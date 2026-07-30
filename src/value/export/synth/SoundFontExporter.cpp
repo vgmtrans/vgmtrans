@@ -712,10 +712,6 @@ SynthExportResult buildSoundFont2(const SynthExportInput& input, const SourceSto
                            .requireMono = true,
                            .nonMonoWarning = "Skipping non-mono sample for SoundFont2 export",
                        });
-  // Unlike DLS, an SF2 preset cannot usefully reference an instrument with no
-  // sample zone. Match the format's representable program set here while the
-  // durable bank and DLS export retain sparse empty slots.
-  std::erase_if(instruments, [](const ResolvedSynthInstrument& instrument) { return instrument.regions.empty(); });
   auto samples = sf2Samples(std::move(decodedSamples));
 
   if (samples.empty()) {

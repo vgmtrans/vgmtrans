@@ -1473,29 +1473,6 @@ void performanceMidiRendererResolvesSourceInstrumentIdentityAtExport() {
                          ModulationConversionPolicy::SynthModulators, instrumentSets);
   expect(std::get<BankSelect>(mmaMidi.tracks[0].events[1]).bank == 3,
          "MSB/LSB MIDI lowering should retain the logical collection instrument bank");
-
-  auto partialPerformance = performance;
-  auto& bankOnly = std::get<InstrumentPerformanceEvent>(partialPerformance.tracks[0].events.front());
-  bankOnly.selectsProgram = false;
-  auto programOnly = bankOnly;
-  programOnly.header.tick = 1;
-  programOnly.selectsBank = false;
-  programOnly.selectsProgram = true;
-  partialPerformance.tracks[0].events.push_back(programOnly);
-  const MidiSequence partialMidi =
-      renderMidiSequence(partialPerformance, {}, ModulationConversionPolicy::SynthModulators, instrumentSets);
-  const auto partialBank =
-      std::ranges::find_if(partialMidi.tracks[0].events, [](const MidiEvent& event) {
-        return std::holds_alternative<BankSelect>(event);
-      });
-  const auto partialProgram =
-      std::ranges::find_if(partialMidi.tracks[0].events, [](const MidiEvent& event) {
-        const auto* program = std::get_if<ProgramChange>(&event);
-        return program != nullptr && program->tick == 1;
-      });
-  expect(partialBank != partialMidi.tracks[0].events.end() &&
-             partialProgram != partialMidi.tracks[0].events.end(),
-         "identity-based lowering should preserve separate bank and program command timing");
 }
 
 void performanceMidiRendererQuantizesPitchBendAndPortamento() {

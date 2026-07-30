@@ -25,7 +25,6 @@
 #include <exception>
 #include <filesystem>
 #include <iterator>
-#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -108,8 +107,8 @@ struct PreparedExport {
   std::vector<const InstrumentSetAsset*> instrumentSets;
   std::vector<const SampleCollectionAsset*> sampleCollections;
   PreparedExportDiagnostics diagnostics;
-  std::unique_ptr<SequenceProgramAsset> ownedSequenceProgram;
   std::vector<InstrumentSetAsset> ownedInstrumentSets;
+  FinalizeCollectionPerformance finalizePerformance;
 };
 
 [[nodiscard]] PreparedExport prepareCollectionExport(const SessionSnapshot& snapshot, CollectionId id,
@@ -174,10 +173,7 @@ struct PreparedExport {
       prepared.diagnostics.instrumentSets.insert(prepared.diagnostics.instrumentSets.end(),
                                                  std::make_move_iterator(result.diagnostics.begin()),
                                                  std::make_move_iterator(result.diagnostics.end()));
-      if (result.replacementSequence) {
-        prepared.ownedSequenceProgram = std::make_unique<SequenceProgramAsset>(std::move(*result.replacementSequence));
-        prepared.sequenceProgram = prepared.ownedSequenceProgram.get();
-      }
+      prepared.finalizePerformance = std::move(result.finalizePerformance);
       prepared.ownedInstrumentSets = std::move(result.replacementInstrumentSets);
       prepared.instrumentSets.reserve(prepared.ownedInstrumentSets.size());
       for (const auto& instrumentSet : prepared.ownedInstrumentSets) {
@@ -200,7 +196,8 @@ struct SequenceRenderResult {
 
 [[nodiscard]] SequenceRenderResult renderSequence(const SequenceProgramAsset& sequence,
                                                   const SequenceDialectRegistry& dialects, LoopPolicy loopPolicy,
-                                                  u32 sequenceLoops) {
+                                                  u32 sequenceLoops,
+                                                  const FinalizeCollectionPerformance* finalizePerformance = nullptr) {
   const auto* dialect = dialects.find(sequence.program.dialect.value);
   if (dialect == nullptr) {
     return SequenceRenderResult{
@@ -214,6 +211,9 @@ struct SequenceRenderResult {
                                     .sequenceLoops = sequenceLoops,
                                 })
                          .render(sequence.program, *dialect);
+  if (finalizePerformance != nullptr && *finalizePerformance) {
+    (*finalizePerformance)(performance);
+  }
   auto modulation = analyzeSequenceModulation(performance);
   return SequenceRenderResult{
       .performance = std::move(performance),
@@ -234,7 +234,8 @@ struct SequenceRenderResult {
     };
   }
 
-  return renderSequence(*prepared.sequenceProgram, dialects, request.loopPolicy, request.sequenceLoops);
+  return renderSequence(*prepared.sequenceProgram, dialects, request.loopPolicy, request.sequenceLoops,
+                        &prepared.finalizePerformance);
 }
 
 [[nodiscard]] std::optional<MidiSequence> renderMidi(const SequenceRenderResult& rendering,

@@ -12,6 +12,7 @@
 #include "value/sequence/SequenceDialect.h"
 
 #include <optional>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -88,7 +89,24 @@ struct SegSatScannedBank {
 struct SegSatBankBinding {
   SegSatBankLayout layout;
   u8 sourceBank = 0;
-  u8 exportBank = 0;
+};
+
+struct SegSatVelocityRegion {
+  u8 keyLow = 0;
+  u8 keyHigh = 127;
+  u8 table = 0;
+  u8 totalLevel = 0;
+};
+
+struct SegSatVelocityInstrument {
+  s8 volumeBias = 0;
+  std::vector<SegSatVelocityRegion> regions;
+};
+
+struct SegSatVelocityBank {
+  u8 sourceBank = 0;
+  std::vector<SegSatVlTable> tables;
+  std::vector<SegSatVelocityInstrument> instruments;
 };
 
 // Mega Man 8's driver converts a VL-table result into the MIDI velocity used
@@ -102,8 +120,12 @@ struct SegSatBankBinding {
 [[nodiscard]] std::optional<SegSatScannedBank> addSegSatBank(core::ScanResultBuilder& builder,
                                                              const SegSatBankLayout& layout,
                                                              SegSatDriverVersion version, u8 exportBank);
-[[nodiscard]] std::vector<u8> makeSegSatVelocityContext(core::ByteReader reader,
-                                                        const std::vector<SegSatBankBinding>& banks);
+// VL tables live in the instrument bank rather than the sequence. Collection
+// preparation reads this typed, format-local context once, then applies it to
+// the transient performance after the standalone sequence VM has rendered.
+[[nodiscard]] std::vector<SegSatVelocityBank> readSegSatVelocityBanks(core::ByteReader reader,
+                                                                      const std::vector<SegSatBankBinding>& banks);
+void applySegSatVelocityTables(core::PerformanceSequence& performance, std::span<const SegSatVelocityBank> banks);
 
 [[nodiscard]] core::SequenceProgram parseSegSatSequenceProgram(core::ByteReader reader, core::AssetId id,
                                                                const SegSatSequenceLayout& layout,

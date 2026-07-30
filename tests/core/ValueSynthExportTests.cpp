@@ -55,6 +55,23 @@ void ndsImaAdpcmDecoderRejectsInvalidInitialIndex() {
          "NDS IMA ADPCM decoder should reject initial predictor indexes outside the step table");
 }
 
+void pcm16DecoderHonorsExplicitByteOrder() {
+  const Sample littleEndian{
+      .codec = AudioCodec::PcmS16,
+      .encodedData = SourceRange{.source = SourceId{0}, .offset = 0, .size = 4},
+  };
+  Sample bigEndian = littleEndian;
+  bigEndian.bigEndian = true;
+
+  const std::vector<u8> bytes{0x12, 0x34, 0xfe, 0xdc};
+  const auto little = decodeSample(littleEndian, bytes);
+  const auto big = decodeSample(bigEndian, bytes);
+  expect(little && little->pcm == std::vector<s16>({0x3412, -8962}),
+         "PCM16 should retain the default little-endian decoding");
+  expect(big && big->pcm == std::vector<s16>({0x1234, -292}),
+         "PCM16 should honor source-declared big-endian byte order");
+}
+
 void envelopePredicateDetectsCanonicalData() {
   expect(!hasExplicitEnvelope(Envelope{}), "empty envelope should not report explicit envelope data");
 
@@ -122,6 +139,52 @@ void fixedPhysicalLfoValuesNeedNoZeroRangeModulators() {
                   modulator.destination == SynthDestination::VibratoDelay;
          }),
          "fixed physical depth, rate, and delay should live entirely in synth base generators");
+}
+
+void regionModulationExportsAtTheRegionScope() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "region-lfo.pcm"}, {0});
+  const SampleCollectionAsset samples{
+      .metadata = AssetMetadata{.id = AssetId{2}, .format = "Probe", .name = "Samples"},
+      .samples = SampleCollection{.samples = {Sample{
+                                      .name = "Zero",
+                                      .codec = AudioCodec::PcmS8,
+                                      .encodedData = SourceRange{.source = source, .offset = 0, .size = 1},
+                                      .sampleRate = 16000,
+                                  }}},
+  };
+  const InstrumentSetAsset instruments{
+      .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe", .name = "Instruments"},
+      .instruments = {Instrument{
+          .name = "Layered LFO",
+          .regions = {Region{
+              .sample = SampleRef{.collection = samples.metadata.id, .index = 0},
+              .modulation =
+                  InstrumentModulation{
+                      .vibrato =
+                          VibratoSpec{
+                              .maxDepthCents = 7.0,
+                              .rateHertz = {.minimum = 0.17, .maximum = 0.17},
+                              .depthMode = ModulationDepthMode::Fixed,
+                          },
+                  },
+          }},
+      }},
+  };
+  const std::array<const InstrumentSetAsset*, 1> instrumentSets{&instruments};
+  const std::array<const SampleCollectionAsset*, 1> sampleCollections{&samples};
+  const SynthExportInput input{
+      .name = "Region LFO",
+      .instrumentSets = instrumentSets,
+      .sampleCollections = sampleCollections,
+  };
+
+  const auto soundFont = buildSoundFont2(input, sources);
+  const auto dls = buildDls(input, sources);
+  expect(soundFont.diagnostics.empty() && soundFontIgenContainsAmount(soundFont.bytes, 6, 7),
+         "SoundFont should write a fixed region vibrato depth into that region's generator zone");
+  expect(dls.diagnostics.empty() && dlsArt2ContainsConnection(dls.bytes, 0x0009, 0x0003, 7 * 65536),
+         "DLS should write a fixed region vibrato depth into that region's articulation list");
 }
 
 void wavExporterWritesPcm16RiffFile() {
@@ -708,8 +771,65 @@ PreparedCollectionAssets prepareReplacementInstrumentSet(const CollectionPrepare
   };
 }
 
+PreparedCollectionAssets preparePerformanceFinalizer(const CollectionPrepareContext&) {
+  return PreparedCollectionAssets{
+      .finalizePerformance =
+          [](PerformanceSequence& performance) {
+            for (auto& track : performance.tracks) {
+              for (auto& event : track.events) {
+                if (auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+                  note->linearVelocity = 0.25;
+                }
+              }
+            }
+          },
+  };
+}
+
 ScanResult scanNoSources(const ScanInput&) {
   return {};
+}
+
+void collectionPreparationFinalizesTransientPerformance() {
+  const SequenceDialect dialect = probeSequenceDialect();
+  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgramBuilder trackBuilder(track);
+  const std::array<u8, 3> noteBytes{0x90, 0x3c, 0x04};
+  const std::array<u8, 1> endBytes{0xff};
+  addProbeCommand<ProbeNoteCommand>(trackBuilder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeEndCommand>(trackBuilder, dialect, Address{3}, probeRange(3, endBytes.size()), endBytes);
+
+  const SequenceProgramAsset sequence{
+      .metadata = AssetMetadata{.id = AssetId{0}, .format = "Performance Finalizer", .name = "Sequence"},
+      .program = SequenceProgram{.dialect = dialect.id, .timebase = dialect.timebase, .tracks = {track}},
+  };
+  test::SessionSnapshotBuilder builder;
+  builder.assets.emplace_back(sequence);
+  builder.collections.push_back(Collection{
+      .id = CollectionId{0},
+      .key = CollectionKey{.resolver = "Performance Finalizer", .value = "one"},
+      .name = "Performance Finalizer",
+      .sequence = sequence.metadata.id,
+  });
+
+  FormatRegistry formats;
+  formats.add(FormatModule{
+      .name = "Performance Finalizer",
+      .scan = scanNoSources,
+      .prepareCollection = preparePerformanceFinalizer,
+  });
+  formats.seal();
+  SequenceDialectRegistry dialects;
+  dialects.add(dialect);
+  const CollectionPlayback playback = prepareCollectionPlayback(builder.finish(), SourceStore{}, CollectionId{0},
+                                                                PlaybackRequest{}, dialects, &formats);
+  const auto note = std::ranges::find_if(playback.performance.tracks.front().events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<NotePerformanceEvent>(event);
+  });
+  const auto* rendered =
+      note == playback.performance.tracks.front().events.end() ? nullptr : std::get_if<NotePerformanceEvent>(&*note);
+  expect(rendered != nullptr && rendered->linearVelocity == 0.25,
+         "collection preparation should enrich the transient performance without replacing the durable program");
 }
 
 void collectionPreparationReplacesDurableInstrumentSets() {
@@ -1056,14 +1176,17 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
 void runValueSynthExportTests() {
   snesBrrDecoderProducesPcm();
   ndsImaAdpcmDecoderRejectsInvalidInitialIndex();
+  pcm16DecoderHonorsExplicitByteOrder();
   envelopePredicateDetectsCanonicalData();
   physicalModulationLowersToLegacySynthControls();
   fixedPhysicalLfoValuesNeedNoZeroRangeModulators();
+  regionModulationExportsAtTheRegionScope();
   wavExporterWritesPcm16RiffFile();
   soundFontExporterWritesSfbkRiffFile();
   dlsExporterWritesDlsRiffFile();
   standaloneSynthExportsKeepNativeModulation();
   collectionSynthExportsCanExportOnlyUsedInstruments();
+  collectionPreparationFinalizesTransientPerformance();
   collectionPreparationReplacesDurableInstrumentSets();
   synthOnlyExportSkipsSequencesWithoutModulation();
   exportDiagnosticsPreserveSourceRanges();

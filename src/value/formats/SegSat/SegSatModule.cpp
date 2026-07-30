@@ -9,9 +9,8 @@
 #include <fmt/format.h>
 
 #include <algorithm>
-#include <array>
 #include <cstddef>
-#include <map>
+#include <limits>
 #include <optional>
 #include <string>
 #include <utility>
@@ -132,15 +131,33 @@ struct BankAssets {
 }
 
 [[nodiscard]] std::vector<u8> sequenceBankAliases(const SequenceProgram& program) {
-  constexpr std::array<u8, 4> signature{'S', 'B', 'R', '1'};
-  const auto& bytes = program.config.driverData;
-  if (bytes.size() < signature.size() ||
-      !std::equal(signature.begin(), signature.end(), bytes.begin())) {
-    return {0};
+  std::vector<u8> aliases;
+  for (const auto& track : program.tracks) {
+    for (const auto& command : track.commands) {
+      const auto bank =
+          std::ranges::find(command.operands, SemanticOperandRole::InstrumentBank, &SemanticOperand::role);
+      if (bank == command.operands.end()) {
+        continue;
+      }
+      const auto* value = std::get_if<u64>(&bank->value);
+      if (value == nullptr || *value > std::numeric_limits<u8>::max()) {
+        continue;
+      }
+      const u8 alias = static_cast<u8>(*value);
+      if (std::ranges::find(aliases, alias) == aliases.end()) {
+        aliases.push_back(alias);
+      }
+    }
   }
-  std::vector<u8> aliases(bytes.begin() + static_cast<std::ptrdiff_t>(signature.size()), bytes.end());
+
+  // A stream without an explicit command starts on Saturn bank zero.
   if (aliases.empty()) {
     aliases.push_back(0);
+  } else {
+    // Collection discovery stores referenced banks in numeric order. Keep the
+    // reconstructed aliases in that same order so each selected instrument
+    // set is rebound to the source bank that caused it to be attached.
+    std::ranges::sort(aliases);
   }
   return aliases;
 }
@@ -202,15 +219,15 @@ struct BankAssets {
     bindings.push_back(SegSatBankBinding{
         .layout = *layout,
         .sourceBank = sourceBank,
-        .exportBank = exportBank,
     });
   }
 
-  SequenceProgramAsset replacement = *sequence;
   if (!bindings.empty() && bindingSource && context.sources.contains(*bindingSource)) {
-    replacement.program.config.driverData = makeSegSatVelocityContext(context.sources.reader(*bindingSource), bindings);
+    auto velocityBanks = readSegSatVelocityBanks(context.sources.reader(*bindingSource), bindings);
+    prepared.finalizePerformance = [velocityBanks = std::move(velocityBanks)](PerformanceSequence& performance) {
+      applySegSatVelocityTables(performance, velocityBanks);
+    };
   }
-  prepared.replacementSequence = std::move(replacement);
   return prepared;
 }
 

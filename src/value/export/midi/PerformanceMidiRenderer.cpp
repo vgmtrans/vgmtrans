@@ -246,8 +246,6 @@ void addPan(MidiTrack& track, MidiControllerState* state, u64 tick, u8 channel, 
 struct MidiInstrumentSelection {
   InstrumentAddress address;
   bool forceBankSelect = false;
-  bool selectsBank = true;
-  bool selectsProgram = true;
   // Direct performance events already use MIDI's packed 14-bit bank space.
   // Addresses resolved from synth instruments are logical preset banks and
   // still need to be lowered for the selected MIDI bank convention.
@@ -260,8 +258,6 @@ struct MidiInstrumentSelection {
     return MidiInstrumentSelection{
         .address = resolveInstrumentAddress(InstrumentAddress{.bank = event.bank, .program = event.program}, {}),
         .forceBankSelect = event.forceBankSelect,
-        .selectsBank = event.selectsBank,
-        .selectsProgram = event.selectsProgram,
         .logicalBank = false,
     };
   }
@@ -277,8 +273,6 @@ struct MidiInstrumentSelection {
       return MidiInstrumentSelection{
           .address = resolveInstrumentAddress(found->explicitAddress, found->identity),
           .forceBankSelect = true,
-          .selectsBank = event.selectsBank,
-          .selectsProgram = event.selectsProgram,
           .logicalBank = true,
       };
     }
@@ -289,8 +283,6 @@ struct MidiInstrumentSelection {
   return MidiInstrumentSelection{
       .address = resolveInstrumentAddress({}, event.sourceInstrument),
       .forceBankSelect = true,
-      .selectsBank = event.selectsBank,
-      .selectsProgram = event.selectsProgram,
       .logicalBank = true,
   };
 }
@@ -986,7 +978,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           // once and written to the first MIDI track by renderMidiSequence.
         } else if constexpr (std::is_same_v<TypedEvent, InstrumentPerformanceEvent>) {
           const auto selection = instrumentSelection(typedEvent, instrumentSets);
-          if (selection.selectsBank && (selection.address.bank != 0 || selection.forceBankSelect)) {
+          if (selection.address.bank != 0 || selection.forceBankSelect) {
             track.events.push_back(BankSelect{
                 .tick = typedEvent.header.tick,
                 .channel = channel,
@@ -994,13 +986,11 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                 .writeLsb = writeBankSelectLsb(options),
             });
           }
-          if (selection.selectsProgram) {
-            track.events.push_back(ProgramChange{
-                .tick = typedEvent.header.tick,
-                .channel = channel,
-                .program = data7(selection.address.program),
-            });
-          }
+          track.events.push_back(ProgramChange{
+              .tick = typedEvent.header.tick,
+              .channel = channel,
+              .program = data7(selection.address.program),
+          });
         } else if constexpr (std::is_same_v<TypedEvent, LevelPerformanceEvent>) {
           addVolume(track, automationState, typedEvent.header.tick, channel, typedEvent.linearGain,
                     typedEvent.precisionHint, options, typedEvent.sourceQuantization);

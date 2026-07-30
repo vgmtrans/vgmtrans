@@ -3245,6 +3245,15 @@ bool compareDls(std::span<const u8> legacyBytes, std::span<const u8> valueBytes,
     for (auto& instrument : value.instruments) {
       instrument.bank = 0;
     }
+    // DLS can represent a program with no playable region, but exporting that
+    // placeholder is not useful and shared synth preparation intentionally
+    // omits it. Compare the playable instrument set on both paths.
+    const auto removeEmptyInstruments = [](NormalizedDls& dls) {
+      std::erase_if(dls.instruments,
+                    [](const DlsInstrumentSummary& instrument) { return instrument.regions.empty(); });
+    };
+    removeEmptyInstruments(legacy);
+    removeEmptyInstruments(value);
   }
   if (normalizeCpsPlaceholders) {
     const auto normalizeCpsDls = [](NormalizedDls& dls) {
@@ -4247,7 +4256,41 @@ bool compareMidi(std::span<const u8> legacyBytes, std::span<const u8> valueBytes
     const bool soleBankWasRemapped = std::ranges::none_of(valueMidi.events, [](const NormalizedMidiEvent& event) {
       return event.kind == "control" && (event.a == 0 || event.a == 32) && event.b != 0;
     });
-    const auto normalize = [soleBankWasRemapped](std::vector<NormalizedMidiEvent>& events) {
+    const auto normalize = [soleBankWasRemapped](std::vector<NormalizedMidiEvent>& events,
+                                                 bool valuePerformanceIsAtomic) {
+      // A SegSat bank command changes only the source bank register. The value
+      // performance emits the complete effective instrument selection so MIDI
+      // receives the Program Change needed to activate that bank immediately.
+      // For parity, discard only a Program Change paired with a bank write when
+      // it repeats the program that was already active on that track/channel.
+      using InstrumentPosition = std::tuple<u32, u64, u8>;
+      std::set<InstrumentPosition> bankSelectPositions;
+      for (const auto& event : events) {
+        if (event.kind == "control" && (event.a == 0 || event.a == 32)) {
+          bankSelectPositions.insert(InstrumentPosition{event.track, event.tick, event.channel});
+        }
+      }
+      if (valuePerformanceIsAtomic) {
+        std::map<std::pair<u32, u8>, u32> activeProgram;
+        std::erase_if(events, [&](const NormalizedMidiEvent& event) {
+          if (event.kind != "program") {
+            return false;
+          }
+          const auto channel = std::pair{event.track, event.channel};
+          const auto previousProgram = activeProgram.find(channel);
+          const u32 previous = previousProgram == activeProgram.end() ? 0 : previousProgram->second;
+          const InstrumentPosition position{event.track, event.tick, event.channel};
+          const bool bankReactivation = bankSelectPositions.contains(position) && event.a == previous;
+          activeProgram.insert_or_assign(channel, event.a);
+          if (bankReactivation) {
+            // Consume the bank command: a separate source Program Change at
+            // the same tick remains observable and comparable with legacy.
+            bankSelectPositions.erase(position);
+          }
+          return bankReactivation;
+        });
+      }
+
       // Collection export remaps a sole Saturn source bank to destination bank
       // zero. Legacy leaves one inconsistent source-bank LSB behind, while the
       // value preparation applies the remap to sequence and instruments alike.
@@ -4334,8 +4377,8 @@ bool compareMidi(std::span<const u8> legacyBytes, std::span<const u8> valueBytes
         event.channel = 0;
       }
     };
-    normalize(legacyMidi.events);
-    normalize(valueMidi.events);
+    normalize(legacyMidi.events, false);
+    normalize(valueMidi.events, true);
 
     // A zero-duration Saturn note whose MM8 VL conversion reaches MIDI
     // velocity one is silent, but the legacy MIDI path writes both of its

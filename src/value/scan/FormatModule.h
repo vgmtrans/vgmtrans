@@ -10,13 +10,14 @@
 #include "value/scan/ScanTypes.h"
 
 #include <functional>
-#include <optional>
 #include <span>
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace vgmtrans::core {
+
+struct PerformanceSequence;
 
 // Lightweight read-only view used while rebuilding collections. It borrows the
 // source store and cheaply shares the Session's immutable asset and fact views
@@ -42,14 +43,16 @@ struct CollectionPrepareContext {
   const Collection& collection;
 };
 
+// Some sequence semantics depend on assets selected by a collection. Formats
+// may enrich the transient rendered performance here, after VM execution and
+// before modulation analysis or target-specific export.
+using FinalizeCollectionPerformance = std::function<void(PerformanceSequence&)>;
+
 struct PreparedCollectionAssets {
-  // A collection may supply source-driver context that is unavailable when a
-  // sequence is scanned alone. The replacement remains transient, just like a
-  // prepared instrument set, and keeps the durable parsed asset inspectable.
-  std::optional<SequenceProgramAsset> replacementSequence;
   // When a format prepares a collection, these are the complete instrument
   // sets to use for that collection, replacing its durable scanned sets.
   std::vector<InstrumentSetAsset> replacementInstrumentSets;
+  FinalizeCollectionPerformance finalizePerformance;
   std::vector<Diagnostic> diagnostics;
 };
 

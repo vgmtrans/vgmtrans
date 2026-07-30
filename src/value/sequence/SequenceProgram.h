@@ -359,14 +359,6 @@ struct SequenceProgramBehavior {
   std::optional<double> initialReverbSend;
   std::optional<u8> initialMonoModeChannels;
   std::optional<u8> initialPitchBendRangeSemitones;
-  // A coordinated play-once boundary normally silences every track exactly at
-  // the boundary. Drivers which stop fetching commands but let already-started
-  // voices finish can retain those note tails.
-  bool clipNotesAtSequenceEnd = true;
-  // Parallel views of one interleaved source stream all encounter the same
-  // loop. The first view to finish its requested passes can therefore end the
-  // sequence without waiting for every view to rediscover that boundary.
-  bool firstTrackLoopEndsSequence = false;
   // Zero means "use the next default": program -> dialect -> MIDI's 120 BPM.
   // The resolved source tempo also governs tempo-relative effects before the
   // first explicit tempo command.
@@ -379,10 +371,6 @@ struct SequenceProgramConfig {
   u32 profile = 0;
   // Format-defined state captured alongside the sequence.
   u32 driverState = 0;
-  // Variable-sized source-driver context belongs to the immutable program,
-  // rather than a registry or live collection object. Most formats leave this
-  // empty; collection preparation may fill it on a transient replacement.
-  std::vector<u8> driverData;
 };
 
 struct SequenceProgram {

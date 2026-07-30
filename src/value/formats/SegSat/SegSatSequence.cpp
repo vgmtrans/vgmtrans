@@ -15,7 +15,6 @@
 #include <cmath>
 #include <limits>
 #include <optional>
-#include <span>
 #include <string_view>
 #include <utility>
 
@@ -25,144 +24,8 @@ using namespace core;
 
 namespace {
 
-struct VelocityRegion {
-  u8 keyLow = 0;
-  u8 keyHigh = 127;
-  u8 table = 0;
-  u8 totalLevel = 0;
-};
-
-struct VelocityInstrument {
-  s8 volumeBias = 0;
-  std::vector<VelocityRegion> regions;
-};
-
-struct VelocityBank {
-  u8 sourceNumber = 0;
-  u8 exportNumber = 0;
-  std::vector<SegSatVlTable> tables;
-  std::vector<VelocityInstrument> instruments;
-};
-
-[[nodiscard]] std::optional<u16> takeU16(std::span<const u8> bytes, size_t& offset) {
-  if (offset > bytes.size() || bytes.size() - offset < 2) {
-    return std::nullopt;
-  }
-  const u16 value = static_cast<u16>(bytes[offset] | (static_cast<u16>(bytes[offset + 1]) << 8));
-  offset += 2;
-  return value;
-}
-
-[[nodiscard]] std::vector<VelocityBank> decodeVelocityContext(std::span<const u8> bytes) {
-  std::vector<VelocityBank> banks;
-  if (bytes.size() < 6 || !std::equal(bytes.begin(), bytes.begin() + 4, std::string_view("SVL2").begin())) {
-    return banks;
-  }
-  size_t offset = 4;
-  const auto bankCount = takeU16(bytes, offset);
-  if (!bankCount) {
-    return banks;
-  }
-  for (u32 bankIndex = 0; bankIndex < *bankCount; ++bankIndex) {
-    if (offset > bytes.size() || bytes.size() - offset < 2) {
-      return {};
-    }
-    VelocityBank bank{
-        .sourceNumber = bytes[offset],
-        .exportNumber = bytes[offset + 1],
-    };
-    offset += 2;
-    const auto tableCount = takeU16(bytes, offset);
-    if (!tableCount || offset > bytes.size() || static_cast<size_t>(*tableCount) * 10 > bytes.size() - offset) {
-      return {};
-    }
-    bank.tables.reserve(*tableCount);
-    for (u32 tableIndex = 0; tableIndex < *tableCount; ++tableIndex) {
-      const u8* row = bytes.data() + offset;
-      bank.tables.push_back(SegSatVlTable{
-          .rate0 = row[0],
-          .point0 = row[1],
-          .level0 = row[2],
-          .rate1 = row[3],
-          .point1 = row[4],
-          .level1 = row[5],
-          .rate2 = row[6],
-          .point2 = row[7],
-          .level2 = row[8],
-          .rate3 = row[9],
-      });
-      offset += 10;
-    }
-    const auto instrumentCount = takeU16(bytes, offset);
-    if (!instrumentCount) {
-      return {};
-    }
-    bank.instruments.reserve(*instrumentCount);
-    for (u32 instrumentIndex = 0; instrumentIndex < *instrumentCount; ++instrumentIndex) {
-      if (offset > bytes.size() || bytes.size() - offset < 2) {
-        return {};
-      }
-      VelocityInstrument instrument{
-          .volumeBias = static_cast<s8>(bytes[offset]),
-      };
-      const u8 regionCount = bytes[offset + 1];
-      offset += 2;
-      if (offset > bytes.size() || static_cast<size_t>(regionCount) * 4 > bytes.size() - offset) {
-        return {};
-      }
-      instrument.regions.reserve(regionCount);
-      for (u32 regionIndex = 0; regionIndex < regionCount; ++regionIndex) {
-        instrument.regions.push_back(VelocityRegion{
-            .keyLow = bytes[offset],
-            .keyHigh = bytes[offset + 1],
-            .table = bytes[offset + 2],
-            .totalLevel = bytes[offset + 3],
-        });
-        offset += 4;
-      }
-      bank.instruments.push_back(std::move(instrument));
-    }
-    banks.push_back(std::move(bank));
-  }
-  return banks;
-}
-
 struct ProgramState {
-  explicit ProgramState(const SequenceProgram& program)
-      : banks(decodeVelocityContext(program.config.driverData)),
-        referencedBankCount(static_cast<u8>(std::min<u32>(program.config.driverState, 255))) {}
-
-  [[nodiscard]] u8 velocity(u8 bankNumber, u8 program, u8 key, u8 sourceVelocity) const {
-    const VelocityBank* bank = nullptr;
-    const auto found = std::ranges::find(banks, bankNumber, &VelocityBank::sourceNumber);
-    if (found != banks.end()) {
-      bank = &*found;
-    } else if (banks.size() == 1) {
-      bank = &banks.front();
-    }
-    if (bank == nullptr || program >= bank->instruments.size()) {
-      return sourceVelocity;
-    }
-    const auto& instrument = bank->instruments[program];
-    const auto region = std::ranges::find_if(instrument.regions, [&](const VelocityRegion& candidate) {
-      return key >= candidate.keyLow && key <= candidate.keyHigh;
-    });
-    if (region == instrument.regions.end() || region->table >= bank->tables.size()) {
-      return sourceVelocity;
-    }
-    return segSatMidiVelocity(sourceVelocity, bank->tables[region->table], region->totalLevel, instrument.volumeBias);
-  }
-
-  [[nodiscard]] u8 exportBank(u8 sourceBank) const {
-    const auto found = std::ranges::find(banks, sourceBank, &VelocityBank::sourceNumber);
-    if (found != banks.end()) {
-      return found->exportNumber;
-    }
-    if (banks.size() == 1) {
-      return banks.front().exportNumber;
-    }
-    return sourceBank;
-  }
+  explicit ProgramState(const SequenceProgram&) {}
 
   void finalizePerformance(PerformanceSequence& performance) {
     if (performance.tracks.size() != 17) {
@@ -214,9 +77,6 @@ struct ProgramState {
     });
     performance.tracks = std::move(channels);
   }
-
-  std::vector<VelocityBank> banks;
-  u8 referencedBankCount = 0;
 };
 
 struct TrackState {
@@ -236,7 +96,6 @@ struct Playback {
   TrackState& track;
   PerformanceEmitter& out;
   VmApi& vm;
-  ProgramState& program;
 
   [[nodiscard]] u64 eventTick(u16 delta) const {
     return vm.tick() > std::numeric_limits<u64>::max() - delta ? std::numeric_limits<u64>::max() : vm.tick() + delta;
@@ -259,8 +118,7 @@ struct Playback {
     duration = static_cast<u16>(duration + track.durationExtension);
     track.durationExtension = 0;
     if (channel == track.channel) {
-      const u8 resolved = program.velocity(track.bank, track.program, key, velocity);
-      out.at(eventTick(delta)).note(key, LevelScale::linearFromMidi7(resolved), duration);
+      out.at(eventTick(delta)).note(key, LevelScale::linearFromMidi7(velocity), duration);
     }
     return afterEvent(delta);
   }
@@ -292,20 +150,12 @@ struct Playback {
           break;
         case 32:
           track.bank = value;
-          // Collection preparation may remap a sole source bank to export bank
-          // zero. Keep multi-bank commands observable, but omit a remapped
-          // zero selection that cannot change the destination instrument.
-          if (const u8 exportBank = program.exportBank(track.bank);
-              program.referencedBankCount > 1 || exportBank != 0) {
-            delayed.instrument(InstrumentPerformanceEvent{
-                .bank = exportBank,
-                .program = track.program,
-                .forceBankSelect = true,
-                .selectsBank = true,
-                .selectsProgram = false,
-                .sourceInstrument = segSatInstrumentIdentity(track.bank, track.program),
-            });
-          }
+          // The source command changes one register, but downstream targets
+          // need the complete effective selection. Emitting it atomically also
+          // activates the new bank when the program number itself is unchanged.
+          delayed.instrument(InstrumentPerformanceEvent{
+              .sourceInstrument = segSatInstrumentIdentity(track.bank, track.program),
+          });
           break;
         case 91:
           delayed.reverb(value / 127.0);
@@ -323,16 +173,10 @@ struct Playback {
   Effects programChange(u8 channel, u8 encodedProgram, u16 delta) {
     if (channel == track.channel) {
       track.program = encodedProgram & 0x7f;
-      if (encodedProgram < 0x80) {
-        out.at(eventTick(delta))
-            .instrument(InstrumentPerformanceEvent{
-                .bank = program.exportBank(track.bank),
-                .program = track.program,
-                .selectsBank = false,
-                .selectsProgram = true,
-                .sourceInstrument = segSatInstrumentIdentity(track.bank, track.program),
-            });
-      }
+      out.at(eventTick(delta))
+          .instrument(InstrumentPerformanceEvent{
+              .sourceInstrument = segSatInstrumentIdentity(track.bank, track.program),
+          });
     }
     return afterEvent(delta);
   }
@@ -418,7 +262,8 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
     const u8 channel = event.opcodeBits<0, 4>("channel");
     const u8 controller = event.u8("controller");
     const u8 encoded = event.u8("encoded_value");
-    const u8 value = event.derived("value", static_cast<u8>(encoded & 0x7f), SemanticOperandRole::Level);
+    const auto valueRole = controller == 32 ? SemanticOperandRole::InstrumentBank : SemanticOperandRole::Level;
+    const u8 value = event.derived("value", static_cast<u8>(encoded & 0x7f), valueRole);
     const u16 delta = static_cast<u16>(((encoded & 0x80) << 1) | event.u8("delta_low"));
     return event.invoke<&Playback::controller>(channel, controller, value, delta).runtimeControlFlow();
   }
@@ -497,6 +342,54 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
 
 }  // namespace
 
+void applySegSatVelocityTables(PerformanceSequence& performance, std::span<const SegSatVelocityBank> banks) {
+  for (auto& track : performance.tracks) {
+    u8 selectedBank = 0;
+    u8 selectedProgram = 0;
+    for (auto& event : track.events) {
+      if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event);
+          selection != nullptr && selection->sourceInstrument &&
+          selection->sourceInstrument->domain == kSegSatInstrumentDomain) {
+        selectedBank = static_cast<u8>((selection->sourceInstrument->key >> 8) & 0xff);
+        selectedProgram = static_cast<u8>(selection->sourceInstrument->key & 0xff);
+        continue;
+      }
+
+      auto* note = std::get_if<NotePerformanceEvent>(&event);
+      if (note == nullptr) {
+        continue;
+      }
+
+      const SegSatVelocityBank* bank = nullptr;
+      const auto selected = std::ranges::find(banks, selectedBank, &SegSatVelocityBank::sourceBank);
+      if (selected != banks.end()) {
+        bank = &*selected;
+      } else if (banks.size() == 1) {
+        // The driver and legacy matcher both fall back to the sole loaded bank
+        // when the sequence names a bank that is not present in the SSF image.
+        bank = &banks.front();
+      }
+      if (bank == nullptr || selectedProgram >= bank->instruments.size()) {
+        continue;
+      }
+
+      const auto& instrument = bank->instruments[selectedProgram];
+      const u8 key = static_cast<u8>(std::clamp<long>(std::lround(note->key), 0, 127));
+      const auto region = std::ranges::find_if(instrument.regions, [&](const SegSatVelocityRegion& candidate) {
+        return key >= candidate.keyLow && key <= candidate.keyHigh;
+      });
+      if (region == instrument.regions.end() || region->table >= bank->tables.size()) {
+        continue;
+      }
+
+      const u8 sourceVelocity = LevelScale::midi7FromLinear(note->linearVelocity);
+      const u8 velocity =
+          segSatMidiVelocity(sourceVelocity, bank->tables[region->table], region->totalLevel, instrument.volumeBias);
+      note->linearVelocity = LevelScale::linearFromMidi7(velocity);
+    }
+  }
+}
+
 const SequenceDialect& segSatSequenceDialect() {
   static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
       .id = DialectId{std::string(kSegSatSequenceDialectId)},
@@ -508,8 +401,6 @@ const SequenceDialect& segSatSequenceDialect() {
               // Sequence pan commands are already MIDI-style equal-power
               // positions; SCSP layer output uses its own constant-sum law.
               .panLaw = PanLaw::EqualPower,
-              .clipNotesAtSequenceEnd = false,
-              .firstTrackLoopEndsSequence = true,
           },
   });
   return dialect;
@@ -519,16 +410,8 @@ SequenceProgram parseSegSatSequenceProgram(ByteReader reader, AssetId id, const 
                                            SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   SequenceProgram program = segSatSequenceDialect().makeProgram(Address{layout.offset});
   program.timebase.ppqn = layout.ppqn;
-  program.config.driverState = static_cast<u32>(layout.referencedBanks.size());
-  // Collection preparation needs the source-domain bank aliases even when a
-  // requested bank falls back to another loaded bank's instrument data.
-  program.config.driverData = {'S', 'B', 'R', '1'};
-  program.config.driverData.insert(program.config.driverData.end(), layout.referencedBanks.begin(),
-                                   layout.referencedBanks.end());
   program.behavior.commandLimit = 1048576;
   program.behavior.panLaw = PanLaw::EqualPower;
-  program.behavior.clipNotesAtSequenceEnd = false;
-  program.behavior.firstTrackLoopEndsSequence = true;
 
   std::optional<SourceAnnotationId> header;
   if (sourceMap != nullptr) {

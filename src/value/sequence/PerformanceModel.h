@@ -91,11 +91,6 @@ struct InstrumentPerformanceEvent {
   u32 bank = 0;
   u32 program = 0;
   bool forceBankSelect = false;
-  // MIDI-like source drivers may change the bank and program in separate
-  // commands. Partial selections retain that source timing without inventing
-  // an extra destination program change or bank write.
-  bool selectsBank = true;
-  bool selectsProgram = true;
   std::optional<InstrumentIdentity> sourceInstrument;
 };
 
