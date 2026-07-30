@@ -719,6 +719,10 @@ SynthExportResult buildSoundFont2(const SynthExportInput& input, const SourceSto
     diagnostics.push_back(exportError("No decodable samples available for SoundFont2 export"));
     return SynthExportResult{.diagnostics = std::move(diagnostics)};
   }
+  if (instruments.empty()) {
+    diagnostics.push_back(exportError("No playable instruments available for SoundFont2 export"));
+    return SynthExportResult{.diagnostics = std::move(diagnostics)};
+  }
 
   return SynthExportResult{
       .bytes = makeRiff("sfbk",

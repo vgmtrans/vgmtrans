@@ -557,6 +557,10 @@ SynthExportResult buildDls(const SynthExportInput& input, const SourceStore& sou
     diagnostics.push_back(exportError("No decodable samples available for DLS export"));
     return SynthExportResult{.diagnostics = std::move(diagnostics)};
   }
+  if (instruments.empty()) {
+    diagnostics.push_back(exportError("No playable instruments available for DLS export"));
+    return SynthExportResult{.diagnostics = std::move(diagnostics)};
+  }
 
   auto waves = waveChunks(samples);
   return SynthExportResult{
