@@ -153,9 +153,7 @@ struct Playback {
           // The source command changes one register, but downstream targets
           // need the complete effective selection. Emitting it atomically also
           // activates the new bank when the program number itself is unchanged.
-          delayed.instrument(InstrumentPerformanceEvent{
-              .sourceInstrument = segSatInstrumentIdentity(track.bank, track.program),
-          });
+          delayed.instrument(segSatInstrumentIdentity(track.bank, track.program));
           break;
         case 91:
           delayed.reverb(value / 127.0);
@@ -173,10 +171,7 @@ struct Playback {
   Effects programChange(u8 channel, u8 encodedProgram, u16 delta) {
     if (channel == track.channel) {
       track.program = encodedProgram & 0x7f;
-      out.at(eventTick(delta))
-          .instrument(InstrumentPerformanceEvent{
-              .sourceInstrument = segSatInstrumentIdentity(track.bank, track.program),
-          });
+      out.at(eventTick(delta)).instrument(segSatInstrumentIdentity(track.bank, track.program));
     }
     return afterEvent(delta);
   }
@@ -342,17 +337,49 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
 
 }  // namespace
 
+std::vector<u8> segSatSequenceBanks(const SequenceProgram& program) {
+  std::vector<u8> banks;
+  if (program.tracks.size() > 1) {
+    // Track zero is the tempo stream. Track one is the first copy of the normal
+    // stream; the remaining tracks contain the same commands for other channels.
+    for (const auto& command : program.tracks[1].commands) {
+      const auto bank =
+          std::ranges::find(command.operands, SemanticOperandRole::InstrumentBank, &SemanticOperand::role);
+      if (bank == command.operands.end()) {
+        continue;
+      }
+      const auto* value = std::get_if<u64>(&bank->value);
+      if (value == nullptr || *value > std::numeric_limits<u8>::max()) {
+        continue;
+      }
+      const u8 number = static_cast<u8>(*value);
+      if (std::ranges::find(banks, number) == banks.end()) {
+        banks.push_back(number);
+      }
+    }
+  }
+
+  if (banks.empty()) {
+    banks.push_back(0);
+  } else {
+    // Collections attach banks in numeric order.
+    std::ranges::sort(banks);
+  }
+  return banks;
+}
+
 void applySegSatVelocityTables(PerformanceSequence& performance, std::span<const SegSatVelocityBank> banks) {
   for (auto& track : performance.tracks) {
     u8 selectedBank = 0;
     u8 selectedProgram = 0;
     for (auto& event : track.events) {
       if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event);
-          selection != nullptr && selection->sourceInstrument &&
-          selection->sourceInstrument->domain == kSegSatInstrumentDomain) {
-        selectedBank = static_cast<u8>((selection->sourceInstrument->key >> 8) & 0xff);
-        selectedProgram = static_cast<u8>(selection->sourceInstrument->key & 0xff);
-        continue;
+          selection != nullptr && selection->sourceInstrument) {
+        if (const auto address = decodeSegSatInstrumentIdentity(*selection->sourceInstrument)) {
+          selectedBank = address->sourceBank;
+          selectedProgram = address->program;
+          continue;
+        }
       }
 
       auto* note = std::get_if<NotePerformanceEvent>(&event);
@@ -410,8 +437,6 @@ SequenceProgram parseSegSatSequenceProgram(ByteReader reader, AssetId id, const 
                                            SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   SequenceProgram program = segSatSequenceDialect().makeProgram(Address{layout.offset});
   program.timebase.ppqn = layout.ppqn;
-  program.behavior.commandLimit = 1048576;
-  program.behavior.panLaw = PanLaw::EqualPower;
 
   std::optional<SourceAnnotationId> header;
   if (sourceMap != nullptr) {

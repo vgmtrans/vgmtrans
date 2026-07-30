@@ -10,6 +10,7 @@
 #include "value/scan/ScanTypes.h"
 
 #include <functional>
+#include <optional>
 #include <span>
 #include <string>
 #include <utility>
@@ -43,15 +44,14 @@ struct CollectionPrepareContext {
   const Collection& collection;
 };
 
-// Some sequence semantics depend on assets selected by a collection. Formats
-// may enrich the transient rendered performance here, after VM execution and
-// before modulation analysis or target-specific export.
+// A format can adjust sequence playback using other assets in the collection.
+// This runs after sequence rendering and before modulation analysis or export.
 using FinalizeCollectionPerformance = std::function<void(PerformanceSequence&)>;
 
 struct PreparedCollectionAssets {
-  // When a format prepares a collection, these are the complete instrument
-  // sets to use for that collection, replacing its durable scanned sets.
-  std::vector<InstrumentSetAsset> replacementInstrumentSets;
+  // If set, these replace the collection's original instrument sets. If not
+  // set, the originals are kept. An empty vector removes all instrument sets.
+  std::optional<std::vector<InstrumentSetAsset>> replacementInstrumentSets;
   FinalizeCollectionPerformance finalizePerformance;
   std::vector<Diagnostic> diagnostics;
 };

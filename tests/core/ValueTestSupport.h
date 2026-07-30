@@ -154,46 +154,49 @@ bool soundFontImodContains(const std::vector<u8>& bytes, u16 source, u16 destina
   return false;
 }
 
-bool dlsArt2ContainsConnection(const std::vector<u8>& bytes, u16 destination, s32 expectedScale) {
-  const auto chunkOffset = asciiOffset(bytes, "art2");
-  const auto payloadOffset = chunkOffset + 8;
-  const auto connectionCount = readLe32(bytes, payloadOffset + 4);
-  for (u32 i = 0; i < connectionCount; ++i) {
-    const auto offset = payloadOffset + 8 + (static_cast<size_t>(i) * 12);
-    if (readLe16(bytes, offset + 4) == destination && readLeS32(bytes, offset + 8) == expectedScale) {
-      return true;
+template <typename Match>
+bool dlsArt2Contains(const std::vector<u8>& bytes, Match matches) {
+  auto searchFrom = bytes.begin();
+  constexpr std::string_view chunkId = "art2";
+  while (searchFrom != bytes.end()) {
+    const auto found = std::search(searchFrom, bytes.end(), chunkId.begin(), chunkId.end());
+    if (found == bytes.end()) {
+      return false;
     }
+    const size_t chunkOffset = static_cast<size_t>(std::distance(bytes.begin(), found));
+    if (chunkOffset + 16 <= bytes.size()) {
+      const size_t chunkEnd = std::min(bytes.size(), chunkOffset + 8 + readLe32(bytes, chunkOffset + 4));
+      const size_t connections = readLe32(bytes, chunkOffset + 12);
+      for (size_t offset = chunkOffset + 16, i = 0; i < connections && offset + 12 <= chunkEnd; ++i, offset += 12) {
+        if (matches(offset)) {
+          return true;
+        }
+      }
+    }
+    searchFrom = found + static_cast<std::ptrdiff_t>(chunkId.size());
   }
   return false;
 }
 
+bool dlsArt2ContainsConnection(const std::vector<u8>& bytes, u16 destination, s32 expectedScale) {
+  return dlsArt2Contains(bytes, [&](size_t offset) {
+    return readLe16(bytes, offset + 4) == destination && readLeS32(bytes, offset + 8) == expectedScale;
+  });
+}
+
 bool dlsArt2ContainsConnection(const std::vector<u8>& bytes, u16 source, u16 destination, s32 expectedScale) {
-  const auto chunkOffset = asciiOffset(bytes, "art2");
-  const auto payloadOffset = chunkOffset + 8;
-  const auto connectionCount = readLe32(bytes, payloadOffset + 4);
-  for (u32 i = 0; i < connectionCount; ++i) {
-    const auto offset = payloadOffset + 8 + (static_cast<size_t>(i) * 12);
-    if (readLe16(bytes, offset) == source && readLe16(bytes, offset + 4) == destination &&
-        readLeS32(bytes, offset + 8) == expectedScale) {
-      return true;
-    }
-  }
-  return false;
+  return dlsArt2Contains(bytes, [&](size_t offset) {
+    return readLe16(bytes, offset) == source && readLe16(bytes, offset + 4) == destination &&
+           readLeS32(bytes, offset + 8) == expectedScale;
+  });
 }
 
 bool dlsArt2ContainsConnection(const std::vector<u8>& bytes, u16 source, u16 control, u16 destination,
                                s32 expectedScale) {
-  const auto chunkOffset = asciiOffset(bytes, "art2");
-  const auto payloadOffset = chunkOffset + 8;
-  const auto connectionCount = readLe32(bytes, payloadOffset + 4);
-  for (u32 i = 0; i < connectionCount; ++i) {
-    const auto offset = payloadOffset + 8 + (static_cast<size_t>(i) * 12);
-    if (readLe16(bytes, offset) == source && readLe16(bytes, offset + 2) == control &&
-        readLe16(bytes, offset + 4) == destination && readLeS32(bytes, offset + 8) == expectedScale) {
-      return true;
-    }
-  }
-  return false;
+  return dlsArt2Contains(bytes, [&](size_t offset) {
+    return readLe16(bytes, offset) == source && readLe16(bytes, offset + 2) == control &&
+           readLe16(bytes, offset + 4) == destination && readLeS32(bytes, offset + 8) == expectedScale;
+  });
 }
 
 bool sameRange(SourceRange lhs, SourceRange rhs) {

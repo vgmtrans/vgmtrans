@@ -36,17 +36,19 @@ constexpr std::array<double, 64> kDecayMilliseconds{
     43,     34,     28,     25,     22,    18,    14,    12,    11,    8.5,   7.1,   6.1,   5.4,   4.3,   3.6,   3.1};
 constexpr std::array<double, 8> kDirectLevelAttenuation{1000000.0, 36.0, 30.0, 24.0, 18.0, 12.0, 6.0, 0.0};
 
-struct ParsedRegion {
-  SourceRange range;
-  u8 keyLow = 0;
-  u8 keyHigh = 127;
-  u32 sampleOffset = 0;
-  u32 sampleBytes = 0;
+struct SampleData {
+  u32 offset = 0;
+  u32 bytes = 0;
   u32 loopStartFrames = 0;
   u32 loopLengthFrames = 0;
   bool loops = false;
   bool reverse = false;
   bool pcm16 = false;
+};
+
+struct ParsedRegion {
+  SourceRange range;
+  SampleData sample;
   Region region;
   u8 vlIndex = 0;
   u8 totalLevel = 0;
@@ -62,6 +64,34 @@ struct ParsedInstrument {
 
 [[nodiscard]] bool rangeValid(ByteReader reader, u64 offset, u64 size) {
   return offset <= reader.size() && size <= reader.size() - offset;
+}
+
+[[nodiscard]] std::optional<SampleData> readSampleData(ByteReader reader, const SegSatBankLayout& bank,
+                                                       u32 regionOffset) {
+  const u32 addressAndFlags = reader.be32(regionOffset + 2);
+  const bool pcm16 = ((addressAndFlags >> 20) & 1) == 0;
+  const u32 bytesPerFrame = pcm16 ? 2 : 1;
+  u32 sampleOffset = addressAndFlags & 0x7ffff;
+  if (pcm16) {
+    sampleOffset &= ~1u;
+  }
+  sampleOffset += bank.offset;
+  const u32 loopStartFrames = reader.be16(regionOffset + 6);
+  const u32 loopEndFrames = reader.be16(regionOffset + 8);
+  if (sampleOffset <= bank.offset || sampleOffset >= bank.offset + 0x7fffe || loopEndFrames < loopStartFrames ||
+      !rangeValid(reader, sampleOffset, static_cast<u64>(loopEndFrames) * bytesPerFrame)) {
+    return std::nullopt;
+  }
+  const u8 loopMode = static_cast<u8>((reader.u8At(regionOffset + 3) >> 5) & 3);
+  return SampleData{
+      .offset = sampleOffset,
+      .bytes = loopEndFrames * bytesPerFrame,
+      .loopStartFrames = loopStartFrames,
+      .loopLengthFrames = loopEndFrames - loopStartFrames,
+      .loops = loopMode != 0,
+      .reverse = loopMode == 2,
+      .pcm16 = pcm16,
+  };
 }
 
 [[nodiscard]] Envelope scspEnvelope(u16 adsr1, u16 adsr2) {
@@ -242,20 +272,8 @@ struct PanAndAttenuation {
       const u32 regionOffset = offset + 4 + regionIndex * 0x20;
       const u8 keyLow = reader.u8At(regionOffset);
       const u8 keyHigh = reader.u8At(regionOffset + 1);
-      const u32 addressAndFlags = reader.be32(regionOffset + 2);
-      const bool pcm16 = ((addressAndFlags >> 20) & 1) == 0;
-      const u32 bytesPerFrame = pcm16 ? 2 : 1;
-      u32 sampleOffset = addressAndFlags & 0x7ffff;
-      if (pcm16) {
-        sampleOffset &= ~1u;
-      }
-      sampleOffset += bank.offset;
-      const u32 loopStartFrames = reader.be16(regionOffset + 6);
-      const u32 loopEndFrames = reader.be16(regionOffset + 8);
-      const u8 loopMode = static_cast<u8>((reader.u8At(regionOffset + 3) >> 5) & 3);
-      if (keyLow == 0xff || keyLow > keyHigh || sampleOffset <= bank.offset || sampleOffset >= bank.offset + 0x7fffe ||
-          loopEndFrames < loopStartFrames ||
-          !rangeValid(reader, sampleOffset, static_cast<u64>(loopEndFrames) * bytesPerFrame)) {
+      const auto sample = readSampleData(reader, bank, regionOffset);
+      if (keyLow == 0xff || keyLow > keyHigh || !sample) {
         continue;
       }
 
@@ -264,15 +282,7 @@ struct PanAndAttenuation {
       const auto output = directOutput(reader.u8At(regionOffset + 24));
       ParsedRegion parsed{
           .range = reader.range(regionOffset, 0x20),
-          .keyLow = keyLow,
-          .keyHigh = keyHigh,
-          .sampleOffset = sampleOffset,
-          .sampleBytes = loopEndFrames * bytesPerFrame,
-          .loopStartFrames = loopStartFrames,
-          .loopLengthFrames = loopEndFrames - loopStartFrames,
-          .loops = loopMode != 0,
-          .reverse = loopMode == 2,
-          .pcm16 = pcm16,
+          .sample = *sample,
           .region =
               Region{
                   .keyRange = {.low = keyLow, .high = keyHigh},
@@ -281,9 +291,9 @@ struct PanAndAttenuation {
                   .envelope = scspEnvelope(reader.be16(regionOffset + 10), reader.be16(regionOffset + 12)),
                   .loop =
                       Loop{
-                          .enabled = loopMode != 0,
-                          .start = loopStartFrames,
-                          .length = loopEndFrames - loopStartFrames,
+                          .enabled = sample->loops,
+                          .start = sample->loopStartFrames,
+                          .length = sample->loopLengthFrames,
                       },
                   .pan = output.position,
                   .attenuationDb = output.attenuationDb,
@@ -377,7 +387,7 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
   std::map<u32, ParsedRegion*> uniqueSamples;
   for (auto& instrument : parsed) {
     for (auto& region : instrument.regions) {
-      uniqueSamples.try_emplace(region.sampleOffset, &region);
+      uniqueSamples.try_emplace(region.sample.offset, &region);
     }
   }
   for (const auto& [offset, parsedRegion] : uniqueSamples) {
@@ -386,20 +396,20 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
         .add(offset,
              Sample{
                  .name = name,
-                 .codec = parsedRegion->pcm16 ? AudioCodec::PcmS16 : AudioCodec::PcmS8,
-                 .encodedData = reader.range(offset, parsedRegion->sampleBytes),
+                 .codec = parsedRegion->sample.pcm16 ? AudioCodec::PcmS16 : AudioCodec::PcmS8,
+                 .encodedData = reader.range(offset, parsedRegion->sample.bytes),
                  .sampleRate = 44100,
-                 .bitsPerSample = static_cast<u16>(parsedRegion->pcm16 ? 16 : 8),
-                 .bigEndian = parsedRegion->pcm16,
-                 .reverse = parsedRegion->reverse,
+                 .bitsPerSample = static_cast<u16>(parsedRegion->sample.pcm16 ? 16 : 8),
+                 .bigEndian = parsedRegion->sample.pcm16,
+                 .reverse = parsedRegion->sample.reverse,
                  .loop =
                      Loop{
-                         .enabled = parsedRegion->loops,
-                         .start = parsedRegion->loopStartFrames,
-                         .length = parsedRegion->loopLengthFrames,
+                         .enabled = parsedRegion->sample.loops,
+                         .start = parsedRegion->sample.loopStartFrames,
+                         .length = parsedRegion->sample.loopLengthFrames,
                      },
              })
-        .source(name, reader.range(offset, parsedRegion->sampleBytes), "segsat-sample");
+        .source(name, reader.range(offset, parsedRegion->sample.bytes), "segsat-sample");
   }
   if (samples.empty()) {
     return std::nullopt;
@@ -431,7 +441,7 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
     entry.source(entry.value().name, parsedInstrument.range, "segsat-instrument")
         .derived("volume_bias", parsedInstrument.volumeBias, SourceValueDisplay::SignedDecimal);
     for (auto& parsedRegion : parsedInstrument.regions) {
-      const auto sample = builder.sampleByKey(sampleRef, parsedRegion.sampleOffset);
+      const auto sample = builder.sampleByKey(sampleRef, parsedRegion.sample.offset);
       if (!sample) {
         continue;
       }
@@ -450,58 +460,56 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
   return SegSatScannedBank{
       .instruments = instrumentRef,
       .samples = sampleRef,
-      .layout = layout,
   };
 }
 
-std::vector<SegSatVelocityBank> readSegSatVelocityBanks(ByteReader reader,
-                                                        const std::vector<SegSatBankBinding>& banks) {
-  std::vector<SegSatVelocityBank> velocityBanks;
-  velocityBanks.reserve(banks.size());
-  for (const auto& binding : banks) {
-    // Only key ranges, VL indices, total levels, and voice volume bias affect
-    // sequence velocity. V2_08 is the MM8-compatible model used by this port;
-    // the version-sensitive LFO result from this parse is deliberately unused.
-    const auto parsed = parseInstruments(reader, binding.layout, SegSatDriverVersion::V2_08);
-    const u16 vlCount = static_cast<u16>((binding.layout.pegTables - binding.layout.velocityTables) / 10);
-    SegSatVelocityBank bank{
-        .sourceBank = binding.sourceBank,
+SegSatVelocityBank readSegSatVelocityBank(ByteReader reader, const SegSatBankLayout& layout, u8 sourceBank) {
+  SegSatVelocityBank bank{
+      .sourceBank = sourceBank,
+  };
+  const u16 vlCount = static_cast<u16>((layout.pegTables - layout.velocityTables) / 10);
+  bank.tables.reserve(vlCount);
+  for (u32 index = 0; index < vlCount; ++index) {
+    const u32 offset = layout.offset + layout.velocityTables + index * 10;
+    bank.tables.push_back(SegSatVlTable{
+        .rate0 = reader.u8At(offset),
+        .point0 = reader.u8At(offset + 1),
+        .level0 = reader.u8At(offset + 2),
+        .rate1 = reader.u8At(offset + 3),
+        .point1 = reader.u8At(offset + 4),
+        .level1 = reader.u8At(offset + 5),
+        .rate2 = reader.u8At(offset + 6),
+        .point2 = reader.u8At(offset + 7),
+        .level2 = reader.u8At(offset + 8),
+        .rate3 = reader.u8At(offset + 9),
+    });
+  }
+
+  bank.instruments.reserve(layout.instrumentCount);
+  for (u32 index = 0; index < layout.instrumentCount; ++index) {
+    const u32 instrumentOffset = layout.offset + reader.be16(layout.offset + 8 + index * 2);
+    const u32 regionCount = segSatRegionCount(reader.u8At(instrumentOffset + 2));
+    SegSatVelocityInstrument instrument{
+        .volumeBias = static_cast<s8>(reader.u8At(instrumentOffset + 3)),
     };
-    bank.tables.reserve(vlCount);
-    for (u32 index = 0; index < vlCount; ++index) {
-      const u32 offset = binding.layout.offset + binding.layout.velocityTables + index * 10;
-      bank.tables.push_back(SegSatVlTable{
-          .rate0 = reader.u8At(offset),
-          .point0 = reader.u8At(offset + 1),
-          .level0 = reader.u8At(offset + 2),
-          .rate1 = reader.u8At(offset + 3),
-          .point1 = reader.u8At(offset + 4),
-          .level1 = reader.u8At(offset + 5),
-          .rate2 = reader.u8At(offset + 6),
-          .point2 = reader.u8At(offset + 7),
-          .level2 = reader.u8At(offset + 8),
-          .rate3 = reader.u8At(offset + 9),
+    instrument.regions.reserve(regionCount);
+    for (u32 regionIndex = 0; regionIndex < regionCount; ++regionIndex) {
+      const u32 regionOffset = instrumentOffset + 4 + regionIndex * 0x20;
+      const u8 keyLow = reader.u8At(regionOffset);
+      const u8 keyHigh = reader.u8At(regionOffset + 1);
+      if (keyLow == 0xff || keyLow > keyHigh || !readSampleData(reader, layout, regionOffset)) {
+        continue;
+      }
+      instrument.regions.push_back(SegSatVelocityRegion{
+          .keyLow = keyLow,
+          .keyHigh = keyHigh,
+          .table = reader.u8At(regionOffset + 29),
+          .totalLevel = reader.u8At(regionOffset + 15),
       });
     }
-    bank.instruments.reserve(parsed.size());
-    for (const auto& instrument : parsed) {
-      SegSatVelocityInstrument velocityInstrument{
-          .volumeBias = instrument.volumeBias,
-      };
-      velocityInstrument.regions.reserve(instrument.regions.size());
-      for (const auto& region : instrument.regions) {
-        velocityInstrument.regions.push_back(SegSatVelocityRegion{
-            .keyLow = region.keyLow,
-            .keyHigh = region.keyHigh,
-            .table = region.vlIndex,
-            .totalLevel = region.totalLevel,
-        });
-      }
-      bank.instruments.push_back(std::move(velocityInstrument));
-    }
-    velocityBanks.push_back(std::move(bank));
+    bank.instruments.push_back(std::move(instrument));
   }
-  return velocityBanks;
+  return bank;
 }
 
 }  // namespace vgmtrans::formats::segsat

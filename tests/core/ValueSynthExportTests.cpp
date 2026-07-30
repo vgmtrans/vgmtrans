@@ -157,18 +157,35 @@ void regionModulationExportsAtTheRegionScope() {
       .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe", .name = "Instruments"},
       .instruments = {Instrument{
           .name = "Layered LFO",
-          .regions = {Region{
-              .sample = SampleRef{.collection = samples.metadata.id, .index = 0},
-              .modulation =
-                  InstrumentModulation{
-                      .vibrato =
-                          VibratoSpec{
-                              .maxDepthCents = 7.0,
-                              .rateHertz = {.minimum = 0.17, .maximum = 0.17},
-                              .depthMode = ModulationDepthMode::Fixed,
+          .regions =
+              {
+                  Region{
+                      .keyRange = {.low = 0, .high = 63},
+                      .sample = SampleRef{.collection = samples.metadata.id, .index = 0},
+                      .modulation =
+                          InstrumentModulation{
+                              .vibrato =
+                                  VibratoSpec{
+                                      .maxDepthCents = 7.0,
+                                      .rateHertz = {.minimum = 0.17, .maximum = 0.17},
+                                      .depthMode = ModulationDepthMode::Fixed,
+                                  },
                           },
                   },
-          }},
+                  Region{
+                      .keyRange = {.low = 64, .high = 127},
+                      .sample = SampleRef{.collection = samples.metadata.id, .index = 0},
+                      .modulation =
+                          InstrumentModulation{
+                              .vibrato =
+                                  VibratoSpec{
+                                      .maxDepthCents = 13.0,
+                                      .rateHertz = {.minimum = 0.34, .maximum = 0.34},
+                                      .depthMode = ModulationDepthMode::Fixed,
+                                  },
+                          },
+                  },
+              },
       }},
   };
   const std::array<const InstrumentSetAsset*, 1> instrumentSets{&instruments};
@@ -181,10 +198,12 @@ void regionModulationExportsAtTheRegionScope() {
 
   const auto soundFont = buildSoundFont2(input, sources);
   const auto dls = buildDls(input, sources);
-  expect(soundFont.diagnostics.empty() && soundFontIgenContainsAmount(soundFont.bytes, 6, 7),
-         "SoundFont should write a fixed region vibrato depth into that region's generator zone");
-  expect(dls.diagnostics.empty() && dlsArt2ContainsConnection(dls.bytes, 0x0009, 0x0003, 7 * 65536),
-         "DLS should write a fixed region vibrato depth into that region's articulation list");
+  expect(soundFont.diagnostics.empty() && soundFontIgenContainsAmount(soundFont.bytes, 6, 7) &&
+             soundFontIgenContainsAmount(soundFont.bytes, 6, 13),
+         "SoundFont should preserve each region's vibrato depth");
+  expect(dls.diagnostics.empty() && dlsArt2ContainsConnection(dls.bytes, 0x0009, 0x0003, 7 * 65536) &&
+             dlsArt2ContainsConnection(dls.bytes, 0x0009, 0x0003, 13 * 65536),
+         "DLS should preserve each region's vibrato depth");
 }
 
 void wavExporterWritesPcm16RiffFile() {
@@ -761,7 +780,7 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
 PreparedCollectionAssets prepareReplacementInstrumentSet(const CollectionPrepareContext& context) {
   const AssetId samples = context.collection.sampleCollections.front();
   return PreparedCollectionAssets{
-      .replacementInstrumentSets = {InstrumentSetAsset{
+      .replacementInstrumentSets = std::vector<InstrumentSetAsset>{InstrumentSetAsset{
           .metadata = AssetMetadata{.format = "Prepared Probe", .name = "Prepared Bank"},
           .instruments = {Instrument{
               .name = "Prepared Instrument",
@@ -771,18 +790,27 @@ PreparedCollectionAssets prepareReplacementInstrumentSet(const CollectionPrepare
   };
 }
 
-PreparedCollectionAssets preparePerformanceFinalizer(const CollectionPrepareContext&) {
+PreparedCollectionAssets preparePerformanceFinalizer(const CollectionPrepareContext& context) {
+  const bool shouldFail = context.collection.key.value == "failure";
   return PreparedCollectionAssets{
       .finalizePerformance =
-          [](PerformanceSequence& performance) {
+          [shouldFail](PerformanceSequence& performance) {
+            if (shouldFail) {
+              throw std::runtime_error("test finalizer failure");
+            }
             for (auto& track : performance.tracks) {
-              for (auto& event : track.events) {
-                if (auto* note = std::get_if<NotePerformanceEvent>(&event)) {
-                  note->linearVelocity = 0.25;
-                }
-              }
+              track.hasPhysicalModulation = true;
+              track.events.emplace_back(ModulationPerformanceEvent{
+                  .target = ModulationPerformanceTarget::VibratoDepth,
+                  .pitchDepthSemitones = 1.0,
+              });
+              track.events.emplace_back(ModulationPerformanceEvent{
+                  .target = ModulationPerformanceTarget::VibratoRate,
+                  .frequencyHz = 6.0,
+              });
             }
           },
+      .diagnostics = {{.severity = Severity::Warning, .message = "Collection preparation warning"}},
   };
 }
 
@@ -790,7 +818,9 @@ ScanResult scanNoSources(const ScanInput&) {
   return {};
 }
 
-void collectionPreparationFinalizesTransientPerformance() {
+void collectionPreparationAppliesToWholeExport() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "performance-finalizer.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder trackBuilder(track);
@@ -803,14 +833,39 @@ void collectionPreparationFinalizesTransientPerformance() {
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "Performance Finalizer", .name = "Sequence"},
       .program = SequenceProgram{.dialect = dialect.id, .timebase = dialect.timebase, .tracks = {track}},
   };
+  const InstrumentSetAsset instruments{
+      .metadata = AssetMetadata{.id = AssetId{1}, .format = "Performance Finalizer", .name = "Durable Bank"},
+      .instruments = {Instrument{
+          .explicitAddress = InstrumentAddress{.bank = 0, .program = 0},
+          .name = "Durable Instrument",
+          .regions = {Region{.sample = SampleRef{.collection = AssetId{2}, .index = 0}}},
+      }},
+  };
+  const SampleCollectionAsset samples{
+      .metadata = AssetMetadata{.id = AssetId{2}, .format = "Performance Finalizer", .name = "Samples"},
+      .samples = SampleCollection{.samples = {Sample{
+                                      .name = "Zero",
+                                      .codec = AudioCodec::SnesBrr,
+                                      .encodedData = SourceRange{.source = source, .offset = 0, .size = 9},
+                                      .sampleRate = 16000,
+                                  }}},
+  };
   test::SessionSnapshotBuilder builder;
   builder.assets.emplace_back(sequence);
+  builder.assets.emplace_back(instruments);
+  builder.assets.emplace_back(samples);
   builder.collections.push_back(Collection{
       .id = CollectionId{0},
       .key = CollectionKey{.resolver = "Performance Finalizer", .value = "one"},
       .name = "Performance Finalizer",
       .sequence = sequence.metadata.id,
+      .instrumentSets = {instruments.metadata.id},
+      .sampleCollections = {samples.metadata.id},
   });
+  auto failingCollection = builder.collections.front();
+  failingCollection.id = CollectionId{1};
+  failingCollection.key.value = "failure";
+  builder.collections.push_back(std::move(failingCollection));
 
   FormatRegistry formats;
   formats.add(FormatModule{
@@ -821,15 +876,20 @@ void collectionPreparationFinalizesTransientPerformance() {
   formats.seal();
   SequenceDialectRegistry dialects;
   dialects.add(dialect);
-  const CollectionPlayback playback = prepareCollectionPlayback(builder.finish(), SourceStore{}, CollectionId{0},
-                                                                PlaybackRequest{}, dialects, &formats);
-  const auto note = std::ranges::find_if(playback.performance.tracks.front().events, [](const PerformanceEvent& event) {
-    return std::holds_alternative<NotePerformanceEvent>(event);
-  });
-  const auto* rendered =
-      note == playback.performance.tracks.front().events.end() ? nullptr : std::get_if<NotePerformanceEvent>(&*note);
-  expect(rendered != nullptr && rendered->linearVelocity == 0.25,
-         "collection preparation should enrich the transient performance without replacing the durable program");
+  const SessionSnapshot snapshot = builder.finish();
+  const CollectionPlayback playback =
+      prepareCollectionPlayback(snapshot, sources, CollectionId{0}, PlaybackRequest{}, dialects, &formats);
+  expect(playback.soundFont.size() >= 12 && containsAscii(playback.soundFont, "Durable Instrument"),
+         "a performance-only collection preparer should preserve durable instrument sets for synth export");
+  expect(soundFontImodContains(playback.soundFont, 129, 6, 100),
+         "collection preparation should run before sequence modulation is analyzed");
+
+  const auto failed = exportCollection(snapshot, sources, CollectionId{1}, ExportRequest{.kinds = {ExportKind::Midi}},
+                                       dialects, &formats);
+  expect(failed.size() == 1, "a failing collection performance finalizer should produce one MIDI artifact");
+  diagnosticWithMessage(failed.front().diagnostics, "Collection preparation warning");
+  diagnosticWithMessage(failed.front().diagnostics,
+                        "Collection performance finalization failed: test finalizer failure");
 }
 
 void collectionPreparationReplacesDurableInstrumentSets() {
@@ -1186,7 +1246,7 @@ void runValueSynthExportTests() {
   dlsExporterWritesDlsRiffFile();
   standaloneSynthExportsKeepNativeModulation();
   collectionSynthExportsCanExportOnlyUsedInstruments();
-  collectionPreparationFinalizesTransientPerformance();
+  collectionPreparationAppliesToWholeExport();
   collectionPreparationReplacesDurableInstrumentSets();
   synthOnlyExportSkipsSequencesWithoutModulation();
   exportDiagnosticsPreserveSourceRanges();
