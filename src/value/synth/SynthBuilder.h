@@ -90,7 +90,8 @@ public:
 
     [[nodiscard]] explicit operator bool() const noexcept;
     [[nodiscard]] SampleRef ref() const;
-    [[nodiscard]] Sample& value() const;
+    // Complete the sample before add(); entries expose it only for inspection.
+    [[nodiscard]] const Sample& value() const;
     AnnotationBuilder source(std::string_view label, SourceRange range, std::string_view kind = {}) const;
     AnnotationBuilder source(std::string_view label, const SourceRecord& record, std::string_view kind = {}) const;
 
@@ -175,7 +176,8 @@ public:
     Entry() = default;
 
     [[nodiscard]] explicit operator bool() const noexcept;
-    [[nodiscard]] Instrument& value() const;
+    // Complete instrument fields before insertion and add regions through region().
+    [[nodiscard]] const Instrument& value() const;
     AnnotationBuilder source(std::string_view label, SourceRange range, std::string_view kind = {}) const;
     AnnotationBuilder source(std::string_view label, const SourceRecord& record, std::string_view kind = {}) const;
     RegionEntry region(SampleRef sample, Region region) const;
@@ -195,7 +197,8 @@ public:
     RegionEntry() = default;
 
     [[nodiscard]] explicit operator bool() const noexcept;
-    [[nodiscard]] Region& value() const;
+    // Complete the region before region(); this view is for inspection and annotation.
+    [[nodiscard]] const Region& value() const;
     AnnotationBuilder source(std::string_view label, SourceRange range, std::string_view kind = {}) const;
     AnnotationBuilder source(std::string_view label, const SourceRecord& record, std::string_view kind = {}) const;
 
@@ -236,7 +239,6 @@ private:
                                                       std::string_view kind);
   [[nodiscard]] AnnotationBuilder addRegionSource(u32 instrumentIndex, u32 regionIndex, std::string_view label,
                                                   SourceRange range, std::string_view kind);
-  void syncPrepopulatedRegions(u32 instrumentIndex);
   void addFallbackSources();
   void annotateValues();
   void linkInstrumentSamples(u32 instrumentIndex, SourceAnnotationId annotation);

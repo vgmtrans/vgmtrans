@@ -501,8 +501,10 @@ std::optional<ScanInstrumentSetDraft> addNdsInstrumentSet(
       continue;
     }
 
+    const std::string instrumentName = instrument.name;
+    const SourceRange instrumentRange = instrument.range;
     auto entry = instruments.add(i, std::move(instrument));
-    entry.source(entry.value().name, entry.value().range, "sbnk-instrument").parent(pointerAnnotation.id());
+    entry.source(instrumentName, instrumentRange, "sbnk-instrument").parent(pointerAnnotation.id());
     for (auto& parsed : parsedRegions) {
       const SampleRef sample = parsed.region.sample;
       entry.region(sample, std::move(parsed.region)).source("Region", parsed.source, "sbnk-region");

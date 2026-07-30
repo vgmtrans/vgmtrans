@@ -418,16 +418,17 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
       .derived("velocity_table_count", (layout.pegTables - layout.velocityTables) / 10);
 
   for (auto& parsedInstrument : parsed) {
+    const std::string name = fmt::format("Instrument {}", parsedInstrument.index);
     Instrument instrument{
         .explicitAddress = InstrumentAddress{.bank = exportBank, .program = parsedInstrument.index},
         .identity =
             segSatInstrumentIdentity(layout.sourceBank.value_or(exportBank), static_cast<u8>(parsedInstrument.index)),
-        .name = fmt::format("Instrument {}", parsedInstrument.index),
+        .name = name,
         .range = parsedInstrument.range,
     };
 
     auto entry = instruments.add(parsedInstrument.index, std::move(instrument));
-    entry.source(entry.value().name, parsedInstrument.range, "segsat-instrument")
+    entry.source(name, parsedInstrument.range, "segsat-instrument")
         .derived("volume_bias", parsedInstrument.volumeBias, SourceValueDisplay::SignedDecimal);
     for (auto& parsedRegion : parsedInstrument.regions) {
       const auto sample = samples.find(parsedRegion.sample.offset);

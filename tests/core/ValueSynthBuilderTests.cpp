@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 using namespace vgmtrans::core;
@@ -311,9 +312,9 @@ void scanResultBuilderRetainsSampleKeysAndExposesExistingRegions() {
          "a prebuilt region should accept an exact source record without being removed and added again");
 }
 
-void valueEscapeHatchContributesFinalRanges() {
+void entryValuesAreReadOnlyAndInitialRangesRemainAuthoritative() {
   SourceStore sources;
-  const SourceId source = sources.add(SourceFile{.name = "synth-value-escape.probe"}, std::vector<u8>(64));
+  const SourceId source = sources.add(SourceFile{.name = "synth-read-only-entry.probe"}, std::vector<u8>(64));
   ScanIdAllocator ids;
   ScanInput input{
       .source = sources.source(source),
@@ -326,30 +327,33 @@ void valueEscapeHatchContributesFinalRanges() {
   const auto instrumentRef = instruments.ref();
   const auto sampleRef = samples.ref();
 
-  auto sample = samples.add(0, Sample{.name = "Late Sample"});
-  sample.value().encodedData = input.reader.range(32, 9);
+  auto sample =
+      samples.add(0, Sample{.name = "Sample", .encodedData = input.reader.range(32, 9)});
+  auto instrument = instruments.add(
+      0, Instrument{.name = "Instrument", .range = input.reader.range(8, 4)});
+  instrument.source("Instrument", input.reader.range(8, 4));
+  auto region =
+      instrument.region(sample.ref(), Region{.range = input.reader.range(12, 4)});
+  region.source("Region", input.reader.range(12, 4));
 
-  auto instrument = instruments.add(0, Instrument{.name = "Late Instrument"});
-  instrument.value().range = input.reader.range(8, 4);
-  instrument.source("Late Instrument", input.reader.range(8, 4));
-  auto region = instrument.region(sample.ref(), Region{});
-  region.value().range = input.reader.range(12, 4);
-  region.source("Late Region", input.reader.range(12, 4));
+  static_assert(std::is_same_v<decltype(sample.value()), const Sample&>);
+  static_assert(std::is_same_v<decltype(instrument.value()), const Instrument&>);
+  static_assert(std::is_same_v<decltype(region.value()), const Region&>);
 
   const ScanResult scan = result.finish();
   const auto* instrumentAsset = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
   const auto* sampleAsset = std::get_if<SampleCollectionAsset>(&scan.assets[1]);
   expect(instrumentAsset != nullptr && instrumentAsset->metadata.range == input.reader.range(8, 8),
-         "a late instrument or region range should contribute to final asset metadata");
+         "instrument and region ranges should contribute to final asset metadata when inserted");
   expect(sampleAsset != nullptr && sampleAsset->metadata.range == input.reader.range(32, 9),
-         "a late encoded-data range should contribute to final sample metadata");
+         "sample payload ranges should contribute to final asset metadata when inserted");
   expect(instrumentAsset->instruments[0].range == input.reader.range(8, 4) &&
              instrumentAsset->instruments[0].regions[0].range == input.reader.range(12, 4),
-         "source records should not replace durable ranges supplied later through value()");
+         "source records should not replace explicit durable ranges");
   expect(!scan.sourceMap.ownedBy(ObjectRefs::instrument(instrumentRef.id, 0)).empty() &&
              !scan.sourceMap.ownedBy(ObjectRefs::region(instrumentRef.id, 0, 0)).empty() &&
              !scan.sourceMap.ownedBy(ObjectRefs::sample(sampleRef.id, 0)).empty(),
-         "late source-backed values should still receive generic annotations with durable owners");
+         "read-only entry views should retain durable source owners");
 }
 
 void scanResultBuilderDraftViewsRemainStableAsTheResultGrows() {
@@ -421,7 +425,7 @@ void runValueSynthBuilderTests() {
   instrumentBuilderGroupsEntriesAndProjectsRegionIdentity();
   scanResultBuilderOwnsSynthDraftsUntilFinish();
   scanResultBuilderRetainsSampleKeysAndExposesExistingRegions();
-  valueEscapeHatchContributesFinalRanges();
+  entryValuesAreReadOnlyAndInitialRangesRemainAuthoritative();
   scanResultBuilderDraftViewsRemainStableAsTheResultGrows();
   detachedBuildersUseTheSameAuthoringSurface();
 }

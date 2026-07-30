@@ -310,7 +310,7 @@ The nested entry types are ergonomic references to objects already owned by a bu
 class SampleCollectionBuilder::Entry {
 public:
   [[nodiscard]] SampleRef ref() const;
-  [[nodiscard]] Sample& value();
+  [[nodiscard]] const Sample& value() const;
   [[nodiscard]] AnnotationBuilder source(
       std::string_view label,
       SourceRange range,
@@ -319,7 +319,7 @@ public:
 
 class InstrumentSetBuilder::Entry {
 public:
-  [[nodiscard]] Instrument& value();
+  [[nodiscard]] const Instrument& value() const;
   [[nodiscard]] AnnotationBuilder source(
       std::string_view label,
       SourceRange range,
@@ -330,7 +330,7 @@ public:
 
 class InstrumentSetBuilder::RegionEntry {
 public:
-  [[nodiscard]] Region& value();
+  [[nodiscard]] const Region& value() const;
   [[nodiscard]] AnnotationBuilder source(
       std::string_view label,
       SourceRange range,
@@ -338,7 +338,7 @@ public:
 };
 ```
 
-`value()` is the narrow escape hatch for an unusual format-specific adjustment. It is not the normal route and should not cause every exceptional operation to become a new shared method.
+`value()` is a read-only view. Complete values before insertion and add regions through `region()` so source owners, indexes, ranges, and sample links cannot be invalidated by an untracked structural change. Add a focused builder operation only when a real format requires one.
 
 `regionAt()` exposes a region already present in the ordinary `Instrument` aggregate. It exists so a parser that naturally constructs a complete instrument can attach an exact region source record without moving the regions out, clearing the vector, and adding the same values again. Generic fallback annotations remain sufficient when the region's durable range already describes all of its source bytes.
 
@@ -484,7 +484,7 @@ result.sampleCollection(displayName, std::move(samples));
 result.instrumentSet(displayName, std::move(instruments));
 ```
 
-These overloads finish the builder and then use its asset ID and final accumulated range to call the existing asset-commit machinery. Finishing first matters because an unusual format may have supplied a late durable range through `value()`. An optional explicit asset range may be supported, but `builder.include(range)` should cover the normal case.
+These overloads finish the builder and then use its asset ID and final accumulated range to call the existing asset-commit machinery. Values contribute their durable ranges when inserted, and source records contribute their ranges when attached. An optional explicit asset range may be supported, but `builder.include(range)` should cover the normal case.
 
 A sample-builder commit also retains its source-key lookup inside `ScanResultBuilder` for the remainder of the scan. Later instrument parsing can therefore resolve a sparse source key with an ordinary `ScanSampleCollectionRef`; the format does not need a wrapper that couples the handle to copied builder state. `sampleByKeyOrWarning()` combines this lookup with the common missing-reference diagnostic.
 
@@ -540,7 +540,7 @@ Use the format module's optional export-preparation callback only for this excep
 - static formats define no callback and pay no authoring cost;
 - no `useColl()`, `unuseColl()`, mutation, reset, or second asset lifecycle reappears under new names.
 
-Formats may either build a derived set from scratch or copy ordinary base values into an `InstrumentSetBuilder`. Use `append` for untouched copied instruments; use `add(formatKey, instrument)` when later overrides need `find(formatKey)` and `value()`. Do not create a generic patch language, recipe schema, or overlay hierarchy merely to avoid copying small value objects.
+Formats may either build a derived set from scratch or copy ordinary base values into an `InstrumentSetBuilder`. Apply collection-specific changes to a local copy before inserting it; use `append` for untouched copied instruments and `add(formatKey, instrument)` when later construction needs keyed lookup. Do not create a generic patch language, recipe schema, or overlay hierarchy merely to avoid copying small value objects.
 
 Sequence-owned preparation data should be decoded into durable values when the surrounding format architecture already has an appropriate place for it. The synth-builder framework must not solve this by adding opaque payloads, a universal recipe tree, or format-specific alternatives to the core asset variant.
 
@@ -749,7 +749,7 @@ Add focused tests for:
 - field ranges, decoded values, display hints, outline policy, and disjoint owned ranges sufficient for future HexView
   and TreeView projections;
 - range accumulation across disjoint entries;
-- `value()` escape-hatch behavior;
+- read-only entry values and builder-owned structural mutation;
 - detached construction with and without source-map output;
 - scan-result consuming commit;
 - immutable collection preparation from base values;
