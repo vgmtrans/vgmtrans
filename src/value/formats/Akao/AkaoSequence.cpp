@@ -280,7 +280,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
   event.u8(conditionName);
   const Address destination =
       relativeAddress(event, profile, operandOffset + 1, "relative", SemanticOperandRole::JumpTarget);
-  return event.mayBranchTo(destination);
+  return event.discoverTarget(destination);
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeSubEvent(AkaoCursor& cursor, ByteReader reader, u32 begin,

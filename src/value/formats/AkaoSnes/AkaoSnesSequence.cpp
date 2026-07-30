@@ -1974,7 +1974,7 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
       auto event =
           cursor.command("CPU-Controlled Jump", SequenceSemantic::Jump, CommandPlaybackStatus::AffectsControlFlow);
       const Address destination = relocated(event, SemanticOperandRole::JumpTarget);
-      return event.mayBranchTo(destination);
+      return event.discoverTarget(destination);
     }
     case EventType::CpuControlledJumpV2: {
       auto event = cursor.command("CPU-Controlled Jump", SequenceSemantic::Jump, CommandPlaybackStatus::SourceOnly);

@@ -98,7 +98,7 @@ struct CommandFlow {
     };
   }
 
-  [[nodiscard]] static CommandFlow jumpTo(Address destination, Address continuation = {},
+  [[nodiscard]] static CommandFlow jumpTo(Address destination, Address continuation,
                                           JumpSemantics semantics = JumpSemantics::Normal) {
     return CommandFlow{
         .continuation = continuation,
@@ -106,28 +106,28 @@ struct CommandFlow {
     };
   }
 
-  [[nodiscard]] static CommandFlow call(Address destination, Address continuation = {}) {
+  [[nodiscard]] static CommandFlow call(Address destination, Address continuation) {
     return CommandFlow{
         .continuation = continuation,
         .defaultTransition = StaticTransition::call(destination),
     };
   }
 
-  [[nodiscard]] static CommandFlow return_(Address continuation = {}) {
+  [[nodiscard]] static CommandFlow return_(Address continuation) {
     return CommandFlow{
         .continuation = continuation,
         .defaultTransition = StaticTransition::return_(),
     };
   }
 
-  [[nodiscard]] static CommandFlow end(Address continuation = {}) {
+  [[nodiscard]] static CommandFlow end(Address continuation) {
     return CommandFlow{
         .continuation = continuation,
         .defaultTransition = StaticTransition::end(),
     };
   }
 
-  [[nodiscard]] static CommandFlow endSection(Address continuation = {}) {
+  [[nodiscard]] static CommandFlow endSection(Address continuation) {
     return CommandFlow{
         .continuation = continuation,
         .defaultTransition = StaticTransition::endSection(),
