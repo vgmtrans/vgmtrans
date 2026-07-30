@@ -202,7 +202,6 @@ public:
   void fact(AssetId asset, MatchScope scope, MatchFactPayload payload);
   void sourceFact(AssetId asset, MatchFactPayload payload);
   void sessionFact(AssetId asset, MatchFactPayload payload);
-  void collectionMember(AssetId asset, CollectionKey key, std::string collectionName, CollectionMemberRole role);
 
   void diagnostic(Diagnostic diagnostic);
   void warning(std::string message, SourceRange range);
@@ -218,11 +217,19 @@ private:
   friend class ScanSampleCollectionDraft;
   friend class ScanMiscDraft;
 
+  enum class DraftRole {
+    Sequence,
+    InstrumentSet,
+    SampleCollection,
+    Misc,
+  };
+
   [[nodiscard]] AssetMetadata metadata(AssetId id, std::string name, SourceRange range) const;
   [[nodiscard]] CollectionKey defaultCollectionKey(std::string_view name) const;
   [[nodiscard]] ExplicitCollection& explicitCollection(size_t index);
+  [[nodiscard]] static std::string roleName(DraftRole role);
 
-  void validateDraftReference(AssetId id, CollectionMemberRole role) const;
+  void validateDraftReference(AssetId id, DraftRole role) const;
   void setSequenceRange(size_t slot, SourceRange range);
   void setSequenceProgram(size_t slot, SequenceProgram program);
   void setMiscPayload(size_t slot, std::vector<u8> payload);

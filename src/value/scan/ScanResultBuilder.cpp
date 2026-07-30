@@ -19,19 +19,6 @@ namespace {
   return "source:" + std::to_string(source.value) + ":collection:" + std::string(name);
 }
 
-[[nodiscard]] std::string roleName(CollectionMemberRole role) {
-  switch (role) {
-    case CollectionMemberRole::Sequence:
-      return "sequence";
-    case CollectionMemberRole::InstrumentSet:
-      return "instrument-set";
-    case CollectionMemberRole::SampleCollection:
-      return "sample-collection";
-    case CollectionMemberRole::Misc:
-      return "misc";
-  }
-}
-
 struct PendingSequence {
   AssetId id;
   std::string name;
@@ -212,7 +199,7 @@ ScanCollectionBuilder::ScanCollectionBuilder(ScanResultBuilder& out, size_t inde
 }
 
 ScanCollectionBuilder& ScanCollectionBuilder::sequence(ScanSequenceRef asset) {
-  out_.validateDraftReference(asset.id, CollectionMemberRole::Sequence);
+  out_.validateDraftReference(asset.id, ScanResultBuilder::DraftRole::Sequence);
   out_.explicitCollection(index_).sequence = asset.id;
   return *this;
 }
@@ -222,7 +209,7 @@ ScanCollectionBuilder& ScanCollectionBuilder::sequence(const ScanSequenceDraft& 
 }
 
 ScanCollectionBuilder& ScanCollectionBuilder::instrumentSet(ScanInstrumentSetRef asset) {
-  out_.validateDraftReference(asset.id, CollectionMemberRole::InstrumentSet);
+  out_.validateDraftReference(asset.id, ScanResultBuilder::DraftRole::InstrumentSet);
   out_.explicitCollection(index_).instrumentSets.push_back(asset.id);
   return *this;
 }
@@ -232,7 +219,7 @@ ScanCollectionBuilder& ScanCollectionBuilder::instrumentSet(const ScanInstrument
 }
 
 ScanCollectionBuilder& ScanCollectionBuilder::samples(ScanSampleCollectionRef asset) {
-  out_.validateDraftReference(asset.id, CollectionMemberRole::SampleCollection);
+  out_.validateDraftReference(asset.id, ScanResultBuilder::DraftRole::SampleCollection);
   out_.explicitCollection(index_).sampleCollections.push_back(asset.id);
   return *this;
 }
@@ -242,7 +229,7 @@ ScanCollectionBuilder& ScanCollectionBuilder::samples(const ScanSampleCollection
 }
 
 ScanCollectionBuilder& ScanCollectionBuilder::misc(ScanMiscAssetRef asset) {
-  out_.validateDraftReference(asset.id, CollectionMemberRole::Misc);
+  out_.validateDraftReference(asset.id, ScanResultBuilder::DraftRole::Misc);
   out_.explicitCollection(index_).miscAssets.push_back(asset.id);
   return *this;
 }
@@ -363,15 +350,6 @@ void ScanResultBuilder::sessionFact(AssetId asset, MatchFactPayload payload) {
   fact(asset, MatchScope{.kind = MatchScopeKind::Session}, std::move(payload));
 }
 
-void ScanResultBuilder::collectionMember(AssetId asset, CollectionKey key, std::string collectionName,
-                                         CollectionMemberRole role) {
-  sourceFact(asset, CollectionMemberFact{
-                        .key = std::move(key),
-                        .collectionName = std::move(collectionName),
-                        .role = role,
-                    });
-}
-
 void ScanResultBuilder::diagnostic(Diagnostic diagnostic) {
   result_.diagnostics.push_back(std::move(diagnostic));
 }
@@ -463,23 +441,36 @@ ExplicitCollection& ScanResultBuilder::explicitCollection(size_t index) {
   return result_.explicitCollections.at(index);
 }
 
-void ScanResultBuilder::validateDraftReference(AssetId id, CollectionMemberRole role) const {
+std::string ScanResultBuilder::roleName(DraftRole role) {
+  switch (role) {
+    case DraftRole::Sequence:
+      return "sequence";
+    case DraftRole::InstrumentSet:
+      return "instrument-set";
+    case DraftRole::SampleCollection:
+      return "sample-collection";
+    case DraftRole::Misc:
+      return "misc";
+  }
+}
+
+void ScanResultBuilder::validateDraftReference(AssetId id, DraftRole role) const {
   for (const auto& slot : drafts_) {
     const auto found = std::visit([&](const auto& pending) { return pending.id == id; }, slot->value);
     if (!found) {
       continue;
     }
-    const CollectionMemberRole actual = std::visit(
+    const DraftRole actual = std::visit(
         [](const auto& pending) {
           using Pending = std::decay_t<decltype(pending)>;
           if constexpr (std::is_same_v<Pending, PendingSequence>) {
-            return CollectionMemberRole::Sequence;
+            return DraftRole::Sequence;
           } else if constexpr (std::is_same_v<Pending, PendingInstrumentSet>) {
-            return CollectionMemberRole::InstrumentSet;
+            return DraftRole::InstrumentSet;
           } else if constexpr (std::is_same_v<Pending, PendingSampleCollection>) {
-            return CollectionMemberRole::SampleCollection;
+            return DraftRole::SampleCollection;
           } else {
-            return CollectionMemberRole::Misc;
+            return DraftRole::Misc;
           }
         },
         slot->value);

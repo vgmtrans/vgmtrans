@@ -250,17 +250,14 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   ScanResult result;
   result.assets.emplace_back(std::move(sequence));
   result.sourceMap = sourceMap.finish();
-  result.matchFacts.push_back(MatchFact{
-      .asset = assetId,
-      .format = "ProbeSequence",
-      .scope = MatchScope{.kind = MatchScopeKind::Source, .source = input.source.id},
-      .payload =
-          CollectionMemberFact{
-              .key = CollectionKey{.resolver = "ProbeSequence",
-                                   .value = "source:" + std::to_string(input.source.id.value)},
-              .collectionName = input.source.name,
-              .role = CollectionMemberRole::Sequence,
+  result.explicitCollections.push_back(ExplicitCollection{
+      .key =
+          CollectionKey{
+              .resolver = "ProbeSequence",
+              .value = "source:" + std::to_string(input.source.id.value),
           },
+      .name = input.source.name,
+      .sequence = assetId,
   });
   result.diagnostics.push_back(Diagnostic{
       .severity = Severity::Info,
@@ -279,16 +276,11 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   return result;
 }
 
-[[nodiscard]] std::vector<DesiredCollection> resolveProbeSequenceCollections(const MatchContext& context) {
-  return resolveCollectionMemberFacts(context, "ProbeSequence", "ProbeSequence");
-}
-
 [[nodiscard]] FormatModule probeSequenceModule() {
   return FormatModule{
       .name = "ProbeSequence",
       .canScan = canScanProbeSequence,
       .scan = scanProbeSequence,
-      .resolveCollections = resolveProbeSequenceCollections,
   };
 }
 
@@ -629,7 +621,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   if (context.assets().empty() || context.assets().size() > 1) {
     throw std::runtime_error("resolver exploded");
   }
-  return resolveCollectionMemberFacts(context, "ProbeSequence", "ProbeSequence");
+  return {};
 }
 
 [[nodiscard]] FormatModule fragileProbeSequenceModule() {

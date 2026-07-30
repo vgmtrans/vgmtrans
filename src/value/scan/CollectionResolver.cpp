@@ -6,105 +6,12 @@
 
 #include "value/scan/CollectionResolver.h"
 
-#include <charconv>
 #include <algorithm>
-#include <map>
 #include <optional>
-#include <set>
 #include <string>
 #include <utility>
 
 namespace vgmtrans::core {
-
-namespace {
-
-void addMember(DesiredCollection& collection, AssetId asset, CollectionMemberRole role) {
-  switch (role) {
-    case CollectionMemberRole::Sequence:
-      collection.sequence = asset;
-      return;
-    case CollectionMemberRole::InstrumentSet:
-      collection.instrumentSets.push_back(asset);
-      return;
-    case CollectionMemberRole::SampleCollection:
-      collection.sampleCollections.push_back(asset);
-      return;
-    case CollectionMemberRole::Misc:
-      collection.miscAssets.push_back(asset);
-      return;
-  }
-}
-
-[[nodiscard]] bool covers(const SampleCoverageProvider& provider, u32 value) {
-  return value >= provider.first && static_cast<u64>(value) < static_cast<u64>(provider.first) + provider.count;
-}
-
-void markCovered(std::set<u32>& remaining, const SampleCoverageProvider& provider) {
-  for (auto it = remaining.begin(); it != remaining.end();) {
-    if (covers(provider, *it)) {
-      it = remaining.erase(it);
-    } else {
-      ++it;
-    }
-  }
-}
-
-}  // namespace
-
-std::optional<MatchFieldValue> fieldValue(const FormatSpecificFact& fact, std::string_view name) {
-  const auto found = std::ranges::find_if(fact.fields, [name](const MatchField& field) { return field.name == name; });
-  if (found == fact.fields.end()) {
-    return std::nullopt;
-  }
-  return MatchFieldValue{.value = found->value};
-}
-
-std::optional<u32> fieldU32(const FormatSpecificFact& fact, std::string_view name) {
-  const auto value = fieldValue(fact, name);
-  if (!value) {
-    return std::nullopt;
-  }
-
-  u32 parsed = 0;
-  const auto begin = value->value.data();
-  const auto end = begin + value->value.size();
-  const auto [ptr, ec] = std::from_chars(begin, end, parsed, 10);
-  if (ec != std::errc{} || ptr != end) {
-    return std::nullopt;
-  }
-  return parsed;
-}
-
-std::optional<s32> fieldS32(const FormatSpecificFact& fact, std::string_view name) {
-  const auto value = fieldValue(fact, name);
-  if (!value) {
-    return std::nullopt;
-  }
-
-  s32 parsed = 0;
-  const auto begin = value->value.data();
-  const auto end = begin + value->value.size();
-  const auto [ptr, ec] = std::from_chars(begin, end, parsed, 10);
-  if (ec != std::errc{} || ptr != end) {
-    return std::nullopt;
-  }
-  return parsed;
-}
-
-bool fieldBool(const FormatSpecificFact& fact, std::string_view name, bool fallback) {
-  const auto value = fieldValue(fact, name);
-  if (!value) {
-    return fallback;
-  }
-  return value->value == "1" || value->value == "true";
-}
-
-FormatSpecificFact formatFact(std::string kind, std::initializer_list<MatchField> fields) {
-  return FormatSpecificFact{
-      .kind = std::move(kind),
-      .fields = std::vector<MatchField>(fields),
-  };
-}
 
 MatchFactIndex::MatchFactIndex(const MatchContext& context) : context_(context) {
   assetsById_.reserve(context.assets().size());
@@ -129,51 +36,6 @@ const SourceFile* MatchFactIndex::sourceFor(const MatchFact& fact) const {
     return nullptr;
   }
   return context_.sources().contains(*fact.scope.source) ? &context_.sources().source(*fact.scope.source) : nullptr;
-}
-
-SampleCoverageSelection selectSampleCoverage(std::optional<u32> preferredGroup, std::span<const u32> required,
-                                             std::span<const SampleCoverageProvider> providers) {
-  std::vector<SampleCoverageProvider> ordered(providers.begin(), providers.end());
-  std::ranges::sort(ordered, std::ranges::greater{}, &SampleCoverageProvider::priority);
-
-  std::set<u32> remaining(required.begin(), required.end());
-  std::vector<SampleCoverageProvider> selected;
-  bool preferredFound = false;
-  if (preferredGroup && *preferredGroup > 0) {
-    const auto preferred = std::ranges::find_if(ordered, [&](const SampleCoverageProvider& provider) {
-      return provider.groupId && *provider.groupId == *preferredGroup;
-    });
-    if (preferred != ordered.end()) {
-      preferredFound = true;
-      selected.push_back(*preferred);
-      markCovered(remaining, *preferred);
-    }
-  }
-
-  for (const auto& provider : ordered) {
-    if (std::ranges::find(selected, provider.index, &SampleCoverageProvider::index) != selected.end()) {
-      continue;
-    }
-    const bool associated = preferredGroup.value_or(0) == provider.groupId.value_or(0);
-    const bool contributes = std::ranges::any_of(remaining, [&](u32 value) { return covers(provider, value); });
-    if (!associated && !contributes) {
-      continue;
-    }
-    selected.push_back(provider);
-    markCovered(remaining, provider);
-    if (remaining.empty()) {
-      break;
-    }
-  }
-
-  std::ranges::sort(selected, {}, &SampleCoverageProvider::first);
-  SampleCoverageSelection result{.preferredGroupFound = preferredFound};
-  result.providers.reserve(selected.size());
-  for (const auto& provider : selected) {
-    result.providers.push_back(provider.index);
-  }
-  result.missing.assign(remaining.begin(), remaining.end());
-  return result;
 }
 
 CollectionAssembly::CollectionAssembly(CollectionKey key, std::string name)
@@ -250,46 +112,6 @@ void CollectionAssembly::addUnique(std::vector<AssetId>& ids, AssetId id) {
   if (std::ranges::find(ids, id) == ids.end()) {
     ids.push_back(id);
   }
-}
-
-std::vector<DesiredCollection> resolveCollectionMemberFacts(const MatchContext& context, std::string_view resolver,
-                                                            std::string_view format) {
-  // Group member facts by CollectionKey so files loaded at different times can
-  // still complete the same collection.
-  std::map<std::pair<std::string, std::string>, DesiredCollection> grouped;
-
-  for (const auto& fact : context.matchFacts()) {
-    if (!format.empty() && fact.format != format) {
-      continue;
-    }
-
-    const auto* member = std::get_if<CollectionMemberFact>(&fact.payload);
-    if (member == nullptr || member->key.resolver != resolver) {
-      continue;
-    }
-
-    auto& collection = grouped[{member->key.resolver, member->key.value}];
-    if (collection.key.resolver.empty()) {
-      collection.key = member->key;
-      collection.name = !member->collectionName.empty() ? member->collectionName : member->key.value;
-    } else if (collection.name.empty() && !member->collectionName.empty()) {
-      collection.name = member->collectionName;
-    }
-
-    addMember(collection, fact.asset, member->role);
-  }
-
-  std::vector<DesiredCollection> collections;
-  collections.reserve(grouped.size());
-  for (auto& entry : grouped) {
-    auto& collection = entry.second;
-    if (!collection.sequence) {
-      collection.status = CollectionStatus::Incomplete;
-      collection.issues.push_back(missingSequenceIssue());
-    }
-    collections.push_back(std::move(collection));
-  }
-  return collections;
 }
 
 }  // namespace vgmtrans::core

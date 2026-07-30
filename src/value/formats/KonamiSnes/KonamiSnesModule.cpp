@@ -49,12 +49,6 @@ using namespace core;
                    input.reader.range(0, input.reader.size()));
   }
 
-  result.sourceFact(sequence.id(),
-                    FormatSpecificFact{
-                        .kind = "konami-snes-version",
-                        .fields = {MatchField{.name = "version", .value = konamiSnesVersionName(layout->version)}},
-                    });
-
   return result.finish();
 }
 

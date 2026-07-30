@@ -17,8 +17,7 @@ using namespace core;
 
 namespace {
 
-[[nodiscard]] SourceRange sequenceRange(ByteReader reader, const Layout& layout,
-                                        const SequenceProgram& program) {
+[[nodiscard]] SourceRange sequenceRange(ByteReader reader, const Layout& layout, const SequenceProgram& program) {
   u64 first = layout.playlistAddress;
   u64 last = first + 2;
   if (program.sectionPlaylist) {
@@ -72,15 +71,6 @@ namespace {
                    input.reader.range(0, input.reader.size()));
   }
 
-  result.sourceFact(sequence.id(),
-                    FormatSpecificFact{
-                        .kind = "nin-snes-profile",
-                        .fields =
-                            {
-                                MatchField{.name = "profile", .value = std::string(profile(layout->profile).name)},
-                                MatchField{.name = "song_index", .value = std::to_string(layout->songIndex)},
-                            },
-                    });
   return result.finish();
 }
 

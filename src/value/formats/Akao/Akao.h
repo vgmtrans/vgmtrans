@@ -30,8 +30,25 @@ inline constexpr std::string_view kAkaoCollectionResolver = "Akao";
 inline constexpr std::string_view kAkaoSequenceIdDomain = "akao.sequence-id";
 inline constexpr std::string_view kAkaoSampleSetDomain = "akao.sample-set";
 inline constexpr std::string_view kAkaoArticulationDomain = "akao.articulation";
-inline constexpr std::string_view kAkaoInstrumentSetFact = "akao.instrument-set";
-inline constexpr std::string_view kAkaoSequenceAssetField = "sequence_asset";
+inline constexpr std::string_view kAkaoInstrumentSequenceDomain = "akao.instrument-sequence";
+
+struct AkaoSampleCoverageProvider {
+  std::size_t index = 0;
+  std::optional<u32> sampleSetId;
+  u32 first = 0;
+  u32 count = 0;
+  u64 sourceOffset = 0;
+};
+
+struct AkaoSampleCoverageSelection {
+  std::vector<std::size_t> providers;
+  std::vector<u32> missing;
+  bool requestedSampleSetFound = false;
+};
+
+[[nodiscard]] AkaoSampleCoverageSelection selectAkaoSampleCoverage(
+    std::optional<u32> requestedSampleSetId, const std::vector<u32>& required,
+    const std::vector<AkaoSampleCoverageProvider>& providers);
 
 inline constexpr u32 kAkaoSignature = 0x414B414F;
 inline constexpr u32 kAkaoPpqn = 0x30;

@@ -33,13 +33,6 @@ struct CollectionKey {
   friend bool operator==(const CollectionKey&, const CollectionKey&) noexcept = default;
 };
 
-enum class CollectionMemberRole {
-  Sequence,
-  InstrumentSet,
-  SampleCollection,
-  Misc,
-};
-
 struct MatchScope {
   MatchScopeKind kind = MatchScopeKind::Session;
   std::optional<SourceId> source;
@@ -52,12 +45,11 @@ struct IdMatchFact {
   u32 value = 0;
 };
 
-struct FilenameStemFact {
-  std::string stem;
-};
-
-struct OffsetOrderFact {
-  u64 offset = 0;
+// A durable relationship between the asset carrying this fact and another
+// asset. Keeping the target typed lets validation and removal follow it.
+struct AssetRelationFact {
+  std::string domain;
+  AssetId target;
 };
 
 struct SampleCoverageFact {
@@ -71,25 +63,7 @@ struct SampleRequirementFact {
   std::vector<u32> required;
 };
 
-struct CollectionMemberFact {
-  // Simple case: the scanner already knows this asset belongs to this collection.
-  CollectionKey key;
-  std::string collectionName;
-  CollectionMemberRole role = CollectionMemberRole::Misc;
-};
-
-struct MatchField {
-  std::string name;
-  std::string value;
-};
-
-struct FormatSpecificFact {
-  std::string kind;
-  std::vector<MatchField> fields;
-};
-
-using MatchFactPayload = std::variant<IdMatchFact, FilenameStemFact, OffsetOrderFact, SampleCoverageFact,
-                                      SampleRequirementFact, CollectionMemberFact, FormatSpecificFact>;
+using MatchFactPayload = std::variant<IdMatchFact, AssetRelationFact, SampleCoverageFact, SampleRequirementFact>;
 
 struct MatchFact {
   AssetId asset;

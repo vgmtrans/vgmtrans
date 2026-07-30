@@ -296,7 +296,10 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
   };
   const auto removesFact = [&](const MatchFact& fact) {
     const bool removedSource = fact.scope.source && sourceIds.contains(fact.scope.source->value);
-    return removedSource || (fact.asset.valid() && assetIds.contains(fact.asset.value));
+    const auto* relation = std::get_if<AssetRelationFact>(&fact.payload);
+    const bool removedTarget =
+        relation != nullptr && relation->target.valid() && assetIds.contains(relation->target.value);
+    return removedSource || removedTarget || (fact.asset.valid() && assetIds.contains(fact.asset.value));
   };
   const auto removesLink = [&](const SourceLink& link) {
     if (const auto* target = std::get_if<SourceRange>(&link.target)) {
