@@ -568,11 +568,11 @@ void standaloneSynthExportsKeepNativeModulation() {
   builder.assets.emplace_back(instruments);
   builder.assets.emplace_back(samples);
   const SessionSnapshot snapshot = builder.finish();
-  SequenceDialectRegistry dialects;
+  const FormatRegistry formats;
   const Artifact soundFont = exportInstrumentSet(snapshot, sources, instruments.metadata.id,
-                                                 SynthExportFormat::SoundFont2, ExportRequest{}, dialects);
-  const Artifact dls = exportInstrumentSet(snapshot, sources, instruments.metadata.id,
-                                           SynthExportFormat::Dls, ExportRequest{}, dialects);
+                                                 SynthExportFormat::SoundFont2, ExportRequest{}, formats);
+  const Artifact dls =
+      exportInstrumentSet(snapshot, sources, instruments.metadata.id, SynthExportFormat::Dls, ExportRequest{}, formats);
 
   expect(soundFontIgenContainsAmount(soundFont.bytes, 24, -8479),
          "standalone SoundFont export should retain native modulation when no MIDI replacement exists");
@@ -646,20 +646,18 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
       .instrumentSets = {instruments.metadata.id},
       .sampleCollections = {samples.metadata.id},
   });
-  SequenceDialectRegistry dialects;
-  dialects.add(dialect);
+  FormatRegistry formats;
+  formats.add(testFormat(probeSequenceModule(), dialect));
   const SessionSnapshot snapshot = builder.finish();
 
-  const auto complete = exportCollection(
-      snapshot, sources, CollectionId{0},
-      ExportRequest{.kinds = {ExportKind::SoundFont2, ExportKind::Dls}}, dialects);
-  const auto restricted = exportCollection(
-      snapshot, sources, CollectionId{0},
-      ExportRequest{
-          .kinds = {ExportKind::SoundFont2, ExportKind::Dls},
-          .exportOnlyUsedInstruments = true,
-      },
-      dialects);
+  const auto complete = exportCollection(snapshot, sources, CollectionId{0},
+                                         ExportRequest{.kinds = {ExportKind::SoundFont2, ExportKind::Dls}}, formats);
+  const auto restricted = exportCollection(snapshot, sources, CollectionId{0},
+                                           ExportRequest{
+                                               .kinds = {ExportKind::SoundFont2, ExportKind::Dls},
+                                               .exportOnlyUsedInstruments = true,
+                                           },
+                                           formats);
 
   expect(complete.size() == 2 && restricted.size() == 2, "collection fixture should export SF2 and DLS pairs");
   expect(chunkSize(complete[0].bytes, "phdr") == 4 * 38 && chunkSize(complete[0].bytes, "shdr") == 4 * 46,
@@ -680,9 +678,9 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
 
   const ExportRequest onlyUsed{.exportOnlyUsedInstruments = true};
   const auto uniqueSoundFont =
-      exportInstrumentSet(snapshot, sources, instruments.metadata.id, SynthExportFormat::SoundFont2, onlyUsed, dialects);
+      exportInstrumentSet(snapshot, sources, instruments.metadata.id, SynthExportFormat::SoundFont2, onlyUsed, formats);
   const auto uniqueDls =
-      exportInstrumentSet(snapshot, sources, instruments.metadata.id, SynthExportFormat::Dls, onlyUsed, dialects);
+      exportInstrumentSet(snapshot, sources, instruments.metadata.id, SynthExportFormat::Dls, onlyUsed, formats);
   expect(chunkSize(uniqueSoundFont.bytes, "phdr") == 3 * 38 && chunkSize(uniqueSoundFont.bytes, "shdr") == 3 * 46 &&
              readLe32(uniqueDls.bytes, asciiOffset(uniqueDls.bytes, "colh") + 8) == 2 &&
              chunkSize(uniqueDls.bytes, "ptbl") == 16,
@@ -702,9 +700,9 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   };
   const SessionSnapshot ambiguousSnapshot = ambiguousBuilder.finish();
   const auto ambiguousSoundFont = exportInstrumentSet(ambiguousSnapshot, sources, instruments.metadata.id,
-                                                      SynthExportFormat::SoundFont2, onlyUsed, dialects);
+                                                      SynthExportFormat::SoundFont2, onlyUsed, formats);
   const auto ambiguousDls = exportInstrumentSet(ambiguousSnapshot, sources, instruments.metadata.id,
-                                                SynthExportFormat::Dls, onlyUsed, dialects);
+                                                SynthExportFormat::Dls, onlyUsed, formats);
   expect(chunkSize(ambiguousSoundFont.bytes, "phdr") == 4 * 38 &&
              chunkSize(ambiguousSoundFont.bytes, "shdr") == 4 * 46 &&
              readLe32(ambiguousDls.bytes, asciiOffset(ambiguousDls.bytes, "colh") + 8) == 3 &&
@@ -777,7 +775,7 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
                                              .kinds = {kind},
                                              .exportOnlyUsedInstruments = true,
                                          },
-                                         SequenceDialectRegistry{});
+                                         FormatRegistry{});
     expect(failed.size() == 1 && failed[0].bytes.empty(),
            "used-instrument export should stop when sequence rendering fails");
     diagnosticWithMessage(failed[0].diagnostics, "No sequence dialect registered for 'probe'");
@@ -880,24 +878,24 @@ void collectionPreparationAppliesToWholeExport() {
   builder.collections.push_back(std::move(failingCollection));
 
   FormatRegistry formats;
-  formats.add(FormatModule{
-      .name = "Performance Finalizer",
-      .scan = scanNoSources,
-      .prepareCollection = preparePerformanceFinalizer,
-  });
+  formats.add(testFormat(
+      FormatModule{
+          .name = "Performance Finalizer",
+          .scan = scanNoSources,
+          .prepareCollection = preparePerformanceFinalizer,
+      },
+      dialect));
   formats.seal();
-  SequenceDialectRegistry dialects;
-  dialects.add(dialect);
   const SessionSnapshot snapshot = builder.finish();
   const CollectionPlayback playback =
-      prepareCollectionPlayback(snapshot, sources, CollectionId{0}, PlaybackRequest{}, dialects, &formats);
+      prepareCollectionPlayback(snapshot, sources, CollectionId{0}, PlaybackRequest{}, formats);
   expect(playback.soundFont.size() >= 12 && containsAscii(playback.soundFont, "Durable Instrument"),
          "a performance-only collection preparer should preserve durable instrument sets for synth export");
   expect(soundFontImodContains(playback.soundFont, 129, 6, 100),
          "collection preparation should run before sequence modulation is analyzed");
 
-  const auto failed = exportCollection(snapshot, sources, CollectionId{1}, ExportRequest{.kinds = {ExportKind::Midi}},
-                                       dialects, &formats);
+  const auto failed =
+      exportCollection(snapshot, sources, CollectionId{1}, ExportRequest{.kinds = {ExportKind::Midi}}, formats);
   expect(failed.size() == 1, "a failing collection performance finalizer should produce one MIDI artifact");
   diagnosticWithMessage(failed.front().diagnostics, "Collection preparation warning");
   diagnosticWithMessage(failed.front().diagnostics,
@@ -936,15 +934,14 @@ void collectionPreparationReplacesDurableInstrumentSets() {
   });
 
   FormatRegistry formats;
-  formats.add(FormatModule{
+  formats.add(testFormat(FormatModule{
       .name = "Prepared Probe",
       .scan = scanNoSources,
       .prepareCollection = prepareReplacementInstrumentSet,
-  });
+  }));
   formats.seal();
-  SequenceDialectRegistry dialects;
-  const auto artifacts = exportCollection(builder.finish(), sources, CollectionId{0},
-                                          ExportRequest{.kinds = {ExportKind::Dls}}, dialects, &formats);
+  const auto artifacts =
+      exportCollection(builder.finish(), sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Dls}}, formats);
 
   expect(artifacts.size() == 1 && !artifacts.front().bytes.empty(),
          "collection preparation replacement fixture should export a DLS");
@@ -1008,18 +1005,17 @@ void synthOnlyExportSkipsSequencesWithoutModulation() {
       .instrumentSets = {instruments.metadata.id},
       .sampleCollections = {samples.metadata.id},
   });
-  SequenceDialectRegistry dialects;
-  dialects.add(dialect);
+  FormatRegistry formats;
+  formats.add(testFormat(probeSequenceModule(), dialect));
 
   synthOnlySequenceExecutions = 0;
-  const auto artifacts = exportCollection(
-      builder.finish(), sources, CollectionId{0},
-      ExportRequest{
-          .kinds = {ExportKind::Dls},
-          .modulationScaling = ModulationScalingPolicy::ObservedSequenceRange,
-          .modulationConversion = ModulationConversionPolicy::SynthModulators,
-      },
-      dialects);
+  const auto artifacts = exportCollection(builder.finish(), sources, CollectionId{0},
+                                          ExportRequest{
+                                              .kinds = {ExportKind::Dls},
+                                              .modulationScaling = ModulationScalingPolicy::ObservedSequenceRange,
+                                              .modulationConversion = ModulationConversionPolicy::SynthModulators,
+                                          },
+                                          formats);
   expect(artifacts.size() == 1 && !artifacts[0].bytes.empty(),
          "synth-only export should still write an instrument artifact without sequence modulation");
   expect(synthOnlySequenceExecutions == 0,
@@ -1057,9 +1053,9 @@ void exportDiagnosticsPreserveSourceRanges() {
   });
   const SessionSnapshot project = builder.finish();
 
-  SequenceDialectRegistry dialects;
+  const FormatRegistry formats;
   const auto wavArtifacts =
-      exportCollection(project, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Wav}}, dialects);
+      exportCollection(project, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Wav}}, formats);
   expect(wavArtifacts.size() == 1, "WAV export should return one artifact for one sample");
   expectDiagnosticRange(wavArtifacts[0].diagnostics, "Sample source was not found", missingSampleRange);
 
@@ -1191,11 +1187,11 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
       .instrumentSets = {instruments.metadata.id},
       .sampleCollections = {samples.metadata.id},
   });
-  SequenceDialectRegistry dialects;
-  dialects.add(dialect);
+  FormatRegistry formats;
+  formats.add(testFormat(probeSequenceModule(), dialect));
 
   const auto playback =
-      prepareCollectionPlayback(builder.finish(), sources, CollectionId{0}, PlaybackRequest{}, dialects);
+      prepareCollectionPlayback(builder.finish(), sources, CollectionId{0}, PlaybackRequest{}, formats);
   expect(playback.playable() && playback.diagnostics.empty(),
          "valid collection playback should prepare clean MIDI and SoundFont data");
   expect(playback.collection == CollectionId{0} && playback.sequence == sequence.metadata.id &&
@@ -1224,7 +1220,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
       .sequence = sequence.metadata.id,
   });
   const auto missingSynth =
-      prepareCollectionPlayback(sequenceOnlyBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{}, dialects);
+      prepareCollectionPlayback(sequenceOnlyBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{}, formats);
   expect(!missingSynth.playable() &&
              std::ranges::any_of(missingSynth.diagnostics,
                                  [](const Diagnostic& diagnostic) {
@@ -1247,7 +1243,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
       .sampleCollections = {samples.metadata.id},
   });
   const auto sampleOnlySynth =
-      prepareCollectionPlayback(sampleOnlySynthBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{}, dialects);
+      prepareCollectionPlayback(sampleOnlySynthBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{}, formats);
   expect(!sampleOnlySynth.playable() && sampleOnlySynth.soundFont.empty() &&
              std::ranges::any_of(sampleOnlySynth.diagnostics,
                                  [](const Diagnostic& diagnostic) {
@@ -1266,7 +1262,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
       .sampleCollections = {samples.metadata.id},
   });
   const auto missingSequence =
-      prepareCollectionPlayback(synthOnlyBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{}, dialects);
+      prepareCollectionPlayback(synthOnlyBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{}, formats);
   expect(!missingSequence.playable() &&
              std::ranges::any_of(missingSequence.diagnostics,
                                  [](const Diagnostic& diagnostic) {

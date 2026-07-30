@@ -347,7 +347,7 @@ void capcomSnesLayoutReadsOldAndRejectsMalformedDspInit() {
 void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   Session session;
   vgmtrans::formats::registerValueFormats(session);
-  expect(session.dialects().contains("capcom-snes"),
+  expect(session.formats().containsDialect("capcom-snes"),
          "value format registration should include the CapcomSnes sequence dialect");
   const auto capcomModule = std::ranges::find_if(
       session.formats().modules(), [](const FormatModule& module) { return module.name == "CapcomSnes"; });
@@ -376,7 +376,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
              sequenceInspection->bytes().size() == 0x1010,
          "sequence inspection should cover its header and decoded tracks");
 
-  const auto* dialect = session.dialects().find(sequence->program.dialect.value);
+  const auto* dialect = session.formats().findDialect(sequence->program.dialect.value);
   expect(dialect != nullptr, "registered dialect should interpret the scanned sequence program");
   expect(dialect->execute != nullptr, "CapcomSnes should register a compiled command executor");
   const auto& firstTrack = sequence->program.tracks[0];
@@ -1059,7 +1059,7 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
   expect(sequence != nullptr, "CapcomSnes note-state scan should produce a sequence");
   expect(!sequence->program.tracks.empty(), "CapcomSnes note-state scan should decode tracks");
 
-  const auto* dialect = session.dialects().find(sequence->program.dialect.value);
+  const auto* dialect = session.formats().findDialect(sequence->program.dialect.value);
   expect(dialect != nullptr, "CapcomSnes note-state scan should have a registered dialect");
   const auto& track = sequence->program.tracks[0];
   const auto& commands = track.commands;

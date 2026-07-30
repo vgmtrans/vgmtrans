@@ -10,10 +10,9 @@
 #include "value/export/Export.h"
 #include "value/model/SessionSnapshot.h"
 #include "value/model/SourceInspection.h"
-#include "value/scan/FormatRegistry.h"
 #include "value/scan/FormatDefinition.h"
+#include "value/scan/FormatRegistry.h"
 #include "value/scan/ScanTypes.h"
-#include "value/sequence/SequenceDialect.h"
 
 #include <filesystem>
 #include <memory>
@@ -29,7 +28,7 @@ class SessionState;
 
 // Session is the mutable state for one loaded workspace. It owns the source
 // bytes, the assets found inside them, the facts used to match related assets,
-// the collections built from those matches, and the format registries.
+// the collections built from those matches, and the format registry.
 // Call snapshot() when UI, tests, or export need a stable read-only view.
 class Session {
 public:
@@ -41,8 +40,6 @@ public:
   Session& operator=(const Session&) = delete;
 
   void registerFormat(FormatDefinition definition);
-  void registerFormat(FormatModule module);
-  void registerFormat(FormatModule module, SequenceDialect dialect);
 
   SourceId addSource(SourceFile file, std::vector<u8> bytes);
   SourceId addSourceFromPath(std::filesystem::path path);
@@ -63,11 +60,10 @@ public:
 
   [[nodiscard]] const SourceStore& sources() const noexcept { return sources_; }
   [[nodiscard]] const FormatRegistry& formats() const noexcept { return formats_; }
-  [[nodiscard]] const SequenceDialectRegistry& dialects() const noexcept { return dialects_; }
 
 private:
   void invalidateSnapshot() noexcept;
-  void sealRegistries() noexcept;
+  void sealFormats() noexcept;
   void scanSourceAndDerived(SourceId id);
   void scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<u32>& queued);
   void addExtractedSources(std::vector<ExtractedSource> extractedSources, SourceId defaultParent,
@@ -78,7 +74,6 @@ private:
   SourceStore sources_;
   std::unique_ptr<SessionState> state_;
   FormatRegistry formats_;
-  SequenceDialectRegistry dialects_;
   ScanIdAllocator ids_;
   std::unordered_set<u32> scannedSources_;
   // Session is single-thread-confined. This memoized immutable revision is

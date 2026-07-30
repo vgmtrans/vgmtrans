@@ -182,7 +182,7 @@ void akaoSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(sequence->program.timebase.ppqn == kAkaoSnesPpqn, "AkaoSnes sequence should use SNES PPQN");
   expect(sequence->program.tracks.size() == 1, "null V1 track pointers should be skipped");
 
-  const auto* dialect = session.dialects().find(sequence->program.dialect.value);
+  const auto* dialect = session.formats().findDialect(sequence->program.dialect.value);
   expect(dialect != nullptr, "registered AkaoSnes dialect should render the scanned sequence");
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program, *dialect);
   expect(performance.diagnostics.empty(), "AkaoSnes performance render should not report diagnostics");

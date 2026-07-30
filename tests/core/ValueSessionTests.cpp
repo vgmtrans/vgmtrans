@@ -19,8 +19,8 @@ namespace {
 
 void sessionScansValuesAndDerivedSources() {
   Session session;
-  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
-  session.registerFormat(probeMiscModule());
+  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
+  session.registerFormat(testFormat(probeMiscModule()));
 
   const auto sourceId = session.addSource(SourceFile{.name = "probe.spc"}, {0xaa, 0x34, 0x12});
   expect(sourceId == SourceId{0}, "first source should get SourceId 0");
@@ -83,7 +83,7 @@ void sessionScansValuesAndDerivedSources() {
 
 void sessionSharesOneImmutableSnapshotPerRevision() {
   Session session;
-  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
+  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
 
   const auto firstSource = session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
   const SessionSnapshot beforeScan = session.snapshot();
@@ -138,7 +138,7 @@ void sessionSharesOneImmutableSnapshotPerRevision() {
 
 void sessionReportsUnregisteredSequenceDialect() {
   Session session;
-  session.registerFormat(probeSequenceModule());
+  session.registerFormat(testFormat(probeSequenceModule()));
 
   session.addSource(SourceFile{.name = "missing-dialect.probe"}, {0xaa});
   session.scanPendingSources();
@@ -163,7 +163,7 @@ void sessionReportsUnregisteredSequenceDialect() {
 
 void sessionScansIndividualSourcesWithoutDuplicating() {
   Session session;
-  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
+  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
 
   const auto first = session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
   session.scanSource(first);
@@ -193,8 +193,8 @@ void sessionScansIndividualSourcesWithoutDuplicating() {
 
 void sessionClosesSourceFamiliesWhenScansFindNoAssets() {
   Session session;
-  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
-  session.registerFormat(FormatModule{
+  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
+  session.registerFormat(testFormat(FormatModule{
       .name = "ProbeEmptyExtractor",
       .canScan = [](const SourceFile&, std::span<const u8> bytes) { return !bytes.empty() && bytes[0] == 0x00; },
       .scan =
@@ -209,7 +209,7 @@ void sessionClosesSourceFamiliesWhenScansFindNoAssets() {
             }
             return result;
           },
-  });
+  }));
 
   const SourceId detected = session.addSource(SourceFile{.name = "detected.probe"}, {0xaa});
   const SourceId empty = session.addSource(SourceFile{.name = "empty.probe"}, {0x00});
@@ -233,7 +233,7 @@ void sessionClosesSourceFamiliesWhenScansFindNoAssets() {
 
 void sessionKeepsScannerKnownCollectionsWithoutResolver() {
   Session session;
-  session.registerFormat(probeExplicitCollectionModule(), probeSequenceDialect());
+  session.registerFormat(testFormat(probeExplicitCollectionModule(), probeSequenceDialect()));
 
   const auto source = session.addSource(SourceFile{.name = "explicit.probe"}, {0xab});
   session.scanSource(source);
@@ -251,8 +251,8 @@ void sessionKeepsScannerKnownCollectionsWithoutResolver() {
 
 void sessionMatchesCollectionsAcrossSeparateSourceScans() {
   Session session;
-  session.registerFormat(probeBankSequenceModule(), probeSequenceDialect());
-  session.registerFormat(probeBankInstrumentModule());
+  session.registerFormat(testFormat(probeBankSequenceModule(), probeSequenceDialect()));
+  session.registerFormat(testFormat(probeBankInstrumentModule()));
 
   const auto instrument = session.addSource(SourceFile{.name = "bank-7.instr"}, {0xdd, 7});
   session.scanSource(instrument);
@@ -280,8 +280,8 @@ void sessionMatchesCollectionsAcrossSeparateSourceScans() {
 
 void sessionRemovesSourceFamilyAndDiscoveredData() {
   Session session;
-  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
-  session.registerFormat(probeMiscModule());
+  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
+  session.registerFormat(testFormat(probeMiscModule()));
 
   const auto source = session.addSource(SourceFile{.name = "remove-me.probe"}, {0xaa, 0x34});
   session.scanSource(source);
@@ -329,8 +329,8 @@ void sessionRemovesSourceFamilyAndDiscoveredData() {
 
 void sessionRemovesSourceFamilyWithItsLastAsset() {
   Session session;
-  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
-  session.registerFormat(probeMiscModule());
+  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
+  session.registerFormat(testFormat(probeMiscModule()));
 
   const SourceId source = session.addSource(SourceFile{.name = "remove-assets.probe"}, {0xaa, 0x34});
   session.scanSource(source);
@@ -369,8 +369,8 @@ void sessionRemovesSourceFamilyWithItsLastAsset() {
 
 void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
   Session session;
-  session.registerFormat(probeBankSequenceModule(), probeSequenceDialect());
-  session.registerFormat(probeBankInstrumentModule());
+  session.registerFormat(testFormat(probeBankSequenceModule(), probeSequenceDialect()));
+  session.registerFormat(testFormat(probeBankInstrumentModule()));
 
   const auto instrument = session.addSource(SourceFile{.name = "bank-9.instr"}, {0xdd, 9});
   const auto sequence = session.addSource(SourceFile{.name = "bank-9.seq"}, {0xcc, 9});
@@ -406,7 +406,7 @@ void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
 
 void sessionResolverFailureDoesNotWipeExistingCollections() {
   Session session;
-  session.registerFormat(fragileProbeSequenceModule(), probeSequenceDialect());
+  session.registerFormat(testFormat(fragileProbeSequenceModule(), probeSequenceDialect()));
 
   const auto first = session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
   session.scanSource(first);
@@ -425,7 +425,7 @@ void sessionResolverFailureDoesNotWipeExistingCollections() {
 
 void sessionMarksCollectionsStaleWhenRemovalCannotReconcile() {
   Session session;
-  session.registerFormat(fragileProbeSequenceModule(), probeSequenceDialect());
+  session.registerFormat(testFormat(fragileProbeSequenceModule(), probeSequenceDialect()));
 
   const auto source = session.addSource(SourceFile{.name = "stale-on-failure.probe"}, {0xaa});
   session.scanSource(source);
@@ -450,13 +450,13 @@ void sessionMarksCollectionsStaleWhenRemovalCannotReconcile() {
 
 void sessionRejectsLateRegistryMutation() {
   Session session;
-  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
+  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
 
   session.addSource(SourceFile{.name = "sealed.probe"}, {0xaa});
 
   bool formatFailed = false;
   try {
-    session.registerFormat(probeMiscModule());
+    session.registerFormat(testFormat(probeMiscModule()));
   } catch (const std::logic_error&) {
     formatFailed = true;
   }
@@ -467,7 +467,7 @@ void sessionRejectsLateRegistryMutation() {
 
   bool emptyScanSealed = false;
   try {
-    scannedEmptySession.registerFormat(probeSequenceModule());
+    scannedEmptySession.registerFormat(testFormat(probeSequenceModule()));
   } catch (const std::logic_error&) {
     emptyScanSealed = true;
   }
@@ -476,7 +476,7 @@ void sessionRejectsLateRegistryMutation() {
 
 void sessionRejectsDuplicateAssetIdsAtAdmission() {
   Session session;
-  session.registerFormat(probeDuplicateAssetModule());
+  session.registerFormat(testFormat(probeDuplicateAssetModule()));
 
   session.addSource(SourceFile{.name = "duplicate.probe"}, {0xee});
   session.scanPendingSources();
@@ -493,8 +493,8 @@ void sessionRejectsDuplicateAssetIdsAtAdmission() {
 
 void sessionRejectsExtractedSourcesWithMissingParents() {
   Session session;
-  session.registerFormat(probeBadExtractedSourceModule());
-  session.registerFormat(probeMiscModule());
+  session.registerFormat(testFormat(probeBadExtractedSourceModule()));
+  session.registerFormat(testFormat(probeMiscModule()));
 
   session.addSource(SourceFile{.name = "bad-derived-parent.probe"}, {0xf1});
   session.scanPendingSources();
@@ -509,7 +509,7 @@ void sessionRejectsExtractedSourcesWithMissingParents() {
 
 void sessionRejectsMatchFactsForMissingAssets() {
   Session session;
-  session.registerFormat(probeBadFactAssetModule());
+  session.registerFormat(testFormat(probeBadFactAssetModule()));
 
   session.addSource(SourceFile{.name = "bad-fact-asset.probe"}, {0xf2});
   session.scanPendingSources();
@@ -523,7 +523,7 @@ void sessionRejectsMatchFactsForMissingAssets() {
 
 void sessionRejectsSourceScopedMatchFactsForMissingSources() {
   Session session;
-  session.registerFormat(probeBadFactSourceModule());
+  session.registerFormat(testFormat(probeBadFactSourceModule()));
 
   session.addSource(SourceFile{.name = "bad-fact-source.probe"}, {0xf3});
   session.scanPendingSources();
@@ -844,7 +844,7 @@ void scanValidationRejectsDanglingSourceAnnotationReferences() {
 
 void sessionReportsDesiredCollectionMissingAssetReferences() {
   Session session;
-  session.registerFormat(missingAssetCollectionResolverModule());
+  session.registerFormat(testFormat(missingAssetCollectionResolverModule()));
 
   session.addSource(SourceFile{.name = "missing-refs.probe"}, {0x00});
   session.scanPendingSources();
@@ -872,8 +872,8 @@ void sessionReportsDesiredCollectionMissingAssetReferences() {
 
 void sessionReportsDesiredCollectionWrongTypeReferences() {
   Session session;
-  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
-  session.registerFormat(wrongTypeCollectionResolverModule());
+  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
+  session.registerFormat(testFormat(wrongTypeCollectionResolverModule()));
 
   session.addSource(SourceFile{.name = "wrong-type.probe"}, {0xaa});
   session.scanPendingSources();
@@ -902,7 +902,7 @@ void sessionReportsDesiredCollectionWrongTypeReferences() {
 
 void sessionReportsDuplicateDesiredCollectionKeys() {
   Session session;
-  session.registerFormat(duplicateKeyCollectionResolverModule());
+  session.registerFormat(testFormat(duplicateKeyCollectionResolverModule()));
 
   session.addSource(SourceFile{.name = "duplicate-keys.probe"}, {0x00});
   session.scanPendingSources();
@@ -1016,7 +1016,7 @@ void sessionAddsSourceFromPath() {
   }
 
   Session session;
-  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
+  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
 
   const auto sourceId = session.addSourceFromPath(path);
   expect(sourceId == SourceId{0}, "path source should get SourceId 0");
@@ -1038,7 +1038,7 @@ void sessionAddsSourceFromPath() {
 
 void sessionExportsAllCollections() {
   Session session;
-  session.registerFormat(probeSequenceModule(), probeSequenceDialect());
+  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
 
   session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
   session.addSource(SourceFile{.name = "second.probe"}, {0xaa});
@@ -1072,7 +1072,7 @@ void sessionExportsASequenceWithoutACollection() {
     result.explicitCollections.clear();
     return result;
   };
-  session.registerFormat(std::move(format), probeSequenceDialect());
+  session.registerFormat(testFormat(std::move(format), probeSequenceDialect()));
 
   session.addSource(SourceFile{.name = "loose.probe"}, {0xaa});
   session.scanPendingSources();

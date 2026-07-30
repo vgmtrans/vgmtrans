@@ -26,10 +26,10 @@ namespace vgmtrans::core {
 
 namespace {
 
-void prepareDiagnostics(ScanResult& result, const SourceFile& source, const SequenceDialectRegistry& dialects) {
+void prepareDiagnostics(ScanResult& result, const SourceFile& source, const FormatRegistry& formats) {
   for (const auto& asset : result.assets) {
     const auto* sequence = std::get_if<SequenceProgramAsset>(&asset);
-    if (sequence == nullptr || dialects.contains(sequence->program.dialect.value)) {
+    if (sequence == nullptr || formats.containsDialect(sequence->program.dialect.value)) {
       continue;
     }
 
@@ -56,22 +56,11 @@ Session::Session(Session&&) noexcept = default;
 Session& Session::operator=(Session&&) noexcept = default;
 
 void Session::registerFormat(FormatDefinition definition) {
-  formats_.add(std::move(definition.module));
-  for (auto& dialect : definition.sequenceDialects) {
-    dialects_.add(std::move(dialect));
-  }
-}
-
-void Session::registerFormat(FormatModule module) {
-  registerFormat(FormatDefinition{.module = std::move(module)});
-}
-
-void Session::registerFormat(FormatModule module, SequenceDialect dialect) {
-  registerFormat(FormatDefinition{.module = std::move(module), .sequenceDialects = {std::move(dialect)}});
+  formats_.add(std::move(definition));
 }
 
 SourceId Session::addSource(SourceFile file, std::vector<u8> bytes) {
-  sealRegistries();
+  sealFormats();
   invalidateSnapshot();
   file.kind = SourceKind::UserLoaded;
   return sources_.add(std::move(file), std::move(bytes));
@@ -112,7 +101,7 @@ void Session::removeSource(SourceId id) {
 }
 
 void Session::removeSources(std::span<const SourceId> ids) {
-  sealRegistries();
+  sealFormats();
   for (const SourceId id : ids) {
     if (!sources_.hasSlot(id)) {
       throw std::out_of_range("Cannot remove a SourceId that is not present in the Session");
@@ -137,7 +126,7 @@ void Session::removeSources(std::span<const SourceId> ids) {
 }
 
 void Session::removeAssets(std::span<const AssetId> assets) {
-  sealRegistries();
+  sealFormats();
   if (!std::ranges::any_of(assets, [&](AssetId id) { return state_->containsAsset(id); })) {
     return;
   }
@@ -181,7 +170,7 @@ void Session::removeAssets(std::span<const AssetId> assets) {
 // Scan this source if it has not been scanned yet. Any files extracted from it are
 // added as derived sources and scanned before this call returns.
 void Session::scanSource(SourceId id) {
-  sealRegistries();
+  sealFormats();
   if (!sources_.contains(id)) {
     throw std::out_of_range("Cannot scan a SourceId that is not present in the Session");
   }
@@ -198,7 +187,7 @@ void Session::scanSource(SourceId id) {
 // Scan every user-loaded source that is still pending. Derived sources are skipped
 // here because scanning their parent source already scans them.
 void Session::scanPendingSources() {
-  sealRegistries();
+  sealFormats();
   bool scannedAny = false;
   for (const SourceId source : sources_.activeUserSources()) {
     if (scannedSources_.contains(source.value)) {
@@ -240,30 +229,29 @@ std::shared_ptr<const SourceInspection> Session::inspect(AssetId asset) const {
 
 CollectionPlayback Session::preparePlayback(CollectionId id, const PlaybackRequest& request) const {
   const auto current = snapshot();
-  return core::prepareCollectionPlayback(current, sources_, id, request, dialects_, &formats_);
+  return core::prepareCollectionPlayback(current, sources_, id, request, formats_);
 }
 
 Artifact Session::exportSequenceMidi(AssetId id, const SequenceExportRequest& request) const {
-  return core::exportSequenceMidi(snapshot(), sources_, id, request, dialects_, &formats_);
+  return core::exportSequenceMidi(snapshot(), sources_, id, request, formats_);
 }
 
 Artifact Session::exportInstrumentSet(AssetId id, SynthExportFormat format, const ExportRequest& request) const {
-  return core::exportInstrumentSet(snapshot(), sources_, id, format, request, dialects_, &formats_);
+  return core::exportInstrumentSet(snapshot(), sources_, id, format, request, formats_);
 }
 
 std::vector<Artifact> Session::exportCollection(CollectionId id, const ExportRequest& request) const {
   const auto current = snapshot();
-  return core::exportCollection(current, sources_, id, request, dialects_, &formats_);
+  return core::exportCollection(current, sources_, id, request, formats_);
 }
 
 std::vector<CollectionExport> Session::exportAllCollections(const ExportRequest& request) const {
   const auto current = snapshot();
-  return core::exportAllCollections(current, sources_, request, dialects_, &formats_);
+  return core::exportAllCollections(current, sources_, request, formats_);
 }
 
-void Session::sealRegistries() noexcept {
+void Session::sealFormats() noexcept {
   formats_.seal();
-  dialects_.seal();
 }
 
 void Session::invalidateSnapshot() noexcept {
@@ -328,7 +316,7 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
           .ids = ids_,
       });
       normalizeScanResult(result, ids_);
-      prepareDiagnostics(result, source, dialects_);
+      prepareDiagnostics(result, source, formats_);
       auto validation = validateScanResult(source.id, result, sources_, state_->assets());
       if (!validation.empty()) {
         auto diagnostics = validation.takeDiagnostics();

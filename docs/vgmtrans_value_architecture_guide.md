@@ -157,7 +157,7 @@ The code uses several repeated words. Here they are in plain language.
 | `MatchFact` | A small fact emitted by a scanner to help decide which assets belong together. |
 | `SourceMap` | A durable map from byte ranges to meaning: headers, tables, commands, fields, pointers, instruments, samples, and so on. |
 | `Diagnostic` | A warning, error, or informational message, usually tied to a source range or object. |
-| `Session` | The mutable workspace. It owns sources, assets, facts, collections, source maps, diagnostics, and registries. |
+| `Session` | The mutable workspace. It owns sources, assets, facts, collections, source maps, diagnostics, and the format registry. |
 | `SessionSnapshot` | A copyable read-only view of the current session state. UI, tests, and export read this. |
 | `SequenceProgram` | A parsed source-level sequence, made of tracks and decoded source commands. |
 | `SequenceDialect` | The driver-specific behavior needed to execute a `SequenceProgram`. |
@@ -376,7 +376,8 @@ The source map is one of the strongest parts of the new architecture. It makes d
 
 Scanning is the process of turning one source into values.
 
-A format definition owns the scanner and any source-free dialects it needs:
+A format definition bundles one scanner module with any source-free dialects it
+provides:
 
 ```text
 FormatDefinition
@@ -388,7 +389,9 @@ FormatDefinition
   zero or more sequence dialects
 ```
 
-`Session::registerFormat` registers the whole definition. The mutable format and dialect registries are not exposed separately.
+`Session::registerFormat` registers the whole definition atomically. One
+`FormatRegistry` keeps modules in registration order and indexes every provided
+dialect by ID.
 
 Recognition belongs at the start of `scan`, which returns an empty result when the source does not match. This ensures layout/signature discovery runs once. `canScan` remains nullable as a migration adapter for older modules and should not be added to new ones.
 
@@ -490,7 +493,6 @@ That boundary is healthy. It means individual format modules can stay focused on
 - `SourceStore`
 - one private `SessionState`
 - `FormatRegistry`
-- `SequenceDialectRegistry`
 - `ScanIdAllocator`
 - the set of sources already scanned
 
@@ -507,7 +509,9 @@ Mutation calls return after changing the session. Callers request a snapshot exp
 
 ### 12.1 Registries are sealed before use
 
-The session seals the format and dialect registries before adding, scanning, removing, or exporting. This prevents the meaning of already-scanned assets from changing halfway through a session because a new format or dialect was added late.
+The session seals its format registry before source or discovered-state
+mutation begins. Because that registry contains both modules and dialects,
+their meaning cannot change independently after session work begins.
 
 ### 12.2 Scanning a source scans its derived sources
 
@@ -671,7 +675,10 @@ The dialect executor receives the command, program state, track state, `Performa
 
 `makeCompiledDialect<TrackState, Playback>(dialect)` fills the mechanical track-state factory and executor hooks. The format's dialect declaration therefore only spells out its identity, timebase, defaults, and any genuinely format-specific program state.
 
-The dialect is registered once in `SequenceDialectRegistry`; export looks it up by family ID. Capcom SNES, for example, registers `capcom-snes` once and resolves its V1/V2/V3 source conversions before playback.
+The dialect is provided through a `FormatDefinition` and indexed once in
+`FormatRegistry`; export looks it up by family ID. Capcom SNES, for example,
+registers `capcom-snes` once and resolves its V1/V2/V3 source conversions before
+playback.
 
 ### 14.3 Compiler-cursor decode and execution
 
@@ -1238,11 +1245,16 @@ It is the main mechanism for HexView-style explanation of parsed bytes.
 
 ### 21.5 `FormatRegistry`
 
-`FormatRegistry` stores registered format modules. The session offers every source to modules in insertion order. That includes derived sources.
+`FormatRegistry` stores registered format modules and the globally available
+sequence dialects their definitions provide. The session offers every source to
+modules in insertion order. That includes derived sources.
 
 Insertion order matters because extractors are registered before normal formats in `ValueFormats.cpp`.
 
-Formats enter through `FormatDefinition` and `Session::registerFormat`, which registers one module and all of its source-free dialects together.
+Formats enter through `FormatDefinition` and `Session::registerFormat`, which
+prevalidates one module and zero or more dialects before changing either
+registry index. The registry has one sealing lifecycle, and high-level export
+receives this same complete registration context.
 
 ### 21.6 `ScanResultBuilder`
 
@@ -1254,7 +1266,7 @@ This is a major readability win for format code.
 
 `SessionState` is the private consistency boundary for accepted scanner output. It owns flat vectors of discovered values, the small indexes required for identity and lookup, collection reconciliation, and coordinated source/asset removal.
 
-It is deliberately not part of the public session API. `Session` handles source bytes, registries, validation, and orchestration; `SessionState` handles durable discovered values as one atomic conceptual state.
+It is deliberately not part of the public session API. `Session` handles source bytes, format registration, validation, and orchestration; `SessionState` handles durable discovered values as one atomic conceptual state.
 
 ### 21.8 `MatchContext` and resolver helpers
 
