@@ -1126,6 +1126,10 @@ void exportDiagnosticsPreserveSourceRanges() {
       },
       sources);
   expectDiagnosticRange(sf2BadRegion.diagnostics, "Region sample reference was not found", regionRange);
+  static_cast<void>(
+      diagnosticWithMessage(sf2BadRegion.diagnostics, "No playable instruments available for SoundFont2 export"));
+  expect(sf2BadRegion.bytes.empty(),
+         "SoundFont export should reject sample-only output after every instrument region fails to resolve");
 
   const auto dlsBadRegion = buildDls(
       SynthExportInput{
@@ -1135,6 +1139,10 @@ void exportDiagnosticsPreserveSourceRanges() {
       },
       sources);
   expectDiagnosticRange(dlsBadRegion.diagnostics, "Region sample reference was not found", regionRange);
+  static_cast<void>(
+      diagnosticWithMessage(dlsBadRegion.diagnostics, "No playable instruments available for DLS export"));
+  expect(dlsBadRegion.bytes.empty(),
+         "DLS export should reject sample-only output after every instrument region fails to resolve");
 }
 
 void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
@@ -1223,6 +1231,30 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
                                    return diagnostic.message == "No decodable samples available for SoundFont2 export";
                                  }),
          "playback preparation should preserve a useful SoundFont failure diagnostic");
+
+  const InstrumentSetAsset emptyInstruments{
+      .metadata = AssetMetadata{.id = AssetId{3}, .format = "Probe", .name = "Empty Instruments"},
+  };
+  test::SessionSnapshotBuilder sampleOnlySynthBuilder;
+  sampleOnlySynthBuilder.assets.emplace_back(sequence);
+  sampleOnlySynthBuilder.assets.emplace_back(emptyInstruments);
+  sampleOnlySynthBuilder.assets.emplace_back(samples);
+  sampleOnlySynthBuilder.collections.push_back(Collection{
+      .id = CollectionId{0},
+      .name = "Sample-only Synth",
+      .sequence = sequence.metadata.id,
+      .instrumentSets = {emptyInstruments.metadata.id},
+      .sampleCollections = {samples.metadata.id},
+  });
+  const auto sampleOnlySynth =
+      prepareCollectionPlayback(sampleOnlySynthBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{}, dialects);
+  expect(!sampleOnlySynth.playable() && sampleOnlySynth.soundFont.empty() &&
+             std::ranges::any_of(sampleOnlySynth.diagnostics,
+                                 [](const Diagnostic& diagnostic) {
+                                   return diagnostic.message ==
+                                          "No playable instruments available for SoundFont2 export";
+                                 }),
+         "playback preparation should reject a sample bank with no playable instruments");
 
   test::SessionSnapshotBuilder synthOnlyBuilder;
   synthOnlyBuilder.assets.emplace_back(instruments);
