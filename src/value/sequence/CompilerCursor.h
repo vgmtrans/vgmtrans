@@ -481,16 +481,14 @@ public:
     }
 
     Event& stop() {
-      flow_.defaultTransition = StaticTransition::end();
-      flow_.overridePolicy = FlowOverridePolicy::Forbidden;
+      setDefaultTransition(StaticTransition::end());
       return *this;
     }
 
     Event& end() {
       presentation_.semantic = SequenceSemantic::End;
       presentation_.playback = CommandPlaybackStatus::StopsPlayback;
-      flow_.defaultTransition = StaticTransition::end();
-      flow_.overridePolicy = FlowOverridePolicy::Forbidden;
+      setDefaultTransition(StaticTransition::end());
       return *this;
     }
 
@@ -598,36 +596,31 @@ public:
 
     Event& jump(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      flow_.defaultTransition = StaticTransition::jump(destination);
-      flow_.overridePolicy = FlowOverridePolicy::Forbidden;
+      setDefaultTransition(StaticTransition::jump(destination));
       return *this;
     }
 
     Event& loopCandidate(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      flow_.defaultTransition = StaticTransition::jump(destination, JumpSemantics::LoopCandidate);
-      flow_.overridePolicy = FlowOverridePolicy::Forbidden;
+      setDefaultTransition(StaticTransition::jump(destination, JumpSemantics::LoopCandidate));
       return *this;
     }
 
     Event& declaredLoop(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      flow_.defaultTransition = StaticTransition::jump(destination, JumpSemantics::DeclaredLoop);
-      flow_.overridePolicy = FlowOverridePolicy::Forbidden;
+      setDefaultTransition(StaticTransition::jump(destination, JumpSemantics::DeclaredLoop));
       return *this;
     }
 
     Event& call(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      flow_.defaultTransition = StaticTransition::call(destination);
-      flow_.overridePolicy = FlowOverridePolicy::Forbidden;
+      setDefaultTransition(StaticTransition::call(destination));
       return *this;
     }
 
     Event& return_() {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      flow_.defaultTransition = StaticTransition::return_();
-      flow_.overridePolicy = FlowOverridePolicy::Forbidden;
+      setDefaultTransition(StaticTransition::return_());
       return *this;
     }
 
@@ -636,9 +629,11 @@ public:
     // action chooses the actual result from call history.
     Event& discoverReturn() {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      flow_.defaultTransition.reset();
-      flow_.overridePolicy = FlowOverridePolicy::Required;
+      if (flow_.defaultTransition) {
+        throw std::logic_error("Compiled sequence command cannot be both a return boundary and a static transition");
+      }
       flow_.discovery = DiscoveryDisposition::ReturnBoundary;
+      requireRuntimeOverride();
       return *this;
     }
 
@@ -646,7 +641,7 @@ public:
     // discovery still follows the command's ordinary fallthrough.
     Event& runtimeControlFlow() {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      flow_.overridePolicy = FlowOverridePolicy::Optional;
+      allowRuntimeOverride();
       return *this;
     }
 
@@ -655,7 +650,7 @@ public:
     // jump and an ordinary fallthrough for loop detection.
     Event& requireRuntimeControlFlow() {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      flow_.overridePolicy = FlowOverridePolicy::Required;
+      requireRuntimeOverride();
       return *this;
     }
 
@@ -663,7 +658,7 @@ public:
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       append<&detail::repeatUntil<Playback>>(slot, totalPlays, destination);
       flow_.additionalTargets.push_back(destination);
-      flow_.overridePolicy = FlowOverridePolicy::Optional;
+      allowRuntimeOverride();
       return *this;
     }
 
@@ -672,13 +667,14 @@ public:
     Event& mayBranchTo(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       flow_.additionalTargets.push_back(destination);
-      flow_.overridePolicy = FlowOverridePolicy::Optional;
+      allowRuntimeOverride();
       return *this;
     }
 
     // Records a decoder-only alternative without permitting runtime actions to
     // override a static transition.
     Event& discoverTarget(Address destination) {
+      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       flow_.additionalTargets.push_back(destination);
       return *this;
     }
@@ -710,6 +706,24 @@ public:
       execution_.actions.push_back(std::move(action));
       return *this;
     }
+
+    void setDefaultTransition(StaticTransition transition) {
+      if (flow_.discovery == DiscoveryDisposition::ReturnBoundary) {
+        throw std::logic_error("Compiled sequence command cannot be both a return boundary and a static transition");
+      }
+      if (flow_.defaultTransition) {
+        throw std::logic_error("Compiled sequence command declared more than one static transition");
+      }
+      flow_.defaultTransition = transition;
+    }
+
+    void allowRuntimeOverride() {
+      if (flow_.overridePolicy == FlowOverridePolicy::Forbidden) {
+        flow_.overridePolicy = FlowOverridePolicy::Optional;
+      }
+    }
+
+    void requireRuntimeOverride() { flow_.overridePolicy = FlowOverridePolicy::Required; }
 
     template <class T>
     [[nodiscard]] static EncodedSemanticField<T> field(const RangedValue<T>& source, std::string_view name,
@@ -795,7 +809,9 @@ public:
     return event.ignore();
   }
 
-  [[nodiscard]] DecodedBytecodeCommand truncated() { return finish(truncatedPresentation(), {}, CommandFlow::end()); }
+  [[nodiscard]] DecodedBytecodeCommand truncated() {
+    return finish(truncatedPresentation(), {}, CommandFlow::end(Address{record_.position()}));
+  }
 
 private:
   template <class T>
