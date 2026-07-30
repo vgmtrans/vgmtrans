@@ -447,23 +447,23 @@ struct Playback {
   [[nodiscard]] Effects conditionalStartRepeat() {
     if (!track.conditional) {
       track.conditional = true;
-      return Effects::overrideWith(vm.jump(track.trackStart));
+      return vm.jump(track.trackStart);
     }
     return {};
   }
 
-  [[nodiscard]] Effects conditionalEnd() { return track.conditional ? Effects::overrideWith(vm.end()) : Effects{}; }
+  [[nodiscard]] Effects conditionalEnd() { return track.conditional ? vm.end() : Effects{}; }
 
   [[nodiscard]] Effects branchIfFirst(Address destination) {
     if (!track.conditional) {
       track.conditional = true;
-      return Effects::overrideWith(vm.finiteBranch(destination));
+      return vm.finiteBranch(destination);
     }
     return {};
   }
 
   [[nodiscard]] Effects branchIfRepeated(Address destination) {
-    return track.conditional ? Effects::overrideWith(vm.finiteBranch(destination)) : Effects{};
+    return track.conditional ? vm.finiteBranch(destination) : Effects{};
   }
 
   void meta(u8 slot, u8 value) {

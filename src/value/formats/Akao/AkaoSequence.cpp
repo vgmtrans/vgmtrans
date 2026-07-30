@@ -266,7 +266,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
   return event.invoke(
       [](Playback& playback, u16 matchingPlay, Address branchDestination) -> Effects {
         if (playback.track.repeats.currentCompletedPlays() + 1 == matchingPlay) {
-          return Effects::overrideWith(playback.vm.finiteBranch(branchDestination));
+          return playback.vm.finiteBranch(branchDestination);
         }
         return {};
       },

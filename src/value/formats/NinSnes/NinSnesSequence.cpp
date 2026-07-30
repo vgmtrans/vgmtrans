@@ -840,7 +840,7 @@ struct Playback {
   }
 
   [[nodiscard]] Effects fe3ParameterFlow(Address standardDestination, Address customDestination) {
-    return Effects::overrideWith(vm.jump(program.customNoteParameters ? customDestination : standardDestination));
+    return vm.jump(program.customNoteParameters ? customDestination : standardDestination);
   }
 
   void switchToMelodicProgram() {
@@ -1074,15 +1074,15 @@ struct Playback {
 
   [[nodiscard]] Effects endOrReturn() {
     if (!track.inPattern) {
-      return Effects::overrideWith(vm.endSection());
+      return vm.endSection();
     }
     if (track.patternRemaining > 1) {
       --track.patternRemaining;
-      return Effects::overrideWith(vm.jump(track.patternStart));
+      return vm.jump(track.patternStart);
     }
     track.inPattern = false;
     track.patternRemaining = 0;
-    return Effects::overrideWith(vm.return_());
+    return vm.return_();
   }
 
   void emitPan(PerformanceEmitter output, u8 value) const {
@@ -1330,7 +1330,7 @@ struct Playback {
           static_cast<u16>(track.konamiLoopPitchDelta) + static_cast<u16>(static_cast<s16>(pitchDelta) * 16);
       track.konamiLoopPitchDelta =
           pitchBits < 0x8000 ? static_cast<s16>(pitchBits) : static_cast<s16>(static_cast<s32>(pitchBits) - 0x10000);
-      return Effects::overrideWith(vm.jump(destination));
+      return vm.jump(destination);
     }
 
     counter.finish();
@@ -1433,7 +1433,7 @@ struct Playback {
 
   [[nodiscard]] Effects intelliConditionalJump(Address destination) {
     const u8 channel = static_cast<u8>(1u << track.trackNumber);
-    return (program.intelliConditionalMask & channel) == 0 ? Effects::overrideWith(vm.jump(destination)) : Effects{};
+    return (program.intelliConditionalMask & channel) == 0 ? vm.jump(destination) : Effects{};
   }
 
   std::span<const u8> panTable = math::kPan;

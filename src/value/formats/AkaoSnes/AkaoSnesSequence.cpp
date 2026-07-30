@@ -1511,7 +1511,7 @@ struct Playback {
       ++frame.incrementCount;
     }
     if (frame.totalPlays == 0) {
-      return Effects::overrideWith(vm.declaredLoop(frame.start));
+      return vm.declaredLoop(frame.start);
     }
     Effects effects = vm.countedRepeatUntil(slot, frame.totalPlays, frame.start);
     if (!effects.flowOverride) {
@@ -1543,7 +1543,7 @@ struct Playback {
     if (counter.active()) {
       counter.finish();
     }
-    return Effects::overrideWith(vm.finiteBranch(destination));
+    return vm.finiteBranch(destination);
   }
 
   void tick() {
