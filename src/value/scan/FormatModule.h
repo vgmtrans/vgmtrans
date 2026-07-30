@@ -10,6 +10,7 @@
 #include "value/scan/ScanTypes.h"
 
 #include <functional>
+#include <optional>
 #include <span>
 #include <string>
 #include <utility>
@@ -42,6 +43,10 @@ struct CollectionPrepareContext {
 };
 
 struct PreparedCollectionAssets {
+  // A collection may supply source-driver context that is unavailable when a
+  // sequence is scanned alone. The replacement remains transient, just like a
+  // prepared instrument set, and keeps the durable parsed asset inspectable.
+  std::optional<SequenceProgramAsset> replacementSequence;
   // When a format prepares a collection, these are the complete instrument
   // sets to use for that collection, replacing its durable scanned sets.
   std::vector<InstrumentSetAsset> replacementInstrumentSets;

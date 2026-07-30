@@ -31,6 +31,7 @@ namespace {
 constexpr u8 kNds2sfVersion = 0x24;
 constexpr u8 kNcsfVersion = 0x25;
 constexpr u8 kPsf1Version = 0x01;
+constexpr u8 kSsfVersion = 0x11;
 constexpr size_t kPsf1DataOffset = 0x800;
 constexpr size_t kPsf1LoadAddressOffset = 0x18;
 constexpr int kMaxRecursion = 10;
@@ -50,13 +51,17 @@ struct Image {
 };
 
 [[nodiscard]] bool supportedVersion(u8 version) {
-  return version == kPsf1Version || version == kNds2sfVersion || version == kNcsfVersion;
+  return version == kPsf1Version || version == kSsfVersion || version == kNds2sfVersion || version == kNcsfVersion;
 }
 
 [[nodiscard]] std::optional<size_t> dataOffsetForVersion(u8 version) {
   switch (version) {
     case kPsf1Version:
       return kPsf1DataOffset;
+    case kSsfVersion:
+      // SSF uses the ordinary PSF mini-header: a little-endian load address
+      // followed immediately by bytes to overlay into Saturn sound RAM.
+      return 0x04;
     case kNds2sfVersion:
       return 0x08;
     case kNcsfVersion:

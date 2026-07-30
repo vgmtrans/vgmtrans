@@ -9,6 +9,7 @@ target_sources(vgmtrans-value-core-tests
     formats/AkaoSnesModuleTests.cpp
     formats/AkaoFormatTests.cpp
     formats/NdsModuleTests.cpp
+    formats/SegSatModuleTests.cpp
     core/SessionSnapshotBuilder.h
     core/ValueCollectionResolverTests.cpp
     core/ValueCompilerCursorTests.cpp
@@ -58,6 +59,7 @@ set(VGMTRANS_PARITY_KONAMI_ARCADE_FILE "" CACHE FILEPATH "Konami Arcade MAME ZIP
 set(VGMTRANS_PARITY_CPS_FILES "" CACHE STRING "Semicolon-separated CPS1/CPS2/CPS3 MAME ZIP files used for parity")
 set(VGMTRANS_PARITY_AKAO_FILE "" CACHE FILEPATH "Akao PSF or raw file used for original/value parity")
 set(VGMTRANS_PARITY_NDS_FILE "" CACHE FILEPATH "NDS or 2SF file used for original/value parity")
+set(VGMTRANS_PARITY_SEGSAT_FILES "" CACHE STRING "Semicolon-separated SSF or raw Saturn files used for parity")
 
 function(add_vgmtrans_parity_corpus_test test_name family mode corpus_file)
   add_test(
@@ -145,3 +147,23 @@ if(VGMTRANS_PARITY_NDS_FILE)
   add_vgmtrans_parity_corpus_test(
     nds-synth nds nds-direct-synth "${VGMTRANS_PARITY_NDS_FILE}")
 endif()
+
+set(segsat_parity_index 0)
+foreach(segsat_file IN LISTS VGMTRANS_PARITY_SEGSAT_FILES)
+  math(EXPR segsat_parity_index "${segsat_parity_index} + 1")
+  add_vgmtrans_parity_corpus_test(
+    "segsat-${segsat_parity_index}-summary" segsat segsat-direct-summary "${segsat_file}")
+  add_vgmtrans_parity_corpus_test(
+    "segsat-${segsat_parity_index}-midi" segsat segsat-direct-midi "${segsat_file}")
+  add_vgmtrans_parity_corpus_test(
+    "segsat-${segsat_parity_index}-synth" segsat segsat-direct-synth "${segsat_file}")
+
+  # The legacy comparison path is not stable when multiple SSF corpus processes
+  # run concurrently. Keep these optional tests isolated so parallel CTest runs
+  # remain deterministic.
+  set_tests_properties(
+    "vgmtrans-parity-segsat-${segsat_parity_index}-summary"
+    "vgmtrans-parity-segsat-${segsat_parity_index}-midi"
+    "vgmtrans-parity-segsat-${segsat_parity_index}-synth"
+    PROPERTIES RUN_SERIAL TRUE)
+endforeach()

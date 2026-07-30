@@ -18,6 +18,7 @@
 #include "value/formats/KonamiSnes/KonamiSnes.h"
 #include "value/formats/NinSnes/NinSnes.h"
 #include "value/formats/NDS/Nds.h"
+#include "value/formats/SegSat/SegSat.h"
 #include "value/session/Session.h"
 
 #include <array>
@@ -85,6 +86,7 @@ void registerValueFormats(core::Session& session, const ValueFormatOptions& opti
   session.registerFormat(konami_arcade::konamiArcadeDefinition());
   session.registerFormat(konami_snes::konamiSnesDefinition());
   session.registerFormat(nin_snes::definition());
+  session.registerFormat(segsat::segSatDefinition());
 }
 
 }  // namespace vgmtrans::formats

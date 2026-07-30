@@ -315,9 +315,25 @@ struct SfModulatorRecord {
       static_cast<s32>(std::clamp(attenuationDb * 10.0, 0.0, static_cast<double>(maxSustainAttenuationCentibels))));
 }
 
-[[nodiscard]] u32 instrumentRegionGeneratorCount(const Region& region) {
-  static_cast<void>(region);
-  return kBaseInstrumentRegionGenerators + kEnvelopeInstrumentRegionGenerators;
+[[nodiscard]] u32 instrumentRegionGeneratorCount(
+    const ResolvedSynthRegion& region,
+    ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators) {
+  return kBaseInstrumentRegionGenerators + kEnvelopeInstrumentRegionGenerators +
+         static_cast<u32>(
+             std::ranges::count_if(region.generators, [modulationConversion](const SynthGenerator& generator) {
+               return shouldExportSynthGenerator(generator, modulationConversion) &&
+                      sf2GeneratorForDestination(generator.destination).has_value();
+             }));
+}
+
+[[nodiscard]] u32 instrumentRegionModulatorCount(
+    const ResolvedSynthRegion& region,
+    ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators) {
+  return static_cast<u32>(
+      std::ranges::count_if(region.modulators, [modulationConversion](const SynthModulator& modulator) {
+        return sf2ModulatorFor(modulator, nullptr, ModulationScalingPolicy::FullFormatRange, modulationConversion)
+            .has_value();
+      }));
 }
 
 [[nodiscard]] u32 instrumentGlobalGeneratorCount(
@@ -509,7 +525,8 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
     for (size_t i = 0; i < instrument.regions.size(); ++i) {
       writeLe16(payload, clampU16(generatorIndex));
       writeLe16(payload, clampU16(modulatorIndex));
-      generatorIndex += instrumentRegionGeneratorCount(*instrument.regions[i].region);
+      generatorIndex += instrumentRegionGeneratorCount(instrument.regions[i], modulationConversion);
+      modulatorIndex += instrumentRegionModulatorCount(instrument.regions[i], modulationConversion);
     }
   }
 
@@ -533,6 +550,19 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
       writeLeS16(payload, record->amount);
       writeLe16(payload, 0);
       writeLe16(payload, kSfTransformLinear);
+    }
+    for (const auto& region : instrument.regions) {
+      for (const auto& modulator : region.modulators) {
+        const auto record = sf2ModulatorFor(modulator, midiModulationUsage, modulationScaling, modulationConversion);
+        if (!record) {
+          continue;
+        }
+
+        writeWordGen(payload, record->source, record->destination);
+        writeLeS16(payload, record->amount);
+        writeLe16(payload, 0);
+        writeLe16(payload, kSfTransformLinear);
+      }
     }
   }
 
@@ -566,6 +596,15 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
 
       writeRangeGen(payload, kSfGenKeyRange, region.keyRange.low, region.keyRange.high);
       writeRangeGen(payload, kSfGenVelRange, region.velocityRange.low, region.velocityRange.high);
+      for (const auto& generator : sfRegion.generators) {
+        if (!shouldExportSynthGenerator(generator, modulationConversion)) {
+          continue;
+        }
+        const auto sf2Generator = sf2GeneratorForDestination(generator.destination);
+        if (sf2Generator) {
+          writeAmountGen(payload, *sf2Generator, sf2GeneratorAmount(generator));
+        }
+      }
       writeAmountGen(payload, kSfGenInitialAttenuation,
                      static_cast<s16>(sf2Attenuation(region, Sample{.attenuationDb = sample.attenuationDb})));
       writeAmountGen(payload, kSfGenPan, sf2Pan(region.pan));
@@ -673,6 +712,10 @@ SynthExportResult buildSoundFont2(const SynthExportInput& input, const SourceSto
                            .requireMono = true,
                            .nonMonoWarning = "Skipping non-mono sample for SoundFont2 export",
                        });
+  // Unlike DLS, an SF2 preset cannot usefully reference an instrument with no
+  // sample zone. Match the format's representable program set here while the
+  // durable bank and DLS export retain sparse empty slots.
+  std::erase_if(instruments, [](const ResolvedSynthInstrument& instrument) { return instrument.regions.empty(); });
   auto samples = sf2Samples(std::move(decodedSamples));
 
   if (samples.empty()) {

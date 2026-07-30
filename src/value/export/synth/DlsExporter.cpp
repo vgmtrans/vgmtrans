@@ -377,11 +377,12 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   writeConnection(bytes, DlsConnection{.destination = destination, .scale = scale});
 }
 
-[[nodiscard]] Chunk art2Chunk(const ResolvedSynthInstrument& instrument, const Region& region,
+[[nodiscard]] Chunk art2Chunk(const ResolvedSynthInstrument& instrument, const ResolvedSynthRegion& resolvedRegion,
                               const MidiModulationUsage* midiModulationUsage, ModulationScalingPolicy modulationScaling,
                               ModulationConversionPolicy modulationConversion) {
   // Each region gets a DLS2 articulation list. Region envelope/pan is always written;
-  // instrument generators/modulators are appended as additional connections.
+  // instrument- and region-level modulation are appended as additional connections.
+  const Region& region = *resolvedRegion.region;
   std::vector<u8> connections;
   writeConnection(connections, kDlsConnDstPan, dlsPanScale(region.pan));
   const bool explicitEnvelope = hasExplicitEnvelope(region.envelope);
@@ -409,6 +410,20 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
     }
     writeConnection(connections, *connection);
   }
+  for (const auto& generator : resolvedRegion.generators) {
+    if (!shouldExportSynthGenerator(generator, modulationConversion)) {
+      continue;
+    }
+    if (const auto connection = dlsConnectionForGenerator(generator)) {
+      writeConnection(connections, *connection);
+    }
+  }
+  for (const auto& modulator : resolvedRegion.modulators) {
+    if (const auto connection =
+            dlsConnectionForModulator(modulator, midiModulationUsage, modulationScaling, modulationConversion)) {
+      writeConnection(connections, *connection);
+    }
+  }
 
   std::vector<u8> art;
   writeLe32(art, 8);
@@ -428,7 +443,8 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
                            rgnhChunk(region),
                            wsmpChunk(region, sample),
                            wlnkChunk(resolvedRegion.sampleIndex),
-                           art2Chunk(instrument, region, midiModulationUsage, modulationScaling, modulationConversion),
+                           art2Chunk(instrument, resolvedRegion, midiModulationUsage, modulationScaling,
+                                     modulationConversion),
                        });
 }
 

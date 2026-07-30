@@ -23,7 +23,8 @@ cmake -S . -B cmake-build-debug \
   -DVGMTRANS_PARITY_AKAO_SNES_FILE="/path/to/game.rsn" \
   -DVGMTRANS_PARITY_KONAMI_SNES_FILE="/path/to/song.spc" \
   -DVGMTRANS_PARITY_AKAO_FILE="/path/to/song.psf" \
-  -DVGMTRANS_PARITY_NDS_FILE="/path/to/game.nds"
+  -DVGMTRANS_PARITY_NDS_FILE="/path/to/game.nds" \
+  -DVGMTRANS_PARITY_SEGSAT_FILES="/path/to/song.ssf;/path/to/another.ssf"
 ```
 
 Then build and run every configured comparison:
@@ -42,6 +43,22 @@ ctest --test-dir cmake-build-debug --output-on-failure -L capcom-snes
 Summary, MIDI, and SF2/DLS tests are deliberately separate. One mismatch will
 not prevent CTest from reporting the other layers. Capcom SNES additionally has
 an export smoke test that checks whole-archive discovery and artifact creation.
+
+SegSat MIDI comparison keeps source-track identity while normalizing
+destination-only differences: redundant controller/tempo writes, sole-bank
+remapping, one narrowly identified replay-destination pan write, silent
+zero-duration note encoding, and MIDI port/channel allocation. Note timing,
+keys, durations, programs, effective modeled controllers, and pitch bends
+remain exact. Multi-bank note velocities may intentionally differ: legacy
+`useColl()` always reads VL data from the first attached bank, while the value
+path follows the active bank like the driver. Narrowly checked loop-boundary
+exceptions cover the legacy two-pass parser losing later zero-delta writes or
+nondeterministically retaining one synthetic key-zero replay note.
+Synth comparison canonicalizes sample-table order together with every SF2/DLS
+region reference because the legacy parser inserts Saturn samples on first use
+while the value parser uses deterministic source-address order. It also ignores
+the bank field that legacy mutates on instrument objects shared by multiple
+collections; MIDI parity and value-core tests cover effective bank selection.
 
 ### Known NDS baseline findings
 

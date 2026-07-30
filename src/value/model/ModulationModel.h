@@ -15,6 +15,13 @@ struct ModulationRange {
   double maximum = 0.0;
 };
 
+enum class ModulationDepthMode {
+  // A sequence controller selects a value from zero through maxDepth.
+  Controller,
+  // The hardware voice applies maxDepth continuously.
+  Fixed,
+};
+
 enum class TremoloGainMode {
   // The synth LFO is centered around nominal gain and may boost above it.
   BipolarAroundNominal,
@@ -26,6 +33,7 @@ struct VibratoSpec {
   double maxDepthCents = 0.0;
   ModulationRange rateHertz;
   std::optional<ModulationRange> delaySeconds;
+  ModulationDepthMode depthMode = ModulationDepthMode::Controller;
 };
 
 struct TremoloSpec {
@@ -33,6 +41,7 @@ struct TremoloSpec {
   ModulationRange rateHertz;
   TremoloGainMode gainMode = TremoloGainMode::BipolarAroundNominal;
   std::optional<ModulationRange> delaySeconds;
+  ModulationDepthMode depthMode = ModulationDepthMode::Controller;
 };
 
 // Physical vibrato and tremolo, whether static or derived from a sequence.
