@@ -261,7 +261,11 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   const size_t sampleCount = encoded.size() / 2;
   for (size_t index = 0; index < sampleCount; ++index) {
     const size_t sourceIndex = sample.reverse ? sampleCount - 1 - index : index;
-    decoded.pcm.push_back(static_cast<s16>(le16(encoded, sourceIndex * 2)));
+    const size_t offset = sourceIndex * 2;
+    const u16 value = sample.bigEndian
+                          ? static_cast<u16>((static_cast<u16>(encoded[offset]) << 8) | encoded[offset + 1])
+                          : le16(encoded, offset);
+    decoded.pcm.push_back(static_cast<s16>(value));
   }
   return decoded;
 }

@@ -109,13 +109,19 @@ void fixedPhysicalLfoValuesNeedNoZeroRangeModulators() {
               .maxDepthCents = 100.0,
               .rateHertz = {6.0, 6.0},
               .delaySeconds = ModulationRange{0.25, 0.25},
+              .depthMode = ModulationDepthMode::Fixed,
           },
   });
+  expect(std::ranges::any_of(lowered.generators, [](const SynthGenerator& generator) {
+           return generator.destination == SynthDestination::VibratoDepth && generator.amount == 100;
+         }),
+         "a hardware-fixed LFO depth should lower to an unconditional synth generator");
   expect(std::ranges::none_of(lowered.modulators, [](const SynthModulator& modulator) {
-           return modulator.destination == SynthDestination::VibratoRate ||
+           return modulator.destination == SynthDestination::VibratoDepth ||
+                  modulator.destination == SynthDestination::VibratoRate ||
                   modulator.destination == SynthDestination::VibratoDelay;
          }),
-         "fixed physical rate and delay should live entirely in synth base generators");
+         "fixed physical depth, rate, and delay should live entirely in synth base generators");
 }
 
 void wavExporterWritesPcm16RiffFile() {

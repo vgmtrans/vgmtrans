@@ -74,15 +74,22 @@ LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulati
       });
     }
 
-    lowered.modulators.push_back(SynthModulator{
-        .source = SynthSource::ChannelPressure,
-        .destination = SynthDestination::VibratoDepth,
-        .amount = 0,
-    });
-    lowered.modulators.push_back(SynthModulator{
-        .destination = SynthDestination::VibratoDepth,
-        .amount = static_cast<s32>(std::lround(vibrato.maxDepthCents)),
-    });
+    if (vibrato.depthMode == ModulationDepthMode::Fixed) {
+      lowered.generators.push_back(SynthGenerator{
+          .destination = SynthDestination::VibratoDepth,
+          .amount = static_cast<s32>(std::lround(vibrato.maxDepthCents)),
+      });
+    } else {
+      lowered.modulators.push_back(SynthModulator{
+          .source = SynthSource::ChannelPressure,
+          .destination = SynthDestination::VibratoDepth,
+          .amount = 0,
+      });
+      lowered.modulators.push_back(SynthModulator{
+          .destination = SynthDestination::VibratoDepth,
+          .amount = static_cast<s32>(std::lround(vibrato.maxDepthCents)),
+      });
+    }
     const s32 rateAmount = synthAmountFromHertzRange(vibrato.rateHertz.minimum, vibrato.rateHertz.maximum);
     if (rateAmount != 0) {
       lowered.modulators.push_back(SynthModulator{
@@ -132,15 +139,30 @@ LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulati
         });
       }
     }
-    lowered.modulators.push_back(SynthModulator{
-        .destination = SynthDestination::TremoloDepth,
-        .amount = synthAmountFromDecibels(tremolo.maxDepthDb),
-    });
-    if (tremolo.gainMode == TremoloGainMode::NoBoost) {
-      lowered.modulators.push_back(SynthModulator{
-          .destination = SynthDestination::VolumeAttenuation,
-          .amount = synthAmountFromDecibels(tremolo.maxDepthDb),
+    const s32 tremoloDepth = synthAmountFromDecibels(tremolo.maxDepthDb);
+    if (tremolo.depthMode == ModulationDepthMode::Fixed) {
+      lowered.generators.push_back(SynthGenerator{
+          .destination = SynthDestination::TremoloDepth,
+          .amount = tremoloDepth,
       });
+    } else {
+      lowered.modulators.push_back(SynthModulator{
+          .destination = SynthDestination::TremoloDepth,
+          .amount = tremoloDepth,
+      });
+    }
+    if (tremolo.gainMode == TremoloGainMode::NoBoost) {
+      if (tremolo.depthMode == ModulationDepthMode::Fixed) {
+        lowered.generators.push_back(SynthGenerator{
+            .destination = SynthDestination::VolumeAttenuation,
+            .amount = tremoloDepth,
+        });
+      } else {
+        lowered.modulators.push_back(SynthModulator{
+            .destination = SynthDestination::VolumeAttenuation,
+            .amount = tremoloDepth,
+        });
+      }
     }
   }
 

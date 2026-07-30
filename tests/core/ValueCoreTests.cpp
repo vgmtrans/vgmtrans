@@ -144,6 +144,12 @@ void ndsSynthParserPreservesInfiniteRelease();
 void ndsSynthParserDerivesAdpcmLengthsSafely();
 void ndsWaveArchiveReportsTruncatedSampleHeaders();
 void ndsSynthBuilderPreservesSparseWaveIndexesAcrossArchives();
+void segSatVlCurveMatchesMm8Saturation();
+void segSatCollectionPreparationSuppliesVlTablesToSequence();
+void segSatRuntimeMapSelectsBankInsideAnotherSampleSpan();
+void segSatMultiBankPlaybackUsesTheActiveBanksVlTable();
+void segSatLoopBoundaryRetainsScheduledNoteTail();
+void segSatSsfExtractorUsesFourByteMiniHeader();
 
 int main() {
   try {
@@ -284,6 +290,12 @@ int main() {
     ndsSynthParserDerivesAdpcmLengthsSafely();
     ndsWaveArchiveReportsTruncatedSampleHeaders();
     ndsSynthBuilderPreservesSparseWaveIndexesAcrossArchives();
+    segSatVlCurveMatchesMm8Saturation();
+    segSatCollectionPreparationSuppliesVlTablesToSequence();
+    segSatRuntimeMapSelectsBankInsideAnotherSampleSpan();
+    segSatMultiBankPlaybackUsesTheActiveBanksVlTable();
+    segSatLoopBoundaryRetainsScheduledNoteTail();
+    segSatSsfExtractorUsesFourByteMiniHeader();
   } catch (const std::exception& ex) {
     std::cerr << ex.what() << '\n';
     return 1;

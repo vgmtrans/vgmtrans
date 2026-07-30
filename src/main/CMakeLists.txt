@@ -263,6 +263,10 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SegSat/SegSatLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SegSat/SegSatModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SegSat/SegSatSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SegSat/SegSatSynth.cpp
   PUBLIC
     FILE_SET HEADERS
     BASE_DIRS ${PROJECT_SOURCE_DIR}/src
@@ -279,6 +283,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/Nds.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/SegSat/SegSat.h
       ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.h
 )
 target_link_libraries(

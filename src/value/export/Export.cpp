@@ -25,6 +25,7 @@
 #include <exception>
 #include <filesystem>
 #include <iterator>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -107,6 +108,7 @@ struct PreparedExport {
   std::vector<const InstrumentSetAsset*> instrumentSets;
   std::vector<const SampleCollectionAsset*> sampleCollections;
   PreparedExportDiagnostics diagnostics;
+  std::unique_ptr<SequenceProgramAsset> ownedSequenceProgram;
   std::vector<InstrumentSetAsset> ownedInstrumentSets;
 };
 
@@ -172,6 +174,10 @@ struct PreparedExport {
       prepared.diagnostics.instrumentSets.insert(prepared.diagnostics.instrumentSets.end(),
                                                  std::make_move_iterator(result.diagnostics.begin()),
                                                  std::make_move_iterator(result.diagnostics.end()));
+      if (result.replacementSequence) {
+        prepared.ownedSequenceProgram = std::make_unique<SequenceProgramAsset>(std::move(*result.replacementSequence));
+        prepared.sequenceProgram = prepared.ownedSequenceProgram.get();
+      }
       prepared.ownedInstrumentSets = std::move(result.replacementInstrumentSets);
       prepared.instrumentSets.reserve(prepared.ownedInstrumentSets.size());
       for (const auto& instrumentSet : prepared.ownedInstrumentSets) {
