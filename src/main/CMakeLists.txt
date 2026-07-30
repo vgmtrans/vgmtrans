@@ -137,7 +137,6 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/scan/ScanResultBuilder.cpp
     ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/CommandSourceMap.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceDialect.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceProgram.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceVm.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/TempoRelativeModulation.cpp

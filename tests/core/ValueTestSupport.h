@@ -46,6 +46,17 @@ void expect(bool condition, const std::string& message) {
   }
 }
 
+[[nodiscard]] FormatDefinition testFormat(FormatModule module) {
+  return FormatDefinition{.module = std::move(module)};
+}
+
+[[nodiscard]] FormatDefinition testFormat(FormatModule module, SequenceDialect dialect) {
+  return FormatDefinition{
+      .module = std::move(module),
+      .sequenceDialects = {std::move(dialect)},
+  };
+}
+
 u32 readLe32(const std::vector<u8>& bytes, size_t offset) {
   return static_cast<u32>(bytes[offset]) | (static_cast<u32>(bytes[offset + 1]) << 8) |
          (static_cast<u32>(bytes[offset + 2]) << 16) | (static_cast<u32>(bytes[offset + 3]) << 24);

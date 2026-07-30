@@ -112,7 +112,7 @@ struct PreparedExport {
 };
 
 [[nodiscard]] PreparedExport prepareCollectionExport(const SessionSnapshot& snapshot, CollectionId id,
-                                                     const SourceStore& sources, const FormatRegistry* formats) {
+                                                     const SourceStore& sources, const FormatRegistry& formats) {
   PreparedExport prepared;
   prepared.collection = snapshot.collection(id);
   if (prepared.collection == nullptr) {
@@ -144,16 +144,11 @@ struct PreparedExport {
     if (const auto* samples = snapshot.asset<SampleCollectionAsset>(assetId)) {
       prepared.sampleCollections.push_back(samples);
     } else {
-      prepared.diagnostics.sampleCollections.push_back(
-          exportError("Collection sample collection asset was not found"));
+      prepared.diagnostics.sampleCollections.push_back(exportError("Collection sample collection asset was not found"));
     }
   }
 
-  if (formats == nullptr) {
-    return prepared;
-  }
-
-  for (const auto& module : formats->modules()) {
+  for (const auto& module : formats.modules()) {
     const std::string_view resolver =
         module.collectionResolverId.empty() ? std::string_view(module.name) : module.collectionResolverId;
     if (module.prepareCollection == nullptr || resolver != collection.key.resolver) {
@@ -195,23 +190,14 @@ struct SequenceRenderResult {
   std::vector<Diagnostic> diagnostics;
 };
 
-[[nodiscard]] SequenceRenderResult renderSequence(const SequenceProgramAsset& sequence,
-                                                  const SequenceDialectRegistry& dialects, LoopPolicy loopPolicy,
-                                                  u32 sequenceLoops,
+[[nodiscard]] SequenceRenderResult renderSequence(const SequenceProgramAsset& sequence, const SequenceDialect& dialect,
+                                                  LoopPolicy loopPolicy, u32 sequenceLoops,
                                                   const FinalizeCollectionPerformance* finalizePerformance = nullptr) {
-  const auto* dialect = dialects.find(sequence.program.dialect.value);
-  if (dialect == nullptr) {
-    return SequenceRenderResult{
-        .diagnostics = {exportError("No sequence dialect registered for '" + sequence.program.dialect.value + "'",
-                                    validDiagnosticRange(sequence.metadata.range))},
-    };
-  }
-
   auto performance = SequenceVm(SequenceVmOptions{
                                     .loopPolicy = loopPolicy,
                                     .sequenceLoops = sequenceLoops,
                                 })
-                         .render(sequence.program, *dialect);
+                         .render(sequence.program, dialect);
   if (finalizePerformance != nullptr && *finalizePerformance) {
     try {
       (*finalizePerformance)(performance);
@@ -234,8 +220,24 @@ struct SequenceRenderResult {
   };
 }
 
+[[nodiscard]] SequenceRenderResult renderRegisteredSequence(
+    const SequenceProgramAsset& sequence, const FormatRegistry& formats, LoopPolicy loopPolicy, u32 sequenceLoops,
+    const FinalizeCollectionPerformance* finalizePerformance = nullptr) {
+  const auto* dialect = formats.findDialect(sequence.program.dialect.value);
+  if (dialect == nullptr) {
+    return SequenceRenderResult{
+        .diagnostics =
+            {
+                exportError("No sequence dialect registered for '" + sequence.program.dialect.value + "'",
+                            validDiagnosticRange(sequence.metadata.range)),
+            },
+    };
+  }
+  return renderSequence(sequence, *dialect, loopPolicy, sequenceLoops, finalizePerformance);
+}
+
 [[nodiscard]] SequenceRenderResult renderCollectionSequence(const PreparedExport& prepared,
-                                                            const SequenceDialectRegistry& dialects,
+                                                            const FormatRegistry& formats,
                                                             const SequenceExportRequest& request) {
   if (prepared.sequenceProgram == nullptr) {
     auto diagnostics = prepared.diagnostics.sequence;
@@ -247,8 +249,8 @@ struct SequenceRenderResult {
     };
   }
 
-  return renderSequence(*prepared.sequenceProgram, dialects, request.loopPolicy, request.sequenceLoops,
-                        &prepared.finalizePerformance);
+  return renderRegisteredSequence(*prepared.sequenceProgram, formats, request.loopPolicy, request.sequenceLoops,
+                                  &prepared.finalizePerformance);
 }
 
 [[nodiscard]] std::optional<MidiSequence> renderMidi(const SequenceRenderResult& rendering,
@@ -434,8 +436,7 @@ void applySequenceModulationToPreparedExport(PreparedExport& prepared, const Seq
 }
 
 Artifact exportStandaloneSequenceMidi(const SessionSnapshot& snapshot, AssetId sequenceId,
-                                      const SequenceExportRequest& request,
-                                      const SequenceDialectRegistry& dialects) {
+                                      const SequenceExportRequest& request, const FormatRegistry& formats) {
   const auto* asset = snapshot.asset(sequenceId);
   const auto* sequence = asset != nullptr ? std::get_if<SequenceProgramAsset>(asset) : nullptr;
   if (sequence == nullptr) {
@@ -452,7 +453,7 @@ Artifact exportStandaloneSequenceMidi(const SessionSnapshot& snapshot, AssetId s
     };
   }
 
-  const auto rendering = renderSequence(*sequence, dialects, request.loopPolicy, request.sequenceLoops);
+  const auto rendering = renderRegisteredSequence(*sequence, formats, request.loopPolicy, request.sequenceLoops);
   const auto midi = renderMidi(rendering, {}, request.midi, ModulationConversionPolicy::SequenceEventSimulation);
   return exportMidi(artifactBaseName(*sequence), rendering, midi, ModulationScalingPolicy::FullFormatRange,
                     ModulationConversionPolicy::SequenceEventSimulation);
@@ -461,12 +462,11 @@ Artifact exportStandaloneSequenceMidi(const SessionSnapshot& snapshot, AssetId s
 }  // namespace
 
 Artifact exportSequenceMidi(const SessionSnapshot& snapshot, const SourceStore& sources, AssetId sequenceId,
-                            const SequenceExportRequest& request, const SequenceDialectRegistry& dialects,
-                            const FormatRegistry* formats) {
+                            const SequenceExportRequest& request, const FormatRegistry& formats) {
   const auto* sequence = snapshot.asset<SequenceProgramAsset>(sequenceId);
   const auto* collection = snapshot.firstCollectionContaining(sequenceId);
   if (sequence == nullptr || collection == nullptr) {
-    return exportStandaloneSequenceMidi(snapshot, sequenceId, request, dialects);
+    return exportStandaloneSequenceMidi(snapshot, sequenceId, request, formats);
   }
 
   auto artifacts = exportCollection(snapshot, sources, collection->id,
@@ -476,7 +476,7 @@ Artifact exportSequenceMidi(const SessionSnapshot& snapshot, const SourceStore& 
                                         .modulationScaling = ModulationScalingPolicy::FullFormatRange,
                                         .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
                                     },
-                                    dialects, formats);
+                                    formats);
   if (artifacts.empty()) {
     return Artifact{
         .filename = artifactBaseName(*sequence) + ".mid",
@@ -489,8 +489,7 @@ Artifact exportSequenceMidi(const SessionSnapshot& snapshot, const SourceStore& 
 }
 
 Artifact exportInstrumentSet(const SessionSnapshot& snapshot, const SourceStore& sources, AssetId instrumentSetId,
-                             SynthExportFormat format, const ExportRequest& request,
-                             const SequenceDialectRegistry& dialects, const FormatRegistry* formats) {
+                             SynthExportFormat format, const ExportRequest& request, const FormatRegistry& formats) {
   const bool soundFont = format == SynthExportFormat::SoundFont2;
   const ExportKind kind = soundFont ? ExportKind::SoundFont2 : ExportKind::Dls;
   const std::string extension = soundFont ? ".sf2" : ".dls";
@@ -513,7 +512,7 @@ Artifact exportInstrumentSet(const SessionSnapshot& snapshot, const SourceStore&
     if (snapshot.countCollectionsContaining(instrumentSetId) > 1) {
       collectionRequest.exportOnlyUsedInstruments = false;
     }
-    auto artifacts = exportCollection(snapshot, sources, collection->id, collectionRequest, dialects, formats);
+    auto artifacts = exportCollection(snapshot, sources, collection->id, collectionRequest, formats);
     if (!artifacts.empty()) {
       artifacts.front().filename = baseName + extension;
       return std::move(artifacts.front());
@@ -546,15 +545,13 @@ Artifact exportInstrumentSet(const SessionSnapshot& snapshot, const SourceStore&
     }
   }
 
-  return soundFont ? exportSoundFont2(prepared, sources, request, nullptr,
-                                      ModulationConversionPolicy::SynthModulators)
-                   : exportDls(prepared, sources, request, nullptr,
-                               ModulationConversionPolicy::SynthModulators);
+  return soundFont ? exportSoundFont2(prepared, sources, request, nullptr, ModulationConversionPolicy::SynthModulators)
+                   : exportDls(prepared, sources, request, nullptr, ModulationConversionPolicy::SynthModulators);
 }
 
 CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, const SourceStore& sources,
                                              CollectionId collection, const PlaybackRequest& request,
-                                             const SequenceDialectRegistry& dialects, const FormatRegistry* formats) {
+                                             const FormatRegistry& formats) {
   CollectionPlayback playback{
       .collection = collection,
   };
@@ -569,11 +566,9 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
     playback.sequence = prepared.sequenceProgram->metadata.id;
     playback.assetDependencies.push_back(playback.sequence);
   }
-  playback.assetDependencies.insert(playback.assetDependencies.end(),
-                                    prepared.collection->instrumentSets.begin(),
+  playback.assetDependencies.insert(playback.assetDependencies.end(), prepared.collection->instrumentSets.begin(),
                                     prepared.collection->instrumentSets.end());
-  playback.assetDependencies.insert(playback.assetDependencies.end(),
-                                    prepared.collection->sampleCollections.begin(),
+  playback.assetDependencies.insert(playback.assetDependencies.end(), prepared.collection->sampleCollections.begin(),
                                     prepared.collection->sampleCollections.end());
 
   const ExportRequest exportRequest{
@@ -581,13 +576,12 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
       .modulationScaling = ModulationScalingPolicy::FullFormatRange,
       .modulationConversion = request.modulationConversion,
   };
-  auto rendering = renderCollectionSequence(prepared, dialects, exportRequest.sequence);
+  auto rendering = renderCollectionSequence(prepared, formats, exportRequest.sequence);
   auto loweredMidi =
       renderMidi(rendering, prepared.instrumentSets, exportRequest.sequence.midi, exportRequest.modulationConversion);
   auto midi = exportMidi(prepared.baseName, rendering, loweredMidi, exportRequest.modulationScaling,
                          exportRequest.modulationConversion);
-  const auto synthConversion =
-      loweredMidi ? request.modulationConversion : ModulationConversionPolicy::SynthModulators;
+  const auto synthConversion = loweredMidi ? request.modulationConversion : ModulationConversionPolicy::SynthModulators;
   if (synthConversion == ModulationConversionPolicy::SynthModulators) {
     applySequenceModulationToPreparedExport(prepared, rendering.modulation);
   }
@@ -608,7 +602,7 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
 
 std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const SourceStore& sources,
                                        CollectionId collection, const ExportRequest& request,
-                                       const SequenceDialectRegistry& dialects, const FormatRegistry* formats) {
+                                       const FormatRegistry& formats) {
   auto prepared = prepareCollectionExport(snapshot, collection, sources, formats);
   if (prepared.collection == nullptr) {
     return {Artifact{
@@ -631,15 +625,15 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
 
   const auto requireRendering = [&]() -> const SequenceRenderResult& {
     if (!rendering) {
-      rendering = renderCollectionSequence(prepared, dialects, request.sequence);
+      rendering = renderCollectionSequence(prepared, formats, request.sequence);
     }
     return *rendering;
   };
 
   const auto requireMidi = [&]() -> const std::optional<MidiSequence>& {
     if (!midiRendered) {
-      loweredMidi = renderMidi(requireRendering(), prepared.instrumentSets, request.sequence.midi,
-                               request.modulationConversion);
+      loweredMidi =
+          renderMidi(requireRendering(), prepared.instrumentSets, request.sequence.midi, request.modulationConversion);
       midiRendered = true;
     }
     return loweredMidi;
@@ -655,9 +649,8 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
 
   const auto usesSequenceModulation = [&]() {
     if (!sequenceHasModulation) {
-      sequenceHasModulation =
-          prepared.sequenceProgram != nullptr &&
-          sequenceUsesSemantic(prepared.sequenceProgram->program, SequenceSemantic::Modulation);
+      sequenceHasModulation = prepared.sequenceProgram != nullptr &&
+                              sequenceUsesSemantic(prepared.sequenceProgram->program, SequenceSemantic::Modulation);
     }
     return *sequenceHasModulation;
   };
@@ -752,15 +745,13 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
 }
 
 std::vector<CollectionExport> exportAllCollections(const SessionSnapshot& snapshot, const SourceStore& sources,
-                                                   const ExportRequest& request,
-                                                   const SequenceDialectRegistry& dialects,
-                                                   const FormatRegistry* formats) {
+                                                   const ExportRequest& request, const FormatRegistry& formats) {
   std::vector<CollectionExport> exports;
   exports.reserve(snapshot.collections().size());
   for (const auto& collection : snapshot.collections()) {
     exports.push_back(CollectionExport{
         .collection = collection.id,
-        .artifacts = exportCollection(snapshot, sources, collection.id, request, dialects, formats),
+        .artifacts = exportCollection(snapshot, sources, collection.id, request, formats),
     });
   }
   return exports;

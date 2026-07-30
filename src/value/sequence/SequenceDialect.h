@@ -12,8 +12,6 @@
 #include <any>
 #include <concepts>
 #include <string>
-#include <string_view>
-#include <unordered_map>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -75,19 +73,6 @@ struct SequenceDialect {
         .behavior = defaultBehavior,
     };
   }
-};
-
-class SequenceDialectRegistry {
-public:
-  void add(SequenceDialect dialect);
-  void seal() noexcept;
-  [[nodiscard]] const SequenceDialect* find(std::string_view id) const;
-  [[nodiscard]] bool contains(std::string_view id) const;
-  [[nodiscard]] bool sealed() const noexcept { return sealed_; }
-
-private:
-  std::unordered_map<std::string, SequenceDialect> dialects_;
-  bool sealed_ = false;
 };
 
 }  // namespace vgmtrans::core

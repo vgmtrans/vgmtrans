@@ -12,13 +12,13 @@
 
 namespace {
 
-void formatRegistryStoresCopyableModuleValues() {
+void formatRegistryStoresCopyableDefinitionsAtomically() {
   FormatRegistry registry;
-  registry.add(probeSequenceModule());
-  registry.add(FormatModule{
+  registry.add(testFormat(probeSequenceModule(), probeSequenceDialect()));
+  registry.add(testFormat(FormatModule{
       .name = std::string("DynamicProbe"),
       .scan = scanProbeSequence,
-  });
+  }));
 
   const FormatRegistry copy = registry;
   const std::array<u8, 1> probeBytes{0xaa};
@@ -29,36 +29,33 @@ void formatRegistryStoresCopyableModuleValues() {
          "format registry should preserve copied module scan predicates");
   expect(copy.modules()[1].canScan == nullptr,
          "format registry should accept scan-only modules without a duplicate recognition probe");
+  const auto* dialect = copy.findDialect("probe");
+  expect(dialect != nullptr && dialect->execute != nullptr,
+         "format registry should copy dialects provided by a definition");
+  expect(copy.findDialect("Missing") == nullptr && !copy.containsDialect("Missing"),
+         "format registry should report missing dialects");
 
   bool threw = false;
   try {
-    registry.add(FormatModule{
-        .name = "Broken",
-    });
+    registry.add(testFormat(FormatModule{.name = "Broken"}));
   } catch (const std::invalid_argument&) {
     threw = true;
   }
   expect(threw, "format registry should reject incomplete module values");
-}
 
-void sequenceDialectRegistryStoresCopyableDialectValues() {
-  SequenceDialectRegistry registry;
-  registry.add(probeSequenceDialect());
-
-  const SequenceDialectRegistry copy = registry;
-  const auto* dialect = copy.find("probe");
-  expect(dialect != nullptr, "sequence dialect registry should copy registered dialect values");
-  expect(dialect->execute != nullptr, "sequence dialect registry should preserve copied command executor");
-  expect(copy.find("Missing") == nullptr, "sequence dialect registry should return null for a missing dialect");
-  expect(copy.contains("probe"), "sequence dialect registry should report copied dialect keys");
-
-  bool threw = false;
+  threw = false;
   try {
-    registry.add(SequenceDialect{});
+    registry.add(testFormat(
+        FormatModule{
+            .name = "DuplicateDialect",
+            .scan = scanProbeSequence,
+        },
+        probeSequenceDialect()));
   } catch (const std::invalid_argument&) {
     threw = true;
   }
-  expect(threw, "sequence dialect registry should reject dialects with empty IDs");
+  expect(threw, "format registry should reject duplicate dialect IDs");
+  expect(registry.modules().size() == 2, "a rejected dialect should not leave its module partially registered");
 }
 
 void sessionRegistersOneFormatDefinitionAtTheAuthoringSurface() {
@@ -70,7 +67,7 @@ void sessionRegistersOneFormatDefinitionAtTheAuthoringSurface() {
 
   expect(session.formats().modules().size() == 1 && session.formats().modules()[0].name == "ProbeSequence",
          "format definition should register its scanner");
-  expect(session.dialects().contains("probe"), "format definition should register its executor family");
+  expect(session.formats().containsDialect("probe"), "format definition should register its executor family");
 }
 
 void scanResultBuilderCoversCommonScannerPlumbing() {
@@ -235,8 +232,7 @@ void scanResultBuilderCursorReportsMalformedFields() {
 }  // namespace
 
 void runValueRegistryTests() {
-  formatRegistryStoresCopyableModuleValues();
-  sequenceDialectRegistryStoresCopyableDialectValues();
+  formatRegistryStoresCopyableDefinitionsAtomically();
   sessionRegistersOneFormatDefinitionAtTheAuthoringSurface();
   scanResultBuilderCoversCommonScannerPlumbing();
   scanResultBuilderNamesSourceCollections();

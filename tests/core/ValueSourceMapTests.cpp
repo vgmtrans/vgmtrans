@@ -363,7 +363,7 @@ void diagnosticsCanReferenceSourceAnnotationsAndObjects() {
 
 void sessionSnapshotCarriesScannerSourceMap() {
   Session session;
-  session.registerFormat(probeExplicitCollectionModule(), probeSequenceDialect());
+  session.registerFormat(testFormat(probeExplicitCollectionModule(), probeSequenceDialect()));
 
   const auto source = session.addSource(SourceFile{.name = "annotated.probe"}, {0xab, 0x01, 0x02});
   session.scanSource(source);

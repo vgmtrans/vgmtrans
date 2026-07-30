@@ -6,6 +6,7 @@
 
 #include "application/WorkspaceController.h"
 #include "models/ValueModels.h"
+#include "value/scan/FormatDefinition.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 
@@ -66,9 +67,12 @@ void workspacePublishesModelsAndRemovesSourceFamilies() {
   source.close();
 
   WorkspaceController workspace([](Session& session) {
-    session.registerFormat(FormatModule{
-        .name = "UI Probe",
-        .scan = scanUiProbe,
+    session.registerFormat(FormatDefinition{
+        .module =
+            FormatModule{
+                .name = "UI Probe",
+                .scan = scanUiProbe,
+            },
     });
   });
   SourceTableModel sources(workspace);
@@ -108,8 +112,7 @@ void workspacePublishesModelsAndRemovesSourceFamilies() {
   expect(playingCollectionIcon.cacheKey() != normalCollectionIcon.cacheKey(),
          "collection model should decorate the playing collection with a distinct icon");
   collections.setPlayingCollection(std::nullopt);
-  expect(collections.index(0, 0).data(Qt::DecorationRole).value<QIcon>().cacheKey() ==
-             normalCollectionIcon.cacheKey(),
+  expect(collections.index(0, 0).data(Qt::DecorationRole).value<QIcon>().cacheKey() == normalCollectionIcon.cacheKey(),
          "collection model should restore the normal icon when playback stops");
   contents.setCollection(collectionId);
   expect(contents.rowCount() == 2, "collection contents should expose the collection root and resolve its member ids");
@@ -169,9 +172,12 @@ void workspaceDoesNotPublishEmptyScansAsSources() {
   source.close();
 
   WorkspaceController workspace([](Session& session) {
-    session.registerFormat(FormatModule{
-        .name = "UI Probe",
-        .scan = scanUiProbe,
+    session.registerFormat(FormatDefinition{
+        .module =
+            FormatModule{
+                .name = "UI Probe",
+                .scan = scanUiProbe,
+            },
     });
   });
   SourceTableModel sources(workspace);

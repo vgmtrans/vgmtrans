@@ -264,7 +264,7 @@ void segSatCollectionPreparationSuppliesVlTablesToSequence() {
   expect(snapshot.collections().size() == 1, "SegSat fixture should produce one explicit collection");
   const Collection& collection = snapshot.collections().front();
   const auto& sequence = sequenceAsset(snapshot, collection);
-  const auto* dialect = session.dialects().find(sequence.program.dialect.value);
+  const auto* dialect = session.formats().findDialect(sequence.program.dialect.value);
   expect(dialect != nullptr, "SegSat fixture dialect should be registered");
 
   const PerformanceSequence unprepared = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, *dialect);
