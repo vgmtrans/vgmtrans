@@ -243,25 +243,18 @@ void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavio
   }
 }
 
-void endTrackAt(PerformanceTrack& track, u64 endTick, bool retainBoundaryEvents = false, bool clipNotes = true,
-                bool retainBoundaryNotes = false) {
+void endTrackAt(PerformanceTrack& track, u64 endTick, bool retainBoundaryEvents = false) {
   std::erase_if(track.events, [&](const PerformanceEvent& event) {
-    const auto& header = performanceEventHeader(event);
-    const u64 tick = header.tick;
-    const bool boundaryNote = tick == endTick && std::holds_alternative<NotePerformanceEvent>(event);
-    if (tick > endTick || (!retainBoundaryEvents && tick == endTick && !(retainBoundaryNotes && boundaryNote))) {
+    const u64 tick = performanceEventHeader(event).tick;
+    if (tick > endTick || (!retainBoundaryEvents && tick == endTick)) {
       return true;
     }
-    // Notes beginning exactly at a section boundary normally have no audible
-    // extent. A driver may already have scheduled that onset before it stops
-    // fetching commands, in which case the note is part of the finished pass.
-    return boundaryNote && !retainBoundaryNotes;
+    // Notes beginning exactly at a section boundary have no audible extent.
+    return tick == endTick && std::holds_alternative<NotePerformanceEvent>(event);
   });
-  if (clipNotes) {
-    for (PerformanceEvent& event : track.events) {
-      if (auto* note = std::get_if<NotePerformanceEvent>(&event)) {
-        note->durationTicks = static_cast<u32>(std::min<u64>(note->durationTicks, endTick - note->header.tick));
-      }
+  for (PerformanceEvent& event : track.events) {
+    if (auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      note->durationTicks = static_cast<u32>(std::min<u64>(note->durationTicks, endTick - note->header.tick));
     }
   }
   std::erase_if(track.automations, [=](const PerformanceAutomation& automation) {
@@ -611,16 +604,7 @@ private:
     const SourceCommand& command = track_.commands.at(commandIndex);
     const VisitState visitState = LoopDetector::visitState(commandIndex, runtime_);
     if (const auto loop = loopDetector_.observe(visitState, command, runtime_, arrivedByControlFlow_)) {
-      const bool hadLoopStop = loopStopTick_.has_value();
       if (handleLoop(*loop, commandIndex, visitState).kind == LoopActionKind::StopTrack) {
-        return false;
-      }
-      if (!hadLoopStop && loopStopTick_ && behavior_.firstTrackLoopEndsSequence) {
-        // Automatic loop detection happens immediately before executing the
-        // repeated destination. Interleaved-stream formats stop at the first
-        // channel view's boundary, so yield before it can retain the first
-        // command of another pass. Conventional independent tracks keep the
-        // established coordinated-loop behavior.
         return false;
       }
     }
@@ -1165,15 +1149,6 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
 
         const bool hasLoopBoundary =
             std::ranges::any_of(executors, [](const auto& executor) { return executor->loopStopTick().has_value(); });
-        if (!playlist && loopPolicy == LoopPolicy::PlayOnce && behavior.firstTrackLoopEndsSequence && hasLoopBoundary) {
-          sequenceEndTick = std::numeric_limits<u64>::max();
-          for (const auto& executor : executors) {
-            if (executor->loopStopTick()) {
-              *sequenceEndTick = std::min(*sequenceEndTick, *executor->loopStopTick());
-            }
-          }
-          break;
-        }
         if (!playlist && loopPolicy == LoopPolicy::PlayOnce && hasLoopBoundary &&
             std::ranges::all_of(executors,
                                 [](const auto& executor) { return !executor->active() || executor->loopStopTick(); })) {
@@ -1193,8 +1168,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
       for (auto& executor : executors) {
         auto rendered = executor->finish();
         if (sequenceEndTick) {
-          endTrackAt(rendered.track, *sequenceEndTick, !behavior.clipNotesAtSequenceEnd,
-                     behavior.clipNotesAtSequenceEnd, !behavior.clipNotesAtSequenceEnd);
+          endTrackAt(rendered.track, *sequenceEndTick);
         }
         tracks.push_back(std::move(rendered.track));
       }
@@ -1298,10 +1272,6 @@ SequenceProgramBehavior SequenceVm::resolvedBehavior(const SequenceProgram& prog
   } else if (dialect.defaultBehavior.panLaw != PanLaw::Unspecified) {
     behavior.panLaw = dialect.defaultBehavior.panLaw;
   }
-  behavior.clipNotesAtSequenceEnd =
-      program.behavior.clipNotesAtSequenceEnd && dialect.defaultBehavior.clipNotesAtSequenceEnd;
-  behavior.firstTrackLoopEndsSequence =
-      program.behavior.firstTrackLoopEndsSequence || dialect.defaultBehavior.firstTrackLoopEndsSequence;
 
   if (program.behavior.initialReverbSend) {
     behavior.initialReverbSend = program.behavior.initialReverbSend;

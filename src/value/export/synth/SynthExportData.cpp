@@ -97,17 +97,7 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
     InstrumentPerformanceEvent selection;
     for (const auto& event : track.events) {
       if (const auto* change = std::get_if<InstrumentPerformanceEvent>(&event)) {
-        if (change->sourceInstrument) {
-          selection = *change;
-        } else {
-          selection.sourceInstrument.reset();
-          if (change->selectsBank) {
-            selection.bank = change->bank;
-          }
-          if (change->selectsProgram) {
-            selection.program = change->program;
-          }
-        }
+        selection = *change;
       } else if (std::get_if<NotePerformanceEvent>(&event) != nullptr) {
         markSelectedInstrument(selection, instruments, used);
       }
@@ -262,9 +252,9 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
       });
     }
 
-    // DLS can preserve empty program slots, which matters for sparse hardware
-    // banks. Exporters that require at least one playable zone may filter them.
-    instruments.push_back(std::move(resolvedInstrument));
+    if (!resolvedInstrument.regions.empty()) {
+      instruments.push_back(std::move(resolvedInstrument));
+    }
   }
 
   return instruments;

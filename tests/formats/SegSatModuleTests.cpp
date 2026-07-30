@@ -181,8 +181,8 @@ std::vector<u8> multiBankVelocityFixture() {
   be16(bytes, sequence + 6, 0);
   size_t command = sequence + 8;
   const std::initializer_list<u8> commands{
-      0xb0, 32, 5, 0, 0xc0, 0, 0, 0x00, 60, 64, 10, 0,
-      0xb0, 32, 6, 0,             0x00, 60, 64, 10, 0, 0x83,
+      0xb0, 32, 6, 0, 0xc0, 0, 0, 0x00, 60, 64, 10, 0,
+      0xb0, 32, 5, 0,             0x00, 60, 64, 10, 0, 0x83,
   };
   std::ranges::copy(commands, bytes.begin() + static_cast<std::ptrdiff_t>(command));
 
@@ -275,9 +275,8 @@ void segSatCollectionPreparationSuppliesVlTablesToSequence() {
   const auto* selection = instrument != playback.performance.tracks[0].events.end()
                               ? std::get_if<InstrumentPerformanceEvent>(&*instrument)
                               : nullptr;
-  expect(selection != nullptr && selection->bank == 0 && selection->program == 0 && !selection->selectsBank &&
-             selection->selectsProgram,
-         "prepared program selection should use the sole bank's remapped export address");
+  expect(selection != nullptr && selection->sourceInstrument == segSatInstrumentIdentity(5, 0),
+         "SegSat program selection should retain its source identity for collection-time address resolution");
 
   const auto bend = std::ranges::find_if(playback.performance.tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<PitchBendPerformanceEvent>(event);
@@ -354,13 +353,14 @@ void segSatMultiBankPlaybackUsesTheActiveBanksVlTable() {
       session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{.sequence = {.sequenceLoops = 0}});
 
   std::vector<const NotePerformanceEvent*> notes;
-  std::vector<u32> selectedBanks;
+  std::vector<u8> selectedBanks;
   for (const auto& event : playback.performance.tracks.front().events) {
     if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
       notes.push_back(note);
     } else if (const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&event);
-               instrument != nullptr && instrument->selectsBank) {
-      selectedBanks.push_back(instrument->bank);
+               instrument != nullptr && instrument->sourceInstrument &&
+               instrument->sourceInstrument->domain == kSegSatInstrumentDomain) {
+      selectedBanks.push_back(static_cast<u8>(instrument->sourceInstrument->key >> 8));
     }
   }
 
@@ -376,47 +376,10 @@ void segSatMultiBankPlaybackUsesTheActiveBanksVlTable() {
       .level2 = 127,
       .rate3 = 2,
   };
-  expect(notes.size() == 2 && selectedBanks == std::vector<u32>({5, 6}) &&
-             LevelScale::midi7FromLinear(notes[0]->linearVelocity) == segSatMidiVelocity(64, identity, 0, 0) &&
-             LevelScale::midi7FromLinear(notes[1]->linearVelocity) == segSatMidiVelocity(64, identity, 128, 0),
-         "each bank command should select the matching prepared preset alias and VL/region attenuation");
-}
-
-void segSatLoopBoundaryRetainsScheduledNoteTail() {
-  std::vector<u8> bytes(32);
-  be16(bytes, 0, 48);
-  be16(bytes, 2, 0);
-  be16(bytes, 4, 8);
-  be16(bytes, 6, 0);
-  size_t offset = 8;
-  auto append = [&](std::initializer_list<u8> values) {
-    std::ranges::copy(values, bytes.begin() + static_cast<std::ptrdiff_t>(offset));
-    offset += values.size();
-  };
-  append({0x82, 0});
-  append({0x00, 60, 64, 5, 5});
-  append({0x82, 0});
-
-  const SegSatSequenceLayout layout{
-      .offset = 0,
-      .end = static_cast<u32>(offset),
-      .ppqn = 48,
-      .normalTrack = 8,
-  };
-  const SequenceProgram program = parseSegSatSequenceProgram(ByteReader(SourceId{4}, bytes), AssetId{1}, layout);
-  const PerformanceSequence performance =
-      SequenceVm(SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = 1})
-          .render(program, segSatSequenceDialect());
-
-  std::vector<const NotePerformanceEvent*> notes;
-  for (const auto& event : performance.tracks[0].events) {
-    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
-      notes.push_back(note);
-    }
-  }
-  expect(notes.size() == 2 && notes[0]->header.tick == 5 && notes[1]->header.tick == 10 &&
-             notes[1]->durationTicks == 5 && performance.tracks[0].endTick == 15,
-         "a note scheduled at the coordinated loop boundary should sound through its complete Saturn duration");
+  expect(notes.size() == 2 && selectedBanks == std::vector<u8>({6, 6, 5}) &&
+             LevelScale::midi7FromLinear(notes[0]->linearVelocity) == segSatMidiVelocity(64, identity, 128, 0) &&
+             LevelScale::midi7FromLinear(notes[1]->linearVelocity) == segSatMidiVelocity(64, identity, 0, 0),
+         "source bank aliases should remain paired with sorted collection banks regardless of command order");
 }
 
 void segSatSsfExtractorUsesFourByteMiniHeader() {

@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <limits>
 #include <map>
 #include <numbers>
 #include <optional>
@@ -300,11 +299,6 @@ struct PanAndAttenuation {
   return instruments;
 }
 
-void appendU16(std::vector<u8>& bytes, u16 value) {
-  bytes.push_back(static_cast<u8>(value));
-  bytes.push_back(static_cast<u8>(value >> 8));
-}
-
 }  // namespace
 
 u8 segSatMidiVelocity(u8 velocity, const SegSatVlTable& table, u8 totalLevel, s8 volumeBias) {
@@ -460,37 +454,54 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
   };
 }
 
-std::vector<u8> makeSegSatVelocityContext(ByteReader reader, const std::vector<SegSatBankBinding>& banks) {
-  std::vector<u8> bytes{'S', 'V', 'L', '2'};
-  appendU16(bytes, static_cast<u16>(std::min<size_t>(banks.size(), std::numeric_limits<u16>::max())));
+std::vector<SegSatVelocityBank> readSegSatVelocityBanks(ByteReader reader,
+                                                        const std::vector<SegSatBankBinding>& banks) {
+  std::vector<SegSatVelocityBank> velocityBanks;
+  velocityBanks.reserve(banks.size());
   for (const auto& binding : banks) {
-    // Only key ranges, VL indices, total levels, and voice volume bias are
-    // serialized below. V2_08 is the MM8-compatible model used by this port;
+    // Only key ranges, VL indices, total levels, and voice volume bias affect
+    // sequence velocity. V2_08 is the MM8-compatible model used by this port;
     // the version-sensitive LFO result from this parse is deliberately unused.
     const auto parsed = parseInstruments(reader, binding.layout, SegSatDriverVersion::V2_08);
     const u16 vlCount = static_cast<u16>((binding.layout.pegTables - binding.layout.velocityTables) / 10);
-    bytes.push_back(binding.sourceBank);
-    bytes.push_back(binding.exportBank);
-    appendU16(bytes, vlCount);
+    SegSatVelocityBank bank{
+        .sourceBank = binding.sourceBank,
+    };
+    bank.tables.reserve(vlCount);
     for (u32 index = 0; index < vlCount; ++index) {
       const u32 offset = binding.layout.offset + binding.layout.velocityTables + index * 10;
-      for (u32 byte = 0; byte < 10; ++byte) {
-        bytes.push_back(reader.u8At(offset + byte));
-      }
+      bank.tables.push_back(SegSatVlTable{
+          .rate0 = reader.u8At(offset),
+          .point0 = reader.u8At(offset + 1),
+          .level0 = reader.u8At(offset + 2),
+          .rate1 = reader.u8At(offset + 3),
+          .point1 = reader.u8At(offset + 4),
+          .level1 = reader.u8At(offset + 5),
+          .rate2 = reader.u8At(offset + 6),
+          .point2 = reader.u8At(offset + 7),
+          .level2 = reader.u8At(offset + 8),
+          .rate3 = reader.u8At(offset + 9),
+      });
     }
-    appendU16(bytes, static_cast<u16>(parsed.size()));
+    bank.instruments.reserve(parsed.size());
     for (const auto& instrument : parsed) {
-      bytes.push_back(static_cast<u8>(instrument.volumeBias));
-      bytes.push_back(static_cast<u8>(std::min<size_t>(instrument.regions.size(), 255)));
+      SegSatVelocityInstrument velocityInstrument{
+          .volumeBias = instrument.volumeBias,
+      };
+      velocityInstrument.regions.reserve(instrument.regions.size());
       for (const auto& region : instrument.regions) {
-        bytes.push_back(region.keyLow);
-        bytes.push_back(region.keyHigh);
-        bytes.push_back(region.vlIndex);
-        bytes.push_back(region.totalLevel);
+        velocityInstrument.regions.push_back(SegSatVelocityRegion{
+            .keyLow = region.keyLow,
+            .keyHigh = region.keyHigh,
+            .table = region.vlIndex,
+            .totalLevel = region.totalLevel,
+        });
       }
+      bank.instruments.push_back(std::move(velocityInstrument));
     }
+    velocityBanks.push_back(std::move(bank));
   }
-  return bytes;
+  return velocityBanks;
 }
 
 }  // namespace vgmtrans::formats::segsat
