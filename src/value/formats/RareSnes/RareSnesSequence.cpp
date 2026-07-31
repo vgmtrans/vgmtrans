@@ -147,9 +147,8 @@ struct Tremolo {
 };
 
 struct CallFrame {
-  u8 remaining = 0;
+  u8 repeatSlot = 0;
   Address destination;
-  Address continuation;
 };
 
 struct BattlemaniacsPercussion {
@@ -939,13 +938,13 @@ struct Playback {
     return Effects::wait(duration);
   }
 
-  [[nodiscard]] Effects call(u8 times, Address destination, Address continuation) {
+  void call(u8 times, Address destination) {
+    const u8 repeatSlot = static_cast<u8>(track.calls.size());
+    vm.repeatCounter(repeatSlot).start(times == 0 ? 256u : static_cast<u32>(times));
     track.calls.push_back(CallFrame{
-        .remaining = times,
+        .repeatSlot = repeatSlot,
         .destination = destination,
-        .continuation = continuation,
     });
-    return vm.jump(destination);
   }
 
   [[nodiscard]] Effects return_() {
@@ -953,13 +952,13 @@ struct Playback {
       return vm.end();
     }
     CallFrame& frame = track.calls.back();
-    frame.remaining = static_cast<u8>(frame.remaining - 1);
-    if (frame.remaining != 0) {
+    RepeatCounter counter = vm.repeatCounter(frame.repeatSlot);
+    if (counter.consumeReplay()) {
       return vm.finiteBranch(frame.destination);
     }
-    const Address continuation = frame.continuation;
+    counter.finish();
     track.calls.pop_back();
-    return vm.jump(continuation);
+    return vm.return_();
   }
 
   [[nodiscard]] Effects conditional(Address command) {
@@ -1316,8 +1315,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command(selected == Kind::Call ? "Pattern Repeat" : "Pattern Play", SequenceSemantic::Call);
       const u8 times = selected == Kind::Call ? event.u8("times", SemanticOperandRole::Count) : u8{1};
       const Address destination = event.addressLe("destination", SemanticOperandRole::CallTarget);
-      event.invoke<&Playback::call>(times, destination, event.nextAddress());
-      return event.mayBranchTo(destination).requireRuntimeControlFlow();
+      return event.invoke<&Playback::call>(times, destination).call(destination);
     }
     case Kind::Return: {
       auto event = cursor.command("Pattern Return", SequenceSemantic::Return);
@@ -1759,9 +1757,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     switch (selected) {
       case Kind::Call:
       case Kind::CallOnce:
-        if (!decoded.flow.additionalTargets.empty()) {
+        if (const auto destination = decoded.flow.defaultDestination()) {
           point.returns.push_back(static_cast<u32>(decoded.flow.continuation.value));
-          queue(decoded.flow.additionalTargets.front(), nextState, std::move(point.returns));
+          queue(*destination, nextState, std::move(point.returns));
         }
         break;
       case Kind::Return:
