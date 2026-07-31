@@ -27,6 +27,7 @@
 #include "value/synth/SampleDecoder.h"
 #include "value/formats/Akao/Akao.h"
 #include "value/formats/CapcomSnes/CapcomSnes.h"
+#include "value/formats/RareSnes/RareSnes.h"
 #include "value/formats/ValueFormats.h"
 #include "io/RawFile.h"
 
@@ -55,6 +56,7 @@
 
 using namespace vgmtrans::core;
 using namespace vgmtrans::formats::capcom_snes;
+namespace rare_snes = vgmtrans::formats::rare_snes;
 
 namespace {
 
@@ -3517,6 +3519,13 @@ constexpr ParitySuite kNinSnesSuite{
     .midiComparison = {.useSharedPlayOnceHorizon = true},
 };
 
+constexpr ParitySuite kRareSnesSuite{
+    .format = "RareSnes",
+    .label = "RareSnes",
+    .filterCollectionsByFormat = true,
+    .midiComparison = {.useSharedPlayOnceHorizon = true},
+};
+
 constexpr ParitySuite kKonamiArcadeSuite{
     .format = "KonamiArcade",
     .label = "KonamiArcade",
@@ -5159,6 +5168,144 @@ int compareNinSnesDirectSummary(const std::filesystem::path& path) {
                           valueSummariesForSuite(path, kNinSnesSuite));
 }
 
+int smokeRareSnesDirectExports(const std::filesystem::path& path) {
+  Session auditSession;
+  vgmtrans::formats::registerValueFormats(auditSession);
+  auditSession.addSource(SourceFile{.name = path.filename().string(), .path = path}, readFile(path));
+  auditSession.scanPendingSources();
+  const SessionSnapshot auditProject = auditSession.snapshot();
+  for (const Diagnostic& diagnostic : auditProject.diagnostics()) {
+    if (diagnostic.message.find("incompatible duration modes") != std::string::npos) {
+      std::cout << "RareSnes stateful decode diagnostic: " << diagnostic.message << "\n";
+      return 1;
+    }
+    if (diagnostic.message.find("no valid used instruments or samples") == std::string::npos) {
+      std::cout << "RareSnes unexpected scan diagnostic: " << diagnostic.message << "\n";
+      return 1;
+    }
+  }
+  size_t auditedCommands = 0;
+  for (const Collection& collection : auditProject.collections()) {
+    if (!valueCollectionHasSequenceFormat(auditProject, collection, kRareSnesSuite.format)) {
+      continue;
+    }
+    const auto* sequence = auditProject.asset<SequenceProgramAsset>(*collection.members.sequence);
+    for (const TrackProgram& track : sequence->program.tracks) {
+      for (const SourceCommand& command : track.commands) {
+        ++auditedCommands;
+        if (command.semantic == SequenceSemantic::Unsupported) {
+          std::cout << "RareSnes unsupported command in '" << collection.name << "': track=" << track.sourceTrackNumber
+                    << " address=0x" << std::hex << command.address.value << " opcode=0x"
+                    << static_cast<u32>(command.opcode) << std::dec << "\n";
+          return 1;
+        }
+      }
+    }
+  }
+
+  const auto summaries = valueSummariesForSuite(path, kRareSnesSuite);
+  const auto midis = valueMidisForSuite(path, kRareSnesSuite, 0);
+  const auto synths = valueSynthsForSuite(path, kRareSnesSuite);
+  if (summaries.size() != midis.size()) {
+    std::cout << "RareSnes export collection counts differ: summaries=" << summaries.size() << " MIDI=" << midis.size()
+              << " synth=" << synths.size() << "\n";
+    return 1;
+  }
+  for (const auto& [name, midi] : midis) {
+    if (synths.contains(name)) {
+      continue;
+    }
+    const auto normalized = normalizeMidi(midi);
+    const bool hasNotes =
+        std::ranges::any_of(normalized.events, [](const NormalizedMidiEvent& event) { return event.kind == "note"; });
+    if (hasNotes) {
+      std::cout << "RareSnes MIDI with notes has no used sample synth: " << name << "\n";
+      return 1;
+    }
+  }
+  std::cout << "RareSnes direct scan/MIDI/synth smoke ok: collections=" << summaries.size()
+            << " synths=" << synths.size() << " commands=" << auditedCommands
+            << " diagnostics=" << auditProject.diagnostics().size() << "\n";
+  return 0;
+}
+
+std::string rareSnesCanonicalCollectionKey(std::string key) {
+  const size_t address = key.rfind(" @ ");
+  if (address == std::string::npos) {
+    return key;
+  }
+  for (const auto profile :
+       {rare_snes::Profile::Battlemaniacs, rare_snes::Profile::BattletoadsDoubleDragon,
+        rare_snes::Profile::DonkeyKongCountry, rare_snes::Profile::KillerInstinctBeta, rare_snes::Profile::WinningRun,
+        rare_snes::Profile::KillerInstinct, rare_snes::Profile::DonkeyKongCountry2}) {
+    const std::string suffix = fmt::format(" ({})", rare_snes::profileName(profile));
+    if (address >= suffix.size() && key.compare(address - suffix.size(), suffix.size(), suffix) == 0) {
+      key.erase(address - suffix.size(), suffix.size());
+      break;
+    }
+  }
+  return key;
+}
+
+int compareRareSnesNoteStructure(const std::filesystem::path& path) {
+  const auto legacy = legacyMidisForSuite(path, kRareSnesSuite, 0);
+  const auto value = valueMidisForSuite(path, kRareSnesSuite, 0);
+  using TrackNoteTicks = std::map<u32, std::vector<u64>>;
+  std::map<std::string, TrackNoteTicks> legacyNotes;
+  std::map<std::string, TrackNoteTicks> valueNotes;
+  const auto collect = [](const MidiCollectionMap& midis, auto& destination) {
+    for (const auto& [name, midi] : midis) {
+      auto& notes = destination[rareSnesCanonicalCollectionKey(name)];
+      for (const NormalizedMidiEvent& event : normalizeMidi(midi).events) {
+        if (event.kind == "note") {
+          notes[event.track].push_back(event.tick);
+        }
+      }
+    }
+  };
+  collect(legacy, legacyNotes);
+  collect(value, valueNotes);
+  size_t comparedCollections = 0;
+  size_t comparedTracks = 0;
+  size_t comparedOnsets = 0;
+  size_t loopTailDifferences = 0;
+  for (const auto& [name, legacyTracks] : legacyNotes) {
+    const auto valueCollection = valueNotes.find(name);
+    if (valueCollection == valueNotes.end()) {
+      continue;
+    }
+    ++comparedCollections;
+    for (const auto& [track, legacyTicks] : legacyTracks) {
+      const auto valueTrack = valueCollection->second.find(track);
+      if (valueTrack == valueCollection->second.end()) {
+        ++loopTailDifferences;
+        continue;
+      }
+      ++comparedTracks;
+      const auto& valueTicks = valueTrack->second;
+      const size_t shared = std::min(legacyTicks.size(), valueTicks.size());
+      const auto [legacyMismatch, valueMismatch] =
+          std::mismatch(legacyTicks.begin(), legacyTicks.begin() + shared, valueTicks.begin());
+      if (legacyMismatch != legacyTicks.begin() + shared) {
+        const size_t index = static_cast<size_t>(legacyMismatch - legacyTicks.begin());
+        std::cout << "RareSnes note-on timing differs in '" << name << "', track=" << track << ", onset=" << index
+                  << ": legacy=" << *legacyMismatch << " value=" << *valueMismatch << "\n";
+        return 1;
+      }
+      comparedOnsets += shared;
+      loopTailDifferences += legacyTicks.size() != valueTicks.size();
+    }
+  }
+  if (comparedCollections == 0 || comparedOnsets == 0) {
+    std::cout << "RareSnes legacy/value scans produced no common note-on data\n";
+    return 1;
+  }
+  std::cout << "RareSnes legacy/value note-on prefixes agree: collections=" << comparedCollections
+            << " tracks=" << comparedTracks << " onsets=" << comparedOnsets
+            << " loop-tail differences=" << loopTailDifferences << "\n";
+  return 0;
+}
+
 int compareKonamiArcadeDirectSummary(const std::filesystem::path& path) {
   return runSummaryParity(kKonamiArcadeSuite, legacySummariesForSuite(path, kKonamiArcadeSuite),
                           valueSummariesForSuite(path, kKonamiArcadeSuite));
@@ -5471,6 +5618,8 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity nin-snes-direct-midi <rsn-or-spc-file> [sequence-loops]\n"
       << "  vgmtrans-parity nin-snes-direct-synth <rsn-or-spc-file>\n"
       << "  vgmtrans-parity nin-snes-direct-summary <rsn-or-spc-file>\n"
+      << "  vgmtrans-parity rare-snes-direct-smoke <rsn-or-spc-file>\n"
+      << "  vgmtrans-parity rare-snes-note-structure <rsn-or-spc-file>\n"
       << "  vgmtrans-parity konami-arcade-direct-midi <mame-zip-file> [sequence-loops]\n"
       << "  vgmtrans-parity konami-arcade-direct-synth <mame-zip-file>\n"
       << "  vgmtrans-parity konami-arcade-direct-summary <mame-zip-file>\n"
@@ -5548,6 +5697,14 @@ int main(int argc, char** argv) {
 
     if (argc == 3 && std::string(argv[1]) == "nin-snes-direct-summary") {
       return compareNinSnesDirectSummary(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "rare-snes-direct-smoke") {
+      return smokeRareSnesDirectExports(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "rare-snes-note-structure") {
+      return compareRareSnesNoteStructure(argv[2]);
     }
 
     if (argc == 3 && std::string(argv[1]) == "konami-arcade-direct-summary") {

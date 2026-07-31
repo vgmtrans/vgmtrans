@@ -6,6 +6,7 @@ target_sources(vgmtrans-value-core-tests
     formats/KonamiArcadeModuleTests.cpp
     formats/KonamiSnesModuleTests.cpp
     formats/NinSnesModuleTests.cpp
+    formats/RareSnesModuleTests.cpp
     formats/AkaoSnesModuleTests.cpp
     formats/AkaoFormatTests.cpp
     formats/NdsModuleTests.cpp
