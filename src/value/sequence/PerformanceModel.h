@@ -185,6 +185,9 @@ struct PitchBendPerformanceEvent {
   PerformanceEventHeader header;
   // Musical bend amount. MIDI renderers quantize this using the active pitch-bend range.
   double semitones = 0.0;
+  // A source pitch wheel may rely on the selected instrument for its range.
+  // Collection-aware lowerers use this position instead of the fallback above.
+  std::optional<double> normalizedWheelPosition;
 };
 
 struct PitchBendRangePerformanceEvent {
@@ -255,14 +258,6 @@ struct PitchTransitionSettingsPerformanceEvent {
 struct LegatoPedalPerformanceEvent {
   PerformanceEventHeader header;
   bool enabled = false;
-};
-
-enum class LfoWaveform {
-  Sine,
-  Triangle,
-  Square,
-  SawtoothUp,
-  SawtoothDown,
 };
 
 enum class ModulationPerformanceTarget {

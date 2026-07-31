@@ -56,12 +56,19 @@ namespace {
   return nullptr;
 }
 
+[[nodiscard]] bool canUseNativeSynthLfo(std::optional<LfoWaveform> waveform) noexcept {
+  // SF2 and DLS cannot select an LFO waveform. Their built-in periodic LFO is
+  // still a useful approximation for sine, square, triangle, and sawtooth.
+  // Noise has no comparable native representation.
+  return waveform != LfoWaveform::Noise;
+}
+
 }  // namespace
 
 LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulation) {
   LoweredSynthModulation lowered;
 
-  if (modulation.vibrato) {
+  if (modulation.vibrato && canUseNativeSynthLfo(modulation.vibrato->waveform)) {
     const auto& vibrato = *modulation.vibrato;
     lowered.generators.push_back(SynthGenerator{
         .destination = SynthDestination::VibratoRate,
@@ -109,7 +116,7 @@ LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulati
     }
   }
 
-  if (modulation.tremolo) {
+  if (modulation.tremolo && canUseNativeSynthLfo(modulation.tremolo->waveform)) {
     const auto& tremolo = *modulation.tremolo;
     lowered.generators.push_back(SynthGenerator{
         .destination = SynthDestination::TremoloRate,

@@ -131,6 +131,9 @@ void annotateSynthValue(AnnotationBuilder annotation, const Instrument& instrume
       .derived("program", address.program)
       .derived("region_count", instrument.regions.size())
       .derived("reverb", instrument.reverb, SourceValueDisplay::Percent);
+  if (instrument.pitchBendRangeCents) {
+    annotation.derived("pitch_bend_range_cents", *instrument.pitchBendRangeCents);
+  }
   if (instrument.synthVoice) {
     std::visit(
         [&](const auto& voice) {

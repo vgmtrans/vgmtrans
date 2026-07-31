@@ -120,6 +120,8 @@ struct InstrumentAddress {
 struct Instrument {
   std::optional<InstrumentAddress> explicitAddress;
   std::optional<InstrumentIdentity> identity;
+  // Some synthesizers give each instrument its own pitch-wheel sensitivity.
+  std::optional<u16> pitchBendRangeCents;
   double reverb = kDefaultInstrumentReverbSend;
   std::string name;
   SourceRange range;

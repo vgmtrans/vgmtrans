@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <map>
 #include <numbers>
 #include <optional>
@@ -52,18 +53,28 @@ struct ParsedRegion {
   Region region;
   u8 vlIndex = 0;
   u8 totalLevel = 0;
-  std::optional<VibratoSpec> vibrato;
+  InstrumentModulation modulation;
 };
 
 struct ParsedInstrument {
   u32 index = 0;
   SourceRange range;
   s8 volumeBias = 0;
+  u16 pitchBendRangeCents = 200;
   std::vector<ParsedRegion> regions;
 };
 
 [[nodiscard]] bool rangeValid(ByteReader reader, u64 offset, u64 size) {
   return offset <= reader.size() && size <= reader.size() - offset;
+}
+
+[[nodiscard]] u16 pitchBendRangeCents(u8 voiceHeader) {
+  const u8 encoded = voiceHeader & 0x0f;
+  // The Tone Editor defines 0-12 as semitones and 13 as two octaves.
+  // It does not produce 14 or 15, so use those values literally if a bank
+  // contains either one.
+  const u8 semitones = encoded == 13 ? 24 : encoded;
+  return static_cast<u16>(semitones) * 100;
 }
 
 [[nodiscard]] std::optional<SampleData> readSampleData(ByteReader reader, const SegSatBankLayout& bank,
@@ -94,21 +105,53 @@ struct ParsedInstrument {
   };
 }
 
+[[nodiscard]] double scspRateSeconds(const std::array<double, 64>& milliseconds, u8 rate, u8 keyRateScaling) {
+  // The rate also changes with the played note. At the region's unity pitch,
+  // OCT and FNS add nothing, leaving only the KRS contribution.
+  const u8 rateBase = keyRateScaling == 15 ? 0 : static_cast<u8>(keyRateScaling * 2);
+  const u8 index = std::min<u8>(static_cast<u8>(rate * 2 + rateBase), 63);
+  if (index < 2) {
+    return std::numeric_limits<double>::infinity();
+  }
+  return milliseconds[index] / 1000.0;
+}
+
 [[nodiscard]] Envelope scspEnvelope(u16 adsr1, u16 adsr2) {
   const u8 attack = static_cast<u8>(adsr1 & 0x1f);
+  const bool holdAttack = (adsr1 & 0x20) != 0;
   const u8 decay1 = static_cast<u8>((adsr1 >> 6) & 0x1f);
   const u8 decay2 = static_cast<u8>((adsr1 >> 11) & 0x1f);
   const u8 release = static_cast<u8>(adsr2 & 0x1f);
   const u8 decayLevel = static_cast<u8>((adsr2 >> 5) & 0x1f);
+  const u8 keyRateScaling = static_cast<u8>((adsr2 >> 10) & 0x0f);
 
-  // MAME begins SCSP attack at 0x17f rather than silence. The original
-  // converter's 0.625 factor retains that audible portion of the envelope.
+  double attackSeconds = scspRateSeconds(kAttackMilliseconds, attack, keyRateScaling);
+  if (std::isfinite(attackSeconds)) {
+    // The rate table covers all 1023 envelope steps, but SCSP attack starts at
+    // step 0x17f (-60 dB), leaving 640 steps before full volume.
+    attackSeconds *= 640.0 / 1023.0;
+  }
+
+  double decaySeconds = scspRateSeconds(kDecayMilliseconds, decay1, keyRateScaling);
+  if (decayLevel == 0) {
+    decaySeconds = 0.0;
+  } else if (std::isfinite(decaySeconds)) {
+    // Each decay-level step is 3 dB, or 32 of the SCSP's 1023 envelope steps.
+    decaySeconds *= (32.0 * decayLevel) / 1023.0;
+  }
+
+  // Unlike the other rates, D2R 0 always holds its current level even when
+  // key-rate scaling would otherwise produce a nonzero effective rate.
+  const double secondDecaySeconds = decay2 == 0 ? std::numeric_limits<double>::infinity()
+                                                : scspRateSeconds(kDecayMilliseconds, decay2, keyRateScaling);
+
   return Envelope{
-      .attackSeconds = (kAttackMilliseconds[attack * 2] / 1000.0) * 0.625,
-      .decaySeconds = kDecayMilliseconds[decay1 * 2] / 1000.0,
-      .secondDecaySeconds = kDecayMilliseconds[decay2 * 2] / 1000.0,
-      .releaseSeconds = kDecayMilliseconds[release * 2] / 1000.0,
-      .sustainAmplitude = (31 - decayLevel) / 31.0,
+      .attackSeconds = holdAttack ? 0.0 : attackSeconds,
+      .holdSeconds = holdAttack ? std::optional{attackSeconds} : std::nullopt,
+      .decaySeconds = decaySeconds,
+      .secondDecaySeconds = secondDecaySeconds,
+      .releaseSeconds = scspRateSeconds(kDecayMilliseconds, release, keyRateScaling),
+      .sustainAmplitude = std::pow(10.0, (-3.0 * decayLevel) / 20.0),
   };
 }
 
@@ -182,68 +225,105 @@ struct PanAndAttenuation {
   return version == SegSatDriverVersion::V2_20 ? irq : irq / 4.0;
 }
 
-[[nodiscard]] std::optional<VibratoSpec> regionVibrato(ByteReader reader, const SegSatBankLayout& bank,
-                                                       SegSatDriverVersion version, u32 offset) {
-  const bool usesPlfo = (reader.u8At(offset + 2) & 0x40) != 0;
-  if (usesPlfo) {
-    const u8 index = reader.u8At(offset + 31);
-    const u32 table = bank.offset + bank.plfoTables + static_cast<u32>(index) * 4;
-    if (table + 4 > bank.offset + bank.firstInstrument || !rangeValid(reader, table, 4)) {
-      return std::nullopt;
-    }
-    const u8 delay = reader.u8At(table);
-    const u8 amplitude = reader.u8At(table + 1);
-    const u8 frequency = reader.u8At(table + 2);
-    const u8 fade = reader.u8At(table + 3);
-    if (frequency == 0) {
-      return std::nullopt;
-    }
-    const double updates = driverRate(version);
-    const u32 fadeStep = (static_cast<u32>(fade) * fade) >> 6;
-    const double fadeSeconds =
-        fadeStep == 0 ? 0.0 : ((fadeStep * 2 - 1) * (static_cast<double>(frequency) * frequency / (64.0 * updates)));
-    double depth = (static_cast<double>(amplitude) * amplitude * frequency * frequency) / ((8192.0 * 256.0) / 100.0);
-    if (fadeStep != 0) {
-      depth *= 2.0 * fadeStep;
-    }
-    const double rate = (updates * 32.0) / (static_cast<double>(frequency) * frequency);
-    const double effectiveDelay = (static_cast<double>(delay) * delay) / (16.0 * updates) + fadeSeconds / 2.0;
-    const std::optional<ModulationRange> delayRange =
-        effectiveDelay > 0.0
-            ? std::optional<ModulationRange>{
-                  ModulationRange{.minimum = effectiveDelay, .maximum = effectiveDelay},
-              }
-            : std::nullopt;
-    return VibratoSpec{
-        .maxDepthCents = depth,
-        .rateHertz = {.minimum = rate, .maximum = rate},
-        // A zero driver delay means "start now." Omitting it avoids lowering
-        // that value to the synth formats' finite one-millisecond floor.
-        .delaySeconds = delayRange,
-        .depthMode = ModulationDepthMode::Fixed,
-    };
+[[nodiscard]] LfoWaveform scspLfoWaveform(u8 encoded) {
+  switch (encoded & 3) {
+    case 0:
+      return LfoWaveform::SawtoothUp;
+    case 1:
+      return LfoWaveform::Square;
+    case 2:
+      return LfoWaveform::Triangle;
+    case 3:
+      return LfoWaveform::Noise;
+  }
+  return LfoWaveform::Noise;
+}
+
+[[nodiscard]] std::optional<VibratoSpec> softwarePlfoVibrato(ByteReader reader, const SegSatBankLayout& bank,
+                                                             SegSatDriverVersion version, u32 offset) {
+  const u8 index = reader.u8At(offset + 31);
+  const u32 table = bank.offset + bank.plfoTables + static_cast<u32>(index) * 4;
+  if (table + 4 > bank.offset + bank.firstInstrument || !rangeValid(reader, table, 4)) {
+    return std::nullopt;
+  }
+
+  const u8 delay = reader.u8At(table);
+  const u8 amplitude = reader.u8At(table + 1);
+  const u8 frequency = reader.u8At(table + 2);
+  const u8 fade = reader.u8At(table + 3);
+  if (frequency == 0) {
+    return std::nullopt;
+  }
+
+  const double updates = driverRate(version);
+  const u32 fadeStep = (static_cast<u32>(fade) * fade) >> 6;
+  const double fadeSeconds =
+      fadeStep == 0 ? 0.0 : ((fadeStep * 2 - 1) * (static_cast<double>(frequency) * frequency / (64.0 * updates)));
+  double depth = (static_cast<double>(amplitude) * amplitude * frequency * frequency) / ((8192.0 * 256.0) / 100.0);
+  if (fadeStep != 0) {
+    depth *= 2.0 * fadeStep;
+  }
+  const double rate = (updates * 32.0) / (static_cast<double>(frequency) * frequency);
+  const double effectiveDelay = (static_cast<double>(delay) * delay) / (16.0 * updates) + fadeSeconds / 2.0;
+  const std::optional<ModulationRange> delayRange =
+      effectiveDelay > 0.0
+          ? std::optional<ModulationRange>{
+                ModulationRange{.minimum = effectiveDelay, .maximum = effectiveDelay},
+            }
+          : std::nullopt;
+  return VibratoSpec{
+      .maxDepthCents = depth,
+      .rateHertz = {.minimum = rate, .maximum = rate},
+      .waveform = LfoWaveform::Triangle,
+      // A zero driver delay means "start now." Omitting it avoids lowering
+      // that value to the synth formats' finite one-millisecond floor.
+      .delaySeconds = delayRange,
+      .depthMode = ModulationDepthMode::Fixed,
+  };
+}
+
+[[nodiscard]] InstrumentModulation regionModulation(ByteReader reader, const SegSatBankLayout& bank,
+                                                    SegSatDriverVersion version, u32 offset) {
+  InstrumentModulation modulation;
+  if ((reader.u8At(offset + 2) & 0x40) != 0) {
+    modulation.vibrato = softwarePlfoVibrato(reader, bank, version, offset);
   }
 
   const u8 lfo0 = reader.u8At(offset + 20);
   const u8 lfo1 = reader.u8At(offset + 21);
-  const bool modulationDisablesHardwareLfo = (reader.u8At(offset + 14) & 0x80) != 0;
-  const u8 waveHigh = lfo0 & 1;
-  const u8 waveLow = (lfo1 >> 3) & 3;
-  const bool triangle = waveHigh == 0 && waveLow == 2;
-  const u8 depth = lfo1 >> 5;
-  if (modulationDisablesHardwareLfo || !triangle || depth == 0) {
-    return std::nullopt;
-  }
+  // With this flag set, the driver starts with zero depth and lets modulation
+  // wheel events enable the region's stored pitch and amplitude depths.
+  const auto depthMode =
+      (reader.u8At(offset + 14) & 0x80) != 0 ? ModulationDepthMode::Controller : ModulationDepthMode::Fixed;
   constexpr std::array<double, 32> rates{0.17, 0.19, 0.23, 0.27, 0.34, 0.39, 0.45, 0.55, 0.68, 0.78, 0.92,
                                          1.10, 1.39, 1.60, 1.87, 2.27, 2.87, 3.31, 3.92, 4.79, 6.15, 7.18,
                                          8.60, 10.8, 14.4, 17.2, 21.5, 28.7, 43.1, 57.4, 86.1, 172.3};
-  constexpr std::array<double, 8> depths{0.0, 7.0, 13.5, 27.0, 55.0, 112.0, 230.0, 494.0};
+  constexpr std::array<double, 8> pitchDepths{0.0, 7.0, 13.5, 27.0, 55.0, 112.0, 230.0, 494.0};
+  // SCSP amplitude depths are the full nominal-to-trough attenuation. The
+  // shared no-boost LFO is bipolar, so its depth is half of that range.
+  constexpr std::array<double, 8> amplitudeDepths{0.0, 0.2, 0.4, 0.75, 1.5, 3.0, 6.0, 12.0};
   const double rate = rates[(lfo0 >> 2) & 0x1f];
-  return VibratoSpec{
-      .maxDepthCents = depths[depth],
-      .rateHertz = {.minimum = rate, .maximum = rate},
-      .depthMode = ModulationDepthMode::Fixed,
-  };
+  const u8 pitchDepth = lfo1 >> 5;
+  // The software PLFO already describes pitch when both mechanisms are enabled.
+  if (!modulation.vibrato && pitchDepth != 0) {
+    modulation.vibrato = VibratoSpec{
+        .maxDepthCents = pitchDepths[pitchDepth],
+        .rateHertz = {.minimum = rate, .maximum = rate},
+        .waveform = scspLfoWaveform(lfo0),
+        .depthMode = depthMode,
+    };
+  }
+  const u8 amplitudeDepth = lfo1 & 7;
+  if (amplitudeDepth != 0) {
+    modulation.tremolo = TremoloSpec{
+        .maxDepthDb = amplitudeDepths[amplitudeDepth],
+        .rateHertz = {.minimum = rate, .maximum = rate},
+        .waveform = scspLfoWaveform(lfo1 >> 3),
+        .gainMode = TremoloGainMode::NoBoost,
+        .depthMode = depthMode,
+    };
+  }
+  return modulation;
 }
 
 [[nodiscard]] std::vector<ParsedInstrument> parseInstruments(ByteReader reader, const SegSatBankLayout& bank,
@@ -256,6 +336,7 @@ struct PanAndAttenuation {
         .index = index,
         .range = reader.range(offset, 4 + regionCount * 0x20),
         .volumeBias = static_cast<s8>(reader.u8At(offset + 3)),
+        .pitchBendRangeCents = pitchBendRangeCents(reader.u8At(offset)),
     };
 
     for (u32 regionIndex = 0; regionIndex < regionCount; ++regionIndex) {
@@ -290,7 +371,7 @@ struct PanAndAttenuation {
               },
           .vlIndex = reader.u8At(regionOffset + 29),
           .totalLevel = reader.u8At(regionOffset + 15),
-          .vibrato = regionVibrato(reader, bank, version, regionOffset),
+          .modulation = regionModulation(reader, bank, version, regionOffset),
       };
       instrument.regions.push_back(std::move(parsed));
     }
@@ -359,6 +440,7 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
         .explicitAddress = InstrumentAddress{.bank = exportBank, .program = parsedInstrument.index},
         .identity =
             segSatInstrumentIdentity(layout.sourceBank.value_or(exportBank), static_cast<u8>(parsedInstrument.index)),
+        .pitchBendRangeCents = parsedInstrument.pitchBendRangeCents,
         .name = name,
         .range = parsedInstrument.range,
     };
@@ -371,7 +453,7 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
       if (!sample) {
         continue;
       }
-      parsedRegion.region.modulation.vibrato = parsedRegion.vibrato;
+      parsedRegion.region.modulation = parsedRegion.modulation;
       entry.region(*sample, std::move(parsedRegion.region))
           .source("Region", parsedRegion.range, "segsat-region")
           .derived("velocity_table", parsedRegion.vlIndex)

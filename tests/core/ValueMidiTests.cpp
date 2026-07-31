@@ -1481,16 +1481,31 @@ void performanceMidiRendererResolvesSourceInstrumentIdentityAtExport() {
       .timebase = Timebase{.ppqn = 48},
       .tracks = {PerformanceTrack{
           .id = TrackId{0},
-          .events = {InstrumentPerformanceEvent{
-              .header = PerformanceEventHeader{.tick = 0},
-              .sourceInstrument = InstrumentIdentity{.domain = "probe.instrument", .key = 5},
-          }},
+          .events =
+              {
+                  InstrumentPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0},
+                      .sourceInstrument = InstrumentIdentity{.domain = "probe.instrument", .key = 5},
+                  },
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 1},
+                      .key = 60.0,
+                      .durationTicks = 4,
+                  },
+                  PitchBendPerformanceEvent{
+                      .header =
+                          PerformanceEventHeader{.tick = 2, .automation = PerformanceAutomationId{0}},
+                      .semitones = -0.09375,
+                      .normalizedWheelPosition = -0.046875,
+                  },
+              },
       }},
   };
   const InstrumentSetAsset instrumentSet{
       .instruments = {Instrument{
           .explicitAddress = InstrumentAddress{.bank = 3, .program = 9},
           .identity = InstrumentIdentity{.domain = "probe.instrument", .key = 5},
+          .pitchBendRangeCents = 2400,
       }},
   };
   const std::array<const InstrumentSetAsset*, 1> instrumentSets{&instrumentSet};
@@ -1498,8 +1513,13 @@ void performanceMidiRendererResolvesSourceInstrumentIdentityAtExport() {
   const MidiSequence midi =
       renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, instrumentSets);
   expect(std::get<BankSelect>(midi.tracks[0].events[1]).bank == (3 << 7) &&
-             std::get<ProgramChange>(midi.tracks[0].events[2]).program == 9,
-         "MSB-only MIDI lowering should resolve and pack logical collection instrument banks");
+             std::get<ProgramChange>(midi.tracks[0].events[2]).program == 9 &&
+             std::get<PitchBendRange>(midi.tracks[0].events[3]).cents == 2400 &&
+             std::get<PitchBend>(midi.tracks[0].events[5]).value == -384 &&
+             std::ranges::count_if(midi.tracks[0].events, [](const MidiEvent& event) {
+               return std::holds_alternative<PitchBendRange>(event);
+             }) == 1,
+         "an automated bend should retain the selected instrument's pitch-wheel sensitivity");
 
   const MidiSequence mmaMidi =
       renderMidiSequence(performance, MidiExportOptions{.bankSelectStyle = MidiBankSelectStyle::MsbAndLsb},
@@ -2186,10 +2206,10 @@ void physicalModulationProfileDrivesMidiAndSynthFromOnePlan() {
   u32 nextAutomation = 0;
   PerformanceEmitter out{track, CommandId{0}, SourceAnnotationId{0}, 0, nextSequence, nextNote, nextAutomation};
 
-  out.vibratoRate(2.0);
+  out.vibratoRate(2.0, LfoPerformanceContext{.waveform = LfoWaveform::SawtoothUp});
   out.vibratoDepth(0.5);
   out.vibratoDelayPhysical(0, 0.0);
-  out.tremoloRate(4.0);
+  out.tremoloRate(4.0, LfoPerformanceContext{.waveform = LfoWaveform::Square});
   out.tremoloDepth(3.0, LfoPerformanceContext{.tremoloGainMode = TremoloGainMode::NoBoost});
   out.tremoloDelayPhysical(10, 200.0);
   out.at(12).vibratoRate(8.0);
@@ -2210,6 +2230,7 @@ void physicalModulationProfileDrivesMidiAndSynthFromOnePlan() {
   expect(profile.instruments.vibrato->maxDepthCents == 200.0 &&
              profile.instruments.vibrato->rateHertz.minimum == 2.0 &&
              profile.instruments.vibrato->rateHertz.maximum == 8.0 &&
+             profile.instruments.vibrato->waveform == LfoWaveform::SawtoothUp &&
              profile.instruments.vibrato->delaySeconds &&
              profile.instruments.vibrato->delaySeconds->minimum == 0.0 &&
              profile.instruments.vibrato->delaySeconds->maximum == 0.4,
@@ -2217,6 +2238,7 @@ void physicalModulationProfileDrivesMidiAndSynthFromOnePlan() {
   expect(profile.instruments.tremolo->maxDepthDb == 12.0 &&
              profile.instruments.tremolo->rateHertz.minimum == 4.0 &&
              profile.instruments.tremolo->rateHertz.maximum == 16.0 &&
+             profile.instruments.tremolo->waveform == LfoWaveform::Square &&
              profile.instruments.tremolo->gainMode == TremoloGainMode::NoBoost,
          "the shared plan should preserve physical tremolo behavior");
 
