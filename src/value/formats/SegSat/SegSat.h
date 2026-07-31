@@ -52,6 +52,16 @@ enum class SegSatDriverVersion : u8 {
   V2_20,
 };
 
+// The IRQ signatures used for LFO timing do not identify the driver's volume
+// arithmetic reliably. Mega Man 8, for example, matches the V2_08 IRQ pattern
+// but identifies its sound driver as version 1.33.
+enum class SegSatVolumeModel : u8 {
+  V1_28,
+  V1_33,
+  V2_20,
+  V3_1,
+};
+
 struct SegSatVlTable {
   u8 rate0 = 0;
   u8 point0 = 0;
@@ -119,22 +129,33 @@ struct SegSatVelocityBank {
   std::vector<SegSatVelocityInstrument> instruments;
 };
 
+struct SegSatControllerChange {
+  u32 command = 0;
+  u8 controller = 0;
+  u8 value = 0;
+};
+
 // Mega Man 8's driver converts a VL-table result into the MIDI velocity used
 // by the legacy exporter. This is public so the velocity math can be tested on
 // its own.
 [[nodiscard]] u8 segSatMidiVelocity(u8 velocity, const SegSatVlTable& table, u8 totalLevel, s8 volumeBias);
+[[nodiscard]] double segSatLinearGain(SegSatVolumeModel model, u8 velocity, const SegSatVlTable& table, u8 totalLevel,
+                                      s8 volumeBias, u8 volume, u8 expression);
 
 [[nodiscard]] std::optional<SegSatBankLayout> readSegSatBankLayout(core::ByteReader reader, u32 offset);
 [[nodiscard]] std::vector<SegSatBankLayout> findSegSatBanks(core::ByteReader reader);
 [[nodiscard]] std::vector<SegSatSequenceLayout> findSegSatSequences(core::ByteReader reader);
 [[nodiscard]] SegSatDriverVersion determineSegSatDriverVersion(core::ByteReader reader);
+[[nodiscard]] SegSatVolumeModel determineSegSatVolumeModel(core::ByteReader reader);
 [[nodiscard]] std::optional<SegSatScannedBank> addSegSatBank(core::ScanResultBuilder& builder,
                                                              const SegSatBankLayout& layout,
                                                              SegSatDriverVersion version, u8 exportBank);
 [[nodiscard]] SegSatVelocityBank readSegSatVelocityBank(core::ByteReader reader, const SegSatBankLayout& layout,
                                                         u8 sourceBank);
 [[nodiscard]] std::vector<u8> segSatSequenceBanks(const core::SequenceProgram& program);
-void applySegSatVelocityTables(core::PerformanceSequence& performance, std::span<const SegSatVelocityBank> banks);
+[[nodiscard]] std::vector<SegSatControllerChange> segSatControllerChanges(const core::SequenceProgram& program);
+void finalizeSegSatPerformance(core::PerformanceSequence& performance, std::span<const SegSatVelocityBank> banks,
+                               SegSatVolumeModel model, std::span<const SegSatControllerChange> controllerChanges);
 
 [[nodiscard]] core::SequenceProgram parseSegSatSequenceProgram(core::ByteReader reader, core::AssetId id,
                                                                const SegSatSequenceLayout& layout,

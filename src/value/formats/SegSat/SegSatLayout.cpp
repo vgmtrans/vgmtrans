@@ -8,8 +8,10 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <limits>
 #include <set>
+#include <string_view>
 
 namespace vgmtrans::formats::segsat {
 
@@ -74,6 +76,16 @@ template <size_t Size>
     }
   }
   return true;
+}
+
+[[nodiscard]] bool containsAsciiIgnoreCase(ByteReader reader, std::string_view text) {
+  if (text.empty() || text.size() > reader.size()) {
+    return false;
+  }
+  const auto bytes = reader.slice(0, reader.size());
+  return std::ranges::search(bytes, text, [](u8 byte, char expected) {
+           return std::tolower(static_cast<unsigned char>(byte)) == std::tolower(static_cast<unsigned char>(expected));
+         }).begin() != bytes.end();
 }
 
 }  // namespace
@@ -284,6 +296,35 @@ SegSatDriverVersion determineSegSatDriverVersion(ByteReader reader) {
     }
   }
   return SegSatDriverVersion::V2_08;
+}
+
+SegSatVolumeModel determineSegSatVolumeModel(ByteReader reader) {
+  // These strings are embedded in the driver images themselves. They are more
+  // useful here than the IRQ signatures, which changed independently.
+  if (containsAsciiIgnoreCase(reader, "ver1.28")) {
+    return SegSatVolumeModel::V1_28;
+  }
+  if (containsAsciiIgnoreCase(reader, "ver1.33")) {
+    return SegSatVolumeModel::V1_33;
+  }
+  if (containsAsciiIgnoreCase(reader, "ver-3.1")) {
+    return SegSatVolumeModel::V3_1;
+  }
+  if (containsAsciiIgnoreCase(reader, "ver-2.2.0") || containsAsciiIgnoreCase(reader, "ver- ")) {
+    return SegSatVolumeModel::V2_20;
+  }
+
+  switch (determineSegSatDriverVersion(reader)) {
+    case SegSatDriverVersion::V1_28:
+      return SegSatVolumeModel::V1_28;
+    case SegSatDriverVersion::V2_20:
+      return SegSatVolumeModel::V2_20;
+    case SegSatDriverVersion::V2_08:
+      // Version 1.33 uses this same IRQ routine. Keeping the existing MM8
+      // behavior is the safest fallback when a driver has no version string.
+      return SegSatVolumeModel::V1_33;
+  }
+  return SegSatVolumeModel::V1_33;
 }
 
 }  // namespace vgmtrans::formats::segsat

@@ -112,6 +112,12 @@ struct BankAssets {
     return prepared;
   }
 
+  SegSatVolumeModel volumeModel = SegSatVolumeModel::V1_33;
+  if (sequence->metadata.range.valid() && context.sources.contains(sequence->metadata.range.source)) {
+    volumeModel = determineSegSatVolumeModel(context.sources.reader(sequence->metadata.range.source));
+  }
+  std::vector<SegSatControllerChange> controllerChanges = segSatControllerChanges(sequence->program);
+
   std::vector<SegSatVelocityBank> velocityBanks;
   velocityBanks.reserve(members.instrumentSets.size());
   const std::vector<u8> bankAliases = segSatSequenceBanks(sequence->program);
@@ -164,8 +170,10 @@ struct BankAssets {
   }
 
   if (!velocityBanks.empty()) {
-    prepared.finalizePerformance = [velocityBanks = std::move(velocityBanks)](PerformanceSequence& performance) {
-      applySegSatVelocityTables(performance, velocityBanks);
+    prepared.finalizePerformance = [velocityBanks = std::move(velocityBanks), volumeModel,
+                                    controllerChanges =
+                                        std::move(controllerChanges)](PerformanceSequence& performance) {
+      finalizeSegSatPerformance(performance, velocityBanks, volumeModel, controllerChanges);
     };
   }
   return prepared;
