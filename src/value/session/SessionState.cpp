@@ -43,33 +43,34 @@ template <typename T, typename Predicate>
   return sharedVector(std::move(filtered));
 }
 
-template <typename CollectionT>
-[[nodiscard]] bool referencesAnyAsset(const CollectionT& collection, const std::unordered_set<u32>& assetIds) {
-  const auto referencesOne = [&](std::optional<AssetId> id) { return id && assetIds.contains(id->value); };
-  const auto referencesMany = [&](const std::vector<AssetId>& ids) {
-    return std::ranges::any_of(ids, [&](AssetId id) { return assetIds.contains(id.value); });
+[[nodiscard]] std::optional<AssetId> referencedAsset(const CollectionMembers& members,
+                                                     const std::unordered_set<u32>& assetIds) {
+  if (members.sequence && assetIds.contains(members.sequence->value)) {
+    return members.sequence;
+  }
+  const auto find = [&](const std::vector<AssetId>& ids) -> std::optional<AssetId> {
+    const auto found = std::ranges::find_if(ids, [&](AssetId id) { return assetIds.contains(id.value); });
+    return found != ids.end() ? std::optional{*found} : std::nullopt;
   };
-  return referencesOne(collection.sequence) || referencesMany(collection.instrumentSets) ||
-         referencesMany(collection.sampleCollections) || referencesMany(collection.miscAssets);
+  if (auto found = find(members.instrumentSets)) {
+    return found;
+  }
+  if (auto found = find(members.sampleCollections)) {
+    return found;
+  }
+  return find(members.miscAssets);
 }
 
 [[nodiscard]] DesiredCollection desiredCollection(const ExplicitCollection& collection) {
   return DesiredCollection{
       .key = collection.key,
       .name = collection.name,
-      .sequence = collection.sequence,
-      .instrumentSets = collection.instrumentSets,
-      .sampleCollections = collection.sampleCollections,
-      .miscAssets = collection.miscAssets,
+      .members = collection.members,
   };
 }
 
 [[nodiscard]] std::string collectionKeyString(const CollectionKey& key) {
   return key.resolver + '\x1f' + key.value;
-}
-
-[[nodiscard]] bool hasIssueCode(const Collection& collection, std::string_view code) {
-  return std::ranges::any_of(collection.issues, [code](const CollectionIssue& issue) { return issue.code == code; });
 }
 
 }  // namespace
@@ -238,19 +239,15 @@ void SessionState::reconcileCollections(std::string_view resolver, std::vector<D
     }
 
     validateCollectionAssetReferences(resolver, candidate);
-    const CollectionStatus status = validatedCollectionStatus(candidate);
     const auto sameKey = [&](const Collection& collection) { return collection.key == candidate.key; };
     if (auto found = std::ranges::find_if(collections_, sameKey); found != collections_.end()) {
       if (found->origin == CollectionOrigin::UserCreated) {
-        found->status = CollectionStatus::Stale;
+        found->freshness = CollectionFreshness::Stale;
         continue;
       }
       found->name = std::move(candidate.name);
-      found->status = status;
-      found->sequence = candidate.sequence;
-      found->instrumentSets = std::move(candidate.instrumentSets);
-      found->sampleCollections = std::move(candidate.sampleCollections);
-      found->miscAssets = std::move(candidate.miscAssets);
+      found->freshness = CollectionFreshness::Current;
+      found->members = std::move(candidate.members);
       found->issues = std::move(candidate.issues);
       continue;
     }
@@ -258,13 +255,9 @@ void SessionState::reconcileCollections(std::string_view resolver, std::vector<D
     collections_.push_back(Collection{
         .id = nextCollectionId(ids),
         .name = std::move(candidate.name),
-        .status = status,
         .origin = CollectionOrigin::Discovered,
         .key = std::move(candidate.key),
-        .sequence = candidate.sequence,
-        .instrumentSets = std::move(candidate.instrumentSets),
-        .sampleCollections = std::move(candidate.sampleCollections),
-        .miscAssets = std::move(candidate.miscAssets),
+        .members = std::move(candidate.members),
         .issues = std::move(candidate.issues),
     });
   }
@@ -320,7 +313,7 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
   };
 
   std::erase_if(explicitCollections_, [&](const ExplicitCollectionEntry& entry) {
-    return sourceIds.contains(entry.origin.value) || referencesAnyAsset(entry.collection, assetIds);
+    return sourceIds.contains(entry.origin.value) || referencedAsset(entry.collection.members, assetIds).has_value();
   });
 
   std::vector<ScanChunk> remainingChunks;
@@ -380,13 +373,12 @@ void SessionState::markCollectionsStaleForAssets(const std::unordered_set<u32>& 
     return;
   }
   for (auto& collection : collections_) {
-    if (!referencesAnyAsset(collection, assetIds)) {
+    const auto removedAsset = referencedAsset(collection.members, assetIds);
+    if (!removedAsset) {
       continue;
     }
-    collection.status = CollectionStatus::Stale;
-    if (!hasIssueCode(collection, "removed-asset")) {
-      collection.issues.push_back(removedStaleAssetIssue());
-    }
+    collection.freshness = CollectionFreshness::Stale;
+    collection.issues.push_back(removedStaleAssetIssue(*removedAsset));
   }
 }
 
@@ -402,6 +394,7 @@ void SessionState::validateCollectionAssetReferences(std::string_view resolver, 
       desired.issues.push_back(missingSampleCollectionIssue(id));
     } else {
       desired.issues.push_back(CollectionIssue{
+          .impact = CollectionIssueImpact::Incomplete,
           .severity = Severity::Error,
           .code = "missing-" + std::string(role),
           .message = "Collection references missing " + std::string(role) + " asset " + std::to_string(id.value),
@@ -413,6 +406,7 @@ void SessionState::validateCollectionAssetReferences(std::string_view resolver, 
     addError("Collection resolver '" + std::string(resolver) + "' returned " + std::string(role) + " asset id " +
              std::to_string(id.value) + " that is not " + std::string(article) + " " + std::string(role) + " asset");
     desired.issues.push_back(CollectionIssue{
+        .impact = CollectionIssueImpact::Incomplete,
         .severity = Severity::Error,
         .code = "wrong-type-" + std::string(role),
         .message = "Collection references wrong-type " + std::string(role) + " asset " + std::to_string(id.value),
@@ -420,13 +414,13 @@ void SessionState::validateCollectionAssetReferences(std::string_view resolver, 
     });
   };
 
-  if (desired.sequence) {
-    if (!containsAsset(*desired.sequence)) {
-      addMissing(*desired.sequence, "sequence");
-      desired.sequence.reset();
-    } else if (asset<SequenceProgramAsset>(*desired.sequence) == nullptr) {
-      addWrongType(*desired.sequence, "sequence", "a");
-      desired.sequence.reset();
+  if (desired.members.sequence) {
+    if (!containsAsset(*desired.members.sequence)) {
+      addMissing(*desired.members.sequence, "sequence");
+      desired.members.sequence.reset();
+    } else if (asset<SequenceProgramAsset>(*desired.members.sequence) == nullptr) {
+      addWrongType(*desired.members.sequence, "sequence", "a");
+      desired.members.sequence.reset();
     }
   }
 
@@ -444,11 +438,11 @@ void SessionState::validateCollectionAssetReferences(std::string_view resolver, 
       return true;
     });
   };
-  filter(desired.instrumentSets, "instrument-set", "an",
+  filter(desired.members.instrumentSets, "instrument-set", "an",
          [&](AssetId id) { return asset<InstrumentSetAsset>(id) != nullptr; });
-  filter(desired.sampleCollections, "sample-collection", "a",
+  filter(desired.members.sampleCollections, "sample-collection", "a",
          [&](AssetId id) { return asset<SampleCollectionAsset>(id) != nullptr; });
-  filter(desired.miscAssets, "misc", "a", [&](AssetId id) { return asset<MiscAsset>(id) != nullptr; });
+  filter(desired.members.miscAssets, "misc", "a", [&](AssetId id) { return asset<MiscAsset>(id) != nullptr; });
 }
 
 CollectionId SessionState::nextCollectionId(ScanIdAllocator& ids) const {

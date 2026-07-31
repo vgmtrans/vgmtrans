@@ -710,9 +710,10 @@ void akaoScanPublishesStructuralInstrumentSetAndPreparesBoundView() {
          "Akao structural regions should remain explicitly unbound until collection preparation");
   expect(project.collections().size() == 1, "Akao synthetic scan should resolve one collection");
   const auto& collection = project.collections().front();
-  expect(collection.sequence == sequenceId, "Akao collection should reference the scanned sequence");
-  expect(collection.sampleCollections.size() == 1, "Akao collection should reference the scanned sample collection");
-  expect(collection.instrumentSets == std::vector<AssetId>{instrumentSetId},
+  expect(collection.members.sequence == sequenceId, "Akao collection should reference the scanned sequence");
+  expect(collection.members.sampleCollections.size() == 1,
+         "Akao collection should reference the scanned sample collection");
+  expect(collection.members.instrumentSets == std::vector<AssetId>{instrumentSetId},
          "Akao collection should reference its detected structural instrument set");
   const auto sequenceHeaders = project.sourceMap().withRole(SourceId{0}, SourceRole::Header);
   const auto header = std::ranges::find_if(sequenceHeaders, [&](SourceAnnotationId id) {
@@ -800,7 +801,7 @@ void akaoScanPublishesStructuralInstrumentSetAndPreparesBoundView() {
              prepared.replacementInstrumentSets->front().instruments.size() == 1 &&
              prepared.replacementInstrumentSets->front().instruments.front().regions.size() == 1 &&
              prepared.replacementInstrumentSets->front().instruments.front().regions.front().sample.collection ==
-                 collection.sampleCollections.front(),
+                 collection.members.sampleCollections.front(),
          "Akao collection preparation should bind the detected structure to its selected samples");
 
   const auto artifacts = session.exportCollection(collection.id, ExportRequest{.kinds = {ExportKind::Dls}});

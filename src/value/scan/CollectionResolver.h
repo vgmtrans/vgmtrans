@@ -128,8 +128,8 @@ private:
 };
 
 // Small mutable helper for building one DesiredCollection deterministically.
-// It owns duplicate suppression and common missing-role status/issue handling,
-// while the resolver remains responsible for format-specific matching policy.
+// It owns duplicate suppression and common missing-role issues, while the
+// resolver remains responsible for format-specific matching policy.
 class CollectionAssembly {
 public:
   CollectionAssembly(CollectionKey key, std::string name);

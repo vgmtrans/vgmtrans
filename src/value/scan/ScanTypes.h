@@ -10,7 +10,6 @@
 #include "value/model/SessionSnapshot.h"
 
 #include <cstddef>
-#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -47,10 +46,7 @@ struct ScanInput {
 struct ExplicitCollection {
   CollectionKey key;
   std::string name;
-  std::optional<AssetId> sequence;
-  std::vector<AssetId> instrumentSets;
-  std::vector<AssetId> sampleCollections;
-  std::vector<AssetId> miscAssets;
+  CollectionMembers members;
 };
 
 struct ScanResult {

@@ -78,13 +78,14 @@ void trackProgramBuilderRejectsDuplicateCommandAddresses() {
   expect(track.commands.size() == 1, "duplicate-address rejection should not mutate the track program");
 }
 
-void collectionIssueHelpersValidateStoredStatus() {
+void collectionIssuesDeriveResolutionIndependentlyFromFreshness() {
   const CollectionIssue missingSequence = missingSequenceIssue();
-  expect(missingSequence.severity == Severity::Warning && missingSequence.code == "missing-sequence",
+  expect(missingSequence.impact == CollectionIssueImpact::Incomplete && missingSequence.severity == Severity::Warning &&
+             missingSequence.code == "missing-sequence",
          "missing sequence helper should create a warning issue");
   const std::vector<CollectionIssue> missingIssues{missingSequence};
-  expect(validatedCollectionStatus(CollectionStatus::Complete, missingIssues) == CollectionStatus::Incomplete,
-         "missing issues should prevent complete collection status");
+  expect(collectionResolution(missingIssues) == CollectionResolution::Incomplete,
+         "missing issues should make collection resolution incomplete");
 
   const CollectionIssue missingInstrument = missingInstrumentSetIssue(AssetId{7});
   expect(missingInstrument.severity == Severity::Error && missingInstrument.asset == AssetId{7},
@@ -92,20 +93,19 @@ void collectionIssueHelpersValidateStoredStatus() {
 
   const CollectionIssue ambiguous = ambiguousMatchIssue("multiple banks match");
   const std::vector<CollectionIssue> ambiguousIssues{ambiguous};
-  expect(validatedCollectionStatus(CollectionStatus::Complete, ambiguousIssues) == CollectionStatus::Ambiguous,
-         "ambiguous match issue should validate complete status to ambiguous");
+  expect(collectionResolution(ambiguousIssues) == CollectionResolution::Ambiguous,
+         "ambiguous match issue should make collection resolution ambiguous");
+  expect(collectionResolution(std::vector{missingSequence, ambiguous}) == CollectionResolution::Ambiguous,
+         "ambiguity should take precedence when a collection is also incomplete");
 
   const CollectionIssue removed = removedStaleAssetIssue();
-  const std::vector<CollectionIssue> removedIssues{removed};
-  expect(validatedCollectionStatus(CollectionStatus::Complete, removedIssues) == CollectionStatus::Stale,
-         "removed asset issue should validate complete status to stale");
-
-  DesiredCollection explicitStale{
-      .status = CollectionStatus::Stale,
+  Collection stale{
+      .freshness = CollectionFreshness::Stale,
       .issues = {missingSampleCollectionIssue()},
   };
-  expect(validatedCollectionStatus(explicitStale) == CollectionStatus::Stale,
-         "explicit non-complete status should remain stored instead of being derived from issues");
+  expect(removed.impact == CollectionIssueImpact::Incomplete, "removed asset issue should make resolution incomplete");
+  expect(stale.freshness == CollectionFreshness::Stale && stale.resolution() == CollectionResolution::Incomplete,
+         "freshness and resolution should remain independent collection properties");
 }
 
 void performanceAutomationRetainsIntentAlongsideOneEventTimeline() {
@@ -350,7 +350,7 @@ void runValueSequenceModelTests() {
   byteReaderChecksBoundsAndEndian();
   sourceCommandsRetainOnlySemanticData();
   trackProgramBuilderRejectsDuplicateCommandAddresses();
-  collectionIssueHelpersValidateStoredStatus();
+  collectionIssuesDeriveResolutionIndependentlyFromFreshness();
   performanceAutomationRetainsIntentAlongsideOneEventTimeline();
   performanceEmitterBindsScalarAutomationWithoutExposingStorage();
   performanceBoundValueOwnsReplacementLifecycle();

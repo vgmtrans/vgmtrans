@@ -568,9 +568,13 @@ A `Collection` is the unit that gets exported. It may contain:
 - zero or more instrument sets;
 - zero or more sample collections;
 - miscellaneous assets;
-- status and issues.
+- issues that explain incomplete or ambiguous resolution.
 
-Collections can be complete, incomplete, ambiguous, or stale.
+`CollectionMembers` represents that membership consistently while scanning,
+resolving, and storing the final collection. A collection's resolution is
+derived from the impact of its issues: it is resolved, incomplete, or
+ambiguous. Freshness is separate session state; a collection may become stale
+when its source assets disappear, independently of how well it was resolved.
 
 The architecture separates scanning from collection matching. This is important because some formats know the full collection while scanning, while others only know partial relationships.
 
@@ -608,6 +612,10 @@ for source inspection belongs in source annotations instead.
 A resolver reads a `MatchContext` and returns the collections that should exist now. The context is a lightweight borrowed view of the source store, assets, and match facts; it does not copy a public snapshot or expose mutable state.
 
 The helper `MatchFactIndex` makes resolver code easier by giving typed access to facts and assets. `CollectionAssembly` helps build collections while handling duplicate suppression and common missing-role issues.
+
+Each `CollectionIssue` declares its effect on resolution with a typed
+`CollectionIssueImpact`. The issue code and message remain explanatory data for
+diagnostics and the UI; core behavior does not infer meaning by parsing them.
 
 ### 13.4 Stable collection keys
 
@@ -1210,7 +1218,7 @@ Build instruments, regions, samples, envelopes, loops, tuning, and physical modu
 The new model is very testable. Good tests can inspect:
 
 - assets and metadata;
-- collections and statuses;
+- collection membership, freshness, resolution, and issues;
 - source map annotations;
 - command fields;
 - VM performance events;

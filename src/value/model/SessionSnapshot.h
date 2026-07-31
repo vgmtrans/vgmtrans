@@ -36,16 +36,15 @@ using Asset = std::variant<SequenceProgramAsset, InstrumentSetAsset, SampleColle
 struct Collection {
   CollectionId id;
   std::string name;
-  CollectionStatus status = CollectionStatus::Complete;
+  CollectionFreshness freshness = CollectionFreshness::Current;
   CollectionOrigin origin = CollectionOrigin::Discovered;
   CollectionKey key;
   // Collections are the export units. A sequence may be paired with instrument
   // sets and sample collections loaded from the same or separate sources.
-  std::optional<AssetId> sequence;
-  std::vector<AssetId> instrumentSets;
-  std::vector<AssetId> sampleCollections;
-  std::vector<AssetId> miscAssets;
+  CollectionMembers members;
   std::vector<CollectionIssue> issues;
+
+  [[nodiscard]] CollectionResolution resolution() const noexcept { return collectionResolution(issues); }
 };
 
 // Copyable read-only view of one Session revision. Copies share immutable

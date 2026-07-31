@@ -46,22 +46,22 @@ CollectionAssembly::CollectionAssembly(CollectionKey key, std::string name)
 }
 
 CollectionAssembly& CollectionAssembly::sequence(AssetId id) {
-  collection_.sequence = id;
+  collection_.members.sequence = id;
   return *this;
 }
 
 CollectionAssembly& CollectionAssembly::instrumentSet(AssetId id) {
-  addUnique(collection_.instrumentSets, id);
+  addUnique(collection_.members.instrumentSets, id);
   return *this;
 }
 
 CollectionAssembly& CollectionAssembly::sampleCollection(AssetId id) {
-  addUnique(collection_.sampleCollections, id);
+  addUnique(collection_.members.sampleCollections, id);
   return *this;
 }
 
 CollectionAssembly& CollectionAssembly::misc(AssetId id) {
-  addUnique(collection_.miscAssets, id);
+  addUnique(collection_.members.miscAssets, id);
   return *this;
 }
 
@@ -71,34 +71,33 @@ CollectionAssembly& CollectionAssembly::issue(CollectionIssue issue) {
 }
 
 CollectionAssembly& CollectionAssembly::incomplete(CollectionIssue issue) {
-  collection_.status = CollectionStatus::Incomplete;
+  issue.impact = CollectionIssueImpact::Incomplete;
   collection_.issues.push_back(std::move(issue));
   return *this;
 }
 
 CollectionAssembly& CollectionAssembly::ambiguous(std::string message, std::optional<AssetId> asset,
                                                   std::optional<SourceRange> range) {
-  collection_.status = CollectionStatus::Ambiguous;
   collection_.issues.push_back(ambiguousMatchIssue(std::move(message), asset, range));
   return *this;
 }
 
 CollectionAssembly& CollectionAssembly::requireSequence() {
-  if (!collection_.sequence) {
+  if (!collection_.members.sequence) {
     incomplete(missingSequenceIssue());
   }
   return *this;
 }
 
 CollectionAssembly& CollectionAssembly::requireInstrumentSet() {
-  if (collection_.instrumentSets.empty()) {
+  if (collection_.members.instrumentSets.empty()) {
     incomplete(missingInstrumentSetIssue());
   }
   return *this;
 }
 
 CollectionAssembly& CollectionAssembly::requireSampleCollection() {
-  if (collection_.sampleCollections.empty()) {
+  if (collection_.members.sampleCollections.empty()) {
     incomplete(missingSampleCollectionIssue());
   }
   return *this;

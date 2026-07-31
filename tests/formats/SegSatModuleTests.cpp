@@ -205,8 +205,8 @@ std::vector<u8> velocityBankSource(u8 totalLevel) {
 }
 
 const SequenceProgramAsset& sequenceAsset(const SessionSnapshot& snapshot, const Collection& collection) {
-  expect(collection.sequence.has_value(), "SegSat fixture collection should reference a sequence");
-  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.sequence);
+  expect(collection.members.sequence.has_value(), "SegSat fixture collection should reference a sequence");
+  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.members.sequence);
   expect(sequence != nullptr, "SegSat fixture sequence asset should exist");
   return *sequence;
 }
@@ -296,12 +296,12 @@ void segSatCollectionPreparationSuppliesVlTablesToSequence() {
   expect(pitch != nullptr && std::abs(pitch->semitones - (-0.09375)) < 0.000001,
          "SegSat pitch bend should discard the encoded high bit before creating a physical bend");
 
-  expect(collection.sampleCollections.size() == 1, "SegSat fixture should attach its parsed sample collection");
-  const auto* samples = snapshot.asset<SampleCollectionAsset>(collection.sampleCollections.front());
+  expect(collection.members.sampleCollections.size() == 1, "SegSat fixture should attach its parsed sample collection");
+  const auto* samples = snapshot.asset<SampleCollectionAsset>(collection.members.sampleCollections.front());
   expect(samples != nullptr && samples->samples.samples.size() == 1,
          "SegSat fixture should expose its one unique sample");
-  expect(collection.instrumentSets.size() == 1, "SegSat fixture should attach its instrument set");
-  const auto* instruments = snapshot.asset<InstrumentSetAsset>(collection.instrumentSets.front());
+  expect(collection.members.instrumentSets.size() == 1, "SegSat fixture should attach its instrument set");
+  const auto* instruments = snapshot.asset<InstrumentSetAsset>(collection.members.instrumentSets.front());
   expect(
       instruments != nullptr && instruments->instruments.size() == 2 && instruments->instruments.back().regions.empty(),
       "SegSat 0xff region-count sentinel should preserve an empty program without creating 256 bogus regions");
@@ -327,9 +327,9 @@ void segSatRuntimeMapSelectsBankInsideAnotherSampleSpan() {
   const SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.collections().size() == 1, "overlapping SegSat fixture should produce one collection");
   const Collection& collection = snapshot.collections().front();
-  expect(collection.instrumentSets.size() == 1,
+  expect(collection.members.instrumentSets.size() == 1,
          "an implicit bank-zero sequence should attach only its runtime-mapped instrument bank");
-  const auto* instruments = snapshot.asset<InstrumentSetAsset>(collection.instrumentSets.front());
+  const auto* instruments = snapshot.asset<InstrumentSetAsset>(collection.members.instrumentSets.front());
   expect(instruments != nullptr && instruments->metadata.range.offset == 0x1200,
          "runtime bank zero should remain discoverable inside an earlier bank's sample span");
 
@@ -360,7 +360,7 @@ void segSatMultiBankPlaybackUsesTheActiveBanksVlTable() {
   session.scanPendingSources();
 
   const SessionSnapshot snapshot = session.snapshot();
-  expect(snapshot.collections().size() == 1 && snapshot.collections().front().instrumentSets.size() == 2,
+  expect(snapshot.collections().size() == 1 && snapshot.collections().front().members.instrumentSets.size() == 2,
          "a two-bank SegSat sequence should attach both runtime-mapped instrument sets");
   const CollectionPlayback playback =
       session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{.sequence = {.sequenceLoops = 0}});
@@ -439,8 +439,11 @@ void segSatCollectionPreparationReadsVelocityBanksFromSeparateSources() {
   const Collection collection{
       .id = CollectionId{0},
       .name = "Multi-source SegSat",
-      .sequence = sequence.metadata.id,
-      .instrumentSets = {bank5.metadata.id, bank6.metadata.id},
+      .members =
+          {
+              .sequence = sequence.metadata.id,
+              .instrumentSets = {bank5.metadata.id, bank6.metadata.id},
+          },
   };
   test::SessionSnapshotBuilder builder;
   builder.sources = sources.sourceFiles();
