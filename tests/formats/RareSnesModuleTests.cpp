@@ -433,6 +433,17 @@ void rareSnesCallsConditionalBranchesAndLongDurationsExecuteSourceFree() {
              std::to_string(repeatedNotes) + ", tick=" + std::to_string(repeated.tracks.front().endTick) +
              ", diagnostics=" + std::to_string(repeated.diagnostics.size()) + ")");
 
+  const std::vector<u8> reusedPatternBytes{
+      0x04, 1, 13, 0,  // call the same pattern from two source sites
+      0x04, 1, 13, 0, 0x81, 2, 0x00, 0x00, 0x00, 0x82, 2, 0x05,
+  };
+  const PerformanceSequence reusedPattern = render(Profile::DonkeyKongCountry, reusedPatternBytes);
+  const size_t reusedPatternNotes = events<NotePerformanceEvent>(reusedPattern).size();
+  expect(reusedPattern.diagnostics.empty() && reusedPatternNotes == 3 && reusedPattern.tracks.front().endTick == 6,
+         "Rare calls to a reused pattern should remain finite and continue after each return (notes=" +
+             std::to_string(reusedPatternNotes) + ", tick=" + std::to_string(reusedPattern.tracks.front().endTick) +
+             ", diagnostics=" + std::to_string(reusedPattern.diagnostics.size()) + ")");
+
   const PerformanceSequence longDuration = render(Profile::DonkeyKongCountry, {
                                                                                   0x2b,
                                                                                   0x06,
