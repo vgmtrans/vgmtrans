@@ -426,6 +426,12 @@ AnnotationBuilder SourceMapBuilder::annotation(SourceRole role, std::string_view
   return add(role, label, range);
 }
 
+// Turns a parsed record into one source annotation so its overall byte range
+// and decoded fields stay together in the source map.
+AnnotationBuilder SourceMapBuilder::annotation(SourceRole role, std::string_view label, const SourceRecord& record) {
+  return add(role, label, record.range).fields(record.fields);
+}
+
 AnnotationBuilder SourceMapBuilder::section(std::string_view label, SourceRange range) {
   return add(SourceRole::Section, label, range);
 }

@@ -355,10 +355,10 @@ void emitSampleCollection(const ScanInput& input, ScanResultBuilder& result, Par
                                                    .id();
   for (const AkaoArticulation& articulation : parsed.parse.articulations) {
     auto annotation = result.sourceMap()
-                          .entry(fmt::format("Articulation {}", articulation.articulationId), articulation.source.range)
+                          .annotation(SourceRole::TableEntry,
+                                      fmt::format("Articulation {}", articulation.articulationId), articulation.source)
                           .kind("akao-articulation")
                           .parent(articulationTable)
-                          .fields(articulation.source.fields)
                           .derived("articulation_id", articulation.articulationId)
                           .derived("effective_unity_key", articulation.unityKey, SourceValueDisplay::MidiNote)
                           .derived("fine_tune_cents", articulation.fineTuneCents, SourceValueDisplay::Cents)
