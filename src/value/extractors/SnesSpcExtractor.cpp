@@ -119,14 +119,14 @@ constexpr std::string_view kExtendedId666Signature = "xid6";
 
 }  // namespace
 
-[[nodiscard]] bool canScanSnesSpc(const SourceFile&, std::span<const u8> bytes) {
-  return hasSpcSignature(bytes);
-}
-
 [[nodiscard]] ScanResult scanSnesSpc(const ScanInput& input) {
   // SPC files are snapshots. The actual format scanners want the 64 KiB ARAM image, so
   // expose RAM as a derived child source and let normal SNES modules scan that.
   const auto spcBytes = input.reader.slice(0, input.reader.size());
+  if (!hasSpcSignature(spcBytes)) {
+    return {};
+  }
+
   const auto ramBytes = input.reader.slice(kSpcRamOffset, kSpcRamSize);
   std::vector<u8> ram(ramBytes.begin(), ramBytes.end());
   const auto origin = input.reader.range(kSpcRamOffset, kSpcRamSize);
@@ -146,7 +146,7 @@ constexpr std::string_view kExtendedId666Signature = "xid6";
 }
 
 FormatDefinition snesSpcExtractorDefinition() {
-  return FormatDefinition{.module = {.name = "SnesSpc", .canScan = canScanSnesSpc, .scan = scanSnesSpc}};
+  return FormatDefinition{.module = {.name = "SnesSpc", .scan = scanSnesSpc}};
 }
 
 }  // namespace vgmtrans::formats::snes_spc

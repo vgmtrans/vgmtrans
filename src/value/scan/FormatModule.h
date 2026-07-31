@@ -11,7 +11,6 @@
 
 #include <functional>
 #include <optional>
-#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -57,18 +56,13 @@ struct PreparedCollectionAssets {
 };
 
 struct FormatModule {
-  // Function table registered by one format. New modules should put recognition
-  // at the start of scan() and return an empty result when the source does not
-  // match. canScan remains only as a migration adapter for older modules.
-  using CanScan = std::function<bool(const SourceFile& source, std::span<const u8> bytes)>;
+  // Function table registered by one format. Recognition belongs at the start
+  // of scan(), which returns an empty result when the source does not match.
   using Scan = std::function<ScanResult(const ScanInput& input)>;
   using ResolveCollections = std::function<std::vector<DesiredCollection>(const MatchContext& context)>;
   using PrepareCollection = std::function<PreparedCollectionAssets(const CollectionPrepareContext& context)>;
 
   std::string name;
-  // Transitional prefilter. It may be null; duplicating layout discovery here
-  // defeats the parse-once model and should not be done by new modules.
-  CanScan canScan;
   Scan scan;
   // Defaults to name when empty. Set this when a resolver intentionally uses a
   // different key prefix for its collections.

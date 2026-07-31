@@ -21,14 +21,10 @@ void formatRegistryStoresCopyableDefinitionsAtomically() {
   }));
 
   const FormatRegistry copy = registry;
-  const std::array<u8, 1> probeBytes{0xaa};
   expect(copy.modules().size() == 2, "format registry should copy registered module values");
   expect(copy.modules()[0].name == "ProbeSequence", "format registry should preserve copied module names");
   expect(copy.modules()[1].name == "DynamicProbe", "format registry should own dynamically registered module names");
-  expect(copy.modules()[0].canScan(SourceFile{}, probeBytes),
-         "format registry should preserve copied module scan predicates");
-  expect(copy.modules()[1].canScan == nullptr,
-         "format registry should accept scan-only modules without a duplicate recognition probe");
+  expect(copy.modules()[0].scan && copy.modules()[1].scan, "format registry should preserve copied module scanners");
   const auto* dialect = copy.findDialect("probe");
   expect(dialect != nullptr && dialect->execute != nullptr,
          "format registry should copy dialects provided by a definition");

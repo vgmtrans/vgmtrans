@@ -230,11 +230,15 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   expect(sameRange(*diagnostic.range, expectedRange), "diagnostic should preserve the expected source range");
 }
 
-[[nodiscard]] bool canScanProbeSequence(const SourceFile&, std::span<const u8> bytes) {
-  return !bytes.empty() && bytes[0] == 0xaa;
+[[nodiscard]] bool hasProbeMagic(const ScanInput& input, u8 magic, u64 minimumSize = 1) {
+  return input.reader.size() >= minimumSize && input.reader.u8At(0) == magic;
 }
 
 [[nodiscard]] ScanResult scanProbeSequence(const ScanInput& input) {
+  if (!hasProbeMagic(input, 0xaa)) {
+    return {};
+  }
+
   const auto assetId = input.ids.nextAssetId();
   const auto assetRange = input.reader.range(0, input.reader.size());
   SourceMapBuilder sourceMap([&input]() { return input.ids.nextSourceAnnotationId(); });
@@ -290,16 +294,15 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 [[nodiscard]] FormatModule probeSequenceModule() {
   return FormatModule{
       .name = "ProbeSequence",
-      .canScan = canScanProbeSequence,
       .scan = scanProbeSequence,
   };
 }
 
-[[nodiscard]] bool canScanProbeMisc(const SourceFile& source, std::span<const u8> bytes) {
-  return source.derived() && !bytes.empty() && bytes[0] == 0xbb;
-}
-
 [[nodiscard]] ScanResult scanProbeMisc(const ScanInput& input) {
+  if (!input.source.derived() || !hasProbeMagic(input, 0xbb)) {
+    return {};
+  }
+
   ScanResultBuilder out(input, "ProbeMisc");
   const SourceRange range = input.reader.range(0, input.reader.size());
   const auto asset = out.misc(input.source.name, range).payload({input.reader.u8At(0), input.reader.u8At(1)});
@@ -310,16 +313,15 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 [[nodiscard]] FormatModule probeMiscModule() {
   return FormatModule{
       .name = "ProbeMisc",
-      .canScan = canScanProbeMisc,
       .scan = scanProbeMisc,
   };
 }
 
-[[nodiscard]] bool canScanProbeExplicitCollection(const SourceFile&, std::span<const u8> bytes) {
-  return !bytes.empty() && bytes[0] == 0xab;
-}
-
 [[nodiscard]] ScanResult scanProbeExplicitCollection(const ScanInput& input) {
+  if (!hasProbeMagic(input, 0xab)) {
+    return {};
+  }
+
   ScanResultBuilder out(input, "ProbeExplicit");
   const auto sequence = out.sequence("Explicit Sequence", input.reader.range(0, 1))
                             .program(SequenceProgram{
@@ -344,17 +346,8 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 [[nodiscard]] FormatModule probeExplicitCollectionModule() {
   return FormatModule{
       .name = "ProbeExplicit",
-      .canScan = canScanProbeExplicitCollection,
       .scan = scanProbeExplicitCollection,
   };
-}
-
-[[nodiscard]] bool canScanProbeBankSequence(const SourceFile&, std::span<const u8> bytes) {
-  return bytes.size() >= 2 && bytes[0] == 0xcc;
-}
-
-[[nodiscard]] bool canScanProbeBankInstruments(const SourceFile&, std::span<const u8> bytes) {
-  return bytes.size() >= 2 && bytes[0] == 0xdd;
 }
 
 [[nodiscard]] MatchFact probeBankFact(const ScanInput& input, AssetId asset, u32 bank) {
@@ -367,6 +360,10 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 }
 
 [[nodiscard]] ScanResult scanProbeBankSequence(const ScanInput& input) {
+  if (!hasProbeMagic(input, 0xcc, 2)) {
+    return {};
+  }
+
   const auto assetId = input.ids.nextAssetId();
   const auto bank = input.reader.u8At(1);
   SequenceProgramAsset sequence{
@@ -398,6 +395,10 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 }
 
 [[nodiscard]] ScanResult scanProbeBankInstruments(const ScanInput& input) {
+  if (!hasProbeMagic(input, 0xdd, 2)) {
+    return {};
+  }
+
   const auto assetId = input.ids.nextAssetId();
   const auto bank = input.reader.u8At(1);
   ScanResult result;
@@ -468,7 +469,6 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 [[nodiscard]] FormatModule probeBankSequenceModule() {
   return FormatModule{
       .name = "ProbeBankSequence",
-      .canScan = canScanProbeBankSequence,
       .scan = scanProbeBankSequence,
       .collectionResolverId = "ProbeBank",
       .resolveCollections = resolveProbeBankCollections,
@@ -478,16 +478,15 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 [[nodiscard]] FormatModule probeBankInstrumentModule() {
   return FormatModule{
       .name = "ProbeBankInstrument",
-      .canScan = canScanProbeBankInstruments,
       .scan = scanProbeBankInstruments,
   };
 }
 
-[[nodiscard]] bool canScanProbeDuplicateAssets(const SourceFile&, std::span<const u8> bytes) {
-  return !bytes.empty() && bytes[0] == 0xee;
-}
-
 [[nodiscard]] ScanResult scanProbeDuplicateAssets(const ScanInput& input) {
+  if (!hasProbeMagic(input, 0xee)) {
+    return {};
+  }
+
   return ScanResult{
       .assets = {MiscAsset{
                      .metadata =
@@ -513,16 +512,15 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 [[nodiscard]] FormatModule probeDuplicateAssetModule() {
   return FormatModule{
       .name = "ProbeDuplicate",
-      .canScan = canScanProbeDuplicateAssets,
       .scan = scanProbeDuplicateAssets,
   };
 }
 
-[[nodiscard]] bool canScanProbeBadExtractedSource(const SourceFile&, std::span<const u8> bytes) {
-  return !bytes.empty() && bytes[0] == 0xf1;
-}
-
 [[nodiscard]] ScanResult scanProbeBadExtractedSource(const ScanInput& input) {
+  if (!hasProbeMagic(input, 0xf1)) {
+    return {};
+  }
+
   const auto assetId = input.ids.nextAssetId();
   ScanResult result;
   result.assets.emplace_back(MiscAsset{
@@ -552,16 +550,15 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 [[nodiscard]] FormatModule probeBadExtractedSourceModule() {
   return FormatModule{
       .name = "ProbeBadExtracted",
-      .canScan = canScanProbeBadExtractedSource,
       .scan = scanProbeBadExtractedSource,
   };
 }
 
-[[nodiscard]] bool canScanProbeBadFactAsset(const SourceFile&, std::span<const u8> bytes) {
-  return !bytes.empty() && bytes[0] == 0xf2;
-}
-
 [[nodiscard]] ScanResult scanProbeBadFactAsset(const ScanInput& input) {
+  if (!hasProbeMagic(input, 0xf2)) {
+    return {};
+  }
+
   return ScanResult{
       .matchFacts = {MatchFact{
           .asset = AssetId{99},
@@ -575,16 +572,15 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 [[nodiscard]] FormatModule probeBadFactAssetModule() {
   return FormatModule{
       .name = "ProbeBadFactAsset",
-      .canScan = canScanProbeBadFactAsset,
       .scan = scanProbeBadFactAsset,
   };
 }
 
-[[nodiscard]] bool canScanProbeBadFactSource(const SourceFile&, std::span<const u8> bytes) {
-  return !bytes.empty() && bytes[0] == 0xf3;
-}
-
 [[nodiscard]] ScanResult scanProbeBadFactSource(const ScanInput& input) {
+  if (!hasProbeMagic(input, 0xf3)) {
+    return {};
+  }
+
   const auto assetId = input.ids.nextAssetId();
   return ScanResult{
       .assets = {MiscAsset{
@@ -615,13 +611,8 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 [[nodiscard]] FormatModule probeBadFactSourceModule() {
   return FormatModule{
       .name = "ProbeBadFactSource",
-      .canScan = canScanProbeBadFactSource,
       .scan = scanProbeBadFactSource,
   };
-}
-
-[[nodiscard]] bool canScanNever(const SourceFile&, std::span<const u8>) {
-  return false;
 }
 
 [[nodiscard]] ScanResult scanNothing(const ScanInput&) {
@@ -638,7 +629,6 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 [[nodiscard]] FormatModule fragileProbeSequenceModule() {
   return FormatModule{
       .name = "ProbeSequenceFragileResolver",
-      .canScan = canScanProbeSequence,
       .scan = scanProbeSequence,
       .collectionResolverId = "ProbeSequence",
       .resolveCollections = fragileProbeSequenceResolver,
@@ -659,7 +649,6 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 [[nodiscard]] FormatModule missingAssetCollectionResolverModule() {
   return FormatModule{
       .name = "ProbeMissingRefs",
-      .canScan = canScanNever,
       .scan = scanNothing,
       .resolveCollections = missingAssetCollectionResolver,
   };
@@ -689,7 +678,6 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 [[nodiscard]] FormatModule wrongTypeCollectionResolverModule() {
   return FormatModule{
       .name = "ProbeWrongTypeRefs",
-      .canScan = canScanNever,
       .scan = scanNothing,
       .resolveCollections = wrongTypeCollectionResolver,
   };
@@ -709,7 +697,6 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 [[nodiscard]] FormatModule duplicateKeyCollectionResolverModule() {
   return FormatModule{
       .name = "ProbeDuplicateKeys",
-      .canScan = canScanNever,
       .scan = scanNothing,
       .resolveCollections = duplicateKeyCollectionResolver,
   };

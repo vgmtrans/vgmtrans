@@ -69,7 +69,8 @@ void addInstrumentSetFacts(ScanResultBuilder& result, ScanInstrumentSetRef instr
                                     });
 }
 
-void scanSampleCollections(const ScanInput& input, ScanResultBuilder& result, std::span<const u32> offsets) {
+void scanSampleCollections(const ScanInput& input, ScanResultBuilder& result, std::span<const u32> offsets,
+                           std::optional<AkaoSplitSampleLocation> hardcodedSampleLocation) {
   const AkaoPs1Version sourceVersion = determineVersionFromSource(input.source);
 
   for (const u32 offset : offsets) {
@@ -86,8 +87,8 @@ void scanSampleCollections(const ScanInput& input, ScanResultBuilder& result, st
     }
   }
 
-  if (const auto hardcoded = ff7HardcodedAkaoSampleLocation(input.reader)) {
-    if (auto parsed = parseAkaoSampleCollection(input, result, *hardcoded)) {
+  if (hardcodedSampleLocation) {
+    if (auto parsed = parseAkaoSampleCollection(input, result, *hardcodedSampleLocation)) {
       addSampleFacts(result, *parsed);
     }
   }
@@ -111,23 +112,15 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
   }
 }
 
-[[nodiscard]] bool canScanAkao(const SourceFile& source, std::span<const u8> bytes) {
-  ByteReader reader(source.id, bytes);
-  if (ff7HardcodedAkaoSampleLocation(reader)) {
-    return true;
-  }
-  for (u64 offset = 0; offset + 0x10 <= reader.size(); ++offset) {
-    if (reader.be32(offset) == kAkaoSignature) {
-      return true;
-    }
-  }
-  return false;
-}
-
 [[nodiscard]] ScanResult scanAkao(const ScanInput& input) {
-  ScanResultBuilder result(input, std::string(kAkaoFormatName), std::string(kAkaoCollectionResolver));
   const auto offsets = akaoOffsets(input.reader);
-  scanSampleCollections(input, result, offsets);
+  const auto hardcodedSampleLocation = ff7HardcodedAkaoSampleLocation(input.reader);
+  if (offsets.empty() && !hardcodedSampleLocation) {
+    return {};
+  }
+
+  ScanResultBuilder result(input, std::string(kAkaoFormatName), std::string(kAkaoCollectionResolver));
+  scanSampleCollections(input, result, offsets, hardcodedSampleLocation);
   scanSequences(input, result, offsets);
   return result.finish();
 }
@@ -139,7 +132,6 @@ FormatDefinition akaoDefinition() {
       .module =
           {
               .name = std::string(kAkaoFormatName),
-              .canScan = canScanAkao,
               .scan = scanAkao,
               .collectionResolverId = std::string(kAkaoCollectionResolver),
               .resolveCollections = resolveAkaoCollections,

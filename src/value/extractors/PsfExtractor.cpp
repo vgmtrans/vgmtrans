@@ -318,16 +318,17 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
 
 }  // namespace
 
-[[nodiscard]] bool canScanPsf(const SourceFile&, std::span<const u8> bytes) {
-  return hasPsfSignature(bytes);
-}
-
 [[nodiscard]] ScanResult scanPsf(const ScanInput& input) {
   // The scanner emits one derived executable image. Platform-specific format modules then
   // inspect that image exactly as if it came from a ROM/container file.
+  const auto bytes = input.reader.slice(0, input.reader.size());
+  if (!hasPsfSignature(bytes)) {
+    return {};
+  }
+
   ScanResult result;
   const auto range = input.reader.range(0, input.reader.size());
-  const auto psf = parsePsf(input.reader.slice(0, input.reader.size()));
+  const auto psf = parsePsf(bytes);
 
   Image image;
   const std::filesystem::path basePath =
@@ -354,7 +355,7 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
 }
 
 FormatDefinition psfExtractorDefinition() {
-  return FormatDefinition{.module = {.name = "PSF", .canScan = canScanPsf, .scan = scanPsf}};
+  return FormatDefinition{.module = {.name = "PSF", .scan = scanPsf}};
 }
 
 }  // namespace vgmtrans::formats::psf

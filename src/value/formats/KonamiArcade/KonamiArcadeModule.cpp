@@ -16,10 +16,6 @@ using namespace core;
 
 namespace {
 
-[[nodiscard]] bool canScanKonamiArcade(const SourceFile& source, std::span<const u8>) {
-  return source.attribute(mame::kMameFormatAttribute) == kKonamiArcadeFormatName;
-}
-
 [[nodiscard]] CollectionKey collectionKey(SourceId source, u32 sequenceIndex) {
   return CollectionKey{
       .resolver = std::string(kKonamiArcadeFormatName),
@@ -28,6 +24,10 @@ namespace {
 }
 
 [[nodiscard]] ScanResult scanKonamiArcade(const ScanInput& input) {
+  if (input.source.attribute(mame::kMameFormatAttribute) != kKonamiArcadeFormatName) {
+    return {};
+  }
+
   ScanResultBuilder result(input, std::string(kKonamiArcadeFormatName));
   const auto layout = findKonamiArcadeLayout(input.source, input.reader, &result.diagnostics());
   if (!layout) {
@@ -56,7 +56,6 @@ FormatDefinition konamiArcadeDefinition() {
       .module =
           {
               .name = std::string(kKonamiArcadeFormatName),
-              .canScan = canScanKonamiArcade,
               .scan = scanKonamiArcade,
           },
       .sequenceDialects = {konamiArcadeSequenceDialect()},

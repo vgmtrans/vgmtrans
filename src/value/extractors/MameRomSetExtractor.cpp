@@ -502,6 +502,11 @@ namespace {
 }
 
 [[nodiscard]] ScanResult scanRomSet(const ScanInput& input, const RomDatabase& database) {
+  const auto archiveBytes = input.reader.slice(0, input.reader.size());
+  if (!hasZipSignature(archiveBytes)) {
+    return {};
+  }
+
   ScanResult result;
   const auto set = database.find(archiveStem(input.source));
   if (set == nullptr) {
@@ -510,7 +515,7 @@ namespace {
 
   const SourceRange archiveRange = input.reader.range(0, input.reader.size());
   MemoryStream stream;
-  auto archive = openZip(input.reader.slice(0, input.reader.size()), stream);
+  auto archive = openZip(archiveBytes, stream);
   if (!archive) {
     result.diagnostics.push_back(warning("MAME ROM set archive could not be opened", archiveRange));
     return result;
@@ -603,11 +608,11 @@ const RomSetDefinition* RomDatabase::find(std::string_view name) const noexcept 
 
 FormatDefinition mameRomSetExtractorDefinition(RomDatabase database) {
   return FormatDefinition{
-      .module = {
-          .name = std::string(kMameExtractorName),
-          .canScan = [](const SourceFile&, std::span<const u8> bytes) { return hasZipSignature(bytes); },
-          .scan = [database = std::move(database)](const ScanInput& input) { return scanRomSet(input, database); },
-      },
+      .module =
+          {
+              .name = std::string(kMameExtractorName),
+              .scan = [database = std::move(database)](const ScanInput& input) { return scanRomSet(input, database); },
+          },
   };
 }
 

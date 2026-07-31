@@ -514,8 +514,6 @@ void segSatSsfExtractorUsesFourByteMiniHeader() {
       .reader = ByteReader(SourceId{9}, ssf),
       .ids = ids,
   };
-  expect(definition.module.canScan && definition.module.canScan(input.source, ssf),
-         "generic PSF extraction should recognize SSF version 0x11");
   const ScanResult result = definition.module.scan(input);
   expect(result.diagnostics.empty() && result.extractedSources.size() == 1 &&
              result.extractedSources.front().bytes == std::vector<u8>({0x12, 0x34, 0x56}),
