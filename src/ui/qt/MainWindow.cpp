@@ -1260,12 +1260,12 @@ void MainWindow::routeSignals() {
             const auto* collection = m_workspace.snapshot().collection(
                 m_sequence_player->activeCollection());
             std::vector<vgmtrans::core::AssetId> assets;
-            if (collection != nullptr && collection->sequence) {
-              assets.push_back(*collection->sequence);
-              assets.insert(assets.end(), collection->instrumentSets.begin(),
-                            collection->instrumentSets.end());
-              assets.insert(assets.end(), collection->sampleCollections.begin(),
-                            collection->sampleCollections.end());
+            if (collection != nullptr && collection->members.sequence) {
+              assets.push_back(*collection->members.sequence);
+              assets.insert(assets.end(), collection->members.instrumentSets.begin(),
+                            collection->members.instrumentSets.end());
+              assets.insert(assets.end(), collection->members.sampleCollections.begin(),
+                            collection->members.sampleCollections.end());
             }
             const auto activeAssets = m_sequence_player->activeAssets();
             const bool assetsChanged =
