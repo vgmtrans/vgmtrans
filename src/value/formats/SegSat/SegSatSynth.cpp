@@ -6,6 +6,7 @@
 
 #include "value/formats/SegSat/SegSat.h"
 
+#include "value/base/RecordReader.h"
 #include "value/synth/SynthMath.h"
 
 #include <fmt/format.h>
@@ -48,7 +49,7 @@ struct SampleData {
 };
 
 struct ParsedRegion {
-  SourceRange range;
+  SourceRecord source;
   SampleData sample;
   Region region;
   u8 vlIndex = 0;
@@ -66,6 +67,34 @@ struct ParsedInstrument {
 
 [[nodiscard]] bool rangeValid(ByteReader reader, u64 offset, u64 size) {
   return offset <= reader.size() && size <= reader.size() - offset;
+}
+
+[[nodiscard]] SourceRecord regionSource(ByteReader reader, u32 offset) {
+  RecordReader record(reader, offset, offset + 0x20);
+  // Parsing below uses these values directly. RecordReader is used here to
+  // retain the exact byte range for every TreeView child.
+  (void)record.u8At(0, "key_low", SourceValueDisplay::MidiNote);
+  (void)record.u8At(1, "key_high", SourceValueDisplay::MidiNote);
+  (void)record.u32beAt(2, "address_and_flags", SourceValueDisplay::Hex);
+  (void)record.u16beAt(6, "loop_start");
+  (void)record.u16beAt(8, "loop_end");
+  (void)record.u16beAt(10, "adsr_1", SourceValueDisplay::Hex);
+  (void)record.u16beAt(12, "adsr_2", SourceValueDisplay::Hex);
+  (void)record.u8At(14, "modulation_flags", SourceValueDisplay::Hex);
+  (void)record.u8At(15, "total_level");
+  (void)record.u16beAt(16, "pitch", SourceValueDisplay::Hex);
+  (void)record.u16beAt(18, "modulation", SourceValueDisplay::Hex);
+  (void)record.u16beAt(20, "lfo", SourceValueDisplay::Hex);
+  (void)record.u16beAt(22, "effect_output", SourceValueDisplay::Hex);
+  (void)record.u8At(24, "direct_output", SourceValueDisplay::Hex);
+  (void)record.u8At(25, "unity_key", SourceValueDisplay::MidiNote);
+  (void)record.s8At(26, "fine_tune");
+  (void)record.u8At(27, "reserved_27", SourceValueDisplay::Hex);
+  (void)record.u8At(28, "reserved_28", SourceValueDisplay::Hex);
+  (void)record.u8At(29, "velocity_table");
+  (void)record.u8At(30, "peg_table");
+  (void)record.u8At(31, "plfo_table");
+  return std::move(record).finish();
 }
 
 [[nodiscard]] u16 pitchBendRangeCents(u8 voiceHeader) {
@@ -352,7 +381,7 @@ struct PanAndAttenuation {
       const s16 fineCents = static_cast<s16>((fine / 128.0) * 50.0);
       const auto output = directOutput(reader.u8At(regionOffset + 24));
       ParsedRegion parsed{
-          .range = reader.range(regionOffset, 0x20),
+          .source = regionSource(reader, regionOffset),
           .sample = *sample,
           .region =
               Region{
@@ -383,7 +412,8 @@ struct PanAndAttenuation {
 }  // namespace
 
 std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const SegSatBankLayout& layout,
-                                               SegSatDriverVersion version, u8 exportBank) {
+                                               SegSatDriverVersion version, SegSatVolumeModel volumeModel,
+                                               u8 exportBank) {
   const ByteReader reader = builder.reader();
   auto parsed = parseInstruments(reader, layout, version);
   if (parsed.empty()) {
@@ -399,6 +429,8 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
   if (uniqueSamples.empty()) {
     return std::nullopt;
   }
+  const SegSatVelocityBank velocityBank =
+      readSegSatVelocityBank(reader, layout, layout.sourceBank.value_or(exportBank), volumeModel);
 
   auto instruments = builder.instrumentSet(fmt::format("SegSat Bank {} Instruments", exportBank));
   auto samples = builder.sampleCollection(fmt::format("SegSat Bank {} Samples", exportBank));
@@ -448,16 +480,19 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
     auto entry = instruments.add(parsedInstrument.index, std::move(instrument));
     entry.source(name, parsedInstrument.range, "segsat-instrument")
         .derived("volume_bias", parsedInstrument.volumeBias, SourceValueDisplay::SignedDecimal);
-    for (auto& parsedRegion : parsedInstrument.regions) {
+    for (size_t regionIndex = 0; regionIndex < parsedInstrument.regions.size(); ++regionIndex) {
+      auto& parsedRegion = parsedInstrument.regions[regionIndex];
       const auto sample = samples.find(parsedRegion.sample.offset);
       if (!sample) {
         continue;
       }
+      if (parsedInstrument.index < velocityBank.instruments.size() &&
+          regionIndex < velocityBank.instruments[parsedInstrument.index].regions.size()) {
+        parsedRegion.region.attenuationDb += linearAmplitudeToAttenuationDb(
+            velocityBank.instruments[parsedInstrument.index].regions[regionIndex].referenceGain);
+      }
       parsedRegion.region.modulation = parsedRegion.modulation;
-      entry.region(*sample, std::move(parsedRegion.region))
-          .source("Region", parsedRegion.range, "segsat-region")
-          .derived("velocity_table", parsedRegion.vlIndex)
-          .derived("total_level", parsedRegion.totalLevel);
+      entry.region(*sample, std::move(parsedRegion.region)).source("Region", parsedRegion.source, "segsat-region");
     }
   }
   return SegSatScannedBank{
@@ -466,7 +501,8 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
   };
 }
 
-SegSatVelocityBank readSegSatVelocityBank(ByteReader reader, const SegSatBankLayout& layout, u8 sourceBank) {
+SegSatVelocityBank readSegSatVelocityBank(ByteReader reader, const SegSatBankLayout& layout, u8 sourceBank,
+                                          SegSatVolumeModel volumeModel) {
   SegSatVelocityBank bank{
       .sourceBank = sourceBank,
   };
@@ -503,11 +539,16 @@ SegSatVelocityBank readSegSatVelocityBank(ByteReader reader, const SegSatBankLay
       if (keyLow == 0xff || keyLow > keyHigh || !readSampleData(reader, layout, regionOffset)) {
         continue;
       }
+      const u8 table = reader.u8At(regionOffset + 29);
+      const u8 totalLevel = reader.u8At(regionOffset + 15);
       instrument.regions.push_back(SegSatVelocityRegion{
           .keyLow = keyLow,
           .keyHigh = keyHigh,
-          .table = reader.u8At(regionOffset + 29),
-          .totalLevel = reader.u8At(regionOffset + 15),
+          .table = table,
+          .totalLevel = totalLevel,
+          .referenceGain = table < bank.tables.size() ? segSatRegionReferenceGain(volumeModel, bank.tables[table],
+                                                                                  totalLevel, instrument.volumeBias)
+                                                      : 1.0,
       });
     }
     bank.instruments.push_back(std::move(instrument));

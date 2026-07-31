@@ -44,11 +44,12 @@ struct BankAssets {
 
   ScanResultBuilder result(input, std::string(kSegSatFormatName), std::string(kSegSatCollectionResolver));
   const SegSatDriverVersion version = determineSegSatDriverVersion(input.reader);
+  const SegSatVolumeModel volumeModel = determineSegSatVolumeModel(input.reader);
   std::vector<BankAssets> banks;
   banks.reserve(bankLayouts.size());
   for (const auto& layout : bankLayouts) {
     const u8 bankNumber = layout.sourceBank.value_or(0);
-    const auto scanned = addSegSatBank(result, layout, version, bankNumber);
+    const auto scanned = addSegSatBank(result, layout, version, volumeModel, bankNumber);
     if (scanned) {
       banks.push_back(BankAssets{
           .layout = layout,
@@ -166,7 +167,7 @@ struct BankAssets {
           "SegSat preparation could not read the selected instrument bank", instruments->metadata.range));
       continue;
     }
-    velocityBanks.push_back(readSegSatVelocityBank(reader, *layout, sourceBank));
+    velocityBanks.push_back(readSegSatVelocityBank(reader, *layout, sourceBank, volumeModel));
   }
 
   if (!velocityBanks.empty()) {

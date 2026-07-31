@@ -55,6 +55,11 @@ void le32(std::vector<u8>& bytes, size_t offset, u32 value) {
   bytes[offset + 3] = static_cast<u8>(value >> 24);
 }
 
+u8 normalizedSegSatVelocity(u8 velocity, const SegSatVlTable& table, u8 totalLevel) {
+  const double gain = segSatLinearGain(SegSatVolumeModel::V1_33, velocity, table, totalLevel, 0, 127, 127);
+  return LevelScale::midi7FromLinear(gain / segSatRegionReferenceGain(SegSatVolumeModel::V1_33, table, totalLevel, 0));
+}
+
 std::vector<u8> segSatFixture() {
   constexpr u32 sequenceTable = 0x400;
   constexpr u32 sequence = sequenceTable + 6;
@@ -364,6 +369,17 @@ void segSatCollectionPreparationSuppliesVlTablesToSequence() {
              parsedRegion.modulation.tremolo->waveform == LfoWaveform::Triangle &&
              parsedRegion.modulation.tremolo->maxDepthDb == 0.4,
          "SegSat regions should preserve both SCSP LFO waveforms and depths");
+  const auto regionSources = snapshot.sourceMap().ownedBy(ObjectRefs::region(instruments->metadata.id, 0, 0));
+  const auto* regionSource = regionSources.size() == 1 ? snapshot.sourceMap().find(regionSources.front()) : nullptr;
+  expect(regionSource != nullptr, "SegSat region should have one source annotation");
+  const auto totalLevel = std::ranges::find_if(regionSource->fields, [](const SourceField& field) {
+    return field.name == "total_level" && field.range.valid();
+  });
+  const auto sourceFields =
+      std::ranges::count_if(regionSource->fields, [](const SourceField& field) { return field.range.valid(); });
+  expect(regionSource->fieldsAsChildren && sourceFields == 21 && totalLevel != regionSource->fields.end() &&
+             totalLevel->range == SourceRange{.source = source, .offset = 0x1049, .size = 1},
+         "SegSat region fields should appear as individually selectable TreeView children");
   const double expectedHold = 0.047 * 640.0 / 1023.0;
   const double expectedDecay = 7.4 * (32.0 * 13.0) / 1023.0;
   const double expectedSustain = std::pow(10.0, -39.0 / 20.0);
@@ -412,9 +428,12 @@ void segSatRuntimeMapSelectsBankInsideAnotherSampleSpan() {
       .level2 = 127,
       .rate3 = 2,
   };
-  expect(note != nullptr &&
-             LevelScale::midi7FromLinear(note->linearVelocity) == segSatMidiVelocity(64, identity, 128, 0),
-         "implicit bank-zero playback should use the mapped bank's region and VL attenuation");
+  const double referenceGain = segSatRegionReferenceGain(SegSatVolumeModel::V1_33, identity, 128, 0);
+  const double noteGain = segSatLinearGain(SegSatVolumeModel::V1_33, 64, identity, 128, 0, 127, 127);
+  expect(note != nullptr && std::abs(note->linearVelocity - noteGain / referenceGain) < 0.000000001 &&
+             std::abs(instruments->instruments.front().regions.front().attenuationDb +
+                      20.0 * std::log10(referenceGain)) < 0.000001,
+         "implicit bank-zero playback should split the region's fixed level from its changing note level");
 }
 
 void segSatMultiBankPlaybackUsesTheActiveBanksVlTable() {
@@ -454,10 +473,11 @@ void segSatMultiBankPlaybackUsesTheActiveBanksVlTable() {
       .level2 = 127,
       .rate3 = 2,
   };
-  expect(notes.size() == 2 && notes[0].first == 6 && notes[1].first == 5 &&
-             LevelScale::midi7FromLinear(notes[0].second->linearVelocity) == segSatMidiVelocity(64, identity, 128, 0) &&
-             LevelScale::midi7FromLinear(notes[1].second->linearVelocity) == segSatMidiVelocity(64, identity, 0, 0),
-         "source bank aliases should remain paired with sorted collection banks regardless of command order");
+  expect(
+      notes.size() == 2 && notes[0].first == 6 && notes[1].first == 5 &&
+          LevelScale::midi7FromLinear(notes[0].second->linearVelocity) == normalizedSegSatVelocity(64, identity, 128) &&
+          LevelScale::midi7FromLinear(notes[1].second->linearVelocity) == normalizedSegSatVelocity(64, identity, 0),
+      "source bank aliases should remain paired with sorted collection banks regardless of command order");
 }
 
 void segSatCollectionPreparationReadsVelocityBanksFromSeparateSources() {
@@ -545,8 +565,8 @@ void segSatCollectionPreparationReadsVelocityBanksFromSeparateSources() {
       .rate3 = 2,
   };
   expect(notes.size() == 2 &&
-             LevelScale::midi7FromLinear(notes[0]->linearVelocity) == segSatMidiVelocity(64, identity, 128, 0) &&
-             LevelScale::midi7FromLinear(notes[1]->linearVelocity) == segSatMidiVelocity(64, identity, 0, 0),
+             LevelScale::midi7FromLinear(notes[0]->linearVelocity) == normalizedSegSatVelocity(64, identity, 128) &&
+             LevelScale::midi7FromLinear(notes[1]->linearVelocity) == normalizedSegSatVelocity(64, identity, 0),
          "each note should use the VL table from its selected bank source");
 }
 
