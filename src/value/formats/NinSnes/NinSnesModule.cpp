@@ -36,10 +36,6 @@ namespace {
   return reader.range(first, last - first);
 }
 
-[[nodiscard]] bool canScan(const SourceFile&, std::span<const u8> bytes) {
-  return findLayout(ByteReader(SourceId{}, bytes)).has_value();
-}
-
 [[nodiscard]] ScanResult scan(const ScanInput& input) {
   const auto layout = findLayout(input.reader);
   if (!layout) {
@@ -78,7 +74,7 @@ namespace {
 
 FormatDefinition definition() {
   return FormatDefinition{
-      .module = {.name = "NinSnes", .canScan = canScan, .scan = scan},
+      .module = {.name = "NinSnes", .scan = scan},
       .sequenceDialects = {sequenceDialect()},
   };
 }

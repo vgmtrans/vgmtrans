@@ -14,10 +14,6 @@ namespace vgmtrans::formats::konami_snes {
 
 using namespace core;
 
-[[nodiscard]] bool canScanKonamiSnes(const SourceFile&, std::span<const u8> bytes) {
-  return findKonamiSnesLayout(ByteReader(SourceId{}, bytes)).has_value();
-}
-
 [[nodiscard]] ScanResult scanKonamiSnes(const ScanInput& input) {
   const auto layout = findKonamiSnesLayout(input.reader);
   if (!layout) {
@@ -54,7 +50,7 @@ using namespace core;
 
 FormatDefinition konamiSnesDefinition() {
   return FormatDefinition{
-      .module = {.name = "KonamiSnes", .canScan = canScanKonamiSnes, .scan = scanKonamiSnes},
+      .module = {.name = "KonamiSnes", .scan = scanKonamiSnes},
       .sequenceDialects = konamiSnesSequenceDialects(),
   };
 }

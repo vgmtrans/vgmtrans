@@ -196,9 +196,12 @@ void sessionClosesSourceFamiliesWhenScansFindNoAssets() {
   session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
   session.registerFormat(testFormat(FormatModule{
       .name = "ProbeEmptyExtractor",
-      .canScan = [](const SourceFile&, std::span<const u8> bytes) { return !bytes.empty() && bytes[0] == 0x00; },
       .scan =
           [](const ScanInput& input) {
+            if (input.reader.size() == 0 || input.reader.u8At(0) != 0x00) {
+              return ScanResult{};
+            }
+
             ScanResult result;
             if (!input.source.derived()) {
               result.extractedSources.push_back(ExtractedSource{

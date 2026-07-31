@@ -393,7 +393,11 @@ FormatDefinition
 `FormatRegistry` keeps modules in registration order and indexes every provided
 dialect by ID.
 
-Recognition belongs at the start of `scan`, which returns an empty result when the source does not match. This ensures layout/signature discovery runs once. `canScan` remains nullable as a migration adapter for older modules and should not be added to new ones.
+Recognition belongs at the start of `scan`. Begin with cheap definitive checks
+such as minimum size, source metadata, or a file signature, and return an empty
+result when the source does not match. Continue into layout discovery only
+after those checks pass. This preserves fast rejection while giving recognition
+and scanning one entry point, so layout or signature work is not repeated.
 
 ### 10.1 `ScanInput`
 
@@ -1114,7 +1118,7 @@ NDS sequence code uses one compiler-cursor opcode switch. Each block reads a sou
 
 Container-specific range recovery belongs to `NdsLayout`, beside FAT and section parsing, rather than in the sequence interpreter. `NdsModule` scans the discovered layout in dependency order and uses indexed optional bank/sample handles instead of parallel lookup maps. SWAR, SBNK, and PSG parsing remain together in `NdsSynth`: their compact shared record layouts are expressed with small helpers and a single instrument-type switch rather than a hierarchy of event or instrument classes. These synth entry points commit their models through `ScanResultBuilder`, so format code does not construct asset metadata or maintain a separate optional diagnostics path. Fixed SWAV records use `RecordReader` for one source-aware field pass, while archive and bank cursors keep every relative pointer bounded to its FAT entry.
 
-NDS exposes one `FormatDefinition` containing both its scanner and compiler-cursor dialect. Recognition occurs inside `scan`, so SDAT signature discovery runs once instead of being duplicated by `canScan`.
+NDS exposes one `FormatDefinition` containing both its scanner and compiler-cursor dialect. Recognition occurs inside `scan`, so SDAT signature discovery runs once instead of being repeated by a separate probe.
 
 ### 19.2 Capcom SNES
 
@@ -1128,7 +1132,7 @@ Capcom uses one imperative compiler-cursor opcode switch. Each case reads its op
 
 The track state owns duration rate, transpose, octave flags, slur state, modulation, portamento, and previous-note information. Loop and repeat commands return VM flow helpers rather than implementing export loop policy. Driver math is local to the value implementation and contains no dependency on the old parser architecture. Pan commands retain Capcom's source-engine left/right gains; shared export code performs MIDI pan quantization and expression compensation. Vibrato events retain both normalized controller amounts and the driver's physical semitone depth and hertz rate, allowing `SequenceEventSimulation` to render pitch-bend motion without depending on SF2/DLS modulators.
 
-The layout uses the shared masked-pattern matcher. The synth path parses the instrument table once, supplies its referenced SRCNs to the shared BRR catalog, and directly commits the instrument and sample assets; it has no intermediate format-specific sample records, sample-construction pass, or SRCN lookup maps. Capcom exposes one public header instead of separate module, layout, sequence, synth, and types headers. Its `scan` function performs recognition and layout discovery once; it does not register a duplicate `canScan` probe. One `FormatDefinition` registers both scanner and dialect. Sequence performance and synth instruments use `capcom-snes.instrument` identities; MIDI/SF2/DLS addressing is assigned in export code.
+The layout uses the shared masked-pattern matcher. The synth path parses the instrument table once, supplies its referenced SRCNs to the shared BRR catalog, and directly commits the instrument and sample assets; it has no intermediate format-specific sample records, sample-construction pass, or SRCN lookup maps. Capcom exposes one public header instead of separate module, layout, sequence, synth, and types headers. Its `scan` function performs recognition and layout discovery once. One `FormatDefinition` registers both scanner and dialect. Sequence performance and synth instruments use `capcom-snes.instrument` identities; MIDI/SF2/DLS addressing is assigned in export code.
 
 ### 19.3 Akao
 
@@ -1163,7 +1167,9 @@ Create a `FormatDefinition` containing a module with:
 
 Add any source-free dialects the format needs, then pass the definition to `Session::registerFormat`. Do not add separate module and dialect registration entry points.
 
-Put recognition at the start of `scan` and return an empty `ScanResult` for non-matches. Do not add `canScan`; it exists only for unmigrated modules.
+Put cheap recognition checks at the start of `scan` and return an empty
+`ScanResult` for non-matches. A scanner must be safe to call with any source;
+only proceed to expensive discovery or parsing after recognition succeeds.
 
 ### Step 2: Decide how collections are discovered
 
@@ -1440,8 +1446,7 @@ The remaining order is intentional:
 
 1. add symbolic Akao articulation/sample binding and remove preparation source reads;
 2. migrate remaining layouts and synth parsers to `RecordReader` and shared platform primitives;
-3. remove the remaining `canScan` recognition adapters;
-4. standardize source annotation naming and roles.
+3. standardize source annotation naming and roles.
 
 Architectural acceptance criteria:
 

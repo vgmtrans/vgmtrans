@@ -283,32 +283,16 @@ void Session::scanSourceAndDerived(SourceId id) {
   }
 }
 
-// Run every module that recognizes this source. Assets, match facts, diagnostics,
-// and extracted sources are appended to the session.
+// Offer the source to every module. Each scan performs its own cheap recognition
+// checks and returns an empty result when the source does not match.
 void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<u32>& queued) {
   if (!scannedSources_.insert(id.value).second) {
     return;
   }
 
   const auto source = sources_.source(id);
-  const auto bytes = sources_.bytes(id);
 
   for (const auto& module : formats_.modules()) {
-    if (module.canScan) {
-      bool shouldScan = false;
-      try {
-        // Legacy probe failures become diagnostics so one broken module cannot
-        // hide data another registered module can still parse.
-        shouldScan = module.canScan(source, bytes);
-      } catch (const std::exception& ex) {
-        state_->addError(std::string(module.name) + " canScan failed: " + ex.what(),
-                         SourceRange{.source = source.id, .offset = 0, .size = source.size});
-      }
-      if (!shouldScan) {
-        continue;
-      }
-    }
-
     try {
       ScanResult result = module.scan(ScanInput{
           .source = source,

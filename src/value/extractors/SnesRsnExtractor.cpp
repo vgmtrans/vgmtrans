@@ -53,15 +53,15 @@ using ArchivePtr = std::unique_ptr<ar_archive, ArchiveCloser>;
 
 }  // namespace
 
-[[nodiscard]] bool canScanSnesRsn(const SourceFile&, std::span<const u8> bytes) {
-  return hasRarSignature(bytes);
-}
-
 [[nodiscard]] ScanResult scanSnesRsn(const ScanInput& input) {
   // RSN is a RAR archive convention for SPC sets. Extract every entry as a derived source
   // so the SPC extractor and SNES format scanners can process them normally.
-  ScanResult result;
   const auto bytes = input.reader.slice(0, input.reader.size());
+  if (!hasRarSignature(bytes)) {
+    return {};
+  }
+
+  ScanResult result;
   const auto sourceRange = input.reader.range(0, input.reader.size());
 
   StreamPtr stream(ar_open_memory(bytes.data(), bytes.size()));
@@ -106,7 +106,7 @@ using ArchivePtr = std::unique_ptr<ar_archive, ArchiveCloser>;
 }
 
 FormatDefinition snesRsnExtractorDefinition() {
-  return FormatDefinition{.module = {.name = "SnesRsn", .canScan = canScanSnesRsn, .scan = scanSnesRsn}};
+  return FormatDefinition{.module = {.name = "SnesRsn", .scan = scanSnesRsn}};
 }
 
 }  // namespace vgmtrans::formats::snes_rsn

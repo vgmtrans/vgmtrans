@@ -19,11 +19,6 @@ using namespace core;
 
 namespace {
 
-[[nodiscard]] bool canScanCps(const SourceFile& source, std::span<const u8>) {
-  const auto format = source.attribute(mame::kMameFormatAttribute);
-  return format == "CPS1" || format == "CPS2";
-}
-
 [[nodiscard]] CollectionKey collectionKey(SourceId source, u32 sequenceIndex) {
   return CollectionKey{
       .resolver = std::string(kCpsFormatName),
@@ -111,6 +106,11 @@ void annotateArticulationTable(SourceMapBuilder& sourceMap, ByteReader reader, c
 }
 
 [[nodiscard]] ScanResult scanCps(const ScanInput& input) {
+  const auto format = input.source.attribute(mame::kMameFormatAttribute);
+  if (format != "CPS1" && format != "CPS2") {
+    return {};
+  }
+
   ScanResultBuilder result(input, std::string(kCpsFormatName));
   auto layout = findCpsLayout(input.source, input.reader, &result.diagnostics());
   if (!layout) {
@@ -188,7 +188,6 @@ FormatDefinition cpsDefinition() {
       .module =
           {
               .name = std::string(kCpsFormatName),
-              .canScan = canScanCps,
               .scan = scanCps,
           },
       .sequenceDialects = {cps1V1Dialect(), cpsEarlyDialect(), cpsLateDialect()},
