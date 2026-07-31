@@ -49,6 +49,21 @@ Layout standardLayout(u16 playlist = 0x100) {
   };
 }
 
+ScanResult scanSynth(std::vector<u8> bytes, const Layout& layout, std::string_view name) {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = std::string(name) + ".spc"}, std::move(bytes));
+  ScanIdAllocator ids;
+  ScanResultBuilder result(
+      ScanInput{
+          .source = sources.source(source),
+          .reader = sources.reader(source),
+          .ids = ids,
+      },
+      "NinSnes");
+  expect(addSynth(result, layout, {}, name).has_value(), "NinSnes synth fixture should produce assets");
+  return result.finish();
+}
+
 void writeSection(std::vector<u8>& bytes, u16 address, std::initializer_list<std::pair<u8, u16>> tracks) {
   for (const auto [track, start] : tracks) {
     writeLe16(bytes, address + static_cast<size_t>(track) * 2, start);
@@ -1045,23 +1060,11 @@ void ninSnesGainModeInstrumentsUseDspEnvelope() {
   writeLe16(bytes, 0x5002, 0x6000);
   bytes[0x6000] = 0x01;
 
-  SourceStore sources;
-  const SourceId source = sources.add(SourceFile{.name = "gain-mode.spc"}, std::move(bytes));
-  ScanIdAllocator ids;
-  ScanResultBuilder result(
-      ScanInput{
-          .source = sources.source(source),
-          .reader = sources.reader(source),
-          .ids = ids,
-      },
-      "NinSnes");
   Layout layout = standardLayout();
   layout.instrumentTableAddress = 0x4000;
   layout.spcDirAddress = 0x5000;
 
-  const auto synth = addSynth(result, layout, {}, "GAIN");
-  expect(synth.has_value(), "NinSnes synth builder should accept a direct-GAIN instrument");
-  const ScanResult scan = result.finish();
+  const ScanResult scan = scanSynth(std::move(bytes), layout, "GAIN");
   const auto* instruments = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
   expect(
       instruments != nullptr && instruments->instruments.size() == 1 && instruments->instruments[0].regions.size() == 1,
@@ -1069,4 +1072,37 @@ void ninSnesGainModeInstrumentsUseDspEnvelope() {
   const Envelope& envelope = instruments->instruments[0].regions[0].envelope;
   expect(envelope.sustainAmplitude && *envelope.sustainAmplitude > 0.99 && *envelope.sustainAmplitude < 1.0,
          "direct GAIN should become the DSP's fixed sustain level instead of an unspecified envelope");
+}
+
+void ninSnesIdentityMappedSilentSlotsAreSparse() {
+  std::vector<u8> bytes(kAramSize);
+  constexpr u32 kInstrumentTable = 0x4000;
+  constexpr u16 kDirectory = 0x5000;
+  constexpr u16 kSample = 0x6000;
+
+  std::ranges::copy(
+      std::initializer_list<u8>{
+          0, 0xff, 0xe0, 0, 1, 0,  // valid
+          1, 0,    0,    0, 0, 0,  // identity-mapped silent
+          2, 0xff, 0xe0, 0, 1, 0,  // valid after the sparse slot
+          3, 0xff, 0xe0, 0, 1, 0,  // valid-looking start of the next structure
+      },
+      bytes.begin() + kInstrumentTable);
+  for (const u8 srcn : {u8{0}, u8{1}, u8{2}, u8{3}}) {
+    writeLe16(bytes, kDirectory + srcn * 4, kSample);
+    writeLe16(bytes, kDirectory + srcn * 4 + 2, kSample);
+  }
+  bytes[kSample] = 0x01;
+
+  Layout layout = standardLayout();
+  layout.songListAddress = kInstrumentTable + 3 * 6;
+  layout.instrumentTableAddress = kInstrumentTable;
+  layout.spcDirAddress = kDirectory;
+
+  const ScanResult scan = scanSynth(std::move(bytes), layout, "Sparse");
+  const auto* instruments = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
+  expect(instruments != nullptr && instruments->instruments.size() == 2 &&
+             instruments->instruments[0].explicitAddress == InstrumentAddress{.bank = 0, .program = 0} &&
+             instruments->instruments[1].explicitAddress == InstrumentAddress{.bank = 0, .program = 2},
+         "identity-mapped silent slots should be skipped without scanning into the following known structure");
 }

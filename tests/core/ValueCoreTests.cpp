@@ -74,6 +74,7 @@ void ninSnesPercussionStartsPerNoteVibratoFade();
 void ninSnesFixedPercussionBaseIgnoresFaOperand();
 void ninSnesEarlierPercussionUsesSeparateSixByteTable();
 void ninSnesGainModeInstrumentsUseDspEnvelope();
+void ninSnesIdentityMappedSilentSlotsAreSparse();
 void rareSnesLayoutsDifferentiateDriverFamilies();
 void rareSnesProfilesDecodeTheirDistinctOpcodeTails();
 void rareSnesSignedStereoVolumesPreserveDriverRelativeLevels();
@@ -226,6 +227,7 @@ int main() {
     ninSnesFixedPercussionBaseIgnoresFaOperand();
     ninSnesEarlierPercussionUsesSeparateSixByteTable();
     ninSnesGainModeInstrumentsUseDspEnvelope();
+    ninSnesIdentityMappedSilentSlotsAreSparse();
     rareSnesLayoutsDifferentiateDriverFamilies();
     rareSnesProfilesDecodeTheirDistinctOpcodeTails();
     rareSnesSignedStereoVolumesPreserveDriverRelativeLevels();
