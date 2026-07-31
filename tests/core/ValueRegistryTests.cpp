@@ -109,11 +109,11 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
   expect(metadata(result.assets[2]).id == AssetId{2}, "scan result builder should assign sample metadata");
   expect(result.matchFacts.empty(), "scan result builder should not need match facts for explicit collections");
   expect(result.explicitCollections.size() == 1, "scan result builder should emit one explicit collection");
-  expect(result.explicitCollections[0].sequence == sequence.id(),
+  expect(result.explicitCollections[0].members.sequence == sequence.id(),
          "scan result builder should preserve the collection sequence");
-  expect(result.explicitCollections[0].instrumentSets == std::vector<AssetId>{bank.id()},
+  expect(result.explicitCollections[0].members.instrumentSets == std::vector<AssetId>{bank.id()},
          "scan result builder should preserve the collection instrument set");
-  expect(result.explicitCollections[0].sampleCollections == std::vector<AssetId>{samples.id()},
+  expect(result.explicitCollections[0].members.sampleCollections == std::vector<AssetId>{samples.id()},
          "scan result builder should preserve the collection sample collection");
   expect(result.diagnostics.size() == 1 && result.diagnostics[0].message == "builder warning",
          "scan result builder should preserve diagnostics");

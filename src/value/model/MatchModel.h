@@ -72,11 +72,22 @@ struct MatchFact {
   MatchFactPayload payload;
 };
 
-enum class CollectionStatus {
-  Complete,
+struct CollectionMembers {
+  std::optional<AssetId> sequence;
+  std::vector<AssetId> instrumentSets;
+  std::vector<AssetId> sampleCollections;
+  std::vector<AssetId> miscAssets;
+};
+
+enum class CollectionFreshness {
+  Current,
+  Stale,
+};
+
+enum class CollectionResolution {
+  Resolved,
   Incomplete,
   Ambiguous,
-  Stale,
 };
 
 enum class CollectionOrigin {
@@ -84,7 +95,14 @@ enum class CollectionOrigin {
   UserCreated,
 };
 
+enum class CollectionIssueImpact {
+  None,
+  Incomplete,
+  Ambiguous,
+};
+
 struct CollectionIssue {
+  CollectionIssueImpact impact = CollectionIssueImpact::None;
   Severity severity = Severity::Info;
   std::string code;
   std::string message;
@@ -95,11 +113,7 @@ struct CollectionIssue {
 struct DesiredCollection {
   CollectionKey key;
   std::string name;
-  std::optional<AssetId> sequence;
-  std::vector<AssetId> instrumentSets;
-  std::vector<AssetId> sampleCollections;
-  std::vector<AssetId> miscAssets;
-  CollectionStatus status = CollectionStatus::Complete;
+  CollectionMembers members;
   std::vector<CollectionIssue> issues;
 };
 
@@ -111,11 +125,8 @@ struct DesiredCollection {
                                                   std::optional<SourceRange> range = std::nullopt);
 [[nodiscard]] CollectionIssue removedStaleAssetIssue(std::optional<AssetId> asset = std::nullopt);
 
-// Status is still stored because a resolver often knows the collection's state
-// directly. This helper only prevents a "complete" status from contradicting
-// common issue codes.
-[[nodiscard]] CollectionStatus validatedCollectionStatus(CollectionStatus status,
-                                                         std::span<const CollectionIssue> issues);
-[[nodiscard]] CollectionStatus validatedCollectionStatus(const DesiredCollection& collection);
+// Resolution summarizes the semantic effect of the issues. Ambiguity takes
+// precedence when a collection has more than one kind of problem.
+[[nodiscard]] CollectionResolution collectionResolution(std::span<const CollectionIssue> issues) noexcept;
 
 }  // namespace vgmtrans::core

@@ -103,27 +103,28 @@ struct BankAssets {
 
 [[nodiscard]] PreparedCollectionAssets prepareSegSatCollection(const CollectionPrepareContext& context) {
   PreparedCollectionAssets prepared;
-  if (!context.collection.sequence) {
+  const auto& members = context.collection.members;
+  if (!members.sequence) {
     return prepared;
   }
-  const auto* sequence = context.snapshot.asset<SequenceProgramAsset>(*context.collection.sequence);
+  const auto* sequence = context.snapshot.asset<SequenceProgramAsset>(*members.sequence);
   if (sequence == nullptr) {
     return prepared;
   }
 
   std::vector<SegSatVelocityBank> velocityBanks;
-  velocityBanks.reserve(context.collection.instrumentSets.size());
+  velocityBanks.reserve(members.instrumentSets.size());
   const std::vector<u8> bankAliases = segSatSequenceBanks(sequence->program);
-  if (bankAliases.size() != context.collection.instrumentSets.size()) {
+  if (bankAliases.size() != members.instrumentSets.size()) {
     prepared.diagnostics.push_back(preparationWarning(
         fmt::format("SegSat sequence refers to {} banks, but the collection contains {} instrument sets",
-                    bankAliases.size(), context.collection.instrumentSets.size()),
+                    bankAliases.size(), members.instrumentSets.size()),
         sequence->metadata.range));
   }
   auto& replacementInstrumentSets = prepared.replacementInstrumentSets.emplace();
-  replacementInstrumentSets.reserve(context.collection.instrumentSets.size());
-  for (size_t bankIndex = 0; bankIndex < context.collection.instrumentSets.size(); ++bankIndex) {
-    const AssetId asset = context.collection.instrumentSets[bankIndex];
+  replacementInstrumentSets.reserve(members.instrumentSets.size());
+  for (size_t bankIndex = 0; bankIndex < members.instrumentSets.size(); ++bankIndex) {
+    const AssetId asset = members.instrumentSets[bankIndex];
     const auto* instruments = context.snapshot.asset<InstrumentSetAsset>(asset);
     if (instruments == nullptr) {
       continue;
@@ -134,7 +135,7 @@ struct BankAssets {
                             ? 0
                             : replacement.instruments.front().explicitAddress->bank);
     const u8 sourceBank = bankIndex < bankAliases.size() ? bankAliases[bankIndex] : durableBank;
-    const u8 exportBank = context.collection.instrumentSets.size() == 1 ? 0 : sourceBank;
+    const u8 exportBank = members.instrumentSets.size() == 1 ? 0 : sourceBank;
     for (auto& instrument : replacement.instruments) {
       const auto address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
       instrument.explicitAddress = InstrumentAddress{.bank = exportBank, .program = address.program};

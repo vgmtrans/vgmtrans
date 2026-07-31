@@ -200,7 +200,7 @@ ScanCollectionBuilder::ScanCollectionBuilder(ScanResultBuilder& out, size_t inde
 
 ScanCollectionBuilder& ScanCollectionBuilder::sequence(ScanSequenceRef asset) {
   out_.validateDraftReference(asset.id, ScanResultBuilder::DraftRole::Sequence);
-  out_.explicitCollection(index_).sequence = asset.id;
+  out_.explicitCollection(index_).members.sequence = asset.id;
   return *this;
 }
 
@@ -210,7 +210,7 @@ ScanCollectionBuilder& ScanCollectionBuilder::sequence(const ScanSequenceDraft& 
 
 ScanCollectionBuilder& ScanCollectionBuilder::instrumentSet(ScanInstrumentSetRef asset) {
   out_.validateDraftReference(asset.id, ScanResultBuilder::DraftRole::InstrumentSet);
-  out_.explicitCollection(index_).instrumentSets.push_back(asset.id);
+  out_.explicitCollection(index_).members.instrumentSets.push_back(asset.id);
   return *this;
 }
 
@@ -220,7 +220,7 @@ ScanCollectionBuilder& ScanCollectionBuilder::instrumentSet(const ScanInstrument
 
 ScanCollectionBuilder& ScanCollectionBuilder::samples(ScanSampleCollectionRef asset) {
   out_.validateDraftReference(asset.id, ScanResultBuilder::DraftRole::SampleCollection);
-  out_.explicitCollection(index_).sampleCollections.push_back(asset.id);
+  out_.explicitCollection(index_).members.sampleCollections.push_back(asset.id);
   return *this;
 }
 
@@ -230,7 +230,7 @@ ScanCollectionBuilder& ScanCollectionBuilder::samples(const ScanSampleCollection
 
 ScanCollectionBuilder& ScanCollectionBuilder::misc(ScanMiscAssetRef asset) {
   out_.validateDraftReference(asset.id, ScanResultBuilder::DraftRole::Misc);
-  out_.explicitCollection(index_).miscAssets.push_back(asset.id);
+  out_.explicitCollection(index_).members.miscAssets.push_back(asset.id);
   return *this;
 }
 

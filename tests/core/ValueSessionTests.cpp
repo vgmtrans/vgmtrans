@@ -63,7 +63,8 @@ void sessionScansValuesAndDerivedSources() {
          "source annotation children should support tree view nodes");
   expect(sourceMap.find(SourceAnnotationId{99}) == nullptr,
          "source map should return null for a missing annotation id");
-  expect(snapshot.collections()[0].sequence == sequence->metadata.id, "collection should reference sequence asset");
+  expect(snapshot.collections()[0].members.sequence == sequence->metadata.id,
+         "collection should reference sequence asset");
   expect(snapshot.collection(snapshot.collections()[0].id) == &snapshot.collections()[0],
          "session snapshot should find a collection by stable id");
   expect(snapshot.collection(CollectionId{99}) == nullptr,
@@ -262,9 +263,9 @@ void sessionMatchesCollectionsAcrossSeparateSourceScans() {
   SessionSnapshot project = session.snapshot();
   expect(project.assets().size() == 1, "instrument scan should add its asset immediately");
   expect(project.collections().size() == 1, "resolver should keep an incomplete collection for a partial match");
-  expect(project.collections()[0].status == CollectionStatus::Incomplete,
+  expect(project.collections()[0].resolution() == CollectionResolution::Incomplete,
          "instrument-only bank collection should be marked incomplete");
-  expect(project.collections()[0].instrumentSets.size() == 1,
+  expect(project.collections()[0].members.instrumentSets.size() == 1,
          "instrument-only bank collection should reference the instrument set");
   const CollectionId bankCollection = project.collections()[0].id;
 
@@ -274,10 +275,11 @@ void sessionMatchesCollectionsAcrossSeparateSourceScans() {
   expect(project.assets().size() == 2, "second source scan should add the matching sequence asset");
   expect(project.collections().size() == 1, "matching facts should update the existing bank collection");
   expect(project.collections()[0].id == bankCollection, "resolver update should preserve the collection id");
-  expect(project.collections()[0].status == CollectionStatus::Complete,
+  expect(project.collections()[0].resolution() == CollectionResolution::Resolved,
          "bank collection should become complete when sequence and instruments are both present");
-  expect(project.collections()[0].sequence.has_value(), "completed bank collection should reference the sequence");
-  expect(project.collections()[0].instrumentSets.size() == 1,
+  expect(project.collections()[0].members.sequence.has_value(),
+         "completed bank collection should reference the sequence");
+  expect(project.collections()[0].members.instrumentSets.size() == 1,
          "completed bank collection should retain the instrument reference");
 }
 
@@ -380,7 +382,8 @@ void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
   session.scanPendingSources();
   SessionSnapshot project = session.snapshot();
   expect(project.collections().size() == 1, "matching bank files should produce one collection");
-  expect(project.collections()[0].status == CollectionStatus::Complete, "matched bank collection should be complete");
+  expect(project.collections()[0].resolution() == CollectionResolution::Resolved,
+         "matched bank collection should be complete");
   const CollectionId collectionId = project.collections()[0].id;
 
   session.removeSource(instrument);
@@ -391,10 +394,10 @@ void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
   expect(project.matchFacts().size() == 1, "removing one matched source should leave the other match fact active");
   expect(project.collections().size() == 1, "remaining match fact should keep the bank collection alive");
   expect(project.collections()[0].id == collectionId, "collection id should be preserved for the same key");
-  expect(project.collections()[0].status == CollectionStatus::Incomplete,
+  expect(project.collections()[0].resolution() == CollectionResolution::Incomplete,
          "remaining sequence-only collection should become incomplete");
-  expect(project.collections()[0].sequence.has_value(), "remaining collection should keep the sequence asset");
-  expect(project.collections()[0].instrumentSets.empty(),
+  expect(project.collections()[0].members.sequence.has_value(), "remaining collection should keep the sequence asset");
+  expect(project.collections()[0].members.instrumentSets.empty(),
          "removed instrument source should be removed from the collection");
   expect(!project.collections()[0].issues.empty(), "incomplete collection should explain what is missing");
 
@@ -444,7 +447,7 @@ void sessionMarksCollectionsStaleWhenRemovalCannotReconcile() {
   expect(project.matchFacts().empty(), "failed reconcile after removal should still remove match facts");
   expect(project.collections().size() == 1, "resolver failure should keep the previous collection inspectable");
   expect(project.collections()[0].id == originalCollection, "stale collection should keep its id");
-  expect(project.collections()[0].status == CollectionStatus::Stale,
+  expect(project.collections()[0].freshness == CollectionFreshness::Stale,
          "collection should be marked stale when cleanup cannot reconcile its resolver");
   expect(!project.collections()[0].issues.empty(), "stale collection should explain why it is stale");
   static_cast<void>(diagnosticWithMessage(project.diagnostics(),
@@ -853,12 +856,12 @@ void sessionReportsDesiredCollectionMissingAssetReferences() {
   session.scanPendingSources();
   const SessionSnapshot project = session.snapshot();
   expect(project.collections().size() == 1, "resolver should still publish the collection shell");
-  expect(project.collections()[0].status == CollectionStatus::Incomplete,
+  expect(project.collections()[0].resolution() == CollectionResolution::Incomplete,
          "collection with missing asset references should be incomplete");
-  expect(!project.collections()[0].sequence, "missing sequence reference should be stripped");
-  expect(project.collections()[0].instrumentSets.empty(), "missing instrument reference should be stripped");
-  expect(project.collections()[0].sampleCollections.empty(), "missing sample reference should be stripped");
-  expect(project.collections()[0].miscAssets.empty(), "missing misc reference should be stripped");
+  expect(!project.collections()[0].members.sequence, "missing sequence reference should be stripped");
+  expect(project.collections()[0].members.instrumentSets.empty(), "missing instrument reference should be stripped");
+  expect(project.collections()[0].members.sampleCollections.empty(), "missing sample reference should be stripped");
+  expect(project.collections()[0].members.miscAssets.empty(), "missing misc reference should be stripped");
   expect(project.collections()[0].issues.size() == 4, "missing references should be recorded as collection issues");
   static_cast<void>(diagnosticWithMessage(
       project.diagnostics(),
@@ -885,10 +888,11 @@ void sessionReportsDesiredCollectionWrongTypeReferences() {
     return collection.key.resolver == "ProbeWrongTypeRefs";
   });
   expect(found != project.collections().end(), "wrong-type resolver should publish a collection shell");
-  expect(found->status == CollectionStatus::Incomplete, "collection with wrong-type references should be incomplete");
-  expect(found->instrumentSets.empty(), "wrong-type instrument reference should be stripped");
-  expect(found->sampleCollections.empty(), "wrong-type sample reference should be stripped");
-  expect(found->miscAssets.empty(), "wrong-type misc reference should be stripped");
+  expect(found->resolution() == CollectionResolution::Incomplete,
+         "collection with wrong-type references should be incomplete");
+  expect(found->members.instrumentSets.empty(), "wrong-type instrument reference should be stripped");
+  expect(found->members.sampleCollections.empty(), "wrong-type sample reference should be stripped");
+  expect(found->members.miscAssets.empty(), "wrong-type misc reference should be stripped");
   expect(found->issues.size() == 3, "wrong-type references should be recorded as collection issues");
 
   static_cast<void>(diagnosticWithMessage(project.diagnostics(),
@@ -1095,8 +1099,8 @@ void snapshotFindsTheFirstCollectionContainingAnAsset() {
   test::SessionSnapshotBuilder builder;
   builder.assets.emplace_back(MiscAsset{.metadata = AssetMetadata{.id = AssetId{4}, .name = "Shared"}});
   builder.collections = {
-      Collection{.id = CollectionId{8}, .name = "First", .miscAssets = {AssetId{4}}},
-      Collection{.id = CollectionId{9}, .name = "Second", .miscAssets = {AssetId{4}}},
+      Collection{.id = CollectionId{8}, .name = "First", .members = {.miscAssets = {AssetId{4}}}},
+      Collection{.id = CollectionId{9}, .name = "Second", .members = {.miscAssets = {AssetId{4}}}},
   };
   const SessionSnapshot snapshot = builder.finish();
 

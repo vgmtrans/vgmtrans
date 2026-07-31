@@ -15,10 +15,11 @@ namespace vgmtrans::core {
 namespace {
 
 [[nodiscard]] bool collectionContains(const Collection& collection, AssetId asset) {
-  return collection.sequence == asset ||
-         std::ranges::find(collection.instrumentSets, asset) != collection.instrumentSets.end() ||
-         std::ranges::find(collection.sampleCollections, asset) != collection.sampleCollections.end() ||
-         std::ranges::find(collection.miscAssets, asset) != collection.miscAssets.end();
+  const auto& members = collection.members;
+  return members.sequence == asset ||
+         std::ranges::find(members.instrumentSets, asset) != members.instrumentSets.end() ||
+         std::ranges::find(members.sampleCollections, asset) != members.sampleCollections.end() ||
+         std::ranges::find(members.miscAssets, asset) != members.miscAssets.end();
 }
 
 }  // namespace

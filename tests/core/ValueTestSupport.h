@@ -272,7 +272,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
               .value = "source:" + std::to_string(input.source.id.value),
           },
       .name = input.source.name,
-      .sequence = assetId,
+      .members = {.sequence = assetId},
   });
   result.diagnostics.push_back(Diagnostic{
       .severity = Severity::Info,
@@ -438,28 +438,21 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
       collections.push_back(DesiredCollection{
           .key = key,
           .name = "Probe Bank " + std::to_string(id->value),
-          .status = CollectionStatus::Incomplete,
       });
       found = std::prev(collections.end());
     }
 
     if (index.asset<SequenceProgramAsset>(fact.asset) != nullptr) {
-      found->sequence = fact.asset;
+      found->members.sequence = fact.asset;
     } else if (index.asset<InstrumentSetAsset>(fact.asset) != nullptr) {
-      found->instrumentSets.push_back(fact.asset);
-    }
-
-    if (found->sequence && !found->instrumentSets.empty()) {
-      found->status = CollectionStatus::Complete;
+      found->members.instrumentSets.push_back(fact.asset);
     }
   }
   for (auto& collection : collections) {
-    if (!collection.sequence) {
-      collection.status = CollectionStatus::Incomplete;
+    if (!collection.members.sequence) {
       collection.issues.push_back(missingSequenceIssue());
     }
-    if (collection.instrumentSets.empty()) {
-      collection.status = CollectionStatus::Incomplete;
+    if (collection.members.instrumentSets.empty()) {
       collection.issues.push_back(missingInstrumentSetIssue());
     }
   }
@@ -639,10 +632,13 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   return {DesiredCollection{
       .key = CollectionKey{.resolver = "ProbeMissingRefs", .value = "missing-assets"},
       .name = "Missing Assets",
-      .sequence = AssetId{99},
-      .instrumentSets = {AssetId{98}},
-      .sampleCollections = {AssetId{97}},
-      .miscAssets = {AssetId{96}},
+      .members =
+          {
+              .sequence = AssetId{99},
+              .instrumentSets = {AssetId{98}},
+              .sampleCollections = {AssetId{97}},
+              .miscAssets = {AssetId{96}},
+          },
   }};
 }
 
@@ -669,9 +665,12 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   return {DesiredCollection{
       .key = CollectionKey{.resolver = "ProbeWrongTypeRefs", .value = "wrong-type-assets"},
       .name = "Wrong Type Assets",
-      .instrumentSets = {*sequence},
-      .sampleCollections = {*sequence},
-      .miscAssets = {*sequence},
+      .members =
+          {
+              .instrumentSets = {*sequence},
+              .sampleCollections = {*sequence},
+              .miscAssets = {*sequence},
+          },
   }};
 }
 

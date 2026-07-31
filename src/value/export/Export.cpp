@@ -120,18 +120,19 @@ struct PreparedExport {
     return prepared;
   }
   const Collection& collection = *prepared.collection;
+  const CollectionMembers& members = collection.members;
   prepared.baseName = artifactBaseName(collection);
 
-  if (collection.sequence) {
-    if (const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.sequence)) {
+  if (members.sequence) {
+    if (const auto* sequence = snapshot.asset<SequenceProgramAsset>(*members.sequence)) {
       prepared.sequenceProgram = sequence;
     } else {
       prepared.diagnostics.sequence.push_back(exportError("Collection sequence asset was not found"));
     }
   }
 
-  prepared.instrumentSets.reserve(collection.instrumentSets.size());
-  for (const auto assetId : collection.instrumentSets) {
+  prepared.instrumentSets.reserve(members.instrumentSets.size());
+  for (const auto assetId : members.instrumentSets) {
     if (const auto* instrumentSet = snapshot.asset<InstrumentSetAsset>(assetId)) {
       prepared.instrumentSets.push_back(instrumentSet);
     } else {
@@ -139,8 +140,8 @@ struct PreparedExport {
     }
   }
 
-  prepared.sampleCollections.reserve(collection.sampleCollections.size());
-  for (const auto assetId : collection.sampleCollections) {
+  prepared.sampleCollections.reserve(members.sampleCollections.size());
+  for (const auto assetId : members.sampleCollections) {
     if (const auto* samples = snapshot.asset<SampleCollectionAsset>(assetId)) {
       prepared.sampleCollections.push_back(samples);
     } else {
@@ -332,7 +333,7 @@ void applySequenceModulationToPreparedExport(PreparedExport& prepared, const Seq
 }
 
 [[nodiscard]] std::vector<Artifact> exportWav(const PreparedExport& prepared, const SourceStore& sources) {
-  if (prepared.collection->sampleCollections.empty()) {
+  if (prepared.collection->members.sampleCollections.empty()) {
     return {Artifact{
         .filename = filenamePart(prepared.baseName) + "-samples.wav",
         .mediaType = "audio/wav",
@@ -566,10 +567,12 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
     playback.sequence = prepared.sequenceProgram->metadata.id;
     playback.assetDependencies.push_back(playback.sequence);
   }
-  playback.assetDependencies.insert(playback.assetDependencies.end(), prepared.collection->instrumentSets.begin(),
-                                    prepared.collection->instrumentSets.end());
-  playback.assetDependencies.insert(playback.assetDependencies.end(), prepared.collection->sampleCollections.begin(),
-                                    prepared.collection->sampleCollections.end());
+  playback.assetDependencies.insert(playback.assetDependencies.end(),
+                                    prepared.collection->members.instrumentSets.begin(),
+                                    prepared.collection->members.instrumentSets.end());
+  playback.assetDependencies.insert(playback.assetDependencies.end(),
+                                    prepared.collection->members.sampleCollections.begin(),
+                                    prepared.collection->members.sampleCollections.end());
 
   const ExportRequest exportRequest{
       .sequence = request.sequence,

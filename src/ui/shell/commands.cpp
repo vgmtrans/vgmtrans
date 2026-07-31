@@ -287,10 +287,11 @@ void printValueSessionSummary(const vgmtrans::core::SessionSnapshot& project) {
 
   for (size_t i = 0; i < project.collections().size(); ++i) {
     const auto& collection = project.collections()[i];
+    const auto& members = collection.members;
     fmt::println("collection #{} id={} name='{}' sequence={} instrumentSets={} sampleCollections={}", i,
                  collection.id.value, collection.name,
-                 collection.sequence ? std::to_string(collection.sequence->value) : std::string("-"),
-                 collection.instrumentSets.size(), collection.sampleCollections.size());
+                 members.sequence ? std::to_string(members.sequence->value) : std::string("-"),
+                 members.instrumentSets.size(), members.sampleCollections.size());
   }
 }
 
@@ -817,21 +818,22 @@ void printValueCollectionAssetRef(const vgmtrans::core::SessionSnapshot& project
 
 void printValueCollectionInfo(const vgmtrans::core::SessionSnapshot& project,
                               const vgmtrans::core::Collection& collection, size_t index) {
+  const auto& members = collection.members;
   fmt::println("collection #{} id={} name='{}'", index, collection.id.value, collection.name);
-  if (collection.sequence) {
-    printValueCollectionAssetRef(project, "Sequence", 0, *collection.sequence);
+  if (members.sequence) {
+    printValueCollectionAssetRef(project, "Sequence", 0, *members.sequence);
   } else {
     fmt::println("  Sequence: none");
   }
 
-  for (size_t i = 0; i < collection.instrumentSets.size(); ++i) {
-    printValueCollectionAssetRef(project, "InstrumentSet", i, collection.instrumentSets[i]);
+  for (size_t i = 0; i < members.instrumentSets.size(); ++i) {
+    printValueCollectionAssetRef(project, "InstrumentSet", i, members.instrumentSets[i]);
   }
-  for (size_t i = 0; i < collection.sampleCollections.size(); ++i) {
-    printValueCollectionAssetRef(project, "SampleCollection", i, collection.sampleCollections[i]);
+  for (size_t i = 0; i < members.sampleCollections.size(); ++i) {
+    printValueCollectionAssetRef(project, "SampleCollection", i, members.sampleCollections[i]);
   }
-  for (size_t i = 0; i < collection.miscAssets.size(); ++i) {
-    printValueCollectionAssetRef(project, "Misc", i, collection.miscAssets[i]);
+  for (size_t i = 0; i < members.miscAssets.size(); ++i) {
+    printValueCollectionAssetRef(project, "Misc", i, members.miscAssets[i]);
   }
 }
 
@@ -844,10 +846,11 @@ bool printValueCollections(const vgmtrans::core::SessionSnapshot& project, const
   if (args.size() <= collectionArgIndex) {
     for (size_t i = 0; i < project.collections().size(); ++i) {
       const auto& collection = project.collections()[i];
+      const auto& members = collection.members;
       fmt::println("collection #{} id={} name='{}' sequence={} instrumentSets={} sampleCollections={} misc={}", i,
                    collection.id.value, collection.name,
-                   collection.sequence ? std::to_string(collection.sequence->value) : std::string("-"),
-                   collection.instrumentSets.size(), collection.sampleCollections.size(), collection.miscAssets.size());
+                   members.sequence ? std::to_string(members.sequence->value) : std::string("-"),
+                   members.instrumentSets.size(), members.sampleCollections.size(), members.miscAssets.size());
     }
     return true;
   }

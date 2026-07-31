@@ -648,9 +648,12 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   builder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Usage",
-      .sequence = sequence.metadata.id,
-      .instrumentSets = {instruments.metadata.id},
-      .sampleCollections = {samples.metadata.id},
+      .members =
+          {
+              .sequence = sequence.metadata.id,
+              .instrumentSets = {instruments.metadata.id},
+              .sampleCollections = {samples.metadata.id},
+          },
   });
   FormatRegistry formats;
   formats.add(testFormat(probeSequenceModule(), dialect));
@@ -699,9 +702,12 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
       Collection{
           .id = CollectionId{1},
           .name = "Other Usage",
-          .sequence = sequence.metadata.id,
-          .instrumentSets = {instruments.metadata.id},
-          .sampleCollections = {samples.metadata.id},
+          .members =
+              {
+                  .sequence = sequence.metadata.id,
+                  .instrumentSets = {instruments.metadata.id},
+                  .sampleCollections = {samples.metadata.id},
+              },
       },
   };
   const SessionSnapshot ambiguousSnapshot = ambiguousBuilder.finish();
@@ -794,7 +800,7 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
 }
 
 PreparedCollectionAssets prepareReplacementInstrumentSet(const CollectionPrepareContext& context) {
-  const AssetId samples = context.collection.sampleCollections.front();
+  const AssetId samples = context.collection.members.sampleCollections.front();
   return PreparedCollectionAssets{
       .replacementInstrumentSets = std::vector<InstrumentSetAsset>{InstrumentSetAsset{
           .metadata = AssetMetadata{.format = "Prepared Probe", .name = "Prepared Bank"},
@@ -872,11 +878,14 @@ void collectionPreparationAppliesToWholeExport() {
   builder.assets.emplace_back(samples);
   builder.collections.push_back(Collection{
       .id = CollectionId{0},
-      .key = CollectionKey{.resolver = "Performance Finalizer", .value = "one"},
       .name = "Performance Finalizer",
-      .sequence = sequence.metadata.id,
-      .instrumentSets = {instruments.metadata.id},
-      .sampleCollections = {samples.metadata.id},
+      .key = CollectionKey{.resolver = "Performance Finalizer", .value = "one"},
+      .members =
+          {
+              .sequence = sequence.metadata.id,
+              .instrumentSets = {instruments.metadata.id},
+              .sampleCollections = {samples.metadata.id},
+          },
   });
   auto failingCollection = builder.collections.front();
   failingCollection.id = CollectionId{1};
@@ -933,10 +942,13 @@ void collectionPreparationReplacesDurableInstrumentSets() {
   builder.assets.emplace_back(samples);
   builder.collections.push_back(Collection{
       .id = CollectionId{0},
-      .key = CollectionKey{.resolver = "Prepared Probe", .value = "one"},
       .name = "Prepared Probe",
-      .instrumentSets = {durable.metadata.id},
-      .sampleCollections = {samples.metadata.id},
+      .key = CollectionKey{.resolver = "Prepared Probe", .value = "one"},
+      .members =
+          {
+              .instrumentSets = {durable.metadata.id},
+              .sampleCollections = {samples.metadata.id},
+          },
   });
 
   FormatRegistry formats;
@@ -1007,9 +1019,12 @@ void synthOnlyExportSkipsSequencesWithoutModulation() {
   builder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "No Modulation",
-      .sequence = sequence.metadata.id,
-      .instrumentSets = {instruments.metadata.id},
-      .sampleCollections = {samples.metadata.id},
+      .members =
+          {
+              .sequence = sequence.metadata.id,
+              .instrumentSets = {instruments.metadata.id},
+              .sampleCollections = {samples.metadata.id},
+          },
   });
   FormatRegistry formats;
   formats.add(testFormat(probeSequenceModule(), dialect));
@@ -1055,7 +1070,7 @@ void exportDiagnosticsPreserveSourceRanges() {
   builder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Probe",
-      .sampleCollections = {missingSampleCollection.metadata.id},
+      .members = {.sampleCollections = {missingSampleCollection.metadata.id}},
   });
   const SessionSnapshot project = builder.finish();
 
@@ -1189,9 +1204,12 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
   builder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Playback",
-      .sequence = sequence.metadata.id,
-      .instrumentSets = {instruments.metadata.id},
-      .sampleCollections = {samples.metadata.id},
+      .members =
+          {
+              .sequence = sequence.metadata.id,
+              .instrumentSets = {instruments.metadata.id},
+              .sampleCollections = {samples.metadata.id},
+          },
   });
   FormatRegistry formats;
   formats.add(testFormat(probeSequenceModule(), dialect));
@@ -1223,7 +1241,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
   sequenceOnlyBuilder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Missing Synth",
-      .sequence = sequence.metadata.id,
+      .members = {.sequence = sequence.metadata.id},
   });
   const auto missingSynth =
       prepareCollectionPlayback(sequenceOnlyBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{}, formats);
@@ -1244,9 +1262,12 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
   sampleOnlySynthBuilder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Sample-only Synth",
-      .sequence = sequence.metadata.id,
-      .instrumentSets = {emptyInstruments.metadata.id},
-      .sampleCollections = {samples.metadata.id},
+      .members =
+          {
+              .sequence = sequence.metadata.id,
+              .instrumentSets = {emptyInstruments.metadata.id},
+              .sampleCollections = {samples.metadata.id},
+          },
   });
   const auto sampleOnlySynth =
       prepareCollectionPlayback(sampleOnlySynthBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{}, formats);
@@ -1264,8 +1285,11 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
   synthOnlyBuilder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Missing Sequence",
-      .instrumentSets = {instruments.metadata.id},
-      .sampleCollections = {samples.metadata.id},
+      .members =
+          {
+              .instrumentSets = {instruments.metadata.id},
+              .sampleCollections = {samples.metadata.id},
+          },
   });
   const auto missingSequence =
       prepareCollectionPlayback(synthOnlyBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{}, formats);

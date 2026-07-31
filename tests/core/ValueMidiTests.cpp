@@ -2027,7 +2027,7 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
   snapshotBuilder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Looping",
-      .sequence = AssetId{0},
+      .members = {.sequence = AssetId{0}},
   });
   const SessionSnapshot project = snapshotBuilder.finish();
 

@@ -276,7 +276,7 @@ void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceFa
                                                              ScanIdAllocator& ids,
                                                              std::vector<Diagnostic>& diagnostics) {
   AkaoArticulationMap articulations;
-  for (const AssetId id : context.collection.sampleCollections) {
+  for (const AssetId id : context.collection.members.sampleCollections) {
     const auto* sampleCollection = context.snapshot.asset<SampleCollectionAsset>(id);
     if (sampleCollection == nullptr) {
       continue;
@@ -395,14 +395,13 @@ std::vector<DesiredCollection> resolveAkaoCollections(const MatchContext& contex
 
 PreparedCollectionAssets prepareAkaoCollection(const CollectionPrepareContext& context) {
   PreparedCollectionAssets prepared;
-  if (!context.collection.sequence || context.collection.instrumentSets.empty() ||
-      context.collection.sampleCollections.empty()) {
+  const auto& members = context.collection.members;
+  if (!members.sequence || members.instrumentSets.empty() || members.sampleCollections.empty()) {
     return prepared;
   }
 
-  const auto* sequence = context.snapshot.asset<SequenceProgramAsset>(*context.collection.sequence);
-  const auto* detectedInstrumentSet =
-      context.snapshot.asset<InstrumentSetAsset>(context.collection.instrumentSets.front());
+  const auto* sequence = context.snapshot.asset<SequenceProgramAsset>(*members.sequence);
+  const auto* detectedInstrumentSet = context.snapshot.asset<InstrumentSetAsset>(members.instrumentSets.front());
   if (sequence == nullptr || detectedInstrumentSet == nullptr) {
     return prepared;
   }

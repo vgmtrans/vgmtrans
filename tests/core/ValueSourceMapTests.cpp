@@ -373,8 +373,8 @@ void sessionSnapshotCarriesScannerSourceMap() {
   expect(headerIds.size() == 1, "session snapshot should publish scanner source annotations");
   const auto& header = snapshot.sourceMap().get(headerIds[0]);
   expect(header.label == "Probe Header", "session source map should preserve annotation labels");
-  expect(header.owner && header.owner->kind == ObjectKind::Sequence && snapshot.collections()[0].sequence &&
-             header.owner->asset == *snapshot.collections()[0].sequence,
+  expect(header.owner && header.owner->kind == ObjectKind::Sequence && snapshot.collections()[0].members.sequence &&
+             header.owner->asset == *snapshot.collections()[0].members.sequence,
          "session source map should preserve annotation ownership");
   expect(header.fields.size() == 1 && std::get<u64>(header.fields[0].value) == 0xab,
          "session source map should preserve annotation fields");

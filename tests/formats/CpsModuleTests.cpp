@@ -583,7 +583,7 @@ void cps1ModuleRetainsYm2151AndOkiDomains() {
   const auto result = scan(fixture);
   expect(result.diagnostics.empty(), "complete CPS1 fixture should scan without diagnostics");
   expect(result.assets.size() == 5 && result.explicitCollections.size() == 1 &&
-             result.explicitCollections[0].miscAssets.size() == 1 &&
+             result.explicitCollections[0].members.miscAssets.size() == 1 &&
              assets<MiscAsset>(result).front()->metadata.range.offset == 0x106,
          "CPS1 should publish and collect its sequence table alongside sequence, synth, and sample assets");
 
@@ -657,7 +657,7 @@ void cps1V1DefaultsAndPitchWrappingMatchLegacyDriver() {
 void cps2EarlyModuleUsesPhysicalModulation() {
   const auto result = scan(earlyCps2Fixture());
   expect(result.diagnostics.empty(), "complete early CPS2 fixture should scan without diagnostics");
-  expect(assets<MiscAsset>(result).size() == 3 && result.explicitCollections[0].miscAssets.size() == 3,
+  expect(assets<MiscAsset>(result).size() == 3 && result.explicitCollections[0].members.miscAssets.size() == 3,
          "early CPS2 should expose sequence, sample-info, and articulation tables as misc assets");
   const auto* instruments = instrumentDomain(result, kCpsQSoundDomain);
   expect(instruments != nullptr && instruments->instruments.size() == 256 &&
@@ -824,7 +824,7 @@ void cps2LateDriverSemanticsRemainProfileSpecific() {
 void cps3ModuleDecodesDelayPrefixesLegatoAndRegions() {
   const auto result = scan(cps3Fixture());
   expect(result.diagnostics.empty(), "complete CPS3 fixture should scan without diagnostics");
-  expect(assets<MiscAsset>(result).size() == 2 && result.explicitCollections[0].miscAssets.size() == 2,
+  expect(assets<MiscAsset>(result).size() == 2 && result.explicitCollections[0].members.miscAssets.size() == 2,
          "CPS3 should expose its sequence and sample-info tables as misc assets");
   const auto* instruments = instrumentDomain(result, kCpsQSoundDomain);
   expect(instruments != nullptr && instruments->instruments.size() == 1 &&
