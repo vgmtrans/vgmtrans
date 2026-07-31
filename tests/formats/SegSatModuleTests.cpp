@@ -61,6 +61,8 @@ std::vector<u8> segSatFixture() {
   constexpr u32 bank = 0x1000;
   constexpr u32 sample = bank + 0x200;
   std::vector<u8> bytes(0x1300);
+  const std::initializer_list<u8> driverVersion{'V', 'e', 'r', '1', '.', '3', '3'};
+  std::ranges::copy(driverVersion, bytes.begin() + 0x20);
 
   // One-entry sequence table. Its first pointer overlaps the detector's
   // six-byte table header, as it does in Saturn sound RAM.
@@ -80,8 +82,12 @@ std::vector<u8> segSatFixture() {
   };
   append({0xb0, 32, 5, 0});       // source bank 5
   append({0xc0, 0, 0});           // program 0
+  append({0xc0, 0x81, 0});        // flagged program event ignored by the driver
+  append({0xb0, 7, 64, 0});       // channel volume
+  append({0xb0, 10, 0, 0});       // hard left
   append({0x00, 60, 64, 10, 0});  // note, source velocity 64
-  append({0xe0, 0xbd, 1});        // high bit is not part of the bend magnitude
+  append({0xe0, 0xbd, 1});        // the driver ignores a flagged event
+  append({0xe0, 0x3d, 1});        // ordinary pitch bend
   append({0x83});
 
   // The sound-RAM bank map gives the bank its source-domain number. A sole
@@ -222,6 +228,17 @@ const NotePerformanceEvent* firstNote(const PerformanceSequence& performance) {
   return nullptr;
 }
 
+const LevelPerformanceEvent* firstLevel(const PerformanceSequence& performance) {
+  for (const auto& track : performance.tracks) {
+    for (const auto& event : track.events) {
+      if (const auto* level = std::get_if<LevelPerformanceEvent>(&event)) {
+        return level;
+      }
+    }
+  }
+  return nullptr;
+}
+
 }  // namespace
 
 void segSatVlCurveMatchesMm8Saturation() {
@@ -242,6 +259,16 @@ void segSatVlCurveMatchesMm8Saturation() {
   };
   expect(segSatMidiVelocity(64, identity, 0, 0) == 8,
          "MM8 VL conversion should include the region total-level attenuation path");
+  const auto expectedGain = [](u8 attenuation) { return std::pow(10.0, -(attenuation * 0.37529) / 20.0); };
+  expect(std::abs(segSatLinearGain(SegSatVolumeModel::V1_28, 64, identity, 0, 0, 64, 127) - expectedGain(192)) <
+                 0.000000001 &&
+             std::abs(segSatLinearGain(SegSatVolumeModel::V1_33, 64, identity, 0, 0, 64, 127) - expectedGain(189)) <
+                 0.000000001 &&
+             std::abs(segSatLinearGain(SegSatVolumeModel::V2_20, 64, identity, 0, 0, 64, 127) - expectedGain(193)) <
+                 0.000000001 &&
+             std::abs(segSatLinearGain(SegSatVolumeModel::V3_1, 64, identity, 0, 0, 64, 127) - expectedGain(189)) <
+                 0.000000001,
+         "each known driver should reproduce its integer note-level arithmetic");
 
   SegSatVlTable positiveOverflow = identity;
   positiveOverflow.rate0 = 0x11;
@@ -275,9 +302,21 @@ void segSatCollectionPreparationSuppliesVlTablesToSequence() {
   const CollectionPlayback playback =
       session.preparePlayback(collection.id, PlaybackRequest{.sequence = {.sequenceLoops = 0}});
   const auto* preparedNote = firstNote(playback.performance);
-  expect(
-      playback.playable() && preparedNote != nullptr && LevelScale::midi7FromLinear(preparedNote->linearVelocity) == 8,
-      "collection preparation should supply the attached bank's VL curve to transient sequence playback");
+  const auto* preparedLevel = firstLevel(playback.performance);
+  const double expectedNoteGain = std::pow(10.0, -(189 * 0.37529) / 20.0);
+  expect(playback.playable() && preparedNote != nullptr && preparedLevel != nullptr &&
+             LevelScale::midi7FromLinear(preparedNote->linearVelocity) == 33 &&
+             std::abs(preparedNote->linearVelocity * preparedLevel->linearGain - expectedNoteGain) < 0.000000001,
+         "collection preparation should combine the VL curve and channel volume exactly at note-on");
+
+  const auto balance = std::ranges::find_if(playback.performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<StereoBalancePerformanceEvent>(event);
+  });
+  const auto* stereo = balance != playback.performance.tracks[0].events.end()
+                           ? std::get_if<StereoBalancePerformanceEvent>(&*balance)
+                           : nullptr;
+  expect(stereo != nullptr && stereo->leftGain == 1.0 && stereo->rightGain == 0.0,
+         "SegSat sequence pan should use the SCSP's stepped left and right gains");
 
   const auto instrument = std::ranges::find_if(
       playback.performance.tracks[0].events,
@@ -293,8 +332,12 @@ void segSatCollectionPreparationSuppliesVlTablesToSequence() {
   });
   const auto* pitch =
       bend != playback.performance.tracks[0].events.end() ? std::get_if<PitchBendPerformanceEvent>(&*bend) : nullptr;
-  expect(pitch != nullptr && std::abs(pitch->semitones - (-0.09375)) < 0.000001,
-         "SegSat pitch bend should discard the encoded high bit before creating a physical bend");
+  const auto pitchCount =
+      std::ranges::count_if(playback.performance.tracks[0].events, [](const PerformanceEvent& event) {
+        return std::holds_alternative<PitchBendPerformanceEvent>(event);
+      });
+  expect(pitchCount == 1 && pitch != nullptr && std::abs(pitch->semitones - (-0.09375)) < 0.000001,
+         "SegSat should ignore flagged events and preserve ordinary pitch bends");
 
   expect(collection.members.sampleCollections.size() == 1, "SegSat fixture should attach its parsed sample collection");
   const auto* samples = snapshot.asset<SampleCollectionAsset>(collection.members.sampleCollections.front());

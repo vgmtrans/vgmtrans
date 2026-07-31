@@ -24,6 +24,188 @@ using namespace core;
 
 namespace {
 
+constexpr double kScspTlDb = 0.37529;
+
+struct ChannelLevel {
+  u8 volume = 127;
+  u8 expression = 127;
+};
+
+struct VoiceLevel {
+  u8 velocity = 0;
+  u8 totalLevel = 0;
+  s8 volumeBias = 0;
+};
+
+[[nodiscard]] u8 vlVelocity(u8 velocity, const SegSatVlTable& table) {
+  u8 point = 0;
+  u8 base = 0;
+  u8 rate = table.rate0;
+  if (velocity > table.point0) {
+    point = table.point0;
+    base = table.level0;
+    rate = table.rate1;
+    if (velocity > table.point1) {
+      point = table.point1;
+      base = table.level1;
+      rate = table.rate2;
+      if (velocity > table.point2) {
+        point = table.point2;
+        base = table.level2;
+        rate = table.rate3;
+      }
+    }
+  }
+
+  const u8 margin = velocity - point;
+  const u8 shift = rate >> 4;
+  const bool onePointFive = (rate & 8) != 0;
+  const u32 steep =
+      onePointFive ? (((static_cast<u32>(margin & 0x7f) * 12) << shift) >> 3) : (static_cast<u32>(margin) << shift);
+  u8 converted = base;
+  switch (rate & 7) {
+    case 1:
+      converted = static_cast<u8>(converted + steep);
+      break;
+    case 2:
+      converted = static_cast<u8>(converted + margin);
+      break;
+    case 3:
+      converted = static_cast<u8>(converted + (margin >> shift));
+      break;
+    case 5:
+      converted = static_cast<u8>(converted - (margin >> shift));
+      break;
+    case 6:
+      converted = static_cast<u8>(converted - margin);
+      break;
+    case 7:
+      converted = static_cast<u8>(converted - steep);
+      break;
+    default:
+      break;
+  }
+
+  // The 68000 routine works in bytes. After wraparound, bit 6 distinguishes
+  // positive overflow (0x80..0xbf) from negative underflow (0xc0..0xff).
+  if (converted & 0x80) {
+    converted = (converted & 0x40) ? 0 : 0x7f;
+  }
+  return converted;
+}
+
+[[nodiscard]] u8 driverAmplitude(SegSatVolumeModel model, VoiceLevel voice, ChannelLevel channel) {
+  // Keep these calculations in integer form. Each driver rounds at different
+  // points before writing the complemented result to the SCSP TL register.
+  u32 amplitude = 0;
+  switch (model) {
+    case SegSatVolumeModel::V1_28: {
+      const u32 voiceScale = static_cast<u32>(voice.velocity) * 2 * (static_cast<u32>(255) - voice.totalLevel);
+      amplitude = (voiceScale * (static_cast<u32>(channel.volume) * 2)) >> 16;
+      amplitude =
+          static_cast<u32>(std::clamp(static_cast<int>(amplitude) + static_cast<int>(voice.volumeBias), 0, 255));
+      break;
+    }
+    case SegSatVolumeModel::V1_33: {
+      const u32 voiceScale = (static_cast<u32>(voice.velocity) + 1) * (static_cast<u32>(256) - voice.totalLevel);
+      amplitude = ((voiceScale * (static_cast<u32>(channel.volume) + 1) * 4) - 1) >> 16;
+      amplitude =
+          static_cast<u32>(std::clamp(static_cast<int>(amplitude) + static_cast<int>(voice.volumeBias), 0, 255));
+      break;
+    }
+    case SegSatVolumeModel::V2_20: {
+      const u32 velocity = std::max<u32>(voice.velocity, 1);
+      // Version 2.20 adds the instrument bias to the region level before
+      // multiplying it by velocity.
+      const u32 regionLevel = static_cast<u32>(
+          std::clamp(255 - static_cast<int>(voice.totalLevel) + static_cast<int>(voice.volumeBias), 0, 255));
+      const u32 voiceScale = (velocity * regionLevel) >> 8;
+      const u32 channelScale = (static_cast<u32>(channel.volume) * channel.expression) >> 7;
+      amplitude = (voiceScale * channelScale) >> 6;
+      break;
+    }
+    case SegSatVolumeModel::V3_1: {
+      const u32 voiceScale =
+          ((((static_cast<u32>(voice.velocity) + 1) * (static_cast<u32>(256) - voice.totalLevel)) - 1) >> 8) + 1;
+      const u32 channelScale =
+          ((((static_cast<u32>(channel.volume) + 1) * (static_cast<u32>(channel.expression) + 1)) - 1) >> 7) + 1;
+      amplitude = ((voiceScale * channelScale) - 1) >> 6;
+      amplitude =
+          static_cast<u32>(std::clamp(static_cast<int>(amplitude) + static_cast<int>(voice.volumeBias), 0, 255));
+      break;
+    }
+  }
+  return static_cast<u8>(std::min<u32>(amplitude, 255));
+}
+
+[[nodiscard]] double linearGain(u8 amplitude) {
+  const u8 attenuation = static_cast<u8>(255 - amplitude);
+  return std::pow(10.0, -(attenuation * kScspTlDb) / 20.0);
+}
+
+void updateChannelLevel(SegSatVolumeModel model, ChannelLevel& channel, u8 controller, u8 value) {
+  if (model == SegSatVolumeModel::V1_28 || model == SegSatVolumeModel::V1_33) {
+    // These drivers store volume and expression in the same byte. The most
+    // recent command replaces the earlier one.
+    channel.volume = value;
+    return;
+  }
+  if (controller == 7) {
+    channel.volume = value;
+  } else {
+    channel.expression = value;
+  }
+}
+
+[[nodiscard]] const SegSatControllerChange* controllerChange(std::span<const SegSatControllerChange> changes,
+                                                             CommandId command) {
+  const auto found = std::ranges::lower_bound(changes, command.value, {}, &SegSatControllerChange::command);
+  return found != changes.end() && found->command == command.value ? &*found : nullptr;
+}
+
+[[nodiscard]] std::vector<VoiceLevel> possibleVoices(std::span<const SegSatVelocityBank> banks) {
+  std::vector<VoiceLevel> voices;
+  for (const auto& bank : banks) {
+    std::vector<u8> tableMaximums;
+    tableMaximums.reserve(bank.tables.size());
+    for (const auto& table : bank.tables) {
+      u8 maximum = 0;
+      for (u32 velocity = 0; velocity < 128; ++velocity) {
+        maximum = std::max(maximum, vlVelocity(static_cast<u8>(velocity), table));
+      }
+      tableMaximums.push_back(maximum);
+    }
+    for (const auto& instrument : bank.instruments) {
+      for (const auto& region : instrument.regions) {
+        if (region.table < tableMaximums.size()) {
+          voices.push_back(VoiceLevel{
+              .velocity = tableMaximums[region.table],
+              .totalLevel = region.totalLevel,
+              .volumeBias = instrument.volumeBias,
+          });
+        }
+      }
+    }
+  }
+  return voices;
+}
+
+[[nodiscard]] double channelGain(SegSatVolumeModel model, ChannelLevel channel, std::span<const VoiceLevel> voices) {
+  u8 loudest = 0;
+  u8 loudestAtFullVolume = 0;
+  for (const auto voice : voices) {
+    loudest = std::max(loudest, driverAmplitude(model, voice, channel));
+    loudestAtFullVolume =
+        std::max(loudestAtFullVolume, driverAmplitude(model, voice, ChannelLevel{.volume = 127, .expression = 127}));
+  }
+  if (voices.empty()) {
+    return 1.0;
+  }
+  // The instruments' own attenuation stays on note velocity. The controller
+  // represents only the change from the driver's normal full-volume state.
+  return std::min(linearGain(loudest) / linearGain(loudestAtFullVolume), 1.0);
+}
+
 struct ProgramState {
   explicit ProgramState(const SequenceProgram&) {}
 
@@ -145,9 +327,19 @@ struct Playback {
           }
           break;
         }
-        case 10:
-          delayed.pan(std::clamp((value / 63.5) - 1.0, -1.0, 1.0));
-          break;
+        case 10: {
+          const u8 position = value >> 2;
+          const u8 encoded = position < 16 ? static_cast<u8>(31 - position) : static_cast<u8>(position - 16);
+          double attenuatedSide = 0.0;
+          if ((encoded & 0x0f) != 0x0f) {
+            attenuatedSide = std::pow(10.0, -(static_cast<double>(encoded & 0x0f) * 3.0) / 20.0);
+          }
+          if (encoded < 16) {
+            delayed.stereoBalance(attenuatedSide, 1.0);
+          } else {
+            delayed.stereoBalance(1.0, attenuatedSide);
+          }
+        } break;
         case 32:
           track.bank = value;
           // The source command changes one register, but downstream targets
@@ -169,8 +361,11 @@ struct Playback {
   }
 
   Effects programChange(u8 channel, u8 encodedProgram, u16 delta) {
-    if (channel == track.channel) {
-      track.program = encodedProgram & 0x7f;
+    // The driver rejects MIDI-like events whose first data byte has bit 7 set
+    // (mm8audio.bin reads_from_seq at 0x580e). These bytes occur in real
+    // streams and must not change the active instrument.
+    if ((encodedProgram & 0x80) == 0 && channel == track.channel) {
+      track.program = encodedProgram;
       out.at(eventTick(delta)).instrument(segSatInstrumentIdentity(track.bank, track.program));
     }
     return afterEvent(delta);
@@ -179,12 +374,8 @@ struct Playback {
   Effects channelPressure(u8, u16 delta) { return afterEvent(delta); }
 
   Effects pitchBend(u8 channel, u8 encoded, u16 delta) {
-    if (channel == track.channel) {
-      // Bit 7 is not part of the Saturn driver's seven-bit bend magnitude.
-      // Legacy happened to discard it later when serializing the 14-bit MIDI
-      // value; mask it here so the performance event remains a physical
-      // ±2-semitone bend instead of an exporter-dependent overflow.
-      const s16 bend = static_cast<s16>((static_cast<s32>(encoded & 0x7f) << 7) - 8192);
+    if ((encoded & 0x80) == 0 && channel == track.channel) {
+      const s16 bend = static_cast<s16>((static_cast<s32>(encoded) << 7) - 8192);
       out.at(eventTick(delta)).pitchBend((bend / 8192.0) * 2.0);
     }
     return afterEvent(delta);
@@ -259,16 +450,17 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
     const u8 encoded = event.u8("encoded_value");
     const auto valueRole = controller == 32 ? SemanticOperandRole::InstrumentBank : SemanticOperandRole::Level;
     const u8 value = event.derived("value", static_cast<u8>(encoded & 0x7f), valueRole);
-    const u16 delta = static_cast<u16>(((encoded & 0x80) << 1) | event.u8("delta_low"));
+    const u16 delta = event.u8("delta", SemanticOperandRole::Duration);
     return event.invoke<&Playback::controller>(channel, controller, value, delta).runtimeControlFlow();
   }
 
   if ((status & 0xf0) == 0xc0) {
     auto event = cursor.command("Program", SequenceSemantic::Program);
     const u8 channel = event.opcodeBits<0, 4>("channel");
-    const u8 program = event.u8("program", SemanticOperandRole::InstrumentProgram);
+    const u8 encodedProgram = event.u8("encoded_program");
+    event.derived("program", static_cast<u8>(encodedProgram & 0x7f), SemanticOperandRole::InstrumentProgram);
     const u16 delta = event.u8("delta", SemanticOperandRole::Duration);
-    return event.invoke<&Playback::programChange>(channel, program, delta).runtimeControlFlow();
+    return event.invoke<&Playback::programChange>(channel, encodedProgram, delta).runtimeControlFlow();
   }
 
   if ((status & 0xf0) == 0xd0) {
@@ -282,9 +474,10 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
   if ((status & 0xf0) == 0xe0) {
     auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
     const u8 channel = event.opcodeBits<0, 4>("channel");
-    const u8 bend = event.u8("bend", SemanticOperandRole::Pitch);
+    const u8 encodedBend = event.u8("encoded_bend");
+    event.derived("bend", static_cast<u8>(encodedBend & 0x7f), SemanticOperandRole::Pitch);
     const u16 delta = event.u8("delta", SemanticOperandRole::Duration);
-    return event.invoke<&Playback::pitchBend>(channel, bend, delta).runtimeControlFlow();
+    return event.invoke<&Playback::pitchBend>(channel, encodedBend, delta).runtimeControlFlow();
   }
 
   switch (status) {
@@ -337,6 +530,25 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
 
 }  // namespace
 
+double segSatLinearGain(SegSatVolumeModel model, u8 velocity, const SegSatVlTable& table, u8 totalLevel, s8 volumeBias,
+                        u8 volume, u8 expression) {
+  return linearGain(driverAmplitude(model,
+                                    VoiceLevel{
+                                        .velocity = vlVelocity(velocity, table),
+                                        .totalLevel = totalLevel,
+                                        .volumeBias = volumeBias,
+                                    },
+                                    ChannelLevel{
+                                        .volume = volume,
+                                        .expression = expression,
+                                    }));
+}
+
+u8 segSatMidiVelocity(u8 velocity, const SegSatVlTable& table, u8 totalLevel, s8 volumeBias) {
+  const double gain = segSatLinearGain(SegSatVolumeModel::V1_33, velocity, table, totalLevel, volumeBias, 127, 127);
+  return LevelScale::midi7FromLinear(gain);
+}
+
 std::vector<u8> segSatSequenceBanks(const SequenceProgram& program) {
   std::vector<u8> banks;
   if (program.tracks.size() > 1) {
@@ -368,11 +580,57 @@ std::vector<u8> segSatSequenceBanks(const SequenceProgram& program) {
   return banks;
 }
 
-void applySegSatVelocityTables(PerformanceSequence& performance, std::span<const SegSatVelocityBank> banks) {
+std::vector<SegSatControllerChange> segSatControllerChanges(const SequenceProgram& program) {
+  std::vector<SegSatControllerChange> changes;
+  if (program.tracks.size() < 2) {
+    return changes;
+  }
+
+  // Every channel is a copy of the same normal event stream, so command IDs
+  // from the first copy also identify controller events on the other copies.
+  for (const auto& command : program.tracks[1].commands) {
+    const auto* controller = semanticOperand(command, "controller");
+    const auto* value = semanticOperand(command, "value");
+    if (controller == nullptr || value == nullptr) {
+      continue;
+    }
+    const auto* controllerNumber = std::get_if<u64>(&controller->value);
+    const auto* controllerValue = std::get_if<u64>(&value->value);
+    if (controllerNumber == nullptr || controllerValue == nullptr || *controllerNumber > 127 ||
+        *controllerValue > 127) {
+      continue;
+    }
+    changes.push_back(SegSatControllerChange{
+        .command = command.id.value,
+        .controller = static_cast<u8>(*controllerNumber),
+        .value = static_cast<u8>(*controllerValue),
+    });
+  }
+  return changes;
+}
+
+void finalizeSegSatPerformance(PerformanceSequence& performance, std::span<const SegSatVelocityBank> banks,
+                               SegSatVolumeModel model, std::span<const SegSatControllerChange> controllerChanges) {
+  const std::vector<VoiceLevel> voices = possibleVoices(banks);
   for (auto& track : performance.tracks) {
     u8 selectedBank = 0;
     u8 selectedProgram = 0;
+    ChannelLevel channel;
+    double exportedChannelGain = 1.0;
     for (auto& event : track.events) {
+      const PerformanceEventHeader header = performanceEventHeader(event);
+      if (const auto* change = controllerChange(controllerChanges, header.sourceCommand);
+          change != nullptr && (change->controller == 7 || change->controller == 11)) {
+        updateChannelLevel(model, channel, change->controller, change->value);
+        exportedChannelGain = channelGain(model, channel, voices);
+        event = LevelPerformanceEvent{
+            .header = header,
+            .linearGain = exportedChannelGain,
+            .sourceQuantization = ValueQuantization{.levels = 128},
+        };
+        continue;
+      }
+
       if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event);
           selection != nullptr && selection->sourceInstrument) {
         if (const auto address = decodeSegSatInstrumentIdentity(*selection->sourceInstrument)) {
@@ -410,9 +668,10 @@ void applySegSatVelocityTables(PerformanceSequence& performance, std::span<const
       }
 
       const u8 sourceVelocity = LevelScale::midi7FromLinear(note->linearVelocity);
-      const u8 velocity =
-          segSatMidiVelocity(sourceVelocity, bank->tables[region->table], region->totalLevel, instrument.volumeBias);
-      note->linearVelocity = LevelScale::linearFromMidi7(velocity);
+      const double exactGain = segSatLinearGain(model, sourceVelocity, bank->tables[region->table], region->totalLevel,
+                                                instrument.volumeBias, channel.volume, channel.expression);
+      note->linearVelocity =
+          LevelScale::linearFromLinear(exportedChannelGain == 0.0 ? 0.0 : exactGain / exportedChannelGain);
     }
   }
 }
@@ -425,9 +684,6 @@ const SequenceDialect& segSatSequenceDialect() {
       .defaultBehavior =
           SequenceProgramBehavior{
               .commandLimit = 1048576,
-              // Sequence pan commands are already MIDI-style equal-power
-              // positions; SCSP layer output uses its own constant-sum law.
-              .panLaw = PanLaw::EqualPower,
           },
   });
   return dialect;
