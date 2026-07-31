@@ -549,6 +549,14 @@ double segSatLinearGain(SegSatVolumeModel model, u8 velocity, const SegSatVlTabl
                                     }));
 }
 
+double segSatRegionReferenceGain(SegSatVolumeModel model, const SegSatVlTable& table, u8 totalLevel, s8 volumeBias) {
+  double gain = 0.0;
+  for (u32 velocity = 0; velocity < 128; ++velocity) {
+    gain = std::max(gain, segSatLinearGain(model, static_cast<u8>(velocity), table, totalLevel, volumeBias, 127, 127));
+  }
+  return gain;
+}
+
 u8 segSatMidiVelocity(u8 velocity, const SegSatVlTable& table, u8 totalLevel, s8 volumeBias) {
   const double gain = segSatLinearGain(SegSatVolumeModel::V1_33, velocity, table, totalLevel, volumeBias, 127, 127);
   return LevelScale::midi7FromLinear(gain);
@@ -675,8 +683,13 @@ void finalizeSegSatPerformance(PerformanceSequence& performance, std::span<const
       const u8 sourceVelocity = LevelScale::midi7FromLinear(note->linearVelocity);
       const double exactGain = segSatLinearGain(model, sourceVelocity, bank->tables[region->table], region->totalLevel,
                                                 instrument.volumeBias, channel.volume, channel.expression);
+      // MIDI has one velocity for all of an instrument's layers. Each region
+      // already stores its own maximum level, so velocity only describes how
+      // far the note is below that maximum.
       note->linearVelocity =
-          LevelScale::linearFromLinear(exportedChannelGain == 0.0 ? 0.0 : exactGain / exportedChannelGain);
+          LevelScale::linearFromLinear(exportedChannelGain == 0.0 || region->referenceGain == 0.0
+                                           ? 0.0
+                                           : exactGain / (region->referenceGain * exportedChannelGain));
     }
   }
 }

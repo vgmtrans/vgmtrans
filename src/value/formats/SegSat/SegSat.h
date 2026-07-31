@@ -116,6 +116,7 @@ struct SegSatVelocityRegion {
   u8 keyHigh = 127;
   u8 table = 0;
   u8 totalLevel = 0;
+  double referenceGain = 1.0;
 };
 
 struct SegSatVelocityInstrument {
@@ -141,6 +142,8 @@ struct SegSatControllerChange {
 [[nodiscard]] u8 segSatMidiVelocity(u8 velocity, const SegSatVlTable& table, u8 totalLevel, s8 volumeBias);
 [[nodiscard]] double segSatLinearGain(SegSatVolumeModel model, u8 velocity, const SegSatVlTable& table, u8 totalLevel,
                                       s8 volumeBias, u8 volume, u8 expression);
+[[nodiscard]] double segSatRegionReferenceGain(SegSatVolumeModel model, const SegSatVlTable& table, u8 totalLevel,
+                                               s8 volumeBias);
 
 [[nodiscard]] std::optional<SegSatBankLayout> readSegSatBankLayout(core::ByteReader reader, u32 offset);
 [[nodiscard]] std::vector<SegSatBankLayout> findSegSatBanks(core::ByteReader reader);
@@ -149,9 +152,10 @@ struct SegSatControllerChange {
 [[nodiscard]] SegSatVolumeModel determineSegSatVolumeModel(core::ByteReader reader);
 [[nodiscard]] std::optional<SegSatScannedBank> addSegSatBank(core::ScanResultBuilder& builder,
                                                              const SegSatBankLayout& layout,
-                                                             SegSatDriverVersion version, u8 exportBank);
+                                                             SegSatDriverVersion version, SegSatVolumeModel volumeModel,
+                                                             u8 exportBank);
 [[nodiscard]] SegSatVelocityBank readSegSatVelocityBank(core::ByteReader reader, const SegSatBankLayout& layout,
-                                                        u8 sourceBank);
+                                                        u8 sourceBank, SegSatVolumeModel volumeModel);
 [[nodiscard]] std::vector<u8> segSatSequenceBanks(const core::SequenceProgram& program);
 [[nodiscard]] std::vector<SegSatControllerChange> segSatControllerChanges(const core::SequenceProgram& program);
 void finalizeSegSatPerformance(core::PerformanceSequence& performance, std::span<const SegSatVelocityBank> banks,
