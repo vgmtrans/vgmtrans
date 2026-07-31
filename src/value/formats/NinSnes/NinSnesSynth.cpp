@@ -44,7 +44,7 @@ struct InstrumentRegion {
   SourceRecord source;
 };
 
-[[nodiscard]] bool blankSlot(ByteReader reader, const Profile& selected, u32 address) {
+[[nodiscard]] bool blankSlot(ByteReader reader, const Profile& selected, u16 program, u32 address) {
   if (selected.instruments == InstrumentLayout::Earlier5Byte) {
     return false;
   }
@@ -54,11 +54,17 @@ struct InstrumentRegion {
   }
   bool allZero = true;
   bool allFf = true;
+  bool identityMappedSilent = reader.u8At(address) == static_cast<u8>(program);
   for (u32 offset = 0; offset < size; ++offset) {
-    allZero &= reader.u8At(address + offset) == 0;
-    allFf &= reader.u8At(address + offset) == 0xff;
+    const u8 byte = reader.u8At(address + offset);
+    allZero &= byte == 0;
+    allFf &= byte == 0xff;
+    identityMappedSilent &= offset == 0 || byte == 0;
   }
-  return allZero || allFf;
+  // Some drivers initialize unused rows with only their identity-mapped SRCN.
+  // Zero ADSR, GAIN, and pitch fields make the row unambiguously silent, but
+  // it remains a sparse slot rather than terminating later instrument banks.
+  return allZero || allFf || identityMappedSilent;
 }
 
 [[nodiscard]] bool validHeader(ByteReader reader, const Profile& selected, const InstrumentInfo& info,
@@ -112,15 +118,24 @@ struct InstrumentRegion {
   }
   const Profile& selected = profile(layout.profile);
   const u32 size = instrumentHeaderSize(selected);
+  u32 tableEnd = kAramSize;
+  for (const u32 boundary : {layout.songListAddress, layout.playlistAddress}) {
+    if (boundary > *layout.instrumentTableAddress) {
+      tableEnd = std::min(tableEnd, boundary);
+    }
+  }
+  if (layout.percussionTableAddress) {
+    tableEnd = std::min(tableEnd, *layout.percussionTableAddress);
+  }
   for (u16 program = 0; program < instrumentSlotCount(selected); ++program) {
     const u32 address = *layout.instrumentTableAddress + program * size;
-    if (layout.percussionTableAddress && address >= *layout.percussionTableAddress) {
+    if (address + size > tableEnd) {
       break;
     }
     if (!reader.has(address, size)) {
       break;
     }
-    if (blankSlot(reader, selected, address)) {
+    if (blankSlot(reader, selected, program, address)) {
       continue;
     }
     InstrumentInfo info = readInstrument(reader, selected, program, address);
