@@ -49,9 +49,9 @@ private:
   TrackProgram track_;
 };
 
-// Sequence-wide services and limits for source-track discovery. Relative
-// address bases, semantic sequence bounds, and diagnostics remain in the
-// format decoder because they affect command meaning rather than track walking.
+// Holds the reader, source-map context, and safety limits used to decode a
+// sequence's tracks. Each format still resolves its relative addresses,
+// validates its format-specific bounds, and reports malformed commands.
 struct TrackDecodeScope {
   ByteReader reader;
   u32 bytecodeEnd = std::numeric_limits<u32>::max();

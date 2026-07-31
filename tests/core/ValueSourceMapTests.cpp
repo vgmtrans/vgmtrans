@@ -16,13 +16,20 @@ void sourceMapBuilderRecordsAnnotationsFieldsAndLinks() {
   const SourceId source{3};
   const SourceRange headerRange{.source = source, .offset = 0, .size = 4};
   const SourceRange tableRange{.source = source, .offset = 8, .size = 8};
+  const SourceRecord headerRecord{
+      .range = headerRange,
+      .fields = {SourceField{
+          .name = "Magic",
+          .range = SourceRange{.source = source, .offset = 0, .size = 1},
+          .value = makeSourceValue(u8{0xaa}),
+          .display = SourceValueDisplay::Hex,
+      }},
+  };
 
-  const auto header =
-      builder.header("Probe Header", headerRange)
-          .fieldsAsChildren()
-          .field("Magic", SourceRange{.source = source, .offset = 0, .size = 1}, u8{0xaa}, SourceValueDisplay::Hex)
-          .derived("Decoded", "yes")
-          .link(SourceLinkRole::PointsTo, tableRange, "Table");
+  const auto header = builder.annotation(SourceRole::Header, "Probe Header", headerRecord)
+                          .fieldsAsChildren()
+                          .derived("Decoded", "yes")
+                          .link(SourceLinkRole::PointsTo, tableRange, "Table");
   const auto table = builder.table("Pointer Table", tableRange).parent(header.id());
   const auto command =
       builder
@@ -34,9 +41,10 @@ void sourceMapBuilderRecordsAnnotationsFieldsAndLinks() {
   expect(sourceMap.annotations().size() == 3, "source map should contain all builder annotations");
 
   const auto& headerAnnotation = sourceMap.get(header.id());
-  expect(headerAnnotation.role == SourceRole::Header, "header helper should create a header annotation");
+  expect(headerAnnotation.role == SourceRole::Header && headerAnnotation.range == headerRecord.range,
+         "record annotation helper should preserve the requested role and covering range");
   expect(headerAnnotation.localKind == "probe-header", "source map should slugify annotation labels");
-  expect(headerAnnotation.fields.size() == 2, "source map should preserve direct and derived fields");
+  expect(headerAnnotation.fields.size() == 2, "source map should preserve record and derived fields");
   expect(std::get<u64>(headerAnnotation.fields[0].value) == 0xaa, "source map should preserve field values");
   expect(headerAnnotation.fields[0].display == SourceValueDisplay::Hex,
          "source map should preserve field display hints");

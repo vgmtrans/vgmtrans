@@ -326,6 +326,7 @@ public:
 
   [[nodiscard]] AnnotationBuilder source(std::string_view label, SourceRange range);
   [[nodiscard]] AnnotationBuilder annotation(SourceRole role, std::string_view label, SourceRange range);
+  [[nodiscard]] AnnotationBuilder annotation(SourceRole role, std::string_view label, const SourceRecord& record);
   [[nodiscard]] AnnotationBuilder section(std::string_view label, SourceRange range);
   [[nodiscard]] AnnotationBuilder header(std::string_view label, SourceRange range);
   [[nodiscard]] AnnotationBuilder table(std::string_view label, SourceRange range);
