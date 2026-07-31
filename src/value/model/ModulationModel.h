@@ -15,6 +15,15 @@ struct ModulationRange {
   double maximum = 0.0;
 };
 
+enum class LfoWaveform {
+  Sine,
+  Triangle,
+  Square,
+  SawtoothUp,
+  SawtoothDown,
+  Noise,
+};
+
 enum class ModulationDepthMode {
   // A sequence controller selects a value from zero through maxDepth.
   Controller,
@@ -32,6 +41,7 @@ enum class TremoloGainMode {
 struct VibratoSpec {
   double maxDepthCents = 0.0;
   ModulationRange rateHertz;
+  std::optional<LfoWaveform> waveform;
   std::optional<ModulationRange> delaySeconds;
   ModulationDepthMode depthMode = ModulationDepthMode::Controller;
 };
@@ -39,6 +49,7 @@ struct VibratoSpec {
 struct TremoloSpec {
   double maxDepthDb = 0.0;
   ModulationRange rateHertz;
+  std::optional<LfoWaveform> waveform;
   TremoloGainMode gainMode = TremoloGainMode::BipolarAroundNominal;
   std::optional<ModulationRange> delaySeconds;
   ModulationDepthMode depthMode = ModulationDepthMode::Controller;

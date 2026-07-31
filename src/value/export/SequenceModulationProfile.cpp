@@ -45,7 +45,21 @@ struct LfoObservation {
   double maxDepth = 0.0;
   ObservedRange rate;
   ObservedRange delay;
+  std::optional<LfoWaveform> waveform;
+  bool hasConflictingWaveforms = false;
   TremoloGainMode gainMode = TremoloGainMode::BipolarAroundNominal;
+
+  void observeWaveform(std::optional<LfoWaveform> observed) {
+    if (!observed || hasConflictingWaveforms) {
+      return;
+    }
+    if (waveform && waveform != observed) {
+      waveform.reset();
+      hasConflictingWaveforms = true;
+    } else {
+      waveform = observed;
+    }
+  }
 };
 
 [[nodiscard]] double normalizedLinear(double value, double maximum) noexcept {
@@ -88,16 +102,19 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
                        LfoObservation& pan) {
   switch (event.target) {
     case ModulationPerformanceTarget::VibratoDepth:
+      vibrato.observeWaveform(event.waveform);
       if (event.pitchDepthSemitones) {
         vibrato.maxDepth = std::max(vibrato.maxDepth, std::abs(*event.pitchDepthSemitones) * 100.0);
       }
       break;
     case ModulationPerformanceTarget::VibratoRate:
+      vibrato.observeWaveform(event.waveform);
       if (event.frequencyHz) {
         vibrato.rate.observe(*event.frequencyHz);
       }
       break;
     case ModulationPerformanceTarget::TremoloDepth:
+      tremolo.observeWaveform(event.waveform);
       if (event.volumeDepthDecibels) {
         tremolo.maxDepth = std::max(tremolo.maxDepth, std::abs(*event.volumeDepthDecibels));
         if (std::abs(*event.volumeDepthDecibels) > 0.0) {
@@ -112,6 +129,7 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
       }
       break;
     case ModulationPerformanceTarget::TremoloRate:
+      tremolo.observeWaveform(event.waveform);
       if (event.frequencyHz) {
         tremolo.rate.observe(*event.frequencyHz);
       }
@@ -178,6 +196,7 @@ SequenceModulationProfile analyzeSequenceModulation(const PerformanceSequence& s
     profile.instruments.vibrato = VibratoSpec{
         .maxDepthCents = vibrato.maxDepth,
         .rateHertz = *vibrato.rate.range(),
+        .waveform = vibrato.waveform,
         .delaySeconds = vibrato.delay.range(true),
     };
   }
@@ -185,6 +204,7 @@ SequenceModulationProfile analyzeSequenceModulation(const PerformanceSequence& s
     profile.instruments.tremolo = TremoloSpec{
         .maxDepthDb = tremolo.maxDepth,
         .rateHertz = *tremolo.rate.range(),
+        .waveform = tremolo.waveform,
         .gainMode = tremolo.gainMode,
         .delaySeconds = tremolo.delay.range(true),
     };

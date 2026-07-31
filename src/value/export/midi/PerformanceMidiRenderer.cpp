@@ -250,32 +250,50 @@ struct MidiInstrumentSelection {
   // Addresses resolved from synth instruments are logical preset banks and
   // still need to be lowered for the selected MIDI bank convention.
   bool logicalBank = false;
+  std::optional<u16> pitchBendRangeCents;
 };
 
-[[nodiscard]] MidiInstrumentSelection instrumentSelection(const InstrumentPerformanceEvent& event,
-                                                          std::span<const InstrumentSetAsset* const> instrumentSets) {
-  if (!event.sourceInstrument) {
-    return MidiInstrumentSelection{
-        .address = resolveInstrumentAddress(InstrumentAddress{.bank = event.bank, .program = event.program}, {}),
-        .forceBankSelect = event.forceBankSelect,
-        .logicalBank = false,
-    };
-  }
-
+[[nodiscard]] const Instrument* selectedInstrument(const InstrumentPerformanceEvent& event,
+                                                   std::span<const InstrumentSetAsset* const> instrumentSets) {
+  const InstrumentAddress directAddress{.bank = event.bank, .program = event.program};
+  const InstrumentAddress logicalAddress{.bank = event.bank >> 7, .program = event.program};
   for (const auto* instrumentSet : instrumentSets) {
     if (instrumentSet == nullptr) {
       continue;
     }
     const auto found = std::ranges::find_if(instrumentSet->instruments, [&](const Instrument& instrument) {
-      return instrument.identity && *instrument.identity == *event.sourceInstrument;
+      if (event.sourceInstrument) {
+        return instrument.identity && *instrument.identity == *event.sourceInstrument;
+      }
+      const InstrumentAddress address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
+      return address == directAddress || ((event.bank & 0x7f) == 0 && address == logicalAddress);
     });
     if (found != instrumentSet->instruments.end()) {
-      return MidiInstrumentSelection{
-          .address = resolveInstrumentAddress(found->explicitAddress, found->identity),
-          .forceBankSelect = true,
-          .logicalBank = true,
-      };
+      return &*found;
     }
+  }
+  return nullptr;
+}
+
+[[nodiscard]] MidiInstrumentSelection instrumentSelection(const InstrumentPerformanceEvent& event,
+                                                          std::span<const InstrumentSetAsset* const> instrumentSets) {
+  const Instrument* instrument = selectedInstrument(event, instrumentSets);
+  if (!event.sourceInstrument) {
+    return MidiInstrumentSelection{
+        .address = resolveInstrumentAddress(InstrumentAddress{.bank = event.bank, .program = event.program}, {}),
+        .forceBankSelect = event.forceBankSelect,
+        .logicalBank = false,
+        .pitchBendRangeCents = instrument != nullptr ? instrument->pitchBendRangeCents : std::nullopt,
+    };
+  }
+
+  if (instrument != nullptr) {
+    return MidiInstrumentSelection{
+        .address = resolveInstrumentAddress(instrument->explicitAddress, instrument->identity),
+        .forceBankSelect = true,
+        .logicalBank = true,
+        .pitchBendRangeCents = instrument->pitchBendRangeCents,
+    };
   }
 
   // A sequential key is a deterministic fallback for incomplete collections.
@@ -327,6 +345,9 @@ struct RenderTrackState {
   u16 pitchBendRangeCents = 200;
   std::optional<u16> lastPitchBendRangeCents;
   u16 sourcePitchBendRangeCents = 200;
+  // Slides may replace the sequence range, but they must not reduce the range
+  // required by the selected instrument.
+  std::optional<u16> instrumentPitchBendRangeCents;
   std::optional<u16> voicePitchBendRangeCents;
   double sourcePitchBendSemitones = 0.0;
   double simulatedVibratoSemitones = 0.0;
@@ -547,7 +568,8 @@ bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePer
 
 [[nodiscard]] u16 effectivePitchBendRangeCents(const RenderTrackState& state,
                                                ModulationConversionPolicy modulationConversion) {
-  const u16 range = state.voicePitchBendRangeCents.value_or(state.sourcePitchBendRangeCents);
+  const u16 range = std::max(state.voicePitchBendRangeCents.value_or(state.sourcePitchBendRangeCents),
+                             state.instrumentPitchBendRangeCents.value_or(0));
   return modulationConversion == ModulationConversionPolicy::SequenceEventSimulation
              ? std::max(range, requiredPitchBendRangeCents(state))
              : range;
@@ -604,6 +626,17 @@ void ensurePitchBendRangePreservingPitch(MidiTrack& track, RenderTrackState& sta
   }
 }
 
+void applyInstrumentPitchBendRange(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
+                                   std::optional<u16> cents, ModulationConversionPolicy modulationConversion) {
+  const u16 previousRange = effectivePitchBendRangeCents(state, modulationConversion);
+  state.instrumentPitchBendRangeCents = cents;
+  const u16 range = effectivePitchBendRangeCents(state, modulationConversion);
+  if (wholeSemitonePitchBendRangeCents(range) == wholeSemitonePitchBendRangeCents(previousRange)) {
+    return;
+  }
+  ensurePitchBendRangePreservingPitch(track, state, tick, channel, range, modulationConversion);
+}
+
 void applyVoicePitchBendRangeChange(MidiTrack& track, RenderTrackState& state, const VoicePitchBendRangeChange& change,
                                     u8 channel, ModulationConversionPolicy modulationConversion) {
   state.sourcePitchBendRangeCents = change.sourceCents;
@@ -639,6 +672,9 @@ void addCombinedPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u
       return (phase * 2.0) - 1.0;
     case LfoWaveform::SawtoothDown:
       return 1.0 - (phase * 2.0);
+    case LfoWaveform::Noise:
+      // Noise has no stable curve for the MIDI renderer to reproduce.
+      return 0.0;
   }
   return 0.0;
 }
@@ -1009,6 +1045,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               .channel = channel,
               .program = data7(selection.address.program),
           });
+          applyInstrumentPitchBendRange(track, state, typedEvent.header.tick, channel, selection.pitchBendRangeCents,
+                                        modulationConversion);
         } else if constexpr (std::is_same_v<TypedEvent, LevelPerformanceEvent>) {
           addVolume(track, automationState, typedEvent.header.tick, channel, typedEvent.linearGain,
                     typedEvent.precisionHint, options, typedEvent.sourceQuantization);
@@ -1064,15 +1102,20 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           // Global transpose changes how later notes and portamento controls are written. It does not
           // become a MIDI event itself.
         } else if constexpr (std::is_same_v<TypedEvent, PitchBendPerformanceEvent>) {
-          state.sourcePitchBendSemitones = typedEvent.semitones;
+          state.sourcePitchBendSemitones = typedEvent.normalizedWheelPosition
+                                               ? std::clamp(*typedEvent.normalizedWheelPosition, -1.0, 1.0) *
+                                                     (state.instrumentPitchBendRangeCents
+                                                          .value_or(state.sourcePitchBendRangeCents) /
+                                                      100.0)
+                                               : typedEvent.semitones;
           if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
             addCombinedPitchBend(track, state, typedEvent.header.tick, channel, false);
           } else {
             addPitchBend(track, state, typedEvent.header.tick, channel,
-                         midiPitchBend(typedEvent.semitones, state.pitchBendRangeCents));
+                         midiPitchBend(state.sourcePitchBendSemitones, state.pitchBendRangeCents));
           }
         } else if constexpr (std::is_same_v<TypedEvent, PitchBendRangePerformanceEvent>) {
-          state.sourcePitchBendRangeCents = std::max<u16>(200, typedEvent.cents);
+          state.sourcePitchBendRangeCents = typedEvent.cents;
           ensurePitchBendRangePreservingPitch(track, state, typedEvent.header.tick, channel,
                                               effectivePitchBendRangeCents(state, modulationConversion),
                                               modulationConversion);
@@ -1296,6 +1339,9 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
           .port = midiPortByte(assignment.port),
       });
     }
+    applyInstrumentPitchBendRange(midiTrack, renderState, 0, assignment.channel,
+                                  instrumentSelection(InstrumentPerformanceEvent{}, instrumentSets).pitchBendRangeCents,
+                                  modulationConversion);
     for (const auto* event : timelines[trackIndex]) {
       const auto& header = performanceEventHeader(*event);
       while (nextPitchBendRangeChange < pitchBendRangeChanges.size() &&

@@ -301,6 +301,9 @@ struct SfModulatorRecord {
 }
 
 [[nodiscard]] s16 sf2EnvelopeTimecents(std::optional<double> seconds) {
+  if (seconds && std::isinf(*seconds) && *seconds > 0.0) {
+    return std::numeric_limits<s16>::max();
+  }
   if (seconds && std::isfinite(*seconds) && *seconds > 0.0) {
     return clampS16(static_cast<s32>(std::lround(1200.0 * std::log2(*seconds))));
   }

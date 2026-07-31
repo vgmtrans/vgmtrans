@@ -106,6 +106,8 @@ std::vector<u8> segSatFixture() {
   const std::initializer_list<u8> identityVl{2, 127, 127, 2, 127, 127, 2, 127, 127, 2};
   std::ranges::copy(identityVl, bytes.begin() + bank + 0x1e);
 
+  // The high nibble is play mode; bend range 13 (two octaves) is the low nibble.
+  bytes[bank + 0x36] = 0x4d;
   bytes[bank + 0x36 + 2] = 0;  // one region
   const u32 region = bank + 0x3a;
   bytes[region] = 0;
@@ -113,9 +115,13 @@ std::vector<u8> segSatFixture() {
   be32(bytes, region + 2, 0x200);
   be16(bytes, region + 6, 0);
   be16(bytes, region + 8, 4);
-  // A triangle-wave pitch LFO with one hardware depth step. Saturn regions
-  // carry their own LFO settings, so this must remain local to this layer.
-  bytes[region + 21] = 0x30;
+  // EGHOLD with KRS 1, a D1 target of -39 dB, and an endless D2.
+  be16(bytes, region + 10, 0x022f);
+  be16(bytes, region + 12, 0x05a0);
+  // Pitch and amplitude have separate waveform fields in the same SCSP word.
+  // Use sawtooth pitch and triangle amplitude so neither can be read as the other.
+  bytes[region + 20] = 0x20;
+  bytes[region + 21] = 0x52;
   bytes[region + 24] = 0xe0;
   bytes[region + 25] = 60;
   bytes[region + 29] = 0;
@@ -336,8 +342,9 @@ void segSatCollectionPreparationSuppliesVlTablesToSequence() {
       std::ranges::count_if(playback.performance.tracks[0].events, [](const PerformanceEvent& event) {
         return std::holds_alternative<PitchBendPerformanceEvent>(event);
       });
-  expect(pitchCount == 1 && pitch != nullptr && std::abs(pitch->semitones - (-0.09375)) < 0.000001,
-         "SegSat should ignore flagged events and preserve ordinary pitch bends");
+  expect(pitchCount == 1 && pitch != nullptr && std::abs(pitch->semitones - (-0.09375)) < 0.000001 &&
+             pitch->normalizedWheelPosition && std::abs(*pitch->normalizedWheelPosition - (-0.046875)) < 0.000001,
+         "SegSat should retain its raw pitch-wheel position for collection-aware lowering");
 
   expect(collection.members.sampleCollections.size() == 1, "SegSat fixture should attach its parsed sample collection");
   const auto* samples = snapshot.asset<SampleCollectionAsset>(collection.members.sampleCollections.front());
@@ -345,17 +352,31 @@ void segSatCollectionPreparationSuppliesVlTablesToSequence() {
          "SegSat fixture should expose its one unique sample");
   expect(collection.members.instrumentSets.size() == 1, "SegSat fixture should attach its instrument set");
   const auto* instruments = snapshot.asset<InstrumentSetAsset>(collection.members.instrumentSets.front());
-  expect(
-      instruments != nullptr && instruments->instruments.size() == 2 && instruments->instruments.back().regions.empty(),
-      "SegSat 0xff region-count sentinel should preserve an empty program without creating 256 bogus regions");
+  expect(instruments != nullptr && instruments->instruments.size() == 2 &&
+             instruments->instruments.front().pitchBendRangeCents == 2400 &&
+             instruments->instruments.back().regions.empty(),
+         "SegSat instruments should decode bend range and preserve an empty 0xff-sentinel program");
   const auto& parsedRegion = instruments->instruments.front().regions.front();
   expect(parsedRegion.modulation.vibrato && parsedRegion.modulation.vibrato->depthMode == ModulationDepthMode::Fixed &&
-             parsedRegion.modulation.vibrato->maxDepthCents == 7.0 &&
-             parsedRegion.modulation.vibrato->rateHertz.minimum == 0.17,
-         "SegSat region LFO should remain a layer-local fixed-depth triangle modulation");
-  expect(parsedRegion.envelope.decaySeconds == 100.0 && parsedRegion.envelope.secondDecaySeconds == 100.0 &&
-             parsedRegion.envelope.sustainAmplitude == 1.0,
-         "SegSat regions should preserve both SCSP decay stages");
+             parsedRegion.modulation.vibrato->waveform == LfoWaveform::SawtoothUp &&
+             parsedRegion.modulation.vibrato->maxDepthCents == 13.5 &&
+             parsedRegion.modulation.vibrato->rateHertz.minimum == 0.68 && parsedRegion.modulation.tremolo &&
+             parsedRegion.modulation.tremolo->waveform == LfoWaveform::Triangle &&
+             parsedRegion.modulation.tremolo->maxDepthDb == 0.4,
+         "SegSat regions should preserve both SCSP LFO waveforms and depths");
+  const double expectedHold = 0.047 * 640.0 / 1023.0;
+  const double expectedDecay = 7.4 * (32.0 * 13.0) / 1023.0;
+  const double expectedSustain = std::pow(10.0, -39.0 / 20.0);
+  expect(parsedRegion.envelope.attackSeconds == 0.0 && parsedRegion.envelope.holdSeconds &&
+             std::abs(*parsedRegion.envelope.holdSeconds - expectedHold) < 0.000001 &&
+             parsedRegion.envelope.decaySeconds &&
+             std::abs(*parsedRegion.envelope.decaySeconds - expectedDecay) < 0.000001 &&
+             parsedRegion.envelope.secondDecaySeconds && std::isinf(*parsedRegion.envelope.secondDecaySeconds) &&
+             parsedRegion.envelope.releaseSeconds &&
+             std::abs(*parsedRegion.envelope.releaseSeconds - 118.2) < 0.000001 &&
+             parsedRegion.envelope.sustainAmplitude &&
+             std::abs(*parsedRegion.envelope.sustainAmplitude - expectedSustain) < 0.000001,
+         "SegSat regions should convert SCSP envelope levels, stage lengths, KRS, holds, and endless D2");
   const auto decoded = decodeSample(samples->samples.samples.front(), session.sources().bytes(source));
   expect(decoded && decoded->pcm.size() == 4 && decoded->pcm[0] == 0x1234 && decoded->pcm[1] == -292,
          "SegSat PCM16 samples should decode in the SCSP's big-endian byte order");

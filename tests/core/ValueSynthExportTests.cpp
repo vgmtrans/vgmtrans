@@ -109,11 +109,13 @@ void physicalModulationLowersToLegacySynthControls() {
           VibratoSpec{
               .maxDepthCents = 1200.0,
               .rateHertz = {stepHertz, 255.0 * stepHertz},
+              .waveform = LfoWaveform::SawtoothUp,
           },
       .tremolo =
           TremoloSpec{
               .maxDepthDb = 48.4,
               .rateHertz = {2.0 * stepHertz, 510.0 * stepHertz},
+              .waveform = LfoWaveform::Square,
               .gainMode = TremoloGainMode::NoBoost,
           },
   });
@@ -133,6 +135,16 @@ void physicalModulationLowersToLegacySynthControls() {
           lowered.modulators[5].destination == SynthDestination::VolumeAttenuation &&
           lowered.modulators[5].amount == 484,
       "physical vibrato and no-boost tremolo should preserve the legacy synth modulator records");
+
+  const auto noise = lowerSynthModulation(InstrumentModulation{
+      .vibrato = VibratoSpec{
+          .maxDepthCents = 100.0,
+          .rateHertz = {1.0, 1.0},
+          .waveform = LfoWaveform::Noise,
+      },
+  });
+  expect(noise.generators.empty() && noise.modulators.empty(),
+         "noise modulation should remain in the model when the synth target cannot represent it");
 }
 
 void fixedPhysicalLfoValuesNeedNoZeroRangeModulators() {
@@ -278,6 +290,7 @@ void soundFontExporterWritesSfbkRiffFile() {
               .envelope =
                   Envelope{
                       .attackSeconds = 1.0,
+                      .holdSeconds = std::numeric_limits<double>::infinity(),
                       .decaySeconds = 0.11,
                       .secondDecaySeconds = 5.5,
                       .releaseSeconds = 0.25,
@@ -371,8 +384,8 @@ void soundFontExporterWritesSfbkRiffFile() {
          "SoundFont export should write physical tremolo frequency");
   expect(soundFontIgenContainsAmount(result.bytes, 34, 0),
          "SoundFont export should write attackVolEnv from Region envelope");
-  expect(soundFontIgenContainsAmount(result.bytes, 35, -32768),
-         "SoundFont export should write holdVolEnv from Region envelope");
+  expect(soundFontIgenContainsAmount(result.bytes, 35, 32767),
+         "SoundFont export should approximate an endless hold with its longest hold time");
   expect(soundFontIgenContainsAmount(result.bytes, 36, 2951),
          "SoundFont export should preserve the second decay after a barely audible first-stage drop");
   expect(soundFontIgenContainsAmount(result.bytes, 37, 1000),
@@ -438,6 +451,7 @@ void dlsExporterWritesDlsRiffFile() {
               .envelope =
                   Envelope{
                       .attackSeconds = 1.0,
+                      .holdSeconds = std::numeric_limits<double>::infinity(),
                       .decaySeconds = 2.0,
                       .secondDecaySeconds = 1.0,
                       .releaseSeconds = 0.25,
@@ -512,8 +526,8 @@ void dlsExporterWritesDlsRiffFile() {
          "DLS art2 chunk should include pan, envelope, generator, and modulator connections");
   expect(dlsArt2ContainsConnection(result.bytes, 0x0206, 0),
          "DLS export should write EG1 attack time from Region envelope");
-  expect(dlsArt2ContainsConnection(result.bytes, 0x020c, std::numeric_limits<s32>::min()),
-         "DLS export should write EG1 hold time from Region envelope");
+  expect(dlsArt2ContainsConnection(result.bytes, 0x020c, std::numeric_limits<s32>::max()),
+         "DLS export should approximate an endless hold with its longest hold time");
   expect(dlsArt2ContainsConnection(result.bytes, 0x0207, 124646523),
          "DLS export should combine short first and second decay stages");
   expect(dlsArt2ContainsConnection(result.bytes, 0x020a, 0),

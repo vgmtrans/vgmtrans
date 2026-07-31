@@ -376,7 +376,12 @@ struct Playback {
   Effects pitchBend(u8 channel, u8 encoded, u16 delta) {
     if ((encoded & 0x80) == 0 && channel == track.channel) {
       const s16 bend = static_cast<s16>((static_cast<s32>(encoded) << 7) - 8192);
-      out.at(eventTick(delta)).pitchBend((bend / 8192.0) * 2.0);
+      const double wheelPosition = bend / 8192.0;
+      out.at(eventTick(delta))
+          .pitchBend(PitchBendPerformanceEvent{
+              .semitones = wheelPosition * 2.0,
+              .normalizedWheelPosition = wheelPosition,
+          });
     }
     return afterEvent(delta);
   }
