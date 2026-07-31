@@ -78,6 +78,7 @@ void rareSnesLayoutsDifferentiateDriverFamilies();
 void rareSnesProfilesDecodeTheirDistinctOpcodeTails();
 void rareSnesSignedStereoVolumesPreserveDriverRelativeLevels();
 void rareSnesPhysicalLfosAndPitchEnvelopesUseTimerClock();
+void rareSnesPitchEnvelopeInvertsOnlyItsInitialSteps();
 void rareSnesCallsConditionalBranchesAndLongDurationsExecuteSourceFree();
 void mameRomDatabaseAndGroupAssemblyAreValueOriented();
 void konamiArcadeModuleBuildsSequencesSynthAndCollections();
@@ -229,6 +230,7 @@ int main() {
     rareSnesProfilesDecodeTheirDistinctOpcodeTails();
     rareSnesSignedStereoVolumesPreserveDriverRelativeLevels();
     rareSnesPhysicalLfosAndPitchEnvelopesUseTimerClock();
+    rareSnesPitchEnvelopeInvertsOnlyItsInitialSteps();
     rareSnesCallsConditionalBranchesAndLongDurationsExecuteSourceFree();
     mameRomDatabaseAndGroupAssemblyAreValueOriented();
     konamiArcadeModuleBuildsSequencesSynthAndCollections();
