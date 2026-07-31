@@ -6,6 +6,7 @@
 
 #include "value/formats/RareSnes/RareSnes.h"
 
+#include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
@@ -368,6 +369,50 @@ void rareSnesPhysicalLfosAndPitchEnvelopesUseTimerClock() {
                                       std::holds_alternative<FixedDurationPitchSlideTiming>(pitch->timing.physical);
                              }),
          "Rare pitch envelopes should remain fixed-duration note pitch transitions");
+
+  const PerformanceSequence delayedNote =
+      render(Profile::DonkeyKongCountry, {0x0f, 8, 2, 4, 3, 0x80, 32, 0x81, 16, 0x00});
+  const MidiSequence simulated =
+      renderMidiSequence(delayedNote, {}, ModulationConversionPolicy::SequenceEventSimulation);
+  expect(std::ranges::none_of(simulated.tracks.front().events,
+                              [](const MidiEvent& event) {
+                                const auto* bend = std::get_if<PitchBend>(&event);
+                                return bend != nullptr && bend->tick < 32 && bend->value != 0;
+                              }),
+         "Rare vibrato configuration should not generate pitch bends during rests before the first note");
+}
+
+void rareSnesPitchEnvelopeInvertsOnlyItsInitialSteps() {
+  // Gang-Plank Galleon uses this envelope at $12e2 and $1608. The driver
+  // subtracts the delta for the first step, then adds it for the remaining 22.
+  const PerformanceSequence performance =
+      render(Profile::DonkeyKongCountry, {0x08, 1, 1, 0x17, 0x17, 1, 0xa3, 0x40, 0x0a, 0x00});
+  expect(performance.diagnostics.empty() && performance.tracks.front().automations.size() == 1,
+         "Gang-Plank Galleon's pitch envelope should render as one transition");
+
+  const auto* pitch = pitchTransitionIntent(performance.tracks.front().automations.front());
+  const auto* curve = pitch == nullptr ? nullptr : std::get_if<SampledAutomationCurve>(&pitch->curve);
+  expect(pitch != nullptr && pitch->targetKey > pitch->startKey && curve != nullptr && curve->samples.size() > 3 &&
+             curve->samples[1].value <= pitch->startKey && curve->samples.back().value == pitch->targetKey,
+         "the initial inverted step should precede the remaining upward driver steps");
+
+  const MidiSequence pitchBend =
+      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  expect(std::ranges::count_if(pitchBend.tracks.front().events,
+                               [](const MidiEvent& event) {
+                                 const auto* bend = std::get_if<PitchBend>(&event);
+                                 return bend != nullptr && bend->value > 0;
+                               }) > 3,
+         "pitch-bend rendering should step upward instead of popping to Gang-Plank Galleon's target");
+
+  const MidiSequence portamento =
+      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
+  expect(std::ranges::any_of(portamento.tracks.front().events,
+                             [](const MidiEvent& event) {
+                               const auto* note = std::get_if<NoteDuration>(&event);
+                               return note != nullptr && note->key > 70;
+                             }),
+         "portamento rendering should glide Gang-Plank Galleon's A3 event upward");
 }
 
 void rareSnesCallsConditionalBranchesAndLongDurationsExecuteSourceFree() {

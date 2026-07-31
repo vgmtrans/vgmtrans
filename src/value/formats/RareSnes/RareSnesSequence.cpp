@@ -121,12 +121,11 @@ struct Preset {
 
 struct PitchEffect {
   bool enabled = false;
-  bool pingPong = false;
   u8 delay = 0;
   u8 interval = 1;
   u8 steps = 0;
   s8 delta = 0;
-  u8 reverseAfter = 0;
+  u8 invertedSteps = 0;
   u8 pitchUnit = 1;
 };
 
@@ -751,8 +750,6 @@ struct Playback {
   void timer(u8 value) {
     program.timer = value;
     out.tempo(tempoMicrosecondsPerQuarter(program.tempo, program.timer));
-    emitVibrato();
-    emitTremolo();
   }
 
   [[nodiscard]] LfoPerformanceContext lfoContext(u8 delay) const {
@@ -787,6 +784,8 @@ struct Playback {
     out.vibratoRate(1.0 / (cycleUpdates * program.timer * kTimerQuantumSeconds), context);
   }
 
+  // Configuration is inert until the driver initializes the live counters for
+  // a note. emitInstrumentAndModulation() publishes the resulting note LFO.
   void vibrato(u8 period, u8 interval, s8 delta, u8 delay, u8 pitchUnit) {
     track.vibrato = Vibrato{
         .enabled = period != 0,
@@ -796,13 +795,9 @@ struct Playback {
         .delay = delay,
         .pitchUnit = pitchUnit,
     };
-    emitVibrato();
   }
 
-  void vibratoOff() {
-    track.vibrato = {};
-    emitVibrato();
-  }
+  void vibratoOff() { track.vibrato = {}; }
 
   void emitTremolo() {
     if (!track.tremolo.enabled || track.tremolo.period == 0) {
@@ -829,13 +824,9 @@ struct Playback {
         .delta = delta,
         .delay = delay,
     };
-    emitTremolo();
   }
 
-  void tremoloOff() {
-    track.tremolo = {};
-    emitTremolo();
-  }
+  void tremoloOff() { track.tremolo = {}; }
 
   void allLfoOff() {
     track.pitch = {};
@@ -843,19 +834,14 @@ struct Playback {
     tremoloOff();
   }
 
-  void configurePitch(bool pingPong, bool inverted, u8 delay, u8 interval, u8 steps, s8 delta, u8 reverseAfter,
-                      u8 pitchUnit) {
-    if (pingPong) {
-      steps = static_cast<u8>((steps / 2) * 2);
-    }
+  void configurePitch(bool inverted, u8 delay, u8 interval, u8 steps, s8 delta, u8 invertedSteps, u8 pitchUnit) {
     track.pitch = PitchEffect{
         .enabled = steps != 0,
-        .pingPong = pingPong,
         .delay = delay,
         .interval = std::max<u8>(interval, 1),
         .steps = steps,
         .delta = static_cast<s8>(inverted ? -delta : delta),
-        .reverseAfter = reverseAfter,
+        .invertedSteps = invertedSteps,
         .pitchUnit = pitchUnit,
     };
   }
@@ -891,25 +877,22 @@ struct Playback {
     const u32 delayTicks = delayUpdates == 0 ? 0 : timelineTicks(delayUpdates, program.tempo);
     const u32 durationTicks = timelineTicks(std::max<u32>(motionUpdates, 1), program.tempo);
     const double milliseconds = motionUpdates * program.timer * kTimerQuantumSeconds * 1000.0;
-    const s32 oneSide = static_cast<s32>(track.pitch.delta) * track.pitch.steps * track.pitch.pitchUnit;
+    const u32 invertedSteps = std::min<u32>(track.pitch.invertedSteps, track.pitch.steps);
+    const s32 totalOffset = static_cast<s32>(track.pitch.delta) *
+                            (static_cast<s32>(track.pitch.steps) - static_cast<s32>(invertedSteps * 2)) *
+                            track.pitch.pitchUnit;
     auto output = out.at(vm.tick() + delayTicks);
-    if (track.pitch.pingPong) {
-      const double peak = key + pitchSemitones(track.lastPitch, oneSide / 2);
-      auto binding =
-          output.pitchSlide(track.lastNote, key, key, PitchSlideTiming::fixedDuration(durationTicks, milliseconds));
-      binding.sample(out.at(vm.tick() + delayTicks + durationTicks / 2), peak);
-      binding.sample(out.at(vm.tick() + delayTicks + durationTicks), key);
-      return;
+    const double target = key + pitchSemitones(track.lastPitch, totalOffset);
+    auto binding =
+        output.pitchSlide(track.lastNote, key, target, PitchSlideTiming::fixedDuration(durationTicks, milliseconds));
+    s32 offset = 0;
+    const s32 delta = static_cast<s32>(track.pitch.delta) * track.pitch.pitchUnit;
+    for (u32 step = 1; step <= track.pitch.steps; ++step) {
+      offset += step <= invertedSteps ? -delta : delta;
+      const u32 stepUpdates = static_cast<u32>(track.pitch.interval) * step;
+      const u32 stepTicks = std::min(timelineTicks(stepUpdates, program.tempo), durationTicks);
+      binding.sample(out.at(vm.tick() + delayTicks + stepTicks), key + pitchSemitones(track.lastPitch, offset));
     }
-    s32 total = oneSide;
-    if (track.pitch.reverseAfter != 0) {
-      const u32 forward = std::min<u32>(track.pitch.reverseAfter, track.pitch.steps);
-      total = static_cast<s32>(track.pitch.delta) *
-              (static_cast<s32>(forward) - static_cast<s32>(track.pitch.steps - forward)) * track.pitch.pitchUnit;
-    }
-    const double target = key + pitchSemitones(track.lastPitch, total);
-    static_cast<void>(
-        output.pitchSlide(track.lastNote, key, target, PitchSlideTiming::fixedDuration(durationTicks, milliseconds)));
   }
 
   [[nodiscard]] Effects note(u8 encoded, u16 duration) {
@@ -1360,16 +1343,17 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return cursor.command("16-Bit Durations Off", SequenceSemantic::State).set<&TrackState::longDuration>(false);
     case Kind::PitchSlide:
     case Kind::PitchSlidePingPong: {
-      auto event = cursor.command(selected == Kind::PitchSlide ? "Pitch Envelope" : "Ping-Pong Pitch Envelope",
-                                  SequenceSemantic::Pitch);
+      const bool shortEnvelope = selected == Kind::PitchSlidePingPong;
+      auto event =
+          cursor.command(!shortEnvelope ? "Pitch Envelope" : "Ping-Pong Pitch Envelope", SequenceSemantic::Pitch);
       const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
       const u8 interval = event.u8("interval", SemanticOperandRole::Duration);
-      const u8 steps = event.u8("steps", SemanticOperandRole::Count);
+      const u8 encodedSteps = event.u8(shortEnvelope ? "half_cycle_steps" : "steps", SemanticOperandRole::Count);
       const s8 delta = event.s8("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
-      const u8 reverse = selected == Kind::PitchSlide ? event.u8("reverse_after", SemanticOperandRole::Count) : 0;
-      return event.invoke<&Playback::configurePitch>(selected == Kind::PitchSlidePingPong,
-                                                     opcode == 0x09 || opcode == 0x26, delay, interval, steps, delta,
-                                                     reverse, u8{1});
+      const u8 steps = shortEnvelope ? static_cast<u8>(encodedSteps * 2) : encodedSteps;
+      const u8 invertedSteps = shortEnvelope ? encodedSteps : event.u8("inverted_steps", SemanticOperandRole::Count);
+      return event.invoke<&Playback::configurePitch>(opcode == 0x09 || opcode == 0x26, delay, interval, steps, delta,
+                                                     invertedSteps, u8{1});
     }
     case Kind::PitchSlideOff:
       return cursor.command("Pitch Envelope Off", SequenceSemantic::Pitch).invoke<&Playback::pitchOff>();
@@ -1625,12 +1609,14 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Pitch Envelope", SequenceSemantic::Pitch);
       const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
       const u8 interval = static_cast<u8>(event.u8("interval", SemanticOperandRole::Duration) + 1);
-      const u8 steps = event.u8("steps", SemanticOperandRole::Count);
+      const u8 encodedSteps = event.u8("steps", SemanticOperandRole::Count);
       const s8 delta = event.s8("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
       const bool pingPong = opcode == 0x18 || opcode == 0x19;
-      const u8 reverse = pingPong ? 0 : event.u8("reverse_after", SemanticOperandRole::Count);
-      return event.invoke<&Playback::configurePitch>(pingPong, opcode == 0x0b || opcode == 0x18, delay, interval, steps,
-                                                     delta, reverse, u8{8});
+      const u8 steps = pingPong ? static_cast<u8>(encodedSteps & 0xfe) : encodedSteps;
+      const u8 invertedSteps =
+          pingPong ? static_cast<u8>(encodedSteps / 2) : event.u8("inverted_steps", SemanticOperandRole::Count);
+      return event.invoke<&Playback::configurePitch>(opcode == 0x0b || opcode == 0x18, delay, interval, steps, delta,
+                                                     invertedSteps, u8{8});
     }
     case Kind::BtmAdsrKeyoff: {
       auto event = cursor.command("ADSR / Key-Off", SequenceSemantic::State);
