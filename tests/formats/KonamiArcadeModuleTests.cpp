@@ -613,6 +613,48 @@ void konamiArcadeGxDriverQuirksRemainRepresented() {
       "F2 should retune the following note without bending the voice that is already playing");
 }
 
+void konamiArcadeExpressionPersistsThroughSoftwareRelease() {
+  auto fixture = makeMysticWarriorFixture();
+  writeBytes(fixture.bytes, 0x320,
+             {
+                 0xea, 0x80,              // tempo
+                 0xfa, 0x02,              // long software release
+                 0x30, 0x04, 0x64, 0x20,  // enter duration-tie mode at low velocity
+                 0x30, 0x08, 0x32, 0x20,  // leave tie mode and release after four ticks
+                 0xe0, 0x10,              // let the release continue
+                 0x32, 0x04, 0x32, 0x7f,  // next activation returns to note velocity
+                 0xff,
+             });
+
+  std::vector<Diagnostic> diagnostics;
+  const auto layout =
+      findKonamiArcadeLayout(fixture.source, ByteReader(fixture.source.id, fixture.bytes), &diagnostics);
+  expect(layout && diagnostics.empty() && layout->sequences.size() == 1,
+         "MysticWarrior expression-release fixture should produce a valid layout");
+
+  const SequenceProgram program = decodeKonamiArcadeSequence(ByteReader(fixture.source.id, fixture.bytes), *layout,
+                                                             layout->sequences[0], AssetId{1}, nullptr, &diagnostics);
+  const PerformanceSequence performance =
+      SequenceVm(LoopPolicy::PlayOnce).render(program, konamiArcadeSequenceDialect());
+  expect(diagnostics.empty() && performance.diagnostics.empty() && performance.tracks.size() == 1,
+         "MysticWarrior expression-release fixture should render without diagnostics");
+
+  std::vector<const NotePerformanceEvent*> notes;
+  std::vector<const ExpressionPerformanceEvent*> expressions;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(note);
+    } else if (const auto* expression = std::get_if<ExpressionPerformanceEvent>(&event)) {
+      expressions.push_back(expression);
+    }
+  }
+  expect(notes.size() == 3 && expressions.size() == 3 && expressions[2]->linearGain == 1.0 &&
+             expressions[2]->header.tick == notes[2]->header.tick && expressions[2]->header.tick == 28,
+         "velocity expression should remain unchanged through release and reset at the next note activation");
+  expect(expressions[2]->header.sequence < notes[2]->header.sequence,
+         "velocity expression should reset before the next note-on at the same tick");
+}
+
 void konamiArcadeTempoSlidesAreCanceledAcrossTracks() {
   std::vector<u8> bytes(0x200);
   writeBe32(bytes, 0x20, 0x80);

@@ -189,6 +189,7 @@ struct TrackState {
   u64 previousNoteStart = 0;
   u32 previousNoteDuration = 0;
   bool previousTied = false;
+  bool velocityUsesExpression = false;
   bool durationTieCanceled = false;
   u8 portamentoTime = 0;
   u8 slideDelay = 0;
@@ -440,9 +441,6 @@ struct Playback {
 
     if (track.durationTieCanceled && track.previousTied) {
       track.previousTied = false;
-      if (durationRate < 100 || isDrum) {
-        out.expression(1.0);
-      }
     }
 
     const bool tied = !isDrum && track.previousTied && track.previousKey && std::abs(*track.previousKey - key) < 0.001;
@@ -453,6 +451,10 @@ struct Playback {
       // itself at full velocity.
       out.expression(gain);
       noteGain = 1.0;
+      track.velocityUsesExpression = true;
+    } else if (track.velocityUsesExpression) {
+      out.expression(1.0);
+      track.velocityUsesExpression = false;
     }
 
     const auto emitNote = [&](double noteKey, double linearVelocity, u32 noteDuration, bool extendsPrevious = false) {
@@ -489,9 +491,6 @@ struct Playback {
       note = emitNote(key, noteGain, duration, tied);
     }
 
-    if (track.previousTied && (durationRate < 100 || isDrum)) {
-      out.at(vm.tick() + duration).expression(1.0);
-    }
     track.previousNoteStart = vm.tick();
     track.previousNoteDuration = duration;
     track.previousKey = key;
