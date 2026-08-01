@@ -26,6 +26,7 @@ inline constexpr std::string_view kKonamiArcadeInstrumentDomain = "konami-arcade
 inline constexpr u32 kKonamiArcadePpqn = 48;
 inline constexpr u32 kKonamiArcadeSampleRate = 24000;
 inline constexpr u32 kKonamiArcadeMaxTracks = 16;
+inline constexpr u32 kKonamiArcadeDrumSelectorCount = 0x60;
 
 enum class KonamiArcadeVersion : u8 {
   MysticWarrior = 1,
@@ -97,7 +98,7 @@ struct KonamiArcadeLayout {
   std::vector<KonamiArcadeSequenceLayout> sequences;
   std::vector<KonamiArcadeSampleInfo> sampleInfos;
   u32 melodicSampleCount = 0;
-  std::array<KonamiArcadeDrum, 46> drums;
+  std::array<KonamiArcadeDrum, kKonamiArcadeDrumSelectorCount> drums;
   u32 drumCount = 0;
 };
 
