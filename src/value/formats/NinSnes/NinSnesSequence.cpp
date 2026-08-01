@@ -763,6 +763,7 @@ struct TrackState {
   u8 velocity = 0xfc;
   s8 transpose = 0;
   bool legato = false;
+  bool voiceHeld = false;
   bool inPattern = false;
   u8 patternRemaining = 0;
   Address patternStart;
@@ -790,12 +791,40 @@ struct Playback {
   ProgramState& program;
 
   [[nodiscard]] u8 soundingDuration() const {
-    if (track.legato) {
+    if (track.legato || (program.selected.id == ProfileId::Konami && track.durationRate == 0)) {
       return track.noteLength;
     }
     const u8 scaled = static_cast<u8>((track.noteLength * track.durationRate) >> 8);
     const u8 maximum = static_cast<u8>(track.noteLength - 2);
     return std::min(std::max<u8>(scaled, 1), maximum);
+  }
+
+  void updateVoiceHold() {
+    const bool held = program.selected.id == ProfileId::Konami && track.durationRate == 0;
+    if (held != track.voiceHeld) {
+      out.legatoPedal(held);
+    }
+    track.voiceHeld = held;
+  }
+
+  void emitVoiceNote(double key, u32 duration) {
+    const bool continuesPreviousVoice = track.voiceHeld && track.lastNote.valid() && track.lastKey.has_value();
+    const bool extendsPrevious = continuesPreviousVoice && std::abs(*track.lastKey - key) < 0.0001;
+    const PerformanceNoteId note = out.note(NotePerformanceEvent{
+        .key = key,
+        .linearVelocity = math::levelGain(track.velocity),
+        .durationTicks = duration,
+        .extendsPrevious = extendsPrevious,
+        .restartsLfoPhase = !continuesPreviousVoice,
+    });
+    if (continuesPreviousVoice && !extendsPrevious) {
+      out.pitchSlide(note, *track.lastKey, key, PitchSlideTiming::fromTicks(0))
+          .continueFrom(track.lastNote)
+          .preferPitchBend();
+    }
+    track.lastNote = note;
+    track.lastKey = key;
+    updateVoiceHold();
   }
 
   void standardParameters(u8 duration, bool hasPacked, u8 durationValue, u8 velocityValue) {
@@ -1009,8 +1038,7 @@ struct Playback {
     const double key =
         kMelodicKeyCorrection + noteIndex + track.transpose + static_cast<double>(track.konamiLoopPitchDelta) / 256.0;
     beginNotePitch(noteIndex);
-    track.lastNote = out.note(key, math::levelGain(track.velocity), soundingDuration() + (track.legato ? 1u : 0u));
-    track.lastKey = key;
+    emitVoiceNote(key, soundingDuration() + (track.legato ? 1u : 0u));
     return Effects::wait(track.noteLength);
   }
 
@@ -1032,8 +1060,7 @@ struct Playback {
       switchToDrumProgram(kit);
       const double key = 0x24 + slot - program.globalTranspose;
       beginNotePitch(static_cast<u8>(0x24 + slot - program.globalTranspose));
-      track.lastNote = out.note(key, math::levelGain(track.velocity), duration);
-      track.lastKey = key;
+      emitVoiceNote(key, duration);
     } else {
       const bool earlier = earlierNote <= 0xff;
       u8 logical = earlier ? slot : 0;
@@ -1045,8 +1072,7 @@ struct Playback {
       switchToDrumProgram(0);
       const double outputKey = key - program.globalTranspose + static_cast<double>(track.konamiLoopPitchDelta) / 256.0;
       beginNotePitch(static_cast<u8>(key - program.globalTranspose));
-      track.lastNote = out.note(outputKey, math::levelGain(track.velocity), duration);
-      track.lastKey = outputKey;
+      emitVoiceNote(outputKey, duration);
     }
     return Effects::wait(track.noteLength);
   }
@@ -1055,14 +1081,21 @@ struct Playback {
     if (track.lastKey) {
       track.lastNote = out.note(*track.lastKey, math::levelGain(track.velocity), soundingDuration(), true);
     }
+    updateVoiceHold();
     return Effects::wait(track.noteLength);
   }
 
   [[nodiscard]] Effects rest() {
-    // A rest ends the preceding note chain; a later tie cannot reach back
-    // across that silence.
-    track.lastNote = {};
-    track.lastKey.reset();
+    if (track.voiceHeld && track.lastNote.valid()) {
+      static_cast<void>(out.setPreviousNoteEnd(vm.tick() + soundingDuration()));
+    }
+    updateVoiceHold();
+    if (!track.voiceHeld) {
+      // A gated rest ends the preceding note chain; a later tie cannot reach
+      // back across that silence.
+      track.lastNote = {};
+      track.lastKey.reset();
+    }
     return Effects::wait(track.noteLength);
   }
 

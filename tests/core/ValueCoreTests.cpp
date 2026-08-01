@@ -69,6 +69,7 @@ void ninSnesFe3ConditionalJumpUsesCapturedDriverState();
 void ninSnesControllerFadesRemainInTheSourceDomain();
 void ninSnesPrepassClearsMasterVolumeAutomationBinding();
 void ninSnesPlaylistCarriesTiesAcrossSectionParserResets();
+void ninSnesKonamiZeroDurationRateContinuesHeldVoice();
 void ninSnesF9UsesSharedPitchTransitions();
 void ninSnesPercussionStartsPerNoteVibratoFade();
 void ninSnesFixedPercussionBaseIgnoresFaOperand();
@@ -222,6 +223,7 @@ int main() {
     ninSnesControllerFadesRemainInTheSourceDomain();
     ninSnesPrepassClearsMasterVolumeAutomationBinding();
     ninSnesPlaylistCarriesTiesAcrossSectionParserResets();
+    ninSnesKonamiZeroDurationRateContinuesHeldVoice();
     ninSnesF9UsesSharedPitchTransitions();
     ninSnesPercussionStartsPerNoteVibratoFade();
     ninSnesFixedPercussionBaseIgnoresFaOperand();
