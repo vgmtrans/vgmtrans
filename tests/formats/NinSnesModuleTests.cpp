@@ -749,6 +749,90 @@ void ninSnesPlaylistCarriesTiesAcrossSectionParserResets() {
          "a fade in the next section should continue from the preceding channel level");
 }
 
+void ninSnesKonamiZeroDurationRateContinuesHeldVoice() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0x220);
+  writeLe16(bytes, 0x104, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+  writeSection(bytes, 0x220, {{0, 0x320}});
+
+  // A normal note precedes the zero-rate run. The first zero-rate note still
+  // attacks, then leaves the driver's voice-hold bit set for the next section.
+  std::ranges::copy(std::initializer_list<u8>{4, 0x6f, 0x80, 4, 0x0f, 0x84, 0}, bytes.begin() + 0x300);
+
+  // The next note changes pitch without a new attack. A zero-rate rest keeps
+  // that voice sounding, and the first later gated note is still part of the
+  // held voice before it clears the hold bit.
+  std::ranges::copy(std::initializer_list<u8>{4, 0x0f, 0x87, 0xc9, 4, 0x6f, 0x89, 0}, bytes.begin() + 0x320);
+
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::Konami;
+  layout.durationRateTable = {0x00, 0xe6, 0xf0, 0xf5, 0xfa, 0xfc, 0xfe, 0xff};
+  const PerformanceSequence performance = render(bytes, layout);
+  expect(performance.diagnostics.empty(), "Konami zero-rate hold fixture should render without diagnostics");
+
+  std::vector<const NotePerformanceEvent*> notes;
+  std::vector<const PitchTransitionIntent*> transitions;
+  std::vector<const LegatoPedalPerformanceEvent*> pedals;
+  for (const PerformanceEvent& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(note);
+    } else if (const auto* pedal = std::get_if<LegatoPedalPerformanceEvent>(&event)) {
+      pedals.push_back(pedal);
+    }
+  }
+  for (const PerformanceAutomation& automation : performance.tracks[0].automations) {
+    if (const auto* transition = pitchTransitionIntent(automation)) {
+      transitions.push_back(transition);
+    }
+  }
+
+  expect(notes.size() == 4 && notes[0]->header.tick == 0 && notes[0]->durationTicks == 2 &&
+             notes[1]->header.tick == 4 && notes[1]->durationTicks == 4 && notes[2]->header.tick == 8 &&
+             notes[2]->durationTicks == 8 && notes[3]->header.tick == 16 && notes[3]->durationTicks == 2,
+         "zero-rate notes and rests should preserve the driver's full held-voice timeline");
+  expect(transitions.size() == 2 && transitions[0]->previousNote == std::optional{notes[1]->note} &&
+             transitions[0]->note == notes[2]->note && transitions[0]->startKey == 28.0 &&
+             transitions[0]->targetKey == 31.0 && transitions[0]->timing.timelineTicks == 0 &&
+             transitions[1]->previousNote == std::optional{notes[2]->note} && transitions[1]->note == notes[3]->note &&
+             transitions[1]->startKey == 31.0 && transitions[1]->targetKey == 33.0 &&
+             transitions[1]->timing.timelineTicks == 0,
+         "middle and terminal notes should continue the held voice with instant pitch changes");
+  expect(pedals.size() == 2 && pedals[0]->header.tick == 4 && pedals[0]->enabled && pedals[1]->header.tick == 16 &&
+             !pedals[1]->enabled,
+         "CC68 intent should bracket the exact zero-rate held-note run");
+
+  const MidiSequence midi = renderMidiSequence(performance);
+  std::vector<NoteDuration> attacks;
+  for (const MidiEvent& event : midi.tracks[0].events) {
+    if (const auto* note = std::get_if<NoteDuration>(&event)) {
+      attacks.push_back(*note);
+    }
+  }
+  expect(attacks.size() == 2 && attacks[0].tick == 0 && attacks[0].key == 24 && attacks[0].duration == 2 &&
+             attacks[1].tick == 4 && attacks[1].key == 28 && attacks[1].duration == 14,
+         "pitch-bend lowering should render the zero-rate run as one sustained physical attack");
+
+  Layout standard = standardLayout();
+  standard.durationRateTable = layout.durationRateTable;
+  const PerformanceSequence standardPerformance = render(std::move(bytes), standard);
+  std::vector<u32> standardDurations;
+  bool standardHasHold = false;
+  for (const PerformanceEvent& event : standardPerformance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      standardDurations.push_back(note->durationTicks);
+    }
+    standardHasHold |= std::holds_alternative<LegatoPedalPerformanceEvent>(event);
+  }
+  const bool standardHasContinuation =
+      std::ranges::any_of(standardPerformance.tracks[0].automations, [](const PerformanceAutomation& automation) {
+        return pitchTransitionIntent(automation) != nullptr;
+      });
+  expect(standardDurations == std::vector<u32>{2, 1, 1, 2} && !standardHasHold && !standardHasContinuation,
+         "zero duration rate should retain ordinary one-tick gates outside the Konami driver");
+}
+
 void ninSnesF9UsesSharedPitchTransitions() {
   const auto commandBytes = [](std::initializer_list<u8> commands) {
     std::vector<u8> bytes(kAramSize);
