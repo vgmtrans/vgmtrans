@@ -267,35 +267,6 @@ void endTrackAt(PerformanceTrack& track, u64 endTick, bool retainBoundaryEvents 
   track.endTick = endTick;
 }
 
-[[nodiscard]] std::optional<u64> noteEndTick(const PerformanceTrack& track, PerformanceNoteId id) {
-  std::optional<u64> endTick;
-  for (const auto& event : track.events) {
-    const auto* note = std::get_if<NotePerformanceEvent>(&event);
-    if (note == nullptr || note->note != id) {
-      continue;
-    }
-    const u64 candidate = note->header.tick > std::numeric_limits<u64>::max() - note->durationTicks
-                              ? std::numeric_limits<u64>::max()
-                              : note->header.tick + note->durationTicks;
-    endTick = std::max(endTick.value_or(0), candidate);
-  }
-  return endTick;
-}
-
-void finalizeAutomations(PerformanceTrack& track) {
-  for (auto& automation : track.automations) {
-    auto* pitch = pitchTransitionIntent(automation);
-    if (pitch == nullptr || pitch->continuesAcrossNotes) {
-      continue;
-    }
-    const auto noteEnd = noteEndTick(track, pitch->note);
-    if (!noteEnd || *noteEnd >= automation.realization.endTick) {
-      continue;
-    }
-    automation.realization.endTick = std::max(automation.realization.startTick, *noteEnd);
-  }
-}
-
 void endSourceSpansAt(std::vector<SourcePlaybackSpan>& spans, u64 endTick) {
   std::erase_if(spans, [endTick](const SourcePlaybackSpan& span) { return span.beginTick >= endTick; });
   for (auto& span : spans) {
@@ -534,7 +505,6 @@ public:
 
   [[nodiscard]] RenderedTrack finish() {
     performanceTrack_.endTick = runtime_.tick;
-    finalizeAutomations(performanceTrack_);
     // Commands may schedule events inside an earlier note (for example a
     // delayed pitch slide discovered after that note has advanced the VM).
     // Keep the target-neutral performance timeline chronological while
