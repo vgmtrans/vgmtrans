@@ -310,6 +310,7 @@ QString diagnosticMessages(const std::vector<vgmtrans::core::Diagnostic>& diagno
 void applySequenceRenderSettings(vgmtrans::core::SequenceRenderOptions& options) {
   options.sequenceLoops = static_cast<u32>(Settings::the()->conversion.numSequenceLoops());
   options.midi.skipChannel10 = Settings::the()->conversion.skipChannel10();
+  options.midi.terminatePreviousVoice = Settings::the()->conversion.terminatePreviousVoice();
   options.midi.bankSelectStyle = Settings::the()->conversion.bankSelectStyle() == BankSelectStyle::MMA
                                      ? vgmtrans::core::MidiBankSelectStyle::MsbAndLsb
                                      : vgmtrans::core::MidiBankSelectStyle::MsbOnly;

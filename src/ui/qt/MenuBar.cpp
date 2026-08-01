@@ -239,6 +239,13 @@ void MenuBar::appendOptionsMenu() {
     Settings::the()->conversion.setExportOnlyUsedInstruments(checked);
   });
 
+  QAction* terminatePreviousVoice = m_optionsMenu->addAction(tr("Terminate previous voice on new attack"));
+  terminatePreviousVoice->setCheckable(true);
+  terminatePreviousVoice->setChecked(Settings::the()->conversion.terminatePreviousVoice());
+  connect(terminatePreviousVoice, &QAction::toggled, this, [](bool checked) {
+    Settings::the()->conversion.setTerminatePreviousVoice(checked);
+  });
+
   QAction* skipChannel10 = m_optionsMenu->addAction(tr("Skip MIDI channel 10"));
   skipChannel10->setCheckable(true);
   skipChannel10->setChecked(Settings::the()->conversion.skipChannel10());

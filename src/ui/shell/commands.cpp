@@ -697,6 +697,10 @@ std::optional<vgmtrans::core::ExportRequest> valueExportRequestFromArgs(const st
       request.dynamicEnvelopes = vgmtrans::core::DynamicEnvelopePolicy::InstrumentVariants;
       continue;
     }
+    if (option == "--terminate-previous-voice") {
+      request.sequence.midi.terminatePreviousVoice = true;
+      continue;
+    }
 
     std::string_view modulationPrefix = "--modulation-scaling=";
     if (option.starts_with(modulationPrefix)) {
@@ -740,8 +744,8 @@ std::optional<vgmtrans::core::ExportRequest> valueExportRequestFromArgs(const st
 
     const auto kind = valueExportKindFromString(option);
     if (!kind) {
-      fmt::println("Unknown value export option '{}'. Use all, midi, sf2, dls, wav, --dynamic-envelopes, or "
-                   "--modulation-scaling full|observed.",
+      fmt::println("Unknown value export option '{}'. Use all, midi, sf2, dls, wav, --dynamic-envelopes, "
+                   "--terminate-previous-voice, or --modulation-scaling full|observed.",
                    args[i]);
       return std::nullopt;
     }
@@ -2044,15 +2048,15 @@ void registerCommands() {
         "List or inspect a value sample collection from a filesystem path", 4, value_samples_path},
        {"export",
         "<rawfile_idx> <collection_idx> <dir> [all|midi|sf2|dls|wav; default midi] "
-        "[--modulation-scaling full|observed] [--dynamic-envelopes]",
+        "[--modulation-scaling full|observed] [--dynamic-envelopes] [--terminate-previous-voice]",
         "Export value artifacts for a collection", 5, value_export},
        {"export-all",
         "<rawfile_idx> <dir> [all|midi|sf2|dls|wav; default midi] [--modulation-scaling full|observed] "
-        "[--dynamic-envelopes]",
+        "[--dynamic-envelopes] [--terminate-previous-voice]",
         "Export value artifacts for all collections", 4, value_export_all},
        {"export-path",
         "<path> <dir> [all|midi|sf2|dls|wav; default midi] [--modulation-scaling full|observed] "
-        "[--dynamic-envelopes]",
+        "[--dynamic-envelopes] [--terminate-previous-voice]",
         "Scan a filesystem path and export all value collections", 4, value_export_path}}};
 
   commandRegistry["help"] = {"help", "Show this help", {}};

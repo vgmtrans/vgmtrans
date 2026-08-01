@@ -47,6 +47,8 @@ public:
     void setNumSequenceLoops(int loops) const;
     [[nodiscard]] bool skipChannel10() const;
     void setSkipChannel10(bool skip) const;
+    [[nodiscard]] bool terminatePreviousVoice() const;
+    void setTerminatePreviousVoice(bool enabled) const;
     [[nodiscard]] vgmtrans::core::MidiPitchTransitionRendering pitchTransitionRendering() const;
     void setPitchTransitionRendering(vgmtrans::core::MidiPitchTransitionRendering rendering) const;
     [[nodiscard]] vgmtrans::core::ModulationConversionPolicy modulationConversion() const;
