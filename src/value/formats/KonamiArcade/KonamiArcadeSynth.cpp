@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <optional>
 #include <string>
 
@@ -199,7 +200,7 @@ ScanSynthRefs addKonamiArcadeSynth(ScanResultBuilder& builder, const KonamiArcad
                 Region{
                     .range = range,
                     .unityKey = 66.0,
-                    .envelope = Envelope{.releaseSeconds = 0.0},
+                    .envelope = Envelope{.releaseSeconds = std::numeric_limits<double>::infinity()},
                 })
         .source("Region", range, "konami-arcade-region");
   }
@@ -235,7 +236,9 @@ ScanSynthRefs addKonamiArcadeSynth(ScanResultBuilder& builder, const KonamiArcad
                                                   .keyRange = KeyRange{.low = key, .high = key},
                                                   .range = drum.range,
                                                   .unityKey = static_cast<double>(key) + 0x2a - driverPitch,
-                                                  .envelope = Envelope{.releaseSeconds = 0.0},
+                                                  .envelope =
+                                                      Envelope{.releaseSeconds =
+                                                                   std::numeric_limits<double>::infinity()},
                                                   .attenuationDb = attenuationDb(drum.attenuation),
                                               });
       auto annotation = region.source(fmt::format("Drum {}", index), drum.range, "konami-arcade-drum");

@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -90,7 +91,9 @@ constexpr u32 kMaxTrackCommands = 32768;
 
 [[nodiscard]] double releaseSeconds(u8 rate, double nmiRateHertz, double tempo) {
   if (rate == 0) {
-    return 0.0;
+    // Both drivers add rate << 4 to the release attenuation each music tick.
+    // A zero increment therefore sustains until the hardware voice is reused.
+    return std::numeric_limits<double>::infinity();
   }
   // FA stores rate << 4 in an 8.8 attenuation accumulator. Each music tick
   // adds that increment until its high byte reaches the maximum loudness.
@@ -182,7 +185,6 @@ struct TrackState {
   u8 previousDelta = 0;
   u8 previousDurationParameter = 0;
   u8 driverDurationRate = 0;
-  u8 releaseRate = 0;
   u8 program = 0;
   s32 transpose = 0;
   std::array<Address, 2> loopStart;
@@ -366,7 +368,6 @@ struct Playback {
   }
 
   void setReleaseRate(u8 rate, double nmiRateHertz) {
-    track.releaseRate = rate;
     out.envelope(
         Envelope{.releaseSeconds = releaseSeconds(rate, nmiRateHertz, sequence.channelTempos[track.sourceTrackNumber])},
         EnvelopeFields::Release, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
@@ -449,7 +450,7 @@ struct Playback {
         const auto [left, right] = stereoGains(drumPan);
         out.stereoBalance(left, right);
       }
-    } else if (durationRate != 0 && track.releaseRate != 0) {
+    } else if (durationRate != 0) {
       duration = std::max<u32>(1, static_cast<u32>(delta) * durationRate / 100);
     }
 
