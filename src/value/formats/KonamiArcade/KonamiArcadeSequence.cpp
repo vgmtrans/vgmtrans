@@ -15,7 +15,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -90,11 +89,6 @@ constexpr u32 kMaxTrackCommands = 32768;
 }
 
 [[nodiscard]] double releaseSeconds(u8 rate, double nmiRateHertz, double tempo) {
-  if (rate == 0) {
-    // Both drivers add rate << 4 to the release attenuation each music tick.
-    // A zero increment therefore sustains until the hardware voice is reused.
-    return std::numeric_limits<double>::infinity();
-  }
   // FA stores rate << 4 in an 8.8 attenuation accumulator. Each music tick
   // adds that increment until its high byte reaches the maximum loudness.
   constexpr double kMaximumLoudness = 127.0;
@@ -185,6 +179,7 @@ struct TrackState {
   u8 previousDelta = 0;
   u8 previousDurationParameter = 0;
   u8 driverDurationRate = 0;
+  u8 releaseRate = 0;
   u8 program = 0;
   s32 transpose = 0;
   std::array<Address, 2> loopStart;
@@ -200,8 +195,9 @@ struct TrackState {
   std::optional<double> previousDrumPitch;
   PerformanceNoteId previousNote;
   u64 previousNoteStart = 0;
-  u32 previousNoteDuration = 0;
+  u32 previousGateDuration = 0;
   bool previousTied = false;
+  bool zeroReleaseVoiceActive = false;
   bool velocityUsesExpression = false;
   bool durationTieCanceled = false;
   u8 portamentoTime = 0;
@@ -243,6 +239,10 @@ struct Playback {
   }
   [[nodiscard]] PitchSlideTiming slideTiming(u8 ticks) const {
     return PitchSlideTiming::fixedDuration(ticks, driverMilliseconds(ticks));
+  }
+  void interruptVoice() {
+    track.zeroReleaseVoiceActive = false;
+    track.previousNote = {};
   }
   [[nodiscard]] LfoPerformanceContext vibratoContext() const {
     const auto& vibrato = track.vibrato;
@@ -342,12 +342,22 @@ struct Playback {
   }
 
   void setPercussion(u8 flag, bool enabled) {
+    const bool wasPercussion = percussion();
     if (flag == 0) {
       track.percussionFlag1 = enabled;
     } else {
       track.percussionFlag2 = enabled;
     }
     const bool isPercussion = percussion();
+    if (flag == 0 && !enabled) {
+      // GX keys off when it reloads the melodic sample. The Z80 opcode resets
+      // an ordinary gated voice even if secondary percussion remains active.
+      const bool stopsVoice = isGx() ? wasPercussion && !isPercussion
+                                     : track.driverDurationRate != 0 && track.driverDurationRate < 100;
+      if (stopsVoice) {
+        interruptVoice();
+      }
+    }
     if (!enabled && isPercussion) {
       return;
     }
@@ -364,13 +374,42 @@ struct Playback {
     if (!percussion()) {
       selectInstrument(value);
     }
+    // GX writes the K054539 key-off register while loading a program.
+    // MysticWarrior only updates channel state for the next activation.
+    if (isGx()) {
+      interruptVoice();
+    }
     track.durationTieCanceled = true;
   }
 
   void setReleaseRate(u8 rate, double nmiRateHertz) {
+    track.releaseRate = rate;
+    if (rate == 0) {
+      // Zero adds no software attenuation. Represent that as a held source
+      // voice rather than an impractical infinite-release instrument.
+      const bool gateStillActive =
+          track.previousNote.valid() &&
+          (track.previousTied || vm.tick() < track.previousNoteStart + track.previousGateDuration);
+      track.zeroReleaseVoiceActive = track.zeroReleaseVoiceActive || gateStillActive;
+      out.restoreEnvelope(EnvelopeFields::Release, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+      return;
+    }
+    track.zeroReleaseVoiceActive = false;
     out.envelope(
         Envelope{.releaseSeconds = releaseSeconds(rate, nmiRateHertz, sequence.channelTempos[track.sourceTrackNumber])},
         EnvelopeFields::Release, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+  }
+
+  void rest(u8 delta) {
+    if (track.zeroReleaseVoiceActive && track.previousNote.valid()) {
+      static_cast<void>(out.setPreviousNoteEnd(vm.tick() + delta));
+    }
+    if (isGx()) {
+      // GX clears the live duration but retains the separately stored
+      // duration parameter used by later velocity-only notes.
+      track.driverDurationRate = 0;
+    }
+    track.durationTieCanceled = true;
   }
 
   void emitNotePitchState(bool isDrum, s8 initialTranspose) {
@@ -467,7 +506,13 @@ struct Playback {
       track.previousTied = false;
     }
 
-    const bool tied = !isDrum && track.previousTied && track.previousKey && std::abs(*track.previousKey - key) < 0.001;
+    const bool continuesPreviousVoice =
+        !isDrum && track.previousTied && track.previousKey && track.previousNote.valid();
+    const bool tied = continuesPreviousVoice && std::abs(*track.previousKey - key) < 0.001;
+    if (!continuesPreviousVoice && track.zeroReleaseVoiceActive && track.previousNote.valid() &&
+        track.previousNoteStart + track.previousGateDuration > vm.tick()) {
+      static_cast<void>(out.setPreviousNoteEnd(vm.tick()));
+    }
     double noteGain = gain;
     if (!isDrum && (track.previousTied || durationRate >= 100)) {
       // A 100% duration is the driver's tie mode. Velocity remains live while
@@ -481,11 +526,12 @@ struct Playback {
       track.velocityUsesExpression = false;
     }
 
-    const auto emitNote = [&](double noteKey, double linearVelocity, u32 noteDuration, bool extendsPrevious = false) {
+    const u32 performanceDuration = track.releaseRate == 0 ? std::max<u32>(duration, delta) : duration;
+    const auto emitNote = [&](double noteKey, double linearVelocity, bool extendsPrevious = false) {
       return out.note(NotePerformanceEvent{
           .key = noteKey,
           .linearVelocity = linearVelocity,
-          .durationTicks = noteDuration,
+          .durationTicks = performanceDuration,
           .extendsPrevious = extendsPrevious,
           .restartsLfoPhase = restartsVibrato,
           .restartsVibratoLfoPhase = restartsVibrato,
@@ -496,8 +542,8 @@ struct Playback {
     PerformanceNoteId note;
     if (!isDrum && track.portamentoTime != 0 && track.previousKey && track.previousNote.valid() &&
         std::abs(*track.previousKey - key) >= 0.001) {
-      note = emitNote(key, noteGain, duration);
-      if (track.previousNoteStart + track.previousNoteDuration == vm.tick()) {
+      note = emitNote(key, noteGain);
+      if (continuesPreviousVoice || track.previousNoteStart + track.previousGateDuration == vm.tick()) {
         auto slide = out.pitchSlide(note, *track.previousKey, key, track.portamentoTime);
         slide.continueFrom(track.previousNote).useCurrentPortamentoTiming();
       } else if (duration > 2) {
@@ -508,26 +554,35 @@ struct Playback {
     } else if (track.slideDuration != 0 && track.slideDepth != 0 && !isDrum &&
                duration > static_cast<u32>(track.slideDelay + 1)) {
       const double slideStartKey = std::clamp(key - track.slideDepth, 0.0, 127.0);
-      note = emitNote(key, noteGain, duration);
+      note = emitNote(key, noteGain);
       out.at(vm.tick() + static_cast<u32>(track.slideDelay) + 1)
           .pitchSlide(note, slideStartKey, key, slideTiming(track.slideDuration));
+    } else if (continuesPreviousVoice && !tied) {
+      note = emitNote(key, noteGain);
+      out.pitchSlide(note, *track.previousKey, key, PitchSlideTiming::fromTicks(0))
+          .continueFrom(track.previousNote)
+          .preferPitchBend();
     } else {
-      note = emitNote(key, noteGain, duration, tied);
+      note = emitNote(key, noteGain, tied);
     }
 
     track.previousNoteStart = vm.tick();
-    track.previousNoteDuration = duration;
+    // Keep the driver's gate boundary separate from the longer portable note
+    // used to represent a zero-rate release tail.
+    track.previousGateDuration = duration;
     track.previousKey = key;
     track.previousDrumPitch = isDrum ? std::optional<double>{drumPitch} : std::nullopt;
     track.previousNote = note;
     track.previousTied = durationRate >= 100 && !isDrum;
+    track.zeroReleaseVoiceActive = track.releaseRate == 0;
     track.durationTieCanceled = false;
   }
 
   void hold(u8 delta, u8 rate) {
     const u32 scaled = static_cast<u32>(delta) * rate / 100;
-    const u32 extension = isGx() ? std::max<u32>(1, scaled) : scaled;
-    if (extension != 0 && track.previousKey) {
+    const u32 nominalExtension = isGx() ? std::max<u32>(1, scaled) : scaled;
+    const u32 extension = track.zeroReleaseVoiceActive ? std::max<u32>(nominalExtension, delta) : nominalExtension;
+    if (extension != 0 && track.previousKey && track.previousNote.valid()) {
       track.previousNote = out.note(*track.previousKey, 1.0, extension, true);
     }
     track.previousDurationParameter = rate;
@@ -638,7 +693,7 @@ struct Playback {
       }
       slideStart = track.previousNoteStart + delay;
     }
-    if (slideStart >= track.previousNoteStart + track.previousNoteDuration) {
+    if (slideStart >= track.previousNoteStart + track.previousGateDuration) {
       return;
     }
     auto slide =
@@ -878,12 +933,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
       const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
       event.set<&TrackState::previousDelta>(delta);
-      if (gx) {
-        // GX clears the live duration but retains the separately stored
-        // duration parameter used by later velocity-only notes.
-        event.set<&TrackState::driverDurationRate>(u8{0});
-      }
-      event.set<&TrackState::durationTieCanceled>(true);
+      event.invoke<&Playback::rest>(delta);
       return event.wait(delta);
     }
     case 0xe1: {

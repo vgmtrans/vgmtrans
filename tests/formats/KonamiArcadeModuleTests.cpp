@@ -282,10 +282,10 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
              std::abs(instruments->instruments[1].regions[0].unityKey - 22.0) < 0.0001,
          "MysticWarrior drums should preserve the Z80 driver's six-bit-sixteenths pitch");
   expect(instruments->instruments[0].regions[0].envelope.releaseSeconds &&
-             std::isinf(*instruments->instruments[0].regions[0].envelope.releaseSeconds) &&
+             *instruments->instruments[0].regions[0].envelope.releaseSeconds == 0.0 &&
              instruments->instruments[1].regions[0].envelope.releaseSeconds &&
-             std::isinf(*instruments->instruments[1].regions[0].envelope.releaseSeconds),
-         "KonamiArcade instruments should use the driver's non-decaying default release");
+             *instruments->instruments[1].regions[0].envelope.releaseSeconds == 0.0,
+         "KonamiArcade instruments should remain practical outside their source sequence");
 
   const PerformanceSequence performance =
       SequenceVm(LoopPolicy::PlayOnce).render(sequence->program, konamiArcadeSequenceDialect());
@@ -323,15 +323,16 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
     }
   }
   expect(chronological, "KonamiArcade delayed slides should leave the performance timeline chronological");
-  expect(envelopes.size() == 2 && envelopes[1]->update.setFields == EnvelopeFields::Release &&
-             envelopes[1]->update.values.releaseSeconds &&
-             std::isinf(*envelopes[1]->update.values.releaseSeconds) &&
+  expect(envelopes.size() == 2 && envelopes[1]->update.setFields == EnvelopeFields::None &&
+             envelopes[1]->update.inheritFields == EnvelopeFields::Release &&
              envelopes[1]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks,
-         "MysticWarrior FA zero should emit a non-decaying release for active and future voices");
+         "MysticWarrior FA zero should restore the instant base release for active and future voices");
   expect(notes.size() == 8 && notes[0]->key == 74.0 && notes[1]->key == 64.0 && notes[2]->key == 64.0 &&
              notes[3]->key == 66.0 && notes[4]->key == 70.0 && notes[5]->key == 24.0 && notes[6]->key == 24.0 &&
-             notes[7]->key == 72.0 && notes[7]->durationTicks == 1,
-         "KonamiArcade playback should retain nominal notes without synthesizing MIDI slide fragments");
+             notes[7]->key == 72.0 && notes[0]->durationTicks == 6 && notes[1]->durationTicks == 4 &&
+             notes[2]->durationTicks == 4 && notes[3]->durationTicks == 8 && notes[4]->durationTicks == 10 &&
+             notes[7]->durationTicks == 1,
+         "zero-release notes should remain active through their event delta without synthesizing MIDI fragments");
   expect(notes[5]->durationTicks == 2 && notes[6]->durationTicks == 2,
          "MysticWarrior should preserve a zero drum-table duration instead of applying GX's fallback");
   expect(notes[6]->linearVelocity < notes[5]->linearVelocity,
@@ -341,12 +342,17 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
   const auto materialized = materializeDynamicEnvelopes(performance, dynamicInstruments);
   const auto* finiteRelease =
       materialized.instruments.selectionFor(performance.tracks[0].id, notes[5]->note);
-  const auto* infiniteRelease =
+  const auto* restoredRelease =
       materialized.instruments.selectionFor(performance.tracks[0].id, notes.back()->note);
   expect(materialized.instruments.complete() && materialized.variantCount != 0 && finiteRelease != nullptr &&
-             infiniteRelease != nullptr && finiteRelease->instrument.instrument != 1 &&
-             infiniteRelease->instrument.instrument == 0,
-         "FA zero should return later notes from a finite-release variant to the infinite-release base instrument");
+             restoredRelease != nullptr && finiteRelease->instrument.instrument != 1 &&
+             restoredRelease->instrument.instrument == 0,
+         "FA zero should return later notes from a finite-release variant to the instant-release base instrument");
+  expect(std::ranges::all_of(dynamicInstruments[0].instruments, [](const Instrument& instrument) {
+    return std::ranges::all_of(instrument.regions, [](const Region& region) {
+      return !region.envelope.releaseSeconds || !std::isinf(*region.envelope.releaseSeconds);
+    });
+  }), "dynamic materialization should not create impractical infinite-release KonamiArcade instruments");
   expect(std::ranges::any_of(performance.tracks[0].events,
                              [](const PerformanceEvent& event) {
                                const auto* reverb = std::get_if<ReverbPerformanceEvent>(&event);
@@ -415,8 +421,8 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
     const auto* note = std::get_if<NoteDuration>(&event);
     return note != nullptr && note->tick == 6 && note->key == 64;
   });
-  expect(tiedNote != midi.tracks[0].events.end() && std::get<NoteDuration>(*tiedNote).duration == 7,
-         "MIDI lowering should end the tied note at its encoded 99% release boundary");
+  expect(tiedNote != midi.tracks[0].events.end() && std::get<NoteDuration>(*tiedNote).duration == 8,
+         "MIDI lowering should hold the zero-release tied voice until its next activation");
   expect(std::ranges::any_of(midi.tracks[0].events,
                              [](const MidiEvent& event) {
                                const auto* control = std::get_if<PortamentoControl>(&event);
@@ -431,7 +437,7 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
              std::ranges::any_of(midi.tracks[0].events,
                                  [](const MidiEvent& event) {
                                    const auto* note = std::get_if<NoteDuration>(&event);
-                                   return note != nullptr && note->tick == 24 && note->key == 72 && note->duration == 7;
+                                   return note != nullptr && note->tick == 24 && note->key == 72 && note->duration == 8;
                                  }),
          "MysticWarrior F3 timing should overlap the fully transposed source and target notes by one tick");
 
@@ -453,13 +459,13 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
   expect(std::ranges::any_of(pitchBendMidi.tracks[0].events,
                              [](const MidiEvent& event) {
                                const auto* note = std::get_if<NoteDuration>(&event);
-                               return note != nullptr && note->tick == 14 && note->key == 66 && note->duration == 7;
+                               return note != nullptr && note->tick == 14 && note->key == 66 && note->duration == 8;
                              }),
          "pitch-bend lowering should retain the fresh attack after the preceding release gap");
   expect(std::ranges::any_of(pitchBendMidi.tracks[0].events,
                              [](const MidiEvent& event) {
                                const auto* note = std::get_if<NoteDuration>(&event);
-                               return note != nullptr && note->tick == 22 && note->key == 70 && note->duration == 9;
+                               return note != nullptr && note->tick == 22 && note->key == 70 && note->duration == 10;
                              }),
          "pitch-bend lowering should retain the delayed slide's one nominal source note");
 }
@@ -632,11 +638,11 @@ void konamiArcadeGxDriverQuirksRemainRepresented() {
   expect(envelopes.size() == 2 && envelopes[0]->update.setFields == EnvelopeFields::Release &&
              envelopes[0]->update.values.releaseSeconds &&
              std::abs(*envelopes[0]->update.values.releaseSeconds - expectedReleaseSeconds) < 0.0001 &&
-             envelopes[1]->update.values.releaseSeconds &&
-             std::isinf(*envelopes[1]->update.values.releaseSeconds) &&
+             envelopes[1]->update.setFields == EnvelopeFields::None &&
+             envelopes[1]->update.inheritFields == EnvelopeFields::Release &&
              envelopes[0]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
              envelopes[1]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks,
-         "GX FA should convert nonzero increments to timed releases and preserve zero as non-decaying");
+         "GX FA should convert nonzero increments to timed releases and restore zero to voice-hold behavior");
   expect(instruments.size() == 2 &&
              std::ranges::all_of(instruments, [](const InstrumentPerformanceEvent* instrument) {
                return instrument->envelopeMode == InstrumentEnvelopeMode::PreserveDynamicOverride;
@@ -644,9 +650,9 @@ void konamiArcadeGxDriverQuirksRemainRepresented() {
          "KonamiArcade instrument changes should preserve the track-level release rate");
   expect(notes.size() == 5 && notes[0]->key == 74.0 && notes[1]->key == 72.0 && notes[2]->key == 73.0 &&
              notes[3]->key == 74.0 && notes[4]->key == 24.0 && notes[0]->durationTicks == 3 &&
-             notes[1]->durationTicks == 7 && notes[2]->durationTicks == 7 && notes[3]->durationTicks == 7 &&
-             notes[4]->durationTicks == 1 && notes[0]->linearVelocity < 1.0,
-         "GX should retain its encoded duration across a rest while keeping live duration and drum fallback distinct");
+             notes[1]->durationTicks == 24 && notes[2]->durationTicks == 24 && notes[3]->durationTicks == 24 &&
+             notes[4]->durationTicks == 2 && notes[0]->linearVelocity < 1.0,
+         "GX should retain encoded gate state while zero release holds each hardware voice to its next activation");
   expect(balances.size() == 2 && std::abs(balances[0]->leftGain - 1.0) < 0.0001 &&
              std::abs(balances[0]->rightGain) < 0.0001 && balances[1]->leftGain > balances[1]->rightGain,
          "encoded sequence and drum pan bytes should use their low-nibble positions");
@@ -702,6 +708,97 @@ void konamiArcadeExpressionPersistsThroughSoftwareRelease() {
          "velocity expression should remain unchanged through release and reset at the next note activation");
   expect(expressions[2]->header.sequence < notes[2]->header.sequence,
          "velocity expression should reset before the next note-on at the same tick");
+}
+
+void konamiArcadeZeroReleaseUsesHardwareVoiceLifetime() {
+  auto mysticFixture = makeMysticWarriorFixture();
+  writeBytes(mysticFixture.bytes, 0x320,
+             {
+                 0xea, 0x80,              // tempo
+                 0x30, 0x04, 0x32, 0x7f,  // zero release holds past the two-tick nominal gate
+                 0xe1, 0x08, 0x32,        // a hold continues the same hardware voice
+                 0xe2, 0x00,              // Z80 program changes do not stop the current voice
+                 0xe0, 0x04,              // neither does a rest
+                 0x32, 0x04, 0x64, 0x7f,  // a fresh attack finally reuses the voice, then requests a tie
+                 0x34, 0x04, 0x32, 0x7f,  // tied pitch change continues without another attack
+                 0xff,
+             });
+
+  std::vector<Diagnostic> diagnostics;
+  const auto mysticLayout = findKonamiArcadeLayout(
+      mysticFixture.source, ByteReader(mysticFixture.source.id, mysticFixture.bytes), &diagnostics);
+  expect(mysticLayout && diagnostics.empty() && mysticLayout->sequences.size() == 1,
+         "MysticWarrior zero-release fixture should produce a valid layout");
+  const SequenceProgram mysticProgram =
+      decodeKonamiArcadeSequence(ByteReader(mysticFixture.source.id, mysticFixture.bytes), *mysticLayout,
+                                 mysticLayout->sequences[0], AssetId{1}, nullptr, &diagnostics);
+  const PerformanceSequence mystic =
+      SequenceVm(LoopPolicy::PlayOnce).render(mysticProgram, konamiArcadeSequenceDialect());
+  expect(diagnostics.empty() && mystic.diagnostics.empty() && mystic.tracks.size() == 1,
+         "MysticWarrior zero-release fixture should render without diagnostics");
+
+  std::vector<const NotePerformanceEvent*> mysticNotes;
+  for (const auto& event : mystic.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      mysticNotes.push_back(note);
+    }
+  }
+  expect(mysticNotes.size() == 4 && mysticNotes[0]->header.tick == 0 && mysticNotes[0]->durationTicks == 16 &&
+             mysticNotes[1]->header.tick == 4 && mysticNotes[1]->durationTicks == 12 &&
+             mysticNotes[1]->extendsPrevious && mysticNotes[2]->header.tick == 16 &&
+             mysticNotes[2]->durationTicks == 4 && mysticNotes[3]->header.tick == 20 &&
+             mysticNotes[3]->durationTicks == 4,
+         "zero release should span Z80 holds, program changes, and rests until a fresh attack");
+  const auto tiedPitchChange = std::ranges::find_if(mystic.tracks[0].automations, [&](const auto& automation) {
+    const auto* transition = pitchTransitionIntent(automation);
+    return transition != nullptr && transition->previousNote == mysticNotes[2]->note;
+  });
+  expect(tiedPitchChange != mystic.tracks[0].automations.end() &&
+             pitchTransitionIntent(*tiedPitchChange)->timing.timelineTicks == 0,
+         "a tied key change should continue the zero-release hardware voice with an instantaneous pitch move");
+
+  std::vector<u8> gxBytes(0x200);
+  writeBe32(gxBytes, 0x20, 0x80);
+  writeBytes(gxBytes, 0x80,
+             {
+                 0xea, 0x80,
+                 0x30, 0x04, 0x32, 0x7f,  // zero-release voice
+                 0xe0, 0x08,              // rest keeps it sounding
+                 0xe2, 0x01,              // GX program loading keys the channel off
+                 0xe1, 0x04, 0x32,        // even a hold must not revive the stopped voice
+                 0x32, 0x04, 0x32, 0x7f,
+                 0xff,
+             });
+  const SourceFile gxSource{
+      .id = SourceId{79},
+      .name = "GX zero-release voice fixture",
+      .title = "fixture",
+      .size = gxBytes.size(),
+  };
+  const KonamiArcadeLayout gxLayout{
+      .version = KonamiArcadeVersion::Gx,
+      .game = "fixture",
+      .code = SourceRange{.source = gxSource.id, .offset = 0, .size = gxBytes.size()},
+      .nmiRateHertz = 245.0,
+  };
+  const KonamiArcadeSequenceLayout gxSequenceLayout = makeGxSequenceLayout(gxSource.id, "Zero release");
+  diagnostics.clear();
+  const SequenceProgram gxProgram = decodeKonamiArcadeSequence(ByteReader(gxSource.id, gxBytes), gxLayout,
+                                                               gxSequenceLayout, AssetId{2}, nullptr, &diagnostics);
+  const PerformanceSequence gx =
+      SequenceVm(LoopPolicy::PlayOnce).render(gxProgram, konamiArcadeSequenceDialect());
+  expect(diagnostics.empty() && gx.diagnostics.empty() && gx.tracks.size() == 1,
+         "GX zero-release fixture should render without diagnostics");
+
+  std::vector<const NotePerformanceEvent*> gxNotes;
+  for (const auto& event : gx.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      gxNotes.push_back(note);
+    }
+  }
+  expect(gxNotes.size() == 2 && gxNotes[0]->header.tick == 0 && gxNotes[0]->durationTicks == 12 &&
+             gxNotes[1]->header.tick == 16 && gxNotes[1]->durationTicks == 4,
+         "GX program changes should end a zero-release voice without allowing a later hold to revive it");
 }
 
 void konamiArcadeTempoSlidesAreCanceledAcrossTracks() {
