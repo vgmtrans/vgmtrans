@@ -75,6 +75,20 @@ void Settings::ConversionSettings::setSkipChannel10(bool skip) const {
   emit owner->conversionOptionsChanged();
 }
 
+bool Settings::ConversionSettings::terminatePreviousVoice() const {
+  settings.beginGroup(QStringLiteral("ConversionOptions"));
+  const bool enabled = settings.value(QStringLiteral("terminatePreviousVoice"), false).toBool();
+  settings.endGroup();
+  return enabled;
+}
+
+void Settings::ConversionSettings::setTerminatePreviousVoice(bool enabled) const {
+  settings.beginGroup(QStringLiteral("ConversionOptions"));
+  settings.setValue(QStringLiteral("terminatePreviousVoice"), enabled);
+  settings.endGroup();
+  emit owner->conversionOptionsChanged();
+}
+
 vgmtrans::core::MidiPitchTransitionRendering Settings::ConversionSettings::pitchTransitionRendering() const {
   settings.beginGroup(QStringLiteral("ConversionOptions"));
   const int value =

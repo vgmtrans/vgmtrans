@@ -65,6 +65,27 @@ void midiExporterKeeps14BitControllerPairsAdjacent() {
          "MIDI exporter should keep 14-bit volume MSB/LSB controllers adjacent before same-tick pan");
 }
 
+void midiExporterWritesAllSoundOffImmediatelyBeforeNoteOn() {
+  const MidiSequence midiSequence{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {MidiTrack{
+          .events =
+              {
+                  NoteDuration{.tick = 12, .channel = 2, .key = 60, .velocity = 100, .duration = 24},
+                  AllSoundOff{.tick = 12, .channel = 2},
+                  EndOfTrack{.tick = 36},
+              },
+      }},
+  };
+
+  const auto exported = encodeMidiFile(midiSequence);
+  const std::vector<u8> expectedOrder{
+      0x0c, 0xb2, 0x78, 0x00, 0x00, 0x92, 0x3c, 0x64,
+  };
+  expect(std::search(exported.begin(), exported.end(), expectedOrder.begin(), expectedOrder.end()) != exported.end(),
+         "MIDI exporter should write All Sound Off immediately before the replacement note-on");
+}
+
 void midiExporterPreservesLegacyPortamentoTimeByteOrder() {
   const MidiSequence midiSequence{
       .timebase = Timebase{.ppqn = 48},
@@ -517,6 +538,51 @@ void performanceMidiRendererHonorsMidiExportOptions() {
   expect(std::get<MidiPort>(forcedMidi.tracks[15].events[0]).port == 0 &&
              std::get<NoteDuration>(forcedMidi.tracks[15].events[1]).channel == 15,
          "MIDI renderer should use all 16 channels per port when channel 10 is allowed");
+}
+
+void performanceMidiRendererCanTerminatePreviousVoices() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {PerformanceTrack{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .events =
+              {
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 0, .sequence = 0},
+                      .key = 60.0,
+                      .durationTicks = 4,
+                  },
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 8, .sequence = 1},
+                      .key = 62.0,
+                      .durationTicks = 4,
+                  },
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 10, .sequence = 2},
+                      .key = 62.0,
+                      .durationTicks = 4,
+                      .extendsPrevious = true,
+                  },
+              },
+      }},
+  };
+
+  const MidiSequence plain = renderMidiSequence(performance);
+  expect(std::ranges::none_of(plain.tracks[0].events,
+                              [](const MidiEvent& event) { return std::holds_alternative<AllSoundOff>(event); }),
+         "previous-voice termination should remain opt-in");
+
+  MidiExportOptions options;
+  options.terminatePreviousVoice = true;
+  const MidiSequence terminated = renderMidiSequence(performance, options);
+  const auto isSoundOff = [](const MidiEvent& event) {
+    return std::holds_alternative<AllSoundOff>(event);
+  };
+  const auto soundOff = std::ranges::find_if(terminated.tracks[0].events, isSoundOff);
+  expect(std::ranges::count_if(terminated.tracks[0].events, isSoundOff) == 1 &&
+             soundOff != terminated.tracks[0].events.end() && std::get<AllSoundOff>(*soundOff).tick == 8,
+         "the renderer should terminate a previous voice before a fresh attack, but not before an extension");
 }
 
 void performanceMidiRendererLowersStructuredScalarAutomationPoints() {
@@ -2019,6 +2085,8 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
   expect(ExportRequest{}.dynamicEnvelopes == DynamicEnvelopePolicy::Ignore &&
              PlaybackRequest{}.dynamicEnvelopes == DynamicEnvelopePolicy::Ignore,
          "dynamic envelope materialization should remain explicitly opt-in");
+  expect(!ExportRequest{}.sequence.midi.terminatePreviousVoice,
+         "previous-voice termination should remain explicitly opt-in");
 
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
@@ -2550,6 +2618,7 @@ void observedModulationScalingUsesPreciseNormalizedAmounts() {
 void runValueMidiTests() {
   midiExporterWritesStandardMidiFile();
   midiExporterKeeps14BitControllerPairsAdjacent();
+  midiExporterWritesAllSoundOffImmediatelyBeforeNoteOn();
   midiExporterPreservesLegacyPortamentoTimeByteOrder();
   midiExporterOrdersFineTuneBeforeSameTickProgramChange();
   midiExporterKeepsSameTickBankProgramPairsAdjacent();
@@ -2562,6 +2631,7 @@ void runValueMidiTests() {
   performanceMidiRendererCombinesExpressionWithPanGain();
   performanceMidiRendererLowersDeclaredPanLaws();
   performanceMidiRendererHonorsMidiExportOptions();
+  performanceMidiRendererCanTerminatePreviousVoices();
   performanceMidiRendererLowersStructuredScalarAutomationPoints();
   performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates();
   performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering();

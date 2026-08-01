@@ -210,6 +210,11 @@ struct LegatoPedal {
   bool enabled = false;
 };
 
+struct AllSoundOff {
+  u64 tick = 0;
+  u8 channel = 0;
+};
+
 struct MonoMode {
   u64 tick = 0;
   u8 channel = 0;
@@ -229,7 +234,8 @@ using MidiEvent = std::variant<NoteOn, NoteOff, NoteDuration, Tempo, TimeSignatu
                                Volume, Volume14, Pan, Expression, Expression14, MasterVolume, Reverb, FineTune,
                                CoarseTune, PitchBend, PitchBendRange, VibratoDepth, VibratoFrequency, VibratoDelay,
                                TremoloDepth, TremoloFrequency, TremoloDelay, PortamentoEnable, PortamentoTime,
-                               PortamentoTime14, PortamentoControl, LegatoPedal, MonoMode, EndOfTrack, Marker>;
+                               PortamentoTime14, PortamentoControl, LegatoPedal, AllSoundOff, MonoMode, EndOfTrack,
+                               Marker>;
 
 struct MidiTrack {
   // Empty names are valid; the exporter will omit track-name meta events.

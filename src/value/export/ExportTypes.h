@@ -53,6 +53,9 @@ struct MidiExportOptions {
   bool writePortMetaEvents = true;
   MidiBankSelectStyle bankSelectStyle = MidiBankSelectStyle::MsbOnly;
   MidiPitchTransitionRendering pitchTransitions = MidiPitchTransitionRendering::PreserveFormat;
+  // Approximate a source track backed by one physical voice: after the first
+  // attack, terminate any lingering sound on its MIDI channel before the next.
+  bool terminatePreviousVoice = false;
 };
 
 // Options shared by standalone sequence export, collection export, and

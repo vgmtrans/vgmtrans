@@ -259,6 +259,11 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
         } else if constexpr (std::is_same_v<TypedEvent, LegatoPedal>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 68, typedEvent.enabled ? 127 : 0);
           endTick = std::max(endTick, typedEvent.tick);
+        } else if constexpr (std::is_same_v<TypedEvent, AllSoundOff>) {
+          // Note-offs sort first; terminate any release tail immediately before
+          // the replacement note-on.
+          addController(messages, typedEvent.tick, typedEvent.channel, 120, 0, 45);
+          endTick = std::max(endTick, typedEvent.tick);
         } else if constexpr (std::is_same_v<TypedEvent, MonoMode>) {
           addController(messages, typedEvent.tick, typedEvent.channel, 126, typedEvent.channels);
           endTick = std::max(endTick, typedEvent.tick);
