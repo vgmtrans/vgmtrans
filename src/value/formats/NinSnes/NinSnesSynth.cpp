@@ -27,6 +27,7 @@ namespace {
 
 struct InstrumentInfo {
   u32 program = 0;
+  u8 tuningProgram = 0;
   u8 srcn = 0;
   u8 adsr1 = 0;
   u8 adsr2 = 0;
@@ -101,6 +102,7 @@ struct InstrumentRegion {
   const u8 pitchLow = earlier ? 0 : *record.u8("pitch_low", SourceValueDisplay::Hex);
   return InstrumentInfo{
       .program = program,
+      .tuningProgram = static_cast<u8>(program),
       .srcn = srcn,
       .adsr1 = adsr1,
       .adsr2 = adsr2,
@@ -198,6 +200,7 @@ struct InstrumentRegion {
   for (const auto& definition : recipes.overrides) {
     infos.push_back(InstrumentInfo{
         .program = definition.program,
+        .tuningProgram = definition.tuningProgram,
         .srcn = definition.srcn,
         .adsr1 = definition.adsr1,
         .adsr2 = definition.adsr2,
@@ -250,19 +253,23 @@ struct InstrumentRegion {
   return 96.0 - coarse - fine;
 }
 
+[[nodiscard]] double konamiUnityKey(s8 coarse, u8 fine) {
+  const double correction = std::log2(4045.0 / 4096.0) * 12.0;
+  const auto fineCents = static_cast<s16>(((fine / 256.0) + correction) * 100.0);
+  return 71.0 - coarse - fineCents / 100.0;
+}
+
 [[nodiscard]] double unityKey(ByteReader reader, const Layout& layout, const InstrumentInfo& info) {
   const Profile& selected = profile(layout.profile);
   if (selected.instruments == InstrumentLayout::KonamiTuningTable && layout.konamiTuningTableAddress != 0) {
     s8 coarse = 0;
     u8 fine = 0;
-    if (info.srcn < layout.konamiTuningTableSize &&
-        reader.has(layout.konamiTuningTableAddress + layout.konamiTuningTableSize + info.srcn, 1)) {
-      coarse = static_cast<s8>(reader.u8At(layout.konamiTuningTableAddress + info.srcn));
-      fine = reader.u8At(layout.konamiTuningTableAddress + layout.konamiTuningTableSize + info.srcn);
+    if (info.tuningProgram < layout.konamiTuningTableSize &&
+        reader.has(layout.konamiTuningTableAddress + layout.konamiTuningTableSize + info.tuningProgram, 1)) {
+      coarse = static_cast<s8>(reader.u8At(layout.konamiTuningTableAddress + info.tuningProgram));
+      fine = reader.u8At(layout.konamiTuningTableAddress + layout.konamiTuningTableSize + info.tuningProgram);
     }
-    const double correction = std::log2(4045.0 / 4096.0) * 12.0;
-    const auto fineCents = static_cast<s16>(((fine / 256.0) + correction) * 100.0);
-    return 71.0 - coarse - fineCents / 100.0;
+    return konamiUnityKey(coarse, fine);
   }
   return standardUnityKey(selected, info.pitchHigh, info.pitchLow);
 }
@@ -270,6 +277,7 @@ struct InstrumentRegion {
 void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layout& layout,
                     const SequenceRecipes& recipes, const std::vector<InstrumentInfo>& infos,
                     const SnesBrrSampleRefs& samples) {
+  const Profile& selected = profile(layout.profile);
   std::map<u32, InstrumentRegion> regionsByProgram;
   for (const InstrumentInfo& info : infos) {
     auto sample = samples.findSrcn(info.srcn);
@@ -342,6 +350,10 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
     for (const auto& [slot, source] : resolvedSlots) {
       Region region = source->region;
       region.keyRange = KeyRange{.low = slot->key, .high = slot->key};
+      if (selected.id == ProfileId::Konami) {
+        // Konami's percussion loader explicitly clears melodic coarse/fine tuning.
+        region.unityKey = konamiUnityKey(0, 0);
+      }
       region.unityKey += static_cast<int>(slot->key) - slot->sourceKey;
       drum.region(source->sample, std::move(region))
           .source(fmt::format("Drum {}", slot->key), source->source, "nin-snes-drum-region");

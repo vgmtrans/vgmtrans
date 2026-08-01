@@ -136,6 +136,12 @@ struct Profile {
   IntelliMode intelli = IntelliMode::None;
 };
 
+struct KonamiPercussionLayout {
+  u16 tableAddress = 0;
+  u8 slotCount = 0;
+  u8 programBase = 0;
+};
+
 struct Layout {
   Signature signature = Signature::None;
   ProfileId profile = ProfileId::Unknown;
@@ -152,6 +158,7 @@ struct Layout {
   u8 quintetBgmInstrumentBase = 0;
   u16 quintetInstrumentLookupAddress = 0;
   std::optional<u8> fixedPercussionBase;
+  std::optional<KonamiPercussionLayout> konamiPercussion;
   u16 konamiTuningTableAddress = 0;
   u8 konamiTuningTableSize = 0;
 
@@ -163,6 +170,7 @@ struct Layout {
 
 struct InstrumentOverride {
   u32 program = 0;
+  u8 tuningProgram = 0;
   u8 srcn = 0;
   u8 adsr1 = 0;
   u8 adsr2 = 0;

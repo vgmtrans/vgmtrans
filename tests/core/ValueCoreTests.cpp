@@ -73,6 +73,7 @@ void ninSnesKonamiZeroDurationRateContinuesHeldVoice();
 void ninSnesF9UsesSharedPitchTransitions();
 void ninSnesPercussionStartsPerNoteVibratoFade();
 void ninSnesFixedPercussionBaseIgnoresFaOperand();
+void ninSnesKonamiPercussionUsesDriverMapAndNeutralTuning();
 void ninSnesEarlierPercussionUsesSeparateSixByteTable();
 void ninSnesGainModeInstrumentsUseDspEnvelope();
 void ninSnesIdentityMappedSilentSlotsAreSparse();
@@ -227,6 +228,7 @@ int main() {
     ninSnesF9UsesSharedPitchTransitions();
     ninSnesPercussionStartsPerNoteVibratoFade();
     ninSnesFixedPercussionBaseIgnoresFaOperand();
+    ninSnesKonamiPercussionUsesDriverMapAndNeutralTuning();
     ninSnesEarlierPercussionUsesSeparateSixByteTable();
     ninSnesGainModeInstrumentsUseDspEnvelope();
     ninSnesIdentityMappedSilentSlotsAreSparse();

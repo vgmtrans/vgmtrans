@@ -49,7 +49,8 @@ Layout standardLayout(u16 playlist = 0x100) {
   };
 }
 
-ScanResult scanSynth(std::vector<u8> bytes, const Layout& layout, std::string_view name) {
+ScanResult scanSynth(std::vector<u8> bytes, const Layout& layout, std::string_view name,
+                     const SequenceRecipes& recipes = {}) {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = std::string(name) + ".spc"}, std::move(bytes));
   ScanIdAllocator ids;
@@ -60,7 +61,7 @@ ScanResult scanSynth(std::vector<u8> bytes, const Layout& layout, std::string_vi
           .ids = ids,
       },
       "NinSnes");
-  expect(addSynth(result, layout, {}, name).has_value(), "NinSnes synth fixture should produce assets");
+  expect(addSynth(result, layout, recipes, name).has_value(), "NinSnes synth fixture should produce assets");
   return result.finish();
 }
 
@@ -1051,6 +1052,66 @@ void ninSnesFixedPercussionBaseIgnoresFaOperand() {
   expect(sourceProgram(std::nullopt) == 5, "normal drivers should continue applying the FA percussion base");
   expect(sourceProgram(0) == 0, "fixed-base drivers should ignore FA while retaining the detected base");
   expect(sourceProgram(0x23) == 0x23, "a nonzero fixed percussion base should override the FA operand");
+}
+
+void ninSnesKonamiPercussionUsesDriverMapAndNeutralTuning() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+
+  // Konami FA consumes no operands. The following 04 7F is a normal note
+  // parameter command, followed by percussion slot CA.
+  std::ranges::copy(std::initializer_list<u8>{0xfa, 4, 0x7f, 0xca, 0}, bytes.begin() + 0x300);
+  bytes[0x3702] = 0xb0;
+
+  // Program 20 deliberately uses SRCN 1. Tuning must be selected by program
+  // for melodic playback, while the percussion branch clears it entirely.
+  std::ranges::copy(std::initializer_list<u8>{1, 0xff, 0xe0, 0, 0, 0}, bytes.begin() + 0x4000 + 20 * 6);
+  bytes[0x3800 + 1] = 0xf9;
+  bytes[0x3800 + 20] = 5;
+  writeLe16(bytes, 0x5000 + 4, 0x6000);
+  writeLe16(bytes, 0x5000 + 6, 0x6000);
+  bytes[0x6000] = 0x01;
+
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::Konami;
+  layout.fixedPercussionBase = 20;
+  layout.konamiPercussion = KonamiPercussionLayout{
+      .tableAddress = 0x3700,
+      .slotCount = 1,
+      .programBase = 20,
+  };
+  layout.konamiTuningTableAddress = 0x3800;
+  layout.konamiTuningTableSize = 21;
+  layout.instrumentTableAddress = 0x4000;
+  layout.spcDirAddress = 0x5000;
+
+  const SequenceParse parsed = decodeSequence(ByteReader(SourceId{7}, bytes), layout, AssetId{1});
+  const auto fa = std::ranges::find(parsed.program.tracks[0].commands, u8{0xfa}, &SourceCommand::opcode);
+  const auto parameters = std::ranges::find(parsed.program.tracks[0].commands, u8{4}, &SourceCommand::opcode);
+  expect(fa != parsed.program.tracks[0].commands.end() && fa->encodedSize == 1 &&
+             parameters != parsed.program.tracks[0].commands.end() && parameters->address.value == 0x301,
+         "Konami FA should remain a zero-operand NOP without swallowing the following note parameters");
+  expect(parsed.recipes.drumKits.size() == 1 && parsed.recipes.drumKits[0].slots.size() == 1 &&
+             parsed.recipes.drumKits[0].slots[0] == DrumSlot{.key = 36, .sourceProgram = 20, .sourceKey = 72},
+         "Konami percussion should use its fixed program base and per-slot played note");
+
+  const ScanResult scan = scanSynth(std::move(bytes), layout, "Konami percussion", parsed.recipes);
+  const auto* instruments = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
+  expect(instruments != nullptr, "Konami synth fixture should produce an instrument set");
+  const auto melodic = std::ranges::find_if(instruments->instruments, [](const Instrument& instrument) {
+    return instrument.explicitAddress == InstrumentAddress{.bank = 0, .program = 20};
+  });
+  const auto drums = std::ranges::find_if(instruments->instruments, [](const Instrument& instrument) {
+    return instrument.explicitAddress == InstrumentAddress{.bank = 0x7f, .program = 0};
+  });
+  expect(melodic != instruments->instruments.end() && melodic->regions.size() == 1 &&
+             std::abs(melodic->regions[0].unityKey - 66.21) < 0.001,
+         "Konami melodic tuning should be indexed by program rather than SRCN");
+  expect(drums != instruments->instruments.end() && drums->regions.size() == 1 &&
+             std::abs(drums->regions[0].unityKey - 35.21) < 0.001,
+         "Konami drums should combine the table note with neutralized melodic tuning");
 }
 
 void ninSnesEarlierPercussionUsesSeparateSixByteTable() {
