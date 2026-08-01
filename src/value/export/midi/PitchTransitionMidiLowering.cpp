@@ -341,7 +341,6 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
 void lowerPitchBends(PerformanceSequence& performance, std::vector<PerformanceEvent>& events,
                      const std::vector<NoteSpan>& notes, const std::vector<const PerformanceAutomation*>& transitions) {
   auto bends = takeSourcePitchBends(events);
-  std::vector<const PerformanceAutomation*> renderedTransitions;
   for (const auto* automation : transitions) {
     const auto& transition = *pitchTransitionIntent(*automation);
     const auto* anchor = findNote(notes, transition.note);
@@ -358,17 +357,12 @@ void lowerPitchBends(PerformanceSequence& performance, std::vector<PerformanceEv
       }
     }
     if (rendered) {
-      renderedTransitions.push_back(automation);
-    }
-  }
-
-  // Retain the terminal bend through note-off and the synth's release phase.
-  // Recenter only for the next attack that would otherwise inherit it.
-  for (const auto* automation : renderedTransitions) {
-    const auto& transition = *pitchTransitionIntent(*automation);
-    const auto* anchor = findNote(notes, transition.note);
-    if (const auto resetTick = nextIndependentAttack(events, notes, *automation, transition, *anchor)) {
-      bends.push_back(transitionPitchBend(*automation, transition, *resetTick, 0.0, true));
+      // Retain the terminal bend through note-off and the synth's release
+      // phase. Make its next-attack reset visible while lowering later
+      // transitions so they inherit the chronological pitch state.
+      if (const auto resetTick = nextIndependentAttack(events, notes, *automation, transition, *anchor)) {
+        bends.push_back(transitionPitchBend(*automation, transition, *resetTick, 0.0, true));
+      }
     }
   }
 

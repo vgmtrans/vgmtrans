@@ -1366,6 +1366,45 @@ void performanceMidiRendererDefersPitchResetUntilTheNextAttack() {
          "a terminal bend should survive note-off and reset only when the next note attacks");
 }
 
+void performanceMidiLoweringAppliesPitchResetsBeforeLaterTransitions() {
+  PerformanceTrack track{
+      .id = TrackId{0},
+      .sourceTrackNumber = 0,
+      .endTick = 30,
+  };
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track, CommandId{8}, SourceAnnotationId{9}, 0, nextSequence, nextNote, nextAutomation};
+  const PerformanceNoteId oldVoice = out.note(60, 1.0, 4);
+  out.pitchSlide(oldVoice, 60, 56, 4);
+  const PerformanceNoteId heldStart = out.at(8).note(68, 1.0, 2);
+  const PerformanceNoteId heldTarget = out.at(10).note(70, 1.0, 20);
+  out.at(10).pitchSlide(heldTarget, 68, 70, 5).continueFrom(heldStart);
+  out.at(16).pitchSlide(heldTarget, 70, 48, 4);
+
+  const PerformanceSequence lowered = lowerMidiPerformanceAutomation(
+      PerformanceSequence{
+          .timebase = Timebase{.ppqn = 48},
+          .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
+          .tracks = {track},
+      },
+      {});
+  const auto bendAt = [&](u64 tick) -> std::optional<double> {
+    std::optional<double> bend;
+    for (const auto& event : lowered.tracks[0].events) {
+      if (const auto* candidate = std::get_if<PitchBendPerformanceEvent>(&event);
+          candidate != nullptr && candidate->header.tick == tick) {
+        bend = candidate->semitones;
+      }
+    }
+    return bend;
+  };
+
+  expect(bendAt(10) == 0.0 && bendAt(15) == 2.0 && bendAt(16) == 2.0,
+         "a delayed transition should observe earlier next-attack resets without doubling a held transition");
+}
+
 void performanceMidiRendererLeavesTerminalPitchBentWithoutAnotherAttack() {
   PerformanceTrack track{
       .id = TrackId{0},
@@ -2647,6 +2686,7 @@ void runValueMidiTests() {
   performanceMidiRendererPreservesExactSamplesAndChainedPitchContinuity();
   performanceMidiRendererResetsInterruptedPitchBeforeTheNewNote();
   performanceMidiRendererDefersPitchResetUntilTheNextAttack();
+  performanceMidiLoweringAppliesPitchResetsBeforeLaterTransitions();
   performanceMidiRendererLeavesTerminalPitchBentWithoutAnotherAttack();
   performanceMidiRendererCombinesSourceBendWithPitchTransitions();
   performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes();
