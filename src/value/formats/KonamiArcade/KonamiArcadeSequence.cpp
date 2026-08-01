@@ -483,7 +483,7 @@ struct Playback {
     const double gain = attenuationGain(attenuation);
 
     u32 duration = delta;
-    if (usesDrumDefaultDuration && sourceKey < 46) {
+    if (usesDrumDefaultDuration) {
       duration = std::max<u32>(1, static_cast<u32>(delta) * durationRate / 100);
       if (track.pan.current() == 0.0) {
         const auto [left, right] = stereoGains(drumPan);
@@ -852,7 +852,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       velocity = durationOrVelocity - 0x80;
     }
 
-    const KonamiArcadeDrum& drum = layout.drums[std::min<u8>(key, 45)];
+    const KonamiArcadeDrum& drum = layout.drums[key];
     event.invoke<&Playback::note>(key, event.state<&TrackState::previousDelta>(),
                                   event.state<&TrackState::previousDurationParameter>(), durationSpecified, velocity,
                                   sequence.initialAttenuation, sequence.initialTranspose, drum.defaultDuration,
