@@ -35,7 +35,7 @@ constexpr u32 kMaxTrackCommands = 32768;
 constexpr u8 kMelodicKeyCorrection = 24;
 constexpr u8 kIntelliDrumSlots = 16;
 constexpr u8 kDefaultTempo = 0x20;
-constexpr u16 kNoEarlierPercussionNote = 0x100;
+constexpr u16 kNoPercussionSourceNote = 0x100;
 constexpr u32 kFixedPercussionBaseFlag = 1u << 8;
 constexpr u32 kFixedPercussionBaseShift = 16;
 
@@ -423,6 +423,7 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
       definition.events[0xf6] = EventType::Unknown0;
       definition.events[0xf7] = EventType::Unknown0;
       definition.events[0xf8] = EventType::Unknown0;
+      definition.events[0xfa] = EventType::Nop;
       definition.events[0xfb] = EventType::KonamiAdsrGain;
       definition.events[0xfc] = EventType::Nop;
       definition.events[0xfd] = EventType::Nop;
@@ -611,6 +612,7 @@ struct ProgramState {
     if (collecting) {
       recipes.overrides.push_back(InstrumentOverride{
           .program = program,
+          .tuningProgram = logical,
           .srcn = srcn,
           .adsr1 = adsr1,
           .adsr2 = adsr2,
@@ -623,15 +625,15 @@ struct ProgramState {
     return program;
   }
 
-  void rememberStandardDrum(u8 logicalProgram, u32 sourceProgram, u8 key, s8 transpose, u16 earlierNote) {
+  void rememberStandardDrum(u8 logicalProgram, u32 sourceProgram, u8 key, s8 transpose, u16 sourceNote) {
     if (!collecting) {
       return;
     }
-    const u8 sourceNote = earlierNote <= 0xff ? static_cast<u8>(earlierNote) : u8{0x24};
+    const u8 resolvedSourceNote = sourceNote <= 0xff ? static_cast<u8>(sourceNote) : u8{0x24};
     standardDrums[logicalProgram] = DrumSlot{
         .key = key,
         .sourceProgram = sourceProgram,
-        .sourceKey = static_cast<s16>((sourceNote & 0x7f) + kMelodicKeyCorrection + transpose),
+        .sourceKey = static_cast<s16>((resolvedSourceNote & 0x7f) + kMelodicKeyCorrection + transpose),
     };
   }
 
@@ -1042,7 +1044,7 @@ struct Playback {
     return Effects::wait(track.noteLength);
   }
 
-  [[nodiscard]] Effects percussion(u8 slot, u8 percussionMinimum, bool intelli, u16 earlierNote) {
+  [[nodiscard]] Effects percussion(u8 slot, u8 percussionMinimum, bool intelli, u16 sourceNote) {
     const u8 duration = soundingDuration();
     if (intelli) {
       const bool custom = (program.intelliFlags & 0x40) != 0;
@@ -1062,13 +1064,13 @@ struct Playback {
       beginNotePitch(static_cast<u8>(0x24 + slot - program.globalTranspose));
       emitVoiceNote(key, duration);
     } else {
-      const bool earlier = earlierNote <= 0xff;
+      const bool earlier = program.selected.base == BaseProfile::Earlier;
       u8 logical = earlier ? slot : 0;
       const u32 sourceProgram =
           earlier ? kEarlierPercussionProgramBase + slot
                   : program.resolveProgram(static_cast<u8>(slot + program.percussionBase), percussionMinimum, &logical);
       const u8 key = static_cast<u8>(0x24 + logical - program.percussionBase);
-      program.rememberStandardDrum(logical, sourceProgram, key, program.globalTranspose, earlierNote);
+      program.rememberStandardDrum(logical, sourceProgram, key, program.globalTranspose, sourceNote);
       switchToDrumProgram(0);
       const double outputKey = key - program.globalTranspose + static_cast<double>(track.konamiLoopPitchDelta) / 256.0;
       beginNotePitch(static_cast<u8>(key - program.globalTranspose));
@@ -1606,14 +1608,19 @@ struct DecodeContext {
       const bool intelli =
           (context.selected.intelli == IntelliMode::Ta || context.selected.intelli == IntelliMode::Fe4) &&
           slot < kIntelliDrumSlots;
-      u16 earlierNote = kNoEarlierPercussionNote;
+      u16 sourceNote = kNoPercussionSourceNote;
       if (context.layout.percussionTableAddress) {
         const u32 address = *context.layout.percussionTableAddress + slot * 6;
         if (context.reader.has(address, 6)) {
-          earlierNote = context.reader.u8At(address + 5);
+          sourceNote = context.reader.u8At(address + 5);
+        }
+      } else if (context.layout.konamiPercussion && slot < context.layout.konamiPercussion->slotCount) {
+        const u32 address = context.layout.konamiPercussion->tableAddress + slot * 3;
+        if (context.reader.has(address, 3)) {
+          sourceNote = context.reader.u8At(address + 2);
         }
       }
-      return event.invoke<&Playback::percussion>(slot, context.definition.status.percussionMin, intelli, earlierNote);
+      return event.invoke<&Playback::percussion>(slot, context.definition.status.percussionMin, intelli, sourceNote);
     }
     case EventType::Program:
     case EventType::Rd2ProgramAndAdsr: {

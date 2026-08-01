@@ -32,6 +32,13 @@ std::optional<u32> Pattern::find(core::ByteReader reader) const {
 Pattern Patterns::ptnEarlierPercussionTable("\x80\xa8\xd0\x8d\x06\x8f\x00\x14\x8f\x00\x15\x3f\x00\x00",
                                             "xxxxxx?xx?xx??", 14);
 
+// Konami:
+//   compare against percussion status, multiply the slot by three, then read
+//   pan, volume reduction, and the note byte from a driver-resident table.
+Pattern Patterns::ptnKonamiPercussionDispatch(
+    "\xad\xca\x90\x00\x3f\x00\x00\xf5\x11\x02\x80\xa8\xca\xc4\x1e\x1c\x84\x1e\xfd\xe4\x00\x24\x47\xf0\x00\xf6\x00\x00",
+    "xxx?x??xxxxxxxxxxxxx?xxx?x??", 28);
+
 // Pilotwings:
 //   mov a,$00 / cmp a,#$ff / beq / and a,#$1f / bne start-song
 // $00-$03 are the canonical mirrors of input ports $F4-$F7.

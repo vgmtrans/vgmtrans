@@ -345,6 +345,53 @@ template <size_t Size>
   return probe;
 }
 
+[[nodiscard]] std::optional<KonamiPercussionLayout> findKonamiPercussion(ByteReader reader) {
+  const auto dispatch = Patterns::ptnKonamiPercussionDispatch.find(reader);
+  const auto instrumentCommand = Patterns::ptnInstrVCmdGD3.find(reader);
+  if (!dispatch || !instrumentCommand || !reader.has(*instrumentCommand + 37, 9)) {
+    return std::nullopt;
+  }
+
+  // The negative instrument branch clears normal tuning, converts CA+slot to
+  // an instrument index, and then enters the shared six-byte row loader.
+  constexpr std::array<std::pair<u8, u8>, 8> kLoaderTail{{
+      {37, 0x80},
+      {38, 0xa8},
+      {39, 0xca},
+      {40, 0x60},
+      {41, 0x88},
+      {43, 0x8d},
+      {44, 0x06},
+      {45, 0xcf},
+  }};
+  if (!std::ranges::all_of(kLoaderTail, [&](const auto& expected) {
+        return reader.u8At(*instrumentCommand + expected.first) == expected.second;
+      })) {
+    return std::nullopt;
+  }
+
+  const u16 tableAddress = reader.le16(*dispatch + 26);
+  if (tableAddress >= *dispatch) {
+    return std::nullopt;
+  }
+  const u32 tableSize = *dispatch - tableAddress;
+  constexpr u8 kMaximumSlots = 0xdf - 0xca + 1;
+  if (tableSize == 0 || tableSize % 3 != 0 || tableSize / 3 > kMaximumSlots) {
+    return std::nullopt;
+  }
+
+  const u8 slotCount = static_cast<u8>(tableSize / 3);
+  const u8 programBase = reader.u8At(*instrumentCommand + 42);
+  if (programBase >= 0x80 || programBase + slotCount > 0x80) {
+    return std::nullopt;
+  }
+  return KonamiPercussionLayout{
+      .tableAddress = tableAddress,
+      .slotCount = slotCount,
+      .programBase = programBase,
+  };
+}
+
 }  // namespace
 
 std::optional<Layout> findLayout(ByteReader reader) {
@@ -453,6 +500,15 @@ std::optional<Layout> findLayout(ByteReader reader) {
     }
     return address;
   };
+  std::optional<KonamiPercussionLayout> konamiPercussion;
+  std::optional<u8> fixedPercussionBase =
+      detectFixedPercussionBase(reader, selected.base == BaseProfile::Earlier ? u8{0xd0} : u8{0xca});
+  if (selected.id == ProfileId::Konami) {
+    konamiPercussion = findKonamiPercussion(reader);
+    if (konamiPercussion) {
+      fixedPercussionBase = konamiPercussion->programBase;
+    }
+  }
   Layout baseLayout{
       .signature = signature,
       .profile = profileId,
@@ -461,8 +517,8 @@ std::optional<Layout> findLayout(ByteReader reader) {
       .konamiBaseAddress = konamiBase.value_or(0),
       .quintetBgmInstrumentBase = quintetBase,
       .quintetInstrumentLookupAddress = quintetLookup,
-      .fixedPercussionBase =
-          detectFixedPercussionBase(reader, selected.base == BaseProfile::Earlier ? u8{0xd0} : u8{0xca}),
+      .fixedPercussionBase = fixedPercussionBase,
+      .konamiPercussion = konamiPercussion,
       .volumeTable = std::move(volumeTable),
       .durationRateTable = std::move(durationRateTable),
   };
