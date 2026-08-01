@@ -58,6 +58,7 @@ enum class SequenceSemantic : u8 {
   // Common source-level classification; this does not prescribe an export format.
   Program,
   Level,
+  Envelope,
   Pan,
   Pitch,
   Tempo,

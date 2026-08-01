@@ -323,6 +323,7 @@ void applyMidiExportSettings(vgmtrans::core::SequenceRenderOptions& options) {
 void applyCollectionExportSettings(vgmtrans::core::ExportRequest& request) {
   applyMidiExportSettings(request.sequence);
   request.modulationConversion = Settings::the()->conversion.modulationConversion();
+  request.dynamicEnvelopes = Settings::the()->conversion.dynamicEnvelopeConversion();
   request.exportOnlyUsedInstruments = Settings::the()->conversion.exportOnlyUsedInstruments();
 }
 }  // namespace
@@ -799,7 +800,8 @@ void MainWindow::togglePlayback() {
 
   vgmtrans::core::SequenceRenderOptions options;
   applySequenceRenderSettings(options);
-  const auto request = m_sequence_player->playbackRequest(std::move(options));
+  auto request = m_sequence_player->playbackRequest(std::move(options));
+  request.dynamicEnvelopes = Settings::the()->conversion.dynamicEnvelopeConversion();
 
   try {
     auto playback = m_workspace.preparePlayback(collection, request);

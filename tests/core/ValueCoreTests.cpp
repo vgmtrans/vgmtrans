@@ -10,6 +10,7 @@
 void runValueRegistryTests();
 void runValueCompilerCursorTests();
 void runValueCollectionResolverTests();
+void runValueDynamicEnvelopeTests();
 void runValueSequenceModelTests();
 void runValueSequenceVmTests();
 void runValueSessionTests();
@@ -63,6 +64,7 @@ void ninSnesProfilesShareTempoRelativeVibratoClock();
 void ninSnesProfilesEmitSubtractiveTremolo();
 void ninSnesStandardEchoUsesMaskLevelAndDisable();
 void ninSnesKonamiLoopAppliesAndClearsReplayDeltas();
+void ninSnesKonamiAdsrGainEmitsNeutralEnvelopeState();
 void ninSnesNoteVelocityPreservesLegacyCurve();
 void ninSnesIntelligentVoiceTablesUseTypedPlaybackState();
 void ninSnesFe3ConditionalJumpUsesCapturedDriverState();
@@ -108,6 +110,7 @@ void akaoSnesModuleDiscoversSequenceInstrumentsAndSamples();
 void akaoSnesV4TieExtendsShortenedPreviousNote();
 void akaoSnesCompilerCursorResolvesRelocatedBranchesWithoutRetainingBytes();
 void akaoSnesCompilerCursorCoversVersionBoundariesAndDurations();
+void akaoSnesV3DynamicAdsrUsesAttackAndHeldNoteDecay();
 void akaoSnesCompilerCursorCoversRemapsUnknownsAndTruncation();
 void akaoSnesV3VibratoPreservesSquareWaveModesAndSteppedAttack();
 void akaoSnesCompiledAutomationTicksControllerAndTempoFades();
@@ -166,6 +169,7 @@ int main() {
     runValueRegistryTests();
     runValueCompilerCursorTests();
     runValueCollectionResolverTests();
+    runValueDynamicEnvelopeTests();
     runValueSequenceModelTests();
     runValueSequenceVmTests();
     runValueSessionTests();
@@ -219,6 +223,7 @@ int main() {
     ninSnesProfilesEmitSubtractiveTremolo();
     ninSnesStandardEchoUsesMaskLevelAndDisable();
     ninSnesKonamiLoopAppliesAndClearsReplayDeltas();
+    ninSnesKonamiAdsrGainEmitsNeutralEnvelopeState();
     ninSnesNoteVelocityPreservesLegacyCurve();
     ninSnesIntelligentVoiceTablesUseTypedPlaybackState();
     ninSnesFe3ConditionalJumpUsesCapturedDriverState();
@@ -264,6 +269,7 @@ int main() {
     akaoSnesV4TieExtendsShortenedPreviousNote();
     akaoSnesCompilerCursorResolvesRelocatedBranchesWithoutRetainingBytes();
     akaoSnesCompilerCursorCoversVersionBoundariesAndDurations();
+    akaoSnesV3DynamicAdsrUsesAttackAndHeldNoteDecay();
     akaoSnesCompilerCursorCoversRemapsUnknownsAndTruncation();
     akaoSnesV3VibratoPreservesSquareWaveModesAndSteppedAttack();
     akaoSnesCompiledAutomationTicksControllerAndTempoFades();

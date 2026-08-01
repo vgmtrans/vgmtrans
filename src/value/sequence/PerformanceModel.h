@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "value/model/EnvelopeModel.h"
 #include "value/model/InstrumentIdentity.h"
 #include "value/model/ModulationModel.h"
 #include "value/sequence/SequenceProgram.h"
@@ -84,6 +85,11 @@ struct TimeSignaturePerformanceEvent {
   u8 clocksPerMetronomeClick = 24;
 };
 
+enum class InstrumentEnvelopeMode : u8 {
+  UseInstrumentEnvelope,
+  PreserveDynamicOverride,
+};
+
 struct InstrumentPerformanceEvent {
   PerformanceEventHeader header;
   // Legacy bank/program selection remains temporarily for cursor dialects.
@@ -92,6 +98,16 @@ struct InstrumentPerformanceEvent {
   u32 program = 0;
   bool forceBankSelect = false;
   std::optional<InstrumentIdentity> sourceInstrument;
+  // Instrument selection governs future attacks. Drivers that retain their
+  // dynamic ADSR state across a selection opt out explicitly.
+  InstrumentEnvelopeMode envelopeMode = InstrumentEnvelopeMode::UseInstrumentEnvelope;
+};
+
+struct EnvelopePerformanceEvent {
+  PerformanceEventHeader header;
+  EnvelopeUpdate update;
+  VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks;
+  PerformanceLaneId lane{0};
 };
 
 enum class LevelPrecisionHint {
@@ -339,13 +355,13 @@ struct MarkerPerformanceEvent {
 
 using PerformanceEvent =
     std::variant<NotePerformanceEvent, TempoPerformanceEvent, TimeSignaturePerformanceEvent, InstrumentPerformanceEvent,
-                 LevelPerformanceEvent, ExpressionPerformanceEvent, PanPerformanceEvent, StereoBalancePerformanceEvent,
-                 MasterLevelPerformanceEvent, ReverbPerformanceEvent, MonoModePerformanceEvent, TuningPerformanceEvent,
-                 GlobalTransposePerformanceEvent, PortamentoPerformanceEvent, PortamentoEnablePerformanceEvent,
-                 PortamentoTimePerformanceEvent, PortamentoControlPerformanceEvent, PitchBendPerformanceEvent,
-                 PitchBendRangePerformanceEvent, VibratoDelayPerformanceEvent, TremoloDelayPerformanceEvent,
-                 PitchTransitionSettingsPerformanceEvent, LegatoPedalPerformanceEvent, ModulationPerformanceEvent,
-                 MarkerPerformanceEvent>;
+                 EnvelopePerformanceEvent, LevelPerformanceEvent, ExpressionPerformanceEvent, PanPerformanceEvent,
+                 StereoBalancePerformanceEvent, MasterLevelPerformanceEvent, ReverbPerformanceEvent,
+                 MonoModePerformanceEvent, TuningPerformanceEvent, GlobalTransposePerformanceEvent,
+                 PortamentoPerformanceEvent, PortamentoEnablePerformanceEvent, PortamentoTimePerformanceEvent,
+                 PortamentoControlPerformanceEvent, PitchBendPerformanceEvent, PitchBendRangePerformanceEvent,
+                 VibratoDelayPerformanceEvent, TremoloDelayPerformanceEvent, PitchTransitionSettingsPerformanceEvent,
+                 LegatoPedalPerformanceEvent, ModulationPerformanceEvent, MarkerPerformanceEvent>;
 
 enum class PerformanceAutomationTarget {
   Tempo,

@@ -6,6 +6,7 @@
 
 #include "value/export/synth/SynthExportData.h"
 
+#include "value/export/DynamicEnvelope.h"
 #include "value/export/ExportDiagnostics.h"
 #include "value/sequence/PerformanceModel.h"
 #include "value/synth/SampleDecoder.h"
@@ -45,8 +46,8 @@ bool markMatchingInstruments(SynthInstrumentList& used, std::span<const Instrume
   return found;
 }
 
-void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
-                            std::span<const Instrument* const> instruments, SynthInstrumentList& used) {
+void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::span<const Instrument* const> instruments,
+                            SynthInstrumentList& used) {
   if (selection.sourceInstrument) {
     if (markMatchingInstruments(used, instruments, [&](const Instrument& instrument) {
           return instrument.identity && *instrument.identity == *selection.sourceInstrument;
@@ -78,7 +79,8 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
 }
 
 [[nodiscard]] SynthInstrumentList selectInstruments(std::span<const InstrumentSetAsset* const> instrumentSets,
-                                                    const PerformanceSequence* sequenceUsage) {
+                                                    const PerformanceSequence* sequenceUsage,
+                                                    const SequenceInstrumentPlan* instrumentPlan) {
   SynthInstrumentList instruments;
   for (const auto* instrumentSet : instrumentSets) {
     if (instrumentSet == nullptr) {
@@ -93,6 +95,30 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
   }
 
   SynthInstrumentList used;
+  if (instrumentPlan != nullptr) {
+    for (u32 setIndex = 0; setIndex < instrumentSets.size(); ++setIndex) {
+      const auto* instrumentSet = instrumentSets[setIndex];
+      if (instrumentSet == nullptr) {
+        continue;
+      }
+      for (u32 instrumentIndex = 0; instrumentIndex < instrumentSet->instruments.size(); ++instrumentIndex) {
+        if (instrumentPlan->uses(PreparedInstrumentRef{
+                .set = setIndex,
+                .instrument = instrumentIndex,
+            })) {
+          used.push_back(&instrumentSet->instruments[instrumentIndex]);
+        }
+      }
+    }
+    if (instrumentPlan->complete()) {
+      std::erase_if(instruments,
+                    [&](const Instrument* instrument) { return std::ranges::find(used, instrument) == used.end(); });
+      return instruments;
+    }
+  }
+
+  // An incomplete plan means at least one source selection could not be
+  // resolved. Union exact assignments with the legacy address replay.
   for (const auto& track : sequenceUsage->tracks) {
     // A track uses bank/program zero until its first instrument change.
     InstrumentPerformanceEvent selection;
@@ -310,7 +336,7 @@ Envelope approximateEnvelopeAsAdsr(Envelope envelope) {
 PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceStore& sources,
                                    const SynthSampleDecodeOptions& options) {
   PreparedSynthData prepared;
-  const auto instruments = selectInstruments(input.instrumentSets, input.sequenceUsage);
+  const auto instruments = selectInstruments(input.instrumentSets, input.sequenceUsage, input.instrumentPlan);
   std::optional<SynthSampleIndexList> sampleFilter;
   if (input.sequenceUsage != nullptr) {
     sampleFilter = referencedSamples(instruments, input.sampleCollections);

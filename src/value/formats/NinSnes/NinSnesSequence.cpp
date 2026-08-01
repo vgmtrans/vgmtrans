@@ -11,6 +11,7 @@
 #include "value/sequence/CompiledCommandDialect.h"
 #include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
+#include "value/synth/SnesDsp.h"
 
 #include <fmt/format.h>
 
@@ -38,6 +39,21 @@ constexpr u8 kDefaultTempo = 0x20;
 constexpr u16 kNoPercussionSourceNote = 0x100;
 constexpr u32 kFixedPercussionBaseFlag = 1u << 8;
 constexpr u32 kFixedPercussionBaseShift = 16;
+
+[[nodiscard]] constexpr u8 konamiDspAdsr1(u8 encoded) {
+  if (encoded >= 0xa0) {
+    return 0;
+  }
+  const u8 attackRate = encoded / 10;
+  const u8 decayRate = encoded % 10;
+  return static_cast<u8>(0x80 | ((decayRate & 0x07) << 4) | attackRate);
+}
+
+[[nodiscard]] constexpr u8 konamiDspAdsr2(u8 encoded) {
+  const u8 sustainLevel = encoded / 30;
+  const u8 sustainRate = static_cast<u8>((encoded % 30) + 2);
+  return static_cast<u8>((sustainLevel << 5) | sustainRate);
+}
 
 [[nodiscard]] constexpr u32 drumInstrumentKey(u8 program) {
   return (0x7fu << 7) | program;
@@ -1155,6 +1171,10 @@ struct Playback {
     emitConfiguredVibrato();
   }
 
+  void konamiEnvelope(u8 adsr1, u8 adsr2, u8 gain) {
+    out.envelope(snesDspEnvelope(adsr1, adsr2, gain), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+  }
+
   void vibratoFade(u8 length) { track.vibrato.fade = length; }
 
   void emitVibratoDepth(u8 rawDepth, PerformanceEmitter output) {
@@ -1781,11 +1801,13 @@ struct DecodeContext {
       return event.runtimeControlFlow();
     }
     case EventType::KonamiAdsrGain: {
-      auto event = cursor.sourceOnly("ADSR / GAIN");
-      event.u8("adsr1", SourceValueDisplay::Hex);
-      event.u8("adsr2", SourceValueDisplay::Hex);
-      event.u8("gain", SourceValueDisplay::Hex);
-      return event.ignore();
+      auto event = cursor.command("ADSR / GAIN", SequenceSemantic::Envelope);
+      const u8 attackDecay = event.u8("attack_decay_parameter", SourceValueDisplay::Hex);
+      const u8 sustain = event.u8("sustain_parameter", SourceValueDisplay::Hex);
+      const u8 gain = event.u8("gain", SourceValueDisplay::Hex);
+      const u8 adsr1 = event.derived("dsp_adsr1", konamiDspAdsr1(attackDecay), SourceValueDisplay::Hex);
+      const u8 adsr2 = event.derived("dsp_adsr2", konamiDspAdsr2(sustain), SourceValueDisplay::Hex);
+      return event.invoke<&Playback::konamiEnvelope>(adsr1, adsr2, gain);
     }
     case EventType::QuintetTuning: {
       auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);

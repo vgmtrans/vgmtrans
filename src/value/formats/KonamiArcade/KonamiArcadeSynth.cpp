@@ -19,8 +19,6 @@ using namespace core;
 
 namespace {
 
-constexpr double kMelodicReleaseSeconds = 0.5;
-constexpr double kDrumReleaseSeconds = 0.7;
 constexpr u8 kDriverInstrumentAttenuation = 16;
 
 [[nodiscard]] double attenuationDb(u32 value) {
@@ -201,7 +199,7 @@ ScanSynthRefs addKonamiArcadeSynth(ScanResultBuilder& builder, const KonamiArcad
                 Region{
                     .range = range,
                     .unityKey = 66.0,
-                    .envelope = Envelope{.releaseSeconds = kMelodicReleaseSeconds},
+                    .envelope = Envelope{.releaseSeconds = 0.0},
                 })
         .source("Region", range, "konami-arcade-region");
   }
@@ -237,7 +235,7 @@ ScanSynthRefs addKonamiArcadeSynth(ScanResultBuilder& builder, const KonamiArcad
                                                   .keyRange = KeyRange{.low = key, .high = key},
                                                   .range = drum.range,
                                                   .unityKey = static_cast<double>(key) + 0x2a - driverPitch,
-                                                  .envelope = Envelope{.releaseSeconds = kDrumReleaseSeconds},
+                                                  .envelope = Envelope{.releaseSeconds = 0.0},
                                                   .attenuationDb = attenuationDb(drum.attenuation),
                                               });
       auto annotation = region.source(fmt::format("Drum {}", index), drum.range, "konami-arcade-drum");

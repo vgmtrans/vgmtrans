@@ -9,6 +9,7 @@
 #include "value/formats/NinSnes/NinSnesPatterns.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
+#include "value/synth/SnesDsp.h"
 
 #include <algorithm>
 #include <array>
@@ -546,6 +547,61 @@ void ninSnesKonamiLoopAppliesAndClearsReplayDeltas() {
     expect(std::abs(notes[index]->key - expectedKeys[index]) < 0.0001,
            "Konami N-SPC loop should apply its accumulated 1/16-semitone pitch delta");
   }
+}
+
+void ninSnesKonamiAdsrGainEmitsNeutralEnvelopeState() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+
+  constexpr u8 attackDecay = 0x96;
+  constexpr u8 sustain = 0xd2;
+  constexpr u8 gain = 0;
+  constexpr u8 gainMode = 0xa0;
+  constexpr u8 directGain = 0x7f;
+  std::ranges::copy(
+      std::initializer_list<u8>{
+          0xfb,
+          attackDecay,
+          sustain,
+          gain,
+          0xfb,
+          gainMode,
+          sustain,
+          directGain,
+          0xe0,
+          1,
+          4,
+          0x7f,
+          0x80,
+          0,
+      },
+      bytes.begin() + 0x300);
+
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::Konami;
+  const PerformanceSequence performance = render(std::move(bytes), layout);
+  std::vector<const EnvelopePerformanceEvent*> envelopes;
+  std::vector<const InstrumentPerformanceEvent*> instruments;
+  for (const PerformanceEvent& event : performance.tracks[0].events) {
+    if (const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event)) {
+      envelopes.push_back(envelope);
+    } else if (const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&event)) {
+      instruments.push_back(instrument);
+    }
+  }
+  expect(envelopes.size() == 2, "Konami FB commands should emit two envelope events");
+  expect(envelopes[0]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
+             envelopes[0]->update.setFields == EnvelopeFields::All &&
+             envelopes[0]->update.values == snesDspEnvelope(0x8f, 0xe2, gain),
+         "Konami FB should expand its packed attack, decay, and sustain parameters to DSP ADSR values");
+  expect(envelopes[1]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
+             envelopes[1]->update.setFields == EnvelopeFields::All &&
+             envelopes[1]->update.values == snesDspEnvelope(0, 0xe2, directGain),
+         "Konami FB attack/decay parameters at or above A0 should select direct GAIN mode");
+  expect(!instruments.empty() && instruments.back()->envelopeMode == InstrumentEnvelopeMode::UseInstrumentEnvelope,
+         "a later Konami program change should select the instrument's native envelope");
 }
 
 void ninSnesNoteVelocityPreservesLegacyCurve() {
