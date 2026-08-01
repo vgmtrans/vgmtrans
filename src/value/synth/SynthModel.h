@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "value/model/EnvelopeModel.h"
 #include "value/model/InstrumentIdentity.h"
 #include "value/model/MetadataModel.h"
 #include "value/model/ModulationModel.h"
@@ -46,25 +47,6 @@ struct SampleRef {
 struct Tuning {
   s32 cents = 0;
 };
-
-struct Envelope {
-  // An absent value means the stage was not specified. Positive infinity means
-  // the stage has no finite duration. Sustain is linear amplitude in [0, 1].
-  std::optional<double> attackSeconds;
-  std::optional<double> holdSeconds;
-  std::optional<double> decaySeconds;
-  // Full-scale decay time for the rate used after the sustain level is reached.
-  // Some sound chips keep fading during a held note instead of sustaining.
-  std::optional<double> secondDecaySeconds;
-  std::optional<double> releaseSeconds;
-  std::optional<double> sustainAmplitude;
-};
-
-[[nodiscard]] inline bool hasExplicitEnvelope(const Envelope& envelope) {
-  return envelope.attackSeconds.has_value() || envelope.holdSeconds.has_value() || envelope.decaySeconds.has_value() ||
-         envelope.secondDecaySeconds.has_value() || envelope.releaseSeconds.has_value() ||
-         envelope.sustainAmplitude.has_value();
-}
 
 struct Loop {
   bool enabled = false;

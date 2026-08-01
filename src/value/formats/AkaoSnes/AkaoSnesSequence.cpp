@@ -12,6 +12,7 @@
 #include "value/sequence/CompiledCommandDialect.h"
 #include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
+#include "value/synth/SnesDsp.h"
 
 #include <algorithm>
 #include <array>
@@ -32,6 +33,10 @@ constexpr s32 kNominalDspPitch = 0x1000;
 constexpr s32 kPitchFractionScale = 0x100;
 constexpr u8 kDefaultTempo = 0x20;
 constexpr u8 kNoteVelocity = 100;
+
+[[nodiscard]] constexpr bool usesDynamicAdsr(AkaoSnesProfile profile) {
+  return profile.version == AKAOSNES_V3;
+}
 
 enum class EventType {
   Unknown0,
@@ -1101,6 +1106,14 @@ struct Playback {
     emitVolume(out, value);
   }
 
+  void programChange(u8 programNumber) {
+    track.nonPercussionProgram = programNumber;
+    if (track.percussion) {
+      return;
+    }
+    out.instrument(0, programNumber);
+  }
+
   void emitPan(PerformanceEmitter output, u8 panValue) {
     const double rightGain = rightGainFromPan(panValue);
     output.stereoBalance(1.0 - rightGain, rightGain);
@@ -1773,6 +1786,10 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
     case EventType::EchoOff:
       return cursor.sourceOnly("Echo Off");
     case EventType::AdsrDefault:
+      if (usesDynamicAdsr(profile)) {
+        return cursor.command("ADSR Default", SequenceSemantic::Envelope)
+            .restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+      }
       return cursor.sourceOnly("ADSR Default");
     case EventType::IncCpuSharedCounter:
       return cursor.sourceOnly("Increment CPU Shared Counter");
@@ -1814,14 +1831,7 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Program", SequenceSemantic::Program);
       event.derived("bank", u8{0}, SemanticOperandRole::InstrumentBank);
       const u8 program = event.u8("program", SemanticOperandRole::InstrumentProgram);
-      return event.invoke(
-          [](Playback& playback, u8 programNumber) {
-            playback.track.nonPercussionProgram = programNumber;
-            if (!playback.track.percussion) {
-              playback.out.instrument(0, programNumber);
-            }
-          },
-          program);
+      return event.invoke<&Playback::programChange>(program);
     }
 
     case EventType::VolumeEnvelope: {
@@ -1847,6 +1857,18 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
                                      : type == EventType::AdsrDr ? "ADSR Decay Rate"
                                      : type == EventType::AdsrSl ? "ADSR Sustain Level"
                                                                  : "ADSR Sustain Rate";
+      if (usesDynamicAdsr(profile) && (type == EventType::AdsrAr || type == EventType::AdsrSr)) {
+        auto event = cursor.command(label, SequenceSemantic::Envelope);
+        const u8 value = event.u8("value", SourceValueDisplay::Hex);
+        if (type == EventType::AdsrAr) {
+          const u8 rate = event.derived("dsp_attack_rate", static_cast<u8>(value & 0x0f));
+          return event.emitEnvelopeField<EnvelopeFields::Attack>(
+              snesDspAdsrAttackSeconds(rate), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+        }
+        const u8 rate = event.derived("dsp_sustain_rate", static_cast<u8>(value & 0x1f));
+        return event.emitEnvelopeField<EnvelopeFields::SecondDecay>(
+            snesDspAdsrSustainSeconds(rate), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+      }
       auto event = cursor.sourceOnly(label);
       event.u8("value");
       return event;

@@ -68,6 +68,10 @@ struct SnesEnvelopeSeconds {
   return std::max(0.0, seconds);
 }
 
+[[nodiscard]] double adsrAttackSeconds(u8 rate) {
+  return rate < 15 ? kCounterRates[rate * 2 + 1] * 64 / kSampleRate : 2 / kSampleRate;
+}
+
 [[nodiscard]] GainEnvelope emulateGainEnvelope(u8 gain, s16 envelopeFrom, s16 envelopeTo) {
   if (envelopeFrom < 0 || envelopeFrom > 0x7ff || envelopeTo < 0 || envelopeTo > 0x7ff) {
     return {};
@@ -164,12 +168,7 @@ struct SnesEnvelopeSeconds {
     const u8 sustainLevel = (adsr2 & 0xe0) >> 5;
     const u8 sustainRate = adsr2 & 0x1f;
 
-    double attackSeconds = 0.0;
-    if (attackRate < 15) {
-      attackSeconds = kCounterRates[attackRate * 2 + 1] * 64 / kSampleRate;
-    } else {
-      attackSeconds = 2 / kSampleRate;
-    }
+    const double attackSeconds = adsrAttackSeconds(attackRate);
 
     s16 envelope = 0x7ff;
     s16 envelopeSustainStart = envelope;
@@ -247,6 +246,16 @@ Envelope snesDspEnvelope(u8 adsr1, u8 adsr2, u8 gain) {
       .releaseSeconds = envelopeSeconds(envelope.release),
       .sustainAmplitude = std::clamp(envelope.sustainLevel, 0.0, 1.0),
   };
+}
+
+double snesDspAdsrAttackSeconds(u8 attackRate) {
+  return adsrAttackSeconds(attackRate & 0x0f);
+}
+
+double snesDspAdsrSustainSeconds(u8 sustainRate) {
+  const u8 rate = sustainRate & 0x1f;
+  return rate == 0 ? std::numeric_limits<double>::infinity()
+                   : emulateGainEnvelope(static_cast<u8>(0xa0 | rate), 0x7ff, 0).seconds;
 }
 
 double snesDspGainEnvelopeSeconds(u8 gain, s16 envelopeFrom, s16 envelopeTo) {

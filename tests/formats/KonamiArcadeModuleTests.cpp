@@ -142,6 +142,7 @@ KonamiArcadeFixture makeMysticWarriorFixture() {
                  0xf4, 1,    2,    3,    0xf5, 4,    5,    6, 0xfc,  // Z80-only command widths
                  0xd2, 0x0f, 0x00,                                   // low nibble is encoded first on Z80
                  0xf2, 0xfd,                                         // Z80 negative packed pitch (-2/16)
+                 0xfa, 0x00,                                         // zero release rate means immediate key-off
                  0xfb, 0x00,                                         // indexed jump to a four-byte note
                  0xff,
              });
@@ -266,7 +267,7 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
   expect(sequence != nullptr && instruments != nullptr && samples != nullptr,
          "KonamiArcade result should use the core value asset types");
   expect(sequence->program.dialect.value == kKonamiArcadeSequenceDialectId && sequence->program.tracks.size() == 1 &&
-             sequence->program.tracks[0].commands.size() == 35,
+             sequence->program.tracks[0].commands.size() == 36,
          "KonamiArcade sequence should compile the source track into typed command values");
   expect(instruments->instruments.size() == 2,
          "KonamiArcade synth should contain one melodic instrument and one drum kit");
@@ -278,6 +279,9 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
   expect(instruments->instruments[1].regions.size() == 1 &&
              std::abs(instruments->instruments[1].regions[0].unityKey - 22.0) < 0.0001,
          "MysticWarrior drums should preserve the Z80 driver's six-bit-sixteenths pitch");
+  expect(instruments->instruments[0].regions[0].envelope.releaseSeconds == 0.0 &&
+             instruments->instruments[1].regions[0].envelope.releaseSeconds == 0.0,
+         "KonamiArcade instruments should use the driver's instantaneous default release");
 
   const PerformanceSequence performance =
       SequenceVm(LoopPolicy::PlayOnce).render(sequence->program, konamiArcadeSequenceDialect());
@@ -299,6 +303,7 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
          "collection preparation should apply the sequence's vibrato range to KonamiArcade instruments");
   std::vector<const NotePerformanceEvent*> notes;
   std::vector<const ExpressionPerformanceEvent*> expressions;
+  std::vector<const EnvelopePerformanceEvent*> envelopes;
   bool chronological = true;
   u64 previousTick = 0;
   for (const auto& event : performance.tracks[0].events) {
@@ -309,9 +314,15 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
       notes.push_back(note);
     } else if (const auto* expression = std::get_if<ExpressionPerformanceEvent>(&event)) {
       expressions.push_back(expression);
+    } else if (const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event)) {
+      envelopes.push_back(envelope);
     }
   }
   expect(chronological, "KonamiArcade delayed slides should leave the performance timeline chronological");
+  expect(envelopes.size() == 1 && envelopes[0]->update.setFields == EnvelopeFields::Release &&
+             envelopes[0]->update.values.releaseSeconds == 0.0 &&
+             envelopes[0]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks,
+         "MysticWarrior FA zero should emit an instantaneous release for active and future voices");
   expect(notes.size() == 8 && notes[0]->key == 74.0 && notes[1]->key == 64.0 && notes[2]->key == 64.0 &&
              notes[3]->key == 66.0 && notes[4]->key == 70.0 && notes[5]->key == 24.0 && notes[6]->key == 24.0 &&
              notes[7]->key == 72.0 && notes[7]->durationTicks == 1,
@@ -520,6 +531,7 @@ void konamiArcadeGxDriverQuirksRemainRepresented() {
              {
                  0xea, 0x80,                          // tempo
                  0xfa, 0x01,                          // enable a software release
+                 0xe2, 0x01,                          // release state survives program changes
                  0xe3, 0x81,                          // encoded hard-left pan
                  0x30, 0x0a, 0x1e, 0x7f,              // establish the Salamander 2 track's 30% duration
                  0xf3, 0x00, 0x10, 0x30,              // GX recognizes F3 through its post-note look-ahead
@@ -564,7 +576,7 @@ void konamiArcadeGxDriverQuirksRemainRepresented() {
   std::vector<Diagnostic> diagnostics;
   const SequenceProgram program = decodeKonamiArcadeSequence(ByteReader(source.id, bytes), layout, sequenceLayout,
                                                              AssetId{1}, nullptr, &diagnostics);
-  expect(diagnostics.empty() && program.tracks.size() == 1 && program.tracks[0].commands.size() == 19,
+  expect(diagnostics.empty() && program.tracks.size() == 1 && program.tracks[0].commands.size() == 20,
          "valid GX state and DSP commands should not truncate sequence decoding");
 
   const PerformanceSequence performance =
@@ -582,6 +594,8 @@ void konamiArcadeGxDriverQuirksRemainRepresented() {
   std::vector<const StereoBalancePerformanceEvent*> balances;
   std::vector<const ReverbPerformanceEvent*> reverbs;
   std::vector<const PitchBendPerformanceEvent*> pitchBends;
+  std::vector<const EnvelopePerformanceEvent*> envelopes;
+  std::vector<const InstrumentPerformanceEvent*> instruments;
   for (const auto& event : performance.tracks[0].events) {
     if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
       notes.push_back(note);
@@ -591,8 +605,23 @@ void konamiArcadeGxDriverQuirksRemainRepresented() {
       reverbs.push_back(reverb);
     } else if (const auto* pitchBend = std::get_if<PitchBendPerformanceEvent>(&event)) {
       pitchBends.push_back(pitchBend);
+    } else if (const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event)) {
+      envelopes.push_back(envelope);
+    } else if (const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&event)) {
+      instruments.push_back(instrument);
     }
   }
+  const double expectedReleaseSeconds = 2032.0 * (256.0 / 0x81) / layout.nmiRateHertz;
+  expect(envelopes.size() == 1 && envelopes[0]->update.setFields == EnvelopeFields::Release &&
+             envelopes[0]->update.values.releaseSeconds &&
+             std::abs(*envelopes[0]->update.values.releaseSeconds - expectedReleaseSeconds) < 0.0001 &&
+             envelopes[0]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks,
+         "GX FA should convert its 8.8 attenuation increment into a tempo-relative release");
+  expect(instruments.size() == 2 &&
+             std::ranges::all_of(instruments, [](const InstrumentPerformanceEvent* instrument) {
+               return instrument->envelopeMode == InstrumentEnvelopeMode::PreserveDynamicOverride;
+             }),
+         "KonamiArcade instrument changes should preserve the track-level release rate");
   expect(notes.size() == 5 && notes[0]->key == 74.0 && notes[1]->key == 72.0 && notes[2]->key == 73.0 &&
              notes[3]->key == 74.0 && notes[4]->key == 24.0 && notes[0]->durationTicks == 3 &&
              notes[1]->durationTicks == 7 && notes[2]->durationTicks == 7 && notes[3]->durationTicks == 7 &&

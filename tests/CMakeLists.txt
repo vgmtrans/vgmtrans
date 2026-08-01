@@ -14,6 +14,7 @@ target_sources(vgmtrans-value-core-tests
     core/SessionSnapshotBuilder.h
     core/ValueCollectionResolverTests.cpp
     core/ValueCompilerCursorTests.cpp
+    core/ValueDynamicEnvelopeTests.cpp
     core/ValueMidiTests.cpp
     core/ValuePsxTests.cpp
     core/ValueRegistryTests.cpp

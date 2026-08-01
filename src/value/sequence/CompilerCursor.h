@@ -229,16 +229,18 @@ void emitStereoBalance(Playback& playback, double leftGain, double rightGain) {
 }
 
 template <class Playback>
-void emitInstrument(Playback& playback, u32 bank, u32 program) {
-  playback.out.instrument(bank, program);
+void emitInstrument(Playback& playback, u32 bank, u32 program, InstrumentEnvelopeMode envelopeMode) {
+  playback.out.instrument(bank, program, envelopeMode);
 }
 
 template <class Playback>
-void emitSourceInstrument(Playback& playback, std::string domain, u32 key) {
-  playback.out.instrument(InstrumentIdentity{
-      .domain = std::move(domain),
-      .key = key,
-  });
+void emitSourceInstrument(Playback& playback, std::string domain, u32 key, InstrumentEnvelopeMode envelopeMode) {
+  playback.out.instrument(
+      InstrumentIdentity{
+          .domain = std::move(domain),
+          .key = key,
+      },
+      envelopeMode);
 }
 
 template <class Playback>
@@ -259,6 +261,33 @@ void emitReverb(Playback& playback, double send) {
 template <class Playback>
 void emitTuning(Playback& playback, double cents) {
   playback.out.tuning(cents);
+}
+
+template <class Playback, EnvelopeFields Field>
+void emitEnvelopeField(Playback& playback, double value, VoiceEnvelopeScope scope) {
+  static_assert(Field == EnvelopeFields::Attack || Field == EnvelopeFields::Hold || Field == EnvelopeFields::Decay ||
+                Field == EnvelopeFields::SecondDecay || Field == EnvelopeFields::Release ||
+                Field == EnvelopeFields::Sustain);
+  Envelope envelope;
+  if constexpr (Field == EnvelopeFields::Attack) {
+    envelope.attackSeconds = value;
+  } else if constexpr (Field == EnvelopeFields::Hold) {
+    envelope.holdSeconds = value;
+  } else if constexpr (Field == EnvelopeFields::Decay) {
+    envelope.decaySeconds = value;
+  } else if constexpr (Field == EnvelopeFields::SecondDecay) {
+    envelope.secondDecaySeconds = value;
+  } else if constexpr (Field == EnvelopeFields::Release) {
+    envelope.releaseSeconds = value;
+  } else {
+    envelope.sustainAmplitude = value;
+  }
+  playback.out.envelope(std::move(envelope), Field, scope);
+}
+
+template <class Playback>
+void restoreEnvelope(Playback& playback, EnvelopeFields fields, VoiceEnvelopeScope scope) {
+  playback.out.restoreEnvelope(fields, scope);
 }
 
 template <class Playback>
@@ -518,12 +547,14 @@ public:
       return append<&detail::emitStereoBalance<Playback>>(std::move(leftGain), std::move(rightGain));
     }
 
-    Event& emitInstrument(auto bank, auto program) {
-      return append<&detail::emitInstrument<Playback>>(std::move(bank), std::move(program));
+    Event& emitInstrument(auto bank, auto program,
+                          InstrumentEnvelopeMode envelopeMode = InstrumentEnvelopeMode::UseInstrumentEnvelope) {
+      return append<&detail::emitInstrument<Playback>>(std::move(bank), std::move(program), envelopeMode);
     }
 
-    Event& emitInstrument(std::string_view domain, auto key) {
-      return append<&detail::emitSourceInstrument<Playback>>(domain, std::move(key));
+    Event& emitInstrument(std::string_view domain, auto key,
+                          InstrumentEnvelopeMode envelopeMode = InstrumentEnvelopeMode::UseInstrumentEnvelope) {
+      return append<&detail::emitSourceInstrument<Playback>>(domain, std::move(key), envelopeMode);
     }
 
     Event& emitTempo(auto microsecondsPerQuarter) {
@@ -535,6 +566,16 @@ public:
     Event& emitReverb(auto send) { return append<&detail::emitReverb<Playback>>(std::move(send)); }
 
     Event& emitTuning(auto cents) { return append<&detail::emitTuning<Playback>>(std::move(cents)); }
+
+    template <EnvelopeFields Field>
+    Event& emitEnvelopeField(auto value, VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks) {
+      return append<&detail::emitEnvelopeField<Playback, Field>>(std::move(value), scope);
+    }
+
+    Event& restoreEnvelope(EnvelopeFields fields = EnvelopeFields::All,
+                           VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks) {
+      return append<&detail::restoreEnvelope<Playback>>(fields, scope);
+    }
 
     Event& emitGlobalTranspose(auto semitones) {
       return append<&detail::emitGlobalTranspose<Playback>>(std::move(semitones));

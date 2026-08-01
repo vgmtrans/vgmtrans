@@ -693,6 +693,10 @@ std::optional<vgmtrans::core::ExportRequest> valueExportRequestFromArgs(const st
       request.modulationScaling = vgmtrans::core::ModulationScalingPolicy::FullFormatRange;
       continue;
     }
+    if (option == "--dynamic-envelopes" || option == "--dynamic-envelope-variants") {
+      request.dynamicEnvelopes = vgmtrans::core::DynamicEnvelopePolicy::InstrumentVariants;
+      continue;
+    }
 
     std::string_view modulationPrefix = "--modulation-scaling=";
     if (option.starts_with(modulationPrefix)) {
@@ -736,9 +740,9 @@ std::optional<vgmtrans::core::ExportRequest> valueExportRequestFromArgs(const st
 
     const auto kind = valueExportKindFromString(option);
     if (!kind) {
-      fmt::println(
-          "Unknown value export option '{}'. Use all, midi, sf2, dls, wav, or --modulation-scaling full|observed.",
-          args[i]);
+      fmt::println("Unknown value export option '{}'. Use all, midi, sf2, dls, wav, --dynamic-envelopes, or "
+                   "--modulation-scaling full|observed.",
+                   args[i]);
       return std::nullopt;
     }
 
@@ -905,11 +909,10 @@ void printValueInstrument(const vgmtrans::core::Instrument& instrument, size_t i
 
   for (size_t i = 0; i < instrument.regions.size(); ++i) {
     const auto& region = instrument.regions[i];
-    fmt::println(
-        "  region #{} range=0x{:x}:0x{:x} key={}-{} vel={}-{} {} unity-key={:.3f} pan={:.3f} atten={:.2f}dB", i,
-        region.range.offset, region.range.size, region.keyRange.low, region.keyRange.high, region.velocityRange.low,
-        region.velocityRange.high, valueSampleRefName(region.sample), region.unityKey, region.pan,
-        region.attenuationDb);
+    fmt::println("  region #{} range=0x{:x}:0x{:x} key={}-{} vel={}-{} {} unity-key={:.3f} pan={:.3f} atten={:.2f}dB",
+                 i, region.range.offset, region.range.size, region.keyRange.low, region.keyRange.high,
+                 region.velocityRange.low, region.velocityRange.high, valueSampleRefName(region.sample),
+                 region.unityKey, region.pan, region.attenuationDb);
     fmt::println("    envelope {}", valueEnvelopeName(region.envelope));
   }
 }
@@ -2041,11 +2044,15 @@ void registerCommands() {
         "List or inspect a value sample collection from a filesystem path", 4, value_samples_path},
        {"export",
         "<rawfile_idx> <collection_idx> <dir> [all|midi|sf2|dls|wav; default midi] "
-        "[--modulation-scaling full|observed]",
+        "[--modulation-scaling full|observed] [--dynamic-envelopes]",
         "Export value artifacts for a collection", 5, value_export},
-       {"export-all", "<rawfile_idx> <dir> [all|midi|sf2|dls|wav; default midi] [--modulation-scaling full|observed]",
+       {"export-all",
+        "<rawfile_idx> <dir> [all|midi|sf2|dls|wav; default midi] [--modulation-scaling full|observed] "
+        "[--dynamic-envelopes]",
         "Export value artifacts for all collections", 4, value_export_all},
-       {"export-path", "<path> <dir> [all|midi|sf2|dls|wav; default midi] [--modulation-scaling full|observed]",
+       {"export-path",
+        "<path> <dir> [all|midi|sf2|dls|wav; default midi] [--modulation-scaling full|observed] "
+        "[--dynamic-envelopes]",
         "Scan a filesystem path and export all value collections", 4, value_export_path}}};
 
   commandRegistry["help"] = {"help", "Show this help", {}};

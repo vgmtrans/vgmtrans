@@ -9,6 +9,7 @@
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
+#include "value/synth/SnesDsp.h"
 #include "ValueFormatTestSupport.h"
 
 #include <algorithm>
@@ -364,6 +365,52 @@ void akaoSnesCompilerCursorCoversVersionBoundariesAndDurations() {
                semanticOperand(boundary.commands[1], "note_index") == nullptr,
            "each AkaoSnes version should switch from status notes to commands at its exact opcode boundary");
   }
+}
+
+void akaoSnesV3DynamicAdsrUsesAttackAndHeldNoteDecay() {
+  constexpr u32 start = 0x20;
+  std::vector<u8> bytes(0x40, 0xf2);
+  std::ranges::copy(std::initializer_list<u8>{0xea, 4, 0xeb, 0xff, 0xee, 0xe5, 0xef, 0xf2},
+                    bytes.begin() + start);
+
+  const AkaoSnesProfile ff5{.version = AKAOSNES_V3, .minorVersion = AKAOSNES_V3_FF5};
+  const TrackProgram ff5Track = decodeTrack(bytes, ff5, start, start + 8);
+  const SemanticOperand* attackRate = semanticOperand(ff5Track.commands[1], "dsp_attack_rate");
+  const SemanticOperand* sustainRate = semanticOperand(ff5Track.commands[2], "dsp_sustain_rate");
+  expect(attackRate != nullptr && std::get<u64>(attackRate->value) == 15 && sustainRate != nullptr &&
+             std::get<u64>(sustainRate->value) == 5,
+         "FF5 ADSR commands should apply the driver's four- and five-bit rate masks");
+
+  const PerformanceSequence ff5Performance = renderTracks(ff5, {ff5Track});
+  const auto instruments = eventsOfType<InstrumentPerformanceEvent>(ff5Performance.tracks.front());
+  const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(ff5Performance.tracks.front());
+  expect(instruments.size() == 1 &&
+             instruments[0]->envelopeMode == InstrumentEnvelopeMode::UseInstrumentEnvelope,
+         "FF5 program changes should select the instrument's native envelope");
+  expect(envelopes.size() == 3, "FF5 ADSR attack, sustain rate, and default should emit envelope state");
+
+  expect(envelopes[0]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
+             envelopes[0]->update.setFields == EnvelopeFields::Attack &&
+             envelopes[0]->update.values == Envelope{.attackSeconds = snesDspAdsrAttackSeconds(15)},
+         "FF5 ADSR attack should update only the attack stage");
+
+  expect(envelopes[1]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
+             envelopes[1]->update.setFields == EnvelopeFields::SecondDecay &&
+             envelopes[1]->update.values == Envelope{.secondDecaySeconds = snesDspAdsrSustainSeconds(5)},
+         "FF5 ADSR sustain rate should control held-note decay rather than note-off release");
+  expect(envelopes[2]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
+             envelopes[2]->update.inheritFields == EnvelopeFields::All,
+         "FF5 ADSR default should restore the instrument envelope for active and future voices");
+
+  std::vector<u8> sd2Bytes(0x40, 0xf2);
+  std::ranges::copy(std::initializer_list<u8>{0xea, 4, 0xee, 0x00, 0x00, 0xf2}, sd2Bytes.begin() + start);
+  const AkaoSnesProfile sd2{.version = AKAOSNES_V3, .minorVersion = AKAOSNES_V3_SD2};
+  const PerformanceSequence sd2Performance = renderTracks(sd2, {decodeTrack(sd2Bytes, sd2, start, start + 6)});
+  const auto sd2Envelopes = eventsOfType<EnvelopePerformanceEvent>(sd2Performance.tracks.front());
+  expect(sd2Envelopes.size() == 1 && sd2Envelopes[0]->update.setFields == EnvelopeFields::SecondDecay &&
+             sd2Envelopes[0]->update.values.secondDecaySeconds &&
+             std::isinf(*sd2Envelopes[0]->update.values.secondDecaySeconds),
+         "Secret of Mana EE 00 should disable held-note decay");
 }
 
 void akaoSnesCompilerCursorCoversRemapsUnknownsAndTruncation() {

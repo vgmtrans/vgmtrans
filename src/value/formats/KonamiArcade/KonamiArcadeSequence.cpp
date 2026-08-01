@@ -88,6 +88,17 @@ constexpr u32 kMaxTrackCommands = 32768;
   return std::trunc(ticks * tickMilliseconds(nmiRateHertz, tempo));
 }
 
+[[nodiscard]] double releaseSeconds(u8 rate, double nmiRateHertz, double tempo) {
+  if (rate == 0) {
+    return 0.0;
+  }
+  // FA stores rate << 4 in an 8.8 attenuation accumulator. Each music tick
+  // adds that increment until its high byte reaches the maximum loudness.
+  constexpr double kMaximumLoudness = 127.0;
+  const double ticks = std::ceil(kMaximumLoudness * 16.0 / rate);
+  return ticks * tickMilliseconds(nmiRateHertz, tempo) / 1000.0;
+}
+
 [[nodiscard]] u8 effectiveTempo(u8 raw, s8 offset, KonamiArcadeVersion version) {
   const int value = static_cast<int>(raw) + offset;
   // The Z80 driver saturates positive overflow. GX uses an ordinary byte add.
@@ -264,6 +275,11 @@ struct Playback {
     };
   }
 
+  void selectInstrument(u32 key) {
+    out.instrument(InstrumentIdentity{.domain = std::string(kKonamiArcadeInstrumentDomain), .key = key},
+                   InstrumentEnvelopeMode::PreserveDynamicOverride);
+  }
+
   void emitVibratoDepth(PerformanceEmitter output, bool force = false) {
     auto& vibrato = track.vibrato;
     const double depth = vibrato.enabled() ? vibratoDepthSemitones(vibrato.depth, vibrato.currentDepthFixed()) : 0.0;
@@ -334,9 +350,9 @@ struct Playback {
       return;
     }
     if (isPercussion) {
-      out.instrument(InstrumentIdentity{.domain = std::string(kKonamiArcadeInstrumentDomain), .key = 0x100});
+      selectInstrument(0x100);
     } else {
-      out.instrument(InstrumentIdentity{.domain = std::string(kKonamiArcadeInstrumentDomain), .key = track.program});
+      selectInstrument(track.program);
     }
     track.durationTieCanceled = true;
   }
@@ -344,9 +360,16 @@ struct Playback {
   void programChange(u8 value) {
     track.program = value;
     if (!percussion()) {
-      out.instrument(InstrumentIdentity{.domain = std::string(kKonamiArcadeInstrumentDomain), .key = value});
+      selectInstrument(value);
     }
     track.durationTieCanceled = true;
+  }
+
+  void setReleaseRate(u8 rate, double nmiRateHertz) {
+    track.releaseRate = rate;
+    out.envelope(
+        Envelope{.releaseSeconds = releaseSeconds(rate, nmiRateHertz, sequence.channelTempos[track.sourceTrackNumber])},
+        EnvelopeFields::Release, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
 
   void emitNotePitchState(bool isDrum, s8 initialTranspose) {
@@ -1031,8 +1054,8 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       return event.invoke<&Playback::setVibratoFade>(length);
     }
     case 0xfa: {
-      auto event = cursor.command("Release Rate", SequenceSemantic::State);
-      return event.set<&TrackState::releaseRate>(event.u8("rate"));
+      auto event = cursor.command("Release Rate", SequenceSemantic::Envelope);
+      return event.invoke<&Playback::setReleaseRate>(event.u8("rate"), layout.nmiRateHertz);
     }
     case 0xfb: {
       if (gx) {

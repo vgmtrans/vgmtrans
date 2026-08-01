@@ -162,6 +162,18 @@ void MenuBar::appendOptionsMenu() {
         Settings::the()->conversion.setModulationConversion(conversion);
       });
 
+  using vgmtrans::core::DynamicEnvelopePolicy;
+  appendEnumOptions(
+      m_optionsMenu, tr("Dynamic Envelope Conversion"),
+      Settings::the()->conversion.dynamicEnvelopeConversion(),
+      std::array{
+          std::pair{tr("Ignore (Default)"), DynamicEnvelopePolicy::Ignore},
+          std::pair{tr("Instrument Variants"), DynamicEnvelopePolicy::InstrumentVariants},
+      },
+      [](DynamicEnvelopePolicy conversion) {
+        Settings::the()->conversion.setDynamicEnvelopeConversion(conversion);
+      });
+
   QMenu* loops = m_optionsMenu->addMenu(tr("Sequence Loops"));
   auto* loopsGroup = new QActionGroup(loops);
   loopsGroup->setExclusive(true);

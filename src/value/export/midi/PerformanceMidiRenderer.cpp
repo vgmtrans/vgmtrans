@@ -7,6 +7,7 @@
 #include "value/export/midi/PerformanceMidiRenderer.h"
 
 #include "value/base/LevelScale.h"
+#include "value/export/DynamicEnvelope.h"
 #include "value/export/SequenceModulationProfile.h"
 #include "value/export/midi/PitchTransitionMidiLowering.h"
 
@@ -342,6 +343,10 @@ struct SimulatedLfoState {
 
 struct RenderTrackState {
   std::optional<size_t> lastNoteIndex;
+  // MIDI starts in bank/program zero. Keep the actual emitted state so a
+  // generated selection can explicitly return to bank zero.
+  u16 midiBank = 0;
+  u8 midiProgram = 0;
   u16 pitchBendRangeCents = 200;
   std::optional<u16> lastPitchBendRangeCents;
   u16 sourcePitchBendRangeCents = 200;
@@ -635,6 +640,60 @@ void applyInstrumentPitchBendRange(MidiTrack& track, RenderTrackState& state, u6
     return;
   }
   ensurePitchBendRangePreservingPitch(track, state, tick, channel, range, modulationConversion);
+}
+
+void applySourceInstrumentSelection(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
+                                    const MidiInstrumentSelection& selection, const MidiExportOptions& options,
+                                    ModulationConversionPolicy modulationConversion) {
+  const u16 bank = midiBank(selection, options);
+  if (selection.address.bank != 0 || selection.forceBankSelect) {
+    track.events.push_back(BankSelect{
+        .tick = tick,
+        .channel = channel,
+        .bank = bank,
+        .writeLsb = writeBankSelectLsb(options),
+    });
+    state.midiBank = bank;
+  }
+  state.midiProgram = data7(selection.address.program);
+  track.events.push_back(ProgramChange{
+      .tick = tick,
+      .channel = channel,
+      .program = state.midiProgram,
+  });
+  applyInstrumentPitchBendRange(track, state, tick, channel, selection.pitchBendRangeCents, modulationConversion);
+}
+
+void applyPlannedInstrumentSelection(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
+                                     const PlannedInstrumentSelection& planned, const MidiExportOptions& options,
+                                     ModulationConversionPolicy modulationConversion) {
+  const MidiInstrumentSelection selection{
+      .address = planned.address,
+      .forceBankSelect = true,
+      .logicalBank = true,
+      .pitchBendRangeCents = planned.pitchBendRangeCents,
+  };
+  const u16 bank = midiBank(selection, options);
+  const u8 program = data7(selection.address.program);
+  const bool bankChanged = bank != state.midiBank;
+  if (bankChanged) {
+    track.events.push_back(BankSelect{
+        .tick = tick,
+        .channel = channel,
+        .bank = bank,
+        .writeLsb = writeBankSelectLsb(options),
+    });
+    state.midiBank = bank;
+  }
+  if (bankChanged || program != state.midiProgram) {
+    track.events.push_back(ProgramChange{
+        .tick = tick,
+        .channel = channel,
+        .program = program,
+    });
+    state.midiProgram = program;
+  }
+  applyInstrumentPitchBendRange(track, state, tick, channel, selection.pitchBendRangeCents, modulationConversion);
 }
 
 void applyVoicePitchBendRangeChange(MidiTrack& track, RenderTrackState& state, const VoicePitchBendRangeChange& change,
@@ -997,11 +1056,18 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                   std::span<const GlobalTransposeChange> globalTransposes, const PerformanceTempoMap& globalTempos,
                   const MidiExportOptions& options, ModulationConversionPolicy modulationConversion,
                   std::span<const InstrumentSetAsset* const> instrumentSets,
-                  const SequenceModulationProfile* modulationProfile, MidiControllerState* automationState) {
+                  const SequenceModulationProfile* modulationProfile, const SequenceInstrumentPlan* instrumentPlan,
+                  MidiControllerState* automationState) {
   std::visit(
       [&](const auto& typedEvent) {
         using TypedEvent = std::decay_t<decltype(typedEvent)>;
         if constexpr (std::is_same_v<TypedEvent, NotePerformanceEvent>) {
+          if (!typedEvent.extendsPrevious && instrumentPlan != nullptr) {
+            if (const auto* planned = instrumentPlan->selectionFor(typedEvent.header.track, typedEvent.note)) {
+              applyPlannedInstrumentSelection(track, state, typedEvent.header.tick, channel, *planned, options,
+                                              modulationConversion);
+            }
+          }
           const u8 key = midiKey(typedEvent.key + globalTransposeAt(globalTransposes, typedEvent.header.tick));
           if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
             if (shouldRestartSimulatedVibratoForNote(typedEvent, state)) {
@@ -1032,21 +1098,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           // once and written to the first MIDI track by renderMidiSequence.
         } else if constexpr (std::is_same_v<TypedEvent, InstrumentPerformanceEvent>) {
           const auto selection = instrumentSelection(typedEvent, instrumentSets);
-          if (selection.address.bank != 0 || selection.forceBankSelect) {
-            track.events.push_back(BankSelect{
-                .tick = typedEvent.header.tick,
-                .channel = channel,
-                .bank = midiBank(selection, options),
-                .writeLsb = writeBankSelectLsb(options),
-            });
-          }
-          track.events.push_back(ProgramChange{
-              .tick = typedEvent.header.tick,
-              .channel = channel,
-              .program = data7(selection.address.program),
-          });
-          applyInstrumentPitchBendRange(track, state, typedEvent.header.tick, channel, selection.pitchBendRangeCents,
-                                        modulationConversion);
+          applySourceInstrumentSelection(track, state, typedEvent.header.tick, channel, selection, options,
+                                         modulationConversion);
         } else if constexpr (std::is_same_v<TypedEvent, LevelPerformanceEvent>) {
           addVolume(track, automationState, typedEvent.header.tick, channel, typedEvent.linearGain,
                     typedEvent.precisionHint, options, typedEvent.sourceQuantization);
@@ -1296,7 +1349,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
 MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExportOptions options,
                                 ModulationConversionPolicy modulationConversion,
                                 std::span<const InstrumentSetAsset* const> instrumentSets,
-                                const SequenceModulationProfile* modulationProfile) {
+                                const SequenceModulationProfile* modulationProfile,
+                                const SequenceInstrumentPlan* instrumentPlan) {
   std::optional<SequenceModulationProfile> derivedModulationProfile;
   if (modulationProfile == nullptr &&
       std::ranges::any_of(performance.tracks, &PerformanceTrack::hasPhysicalModulation)) {
@@ -1391,7 +1445,7 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
           header.automation ? &automationControllerStates[*header.automation] : nullptr;
       addMidiEvent(midiTrack, renderState, *event, assignment.channel, performanceTrack.sourceTrackNumber,
                    globalTransposes, globalTempos, options, modulationConversion, instrumentSets, modulationProfile,
-                   automationState);
+                   instrumentPlan, automationState);
     }
     u64 endTick = performanceTrack.endTick;
     if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {

@@ -125,18 +125,48 @@ void PerformanceEmitter::instrument(InstrumentPerformanceEvent event) {
   append(std::move(event));
 }
 
-void PerformanceEmitter::instrument(InstrumentIdentity sourceInstrument) {
+void PerformanceEmitter::instrument(InstrumentIdentity sourceInstrument, InstrumentEnvelopeMode envelopeMode) {
   instrument(InstrumentPerformanceEvent{
       .sourceInstrument = std::move(sourceInstrument),
+      .envelopeMode = envelopeMode,
   });
 }
 
-void PerformanceEmitter::instrument(u32 bank, u32 program, bool forceBankSelect) {
+void PerformanceEmitter::instrument(u32 bank, u32 program, InstrumentEnvelopeMode envelopeMode) {
+  instrument(bank, program, false, envelopeMode);
+}
+
+void PerformanceEmitter::instrument(u32 bank, u32 program, bool forceBankSelect,
+                                    InstrumentEnvelopeMode envelopeMode) {
   instrument(InstrumentPerformanceEvent{
       .bank = bank,
       .program = program,
       .forceBankSelect = forceBankSelect,
+      .envelopeMode = envelopeMode,
   });
+}
+
+void PerformanceEmitter::envelope(EnvelopePerformanceEvent event) {
+  append(std::move(event));
+}
+
+void PerformanceEmitter::envelope(EnvelopeUpdate update, VoiceEnvelopeScope scope) {
+  envelope(EnvelopePerformanceEvent{
+      .update = std::move(update),
+      .scope = scope,
+  });
+}
+
+void PerformanceEmitter::envelope(Envelope values, VoiceEnvelopeScope scope) {
+  envelope(EnvelopeUpdate::replace(std::move(values)), scope);
+}
+
+void PerformanceEmitter::envelope(Envelope values, EnvelopeFields fields, VoiceEnvelopeScope scope) {
+  envelope(EnvelopeUpdate::set(std::move(values), fields), scope);
+}
+
+void PerformanceEmitter::restoreEnvelope(EnvelopeFields fields, VoiceEnvelopeScope scope) {
+  envelope(EnvelopeUpdate::restore(fields), scope);
 }
 
 void PerformanceEmitter::level(LevelPerformanceEvent event) {

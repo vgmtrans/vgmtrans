@@ -122,6 +122,29 @@ void Settings::ConversionSettings::setModulationConversion(
   emit owner->conversionOptionsChanged();
 }
 
+vgmtrans::core::DynamicEnvelopePolicy Settings::ConversionSettings::dynamicEnvelopeConversion() const {
+  settings.beginGroup(QStringLiteral("ConversionOptions"));
+  const int value =
+      settings.value(QStringLiteral("dynamicEnvelopeConversion"),
+                     static_cast<int>(vgmtrans::core::DynamicEnvelopePolicy::Ignore))
+          .toInt();
+  settings.endGroup();
+  switch (static_cast<vgmtrans::core::DynamicEnvelopePolicy>(value)) {
+    case vgmtrans::core::DynamicEnvelopePolicy::Ignore:
+    case vgmtrans::core::DynamicEnvelopePolicy::InstrumentVariants:
+      return static_cast<vgmtrans::core::DynamicEnvelopePolicy>(value);
+  }
+  return vgmtrans::core::DynamicEnvelopePolicy::Ignore;
+}
+
+void Settings::ConversionSettings::setDynamicEnvelopeConversion(
+    vgmtrans::core::DynamicEnvelopePolicy policy) const {
+  settings.beginGroup(QStringLiteral("ConversionOptions"));
+  settings.setValue(QStringLiteral("dynamicEnvelopeConversion"), static_cast<int>(policy));
+  settings.endGroup();
+  emit owner->conversionOptionsChanged();
+}
+
 bool Settings::ConversionSettings::exportOnlyUsedInstruments() const {
   settings.beginGroup(QStringLiteral("ConversionOptions"));
   const bool enabled = settings.value(QStringLiteral("exportOnlyUsedInstruments"), true).toBool();

@@ -117,6 +117,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/PitchTransitionMidiLowering.h
     ${PROJECT_SOURCE_DIR}/src/value/export/BinaryWriter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/BinaryWriter.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/DynamicEnvelope.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/ExportDiagnostics.h
     ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceEmitter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.cpp
@@ -186,6 +187,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.h
       ${PROJECT_SOURCE_DIR}/src/value/base/LevelScale.h
       ${PROJECT_SOURCE_DIR}/src/value/model/MatchModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/model/EnvelopeModel.h
       ${PROJECT_SOURCE_DIR}/src/value/model/InstrumentIdentity.h
       ${PROJECT_SOURCE_DIR}/src/value/model/MetadataModel.h
       ${PROJECT_SOURCE_DIR}/src/value/model/SourceMap.h
@@ -207,6 +209,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/synth/SynthMath.h
       ${PROJECT_SOURCE_DIR}/src/value/synth/Ym2151.h
       ${PROJECT_SOURCE_DIR}/src/value/export/Export.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/DynamicEnvelope.h
       ${PROJECT_SOURCE_DIR}/src/value/export/ExportPolicy.h
       ${PROJECT_SOURCE_DIR}/src/value/export/ExportTypes.h
 )

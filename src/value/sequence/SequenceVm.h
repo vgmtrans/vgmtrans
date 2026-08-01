@@ -68,8 +68,18 @@ public:
   void timeSignature(TimeSignaturePerformanceEvent event);
   void timeSignature(u8 numerator, u8 denominator, u8 clocksPerMetronomeClick);
   void instrument(InstrumentPerformanceEvent event);
-  void instrument(InstrumentIdentity sourceInstrument);
-  void instrument(u32 bank, u32 program, bool forceBankSelect = false);
+  void instrument(InstrumentIdentity sourceInstrument,
+                  InstrumentEnvelopeMode envelopeMode = InstrumentEnvelopeMode::UseInstrumentEnvelope);
+  void instrument(u32 bank, u32 program,
+                  InstrumentEnvelopeMode envelopeMode = InstrumentEnvelopeMode::UseInstrumentEnvelope);
+  void instrument(u32 bank, u32 program, bool forceBankSelect,
+                  InstrumentEnvelopeMode envelopeMode = InstrumentEnvelopeMode::UseInstrumentEnvelope);
+  void envelope(EnvelopePerformanceEvent event);
+  void envelope(EnvelopeUpdate update, VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks);
+  void envelope(Envelope values, VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks);
+  void envelope(Envelope values, EnvelopeFields fields, VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks);
+  void restoreEnvelope(EnvelopeFields fields = EnvelopeFields::All,
+                       VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks);
   void level(LevelPerformanceEvent event);
   void level(double linearGain, ValueQuantization sourceQuantization);
   void level(double linearGain, LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit);

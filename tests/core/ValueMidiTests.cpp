@@ -2016,6 +2016,9 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
          "collection export should default to native synth modulation");
   expect(PlaybackRequest{}.modulationConversion == ModulationConversionPolicy::SynthModulators,
          "backend-neutral playback requests should default to native synth modulation");
+  expect(ExportRequest{}.dynamicEnvelopes == DynamicEnvelopePolicy::Ignore &&
+             PlaybackRequest{}.dynamicEnvelopes == DynamicEnvelopePolicy::Ignore,
+         "dynamic envelope materialization should remain explicitly opt-in");
 
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{

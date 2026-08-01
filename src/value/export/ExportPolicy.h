@@ -23,4 +23,12 @@ enum class ModulationConversionPolicy {
   SequenceEventSimulation,
 };
 
+// Dynamic envelope commands remain in the neutral performance model regardless
+// of export policy. InstrumentVariants opts into portable bank/program
+// materialization for MIDI plus SF2/DLS-style playback.
+enum class DynamicEnvelopePolicy {
+  Ignore,
+  InstrumentVariants,
+};
+
 }  // namespace vgmtrans::core
