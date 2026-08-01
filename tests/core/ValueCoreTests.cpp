@@ -90,6 +90,7 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections();
 void konamiArcadeGxLfosMatchDriverState();
 void konamiArcadeGxDriverQuirksRemainRepresented();
 void konamiArcadeExpressionPersistsThroughSoftwareRelease();
+void konamiArcadeZeroReleaseUsesHardwareVoiceLifetime();
 void konamiArcadeTempoSlidesAreCanceledAcrossTracks();
 void konamiArcadeMysticDrumPitchSlidesUseTablePitch();
 void konamiArcadeAdpcmDecoderSupportsForwardAndReverseSamples();
@@ -249,6 +250,7 @@ int main() {
     konamiArcadeGxLfosMatchDriverState();
     konamiArcadeGxDriverQuirksRemainRepresented();
     konamiArcadeExpressionPersistsThroughSoftwareRelease();
+    konamiArcadeZeroReleaseUsesHardwareVoiceLifetime();
     konamiArcadeTempoSlidesAreCanceledAcrossTracks();
     konamiArcadeMysticDrumPitchSlidesUseTablePitch();
     konamiArcadeAdpcmDecoderSupportsForwardAndReverseSamples();
