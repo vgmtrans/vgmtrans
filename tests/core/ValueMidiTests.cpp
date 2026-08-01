@@ -1342,7 +1342,7 @@ void performanceMidiRendererDefersPitchResetUntilTheNextAttack() {
   u32 nextNote = 0;
   u32 nextAutomation = 0;
   PerformanceEmitter out{track, CommandId{7}, SourceAnnotationId{8}, 0, nextSequence, nextNote, nextAutomation};
-  const PerformanceNoteId slidingNote = out.note(60, 1.0, 8);
+  const PerformanceNoteId slidingNote = out.note(60, 1.0, 2);
   out.pitchSlide(slidingNote, 60, 64, 4);
   out.at(12).note(67, 1.0, 4);
 

@@ -269,9 +269,11 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
 }
 
 [[nodiscard]] bool appendPitchBends(std::vector<PitchBendWrite>& bends, const PerformanceAutomation& automation,
-                                    const PitchTransitionIntent& transition, const NoteSpan& note) {
+                                    const PitchTransitionIntent& transition, const NoteSpan& note,
+                                    bool retainReleaseTail) {
   const u64 startTick = std::max(note.source.header.tick, automation.realization.startTick);
-  const u64 endTick = std::min(note.endTick, automation.realization.endTick);
+  const u64 endTick =
+      retainReleaseTail ? automation.realization.endTick : std::min(note.endTick, automation.realization.endTick);
   if (startTick >= note.endTick || endTick < startTick) {
     return false;
   }
@@ -349,12 +351,15 @@ void lowerPitchBends(PerformanceSequence& performance, std::vector<PerformanceEv
       continue;
     }
 
-    bool rendered = false;
+    std::vector<const NoteSpan*> affectedNotes;
     for (const auto& note : notes) {
-      if (affectsNote(*automation, transition, *anchor, note) &&
-          appendPitchBends(bends, *automation, transition, note)) {
-        rendered = true;
+      if (affectsNote(*automation, transition, *anchor, note)) {
+        affectedNotes.push_back(&note);
       }
+    }
+    bool rendered = false;
+    for (const auto* note : affectedNotes) {
+      rendered |= appendPitchBends(bends, *automation, transition, *note, note == affectedNotes.back());
     }
     if (rendered) {
       // Retain the terminal bend through note-off and the synth's release

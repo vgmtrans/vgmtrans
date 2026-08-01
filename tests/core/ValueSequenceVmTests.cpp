@@ -114,6 +114,36 @@ void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
          "source timeline should preserve waits and zero-time commands without musical events");
 }
 
+void sequenceVmPreservesPitchMotionThroughNoteRelease() {
+  const SequenceDialect dialect{
+      .id = DialectId{.value = "release-pitch-probe"},
+      .timebase = Timebase{.ppqn = 48},
+      .execute =
+          [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter& out, VmApi&) {
+            if (command.address.value != 0) {
+              return Effects{};
+            }
+            const PerformanceNoteId note = out.note(60, 1.0, 2);
+            out.pitchSlide(note, 60, 64, 4);
+            return Effects::wait(8);
+          },
+  };
+  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgramBuilder builder{track};
+  builder.addSemantic(Address{0}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{1}));
+  builder.addSemantic(Address{1}, 0, 1, {}, {}, CommandFlow::end(Address{2}));
+
+  const PerformanceSequence performance = SequenceVm().render(
+      SequenceProgram{
+          .dialect = dialect.id,
+          .timebase = dialect.timebase,
+          .tracks = {track},
+      },
+      dialect);
+  expect(performance.tracks[0].automations.size() == 1 && performance.tracks[0].automations[0].realization.endTick == 4,
+         "sequence finalization should preserve pitch motion beyond note-off for a sounding release tail");
+}
+
 void sequenceVmReplaysInfiniteLoopsWhenRequested() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
@@ -1354,6 +1384,7 @@ void sequenceVmExecutesFiniteAndInfiniteSectionPlaylistRepeats() {
 void runValueSequenceVmTests() {
   sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop();
   sequenceVmTimesCommandsThatEmitNoPerformanceEvents();
+  sequenceVmPreservesPitchMotionThroughNoteRelease();
   sequenceVmReplaysInfiniteLoopsWhenRequested();
   sequenceVmStopsDeclaredLoopBeforeTargetReplay();
   sequenceVmPreservesDeclaredLoopAsPerformanceMarkers();

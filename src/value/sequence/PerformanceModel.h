@@ -482,7 +482,8 @@ struct PitchTransitionIntent {
 using PerformanceAutomationIntent = std::variant<ScalarPerformanceAutomationIntent, PitchTransitionIntent>;
 
 enum class PerformanceAutomationEndReason {
-  // The final value remains until the attached note ends.
+  // The motion reached its final value, which remains on the sounding voice
+  // until another source event replaces it.
   Completed,
   // Another transition takes over without resetting pitch.
   Continued,
@@ -493,7 +494,7 @@ enum class PerformanceAutomationEndReason {
 struct PerformanceAutomationRealization {
   u64 startTick = 0;
   // The half-open end of the changing portion of the automation. The terminal
-  // value remains in force until another event or the attached note ends.
+  // value remains in force until another source event replaces it.
   u64 endTick = 0;
   PerformanceAutomationEndReason endReason = PerformanceAutomationEndReason::Completed;
 };
