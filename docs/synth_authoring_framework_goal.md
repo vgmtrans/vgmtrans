@@ -603,11 +603,11 @@ KonamiSnes should prove:
 - entries from several disjoint instrument tables;
 - `getOrAdd` merging percussion entries into one kit;
 - repeated sample use;
-- format-specific sample-selection fallback by BRR location;
+- direct DSP SRCN sample selection and aliased BRR streams;
 - physical modulation specifications;
 - precise source fields and parents.
 
-The unusual sample-selection rule remains visible in format code or the SNES platform adapter. The builder must not hide it as generic lookup policy.
+The shared SNES adapter canonicalizes aliased BRR streams while the format keeps the source SRCN identity. The builder must not invent a location transform or fallback sample.
 
 ### NDS: many-to-many and sparse source keys
 

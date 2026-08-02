@@ -52,7 +52,7 @@ std::optional<SnesSampleDirectoryEntry> readSnesSampleDirectoryEntry(ByteReader 
   };
   // Match the legacy validity rule: a complete 9-byte block plus at least one
   // following byte must fit in ARAM.
-  if (result.loopAddress < result.startAddress || !reader.has(result.startAddress, 10)) {
+  if (!reader.has(result.startAddress, 10)) {
     return std::nullopt;
   }
   if (!inspectStream) {
@@ -63,8 +63,12 @@ std::optional<SnesSampleDirectoryEntry> readSnesSampleDirectoryEntry(ByteReader 
   if (!result.stream) {
     return std::nullopt;
   }
-  if (result.stream->loops && result.loopAddress >= result.stream->encodedData.endOffset()) {
-    return std::nullopt;
+  if (result.stream->loops) {
+    const u32 lastBlock = static_cast<u32>(result.stream->encodedData.endOffset()) - 9;
+    if (result.loopAddress < result.startAddress || result.loopAddress > lastBlock ||
+        ((result.loopAddress - result.startAddress) % 9) != 0) {
+      return std::nullopt;
+    }
   }
   return result;
 }

@@ -182,14 +182,14 @@ constexpr MaskedBytePattern kLoadPercInstrGG4{
 
   const u16 sampleStart = reader.le16(dirEntryAddress);
   const u16 sampleLoop = reader.le16(dirEntryAddress + 2);
-  if (sampleStart < dirEntryAddress + 4 || sampleLoop < sampleStart || !reader.has(sampleStart, 10) ||
-      ((sampleLoop - sampleStart) % 9) != 0) {
+  if (sampleStart < dirEntryAddress + 4 || !reader.has(sampleStart, 10)) {
     return false;
   }
 
   bool loops = false;
   const u32 length = inferredSampleLength(reader, sampleStart, loops);
-  return length != 0 && (!loops || sampleLoop < sampleStart + length);
+  return length != 0 && (!loops || (sampleLoop >= sampleStart && sampleLoop < sampleStart + length &&
+                                    ((sampleLoop - sampleStart) % 9) == 0));
 }
 
 [[nodiscard]] bool instrumentHeaderLooksValid(ByteReader reader, KonamiSnesVersion version, u32 address,
