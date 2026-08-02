@@ -192,6 +192,39 @@ void ninSnesProfilesDescribeEverySupportedDriverFamily() {
       "early and standard drivers should retain their distinct instrument layouts");
 }
 
+void ninSnesKonamiClockControlsTempo() {
+  std::vector<u8> direct(32);
+  std::ranges::copy(
+      std::initializer_list<u8>{0xe8, 0xf0, 0xc4, 0xf1, 0xe8, 0x40, 0xc4, 0xfa, 0xe8, 0x01, 0xc4, 0xf1},
+      direct.begin());
+  std::vector<u8> absolute(32);
+  std::ranges::copy(std::initializer_list<u8>{0xe8, 0xf0, 0xc5, 0xf1, 0x00, 0xe8, 0x20, 0xc5, 0xfa, 0x00, 0xe8,
+                                              0x01, 0xc5, 0xf1, 0x00},
+                    absolute.begin());
+  expect(detectKonamiTempoTimerTarget(ByteReader(SourceId{1}, direct)) == 0x40 &&
+             detectKonamiTempoTimerTarget(ByteReader(SourceId{1}, absolute)) == 0x20,
+         "Konami timer detection should cover the Parodius and Gradius register-write forms");
+
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+  std::ranges::copy(std::initializer_list<u8>{0xe7, 0x40, 4, 0x7f, 0xc9, 0}, bytes.begin() + 0x300);
+
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::Konami;
+  layout.tempoTimerTarget = 0x40;
+  const PerformanceSequence performance = render(std::move(bytes), layout);
+  const auto tempo = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<TempoPerformanceEvent>(event);
+  });
+  expect(profile(ProfileId::Konami).tempoCommandMultiplier == 2 &&
+             performance.initialTempoMicrosecondsPerQuarter == 3'072'000 &&
+             tempo != performance.tracks[0].events.end() &&
+             std::get<TempoPerformanceEvent>(*tempo).microsecondsPerQuarter == 768'000,
+         "Konami's tempo command doubling should partially offset its slower timer");
+}
+
 void ninSnesScannerFindsRequestedSongAcrossSparseTable() {
   std::vector<u8> bytes(kAramSize);
 

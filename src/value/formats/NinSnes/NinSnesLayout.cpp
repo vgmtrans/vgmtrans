@@ -503,10 +503,14 @@ std::optional<Layout> findLayout(ByteReader reader) {
   std::optional<KonamiPercussionLayout> konamiPercussion;
   std::optional<u8> fixedPercussionBase =
       detectFixedPercussionBase(reader, selected.base == BaseProfile::Earlier ? u8{0xd0} : u8{0xca});
+  u8 tempoTimerTarget = kStandardTimerTarget;
   if (selected.id == ProfileId::Konami) {
     konamiPercussion = findKonamiPercussion(reader);
     if (konamiPercussion) {
       fixedPercussionBase = konamiPercussion->programBase;
+    }
+    if (const auto target = detectKonamiTempoTimerTarget(reader)) {
+      tempoTimerTarget = *target;
     }
   }
   Layout baseLayout{
@@ -519,6 +523,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
       .quintetInstrumentLookupAddress = quintetLookup,
       .fixedPercussionBase = fixedPercussionBase,
       .konamiPercussion = konamiPercussion,
+      .tempoTimerTarget = tempoTimerTarget,
       .volumeTable = std::move(volumeTable),
       .durationRateTable = std::move(durationRateTable),
   };

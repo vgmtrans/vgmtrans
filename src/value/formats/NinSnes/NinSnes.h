@@ -21,6 +21,7 @@ namespace vgmtrans::formats::nin_snes {
 inline constexpr u32 kAramSize = 0x10000;
 inline constexpr u32 kTrackCount = 8;
 inline constexpr u16 kPpqn = 48;
+inline constexpr u8 kStandardTimerTarget = 0x10;
 inline constexpr std::string_view kInstrumentDomain = "nin-snes.instrument";
 inline constexpr u32 kEarlierPercussionProgramBase = 0x100;
 
@@ -134,6 +135,8 @@ struct Profile {
   InstrumentLayout instruments = InstrumentLayout::Standard6Byte;
   InstrumentTableAddressModel instrumentTable = InstrumentTableAddressModel::Standard;
   IntelliMode intelli = IntelliMode::None;
+  // Applied by the tempo command before it stores the driver's tempo value.
+  u8 tempoCommandMultiplier = 1;
 };
 
 struct KonamiPercussionLayout {
@@ -161,6 +164,9 @@ struct Layout {
   std::optional<KonamiPercussionLayout> konamiPercussion;
   u16 konamiTuningTableAddress = 0;
   u8 konamiTuningTableSize = 0;
+  // SPC timer targets are measured in 125-microsecond units. Most N-SPC
+  // drivers use $10, but Konami's derivatives use slower driver ticks.
+  u8 tempoTimerTarget = kStandardTimerTarget;
 
   std::vector<u8> volumeTable;
   std::vector<u8> durationRateTable;

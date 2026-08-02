@@ -39,6 +39,15 @@ Pattern Patterns::ptnKonamiPercussionDispatch(
     "\xad\xca\x90\x00\x3f\x00\x00\xf5\x11\x02\x80\xa8\xca\xc4\x1e\x1c\x84\x1e\xfd\xe4\x00\x24\x47\xf0\x00\xf6\x00\x00",
     "xxx?x??xxxxxxxxxxxxx?xxx?x??", 28);
 
+// Konami N-SPC derivatives disable the timers, set timer 0's target, then
+// enable timer 0. Gradius III uses absolute register writes; Parodius Da! uses
+// direct-page writes. Both schedulers advance the sequence once per timer 0
+// result, so the immediate operand is the sequence tick duration in units of
+// 125 microseconds.
+Pattern Patterns::ptnKonamiTimer0Direct("\xe8\xf0\xc4\xf1\xe8\x00\xc4\xfa\xe8\x01\xc4\xf1", "xxxxx?xxxxxx", 12);
+Pattern Patterns::ptnKonamiTimer0Absolute("\xe8\xf0\xc5\xf1\x00\xe8\x00\xc5\xfa\x00\xe8\x01\xc5\xf1\x00",
+                                         "xxxxxx?xxxxxxxx", 15);
+
 // Pilotwings:
 //   mov a,$00 / cmp a,#$ff / beq / and a,#$1f / bne start-song
 // $00-$03 are the canonical mirrors of input ports $F4-$F7.
@@ -68,6 +77,18 @@ std::optional<u8> detectFixedPercussionBase(core::ByteReader reader, u8 percussi
     if (subtract <= percussionMinimum) {
       return static_cast<u8>(percussionMinimum - subtract);
     }
+  }
+  return std::nullopt;
+}
+
+std::optional<u8> detectKonamiTempoTimerTarget(core::ByteReader reader) {
+  if (const auto offset = Patterns::ptnKonamiTimer0Direct.find(reader)) {
+    const u8 target = reader.u8At(*offset + 5);
+    return target == 0 ? std::nullopt : std::optional{target};
+  }
+  if (const auto offset = Patterns::ptnKonamiTimer0Absolute.find(reader)) {
+    const u8 target = reader.u8At(*offset + 6);
+    return target == 0 ? std::nullopt : std::optional{target};
   }
   return std::nullopt;
 }
