@@ -523,32 +523,25 @@ struct Playback {
     const u8 duration = track.noteDuration(track.noteLength);
     const bool continuesVoice =
         !track.percussion && track.previousWasNote && isLegatoDuration(track.version, track.previousDurationRate);
-    const bool extendsPrevious = continuesVoice && track.previousNoteKey && key == *track.previousNoteKey;
     const PerformanceNoteId previousPitchNote = track.pitchNote;
-    const std::optional<u8> previousKey = track.previousNoteKey;
     resetPitchForNote(key);
     if (track.vibrato.depthState.restartFade(track.vibrato.delay)) {
       emitVibratoDepth(track.vibrato.depthState.fadeOutput(out), true);
     }
-    track.pitchNote = out.note(NotePerformanceEvent{
+    NotePerformanceEvent note{
         .key = track.percussion ? static_cast<double>(key) : track.noteSemitones(key, false),
         // Konami's note, track, instrument, and nonlinear table stages form one
         // coupled level calculation, emitted separately by emitLevel().
         .linearVelocity = 1.0,
         .durationTicks = duration,
-        .extendsPrevious = extendsPrevious,
         // Even without a DSP key-on, every source note resets the driver's
         // per-note LFO state.
         .restartsLfoPhase = true,
         .restartsVibratoLfoPhase = true,
         .restartsTremoloLfoPhase = true,
-    });
-    if (continuesVoice && !extendsPrevious && previousKey) {
-      out.pitchSlide(track.pitchNote, track.noteSemitones(*previousKey, false), track.noteSemitones(key, false),
-                     PitchSlideTiming::fromTicks(0))
-          .continueFrom(previousPitchNote)
-          .preferPitchBend();
-    }
+    };
+    track.pitchNote =
+        continuesVoice ? out.continueVoice(previousPitchNote, std::move(note)) : out.note(std::move(note));
     applyPitchEffectToNote(key, previousPitchNote);
     track.previousNoteKey = key;
     track.previousDurationRate = track.noteDurationRate;

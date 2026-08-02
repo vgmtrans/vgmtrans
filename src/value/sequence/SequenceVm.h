@@ -60,6 +60,11 @@ public:
   [[nodiscard]] PerformanceEmitter at(u64 tick) const;
   PerformanceNoteId note(NotePerformanceEvent event);
   PerformanceNoteId note(double key, double linearVelocity, u32 durationTicks, bool extendsPrevious = false);
+  // Emits event on an already-sounding source voice and returns the note
+  // identity that later automation should address. If event.key is the pitch
+  // currently sounding, the existing note is extended. Otherwise a new note
+  // identity is linked to the old one by an attack-free key change.
+  PerformanceNoteId continueVoice(PerformanceNoteId previousNote, NotePerformanceEvent event);
   // Formats whose slide command follows its note can revise the most recently
   // emitted note chain once the delayed transition point becomes known.
   [[nodiscard]] bool setPreviousNoteEnd(u64 endTick);
@@ -149,9 +154,9 @@ public:
                                PerformanceLaneId lane = PerformanceLaneId{0});
   PitchSlideBinding pitchSlide(PerformanceNoteId note, double startKey, double targetKey, PitchSlideTiming timing,
                                PerformanceLaneId lane = PerformanceLaneId{0});
-  // Starts from the latest realized pitch for this note, or fallbackStartKey
-  // when no earlier transition exists. This keeps source retargeting out of
-  // format-local per-tick schedulers.
+  // Replaces any earlier slide on note and returns the new slide. Its starting
+  // key is the pitch reached by that slide at this emitter's tick, or
+  // fallbackStartKey if note has not slid yet.
   PitchSlideBinding retargetPitchSlide(PerformanceNoteId note, double fallbackStartKey, double targetKey,
                                        u32 durationTicks, PerformanceLaneId lane = PerformanceLaneId{0});
   PitchSlideBinding retargetPitchSlide(PerformanceNoteId note, double fallbackStartKey, double targetKey,
@@ -175,6 +180,8 @@ private:
   void append(PerformanceEvent event);
   void automationSample(u32 automation, double value);
   void interruptPitchSlidesForNewNote(PerformanceLaneId lane);
+  [[nodiscard]] std::optional<double> currentPitchTransitionKey(PerformanceNoteId note,
+                                                                PerformanceLaneId lane) const;
 
   PerformanceTrack& track_;
   CommandId sourceCommand_;

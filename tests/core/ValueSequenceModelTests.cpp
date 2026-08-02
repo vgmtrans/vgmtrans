@@ -298,7 +298,9 @@ void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
   out.at(28).retargetPitchSlide(chainedNote, 65, 71, 2);
   expect(track.automations[2].realization.endReason == PerformanceAutomationEndReason::Continued &&
              track.automations[3].realization.endReason == PerformanceAutomationEndReason::Continued &&
-             track.automations[3].realization.startTick == 25,
+             track.automations[3].realization.startTick == 25 &&
+             std::get<PitchTransitionIntent>(track.automations[3].intent).startKey == 67 &&
+             std::get<PitchTransitionIntent>(track.automations[4].intent).startKey == 69,
          "playback code should emit queued source motion at its realized tick and retain adjacent chaining");
 
   const PerformanceNoteId interruptedNote = out.at(40).note(72, 1.0, 10);
@@ -309,7 +311,7 @@ void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
   out.at(43).note(74, 1.0, 2);
   expect(track.automations[5].realization.endTick == 43 &&
              track.automations[5].realization.endReason == PerformanceAutomationEndReason::Interrupted,
-         "a genuinely new note should mark the transition interrupted at that tick");
+         "a new note should interrupt the transition at that tick");
 
   const PerformanceNoteId replacedNote = out.at(50).note(76, 1.0, 10);
   out.at(50).pitchSlide(replacedNote, 74, 76, 6);
@@ -318,7 +320,7 @@ void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
              track.automations[6].realization.endReason == PerformanceAutomationEndReason::Continued &&
              std::abs(std::get<PitchTransitionIntent>(track.automations[7].intent).startKey - (74.0 + 2.0 / 3.0)) <
                  0.0001,
-         "retargeting should replace active motion from its shared linear value");
+         "replacement motion should start from the prior transition's shared linear value");
 
   const PerformanceNoteId stoppedNote = out.at(60).note(81, 1.0, 10);
   const auto stopped = out.at(60).pitchSlide(stoppedNote, 79, 81, 6);
@@ -343,6 +345,28 @@ void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
          "the pitch-slide handle should attach uncommon source behavior without exposing IR construction");
 }
 
+void continuedVoiceResolvesPriorPitchMotion() {
+  PerformanceTrack track{.id = TrackId{6}};
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track, CommandId{15}, SourceAnnotationId{17}, 0, nextSequence, nextNote, nextAutomation};
+
+  const PerformanceNoteId first = out.note(60, 1.0, 8);
+  out.pitchSlide(first, 60, 62, 4);
+  const PerformanceNoteId samePitch = out.at(4).continueVoice(
+      first, NotePerformanceEvent{.key = 62, .linearVelocity = 1.0, .durationTicks = 4});
+  expect(samePitch == first && std::get<NotePerformanceEvent>(track.events.back()).extendsPrevious,
+         "continuing at a completed slide target should extend the existing note identity");
+
+  const PerformanceNoteId changedPitch = out.at(8).continueVoice(
+      samePitch, NotePerformanceEvent{.key = 64, .linearVelocity = 1.0, .durationTicks = 4});
+  const auto& transition = std::get<PitchTransitionIntent>(track.automations.back().intent);
+  expect(changedPitch != samePitch && transition.previousNote == samePitch && transition.startKey == 62 &&
+             transition.targetKey == 64 && transition.timing.timelineTicks == 0,
+         "a continued voice that changes key should emit one attack-free boundary transition");
+}
+
 }  // namespace
 
 void runValueSequenceModelTests() {
@@ -356,4 +380,5 @@ void runValueSequenceModelTests() {
   performanceBoundValueOwnsReplacementLifecycle();
   performanceEmitterResolvesDeclaredPanLawIntoEvents();
   pitchTransitionApiPreservesSamplesAndRealizedLifecycle();
+  continuedVoiceResolvesPriorPitchMotion();
 }

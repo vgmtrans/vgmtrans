@@ -1115,6 +1115,44 @@ void konamiSnesCompiledPlaybackHandlesCallsLoopsTiesAndSlides() {
          "the shared linear transition should support native portamento");
 }
 
+void konamiSnesHeldNoteUsesRealizedInlineSlidePitch() {
+  // Vampire Hunter, track 5 at ARAM $3a37. F3 reaches key $0e during
+  // the first note; both following $0e notes keep the same DSP voice alive.
+  const PerformanceSequence performance =
+      renderKonamiSnesProgram(KONAMISNES_V6, {{0x0d, 0x60, 0x7f, 0x78,        // held key $0d
+                                               0xf3, 0x06, 0x12, 0x0e, 5, 0,  // slide to key $0e
+                                               0x8e, 0xf8,                    // compressed held key $0e
+                                               0xef, 0xb4, 0x02,              // volume fade
+                                               0x0e, 0xb4, 0x7d, 0x7f,        // another held key $0e
+                                               0xff}});
+  const auto notes = performanceEvents<NotePerformanceEvent>(performance.tracks[0]);
+  expect(notes.size() == 3 && notes[1]->extendsPrevious && notes[2]->extendsPrevious &&
+             notes[0]->note == notes[1]->note && notes[1]->note == notes[2]->note,
+         "a held note at an inline slide's realized target should extend the sounding voice");
+  expect(std::ranges::count_if(performance.tracks[0].automations, [](const PerformanceAutomation& automation) {
+           return pitchTransitionIntent(automation) != nullptr;
+         }) == 1,
+         "a completed inline slide should not be repeated at the next held-note boundary");
+
+  const MidiSequence pitchBend = renderMidiSequence(performance);
+  expect(std::ranges::none_of(pitchBend.tracks[0].events, [](const MidiEvent& event) {
+           const auto* bend = std::get_if<PitchBend>(&event);
+           return bend != nullptr && bend->tick == 0x60;
+         }),
+         "the retained inline-slide bend should not be doubled at tick 96");
+
+  const MidiSequence portamento =
+      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
+  expect(std::ranges::count_if(portamento.tracks[0].events, [](const MidiEvent& event) {
+           return std::holds_alternative<PortamentoControl>(event);
+         }) == 1 &&
+             std::ranges::none_of(portamento.tracks[0].events, [](const MidiEvent& event) {
+               const auto* note = std::get_if<NoteDuration>(&event);
+               return note != nullptr && note->tick == 0x60;
+             }),
+         "native portamento should not retrigger and immediately silence the slide target at tick 96");
+}
+
 void konamiSnesCompiledAutomationTicksFades() {
   const PerformanceSequence performance =
       renderKonamiSnesProgram(KONAMISNES_V6, {{0xea, 0x80,              // tempo
