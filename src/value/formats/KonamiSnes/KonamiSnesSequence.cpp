@@ -105,6 +105,24 @@ struct PersistentPitchEffect {
   return isLateVersion(version) ? PitchSlideKind::V3 : PitchSlideKind::V2;
 }
 
+[[nodiscard]] constexpr bool isTerminalLowOpcode(KonamiSnesVersion version, u8 opcode) {
+  switch (version) {
+    case KONAMISNES_V1:
+      return opcode >= 0x65 && opcode <= 0x7f;
+    case KONAMISNES_V2:
+    case KONAMISNES_V3:
+    case KONAMISNES_V4:
+      return opcode >= 0x62 && opcode <= 0x7f;
+    case KONAMISNES_V5:
+      return opcode >= 0x63 && opcode <= 0x6f;
+    case KONAMISNES_V6:
+      return opcode >= 0x65 && opcode <= 0x6f;
+    case KONAMISNES_NONE:
+      return false;
+  }
+  return false;
+}
+
 [[nodiscard]] u32 tempoMicrosecondsPerQuarter(KonamiSnesVersion version, u8 tempo) {
   // One driver tick is timerFrequency * 125 microseconds, scaled by the inverse
   // tempo byte. Convert that tick length to one MIDI quarter note (48 ticks).
@@ -151,8 +169,15 @@ struct PersistentPitchEffect {
   return tuning * (400.0 / 256.0);
 }
 
-[[nodiscard]] double linearGainFromRawVolume(u8 volume) {
-  return static_cast<double>(volume) / 255.0;
+[[nodiscard]] constexpr u8 volumeTableValue(KonamiSnesVersion version, u8 index) {
+  // Goemon 3 shipped with $23 at index 94; the next driver corrected it to
+  // $20. Preserve the original byte instead of silently repairing the ROM.
+  return version == KONAMISNES_V5 && index == 94 ? u8{0x23} : kVolumeTable[index];
+}
+
+[[nodiscard]] constexpr u8 panTableValue(KonamiSnesVersion version, u8 index) {
+  // The same Goemon 3 table contains $46 at index 10, corrected to $40 in V6.
+  return version == KONAMISNES_V5 && index == 10 ? u8{0x46} : kPanTable[index];
 }
 
 [[nodiscard]] constexpr bool usesEncodedEnvelopeParameters(KonamiSnesVersion version) {
@@ -189,26 +214,48 @@ struct PersistentPitchEffect {
   return std::nullopt;
 }
 
-[[nodiscard]] Envelope dspEnvelope(u8 adsr1, u8 adsr2OrGain) {
-  return snesDspEnvelope(adsr1, adsr2OrGain, adsr2OrGain);
-}
-
 struct RawEnvelopeRegisters {
   u8 adsr1 = 0;
-  u8 adsr2OrGain = 0;
+  std::optional<u8> adsr2;
+  std::optional<u8> gain;
+};
+
+struct RuntimeInstrument {
+  RawEnvelopeRegisters envelope;
+  u8 savedCompanion = 0;
+  u8 pan = 0;
+  u8 volume = 0;
 };
 
 constexpr size_t kPercussionEnvelopeBase = 0x100;
 constexpr size_t kInstrumentEnvelopeCount = kPercussionEnvelopeBase + 0x60;
-constexpr u32 kUnknownEnvelopeRegisters = std::numeric_limits<u32>::max();
+constexpr size_t kRuntimeInstrumentWords = 2;
+constexpr u32 kUnknownRuntimeInstrument = std::numeric_limits<u32>::max();
 
-[[nodiscard]] std::optional<RawEnvelopeRegisters> envelopeRegisters(const std::vector<u32>& data, size_t index) {
-  if (index >= data.size() || data[index] == kUnknownEnvelopeRegisters) {
+[[nodiscard]] std::optional<RuntimeInstrument> runtimeInstrument(const std::vector<u32>& data, size_t index,
+                                                                 KonamiSnesVersion version) {
+  const size_t offset = index * kRuntimeInstrumentWords;
+  if (offset + 1 >= data.size() || data[offset] == kUnknownRuntimeInstrument) {
     return std::nullopt;
   }
-  return RawEnvelopeRegisters{
-      .adsr1 = static_cast<u8>(data[index] >> 8),
-      .adsr2OrGain = static_cast<u8>(data[index]),
+  const u32 envelope = data[offset];
+  const u32 mix = data[offset + 1];
+  const u8 adsr1 = static_cast<u8>(envelope >> 16);
+  const u8 adsr2 = static_cast<u8>(envelope >> 8);
+  const u8 gain = static_cast<u8>(envelope);
+  const u8 companion = usesLegacyInstrumentLayout(version) ? gain : ((adsr1 & 0x80) != 0 ? adsr2 : gain);
+  return RuntimeInstrument{
+      .envelope =
+          RawEnvelopeRegisters{
+              .adsr1 = adsr1,
+              // Early rows load both physical registers. Late rows load only
+              // the register selected by ADSR1; the other remains untouched.
+              .adsr2 = usesLegacyInstrumentLayout(version) || (adsr1 & 0x80) != 0 ? std::optional{adsr2} : std::nullopt,
+              .gain = usesLegacyInstrumentLayout(version) || (adsr1 & 0x80) == 0 ? std::optional{gain} : std::nullopt,
+          },
+      .savedCompanion = companion,
+      .pan = static_cast<u8>(mix >> 8),
+      .volume = static_cast<u8>(mix),
   };
 }
 
@@ -234,10 +281,11 @@ struct PanGains {
     left = kPanVolumeLeftV2[pan];
     right = kPanVolumeRightV2[pan];
   } else {
-    left = kPanTable[40 - pan];
-    right = kPanTable[pan];
+    left = panTableValue(version, pan);
+    right = panTableValue(version, static_cast<u8>(40 - pan));
   }
-  const double fullScale = version == KONAMISNES_V1 ? 127.0 : 254.0;
+  // V1 divides by $7f. Later engines keep the high byte of an 8x8 product.
+  const double fullScale = version == KONAMISNES_V1 ? 127.0 : 256.0;
   return PanGains{
       .left = left / fullScale,
       .right = right / fullScale,
@@ -268,10 +316,11 @@ struct LfoState {
 
 struct ProgramState {
   explicit ProgramState(const SequenceProgram& program)
-      : instrumentEnvelopes(program.config.driverData), indexedEchoFilter(program.config.driverState != 0) {}
+      : instruments(program.config.driverData), version(static_cast<KonamiSnesVersion>(program.config.profile)),
+        indexedEchoFilter(program.config.driverState != 0) {}
 
-  [[nodiscard]] std::optional<RawEnvelopeRegisters> envelope(size_t index) const {
-    return envelopeRegisters(instrumentEnvelopes, index);
+  [[nodiscard]] std::optional<RuntimeInstrument> instrument(size_t index) const {
+    return runtimeInstrument(instruments, index, version);
   }
 
   void setEcho(u8 mask, u8 left, u8 right) {
@@ -289,38 +338,72 @@ struct ProgramState {
     echo.filterIndex = indexedEchoFilter ? filter : 2;
   }
 
+  void setEchoVoice(u8 voiceBit, bool enabled) {
+    u8 mask = echo.voiceMask.value_or(0);
+    if (enabled) {
+      mask |= voiceBit;
+    } else {
+      mask &= static_cast<u8>(~voiceBit);
+    }
+    echo.voiceMask = mask;
+  }
+
   ReverbPerformanceEvent echo{.voiceMask = 0};
-  const std::vector<u32>& instrumentEnvelopes;
+  const std::vector<u32>& instruments;
+  KonamiSnesVersion version = KONAMISNES_NONE;
   bool indexedEchoFilter = false;
 };
 
 struct TrackEnvelopeState {
-  void selectInstrument(KonamiSnesVersion version, std::optional<RawEnvelopeRegisters> value) {
-    registers = value;
+  void selectInstrument(KonamiSnesVersion version, const std::optional<RuntimeInstrument>& instrument) {
+    if (!instrument) {
+      registers.reset();
+      savedCompanion.reset();
+    } else if (usesLegacyInstrumentLayout(version)) {
+      registers = instrument->envelope;
+      savedCompanion = instrument->savedCompanion;
+    } else {
+      // A late seven-byte row writes only ADSR2 or GAIN. Preserve the inactive
+      // physical register because ED can later switch ADSR1 without writing it.
+      RawEnvelopeRegisters selected = registers.value_or(RawEnvelopeRegisters{});
+      selected.adsr1 = instrument->envelope.adsr1;
+      if ((selected.adsr1 & 0x80) != 0) {
+        selected.adsr2 = instrument->savedCompanion;
+      } else {
+        selected.gain = instrument->savedCompanion;
+      }
+      registers = selected;
+      savedCompanion = instrument->savedCompanion;
+    }
     // V1-V2 keep their software release accumulator step across instrument
     // loads. V3 and later explicitly clear their release control.
     if (version >= KONAMISNES_V3) {
       releaseAmount = 0;
     }
+    dspReleasePendingRestore = false;
   }
 
   std::optional<RawEnvelopeRegisters> registers;
+  std::optional<u8> savedCompanion;
   u8 releaseAmount = 0;
+  bool dspReleasePendingRestore = false;
 };
 
 // Only values that persist from one executed command to the next live here.
 struct TrackState {
   TrackState(const SequenceProgram& program, const TrackProgram& track)
-      : version(static_cast<KonamiSnesVersion>(program.config.profile)) {
-    envelope.selectInstrument(version, envelopeRegisters(program.config.driverData, 0));
+      : version(static_cast<KonamiSnesVersion>(program.config.profile)),
+        voiceBit(static_cast<u8>(1u << std::min<u32>(track.sourceTrackNumber, 7))) {
+    const auto initialInstrument = runtimeInstrument(program.config.driverData, 0, version);
+    envelope.selectInstrument(version, initialInstrument);
+    instrumentVolume = initialInstrument ? initialInstrument->volume : 0;
     pan.reset(version <= KONAMISNES_V2 ? 10 : 20);
-    volume.reset(0xff);
+    volume.reset(0);
     tempoState.reset(kKonamiSnesDefaultTempo);
   }
 
   [[nodiscard]] u8 noteDuration(u8 length) const {
-    const u8 maxRate = noteDurationRateMax(version);
-    if (noteDurationRate == maxRate) {
+    if (isHeldDuration(version, noteDurationRate)) {
       return length;
     }
     // V1 stores a percentage from 0-100. Later versions store a 7-bit fraction
@@ -346,10 +429,14 @@ struct TrackState {
   }
 
   KonamiSnesVersion version = KONAMISNES_NONE;
+  u8 voiceBit = 1;
 
   // Note bytes can omit length or duration rate and reuse these values.
   u8 noteLength = 0;
   u8 noteDurationRate = 0;
+  u8 defaultNoteVolume = 0;
+  u8 currentNoteVolume = 0;
+  u8 instrumentVolume = 0;
   s32 transpose = 0;
 
   // The driver provides two independent counted-loop slots. Each remembers
@@ -372,10 +459,12 @@ struct TrackState {
   // Instrument mode and the previous note decide whether a new source command
   // starts a note, extends a slur, or addresses the drum kit.
   bool percussion = false;
+  bool instrumentPanEnabled = true;
   bool inSubroutine = false;
   u8 instrument = 0;
   std::optional<u8> previousNoteKey;
-  bool previousNoteSlurred = false;
+  u8 previousDurationRate = 0;
+  bool previousWasNote = false;
   double sequenceTuningCents = 0.0;
   double lastEmittedTuningCents = std::numeric_limits<double>::quiet_NaN();
   u8 tempo = kKonamiSnesDefaultTempo;
@@ -407,55 +496,100 @@ struct Playback {
 
   void note(u8 key, u8 sourceVelocity) {
     if (track.percussion) {
-      track.envelope.selectInstrument(track.version, program.envelope(kPercussionEnvelopeBase + key));
+      loadInstrument(program.instrument(kPercussionEnvelopeBase + key));
       out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
       emitPersistentRelease();
     }
 
-    // Counted loops alter velocity before the later engines pass it through
-    // their nonlinear loudness table.
-    u8 velocity =
-        static_cast<u8>(std::clamp<int>(sourceVelocity + track.loopVolumeDelta + track.loopVolumeDelta2, 1, 127));
-    if (track.version != KONAMISNES_V1) {
-      velocity = kVolumeTable[velocity];
+    track.currentNoteVolume = sourceVelocity;
+    track.defaultNoteVolume = sourceVelocity;
+    if (sourceVelocity == 0) {
+      // Zero clears the pending attack. V1-V2 also write zero volume; later
+      // mixers return before touching VOL(L/R), leaving their previous values.
+      track.previousWasNote = false;
+      if (track.version <= KONAMISNES_V2) {
+        emitLevel(out);
+      } else {
+        // A running volume fade still advances in driver RAM, but its audible
+        // automation stops when the late mixer begins returning early.
+        track.volume.interruptAutomationAt(vm.tick());
+      }
+      return;
     }
 
+    restorePostReleaseEnvelope();
+    emitLevel(out);
     applyEffectiveTuning();
     const u8 duration = track.noteDuration(track.noteLength);
-    // A full-length note leaves the voice open. Repeating the same key then
-    // extends that voice instead of retriggering its sample and envelope.
-    const bool tied = track.previousNoteSlurred && track.previousNoteKey && key == *track.previousNoteKey;
+    const bool continuesVoice =
+        !track.percussion && track.previousWasNote && isLegatoDuration(track.version, track.previousDurationRate);
+    const bool extendsPrevious = continuesVoice && track.previousNoteKey && key == *track.previousNoteKey;
     const PerformanceNoteId previousPitchNote = track.pitchNote;
+    const std::optional<u8> previousKey = track.previousNoteKey;
     resetPitchForNote(key);
     if (track.vibrato.depthState.restartFade(track.vibrato.delay)) {
       emitVibratoDepth(track.vibrato.depthState.fadeOutput(out), true);
     }
-    if (tied) {
-      track.pitchNote =
-          out.note(track.noteSemitones(key, false), LevelScale::linearFromLinear(velocity / 127.0), duration, true);
-    } else {
-      track.pitchNote = out.note(track.percussion ? key : track.noteSemitones(key, false),
-                                 LevelScale::linearFromLinear(velocity / 127.0), duration);
-      track.previousNoteKey = key;
+    track.pitchNote = out.note(NotePerformanceEvent{
+        .key = track.percussion ? static_cast<double>(key) : track.noteSemitones(key, false),
+        // Konami's note, track, instrument, and nonlinear table stages form one
+        // coupled level calculation, emitted separately by emitLevel().
+        .linearVelocity = 1.0,
+        .durationTicks = duration,
+        .extendsPrevious = extendsPrevious,
+        // Even without a DSP key-on, every source note resets the driver's
+        // per-note LFO state.
+        .restartsLfoPhase = true,
+        .restartsVibratoLfoPhase = true,
+        .restartsTremoloLfoPhase = true,
+    });
+    if (continuesVoice && !extendsPrevious && previousKey) {
+      out.pitchSlide(track.pitchNote, track.noteSemitones(*previousKey, false), track.noteSemitones(key, false),
+                     PitchSlideTiming::fromTicks(0))
+          .continueFrom(previousPitchNote)
+          .preferPitchBend();
     }
     applyPitchEffectToNote(key, previousPitchNote);
-    track.previousNoteSlurred = track.noteDurationRate == noteDurationRateMax(track.version) && !track.percussion;
+    track.previousNoteKey = key;
+    track.previousDurationRate = track.noteDurationRate;
+    track.previousWasNote = !track.percussion;
+    track.envelope.dspReleasePendingRestore = track.version >= KONAMISNES_V3 && track.envelope.releaseAmount >= 100 &&
+                                              !isHeldDuration(track.version, track.noteDurationRate);
+  }
+
+  void rest() {
+    track.currentNoteVolume = 0;
+    track.previousWasNote = false;
+    if (track.version >= KONAMISNES_V3) {
+      track.volume.interruptAutomationAt(vm.tick());
+    }
   }
 
   void tie() {
-    // The explicit tie command is ignored unless the preceding note was left
-    // open. This prevents a tie after a rest from reviving an older note.
-    if (!track.previousNoteSlurred) {
+    // Eligibility belongs to the preceding note's gate state, not the new
+    // duration byte carried by E1. A rest therefore cannot revive an old voice.
+    if (!track.previousWasNote || !track.previousNoteKey ||
+        !isHeldDuration(track.version, track.previousDurationRate)) {
+      track.previousWasNote = false;
       return;
     }
-    out.note(0.0, 1.0, track.noteDuration(track.noteLength), true);
-    track.previousNoteSlurred = track.noteDurationRate == noteDurationRateMax(track.version);
+    track.pitchNote = out.note(NotePerformanceEvent{
+        .key = track.noteSemitones(*track.previousNoteKey, false),
+        .linearVelocity = 1.0,
+        .durationTicks = track.noteDuration(track.noteLength),
+        .extendsPrevious = true,
+        .restartsLfoPhase = false,
+    });
+    track.previousDurationRate = track.noteDurationRate;
+    track.envelope.dspReleasePendingRestore = track.version >= KONAMISNES_V3 && track.envelope.releaseAmount >= 100 &&
+                                              !isHeldDuration(track.version, track.noteDurationRate);
   }
 
-  void selectInstrument(u32 bank, u32 programNumber, std::optional<RawEnvelopeRegisters> envelope) {
-    track.envelope.selectInstrument(track.version, envelope);
+  void selectInstrument(u32 bank, u32 programNumber, const std::optional<RuntimeInstrument>& instrument) {
+    loadInstrument(instrument);
     out.instrument(bank, programNumber, true);
     emitPersistentRelease();
+    emitLevel(out);
   }
 
   void emitPersistentRelease() {
@@ -466,8 +600,6 @@ struct Playback {
   }
 
   void percussionOn() {
-    // Percussion commands do not change the remembered melodic instrument;
-    // leaving percussion mode restores that program below.
     if (!track.percussion) {
       out.instrument(0x7f, 0, true);
       track.percussion = true;
@@ -475,34 +607,29 @@ struct Playback {
   }
 
   void percussionOff() {
-    if (track.percussion) {
-      selectInstrument(track.instrument >> 7, track.instrument & 0x7f, program.envelope(track.instrument));
-      track.percussion = false;
-    }
+    // The driver only clears its interpretation flag. It deliberately leaves
+    // the last drum sample, envelope, pan, and attenuation in the voice.
+    track.percussion = false;
   }
 
   void programChange(u8 programNumber) {
-    // Changing samples also reapplies the current fine tuning and resets pan,
-    // both of which the original driver performs as part of instrument setup.
     applyEffectiveTuning(true);
     track.instrument = programNumber;
-    selectInstrument(programNumber >> 7, programNumber & 0x7f, program.envelope(programNumber));
-    pan(track.version <= KONAMISNES_V2 ? 10 : 20);
+    selectInstrument(programNumber >> 7, programNumber & 0x7f, program.instrument(programNumber));
   }
 
   void programChangeAndVolume(u8 volumeValue, u8 programNumber) {
-    // Later engines combine program and volume in one command but otherwise
-    // perform the same instrument setup as a normal program change.
+    // FC stores volume first, then tail-calls the ordinary instrument loader.
+    // Defer output until both operands are live so no partial mix leaks out.
+    track.volume.setCurrentAt(vm.tick(), volumeValue);
     applyEffectiveTuning(true);
     track.instrument = programNumber;
-    selectInstrument(programNumber >> 7, programNumber & 0x7f, program.envelope(programNumber));
-    volume(volumeValue);
-    pan(track.version <= KONAMISNES_V2 ? 10 : 20);
+    selectInstrument(programNumber >> 7, programNumber & 0x7f, program.instrument(programNumber));
   }
 
   void volume(u8 rawVolume) {
     track.volume.setCurrentAt(vm.tick(), rawVolume);
-    out.level(LevelScale::linearFromLinear(linearGainFromRawVolume(rawVolume)), LevelPrecisionHint::FourteenBit);
+    emitLevel(out);
   }
 
   void pan(u8 rawPan) {
@@ -517,21 +644,43 @@ struct Playback {
     applyEffectiveTuning();
   }
 
-  void replaceCurrentEnvelope() {
-    if (!track.envelope.registers) {
-      return;
-    }
-    const auto [adsr1, adsr2OrGain] = *track.envelope.registers;
-    Envelope envelope = dspEnvelope(adsr1, adsr2OrGain);
-    if (const auto release = customReleaseSeconds(track.version, track.envelope.releaseAmount)) {
-      envelope.releaseSeconds = *release;
-    }
-    out.replaceEnvelope(std::move(envelope), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+  void setDefaultDuration(u8 rate) { track.noteDurationRate = rate; }
+
+  void setDefaultNoteVolume(u8 volume) { track.defaultNoteVolume = static_cast<u8>(volume & 0x7f); }
+
+  void setDefaults(u8 rate, u8 volume) {
+    setDefaultDuration(rate);
+    setDefaultNoteVolume(volume);
   }
 
-  void setEnvelope(u8 adsr1, u8 adsr2OrGain, u8 releaseAmount) {
-    track.envelope.registers = RawEnvelopeRegisters{adsr1, adsr2OrGain};
+  void setInstrumentPanEnabled(bool enabled) { track.instrumentPanEnabled = enabled; }
+
+  void setEchoVoice(bool enabled) {
+    program.setEchoVoice(track.voiceBit, enabled);
+    out.reverb(program.echo);
+  }
+
+  void replaceCurrentEnvelope() {
+    const auto envelope = currentEnvelope();
+    if (!envelope) {
+      return;
+    }
+    out.replaceEnvelope(*envelope, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+  }
+
+  void setEnvelope(u8 adsr1, u8 companion, u8 releaseAmount) {
+    RawEnvelopeRegisters& registers =
+        track.envelope.registers.emplace(track.envelope.registers.value_or(RawEnvelopeRegisters{}));
+    registers.adsr1 = adsr1;
+    if ((adsr1 & 0x80) != 0) {
+      // FA in ADSR mode does not alter the saved GAIN companion.
+      registers.adsr2 = companion;
+    } else {
+      registers.gain = companion;
+      track.envelope.savedCompanion = companion;
+    }
     track.envelope.releaseAmount = releaseAmount;
+    track.envelope.dspReleasePendingRestore = false;
     replaceCurrentEnvelope();
   }
 
@@ -540,10 +689,9 @@ struct Playback {
     if (const auto release = customReleaseSeconds(track.version, amount)) {
       out.updateEnvelope(Envelope{.releaseSeconds = *release}, EnvelopeFields::Release,
                          VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
-    } else if (track.envelope.registers) {
-      const auto [adsr1, adsr2OrGain] = *track.envelope.registers;
-      out.updateEnvelope(Envelope{.releaseSeconds = dspEnvelope(adsr1, adsr2OrGain).releaseSeconds},
-                         EnvelopeFields::Release, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    } else if (const auto envelope = currentEnvelope()) {
+      out.updateEnvelope(Envelope{.releaseSeconds = envelope->releaseSeconds}, EnvelopeFields::Release,
+                         VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
     } else {
       out.restoreEnvelope(EnvelopeFields::Release, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
     }
@@ -562,7 +710,7 @@ struct Playback {
     if (!track.envelope.registers || (track.envelope.registers->adsr1 & 0x80) == 0) {
       return;
     }
-    track.envelope.registers->adsr2OrGain = adsr2;
+    track.envelope.registers->adsr2 = adsr2;
     replaceCurrentEnvelope();
   }
 
@@ -652,7 +800,7 @@ struct Playback {
       case FadeTarget::Volume:
         state = &track.volume;
         automationTarget = PerformanceAutomationTarget::Level;
-        targetValue = linearGainFromRawVolume(clampedDestination);
+        targetValue = mixedLevel(clampedDestination);
         break;
       case FadeTarget::Pan:
         state = &track.pan;
@@ -660,9 +808,16 @@ struct Playback {
         targetValue = stereoPositionFromPan(track.version, clampedDestination);
         break;
     }
-    auto automation =
-        stepBased ? out.step(automationTarget, targetValue, ticks) : out.fade(automationTarget, targetValue, ticks);
-    static_cast<void>(state->begin(std::move(automation), motion));
+    if (target == FadeTarget::Volume && track.currentNoteVolume == 0 && track.version >= KONAMISNES_V3) {
+      // Preserve only the raw motion until a nonzero note makes the mixer write
+      // VOL(L/R) again.
+      state->interruptAutomationAt(vm.tick());
+      static_cast<void>(state->begin(motion));
+    } else {
+      auto automation =
+          stepBased ? out.step(automationTarget, targetValue, ticks) : out.fade(automationTarget, targetValue, ticks);
+      static_cast<void>(state->begin(std::move(automation), motion));
+    }
   }
 
   [[nodiscard]] Effects loopEnd(u8 slot, u8 times, s8 volumeDelta, s8 pitchDelta) {
@@ -692,6 +847,7 @@ struct Playback {
       accumulatedPitch += pitchDelta;
     }
     applyEffectiveTuning();
+    emitLevel(out);
     return effects;
   }
 
@@ -746,8 +902,7 @@ struct Playback {
     }));
     static_cast<void>(track.volume.tickRaw([&](s32 rawVolume) {
       const auto value = static_cast<u8>(std::clamp<s32>(rawVolume, 0, 0xff));
-      track.volume.output(out).level(LevelScale::linearFromLinear(linearGainFromRawVolume(value)),
-                                     LevelPrecisionHint::FourteenBit);
+      emitLevel(track.volume.output(out), value);
     }));
     static_cast<void>(track.pan.tickRaw([&](s32 rawPan) {
       const auto value = static_cast<u8>(std::clamp<s32>(rawPan, 0, 0xff));
@@ -761,6 +916,69 @@ struct Playback {
   }
 
 private:
+  [[nodiscard]] double mixedLevel(u8 trackVolume) const {
+    const int effectiveNote =
+        std::clamp<int>(track.currentNoteVolume + track.loopVolumeDelta + track.loopVolumeDelta2, 0, 127);
+    const unsigned product = static_cast<unsigned>(effectiveNote) * trackVolume;
+    const unsigned combined = product >> (track.version == KONAMISNES_V1 ? 7 : 8);
+    const u8 attenuated = static_cast<u8>(std::clamp<int>(static_cast<int>(combined) - track.instrumentVolume, 0, 127));
+    const u8 dspVolume = track.version == KONAMISNES_V1 ? attenuated : volumeTableValue(track.version, attenuated);
+    return static_cast<double>(dspVolume) / 127.0;
+  }
+
+  void emitLevel(PerformanceEmitter output) const {
+    emitLevel(output, static_cast<u8>(std::clamp<s32>(track.volume.currentRaw(), 0, 0xff)));
+  }
+
+  void emitLevel(PerformanceEmitter output, u8 trackVolume) const {
+    if (track.currentNoteVolume == 0 && track.version >= KONAMISNES_V3) {
+      return;
+    }
+    output.level(LevelScale::linearFromLinear(mixedLevel(trackVolume)), LevelPrecisionHint::FourteenBit);
+  }
+
+  void loadInstrument(const std::optional<RuntimeInstrument>& instrument) {
+    track.envelope.selectInstrument(track.version, instrument);
+    track.instrumentVolume = instrument ? instrument->volume : 0;
+    if (instrument && track.instrumentPanEnabled) {
+      pan(instrument->pan);
+    }
+  }
+
+  [[nodiscard]] std::optional<Envelope> currentEnvelope() const {
+    if (!track.envelope.registers) {
+      return std::nullopt;
+    }
+    const RawEnvelopeRegisters& registers = *track.envelope.registers;
+    if ((registers.adsr1 & 0x80) != 0 && !registers.adsr2) {
+      return std::nullopt;
+    }
+    if ((registers.adsr1 & 0x80) == 0 && !registers.gain) {
+      return std::nullopt;
+    }
+    Envelope envelope = snesDspEnvelope(registers.adsr1, registers.adsr2.value_or(0), registers.gain.value_or(0));
+    if (const auto release = customReleaseSeconds(track.version, track.envelope.releaseAmount)) {
+      envelope.releaseSeconds = *release;
+    }
+    return envelope;
+  }
+
+  void restorePostReleaseEnvelope() {
+    if (!track.envelope.dspReleasePendingRestore) {
+      return;
+    }
+    track.envelope.dspReleasePendingRestore = false;
+    if (!track.envelope.registers || (track.envelope.registers->adsr1 & 0x80) != 0 || !track.envelope.savedCompanion) {
+      return;
+    }
+    // DSP decrease-GAIN temporarily replaces the live GAIN register at key-off.
+    // A later attack restores the saved companion, but only in GAIN mode.
+    if (track.envelope.registers->gain != track.envelope.savedCompanion) {
+      track.envelope.registers->gain = track.envelope.savedCompanion;
+      replaceCurrentEnvelope();
+    }
+  }
+
   void applyPitchEffectToNote(u8 key, PerformanceNoteId previousNote) {
     auto& effect = track.pitchEffect;
     if (track.percussion) {
@@ -952,12 +1170,11 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     // A clear high bit means this byte is a new duration rate and another byte
     // follows for velocity. A set high bit means it is velocity by itself.
     if ((velocity & 0x80) == 0) {
-      const u8 rate = event.derived("duration_rate", std::min(velocity, noteDurationRateMax(version)),
-                                    SemanticOperandRole::Duration);
+      const u8 rate = event.derived("duration_rate", velocity, SemanticOperandRole::Duration);
       event.set<&TrackState::noteDurationRate>(rate);
       velocity = event.u8("velocity", SemanticOperandRole::Level);
     }
-    velocity = static_cast<u8>(std::max<int>(velocity & 0x7f, 1));
+    velocity &= 0x7f;
     event.invoke<&Playback::note>(key, velocity);
     if (const auto slide = readInlinePitchSlide(event, version)) {
       appendPitchSlide(event, *slide);
@@ -967,17 +1184,17 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
 
   if (opcode >= 0x70 && opcode <= 0x7f && isLateVersion(version)) {
     // Later engines reserve this opcode range for a signed four-bit tuning
-    // adjustment. Values 9-15 therefore represent -7 through -1.
+    // adjustment. Values 8-15 therefore represent -8 through -1.
     auto event = cursor.command("Instant Tuning", SequenceSemantic::Pitch);
     s8 tuning = opcode & 0x0f;
-    if (tuning > 8) {
+    if (tuning >= 8) {
       tuning -= 16;
     }
     event.opcodeValue("tuning", tuning);
     return event.invoke<&Playback::tuning>(tuning);
   }
 
-  if (version >= KONAMISNES_V2 && version <= KONAMISNES_V3 && opcode >= 0x62 && opcode <= 0x7f) {
+  if (isTerminalLowOpcode(version, opcode)) {
     return cursor.command("Stop", SequenceSemantic::End).end();
   }
 
@@ -987,7 +1204,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     case 0x61:
       return cursor.command("Percussion Off", SequenceSemantic::Program).invoke<&Playback::percussionOff>();
     case 0x62:
-      if (version >= KONAMISNES_V4) {
+      if (version == KONAMISNES_V5 || version == KONAMISNES_V6) {
         auto event = cursor.command("Release Rate", SequenceSemantic::Envelope);
         const u8 amount = event.u8("amount");
         if (amount >= 100) {
@@ -998,13 +1215,32 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
         return event.invoke<&Playback::setRelease>(amount);
       }
       if (version == KONAMISNES_V1) {
-        return unknownCommand(cursor, 1);
+        auto event = cursor.command("Default Duration", SequenceSemantic::State);
+        return event.invoke<&Playback::setDefaultDuration>(event.u8("duration_rate", SemanticOperandRole::Duration));
       }
       return unknownCommand(cursor, 0);
-    case 0x63:
-      return unknownCommand(cursor, version == KONAMISNES_V1 ? 1 : 0);
-    case 0x64:
-      return unknownCommand(cursor, version == KONAMISNES_V1 ? 2 : 0);
+    case 0x63: {
+      if (version == KONAMISNES_V1) {
+        auto event = cursor.command("Default Note Volume", SequenceSemantic::State);
+        return event.invoke<&Playback::setDefaultNoteVolume>(event.u8("volume", SemanticOperandRole::Level));
+      }
+      if (version == KONAMISNES_V6) {
+        return cursor.command("Echo Voice On", SequenceSemantic::State).invoke<&Playback::setEchoVoice>(true);
+      }
+      return unknownCommand(cursor, 0);
+    }
+    case 0x64: {
+      if (version == KONAMISNES_V1) {
+        auto event = cursor.command("Default Duration And Note Volume", SequenceSemantic::State);
+        const u8 rate = event.u8("duration_rate", SemanticOperandRole::Duration);
+        const u8 volume = event.u8("volume", SemanticOperandRole::Level);
+        return event.invoke<&Playback::setDefaults>(rate, volume);
+      }
+      if (version == KONAMISNES_V6) {
+        return cursor.command("Echo Voice Off", SequenceSemantic::State).invoke<&Playback::setEchoVoice>(false);
+      }
+      return unknownCommand(cursor, 0);
+    }
     case 0x65:
     case 0x66:
     case 0x67:
@@ -1039,13 +1275,13 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       if (const auto slide = readInlinePitchSlide(event, version)) {
         appendPitchSlide(event, *slide);
       }
-      event.set<&TrackState::previousNoteSlurred>(false);
+      event.invoke<&Playback::rest>();
       return event.wait(event.state<&TrackState::noteLength>());
     }
     case 0xe1: {
       auto event = cursor.command("Tie", SequenceSemantic::Note);
       event.set<&TrackState::noteLength>(event.u8("length", SemanticOperandRole::Duration));
-      const u8 rate = std::min(event.u8("duration_rate", SemanticOperandRole::Duration), noteDurationRateMax(version));
+      const u8 rate = event.u8("duration_rate", SemanticOperandRole::Duration);
       event.set<&TrackState::noteDurationRate>(rate);
       event.invoke<&Playback::tie>();
       return event.wait(event.state<&TrackState::noteLength>());
@@ -1066,7 +1302,10 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       // internal instrument-pan feature; they are not audible pan positions.
       event.derived("instrument_pan_off", instrumentPanOff);
       event.derived("instrument_pan_on", instrumentPanOn);
-      return instrumentPanOff || instrumentPanOn ? event.ignore() : event.invoke<&Playback::pan>(raw);
+      if (instrumentPanOff || instrumentPanOn) {
+        return event.invoke<&Playback::setInstrumentPanEnabled>(instrumentPanOn);
+      }
+      return event.invoke<&Playback::pan>(raw);
     }
     case 0xe4: {
       auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
@@ -1304,7 +1543,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       .defaultBehavior =
           SequenceProgramBehavior{
               .defaultLoopPolicy = LoopPolicy::PlayOnce,
-              .initialLevel = 1.0,
+              .initialLevel = 0.0,
               .initialReverbSend = 0.0,
               .initialPitchBendRangeSemitones = 2,
               .initialTempoMicrosecondsPerQuarter = tempoMicrosecondsPerQuarter(version, kKonamiSnesDefaultTempo),
@@ -1414,14 +1653,13 @@ SequenceProgram decodeKonamiSnesSequence(ByteReader reader, const KonamiSnesLayo
   // engine rules; they never reopen the source bytes to identify the version.
   program.config.profile = static_cast<u32>(layout.version);
   program.config.driverState = layout.indexedEchoFilter;
-  if (layout.version >= KONAMISNES_V4) {
-    program.config.driverData.assign(kInstrumentEnvelopeCount, kUnknownEnvelopeRegisters);
-    for (const auto& instrument : parseKonamiSnesInstrumentInfos(reader, layout)) {
-      const size_t index =
-          instrument.percussion ? kPercussionEnvelopeBase + instrument.percussionNote : instrument.index;
-      const u8 companion = (instrument.adsr1 & 0x80) != 0 ? instrument.adsr2 : instrument.gain;
-      program.config.driverData[index] = (static_cast<u32>(instrument.adsr1) << 8) | companion;
-    }
+  program.config.driverData.assign(kInstrumentEnvelopeCount * kRuntimeInstrumentWords, kUnknownRuntimeInstrument);
+  for (const auto& instrument : parseKonamiSnesInstrumentInfos(reader, layout)) {
+    const size_t index = instrument.percussion ? kPercussionEnvelopeBase + instrument.percussionNote : instrument.index;
+    const size_t offset = index * kRuntimeInstrumentWords;
+    program.config.driverData[offset] =
+        (static_cast<u32>(instrument.adsr1) << 16) | (static_cast<u32>(instrument.adsr2) << 8) | instrument.gain;
+    program.config.driverData[offset + 1] = (static_cast<u32>(instrument.pan) << 8) | instrument.volume;
   }
   return program;
 }

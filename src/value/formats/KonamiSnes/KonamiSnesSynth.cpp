@@ -78,16 +78,7 @@ constexpr u32 kDrumKitProgram = 0x00;
     return false;
   }
 
-  const u32 dirEntryAddress = spcDirAddress + info.srcn * 4;
-  if (!readSnesSampleDirectoryEntry(reader, dirEntryAddress, validateSample)) {
-    return false;
-  }
-
-  const u16 sampleStart = reader.le16(dirEntryAddress);
-  const u16 sampleLoop = reader.le16(dirEntryAddress + 2);
-  // BRR data is stored in nine-byte blocks, so a loop point can only land on a
-  // block boundary at or after the sample start.
-  return sampleStart <= sampleLoop && ((sampleLoop - sampleStart) % 9) == 0;
+  return readSnesSampleDirectoryEntry(reader, spcDirAddress + info.srcn * 4, validateSample).has_value();
 }
 
 [[nodiscard]] int percussionKey(const KonamiSnesInstrumentInfo& info) {
@@ -160,14 +151,6 @@ constexpr u32 kDrumKitProgram = 0x00;
   return std::clamp(root, 0, 127) - (fineTuneCents / 100.0);
 }
 
-[[nodiscard]] double attenuationFromVolume(u8 volume) {
-  // Match legacy KonamiSnesRgn::loadRgn: the instrument byte decreases volume
-  // relative to an assumed pre-pan channel level of 72 rather than acting as a
-  // direct loudness value.
-  const double amplitude = std::max(1.0 - (static_cast<double>(volume) / 72.0), 0.0);
-  return amplitude <= 0.0 ? 100.0 : std::min(-20.0 * std::log10(amplitude), 100.0);
-}
-
 }  // namespace
 
 std::vector<KonamiSnesInstrumentInfo> parseKonamiSnesInstrumentInfos(ByteReader reader,
@@ -232,34 +215,9 @@ SnesBrrCatalog parseKonamiSnesSampleInfos(ByteReader reader, u32 spcDirAddress,
 
 namespace {
 
-// Konami's legacy converter first subtracted the DIR base from a sample's
-// address and tried to match that transformed address as though it were an
-// absolute BRR address. Preserve that unusual lookup before the normal SRCN
-// lookup because a few songs depend on the resulting sample choice.
-[[nodiscard]] std::optional<SampleRef> konamiSampleRef(const KonamiSnesInstrumentInfo& info, u32 spcDirAddress,
-                                                       const SnesBrrCatalog& catalog,
-                                                       const SnesBrrSampleRefs& sampleRefs) {
-  if (const auto catalogIndex = catalog.index(info.srcn)) {
-    const u32 sampleStart = catalog.samples[*catalogIndex].startAddress;
-    if (sampleStart >= spcDirAddress) {
-      if (const auto transformed = sampleRefs.firstStartingAt(sampleStart - spcDirAddress)) {
-        return transformed;
-      }
-      if (const auto direct = sampleRefs.findSrcn(info.srcn)) {
-        return direct;
-      }
-    }
-  }
-
-  // The old path used dense sample zero when neither lookup succeeded.
-  // Express that fallback through the catalog's first source entry so format
-  // code still does not manufacture a dense SampleRef.
-  return catalog.samples.empty() ? std::nullopt : sampleRefs.findSrcn(catalog.samples.front().srcn);
-}
-
-void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader reader, KonamiSnesVersion version,
-                              u32 spcDirAddress, const std::vector<KonamiSnesInstrumentInfo>& instrumentInfos,
-                              const SnesBrrCatalog& sampleCatalog, const SnesBrrSampleRefs& sampleRefs) {
+void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader reader,
+                              const std::vector<KonamiSnesInstrumentInfo>& instrumentInfos,
+                              const SnesBrrSampleRefs& sampleRefs) {
   // Entries can come from three separate tables. Their common source parent
   // spans the lowest through highest entry while each exact record remains
   // separately selectable in HexView.
@@ -275,7 +233,7 @@ void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader read
       instruments.source(SourceRole::Table, "Instrument Tables", tableRange, "konami-snes-instrument-tables").id();
 
   for (const auto& info : instrumentInfos) {
-    const auto sample = konamiSampleRef(info, spcDirAddress, sampleCatalog, sampleRefs);
+    const auto sample = sampleRefs.findSrcn(info.srcn);
     if (!sample) {
       instruments.warning("Instrument sample was not found", info.source.range);
       continue;
@@ -301,10 +259,8 @@ void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader read
     const double unityKey = konamiUnityKey(info);
     Region region{
         .unityKey = unityKey,
-        // ADSR1 bit 7 chooses the DSP's ADSR envelope. When clear, the driver
-        // uses GAIN behavior that cannot be represented as the same envelope.
-        .envelope = (info.adsr1 & 0x80) != 0 ? snesDspEnvelope(info.adsr1, info.adsr2, info.gain) : Envelope{},
-        .attenuationDb = attenuationFromVolume(info.volume),
+        // The shared DSP conversion understands both ADSR and GAIN modes.
+        .envelope = snesDspEnvelope(info.adsr1, info.adsr2, info.gain),
     };
     if (info.percussion) {
       region.keyRange = KeyRange{.low = info.percussionNote, .high = info.percussionNote};
@@ -332,8 +288,7 @@ std::optional<ScanSynthRefs> addKonamiSnesSynth(ScanResultBuilder& builder, cons
   auto samples = builder.sampleCollection(fmt::format("{} Samples", displayName));
   const auto sampleRefs = addSnesBrrSamples(samples.builder(), reader, sampleCatalog);
 
-  addKonamiSnesInstruments(instruments.builder(), reader, layout.version, *layout.spcDirAddress, instrumentInfos,
-                           sampleCatalog, sampleRefs);
+  addKonamiSnesInstruments(instruments.builder(), reader, instrumentInfos, sampleRefs);
 
   return ScanSynthRefs{
       .instruments = instruments.ref(),

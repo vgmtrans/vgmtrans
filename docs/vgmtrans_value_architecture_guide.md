@@ -920,7 +920,7 @@ instrument.region(*sample, Region{
 
 `add` diagnoses an accidental duplicate grouping key. `getOrAdd` explicitly allows several source entries to contribute to one instrument, such as a percussion kit. The grouping key is temporary lookup state and never silently becomes the instrument identity or export address. `append` accepts values that need no lookup key, and pre-populated regions remain valid.
 
-KonamiSnes is a representative mixed case. It uses `getOrAdd` to state directly that several percussion entries form one kit, while `RecordReader` retains every encoded instrument field. Its unusual transformed-address sample lookup and sample-zero fallback stay in one plainly named Konami helper. The generic builder handles grouping, dense owners, ranges, and sample links without learning that format rule.
+KonamiSnes is a representative mixed case. It uses `getOrAdd` to state directly that several percussion entries form one kit, while `RecordReader` retains every encoded instrument field. Instrument rows resolve their DSP SRCN through the shared SNES sample lookup. The generic builder handles grouping, dense owners, ranges, and sample links without learning format-specific driver state.
 
 NDS demonstrates separate asset lifetimes. When a SWAR sample builder is committed, `ScanResultBuilder` retains its source-key lookup for the rest of that scan. A later SBNK receives up to four ordinary sample-collection handles and resolves the encoded archive slot and source sample number with `sampleByKeyOrWarning()`. Invalid SWAR entries can therefore leave holes without shifting later references, and several banks can reuse one SWAR without a combined synth owner. The temporary source keys never enter the durable model or the NDS format interface.
 

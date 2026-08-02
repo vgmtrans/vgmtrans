@@ -48,8 +48,12 @@ inline constexpr u8 kLateEraVibratoFadeThreshold = 0xc8;
   return usesLegacyInstrumentLayout(version) ? 8 : 7;
 }
 
-[[nodiscard]] constexpr u8 noteDurationRateMax(KonamiSnesVersion version) {
-  return version == KONAMISNES_V1 ? 100 : 127;
+[[nodiscard]] constexpr bool isHeldDuration(KonamiSnesVersion version, u8 rate) {
+  return version == KONAMISNES_V1 ? rate >= 100 : rate == 127;
+}
+
+[[nodiscard]] constexpr bool isLegatoDuration(KonamiSnesVersion version, u8 rate) {
+  return version == KONAMISNES_V1 ? rate == 101 : rate == 127;
 }
 
 // The first engine runs its music timer at half the rate used by later games.
