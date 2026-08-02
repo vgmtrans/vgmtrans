@@ -10,6 +10,7 @@
 #include "value/formats/ValueFormats.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
+#include "value/synth/SnesDsp.h"
 #include "value/synth/SynthMath.h"
 
 #include "ValueFormatTestSupport.h"
@@ -728,6 +729,67 @@ void konamiSnesCompilerCursorUsesVersionedOperandLengths() {
          "late pitch slide should use its six-byte command layout");
   expect(firstSize(KONAMISNES_V1, {0x63, 0xaa, 0xff}) == 2 && firstSize(KONAMISNES_V6, {0x63, 0xff}) == 1,
          "unknown low opcodes should retain their version-dependent operand lengths");
+  expect(firstSize(KONAMISNES_V4, {0xfb, 0x34, 0x12, 0xff}) == 3 &&
+             firstSize(KONAMISNES_V4, {0xfc, 0x78, 0x56, 0xff}) == 3,
+         "V4 pitch-envelope aliases should retain both delta bytes");
+}
+
+void konamiSnesDynamicAdsrMatchesEachDriverFamily() {
+  const auto envelopesFor = [](const PerformanceSequence& performance) {
+    return performanceEvents<EnvelopePerformanceEvent>(performance.tracks.front());
+  };
+
+  const auto v1 = envelopesFor(renderKonamiSnesProgram(KONAMISNES_V1, {{0xfa, 35, 64, 16, 0xe2, 0x01, 0xff}}));
+  Envelope expectedV1 = snesDspEnvelope(0xd3, 0x46, 0x46);
+  expectedV1.releaseSeconds = 0.508;
+  expect(v1.size() == 2 && v1[0]->update.values == expectedV1 && v1[0]->update.fields == EnvelopeFields::All &&
+             v1[1]->update.fields == EnvelopeFields::Release && v1[1]->update.values &&
+             v1[1]->update.values->releaseSeconds == 0.508,
+         "V1 0xFA should decode decimal ADSR parameters and preserve its software release across program changes");
+
+  const auto v1Gain = envelopesFor(renderKonamiSnesProgram(KONAMISNES_V1, {{0xfa, 0xa0, 0x9f, 0x00, 0xff}}));
+  expect(v1Gain.size() == 1 && v1Gain[0]->update.values == snesDspEnvelope(0x00, 0x9f, 0x9f),
+         "V1 0xFA should treat attack/decay values 0xA0 and above as direct GAIN mode");
+
+  const auto v3 = envelopesFor(renderKonamiSnesProgram(KONAMISNES_V3, {{0xfa, 35, 64, 115, 0xff}}));
+  Envelope expectedV3 = snesDspEnvelope(0xd3, 0x46, 0x46);
+  expectedV3.releaseSeconds = snesDspGainEnvelopeSeconds(0x8f, 0x7ff, 0);
+  expect(v3.size() == 1 && v3[0]->update.values == expectedV3,
+         "V3 0xFA should switch release values 100 and above to DSP GAIN");
+
+  const auto v4 = envelopesFor(renderKonamiSnesProgram(KONAMISNES_V4, {{0xfa, 0x8f, 0xe0, 115, 0x62, 0x00, 0xff}}));
+  const Envelope expectedV4 = snesDspEnvelope(0x8f, 0xe0, 0xe0);
+  expect(v4.size() == 2 && v4[0]->update.values && v4[0]->update.values->releaseSeconds == expectedV3.releaseSeconds &&
+             v4[1]->update.fields == EnvelopeFields::Release && v4[1]->update.values &&
+             v4[1]->update.values->releaseSeconds == expectedV4.releaseSeconds,
+         "V4 0x62 should restore the raw 0xFA envelope's normal DSP release");
+
+  const auto renderV6Instrument = [](u8 instrumentAdsr1) {
+    auto bytes = makeKonamiSnesBuilderAram();
+    bytes[0x401c + 3] = instrumentAdsr1;
+    writeLe16(bytes, 0x2000, 0x2002);
+    writeBytes(bytes, 0x2002, std::array<u8, 7>{0xe2, 0x04, 0xed, 0x8a, 0xfb, 0x42, 0xff});
+    const KonamiSnesLayout layout{
+        .version = KONAMISNES_V6,
+        .sequenceHeaderAddress = 0x2000,
+        .spcDirAddress = 0x5000,
+        .commonInstrumentTableAddress = 0x4000,
+        .bankedInstrumentTableAddress = 0x4200,
+        .firstBankedInstrument = 5,
+        .percussionInstrumentTableAddress = 0x4300,
+    };
+    const auto& dialect = konamiSnesSequenceDialect(layout.version);
+    const SequenceProgram program = decodeKonamiSnesSequence(ByteReader(SourceId{33}, bytes), layout, AssetId{33});
+    return SequenceVm(LoopPolicy::PlayOnce).render(program, dialect);
+  };
+
+  const auto v6 = envelopesFor(renderV6Instrument(0x8f));
+  expect(v6.size() == 2 && v6[0]->update.values == snesDspEnvelope(0x8a, 0xe0, 0xe0) &&
+             v6[1]->update.values == snesDspEnvelope(0x8a, 0x42, 0x42),
+         "V5-V6 ADSR1 and ADSR2 commands should combine with the selected instrument's companion register");
+
+  const auto gain = envelopesFor(renderV6Instrument(0x00));
+  expect(gain.empty(), "V5-V6 should ignore standalone ADSR writes while the selected instrument uses GAIN");
 }
 
 void konamiSnesEveryVersionRendersSourceFreeCommands() {

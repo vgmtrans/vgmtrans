@@ -369,8 +369,10 @@ struct SequenceProgramBehavior {
 // executor. A single dialect can therefore execute every version of a format.
 struct SequenceProgramConfig {
   u32 profile = 0;
-  // Format-defined state captured alongside the sequence.
+  // Small format-defined state captured alongside the sequence.
   u32 driverState = 0;
+  // Larger source-free lookup tables used by format playback.
+  std::vector<u32> driverData;
 };
 
 struct SequenceProgram {

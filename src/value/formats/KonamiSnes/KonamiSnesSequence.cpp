@@ -12,6 +12,7 @@
 #include "value/sequence/CompiledCommandDialect.h"
 #include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
+#include "value/synth/SnesDsp.h"
 
 #include <fmt/format.h>
 
@@ -154,6 +155,63 @@ struct PersistentPitchEffect {
   return static_cast<double>(volume) / 255.0;
 }
 
+[[nodiscard]] constexpr bool usesEncodedEnvelopeParameters(KonamiSnesVersion version) {
+  return version >= KONAMISNES_V1 && version <= KONAMISNES_V3;
+}
+
+[[nodiscard]] constexpr u8 releaseGain(u8 amount) {
+  if (amount < 100) {
+    return amount;
+  }
+  const u8 base = amount >= 200 ? 200 : 100;
+  return static_cast<u8>((amount >= 200 ? 0xa0 : 0x80) | ((amount - base) & 0x1f));
+}
+
+[[nodiscard]] double softwareReleaseSeconds(KonamiSnesVersion version, u8 rate) {
+  // Early engines add rate << 4 to an 8.8 attenuation accumulator until its
+  // high byte reaches the maximum note volume. Timer 0 advances once per
+  // timerFrequency * 125 microseconds.
+  constexpr double kMaximumNoteVolume = 127.0;
+  const double ticks = std::ceil(kMaximumNoteVolume * 16.0 / rate);
+  return ticks * timerFrequency(version) / 8000.0;
+}
+
+[[nodiscard]] std::optional<double> customReleaseSeconds(KonamiSnesVersion version, u8 amount) {
+  if (amount == 0) {
+    return std::nullopt;
+  }
+  if (version <= KONAMISNES_V2 || (version == KONAMISNES_V3 && amount < 100)) {
+    return softwareReleaseSeconds(version, amount);
+  }
+  if (amount >= 100) {
+    return snesDspGainEnvelopeSeconds(releaseGain(amount), 0x7ff, 0);
+  }
+  return std::nullopt;
+}
+
+[[nodiscard]] Envelope dspEnvelope(u8 adsr1, u8 adsr2OrGain) {
+  return snesDspEnvelope(adsr1, adsr2OrGain, adsr2OrGain);
+}
+
+struct RawEnvelopeRegisters {
+  u8 adsr1 = 0;
+  u8 adsr2OrGain = 0;
+};
+
+constexpr size_t kPercussionEnvelopeBase = 0x100;
+constexpr size_t kInstrumentEnvelopeCount = kPercussionEnvelopeBase + 0x60;
+constexpr u32 kUnknownEnvelopeRegisters = std::numeric_limits<u32>::max();
+
+[[nodiscard]] std::optional<RawEnvelopeRegisters> envelopeRegisters(const std::vector<u32>& data, size_t index) {
+  if (index >= data.size() || data[index] == kUnknownEnvelopeRegisters) {
+    return std::nullopt;
+  }
+  return RawEnvelopeRegisters{
+      .adsr1 = static_cast<u8>(data[index] >> 8),
+      .adsr2OrGain = static_cast<u8>(data[index]),
+  };
+}
+
 [[nodiscard]] u8 clampPan(KonamiSnesVersion version, u8 pan) {
   return std::min(pan, version <= KONAMISNES_V2 ? u8{20} : u8{40});
 }
@@ -209,7 +267,12 @@ struct LfoState {
 };
 
 struct ProgramState {
-  explicit ProgramState(const SequenceProgram& program) : indexedEchoFilter(program.config.driverState != 0) {}
+  explicit ProgramState(const SequenceProgram& program)
+      : instrumentEnvelopes(program.config.driverData), indexedEchoFilter(program.config.driverState != 0) {}
+
+  [[nodiscard]] std::optional<RawEnvelopeRegisters> envelope(size_t index) const {
+    return envelopeRegisters(instrumentEnvelopes, index);
+  }
 
   void setEcho(u8 mask, u8 left, u8 right) {
     const double leftGain = static_cast<s8>(left) / 127.0;
@@ -227,13 +290,29 @@ struct ProgramState {
   }
 
   ReverbPerformanceEvent echo{.voiceMask = 0};
+  const std::vector<u32>& instrumentEnvelopes;
   bool indexedEchoFilter = false;
+};
+
+struct TrackEnvelopeState {
+  void selectInstrument(KonamiSnesVersion version, std::optional<RawEnvelopeRegisters> value) {
+    registers = value;
+    // V1-V2 keep their software release accumulator step across instrument
+    // loads. V3 and later explicitly clear their release control.
+    if (version >= KONAMISNES_V3) {
+      releaseAmount = 0;
+    }
+  }
+
+  std::optional<RawEnvelopeRegisters> registers;
+  u8 releaseAmount = 0;
 };
 
 // Only values that persist from one executed command to the next live here.
 struct TrackState {
   TrackState(const SequenceProgram& program, const TrackProgram& track)
       : version(static_cast<KonamiSnesVersion>(program.config.profile)) {
+    envelope.selectInstrument(version, envelopeRegisters(program.config.driverData, 0));
     pan.reset(version <= KONAMISNES_V2 ? 10 : 20);
     volume.reset(0xff);
     tempoState.reset(kKonamiSnesDefaultTempo);
@@ -316,6 +395,7 @@ struct TrackState {
   std::optional<double> notePitch;
   PerformanceNoteId pitchNote;
   PersistentPitchEffect pitchEffect;
+  TrackEnvelopeState envelope;
 };
 
 // History-dependent driver behavior stays close to the opcode switch below.
@@ -326,6 +406,12 @@ struct Playback {
   ProgramState& program;
 
   void note(u8 key, u8 sourceVelocity) {
+    if (track.percussion) {
+      track.envelope.selectInstrument(track.version, program.envelope(kPercussionEnvelopeBase + key));
+      out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+      emitPersistentRelease();
+    }
+
     // Counted loops alter velocity before the later engines pass it through
     // their nonlinear loudness table.
     u8 velocity =
@@ -366,6 +452,19 @@ struct Playback {
     track.previousNoteSlurred = track.noteDurationRate == noteDurationRateMax(track.version);
   }
 
+  void selectInstrument(u32 bank, u32 programNumber, std::optional<RawEnvelopeRegisters> envelope) {
+    track.envelope.selectInstrument(track.version, envelope);
+    out.instrument(bank, programNumber, true);
+    emitPersistentRelease();
+  }
+
+  void emitPersistentRelease() {
+    if (const auto release = customReleaseSeconds(track.version, track.envelope.releaseAmount)) {
+      out.updateEnvelope(Envelope{.releaseSeconds = *release}, EnvelopeFields::Release,
+                         VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    }
+  }
+
   void percussionOn() {
     // Percussion commands do not change the remembered melodic instrument;
     // leaving percussion mode restores that program below.
@@ -377,7 +476,7 @@ struct Playback {
 
   void percussionOff() {
     if (track.percussion) {
-      out.instrument(track.instrument >> 7, track.instrument & 0x7f, true);
+      selectInstrument(track.instrument >> 7, track.instrument & 0x7f, program.envelope(track.instrument));
       track.percussion = false;
     }
   }
@@ -387,7 +486,7 @@ struct Playback {
     // both of which the original driver performs as part of instrument setup.
     applyEffectiveTuning(true);
     track.instrument = programNumber;
-    out.instrument(programNumber >> 7, programNumber & 0x7f, true);
+    selectInstrument(programNumber >> 7, programNumber & 0x7f, program.envelope(programNumber));
     pan(track.version <= KONAMISNES_V2 ? 10 : 20);
   }
 
@@ -396,7 +495,7 @@ struct Playback {
     // perform the same instrument setup as a normal program change.
     applyEffectiveTuning(true);
     track.instrument = programNumber;
-    out.instrument(programNumber >> 7, programNumber & 0x7f, true);
+    selectInstrument(programNumber >> 7, programNumber & 0x7f, program.envelope(programNumber));
     volume(volumeValue);
     pan(track.version <= KONAMISNES_V2 ? 10 : 20);
   }
@@ -416,6 +515,55 @@ struct Playback {
   void tuning(s8 value) {
     track.sequenceTuningCents = tuningCents(value);
     applyEffectiveTuning();
+  }
+
+  void replaceCurrentEnvelope() {
+    if (!track.envelope.registers) {
+      return;
+    }
+    const auto [adsr1, adsr2OrGain] = *track.envelope.registers;
+    Envelope envelope = dspEnvelope(adsr1, adsr2OrGain);
+    if (const auto release = customReleaseSeconds(track.version, track.envelope.releaseAmount)) {
+      envelope.releaseSeconds = *release;
+    }
+    out.replaceEnvelope(std::move(envelope), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+  }
+
+  void setEnvelope(u8 adsr1, u8 adsr2OrGain, u8 releaseAmount) {
+    track.envelope.registers = RawEnvelopeRegisters{adsr1, adsr2OrGain};
+    track.envelope.releaseAmount = releaseAmount;
+    replaceCurrentEnvelope();
+  }
+
+  void setRelease(u8 amount) {
+    track.envelope.releaseAmount = amount;
+    if (const auto release = customReleaseSeconds(track.version, amount)) {
+      out.updateEnvelope(Envelope{.releaseSeconds = *release}, EnvelopeFields::Release,
+                         VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    } else if (track.envelope.registers) {
+      const auto [adsr1, adsr2OrGain] = *track.envelope.registers;
+      out.updateEnvelope(Envelope{.releaseSeconds = dspEnvelope(adsr1, adsr2OrGain).releaseSeconds},
+                         EnvelopeFields::Release, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    } else {
+      out.restoreEnvelope(EnvelopeFields::Release, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    }
+  }
+
+  void setAdsr1(u8 adsr1) {
+    // Late drivers ignore this command while their saved ADSR1 selects GAIN.
+    if (!track.envelope.registers || (track.envelope.registers->adsr1 & 0x80) == 0) {
+      return;
+    }
+    track.envelope.registers->adsr1 = adsr1;
+    replaceCurrentEnvelope();
+  }
+
+  void setAdsr2(u8 adsr2) {
+    if (!track.envelope.registers || (track.envelope.registers->adsr1 & 0x80) == 0) {
+      return;
+    }
+    track.envelope.registers->adsr2OrGain = adsr2;
+    replaceCurrentEnvelope();
   }
 
   void tempo(u8 value) {
@@ -829,19 +977,30 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     return event.invoke<&Playback::tuning>(tuning);
   }
 
+  if (version >= KONAMISNES_V2 && version <= KONAMISNES_V3 && opcode >= 0x62 && opcode <= 0x7f) {
+    return cursor.command("Stop", SequenceSemantic::End).end();
+  }
+
   switch (opcode) {
     case 0x60:
       return cursor.command("Percussion On", SequenceSemantic::Program).invoke<&Playback::percussionOn>();
     case 0x61:
       return cursor.command("Percussion Off", SequenceSemantic::Program).invoke<&Playback::percussionOff>();
     case 0x62:
+      if (version >= KONAMISNES_V4) {
+        auto event = cursor.command("Release Rate", SequenceSemantic::Envelope);
+        const u8 amount = event.u8("amount");
+        if (amount >= 100) {
+          event.derived("dsp_release_gain", releaseGain(amount), SourceValueDisplay::Hex);
+        } else {
+          event.derived("normal_key_off", true);
+        }
+        return event.invoke<&Playback::setRelease>(amount);
+      }
       if (version == KONAMISNES_V1) {
         return unknownCommand(cursor, 1);
-      } else {
-        auto event = cursor.sourceOnly("GAIN");
-        event.u8("gain_amount", SourceValueDisplay::Hex);
-        return event.ignore();
       }
+      return unknownCommand(cursor, 0);
     case 0x63:
       return unknownCommand(cursor, version == KONAMISNES_V1 ? 1 : 0);
     case 0x64:
@@ -982,9 +1141,8 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     }
     case 0xed:
       if (isLateVersion(version)) {
-        auto event = cursor.sourceOnly("ADSR(1)");
-        event.u8("adsr1", SourceValueDisplay::Hex);
-        return event.ignore();
+        auto event = cursor.command("ADSR(1)", SequenceSemantic::Envelope);
+        return event.invoke<&Playback::setAdsr1>(event.u8("adsr1", SourceValueDisplay::Hex));
       }
       return unknownCommand(cursor, 3);
     case 0xee: {
@@ -1049,22 +1207,42 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       auto event = cursor.command("Vibrato Fade", SequenceSemantic::Modulation);
       return event.invoke<&Playback::setVibratoFade>(event.u8("length", SemanticOperandRole::Duration));
     }
-    case 0xfa:
-      if (version >= KONAMISNES_V4) {
-        auto event = cursor.sourceOnly("ADSR/Gain");
-        event.u8("adsr1", SourceValueDisplay::Hex);
-        event.u8("adsr2", SourceValueDisplay::Hex);
-        event.u8("gain", SourceValueDisplay::Hex);
-        return event.ignore();
+    case 0xfa: {
+      auto event = cursor.command("ADSR / GAIN", SequenceSemantic::Envelope);
+      const u8 arg1 = event.u8(usesEncodedEnvelopeParameters(version) ? "attack_decay_parameter" : "adsr1",
+                               SourceValueDisplay::Hex);
+      const u8 arg2 = event.u8(usesEncodedEnvelopeParameters(version) ? "sustain_parameter" : "adsr2_or_gain",
+                               SourceValueDisplay::Hex);
+      const u8 releaseAmount = event.u8("release_amount");
+      const u8 adsr1 = usesEncodedEnvelopeParameters(version) ? snesDspKonamiAdsr1(arg1) : arg1;
+      const u8 adsr2OrGain =
+          usesEncodedEnvelopeParameters(version) && (adsr1 & 0x80) != 0 ? snesDspKonamiAdsr2(arg2) : arg2;
+      event.derived("dsp_adsr1", adsr1, SourceValueDisplay::Hex);
+      if ((adsr1 & 0x80) != 0) {
+        event.derived("dsp_adsr2", adsr2OrGain, SourceValueDisplay::Hex);
+      } else {
+        event.derived("dsp_gain", adsr2OrGain, SourceValueDisplay::Hex);
       }
-      return unknownCommand(cursor, 3);
+      if (version >= KONAMISNES_V3 && releaseAmount >= 100) {
+        event.derived("dsp_release_gain", releaseGain(releaseAmount), SourceValueDisplay::Hex);
+      }
+      return event.invoke<&Playback::setEnvelope>(adsr1, adsr2OrGain, releaseAmount);
+    }
     case 0xfb:
-      if (version >= KONAMISNES_V4) {
-        auto event = cursor.sourceOnly("ADSR(2)");
-        event.u8("adsr2", SourceValueDisplay::Hex);
+      if (isLateVersion(version)) {
+        auto event = cursor.command("ADSR(2)", SequenceSemantic::Envelope);
+        return event.invoke<&Playback::setAdsr2>(event.u8("adsr2", SourceValueDisplay::Hex));
+      }
+      if (version == KONAMISNES_V4) {
+        auto event = cursor.sourceOnly("Linear Pitch Envelope");
+        event.u8("delta_fraction");
+        event.s8("delta_integer", SourceValueDisplay::SignedDecimal);
+        return event.ignore();
+      } else {
+        auto event = cursor.sourceOnly("Pitch Modulation");
+        event.u8("voice_mask", SourceValueDisplay::Hex);
         return event.ignore();
       }
-      return unknownCommand(cursor, 1);
     case 0xfc:
       // Konami repeatedly reassigned opcode 0xfc. Keep each version next to the
       // others so its changing operand length and behavior are easy to compare.
@@ -1075,13 +1253,13 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
         event.jump(destination);
         return event.discoverTarget(alternate);
       }
-      if (version == KONAMISNES_V2) {
+      if (version >= KONAMISNES_V2 && version <= KONAMISNES_V4) {
         auto event = cursor.sourceOnly("Linear Pitch Envelope");
         event.u8("delta_fraction");
         event.s8("delta_integer", SourceValueDisplay::SignedDecimal);
         return event.ignore();
       }
-      if (version >= KONAMISNES_V4) {
+      if (version >= KONAMISNES_V5) {
         auto event = cursor.command("Program And Volume", SequenceSemantic::Program);
         const u8 volume = event.u8("volume", SemanticOperandRole::Level);
         const u8 program = event.u8("raw");
@@ -1236,6 +1414,15 @@ SequenceProgram decodeKonamiSnesSequence(ByteReader reader, const KonamiSnesLayo
   // engine rules; they never reopen the source bytes to identify the version.
   program.config.profile = static_cast<u32>(layout.version);
   program.config.driverState = layout.indexedEchoFilter;
+  if (layout.version >= KONAMISNES_V4) {
+    program.config.driverData.assign(kInstrumentEnvelopeCount, kUnknownEnvelopeRegisters);
+    for (const auto& instrument : parseKonamiSnesInstrumentInfos(reader, layout)) {
+      const size_t index =
+          instrument.percussion ? kPercussionEnvelopeBase + instrument.percussionNote : instrument.index;
+      const u8 companion = (instrument.adsr1 & 0x80) != 0 ? instrument.adsr2 : instrument.gain;
+      program.config.driverData[index] = (static_cast<u32>(instrument.adsr1) << 8) | companion;
+    }
+  }
   return program;
 }
 
