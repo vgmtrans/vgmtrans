@@ -60,6 +60,7 @@ void konamiSnesLowCommandsAndInstrumentPanAreVersioned();
 void konamiSnesEveryVersionRendersSourceFreeCommands();
 void konamiSnesSequenceSimulationPreservesDriverVibratoDepth();
 void konamiSnesCompiledPlaybackHandlesCallsLoopsTiesAndSlides();
+void konamiSnesHeldNoteUsesRealizedInlineSlidePitch();
 void konamiSnesCompiledAutomationTicksFades();
 void konamiSnesPlayOnceCoordinatesGlobalLoopCompletion();
 void ninSnesProfilesDescribeEverySupportedDriverFamily();
@@ -225,6 +226,7 @@ int main() {
     konamiSnesEveryVersionRendersSourceFreeCommands();
     konamiSnesSequenceSimulationPreservesDriverVibratoDepth();
     konamiSnesCompiledPlaybackHandlesCallsLoopsTiesAndSlides();
+    konamiSnesHeldNoteUsesRealizedInlineSlidePitch();
     konamiSnesCompiledAutomationTicksFades();
     konamiSnesPlayOnceCoordinatesGlobalLoopCompletion();
     ninSnesProfilesDescribeEverySupportedDriverFamily();

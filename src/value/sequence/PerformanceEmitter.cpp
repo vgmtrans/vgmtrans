@@ -7,6 +7,7 @@
 #include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
+#include <cmath>
 #include <iterator>
 #include <limits>
 #include <stdexcept>
@@ -79,6 +80,40 @@ PerformanceNoteId PerformanceEmitter::note(double key, double linearVelocity, u3
       .durationTicks = durationTicks,
       .extendsPrevious = extendsPrevious,
   });
+}
+
+PerformanceNoteId PerformanceEmitter::continueVoice(PerformanceNoteId previousNote, NotePerformanceEvent event) {
+  const NotePerformanceEvent* previousEvent = nullptr;
+  for (auto previous = track_.events.rbegin(); previous != track_.events.rend(); ++previous) {
+    const auto* candidate = std::get_if<NotePerformanceEvent>(&*previous);
+    if (candidate != nullptr && candidate->note == previousNote) {
+      previousEvent = candidate;
+      break;
+    }
+  }
+  if (previousEvent == nullptr) {
+    event.note = {};
+    event.extendsPrevious = false;
+    return note(std::move(event));
+  }
+
+  const PerformanceLaneId lane = previousEvent->lane;
+  event.lane = lane;
+  const double startKey =
+      currentPitchTransitionKey(previousNote, lane).value_or(previousEvent->key);
+  if (std::abs(startKey - event.key) < 0.000001) {
+    event.note = previousNote;
+    event.extendsPrevious = true;
+    return note(std::move(event));
+  }
+
+  event.note = {};
+  event.extendsPrevious = false;
+  const double targetKey = event.key;
+  const PerformanceNoteId continuedNote = note(std::move(event));
+  pitchSlide(continuedNote, startKey, targetKey, PitchSlideTiming::fromTicks(0), lane)
+      .continueFrom(previousNote);
+  return continuedNote;
 }
 
 bool PerformanceEmitter::setPreviousNoteEnd(u64 endTick) {
@@ -526,8 +561,7 @@ PitchSlideBinding PerformanceEmitter::pitchSlide(PerformanceNoteId note, double 
   const u32 durationTicks = timing.timelineTicks;
   const u64 start = tick_;
 
-  // This explicit-start form trusts playback's realized pitch. Formats that
-  // need the value of an earlier shared transition use retargetPitchSlide().
+  // This explicit-start form trusts the caller's source-domain pitch state.
   for (auto previous = track_.automations.rbegin(); previous != track_.automations.rend(); ++previous) {
     auto* previousPitch = pitchTransitionIntent(*previous);
     if (previousPitch == nullptr || previousPitch->lane != lane || previous->realization.endTick < start) {
@@ -575,7 +609,12 @@ PitchSlideBinding PerformanceEmitter::retargetPitchSlide(PerformanceNoteId note,
 PitchSlideBinding PerformanceEmitter::retargetPitchSlide(PerformanceNoteId note, double fallbackStartKey,
                                                          double targetKey, PitchSlideTiming timing,
                                                          PerformanceLaneId lane) {
-  double startKey = fallbackStartKey;
+  return pitchSlide(note, currentPitchTransitionKey(note, lane).value_or(fallbackStartKey), targetKey,
+                    std::move(timing), lane);
+}
+
+std::optional<double> PerformanceEmitter::currentPitchTransitionKey(PerformanceNoteId note,
+                                                                    PerformanceLaneId lane) const {
   for (auto previous = track_.automations.rbegin(); previous != track_.automations.rend(); ++previous) {
     const auto* transition = pitchTransitionIntent(*previous);
     if (transition == nullptr || transition->note != note || transition->lane != lane ||
@@ -584,11 +623,10 @@ PitchSlideBinding PerformanceEmitter::retargetPitchSlide(PerformanceNoteId note,
     }
     const u64 realizedTick = std::min(tick_, previous->realization.endTick);
     const u64 elapsed = realizedTick - previous->realization.startTick;
-    startKey = pitchTransitionValueAt(
+    return pitchTransitionValueAt(
         *transition, static_cast<u32>(std::min<u64>(elapsed, std::numeric_limits<u32>::max())));
-    break;
   }
-  return pitchSlide(note, startKey, targetKey, std::move(timing), lane);
+  return std::nullopt;
 }
 
 PerformanceAutomationBinding PerformanceEmitter::beginAutomation(ScalarPerformanceAutomationIntent intent) {
