@@ -630,11 +630,12 @@ void applyInstrumentPitchBendRange(MidiTrack& track, RenderTrackState& state, u6
   ensurePitchBendRangePreservingPitch(track, state, tick, channel, range, modulationConversion);
 }
 
-void applySourceInstrumentSelection(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
-                                    const MidiInstrumentSelection& selection, const MidiExportOptions& options,
-                                    ModulationConversionPolicy modulationConversion) {
+void applyInstrumentSelection(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
+                              const MidiInstrumentSelection& selection, const MidiExportOptions& options,
+                              ModulationConversionPolicy modulationConversion, bool forceProgramChange) {
   const u16 bank = midiBank(selection, options);
-  if (bank != state.midiBank || selection.forceBankSelect) {
+  const bool bankChanged = bank != state.midiBank;
+  if (bankChanged || selection.forceBankSelect) {
     track.events.push_back(BankSelect{
         .tick = tick,
         .channel = channel,
@@ -643,12 +644,15 @@ void applySourceInstrumentSelection(MidiTrack& track, RenderTrackState& state, u
     });
     state.midiBank = bank;
   }
-  state.midiProgram = data7(selection.address.program);
-  track.events.push_back(ProgramChange{
-      .tick = tick,
-      .channel = channel,
-      .program = state.midiProgram,
-  });
+  const u8 program = data7(selection.address.program);
+  if (forceProgramChange || bankChanged || program != state.midiProgram) {
+    state.midiProgram = program;
+    track.events.push_back(ProgramChange{
+        .tick = tick,
+        .channel = channel,
+        .program = program,
+    });
+  }
   applyInstrumentPitchBendRange(track, state, tick, channel, selection.pitchBendRangeCents, modulationConversion);
 }
 
@@ -1017,6 +1021,14 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
       [&](const auto& typedEvent) {
         using TypedEvent = std::decay_t<decltype(typedEvent)>;
         if constexpr (std::is_same_v<TypedEvent, NotePerformanceEvent>) {
+          if (!typedEvent.extendsPrevious && typedEvent.instrumentAddress) {
+            const auto address = *typedEvent.instrumentAddress;
+            applyInstrumentSelection(
+                track, state, typedEvent.header.tick, channel,
+                instrumentSelection(InstrumentPerformanceEvent{.bank = address.bank, .program = address.program},
+                                    instrumentSets),
+                options, modulationConversion, false);
+          }
           const u8 key = midiKey(typedEvent.key + globalTransposeAt(globalTransposes, typedEvent.header.tick));
           if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
             if (shouldRestartSimulatedVibratoForNote(typedEvent, state)) {
@@ -1053,8 +1065,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           // once and written to the first MIDI track by renderMidiSequence.
         } else if constexpr (std::is_same_v<TypedEvent, InstrumentPerformanceEvent>) {
           const auto selection = instrumentSelection(typedEvent, instrumentSets);
-          applySourceInstrumentSelection(track, state, typedEvent.header.tick, channel, selection, options,
-                                         modulationConversion);
+          applyInstrumentSelection(track, state, typedEvent.header.tick, channel, selection, options,
+                                   modulationConversion, true);
         } else if constexpr (std::is_same_v<TypedEvent, LevelPerformanceEvent>) {
           addVolume(track, automationState, typedEvent.header.tick, channel, typedEvent.linearGain,
                     typedEvent.precisionHint, options, typedEvent.sourceQuantization);

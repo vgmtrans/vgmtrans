@@ -40,43 +40,19 @@ PerformanceSequence sequenceWithEvents(std::vector<PerformanceEvent> events, u64
   };
 }
 
-InstrumentAddress selectedAddressForNote(const PerformanceSequence& performance, PerformanceNoteId note,
-                                         std::span<const InstrumentSetAsset> instrumentSets) {
-  InstrumentAddress selected;
+InstrumentAddress selectedAddressForNote(const PerformanceSequence& performance, PerformanceNoteId note) {
   for (const auto& event : performance.tracks.front().events) {
-    if (const auto* instrumentEvent = std::get_if<InstrumentPerformanceEvent>(&event)) {
-      if (!instrumentEvent->sourceInstrument) {
-        selected = InstrumentAddress{.bank = instrumentEvent->bank, .program = instrumentEvent->program};
-        continue;
-      }
-      const auto identity = *instrumentEvent->sourceInstrument;
-      bool resolved = false;
-      for (const auto& instrumentSet : instrumentSets) {
-        const auto instrument = std::ranges::find_if(instrumentSet.instruments, [&](const Instrument& candidate) {
-          return candidate.identity && *candidate.identity == identity;
-        });
-        if (instrument == instrumentSet.instruments.end()) {
-          continue;
-        }
-        selected = resolveInstrumentAddress(instrument->explicitAddress, instrument->identity);
-        resolved = true;
-        break;
-      }
-      if (!resolved) {
-        selected = resolveInstrumentAddress({}, identity);
-      }
-    } else if (const auto* noteEvent = std::get_if<NotePerformanceEvent>(&event);
-               noteEvent != nullptr && noteEvent->note == note) {
-      return selected;
+    if (const auto* noteEvent = std::get_if<NotePerformanceEvent>(&event);
+        noteEvent != nullptr && noteEvent->note == note && noteEvent->instrumentAddress) {
+      return *noteEvent->instrumentAddress;
     }
   }
-  throw std::runtime_error("Dynamic-envelope test note was not found");
+  throw std::runtime_error("Dynamic-envelope test note instrument was not found");
 }
 
 size_t selectedInstrumentForNote(const DynamicEnvelopeMaterialization& materialized, PerformanceNoteId note,
                                  const InstrumentSetAsset& instrumentSet) {
-  const InstrumentAddress address =
-      selectedAddressForNote(materialized.performance, note, std::span{&instrumentSet, size_t{1}});
+  const InstrumentAddress address = selectedAddressForNote(materialized.performance, note);
   const auto instrument = std::ranges::find_if(instrumentSet.instruments, [&](const Instrument& candidate) {
     return resolveInstrumentAddress(candidate.explicitAddress, candidate.identity) == address;
   });
@@ -195,10 +171,11 @@ void dynamicEnvelopeMaterializationIsIncrementalAndDeduplicated() {
 
 void dynamicEnvelopeInstrumentSelectionControlsOverrideCarry() {
   std::vector<InstrumentSetAsset> sets{InstrumentSetAsset{
-      .instruments = {
-          testInstrument(0, Envelope{.attackSeconds = 1.0}),
-          testInstrument(1, Envelope{.attackSeconds = 2.0}),
-      },
+      .instruments =
+          {
+              testInstrument(0, Envelope{.attackSeconds = 1.0}),
+              testInstrument(1, Envelope{.attackSeconds = 2.0}),
+          },
   }};
   auto performance = sequenceWithEvents({
       InstrumentPerformanceEvent{
@@ -244,10 +221,14 @@ void dynamicEnvelopeInstrumentSelectionControlsOverrideCarry() {
 
   const auto materialized = materializeDynamicEnvelopes(performance, sets);
   const size_t first = selectedInstrumentForNote(materialized, PerformanceNoteId{1}, sets[0]);
-  const size_t reset = selectedInstrumentForNote(materialized, PerformanceNoteId{2}, sets[0]);
   const size_t preserved = selectedInstrumentForNote(materialized, PerformanceNoteId{3}, sets[0]);
   expect(first >= 2, "a dynamic override should materialize a variant before an instrument change");
-  expect(reset == 1, "ordinary instrument selection should use the new instrument's native envelope");
+  expect(std::ranges::none_of(materialized.performance.tracks[0].events,
+                              [](const PerformanceEvent& event) {
+                                const auto* note = std::get_if<NotePerformanceEvent>(&event);
+                                return note != nullptr && note->note == PerformanceNoteId{2} && note->instrumentAddress;
+                              }),
+         "ordinary instrument selection should use the new instrument's native envelope without an override");
   expect(preserved >= 2 && sets[0].instruments[preserved].regions[0].envelope.attackSeconds == 0.2,
          "an explicit preserve transition should carry the dynamic override to the selected instrument");
 }
@@ -347,6 +328,12 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero() {
          "the first fresh note should select the generated logical bank");
   expect(std::ranges::find(banks, std::pair<u64, u16>{10, 0}) != banks.end(),
          "restoring the base envelope should explicitly return MIDI to bank zero");
+  expect(std::ranges::any_of(midi.tracks[0].events,
+                             [](const MidiEvent& event) {
+                               const auto* program = std::get_if<ProgramChange>(&event);
+                               return program != nullptr && program->tick == 10 && program->program == 0;
+                             }),
+         "a bank change should reselect the program even when its number is unchanged");
   expect(std::ranges::none_of(banks, [](const auto& bank) { return bank.first == 4; }),
          "a tied extension should not reselect its instrument");
 }

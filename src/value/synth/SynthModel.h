@@ -76,29 +76,6 @@ struct Region {
   InstrumentModulation modulation;
 };
 
-struct InstrumentAddress {
-  u32 bank = 0;
-  u32 program = 0;
-
-  friend bool operator==(const InstrumentAddress&, const InstrumentAddress&) noexcept = default;
-};
-
-// Export addresses are explicit policy when a format needs a particular bank;
-// otherwise a source identity receives a stable sequential 128-program address.
-// Every target uses this function so identity and address can never disagree.
-[[nodiscard]] inline InstrumentAddress resolveInstrumentAddress(
-    const std::optional<InstrumentAddress>& explicitAddress,
-    const std::optional<InstrumentIdentity>& identity) noexcept {
-  if (explicitAddress) {
-    return *explicitAddress;
-  }
-  const u32 sequentialKey = identity ? identity->key : 0;
-  return InstrumentAddress{
-      .bank = sequentialKey >> 7,
-      .program = sequentialKey & 0x7f,
-  };
-}
-
 struct Instrument {
   std::optional<InstrumentAddress> explicitAddress;
   std::optional<InstrumentIdentity> identity;

@@ -390,16 +390,16 @@ void akaoSnesV3DynamicAdsrUsesAttackAndHeldNoteDecay() {
   expect(envelopes.size() == 3, "FF5 ADSR attack, sustain rate, and default should emit envelope state");
 
   expect(envelopes[0]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
-             envelopes[0]->update.setFields == EnvelopeFields::Attack &&
+             envelopes[0]->update.fields == EnvelopeFields::Attack &&
              envelopes[0]->update.values == Envelope{.attackSeconds = snesDspAdsrAttackSeconds(15)},
          "FF5 ADSR attack should update only the attack stage");
 
   expect(envelopes[1]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
-             envelopes[1]->update.setFields == EnvelopeFields::SecondDecay &&
+             envelopes[1]->update.fields == EnvelopeFields::SecondDecay &&
              envelopes[1]->update.values == Envelope{.secondDecaySeconds = snesDspAdsrSustainSeconds(5)},
          "FF5 ADSR sustain rate should control held-note decay rather than note-off release");
   expect(envelopes[2]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
-             envelopes[2]->update.inheritFields == EnvelopeFields::All,
+             !envelopes[2]->update.values && envelopes[2]->update.fields == EnvelopeFields::All,
          "FF5 ADSR default should restore the instrument envelope for active and future voices");
 
   std::vector<u8> sd2Bytes(0x40, 0xf2);
@@ -407,9 +407,9 @@ void akaoSnesV3DynamicAdsrUsesAttackAndHeldNoteDecay() {
   const AkaoSnesProfile sd2{.version = AKAOSNES_V3, .minorVersion = AKAOSNES_V3_SD2};
   const PerformanceSequence sd2Performance = renderTracks(sd2, {decodeTrack(sd2Bytes, sd2, start, start + 6)});
   const auto sd2Envelopes = eventsOfType<EnvelopePerformanceEvent>(sd2Performance.tracks.front());
-  expect(sd2Envelopes.size() == 1 && sd2Envelopes[0]->update.setFields == EnvelopeFields::SecondDecay &&
-             sd2Envelopes[0]->update.values.secondDecaySeconds &&
-             std::isinf(*sd2Envelopes[0]->update.values.secondDecaySeconds),
+  expect(sd2Envelopes.size() == 1 && sd2Envelopes[0]->update.fields == EnvelopeFields::SecondDecay &&
+             sd2Envelopes[0]->update.values && sd2Envelopes[0]->update.values->secondDecaySeconds &&
+             std::isinf(*sd2Envelopes[0]->update.values->secondDecaySeconds),
          "Secret of Mana EE 00 should disable held-note decay");
 }
 

@@ -7,11 +7,11 @@
 #include "value/export/DynamicEnvelope.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <set>
 #include <string>
-#include <tuple>
 #include <unordered_map>
 #include <utility>
 
@@ -24,106 +24,79 @@ struct EnvelopeOverride {
   EnvelopeFields fields = EnvelopeFields::None;
 };
 
-struct PreparedInstrumentRef {
+struct InstrumentRef {
   u32 set = invalidIdValue;
-  u32 instrument = invalidIdValue;
+  const Instrument* instrument = nullptr;
 
-  friend bool operator==(const PreparedInstrumentRef&, const PreparedInstrumentRef&) noexcept = default;
+  friend bool operator==(const InstrumentRef&, const InstrumentRef&) noexcept = default;
 };
 
-template <typename Member>
-void copyEnvelopeField(Envelope& destination, const Envelope& source, Member member, EnvelopeFields fields,
-                       EnvelopeFields field) {
-  if (hasEnvelopeField(fields, field)) {
-    destination.*member = source.*member;
-  }
-}
+using EnvelopeMember = std::optional<double> Envelope::*;
+
+struct EnvelopeField {
+  EnvelopeFields field;
+  EnvelopeMember member;
+};
+
+constexpr std::array envelopeFields{
+    EnvelopeField{EnvelopeFields::Attack, &Envelope::attackSeconds},
+    EnvelopeField{EnvelopeFields::Hold, &Envelope::holdSeconds},
+    EnvelopeField{EnvelopeFields::Decay, &Envelope::decaySeconds},
+    EnvelopeField{EnvelopeFields::SecondDecay, &Envelope::secondDecaySeconds},
+    EnvelopeField{EnvelopeFields::Release, &Envelope::releaseSeconds},
+    EnvelopeField{EnvelopeFields::Sustain, &Envelope::sustainAmplitude},
+};
 
 void applyEnvelopeUpdate(EnvelopeOverride& state, const EnvelopeUpdate& update) {
-  const auto inherit = [&](auto member, EnvelopeFields field) {
-    if (hasEnvelopeField(update.inheritFields, field)) {
-      state.fields = static_cast<EnvelopeFields>(static_cast<u8>(state.fields) & ~static_cast<u8>(field));
-      state.values.*member = std::nullopt;
+  if (!update.values) {
+    state.fields = static_cast<EnvelopeFields>(static_cast<u8>(state.fields) & ~static_cast<u8>(update.fields));
+    return;
+  }
+  for (const auto [field, member] : envelopeFields) {
+    if (hasEnvelopeField(update.fields, field)) {
+      state.values.*member = (*update.values).*member;
     }
-  };
-  const auto set = [&](auto member, EnvelopeFields field) {
-    if (hasEnvelopeField(update.setFields, field)) {
-      state.fields |= field;
-      state.values.*member = update.values.*member;
-    }
-  };
-
-  inherit(&Envelope::attackSeconds, EnvelopeFields::Attack);
-  inherit(&Envelope::holdSeconds, EnvelopeFields::Hold);
-  inherit(&Envelope::decaySeconds, EnvelopeFields::Decay);
-  inherit(&Envelope::secondDecaySeconds, EnvelopeFields::SecondDecay);
-  inherit(&Envelope::releaseSeconds, EnvelopeFields::Release);
-  inherit(&Envelope::sustainAmplitude, EnvelopeFields::Sustain);
-  set(&Envelope::attackSeconds, EnvelopeFields::Attack);
-  set(&Envelope::holdSeconds, EnvelopeFields::Hold);
-  set(&Envelope::decaySeconds, EnvelopeFields::Decay);
-  set(&Envelope::secondDecaySeconds, EnvelopeFields::SecondDecay);
-  set(&Envelope::releaseSeconds, EnvelopeFields::Release);
-  set(&Envelope::sustainAmplitude, EnvelopeFields::Sustain);
+  }
+  state.fields |= update.fields;
 }
 
 [[nodiscard]] Envelope applyEnvelopeOverride(Envelope envelope, const EnvelopeOverride& state) {
-  copyEnvelopeField(envelope, state.values, &Envelope::attackSeconds, state.fields, EnvelopeFields::Attack);
-  copyEnvelopeField(envelope, state.values, &Envelope::holdSeconds, state.fields, EnvelopeFields::Hold);
-  copyEnvelopeField(envelope, state.values, &Envelope::decaySeconds, state.fields, EnvelopeFields::Decay);
-  copyEnvelopeField(envelope, state.values, &Envelope::secondDecaySeconds, state.fields, EnvelopeFields::SecondDecay);
-  copyEnvelopeField(envelope, state.values, &Envelope::releaseSeconds, state.fields, EnvelopeFields::Release);
-  copyEnvelopeField(envelope, state.values, &Envelope::sustainAmplitude, state.fields, EnvelopeFields::Sustain);
+  for (const auto [field, member] : envelopeFields) {
+    if (hasEnvelopeField(state.fields, field)) {
+      envelope.*member = state.values.*member;
+    }
+  }
   return envelope;
-}
-
-[[nodiscard]] bool validDuration(const std::optional<double>& value) {
-  return !value || (!std::isnan(*value) && *value >= 0.0);
 }
 
 [[nodiscard]] bool validEnvelopeUpdate(const EnvelopeUpdate& update) {
   constexpr u8 knownFields = static_cast<u8>(EnvelopeFields::All);
-  const u8 setFields = static_cast<u8>(update.setFields);
-  const u8 inheritFields = static_cast<u8>(update.inheritFields);
-  if ((setFields & inheritFields) != 0 || ((setFields | inheritFields) & ~knownFields) != 0) {
-    return false;
+  if ((static_cast<u8>(update.fields) & ~knownFields) != 0 || !update.values) {
+    return (static_cast<u8>(update.fields) & ~knownFields) == 0;
   }
-  if (hasEnvelopeField(update.setFields, EnvelopeFields::Attack) && !validDuration(update.values.attackSeconds)) {
-    return false;
-  }
-  if (hasEnvelopeField(update.setFields, EnvelopeFields::Hold) && !validDuration(update.values.holdSeconds)) {
-    return false;
-  }
-  if (hasEnvelopeField(update.setFields, EnvelopeFields::Decay) && !validDuration(update.values.decaySeconds)) {
-    return false;
-  }
-  if (hasEnvelopeField(update.setFields, EnvelopeFields::SecondDecay) &&
-      !validDuration(update.values.secondDecaySeconds)) {
-    return false;
-  }
-  if (hasEnvelopeField(update.setFields, EnvelopeFields::Release) && !validDuration(update.values.releaseSeconds)) {
-    return false;
-  }
-  if (hasEnvelopeField(update.setFields, EnvelopeFields::Sustain)) {
-    const auto sustain = update.values.sustainAmplitude;
-    if (sustain && (!std::isfinite(*sustain) || *sustain < 0.0 || *sustain > 1.0)) {
+  for (const auto [field, member] : envelopeFields) {
+    if (!hasEnvelopeField(update.fields, field)) {
+      continue;
+    }
+    const auto value = update.values.value().*member;
+    if (field == EnvelopeFields::Sustain) {
+      if (value && (!std::isfinite(*value) || *value < 0.0 || *value > 1.0)) {
+        return false;
+      }
+    } else if (value && (std::isnan(*value) || *value < 0.0)) {
       return false;
     }
   }
   return true;
 }
 
-[[nodiscard]] Diagnostic envelopeWarning(std::string code, std::string message,
-                                         const PerformanceEventHeader* header = nullptr) {
-  Diagnostic diagnostic{
+[[nodiscard]] Diagnostic envelopeWarning(std::string code, std::string message, const PerformanceEventHeader& header) {
+  return Diagnostic{
       .severity = Severity::Warning,
       .code = std::move(code),
       .message = std::move(message),
+      .annotation = header.sourceAnnotation.valid() ? std::optional{header.sourceAnnotation} : std::nullopt,
   };
-  if (header != nullptr && header->sourceAnnotation.valid()) {
-    diagnostic.annotation = header->sourceAnnotation;
-  }
-  return diagnostic;
 }
 
 [[nodiscard]] u64 warningSourceKey(const PerformanceEventHeader& header) noexcept {
@@ -137,31 +110,33 @@ void applyEnvelopeUpdate(EnvelopeOverride& state, const EnvelopeUpdate& update) 
 }
 
 template <typename Predicate>
-[[nodiscard]] std::optional<PreparedInstrumentRef> findInstrument(std::span<const InstrumentSetAsset> instrumentSets,
-                                                                  Predicate matches) {
+[[nodiscard]] std::optional<InstrumentRef> findInstrument(std::span<const InstrumentSetAsset> instrumentSets,
+                                                          Predicate matches) {
   for (u32 setIndex = 0; setIndex < instrumentSets.size(); ++setIndex) {
-    const auto& instruments = instrumentSets[setIndex].instruments;
-    for (u32 instrumentIndex = 0; instrumentIndex < instruments.size(); ++instrumentIndex) {
-      if (matches(instruments[instrumentIndex])) {
-        return PreparedInstrumentRef{.set = setIndex, .instrument = instrumentIndex};
+    for (const auto& instrument : instrumentSets[setIndex].instruments) {
+      if (matches(instrument)) {
+        return InstrumentRef{.set = setIndex, .instrument = &instrument};
       }
     }
   }
   return std::nullopt;
 }
 
-[[nodiscard]] std::optional<PreparedInstrumentRef> resolveInstrument(const InstrumentPerformanceEvent& selection,
-                                                                     std::span<const InstrumentSetAsset> instrumentSets) {
+[[nodiscard]] InstrumentAddress instrumentAddress(InstrumentRef ref) {
+  return resolveInstrumentAddress(ref.instrument->explicitAddress, ref.instrument->identity);
+}
+
+[[nodiscard]] std::optional<InstrumentRef> resolveSelection(const InstrumentPerformanceEvent& selection,
+                                                            std::span<const InstrumentSetAsset> instrumentSets) {
   if (selection.sourceInstrument) {
-    if (const auto exact = findInstrument(instrumentSets, [&](const Instrument& instrument) {
+    if (auto resolved = findInstrument(instrumentSets, [&](const Instrument& instrument) {
           return instrument.identity && *instrument.identity == *selection.sourceInstrument;
         })) {
-      return exact;
+      return resolved;
     }
-
-    const auto fallbackAddress = resolveInstrumentAddress({}, selection.sourceInstrument);
+    const auto fallback = resolveInstrumentAddress({}, selection.sourceInstrument);
     return findInstrument(instrumentSets, [&](const Instrument& instrument) {
-      return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == fallbackAddress;
+      return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == fallback;
     });
   }
 
@@ -170,26 +145,6 @@ template <typename Predicate>
     return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == address;
   });
 }
-
-[[nodiscard]] InstrumentAddress preparedInstrumentAddress(PreparedInstrumentRef ref,
-                                                          std::span<const InstrumentSetAsset> instrumentSets) {
-  const auto& instrument = instrumentSets[ref.set].instruments[ref.instrument];
-  return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
-}
-
-[[nodiscard]] InstrumentAddress selectionAddress(const InstrumentPerformanceEvent& selection,
-                                                 std::optional<PreparedInstrumentRef> resolved,
-                                                 std::span<const InstrumentSetAsset> instrumentSets) {
-  if (resolved) {
-    return preparedInstrumentAddress(*resolved, instrumentSets);
-  }
-  if (selection.sourceInstrument) {
-    return resolveInstrumentAddress({}, selection.sourceInstrument);
-  }
-  return InstrumentAddress{.bank = selection.bank, .program = selection.program};
-}
-
-using TargetAddress = std::pair<u32, u32>;
 
 class AddressAllocator {
 public:
@@ -241,25 +196,23 @@ private:
     }
   }
 
-  std::set<TargetAddress> used_;
+  std::set<std::pair<u32, u32>> used_;
 };
 
 struct VariantRecord {
-  PreparedInstrumentRef base;
-  std::vector<Envelope> envelopes;
-  PreparedInstrumentRef variant;
+  InstrumentRef base;
+  InstrumentAddress address;
+  Instrument instrument;
 };
 
-[[nodiscard]] std::optional<PreparedInstrumentRef> findVariant(std::span<const VariantRecord> variants,
-                                                               PreparedInstrumentRef base,
-                                                               std::span<const Envelope> envelopes) {
+[[nodiscard]] const VariantRecord* findVariant(std::span<const VariantRecord> variants, InstrumentRef base,
+                                               const Instrument& candidate) {
   const auto found = std::ranges::find_if(variants, [&](const VariantRecord& variant) {
-    return variant.base == base && std::ranges::equal(variant.envelopes, envelopes);
+    return variant.base == base &&
+           std::ranges::equal(variant.instrument.regions, candidate.regions,
+                              [](const Region& left, const Region& right) { return left.envelope == right.envelope; });
   });
-  if (found == variants.end()) {
-    return std::nullopt;
-  }
-  return found->variant;
+  return found == variants.end() ? nullptr : &*found;
 }
 
 }  // namespace
@@ -272,41 +225,29 @@ DynamicEnvelopeMaterialization materializeDynamicEnvelopes(const PerformanceSequ
   AddressAllocator addresses{instrumentSets, performance};
   std::vector<VariantRecord> variants;
   std::set<u64> activeVoiceWarnings;
-  std::set<u64> regionlessInstrumentWarnings;
-  std::set<u32> missingInstrumentWarnings;
+  std::set<const Instrument*> regionlessInstrumentWarnings;
 
   for (auto& track : result.performance.tracks) {
-    auto sourceEvents = std::move(track.events);
-    std::ranges::stable_sort(sourceEvents, [](const PerformanceEvent& left, const PerformanceEvent& right) {
-      const auto& leftHeader = performanceEventHeader(left);
-      const auto& rightHeader = performanceEventHeader(right);
-      return std::tie(leftHeader.tick, leftHeader.sequence) < std::tie(rightHeader.tick, rightHeader.sequence);
-    });
-    std::vector<PerformanceEvent> loweredEvents;
-    loweredEvents.reserve(sourceEvents.size());
-
-    InstrumentPerformanceEvent selectedInstrument;
-    InstrumentAddress outputAddress;
+    auto selectedInstrument = resolveSelection({}, instrumentSets);
     std::unordered_map<PerformanceLaneId, EnvelopeOverride> envelopeStates;
     std::unordered_map<PerformanceLaneId, u64> voiceEnds;
+    bool warnedMissingInstrument = false;
+    bool variantSelected = false;
 
-    for (const auto& event : sourceEvents) {
+    for (auto& event : track.events) {
       if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event)) {
-        selectedInstrument = *selection;
-        const auto resolved = resolveInstrument(*selection, instrumentSets);
-        outputAddress = selectionAddress(*selection, resolved, instrumentSets);
+        selectedInstrument = resolveSelection(*selection, instrumentSets);
+        variantSelected = false;
         if (selection->envelopeMode == InstrumentEnvelopeMode::UseInstrumentEnvelope) {
           envelopeStates.clear();
         }
-        loweredEvents.push_back(event);
         continue;
       }
 
       if (const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event)) {
         if (!validEnvelopeUpdate(envelope->update)) {
-          result.diagnostics.push_back(envelopeWarning(
-              "dynamic-envelope-invalid", "Ignored an invalid dynamic envelope update", &envelope->header));
-          loweredEvents.push_back(event);
+          result.diagnostics.push_back(envelopeWarning("dynamic-envelope-invalid",
+                                                       "Ignored an invalid dynamic envelope update", envelope->header));
           continue;
         }
 
@@ -319,18 +260,16 @@ DynamicEnvelopeMaterialization materializeDynamicEnvelopes(const PerformanceSequ
               "dynamic-envelope-active-voice",
               "A dynamic envelope update occurred during a sounding note; instrument variants apply it to "
               "future note attacks only",
-              &envelope->header));
+              envelope->header));
         }
         if (affectsFuture) {
           applyEnvelopeUpdate(envelopeStates[envelope->lane], envelope->update);
         }
-        loweredEvents.push_back(event);
         continue;
       }
 
-      const auto* note = std::get_if<NotePerformanceEvent>(&event);
+      auto* note = std::get_if<NotePerformanceEvent>(&event);
       if (note == nullptr) {
-        loweredEvents.push_back(event);
         continue;
       }
 
@@ -340,91 +279,76 @@ DynamicEnvelopeMaterialization materializeDynamicEnvelopes(const PerformanceSequ
       auto& voiceEnd = voiceEnds[note->lane];
       voiceEnd = note->extendsPrevious ? std::max(voiceEnd, noteEnd) : noteEnd;
       if (note->extendsPrevious) {
-        loweredEvents.push_back(event);
         continue;
       }
 
       const auto state = envelopeStates.find(note->lane);
       const bool hasOverride = state != envelopeStates.end() && state->second.fields != EnvelopeFields::None;
-      const auto baseRef = resolveInstrument(selectedInstrument, instrumentSets);
+      const auto baseRef = selectedInstrument;
       if (!baseRef) {
-        if (hasOverride && missingInstrumentWarnings.insert(track.id.value).second) {
+        if (hasOverride && !warnedMissingInstrument) {
           result.diagnostics.push_back(envelopeWarning(
               "dynamic-envelope-instrument-not-found",
-              "Could not resolve the selected instrument for a dynamic envelope variant", &note->header));
+              "Could not resolve the selected instrument for a dynamic envelope variant", note->header));
+          warnedMissingInstrument = true;
         }
-        loweredEvents.push_back(event);
         continue;
       }
 
-      PreparedInstrumentRef selectedRef = *baseRef;
+      InstrumentAddress selectedAddress = instrumentAddress(*baseRef);
+      bool usesVariant = false;
       if (hasOverride) {
-        const auto& base = instrumentSets[baseRef->set].instruments[baseRef->instrument];
+        const auto& base = *baseRef->instrument;
         if (base.regions.empty()) {
-          const u64 instrumentKey = (static_cast<u64>(baseRef->set) << 32) | baseRef->instrument;
-          if (regionlessInstrumentWarnings.insert(instrumentKey).second) {
+          if (regionlessInstrumentWarnings.insert(&base).second) {
             result.diagnostics.push_back(envelopeWarning(
                 "dynamic-envelope-no-regions",
-                "Could not apply a dynamic envelope to an instrument without sampled regions", &note->header));
+                "Could not apply a dynamic envelope to an instrument without sampled regions", note->header));
           }
         } else {
-          std::vector<Envelope> effectiveEnvelopes;
-          effectiveEnvelopes.reserve(base.regions.size());
+          Instrument variant = base;
           bool differs = false;
-          for (const auto& region : base.regions) {
-            auto effective = applyEnvelopeOverride(region.envelope, state->second);
+          for (auto& region : variant.regions) {
+            const auto effective = applyEnvelopeOverride(region.envelope, state->second);
             differs = differs || effective != region.envelope;
-            effectiveEnvelopes.push_back(std::move(effective));
+            region.envelope = effective;
           }
 
           if (differs) {
-            if (const auto existing = findVariant(variants, *baseRef, effectiveEnvelopes)) {
-              selectedRef = *existing;
+            if (const auto* existing = findVariant(variants, *baseRef, variant)) {
+              selectedAddress = existing->address;
+              usesVariant = true;
             } else if (const auto address = addresses.allocate()) {
-              Instrument variant = base;
               variant.identity.reset();
               variant.explicitAddress = *address;
               variant.name = base.name.empty() ? "Dynamic envelope" : base.name + " [dynamic envelope]";
-              for (size_t region = 0; region < variant.regions.size(); ++region) {
-                variant.regions[region].envelope = effectiveEnvelopes[region];
-              }
-              auto& destination = instrumentSets[baseRef->set].instruments;
-              selectedRef = PreparedInstrumentRef{
-                  .set = baseRef->set,
-                  .instrument = static_cast<u32>(destination.size()),
-              };
-              destination.push_back(std::move(variant));
+              selectedAddress = *address;
+              usesVariant = true;
               variants.push_back(VariantRecord{
                   .base = *baseRef,
-                  .envelopes = std::move(effectiveEnvelopes),
-                  .variant = selectedRef,
+                  .address = *address,
+                  .instrument = std::move(variant),
               });
             } else {
               result.diagnostics.push_back(envelopeWarning(
                   "dynamic-envelope-addresses-exhausted",
                   "Could not allocate another portable bank/program address for a dynamic envelope variant",
-                  &note->header));
+                  note->header));
             }
           }
         }
       }
 
-      const InstrumentAddress selectedAddress = preparedInstrumentAddress(selectedRef, instrumentSets);
-      if (selectedAddress != outputAddress) {
-        loweredEvents.push_back(InstrumentPerformanceEvent{
-            .header = note->header,
-            .bank = selectedAddress.bank,
-            .program = selectedAddress.program,
-            .envelopeMode = InstrumentEnvelopeMode::PreserveDynamicOverride,
-        });
-        outputAddress = selectedAddress;
+      if (usesVariant || variantSelected) {
+        note->instrumentAddress = selectedAddress;
       }
-      loweredEvents.push_back(event);
+      variantSelected = usesVariant;
     }
-
-    track.events = std::move(loweredEvents);
   }
 
+  for (auto& variant : variants) {
+    instrumentSets[variant.base.set].instruments.push_back(std::move(variant.instrument));
+  }
   return result;
 }
 

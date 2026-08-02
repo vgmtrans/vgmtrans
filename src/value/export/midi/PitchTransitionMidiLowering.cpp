@@ -566,6 +566,7 @@ void appendSourceEvents(std::vector<PerformanceEvent>& events, const Performance
           .durationTicks =
               static_cast<u32>(std::min<u64>(segment.endTick - segment.startTick, std::numeric_limits<u32>::max())),
           .extendsPrevious = segment.extendsPrevious,
+          .instrumentAddress = note.source.instrumentAddress,
           .restartsLfoPhase = note.source.restartsLfoPhase,
           .restartsVibratoLfoPhase = note.source.restartsVibratoLfoPhase,
           .restartsTremoloLfoPhase = note.source.restartsTremoloLfoPhase,

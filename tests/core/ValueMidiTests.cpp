@@ -813,16 +813,24 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
   const PerformanceNoteId fixedNoteId = fixedOut.note(64, 1.0, 8);
   fixedOut.pitchSlide(fixedNoteId, 60, 64, PitchSlideTiming::fixedDuration(4, 125.0));
 
-  const PerformanceSequence performance{
+  PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {track, rateTrack, fixedTrack},
   };
+  auto sourceAttack = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<NotePerformanceEvent>(event);
+  });
+  std::get<NotePerformanceEvent>(*sourceAttack).instrumentAddress = InstrumentAddress{.bank = 3, .program = 4};
 
   const MidiSequence native = renderMidiSequence(
       performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PreserveFormat});
   const auto portamentoTime = std::ranges::find_if(
       native.tracks[0].events, [](const MidiEvent& event) { return std::holds_alternative<PortamentoTime14>(event); });
   expect(portamentoTime != native.tracks[0].events.end() && std::get<PortamentoTime14>(*portamentoTime).value == 63 &&
+             std::ranges::any_of(native.tracks[0].events, [](const MidiEvent& event) {
+               const auto* bank = std::get_if<BankSelect>(&event);
+               return bank != nullptr && bank->bank == (3 << 7);
+             }) &&
              std::ranges::any_of(
                  native.tracks[0].events,
                  [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) &&
@@ -854,7 +862,8 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
            lhs.header.tick == rhs.header.tick && lhs.header.sequence == rhs.header.sequence &&
            lhs.header.automation == rhs.header.automation && lhs.key == rhs.key &&
            lhs.linearVelocity == rhs.linearVelocity && lhs.durationTicks == rhs.durationTicks &&
-           lhs.extendsPrevious == rhs.extendsPrevious && lhs.restartsLfoPhase == rhs.restartsLfoPhase &&
+           lhs.extendsPrevious == rhs.extendsPrevious && lhs.instrumentAddress == rhs.instrumentAddress &&
+           lhs.restartsLfoPhase == rhs.restartsLfoPhase &&
            lhs.restartsVibratoLfoPhase == rhs.restartsVibratoLfoPhase &&
            lhs.restartsTremoloLfoPhase == rhs.restartsTremoloLfoPhase &&
            lhs.note == rhs.note && lhs.lane == rhs.lane;
