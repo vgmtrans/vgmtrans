@@ -1483,7 +1483,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
         auto event = cursor.command("Conditional Jump", SequenceSemantic::Jump);
         const Address destination = event.addressLe("destination", SemanticOperandRole::JumpTarget);
         const Address alternate = event.addressLe("alternate_destination", SemanticOperandRole::JumpTarget);
-        event.jump(destination);
+        event.loopCandidate(destination);
         return event.discoverTarget(alternate);
       }
       if (version >= KONAMISNES_V2 && version <= KONAMISNES_V4) {
@@ -1542,6 +1542,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
               .initialPitchBendRangeSemitones = 2,
               .initialTempoMicrosecondsPerQuarter = tempoMicrosecondsPerQuarter(version, kKonamiSnesDefaultTempo),
           },
+      .inferLoopsFromRepeatedState = false,
       .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
   });
 }

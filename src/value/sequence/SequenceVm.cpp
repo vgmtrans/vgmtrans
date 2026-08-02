@@ -573,7 +573,8 @@ private:
     const u32 commandIndex = *current_;
     const SourceCommand& command = track_.commands.at(commandIndex);
     const VisitState visitState = LoopDetector::visitState(commandIndex, runtime_);
-    if (const auto loop = loopDetector_.observe(visitState, command, runtime_, arrivedByControlFlow_)) {
+    const auto loop = loopDetector_.observe(visitState, command, runtime_, arrivedByControlFlow_);
+    if (dialect_.inferLoopsFromRepeatedState && loop) {
       if (handleLoop(*loop, commandIndex, visitState).kind == LoopActionKind::StopTrack) {
         return false;
       }

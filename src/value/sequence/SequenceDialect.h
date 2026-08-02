@@ -50,6 +50,7 @@ struct SequenceDialect {
   std::string commandDetailKindPrefix;
   Timebase timebase;
   SequenceProgramBehavior defaultBehavior;
+  bool inferLoopsFromRepeatedState = true;
   // PreserveFormat uses this default when a transition has no preference of
   // its own; an export request may still override every transition.
   PitchTransitionRenderingHint preferredPitchTransitionRendering = PitchTransitionRenderingHint::Portamento;
