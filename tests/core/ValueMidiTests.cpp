@@ -959,8 +959,9 @@ void performanceMidiRendererRetainsHeldVoiceAcrossChainedPitchBends() {
   u32 nextAutomation = 0;
   PerformanceEmitter out{track, CommandId{1}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
   const PerformanceNoteId first = out.note(60, 1.0, 4);
+  out.pitchSlide(first, 60, 62, 2);
   const PerformanceNoteId second = out.at(4).note(64, 1.0, 4);
-  out.at(4).pitchSlide(second, 60, 64, 4).continueFrom(first);
+  out.at(4).pitchSlide(second, 62, 64, 4).continueFrom(first);
   const PerformanceNoteId third = out.at(8).note(67, 1.0, 4);
   out.at(8).pitchSlide(third, 64, 67, 4).continueFrom(second);
 

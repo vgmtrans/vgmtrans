@@ -50,8 +50,8 @@ enum class PitchBendWriteKind {
   HeldTransition,
 };
 
-// Source bends and same-note transitions set channel pitch. An attack-free
-// transition adds an offset to that pitch until its owning transition ends.
+// Source bends and same-note transitions set channel pitch. Each attack-free
+// transition adds its motion to the offset inherited from the held voice.
 struct PitchBendWrite {
   PitchBendPerformanceEvent bend;
   PitchBendWriteKind kind = PitchBendWriteKind::Source;
@@ -61,6 +61,7 @@ struct PitchBendWrite {
 
 struct PitchBendLayer {
   double semitones = 0.0;
+  double ownerBaseSemitones = 0.0;
   std::optional<PerformanceAutomationId> owner;
 };
 
@@ -235,10 +236,12 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
       if (write.kind == PitchBendWriteKind::AbsoluteTransition) {
         heldVoice = {};
       }
-      layer = PitchBendLayer{
-          .semitones = write.bend.semitones,
-          .owner = write.owner,
-      };
+      const bool relative = write.kind == PitchBendWriteKind::HeldTransition;
+      if (relative && layer.owner != write.owner) {
+        layer.ownerBaseSemitones = layer.semitones;
+      }
+      layer.semitones = (relative ? layer.ownerBaseSemitones : 0.0) + write.bend.semitones;
+      layer.owner = write.owner;
     }
 
     auto bend = write.bend;
@@ -282,8 +285,8 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
   const double noteBaseKey = bendBaseKeyAt(note, note.source.header.tick);
   if (startTick > note.source.header.tick && std::abs(transition.startKey - noteBaseKey) > 0.000001 &&
       !establishedPitchBend(bends, note, transition, startTick)) {
-    bends.push_back(
-        transitionPitchBend(automation, transition, note.source.header.tick, transition.startKey - noteBaseKey));
+    bends.push_back(transitionPitchBend(automation, transition, note.source.header.tick,
+                                        transition.previousNote ? 0.0 : transition.startKey - noteBaseKey));
   }
 
   for (u64 tick = startTick;; ++tick) {
@@ -291,7 +294,7 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
     bends.push_back(transitionPitchBend(
         automation, transition, tick,
         pitchTransitionValueAt(transition, static_cast<u32>(std::min<u64>(elapsed, std::numeric_limits<u32>::max()))) -
-            bendBaseKeyAt(note, tick)));
+            (transition.previousNote ? transition.startKey : bendBaseKeyAt(note, tick))));
     if (tick == endTick) {
       break;
     }
