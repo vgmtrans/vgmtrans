@@ -764,9 +764,8 @@ void akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo() {
              notes[4]->durationTicks == 1 && notes[5]->extendsPrevious,
          "percussion, slur, legato, one-time duration, rest, and tie should preserve their distinct note behavior");
   const auto instruments = eventsOfType<InstrumentPerformanceEvent>(noteModePerformance.tracks.front());
-  expect(instruments.size() == 3 && instruments[0]->program == 5 &&
-             instruments[1]->bank == (kAkaoSnesDrumKitBank << 7) && instruments[2]->bank == 0 &&
-             instruments[2]->program == 5,
+  expect(instruments.size() == 3 && instruments[0]->program == 5 && instruments[1]->bank == kAkaoSnesDrumKitBank &&
+             instruments[2]->bank == 0 && instruments[2]->program == 5,
          "percussion mode should restore the remembered melodic program when it turns off");
 
   const AkaoSnesProfile ff6{.version = AKAOSNES_V4, .minorVersion = AKAOSNES_V4_FF6};

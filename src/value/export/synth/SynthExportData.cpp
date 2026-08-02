@@ -6,7 +6,6 @@
 
 #include "value/export/synth/SynthExportData.h"
 
-#include "value/export/DynamicEnvelope.h"
 #include "value/export/ExportDiagnostics.h"
 #include "value/sequence/PerformanceModel.h"
 #include "value/synth/SampleDecoder.h"
@@ -62,25 +61,13 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::sp
   }
 
   const InstrumentAddress directAddress{.bank = selection.bank, .program = selection.program};
-  if (markMatchingInstruments(used, instruments, [&](const Instrument& instrument) {
-        return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == directAddress;
-      })) {
-    return;
-  }
-
-  // Legacy performance events use MIDI's packed bank, while container
-  // instruments generally retain their logical preset bank.
-  if ((selection.bank & 0x7f) == 0) {
-    const InstrumentAddress logicalAddress{.bank = selection.bank >> 7, .program = selection.program};
-    markMatchingInstruments(used, instruments, [&](const Instrument& instrument) {
-      return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == logicalAddress;
-    });
-  }
+  markMatchingInstruments(used, instruments, [&](const Instrument& instrument) {
+    return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == directAddress;
+  });
 }
 
 [[nodiscard]] SynthInstrumentList selectInstruments(std::span<const InstrumentSetAsset* const> instrumentSets,
-                                                    const PerformanceSequence* sequenceUsage,
-                                                    const SequenceInstrumentPlan* instrumentPlan) {
+                                                    const PerformanceSequence* sequenceUsage) {
   SynthInstrumentList instruments;
   for (const auto* instrumentSet : instrumentSets) {
     if (instrumentSet == nullptr) {
@@ -95,30 +82,6 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::sp
   }
 
   SynthInstrumentList used;
-  if (instrumentPlan != nullptr) {
-    for (u32 setIndex = 0; setIndex < instrumentSets.size(); ++setIndex) {
-      const auto* instrumentSet = instrumentSets[setIndex];
-      if (instrumentSet == nullptr) {
-        continue;
-      }
-      for (u32 instrumentIndex = 0; instrumentIndex < instrumentSet->instruments.size(); ++instrumentIndex) {
-        if (instrumentPlan->uses(PreparedInstrumentRef{
-                .set = setIndex,
-                .instrument = instrumentIndex,
-            })) {
-          used.push_back(&instrumentSet->instruments[instrumentIndex]);
-        }
-      }
-    }
-    if (instrumentPlan->complete()) {
-      std::erase_if(instruments,
-                    [&](const Instrument* instrument) { return std::ranges::find(used, instrument) == used.end(); });
-      return instruments;
-    }
-  }
-
-  // An incomplete plan means at least one source selection could not be
-  // resolved. Union exact assignments with the legacy address replay.
   for (const auto& track : sequenceUsage->tracks) {
     // A track uses bank/program zero until its first instrument change.
     InstrumentPerformanceEvent selection;
@@ -336,7 +299,7 @@ Envelope approximateEnvelopeAsAdsr(Envelope envelope) {
 PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceStore& sources,
                                    const SynthSampleDecodeOptions& options) {
   PreparedSynthData prepared;
-  const auto instruments = selectInstruments(input.instrumentSets, input.sequenceUsage, input.instrumentPlan);
+  const auto instruments = selectInstruments(input.instrumentSets, input.sequenceUsage);
   std::optional<SynthSampleIndexList> sampleFilter;
   if (input.sequenceUsage != nullptr) {
     sampleFilter = referencedSamples(instruments, input.sampleCollections);

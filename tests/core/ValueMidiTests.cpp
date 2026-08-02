@@ -508,8 +508,9 @@ void performanceMidiRendererHonorsMidiExportOptions() {
   const MidiSequence autoMidi = renderMidiSequence(performance);
   expect(std::get<MidiPort>(autoMidi.tracks[0].events[0]).port == 0,
          "MIDI renderer should emit port zero for the first channel group");
-  expect(std::get<BankSelect>(autoMidi.tracks[0].events[1]).writeLsb == false,
-         "MIDI renderer should default to MSB-only bank select");
+  expect(std::get<BankSelect>(autoMidi.tracks[0].events[1]).bank == (2 << 7) &&
+             !std::get<BankSelect>(autoMidi.tracks[0].events[1]).writeLsb,
+         "MIDI renderer should lower logical banks to MSB-only bank select by default");
   expect(std::holds_alternative<Volume14>(autoMidi.tracks[0].events[3]),
          "MIDI renderer should honor 14-bit source volume hints by default");
   expect(std::holds_alternative<Expression14>(autoMidi.tracks[0].events[4]),
@@ -527,8 +528,9 @@ void performanceMidiRendererHonorsMidiExportOptions() {
                                           .skipChannel10 = false,
                                           .bankSelectStyle = MidiBankSelectStyle::MsbAndLsb,
                                       });
-  expect(std::get<BankSelect>(forcedMidi.tracks[0].events[1]).writeLsb == true,
-         "MIDI renderer should allow bank-select LSB output");
+  expect(std::get<BankSelect>(forcedMidi.tracks[0].events[1]).bank == 130 &&
+             std::get<BankSelect>(forcedMidi.tracks[0].events[1]).writeLsb,
+         "MIDI renderer should lower logical banks to combined MSB/LSB output when requested");
   expect(std::holds_alternative<Volume>(forcedMidi.tracks[0].events[3]),
          "MIDI renderer should allow forced 7-bit volume output");
   expect(std::holds_alternative<Expression>(forcedMidi.tracks[0].events[4]),

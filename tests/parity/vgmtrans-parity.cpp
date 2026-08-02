@@ -4036,7 +4036,7 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
       if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
         ++stats.noteEvents;
         stats.lastNoteTick = std::max(stats.lastNoteTick, note->header.tick);
-        if (instrument.bank == (0x7f << 7) && instrument.program == 0) {
+        if (instrument.bank == 0x7f && instrument.program == 0) {
           ++stats.drumBankNoteEvents;
           if (stats.drumBankNoteEvents == 1) {
             stats.firstDrumBankNoteTick = note->header.tick;
@@ -4055,7 +4055,7 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
         const InstrumentAddress address = resolveInstrumentAddress(explicitAddress, instrumentEvent->sourceInstrument);
         instrument.bank = address.bank;
         instrument.program = address.program;
-        if (instrument.bank == (0x7f << 7) && instrument.program == 0) {
+        if (instrument.bank == 0x7f && instrument.program == 0) {
           ++stats.drumBankInstrumentEvents;
         } else {
           ++stats.melodicInstrumentEvents;

@@ -395,7 +395,7 @@ struct Playback {
       return;
     }
     track.zeroReleaseVoiceActive = false;
-    out.envelope(
+    out.updateEnvelope(
         Envelope{.releaseSeconds = releaseSeconds(rate, nmiRateHertz, sequence.channelTempos[track.sourceTrackNumber])},
         EnvelopeFields::Release, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }

@@ -15,7 +15,6 @@
 
 namespace vgmtrans::core {
 
-class SequenceInstrumentPlan;
 struct SequenceModulationProfile;
 
 // Converts SequenceVm output into MIDI events. This is where parsed performance
@@ -24,7 +23,6 @@ struct SequenceModulationProfile;
     const PerformanceSequence& performance, MidiExportOptions options = {},
     ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators,
     std::span<const InstrumentSetAsset* const> instrumentSets = {},
-    const SequenceModulationProfile* modulationProfile = nullptr,
-    const SequenceInstrumentPlan* instrumentPlan = nullptr);
+    const SequenceModulationProfile* modulationProfile = nullptr);
 
 }  // namespace vgmtrans::core

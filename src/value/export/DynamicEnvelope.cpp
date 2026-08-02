@@ -19,13 +19,16 @@ namespace vgmtrans::core {
 
 namespace {
 
-[[nodiscard]] u64 assignmentKey(TrackId track, PerformanceNoteId note) noexcept {
-  return (static_cast<u64>(track.value) << 32) | note.value;
-}
-
 struct EnvelopeOverride {
   Envelope values;
   EnvelopeFields fields = EnvelopeFields::None;
+};
+
+struct PreparedInstrumentRef {
+  u32 set = invalidIdValue;
+  u32 instrument = invalidIdValue;
+
+  friend bool operator==(const PreparedInstrumentRef&, const PreparedInstrumentRef&) noexcept = default;
 };
 
 template <typename Member>
@@ -134,7 +137,7 @@ void applyEnvelopeUpdate(EnvelopeOverride& state, const EnvelopeUpdate& update) 
 }
 
 template <typename Predicate>
-[[nodiscard]] std::optional<PreparedInstrumentRef> findInstrument(std::span<InstrumentSetAsset> instrumentSets,
+[[nodiscard]] std::optional<PreparedInstrumentRef> findInstrument(std::span<const InstrumentSetAsset> instrumentSets,
                                                                   Predicate matches) {
   for (u32 setIndex = 0; setIndex < instrumentSets.size(); ++setIndex) {
     const auto& instruments = instrumentSets[setIndex].instruments;
@@ -148,7 +151,7 @@ template <typename Predicate>
 }
 
 [[nodiscard]] std::optional<PreparedInstrumentRef> resolveInstrument(const InstrumentPerformanceEvent& selection,
-                                                                     std::span<InstrumentSetAsset> instrumentSets) {
+                                                                     std::span<const InstrumentSetAsset> instrumentSets) {
   if (selection.sourceInstrument) {
     if (const auto exact = findInstrument(instrumentSets, [&](const Instrument& instrument) {
           return instrument.identity && *instrument.identity == *selection.sourceInstrument;
@@ -162,30 +165,28 @@ template <typename Predicate>
     });
   }
 
-  const InstrumentAddress direct{.bank = selection.bank, .program = selection.program};
-  if (const auto exact = findInstrument(instrumentSets, [&](const Instrument& instrument) {
-        return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == direct;
-      })) {
-    return exact;
-  }
-
-  if ((selection.bank & 0x7f) != 0) {
-    return std::nullopt;
-  }
-  const InstrumentAddress logical{.bank = selection.bank >> 7, .program = selection.program};
+  const InstrumentAddress address{.bank = selection.bank, .program = selection.program};
   return findInstrument(instrumentSets, [&](const Instrument& instrument) {
-    return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == logical;
+    return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == address;
   });
 }
 
-[[nodiscard]] PlannedInstrumentSelection plannedSelection(PreparedInstrumentRef ref,
-                                                          std::span<InstrumentSetAsset> instrumentSets) {
+[[nodiscard]] InstrumentAddress preparedInstrumentAddress(PreparedInstrumentRef ref,
+                                                          std::span<const InstrumentSetAsset> instrumentSets) {
   const auto& instrument = instrumentSets[ref.set].instruments[ref.instrument];
-  return PlannedInstrumentSelection{
-      .instrument = ref,
-      .address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity),
-      .pitchBendRangeCents = instrument.pitchBendRangeCents,
-  };
+  return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
+}
+
+[[nodiscard]] InstrumentAddress selectionAddress(const InstrumentPerformanceEvent& selection,
+                                                 std::optional<PreparedInstrumentRef> resolved,
+                                                 std::span<const InstrumentSetAsset> instrumentSets) {
+  if (resolved) {
+    return preparedInstrumentAddress(*resolved, instrumentSets);
+  }
+  if (selection.sourceInstrument) {
+    return resolveInstrumentAddress({}, selection.sourceInstrument);
+  }
+  return InstrumentAddress{.bank = selection.bank, .program = selection.program};
 }
 
 using TargetAddress = std::pair<u32, u32>;
@@ -211,12 +212,6 @@ public:
               .bank = selection->bank,
               .program = selection->program,
           });
-          if ((selection->bank & 0x7f) == 0) {
-            reserve(InstrumentAddress{
-                .bank = selection->bank >> 7,
-                .program = selection->program,
-            });
-          }
         }
       }
     }
@@ -267,81 +262,51 @@ struct VariantRecord {
   return found->variant;
 }
 
-[[nodiscard]] std::vector<const PerformanceEvent*> sortedTrackEvents(const PerformanceTrack& track) {
-  std::vector<const PerformanceEvent*> events;
-  events.reserve(track.events.size());
-  for (const auto& event : track.events) {
-    events.push_back(&event);
-  }
-  std::ranges::stable_sort(events, [](const PerformanceEvent* left, const PerformanceEvent* right) {
-    const auto& leftHeader = performanceEventHeader(*left);
-    const auto& rightHeader = performanceEventHeader(*right);
-    return std::tie(leftHeader.tick, leftHeader.sequence) < std::tie(rightHeader.tick, rightHeader.sequence);
-  });
-  return events;
-}
-
 }  // namespace
-
-const PlannedInstrumentSelection* SequenceInstrumentPlan::selectionFor(TrackId track, PerformanceNoteId note) const {
-  const auto found = indexes_.find(assignmentKey(track, note));
-  if (found == indexes_.end()) {
-    return nullptr;
-  }
-  return &assignments_[found->second].selection;
-}
-
-std::span<const NoteInstrumentAssignment> SequenceInstrumentPlan::assignments() const noexcept {
-  return assignments_;
-}
-
-bool SequenceInstrumentPlan::uses(PreparedInstrumentRef instrument) const {
-  return std::ranges::any_of(assignments_, [&](const NoteInstrumentAssignment& assignment) {
-    return assignment.selection.instrument == instrument;
-  });
-}
-
-bool SequenceInstrumentPlan::complete() const noexcept {
-  return complete_;
-}
-
-void SequenceInstrumentPlan::assign(NoteInstrumentAssignment assignment) {
-  const u64 key = assignmentKey(assignment.track, assignment.note);
-  if (const auto found = indexes_.find(key); found != indexes_.end()) {
-    assignments_[found->second] = std::move(assignment);
-    return;
-  }
-  indexes_.emplace(key, assignments_.size());
-  assignments_.push_back(std::move(assignment));
-}
 
 DynamicEnvelopeMaterialization materializeDynamicEnvelopes(const PerformanceSequence& performance,
                                                            std::span<InstrumentSetAsset> instrumentSets) {
-  DynamicEnvelopeMaterialization result;
+  DynamicEnvelopeMaterialization result{
+      .performance = performance,
+  };
   AddressAllocator addresses{instrumentSets, performance};
   std::vector<VariantRecord> variants;
   std::set<u64> activeVoiceWarnings;
   std::set<u64> regionlessInstrumentWarnings;
   std::set<u32> missingInstrumentWarnings;
 
-  for (const auto& track : performance.tracks) {
+  for (auto& track : result.performance.tracks) {
+    auto sourceEvents = std::move(track.events);
+    std::ranges::stable_sort(sourceEvents, [](const PerformanceEvent& left, const PerformanceEvent& right) {
+      const auto& leftHeader = performanceEventHeader(left);
+      const auto& rightHeader = performanceEventHeader(right);
+      return std::tie(leftHeader.tick, leftHeader.sequence) < std::tie(rightHeader.tick, rightHeader.sequence);
+    });
+    std::vector<PerformanceEvent> loweredEvents;
+    loweredEvents.reserve(sourceEvents.size());
+
     InstrumentPerformanceEvent selectedInstrument;
+    InstrumentAddress outputAddress;
     std::unordered_map<PerformanceLaneId, EnvelopeOverride> envelopeStates;
     std::unordered_map<PerformanceLaneId, u64> voiceEnds;
 
-    for (const auto* event : sortedTrackEvents(track)) {
-      if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(event)) {
+    for (const auto& event : sourceEvents) {
+      if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event)) {
         selectedInstrument = *selection;
+        const auto resolved = resolveInstrument(*selection, instrumentSets);
+        outputAddress = selectionAddress(*selection, resolved, instrumentSets);
         if (selection->envelopeMode == InstrumentEnvelopeMode::UseInstrumentEnvelope) {
           envelopeStates.clear();
         }
+        loweredEvents.push_back(event);
         continue;
       }
 
-      if (const auto* envelope = std::get_if<EnvelopePerformanceEvent>(event)) {
+      if (const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event)) {
         if (!validEnvelopeUpdate(envelope->update)) {
           result.diagnostics.push_back(envelopeWarning(
               "dynamic-envelope-invalid", "Ignored an invalid dynamic envelope update", &envelope->header));
+          loweredEvents.push_back(event);
           continue;
         }
 
@@ -359,19 +324,23 @@ DynamicEnvelopeMaterialization materializeDynamicEnvelopes(const PerformanceSequ
         if (affectsFuture) {
           applyEnvelopeUpdate(envelopeStates[envelope->lane], envelope->update);
         }
+        loweredEvents.push_back(event);
         continue;
       }
 
-      const auto* note = std::get_if<NotePerformanceEvent>(event);
+      const auto* note = std::get_if<NotePerformanceEvent>(&event);
       if (note == nullptr) {
+        loweredEvents.push_back(event);
         continue;
       }
+
       const u64 noteEnd = note->header.tick > std::numeric_limits<u64>::max() - note->durationTicks
                               ? std::numeric_limits<u64>::max()
                               : note->header.tick + note->durationTicks;
       auto& voiceEnd = voiceEnds[note->lane];
       voiceEnd = note->extendsPrevious ? std::max(voiceEnd, noteEnd) : noteEnd;
       if (note->extendsPrevious) {
+        loweredEvents.push_back(event);
         continue;
       }
 
@@ -379,12 +348,12 @@ DynamicEnvelopeMaterialization materializeDynamicEnvelopes(const PerformanceSequ
       const bool hasOverride = state != envelopeStates.end() && state->second.fields != EnvelopeFields::None;
       const auto baseRef = resolveInstrument(selectedInstrument, instrumentSets);
       if (!baseRef) {
-        result.instruments.complete_ = false;
         if (hasOverride && missingInstrumentWarnings.insert(track.id.value).second) {
           result.diagnostics.push_back(envelopeWarning(
               "dynamic-envelope-instrument-not-found",
               "Could not resolve the selected instrument for a dynamic envelope variant", &note->header));
         }
+        loweredEvents.push_back(event);
         continue;
       }
 
@@ -409,48 +378,51 @@ DynamicEnvelopeMaterialization materializeDynamicEnvelopes(const PerformanceSequ
           }
 
           if (differs) {
-            selectedRef = findVariant(variants, *baseRef, effectiveEnvelopes).value_or(PreparedInstrumentRef{});
-            if (!selectedRef.valid()) {
-              const auto address = addresses.allocate();
-              if (!address) {
-                result.instruments.complete_ = false;
-                result.diagnostics.push_back(envelopeWarning(
-                    "dynamic-envelope-addresses-exhausted",
-                    "Could not allocate another portable bank/program address for a dynamic envelope variant",
-                    &note->header));
-                selectedRef = *baseRef;
-              } else {
-                Instrument variant = base;
-                variant.identity.reset();
-                variant.explicitAddress = *address;
-                variant.name = base.name.empty() ? "Dynamic envelope" : base.name + " [dynamic envelope]";
-                for (size_t region = 0; region < variant.regions.size(); ++region) {
-                  variant.regions[region].envelope = effectiveEnvelopes[region];
-                }
-                auto& destination = instrumentSets[baseRef->set].instruments;
-                selectedRef = PreparedInstrumentRef{
-                    .set = baseRef->set,
-                    .instrument = static_cast<u32>(destination.size()),
-                };
-                destination.push_back(std::move(variant));
-                variants.push_back(VariantRecord{
-                    .base = *baseRef,
-                    .envelopes = std::move(effectiveEnvelopes),
-                    .variant = selectedRef,
-                });
-                ++result.variantCount;
+            if (const auto existing = findVariant(variants, *baseRef, effectiveEnvelopes)) {
+              selectedRef = *existing;
+            } else if (const auto address = addresses.allocate()) {
+              Instrument variant = base;
+              variant.identity.reset();
+              variant.explicitAddress = *address;
+              variant.name = base.name.empty() ? "Dynamic envelope" : base.name + " [dynamic envelope]";
+              for (size_t region = 0; region < variant.regions.size(); ++region) {
+                variant.regions[region].envelope = effectiveEnvelopes[region];
               }
+              auto& destination = instrumentSets[baseRef->set].instruments;
+              selectedRef = PreparedInstrumentRef{
+                  .set = baseRef->set,
+                  .instrument = static_cast<u32>(destination.size()),
+              };
+              destination.push_back(std::move(variant));
+              variants.push_back(VariantRecord{
+                  .base = *baseRef,
+                  .envelopes = std::move(effectiveEnvelopes),
+                  .variant = selectedRef,
+              });
+            } else {
+              result.diagnostics.push_back(envelopeWarning(
+                  "dynamic-envelope-addresses-exhausted",
+                  "Could not allocate another portable bank/program address for a dynamic envelope variant",
+                  &note->header));
             }
           }
         }
       }
 
-      result.instruments.assign(NoteInstrumentAssignment{
-          .track = note->header.track,
-          .note = note->note,
-          .selection = plannedSelection(selectedRef, instrumentSets),
-      });
+      const InstrumentAddress selectedAddress = preparedInstrumentAddress(selectedRef, instrumentSets);
+      if (selectedAddress != outputAddress) {
+        loweredEvents.push_back(InstrumentPerformanceEvent{
+            .header = note->header,
+            .bank = selectedAddress.bank,
+            .program = selectedAddress.program,
+            .envelopeMode = InstrumentEnvelopeMode::PreserveDynamicOverride,
+        });
+        outputAddress = selectedAddress;
+      }
+      loweredEvents.push_back(event);
     }
+
+    track.events = std::move(loweredEvents);
   }
 
   return result;

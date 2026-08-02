@@ -282,7 +282,7 @@ void emitEnvelopeField(Playback& playback, double value, VoiceEnvelopeScope scop
   } else {
     envelope.sustainAmplitude = value;
   }
-  playback.out.envelope(std::move(envelope), Field, scope);
+  playback.out.updateEnvelope(std::move(envelope), Field, scope);
 }
 
 template <class Playback>

@@ -759,9 +759,31 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
              semanticData.samples.size() == 1 && semanticData.samples[0].name == "Noise Wave",
          "shared synth preparation should resolve semantic instrument identities and their samples");
 
-  auto packedBankInstruments = instruments;
-  packedBankInstruments.instruments[1].explicitAddress = InstrumentAddress{.bank = 1, .program = 1};
-  PerformanceSequence packedBankPerformance{
+  auto logicalBankInstruments = instruments;
+  logicalBankInstruments.instruments[1].explicitAddress = InstrumentAddress{.bank = 1, .program = 1};
+  PerformanceSequence logicalBankPerformance{
+      .tracks = {PerformanceTrack{
+          .events = {
+              InstrumentPerformanceEvent{.bank = 1, .program = 1},
+              NotePerformanceEvent{},
+          },
+      }},
+  };
+  const std::array<const InstrumentSetAsset*, 1> logicalBankSets{&logicalBankInstruments};
+  const auto logicalBankData = prepareSynthData(
+      SynthExportInput{
+          .instrumentSets = logicalBankSets,
+          .sampleCollections = sampleSets,
+          .sequenceUsage = &logicalBankPerformance,
+      },
+      sources);
+  expect(logicalBankData.instruments.size() == 1 && logicalBankData.instruments[0].instrument->name == "Lead" &&
+             logicalBankData.samples.size() == 1 && logicalBankData.samples[0].name == "Lead Wave",
+         "shared synth preparation should use logical instrument banks directly");
+
+  auto exactBankInstruments = logicalBankInstruments;
+  exactBankInstruments.instruments[2].explicitAddress = InstrumentAddress{.bank = 1 << 7, .program = 1};
+  PerformanceSequence exactBankPerformance{
       .tracks = {PerformanceTrack{
           .events = {
               InstrumentPerformanceEvent{.bank = 1 << 7, .program = 1},
@@ -769,31 +791,17 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
           },
       }},
   };
-  const std::array<const InstrumentSetAsset*, 1> packedBankSets{&packedBankInstruments};
-  const auto packedBankData = prepareSynthData(
-      SynthExportInput{
-          .instrumentSets = packedBankSets,
-          .sampleCollections = sampleSets,
-          .sequenceUsage = &packedBankPerformance,
-      },
-      sources);
-  expect(packedBankData.instruments.size() == 1 && packedBankData.instruments[0].instrument->name == "Lead" &&
-             packedBankData.samples.size() == 1 && packedBankData.samples[0].name == "Lead Wave",
-         "shared synth preparation should map packed MIDI banks back to collection instrument banks");
-
-  auto exactBankInstruments = packedBankInstruments;
-  exactBankInstruments.instruments[2].explicitAddress = InstrumentAddress{.bank = 1 << 7, .program = 1};
   const std::array<const InstrumentSetAsset*, 1> exactBankSets{&exactBankInstruments};
   const auto exactBankData = prepareSynthData(
       SynthExportInput{
           .instrumentSets = exactBankSets,
           .sampleCollections = sampleSets,
-          .sequenceUsage = &packedBankPerformance,
+          .sequenceUsage = &exactBankPerformance,
       },
       sources);
   expect(exactBankData.instruments.size() == 1 && exactBankData.instruments[0].instrument->name == "Noise" &&
              exactBankData.samples.size() == 1 && exactBankData.samples[0].name == "Noise Wave",
-         "an exact instrument address should take precedence over a packed-bank fallback");
+         "a large logical instrument bank should not be reinterpreted as packed MIDI");
 
   for (const auto kind : {ExportKind::SoundFont2, ExportKind::Dls}) {
     const auto failed = exportCollection(snapshot, sources, CollectionId{0},

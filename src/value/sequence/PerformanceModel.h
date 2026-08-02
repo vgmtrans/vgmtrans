@@ -92,8 +92,9 @@ enum class InstrumentEnvelopeMode : u8 {
 
 struct InstrumentPerformanceEvent {
   PerformanceEventHeader header;
-  // Legacy bank/program selection remains temporarily for cursor dialects.
-  // Semantic formats set sourceInstrument and leave target addressing to export.
+  // Direct selections use the same logical preset bank as InstrumentAddress.
+  // MIDI bank packing belongs exclusively to MIDI lowering. Semantic formats
+  // may instead set sourceInstrument and leave address resolution to export.
   u32 bank = 0;
   u32 program = 0;
   bool forceBankSelect = false;

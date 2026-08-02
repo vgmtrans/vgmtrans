@@ -146,27 +146,23 @@ void PerformanceEmitter::instrument(u32 bank, u32 program, bool forceBankSelect,
   });
 }
 
-void PerformanceEmitter::envelope(EnvelopePerformanceEvent event) {
-  append(std::move(event));
-}
-
-void PerformanceEmitter::envelope(EnvelopeUpdate update, VoiceEnvelopeScope scope) {
-  envelope(EnvelopePerformanceEvent{
+void PerformanceEmitter::updateEnvelope(EnvelopeUpdate update, VoiceEnvelopeScope scope) {
+  append(EnvelopePerformanceEvent{
       .update = std::move(update),
       .scope = scope,
   });
 }
 
-void PerformanceEmitter::envelope(Envelope values, VoiceEnvelopeScope scope) {
-  envelope(EnvelopeUpdate::replace(std::move(values)), scope);
+void PerformanceEmitter::replaceEnvelope(Envelope values, VoiceEnvelopeScope scope) {
+  updateEnvelope(EnvelopeUpdate::replace(std::move(values)), scope);
 }
 
-void PerformanceEmitter::envelope(Envelope values, EnvelopeFields fields, VoiceEnvelopeScope scope) {
-  envelope(EnvelopeUpdate::set(std::move(values), fields), scope);
+void PerformanceEmitter::updateEnvelope(Envelope values, EnvelopeFields fields, VoiceEnvelopeScope scope) {
+  updateEnvelope(EnvelopeUpdate::set(std::move(values), fields), scope);
 }
 
 void PerformanceEmitter::restoreEnvelope(EnvelopeFields fields, VoiceEnvelopeScope scope) {
-  envelope(EnvelopeUpdate::restore(fields), scope);
+  updateEnvelope(EnvelopeUpdate::restore(fields), scope);
 }
 
 void PerformanceEmitter::level(LevelPerformanceEvent event) {

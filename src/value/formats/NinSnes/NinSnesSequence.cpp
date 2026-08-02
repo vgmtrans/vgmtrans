@@ -1172,7 +1172,7 @@ struct Playback {
   }
 
   void konamiEnvelope(u8 adsr1, u8 adsr2, u8 gain) {
-    out.envelope(snesDspEnvelope(adsr1, adsr2, gain), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    out.replaceEnvelope(snesDspEnvelope(adsr1, adsr2, gain), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
 
   void vibratoFade(u8 length) { track.vibrato.fade = length; }
