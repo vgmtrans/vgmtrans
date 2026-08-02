@@ -52,6 +52,8 @@ struct Patterns {
   // Value-only behavioral probes; these do not participate in legacy format recognition.
   static Pattern ptnEarlierPercussionTable;
   static Pattern ptnKonamiPercussionDispatch;
+  static Pattern ptnKonamiTimer0Direct;
+  static Pattern ptnKonamiTimer0Absolute;
   static Pattern ptnReadSongRequestPort;
   static Pattern ptnFixedPercussionBaseDispatch;
   static Pattern ptnFixedPercussionBaseLoader;
@@ -91,5 +93,6 @@ struct Patterns {
 };
 
 [[nodiscard]] std::optional<u8> detectFixedPercussionBase(core::ByteReader reader, u8 percussionMinimum);
+[[nodiscard]] std::optional<u8> detectKonamiTempoTimerTarget(core::ByteReader reader);
 
 }  // namespace vgmtrans::formats::nin_snes

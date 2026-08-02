@@ -37,8 +37,14 @@ constexpr u8 kMelodicKeyCorrection = 24;
 constexpr u8 kIntelliDrumSlots = 16;
 constexpr u8 kDefaultTempo = 0x20;
 constexpr u16 kNoPercussionSourceNote = 0x100;
-constexpr u32 kFixedPercussionBaseFlag = 1u << 8;
-constexpr u32 kFixedPercussionBaseShift = 16;
+constexpr u32 kTempoTimerTargetShift = 8;
+constexpr u32 kFixedPercussionBaseFlag = 1u << 16;
+constexpr u32 kFixedPercussionBaseShift = 24;
+
+[[nodiscard]] constexpr u8 decodeTempoTimerTarget(u32 driverState) {
+  const u8 target = static_cast<u8>(driverState >> kTempoTimerTargetShift);
+  return target == 0 ? kStandardTimerTarget : target;
+}
 
 [[nodiscard]] constexpr u32 drumInstrumentKey(u8 program) {
   return (0x7fu << 7) | program;
@@ -100,8 +106,12 @@ constexpr std::array<u8, 64> kIntelliFe4{
   return 20.0 * std::log10(255.0 / trough);
 }
 
-[[nodiscard]] constexpr u32 tempoMicrosecondsPerQuarter(u8 tempo) {
-  return tempo == 0 ? 60'000'000 : static_cast<u32>(std::lround(24'576'000.0 / tempo));
+[[nodiscard]] constexpr u32 tempoMicrosecondsPerQuarter(u8 tempo, u8 timerTarget = kStandardTimerTarget) {
+  // Each sequence tick occurs after timerTarget * 125 microseconds. The
+  // driver's 8-bit tempo accumulator overflows after 256 / tempo ticks.
+  return tempo == 0
+             ? 60'000'000
+             : static_cast<u32>(std::lround(kPpqn * (125.0 * timerTarget) * 256.0 / tempo));
 }
 
 // Convert the driver's 8-bit level control to linear gain using its square law.
@@ -551,6 +561,7 @@ private:
 struct ProgramState {
   explicit ProgramState(const SequenceProgram& program)
       : selected(profile(static_cast<ProfileId>(program.config.profile))),
+        tempoTimerTarget(decodeTempoTimerTarget(program.config.driverState)),
         fixedPercussionBase(
             (program.config.driverState & kFixedPercussionBaseFlag) != 0
                 ? std::optional<u8>{static_cast<u8>(program.config.driverState >> kFixedPercussionBaseShift)}
@@ -604,6 +615,10 @@ struct ProgramState {
               : index;
     }
     return programs[index];
+  }
+
+  [[nodiscard]] u8 commandTempo(u8 encoded) const {
+    return static_cast<u8>(encoded * selected.tempoCommandMultiplier);
   }
 
   [[nodiscard]] u32 registerOverride(u8 logical, u8 srcn, u8 adsr1, u8 adsr2, u8 gain, u8 pitchHigh, u8 pitchLow,
@@ -688,6 +703,7 @@ struct ProgramState {
   }
 
   const Profile& selected;
+  u8 tempoTimerTarget = kStandardTimerTarget;
   std::array<u32, 256> basePrograms{};
   std::array<u32, 256> programs{};
   std::map<u64, SourceRange> sourceRanges;
@@ -1205,10 +1221,11 @@ struct Playback {
   void tremoloOff() { out.tremoloDepth(0.0, tremoloLfoContext()); }
 
   void tempo(u8 value) {
-    program.tempoState.setCurrentAt(vm.tick(), value);
+    const u8 driverTempo = program.commandTempo(value);
+    program.tempoState.setCurrentAt(vm.tick(), driverTempo);
     program.tempoAutomationTrack.reset();
-    program.tempo = value;
-    out.tempo(math::tempoMicrosecondsPerQuarter(value));
+    program.tempo = driverTempo;
+    out.tempo(math::tempoMicrosecondsPerQuarter(driverTempo, program.tempoTimerTarget));
   }
 
   void tempoFade(u8 length, u8 value) {
@@ -1216,10 +1233,13 @@ struct Playback {
       tempo(value);
       return;
     }
+    const u8 driverTempo = program.commandTempo(value);
     program.tempoState.setCurrentRaw(program.tempo);
     program.tempoState.begin(out.fade(PerformanceAutomationTarget::Tempo,
-                                      static_cast<double>(math::tempoMicrosecondsPerQuarter(value)), length),
-                             SequenceFixedPointMotion<s32>::toRawTarget(value, length));
+                                      static_cast<double>(
+                                          math::tempoMicrosecondsPerQuarter(driverTempo, program.tempoTimerTarget)),
+                                      length),
+                             SequenceFixedPointMotion<s32>::toRawTarget(driverTempo, length));
     program.tempoAutomationTrack = track.trackNumber;
     advanceTempoFade();
   }
@@ -1261,7 +1281,7 @@ struct Playback {
     static_cast<void>(program.tempoState.tickRaw([&](s32 raw) {
       const u8 value = static_cast<u8>(std::clamp<s32>(raw, 0, 0xff));
       program.tempo = value;
-      program.tempoState.output(out).tempo(math::tempoMicrosecondsPerQuarter(value));
+      program.tempoState.output(out).tempo(math::tempoMicrosecondsPerQuarter(value, program.tempoTimerTarget));
     }));
     if (!program.tempoState.active()) {
       program.tempoAutomationTrack.reset();
@@ -2294,12 +2314,16 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
 
   SequenceProgram program = sequenceDialect().makeProgram(Address{layout.playlistAddress});
   program.config.profile = static_cast<u32>(layout.profile);
-  program.config.driverState =
-      layout.profile == ProfileId::IntelliFe3 && reader.has(0xb9, 1) ? reader.u8At(0xb9) : u8{0};
+  program.config.driverState = static_cast<u32>(layout.tempoTimerTarget) << kTempoTimerTargetShift;
+  if (layout.profile == ProfileId::IntelliFe3 && reader.has(0xb9, 1)) {
+    program.config.driverState |= reader.u8At(0xb9);
+  }
   if (layout.fixedPercussionBase) {
     program.config.driverState |=
         kFixedPercussionBaseFlag | (static_cast<u32>(*layout.fixedPercussionBase) << kFixedPercussionBaseShift);
   }
+  program.behavior.initialTempoMicrosecondsPerQuarter =
+      math::tempoMicrosecondsPerQuarter(kDefaultTempo, layout.tempoTimerTarget);
   program.sourceProgramMap = buildProgramMap(reader, layout);
   program.sectionPlaylist = std::move(playlist.playlist);
   DecodeContext context{
