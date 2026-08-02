@@ -426,6 +426,12 @@ public:
     // a command may have an optional suffix identified by its own opcode.
     [[nodiscard]] std::optional<::u8> peekU8() const { return cursor_.record_.peekU8(); }
 
+    // Changes the label for the decoded command.
+    Event& label(std::string_view label) {
+      presentation_.label = label;
+      return *this;
+    }
+
     // Some commands implicitly refer to the byte immediately after themselves,
     // such as a loop start with no encoded destination.
     [[nodiscard]] Address nextAddress() const { return Address{cursor_.record_.position()}; }

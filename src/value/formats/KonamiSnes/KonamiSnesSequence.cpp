@@ -1170,6 +1170,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     velocity &= 0x7f;
     event.invoke<&Playback::note>(key, velocity);
     if (const auto slide = readInlinePitchSlide(event, version)) {
+      event.label("Note with Pitch Slide");
       appendPitchSlide(event, *slide);
     }
     return event.wait(event.state<&TrackState::noteLength>());
