@@ -280,12 +280,15 @@ struct SequenceRenderResult {
                                                      std::span<const InstrumentSetAsset* const> instrumentSets,
                                                      const MidiExportOptions& options,
                                                      ModulationConversionPolicy modulationConversion,
-                                                     const SequenceInstrumentPlan* instrumentPlan = nullptr) {
-  if (!rendering.performance) {
+                                                     const PerformanceSequence* preparedPerformance = nullptr) {
+  const auto* performance = preparedPerformance;
+  if (performance == nullptr && rendering.performance) {
+    performance = &*rendering.performance;
+  }
+  if (performance == nullptr) {
     return std::nullopt;
   }
-  return renderMidiSequence(*rendering.performance, options, modulationConversion, instrumentSets,
-                            &rendering.modulation, instrumentPlan);
+  return renderMidiSequence(*performance, options, modulationConversion, instrumentSets, &rendering.modulation);
 }
 
 [[nodiscard]] std::optional<MidiModulationUsage> midiModulationUsage(const SequenceRenderResult& rendering) {
@@ -421,14 +424,12 @@ void applySequenceModulationToPreparedExport(PreparedExport& prepared, const Seq
 [[nodiscard]] SynthExportInput synthExportInput(const PreparedExport& prepared, const ExportRequest& request,
                                                 const MidiModulationUsage* midiModulation,
                                                 ModulationConversionPolicy modulationConversion,
-                                                const PerformanceSequence* sequenceUsage,
-                                                const SequenceInstrumentPlan* instrumentPlan) {
+                                                const PerformanceSequence* sequenceUsage) {
   return SynthExportInput{
       .name = prepared.baseName,
       .instrumentSets = prepared.instrumentSets,
       .sampleCollections = prepared.sampleCollections,
       .sequenceUsage = sequenceUsage,
-      .instrumentPlan = instrumentPlan,
       .midiModulationUsage = midiModulation,
       .modulationScaling = request.modulationScaling,
       .modulationConversion = modulationConversion,
@@ -454,20 +455,16 @@ void applySequenceModulationToPreparedExport(PreparedExport& prepared, const Seq
 [[nodiscard]] Artifact exportSoundFont2(const PreparedExport& prepared, const SourceStore& sources,
                                         const ExportRequest& request, const MidiModulationUsage* midiModulation,
                                         ModulationConversionPolicy modulationConversion,
-                                        const PerformanceSequence* sequenceUsage = nullptr,
-                                        const SequenceInstrumentPlan* instrumentPlan = nullptr) {
-  const auto input =
-      synthExportInput(prepared, request, midiModulation, modulationConversion, sequenceUsage, instrumentPlan);
+                                        const PerformanceSequence* sequenceUsage = nullptr) {
+  const auto input = synthExportInput(prepared, request, midiModulation, modulationConversion, sequenceUsage);
   return synthArtifact(prepared, buildSoundFont2(input, sources), ".sf2", "audio/soundfont");
 }
 
 [[nodiscard]] Artifact exportDls(const PreparedExport& prepared, const SourceStore& sources,
                                  const ExportRequest& request, const MidiModulationUsage* midiModulation,
                                  ModulationConversionPolicy modulationConversion,
-                                 const PerformanceSequence* sequenceUsage = nullptr,
-                                 const SequenceInstrumentPlan* instrumentPlan = nullptr) {
-  const auto input =
-      synthExportInput(prepared, request, midiModulation, modulationConversion, sequenceUsage, instrumentPlan);
+                                 const PerformanceSequence* sequenceUsage = nullptr) {
+  const auto input = synthExportInput(prepared, request, midiModulation, modulationConversion, sequenceUsage);
   return synthArtifact(prepared, buildDls(input, sources), ".dls", "audio/dls");
 }
 
@@ -617,17 +614,17 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
   };
   auto rendering = renderCollectionSequence(prepared, formats, exportRequest.sequence);
   auto dynamicEnvelopes = materializePreparedDynamicEnvelopes(prepared, rendering, exportRequest.dynamicEnvelopes);
-  const auto* instrumentPlan = dynamicEnvelopes ? &dynamicEnvelopes->instruments : nullptr;
+  const auto* preparedPerformance =
+      dynamicEnvelopes ? &dynamicEnvelopes->performance : (rendering.performance ? &*rendering.performance : nullptr);
   auto loweredMidi = renderMidi(rendering, prepared.instrumentSets, exportRequest.sequence.midi,
-                                exportRequest.modulationConversion, instrumentPlan);
+                                exportRequest.modulationConversion, preparedPerformance);
   auto midi = exportMidi(prepared.baseName, rendering, loweredMidi, exportRequest.modulationScaling,
                          exportRequest.modulationConversion);
   const auto synthConversion = loweredMidi ? request.modulationConversion : ModulationConversionPolicy::SynthModulators;
   if (synthConversion == ModulationConversionPolicy::SynthModulators) {
     applySequenceModulationToPreparedExport(prepared, rendering.modulation);
   }
-  auto soundFont =
-      exportSoundFont2(prepared, sources, exportRequest, nullptr, synthConversion, nullptr, instrumentPlan);
+  auto soundFont = exportSoundFont2(prepared, sources, exportRequest, nullptr, synthConversion);
 
   playback.midi = std::move(midi.bytes);
   playback.soundFont = std::move(soundFont.bytes);
@@ -674,20 +671,24 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
     return *rendering;
   };
 
-  const auto requireDynamicEnvelopePlan = [&]() -> const SequenceInstrumentPlan* {
+  const auto requirePreparedPerformance = [&]() -> const PerformanceSequence* {
+    const auto& rendered = requireRendering();
     if (!dynamicEnvelopesMaterialized) {
       if (request.dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants) {
-        dynamicEnvelopes = materializePreparedDynamicEnvelopes(prepared, requireRendering(), request.dynamicEnvelopes);
+        dynamicEnvelopes = materializePreparedDynamicEnvelopes(prepared, rendered, request.dynamicEnvelopes);
       }
       dynamicEnvelopesMaterialized = true;
     }
-    return dynamicEnvelopes ? &dynamicEnvelopes->instruments : nullptr;
+    if (dynamicEnvelopes) {
+      return &dynamicEnvelopes->performance;
+    }
+    return rendered.performance ? &*rendered.performance : nullptr;
   };
 
   const auto requireMidi = [&]() -> const std::optional<MidiSequence>& {
     if (!midiRendered) {
       loweredMidi = renderMidi(requireRendering(), prepared.instrumentSets, request.sequence.midi,
-                               request.modulationConversion, requireDynamicEnvelopePlan());
+                               request.modulationConversion, requirePreparedPerformance());
       midiRendered = true;
     }
     return loweredMidi;
@@ -725,8 +726,8 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
     return midiUsage ? &*midiUsage : nullptr;
   };
 
-  const auto requireSequenceUsage = [&]() -> const SequenceRenderResult* {
-    return request.exportOnlyUsedInstruments ? &requireRendering() : nullptr;
+  const auto requireSequenceUsage = [&]() -> const PerformanceSequence* {
+    return request.exportOnlyUsedInstruments ? requirePreparedPerformance() : nullptr;
   };
 
   const auto synthModulationConversion = [&]() {
@@ -755,10 +756,12 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
         break;
       }
       case ExportKind::SoundFont2: {
-        const auto* instrumentPlan = requireDynamicEnvelopePlan();
+        if (request.dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants) {
+          static_cast<void>(requirePreparedPerformance());
+        }
         const auto* sequenceUsage = requireSequenceUsage();
-        if (sequenceUsage != nullptr && !sequenceUsage->performance) {
-          artifacts.push_back(synthArtifact(prepared, SynthExportResult{.diagnostics = sequenceUsage->diagnostics},
+        if (request.exportOnlyUsedInstruments && sequenceUsage == nullptr) {
+          artifacts.push_back(synthArtifact(prepared, SynthExportResult{.diagnostics = requireRendering().diagnostics},
                                             ".sf2", "audio/soundfont"));
           break;
         }
@@ -769,14 +772,16 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
         artifacts.push_back(exportSoundFont2(
             prepared, sources, request,
             conversion == ModulationConversionPolicy::SynthModulators ? requireMidiModulationUsage() : nullptr,
-            conversion, sequenceUsage != nullptr ? &*sequenceUsage->performance : nullptr, instrumentPlan));
+            conversion, sequenceUsage));
         break;
       }
       case ExportKind::Dls: {
-        const auto* instrumentPlan = requireDynamicEnvelopePlan();
+        if (request.dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants) {
+          static_cast<void>(requirePreparedPerformance());
+        }
         const auto* sequenceUsage = requireSequenceUsage();
-        if (sequenceUsage != nullptr && !sequenceUsage->performance) {
-          artifacts.push_back(synthArtifact(prepared, SynthExportResult{.diagnostics = sequenceUsage->diagnostics},
+        if (request.exportOnlyUsedInstruments && sequenceUsage == nullptr) {
+          artifacts.push_back(synthArtifact(prepared, SynthExportResult{.diagnostics = requireRendering().diagnostics},
                                             ".dls", "audio/dls"));
           break;
         }
@@ -787,7 +792,7 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
         artifacts.push_back(exportDls(
             prepared, sources, request,
             conversion == ModulationConversionPolicy::SynthModulators ? requireMidiModulationUsage() : nullptr,
-            conversion, sequenceUsage != nullptr ? &*sequenceUsage->performance : nullptr, instrumentPlan));
+            conversion, sequenceUsage));
         break;
       }
     }

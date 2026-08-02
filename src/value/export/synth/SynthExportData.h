@@ -17,7 +17,6 @@
 namespace vgmtrans::core {
 
 struct PerformanceSequence;
-class SequenceInstrumentPlan;
 
 struct SynthExportInput {
   std::string name;
@@ -26,8 +25,6 @@ struct SynthExportInput {
   // Null retains the complete collection. A performance filters instruments
   // selected by its notes and the samples referenced by those instruments.
   const PerformanceSequence* sequenceUsage = nullptr;
-  // Exact prepared instruments selected by materialized dynamic envelopes.
-  const SequenceInstrumentPlan* instrumentPlan = nullptr;
   const MidiModulationUsage* midiModulationUsage = nullptr;
   ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
   ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;

@@ -340,13 +340,33 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
 
   std::array<InstrumentSetAsset, 1> dynamicInstruments{*instruments};
   const auto materialized = materializeDynamicEnvelopes(performance, dynamicInstruments);
-  const auto* finiteRelease =
-      materialized.instruments.selectionFor(performance.tracks[0].id, notes[5]->note);
-  const auto* restoredRelease =
-      materialized.instruments.selectionFor(performance.tracks[0].id, notes.back()->note);
-  expect(materialized.instruments.complete() && materialized.variantCount != 0 && finiteRelease != nullptr &&
-             restoredRelease != nullptr && finiteRelease->instrument.instrument != 1 &&
-             restoredRelease->instrument.instrument == 0,
+  const auto selectedAddress = [&](PerformanceNoteId note) {
+    InstrumentAddress selected;
+    for (const auto& event : materialized.performance.tracks[0].events) {
+      if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event)) {
+        selected = InstrumentAddress{.bank = selection->bank, .program = selection->program};
+        if (selection->sourceInstrument) {
+          const auto instrument =
+              std::ranges::find_if(dynamicInstruments[0].instruments, [&](const Instrument& candidate) {
+                return candidate.identity == selection->sourceInstrument;
+              });
+          selected = instrument != dynamicInstruments[0].instruments.end()
+                         ? resolveInstrumentAddress(instrument->explicitAddress, instrument->identity)
+                         : resolveInstrumentAddress({}, selection->sourceInstrument);
+        }
+      } else if (const auto* noteEvent = std::get_if<NotePerformanceEvent>(&event);
+                 noteEvent != nullptr && noteEvent->note == note) {
+        return selected;
+      }
+    }
+    return InstrumentAddress{.bank = invalidIdValue, .program = invalidIdValue};
+  };
+  const auto finiteRelease = selectedAddress(notes[5]->note);
+  const auto restoredRelease = selectedAddress(notes.back()->note);
+  expect(finiteRelease != resolveInstrumentAddress(dynamicInstruments[0].instruments[1].explicitAddress,
+                                                   dynamicInstruments[0].instruments[1].identity) &&
+             restoredRelease == resolveInstrumentAddress(dynamicInstruments[0].instruments[0].explicitAddress,
+                                                         dynamicInstruments[0].instruments[0].identity),
          "FA zero should return later notes from a finite-release variant to the instant-release base instrument");
   expect(std::ranges::all_of(dynamicInstruments[0].instruments, [](const Instrument& instrument) {
     return std::ranges::all_of(instrument.regions, [](const Region& region) {

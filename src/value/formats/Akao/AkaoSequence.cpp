@@ -105,7 +105,7 @@ struct Playback {
   PerformanceEmitter& out;
   VmApi& vm;
 
-  void instrument(u32 bank, u32 program) { out.instrument(bank << 7, program, true); }
+  void instrument(u32 bank, u32 program) { out.instrument(bank, program, true); }
 
   [[nodiscard]] u32 consumeDelta(u32 encodedDelta, u32 fallbackDelta) {
     u32 delta = encodedDelta;

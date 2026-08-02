@@ -40,6 +40,52 @@ PerformanceSequence sequenceWithEvents(std::vector<PerformanceEvent> events, u64
   };
 }
 
+InstrumentAddress selectedAddressForNote(const PerformanceSequence& performance, PerformanceNoteId note,
+                                         std::span<const InstrumentSetAsset> instrumentSets) {
+  InstrumentAddress selected;
+  for (const auto& event : performance.tracks.front().events) {
+    if (const auto* instrumentEvent = std::get_if<InstrumentPerformanceEvent>(&event)) {
+      if (!instrumentEvent->sourceInstrument) {
+        selected = InstrumentAddress{.bank = instrumentEvent->bank, .program = instrumentEvent->program};
+        continue;
+      }
+      const auto identity = *instrumentEvent->sourceInstrument;
+      bool resolved = false;
+      for (const auto& instrumentSet : instrumentSets) {
+        const auto instrument = std::ranges::find_if(instrumentSet.instruments, [&](const Instrument& candidate) {
+          return candidate.identity && *candidate.identity == identity;
+        });
+        if (instrument == instrumentSet.instruments.end()) {
+          continue;
+        }
+        selected = resolveInstrumentAddress(instrument->explicitAddress, instrument->identity);
+        resolved = true;
+        break;
+      }
+      if (!resolved) {
+        selected = resolveInstrumentAddress({}, identity);
+      }
+    } else if (const auto* noteEvent = std::get_if<NotePerformanceEvent>(&event);
+               noteEvent != nullptr && noteEvent->note == note) {
+      return selected;
+    }
+  }
+  throw std::runtime_error("Dynamic-envelope test note was not found");
+}
+
+size_t selectedInstrumentForNote(const DynamicEnvelopeMaterialization& materialized, PerformanceNoteId note,
+                                 const InstrumentSetAsset& instrumentSet) {
+  const InstrumentAddress address =
+      selectedAddressForNote(materialized.performance, note, std::span{&instrumentSet, size_t{1}});
+  const auto instrument = std::ranges::find_if(instrumentSet.instruments, [&](const Instrument& candidate) {
+    return resolveInstrumentAddress(candidate.explicitAddress, candidate.identity) == address;
+  });
+  if (instrument == instrumentSet.instruments.end()) {
+    throw std::runtime_error("Dynamic-envelope test instrument was not found");
+  }
+  return static_cast<size_t>(std::distance(instrumentSet.instruments.begin(), instrument));
+}
+
 void dynamicEnvelopeMaterializationIsIncrementalAndDeduplicated() {
   const Envelope firstBase{
       .attackSeconds = 1.0,
@@ -122,30 +168,23 @@ void dynamicEnvelopeMaterializationIsIncrementalAndDeduplicated() {
 
   const auto materialized = materializeDynamicEnvelopes(performance, sets);
   expect(materialized.diagnostics.empty(), "valid future-note envelope updates should not warn");
-  expect(materialized.variantCount == 4 && sets[0].instruments.size() == 5,
-         "only four distinct effective envelopes should create variants");
+  expect(sets[0].instruments.size() == 5, "only four distinct effective envelopes should create variants");
 
-  const auto* first = materialized.instruments.selectionFor(TrackId{0}, PerformanceNoteId{1});
-  const auto* duplicate = materialized.instruments.selectionFor(TrackId{0}, PerformanceNoteId{2});
-  const auto* combined = materialized.instruments.selectionFor(TrackId{0}, PerformanceNoteId{3});
-  const auto* releaseOnly = materialized.instruments.selectionFor(TrackId{0}, PerformanceNoteId{4});
-  const auto* cleared = materialized.instruments.selectionFor(TrackId{0}, PerformanceNoteId{5});
-  const auto* restored = materialized.instruments.selectionFor(TrackId{0}, PerformanceNoteId{6});
-  expect(first != nullptr && duplicate != nullptr && combined != nullptr && releaseOnly != nullptr &&
-             cleared != nullptr && restored != nullptr,
-      "every fresh note should receive a concrete prepared-instrument assignment");
-  expect(first->instrument == duplicate->instrument,
-         "repeated notes under one envelope state should share a materialized variant");
-  expect(combined->instrument != first->instrument && releaseOnly->instrument != combined->instrument,
+  const size_t first = selectedInstrumentForNote(materialized, PerformanceNoteId{1}, sets[0]);
+  const size_t duplicate = selectedInstrumentForNote(materialized, PerformanceNoteId{2}, sets[0]);
+  const size_t combined = selectedInstrumentForNote(materialized, PerformanceNoteId{3}, sets[0]);
+  const size_t releaseOnly = selectedInstrumentForNote(materialized, PerformanceNoteId{4}, sets[0]);
+  const size_t cleared = selectedInstrumentForNote(materialized, PerformanceNoteId{5}, sets[0]);
+  const size_t restored = selectedInstrumentForNote(materialized, PerformanceNoteId{6}, sets[0]);
+  expect(first == duplicate, "repeated notes under one envelope state should share a materialized variant");
+  expect(combined != first && releaseOnly != combined,
          "incremental changes should materialize only their distinct effective states");
-  expect(restored->instrument == PreparedInstrumentRef{.set = 0, .instrument = 0},
-         "restoring inheritance should select the original instrument");
-  const auto& clearedVariant = sets[0].instruments[cleared->instrument.instrument];
-  expect(!clearedVariant.regions[0].envelope.releaseSeconds &&
-             !clearedVariant.regions[1].envelope.releaseSeconds,
+  expect(restored == 0, "restoring inheritance should select the original instrument");
+  const auto& clearedVariant = sets[0].instruments[cleared];
+  expect(!clearedVariant.regions[0].envelope.releaseSeconds && !clearedVariant.regions[1].envelope.releaseSeconds,
          "setting a field with an absent value should explicitly clear that field");
 
-  const auto& attackVariant = sets[0].instruments[first->instrument.instrument];
+  const auto& attackVariant = sets[0].instruments[first];
   expect(attackVariant.regions[0].envelope.attackSeconds == 0.25 &&
              attackVariant.regions[1].envelope.attackSeconds == 0.25,
          "a partial attack update should apply to every region");
@@ -204,15 +243,12 @@ void dynamicEnvelopeInstrumentSelectionControlsOverrideCarry() {
   });
 
   const auto materialized = materializeDynamicEnvelopes(performance, sets);
-  const auto* first = materialized.instruments.selectionFor(TrackId{0}, PerformanceNoteId{1});
-  const auto* reset = materialized.instruments.selectionFor(TrackId{0}, PerformanceNoteId{2});
-  const auto* preserved = materialized.instruments.selectionFor(TrackId{0}, PerformanceNoteId{3});
-  expect(first != nullptr && first->instrument.instrument >= 2,
-         "a dynamic override should materialize a variant before an instrument change");
-  expect(reset != nullptr && reset->instrument == PreparedInstrumentRef{.set = 0, .instrument = 1},
-         "ordinary instrument selection should use the new instrument's native envelope");
-  expect(preserved != nullptr && preserved->instrument.instrument >= 2 &&
-             sets[0].instruments[preserved->instrument.instrument].regions[0].envelope.attackSeconds == 0.2,
+  const size_t first = selectedInstrumentForNote(materialized, PerformanceNoteId{1}, sets[0]);
+  const size_t reset = selectedInstrumentForNote(materialized, PerformanceNoteId{2}, sets[0]);
+  const size_t preserved = selectedInstrumentForNote(materialized, PerformanceNoteId{3}, sets[0]);
+  expect(first >= 2, "a dynamic override should materialize a variant before an instrument change");
+  expect(reset == 1, "ordinary instrument selection should use the new instrument's native envelope");
+  expect(preserved >= 2 && sets[0].instruments[preserved].regions[0].envelope.attackSeconds == 0.2,
          "an explicit preserve transition should carry the dynamic override to the selected instrument");
 }
 
@@ -245,12 +281,11 @@ void dynamicEnvelopeActiveVoiceLimitationIsExplicit() {
              materialized.diagnostics,
              [](const Diagnostic& diagnostic) { return diagnostic.code == "dynamic-envelope-active-voice"; }),
          "an active-voice envelope command should report the static-variant limitation");
-  const auto* later = materialized.instruments.selectionFor(TrackId{0}, PerformanceNoteId{2});
-  expect(later != nullptr && later->instrument.instrument == 1,
-         "a combined active/future command should still affect the next fresh attack");
+  const size_t later = selectedInstrumentForNote(materialized, PerformanceNoteId{2}, sets[0]);
+  expect(later == 1, "a combined active/future command should still affect the next fresh attack");
 }
 
-void dynamicEnvelopeMidiUsesTheSharedPlanAndReturnsToBankZero() {
+void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero() {
   std::vector<Instrument> instruments;
   instruments.reserve(128);
   for (u32 program = 0; program < 128; ++program) {
@@ -295,13 +330,13 @@ void dynamicEnvelopeMidiUsesTheSharedPlanAndReturnsToBankZero() {
   });
 
   const auto materialized = materializeDynamicEnvelopes(performance, sets);
-  expect(materialized.variantCount == 1 &&
+  expect(sets[0].instruments.size() == 129 &&
              sets[0].instruments.back().explicitAddress == std::optional{InstrumentAddress{.bank = 1, .program = 0}},
          "the allocator should move to the next free bank after bank zero is occupied");
 
   std::vector<const InstrumentSetAsset*> views{&sets[0]};
-  const MidiSequence midi = renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, views,
-                                               nullptr, &materialized.instruments);
+  const MidiSequence midi =
+      renderMidiSequence(materialized.performance, {}, ModulationConversionPolicy::SynthModulators, views);
   std::vector<std::pair<u64, u16>> banks;
   for (const auto& event : midi.tracks[0].events) {
     if (const auto* bank = std::get_if<BankSelect>(&event)) {
@@ -333,9 +368,8 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments() {
       },
   });
   const auto materialized = materializeDynamicEnvelopes(performance, sets);
-  const auto* selected = materialized.instruments.selectionFor(TrackId{0}, PerformanceNoteId{1});
-  expect(selected != nullptr && selected->instrument.instrument == 1,
-         "the dynamic note should select its generated prepared instrument");
+  const size_t selected = selectedInstrumentForNote(materialized, PerformanceNoteId{1}, sets[0]);
+  expect(selected == 1, "the dynamic note should select its generated prepared instrument");
 
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "dynamic-envelope.pcm"}, std::vector<u8>{0});
@@ -353,12 +387,13 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments() {
       SynthExportInput{
           .instrumentSets = instrumentViews,
           .sampleCollections = sampleViews,
-          .sequenceUsage = &performance,
-          .instrumentPlan = &materialized.instruments,
+          .sequenceUsage = &materialized.performance,
       },
       sources);
-  expect(prepared.instruments.size() == 1 && prepared.instruments[0].address == selected->address,
-         "used-only synth export should retain the exact generated variant selected by the shared plan");
+  expect(prepared.instruments.size() == 1 &&
+             prepared.instruments[0].address == resolveInstrumentAddress(sets[0].instruments[selected].explicitAddress,
+                                                                         sets[0].instruments[selected].identity),
+         "used-only synth export should retain the exact generated variant selected by the lowered performance");
 }
 
 }  // namespace
@@ -367,6 +402,6 @@ void runValueDynamicEnvelopeTests() {
   dynamicEnvelopeMaterializationIsIncrementalAndDeduplicated();
   dynamicEnvelopeInstrumentSelectionControlsOverrideCarry();
   dynamicEnvelopeActiveVoiceLimitationIsExplicit();
-  dynamicEnvelopeMidiUsesTheSharedPlanAndReturnsToBankZero();
+  dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero();
   dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments();
 }

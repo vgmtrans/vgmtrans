@@ -2007,7 +2007,7 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
     case EventType::PercOn:
       return cursor.command("Percussion On", SequenceSemantic::Program).invoke([](Playback& playback) {
         playback.track.percussion = true;
-        playback.out.instrument(kAkaoSnesDrumKitBank << 7, kAkaoSnesDrumKitProgram);
+        playback.out.instrument(kAkaoSnesDrumKitBank, kAkaoSnesDrumKitProgram);
       });
     case EventType::PercOff:
       return cursor.command("Percussion Off", SequenceSemantic::Program).invoke([](Playback& playback) {

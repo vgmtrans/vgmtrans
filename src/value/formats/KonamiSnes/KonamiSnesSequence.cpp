@@ -150,11 +150,6 @@ struct PersistentPitchEffect {
   return tuning * (400.0 / 256.0);
 }
 
-[[nodiscard]] constexpr u32 midiBank(u32 bankMsb) {
-  // InstrumentAddress packs MIDI bank MSB and LSB into one 14-bit number.
-  return bankMsb << 7;
-}
-
 [[nodiscard]] double linearGainFromRawVolume(u8 volume) {
   return static_cast<double>(volume) / 255.0;
 }
@@ -375,14 +370,14 @@ struct Playback {
     // Percussion commands do not change the remembered melodic instrument;
     // leaving percussion mode restores that program below.
     if (!track.percussion) {
-      out.instrument(midiBank(0x7f), 0, true);
+      out.instrument(0x7f, 0, true);
       track.percussion = true;
     }
   }
 
   void percussionOff() {
     if (track.percussion) {
-      out.instrument(midiBank(track.instrument >> 7), track.instrument & 0x7f, true);
+      out.instrument(track.instrument >> 7, track.instrument & 0x7f, true);
       track.percussion = false;
     }
   }
@@ -392,7 +387,7 @@ struct Playback {
     // both of which the original driver performs as part of instrument setup.
     applyEffectiveTuning(true);
     track.instrument = programNumber;
-    out.instrument(midiBank(programNumber >> 7), programNumber & 0x7f, true);
+    out.instrument(programNumber >> 7, programNumber & 0x7f, true);
     pan(track.version <= KONAMISNES_V2 ? 10 : 20);
   }
 
@@ -401,7 +396,7 @@ struct Playback {
     // perform the same instrument setup as a normal program change.
     applyEffectiveTuning(true);
     track.instrument = programNumber;
-    out.instrument(midiBank(programNumber >> 7), programNumber & 0x7f, true);
+    out.instrument(programNumber >> 7, programNumber & 0x7f, true);
     volume(volumeValue);
     pan(track.version <= KONAMISNES_V2 ? 10 : 20);
   }

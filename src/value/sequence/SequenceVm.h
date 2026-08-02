@@ -74,10 +74,10 @@ public:
                   InstrumentEnvelopeMode envelopeMode = InstrumentEnvelopeMode::UseInstrumentEnvelope);
   void instrument(u32 bank, u32 program, bool forceBankSelect,
                   InstrumentEnvelopeMode envelopeMode = InstrumentEnvelopeMode::UseInstrumentEnvelope);
-  void envelope(EnvelopePerformanceEvent event);
-  void envelope(EnvelopeUpdate update, VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks);
-  void envelope(Envelope values, VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks);
-  void envelope(Envelope values, EnvelopeFields fields, VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks);
+  void updateEnvelope(EnvelopeUpdate update, VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks);
+  void replaceEnvelope(Envelope values, VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks);
+  void updateEnvelope(Envelope values, EnvelopeFields fields,
+                      VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks);
   void restoreEnvelope(EnvelopeFields fields = EnvelopeFields::All,
                        VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks);
   void level(LevelPerformanceEvent event);
