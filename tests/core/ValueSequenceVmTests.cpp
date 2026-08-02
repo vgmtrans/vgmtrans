@@ -276,6 +276,12 @@ void sequenceVmLoopCandidateRequiresVisitedDestination() {
          "loop-candidate should allow an unvisited backward destination and stop after it repeats");
   expect(countProbeNotesAt(performance.tracks[0], 0) == 1,
          "loop-candidate should not replay the loop target after detecting the visited destination");
+
+  SequenceDialect explicitLoopsOnly = dialect;
+  explicitLoopsOnly.inferLoopsFromRepeatedState = false;
+  const PerformanceSequence explicitPerformance = SequenceVm().render(program, explicitLoopsOnly);
+  expect(explicitPerformance.tracks[0].endTick == 12,
+         "disabling repeated-state inference should preserve explicit loop-candidate detection");
 }
 
 void sequenceVmLoopCandidateIgnoresRepeatState() {
