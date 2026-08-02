@@ -45,6 +45,13 @@ bool markMatchingInstruments(SynthInstrumentList& used, std::span<const Instrume
   return found;
 }
 
+void markInstrumentAddress(InstrumentAddress address, std::span<const Instrument* const> instruments,
+                           SynthInstrumentList& used) {
+  markMatchingInstruments(used, instruments, [&](const Instrument& instrument) {
+    return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == address;
+  });
+}
+
 void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::span<const Instrument* const> instruments,
                             SynthInstrumentList& used) {
   if (selection.sourceInstrument) {
@@ -60,10 +67,7 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::sp
     return;
   }
 
-  const InstrumentAddress directAddress{.bank = selection.bank, .program = selection.program};
-  markMatchingInstruments(used, instruments, [&](const Instrument& instrument) {
-    return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == directAddress;
-  });
+  markInstrumentAddress(InstrumentAddress{.bank = selection.bank, .program = selection.program}, instruments, used);
 }
 
 [[nodiscard]] SynthInstrumentList selectInstruments(std::span<const InstrumentSetAsset* const> instrumentSets,
@@ -88,8 +92,12 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::sp
     for (const auto& event : track.events) {
       if (const auto* change = std::get_if<InstrumentPerformanceEvent>(&event)) {
         selection = *change;
-      } else if (std::get_if<NotePerformanceEvent>(&event) != nullptr) {
-        markSelectedInstrument(selection, instruments, used);
+      } else if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+        if (note->instrumentAddress) {
+          markInstrumentAddress(*note->instrumentAddress, instruments, used);
+        } else {
+          markSelectedInstrument(selection, instruments, used);
+        }
       }
     }
   }

@@ -323,8 +323,8 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
     }
   }
   expect(chronological, "KonamiArcade delayed slides should leave the performance timeline chronological");
-  expect(envelopes.size() == 2 && envelopes[1]->update.setFields == EnvelopeFields::None &&
-             envelopes[1]->update.inheritFields == EnvelopeFields::Release &&
+  expect(envelopes.size() == 2 && !envelopes[1]->update.values &&
+             envelopes[1]->update.fields == EnvelopeFields::Release &&
              envelopes[1]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks,
          "MysticWarrior FA zero should restore the instant base release for active and future voices");
   expect(notes.size() == 8 && notes[0]->key == 74.0 && notes[1]->key == 64.0 && notes[2]->key == 64.0 &&
@@ -341,33 +341,25 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
   std::array<InstrumentSetAsset, 1> dynamicInstruments{*instruments};
   const auto materialized = materializeDynamicEnvelopes(performance, dynamicInstruments);
   const auto selectedAddress = [&](PerformanceNoteId note) {
-    InstrumentAddress selected;
     for (const auto& event : materialized.performance.tracks[0].events) {
-      if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event)) {
-        selected = InstrumentAddress{.bank = selection->bank, .program = selection->program};
-        if (selection->sourceInstrument) {
-          const auto instrument =
-              std::ranges::find_if(dynamicInstruments[0].instruments, [&](const Instrument& candidate) {
-                return candidate.identity == selection->sourceInstrument;
-              });
-          selected = instrument != dynamicInstruments[0].instruments.end()
-                         ? resolveInstrumentAddress(instrument->explicitAddress, instrument->identity)
-                         : resolveInstrumentAddress({}, selection->sourceInstrument);
-        }
-      } else if (const auto* noteEvent = std::get_if<NotePerformanceEvent>(&event);
-                 noteEvent != nullptr && noteEvent->note == note) {
-        return selected;
+      if (const auto* noteEvent = std::get_if<NotePerformanceEvent>(&event);
+          noteEvent != nullptr && noteEvent->note == note && noteEvent->instrumentAddress) {
+        return *noteEvent->instrumentAddress;
       }
     }
     return InstrumentAddress{.bank = invalidIdValue, .program = invalidIdValue};
   };
   const auto finiteRelease = selectedAddress(notes[5]->note);
-  const auto restoredRelease = selectedAddress(notes.back()->note);
+  const auto restoredRelease = std::ranges::find_if(
+      materialized.performance.tracks[0].events, [&](const PerformanceEvent& event) {
+        const auto* note = std::get_if<NotePerformanceEvent>(&event);
+        return note != nullptr && note->note == notes.back()->note;
+      });
   expect(finiteRelease != resolveInstrumentAddress(dynamicInstruments[0].instruments[1].explicitAddress,
                                                    dynamicInstruments[0].instruments[1].identity) &&
-             restoredRelease == resolveInstrumentAddress(dynamicInstruments[0].instruments[0].explicitAddress,
-                                                         dynamicInstruments[0].instruments[0].identity),
-         "FA zero should return later notes from a finite-release variant to the instant-release base instrument");
+             restoredRelease != materialized.performance.tracks[0].events.end() &&
+             !std::get<NotePerformanceEvent>(*restoredRelease).instrumentAddress,
+         "FA zero should leave later notes on the instant-release instrument selected after percussion mode");
   expect(std::ranges::all_of(dynamicInstruments[0].instruments, [](const Instrument& instrument) {
     return std::ranges::all_of(instrument.regions, [](const Region& region) {
       return !region.envelope.releaseSeconds || !std::isinf(*region.envelope.releaseSeconds);
@@ -655,11 +647,10 @@ void konamiArcadeGxDriverQuirksRemainRepresented() {
     }
   }
   const double expectedReleaseSeconds = 2032.0 * (256.0 / 0x81) / layout.nmiRateHertz;
-  expect(envelopes.size() == 2 && envelopes[0]->update.setFields == EnvelopeFields::Release &&
-             envelopes[0]->update.values.releaseSeconds &&
-             std::abs(*envelopes[0]->update.values.releaseSeconds - expectedReleaseSeconds) < 0.0001 &&
-             envelopes[1]->update.setFields == EnvelopeFields::None &&
-             envelopes[1]->update.inheritFields == EnvelopeFields::Release &&
+  expect(envelopes.size() == 2 && envelopes[0]->update.fields == EnvelopeFields::Release &&
+             envelopes[0]->update.values && envelopes[0]->update.values->releaseSeconds &&
+             std::abs(*envelopes[0]->update.values->releaseSeconds - expectedReleaseSeconds) < 0.0001 &&
+             !envelopes[1]->update.values && envelopes[1]->update.fields == EnvelopeFields::Release &&
              envelopes[0]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
              envelopes[1]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks,
          "GX FA should convert nonzero increments to timed releases and restore zero to voice-hold behavior");

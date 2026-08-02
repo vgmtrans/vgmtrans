@@ -55,6 +55,10 @@ struct NotePerformanceEvent {
   // continueFrom(previousNote); target-specific lowering may then use this
   // flag for the resulting same-voice MIDI representation.
   bool extendsPrevious = false;
+  // A fresh attack may override the track's selected instrument. Performance
+  // preparation uses this for generated presets; tied continuations inherit
+  // the sounding voice.
+  std::optional<InstrumentAddress> instrumentAddress;
   // Source voices normally restart their LFOs on a fresh attack, but some
   // drivers can disable that reset or suppress it for legato notes.
   bool restartsLfoPhase = true;
@@ -513,6 +517,7 @@ struct PerformanceTrack {
   u64 endTick = 0;
   // Lets physical modulation analysis return immediately for ordinary tracks.
   bool hasPhysicalModulation = false;
+  // Events are stored in chronological execution order.
   std::vector<PerformanceEvent> events;
   std::vector<PerformanceAutomation> automations;
 };

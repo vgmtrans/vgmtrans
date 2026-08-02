@@ -593,11 +593,11 @@ void ninSnesKonamiAdsrGainEmitsNeutralEnvelopeState() {
   }
   expect(envelopes.size() == 2, "Konami FB commands should emit two envelope events");
   expect(envelopes[0]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
-             envelopes[0]->update.setFields == EnvelopeFields::All &&
+             envelopes[0]->update.fields == EnvelopeFields::All &&
              envelopes[0]->update.values == snesDspEnvelope(0x8f, 0xe2, gain),
          "Konami FB should expand its packed attack, decay, and sustain parameters to DSP ADSR values");
   expect(envelopes[1]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
-             envelopes[1]->update.setFields == EnvelopeFields::All &&
+             envelopes[1]->update.fields == EnvelopeFields::All &&
              envelopes[1]->update.values == snesDspEnvelope(0, 0xe2, directGain),
          "Konami FB attack/decay parameters at or above A0 should select direct GAIN mode");
   expect(!instruments.empty() && instruments.back()->envelopeMode == InstrumentEnvelopeMode::UseInstrumentEnvelope,

@@ -65,30 +65,29 @@ constexpr EnvelopeFields& operator|=(EnvelopeFields& left, EnvelopeFields right)
 }
 
 struct EnvelopeUpdate {
-  Envelope values;
-  // setFields copies the corresponding optional from values. An absent value
-  // explicitly clears that field. inheritFields restores the instrument value.
-  // Fields in neither mask retain the previous dynamic override.
-  EnvelopeFields setFields = EnvelopeFields::None;
-  EnvelopeFields inheritFields = EnvelopeFields::None;
+  // Present values replace the selected fields; an absent value inside the
+  // envelope explicitly clears that field. No envelope means inherit the
+  // selected fields from the instrument.
+  std::optional<Envelope> values;
+  EnvelopeFields fields = EnvelopeFields::None;
 
   [[nodiscard]] static EnvelopeUpdate replace(Envelope values) {
     return EnvelopeUpdate{
         .values = std::move(values),
-        .setFields = EnvelopeFields::All,
+        .fields = EnvelopeFields::All,
     };
   }
 
   [[nodiscard]] static EnvelopeUpdate set(Envelope values, EnvelopeFields fields) {
     return EnvelopeUpdate{
         .values = std::move(values),
-        .setFields = fields,
+        .fields = fields,
     };
   }
 
   [[nodiscard]] static EnvelopeUpdate restore(EnvelopeFields fields = EnvelopeFields::All) {
     return EnvelopeUpdate{
-        .inheritFields = fields,
+        .fields = fields,
     };
   }
 };

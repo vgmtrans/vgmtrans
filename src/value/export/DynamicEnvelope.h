@@ -15,8 +15,8 @@
 namespace vgmtrans::core {
 
 struct DynamicEnvelopeMaterialization {
-  // Export-only performance with generated instrument selections inserted
-  // immediately before the fresh attacks that need them.
+  // Export-only performance whose fresh attacks select the generated variants
+  // they need.
   PerformanceSequence performance;
   std::vector<Diagnostic> diagnostics;
 };
