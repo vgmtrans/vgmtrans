@@ -169,6 +169,29 @@ std::vector<u8> makeAkaoSnesAram() {
   return bytes;
 }
 
+std::vector<u8> makeLateAkaoSnesLayoutAram() {
+  std::vector<u8> bytes(0x10000);
+
+  constexpr std::array<u8, 8> readNoteLengthV4{0xcd, 0x0e, 0x9e, 0xf8, 0xa2, 0xf6, 0xaa, 0x16};
+  writeBytes(bytes, 0x0100, readNoteLengthV4);
+
+  constexpr std::array<u8, 21> vcmdExecRS3{0xa8, 0xc4, 0xc4, 0xa6, 0x1c, 0xfd, 0xf6,
+                                           0x56, 0x16, 0x2d, 0xf6, 0x55, 0x16, 0x2d,
+                                           0xeb, 0xa6, 0xf6, 0xcd, 0x16, 0xd0, 0x01};
+  writeBytes(bytes, 0x0200, vcmdExecRS3);
+
+  constexpr std::array<u8, 18> readSeqHeaderV4{0xe5, 0x00, 0x1c, 0xc4, 0x00, 0xe5, 0x01, 0x1c, 0xc4,
+                                               0x01, 0xe8, 0x24, 0x8d, 0x1c, 0x9a, 0x00, 0xda, 0x00};
+  writeBytes(bytes, 0x0300, readSeqHeaderV4);
+
+  constexpr std::array<u8, 26> readPercussionTableRS3{
+      0x8d, 0x03, 0xcf, 0xfd, 0xf5, 0xc0, 0xf2, 0xd0, 0x06, 0xf6, 0x22, 0xf1, 0xd5,
+      0x41, 0xf2, 0xf6, 0x21, 0xf1, 0xc4, 0xa6, 0xf6, 0x20, 0xf1, 0x3f, 0x64, 0x1b};
+  writeBytes(bytes, 0x0400, readPercussionTableRS3);
+
+  return bytes;
+}
+
 }  // namespace
 
 void akaoSnesLayoutDiscoversFf4StyleAram() {
@@ -183,6 +206,15 @@ void akaoSnesLayoutDiscoversFf4StyleAram() {
   expect(layout->volumeEnvelopeTableAddress == 0x1d00,
          "V1 software-envelope table address should come from the DC command handler");
   expect(!layout->adsrTableAddress, "V1 layouts should not invent an ADSR table at ARAM offset zero");
+}
+
+void akaoSnesLayoutDiscoversLatePercussionTable() {
+  const auto bytes = makeLateAkaoSnesLayoutAram();
+  const auto layout = findAkaoSnesLayout(ByteReader(SourceId{8}, bytes));
+  expect(layout && layout->version == AKAOSNES_V4,
+         "late AkaoSnes synthetic ARAM should be classified as V4");
+  expect(layout->percussionTableAddress == 0xf120,
+         "RS3-style pan handling should not hide the percussion table");
 }
 
 void akaoSnesModuleDiscoversSequenceInstrumentsAndSamples() {

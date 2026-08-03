@@ -62,6 +62,10 @@ constexpr auto kReadPercussionTableV4 =
     makeMaskedBytePattern("\x8d\x03\xcf\xfd\xf6\x22\xf1\x30\x04\x1c\xd5\x81\xf2\xf6\x21\xf1"
                           "\xc4\xa5\xf6\x20\xf1\x3f\xcf\x1a",
                           "xxxxx??xxxx??x??x?x??x??");
+constexpr auto kReadPercussionTableRS3 =
+    makeMaskedBytePattern("\x8d\x03\xcf\xfd\xf5\xc0\xf2\xd0\x06\xf6\x22\xf1\xd5\x41\xf2\xf6"
+                          "\x21\xf1\xc4\xa6\xf6\x20\xf1\x3f\x64\x1b",
+                          "xxxxx??x?x??x??x??x?x??x??");
 constexpr auto kVCmdF9CT = makeMaskedBytePattern("\x28\x0f\xc4\x7b\x6f", "xxx?x");
 
 constexpr std::array<u8, 46> kFF4VcmdLengthTable{0x03, 0x03, 0x01, 0x02, 0x03, 0x03, 0x03, 0x03, 0x01, 0x01, 0x01, 0x01,
@@ -273,6 +277,8 @@ std::optional<AkaoSnesLayout> findAkaoSnesLayout(ByteReader reader) {
 
   if (const auto offset = findBytePattern(reader, kReadPercussionTableV4)) {
     layout.percussionTableAddress = reader.le16(*offset + 19);
+  } else if (const auto rs3Offset = findBytePattern(reader, kReadPercussionTableRS3)) {
+    layout.percussionTableAddress = reader.le16(*rs3Offset + 21);
   }
 
   return layout;
