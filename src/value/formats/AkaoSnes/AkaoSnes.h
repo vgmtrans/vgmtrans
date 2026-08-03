@@ -118,23 +118,8 @@ inline constexpr u32 kAkaoSnesDrumKitProgram = 0;
   return 8000.0 / timer0Frequency;
 }
 
-[[nodiscard]] inline double akaoSnesVibratoDepthCentsForAmplitude(double amplitude) {
-  if (amplitude <= 0.0) {
-    return 0.0;
-  }
-  const double ratio = 15.0 * amplitude / 32768.0;
-  return std::max(1200.0 * std::log2(1.0 + ratio), -1200.0 * std::log2(1.0 - ratio));
-}
-
 [[nodiscard]] inline double akaoSnesV1VibratoDepthCents(u8 amplitude) {
   return amplitude == 0 ? 0.0 : 1200.0 * std::log2(1.0 + (static_cast<double>(amplitude) / 3072.0));
-}
-
-[[nodiscard]] inline double akaoSnesTremoloDepthDbForAmplitude(double amplitude) {
-  if (amplitude <= 0.0) {
-    return 0.0;
-  }
-  return -20.0 * std::log10(std::max(1.0 / 1024.0, 1.0 - (amplitude / 128.0)));
 }
 
 [[nodiscard]] constexpr bool akaoSnesExportsTremolo(AkaoSnesVersion version) {

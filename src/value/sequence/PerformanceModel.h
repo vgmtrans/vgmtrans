@@ -303,6 +303,9 @@ struct LfoPerformanceContext {
   std::optional<double> delayMilliseconds;
   bool delayIsTempoRelative = false;
   std::optional<LfoWaveform> waveform;
+  // Maps the oscillator's normal -1..+1 output to 0..+1 or -1..0.
+  // A missing value retains the ordinary bipolar range.
+  std::optional<LfoPolarity> polarity;
   // Oscillator position, in cycles, used when playback starts or a note resets
   // the phase. Zero is the bipolar triangle's center/rising point.
   std::optional<double> initialPhaseCycles;
@@ -341,6 +344,7 @@ struct ModulationPerformanceEvent {
   bool delayIsTempoRelative = false;
   // A missing waveform retains the renderer's legacy/default LFO shape.
   std::optional<LfoWaveform> waveform;
+  std::optional<LfoPolarity> polarity;
   std::optional<double> initialPhaseCycles;
   std::optional<ModulationRange> pitchRangeSemitones;
   std::optional<u32> steppedDepthAttackSteps;

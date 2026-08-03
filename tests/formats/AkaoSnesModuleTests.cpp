@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/AkaoSnes/AkaoSnes.h"
+#include "value/formats/AkaoSnes/AkaoSnesV4Lfo.h"
 #include "value/formats/ValueFormats.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
@@ -715,6 +716,120 @@ void akaoSnesV3VibratoPreservesSquareWaveModesAndSteppedAttack() {
              std::ranges::any_of(
                  delayedBends, [](const PitchBend* bend) { return bend->value > 3500; }),
          "AkaoSnes V3 delayed vibrato should begin one tick later at quarter depth and reach full depth by stages");
+}
+
+void akaoSnesV4LfosPreserveDriverFamiliesAndPackedModes() {
+  constexpr u32 start = 0x20;
+  const auto renderLfos = [&](AkaoSnesProfile profile, u8 delay, u8 rate, u8 depth) {
+    std::vector<u8> bytes(0x40, 0xec);
+    bytes[start] = 0xc9;
+    bytes[start + 1] = delay;
+    bytes[start + 2] = rate;
+    bytes[start + 3] = depth;
+    bytes[start + 4] = 0xcb;
+    bytes[start + 5] = delay;
+    bytes[start + 6] = rate;
+    bytes[start + 7] = depth;
+    bytes[start + 8] = 0;
+    bytes[start + 9] = 0xec;
+    return renderTracks(profile, {decodeTrack(bytes, profile, start, start + 10)});
+  };
+  const auto modulation = [](const PerformanceSequence& performance, ModulationPerformanceTarget target,
+                             bool depth) {
+    const auto events = eventsOfType<ModulationPerformanceEvent>(performance.tracks.front());
+    const auto found = std::ranges::find_if(events, [&](const ModulationPerformanceEvent* event) {
+      return event->target == target &&
+             (depth ? event->pitchDepthSemitones.has_value() || event->volumeDepthLinearGain.has_value()
+                    : event->frequencyHz.has_value());
+    });
+    expect(found != events.end(), "AkaoSnes V4 should emit the requested physical LFO event");
+    return *found;
+  };
+
+  struct Case {
+    AkaoSnesProfile profile;
+    u8 delay;
+    u8 rate;
+    u8 depth;
+    LfoWaveform waveform;
+    LfoPolarity polarity;
+    double initialPhase;
+    u32 attackSteps;
+  };
+  const std::array<Case, 4> cases{
+      Case{.profile = {AKAOSNES_V4, AKAOSNES_V4_RS2},
+           .delay = 1,
+           .rate = 11,
+           .depth = 0x3f,
+           .waveform = LfoWaveform::Square,
+           .polarity = LfoPolarity::Negative,
+           .initialPhase = 0.5,
+           .attackSteps = 4},
+      Case{.profile = {AKAOSNES_V4, AKAOSNES_V4_FF6},
+           .delay = 1,
+           .rate = 12,
+           .depth = 0xff,
+           .waveform = LfoWaveform::Triangle,
+           .polarity = LfoPolarity::Bipolar,
+           .initialPhase = 0.0,
+           .attackSteps = 4},
+      Case{.profile = {AKAOSNES_V4, AKAOSNES_V4_FF6},
+           .delay = 0,
+           .rate = 12,
+           .depth = 0xff,
+           .waveform = LfoWaveform::Triangle,
+           .polarity = LfoPolarity::Positive,
+           .initialPhase = 0.75,
+           .attackSteps = 0},
+      Case{.profile = {AKAOSNES_V4, AKAOSNES_V4_RS3},
+           .delay = 0,
+           .rate = 12,
+           .depth = 0xff,
+           .waveform = LfoWaveform::Square,
+           .polarity = LfoPolarity::Bipolar,
+           .initialPhase = 0.5,
+           .attackSteps = 0},
+  };
+
+  for (const Case& test : cases) {
+    const AkaoSnesV4Lfo expected = akaoSnesV4Lfo(test.profile, test.rate, test.depth, test.delay);
+    const PerformanceSequence performance = renderLfos(test.profile, test.delay, test.rate, test.depth);
+    expect(performance.diagnostics.empty(), "valid AkaoSnes V4 LFO fixtures should render without diagnostics");
+    const ModulationPerformanceEvent* vibratoDepth =
+        modulation(performance, ModulationPerformanceTarget::VibratoDepth, true);
+    const ModulationPerformanceEvent* vibratoRate =
+        modulation(performance, ModulationPerformanceTarget::VibratoRate, false);
+    const ModulationPerformanceEvent* tremoloDepth =
+        modulation(performance, ModulationPerformanceTarget::TremoloDepth, true);
+    const ModulationPerformanceEvent* tremoloRate =
+        modulation(performance, ModulationPerformanceTarget::TremoloRate, false);
+
+    expect(vibratoDepth->waveform == test.waveform && vibratoDepth->polarity == test.polarity &&
+               vibratoDepth->initialPhaseCycles == test.initialPhase &&
+               vibratoDepth->steppedDepthAttackSteps == test.attackSteps && vibratoDepth->pitchRangeSemitones &&
+               vibratoDepth->pitchDepthSemitones == expected.vibratoDepthSemitones,
+           "AkaoSnes V4 vibrato should preserve each driver's waveform, packed direction, phase, and attack");
+    expect(tremoloDepth->waveform == test.waveform && tremoloDepth->polarity == test.polarity &&
+               tremoloDepth->volumeDepthLinearGain == expected.tremoloDepthLinearGain &&
+               !tremoloDepth->volumeDepthDecibels,
+           "AkaoSnes V4 tremolo should use the matching driver waveform and exact signed linear gain");
+    expect(vibratoRate->frequencyHz == expected.rateHertz && tremoloRate->frequencyHz == expected.rateHertz,
+           "AkaoSnes V4 LFO rate should follow the selected driver's counter semantics");
+
+    const MidiSequence midi =
+        renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+    const bool bendsDown = std::ranges::any_of(midi.tracks.front().events, [](const MidiEvent& event) {
+      const auto* bend = std::get_if<PitchBend>(&event);
+      return bend != nullptr && bend->value < 0;
+    });
+    const bool bendsUp = std::ranges::any_of(midi.tracks.front().events, [](const MidiEvent& event) {
+      const auto* bend = std::get_if<PitchBend>(&event);
+      return bend != nullptr && bend->value > 0;
+    });
+    expect(bendsDown == (test.polarity != LfoPolarity::Positive) &&
+               bendsUp == (test.polarity != LfoPolarity::Negative),
+           "AkaoSnes V4 MIDI simulation should preserve each packed direction mode");
+  }
 }
 
 void akaoSnesCompiledAutomationTicksControllerAndTempoFades() {
