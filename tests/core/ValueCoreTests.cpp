@@ -109,6 +109,7 @@ void kabukiMameDecryptionUsesDataAddressPath();
 void cps1ModuleRetainsYm2151AndOkiDomains();
 void cps1V1DefaultsAndPitchWrappingMatchLegacyDriver();
 void cps2EarlyModuleUsesPhysicalModulation();
+void cps2ShortEnvelopeIncludesItsCompletionTick();
 void cps2EarlyZeroRateSlursRemainLinked();
 void cps2LateDriverSemanticsRemainProfileSpecific();
 void cps3ModuleDecodesDelayPrefixesLegatoAndRegions();
@@ -280,6 +281,7 @@ int main() {
     cps1ModuleRetainsYm2151AndOkiDomains();
     cps1V1DefaultsAndPitchWrappingMatchLegacyDriver();
     cps2EarlyModuleUsesPhysicalModulation();
+    cps2ShortEnvelopeIncludesItsCompletionTick();
     cps2EarlyZeroRateSlursRemainLinked();
     cps2LateDriverSemanticsRemainProfileSpecific();
     cps3ModuleDecodesDelayPrefixesLegatoAndRegions();
