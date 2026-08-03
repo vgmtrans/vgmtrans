@@ -381,7 +381,7 @@ void segSatCollectionPreparationSuppliesVlTablesToSequence() {
              totalLevel->range == SourceRange{.source = source, .offset = 0x1049, .size = 1},
          "SegSat region fields should appear as individually selectable TreeView children");
   const double expectedHold = 0.047 * 640.0 / 1023.0;
-  const double expectedDecay = 7.4 * (32.0 * 13.0) / 1023.0;
+  const double expectedDecay = 7.4;
   const double expectedSustain = std::pow(10.0, -39.0 / 20.0);
   expect(parsedRegion.envelope.attackSeconds == 0.0 && parsedRegion.envelope.holdSeconds &&
              std::abs(*parsedRegion.envelope.holdSeconds - expectedHold) < 0.000001 &&
@@ -392,7 +392,7 @@ void segSatCollectionPreparationSuppliesVlTablesToSequence() {
              std::abs(*parsedRegion.envelope.releaseSeconds - 118.2) < 0.000001 &&
              parsedRegion.envelope.sustainAmplitude &&
              std::abs(*parsedRegion.envelope.sustainAmplitude - expectedSustain) < 0.000001,
-         "SegSat regions should convert SCSP envelope levels, stage lengths, KRS, holds, and endless D2");
+         "SegSat regions should retain SCSP full-scale decay rates, levels, KRS, holds, and endless D2");
   const auto decoded = decodeSample(samples->samples.samples.front(), session.sources().bytes(source));
   expect(decoded && decoded->pcm.size() == 4 && decoded->pcm[0] == 0x1234 && decoded->pcm[1] == -292,
          "SegSat PCM16 samples should decode in the SCSP's big-endian byte order");

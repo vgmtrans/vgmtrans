@@ -164,10 +164,9 @@ struct ParsedInstrument {
   double decaySeconds = scspRateSeconds(kDecayMilliseconds, decay1, keyRateScaling);
   if (decayLevel == 0) {
     decaySeconds = 0.0;
-  } else if (std::isfinite(decaySeconds)) {
-    // Each decay-level step is 3 dB, or 32 of the SCSP's 1023 envelope steps.
-    decaySeconds *= (32.0 * decayLevel) / 1023.0;
   }
+  // D1R is a full-scale rate. DL determines how much of it elapses before the
+  // chip switches to D2R; scaling it here would make SF2/DLS scale it twice.
 
   // Unlike the other rates, D2R 0 always holds its current level even when
   // key-rate scaling would otherwise produce a nonzero effective rate.

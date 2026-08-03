@@ -60,6 +60,7 @@ constexpr u16 kSfModVibratoDelay = kSfModMidiContinuousController | 78;
 constexpr u16 kSfModSoundController10 = kSfModMidiContinuousController | 79;
 constexpr u16 kSfModTremoloDepth = kSfModMidiContinuousController | 92;
 constexpr u16 kSfTransformLinear = 0;
+constexpr double kSoundFontVolumeEnvelopeRangeDb = 100.0;
 
 constexpr u32 kSf2SamplePaddingFrames = 46;
 constexpr u8 kDefaultRootKey = 60;
@@ -311,9 +312,11 @@ struct SfModulatorRecord {
 }
 
 [[nodiscard]] s16 sf2SustainAttenuation(const Envelope& envelope) {
-  constexpr long maxSustainAttenuationCentibels = 1000;
+  constexpr long maxSustainAttenuationCentibels = static_cast<long>(kSoundFontVolumeEnvelopeRangeDb * 10.0);
   const double amplitude = std::clamp(envelope.sustainAmplitude.value_or(1.0), 0.0, 1.0);
-  const double attenuationDb = amplitude == 0.0 ? 100.0 : std::min(-20.0 * std::log10(amplitude), 100.0);
+  const double attenuationDb = amplitude == 0.0
+                                   ? kSoundFontVolumeEnvelopeRangeDb
+                                   : std::min(-20.0 * std::log10(amplitude), kSoundFontVolumeEnvelopeRangeDb);
   return clampS16(
       static_cast<s32>(std::clamp(attenuationDb * 10.0, 0.0, static_cast<double>(maxSustainAttenuationCentibels))));
 }
@@ -613,7 +616,7 @@ void writeWordGen(std::vector<u8>& bytes, u16 generator, u16 value) {
       writeAmountGen(payload, kSfGenPan, sf2Pan(region.pan));
       writeAmountGen(payload, kSfGenCoarseTune, pitch.coarseTune);
       writeAmountGen(payload, kSfGenFineTune, pitch.fineTune);
-      const Envelope envelope = approximateEnvelopeAsAdsr(region.envelope);
+      const Envelope envelope = approximateEnvelopeAsAdsr(region.envelope, kSoundFontVolumeEnvelopeRangeDb);
       const bool explicitEnvelope = hasExplicitEnvelope(envelope);
       writeAmountGen(payload, kSfGenAttackVolEnv, sf2EnvelopeTimecents(envelope.attackSeconds));
       writeAmountGen(payload, kSfGenHoldVolEnv, sf2EnvelopeTimecents(envelope.holdSeconds));

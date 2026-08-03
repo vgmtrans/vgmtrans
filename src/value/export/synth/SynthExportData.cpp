@@ -260,7 +260,7 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::sp
 
 }  // namespace
 
-Envelope approximateEnvelopeAsAdsr(Envelope envelope) {
+Envelope approximateEnvelopeAsAdsr(Envelope envelope, double attenuationRangeDb) {
   constexpr double endlessReleaseFallbackSeconds = 150.0;
   if (envelope.releaseSeconds && std::isinf(*envelope.releaseSeconds) && *envelope.releaseSeconds > 0.0) {
     // SF2 and DLS cannot represent an endless release, so use 150 seconds.
@@ -272,35 +272,34 @@ Envelope approximateEnvelopeAsAdsr(Envelope envelope) {
   }
 
   const double secondDecay = *envelope.secondDecaySeconds;
-  const double sustain = envelope.sustainAmplitude.value_or(1.0);
-  const double firstDecayDropDb = sustain > 0.0 ? -20.0 * std::log10(sustain) : std::numeric_limits<double>::infinity();
-  constexpr double usefulDecayRangeDb = 70.0;
-  constexpr double negligibleStageSeconds = 0.02;
-  const double firstStageSeconds =
-      envelope.decaySeconds && std::isfinite(*envelope.decaySeconds) && *envelope.decaySeconds >= 0.0
-          ? *envelope.decaySeconds * std::clamp(firstDecayDropDb / usefulDecayRangeDb, 0.0, 1.0)
-          : std::numeric_limits<double>::infinity();
-  const bool negligibleFirstStage = firstDecayDropDb <= 1.0 && firstStageSeconds <= negligibleStageSeconds;
-  const bool briefFirstStage = firstStageSeconds <= 0.05;
-  constexpr double prominentDecayRateDbPerSecond = 7.0;
-  const bool prominentSecondStage = std::isfinite(secondDecay) && secondDecay > 0.0 &&
-                                    secondDecay <= usefulDecayRangeDb / prominentDecayRateDbPerSecond;
-  const bool useSecondDecay = negligibleFirstStage || (briefFirstStage && prominentSecondStage);
-  if (std::isfinite(secondDecay) && sustain >= 1.0) {
-    envelope.decaySeconds = secondDecay;
-    envelope.sustainAmplitude = 0.0;
-  } else if (secondDecay >= 0.0 && secondDecay < 2.0) {
-    // A short second decay sounds closer to one continuous fade than to a
-    // permanent sustain level.
-    envelope.decaySeconds = envelope.decaySeconds.value_or(0.0) + secondDecay;
-    envelope.sustainAmplitude = 0.0;
-  } else if (std::isfinite(secondDecay) && useSecondDecay) {
-    // Keep the audible fade when the first stage is negligible, or when it is
-    // only a brief lead-in to a much clearer decay.
-    envelope.decaySeconds = secondDecay;
-    envelope.sustainAmplitude = 0.0;
-  }
   envelope.secondDecaySeconds.reset();
+  if (!std::isfinite(secondDecay) || secondDecay < 0.0 || !std::isfinite(attenuationRangeDb) ||
+      attenuationRangeDb <= 0.0) {
+    return envelope;
+  }
+
+  const double sustain = std::clamp(envelope.sustainAmplitude.value_or(1.0), 0.0, 1.0);
+  const double firstDropDb =
+      sustain > 0.0 ? std::min(-20.0 * std::log10(sustain), attenuationRangeDb) : attenuationRangeDb;
+  const double firstFraction = firstDropDb / attenuationRangeDb;
+  if (firstFraction >= 1.0) {
+    // The continuing stage starts at or below the target's silence floor.
+    return envelope;
+  }
+
+  const double firstDecay = envelope.decaySeconds.value_or(0.0);
+  if (firstFraction > 0.0 && (!std::isfinite(firstDecay) || firstDecay < 0.0)) {
+    // An endless or invalid first stage cannot lead into a finite second one.
+    return envelope;
+  }
+
+  // Both fields are full-scale rates. Collapse the serial stages by weighting
+  // each rate by the dB distance it covers. This preserves the source
+  // envelope's time to silence instead of turning a held-note fade into a
+  // permanent sustain or blindly discarding either slope.
+  envelope.decaySeconds =
+      firstFraction == 0.0 ? secondDecay : firstDecay * firstFraction + secondDecay * (1.0 - firstFraction);
+  envelope.sustainAmplitude = 0.0;
   return envelope;
 }
 

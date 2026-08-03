@@ -51,6 +51,7 @@ constexpr u16 kDlsConnDstEg1SustainLevel = 0x020a;
 constexpr u16 kDlsConnDstEg1HoldTime = 0x020c;
 constexpr u16 kDlsConnTrnNone = 0;
 constexpr s32 kDlsSustainLevelFullScale = 0x03e80000;
+constexpr double kDlsVolumeEnvelopeRangeDb = 96.0;
 
 using Chunk = RiffChunk;
 
@@ -292,8 +293,9 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
 
 [[nodiscard]] s32 dlsSustainLevel(const Envelope& envelope) {
   const double amplitude = std::clamp(envelope.sustainAmplitude.value_or(1.0), 0.0, 1.0);
-  const double attenuationDb = std::clamp(-20.0 * std::log10(amplitude), 0.0, 96.0);
-  const double scaledLevel = ((96.0 - attenuationDb) / 96.0) * kDlsSustainLevelFullScale;
+  const double attenuationDb = std::clamp(-20.0 * std::log10(amplitude), 0.0, kDlsVolumeEnvelopeRangeDb);
+  const double scaledLevel =
+      ((kDlsVolumeEnvelopeRangeDb - attenuationDb) / kDlsVolumeEnvelopeRangeDb) * kDlsSustainLevelFullScale;
   return static_cast<s32>(std::clamp(std::lround(scaledLevel), 0l, static_cast<long>(kDlsSustainLevelFullScale)));
 }
 
@@ -388,7 +390,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   const Region& region = *resolvedRegion.region;
   std::vector<u8> connections;
   writeConnection(connections, kDlsConnDstPan, dlsPanScale(region.pan));
-  const Envelope envelope = approximateEnvelopeAsAdsr(region.envelope);
+  const Envelope envelope = approximateEnvelopeAsAdsr(region.envelope, kDlsVolumeEnvelopeRangeDb);
   const bool explicitEnvelope = hasExplicitEnvelope(envelope);
   writeConnection(connections, kDlsConnDstEg1AttackTime, dlsEnvelopeTimecents(envelope.attackSeconds));
   writeConnection(connections, kDlsConnDstEg1HoldTime, dlsEnvelopeTimecents(envelope.holdSeconds));
