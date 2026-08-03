@@ -528,6 +528,7 @@ struct Playback {
     const u8 duration = track.noteDuration(track.noteLength);
     const bool continuesVoice =
         !track.percussion && track.previousWasNote && isLegatoDuration(track.version, track.previousDurationRate);
+    const bool repeatsHeldKey = continuesVoice && track.previousNoteKey == key;
     const PerformanceNoteId previousPitchNote = track.pitchNote;
     resetPitchForNote(key);
     if (track.vibrato.depthState.restartFade(track.vibrato.delay)) {
@@ -539,14 +540,15 @@ struct Playback {
         // coupled level calculation, emitted separately by emitLevel().
         .linearVelocity = 1.0,
         .durationTicks = duration,
+        .extendsPrevious = repeatsHeldKey,
         // Even without a DSP key-on, every source note resets the driver's
         // per-note LFO state.
         .restartsLfoPhase = true,
         .restartsVibratoLfoPhase = true,
         .restartsTremoloLfoPhase = true,
     };
-    track.pitchNote =
-        continuesVoice ? out.continueVoice(previousPitchNote, std::move(note)) : out.note(std::move(note));
+    track.pitchNote = continuesVoice && !repeatsHeldKey ? out.continueVoice(previousPitchNote, std::move(note))
+                                                       : out.note(std::move(note));
     applyPitchEffectToNote(key, previousPitchNote);
     track.previousNoteKey = key;
     track.previousDurationRate = track.noteDurationRate;
