@@ -316,6 +316,7 @@ struct SimulatedLfoState {
   u64 cursorTick = 0;
   double phaseCycles = 0.0;
   std::optional<LfoWaveform> waveform;
+  LfoPolarity polarity = LfoPolarity::Bipolar;
   std::optional<double> initialPhaseCycles;
   std::optional<ModulationRange> pitchRangeSemitones;
   u32 steppedDepthAttackSteps = 0;
@@ -698,6 +699,19 @@ void addCombinedPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u
   return 0.0;
 }
 
+[[nodiscard]] double lfoValue(const SimulatedLfoState& lfo) {
+  const double value = lfoValue(lfo.waveform.value_or(LfoWaveform::Triangle), lfo.phaseCycles);
+  switch (lfo.polarity) {
+    case LfoPolarity::Positive:
+      return (value + 1.0) / 2.0;
+    case LfoPolarity::Negative:
+      return (value - 1.0) / 2.0;
+    case LfoPolarity::Bipolar:
+    default:
+      return value;
+  }
+}
+
 // Normalized tremolo events do not carry physical phase metadata. Preserve
 // their established unipolar triangle start at nominal gain; physical events
 // can provide initialPhaseCycles and bypass this renderer fallback entirely.
@@ -737,6 +751,9 @@ void configureLfo(SimulatedLfoState& lfo, u64 tick, const ModulationPerformanceE
   }
   if (event.waveform) {
     lfo.waveform = event.waveform;
+  }
+  if (event.polarity) {
+    lfo.polarity = *event.polarity;
   }
   if (event.initialPhaseCycles) {
     lfo.initialPhaseCycles = event.initialPhaseCycles;
@@ -819,7 +836,7 @@ void flushLfo(SimulatedLfoState& lfo, u64 upToTick, const PerformanceTempoMap& t
     if (lfo.producedSample && lfo.sampleImmediatelyOnNote) {
       advancePhase();
     }
-    const double value = lfoValue(lfo.waveform.value_or(LfoWaveform::Triangle), lfo.phaseCycles);
+    const double value = lfoValue(lfo);
     if (lfo.depth > 0.0) {
       apply(lfo.cursorTick, value);
     }
@@ -873,10 +890,7 @@ void restartSimulatedVibratoForNote(MidiTrack& track, RenderTrackState& state, u
                                  state.vibrato.cyclesPerTick.value_or(state.vibrato.frequencyHz) > 0.0 &&
                                  state.vibrato.depth > 0.0;
   state.simulatedVibratoSemitones =
-      startsImmediately
-          ? simulatedVibratoAtPhase(state.vibrato, lfoValue(state.vibrato.waveform.value_or(LfoWaveform::Triangle),
-                                                            state.vibrato.phaseCycles))
-          : 0.0;
+      startsImmediately ? simulatedVibratoAtPhase(state.vibrato, lfoValue(state.vibrato)) : 0.0;
   state.vibrato.producedSample = startsImmediately;
   if (startsImmediately || previousSemitones != 0.0) {
     addCombinedPitchBend(track, state, tick, channel, false);
@@ -901,19 +915,20 @@ void addCombinedExpression(MidiTrack& track, RenderTrackState& state, u64 tick, 
 }
 
 [[nodiscard]] double simulatedTremoloGain(const RenderTrackState& state, double lfoValue) {
+  const double depth = state.tremolo.depth * lfoDepthScale(state.tremolo);
   if (state.tremoloDepthUnit == RenderTrackState::TremoloDepthUnit::Decibels) {
-    double gainDecibels = state.tremolo.depth * lfoValue;
+    double gainDecibels = depth * lfoValue;
     if (state.tremoloGainMode == TremoloGainMode::NoBoost) {
-      gainDecibels -= state.tremolo.depth;
+      gainDecibels -= depth;
     }
     return std::pow(10.0, gainDecibels / 20.0);
   }
   if (state.tremoloDepthUnit == RenderTrackState::TremoloDepthUnit::LinearGain) {
-    return std::max(0.0, 1.0 + state.tremolo.depth * lfoValue);
+    return std::max(0.0, 1.0 + depth * lfoValue);
   }
 
   const double normalizedLfo = (lfoValue + 1.0) / 2.0;
-  return 1.0 - (state.tremolo.depth * normalizedLfo);
+  return 1.0 - (depth * normalizedLfo);
 }
 
 void flushSimulatedTremolo(MidiTrack& track, RenderTrackState& state, u64 upToTick, u8 channel,
@@ -930,7 +945,7 @@ void flushSimulatedTremolo(MidiTrack& track, RenderTrackState& state, u64 upToTi
     return 1.0;
   }
 
-  const double value = lfoValue(state.tremolo.waveform.value_or(LfoWaveform::Triangle), state.tremolo.phaseCycles);
+  const double value = lfoValue(state.tremolo);
   return simulatedTremoloGain(state, value);
 }
 
@@ -958,7 +973,11 @@ void restartSimulatedTremoloForNote(MidiTrack& track, RenderTrackState& state, u
           ? LfoInitialPhaseFallback::UnipolarTremoloNominalGain
           : LfoInitialPhaseFallback::Zero;
   restartLfo(state.tremolo, tick, fallback);
-  const double gain = tremoloGainAtCurrentPhase(state);
+  const bool delayed = state.tremolo.delayTicks != 0 || state.tremolo.delayMilliseconds.value_or(0.0) > 0.0;
+  const double gain = delayed ? 1.0 : tremoloGainAtCurrentPhase(state);
+  state.tremolo.producedSample =
+      !delayed && state.tremolo.sampleImmediatelyOnNote &&
+      state.tremolo.cyclesPerTick.value_or(state.tremolo.frequencyHz) > 0.0 && state.tremolo.depth > 0.0;
   if (gain != state.simulatedTremoloGain) {
     state.simulatedTremoloGain = gain;
     addCombinedExpression(track, state, tick, channel, options, modulationConversion);

@@ -466,6 +466,7 @@ namespace {
       .delayMilliseconds = context.delayMilliseconds,
       .delayIsTempoRelative = context.delayIsTempoRelative,
       .waveform = context.waveform,
+      .polarity = context.polarity,
       .initialPhaseCycles = context.initialPhaseCycles,
       .pitchRangeSemitones = context.pitchRangeSemitones,
       .steppedDepthAttackSteps = context.steppedDepthAttackSteps,

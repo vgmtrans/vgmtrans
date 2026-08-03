@@ -123,6 +123,7 @@ void akaoSnesDynamicAdsrCoversHardwareFields();
 void akaoSnesV1SoftwareEnvelopesDriveLevelWithoutDynamicInstruments();
 void akaoSnesCompilerCursorCoversRemapsUnknownsAndTruncation();
 void akaoSnesV3VibratoPreservesSquareWaveModesAndSteppedAttack();
+void akaoSnesV4LfosPreserveDriverFamiliesAndPackedModes();
 void akaoSnesCompiledAutomationTicksControllerAndTempoFades();
 void akaoSnesCompilerCursorCoversLoopsAndCpuBranches();
 void akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo();
@@ -292,6 +293,7 @@ int main() {
     akaoSnesV1SoftwareEnvelopesDriveLevelWithoutDynamicInstruments();
     akaoSnesCompilerCursorCoversRemapsUnknownsAndTruncation();
     akaoSnesV3VibratoPreservesSquareWaveModesAndSteppedAttack();
+    akaoSnesV4LfosPreserveDriverFamiliesAndPackedModes();
     akaoSnesCompiledAutomationTicksControllerAndTempoFades();
     akaoSnesCompilerCursorCoversLoopsAndCpuBranches();
     akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo();

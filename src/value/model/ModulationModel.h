@@ -24,6 +24,12 @@ enum class LfoWaveform {
   Noise,
 };
 
+enum class LfoPolarity {
+  Bipolar,
+  Positive,
+  Negative,
+};
+
 enum class ModulationDepthMode {
   // A sequence controller selects a value from zero through maxDepth.
   Controller,

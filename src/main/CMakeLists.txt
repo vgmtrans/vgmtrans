@@ -239,6 +239,7 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnesSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnesV4Lfo.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesLayout.cpp
