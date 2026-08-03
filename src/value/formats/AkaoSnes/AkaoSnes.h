@@ -206,6 +206,7 @@ struct AkaoSnesLayout {
   std::optional<u32> tuningTableAddress;
   std::optional<u32> adsrTableAddress;
   std::optional<u32> percussionTableAddress;
+  std::optional<u32> volumeEnvelopeTableAddress;
 };
 
 struct AkaoSnesTrackDecodeOptions {

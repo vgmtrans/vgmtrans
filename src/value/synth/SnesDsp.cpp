@@ -245,4 +245,38 @@ double snesDspGainEnvelopeSeconds(u8 gain, s16 envelopeFrom, s16 envelopeTo) {
   return emulateGainEnvelope(gain, envelopeFrom, envelopeTo).seconds;
 }
 
+s16 snesDspGainEnvelopeValue(u8 gain, s16 envelopeFrom, double elapsedSeconds) {
+  s16 envelope = std::clamp<s16>(envelopeFrom, 0, 0x7ff);
+  const u8 mode = gain >> 5;
+  if (mode < 4) {
+    return static_cast<s16>(gain * 0x10);
+  }
+  if (elapsedSeconds <= 0.0) {
+    return envelope;
+  }
+  if (!std::isfinite(elapsedSeconds)) {
+    return mode < 6 ? 0 : 0x7ff;
+  }
+
+  const u8 rate = gain & 0x1f;
+  const auto updates =
+      static_cast<u64>(std::floor(elapsedSeconds * kSampleRate / static_cast<double>(kCounterRates[rate])));
+  for (u64 i = 0; i < updates; ++i) {
+    if ((mode < 6 && envelope == 0) || (mode >= 6 && envelope == 0x7ff)) {
+      break;
+    }
+    if (mode == 4) {
+      envelope = static_cast<s16>(std::max(0, envelope - 0x20));
+    } else if (mode == 5) {
+      if (envelope != 0) {
+        --envelope;
+        envelope -= envelope >> 8;
+      }
+    } else {
+      envelope = static_cast<s16>(std::min<int>(0x7ff, envelope + (mode == 7 && envelope > 0x600 ? 0x08 : 0x20)));
+    }
+  }
+  return envelope;
+}
+
 }  // namespace vgmtrans::core

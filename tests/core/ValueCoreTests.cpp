@@ -120,6 +120,7 @@ void akaoSnesV4TieExtendsShortenedPreviousNote();
 void akaoSnesCompilerCursorResolvesRelocatedBranchesWithoutRetainingBytes();
 void akaoSnesCompilerCursorCoversVersionBoundariesAndDurations();
 void akaoSnesV3DynamicAdsrUsesAttackAndHeldNoteDecay();
+void akaoSnesV1SoftwareEnvelopesDriveLevelWithoutDynamicInstruments();
 void akaoSnesCompilerCursorCoversRemapsUnknownsAndTruncation();
 void akaoSnesV3VibratoPreservesSquareWaveModesAndSteppedAttack();
 void akaoSnesCompiledAutomationTicksControllerAndTempoFades();
@@ -288,6 +289,7 @@ int main() {
     akaoSnesCompilerCursorResolvesRelocatedBranchesWithoutRetainingBytes();
     akaoSnesCompilerCursorCoversVersionBoundariesAndDurations();
     akaoSnesV3DynamicAdsrUsesAttackAndHeldNoteDecay();
+    akaoSnesV1SoftwareEnvelopesDriveLevelWithoutDynamicInstruments();
     akaoSnesCompilerCursorCoversRemapsUnknownsAndTruncation();
     akaoSnesV3VibratoPreservesSquareWaveModesAndSteppedAttack();
     akaoSnesCompiledAutomationTicksControllerAndTempoFades();

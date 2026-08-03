@@ -42,6 +42,8 @@ constexpr auto kReadSeqHeaderV4 = makeMaskedBytePattern(
 constexpr auto kLoadDirV1 = makeMaskedBytePattern("\xe8\x1e\x8d\x5d\x3f\xe9\x10", "x?xxx??");
 constexpr auto kLoadDirV3 = makeMaskedBytePattern("\x8d\x5d\xe8\x1b\x3f\x55\x06", "xxx?x??");
 constexpr auto kLoadInstrV1 = makeMaskedBytePattern("\xd5\xc1\x02\xfd\xf6\x00\xff\xd5\x00\x03\x6f", "x??xxx?x??x");
+constexpr auto kLoadVolumeEnvelopeV1 =
+    makeMaskedBytePattern("\x1c\xfd\xf6\x00\x1d\xd5\x20\x03\xf6\x01\x1d\xd5\x21\x03", "xxx??x??x??x??");
 constexpr auto kLoadInstrV2 = makeMaskedBytePattern("\xd4\xa6\xfd\xf6\x40\x1e\xd5\xa0\x03\xc8\x10\xb0\x06\xe4\x93\x24"
                                                     "\x8f\xd0\x1f\x7d\x9f\x5c\x08\x04\x5d\xd8\xf2\xcb\xf3\x3d\xdd\x1c"
                                                     "\xfd\xf6\x80\x1e\xd8\xf2\xc4\xf3\x3d\xf6\x81\x1e\xd8\xf2\xc4\xf3"
@@ -251,6 +253,13 @@ std::optional<AkaoSnesLayout> findAkaoSnesLayout(ByteReader reader) {
   if (version == AKAOSNES_V1) {
     if (const auto offset = findBytePattern(reader, kLoadInstrV1)) {
       layout.tuningTableAddress = reader.le16(*offset + 5);
+    }
+    if (const auto offset = findBytePattern(reader, kLoadVolumeEnvelopeV1)) {
+      const u16 lowByteTable = reader.le16(*offset + 3);
+      const u16 highByteTable = reader.le16(*offset + 9);
+      if (highByteTable == static_cast<u16>(lowByteTable + 1)) {
+        layout.volumeEnvelopeTableAddress = lowByteTable;
+      }
     }
   } else if (version == AKAOSNES_V2) {
     if (const auto offset = findBytePattern(reader, kLoadInstrV2)) {
