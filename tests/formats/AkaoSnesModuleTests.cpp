@@ -808,7 +808,8 @@ void akaoSnesV4LfosPreserveDriverFamiliesAndPackedModes() {
                vibratoDepth->initialPhaseCycles == test.initialPhase &&
                vibratoDepth->steppedDepthAttackSteps == test.attackSteps && vibratoDepth->pitchRangeSemitones &&
                vibratoDepth->pitchDepthSemitones == expected.vibratoDepthSemitones,
-           "AkaoSnes V4 vibrato should preserve each driver's waveform, packed direction, phase, and attack");
+           std::string(akaoSnesMinorVersionName(test.profile.minorVersion)) +
+               " vibrato should preserve its waveform, packed direction, phase, and attack");
     expect(tremoloDepth->waveform == test.waveform && tremoloDepth->polarity == test.polarity &&
                tremoloDepth->volumeDepthLinearGain == expected.tremoloDepthLinearGain &&
                !tremoloDepth->volumeDepthDecibels,
@@ -830,6 +831,15 @@ void akaoSnesV4LfosPreserveDriverFamiliesAndPackedModes() {
                bendsUp == (test.polarity != LfoPolarity::Negative),
            "AkaoSnes V4 MIDI simulation should preserve each packed direction mode");
   }
+
+  const AkaoSnesV4Lfo gunHazard =
+      akaoSnesV4Lfo({AKAOSNES_V4, AKAOSNES_V4_GH}, 0x0c, 0xcb, 0x30);
+  const double gunHazardNegativePitchRatio = 15.0 * 24.0 / 65536.0;
+  expect(std::abs(gunHazard.vibratoDepthSemitones + 12.0 * std::log2(1.0 - gunHazardNegativePitchRatio)) <
+                 0.000001 &&
+             gunHazard.context.polarity == LfoPolarity::Bipolar &&
+             std::abs(gunHazard.rateHertz - (8000.0 / 39.0 / 24.0)) < 0.000001,
+         "Gun Hazard vibrato should retain its two-stage pitch scaling and held-value rate");
 }
 
 void akaoSnesCompiledAutomationTicksControllerAndTempoFades() {

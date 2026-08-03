@@ -81,14 +81,14 @@ enum class Engine {
   if (polarity == LfoPolarity::Negative) {
     return 0.5;
   }
-  // Late V4 begins an immediate bipolar LFO below center; its delayed attack
-  // begins above center. RS2 begins above center in both cases.
+  // An immediate late bipolar LFO first holds its negative endpoint. Its
+  // delayed widening sequence begins on the positive side.
   return engine == Engine::LateStepped && polarity == LfoPolarity::Bipolar && delay == 0 ? 0.5 : 0.0;
 }
 
-[[nodiscard]] ModulationRange pitchRange(LfoPolarity polarity, double ratio) {
-  const double upward = 12.0 * std::log2(1.0 + ratio);
-  const double downward = 12.0 * std::log2(std::max(1.0 / 65536.0, 1.0 - ratio));
+[[nodiscard]] ModulationRange pitchRange(LfoPolarity polarity, double positiveRatio, double negativeRatio) {
+  const double upward = 12.0 * std::log2(1.0 + positiveRatio);
+  const double downward = 12.0 * std::log2(std::max(1.0 / 65536.0, 1.0 - negativeRatio));
   return ModulationRange{
       .minimum = polarity == LfoPolarity::Positive ? 0.0 : downward,
       .maximum = polarity == LfoPolarity::Negative ? 0.0 : upward,
@@ -102,15 +102,23 @@ AkaoSnesV4Lfo akaoSnesV4Lfo(AkaoSnesProfile profile, u8 rate, u8 depth, u8 delay
   const u16 frames = halfCycleFrames(engine, rate);
   const double lfoAmplitude = highByteAmplitude(engine, rate, depth);
   const LfoPolarity lfoPolarity = polarity(engine, depth, delay);
-  const double pitchRatio = lfoAmplitude * (engine == Engine::Rs2           ? 1.0 / 128.0
-                                            : engine == Engine::LateStepped ? 1.0 / 256.0
-                                                                            : 15.0 / 32768.0);
-  const ModulationRange range = pitchRange(lfoPolarity, pitchRatio);
+  // The late drivers first scale the note pitch by the music-channel table's
+  // $0f entry, then multiply that result by the signed 8-bit LFO value.
+  const double pitchScale = engine == Engine::Rs2           ? 1.0 / 128.0
+                            : engine == Engine::LateStepped ? 15.0 / 65536.0
+                                                            : 15.0 / 32768.0;
+  const double positivePitchRatio = lfoAmplitude * pitchScale;
+  // The late engine forms negative values with one's complement, so its
+  // negative held endpoint is one unit farther from zero.
+  const double negativeAmplitude =
+      engine == Engine::LateStepped && depth >= 0x80 ? lfoAmplitude + 1.0 : lfoAmplitude;
+  const double negativePitchRatio = negativeAmplitude * pitchScale;
+  const ModulationRange range = pitchRange(lfoPolarity, positivePitchRatio, negativePitchRatio);
 
   return AkaoSnesV4Lfo{
       .rateHertz = akaoSnesFrameRateHz(akaoSnesTimer0Frequency(profile.version, profile.minorVersion)) / (2.0 * frames),
       .vibratoDepthSemitones = std::max(std::abs(range.minimum), std::abs(range.maximum)),
-      .tremoloDepthLinearGain = lfoAmplitude / 128.0,
+      .tremoloDepthLinearGain = std::max(lfoAmplitude, negativeAmplitude) / 128.0,
       .context =
           {
               .waveform = engine == Engine::PhaseAccumulator ? LfoWaveform::Triangle : LfoWaveform::Square,
