@@ -1165,6 +1165,32 @@ void konamiSnesHeldNoteUsesRealizedInlineSlidePitch() {
          "native portamento should not retrigger and immediately silence the slide target at tick 96");
 }
 
+void konamiSnesHeldNoteRestartsPitchEnvelopeWithoutRetrigger() {
+  // Nesting in the Sands, track 2 at ARAM $35c9/$40e9. Duration rate $65
+  // suppresses key-off/key-on while each repeated note restarts F1.
+  const PerformanceSequence performance =
+      renderKonamiSnesProgram(KONAMISNES_V1, {{0x4a, 0x24, 0x64, 0x38,  // ordinary key $4a
+                                               0xf1, 0x00, 0xc1, 0x20,  // persistent pitch envelope
+                                               0x4d, 0x06, 0x65, 0x65,  // held key $4d
+                                               0x4d, 0x06, 0x65, 0x65,  // repeat without another attack
+                                               0xff}});
+  const auto notes = performanceEvents<NotePerformanceEvent>(performance.tracks[0]);
+  expect(notes.size() == 3 && notes[1]->note == notes[2]->note && notes[2]->extendsPrevious,
+         "a repeated held key should retain its sounding voice while the pitch envelope restarts");
+  expect(std::ranges::count_if(performance.tracks[0].automations, [](const PerformanceAutomation& automation) {
+           return pitchTransitionIntent(automation) != nullptr;
+         }) == 2,
+         "every held source note should restart the persistent pitch envelope");
+
+  const MidiSequence midi =
+      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  expect(std::ranges::none_of(midi.tracks[0].events, [](const MidiEvent& event) {
+           const auto* note = std::get_if<NoteDuration>(&event);
+           return note != nullptr && note->tick == 42;
+         }),
+         "restarting a held pitch envelope should not retrigger its MIDI note");
+}
+
 void konamiSnesCompiledAutomationTicksFades() {
   const PerformanceSequence performance =
       renderKonamiSnesProgram(KONAMISNES_V6, {{0xea, 0x80,              // tempo

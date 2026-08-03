@@ -61,6 +61,7 @@ void konamiSnesEveryVersionRendersSourceFreeCommands();
 void konamiSnesSequenceSimulationPreservesDriverVibratoDepth();
 void konamiSnesCompiledPlaybackHandlesCallsLoopsTiesAndSlides();
 void konamiSnesHeldNoteUsesRealizedInlineSlidePitch();
+void konamiSnesHeldNoteRestartsPitchEnvelopeWithoutRetrigger();
 void konamiSnesCompiledAutomationTicksFades();
 void konamiSnesPlayOnceCoordinatesGlobalLoopCompletion();
 void ninSnesProfilesDescribeEverySupportedDriverFamily();
@@ -228,6 +229,7 @@ int main() {
     konamiSnesSequenceSimulationPreservesDriverVibratoDepth();
     konamiSnesCompiledPlaybackHandlesCallsLoopsTiesAndSlides();
     konamiSnesHeldNoteUsesRealizedInlineSlidePitch();
+    konamiSnesHeldNoteRestartsPitchEnvelopeWithoutRetrigger();
     konamiSnesCompiledAutomationTicksFades();
     konamiSnesPlayOnceCoordinatesGlobalLoopCompletion();
     ninSnesProfilesDescribeEverySupportedDriverFamily();
