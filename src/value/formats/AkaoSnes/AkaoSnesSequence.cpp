@@ -36,7 +36,7 @@ constexpr u8 kDefaultTempo = 0x20;
 constexpr u8 kNoteVelocity = 100;
 
 [[nodiscard]] constexpr bool usesDynamicAdsr(AkaoSnesProfile profile) {
-  return profile.version == AKAOSNES_V3;
+  return profile.version == AKAOSNES_V3 || profile.version == AKAOSNES_V4;
 }
 
 enum class EventType {
@@ -1916,13 +1916,23 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
                                      : type == EventType::AdsrDr ? "ADSR Decay Rate"
                                      : type == EventType::AdsrSl ? "ADSR Sustain Level"
                                                                  : "ADSR Sustain Rate";
-      if (usesDynamicAdsr(profile) && (type == EventType::AdsrAr || type == EventType::AdsrSr)) {
+      if (usesDynamicAdsr(profile)) {
         auto event = cursor.command(label, SequenceSemantic::Envelope);
         const u8 value = event.u8("value", SourceValueDisplay::Hex);
         if (type == EventType::AdsrAr) {
           const u8 rate = event.derived("dsp_attack_rate", static_cast<u8>(value & 0x0f));
           return event.emitEnvelopeField<EnvelopeFields::Attack>(
               snesDspAdsrAttackSeconds(rate), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+        }
+        if (type == EventType::AdsrDr) {
+          const u8 rate = event.derived("dsp_decay_rate", static_cast<u8>(value & 0x07));
+          return event.emitEnvelopeField<EnvelopeFields::Decay>(
+              snesDspAdsrDecaySeconds(rate), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+        }
+        if (type == EventType::AdsrSl) {
+          const u8 level = event.derived("dsp_sustain_level", static_cast<u8>(value & 0x07));
+          return event.emitEnvelopeField<EnvelopeFields::Sustain>(
+              (level + 1) / 8.0, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
         }
         const u8 rate = event.derived("dsp_sustain_rate", static_cast<u8>(value & 0x1f));
         return event.emitEnvelopeField<EnvelopeFields::SecondDecay>(

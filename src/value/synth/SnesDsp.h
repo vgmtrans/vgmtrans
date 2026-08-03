@@ -21,6 +21,7 @@ namespace vgmtrans::core {
 
 [[nodiscard]] Envelope snesDspEnvelope(u8 adsr1, u8 adsr2, u8 gain);
 [[nodiscard]] double snesDspAdsrAttackSeconds(u8 attackRate);
+[[nodiscard]] double snesDspAdsrDecaySeconds(u8 decayRate);
 [[nodiscard]] double snesDspAdsrSustainSeconds(u8 sustainRate);
 [[nodiscard]] double snesDspGainEnvelopeSeconds(u8 gain, s16 envelopeFrom, s16 envelopeTo);
 // Returns the DSP ENVX value reached after running GAIN from envelopeFrom for
