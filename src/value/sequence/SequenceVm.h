@@ -161,6 +161,10 @@ public:
                                        u32 durationTicks, PerformanceLaneId lane = PerformanceLaneId{0});
   PitchSlideBinding retargetPitchSlide(PerformanceNoteId note, double fallbackStartKey, double targetKey,
                                        PitchSlideTiming timing, PerformanceLaneId lane = PerformanceLaneId{0});
+  // Returns the pitch reached by note's latest transition at this emitter's
+  // tick, or no value if note has no transition.
+  [[nodiscard]] std::optional<double> currentPitchTransitionKey(
+      PerformanceNoteId note, PerformanceLaneId lane = PerformanceLaneId{0}) const;
 
   [[nodiscard]] PerformanceAutomationBinding fade(PerformanceAutomationTarget target, double targetValue,
                                                   u32 durationTicks, u32 delayTicks = 0);
@@ -180,8 +184,6 @@ private:
   void append(PerformanceEvent event);
   void automationSample(u32 automation, double value);
   void interruptPitchSlidesForNewNote(PerformanceLaneId lane);
-  [[nodiscard]] std::optional<double> currentPitchTransitionKey(PerformanceNoteId note,
-                                                                PerformanceLaneId lane) const;
 
   PerformanceTrack& track_;
   CommandId sourceCommand_;

@@ -213,10 +213,10 @@ Fixture earlyCps2Fixture() {
   return Fixture{.source = std::move(source), .bytes = std::move(bytes)};
 }
 
-Fixture earlyCps2ZeroRateSlurFixture() {
+Fixture earlyCps2SlurFixture(u8 portamentoRate) {
   auto fixture = earlyCps2Fixture();
-  fixture.source.name = "cps2 zero-rate slur fixture";
-  fixture.source.attributes[std::string(mame::kMameGameAttribute)] = "cps2-zero-rate-slur-fixture";
+  fixture.source.name = "cps2 slur fixture";
+  fixture.source.attributes[std::string(mame::kMameGameAttribute)] = "cps2-slur-fixture";
   fixture.source.attributes[std::string(mame::kMameFormatVersionAttribute)] = "CPS2_V1.31";
   bytesAt(fixture.bytes, 0x1121,
           {
@@ -227,7 +227,7 @@ Fixture earlyCps2ZeroRateSlurFixture() {
               0x68,  // octave bank 1 + tie
               0x51,  // E4, first tied note
               0x0d,
-              0x00,  // instantaneous portamento
+              portamentoRate,
               0x52,  // F4
               0x53,  // F#4
               0x02,
@@ -721,7 +721,7 @@ void cps2EarlyModuleUsesPhysicalModulation() {
 }
 
 void cps2EarlyZeroRateSlursRemainLinked() {
-  const auto result = scan(earlyCps2ZeroRateSlurFixture());
+  const auto result = scan(earlyCps2SlurFixture(0));
   expect(result.diagnostics.empty(), "mshvsf zero-rate slur fixture should scan without diagnostics");
   const auto& sequence = onlySequence(result);
   const auto& commands = sequence.program.tracks[0].commands;
@@ -785,6 +785,20 @@ void cps2EarlyZeroRateSlursRemainLinked() {
              std::ranges::none_of(portamento.tracks[0].events,
                                   [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }),
          "native-portamento export should retain all three zero-rate target changes");
+
+  const auto slowResult = scan(earlyCps2SlurFixture(1));
+  const auto slowPerformance =
+      SequenceVm(LoopPolicy::PlayOnce).render(onlySequence(slowResult).program, cpsEarlyDialect());
+  const auto& slowAutomations = slowPerformance.tracks[0].automations;
+  const auto* first = slowAutomations.empty() ? nullptr : pitchTransitionIntent(slowAutomations[0]);
+  const auto* second = slowAutomations.size() < 2 ? nullptr : pitchTransitionIntent(slowAutomations[1]);
+  const u64 elapsed = slowAutomations.size() < 2
+                          ? 0
+                          : slowAutomations[1].realization.startTick - slowAutomations[0].realization.startTick;
+  expect(first != nullptr && second != nullptr && elapsed < first->timing.timelineTicks &&
+             std::abs(second->startKey - pitchTransitionValueAt(*first, static_cast<u32>(elapsed))) < 0.0001 &&
+             second->startKey < first->targetKey,
+         "an interrupted CPS portamento should retarget from the pitch the voice actually reached");
 }
 
 void cps2LateDriverSemanticsRemainProfileSpecific() {

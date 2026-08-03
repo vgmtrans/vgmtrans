@@ -171,16 +171,17 @@ struct Playback {
         std::abs(*track.previousKey - key) < 0.0001) {
       return;
     }
+    const double startKey = out.currentPitchTransitionKey(track.previousNote).value_or(*track.previousKey);
     if (track.portamentoRate == 0) {
-      out.pitchSlide(note, *track.previousKey, key, PitchSlideTiming::fromTicks(0))
+      out.pitchSlide(note, startKey, key, PitchSlideTiming::fromTicks(0))
           .continueFrom(track.previousNote)
           .preferPortamento();
       return;
     }
     const double semitonesPerSecond = track.portamentoRate * 2.0 / 256.0 * cpsDriverRateHertz(track.version);
-    const double seconds = std::abs(*track.previousKey - key) / semitonesPerSecond;
+    const double seconds = std::abs(startKey - key) / semitonesPerSecond;
     const u32 timelineTicks = std::max<u32>(1, static_cast<u32>(std::ceil(seconds * ticksPerSecond())));
-    out.pitchSlide(note, *track.previousKey, key, PitchSlideTiming::fixedRate(timelineTicks, semitonesPerSecond))
+    out.pitchSlide(note, startKey, key, PitchSlideTiming::fixedRate(timelineTicks, semitonesPerSecond))
         .continueFrom(track.previousNote)
         .preferPortamento();
   }
@@ -190,7 +191,8 @@ struct Playback {
       emitPortamento(note, key);
       return;
     }
-    out.pitchSlide(note, *track.previousKey, key, PitchSlideTiming::fromTicks(0))
+    const double startKey = out.currentPitchTransitionKey(track.previousNote).value_or(*track.previousKey);
+    out.pitchSlide(note, startKey, key, PitchSlideTiming::fromTicks(0))
         .continueFrom(track.previousNote)
         .preferPitchBend();
   }
