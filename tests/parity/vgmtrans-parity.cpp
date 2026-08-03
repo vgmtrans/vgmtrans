@@ -3057,6 +3057,36 @@ bool compareSf2(std::span<const u8> legacyBytes, std::span<const u8> valueBytes,
     for (auto& preset : value.presets) {
       preset.bank = 0;
     }
+
+    const size_t instrumentCount = std::min(legacy.instruments.size(), value.instruments.size());
+    for (size_t instrumentIndex = 0; instrumentIndex < instrumentCount; ++instrumentIndex) {
+      const size_t zoneCount =
+          std::min(legacy.instruments[instrumentIndex].zones.size(), value.instruments[instrumentIndex].zones.size());
+      for (size_t zoneIndex = 0; zoneIndex < zoneCount; ++zoneIndex) {
+        const auto& legacyGenerators = legacy.instruments[instrumentIndex].zones[zoneIndex].generators;
+        auto& valueGenerators = value.instruments[instrumentIndex].zones[zoneIndex].generators;
+        const auto legacySustain = std::ranges::find(legacyGenerators, u16{37}, &Sf2Generator::operation);
+        const auto valueSustain = std::ranges::find(valueGenerators, u16{37}, &Sf2Generator::operation);
+        if (legacySustain == legacyGenerators.end() || valueSustain == valueGenerators.end() ||
+            legacySustain->amount == 1000 || valueSustain->amount != 1000) {
+          continue;
+        }
+
+        // The value exporter collapses a finite D2R to silence; legacy may
+        // retain DL forever. Physical envelope tests cover this intentional
+        // difference, so normalize its paired decay/sustain generators here.
+        for (auto& valueGenerator : valueGenerators) {
+          if (valueGenerator.operation != 36 && valueGenerator.operation != 37) {
+            continue;
+          }
+          const auto legacyGenerator =
+              std::ranges::find(legacyGenerators, valueGenerator.operation, &Sf2Generator::operation);
+          if (legacyGenerator != legacyGenerators.end()) {
+            valueGenerator.amount = legacyGenerator->amount;
+          }
+        }
+      }
+    }
   }
   if (normalizeCpsPlaceholders) {
     constexpr u64 eightSilentFramesHash = 0x88201fb960ff6465;
@@ -3110,6 +3140,8 @@ bool compareSf2(std::span<const u8> legacyBytes, std::span<const u8> valueBytes,
             continue;
           }
           const bool combinedDecayApproximation = valueGenerator.operation == 36;
+          const bool combinedSustainApproximation =
+              valueGenerator.operation == 37 && valueGenerator.amount == 1000;
           const bool stoppedEnvelopeStage = (valueGenerator.operation == 34 || valueGenerator.operation == 38) &&
                                             valueGenerator.amount == std::numeric_limits<s16>::min();
           const bool correctedCps3Sustain = correctedCps3Instrument && valueGenerator.operation == 37;
@@ -3120,12 +3152,14 @@ bool compareSf2(std::span<const u8> legacyBytes, std::span<const u8> valueBytes,
           const bool fractionalCentTruncation =
               valueGenerator.operation == 58 &&
               std::abs(static_cast<int>(valueGenerator.amount) - static_cast<int>(legacyGenerator->amount)) <= 1;
-          if (combinedDecayApproximation || stoppedEnvelopeStage || correctedCps3Sustain || correctedCps3FirstKey ||
-              correctedCps3FineTune || fractionalCentTruncation) {
+          if (combinedDecayApproximation || combinedSustainApproximation || stoppedEnvelopeStage ||
+              correctedCps3Sustain || correctedCps3FirstKey || correctedCps3FineTune || fractionalCentTruncation) {
             // QSound rate zero holds a stage forever, while legacy approximates
             // that state with exporter-specific finite times. The CPS3 legacy
             // parser also omits key zero and the sustain-level +1, and doubles
-            // fine tuning. Physical fixture tests cover the corrected values.
+            // fine tuning. A finite second decay now ends at silence even when
+            // legacy retained its intermediate sustain. Physical fixture tests
+            // cover the corrected values.
             valueGenerator.amount = legacyGenerator->amount;
           }
         }
@@ -5077,8 +5111,16 @@ int selfTest() {
   const auto legacySummary = legacyCapcomSnesSummary(aramBytes, "synthetic.spc");
   expect(compareSummary(legacySummary, legacySummary, summaryOutput),
          "self-test should compare identical CapcomSnes summaries: " + summaryOutput.str());
+
+  auto valueSummary = valueCapcomSnesSummary(aramBytes, "synthetic.spc");
+  for (size_t i = 0; i < std::min(legacySummary.regions.size(), valueSummary.regions.size()); ++i) {
+    // Isolate the sequence-derived modulation mismatch this check is meant to
+    // exercise from intentional differences in two-stage ADSR approximation.
+    valueSummary.regions[i].envelopeDecay = legacySummary.regions[i].envelopeDecay;
+    valueSummary.regions[i].envelopeSustain = legacySummary.regions[i].envelopeSustain;
+  }
   std::ostringstream modulationDifference;
-  expect(!compareCapcomSnesSummary(aramBytes, "synthetic.spc", modulationDifference) &&
+  expect(!compareSummary(legacySummary, valueSummary, modulationDifference) &&
              modulationDifference.str().find("instrument synth mismatch") != std::string::npos,
          "self-test should detect sequence-derived modulation differences in scanned instruments");
   legacyLevelReapplicationKeepsPreCurvePrecision();

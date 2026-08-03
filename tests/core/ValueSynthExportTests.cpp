@@ -10,6 +10,7 @@
 
 #include "value/export/synth/ModulationScaling.h"
 #include "value/export/synth/SynthExportData.h"
+#include "value/synth/PsxSpu.h"
 
 namespace {
 
@@ -93,13 +94,31 @@ void adsrApproximationLowersUnsupportedStages() {
   expect(exportableRelease.releaseSeconds == 150.0,
          "ADSR export should replace an endless release with a finite fallback");
 
-  const Envelope envelope = approximateEnvelopeAsAdsr(Envelope{
-      .decaySeconds = 1.009728,
-      .secondDecaySeconds = 5.100173,
-      .sustainAmplitude = 0.8125,
+  // Final Fantasy Tactics instrument 41: 00 0D 3E 0C 02 01 07 07.
+  const Envelope nativeFftEnvelope =
+      psxSpuEnvelope(composePsxAdsr1(0, 0x00, 0x0d, 0x02), composePsxAdsr2(1, 1, 0x3e, 1, 0x0c));
+  const Envelope fftEnvelope = approximateEnvelopeAsAdsr(nativeFftEnvelope);
+  expect(fftEnvelope.decaySeconds && std::abs(*fftEnvelope.decaySeconds - 17.167896) < 0.000001 &&
+             !fftEnvelope.secondDecaySeconds && fftEnvelope.sustainAmplitude == 0.0,
+         "ADSR export should combine FFT instrument 41's two rates by the attenuation distance each covers");
+
+  const Envelope endlessSecondDecay = approximateEnvelopeAsAdsr(Envelope{
+      .decaySeconds = 2.0,
+      .secondDecaySeconds = std::numeric_limits<double>::infinity(),
+      .sustainAmplitude = 0.5,
   });
-  expect(envelope.decaySeconds == 5.100173 && !envelope.secondDecaySeconds && envelope.sustainAmplitude == 0.0,
-         "a brief first stage should not hide an audible second decay");
+  expect(endlessSecondDecay.decaySeconds == 2.0 && !endlessSecondDecay.secondDecaySeconds &&
+             endlessSecondDecay.sustainAmplitude == 0.5,
+         "an endless second decay should remain a true sustain");
+
+  const Envelope secondDecayBelowSilence = approximateEnvelopeAsAdsr(Envelope{
+      .decaySeconds = 2.0,
+      .secondDecaySeconds = 1.0,
+      .sustainAmplitude = 0.0,
+  });
+  expect(secondDecayBelowSilence.decaySeconds == 2.0 && !secondDecayBelowSilence.secondDecaySeconds &&
+             secondDecayBelowSilence.sustainAmplitude == 0.0,
+         "a second decay that begins at silence should not alter the first rate");
 }
 
 void physicalModulationLowersToLegacySynthControls() {
@@ -386,8 +405,8 @@ void soundFontExporterWritesSfbkRiffFile() {
          "SoundFont export should write attackVolEnv from Region envelope");
   expect(soundFontIgenContainsAmount(result.bytes, 35, 32767),
          "SoundFont export should approximate an endless hold with its longest hold time");
-  expect(soundFontIgenContainsAmount(result.bytes, 36, 2951),
-         "SoundFont export should preserve the second decay after a barely audible first-stage drop");
+  expect(soundFontIgenContainsAmount(result.bytes, 36, 2941),
+         "SoundFont export should combine two decay rates over its 100 dB envelope range");
   expect(soundFontIgenContainsAmount(result.bytes, 37, 1000),
          "SoundFont export should end the approximated second decay at silence");
   expect(soundFontIgenContainsAmount(result.bytes, 38, -2400),
@@ -528,8 +547,8 @@ void dlsExporterWritesDlsRiffFile() {
          "DLS export should write EG1 attack time from Region envelope");
   expect(dlsArt2ContainsConnection(result.bytes, 0x020c, std::numeric_limits<s32>::max()),
          "DLS export should approximate an endless hold with its longest hold time");
-  expect(dlsArt2ContainsConnection(result.bytes, 0x0207, 124646523),
-         "DLS export should combine short first and second decay stages");
+  expect(dlsArt2ContainsConnection(result.bytes, 0x0207, 6901269),
+         "DLS export should combine two decay rates over its 96 dB envelope range");
   expect(dlsArt2ContainsConnection(result.bytes, 0x020a, 0),
          "DLS export should end a combined two-stage decay at silence");
   expect(dlsArt2ContainsConnection(result.bytes, 0x0209, -157286400),

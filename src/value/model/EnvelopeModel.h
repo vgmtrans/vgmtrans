@@ -18,9 +18,11 @@ struct Envelope {
   // the stage has no finite duration. Sustain is linear amplitude in [0, 1].
   std::optional<double> attackSeconds;
   std::optional<double> holdSeconds;
+  // Decay times describe the rate as the duration of a full-scale envelope
+  // change. The sustain level determines how much of the first rate is used.
   std::optional<double> decaySeconds;
-  // Full-scale decay time for the rate used after the sustain level is reached.
-  // Some sound chips keep fading during a held note instead of sustaining.
+  // Some sound chips switch to another full-scale decay rate after reaching
+  // the sustain level instead of holding there.
   std::optional<double> secondDecaySeconds;
   std::optional<double> releaseSeconds;
   std::optional<double> sustainAmplitude;
