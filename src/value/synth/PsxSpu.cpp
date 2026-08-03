@@ -6,6 +6,8 @@
 
 #include "value/synth/PsxSpu.h"
 
+#include "value/synth/SynthMath.h"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -41,27 +43,6 @@ namespace {
     return rates;
   }();
   return table;
-}
-
-// SF2 and DLS use a constant rate of decibel attenuation, while a linear SPU
-// stage changes amplitude at a constant rate. This adjustment keeps the heard
-// fade shape closer after conversion.
-[[nodiscard]] double linearAmplitudeDecayToDbDecay(double secondsToFullAttenuation) {
-  if (secondsToFullAttenuation <= 0.0) {
-    return 0.0;
-  }
-
-  constexpr double targetDbLeastSquares = 70.0;
-  constexpr double targetDbInitialSlope = 140.0;
-  constexpr double ln10 = 2.302585092994046;
-  constexpr double kneeSeconds = 0.12;
-  constexpr double kneePower = 2.0;
-
-  const double shortScale = targetDbInitialSlope / (20.0 / ln10);
-  const double longScale = targetDbLeastSquares * ln10 / 45.0;
-  const double x = secondsToFullAttenuation / kneeSeconds;
-  const double weight = 1.0 / (1.0 + std::pow(x, kneePower));
-  return secondsToFullAttenuation * (weight * shortScale + (1.0 - weight) * longScale);
 }
 
 }  // namespace
@@ -192,7 +173,7 @@ Envelope psxSpuEnvelope(u16 adsr1, u16 adsr2, PsxSpuGeneration generation) {
       }
       samples = steps;
     }
-    sustainSeconds = linearAmplitudeDecayToDbDecay(samples / sampleRate);
+    sustainSeconds = linearAmplitudeFadeToDbEnvelopeSeconds(samples / sampleRate);
   }
 
   if (sustainLevel == 0) {
@@ -242,7 +223,7 @@ Envelope psxSpuEnvelope(u16 adsr1, u16 adsr2, PsxSpuGeneration generation) {
     }
     samples = steps;
   }
-  const double releaseSeconds = linearAmplitudeDecayToDbDecay(samples / sampleRate);
+  const double releaseSeconds = linearAmplitudeFadeToDbEnvelopeSeconds(samples / sampleRate);
 
   return Envelope{
       .attackSeconds = attackSeconds,
