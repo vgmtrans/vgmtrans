@@ -13,6 +13,7 @@
 #include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
+#include "value/synth/SynthMath.h"
 
 #include <fmt/format.h>
 
@@ -192,21 +193,25 @@ struct PersistentPitchEffect {
   return static_cast<u8>((amount >= 200 ? 0xa0 : 0x80) | ((amount - base) & 0x1f));
 }
 
-[[nodiscard]] double softwareReleaseSeconds(KonamiSnesVersion version, u8 rate) {
+[[nodiscard]] double softwareReleaseSeconds(KonamiSnesVersion version, u8 rate, u8 tempo) {
   // Early engines add rate << 4 to an 8.8 attenuation accumulator until its
-  // high byte reaches the maximum note volume. Timer 0 advances once per
-  // timerFrequency * 125 microseconds.
+  // high byte reaches the maximum note volume, once per tempo-scaled track
+  // update.
   constexpr double kMaximumNoteVolume = 127.0;
   const double ticks = std::ceil(kMaximumNoteVolume * 16.0 / rate);
-  return ticks * timerFrequency(version) / 8000.0;
+  const double secondsPerTick =
+      tempo == 0 ? std::numeric_limits<double>::infinity()
+                 : timerFrequency(version) * 125e-6 * 256.0 / tempo;
+  const double secondsToSilence = ticks * secondsPerTick;
+  return linearAmplitudeFadeToDbEnvelopeSeconds(secondsToSilence);
 }
 
-[[nodiscard]] std::optional<double> customReleaseSeconds(KonamiSnesVersion version, u8 amount) {
+[[nodiscard]] std::optional<double> customReleaseSeconds(KonamiSnesVersion version, u8 amount, u8 tempo) {
   if (amount == 0) {
     return std::nullopt;
   }
   if (version <= KONAMISNES_V2 || (version == KONAMISNES_V3 && amount < 100)) {
-    return softwareReleaseSeconds(version, amount);
+    return softwareReleaseSeconds(version, amount, tempo);
   }
   if (amount >= 100) {
     return snesDspGainEnvelopeSeconds(releaseGain(amount), 0x7ff, 0);
@@ -586,7 +591,7 @@ struct Playback {
   }
 
   void emitPersistentRelease() {
-    if (const auto release = customReleaseSeconds(track.version, track.envelope.releaseAmount)) {
+    if (const auto release = customReleaseSeconds(track.version, track.envelope.releaseAmount, track.tempo)) {
       out.updateEnvelope(Envelope{.releaseSeconds = *release}, EnvelopeFields::Release,
                          VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
     }
@@ -679,7 +684,7 @@ struct Playback {
 
   void setRelease(u8 amount) {
     track.envelope.releaseAmount = amount;
-    if (const auto release = customReleaseSeconds(track.version, amount)) {
+    if (const auto release = customReleaseSeconds(track.version, amount, track.tempo)) {
       out.updateEnvelope(Envelope{.releaseSeconds = *release}, EnvelopeFields::Release,
                          VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
     } else if (const auto envelope = currentEnvelope()) {
@@ -950,7 +955,7 @@ private:
       return std::nullopt;
     }
     Envelope envelope = snesDspEnvelope(registers.adsr1, registers.adsr2.value_or(0), registers.gain.value_or(0));
-    if (const auto release = customReleaseSeconds(track.version, track.envelope.releaseAmount)) {
+    if (const auto release = customReleaseSeconds(track.version, track.envelope.releaseAmount, track.tempo)) {
       envelope.releaseSeconds = *release;
     }
     return envelope;

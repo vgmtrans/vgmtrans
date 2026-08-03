@@ -17,6 +17,9 @@ namespace vgmtrans::core {
 [[nodiscard]] s32 synthAmountFromDecibels(double decibels);
 [[nodiscard]] double synthSecondsRangeMinimum(double seconds);
 [[nodiscard]] double linearAmplitudeToAttenuationDb(double amplitude, double silenceDb = 96.0);
+// Returns the dB-linear envelope duration that best approximates a
+// linear-amplitude fade lasting secondsToSilence.
+[[nodiscard]] double linearAmplitudeFadeToDbEnvelopeSeconds(double secondsToSilence);
 [[nodiscard]] double panPositionFrom7Bit(u8 pan);
 
 }  // namespace vgmtrans::core

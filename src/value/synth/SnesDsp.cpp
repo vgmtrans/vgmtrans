@@ -6,6 +6,8 @@
 
 #include "value/synth/SnesDsp.h"
 
+#include "value/synth/SynthMath.h"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -33,25 +35,6 @@ struct SnesEnvelopeSeconds {
   double sustain = 0.0;
   double release = 0.0;
 };
-
-[[nodiscard]] double linearAmpDecayTimeToLinDbDecayTime(double secondsToFullAttenuation) {
-  if (secondsToFullAttenuation <= 0.0) {
-    return 0.0;
-  }
-
-  constexpr double targetDbLeastSquares = 70.0;
-  constexpr double targetDbInitialSlope = 140.0;
-  constexpr double ln10 = 2.302585092994046;
-  constexpr double kneeSeconds = 0.12;
-  constexpr double kneeShape = 2.0;
-
-  const double shortScale = targetDbInitialSlope / (20.0 / ln10);
-  const double longScale = targetDbLeastSquares * ln10 / 45.0;
-  const double x = secondsToFullAttenuation / kneeSeconds;
-  const double weight = 1.0 / (1.0 + std::pow(x, kneeShape));
-
-  return secondsToFullAttenuation * (weight * shortScale + (1.0 - weight) * longScale);
-}
 
 [[nodiscard]] double ampToDb(double amp) {
   constexpr double maxAttenuationDb = 100.0;
@@ -124,7 +107,7 @@ struct SnesEnvelopeSeconds {
     seconds = 0.0;
   } else if (mode == 4) {
     const u32 fullSamples = (0x800 / 0x20) * kCounterRates[rate];
-    seconds = linearAmpDecayTimeToLinDbDecayTime(fullSamples / kSampleRate);
+    seconds = linearAmplitudeFadeToDbEnvelopeSeconds(fullSamples / kSampleRate);
   } else if (mode == 5) {
     if (ticks == 0) {
       seconds = 0.0;
@@ -193,7 +176,7 @@ struct SnesEnvelopeSeconds {
         .decay = decaySeconds,
         .sustainLevel = (sustainLevel + 1) / 8.0,
         .sustain = sustainSeconds,
-        .release = linearAmpDecayTimeToLinDbDecayTime(releaseSamples / kSampleRate),
+        .release = linearAmplitudeFadeToDbEnvelopeSeconds(releaseSamples / kSampleRate),
     };
   }
 
@@ -205,7 +188,7 @@ struct SnesEnvelopeSeconds {
         .decay = -1.0,
         .sustainLevel = (gain & 0x7f) / 128.0,
         .sustain = -1.0,
-        .release = linearAmpDecayTimeToLinDbDecayTime(releaseSamples / kSampleRate),
+        .release = linearAmplitudeFadeToDbEnvelopeSeconds(releaseSamples / kSampleRate),
     };
   }
 
@@ -218,7 +201,7 @@ struct SnesEnvelopeSeconds {
         .decay = -1.0,
         .sustainLevel = 1.0,
         .sustain = -1.0,
-        .release = linearAmpDecayTimeToLinDbDecayTime(releaseSamples / kSampleRate),
+        .release = linearAmplitudeFadeToDbEnvelopeSeconds(releaseSamples / kSampleRate),
     };
   }
 
@@ -228,7 +211,7 @@ struct SnesEnvelopeSeconds {
       .decay = gainEnvelope.seconds,
       .sustainLevel = 0.0,
       .sustain = 0.0,
-      .release = linearAmpDecayTimeToLinDbDecayTime(releaseSamples / kSampleRate),
+      .release = linearAmplitudeFadeToDbEnvelopeSeconds(releaseSamples / kSampleRate),
   };
 }
 

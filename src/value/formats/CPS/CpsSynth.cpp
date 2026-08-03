@@ -78,21 +78,6 @@ struct QSoundSampleInfo {
   return gain <= 0.0 ? 96.0 : -20.0 * std::log10(gain);
 }
 
-[[nodiscard]] double linearDecayToDbSeconds(double seconds) {
-  if (seconds <= 0.0 || !std::isfinite(seconds)) {
-    return seconds;
-  }
-  constexpr double targetDbLeastSquares = 70.0;
-  constexpr double targetDbInitialSlope = 140.0;
-  constexpr double ln10 = 2.302585092994046;
-  constexpr double kneeSeconds = 0.12;
-  const double shortScale = targetDbInitialSlope / (20.0 / ln10);
-  const double longScale = targetDbLeastSquares * ln10 / 45.0;
-  const double x = seconds / kneeSeconds;
-  const double weight = 1.0 / (1.0 + x * x);
-  return seconds * (weight * shortScale + (1.0 - weight) * longScale);
-}
-
 [[nodiscard]] Envelope qsoundEnvelope(CpsVersion version, u8 attack, u8 decay, u8 sustainLevel, u8 sustain,
                                       u8 release) {
   const u16 ar = kAttackRates[std::min<u8>(attack, 63)];
@@ -119,13 +104,13 @@ struct QSoundSampleInfo {
   const double sustainAmplitude = isCps3(version) ? (std::min<u8>(sustainLevel, 127) + 1) / 128.0 : sl / 65535.0;
   return Envelope{
       .attackSeconds = stageSeconds(ar, true),
-      .decaySeconds = std::isinf(decaySeconds) ? decaySeconds : linearDecayToDbSeconds(decaySeconds),
-      .secondDecaySeconds =
-          dr == 0 || sustainAmplitude == 0.0
-              ? std::nullopt
-              : std::optional{std::isinf(secondDecaySeconds) ? secondDecaySeconds
-                                                             : linearDecayToDbSeconds(secondDecaySeconds)},
-      .releaseSeconds = linearDecayToDbSeconds(stageSeconds(rr, true)),
+      .decaySeconds = std::isinf(decaySeconds) ? decaySeconds : linearAmplitudeFadeToDbEnvelopeSeconds(decaySeconds),
+      .secondDecaySeconds = dr == 0 || sustainAmplitude == 0.0
+                                ? std::nullopt
+                                : std::optional{std::isinf(secondDecaySeconds)
+                                                    ? secondDecaySeconds
+                                                    : linearAmplitudeFadeToDbEnvelopeSeconds(secondDecaySeconds)},
+      .releaseSeconds = linearAmplitudeFadeToDbEnvelopeSeconds(stageSeconds(rr, true)),
       .sustainAmplitude = sustainAmplitude,
   };
 }
