@@ -63,12 +63,17 @@ TrackProgram decodeTrack(const std::vector<u8>& bytes, AkaoSnesProfile profile, 
 }
 
 PerformanceSequence renderTracks(AkaoSnesProfile profile, std::vector<TrackProgram> tracks,
-                                 SequenceVmOptions options = SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce}) {
+                                 SequenceVmOptions options = SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce},
+                                 std::vector<u32> driverData = {}) {
   const auto& dialect = akaoSnesSequenceDialect();
   const SequenceProgram program{
       .dialect = dialect.id,
       .timebase = dialect.timebase,
-      .config = SequenceProgramConfig{.profile = encodeAkaoSnesProfile(profile)},
+      .config =
+          SequenceProgramConfig{
+              .profile = encodeAkaoSnesProfile(profile),
+              .driverData = std::move(driverData),
+          },
       .tracks = std::move(tracks),
   };
   return SequenceVm(options).render(program, dialect);
@@ -133,6 +138,15 @@ std::vector<u8> makeAkaoSnesAram() {
   writeBytes(bytes, 0x0500, loadInstrV1);
   bytes[0x0500 + 6] = 0x52;
 
+  constexpr std::array<u8, 14> loadVolumeEnvelopeV1{0x1c, 0xfd, 0xf6, 0x00, 0x1d, 0xd5, 0x20,
+                                                    0x03, 0xf6, 0x01, 0x1d, 0xd5, 0x21, 0x03};
+  writeBytes(bytes, 0x0550, loadVolumeEnvelopeV1);
+  for (size_t i = 0; i < 0x20; ++i) {
+    writeLe16(bytes, 0x1d00 + i * 2, 0x1f00);
+  }
+  bytes[0x1f00] = 0xff;
+  bytes[0x1f01] = 0;
+
   writeLe16(bytes, 0x2000, 0x2100);
   for (size_t i = 1; i < 8; ++i) {
     writeLe16(bytes, 0x2000 + i * 2, 0);
@@ -141,8 +155,10 @@ std::vector<u8> makeAkaoSnesAram() {
   bytes[0x2101] = 5;
   bytes[0x2102] = 0xdb;
   bytes[0x2103] = 0;
-  bytes[0x2104] = 0x00;
-  bytes[0x2105] = 0xf1;
+  bytes[0x2104] = 0xdc;
+  bytes[0x2105] = 0x0b;
+  bytes[0x2106] = 0x00;
+  bytes[0x2107] = 0xf1;
 
   writeLe16(bytes, 0x5000, 0x6000);
   writeLe16(bytes, 0x5002, 0x6000);
@@ -163,6 +179,8 @@ void akaoSnesLayoutDiscoversFf4StyleAram() {
   expect(layout->sequenceHeaderAddress == 0x2000, "sequence header address should come from legacy V1 header reader");
   expect(layout->spcDirAddress == 0x5000, "SPC DIR address should come from legacy V1 DIR loader");
   expect(layout->tuningTableAddress == 0x5200, "V1 tuning table address should come from legacy instrument loader");
+  expect(layout->volumeEnvelopeTableAddress == 0x1d00,
+         "V1 software-envelope table address should come from the DC command handler");
   expect(!layout->adsrTableAddress, "V1 layouts should not invent an ADSR table at ARAM offset zero");
 }
 
@@ -411,6 +429,64 @@ void akaoSnesV3DynamicAdsrUsesAttackAndHeldNoteDecay() {
              sd2Envelopes[0]->update.values && sd2Envelopes[0]->update.values->secondDecaySeconds &&
              std::isinf(*sd2Envelopes[0]->update.values->secondDecaySeconds),
          "Secret of Mana EE 00 should disable held-note decay");
+}
+
+void akaoSnesV1SoftwareEnvelopesDriveLevelWithoutDynamicInstruments() {
+  constexpr u32 start = 0x20;
+  const AkaoSnesProfile ff4{.version = AKAOSNES_V1, .minorVersion = AKAOSNES_V1_FF4};
+
+  std::vector<u32> driverData(0x20);
+  driverData[0] = static_cast<u32>(driverData.size());
+  driverData.push_back(0x40);
+  driverData.push_back(0x80);
+  driverData.push_back(0xc0);
+  for (size_t i = 0; i < 61; ++i) {
+    driverData.push_back(0xff);
+  }
+  driverData.push_back(0);
+  driverData[1] = static_cast<u32>(driverData.size());
+  driverData.push_back(0xff);
+  driverData.push_back(0);
+
+  const auto levelAt = [](const PerformanceTrack& track, u64 tick) {
+    double level = 1.0;
+    for (const auto* event : eventsOfType<LevelPerformanceEvent>(track)) {
+      if (event->header.tick <= tick) {
+        level = event->linearGain;
+      }
+    }
+    return level;
+  };
+
+  std::vector<u8> durationBytes(0x40, 0xf1);
+  std::ranges::copy(std::initializer_list<u8>{0xdc, 0, 0xdd, 0, 0xde, 50, 0x0b, 0xf1}, durationBytes.begin() + start);
+  const PerformanceSequence durationEnvelope =
+      renderTracks(ff4, {decodeTrack(durationBytes, ff4, start, start + 8)}, {}, driverData);
+  expect(durationEnvelope.diagnostics.empty(),
+         "valid FF4 software-envelope commands should render without diagnostics");
+  expect(eventsOfType<EnvelopePerformanceEvent>(durationEnvelope.tracks.front()).empty(),
+         "FF4 software envelopes should not create dynamic instrument-envelope variants");
+  expect(std::abs(levelAt(durationEnvelope.tracks.front(), 0) - (0x40 / 255.0)) < 0.000001 &&
+             levelAt(durationEnvelope.tracks.front(), 1) > 0.99,
+         "DC should restart its physical-time volume table for each note");
+  expect(levelAt(durationEnvelope.tracks.front(), 4) > 0.99 &&
+             levelAt(durationEnvelope.tracks.front(), 5) < levelAt(durationEnvelope.tracks.front(), 4),
+         "DE 50 should switch to B1 after half of an eight-tick note");
+
+  std::vector<u8> tieBytes(0x40, 0xf1);
+  std::ranges::copy(std::initializer_list<u8>{0xdc, 0, 0xdd, 0, 0xde, 50, 0x0b, 0xce, 0xf1},
+                    tieBytes.begin() + start);
+  const PerformanceSequence tiedEnvelope =
+      renderTracks(ff4, {decodeTrack(tieBytes, ff4, start, start + 9)}, {}, driverData);
+  expect(levelAt(tiedEnvelope.tracks.front(), 5) > 0.99 && levelAt(tiedEnvelope.tracks.front(), 9) < 0.99,
+         "DE should use the combined duration of a note and its following ties");
+
+  std::vector<u8> gainBytes(0x40, 0xf1);
+  std::ranges::copy(std::initializer_list<u8>{0xdc, 1, 0xdd, 17, 0xde, 0, 0x0b, 0xf1}, gainBytes.begin() + start);
+  const PerformanceSequence gainEnvelope =
+      renderTracks(ff4, {decodeTrack(gainBytes, ff4, start, start + 8)}, {}, std::move(driverData));
+  expect(levelAt(gainEnvelope.tracks.front(), 0) > 0.99 && levelAt(gainEnvelope.tracks.front(), 1) < 0.99,
+         "DD should begin its selected exponential GAIN decrease when the DC table terminates");
 }
 
 void akaoSnesCompilerCursorCoversRemapsUnknownsAndTruncation() {
