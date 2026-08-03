@@ -11,7 +11,6 @@
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 #include "value/synth/SnesDsp.h"
-#include "value/synth/SynthMath.h"
 
 #include "ValueFormatTestSupport.h"
 
@@ -783,23 +782,20 @@ void konamiSnesDynamicAdsrMatchesEachDriverFamily() {
     return result;
   };
 
-  constexpr double v1DefaultTickSeconds = 32 * 125e-6 * 256.0 / 0xff;
   const auto v1 = envelopesFor(renderKonamiSnesProgram(KONAMISNES_V1, {{0xfa, 35, 64, 16, 0xe2, 0x01, 0xff}}));
   Envelope expectedV1 = snesDspEnvelope(0xd3, 0x46, 0x46);
-  expectedV1.releaseSeconds = linearAmplitudeFadeToDbEnvelopeSeconds(127 * v1DefaultTickSeconds);
-  expect(v1.size() == 2 && v1[0].update.values == expectedV1 && v1[0].update.fields == EnvelopeFields::All &&
-             v1[1].update.fields == EnvelopeFields::Release && v1[1].update.values &&
-             v1[1].update.values->releaseSeconds == expectedV1.releaseSeconds,
-         "V1 0xFA should decode decimal ADSR parameters and preserve its software release across program changes");
+  expect(v1.size() == 1 && v1[0].update.values == expectedV1 && v1[0].update.fields == EnvelopeFields::All,
+         "V1 0xFA should decode decimal ADSR parameters without turning its software release into a synth envelope");
 
-  constexpr double contraTickSeconds = 32 * 125e-6 * 256.0 / 0x4e;
-  const auto contra =
-      envelopesFor(renderKonamiSnesProgram(KONAMISNES_V1, {{0xea, 0x4e, 0xfa, 0x8c, 0xd2, 0x64, 0xff}}));
+  const auto contraPerformance = renderKonamiSnesProgram(
+      KONAMISNES_V1, {{0xea, 0x4e, 0xee, 0x7f, 0xfa, 0x8c, 0xd2, 0x64, 0x3c, 0x08, 0x32, 0x8a, 0xff}});
+  const auto contra = envelopesFor(contraPerformance);
   Envelope expectedContra = snesDspEnvelope(0x8e, 0xe2, 0xe2);
-  expectedContra.releaseSeconds = linearAmplitudeFadeToDbEnvelopeSeconds(21 * contraTickSeconds);
-  expect(contra.size() == 1 && contra[0].update.values == expectedContra && expectedContra.releaseSeconds > 1.53 &&
-             expectedContra.releaseSeconds < 1.55,
-         "V1 0xFA software release should preserve its tempo-scaled linear fade in a dB-linear synth envelope");
+  const auto contraNotes = performanceEvents<NotePerformanceEvent>(contraPerformance.tracks.front());
+  const auto contraLevels = performanceEvents<LevelPerformanceEvent>(contraPerformance.tracks.front());
+  expect(contra.size() == 1 && contra[0].update.values == expectedContra && contraNotes.size() == 1 &&
+             contraNotes[0]->durationTicks == 6 && contraLevels.size() > 3 && contraLevels.back()->linearGain == 0.0,
+         "V1 0xFA software release should extend the keyed voice and fade the driver's mixed level");
 
   const auto v1Gain = envelopesFor(renderKonamiSnesProgram(KONAMISNES_V1, {{0xfa, 0xa0, 0x9f, 0x00, 0xff}}));
   expect(v1Gain.size() == 1 && v1Gain[0].update.values == snesDspEnvelope(0x00, 0x9f, 0x9f),
