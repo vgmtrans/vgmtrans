@@ -20,6 +20,7 @@
 #include "value/formats/RareSnes/RareSnes.h"
 #include "value/formats/NDS/Nds.h"
 #include "value/formats/SegSat/SegSat.h"
+#include "value/formats/SuzukiPS1/SuzukiPS1.h"
 #include "value/session/Session.h"
 
 #include <array>
@@ -89,6 +90,7 @@ void registerValueFormats(core::Session& session, const ValueFormatOptions& opti
   session.registerFormat(nin_snes::definition());
   session.registerFormat(rare_snes::definition());
   session.registerFormat(segsat::segSatDefinition());
+  session.registerFormat(suzuki_ps1::suzukiPs1Definition());
 }
 
 }  // namespace vgmtrans::formats
