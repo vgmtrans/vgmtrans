@@ -115,6 +115,7 @@ void cpsLateRepeatBreakUsesEndOfCommandBase();
 void cps3TerminalMaxRepeatActsAsPracticalLoop();
 void cpsLateControlFlowOffsetsFollowEachDriver();
 void akaoSnesLayoutDiscoversFf4StyleAram();
+void akaoSnesLayoutDiscoversLatePercussionTable();
 void akaoSnesModuleDiscoversSequenceInstrumentsAndSamples();
 void akaoSnesV4TieExtendsShortenedPreviousNote();
 void akaoSnesCompilerCursorResolvesRelocatedBranchesWithoutRetainingBytes();
@@ -285,6 +286,7 @@ int main() {
     cps3TerminalMaxRepeatActsAsPracticalLoop();
     cpsLateControlFlowOffsetsFollowEachDriver();
     akaoSnesLayoutDiscoversFf4StyleAram();
+    akaoSnesLayoutDiscoversLatePercussionTable();
     akaoSnesModuleDiscoversSequenceInstrumentsAndSamples();
     akaoSnesV4TieExtendsShortenedPreviousNote();
     akaoSnesCompilerCursorResolvesRelocatedBranchesWithoutRetainingBytes();
