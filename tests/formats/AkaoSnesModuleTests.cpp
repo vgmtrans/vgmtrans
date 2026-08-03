@@ -992,6 +992,18 @@ void akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo() {
              instruments[2]->bank == 0 && instruments[2]->program == 5,
          "percussion mode should restore the remembered melodic program when it turns off");
 
+  std::vector<u8> transposedDrum(0x40, 0xec);
+  transposedDrum[start] = 0xd9;
+  transposedDrum[start + 1] = 1;
+  transposedDrum[start + 2] = 0xfb;
+  transposedDrum[start + 3] = 0x1c;
+  transposedDrum[start + 4] = 0xec;
+  const PerformanceSequence transposedDrumPerformance =
+      renderTracks(ct, {decodeTrack(transposedDrum, ct, start, start + 5)});
+  const auto transposedDrumNotes = eventsOfType<NotePerformanceEvent>(transposedDrumPerformance.tracks.front());
+  expect(transposedDrumNotes.size() == 1 && transposedDrumNotes.front()->key == kAkaoSnesDrumKeyBias + 2,
+         "track transpose should not move a percussion note away from its drum-kit region");
+
   const AkaoSnesProfile ff6{.version = AKAOSNES_V4, .minorVersion = AKAOSNES_V4_FF6};
   std::vector<u8> slideBytes(0x40, 0xec);
   slideBytes[start] = 0xc8;

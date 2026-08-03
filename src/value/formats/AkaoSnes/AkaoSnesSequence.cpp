@@ -1293,7 +1293,9 @@ struct Playback {
         beginTremoloForNote();
       }
       if (track.percussion) {
-        out.note(kAkaoSnesDrumKeyBias + noteIndex - track.transpose, velocity, duration);
+        // The note index selects a percussion-table row. Track transpose must
+        // not redirect it to a different drum-kit region.
+        out.note(kAkaoSnesDrumKeyBias + noteIndex, velocity, duration);
       } else {
         const PerformanceNoteId pitchNote =
             out.note((track.octave * 12) + noteIndex + track.transpose, velocity, duration);
