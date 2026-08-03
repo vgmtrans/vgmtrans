@@ -166,9 +166,6 @@ struct TrackState {
   u8 octave = 3;
   u16 bank = 0;
   u8 program = 0;
-  u8 volume = 127;
-  u8 pan = 64;
-  bool slur = false;
   bool initialized = false;
   bool hasEnvelope = false;
   u16 adsr1 = 0;
@@ -325,14 +322,12 @@ struct Playback {
   }
 
   void volumeSlide(u8 duration, u8 target) {
-    track.volume = target;
     out.fade(PerformanceAutomationTarget::Level, linearController(target), duration)
         .at(out, vm.tick() + duration)
         .level(linearController(target));
   }
 
   void panSlide(u8 duration, u8 target) {
-    track.pan = target;
     out.fade(PerformanceAutomationTarget::Pan, panPosition(target), duration)
         .at(out, vm.tick() + duration)
         .pan(panPosition(target));
@@ -475,9 +470,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xaf:
       return cursor.noOp("Percussion Off");
     case 0xb0:
-      return cursor.command("Slur On", SequenceSemantic::State).set<&TrackState::slur>(true).emitLegatoPedal(true);
+      return cursor.command("Slur On", SequenceSemantic::State).emitLegatoPedal(true);
     case 0xb1:
-      return cursor.command("Slur Off", SequenceSemantic::State).set<&TrackState::slur>(false).emitLegatoPedal(false);
+      return cursor.command("Slur Off", SequenceSemantic::State).emitLegatoPedal(false);
     case 0xba:
       return cursor.command("Reverb On", SequenceSemantic::State).emitReverb(1.0);
     case 0xbb:
@@ -565,7 +560,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xe0: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
       const u8 value = event.u8("volume", SemanticOperandRole::Level);
-      return event.set<&TrackState::volume>(value).emitLevel(linearController(value));
+      return event.emitLevel(linearController(value));
     }
     case 0xe1: {
       auto event =
@@ -597,7 +592,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xe8: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
       const u8 value = event.u8("pan", SemanticOperandRole::Pan);
-      return event.set<&TrackState::pan>(value).emitPan(panPosition(value));
+      return event.emitPan(panPosition(value));
     }
     case 0xe9: {
       auto event = cursor.command("Relative Pan Parameter", SequenceSemantic::Pan, CommandPlaybackStatus::SourceOnly);

@@ -64,9 +64,14 @@ struct ParsedInstrument {
     const u32 rates = *record.u32leAt(8, "adsr_rates", SourceValueDisplay::Hex);
     const u16 modes = *record.u16leAt(12, "adsr_modes", SourceValueDisplay::Hex);
     (void)record.rangeAt(14, 2, "reserved");
-    adsr1 = composePsxAdsr1(((modes & 7) & 4) >> 2, rates & 0x7f, (rates >> 8) & 0x0f, (rates >> 12) & 0x0f);
-    adsr2 = composePsxAdsr2((((modes >> 4) & 7) & 4) >> 2, (((modes >> 4) & 7) & 2) >> 1, (rates >> 16) & 0x7f,
-                            (((modes >> 8) & 7) & 4) >> 2, (rates >> 24) & 0x1f);
+    // WDS packs the attack, sustain, and release modes into adjacent
+    // three-bit fields. Name them before selecting their native SPU bits.
+    const u8 attackMode = modes & 0x07;
+    const u8 sustainMode = (modes >> 4) & 0x07;
+    const u8 releaseMode = (modes >> 8) & 0x07;
+    adsr1 = composePsxAdsr1((attackMode >> 2) & 1, rates & 0x7f, (rates >> 8) & 0x0f, (rates >> 12) & 0x0f);
+    adsr2 = composePsxAdsr2((sustainMode >> 2) & 1, (sustainMode >> 1) & 1, (rates >> 16) & 0x7f,
+                            (releaseMode >> 2) & 1, (rates >> 24) & 0x1f);
   }
   record.derived("adsr1", adsr1, SourceValueDisplay::Hex);
   record.derived("adsr2", adsr2, SourceValueDisplay::Hex);
@@ -199,13 +204,9 @@ std::optional<SuzukiPs1ScannedBank> addSuzukiPs1Bank(ScanResultBuilder& result, 
     instrument.region(sample->second, std::move(region)).source("Region", source.source.range, "suzuki-ps1-region");
   }
 
-  if (instruments.empty()) {
-    return std::nullopt;
-  }
   return SuzukiPs1ScannedBank{
       .instruments = instruments.ref(),
       .samples = samples.ref(),
-      .layout = layout,
       .envelopes = std::move(envelopes),
   };
 }
