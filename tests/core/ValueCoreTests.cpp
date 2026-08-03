@@ -19,6 +19,8 @@ void runValueSynthBuilderTests();
 void runValueMidiTests();
 void runValueSynthExportTests();
 void runValuePsxTests();
+void suzukiPs1DynamicAdsrUsesAuditedDriverCommands();
+void suzukiPs1ModuleBuildsFractionallyTunedWdsSynth();
 
 void capcomSnesLayoutSelectsSongListAndFixedHeaders();
 void capcomSnesLayoutFallsBackToV2SongList();
@@ -346,6 +348,8 @@ int main() {
     segSatMultiBankPlaybackUsesTheActiveBanksVlTable();
     segSatCollectionPreparationReadsVelocityBanksFromSeparateSources();
     segSatSsfExtractorUsesFourByteMiniHeader();
+    suzukiPs1DynamicAdsrUsesAuditedDriverCommands();
+    suzukiPs1ModuleBuildsFractionallyTunedWdsSynth();
   } catch (const std::exception& ex) {
     std::cerr << ex.what() << '\n';
     return 1;
