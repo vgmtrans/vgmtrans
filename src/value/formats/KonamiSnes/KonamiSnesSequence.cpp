@@ -13,7 +13,6 @@
 #include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
-#include "value/synth/SynthMath.h"
 
 #include <fmt/format.h>
 
@@ -193,27 +192,12 @@ struct PersistentPitchEffect {
   return static_cast<u8>((amount >= 200 ? 0xa0 : 0x80) | ((amount - base) & 0x1f));
 }
 
-[[nodiscard]] double softwareReleaseSeconds(KonamiSnesVersion version, u8 rate, u8 tempo) {
-  // Early engines add rate << 4 to an 8.8 attenuation accumulator until its
-  // high byte reaches the maximum note volume, once per tempo-scaled track
-  // update.
-  constexpr double kMaximumNoteVolume = 127.0;
-  const double ticks = std::ceil(kMaximumNoteVolume * 16.0 / rate);
-  const double secondsPerTick =
-      tempo == 0 ? std::numeric_limits<double>::infinity()
-                 : timerFrequency(version) * 125e-6 * 256.0 / tempo;
-  const double secondsToSilence = ticks * secondsPerTick;
-  return linearAmplitudeFadeToDbEnvelopeSeconds(secondsToSilence);
+[[nodiscard]] constexpr bool usesSoftwareRelease(KonamiSnesVersion version, u8 amount) {
+  return amount != 0 && (version <= KONAMISNES_V2 || (version == KONAMISNES_V3 && amount < 100));
 }
 
-[[nodiscard]] std::optional<double> customReleaseSeconds(KonamiSnesVersion version, u8 amount, u8 tempo) {
-  if (amount == 0) {
-    return std::nullopt;
-  }
-  if (version <= KONAMISNES_V2 || (version == KONAMISNES_V3 && amount < 100)) {
-    return softwareReleaseSeconds(version, amount, tempo);
-  }
-  if (amount >= 100) {
+[[nodiscard]] std::optional<double> dspReleaseSeconds(KonamiSnesVersion version, u8 amount) {
+  if (version >= KONAMISNES_V3 && amount >= 100) {
     return snesDspGainEnvelopeSeconds(releaseGain(amount), 0x7ff, 0);
   }
   return std::nullopt;
@@ -474,6 +458,12 @@ struct TrackState {
   double lastEmittedTuningCents = std::numeric_limits<double>::quiet_NaN();
   u8 tempo = kKonamiSnesDefaultTempo;
 
+  // V1-V3 can release a note by subtracting an 8.8 attenuation value in the
+  // software mixer instead of keying off the DSP voice.
+  u8 softwareReleaseTicks = 0;
+  u8 softwareReleaseGateTicks = 0;
+  u16 softwareReleaseAttenuation = 0;
+
   // These controls retain fractional fade progress between note ticks. Their
   // raw values are converted to tempo, gain, or pan only when a tick changes.
   PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan;
@@ -512,6 +502,7 @@ struct Playback {
       // Zero clears the pending attack. V1-V2 also write zero volume; later
       // mixers return before touching VOL(L/R), leaving their previous values.
       track.previousWasNote = false;
+      stopSoftwareRelease();
       if (track.version <= KONAMISNES_V2) {
         emitLevel(out);
       } else {
@@ -523,9 +514,10 @@ struct Playback {
     }
 
     restorePostReleaseEnvelope();
+    const u8 duration = track.noteDuration(track.noteLength);
+    beginSoftwareRelease(duration);
     emitLevel(out);
     applyEffectiveTuning();
-    const u8 duration = track.noteDuration(track.noteLength);
     const bool continuesVoice =
         !track.percussion && track.previousWasNote && isLegatoDuration(track.version, track.previousDurationRate);
     const bool repeatsHeldKey = continuesVoice && track.previousNoteKey == key;
@@ -560,6 +552,7 @@ struct Playback {
   void rest() {
     track.currentNoteVolume = 0;
     track.previousWasNote = false;
+    stopSoftwareRelease();
     if (track.version >= KONAMISNES_V3) {
       track.volume.interruptAutomationAt(vm.tick());
     }
@@ -573,10 +566,12 @@ struct Playback {
       track.previousWasNote = false;
       return;
     }
+    const u8 duration = track.noteDuration(track.noteLength);
+    beginSoftwareRelease(duration);
     track.pitchNote = out.note(NotePerformanceEvent{
         .key = track.noteSemitones(*track.previousNoteKey, false),
         .linearVelocity = 1.0,
-        .durationTicks = track.noteDuration(track.noteLength),
+        .durationTicks = duration,
         .extendsPrevious = true,
         .restartsLfoPhase = false,
     });
@@ -593,7 +588,7 @@ struct Playback {
   }
 
   void emitPersistentRelease() {
-    if (const auto release = customReleaseSeconds(track.version, track.envelope.releaseAmount, track.tempo)) {
+    if (const auto release = dspReleaseSeconds(track.version, track.envelope.releaseAmount)) {
       out.updateEnvelope(Envelope{.releaseSeconds = *release}, EnvelopeFields::Release,
                          VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
     }
@@ -686,7 +681,7 @@ struct Playback {
 
   void setRelease(u8 amount) {
     track.envelope.releaseAmount = amount;
-    if (const auto release = customReleaseSeconds(track.version, amount, track.tempo)) {
+    if (const auto release = dspReleaseSeconds(track.version, amount)) {
       out.updateEnvelope(Envelope{.releaseSeconds = *release}, EnvelopeFields::Release,
                          VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
     } else if (const auto envelope = currentEnvelope()) {
@@ -913,17 +908,58 @@ struct Playback {
     if (fadeTick.shouldApply()) {
       emitVibratoDepth(track.vibrato.depthState.fadeOutput(out));
     }
+    tickSoftwareRelease();
   }
 
 private:
   [[nodiscard]] double mixedLevel(u8 trackVolume) const {
-    const int effectiveNote =
-        std::clamp<int>(track.currentNoteVolume + track.loopVolumeDelta + track.loopVolumeDelta2, 0, 127);
+    const int effectiveNote = std::clamp<int>(track.currentNoteVolume + track.loopVolumeDelta + track.loopVolumeDelta2 -
+                                                  static_cast<int>(track.softwareReleaseAttenuation >> 8),
+                                              0, 127);
     const unsigned product = static_cast<unsigned>(effectiveNote) * trackVolume;
     const unsigned combined = product >> (track.version == KONAMISNES_V1 ? 7 : 8);
     const u8 attenuated = static_cast<u8>(std::clamp<int>(static_cast<int>(combined) - track.instrumentVolume, 0, 127));
     const u8 dspVolume = track.version == KONAMISNES_V1 ? attenuated : volumeTableValue(track.version, attenuated);
     return static_cast<double>(dspVolume) / 127.0;
+  }
+
+  void beginSoftwareRelease(u8 gateTicks) {
+    track.softwareReleaseTicks =
+        usesSoftwareRelease(track.version, track.envelope.releaseAmount) ? track.noteLength : 0;
+    track.softwareReleaseGateTicks = gateTicks;
+    track.softwareReleaseAttenuation = 0;
+  }
+
+  void stopSoftwareRelease() {
+    track.softwareReleaseTicks = 0;
+    track.softwareReleaseGateTicks = 0;
+    track.softwareReleaseAttenuation = 0;
+  }
+
+  void tickSoftwareRelease() {
+    // Early drivers suppress the last update before the next sequence event.
+    if (track.softwareReleaseTicks == 0 || --track.softwareReleaseTicks == 0) {
+      return;
+    }
+    if (track.softwareReleaseGateTicks != 0 && --track.softwareReleaseGateTicks != 0) {
+      return;
+    }
+    const u8 amount = track.envelope.releaseAmount;
+    const u8 previousAttenuation = static_cast<u8>(track.softwareReleaseAttenuation >> 8);
+    track.softwareReleaseAttenuation = static_cast<u16>(track.softwareReleaseAttenuation + (amount << 4));
+    const u8 attenuation = static_cast<u8>(track.softwareReleaseAttenuation >> 8);
+    // The DSP voice remains keyed on until the update after software volume
+    // reaches zero.
+    static_cast<void>(out.setPreviousNoteEnd(vm.tick() + 1));
+    if (attenuation >= track.currentNoteVolume) {
+      emitLevel(out);
+      track.softwareReleaseTicks = 0;
+      return;
+    }
+
+    if (attenuation != previousAttenuation) {
+      emitLevel(out);
+    }
   }
 
   void emitLevel(PerformanceEmitter output) const {
@@ -957,7 +993,7 @@ private:
       return std::nullopt;
     }
     Envelope envelope = snesDspEnvelope(registers.adsr1, registers.adsr2.value_or(0), registers.gain.value_or(0));
-    if (const auto release = customReleaseSeconds(track.version, track.envelope.releaseAmount, track.tempo)) {
+    if (const auto release = dspReleaseSeconds(track.version, track.envelope.releaseAmount)) {
       envelope.releaseSeconds = *release;
     }
     return envelope;
