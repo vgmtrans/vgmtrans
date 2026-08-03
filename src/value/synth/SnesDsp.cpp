@@ -235,6 +235,11 @@ double snesDspAdsrAttackSeconds(u8 attackRate) {
   return adsrAttackSeconds(attackRate & 0x0f);
 }
 
+double snesDspAdsrDecaySeconds(u8 decayRate) {
+  const u8 rate = static_cast<u8>(0x10 | ((decayRate & 0x07) << 1));
+  return emulateGainEnvelope(static_cast<u8>(0xa0 | rate), 0x7ff, 0).seconds;
+}
+
 double snesDspAdsrSustainSeconds(u8 sustainRate) {
   const u8 rate = sustainRate & 0x1f;
   return rate == 0 ? std::numeric_limits<double>::infinity()

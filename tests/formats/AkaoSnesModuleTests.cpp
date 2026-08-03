@@ -385,7 +385,7 @@ void akaoSnesCompilerCursorCoversVersionBoundariesAndDurations() {
   }
 }
 
-void akaoSnesV3DynamicAdsrUsesAttackAndHeldNoteDecay() {
+void akaoSnesDynamicAdsrCoversHardwareFields() {
   constexpr u32 start = 0x20;
   std::vector<u8> bytes(0x40, 0xf2);
   std::ranges::copy(std::initializer_list<u8>{0xea, 4, 0xeb, 0xff, 0xee, 0xe5, 0xef, 0xf2},
@@ -429,6 +429,39 @@ void akaoSnesV3DynamicAdsrUsesAttackAndHeldNoteDecay() {
              sd2Envelopes[0]->update.values && sd2Envelopes[0]->update.values->secondDecaySeconds &&
              std::isinf(*sd2Envelopes[0]->update.values->secondDecaySeconds),
          "Secret of Mana EE 00 should disable held-note decay");
+
+  std::vector<u8> ff6Bytes(0x40, 0xec);
+  std::ranges::copy(
+      std::initializer_list<u8>{0xdc, 4, 0xdd, 0xff, 0xde, 0xfe, 0xdf, 0xfd, 0xe0, 0xe5, 0xe1, 0xec},
+      ff6Bytes.begin() + start);
+  const AkaoSnesProfile ff6{.version = AKAOSNES_V4, .minorVersion = AKAOSNES_V4_FF6};
+  const TrackProgram ff6Track = decodeTrack(ff6Bytes, ff6, start, start + 12);
+  expect(std::get<u64>(semanticOperand(ff6Track.commands[1], "dsp_attack_rate")->value) == 15 &&
+             std::get<u64>(semanticOperand(ff6Track.commands[2], "dsp_decay_rate")->value) == 6 &&
+             std::get<u64>(semanticOperand(ff6Track.commands[3], "dsp_sustain_level")->value) == 5 &&
+             std::get<u64>(semanticOperand(ff6Track.commands[4], "dsp_sustain_rate")->value) == 5,
+         "FF6 ADSR commands should apply the DSP field masks");
+
+  const PerformanceSequence ff6Performance = renderTracks(ff6, {ff6Track});
+  const auto ff6Envelopes = eventsOfType<EnvelopePerformanceEvent>(ff6Performance.tracks.front());
+  expect(ff6Envelopes.size() == 5, "FF6 ADSR field commands and default should emit envelope state");
+  expect(ff6Envelopes[0]->update.fields == EnvelopeFields::Attack &&
+             ff6Envelopes[0]->update.values ==
+                 Envelope{.attackSeconds = snesDspAdsrAttackSeconds(15)},
+         "FF6 DD should set the hardware attack rate");
+  expect(ff6Envelopes[1]->update.fields == EnvelopeFields::Decay &&
+             ff6Envelopes[1]->update.values ==
+                 Envelope{.decaySeconds = snesDspAdsrDecaySeconds(6)},
+         "FF6 DE should set the hardware decay rate");
+  expect(ff6Envelopes[2]->update.fields == EnvelopeFields::Sustain &&
+             ff6Envelopes[2]->update.values == Envelope{.sustainAmplitude = 0.75},
+         "FF6 DF should set the hardware sustain level");
+  expect(ff6Envelopes[3]->update.fields == EnvelopeFields::SecondDecay &&
+             ff6Envelopes[3]->update.values ==
+                 Envelope{.secondDecaySeconds = snesDspAdsrSustainSeconds(5)},
+         "FF6 E0 should set held-note decay, not note-off release");
+  expect(!ff6Envelopes[4]->update.values && ff6Envelopes[4]->update.fields == EnvelopeFields::All,
+         "FF6 E1 should restore the selected instrument's ADSR envelope");
 }
 
 void akaoSnesV1SoftwareEnvelopesDriveLevelWithoutDynamicInstruments() {
