@@ -7,6 +7,7 @@
 #include "value/extractors/MameRomSetExtractor.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/export/midi/PitchTransitionMidiLowering.h"
+#include "value/export/synth/SynthExportData.h"
 #include "value/formats/CPS/Cps.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/SampleDecoder.h"
@@ -718,6 +719,35 @@ void cps2EarlyModuleUsesPhysicalModulation() {
   expect(performance.tracks[0].hasPhysicalModulation && physicalVibrato && physicalTremolo && physicalPan &&
              physicalCenter && !markerWorkaround,
          "early CPS2 modulation and balance should stay physical without legacy MIDI marker workarounds");
+}
+
+void cps2ShortEnvelopeIncludesItsCompletionTick() {
+  auto fixture = earlyCps2Fixture();
+  fixture.source.name = "Vampire Savior short-envelope fixture";
+  fixture.source.attributes[std::string(mame::kMameGameAttribute)] = "vsav-envelope-fixture";
+  fixture.source.attributes[std::string(mame::kMameFormatVersionAttribute)] = "CPS2_V1.30";
+
+  // Vampire Savior instrument 117, articulation 0x42:
+  // AR=3f, DR=38, SL=7f, SR=38, RR=3f. Both falling stages use
+  // rate 0x5f24, which needs three 62.5 Hz updates to reach zero.
+  bytesAt(fixture.bytes, 0x300, {0x3f, 0x38, 0x7f, 0x38, 0x3f});
+
+  const auto result = scan(fixture);
+  expect(result.diagnostics.empty(), "Vampire Savior envelope fixture should scan without diagnostics");
+  const auto* instruments = instrumentDomain(result, kCpsQSoundDomain);
+  expect(instruments != nullptr && !instruments->instruments.empty() &&
+             !instruments->instruments[0].regions.empty(),
+         "Vampire Savior envelope fixture should produce its QSound region");
+
+  const Envelope& native = instruments->instruments[0].regions[0].envelope;
+  const Envelope exported = approximateEnvelopeAsAdsr(native);
+  constexpr double expectedSeconds = 0.6906696619169267;
+  expect(native.decaySeconds && native.secondDecaySeconds &&
+             std::abs(*native.decaySeconds - expectedSeconds) < 0.000001 &&
+             std::abs(*native.secondDecaySeconds - expectedSeconds) < 0.000001 &&
+             exported.decaySeconds && std::abs(*exported.decaySeconds - expectedSeconds) < 0.000001 &&
+             exported.sustainAmplitude == 0.0,
+         "short QSound decays should retain the final driver update through ADSR export");
 }
 
 void cps2EarlyZeroRateSlursRemainLinked() {

@@ -96,7 +96,13 @@ struct QSoundSampleInfo {
     if (sourceRate == 0xffff) {
       return 0.0;
     }
-    return std::floor(65535.0 / sourceRate) / rate;
+
+    // QSound changes its integer envelope once per driver tick and clamps the
+    // final update at the target. Include that completion tick: truncating here
+    // is especially audible for fast fades (for example, 0xffff / 0x5f24
+    // requires three updates, not two).
+    const u32 ticks = (0xffffu + sourceRate - 1u) / sourceRate;
+    return ticks / rate;
   };
 
   const double decaySeconds = stageSeconds(dr, true);
