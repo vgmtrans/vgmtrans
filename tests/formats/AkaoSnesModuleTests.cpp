@@ -437,16 +437,16 @@ void akaoSnesV1SoftwareEnvelopesDriveLevelWithoutDynamicInstruments() {
 
   std::vector<u32> driverData(0x20);
   driverData[0] = static_cast<u32>(driverData.size());
+  driverData.push_back(64);
   driverData.push_back(0x40);
   driverData.push_back(0x80);
   driverData.push_back(0xc0);
   for (size_t i = 0; i < 61; ++i) {
     driverData.push_back(0xff);
   }
-  driverData.push_back(0);
   driverData[1] = static_cast<u32>(driverData.size());
+  driverData.push_back(1);
   driverData.push_back(0xff);
-  driverData.push_back(0);
 
   const auto levelAt = [](const PerformanceTrack& track, u64 tick) {
     double level = 1.0;

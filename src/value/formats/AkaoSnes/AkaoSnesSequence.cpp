@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/AkaoSnes/AkaoSnes.h"
+#include "value/formats/AkaoSnes/AkaoSnesV1Envelope.h"
 
 #include "value/base/LevelScale.h"
 #include "value/sequence/BytecodeDecode.h"
@@ -19,7 +20,6 @@
 #include <cmath>
 #include <limits>
 #include <optional>
-#include <span>
 #include <unordered_set>
 #include <vector>
 
@@ -34,20 +34,9 @@ constexpr s32 kNominalDspPitch = 0x1000;
 constexpr s32 kPitchFractionScale = 0x100;
 constexpr u8 kDefaultTempo = 0x20;
 constexpr u8 kNoteVelocity = 100;
-constexpr size_t kV1VolumeEnvelopeCount = 0x20;
-constexpr s16 kDspEnvelopeMaximum = 0x7ff;
-constexpr double kV1VolumeEnvelopeStepSeconds =
-    2.0 / akaoSnesFrameRateHz(akaoSnesTimer0Frequency(AKAOSNES_V1, AKAOSNES_V1_FF4));
 
 [[nodiscard]] constexpr bool usesDynamicAdsr(AkaoSnesProfile profile) {
   return profile.version == AKAOSNES_V3;
-}
-
-[[nodiscard]] constexpr u8 v1DurationRate(u8 parameter) {
-  if (parameter == 0 || parameter > 100) {
-    return 0;
-  }
-  return parameter == 100 ? parameter : static_cast<u8>((static_cast<u16>(parameter) << 8) / 100);
 }
 
 enum class EventType {
@@ -136,10 +125,6 @@ constexpr std::array<u8, 15> kNoteDurationsV2V3{0xc0, 0x90, 0x60, 0x40, 0x48, 0x
                                                 0x18, 0x10, 0x0c, 0x08, 0x06, 0x04, 0x03};
 constexpr std::array<u8, 14> kNoteDurationsV4{0xc0, 0x60, 0x40, 0x48, 0x30, 0x20, 0x24,
                                               0x18, 0x10, 0x0c, 0x08, 0x06, 0x04, 0x03};
-constexpr std::array<u8, 46> kV1CommandOperandCounts{
-    3, 3, 1, 2, 3, 3, 3, 3, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-
 [[nodiscard]] u8 noteDuration(AkaoSnesVersion version, u8 index) {
   if (version == AKAOSNES_V1) {
     return kNoteDurationsV1[std::min<size_t>(index, kNoteDurationsV1.size() - 1)];
@@ -148,30 +133,6 @@ constexpr std::array<u8, 46> kV1CommandOperandCounts{
     return kNoteDurationsV2V3[std::min<size_t>(index, kNoteDurationsV2V3.size() - 1)];
   }
   return kNoteDurationsV4[std::min<size_t>(index, kNoteDurationsV4.size() - 1)];
-}
-
-[[nodiscard]] u16 followingV1TieDuration(ByteReader reader, u32 address, u32 end) {
-  u16 duration = 0;
-  for (u32 scanned = 0; scanned < 0x100 && address < end && reader.has(address, 1); ++scanned) {
-    const u8 opcode = reader.u8At(address);
-    if (opcode >= 0xc3 && opcode < 0xd2) {
-      duration = static_cast<u16>(duration + noteDuration(AKAOSNES_V1, opcode % kNoteDurationsV1.size()));
-      ++address;
-      continue;
-    }
-    if (opcode < 0xd2 || opcode == 0xf0 || opcode == 0xf1 || opcode >= 0xf7) {
-      break;
-    }
-    if (opcode == 0xf4) {
-      if (!reader.has(address + 1, 2)) {
-        break;
-      }
-      address = reader.le16(address + 1);
-      continue;
-    }
-    address += 1 + kV1CommandOperandCounts[opcode - 0xd2];
-  }
-  return duration;
 }
 
 [[nodiscard]] u32 tempoMicrosecondsPerQuarter(AkaoSnesVersion version, AkaoSnesMinorVersion minorVersion, u8 tempo) {
@@ -869,6 +830,31 @@ struct LfoState {
   SequenceLfoDepthFadeState depthState;
 };
 
+[[nodiscard]] u16 followingV1TieDuration(const TrackProgram& track, Address address) {
+  u16 duration = 0;
+  for (u32 scanned = 0; scanned < 0x100; ++scanned) {
+    const auto index = track.addressIndex.find(address);
+    if (!index) {
+      break;
+    }
+    const SourceCommand& command = track.commands[*index];
+    if (command.opcode >= 0xc3 && command.opcode < 0xd2) {
+      duration =
+          static_cast<u16>(duration + noteDuration(AKAOSNES_V1, command.opcode % kNoteDurationsV1.size()));
+    } else if (command.opcode < 0xd2 || command.opcode == 0xf0 || command.opcode == 0xf1 ||
+               command.opcode >= 0xf7) {
+      break;
+    }
+    const std::optional<Address> next =
+        command.opcode == 0xf4 ? command.flow.defaultDestination() : command.flow.continuation;
+    if (!next) {
+      break;
+    }
+    address = *next;
+  }
+  return duration;
+}
+
 struct SharedTempoChange {
   u64 tick = 0;
   u8 tempo = 0;
@@ -877,8 +863,7 @@ struct SharedTempoChange {
 };
 
 struct ProgramState {
-  explicit ProgramState(const SequenceProgram& program)
-      : profile(decodeAkaoSnesProfile(program.config.profile)), driverData(program.config.driverData) {
+  explicit ProgramState(const SequenceProgram& program) : profile(decodeAkaoSnesProfile(program.config.profile)) {
     for (const TrackProgram& track : program.tracks) {
       for (const SourceCommand& command : track.commands) {
         const Address fallthrough = command.flow.continuation;
@@ -958,26 +943,7 @@ struct ProgramState {
     return terminalPitchBoundaries.contains(fallthrough.value);
   }
 
-  [[nodiscard]] bool hasV1VolumeEnvelopes() const { return driverData.size() >= kV1VolumeEnvelopeCount; }
-
-  [[nodiscard]] std::optional<std::span<const u32>> v1VolumeEnvelope(u8 index) const {
-    if (!hasV1VolumeEnvelopes() || index >= kV1VolumeEnvelopeCount) {
-      return std::nullopt;
-    }
-    const size_t offset = driverData[index];
-    if (offset < kV1VolumeEnvelopeCount || offset >= driverData.size()) {
-      return std::nullopt;
-    }
-    const std::span<const u32> values(driverData.begin() + static_cast<std::ptrdiff_t>(offset), driverData.end());
-    const auto terminator = std::ranges::find(values, 0u);
-    if (terminator == values.end()) {
-      return std::nullopt;
-    }
-    return values.first(static_cast<size_t>(terminator - values.begin()));
-  }
-
   AkaoSnesProfile profile;
-  const std::vector<u32>& driverData;
   std::vector<SharedTempoChange> tempoChanges;
   std::unordered_set<u64> terminalPitchBoundaries;
   bool collecting = true;
@@ -998,93 +964,12 @@ struct PitchEnvelopeState {
   s32 targetOffset = 0;
 };
 
-// FF4 multiplies track volume by DC's per-note software table. When that table
-// ends, DD switches the still-keyed voice to exponential GAIN; DE can replace
-// that decay with B1 at a duration-relative point.
-struct V1EnvelopeState {
-  void selectVolumeEnvelope(u8 index) { selectedVolumeEnvelope = index; }
-  void selectGain(u8 parameter) { selectedGain = static_cast<u8>(0xa0 | (parameter & 0x1f)); }
-  void selectDurationRate(u8 parameter) { selectedDurationRate = v1DurationRate(parameter); }
-
-  void beginNote(const ProgramState& program, u16 duration) {
-    elapsedSeconds = 0.0;
-    gainStartSeconds.reset();
-    gainStartEnvelope = kDspEnvelopeMaximum;
-    activeGain = selectedGain;
-    releaseTicks = static_cast<u16>((static_cast<u16>(duration) * selectedDurationRate) >> 8);
-
-    const auto curve = selectedVolumeEnvelope ? program.v1VolumeEnvelope(*selectedVolumeEnvelope) : std::nullopt;
-    activeCurve = curve.value_or(std::span<const u32>{});
-    curveRunning = curve.has_value();
-    volumeMultiplier =
-        !program.hasV1VolumeEnvelopes() ? 0xff : (activeCurve.empty() ? 0 : static_cast<u8>(activeCurve.front()));
-  }
-
-  [[nodiscard]] double level() const {
-    return (static_cast<double>(volumeMultiplier) / 255.0) *
-           (static_cast<double>(gainEnvelopeAt(elapsedSeconds)) / kDspEnvelopeMaximum);
-  }
-
-  [[nodiscard]] bool advance(double seconds) {
-    const u8 previousMultiplier = volumeMultiplier;
-    const s16 previousEnvelope = gainEnvelopeAt(elapsedSeconds);
-    elapsedSeconds += seconds;
-
-    if (curveRunning) {
-      const size_t index = static_cast<size_t>(elapsedSeconds / kV1VolumeEnvelopeStepSeconds);
-      if (index < activeCurve.size()) {
-        volumeMultiplier = static_cast<u8>(activeCurve[index]);
-      } else {
-        curveRunning = false;
-        if (!activeCurve.empty()) {
-          volumeMultiplier = static_cast<u8>(activeCurve.back());
-        }
-        if (!gainStartSeconds) {
-          startGain(activeGain, activeCurve.size() * kV1VolumeEnvelopeStepSeconds);
-        }
-      }
-    }
-
-    // DE's countdown advances on music ticks. If DC already selected GAIN
-    // during the elapsed interval, DE continues from that ENVX value with B1.
-    if (releaseTicks != 0 && --releaseTicks == 0) {
-      startGain(0xb1, elapsedSeconds);
-    }
-
-    return volumeMultiplier != previousMultiplier || gainEnvelopeAt(elapsedSeconds) != previousEnvelope;
-  }
-
-private:
-  [[nodiscard]] s16 gainEnvelopeAt(double seconds) const {
-    return gainStartSeconds
-               ? snesDspGainEnvelopeValue(activeGain, gainStartEnvelope, std::max(0.0, seconds - *gainStartSeconds))
-               : kDspEnvelopeMaximum;
-  }
-
-  void startGain(u8 gain, double seconds) {
-    gainStartEnvelope = gainEnvelopeAt(seconds);
-    gainStartSeconds = seconds;
-    activeGain = gain;
-  }
-
-  std::optional<u8> selectedVolumeEnvelope;
-  u8 selectedGain = 0;
-  u8 selectedDurationRate = 0;
-
-  u8 activeGain = 0;
-  u8 volumeMultiplier = 0xff;
-  u16 releaseTicks = 0;
-  bool curveRunning = false;
-  std::span<const u32> activeCurve;
-  double elapsedSeconds = 0.0;
-  std::optional<double> gainStartSeconds;
-  s16 gainStartEnvelope = kDspEnvelopeMaximum;
-};
-
 struct TrackState {
   TrackState(const SequenceProgram& program, const TrackProgram& track)
-      : trackNumber(track.sourceTrackNumber),
-        pan8Bit(akaoSnesUses8BitPan(decodeAkaoSnesProfile(program.config.profile))) {
+      : sourceTrack(track),
+        trackNumber(track.sourceTrackNumber),
+        pan8Bit(akaoSnesUses8BitPan(decodeAkaoSnesProfile(program.config.profile))),
+        v1Envelope(program.config.driverData) {
     volume.reset(0xff);
     pan.reset(0x80);
     tempoState.reset(kDefaultTempo);
@@ -1185,6 +1070,7 @@ struct TrackState {
            std::clamp(static_cast<double>(depth) / targetDepth, 0.0, 1.0);
   }
 
+  const TrackProgram& sourceTrack;
   u32 trackNumber = 0;
   u8 octave = 6;
   s8 transpose = 0;
@@ -1201,7 +1087,7 @@ struct TrackState {
   PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume;
   PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan;
   PerformanceBoundValue<SequenceFixedPointAutomation<s32>> tempoState;
-  V1EnvelopeState v1Envelope;
+  AkaoSnesV1EnvelopeState v1Envelope;
   std::optional<u64> lastTieableNoteTick;
   std::optional<u64> pitchAutomationStopTick;
   PitchEnvelopeState pitchEnvelope;
@@ -1432,7 +1318,7 @@ struct Playback {
     emitPitchBendForCurrentPitch(track.pitchEnvelopeAutomation.output(out));
   }
 
-  Effects note(u8 durationIndex, u8 noteIndex, u16 followingTieTicks, Address fallthrough) {
+  Effects note(u8 durationIndex, u8 noteIndex, Address fallthrough) {
     u8 length = noteDuration(context.version, durationIndex);
     if (track.onetimeDuration != 0) {
       length = track.onetimeDuration;
@@ -1445,7 +1331,7 @@ struct Playback {
       const double velocity = kNoteVelocity / 127.0;
       const u8 note = static_cast<u8>((track.octave * 12) + noteIndex);
       if (context.version == AKAOSNES_V1) {
-        track.v1Envelope.beginNote(program, static_cast<u16>(length + followingTieTicks));
+        track.v1Envelope.beginNote(static_cast<u16>(length + followingV1TieDuration(track.sourceTrack, fallthrough)));
         emitVolume(out, currentVolume());
       }
       beginNotePitch(note, !track.percussion);
@@ -1720,12 +1606,10 @@ struct Playback {
 
   void tick() {
     syncSharedTempoAtTick();
-    bool v1EnvelopeChanged = false;
-    if (context.version == AKAOSNES_V1) {
-      const double seconds =
-          tempoMicrosecondsPerQuarter(context.version, context.minorVersion, track.tempo) / 1'000'000.0 / kAkaoSnesPpqn;
-      v1EnvelopeChanged = track.v1Envelope.advance(seconds);
-    }
+    const bool v1EnvelopeChanged =
+        context.version == AKAOSNES_V1 &&
+        track.v1Envelope.advance(tempoMicrosecondsPerQuarter(context.version, context.minorVersion, track.tempo) /
+                                 (1'000'000.0 * kAkaoSnesPpqn));
     const u8 volumeBeforeTick = currentVolume();
     static_cast<void>(
         track.volume.tickRaw([&](s32 value) { emitVolume(track.volume.output(out), static_cast<u8>(value)); }));
@@ -1791,13 +1675,7 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command(rest ? "Rest" : "Note", rest ? SequenceSemantic::Rest : SequenceSemantic::Note);
       event.opcodeValue("duration_index", durationIndex);
       event.opcodeValue("note_index", noteIndex);
-      const u16 followingTieTicks = profile.version == AKAOSNES_V1 && noteIndex < 12
-                                        ? followingV1TieDuration(reader, event.nextAddress().value, end)
-                                        : 0;
-      if (followingTieTicks != 0) {
-        event.derived("following_tie_ticks", followingTieTicks, SemanticOperandRole::Duration);
-      }
-      return event.invoke<&Playback::note>(durationIndex, noteIndex, followingTieTicks, event.nextAddress());
+      return event.invoke<&Playback::note>(durationIndex, noteIndex, event.nextAddress());
     }
 
     case EventType::Nop:
@@ -2021,13 +1899,13 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
     case EventType::GainRelease: {
       auto event = cursor.command("GAIN Release Rate", SequenceSemantic::Envelope);
       const u8 parameter = event.u8("rate");
-      event.derived("dsp_gain", static_cast<u8>(0xa0 | (parameter & 0x1f)), SourceValueDisplay::Hex);
+      event.derived("dsp_gain", akaoSnesV1Gain(parameter), SourceValueDisplay::Hex);
       return event.invoke<&Playback::selectV1Gain>(parameter);
     }
     case EventType::DurationRate: {
       auto event = cursor.command("GAIN Trigger", SequenceSemantic::Envelope);
       const u8 parameter = event.u8("duration_percent");
-      event.derived("driver_rate", v1DurationRate(parameter), SourceValueDisplay::Hex);
+      event.derived("driver_rate", akaoSnesV1DurationRate(parameter), SourceValueDisplay::Hex);
       return event.invoke<&Playback::selectV1DurationRate>(parameter);
     }
     case EventType::AdsrAr:
@@ -2273,33 +2151,6 @@ struct SequenceHeaderInfo {
   return info;
 }
 
-void captureV1VolumeEnvelopes(ByteReader reader, u32 tableAddress, std::vector<u32>& data) {
-  data.assign(kV1VolumeEnvelopeCount, 0);
-  for (size_t index = 0; index < kV1VolumeEnvelopeCount; ++index) {
-    const u32 pointerAddress = tableAddress + static_cast<u32>(index * 2);
-    if (!reader.has(pointerAddress, 2)) {
-      continue;
-    }
-
-    const u32 curveAddress = reader.le16(pointerAddress);
-    const size_t dataStart = data.size();
-    data[index] = static_cast<u32>(dataStart);
-    bool terminated = false;
-    for (u32 offset = 0; offset < 0x100 && reader.has(curveAddress + offset, 1); ++offset) {
-      const u8 value = reader.u8At(curveAddress + offset);
-      data.push_back(value);
-      if (value == 0) {
-        terminated = true;
-        break;
-      }
-    }
-    if (!terminated) {
-      data.resize(dataStart);
-      data[index] = 0;
-    }
-  }
-}
-
 }  // namespace
 
 const SequenceDialect& akaoSnesSequenceDialect() {
@@ -2374,7 +2225,7 @@ SequenceProgram parseAkaoSnesSequence(ByteReader reader, const AkaoSnesLayout& l
   program.behavior.initialTempoMicrosecondsPerQuarter =
       tempoMicrosecondsPerQuarter(profile.version, profile.minorVersion, kDefaultTempo);
   if (layout.version == AKAOSNES_V1 && layout.volumeEnvelopeTableAddress) {
-    captureV1VolumeEnvelopes(reader, *layout.volumeEnvelopeTableAddress, program.config.driverData);
+    program.config.driverData = captureAkaoSnesV1VolumeEnvelopes(reader, *layout.volumeEnvelopeTableAddress);
   }
 
   return program;
