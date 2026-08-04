@@ -285,6 +285,26 @@ void performanceMidiRendererTrustsSourceNoteExtensions() {
   expect(std::get<EndOfTrack>(events.back()).tick == 30, "performance renderer should preserve track end ticks");
 }
 
+void performanceMidiRendererSplitsWideTuning() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {PerformanceTrack{
+          .endTick = 12,
+          .events =
+              {
+                  TuningPerformanceEvent{.header = PerformanceEventHeader{.tick = 0}, .cents = 214.0625},
+                  TuningPerformanceEvent{.header = PerformanceEventHeader{.tick = 12}, .cents = 14.0625},
+              },
+      }},
+  };
+
+  const MidiSequence midi = renderMidiSequence(performance);
+  const auto& events = midi.tracks.front().events;
+  expect(std::get<CoarseTune>(events[1]).semitones == 2 && std::get<FineTune>(events[2]).cents == 14.0625 &&
+             std::get<CoarseTune>(events[3]).semitones == 0 && std::get<FineTune>(events[4]).cents == 14.0625,
+         "performance tuning should use coarse RPN outside fine tuning's one-semitone range and reset it afterward");
+}
+
 void performanceMidiRendererWritesTimeSignaturesToFirstTrack() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
@@ -2677,6 +2697,7 @@ void runValueMidiTests() {
   midiExporterOrdersGeneratedNoteOffBeforeSameTickNoteOn();
   midiExporterKeepsZeroDurationNotePairedAtSameTick();
   performanceMidiRendererTrustsSourceNoteExtensions();
+  performanceMidiRendererSplitsWideTuning();
   performanceMidiRendererWritesTimeSignaturesToFirstTrack();
   performanceMidiRendererWritesPanGainResetWhenRequested();
   performanceMidiRendererCombinesExpressionWithPanGain();

@@ -1132,10 +1132,17 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               .channels = typedEvent.channels,
           });
         } else if constexpr (std::is_same_v<TypedEvent, TuningPerformanceEvent>) {
+          // MIDI fine tuning spans only one semitone in either direction.
+          const s32 coarseSemitones = std::clamp<s32>(static_cast<s32>(typedEvent.cents / 100.0), -64, 63);
+          track.events.push_back(CoarseTune{
+              .tick = typedEvent.header.tick,
+              .channel = channel,
+              .semitones = static_cast<s8>(coarseSemitones),
+          });
           track.events.push_back(FineTune{
               .tick = typedEvent.header.tick,
               .channel = channel,
-              .cents = typedEvent.cents,
+              .cents = typedEvent.cents - static_cast<double>(coarseSemitones) * 100.0,
           });
         } else if constexpr (std::is_same_v<TypedEvent, GlobalTransposePerformanceEvent>) {
           // Global transpose changes how later notes and portamento controls are written. It does not
