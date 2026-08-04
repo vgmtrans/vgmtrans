@@ -953,6 +953,23 @@ void konamiSnesZeroNotesAndLegatoMatchDriverGating() {
   const auto afterRest = renderKonamiSnesProgram(KONAMISNES_V2, {{0x3c, 2, 0x7f, 0x7f, 0xe0, 1, 0xe1, 2, 0x7f, 0xff}});
   expect(performanceEvents<NotePerformanceEvent>(afterRest.tracks.front()).size() == 1,
          "an explicit tie after a rest should not revive the earlier held note");
+
+  const auto portamentoAfterRest =
+      renderKonamiSnesProgram(KONAMISNES_V1, {{0xfa, 0x93, 0xbb, 0x64,  // dynamic ADSR with software release
+                                               0x3c, 4, 100, 0x7f,      // establish the portamento's prior pitch
+                                               0xe0, 1,                 // rest forces the next note to attack
+                                               0xf0, 3,                 // persistent portamento
+                                               0x3e, 4, 100, 0x7f, 0xff}});
+  const auto portamentoNotes = performanceEvents<NotePerformanceEvent>(portamentoAfterRest.tracks.front());
+  const auto transition = std::ranges::find_if(portamentoAfterRest.tracks.front().automations,
+                                                [](const PerformanceAutomation& automation) {
+                                                  return pitchTransitionIntent(automation) != nullptr;
+                                                });
+  expect(portamentoNotes.size() == 2 && portamentoNotes[0]->note != portamentoNotes[1]->note &&
+             transition != portamentoAfterRest.tracks.front().automations.end() &&
+             pitchTransitionIntent(*transition)->note == portamentoNotes[1]->note &&
+             !pitchTransitionIntent(*transition)->previousNote,
+         "V1 portamento after a rest should retain the prior pitch but attack a new voice");
 }
 
 void konamiSnesLowCommandsAndInstrumentPanAreVersioned() {
