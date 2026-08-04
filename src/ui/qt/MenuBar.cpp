@@ -150,6 +150,18 @@ void MenuBar::appendOptionsMenu() {
         Settings::the()->conversion.setPitchTransitionRendering(rendering);
       });
 
+  using vgmtrans::core::MidiWideTuningRendering;
+  appendEnumOptions(
+      m_optionsMenu, tr("Wide Tuning Rendering"),
+      Settings::the()->conversion.wideTuningRendering(),
+      std::array{
+          std::pair{tr("Pitch Bend (Compatible, Default)"), MidiWideTuningRendering::PitchBend},
+          std::pair{tr("Coarse Tune RPN"), MidiWideTuningRendering::CoarseTune},
+      },
+      [](MidiWideTuningRendering rendering) {
+        Settings::the()->conversion.setWideTuningRendering(rendering);
+      });
+
   using vgmtrans::core::ModulationConversionPolicy;
   appendEnumOptions(
       m_optionsMenu, tr("Modulation Conversion"),
