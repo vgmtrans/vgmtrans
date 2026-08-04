@@ -153,18 +153,6 @@ struct PersistentPitchEffect {
   return static_cast<u32>(std::min<double>(std::lround(ticks), std::numeric_limits<u32>::max()));
 }
 
-[[nodiscard]] u32 pitchEffectTimelineTicks(u8 updates, u8 tempo) {
-  // Pitch effects advance on the timer clock while note lengths use the
-  // tempo-scaled sequence clock. Keep the closest representable sequence tick.
-  return static_cast<u32>(std::lround(static_cast<double>(updates) * tempo / 256.0));
-}
-
-[[nodiscard]] PitchSlideTiming pitchEffectTiming(KonamiSnesVersion version, u8 updates, u8 tempo) {
-  // One effect update is 4 ms in V1 and 8 ms in later engines.
-  return PitchSlideTiming::fixedDuration(std::max<u32>(pitchEffectTimelineTicks(updates, tempo), 1),
-                                         static_cast<double>(updates) * timerFrequency(version) / 8.0);
-}
-
 [[nodiscard]] double tuningCents(s8 tuning) {
   return tuning * (400.0 / 256.0);
 }
@@ -1024,20 +1012,21 @@ private:
 
     const double target = track.noteSemitones(key, false);
     if (effect.duration != 0) {
+      // The driver decrements the F0/F1 counters in the tempo-gated track
+      // update, so their operands are already measured in sequence ticks.
       switch (effect.kind) {
         case PersistentPitchEffect::Kind::Portamento:
           // Later engines use the deferred proportional curve, not this linear
           // fixed-duration form.
           if (track.version <= KONAMISNES_V2 && effect.previousKey) {
-            out.pitchSlide(track.pitchNote, *effect.previousKey, target,
-                           pitchEffectTiming(track.version, effect.duration, track.tempo))
+            out.pitchSlide(track.pitchNote, *effect.previousKey, target, PitchSlideTiming::fromTicks(effect.duration))
                 .continueFrom(continuedNote);
           }
           break;
         case PersistentPitchEffect::Kind::Envelope:
-          out.at(vm.tick() + pitchEffectTimelineTicks(effect.delay, track.tempo))
+          out.at(vm.tick() + effect.delay)
               .pitchSlide(track.pitchNote, target - effect.depth, target,
-                          pitchEffectTiming(track.version, effect.duration, track.tempo));
+                          PitchSlideTiming::fromTicks(effect.duration));
           break;
         case PersistentPitchEffect::Kind::None:
           break;

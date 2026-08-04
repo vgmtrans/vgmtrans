@@ -662,12 +662,12 @@ void konamiSnesLinearDriverPitchUsesSharedTransitions() {
     double startKey;
     double targetKey;
     u32 timelineTicks;
-    double milliseconds;
   };
   const std::array cases{
-      Case{KONAMISNES_V2, {0x3c, 2, 0x7f, 0x7f, 0xf0, 4, 0x40, 6, 0x7f, 0x7f, 0xff}, 2, 60, 64, 4, 32},
-      Case{KONAMISNES_V2, {0xf1, 2, 4, 2, 0x3c, 8, 0x7f, 0x7f, 0xff}, 2, 58, 60, 4, 32},
-      Case{KONAMISNES_V6, {0xf1, 1, 3, 2, 0x80, 0, 0x3c, 8, 0x7f, 0x7f, 0xff}, 1, 58, 60, 3, 24},
+      Case{KONAMISNES_V1, {0xea, 0x4e, 0x3c, 2, 0x7f, 0x7f, 0xf0, 5, 0x40, 6, 0x7f, 0x7f, 0xff}, 2, 60, 64, 5},
+      Case{KONAMISNES_V2, {0x3c, 2, 0x7f, 0x7f, 0xf0, 4, 0x40, 6, 0x7f, 0x7f, 0xff}, 2, 60, 64, 4},
+      Case{KONAMISNES_V2, {0xf1, 2, 4, 2, 0x3c, 8, 0x7f, 0x7f, 0xff}, 2, 58, 60, 4},
+      Case{KONAMISNES_V6, {0xf1, 1, 3, 2, 0x80, 0, 0x3c, 8, 0x7f, 0x7f, 0xff}, 1, 58, 60, 3},
   };
   for (const auto& test : cases) {
     const auto performance = renderKonamiSnesProgram(test.version, {test.bytes});
@@ -681,10 +681,8 @@ void konamiSnesLinearDriverPitchUsesSharedTransitions() {
     expect(transition != performance.tracks[0].automations.end(),
            "Konami pitch should declare the expected shared transition");
     const auto* intent = pitchTransitionIntent(*transition);
-    const auto* duration =
-        intent == nullptr ? nullptr : std::get_if<FixedDurationPitchSlideTiming>(&intent->timing.physical);
-    expect(duration != nullptr && duration->milliseconds == test.milliseconds,
-           "Konami F0/F1 should retain linear fixed-duration intent without a local scheduler");
+    expect(intent != nullptr && std::holds_alternative<TempoRelativePitchSlideTiming>(intent->timing.physical),
+           "Konami F0/F1 counters should retain their tempo-relative sequence timing");
   }
 }
 
