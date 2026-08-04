@@ -76,8 +76,9 @@ struct PreparedSynthData {
 };
 
 // SF2 and DLS have one decay followed by a fixed sustain level. Approximate a
-// richer envelope without changing the instrument data kept by the scanner.
-// attenuationRangeDb is the target's full-scale volume-envelope range.
+// richer envelope using both endpoint timing and perceptual salience, without
+// changing the instrument data kept by the scanner. attenuationRangeDb is the
+// target's full-scale volume-envelope range.
 [[nodiscard]] Envelope approximateEnvelopeAsAdsr(Envelope envelope, double attenuationRangeDb = 100.0);
 
 // Decode samples and resolve instrument references once before a format-specific
