@@ -51,6 +51,7 @@ void konamiSnesProgramChangeReemitsCurrentFineTune();
 void konamiSnesEarlyVibratoQuantizesRateAtCommandTempo();
 void konamiSnesEchoPreservesGlobalDspState();
 void konamiSnesLinearDriverPitchUsesSharedTransitions();
+void konamiSnesProportionalPortamentoMatchesDriverCurve();
 void konamiSnesPercussionUsesPackedGsDrumBank();
 void konamiSnesCompilerCursorDecodesVersionedFlowAndTruncation();
 void konamiSnesCompilerCursorUsesVersionedOperandLengths();
@@ -223,6 +224,7 @@ int main() {
     konamiSnesEarlyVibratoQuantizesRateAtCommandTempo();
     konamiSnesEchoPreservesGlobalDspState();
     konamiSnesLinearDriverPitchUsesSharedTransitions();
+    konamiSnesProportionalPortamentoMatchesDriverCurve();
     konamiSnesPercussionUsesPackedGsDrumBank();
     konamiSnesCompilerCursorDecodesVersionedFlowAndTruncation();
     konamiSnesCompilerCursorUsesVersionedOperandLengths();
