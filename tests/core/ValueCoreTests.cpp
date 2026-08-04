@@ -112,6 +112,7 @@ void cps1V1DefaultsAndPitchWrappingMatchLegacyDriver();
 void cps2EarlyModuleUsesPhysicalModulation();
 void cps2ShortEnvelopeIncludesItsCompletionTick();
 void cps2EarlyZeroRateSlursRemainLinked();
+void cps2EarlyPortamentoStartsOnFirstTiedNote();
 void cps2LateDriverSemanticsRemainProfileSpecific();
 void cps3ModuleDecodesDelayPrefixesLegatoAndRegions();
 void cps3HeldNotesRetargetOneVoiceWithoutLosingPitch();
@@ -285,6 +286,7 @@ int main() {
     cps2EarlyModuleUsesPhysicalModulation();
     cps2ShortEnvelopeIncludesItsCompletionTick();
     cps2EarlyZeroRateSlursRemainLinked();
+    cps2EarlyPortamentoStartsOnFirstTiedNote();
     cps2LateDriverSemanticsRemainProfileSpecific();
     cps3ModuleDecodesDelayPrefixesLegatoAndRegions();
     cps3HeldNotesRetargetOneVoiceWithoutLosingPitch();
