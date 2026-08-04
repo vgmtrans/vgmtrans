@@ -686,6 +686,54 @@ void konamiSnesLinearDriverPitchUsesSharedTransitions() {
   }
 }
 
+void konamiSnesProportionalPortamentoMatchesDriverCurve() {
+  // Pop 'n' TwinBee, Big Airship, track 4 at ARAM $350b. From V3 onward F0 is
+  // a 250 Hz proportional rate: $9b moves 155/256 of the remaining distance.
+  const PerformanceSequence proportional =
+      renderKonamiSnesProgram(KONAMISNES_V3, {{0xea, 0x82,           // track tempo from the song
+                                               0x28, 1, 0x7d, 0x7d,  // establish key $28
+                                               0xf0, 0x9b,           // persistent proportional portamento
+                                               0x2f, 8, 0x7d, 0x7d,  // glide seven semitones upward
+                                               0xff}});
+  const auto proportionalTransition =
+      std::ranges::find_if(proportional.tracks[0].automations, [](const PerformanceAutomation& automation) {
+        const auto* intent = pitchTransitionIntent(automation);
+        return intent != nullptr && intent->startKey == 40.0 && intent->targetKey == 47.0;
+      });
+  expect(proportionalTransition != proportional.tracks[0].automations.end(),
+         "V3 proportional portamento should create a transition for every following note");
+  const auto* proportionalIntent = pitchTransitionIntent(*proportionalTransition);
+  const auto* physicalDuration = proportionalIntent == nullptr
+                                     ? nullptr
+                                     : std::get_if<FixedDurationPitchSlideTiming>(&proportionalIntent->timing.physical);
+  const auto* sampledCurve =
+      proportionalIntent == nullptr ? nullptr : std::get_if<SampledAutomationCurve>(&proportionalIntent->curve);
+  expect(physicalDuration != nullptr && physicalDuration->milliseconds == 40.0 &&
+             proportionalIntent->timing.timelineTicks == 3 && sampledCurve != nullptr &&
+             sampledCurve->samples.size() == 4 && sampledCurve->samples[1].value == 46.56640625 &&
+             sampledCurve->samples[2].value == 46.984375,
+         "F0 $9b should preserve the driver's fast, front-loaded integer pitch curve");
+
+  const MidiSequence pitchBend =
+      renderMidiSequence(proportional, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  const MidiSequence portamento =
+      renderMidiSequence(proportional, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
+  expect(hasMidiEvent<PitchBend>(pitchBend.tracks[0]) && hasMidiEvent<PortamentoControl>(portamento.tracks[0]),
+         "V3 proportional portamento should render in both MIDI transition modes");
+
+  const PerformanceSequence interrupted =
+      renderKonamiSnesProgram(KONAMISNES_V3, {{0x28, 1, 0x7d, 0x7d, 0xf0, 1, 0x2f, 1, 0x7d, 0x7d,
+                                               0x30, 8, 0x7d, 0x7d, 0xff}});
+  const auto retargeted =
+      std::ranges::find_if(interrupted.tracks[0].automations, [](const PerformanceAutomation& automation) {
+        const auto* intent = pitchTransitionIntent(automation);
+        return intent != nullptr && intent->targetKey == 48.0;
+      });
+  expect(retargeted != interrupted.tracks[0].automations.end() &&
+             pitchTransitionIntent(*retargeted)->startKey < 41.0,
+         "a new note should continue from an interrupted proportional glide, not its old target");
+}
+
 void konamiSnesPercussionUsesPackedGsDrumBank() {
   constexpr std::array<u8, 3> bytes{
       0x60,  // percussion on
