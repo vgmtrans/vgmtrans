@@ -541,7 +541,7 @@ struct Playback {
     };
     track.pitchNote = continuesVoice && !repeatsHeldKey ? out.continueVoice(previousPitchNote, std::move(note))
                                                        : out.note(std::move(note));
-    applyPitchEffectToNote(key, previousPitchNote);
+    applyPitchEffectToNote(key, continuesVoice ? previousPitchNote : PerformanceNoteId{});
     track.previousNoteKey = key;
     track.previousDurationRate = track.noteDurationRate;
     track.previousWasNote = !track.percussion;
@@ -1015,7 +1015,7 @@ private:
     }
   }
 
-  void applyPitchEffectToNote(u8 key, PerformanceNoteId previousNote) {
+  void applyPitchEffectToNote(u8 key, PerformanceNoteId continuedNote) {
     auto& effect = track.pitchEffect;
     if (track.percussion) {
       effect.previousKey.reset();
@@ -1031,7 +1031,7 @@ private:
           if (track.version <= KONAMISNES_V2 && effect.previousKey) {
             out.pitchSlide(track.pitchNote, *effect.previousKey, target,
                            pitchEffectTiming(track.version, effect.duration, track.tempo))
-                .continueFrom(previousNote);
+                .continueFrom(continuedNote);
           }
           break;
         case PersistentPitchEffect::Kind::Envelope:
