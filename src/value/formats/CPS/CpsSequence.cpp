@@ -166,24 +166,28 @@ struct Playback {
     return kCpsPpqn * 1'000'000.0 / std::max<u32>(1, program.tempoMicrosecondsPerQuarter);
   }
 
-  void emitPortamento(PerformanceNoteId note, double key) {
-    if (!track.held || !track.previousKey || !track.previousNote.valid() ||
-        std::abs(*track.previousKey - key) < 0.0001) {
+  void emitPortamento(PerformanceNoteId note, double key, bool continuesPreviousVoice = true) {
+    if (!track.previousKey || !track.previousNote.valid() || std::abs(*track.previousKey - key) < 0.0001) {
       return;
     }
     const double startKey = out.currentPitchTransitionKey(track.previousNote).value_or(*track.previousKey);
+    PitchSlideTiming timing;
     if (track.portamentoRate == 0) {
-      out.pitchSlide(note, startKey, key, PitchSlideTiming::fromTicks(0))
-          .continueFrom(track.previousNote)
-          .preferPortamento();
-      return;
+      if (!continuesPreviousVoice) {
+        return;
+      }
+      timing = PitchSlideTiming::fromTicks(0);
+    } else {
+      const double semitonesPerSecond = track.portamentoRate * 2.0 / 256.0 * cpsDriverRateHertz(track.version);
+      const double seconds = std::abs(startKey - key) / semitonesPerSecond;
+      const u32 timelineTicks = std::max<u32>(1, static_cast<u32>(std::ceil(seconds * ticksPerSecond())));
+      timing = PitchSlideTiming::fixedRate(timelineTicks, semitonesPerSecond);
     }
-    const double semitonesPerSecond = track.portamentoRate * 2.0 / 256.0 * cpsDriverRateHertz(track.version);
-    const double seconds = std::abs(startKey - key) / semitonesPerSecond;
-    const u32 timelineTicks = std::max<u32>(1, static_cast<u32>(std::ceil(seconds * ticksPerSecond())));
-    out.pitchSlide(note, startKey, key, PitchSlideTiming::fixedRate(timelineTicks, semitonesPerSecond))
-        .continueFrom(track.previousNote)
-        .preferPortamento();
+    auto transition = out.pitchSlide(note, startKey, key, timing);
+    if (continuesPreviousVoice) {
+      transition.continueFrom(track.previousNote);
+    }
+    transition.preferPortamento();
   }
 
   void emitLateHeldTransition(PerformanceNoteId note, double key) {
@@ -291,7 +295,9 @@ struct Playback {
         .restartsVibratoLfoPhase = restart,
         .restartsTremoloLfoPhase = restart,
     });
-    emitPortamento(played, key);
+    if (tied || track.held) {
+      emitPortamento(played, key, track.held);
+    }
     track.previousKey = key;
     track.previousNote = played;
     track.held = tied;

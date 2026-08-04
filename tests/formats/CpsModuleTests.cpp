@@ -831,6 +831,37 @@ void cps2EarlyZeroRateSlursRemainLinked() {
          "an interrupted CPS portamento should retarget from the pitch the voice actually reached");
 }
 
+void cps2EarlyPortamentoStartsOnFirstTiedNote() {
+  auto fixture = earlyCps2Fixture();
+  // Independent note, rate, enter tie state, program, fine bend, destination note.
+  bytesAt(fixture.bytes, 0x1121, {0x09, 0x03, 0xcc, 0x0d, 0x28, 0x04, 0x40, 0x08, 0x1b, 0x0c, 0x01, 0xe9, 0x17});
+  const auto result = scan(fixture);
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(onlySequence(result).program, cpsEarlyDialect());
+
+  const auto* transition = performance.tracks[0].automations.empty()
+                               ? nullptr
+                               : pitchTransitionIntent(performance.tracks[0].automations.front());
+  const auto* rate =
+      transition == nullptr ? nullptr : std::get_if<FixedRatePitchSlideTiming>(&transition->timing.physical);
+  expect(transition != nullptr && !transition->previousNote && transition->startKey == 47.0 &&
+             transition->targetKey == 44.0 && transition->timing.timelineTicks == 15 && rate != nullptr &&
+             std::abs(rate->semitonesPerSecond - 19.53125) < 0.000001,
+         "entering early-CPS tie state with a rate should glide the newly attacked note from the preceding key");
+
+  const MidiSequence portamento =
+      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
+  const MidiSequence pitchBend =
+      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  expect(std::ranges::any_of(portamento.tracks[0].events,
+                             [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) &&
+             std::ranges::any_of(pitchBend.tracks[0].events,
+                                 [](const MidiEvent& event) {
+                                   const auto* bend = std::get_if<PitchBend>(&event);
+                                   return bend != nullptr && std::abs(static_cast<int>(bend->value)) > 4096;
+                                 }),
+         "both MIDI transition renderers should preserve the Dino-style portamento entry");
+}
+
 void cps2LateDriverSemanticsRemainProfileSpecific() {
   const auto result = scan(lateCps2Fixture());
   expect(result.diagnostics.empty(), result.diagnostics.empty()
