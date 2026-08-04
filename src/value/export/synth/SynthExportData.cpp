@@ -258,6 +258,67 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::sp
   return instruments;
 }
 
+[[nodiscard]] double smoothstep(double low, double high, double value) {
+  const double position = std::clamp((value - low) / (high - low), 0.0, 1.0);
+  return position * position * (3.0 - 2.0 * position);
+}
+
+[[nodiscard]] double perceptualDecayFit(double firstDecay, double secondDecay, double firstDropDb,
+                                        double attenuationRangeDb) {
+  // In this model a 10 dB drop halves perceived loudness. Each source stage and
+  // the target decay are therefore exponential curves in perceived loudness.
+  // Minimize their squared difference over time; the closed-form integrals
+  // make evaluating a candidate duration both cheap and deterministic.
+  constexpr double halfLoudnessDb = 10.0;
+  constexpr double ln2 = 0.6931471805599453;
+  const double exponentScale = ln2 * attenuationRangeDb / halfLoudnessDb;
+  const double firstStageSeconds = firstDecay * firstDropDb / attenuationRangeDb;
+  const double loudnessAtSecondStage = std::exp2(-firstDropDb / halfLoudnessDb);
+  const double firstExponent = firstDecay > 0.0 ? exponentScale / firstDecay : 0.0;
+  const double secondExponent = secondDecay > 0.0 ? exponentScale / secondDecay : 0.0;
+
+  const auto error = [&](double duration) {
+    const double targetExponent = exponentScale / duration;
+    double overlap = 0.0;
+    if (firstStageSeconds > 0.0) {
+      overlap +=
+          (1.0 - std::exp(-(targetExponent + firstExponent) * firstStageSeconds)) / (targetExponent + firstExponent);
+    }
+    if (secondDecay > 0.0 && firstDropDb < attenuationRangeDb) {
+      overlap +=
+          std::exp(-targetExponent * firstStageSeconds) * loudnessAtSecondStage / (targetExponent + secondExponent);
+    }
+    // Source energy is constant with respect to the candidate duration, so it
+    // can be omitted from the minimization.
+    return 1.0 / (2.0 * targetExponent) - 2.0 * overlap;
+  };
+
+  if (firstDecay == 0.0 && secondDecay == 0.0) {
+    return 0.0;
+  }
+
+  // There is only one best-fitting duration. Find it numerically instead of
+  // relying on a complicated closed-form equation; 40 iterations are more
+  // precise than the envelope timing that SF2 or DLS can store.
+  constexpr double goldenRatio = 1.618033988749895;
+  double low = 0.000001;
+  double high = std::max(firstDecay, secondDecay) * 2.0;
+  double left = high - (high - low) / goldenRatio;
+  double right = low + (high - low) / goldenRatio;
+  for (int iteration = 0; iteration < 40; ++iteration) {
+    if (error(left) < error(right)) {
+      high = right;
+      right = left;
+      left = high - (high - low) / goldenRatio;
+    } else {
+      low = left;
+      left = right;
+      right = low + (high - low) / goldenRatio;
+    }
+  }
+  return (low + high) * 0.5;
+}
+
 }  // namespace
 
 Envelope approximateEnvelopeAsAdsr(Envelope envelope, double attenuationRangeDb) {
@@ -293,12 +354,23 @@ Envelope approximateEnvelopeAsAdsr(Envelope envelope, double attenuationRangeDb)
     return envelope;
   }
 
-  // Both fields are full-scale rates. Collapse the serial stages by weighting
-  // each rate by the dB distance it covers. This preserves the source
-  // envelope's time to silence instead of turning a held-note fade into a
-  // permanent sustain or blindly discarding either slope.
-  envelope.decaySeconds =
-      firstFraction == 0.0 ? secondDecay : firstDecay * firstFraction + secondDecay * (1.0 - firstFraction);
+  if (firstFraction == 0.0) {
+    envelope.decaySeconds = secondDecay;
+    envelope.sustainAmplitude = 0.0;
+    return envelope;
+  }
+
+  // Endpoint matching preserves the time to total silence, but can let a very
+  // slow, quiet tail flatten an obviously separate first decay. Blend toward a
+  // perceived-loudness-weighted fit when the first stage lasts long enough to
+  // be heard independently. A first drop below 1% amplitude selects that fit
+  // regardless of duration, since the following tail is already very quiet.
+  const double endpointFit = firstDecay * firstFraction + secondDecay * (1.0 - firstFraction);
+  const double perceptualFit = perceptualDecayFit(firstDecay, secondDecay, firstDropDb, attenuationRangeDb);
+  const double firstStageSeconds = firstDecay * firstFraction;
+  const double temporalSalience = smoothstep(0.15, 0.5, firstStageSeconds);
+  const double depthSalience = smoothstep(20.0, 40.0, firstDropDb);
+  envelope.decaySeconds = std::lerp(endpointFit, perceptualFit, std::max(temporalSalience, depthSalience));
   envelope.sustainAmplitude = 0.0;
   return envelope;
 }

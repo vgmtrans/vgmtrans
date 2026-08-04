@@ -11,6 +11,7 @@
 #include "value/export/synth/ModulationScaling.h"
 #include "value/export/synth/SynthExportData.h"
 #include "value/synth/PsxSpu.h"
+#include "value/synth/SnesDsp.h"
 
 namespace {
 
@@ -101,6 +102,36 @@ void adsrApproximationLowersUnsupportedStages() {
   expect(fftEnvelope.decaySeconds && std::abs(*fftEnvelope.decaySeconds - 17.167896) < 0.000001 &&
              !fftEnvelope.secondDecaySeconds && fftEnvelope.sustainAmplitude == 0.0,
          "ADSR export should combine FFT instrument 41's two rates by the attenuation distance each covers");
+
+  // Dracula X, Picture of the Ghost Ship, track 0 at ARAM $342b:
+  // FA 8F 02 DA. The audible first drop lasts 0.88 seconds; matching only the
+  // eventual endpoint stretches it to almost four seconds.
+  const Envelope nativeDraculaEnvelope = snesDspEnvelope(0x8f, 0x02, 0xda);
+  const Envelope draculaEnvelope = approximateEnvelopeAsAdsr(nativeDraculaEnvelope);
+  expect(nativeDraculaEnvelope.decaySeconds && nativeDraculaEnvelope.secondDecaySeconds &&
+             std::abs(*nativeDraculaEnvelope.decaySeconds - 4.853094) < 0.000001 &&
+             std::abs(*nativeDraculaEnvelope.secondDecaySeconds - 25.330971) < 0.000001 &&
+             draculaEnvelope.decaySeconds && std::abs(*draculaEnvelope.decaySeconds - 7.473188) < 0.000001 &&
+             !draculaEnvelope.secondDecaySeconds && draculaEnvelope.sustainAmplitude == 0.0,
+         "a distinct SNES first decay should not be flattened by its quieter sustain-rate tail");
+
+  const Envelope barelyAudibleTail = approximateEnvelopeAsAdsr(Envelope{
+      .decaySeconds = 0.2,
+      .secondDecaySeconds = 100.0,
+      .sustainAmplitude = 0.000316227766,
+  });
+  expect(barelyAudibleTail.decaySeconds && *barelyAudibleTail.decaySeconds < 0.3 &&
+             !barelyAudibleTail.secondDecaySeconds && barelyAudibleTail.sustainAmplitude == 0.0,
+         "a long second decay beginning 70 dB down should not dominate an audible ADSR approximation");
+
+  const Envelope equalRates = approximateEnvelopeAsAdsr(Envelope{
+      .decaySeconds = 3.0,
+      .secondDecaySeconds = 3.0,
+      .sustainAmplitude = 0.25,
+  });
+  expect(equalRates.decaySeconds && std::abs(*equalRates.decaySeconds - 3.0) < 0.000001 &&
+             !equalRates.secondDecaySeconds && equalRates.sustainAmplitude == 0.0,
+         "collapsing equal decay rates should preserve their common slope");
 
   const Envelope endlessSecondDecay = approximateEnvelopeAsAdsr(Envelope{
       .decaySeconds = 2.0,
