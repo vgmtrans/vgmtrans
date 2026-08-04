@@ -115,6 +115,18 @@ void adsrApproximationLowersUnsupportedStages() {
              !draculaEnvelope.secondDecaySeconds && draculaEnvelope.sustainAmplitude == 0.0,
          "a distinct SNES first decay should not be flattened by its quieter sustain-rate tail");
 
+  // Contra III, Neo Kobe Steel Factory, track 2 at ARAM $39cf:
+  // FA 70 00 01 decodes to ADSR1 $ab and ADSR2 $02. It reaches the -18 dB
+  // knee in 0.33 seconds, so the much slower tail must not dominate the fit.
+  const Envelope nativeContraEnvelope = snesDspEnvelope(0xab, 0x02, 0x00);
+  const Envelope contraEnvelope = approximateEnvelopeAsAdsr(nativeContraEnvelope);
+  expect(nativeContraEnvelope.decaySeconds && nativeContraEnvelope.secondDecaySeconds &&
+             std::abs(*nativeContraEnvelope.decaySeconds - 1.819910) < 0.000001 &&
+             std::abs(*nativeContraEnvelope.secondDecaySeconds - 25.330971) < 0.000001 &&
+             contraEnvelope.decaySeconds && std::abs(*contraEnvelope.decaySeconds - 4.140138) < 0.000001 &&
+             !contraEnvelope.secondDecaySeconds && contraEnvelope.sustainAmplitude == 0.0,
+         "a 0.33-second SNES first decay should be fitted independently of its long quieter tail");
+
   const Envelope barelyAudibleTail = approximateEnvelopeAsAdsr(Envelope{
       .decaySeconds = 0.2,
       .secondDecaySeconds = 100.0,
