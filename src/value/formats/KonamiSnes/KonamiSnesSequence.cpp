@@ -153,35 +153,6 @@ struct PersistentPitchEffect {
   return static_cast<u32>(std::min<double>(std::lround(ticks), std::numeric_limits<u32>::max()));
 }
 
-inline constexpr s32 kPitchUnitsPerSemitone = 256;
-inline constexpr double kPitchUpdateMilliseconds = 1000.0 / kKonamiSnesTimerHz;
-
-[[nodiscard]] s32 pitchUnits(double key) {
-  return static_cast<s32>(std::lround(key * kPitchUnitsPerSemitone));
-}
-
-[[nodiscard]] s32 advanceProportionalPortamento(s32 current, s32 target, u8 speed) {
-  const s32 difference = target - current;
-  if (difference == 0 || speed == 0) {
-    return current;
-  }
-
-  // The later driver moves speed/256 of the remaining 8.8 pitch distance on
-  // each 250 Hz update. Its one-unit minimum makes every glide terminate.
-  const s32 distance = std::abs(difference);
-  const s32 step = std::max<s32>((distance * speed) >> 8, 1);
-  return current + (difference < 0 ? -step : step);
-}
-
-[[nodiscard]] u32 proportionalPortamentoUpdates(s32 start, s32 target, u8 speed) {
-  u32 updates = 0;
-  while (start != target && speed != 0) {
-    start = advanceProportionalPortamento(start, target, speed);
-    ++updates;
-  }
-  return updates;
-}
-
 [[nodiscard]] double tuningCents(s8 tuning) {
   return tuning * (400.0 / 256.0);
 }
@@ -1069,33 +1040,35 @@ private:
   }
 
   void beginProportionalPortamento(double startKey, double targetKey, u8 speed, PerformanceNoteId continuedNote) {
-    s32 current = pitchUnits(startKey);
-    const s32 target = pitchUnits(targetKey);
-    const u32 updates = proportionalPortamentoUpdates(current, target, speed);
-    if (updates == 0) {
+    constexpr double pitchScale = 256.0;
+    const s32 start = static_cast<s32>(std::lround(startKey * pitchScale));
+    const s32 target = static_cast<s32>(std::lround(targetKey * pitchScale));
+    if (speed == 0 || start == target) {
       return;
     }
+    std::vector<s32> curve{start};
+    while (curve.back() != target) {
+      const s32 difference = target - curve.back();
+      // At 250 Hz the driver moves speed/256 of the remaining 8.8 pitch
+      // distance, but always advances by at least one unit.
+      const s32 step = std::max<s32>((std::abs(difference) * speed) >> 8, 1);
+      curve.push_back(curve.back() + (difference < 0 ? -step : step));
+    }
 
-    const double milliseconds = updates * kPitchUpdateMilliseconds;
+    const u32 updates = static_cast<u32>(curve.size() - 1);
+    const double milliseconds = updates * (1000.0 / kKonamiSnesTimerHz);
     const double tickMilliseconds = sequenceTickSeconds(track.version, track.tempo) * 1000.0;
     const u32 timelineTicks = std::max<u32>(static_cast<u32>(std::lround(milliseconds / tickMilliseconds)), 1);
-    auto transition = out.pitchSlide(track.pitchNote, current / static_cast<double>(kPitchUnitsPerSemitone),
-                                     target / static_cast<double>(kPitchUnitsPerSemitone),
+    auto transition = out.pitchSlide(track.pitchNote, curve.front() / pitchScale, curve.back() / pitchScale,
                                      PitchSlideTiming::fixedDuration(timelineTicks, milliseconds));
     transition.continueFrom(continuedNote);
 
     // MIDI cannot place the 250 Hz hardware updates between sequence ticks.
     // Sample the exact integer curve at the nearest representable positions,
     // preserving both its strongly front-loaded shape and its total duration.
-    transition.sample(out, current / static_cast<double>(kPitchUnitsPerSemitone));
-    u32 appliedUpdates = 0;
-    for (u32 tick = 1; tick <= timelineTicks; ++tick) {
-      const u32 wantedUpdates = static_cast<u32>(std::lround(static_cast<double>(tick) * updates / timelineTicks));
-      while (appliedUpdates < wantedUpdates) {
-        current = advanceProportionalPortamento(current, target, speed);
-        ++appliedUpdates;
-      }
-      transition.sample(out.at(vm.tick() + tick), current / static_cast<double>(kPitchUnitsPerSemitone));
+    for (u32 tick = 0; tick <= timelineTicks; ++tick) {
+      const size_t sample = static_cast<size_t>(std::lround(static_cast<double>(tick) * updates / timelineTicks));
+      transition.sample(out.at(vm.tick() + tick), curve[sample] / pitchScale);
     }
   }
 

@@ -695,19 +695,13 @@ void konamiSnesProportionalPortamentoMatchesDriverCurve() {
                                                0xf0, 0x9b,           // persistent proportional portamento
                                                0x2f, 8, 0x7d, 0x7d,  // glide seven semitones upward
                                                0xff}});
-  const auto proportionalTransition =
-      std::ranges::find_if(proportional.tracks[0].automations, [](const PerformanceAutomation& automation) {
-        const auto* intent = pitchTransitionIntent(automation);
-        return intent != nullptr && intent->startKey == 40.0 && intent->targetKey == 47.0;
-      });
-  expect(proportionalTransition != proportional.tracks[0].automations.end(),
+  expect(proportional.tracks[0].automations.size() == 1,
          "V3 proportional portamento should create a transition for every following note");
-  const auto* proportionalIntent = pitchTransitionIntent(*proportionalTransition);
-  const auto* physicalDuration = proportionalIntent == nullptr
-                                     ? nullptr
-                                     : std::get_if<FixedDurationPitchSlideTiming>(&proportionalIntent->timing.physical);
+  const auto* proportionalIntent = pitchTransitionIntent(proportional.tracks[0].automations.front());
+  expect(proportionalIntent != nullptr, "V3 proportional portamento should use shared pitch-transition intent");
+  const auto* physicalDuration = std::get_if<FixedDurationPitchSlideTiming>(&proportionalIntent->timing.physical);
   const auto* sampledCurve =
-      proportionalIntent == nullptr ? nullptr : std::get_if<SampledAutomationCurve>(&proportionalIntent->curve);
+      std::get_if<SampledAutomationCurve>(&proportionalIntent->curve);
   expect(physicalDuration != nullptr && physicalDuration->milliseconds == 40.0 &&
              proportionalIntent->timing.timelineTicks == 3 && sampledCurve != nullptr &&
              sampledCurve->samples.size() == 4 && sampledCurve->samples[1].value == 46.56640625 &&
@@ -724,13 +718,10 @@ void konamiSnesProportionalPortamentoMatchesDriverCurve() {
   const PerformanceSequence interrupted =
       renderKonamiSnesProgram(KONAMISNES_V3, {{0x28, 1, 0x7d, 0x7d, 0xf0, 1, 0x2f, 1, 0x7d, 0x7d,
                                                0x30, 8, 0x7d, 0x7d, 0xff}});
-  const auto retargeted =
-      std::ranges::find_if(interrupted.tracks[0].automations, [](const PerformanceAutomation& automation) {
-        const auto* intent = pitchTransitionIntent(automation);
-        return intent != nullptr && intent->targetKey == 48.0;
-      });
-  expect(retargeted != interrupted.tracks[0].automations.end() &&
-             pitchTransitionIntent(*retargeted)->startKey < 41.0,
+  expect(interrupted.tracks[0].automations.size() == 2,
+         "each note should restart persistent proportional portamento");
+  const auto* retargeted = pitchTransitionIntent(interrupted.tracks[0].automations.back());
+  expect(retargeted != nullptr && retargeted->targetKey == 48.0 && retargeted->startKey < 41.0,
          "a new note should continue from an interrupted proportional glide, not its old target");
 }
 
