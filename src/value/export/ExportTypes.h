@@ -44,6 +44,13 @@ enum class MidiPitchTransitionRendering {
   PitchBend,
 };
 
+enum class MidiWideTuningRendering {
+  // Preserve sampler key selection on receivers that apply Coarse Tune before
+  // choosing an instrument region.
+  PitchBend,
+  CoarseTune,
+};
+
 struct MidiExportOptions {
   // Auto follows neutral source quantization when available, then falls back
   // to the legacy precision hint used by unmigrated dialects.
@@ -53,6 +60,7 @@ struct MidiExportOptions {
   bool writePortMetaEvents = true;
   MidiBankSelectStyle bankSelectStyle = MidiBankSelectStyle::MsbOnly;
   MidiPitchTransitionRendering pitchTransitions = MidiPitchTransitionRendering::PreserveFormat;
+  MidiWideTuningRendering wideTuning = MidiWideTuningRendering::PitchBend;
   // Approximate a source track backed by one physical voice: after the first
   // attack, terminate any lingering sound on its MIDI channel before the next.
   bool terminatePreviousVoice = false;

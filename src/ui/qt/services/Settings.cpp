@@ -113,6 +113,26 @@ void Settings::ConversionSettings::setPitchTransitionRendering(
   emit owner->conversionOptionsChanged();
 }
 
+vgmtrans::core::MidiWideTuningRendering Settings::ConversionSettings::wideTuningRendering() const {
+  settings.beginGroup(QStringLiteral("ConversionOptions"));
+  const int value =
+      settings.value(QStringLiteral("wideTuningRendering"),
+                     static_cast<int>(vgmtrans::core::MidiWideTuningRendering::PitchBend))
+          .toInt();
+  settings.endGroup();
+  return value == static_cast<int>(vgmtrans::core::MidiWideTuningRendering::CoarseTune)
+             ? vgmtrans::core::MidiWideTuningRendering::CoarseTune
+             : vgmtrans::core::MidiWideTuningRendering::PitchBend;
+}
+
+void Settings::ConversionSettings::setWideTuningRendering(
+    vgmtrans::core::MidiWideTuningRendering rendering) const {
+  settings.beginGroup(QStringLiteral("ConversionOptions"));
+  settings.setValue(QStringLiteral("wideTuningRendering"), static_cast<int>(rendering));
+  settings.endGroup();
+  emit owner->conversionOptionsChanged();
+}
+
 vgmtrans::core::ModulationConversionPolicy Settings::ConversionSettings::modulationConversion() const {
   settings.beginGroup(QStringLiteral("ConversionOptions"));
   const int value =

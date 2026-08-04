@@ -51,6 +51,8 @@ public:
     void setTerminatePreviousVoice(bool enabled) const;
     [[nodiscard]] vgmtrans::core::MidiPitchTransitionRendering pitchTransitionRendering() const;
     void setPitchTransitionRendering(vgmtrans::core::MidiPitchTransitionRendering rendering) const;
+    [[nodiscard]] vgmtrans::core::MidiWideTuningRendering wideTuningRendering() const;
+    void setWideTuningRendering(vgmtrans::core::MidiWideTuningRendering rendering) const;
     [[nodiscard]] vgmtrans::core::ModulationConversionPolicy modulationConversion() const;
     void setModulationConversion(vgmtrans::core::ModulationConversionPolicy policy) const;
     [[nodiscard]] vgmtrans::core::DynamicEnvelopePolicy dynamicEnvelopeConversion() const;
