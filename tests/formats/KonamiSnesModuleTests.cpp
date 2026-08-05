@@ -883,9 +883,11 @@ void konamiSnesProportionalPortamentoMatchesDriverCurve() {
 }
 
 void konamiSnesPercussionUsesPackedGsDrumBank() {
-  constexpr std::array<u8, 3> bytes{
+  constexpr std::array<u8, 10> bytes{
       0x60,  // percussion on
-      0x61,  // percussion off only clears the source-mode flag
+      0x04, 0x06, 0x7f, 0x7d,
+      0x61,              // percussion off only clears the source-mode flag
+      0xe1, 0x18, 0x7d,  // tie the preceding drum note
       0xff,
   };
 
@@ -902,6 +904,12 @@ void konamiSnesPercussionUsesPackedGsDrumBank() {
   expect(drumBank != events.end(), "KonamiSnes percussion should emit a drum bank select");
   expect(std::get<BankSelect>(*drumBank).bank == (0x7f << 7),
          "KonamiSnes percussion should use the packed GS bank field so MIDI serializes bank MSB 127");
+  const auto midiNote = std::ranges::find_if(events, [](const MidiEvent& event) {
+    const auto* note = std::get_if<NoteDuration>(&event);
+    return note != nullptr && note->key == 4;
+  });
+  expect(midiNote != events.end() && std::get<NoteDuration>(*midiNote).duration == 29,
+         "percussion off should not prevent a tie from extending the preceding drum note");
 }
 
 void konamiSnesCompilerCursorDecodesVersionedFlowAndTruncation() {

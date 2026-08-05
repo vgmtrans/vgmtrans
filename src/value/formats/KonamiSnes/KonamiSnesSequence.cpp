@@ -442,6 +442,7 @@ struct TrackState {
   std::optional<u8> previousNoteKey;
   u8 previousDurationRate = 0;
   bool previousWasNote = false;
+  bool previousNoteWasPercussion = false;
   double sequenceTuningCents = 0.0;
   double lastEmittedTuningCents = std::numeric_limits<double>::quiet_NaN();
   u8 tempo = kKonamiSnesDefaultTempo;
@@ -506,8 +507,8 @@ struct Playback {
     beginSoftwareRelease(duration);
     emitLevel(out);
     applyEffectiveTuning();
-    const bool continuesVoice =
-        !track.percussion && track.previousWasNote && isLegatoDuration(track.version, track.previousDurationRate);
+    const bool continuesVoice = !track.percussion && !track.previousNoteWasPercussion && track.previousWasNote &&
+                                isLegatoDuration(track.version, track.previousDurationRate);
     const bool repeatsHeldKey = continuesVoice && track.previousNoteKey == key;
     const PerformanceNoteId previousPitchNote = track.pitchNote;
     const std::optional<double> realizedPitch =
@@ -534,7 +535,8 @@ struct Playback {
     applyPitchEffectToNote(key, continuesVoice ? previousPitchNote : PerformanceNoteId{}, realizedPitch);
     track.previousNoteKey = key;
     track.previousDurationRate = track.noteDurationRate;
-    track.previousWasNote = !track.percussion;
+    track.previousWasNote = true;
+    track.previousNoteWasPercussion = track.percussion;
     track.envelope.dspReleasePendingRestore = track.version >= KONAMISNES_V3 && track.envelope.releaseAmount >= 100 &&
                                               !isHeldDuration(track.version, track.noteDurationRate);
   }
@@ -558,8 +560,10 @@ struct Playback {
     }
     const u8 duration = track.noteDuration(track.noteLength);
     beginSoftwareRelease(duration);
+    const double key = track.previousNoteWasPercussion ? static_cast<double>(*track.previousNoteKey)
+                                                      : track.noteSemitones(*track.previousNoteKey, false);
     track.pitchNote = out.note(NotePerformanceEvent{
-        .key = track.noteSemitones(*track.previousNoteKey, false),
+        .key = key,
         .linearVelocity = 1.0,
         .durationTicks = duration,
         .extendsPrevious = true,
