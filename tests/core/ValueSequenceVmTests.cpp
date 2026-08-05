@@ -90,6 +90,7 @@ void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
   const SequenceDialect dialect{
       .id = DialectId{.value = "source-timeline-probe"},
       .timebase = Timebase{.ppqn = 48},
+      .defaultBehavior = SequenceProgramBehavior{.initialStereoBalance = omitInitialStereoBalance},
       .execute = [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter&,
                     VmApi&) { return command.address.value == 0 ? Effects::wait(7) : Effects{}; },
   };
@@ -118,6 +119,7 @@ void sequenceVmPreservesPitchMotionThroughNoteRelease() {
   const SequenceDialect dialect{
       .id = DialectId{.value = "release-pitch-probe"},
       .timebase = Timebase{.ppqn = 48},
+      .defaultBehavior = SequenceProgramBehavior{.initialStereoBalance = omitInitialStereoBalance},
       .execute =
           [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter& out, VmApi&) {
             if (command.address.value != 0) {
@@ -532,13 +534,15 @@ void sequenceVmFallsThroughBySourceAddressWhenDecodeOrderDiffers() {
 }
 
 void sequenceVmEmitsDialectInitialChannelDefaults() {
-  const SequenceDialect dialect = probeSequenceDialect(SequenceProgramBehavior{
-      .defaultLoopPolicy = LoopPolicy::Default,
-      .initialLevel = 0.0,
-      .initialExpression = 0.5,
-      .initialReverbSend = 0.0,
-      .initialMonoModeChannels = 0,
-  });
+  const SequenceDialect dialect = probeSequenceDialect(
+      SequenceProgramBehavior{
+          .defaultLoopPolicy = LoopPolicy::Default,
+          .initialLevel = 0.0,
+          .initialExpression = 0.5,
+          .initialReverbSend = 0.0,
+          .initialMonoModeChannels = 0,
+      },
+      StereoBalance{0.25, 0.75});
   TrackProgram track{
       .id = TrackId{3},
       .sourceTrackNumber = 4,
@@ -558,7 +562,7 @@ void sequenceVmEmitsDialectInitialChannelDefaults() {
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
   expect(performance.tracks.size() == 1, "initial-default fixture should render one track");
   const auto& events = performance.tracks[0].events;
-  expect(events.size() == 4, "VM should emit dialect initial channel defaults before source commands");
+  expect(events.size() == 5, "VM should emit dialect initial channel defaults before source commands");
 
   const auto* reverb = std::get_if<ReverbPerformanceEvent>(&events[0]);
   expect(reverb != nullptr && reverb->send == 0.0 && !reverb->header.sourceCommand.valid(),
@@ -569,7 +573,11 @@ void sequenceVmEmitsDialectInitialChannelDefaults() {
   const auto* expression = std::get_if<ExpressionPerformanceEvent>(&events[2]);
   expect(expression != nullptr && expression->linearGain == 0.5 && !expression->header.sourceCommand.valid(),
          "initial expression should preserve its physical gain and should not pretend to come from a source command");
-  const auto* mono = std::get_if<MonoModePerformanceEvent>(&events[3]);
+  const auto* balance = std::get_if<StereoBalancePerformanceEvent>(&events[3]);
+  expect(balance != nullptr && balance->leftGain == 0.25 && balance->rightGain == 0.75 &&
+             !balance->header.sourceCommand.valid(),
+         "initial stereo balance should preserve physical channel gains without inventing a source command");
+  const auto* mono = std::get_if<MonoModePerformanceEvent>(&events[4]);
   expect(mono != nullptr && mono->channels == 0 && !mono->header.sourceCommand.valid(),
          "initial mono mode should preserve explicit zero and should not pretend to come from a source command");
 
@@ -582,9 +590,17 @@ void sequenceVmEmitsDialectInitialChannelDefaults() {
   expect(std::holds_alternative<Volume>(midi.tracks[0].events[2]) &&
              std::holds_alternative<Expression>(midi.tracks[0].events[3]),
          "performance renderer should lower initial level and expression to their distinct MIDI controllers");
-  const auto* midiMono = std::get_if<MonoMode>(&midi.tracks[0].events[4]);
+  const auto* midiMono = std::get_if<MonoMode>(&midi.tracks[0].events[6]);
   expect(midiMono != nullptr && midiMono->channel == 0 && midiMono->channels == 0,
          "performance renderer should lower initial mono mode to MIDI CC126");
+
+  bool rejectedUnresolvedBalance = false;
+  try {
+    static_cast<void>(SequenceVm().render(program, probeSequenceDialect({}, unresolvedInitialStereoBalance)));
+  } catch (const std::logic_error&) {
+    rejectedUnresolvedBalance = true;
+  }
+  expect(rejectedUnresolvedBalance, "VM should reject an initial stereo balance that remains unresolved");
 }
 
 void sequenceVmAllowsRepeatedCallsToSameSubroutine() {
@@ -936,6 +952,7 @@ SequenceDialect authoritativeFlowProbeDialect() {
   return SequenceDialect{
       .id = DialectId{.value = "authoritative-flow-probe"},
       .timebase = Timebase{.ppqn = 48},
+      .defaultBehavior = SequenceProgramBehavior{.initialStereoBalance = omitInitialStereoBalance},
       .execute =
           [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter& out, VmApi& vm) {
             if (command.opcode == 0xfe) {
@@ -1121,6 +1138,7 @@ void sequenceVmSchedulesSemanticTracksAgainstOneProgramState() {
   const SequenceDialect dialect{
       .id = DialectId{.value = "scheduled-probe"},
       .timebase = Timebase{.ppqn = 48},
+      .defaultBehavior = SequenceProgramBehavior{.initialStereoBalance = omitInitialStereoBalance},
       .createProgramState = createScheduledProbeProgramState,
       .execute = executeScheduledProbe,
   };
@@ -1179,6 +1197,7 @@ void sequenceVmCoordinatesSemanticLoopsAtSequenceScope() {
   const SequenceDialect dialect{
       .id = DialectId{.value = "scheduled-loop-probe"},
       .timebase = Timebase{.ppqn = 48},
+      .defaultBehavior = SequenceProgramBehavior{.initialStereoBalance = omitInitialStereoBalance},
       .execute = executeScheduledLoopProbe,
   };
 
@@ -1284,6 +1303,7 @@ SequenceDialect playlistProbeDialect() {
   return SequenceDialect{
       .id = DialectId{.value = "section-playlist-probe"},
       .timebase = Timebase{.ppqn = 48},
+      .defaultBehavior = SequenceProgramBehavior{.initialStereoBalance = omitInitialStereoBalance},
       .createTrackState = createPlaylistProbeTrackState,
       .execute = executePlaylistProbe,
       .beginTrackSection = beginPlaylistProbeSection,

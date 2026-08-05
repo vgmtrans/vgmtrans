@@ -1110,9 +1110,10 @@ void konamiSnesMixerAndPanFollowVersionedDriverMath() {
   const auto v3Pan = performanceEvents<StereoBalancePerformanceEvent>(v3PanPerformance.tracks.front());
   const auto v5Pan = performanceEvents<StereoBalancePerformanceEvent>(v5PanPerformance.tracks.front());
   const auto v6Pan = performanceEvents<StereoBalancePerformanceEvent>(v6PanPerformance.tracks.front());
-  expect(v3Pan.size() == 1 && v3Pan[0]->leftGain == 0.0 && std::abs(v3Pan[0]->rightGain - 254.0 / 256.0) < 0.0001 &&
-             v5Pan.size() == 1 && std::abs(v5Pan[0]->leftGain - 0x46 / 256.0) < 0.0001 && v6Pan.size() == 1 &&
-             std::abs(v6Pan[0]->leftGain - 0x40 / 256.0) < 0.0001,
+  expect(v3Pan.size() == 2 && v3Pan.back()->leftGain == 0.0 &&
+             std::abs(v3Pan.back()->rightGain - 254.0 / 256.0) < 0.0001 && v5Pan.size() == 2 &&
+             std::abs(v5Pan.back()->leftGain - 0x46 / 256.0) < 0.0001 && v6Pan.size() == 2 &&
+             std::abs(v6Pan.back()->leftGain - 0x40 / 256.0) < 0.0001,
          "late pan should use left[pan], right[40-pan], a divisor of 256, and the V5 table anomaly");
 }
 
@@ -1207,7 +1208,7 @@ void konamiSnesLowCommandsAndInstrumentPanAreVersioned() {
   };
   const auto instrumentPan = renderKonamiSnesAramSequence(bytes, layout);
   const auto pans = performanceEvents<StereoBalancePerformanceEvent>(instrumentPan.tracks.front());
-  expect(pans.size() == 1 && std::abs(pans.front()->leftGain - 0x0e / 256.0) < 0.0001,
+  expect(pans.size() == 2 && std::abs(pans.back()->leftGain - 0x0e / 256.0) < 0.0001,
          "instrument loads should apply row pan only while the persistent instrument-pan flag is enabled");
 
   bytes = makeKonamiSnesBuilderAram();

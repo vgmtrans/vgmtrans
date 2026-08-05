@@ -229,6 +229,13 @@ void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavio
         .precisionHint = LevelPrecisionHint::SevenBit,
     });
   }
+  if (const auto* balance = std::get_if<StereoBalance>(&behavior.initialStereoBalance)) {
+    track.events.emplace_back(StereoBalancePerformanceEvent{
+        .header = header,
+        .leftGain = balance->leftGain,
+        .rightGain = balance->rightGain,
+    });
+  }
   if (behavior.initialMonoModeChannels) {
     track.events.emplace_back(MonoModePerformanceEvent{
         .header = header,
@@ -1260,6 +1267,14 @@ SequenceProgramBehavior SequenceVm::resolvedBehavior(const SequenceProgram& prog
     behavior.initialExpression = program.behavior.initialExpression;
   } else if (dialect.defaultBehavior.initialExpression) {
     behavior.initialExpression = dialect.defaultBehavior.initialExpression;
+  }
+
+  behavior.initialStereoBalance = program.behavior.initialStereoBalance;
+  if (std::holds_alternative<UnresolvedInitialStereoBalance>(behavior.initialStereoBalance)) {
+    behavior.initialStereoBalance = dialect.defaultBehavior.initialStereoBalance;
+  }
+  if (std::holds_alternative<UnresolvedInitialStereoBalance>(behavior.initialStereoBalance)) {
+    throw std::logic_error("Sequence initial stereo balance remains unresolved");
   }
 
   if (program.behavior.initialMonoModeChannels) {

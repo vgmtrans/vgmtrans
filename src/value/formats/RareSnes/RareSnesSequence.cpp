@@ -1857,6 +1857,8 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   if (layout.profile == Profile::KillerInstinct) {
     program.behavior.initialLevel = 0.5;
   }
+  const double initialChannelGain = layout.profile == Profile::KillerInstinct ? 0.5 : 127.0 / 128.0;
+  program.behavior.initialStereoBalance = StereoBalance{initialChannelGain, initialChannelGain};
   program.behavior.initialTempoMicrosecondsPerQuarter =
       tempoMicrosecondsPerQuarter(layout.initialTempo, layout.initialTimer);
 

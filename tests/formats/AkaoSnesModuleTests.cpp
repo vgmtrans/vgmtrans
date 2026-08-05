@@ -905,7 +905,7 @@ void akaoSnesCompiledAutomationTicksControllerAndTempoFades() {
   expect(levels.size() == 5 && levels.back()->header.tick == 4 &&
              std::abs(levels.back()->linearGain - (63.0 / 127.0)) < 1e-9,
          "volume fades should advance once per driver tick and land exactly on their target");
-  expect(pans.size() == 5 && pans.back()->header.tick == 4 && pans.back()->rightGain == 0.0,
+  expect(pans.size() == 6 && pans.back()->header.tick == 4 && pans.back()->rightGain == 0.0,
          "pan fades should advance once per driver tick and land exactly on their target");
   expect(tempos.size() == 5 && tempos.back()->header.tick == 4 && tempos.back()->microsecondsPerQuarter == 936000,
          "tempo fades should emit their intermediate shared tempo changes and final target");

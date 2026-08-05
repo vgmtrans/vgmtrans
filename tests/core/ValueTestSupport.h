@@ -848,7 +848,9 @@ using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
   }
 }
 
-[[nodiscard]] SequenceDialect probeSequenceDialect(SequenceProgramBehavior behavior = {}) {
+[[nodiscard]] SequenceDialect probeSequenceDialect(
+    SequenceProgramBehavior behavior = {}, InitialStereoBalance initialStereoBalance = omitInitialStereoBalance) {
+  behavior.initialStereoBalance = initialStereoBalance;
   return makeCompiledDialect<ProbeTrackState, ProbePlayback>(SequenceDialect{
       .id = DialectId{.value = "probe"},
       .commandDetailKindPrefix = "probe",

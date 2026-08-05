@@ -1603,6 +1603,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
 }
 
 [[nodiscard]] SequenceDialect makeDialect(KonamiSnesVersion version) {
+  const PanGains initialBalance = panGains(version, version <= KONAMISNES_V2 ? 10 : 20);
   return makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
       .id = DialectId{.value = dialectId(version)},
       .commandDetailKindPrefix = "konami-snes",
@@ -1612,6 +1613,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
               .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .initialLevel = 0.0,
               .initialReverbSend = 0.0,
+              .initialStereoBalance = StereoBalance{initialBalance.left, initialBalance.right},
               .initialPitchBendRangeSemitones = 2,
               .initialTempoMicrosecondsPerQuarter = tempoMicrosecondsPerQuarter(version, kKonamiSnesDefaultTempo),
           },

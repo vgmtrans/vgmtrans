@@ -1157,6 +1157,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
               .commandLimit = kMaxTrackCommands,
               .initialLevel = 1.0,
               .initialReverbSend = 0.0,
+              .initialStereoBalance = omitInitialStereoBalance,
           },
   });
 }

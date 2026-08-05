@@ -2083,6 +2083,7 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
           SequenceProgramBehavior{
               .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .initialReverbSend = 0.0,
+              .initialStereoBalance = StereoBalance{127.0 / 255.0, 128.0 / 255.0},
           },
       .prepass = SemanticPrepassMode::ScheduledPlayback,
   });
