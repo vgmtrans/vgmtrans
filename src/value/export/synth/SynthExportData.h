@@ -8,6 +8,7 @@
 
 #include "value/base/Source.h"
 #include "value/export/synth/ModulationScaling.h"
+#include "value/synth/SampleFiltering.h"
 #include "value/synth/SynthModel.h"
 
 #include <span>
@@ -17,17 +18,21 @@
 namespace vgmtrans::core {
 
 struct PerformanceSequence;
+class FormatRegistry;
 
 struct SynthExportInput {
   std::string name;
   std::span<const InstrumentSetAsset* const> instrumentSets;
   std::span<const SampleCollectionAsset* const> sampleCollections;
+  // Resolves FormatPreferred independently for each sample collection.
+  const FormatRegistry* formats = nullptr;
   // Null retains the complete collection. A performance filters instruments
   // selected by its notes and the samples referenced by those instruments.
   const PerformanceSequence* sequenceUsage = nullptr;
   const MidiModulationUsage* midiModulationUsage = nullptr;
   ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
   ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;
+  SampleFilteringPolicy sampleFiltering = SampleFilteringPolicy::FormatPreferred;
 };
 
 struct SynthExportResult {

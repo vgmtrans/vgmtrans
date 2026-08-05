@@ -59,6 +59,8 @@ public:
     void setDynamicEnvelopeConversion(vgmtrans::core::DynamicEnvelopePolicy policy) const;
     [[nodiscard]] bool exportOnlyUsedInstruments() const;
     void setExportOnlyUsedInstruments(bool enabled) const;
+    [[nodiscard]] vgmtrans::core::SampleFilteringPolicy sampleFiltering() const;
+    void setSampleFiltering(vgmtrans::core::SampleFilteringPolicy filtering) const;
   } conversion;
 
   struct RecentFilesSettings : SettingsGroup {

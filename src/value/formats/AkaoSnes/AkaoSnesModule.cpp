@@ -54,7 +54,9 @@ using namespace core;
 
 FormatDefinition akaoSnesDefinition() {
   return FormatDefinition{
-      .module = {.name = std::string(kAkaoSnesFormatName), .scan = scanAkaoSnes},
+      .module = {.name = std::string(kAkaoSnesFormatName),
+                 .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+                 .scan = scanAkaoSnes},
       .sequenceDialects = {akaoSnesSequenceDialect()},
   };
 }

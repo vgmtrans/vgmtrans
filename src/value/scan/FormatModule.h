@@ -8,6 +8,7 @@
 
 #include "value/model/SessionSnapshot.h"
 #include "value/scan/ScanTypes.h"
+#include "value/synth/SampleFiltering.h"
 
 #include <functional>
 #include <optional>
@@ -63,6 +64,8 @@ struct FormatModule {
   using PrepareCollection = std::function<PreparedCollectionAssets(const CollectionPrepareContext& context)>;
 
   std::string name;
+  // Used when a request delegates sample filtering to the owning format.
+  SampleFilter preferredSampleFilter = SampleFilter::None;
   Scan scan;
   // Defaults to name when empty. Set this when a resolver intentionally uses a
   // different key prefix for its collections.

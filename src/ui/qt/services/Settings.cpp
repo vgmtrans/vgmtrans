@@ -193,6 +193,31 @@ void Settings::ConversionSettings::setExportOnlyUsedInstruments(bool enabled) co
   emit owner->conversionOptionsChanged();
 }
 
+vgmtrans::core::SampleFilteringPolicy Settings::ConversionSettings::sampleFiltering() const {
+  settings.beginGroup(QStringLiteral("ConversionOptions"));
+  const auto fallback =
+      settings.value(QStringLiteral("preserveSnesGaussianResponse"), true).toBool()
+          ? vgmtrans::core::SampleFilteringPolicy::FormatPreferred
+          : vgmtrans::core::SampleFilteringPolicy::None;
+  const int value = settings.value(QStringLiteral("sampleFiltering"), static_cast<int>(fallback)).toInt();
+  settings.endGroup();
+  switch (static_cast<vgmtrans::core::SampleFilteringPolicy>(value)) {
+    case vgmtrans::core::SampleFilteringPolicy::FormatPreferred:
+    case vgmtrans::core::SampleFilteringPolicy::None:
+    case vgmtrans::core::SampleFilteringPolicy::SnesDspLowPass:
+      return static_cast<vgmtrans::core::SampleFilteringPolicy>(value);
+  }
+  return vgmtrans::core::SampleFilteringPolicy::FormatPreferred;
+}
+
+void Settings::ConversionSettings::setSampleFiltering(vgmtrans::core::SampleFilteringPolicy filtering) const {
+  settings.beginGroup(QStringLiteral("ConversionOptions"));
+  settings.setValue(QStringLiteral("sampleFiltering"), static_cast<int>(filtering));
+  settings.remove(QStringLiteral("preserveSnesGaussianResponse"));
+  settings.endGroup();
+  emit owner->conversionOptionsChanged();
+}
+
 QStringList Settings::RecentFilesSettings::list() const {
   settings.beginGroup(QStringLiteral("RecentFiles"));
   const QStringList files = settings.value(QStringLiteral("files")).toStringList();

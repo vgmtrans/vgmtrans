@@ -23,6 +23,7 @@ target_sources(vgmtrans-value-core-tests
     core/ValueSequenceVmTests.cpp
     core/ValueSessionTests.cpp
     core/ValueSourceMapTests.cpp
+    core/SnesGaussianFilterTests.cpp
     core/ValueSynthBuilderTests.cpp
     core/ValueSynthExportTests.cpp
     core/ValueCoreTests.cpp

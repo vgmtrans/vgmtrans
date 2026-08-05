@@ -74,7 +74,9 @@ namespace {
 
 FormatDefinition definition() {
   return FormatDefinition{
-      .module = {.name = "NinSnes", .scan = scan},
+      .module = {.name = "NinSnes",
+                 .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+                 .scan = scan},
       .sequenceDialects = {sequenceDialect()},
   };
 }

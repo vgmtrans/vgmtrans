@@ -2195,6 +2195,9 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
   expect(ExportRequest{}.dynamicEnvelopes == DynamicEnvelopePolicy::Ignore &&
              PlaybackRequest{}.dynamicEnvelopes == DynamicEnvelopePolicy::Ignore,
          "dynamic envelope materialization should remain explicitly opt-in");
+  expect(ExportRequest{}.sampleFiltering == SampleFilteringPolicy::FormatPreferred &&
+             PlaybackRequest{}.sampleFiltering == SampleFilteringPolicy::FormatPreferred,
+         "sample filtering should use each format's recommendation by default");
   expect(!ExportRequest{}.sequence.midi.terminatePreviousVoice,
          "previous-voice termination should remain explicitly opt-in");
   expect(ExportRequest{}.sequence.midi.wideTuning == MidiWideTuningRendering::PitchBend,

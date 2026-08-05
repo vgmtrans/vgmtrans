@@ -64,7 +64,9 @@ namespace {
 
 FormatDefinition definition() {
   return FormatDefinition{
-      .module = {.name = "RareSnes", .scan = scan},
+      .module = {.name = "RareSnes",
+                 .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+                 .scan = scan},
       .sequenceDialects = {sequenceDialect()},
   };
 }

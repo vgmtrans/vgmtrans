@@ -6,6 +6,8 @@
 
 #include "SequencePlayer.h"
 
+#include "services/Settings.h"
+
 #include <algorithm>
 #include <cstddef>
 #include <limits>
@@ -95,6 +97,7 @@ vgmtrans::core::PlaybackRequest SequencePlayer::playbackRequest(
   return vgmtrans::core::PlaybackRequest{
       .sequence = std::move(options),
       .modulationConversion = vgmtrans::core::ModulationConversionPolicy::SequenceEventSimulation,
+      .sampleFiltering = Settings::the()->conversion.sampleFiltering(),
   };
 }
 

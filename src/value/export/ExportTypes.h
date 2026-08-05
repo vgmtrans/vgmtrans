@@ -8,6 +8,7 @@
 
 #include "value/model/MetadataModel.h"
 #include "value/export/ExportPolicy.h"
+#include "value/synth/SampleFiltering.h"
 
 #include <string>
 #include <vector>
@@ -87,6 +88,7 @@ struct PlaybackRequest {
   SequenceRenderOptions sequence;
   ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;
   DynamicEnvelopePolicy dynamicEnvelopes = DynamicEnvelopePolicy::Ignore;
+  SampleFilteringPolicy sampleFiltering = SampleFilteringPolicy::FormatPreferred;
 };
 
 // ExportRequest is policy, not parsed data. Callers choose which files to write
@@ -97,6 +99,7 @@ struct ExportRequest {
   ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
   ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;
   DynamicEnvelopePolicy dynamicEnvelopes = DynamicEnvelopePolicy::Ignore;
+  SampleFilteringPolicy sampleFiltering = SampleFilteringPolicy::FormatPreferred;
   // Instrument-container exports retain only instruments selected by rendered
   // notes, plus the samples referenced by those instruments.
   bool exportOnlyUsedInstruments = false;
