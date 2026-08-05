@@ -134,6 +134,7 @@ void akaoSnesV4LfosPreserveDriverFamiliesAndPackedModes();
 void akaoSnesCompiledAutomationTicksControllerAndTempoFades();
 void akaoSnesCompilerCursorCoversLoopsAndCpuBranches();
 void akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo();
+void akaoSnesSecretOfManaEchoEventsEmitReverb();
 void akaoDialectDecodesLegacyRelativeJumpTargets();
 void akaoDialectDecodesConditionalBranchSideTargets();
 void akaoSequenceAnalysisUsesSemanticOperands();
@@ -309,6 +310,7 @@ int main() {
     akaoSnesCompiledAutomationTicksControllerAndTempoFades();
     akaoSnesCompilerCursorCoversLoopsAndCpuBranches();
     akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo();
+    akaoSnesSecretOfManaEchoEventsEmitReverb();
     akaoDialectDecodesLegacyRelativeJumpTargets();
     akaoDialectDecodesConditionalBranchSideTargets();
     akaoSequenceAnalysisUsesSemanticOperands();

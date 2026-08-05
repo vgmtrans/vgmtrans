@@ -1165,6 +1165,19 @@ void akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo() {
          "a delayed tempo change on one track should resynchronize another track's active LFO at that tick");
 }
 
+void akaoSnesSecretOfManaEchoEventsEmitReverb() {
+  constexpr u32 start = 0x20;
+  const AkaoSnesProfile sd2{.version = AKAOSNES_V3, .minorVersion = AKAOSNES_V3_SD2};
+  std::vector<u8> bytes(0x40, 0xf2);
+  writeBytes(bytes, start, std::array<u8, 4>{0xe2, 0x0e, 0xe3, 0xf2});
+
+  const PerformanceSequence performance = renderTracks(sd2, {decodeTrack(bytes, sd2, start, 0x40)});
+  const auto echo = eventsOfType<ReverbPerformanceEvent>(performance.tracks.front());
+  expect(echo.size() == 3 && std::abs(echo[1]->send - 40.0 / 127.0) < 0.000001 &&
+             echo[2]->header.tick == 3 && echo[2]->send == 0.0,
+         "Secret of Mana echo on/off should emit audible reverb followed by a dry send");
+}
+
 void akaoSnesV4TieExtendsShortenedPreviousNote() {
   std::vector<u8> bytes(0x40, 0xeb);
   constexpr u32 start = 0x20;

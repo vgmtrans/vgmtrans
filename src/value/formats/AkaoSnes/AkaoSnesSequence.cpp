@@ -1807,9 +1807,9 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
     case EventType::PitchModOff:
       return cursor.sourceOnly("Pitch Modulation Off");
     case EventType::EchoOn:
-      return cursor.sourceOnly("Echo On");
+      return cursor.command("Echo On", SequenceSemantic::State).emitReverb(40.0 / 127.0);
     case EventType::EchoOff:
-      return cursor.sourceOnly("Echo Off");
+      return cursor.command("Echo Off", SequenceSemantic::State).emitReverb(0.0);
     case EventType::AdsrDefault:
       if (usesDynamicAdsr(profile)) {
         return cursor.command("ADSR Default", SequenceSemantic::Envelope)
