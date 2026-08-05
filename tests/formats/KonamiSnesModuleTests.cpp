@@ -169,6 +169,103 @@ void writeKonamiInstrumentEntry(std::vector<u8>& bytes, u32 offset, u8 srcn) {
   writeBytes(bytes, offset + 1, fields);
 }
 
+void writeKonamiLegacyInstrumentEntry(std::vector<u8>& bytes, u32 offset, u8 srcn) {
+  constexpr std::array<u8, 7> fields{
+      0x00,  // key
+      0x00,  // tuning
+      0xff,  // ADSR1
+      0xe0,  // ADSR2
+      0xb8,  // GAIN
+      0x0a,  // pan
+      0x00,  // volume
+  };
+  bytes[offset] = srcn;
+  writeBytes(bytes, offset + 1, fields);
+}
+
+std::vector<u8> makeBatmanReturnsAram() {
+  std::vector<u8> bytes(0x10000);
+
+  // Batman Returns enters its music setup path for table indexes 0x7c and
+  // above. Keep earlier rows empty and make row 0x7c playable.
+  constexpr std::array<u8, 38> readSongList{
+      0xe4, 0x0c, 0x8f, 0xe5, 0x04, 0x8f, 0x03, 0x05, 0x9c, 0x8d, 0x05, 0xcf, 0x7a,
+      0x04, 0xda, 0x04, 0x8d, 0x00, 0xcd, 0x00, 0xf7, 0x04, 0xc4, 0x1c, 0xfc, 0xf7,
+      0x04, 0xc4, 0x06, 0xe4, 0x0c, 0x68, 0x7c, 0x90, 0x03, 0x5f, 0x6d, 0x1b,
+  };
+  writeBytes(bytes, 0x1aba, readSongList);
+  writeLe16(bytes, 0x03e5 + 0x7c * 5 + 3, 0x3900);
+
+  // The V2 dispatcher has two low commands (0x60/0x61) and one-byte command
+  // lengths. Its 0xfc entry is two operands, which keeps the following note
+  // aligned at 0x3909.
+  constexpr std::array<u8, 34> vcmdLengths{
+      0x00, 0x00, 0x01, 0x02, 0x01, 0x01, 0x03, 0x03, 0x00, 0x03, 0x00, 0x03,
+      0x01, 0x02, 0x01, 0x03, 0x01, 0x02, 0x01, 0x03, 0x01, 0x03, 0x03, 0x03,
+      0x00, 0x00, 0x02, 0x01, 0x03, 0x01, 0x01, 0x02, 0x02, 0x00,
+  };
+  writeBytes(bytes, 0x0e60, vcmdLengths);
+  constexpr std::array<u8, 16> branchForVcmd6x{
+      0xe4, 0x08, 0x8f, 0xde, 0x04, 0x68, 0xe0, 0xb0, 0x0c, 0x8f, 0x60, 0x04, 0x68, 0x62, 0x90, 0x05,
+  };
+  writeBytes(bytes, 0x0e82, branchForVcmd6x);
+  constexpr std::array<u8, 21> jumpToVcmd{
+      0x80, 0xa4, 0x04, 0x1c, 0xfd, 0xf6, 0x1d, 0x0e, 0x2d, 0xf6, 0x1c,
+      0x0e, 0x2d, 0xdd, 0x5c, 0xfd, 0xf6, 0x60, 0x0e, 0xf0, 0x08,
+  };
+  writeBytes(bytes, 0x0e97, jumpToVcmd);
+
+  constexpr std::array<u8, 10> setDir{
+      0xe8, 0x4c, 0x8d, 0x5d, 0xcc, 0xf2, 0x00, 0xc5, 0xf3, 0x00,
+  };
+  writeBytes(bytes, 0x097a, setDir);
+
+  // The loader routes programs 0x10-0x18 through the selected bank and returns
+  // to the common table at 0x19. The bank pointer is selected by RAM byte 0x26.
+  constexpr std::array<u8, 76> loadInstrument{
+      0x09, 0x1c, 0x13, 0xd5, 0x96, 0x02, 0x68, 0x19, 0xb0, 0x04, 0x68, 0x10, 0xb0,
+      0x11, 0xe8, 0x17, 0xc4, 0x04, 0xe8, 0x07, 0xc4, 0x05, 0xf5, 0x96, 0x02, 0x3f,
+      0x64, 0x0f, 0x5f, 0xe4, 0x0c, 0xe5, 0x26, 0x00, 0x1c, 0xfd, 0xf6, 0x0d, 0x07,
+      0xc4, 0x04, 0xf6, 0x0e, 0x07, 0xc4, 0x05, 0xf5, 0x96, 0x02, 0x80, 0xa8, 0x10,
+      0x3f, 0x64, 0x0f, 0x5f, 0xe4, 0x0c, 0xe8, 0xdf, 0xc4, 0x04, 0xe8, 0x07, 0xc4,
+      0x05, 0xf5, 0x96, 0x02, 0x8d, 0x08, 0xcf, 0x7a, 0x04, 0xda, 0x04,
+  };
+  writeBytes(bytes, 0x0f1f, loadInstrument);
+  bytes[0x0026] = 0x04;
+  writeLe16(bytes, 0x070d + 0x04 * 2, 0x08bf);
+
+  // Keep the common prefix sparse, then provide the seven bank rows that fit
+  // before the driver entry point. Program 0x17 would begin at 0x08f7, where
+  // actual SPC700 opcodes must not be accepted as an instrument row.
+  for (u32 program = 0; program < 0x10; ++program) {
+    bytes[0x0717 + program * 8] = 0xff;
+  }
+  writeKonamiLegacyInstrumentEntry(bytes, 0x0717, 0);
+  for (u32 program = 0x10; program <= 0x16; ++program) {
+    writeKonamiLegacyInstrumentEntry(bytes, 0x08bf + (program - 0x10) * 8, 0);
+  }
+  constexpr std::array<u8, 8> driverEntry{0x20, 0xcd, 0xcf, 0xbd, 0xe8, 0x30, 0xc5, 0xf1};
+  writeBytes(bytes, 0x08f7, driverEntry);
+
+  // Program 0x19 returns to the common table. That same row is percussion note
+  // zero; an implausible pan in the next row terminates both packed suffixes.
+  writeKonamiLegacyInstrumentEntry(bytes, 0x07df, 0);
+  writeKonamiLegacyInstrumentEntry(bytes, 0x07e7, 0);
+  bytes[0x07e7 + 6] = 0xff;
+
+  writeLe16(bytes, 0x3900, 0x3902);
+  constexpr std::array<u8, 12> track{
+      0xea, 0x80, 0xe2, 0x10, 0xfc, 0x00, 0x00, 0x3c, 0x06, 0x7f, 0x7f, 0xff,
+  };
+  writeBytes(bytes, 0x3902, track);
+
+  writeLe16(bytes, 0x4c00, 0x5000);
+  writeLe16(bytes, 0x4c02, 0x5000);
+  bytes[0x5000] = 0x01;
+
+  return bytes;
+}
+
 std::vector<u8> makeKonamiSnesBuilderAram() {
   std::vector<u8> bytes(0x10000);
 
@@ -273,6 +370,46 @@ void konamiSnesLayoutInfersSpcDirFromInstrumentTables() {
   const auto layout = findKonamiSnesLayout(ByteReader(SourceId{8}, bytes));
   expect(layout.has_value(), "KonamiSnes fixture should still match without a DIR write pattern");
   expect(layout->spcDirAddress == 0x5000, "layout should infer SPC DIR from valid instrument sample references");
+}
+
+void konamiSnesBatmanReturnsAramUsesV2LayoutAndBoundedBank() {
+  const auto aram = makeBatmanReturnsAram();
+  const ByteReader reader(SourceId{8}, aram);
+  const auto layout = findKonamiSnesLayout(reader);
+  expect(layout.has_value(), "Batman Returns selector should be recognized as a KonamiSnes layout");
+  expect(layout->version == KONAMISNES_V2, "Batman Returns should use the V2 command dialect");
+  expect(layout->sequenceHeaderAddress == 0x3900,
+         "Batman Returns song row 0x7c should resolve the streamed music header");
+  expect(layout->spcDirAddress == 0x4c00, "Batman Returns layout should recover the live DSP sample directory");
+  expect(layout->commonInstrumentTableAddress == 0x0717 && layout->bankedInstrumentTableAddress == 0x08bf &&
+             layout->firstBankedInstrument == 0x10 && layout->bankedInstrumentEnd == 0x19 &&
+             layout->percussionInstrumentTableAddress == 0x07df,
+         "Batman Returns loader should expose its common, bounded bank, and percussion tables");
+
+  const SourceRange headerRange = konamiSnesSequenceHeaderRange(reader, *layout);
+  expect(headerRange.offset == 0x3900 && headerRange.size == 2,
+         "Batman Returns streamed header should infer one source track");
+  const SequenceProgram program = decodeKonamiSnesSequence(reader, *layout, AssetId{33});
+  expect(program.dialect.value == "konami-snes:v2" && program.tracks.size() == 1,
+         "Batman Returns sequence should retain the V2 dialect and decoded track");
+  const TrackProgram& track = program.tracks.front();
+  expect(track.commands.size() == 5 && track.commands[2].opcode == 0xfc && track.commands[2].encodedSize == 3 &&
+             track.commands[3].opcode == 0x3c && track.commands[3].address.value == 0x3909,
+         "V2 opcode 0xfc should consume two operands without misaligning the following note");
+
+  const auto infos = parseKonamiSnesInstrumentInfos(reader, *layout);
+  constexpr std::array<u32, 9> expectedMelodicPrograms{0x00, 0x10, 0x11, 0x12, 0x13,
+                                                       0x14, 0x15, 0x16, 0x19};
+  expect(infos.size() == expectedMelodicPrograms.size() + 1,
+         "Batman Returns should retain the bounded melodic bank and one percussion row");
+  for (size_t index = 0; index < expectedMelodicPrograms.size(); ++index) {
+    expect(!infos[index].percussion && infos[index].index == expectedMelodicPrograms[index],
+           "Batman Returns melodic instruments should preserve loader program routing");
+    expect(infos[index].source.range.offset < 0x08f7,
+           "Batman Returns SPC700 driver opcodes must not be parsed as instruments");
+  }
+  expect(infos.back().percussion && infos.back().percussionNote == 0 && infos.back().source.range.offset == 0x07df,
+         "Batman Returns percussion table should remain independently discoverable");
 }
 
 void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
@@ -434,6 +571,26 @@ void konamiSnesSynthParsersStopAtInvalidBankedInstrument() {
   staleLoopBytes[0x6000] = 0x03;
   expect(!readSnesSampleDirectoryEntry(ByteReader(SourceId{82}, staleLoopBytes), 0x5000, true),
          "a looping BRR stream should still require an aligned in-range loop pointer");
+
+  auto highVolumeBytes = makeKonamiSnesBuilderAram();
+  highVolumeBytes[0x4206] = 0x80;
+  writeKonamiInstrumentEntry(highVolumeBytes, 0x4207, 4);
+  highVolumeBytes[0x420e] = 0xff;
+  const KonamiSnesLayout highVolumeLayout{
+      .version = KONAMISNES_V6,
+      .spcDirAddress = 0x5000,
+      .commonInstrumentTableAddress = 0x4000,
+      .bankedInstrumentTableAddress = 0x4200,
+      .firstBankedInstrument = 5,
+      .percussionInstrumentTableAddress = 0x4300,
+  };
+  const auto highVolumeInstruments =
+      parseKonamiSnesInstrumentInfos(ByteReader(SourceId{83}, highVolumeBytes), highVolumeLayout);
+  const auto programFive = std::ranges::find(highVolumeInstruments, 5, &KonamiSnesInstrumentInfo::index);
+  const auto programSix = std::ranges::find(highVolumeInstruments, 6, &KonamiSnesInstrumentInfo::index);
+  expect(programFive != highVolumeInstruments.end() && programFive->volume == 0x80 &&
+             programSix != highVolumeInstruments.end(),
+         "an unrestricted subtractive volume byte should not terminate a packed melodic bank");
 }
 
 void konamiSnesSynthBuilderGroupsPercussionAndPreservesSampleRules() {

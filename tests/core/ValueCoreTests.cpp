@@ -44,6 +44,7 @@ void capcomSnesDialectDecodesRepeatBreakSideTargets();
 void capcomSnesV1DialectPreservesUnknownOneByteEvents();
 void konamiSnesLayoutDiscoversDirectHeaderAndSynthTables();
 void konamiSnesLayoutInfersSpcDirFromInstrumentTables();
+void konamiSnesBatmanReturnsAramUsesV2LayoutAndBoundedBank();
 void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples();
 void konamiSnesSynthParsersStopAtInvalidBankedInstrument();
 void konamiSnesSynthBuilderGroupsPercussionAndPreservesSampleRules();
@@ -218,6 +219,7 @@ int main() {
     capcomSnesV1DialectPreservesUnknownOneByteEvents();
     konamiSnesLayoutDiscoversDirectHeaderAndSynthTables();
     konamiSnesLayoutInfersSpcDirFromInstrumentTables();
+    konamiSnesBatmanReturnsAramUsesV2LayoutAndBoundedBank();
     konamiSnesModuleDiscoversSequenceInstrumentsAndSamples();
     konamiSnesSynthParsersStopAtInvalidBankedInstrument();
     konamiSnesSynthBuilderGroupsPercussionAndPreservesSampleRules();

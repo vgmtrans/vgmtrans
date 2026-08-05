@@ -25,18 +25,11 @@ namespace {
 
 constexpr u8 kPercussionNoteCount = 0x60;
 constexpr u8 kPercussionBaseNote = 0x3c;
+constexpr u32 kInstrumentProgramCount = 0x100;
 // Konami's percussion mode selects one shared kit. Bank 127 is the conventional
 // MIDI drum bank, while each source entry becomes one key region in that kit.
 constexpr u32 kDrumKitBank = 0x7f;
 constexpr u32 kDrumKitProgram = 0x00;
-
-[[nodiscard]] bool usesLegacyPanRange(KonamiSnesVersion version) {
-  return version == KONAMISNES_V1 || version == KONAMISNES_V2;
-}
-
-[[nodiscard]] u8 percussionPanLimit(KonamiSnesVersion version) {
-  return usesLegacyPanRange(version) ? 0x14 : 0x28;
-}
 
 [[nodiscard]] KonamiSnesInstrumentInfo parseInstrumentInfo(ByteReader reader, KonamiSnesVersion version, u32 index,
                                                            u32 address, bool percussion = false,
@@ -81,6 +74,11 @@ constexpr u32 kDrumKitProgram = 0x00;
   return readSnesSampleDirectoryEntry(reader, spcDirAddress + info.srcn * 4, validateSample).has_value();
 }
 
+[[nodiscard]] bool sampleStartsAfterDirectoryEntry(ByteReader reader, u32 spcDirAddress, u8 srcn) {
+  const u32 dirEntry = spcDirAddress + static_cast<u32>(srcn) * 4;
+  return reader.has(dirEntry, 4) && reader.le16(dirEntry) >= dirEntry + 4;
+}
+
 [[nodiscard]] int percussionKey(const KonamiSnesInstrumentInfo& info) {
   // Key and tuning form one signed 8.8 value. A negative fractional byte
   // borrows one from the integer byte when converted back to a whole key.
@@ -102,11 +100,11 @@ constexpr u32 kDrumKitProgram = 0x00;
     const bool sampleIsValid = instrumentHeaderIsValid(reader, info, spcDirAddress, true);
     // Drum tables have no explicit length. Pan and volume are checked as well
     // as the sample reference so unrelated RAM is unlikely to look like data.
-    if (!sampleIsValid || info.pan > percussionPanLimit(version) || info.volume > 0x7f) {
+    if (!sampleIsValid || info.pan > instrumentPanLimit(version) || info.volume > 0x7f) {
       // Empty or damaged drum slots may appear inside the table. Implausible
       // pan or pitch values indicate that the table has ended; otherwise skip
       // this slot and keep looking for later valid keys.
-      if (info.pan > percussionPanLimit(version)) {
+      if (info.pan > instrumentPanLimit(version)) {
         break;
       }
       const int key = percussionKey(info);
@@ -119,6 +117,41 @@ constexpr u32 kDrumKitProgram = 0x00;
     infos.push_back(std::move(info));
   }
   return infos;
+}
+
+enum class InstrumentRangeLayout {
+  Sparse,
+  Packed,
+};
+
+void appendMelodicInstrumentRange(ByteReader reader, KonamiSnesVersion version, u32 spcDirAddress, u32 firstProgram,
+                                  u32 endProgram, u32 tableAddress, u32 tableFirstProgram,
+                                  InstrumentRangeLayout rangeLayout, std::vector<KonamiSnesInstrumentInfo>& infos) {
+  const u32 headerSize = instrumentHeaderSize(version);
+  for (u32 program = firstProgram; program < endProgram; ++program) {
+    const u32 address = tableAddress + headerSize * (program - tableFirstProgram);
+    if (!reader.has(address, headerSize)) {
+      break;
+    }
+
+    auto info = parseInstrumentInfo(reader, version, program, address);
+    // Reject false-positive melodic entries whose sample begins before its DIR
+    // entry. Do not apply this heuristic to percussion; valid percussion
+    // samples may precede the DIR table.
+    const bool structurallyValid = info.pan <= instrumentPanLimit(version) &&
+                                   instrumentHeaderIsValid(reader, info, spcDirAddress, false) &&
+                                   sampleStartsAfterDirectoryEntry(reader, spcDirAddress, info.srcn);
+    if (!structurallyValid) {
+      if (rangeLayout == InstrumentRangeLayout::Packed) {
+        break;
+      }
+      continue;
+    }
+    if (!instrumentHeaderIsValid(reader, info, spcDirAddress, true)) {
+      continue;
+    }
+    infos.push_back(std::move(info));
+  }
 }
 
 [[nodiscard]] double konamiUnityKey(const KonamiSnesInstrumentInfo& info) {
@@ -161,38 +194,19 @@ std::vector<KonamiSnesInstrumentInfo> parseKonamiSnesInstrumentInfos(ByteReader 
     return infos;
   }
 
-  const u32 headerSize = instrumentHeaderSize(layout.version);
-  for (u32 instrumentIndex = 0; instrumentIndex <= 0xff; ++instrumentIndex) {
-    // Programs below the split come from a shared table. Programs at or above
-    // it come from the bank selected when this SPC snapshot was captured.
-    const u32 address =
-        instrumentIndex < layout.firstBankedInstrument
-            ? *layout.commonInstrumentTableAddress + headerSize * instrumentIndex
-            : *layout.bankedInstrumentTableAddress + headerSize * (instrumentIndex - layout.firstBankedInstrument);
-    if (!reader.has(address, headerSize)) {
-      break;
-    }
-    auto info = parseInstrumentInfo(reader, layout.version, instrumentIndex, address);
-    if (!instrumentHeaderIsValid(reader, info, *layout.spcDirAddress, false)) {
-      // The shared table may be sparse, but the selected bank is stored as one
-      // packed run. A bad shared entry is a hole; a bad banked entry ends the run.
-      if (instrumentIndex < layout.firstBankedInstrument) {
-        continue;
-      }
-      break;
-    }
-    if (!instrumentHeaderIsValid(reader, info, *layout.spcDirAddress, true)) {
-      continue;
-    }
+  const u32 firstBankedProgram = layout.firstBankedInstrument;
+  const u32 bankedEnd = std::clamp<u32>(layout.bankedInstrumentEnd, firstBankedProgram, kInstrumentProgramCount);
 
-    const u32 dirEntry = *layout.spcDirAddress + info.srcn * 4;
-    // A sample may not begin inside the directory entry that points to it. This
-    // extra check filters out self-referential entries in unused RAM.
-    if (!reader.has(dirEntry, 4) || reader.le16(dirEntry) < dirEntry + 4) {
-      continue;
-    }
-    infos.push_back(std::move(info));
-  }
+  // Programs before the banked range may have unused entries. The banked range
+  // and any common-table suffix are contiguous, so their first invalid entry
+  // ends the range.
+  appendMelodicInstrumentRange(reader, layout.version, *layout.spcDirAddress, 0, firstBankedProgram,
+                               *layout.commonInstrumentTableAddress, 0, InstrumentRangeLayout::Sparse, infos);
+  appendMelodicInstrumentRange(reader, layout.version, *layout.spcDirAddress, firstBankedProgram, bankedEnd,
+                               *layout.bankedInstrumentTableAddress, firstBankedProgram, InstrumentRangeLayout::Packed,
+                               infos);
+  appendMelodicInstrumentRange(reader, layout.version, *layout.spcDirAddress, bankedEnd, kInstrumentProgramCount,
+                               *layout.commonInstrumentTableAddress, 0, InstrumentRangeLayout::Packed, infos);
 
   auto percussionInfos =
       collectPercussionInfos(reader, layout.version, *layout.percussionInstrumentTableAddress, *layout.spcDirAddress);

@@ -50,6 +50,16 @@ constexpr MaskedBytePattern kReadSongListCNTR3{
     "x?x??x??xxxxx?x?xxxxx?x?xx?x?x?x?x?x?x?"sv,
 };
 
+// Batman Returns uses the same early five-byte song rows as the other
+// pointer-based builds, but branches around its sound-effect arbitration and
+// jumps directly to the shared music setup path for IDs 0x7c and above.
+constexpr MaskedBytePattern kReadSongListBR{
+    "\xe4\x0c\x8f\xe5\x04\x8f\x03\x05\x9c\x8d\x05\xcf\x7a\x04\xda\x04"
+    "\x8d\x00\xcd\x00\xf7\x04\xc4\x1c\xfc\xf7\x04\xc4\x06\xe4\x0c\x68"
+    "\x7c\x90\x03\x5f\x6d\x1b"sv,
+    "x?x??x??xxxxx?x?xxxxx?x?xx?x?x?x?x?x??"sv,
+};
+
 constexpr MaskedBytePattern kJumpToVcmdGG4{
     "\x1c\xfd\xf6\xbc\x1a\x2d\xf6\xbb\x1a\x2d\xf6\xfb\x1a\xf0\x08"sv,
     "xxx??xx??xx??x?"sv,
@@ -198,7 +208,9 @@ constexpr MaskedBytePattern kLoadPercInstrGG4{
     return false;
   }
   const u8 srcn = reader.u8At(address);
-  return srcn != 0xff && sampleDirEntryLooksValid(reader, spcDirAddress, srcn);
+  const u32 panOffset = usesLegacyInstrumentLayout(version) ? 6 : 5;
+  return srcn != 0xff && reader.u8At(address + panOffset) <= instrumentPanLimit(version) &&
+         sampleDirEntryLooksValid(reader, spcDirAddress, srcn);
 }
 
 // Test each possible sample-directory page against a few rows from every
@@ -218,11 +230,14 @@ constexpr MaskedBytePattern kLoadPercInstrGG4{
       ++score;
     }
   }
-  for (u32 i = 0; i < 8; ++i) {
+  const u32 bankedProbeCount = std::min<u32>(8, layout.bankedInstrumentEnd - layout.firstBankedInstrument);
+  for (u32 i = 0; i < bankedProbeCount; ++i) {
     if (instrumentHeaderLooksValid(reader, layout.version, *layout.bankedInstrumentTableAddress + i * headerSize,
                                    candidateDir)) {
       ++score;
     }
+  }
+  for (u32 i = 0; i < 8; ++i) {
     if (instrumentHeaderLooksValid(reader, layout.version, *layout.percussionInstrumentTableAddress + i * headerSize,
                                    candidateDir)) {
       ++score;
@@ -281,11 +296,10 @@ std::optional<KonamiSnesLayout> findKonamiSnesLayout(ByteReader reader) {
 
   KonamiSnesLayout layout;
 
-  bool hasSongList = false;
-  u32 songListAddress = 0;
   u32 songHeaderAddress = 0;
-  u8 primarySongIndex = 0;
   u8 vcmdLengthItemSize = 0;
+  std::optional<u32> songListAddress;
+  u8 firstCandidateSongIndex = 0;
   // Early engines select a five-byte song-list row; later engines keep the
   // active header address directly in driver RAM.
   if (const auto directHeaderOffset = findBytePattern(reader, kSetSongHeaderAddressGG4)) {
@@ -295,19 +309,20 @@ std::optional<KonamiSnesLayout> findKonamiSnesLayout(ByteReader reader) {
     vcmdLengthItemSize = 2;
   } else if (const auto pntbSongListOffset = findBytePattern(reader, kReadSongListPNTB)) {
     songListAddress = reader.u8At(*pntbSongListOffset + 3) | (reader.u8At(*pntbSongListOffset + 6) << 8);
-    primarySongIndex = reader.u8At(*pntbSongListOffset + 31);
+    firstCandidateSongIndex = reader.u8At(*pntbSongListOffset + 31);
     vcmdLengthItemSize = 1;
-    hasSongList = true;
   } else if (const auto axeSongListOffset = findBytePattern(reader, kReadSongListAXE)) {
     songListAddress = reader.u8At(*axeSongListOffset + 3) | (reader.u8At(*axeSongListOffset + 6) << 8);
-    primarySongIndex = reader.u8At(*axeSongListOffset + 32);
+    firstCandidateSongIndex = reader.u8At(*axeSongListOffset + 32);
     vcmdLengthItemSize = 2;
-    hasSongList = true;
   } else if (const auto cntr3SongListOffset = findBytePattern(reader, kReadSongListCNTR3)) {
     songListAddress = reader.u8At(*cntr3SongListOffset + 3) | (reader.u8At(*cntr3SongListOffset + 6) << 8);
-    primarySongIndex = reader.u8At(*cntr3SongListOffset + 32);
+    firstCandidateSongIndex = reader.u8At(*cntr3SongListOffset + 32);
     vcmdLengthItemSize = 1;
-    hasSongList = true;
+  } else if (const auto brSongListOffset = findBytePattern(reader, kReadSongListBR)) {
+    songListAddress = reader.u8At(*brSongListOffset + 3) | (reader.u8At(*brSongListOffset + 6) << 8);
+    firstCandidateSongIndex = reader.u8At(*brSongListOffset + 32);
+    vcmdLengthItemSize = 1;
   } else {
     return std::nullopt;
   }
@@ -340,7 +355,7 @@ std::optional<KonamiSnesLayout> findKonamiSnesLayout(ByteReader reader) {
 
   // Early versions are distinguished by their extra 0x60 handlers. Later
   // versions are distinguished by two opcode lengths in the same table.
-  if (hasSongList) {
+  if (songListAddress) {
     if (vcmd6xCountInList == 5) {
       layout.version = KONAMISNES_V1;
     } else if (vcmd6xCountInList == 2) {
@@ -361,12 +376,12 @@ std::optional<KonamiSnesLayout> findKonamiSnesLayout(ByteReader reader) {
       std::ranges::any_of(kIndexedEchoFilters,
                           [&](const auto& pattern) { return findBytePattern(reader, pattern).has_value(); });
 
-  if (hasSongList) {
-    // Empty song rows are normal; use the first playable row at or after the
-    // driver's current index, matching the original scanner.
-    u8 songIndex = primarySongIndex;
+  if (songListAddress) {
+    // The comparison immediate gives the first song-table index to inspect.
+    // Each entry is five bytes; skip entries with a null sequence-header pointer.
+    u8 songIndex = firstCandidateSongIndex;
     while (true) {
-      const u32 pointerOffset = songListAddress + songIndex * 5 + 3;
+      const u32 pointerOffset = *songListAddress + songIndex * 5 + 3;
       if (!reader.has(pointerOffset, 2)) {
         return std::nullopt;
       }
@@ -469,6 +484,10 @@ std::optional<KonamiSnesLayout> findKonamiSnesLayout(ByteReader reader) {
       layout.commonInstrumentTableAddress =
           reader.u8At(loadInstrumentOffset + 15) | (reader.u8At(loadInstrumentOffset + 19) << 8);
       layout.firstBankedInstrument = reader.u8At(loadInstrumentOffset + 11);
+      const u8 bankedInstrumentEnd = reader.u8At(loadInstrumentOffset + 7);
+      if (bankedInstrumentEnd > layout.firstBankedInstrument) {
+        layout.bankedInstrumentEnd = bankedInstrumentEnd;
+      }
       layout.bankedInstrumentTableAddress = bankedTableByCurrentBank(reader, reader.le16(loadInstrumentOffset + 32),
                                                                      reader.le16(loadInstrumentOffset + 37), true);
       layout.percussionInstrumentTableAddress =
