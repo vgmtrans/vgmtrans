@@ -48,6 +48,10 @@ inline constexpr u8 kLateEraVibratoFadeThreshold = 0xc8;
   return usesLegacyInstrumentLayout(version) ? 8 : 7;
 }
 
+[[nodiscard]] constexpr u8 instrumentPanLimit(KonamiSnesVersion version) {
+  return version == KONAMISNES_V1 || version == KONAMISNES_V2 ? 0x14 : 0x28;
+}
+
 [[nodiscard]] constexpr bool isHeldDuration(KonamiSnesVersion version, u8 rate) {
   return version == KONAMISNES_V1 ? rate >= 100 : rate == 127;
 }
@@ -154,6 +158,10 @@ struct KonamiSnesLayout {
   std::optional<u32> commonInstrumentTableAddress;
   std::optional<u32> bankedInstrumentTableAddress;
   u8 firstBankedInstrument = 0;
+  // The selected bank occupies [firstBankedInstrument, bankedInstrumentEnd).
+  // Early loaders may return to the common table; other builds use the bank
+  // through the end of the 8-bit program range.
+  u16 bankedInstrumentEnd = 0x100;
   std::optional<u32> percussionInstrumentTableAddress;
 };
 
