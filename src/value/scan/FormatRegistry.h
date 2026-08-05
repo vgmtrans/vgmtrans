@@ -25,6 +25,7 @@ public:
   // Order matters: every source is offered to modules in registration order,
   // including derived sources extracted by earlier modules.
   [[nodiscard]] const std::vector<FormatModule>& modules() const noexcept { return modules_; }
+  [[nodiscard]] const FormatModule* findModule(std::string_view name) const;
   [[nodiscard]] const SequenceDialect* findDialect(std::string_view id) const;
   [[nodiscard]] bool containsDialect(std::string_view id) const;
   [[nodiscard]] bool sealed() const noexcept { return sealed_; }

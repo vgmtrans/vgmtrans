@@ -327,6 +327,7 @@ void applyCollectionExportSettings(vgmtrans::core::ExportRequest& request) {
   request.modulationConversion = Settings::the()->conversion.modulationConversion();
   request.dynamicEnvelopes = Settings::the()->conversion.dynamicEnvelopeConversion();
   request.exportOnlyUsedInstruments = Settings::the()->conversion.exportOnlyUsedInstruments();
+  request.sampleFiltering = Settings::the()->conversion.sampleFiltering();
 }
 }  // namespace
 
@@ -757,6 +758,7 @@ void MainWindow::exportInstrumentSet(const QModelIndex& index, vgmtrans::core::S
     applyCollectionExportSettings(request);
   } else {
     applySequenceRenderSettings(request.sequence);
+    request.sampleFiltering = Settings::the()->conversion.sampleFiltering();
   }
   const bool ambiguousCollection =
       fromDetectedFiles && request.exportOnlyUsedInstruments &&

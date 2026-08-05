@@ -8,6 +8,7 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <stdexcept>
 #include <string_view>
 #include <unordered_set>
@@ -46,6 +47,11 @@ void FormatRegistry::add(FormatDefinition definition) {
 
 void FormatRegistry::seal() noexcept {
   sealed_ = true;
+}
+
+const FormatModule* FormatRegistry::findModule(std::string_view name) const {
+  const auto found = std::ranges::find(modules_, name, &FormatModule::name);
+  return found != modules_.end() ? &*found : nullptr;
 }
 
 const SequenceDialect* FormatRegistry::findDialect(std::string_view id) const {

@@ -50,7 +50,9 @@ using namespace core;
 
 FormatDefinition konamiSnesDefinition() {
   return FormatDefinition{
-      .module = {.name = "KonamiSnes", .scan = scanKonamiSnes},
+      .module = {.name = "KonamiSnes",
+                 .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+                 .scan = scanKonamiSnes},
       .sequenceDialects = konamiSnesSequenceDialects(),
   };
 }

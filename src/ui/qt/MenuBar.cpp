@@ -270,6 +270,16 @@ void MenuBar::appendOptionsMenu() {
           ToastType::Info, 3000);
     }
   });
+
+  using vgmtrans::core::SampleFilteringPolicy;
+  appendEnumOptions(
+      m_optionsMenu, tr("Sample Filtering"), Settings::the()->conversion.sampleFiltering(),
+      std::array{
+          std::pair{tr("Automatic (format recommended)"), SampleFilteringPolicy::FormatPreferred},
+          std::pair{tr("None"), SampleFilteringPolicy::None},
+          std::pair{tr("SNES S-DSP low-pass"), SampleFilteringPolicy::SnesDspLowPass},
+      },
+      [](SampleFilteringPolicy filtering) { Settings::the()->conversion.setSampleFiltering(filtering); });
 }
 
 void MenuBar::appendInfoMenu() {

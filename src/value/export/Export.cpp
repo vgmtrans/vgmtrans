@@ -422,6 +422,7 @@ void applySequenceModulationToPreparedExport(PreparedExport& prepared, const Seq
 }
 
 [[nodiscard]] SynthExportInput synthExportInput(const PreparedExport& prepared, const ExportRequest& request,
+                                                const FormatRegistry& formats,
                                                 const MidiModulationUsage* midiModulation,
                                                 ModulationConversionPolicy modulationConversion,
                                                 const PerformanceSequence* sequenceUsage) {
@@ -429,10 +430,12 @@ void applySequenceModulationToPreparedExport(PreparedExport& prepared, const Seq
       .name = prepared.baseName,
       .instrumentSets = prepared.instrumentSets,
       .sampleCollections = prepared.sampleCollections,
+      .formats = &formats,
       .sequenceUsage = sequenceUsage,
       .midiModulationUsage = midiModulation,
       .modulationScaling = request.modulationScaling,
       .modulationConversion = modulationConversion,
+      .sampleFiltering = request.sampleFiltering,
   };
 }
 
@@ -453,18 +456,20 @@ void applySequenceModulationToPreparedExport(PreparedExport& prepared, const Seq
 }
 
 [[nodiscard]] Artifact exportSoundFont2(const PreparedExport& prepared, const SourceStore& sources,
-                                        const ExportRequest& request, const MidiModulationUsage* midiModulation,
+                                        const FormatRegistry& formats, const ExportRequest& request,
+                                        const MidiModulationUsage* midiModulation,
                                         ModulationConversionPolicy modulationConversion,
                                         const PerformanceSequence* sequenceUsage = nullptr) {
-  const auto input = synthExportInput(prepared, request, midiModulation, modulationConversion, sequenceUsage);
+  const auto input = synthExportInput(prepared, request, formats, midiModulation, modulationConversion, sequenceUsage);
   return synthArtifact(prepared, buildSoundFont2(input, sources), ".sf2", "audio/soundfont");
 }
 
 [[nodiscard]] Artifact exportDls(const PreparedExport& prepared, const SourceStore& sources,
-                                 const ExportRequest& request, const MidiModulationUsage* midiModulation,
+                                 const FormatRegistry& formats, const ExportRequest& request,
+                                 const MidiModulationUsage* midiModulation,
                                  ModulationConversionPolicy modulationConversion,
                                  const PerformanceSequence* sequenceUsage = nullptr) {
-  const auto input = synthExportInput(prepared, request, midiModulation, modulationConversion, sequenceUsage);
+  const auto input = synthExportInput(prepared, request, formats, midiModulation, modulationConversion, sequenceUsage);
   return synthArtifact(prepared, buildDls(input, sources), ".dls", "audio/dls");
 }
 
@@ -578,8 +583,10 @@ Artifact exportInstrumentSet(const SessionSnapshot& snapshot, const SourceStore&
     }
   }
 
-  return soundFont ? exportSoundFont2(prepared, sources, request, nullptr, ModulationConversionPolicy::SynthModulators)
-                   : exportDls(prepared, sources, request, nullptr, ModulationConversionPolicy::SynthModulators);
+  return soundFont
+             ? exportSoundFont2(prepared, sources, formats, request, nullptr,
+                                ModulationConversionPolicy::SynthModulators)
+             : exportDls(prepared, sources, formats, request, nullptr, ModulationConversionPolicy::SynthModulators);
 }
 
 CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, const SourceStore& sources,
@@ -611,6 +618,7 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
       .modulationScaling = ModulationScalingPolicy::FullFormatRange,
       .modulationConversion = request.modulationConversion,
       .dynamicEnvelopes = request.dynamicEnvelopes,
+      .sampleFiltering = request.sampleFiltering,
   };
   auto rendering = renderCollectionSequence(prepared, formats, exportRequest.sequence);
   auto dynamicEnvelopes = materializePreparedDynamicEnvelopes(prepared, rendering, exportRequest.dynamicEnvelopes);
@@ -624,7 +632,7 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
   if (synthConversion == ModulationConversionPolicy::SynthModulators) {
     applySequenceModulationToPreparedExport(prepared, rendering.modulation);
   }
-  auto soundFont = exportSoundFont2(prepared, sources, exportRequest, nullptr, synthConversion);
+  auto soundFont = exportSoundFont2(prepared, sources, formats, exportRequest, nullptr, synthConversion);
 
   playback.midi = std::move(midi.bytes);
   playback.soundFont = std::move(soundFont.bytes);
@@ -770,7 +778,7 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
           requireSequenceModulation();
         }
         artifacts.push_back(exportSoundFont2(
-            prepared, sources, request,
+            prepared, sources, formats, request,
             conversion == ModulationConversionPolicy::SynthModulators ? requireMidiModulationUsage() : nullptr,
             conversion, sequenceUsage));
         break;
@@ -790,7 +798,7 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
           requireSequenceModulation();
         }
         artifacts.push_back(exportDls(
-            prepared, sources, request,
+            prepared, sources, formats, request,
             conversion == ModulationConversionPolicy::SynthModulators ? requireMidiModulationUsage() : nullptr,
             conversion, sequenceUsage));
         break;

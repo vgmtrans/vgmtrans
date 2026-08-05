@@ -52,7 +52,9 @@ namespace {
 
 FormatDefinition capcomSnesDefinition() {
   return FormatDefinition{
-      .module = {.name = "CapcomSnes", .scan = scanCapcomSnes},
+      .module = {.name = "CapcomSnes",
+                 .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+                 .scan = scanCapcomSnes},
       .sequenceDialects = {capcomSnesSequenceDialect()},
   };
 }

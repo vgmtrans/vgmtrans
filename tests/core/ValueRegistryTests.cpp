@@ -17,6 +17,7 @@ void formatRegistryStoresCopyableDefinitionsAtomically() {
   registry.add(testFormat(probeSequenceModule(), probeSequenceDialect()));
   registry.add(testFormat(FormatModule{
       .name = std::string("DynamicProbe"),
+      .preferredSampleFilter = SampleFilter::SnesDspLowPass,
       .scan = scanProbeSequence,
   }));
 
@@ -25,6 +26,12 @@ void formatRegistryStoresCopyableDefinitionsAtomically() {
   expect(copy.modules()[0].name == "ProbeSequence", "format registry should preserve copied module names");
   expect(copy.modules()[1].name == "DynamicProbe", "format registry should own dynamically registered module names");
   expect(copy.modules()[0].scan && copy.modules()[1].scan, "format registry should preserve copied module scanners");
+  expect(copy.modules()[0].preferredSampleFilter == SampleFilter::None,
+         "formats should prefer no sample filtering unless they opt into a filter");
+  expect(copy.findModule("DynamicProbe") != nullptr &&
+             copy.findModule("DynamicProbe")->preferredSampleFilter == SampleFilter::SnesDspLowPass,
+         "format registry should expose a format's preferred sample filter");
+  expect(copy.findModule("Missing") == nullptr, "format registry should report missing modules");
   const auto* dialect = copy.findDialect("probe");
   expect(dialect != nullptr && dialect->execute != nullptr,
          "format registry should copy dialects provided by a definition");
