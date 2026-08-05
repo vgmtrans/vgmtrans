@@ -520,9 +520,9 @@ struct EchoState {
 
   void disable() { event.voiceMask = 0; }
 
-  void setParameters(u8 delay, u8 feedback, u8 filter) {
+  void setParameters(u8 delay, s8 feedback, u8 filter) {
     event.delayMilliseconds = static_cast<double>(delay & 0x0f) * 16.0;
-    event.feedback = static_cast<s8>(feedback) / 128.0;
+    event.feedback = feedback / 128.0;
     event.filterIndex = filter;
   }
 
@@ -1348,7 +1348,7 @@ struct Playback {
     out.reverb(program.echo.current());
   }
 
-  void echoParameters(u8 delay, u8 feedback, u8 filter) {
+  void echoParameters(u8 delay, s8 feedback, u8 filter) {
     program.echo.setParameters(delay, feedback, filter);
     out.reverb(program.echo.current());
   }
@@ -1768,7 +1768,7 @@ struct DecodeContext {
     case EventType::EchoParameter: {
       auto event = cursor.command("Echo Parameters", SequenceSemantic::State);
       const u8 delay = event.u8("delay");
-      const u8 feedback = event.u8("feedback");
+      const s8 feedback = event.s8("feedback", SourceValueDisplay::SignedDecimal);
       const u8 filter = event.u8("fir");
       return event.invoke<&Playback::echoParameters>(delay, feedback, filter);
     }
