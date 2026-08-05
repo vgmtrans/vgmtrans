@@ -66,7 +66,9 @@ namespace {
 
 FormatDefinition suzukiPs1Definition() {
   return FormatDefinition{
-      .module = {.name = std::string(kSuzukiPs1FormatName), .scan = scanSuzukiPs1},
+      .module = {.name = std::string(kSuzukiPs1FormatName),
+                 .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
+                 .scan = scanSuzukiPs1},
       .sequenceDialects = {suzukiPs1SequenceDialect()},
   };
 }

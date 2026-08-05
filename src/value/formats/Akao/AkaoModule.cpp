@@ -132,6 +132,7 @@ FormatDefinition akaoDefinition() {
       .module =
           {
               .name = std::string(kAkaoFormatName),
+              .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
               .scan = scanAkao,
               .collectionResolverId = std::string(kAkaoCollectionResolver),
               .resolveCollections = resolveAkaoCollections,

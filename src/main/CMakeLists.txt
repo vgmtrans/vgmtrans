@@ -143,10 +143,9 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/sequence/TempoRelativeModulation.cpp
     ${PROJECT_SOURCE_DIR}/src/value/base/RecordReader.cpp
     ${PROJECT_SOURCE_DIR}/src/value/platform/SnesSampleDirectory.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/synth/SampleFiltering.cpp
     ${PROJECT_SOURCE_DIR}/src/value/synth/SampleFiltering.h
     ${PROJECT_SOURCE_DIR}/src/value/synth/SnesDsp.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/synth/SnesGaussianFilter.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/synth/SnesGaussianFilter.h
     ${PROJECT_SOURCE_DIR}/src/value/base/Source.cpp
     ${PROJECT_SOURCE_DIR}/src/value/synth/SynthMath.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/synth/DlsExporter.cpp
