@@ -10,7 +10,6 @@
 #include "value/scan/FormatRegistry.h"
 #include "value/sequence/PerformanceModel.h"
 #include "value/synth/SampleDecoder.h"
-#include "value/synth/SnesGaussianFilter.h"
 
 #include <algorithm>
 #include <cmath>
@@ -153,13 +152,7 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::sp
         continue;
       }
 
-      switch (selectedFilter) {
-        case SampleFilter::None:
-          break;
-        case SampleFilter::SnesDspLowPass:
-          applySnesGaussianResponseFilter(*decoded);
-          break;
-      }
+      applySampleFilter(*decoded, selectedFilter);
 
       samples.push_back(DecodedSynthSample{
           .collectionId = collection->metadata.id,

@@ -15,7 +15,7 @@ void runValueSequenceModelTests();
 void runValueSequenceVmTests();
 void runValueSessionTests();
 void runValueSourceMapTests();
-void runSnesGaussianFilterTests();
+void runSampleFilteringTests();
 void runValueSynthBuilderTests();
 void runValueMidiTests();
 void runValueSynthExportTests();
@@ -194,7 +194,7 @@ int main() {
     runValueSequenceVmTests();
     runValueSessionTests();
     runValueSourceMapTests();
-    runSnesGaussianFilterTests();
+    runSampleFilteringTests();
     runValueSynthBuilderTests();
     runValueMidiTests();
     runValueSynthExportTests();

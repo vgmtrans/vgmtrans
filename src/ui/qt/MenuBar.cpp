@@ -278,6 +278,7 @@ void MenuBar::appendOptionsMenu() {
           std::pair{tr("Automatic (format recommended)"), SampleFilteringPolicy::FormatPreferred},
           std::pair{tr("None"), SampleFilteringPolicy::None},
           std::pair{tr("SNES S-DSP low-pass"), SampleFilteringPolicy::SnesDspLowPass},
+          std::pair{tr("PlayStation SPU low-pass"), SampleFilteringPolicy::PsxSpuLowPass},
       },
       [](SampleFilteringPolicy filtering) { Settings::the()->conversion.setSampleFiltering(filtering); });
 }

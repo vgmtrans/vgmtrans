@@ -205,6 +205,7 @@ vgmtrans::core::SampleFilteringPolicy Settings::ConversionSettings::sampleFilter
     case vgmtrans::core::SampleFilteringPolicy::FormatPreferred:
     case vgmtrans::core::SampleFilteringPolicy::None:
     case vgmtrans::core::SampleFilteringPolicy::SnesDspLowPass:
+    case vgmtrans::core::SampleFilteringPolicy::PsxSpuLowPass:
       return static_cast<vgmtrans::core::SampleFilteringPolicy>(value);
   }
   return vgmtrans::core::SampleFilteringPolicy::FormatPreferred;
