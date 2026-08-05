@@ -27,6 +27,8 @@ using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
 using SynthSampleIndexList = std::vector<SynthSampleIndexKey>;
 using SynthInstrumentList = std::vector<const Instrument*>;
 
+constexpr double kPerceivedHalfLoudnessDb = 10.0;
+
 [[nodiscard]] u16 clampU16(u32 value) {
   return static_cast<u16>(std::min<u32>(value, std::numeric_limits<u16>::max()));
 }
@@ -280,11 +282,10 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::sp
   // the target decay are therefore exponential curves in perceived loudness.
   // Minimize their squared difference over time; the closed-form integrals
   // make evaluating a candidate duration both cheap and deterministic.
-  constexpr double halfLoudnessDb = 10.0;
   constexpr double ln2 = 0.6931471805599453;
-  const double exponentScale = ln2 * attenuationRangeDb / halfLoudnessDb;
+  const double exponentScale = ln2 * attenuationRangeDb / kPerceivedHalfLoudnessDb;
   const double firstStageSeconds = firstDecay * firstDropDb / attenuationRangeDb;
-  const double loudnessAtSecondStage = std::exp2(-firstDropDb / halfLoudnessDb);
+  const double loudnessAtSecondStage = std::exp2(-firstDropDb / kPerceivedHalfLoudnessDb);
   const double firstExponent = firstDecay > 0.0 ? exponentScale / firstDecay : 0.0;
   const double secondExponent = secondDecay > 0.0 ? exponentScale / secondDecay : 0.0;
 
@@ -379,11 +380,18 @@ Envelope approximateEnvelopeAsAdsr(Envelope envelope, double attenuationRangeDb)
   const double endpointFit = firstDecay * firstFraction + secondDecay * (1.0 - firstFraction);
   const double perceptualFit = perceptualDecayFit(firstDecay, secondDecay, firstDropDb, attenuationRangeDb);
   const double firstStageSeconds = firstDecay * firstFraction;
-  // Below 150 ms, the first stage tends to fuse with the onset. By 100 ms it
+  // Below 150 ms, the first stage tends to fuse with the onset. By 300 ms it
   // is heard as a separate fade and should fully outweigh a much quieter tail.
-  const double temporalSalience = smoothstep(0.15, 0.1, firstStageSeconds);
+  const double firstStageSalience = smoothstep(0.15, 0.3, firstStageSeconds);
+  // A rapid second stage remains perceptually important even when the first
+  // stage is too brief to hear separately. Favor the loudness fit when that
+  // stage halves perceived loudness within 150 ms, tapering to endpoint timing
+  // by 300 ms. Slow tails retain their full duration.
+  const double secondStageHalfLoudnessSeconds = secondDecay * kPerceivedHalfLoudnessDb / attenuationRangeDb;
+  const double rapidSecondStageSalience = 1.0 - smoothstep(0.15, 0.3, secondStageHalfLoudnessSeconds);
   const double depthSalience = smoothstep(20.0, 40.0, firstDropDb);
-  envelope.decaySeconds = std::lerp(endpointFit, perceptualFit, std::max(temporalSalience, depthSalience));
+  envelope.decaySeconds =
+      std::lerp(endpointFit, perceptualFit, std::max({firstStageSalience, rapidSecondStageSalience, depthSalience}));
   envelope.sustainAmplitude = 0.0;
   return envelope;
 }

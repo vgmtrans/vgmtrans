@@ -127,6 +127,30 @@ void adsrApproximationLowersUnsupportedStages() {
              !contraEnvelope.secondDecaySeconds && contraEnvelope.sustainAmplitude == 0.0,
          "a 0.33-second SNES first decay should be fitted independently of its long quieter tail");
 
+  // Star Fox, Continue, track 0, instrument 20 at ARAM $3d78: DF 34.
+  // Its 58 ms first stage is brief, but the following stage halves perceived
+  // loudness every 158 ms and must not be flattened into a 1.45-second decay.
+  const Envelope nativeStarFoxEnvelope = snesDspEnvelope(0xdf, 0x34, 0x00);
+  const Envelope starFoxEnvelope = approximateEnvelopeAsAdsr(nativeStarFoxEnvelope);
+  expect(nativeStarFoxEnvelope.decaySeconds && nativeStarFoxEnvelope.secondDecaySeconds &&
+             std::abs(*nativeStarFoxEnvelope.decaySeconds - 0.485319) < 0.000001 &&
+             std::abs(*nativeStarFoxEnvelope.secondDecaySeconds - 1.582068) < 0.000001 &&
+             starFoxEnvelope.decaySeconds && std::abs(*starFoxEnvelope.decaySeconds - 0.843394) < 0.000001 &&
+             !starFoxEnvelope.secondDecaySeconds && starFoxEnvelope.sustainAmplitude == 0.0,
+         "a rapid SNES second stage should retain its perceived decay rate after a brief first stage");
+
+  // Super Mario World, Overworld, track 0, instrument 7 at ARAM $5f69: 9E 1F.
+  // Its first stage takes 548 ms to reach the -18 dB knee. The fast tail must
+  // not make the single-stage approximation rush through that audible fade.
+  const Envelope nativeMarioEnvelope = snesDspEnvelope(0x9e, 0x1f, 0x00);
+  const Envelope marioEnvelope = approximateEnvelopeAsAdsr(nativeMarioEnvelope);
+  expect(nativeMarioEnvelope.decaySeconds && nativeMarioEnvelope.secondDecaySeconds &&
+             std::abs(*nativeMarioEnvelope.decaySeconds - 3.033183) < 0.000001 &&
+             std::abs(*nativeMarioEnvelope.secondDecaySeconds - 0.016492) < 0.000001 && marioEnvelope.decaySeconds &&
+             std::abs(*marioEnvelope.decaySeconds - 2.337143) < 0.000001 && !marioEnvelope.secondDecaySeconds &&
+             marioEnvelope.sustainAmplitude == 0.0,
+         "a distinct SNES first stage should survive a very rapid second-stage tail");
+
   const Envelope barelyAudibleTail = approximateEnvelopeAsAdsr(Envelope{
       .decaySeconds = 0.2,
       .secondDecaySeconds = 100.0,
@@ -590,8 +614,8 @@ void dlsExporterWritesDlsRiffFile() {
          "DLS export should write EG1 attack time from Region envelope");
   expect(dlsArt2ContainsConnection(result.bytes, 0x020c, std::numeric_limits<s32>::max()),
          "DLS export should approximate an endless hold with its longest hold time");
-  expect(dlsArt2ContainsConnection(result.bytes, 0x0207, 6901269),
-         "DLS export should combine two decay rates over its 96 dB envelope range");
+  expect(dlsArt2ContainsConnection(result.bytes, 0x0207, 36677699),
+         "DLS export should perceptually fit two rapid decay rates over its 96 dB envelope range");
   expect(dlsArt2ContainsConnection(result.bytes, 0x020a, 0),
          "DLS export should end a combined two-stage decay at silence");
   expect(dlsArt2ContainsConnection(result.bytes, 0x0209, -157286400),
