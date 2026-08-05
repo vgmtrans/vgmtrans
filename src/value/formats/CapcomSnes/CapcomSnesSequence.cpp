@@ -538,6 +538,7 @@ const SequenceDialect& capcomSnesSequenceDialect() {
           SequenceProgramBehavior{
               .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .initialReverbSend = 0.0,
+              .initialStereoBalance = omitInitialStereoBalance,
               .initialMonoModeChannels = 0,
           },
   });

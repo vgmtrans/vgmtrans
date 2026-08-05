@@ -227,6 +227,7 @@ SequenceDialect compilerProbeDialect() {
       .defaultBehavior =
           SequenceProgramBehavior{
               .panLaw = PanLaw::EqualPower,
+              .initialStereoBalance = omitInitialStereoBalance,
           },
   });
 }

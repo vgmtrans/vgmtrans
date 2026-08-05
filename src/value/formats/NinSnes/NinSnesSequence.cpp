@@ -1068,8 +1068,7 @@ struct Playback {
       const PercussionEntry entry = program.percussionTable[slot];
       const u8 patch = custom ? static_cast<u8>(entry.patch & 0xbf) : static_cast<u8>(percussionMinimum + slot);
       if (custom && entry.pan < 0x80) {
-        const auto gains = math::panGains(program.selected, panTable, entry.pan);
-        out.stereoBalance(gains.left, gains.right);
+        emitPan(out, entry.pan);
       }
       if (custom) {
         out.reverb((entry.patch & 0x40) != 0 ? 40.0 / 127.0 : 0.0);
@@ -2324,6 +2323,8 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   }
   program.behavior.initialTempoMicrosecondsPerQuarter =
       math::tempoMicrosecondsPerQuarter(kDefaultTempo, layout.tempoTimerTarget);
+  const auto initialBalance = math::panGains(selected, math::kPan, 10);
+  program.behavior.initialStereoBalance = StereoBalance{initialBalance.left, initialBalance.right};
   program.sourceProgramMap = buildProgramMap(reader, layout);
   program.sectionPlaylist = std::move(playlist.playlist);
   DecodeContext context{

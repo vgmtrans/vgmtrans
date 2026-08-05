@@ -99,6 +99,8 @@ PerformanceSequence render(Profile profile, std::vector<u8> bytes, u32 floor = 0
       .behavior = dialect.defaultBehavior,
       .tracks = {std::move(track)},
   };
+  const double initialChannelGain = profile == Profile::KillerInstinct ? 0.5 : 127.0 / 128.0;
+  program.behavior.initialStereoBalance = StereoBalance{initialChannelGain, initialChannelGain};
   return SequenceVm(LoopPolicy::PlayOnce).render(program, dialect);
 }
 
@@ -285,23 +287,22 @@ void rareSnesProfilesDecodeTheirDistinctOpcodeTails() {
 void rareSnesSignedStereoVolumesPreserveDriverRelativeLevels() {
   const PerformanceSequence performance = render(Profile::DonkeyKongCountry, {0x02, 0x40, 0x20, 0x81, 4, 0x00});
   const auto balances = events<StereoBalancePerformanceEvent>(performance);
-  expect(performance.diagnostics.empty() && balances.size() == 1,
-         "Rare stereo volume should produce one exact channel-gain event");
-  expect(
-      std::abs(balances.front()->leftGain - 0.5) < 0.000001 && std::abs(balances.front()->rightGain - 0.25) < 0.000001,
-      "Rare signed DSP volumes should be normalized independently, without legacy sqrt pan attenuation");
+  expect(performance.diagnostics.empty() && balances.size() == 2,
+         "Rare stereo volume should follow the initial balance with one exact source channel-gain event");
+  expect(std::abs(balances.back()->leftGain - 0.5) < 0.000001 && std::abs(balances.back()->rightGain - 0.25) < 0.000001,
+         "Rare signed DSP volumes should be normalized independently, without legacy sqrt pan attenuation");
 
   const PerformanceSequence inverted = render(Profile::DonkeyKongCountry, {0x02, 0x80, 0x7f, 0x81, 4, 0x00});
   const auto invertedBalance = events<StereoBalancePerformanceEvent>(inverted);
-  expect(invertedBalance.size() == 1 && std::abs(invertedBalance.front()->leftGain - 1.0) < 0.000001 &&
-             std::abs(invertedBalance.front()->rightGain - (127.0 / 128.0)) < 0.000001,
+  expect(invertedBalance.size() == 2 && std::abs(invertedBalance.back()->leftGain - 1.0) < 0.000001 &&
+             std::abs(invertedBalance.back()->rightGain - (127.0 / 128.0)) < 0.000001,
          "DSP phase inversion should retain its magnitude instead of overflowing signed -128");
 
   const PerformanceSequence dkc2Mono =
       render(Profile::DonkeyKongCountry2, {0x02, 0xc0, 0x20, 0x81, 4, 0x00}, 0, 0, true);
   const auto dkc2MonoBalance = events<StereoBalancePerformanceEvent>(dkc2Mono);
-  expect(dkc2MonoBalance.size() == 1 && std::abs(dkc2MonoBalance.front()->leftGain - 0.375) < 0.000001 &&
-             std::abs(dkc2MonoBalance.front()->rightGain - 0.375) < 0.000001,
+  expect(dkc2MonoBalance.size() == 2 && std::abs(dkc2MonoBalance.back()->leftGain - 0.375) < 0.000001 &&
+             std::abs(dkc2MonoBalance.back()->rightGain - 0.375) < 0.000001,
          "later Rare mono mode should average absolute signed channel magnitudes exactly as the driver");
 
   const auto& dialect = sequenceDialect();
@@ -326,11 +327,12 @@ void rareSnesSignedStereoVolumesPreserveDriverRelativeLevels() {
               decodeSourceTrack(ByteReader(SourceId{95}, secondTrackBytes), Profile::DonkeyKongCountry, 1, 0),
           },
   };
+  presetProgram.behavior.initialStereoBalance = StereoBalance{127.0 / 128.0, 127.0 / 128.0};
   const PerformanceSequence localPresets = SequenceVm(LoopPolicy::PlayOnce).render(presetProgram, dialect);
   const auto firstTrackBalances = events<StereoBalancePerformanceEvent>(localPresets);
-  expect(localPresets.diagnostics.empty() && firstTrackBalances.size() == 1 &&
-             std::abs(firstTrackBalances.front()->leftGain - 0.5) < 0.000001 &&
-             std::abs(firstTrackBalances.front()->rightGain - 0.25) < 0.000001,
+  expect(localPresets.diagnostics.empty() && firstTrackBalances.size() == 2 &&
+             std::abs(firstTrackBalances.back()->leftGain - 0.5) < 0.000001 &&
+             std::abs(firstTrackBalances.back()->rightGain - 0.25) < 0.000001,
          "Rare volume/envelope presets should remain local to the voice that saved them");
 }
 

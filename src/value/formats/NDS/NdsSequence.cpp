@@ -686,6 +686,7 @@ const SequenceDialect& ndsSequenceDialect() {
               .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .commandLimit = kMaxTrackCommands,
               .panLaw = PanLaw::EqualPower,
+              .initialStereoBalance = omitInitialStereoBalance,
           },
   });
   return dialect;

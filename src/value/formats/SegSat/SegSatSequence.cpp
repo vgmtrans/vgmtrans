@@ -702,6 +702,7 @@ const SequenceDialect& segSatSequenceDialect() {
       .defaultBehavior =
           SequenceProgramBehavior{
               .commandLimit = 1048576,
+              .initialStereoBalance = omitInitialStereoBalance,
           },
   });
   return dialect;

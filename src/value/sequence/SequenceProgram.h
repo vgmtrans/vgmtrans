@@ -342,6 +342,19 @@ enum class PanLaw {
   EqualPower,
 };
 
+struct StereoBalance {
+  double leftGain = 1.0;
+  double rightGain = 1.0;
+};
+
+struct OmitInitialStereoBalance {};
+inline constexpr OmitInitialStereoBalance omitInitialStereoBalance{};
+
+struct UnresolvedInitialStereoBalance {};
+inline constexpr UnresolvedInitialStereoBalance unresolvedInitialStereoBalance{};
+
+using InitialStereoBalance = std::variant<UnresolvedInitialStereoBalance, OmitInitialStereoBalance, StereoBalance>;
+
 // Driver settings that affect playback but are not individual source commands,
 // such as loop policy or initial channel state.
 struct SequenceProgramBehavior {
@@ -357,6 +370,9 @@ struct SequenceProgramBehavior {
   std::optional<double> initialLevel;
   std::optional<double> initialExpression;
   std::optional<double> initialReverbSend;
+  // Omission must be deliberate. The default sentinel must be resolved before
+  // rendering by either the dialect or the parsed program.
+  InitialStereoBalance initialStereoBalance = unresolvedInitialStereoBalance;
   std::optional<u8> initialMonoModeChannels;
   std::optional<u8> initialPitchBendRangeSemitones;
   // Zero means "use the next default": program -> dialect -> MIDI's 120 BPM.

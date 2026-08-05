@@ -656,6 +656,7 @@ const SequenceDialect& suzukiPs1SequenceDialect() {
               .commandLimit = kMaxCommands,
               .panLaw = PanLaw::EqualPower,
               .initialLevel = 1.0,
+              .initialStereoBalance = omitInitialStereoBalance,
           },
   });
   return dialect;

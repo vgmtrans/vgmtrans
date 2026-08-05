@@ -1026,6 +1026,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
               .commandLimit = kMaxTrackCommands,
               .panLaw = PanLaw::ConstantSum,
               .initialLevel = initialLevel,
+              .initialStereoBalance = omitInitialStereoBalance,
               .initialMonoModeChannels = 16,
               .initialPitchBendRangeSemitones = initialPitchBendRange,
               .initialTempoMicrosecondsPerQuarter = 500000,

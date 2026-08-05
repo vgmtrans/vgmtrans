@@ -750,7 +750,8 @@ void ninSnesControllerFadesRemainInTheSourceDomain() {
   std::vector<const StereoBalancePerformanceEvent*> balances;
   std::vector<const LevelPerformanceEvent*> levels;
   for (const PerformanceEvent& event : events) {
-    if (const auto* balance = std::get_if<StereoBalancePerformanceEvent>(&event)) {
+    if (const auto* balance = std::get_if<StereoBalancePerformanceEvent>(&event);
+        balance != nullptr && balance->header.sourceCommand.valid()) {
       balances.push_back(balance);
     }
     if (const auto* level = std::get_if<LevelPerformanceEvent>(&event)) {
