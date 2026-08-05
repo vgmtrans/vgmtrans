@@ -379,9 +379,9 @@ Envelope approximateEnvelopeAsAdsr(Envelope envelope, double attenuationRangeDb)
   const double endpointFit = firstDecay * firstFraction + secondDecay * (1.0 - firstFraction);
   const double perceptualFit = perceptualDecayFit(firstDecay, secondDecay, firstDropDb, attenuationRangeDb);
   const double firstStageSeconds = firstDecay * firstFraction;
-  // Below 150 ms, the first stage tends to fuse with the onset. By 300 ms it
+  // Below 150 ms, the first stage tends to fuse with the onset. By 100 ms it
   // is heard as a separate fade and should fully outweigh a much quieter tail.
-  const double temporalSalience = smoothstep(0.15, 0.3, firstStageSeconds);
+  const double temporalSalience = smoothstep(0.15, 0.1, firstStageSeconds);
   const double depthSalience = smoothstep(20.0, 40.0, firstDropDb);
   envelope.decaySeconds = std::lerp(endpointFit, perceptualFit, std::max(temporalSalience, depthSalience));
   envelope.sustainAmplitude = 0.0;
