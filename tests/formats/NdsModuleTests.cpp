@@ -1280,7 +1280,7 @@ void ndsMalformedRecoveryKeepsExecutableJumps() {
          "NDS recovered jump loop should render one pass through the subroutine loop");
 }
 
-void ndsSynthParserPreservesInfiniteRelease() {
+void ndsSynthParserConvertsMaximumReleaseRate() {
   std::vector<u8> bytes(0x80);
   writeLe32(bytes, 0x38, 1);
   writeLe32(bytes, 0x3c, (0x40u << 8) | 0x01);
@@ -1316,11 +1316,13 @@ void ndsSynthParserPreservesInfiniteRelease() {
   const auto* bank = assetWithId<InstrumentSetAsset>(result, bankRef->id());
   const auto* malformedBank = assetWithId<InstrumentSetAsset>(result, malformedBankRef->id());
   expect(bank != nullptr && bank->instruments.size() == 1 && bank->instruments[0].regions.size() == 1,
-         "NDS synth parser should keep a valid instrument with infinite release");
+         "NDS synth parser should keep a valid instrument with the maximum release rate");
   const Envelope& envelope = bank->instruments[0].regions[0].envelope;
-  expect(envelope.releaseSeconds && std::isinf(*envelope.releaseSeconds),
-         "NDS infinite release should remain explicit in physical envelope units");
-  expect(validateInstrumentSet(*bank).empty(), "NDS infinite release should pass synth validation");
+  constexpr double expectedReleaseSeconds = (0x16980 / 0xffff) * ((2728.0 * 64.0) / 33513982.0);
+  expect(envelope.releaseSeconds && std::isfinite(*envelope.releaseSeconds) &&
+             std::abs(*envelope.releaseSeconds - expectedReleaseSeconds) < 0.000001,
+         "NDS release 0x7f should convert to one short finite envelope interval");
+  expect(validateInstrumentSet(*bank).empty(), "NDS maximum release rate should pass synth validation");
   expect(malformedBank != nullptr && malformedBank->instruments.empty(),
          "NDS synth parser should skip regions with malformed envelope-rate bytes");
 

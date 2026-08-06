@@ -8,7 +8,6 @@
 
 #include <array>
 #include <cmath>
-#include <limits>
 
 namespace vgmtrans::formats::nds {
 
@@ -89,9 +88,6 @@ std::optional<double> ndsSustainAmplitude(u8 sustain) {
 std::optional<double> ndsReleaseSeconds(u8 release) {
   if (release > 0x7f) {
     return std::nullopt;
-  }
-  if (release == 0x7f) {
-    return std::numeric_limits<double>::infinity();
   }
   return (0x16980 / fallingRate(release)) * kEnvelopeIntervalSeconds;
 }
