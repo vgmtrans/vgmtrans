@@ -268,6 +268,7 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/RareSnes/RareSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/RareSnes/RareSnesSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/RareSnes/RareSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsEnvelope.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequence.cpp

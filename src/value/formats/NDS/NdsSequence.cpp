@@ -7,6 +7,7 @@
 #include "value/formats/NDS/Nds.h"
 
 #include "value/base/LevelScale.h"
+#include "value/formats/NDS/NdsEnvelope.h"
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompiledCommandDialect.h"
@@ -357,7 +358,7 @@ struct SequenceDecodeContext {
       const u32 raw = event.varLen("raw");
       const u32 bank = event.derived("bank", raw >> 7, SemanticOperandRole::InstrumentBank);
       const u32 program = event.derived("program", raw & 0x7f, SemanticOperandRole::InstrumentProgram);
-      return event.emitInstrument(bank, program);
+      return event.emitInstrument(bank, program, InstrumentEnvelopeMode::PreserveDynamicOverride);
     }
     case 0x93: {
       auto event = cursor.sourceOnly("Open Track");
@@ -480,14 +481,42 @@ struct SequenceDecodeContext {
       auto event = cursor.command("Portamento Time", SequenceSemantic::Portamento);
       return event.set<&TrackState::portamentoTime>(event.u8("time"));
     }
-    case 0xd0:
-      return cursor.ignored("Attack Rate", 1);
-    case 0xd1:
-      return cursor.ignored("Decay Rate", 1);
-    case 0xd2:
-      return cursor.ignored("Sustain Level", 1);
-    case 0xd3:
-      return cursor.ignored("Release Rate", 1);
+    case 0xd0: {
+      auto event = cursor.command("Attack Rate", SequenceSemantic::Envelope);
+      const auto seconds = ndsAttackSeconds(event.u8("attack"));
+      if (!seconds) {
+        event.warning("NDS attack rate was outside the supported 0-127 range");
+        return event.ignore();
+      }
+      return event.emitEnvelopeField<EnvelopeFields::Attack>(*seconds);
+    }
+    case 0xd1: {
+      auto event = cursor.command("Decay Rate", SequenceSemantic::Envelope);
+      const auto seconds = ndsDecaySeconds(event.u8("decay"));
+      if (!seconds) {
+        event.warning("NDS decay rate was outside the supported 0-127 range");
+        return event.ignore();
+      }
+      return event.emitEnvelopeField<EnvelopeFields::Decay>(*seconds);
+    }
+    case 0xd2: {
+      auto event = cursor.command("Sustain Level", SequenceSemantic::Envelope);
+      const auto amplitude = ndsSustainAmplitude(event.u8("sustain"));
+      if (!amplitude) {
+        event.warning("NDS sustain level was outside the supported 0-127 range");
+        return event.ignore();
+      }
+      return event.emitEnvelopeField<EnvelopeFields::Sustain>(*amplitude);
+    }
+    case 0xd3: {
+      auto event = cursor.command("Release Rate", SequenceSemantic::Envelope);
+      const auto seconds = ndsReleaseSeconds(event.u8("release"));
+      if (!seconds) {
+        event.warning("NDS release rate was outside the supported 0-127 range");
+        return event.ignore();
+      }
+      return event.emitEnvelopeField<EnvelopeFields::Release>(*seconds);
+    }
     case 0xd4:
       return cursor.ignored("Loop Start", 1);
     case 0xd5: {
