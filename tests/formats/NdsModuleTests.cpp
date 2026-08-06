@@ -7,6 +7,7 @@
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/export/synth/ModulationScaling.h"
 #include "value/formats/NDS/Nds.h"
+#include "value/formats/NDS/NdsEnvelope.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/scan/ScanTypes.h"
 #include "value/sequence/SequenceVm.h"
@@ -553,6 +554,62 @@ void ndsSequenceDialectComposesPitchBendRangeActions() {
   expect(std::get<PitchBendRangePerformanceEvent>(performance.tracks[0].events[0]).cents == 1200 &&
              std::get<PitchBendPerformanceEvent>(performance.tracks[0].events[1]).semitones == 6.0,
          "NDS pitch bend should observe the range state set by the preceding explicit action");
+}
+
+void ndsSequenceDialectEmitsStickyDynamicAdsr() {
+  constexpr u8 attack = 0x6d;
+  constexpr u8 decay = 0x20;
+  constexpr u8 sustain = 0x40;
+  constexpr u8 release = 0x7f;
+  const auto expected = ndsEnvelope(attack, decay, sustain, release);
+  expect(expected.has_value(), "NDS dynamic ADSR fixture should use valid SBNK envelope bytes");
+
+  const SequenceProgram program = decodeTestSequenceProgram({
+      0xd0, attack,   // attack override
+      0xd1, decay,    // decay override
+      0xd2, sustain,  // sustain override
+      0xd3, release,  // release override
+      0x81, 0x01,     // subsequent program changes retain the overrides
+      0xff,
+  });
+
+  const auto& commands = program.tracks.front().commands;
+  const auto envelopeCommandCount = std::ranges::count(commands, SequenceSemantic::Envelope, &SourceCommand::semantic);
+  expect(envelopeCommandCount == 4 && std::ranges::all_of(commands,
+                                                          [](const SourceCommand& command) {
+                                                            return command.semantic != SequenceSemantic::Envelope ||
+                                                                   (command.encodedSize == 2 &&
+                                                                    command.execution.actions.size() == 1);
+                                                          }),
+         "NDS D0-D3 should decode as executable two-byte envelope commands");
+
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program, ndsSequenceDialect());
+  expect(performance.diagnostics.empty(), "NDS dynamic ADSR fixture should render without diagnostics");
+
+  const auto& events = performance.tracks.front().events;
+  expect(events.size() == 5 && std::holds_alternative<InstrumentPerformanceEvent>(events.back()),
+         "NDS dynamic ADSR should emit four envelope updates followed by the program change");
+  std::array<const EnvelopePerformanceEvent*, 4> envelopes{};
+  for (size_t i = 0; i < envelopes.size(); ++i) {
+    envelopes[i] = std::get_if<EnvelopePerformanceEvent>(&events[i]);
+  }
+  expect(std::ranges::all_of(envelopes,
+                             [](const EnvelopePerformanceEvent* event) {
+                               return event != nullptr && event->scope == VoiceEnvelopeScope::FutureAttacks;
+                             }),
+         "NDS D0-D3 should affect future attacks without changing active voices");
+  expect(envelopes[0]->update.fields == EnvelopeFields::Attack && envelopes[0]->update.values &&
+             envelopes[0]->update.values->attackSeconds == expected->attackSeconds &&
+             envelopes[1]->update.fields == EnvelopeFields::Decay && envelopes[1]->update.values &&
+             envelopes[1]->update.values->decaySeconds == expected->decaySeconds &&
+             envelopes[2]->update.fields == EnvelopeFields::Sustain && envelopes[2]->update.values &&
+             envelopes[2]->update.values->sustainAmplitude == expected->sustainAmplitude &&
+             envelopes[3]->update.fields == EnvelopeFields::Release && envelopes[3]->update.values &&
+             envelopes[3]->update.values->releaseSeconds == expected->releaseSeconds,
+         "NDS D0-D3 should use the same raw-byte conversions as SBNK regions");
+  expect(std::get<InstrumentPerformanceEvent>(events.back()).envelopeMode ==
+             InstrumentEnvelopeMode::PreserveDynamicOverride,
+         "NDS program changes should preserve the track's dynamic ADSR overrides");
 }
 
 void ndsSequenceDialectModelsNitroLfoRegisters() {

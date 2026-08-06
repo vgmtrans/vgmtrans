@@ -7,6 +7,7 @@
 #include "value/formats/NDS/Nds.h"
 
 #include "value/base/RecordReader.h"
+#include "value/formats/NDS/NdsEnvelope.h"
 #include "value/scan/BytePattern.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/synth/SynthMath.h"
@@ -15,7 +16,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cmath>
 #include <limits>
 #include <optional>
 #include <string>
@@ -30,19 +30,6 @@ using namespace core;
 namespace {
 
 constexpr std::string_view kSwarSignature = "SWAR\xff\xfe\x00\x01";
-constexpr double kEnvelopeIntervalSeconds = (2728.0 * 64.0) / 33513982.0;
-
-constexpr std::array<s16, 128> kDecibelSquareTable = {
-    -481, -480, -480, -480, -480, -480, -480, -480, -480, -460, -442, -425, -410, -396, -383, -371, -360, -349, -339,
-    -330, -321, -313, -305, -297, -289, -282, -276, -269, -263, -257, -251, -245, -239, -234, -229, -224, -219, -214,
-    -210, -205, -201, -196, -192, -188, -184, -180, -176, -173, -169, -165, -162, -158, -155, -152, -149, -145, -142,
-    -139, -136, -133, -130, -127, -125, -122, -119, -116, -114, -111, -109, -106, -103, -101, -99,  -96,  -94,  -91,
-    -89,  -87,  -85,  -82,  -80,  -78,  -76,  -74,  -72,  -70,  -68,  -66,  -64,  -62,  -60,  -58,  -56,  -54,  -52,
-    -50,  -49,  -47,  -45,  -43,  -42,  -40,  -38,  -36,  -35,  -33,  -31,  -30,  -28,  -27,  -25,  -23,  -22,  -20,
-    -19,  -17,  -16,  -14,  -13,  -11,  -10,  -8,   -7,   -6,   -4,   -3,   -1,   0};
-
-constexpr std::array<u8, 19> kAttackTimeTable = {0x00, 0x01, 0x05, 0x0E, 0x1A, 0x26, 0x33, 0x3F, 0x49, 0x54,
-                                                 0x5C, 0x64, 0x6D, 0x74, 0x7B, 0x7F, 0x84, 0x89, 0x8F};
 constexpr std::array<std::string_view, 8> kDutyNames = {"12.5%", "25%", "37.5%", "50%", "62.5%", "75%", "87.5%", "0%"};
 constexpr std::array<AudioCodec, 3> kWaveCodecs = {AudioCodec::PcmS8, AudioCodec::PcmS16, AudioCodec::NdsImaAdpcm};
 
@@ -59,62 +46,6 @@ enum class InstrumentType : u8 {
   Drumset = 0x10,
   KeySplit = 0x11,
 };
-
-// Converts an NDS decay or release byte into the rate used by the sound hardware.
-[[nodiscard]] u16 fallingRate(u8 decayTime) {
-  if (decayTime == 0x7f) {
-    return 0xffff;
-  }
-  if (decayTime == 0x7e) {
-    return 0x3c00;
-  }
-  if (decayTime < 0x32) {
-    return static_cast<u16>(decayTime * 2 + 1);
-  }
-  return static_cast<u16>(0x1e00 / (0x7e - decayTime));
-}
-
-// Converts the four NDS envelope bytes into common attack, decay, sustain, and
-// release values.
-[[nodiscard]] std::optional<Envelope> ndsEnvelope(u8 attackTime, u8 decayTime, u8 sustainLevel, u8 releaseTime) {
-  // NDS envelopes use driver rate tables rather than SF2/DLS units. Convert
-  // them once to the shared physical representation.
-  if (attackTime > 0x7f || decayTime > 0x7f || sustainLevel > 0x7f || releaseTime > 0x7f) {
-    return std::nullopt;
-  }
-
-  u8 realAttack = 0xff - attackTime;
-  if (attackTime >= 0x6d) {
-    realAttack = kAttackTimeTable[0x7f - attackTime];
-  }
-
-  int count = 0;
-  constexpr long attackThreshold = 0x16980 / 10;
-  for (long value = 0x16980; value > attackThreshold; value = (value * realAttack) >> 8) {
-    ++count;
-  }
-  const double attackSeconds = count * kEnvelopeIntervalSeconds;
-
-  double sustainAmplitude = 0.0;
-  if (sustainLevel == 0x7f) {
-    sustainAmplitude = 1.0;
-  } else if (sustainLevel != 0) {
-    sustainAmplitude = std::pow(10.0, (kDecibelSquareTable[sustainLevel] / 10.0) / 20.0);
-  }
-
-  const u16 realDecay = fallingRate(decayTime);
-  const u16 realRelease = fallingRate(releaseTime);
-  const double decaySeconds = decayTime == 0x7f ? 0.001 : ((0x16980 / realDecay) * kEnvelopeIntervalSeconds);
-  const double releaseSeconds = releaseTime == 0x7f ? std::numeric_limits<double>::infinity()
-                                                    : (0x16980 / realRelease) * kEnvelopeIntervalSeconds;
-
-  return Envelope{
-      .attackSeconds = attackSeconds,
-      .decaySeconds = decaySeconds,
-      .releaseSeconds = releaseSeconds,
-      .sustainAmplitude = sustainAmplitude,
-  };
-}
 
 struct ParsedNdsRegion {
   Region region;

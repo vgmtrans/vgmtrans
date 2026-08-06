@@ -159,6 +159,7 @@ void ndsSequenceFatRangesHandleNormalEmptyAndRecoveredFiles();
 void ndsModuleOnlyBuildsDependenciesOfReferencedBanks();
 void ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
 void ndsSequenceDialectComposesPitchBendRangeActions();
+void ndsSequenceDialectAppliesStickyDynamicAdsr();
 void ndsSequenceDialectModelsNitroLfoRegisters();
 void ndsSynthModulatorsUseSequenceLfoRanges();
 void ndsSequenceDialectRevealsRunningSineLfoAtDepthChange();
@@ -336,6 +337,7 @@ int main() {
     ndsModuleOnlyBuildsDependenciesOfReferencedBanks();
     ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
     ndsSequenceDialectComposesPitchBendRangeActions();
+    ndsSequenceDialectAppliesStickyDynamicAdsr();
     ndsSequenceDialectModelsNitroLfoRegisters();
     ndsSynthModulatorsUseSequenceLfoRanges();
     ndsSequenceDialectRevealsRunningSineLfoAtDepthChange();
