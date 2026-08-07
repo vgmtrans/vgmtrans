@@ -281,6 +281,10 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1Module.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1Sequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1Synth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnesSynth.cpp
   PUBLIC
     FILE_SET HEADERS
     BASE_DIRS ${PROJECT_SOURCE_DIR}/src
@@ -300,6 +304,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/Nds.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SegSat/SegSat.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.h
 )
 target_link_libraries(

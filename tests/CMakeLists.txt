@@ -12,6 +12,7 @@ target_sources(vgmtrans-value-core-tests
     formats/NdsModuleTests.cpp
     formats/SegSatModuleTests.cpp
     formats/SuzukiPS1ModuleTests.cpp
+    formats/SuzukiSnesModuleTests.cpp
     core/SessionSnapshotBuilder.h
     core/ValueCollectionResolverTests.cpp
     core/ValueCompilerCursorTests.cpp
