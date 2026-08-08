@@ -367,6 +367,28 @@ void continuedVoiceResolvesPriorPitchMotion() {
          "a continued voice that changes key should emit one attack-free boundary transition");
 }
 
+void previousNoteEndRetainsContinuationChainBehavior() {
+  PerformanceTrack track{.id = TrackId{7}};
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track, CommandId{18}, SourceAnnotationId{19}, 0, nextSequence, nextNote, nextAutomation};
+
+  expect(!out.setPreviousNoteEnd(4), "revising the previous note should still report failure when none exists");
+  const PerformanceNoteId unrelated = out.note(55, 1.0, 6);
+  const PerformanceNoteId base = out.at(10).note(60, 1.0, 20);
+  out.at(12).level(0.5);
+  const PerformanceNoteId extension = out.at(18).note(60, 0.75, 4, true);
+
+  expect(unrelated != base && extension == base && out.at(20).setPreviousNoteEnd(25),
+         "the previous-note convenience API should resolve the latest continuation's stable identity");
+  const auto& unrelatedEvent = std::get<NotePerformanceEvent>(track.events[0]);
+  const auto& baseEvent = std::get<NotePerformanceEvent>(track.events[1]);
+  const auto& extensionEvent = std::get<NotePerformanceEvent>(track.events[3]);
+  expect(unrelatedEvent.durationTicks == 6 && baseEvent.durationTicks == 15 && extensionEvent.durationTicks == 7,
+         "revising a continuation chain should retain the former durations and stopping boundary exactly");
+}
+
 }  // namespace
 
 void runValueSequenceModelTests() {
@@ -381,4 +403,5 @@ void runValueSequenceModelTests() {
   performanceEmitterResolvesDeclaredPanLawIntoEvents();
   pitchTransitionApiPreservesSamplesAndRealizedLifecycle();
   continuedVoiceResolvesPriorPitchMotion();
+  previousNoteEndRetainsContinuationChainBehavior();
 }

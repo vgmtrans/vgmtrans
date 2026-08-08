@@ -286,12 +286,20 @@ struct AddressIndex {
   [[nodiscard]] std::optional<u32> find(Address address) const;
 };
 
+struct TrackProgramConfig {
+  // Small format-defined state captured for this track.
+  u32 driverState = 0;
+  // Larger source-free lookup tables used to initialize format playback.
+  std::vector<u32> driverData;
+};
+
 struct TrackProgram {
   TrackId id;
   u32 sourceTrackNumber = 0;
   Address startAddress;
   std::vector<SourceCommand> commands;
   AddressIndex addressIndex;
+  TrackProgramConfig config;
 };
 
 // Some drivers arrange a song as a playlist of parallel track sections. A
