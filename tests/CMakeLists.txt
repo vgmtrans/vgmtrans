@@ -13,6 +13,7 @@ target_sources(vgmtrans-value-core-tests
     formats/SegSatModuleTests.cpp
     formats/SuzukiPS1ModuleTests.cpp
     formats/SuzukiSnesModuleTests.cpp
+    formats/WolfTeamSnesModuleTests.cpp
     core/SessionSnapshotBuilder.h
     core/ValueCollectionResolverTests.cpp
     core/ValueCompilerCursorTests.cpp
@@ -33,6 +34,14 @@ target_link_libraries(vgmtrans-value-core-tests PRIVATE vgmtransvalueformats vgm
 target_compile_features(vgmtrans-value-core-tests PRIVATE cxx_std_20)
 
 add_test(NAME vgmtrans-value-core-tests COMMAND vgmtrans-value-core-tests)
+
+add_executable(vgmtrans-wolf-team-snes-tests
+  formats/WolfTeamSnesModuleTests.cpp
+  formats/WolfTeamSnesTestMain.cpp
+)
+target_link_libraries(vgmtrans-wolf-team-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
+target_compile_features(vgmtrans-wolf-team-snes-tests PRIVATE cxx_std_20)
+add_test(NAME vgmtrans-wolf-team-snes-tests COMMAND vgmtrans-wolf-team-snes-tests)
 
 if(ENABLE_UI_QT)
   add_executable(vgmtrans-value-ui-tests ui/ValueUiModelTests.cpp)

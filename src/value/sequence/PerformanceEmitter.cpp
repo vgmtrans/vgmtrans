@@ -10,6 +10,7 @@
 #include <cmath>
 #include <iterator>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
@@ -20,6 +21,24 @@ namespace {
 
 [[nodiscard]] u64 addTicks(u64 tick, u32 ticks) {
   return tick > std::numeric_limits<u64>::max() - ticks ? std::numeric_limits<u64>::max() : tick + ticks;
+}
+
+[[nodiscard]] bool reviseNoteEnd(std::vector<PerformanceEvent>& events, std::optional<PerformanceNoteId> target,
+                                 u64 endTick) {
+  bool found = false;
+  for (auto event = events.rbegin(); event != events.rend(); ++event) {
+    auto* note = std::get_if<NotePerformanceEvent>(&*event);
+    if (note == nullptr || (target && note->note != *target)) {
+      continue;
+    }
+    found = true;
+    const u64 duration = endTick > note->header.tick ? endTick - note->header.tick : 0;
+    note->durationTicks = static_cast<u32>(std::min<u64>(duration, std::numeric_limits<u32>::max()));
+    if (!note->extendsPrevious) {
+      break;
+    }
+  }
+  return found;
 }
 
 [[nodiscard]] ScalarPerformanceAutomationIntent scalarAutomationIntent(PerformanceAutomationTarget target,
@@ -117,21 +136,11 @@ PerformanceNoteId PerformanceEmitter::continueVoice(PerformanceNoteId previousNo
 }
 
 bool PerformanceEmitter::setPreviousNoteEnd(u64 endTick) {
-  bool found = false;
-  for (auto event = track_.events.rbegin(); event != track_.events.rend(); ++event) {
-    auto* note = std::get_if<NotePerformanceEvent>(&*event);
-    if (note == nullptr) {
-      continue;
-    }
+  return reviseNoteEnd(track_.events, std::nullopt, endTick);
+}
 
-    found = true;
-    const u64 duration = endTick > note->header.tick ? endTick - note->header.tick : 0;
-    note->durationTicks = static_cast<u32>(std::min<u64>(duration, std::numeric_limits<u32>::max()));
-    if (!note->extendsPrevious) {
-      break;
-    }
-  }
-  return found;
+bool PerformanceEmitter::setNoteEnd(PerformanceNoteId target, u64 endTick) {
+  return target.valid() && reviseNoteEnd(track_.events, target, endTick);
 }
 
 void PerformanceEmitter::tempo(TempoPerformanceEvent event) {

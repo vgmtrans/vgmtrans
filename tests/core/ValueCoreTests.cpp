@@ -23,6 +23,7 @@ void runValuePsxTests();
 void suzukiPs1DynamicAdsrUsesAuditedDriverCommands();
 void suzukiPs1ModuleBuildsFractionallyTunedWdsSynth();
 void runSuzukiSnesModuleTests();
+void runWolfTeamSnesModuleTests();
 
 void capcomSnesLayoutSelectsSongListAndFixedHeaders();
 void capcomSnesLayoutFallsBackToV2SongList();
@@ -366,6 +367,7 @@ int main() {
     segSatSsfExtractorUsesFourByteMiniHeader();
     suzukiPs1DynamicAdsrUsesAuditedDriverCommands();
     suzukiPs1ModuleBuildsFractionallyTunedWdsSynth();
+    runWolfTeamSnesModuleTests();
   } catch (const std::exception& ex) {
     std::cerr << ex.what() << '\n';
     return 1;
