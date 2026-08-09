@@ -95,6 +95,46 @@ namespace math {
   };
 }
 
+struct TremoloLfo {
+  double depth = 0.0;
+  LfoPerformanceContext context;
+};
+
+[[nodiscard]] TremoloLfo tremoloLfo(Version version, u8 period, u8 step, u8 delay = 0) {
+  // The driver reloads an 8-bit down-counter and reverses the volume step
+  // whenever it reaches zero. Tremolo starts at nominal volume, descends for
+  // one period, then returns over a second period. A zero reload wraps to 256.
+  const u32 phaseTicks = period == 0 ? 256u : period;
+  const u32 accumulatorLevels = version == Version::SeikenDensetsu3 ? 256u : 128u;
+  const u32 effectiveStep = step % accumulatorLevels;
+  const u32 excursion = effectiveStep * phaseTicks;
+  // Later revisions retain only seven accumulator bits; SD3 retains all eight.
+  // Large steps therefore wrap within a direction period and sound like a much
+  // faster folded sawtooth, not one slow outer triangle. A standard synth LFO
+  // cannot reverse that sawtooth at the period boundary, but preserving its
+  // step-driven carrier is the closest target-neutral representation.
+  const bool folded = excursion > 0x7f;
+  double cycles = 0.0;
+  if (effectiveStep != 0) {
+    cycles = folded ? static_cast<double>(effectiveStep) / accumulatorLevels : 1.0 / (2.0 * phaseTicks);
+  }
+  const LfoPerformanceContext context{
+      .cyclesPerTick = cycles,
+      .delayTicks = delay,
+      .delayIsTempoRelative = true,
+      .waveform = folded ? LfoWaveform::SawtoothDown : LfoWaveform::Triangle,
+      .polarity = LfoPolarity::Negative,
+      .initialPhaseCycles = folded ? 0.0 : 0.25,
+      .sampleImmediatelyOnNote = true,
+      .directionReversalTicks = folded ? phaseTicks : 0u,
+      .tremoloGainMode = TremoloGainMode::NoBoost,
+  };
+  return TremoloLfo{
+      .depth = std::min(1.0, excursion / 128.0),
+      .context = context,
+  };
+}
+
 [[nodiscard]] double pitchLfoDepth(Version version, u8 period, s8 step) {
   if (version == Version::SeikenDensetsu3) {
     // SD3 adds step*4 to an 8.8-semitone accumulator each tick.
@@ -499,10 +539,9 @@ struct Playback {
   void vibratoOff() { out.vibratoDepth(0.0, math::lfoContext(0)); }
 
   void tremolo(u8 period, u8 step, u8 delay) {
-    const auto context = math::lfoContext(period, delay);
-    const double depth = std::min(1.0, step * period / 128.0);
-    out.tremoloLinearGainDepth(depth, context);
-    out.tremoloRateCyclesPerTick(period == 0 ? 0.0 : 1.0 / (4.0 * period), context);
+    const auto lfo = math::tremoloLfo(track.version, period, step, delay);
+    out.tremoloLinearGainDepth(lfo.depth, lfo.context);
+    out.tremoloRateCyclesPerTick(lfo.context.cyclesPerTick.value_or(0.0), lfo.context);
     out.tremoloDelayTicks(delay);
   }
 

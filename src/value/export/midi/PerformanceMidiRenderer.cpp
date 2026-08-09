@@ -324,6 +324,9 @@ struct SimulatedLfoState {
   u32 steppedDepthAttackStep = 0;
   double steppedDepthAttackPhaseCycles = 0.0;
   bool sampleImmediatelyOnNote = false;
+  u32 directionReversalTicks = 0;
+  u32 directionTick = 0;
+  bool phaseReversed = false;
   bool phaseRunsAtZeroDepth = false;
   bool configured = false;
   bool started = false;
@@ -761,6 +764,8 @@ void restartLfo(SimulatedLfoState& lfo, u64 tick, LfoInitialPhaseFallback fallba
   lfo.activeSteppedDepthAttackSteps = lfo.steppedDepthAttackSteps;
   lfo.steppedDepthAttackStep = lfo.activeSteppedDepthAttackSteps == 0 ? 0 : 1;
   lfo.steppedDepthAttackPhaseCycles = 0.0;
+  lfo.directionTick = 0;
+  lfo.phaseReversed = false;
   lfo.started = true;
   lfo.producedSample = false;
 }
@@ -791,6 +796,9 @@ void configureLfo(SimulatedLfoState& lfo, u64 tick, const ModulationPerformanceE
     lfo.steppedDepthAttackSteps = *event.steppedDepthAttackSteps;
   }
   lfo.sampleImmediatelyOnNote = event.sampleImmediatelyOnNote;
+  if (event.directionReversalTicks) {
+    lfo.directionReversalTicks = *event.directionReversalTicks;
+  }
   if (event.delayTicks) {
     lfo.delayTicks = *event.delayTicks;
   }
@@ -850,7 +858,14 @@ void flushLfo(SimulatedLfoState& lfo, u64 upToTick, const PerformanceTempoMap& t
 
     const double phaseStep = lfo.cyclesPerTick.value_or(lfo.frequencyHz * tickSeconds);
     const auto advancePhase = [&]() {
-      lfo.phaseCycles = std::fmod(lfo.phaseCycles + phaseStep, 1.0);
+      lfo.phaseCycles = std::fmod(lfo.phaseCycles + (lfo.phaseReversed ? -phaseStep : phaseStep), 1.0);
+      if (lfo.phaseCycles < 0.0) {
+        lfo.phaseCycles += 1.0;
+      }
+      if (lfo.directionReversalTicks != 0 && ++lfo.directionTick == lfo.directionReversalTicks) {
+        lfo.directionTick = 0;
+        lfo.phaseReversed = !lfo.phaseReversed;
+      }
       if (lfo.activeSteppedDepthAttackSteps != 0 && lfo.steppedDepthAttackStep < lfo.activeSteppedDepthAttackSteps) {
         const double attackPhase = lfo.steppedDepthAttackPhaseCycles + phaseStep;
         const u32 completedCycles = static_cast<u32>(std::floor(attackPhase));

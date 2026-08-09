@@ -7,6 +7,7 @@
 #include "value/formats/SuzukiSnes/SuzukiSnes.h"
 
 #include "value/export/DynamicEnvelope.h"
+#include "value/export/SequenceModulationProfile.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
@@ -366,6 +367,65 @@ void modulationMathMatchesEachDriverRevision() {
   expect(blPan && blPan->panDepth == 0.25 && blPan->cyclesPerTick == 0.0625 &&
              blPan->polarity == LfoPolarity::Positive && blPan->initialPhaseCycles == 0.75,
          "BL's high pan-LFO period bit should select a one-sided two-period triangle");
+
+  // And My Name's Booster, track 0 at ARAM $202A: F4 07 36. Its $36 step
+  // wraps the 7-bit volume accumulator several times before each reversal.
+  const PerformanceSequence booster =
+      render(Version::SuperMarioRpg, {0xf4, 0x07, 0x36, 0xde, 0x5e, 0xb6, 0x20, 0xd0});
+  const auto* boosterDepth = modulationValue(booster, ModulationPerformanceTarget::TremoloDepth);
+  const auto* boosterRate = modulationValue(booster, ModulationPerformanceTarget::TremoloRate);
+  expect(boosterDepth && boosterDepth->volumeDepthLinearGain == 1.0 &&
+             boosterDepth->waveform == LfoWaveform::SawtoothDown &&
+             boosterDepth->polarity == LfoPolarity::Negative && boosterDepth->initialPhaseCycles == 0.0 &&
+             boosterDepth->sampleImmediatelyOnNote && boosterDepth->directionReversalTicks == 7 &&
+             boosterDepth->tremoloGainMode == TremoloGainMode::NoBoost &&
+             boosterRate && std::abs(boosterRate->cyclesPerTick.value_or(0.0) - (0x36 / 128.0)) < 0.000001,
+         "SMR F4 07 36 should preserve the fast carrier created by its wrapped 7-bit volume steps");
+  const SequenceModulationProfile boosterProfile = analyzeSequenceModulation(booster);
+  expect(boosterProfile.instruments.tremolo &&
+             boosterProfile.instruments.tremolo->gainMode == TremoloGainMode::NoBoost,
+         "linear-gain tremolo planning should retain Suzuki's attenuation-first oscillator");
+  const MidiSequence boosterMidi =
+      renderMidiSequence(booster, {}, ModulationConversionPolicy::SequenceEventSimulation);
+  const auto boosterExpressionAt = [&](u64 tick) -> std::optional<u8> {
+    for (const MidiEvent& event : boosterMidi.tracks.front().events) {
+      if (const auto* expression = std::get_if<Expression>(&event);
+          expression != nullptr && expression->tick == tick) {
+        return expression->value;
+      }
+    }
+    return std::nullopt;
+  };
+  expect(boosterExpressionAt(6) == boosterExpressionAt(8) &&
+             boosterExpressionAt(7).value_or(127) < boosterExpressionAt(6).value_or(0) &&
+             boosterExpressionAt(14) == 127,
+         "SMR folded-tremolo simulation should reverse after seven ticks and return to nominal after fourteen");
+
+  const PerformanceSequence shortTremolo =
+      render(Version::SuperMarioRpg, {0xf4, 0x04, 0x10, 0xb6, 0x10, 0xd0});
+  const MidiSequence shortTremoloMidi =
+      renderMidiSequence(shortTremolo, {}, ModulationConversionPolicy::SequenceEventSimulation);
+  const auto expressionAt = [&](u64 tick) -> std::optional<u8> {
+    for (const MidiEvent& event : shortTremoloMidi.tracks.front().events) {
+      if (const auto* expression = std::get_if<Expression>(&event);
+          expression != nullptr && expression->tick == tick) {
+        return expression->value;
+      }
+    }
+    return std::nullopt;
+  };
+  expect(expressionAt(4).value_or(127) < 127 && expressionAt(8) == 127,
+         "sequence-event MIDI should reach Suzuki's attenuation extreme after one period and return after two");
+
+  const PerformanceSequence wrappedPeriod = render(Version::SuperMarioRpg, {0xf4, 0x00, 0x01, 0xd0});
+  const auto* wrappedRate = modulationValue(wrappedPeriod, ModulationPerformanceTarget::TremoloRate);
+  expect(wrappedRate && std::abs(wrappedRate->cyclesPerTick.value_or(0.0) - (1.0 / 128.0)) < 0.000001,
+         "a zero counter reload should retain the wrapped accumulator's step-driven carrier");
+
+  const PerformanceSequence sd3Folded = render(Version::SeikenDensetsu3, {0xf4, 0x07, 0x36, 0xd0});
+  const auto* sd3FoldedRate = modulationValue(sd3Folded, ModulationPerformanceTarget::TremoloRate);
+  expect(sd3FoldedRate && std::abs(sd3FoldedRate->cyclesPerTick.value_or(0.0) - (0x36 / 256.0)) < 0.000001,
+         "SD3 folded tremolo should retain its eight-bit accumulator carrier");
 
   const PerformanceSequence restarted = render(Version::SeikenDensetsu3, {0xe9, 0x08, 0x04, 0xeb, 0xea, 0xd0});
   std::vector<double> panDepths;

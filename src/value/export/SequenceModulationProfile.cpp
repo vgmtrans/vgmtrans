@@ -124,7 +124,7 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
         const double depth = std::clamp(std::abs(*event.volumeDepthLinearGain), 0.0, 1.0 - 1e-9);
         tremolo.maxDepth = std::max(tremolo.maxDepth, -20.0 * std::log10(1.0 - depth));
         if (depth > 0.0) {
-          tremolo.gainMode = TremoloGainMode::BipolarAroundNominal;
+          tremolo.gainMode = event.tremoloGainMode;
         }
       }
       break;

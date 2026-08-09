@@ -319,6 +319,9 @@ struct LfoPerformanceContext {
   // Calculate the first oscillator sample on a fresh note instead of waiting
   // for the first rendered sequence-tick boundary.
   bool sampleImmediatelyOnNote = false;
+  // Reverse the oscillator's phase advance after this many active source
+  // ticks. Folded accumulator LFOs use this to alternate sawtooth direction.
+  std::optional<u32> directionReversalTicks;
   bool phaseRunsAtZeroDepth = false;
   TremoloGainMode tremoloGainMode = TremoloGainMode::BipolarAroundNominal;
 };
@@ -349,6 +352,7 @@ struct ModulationPerformanceEvent {
   std::optional<ModulationRange> pitchRangeSemitones;
   std::optional<u32> steppedDepthAttackSteps;
   bool sampleImmediatelyOnNote = false;
+  std::optional<u32> directionReversalTicks;
   // Some drivers keep advancing the oscillator while its depth is zero. This
   // matters when a later command reveals an already-running LFO mid-note.
   bool phaseRunsAtZeroDepth = false;
