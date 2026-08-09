@@ -480,6 +480,7 @@ namespace {
       .pitchRangeSemitones = context.pitchRangeSemitones,
       .steppedDepthAttackSteps = context.steppedDepthAttackSteps,
       .sampleImmediatelyOnNote = context.sampleImmediatelyOnNote,
+      .directionReversalTicks = context.directionReversalTicks,
       .phaseRunsAtZeroDepth = context.phaseRunsAtZeroDepth,
       .tremoloGainMode = context.tremoloGainMode,
   };
