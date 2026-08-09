@@ -10,6 +10,7 @@
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompiledCommandDialect.h"
 #include "value/sequence/SequenceVm.h"
+#include "value/synth/SnesDsp.h"
 
 #include <algorithm>
 #include <array>
@@ -173,7 +174,7 @@ struct TrackState {
   bool noteOctaveUp = false;
   bool resetLfoPhaseOnNote = true;
   double portamentoMillisecondsPerSemitone = 0.0;
-  u16 lastPortamentoMilliseconds = 0;
+  std::optional<double> lastPortamentoMilliseconds;
   std::optional<s32> lastSourceKey;
   PerformanceNoteId lastNote;
   bool lastNoteSlurred = false;
@@ -241,26 +242,26 @@ struct Playback {
     const u32 duration = soundingTicks(length);
     const double outputKey = static_cast<double>(key + track.transposeSemitones);
 
-    // Consecutive slurred notes at the same source pitch extend the existing
-    // note instead of retriggering it.
-    if (track.lastNoteSlurred && track.lastSourceKey && key == *track.lastSourceKey && !track.didRest) {
-      track.lastNote = out.note(NotePerformanceEvent{
-          .key = outputKey,
-          .linearVelocity = 1.0,
-          .durationTicks = duration,
-          .extendsPrevious = true,
-          .restartsLfoPhase = false,
-      });
+    const bool continuesVoice = track.lastNoteSlurred && !track.didRest && track.lastNote.valid();
+    const bool repeatsSourcePitch = continuesVoice && track.lastSourceKey && key == *track.lastSourceKey;
+    NotePerformanceEvent event{
+        .key = outputKey,
+        .linearVelocity = 1.0,
+        .durationTicks = duration + (track.noteSlurred && !repeatsSourcePitch ? 1u : 0u),
+        // The driver decides whether this note is a new key-on from the
+        // preceding note's slur bit. The current note's slur bit controls
+        // whether the following note will be tied to this one.
+        .restartsLfoPhase = track.resetLfoPhaseOnNote && !track.lastNoteSlurred,
+    };
+
+    if (repeatsSourcePitch) {
+      // Repeating the target extends both the sounding voice and any glide
+      // still approaching that target.
+      event.note = track.lastNote;
+      event.extendsPrevious = true;
+      track.lastNote = out.note(std::move(event));
     } else {
-      const PerformanceNoteId note = out.note(NotePerformanceEvent{
-          .key = outputKey,
-          .linearVelocity = 1.0,
-          .durationTicks = duration + (track.noteSlurred ? 1u : 0u),
-          // The driver decides whether this note is a new key-on from the
-          // preceding note's slur bit. The current note's slur bit controls
-          // whether the following note will be tied to this one.
-          .restartsLfoPhase = track.resetLfoPhaseOnNote && !track.lastNoteSlurred,
-      });
+      const PerformanceNoteId note = out.note(std::move(event));
       emitPitchSlideTo(note, key);
       track.lastNote = note;
     }
@@ -302,27 +303,33 @@ private:
         std::clamp<double>(std::ceil(ticks), 1.0, static_cast<double>(std::numeric_limits<u32>::max())));
   }
 
-  // Declares the driver's fixed-time glide into this note. Slurred notes carry
-  // their prior voice across the boundary; CC 84 supplies the source key even
-  // when the previous note is no longer sounding.
+  // Declares the driver's fixed-rate glide from the preceding note target.
   void emitPitchSlideTo(PerformanceNoteId note, s32 key) {
-    if (track.portamentoMillisecondsPerSemitone <= 0.0 || !track.lastSourceKey || key == *track.lastSourceKey) {
+    if (!track.lastSourceKey) {
       return;
     }
 
-    const auto distance = static_cast<u32>(std::abs(key - *track.lastSourceKey));
-    const auto portamentoTime = static_cast<u16>(distance * track.portamentoMillisecondsPerSemitone);
-    const double previousKey = static_cast<double>(*track.lastSourceKey + track.transposeSemitones);
-    auto slide = out.pitchSlide(note, previousKey, static_cast<double>(key + track.transposeSemitones),
-                                PitchSlideTiming::fixedDuration(pitchSlideTicks(portamentoTime), portamentoTime));
-    if (track.lastNoteSlurred && !track.didRest && track.lastNote.valid()) {
+    const bool continuesVoice = track.lastNoteSlurred && !track.didRest && track.lastNote.valid();
+    if (track.portamentoMillisecondsPerSemitone <= 0.0 && !continuesVoice) {
+      return;
+    }
+    const double startKey = static_cast<double>(*track.lastSourceKey + track.transposeSemitones);
+    const double targetKey = static_cast<double>(key + track.transposeSemitones);
+    if (std::abs(startKey - targetKey) < 0.000001) {
+      return;
+    }
+    const double milliseconds = std::abs(targetKey - startKey) * track.portamentoMillisecondsPerSemitone;
+    const PitchSlideTiming timing = milliseconds <= 0.0
+                                        ? PitchSlideTiming::fromTicks(0)
+                                        : PitchSlideTiming::fixedDuration(pitchSlideTicks(milliseconds), milliseconds);
+    auto slide = out.pitchSlide(note, startKey, targetKey, timing);
+    if (continuesVoice) {
       slide.continueFrom(track.lastNote);
     }
-    if (portamentoTime != track.lastPortamentoMilliseconds) {
-      track.lastPortamentoMilliseconds = portamentoTime;
-    } else {
+    if (track.lastPortamentoMilliseconds && std::abs(*track.lastPortamentoMilliseconds - milliseconds) < 0.000001) {
       slide.useCurrentPortamentoTiming();
     }
+    track.lastPortamentoMilliseconds = milliseconds;
   }
 };
 
@@ -389,7 +396,10 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
     case 0x08: {
       auto event = cursor.command("Instrument", SequenceSemantic::Instrument);
       const u8 instrument = event.u8("instrument", SemanticOperandRole::Instrument);
-      return event.emitInstrument(kCapcomSnesInstrumentDomain, instrument);
+      // The driver loads SRCN/ADSR/GAIN from the instrument table, but keeps
+      // its separate per-voice release GAIN byte intact for the next key-off.
+      return event.emitInstrument(kCapcomSnesInstrumentDomain, instrument,
+                                  InstrumentEnvelopeMode::PreserveDynamicOverride);
     }
     case 0x09: {
       auto event = cursor.command("Octave", SequenceSemantic::State);
@@ -511,10 +521,15 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
       return event.emitReverb(enabled ? 40.0 / 127.0 : 0.0);
     }
     case 0x1d: {
-      auto event = cursor.sourceOnly("Release Rate");
+      auto event = cursor.command("Release Rate", SequenceSemantic::Envelope);
       const auto raw = event.rawU8("raw");
-      static_cast<void>(event.resolvedValue("gain", raw, static_cast<u32>(raw.value | 0xa0), SourceValueDisplay::Hex));
-      return event.ignore();
+      const u8 gain = event.derived("gain", static_cast<u8>(raw.value | 0xa0), SourceValueDisplay::Hex);
+      // Normalize the GAIN rate from full ENVX so the same sticky override can
+      // be applied to any instrument selected later on this track.
+      const double releaseSeconds =
+          event.resolvedValue("release_seconds", raw, snesDspGainEnvelopeSeconds(gain, 0x7ff, 0));
+      return event.emitEnvelopeField<EnvelopeFields::Release>(releaseSeconds,
+                                                              VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
     }
     case 0x1e:
     case 0x1f:
