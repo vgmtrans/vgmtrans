@@ -200,7 +200,7 @@ void playbackUsesAuditedGatingPitchAndLoops() {
          "repeat break should branch only on the final pass and repeat end should restore the saved octave");
 }
 
-void driverDefaultsAndPortamentoAreVersioned() {
+void driverDefaultsAndPitchTransitionsAreVersioned() {
   struct ExpectedDefaults {
     Version version;
     u32 duration;
@@ -235,7 +235,30 @@ void driverDefaultsAndPortamentoAreVersioned() {
                                : pitchTransitionIntent(later.tracks.front().automations.front());
   expect(sd3Slide != nullptr && sd3Slide->timing.timelineTicks == 3 && laterSlide != nullptr &&
              laterSlide->timing.timelineTicks == 4,
-         "SD3 should decrement E5's duration while the later drivers should use its raw duration");
+         "SD3 should decrement E5's pitch-slide duration while the later drivers should use its raw duration");
+
+  // And my Name's Booster, track 0 at ARAM $2035 and $203B: each E5 precedes the note it bends.
+  const PerformanceSequence booster =
+      render(Version::SuperMarioRpg, {0xc6, 0x05, 0xe5, 0x18, 0x02, 0x38, 0x41, 0xd7, 0xe5, 0x24, 0x02, 0x21, 0xd0});
+  const auto boosterNotes = events<NotePerformanceEvent>(booster.tracks.front());
+  const auto& boosterAutomations = booster.tracks.front().automations;
+  const auto* firstBoosterSlide =
+      boosterAutomations.empty() ? nullptr : pitchTransitionIntent(boosterAutomations.front());
+  const auto* thirdBoosterSlide =
+      boosterAutomations.size() < 2 ? nullptr : pitchTransitionIntent(boosterAutomations[1]);
+  const MidiSequence boosterMidi =
+      renderMidiSequence(booster, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  const bool thirdNoteBendsUp = std::ranges::any_of(boosterMidi.tracks.front().events, [](const MidiEvent& event) {
+    const auto* bend = std::get_if<PitchBend>(&event);
+    return bend != nullptr && bend->tick > 96 && bend->value > 0;
+  });
+  expect(boosterNotes.size() == 3 && firstBoosterSlide != nullptr && thirdBoosterSlide != nullptr &&
+             firstBoosterSlide->note == boosterNotes.front()->note && firstBoosterSlide->startKey == 60.0 &&
+             firstBoosterSlide->targetKey == 62.0 && firstBoosterSlide->timing.timelineTicks == 0x18 &&
+             thirdBoosterSlide->note == boosterNotes[2]->note && thirdBoosterSlide->startKey == 65.0 &&
+             thirdBoosterSlide->targetKey == 67.0 && thirdBoosterSlide->timing.timelineTicks == 0x24 &&
+             thirdNoteBendsUp,
+         "each SMR E5 should slide the note immediately following it upward by two semitones");
 
   const PerformanceSequence automatic = render(Version::BahamutLagoon, {0xa8, 0xf6, 0x04, 0xaa, 0xd0});
   const auto automaticNotes = events<NotePerformanceEvent>(automatic.tracks.front());
@@ -251,8 +274,8 @@ void driverDefaultsAndPortamentoAreVersioned() {
   const PerformanceSequence repeatedSlide =
       render(Version::SuperMarioRpg, {0xa8, 0xe6, 0xe5, 0x02, 0x02, 0xc3, 0x04, 0xe6, 0xd0});
   const auto& repeatedAutomations = repeatedSlide.tracks.front().automations;
-  const auto* repeatedTail = repeatedAutomations.size() == 2 ? pitchTransitionIntent(repeatedAutomations.back())
-                                                             : nullptr;
+  const auto* repeatedTail =
+      repeatedAutomations.size() == 2 ? pitchTransitionIntent(repeatedAutomations.back()) : nullptr;
   expect(repeatedTail != nullptr && repeatedAutomations.front().realization.startTick == 3 &&
              repeatedAutomations.front().realization.endTick == 5 && repeatedTail->startKey == 74.0 &&
              repeatedTail->timing.timelineTicks == 256 && repeatedAutomations.back().realization.endTick == 7 &&
@@ -260,7 +283,7 @@ void driverDefaultsAndPortamentoAreVersioned() {
          "E6 should keep E5 moving past its duration until the next E6 stops the repeated slide");
 }
 
-void smrBowserPortamentoContinuesAcrossTies() {
+void smrBowserPitchSlideContinuesAcrossTies() {
   // Fight Against Bowser, track 0 at ARAM $2081: E5 C0 FE, tie 29,
   // volume fade E4 90 00, then tie 1B.
   const PerformanceSequence performance =
@@ -288,7 +311,7 @@ void smrBowserPortamentoContinuesAcrossTies() {
                                const auto* bend = std::get_if<PitchBend>(&event);
                                return bend != nullptr && bend->value != 0;
                              }),
-         "SMR portamento should lower to audible MIDI pitch-bend events");
+         "SMR pitch slide should lower to audible MIDI pitch-bend events");
 }
 
 void laterE0UsesTheSustainRateAsAGatedRelease() {
@@ -475,8 +498,8 @@ void scannerBuildsSequenceDerivedDrumKit() {
 void runSuzukiSnesModuleTests() {
   layoutsAndHeadersAreVersioned();
   playbackUsesAuditedGatingPitchAndLoops();
-  driverDefaultsAndPortamentoAreVersioned();
-  smrBowserPortamentoContinuesAcrossTies();
+  driverDefaultsAndPitchTransitionsAreVersioned();
+  smrBowserPitchSlideContinuesAcrossTies();
   laterE0UsesTheSustainRateAsAGatedRelease();
   modulationMathMatchesEachDriverRevision();
   scannerBuildsSequenceDerivedDrumKit();
