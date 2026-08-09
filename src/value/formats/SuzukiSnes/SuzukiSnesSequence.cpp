@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <map>
 #include <optional>
 #include <vector>
@@ -402,6 +403,26 @@ struct Playback {
     }
   }
 
+  void sustainRate(u8 rate) {
+    out.updateEnvelope(Envelope{.secondDecaySeconds = snesDspAdsrSustainSeconds(rate)}, EnvelopeFields::SecondDecay,
+                       VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    // DC clears the later drivers' gated-release flag, returning note-off to
+    // the instrument's native release behavior.
+    out.restoreEnvelope(EnvelopeFields::Release, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+  }
+
+  void gatedSustainRelease(u8 rate) {
+    // BL/SMR E0 clears ADSR2's sustain-rate bits at every attack, then writes
+    // this rate when the gate expires instead of keying the voice off. Model
+    // that as a held sustain followed by an exponential release.
+    out.updateEnvelope(
+        Envelope{
+            .secondDecaySeconds = std::numeric_limits<double>::infinity(),
+            .releaseSeconds = snesDspAdsrSustainSeconds(rate),
+        },
+        EnvelopeFields::SecondDecay | EnvelopeFields::Release, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+  }
+
   void percussion(bool enabled) {
     track.percussion = enabled;
     out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain),
@@ -725,8 +746,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xdc: {
       auto event = cursor.command("Sustain Rate", SequenceSemantic::Envelope);
       const u8 rate = event.u8("rate") & 0x1f;
-      return event.emitEnvelopeField<EnvelopeFields::SecondDecay>(snesDspAdsrSustainSeconds(rate),
-                                                                  VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+      return event.invoke<&Playback::sustainRate>(rate);
     }
     case 0xdd: {
       auto event = cursor.command("Duration Rate", SequenceSemantic::State);
@@ -738,10 +758,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xe0:
       if (version != Version::SeikenDensetsu3) {
-        auto event = cursor.command("Sustain Rate Override", SequenceSemantic::Envelope);
+        auto event = cursor.command("Gated Sustain Release", SequenceSemantic::Envelope);
         const u8 rate = event.u8("rate") & 0x1f;
-        return event.emitEnvelopeField<EnvelopeFields::SecondDecay>(snesDspAdsrSustainSeconds(rate),
-                                                                    VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+        return event.invoke<&Playback::gatedSustainRelease>(rate);
       }
       [[fallthrough]];
     case 0xe2: {
