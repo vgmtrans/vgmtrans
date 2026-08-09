@@ -33,6 +33,34 @@ namespace math {
   return version == Version::SeikenDensetsu3 ? 0x60 : 0x3e;
 }
 
+[[nodiscard]] u8 initialVolume(Version version) {
+  switch (version) {
+    case Version::SeikenDensetsu3:
+      return 0x3c;
+    case Version::BahamutLagoon:
+      return 0x50;
+    case Version::SuperMarioRpg:
+      return 0x64;
+  }
+  return 0x3c;
+}
+
+[[nodiscard]] u8 initialProgram(Version version) {
+  switch (version) {
+    case Version::SeikenDensetsu3:
+      return 5;
+    case Version::BahamutLagoon:
+      return 6;
+    case Version::SuperMarioRpg:
+      return 4;
+  }
+  return 5;
+}
+
+[[nodiscard]] u8 initialDurationRate(Version version) {
+  return version == Version::SeikenDensetsu3 ? 0 : 0x0f;
+}
+
 [[nodiscard]] u32 tempoMicrosecondsPerQuarter(u8 timerTarget) {
   return timerTarget == 0 ? 60'000'000 : static_cast<u32>(kPpqn) * timerTarget * 125;
 }
@@ -52,24 +80,45 @@ namespace math {
 }
 
 [[nodiscard]] double panPosition(u8 value) {
-  return value / 256.0;
+  return std::clamp(value / 128.0 - 1.0, -1.0, 1.0);
 }
 
-[[nodiscard]] LfoPerformanceContext lfoContext(u8 period, u8 delay = 0) {
+[[nodiscard]] LfoPerformanceContext lfoContext(u8 period, u8 delay = 0, double initialPhase = 0.0) {
   const double cycles = period == 0 ? 0.0 : 1.0 / (4.0 * period);
   return LfoPerformanceContext{
       .cyclesPerTick = cycles,
       .delayTicks = delay,
       .delayIsTempoRelative = true,
       .waveform = LfoWaveform::Triangle,
-      .initialPhaseCycles = 0.0,
+      .initialPhaseCycles = initialPhase,
   };
 }
 
-[[nodiscard]] double pitchLfoDepth(u8 period, s8 step) {
-  // The driver adds a signed step*4 to an 8.8-semitone accumulator and
-  // reverses direction after period ticks.
-  return std::abs(static_cast<int>(step)) * period / 64.0;
+[[nodiscard]] double pitchLfoDepth(Version version, u8 period, s8 step) {
+  if (version == Version::SeikenDensetsu3) {
+    // SD3 adds step*4 to an 8.8-semitone accumulator each tick.
+    return std::abs(static_cast<int>(step)) * period / 64.0;
+  }
+  if (period == 0) {
+    return 0.0;
+  }
+  // The later drivers square abs(step)+4, divide it by twice the period,
+  // and reverse after period ticks. The period therefore controls rate only.
+  const int magnitude = std::abs(static_cast<int>(step)) + 4;
+  return magnitude * magnitude / 512.0;
+}
+
+[[nodiscard]] u8 panLfoPeriod(Version version, u8 rawPeriod) {
+  return version == Version::BahamutLagoon ? rawPeriod & 0x7f : rawPeriod;
+}
+
+[[nodiscard]] double panLfoDepth(Version version, u8 period, s8 step) {
+  if (version == Version::SuperMarioRpg) {
+    // SMR divides the requested excursion by the period before the per-tick
+    // update, so its peak is independent of the period.
+    return std::min(1.0, std::abs(static_cast<int>(step)) / 128.0);
+  }
+  return std::min(1.0, std::abs(static_cast<int>(step)) * period / 128.0);
 }
 
 }  // namespace math
@@ -232,8 +281,9 @@ struct ProgramState {
 
 struct TrackState {
   explicit TrackState(const SequenceProgram& program)
-      : version(static_cast<Version>(program.config.profile)) {
-    volume.reset(0x3c);
+      : version(static_cast<Version>(program.config.profile)), durationRate(math::initialDurationRate(version)),
+        sourceProgram(math::initialProgram(version)) {
+    volume.reset(math::initialVolume(version));
     pan.reset(0x80);
   }
 
@@ -247,6 +297,16 @@ struct TrackState {
   bool previousWasRest = true;
   s8 fineTuning = 0;
   s16 transposeQuarters = 0;
+  u8 automaticPortamentoLength = 0;
+  u8 panLfoPeriod = 0;
+  s8 panLfoStep = 0;
+  bool portamentoRepeat = false;
+  bool portamentoActive = false;
+  double portamentoStep = 0.0;
+  double portamentoTarget = 0.0;
+  u64 portamentoEndTick = 0;
+  PerformanceNoteId portamentoNote;
+  PerformanceAutomationBinding portamentoBinding;
   PerformanceNoteId lastNote;
   std::optional<double> lastKey;
   std::array<s32, 4> repeatOctaves{};
@@ -271,6 +331,9 @@ struct Playback {
     if (track.durationRate == 0) {
       return length;
     }
+    if (track.durationRate == 0x0f) {
+      return length == 1 ? 1 : length - 1;
+    }
     const u8 scale = static_cast<u8>((track.durationRate << 4) | (track.durationRate >> 4));
     return std::min(length, (length * scale) / 256 + 1);
   }
@@ -278,20 +341,32 @@ struct Playback {
   [[nodiscard]] Effects note(u32 length, u8 scaleStep) {
     const double key = track.percussion ? scaleStep + kDrumKeyBias : track.octave * 12.0 + scaleStep;
     const u32 duration = soundingTicks(length);
+    const PerformanceNoteId previousNote = track.lastNote;
+    const std::optional<double> previousKey = track.lastKey;
+    const bool continuesPreviousVoice = track.slur && previousNote.valid() && !track.previousWasRest;
+    const bool automaticPortamento = track.version != Version::SeikenDensetsu3 && !track.percussion &&
+                                     track.automaticPortamentoLength != 0 && previousNote.valid() && previousKey &&
+                                     !track.previousWasRest && std::abs(*previousKey - key) >= 0.000001;
     NotePerformanceEvent event{
         .key = key,
         .linearVelocity = 1.0,
         .durationTicks = duration,
-        .restartsLfoPhase = !(track.slur && !track.previousWasRest),
+        .restartsLfoPhase = !continuesPreviousVoice,
     };
-    if (track.slur && track.lastNote.valid() && !track.previousWasRest) {
-      track.lastNote = track.lastKey && *track.lastKey == key
-                           ? out.note(NotePerformanceEvent{.key = key,
-                                                          .linearVelocity = 1.0,
-                                                          .durationTicks = duration,
-                                                          .extendsPrevious = true,
-                                                          .restartsLfoPhase = false})
-                           : out.continueVoice(track.lastNote, std::move(event));
+    if (automaticPortamento) {
+      track.lastNote = out.note(std::move(event));
+      auto slide = out.pitchSlide(track.lastNote, *previousKey, key, track.automaticPortamentoLength);
+      if (continuesPreviousVoice) {
+        slide.continueFrom(previousNote);
+      }
+      rememberPortamento(slide, track.lastNote, *previousKey, key, track.automaticPortamentoLength);
+    } else if (continuesPreviousVoice) {
+      track.lastNote = previousKey && *previousKey == key ? out.note(NotePerformanceEvent{.key = key,
+                                                                                          .linearVelocity = 1.0,
+                                                                                          .durationTicks = duration,
+                                                                                          .extendsPrevious = true,
+                                                                                          .restartsLfoPhase = false})
+                                                          : out.continueVoice(track.lastNote, std::move(event));
     } else {
       track.lastNote = out.note(std::move(event));
     }
@@ -368,7 +443,6 @@ struct Playback {
   void volumeFade(u8 length, u8 target) {
     target &= 0x7f;
     if (length == 0) {
-      volume(target);
       return;
     }
     static_cast<void>(track.volume.begin(out.fade(PerformanceAutomationTarget::Level, math::levelGain(target), length),
@@ -381,13 +455,13 @@ struct Playback {
   }
 
   void pan(u8 value) {
+    panLfoOff();
     track.pan.setCurrentAt(vm.tick(), value);
     emitPan(out, value);
   }
 
   void panFade(u8 length, u8 target) {
     if (length == 0) {
-      pan(target);
       return;
     }
     static_cast<void>(track.pan.begin(out.fade(PerformanceAutomationTarget::Pan, math::panPosition(target), length),
@@ -395,8 +469,8 @@ struct Playback {
   }
 
   void vibrato(u8 period, s8 step, u8 delay) {
-    const auto context = math::lfoContext(period, delay);
-    out.vibratoDepth(math::pitchLfoDepth(period, step), context);
+    const auto context = math::lfoContext(period, delay, step < 0 ? 0.5 : 0.0);
+    out.vibratoDepth(math::pitchLfoDepth(track.version, period, step), context);
     out.vibratoRateCyclesPerTick(period == 0 ? 0.0 : 1.0 / (4.0 * period), context);
     out.vibratoDelayTicks(delay);
   }
@@ -413,19 +487,53 @@ struct Playback {
 
   void tremoloOff() { out.tremoloLinearGainDepth(0.0, math::lfoContext(0)); }
 
-  void panLfo(u8 period, s8 step) {
-    const auto context = math::lfoContext(period);
-    out.panLfoDepth(std::min(1.0, std::abs(static_cast<int>(step)) * period / 128.0), context);
-    out.panLfoRateCyclesPerTick(period == 0 ? 0.0 : 1.0 / (4.0 * period), context);
+  void panLfo(u8 rawPeriod, s8 step) {
+    track.panLfoPeriod = rawPeriod;
+    track.panLfoStep = step;
+    const u8 period = math::panLfoPeriod(track.version, rawPeriod);
+    auto context = math::lfoContext(period, 0, step < 0 ? 0.5 : 0.0);
+    if (track.version == Version::BahamutLagoon && (rawPeriod & 0x80) != 0 && period != 0) {
+      context.cyclesPerTick = 1.0 / (2.0 * period);
+      context.polarity = step < 0 ? LfoPolarity::Negative : LfoPolarity::Positive;
+      context.initialPhaseCycles = step < 0 ? 0.25 : 0.75;
+    }
+    out.panLfoDepth(math::panLfoDepth(track.version, period, step), context);
+    out.panLfoRateCyclesPerTick(context.cyclesPerTick.value_or(0.0), context);
   }
 
   void panLfoOff() { out.panLfoDepth(0.0, math::lfoContext(0)); }
 
+  void restartPanLfo() { panLfo(track.panLfoPeriod, track.panLfoStep); }
+
+  void automaticPortamento(u8 length) { track.automaticPortamentoLength = length; }
+
+  void rememberPortamento(PitchSlideBinding slide, PerformanceNoteId note, double start, double target, u32 length) {
+    slide.preferPitchBend();
+    track.portamentoBinding = slide;
+    track.portamentoActive = length != 0;
+    track.portamentoStep = length == 0 ? 0.0 : (target - start) / length;
+    track.portamentoTarget = target;
+    track.portamentoEndTick = vm.tick() + length;
+    track.portamentoNote = note;
+  }
+
   void portamento(u8 rawLength, s8 semitones) {
-    const u8 length = static_cast<u8>(rawLength - 1);
-    if (length != 0 && track.lastKey) {
-      static_cast<void>(out.fade(PerformanceAutomationTarget::Pitch, *track.lastKey + semitones, length));
+    const u8 length = track.version == Version::SeikenDensetsu3 ? static_cast<u8>(rawLength - 1) : rawLength;
+    if (length != 0 && semitones != 0 && track.lastKey && track.lastNote.valid() && !track.previousWasRest) {
+      const double start = out.currentPitchTransitionKey(track.lastNote).value_or(*track.lastKey);
+      auto slide = out.retargetPitchSlide(track.lastNote, start, start + semitones, length);
+      rememberPortamento(slide, track.lastNote, start, start + semitones, length);
     }
+  }
+
+  void togglePortamentoRepeat() {
+    if (!track.portamentoRepeat) {
+      track.portamentoRepeat = true;
+      return;
+    }
+    track.portamentoRepeat = false;
+    track.portamentoActive = false;
+    track.portamentoBinding.interrupt(out);
   }
 
   void beginRepeat(u8 slot) { track.repeatOctaves[slot] = track.octave; }
@@ -443,6 +551,18 @@ struct Playback {
   }
 
   void tick() {
+    if (track.portamentoActive && vm.tick() >= track.portamentoEndTick) {
+      if (track.portamentoRepeat) {
+        constexpr u32 kRepeatedPortamentoTicks = 256;
+        const double start = track.portamentoTarget;
+        const double target = start + track.portamentoStep * kRepeatedPortamentoTicks;
+        auto slide = out.pitchSlide(track.portamentoNote, start, target, kRepeatedPortamentoTicks);
+        rememberPortamento(slide, track.portamentoNote, start, target, kRepeatedPortamentoTicks);
+      } else {
+        track.portamentoActive = false;
+        track.portamentoBinding.clear();
+      }
+    }
     static_cast<void>(track.volume.tickRaw([&](s32 value) {
       track.volume.output(out).level(math::levelGain(static_cast<u8>(std::clamp<s32>(value, 0, 0x7f))),
                                      ValueQuantization{.levels = 128});
@@ -486,17 +606,21 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
   switch (opcode) {
     case 0xc4:
-    case 0xf6:
     case 0xfe:
     case 0xff:
       if (version == Version::SeikenDensetsu3 || opcode == 0xc4 ||
           (version == Version::SuperMarioRpg && opcode == 0xff)) {
         return cursor.command("Octave Up", SequenceSemantic::Pitch).add<&TrackState::octave>(1);
       }
-      if (opcode == 0xf6) {
-        return cursor.ignored("Unknown F6", 1);
-      }
       return cursor.sourceOnly("Unknown Command").ignore();
+    case 0xf6:
+      if (version == Version::SeikenDensetsu3) {
+        return cursor.command("Octave Up", SequenceSemantic::Pitch).add<&TrackState::octave>(1);
+      }
+      {
+        auto event = cursor.command("Automatic Portamento", SequenceSemantic::Portamento);
+        return event.invoke<&Playback::automaticPortamento>(event.u8("length", SemanticOperandRole::Duration));
+      }
     case 0xc5:
       return cursor.command("Octave Down", SequenceSemantic::Pitch).add<&TrackState::octave>(-1);
     case 0xc6: {
@@ -614,7 +738,10 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xe0:
       if (version != Version::SeikenDensetsu3) {
-        return cursor.ignored("Unknown E0", 1);
+        auto event = cursor.command("Sustain Rate Override", SequenceSemantic::Envelope);
+        const u8 rate = event.u8("rate") & 0x1f;
+        return event.emitEnvelopeField<EnvelopeFields::SecondDecay>(snesDspAdsrSustainSeconds(rate),
+                                                                    VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
       }
       [[fallthrough]];
     case 0xe2: {
@@ -640,7 +767,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return cursor.unsupported("Undefined Command").stop();
     case 0xea:
       if (version == Version::SeikenDensetsu3) {
-        return cursor.sourceOnly("Restart Pan LFO", "pan-lfo-restart").ignore();
+        return cursor.command("Restart Pan LFO", SequenceSemantic::Modulation).invoke<&Playback::restartPanLfo>();
       }
       return cursor.command("Octave Up", SequenceSemantic::Pitch).add<&TrackState::octave>(1);
     case 0xeb:
@@ -663,7 +790,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return event.invoke<&Playback::portamento>(length, event.s8("semitones", SemanticOperandRole::Pitch));
     }
     case 0xe6:
-      return cursor.sourceOnly("Portamento Toggle", "portamento-toggle").ignore();
+      return cursor.command("Portamento Repeat Toggle", SequenceSemantic::Portamento)
+          .invoke<&Playback::togglePortamentoRepeat>();
     case 0xe7: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
       return event.invoke<&Playback::pan>(event.u8("pan", SemanticOperandRole::Pan));
@@ -801,7 +929,9 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   }
   SequenceProgram program = sequence.finish();
   program.config.profile = static_cast<u32>(layout.version);
-  program.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(math::initialTempo(layout.version));
+  program.behavior.initialTempoMicrosecondsPerQuarter =
+      math::tempoMicrosecondsPerQuarter(math::initialTempo(layout.version));
+  program.behavior.initialLevel = math::levelGain(math::initialVolume(layout.version));
   return SequenceParse{
       .program = std::move(program),
       .recipes = std::move(header.recipes),
