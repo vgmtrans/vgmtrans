@@ -6,9 +6,11 @@
 
 #include "value/formats/SuzukiSnes/SuzukiSnes.h"
 
+#include "value/export/DynamicEnvelope.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
+#include "value/synth/SnesDsp.h"
 
 #include <algorithm>
 #include <cmath>
@@ -288,6 +290,55 @@ void smrBowserPortamentoContinuesAcrossTies() {
          "SMR portamento should lower to audible MIDI pitch-bend events");
 }
 
+void laterE0UsesTheSustainRateAsAGatedRelease() {
+  // The Road is Full of Dangers, track 0 at ARAM $2033: E0 1B. The later
+  // driver clears SR at note attack and restores 1B only when the gate ends.
+  const PerformanceSequence performance = render(Version::SuperMarioRpg, {0xde, 0x1e, 0xe0, 0x1b, 0x85, 0xd0});
+  const auto envelopes = events<EnvelopePerformanceEvent>(performance.tracks.front());
+  expect(envelopes.size() == 1 && envelopes.front()->update.values &&
+             envelopes.front()->update.fields == (EnvelopeFields::SecondDecay | EnvelopeFields::Release) &&
+             envelopes.front()->update.values->secondDecaySeconds &&
+             std::isinf(*envelopes.front()->update.values->secondDecaySeconds) &&
+             envelopes.front()->update.values->releaseSeconds &&
+             std::abs(*envelopes.front()->update.values->releaseSeconds - snesDspAdsrSustainSeconds(0x1b)) < 0.000001,
+         "later-driver E0 should hold the sustain during the note and apply its rate only at gate release");
+
+  std::vector<InstrumentSetAsset> sets{InstrumentSetAsset{
+      .instruments = {Instrument{
+          .explicitAddress = InstrumentAddress{.bank = 0, .program = 30},
+          .identity = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 30},
+          .regions = {Region{.envelope =
+                                 Envelope{
+                                     .attackSeconds = 0.0,
+                                     .decaySeconds = 0.0,
+                                     .secondDecaySeconds = 0.01,
+                                     .releaseSeconds = 0.128,
+                                     .sustainAmplitude = 1.0,
+                                 }}},
+      }},
+  }};
+  const auto materialized = materializeDynamicEnvelopes(performance, sets);
+  const auto notes = events<NotePerformanceEvent>(materialized.performance.tracks.front());
+  expect(notes.size() == 1 && notes.front()->instrumentAddress,
+         "E0 should select a materialized envelope variant for the following attack");
+  const auto variant = std::ranges::find_if(sets.front().instruments, [&](const Instrument& instrument) {
+    return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) ==
+           *notes.front()->instrumentAddress;
+  });
+  expect(variant != sets.front().instruments.end() && variant->regions.size() == 1 &&
+             variant->regions.front().envelope.secondDecaySeconds &&
+             std::isinf(*variant->regions.front().envelope.secondDecaySeconds) &&
+             variant->regions.front().envelope.releaseSeconds &&
+             std::abs(*variant->regions.front().envelope.releaseSeconds - snesDspAdsrSustainSeconds(0x1b)) < 0.000001,
+         "the generated E0 variant must not decay toward silence from the start of the note");
+
+  const PerformanceSequence normalSustain = render(Version::SuperMarioRpg, {0xe0, 0x1b, 0xdc, 0x08, 0x85, 0xd0});
+  const auto restored = events<EnvelopePerformanceEvent>(normalSustain.tracks.front());
+  expect(restored.size() == 3 && restored[1]->update.fields == EnvelopeFields::SecondDecay &&
+             restored[2]->update.fields == EnvelopeFields::Release && !restored[2]->update.values,
+         "DC should disable E0's gated release while installing its ordinary sustain rate");
+}
+
 void modulationMathMatchesEachDriverRevision() {
   const auto modulationValue = [](const PerformanceSequence& performance, ModulationPerformanceTarget target) {
     const auto modulation = std::ranges::find_if(performance.tracks.front().events, [&](const PerformanceEvent& event) {
@@ -366,6 +417,7 @@ void runSuzukiSnesModuleTests() {
   playbackUsesAuditedGatingPitchAndLoops();
   driverDefaultsAndPortamentoAreVersioned();
   smrBowserPortamentoContinuesAcrossTies();
+  laterE0UsesTheSustainRateAsAGatedRelease();
   modulationMathMatchesEachDriverRevision();
   scannerBuildsSequenceDerivedDrumKit();
 }
