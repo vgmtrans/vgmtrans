@@ -240,7 +240,10 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
       }
       const bool relative = write.kind == PitchBendWriteKind::HeldTransition;
       if (relative && layer.owner != write.owner) {
-        layer.ownerBaseSemitones = write.establishesHeldPitch ? 0.0 : layer.semitones;
+        // Cancel an interrupted absolute transition, but retain ownerless
+        // source bend beneath the held transition.
+        layer.ownerBaseSemitones =
+            write.establishesHeldPitch ? (pitch.owner ? -pitch.semitones : 0.0) : layer.semitones;
       }
       layer.semitones = (relative ? layer.ownerBaseSemitones : 0.0) + write.bend.semitones;
       layer.owner = write.owner;

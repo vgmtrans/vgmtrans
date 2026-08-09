@@ -300,7 +300,7 @@ private:
     const double ticks =
         milliseconds * 1000.0 * kCapcomSnesPpqn / std::max<u32>(program.tempoMicrosecondsPerQuarter, 1);
     return static_cast<u32>(
-        std::clamp<double>(std::ceil(ticks), 1.0, static_cast<double>(std::numeric_limits<u32>::max())));
+        std::clamp<double>(std::round(ticks), 1.0, static_cast<double>(std::numeric_limits<u32>::max())));
   }
 
   // Declares the driver's fixed-rate glide from the preceding note target.
