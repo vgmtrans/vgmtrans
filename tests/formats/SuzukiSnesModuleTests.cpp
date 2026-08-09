@@ -6,6 +6,7 @@
 
 #include "value/formats/SuzukiSnes/SuzukiSnes.h"
 
+#include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 
@@ -127,6 +128,9 @@ PerformanceSequence render(Version version, std::vector<u8> bytes) {
       .tracks = {decodeSourceTrack(ByteReader(SourceId{121}, bytes), version, 0, 0)},
   };
   program.behavior.initialTempoMicrosecondsPerQuarter = version == Version::SeikenDensetsu3 ? 576000 : 372000;
+  program.behavior.initialLevel = version == Version::SeikenDensetsu3
+                                      ? 0x3c / 128.0
+                                      : (version == Version::BahamutLagoon ? 0x50 / 128.0 : 0x64 / 128.0);
   return SequenceVm(LoopPolicy::PlayOnce).render(program, dialect);
 }
 
@@ -193,6 +197,142 @@ void playbackUsesAuditedGatingPitchAndLoops() {
          "repeat break should branch only on the final pass and repeat end should restore the saved octave");
 }
 
+void driverDefaultsAndPortamentoAreVersioned() {
+  struct ExpectedDefaults {
+    Version version;
+    u32 duration;
+    u32 program;
+    double level;
+  };
+  constexpr std::array expectedDefaults{
+      ExpectedDefaults{Version::SeikenDensetsu3, 3, 5, 0x3c / 128.0},
+      ExpectedDefaults{Version::BahamutLagoon, 2, 6, 0x50 / 128.0},
+      ExpectedDefaults{Version::SuperMarioRpg, 2, 4, 0x64 / 128.0},
+  };
+  for (const ExpectedDefaults expected : expectedDefaults) {
+    const PerformanceSequence performance = render(expected.version, {0xa8, 0xd0});
+    const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+    const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks.front());
+    const auto levels = events<LevelPerformanceEvent>(performance.tracks.front());
+    expect(notes.size() == 1 && notes.front()->durationTicks == expected.duration,
+           "the profile-specific initial duration rate should match the driver reset state");
+    expect(!instruments.empty() && instruments.front()->sourceInstrument &&
+               instruments.front()->sourceInstrument->key == expected.program,
+           "the profile-specific initial instrument should match the driver reset state");
+    expect(!levels.empty() && std::abs(levels.front()->linearGain - expected.level) < 0.000001,
+           "the profile-specific initial channel volume should match the driver reset state");
+  }
+
+  const PerformanceSequence sd3 = render(Version::SeikenDensetsu3, {0x3c, 0x6f, 0xe5, 0x04, 0xfe, 0x29, 0xd0});
+  const PerformanceSequence later = render(Version::BahamutLagoon, {0x3c, 0x6f, 0xe5, 0x04, 0xfe, 0x29, 0xd0});
+  const auto* sd3Slide =
+      sd3.tracks.front().automations.empty() ? nullptr : pitchTransitionIntent(sd3.tracks.front().automations.front());
+  const auto* laterSlide = later.tracks.front().automations.empty()
+                               ? nullptr
+                               : pitchTransitionIntent(later.tracks.front().automations.front());
+  expect(sd3Slide != nullptr && sd3Slide->timing.timelineTicks == 3 && laterSlide != nullptr &&
+             laterSlide->timing.timelineTicks == 4,
+         "SD3 should decrement E5's duration while the later drivers should use its raw duration");
+
+  const PerformanceSequence automatic = render(Version::BahamutLagoon, {0xa8, 0xf6, 0x04, 0xaa, 0xd0});
+  const auto automaticNotes = events<NotePerformanceEvent>(automatic.tracks.front());
+  const auto* automaticSlide = automatic.tracks.front().automations.empty()
+                                   ? nullptr
+                                   : pitchTransitionIntent(automatic.tracks.front().automations.front());
+  expect(automaticNotes.size() == 2 && automaticSlide != nullptr &&
+             automaticSlide->note == automaticNotes.back()->note && !automaticSlide->previousNote &&
+             automaticSlide->startKey == 72.0 && automaticSlide->targetKey == 74.0 &&
+             automaticSlide->timing.timelineTicks == 4,
+         "later-driver F6 should glide each newly attacked note from the preceding note's pitch");
+
+  const PerformanceSequence repeatedSlide =
+      render(Version::SuperMarioRpg, {0xa8, 0xe6, 0xe5, 0x02, 0x02, 0xc3, 0x04, 0xe6, 0xd0});
+  const auto& repeatedAutomations = repeatedSlide.tracks.front().automations;
+  const auto* repeatedTail = repeatedAutomations.size() == 2 ? pitchTransitionIntent(repeatedAutomations.back())
+                                                             : nullptr;
+  expect(repeatedTail != nullptr && repeatedAutomations.front().realization.startTick == 3 &&
+             repeatedAutomations.front().realization.endTick == 5 && repeatedTail->startKey == 74.0 &&
+             repeatedTail->timing.timelineTicks == 256 && repeatedAutomations.back().realization.endTick == 7 &&
+             repeatedAutomations.back().realization.endReason == PerformanceAutomationEndReason::Interrupted,
+         "E6 should keep E5 moving past its duration until the next E6 stops the repeated slide");
+}
+
+void smrBowserPortamentoContinuesAcrossTies() {
+  // Fight Against Bowser, track 0 at ARAM $2081: E5 C0 FE, tie 29,
+  // volume fade E4 90 00, then tie 1B.
+  const PerformanceSequence performance =
+      render(Version::SuperMarioRpg, {0x3c, 0x6f, 0xe5, 0xc0, 0xfe, 0x29, 0xe4, 0x90, 0x00, 0x1b, 0xd0});
+  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto& automations = performance.tracks.front().automations;
+  const auto slide = std::ranges::find_if(automations, [](const PerformanceAutomation& automation) {
+    return pitchTransitionIntent(automation) != nullptr;
+  });
+  const auto* intent = slide == automations.end() ? nullptr : pitchTransitionIntent(*slide);
+
+  expect(notes.size() == 4 &&
+             std::ranges::all_of(notes,
+                                 [&](const NotePerformanceEvent* note) { return note->note == notes.front()->note; }),
+         "the source note and its three ties should remain one sounding voice");
+  expect(intent != nullptr && intent->note == notes.front()->note && intent->startKey == 76.0 &&
+             intent->targetKey == 74.0 && intent->timing.timelineTicks == 0xc0 && slide->realization.startTick == 72 &&
+             slide->realization.endTick == 264,
+         "SMR E5 C0 FE should slide E5 down to D5 for 192 ticks across the following ties");
+
+  const MidiSequence midi =
+      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  expect(std::ranges::any_of(midi.tracks.front().events,
+                             [](const MidiEvent& event) {
+                               const auto* bend = std::get_if<PitchBend>(&event);
+                               return bend != nullptr && bend->value != 0;
+                             }),
+         "SMR portamento should lower to audible MIDI pitch-bend events");
+}
+
+void modulationMathMatchesEachDriverRevision() {
+  const auto modulationValue = [](const PerformanceSequence& performance, ModulationPerformanceTarget target) {
+    const auto modulation = std::ranges::find_if(performance.tracks.front().events, [&](const PerformanceEvent& event) {
+      const auto* candidate = std::get_if<ModulationPerformanceEvent>(&event);
+      return candidate != nullptr && candidate->target == target;
+    });
+    return modulation == performance.tracks.front().events.end()
+               ? static_cast<const ModulationPerformanceEvent*>(nullptr)
+               : std::get_if<ModulationPerformanceEvent>(&*modulation);
+  };
+
+  const PerformanceSequence sd3 = render(Version::SeikenDensetsu3, {0xf0, 0x08, 0x04, 0xe9, 0x08, 0x04, 0xd0});
+  const PerformanceSequence smr = render(Version::SuperMarioRpg, {0xf0, 0x08, 0x08, 0xe9, 0x08, 0x04, 0xd0});
+  const auto* sd3Vibrato = modulationValue(sd3, ModulationPerformanceTarget::VibratoDepth);
+  const auto* sd3Pan = modulationValue(sd3, ModulationPerformanceTarget::PanDepth);
+  const auto* smrVibrato = modulationValue(smr, ModulationPerformanceTarget::VibratoDepth);
+  const auto* smrPan = modulationValue(smr, ModulationPerformanceTarget::PanDepth);
+  expect(sd3Vibrato && sd3Vibrato->pitchDepthSemitones == 0.5 && sd3Pan && sd3Pan->panDepth == 0.25,
+         "SD3 modulation should use its step-times-period accumulator scaling");
+  expect(smrVibrato && smrVibrato->pitchDepthSemitones == 0.28125 && smrPan && smrPan->panDepth == 0.03125,
+         "SMR modulation should use the later driver's divided vibrato and fixed-excursion pan scaling");
+
+  const PerformanceSequence blOneSided = render(Version::BahamutLagoon, {0xe9, 0x88, 0x04, 0xd0});
+  const auto* blPan = modulationValue(blOneSided, ModulationPerformanceTarget::PanDepth);
+  expect(blPan && blPan->panDepth == 0.25 && blPan->cyclesPerTick == 0.0625 &&
+             blPan->polarity == LfoPolarity::Positive && blPan->initialPhaseCycles == 0.75,
+         "BL's high pan-LFO period bit should select a one-sided two-period triangle");
+
+  const PerformanceSequence restarted = render(Version::SeikenDensetsu3, {0xe9, 0x08, 0x04, 0xeb, 0xea, 0xd0});
+  std::vector<double> panDepths;
+  for (const PerformanceEvent& event : restarted.tracks.front().events) {
+    const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+    if (modulation != nullptr && modulation->target == ModulationPerformanceTarget::PanDepth && modulation->panDepth) {
+      panDepths.push_back(*modulation->panDepth);
+    }
+  }
+  expect(panDepths == std::vector<double>{0.25, 0.0, 0.25},
+         "SD3 EA should restart the saved pan LFO after EB disables it");
+
+  const PerformanceSequence zeroLengthFades =
+      render(Version::SuperMarioRpg, {0xe4, 0x00, 0x00, 0xe8, 0x00, 0x00, 0xd0});
+  expect(zeroLengthFades.tracks.front().automations.empty(),
+         "zero-length E4 and E8 commands should be no-ops, as in the SPC700 drivers");
+}
+
 void scannerBuildsSequenceDerivedDrumKit() {
   Session session;
   session.registerFormat(definition());
@@ -214,7 +354,7 @@ void scannerBuildsSequenceDerivedDrumKit() {
   expect(kit != set->instruments.end() && kit->regions.size() == 1,
          "the decoded sequence recipe should materialize one drum region during scanning");
   const Region& drum = kit->regions.front();
-  expect(drum.keyRange == KeyRange{.low = 62, .high = 62} && std::abs(drum.unityKey - 67.5) < 0.000001 &&
+  expect(drum.keyRange.low == 62 && drum.keyRange.high == 62 && std::abs(drum.unityKey - 67.5) < 0.000001 &&
              std::abs(drum.pan - 0.5) < 0.000001 && std::abs(drum.attenuationDb - 6.020599913) < 0.000001,
          "drum key remapping, signed 8.8 tuning, center pan, and 7-bit gain should match the SPC driver");
 }
@@ -224,5 +364,8 @@ void scannerBuildsSequenceDerivedDrumKit() {
 void runSuzukiSnesModuleTests() {
   layoutsAndHeadersAreVersioned();
   playbackUsesAuditedGatingPitchAndLoops();
+  driverDefaultsAndPortamentoAreVersioned();
+  smrBowserPortamentoContinuesAcrossTies();
+  modulationMathMatchesEachDriverRevision();
   scannerBuildsSequenceDerivedDrumKit();
 }
