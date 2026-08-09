@@ -1011,18 +1011,19 @@ void performanceMidiRendererRetainsHeldVoiceAcrossChainedPitchBends() {
   PerformanceTrack track{
       .id = TrackId{0},
       .sourceTrackNumber = 0,
-      .endTick = 12,
+      .endTick = 16,
   };
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
   PerformanceEmitter out{track, CommandId{1}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
   const PerformanceNoteId first = out.note(60, 1.0, 4);
-  out.pitchSlide(first, 60, 62, 2);
-  const PerformanceNoteId second = out.at(4).note(64, 1.0, 4);
-  out.at(4).pitchSlide(second, 62, 64, 4).continueFrom(first);
-  const PerformanceNoteId third = out.at(8).note(67, 1.0, 4);
-  out.at(8).pitchSlide(third, 64, 67, 4).continueFrom(second);
+  const PerformanceNoteId second = out.at(4).note(62, 1.0, 4);
+  out.at(4).pitchSlide(second, 60, 62, 8).continueFrom(first);
+  const PerformanceNoteId third = out.at(8).note(64, 1.0, 4);
+  out.at(8).pitchSlide(third, 62, 64, 4).continueFrom(second);
+  const PerformanceNoteId fourth = out.at(12).note(67, 1.0, 4);
+  out.at(12).pitchSlide(fourth, 64, 67, 4).continueFrom(third);
 
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
@@ -1038,7 +1039,7 @@ void performanceMidiRendererRetainsHeldVoiceAcrossChainedPitchBends() {
       notes.push_back(*note);
     }
   }
-  expect(notes.size() == 1 && notes[0].tick == 0 && notes[0].key == 60 && notes[0].duration == 12,
+  expect(notes.size() == 1 && notes[0].tick == 0 && notes[0].key == 60 && notes[0].duration == 16,
          "linked pitch bends should sustain one MIDI note instead of retriggering each destination");
 
   std::vector<std::pair<u64, u16>> ranges;
@@ -1055,12 +1056,12 @@ void performanceMidiRendererRetainsHeldVoiceAcrossChainedPitchBends() {
       return bend != nullptr && bend->tick == tick && bend->value == value;
     });
   };
-  expect(hasMidiBend(8, 4681) && hasMidiBend(12, 8191),
-         "chained transitions should change bend values without retuning through mid-voice RPN updates");
+  expect(hasMidiBend(8, 2341) && hasMidiBend(12, 4681) && hasMidiBend(16, 8191),
+         "chained transitions should honor each absolute start key without retuning the held voice's bend range");
 
   const auto chainedStart = std::ranges::find_if(lowered.tracks[0].events, [](const PerformanceEvent& event) {
     const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
-    return bend != nullptr && bend->header.tick == 8 && std::abs(bend->semitones - 4.0) < 0.000001;
+    return bend != nullptr && bend->header.tick == 12 && std::abs(bend->semitones - 4.0) < 0.000001;
   });
   expect(chainedStart != lowered.tracks[0].events.end(),
          "a chained bend should remain relative to the MIDI key that began the held voice");

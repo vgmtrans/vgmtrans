@@ -6,12 +6,14 @@
 
 #include "value/formats/CapcomSnes/CapcomSnes.h"
 
+#include "value/export/DynamicEnvelope.h"
 #include "value/export/Export.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 #include "value/formats/ValueFormats.h"
+#include "value/synth/SnesDsp.h"
 
 #include "ValueFormatTestSupport.h"
 
@@ -1305,7 +1307,7 @@ void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
   };
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
   expect(performance.diagnostics.empty(), "CapcomSnes source-only commands should render without diagnostics");
-  expect(performance.tracks[0].events.size() == 6,
+  expect(performance.tracks[0].events.size() == 7,
          "CapcomSnes source-only commands should emit semantic performance events where possible");
   expect(std::holds_alternative<ReverbPerformanceEvent>(performance.tracks[0].events[0]),
          "CapcomSnes should emit initial reverb before source command events");
@@ -1317,7 +1319,9 @@ void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
          "CapcomSnes master volume should emit a target-neutral master level event");
   expect(std::holds_alternative<ReverbPerformanceEvent>(performance.tracks[0].events[4]),
          "CapcomSnes echo on/off should emit a target-neutral reverb event");
-  expect(std::holds_alternative<NotePerformanceEvent>(performance.tracks[0].events[5]),
+  expect(std::holds_alternative<EnvelopePerformanceEvent>(performance.tracks[0].events[5]),
+         "CapcomSnes release rate should emit a target-neutral dynamic envelope event");
+  expect(std::holds_alternative<NotePerformanceEvent>(performance.tracks[0].events[6]),
          "CapcomSnes source-only fixture should still reach the later note");
   expect(performance.tracks[0].endTick == 6, "CapcomSnes source-only fixture should advance through the later note");
 
@@ -1328,6 +1332,101 @@ void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
          "CapcomSnes master level performance should render as MIDI master volume");
   expect(std::get<Reverb>(midi.tracks[0].events[5]).value == 40,
          "CapcomSnes reverb performance should preserve the legacy echo send");
+}
+
+void capcomSnesReleaseRateIsStickyAcrossInstrumentChanges() {
+  std::vector<u8> bytes(0x4000);
+  writeBytes(bytes, 0x3000,
+             std::array<u8, 10>{
+                 0x1d,
+                 0x10,  // GAIN $B0 release override
+                 0x08,
+                 0x00,  // instrument 0 must retain it
+                 0x41,  // note
+                 0x08,
+                 0x01,  // later instrument must also retain it
+                 0x42,  // note
+                 0x17,
+             });
+
+  constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
+  const SequenceDialect& dialect = capcomSnesSequenceDialect();
+  const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version,
+                                                         CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
+  expect(track.commands.size() == 6 && track.commands.front().semantic == SequenceSemantic::Envelope &&
+             track.commands.front().encodedSize == 2 && track.commands.front().execution.actions.size() == 1,
+         "CapcomSnes $1D should decode as an executable two-byte envelope command");
+  const SemanticOperand* gain = semanticOperand(track.commands.front(), "gain");
+  const SemanticOperand* releaseSeconds = semanticOperand(track.commands.front(), "release_seconds");
+  const double expectedReleaseSeconds = snesDspGainEnvelopeSeconds(0xb0, 0x7ff, 0);
+  expect(gain != nullptr && std::get<u64>(gain->value) == 0xb0 && releaseSeconds != nullptr &&
+             std::abs(std::get<double>(releaseSeconds->value) - expectedReleaseSeconds) < 0.000001,
+         "CapcomSnes $1D should expose the driver's OR-$A0 GAIN byte and its physical release time");
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program, dialect);
+  expect(performance.diagnostics.empty(), "CapcomSnes dynamic release fixture should render without diagnostics");
+
+  std::vector<const EnvelopePerformanceEvent*> envelopes;
+  std::vector<const InstrumentPerformanceEvent*> instruments;
+  for (const auto& event : performance.tracks.front().events) {
+    if (const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event)) {
+      envelopes.push_back(envelope);
+    } else if (const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&event)) {
+      instruments.push_back(instrument);
+    }
+  }
+  expect(envelopes.size() == 1 && envelopes.front()->update.fields == EnvelopeFields::Release &&
+             envelopes.front()->update.values && envelopes.front()->update.values->releaseSeconds &&
+             std::abs(*envelopes.front()->update.values->releaseSeconds - expectedReleaseSeconds) < 0.000001 &&
+             envelopes.front()->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks,
+         "CapcomSnes $1D should update release for the active voice and future attacks");
+  expect(instruments.size() == 2 && std::ranges::all_of(instruments,
+                                                        [](const InstrumentPerformanceEvent* instrument) {
+                                                          return instrument->envelopeMode ==
+                                                                 InstrumentEnvelopeMode::PreserveDynamicOverride;
+                                                        }),
+         "CapcomSnes instrument changes should preserve the track-level release override");
+
+  std::vector<InstrumentSetAsset> sets{InstrumentSetAsset{
+      .instruments =
+          {
+              Instrument{
+                  .explicitAddress = InstrumentAddress{.bank = 0, .program = 0},
+                  .identity = InstrumentIdentity{.domain = std::string(kCapcomSnesInstrumentDomain), .key = 0},
+                  .regions = {Region{.envelope = Envelope{.releaseSeconds = 1.0}}},
+              },
+              Instrument{
+                  .explicitAddress = InstrumentAddress{.bank = 0, .program = 1},
+                  .identity = InstrumentIdentity{.domain = std::string(kCapcomSnesInstrumentDomain), .key = 1},
+                  .regions = {Region{.envelope = Envelope{.releaseSeconds = 2.0}}},
+              },
+          },
+  }};
+  const auto materialized = materializeDynamicEnvelopes(performance, sets);
+  std::vector<const NotePerformanceEvent*> notes;
+  for (const auto& event : materialized.performance.tracks.front().events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(note);
+    }
+  }
+  expect(materialized.diagnostics.empty() && notes.size() == 2 && notes[0]->instrumentAddress &&
+             notes[1]->instrumentAddress && sets.front().instruments.size() == 4,
+         "CapcomSnes sticky release should materialize a dynamic variant for both selected instruments");
+  for (const NotePerformanceEvent* note : notes) {
+    const auto variant = std::ranges::find_if(sets.front().instruments, [&](const Instrument& instrument) {
+      return instrument.explicitAddress == note->instrumentAddress;
+    });
+    expect(variant != sets.front().instruments.end() && variant->regions.size() == 1 &&
+               variant->regions.front().envelope.releaseSeconds &&
+               std::abs(*variant->regions.front().envelope.releaseSeconds - expectedReleaseSeconds) < 0.000001,
+           "CapcomSnes dynamic instrument variants should carry the $1D release time");
+  }
 }
 
 void capcomSnesDialectEmitsStructuredPitchSlides() {
@@ -1346,14 +1445,19 @@ void capcomSnesDialectEmitsStructuredPitchSlides() {
   bytes[0x300b] = 0x01;
   bytes[0x300c] = 0x41;
   bytes[0x300d] = 0x46;
-  bytes[0x300e] = 0x4b;
-  bytes[0x300f] = 0x17;
+  bytes[0x300e] = 0x0d;
+  bytes[0x300f] = 0x20;
+  bytes[0x3010] = 0x47;
+  bytes[0x3011] = 0x0d;
+  bytes[0x3012] = 0x00;
+  bytes[0x3013] = 0x47;
+  bytes[0x3014] = 0x17;
 
   constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
   const SequenceDialect& dialect = capcomSnesSequenceDialect();
   const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version,
                                                          CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
-  expect(track.commands.size() == 9,
+  expect(track.commands.size() == 12,
          "CapcomSnes portamento fixture should decode tempo, portamento, vibrato, slur, notes, and end");
 
   const SequenceProgram program{
@@ -1370,7 +1474,7 @@ void capcomSnesDialectEmitsStructuredPitchSlides() {
       notes.push_back(note);
     }
   }
-  expect(notes.size() == 3, "CapcomSnes portamento fixture should retain three neutral notes");
+  expect(notes.size() == 4, "CapcomSnes portamento fixture should retain four neutral notes");
   expect(performance.tracks[0].automations.size() == 2,
          "CapcomSnes portamento should produce structured pitch transitions between notes");
   const auto* transition = pitchTransitionIntent(performance.tracks[0].automations[0]);
@@ -1378,10 +1482,14 @@ void capcomSnesDialectEmitsStructuredPitchSlides() {
              transition->previousNote == notes[0]->note && transition->timing.timelineTicks == 30 &&
              std::get<FixedDurationPitchSlideTiming>(transition->timing.physical).milliseconds == 160.0,
          "CapcomSnes pitch intent should retain its source key, target, overlap voice, and physical timing");
-  const auto* repeatedTiming = pitchTransitionIntent(performance.tracks[0].automations[1]);
-  expect(repeatedTiming != nullptr && repeatedTiming->startKey == 5.0 && repeatedTiming->targetKey == 10.0 &&
-             repeatedTiming->previousNote == notes[1]->note && repeatedTiming->nativePortamento.useCurrentTiming,
-         "equal-distance CapcomSnes slides should reuse the native portamento timing already in effect");
+  const auto* retargeted = pitchTransitionIntent(performance.tracks[0].automations[1]);
+  expect(retargeted != nullptr && retargeted->startKey == 5.0 && retargeted->targetKey == 6.0 &&
+             retargeted->previousNote == notes[1]->note && retargeted->timing.timelineTicks == 12 &&
+             std::get<FixedDurationPitchSlideTiming>(retargeted->timing.physical).milliseconds == 64.0 &&
+             !retargeted->nativePortamento.useCurrentTiming,
+         "a new CapcomSnes glide should begin at the preceding note target with its newly selected rate");
+  expect(notes[3]->note == notes[2]->note && notes[3]->extendsPrevious,
+         "a repeated CapcomSnes target should extend the active glide without creating a snap transition");
   expect(std::ranges::none_of(performance.tracks[0].events,
                               [](const PerformanceEvent& event) {
                                 return std::holds_alternative<PortamentoPerformanceEvent>(event) ||
@@ -1405,7 +1513,7 @@ void capcomSnesDialectEmitsStructuredPitchSlides() {
              std::ranges::any_of(midi.tracks[0].events,
                                  [](const MidiEvent& event) {
                                    const auto* note = std::get_if<NoteDuration>(&event);
-                                   return note != nullptr && note->tick == 12 && note->key == 10 && note->duration == 7;
+                                   return note != nullptr && note->tick == 12 && note->key == 6 && note->duration == 12;
                                  }),
          "native CapcomSnes portamento should retain the slurred notes' one-tick overlap");
   expect(std::ranges::any_of(midi.tracks[0].events,
@@ -1421,11 +1529,11 @@ void capcomSnesDialectEmitsStructuredPitchSlides() {
          "native CapcomSnes portamento should lower to its physical time and CC 84 source key");
   expect(std::ranges::count_if(
              midi.tracks[0].events,
-             [](const MidiEvent& event) { return std::holds_alternative<PortamentoTime14>(event); }) == 1 &&
+             [](const MidiEvent& event) { return std::holds_alternative<PortamentoTime14>(event); }) == 2 &&
              std::ranges::count_if(
                  midi.tracks[0].events,
                  [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) == 2,
-         "native CapcomSnes lowering should not repeat an unchanged portamento time");
+         "native CapcomSnes lowering should emit one controller pair for each actual glide");
 
   const MidiSequence pitchBendMidi =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
@@ -1442,7 +1550,7 @@ void capcomSnesDialectEmitsStructuredPitchSlides() {
   });
   const auto heldNote = std::ranges::find_if(pitchBendMidi.tracks[0].events, [](const MidiEvent& event) {
     const auto* note = std::get_if<NoteDuration>(&event);
-    return note != nullptr && note->tick == 0 && note->key == 0 && note->duration == 19;
+    return note != nullptr && note->tick == 0 && note->key == 0 && note->duration == 24;
   });
   expect(pitchBendNotes == 1 && heldNote != pitchBendMidi.tracks[0].events.end(),
          "CapcomSnes pitch-bend export should carry one attack across the complete slurred note chain");
@@ -1460,6 +1568,11 @@ void capcomSnesDialectEmitsStructuredPitchSlides() {
     }
     return result;
   };
+  const auto bendAtRepeat = lastPitchBendAt(pitchBendMidi, 18);
+  const auto completedBend = lastPitchBendAt(pitchBendMidi, 24);
+  expect(bendAtRepeat && completedBend && *bendAtRepeat > 0 && *bendAtRepeat < *completedBend &&
+             *completedBend == 8191,
+         "a repeated CapcomSnes target should let the existing pitch-bend glide finish without an immediate snap");
   const auto slideOnly = lastPitchBendAt(pitchBendMidi, 8);
   const auto slideWithVibrato = lastPitchBendAt(simulatedPitchBendMidi, 8);
   expect(slideOnly && slideWithVibrato && *slideOnly > 0 && *slideWithVibrato > 0 && *slideOnly != *slideWithVibrato,

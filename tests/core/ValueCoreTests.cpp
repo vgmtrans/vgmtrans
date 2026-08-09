@@ -40,6 +40,7 @@ void capcomSnesSourceDialectDecodesAndRendersDriverCommands();
 void capcomSnesInitialDurationRateIsFullLength();
 void capcomSnesPanPerformanceCarriesGainCompensation();
 void capcomSnesDialectEmitsSourceOnlyDriverSemantics();
+void capcomSnesReleaseRateIsStickyAcrossInstrumentChanges();
 void capcomSnesDialectEmitsStructuredPitchSlides();
 void capcomSnesDialectExecutesRepeatUntilCommand();
 void capcomSnesDialectAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken();
@@ -219,6 +220,7 @@ int main() {
     capcomSnesInitialDurationRateIsFullLength();
     capcomSnesPanPerformanceCarriesGainCompensation();
     capcomSnesDialectEmitsSourceOnlyDriverSemantics();
+    capcomSnesReleaseRateIsStickyAcrossInstrumentChanges();
     capcomSnesDialectEmitsStructuredPitchSlides();
     capcomSnesDialectExecutesRepeatUntilCommand();
     capcomSnesDialectAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken();

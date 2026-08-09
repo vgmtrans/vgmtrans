@@ -50,13 +50,14 @@ enum class PitchBendWriteKind {
   HeldTransition,
 };
 
-// Source bends and same-note transitions set channel pitch. Each attack-free
-// transition adds its motion to the offset inherited from the held voice.
+// Attack-free transitions use a separate layer so they can either inherit the
+// held pitch or establish a declared start without discarding source bends.
 struct PitchBendWrite {
   PitchBendPerformanceEvent bend;
   PitchBendWriteKind kind = PitchBendWriteKind::Source;
   std::optional<PerformanceAutomationId> owner;
   bool reset = false;
+  bool establishesHeldPitch = false;
 };
 
 struct PitchBendLayer {
@@ -202,7 +203,7 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
 
 [[nodiscard]] PitchBendWrite transitionPitchBend(const PerformanceAutomation& automation,
                                                  const PitchTransitionIntent& transition, u64 tick, double semitones,
-                                                 bool reset = false) {
+                                                 bool reset = false, bool establishesHeldPitch = false) {
   return PitchBendWrite{
       .bend =
           PitchBendPerformanceEvent{
@@ -212,6 +213,7 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
       .kind = transition.previousNote ? PitchBendWriteKind::HeldTransition : PitchBendWriteKind::AbsoluteTransition,
       .owner = automation.id,
       .reset = reset,
+      .establishesHeldPitch = establishesHeldPitch,
   };
 }
 
@@ -238,7 +240,7 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
       }
       const bool relative = write.kind == PitchBendWriteKind::HeldTransition;
       if (relative && layer.owner != write.owner) {
-        layer.ownerBaseSemitones = layer.semitones;
+        layer.ownerBaseSemitones = write.establishesHeldPitch ? 0.0 : layer.semitones;
       }
       layer.semitones = (relative ? layer.ownerBaseSemitones : 0.0) + write.bend.semitones;
       layer.owner = write.owner;
@@ -261,7 +263,7 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
   const auto resolved = resolvePitchBends(bends);
   std::optional<double> bendAtStart;
   for (const auto& bend : resolved) {
-    if (bend.header.tick >= note.source.header.tick && bend.header.tick <= startTick) {
+    if (bend.header.tick <= startTick) {
       bendAtStart = bend.semitones;
     }
   }
@@ -283,18 +285,26 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
 
   // A delayed slide may begin away from the note's nominal key.
   const double noteBaseKey = bendBaseKeyAt(note, note.source.header.tick);
+  const bool startPitchEstablished = establishedPitchBend(bends, note, transition, startTick).has_value();
+  // A held source voice may either continue from its live bend or explicitly
+  // reload the transition's declared start key at the note boundary.
+  const bool establishesHeldPitch = transition.previousNote && !startPitchEstablished;
   if (startTick > note.source.header.tick && std::abs(transition.startKey - noteBaseKey) > 0.000001 &&
-      !establishedPitchBend(bends, note, transition, startTick)) {
+      !startPitchEstablished) {
     bends.push_back(transitionPitchBend(automation, transition, note.source.header.tick,
                                         transition.previousNote ? 0.0 : transition.startKey - noteBaseKey));
   }
 
   for (u64 tick = startTick;; ++tick) {
     const u64 elapsed = tick - automation.realization.startTick;
+    const double transitionBaseKey = transition.previousNote && !establishesHeldPitch
+                                         ? transition.startKey
+                                         : bendBaseKeyAt(note, tick);
     bends.push_back(transitionPitchBend(
         automation, transition, tick,
         pitchTransitionValueAt(transition, static_cast<u32>(std::min<u64>(elapsed, std::numeric_limits<u32>::max()))) -
-            (transition.previousNote ? transition.startKey : bendBaseKeyAt(note, tick))));
+            transitionBaseKey,
+        false, establishesHeldPitch));
     if (tick == endTick) {
       break;
     }
