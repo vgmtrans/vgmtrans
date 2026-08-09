@@ -336,12 +336,11 @@ struct TrackState {
   bool slur = false;
   bool initialized = false;
   bool previousWasRest = true;
-  bool previousVoiceHeld = false;
   s8 fineTuning = 0;
   s16 transposeQuarters = 0;
   u8 automaticPortamentoLength = 0;
-  u8 pendingPitchSlideLength = 0;
-  s8 pendingPitchSlideSemitones = 0;
+  u8 queuedPitchSlideLength = 0;
+  s8 queuedPitchSlideSemitones = 0;
   u8 panLfoPeriod = 0;
   s8 panLfoStep = 0;
   bool pitchSlideRepeat = false;
@@ -403,7 +402,7 @@ struct Playback {
       if (continuesPreviousVoice) {
         slide.continueFrom(previousNote);
       }
-      rememberPitchSlide(slide, track.lastNote, *previousKey, key, track.automaticPortamentoLength);
+      activatePitchSlide(slide, track.lastNote, *previousKey, key, track.automaticPortamentoLength);
     } else if (continuesPreviousVoice) {
       track.lastNote = previousKey && *previousKey == key ? out.note(NotePerformanceEvent{.key = key,
                                                                                           .linearVelocity = 1.0,
@@ -414,10 +413,9 @@ struct Playback {
     } else {
       track.lastNote = out.note(std::move(event));
     }
-    applyPendingPitchSlide(key);
+    applyQueuedPitchSlide(key);
     track.lastKey = key;
     track.previousWasRest = false;
-    track.previousVoiceHeld = track.slur;
     return Effects::wait(length);
   }
 
@@ -431,15 +429,15 @@ struct Playback {
           .restartsLfoPhase = false,
       });
       const double start = out.currentPitchTransitionKey(track.lastNote).value_or(*track.lastKey);
-      applyPendingPitchSlide(start);
-      track.previousVoiceHeld = true;
+      applyQueuedPitchSlide(start);
     }
     return Effects::wait(length);
   }
 
   [[nodiscard]] Effects rest(u32 length) {
     track.previousWasRest = true;
-    track.previousVoiceHeld = false;
+    track.queuedPitchSlideLength = 0;
+    track.queuedPitchSlideSemitones = 0;
     track.lastNote = {};
     track.lastKey.reset();
     return Effects::wait(length);
@@ -576,7 +574,7 @@ struct Playback {
 
   void automaticPortamento(u8 length) { track.automaticPortamentoLength = length; }
 
-  void rememberPitchSlide(PitchSlideBinding slide, PerformanceNoteId note, double start, double target, u32 length) {
+  void activatePitchSlide(PitchSlideBinding slide, PerformanceNoteId note, double start, double target, u32 length) {
     slide.preferPitchBend();
     track.pitchSlideBinding = slide;
     track.pitchSlideActive = length != 0;
@@ -586,16 +584,17 @@ struct Playback {
     track.pitchSlideNote = note;
   }
 
-  void applyPendingPitchSlide(double start) {
-    if (track.pendingPitchSlideLength == 0 || track.pendingPitchSlideSemitones == 0 || !track.lastNote.valid()) {
+  void applyQueuedPitchSlide(double fallbackStart) {
+    if (track.queuedPitchSlideLength == 0 || track.queuedPitchSlideSemitones == 0 || !track.lastNote.valid()) {
       return;
     }
-    auto slide =
-        out.pitchSlide(track.lastNote, start, start + track.pendingPitchSlideSemitones, track.pendingPitchSlideLength);
-    rememberPitchSlide(slide, track.lastNote, start, start + track.pendingPitchSlideSemitones,
-                       track.pendingPitchSlideLength);
-    track.pendingPitchSlideLength = 0;
-    track.pendingPitchSlideSemitones = 0;
+    const u8 length = track.queuedPitchSlideLength;
+    const s8 semitones = track.queuedPitchSlideSemitones;
+    track.queuedPitchSlideLength = 0;
+    track.queuedPitchSlideSemitones = 0;
+    const double start = out.currentPitchTransitionKey(track.lastNote).value_or(fallbackStart);
+    auto slide = out.retargetPitchSlide(track.lastNote, start, start + semitones, length);
+    activatePitchSlide(slide, track.lastNote, start, start + semitones, length);
   }
 
   void pitchSlide(u8 rawLength, s8 semitones) {
@@ -603,14 +602,8 @@ struct Playback {
     if (length == 0 || semitones == 0) {
       return;
     }
-    if (!track.lastKey || !track.lastNote.valid() || track.previousWasRest || !track.previousVoiceHeld) {
-      track.pendingPitchSlideLength = length;
-      track.pendingPitchSlideSemitones = semitones;
-      return;
-    }
-    const double start = out.currentPitchTransitionKey(track.lastNote).value_or(*track.lastKey);
-    auto slide = out.retargetPitchSlide(track.lastNote, start, start + semitones, length);
-    rememberPitchSlide(slide, track.lastNote, start, start + semitones, length);
+    track.queuedPitchSlideLength = length;
+    track.queuedPitchSlideSemitones = semitones;
   }
 
   void togglePitchSlideRepeat() {
@@ -620,6 +613,8 @@ struct Playback {
     }
     track.pitchSlideRepeat = false;
     track.pitchSlideActive = false;
+    track.queuedPitchSlideLength = 0;
+    track.queuedPitchSlideSemitones = 0;
     track.pitchSlideBinding.interrupt(out);
   }
 
@@ -644,7 +639,7 @@ struct Playback {
         const double start = track.pitchSlideTarget;
         const double target = start + track.pitchSlideStep * kRepeatedPitchSlideTicks;
         auto slide = out.pitchSlide(track.pitchSlideNote, start, target, kRepeatedPitchSlideTicks);
-        rememberPitchSlide(slide, track.pitchSlideNote, start, target, kRepeatedPitchSlideTicks);
+        activatePitchSlide(slide, track.pitchSlideNote, start, target, kRepeatedPitchSlideTicks);
       } else {
         track.pitchSlideActive = false;
         track.pitchSlideBinding.clear();
