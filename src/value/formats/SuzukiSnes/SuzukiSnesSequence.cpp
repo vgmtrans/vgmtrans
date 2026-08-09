@@ -336,18 +336,21 @@ struct TrackState {
   bool slur = false;
   bool initialized = false;
   bool previousWasRest = true;
+  bool previousVoiceHeld = false;
   s8 fineTuning = 0;
   s16 transposeQuarters = 0;
   u8 automaticPortamentoLength = 0;
+  u8 pendingPitchSlideLength = 0;
+  s8 pendingPitchSlideSemitones = 0;
   u8 panLfoPeriod = 0;
   s8 panLfoStep = 0;
-  bool portamentoRepeat = false;
-  bool portamentoActive = false;
-  double portamentoStep = 0.0;
-  double portamentoTarget = 0.0;
-  u64 portamentoEndTick = 0;
-  PerformanceNoteId portamentoNote;
-  PerformanceAutomationBinding portamentoBinding;
+  bool pitchSlideRepeat = false;
+  bool pitchSlideActive = false;
+  double pitchSlideStep = 0.0;
+  double pitchSlideTarget = 0.0;
+  u64 pitchSlideEndTick = 0;
+  PerformanceNoteId pitchSlideNote;
+  PerformanceAutomationBinding pitchSlideBinding;
   PerformanceNoteId lastNote;
   std::optional<double> lastKey;
   std::array<s32, 4> repeatOctaves{};
@@ -400,7 +403,7 @@ struct Playback {
       if (continuesPreviousVoice) {
         slide.continueFrom(previousNote);
       }
-      rememberPortamento(slide, track.lastNote, *previousKey, key, track.automaticPortamentoLength);
+      rememberPitchSlide(slide, track.lastNote, *previousKey, key, track.automaticPortamentoLength);
     } else if (continuesPreviousVoice) {
       track.lastNote = previousKey && *previousKey == key ? out.note(NotePerformanceEvent{.key = key,
                                                                                           .linearVelocity = 1.0,
@@ -411,8 +414,10 @@ struct Playback {
     } else {
       track.lastNote = out.note(std::move(event));
     }
+    applyPendingPitchSlide(key);
     track.lastKey = key;
     track.previousWasRest = false;
+    track.previousVoiceHeld = track.slur;
     return Effects::wait(length);
   }
 
@@ -425,12 +430,16 @@ struct Playback {
           .extendsPrevious = true,
           .restartsLfoPhase = false,
       });
+      const double start = out.currentPitchTransitionKey(track.lastNote).value_or(*track.lastKey);
+      applyPendingPitchSlide(start);
+      track.previousVoiceHeld = true;
     }
     return Effects::wait(length);
   }
 
   [[nodiscard]] Effects rest(u32 length) {
     track.previousWasRest = true;
+    track.previousVoiceHeld = false;
     track.lastNote = {};
     track.lastKey.reset();
     return Effects::wait(length);
@@ -567,33 +576,51 @@ struct Playback {
 
   void automaticPortamento(u8 length) { track.automaticPortamentoLength = length; }
 
-  void rememberPortamento(PitchSlideBinding slide, PerformanceNoteId note, double start, double target, u32 length) {
+  void rememberPitchSlide(PitchSlideBinding slide, PerformanceNoteId note, double start, double target, u32 length) {
     slide.preferPitchBend();
-    track.portamentoBinding = slide;
-    track.portamentoActive = length != 0;
-    track.portamentoStep = length == 0 ? 0.0 : (target - start) / length;
-    track.portamentoTarget = target;
-    track.portamentoEndTick = vm.tick() + length;
-    track.portamentoNote = note;
+    track.pitchSlideBinding = slide;
+    track.pitchSlideActive = length != 0;
+    track.pitchSlideStep = length == 0 ? 0.0 : (target - start) / length;
+    track.pitchSlideTarget = target;
+    track.pitchSlideEndTick = vm.tick() + length;
+    track.pitchSlideNote = note;
   }
 
-  void portamento(u8 rawLength, s8 semitones) {
-    const u8 length = track.version == Version::SeikenDensetsu3 ? static_cast<u8>(rawLength - 1) : rawLength;
-    if (length != 0 && semitones != 0 && track.lastKey && track.lastNote.valid() && !track.previousWasRest) {
-      const double start = out.currentPitchTransitionKey(track.lastNote).value_or(*track.lastKey);
-      auto slide = out.retargetPitchSlide(track.lastNote, start, start + semitones, length);
-      rememberPortamento(slide, track.lastNote, start, start + semitones, length);
-    }
-  }
-
-  void togglePortamentoRepeat() {
-    if (!track.portamentoRepeat) {
-      track.portamentoRepeat = true;
+  void applyPendingPitchSlide(double start) {
+    if (track.pendingPitchSlideLength == 0 || track.pendingPitchSlideSemitones == 0 || !track.lastNote.valid()) {
       return;
     }
-    track.portamentoRepeat = false;
-    track.portamentoActive = false;
-    track.portamentoBinding.interrupt(out);
+    auto slide =
+        out.pitchSlide(track.lastNote, start, start + track.pendingPitchSlideSemitones, track.pendingPitchSlideLength);
+    rememberPitchSlide(slide, track.lastNote, start, start + track.pendingPitchSlideSemitones,
+                       track.pendingPitchSlideLength);
+    track.pendingPitchSlideLength = 0;
+    track.pendingPitchSlideSemitones = 0;
+  }
+
+  void pitchSlide(u8 rawLength, s8 semitones) {
+    const u8 length = track.version == Version::SeikenDensetsu3 ? static_cast<u8>(rawLength - 1) : rawLength;
+    if (length == 0 || semitones == 0) {
+      return;
+    }
+    if (!track.lastKey || !track.lastNote.valid() || track.previousWasRest || !track.previousVoiceHeld) {
+      track.pendingPitchSlideLength = length;
+      track.pendingPitchSlideSemitones = semitones;
+      return;
+    }
+    const double start = out.currentPitchTransitionKey(track.lastNote).value_or(*track.lastKey);
+    auto slide = out.retargetPitchSlide(track.lastNote, start, start + semitones, length);
+    rememberPitchSlide(slide, track.lastNote, start, start + semitones, length);
+  }
+
+  void togglePitchSlideRepeat() {
+    if (!track.pitchSlideRepeat) {
+      track.pitchSlideRepeat = true;
+      return;
+    }
+    track.pitchSlideRepeat = false;
+    track.pitchSlideActive = false;
+    track.pitchSlideBinding.interrupt(out);
   }
 
   void beginRepeat(u8 slot) { track.repeatOctaves[slot] = track.octave; }
@@ -611,16 +638,16 @@ struct Playback {
   }
 
   void tick() {
-    if (track.portamentoActive && vm.tick() >= track.portamentoEndTick) {
-      if (track.portamentoRepeat) {
-        constexpr u32 kRepeatedPortamentoTicks = 256;
-        const double start = track.portamentoTarget;
-        const double target = start + track.portamentoStep * kRepeatedPortamentoTicks;
-        auto slide = out.pitchSlide(track.portamentoNote, start, target, kRepeatedPortamentoTicks);
-        rememberPortamento(slide, track.portamentoNote, start, target, kRepeatedPortamentoTicks);
+    if (track.pitchSlideActive && vm.tick() >= track.pitchSlideEndTick) {
+      if (track.pitchSlideRepeat) {
+        constexpr u32 kRepeatedPitchSlideTicks = 256;
+        const double start = track.pitchSlideTarget;
+        const double target = start + track.pitchSlideStep * kRepeatedPitchSlideTicks;
+        auto slide = out.pitchSlide(track.pitchSlideNote, start, target, kRepeatedPitchSlideTicks);
+        rememberPitchSlide(slide, track.pitchSlideNote, start, target, kRepeatedPitchSlideTicks);
       } else {
-        track.portamentoActive = false;
-        track.portamentoBinding.clear();
+        track.pitchSlideActive = false;
+        track.pitchSlideBinding.clear();
       }
     }
     static_cast<void>(track.volume.tickRaw([&](s32 value) {
@@ -843,13 +870,13 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return event.invoke<&Playback::volumeFade>(length, event.u8("target", SemanticOperandRole::Level));
     }
     case 0xe5: {
-      auto event = cursor.command("Portamento", SequenceSemantic::Portamento);
+      auto event = cursor.command("Pitch Slide", SequenceSemantic::Pitch);
       const u8 length = event.u8("length", SemanticOperandRole::Duration);
-      return event.invoke<&Playback::portamento>(length, event.s8("semitones", SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::pitchSlide>(length, event.s8("semitones", SemanticOperandRole::Pitch));
     }
     case 0xe6:
-      return cursor.command("Portamento Repeat Toggle", SequenceSemantic::Portamento)
-          .invoke<&Playback::togglePortamentoRepeat>();
+      return cursor.command("Pitch Slide Repeat Toggle", SequenceSemantic::Pitch)
+          .invoke<&Playback::togglePitchSlideRepeat>();
     case 0xe7: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
       return event.invoke<&Playback::pan>(event.u8("pan", SemanticOperandRole::Pan));
