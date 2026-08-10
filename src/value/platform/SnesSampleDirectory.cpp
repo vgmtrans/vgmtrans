@@ -79,15 +79,17 @@ std::optional<u32> SnesBrrCatalog::index(u8 srcn) const {
                                 : std::optional<u32>{static_cast<u32>(std::distance(samples.begin(), found))};
 }
 
-std::optional<u32> SnesBrrCatalog::firstIndexStartingAt(u32 address) const {
-  const auto found = std::ranges::find(samples, address, &SnesBrrSample::startAddress);
-  return found == samples.end() ? std::nullopt
-                                : std::optional<u32>{static_cast<u32>(std::distance(samples.begin(), found))};
-}
-
 std::optional<u32> SnesBrrCatalog::canonicalIndex(u8 srcn) const {
   const auto found = index(srcn);
-  return found ? firstIndexStartingAt(samples[*found].startAddress) : std::nullopt;
+  if (!found) {
+    return std::nullopt;
+  }
+  const SnesBrrSample& target = samples[*found];
+  const auto canonical = std::ranges::find_if(samples, [&](const SnesBrrSample& candidate) {
+    return candidate.startAddress == target.startAddress && candidate.stream.loops == target.stream.loops &&
+           (!target.stream.loops || candidate.loopAddress == target.loopAddress);
+  });
+  return static_cast<u32>(std::distance(samples.begin(), canonical));
 }
 
 SnesBrrCatalog readSnesBrrCatalog(ByteReader reader, u32 directoryAddress, std::span<const u8> referencedSrcns) {
@@ -125,11 +127,6 @@ std::optional<SampleRef> SnesBrrSampleRefs::findSrcn(u8 srcn) const {
   return found == entries_.end() ? std::nullopt : std::optional<SampleRef>{found->sample};
 }
 
-std::optional<SampleRef> SnesBrrSampleRefs::firstStartingAt(u32 address) const {
-  const auto found = std::ranges::find(entries_, address, &Entry::startAddress);
-  return found == entries_.end() ? std::nullopt : std::optional<SampleRef>{found->sample};
-}
-
 SnesBrrSampleRefs addSnesBrrSamples(SampleCollectionBuilder& samples, ByteReader reader, const SnesBrrCatalog& catalog,
                                     std::string_view directoryEntryKind) {
   samples.include(catalog.directoryRange);
@@ -138,7 +135,10 @@ SnesBrrSampleRefs addSnesBrrSamples(SampleCollectionBuilder& samples, ByteReader
 
   SnesBrrSampleRefs refs;
   refs.entries_.reserve(catalog.samples.size());
-  for (const auto& info : catalog.samples) {
+  std::vector<SampleRef> canonicalSamples;
+  canonicalSamples.reserve(catalog.samples.size());
+  for (size_t index = 0; index < catalog.samples.size(); ++index) {
+    const auto& info = catalog.samples[index];
     const u32 encodedLength = static_cast<u32>(info.stream.encodedData.size);
     const u32 decodedLength = (encodedLength / 9) * 16;
     const u32 lastBlockAddress = encodedLength >= 9 ? info.startAddress + encodedLength - 9 : info.startAddress;
@@ -176,10 +176,14 @@ SnesBrrSampleRefs addSnesBrrSamples(SampleCollectionBuilder& samples, ByteReader
         .role(SourceRole::Payload)
         .parent(directoryEntry.id());
 
-    const auto canonical = refs.firstStartingAt(info.startAddress).value_or(sample.ref());
+    SampleRef canonical = sample.ref();
+    const auto canonicalIndex = catalog.canonicalIndex(info.srcn);
+    if (canonicalIndex && *canonicalIndex < canonicalSamples.size()) {
+      canonical = canonicalSamples[*canonicalIndex];
+    }
+    canonicalSamples.push_back(canonical);
     refs.entries_.push_back(SnesBrrSampleRefs::Entry{
         .srcn = info.srcn,
-        .startAddress = info.startAddress,
         .sample = canonical,
     });
   }
