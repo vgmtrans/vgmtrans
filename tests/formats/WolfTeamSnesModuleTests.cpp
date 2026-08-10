@@ -7,6 +7,7 @@
 #include "value/formats/WolfTeamSnes/WolfTeamSnes.h"
 
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/platform/SnesSampleDirectory.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 #include "value/validation/SequenceValidation.h"
@@ -211,6 +212,8 @@ void lateCommandsRenderLoopsSplitsLfoAndDynamicAdsr() {
   expect(performance.diagnostics.empty() && performance.tracks.size() == 1,
          "source-free late playback should finish without VM diagnostics");
   const PerformanceTrack& track = performance.tracks.front();
+  expect(!sequenceDialect().defaultBehavior.initialMonoModeChannels && events<MonoModePerformanceEvent>(track).empty(),
+         "polyphonic Wolf Team tracks must not emit a MIDI mono-mode initialization");
   const auto notes = events<NotePerformanceEvent>(track);
   const auto instruments = events<InstrumentPerformanceEvent>(track);
   const auto envelopes = events<EnvelopePerformanceEvent>(track);
@@ -497,6 +500,17 @@ void scannerBuildsArcusPitchModel() {
          "Arcus region tuning must combine its coarse pitch and 0x10be pitch-table bias exactly once");
 }
 
+void brrAliasesIncludeLoopPosition() {
+  const SnesBrrStream stream{.loops = true};
+  const SnesBrrCatalog catalog{.samples = {
+                                   {.srcn = 18, .startAddress = 0x8e8a, .loopAddress = 0x91b4, .stream = stream},
+                                   {.srcn = 49, .startAddress = 0x8e8a, .loopAddress = 0x937f, .stream = stream},
+                                   {.srcn = 53, .startAddress = 0x8e8a, .loopAddress = 0x937f, .stream = stream},
+                               }};
+  expect(catalog.canonicalIndex(18) == 0 && catalog.canonicalIndex(49) == 1 && catalog.canonicalIndex(53) == 1,
+         "BRR aliases must include the Tales sample's loop position in their identity");
+}
+
 void sameKeyTimedNotesMoveThePendingNoteOff() {
   std::vector<u8> bytes(kAramSize);
   bytes[0x2000 + 0x22] = 0x40;
@@ -599,6 +613,7 @@ void runWolfTeamSnesModuleTests() {
   latePitchBendClampsToTheLegacyTwelveSemitoneWheel();
   scannerBuildsTunedSynthAndCollection();
   scannerBuildsArcusPitchModel();
+  brrAliasesIncludeLoopPosition();
   sameKeyTimedNotesMoveThePendingNoteOff();
   streamListsStayOutOfCommandAnnotations();
 }

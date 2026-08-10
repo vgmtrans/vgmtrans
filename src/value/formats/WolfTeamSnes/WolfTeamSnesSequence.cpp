@@ -1029,7 +1029,6 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       .initialExpression = 1.0,
       .initialReverbSend = 0.0,
       .initialStereoBalance = layout.segmented() ? StereoBalance{} : latePan(0x40),
-      .initialMonoModeChannels = 0,
       .initialPitchBendRangeSemitones = static_cast<u8>(layout.segmented() ? 2 : 12),
   };
   const u8 headerTempo = reader.u8At(layout.sequenceHeaderAddress + 0x22);
@@ -1059,7 +1058,6 @@ const SequenceDialect& sequenceDialect() {
               .initialExpression = 1.0,
               .initialReverbSend = 0.0,
               .initialStereoBalance = StereoBalance{},
-              .initialMonoModeChannels = 0,
               .initialPitchBendRangeSemitones = 12,
           },
       .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,

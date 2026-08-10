@@ -48,13 +48,12 @@ struct SnesBrrSample {
 };
 
 // Shared decoded view used by SNES formats. Collection order follows SRCN;
-// canonicalIndex() resolves aliases that point at the same BRR stream.
+// canonicalIndex() resolves aliases with equivalent BRR data and loop behavior.
 struct SnesBrrCatalog {
   std::vector<SnesBrrSample> samples;
   SourceRange directoryRange;
 
   [[nodiscard]] std::optional<u32> index(u8 srcn) const;
-  [[nodiscard]] std::optional<u32> firstIndexStartingAt(u32 address) const;
   [[nodiscard]] std::optional<u32> canonicalIndex(u8 srcn) const;
 };
 
@@ -75,13 +74,11 @@ private:
 [[nodiscard]] SnesBrrCatalog readSnesBrrCatalog(ByteReader reader, u32 directoryAddress,
                                                 std::span<const u8> referencedSrcns);
 
-// Concrete references created while adding an SNES catalog. SRCNs that share
-// one BRR stream resolve to the first matching sample, preserving the driver's
-// alias behavior without exposing dense indexes to format code.
+// Concrete references created while adding an SNES catalog. SRCNs with
+// equivalent BRR data and loop behavior resolve to the first matching sample.
 class SnesBrrSampleRefs {
 public:
   [[nodiscard]] std::optional<SampleRef> findSrcn(u8 srcn) const;
-  [[nodiscard]] std::optional<SampleRef> firstStartingAt(u32 address) const;
 
 private:
   friend SnesBrrSampleRefs addSnesBrrSamples(SampleCollectionBuilder&, ByteReader, const SnesBrrCatalog&,
@@ -89,7 +86,6 @@ private:
 
   struct Entry {
     u8 srcn = 0;
-    u32 startAddress = 0;
     SampleRef sample;
   };
 
