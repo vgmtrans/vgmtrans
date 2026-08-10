@@ -170,7 +170,13 @@ struct Playback {
     if (!track.previousKey || !track.previousNote.valid() || std::abs(*track.previousKey - key) < 0.0001) {
       return;
     }
-    const double startKey = out.currentPitchTransitionKey(track.previousNote).value_or(*track.previousKey);
+    // The early driver keeps the destination pitch separate from the currently
+    // interpolated pitch. A new note reloads the former destination before it
+    // installs the next one, so an interrupted slide snaps to the previous
+    // target instead of continuing from the pitch it happened to reach.
+    const double startKey = usesLateSequence(track.version)
+                                ? out.currentPitchTransitionKey(track.previousNote).value_or(*track.previousKey)
+                                : *track.previousKey;
     PitchSlideTiming timing;
     if (track.portamentoRate == 0) {
       if (!continuesPreviousVoice) {
