@@ -11,6 +11,7 @@ target_sources(vgmtrans-value-core-tests
     formats/AkaoFormatTests.cpp
     formats/NdsModuleTests.cpp
     formats/SegSatModuleTests.cpp
+    formats/SonyPS1ModuleTests.cpp
     formats/SuzukiPS1ModuleTests.cpp
     formats/SuzukiSnesModuleTests.cpp
     formats/WolfTeamSnesModuleTests.cpp
