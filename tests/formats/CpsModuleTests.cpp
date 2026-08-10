@@ -826,9 +826,8 @@ void cps2EarlyZeroRateSlursRemainLinked() {
                           ? 0
                           : slowAutomations[1].realization.startTick - slowAutomations[0].realization.startTick;
   expect(first != nullptr && second != nullptr && elapsed < first->timing.timelineTicks &&
-             std::abs(second->startKey - pitchTransitionValueAt(*first, static_cast<u32>(elapsed))) < 0.0001 &&
-             second->startKey < first->targetKey,
-         "an interrupted CPS portamento should retarget from the pitch the voice actually reached");
+             second->startKey == first->targetKey && second->timing.timelineTicks == first->timing.timelineTicks,
+         "an interrupted early-CPS portamento should retarget from the preceding destination pitch");
 }
 
 void cps2EarlyPortamentoStartsOnFirstTiedNote() {
