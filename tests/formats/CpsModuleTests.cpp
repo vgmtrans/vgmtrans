@@ -1046,6 +1046,17 @@ void cps3HeldNotesRetargetOneVoiceWithoutLosingPitch() {
   };
   expect(hasBend(24, 4.0) && hasBend(36, 2.0) && hasBend(48, 4.0),
          "MIDI lowering should emit every attack-free CPS3 pitch change relative to its sounding attack");
+
+  auto portamentoFixture = cps3HeldPitchChainFixture();
+  be16(portamentoFixture.bytes, 0x901, 0x1f);
+  bytesAt(portamentoFixture.bytes, 0x91f, {0xc9, 1});
+  const auto portamentoResult = scan(portamentoFixture);
+  const auto portamentoPerformance =
+      SequenceVm(LoopPolicy::PlayOnce).render(onlySequence(portamentoResult).program, cpsLateDialect());
+  const auto& slides = portamentoPerformance.tracks[0].automations;
+  const auto* interrupted = slides.size() < 3 ? nullptr : pitchTransitionIntent(slides[2]);
+  expect(interrupted != nullptr && interrupted->startKey == 93.0 && interrupted->targetKey == 95.0,
+         "interrupted CPS3 portamento should retarget from the preceding destination pitch");
 }
 
 void cpsLateRepeatBreakUsesEndOfCommandBase() {
