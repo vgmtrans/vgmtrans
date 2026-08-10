@@ -20,6 +20,7 @@
 #include "value/formats/RareSnes/RareSnes.h"
 #include "value/formats/NDS/Nds.h"
 #include "value/formats/SegSat/SegSat.h"
+#include "value/formats/SonyPS1/SonyPS1.h"
 #include "value/formats/SuzukiPS1/SuzukiPS1.h"
 #include "value/formats/SuzukiSnes/SuzukiSnes.h"
 #include "value/formats/WolfTeamSnes/WolfTeamSnes.h"
@@ -92,6 +93,7 @@ void registerValueFormats(core::Session& session, const ValueFormatOptions& opti
   session.registerFormat(nin_snes::definition());
   session.registerFormat(rare_snes::definition());
   session.registerFormat(segsat::segSatDefinition());
+  session.registerFormat(sony_ps1::sonyPs1Definition());
   session.registerFormat(suzuki_ps1::suzukiPs1Definition());
   session.registerFormat(suzuki_snes::definition());
   session.registerFormat(wolf_team_snes::definition());

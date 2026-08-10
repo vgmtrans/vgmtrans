@@ -277,6 +277,12 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/SegSat/SegSatModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SegSat/SegSatSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SegSat/SegSatSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1Layout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1Module.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1Resolver.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1Samples.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1Sequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1Synth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1Layout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1Module.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1Sequence.cpp
@@ -308,6 +314,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/RareSnes/RareSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/Nds.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SegSat/SegSat.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/WolfTeamSnes/WolfTeamSnes.h

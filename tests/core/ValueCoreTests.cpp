@@ -20,6 +20,9 @@ void runValueSynthBuilderTests();
 void runValueMidiTests();
 void runValueSynthExportTests();
 void runValuePsxTests();
+void sonyPs1SequenceSupportsBothLoopCountGenerations();
+void sonyPs1SepAndVabLayoutsAreVersionAware();
+void sonyPs1ModuleBuildsCombinedAndSplitVabSynths();
 void suzukiPs1DynamicAdsrUsesAuditedDriverCommands();
 void suzukiPs1ModuleBuildsFractionallyTunedWdsSynth();
 void runSuzukiSnesModuleTests();
@@ -203,6 +206,9 @@ int main() {
     runValueMidiTests();
     runValueSynthExportTests();
     runValuePsxTests();
+    sonyPs1SequenceSupportsBothLoopCountGenerations();
+    sonyPs1SepAndVabLayoutsAreVersionAware();
+    sonyPs1ModuleBuildsCombinedAndSplitVabSynths();
     runSuzukiSnesModuleTests();
 
     capcomSnesLayoutSelectsSongListAndFixedHeaders();
