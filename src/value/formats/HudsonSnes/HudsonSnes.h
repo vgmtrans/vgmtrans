@@ -13,6 +13,7 @@
 #include "value/sequence/SequenceDialect.h"
 
 #include <optional>
+#include <set>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -96,6 +97,13 @@ struct SequenceRecipes {
   std::vector<VolumeCurve> volumeCurves;
 };
 
+struct SequenceReferences {
+  std::set<u8> programs{0};
+  std::set<u8> pitchScripts;
+  std::set<u8> customWaveforms;
+  std::set<u8> volumeCurves;
+};
+
 struct ParsedHeader {
   u8 timebaseShift = 2;
   bool noteVelocity = false;
@@ -121,7 +129,7 @@ struct SequenceParse {
 [[nodiscard]] double driverPseudoReleaseSeconds(u8 gain);
 [[nodiscard]] std::optional<ParsedHeader> parseHeader(core::ByteReader reader, Version version, u32 address);
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);
-void supplementLiveRecipes(core::ByteReader reader, const Layout& layout, const core::SequenceProgram& program,
+void supplementLiveRecipes(core::ByteReader reader, const Layout& layout, SequenceReferences references,
                            SequenceRecipes& recipes);
 [[nodiscard]] core::TrackProgram decodeSourceTrack(core::ByteReader reader, Version version, u8 timebaseShift,
                                                    bool noteVelocity, u32 trackNumber, u32 startAddress,

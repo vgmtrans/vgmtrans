@@ -18,6 +18,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace vgmtrans::formats::hudson_snes {
@@ -51,13 +52,13 @@ constexpr std::array<u8, 80> kV2MixerCurve{
     0x36, 0x39, 0x3d, 0x40, 0x44, 0x48, 0x4c, 0x51, 0x56, 0x5b, 0x60, 0x66, 0x6c, 0x72, 0x79, 0x80,
 };
 
-constexpr u32 kInstrumentWords = 128;
-constexpr u32 kWaveformBase = kInstrumentWords;
-constexpr u32 kPitchDescriptorBase = kWaveformBase + 128;
-constexpr u32 kDrumBase = kPitchDescriptorBase + 128;
-constexpr u32 kEchoBase = kDrumBase + 128;
+constexpr u32 kTableEntries = 128;
+constexpr u32 kWaveformBase = kTableEntries;
+constexpr u32 kPitchDescriptorBase = kWaveformBase + kTableEntries;
+constexpr u32 kDrumBase = kPitchDescriptorBase + kTableEntries;
+constexpr u32 kEchoBase = kDrumBase + kTableEntries;
 constexpr u32 kVolumeDescriptorBase = kEchoBase + 2;
-constexpr u32 kPayloadBase = kVolumeDescriptorBase + 128;
+constexpr u32 kPayloadBase = kVolumeDescriptorBase + kTableEntries;
 constexpr u32 kMissingInstrument = 0xffffffffu;
 
 struct RuntimeInstrument {
@@ -71,6 +72,89 @@ struct RuntimeDrum {
   u8 sourceKey = 0;
   u8 volume = 0;
   u8 pan = 15;
+};
+
+class RuntimeTables {
+public:
+  explicit RuntimeTables(const std::vector<u32>& words) : words_(words) {}
+
+  [[nodiscard]] static std::vector<u32> encode(const ParsedHeader& header);
+
+  [[nodiscard]] std::optional<RuntimeInstrument> instrument(u8 program) const {
+    if (program >= kTableEntries || program >= words_.size() || words_[program] == kMissingInstrument) {
+      return std::nullopt;
+    }
+    return RuntimeInstrument{
+        .adsr1 = static_cast<u8>(words_[program] >> 16),
+        .adsr2 = static_cast<u8>(words_[program] >> 8),
+        .gain = static_cast<u8>(words_[program]),
+    };
+  }
+
+  [[nodiscard]] std::optional<RuntimeDrum> drum(u8 note) const {
+    if (note >= kTableEntries) {
+      return std::nullopt;
+    }
+    const u32 address = kDrumBase + note;
+    if (address >= words_.size() || words_[address] == kMissingInstrument) {
+      return std::nullopt;
+    }
+    const u32 value = words_[address];
+    return RuntimeDrum{
+        .program = static_cast<u8>(value >> 24),
+        .sourceKey = static_cast<u8>(value >> 16),
+        .volume = static_cast<u8>(value >> 8),
+        .pan = static_cast<u8>(value),
+    };
+  }
+
+  [[nodiscard]] u32 waveform(u8 index) const {
+    if (index >= kTableEntries) {
+      return 0;
+    }
+    const u32 address = kWaveformBase + index;
+    return address < words_.size() ? words_[address] : 0;
+  }
+
+  [[nodiscard]] std::span<const u32> waveformSamples(u8 index) const { return slice(kWaveformBase, index, 16); }
+
+  [[nodiscard]] std::span<const u32> pitchScript(u8 index) const { return slice(kPitchDescriptorBase, index, 8); }
+
+  [[nodiscard]] std::span<const u32> volumeCurve(u8 index) const { return slice(kVolumeDescriptorBase, index, 8); }
+
+  [[nodiscard]] ReverbPerformanceEvent initialEcho(u8 voiceMask) const {
+    ReverbPerformanceEvent echo{.voiceMask = voiceMask, .send = 0.0};
+    if (words_.size() <= kEchoBase + 1) {
+      return echo;
+    }
+    echo.leftGain = static_cast<s8>(static_cast<u8>(words_[kEchoBase] >> 24)) / 127.0;
+    echo.rightGain = static_cast<s8>(static_cast<u8>(words_[kEchoBase] >> 16)) / 127.0;
+    echo.delayMilliseconds = ((words_[kEchoBase] >> 8) & 0x0f) * 16.0;
+    echo.feedback = static_cast<s8>(static_cast<u8>(words_[kEchoBase])) / 128.0;
+    echo.filterIndex = static_cast<u8>(words_[kEchoBase + 1]);
+    echo.send = std::min(1.0, std::max(std::abs(*echo.leftGain), std::abs(*echo.rightGain)));
+    return echo;
+  }
+
+private:
+  [[nodiscard]] std::span<const u32> slice(u32 base, u8 index, u8 offsetShift) const {
+    if (index >= kTableEntries) {
+      return {};
+    }
+    const u32 descriptorAddress = base + index;
+    if (descriptorAddress >= words_.size()) {
+      return {};
+    }
+    const u32 descriptor = words_[descriptorAddress];
+    const u32 offset = descriptor >> offsetShift;
+    const u32 count = descriptor & 0xff;
+    if (count == 0 || offset > words_.size() || count > words_.size() - offset) {
+      return {};
+    }
+    return std::span<const u32>{words_.data() + offset, count};
+  }
+
+  const std::vector<u32>& words_;
 };
 
 namespace math {
@@ -157,103 +241,18 @@ namespace math {
 
 }  // namespace math
 
-[[nodiscard]] std::optional<RuntimeInstrument> runtimeInstrument(const std::vector<u32>& data, u8 program) {
-  if (program >= kInstrumentWords || program >= data.size() || data[program] == kMissingInstrument) {
-    return std::nullopt;
-  }
-  return RuntimeInstrument{
-      .adsr1 = static_cast<u8>(data[program] >> 16),
-      .adsr2 = static_cast<u8>(data[program] >> 8),
-      .gain = static_cast<u8>(data[program]),
-  };
-}
-
 struct ProgramState {
   explicit ProgramState(const SequenceProgram& sequence)
-      : version(static_cast<Version>(sequence.config.profile)), timebaseShift(sequence.config.driverState & 3),
-        initialEchoMask(static_cast<u8>(sequence.config.driverState >> 16)), data(sequence.config.driverData) {
-    echo.voiceMask = initialEchoMask;
-    if (data.size() > kEchoBase + 1) {
-      echo.leftGain = static_cast<s8>(static_cast<u8>(data[kEchoBase] >> 24)) / 127.0;
-      echo.rightGain = static_cast<s8>(static_cast<u8>(data[kEchoBase] >> 16)) / 127.0;
-      echo.delayMilliseconds = ((data[kEchoBase] >> 8) & 0x0f) * 16.0;
-      echo.feedback = static_cast<s8>(static_cast<u8>(data[kEchoBase])) / 128.0;
-      echo.filterIndex = static_cast<u8>(data[kEchoBase + 1]);
-      echo.send = std::min(1.0, std::max(std::abs(*echo.leftGain), std::abs(*echo.rightGain)));
-    }
-  }
+      : tables(sequence.config.driverData),
+        echo(tables.initialEcho(static_cast<u8>(sequence.config.driverState >> 16))) {}
 
-  [[nodiscard]] std::optional<RuntimeInstrument> instrument(u8 program) const {
-    return runtimeInstrument(data, program);
-  }
-
-  [[nodiscard]] u32 waveform(u8 index) const {
-    const u32 address = kWaveformBase + index;
-    return address < data.size() ? data[address] : 0;
-  }
-
-  [[nodiscard]] std::span<const u32> waveformSamples(u8 index) const {
-    const u32 descriptor = waveform(index);
-    const u32 offset = descriptor >> 16;
-    const u32 count = descriptor & 0xff;
-    if (count == 0 || offset > data.size() || count > data.size() - offset) {
-      return {};
-    }
-    return std::span<const u32>{data.data() + offset, count};
-  }
-
-  [[nodiscard]] std::optional<RuntimeDrum> drum(u8 note) const {
-    const u32 address = kDrumBase + note;
-    if (address >= data.size() || data[address] == kMissingInstrument) {
-      return std::nullopt;
-    }
-    const u32 value = data[address];
-    return RuntimeDrum{
-        .program = static_cast<u8>(value >> 24),
-        .sourceKey = static_cast<u8>(value >> 16),
-        .volume = static_cast<u8>(value >> 8),
-        .pan = static_cast<u8>(value),
-    };
-  }
-
-  [[nodiscard]] std::span<const u32> pitchScript(u8 index) const {
-    const u32 descriptorAddress = kPitchDescriptorBase + index;
-    if (descriptorAddress >= data.size()) {
-      return {};
-    }
-    const u32 descriptor = data[descriptorAddress];
-    const u32 offset = descriptor >> 8;
-    const u32 count = descriptor & 0xff;
-    if (count == 0 || offset > data.size() || count > data.size() - offset) {
-      return {};
-    }
-    return std::span<const u32>{data.data() + offset, count};
-  }
-
-  [[nodiscard]] std::span<const u32> volumeCurve(u8 index) const {
-    const u32 descriptorAddress = kVolumeDescriptorBase + index;
-    if (descriptorAddress >= data.size()) {
-      return {};
-    }
-    const u32 descriptor = data[descriptorAddress];
-    const u32 offset = descriptor >> 8;
-    const u32 count = descriptor & 0xff;
-    if (count == 0 || offset > data.size() || count > data.size() - offset) {
-      return {};
-    }
-    return std::span<const u32>{data.data() + offset, count};
-  }
-
-  Version version = Version::Early;
-  u8 timebaseShift = 2;
-  u8 initialEchoMask = 0;
   u8 tempo = 120;
   std::array<u8, 256> registers{};
   bool zero = true;
   bool negative = false;
   bool carry = false;
-  ReverbPerformanceEvent echo{.voiceMask = 0, .send = 0.0};
-  const std::vector<u32>& data;
+  RuntimeTables tables;
+  ReverbPerformanceEvent echo;
 };
 
 struct TrackState {
@@ -262,7 +261,7 @@ struct TrackState {
         velocityEnabled((sequence.config.driverState & 0x100) != 0), volume(math::initialVolume(version)),
         initialEcho((sequence.config.driverState & (0x10000u << sourceTrack.sourceTrackNumber)) != 0),
         voiceBit(static_cast<u8>(1u << sourceTrack.sourceTrackNumber)), loopPoint(sourceTrack.startAddress) {
-    if (const auto instrument = runtimeInstrument(sequence.config.driverData, 0)) {
+    if (const auto instrument = RuntimeTables(sequence.config.driverData).instrument(0)) {
       envelope = *instrument;
     }
   }
@@ -409,7 +408,7 @@ struct Playback {
       return;
     }
     if ((track.attackDirection & 0x80) != 0) {
-      const std::span<const u32> samples = program.waveformSamples(track.attackDirection & 0x7f);
+      const std::span<const u32> samples = program.tables.waveformSamples(track.attackDirection & 0x7f);
       if (!samples.empty()) {
         const double updatesPerSample = 128.0 / track.attackSpeed;
         const double milliseconds = samples.size() * updatesPerSample * 4.0;
@@ -433,7 +432,7 @@ struct Playback {
   }
 
   void applyPitchScript(double key) {
-    const std::span<const u32> script = program.pitchScript(track.pitchScript);
+    const std::span<const u32> script = program.tables.pitchScript(track.pitchScript);
     if (track.pitchScriptDelay == 0 || script.empty() || !track.lastNote.valid()) {
       return;
     }
@@ -498,10 +497,10 @@ struct Playback {
 
     const u8 sourceNote = static_cast<u8>(track.octave * 12 + noteIndex - 1);
     if (track.percussion) {
-      if (const auto drum = program.drum(sourceNote)) {
+      if (const auto drum = program.tables.drum(sourceNote)) {
         track.volume = std::min<u8>(drum->volume & 0x7f, math::maximumVolume(track.version));
         track.pan = std::min<u8>(drum->pan & 0x1f, 30);
-        track.envelope = program.instrument(drum->program);
+        track.envelope = program.tables.instrument(drum->program);
         emitPan(out);
       }
     }
@@ -548,7 +547,7 @@ struct Playback {
 
   void programChange(u8 value) {
     track.sourceProgram = value;
-    track.envelope = program.instrument(value);
+    track.envelope = program.tables.instrument(value);
     if (!track.percussion) {
       out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = value});
       out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::FutureAttacks);
@@ -560,7 +559,7 @@ struct Playback {
     if (track.version != Version::V2 || track.noteVolumeCurve < 0 || !track.currentSourceNote) {
       return track.volume;
     }
-    const std::span<const u32> curve = program.volumeCurve(static_cast<u8>(track.noteVolumeCurve));
+    const std::span<const u32> curve = program.tables.volumeCurve(static_cast<u8>(track.noteVolumeCurve));
     if (*track.currentSourceNote >= curve.size()) {
       return track.volume;
     }
@@ -645,7 +644,7 @@ struct Playback {
       return 250.0 / ((track.vibratoType == 0 ? 4.0 : 2.0) * track.vibratoRate);
     }
     if ((track.vibratoMode & 0x80) != 0) {
-      const u32 meta = program.waveform(track.vibratoMode & 0x7f);
+      const u32 meta = program.tables.waveform(track.vibratoMode & 0x7f);
       const u32 length = std::max<u32>(meta & 0xff, 1);
       return 250.0 * track.vibratoRate / (128.0 * length);
     }
@@ -663,7 +662,7 @@ struct Playback {
       return context;
     }
     if ((track.vibratoMode & 0x80) != 0) {
-      const u32 meta = program.waveform(track.vibratoMode & 0x7f);
+      const u32 meta = program.tables.waveform(track.vibratoMode & 0x7f);
       context.waveform = static_cast<LfoWaveform>((meta >> 8) & 0xff);
     } else if ((track.vibratoMode & 3) == 1) {
       context.polarity = LfoPolarity::Positive;
@@ -771,20 +770,16 @@ struct Playback {
     track.pseudoReleaseGain.reset();
   }
 
-  void echoOn() {
-    program.echo.voiceMask = static_cast<u8>(program.echo.voiceMask.value_or(0) | track.voiceBit);
+  void setEchoMask(u8 mask) {
+    program.echo.voiceMask = mask;
     out.reverb(program.echo);
   }
 
-  void echoOff() {
-    program.echo.voiceMask = static_cast<u8>(program.echo.voiceMask.value_or(0) & ~track.voiceBit);
-    out.reverb(program.echo);
-  }
+  void echoOn() { setEchoMask(static_cast<u8>(program.echo.voiceMask.value_or(0) | track.voiceBit)); }
 
-  void echoOffAll() {
-    program.echo.voiceMask = 0;
-    out.reverb(program.echo);
-  }
+  void echoOff() { setEchoMask(static_cast<u8>(program.echo.voiceMask.value_or(0) & ~track.voiceBit)); }
+
+  void echoOffAll() { setEchoMask(0); }
 
   void echoVolume(s8 left, s8 right) {
     program.echo.leftGain = std::clamp(left / 127.0, -1.0, 1.0);
@@ -883,39 +878,41 @@ struct Playback {
     }
   }
 
-  void attackRate(u8 value) {
-    if (track.envelope) {
-      track.envelope->adsr1 = static_cast<u8>((track.envelope->adsr1 & 0xf0) | (value & 0x0f));
-      replaceEnvelope();
+  template <class Edit>
+  void editEnvelope(Edit edit) {
+    if (!track.envelope) {
+      return;
     }
+    edit(*track.envelope);
+    replaceEnvelope();
+  }
+
+  void attackRate(u8 value) {
+    editEnvelope([&](RuntimeInstrument& envelope) {
+      envelope.adsr1 = static_cast<u8>((envelope.adsr1 & 0xf0) | (value & 0x0f));
+    });
   }
 
   void decayRate(u8 value) {
-    if (track.envelope) {
-      track.envelope->adsr1 = static_cast<u8>(0x80 | (track.envelope->adsr1 & 0x0f) | ((value & 7) << 4));
-      replaceEnvelope();
-    }
+    editEnvelope([&](RuntimeInstrument& envelope) {
+      envelope.adsr1 = static_cast<u8>(0x80 | (envelope.adsr1 & 0x0f) | ((value & 7) << 4));
+    });
   }
 
   void sustainLevel(u8 value) {
-    if (track.envelope) {
-      track.envelope->adsr2 = static_cast<u8>((track.envelope->adsr2 & 0x1f) | ((value & 7) << 5));
-      replaceEnvelope();
-    }
+    editEnvelope([&](RuntimeInstrument& envelope) {
+      envelope.adsr2 = static_cast<u8>((envelope.adsr2 & 0x1f) | ((value & 7) << 5));
+    });
   }
 
   void sustainRate(u8 value) {
-    if (track.envelope) {
-      track.envelope->adsr2 = static_cast<u8>((track.envelope->adsr2 & 0xe0) | (value & 0x1f));
-      replaceEnvelope();
-    }
+    editEnvelope([&](RuntimeInstrument& envelope) {
+      envelope.adsr2 = static_cast<u8>((envelope.adsr2 & 0xe0) | (value & 0x1f));
+    });
   }
 
   void releaseRate(u8 value) {
-    if (track.envelope) {
-      track.envelope->gain = static_cast<u8>(0xa0 | (value & 0x1f));
-      replaceEnvelope();
-    }
+    editEnvelope([&](RuntimeInstrument& envelope) { envelope.gain = static_cast<u8>(0xa0 | (value & 0x1f)); });
   }
 
   void tick() {
@@ -944,7 +941,7 @@ struct Playback {
 
 using Cursor = CompilerCursor<TrackState, Playback>;
 
-[[nodiscard]] DecodedBytecodeCommand decodeSubcommand(Cursor& cursor, Version version) {
+[[nodiscard]] DecodedBytecodeCommand decodeSubcommand(Cursor& cursor, Version version, SequenceReferences* references) {
   auto event = cursor.command("Subcommand", SequenceSemantic::State);
   const u8 subcommand = event.u8("subcommand", SourceValueDisplay::Hex);
   switch (subcommand) {
@@ -989,9 +986,14 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x0c:
       event.label("Note Velocity Off");
       return event.set<&TrackState::velocityEnabled>(false);
-    case 0x0d:
+    case 0x0d: {
       event.label("Select Note Volume Curve");
-      return event.invoke<&Playback::volumeCurve>(event.u8("curve"));
+      const u8 curve = event.u8("curve");
+      if (references != nullptr) {
+        references->volumeCurves.insert(curve);
+      }
+      return event.invoke<&Playback::volumeCurve>(curve);
+    }
     case 0x10: {
       event.label("Move Immediate");
       const u8 reg = event.u8("register");
@@ -1045,7 +1047,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, Version version, u8 timebaseShift,
                                                    bool noteVelocity, u32 noteTable,
-                                                   std::vector<Diagnostic>* diagnostics) {
+                                                   std::vector<Diagnostic>* diagnostics,
+                                                   SequenceReferences* references = nullptr) {
   Cursor cursor(reader, begin, "hudson-snes", diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
@@ -1100,7 +1103,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xd6: {
       auto event = cursor.command("Instrument", SequenceSemantic::Instrument);
-      return event.invoke<&Playback::programChange>(event.u8("program", SemanticOperandRole::InstrumentProgram));
+      const u8 program = event.u8("program", SemanticOperandRole::InstrumentProgram);
+      if (references != nullptr) {
+        references->programs.insert(program);
+      }
+      return event.invoke<&Playback::programChange>(program);
     }
     case 0xd7:
     case 0xd8:
@@ -1154,6 +1161,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 rate = event.u8("rate");
       const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
       const u8 mode = version == Version::V2 ? event.u8("mode", SemanticOperandRole::Modulation) : 0;
+      if (references != nullptr && (mode & 0x80) != 0) {
+        references->customWaveforms.insert(mode & 0x7f);
+      }
       return event.invoke<&Playback::vibrato>(rate, depth, mode);
     }
     case 0xe3: {
@@ -1186,7 +1196,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Pitch Attack Envelope", SequenceSemantic::Pitch);
       const u8 speed = event.u8("speed");
       const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
-      return event.invoke<&Playback::pitchAttack>(speed, depth, event.u8("direction"));
+      const u8 direction = event.u8("direction");
+      if (references != nullptr && (direction & 0x80) != 0) {
+        references->customWaveforms.insert(direction & 0x7f);
+      }
+      return event.invoke<&Playback::pitchAttack>(speed, depth, direction);
     }
     case 0xea:
       return cursor.command("Pitch Attack Envelope Off", SequenceSemantic::Pitch).invoke<&Playback::pitchAttackOff>();
@@ -1214,6 +1228,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       } else {
         auto event = cursor.command("Pitch Script", SequenceSemantic::Pitch);
         const u8 script = event.u8("script");
+        if (references != nullptr) {
+          references->pitchScripts.insert(script);
+        }
         return event.invoke<&Playback::pitchScript>(script, event.u8("delay", SemanticOperandRole::Duration));
       }
     case 0xf0:
@@ -1256,7 +1273,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xfd:
       return cursor.noOp("No Operation", "nop");
     case 0xfe:
-      return decodeSubcommand(cursor, version);
+      return decodeSubcommand(cursor, version, references);
     case 0xff: {
       auto event = cursor.command("End / Return", SequenceSemantic::End);
       event.invoke<&Playback::endOrReturn>();
@@ -1288,15 +1305,18 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   return LfoWaveform::Sine;
 }
 
-[[nodiscard]] std::vector<u32> driverData(const ParsedHeader& header) {
+std::vector<u32> RuntimeTables::encode(const ParsedHeader& header) {
   std::vector<u32> result(kPayloadBase, 0);
   result[kEchoBase] = (static_cast<u32>(static_cast<u8>(header.initialEchoLeft)) << 24) |
                       (static_cast<u32>(static_cast<u8>(header.initialEchoRight)) << 16) |
                       (static_cast<u32>(header.initialEchoDelay) << 8) | static_cast<u8>(header.initialEchoFeedback);
   result[kEchoBase + 1] = header.initialEchoFilter;
-  std::fill_n(result.begin(), kInstrumentWords, kMissingInstrument);
-  std::fill_n(result.begin() + kDrumBase, 128, kMissingInstrument);
+  std::fill_n(result.begin(), kTableEntries, kMissingInstrument);
+  std::fill_n(result.begin() + kDrumBase, kTableEntries, kMissingInstrument);
   for (const InstrumentRow& instrument : header.recipes.instruments) {
+    if (instrument.program >= kTableEntries) {
+      continue;
+    }
     result[instrument.program] =
         (static_cast<u32>(instrument.adsr1) << 16) | (static_cast<u32>(instrument.adsr2) << 8) | instrument.gain;
   }
@@ -1310,6 +1330,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
   }
   for (const DrumSlot& drum : header.recipes.drums) {
+    if (drum.note >= kTableEntries) {
+      continue;
+    }
     result[kDrumBase + drum.note] = (static_cast<u32>(drum.sourceProgram) << 24) |
                                     (static_cast<u32>(drum.sourceKey) << 16) | (static_cast<u32>(drum.volume) << 8) |
                                     drum.pan;
@@ -1370,19 +1393,20 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     empty.timebase = sequenceDialect().timebase;
     return SequenceParse{.program = std::move(empty)};
   }
+  SequenceReferences references;
   SequenceDecodeSession sequence{reader, sequenceDialect(), sequenceId, header->range, sourceMap, 32768};
   for (const auto& [track, start] : header->tracks) {
     sequence.addLinearTrack(track, header->range, start, [&](u32 offset) {
       return decodeCommand(reader, offset, layout.version, header->timebaseShift, header->noteVelocity,
-                           layout.noteLengthTableAddress, diagnostics);
+                           layout.noteLengthTableAddress, diagnostics, &references);
     });
   }
   SequenceProgram program = sequence.finish();
-  supplementLiveRecipes(reader, layout, program, header->recipes);
+  supplementLiveRecipes(reader, layout, std::move(references), header->recipes);
   program.config.profile = static_cast<u32>(layout.version);
   program.config.driverState =
       header->timebaseShift | (header->noteVelocity ? 0x100 : 0) | (static_cast<u32>(header->initialEchoMask) << 16);
-  program.config.driverData = driverData(*header);
+  program.config.driverData = RuntimeTables::encode(*header);
   program.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(120, header->timebaseShift);
   program.behavior.initialLevel = math::levelGain(layout.version, math::initialVolume(layout.version));
   program.behavior.initialStereoBalance = math::panGains(15);

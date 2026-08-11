@@ -16,6 +16,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
 #include <iterator>
 #include <map>
 #include <stdexcept>
@@ -37,6 +38,15 @@ void expect(bool condition, const std::string& message) {
 void writeLe16(std::vector<u8>& bytes, u32 offset, u16 value) {
   bytes[offset] = static_cast<u8>(value);
   bytes[offset + 1] = static_cast<u8>(value >> 8);
+}
+
+void writeBytes(std::vector<u8>& bytes, u32 offset, std::initializer_list<u8> values) {
+  std::ranges::copy(values, bytes.begin() + offset);
+}
+
+void appendBytes(std::vector<u8>& bytes, u32& cursor, std::initializer_list<u8> values) {
+  writeBytes(bytes, cursor, values);
+  cursor += values.size();
 }
 
 template <class Event>
@@ -272,6 +282,67 @@ void headerDecodesEveryVersionTwoRecipe() {
          "header 09 note-volume curves should apply the selected signed offset on each note");
 }
 
+void earlyHeaderGrammarSupportsBothInstrumentLengths() {
+  std::vector<u8> bytes(kAramSize);
+  u32 cursor = 0x100;
+  appendBytes(bytes, cursor, {0x01});
+  writeLe16(bytes, cursor, 0x200);
+  cursor += 2;
+  appendBytes(bytes, cursor, {0x01, 0x02, 0x02, 0x04, 0x01, 0x8f, 0xe0, 0x8a, 0x03, 0x04, 0x00,
+                              60,   64,   15,   0x04, 0x01, 0x02, 0x9f, 0xe1, 0x8b, 0x05, 0x01});
+  writeLe16(bytes, cursor, 0x300);
+  cursor += 2;
+  appendBytes(bytes, cursor, {0x00});
+  writeBytes(bytes, 0x200, {0xff});
+  writeBytes(bytes, 0x300, {1, 32, 0xff});
+
+  const auto header = parseHeader(ByteReader(SourceId{156}, bytes), Version::Early, 0x100);
+  expect(header && header->timebaseShift == 2 && header->tracks == std::vector<std::pair<u8, u16>>{{0, 0x200}} &&
+             header->recipes.instruments.size() == 2 && header->recipes.instruments.front().srcn == 1 &&
+             header->recipes.instruments.back().srcn == 2 && header->recipes.drums.size() == 1 &&
+             header->recipes.pitchScripts.size() == 1,
+         "early headers should share recipe decoding while preserving byte- and row-counted instrument commands");
+}
+
+void sequenceDecodeCollectsTypedLiveTableReferences() {
+  std::vector<u8> bytes(kAramSize);
+  u32 cursor = 0x100;
+  appendBytes(bytes, cursor, {0x01, 0x01});
+  writeLe16(bytes, cursor, 0x200);
+  cursor += 2;
+  appendBytes(bytes, cursor, {0x00});
+
+  writeBytes(bytes, 0x200, {0xd6, 7, 0xef, 2, 1, 0xe2, 64, 32, 0x83, 0xe9, 64, 32, 0x84, 0xfe, 0x0d, 5, 0xff});
+  writeBytes(bytes, 0x400 + 7 * 4, {1, 0x8f, 0xe0, 0x8a});
+  writeLe16(bytes, 0x600 + 2 * 2, 0x700);
+  writeBytes(bytes, 0x700, {1, 32, 0xff});
+  writeLe16(bytes, 0x800 + 3 * 2, 0x900);
+  writeLe16(bytes, 0x800 + 4 * 2, 0x910);
+  writeBytes(bytes, 0x900, {0, 64, 0x80});
+  writeBytes(bytes, 0x910, {static_cast<u8>(-64), 0, 0x80});
+  writeLe16(bytes, 0xa00 + 5 * 2, 0xb00);
+  bytes[0xb00 + 24] = static_cast<u8>(-8);
+
+  const SequenceParse parsed = decodeSequence(ByteReader(SourceId{157}, bytes),
+                                              Layout{
+                                                  .version = Version::V2,
+                                                  .sequenceHeaderAddress = 0x100,
+                                                  .activeInstrumentTableAddress = 0x400,
+                                                  .activePitchTableAddress = 0x600,
+                                                  .activeWaveformTableAddress = 0x800,
+                                                  .activeVolumeTableAddress = 0xa00,
+                                              },
+                                              AssetId{158});
+  const auto contains = [](const auto& recipes, u8 index) {
+    return std::ranges::any_of(recipes, [=](const auto& recipe) { return recipe.index == index; });
+  };
+  expect(std::ranges::any_of(parsed.recipes.instruments, [](const InstrumentRow& row) { return row.program == 7; }) &&
+             contains(parsed.recipes.pitchScripts, 2) && contains(parsed.recipes.customWaveforms, 3) &&
+             contains(parsed.recipes.customWaveforms, 4) && contains(parsed.recipes.volumeCurves, 5) &&
+             parsed.program.config.driverData[7] == 0x8fe08a,
+         "sequence decoding should collect typed program, script, waveform, and volume-curve references");
+}
+
 void v2VolumeUsesThePostVelocityMixerCurve() {
   const PerformanceSequence relative = render(Version::V2, 2, false, {0xd9, 51, 0xdc, 0xf6, 0xff});
   const auto levels = events<LevelPerformanceEvent>(relative.tracks.front());
@@ -485,6 +556,8 @@ void runHudsonSnesModuleTests() {
   scannerBuildsACompleteV2Collection();
   earlyGateReleaseStateMachineMatchesSuperBomberman2();
   headerDecodesEveryVersionTwoRecipe();
+  earlyHeaderGrammarSupportsBothInstrumentLengths();
+  sequenceDecodeCollectsTypedLiveTableReferences();
   v2VolumeUsesThePostVelocityMixerCurve();
   v2PlaybackUsesAuditedTempoLfosAndDynamicAdsr();
   conditionalDispatchAndEarlyOperandLayoutsMatchTheDriver();

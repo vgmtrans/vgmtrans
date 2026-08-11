@@ -9,11 +9,11 @@
 #include "value/scan/BytePattern.h"
 
 #include <algorithm>
+#include <array>
 #include <limits>
 #include <set>
 #include <string_view>
 #include <utility>
-#include <variant>
 #include <vector>
 
 namespace vgmtrans::formats::hudson_snes {
@@ -46,6 +46,96 @@ constexpr MaskedBytePattern kLoadTracks{
 };
 
 constexpr MaskedBytePattern kLoadDirEarly{"\xe4\x00\x8d\x5d\x4f\x0c"sv, "x?xxxx"sv};
+
+enum class HeaderField : u8 {
+  Invalid,
+  End,
+  Tracks,
+  Timebase,
+  Instruments,
+  Drums,
+  PitchScripts,
+  CustomWaveforms,
+  Echo,
+  NoteVelocity,
+  VolumeCurves,
+};
+
+struct HeaderCommand {
+  HeaderField field = HeaderField::Invalid;
+  u8 unitSize = 0;
+};
+
+constexpr std::array<HeaderCommand, 10> kEarlyHeaderCommands{{
+    {HeaderField::End},
+    {HeaderField::Timebase},
+    {HeaderField::Instruments, 1},
+    {HeaderField::Drums, 1},
+    {HeaderField::Instruments, 4},
+    {HeaderField::PitchScripts, 2},
+}};
+
+constexpr std::array<HeaderCommand, 10> kV2HeaderCommands{{
+    {HeaderField::End},
+    {HeaderField::Tracks},
+    {HeaderField::Timebase},
+    {HeaderField::Instruments, 4},
+    {HeaderField::Drums, 4},
+    {HeaderField::PitchScripts, 2},
+    {HeaderField::CustomWaveforms, 2},
+    {HeaderField::Echo},
+    {HeaderField::NoteVelocity},
+    {HeaderField::VolumeCurves, 2},
+}};
+
+struct CountedBlock {
+  u32 address = 0;
+  u32 size = 0;
+};
+
+[[nodiscard]] HeaderCommand headerCommand(Version version, u8 opcode) {
+  const auto& commands = version == Version::V2 ? kV2HeaderCommands : kEarlyHeaderCommands;
+  return opcode < commands.size() ? commands[opcode] : HeaderCommand{};
+}
+
+[[nodiscard]] std::optional<CountedBlock> readCountedBlock(ByteReader reader, u32& cursor, u8 unitSize) {
+  if (!reader.has(cursor, 1)) {
+    return std::nullopt;
+  }
+  const u32 size = reader.u8At(cursor++) * unitSize;
+  if (!reader.has(cursor, size)) {
+    return std::nullopt;
+  }
+  const CountedBlock block{.address = cursor, .size = size};
+  cursor += size;
+  return block;
+}
+
+void appendRecipeRows(ByteReader reader, CountedBlock block, HeaderField field, SequenceRecipes& recipes) {
+  const u32 rows = block.size / 4;
+  for (u32 row = 0; row < rows; ++row) {
+    const u32 item = block.address + row * 4;
+    if (field == HeaderField::Instruments) {
+      recipes.instruments.push_back(InstrumentRow{
+          .program = static_cast<u8>(row),
+          .srcn = reader.u8At(item),
+          .adsr1 = reader.u8At(item + 1),
+          .adsr2 = reader.u8At(item + 2),
+          .gain = reader.u8At(item + 3),
+          .source = reader.range(item, 4),
+      });
+    } else {
+      recipes.drums.push_back(DrumSlot{
+          .note = static_cast<u8>(row),
+          .sourceProgram = reader.u8At(item),
+          .sourceKey = reader.u8At(item + 1),
+          .volume = reader.u8At(item + 2),
+          .pan = reader.u8At(item + 3),
+          .source = reader.range(item, 4),
+      });
+    }
+  }
+}
 
 [[nodiscard]] bool readTracks(ByteReader reader, u32& cursor, ParsedHeader& header) {
   if (!reader.has(cursor, 1)) {
@@ -87,7 +177,7 @@ void readInitialEcho(ByteReader reader, u32 address, ParsedHeader& header) {
   header.initialEchoMask = reader.u8At(address + 5);
 }
 
-void decodeWaveforms(ByteReader reader, const std::vector<u16>& pointers, ParsedHeader& header) {
+void decodeWaveforms(ByteReader reader, const std::vector<u16>& pointers, SequenceRecipes& recipes) {
   for (u32 index = 0; index < pointers.size() && index < 128; ++index) {
     const u32 start = pointers[index];
     if (start == 0 || !reader.has(start, 1)) {
@@ -104,12 +194,12 @@ void decodeWaveforms(ByteReader reader, const std::vector<u16>& pointers, Parsed
     }
     if (!waveform.samples.empty()) {
       waveform.source = reader.range(start, cursor - start);
-      header.recipes.customWaveforms.push_back(std::move(waveform));
+      recipes.customWaveforms.push_back(std::move(waveform));
     }
   }
 }
 
-void decodePitchScripts(ByteReader reader, const std::vector<u16>& pointers, ParsedHeader& header) {
+void decodePitchScripts(ByteReader reader, const std::vector<u16>& pointers, SequenceRecipes& recipes) {
   for (u32 index = 0; index < pointers.size() && index < 128; ++index) {
     const u32 start = pointers[index];
     if (start == 0 || !reader.has(start, 1)) {
@@ -173,12 +263,12 @@ void decodePitchScripts(ByteReader reader, const std::vector<u16>& pointers, Par
     }
     if (!script.steps.empty()) {
       script.source = reader.range(first, last - first);
-      header.recipes.pitchScripts.push_back(std::move(script));
+      recipes.pitchScripts.push_back(std::move(script));
     }
   }
 }
 
-void decodeVolumeCurves(ByteReader reader, const std::vector<u16>& pointers, ParsedHeader& header) {
+void decodeVolumeCurves(ByteReader reader, const std::vector<u16>& pointers, SequenceRecipes& recipes) {
   for (u32 index = 0; index < pointers.size() && index < 128; ++index) {
     const u32 start = pointers[index];
     if (start == 0 || !reader.has(start, 128)) {
@@ -189,7 +279,7 @@ void decodeVolumeCurves(ByteReader reader, const std::vector<u16>& pointers, Par
     for (u32 note = 0; note < 128; ++note) {
       curve.offsets.push_back(static_cast<s8>(reader.u8At(start + note)));
     }
-    header.recipes.volumeCurves.push_back(std::move(curve));
+    recipes.volumeCurves.push_back(std::move(curve));
   }
 }
 
@@ -227,17 +317,6 @@ struct SongCandidate {
   }
   const u16 loop = static_cast<u16>(reader.u8At(lowAddress) | (reader.u8At(highAddress) << 8));
   return loop == 0 || loop == 0xffff ? std::nullopt : std::optional{loop};
-}
-
-[[nodiscard]] std::optional<u8> operandU8(const SourceCommand& command, std::string_view name) {
-  const SemanticOperand* operand = semanticOperand(command, name);
-  if (operand == nullptr) {
-    return std::nullopt;
-  }
-  if (const auto* value = std::get_if<u64>(&operand->value); value != nullptr && *value <= 0xff) {
-    return static_cast<u8>(*value);
-  }
-  return std::nullopt;
 }
 
 [[nodiscard]] std::vector<u16> referencedPointers(ByteReader reader, u16 table, const std::set<u8>& indexes) {
@@ -293,136 +372,49 @@ std::optional<ParsedHeader> parseHeader(ByteReader reader, Version version, u32 
   bool ended = false;
   for (u32 command = 0; command < 32 && reader.has(cursor, 1); ++command) {
     const u8 opcode = reader.u8At(cursor++);
-    if (opcode == 0) {
-      ended = true;
-      break;
-    }
-
-    if (version != Version::V2) {
-      if (opcode == 1) {
-        if (!reader.has(cursor, 1)) {
-          return std::nullopt;
-        }
-        header.timebaseShift = reader.u8At(cursor++) & 3;
-      } else if (opcode == 2 || opcode == 3 || opcode == 4) {
-        if (!reader.has(cursor, 1)) {
-          return std::nullopt;
-        }
-        const u32 bytes = opcode == 4 ? reader.u8At(cursor++) * 4u : reader.u8At(cursor++);
-        if (!reader.has(cursor, bytes)) {
-          return std::nullopt;
-        }
-        if (opcode == 2 || opcode == 4) {
-          const u32 rows = bytes / 4;
-          for (u32 row = 0; row < rows; ++row) {
-            const u32 item = cursor + row * 4;
-            header.recipes.instruments.push_back(InstrumentRow{
-                .program = static_cast<u8>(row),
-                .srcn = reader.u8At(item),
-                .adsr1 = reader.u8At(item + 1),
-                .adsr2 = reader.u8At(item + 2),
-                .gain = reader.u8At(item + 3),
-                .source = reader.range(item, 4),
-            });
-          }
-        } else {
-          const u32 rows = bytes / 4;
-          for (u32 row = 0; row < rows; ++row) {
-            const u32 item = cursor + row * 4;
-            header.recipes.drums.push_back(DrumSlot{
-                .note = static_cast<u8>(row),
-                .sourceProgram = reader.u8At(item),
-                .sourceKey = reader.u8At(item + 1),
-                .volume = reader.u8At(item + 2),
-                .pan = reader.u8At(item + 3),
-                .source = reader.range(item, 4),
-            });
-          }
-        }
-        cursor += bytes;
-      } else if (opcode == 5) {
-        if (!reader.has(cursor, 1)) {
-          return std::nullopt;
-        }
-        const u32 bytes = reader.u8At(cursor++) * 2u;
-        if (!reader.has(cursor, bytes)) {
-          return std::nullopt;
-        }
-        pitchPointers = pointerTable(reader, cursor, bytes);
-        cursor += bytes;
-      } else {
-        return std::nullopt;
-      }
-      continue;
-    }
-
-    switch (opcode) {
-      case 1:
+    const HeaderCommand descriptor = headerCommand(version, opcode);
+    switch (descriptor.field) {
+      case HeaderField::End:
+        ended = true;
+        break;
+      case HeaderField::Tracks:
         if (!readTracks(reader, cursor, header)) {
           return std::nullopt;
         }
         break;
-      case 2:
+      case HeaderField::Timebase:
         if (!reader.has(cursor, 1)) {
           return std::nullopt;
         }
         header.timebaseShift = reader.u8At(cursor++) & 3;
         break;
-      case 3:
-      case 4: {
-        if (!reader.has(cursor, 1)) {
+      case HeaderField::Instruments:
+      case HeaderField::Drums: {
+        const auto block = readCountedBlock(reader, cursor, descriptor.unitSize);
+        if (!block) {
           return std::nullopt;
         }
-        const u32 rows = reader.u8At(cursor++);
-        if (!reader.has(cursor, rows * 4u)) {
-          return std::nullopt;
-        }
-        for (u32 row = 0; row < rows; ++row) {
-          const u32 item = cursor + row * 4;
-          if (opcode == 3) {
-            header.recipes.instruments.push_back(InstrumentRow{
-                .program = static_cast<u8>(row),
-                .srcn = reader.u8At(item),
-                .adsr1 = reader.u8At(item + 1),
-                .adsr2 = reader.u8At(item + 2),
-                .gain = reader.u8At(item + 3),
-                .source = reader.range(item, 4),
-            });
-          } else {
-            header.recipes.drums.push_back(DrumSlot{
-                .note = static_cast<u8>(row),
-                .sourceProgram = reader.u8At(item),
-                .sourceKey = reader.u8At(item + 1),
-                .volume = reader.u8At(item + 2),
-                .pan = reader.u8At(item + 3),
-                .source = reader.range(item, 4),
-            });
-          }
-        }
-        cursor += rows * 4u;
+        appendRecipeRows(reader, *block, descriptor.field, header.recipes);
         break;
       }
-      case 5:
-      case 6:
-      case 9: {
-        if (!reader.has(cursor, 1)) {
+      case HeaderField::PitchScripts:
+      case HeaderField::CustomWaveforms:
+      case HeaderField::VolumeCurves: {
+        const auto block = readCountedBlock(reader, cursor, descriptor.unitSize);
+        if (!block) {
           return std::nullopt;
         }
-        const u32 bytes = reader.u8At(cursor++) * 2u;
-        if (!reader.has(cursor, bytes)) {
-          return std::nullopt;
-        }
-        if (opcode == 5) {
-          pitchPointers = pointerTable(reader, cursor, bytes);
-        } else if (opcode == 6) {
-          waveformPointers = pointerTable(reader, cursor, bytes);
+        std::vector<u16> pointers = pointerTable(reader, block->address, block->size);
+        if (descriptor.field == HeaderField::PitchScripts) {
+          pitchPointers = std::move(pointers);
+        } else if (descriptor.field == HeaderField::CustomWaveforms) {
+          waveformPointers = std::move(pointers);
         } else {
-          volumePointers = pointerTable(reader, cursor, bytes);
+          volumePointers = std::move(pointers);
         }
-        cursor += bytes;
         break;
       }
-      case 7: {
+      case HeaderField::Echo: {
         if (!reader.has(cursor, 1)) {
           return std::nullopt;
         }
@@ -437,14 +429,18 @@ std::optional<ParsedHeader> parseHeader(ByteReader reader, Version version, u32 
         }
         break;
       }
-      case 8:
+      case HeaderField::NoteVelocity:
         if (!reader.has(cursor, 1)) {
           return std::nullopt;
         }
         header.noteVelocity = reader.u8At(cursor++) != 0;
         break;
+      case HeaderField::Invalid:
       default:
         return std::nullopt;
+    }
+    if (ended) {
+      break;
     }
   }
 
@@ -452,9 +448,9 @@ std::optional<ParsedHeader> parseHeader(ByteReader reader, Version version, u32 
     return std::nullopt;
   }
   header.range = reader.range(address, cursor - address);
-  decodeWaveforms(reader, waveformPointers, header);
-  decodePitchScripts(reader, pitchPointers, header);
-  decodeVolumeCurves(reader, volumePointers, header);
+  decodeWaveforms(reader, waveformPointers, header.recipes);
+  decodePitchScripts(reader, pitchPointers, header.recipes);
+  decodeVolumeCurves(reader, volumePointers, header.recipes);
   return header;
 }
 
@@ -554,41 +550,8 @@ std::optional<Layout> findLayout(ByteReader reader) {
   };
 }
 
-void supplementLiveRecipes(ByteReader reader, const Layout& layout, const SequenceProgram& program,
+void supplementLiveRecipes(ByteReader reader, const Layout& layout, SequenceReferences references,
                            SequenceRecipes& recipes) {
-  std::set<u8> programs{0};
-  std::set<u8> pitchScripts;
-  std::set<u8> waveforms;
-  std::set<u8> volumeCurves;
-  for (const TrackProgram& track : program.tracks) {
-    for (const SourceCommand& command : track.commands) {
-      if (command.opcode == 0xd6) {
-        if (const auto value = operandU8(command, "program")) {
-          programs.insert(*value);
-        }
-      } else if (command.opcode == 0xef) {
-        if (const auto value = operandU8(command, "script")) {
-          pitchScripts.insert(*value);
-        }
-      } else if (command.opcode == 0xe2) {
-        if (const auto value = operandU8(command, "mode"); value && (*value & 0x80) != 0) {
-          waveforms.insert(*value & 0x7f);
-        }
-      } else if (command.opcode == 0xe9) {
-        if (const auto value = operandU8(command, "direction"); value && (*value & 0x80) != 0) {
-          waveforms.insert(*value & 0x7f);
-        }
-      } else if (command.opcode == 0xfe) {
-        const auto subcommand = operandU8(command, "subcommand");
-        if (subcommand == 0x0d) {
-          if (const auto value = operandU8(command, "curve")) {
-            volumeCurves.insert(*value);
-          }
-        }
-      }
-    }
-  }
-
   if (recipes.drums.empty() && layout.activeDrumTableAddress != 0) {
     u32 end = kAramSize;
     for (const u16 candidate :
@@ -611,11 +574,11 @@ void supplementLiveRecipes(ByteReader reader, const Layout& layout, const Sequen
           .pan = reader.u8At(item + 3),
           .source = reader.range(item, 4),
       });
-      programs.insert(reader.u8At(item));
+      references.programs.insert(reader.u8At(item));
     }
   }
 
-  for (const u8 programNumber : programs) {
+  for (const u8 programNumber : references.programs) {
     if (std::ranges::any_of(recipes.instruments,
                             [&](const InstrumentRow& row) { return row.program == programNumber; })) {
       continue;
@@ -634,13 +597,15 @@ void supplementLiveRecipes(ByteReader reader, const Layout& layout, const Sequen
     });
   }
 
-  ParsedHeader live;
-  decodePitchScripts(reader, referencedPointers(reader, layout.activePitchTableAddress, pitchScripts), live);
-  decodeWaveforms(reader, referencedPointers(reader, layout.activeWaveformTableAddress, waveforms), live);
-  decodeVolumeCurves(reader, referencedPointers(reader, layout.activeVolumeTableAddress, volumeCurves), live);
-  appendMissing(recipes.pitchScripts, std::move(live.recipes.pitchScripts));
-  appendMissing(recipes.customWaveforms, std::move(live.recipes.customWaveforms));
-  appendMissing(recipes.volumeCurves, std::move(live.recipes.volumeCurves));
+  SequenceRecipes live;
+  decodePitchScripts(reader, referencedPointers(reader, layout.activePitchTableAddress, references.pitchScripts), live);
+  decodeWaveforms(reader, referencedPointers(reader, layout.activeWaveformTableAddress, references.customWaveforms),
+                  live);
+  decodeVolumeCurves(reader, referencedPointers(reader, layout.activeVolumeTableAddress, references.volumeCurves),
+                     live);
+  appendMissing(recipes.pitchScripts, std::move(live.pitchScripts));
+  appendMissing(recipes.customWaveforms, std::move(live.customWaveforms));
+  appendMissing(recipes.volumeCurves, std::move(live.volumeCurves));
 
   if (layout.version != Version::Early) {
     const u32 presets = layout.version == Version::V1 ? 0x0780 : 0x0840;
