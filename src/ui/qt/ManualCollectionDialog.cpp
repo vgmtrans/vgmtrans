@@ -9,6 +9,7 @@
 #include "application/WorkspaceController.h"
 
 #include <QAbstractItemView>
+#include <QButtonGroup>
 #include <QDialogButtonBox>
 #include <QGridLayout>
 #include <QLabel>
@@ -16,6 +17,7 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QRadioButton>
 
 #include <exception>
 #include <vector>
@@ -23,9 +25,9 @@
 namespace {
 
 template <typename Asset>
-QListWidget* makeAssetList(const vgmtrans::core::SessionSnapshot& snapshot, bool checkable, QWidget* parent) {
+QListWidget* makeAssetList(const vgmtrans::core::SessionSnapshot& snapshot, QButtonGroup* buttons, QWidget* parent) {
   auto* list = new QListWidget(parent);
-  list->setSelectionMode(checkable ? QAbstractItemView::NoSelection : QAbstractItemView::SingleSelection);
+  list->setSelectionMode(QAbstractItemView::NoSelection);
   for (const auto& value : snapshot.assets()) {
     const auto* asset = std::get_if<Asset>(&value);
     if (asset == nullptr) {
@@ -35,9 +37,16 @@ QListWidget* makeAssetList(const vgmtrans::core::SessionSnapshot& snapshot, bool
     auto* item = new QListWidgetItem(QString::fromStdString(asset->metadata.name), list);
     item->setData(Qt::UserRole, asset->metadata.id.value);
     item->setToolTip(QString::fromStdString(asset->metadata.format));
-    if (checkable) {
+    if (buttons == nullptr) {
       item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
       item->setCheckState(Qt::Unchecked);
+    } else {
+      auto* radio = new QRadioButton(item->text(), list);
+      radio->setProperty("assetId", asset->metadata.id.value);
+      radio->setToolTip(item->toolTip());
+      buttons->addButton(radio);
+      item->setText({});
+      list->setItemWidget(item, radio);
     }
   }
   return list;
@@ -87,15 +96,16 @@ ManualCollectionDialog::ManualCollectionDialog(vgmtrans::ui::WorkspaceController
   nameLabel->setBuddy(m_name_field);
 
   auto* sequenceLabel = new QLabel(tr("Music &sequence"), this);
-  m_seq_list = makeAssetList<vgmtrans::core::SequenceProgramAsset>(workspace.snapshot(), false, this);
-  sequenceLabel->setBuddy(m_seq_list);
+  m_seq_buttons = new QButtonGroup(this);
+  auto* sequenceList = makeAssetList<vgmtrans::core::SequenceProgramAsset>(workspace.snapshot(), m_seq_buttons, this);
+  sequenceLabel->setBuddy(sequenceList);
 
   auto* instrumentLabel = new QLabel(tr("&Instrument sets"), this);
-  m_instr_list = makeAssetList<vgmtrans::core::InstrumentSetAsset>(workspace.snapshot(), true, this);
+  m_instr_list = makeAssetList<vgmtrans::core::InstrumentSetAsset>(workspace.snapshot(), nullptr, this);
   instrumentLabel->setBuddy(m_instr_list);
 
   auto* sampleLabel = new QLabel(tr("Sample &collections"), this);
-  m_samp_list = makeAssetList<vgmtrans::core::SampleCollectionAsset>(workspace.snapshot(), true, this);
+  m_samp_list = makeAssetList<vgmtrans::core::SampleCollectionAsset>(workspace.snapshot(), nullptr, this);
   sampleLabel->setBuddy(m_samp_list);
 
   auto* buttons = new QDialogButtonBox(QDialogButtonBox::Cancel, this);
@@ -106,7 +116,7 @@ ManualCollectionDialog::ManualCollectionDialog(vgmtrans::ui::WorkspaceController
   layout->addWidget(nameLabel, 0, 0);
   layout->addWidget(m_name_field, 0, 1);
   layout->addWidget(sequenceLabel, 1, 0, 1, 2);
-  layout->addWidget(m_seq_list, 2, 0, 1, 2);
+  layout->addWidget(sequenceList, 2, 0, 1, 2);
   layout->addWidget(instrumentLabel, 3, 0, 1, 2);
   layout->addWidget(m_instr_list, 4, 0, 1, 2);
   layout->addWidget(sampleLabel, 5, 0, 1, 2);
@@ -120,14 +130,14 @@ ManualCollectionDialog::ManualCollectionDialog(vgmtrans::ui::WorkspaceController
 }
 
 void ManualCollectionDialog::createCollection() {
-  const auto selected = m_seq_list->selectedItems();
-  if (selected.isEmpty()) {
+  const auto* sequence = m_seq_buttons->checkedButton();
+  if (sequence == nullptr) {
     QMessageBox::critical(this, tr("Error creating collection"), tr("A music sequence must be selected"));
     return;
   }
 
   vgmtrans::core::CollectionMembers members{
-      .sequence = vgmtrans::core::AssetId{selected.front()->data(Qt::UserRole).toUInt()},
+      .sequence = vgmtrans::core::AssetId{sequence->property("assetId").toUInt()},
       .instrumentSets = checkedAssets(*m_instr_list),
       .sampleCollections = checkedAssets(*m_samp_list),
   };

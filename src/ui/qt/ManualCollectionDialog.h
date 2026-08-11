@@ -14,6 +14,7 @@
 
 class QLineEdit;
 class QListWidget;
+class QButtonGroup;
 
 namespace vgmtrans::ui {
 class WorkspaceController;
@@ -35,7 +36,7 @@ private:
 
   vgmtrans::ui::WorkspaceController& m_workspace;
   QLineEdit* m_name_field{};
-  QListWidget* m_seq_list{};
+  QButtonGroup* m_seq_buttons{};
   QListWidget* m_instr_list{};
   QListWidget* m_samp_list{};
   std::optional<vgmtrans::core::CollectionId> m_created_collection;
