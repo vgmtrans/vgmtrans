@@ -26,6 +26,7 @@ constexpr std::array<unsigned, 32> kCounterRates{
 struct GainEnvelope {
   s16 envelope = 0;
   double seconds = 0.0;
+  double physicalSeconds = 0.0;
 };
 
 struct SnesEnvelopeSeconds {
@@ -102,8 +103,13 @@ struct SnesEnvelopeSeconds {
     }
   }
 
+  const bool stoppedCounter = mode >= 4 && ticks != 0 && rate == 0;
+  const double physicalSeconds =
+      stoppedCounter ? std::numeric_limits<double>::infinity() : (ticks * kCounterRates[rate]) / kSampleRate;
   double seconds = 0.0;
-  if (mode < 4) {
+  if (stoppedCounter) {
+    seconds = std::numeric_limits<double>::infinity();
+  } else if (mode < 4) {
     seconds = 0.0;
   } else if (mode == 4) {
     const u32 fullSamples = (0x800 / 0x20) * kCounterRates[rate];
@@ -139,6 +145,7 @@ struct SnesEnvelopeSeconds {
   return GainEnvelope{
       .envelope = envelope,
       .seconds = seconds,
+      .physicalSeconds = physicalSeconds,
   };
 }
 
@@ -250,6 +257,10 @@ double snesDspGainEnvelopeSeconds(u8 gain, s16 envelopeFrom, s16 envelopeTo) {
   return emulateGainEnvelope(gain, envelopeFrom, envelopeTo).seconds;
 }
 
+double snesDspGainPhysicalSeconds(u8 gain, s16 envelopeFrom, s16 envelopeTo) {
+  return emulateGainEnvelope(gain, envelopeFrom, envelopeTo).physicalSeconds;
+}
+
 s16 snesDspGainEnvelopeValue(u8 gain, s16 envelopeFrom, double elapsedSeconds) {
   s16 envelope = std::clamp<s16>(envelopeFrom, 0, 0x7ff);
   const u8 mode = gain >> 5;
@@ -264,6 +275,9 @@ s16 snesDspGainEnvelopeValue(u8 gain, s16 envelopeFrom, double elapsedSeconds) {
   }
 
   const u8 rate = gain & 0x1f;
+  if (rate == 0) {
+    return envelope;
+  }
   const auto updates =
       static_cast<u64>(std::floor(elapsedSeconds * kSampleRate / static_cast<double>(kCounterRates[rate])));
   for (u64 i = 0; i < updates; ++i) {

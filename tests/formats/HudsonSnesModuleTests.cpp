@@ -8,6 +8,7 @@
 
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
+#include "value/synth/SnesDsp.h"
 
 #include <algorithm>
 #include <array>
@@ -98,7 +99,7 @@ std::vector<u8> v2ScannerFixture() {
   bytes[cursor++] = 0x00;
   bytes[cursor++] = 0x8f;
   bytes[cursor++] = 0xe0;
-  bytes[cursor++] = 0x80;
+  bytes[cursor++] = 0x8a;
   bytes[cursor++] = 0x01;
   bytes[cursor++] = 0x01;
   writeLe16(bytes, cursor, 0x2100);
@@ -130,6 +131,40 @@ void scannerBuildsACompleteV2Collection() {
   expect(snapshot.collections().size() == 1 && collection->members.sequence &&
              collection->members.instrumentSets.size() == 1 && collection->members.sampleCollections.size() == 1,
          "HudsonSnes scanning should publish a connected sequence, instrument set, and BRR sample collection");
+  const auto* instruments = snapshot.asset<InstrumentSetAsset>(collection->members.instrumentSets.front());
+  const Envelope* envelope =
+      instruments != nullptr && !instruments->instruments.empty() && !instruments->instruments.front().regions.empty()
+          ? &instruments->instruments.front().regions.front().envelope
+          : nullptr;
+  const Envelope expected = snesDspEnvelope(0x8f, 0xe0, 0x8a);
+  expect(envelope != nullptr && envelope->releaseSeconds == expected.releaseSeconds,
+         "Hudson instruments should use the curve-compensated native KOF release by default");
+}
+
+void earlyGateReleaseStateMachineMatchesSuperBomberman2() {
+  std::vector<u32> instruments = runtimeData();
+  instruments[0] = 0x8fe08a;
+  const PerformanceSequence performance =
+      render(Version::Early, 1, false, {0xd5, 8, 0x40, 3, 0x40, 3, 0xff}, std::move(instruments));
+  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  expect(performance.diagnostics.empty() && notes.size() == 2 && notes[0]->header.tick == 0 &&
+             notes[0]->durationTicks == 4 && notes[1]->header.tick == 6 && notes[1]->durationTicks == 4,
+         "Hudson early quantize 8 should raise KOF on the penultimate driver tick");
+
+  const Envelope envelope = driverEnvelope(0x8f, 0xe0, 0x8a);
+  expect(envelope.decaySeconds == 0.0 && envelope.secondDecaySeconds && std::isinf(*envelope.secondDecaySeconds) &&
+             envelope.releaseSeconds == snesDspEnvelope(0x8f, 0xe0, 0x8a).releaseSeconds &&
+             std::abs(driverPseudoReleaseSeconds(0x8a) - 0.512) < 0.000001,
+         "Super Bomberman 2's 8F E0 8A instrument should distinguish native KOF from its gated GAIN release");
+
+  const PerformanceSequence shortened = render(
+      Version::Early, 0, false, {0xd5, 4, 0x40, 8, 0xd5, 7, 0x40, 8, 0xd5, 0, 0x40, 8, 0xd5, 0x80, 0x40, 8, 0xff});
+  const auto shortenedNotes = events<NotePerformanceEvent>(shortened.tracks.front());
+  const auto envelopes = events<EnvelopePerformanceEvent>(shortened.tracks.front());
+  expect(shortened.diagnostics.empty() && shortenedNotes.size() == 4 && shortenedNotes[0]->durationTicks == 5 &&
+             shortenedNotes[1]->durationTicks == 7 && shortenedNotes[2]->durationTicks == 1 &&
+             shortenedNotes[3]->durationTicks == 1 && envelopes.size() == 3,
+         "shortened Hudson gates should use GAIN only when it precedes the independent native KOF tick");
 }
 
 void headerDecodesEveryVersionTwoRecipe() {
@@ -266,7 +301,7 @@ void v2PlaybackUsesAuditedTempoLfosAndDynamicAdsr() {
     return event->target == ModulationPerformanceTarget::TremoloDepth && event->volumeDepthLinearGain;
   });
   expect(performance.diagnostics.empty() && !tempos.empty() && tempos.back()->microsecondsPerQuarter == 512000 &&
-             notes.size() == 1 && notes.front()->durationTicks == 24 &&
+             notes.size() == 1 && notes.front()->durationTicks == 20 &&
              std::abs(notes.front()->linearVelocity - 0.5) < 0.000001 && envelopes.size() == 5 &&
              tremolo != modulation.end() && (*tremolo)->frequencyHz &&
              std::abs(*(*tremolo)->frequencyHz - 0.9765625) < 0.000001,
@@ -288,8 +323,8 @@ void conditionalDispatchAndEarlyOperandLayoutsMatchTheDriver() {
 
   const PerformanceSequence directQuantize = render(Version::V2, 0, false, {0xd5, 0x80, 0x10, 1, 0xff});
   const auto directNotes = events<NotePerformanceEvent>(directQuantize.tracks.front());
-  expect(directQuantize.diagnostics.empty() && directNotes.size() == 1 && directNotes.front()->durationTicks == 256,
-         "a direct quantize value of zero should retain the driver's 256-tick counter wrap");
+  expect(directQuantize.diagnostics.empty() && directNotes.size() == 1 && directNotes.front()->durationTicks == 1,
+         "direct quantize zero should preserve the driver's zero gate instead of inventing a 256-tick wrap");
 }
 
 void customPitchAttackAndPercussionPreserveDriverCurvesAndMixerRows() {
@@ -448,6 +483,7 @@ void optionalRealCorpusSmokeTest() {
 
 void runHudsonSnesModuleTests() {
   scannerBuildsACompleteV2Collection();
+  earlyGateReleaseStateMachineMatchesSuperBomberman2();
   headerDecodesEveryVersionTwoRecipe();
   v2VolumeUsesThePostVelocityMixerCurve();
   v2PlaybackUsesAuditedTempoLfosAndDynamicAdsr();
