@@ -1079,13 +1079,13 @@ void MainWindow::routeSignals() {
   connect(m_vgmfile_listview->selectionModel(), &QItemSelectionModel::currentChanged, this,
           [this, synchronizeAssetSelection](const QModelIndex& current) {
             m_menu_bar->setContext(contextForAsset(m_workspace, current));
-            updateSelectionStatus(current, SelectionStatusKind::Asset);
             if (current.isValid()) {
               const auto asset = vgmtrans::core::AssetId{
                   current.data(vgmtrans::ui::IdRole).toUInt()};
               synchronizeAssetSelection(asset, m_vgmfile_listview);
               MdiArea::the()->selectAsset(asset, m_vgmfile_listview);
             }
+            updateSelectionStatus(current, SelectionStatusKind::Asset);
           });
   connect(m_coll_view->selectionModel(), &QItemSelectionModel::currentChanged, this,
           [this, synchronizeAssetSelection](const QModelIndex& current) {
@@ -1093,7 +1093,6 @@ void MainWindow::routeSignals() {
                 current.data(vgmtrans::ui::IsCollectionRole).toBool()
                     ? MenuBar::Context::Collection
                     : contextForAsset(m_workspace, current));
-            updateSelectionStatus(current, SelectionStatusKind::CollectionContents);
             if (current.isValid() &&
                 !current.data(vgmtrans::ui::IsCollectionRole).toBool()) {
               const auto asset = vgmtrans::core::AssetId{
@@ -1101,6 +1100,7 @@ void MainWindow::routeSignals() {
               synchronizeAssetSelection(asset, m_coll_view);
               MdiArea::the()->selectAsset(asset, m_coll_view);
             }
+            updateSelectionStatus(current, SelectionStatusKind::CollectionContents);
           });
 
   connect(m_coll_listview, &QAbstractItemView::doubleClicked, this,
