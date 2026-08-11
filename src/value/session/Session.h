@@ -25,6 +25,7 @@
 namespace vgmtrans::core {
 
 class SessionState;
+struct CollectionStitchResult;
 
 // Session is the mutable state for one loaded workspace. It owns the source
 // bytes, the assets found inside them, the facts used to match related assets,
@@ -58,6 +59,8 @@ public:
   [[nodiscard]] Artifact exportInstrumentSet(AssetId id, SynthExportFormat format, const ExportRequest& request) const;
   [[nodiscard]] std::vector<Artifact> exportCollection(CollectionId id, const ExportRequest& request) const;
   [[nodiscard]] std::vector<CollectionExport> exportAllCollections(const ExportRequest& request) const;
+  [[nodiscard]] CollectionStitchResult stitchCollections(std::span<const CollectionId> collections,
+                                                         const ExportRequest& request) const;
 
   [[nodiscard]] const SourceStore& sources() const noexcept { return sources_; }
   [[nodiscard]] const FormatRegistry& formats() const noexcept { return formats_; }

@@ -55,6 +55,8 @@ public:
                                                    const core::ExportRequest& request) const;
   [[nodiscard]] std::vector<core::Artifact> exportCollection(core::CollectionId id,
                                                              const core::ExportRequest& request) const;
+  [[nodiscard]] core::CollectionStitchResult stitchCollections(std::span<const core::CollectionId> collections,
+                                                               const core::ExportRequest& request) const;
 
 signals:
   void snapshotAboutToChange();

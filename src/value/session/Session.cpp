@@ -6,6 +6,7 @@
 
 #include "value/session/Session.h"
 
+#include "value/export/CollectionStitch.h"
 #include "value/export/Export.h"
 #include "value/model/SessionSnapshotAccess.h"
 #include "value/scan/FormatModule.h"
@@ -255,6 +256,11 @@ std::vector<Artifact> Session::exportCollection(CollectionId id, const ExportReq
 std::vector<CollectionExport> Session::exportAllCollections(const ExportRequest& request) const {
   const auto current = snapshot();
   return core::exportAllCollections(current, sources_, request, formats_);
+}
+
+CollectionStitchResult Session::stitchCollections(std::span<const CollectionId> collections,
+                                                  const ExportRequest& request) const {
+  return core::stitchCollections(snapshot(), sources_, collections, request, formats_);
 }
 
 void Session::sealFormats() noexcept {

@@ -80,6 +80,11 @@ struct PreparedSynthData {
   std::vector<Diagnostic> diagnostics;
 };
 
+// Apply the same performance-based instrument selection used by SF2 and DLS
+// preparation without decoding samples or lowering a container.
+[[nodiscard]] std::vector<const Instrument*> selectSynthInstruments(
+    std::span<const InstrumentSetAsset* const> instrumentSets, const PerformanceSequence* sequenceUsage);
+
 // SF2 and DLS have one decay followed by a fixed sustain level. Approximate a
 // richer envelope using both endpoint timing and perceptual salience, without
 // changing the instrument data kept by the scanner. attenuationRangeDb is the

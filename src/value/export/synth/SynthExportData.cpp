@@ -333,6 +333,11 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::sp
 
 }  // namespace
 
+std::vector<const Instrument*> selectSynthInstruments(std::span<const InstrumentSetAsset* const> instrumentSets,
+                                                      const PerformanceSequence* sequenceUsage) {
+  return selectInstruments(instrumentSets, sequenceUsage);
+}
+
 Envelope approximateEnvelopeAsAdsr(Envelope envelope, double attenuationRangeDb) {
   constexpr double endlessReleaseFallbackSeconds = 150.0;
   if (envelope.releaseSeconds && std::isinf(*envelope.releaseSeconds) && *envelope.releaseSeconds > 0.0) {
@@ -399,7 +404,7 @@ Envelope approximateEnvelopeAsAdsr(Envelope envelope, double attenuationRangeDb)
 PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceStore& sources,
                                    const SynthSampleDecodeOptions& options) {
   PreparedSynthData prepared;
-  const auto instruments = selectInstruments(input.instrumentSets, input.sequenceUsage);
+  const auto instruments = selectSynthInstruments(input.instrumentSets, input.sequenceUsage);
   std::optional<SynthSampleIndexList> sampleFilter;
   if (input.sequenceUsage != nullptr) {
     sampleFilter = referencedSamples(instruments, input.sampleCollections);
