@@ -47,6 +47,7 @@ public:
   [[nodiscard]] OpenResult openPaths(std::span<const std::filesystem::path> paths);
   [[nodiscard]] size_t removeSources(std::span<const core::SourceId> sources);
   [[nodiscard]] size_t removeAssets(std::span<const core::AssetId> assets);
+  [[nodiscard]] core::CollectionId createUserCollection(std::string name, core::CollectionMembers members);
   [[nodiscard]] core::CollectionPlayback preparePlayback(core::CollectionId id,
                                                          const core::PlaybackRequest& request) const;
   [[nodiscard]] core::Artifact exportSequenceMidi(core::AssetId id, const core::SequenceExportRequest& request) const;

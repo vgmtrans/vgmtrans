@@ -38,6 +38,7 @@ struct InstrumentEntry {
   AssetId asset;
   std::optional<SourceId> source;
   const SourceFile* file = nullptr;
+  u64 offset = 0;
   u32 sampleBytes = 0;
   std::optional<AssetId> samples;
 };
@@ -94,6 +95,7 @@ struct SampleEntry {
           .asset = facts.asset().metadata.id,
           .source = facts.sourceId,
           .file = facts.source,
+          .offset = facts.asset().metadata.range.offset,
           .sampleBytes = *sampleBytes,
           .samples = facts.relation(kInstrumentSamplesFact),
       });
@@ -119,6 +121,7 @@ struct SampleEntry {
 }
 
 [[nodiscard]] std::vector<const InstrumentEntry*> chooseInstruments(const SequenceEntry& sequence,
+                                                                    const std::vector<SequenceEntry>& sequenceEntries,
                                                                     const std::vector<InstrumentEntry>& banks) {
   std::vector<const InstrumentEntry*> selected;
   for (const auto& bank : banks) {
@@ -127,7 +130,13 @@ struct SampleEntry {
     }
   }
   if (!selected.empty()) {
-    return selected;
+    std::ranges::sort(selected, [](const InstrumentEntry* left, const InstrumentEntry* right) {
+      return left->offset > right->offset;
+    });
+    const size_t rank = std::ranges::count_if(sequenceEntries, [&](const SequenceEntry& candidate) {
+      return candidate.source == sequence.source && candidate.offset > sequence.offset;
+    });
+    return {selected[std::min(rank, selected.size() - 1)]};
   }
   for (const auto& bank : banks) {
     if (sameDirectory(sequence.file, bank.file)) {
@@ -196,7 +205,7 @@ std::vector<DesiredCollection> resolveSonyPs1Collections(const MatchContext& con
         },
         sequence.name);
     collection.sequence(sequence.asset);
-    const auto banks = chooseInstruments(sequence, instrumentEntries);
+    const auto banks = chooseInstruments(sequence, sequenceEntries, instrumentEntries);
     for (const auto* bank : banks) {
       attachBank(collection, *bank, sampleEntries);
     }
@@ -213,7 +222,7 @@ std::vector<DesiredCollection> resolveSonyPs1Collections(const MatchContext& con
 
   for (const auto& bank : instrumentEntries) {
     const bool pairedWithSequence = std::ranges::any_of(sequenceEntries, [&](const SequenceEntry& sequence) {
-      const auto selected = chooseInstruments(sequence, instrumentEntries);
+      const auto selected = chooseInstruments(sequence, sequenceEntries, instrumentEntries);
       return std::ranges::find(selected, &bank) != selected.end();
     });
     if (pairedWithSequence) {
@@ -233,6 +242,32 @@ std::vector<DesiredCollection> resolveSonyPs1Collections(const MatchContext& con
     collections.push_back(std::move(collection).finish());
   }
   return collections;
+}
+
+PreparedCollectionAssets prepareSonyPs1Collection(const CollectionPrepareContext& context) {
+  // Scan-time bank numbers describe every VAB in a source. Collections load
+  // their selected VABs into bank slots in member order.
+  std::vector<InstrumentSetAsset> instrumentSets;
+  instrumentSets.reserve(context.collection.members.instrumentSets.size());
+  for (size_t index = 0; index < context.collection.members.instrumentSets.size(); ++index) {
+    const auto* source = context.snapshot.asset<InstrumentSetAsset>(context.collection.members.instrumentSets[index]);
+    if (source == nullptr) {
+      return {};
+    }
+    instrumentSets.push_back(*source);
+    auto& prepared = instrumentSets.back();
+    if (prepared.metadata.format != kSonyPs1FormatName) {
+      continue;
+    }
+    const u32 bank = static_cast<u32>(index);
+    for (auto& instrument : prepared.instruments) {
+      const u32 program = instrument.explicitAddress ? instrument.explicitAddress->program
+                                                     : instrument.identity ? instrument.identity->key & 0xff : 0;
+      instrument.explicitAddress = InstrumentAddress{.bank = bank, .program = program};
+      instrument.identity = sonyPs1InstrumentIdentity(static_cast<u16>(bank), static_cast<u8>(program));
+    }
+  }
+  return PreparedCollectionAssets{.replacementInstrumentSets = std::move(instrumentSets)};
 }
 
 }  // namespace vgmtrans::formats::sony_ps1

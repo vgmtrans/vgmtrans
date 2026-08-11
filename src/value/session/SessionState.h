@@ -43,6 +43,7 @@ public:
 
   [[nodiscard]] bool removeAssets(std::span<const AssetId> assets);
   void removeSources(std::span<const SourceId> sources);
+  [[nodiscard]] CollectionId createUserCollection(std::string name, CollectionMembers members, ScanIdAllocator& ids);
 
   void addError(std::string message, std::optional<SourceRange> range = std::nullopt);
   void addDiagnostics(std::vector<Diagnostic> diagnostics);

@@ -112,6 +112,7 @@ FormatDefinition sonyPs1Definition() {
               .collectionResolverId = std::string(kSonyPs1CollectionResolver),
               .scan = scanSonyPs1,
               .resolveCollections = resolveSonyPs1Collections,
+              .prepareCollection = prepareSonyPs1Collection,
           },
       .sequenceDialects = {sonyPs1SequenceDialect()},
   };

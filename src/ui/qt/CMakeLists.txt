@@ -53,6 +53,7 @@ target_sources(vgmtrans
   PRIVATE
     About.cpp
     Logger.cpp
+    ManualCollectionDialog.cpp
     PlaybackControls.cpp
     ReportDialog.cpp
     SequencePlayer.cpp
@@ -93,6 +94,7 @@ target_sources(vgmtrans
     FILES
       About.h
       Logger.h
+      ManualCollectionDialog.h
       PlaybackPosition.h
       PlaybackControls.h
       ReportDialog.h
@@ -163,8 +165,6 @@ endif()
 # IDs and snapshots. Keep them visible in the project as reference
 # implementations; they are intentionally not linked into the value-only UI.
 set(VGMTRANS_UI_VALUE_PORT_REFERENCE_SOURCES
-  ManualCollectionDialog.cpp
-  ManualCollectionDialog.h
   services/MenuManager.cpp
   services/MenuManager.h
   services/NotificationCenter.cpp

@@ -176,6 +176,46 @@ void SessionState::removeSources(std::span<const SourceId> sources) {
   removeDiscoveredData(sourceIds, removedAssets);
 }
 
+CollectionId SessionState::createUserCollection(std::string name, CollectionMembers members, ScanIdAllocator& ids) {
+  if (name.empty()) {
+    throw std::invalid_argument("A user-created collection must have a name");
+  }
+  if (!members.sequence) {
+    throw std::invalid_argument("A user-created collection must contain a sequence");
+  }
+  if (asset<SequenceProgramAsset>(*members.sequence) == nullptr) {
+    throw std::invalid_argument("The selected sequence asset does not exist or has the wrong type");
+  }
+  if (members.instrumentSets.empty()) {
+    throw std::invalid_argument("A user-created collection must contain an instrument set");
+  }
+
+  const auto validate = [](const std::vector<AssetId>& values, auto expected, std::string_view role) {
+    std::unordered_set<u32> seen;
+    for (const AssetId id : values) {
+      if (!seen.insert(id.value).second) {
+        throw std::invalid_argument("The selected " + std::string(role) + " asset is duplicated");
+      }
+      if (expected(id) == nullptr) {
+        throw std::invalid_argument("A selected " + std::string(role) + " asset does not exist or has the wrong type");
+      }
+    }
+  };
+  validate(members.instrumentSets, [this](AssetId id) { return asset<InstrumentSetAsset>(id); }, "instrument set");
+  validate(
+      members.sampleCollections, [this](AssetId id) { return asset<SampleCollectionAsset>(id); }, "sample collection");
+  validate(members.miscAssets, [this](AssetId id) { return asset<MiscAsset>(id); }, "miscellaneous");
+
+  const CollectionId id = nextCollectionId(ids);
+  collections_.push_back(Collection{
+      .id = id,
+      .name = std::move(name),
+      .origin = CollectionOrigin::UserCreated,
+      .members = std::move(members),
+  });
+  return id;
+}
+
 void SessionState::addError(std::string message, std::optional<SourceRange> range) {
   diagnostics_.push_back(Diagnostic{
       .severity = Severity::Error,
