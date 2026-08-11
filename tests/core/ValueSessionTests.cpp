@@ -285,11 +285,10 @@ void sessionCreatesUserCollectionsFromDetectedAssets() {
       "manual collection should preserve the selected asset ids");
 
   session.removeSource(instrumentSource);
-  const SessionSnapshot stale = session.snapshot();
-  collection = stale.collection(created);
-  expect(collection != nullptr && collection->freshness == CollectionFreshness::Stale,
-         "a manual collection should remain inspectable when a selected asset is removed");
-  expect(stale.source(sequenceSource) != nullptr, "removing an instrument should preserve the sequence source");
+  const SessionSnapshot removed = session.snapshot();
+  expect(removed.collection(created) == nullptr,
+         "a manual collection should be removed when a selected asset's source is removed");
+  expect(removed.source(sequenceSource) != nullptr, "removing an instrument should preserve the sequence source");
 }
 
 void sessionMatchesCollectionsAcrossSeparateSourceScans() {

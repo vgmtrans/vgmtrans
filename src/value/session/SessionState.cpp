@@ -403,23 +403,28 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
 
   std::erase_if(diagnostics_, removesDiagnostic);
 
-  markCollectionsStaleForAssets(assetIds);
+  updateCollectionsForRemovedAssets(assetIds);
   rebuildViews();
   rebuildIndexes();
 }
 
-void SessionState::markCollectionsStaleForAssets(const std::unordered_set<u32>& assetIds) {
+void SessionState::updateCollectionsForRemovedAssets(const std::unordered_set<u32>& assetIds) {
   if (assetIds.empty()) {
     return;
   }
-  for (auto& collection : collections_) {
+
+  std::erase_if(collections_, [&](Collection& collection) {
     const auto removedAsset = referencedAsset(collection.members, assetIds);
     if (!removedAsset) {
-      continue;
+      return false;
+    }
+    if (collection.origin == CollectionOrigin::UserCreated) {
+      return true;
     }
     collection.freshness = CollectionFreshness::Stale;
     collection.issues.push_back(removedStaleAssetIssue(*removedAsset));
-  }
+    return false;
+  });
 }
 
 void SessionState::validateCollectionAssetReferences(std::string_view resolver, DesiredCollection& desired) {
