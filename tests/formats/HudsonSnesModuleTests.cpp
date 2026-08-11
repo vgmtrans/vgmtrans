@@ -65,6 +65,18 @@ std::vector<const Event*> events(const PerformanceTrack& track) {
   return result;
 }
 
+template <class Timing>
+std::vector<const PitchTransitionIntent*> pitchTransitions(const PerformanceTrack& track) {
+  std::vector<const PitchTransitionIntent*> result;
+  for (const PerformanceAutomation& automation : track.automations) {
+    const auto* transition = pitchTransitionIntent(automation);
+    if (transition != nullptr && std::holds_alternative<Timing>(transition->timing.physical)) {
+      result.push_back(transition);
+    }
+  }
+  return result;
+}
+
 std::vector<u32> runtimeData() {
   std::vector<u32> data(512);
   std::fill(data.begin() + 384, data.end(), 0xffffffffu);
@@ -381,19 +393,12 @@ void v1MixerAndPitchPipelineMatchesSuperBomberman3() {
       break;
     }
   }
-  const PitchTransitionIntent* attack = nullptr;
-  u32 fixedDurationAttacks = 0;
-  for (const auto& automation : pitched.tracks.front().automations) {
-    const auto* transition = pitchTransitionIntent(automation);
-    if (transition != nullptr && std::holds_alternative<FixedDurationPitchSlideTiming>(transition->timing.physical)) {
-      attack = transition;
-      ++fixedDurationAttacks;
-    }
-  }
+  const auto attacks = pitchTransitions<FixedDurationPitchSlideTiming>(pitched.tracks.front());
+  const auto* attack = attacks.empty() ? nullptr : attacks.back();
   const auto* timing =
       attack == nullptr ? nullptr : std::get_if<FixedDurationPitchSlideTiming>(&attack->timing.physical);
   expect(pitched.diagnostics.empty() && notes.size() == 2 && !notes.back()->restartsLfoPhase &&
-             fixedDurationAttacks == 1 && timing != nullptr && timing->milliseconds == 508.0 &&
+             attacks.size() == 1 && timing != nullptr && timing->milliseconds == 508.0 &&
              attack->targetKey - attack->startKey > 10.0 && vibrato != nullptr && vibrato->delayTicks == 0 &&
              vibrato->pitchRangeSemitones->minimum < 0.0 && vibrato->pitchRangeSemitones->maximum > 0.0,
          "Hudson 1.x should retain pitch state across slurs and express raw DSP pitch envelopes and vibrato");
@@ -430,12 +435,8 @@ void periodicVolumeSlidesRunOnTheDriverClock() {
 
 void portamentoRetainsPhysicalDriverTiming() {
   const PerformanceSequence performance = render(Version::V2, 2, false, {0x10, 6, 0xf1, 126, 0, 0x20, 6, 0xff});
-  const auto transition = std::ranges::find_if(performance.tracks.front().automations, [](const auto& automation) {
-    const auto* pitch = pitchTransitionIntent(automation);
-    return pitch != nullptr && std::holds_alternative<FixedRatePitchSlideTiming>(pitch->timing.physical);
-  });
-  const auto* pitch =
-      transition == performance.tracks.front().automations.end() ? nullptr : pitchTransitionIntent(*transition);
+  const auto transitions = pitchTransitions<FixedRatePitchSlideTiming>(performance.tracks.front());
+  const auto* pitch = transitions.empty() ? nullptr : transitions.front();
   const auto* timing = pitch == nullptr ? nullptr : std::get_if<FixedRatePitchSlideTiming>(&pitch->timing.physical);
   expect(performance.diagnostics.empty() && pitch != nullptr && timing != nullptr &&
              pitch->preferredRendering == PitchTransitionRenderingHint::Portamento &&
@@ -443,12 +444,8 @@ void portamentoRetainsPhysicalDriverTiming() {
          "portamento should retain the driver's fixed physical pitch rate and native-portamento preference");
 
   const PerformanceSequence v1 = render(Version::V1, 2, false, {0xf1, 1, 0, 0x10, 6, 0x30, 6, 0xff});
-  const auto v1Transition = std::ranges::find_if(v1.tracks.front().automations, [](const auto& automation) {
-    const auto* intent = pitchTransitionIntent(automation);
-    return intent != nullptr && std::holds_alternative<FixedDurationPitchSlideTiming>(intent->timing.physical);
-  });
-  const auto* v1Pitch =
-      v1Transition == v1.tracks.front().automations.end() ? nullptr : pitchTransitionIntent(*v1Transition);
+  const auto v1Transitions = pitchTransitions<FixedDurationPitchSlideTiming>(v1.tracks.front());
+  const auto* v1Pitch = v1Transitions.empty() ? nullptr : v1Transitions.front();
   const auto* v1Timing =
       v1Pitch == nullptr ? nullptr : std::get_if<FixedDurationPitchSlideTiming>(&v1Pitch->timing.physical);
   expect(v1.diagnostics.empty() && v1Timing != nullptr && v1Timing->milliseconds == 20.0,

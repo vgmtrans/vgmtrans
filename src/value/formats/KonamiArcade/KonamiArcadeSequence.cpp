@@ -545,7 +545,10 @@ struct Playback {
       note = emitNote(key, noteGain);
       if (continuesPreviousVoice || track.previousNoteStart + track.previousGateDuration == vm.tick()) {
         auto slide = out.pitchSlide(note, *track.previousKey, key, track.portamentoTime);
-        slide.continueFrom(track.previousNote).useCurrentPortamentoTiming();
+        slide.useCurrentPortamentoTiming();
+        if (continuesPreviousVoice) {
+          slide.continueFrom(track.previousNote);
+        }
       } else if (duration > 2) {
         out.at(vm.tick() + 1)
             .pitchSlide(note, *track.previousKey, key, track.portamentoTime)

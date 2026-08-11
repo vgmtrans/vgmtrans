@@ -1000,6 +1000,13 @@ void performanceMidiRendererAllowsMixedPitchTransitionRendering() {
              noteDuration(allPortamento, 8) == 4,
          "an explicit portamento request should override every transition preference");
 
+  const MidiSequence terminatingPortamento = renderMidiSequence(
+      performance,
+      MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento, .terminatePreviousVoice = true});
+  expect(std::ranges::none_of(terminatingPortamento.tracks[0].events,
+                              [](const MidiEvent& event) { return std::holds_alternative<AllSoundOff>(event); }),
+         "new-attack termination should not cut off linked native-portamento continuations");
+
   const MidiSequence allPitchBend =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   expect(countPortamento(allPitchBend) == 0 && countPitchBends(allPitchBend) != 0 &&
@@ -1091,6 +1098,13 @@ void performanceMidiRendererRetriggersUnlinkedPitchBendDestinations() {
   const auto noteCount = std::ranges::count_if(
       midi.tracks[0].events, [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); });
   expect(noteCount == 2, "a boundary pitch slide without continueFrom should retain the destination note's attack");
+
+  const MidiSequence terminatingPortamento = renderMidiSequence(
+      PerformanceSequence{.timebase = Timebase{.ppqn = 48}, .tracks = {track}},
+      MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento, .terminatePreviousVoice = true});
+  expect(std::ranges::count_if(terminatingPortamento.tracks[0].events,
+                               [](const MidiEvent& event) { return std::holds_alternative<AllSoundOff>(event); }) == 1,
+         "new-attack termination should still cut off an unlinked portamento destination");
 }
 
 void performanceMidiRendererStartsANewVoiceAfterPitchBendContinuationWhenNativePortamentoTakesOver() {
