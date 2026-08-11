@@ -58,13 +58,17 @@ constexpr u32 kPitchDescriptorBase = kWaveformBase + kTableEntries;
 constexpr u32 kDrumBase = kPitchDescriptorBase + kTableEntries;
 constexpr u32 kEchoBase = kDrumBase + kTableEntries;
 constexpr u32 kVolumeDescriptorBase = kEchoBase + 2;
-constexpr u32 kPayloadBase = kVolumeDescriptorBase + kTableEntries;
+constexpr u32 kTuningBase = kVolumeDescriptorBase + kTableEntries;
+constexpr u32 kPayloadBase = kTuningBase + kTableEntries;
 constexpr u32 kMissingInstrument = 0xffffffffu;
 
 struct RuntimeInstrument {
   u8 adsr1 = 0;
   u8 adsr2 = 0;
   u8 gain = 0;
+  u16 pitchScale = 0x0100;
+  s8 coarseTuning = 0;
+  s8 fineTuning = 0;
 };
 
 struct RuntimeDrum {
@@ -85,10 +89,14 @@ public:
     if (!value || *value == kMissingInstrument) {
       return std::nullopt;
     }
+    const u32 tuning = word(kTuningBase, program).value_or(0x01000000);
     return RuntimeInstrument{
         .adsr1 = static_cast<u8>(*value >> 16),
         .adsr2 = static_cast<u8>(*value >> 8),
         .gain = static_cast<u8>(*value),
+        .pitchScale = static_cast<u16>(tuning >> 16),
+        .coarseTuning = static_cast<s8>(static_cast<u8>(tuning >> 8)),
+        .fineTuning = static_cast<s8>(static_cast<u8>(tuning)),
     };
   }
 
@@ -155,7 +163,7 @@ private:
 namespace math {
 
 [[nodiscard]] u8 initialVolume(Version version) {
-  return version == Version::V2 ? 0x48 : 100;
+  return version == Version::V2 ? 0x48 : 0x78;
 }
 
 [[nodiscard]] u8 maximumVolume(Version version) {
@@ -211,6 +219,40 @@ namespace math {
       .leftGain = kPanTable[pan] / 127.0,
       .rightGain = kPanTable[30 - pan] / 127.0,
   };
+}
+
+[[nodiscard]] StereoBalance mixerGains(Version version, u8 volume, u8 pan) {
+  const StereoBalance balance = panGains(pan);
+  if (version == Version::V2 || volume == 0) {
+    return balance;
+  }
+
+  // 0.x/1.x perform both the channel-volume and $FF master-volume products
+  // with SPC700 MUL and retain only each high byte. Preserve those floors,
+  // which materially affect the quiet rows in Hudson's logarithmic table.
+  const auto side = [&](u8 panGain) {
+    const u8 channel = static_cast<u8>((static_cast<u16>(panGain) * volume) >> 8);
+    return ((static_cast<u16>(channel) * 0xff) >> 8) / 127.0;
+  };
+  const double level = levelGain(version, volume);
+  return StereoBalance{
+      .leftGain = side(kPanTable[std::min<u8>(pan & 0x1f, 30)]) / level,
+      .rightGain = side(kPanTable[30 - std::min<u8>(pan & 0x1f, 30)]) / level,
+  };
+}
+
+[[nodiscard]] double driverPitch(RuntimeInstrument instrument, double sourceKey) {
+  if (instrument.pitchScale == 0) {
+    return 0.0;
+  }
+  constexpr double topOctaveC = 4286.0;
+  const double tunedKey = sourceKey + instrument.coarseTuning + instrument.fineTuning / 256.0;
+  return topOctaveC * (instrument.pitchScale / 256.0) * std::exp2((tunedKey - 72.0) / 12.0);
+}
+
+[[nodiscard]] double pitchOffsetSemitones(double pitch, s32 offset) {
+  const double target = pitch + offset;
+  return pitch > 0.0 && target > 0.0 ? 12.0 * std::log2(target / pitch) : 0.0;
 }
 
 [[nodiscard]] double driverTickMilliseconds(u8 tempo, u8 timebaseShift) {
@@ -276,7 +318,7 @@ struct TrackState {
   bool initialEcho = false;
   u8 voiceBit = 1;
   s8 fineTuning = 0;
-  s16 transpose = 0;
+  s8 transpose = 0;
   std::optional<RuntimeInstrument> envelope;
   std::optional<u8> pseudoReleaseGain;
 
@@ -285,6 +327,7 @@ struct TrackState {
   bool shortLengthFlip = false;
   PerformanceNoteId lastNote;
   std::optional<double> lastKey;
+  std::optional<double> lastDriverPitch;
 
   u8 vibratoRate = 0;
   u8 vibratoDepth = 0;
@@ -302,8 +345,10 @@ struct TrackState {
   u8 pitchScriptScale = 2;
   s8 noteVolumeCurve = -1;
   std::optional<u8> currentSourceNote;
+  std::optional<u8> currentPitchNote;
 
   u8 portamentoSpeed = 0;
+  bool portamentoNeedsAnchor = false;
   std::array<Address, 6> loopStarts{};
   std::array<u32, 6> loopPlays{};
   u8 loopDepth = 0;
@@ -377,26 +422,39 @@ struct Playback {
     };
   }
 
-  void selectRelease(bool pseudoRelease) {
+  void selectRelease(bool pseudoRelease, bool activeVoice) {
     if (!track.envelope) {
       return;
     }
+    const VoiceEnvelopeScope scope =
+        activeVoice ? VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks : VoiceEnvelopeScope::FutureAttacks;
     if (pseudoRelease) {
       if (track.pseudoReleaseGain == track.envelope->gain) {
         return;
       }
       out.updateEnvelope(Envelope{.releaseSeconds = driverPseudoReleaseSeconds(track.envelope->gain)},
-                         EnvelopeFields::Release, VoiceEnvelopeScope::FutureAttacks);
+                         EnvelopeFields::Release, scope);
       track.pseudoReleaseGain = track.envelope->gain;
     } else if (track.pseudoReleaseGain) {
       const Envelope native = driverEnvelope(track.envelope->adsr1, track.envelope->adsr2, track.envelope->gain);
-      out.updateEnvelope(Envelope{.releaseSeconds = native.releaseSeconds}, EnvelopeFields::Release,
-                         VoiceEnvelopeScope::FutureAttacks);
+      out.updateEnvelope(Envelope{.releaseSeconds = native.releaseSeconds}, EnvelopeFields::Release, scope);
       track.pseudoReleaseGain.reset();
     }
   }
 
   [[nodiscard]] double currentVelocity() const { return math::noteVelocityGain(track.version, track.velocity); }
+
+  [[nodiscard]] double currentDriverPitch() const {
+    if (!track.envelope || !track.currentPitchNote) {
+      return 0.0;
+    }
+    const double sourceKey = *track.currentPitchNote + track.transpose + track.fineTuning / 256.0;
+    return math::driverPitch(*track.envelope, sourceKey);
+  }
+
+  [[nodiscard]] s32 modulationPitchOffset(u8 depth) const {
+    return static_cast<s32>((127u * depth) >> 8) << track.octave;
+  }
 
   void applyAttackEnvelope(double key) {
     if (!track.attackEnvelope || track.attackSpeed == 0 || track.attackDepth == 0) {
@@ -419,8 +477,9 @@ struct Playback {
         return;
       }
     }
-    const double initial = (track.attackDirection == 0 ? 1.0 : -1.0) * track.attackDepth / 256.0;
-    const double milliseconds = std::max<u32>(1, 128u - (track.attackSpeed & 0x7f)) * 4.0;
+    const s32 rawOffset = (track.attackDirection == 0 ? 1 : -1) * modulationPitchOffset(track.attackDepth);
+    const double initial = math::pitchOffsetSemitones(currentDriverPitch(), rawOffset);
+    const double milliseconds = track.attackSpeed * 4.0;
     const u32 ticks = math::timelineTicksForMilliseconds(milliseconds, program.tempo, track.timebaseShift);
     out.pitchSlide(track.lastNote, key + initial, key, PitchSlideTiming::fixedDuration(ticks, milliseconds))
         .preferPitchBend();
@@ -451,16 +510,42 @@ struct Playback {
     slide.preferPitchBend();
   }
 
-  void applyPortamento(double key, PerformanceNoteId previousNote, std::optional<double> previousKey) {
-    if (track.portamentoSpeed == 0 || !previousNote.valid() || !previousKey ||
-        std::abs(*previousKey - key) < 0.000001) {
+  void applyPortamento(double key, double driverPitch, PerformanceNoteId previousNote,
+                       std::optional<double> previousKey, bool continuesPreviousVoice) {
+    if (track.portamentoSpeed == 0) {
       return;
     }
-    const double semitonesPerSecond = 250.0 * track.portamentoSpeed / 127.0;
-    const double milliseconds = std::abs(*previousKey - key) / semitonesPerSecond * 1000.0;
-    const u32 ticks = math::timelineTicksForMilliseconds(milliseconds, program.tempo, track.timebaseShift);
-    out.pitchSlide(track.lastNote, *previousKey, key, PitchSlideTiming::fixedRate(ticks, semitonesPerSecond))
-        .preferPortamento();
+    if (track.portamentoNeedsAnchor) {
+      track.portamentoNeedsAnchor = false;
+      if (continuesPreviousVoice && previousNote.valid() && previousKey && *previousKey != key) {
+        out.pitchSlide(track.lastNote, *previousKey, key, PitchSlideTiming::fromTicks(0))
+            .continueFrom(previousNote)
+            .preferPitchBend();
+      }
+      return;
+    }
+    if (!previousNote.valid() || !previousKey || !track.lastDriverPitch || std::abs(*previousKey - key) < 0.000001) {
+      return;
+    }
+    double milliseconds;
+    PitchSlideTiming timing;
+    if (track.version != Version::V2 && driverPitch > 0.0) {
+      const u32 rawStep = static_cast<u32>(track.portamentoSpeed) << track.octave;
+      const double updates = std::ceil(std::abs(*track.lastDriverPitch - driverPitch) / rawStep);
+      milliseconds = std::max(1.0, updates) * 4.0;
+      timing = PitchSlideTiming::fixedDuration(
+          math::timelineTicksForMilliseconds(milliseconds, program.tempo, track.timebaseShift), milliseconds);
+    } else {
+      const double semitonesPerSecond = 250.0 * track.portamentoSpeed / 127.0;
+      milliseconds = std::abs(*previousKey - key) / semitonesPerSecond * 1000.0;
+      timing = PitchSlideTiming::fixedRate(
+          math::timelineTicksForMilliseconds(milliseconds, program.tempo, track.timebaseShift), semitonesPerSecond);
+    }
+    auto slide = out.pitchSlide(track.lastNote, *previousKey, key, timing);
+    if (continuesPreviousVoice) {
+      slide.continueFrom(previousNote);
+    }
+    slide.preferPortamento();
   }
 
   [[nodiscard]] Effects note(u32 encodedLength, u8 noteIndex, bool noKeyoff, u8 velocity, bool alternatingShortest) {
@@ -486,46 +571,69 @@ struct Playback {
         track.previousWasRest = true;
       }
       track.currentSourceNote.reset();
+      if (!noKeyoff) {
+        track.currentPitchNote.reset();
+      }
       track.previousSlurred = noKeyoff;
       return Effects::wait(wait);
     }
 
     const u8 sourceNote = static_cast<u8>(track.octave * 12 + noteIndex - 1);
+    u8 pitchNote = sourceNote;
     if (track.percussion) {
       if (const auto drum = program.tables.drum(sourceNote)) {
-        track.volume = std::min<u8>(drum->volume & 0x7f, math::maximumVolume(track.version));
+        const u8 volume = track.version == Version::V2 ? static_cast<u8>(drum->volume & 0x7f) : drum->volume;
+        track.volume = math::clippedVolume(track.version, volume);
         track.pan = std::min<u8>(drum->pan & 0x1f, 30);
         track.envelope = program.tables.instrument(drum->program);
-        emitPan(out);
+        pitchNote = drum->sourceKey & 0x7f;
       }
     }
     track.currentSourceNote = sourceNote;
+    track.currentPitchNote = pitchNote;
+    const double driverPitch = currentDriverPitch();
     if (velocityChanged || track.percussion || track.noteVolumeCurve >= 0) {
       emitLevel(out);
     }
+    if (track.percussion && track.version == Version::V2) {
+      emitPan(out);
+    }
     const double key = sourceNote + (track.percussion ? kDrumKeyBias : 0);
     const Articulation noteArticulation = articulation(driverLength, noKeyoff);
-    if (!noKeyoff) {
-      selectRelease(noteArticulation.pseudoRelease);
-    }
     const PerformanceNoteId previousNote = track.lastNote;
     const std::optional<double> previousKey = track.lastKey;
-    const bool tie =
-        track.previousSlurred && previousNote.valid() && previousKey && *previousKey == key && !track.previousWasRest;
+    const bool continuesPreviousVoice =
+        track.previousSlurred && previousNote.valid() && previousKey && !track.previousWasRest;
+    const bool tie = continuesPreviousVoice && *previousKey == key;
+    if (!noKeyoff) {
+      selectRelease(noteArticulation.pseudoRelease, continuesPreviousVoice);
+    }
+    if (track.version != Version::V2 && track.vibratoRate != 0 && track.vibratoDepth != 0) {
+      emitVibratoDepth();
+    }
     NotePerformanceEvent event{
         .key = key,
         .linearVelocity = currentVelocity(),
         .durationTicks = noteArticulation.ticks,
         .extendsPrevious = tie,
-        .restartsLfoPhase = !tie,
-        .restartsVibratoLfoPhase = !tie,
-        .restartsTremoloLfoPhase = !tie,
+        .restartsLfoPhase = !continuesPreviousVoice,
+        .restartsVibratoLfoPhase = !continuesPreviousVoice,
+        .restartsTremoloLfoPhase = !continuesPreviousVoice,
     };
     track.lastNote = out.note(std::move(event));
-    applyPortamento(key, previousNote, previousKey);
-    applyAttackEnvelope(key);
-    applyPitchScript(key);
+    if (continuesPreviousVoice && !tie && track.portamentoSpeed == 0) {
+      out.pitchSlide(track.lastNote, *previousKey, key, PitchSlideTiming::fromTicks(0))
+          .continueFrom(previousNote)
+          .preferPitchBend();
+    } else {
+      applyPortamento(key, driverPitch, previousNote, previousKey, continuesPreviousVoice);
+    }
+    if (!continuesPreviousVoice) {
+      applyAttackEnvelope(key);
+      applyPitchScript(key);
+    }
     track.lastKey = key;
+    track.lastDriverPitch = driverPitch;
     track.previousWasRest = false;
     track.previousSlurred = noKeyoff;
     return Effects::wait(wait);
@@ -565,6 +673,9 @@ struct Playback {
   void emitLevel(PerformanceEmitter output) const {
     output.level(math::levelGain(track.version, effectiveVolume(), track.velocity),
                  ValueQuantization{.levels = static_cast<u16>(math::maximumVolume(track.version) + 1)});
+    if (track.version != Version::V2) {
+      emitPan(output);
+    }
   }
 
   void setVolume(u8 value, bool stopSlide) {
@@ -593,7 +704,7 @@ struct Playback {
   }
 
   void emitPan(PerformanceEmitter output) const {
-    const StereoBalance gains = math::panGains(track.pan);
+    const StereoBalance gains = math::mixerGains(track.version, effectiveVolume(), track.pan);
     output.stereoBalance((track.reversePhase & 2) != 0 ? -gains.leftGain : gains.leftGain,
                          (track.reversePhase & 1) != 0 ? -gains.rightGain : gains.rightGain);
   }
@@ -614,16 +725,24 @@ struct Playback {
   }
 
   void transposeRelative(s8 value) {
-    track.transpose = static_cast<s16>(track.transpose + value);
+    track.transpose = static_cast<s8>(track.transpose + value);
     emitTuning();
   }
 
-  void emitTuning() { out.tuning(track.transpose * 100.0 + track.fineTuning * (100.0 / 256.0)); }
+  void emitTuning() {
+    out.tuning(track.transpose * 100.0 + track.fineTuning * (100.0 / 256.0));
+    if (track.version != Version::V2 && track.vibratoRate != 0 && track.vibratoDepth != 0) {
+      emitVibratoDepth();
+    }
+  }
 
   [[nodiscard]] LfoPerformanceContext lfoContext(u8 delay = 0) const {
+    // 0.x/1.x load the delay counter at note-on and decrement it later in the
+    // same music tick, so a value of one starts immediately.
+    const u8 effectiveDelay = track.version != Version::V2 && delay != 0 ? delay - 1 : delay;
     LfoPerformanceContext context{
-        .delayTicks = normalized(delay),
-        .delayMilliseconds = delay * math::driverTickMilliseconds(program.tempo, track.timebaseShift),
+        .delayTicks = normalized(effectiveDelay),
+        .delayMilliseconds = effectiveDelay * math::driverTickMilliseconds(program.tempo, track.timebaseShift),
         .delayIsTempoRelative = true,
         .waveform = LfoWaveform::Triangle,
         .sampleImmediatelyOnNote = true,
@@ -647,9 +766,31 @@ struct Playback {
     return 250.0 / (((track.vibratoMode & 3) == 0 ? 4.0 : 2.0) * period);
   }
 
+  [[nodiscard]] std::optional<ModulationRange> vibratoPitchRange() const {
+    if (track.version == Version::V2 || track.vibratoRate == 0) {
+      return std::nullopt;
+    }
+    const double pitch = currentDriverPitch();
+    const s32 offset = modulationPitchOffset(track.vibratoDepth);
+    if (pitch == 0.0 || offset == 0) {
+      return ModulationRange{};
+    }
+    const double upward = math::pitchOffsetSemitones(pitch, offset);
+    const double downward = track.vibratoType == 0 ? math::pitchOffsetSemitones(pitch, -offset) : 0.0;
+    return ModulationRange{.minimum = downward, .maximum = upward};
+  }
+
+  [[nodiscard]] double vibratoDepthSemitones() const {
+    if (const auto range = vibratoPitchRange()) {
+      return std::max(std::abs(range->minimum), std::abs(range->maximum));
+    }
+    return track.vibratoDepth / 256.0;
+  }
+
   [[nodiscard]] LfoPerformanceContext configuredLfoContext(u8 delay) const {
     auto context = lfoContext(delay);
     context.frequencyHz = vibratoFrequency();
+    context.pitchRangeSemitones = vibratoPitchRange();
     if (track.version != Version::V2) {
       if (track.vibratoType != 0) {
         context.polarity = LfoPolarity::Positive;
@@ -667,16 +808,27 @@ struct Playback {
     return context;
   }
 
+  void emitVibratoDepth() {
+    const auto context = configuredLfoContext(track.vibratoDelay);
+    out.vibratoDepth(track.vibratoRate == 0 ? 0.0 : vibratoDepthSemitones(), context);
+  }
+
   void emitVibrato() {
     const auto context = configuredLfoContext(track.vibratoDelay);
-    out.vibratoDepth(track.vibratoRate == 0 ? 0.0 : track.vibratoDepth / 256.0, context);
+    out.vibratoDepth(track.vibratoRate == 0 ? 0.0 : vibratoDepthSemitones(), context);
     out.vibratoRate(vibratoFrequency(), context);
-    out.vibratoDelayPhysical(normalized(track.vibratoDelay),
-                             track.vibratoDelay * math::driverTickMilliseconds(program.tempo, track.timebaseShift));
+    out.vibratoDelayPhysical(context.delayTicks.value_or(0), context.delayMilliseconds.value_or(0.0));
   }
 
   void vibrato(u8 rate, u8 depth, u8 mode) {
-    track.vibratoRate = rate & 0x7f;
+    const u8 maskedRate = rate & 0x7f;
+    if (track.version != Version::V2 && maskedRate == 0) {
+      // The 0.x/1.x command clears only depth; its previous rate survives.
+      track.vibratoDepth = 0;
+      emitVibrato();
+      return;
+    }
+    track.vibratoRate = maskedRate;
     track.vibratoDepth = depth;
     track.vibratoMode = mode;
     track.tremolo = false;
@@ -708,8 +860,7 @@ struct Playback {
     out.vibratoDepth(0.0, context);
     out.tremoloLinearGainDepth(depth, context);
     out.tremoloRate(vibratoFrequency(), context);
-    out.tremoloDelayPhysical(normalized(track.vibratoDelay),
-                             track.vibratoDelay * math::driverTickMilliseconds(program.tempo, track.timebaseShift));
+    out.tremoloDelayPhysical(context.delayTicks.value_or(0), context.delayMilliseconds.value_or(0.0));
   }
 
   void tremolo(u8 delay) {
@@ -733,10 +884,17 @@ struct Playback {
   }
 
   void pitchAttack(u8 speed, u8 depth, u8 direction) {
-    track.attackSpeed = speed & 0x7f;
+    const u8 maskedSpeed = speed & 0x7f;
+    if (maskedSpeed == 0) {
+      return;
+    }
+    track.attackSpeed = maskedSpeed;
+    if (depth == 0) {
+      return;
+    }
     track.attackDepth = depth;
     track.attackDirection = direction;
-    track.attackEnvelope = track.attackSpeed != 0 && depth != 0;
+    track.attackEnvelope = true;
   }
 
   void pitchAttackOff() {
@@ -755,6 +913,10 @@ struct Playback {
 
   void portamento(u8 speed) {
     track.portamentoSpeed = speed == 0 ? 0 : static_cast<u8>(speed + 1);
+    track.portamentoNeedsAnchor = track.version != Version::V2 && track.portamentoSpeed != 0;
+    if (track.portamentoSpeed != 0) {
+      track.pitchScriptDelay = 0;
+    }
     out.portamentoEnable(track.portamentoSpeed != 0);
   }
 
@@ -1314,6 +1476,9 @@ std::vector<u32> RuntimeTables::encode(const ParsedHeader& header) {
     }
     result[instrument.program] =
         (static_cast<u32>(instrument.adsr1) << 16) | (static_cast<u32>(instrument.adsr2) << 8) | instrument.gain;
+    result[kTuningBase + instrument.program] = (static_cast<u32>(instrument.pitchScale) << 16) |
+                                               (static_cast<u32>(static_cast<u8>(instrument.coarseTuning)) << 8) |
+                                               static_cast<u8>(instrument.fineTuning);
   }
   for (const CustomWaveform& waveform : header.recipes.customWaveforms) {
     const u32 count = std::min<size_t>(waveform.samples.size(), 255);
@@ -1364,7 +1529,7 @@ const SequenceDialect& sequenceDialect() {
               .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .initialLevel = math::levelGain(Version::Early, math::initialVolume(Version::Early)),
               .initialReverbSend = 0.0,
-              .initialStereoBalance = math::panGains(15),
+              .initialStereoBalance = math::mixerGains(Version::Early, math::initialVolume(Version::Early), 15),
               .initialMonoModeChannels = 0,
           },
   });
@@ -1404,7 +1569,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   program.config.driverData = RuntimeTables::encode(*header);
   program.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(120, header->timebaseShift);
   program.behavior.initialLevel = math::levelGain(layout.version, math::initialVolume(layout.version));
-  program.behavior.initialStereoBalance = math::panGains(15);
+  program.behavior.initialStereoBalance = math::mixerGains(layout.version, math::initialVolume(layout.version), 15);
   return SequenceParse{
       .program = std::move(program),
       .recipes = std::move(header->recipes),
