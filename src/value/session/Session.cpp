@@ -167,6 +167,13 @@ void Session::removeAssets(std::span<const AssetId> assets) {
   rebuildCollections();
 }
 
+CollectionId Session::createUserCollection(std::string name, CollectionMembers members) {
+  sealFormats();
+  const CollectionId id = state_->createUserCollection(std::move(name), std::move(members), ids_);
+  invalidateSnapshot();
+  return id;
+}
+
 // Scan this source if it has not been scanned yet. Any files extracted from it are
 // added as derived sources and scanned before this call returns.
 void Session::scanSource(SourceId id) {

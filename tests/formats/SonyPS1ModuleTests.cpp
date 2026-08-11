@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <variant>
@@ -334,4 +335,49 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
   expect(splitSnapshot.collections().size() == 1 && splitSnapshot.collections()[0].members.instrumentSets.size() == 1 &&
              splitSnapshot.collections()[0].members.sampleCollections.size() == 1,
          "matching split VH and VB sources should resolve into one exportable synth collection");
+
+  const auto bankBytes = vabFixture(7, true);
+  const auto sequenceBytes = sequenceFixture({0x00, 0xff, 0x2f, 0x00});
+  const u32 secondBank = static_cast<u32>(bankBytes.size() + 0x100);
+  const u32 firstSequence = static_cast<u32>(secondBank + bankBytes.size() + 0x100);
+  const u32 secondSequence = static_cast<u32>(firstSequence + sequenceBytes.size() + 0x100);
+  std::vector<u8> pairedBytes(secondSequence + sequenceBytes.size(), 0);
+  std::ranges::copy(bankBytes, pairedBytes.begin());
+  std::ranges::copy(bankBytes, pairedBytes.begin() + secondBank);
+  std::ranges::copy(sequenceBytes, pairedBytes.begin() + firstSequence);
+  std::ranges::copy(sequenceBytes, pairedBytes.begin() + secondSequence);
+
+  Session paired;
+  paired.registerFormat(sonyPs1Definition());
+  paired.addSource(SourceFile{.name = "paired.psf"}, std::move(pairedBytes));
+  paired.scanPendingSources();
+  const SessionSnapshot pairedSnapshot = paired.snapshot();
+  const Collection* latestCollection = nullptr;
+  const auto bankForSequence = [&](u32 sequenceOffset) {
+    for (const auto& collection : pairedSnapshot.collections()) {
+      const auto* sequence = pairedSnapshot.asset<SequenceProgramAsset>(*collection.members.sequence);
+      if (sequence->metadata.range.offset == sequenceOffset) {
+        if (sequenceOffset == secondSequence) {
+          latestCollection = &collection;
+        }
+        expect(collection.members.instrumentSets.size() == 1 && collection.members.sampleCollections.size() == 1,
+               "each same-source SonyPS1 sequence should resolve to one VAB pair");
+        return pairedSnapshot.asset<InstrumentSetAsset>(collection.members.instrumentSets.front())
+            ->metadata.range.offset;
+      }
+    }
+    return std::numeric_limits<u64>::max();
+  };
+  expect(bankForSequence(secondSequence) == secondBank && bankForSequence(firstSequence) == 0,
+         "same-source SonyPS1 sequences and VABs should pair in descending offset order");
+  const auto prepared = prepareSonyPs1Collection(CollectionPrepareContext{
+      .sources = paired.sources(),
+      .snapshot = pairedSnapshot,
+      .collection = *latestCollection,
+  });
+  expect(prepared.replacementInstrumentSets && prepared.replacementInstrumentSets->size() == 1,
+         "resolved SonyPS1 preparation should retain its selected VAB");
+  const auto& instrument = prepared.replacementInstrumentSets->front().instruments.front();
+  expect(instrument.explicitAddress && instrument.explicitAddress->bank == 0,
+         "the selected VAB should be rebased from scan bank 1 to collection bank 0");
 }

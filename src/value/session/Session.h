@@ -46,6 +46,7 @@ public:
   void removeSource(SourceId id);
   void removeSources(std::span<const SourceId> ids);
   void removeAssets(std::span<const AssetId> assets);
+  [[nodiscard]] CollectionId createUserCollection(std::string name, CollectionMembers members);
 
   void scanSource(SourceId id);
   void scanPendingSources();

@@ -253,6 +253,45 @@ void sessionKeepsScannerKnownCollectionsWithoutResolver() {
   expect(project.collections().empty(), "explicit scanner-known collection should disappear with its source");
 }
 
+void sessionCreatesUserCollectionsFromDetectedAssets() {
+  Session session;
+  session.registerFormat(testFormat(probeBankSequenceModule(), probeSequenceDialect()));
+  session.registerFormat(testFormat(probeBankInstrumentModule()));
+
+  const SourceId sequenceSource = session.addSource(SourceFile{.name = "manual.seq"}, {0xcc, 4});
+  const SourceId instrumentSource = session.addSource(SourceFile{.name = "manual.instr"}, {0xdd, 4});
+  session.scanPendingSources();
+
+  const SessionSnapshot before = session.snapshot();
+  expect(before.collections().size() == 1, "matched fixture assets should begin in one discovered collection");
+  const auto* sequence = std::get_if<SequenceProgramAsset>(&before.assets()[0]);
+  const auto* instruments = std::get_if<InstrumentSetAsset>(&before.assets()[1]);
+  expect(sequence != nullptr && instruments != nullptr, "manual collection fixture should expose compatible assets");
+
+  const CollectionMembers members{
+      .sequence = sequence->metadata.id,
+      .instrumentSets = {instruments->metadata.id},
+  };
+  const CollectionId created = session.createUserCollection("Hand-picked", members);
+  const SessionSnapshot after = session.snapshot();
+  const Collection* collection = after.collection(created);
+  expect(collection != nullptr, "created collection should be addressable by its stable id");
+  expect(after.collections().size() == 2 && before.collections().size() == 1,
+         "creating a collection should publish a new immutable snapshot revision");
+  expect(collection->name == "Hand-picked" && collection->origin == CollectionOrigin::UserCreated,
+         "manual collection should preserve its name and user-created origin");
+  expect(
+      collection->members.sequence == members.sequence && collection->members.instrumentSets == members.instrumentSets,
+      "manual collection should preserve the selected asset ids");
+
+  session.removeSource(instrumentSource);
+  const SessionSnapshot stale = session.snapshot();
+  collection = stale.collection(created);
+  expect(collection != nullptr && collection->freshness == CollectionFreshness::Stale,
+         "a manual collection should remain inspectable when a selected asset is removed");
+  expect(stale.source(sequenceSource) != nullptr, "removing an instrument should preserve the sequence source");
+}
+
 void sessionMatchesCollectionsAcrossSeparateSourceScans() {
   Session session;
   session.registerFormat(testFormat(probeBankSequenceModule(), probeSequenceDialect()));
@@ -1124,6 +1163,7 @@ void runValueSessionTests() {
   sessionScansIndividualSourcesWithoutDuplicating();
   sessionClosesSourceFamiliesWhenScansFindNoAssets();
   sessionKeepsScannerKnownCollectionsWithoutResolver();
+  sessionCreatesUserCollectionsFromDetectedAssets();
   sessionMatchesCollectionsAcrossSeparateSourceScans();
   sessionRemovesSourceFamilyAndDiscoveredData();
   sessionRemovesSourceFamilyWithItsLastAsset();

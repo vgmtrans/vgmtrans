@@ -136,6 +136,24 @@ void ensureOwnedInstrumentSets(PreparedExport& prepared) {
   rebuildInstrumentSetView(prepared);
 }
 
+[[nodiscard]] const FormatModule* collectionPreparationModule(const Collection& collection,
+                                                              const SequenceProgramAsset* sequence,
+                                                              const FormatRegistry& formats) {
+  if (collection.origin == CollectionOrigin::UserCreated && sequence != nullptr) {
+    const auto* module = formats.findModule(sequence->metadata.format);
+    if (module != nullptr && module->prepareCollection != nullptr) {
+      return module;
+    }
+  }
+
+  const auto found = std::ranges::find_if(formats.modules(), [&](const FormatModule& module) {
+    const std::string_view resolver =
+        module.collectionResolverId.empty() ? std::string_view(module.name) : module.collectionResolverId;
+    return module.prepareCollection != nullptr && resolver == collection.key.resolver;
+  });
+  return found != formats.modules().end() ? &*found : nullptr;
+}
+
 [[nodiscard]] PreparedExport prepareCollectionExport(const SessionSnapshot& snapshot, CollectionId id,
                                                      const SourceStore& sources, const FormatRegistry& formats) {
   PreparedExport prepared;
@@ -174,15 +192,9 @@ void ensureOwnedInstrumentSets(PreparedExport& prepared) {
     }
   }
 
-  for (const auto& module : formats.modules()) {
-    const std::string_view resolver =
-        module.collectionResolverId.empty() ? std::string_view(module.name) : module.collectionResolverId;
-    if (module.prepareCollection == nullptr || resolver != collection.key.resolver) {
-      continue;
-    }
-
+  if (const auto* module = collectionPreparationModule(collection, prepared.sequenceProgram, formats)) {
     try {
-      auto result = module.prepareCollection(CollectionPrepareContext{
+      auto result = module->prepareCollection(CollectionPrepareContext{
           .sources = sources,
           .snapshot = snapshot,
           .collection = collection,
@@ -200,9 +212,8 @@ void ensureOwnedInstrumentSets(PreparedExport& prepared) {
       }
     } catch (const std::exception& ex) {
       prepared.diagnostics.collection.push_back(
-          exportError(module.name + " collection preparation failed: " + ex.what()));
+          exportError(module->name + " collection preparation failed: " + ex.what()));
     }
-    break;
   }
   return prepared;
 }

@@ -9,6 +9,7 @@
 #include "About.h"
 #include "Logger.h"
 #include "MainWindowDockLayout.h"
+#include "ManualCollectionDialog.h"
 #include "MenuBar.h"
 #include "PlaybackControls.h"
 #include "ReportDialog.h"
@@ -829,6 +830,26 @@ void MainWindow::togglePlayback() {
 
 void MainWindow::routeSignals() {
   auto* mdiArea = MdiArea::the();
+  connect(this, &MainWindow::manualCollectionRequested, this, [this] {
+    auto* dialog = new ManualCollectionDialog(m_workspace, this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    connect(dialog, &QDialog::accepted, this, [this, dialog] {
+      if (dialog->mayBeSilent()) {
+        showToast(tr("The created collection does not contain a sample collection. "
+                     "The instrument bank may be silent."),
+                  ToastType::Warning);
+      }
+      if (const auto collection = dialog->createdCollection()) {
+        const QModelIndex index = indexForId(m_coll_listview, collection->value, false);
+        if (index.isValid()) {
+          m_coll_listview->selectionModel()->setCurrentIndex(
+              index, QItemSelectionModel::ClearAndSelect);
+          m_coll_listview->scrollTo(index, QAbstractItemView::EnsureVisible);
+        }
+      }
+    });
+    dialog->open();
+  });
   connect(m_menu_bar, &MenuBar::openFile, this, &MainWindow::openFile);
   connect(m_menu_bar, &MenuBar::openRecentFile, this, &MainWindow::openFileInternal);
   connect(m_menu_bar, &MenuBar::exit, this, &MainWindow::close);

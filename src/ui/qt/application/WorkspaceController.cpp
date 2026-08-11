@@ -115,6 +115,12 @@ size_t WorkspaceController::removeAssets(std::span<const core::AssetId> assets) 
   return existing.size();
 }
 
+core::CollectionId WorkspaceController::createUserCollection(std::string name, core::CollectionMembers members) {
+  const core::CollectionId id = session_.createUserCollection(std::move(name), std::move(members));
+  publish(session_.snapshot());
+  return id;
+}
+
 core::CollectionPlayback WorkspaceController::preparePlayback(core::CollectionId id,
                                                               const core::PlaybackRequest& request) const {
   return session_.preparePlayback(id, request);
