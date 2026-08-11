@@ -24,6 +24,10 @@ namespace vgmtrans::core {
 [[nodiscard]] double snesDspAdsrDecaySeconds(u8 decayRate);
 [[nodiscard]] double snesDspAdsrSustainSeconds(u8 sustainRate);
 [[nodiscard]] double snesDspGainEnvelopeSeconds(u8 gain, s16 envelopeFrom, s16 envelopeTo);
+// Returns the actual wall-clock time for the DSP to reach envelopeTo. Unlike
+// snesDspGainEnvelopeSeconds, this does not reshape the result for a dB-linear
+// synth envelope.
+[[nodiscard]] double snesDspGainPhysicalSeconds(u8 gain, s16 envelopeFrom, s16 envelopeTo);
 // Returns the DSP ENVX value reached after running GAIN from envelopeFrom for
 // elapsedSeconds.
 [[nodiscard]] s16 snesDspGainEnvelopeValue(u8 gain, s16 envelopeFrom, double elapsedSeconds);

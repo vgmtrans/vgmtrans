@@ -147,11 +147,11 @@ namespace math {
   return duration == 0 ? 256 : duration;
 }
 
-[[nodiscard]] Envelope envelope(RuntimeInstrument instrument) {
-  Envelope result = snesDspEnvelope(instrument.adsr1, instrument.adsr2, instrument.gain);
-  // Hudson keys notes off by writing GAIN and clearing ADSR1 bit 7. Preserve
-  // that pseudo-release instead of the generic SNES ADSR release estimate.
-  result.releaseSeconds = snesDspGainEnvelopeSeconds(instrument.gain, 0x7ff, 0);
+[[nodiscard]] Envelope envelope(RuntimeInstrument instrument, bool pseudoRelease = false) {
+  Envelope result = driverEnvelope(instrument.adsr1, instrument.adsr2, instrument.gain);
+  if (pseudoRelease) {
+    result.releaseSeconds = driverPseudoReleaseSeconds(instrument.gain);
+  }
   return result;
 }
 
@@ -284,6 +284,7 @@ struct TrackState {
   s8 fineTuning = 0;
   s16 transpose = 0;
   std::optional<RuntimeInstrument> envelope;
+  std::optional<u8> pseudoReleaseGain;
 
   bool previousSlurred = false;
   bool previousWasRest = true;
@@ -352,22 +353,53 @@ struct Playback {
     return track.shortLengthFlip ? 2 : 1;
   }
 
-  [[nodiscard]] u32 soundingTicks(u32 driverLength, bool noKeyoff) const {
+  struct Articulation {
+    u32 ticks = 1;
+    bool pseudoRelease = false;
+  };
+
+  [[nodiscard]] Articulation articulation(u32 driverLength, bool noKeyoff) const {
     if (noKeyoff) {
-      return normalized(driverLength);
+      return Articulation{.ticks = normalized(driverLength)};
     }
-    u32 duration = 1;
+    u32 gate = 1;
     if ((track.quantize & 0x80) != 0) {
-      duration = track.quantize & 0x7f;
-      if (duration == 0) {
-        duration = 256;
-      }
+      gate = track.quantize & 0x7f;
     } else if (track.quantize <= 8) {
-      duration = std::max<u32>((driverLength * track.quantize + 7) / 8, 1);
+      gate = (driverLength * track.quantize + 7) / 8;
     } else {
-      duration = std::max<s32>(static_cast<s32>(driverLength) - (track.quantize - 8), 1);
+      gate = std::max<s32>(static_cast<s32>(driverLength) - (track.quantize - 8), 1);
     }
-    return normalized(duration);
+    // State 1 starts the attack without decrementing the gate. State 2 begins
+    // the cached-GAIN release one tick after that counter reaches zero. The
+    // length counter independently raises KOF on its penultimate tick; KOF
+    // wins when both happen together.
+    const u32 keyOffTick = std::max<u32>(driverLength - 1, 1);
+    const u32 pseudoReleaseTick = gate + 1;
+    const bool pseudoRelease = pseudoReleaseTick < keyOffTick;
+    return Articulation{
+        .ticks = normalized(pseudoRelease ? pseudoReleaseTick : keyOffTick),
+        .pseudoRelease = pseudoRelease,
+    };
+  }
+
+  void selectRelease(bool pseudoRelease) {
+    if (!track.envelope) {
+      return;
+    }
+    if (pseudoRelease) {
+      if (track.pseudoReleaseGain == track.envelope->gain) {
+        return;
+      }
+      out.updateEnvelope(Envelope{.releaseSeconds = driverPseudoReleaseSeconds(track.envelope->gain)},
+                         EnvelopeFields::Release, VoiceEnvelopeScope::FutureAttacks);
+      track.pseudoReleaseGain = track.envelope->gain;
+    } else if (track.pseudoReleaseGain) {
+      const Envelope native = driverEnvelope(track.envelope->adsr1, track.envelope->adsr2, track.envelope->gain);
+      out.updateEnvelope(Envelope{.releaseSeconds = native.releaseSeconds}, EnvelopeFields::Release,
+                         VoiceEnvelopeScope::FutureAttacks);
+      track.pseudoReleaseGain.reset();
+    }
   }
 
   [[nodiscard]] double currentVelocity() const { return math::noteVelocityGain(track.version, track.velocity); }
@@ -478,7 +510,10 @@ struct Playback {
       emitLevel(out);
     }
     const double key = sourceNote + (track.percussion ? kDrumKeyBias : 0);
-    const u32 duration = soundingTicks(driverLength, noKeyoff);
+    const Articulation noteArticulation = articulation(driverLength, noKeyoff);
+    if (!noKeyoff) {
+      selectRelease(noteArticulation.pseudoRelease);
+    }
     const PerformanceNoteId previousNote = track.lastNote;
     const std::optional<double> previousKey = track.lastKey;
     const bool tie =
@@ -486,7 +521,7 @@ struct Playback {
     NotePerformanceEvent event{
         .key = key,
         .linearVelocity = currentVelocity(),
-        .durationTicks = duration,
+        .durationTicks = noteArticulation.ticks,
         .extendsPrevious = tie,
         .restartsLfoPhase = !tie,
         .restartsVibratoLfoPhase = !tie,
@@ -517,6 +552,7 @@ struct Playback {
     if (!track.percussion) {
       out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = value});
       out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::FutureAttacks);
+      track.pseudoReleaseGain.reset();
     }
   }
 
@@ -732,6 +768,7 @@ struct Playback {
     track.percussion = enabled;
     out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain),
                                       .key = enabled ? kDrumKitKey : track.sourceProgram});
+    track.pseudoReleaseGain.reset();
   }
 
   void echoOn() {
@@ -838,7 +875,11 @@ struct Playback {
 
   void replaceEnvelope() {
     if (track.envelope) {
-      out.replaceEnvelope(math::envelope(*track.envelope), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+      out.replaceEnvelope(math::envelope(*track.envelope, track.pseudoReleaseGain.has_value()),
+                          VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+      if (track.pseudoReleaseGain) {
+        track.pseudoReleaseGain = track.envelope->gain;
+      }
     }
   }
 

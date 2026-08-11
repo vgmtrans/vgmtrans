@@ -13,12 +13,31 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <optional>
 #include <vector>
 
 namespace vgmtrans::formats::hudson_snes {
 
 using namespace core;
+
+Envelope driverEnvelope(u8 adsr1, u8 adsr2, u8 gain) {
+  // Ordinary expiration uses native KOF. The shared conversion compensates
+  // its short linear-amplitude fade for dB-linear SoundFont/DLS envelopes.
+  return snesDspEnvelope(adsr1, adsr2, gain);
+}
+
+double driverPseudoReleaseSeconds(u8 gain) {
+  const u8 mode = gain >> 5;
+  if (mode == 4) {
+    return snesDspGainPhysicalSeconds(gain, 0x7ff, 0);
+  }
+  if (mode == 5) {
+    return snesDspGainEnvelopeSeconds(gain, 0x7ff, 0);
+  }
+  // Direct and increasing GAIN modes do not fade the voice at gate-off.
+  return std::numeric_limits<double>::infinity();
+}
 
 namespace {
 
@@ -27,14 +46,6 @@ struct Patch {
   double unityKey = 72.0;
   SourceRange tuningSource;
 };
-
-[[nodiscard]] Envelope envelope(const InstrumentRow& row) {
-  Envelope result = snesDspEnvelope(row.adsr1, row.adsr2, row.gain);
-  // Note-off switches the voice to the cached GAIN byte in every audited
-  // Hudson generation, even when the attack uses ADSR.
-  result.releaseSeconds = snesDspGainEnvelopeSeconds(row.gain, 0x7ff, 0);
-  return result;
-}
 
 [[nodiscard]] double tuningUnityKey(ByteReader reader, u32 address) {
   const u16 rawScale = static_cast<u16>((reader.u8At(address) << 8) | reader.u8At(address + 1));
@@ -103,7 +114,7 @@ void addMelodic(InstrumentSetBuilder& instruments, const std::vector<Patch>& pat
                 Region{
                     .range = patch.row.source,
                     .unityKey = patch.unityKey,
-                    .envelope = envelope(patch.row),
+                    .envelope = driverEnvelope(patch.row.adsr1, patch.row.adsr2, patch.row.gain),
                 })
         .source("Region", patch.row.source, "hudson-snes-region")
         .description(fmt::format("SRCN {}", patch.row.srcn));
@@ -137,7 +148,7 @@ void addDrums(InstrumentSetBuilder& instruments, const SequenceRecipes& recipes,
                     .keyRange = KeyRange{.low = key, .high = key},
                     .range = drum.source,
                     .unityKey = patch->unityKey + key - drum.sourceKey,
-                    .envelope = envelope(patch->row),
+                    .envelope = driverEnvelope(patch->row.adsr1, patch->row.adsr2, patch->row.gain),
                 })
         .source(fmt::format("Drum {}", drum.note), drum.source, "hudson-snes-drum-region")
         .description(
