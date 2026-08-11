@@ -28,6 +28,7 @@ struct PortamentoSegment {
   // voice. A segment entered without a new attack inherits that note's key.
   double bendBaseKey = 0.0;
   bool extendsPrevious = false;
+  bool restartsEnvelope = true;
 };
 
 struct NoteSpan {
@@ -403,6 +404,7 @@ void beginPortamentoRewrite(NoteSpan& note) {
       .endTick = note.endTick,
       .key = note.source.key,
       .bendBaseKey = note.bendBaseKey,
+      .restartsEnvelope = note.source.restartsEnvelope,
   });
 }
 
@@ -413,6 +415,9 @@ void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
     note.portamentoSegments.front().key = transition.targetKey;
     note.portamentoSegments.front().bendBaseKey = transition.targetKey;
     note.portamentoSegments.front().extendsPrevious = false;
+    if (transition.previousNote) {
+      note.portamentoSegments.front().restartsEnvelope = false;
+    }
     return;
   }
 
@@ -444,6 +449,7 @@ void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
         .endTick = note.endTick,
         .key = transition.targetKey,
         .bendBaseKey = transition.targetKey,
+        .restartsEnvelope = false,
     });
   }
   note.portamentoSegments = std::move(segments);
@@ -582,6 +588,7 @@ void appendSourceEvents(std::vector<PerformanceEvent>& events, const Performance
           .durationTicks =
               static_cast<u32>(std::min<u64>(segment.endTick - segment.startTick, std::numeric_limits<u32>::max())),
           .extendsPrevious = segment.extendsPrevious,
+          .restartsEnvelope = segment.restartsEnvelope,
           .instrumentAddress = note.source.instrumentAddress,
           .restartsLfoPhase = note.source.restartsLfoPhase,
           .restartsVibratoLfoPhase = note.source.restartsVibratoLfoPhase,

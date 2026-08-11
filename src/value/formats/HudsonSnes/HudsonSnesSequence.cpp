@@ -213,18 +213,13 @@ namespace math {
   return v2MixerGain(volume, velocity) / noteVelocityGain(version, velocity);
 }
 
-[[nodiscard]] StereoBalance panGains(u8 raw) {
-  const u8 pan = std::min<u8>(raw & 0x1f, 30);
-  return StereoBalance{
-      .leftGain = kPanTable[pan] / 127.0,
-      .rightGain = kPanTable[30 - pan] / 127.0,
-  };
-}
-
 [[nodiscard]] StereoBalance mixerGains(Version version, u8 volume, u8 pan) {
-  const StereoBalance balance = panGains(pan);
+  const u8 clippedPan = std::min<u8>(pan & 0x1f, 30);
   if (version == Version::V2 || volume == 0) {
-    return balance;
+    return StereoBalance{
+        .leftGain = kPanTable[clippedPan] / 127.0,
+        .rightGain = kPanTable[30 - clippedPan] / 127.0,
+    };
   }
 
   // 0.x/1.x perform both the channel-volume and $FF master-volume products
@@ -236,8 +231,8 @@ namespace math {
   };
   const double level = levelGain(version, volume);
   return StereoBalance{
-      .leftGain = side(kPanTable[std::min<u8>(pan & 0x1f, 30)]) / level,
-      .rightGain = side(kPanTable[30 - std::min<u8>(pan & 0x1f, 30)]) / level,
+      .leftGain = side(kPanTable[clippedPan]) / level,
+      .rightGain = side(kPanTable[30 - clippedPan]) / level,
   };
 }
 
@@ -323,11 +318,10 @@ struct TrackState {
   std::optional<u8> pseudoReleaseGain;
 
   bool previousSlurred = false;
-  bool previousWasRest = true;
   bool shortLengthFlip = false;
   PerformanceNoteId lastNote;
   std::optional<double> lastKey;
-  std::optional<double> lastDriverPitch;
+  double lastDriverPitch = 0.0;
 
   u8 vibratoRate = 0;
   u8 vibratoDepth = 0;
@@ -457,7 +451,7 @@ struct Playback {
   }
 
   void applyAttackEnvelope(double key) {
-    if (!track.attackEnvelope || track.attackSpeed == 0 || track.attackDepth == 0) {
+    if (!track.attackEnvelope) {
       return;
     }
     if ((track.attackDirection & 0x80) != 0) {
@@ -487,7 +481,7 @@ struct Playback {
 
   void applyPitchScript(double key) {
     const std::span<const u32> script = program.tables.pitchScript(track.pitchScript);
-    if (track.pitchScriptDelay == 0 || script.empty() || !track.lastNote.valid()) {
+    if (track.pitchScriptDelay == 0 || script.empty()) {
       return;
     }
     const u32 scale = 1u << track.timebaseShift;
@@ -512,26 +506,14 @@ struct Playback {
 
   void applyPortamento(double key, double driverPitch, PerformanceNoteId previousNote,
                        std::optional<double> previousKey, bool continuesPreviousVoice) {
-    if (track.portamentoSpeed == 0) {
-      return;
-    }
-    if (track.portamentoNeedsAnchor) {
-      track.portamentoNeedsAnchor = false;
-      if (continuesPreviousVoice && previousNote.valid() && previousKey && *previousKey != key) {
-        out.pitchSlide(track.lastNote, *previousKey, key, PitchSlideTiming::fromTicks(0))
-            .continueFrom(previousNote)
-            .preferPitchBend();
-      }
-      return;
-    }
-    if (!previousNote.valid() || !previousKey || !track.lastDriverPitch || std::abs(*previousKey - key) < 0.000001) {
+    if (!previousNote.valid() || !previousKey || std::abs(*previousKey - key) < 0.000001) {
       return;
     }
     double milliseconds;
     PitchSlideTiming timing;
     if (track.version != Version::V2 && driverPitch > 0.0) {
       const u32 rawStep = static_cast<u32>(track.portamentoSpeed) << track.octave;
-      const double updates = std::ceil(std::abs(*track.lastDriverPitch - driverPitch) / rawStep);
+      const double updates = std::ceil(std::abs(track.lastDriverPitch - driverPitch) / rawStep);
       milliseconds = std::max(1.0, updates) * 4.0;
       timing = PitchSlideTiming::fixedDuration(
           math::timelineTicksForMilliseconds(milliseconds, program.tempo, track.timebaseShift), milliseconds);
@@ -557,7 +539,7 @@ struct Playback {
       track.velocity = velocity;
     }
     if (noteIndex == 0) {
-      if (noKeyoff && track.lastNote.valid() && track.lastKey && !track.previousWasRest) {
+      if (noKeyoff && track.lastNote.valid() && track.lastKey) {
         track.lastNote = out.note(NotePerformanceEvent{
             .key = *track.lastKey,
             .linearVelocity = 1.0,
@@ -568,7 +550,6 @@ struct Playback {
       } else {
         track.lastNote = {};
         track.lastKey.reset();
-        track.previousWasRest = true;
       }
       track.currentSourceNote.reset();
       if (!noKeyoff) {
@@ -602,9 +583,9 @@ struct Playback {
     const Articulation noteArticulation = articulation(driverLength, noKeyoff);
     const PerformanceNoteId previousNote = track.lastNote;
     const std::optional<double> previousKey = track.lastKey;
-    const bool continuesPreviousVoice =
-        track.previousSlurred && previousNote.valid() && previousKey && !track.previousWasRest;
+    const bool continuesPreviousVoice = track.previousSlurred && previousNote.valid() && previousKey;
     const bool tie = continuesPreviousVoice && *previousKey == key;
+    const bool portamentoAnchor = std::exchange(track.portamentoNeedsAnchor, false);
     if (!noKeyoff) {
       selectRelease(noteArticulation.pseudoRelease, continuesPreviousVoice);
     }
@@ -620,12 +601,11 @@ struct Playback {
         .restartsVibratoLfoPhase = !continuesPreviousVoice,
         .restartsTremoloLfoPhase = !continuesPreviousVoice,
     };
-    track.lastNote = out.note(std::move(event));
-    if (continuesPreviousVoice && !tie && track.portamentoSpeed == 0) {
-      out.pitchSlide(track.lastNote, *previousKey, key, PitchSlideTiming::fromTicks(0))
-          .continueFrom(previousNote)
-          .preferPitchBend();
-    } else {
+    const bool continuesWithoutGlide =
+        continuesPreviousVoice && !tie && (track.portamentoSpeed == 0 || portamentoAnchor);
+    track.lastNote = continuesWithoutGlide ? out.continueVoice(previousNote, std::move(event))
+                                           : out.note(std::move(event));
+    if (!portamentoAnchor && track.portamentoSpeed != 0) {
       applyPortamento(key, driverPitch, previousNote, previousKey, continuesPreviousVoice);
     }
     if (!continuesPreviousVoice) {
@@ -634,7 +614,6 @@ struct Playback {
     }
     track.lastKey = key;
     track.lastDriverPitch = driverPitch;
-    track.previousWasRest = false;
     track.previousSlurred = noKeyoff;
     return Effects::wait(wait);
   }
@@ -740,14 +719,13 @@ struct Playback {
     // 0.x/1.x load the delay counter at note-on and decrement it later in the
     // same music tick, so a value of one starts immediately.
     const u8 effectiveDelay = track.version != Version::V2 && delay != 0 ? delay - 1 : delay;
-    LfoPerformanceContext context{
+    return LfoPerformanceContext{
         .delayTicks = normalized(effectiveDelay),
         .delayMilliseconds = effectiveDelay * math::driverTickMilliseconds(program.tempo, track.timebaseShift),
         .delayIsTempoRelative = true,
         .waveform = LfoWaveform::Triangle,
         .sampleImmediatelyOnNote = true,
     };
-    return context;
   }
 
   [[nodiscard]] double vibratoFrequency() const {
@@ -766,31 +744,9 @@ struct Playback {
     return 250.0 / (((track.vibratoMode & 3) == 0 ? 4.0 : 2.0) * period);
   }
 
-  [[nodiscard]] std::optional<ModulationRange> vibratoPitchRange() const {
-    if (track.version == Version::V2 || track.vibratoRate == 0) {
-      return std::nullopt;
-    }
-    const double pitch = currentDriverPitch();
-    const s32 offset = modulationPitchOffset(track.vibratoDepth);
-    if (pitch == 0.0 || offset == 0) {
-      return ModulationRange{};
-    }
-    const double upward = math::pitchOffsetSemitones(pitch, offset);
-    const double downward = track.vibratoType == 0 ? math::pitchOffsetSemitones(pitch, -offset) : 0.0;
-    return ModulationRange{.minimum = downward, .maximum = upward};
-  }
-
-  [[nodiscard]] double vibratoDepthSemitones() const {
-    if (const auto range = vibratoPitchRange()) {
-      return std::max(std::abs(range->minimum), std::abs(range->maximum));
-    }
-    return track.vibratoDepth / 256.0;
-  }
-
   [[nodiscard]] LfoPerformanceContext configuredLfoContext(u8 delay) const {
     auto context = lfoContext(delay);
     context.frequencyHz = vibratoFrequency();
-    context.pitchRangeSemitones = vibratoPitchRange();
     if (track.version != Version::V2) {
       if (track.vibratoType != 0) {
         context.polarity = LfoPolarity::Positive;
@@ -808,15 +764,35 @@ struct Playback {
     return context;
   }
 
+  double configureVibratoDepth(LfoPerformanceContext& context) const {
+    if (track.vibratoRate == 0) {
+      return 0.0;
+    }
+    if (track.version == Version::V2) {
+      return track.vibratoDepth / 256.0;
+    }
+    const double pitch = currentDriverPitch();
+    const s32 offset = modulationPitchOffset(track.vibratoDepth);
+    ModulationRange range;
+    if (pitch != 0.0 && offset != 0) {
+      range.maximum = math::pitchOffsetSemitones(pitch, offset);
+      range.minimum = track.vibratoType == 0 ? math::pitchOffsetSemitones(pitch, -offset) : 0.0;
+    }
+    context.pitchRangeSemitones = range;
+    return std::max(std::abs(range.minimum), std::abs(range.maximum));
+  }
+
   void emitVibratoDepth() {
-    const auto context = configuredLfoContext(track.vibratoDelay);
-    out.vibratoDepth(track.vibratoRate == 0 ? 0.0 : vibratoDepthSemitones(), context);
+    auto context = configuredLfoContext(track.vibratoDelay);
+    const double depth = configureVibratoDepth(context);
+    out.vibratoDepth(depth, context);
   }
 
   void emitVibrato() {
-    const auto context = configuredLfoContext(track.vibratoDelay);
-    out.vibratoDepth(track.vibratoRate == 0 ? 0.0 : vibratoDepthSemitones(), context);
-    out.vibratoRate(vibratoFrequency(), context);
+    auto context = configuredLfoContext(track.vibratoDelay);
+    const double depth = configureVibratoDepth(context);
+    out.vibratoDepth(depth, context);
+    out.vibratoRate(context.frequencyHz.value_or(0.0), context);
     out.vibratoDelayPhysical(context.delayTicks.value_or(0), context.delayMilliseconds.value_or(0.0));
   }
 
@@ -853,13 +829,14 @@ struct Playback {
 
   void emitTremolo() {
     auto context = configuredLfoContext(track.vibratoDelay);
+    configureVibratoDepth(context);
     context.polarity = LfoPolarity::Negative;
     context.tremoloGainMode = TremoloGainMode::NoBoost;
     const double pitchUnits = track.vibratoDepth * 127.0 / 256.0;
     const double depth = std::min(1.0, (pitchUnits * 2.0 + 1.0) / 256.0);
     out.vibratoDepth(0.0, context);
     out.tremoloLinearGainDepth(depth, context);
-    out.tremoloRate(vibratoFrequency(), context);
+    out.tremoloRate(context.frequencyHz.value_or(0.0), context);
     out.tremoloDelayPhysical(context.delayTicks.value_or(0), context.delayMilliseconds.value_or(0.0));
   }
 

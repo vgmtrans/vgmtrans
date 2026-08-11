@@ -55,6 +55,9 @@ struct NotePerformanceEvent {
   // continueFrom(previousNote); target-specific lowering may then use this
   // flag for the resulting same-voice MIDI representation.
   bool extendsPrevious = false;
+  // Native portamento may need another MIDI note to continue a source voice.
+  // This distinguishes that synthetic note from a genuine envelope restart.
+  bool restartsEnvelope = true;
   // A fresh attack may override the track's selected instrument. Performance
   // preparation uses this for generated presets; tied continuations inherit
   // the sounding voice.

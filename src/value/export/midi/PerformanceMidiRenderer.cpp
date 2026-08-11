@@ -1103,7 +1103,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             return;
           }
           restartSimulatedPanForNote(track, state, typedEvent.header.tick, channel);
-          if (options.terminatePreviousVoice && state.lastNoteIndex) {
+          if (options.terminatePreviousVoice && typedEvent.restartsEnvelope && state.lastNoteIndex) {
             track.events.push_back(AllSoundOff{
                 .tick = typedEvent.header.tick,
                 .channel = channel,
