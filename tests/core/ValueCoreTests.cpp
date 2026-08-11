@@ -26,6 +26,7 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths();
 void suzukiPs1DynamicAdsrUsesAuditedDriverCommands();
 void suzukiPs1ModuleBuildsFractionallyTunedWdsSynth();
 void runSuzukiSnesModuleTests();
+void runHudsonSnesModuleTests();
 void runWolfTeamSnesModuleTests();
 
 void capcomSnesLayoutSelectsSongListAndFixedHeaders();
@@ -210,6 +211,7 @@ int main() {
     sonyPs1SepAndVabLayoutsAreVersionAware();
     sonyPs1ModuleBuildsCombinedAndSplitVabSynths();
     runSuzukiSnesModuleTests();
+    runHudsonSnesModuleTests();
 
     capcomSnesLayoutSelectsSongListAndFixedHeaders();
     capcomSnesLayoutFallsBackToV2SongList();

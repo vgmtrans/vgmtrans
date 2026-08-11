@@ -2,6 +2,7 @@ add_executable(vgmtrans-value-core-tests)
 target_sources(vgmtrans-value-core-tests
   PRIVATE
     formats/CapcomSnesModuleTests.cpp
+    formats/HudsonSnesModuleTests.cpp
     formats/CpsModuleTests.cpp
     formats/KonamiArcadeModuleTests.cpp
     formats/KonamiSnesModuleTests.cpp
@@ -35,6 +36,14 @@ target_link_libraries(vgmtrans-value-core-tests PRIVATE vgmtransvalueformats vgm
 target_compile_features(vgmtrans-value-core-tests PRIVATE cxx_std_20)
 
 add_test(NAME vgmtrans-value-core-tests COMMAND vgmtrans-value-core-tests)
+
+add_executable(vgmtrans-hudson-snes-tests
+  formats/HudsonSnesModuleTests.cpp
+  formats/HudsonSnesTestMain.cpp
+)
+target_link_libraries(vgmtrans-hudson-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
+target_compile_features(vgmtrans-hudson-snes-tests PRIVATE cxx_std_20)
+add_test(NAME vgmtrans-hudson-snes-tests COMMAND vgmtrans-hudson-snes-tests)
 
 add_executable(vgmtrans-wolf-team-snes-tests
   formats/WolfTeamSnesModuleTests.cpp
