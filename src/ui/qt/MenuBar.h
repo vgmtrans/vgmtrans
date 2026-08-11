@@ -58,6 +58,7 @@ signals:
   void exportSelectedInstrumentSetSf2();
   void exportSelectedInstrumentSetDls();
   void exportSelectedCollection(int choice);
+  void stitchSelectedCollections();
   void increaseHexFontRequested();
   void decreaseHexFontRequested();
   void resetHexFontRequested();

@@ -6,6 +6,7 @@
 
 #include "application/WorkspaceController.h"
 
+#include "value/export/CollectionStitch.h"
 #include "value/formats/ValueFormats.h"
 
 #include <exception>
@@ -139,6 +140,11 @@ core::Artifact WorkspaceController::exportInstrumentSet(core::AssetId id, core::
 std::vector<core::Artifact> WorkspaceController::exportCollection(core::CollectionId id,
                                                                   const core::ExportRequest& request) const {
   return session_.exportCollection(id, request);
+}
+
+core::CollectionStitchResult WorkspaceController::stitchCollections(
+    std::span<const core::CollectionId> collections, const core::ExportRequest& request) const {
+  return session_.stitchCollections(collections, request);
 }
 
 void WorkspaceController::publish(core::SessionSnapshot snapshot) {

@@ -383,7 +383,7 @@ void MenuBar::appendContextualCommands(Context context) {
     addAction(convert, tr("Export as MIDI, SF2, and DLS"), true, {},
               [this] { emit exportSelectedCollection(2); });
     addSeparator(convert);
-    addAction(convert, tr("Stitch"), false, {});
+    addAction(convert, tr("Stitch"), true, {}, [this] { emit stitchSelectedCollections(); });
     return;
   }
 

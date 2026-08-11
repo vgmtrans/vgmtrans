@@ -10,6 +10,7 @@
 void runValueRegistryTests();
 void runValueCompilerCursorTests();
 void runValueCollectionResolverTests();
+void runValueCollectionStitchTests();
 void runValueDynamicEnvelopeTests();
 void runValueSequenceModelTests();
 void runValueSequenceVmTests();
@@ -197,6 +198,7 @@ int main() {
     runValueRegistryTests();
     runValueCompilerCursorTests();
     runValueCollectionResolverTests();
+    runValueCollectionStitchTests();
     runValueDynamicEnvelopeTests();
     runValueSequenceModelTests();
     runValueSequenceVmTests();

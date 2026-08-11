@@ -70,6 +70,8 @@ target_sources(vgmtrans
     widgets/EmptyStateWidget.cpp
     widgets/ItemViewDensity.cpp
     widgets/SnappingSplitter.cpp
+    widgets/StitchPlanModel.cpp
+    widgets/StitchUI.cpp
     widgets/SeekBar.cpp
     widgets/StatusBarContent.cpp
     widgets/TableView.cpp
@@ -117,6 +119,8 @@ target_sources(vgmtrans
       widgets/FixedHeightListDelegate.h
       widgets/ItemViewDensity.h
       widgets/SnappingSplitter.h
+      widgets/StitchPlanModel.h
+      widgets/StitchUI.h
       widgets/SeekBar.h
       widgets/StatusBarContent.h
       widgets/TableView.h
@@ -175,8 +179,6 @@ set(VGMTRANS_UI_VALUE_PORT_REFERENCE_SOURCES
   services/commands/StitchCommands.cpp
   services/commands/StitchCommands.h
   services/commands/VGMCollCommands.h
-  widgets/StitchUI.cpp
-  widgets/StitchUI.h
   workarea/RawFileListView.cpp
   workarea/RawFileListView.h
   workarea/VGMCollListView.cpp

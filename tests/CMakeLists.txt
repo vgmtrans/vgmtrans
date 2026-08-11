@@ -18,6 +18,7 @@ target_sources(vgmtrans-value-core-tests
     formats/WolfTeamSnesModuleTests.cpp
     core/SessionSnapshotBuilder.h
     core/ValueCollectionResolverTests.cpp
+    core/ValueCollectionStitchTests.cpp
     core/ValueCompilerCursorTests.cpp
     core/ValueDynamicEnvelopeTests.cpp
     core/ValueMidiTests.cpp

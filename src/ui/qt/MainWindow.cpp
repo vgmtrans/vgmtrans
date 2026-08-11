@@ -24,6 +24,8 @@
 #include <version.h>
 #include "widgets/FixedHeightListDelegate.h"
 #include "widgets/ItemViewDensity.h"
+#include "widgets/StitchPlanModel.h"
+#include "widgets/StitchUI.h"
 #include "widgets/TableView.h"
 #include "widgets/ToastHost.h"
 #include "widgets/WindowBar.h"
@@ -330,6 +332,7 @@ void applyCollectionExportSettings(vgmtrans::core::ExportRequest& request) {
   request.exportOnlyUsedInstruments = Settings::the()->conversion.exportOnlyUsedInstruments();
   request.sampleFiltering = Settings::the()->conversion.sampleFiltering();
 }
+
 }  // namespace
 
 MainWindow::MainWindow(vgmtrans::ui::WorkspaceController& workspace)
@@ -413,7 +416,9 @@ void MainWindow::createElements() {
   m_collection_model = new vgmtrans::ui::CollectionTableModel(m_workspace, m_coll_listview);
   m_collection_filter =
       new vgmtrans::ui::CollectionFilterProxyModel(m_workspace, m_coll_listview);
-  m_collection_filter->setSourceModel(m_collection_model);
+  m_stitch_plan_model = new vgmtrans::ui::StitchPlanModel(m_coll_listview);
+  m_stitch_plan_model->setSourceModel(m_collection_model);
+  m_collection_filter->setSourceModel(m_stitch_plan_model);
   m_coll_listview->setModel(m_collection_filter);
 
   m_coll_view = new QListView();
@@ -516,7 +521,7 @@ void MainWindow::createElements() {
           &CollectionListView::setFilterText);
   connect(m_stitchButton, &QToolButton::clicked, this,
           &MainWindow::collectionStitchRequested);
-  m_stitchButton->setEnabled(false);
+  m_stitchButton->setEnabled(m_workspace.snapshot().collections().size() >= 2);
 
   m_coll_view_dock = new QDockWidget("Collection Contents");
   m_coll_view_dock->setObjectName(QStringLiteral("collectionContentDock"));
@@ -850,6 +855,28 @@ void MainWindow::routeSignals() {
     });
     dialog->open();
   });
+  connect(this, &MainWindow::collectionStitchRequested, this, [this] {
+    std::vector<vgmtrans::core::CollectionId> collections;
+    if (m_coll_listview->selectionModel() != nullptr) {
+      for (const auto& index : m_coll_listview->selectionModel()->selectedRows()) {
+        collections.push_back(vgmtrans::core::CollectionId{index.data(vgmtrans::ui::IdRole).toUInt()});
+      }
+    }
+    vgmtrans::core::ExportRequest request;
+    applyCollectionExportSettings(request);
+    static_cast<void>(stitchui::toggleCollectionStitchBalloon(
+        m_workspace, collections, request,
+        stitchui::Callbacks{
+            .showToast = [this](const QString& message, ToastType type, int duration) {
+              showToast(message, type, duration);
+            },
+            .visibilityChanged = [this](bool visible) { setCollectionStitchOpen(visible); },
+            .planChanged = [this](std::span<const vgmtrans::core::CollectionId> plan) {
+              m_stitch_plan_model->setCollections(plan);
+            },
+        },
+        this, m_stitchButton, m_stitchButton));
+  });
   connect(m_menu_bar, &MenuBar::openFile, this, &MainWindow::openFile);
   connect(m_menu_bar, &MenuBar::openRecentFile, this, &MainWindow::openFileInternal);
   connect(m_menu_bar, &MenuBar::exit, this, &MainWindow::close);
@@ -864,6 +891,7 @@ void MainWindow::routeSignals() {
   });
   connect(m_menu_bar, &MenuBar::showToastRequested, this,
           &MainWindow::showToast);
+  connect(m_menu_bar, &MenuBar::stitchSelectedCollections, this, &MainWindow::collectionStitchRequested);
   connect(m_menu_bar, &MenuBar::resetDockLayout, m_dockLayout, &MainWindowDockLayout::resetToDefault);
   connect(m_menu_bar, &MenuBar::increaseHexFontRequested, mdiArea,
           &MdiArea::increaseActiveHexFont);
@@ -881,10 +909,11 @@ void MainWindow::routeSignals() {
           m_playback_controls, &PlaybackControls::setPlaybackState);
   connect(m_sequence_player, &SequencePlayer::stateChanged, m_collection_model,
           [this](bool playing, bool hasActiveCollection) {
-            m_collection_model->setPlayingCollection(
-                playing && hasActiveCollection
-                    ? std::optional{m_sequence_player->activeCollection()}
-                    : std::nullopt);
+            const auto collection = playing && hasActiveCollection
+                                        ? std::optional{m_sequence_player->activeCollection()}
+                                        : std::nullopt;
+            m_collection_model->setPlayingCollection(collection);
+            m_stitch_plan_model->setPlayingCollection(collection);
           });
   connect(m_sequence_player, &SequencePlayer::stateChanged, mdiArea,
           [mdiArea](bool, bool hasActiveCollection) {
@@ -1229,7 +1258,7 @@ void MainWindow::routeSignals() {
             QAction* all = menu.addAction(tr("Export as MIDI, SF2, and DLS"));
             menu.addSeparator();
             QAction* stitch = menu.addAction(tr("Stitch"));
-            stitch->setEnabled(false);
+            stitch->setEnabled(m_workspace.snapshot().collections().size() >= 2);
             QAction* chosen = menu.exec(m_coll_listview->viewport()->mapToGlobal(position));
             if (chosen == play) {
               togglePlayback();
@@ -1239,6 +1268,8 @@ void MainWindow::routeSignals() {
               exportSelectedCollection(1);
             } else if (chosen == all) {
               exportSelectedCollection(2);
+            } else if (chosen == stitch) {
+              emit collectionStitchRequested();
             }
           });
 
@@ -1264,7 +1295,7 @@ void MainWindow::routeSignals() {
             QAction* all = menu.addAction(tr("Export as MIDI, SF2, and DLS"));
             menu.addSeparator();
             QAction* stitch = menu.addAction(tr("Stitch"));
-            stitch->setEnabled(false);
+            stitch->setEnabled(m_workspace.snapshot().collections().size() >= 2);
             QAction* chosen = menu.exec(m_coll_view->viewport()->mapToGlobal(position));
             if (chosen == play) {
               togglePlayback();
@@ -1274,11 +1305,16 @@ void MainWindow::routeSignals() {
               exportSelectedCollection(1);
             } else if (chosen == all) {
               exportSelectedCollection(2);
+            } else if (chosen == stitch) {
+              emit collectionStitchRequested();
             }
           });
 
   connect(&m_workspace, &vgmtrans::ui::WorkspaceController::snapshotChanged,
           MdiArea::the(), &MdiArea::workspaceChanged);
+  connect(&m_workspace, &vgmtrans::ui::WorkspaceController::snapshotChanged, this, [this] {
+    setCollectionStitchAvailable(m_workspace.snapshot().collections().size() >= 2);
+  });
   connect(&m_workspace, &vgmtrans::ui::WorkspaceController::snapshotChanged,
           this, [this] {
             if (!m_sequence_player->hasActiveCollection()) {
@@ -1577,6 +1613,7 @@ void MainWindow::setCollectionStitchAvailable(bool available) {
 
 void MainWindow::setCollectionStitchOpen(bool open) {
   m_stitchButton->setChecked(open);
+  m_coll_listview->setStitchDragDropEnabled(open);
 }
 
 void MainWindow::showToast(const QString& message, ToastType type, int durationMs) {
