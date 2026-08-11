@@ -68,7 +68,7 @@ private:
   };
 
   void removeDiscoveredData(const std::unordered_set<u32>& sourceIds, const std::unordered_set<u32>& assetIds);
-  void markCollectionsStaleForAssets(const std::unordered_set<u32>& assetIds);
+  void updateCollectionsForRemovedAssets(const std::unordered_set<u32>& assetIds);
   void validateCollectionAssetReferences(std::string_view resolver, DesiredCollection& desired);
   [[nodiscard]] CollectionId nextCollectionId(ScanIdAllocator& ids) const;
   [[nodiscard]] std::optional<AssetId> annotationAssetOwner(SourceAnnotationId id) const;
