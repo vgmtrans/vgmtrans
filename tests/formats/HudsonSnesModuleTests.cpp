@@ -40,6 +40,11 @@ void writeLe16(std::vector<u8>& bytes, u32 offset, u16 value) {
   bytes[offset + 1] = static_cast<u8>(value >> 8);
 }
 
+void appendLe16(std::vector<u8>& bytes, u32& cursor, u16 value) {
+  writeLe16(bytes, cursor, value);
+  cursor += 2;
+}
+
 void writeBytes(std::vector<u8>& bytes, u32 offset, std::initializer_list<u8> values) {
   std::ranges::copy(values, bytes.begin() + offset);
 }
@@ -104,18 +109,24 @@ std::vector<u8> v2ScannerFixture() {
   std::ranges::copy(std::array<u8, 8>{0xc0, 0x60, 0x30, 0x18, 0x0c, 0x06, 0x03, 0x01}, bytes.begin() + 0x3000);
 
   u32 cursor = 0x2000;
-  bytes[cursor++] = 0x03;
-  bytes[cursor++] = 0x01;
-  bytes[cursor++] = 0x00;
-  bytes[cursor++] = 0x8f;
-  bytes[cursor++] = 0xe0;
-  bytes[cursor++] = 0x8a;
-  bytes[cursor++] = 0x01;
-  bytes[cursor++] = 0x01;
-  writeLe16(bytes, cursor, 0x2100);
-  cursor += 2;
-  bytes[cursor] = 0x00;
-  bytes[0x2100] = 0xff;
+  appendBytes(bytes, cursor, {0x03, 0x01, 0x00, 0x8f, 0xe0, 0x8a, 0x01, 0x01});
+  appendLe16(bytes, cursor, 0x2100);
+  appendBytes(bytes, cursor, {0x00});
+  writeBytes(bytes, 0x2100, {0xd6, 7, 0xef, 2, 1, 0xe2, 64, 32, 0x83, 0xe9, 64, 32, 0x84, 0xfe, 0x0d, 5, 0xff});
+
+  writeLe16(bytes, 0x40, 0x4000);
+  writeLe16(bytes, 0x44, 0x4500);
+  writeLe16(bytes, 0x46, 0x4600);
+  writeLe16(bytes, 0x48, 0x4700);
+  writeBytes(bytes, 0x4000 + 7 * 4, {0, 0x8f, 0xe0, 0x8a});
+  writeLe16(bytes, 0x4500 + 2 * 2, 0x4800);
+  writeBytes(bytes, 0x4800, {1, 32, 0xff});
+  writeLe16(bytes, 0x4600 + 3 * 2, 0x4900);
+  writeLe16(bytes, 0x4600 + 4 * 2, 0x4910);
+  writeBytes(bytes, 0x4900, {0, 64, 0x80});
+  writeBytes(bytes, 0x4910, {static_cast<u8>(-64), 0, 0x80});
+  writeLe16(bytes, 0x4700 + 5 * 2, 0x4a00);
+  bytes[0x4a00 + 24] = static_cast<u8>(-8);
 
   bytes[0x5000] = 0x01;
   bytes[0x5001] = 0x00;
@@ -127,10 +138,20 @@ std::vector<u8> v2ScannerFixture() {
 
 void scannerBuildsACompleteV2Collection() {
   const std::vector<u8> bytes = v2ScannerFixture();
-  const auto layout = findLayout(ByteReader(SourceId{150}, bytes));
+  const ByteReader reader(SourceId{150}, bytes);
+  const auto layout = findLayout(reader);
   expect(layout && layout->version == Version::V2 && layout->sequenceHeaderAddress == 0x2000 &&
              layout->spcDirAddress == 0x6000 && layout->tuningTableAddress == 0x5000,
          "the 2.x engine structure should resolve the song list, tuning table, and DSP directory");
+  const SequenceParse parsed = decodeSequence(reader, *layout, AssetId{159});
+  const auto contains = [](const auto& recipes, u8 index) {
+    return std::ranges::any_of(recipes, [=](const auto& recipe) { return recipe.index == index; });
+  };
+  expect(std::ranges::any_of(parsed.recipes.instruments, [](const InstrumentRow& row) { return row.program == 7; }) &&
+             contains(parsed.recipes.pitchScripts, 2) && contains(parsed.recipes.customWaveforms, 3) &&
+             contains(parsed.recipes.customWaveforms, 4) && contains(parsed.recipes.volumeCurves, 5) &&
+             parsed.program.config.driverData[7] == 0x8fe08a,
+         "sequence decoding should collect typed references to the driver's live resource tables");
 
   Session session;
   session.registerFormat(definition());
@@ -180,71 +201,24 @@ void earlyGateReleaseStateMachineMatchesSuperBomberman2() {
 void headerDecodesEveryVersionTwoRecipe() {
   std::vector<u8> bytes(kAramSize);
   u32 cursor = 0x100;
-  bytes[cursor++] = 0x02;
-  bytes[cursor++] = 0x01;
-  bytes[cursor++] = 0x08;
-  bytes[cursor++] = 0x01;
-  bytes[cursor++] = 0x03;
-  bytes[cursor++] = 0x01;
-  bytes[cursor++] = 0x04;
-  bytes[cursor++] = 0x00;
-  bytes[cursor++] = 0x00;
-  bytes[cursor++] = 0x01;
-  bytes[cursor++] = 0x04;
-  bytes[cursor++] = 0x01;
-  bytes[cursor++] = 0x00;
-  bytes[cursor++] = 0x24;
-  bytes[cursor++] = 0x40;
-  bytes[cursor++] = 0x0f;
-  bytes[cursor++] = 0x05;
-  bytes[cursor++] = 0x01;
-  writeLe16(bytes, cursor, 0x300);
-  cursor += 2;
-  bytes[cursor++] = 0x06;
-  bytes[cursor++] = 0x01;
-  writeLe16(bytes, cursor, 0x320);
-  cursor += 2;
-  bytes[cursor++] = 0x09;
-  bytes[cursor++] = 0x01;
-  writeLe16(bytes, cursor, 0x360);
-  cursor += 2;
-  bytes[cursor++] = 0x07;
-  bytes[cursor++] = 0x00;
-  bytes[cursor++] = 0x20;
-  bytes[cursor++] = 0x20;
-  bytes[cursor++] = 0x04;
-  bytes[cursor++] = 0x40;
-  bytes[cursor++] = 0x02;
-  bytes[cursor++] = 0x04;
-  bytes[cursor++] = 0x01;
-  bytes[cursor++] = 0x04;
-  writeLe16(bytes, cursor, 0x200);
-  cursor += 2;
-  bytes[cursor++] = 0x00;
-  bytes[0x200] = 0xfe;
-  bytes[0x201] = 0x0d;
-  bytes[0x202] = 0;
-  bytes[0x203] = 0x10;
-  bytes[0x204] = 6;
-  bytes[0x205] = 127;
-  bytes[0x206] = 0xff;
-  bytes[0x300] = 1;
-  bytes[0x301] = 0x81;
-  bytes[0x302] = 0xfe;
-  bytes[0x303] = 2;
+  appendBytes(
+      bytes, cursor,
+      {0x02, 0x01, 0x08, 0x01, 0x03, 0x01, 0x04, 0x00, 0x00, 0x01, 0x04, 0x01, 0x00, 0x24, 0x40, 0x0f, 0x05, 0x01});
+  appendLe16(bytes, cursor, 0x300);
+  appendBytes(bytes, cursor, {0x06, 0x01});
+  appendLe16(bytes, cursor, 0x320);
+  appendBytes(bytes, cursor, {0x09, 0x01});
+  appendLe16(bytes, cursor, 0x360);
+  appendBytes(bytes, cursor, {0x07, 0x00, 0x20, 0x20, 0x04, 0x40, 0x02, 0x04, 0x01, 0x04});
+  appendLe16(bytes, cursor, 0x200);
+  appendBytes(bytes, cursor, {0x00});
+  writeBytes(bytes, 0x200, {0xfe, 0x0d, 0, 0x10, 6, 127, 0xff});
+  writeBytes(bytes, 0x300, {1, 0x81, 0xfe, 2});
   writeLe16(bytes, 0x304, 0x300);
-  bytes[0x306] = 0xff;
-  bytes[0x320] = 0;
-  bytes[0x321] = 64;
-  bytes[0x322] = 127;
-  bytes[0x323] = 64;
-  bytes[0x324] = 0;
-  bytes[0x325] = 0x80;
+  writeBytes(bytes, 0x306, {0xff});
+  writeBytes(bytes, 0x320, {0, 64, 127, 64, 0, 0x80});
   bytes[0x360 + 24] = static_cast<u8>(-16);
-  bytes[0x0844] = 0;
-  bytes[0x0845] = 0x8f;
-  bytes[0x0846] = 0xe0;
-  bytes[0x0847] = 0x80;
+  writeBytes(bytes, 0x0844, {0, 0x8f, 0xe0, 0x80});
 
   const ByteReader reader(SourceId{152}, bytes);
   const auto header = parseHeader(reader, Version::V2, 0x100);
@@ -286,12 +260,10 @@ void earlyHeaderGrammarSupportsBothInstrumentLengths() {
   std::vector<u8> bytes(kAramSize);
   u32 cursor = 0x100;
   appendBytes(bytes, cursor, {0x01});
-  writeLe16(bytes, cursor, 0x200);
-  cursor += 2;
+  appendLe16(bytes, cursor, 0x200);
   appendBytes(bytes, cursor, {0x01, 0x02, 0x02, 0x04, 0x01, 0x8f, 0xe0, 0x8a, 0x03, 0x04, 0x00,
                               60,   64,   15,   0x04, 0x01, 0x02, 0x9f, 0xe1, 0x8b, 0x05, 0x01});
-  writeLe16(bytes, cursor, 0x300);
-  cursor += 2;
+  appendLe16(bytes, cursor, 0x300);
   appendBytes(bytes, cursor, {0x00});
   writeBytes(bytes, 0x200, {0xff});
   writeBytes(bytes, 0x300, {1, 32, 0xff});
@@ -302,45 +274,6 @@ void earlyHeaderGrammarSupportsBothInstrumentLengths() {
              header->recipes.instruments.back().srcn == 2 && header->recipes.drums.size() == 1 &&
              header->recipes.pitchScripts.size() == 1,
          "early headers should share recipe decoding while preserving byte- and row-counted instrument commands");
-}
-
-void sequenceDecodeCollectsTypedLiveTableReferences() {
-  std::vector<u8> bytes(kAramSize);
-  u32 cursor = 0x100;
-  appendBytes(bytes, cursor, {0x01, 0x01});
-  writeLe16(bytes, cursor, 0x200);
-  cursor += 2;
-  appendBytes(bytes, cursor, {0x00});
-
-  writeBytes(bytes, 0x200, {0xd6, 7, 0xef, 2, 1, 0xe2, 64, 32, 0x83, 0xe9, 64, 32, 0x84, 0xfe, 0x0d, 5, 0xff});
-  writeBytes(bytes, 0x400 + 7 * 4, {1, 0x8f, 0xe0, 0x8a});
-  writeLe16(bytes, 0x600 + 2 * 2, 0x700);
-  writeBytes(bytes, 0x700, {1, 32, 0xff});
-  writeLe16(bytes, 0x800 + 3 * 2, 0x900);
-  writeLe16(bytes, 0x800 + 4 * 2, 0x910);
-  writeBytes(bytes, 0x900, {0, 64, 0x80});
-  writeBytes(bytes, 0x910, {static_cast<u8>(-64), 0, 0x80});
-  writeLe16(bytes, 0xa00 + 5 * 2, 0xb00);
-  bytes[0xb00 + 24] = static_cast<u8>(-8);
-
-  const SequenceParse parsed = decodeSequence(ByteReader(SourceId{157}, bytes),
-                                              Layout{
-                                                  .version = Version::V2,
-                                                  .sequenceHeaderAddress = 0x100,
-                                                  .activeInstrumentTableAddress = 0x400,
-                                                  .activePitchTableAddress = 0x600,
-                                                  .activeWaveformTableAddress = 0x800,
-                                                  .activeVolumeTableAddress = 0xa00,
-                                              },
-                                              AssetId{158});
-  const auto contains = [](const auto& recipes, u8 index) {
-    return std::ranges::any_of(recipes, [=](const auto& recipe) { return recipe.index == index; });
-  };
-  expect(std::ranges::any_of(parsed.recipes.instruments, [](const InstrumentRow& row) { return row.program == 7; }) &&
-             contains(parsed.recipes.pitchScripts, 2) && contains(parsed.recipes.customWaveforms, 3) &&
-             contains(parsed.recipes.customWaveforms, 4) && contains(parsed.recipes.volumeCurves, 5) &&
-             parsed.program.config.driverData[7] == 0x8fe08a,
-         "sequence decoding should collect typed program, script, waveform, and volume-curve references");
 }
 
 void v2VolumeUsesThePostVelocityMixerCurve() {
@@ -557,7 +490,6 @@ void runHudsonSnesModuleTests() {
   earlyGateReleaseStateMachineMatchesSuperBomberman2();
   headerDecodesEveryVersionTwoRecipe();
   earlyHeaderGrammarSupportsBothInstrumentLengths();
-  sequenceDecodeCollectsTypedLiveTableReferences();
   v2VolumeUsesThePostVelocityMixerCurve();
   v2PlaybackUsesAuditedTempoLfosAndDynamicAdsr();
   conditionalDispatchAndEarlyOperandLayoutsMatchTheDriver();
