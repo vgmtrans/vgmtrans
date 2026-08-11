@@ -81,40 +81,31 @@ public:
   [[nodiscard]] static std::vector<u32> encode(const ParsedHeader& header);
 
   [[nodiscard]] std::optional<RuntimeInstrument> instrument(u8 program) const {
-    if (program >= kTableEntries || program >= words_.size() || words_[program] == kMissingInstrument) {
+    const auto value = word(0, program);
+    if (!value || *value == kMissingInstrument) {
       return std::nullopt;
     }
     return RuntimeInstrument{
-        .adsr1 = static_cast<u8>(words_[program] >> 16),
-        .adsr2 = static_cast<u8>(words_[program] >> 8),
-        .gain = static_cast<u8>(words_[program]),
+        .adsr1 = static_cast<u8>(*value >> 16),
+        .adsr2 = static_cast<u8>(*value >> 8),
+        .gain = static_cast<u8>(*value),
     };
   }
 
   [[nodiscard]] std::optional<RuntimeDrum> drum(u8 note) const {
-    if (note >= kTableEntries) {
+    const auto value = word(kDrumBase, note);
+    if (!value || *value == kMissingInstrument) {
       return std::nullopt;
     }
-    const u32 address = kDrumBase + note;
-    if (address >= words_.size() || words_[address] == kMissingInstrument) {
-      return std::nullopt;
-    }
-    const u32 value = words_[address];
     return RuntimeDrum{
-        .program = static_cast<u8>(value >> 24),
-        .sourceKey = static_cast<u8>(value >> 16),
-        .volume = static_cast<u8>(value >> 8),
-        .pan = static_cast<u8>(value),
+        .program = static_cast<u8>(*value >> 24),
+        .sourceKey = static_cast<u8>(*value >> 16),
+        .volume = static_cast<u8>(*value >> 8),
+        .pan = static_cast<u8>(*value),
     };
   }
 
-  [[nodiscard]] u32 waveform(u8 index) const {
-    if (index >= kTableEntries) {
-      return 0;
-    }
-    const u32 address = kWaveformBase + index;
-    return address < words_.size() ? words_[address] : 0;
-  }
+  [[nodiscard]] u32 waveform(u8 index) const { return word(kWaveformBase, index).value_or(0); }
 
   [[nodiscard]] std::span<const u32> waveformSamples(u8 index) const { return slice(kWaveformBase, index, 16); }
 
@@ -137,17 +128,21 @@ public:
   }
 
 private:
-  [[nodiscard]] std::span<const u32> slice(u32 base, u8 index, u8 offsetShift) const {
+  [[nodiscard]] std::optional<u32> word(u32 base, u8 index) const {
     if (index >= kTableEntries) {
+      return std::nullopt;
+    }
+    const u32 address = base + index;
+    return address < words_.size() ? std::optional{words_[address]} : std::nullopt;
+  }
+
+  [[nodiscard]] std::span<const u32> slice(u32 base, u8 index, u8 offsetShift) const {
+    const auto descriptor = word(base, index);
+    if (!descriptor) {
       return {};
     }
-    const u32 descriptorAddress = base + index;
-    if (descriptorAddress >= words_.size()) {
-      return {};
-    }
-    const u32 descriptor = words_[descriptorAddress];
-    const u32 offset = descriptor >> offsetShift;
-    const u32 count = descriptor & 0xff;
+    const u32 offset = *descriptor >> offsetShift;
+    const u32 count = *descriptor & 0xff;
     if (count == 0 || offset > words_.size() || count > words_.size() - offset) {
       return {};
     }
