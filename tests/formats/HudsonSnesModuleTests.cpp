@@ -358,6 +358,47 @@ void customPitchAttackAndPercussionPreserveDriverCurvesAndMixerRows() {
          "percussion notes should replace track volume and pan with the selected drum row, as the driver does");
 }
 
+void v1MixerAndPitchPipelineMatchesSuperBomberman3() {
+  std::vector<u32> drums = runtimeData();
+  drums[384 + 24] = (60u << 16) | (0x80u << 8) | 15;
+  const PerformanceSequence percussion = render(Version::V1, 2, false, {0xfe, 0x03, 0x10, 6, 0xff}, std::move(drums));
+  const auto levels = events<LevelPerformanceEvent>(percussion.tracks.front());
+  const auto balances = events<StereoBalancePerformanceEvent>(percussion.tracks.front());
+  expect(percussion.diagnostics.empty() && !levels.empty() && !balances.empty() &&
+             std::abs(levels.back()->linearGain - 128.0 / 255.0) < 0.000001 &&
+             std::abs(levels.back()->linearGain * balances.back()->leftGain - 44.0 / 127.0) < 0.000001,
+         "Hudson 1.x drums should retain all eight volume bits and both SPC700 mixer truncations");
+
+  const PerformanceSequence pitched =
+      render(Version::V1, 2, false, {0xe2, 12, 6, 0xe3, 1, 0xe9, 127, 68, 1, 0xe9, 0, 0, 0, 0x18, 6, 0x20, 6, 0xff});
+  const auto notes = events<NotePerformanceEvent>(pitched.tracks.front());
+  const auto modulation = events<ModulationPerformanceEvent>(pitched.tracks.front());
+  const ModulationPerformanceEvent* vibrato = nullptr;
+  for (const auto* event : modulation) {
+    if (event->target == ModulationPerformanceTarget::VibratoDepth && event->pitchRangeSemitones &&
+        event->pitchDepthSemitones && *event->pitchDepthSemitones > 0.4) {
+      vibrato = event;
+      break;
+    }
+  }
+  const PitchTransitionIntent* attack = nullptr;
+  u32 fixedDurationAttacks = 0;
+  for (const auto& automation : pitched.tracks.front().automations) {
+    const auto* transition = pitchTransitionIntent(automation);
+    if (transition != nullptr && std::holds_alternative<FixedDurationPitchSlideTiming>(transition->timing.physical)) {
+      attack = transition;
+      ++fixedDurationAttacks;
+    }
+  }
+  const auto* timing =
+      attack == nullptr ? nullptr : std::get_if<FixedDurationPitchSlideTiming>(&attack->timing.physical);
+  expect(pitched.diagnostics.empty() && notes.size() == 2 && !notes.back()->restartsLfoPhase &&
+             fixedDurationAttacks == 1 && timing != nullptr && timing->milliseconds == 508.0 &&
+             attack->targetKey - attack->startKey > 10.0 && vibrato != nullptr && vibrato->delayTicks == 0 &&
+             vibrato->pitchRangeSemitones->minimum < 0.0 && vibrato->pitchRangeSemitones->maximum > 0.0,
+         "Hudson 1.x should retain pitch state across slurs and express raw DSP pitch envelopes and vibrato");
+}
+
 void pitchScriptsUseDriverDefaultsAndZeroMeans256Ticks() {
   std::vector<u32> script = runtimeData();
   script[256] = (512u << 8) | 1;
@@ -387,7 +428,7 @@ void periodicVolumeSlidesRunOnTheDriverClock() {
          "periodic volume slides should accumulate eighth-steps at the driver's timebase-adjusted interval");
 }
 
-void portamentoRetainsItsPhysicalDriverRate() {
+void portamentoRetainsPhysicalDriverTiming() {
   const PerformanceSequence performance = render(Version::V2, 2, false, {0x10, 6, 0xf1, 126, 0, 0x20, 6, 0xff});
   const auto transition = std::ranges::find_if(performance.tracks.front().automations, [](const auto& automation) {
     const auto* pitch = pitchTransitionIntent(automation);
@@ -400,6 +441,18 @@ void portamentoRetainsItsPhysicalDriverRate() {
              pitch->preferredRendering == PitchTransitionRenderingHint::Portamento &&
              timing->semitonesPerSecond == 250.0,
          "portamento should retain the driver's fixed physical pitch rate and native-portamento preference");
+
+  const PerformanceSequence v1 = render(Version::V1, 2, false, {0xf1, 1, 0, 0x10, 6, 0x30, 6, 0xff});
+  const auto v1Transition = std::ranges::find_if(v1.tracks.front().automations, [](const auto& automation) {
+    const auto* intent = pitchTransitionIntent(automation);
+    return intent != nullptr && std::holds_alternative<FixedDurationPitchSlideTiming>(intent->timing.physical);
+  });
+  const auto* v1Pitch =
+      v1Transition == v1.tracks.front().automations.end() ? nullptr : pitchTransitionIntent(*v1Transition);
+  const auto* v1Timing =
+      v1Pitch == nullptr ? nullptr : std::get_if<FixedDurationPitchSlideTiming>(&v1Pitch->timing.physical);
+  expect(v1.diagnostics.empty() && v1Timing != nullptr && v1Timing->milliseconds == 20.0,
+         "Hudson 1.x portamento should advance raw DSP pitch every four milliseconds after its anchor note");
 }
 
 void optionalRealCorpusSmokeTest() {
@@ -494,9 +547,10 @@ void runHudsonSnesModuleTests() {
   v2PlaybackUsesAuditedTempoLfosAndDynamicAdsr();
   conditionalDispatchAndEarlyOperandLayoutsMatchTheDriver();
   customPitchAttackAndPercussionPreserveDriverCurvesAndMixerRows();
+  v1MixerAndPitchPipelineMatchesSuperBomberman3();
   pitchScriptsUseDriverDefaultsAndZeroMeans256Ticks();
   reversePhasePreservesSignedStereoGains();
   periodicVolumeSlidesRunOnTheDriverClock();
-  portamentoRetainsItsPhysicalDriverRate();
+  portamentoRetainsPhysicalDriverTiming();
   optionalRealCorpusSmokeTest();
 }

@@ -54,6 +54,9 @@ struct InstrumentRow {
   u8 adsr1 = 0;
   u8 adsr2 = 0;
   u8 gain = 0;
+  u16 pitchScale = 0x0100;
+  s8 coarseTuning = 0;
+  s8 fineTuning = 0;
   core::SourceRange source;
 };
 

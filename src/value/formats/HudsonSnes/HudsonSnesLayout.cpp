@@ -563,7 +563,11 @@ void supplementLiveRecipes(ByteReader reader, const Layout& layout, SequenceRefe
     const u32 rows = std::min<u32>((end - layout.activeDrumTableAddress) / 4, 68);
     for (u32 note = 0; note < rows; ++note) {
       const u32 item = layout.activeDrumTableAddress + note * 4;
-      if (!reader.has(item, 4) || (reader.u8At(item + 2) & 0x7f) > 0x4f || (reader.u8At(item + 3) & 0x1f) > 30) {
+      if (!reader.has(item, 4)) {
+        break;
+      }
+      const bool invalidVolume = layout.version == Version::V2 && (reader.u8At(item + 2) & 0x7f) > 0x4f;
+      if (invalidVolume || (reader.u8At(item + 3) & 0x1f) > 30) {
         break;
       }
       recipes.drums.push_back(DrumSlot{
@@ -621,6 +625,16 @@ void supplementLiveRecipes(ByteReader reader, const Layout& layout, SequenceRefe
         row.gain = reader.u8At(preset + 3);
       }
     }
+  }
+
+  for (InstrumentRow& row : recipes.instruments) {
+    const u32 tuning = layout.tuningTableAddress + row.srcn * 4u;
+    if (!reader.has(tuning, 4)) {
+      continue;
+    }
+    row.pitchScale = static_cast<u16>((reader.u8At(tuning) << 8) | reader.u8At(tuning + 1));
+    row.coarseTuning = static_cast<s8>(reader.u8At(tuning + 2));
+    row.fineTuning = static_cast<s8>(reader.u8At(tuning + 3));
   }
 }
 
