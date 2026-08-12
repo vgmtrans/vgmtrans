@@ -263,18 +263,25 @@ void pitchSweepAdvancesThroughThePitchTable() {
          "pitch-sweep rates with bit 7 set should ascend by note-table steps");
 }
 
-void enablingPortamentoRetriggersItsFirstNote() {
+void portamentoUsesDriverRateAndRetriggersFirstNote() {
+  const PerformanceSequence performance =
+      render(fixture({0x60, 0xdf, 0xa0, 0x03, 0xa1, 0x84, 0x07, 0x62, 0xdf, 0x64, 0xdf, 0x82}));
+  const auto* slide = performance.tracks.front().automations.empty()
+                          ? nullptr
+                          : pitchTransitionIntent(performance.tracks.front().automations.back());
+  const auto* timing =
+      slide == nullptr ? nullptr : std::get_if<FixedDurationPitchSlideTiming>(&slide->timing.physical);
   const MidiSequence midi = renderMidiSequence(
-      render(fixture({0x60, 0xdf, 0xa0, 0x03, 0xa1, 0x84, 0x03, 0x62, 0xdf, 0x64, 0xdf, 0x82})),
-      MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+      performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   const auto noteCount = std::ranges::count_if(
       midi.tracks.front().events, [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); });
   const auto portamentoCount = std::ranges::count_if(midi.tracks.front().events, [](const MidiEvent& event) {
     return std::holds_alternative<PortamentoEnable>(event) || std::holds_alternative<PortamentoTime>(event) ||
            std::holds_alternative<PortamentoTime14>(event) || std::holds_alternative<PortamentoControl>(event);
   });
-  expect(noteCount == 2 && portamentoCount == 0,
-         "pitch-bend lowering should retain the fresh attack without leaking native MIDI portamento");
+  expect(slide != nullptr && slide->timing.timelineTicks == 1 && timing != nullptr && timing->milliseconds == 16.0 &&
+             noteCount == 2 && portamentoCount == 0,
+         "Compile portamento should use driver-rate timing, retrigger its first note, and lower cleanly to pitch bend");
 }
 
 }  // namespace
@@ -287,5 +294,5 @@ void runCompileSnesModuleTests() {
   trackAndPercussionFlagsDoNotBecomeStereoPhase();
   monoModeForcesCenterAndIgnoresStereoPhase();
   pitchSweepAdvancesThroughThePitchTable();
-  enablingPortamentoRetriggersItsFirstNote();
+  portamentoUsesDriverRateAndRetriggersFirstNote();
 }
