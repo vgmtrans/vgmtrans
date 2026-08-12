@@ -867,7 +867,7 @@ const SequenceDialect& mp2kSequenceDialect() {
 SequenceProgram parseMp2kSequenceProgram(ByteReader reader, AssetId id, const Mp2kSong& song,
                                          SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const SequenceDialect& dialect = mp2kSequenceDialect();
-  const u32 headerSize = 8 + song.trackCount * 4;
+  const u32 headerSize = 8 + reader.u8At(song.offset) * 4;
   SequenceProgram program = dialect.makeProgram(Address{song.offset});
   program.behavior = dialect.defaultBehavior;
   program.config.driverData.resize(385);
@@ -884,7 +884,7 @@ SequenceProgram parseMp2kSequenceProgram(ByteReader reader, AssetId id, const Mp
     auto annotation = sourceMap->header("MP2k Song Header", reader.range(song.offset, headerSize))
                           .kind("mp2k-song-header")
                           .owner(ObjectRefs::sequence(id))
-                          .field("track_count", reader.range(song.offset, 1), song.trackCount)
+                          .field("track_count", reader.range(song.offset, 1), reader.u8At(song.offset))
                           .field("block_count", reader.range(song.offset + 1, 1), reader.u8At(song.offset + 1))
                           .field("priority", reader.range(song.offset + 2, 1), reader.u8At(song.offset + 2))
                           .field("reverb", reader.range(song.offset + 3, 1), reader.u8At(song.offset + 3));

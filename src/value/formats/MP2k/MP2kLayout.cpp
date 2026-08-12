@@ -83,15 +83,33 @@ constexpr std::string_view kExactPatternMask = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
   return std::nullopt;
 }
 
-[[nodiscard]] bool validSong(ByteReader reader, u32 offset, Mp2kSong& song) {
+struct PlayerTable {
+  u32 offset = 0;
+  u32 count = 0;
+};
+
+[[nodiscard]] std::optional<u8> playerTrackLimit(ByteReader reader, const PlayerTable& players, u32 songEntry) {
+  const u32 player = reader.le16(songEntry + 4);
+  if (player >= players.count || !reader.has(players.offset + static_cast<u64>(player) * 12, 12)) {
+    return std::nullopt;
+  }
+  const u8 tracks = reader.u8At(players.offset + player * 12 + 8);
+  return tracks > 0 && tracks <= 24 ? std::optional<u8>{tracks} : std::nullopt;
+}
+
+[[nodiscard]] bool validSong(ByteReader reader, u32 offset, Mp2kSong& song, u8 trackLimit = 24) {
   if (!reader.has(offset, 8)) {
     return false;
   }
-  const u8 tracks = reader.u8At(offset);
+  const u8 headerTracks = reader.u8At(offset);
   const auto bank = romOffset(reader.le32(offset + 4), reader);
-  if (tracks == 0 || tracks > 24 || !bank || !reader.has(offset + 8, static_cast<u64>(tracks) * 4)) {
+  if (headerTracks == 0 || headerTracks > 24 || trackLimit == 0 || !bank ||
+      !reader.has(offset + 8, static_cast<u64>(headerTracks) * 4)) {
     return false;
   }
+  // MPlayStart stops at the selected player's capacity. Some valid headers
+  // leave null pointers beyond that limit, and the driver never reads them.
+  const u8 tracks = std::min(headerTracks, trackLimit);
   for (u32 track = 0; track < tracks; ++track) {
     if (!romOffset(reader.le32(offset + 8 + track * 4), reader)) {
       return false;
@@ -104,30 +122,25 @@ constexpr std::string_view kExactPatternMask = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
   return true;
 }
 
-[[nodiscard]] std::optional<Mp2kLayout> readLayout(ByteReader reader, u32 settings) {
-  const u32 value = reader.le32(settings);
-  const u32 encodedRateIndex = (value >> 16) & 0x0f;
-  const u32 rateIndex = encodedRateIndex == 0 ? kDefaultSampleRateIndex : encodedRateIndex;
-  const u8 encodedMasterVolume = static_cast<u8>((value >> 12) & 0x0f);
-  const u8 encodedDacMode = static_cast<u8>((value >> 20) & 0x0f);
-  const u32 songLevels = reader.le32(settings + 4);
-  const auto tableBase = romOffset(reader.le32(settings + 8), reader);
-  if (!tableBase) {
-    return std::nullopt;
+void addBanks(ByteReader reader, Mp2kLayout& layout, const std::set<u32>& offsets) {
+  for (auto it = offsets.begin(); it != offsets.end(); ++it) {
+    u32 count = 128;
+    if (const auto next = std::next(it); next != offsets.end()) {
+      count = std::min<u32>(count, (*next - *it) / 12);
+    }
+    count = std::min<u32>(count, static_cast<u32>((reader.size() - *it) / 12));
+    layout.banks.push_back(Mp2kBank{.offset = *it, .instrumentCount = count});
   }
-  const u64 table64 = static_cast<u64>(*tableBase) + static_cast<u64>(songLevels) * 12;
-  if (table64 > reader.size() || !reader.has(table64, 8)) {
-    return std::nullopt;
-  }
-  const u32 table = static_cast<u32>(table64);
+}
 
-  Mp2kLayout layout{.engine = {.settingsOffset = settings,
-                               .songTableOffset = table,
-                               .sampleRate = kSampleRates[rateIndex],
-                               .directSoundMasterVolume =
-                                   encodedMasterVolume == 0 ? kDefaultDirectSoundMasterVolume : encodedMasterVolume,
-                               .dacBits = static_cast<u8>(encodedDacMode == 0 ? 8 : 17 - encodedDacMode),
-                               .reverb = static_cast<u8>(value & 0x7f)}};
+[[nodiscard]] std::optional<Mp2kLayout> readSongTable(ByteReader reader, Mp2kEngine engine,
+                                                      std::optional<PlayerTable> players = std::nullopt) {
+  const u32 table = engine.songTableOffset;
+  if (!reader.has(table, 8)) {
+    return std::nullopt;
+  }
+
+  Mp2kLayout layout{.engine = engine};
   std::set<u32> bankOffsets;
   const u32 availableEntries = static_cast<u32>(std::min<u64>((reader.size() - table) / 8, 4096));
   bool foundSong = false;
@@ -143,8 +156,15 @@ constexpr std::string_view kExactPatternMask = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
       }
       continue;
     }
+    std::optional<u8> trackLimit;
+    if (players) {
+      trackLimit = playerTrackLimit(reader, *players, table + index * 8);
+      if (!trackLimit) {
+        continue;
+      }
+    }
     Mp2kSong song{.index = index};
-    if (!validSong(reader, *offset, song)) {
+    if (!validSong(reader, *offset, song, trackLimit.value_or(24))) {
       continue;
     }
     song.reverb = (song.reverb & 0x80) != 0 ? song.reverb & 0x7f : layout.engine.reverb;
@@ -155,16 +175,60 @@ constexpr std::string_view kExactPatternMask = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
   if (layout.songs.empty()) {
     return std::nullopt;
   }
-
-  for (auto it = bankOffsets.begin(); it != bankOffsets.end(); ++it) {
-    u32 count = 128;
-    if (const auto next = std::next(it); next != bankOffsets.end()) {
-      count = std::min<u32>(count, (*next - *it) / 12);
-    }
-    count = std::min<u32>(count, static_cast<u32>((reader.size() - *it) / 12));
-    layout.banks.push_back(Mp2kBank{.offset = *it, .instrumentCount = count});
-  }
+  addBanks(reader, layout, bankOffsets);
   return layout;
+}
+
+[[nodiscard]] std::optional<Mp2kLayout> readLayout(ByteReader reader, u32 settings) {
+  const u32 value = reader.le32(settings);
+  const u32 encodedRateIndex = (value >> 16) & 0x0f;
+  const u32 rateIndex = encodedRateIndex == 0 ? kDefaultSampleRateIndex : encodedRateIndex;
+  const u8 encodedMasterVolume = static_cast<u8>((value >> 12) & 0x0f);
+  const u8 encodedDacMode = static_cast<u8>((value >> 20) & 0x0f);
+  const u32 songLevels = reader.le32(settings + 4);
+  const auto tableBase = romOffset(reader.le32(settings + 8), reader);
+  if (!tableBase) {
+    return std::nullopt;
+  }
+  const u64 table64 = static_cast<u64>(*tableBase) + static_cast<u64>(songLevels) * 12;
+  if (table64 > reader.size()) {
+    return std::nullopt;
+  }
+
+  Mp2kEngine engine{
+      .settingsOffset = settings,
+      .songTableOffset = static_cast<u32>(table64),
+      .sampleRate = kSampleRates[rateIndex],
+      .directSoundMasterVolume = encodedMasterVolume == 0 ? kDefaultDirectSoundMasterVolume : encodedMasterVolume,
+      .dacBits = static_cast<u8>(encodedDacMode == 0 ? 8 : 17 - encodedDacMode),
+      .reverb = static_cast<u8>(value & 0x7f)};
+  const std::optional<PlayerTable> players =
+      songLevels == 0 ? std::nullopt : std::optional<PlayerTable>{{.offset = *tableBase, .count = songLevels}};
+  return readSongTable(reader, engine, players);
+}
+
+[[nodiscard]] std::optional<Mp2kLayout> readSignatureLayout(ByteReader reader, u32 signature) {
+  // SongNumStart loads the player and song-table addresses from these two
+  // literals in both SDK variants. Some games relocate or omit the usual
+  // engine-settings words while retaining this unmodified routine.
+  if (!reader.has(signature + 36, 8)) {
+    return std::nullopt;
+  }
+  const auto playerTable = romOffset(reader.le32(signature + 36), reader);
+  const auto songTable = romOffset(reader.le32(signature + 40), reader);
+  if (!playerTable || !songTable || *songTable <= *playerTable || (*songTable - *playerTable) % 12 != 0) {
+    return std::nullopt;
+  }
+  const u32 playerCount = (*songTable - *playerTable) / 12;
+  if (playerCount == 0 || playerCount >= 256) {
+    return std::nullopt;
+  }
+
+  return readSongTable(reader,
+                       Mp2kEngine{.songTableOffset = *songTable,
+                                  .sampleRate = kSampleRates[kDefaultSampleRateIndex],
+                                  .directSoundMasterVolume = kDefaultDirectSoundMasterVolume},
+                       PlayerTable{.offset = *playerTable, .count = playerCount});
 }
 
 struct CompatibleTableCandidate {
@@ -233,14 +297,7 @@ struct CompatibleTableCandidate {
     bankOffsets.insert(song.bankOffset);
     layout.songs.push_back(song);
   }
-  for (auto it = bankOffsets.begin(); it != bankOffsets.end(); ++it) {
-    u32 count = 128;
-    if (const auto next = std::next(it); next != bankOffsets.end()) {
-      count = std::min<u32>(count, (*next - *it) / 12);
-    }
-    count = std::min<u32>(count, static_cast<u32>((reader.size() - *it) / 12));
-    layout.banks.push_back(Mp2kBank{.offset = *it, .instrumentCount = count});
-  }
+  addBanks(reader, layout, bankOffsets);
   return layout.songs.empty() ? std::nullopt : std::optional<Mp2kLayout>{std::move(layout)};
 }
 
@@ -250,16 +307,21 @@ std::vector<Mp2kLayout> findMp2kLayouts(ScanResultBuilder& builder) {
   const ByteReader reader = builder.reader();
   std::vector<Mp2kLayout> layouts;
   std::set<u32> settingsSeen;
+  std::set<u32> tablesSeen;
 
   const auto scanPattern = [&](std::span<const u8> pattern) {
     u32 begin = 0;
     while (const auto signature = findBytePattern(reader, MaskedBytePattern{pattern, kExactPatternMask}, begin)) {
       begin = *signature + 1;
       const auto settings = settingsForSignature(reader, *signature);
-      if (!settings || !settingsSeen.insert(*settings).second) {
-        continue;
+      std::optional<Mp2kLayout> layout;
+      if (settings && settingsSeen.insert(*settings).second) {
+        layout = readLayout(reader, *settings);
       }
-      if (auto layout = readLayout(reader, *settings)) {
+      if (!layout) {
+        layout = readSignatureLayout(reader, *signature);
+      }
+      if (layout && tablesSeen.insert(layout->engine.songTableOffset).second) {
         layouts.push_back(std::move(*layout));
       }
     }

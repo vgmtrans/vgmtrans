@@ -13,6 +13,7 @@
 #include <cctype>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <map>
 #include <optional>
 #include <span>
@@ -201,21 +202,27 @@ void parseTags(PsfData& psf, std::span<const u8> bytes, size_t offset) {
   return std::nullopt;
 }
 
-void overlay(Image& image, u32 address, const u8* data, size_t size) {
+void overlay(Image& image, u32 address, const u8* data, size_t dataSize, size_t imageSize) {
   // Libraries can extend the image before or after previous payloads. Resize and zero-fill
-  // so later overlays land at their emulated addresses.
-  if (size == 0) {
+  // so later overlays land at their emulated addresses. Some containers omit a zero-filled
+  // tail while retaining its size in the executable header.
+  if (dataSize > imageSize || imageSize > std::numeric_limits<u32>::max() - address) {
+    throw std::runtime_error("PSF executable overlay range is invalid");
+  }
+  if (imageSize == 0) {
     return;
   }
+  const u32 overlayEnd = address + static_cast<u32>(imageSize);
   if (image.data.empty()) {
     image.start = address;
-    image.end = address + static_cast<u32>(size);
-    image.data.assign(data, data + size);
+    image.end = overlayEnd;
+    image.data.assign(imageSize, 0);
+    std::copy(data, data + dataSize, image.data.begin());
     return;
   }
 
   const u32 newStart = std::min(image.start, address);
-  const u32 newEnd = std::max(image.end, address + static_cast<u32>(size));
+  const u32 newEnd = std::max(image.end, overlayEnd);
   if (newStart != image.start) {
     image.data.insert(image.data.begin(), image.start - newStart, 0);
     image.start = newStart;
@@ -224,7 +231,9 @@ void overlay(Image& image, u32 address, const u8* data, size_t size) {
     image.data.resize(newEnd - image.start, 0);
     image.end = newEnd;
   }
-  std::copy(data, data + size, image.data.begin() + (address - image.start));
+  const auto destination = image.data.begin() + (address - image.start);
+  std::fill(destination, destination + static_cast<std::ptrdiff_t>(imageSize), 0);
+  std::copy(data, data + dataSize, destination);
 }
 
 [[nodiscard]] std::vector<u8> readFile(const std::filesystem::path& path) {
@@ -251,27 +260,32 @@ void overlay(Image& image, u32 address, const u8* data, size_t size) {
 }
 
 void overlayPsfExe(const PsfData& psf, Image& image) {
-  // The first word of the decompressed executable gives the load address. The playable
-  // data begins after a version-specific mini-header. PSF1 is the exception: it stores
-  // a PS-X EXE header, with the load address at 0x18 and the payload at 0x800.
+  // The decompressed executable carries version-specific load metadata. PSF1 stores a
+  // PS-X EXE header; GSF keeps its overlay address in the second word of its mini-header.
   if (psf.exe.empty()) {
     return;
   }
   const auto dataOffset = dataOffsetForVersion(psf.version);
-  const size_t addressOffset = psf.version == kPsf1Version ? kPsf1LoadAddressOffset : psf.version == kGsfVersion ? 4 : 0;
+  size_t addressOffset = 0;
+  if (psf.version == kPsf1Version) {
+    addressOffset = kPsf1LoadAddressOffset;
+  } else if (psf.version == kGsfVersion) {
+    addressOffset = 4;
+  }
   if (!dataOffset || psf.exe.size() < *dataOffset || psf.exe.size() < addressOffset + 4) {
     throw std::runtime_error("PSF executable header is invalid");
   }
   const u32 address = le32(psf.exe, addressOffset);
-  size_t size = psf.exe.size() - *dataOffset;
+  const size_t storedSize = psf.exe.size() - *dataOffset;
+  size_t imageSize = storedSize;
   if (psf.version == kGsfVersion) {
     const u32 declaredSize = le32(psf.exe, 8);
-    if (declaredSize > size) {
-      throw std::runtime_error("GSF executable payload size is invalid");
+    if (declaredSize < storedSize) {
+      throw std::runtime_error("GSF executable payload exceeds its declared size");
     }
-    size = declaredSize;
+    imageSize = declaredSize;
   }
-  overlay(image, address, psf.exe.data() + *dataOffset, size);
+  overlay(image, address, psf.exe.data() + *dataOffset, storedSize, imageSize);
 }
 
 void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Image& image,

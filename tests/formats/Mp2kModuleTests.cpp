@@ -154,11 +154,11 @@ void le32(std::vector<u8>& bytes, size_t offset, u32 value) {
   return result;
 }
 
-[[nodiscard]] std::vector<u8> gsf(std::span<const u8> rom) {
+[[nodiscard]] std::vector<u8> gsf(std::span<const u8> rom, u32 omittedZeroBytes = 0) {
   std::vector<u8> executable(12 + rom.size());
   le32(executable, 0, 0x08000000);
   le32(executable, 4, 0x08000000);
-  le32(executable, 8, static_cast<u32>(rom.size()));
+  le32(executable, 8, static_cast<u32>(rom.size()) + omittedZeroBytes);
   std::copy(rom.begin(), rom.end(), executable.begin() + 12);
   return psf22(executable);
 }
@@ -582,6 +582,27 @@ void mp2kCompatibleDriverFallbackFindsDataTable() {
          "a replacement driver should still be found from its referenced MP2k-compatible song table");
 }
 
+void mp2kSongSelectLiteralsFindSparseTableAndRespectPlayerCapacity() {
+  std::vector<u8> bytes = mp2kFixture();
+  std::fill(bytes.begin() + 0x100, bytes.begin() + 0x118, 0);  // no adjacent engine-settings block
+  le32(bytes, 0x118 + 36, 0x08000d00);                         // player table literal
+  le32(bytes, 0x118 + 40, 0x08000d0c);                         // song table literal
+  bytes[0xd08] = 1;                                            // player 0 owns one track
+  le32(bytes, 0xd0c + 42 * 8, 0x08000300);                     // sparse song ID 42
+  bytes[0x300] = 2;                                            // only the first pointer is used
+  le32(bytes, 0x30c, 0);
+
+  ScanIdAllocator ids;
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "Synthetic sparse MP2k ROM"}, bytes);
+  ScanInput input{.source = sources.source(source), .reader = sources.reader(source), .ids = ids};
+  ScanResultBuilder result(input, "MP2k");
+  const auto layouts = findMp2kLayouts(result);
+  expect(layouts.size() == 1 && layouts.front().engine.songTableOffset == 0xd0c && layouts.front().songs.size() == 1 &&
+             layouts.front().songs.front().index == 42 && layouts.front().songs.front().trackCount == 1,
+         "SongNumStart literals should expose sparse IDs and MPlayStart should cap tracks to the selected player");
+}
+
 void mp2kDirectSoundMasterVolumeAffectsOnlyPcmVoices() {
   Session session;
   session.registerFormat(mp2kDefinition());
@@ -608,6 +629,20 @@ void gsfExtractorFeedsMp2kValueScanner() {
   expect(snapshot.sources().size() == 2 && snapshot.sources()[1].attribute("container-format") == "GSF" &&
              snapshot.collections().size() == 1,
          "PSF version 0x22 should produce a derived GBA image that the MP2k module scans");
+}
+
+void gsfExtractorZeroFillsSparseTail() {
+  const std::vector<u8> rom = mp2kFixture();
+  constexpr u32 omittedZeroBytes = 12;
+  Session session;
+  session.registerFormat(vgmtrans::formats::psf::psfExtractorDefinition());
+  session.registerFormat(mp2kDefinition());
+  session.addSource(SourceFile{.name = "Synthetic sparse-tail GSF"}, gsf(rom, omittedZeroBytes));
+  session.scanPendingSources();
+  const SessionSnapshot snapshot = session.snapshot();
+  expect(snapshot.sources().size() == 2 && snapshot.sources()[1].size == rom.size() + omittedZeroBytes &&
+             snapshot.collections().size() == 1 && snapshot.diagnostics().empty(),
+         "GSF should zero-fill an omitted tail up to its declared image size");
 }
 
 void miniGsfOverlaysLibraryAndNamesSelectedSong() {
@@ -668,7 +703,9 @@ void runMp2kModuleTests() {
   mp2kPortConsumesItsRegisterOperands();
   mp2kUnknownMemaccDoesNotConsumeAJumpPointer();
   mp2kCompatibleDriverFallbackFindsDataTable();
+  mp2kSongSelectLiteralsFindSparseTableAndRespectPlayerCapacity();
   gsfExtractorFeedsMp2kValueScanner();
+  gsfExtractorZeroFillsSparseTail();
   miniGsfOverlaysLibraryAndNamesSelectedSong();
   mp2kSkipsEmptyPcmCollections();
 }
