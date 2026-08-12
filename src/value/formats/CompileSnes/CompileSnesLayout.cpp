@@ -143,6 +143,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
       .regularPitchTableAddress = regularPitch,
       .spcDirAddress = static_cast<u16>(reader.u8At(engine + 0x0e) << 8),
       .globalTranspose = static_cast<s8>(reader.u8At(engine + 0x0f)),
+      .stereoEnabled = (reader.u8At(1) & 4) != 0,
   };
 }
 
