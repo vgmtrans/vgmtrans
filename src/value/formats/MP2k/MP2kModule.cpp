@@ -20,7 +20,7 @@ using namespace core;
 namespace {
 
 struct BankAssets {
-  ScanSampleCollectionDraft samples;
+  std::optional<ScanSampleCollectionDraft> samples;
   ScanInstrumentSetDraft instruments;
 };
 
@@ -46,10 +46,10 @@ void scanLayout(const Mp2kLayout& layout, ScanResultBuilder& result) {
   auto psg = addMp2kPsgSamples(result, layout.engine.sampleRate);
   std::map<u32, BankAssets> banks;
   for (const auto& bank : layout.banks) {
-    auto samples = result.sampleCollection(fmt::format("MP2k samples {:#x}", bank.offset));
+    std::optional<ScanSampleCollectionDraft> samples;
     auto instruments = addMp2kInstrumentSet(result, bank, layout.engine.sampleRate,
                                             layout.engine.directSoundMasterVolume, layout.engine.dacBits, psg, samples);
-    banks.emplace(bank.offset, BankAssets{.samples = samples, .instruments = instruments});
+    banks.emplace(bank.offset, BankAssets{.samples = std::move(samples), .instruments = instruments});
   }
 
   const auto selected = selectedSong(result.sourceFile());
@@ -69,8 +69,8 @@ void scanLayout(const Mp2kLayout& layout, ScanResultBuilder& result) {
     collection.sequence(sequence).samples(psg);
     if (const auto found = banks.find(song.bankOffset); found != banks.end()) {
       collection.instrumentSet(found->second.instruments);
-      if (!found->second.samples.empty()) {
-        collection.samples(found->second.samples);
+      if (found->second.samples) {
+        collection.samples(*found->second.samples);
       }
     }
   }

@@ -634,6 +634,24 @@ void miniGsfOverlaysLibraryAndNamesSelectedSong() {
          "miniGSF should overlay its gsflib and apply title metadata only to the selected MP2k song");
 }
 
+void mp2kSkipsEmptyPcmCollections() {
+  std::vector<u8> bytes = mp2kFixture();
+  le32(bytes, 0x208, 0x08000380);
+  le32(bytes, 0x210, 0xffffffff);
+  bytes[0x380] = 1;
+  le32(bytes, 0x384, 0x08000500);
+  le32(bytes, 0x388, 0x080003a0);
+  bytes[0x3a0] = 0xb1;
+
+  Session session;
+  session.registerFormat(mp2kDefinition());
+  session.addSource(SourceFile{.name = "mp2k-empty-pcm-bank.gba"}, bytes);
+  session.scanPendingSources();
+  const SessionSnapshot snapshot = session.snapshot();
+  expect(snapshot.collections().size() == 2 && snapshot.diagnostics().empty(),
+         "MP2k banks without valid DirectSound samples must not emit source-less PCM assets");
+}
+
 }  // namespace
 
 void runMp2kModuleTests() {
@@ -652,6 +670,7 @@ void runMp2kModuleTests() {
   mp2kCompatibleDriverFallbackFindsDataTable();
   gsfExtractorFeedsMp2kValueScanner();
   miniGsfOverlaysLibraryAndNamesSelectedSong();
+  mp2kSkipsEmptyPcmCollections();
 }
 
 void validateMp2kCorpus(const std::filesystem::path& path) {

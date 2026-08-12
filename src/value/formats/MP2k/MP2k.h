@@ -57,10 +57,9 @@ struct Mp2kLayout {
                                                              std::vector<core::Diagnostic>* diagnostics = nullptr);
 
 [[nodiscard]] core::ScanSampleCollectionDraft addMp2kPsgSamples(core::ScanResultBuilder& builder, u32 sampleRate);
-[[nodiscard]] core::ScanInstrumentSetDraft addMp2kInstrumentSet(core::ScanResultBuilder& builder, const Mp2kBank& bank,
-                                                                u32 sampleRate, u8 directSoundMasterVolume, u8 dacBits,
-                                                                core::ScanSampleCollectionDraft& psgSamples,
-                                                                core::ScanSampleCollectionDraft& pcmSamples);
+[[nodiscard]] core::ScanInstrumentSetDraft addMp2kInstrumentSet(
+    core::ScanResultBuilder& builder, const Mp2kBank& bank, u32 sampleRate, u8 directSoundMasterVolume, u8 dacBits,
+    core::ScanSampleCollectionDraft& psgSamples, std::optional<core::ScanSampleCollectionDraft>& pcmSamples);
 
 [[nodiscard]] core::FormatDefinition mp2kDefinition();
 

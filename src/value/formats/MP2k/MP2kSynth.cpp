@@ -61,6 +61,18 @@ struct Tone {
   SourceRecord source;
 };
 
+struct PcmSamples {
+  std::optional<ScanSampleCollectionDraft>& asset;
+  u32 bankOffset = 0;
+
+  [[nodiscard]] ScanSampleCollectionDraft& get(ScanResultBuilder& builder) {
+    if (!asset) {
+      asset.emplace(builder.sampleCollection(fmt::format("MP2k samples {:#x}", bankOffset)));
+    }
+    return *asset;
+  }
+};
+
 [[nodiscard]] std::optional<u32> romOffset(u32 address, ByteReader reader, u32 size = 1) {
   if ((address & 0xfe000000) != 0x08000000) {
     return std::nullopt;
@@ -172,17 +184,19 @@ struct Tone {
   };
 }
 
-[[nodiscard]] std::optional<SampleRef> addPcmSample(ScanResultBuilder& builder, ScanSampleCollectionDraft& samples,
-                                                    u32 pointer, u32 sampleRate, bool reverse, double& unityKey) {
+[[nodiscard]] std::optional<SampleRef> addPcmSample(ScanResultBuilder& builder, PcmSamples& samples, u32 pointer,
+                                                    u32 sampleRate, bool reverse, double& unityKey) {
   const auto offset = romOffset(pointer, builder.reader(), 16);
   if (!offset) {
     return std::nullopt;
   }
   const u64 sampleKey = reverse ? (u64{1} << 63) | *offset : *offset;
-  if (const auto existing = samples.find(sampleKey)) {
-    const u32 frequency = builder.reader().le32(*offset + 4);
-    unityKey = frequency == 0 ? 60.0 : 60.0 + 12.0 * std::log2(sampleRate * 1024.0 / frequency);
-    return existing;
+  if (samples.asset) {
+    if (const auto existing = samples.asset->find(sampleKey)) {
+      const u32 frequency = builder.reader().le32(*offset + 4);
+      unityKey = frequency == 0 ? 60.0 : 60.0 + 12.0 * std::log2(sampleRate * 1024.0 / frequency);
+      return existing;
+    }
   }
 
   RecordReader header(builder.reader(), *offset, *offset + 16, &builder.diagnostics());
@@ -211,7 +225,7 @@ struct Tone {
   unityKey = 60.0 + 12.0 * std::log2(sampleRate * 1024.0 / *frequency);
   const auto source = std::move(header).finish();
   const std::string name = fmt::format("Sample {:#x}", *offset);
-  auto entry = samples.add(
+  auto entry = samples.get(builder).add(
       sampleKey, Sample{
                      .name = name,
                      .codec = compressed ? AudioCodec::GbaBdpcm : AudioCodec::PcmS8,
@@ -250,7 +264,7 @@ struct Tone {
 
 [[nodiscard]] std::optional<Region> regionForTone(ScanResultBuilder& builder, const Tone& tone, KeyRange keys,
                                                   u32 sampleRate, u8 directSoundMasterVolume, u8 dacBits,
-                                                  ScanSampleCollectionDraft& psg, ScanSampleCollectionDraft& pcm,
+                                                  ScanSampleCollectionDraft& psg, PcmSamples& pcm,
                                                   std::optional<u8> rhythmKey = std::nullopt) {
   const u8 cgbType = tone.type & 7;
   std::optional<SampleRef> sample;
@@ -303,7 +317,7 @@ struct Tone {
 
 void addToneRegion(ScanResultBuilder& builder, InstrumentSetBuilder::Entry instrument, const Tone& tone, KeyRange keys,
                    u32 sampleRate, u8 directSoundMasterVolume, u8 dacBits, ScanSampleCollectionDraft& psg,
-                   ScanSampleCollectionDraft& pcm, std::optional<u8> rhythmKey = std::nullopt) {
+                   PcmSamples& pcm, std::optional<u8> rhythmKey = std::nullopt) {
   const u8 cgbType = tone.type & kToneCgbMask;
   if (cgbType >= 1 && cgbType <= 4 && keys.low != keys.high) {
     for (u32 key = keys.low; key <= keys.high; ++key) {
@@ -367,8 +381,9 @@ ScanSampleCollectionDraft addMp2kPsgSamples(ScanResultBuilder& builder, u32 samp
 
 ScanInstrumentSetDraft addMp2kInstrumentSet(ScanResultBuilder& builder, const Mp2kBank& bank, u32 sampleRate,
                                             u8 directSoundMasterVolume, u8 dacBits, ScanSampleCollectionDraft& psg,
-                                            ScanSampleCollectionDraft& pcm) {
+                                            std::optional<ScanSampleCollectionDraft>& pcmAsset) {
   auto instruments = builder.instrumentSet(fmt::format("MP2k bank {:#x}", bank.offset));
+  PcmSamples pcm{.asset = pcmAsset, .bankOffset = bank.offset};
   instruments.include(builder.reader().range(bank.offset, static_cast<u64>(bank.instrumentCount) * 12));
   instruments.source(SourceRole::Table, "Voicegroup", instruments.range(), "mp2k-voicegroup")
       .derived("instrument_count", bank.instrumentCount);
