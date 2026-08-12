@@ -33,7 +33,8 @@ struct Mp2kSong {
   u32 index = 0;
   u32 offset = 0;
   u32 bankOffset = 0;
-  u8 trackCount = 0;
+  u8 declaredTracks = 0;
+  u8 activeTracks = 0;
   u8 reverb = 0;
 };
 

@@ -31,14 +31,16 @@ struct BankAssets {
   }
   u32 value = 0;
   const auto [end, error] = std::from_chars(text->data(), text->data() + text->size(), value);
-  return error == std::errc{} && end == text->data() + text->size() ? std::optional<u32>{value} : std::nullopt;
+  if (error != std::errc{} || end != text->data() + text->size()) {
+    return std::nullopt;
+  }
+  return value;
 }
 
 [[nodiscard]] CollectionKey collectionKey(SourceId source, u32 table, u32 song) {
   return CollectionKey{
       .resolver = std::string(kMp2kFormatName),
-      .value = "source:" + std::to_string(source.value) + ":table:" + std::to_string(table) +
-               ":song:" + std::to_string(song),
+      .value = fmt::format("source:{}:table:{}:song:{}", source.value, table, song),
   };
 }
 
@@ -59,7 +61,7 @@ void scanLayout(const Mp2kLayout& layout, ScanResultBuilder& result) {
     }
     const bool titled = selected == song.index && result.sourceFile().title && !result.sourceFile().title->empty();
     const std::string name = titled ? *result.sourceFile().title : fmt::format("MP2k Song #{:03}", song.index);
-    const u32 headerSize = 8 + result.reader().u8At(song.offset) * 4;
+    const u32 headerSize = 8 + song.declaredTracks * 4;
     auto sequence = result.sequence(name, result.reader().range(song.offset, headerSize));
     sequence.program(
         parseMp2kSequenceProgram(result.reader(), sequence.id(), song, &result.sourceMap(), &result.diagnostics()));
