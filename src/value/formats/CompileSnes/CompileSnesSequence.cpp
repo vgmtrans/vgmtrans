@@ -204,19 +204,6 @@ namespace math {
   return distance <= step ? target : static_cast<u16>(pitch < target ? pitch + step : pitch - step);
 }
 
-[[nodiscard]] u32 portamentoFrames(u16 pitch, u16 target, u8 divisor) {
-  u32 frames = 0;
-  while (pitch != target) {
-    pitch = advancePortamento(pitch, target, divisor);
-    ++frames;
-  }
-  return frames;
-}
-
-[[nodiscard]] u32 ticksForDriverFrames(u32 frames, u8 tempo) {
-  return tempo == 0 ? frames : (frames * tempo + 0xffu) >> 8;
-}
-
 [[nodiscard]] double volumeGain(u8 volume, u8 envelope) {
   const u8 logical = envelope == 0xff ? volume : static_cast<u8>((volume * (envelope + 1u)) >> 5);
   return kVolumeTable[std::min<u8>(logical, 31)] / 127.0;
@@ -392,8 +379,6 @@ struct TrackState {
   u8 portamentoDivisor = 0;
   bool retriggerNextNote = false;
   u16 currentPitch = 0;
-  u16 targetPitch = 0;
-  u16 pitchBeforeSequenceTick = 0;
   s16 tuning = 0;
   s8 pitchSweep = 0;
   std::array<u8, 256> loops{};
@@ -624,7 +609,6 @@ struct Playback {
       track.activeUntil = vm.tick();
       track.lastNote = {};
       track.currentPitch = 0;
-      track.targetPitch = 0;
       return Effects::wait(length);
     }
     track.rawNote = raw;
@@ -639,7 +623,6 @@ struct Playback {
     const double key = keyForPitch(targetPitch);
     if (key == 0.0) {
       track.currentPitch = 0;
-      track.targetPitch = 0;
       return Effects::wait(length);
     }
     const u32 sounding = math::gateTicks(length, track.gate);
@@ -663,19 +646,25 @@ struct Playback {
       track.lastNote = out.note(std::move(event));
     }
     if (track.portamentoDivisor != 0 && continuesVoice) {
-      track.targetPitch = targetPitch;
-      // Sequence commands precede the effect update on a carry frame.
-      track.currentPitch = track.pitchBeforeSequenceTick;
       track.currentPitch = math::advancePortamento(track.currentPitch, targetPitch, track.portamentoDivisor);
-      const u32 frames = math::portamentoFrames(track.currentPitch, targetPitch, track.portamentoDivisor);
-      const auto timing =
-          PitchSlideTiming::fixedDuration(math::ticksForDriverFrames(frames, track.tempo), frames * 16.0);
+      u16 endPitch = track.currentPitch;
+      u32 frames = 0;
+      while (endPitch != targetPitch) {
+        endPitch = math::advancePortamento(endPitch, targetPitch, track.portamentoDivisor);
+        ++frames;
+      }
+      const auto timing = PitchSlideTiming::fixedDuration(
+          (frames * math::ticks(track.tempo) + 0xffu) >> 8, frames * 16.0);
       out.pitchSlide(track.lastNote, keyForPitch(track.currentPitch), key, timing)
           .continueFrom(previous)
           .preferPortamento();
     } else {
       track.currentPitch = targetPitch;
-      track.targetPitch = targetPitch;
+    }
+    // Notes are the only commands that advance sequence time. Preserve the
+    // pitch just before the next carry frame, whose update follows its commands.
+    for (u32 frame = 1; frame < math::driverFrames(length, track.tempo, track.tempoAccumulator); ++frame) {
+      track.currentPitch = math::advancePortamento(track.currentPitch, targetPitch, track.portamentoDivisor);
     }
     if (track.pitchSweep != 0) {
       const int step = static_cast<u8>(track.pitchSweep) & 0x7f;
@@ -848,11 +837,6 @@ struct Playback {
     bool panChanged = false;
     bool gainChanged = false;
     for (u32 frame = 0; frame < frames; ++frame) {
-      if (frame + 1 == frames) {
-        track.pitchBeforeSequenceTick = track.currentPitch;
-      }
-      track.currentPitch =
-          math::advancePortamento(track.currentPitch, track.targetPitch, track.portamentoDivisor);
       const bool active = track.rawNote != 0 && vm.tick() < track.activeUntil;
       levelChanged |= track.volumeEnvelope.advance(table(data(), Table::Volume, track.volumeEnvelope.index), active);
       pitchChanged |= track.vibrato.advance(table(data(), Table::Vibrato, track.vibrato.index), active);
