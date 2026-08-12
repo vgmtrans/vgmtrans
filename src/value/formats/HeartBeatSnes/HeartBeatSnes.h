@@ -29,21 +29,18 @@ enum class Version : u8 {
 };
 
 struct Layout {
-  Version version = Version::DragonQuest6;
-  u16 sequenceHeaderAddress = 0;
-  u16 instrumentTableAddress = 0;
-  u16 spcDirAddress = 0;
-  u16 srcnTableAddress = 0;
-  u8 songIndex = 0;
-};
-
-struct SequenceRecipes {
-  std::set<u8> programs{0};
+  Version version;
+  u16 sequenceHeaderAddress;
+  u16 instrumentTableAddress;
+  u16 spcDirAddress;
+  u16 srcnTableAddress;
+  u8 songIndex;
+  u8 trackCount;
 };
 
 struct SequenceParse {
   core::SequenceProgram program;
-  SequenceRecipes recipes;
+  std::set<u8> programs;
   core::SourceRange headerRange;
 };
 
@@ -56,8 +53,9 @@ struct SequenceParse {
                                            core::SourceMapBuilder* sourceMap = nullptr,
                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceDialect& sequenceDialect();
+[[nodiscard]] core::Envelope driverEnvelope(u8 adsr1, u8 adsr2);
 [[nodiscard]] std::optional<core::ScanSynthRefs> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
-                                                          const SequenceRecipes& recipes, std::string_view displayName);
+                                                          const std::set<u8>& programs, std::string_view displayName);
 [[nodiscard]] core::FormatDefinition definition();
 
 }  // namespace vgmtrans::formats::heartbeat_snes

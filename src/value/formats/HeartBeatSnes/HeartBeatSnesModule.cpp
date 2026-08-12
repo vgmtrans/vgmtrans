@@ -9,6 +9,7 @@
 #include <fmt/format.h>
 
 #include <string>
+#include <utility>
 
 namespace vgmtrans::formats::heartbeat_snes {
 
@@ -31,7 +32,7 @@ namespace {
       .program(std::move(parsed.program));
 
   auto collection = result.sourceCollection(displayName).sequence(sequence);
-  if (const auto synth = addSynth(result, *layout, parsed.recipes, displayName)) {
+  if (const auto synth = addSynth(result, *layout, parsed.programs, displayName)) {
     collection.instrumentSet(synth->instruments).samples(synth->samples);
   } else {
     result.warning("HeartBeatSnes sequence found, but no valid instruments or samples were discovered",

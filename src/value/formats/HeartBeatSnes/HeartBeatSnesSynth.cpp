@@ -11,23 +11,31 @@
 
 #include <fmt/format.h>
 
-#include <algorithm>
 #include <cmath>
+#include <set>
+#include <string>
 #include <vector>
 
 namespace vgmtrans::formats::heartbeat_snes {
 
 using namespace core;
 
+Envelope driverEnvelope(u8 adsr1, u8 adsr2) {
+  Envelope envelope = snesDspEnvelope(static_cast<u8>(adsr1 | 0x80), adsr2, 0);
+  // Gate expiry changes ADSR2's sustain rate rather than issuing KOF.
+  envelope.releaseSeconds = snesDspAdsrSustainSeconds(adsr2 & 0x1f);
+  return envelope;
+}
+
 namespace {
 
 struct Patch {
-  u8 program = 0;
-  u8 sampleIndex = 0;
-  u8 srcn = 0;
-  u8 adsr1 = 0;
-  u8 adsr2 = 0;
-  u16 pitchScale = 0;
+  u8 program;
+  u8 sampleIndex;
+  u8 srcn;
+  u8 adsr1;
+  u8 adsr2;
+  u16 pitchScale;
   SourceRange source;
   SourceRange srcnSource;
 };
@@ -40,18 +48,10 @@ struct Patch {
   return 72.0 - std::log2((pitchScale / 256.0) * pitchTableCorrection) * 12.0;
 }
 
-[[nodiscard]] Envelope driverEnvelope(u8 adsr1, u8 adsr2) {
-  Envelope envelope = snesDspEnvelope(static_cast<u8>(adsr1 | 0x80), adsr2, 0);
-  // Gate expiry changes ADSR2's sustain-rate field rather than issuing KOF.
-  // Instrument selection initializes the gated rate from the ordinary SR.
-  envelope.releaseSeconds = snesDspAdsrSustainSeconds(adsr2 & 0x1f);
-  return envelope;
-}
-
-[[nodiscard]] std::vector<Patch> collectPatches(ByteReader reader, const Layout& layout,
-                                                const SequenceRecipes& recipes) {
+[[nodiscard]] std::vector<Patch> collectPatches(ByteReader reader, const Layout& layout, const std::set<u8>& programs) {
   std::vector<Patch> patches;
-  for (const u8 program : recipes.programs) {
+  patches.reserve(programs.size());
+  for (const u8 program : programs) {
     // The SPC700 multiplication keeps only the low byte before indexing the
     // song-relative table.
     const u16 row = static_cast<u16>(layout.instrumentTableAddress + static_cast<u8>(program * 6u));
@@ -65,9 +65,7 @@ struct Patch {
     }
     const u8 srcn = reader.u8At(srcnAddress);
     const u16 pitchScale = reader.be16(row + 4);
-    const auto directory =
-        readSnesSampleDirectoryEntry(reader, static_cast<u16>(layout.spcDirAddress + srcn * 4u), true);
-    if (pitchScale == 0 || !directory || !directory->stream || !directory->loopAddressIsBlockAligned()) {
+    if (pitchScale == 0) {
       continue;
     }
     patches.push_back(Patch{
@@ -86,20 +84,19 @@ struct Patch {
 
 [[nodiscard]] std::vector<u8> referencedSrcns(const std::vector<Patch>& patches) {
   std::vector<u8> result;
+  result.reserve(patches.size());
   for (const Patch& patch : patches) {
     result.push_back(patch.srcn);
   }
-  std::ranges::sort(result);
-  result.erase(std::ranges::unique(result).begin(), result.end());
   return result;
 }
 
 }  // namespace
 
-std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& layout, const SequenceRecipes& recipes,
+std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& layout, const std::set<u8>& programs,
                                       std::string_view displayName) {
   const ByteReader reader = builder.reader();
-  const std::vector<Patch> patches = collectPatches(reader, layout, recipes);
+  const std::vector<Patch> patches = collectPatches(reader, layout, programs);
   if (patches.empty()) {
     return std::nullopt;
   }
@@ -137,10 +134,6 @@ std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& 
                 })
         .source("Region", patch.source, "heartbeat-snes-region")
         .description(fmt::format("SRCN {}, scale ${:04X}", patch.srcn, patch.pitchScale));
-  }
-
-  if (instruments.builder().empty()) {
-    return std::nullopt;
   }
   return ScanSynthRefs{.instruments = instruments.ref(), .samples = sampleCollection.ref()};
 }
