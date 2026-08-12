@@ -8,6 +8,7 @@
 
 #include "value/scan/BytePattern.h"
 
+#include <algorithm>
 #include <array>
 
 namespace vgmtrans::formats::heartbeat_snes {
@@ -17,6 +18,7 @@ using namespace core;
 namespace {
 
 constexpr u32 kGroupCount = 7;
+constexpr u32 kMaxSongs = 16;
 
 constexpr auto kLoadSong = makeMaskedBytePattern(
     "\xee\xf6\x00\x00\xc4\x00\xf6\x00\x00\xc4\x00\xf8\x00\xdd\xd5\x00\x00\x8d\x00", "xx??x?x??x?x?xx??xx");
@@ -49,12 +51,8 @@ template <size_t Size>
   if (reader.size() < bytes.size()) {
     return false;
   }
-  for (u32 offset = 0; offset <= reader.size() - bytes.size(); ++offset) {
-    if (matchesBytes(reader, offset, bytes)) {
-      return true;
-    }
-  }
-  return false;
+  const auto source = reader.slice(0, reader.size());
+  return std::ranges::search(source, bytes).begin() != source.end();
 }
 
 struct SequenceLocation {
@@ -100,19 +98,23 @@ struct SequenceLocation {
 }
 
 [[nodiscard]] std::optional<SequenceLocation> selectSequence(ByteReader reader, u32 loader, u16 liveHeader) {
-  const u16 songLow = reader.le16(loader + 2);
-  const u16 songHigh = reader.le16(loader + 7);
-  if (songLow >= songHigh || songHigh - songLow > 16 || !reader.has(songHigh, songHigh - songLow)) {
+  const u16 headerLowTable = reader.le16(loader + 2);
+  const u16 headerHighTable = reader.le16(loader + 7);
+  if (headerLowTable >= headerHighTable) {
+    return std::nullopt;
+  }
+  const u32 songCount = headerHighTable - headerLowTable;
+  if (songCount > kMaxSongs || !reader.has(headerHighTable, songCount)) {
     return std::nullopt;
   }
 
   const auto songHeader = [&](u32 index) {
-    return static_cast<u16>(reader.u8At(songLow + index) | (reader.u8At(songHigh + index) << 8));
+    return static_cast<u16>(reader.u8At(headerLowTable + index) | (reader.u8At(headerHighTable + index) << 8));
   };
   const auto readSong = [&](u32 index) { return readSequence(reader, songHeader(index), static_cast<u8>(index)); };
 
   u32 musicCount = 0;
-  while (musicCount < songHigh - songLow) {
+  while (musicCount < songCount) {
     const u16 candidate = songHeader(musicCount);
     if (candidate == 0) {
       break;
@@ -151,9 +153,6 @@ struct SequenceLocation {
 
   // Dedicated SFX snapshots occasionally have no usable music entry.
   const u8 activeGroupPointer = reader.u8At(loader + 12);
-  if (!reader.has(activeGroupPointer, 1)) {
-    return std::nullopt;
-  }
   const u8 group = reader.u8At(activeGroupPointer);
   if (group >= kGroupCount || !reader.has(groupSongs + group, 1)) {
     return std::nullopt;
