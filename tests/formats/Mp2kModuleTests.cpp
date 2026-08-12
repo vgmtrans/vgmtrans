@@ -6,6 +6,7 @@
 
 #include "value/extractors/PsfExtractor.h"
 #include "value/formats/MP2k/MP2k.h"
+#include "value/formats/MP2k/MP2kEnvelope.h"
 #include "value/session/Session.h"
 #include "value/synth/SampleDecoder.h"
 
@@ -172,6 +173,7 @@ void le32(std::vector<u8>& bytes, size_t offset, u32 value) {
 }
 
 void mp2kModuleBuildsAuditedSequenceAndSynth() {
+  constexpr double gbaFrameRate = 16777216.0 / 280896.0;
   const std::vector<u8> bytes = mp2kFixture();
   Session session;
   session.registerFormat(mp2kDefinition());
@@ -194,6 +196,20 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
              std::abs(instruments->instruments[2].regions.front().attenuationDb - 20.0 * std::log10(2.0)) < 1e-12,
          "full-scale DirectSound must remain at unity while CGB voices retain the driver's single-lane mixer "
          "scaling");
+  expect(instruments->instruments[0].regions.front().envelope.attackSeconds == 0.0,
+         "DirectSound attack 0xff must be at full scale on the first mixer frame");
+  expect(instruments->instruments[0].regions.front().envelope.holdSeconds &&
+             std::abs(*instruments->instruments[0].regions.front().envelope.holdSeconds - 1.0 / gbaFrameRate) < 1e-12,
+         "DirectSound must hold its peak until the mixer frame after attack completes");
+  expect(instruments->instruments[0].regions.front().envelope.releaseSeconds &&
+             std::abs(*instruments->instruments[0].regions.front().envelope.releaseSeconds -
+                      5.0 * std::log(10.0) / (gbaFrameRate * std::log(256.0 / 224.0))) < 1e-12,
+         "DirectSound release must preserve the driver's dB-per-frame slope across SoundFont's 100 dB range");
+  expect(directReleaseSeconds(0) == 0.0, "DirectSound release zero must silence the first release mixer pass");
+  expect(directDecaySeconds(0) == 0.0,
+         "DirectSound decay zero must silence the first decay pass after the separate peak hold frame");
+  expect(std::abs(directAttackSeconds(127) - 258.0 / (255.0 * gbaFrameRate)) < 1e-12,
+         "DirectSound attack conversion must retain the final partial integer step");
 
   const auto* firstSamples = snapshot.asset<SampleCollectionAsset>(collection.members.sampleCollections[0]);
   const auto* secondSamples = snapshot.asset<SampleCollectionAsset>(collection.members.sampleCollections[1]);
@@ -282,12 +298,11 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
     const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event);
     return envelope && hasEnvelopeField(envelope->update.fields, EnvelopeFields::Attack);
   });
-  constexpr double gbaFrameRate = 16777216.0 / 280896.0;
   expect(attack != events.end() && std::get<EnvelopePerformanceEvent>(*attack).update.values &&
              std::get<EnvelopePerformanceEvent>(*attack).update.values->attackSeconds &&
-             std::abs(*std::get<EnvelopePerformanceEvent>(*attack).update.values->attackSeconds - 2.0 / gbaFrameRate) <
-                 1e-12,
-         "DirectSound attack should count the driver's integer frames through 0xff");
+             std::abs(*std::get<EnvelopePerformanceEvent>(*attack).update.values->attackSeconds -
+                      254.0 / (255.0 * gbaFrameRate)) < 1e-12,
+         "DirectSound attack should preserve the exact area of the pre-advanced integer staircase");
   expect(std::ranges::count_if(
              events,
              [](const PerformanceEvent& event) { return std::holds_alternative<ReverbPerformanceEvent>(event); }) == 1,

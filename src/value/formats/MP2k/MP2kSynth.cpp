@@ -6,6 +6,8 @@
 
 #include "value/formats/MP2k/MP2k.h"
 
+#include "value/formats/MP2k/MP2kEnvelope.h"
+
 #include "value/base/RecordReader.h"
 
 #include <fmt/format.h>
@@ -13,7 +15,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <limits>
 #include <optional>
 #include <string>
 #include <utility>
@@ -25,14 +26,12 @@ using namespace core;
 
 namespace {
 
-constexpr double kGbaFrameRate = 16777216.0 / 280896.0;
 constexpr double kPsgSampleFrequency = 440.0;
 constexpr u64 kProgrammableWaveKeyBase = u64{1} << 32;
 // Aria routes the summed CGB envelope through one hardware-volume lane while
 // DirectSound mixes independent left and right lanes. With both GBA output
 // ratios at full scale, the CGB path is therefore one half of DirectSound.
 constexpr double kPsgDacAttenuationDb = 6.020599913279624;
-constexpr double kEnvelopeRangeDb = 100.0;
 constexpr u8 kToneCgbMask = 0x07;
 constexpr u8 kToneFixed = 0x08;
 constexpr u8 kToneReverse = 0x10;
@@ -103,54 +102,14 @@ struct Tone {
   return tone;
 }
 
-[[nodiscard]] double attackSeconds(u8 rate, bool cgb) {
-  if (cgb) {
-    const u8 period = rate & 7;
-    return period == 0 ? 0.0 : 15.0 * period / 64.0;
-  }
-  return rate == 0 ? std::numeric_limits<double>::infinity() : std::ceil(255.0 / rate) / kGbaFrameRate;
-}
-
-[[nodiscard]] double directDecaySeconds(u8 rate) {
-  if (rate == 0) {
-    return 1.0 / kGbaFrameRate;
-  }
-  // DirectSound decay is exponential in amplitude. Express its constant dB
-  // slope as the time for the value core's full 100 dB envelope range.
-  return (kEnvelopeRangeDb / 20.0) * std::log(10.0) / (kGbaFrameRate * std::log(256.0 / rate));
-}
-
-[[nodiscard]] double directReleaseSeconds(u8 rate) {
-  // The integer mixer recurrence reaches zero in finite time. Counting those
-  // exact steps retains the audible tail instead of choosing an arbitrary dB
-  // threshold for a mathematically asymptotic curve.
-  u32 frames = 1;
-  for (u32 level = 255; rate != 0 && (level = (level * rate) >> 8) != 0; ++frames) {
-  }
-  return frames / kGbaFrameRate;
-}
-
-[[nodiscard]] double cgbEnvelopeSeconds(u8 rate) {
-  const u8 period = rate & 7;
-  return period == 0 ? 0.0 : 15.0 * period / 64.0;
-}
-
-[[nodiscard]] double decaySeconds(u8 rate, bool cgb) {
-  if (cgb) {
-    return cgbEnvelopeSeconds(rate);
-  }
-  return directDecaySeconds(rate);
-}
-
-[[nodiscard]] double releaseSeconds(u8 rate, bool cgb) {
-  return cgb ? cgbEnvelopeSeconds(rate) : directReleaseSeconds(rate);
-}
-
 [[nodiscard]] Envelope envelopeFor(const Tone& tone, bool cgb) {
   return Envelope{
-      .attackSeconds = attackSeconds(tone.attack, cgb),
-      .decaySeconds = decaySeconds(tone.decay, cgb),
-      .releaseSeconds = releaseSeconds(tone.release, cgb),
+      .attackSeconds = cgb ? cgbEnvelopeSeconds(tone.attack) : directAttackSeconds(tone.attack),
+      // DirectSound changes ATK to DEC on the frame that reaches 0xff; decay
+      // is not evaluated until the following SoundMainRAM pass.
+      .holdSeconds = cgb ? std::optional<double>{} : std::optional{1.0 / kGbaMixerFrameRate},
+      .decaySeconds = cgb ? cgbEnvelopeSeconds(tone.decay) : directDecaySeconds(tone.decay),
+      .releaseSeconds = cgb ? cgbEnvelopeSeconds(tone.release) : directReleaseSeconds(tone.release),
       .sustainAmplitude = cgb ? std::min<u8>(tone.sustain, 15) / 15.0 : tone.sustain / 255.0,
   };
 }
@@ -193,14 +152,14 @@ struct Tone {
 }
 
 [[nodiscard]] InstrumentModulation mp2kModulation() {
-  const double maximumRate = 127.0 * kGbaFrameRate / 256.0;
+  const double maximumRate = 127.0 * kGbaMixerFrameRate / 256.0;
   return InstrumentModulation{
       .vibrato =
           VibratoSpec{
               .maxDepthCents = 127.0 * 100.0 / 16.0,
               .rateHertz = {.minimum = 0.0, .maximum = maximumRate},
               .waveform = LfoWaveform::Triangle,
-              .delaySeconds = ModulationRange{.minimum = 0.0, .maximum = 255.0 / kGbaFrameRate},
+              .delaySeconds = ModulationRange{.minimum = 0.0, .maximum = 255.0 / kGbaMixerFrameRate},
           },
       .tremolo =
           TremoloSpec{
@@ -208,7 +167,7 @@ struct Tone {
               .rateHertz = {.minimum = 0.0, .maximum = maximumRate},
               .waveform = LfoWaveform::Triangle,
               .gainMode = TremoloGainMode::BipolarAroundNominal,
-              .delaySeconds = ModulationRange{.minimum = 0.0, .maximum = 255.0 / kGbaFrameRate},
+              .delaySeconds = ModulationRange{.minimum = 0.0, .maximum = 255.0 / kGbaMixerFrameRate},
           },
   };
 }

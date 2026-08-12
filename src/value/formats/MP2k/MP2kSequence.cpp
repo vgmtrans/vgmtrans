@@ -6,6 +6,8 @@
 
 #include "value/formats/MP2k/MP2k.h"
 
+#include "value/formats/MP2k/MP2kEnvelope.h"
+
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompiledCommandDialect.h"
@@ -27,8 +29,6 @@ using namespace core;
 namespace {
 
 constexpr u32 kMaxTrackCommands = 262144;
-constexpr double kGbaFrameRate = 16777216.0 / 280896.0;
-constexpr double kEnvelopeRangeDb = 100.0;
 constexpr ValueQuantization kMp2kLevelQuantization{.levels = 128};
 constexpr std::array<u8, 49> kClockTable{
     0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
@@ -129,27 +129,6 @@ struct TrackState {
   std::map<u8, PerformanceNoteId> tiedNotes;
   std::vector<ActiveNote> activeNotes;
 };
-
-[[nodiscard]] double directAttackSeconds(u8 rate) {
-  return rate == 0 ? std::numeric_limits<double>::infinity() : std::ceil(255.0 / rate) / kGbaFrameRate;
-}
-
-[[nodiscard]] double directDecaySeconds(u8 rate) {
-  return rate == 0 ? 1.0 / kGbaFrameRate
-                   : (kEnvelopeRangeDb / 20.0) * std::log(10.0) / (kGbaFrameRate * std::log(256.0 / rate));
-}
-
-[[nodiscard]] double directReleaseSeconds(u8 rate) {
-  u32 frames = 1;
-  for (u32 level = 255; rate != 0 && (level = (level * rate) >> 8) != 0; ++frames) {
-  }
-  return frames / kGbaFrameRate;
-}
-
-[[nodiscard]] double cgbEnvelopeSeconds(u8 rate) {
-  const u8 period = rate & 7;
-  return period == 0 ? 0.0 : 15.0 * period / 64.0;
-}
 
 [[nodiscard]] s32 arithmeticShiftRight(s32 value, u32 bits) {
   if (value >= 0 || bits == 0) {
@@ -403,7 +382,7 @@ struct Playback {
     if (raw == 0) {
       return;
     }
-    const double bpm = raw * 2.0 * kGbaFrameRate / 60.0;
+    const double bpm = raw * 2.0 * kGbaMixerFrameRate / 60.0;
     out.tempo(static_cast<u32>(std::llround(60000000.0 / bpm)));
   }
 
@@ -879,7 +858,7 @@ const SequenceDialect& mp2kSequenceDialect() {
               .initialStereoBalance = StereoBalance{.leftGain = 127.0 / 256.0, .rightGain = 128.0 / 256.0},
               .initialPitchBendRangeSemitones = 2,
               .initialTempoMicrosecondsPerQuarter =
-                  static_cast<u32>(std::llround(60000000.0 / (kGbaFrameRate * 60.0 / 24.0))),
+                  static_cast<u32>(std::llround(60000000.0 / (kGbaMixerFrameRate * 60.0 / 24.0))),
           },
   });
   return dialect;
