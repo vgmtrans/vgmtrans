@@ -147,7 +147,7 @@ void groupFallbackAndProgramBanksMatchTheDriver() {
 
 void physicalLfosAndMixerStateArePreserved() {
   const PerformanceSequence performance =
-      render({0x19, 2,    4,    0x20, 0x1b, 3,    2,    0xa0, 0x1d, 4,    0x40, 0x02, 0x40,
+      render({0x19, 2,    4,    0xa0, 0x1b, 3,    2,    0xa0, 0x1d, 4,    0x40, 0x02, 0x40,
               0x04, 0xc0, 0x00, 0x04, 0x7f, 0x01, 0x23, 0x24, 0x27, 0x83, 0x0e, 0x40, 0});
   const PerformanceTrack& track = performance.tracks.front();
   const auto vibrato = modulationEvents(track, ModulationPerformanceTarget::VibratoDepth);
@@ -163,12 +163,16 @@ void physicalLfosAndMixerStateArePreserved() {
   expect(performance.diagnostics.empty() && vibrato.size() == 1 && vibrato.front()->pitchRangeSemitones &&
              std::abs(vibrato.front()->pitchRangeSemitones->minimum - minimum) < 0.000001 &&
              std::abs(vibrato.front()->pitchRangeSemitones->maximum - maximum) < 0.000001 && vibratoRate.size() == 1 &&
-             vibratoRate.front()->frequencyHz && std::abs(*vibratoRate.front()->frequencyHz - 31.25 / 128.0) < 0.000001,
-         "vibrato should preserve the fixed timer clock and asymmetric driver pitch ratios");
-  expect(tremolo.size() == 1 && tremolo.front()->polarity == LfoPolarity::Positive &&
-             tremolo.front()->initialPhaseCycles == 0.75 && tremolo.front()->volumeDepthLinearGain == 0.25 &&
-             tremoloRate.size() == 1 && tremoloRate.front()->frequencyHz == 31.25 / 32.0 && panLfo.size() == 1 &&
-             panLfo.front()->cyclesPerTick == 1.0 / 16.0 && panLfo.front()->panDepth == 0.5,
+             vibratoRate.front()->frequencyHz &&
+             std::abs(*vibratoRate.front()->frequencyHz - 8000.0 / (39.0 * 32.0 * 4.0)) < 0.000001 &&
+             vibrato.front()->waveform == LfoWaveform::Sine && vibrato.front()->polarity == LfoPolarity::Bipolar,
+         "vibrato should preserve the timer-0 oscillator and asymmetric driver pitch ratios");
+  expect(tremolo.size() == 1 && tremolo.front()->polarity == LfoPolarity::Bipolar &&
+             tremolo.front()->initialPhaseCycles == 0.0 && tremolo.front()->waveform == LfoWaveform::Sine &&
+             tremolo.front()->volumeDepthLinearGain == 0.25 && tremoloRate.size() == 1 &&
+             tremoloRate.front()->frequencyHz &&
+             std::abs(*tremoloRate.front()->frequencyHz - 8000.0 / (39.0 * 32.0 * 2.0)) < 0.000001 &&
+             panLfo.size() == 1 && panLfo.front()->cyclesPerTick == 1.0 / 16.0 && panLfo.front()->panDepth == 0.5,
          "tremolo mode bits and the sequence-clocked pan triangle should remain physical");
   expect(reverb.size() == 5 && reverb[1]->delayMilliseconds == 64.0 && reverb[1]->leftGain &&
              *reverb[1]->leftGain == 64.0 / 127.0 && reverb[2]->feedback == -0.5 && reverb[3]->voiceMask == 1 &&
@@ -176,6 +180,39 @@ void physicalLfosAndMixerStateArePreserved() {
          "EDL, signed EVOL/feedback, the shipped selector quirk, and echo voice masks should be retained");
   expect(!balance.empty() && balance.back()->leftGain == 0.5 && balance.back()->rightGain == 0.25,
          "the alternate mixer should clamp large coefficients while retaining smaller linear pan gains");
+}
+
+void lfoModesFollowTheDriverStateMachine() {
+  const PerformanceSequence performance =
+      render({0x19, 0, 1, 0x20, 0x19, 0, 2, 0x60, 0x19, 0, 1, 0xa0, 0x19, 0, 8, 0xe0, 0x1a, 0});
+  const PerformanceSequence continuous = render({0x27, 0x85, 0x19, 0, 1, 0xe0, 0});
+  const auto depth = modulationEvents(performance.tracks.front(), ModulationPerformanceTarget::VibratoDepth);
+  const auto rate = modulationEvents(performance.tracks.front(), ModulationPerformanceTarget::VibratoRate);
+  const auto continuousDepth = modulationEvents(continuous.tracks.front(), ModulationPerformanceTarget::VibratoDepth);
+  const double minimum = 12.0 * std::log2(1.0 - 32.0 / 256.0);
+  const double maximum = 12.0 * std::log2(1.0 + 32.0 / 128.0);
+
+  expect(performance.diagnostics.empty() && continuous.diagnostics.empty() && depth.size() == 5 && rate.size() == 4,
+         "all encoded LFO phase modes should decode");
+  expect(depth[0]->polarity == LfoPolarity::Positive && depth[0]->initialPhaseCycles == 0.75 &&
+             depth[0]->pitchRangeSemitones && depth[0]->pitchRangeSemitones->minimum == 0.0 &&
+             std::abs(depth[0]->pitchRangeSemitones->maximum - maximum) < 0.000001 && rate[0]->frequencyHz &&
+             std::abs(*rate[0]->frequencyHz - 8000.0 / (39.0 * 16.0)) < 0.000001,
+         "the positive-lobe mode should repeat after sixteen timer-0 steps");
+  expect(depth[1]->polarity == LfoPolarity::Negative && depth[1]->initialPhaseCycles == 0.25 &&
+             depth[1]->pitchRangeSemitones && std::abs(depth[1]->pitchRangeSemitones->minimum - minimum) < 0.000001 &&
+             depth[1]->pitchRangeSemitones->maximum == 0.0 && rate[1]->frequencyHz &&
+             std::abs(*rate[1]->frequencyHz - 8000.0 / (39.0 * 16.0 * 2.0)) < 0.000001,
+         "the negative-lobe mode should retain its signed phase and pitch range");
+  expect(depth[2]->polarity == LfoPolarity::Bipolar && depth[2]->initialPhaseCycles == 0.0 &&
+             depth[2]->pitchRangeSemitones && std::abs(depth[2]->pitchRangeSemitones->minimum - minimum) < 0.000001 &&
+             std::abs(depth[2]->pitchRangeSemitones->maximum - maximum) < 0.000001 && rate[2]->frequencyHz &&
+             std::abs(*rate[2]->frequencyHz - 8000.0 / (39.0 * 32.0)) < 0.000001 &&
+             depth[3]->polarity == LfoPolarity::Bipolar && depth[3]->initialPhaseCycles == 0.0 &&
+             depth[4]->pitchDepthSemitones == 0.0 && depth[4]->polarity == LfoPolarity::Bipolar &&
+             !depth[4]->restartPhase && continuousDepth.size() == 1 &&
+             continuousDepth.front()->initialPhaseCycles == 0.5,
+         "the alternating mode should use both asymmetric lobes and retain the driver's reset behavior");
 }
 
 void trackAndMasterVolumeRetainIndependentResolution() {
@@ -286,6 +323,7 @@ void runItikitiSnesModuleTests() {
   layoutAndSynthFollowRelocatedDriverTables();
   groupFallbackAndProgramBanksMatchTheDriver();
   physicalLfosAndMixerStateArePreserved();
+  lfoModesFollowTheDriverStateMachine();
   trackAndMasterVolumeRetainIndependentResolution();
   dynamicAdsrPitchAndControlFlowAreAudited();
   packedLengthPatternsFollowTheDriverByteOrder();
