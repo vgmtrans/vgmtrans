@@ -179,18 +179,6 @@ struct SongChoice {
 
 }  // namespace
 
-const char* versionName(Version version) {
-  switch (version) {
-    case Version::Summer:
-      return "Earlier / Summer";
-    case Version::Winter:
-      return "Earlier / Winter";
-    case Version::WinterV3:
-      return "Earlier / Winter SN2";
-  }
-  return "Unknown";
-}
-
 std::optional<Layout> findLayout(ByteReader reader) {
   if (reader.size() != kAramSize) {
     return std::nullopt;
@@ -296,7 +284,6 @@ std::optional<Layout> findLayout(ByteReader reader) {
   const u8 dir = reader.u8At(*dsp + 29);
   return Layout{
       .version = version,
-      .songListAddress = songList,
       .sequenceHeaderAddress = song->header,
       .instrumentSetAddress = instrumentSet,
       .srcnTableAddress = srcns,
@@ -308,7 +295,6 @@ std::optional<Layout> findLayout(ByteReader reader) {
       .gainEnvelopeTableAddress = gainEnvelopes,
       .pitchReference =
           static_cast<u16>(version == Version::Summer ? 0x1ede : winterPitchReference(reader, miniSequences)),
-      .songIndex = song->index,
       .echo = EchoState{.left = static_cast<s8>(reader.u8At(*dsp + 13)),
                         .right = static_cast<s8>(reader.u8At(*dsp + 11)),
                         .feedback = static_cast<s8>(reader.u8At(*dsp + 21)),

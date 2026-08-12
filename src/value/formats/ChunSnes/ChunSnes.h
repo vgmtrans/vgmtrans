@@ -27,6 +27,10 @@ enum class Version : u8 {
   WinterV3,
 };
 
+[[nodiscard]] constexpr u8 defaultReleaseRate(Version version) {
+  return version == Version::Summer ? 0x1d : 0x19;
+}
+
 struct EchoState {
   s8 left = 0;
   s8 right = 0;
@@ -36,7 +40,6 @@ struct EchoState {
 
 struct Layout {
   Version version = Version::Summer;
-  u16 songListAddress = 0;
   u16 sequenceHeaderAddress = 0;
   u16 instrumentSetAddress = 0;
   u16 srcnTableAddress = 0;
@@ -47,7 +50,6 @@ struct Layout {
   u16 durationScriptTableAddress = 0;
   u16 gainEnvelopeTableAddress = 0;
   u16 pitchReference = 0x1ede;
-  u8 songIndex = 0;
   EchoState echo;
 };
 
@@ -56,11 +58,7 @@ struct SequenceParse {
   core::SourceRange headerRange;
 };
 
-[[nodiscard]] const char* versionName(Version version);
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);
-[[nodiscard]] core::TrackProgram decodeSourceTrack(core::ByteReader reader, Version version, u32 trackNumber,
-                                                   u32 startAddress,
-                                                   std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] SequenceParse decodeSequence(core::ByteReader reader, const Layout& layout, core::AssetId sequenceId,
                                            core::SourceMapBuilder* sourceMap = nullptr,
                                            std::vector<core::Diagnostic>* diagnostics = nullptr);

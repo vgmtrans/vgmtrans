@@ -14,7 +14,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <limits>
 #include <span>
 #include <vector>
 
@@ -188,53 +187,62 @@ public:
   [[nodiscard]] std::span<const u32> duration(u8 index) const { return blob(index, 2); }
   [[nodiscard]] std::span<const u32> gain(u8 index) const { return blob(index, 3); }
 
+  [[nodiscard]] EchoState echo() const {
+    const u32 packed = valid() ? data_[1] : 0;
+    return EchoState{
+        .left = static_cast<s8>(packed),
+        .right = static_cast<s8>(packed >> 8),
+        .feedback = static_cast<s8>(packed >> 16),
+        .delay = static_cast<u8>(packed >> 24),
+    };
+  }
+
   [[nodiscard]] static std::vector<u32> encode(ByteReader reader, const Layout& layout) {
     const u32 pitchCount = pointerCount(reader, layout.pitchEnvelopeTableAddress);
     const u32 miniCount = pointerCount(reader, layout.miniSequenceTableAddress);
     const u32 durationCount = pointerCount(reader, layout.durationScriptTableAddress);
     const u32 gainCount = pointerCount(reader, layout.gainEnvelopeTableAddress);
-    std::vector<u32> result{kRuntimeMagic, pitchCount, miniCount, durationCount, gainCount, 6};
-    result.resize(6 + (pitchCount + miniCount + durationCount + gainCount) * 2);
+    const u32 echo = static_cast<u8>(layout.echo.left) | (static_cast<u32>(static_cast<u8>(layout.echo.right)) << 8) |
+                     (static_cast<u32>(static_cast<u8>(layout.echo.feedback)) << 16) |
+                     (static_cast<u32>(layout.echo.delay) << 24);
+    std::vector<u32> result{kRuntimeMagic, echo, pitchCount, miniCount, durationCount, gainCount};
+    result.resize(kHeaderSize + (pitchCount + miniCount + durationCount + gainCount) * 2);
 
-    const auto append = [&](u32 descriptor, u16 pointer, u32 length) {
-      result[descriptor] = result.size();
-      result[descriptor + 1] = length;
-      for (u32 byte = 0; byte < length; ++byte) {
-        result.push_back(reader.u8At(pointer + byte));
+    u32 descriptor = kHeaderSize;
+    const auto append = [&](u16 table, u32 count, auto scriptLength) {
+      for (u32 index = 0; index < count; ++index) {
+        const u16 pointer = reader.le16(table + index * 2);
+        const u32 length = scriptLength(reader, pointer);
+        result[descriptor++] = result.size();
+        result[descriptor++] = length;
+        for (u32 byte = 0; byte < length; ++byte) {
+          result.push_back(reader.u8At(pointer + byte));
+        }
       }
     };
-    u32 descriptor = 6;
-    for (u32 index = 0; index < pitchCount; ++index, descriptor += 2) {
-      const u16 pointer = reader.le16(layout.pitchEnvelopeTableAddress + index * 2);
-      append(descriptor, pointer, pitchScriptLength(reader, pointer));
-    }
-    for (u32 index = 0; index < miniCount; ++index, descriptor += 2) {
-      const u16 pointer = reader.le16(layout.miniSequenceTableAddress + index * 2);
-      append(descriptor, pointer, miniScriptLength(reader, pointer));
-    }
-    for (u32 index = 0; index < durationCount; ++index, descriptor += 2) {
-      const u16 pointer = reader.le16(layout.durationScriptTableAddress + index * 2);
-      append(descriptor, pointer, durationScriptLength(reader, pointer));
-    }
-    for (u32 index = 0; index < gainCount; ++index, descriptor += 2) {
-      const u16 pointer = reader.le16(layout.gainEnvelopeTableAddress + index * 2);
-      append(descriptor, pointer, pitchScriptLength(reader, pointer));
-    }
+    append(layout.pitchEnvelopeTableAddress, pitchCount, pitchScriptLength);
+    append(layout.miniSequenceTableAddress, miniCount, miniScriptLength);
+    append(layout.durationScriptTableAddress, durationCount, durationScriptLength);
+    append(layout.gainEnvelopeTableAddress, gainCount, pitchScriptLength);
     return result;
   }
 
 private:
+  static constexpr u32 kTableCount = 4;
+  static constexpr u32 kHeaderSize = 2 + kTableCount;
+
+  [[nodiscard]] bool valid() const { return data_.size() >= kHeaderSize && data_[0] == kRuntimeMagic; }
+
   [[nodiscard]] std::span<const u32> blob(u32 index, u32 kind) const {
-    if (data_.size() < 6 || data_[0] != kRuntimeMagic || kind >= 4) {
+    if (!valid() || kind >= kTableCount) {
       return {};
     }
-    const u32 count = data_[1 + kind];
-    if (index >= count) {
+    if (index >= data_[2 + kind]) {
       return {};
     }
-    u32 descriptor = 6;
+    u32 descriptor = kHeaderSize;
     for (u32 prior = 0; prior < kind; ++prior) {
-      descriptor += data_[1 + prior] * 2;
+      descriptor += data_[2 + prior] * 2;
     }
     descriptor += index * 2;
     if (descriptor + 1 >= data_.size()) {
@@ -249,6 +257,37 @@ private:
   std::span<const u32> data_;
 };
 
+struct TimedScriptCursor {
+  u8 index = 0xff;
+  u16 offset = 2;
+  u16 delay = 0;
+
+  void start(u8 script) {
+    index = script;
+    offset = 2;
+    delay = script == 0xff ? 0 : 1;
+  }
+
+  [[nodiscard]] std::optional<u8> advance(std::span<const u32> script, u8 terminator) {
+    if (index == 0xff || delay == 0 || --delay != 0) {
+      return std::nullopt;
+    }
+    if (script.size() < 2 || offset + 1 >= script.size() || static_cast<u8>(script[offset]) == terminator) {
+      index = 0xff;
+      return std::nullopt;
+    }
+
+    const u8 value = static_cast<u8>(script[offset]);
+    delay = static_cast<u8>(script[offset + 1]);
+    delay = delay == 0 ? 256 : delay;
+    offset += 2;
+    if (offset == static_cast<u8>(script[0])) {
+      offset = static_cast<u8>(script[1]);
+    }
+    return value;
+  }
+};
+
 struct ProgramState {
   struct DurationState {
     u64 tick = 0;
@@ -258,29 +297,19 @@ struct ProgramState {
 
   explicit ProgramState(const SequenceProgram& sequence)
       : version(static_cast<Version>(sequence.config.profile)), tables(sequence.config.driverData),
-        baseTempo(static_cast<u8>(sequence.config.driverState)), tempo(baseTempo) {
+        baseTempo(static_cast<u8>(sequence.config.driverState)) {
     for (auto& timeline : durationTimeline) {
       timeline.push_back(DurationState{});
     }
-    if (sequence.config.driverData.size() >= 4) {
-      const u32 echo = sequence.config.driverData.back();
-      echoLeft = static_cast<s8>(echo);
-      echoRight = static_cast<s8>(echo >> 8);
-      echoFeedback = static_cast<s8>(echo >> 16);
-      echoDelay = static_cast<u8>(echo >> 24);
-    }
+    echo = tables.echo();
   }
 
   Version version;
   RuntimeTables tables;
   u8 baseTempo = 1;
-  u8 tempo = 1;
   u8 condition = 0;
   u8 masterVolume = 0x80;
-  s8 echoLeft = 0;
-  s8 echoRight = 0;
-  s8 echoFeedback = 0;
-  u8 echoDelay = 0;
+  EchoState echo;
   u8 echoFilter = 0;
   std::array<std::vector<DurationState>, kTrackCount> durationTimeline;
 };
@@ -291,13 +320,11 @@ struct TrackState {
     u8 duration = 0;
   };
 
-  TrackState(const SequenceProgram& sequence, const TrackProgram& trackProgram)
-      : version(static_cast<Version>(sequence.config.profile)), trackNumber(trackProgram.sourceTrackNumber) {
+  explicit TrackState(const TrackProgram& trackProgram) : trackNumber(trackProgram.sourceTrackNumber) {
     volume.reset(0x80);
     volume.setRounding(SequenceFixedPointRounding::Nearest);
   }
 
-  Version version;
   u32 trackNumber = 0;
   u16 noteLength = 1;
   u8 durationRate = 0xcc;
@@ -308,26 +335,19 @@ struct TrackState {
   s8 pan = 0;
   u8 surround = 0;
   s8 tuning = 0;
-  s8 transpose = 0;
   bool syncLength = false;
   bool initialized = false;
   bool previousSlur = false;
   bool previousWasRest = true;
-  u8 sourceProgram = 0;
   u8 callDepth = 0;
-  std::array<u8, 2> loopCount{};
   PerformanceNoteId lastNote;
   std::optional<double> lastKey;
   std::optional<PendingPitchSlide> pendingPitchSlide;
   PitchSlideBinding activePitchSlide;
-  u8 pitchEnvelope = 0xff;
-  u16 pitchEnvelopeOffset = 2;
-  u16 pitchEnvelopeDelay = 0;
+  TimedScriptCursor pitchEnvelope;
   u8 durationScript = 0xff;
   u16 durationScriptOffset = 0;
-  u8 gainEnvelope = 0xff;
-  u16 gainEnvelopeOffset = 2;
-  u16 gainEnvelopeDelay = 0;
+  TimedScriptCursor gainEnvelope;
 };
 
 struct Playback {
@@ -351,9 +371,7 @@ struct Playback {
     }
     if (!track.initialized) {
       track.initialized = true;
-      out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = track.sourceProgram});
-      emitLevel();
-      emitPan();
+      out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0});
     }
   }
 
@@ -432,11 +450,6 @@ struct Playback {
     return Effects::wait(length);
   }
 
-  void programChange(u8 value) {
-    track.sourceProgram = value;
-    out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = value});
-  }
-
   [[nodiscard]] u8 channelVolume() const {
     return static_cast<u8>(std::clamp<s32>(track.volume.currentRaw(), 0, 0xff));
   }
@@ -504,15 +517,8 @@ struct Playback {
     emitPitchOffset();
   }
 
-  void transpose(s8 value) {
-    track.transpose = value;
-    out.tuning(track.transpose * 100.0);
-  }
-
   void pitchEnvelope(u8 index) {
-    track.pitchEnvelope = index;
-    track.pitchEnvelopeOffset = 2;
-    track.pitchEnvelopeDelay = index == 0xff ? 0 : 1;
+    track.pitchEnvelope.start(index);
     tuning(0);
   }
 
@@ -552,9 +558,7 @@ struct Playback {
   }
 
   void gainEnvelope(u8 index) {
-    track.gainEnvelope = index;
-    track.gainEnvelopeOffset = 2;
-    track.gainEnvelopeDelay = index == 0xff ? 0 : 1;
+    track.gainEnvelope.start(index);
     if (index == 0xff) {
       out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::FutureAttacks);
     } else {
@@ -563,54 +567,38 @@ struct Playback {
   }
 
   void advanceGainEnvelope() {
-    if (track.gainEnvelope == 0xff || track.gainEnvelopeDelay == 0 || --track.gainEnvelopeDelay != 0) {
+    const auto gain = track.gainEnvelope.advance(program.tables.gain(track.gainEnvelope.index), 0xff);
+    if (!gain) {
       return;
     }
-    const auto script = program.tables.gain(track.gainEnvelope);
-    if (script.size() < 2 || track.gainEnvelopeOffset + 1 >= script.size() ||
-        static_cast<u8>(script[track.gainEnvelopeOffset]) == 0xff) {
-      track.gainEnvelope = 0xff;
-      return;
-    }
-    const u8 gain = static_cast<u8>(script[track.gainEnvelopeOffset]);
-    track.gainEnvelopeDelay = static_cast<u8>(script[track.gainEnvelopeOffset + 1]);
-    track.gainEnvelopeDelay = track.gainEnvelopeDelay == 0 ? 256 : track.gainEnvelopeDelay;
-    track.gainEnvelopeOffset += 2;
-    if (track.gainEnvelopeOffset == static_cast<u8>(script[0])) {
-      track.gainEnvelopeOffset = static_cast<u8>(script[1]);
-    }
-    out.replaceEnvelope(snesDspEnvelope(0, 0, gain), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
-  }
-
-  void releaseRate(u8 value) {
-    out.updateEnvelope(Envelope{.releaseSeconds = snesDspAdsrSustainSeconds(value & 0x1f)}, EnvelopeFields::Release,
-                       VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    out.replaceEnvelope(snesDspEnvelope(0, 0, *gain), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
 
   void adsr(u8 adsr1, u8 adsr2, u16 release) {
     Envelope envelope = snesDspEnvelope(adsr1, adsr2, 0);
-    const u8 releaseRate =
-        release == 0x100 ? (track.version == Version::Summer ? 0x1d : 0x19) : static_cast<u8>(release);
+    const u8 releaseRate = release == 0x100 ? defaultReleaseRate(program.version) : static_cast<u8>(release);
     envelope.releaseSeconds = snesDspAdsrSustainSeconds(releaseRate & 0x1f);
     out.replaceEnvelope(envelope, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
 
   void tempo(u8 value) {
-    const u32 bpm = track.version == Version::WinterV3 ? program.baseTempo * value / 64u : value;
-    program.tempo = static_cast<u8>(std::max(1u, bpm));
+    const u32 bpm = program.version == Version::WinterV3 ? program.baseTempo * value / 64u : value;
     out.tempo(math::tempoMicroseconds(bpm));
+  }
+
+  void fadeMaster(u8 target, u32 speed) {
+    speed = std::max(1u, speed);
+    const u32 distance = std::abs(static_cast<int>(target) - program.masterVolume);
+    const u32 ticks = std::max(1u, (distance + speed - 1) / speed);
+    static_cast<void>(out.fade(PerformanceAutomationTarget::MasterLevel, math::masterGain(target), ticks));
+    program.masterVolume = target;
   }
 
   void masterFade(s8 rate) {
     if (rate == 0) {
       return;
     }
-    const u8 target = rate < 0 ? 0 : 0xff;
-    const u32 distance = std::abs(static_cast<int>(target) - program.masterVolume);
-    const u32 ticks =
-        std::max(1u, (distance + std::abs(static_cast<int>(rate)) * 8u - 1) / (std::abs(static_cast<int>(rate)) * 8u));
-    static_cast<void>(out.fade(PerformanceAutomationTarget::MasterLevel, math::masterGain(target), ticks));
-    program.masterVolume = target;
+    fadeMaster(rate < 0 ? 0 : 0xff, std::abs(static_cast<int>(rate)) * 8u);
   }
 
   void pitchSlide(s8 semitones, u8 duration) {
@@ -640,12 +628,35 @@ struct Playback {
     out.reverb(ReverbPerformanceEvent{
         .voiceMask = mask,
         .send = send,
-        .leftGain = program.echoLeft / 128.0,
-        .rightGain = program.echoRight / 128.0,
-        .delayMilliseconds = program.echoDelay * 16.0,
-        .feedback = program.echoFeedback / 128.0,
+        .leftGain = program.echo.left / 128.0,
+        .rightGain = program.echo.right / 128.0,
+        .delayMilliseconds = program.echo.delay * 16.0,
+        .feedback = program.echo.feedback / 128.0,
         .filterIndex = program.echoFilter,
     });
+  }
+
+  void writeDspRegister(u8 reg, u8 value) {
+    switch (reg) {
+      case 0x0d:
+        program.echo.feedback = static_cast<s8>(value);
+        break;
+      case 0x2c:
+        program.echo.left = static_cast<s8>(value);
+        break;
+      case 0x3c:
+        program.echo.right = static_cast<s8>(value);
+        break;
+      case 0x4d:
+        emitEcho(value, value == 0 ? 0.0 : 1.0);
+        return;
+      case 0x7d:
+        program.echo.delay = value & 0x0f;
+        break;
+      default:
+        return;
+    }
+    emitEcho(0xff, 1.0);
   }
 
   void preset(u8 index) {
@@ -657,67 +668,57 @@ struct Playback {
         break;
       }
       const auto arg = [&](u32 n) { return static_cast<u8>(script[offset + n]); };
-      if (opcode == 0x00) {
-        program.masterVolume = arg(1);
-        out.masterLevel(math::masterGain(program.masterVolume));
-      } else if (opcode == 0x01) {
-        const s8 rate = static_cast<s8>(arg(1));
-        const u8 target = arg(2);
-        const u32 speed = std::max(1, std::abs(static_cast<int>(rate)) * 8);
-        const u32 ticks = std::max(
-            1u, (static_cast<u32>(std::abs(static_cast<int>(target) - program.masterVolume)) + speed - 1) / speed);
-        static_cast<void>(out.fade(PerformanceAutomationTarget::MasterLevel, math::masterGain(target), ticks));
-        program.masterVolume = target;
-      } else if (opcode == 0x02) {
-        program.baseTempo = arg(1);
-        program.tempo = arg(1);
-        out.tempo(math::tempoMicroseconds(arg(1)));
-      } else if (opcode == 0x04 || opcode == 0x18) {
-        masterFade(static_cast<s8>(arg(1)));
-      } else if (opcode == 0x05) {
-        program.condition = arg(1);
-      } else if (opcode == 0x10) {
-        program.echoFilter = index;
-        emitEcho(0xff, 1.0);
-      } else if (opcode == 0x13) {
-        out.masterLevel(std::max(std::abs(static_cast<s8>(arg(1))), std::abs(static_cast<s8>(arg(2)))) / 127.0);
-      } else if (opcode == 0x14) {
-        program.echoLeft = static_cast<s8>(arg(1));
-        program.echoRight = static_cast<s8>(arg(2));
-        emitEcho(0xff, 1.0);
-      } else if (opcode == 0x16) {
-        program.echoFeedback = static_cast<s8>(arg(1));
-        emitEcho(0xff, 1.0);
-      } else if (opcode == 0x17) {
-        program.echoDelay = std::min<u8>(arg(1), 5);
-        emitEcho(0xff, 1.0);
-      } else if (opcode >= 0x20 && opcode < 0xc0) {
-        const u8 voice = static_cast<u8>(std::min<int>((opcode >> 4) - 2, 7));
-        const u8 sub = opcode & 0x0f;
-        if (sub == 2 || sub == 3) {
-          emitEcho(static_cast<u8>(1u << voice), sub == 2 ? 1.0 : 0.0);
-        }
-      } else if (opcode == 0xfe) {
-        const u8 reg = arg(1);
-        const u8 value = arg(2);
-        if (reg == 0x2c) {
-          program.echoLeft = static_cast<s8>(value);
-        }
-        if (reg == 0x3c) {
-          program.echoRight = static_cast<s8>(value);
-        }
-        if (reg == 0x0d) {
-          program.echoFeedback = static_cast<s8>(value);
-        }
-        if (reg == 0x7d) {
-          program.echoDelay = value & 0x0f;
-        }
-        if (reg == 0x4d) {
-          emitEcho(value, value == 0 ? 0.0 : 1.0);
-        }
-        if (reg == 0x2c || reg == 0x3c || reg == 0x0d || reg == 0x7d) {
+      switch (opcode) {
+        case 0x00:
+          program.masterVolume = arg(1);
+          out.masterLevel(math::masterGain(program.masterVolume));
+          break;
+        case 0x01:
+          fadeMaster(arg(2), std::abs(static_cast<int>(static_cast<s8>(arg(1)))) * 8u);
+          break;
+        case 0x02:
+          program.baseTempo = arg(1);
+          out.tempo(math::tempoMicroseconds(program.baseTempo));
+          break;
+        case 0x04:
+        case 0x18:
+          masterFade(static_cast<s8>(arg(1)));
+          break;
+        case 0x05:
+          program.condition = arg(1);
+          break;
+        case 0x10:
+          program.echoFilter = index;
           emitEcho(0xff, 1.0);
-        }
+          break;
+        case 0x13:
+          out.masterLevel(std::max(std::abs(static_cast<s8>(arg(1))), std::abs(static_cast<s8>(arg(2)))) / 127.0);
+          break;
+        case 0x14:
+          program.echo.left = static_cast<s8>(arg(1));
+          program.echo.right = static_cast<s8>(arg(2));
+          emitEcho(0xff, 1.0);
+          break;
+        case 0x16:
+          program.echo.feedback = static_cast<s8>(arg(1));
+          emitEcho(0xff, 1.0);
+          break;
+        case 0x17:
+          program.echo.delay = std::min<u8>(arg(1), 5);
+          emitEcho(0xff, 1.0);
+          break;
+        case 0xfe:
+          writeDspRegister(arg(1), arg(2));
+          break;
+        default:
+          if (opcode >= 0x20 && opcode < 0xc0) {
+            const u8 voice = static_cast<u8>(std::min<int>((opcode >> 4) - 2, 7));
+            const u8 sub = opcode & 0x0f;
+            if (sub == 2 || sub == 3) {
+              emitEcho(static_cast<u8>(1u << voice), sub == 2 ? 1.0 : 0.0);
+            }
+          }
+          break;
       }
       offset += size;
     }
@@ -732,20 +733,7 @@ struct Playback {
     return {};
   }
 
-  [[nodiscard]] Effects repeat(u8 slot, u8 count, Address destination) {
-    u8& remaining = track.loopCount[slot];
-    if (remaining == 0) {
-      remaining = count;
-    }
-    if (--remaining != 0) {
-      return vm.finiteBranch(destination);
-    }
-    return {};
-  }
-
-  [[nodiscard]] Effects repeatBreak(Address destination) {
-    return track.loopCount[1] != 0 ? vm.finiteBranch(destination) : Effects{};
-  }
+  [[nodiscard]] Effects repeatBreak(Address destination) { return vm.countedRepeatBreak(1, destination).effects; }
 
   void beginCall() { ++track.callDepth; }
 
@@ -781,22 +769,10 @@ struct Playback {
 
     advanceGainEnvelope();
 
-    if (track.pitchEnvelope != 0xff && track.pitchEnvelopeDelay != 0 && --track.pitchEnvelopeDelay == 0) {
-      const auto script = program.tables.pitch(track.pitchEnvelope);
-      if (script.size() < 2 || track.pitchEnvelopeOffset >= script.size() ||
-          static_cast<u8>(script[track.pitchEnvelopeOffset]) == 0x80 ||
-          track.pitchEnvelopeOffset + 1 >= script.size()) {
-        track.pitchEnvelope = 0xff;
-      } else {
-        track.tuning = static_cast<s8>(script[track.pitchEnvelopeOffset]);
-        track.pitchEnvelopeDelay = static_cast<u8>(script[track.pitchEnvelopeOffset + 1]);
-        track.pitchEnvelopeDelay = track.pitchEnvelopeDelay == 0 ? 256 : track.pitchEnvelopeDelay;
-        track.pitchEnvelopeOffset += 2;
-        if (track.pitchEnvelopeOffset == static_cast<u8>(script[0])) {
-          track.pitchEnvelopeOffset = static_cast<u8>(script[1]);
-        }
-        emitPitchOffset();
-      }
+    const auto pitch = track.pitchEnvelope.advance(program.tables.pitch(track.pitchEnvelope.index), 0x80);
+    if (pitch) {
+      track.tuning = static_cast<s8>(*pitch);
+      emitPitchOffset();
     }
   }
 };
@@ -855,12 +831,13 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const s16 relative = event.s16le("relative");
       const Address destination = relativeTarget(relative, begin + 3);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-      event.mayBranchTo(destination).runtimeControlFlow();
-      return event.invoke<&Playback::repeat>(1, 2, destination);
+      return event.repeatUntil(1, 2, destination);
     }
     case 0xdd: {
       auto event = cursor.command("Release Rate", SequenceSemantic::Envelope);
-      return event.invoke<&Playback::releaseRate>(event.u8("rate") & 0x1f);
+      const u8 rate = event.u8("rate") & 0x1f;
+      return event.emitEnvelopeField<EnvelopeFields::Release>(snesDspAdsrSustainSeconds(rate),
+                                                              VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
     }
     case 0xde: {
       auto event = cursor.command("ADSR and Release Rate", SequenceSemantic::Envelope);
@@ -944,7 +921,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xf0: {
       auto event = cursor.command("Program Change", SequenceSemantic::Program);
-      return event.invoke<&Playback::programChange>(event.u8("program", SemanticOperandRole::InstrumentProgram));
+      return event.emitInstrument(kInstrumentDomain, event.u8("program", SemanticOperandRole::InstrumentProgram));
     }
     case 0xf1:
       if (version == Version::Summer) {
@@ -961,8 +938,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const s16 relative = event.s16le("relative");
       const Address destination = relativeTarget(relative, begin + 3);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-      event.mayBranchTo(destination).runtimeControlFlow();
-      return event.invoke<&Playback::repeat>(0, 2, destination);
+      return event.repeatUntil(0, 2, destination);
     }
     case 0xf5: {
       auto event = cursor.command("Repeat", SequenceSemantic::Repeat);
@@ -970,8 +946,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const s16 relative = event.s16le("relative");
       const Address destination = relativeTarget(relative, begin + 4);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-      event.mayBranchTo(destination).runtimeControlFlow();
-      return event.invoke<&Playback::repeat>(0, count, destination);
+      return event.repeatUntil(0, count == 0 ? 256u : count, destination);
     }
     case 0xf6: {
       auto event = cursor.command("Channel Volume", SequenceSemantic::Level);
@@ -1001,7 +976,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xfa: {
       auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::transpose>(event.s8("semitones", SemanticOperandRole::Pitch));
+      const s8 semitones = event.s8("semitones", SemanticOperandRole::Pitch);
+      return event.emitTuning(semitones * 100.0);
     }
     case 0xfb: {
       auto event = cursor.command("Pitch Slide", SequenceSemantic::Portamento);
@@ -1046,13 +1022,6 @@ const SequenceDialect& sequenceDialect() {
   return dialect;
 }
 
-TrackProgram decodeSourceTrack(ByteReader reader, Version version, u32 trackNumber, u32 startAddress,
-                               std::vector<Diagnostic>* diagnostics) {
-  const TrackDecodeScope tracks{.reader = reader, .maxCommands = 32768};
-  return tracks.reachable(trackNumber, startAddress,
-                          [&](u32 offset) { return decodeCommand(reader, offset, version, diagnostics); });
-}
-
 SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
                              std::vector<Diagnostic>* diagnostics) {
   const u32 headerSize = 2 + reader.u8At(layout.sequenceHeaderAddress + 1) * 2;
@@ -1073,11 +1042,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   const u8 initialTempo = reader.u8At(layout.sequenceHeaderAddress);
   program.config.driverState = initialTempo;
   program.config.driverData = RuntimeTables::encode(reader, layout);
-  program.config.driverData.push_back(
-      static_cast<u8>(layout.echo.left) | (static_cast<u32>(static_cast<u8>(layout.echo.right)) << 8) |
-      (static_cast<u32>(static_cast<u8>(layout.echo.feedback)) << 16) | (static_cast<u32>(layout.echo.delay) << 24));
   program.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicroseconds(initialTempo);
-  program.behavior.initialLevel = math::channelGain(0x60, 0x80, 0xff);
   return {.program = std::move(program), .headerRange = headerRange};
 }
 

@@ -33,10 +33,6 @@ struct Patch {
   SourceRange sampleInfoSource;
 };
 
-[[nodiscard]] u8 defaultRelease(Version version) {
-  return version == Version::Summer ? 0x1d : 0x19;
-}
-
 [[nodiscard]] double unityKey(const Layout& layout, u16 scale) {
   const double referenceKey = layout.version == Version::Summer ? 95.0 : 119.0;
   const double ratio = (scale / 256.0) * (layout.pitchReference / 8192.0);
@@ -58,8 +54,7 @@ struct Patch {
       continue;
     }
     const u32 info = layout.sampleInfoTableAddress + srcn * 8;
-    const auto directory = readSnesSampleDirectoryEntry(reader, layout.spcDirAddress + srcn * 4, true);
-    if (!reader.has(info, 8) || !directory || !directory->stream) {
+    if (!reader.has(info, 8)) {
       continue;
     }
     const u16 scale = reader.be16(info + 5);
@@ -125,7 +120,7 @@ std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& 
     entry.source("Sample parameters", patch.sampleInfoSource, "chun-snes-sample-info").parent(root);
 
     Envelope envelope = snesDspEnvelope(patch.adsr1, patch.adsr2, patch.gain);
-    envelope.releaseSeconds = snesDspAdsrSustainSeconds(defaultRelease(layout.version));
+    envelope.releaseSeconds = snesDspAdsrSustainSeconds(defaultReleaseRate(layout.version));
     entry
         .region(*sample,
                 Region{

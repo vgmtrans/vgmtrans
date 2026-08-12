@@ -6,8 +6,6 @@
 
 #include "value/formats/ChunSnes/ChunSnes.h"
 
-#include <fmt/format.h>
-
 #include <algorithm>
 #include <string>
 
@@ -38,8 +36,7 @@ namespace {
   }
 
   ScanResultBuilder result(input, "ChunSnes");
-  const std::string displayName =
-      fmt::format("{} ({}, song {})", result.sourceDisplayName(), versionName(layout->version), layout->songIndex);
+  const std::string displayName = result.sourceDisplayName();
   auto sequence = result.sequence(displayName);
   SequenceParse parsed =
       decodeSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics());
