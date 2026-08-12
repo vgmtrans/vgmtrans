@@ -15,6 +15,7 @@
 #include "value/formats/CapcomSnes/CapcomSnes.h"
 #include "value/formats/ChunSnes/ChunSnes.h"
 #include "value/formats/CPS/Cps.h"
+#include "value/formats/HeartBeatSnes/HeartBeatSnes.h"
 #include "value/formats/HudsonSnes/HudsonSnes.h"
 #include "value/formats/KonamiArcade/KonamiArcade.h"
 #include "value/formats/KonamiSnes/KonamiSnes.h"
@@ -89,6 +90,7 @@ void registerValueFormats(core::Session& session, const ValueFormatOptions& opti
   session.registerFormat(capcom_snes::capcomSnesDefinition());
   session.registerFormat(chun_snes::definition());
   session.registerFormat(cps::cpsDefinition());
+  session.registerFormat(heartbeat_snes::definition());
   session.registerFormat(hudson_snes::definition());
   session.registerFormat(nds::ndsDefinition());
   session.registerFormat(akao_snes::akaoSnesDefinition());
