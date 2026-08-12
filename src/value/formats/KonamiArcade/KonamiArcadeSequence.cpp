@@ -209,7 +209,6 @@ struct TrackState {
   Address subroutineReturn;
   bool definingSubroutine = false;
   bool inSubroutine = false;
-  u8 callDepth = 0;
 };
 
 struct SequenceState {
@@ -748,15 +747,7 @@ struct Playback {
     return vm.finiteBranch(track.subroutineStart);
   }
 
-  void beginCall() { ++track.callDepth; }
-
-  [[nodiscard]] Effects returnOrEnd() {
-    if (track.callDepth != 0) {
-      --track.callDepth;
-      return vm.return_();
-    }
-    return vm.end();
-  }
+  [[nodiscard]] Effects returnOrEnd() { return vm.inSubroutine() ? vm.return_() : vm.end(); }
 
   void tick() {
     static_cast<void>(track.volume.tickChanged([&](double value) {
@@ -1136,7 +1127,6 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
     case 0xfe: {
       auto event = cursor.command("Call", SequenceSemantic::Call);
       const Address destination = readDestination(event, layout, sequence, SemanticOperandRole::CallTarget);
-      event.invoke<&Playback::beginCall>();
       return event.call(destination);
     }
     case 0xff: {

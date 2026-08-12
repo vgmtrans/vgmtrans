@@ -537,6 +537,7 @@ void sequenceVmEmitsDialectInitialChannelDefaults() {
   const SequenceDialect dialect = probeSequenceDialect(
       SequenceProgramBehavior{
           .defaultLoopPolicy = LoopPolicy::Default,
+          .initialSourceInstrument = InstrumentIdentity{.domain = "probe", .key = 7},
           .initialLevel = 0.0,
           .initialExpression = 0.5,
           .initialReverbSend = 0.0,
@@ -562,7 +563,7 @@ void sequenceVmEmitsDialectInitialChannelDefaults() {
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
   expect(performance.tracks.size() == 1, "initial-default fixture should render one track");
   const auto& events = performance.tracks[0].events;
-  expect(events.size() == 5, "VM should emit dialect initial channel defaults before source commands");
+  expect(events.size() == 6, "VM should emit dialect initial channel defaults before source commands");
 
   const auto* reverb = std::get_if<ReverbPerformanceEvent>(&events[0]);
   expect(reverb != nullptr && reverb->send == 0.0 && !reverb->header.sourceCommand.valid(),
@@ -580,6 +581,10 @@ void sequenceVmEmitsDialectInitialChannelDefaults() {
   const auto* mono = std::get_if<MonoModePerformanceEvent>(&events[4]);
   expect(mono != nullptr && mono->channels == 0 && !mono->header.sourceCommand.valid(),
          "initial mono mode should preserve explicit zero and should not pretend to come from a source command");
+  const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&events[5]);
+  expect(instrument != nullptr && instrument->sourceInstrument == InstrumentIdentity{.domain = "probe", .key = 7} &&
+             !instrument->header.sourceCommand.valid(),
+         "initial source instrument should preserve its identity without inventing a source command");
 
   const MidiSequence midi = renderMidiSequence(performance);
   const auto* midiPort = std::get_if<MidiPort>(&midi.tracks[0].events[0]);
@@ -601,6 +606,39 @@ void sequenceVmEmitsDialectInitialChannelDefaults() {
     rejectedUnresolvedBalance = true;
   }
   expect(rejectedUnresolvedBalance, "VM should reject an initial stereo balance that remains unresolved");
+}
+
+void sequenceVmExposesSubroutineStateFromItsCallStack() {
+  const SequenceDialect dialect{
+      .id = DialectId{.value = "subroutine-state-probe"},
+      .timebase = Timebase{.ppqn = 48},
+      .defaultBehavior = SequenceProgramBehavior{.initialStereoBalance = omitInitialStereoBalance},
+      .execute =
+          [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter& out, VmApi& vm) {
+            if (command.address.value != 0) {
+              out.instrument(0, vm.inSubroutine() ? 1 : 0);
+            }
+            return Effects{};
+          },
+  };
+  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgramBuilder builder{track};
+  builder.addSemantic(Address{0}, 0, 1, {}, {}, CommandFlow::call(Address{10}, Address{1}));
+  builder.addSemantic(Address{1}, 0, 1, {}, {}, CommandFlow::end(Address{2}));
+  builder.addSemantic(Address{10}, 0, 1, {}, {}, CommandFlow::return_(Address{11}));
+
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {track},
+  };
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  expect(performance.tracks[0].events.size() == 2,
+         "subroutine-state fixture should visit the called command and its continuation");
+  const auto& called = std::get<InstrumentPerformanceEvent>(performance.tracks[0].events[0]);
+  const auto& continued = std::get<InstrumentPerformanceEvent>(performance.tracks[0].events[1]);
+  expect(called.program == 1 && continued.program == 0,
+         "VM should expose call-stack state inside a subroutine and clear it after return");
 }
 
 void sequenceVmAllowsRepeatedCallsToSameSubroutine() {
@@ -1422,6 +1460,7 @@ void runValueSequenceVmTests() {
   sequenceVmResolvesInitialTempoAndGlobalEventOrder();
   sequenceVmFallsThroughBySourceAddressWhenDecodeOrderDiffers();
   sequenceVmEmitsDialectInitialChannelDefaults();
+  sequenceVmExposesSubroutineStateFromItsCallStack();
   sequenceVmAllowsRepeatedCallsToSameSubroutine();
   sequenceVmReplaysFiniteRepeatBlocks();
   sequenceVmRepeatReplayUsesCommandAddressesNotSourceOffsets();

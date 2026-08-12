@@ -8,7 +8,6 @@
 
 #include <fmt/format.h>
 
-#include <algorithm>
 #include <string>
 
 namespace vgmtrans::formats::wolf_team_snes {
@@ -16,21 +15,6 @@ namespace vgmtrans::formats::wolf_team_snes {
 using namespace core;
 
 namespace {
-
-[[nodiscard]] SourceRange sequenceRange(ByteReader reader, SourceRange header, const SequenceProgram& program) {
-  SourceRange result = header;
-  for (const TrackProgram& track : program.tracks) {
-    for (const SourceCommand& command : track.commands) {
-      if (!command.range.valid() || command.range.source != result.source) {
-        continue;
-      }
-      const u64 begin = std::min(result.offset, command.range.offset);
-      const u64 end = std::max(result.endOffset(), command.range.endOffset());
-      result = reader.range(begin, end - begin);
-    }
-  }
-  return result;
-}
 
 [[nodiscard]] ScanResult scan(const ScanInput& input) {
   const auto layout = findLayout(input.reader);
@@ -44,7 +28,8 @@ namespace {
   auto sequence = result.sequence(displayName);
   SequenceParse parsed =
       decodeSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics());
-  sequence.range(sequenceRange(input.reader, parsed.headerRange, parsed.program)).program(std::move(parsed.program));
+  sequence.range(sequenceSourceRange(input.reader, parsed.headerRange, parsed.program))
+      .program(std::move(parsed.program));
 
   auto collection = result.sourceCollection(displayName).sequence(sequence);
   if (const auto synth = addSynth(result, *layout, displayName)) {

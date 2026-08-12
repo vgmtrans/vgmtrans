@@ -304,7 +304,6 @@ struct TrackState {
   u8 quantize = 8;
   u8 sourceProgram = 0;
   bool percussion = false;
-  bool initialized = false;
   bool velocityEnabled = false;
   u8 velocity = 127;
   u8 volume = 100;
@@ -346,7 +345,6 @@ struct TrackState {
   std::array<Address, 6> loopStarts{};
   std::array<u32, 6> loopPlays{};
   u8 loopDepth = 0;
-  u8 callDepth = 0;
   Address loopPoint;
   bool loopPointOnce = false;
 
@@ -364,12 +362,7 @@ struct Playback {
   ProgramState& program;
 
   void beforeCommand() {
-    if (track.initialized) {
-      return;
-    }
-    track.initialized = true;
-    out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = track.sourceProgram});
-    if (track.initialEcho) {
+    if (std::exchange(track.initialEcho, false)) {
       out.reverb(program.echo);
     }
   }
@@ -950,15 +943,7 @@ struct Playback {
     return effects;
   }
 
-  void beginCall() { ++track.callDepth; }
-
-  [[nodiscard]] Effects endOrReturn() {
-    if (track.callDepth != 0) {
-      --track.callDepth;
-      return vm.return_();
-    }
-    return vm.end();
-  }
+  [[nodiscard]] Effects endOrReturn() { return vm.inSubroutine() ? vm.return_() : vm.end(); }
 
   void setLoopPoint(Address point) { track.loopPoint = point; }
 
@@ -1279,7 +1264,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xdf: {
       auto event = cursor.command("Pattern Call", SequenceSemantic::Call);
       const Address destination = event.addressLe("destination", SemanticOperandRole::CallTarget);
-      return event.invoke<&Playback::beginCall>().call(destination);
+      return event.call(destination);
     }
     case 0xe0: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
@@ -1504,6 +1489,7 @@ const SequenceDialect& sequenceDialect() {
       .defaultBehavior =
           SequenceProgramBehavior{
               .defaultLoopPolicy = LoopPolicy::PlayOnce,
+              .initialSourceInstrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0},
               .initialLevel = math::levelGain(Version::Early, math::initialVolume(Version::Early)),
               .initialReverbSend = 0.0,
               .initialStereoBalance = math::mixerGains(Version::Early, math::initialVolume(Version::Early), 15),

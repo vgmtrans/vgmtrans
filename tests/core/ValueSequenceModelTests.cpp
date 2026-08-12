@@ -59,6 +59,28 @@ void sourceCommandsRetainOnlySemanticData() {
   expect(command.execution.valid(), "source command should retain compiled playback actions");
 }
 
+void sequenceSourceRangeIncludesDecodedCommandsFromTheBaseSource() {
+  const std::vector<u8> bytes(32);
+  const ByteReader reader(SourceId{7}, bytes);
+  const SourceRange baseRange = reader.range(10, 4);
+  const SequenceProgram program{
+      .tracks =
+          {
+              TrackProgram{
+                  .commands =
+                      {
+                          SourceCommand{.range = reader.range(4, 2)},
+                          SourceCommand{.range = reader.range(20, 3)},
+                          SourceCommand{.range = SourceRange{.source = SourceId{8}, .offset = 0, .size = 30}},
+                      },
+              },
+          },
+  };
+
+  expect(sequenceSourceRange(reader, baseRange, program) == reader.range(4, 19),
+         "sequence source range should span its base range and same-source decoded commands only");
+}
+
 void trackProgramBuilderRejectsDuplicateCommandAddresses() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
@@ -395,6 +417,7 @@ void runValueSequenceModelTests() {
   levelScaleRoundTripsMidiValues();
   byteReaderChecksBoundsAndEndian();
   sourceCommandsRetainOnlySemanticData();
+  sequenceSourceRangeIncludesDecodedCommandsFromTheBaseSource();
   trackProgramBuilderRejectsDuplicateCommandAddresses();
   collectionIssuesDeriveResolutionIndependentlyFromFreshness();
   performanceAutomationRetainsIntentAlongsideOneEventTimeline();

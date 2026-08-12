@@ -334,7 +334,6 @@ struct TrackState {
   u8 sourceProgram = 5;
   bool percussion = false;
   bool slur = false;
-  bool initialized = false;
   bool previousWasRest = true;
   s8 fineTuning = 0;
   s16 transposeQuarters = 0;
@@ -362,13 +361,6 @@ struct Playback {
   PerformanceEmitter& out;
   VmApi& vm;
   ProgramState& program;
-
-  void beforeCommand() {
-    if (!track.initialized) {
-      track.initialized = true;
-      out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = track.sourceProgram});
-    }
-  }
 
   [[nodiscard]] u32 soundingTicks(u32 length) const {
     if (track.durationRate == 0) {
@@ -1011,6 +1003,8 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   program.config.profile = static_cast<u32>(layout.version);
   program.behavior.initialTempoMicrosecondsPerQuarter =
       math::tempoMicrosecondsPerQuarter(math::initialTempo(layout.version));
+  program.behavior.initialSourceInstrument =
+      InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = math::initialProgram(layout.version)};
   program.behavior.initialLevel = math::levelGain(math::initialVolume(layout.version));
   return SequenceParse{
       .program = std::move(program),
