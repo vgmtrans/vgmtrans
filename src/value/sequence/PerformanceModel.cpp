@@ -126,6 +126,22 @@ double PerformanceTempoMap::durationMilliseconds(u64 startTick, u32 durationTick
   return microseconds / 1000.0;
 }
 
+u32 PerformanceTempoMap::durationTicksForMilliseconds(u64 startTick, double milliseconds) const {
+  if (!(milliseconds > 0.0) || !std::isfinite(milliseconds)) {
+    return 0;
+  }
+  const double targetSeconds = milliseconds / 1000.0;
+  double elapsedSeconds = 0.0;
+  for (u32 ticks = 0; ticks < std::numeric_limits<u32>::max(); ++ticks) {
+    const double nextSeconds = elapsedSeconds + tickSeconds(startTick + ticks);
+    if (nextSeconds >= targetSeconds) {
+      return targetSeconds - elapsedSeconds <= nextSeconds - targetSeconds ? ticks : ticks + 1;
+    }
+    elapsedSeconds = nextSeconds;
+  }
+  return std::numeric_limits<u32>::max();
+}
+
 bool PerformanceTempoMap::contains(const TempoPerformanceEvent& event) const {
   return std::ranges::any_of(changes_, [&](const Change& change) {
     return change.tick == event.header.tick && change.track == event.header.track &&

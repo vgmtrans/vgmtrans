@@ -50,6 +50,9 @@ struct NotePerformanceEvent {
   // are applied only by MIDI-like renderers.
   double linearVelocity = 1.0;
   u32 durationTicks = 0;
+  // Some hardware stops a voice after a fixed real-time counter even when the
+  // sequence gate remains open. Renderers clamp durationTicks to this limit.
+  std::optional<double> maximumDurationMilliseconds;
   // Extend the previously emitted voice at the same pitch without another
   // attack. Key-changing continuations are pitch transitions linked with
   // continueFrom(previousNote); target-specific lowering may then use this
@@ -325,7 +328,16 @@ struct LfoPerformanceContext {
   // Reverse the oscillator's phase advance after this many active source
   // ticks. Folded accumulator LFOs use this to alternate sawtooth direction.
   std::optional<u32> directionReversalTicks;
+  // Some drivers only load the configured delay when a note explicitly
+  // restarts the oscillator. Changing the register must not pause an LFO that
+  // is already running.
+  bool delayAppliesOnNoteRestartOnly = false;
+  // Restart the oscillator at this event after applying phase metadata.
+  bool restartPhase = false;
   bool phaseRunsAtZeroDepth = false;
+  // Some register-driven oscillators also pause their delay counter while
+  // either rate or depth is zero. The default keeps the existing behavior.
+  bool delayRunsWhileInactive = true;
   TremoloGainMode tremoloGainMode = TremoloGainMode::BipolarAroundNominal;
 };
 
@@ -356,9 +368,15 @@ struct ModulationPerformanceEvent {
   std::optional<u32> steppedDepthAttackSteps;
   bool sampleImmediatelyOnNote = false;
   std::optional<u32> directionReversalTicks;
+  // Pan LFOs move through the source engine's pan law. MIDI simulation uses
+  // this to retain loudness when its equal-power controller law differs.
+  PanLaw panLaw = PanLaw::Unspecified;
+  bool delayAppliesOnNoteRestartOnly = false;
+  bool restartPhase = false;
   // Some drivers keep advancing the oscillator while its depth is zero. This
   // matters when a later command reveals an already-running LFO mid-note.
   bool phaseRunsAtZeroDepth = false;
+  bool delayRunsWhileInactive = true;
   // Tremolo depth is physical, but source engines differ in whether the
   // oscillator may rise above nominal gain.
   TremoloGainMode tremoloGainMode = TremoloGainMode::BipolarAroundNominal;
@@ -572,6 +590,7 @@ public:
   [[nodiscard]] u32 microsecondsPerQuarterAt(u64 tick) const;
   [[nodiscard]] double tickSeconds(u64 tick) const;
   [[nodiscard]] double durationMilliseconds(u64 startTick, u32 durationTicks) const;
+  [[nodiscard]] u32 durationTicksForMilliseconds(u64 startTick, double milliseconds) const;
   [[nodiscard]] bool contains(const TempoPerformanceEvent& event) const;
   [[nodiscard]] std::vector<Point> points() const;
 

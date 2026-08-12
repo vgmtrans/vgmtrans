@@ -30,8 +30,10 @@ namespace {
 
 constexpr u8 kNds2sfVersion = 0x24;
 constexpr u8 kNcsfVersion = 0x25;
+constexpr u8 kGsfVersion = 0x22;
 constexpr u8 kPsf1Version = 0x01;
 constexpr u8 kSsfVersion = 0x11;
+constexpr u32 kGbaRomBase = 0x08000000;
 constexpr size_t kPsf1DataOffset = 0x800;
 constexpr size_t kPsf1LoadAddressOffset = 0x18;
 constexpr int kMaxRecursion = 10;
@@ -51,7 +53,8 @@ struct Image {
 };
 
 [[nodiscard]] bool supportedVersion(u8 version) {
-  return version == kPsf1Version || version == kSsfVersion || version == kNds2sfVersion || version == kNcsfVersion;
+  return version == kPsf1Version || version == kSsfVersion || version == kGsfVersion || version == kNds2sfVersion ||
+         version == kNcsfVersion;
 }
 
 [[nodiscard]] std::optional<size_t> dataOffsetForVersion(u8 version) {
@@ -62,6 +65,8 @@ struct Image {
       // SSF uses the ordinary PSF mini-header: a little-endian load address
       // followed immediately by bytes to overlay into Saturn sound RAM.
       return 0x04;
+    case kGsfVersion:
+      return 0x0c;
     case kNds2sfVersion:
       return 0x08;
     case kNcsfVersion:
@@ -253,12 +258,20 @@ void overlayPsfExe(const PsfData& psf, Image& image) {
     return;
   }
   const auto dataOffset = dataOffsetForVersion(psf.version);
-  const size_t addressOffset = psf.version == kPsf1Version ? kPsf1LoadAddressOffset : 0;
+  const size_t addressOffset = psf.version == kPsf1Version ? kPsf1LoadAddressOffset : psf.version == kGsfVersion ? 4 : 0;
   if (!dataOffset || psf.exe.size() < *dataOffset || psf.exe.size() < addressOffset + 4) {
     throw std::runtime_error("PSF executable header is invalid");
   }
   const u32 address = le32(psf.exe, addressOffset);
-  overlay(image, address, psf.exe.data() + *dataOffset, psf.exe.size() - *dataOffset);
+  size_t size = psf.exe.size() - *dataOffset;
+  if (psf.version == kGsfVersion) {
+    const u32 declaredSize = le32(psf.exe, 8);
+    if (declaredSize > size) {
+      throw std::runtime_error("GSF executable payload size is invalid");
+    }
+    size = declaredSize;
+  }
+  overlay(image, address, psf.exe.data() + *dataOffset, size);
 }
 
 void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Image& image,
@@ -316,6 +329,24 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
   return "PSF image";
 }
 
+[[nodiscard]] std::optional<u32> gsfSongIndex(const PsfData& psf) {
+  if (psf.version != kGsfVersion || psf.exe.size() <= 0x0c || le32(psf.exe, 0) != kGbaRomBase ||
+      le32(psf.exe, 8) != psf.exe.size() - 0x0c) {
+    return std::nullopt;
+  }
+  const auto payload = std::span<const u8>(psf.exe).subspan(0x0c);
+  if (payload.size() == 1) {
+    return payload[0];
+  }
+  if (payload.size() == 2) {
+    return static_cast<u32>(payload[0]) | (static_cast<u32>(payload[1]) << 8);
+  }
+  if (payload.size() == 4) {
+    return le32(payload, 0);
+  }
+  return std::nullopt;
+}
+
 }  // namespace
 
 [[nodiscard]] ScanResult scanPsf(const ScanInput& input) {
@@ -345,6 +376,12 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
   };
   if (auto title = psf.tags.find("title"); title != psf.tags.end() && !title->second.empty()) {
     file.title = title->second;
+  }
+  if (const auto songIndex = gsfSongIndex(psf)) {
+    file.attributes.emplace("mp2k.song-index", std::to_string(*songIndex));
+  }
+  if (psf.version == kGsfVersion) {
+    file.attributes.emplace("container-format", "GSF");
   }
   result.extractedSources.push_back(ExtractedSource{
       .file = std::move(file),
