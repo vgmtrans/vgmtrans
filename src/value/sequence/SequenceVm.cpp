@@ -203,7 +203,8 @@ void addLoopMarker(PerformanceTrack& track, CommandId sourceCommand, u64 tick, u
   });
 }
 
-void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavior& behavior) {
+void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavior& behavior,
+                           bool includeGlobalEvents) {
   const PerformanceEventHeader header{
       .track = track.id,
       .tick = 0,
@@ -220,6 +221,12 @@ void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavio
         .header = header,
         .linearGain = *behavior.initialLevel,
         .precisionHint = LevelPrecisionHint::SevenBit,
+    });
+  }
+  if (includeGlobalEvents && behavior.initialMasterLevel) {
+    track.events.emplace_back(MasterLevelPerformanceEvent{
+        .header = header,
+        .linearGain = *behavior.initialMasterLevel,
     });
   }
   if (behavior.initialExpression) {
@@ -410,7 +417,8 @@ class VmTrackExecutor {
 public:
   VmTrackExecutor(const SequenceProgram& program, const TrackProgram& track, const SequenceDialect& dialect,
                   const SequenceProgramBehavior& behavior, const SequenceVmOptions& options,
-                  PerformanceSequence& targetSequence, u64& outputSequence, std::optional<u64> stopTick,
+                  PerformanceSequence& targetSequence, u64& outputSequence, bool includeGlobalInitialEvents,
+                  std::optional<u64> stopTick,
                   std::any* programState = nullptr, bool sequenceCoordinatesLoops = false, bool startsActive = true)
       : track_(track), dialect_(dialect), behavior_(behavior), loopPolicy_(behavior.defaultLoopPolicy),
         options_(options), targetSequence_(targetSequence), outputSequence_(outputSequence), stopTick_(stopTick),
@@ -422,7 +430,7 @@ public:
         programState_(programState),
         current_(startsActive ? destinationIndex(track, track.startAddress) : std::optional<u32>{}),
         sequenceCoordinatesLoops_(sequenceCoordinatesLoops) {
-    addInitialTrackEvents(performanceTrack_, behavior_);
+    addInitialTrackEvents(performanceTrack_, behavior_, includeGlobalInitialEvents);
     for (auto& event : performanceTrack_.events) {
       std::visit([&](auto& typedEvent) { typedEvent.header.sequence = outputSequence_++; }, event);
     }
@@ -1072,7 +1080,8 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
       const bool hasSectionPlaylist = program.sectionPlaylist.has_value();
       for (const TrackProgram& track : program.tracks) {
         executors.push_back(std::make_unique<VmTrackExecutor>(program, track, dialect, behavior, options_, target,
-                                                              outputSequence, std::nullopt, &passProgramState,
+                                                              outputSequence, executors.empty(), std::nullopt,
+                                                              &passProgramState,
                                                               loopPolicy == LoopPolicy::PlayOnce, !hasSectionPlaylist));
       }
 
@@ -1277,6 +1286,12 @@ SequenceProgramBehavior SequenceVm::resolvedBehavior(const SequenceProgram& prog
     behavior.initialLevel = program.behavior.initialLevel;
   } else if (dialect.defaultBehavior.initialLevel) {
     behavior.initialLevel = dialect.defaultBehavior.initialLevel;
+  }
+
+  if (program.behavior.initialMasterLevel) {
+    behavior.initialMasterLevel = program.behavior.initialMasterLevel;
+  } else if (dialect.defaultBehavior.initialMasterLevel) {
+    behavior.initialMasterLevel = dialect.defaultBehavior.initialMasterLevel;
   }
 
   if (program.behavior.initialExpression) {

@@ -379,6 +379,8 @@ struct SequenceProgramBehavior {
   // initialization without attaching it to a fake source command.
   std::optional<InstrumentIdentity> initialSourceInstrument;
   std::optional<double> initialLevel;
+  // Song-wide gain is initialized once, independently of per-track level.
+  std::optional<double> initialMasterLevel;
   std::optional<double> initialExpression;
   std::optional<double> initialReverbSend;
   // Omission must be deliberate. The default sentinel must be resolved before
