@@ -29,6 +29,7 @@ void suzukiPs1ModuleBuildsFractionallyTunedWdsSynth();
 void runSuzukiSnesModuleTests();
 void runHeartBeatSnesModuleTests();
 void runHudsonSnesModuleTests();
+void runItikitiSnesModuleTests();
 void runWolfTeamSnesModuleTests();
 void runMp2kModuleTests();
 
@@ -217,6 +218,7 @@ int main() {
     runSuzukiSnesModuleTests();
     runHeartBeatSnesModuleTests();
     runHudsonSnesModuleTests();
+    runItikitiSnesModuleTests();
 
     capcomSnesLayoutSelectsSongListAndFixedHeaders();
     capcomSnesLayoutFallsBackToV2SongList();

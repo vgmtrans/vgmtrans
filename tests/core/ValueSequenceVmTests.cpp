@@ -608,6 +608,36 @@ void sequenceVmEmitsDialectInitialChannelDefaults() {
   expect(rejectedUnresolvedBalance, "VM should reject an initial stereo balance that remains unresolved");
 }
 
+void sequenceVmEmitsInitialMasterLevelOnce() {
+  const SequenceDialect dialect = probeSequenceDialect(
+      SequenceProgramBehavior{.initialMasterLevel = 0.25}, omitInitialStereoBalance);
+  const auto makeTrack = [&](u32 id) {
+    TrackProgram track{.id = TrackId{id}, .sourceTrackNumber = id, .startAddress = Address{0}};
+    TrackProgramBuilder builder{track};
+    const std::array<u8, 1> endBytes{0xff};
+    addProbeCommand<ProbeEndCommand>(builder, dialect, Address{0}, probeRange(id, endBytes.size()), endBytes);
+    return track;
+  };
+  const SequenceProgram program{
+      .dialect = dialect.id,
+      .timebase = dialect.timebase,
+      .tracks = {makeTrack(3), makeTrack(4)},
+  };
+
+  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const auto first = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<MasterLevelPerformanceEvent>(event);
+  });
+  const auto second = std::ranges::find_if(performance.tracks[1].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<MasterLevelPerformanceEvent>(event);
+  });
+  expect(first != performance.tracks[0].events.end() &&
+             std::get<MasterLevelPerformanceEvent>(*first).linearGain == 0.25 &&
+             !std::get<MasterLevelPerformanceEvent>(*first).header.sourceCommand.valid() &&
+             second == performance.tracks[1].events.end(),
+         "VM should initialize song-wide master gain once, independently of per-track levels");
+}
+
 void sequenceVmExposesSubroutineStateFromItsCallStack() {
   const SequenceDialect dialect{
       .id = DialectId{.value = "subroutine-state-probe"},
@@ -1460,6 +1490,7 @@ void runValueSequenceVmTests() {
   sequenceVmResolvesInitialTempoAndGlobalEventOrder();
   sequenceVmFallsThroughBySourceAddressWhenDecodeOrderDiffers();
   sequenceVmEmitsDialectInitialChannelDefaults();
+  sequenceVmEmitsInitialMasterLevelOnce();
   sequenceVmExposesSubroutineStateFromItsCallStack();
   sequenceVmAllowsRepeatedCallsToSameSubroutine();
   sequenceVmReplaysFiniteRepeatBlocks();
