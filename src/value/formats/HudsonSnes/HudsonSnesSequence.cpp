@@ -716,7 +716,7 @@ struct Playback {
         .delayTicks = normalized(effectiveDelay),
         .delayMilliseconds = effectiveDelay * math::driverTickMilliseconds(program.tempo, track.timebaseShift),
         .delayIsTempoRelative = true,
-        .waveform = LfoWaveform::Triangle,
+        .shape = LfoShape{.waveform = LfoWaveform::Triangle},
         .sampleImmediatelyOnNote = true,
     };
   }
@@ -748,7 +748,7 @@ struct Playback {
     }
     if ((track.vibratoMode & 0x80) != 0) {
       const u32 meta = program.tables.waveform(track.vibratoMode & 0x7f);
-      context.waveform = static_cast<LfoWaveform>((meta >> 8) & 0xff);
+      context.shape = LfoShape{.waveform = static_cast<LfoWaveform>((meta >> 8) & 0xff)};
     } else if ((track.vibratoMode & 3) == 1) {
       context.polarity = LfoPolarity::Positive;
     } else if ((track.vibratoMode & 3) == 2) {

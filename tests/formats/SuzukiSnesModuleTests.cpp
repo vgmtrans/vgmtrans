@@ -401,12 +401,12 @@ void modulationMathMatchesEachDriverRevision() {
       render(Version::SuperMarioRpg, {0xf4, 0x07, 0x36, 0xde, 0x5e, 0xb6, 0x20, 0xd0});
   const auto* boosterDepth = modulationValue(booster, ModulationPerformanceTarget::TremoloDepth);
   const auto* boosterRate = modulationValue(booster, ModulationPerformanceTarget::TremoloRate);
-  expect(boosterDepth && boosterDepth->volumeDepthLinearGain == 1.0 &&
-             boosterDepth->waveform == LfoWaveform::SawtoothDown &&
+  expect(boosterDepth && boosterDepth->volumeDepthLinearGain == 1.0 && boosterDepth->shape &&
+             boosterDepth->shape->waveform == LfoWaveform::SawtoothDown &&
              boosterDepth->polarity == LfoPolarity::Negative && boosterDepth->initialPhaseCycles == 0.0 &&
              boosterDepth->sampleImmediatelyOnNote && boosterDepth->directionReversalTicks == 7 &&
-             boosterDepth->tremoloGainMode == TremoloGainMode::NoBoost &&
-             boosterRate && std::abs(boosterRate->cyclesPerTick.value_or(0.0) - (0x36 / 128.0)) < 0.000001,
+             boosterDepth->tremoloGainMode == TremoloGainMode::NoBoost && boosterRate &&
+             std::abs(boosterRate->cyclesPerTick.value_or(0.0) - (0x36 / 128.0)) < 0.000001,
          "SMR F4 07 36 should preserve the fast carrier created by its wrapped 7-bit volume steps");
   const SequenceModulationProfile boosterProfile = analyzeSequenceModulation(booster);
   expect(boosterProfile.instruments.tremolo &&

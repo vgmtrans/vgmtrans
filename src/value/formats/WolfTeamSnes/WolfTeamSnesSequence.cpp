@@ -418,7 +418,7 @@ struct Playback {
         .cyclesPerTick = track.vibratoPhaseStep / 64.0,
         .delayTicks = track.vibratoDelay,
         .delayIsTempoRelative = true,
-        .waveform = LfoWaveform::Triangle,
+        .shape = LfoShape{.waveform = LfoWaveform::Triangle},
         .initialPhaseCycles = 0.0,
     };
   }

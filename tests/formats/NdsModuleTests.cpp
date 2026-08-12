@@ -655,8 +655,8 @@ void ndsSequenceDialectModelsNitroLfoRegisters() {
     }
   }
 
-  expect(rate != nullptr && rate->frequencyHz == 12.0 && rate->delayTicks == 24 &&
-             rate->waveform == LfoWaveform::Sine && rate->phaseRunsAtZeroDepth,
+  expect(rate != nullptr && rate->frequencyHz == 12.0 && rate->delayTicks == 24 && rate->shape &&
+             rate->shape->waveform == LfoWaveform::Sine && rate->phaseRunsAtZeroDepth,
          "NDS should retain Nitro's fixed-clock rate, delay, sine shape, and zero-depth phase behavior");
   expect(pitch != nullptr && pitch->pitchDepthSemitones && std::abs(*pitch->pitchDepthSemitones - 0.9921875) < 0.000001,
          "NDS pitch modulation should use Nitro's depth/range scaling");

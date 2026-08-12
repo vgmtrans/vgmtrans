@@ -131,7 +131,7 @@ struct Playback {
   [[nodiscard]] LfoPerformanceContext lfoContext() const {
     return LfoPerformanceContext{
         .frequencyHz = cpsDriverRateHertz(track.version) * tables::lfoRate[track.lfoRate] / 262144.0,
-        .waveform = LfoWaveform::Triangle,
+        .shape = LfoShape{.waveform = LfoWaveform::Triangle},
         .initialPhaseCycles = 0.0,
         .sampleImmediatelyOnNote = true,
         .phaseRunsAtZeroDepth = !isCps3(track.version),

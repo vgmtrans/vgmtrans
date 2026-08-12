@@ -848,8 +848,9 @@ void capcomSnesLfoValuesAreResolvedDuringDecode() {
                  std::get<double>(tremoloDepth->value),
          "CapcomSnes playback should emit the physical tremolo depth resolved by decode");
   const auto& tremoloEvent = std::get<ModulationPerformanceEvent>(*emittedTremolo);
-  expect(tremoloEvent.waveform == LfoWaveform::Triangle && tremoloEvent.initialPhaseCycles == 0.75 &&
-             tremoloEvent.phaseRunsAtZeroDepth && tremoloEvent.tremoloGainMode == TremoloGainMode::NoBoost,
+  expect(tremoloEvent.shape && tremoloEvent.shape->waveform == LfoWaveform::Triangle &&
+             tremoloEvent.initialPhaseCycles == 0.75 && tremoloEvent.phaseRunsAtZeroDepth &&
+             tremoloEvent.tremoloGainMode == TremoloGainMode::NoBoost,
          "CapcomSnes playback should preserve its trough-first subtractive folded-triangle behavior");
   const auto emittedNote = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<NotePerformanceEvent>(event);

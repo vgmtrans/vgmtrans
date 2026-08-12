@@ -1330,7 +1330,7 @@ struct Playback {
     }
     if (context.version == AKAOSNES_V3 && target == LfoTarget::Vibrato) {
       return LfoPerformanceContext{
-          .waveform = LfoWaveform::Square,
+          .shape = LfoShape{.waveform = LfoWaveform::Square},
           .initialPhaseCycles = (lfo.depth & 0x40) == 0 ? 0.5 : 0.0,
           .pitchRangeSemitones = v3VibratoPitchRangeSemitones(lfo.depth),
           .steppedDepthAttackSteps = lfo.delay == 0 ? 0u : 4u,

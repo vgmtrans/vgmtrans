@@ -165,10 +165,14 @@ void physicalLfosAndMixerStateArePreserved() {
              std::abs(vibrato.front()->pitchRangeSemitones->maximum - maximum) < 0.000001 && vibratoRate.size() == 1 &&
              vibratoRate.front()->frequencyHz &&
              std::abs(*vibratoRate.front()->frequencyHz - 8000.0 / (39.0 * 32.0 * 4.0)) < 0.000001 &&
-             vibrato.front()->waveform == LfoWaveform::Sine && vibrato.front()->polarity == LfoPolarity::Bipolar,
+             vibrato.front()->shape && vibrato.front()->shape->waveform == LfoWaveform::Sine &&
+             vibrato.front()->polarity == LfoPolarity::Bipolar && vibrato.front()->shape->samples.size() == 32 &&
+             vibrato.front()->sampleImmediatelyOnNote &&
+             vibrato.front()->restartMode == LfoRestartMode::PhaseAndDelay &&
+             vibratoRate.front()->restartMode == LfoRestartMode::None,
          "vibrato should preserve the timer-0 oscillator and asymmetric driver pitch ratios");
-  expect(tremolo.size() == 1 && tremolo.front()->polarity == LfoPolarity::Bipolar &&
-             tremolo.front()->initialPhaseCycles == 0.0 && tremolo.front()->waveform == LfoWaveform::Sine &&
+  expect(tremolo.size() == 1 && tremolo.front()->polarity == LfoPolarity::Bipolar && tremolo.front()->shape &&
+             tremolo.front()->initialPhaseCycles == 0.0 && tremolo.front()->shape->waveform == LfoWaveform::Sine &&
              tremolo.front()->volumeDepthLinearGain == 0.25 && tremoloRate.size() == 1 &&
              tremoloRate.front()->frequencyHz &&
              std::abs(*tremoloRate.front()->frequencyHz - 8000.0 / (39.0 * 32.0 * 2.0)) < 0.000001 &&
@@ -185,21 +189,37 @@ void physicalLfosAndMixerStateArePreserved() {
 void lfoModesFollowTheDriverStateMachine() {
   const PerformanceSequence performance =
       render({0x19, 0, 1, 0x20, 0x19, 0, 2, 0x60, 0x19, 0, 1, 0xa0, 0x19, 0, 8, 0xe0, 0x1a, 0});
-  const PerformanceSequence continuous = render({0x27, 0x85, 0x19, 0, 1, 0xe0, 0});
+  const PerformanceSequence continuous = render({0x27, 0x85, 0x19, 0, 1, 0xe0, 0x27, 0x84, 0x30, 0});
+  const PerformanceSequence portamento = render({0x19, 0, 1, 0x82, 0x25, 4, 0x30, 0x31, 0});
+  const PerformanceSequence stoppedTremolo = render({0x1b, 0, 1, 0xa0, 0x1c, 0});
   const auto depth = modulationEvents(performance.tracks.front(), ModulationPerformanceTarget::VibratoDepth);
   const auto rate = modulationEvents(performance.tracks.front(), ModulationPerformanceTarget::VibratoRate);
   const auto continuousDepth = modulationEvents(continuous.tracks.front(), ModulationPerformanceTarget::VibratoDepth);
+  const auto continuousDelay = events<VibratoDelayPerformanceEvent>(continuous.tracks.front());
+  const auto portamentoDepth = modulationEvents(portamento.tracks.front(), ModulationPerformanceTarget::VibratoDepth);
+  const auto portamentoNotes = events<NotePerformanceEvent>(portamento.tracks.front());
+  const auto tremoloDepth = modulationEvents(stoppedTremolo.tracks.front(), ModulationPerformanceTarget::TremoloDepth);
+  const MidiSequence portamentoMidi =
+      renderMidiSequence(portamento, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+  const auto hasNonzeroBendAt = [&](u64 tick) {
+    return std::ranges::any_of(portamentoMidi.tracks.front().events, [=](const MidiEvent& event) {
+      const auto* bend = std::get_if<PitchBend>(&event);
+      return bend != nullptr && bend->tick == tick && bend->value != 0;
+    });
+  };
   const double minimum = 12.0 * std::log2(1.0 - 32.0 / 256.0);
   const double maximum = 12.0 * std::log2(1.0 + 32.0 / 128.0);
 
-  expect(performance.diagnostics.empty() && continuous.diagnostics.empty() && depth.size() == 5 && rate.size() == 4,
+  expect(performance.diagnostics.empty() && continuous.diagnostics.empty() && portamento.diagnostics.empty() &&
+             stoppedTremolo.diagnostics.empty() && depth.size() == 5 && rate.size() == 4,
          "all encoded LFO phase modes should decode");
-  expect(depth[0]->polarity == LfoPolarity::Positive && depth[0]->initialPhaseCycles == 0.75 &&
+  expect(depth[0]->polarity == LfoPolarity::Positive && depth[0]->initialPhaseCycles == 0.0 &&
              depth[0]->pitchRangeSemitones && depth[0]->pitchRangeSemitones->minimum == 0.0 &&
              std::abs(depth[0]->pitchRangeSemitones->maximum - maximum) < 0.000001 && rate[0]->frequencyHz &&
-             std::abs(*rate[0]->frequencyHz - 8000.0 / (39.0 * 16.0)) < 0.000001,
+             std::abs(*rate[0]->frequencyHz - 8000.0 / (39.0 * 16.0)) < 0.000001 && depth[0]->shape &&
+             depth[0]->shape->samples.size() == 16 && depth[0]->shape->samples.at(8) == 1.0,
          "the positive-lobe mode should repeat after sixteen timer-0 steps");
-  expect(depth[1]->polarity == LfoPolarity::Negative && depth[1]->initialPhaseCycles == 0.25 &&
+  expect(depth[1]->polarity == LfoPolarity::Negative && depth[1]->initialPhaseCycles == 0.0 &&
              depth[1]->pitchRangeSemitones && std::abs(depth[1]->pitchRangeSemitones->minimum - minimum) < 0.000001 &&
              depth[1]->pitchRangeSemitones->maximum == 0.0 && rate[1]->frequencyHz &&
              std::abs(*rate[1]->frequencyHz - 8000.0 / (39.0 * 16.0 * 2.0)) < 0.000001,
@@ -210,8 +230,19 @@ void lfoModesFollowTheDriverStateMachine() {
              std::abs(*rate[2]->frequencyHz - 8000.0 / (39.0 * 32.0)) < 0.000001 &&
              depth[3]->polarity == LfoPolarity::Bipolar && depth[3]->initialPhaseCycles == 0.0 &&
              depth[4]->pitchDepthSemitones == 0.0 && depth[4]->polarity == LfoPolarity::Bipolar &&
-             !depth[4]->restartPhase && continuousDepth.size() == 1 &&
-             continuousDepth.front()->initialPhaseCycles == 0.5,
+             depth[4]->zeroDepthBehavior == LfoZeroDepthBehavior::HoldOutputUntilNextNote &&
+             depth[4]->restartMode == LfoRestartMode::None && continuousDepth.size() == 1 &&
+             continuousDepth.front()->initialPhaseCycles == 0.5 &&
+             continuousDepth.front()->restartMode == LfoRestartMode::Phase &&
+             continuousDepth.front()->noteRestartInitialPhaseCycles == 0.0 && continuousDelay.size() == 1 &&
+             continuousDelay.front()->updateMode == LfoDelayUpdateMode::FutureNotesOnly &&
+             portamentoDepth.size() == 1 && portamentoDepth.front()->shape &&
+             portamentoDepth.front()->shape->samples.at(2) == 0.0 &&
+             portamentoDepth.front()->shape->samples.at(3) > 0.0 && !hasNonzeroBendAt(1) && hasNonzeroBendAt(2) &&
+             portamentoNotes.size() == 2 && !portamentoNotes.back()->restartsEnvelope &&
+             portamentoNotes.back()->restartsVibratoLfoPhase == true && !portamentoNotes.back()->restartsLfoPhase &&
+             tremoloDepth.size() == 2 && tremoloDepth.back()->volumeDepthLinearGain == 0.0 &&
+             tremoloDepth.back()->zeroDepthBehavior == LfoZeroDepthBehavior::HoldOutputUntilNextNote,
          "the alternating mode should use both asymmetric lobes and retain the driver's reset behavior");
 }
 
@@ -228,18 +259,16 @@ void trackAndMasterVolumeRetainIndependentResolution() {
              levels[1]->sourceQuantization->levels == 256 && levels[2]->sourceQuantization &&
              levels[2]->sourceQuantization->levels == 256,
          "track and channel volume should multiply independently at their full eight-bit precision");
-  expect(masters.size() == 2 &&
-             std::abs(masters.front()->linearGain - 24.0 / 255.0) < 0.000001 &&
+  expect(masters.size() == 2 && std::abs(masters.front()->linearGain - 24.0 / 255.0) < 0.000001 &&
              std::abs(masters.back()->linearGain - half) < 0.000001,
          "master volume should be an absolute gain instead of a clipped boost over the $18 startup value");
 
   const MidiSequence midi = renderMidiSequence(performance);
   const auto volume = std::ranges::find_if(
       midi.tracks.front().events, [](const MidiEvent& event) { return std::holds_alternative<Volume14>(event); });
-  const auto master = std::ranges::find_if(midi.tracks.front().events.rbegin(), midi.tracks.front().events.rend(),
-                                           [](const MidiEvent& event) {
-                                             return std::holds_alternative<MasterVolume>(event);
-                                           });
+  const auto master =
+      std::ranges::find_if(midi.tracks.front().events.rbegin(), midi.tracks.front().events.rend(),
+                           [](const MidiEvent& event) { return std::holds_alternative<MasterVolume>(event); });
   expect(volume != midi.tracks.front().events.end(),
          "eight-bit source volume should automatically use a 14-bit MIDI controller");
   expect(master != midi.tracks.front().events.rend() &&
@@ -303,8 +332,7 @@ void dynamicAdsrPitchAndControlFlowAreAudited() {
 }
 
 void packedLengthPatternsFollowTheDriverByteOrder() {
-  const PerformanceSequence performance =
-      render({0x09, 0x94, 0x35, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0});
+  const PerformanceSequence performance = render({0x09, 0x94, 0x35, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0});
   const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
   constexpr std::array<u32, 7> lengths{96, 72, 48, 32, 24, 12, 6};
   u64 tick = 0;

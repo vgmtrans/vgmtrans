@@ -304,23 +304,26 @@ struct MidiInstrumentSelection {
   return static_cast<u16>(selection.address.bank & 0x3fff);
 }
 
+struct SimulatedLfoDelay {
+  u32 ticks = 0;
+  std::optional<double> milliseconds;
+  bool tempoRelative = false;
+};
+
 struct SimulatedLfoState {
   double depth = 0.0;
   double frequencyHz = 0.0;
   std::optional<double> cyclesPerTick;
-  u32 delayTicks = 0;
-  std::optional<double> delayMilliseconds;
-  bool delayIsTempoRelative = false;
-  std::optional<u32> noteRestartDelayTicks;
-  std::optional<double> noteRestartDelayMilliseconds;
-  bool noteRestartDelayIsTempoRelative = false;
+  SimulatedLfoDelay delay;
+  std::optional<SimulatedLfoDelay> noteRestartDelay;
   u32 delayCounterTicks = 0;
   double delayCounterMilliseconds = 0.0;
   u64 cursorTick = 0;
   double phaseCycles = 0.0;
-  std::optional<LfoWaveform> waveform;
+  std::optional<LfoShape> shape;
   LfoPolarity polarity = LfoPolarity::Bipolar;
   std::optional<double> initialPhaseCycles;
+  std::optional<double> noteRestartInitialPhaseCycles;
   std::optional<ModulationRange> pitchRangeSemitones;
   u32 steppedDepthAttackSteps = 0;
   u32 activeSteppedDepthAttackSteps = 0;
@@ -332,6 +335,7 @@ struct SimulatedLfoState {
   bool phaseReversed = false;
   bool phaseRunsAtZeroDepth = false;
   bool delayRunsWhileInactive = true;
+  bool outputHeldUntilNextNote = false;
   PanLaw panLaw = PanLaw::Unspecified;
   bool configured = false;
   bool started = false;
@@ -736,7 +740,13 @@ void addCurrentPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u8
 }
 
 [[nodiscard]] double lfoValue(const SimulatedLfoState& lfo) {
-  const double value = lfoValue(lfo.waveform.value_or(LfoWaveform::Triangle), lfo.phaseCycles);
+  if (lfo.shape && !lfo.shape->samples.empty()) {
+    const double phase = lfo.phaseCycles - std::floor(lfo.phaseCycles);
+    const size_t index =
+        std::min(lfo.shape->samples.size() - 1, static_cast<size_t>(std::floor(phase * lfo.shape->samples.size())));
+    return std::clamp(lfo.shape->samples[index], -1.0, 1.0);
+  }
+  const double value = lfoValue(lfo.shape ? lfo.shape->waveform : LfoWaveform::Triangle, lfo.phaseCycles);
   switch (lfo.polarity) {
     case LfoPolarity::Positive:
       return (value + 1.0) / 2.0;
@@ -763,9 +773,15 @@ enum class LfoInitialPhaseFallback {
   return fallback == LfoInitialPhaseFallback::UnipolarTremoloNominalGain ? 0.75 : 0.0;
 }
 
-void restartLfo(SimulatedLfoState& lfo, u64 tick, LfoInitialPhaseFallback fallback = LfoInitialPhaseFallback::Zero) {
-  lfo.delayCounterTicks = 0;
-  lfo.delayCounterMilliseconds = 0.0;
+void applyLfoRestart(SimulatedLfoState& lfo, u64 tick, LfoRestartMode mode,
+                     LfoInitialPhaseFallback fallback = LfoInitialPhaseFallback::Zero) {
+  if (mode == LfoRestartMode::None) {
+    return;
+  }
+  if (mode == LfoRestartMode::PhaseAndDelay) {
+    lfo.delayCounterTicks = 0;
+    lfo.delayCounterMilliseconds = 0.0;
+  }
   lfo.cursorTick = tick;
   lfo.phaseCycles = initialLfoPhase(lfo, fallback);
   lfo.activeSteppedDepthAttackSteps = lfo.steppedDepthAttackSteps;
@@ -777,16 +793,11 @@ void restartLfo(SimulatedLfoState& lfo, u64 tick, LfoInitialPhaseFallback fallba
   lfo.producedSample = false;
 }
 
-void resetLfoPhase(SimulatedLfoState& lfo, u64 tick, LfoInitialPhaseFallback fallback = LfoInitialPhaseFallback::Zero) {
-  lfo.cursorTick = tick;
-  lfo.phaseCycles = initialLfoPhase(lfo, fallback);
-  lfo.activeSteppedDepthAttackSteps = lfo.steppedDepthAttackSteps;
-  lfo.steppedDepthAttackStep = lfo.activeSteppedDepthAttackSteps == 0 ? 0 : 1;
-  lfo.steppedDepthAttackPhaseCycles = 0.0;
-  lfo.directionTick = 0;
-  lfo.phaseReversed = false;
-  lfo.started = true;
-  lfo.producedSample = false;
+void applyLfoDelayUpdate(SimulatedLfoState& lfo, SimulatedLfoDelay delay, LfoDelayUpdateMode mode) {
+  lfo.noteRestartDelay = delay;
+  if (mode == LfoDelayUpdateMode::CurrentAndFutureNotes) {
+    lfo.delay = std::move(delay);
+  }
 }
 
 void configureLfo(SimulatedLfoState& lfo, u64 tick, const ModulationPerformanceEvent& event,
@@ -799,14 +810,17 @@ void configureLfo(SimulatedLfoState& lfo, u64 tick, const ModulationPerformanceE
   if (event.frequencyHz) {
     lfo.frequencyHz = std::max(0.0, *event.frequencyHz);
   }
-  if (event.waveform) {
-    lfo.waveform = event.waveform;
+  if (event.shape) {
+    lfo.shape = event.shape;
   }
   if (event.polarity) {
     lfo.polarity = *event.polarity;
   }
   if (event.initialPhaseCycles) {
     lfo.initialPhaseCycles = event.initialPhaseCycles;
+  }
+  if (event.noteRestartInitialPhaseCycles) {
+    lfo.noteRestartInitialPhaseCycles = event.noteRestartInitialPhaseCycles;
   }
   if (event.pitchRangeSemitones) {
     lfo.pitchRangeSemitones = event.pitchRangeSemitones;
@@ -821,60 +835,43 @@ void configureLfo(SimulatedLfoState& lfo, u64 tick, const ModulationPerformanceE
   if (event.panLaw != PanLaw::Unspecified) {
     lfo.panLaw = event.panLaw;
   }
-  if (event.delayAppliesOnNoteRestartOnly) {
-    if (event.delayTicks) {
-      lfo.noteRestartDelayTicks = *event.delayTicks;
-    }
-    if (event.delayMilliseconds) {
-      lfo.noteRestartDelayMilliseconds = std::max(0.0, *event.delayMilliseconds);
-    }
-    if (event.delayTicks || event.delayMilliseconds) {
-      lfo.noteRestartDelayIsTempoRelative = event.delayIsTempoRelative;
-    }
-  } else {
-    if (event.delayTicks) {
-      lfo.delayTicks = *event.delayTicks;
-    }
-    if (event.delayMilliseconds) {
-      lfo.delayMilliseconds = std::max(0.0, *event.delayMilliseconds);
-    }
-    if (event.delayTicks || event.delayMilliseconds) {
-      lfo.delayIsTempoRelative = event.delayIsTempoRelative;
-    }
+  if (event.delayTicks || event.delayMilliseconds) {
+    SimulatedLfoDelay delay{
+        .ticks = event.delayTicks.value_or(0),
+        .milliseconds = event.delayMilliseconds ? std::optional{std::max(0.0, *event.delayMilliseconds)} : std::nullopt,
+        .tempoRelative = event.delayIsTempoRelative,
+    };
+    applyLfoDelayUpdate(lfo, std::move(delay), event.delayUpdateMode);
   }
   lfo.phaseRunsAtZeroDepth = event.phaseRunsAtZeroDepth;
   lfo.delayRunsWhileInactive = event.delayRunsWhileInactive;
   lfo.configured = true;
-  if (!lfo.started) {
-    restartLfo(lfo, tick, fallback);
-  } else if (event.restartPhase) {
-    // Register-level phase clears do not reload a note-triggered delay.
-    resetLfoPhase(lfo, tick, fallback);
-  }
+  applyLfoRestart(lfo, tick, lfo.started ? event.restartMode : LfoRestartMode::PhaseAndDelay, fallback);
 }
 
 void restartNoteLfo(SimulatedLfoState& lfo, u64 tick,
                     LfoInitialPhaseFallback fallback = LfoInitialPhaseFallback::Zero) {
-  if (lfo.noteRestartDelayTicks) {
-    lfo.delayTicks = *lfo.noteRestartDelayTicks;
+  if (lfo.noteRestartDelay) {
+    lfo.delay = *lfo.noteRestartDelay;
   }
-  if (lfo.noteRestartDelayMilliseconds) {
-    lfo.delayMilliseconds = *lfo.noteRestartDelayMilliseconds;
+  applyLfoRestart(lfo, tick, LfoRestartMode::PhaseAndDelay, fallback);
+  if (lfo.noteRestartInitialPhaseCycles) {
+    lfo.phaseCycles = *lfo.noteRestartInitialPhaseCycles - std::floor(*lfo.noteRestartInitialPhaseCycles);
   }
-  if (lfo.noteRestartDelayTicks || lfo.noteRestartDelayMilliseconds) {
-    lfo.delayIsTempoRelative = lfo.noteRestartDelayIsTempoRelative;
-  }
-  restartLfo(lfo, tick, fallback);
 }
 
 void setLfoDelay(SimulatedLfoState& lfo, u64 tick, u32 delayTicks, std::optional<double> delayMilliseconds,
-                 bool tempoRelative, LfoInitialPhaseFallback fallback = LfoInitialPhaseFallback::Zero) {
-  lfo.delayTicks = delayTicks;
-  lfo.delayMilliseconds = delayMilliseconds;
-  lfo.delayIsTempoRelative = tempoRelative;
+                 bool tempoRelative, LfoDelayUpdateMode updateMode,
+                 LfoInitialPhaseFallback fallback = LfoInitialPhaseFallback::Zero) {
+  SimulatedLfoDelay delay{
+      .ticks = delayTicks,
+      .milliseconds = delayMilliseconds ? std::optional{std::max(0.0, *delayMilliseconds)} : std::nullopt,
+      .tempoRelative = tempoRelative,
+  };
+  applyLfoDelayUpdate(lfo, std::move(delay), updateMode);
   lfo.configured = true;
   if (!lfo.started) {
-    restartLfo(lfo, tick, fallback);
+    applyLfoRestart(lfo, tick, LfoRestartMode::PhaseAndDelay, fallback);
   }
 }
 
@@ -894,17 +891,17 @@ void flushLfo(SimulatedLfoState& lfo, u64 upToTick, const PerformanceTempoMap& t
     if (inactive && !lfo.delayRunsWhileInactive) {
       continue;
     }
-    if (!lfo.delayIsTempoRelative && lfo.delayMilliseconds) {
-      if (lfo.delayCounterMilliseconds < *lfo.delayMilliseconds) {
+    if (!lfo.delay.tempoRelative && lfo.delay.milliseconds) {
+      if (lfo.delayCounterMilliseconds < *lfo.delay.milliseconds) {
         lfo.delayCounterMilliseconds =
-            std::min(*lfo.delayMilliseconds, lfo.delayCounterMilliseconds + tickMilliseconds);
-        if (lfo.delayCounterMilliseconds < *lfo.delayMilliseconds) {
+            std::min(*lfo.delay.milliseconds, lfo.delayCounterMilliseconds + tickMilliseconds);
+        if (lfo.delayCounterMilliseconds < *lfo.delay.milliseconds) {
           continue;
         }
       }
-    } else if (lfo.delayCounterTicks < lfo.delayTicks) {
+    } else if (lfo.delayCounterTicks < lfo.delay.ticks) {
       ++lfo.delayCounterTicks;
-      if (lfo.delayCounterTicks < lfo.delayTicks) {
+      if (lfo.delayCounterTicks < lfo.delay.ticks) {
         continue;
       }
     }
@@ -968,11 +965,32 @@ void flushSimulatedVibrato(MidiTrack& track, RenderTrackState& state, u64 upToTi
   });
 }
 
-void setSimulatedVibratoDepth(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, double semitones) {
+void setSimulatedVibratoDepth(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, double semitones,
+                              LfoZeroDepthBehavior zeroDepthBehavior) {
   state.vibrato.depth = std::max(0.0, semitones);
-  if (state.vibrato.depth <= 0.0) {
+  state.vibrato.outputHeldUntilNextNote =
+      state.vibrato.depth <= 0.0 && zeroDepthBehavior == LfoZeroDepthBehavior::HoldOutputUntilNextNote;
+  if (state.vibrato.depth <= 0.0 && !state.vibrato.outputHeldUntilNextNote) {
     state.simulatedVibratoSemitones = 0.0;
     addCurrentPitchBend(track, state, tick, channel, ModulationConversionPolicy::SequenceEventSimulation, false);
+  }
+}
+
+void sampleRestartedVibrato(MidiTrack& track, RenderTrackState& state, const ModulationPerformanceEvent& event,
+                            u8 channel) {
+  const bool immediate = event.restartMode == LfoRestartMode::PhaseAndDelay && state.vibrato.sampleImmediatelyOnNote &&
+                         state.vibrato.delay.ticks == 0 && state.vibrato.delay.milliseconds.value_or(0.0) <= 0.0 &&
+                         state.vibrato.depth > 0.0 &&
+                         state.vibrato.cyclesPerTick.value_or(state.vibrato.frequencyHz) > 0.0;
+  if (!immediate) {
+    return;
+  }
+  const double value = simulatedVibratoAtPhase(state.vibrato, lfoValue(state.vibrato));
+  state.vibrato.producedSample = true;
+  if (value != state.simulatedVibratoSemitones) {
+    state.simulatedVibratoSemitones = value;
+    addCurrentPitchBend(track, state, event.header.tick, channel, ModulationConversionPolicy::SequenceEventSimulation,
+                        false);
   }
 }
 
@@ -982,9 +1000,10 @@ void restartSimulatedVibratoForNote(MidiTrack& track, RenderTrackState& state, u
   }
 
   restartNoteLfo(state.vibrato, tick);
+  state.vibrato.outputHeldUntilNextNote = false;
   const double previousSemitones = state.simulatedVibratoSemitones;
-  const bool startsImmediately = state.vibrato.sampleImmediatelyOnNote && state.vibrato.delayTicks == 0 &&
-                                 state.vibrato.delayMilliseconds.value_or(0.0) <= 0.0 &&
+  const bool startsImmediately = state.vibrato.sampleImmediatelyOnNote && state.vibrato.delay.ticks == 0 &&
+                                 state.vibrato.delay.milliseconds.value_or(0.0) <= 0.0 &&
                                  state.vibrato.cyclesPerTick.value_or(state.vibrato.frequencyHz) > 0.0 &&
                                  state.vibrato.depth > 0.0;
   state.simulatedVibratoSemitones =
@@ -998,6 +1017,12 @@ void restartSimulatedVibratoForNote(MidiTrack& track, RenderTrackState& state, u
 bool shouldRestartSimulatedVibratoForNote(const NotePerformanceEvent& note, const RenderTrackState& state) {
   return note.restartsVibratoLfoPhase.value_or(!note.extendsPrevious && note.restartsLfoPhase) &&
          state.vibrato.configured;
+}
+
+[[nodiscard]] bool releaseHeldLfoOutput(SimulatedLfoState& lfo) {
+  const bool wasHeld = lfo.outputHeldUntilNextNote;
+  lfo.outputHeldUntilNextNote = false;
+  return wasHeld;
 }
 
 // Source expression, pan-law compensation, and simulated tremolo all use MIDI
@@ -1049,10 +1074,16 @@ void flushSimulatedTremolo(MidiTrack& track, RenderTrackState& state, u64 upToTi
 
 void setSimulatedTremoloDepth(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, double depth,
                               RenderTrackState::TremoloDepthUnit unit, TremoloGainMode gainMode,
-                              const MidiExportOptions& options, ModulationConversionPolicy modulationConversion) {
+                              LfoZeroDepthBehavior zeroDepthBehavior, const MidiExportOptions& options,
+                              ModulationConversionPolicy modulationConversion) {
   state.tremolo.depth = std::max(0.0, depth);
   state.tremoloDepthUnit = unit;
   state.tremoloGainMode = gainMode;
+  state.tremolo.outputHeldUntilNextNote =
+      state.tremolo.depth <= 0.0 && zeroDepthBehavior == LfoZeroDepthBehavior::HoldOutputUntilNextNote;
+  if (state.tremolo.outputHeldUntilNextNote) {
+    return;
+  }
   const double gain = tremoloGainAtCurrentPhase(state);
   if (gain != state.simulatedTremoloGain) {
     state.simulatedTremoloGain = gain;
@@ -1067,15 +1098,16 @@ void restartSimulatedTremoloForNote(MidiTrack& track, RenderTrackState& state, u
   }
 
   const auto fallback =
-      !state.tremolo.waveform && state.tremoloDepthUnit == RenderTrackState::TremoloDepthUnit::LegacyUnipolar
+      !state.tremolo.shape && state.tremoloDepthUnit == RenderTrackState::TremoloDepthUnit::LegacyUnipolar
           ? LfoInitialPhaseFallback::UnipolarTremoloNominalGain
           : LfoInitialPhaseFallback::Zero;
   restartNoteLfo(state.tremolo, tick, fallback);
-  const bool delayed = state.tremolo.delayTicks != 0 || state.tremolo.delayMilliseconds.value_or(0.0) > 0.0;
+  state.tremolo.outputHeldUntilNextNote = false;
+  const bool delayed = state.tremolo.delay.ticks != 0 || state.tremolo.delay.milliseconds.value_or(0.0) > 0.0;
   const double gain = delayed ? 1.0 : tremoloGainAtCurrentPhase(state);
-  state.tremolo.producedSample =
-      !delayed && state.tremolo.sampleImmediatelyOnNote &&
-      state.tremolo.cyclesPerTick.value_or(state.tremolo.frequencyHz) > 0.0 && state.tremolo.depth > 0.0;
+  state.tremolo.producedSample = !delayed && state.tremolo.sampleImmediatelyOnNote &&
+                                 state.tremolo.cyclesPerTick.value_or(state.tremolo.frequencyHz) > 0.0 &&
+                                 state.tremolo.depth > 0.0;
   if (gain != state.simulatedTremoloGain) {
     state.simulatedTremoloGain = gain;
     addCombinedExpression(track, state, tick, channel, options, modulationConversion);
@@ -1169,10 +1201,16 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
             if (shouldRestartSimulatedVibratoForNote(typedEvent, state)) {
               restartSimulatedVibratoForNote(track, state, typedEvent.header.tick, channel);
+            } else if (releaseHeldLfoOutput(state.vibrato) && state.simulatedVibratoSemitones != 0.0) {
+              state.simulatedVibratoSemitones = 0.0;
+              addCurrentPitchBend(track, state, typedEvent.header.tick, channel, modulationConversion, false);
             }
             if (shouldRestartSimulatedTremoloForNote(typedEvent, state)) {
               restartSimulatedTremoloForNote(track, state, typedEvent.header.tick, channel, options,
                                              modulationConversion);
+            } else if (releaseHeldLfoOutput(state.tremolo) && state.simulatedTremoloGain != 1.0) {
+              state.simulatedTremoloGain = 1.0;
+              addCombinedExpression(track, state, typedEvent.header.tick, channel, options, modulationConversion);
             }
           }
           if (shouldRestartSimulatedPanForNote(typedEvent, state)) {
@@ -1300,7 +1338,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                                               modulationConversion);
         } else if constexpr (std::is_same_v<TypedEvent, VibratoDelayPerformanceEvent>) {
           setLfoDelay(state.vibrato, typedEvent.header.tick, typedEvent.delayTicks, typedEvent.milliseconds,
-                      typedEvent.tempoRelative);
+                      typedEvent.tempoRelative, typedEvent.updateMode);
           if (modulationConversion != ModulationConversionPolicy::SequenceEventSimulation) {
             track.events.push_back(VibratoDelay{
                 .tick = typedEvent.header.tick,
@@ -1312,7 +1350,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           const auto fallback = typedEvent.milliseconds ? LfoInitialPhaseFallback::Zero
                                                         : LfoInitialPhaseFallback::UnipolarTremoloNominalGain;
           setLfoDelay(state.tremolo, typedEvent.header.tick, typedEvent.delayTicks, typedEvent.milliseconds,
-                      typedEvent.tempoRelative, fallback);
+                      typedEvent.tempoRelative, typedEvent.updateMode, fallback);
           if (modulationConversion != ModulationConversionPolicy::SequenceEventSimulation) {
             track.events.push_back(TremoloDelay{
                 .tick = typedEvent.header.tick,
@@ -1370,13 +1408,15 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                 configureLfo(state.vibrato, typedEvent.header.tick, typedEvent);
                 setSimulatedVibratoDepth(
                     track, state, typedEvent.header.tick, channel,
-                    typedEvent.pitchDepthSemitones.value_or(std::clamp(typedEvent.amount, 0.0, 1.0) * 2.0));
+                    typedEvent.pitchDepthSemitones.value_or(std::clamp(typedEvent.amount, 0.0, 1.0) * 2.0),
+                    typedEvent.zeroDepthBehavior);
+                sampleRestartedVibrato(track, state, typedEvent, channel);
                 break;
               }
               case ModulationPerformanceTarget::TremoloDepth: {
                 const bool physicalDecibels = typedEvent.volumeDepthDecibels.has_value();
                 const bool physicalLinearGain = typedEvent.volumeDepthLinearGain.has_value();
-                const auto fallback = !typedEvent.waveform && !physicalDecibels && !physicalLinearGain
+                const auto fallback = !typedEvent.shape && !physicalDecibels && !physicalLinearGain
                                           ? LfoInitialPhaseFallback::UnipolarTremoloNominalGain
                                           : LfoInitialPhaseFallback::Zero;
                 configureLfo(state.tremolo, typedEvent.header.tick, typedEvent, fallback);
@@ -1384,12 +1424,12 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                                       ? RenderTrackState::TremoloDepthUnit::Decibels
                                       : (physicalLinearGain ? RenderTrackState::TremoloDepthUnit::LinearGain
                                                             : RenderTrackState::TremoloDepthUnit::LegacyUnipolar);
-                setSimulatedTremoloDepth(track, state, typedEvent.header.tick, channel,
-                                         physicalDecibels
-                                             ? *typedEvent.volumeDepthDecibels
-                                             : (physicalLinearGain ? *typedEvent.volumeDepthLinearGain
-                                                                   : std::clamp(typedEvent.amount, 0.0, 1.0) * 0.5),
-                                         unit, typedEvent.tremoloGainMode, options, modulationConversion);
+                setSimulatedTremoloDepth(
+                    track, state, typedEvent.header.tick, channel,
+                    physicalDecibels ? *typedEvent.volumeDepthDecibels
+                                     : (physicalLinearGain ? *typedEvent.volumeDepthLinearGain
+                                                           : std::clamp(typedEvent.amount, 0.0, 1.0) * 0.5),
+                    unit, typedEvent.tremoloGainMode, typedEvent.zeroDepthBehavior, options, modulationConversion);
                 break;
               }
               case ModulationPerformanceTarget::VibratoRate:
@@ -1400,8 +1440,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                 break;
               case ModulationPerformanceTarget::TremoloRate:
                 configureLfo(state.tremolo, typedEvent.header.tick, typedEvent,
-                             typedEvent.waveform ? LfoInitialPhaseFallback::Zero
-                                                 : LfoInitialPhaseFallback::UnipolarTremoloNominalGain);
+                             typedEvent.shape ? LfoInitialPhaseFallback::Zero
+                                              : LfoInitialPhaseFallback::UnipolarTremoloNominalGain);
                 break;
               case ModulationPerformanceTarget::PanDepth:
                 configureLfo(state.panLfo, typedEvent.header.tick, typedEvent);

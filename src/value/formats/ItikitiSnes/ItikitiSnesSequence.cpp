@@ -17,6 +17,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace vgmtrans::formats::itikiti_snes {
 
@@ -28,8 +29,14 @@ constexpr std::array<u8, 16> kMasterLengths{
     0xc0, 0x90, 0x60, 0x48, 0x40, 0x30, 0x24, 0x20, 0x18, 0x12, 0x10, 0x0c, 0x08, 0x06, 0x04, 0x03,
 };
 constexpr std::array<u8, 7> kDefaultLengths{0xc0, 0x60, 0x48, 0x30, 0x24, 0x18, 0x0c};
+constexpr std::array<u8, 8> kLfoSine{0x00, 0x32, 0x62, 0x8e, 0xb5, 0xd5, 0xed, 0xfb};
 constexpr double kTimer0Hz = 8000.0 / 0x27;
 constexpr u8 kDefaultMasterVolume = 0x18;
+
+enum class LfoTarget {
+  Pitch,
+  Gain,
+};
 
 namespace math {
 
@@ -74,10 +81,7 @@ namespace math {
 }
 
 [[nodiscard]] double lfoInitialPhase(LfoPolarity polarity, bool startsNegative = false) {
-  if (polarity == LfoPolarity::Bipolar) {
-    return startsNegative ? 0.5 : 0.0;
-  }
-  return polarity == LfoPolarity::Positive ? 0.75 : 0.25;
+  return polarity == LfoPolarity::Bipolar && startsNegative ? 0.5 : 0.0;
 }
 
 [[nodiscard]] ModulationRange vibratoRange(u8 depth, LfoPolarity polarity) {
@@ -92,6 +96,37 @@ namespace math {
 [[nodiscard]] double lfoFrequency(u8 interval, LfoPolarity polarity) {
   const double stepsPerCycle = polarity == LfoPolarity::Bipolar ? 32.0 : 16.0;
   return kTimer0Hz / (stepsPerCycle * ticks(interval));
+}
+
+[[nodiscard]] u8 lfoMagnitude(u8 depth, u32 quarterStep) {
+  return quarterStep == 8 ? depth : static_cast<u8>(kLfoSine[quarterStep] * depth / 256u);
+}
+
+[[nodiscard]] double normalizedLfoSample(u8 magnitude, u8 depth, bool negative, LfoTarget target) {
+  if (magnitude == 0 || depth == 0) {
+    return 0.0;
+  }
+  if (target == LfoTarget::Gain) {
+    const double value = magnitude / static_cast<double>(depth);
+    return negative ? -value / 2.0 : value;
+  }
+  if (negative) {
+    return -std::log2(1.0 - magnitude / 256.0) / std::log2(1.0 - depth / 256.0);
+  }
+  return std::log2(1.0 + magnitude / 128.0) / std::log2(1.0 + depth / 128.0);
+}
+
+[[nodiscard]] std::vector<double> lfoCycleSamples(u8 depth, LfoPolarity polarity, LfoTarget target) {
+  const u32 period = polarity == LfoPolarity::Bipolar ? 32 : 16;
+  std::vector<double> samples;
+  samples.reserve(period);
+  for (u32 step = 0; step < period; ++step) {
+    const u32 halfStep = step % 16;
+    const u32 quarterStep = halfStep <= 8 ? halfStep : 16 - halfStep;
+    const bool negative = polarity == LfoPolarity::Negative || (polarity == LfoPolarity::Bipolar && step >= 16);
+    samples.push_back(normalizedLfoSample(lfoMagnitude(depth, quarterStep), depth, negative, target));
+  }
+  return samples;
 }
 
 }  // namespace math
@@ -174,22 +209,33 @@ struct Playback {
     output.stereoBalance(gains.leftGain, gains.rightGain);
   }
 
-  [[nodiscard]] LfoPerformanceContext lfoContext(u8 delay, u8 interval, u8 rawDepth, bool restart) const {
+  [[nodiscard]] LfoPerformanceContext lfoContext(u8 delay, u8 interval, u8 rawDepth, LfoTarget target,
+                                                 bool restart) const {
     const LfoPolarity polarity = math::lfoPolarity(rawDepth);
     const bool startsNegative = polarity == LfoPolarity::Bipolar && program.globalLfo && (rawDepth & 0x40) != 0;
-    // $16ea walks a quarter-sine table. Raw bit 7 makes the sign alternate at
-    // each zero crossing; without it, bit 6 selects a single signed lobe. A
-    // note reset clears bit 6 in alternating mode, unless resets are disabled.
+    // The driver builds the waveform from the stepped quarter-sine table at
+    // $16e2. Bit 7 alternates between upward and downward pitch movement; when
+    // bit 7 is clear, bit 6 selects one direction only.
+    //
+    // An LFO command always moves the waveform back to its starting position.
+    // Normally it also begins the LFO delay again. Global-LFO mode preserves
+    // the delay already in progress, so only the waveform position is reset.
     return LfoPerformanceContext{
         .frequencyHz = math::lfoFrequency(interval, polarity),
         .delayTicks = delay,
         .delayIsTempoRelative = true,
-        .waveform = LfoWaveform::Sine,
+        .shape = LfoShape{
+            .waveform = LfoWaveform::Sine,
+            .samples = math::lfoCycleSamples(rawDepth & 0x3f, polarity, target),
+        },
         .polarity = polarity,
         .initialPhaseCycles = math::lfoInitialPhase(polarity, startsNegative),
-        .sampleImmediatelyOnNote = false,
-        .delayAppliesOnNoteRestartOnly = true,
-        .restartPhase = restart,
+        .noteRestartInitialPhaseCycles = 0.0,
+        .sampleImmediatelyOnNote = true,
+        .delayUpdateMode =
+            program.globalLfo ? LfoDelayUpdateMode::FutureNotesOnly : LfoDelayUpdateMode::CurrentAndFutureNotes,
+        .restartMode = !restart ? LfoRestartMode::None
+                                : (program.globalLfo ? LfoRestartMode::Phase : LfoRestartMode::PhaseAndDelay),
         .phaseRunsAtZeroDepth = false,
         .tremoloGainMode = TremoloGainMode::BipolarAroundNominal,
     };
@@ -237,7 +283,9 @@ struct Playback {
         .linearVelocity = 1.0,
         .durationTicks = length > 2 ? length - 2 : length,
         .restartsEnvelope = !glide,
-        .restartsLfoPhase = !program.globalLfo && !glide,
+        .restartsLfoPhase = false,
+        .restartsVibratoLfoPhase = !program.globalLfo,
+        .restartsTremoloLfoPhase = !program.globalLfo,
     };
 
     if (glide) {
@@ -375,40 +423,67 @@ struct Playback {
     track.vibratoInterval = interval;
     track.vibratoRawDepth = rawDepth;
     const u8 depth = rawDepth & 0x3f;
-    auto context = lfoContext(delay, interval, rawDepth, true);
+    auto context = lfoContext(delay, interval, rawDepth, LfoTarget::Pitch, true);
+    if (depth == 0 && program.globalLfo) {
+      context.zeroDepthBehavior = LfoZeroDepthBehavior::HoldOutputUntilNextNote;
+    }
     const ModulationRange range = math::vibratoRange(depth, math::lfoPolarity(rawDepth));
     context.pitchRangeSemitones = range;
     out.vibratoDepth(std::max(std::abs(range.minimum), std::abs(range.maximum)), context);
+    context.restartMode = LfoRestartMode::None;
     out.vibratoRate(*context.frequencyHz, context);
-    out.vibratoDelayTicks(delay);
+    out.vibratoDelay(VibratoDelayPerformanceEvent{
+        .delayTicks = delay,
+        .tempoRelative = true,
+        .updateMode =
+            program.globalLfo ? LfoDelayUpdateMode::FutureNotesOnly : LfoDelayUpdateMode::CurrentAndFutureNotes,
+    });
   }
 
   void vibratoOff() {
-    out.vibratoDepth(0.0, lfoContext(track.vibratoDelay, track.vibratoInterval, track.vibratoRawDepth, false));
+    auto context =
+        lfoContext(track.vibratoDelay, track.vibratoInterval, track.vibratoRawDepth, LfoTarget::Pitch, false);
+    // Vibrato-off stops producing new pitch changes, but it does not undo the
+    // pitch change currently being heard. The next note returns the pitch to
+    // its unmodulated value. This matches $0a26 and the depth-zero path at $08c5.
+    context.zeroDepthBehavior = LfoZeroDepthBehavior::HoldOutputUntilNextNote;
+    out.vibratoDepth(0.0, std::move(context));
   }
 
   void tremolo(u8 delay, u8 interval, u8 rawDepth) {
     track.tremoloDelay = delay;
     track.tremoloInterval = interval;
     track.tremoloRawDepth = rawDepth;
-    const auto context = lfoContext(delay, interval, rawDepth, true);
+    auto context = lfoContext(delay, interval, rawDepth, LfoTarget::Gain, true);
+    if ((rawDepth & 0x3f) == 0 && program.globalLfo) {
+      context.zeroDepthBehavior = LfoZeroDepthBehavior::HoldOutputUntilNextNote;
+    }
     out.tremoloLinearGainDepth((rawDepth & 0x3f) / 128.0, context);
+    context.restartMode = LfoRestartMode::None;
     out.tremoloRate(*context.frequencyHz, context);
-    out.tremoloDelayTicks(delay);
+    out.tremoloDelay(TremoloDelayPerformanceEvent{
+        .delayTicks = delay,
+        .tempoRelative = true,
+        .updateMode =
+            program.globalLfo ? LfoDelayUpdateMode::FutureNotesOnly : LfoDelayUpdateMode::CurrentAndFutureNotes,
+    });
   }
 
   void tremoloOff() {
-    out.tremoloLinearGainDepth(0.0,
-                               lfoContext(track.tremoloDelay, track.tremoloInterval, track.tremoloRawDepth, false));
+    auto context = lfoContext(track.tremoloDelay, track.tremoloInterval, track.tremoloRawDepth, LfoTarget::Gain, false);
+    // Tremolo-off stops producing new volume changes, but it leaves the current
+    // volume change in place until the next note. This matches $0a49.
+    context.zeroDepthBehavior = LfoZeroDepthBehavior::HoldOutputUntilNextNote;
+    out.tremoloLinearGainDepth(0.0, std::move(context));
   }
 
   void panLfo(u8 halfPeriod, u8 excursion) {
     const u32 period = math::ticks(halfPeriod);
     LfoPerformanceContext context{
         .cyclesPerTick = 1.0 / (4.0 * period),
-        .waveform = LfoWaveform::Triangle,
+        .shape = LfoShape{.waveform = LfoWaveform::Triangle},
         .initialPhaseCycles = 0.0,
-        .restartPhase = true,
+        .restartMode = LfoRestartMode::Phase,
     };
     out.panLfoDepth(std::min(1.0, excursion / 128.0), context);
     out.panLfoRateCyclesPerTick(*context.cyclesPerTick, context);

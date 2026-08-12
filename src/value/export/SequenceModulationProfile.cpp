@@ -98,23 +98,27 @@ template <class Convert>
       std::clamp<s32>(static_cast<s32>(std::lround(std::clamp(normalized, 0.0, 1.0) * 127.0)), 0, 127));
 }
 
+[[nodiscard]] std::optional<LfoWaveform> standardWaveform(const ModulationPerformanceEvent& event) {
+  return event.shape ? std::optional{event.shape->waveform} : std::nullopt;
+}
+
 void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& vibrato, LfoObservation& tremolo,
                        LfoObservation& pan) {
   switch (event.target) {
     case ModulationPerformanceTarget::VibratoDepth:
-      vibrato.observeWaveform(event.waveform);
+      vibrato.observeWaveform(standardWaveform(event));
       if (event.pitchDepthSemitones) {
         vibrato.maxDepth = std::max(vibrato.maxDepth, std::abs(*event.pitchDepthSemitones) * 100.0);
       }
       break;
     case ModulationPerformanceTarget::VibratoRate:
-      vibrato.observeWaveform(event.waveform);
+      vibrato.observeWaveform(standardWaveform(event));
       if (event.frequencyHz) {
         vibrato.rate.observe(*event.frequencyHz);
       }
       break;
     case ModulationPerformanceTarget::TremoloDepth:
-      tremolo.observeWaveform(event.waveform);
+      tremolo.observeWaveform(standardWaveform(event));
       if (event.volumeDepthDecibels) {
         tremolo.maxDepth = std::max(tremolo.maxDepth, std::abs(*event.volumeDepthDecibels));
         if (std::abs(*event.volumeDepthDecibels) > 0.0) {
@@ -129,7 +133,7 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
       }
       break;
     case ModulationPerformanceTarget::TremoloRate:
-      tremolo.observeWaveform(event.waveform);
+      tremolo.observeWaveform(standardWaveform(event));
       if (event.frequencyHz) {
         tremolo.rate.observe(*event.frequencyHz);
       }

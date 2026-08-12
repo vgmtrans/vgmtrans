@@ -31,6 +31,8 @@ struct TrackModulationState {
   std::optional<ModulationPerformanceEvent> panRate;
   std::optional<u32> vibratoDelayTicks;
   std::optional<u32> tremoloDelayTicks;
+  LfoDelayUpdateMode vibratoDelayUpdateMode = LfoDelayUpdateMode::CurrentAndFutureNotes;
+  LfoDelayUpdateMode tremoloDelayUpdateMode = LfoDelayUpdateMode::CurrentAndFutureNotes;
 };
 
 [[nodiscard]] double tickSeconds(const PerformanceSequence& performance, u32 microsecondsPerQuarter) {
@@ -185,6 +187,7 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
               .delayTicks = *trackState.vibratoDelayTicks,
               .milliseconds = delayMilliseconds(*trackState.vibratoDelayTicks, secondsPerTick),
               .tempoRelative = true,
+              .updateMode = trackState.vibratoDelayUpdateMode,
           });
         }
         if (trackState.tremoloDelayTicks) {
@@ -193,6 +196,7 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
               .delayTicks = *trackState.tremoloDelayTicks,
               .milliseconds = delayMilliseconds(*trackState.tremoloDelayTicks, secondsPerTick),
               .tempoRelative = true,
+              .updateMode = trackState.tremoloDelayUpdateMode,
           });
         }
       }
@@ -215,6 +219,7 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
       if (delay->tempoRelative) {
         delay->milliseconds = delayMilliseconds(delay->delayTicks, secondsPerTick);
         state.vibratoDelayTicks = delay->delayTicks;
+        state.vibratoDelayUpdateMode = delay->updateMode;
       } else {
         state.vibratoDelayTicks.reset();
       }
@@ -225,6 +230,7 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
       if (delay->tempoRelative) {
         delay->milliseconds = delayMilliseconds(delay->delayTicks, secondsPerTick);
         state.tremoloDelayTicks = delay->delayTicks;
+        state.tremoloDelayUpdateMode = delay->updateMode;
       } else {
         state.tremoloDelayTicks.reset();
       }

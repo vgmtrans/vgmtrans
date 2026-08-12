@@ -1124,7 +1124,7 @@ private:
 
   [[nodiscard]] LfoPerformanceContext vibratoLfoContext() const {
     return LfoPerformanceContext{
-        .waveform = LfoWaveform::Triangle,
+        .shape = LfoShape{.waveform = LfoWaveform::Triangle},
         // The source phase resets to zero on a note. A phase step above $80
         // traverses that same triangle backward, so it starts center/falling.
         .initialPhaseCycles = vibrato::usesEarlyCounter(track.version) && track.vibratoPhaseStep > 0x80 ? 0.5 : 0.0,

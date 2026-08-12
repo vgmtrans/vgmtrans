@@ -90,7 +90,7 @@ namespace math {
       .cyclesPerTick = cycles,
       .delayTicks = delay,
       .delayIsTempoRelative = true,
-      .waveform = LfoWaveform::Triangle,
+      .shape = LfoShape{.waveform = LfoWaveform::Triangle},
       .initialPhaseCycles = initialPhase,
   };
 }
@@ -122,7 +122,7 @@ struct TremoloLfo {
       .cyclesPerTick = cycles,
       .delayTicks = delay,
       .delayIsTempoRelative = true,
-      .waveform = folded ? LfoWaveform::SawtoothDown : LfoWaveform::Triangle,
+      .shape = LfoShape{.waveform = folded ? LfoWaveform::SawtoothDown : LfoWaveform::Triangle},
       .polarity = LfoPolarity::Negative,
       .initialPhaseCycles = folded ? 0.0 : 0.25,
       .sampleImmediatelyOnNote = true,

@@ -123,7 +123,7 @@ struct Playback {
         .frequencyHz = lfoFrequencyHz(),
         .delayTicks = lfoDelayTicks(),
         .delayMilliseconds = lfoDelayMilliseconds(),
-        .waveform = LfoWaveform::Sine,
+        .shape = LfoShape{.waveform = LfoWaveform::Sine},
         .phaseRunsAtZeroDepth = true,
     };
   }

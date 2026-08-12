@@ -135,7 +135,7 @@ struct StereoBalance {
 
 [[nodiscard]] LfoPerformanceContext vibratoLfoContext() {
   return LfoPerformanceContext{
-      .waveform = LfoWaveform::Triangle,
+      .shape = LfoShape{.waveform = LfoWaveform::Triangle},
       .initialPhaseCycles = 0.0,
       .phaseRunsAtZeroDepth = true,
   };
@@ -143,7 +143,7 @@ struct StereoBalance {
 
 [[nodiscard]] LfoPerformanceContext tremoloLfoContext() {
   return LfoPerformanceContext{
-      .waveform = LfoWaveform::Triangle,
+      .shape = LfoShape{.waveform = LfoWaveform::Triangle},
       // Capcom folds the shared phase so tremolo starts at its deepest
       // attenuation and then rises toward nominal gain.
       .initialPhaseCycles = 0.75,

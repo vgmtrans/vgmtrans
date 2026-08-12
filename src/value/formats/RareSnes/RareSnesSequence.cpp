@@ -757,7 +757,7 @@ struct Playback {
         .delayTicks =
             delayUpdates == 0 ? std::optional<u32>{0} : std::optional<u32>{timelineTicks(delayUpdates, program.tempo)},
         .delayMilliseconds = delayUpdates * program.timer * kTimerQuantumSeconds * 1000.0,
-        .waveform = LfoWaveform::Triangle,
+        .shape = LfoShape{.waveform = LfoWaveform::Triangle},
         .initialPhaseCycles = 0.0,
         .sampleImmediatelyOnNote = false,
         .tremoloGainMode = TremoloGainMode::BipolarAroundNominal,
