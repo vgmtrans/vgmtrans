@@ -46,6 +46,14 @@ target_link_libraries(vgmtrans-hudson-snes-tests PRIVATE vgmtransvalueformats vg
 target_compile_features(vgmtrans-hudson-snes-tests PRIVATE cxx_std_20)
 add_test(NAME vgmtrans-hudson-snes-tests COMMAND vgmtrans-hudson-snes-tests)
 
+add_executable(vgmtrans-chun-snes-tests
+  formats/ChunSnesModuleTests.cpp
+  formats/ChunSnesTestMain.cpp
+)
+target_link_libraries(vgmtrans-chun-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
+target_compile_features(vgmtrans-chun-snes-tests PRIVATE cxx_std_20)
+add_test(NAME vgmtrans-chun-snes-tests COMMAND vgmtrans-chun-snes-tests)
+
 add_executable(vgmtrans-wolf-team-snes-tests
   formats/WolfTeamSnesModuleTests.cpp
   formats/WolfTeamSnesTestMain.cpp

@@ -250,6 +250,10 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/ChunSnes/ChunSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/ChunSnes/ChunSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/ChunSnes/ChunSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/ChunSnes/ChunSnesSynth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/CpsLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/CpsModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/CpsSequence.cpp
@@ -315,6 +319,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/Akao.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/ChunSnes/ChunSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/Cps.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/HudsonSnes/HudsonSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcade.h
