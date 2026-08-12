@@ -599,7 +599,7 @@ void mp2kSongSelectLiteralsFindSparseTableAndRespectPlayerCapacity() {
   ScanResultBuilder result(input, "MP2k");
   const auto layouts = findMp2kLayouts(result);
   expect(layouts.size() == 1 && layouts.front().engine.songTableOffset == 0xd0c && layouts.front().songs.size() == 1 &&
-             layouts.front().songs.front().index == 42 && layouts.front().songs.front().trackCount == 1,
+             layouts.front().songs.front().index == 42 && layouts.front().songs.front().activeTracks == 1,
          "SongNumStart literals should expose sparse IDs and MPlayStart should cap tracks to the selected player");
 }
 
