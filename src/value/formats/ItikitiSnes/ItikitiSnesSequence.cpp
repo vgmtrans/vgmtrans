@@ -28,7 +28,7 @@ constexpr std::array<u8, 16> kMasterLengths{
     0xc0, 0x90, 0x60, 0x48, 0x40, 0x30, 0x24, 0x20, 0x18, 0x12, 0x10, 0x0c, 0x08, 0x06, 0x04, 0x03,
 };
 constexpr std::array<u8, 7> kDefaultLengths{0xc0, 0x60, 0x48, 0x30, 0x24, 0x18, 0x0c};
-constexpr double kLfoClockHz = 31.25;
+constexpr double kTimer0Hz = 8000.0 / 0x27;
 constexpr u8 kDefaultMasterVolume = 0x18;
 
 namespace math {
@@ -66,14 +66,32 @@ namespace math {
   return 1200.0 * std::log2(1.0 + raw / 2048.0);
 }
 
-[[nodiscard]] ModulationRange vibratoRange(u8 depth, bool positiveOnly) {
-  const double upward = 12.0 * std::log2(1.0 + depth / 128.0);
-  const double downward = positiveOnly ? 0.0 : 12.0 * std::log2(1.0 - depth / 256.0);
-  return {.minimum = downward, .maximum = upward};
+[[nodiscard]] LfoPolarity lfoPolarity(u8 rawDepth) {
+  if ((rawDepth & 0x80) != 0) {
+    return LfoPolarity::Bipolar;
+  }
+  return (rawDepth & 0x40) != 0 ? LfoPolarity::Negative : LfoPolarity::Positive;
 }
 
-[[nodiscard]] double lfoFrequency(u8 interval) {
-  return kLfoClockHz / (32.0 * ticks(interval));
+[[nodiscard]] double lfoInitialPhase(LfoPolarity polarity, bool startsNegative = false) {
+  if (polarity == LfoPolarity::Bipolar) {
+    return startsNegative ? 0.5 : 0.0;
+  }
+  return polarity == LfoPolarity::Positive ? 0.75 : 0.25;
+}
+
+[[nodiscard]] ModulationRange vibratoRange(u8 depth, LfoPolarity polarity) {
+  const double upward = 12.0 * std::log2(1.0 + depth / 128.0);
+  const double downward = 12.0 * std::log2(1.0 - depth / 256.0);
+  return {
+      .minimum = polarity == LfoPolarity::Positive ? 0.0 : downward,
+      .maximum = polarity == LfoPolarity::Negative ? 0.0 : upward,
+  };
+}
+
+[[nodiscard]] double lfoFrequency(u8 interval, LfoPolarity polarity) {
+  const double stepsPerCycle = polarity == LfoPolarity::Bipolar ? 32.0 : 16.0;
+  return kTimer0Hz / (stepsPerCycle * ticks(interval));
 }
 
 }  // namespace math
@@ -130,8 +148,10 @@ struct TrackState {
 
   u8 vibratoDelay = 0;
   u8 vibratoInterval = 0;
+  u8 vibratoRawDepth = 0;
   u8 tremoloDelay = 0;
   u8 tremoloInterval = 0;
+  u8 tremoloRawDepth = 0;
 
   std::array<RepeatFrame, 4> repeats;
   u8 repeatDepth = 0;
@@ -154,17 +174,19 @@ struct Playback {
     output.stereoBalance(gains.leftGain, gains.rightGain);
   }
 
-  [[nodiscard]] LfoPerformanceContext lfoContext(u8 delay, u8 interval, u8 depth, bool restart) const {
-    const bool positiveOnly = (depth & 0x80) != 0;
-    // Bit 7 folds the negative lobe upward: the resulting oscillator starts
-    // at zero and completes a cycle in half the ordinary time.
+  [[nodiscard]] LfoPerformanceContext lfoContext(u8 delay, u8 interval, u8 rawDepth, bool restart) const {
+    const LfoPolarity polarity = math::lfoPolarity(rawDepth);
+    const bool startsNegative = polarity == LfoPolarity::Bipolar && program.globalLfo && (rawDepth & 0x40) != 0;
+    // $16ea walks a quarter-sine table. Raw bit 7 makes the sign alternate at
+    // each zero crossing; without it, bit 6 selects a single signed lobe. A
+    // note reset clears bit 6 in alternating mode, unless resets are disabled.
     return LfoPerformanceContext{
-        .frequencyHz = math::lfoFrequency(interval) * (positiveOnly ? 2.0 : 1.0),
+        .frequencyHz = math::lfoFrequency(interval, polarity),
         .delayTicks = delay,
         .delayIsTempoRelative = true,
-        .waveform = LfoWaveform::Triangle,
-        .polarity = positiveOnly ? std::optional{LfoPolarity::Positive} : std::nullopt,
-        .initialPhaseCycles = positiveOnly ? 0.75 : ((depth & 0x40) != 0 ? 0.5 : 0.0),
+        .waveform = LfoWaveform::Sine,
+        .polarity = polarity,
+        .initialPhaseCycles = math::lfoInitialPhase(polarity, startsNegative),
         .sampleImmediatelyOnNote = false,
         .delayAppliesOnNoteRestartOnly = true,
         .restartPhase = restart,
@@ -351,20 +373,24 @@ struct Playback {
   void vibrato(u8 delay, u8 interval, u8 rawDepth) {
     track.vibratoDelay = delay;
     track.vibratoInterval = interval;
+    track.vibratoRawDepth = rawDepth;
     const u8 depth = rawDepth & 0x3f;
     auto context = lfoContext(delay, interval, rawDepth, true);
-    const ModulationRange range = math::vibratoRange(depth, (rawDepth & 0x80) != 0);
+    const ModulationRange range = math::vibratoRange(depth, math::lfoPolarity(rawDepth));
     context.pitchRangeSemitones = range;
     out.vibratoDepth(std::max(std::abs(range.minimum), std::abs(range.maximum)), context);
     out.vibratoRate(*context.frequencyHz, context);
     out.vibratoDelayTicks(delay);
   }
 
-  void vibratoOff() { out.vibratoDepth(0.0, lfoContext(track.vibratoDelay, track.vibratoInterval, 0, false)); }
+  void vibratoOff() {
+    out.vibratoDepth(0.0, lfoContext(track.vibratoDelay, track.vibratoInterval, track.vibratoRawDepth, false));
+  }
 
   void tremolo(u8 delay, u8 interval, u8 rawDepth) {
     track.tremoloDelay = delay;
     track.tremoloInterval = interval;
+    track.tremoloRawDepth = rawDepth;
     const auto context = lfoContext(delay, interval, rawDepth, true);
     out.tremoloLinearGainDepth((rawDepth & 0x3f) / 128.0, context);
     out.tremoloRate(*context.frequencyHz, context);
@@ -372,7 +398,8 @@ struct Playback {
   }
 
   void tremoloOff() {
-    out.tremoloLinearGainDepth(0.0, lfoContext(track.tremoloDelay, track.tremoloInterval, 0, false));
+    out.tremoloLinearGainDepth(0.0,
+                               lfoContext(track.tremoloDelay, track.tremoloInterval, track.tremoloRawDepth, false));
   }
 
   void panLfo(u8 halfPeriod, u8 excursion) {
