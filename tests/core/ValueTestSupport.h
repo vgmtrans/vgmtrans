@@ -585,6 +585,12 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
                   .range = input.reader.range(0, input.reader.size()),
               },
       }},
+      .matchFacts = {MatchFact{
+          .asset = assetId,
+          .format = "ProbeBadFact",
+          .scope = MatchScope{.kind = MatchScopeKind::Source, .source = SourceId{99}},
+          .payload = IdMatchFact{.domain = "probe.bad", .value = 2},
+      }},
       .sourceMap = SourceMap{{SourceAnnotation{
           .id = input.ids.nextSourceAnnotationId(),
           .range = input.reader.range(0, input.reader.size()),
@@ -592,12 +598,6 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
           .label = "Bad source fact",
           .owner = ObjectRefs::misc(assetId),
       }}},
-      .matchFacts = {MatchFact{
-          .asset = assetId,
-          .format = "ProbeBadFact",
-          .scope = MatchScope{.kind = MatchScopeKind::Source, .source = SourceId{99}},
-          .payload = IdMatchFact{.domain = "probe.bad", .value = 2},
-      }},
   };
 }
 

@@ -109,8 +109,8 @@ FormatDefinition sonyPs1Definition() {
           FormatModule{
               .name = std::string(kSonyPs1FormatName),
               .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
-              .collectionResolverId = std::string(kSonyPs1CollectionResolver),
               .scan = scanSonyPs1,
+              .collectionResolverId = std::string(kSonyPs1CollectionResolver),
               .resolveCollections = resolveSonyPs1Collections,
               .prepareCollection = prepareSonyPs1Collection,
           },

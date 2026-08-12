@@ -187,8 +187,8 @@ FormatDefinition segSatDefinition() {
       .module =
           FormatModule{
               .name = std::string(kSegSatFormatName),
-              .collectionResolverId = std::string(kSegSatCollectionResolver),
               .scan = scanSegSat,
+              .collectionResolverId = std::string(kSegSatCollectionResolver),
               .prepareCollection = prepareSegSatCollection,
           },
       .sequenceDialects = {segSatSequenceDialect()},
