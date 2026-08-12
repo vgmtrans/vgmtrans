@@ -561,6 +561,14 @@ void appendSourceEvents(std::vector<PerformanceEvent>& events, const Performance
         continue;
       }
     }
+    const bool nativePortamentoEvent =
+        std::holds_alternative<PortamentoPerformanceEvent>(event) ||
+        std::holds_alternative<PortamentoEnablePerformanceEvent>(event) ||
+        std::holds_alternative<PortamentoTimePerformanceEvent>(event) ||
+        std::holds_alternative<PortamentoControlPerformanceEvent>(event);
+    if (nativePortamentoEvent && !renderPortamentoSettings) {
+      continue;
+    }
     if (const auto* settings = std::get_if<PitchTransitionSettingsPerformanceEvent>(&event)) {
       if (renderPortamentoSettings) {
         events.emplace_back(PortamentoPerformanceEvent{

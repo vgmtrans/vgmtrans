@@ -45,6 +45,8 @@ constexpr size_t kPercussionBase = kAdsrBase + 128;
 constexpr size_t kDescriptorBase = kPercussionBase + 30 * 2;
 constexpr size_t kDescriptorStride = 256 * 2;
 constexpr size_t kPayloadBase = kDescriptorBase + static_cast<size_t>(Table::Count) * kDescriptorStride;
+constexpr u32 kEchoCapable = 1u << 0;
+constexpr u32 kStereoEnabled = 1u << 1;
 
 [[nodiscard]] size_t descriptor(Table table, u8 index) {
   return kDescriptorBase + static_cast<size_t>(table) * kDescriptorStride + index * 2u;
@@ -179,6 +181,14 @@ namespace math {
   return 49'152'000u / (tempo == 0 ? 256u : tempo);
 }
 
+[[nodiscard]] u32 driverFrames(u32 sourceTicks, u8 tempo, u8 accumulator) {
+  if (tempo == 0) {
+    return sourceTicks;
+  }
+  const u64 distance = static_cast<u64>(sourceTicks) * 0x100u - accumulator;
+  return static_cast<u32>((distance + tempo - 1u) / tempo);
+}
+
 [[nodiscard]] double volumeGain(u8 volume, u8 envelope) {
   const u8 logical = envelope == 0xff ? volume : static_cast<u8>((volume * (envelope + 1u)) >> 5);
   return kVolumeTable[std::min<u8>(logical, 31)] / 127.0;
@@ -293,7 +303,7 @@ struct CurveState {
 
 struct ProgramState {
   explicit ProgramState(const SequenceProgram& sequence)
-      : data(&sequence.config.driverData), echoCapable((sequence.config.driverState & 1u) != 0) {
+      : data(&sequence.config.driverData), echoCapable((sequence.config.driverState & kEchoCapable) != 0) {
     const auto preset = table(*data, Table::Echo, 0);
     if (preset.size() >= 16) {
       echo.delayMilliseconds = (preset[1] & 0x0f) * 16.0;
@@ -313,7 +323,8 @@ struct ProgramState {
 
 struct TrackState {
   TrackState(const SequenceProgram& sequence, const TrackProgram& source)
-      : trackNumber(source.sourceTrackNumber), early(sequence.config.profile <= static_cast<u32>(Version::JakiCrush)) {
+      : trackNumber(source.sourceTrackNumber), early(sequence.config.profile <= static_cast<u32>(Version::JakiCrush)),
+        stereoEnabled((sequence.config.driverState & kStereoEnabled) != 0) {
     const auto& data = source.config.driverData;
     const auto at = [&](size_t index) { return index < data.size() ? data[index] : 0u; };
     channel = static_cast<u8>(at(0));
@@ -327,13 +338,14 @@ struct TrackState {
     branchId = static_cast<u8>(at(7));
     program = static_cast<u8>(at(8));
     adsr = static_cast<u8>(at(9));
-    pan = static_cast<s8>(at(10));
+    pan = stereoEnabled ? static_cast<s8>(at(10)) : 0;
     slur = (headerFlags & 0x10) != 0;
   }
 
   u32 trackNumber = 0;
   u8 channel = 0;
   bool early = false;
+  bool stereoEnabled = false;
   u8 headerFlags = 0;
   u8 volume = 31;
   s8 transpose = 0;
@@ -350,9 +362,9 @@ struct TrackState {
   u64 activeUntil = 0;
   bool slur = false;
   u8 portamentoFrames = 0;
+  bool retriggerNextNote = false;
   s16 tuning = 0;
   s8 pitchSweep = 0;
-  s16 pitchSweepValue = 0;
   std::array<u8, 256> loops{};
   CurveState volumeEnvelope;
   CurveState vibrato;
@@ -401,14 +413,18 @@ struct Playback {
 
   [[nodiscard]] u32 patch(u8 srcn) const { return srcn < 64 ? data()[kPatchBase + srcn] : 0; }
 
-  [[nodiscard]] u16 basePitch(u8 rawNote) const {
+  [[nodiscard]] u16 pitchForSequenceNote(u8 note) const {
     const u32 patchData = patch(track.program);
     const s8 patchTranspose = static_cast<s8>(patchData & 0xff);
     const u8 pitchIndex = static_cast<u8>((patchData >> 8) & 0xff);
-    const int key = rawNote + track.transpose + patchTranspose;
+    const u8 key = static_cast<u8>(note + patchTranspose);
     const auto pitches = table(data(), Table::Pitch, pitchIndex);
-    return key > 0 && key < 0x79 && static_cast<size_t>(key) < pitches.size() ? static_cast<u16>(pitches[key]) : 0;
+    return key > 0 && key < 0x79 && key < pitches.size() ? static_cast<u16>(pitches[key]) : 0;
   }
+
+  [[nodiscard]] u8 sequenceNote(u8 rawNote) const { return static_cast<u8>(rawNote + track.transpose); }
+
+  [[nodiscard]] u16 basePitch(u8 rawNote) const { return pitchForSequenceNote(sequenceNote(rawNote)); }
 
   [[nodiscard]] double patchUnity() const {
     const u32 patchData = patch(track.program);
@@ -429,10 +445,12 @@ struct Playback {
     return nearest - patchTranspose - (pitch == 0 ? 0.0 : 12.0 * std::log2(pitch / 4096.0));
   }
 
-  [[nodiscard]] double noteKey(u8 rawNote) const {
-    const u16 pitch = basePitch(rawNote);
+  [[nodiscard]] double keyForSequenceNote(u8 note) const {
+    const u16 pitch = pitchForSequenceNote(note);
     return pitch == 0 ? 0.0 : patchUnity() + 12.0 * std::log2(pitch / 4096.0);
   }
+
+  [[nodiscard]] double noteKey(u8 rawNote) const { return keyForSequenceNote(sequenceNote(rawNote)); }
 
   void emitLevel() const {
     const u8 envelope = track.volumeEnvelope.index == 0 ? 0xff : track.volumeEnvelope.value;
@@ -446,8 +464,7 @@ struct Playback {
 
   void emitPitch() const {
     const u16 pitch = basePitch(track.rawNote);
-    out.pitchBend(
-        math::pitchSemitones(pitch, track.tuning + track.pitchSweepValue + static_cast<s8>(track.vibrato.value)));
+    out.pitchBend(math::pitchSemitones(pitch, track.tuning + static_cast<s8>(track.vibrato.value)));
   }
 
   void setAdsr(u8 index) {
@@ -493,13 +510,19 @@ struct Playback {
 
   void pan(s8 value) {
     track.panEnvelopeActive = false;
-    track.pan = value;
+    track.pan = track.stereoEnabled ? value : 0;
     emitPan();
   }
 
   void panEnvelope(u8 index, s8 direct) {
     if (index == 0) {
       pan(direct);
+      return;
+    }
+    if (!track.stereoEnabled) {
+      track.panEnvelopeActive = false;
+      track.pan = 0;
+      emitPan();
       return;
     }
     const auto packed = table(data(), Table::Pan, index);
@@ -539,14 +562,24 @@ struct Playback {
     slur((value & 0x10) != 0);
   }
   void stereoPhase(u8 value) {
+    if (!track.stereoEnabled) {
+      return;
+    }
     track.stereoPhase = value & 3;
     emitPan();
   }
   void gate(u8 value) { track.gate = value; }
   void portamento(u8 frames) {
     track.portamentoFrames = frames;
+    if (frames != 0) {
+      // The driver clears $0540+x here. The first following note therefore
+      // keys on normally; only later notes glide from the preceding pitch.
+      track.retriggerNextNote = true;
+    }
     out.portamentoEnable(frames != 0);
-    out.portamentoTime(frames * 16.0);
+    if (frames != 0) {
+      out.pitchTransitionSettings(frames * 16.0);
+    }
   }
   void slur(bool enabled) {
     track.slur = enabled;
@@ -568,13 +601,13 @@ struct Playback {
       return Effects::wait(length);
     }
     track.rawNote = raw;
-    track.pitchSweepValue = 0;
     track.volumeEnvelope.counter = 1;
     track.volumeEnvelope.position = -1;
     track.vibrato.counter = 1;
     track.vibrato.position = -1;
     track.gainEnvelope.counter = 1;
     track.gainEnvelope.position = -1;
+    const bool startsFresh = std::exchange(track.retriggerNextNote, false);
     const double key = noteKey(raw);
     if (key == 0.0) {
       return Effects::wait(length);
@@ -583,25 +616,44 @@ struct Playback {
     track.activeUntil = vm.tick() + sounding;
     const PerformanceNoteId previous = track.lastNote;
     const std::optional<double> previousKey = track.lastKey;
+    const bool continuesVoice = track.slur && previous.valid() && !startsFresh;
     NotePerformanceEvent event{
         .key = key,
         .linearVelocity = 1.0,
         .durationTicks = sounding,
-        .restartsEnvelope = !track.slur,
+        .restartsEnvelope = !continuesVoice,
         .restartsLfoPhase = true,
     };
-    if (track.slur && previous.valid()) {
+    if (continuesVoice) {
       static_cast<void>(out.setNoteEnd(previous, vm.tick()));
       track.lastNote = out.continueVoice(previous, event);
     } else {
+      if (startsFresh && previous.valid()) {
+        static_cast<void>(out.setNoteEnd(previous, vm.tick()));
+      }
       track.lastNote = out.note(std::move(event));
     }
-    if (track.portamentoFrames != 0 && previous.valid() && previousKey) {
+    if (track.portamentoFrames != 0 && continuesVoice && previousKey) {
       const u32 slideTicks =
           std::max<u32>(1, (track.portamentoFrames * (track.tempo == 0 ? 256u : track.tempo) + 255) / 256);
       out.pitchSlide(track.lastNote, *previousKey, key, slideTicks).continueFrom(previous).preferPortamento();
     }
     track.lastKey = key;
+    if (track.pitchSweep != 0) {
+      const int step = static_cast<u8>(track.pitchSweep) & 0x7f;
+      const u32 frames = math::driverFrames(length, track.tempo, track.tempoAccumulator);
+      const int targetNote = sequenceNote(raw) + (track.pitchSweep < 0 ? step : -step) * static_cast<int>(frames);
+      if (targetNote > 0 && targetNote < 0x79) {
+        const double targetKey = keyForSequenceNote(static_cast<u8>(targetNote));
+        if (targetKey != 0.0) {
+          auto slide = out.pitchSlide(track.lastNote, key, targetKey, length);
+          slide.preferPitchBend();
+          if (continuesVoice) {
+            slide.continueFrom(previous);
+          }
+        }
+      }
+    }
     emitPitch();
     return Effects::wait(length);
   }
@@ -774,11 +826,6 @@ struct Playback {
           levelChanged = true;
           track.volumeSweepActive = track.volume != track.volumeTarget;
         }
-      }
-      if (track.pitchSweep != 0) {
-        const int magnitude = track.pitchSweep < 0 ? -(track.pitchSweep & 0x7f) : track.pitchSweep;
-        track.pitchSweepValue = static_cast<s16>(track.pitchSweepValue - magnitude);
-        pitchChanged = true;
       }
     }
     if (levelChanged) {
@@ -1252,7 +1299,8 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   SequenceProgram program = sequence.finish();
   program.sourceBaseAddress = Address{layout.songHeaderAddress};
   program.config.profile = static_cast<u32>(layout.version);
-  program.config.driverState = layout.hasEchoCommands() ? 1 : 0;
+  program.config.driverState =
+      (layout.hasEchoCommands() ? kEchoCapable : 0) | (layout.stereoEnabled ? kStereoEnabled : 0);
   program.config.driverData = runtimeData(reader, layout, references);
   for (u32 track = 0; track < count && track < program.tracks.size(); ++track) {
     const u32 item = layout.songHeaderAddress + 1 + track * 14u;

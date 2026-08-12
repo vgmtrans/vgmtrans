@@ -414,6 +414,11 @@ void performanceMidiRendererWritesPanGainResetWhenRequested() {
                       .leftGain = 0.7071067811865476,
                       .rightGain = 0.7071067811865476,
                   },
+                  StereoBalancePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 24},
+                      .leftGain = 0.5,
+                      .rightGain = -0.5,
+                  },
               },
       }},
   };
@@ -424,6 +429,8 @@ void performanceMidiRendererWritesPanGainResetWhenRequested() {
          "pan gain compensation should emit expression with the pan event");
   expect(std::get<Pan>(events[3]).value == 64 && std::get<Expression>(events[4]).value == 127,
          "full-gain compensated pan should reset expression to full scale");
+  expect(std::get<Pan>(events[5]).value == 64 && std::get<Expression>(events[6]).value == 107,
+         "MIDI pan lowering should preserve a phase-inverted channel's magnitude");
 }
 
 void performanceMidiRendererCombinesExpressionWithPanGain() {

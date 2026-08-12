@@ -6,6 +6,7 @@
 
 #include "value/formats/CompileSnes/CompileSnes.h"
 
+#include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 
@@ -67,6 +68,7 @@ std::vector<u8> fixture(std::initializer_list<u8> score = {
                             0x82,
                         }) {
   std::vector<u8> bytes(kAramSize);
+  bytes[1] = 4;
   writeBytes(bytes, 0x00fc, {0x28, 0x0c});
   writeBytes(bytes, 0x0100, {0xe5, 0x00, 0x18, 0xc4, 0x50, 0xe5, 0x01, 0x18, 0xc4, 0x51, 0xe5, 0x02, 0x18, 0xc4, 0x52,
                              0x60, 0x88, 0x11, 0xc4, 0x54, 0xe5, 0x03, 0x18, 0xc4, 0x53, 0x88, 0x00, 0xc4, 0x55});
@@ -134,7 +136,7 @@ void layoutAndModuleUseLiveSongState() {
   const auto layout = findLayout(ByteReader(SourceId{302}, bytes));
   expect(layout && layout->version == Version::SuperPuyo && layout->engineHeaderAddress == 0x1800 &&
              layout->songIndex == 1 && layout->songHeaderAddress == 0x2100 &&
-             layout->regularPitchTableAddress == 0x3400 && layout->spcDirAddress == 0x4000,
+             layout->regularPitchTableAddress == 0x3400 && layout->spcDirAddress == 0x4000 && layout->stereoEnabled,
          "CompileSnes should recover its revision, live song, tables, fixed pitch base, and DIR");
 
   Session session;
@@ -181,9 +183,10 @@ void frameCurvesDynamicAdsrAndEchoRenderPhysically() {
   const auto pans = events<StereoBalancePerformanceEvent>(track);
   const auto reverbs = events<ReverbPerformanceEvent>(track);
   const auto tempos = events<TempoPerformanceEvent>(track);
-  expect(performance.diagnostics.empty() && notes.size() == 1 && std::abs(notes.front()->key - 96.0) < 0.001 &&
-             notes.front()->durationTicks == 4 && tempos.front()->microsecondsPerQuarter == 384000,
-         "Compile notes and the 62.5 Hz tempo accumulator should render at their exact source timing");
+  expect(performance.diagnostics.empty() && performance.timebase.ppqn == 12 && notes.size() == 1 &&
+             std::abs(notes.front()->key - 96.0) < 0.001 && notes.front()->durationTicks == 4 &&
+             tempos.front()->microsecondsPerQuarter == 384000,
+         "Compile notes and the tempo accumulator should render at their source timing");
   expect(envelopes.size() >= 4 && levels.size() >= 3 && bends.size() >= 3 && pans.size() >= 2,
          "ADSR/GAIN, software volume, vibrato, and pan curves should advance on driver frames");
   const double echoLeft = 64.0 / 127.0 * 64.0 / 256.0;
@@ -220,6 +223,60 @@ void trackAndPercussionFlagsDoNotBecomeStereoPhase() {
          "track and percussion flags must not be mistaken for the separate stereo-phase register");
 }
 
+void monoModeForcesCenterAndIgnoresStereoPhase() {
+  std::vector<u8> bytes = fixture({0xab, 0xe2, 0x92, 0x02, 0x60, 0xdf, 0x82});
+  bytes[1] = 0;
+
+  const auto layout = findLayout(ByteReader(SourceId{306}, bytes));
+  const auto balances = events<StereoBalancePerformanceEvent>(render(bytes).tracks.front());
+  expect(layout && !layout->stereoEnabled && !balances.empty() &&
+             std::ranges::all_of(
+                 balances, [](const auto* balance) { return balance->leftGain > 0.49 && balance->rightGain > 0.49; }),
+         "Compile mono mode should force pan to center and ignore stereo-phase commands");
+}
+
+void pitchSweepAdvancesThroughThePitchTable() {
+  const PerformanceSequence downward = render(fixture({0x94, 0x02, 0x60, 0xde, 6, 0x94, 0x00, 0x82}));
+  expect(!downward.tracks.front().automations.empty(), "an active pitch sweep should create a pitch transition");
+  const auto* downSlide = pitchTransitionIntent(downward.tracks.front().automations.front());
+  expect(downSlide != nullptr && std::holds_alternative<LinearAutomationCurve>(downSlide->curve) &&
+             std::abs(pitchTransitionValueAt(*downSlide, 1) - downSlide->startKey + 4.0) < 0.05 &&
+             std::abs(pitchTransitionValueAt(*downSlide, 2) - downSlide->startKey + 8.0) < 0.05 &&
+             pitchTransitionValueAt(*downSlide, 6) - downSlide->startKey < -20.0 &&
+             downSlide->preferredRendering == PitchTransitionRenderingHint::PitchBend,
+         "positive pitch-sweep rates should become smooth transitions over the note-table-derived range");
+
+  const MidiSequence midi = renderMidiSequence(downward);
+  const auto hasBendAt = [&](u64 tick) {
+    return std::ranges::any_of(midi.tracks.front().events, [tick](const MidiEvent& event) {
+      const auto* bend = std::get_if<PitchBend>(&event);
+      return bend != nullptr && bend->tick == tick;
+    });
+  };
+  expect(midi.timebase.ppqn == 12 && hasBendAt(1) && hasBendAt(2) && hasBendAt(3),
+         "Compile MIDI should preserve the 12 PPQN source grid");
+
+  const PerformanceSequence upward = render(fixture({0x94, 0x82, 0x60, 0xde, 3, 0x94, 0x00, 0x82}));
+  expect(!upward.tracks.front().automations.empty(), "an upward pitch sweep should create a pitch transition");
+  const auto* upSlide = pitchTransitionIntent(upward.tracks.front().automations.front());
+  expect(upSlide != nullptr && std::abs(pitchTransitionValueAt(*upSlide, 1) - upSlide->startKey - 4.0) < 0.05,
+         "pitch-sweep rates with bit 7 set should ascend by note-table steps");
+}
+
+void enablingPortamentoRetriggersItsFirstNote() {
+  const MidiSequence midi = renderMidiSequence(
+      render(fixture({0x60, 0xdf, 0xa0, 0x03, 0xa1, 0x84, 0x03, 0x62, 0xdf, 0x64, 0xdf, 0x82})),
+      MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  const auto noteCount = std::ranges::count_if(
+      midi.tracks.front().events, [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); });
+  const auto portamentoCount = std::ranges::count_if(midi.tracks.front().events, [](const MidiEvent& event) {
+    return std::holds_alternative<PortamentoEnable>(event) || std::holds_alternative<PortamentoTime>(event) ||
+           std::holds_alternative<PortamentoTime14>(event) || std::holds_alternative<PortamentoControl>(event);
+  });
+  expect(noteCount == 2 && portamentoCount == 0,
+         "pitch-bend lowering should retain the fresh attack without leaking native MIDI portamento");
+}
+
 }  // namespace
 
 void runCompileSnesModuleTests() {
@@ -228,4 +285,7 @@ void runCompileSnesModuleTests() {
   frameCurvesDynamicAdsrAndEchoRenderPhysically();
   standaloneDurationsRepeatTheCurrentNoteAndGate();
   trackAndPercussionFlagsDoNotBecomeStereoPhase();
+  monoModeForcesCenterAndIgnoresStereoPhase();
+  pitchSweepAdvancesThroughThePitchTable();
+  enablingPortamentoRetriggersItsFirstNote();
 }

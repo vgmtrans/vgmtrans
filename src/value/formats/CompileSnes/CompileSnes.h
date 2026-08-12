@@ -49,6 +49,7 @@ struct Layout {
   u16 regularPitchTableAddress;
   u16 spcDirAddress;
   s8 globalTranspose;
+  bool stereoEnabled;
 
   [[nodiscard]] bool early() const noexcept { return version == Version::Aleste || version == Version::JakiCrush; }
   [[nodiscard]] bool hasEchoCommands() const noexcept {

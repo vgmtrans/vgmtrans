@@ -80,8 +80,10 @@ struct LoweredStereoBalance {
 
 [[nodiscard]] LoweredStereoBalance lowerStereoBalance(double sourceLeft, double sourceRight) {
   constexpr double piOverTwo = 1.57079632679489661923;
-  sourceLeft = std::max(0.0, sourceLeft);
-  sourceRight = std::max(0.0, sourceRight);
+  // MIDI pan cannot encode polarity. Retain the magnitude of a phase-inverted
+  // source channel instead of incorrectly treating it as silence.
+  sourceLeft = std::abs(sourceLeft);
+  sourceRight = std::abs(sourceRight);
 
   // MIDI pan has only one position value, while source engines may specify two
   // independent channel gains. Pick the closest equal-power MIDI position,
@@ -1265,8 +1267,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                          automationState == nullptr);
         } else if constexpr (std::is_same_v<TypedEvent, StereoBalancePerformanceEvent>) {
           const LoweredStereoBalance lowered = lowerStereoBalance(typedEvent.leftGain, typedEvent.rightGain);
-          const double left = std::max(0.0, typedEvent.leftGain);
-          const double right = std::max(0.0, typedEvent.rightGain);
+          const double left = std::abs(typedEvent.leftGain);
+          const double right = std::abs(typedEvent.rightGain);
           const double sum = left + right;
           state.sourcePanPosition = sum == 0.0 ? 0.0 : (right - left) / sum;
           state.sourcePanLinearGain = sum;
