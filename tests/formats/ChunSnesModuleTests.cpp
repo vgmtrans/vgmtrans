@@ -39,13 +39,13 @@ void runChunSnesModuleTests() {
       0xe2, 0x00,        // pitch script
       0xf9,              // top-level pattern end is a no-op
       0xfc,              // echo on
-      0xed, 0x46,        // Monsters channel master volume
-      0xf6, 0xfe,        // Monsters initial channel volume
-      0xe6, 0x78, 0x60,  // first stage of the Monsters fade
+      0xfb, 0x01, 0x06,  // slide the following note upward
+      0xed, 0x46,        // channel master volume
+      0xf6, 0xfe,        // channel volume
+      0xe6, 0x78, 0x60,  // first volume fade
       0x51, 0x60,        // C, length 96
       0xe6, 0x18, 0x48,  // second stage, down to near-silence
       0x51, 0x48,        // C, length 72
-      0xfb, 0x02, 0x04,  // slide two semitones over four ticks
       0xfd,              // echo off
       0xff,              // end
   };
@@ -70,7 +70,7 @@ void runChunSnesModuleTests() {
   const SequenceParse parsed = decodeSequence(reader, layout, AssetId{1});
   expect(parsed.program.tracks.size() == 1, "ChunSnes should decode the active track");
   const TrackProgram& track = parsed.program.tracks.front();
-  expect(track.commands.size() == 15 && track.commands[9].opcode == 0x51 && track.commands[12].opcode == 0xfb,
+  expect(track.commands.size() == 15 && track.commands[6].opcode == 0xfb && track.commands[10].opcode == 0x51,
          "top-level pattern end should preserve the following commands");
 
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program, sequenceDialect());
@@ -79,38 +79,39 @@ void runChunSnesModuleTests() {
          "ChunSnes note length and track end should follow the 48 PPQN driver timeline");
 
   bool envelope = false;
-  bool negativeVibratoPeak = false;
-  bool positiveVibratoPeak = false;
+  bool negativePitchPeak = false;
+  bool positivePitchPeak = false;
   bool reverb = false;
   bool silentFadeEndpoint = false;
   for (const PerformanceEvent& event : performance.tracks.front().events) {
     envelope |= std::holds_alternative<EnvelopePerformanceEvent>(event);
     if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event)) {
-      negativeVibratoPeak |= bend->header.tick == 34 && bend->semitones == -0.09375;
-      positiveVibratoPeak |= bend->header.tick == 40 && bend->semitones == 0.09375;
+      negativePitchPeak |= bend->header.tick == 34 && bend->semitones == -0.09375;
+      positivePitchPeak |= bend->header.tick == 40 && bend->semitones == 0.09375;
     }
     reverb |= std::holds_alternative<ReverbPerformanceEvent>(event);
     if (const auto* level = std::get_if<LevelPerformanceEvent>(&event)) {
       silentFadeEndpoint |= level->header.tick == 168 && level->linearGain == 7.0 / 256.0;
     }
   }
-  const bool slide =
-      std::ranges::any_of(performance.tracks.front().automations, [](const PerformanceAutomation& automation) {
-        return std::holds_alternative<PitchTransitionIntent>(automation.intent);
-      });
+  const auto slide = std::ranges::find_if(performance.tracks.front().automations, [](const auto& automation) {
+    return std::holds_alternative<PitchTransitionIntent>(automation.intent);
+  });
   expect(envelope, "dynamic ADSR and release commands should emit active-voice envelope changes");
-  expect(negativeVibratoPeak && positiveVibratoPeak,
-         "the Traveling Alone vibrato script should reach both driver-accurate pitch peaks");
+  expect(negativePitchPeak && positivePitchPeak, "looping pitch scripts should reach their signed pitch peaks");
   expect(reverb, "echo commands should retain the DSP echo parameters");
-  expect(silentFadeEndpoint, "the two-stage Monsters fade should end at the driver's near-silent mixer level");
-  expect(slide, "pitch-slide commands should emit structured pitch transitions");
+  expect(silentFadeEndpoint, "two-stage volume fades should end at the driver's near-silent mixer level");
+  expect(slide != performance.tracks.front().automations.end(), "pre-note slides should bind to the following note");
+  const auto& transition = std::get<PitchTransitionIntent>(slide->intent);
+  expect(transition.startKey == 24.0 && transition.targetKey == 25.0 && transition.timing.timelineTicks == 6,
+         "pitch slides should retain their direction, distance, and duration");
 
   const MidiSequence midi = renderMidiSequence(performance);
-  const bool audiblePitchEnvelope = std::ranges::any_of(midi.tracks.front().events, [](const MidiEvent& event) {
+  const bool upwardSlide = std::ranges::any_of(midi.tracks.front().events, [](const MidiEvent& event) {
     const auto* bend = std::get_if<PitchBend>(&event);
-    return bend != nullptr && bend->value != 0;
+    return bend != nullptr && bend->tick <= 6 && bend->value > 1024;
   });
-  expect(audiblePitchEnvelope, "scripted pitch envelopes should lower to live MIDI pitch bends");
+  expect(upwardSlide, "upward slides should lower to positive pitch bends");
 
   std::vector<u8> synchronizedAram(kAramSize);
   synchronizedAram[0x400] = 120;

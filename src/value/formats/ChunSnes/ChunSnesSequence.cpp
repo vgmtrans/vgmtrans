@@ -286,6 +286,11 @@ struct ProgramState {
 };
 
 struct TrackState {
+  struct PendingPitchSlide {
+    s8 semitones = 0;
+    u8 duration = 0;
+  };
+
   TrackState(const SequenceProgram& sequence, const TrackProgram& trackProgram)
       : version(static_cast<Version>(sequence.config.profile)), trackNumber(trackProgram.sourceTrackNumber) {
     volume.reset(0x80);
@@ -313,6 +318,8 @@ struct TrackState {
   std::array<u8, 2> loopCount{};
   PerformanceNoteId lastNote;
   std::optional<double> lastKey;
+  std::optional<PendingPitchSlide> pendingPitchSlide;
+  PitchSlideBinding activePitchSlide;
   u8 pitchEnvelope = 0xff;
   u16 pitchEnvelopeOffset = 2;
   u16 pitchEnvelopeDelay = 0;
@@ -383,6 +390,7 @@ struct Playback {
     const u32 length = track.noteLength;
     const u32 sounding = math::duration(length, track.durationRate);
     if (encodedNote == 0) {
+      track.pendingPitchSlide.reset();
       if (track.previousSlur && track.lastNote.valid() && track.lastKey) {
         track.lastNote = out.note(NotePerformanceEvent{.key = *track.lastKey,
                                                        .linearVelocity = 1.0,
@@ -400,6 +408,7 @@ struct Playback {
                                                        .durationTicks = sounding,
                                                        .extendsPrevious = true,
                                                        .restartsLfoPhase = false});
+        startPitchSlide(*track.lastKey);
       }
       track.previousSlur = track.durationRate == 0;
       track.previousWasRest = false;
@@ -417,6 +426,7 @@ struct Playback {
       track.lastNote = out.note(NotePerformanceEvent{.key = key, .linearVelocity = 1.0, .durationTicks = sounding});
     }
     track.lastKey = key;
+    startPitchSlide(key);
     track.previousWasRest = false;
     track.previousSlur = track.durationRate == 0;
     return Effects::wait(length);
@@ -604,11 +614,23 @@ struct Playback {
   }
 
   void pitchSlide(s8 semitones, u8 duration) {
-    if (duration == 0 || semitones == 0 || !track.lastNote.valid() || !track.lastKey) {
+    track.activePitchSlide.interrupt(out);
+    track.pendingPitchSlide = TrackState::PendingPitchSlide{.semitones = semitones, .duration = duration};
+  }
+
+  void startPitchSlide(double startKey) {
+    if (!track.pendingPitchSlide) {
       return;
     }
-    const double target = *track.lastKey + semitones;
-    out.pitchSlide(track.lastNote, *track.lastKey, target, duration).preferPitchBend();
+    const auto [semitones, duration] = *track.pendingPitchSlide;
+    track.pendingPitchSlide.reset();
+    if (duration == 0 || semitones == 0 || !track.lastNote.valid()) {
+      return;
+    }
+    const double target = startKey + semitones;
+    auto slide = out.pitchSlide(track.lastNote, startKey, target, duration);
+    slide.preferPitchBend();
+    track.activePitchSlide = std::move(slide);
     track.lastKey = target;
   }
 
