@@ -8,6 +8,7 @@
 
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
 
@@ -15,6 +16,7 @@
 #include <array>
 #include <cmath>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 
@@ -23,6 +25,8 @@ namespace vgmtrans::formats::heartbeat_snes {
 using namespace core;
 
 namespace {
+
+constexpr u32 kCommandLimit = 32768;
 
 constexpr std::array<u8, 16> kDurationRates{
     0x23, 0x46, 0x69, 0x8c, 0xaf, 0xd2, 0xf5, 0xff, 0x19, 0x28, 0x37, 0x46, 0x55, 0x64, 0x73, 0x82,
@@ -78,6 +82,10 @@ namespace math {
   return 1.0 - minimum * minimum;
 }
 
+[[nodiscard]] double tuningCents(u8 fraction) {
+  return fraction * (100.0 / 256.0);
+}
+
 [[nodiscard]] StereoBalance panGains(u8 raw, bool invertLeft = false, bool invertRight = false) {
   const u8 pan = std::min<u8>(raw & 0x1f, 20);
   double left = kPanTable[20 - pan] / 127.0;
@@ -105,33 +113,60 @@ enum class PitchEnvelopeKind : u8 {
   From,
 };
 
-struct ProgramState {
-  explicit ProgramState(const SequenceProgram&) {
-    masterVolume.reset(0xc0);
-    echo.voiceMask = 0;
+struct VibratoState {
+  u8 delay = 0;
+  u8 rate = 0;
+  u8 depth = 0;
+  u8 fade = 0;
+  SequenceLfoDepthFadeState depthState;
+
+  void configure(u8 newDelay, u8 newRate, u8 newDepth) {
+    delay = newDelay;
+    rate = newRate;
+    depth = newDepth;
+    fade = 0;
+    depthState.resetDepth(depth);
   }
 
-  u8 masterVolumeRaw = 0xc0;
+  void configureFade(u8 length) {
+    fade = length;
+    depthState.configureFade(length, length == 0 ? 0 : depth / length);
+  }
+
+  void disable() { configure(0, 0, 0); }
+};
+
+struct TremoloConfig {
+  u8 delay = 0;
+  u8 rate = 0;
+};
+
+struct PitchEnvelope {
+  PitchEnvelopeKind kind = PitchEnvelopeKind::Off;
+  u8 delay = 0;
+  u8 duration = 0;
+  s8 depth = 0;
+};
+
+struct ProgramState {
+  ProgramState() { masterVolume.reset(0xc0); }
+
   PerformanceBoundValue<SequenceFixedPointAutomation<s32>> masterVolume;
   std::optional<u32> masterVolumeTrack;
-  ReverbPerformanceEvent echo;
+  ReverbPerformanceEvent echo{.voiceMask = 0};
 };
 
 struct TrackState {
-  TrackState(const SequenceProgram&, const TrackProgram& sourceTrack)
-      : trackNumber(sourceTrack.sourceTrackNumber),
-        voiceBit(static_cast<u8>(1u << std::min<u32>(sourceTrack.sourceTrackNumber, 7))) {
+  explicit TrackState(const TrackProgram& sourceTrack) : trackNumber(sourceTrack.sourceTrackNumber) {
     volume.reset(0xff);
     pan.reset(10);
   }
 
-  u32 trackNumber = 0;
-  u8 voiceBit = 1;
+  u32 trackNumber;
   u8 noteLength = 0x10;
   u8 durationRate = 0xaf;
   u8 velocity = 0xff;
   s8 transpose = 0;
-  u8 program = 0;
   bool legato = false;
   bool invertLeft = false;
   bool invertRight = false;
@@ -141,18 +176,9 @@ struct TrackState {
   PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume;
   PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan;
 
-  u8 vibratoDelay = 0;
-  u8 vibratoRate = 0;
-  u8 vibratoDepth = 0;
-  u8 vibratoFade = 0;
-  u8 tremoloDelay = 0;
-  u8 tremoloRate = 0;
-  u8 tremoloDepth = 0;
-
-  PitchEnvelopeKind pitchEnvelope = PitchEnvelopeKind::Off;
-  u8 pitchDelay = 0;
-  u8 pitchDuration = 0;
-  s8 pitchDepth = 0;
+  VibratoState vibrato;
+  TremoloConfig tremolo;
+  PitchEnvelope pitchEnvelope;
   u8 repeatCount = 0;
 };
 
@@ -162,28 +188,26 @@ struct Playback {
   VmApi& vm;
   ProgramState& program;
 
-  [[nodiscard]] LfoPerformanceContext vibratoContext(bool restart = false) const {
+  [[nodiscard]] LfoPerformanceContext vibratoContext() const {
     return LfoPerformanceContext{
-        .cyclesPerTick = static_cast<double>(track.vibratoRate) / 256.0,
-        .delayTicks = track.vibratoDelay,
+        .cyclesPerTick = static_cast<double>(track.vibrato.rate) / 256.0,
+        .delayTicks = track.vibrato.delay,
         .waveform = LfoWaveform::Triangle,
-        .initialPhaseCycles = (track.vibratoFade & 1) != 0 ? 0.5 : 0.0,
+        .initialPhaseCycles = (track.vibrato.fade & 1) != 0 ? 0.5 : 0.0,
         .sampleImmediatelyOnNote = true,
         .delayAppliesOnNoteRestartOnly = true,
-        .restartPhase = restart,
         .phaseRunsAtZeroDepth = true,
     };
   }
 
-  [[nodiscard]] LfoPerformanceContext tremoloContext(bool restart = false) const {
+  [[nodiscard]] LfoPerformanceContext tremoloContext() const {
     return LfoPerformanceContext{
-        .cyclesPerTick = static_cast<double>(track.tremoloRate) / 256.0,
-        .delayTicks = track.tremoloDelay,
+        .cyclesPerTick = static_cast<double>(track.tremolo.rate) / 256.0,
+        .delayTicks = track.tremolo.delay,
         .waveform = LfoWaveform::Triangle,
         .initialPhaseCycles = 0.25,
         .sampleImmediatelyOnNote = true,
         .delayAppliesOnNoteRestartOnly = true,
-        .restartPhase = restart,
         .tremoloGainMode = TremoloGainMode::NoBoost,
     };
   }
@@ -216,30 +240,33 @@ struct Playback {
   }
 
   void beginPersistentPitchEnvelope(double key) {
-    if (track.pitchEnvelope == PitchEnvelopeKind::Off || track.pitchDuration == 0 || track.pitchDepth == 0) {
+    if (track.pitchEnvelope.kind == PitchEnvelopeKind::Off || track.pitchEnvelope.duration == 0 ||
+        track.pitchEnvelope.depth == 0) {
       return;
     }
-    if (track.pitchEnvelope == PitchEnvelopeKind::To) {
-      beginPitchSlide(key, key + track.pitchDepth, track.pitchDelay, track.pitchDuration);
+    if (track.pitchEnvelope.kind == PitchEnvelopeKind::To) {
+      beginPitchSlide(key, key + track.pitchEnvelope.depth, track.pitchEnvelope.delay, track.pitchEnvelope.duration);
     } else {
-      beginPitchSlide(key - track.pitchDepth, key, track.pitchDelay, track.pitchDuration);
+      beginPitchSlide(key - track.pitchEnvelope.depth, key, track.pitchEnvelope.delay, track.pitchEnvelope.duration);
     }
   }
 
+  void emitVibratoDepth(s32 rawDepth, PerformanceEmitter output, bool force = false) {
+    track.vibrato.depthState.emitPhysicalDepth(
+        math::vibratoDepth(static_cast<u8>(rawDepth)),
+        [&](double depth) { output.vibratoDepth(depth, vibratoContext()); }, force);
+  }
+
   void beginVibratoFade() {
-    if (track.vibratoRate == 0 || track.vibratoDepth == 0 || track.vibratoFade == 0) {
+    if (track.vibrato.rate == 0 || track.vibrato.depth == 0 || track.vibrato.fade == 0) {
       return;
     }
-    const double target = math::vibratoDepth(track.vibratoDepth);
-    const u8 step = static_cast<u8>(track.vibratoDepth / track.vibratoFade);
-    auto fade =
-        out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth, target, track.vibratoFade, track.vibratoDelay);
-    for (u32 tick = 0; tick <= track.vibratoFade; ++tick) {
-      const u8 raw = tick == track.vibratoFade ? track.vibratoDepth
-                                               : static_cast<u8>(std::min<u32>((tick + 1) * step, track.vibratoDepth));
-      fade.output(out.at(vm.tick() + track.vibratoDelay + tick))
-          .vibratoDepth(math::vibratoDepth(raw), vibratoContext());
-    }
+    const s32 step = track.vibrato.depth / track.vibrato.fade;
+    static_cast<void>(track.vibrato.depthState.restartFade(track.vibrato.delay, step));
+    track.vibrato.depthState.bindFade(out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth,
+                                                       math::vibratoDepth(track.vibrato.depth), track.vibrato.fade,
+                                                       track.vibrato.delay));
+    emitVibratoDepth(step, track.vibrato.depthState.fadeOutput(out.at(vm.tick() + track.vibrato.delay)), true);
   }
 
   [[nodiscard]] Effects note(u8 key) {
@@ -253,7 +280,6 @@ struct Playback {
         .restartsLfoPhase = true,
     };
     if (continues) {
-      event.restartsLfoPhase = true;
       track.lastNote = track.lastKey && *track.lastKey == outputKey
                            ? out.note(NotePerformanceEvent{
                                  .key = outputKey,
@@ -297,18 +323,6 @@ struct Playback {
     return Effects::wait(track.noteLength);
   }
 
-  void legato(bool enabled) {
-    track.legato = enabled;
-    out.legatoPedal(enabled);
-  }
-
-  void programChange(u8 value) {
-    track.program = value;
-    out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = value},
-                   InstrumentEnvelopeMode::UseInstrumentEnvelope);
-    out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
-  }
-
   void pan(u8 value) {
     track.pan.setCurrentAt(vm.tick(), value & 0x1f);
     emitPan(out);
@@ -325,34 +339,29 @@ struct Playback {
   }
 
   void vibrato(u8 delay, u8 rate, u8 depth) {
-    track.vibratoDelay = delay;
-    track.vibratoRate = rate;
-    track.vibratoDepth = depth;
-    track.vibratoFade = 0;
+    track.vibrato.depthState.interruptFadeAutomationAt(vm.tick());
+    track.vibrato.configure(delay, rate, depth);
     const auto context = vibratoContext();
-    out.vibratoDepth(math::vibratoDepth(depth), context);
+    emitVibratoDepth(depth, out, true);
     out.vibratoRateCyclesPerTick(static_cast<double>(rate) / 256.0, context);
     out.vibratoDelayTicks(delay);
   }
 
   void vibratoFade(u8 length) {
-    track.vibratoFade = length;
-    out.vibratoDepth(math::vibratoDepth(track.vibratoDepth), vibratoContext());
+    track.vibrato.configureFade(length);
+    emitVibratoDepth(track.vibrato.depth, out, true);
   }
 
   void vibratoOff() {
-    track.vibratoRate = 0;
-    track.vibratoDepth = 0;
-    track.vibratoFade = 0;
-    out.vibratoDepth(0.0, vibratoContext());
+    track.vibrato.depthState.interruptFadeAutomationAt(vm.tick());
+    track.vibrato.disable();
+    emitVibratoDepth(0, out, true);
     out.vibratoRateCyclesPerTick(0.0, vibratoContext());
     out.vibratoDelayTicks(0);
   }
 
   void tremolo(u8 delay, u8 rate, u8 depth) {
-    track.tremoloDelay = delay;
-    track.tremoloRate = rate;
-    track.tremoloDepth = depth;
+    track.tremolo = {.delay = delay, .rate = rate};
     const auto context = tremoloContext();
     out.tremoloLinearGainDepth(math::tremoloDepth(depth), context);
     out.tremoloRateCyclesPerTick(static_cast<double>(rate) / 256.0, context);
@@ -360,8 +369,7 @@ struct Playback {
   }
 
   void tremoloOff() {
-    track.tremoloRate = 0;
-    track.tremoloDepth = 0;
+    track.tremolo = {};
     out.tremoloLinearGainDepth(0.0, tremoloContext());
     out.tremoloRateCyclesPerTick(0.0, tremoloContext());
     out.tremoloDelayTicks(0);
@@ -387,7 +395,6 @@ struct Playback {
   }
 
   void masterVolume(u8 value) {
-    program.masterVolumeRaw = value;
     program.masterVolume.setCurrentAt(vm.tick(), value);
     program.masterVolumeTrack.reset();
     out.masterLevel(masterRelativeGain(value));
@@ -398,26 +405,21 @@ struct Playback {
       masterVolume(target);
       return;
     }
-    program.masterVolume.setCurrentRaw(program.masterVolumeRaw);
     static_cast<void>(program.masterVolume.begin(
         out.fade(PerformanceAutomationTarget::MasterLevel, masterRelativeGain(target), length),
         SequenceFixedPointMotion<s32>::toRawTarget(target, length)));
     program.masterVolumeTrack = track.trackNumber;
   }
 
-  void tuning(u8 value) { out.tuning(value * (100.0 / 256.0)); }
-
   void pitchEnvelope(PitchEnvelopeKind kind, u8 delay, u8 duration, s8 depth) {
-    track.pitchEnvelope = kind;
-    track.pitchDelay = delay;
-    track.pitchDuration = duration;
-    track.pitchDepth = depth;
+    track.pitchEnvelope = {.kind = kind, .delay = delay, .duration = duration, .depth = depth};
   }
 
-  void pitchEnvelopeOff() { track.pitchEnvelope = PitchEnvelopeKind::Off; }
+  void pitchEnvelopeOff() { track.pitchEnvelope.kind = PitchEnvelopeKind::Off; }
 
   [[nodiscard]] bool canInlinePitchSlide() const {
-    return track.lastNote.valid() && (track.pitchEnvelope == PitchEnvelopeKind::Off || track.pitchDuration == 0);
+    return track.lastNote.valid() &&
+           (track.pitchEnvelope.kind == PitchEnvelopeKind::Off || track.pitchEnvelope.duration == 0);
   }
 
   void pitchSlideTo(u8 delay, u8 duration, u8 rawTarget) {
@@ -444,7 +446,8 @@ struct Playback {
 
   void echoEnabled(bool enabled) {
     const u8 mask = program.echo.voiceMask.value_or(0);
-    program.echo.voiceMask = enabled ? static_cast<u8>(mask | track.voiceBit) : static_cast<u8>(mask & ~track.voiceBit);
+    const u8 voice = static_cast<u8>(1u << std::min(track.trackNumber, u32{7}));
+    program.echo.voiceMask = enabled ? static_cast<u8>(mask | voice) : static_cast<u8>(mask & ~voice);
     out.reverb(program.echo);
   }
 
@@ -460,9 +463,7 @@ struct Playback {
   }
 
   void adsr(u8 adsr1, u8 adsr2) {
-    Envelope envelope = snesDspEnvelope(static_cast<u8>(adsr1 | 0x80), adsr2, 0);
-    envelope.releaseSeconds = snesDspAdsrSustainSeconds(adsr2 & 0x1f);
-    out.replaceEnvelope(std::move(envelope), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    out.replaceEnvelope(driverEnvelope(adsr1, adsr2), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
 
   void surround(bool left, bool right) {
@@ -486,10 +487,14 @@ struct Playback {
                                      ValueQuantization{.levels = 256});
     }));
     static_cast<void>(track.pan.tickRaw([&](s32) { emitPan(track.pan.output(out)); }));
+    const auto vibratoTick = track.vibrato.depthState.tickFade();
+    if (vibratoTick.shouldApply() && vibratoTick.changed) {
+      emitVibratoDepth(track.vibrato.depthState.currentDepth(), track.vibrato.depthState.fadeOutput(out));
+    }
     if (program.masterVolumeTrack == track.trackNumber) {
       static_cast<void>(program.masterVolume.tickRaw([&](s32 value) {
-        program.masterVolumeRaw = static_cast<u8>(std::clamp<s32>(value, 0, 0xff));
-        program.masterVolume.output(out).masterLevel(masterRelativeGain(program.masterVolumeRaw));
+        const auto volume = static_cast<u8>(std::clamp<s32>(value, 0, 0xff));
+        program.masterVolume.output(out).masterLevel(masterRelativeGain(volume));
       }));
       if (!program.masterVolume.active()) {
         program.masterVolumeTrack.reset();
@@ -500,13 +505,58 @@ struct Playback {
 
 using Cursor = CompilerCursor<TrackState, Playback>;
 
-[[nodiscard]] Address relativeTarget(u32 sequenceBase, u16 relative) {
-  return Address{static_cast<u16>(sequenceBase + relative)};
+[[nodiscard]] Address readRelativeTarget(Cursor::Event& event, u32 sequenceBase, SemanticOperandRole role) {
+  const u16 relative = event.u16le("relative", SourceValueDisplay::Address, role);
+  const Address destination{static_cast<u16>(sequenceBase + relative)};
+  event.derived("destination", destination, SourceValueDisplay::Address, role);
+  return destination;
+}
+
+[[nodiscard]] DecodedBytecodeCommand decodeExtendedCommand(Cursor& cursor, u32 sequenceBase) {
+  auto event = cursor.command("Extended Command", SequenceSemantic::State);
+  const u8 subcommand = event.u8("subcommand", SourceValueDisplay::Hex);
+  switch (subcommand) {
+    case 0x00:
+      event.label("Repeat Count");
+      return event.invoke<&Playback::repeatCount>(event.u8("count", SemanticOperandRole::Count));
+    case 0x01: {
+      event.label("Repeat End");
+      const Address destination = readRelativeTarget(event, sequenceBase, SemanticOperandRole::RepeatTarget);
+      return event.invoke<&Playback::conditionalLoop>(destination).mayBranchTo(destination).runtimeControlFlow();
+    }
+    case 0x02:
+      return event.label("No Operation").ignore();
+    case 0x03:
+      event.label("Attack Rate");
+      return event.emitEnvelopeField<EnvelopeFields::Attack>(snesDspAdsrAttackSeconds(event.u8("rate") & 0x0f));
+    case 0x04:
+      event.label("Decay Rate");
+      return event.emitEnvelopeField<EnvelopeFields::Decay>(snesDspAdsrDecaySeconds(event.u8("rate") & 0x07));
+    case 0x05:
+      event.label("Sustain Level");
+      return event.emitEnvelopeField<EnvelopeFields::Sustain>(((event.u8("level") & 0x07) + 1) / 8.0);
+    case 0x06:
+      event.label("Held Sustain Rate");
+      return event.emitEnvelopeField<EnvelopeFields::SecondDecay>(snesDspAdsrSustainSeconds(event.u8("rate") & 0x1f));
+    case 0x07:
+      event.label("Gate Release Rate");
+      return event.emitEnvelopeField<EnvelopeFields::Release>(snesDspAdsrSustainSeconds(event.u8("rate") & 0x1f));
+    case 0x09: {
+      event.label("Surround Phase");
+      const bool left = event.u8("invert_left") != 0;
+      return event.invoke<&Playback::surround>(left, event.u8("invert_right") != 0);
+    }
+    case 0x08:
+    case 0x0a:
+      return event.label("Invalid Extended Command").stop();
+    default:
+      return event.label("Unknown Extended Command").ignore();
+  }
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, Version version, u32 sequenceBase,
                                                    std::vector<Diagnostic>* diagnostics,
-                                                   SequenceRecipes* recipes = nullptr) {
+                                                   std::set<u8>* programs = nullptr) {
   Cursor cursor(reader, begin, "heartbeat-snes", diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
@@ -534,16 +584,20 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xd1:
       return cursor.command("Rest", SequenceSemantic::Rest).invoke<&Playback::rest>();
     case 0xd2:
-    case 0xd3:
-      return cursor.command(opcode == 0xd2 ? "Legato On" : "Legato Off", SequenceSemantic::State)
-          .invoke<&Playback::legato>(opcode == 0xd2);
+    case 0xd3: {
+      const bool enabled = opcode == 0xd2;
+      return cursor.command(enabled ? "Legato On" : "Legato Off", SequenceSemantic::State)
+          .set<&TrackState::legato>(enabled)
+          .emitLegatoPedal(enabled);
+    }
     case 0xd4: {
       auto event = cursor.command("Program Change", SequenceSemantic::Program);
       const u8 program = event.u8("program", SemanticOperandRole::InstrumentProgram);
-      if (recipes != nullptr) {
-        recipes->programs.insert(program);
+      if (programs != nullptr) {
+        programs->insert(program);
       }
-      return event.invoke<&Playback::programChange>(program);
+      return event.emitInstrument(kInstrumentDomain, program, InstrumentEnvelopeMode::UseInstrumentEnvelope)
+          .restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
     }
     case 0xd5:
       return cursor.ignored("Reserved", 7, "reserved");
@@ -635,7 +689,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return cursor.command("Pitch Envelope Off", SequenceSemantic::Pitch).invoke<&Playback::pitchEnvelopeOff>();
     case 0xe9: {
       auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::tuning>(event.u8("fraction", SourceValueDisplay::Hex));
+      return event.emitTuning(event.resolved("cents", event.rawU8("fraction"), math::tuningCents));
     }
     case 0xea: {
       auto event = cursor.command("Echo Volume", SequenceSemantic::State);
@@ -681,12 +735,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xf3: {
       auto event = cursor.command(opcode == 0xf2 ? "Jump" : "Call",
                                   opcode == 0xf2 ? SequenceSemantic::Jump : SequenceSemantic::Call);
-      const u16 relative =
-          event.u16le("relative", SourceValueDisplay::Address,
-                      opcode == 0xf2 ? SemanticOperandRole::JumpTarget : SemanticOperandRole::CallTarget);
-      const Address destination = relativeTarget(sequenceBase, relative);
-      event.derived("destination", destination, SourceValueDisplay::Address,
-                    opcode == 0xf2 ? SemanticOperandRole::JumpTarget : SemanticOperandRole::CallTarget);
+      const Address destination = readRelativeTarget(
+          event, sequenceBase, opcode == 0xf2 ? SemanticOperandRole::JumpTarget : SemanticOperandRole::CallTarget);
       return opcode == 0xf2 ? event.loopCandidate(destination) : event.call(destination);
     }
     case 0xf4:
@@ -701,59 +751,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xf8:
       return cursor.sourceOnly("Note-Keyed DSP Noise On", "keyed-noise").ignore();
-    case 0xf9: {
-      auto event = cursor.command("Extended Command", SequenceSemantic::State);
-      const u8 subcommand = event.u8("subcommand", SourceValueDisplay::Hex);
-      switch (subcommand) {
-        case 0x00:
-          event.label("Repeat Count");
-          return event.invoke<&Playback::repeatCount>(event.u8("count", SemanticOperandRole::Count));
-        case 0x01: {
-          event.label("Repeat End");
-          const u16 relative = event.u16le("relative", SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-          const Address destination = relativeTarget(sequenceBase, relative);
-          event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-          return event.invoke<&Playback::conditionalLoop>(destination).mayBranchTo(destination).runtimeControlFlow();
-        }
-        case 0x02:
-          return event.label("No Operation").ignore();
-        case 0x03: {
-          event.label("Attack Rate");
-          const u8 rate = event.u8("rate") & 0x0f;
-          return event.emitEnvelopeField<EnvelopeFields::Attack>(snesDspAdsrAttackSeconds(rate));
-        }
-        case 0x04: {
-          event.label("Decay Rate");
-          const u8 rate = event.u8("rate") & 0x07;
-          return event.emitEnvelopeField<EnvelopeFields::Decay>(snesDspAdsrDecaySeconds(rate));
-        }
-        case 0x05: {
-          event.label("Sustain Level");
-          const u8 level = event.u8("level") & 0x07;
-          return event.emitEnvelopeField<EnvelopeFields::Sustain>((level + 1) / 8.0);
-        }
-        case 0x06: {
-          event.label("Held Sustain Rate");
-          const u8 rate = event.u8("rate") & 0x1f;
-          return event.emitEnvelopeField<EnvelopeFields::SecondDecay>(snesDspAdsrSustainSeconds(rate));
-        }
-        case 0x07: {
-          event.label("Gate Release Rate");
-          const u8 rate = event.u8("rate") & 0x1f;
-          return event.emitEnvelopeField<EnvelopeFields::Release>(snesDspAdsrSustainSeconds(rate));
-        }
-        case 0x09: {
-          event.label("Surround Phase");
-          const bool left = event.u8("invert_left") != 0;
-          return event.invoke<&Playback::surround>(left, event.u8("invert_right") != 0);
-        }
-        case 0x08:
-        case 0x0a:
-          return event.label("Invalid Extended Command").stop();
-        default:
-          return event.label("Unknown Extended Command").ignore();
-      }
-    }
+    case 0xf9:
+      return decodeExtendedCommand(cursor, sequenceBase);
     default:
       return cursor.unsupported("Invalid Command").stop();
   }
@@ -769,7 +768,7 @@ const SequenceDialect& sequenceDialect() {
       .defaultBehavior =
           SequenceProgramBehavior{
               .defaultLoopPolicy = LoopPolicy::PlayOnce,
-              .commandLimit = 32768,
+              .commandLimit = kCommandLimit,
               .initialSourceInstrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0},
               .initialLevel = math::squaredGain(0xc0),
               .initialReverbSend = 0.0,
@@ -783,7 +782,7 @@ const SequenceDialect& sequenceDialect() {
 
 TrackProgram decodeSourceTrack(ByteReader reader, Version version, u32 trackNumber, u32 startAddress, u32 sequenceBase,
                                std::vector<Diagnostic>* diagnostics) {
-  const TrackDecodeScope tracks{.reader = reader, .maxCommands = 32768};
+  const TrackDecodeScope tracks{.reader = reader, .maxCommands = kCommandLimit};
   return tracks.reachable(trackNumber, startAddress, [&](u32 offset) {
     return decodeCommand(reader, offset, version, sequenceBase, diagnostics);
   });
@@ -791,32 +790,25 @@ TrackProgram decodeSourceTrack(ByteReader reader, Version version, u32 trackNumb
 
 SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
                              std::vector<Diagnostic>* diagnostics) {
-  u32 trackCount = 0;
-  while (trackCount < kTrackCount && reader.has(layout.sequenceHeaderAddress + 2 + trackCount * 2, 2) &&
-         reader.le16(layout.sequenceHeaderAddress + 2 + trackCount * 2) != 0) {
-    ++trackCount;
-  }
-  const u32 headerSize = 2 + trackCount * 2 + (trackCount < kTrackCount ? 2 : 0);
+  const u32 headerSize = 2 + layout.trackCount * 2 + (layout.trackCount < kTrackCount ? 2 : 0);
   const SourceRange header = reader.range(layout.sequenceHeaderAddress, headerSize);
-  SequenceRecipes recipes;
-  SequenceDecodeSession sequence{reader, sequenceDialect(), sequenceId, header, sourceMap, 32768, kAramSize};
-  for (u32 track = 0; track < trackCount; ++track) {
+  std::set<u8> programs{0};
+  SequenceDecodeSession sequence{reader, sequenceDialect(), sequenceId, header, sourceMap, kCommandLimit, kAramSize};
+  for (u32 track = 0; track < layout.trackCount; ++track) {
     const u32 pointer = layout.sequenceHeaderAddress + 2 + track * 2;
     const u16 relative = reader.le16(pointer);
     sequence.addReachableTrack(
         track, reader.range(pointer, 2), static_cast<u16>(layout.sequenceHeaderAddress + relative),
         [&](u32 offset) {
-          return decodeCommand(reader, offset, layout.version, layout.sequenceHeaderAddress, diagnostics, &recipes);
+          return decodeCommand(reader, offset, layout.version, layout.sequenceHeaderAddress, diagnostics, &programs);
         },
         relative);
   }
   SequenceProgram program = sequence.finish();
   program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
-  program.config.profile = static_cast<u32>(layout.version);
-  program.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(0x10);
   return SequenceParse{
       .program = std::move(program),
-      .recipes = std::move(recipes),
+      .programs = std::move(programs),
       .headerRange = header,
   };
 }
