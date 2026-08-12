@@ -258,6 +258,10 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/CpsModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/CpsSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/CpsSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HeartBeatSnes/HeartBeatSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HeartBeatSnes/HeartBeatSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HeartBeatSnes/HeartBeatSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HeartBeatSnes/HeartBeatSnesSynth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/HudsonSnes/HudsonSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/HudsonSnes/HudsonSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/HudsonSnes/HudsonSnesSequence.cpp
@@ -325,6 +329,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/ChunSnes/ChunSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/Cps.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/HeartBeatSnes/HeartBeatSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/HudsonSnes/HudsonSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcade.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnes.h

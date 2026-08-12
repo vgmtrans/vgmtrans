@@ -2,6 +2,7 @@ add_executable(vgmtrans-value-core-tests)
 target_sources(vgmtrans-value-core-tests
   PRIVATE
     formats/CapcomSnesModuleTests.cpp
+    formats/HeartBeatSnesModuleTests.cpp
     formats/HudsonSnesModuleTests.cpp
     formats/CpsModuleTests.cpp
     formats/KonamiArcadeModuleTests.cpp
@@ -53,6 +54,14 @@ add_executable(vgmtrans-hudson-snes-tests
 target_link_libraries(vgmtrans-hudson-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
 target_compile_features(vgmtrans-hudson-snes-tests PRIVATE cxx_std_20)
 add_test(NAME vgmtrans-hudson-snes-tests COMMAND vgmtrans-hudson-snes-tests)
+
+add_executable(vgmtrans-heartbeat-snes-tests
+  formats/HeartBeatSnesModuleTests.cpp
+  formats/HeartBeatSnesTestMain.cpp
+)
+target_link_libraries(vgmtrans-heartbeat-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
+target_compile_features(vgmtrans-heartbeat-snes-tests PRIVATE cxx_std_20)
+add_test(NAME vgmtrans-heartbeat-snes-tests COMMAND vgmtrans-heartbeat-snes-tests)
 
 add_executable(vgmtrans-chun-snes-tests
   formats/ChunSnesModuleTests.cpp
