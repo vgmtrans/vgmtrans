@@ -561,8 +561,8 @@ void akaoRequiredArticulationsComeFromInstrumentRows() {
       .length = 0x100,
       .version = AkaoPs1Version::Version3_2,
       .sequenceId = 7,
-      .instrumentSetOffset = instrSet,
       .sampleSetId = 1,
+      .instrumentSetOffset = instrSet,
   };
 
   ScanIdAllocator ids;
@@ -602,8 +602,8 @@ void akaoMelodicRegionsDropAdvancingOverlaps() {
       .length = 0x100,
       .version = AkaoPs1Version::Version3_2,
       .sequenceId = 7,
-      .instrumentSetOffset = instrSet,
       .sampleSetId = 1,
+      .instrumentSetOffset = instrSet,
   };
   ScanInput input{
       .source = SourceFile{.id = SourceId{22}, .name = "overlap-keys.akao", .size = bytes.size()},
