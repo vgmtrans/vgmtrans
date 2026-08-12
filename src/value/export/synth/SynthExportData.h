@@ -26,9 +26,10 @@ struct SynthExportInput {
   std::span<const SampleCollectionAsset* const> sampleCollections;
   // Resolves FormatPreferred independently for each sample collection.
   const FormatRegistry* formats = nullptr;
-  // Null retains the complete collection. A performance filters instruments
-  // selected by its notes and the samples referenced by those instruments.
+  // Null retains every instrument. A performance selects the instruments used
+  // by its notes; sample filtering can also be requested independently.
   const PerformanceSequence* sequenceUsage = nullptr;
+  bool filterSamplesToReferencedInstruments = false;
   const MidiModulationUsage* midiModulationUsage = nullptr;
   ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
   ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;

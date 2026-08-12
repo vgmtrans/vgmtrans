@@ -6,23 +6,21 @@
 
 #include "value/export/CollectionStitch.h"
 
-#include "value/export/DynamicEnvelope.h"
+#include "value/export/CollectionPreparation.h"
 #include "value/export/ExportDiagnostics.h"
-#include "value/export/SequenceModulationProfile.h"
 #include "value/export/midi/MidiExporter.h"
+#include "value/export/midi/ModulationAnalysis.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/export/synth/ModulationScaling.h"
 #include "value/export/synth/SynthExportData.h"
 #include "value/model/SessionSnapshot.h"
 #include "value/scan/FormatRegistry.h"
-#include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
-#include <exception>
 #include <limits>
 #include <numeric>
 #include <optional>
 #include <set>
-#include <string_view>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
@@ -39,9 +37,8 @@ struct StitchPart {
   CollectionId collection;
   std::vector<InstrumentSetAsset> instruments;
   std::vector<const SampleCollectionAsset*> samples;
-  PerformanceSequence performance;
-  SequenceModulationProfile modulation;
   MidiSequence midi;
+  std::optional<MidiModulationUsage> modulationUsage;
   std::vector<CollectionStitchBank> banks;
 };
 
@@ -60,124 +57,93 @@ void fail(CollectionStitchResult& result, std::string message) {
   result.soundFont.diagnostics.push_back(diagnostic);
 }
 
-[[nodiscard]] const FormatModule* preparationModule(const Collection& collection, const SequenceProgramAsset& sequence,
-                                                    const FormatRegistry& formats) {
-  if (collection.origin == CollectionOrigin::UserCreated) {
-    const auto* module = formats.findModule(sequence.metadata.format);
-    if (module != nullptr && module->prepareCollection) {
-      return module;
-    }
+void append(std::vector<Diagnostic>& destination, const PreparedCollectionDiagnostics& source) {
+  append(destination, source.collection);
+  append(destination, source.sequence);
+  append(destination, source.instrumentSets);
+  append(destination, source.sampleCollections);
+}
+
+[[nodiscard]] bool hasErrors(const std::vector<Diagnostic>& diagnostics) {
+  return std::ranges::any_of(diagnostics,
+                             [](const Diagnostic& diagnostic) { return diagnostic.severity == Severity::Error; });
+}
+
+[[nodiscard]] bool hasErrors(const PreparedCollectionDiagnostics& diagnostics) {
+  return hasErrors(diagnostics.collection) || hasErrors(diagnostics.sequence) ||
+         hasErrors(diagnostics.instrumentSets) || hasErrors(diagnostics.sampleCollections);
+}
+
+void mergeRange(ObservedValueRange& destination, const ObservedValueRange& source) {
+  if (!source.observed) {
+    return;
   }
-  const auto found = std::ranges::find_if(formats.modules(), [&](const FormatModule& module) {
-    const std::string_view resolver =
-        module.collectionResolverId.empty() ? std::string_view(module.name) : module.collectionResolverId;
-    return module.prepareCollection && resolver == collection.key.resolver;
-  });
-  return found == formats.modules().end() ? nullptr : &*found;
+  if (!destination.observed) {
+    destination = source;
+    return;
+  }
+  destination.min = std::min(destination.min, source.min);
+  destination.max = std::max(destination.max, source.max);
+  destination.normalizedMin = std::min(destination.normalizedMin, source.normalizedMin);
+  destination.normalizedMax = std::max(destination.normalizedMax, source.normalizedMax);
+}
+
+void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulationUsage& source) {
+  mergeRange(destination.vibratoDepth, source.vibratoDepth);
+  mergeRange(destination.vibratoRate, source.vibratoRate);
+  mergeRange(destination.tremoloDepth, source.tremoloDepth);
+  mergeRange(destination.tremoloRate, source.tremoloRate);
 }
 
 [[nodiscard]] bool preparePart(StitchPart& part, const SessionSnapshot& snapshot, const SourceStore& sources,
                                const ExportRequest& request, const FormatRegistry& formats,
                                std::vector<Diagnostic>& diagnostics) {
-  const Collection* collection = snapshot.collection(part.collection);
-  if (collection == nullptr) {
-    diagnostics.push_back(exportError("CollectionId was not found in the SessionSnapshot"));
+  auto prepared = prepareCollection(snapshot, part.collection, sources, formats);
+  if (hasErrors(prepared.diagnostics)) {
+    append(diagnostics, prepared.diagnostics);
     return false;
   }
-  if (!collection->members.sequence) {
+  if (prepared.sequence == nullptr) {
+    append(diagnostics, prepared.diagnostics);
     diagnostics.push_back(exportError("A stitched collection does not contain a sequence"));
     return false;
   }
-  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection->members.sequence);
-  if (sequence == nullptr) {
-    diagnostics.push_back(exportError("A stitched collection's sequence asset was not found"));
-    return false;
-  }
-
-  FinalizeCollectionPerformance finalize;
-  std::optional<std::vector<InstrumentSetAsset>> replacements;
-  if (const auto* module = preparationModule(*collection, *sequence, formats)) {
-    try {
-      auto prepared = module->prepareCollection(CollectionPrepareContext{
-          .sources = sources,
-          .snapshot = snapshot,
-          .collection = *collection,
-      });
-      replacements = std::move(prepared.replacementInstrumentSets);
-      finalize = std::move(prepared.finalizePerformance);
-      append(diagnostics, prepared.diagnostics);
-    } catch (const std::exception& error) {
-      diagnostics.push_back(exportError(module->name + " collection preparation failed: " + error.what()));
-      return false;
-    }
-  }
-
-  if (replacements) {
-    part.instruments = std::move(*replacements);
-  } else {
-    for (const AssetId id : collection->members.instrumentSets) {
-      const auto* instruments = snapshot.asset<InstrumentSetAsset>(id);
-      if (instruments == nullptr) {
-        diagnostics.push_back(exportError("A stitched collection's instrument set was not found"));
-        return false;
-      }
-      part.instruments.push_back(*instruments);
-    }
-  }
-  for (const AssetId id : collection->members.sampleCollections) {
-    const auto* samples = snapshot.asset<SampleCollectionAsset>(id);
-    if (samples == nullptr) {
-      diagnostics.push_back(exportError("A stitched collection's sample collection was not found"));
-      return false;
-    }
-    part.samples.push_back(samples);
-  }
-  if (part.instruments.empty()) {
+  if (prepared.instrumentSets.empty()) {
+    append(diagnostics, prepared.diagnostics);
     diagnostics.push_back(exportError("A stitched collection does not contain instruments"));
     return false;
   }
 
-  const auto* dialect = formats.findDialect(sequence->program.dialect.value);
-  if (dialect == nullptr) {
-    diagnostics.push_back(exportError("No sequence dialect registered for '" + sequence->program.dialect.value + "'"));
+  auto rendering = renderCollection(prepared, formats, request.sequence);
+  if (!rendering.performance) {
+    append(diagnostics, prepared.diagnostics);
+    append(diagnostics, rendering.diagnostics);
     return false;
   }
-  part.performance = SequenceVm(SequenceVmOptions{
-                                    .loopPolicy = request.sequence.loopPolicy,
-                                    .sequenceLoops = request.sequence.sequenceLoops,
-                                })
-                         .render(sequence->program, *dialect);
-  if (finalize) {
-    try {
-      finalize(part.performance);
-    } catch (const std::exception& error) {
-      diagnostics.push_back(exportError("Collection performance finalization failed: " + std::string(error.what())));
-      return false;
-    }
+
+  const PerformanceSequence* performance = &*rendering.performance;
+  auto materialization = materializeCollectionDynamicEnvelopes(prepared, rendering, request.dynamicEnvelopes);
+  if (materialization) {
+    performance = &materialization->performance;
   }
-  part.modulation = analyzeSequenceModulation(part.performance);
-  if (request.dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants) {
-    auto materialized = materializeDynamicEnvelopes(part.performance, part.instruments);
-    part.performance = std::move(materialized.performance);
-    append(diagnostics, materialized.diagnostics);
-  }
+
   if (request.modulationConversion == ModulationConversionPolicy::SynthModulators) {
-    for (auto& instruments : part.instruments) {
-      applySequenceModulation(instruments, part.modulation);
+    applyCollectionSequenceModulation(prepared, rendering.modulation);
+    if (request.modulationScaling == ModulationScalingPolicy::ObservedSequenceRange) {
+      auto usage = analyzePerformanceModulationUsage(*performance, &rendering.modulation);
+      if (hasMidiModulationUsage(usage)) {
+        part.modulationUsage = std::move(usage);
+      }
     }
   }
 
-  std::vector<const InstrumentSetAsset*> instrumentView;
-  instrumentView.reserve(part.instruments.size());
-  for (const auto& instruments : part.instruments) {
-    instrumentView.push_back(&instruments);
-  }
-  part.midi = renderMidiSequence(part.performance, request.sequence.midi, request.modulationConversion, instrumentView,
-                                 &part.modulation);
+  const auto instrumentView = prepared.instrumentView();
+  part.midi = renderMidiSequence(*performance, request.sequence.midi, request.modulationConversion, instrumentView,
+                                 &rendering.modulation);
   if (request.exportOnlyUsedInstruments) {
-    const auto selected = selectSynthInstruments(instrumentView, &part.performance);
+    const auto selected = selectSynthInstruments(instrumentView, performance);
     const std::unordered_set<const Instrument*> used(selected.begin(), selected.end());
-    for (auto& set : part.instruments) {
+    for (auto& set : prepared.instrumentSets) {
       std::vector<Instrument> retained;
       retained.reserve(set.instruments.size());
       for (auto& instrument : set.instruments) {
@@ -187,8 +153,12 @@ void fail(CollectionStitchResult& result, std::string message) {
       }
       set.instruments = std::move(retained);
     }
-    std::erase_if(part.instruments, [](const InstrumentSetAsset& set) { return set.instruments.empty(); });
+    std::erase_if(prepared.instrumentSets, [](const InstrumentSetAsset& set) { return set.instruments.empty(); });
   }
+
+  part.instruments = std::move(prepared.instrumentSets);
+  part.samples = std::move(prepared.sampleCollections);
+  append(diagnostics, prepared.diagnostics);
   return true;
 }
 
@@ -289,29 +259,6 @@ void remapPart(StitchPart& part, MidiBankSelectStyle style) {
           region.sample.collection = fallbackSamples.value_or(AssetId{});
         }
       }
-    }
-  }
-
-  const u32 defaultBank = *remappedBank(part, 0);
-  for (auto& track : part.performance.tracks) {
-    for (auto& event : track.events) {
-      if (auto* selection = std::get_if<InstrumentPerformanceEvent>(&event);
-          selection && !selection->sourceInstrument) {
-        if (const auto target = remappedBank(part, selection->bank)) {
-          selection->bank = *target;
-        }
-      } else if (auto* note = std::get_if<NotePerformanceEvent>(&event); note && note->instrumentAddress) {
-        if (const auto target = remappedBank(part, note->instrumentAddress->bank)) {
-          note->instrumentAddress->bank = *target;
-        }
-      }
-    }
-    if (defaultBank != 0) {
-      track.events.insert(track.events.begin(), InstrumentPerformanceEvent{
-                                                    .bank = defaultBank,
-                                                    .program = 0,
-                                                    .forceBankSelect = true,
-                                                });
     }
   }
 
@@ -462,6 +409,22 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
     }
     parts.push_back(std::move(part));
   }
+
+  std::optional<MidiModulationUsage> modulationUsage;
+  for (const auto& part : parts) {
+    if (part.modulationUsage) {
+      if (!modulationUsage) {
+        modulationUsage.emplace();
+      }
+      mergeModulationUsage(*modulationUsage, *part.modulationUsage);
+    }
+  }
+  if (modulationUsage) {
+    for (auto& part : parts) {
+      applyMidiModulationScaling(part.midi, *modulationUsage, request.modulationScaling);
+    }
+  }
+
   if (!planBanks(parts, request.sequence.midi.bankSelectStyle)) {
     fail(result, "Stitched collections require more than the 128 preset banks supported by SoundFont2");
     return result;
@@ -480,10 +443,6 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
 
   std::vector<const InstrumentSetAsset*> instruments;
   std::vector<const SampleCollectionAsset*> samples;
-  std::optional<PerformanceSequence> sequenceUsage;
-  if (request.exportOnlyUsedInstruments) {
-    sequenceUsage.emplace();
-  }
   std::unordered_set<u32> includedCollections;
   std::unordered_set<u32> includedSamples;
   for (const auto& part : parts) {
@@ -492,10 +451,6 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
     }
     for (const auto& set : part.instruments) {
       instruments.push_back(&set);
-    }
-    if (sequenceUsage) {
-      sequenceUsage->tracks.insert(sequenceUsage->tracks.end(), part.performance.tracks.begin(),
-                                   part.performance.tracks.end());
     }
     for (const auto* collection : part.samples) {
       if (includedSamples.insert(collection->metadata.id.value).second) {
@@ -509,7 +464,8 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
           .instrumentSets = instruments,
           .sampleCollections = samples,
           .formats = &formats,
-          .sequenceUsage = sequenceUsage ? &*sequenceUsage : nullptr,
+          .filterSamplesToReferencedInstruments = request.exportOnlyUsedInstruments,
+          .midiModulationUsage = modulationUsage ? &*modulationUsage : nullptr,
           .modulationScaling = request.modulationScaling,
           .modulationConversion = request.modulationConversion,
           .sampleFiltering = request.sampleFiltering,
