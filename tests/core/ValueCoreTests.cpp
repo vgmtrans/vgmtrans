@@ -30,6 +30,7 @@ void runSuzukiSnesModuleTests();
 void runHeartBeatSnesModuleTests();
 void runHudsonSnesModuleTests();
 void runItikitiSnesModuleTests();
+void runCompileSnesModuleTests();
 void runWolfTeamSnesModuleTests();
 void runMp2kModuleTests();
 
@@ -219,6 +220,7 @@ int main() {
     runHeartBeatSnesModuleTests();
     runHudsonSnesModuleTests();
     runItikitiSnesModuleTests();
+    runCompileSnesModuleTests();
 
     capcomSnesLayoutSelectsSongListAndFixedHeaders();
     capcomSnesLayoutFallsBackToV2SongList();

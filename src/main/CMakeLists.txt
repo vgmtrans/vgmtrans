@@ -254,6 +254,10 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/ChunSnes/ChunSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/ChunSnes/ChunSnesSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/ChunSnes/ChunSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CompileSnes/CompileSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CompileSnes/CompileSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CompileSnes/CompileSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CompileSnes/CompileSnesSynth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/CpsLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/CpsModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/CpsSequence.cpp
@@ -332,6 +336,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/ChunSnes/ChunSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CompileSnes/CompileSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/Cps.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/HeartBeatSnes/HeartBeatSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/HudsonSnes/HudsonSnes.h
