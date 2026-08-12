@@ -406,7 +406,7 @@ PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceSt
   PreparedSynthData prepared;
   const auto instruments = selectSynthInstruments(input.instrumentSets, input.sequenceUsage);
   std::optional<SynthSampleIndexList> sampleFilter;
-  if (input.sequenceUsage != nullptr) {
+  if (input.sequenceUsage != nullptr || input.filterSamplesToReferencedInstruments) {
     sampleFilter = referencedSamples(instruments, input.sampleCollections);
   }
   prepared.samples = decodeSynthSamples(input.sampleCollections, sources, prepared.diagnostics, options,

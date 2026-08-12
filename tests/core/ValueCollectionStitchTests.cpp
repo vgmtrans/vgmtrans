@@ -99,9 +99,14 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
                                                                               .program = 0,
                                                                               .forceBankSelect = true,
                                                                           });
-                track.events.insert(++position, EnvelopePerformanceEvent{
-                                                    .update = EnvelopeUpdate::set(Envelope{.attackSeconds = 0.25},
-                                                                                  EnvelopeFields::Attack),
+                position = track.events.insert(
+                    ++position,
+                    EnvelopePerformanceEvent{
+                        .update = EnvelopeUpdate::set(Envelope{.attackSeconds = 0.25}, EnvelopeFields::Attack),
+                    });
+                track.events.insert(++position, ModulationPerformanceEvent{
+                                                    .target = ModulationPerformanceTarget::VibratoDepth,
+                                                    .amount = leaveDirtyMidiState ? 0.25 : 0.5,
                                                 });
                 if (leaveDirtyMidiState) {
                   track.events.push_back(TuningPerformanceEvent{
@@ -141,9 +146,13 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
   auto restrictedRequest = request;
   restrictedRequest.exportOnlyUsedInstruments = true;
   const auto restricted = stitchCollections(snapshot, sources, collections, restrictedRequest, formats);
+  auto observedRequest = request;
+  observedRequest.modulationScaling = ModulationScalingPolicy::ObservedSequenceRange;
+  const auto observed = stitchCollections(snapshot, sources, collections, observedRequest, formats);
 
   expect(result.complete(), "stitching should compact sparse source banks instead of reserving their numeric gaps");
   expect(restricted.complete(), "used-only stitched export should retain each part's playable instrument data");
+  expect(observed.complete(), "observed-range modulation scaling should support stitched exports");
   expect(result.parts.size() == 2 && result.parts[0].startTick == 0 && result.parts[1].startTick == 8,
          "stitched parts should be rescaled to a common PPQN and placed sequentially");
   expect(result.parts[0].banks ==
@@ -163,6 +172,13 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
              std::search(result.midi.bytes.begin(), result.midi.bytes.end(), secondPartDrums.begin(),
                          secondPartDrums.end()) != result.midi.bytes.end(),
          "source bank 127 selections should follow the same compact mapping as the SoundFont presets");
+  const std::vector<u8> scaledFirstPartVibrato{0xb0, 0x01, 0x40};
+  const std::vector<u8> scaledSecondPartVibrato{0xb0, 0x01, 0x7f};
+  expect(std::search(observed.midi.bytes.begin(), observed.midi.bytes.end(), scaledFirstPartVibrato.begin(),
+                     scaledFirstPartVibrato.end()) != observed.midi.bytes.end() &&
+             std::search(observed.midi.bytes.begin(), observed.midi.bytes.end(), scaledSecondPartVibrato.begin(),
+                         scaledSecondPartVibrato.end()) != observed.midi.bytes.end(),
+         "observed modulation scaling should use one range across all stitched parts");
   const std::vector<u8> centeredPitchBend{0xe0, 0x00, 0x40};
   const std::vector<u8> defaultPitchBendRange{0xb0, 0x06, 0x02};
   const std::vector<u8> centeredFineOrCoarseTune{0xb0, 0x06, 0x40};

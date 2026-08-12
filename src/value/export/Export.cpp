@@ -6,16 +6,14 @@
 
 #include "value/export/Export.h"
 
-#include "value/export/DynamicEnvelope.h"
+#include "value/export/CollectionPreparation.h"
 #include "value/export/ExportDiagnostics.h"
-#include "value/export/SequenceModulationProfile.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/midi/ModulationAnalysis.h"
 #include "value/export/synth/SynthExportData.h"
 #include "value/model/SessionSnapshot.h"
 #include "value/scan/FormatRegistry.h"
 #include "value/synth/SampleDecoder.h"
-#include "value/sequence/SequenceVm.h"
 #include "value/base/Source.h"
 #include "value/export/synth/ModulationScaling.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
@@ -34,13 +32,6 @@
 namespace vgmtrans::core {
 
 namespace {
-
-[[nodiscard]] std::string artifactBaseName(const Collection& collection) {
-  if (!collection.name.empty()) {
-    return collection.name;
-  }
-  return "collection-" + std::to_string(collection.id.value);
-}
 
 [[nodiscard]] std::string filenamePart(std::string name) {
   if (name.empty()) {
@@ -86,208 +77,7 @@ namespace {
   return {ExportKind::Midi};
 }
 
-struct PreparedExportDiagnostics {
-  std::vector<Diagnostic> collection;
-  std::vector<Diagnostic> sequence;
-  std::vector<Diagnostic> instrumentSets;
-  std::vector<Diagnostic> sampleCollections;
-};
-
-struct PreparedExport {
-  // instrumentSets may point into ownedInstrumentSets, so copying would leave
-  // pointers referring to the original object.
-  PreparedExport() = default;
-  PreparedExport(const PreparedExport&) = delete;
-  PreparedExport& operator=(const PreparedExport&) = delete;
-  PreparedExport(PreparedExport&&) = default;
-  PreparedExport& operator=(PreparedExport&&) = default;
-
-  std::string baseName;
-  const Collection* collection = nullptr;
-  const SequenceProgramAsset* sequenceProgram = nullptr;
-  std::vector<const InstrumentSetAsset*> instrumentSets;
-  std::vector<const SampleCollectionAsset*> sampleCollections;
-  PreparedExportDiagnostics diagnostics;
-  std::vector<InstrumentSetAsset> ownedInstrumentSets;
-  bool ownsInstrumentSets = false;
-  FinalizeCollectionPerformance finalizePerformance;
-};
-
-void rebuildInstrumentSetView(PreparedExport& prepared) {
-  prepared.instrumentSets.clear();
-  prepared.instrumentSets.reserve(prepared.ownedInstrumentSets.size());
-  for (const auto& instrumentSet : prepared.ownedInstrumentSets) {
-    prepared.instrumentSets.push_back(&instrumentSet);
-  }
-}
-
-void ensureOwnedInstrumentSets(PreparedExport& prepared) {
-  if (prepared.ownsInstrumentSets) {
-    return;
-  }
-  prepared.ownedInstrumentSets.clear();
-  prepared.ownedInstrumentSets.reserve(prepared.instrumentSets.size());
-  for (const auto* instrumentSet : prepared.instrumentSets) {
-    if (instrumentSet != nullptr) {
-      prepared.ownedInstrumentSets.push_back(*instrumentSet);
-    }
-  }
-  prepared.ownsInstrumentSets = true;
-  rebuildInstrumentSetView(prepared);
-}
-
-[[nodiscard]] const FormatModule* collectionPreparationModule(const Collection& collection,
-                                                              const SequenceProgramAsset* sequence,
-                                                              const FormatRegistry& formats) {
-  if (collection.origin == CollectionOrigin::UserCreated && sequence != nullptr) {
-    const auto* module = formats.findModule(sequence->metadata.format);
-    if (module != nullptr && module->prepareCollection != nullptr) {
-      return module;
-    }
-  }
-
-  const auto found = std::ranges::find_if(formats.modules(), [&](const FormatModule& module) {
-    const std::string_view resolver =
-        module.collectionResolverId.empty() ? std::string_view(module.name) : module.collectionResolverId;
-    return module.prepareCollection != nullptr && resolver == collection.key.resolver;
-  });
-  return found != formats.modules().end() ? &*found : nullptr;
-}
-
-[[nodiscard]] PreparedExport prepareCollectionExport(const SessionSnapshot& snapshot, CollectionId id,
-                                                     const SourceStore& sources, const FormatRegistry& formats) {
-  PreparedExport prepared;
-  prepared.collection = snapshot.collection(id);
-  if (prepared.collection == nullptr) {
-    prepared.diagnostics.collection.push_back(exportError("CollectionId was not found in the SessionSnapshot"));
-    return prepared;
-  }
-  const Collection& collection = *prepared.collection;
-  const CollectionMembers& members = collection.members;
-  prepared.baseName = artifactBaseName(collection);
-
-  if (members.sequence) {
-    if (const auto* sequence = snapshot.asset<SequenceProgramAsset>(*members.sequence)) {
-      prepared.sequenceProgram = sequence;
-    } else {
-      prepared.diagnostics.sequence.push_back(exportError("Collection sequence asset was not found"));
-    }
-  }
-
-  prepared.instrumentSets.reserve(members.instrumentSets.size());
-  for (const auto assetId : members.instrumentSets) {
-    if (const auto* instrumentSet = snapshot.asset<InstrumentSetAsset>(assetId)) {
-      prepared.instrumentSets.push_back(instrumentSet);
-    } else {
-      prepared.diagnostics.instrumentSets.push_back(exportError("Collection instrument set asset was not found"));
-    }
-  }
-
-  prepared.sampleCollections.reserve(members.sampleCollections.size());
-  for (const auto assetId : members.sampleCollections) {
-    if (const auto* samples = snapshot.asset<SampleCollectionAsset>(assetId)) {
-      prepared.sampleCollections.push_back(samples);
-    } else {
-      prepared.diagnostics.sampleCollections.push_back(exportError("Collection sample collection asset was not found"));
-    }
-  }
-
-  if (const auto* module = collectionPreparationModule(collection, prepared.sequenceProgram, formats)) {
-    try {
-      auto result = module->prepareCollection(CollectionPrepareContext{
-          .sources = sources,
-          .snapshot = snapshot,
-          .collection = collection,
-      });
-      prepared.diagnostics.collection.insert(prepared.diagnostics.collection.end(),
-                                             std::make_move_iterator(result.diagnostics.begin()),
-                                             std::make_move_iterator(result.diagnostics.end()));
-      prepared.finalizePerformance = std::move(result.finalizePerformance);
-      if (result.replacementInstrumentSets) {
-        // Replace the collection's instruments only when the format asks us to.
-        // A format that only changes sequence playback keeps the originals.
-        prepared.ownedInstrumentSets = std::move(*result.replacementInstrumentSets);
-        prepared.ownsInstrumentSets = true;
-        rebuildInstrumentSetView(prepared);
-      }
-    } catch (const std::exception& ex) {
-      prepared.diagnostics.collection.push_back(
-          exportError(module->name + " collection preparation failed: " + ex.what()));
-    }
-  }
-  return prepared;
-}
-
-struct SequenceRenderResult {
-  std::optional<PerformanceSequence> performance;
-  SequenceModulationProfile modulation;
-  std::vector<Diagnostic> diagnostics;
-};
-
-[[nodiscard]] SequenceRenderResult renderSequence(const SequenceProgramAsset& sequence, const SequenceDialect& dialect,
-                                                  LoopPolicy loopPolicy, u32 sequenceLoops,
-                                                  const FinalizeCollectionPerformance* finalizePerformance = nullptr) {
-  auto performance = SequenceVm(SequenceVmOptions{
-                                    .loopPolicy = loopPolicy,
-                                    .sequenceLoops = sequenceLoops,
-                                })
-                         .render(sequence.program, dialect);
-  if (finalizePerformance != nullptr && *finalizePerformance) {
-    try {
-      (*finalizePerformance)(performance);
-    } catch (const std::exception& ex) {
-      auto diagnostics = std::move(performance.diagnostics);
-      diagnostics.push_back(exportError("Collection performance finalization failed: " + std::string(ex.what()),
-                                        validDiagnosticRange(sequence.metadata.range)));
-      return SequenceRenderResult{.diagnostics = std::move(diagnostics)};
-    } catch (...) {
-      auto diagnostics = std::move(performance.diagnostics);
-      diagnostics.push_back(
-          exportError("Collection performance finalization failed", validDiagnosticRange(sequence.metadata.range)));
-      return SequenceRenderResult{.diagnostics = std::move(diagnostics)};
-    }
-  }
-  auto modulation = analyzeSequenceModulation(performance);
-  return SequenceRenderResult{
-      .performance = std::move(performance),
-      .modulation = std::move(modulation),
-  };
-}
-
-[[nodiscard]] SequenceRenderResult renderRegisteredSequence(
-    const SequenceProgramAsset& sequence, const FormatRegistry& formats, LoopPolicy loopPolicy, u32 sequenceLoops,
-    const FinalizeCollectionPerformance* finalizePerformance = nullptr) {
-  const auto* dialect = formats.findDialect(sequence.program.dialect.value);
-  if (dialect == nullptr) {
-    return SequenceRenderResult{
-        .diagnostics =
-            {
-                exportError("No sequence dialect registered for '" + sequence.program.dialect.value + "'",
-                            validDiagnosticRange(sequence.metadata.range)),
-            },
-    };
-  }
-  return renderSequence(sequence, *dialect, loopPolicy, sequenceLoops, finalizePerformance);
-}
-
-[[nodiscard]] SequenceRenderResult renderCollectionSequence(const PreparedExport& prepared,
-                                                            const FormatRegistry& formats,
-                                                            const SequenceExportRequest& request) {
-  if (prepared.sequenceProgram == nullptr) {
-    auto diagnostics = prepared.diagnostics.sequence;
-    if (diagnostics.empty()) {
-      diagnostics.push_back(exportError("Collection does not reference a sequence asset"));
-    }
-    return SequenceRenderResult{
-        .diagnostics = std::move(diagnostics),
-    };
-  }
-
-  return renderRegisteredSequence(*prepared.sequenceProgram, formats, request.loopPolicy, request.sequenceLoops,
-                                  &prepared.finalizePerformance);
-}
-
-[[nodiscard]] std::optional<MidiSequence> renderMidi(const SequenceRenderResult& rendering,
+[[nodiscard]] std::optional<MidiSequence> renderMidi(const RenderedCollection& rendering,
                                                      std::span<const InstrumentSetAsset* const> instrumentSets,
                                                      const MidiExportOptions& options,
                                                      ModulationConversionPolicy modulationConversion,
@@ -302,7 +92,7 @@ struct SequenceRenderResult {
   return renderMidiSequence(*performance, options, modulationConversion, instrumentSets, &rendering.modulation);
 }
 
-[[nodiscard]] std::optional<MidiModulationUsage> midiModulationUsage(const SequenceRenderResult& rendering) {
+[[nodiscard]] std::optional<MidiModulationUsage> midiModulationUsage(const RenderedCollection& rendering) {
   // SF2/DLS modulators often have only 7-bit controller inputs. Observed ranges let us
   // trade theoretical format coverage for better practical resolution when requested.
   if (!rendering.performance) {
@@ -316,7 +106,7 @@ struct SequenceRenderResult {
   return usage;
 }
 
-[[nodiscard]] Artifact exportMidi(std::string_view baseName, const SequenceRenderResult& rendering,
+[[nodiscard]] Artifact exportMidi(std::string_view baseName, const RenderedCollection& rendering,
                                   const std::optional<MidiSequence>& loweredMidi,
                                   ModulationScalingPolicy modulationScaling,
                                   ModulationConversionPolicy modulationConversion) {
@@ -348,34 +138,7 @@ struct SequenceRenderResult {
   };
 }
 
-void applySequenceModulationToPreparedExport(PreparedExport& prepared, const SequenceModulationProfile& profile) {
-  if (!profile.hasSynthModulation() || prepared.instrumentSets.empty()) {
-    return;
-  }
-
-  ensureOwnedInstrumentSets(prepared);
-  for (auto& instrumentSet : prepared.ownedInstrumentSets) {
-    core::applySequenceModulation(instrumentSet, profile);
-  }
-  rebuildInstrumentSetView(prepared);
-}
-
-[[nodiscard]] std::optional<DynamicEnvelopeMaterialization> materializePreparedDynamicEnvelopes(
-    PreparedExport& prepared, const SequenceRenderResult& rendering, DynamicEnvelopePolicy policy) {
-  if (policy != DynamicEnvelopePolicy::InstrumentVariants || !rendering.performance) {
-    return std::nullopt;
-  }
-
-  ensureOwnedInstrumentSets(prepared);
-  auto materialization =
-      materializeDynamicEnvelopes(*rendering.performance, std::span<InstrumentSetAsset>(prepared.ownedInstrumentSets));
-  rebuildInstrumentSetView(prepared);
-  prepared.diagnostics.collection.insert(prepared.diagnostics.collection.end(), materialization.diagnostics.begin(),
-                                         materialization.diagnostics.end());
-  return materialization;
-}
-
-[[nodiscard]] std::vector<Artifact> exportWav(const PreparedExport& prepared, const SourceStore& sources) {
+[[nodiscard]] std::vector<Artifact> exportWav(const PreparedCollection& prepared, const SourceStore& sources) {
   if (prepared.collection->members.sampleCollections.empty()) {
     return {Artifact{
         .filename = filenamePart(prepared.baseName) + "-samples.wav",
@@ -432,14 +195,15 @@ void applySequenceModulationToPreparedExport(PreparedExport& prepared, const Seq
   return artifacts;
 }
 
-[[nodiscard]] SynthExportInput synthExportInput(const PreparedExport& prepared, const ExportRequest& request,
-                                                const FormatRegistry& formats,
+[[nodiscard]] SynthExportInput synthExportInput(const PreparedCollection& prepared,
+                                                std::span<const InstrumentSetAsset* const> instrumentSets,
+                                                const ExportRequest& request, const FormatRegistry& formats,
                                                 const MidiModulationUsage* midiModulation,
                                                 ModulationConversionPolicy modulationConversion,
                                                 const PerformanceSequence* sequenceUsage) {
   return SynthExportInput{
       .name = prepared.baseName,
-      .instrumentSets = prepared.instrumentSets,
+      .instrumentSets = instrumentSets,
       .sampleCollections = prepared.sampleCollections,
       .formats = &formats,
       .sequenceUsage = sequenceUsage,
@@ -450,7 +214,7 @@ void applySequenceModulationToPreparedExport(PreparedExport& prepared, const Seq
   };
 }
 
-[[nodiscard]] Artifact synthArtifact(const PreparedExport& prepared, SynthExportResult result,
+[[nodiscard]] Artifact synthArtifact(const PreparedCollection& prepared, SynthExportResult result,
                                      std::string_view extension, std::string_view mediaType) {
   auto diagnostics = prepared.diagnostics.instrumentSets;
   diagnostics.insert(diagnostics.end(), prepared.diagnostics.sampleCollections.begin(),
@@ -466,21 +230,25 @@ void applySequenceModulationToPreparedExport(PreparedExport& prepared, const Seq
   };
 }
 
-[[nodiscard]] Artifact exportSoundFont2(const PreparedExport& prepared, const SourceStore& sources,
+[[nodiscard]] Artifact exportSoundFont2(const PreparedCollection& prepared, const SourceStore& sources,
                                         const FormatRegistry& formats, const ExportRequest& request,
                                         const MidiModulationUsage* midiModulation,
                                         ModulationConversionPolicy modulationConversion,
                                         const PerformanceSequence* sequenceUsage = nullptr) {
-  const auto input = synthExportInput(prepared, request, formats, midiModulation, modulationConversion, sequenceUsage);
+  const auto instruments = prepared.instrumentView();
+  const auto input =
+      synthExportInput(prepared, instruments, request, formats, midiModulation, modulationConversion, sequenceUsage);
   return synthArtifact(prepared, buildSoundFont2(input, sources), ".sf2", "audio/soundfont");
 }
 
-[[nodiscard]] Artifact exportDls(const PreparedExport& prepared, const SourceStore& sources,
+[[nodiscard]] Artifact exportDls(const PreparedCollection& prepared, const SourceStore& sources,
                                  const FormatRegistry& formats, const ExportRequest& request,
                                  const MidiModulationUsage* midiModulation,
                                  ModulationConversionPolicy modulationConversion,
                                  const PerformanceSequence* sequenceUsage = nullptr) {
-  const auto input = synthExportInput(prepared, request, formats, midiModulation, modulationConversion, sequenceUsage);
+  const auto instruments = prepared.instrumentView();
+  const auto input =
+      synthExportInput(prepared, instruments, request, formats, midiModulation, modulationConversion, sequenceUsage);
   return synthArtifact(prepared, buildDls(input, sources), ".dls", "audio/dls");
 }
 
@@ -502,7 +270,7 @@ Artifact exportStandaloneSequenceMidi(const SessionSnapshot& snapshot, AssetId s
     };
   }
 
-  const auto rendering = renderRegisteredSequence(*sequence, formats, request.loopPolicy, request.sequenceLoops);
+  const auto rendering = renderSequence(*sequence, formats, request);
   const auto midi = renderMidi(rendering, {}, request.midi, ModulationConversionPolicy::SequenceEventSimulation);
   return exportMidi(artifactBaseName(*sequence), rendering, midi, ModulationScalingPolicy::FullFormatRange,
                     ModulationConversionPolicy::SequenceEventSimulation);
@@ -573,9 +341,9 @@ Artifact exportInstrumentSet(const SessionSnapshot& snapshot, const SourceStore&
     };
   }
 
-  PreparedExport prepared;
+  PreparedCollection prepared;
   prepared.baseName = baseName;
-  prepared.instrumentSets.push_back(instrumentSet);
+  prepared.instrumentSets.push_back(*instrumentSet);
   std::vector<AssetId> sampleIds;
   for (const auto& instrument : instrumentSet->instruments) {
     for (const auto& region : instrument.regions) {
@@ -606,15 +374,15 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
   CollectionPlayback playback{
       .collection = collection,
   };
-  auto prepared = prepareCollectionExport(snapshot, collection, sources, formats);
+  auto prepared = prepareCollection(snapshot, collection, sources, formats);
   if (prepared.collection == nullptr) {
     playback.diagnostics = prepared.diagnostics.collection;
     return playback;
   }
 
   playback.title = prepared.baseName;
-  if (prepared.sequenceProgram != nullptr) {
-    playback.sequence = prepared.sequenceProgram->metadata.id;
+  if (prepared.sequence != nullptr) {
+    playback.sequence = prepared.sequence->metadata.id;
     playback.assetDependencies.push_back(playback.sequence);
   }
   playback.assetDependencies.insert(playback.assetDependencies.end(),
@@ -631,17 +399,18 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
       .dynamicEnvelopes = request.dynamicEnvelopes,
       .sampleFiltering = request.sampleFiltering,
   };
-  auto rendering = renderCollectionSequence(prepared, formats, exportRequest.sequence);
-  auto dynamicEnvelopes = materializePreparedDynamicEnvelopes(prepared, rendering, exportRequest.dynamicEnvelopes);
+  auto rendering = renderCollection(prepared, formats, exportRequest.sequence);
+  auto dynamicEnvelopes = materializeCollectionDynamicEnvelopes(prepared, rendering, exportRequest.dynamicEnvelopes);
   const auto* preparedPerformance =
       dynamicEnvelopes ? &dynamicEnvelopes->performance : (rendering.performance ? &*rendering.performance : nullptr);
-  auto loweredMidi = renderMidi(rendering, prepared.instrumentSets, exportRequest.sequence.midi,
-                                exportRequest.modulationConversion, preparedPerformance);
+  const auto instruments = prepared.instrumentView();
+  auto loweredMidi = renderMidi(rendering, instruments, exportRequest.sequence.midi, exportRequest.modulationConversion,
+                                preparedPerformance);
   auto midi = exportMidi(prepared.baseName, rendering, loweredMidi, exportRequest.modulationScaling,
                          exportRequest.modulationConversion);
   const auto synthConversion = loweredMidi ? request.modulationConversion : ModulationConversionPolicy::SynthModulators;
   if (synthConversion == ModulationConversionPolicy::SynthModulators) {
-    applySequenceModulationToPreparedExport(prepared, rendering.modulation);
+    applyCollectionSequenceModulation(prepared, rendering.modulation);
   }
   auto soundFont = exportSoundFont2(prepared, sources, formats, exportRequest, nullptr, synthConversion);
 
@@ -661,7 +430,7 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
 std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const SourceStore& sources,
                                        CollectionId collection, const ExportRequest& request,
                                        const FormatRegistry& formats) {
-  auto prepared = prepareCollectionExport(snapshot, collection, sources, formats);
+  auto prepared = prepareCollection(snapshot, collection, sources, formats);
   if (prepared.collection == nullptr) {
     return {Artifact{
         .filename = "export-error.txt",
@@ -671,7 +440,7 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
   }
 
   std::vector<Artifact> artifacts;
-  std::optional<SequenceRenderResult> rendering;
+  std::optional<RenderedCollection> rendering;
   std::optional<MidiSequence> loweredMidi;
   bool midiRendered = false;
   std::optional<MidiModulationUsage> midiUsage;
@@ -683,9 +452,9 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
   const auto kinds = requestedKinds(request);
   const bool exportsMidi = std::ranges::find(kinds, ExportKind::Midi) != kinds.end();
 
-  const auto requireRendering = [&]() -> const SequenceRenderResult& {
+  const auto requireRendering = [&]() -> const RenderedCollection& {
     if (!rendering) {
-      rendering = renderCollectionSequence(prepared, formats, request.sequence);
+      rendering = renderCollection(prepared, formats, request.sequence);
     }
     return *rendering;
   };
@@ -694,7 +463,7 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
     const auto& rendered = requireRendering();
     if (!dynamicEnvelopesMaterialized) {
       if (request.dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants) {
-        dynamicEnvelopes = materializePreparedDynamicEnvelopes(prepared, rendered, request.dynamicEnvelopes);
+        dynamicEnvelopes = materializeCollectionDynamicEnvelopes(prepared, rendered, request.dynamicEnvelopes);
       }
       dynamicEnvelopesMaterialized = true;
     }
@@ -706,8 +475,10 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
 
   const auto requireMidi = [&]() -> const std::optional<MidiSequence>& {
     if (!midiRendered) {
-      loweredMidi = renderMidi(requireRendering(), prepared.instrumentSets, request.sequence.midi,
-                               request.modulationConversion, requirePreparedPerformance());
+      const auto* performance = requirePreparedPerformance();
+      const auto instruments = prepared.instrumentView();
+      loweredMidi =
+          renderMidi(requireRendering(), instruments, request.sequence.midi, request.modulationConversion, performance);
       midiRendered = true;
     }
     return loweredMidi;
@@ -717,14 +488,14 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
     if (sequenceModulationApplied) {
       return;
     }
-    applySequenceModulationToPreparedExport(prepared, requireRendering().modulation);
+    applyCollectionSequenceModulation(prepared, requireRendering().modulation);
     sequenceModulationApplied = true;
   };
 
   const auto usesSequenceModulation = [&]() {
     if (!sequenceHasModulation) {
-      sequenceHasModulation = prepared.sequenceProgram != nullptr &&
-                              sequenceUsesSemantic(prepared.sequenceProgram->program, SequenceSemantic::Modulation);
+      sequenceHasModulation = prepared.sequence != nullptr &&
+                              sequenceUsesSemantic(prepared.sequence->program, SequenceSemantic::Modulation);
     }
     return *sequenceHasModulation;
   };
