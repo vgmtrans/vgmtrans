@@ -131,6 +131,10 @@ PerformanceSequence render(Version version, std::vector<u8> bytes) {
       .tracks = {decodeSourceTrack(ByteReader(SourceId{121}, bytes), version, 0, 0)},
   };
   program.behavior.initialTempoMicrosecondsPerQuarter = version == Version::SeikenDensetsu3 ? 576000 : 372000;
+  program.behavior.initialSourceInstrument = InstrumentIdentity{
+      .domain = std::string(kInstrumentDomain),
+      .key = version == Version::SeikenDensetsu3 ? 5u : (version == Version::BahamutLagoon ? 6u : 4u),
+  };
   program.behavior.initialLevel = version == Version::SeikenDensetsu3
                                       ? 0x3c / 128.0
                                       : (version == Version::BahamutLagoon ? 0x50 / 128.0 : 0x64 / 128.0);

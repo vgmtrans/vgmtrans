@@ -313,6 +313,7 @@ public:
   [[nodiscard]] Effects declaredLoop(Address destination) const noexcept;
   [[nodiscard]] Effects call(Address destination) const noexcept;
   [[nodiscard]] Effects return_() const noexcept;
+  [[nodiscard]] bool inSubroutine() const noexcept;
 
   // Formats can manage repeat counters directly when their driver does not fit
   // the counted-repeat helpers below.

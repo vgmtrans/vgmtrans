@@ -8,7 +8,6 @@
 
 #include <fmt/format.h>
 
-#include <algorithm>
 #include <string>
 
 namespace vgmtrans::formats::hudson_snes {
@@ -16,21 +15,6 @@ namespace vgmtrans::formats::hudson_snes {
 using namespace core;
 
 namespace {
-
-[[nodiscard]] SourceRange sequenceRange(ByteReader reader, SourceRange header, const SequenceProgram& program) {
-  u64 first = header.offset;
-  u64 last = header.endOffset();
-  for (const TrackProgram& track : program.tracks) {
-    for (const SourceCommand& command : track.commands) {
-      if (!command.range.valid() || command.range.source != header.source) {
-        continue;
-      }
-      first = std::min(first, command.range.offset);
-      last = std::max(last, command.range.endOffset());
-    }
-  }
-  return reader.range(first, last - first);
-}
 
 [[nodiscard]] ScanResult scan(const ScanInput& input) {
   const auto layout = findLayout(input.reader);
@@ -43,7 +27,8 @@ namespace {
   auto sequence = result.sequence(displayName);
   SequenceParse parsed =
       decodeSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics());
-  sequence.range(sequenceRange(input.reader, parsed.headerRange, parsed.program)).program(std::move(parsed.program));
+  sequence.range(sequenceSourceRange(input.reader, parsed.headerRange, parsed.program))
+      .program(std::move(parsed.program));
 
   auto collection = result.sourceCollection(displayName).sequence(sequence);
   if (const auto synth = addSynth(result, *layout, parsed.recipes, displayName)) {

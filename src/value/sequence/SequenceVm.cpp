@@ -248,6 +248,12 @@ void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavio
         .cents = static_cast<u16>(static_cast<u16>(*behavior.initialPitchBendRangeSemitones) * 100),
     });
   }
+  if (behavior.initialSourceInstrument) {
+    track.events.emplace_back(InstrumentPerformanceEvent{
+        .header = header,
+        .sourceInstrument = *behavior.initialSourceInstrument,
+    });
+  }
 }
 
 void endTrackAt(PerformanceTrack& track, u64 endTick, bool retainBoundaryEvents = false) {
@@ -973,6 +979,10 @@ Effects VmApi::return_() const noexcept {
   return Effects{.flowOverride = RuntimeTransition::return_()};
 }
 
+bool VmApi::inSubroutine() const noexcept {
+  return !runtime_.callStack.empty();
+}
+
 RepeatCounter VmApi::repeatCounter(u8 slot) {
   return RepeatCounter(runtime_.repeat, slot);
 }
@@ -1249,6 +1259,12 @@ SequenceProgramBehavior SequenceVm::resolvedBehavior(const SequenceProgram& prog
     behavior.panLaw = program.behavior.panLaw;
   } else if (dialect.defaultBehavior.panLaw != PanLaw::Unspecified) {
     behavior.panLaw = dialect.defaultBehavior.panLaw;
+  }
+
+  if (program.behavior.initialSourceInstrument) {
+    behavior.initialSourceInstrument = program.behavior.initialSourceInstrument;
+  } else if (dialect.defaultBehavior.initialSourceInstrument) {
+    behavior.initialSourceInstrument = dialect.defaultBehavior.initialSourceInstrument;
   }
 
   if (program.behavior.initialReverbSend) {

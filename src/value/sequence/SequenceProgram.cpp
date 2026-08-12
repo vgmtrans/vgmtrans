@@ -6,6 +6,8 @@
 
 #include "value/sequence/SequenceProgram.h"
 
+#include "value/base/Source.h"
+
 #include <algorithm>
 #include <stdexcept>
 #include <type_traits>
@@ -67,6 +69,20 @@ bool trackUsesSemantic(const TrackProgram& track, SequenceSemantic semantic) {
 bool sequenceUsesSemantic(const SequenceProgram& program, SequenceSemantic semantic) {
   return std::ranges::any_of(program.tracks,
                              [semantic](const TrackProgram& track) { return trackUsesSemantic(track, semantic); });
+}
+
+SourceRange sequenceSourceRange(ByteReader reader, SourceRange baseRange, const SequenceProgram& program) {
+  u64 first = baseRange.offset;
+  u64 last = baseRange.endOffset();
+  for (const TrackProgram& track : program.tracks) {
+    for (const SourceCommand& command : track.commands) {
+      if (command.range.valid() && command.range.source == baseRange.source) {
+        first = std::min(first, command.range.offset);
+        last = std::max(last, command.range.endOffset());
+      }
+    }
+  }
+  return reader.range(first, last - first);
 }
 
 const SemanticOperand* semanticOperand(const SourceCommand& command, std::string_view name) {

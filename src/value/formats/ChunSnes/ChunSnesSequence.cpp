@@ -336,10 +336,8 @@ struct TrackState {
   u8 surround = 0;
   s8 tuning = 0;
   bool syncLength = false;
-  bool initialized = false;
   bool previousSlur = false;
   bool previousWasRest = true;
-  u8 callDepth = 0;
   PerformanceNoteId lastNote;
   std::optional<double> lastKey;
   std::optional<PendingPitchSlide> pendingPitchSlide;
@@ -368,10 +366,6 @@ struct Playback {
         track.durationRate = found->rate;
         rememberLength();
       }
-    }
-    if (!track.initialized) {
-      track.initialized = true;
-      out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0});
     }
   }
 
@@ -735,23 +729,9 @@ struct Playback {
 
   [[nodiscard]] Effects repeatBreak(Address destination) { return vm.countedRepeatBreak(1, destination).effects; }
 
-  void beginCall() { ++track.callDepth; }
+  [[nodiscard]] Effects return_() { return vm.inSubroutine() ? vm.return_() : vm.fallthrough(); }
 
-  [[nodiscard]] Effects return_() {
-    if (track.callDepth == 0) {
-      return vm.fallthrough();
-    }
-    --track.callDepth;
-    return vm.return_();
-  }
-
-  [[nodiscard]] Effects returnOrEnd() {
-    if (track.callDepth != 0) {
-      --track.callDepth;
-      return vm.return_();
-    }
-    return vm.end();
-  }
+  [[nodiscard]] Effects returnOrEnd() { return vm.inSubroutine() ? vm.return_() : vm.end(); }
 
   void tick() {
     if (track.alternateRate != 0) {
@@ -963,7 +943,6 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const s16 relative = event.s16le("relative");
       const Address destination = relativeTarget(relative, begin + 3);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::CallTarget);
-      event.invoke<&Playback::beginCall>();
       return event.call(destination);
     }
     case 0xf9: {
@@ -1013,6 +992,7 @@ const SequenceDialect& sequenceDialect() {
           SequenceProgramBehavior{
               .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .commandLimit = 8192,
+              .initialSourceInstrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0},
               .initialLevel = math::channelGain(0x60, 0x80, 0xff),
               .initialReverbSend = 0.0,
               .initialStereoBalance = StereoBalance{},
