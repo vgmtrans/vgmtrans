@@ -116,21 +116,12 @@ enum class PitchEnvelopeKind : u8 {
 struct VibratoState {
   u8 delay = 0;
   u8 rate = 0;
-  u8 depth = 0;
-  u8 fade = 0;
   SequenceLfoDepthFadeState depthState;
 
   void configure(u8 newDelay, u8 newRate, u8 newDepth) {
     delay = newDelay;
     rate = newRate;
-    depth = newDepth;
-    fade = 0;
-    depthState.resetDepth(depth);
-  }
-
-  void configureFade(u8 length) {
-    fade = length;
-    depthState.configureFade(length, length == 0 ? 0 : depth / length);
+    depthState.resetDepth(newDepth);
   }
 
   void disable() { configure(0, 0, 0); }
@@ -193,7 +184,7 @@ struct Playback {
         .cyclesPerTick = static_cast<double>(track.vibrato.rate) / 256.0,
         .delayTicks = track.vibrato.delay,
         .waveform = LfoWaveform::Triangle,
-        .initialPhaseCycles = (track.vibrato.fade & 1) != 0 ? 0.5 : 0.0,
+        .initialPhaseCycles = (track.vibrato.depthState.fadeDurationTicks() & 1) != 0 ? 0.5 : 0.0,
         .sampleImmediatelyOnNote = true,
         .delayAppliesOnNoteRestartOnly = true,
         .phaseRunsAtZeroDepth = true,
@@ -258,13 +249,15 @@ struct Playback {
   }
 
   void beginVibratoFade() {
-    if (track.vibrato.rate == 0 || track.vibrato.depth == 0 || track.vibrato.fade == 0) {
+    const s32 depth = track.vibrato.depthState.targetDepth();
+    const u32 fade = track.vibrato.depthState.fadeDurationTicks();
+    if (track.vibrato.rate == 0 || depth == 0 || fade == 0) {
       return;
     }
-    const s32 step = track.vibrato.depth / track.vibrato.fade;
+    const s32 step = depth / static_cast<s32>(fade);
     static_cast<void>(track.vibrato.depthState.restartFade(track.vibrato.delay, step));
     track.vibrato.depthState.bindFade(out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth,
-                                                       math::vibratoDepth(track.vibrato.depth), track.vibrato.fade,
+                                                       math::vibratoDepth(static_cast<u8>(depth)), fade,
                                                        track.vibrato.delay));
     emitVibratoDepth(step, track.vibrato.depthState.fadeOutput(out.at(vm.tick() + track.vibrato.delay)), true);
   }
@@ -280,15 +273,12 @@ struct Playback {
         .restartsLfoPhase = true,
     };
     if (continues) {
-      track.lastNote = track.lastKey && *track.lastKey == outputKey
-                           ? out.note(NotePerformanceEvent{
-                                 .key = outputKey,
-                                 .linearVelocity = math::squaredGain(track.velocity),
-                                 .durationTicks = track.noteLength,
-                                 .extendsPrevious = true,
-                                 .restartsLfoPhase = true,
-                             })
-                           : out.continueVoice(track.lastNote, std::move(event));
+      if (track.lastKey && *track.lastKey == outputKey) {
+        event.extendsPrevious = true;
+        track.lastNote = out.note(std::move(event));
+      } else {
+        track.lastNote = out.continueVoice(track.lastNote, std::move(event));
+      }
     } else {
       track.lastNote = out.note(std::move(event));
     }
@@ -348,8 +338,8 @@ struct Playback {
   }
 
   void vibratoFade(u8 length) {
-    track.vibrato.configureFade(length);
-    emitVibratoDepth(track.vibrato.depth, out, true);
+    track.vibrato.depthState.configureLinearFade(length);
+    emitVibratoDepth(track.vibrato.depthState.targetDepth(), out, true);
   }
 
   void vibratoOff() {
