@@ -183,10 +183,10 @@ struct Playback {
     return LfoPerformanceContext{
         .cyclesPerTick = static_cast<double>(track.vibrato.rate) / 256.0,
         .delayTicks = track.vibrato.delay,
-        .waveform = LfoWaveform::Triangle,
+        .shape = LfoShape{.waveform = LfoWaveform::Triangle},
         .initialPhaseCycles = (track.vibrato.depthState.fadeDurationTicks() & 1) != 0 ? 0.5 : 0.0,
         .sampleImmediatelyOnNote = true,
-        .delayAppliesOnNoteRestartOnly = true,
+        .delayUpdateMode = LfoDelayUpdateMode::FutureNotesOnly,
         .phaseRunsAtZeroDepth = true,
     };
   }
@@ -195,10 +195,10 @@ struct Playback {
     return LfoPerformanceContext{
         .cyclesPerTick = static_cast<double>(track.tremolo.rate) / 256.0,
         .delayTicks = track.tremolo.delay,
-        .waveform = LfoWaveform::Triangle,
+        .shape = LfoShape{.waveform = LfoWaveform::Triangle},
         .initialPhaseCycles = 0.25,
         .sampleImmediatelyOnNote = true,
-        .delayAppliesOnNoteRestartOnly = true,
+        .delayUpdateMode = LfoDelayUpdateMode::FutureNotesOnly,
         .tremoloGainMode = TremoloGainMode::NoBoost,
     };
   }

@@ -486,7 +486,7 @@ struct VibratoConfig {
 
 [[nodiscard]] LfoPerformanceContext tremoloLfoContext() {
   return LfoPerformanceContext{
-      .waveform = LfoWaveform::Triangle,
+      .shape = LfoShape{.waveform = LfoWaveform::Triangle},
       // N-SPC starts at nominal gain and initially moves toward attenuation.
       .initialPhaseCycles = 0.25,
       .tremoloGainMode = TremoloGainMode::NoBoost,

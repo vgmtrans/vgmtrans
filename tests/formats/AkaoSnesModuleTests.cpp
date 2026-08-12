@@ -693,7 +693,7 @@ void akaoSnesV3VibratoPreservesSquareWaveModesAndSteppedAttack() {
     const PerformanceSequence performance = renderVibrato(0, 0x0c, mode.depth);
     expect(performance.diagnostics.empty(), "valid AkaoSnes V3 vibrato should render without diagnostics");
     const ModulationPerformanceEvent* depth = depthEvent(performance);
-    expect(depth != nullptr && depth->waveform == LfoWaveform::Square &&
+    expect(depth != nullptr && depth->shape && depth->shape->waveform == LfoWaveform::Square &&
                depth->initialPhaseCycles == mode.initialPhase && depth->pitchRangeSemitones &&
                depth->steppedDepthAttackSteps == 0,
            "AkaoSnes V3 vibrato should retain its square waveform, phase, and packed direction mode");
@@ -836,13 +836,14 @@ void akaoSnesV4LfosPreserveDriverFamiliesAndPackedModes() {
     const ModulationPerformanceEvent* tremoloRate =
         modulation(performance, ModulationPerformanceTarget::TremoloRate, false);
 
-    expect(vibratoDepth->waveform == test.waveform && vibratoDepth->polarity == test.polarity &&
-               vibratoDepth->initialPhaseCycles == test.initialPhase &&
+    expect(vibratoDepth->shape && vibratoDepth->shape->waveform == test.waveform &&
+               vibratoDepth->polarity == test.polarity && vibratoDepth->initialPhaseCycles == test.initialPhase &&
                vibratoDepth->steppedDepthAttackSteps == test.attackSteps && vibratoDepth->pitchRangeSemitones &&
                vibratoDepth->pitchDepthSemitones == expected.vibratoDepthSemitones,
            std::string(akaoSnesMinorVersionName(test.profile.minorVersion)) +
                " vibrato should preserve its waveform, packed direction, phase, and attack");
-    expect(tremoloDepth->waveform == test.waveform && tremoloDepth->polarity == test.polarity &&
+    expect(tremoloDepth->shape && tremoloDepth->shape->waveform == test.waveform &&
+               tremoloDepth->polarity == test.polarity &&
                tremoloDepth->volumeDepthLinearGain == expected.tremoloDepthLinearGain &&
                !tremoloDepth->volumeDepthDecibels,
            "AkaoSnes V4 tremolo should use the matching driver waveform and exact signed linear gain");

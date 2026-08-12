@@ -310,10 +310,12 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
   expect(std::ranges::any_of(events,
                              [](const PerformanceEvent& event) {
                                const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
-                               return modulation && modulation->waveform == LfoWaveform::Triangle &&
+                               return modulation && modulation->shape &&
+                                      modulation->shape->waveform == LfoWaveform::Triangle &&
                                       modulation->cyclesPerTick &&
                                       std::abs(*modulation->cyclesPerTick - 22.0 / 256.0) < 1e-12 &&
-                                      modulation->delayTicks == 3 && modulation->delayAppliesOnNoteRestartOnly &&
+                                      modulation->delayTicks == 3 &&
+                                      modulation->delayUpdateMode == LfoDelayUpdateMode::FutureNotesOnly &&
                                       !modulation->delayRunsWhileInactive &&
                                       modulation->initialPhaseCycles == 22.0 / 256.0;
                              }),

@@ -121,7 +121,9 @@ AkaoSnesV4Lfo akaoSnesV4Lfo(AkaoSnesProfile profile, u8 rate, u8 depth, u8 delay
       .tremoloDepthLinearGain = std::max(lfoAmplitude, negativeAmplitude) / 128.0,
       .context =
           {
-              .waveform = engine == Engine::PhaseAccumulator ? LfoWaveform::Triangle : LfoWaveform::Square,
+              .shape = LfoShape{
+                  .waveform = engine == Engine::PhaseAccumulator ? LfoWaveform::Triangle : LfoWaveform::Square,
+              },
               .polarity = lfoPolarity,
               .initialPhaseCycles = initialPhase(engine, lfoPolarity, delay),
               .pitchRangeSemitones = range,

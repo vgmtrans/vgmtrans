@@ -251,7 +251,7 @@ struct Playback {
         // nonzero sample occurs on music tick delay+1.
         .delayTicks = static_cast<u32>(vibrato.delay) + 1,
         .delayIsTempoRelative = true,
-        .waveform = LfoWaveform::Triangle,
+        .shape = LfoShape{.waveform = LfoWaveform::Triangle},
         // The shared simulator samples before advancing. Starting one phase
         // step ahead reproduces the driver's add-rate-then-sample order.
         .initialPhaseCycles = vibrato.rate / 256.0,
@@ -267,7 +267,7 @@ struct Playback {
         // sample is therefore observed at delay+1.
         .delayTicks = static_cast<u32>(delay) + 1,
         .delayIsTempoRelative = true,
-        .waveform = LfoWaveform::Triangle,
+        .shape = LfoShape{.waveform = LfoWaveform::Triangle},
         // The driver's absolute signed-byte phase starts at nominal gain and
         // advances before the first coarse tick sample.
         .initialPhaseCycles = std::fmod(0.25 + rate / 256.0, 1.0),

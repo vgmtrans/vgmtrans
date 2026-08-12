@@ -469,8 +469,9 @@ void ninSnesProfilesEmitSubtractiveTremolo() {
     expect(depths.size() == 2, label + " should emit tremolo-on and tremolo-off depth events");
     expect(depths[0]->volumeDepthDecibels && std::abs(*depths[0]->volumeDepthDecibels - expectedDepth) < 0.0001,
            label + " should convert N-SPC tremolo depth to physical decibels");
-    expect(depths[0]->waveform == LfoWaveform::Triangle && depths[0]->initialPhaseCycles == 0.25 &&
-               !depths[0]->phaseRunsAtZeroDepth && depths[0]->tremoloGainMode == TremoloGainMode::NoBoost,
+    expect(depths[0]->shape && depths[0]->shape->waveform == LfoWaveform::Triangle &&
+               depths[0]->initialPhaseCycles == 0.25 && !depths[0]->phaseRunsAtZeroDepth &&
+               depths[0]->tremoloGainMode == TremoloGainMode::NoBoost,
            label + " should emit a subtractive triangle beginning at nominal gain");
     expect(depths[1]->volumeDepthDecibels == 0.0, label + " should disable tremolo by clearing its depth");
     expect(rate != nullptr && rate->cyclesPerTick && rate->frequencyHz &&

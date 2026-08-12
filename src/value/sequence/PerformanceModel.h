@@ -222,6 +222,16 @@ struct PitchBendRangePerformanceEvent {
   u16 cents = 200;
 };
 
+// Controls when a new vibrato or tremolo delay takes effect.
+enum class LfoDelayUpdateMode {
+  // Apply the new delay to the LFO already playing and to later notes that
+  // restart it. Keep the amount of delay time that has already elapsed.
+  CurrentAndFutureNotes,
+  // Leave the LFO already playing unchanged. Use the new delay when a later
+  // note restarts it.
+  FutureNotesOnly,
+};
+
 struct VibratoDelayPerformanceEvent {
   PerformanceEventHeader header;
   // Delay in rendered sequence ticks, used when vibrato is simulated as pitch bend.
@@ -232,6 +242,9 @@ struct VibratoDelayPerformanceEvent {
   // Sequence-relative delays remain exact in event simulation. The shared
   // resolver also supplies milliseconds for synth-modulator lowering.
   bool tempoRelative = false;
+  // Controls whether this delay affects the LFO already playing or only later
+  // notes that restart it.
+  LfoDelayUpdateMode updateMode = LfoDelayUpdateMode::CurrentAndFutureNotes;
   // Legacy controller fallback for formats that do not provide milliseconds.
   u8 midiValue = 0;
 };
@@ -241,6 +254,9 @@ struct TremoloDelayPerformanceEvent {
   u32 delayTicks = 0;
   std::optional<double> milliseconds;
   bool tempoRelative = false;
+  // Controls whether this delay affects the LFO already playing or only later
+  // notes that restart it.
+  LfoDelayUpdateMode updateMode = LfoDelayUpdateMode::CurrentAndFutureNotes;
   u8 midiValue = 0;
 };
 
@@ -296,10 +312,49 @@ enum class ModulationPerformanceTarget {
   PanRate,
 };
 
-// Optional source-oscillator behavior shared by the physical LFO helpers.
-// Most formats need none of it; drivers with a continuously running or
-// non-default oscillator can describe that behavior without doing controller
-// conversion.
+// Defines the repeating shape of a vibrato, tremolo, or pan LFO. Most formats
+// need only a standard waveform. Formats with a lookup table can also provide
+// its exact samples; playback then uses the samples, while simpler exports use
+// the standard waveform as the closest available shape.
+struct LfoShape {
+  // The ordinary sine, triangle, or other named waveform for this shape.
+  // Playback uses it when samples is empty. Exports that cannot reproduce an
+  // exact sample table use it as the closest available shape.
+  LfoWaveform waveform = LfoWaveform::Triangle;
+  // Each number is the LFO output at one step of a complete cycle, from -1 to
+  // +1. Playback gives every step the same duration and uses these numbers
+  // directly, so they must already include any one-sided or reversed motion.
+  // An empty vector means to calculate the named waveform above instead.
+  std::vector<double> samples;
+};
+
+// Controls how an LFO restarts when a rate or depth event occurs during
+// playback. "Phase" means the current position within the repeating waveform.
+enum class LfoRestartMode {
+  // Continue from the current waveform position and current delay progress.
+  None,
+  // Jump to the waveform's starting position, but keep the current delay
+  // progress.
+  Phase,
+  // Jump to the waveform's starting position and begin its delay again from
+  // zero.
+  PhaseAndDelay,
+};
+
+// Controls what happens to the pitch or volume change currently being heard
+// when an event sets vibrato or tremolo depth to zero.
+enum class LfoZeroDepthBehavior {
+  // Cancel the current pitch or volume change immediately.
+  CenterOutput,
+  // Keep the current pitch or volume change until the next note, then cancel
+  // it. The next note does not restart the LFO unless its normal restart rules
+  // also say to do so.
+  HoldOutputUntilNextNote,
+};
+
+// Describes how a format's vibrato, tremolo, or pan LFO behaves during
+// playback. Format code supplies this alongside depth and rate values so the
+// playback and export code can reproduce the source waveform and timing.
 struct LfoPerformanceContext {
   std::optional<double> frequencyHz;
   // Oscillator cycles advanced by one sequence tick. The shared resolver
@@ -308,13 +363,18 @@ struct LfoPerformanceContext {
   std::optional<u32> delayTicks;
   std::optional<double> delayMilliseconds;
   bool delayIsTempoRelative = false;
-  std::optional<LfoWaveform> waveform;
+  // Replaces the current LFO shape, including both its standard waveform and
+  // its exact sample table. A missing value leaves the current shape unchanged.
+  std::optional<LfoShape> shape;
   // Maps the oscillator's normal -1..+1 output to 0..+1 or -1..0.
   // A missing value retains the ordinary bipolar range.
   std::optional<LfoPolarity> polarity;
-  // Oscillator position, in cycles, used when playback starts or a note resets
-  // the phase. Zero is the bipolar triangle's center/rising point.
+  // Sets the position within the waveform where the LFO begins. Zero is the
+  // start of the cycle and 0.5 is halfway through it.
   std::optional<double> initialPhaseCycles;
+  // Sets a different starting position when a note restarts the LFO. When this
+  // is absent, note restarts use initialPhaseCycles instead.
+  std::optional<double> noteRestartInitialPhaseCycles;
   // Optional asymmetric pitch endpoints for one normalized LFO cycle. The
   // ordinary pitchDepthSemitones value remains the maximum absolute excursion
   // used by target-neutral modulation planning.
@@ -328,16 +388,19 @@ struct LfoPerformanceContext {
   // Reverse the oscillator's phase advance after this many active source
   // ticks. Folded accumulator LFOs use this to alternate sawtooth direction.
   std::optional<u32> directionReversalTicks;
-  // Some drivers only load the configured delay when a note explicitly
-  // restarts the oscillator. Changing the register must not pause an LFO that
-  // is already running.
-  bool delayAppliesOnNoteRestartOnly = false;
-  // Restart the oscillator at this event after applying phase metadata.
-  bool restartPhase = false;
+  // Controls whether this delay affects the LFO already playing or only later
+  // notes that restart it.
+  LfoDelayUpdateMode delayUpdateMode = LfoDelayUpdateMode::CurrentAndFutureNotes;
+  // Controls whether this event continues the LFO, moves it back to the start
+  // of its waveform, or also begins its delay again.
+  LfoRestartMode restartMode = LfoRestartMode::None;
   bool phaseRunsAtZeroDepth = false;
   // Some register-driven oscillators also pause their delay counter while
   // either rate or depth is zero. The default keeps the existing behavior.
   bool delayRunsWhileInactive = true;
+  // Controls whether setting depth to zero cancels the current pitch or volume
+  // change immediately or leaves it in place until the next note.
+  LfoZeroDepthBehavior zeroDepthBehavior = LfoZeroDepthBehavior::CenterOutput;
   TremoloGainMode tremoloGainMode = TremoloGainMode::BipolarAroundNominal;
 };
 
@@ -360,10 +423,16 @@ struct ModulationPerformanceEvent {
   std::optional<u32> delayTicks;
   std::optional<double> delayMilliseconds;
   bool delayIsTempoRelative = false;
-  // A missing waveform retains the renderer's legacy/default LFO shape.
-  std::optional<LfoWaveform> waveform;
+  // Replaces the current LFO shape, including both its standard waveform and
+  // its exact sample table. A missing value leaves the current shape unchanged.
+  std::optional<LfoShape> shape;
   std::optional<LfoPolarity> polarity;
+  // Sets the position within the waveform where the LFO begins. Zero is the
+  // start of the cycle and 0.5 is halfway through it.
   std::optional<double> initialPhaseCycles;
+  // Sets a different starting position when a note restarts the LFO. When this
+  // is absent, note restarts use initialPhaseCycles instead.
+  std::optional<double> noteRestartInitialPhaseCycles;
   std::optional<ModulationRange> pitchRangeSemitones;
   std::optional<u32> steppedDepthAttackSteps;
   bool sampleImmediatelyOnNote = false;
@@ -371,12 +440,19 @@ struct ModulationPerformanceEvent {
   // Pan LFOs move through the source engine's pan law. MIDI simulation uses
   // this to retain loudness when its equal-power controller law differs.
   PanLaw panLaw = PanLaw::Unspecified;
-  bool delayAppliesOnNoteRestartOnly = false;
-  bool restartPhase = false;
+  // Controls whether this delay affects the LFO already playing or only later
+  // notes that restart it.
+  LfoDelayUpdateMode delayUpdateMode = LfoDelayUpdateMode::CurrentAndFutureNotes;
+  // Controls whether this event continues the LFO, moves it back to the start
+  // of its waveform, or also begins its delay again.
+  LfoRestartMode restartMode = LfoRestartMode::None;
   // Some drivers keep advancing the oscillator while its depth is zero. This
   // matters when a later command reveals an already-running LFO mid-note.
   bool phaseRunsAtZeroDepth = false;
   bool delayRunsWhileInactive = true;
+  // Controls whether setting depth to zero cancels the current pitch or volume
+  // change immediately or leaves it in place until the next note.
+  LfoZeroDepthBehavior zeroDepthBehavior = LfoZeroDepthBehavior::CenterOutput;
   // Tremolo depth is physical, but source engines differ in whether the
   // oscillator may rise above nominal gain.
   TremoloGainMode tremoloGainMode = TremoloGainMode::BipolarAroundNominal;
