@@ -2,6 +2,7 @@ add_executable(vgmtrans-value-core-tests)
 target_sources(vgmtrans-value-core-tests
   PRIVATE
     formats/CapcomSnesModuleTests.cpp
+    formats/CompileSnesModuleTests.cpp
     formats/HeartBeatSnesModuleTests.cpp
     formats/HudsonSnesModuleTests.cpp
     formats/ItikitiSnesModuleTests.cpp
@@ -40,6 +41,13 @@ target_link_libraries(vgmtrans-value-core-tests PRIVATE vgmtransvalueformats vgm
 target_compile_features(vgmtrans-value-core-tests PRIVATE cxx_std_20)
 
 add_test(NAME vgmtrans-value-core-tests COMMAND vgmtrans-value-core-tests)
+
+add_executable(vgmtrans-compile-snes-tests
+  formats/CompileSnesModuleTests.cpp
+  formats/CompileSnesTestMain.cpp)
+target_link_libraries(vgmtrans-compile-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
+target_compile_features(vgmtrans-compile-snes-tests PRIVATE cxx_std_20)
+add_test(NAME vgmtrans-compile-snes-tests COMMAND vgmtrans-compile-snes-tests)
 
 add_executable(vgmtrans-mp2k-tests
   formats/Mp2kModuleTests.cpp
