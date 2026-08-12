@@ -452,6 +452,77 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   return decoded;
 }
 
+[[nodiscard]] std::optional<DecodedSample> decodeGbaBdpcm(const Sample& sample, std::span<const u8> sourceBytes) {
+  if (sample.encodedData.offset > sourceBytes.size() ||
+      sample.encodedData.size > sourceBytes.size() - sample.encodedData.offset) {
+    return std::nullopt;
+  }
+
+  static constexpr std::array<s8, 16> deltas{
+      0, 1, 4, 9, 16, 25, 36, 49, -64, -49, -36, -25, -16, -9, -4, -1,
+  };
+  const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
+  const u32 requestedSamples = sample.codecParameter;
+  DecodedSample decoded{.sampleRate = sample.sampleRate, .channels = 1, .loop = sample.loop};
+  decoded.pcm.reserve(requestedSamples);
+
+  for (size_t block = 0; block + 33 <= encoded.size() && decoded.pcm.size() < requestedSamples; block += 33) {
+    s8 value = static_cast<s8>(encoded[block]);
+    decoded.pcm.push_back(static_cast<s16>(value) << 8);
+    for (size_t byte = 1; byte < 33 && decoded.pcm.size() < requestedSamples; ++byte) {
+      const u8 packed = encoded[block + byte];
+      // The first byte contributes only its low nibble. Every later byte is
+      // decoded high-nibble first, then low-nibble.
+      if (byte != 1) {
+        value = static_cast<s8>(value + deltas[packed >> 4]);
+        decoded.pcm.push_back(static_cast<s16>(value) << 8);
+        if (decoded.pcm.size() >= requestedSamples) {
+          break;
+        }
+      }
+      value = static_cast<s8>(value + deltas[packed & 0x0f]);
+      decoded.pcm.push_back(static_cast<s16>(value) << 8);
+    }
+  }
+  decoded.pcm.resize(requestedSamples, 0);
+  if (sample.reverse) {
+    std::ranges::reverse(decoded.pcm);
+  }
+  return decoded;
+}
+
+[[nodiscard]] std::optional<DecodedSample> decodeGbaPsg(const Sample& sample) {
+  constexpr std::array<double, 4> duties{0.125, 0.25, 0.5, 0.75};
+  const u32 sampleCount = sample.loop.length;
+  DecodedSample decoded{.sampleRate = sample.sampleRate, .channels = 1, .loop = sample.loop};
+  if (sample.codecParameter == 4) {
+    decoded.pcm = synthesizeLfsrNoisePcm16(sampleCount);
+  } else if (sample.codecParameter == 5) {
+    decoded.pcm = synthesizeLfsrNoisePcm16(sampleCount, 0x7f, 0x60);
+  } else {
+    decoded.pcm = synthesizeBandLimitedPulsePcm16(duties[sample.codecParameter & 3], sample.sampleRate, sampleCount);
+  }
+  return decoded;
+}
+
+[[nodiscard]] std::optional<DecodedSample> decodeGbaPsgWave(const Sample& sample, std::span<const u8> sourceBytes) {
+  if (sample.encodedData.offset > sourceBytes.size() || sample.encodedData.size != 16 ||
+      sample.encodedData.size > sourceBytes.size() - sample.encodedData.offset) {
+    return std::nullopt;
+  }
+  const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
+  DecodedSample decoded{.sampleRate = sample.sampleRate, .channels = 1, .loop = sample.loop};
+  decoded.pcm.reserve(32);
+  for (const u8 packed : encoded) {
+    // The GBA wave channel converts each unsigned nibble to 2 * (n - 8).
+    // Scaling that exact asymmetric -16..14 DAC range to PCM16 preserves both
+    // its zero point and its amplitude relative to the other PSG channels.
+    decoded.pcm.push_back(static_cast<s16>((static_cast<s32>(packed >> 4) - 8) << 12));
+    decoded.pcm.push_back(static_cast<s16>((static_cast<s32>(packed & 0x0f) - 8) << 12));
+  }
+  return decoded;
+}
+
 }  // namespace
 
 std::optional<DecodedSample> decodeSample(const Sample& sample, std::span<const u8> sourceBytes) {
@@ -466,6 +537,12 @@ std::optional<DecodedSample> decodeSample(const Sample& sample, std::span<const 
       return decodeNdsImaAdpcm(sample, sourceBytes);
     case AudioCodec::NdsPsg:
       return decodeNdsPsg(sample, sourceBytes);
+    case AudioCodec::GbaBdpcm:
+      return decodeGbaBdpcm(sample, sourceBytes);
+    case AudioCodec::GbaPsg:
+      return decodeGbaPsg(sample);
+    case AudioCodec::GbaPsgWave:
+      return decodeGbaPsgWave(sample, sourceBytes);
     case AudioCodec::PsxAdpcm:
       return decodePsxAdpcm(sample, sourceBytes);
     case AudioCodec::KonamiK054539Adpcm:

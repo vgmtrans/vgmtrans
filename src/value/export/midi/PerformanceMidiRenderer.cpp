@@ -311,6 +311,9 @@ struct SimulatedLfoState {
   u32 delayTicks = 0;
   std::optional<double> delayMilliseconds;
   bool delayIsTempoRelative = false;
+  std::optional<u32> noteRestartDelayTicks;
+  std::optional<double> noteRestartDelayMilliseconds;
+  bool noteRestartDelayIsTempoRelative = false;
   u32 delayCounterTicks = 0;
   double delayCounterMilliseconds = 0.0;
   u64 cursorTick = 0;
@@ -328,6 +331,8 @@ struct SimulatedLfoState {
   u32 directionTick = 0;
   bool phaseReversed = false;
   bool phaseRunsAtZeroDepth = false;
+  bool delayRunsWhileInactive = true;
+  PanLaw panLaw = PanLaw::Unspecified;
   bool configured = false;
   bool started = false;
   bool producedSample = false;
@@ -365,6 +370,8 @@ struct RenderTrackState {
   TremoloGainMode tremoloGainMode = TremoloGainMode::BipolarAroundNominal;
   SimulatedLfoState tremolo;
   double sourcePanPosition = 0.0;
+  double sourcePanLinearGain = 1.0;
+  PanLaw sourcePanLaw = PanLaw::Unspecified;
   double simulatedPanOffset = 0.0;
   std::optional<u8> lastPanValue;
   SimulatedLfoState panLfo;
@@ -770,6 +777,18 @@ void restartLfo(SimulatedLfoState& lfo, u64 tick, LfoInitialPhaseFallback fallba
   lfo.producedSample = false;
 }
 
+void resetLfoPhase(SimulatedLfoState& lfo, u64 tick, LfoInitialPhaseFallback fallback = LfoInitialPhaseFallback::Zero) {
+  lfo.cursorTick = tick;
+  lfo.phaseCycles = initialLfoPhase(lfo, fallback);
+  lfo.activeSteppedDepthAttackSteps = lfo.steppedDepthAttackSteps;
+  lfo.steppedDepthAttackStep = lfo.activeSteppedDepthAttackSteps == 0 ? 0 : 1;
+  lfo.steppedDepthAttackPhaseCycles = 0.0;
+  lfo.directionTick = 0;
+  lfo.phaseReversed = false;
+  lfo.started = true;
+  lfo.producedSample = false;
+}
+
 void configureLfo(SimulatedLfoState& lfo, u64 tick, const ModulationPerformanceEvent& event,
                   LfoInitialPhaseFallback fallback = LfoInitialPhaseFallback::Zero) {
   if (event.cyclesPerTick) {
@@ -799,20 +818,53 @@ void configureLfo(SimulatedLfoState& lfo, u64 tick, const ModulationPerformanceE
   if (event.directionReversalTicks) {
     lfo.directionReversalTicks = *event.directionReversalTicks;
   }
-  if (event.delayTicks) {
-    lfo.delayTicks = *event.delayTicks;
+  if (event.panLaw != PanLaw::Unspecified) {
+    lfo.panLaw = event.panLaw;
   }
-  if (event.delayMilliseconds) {
-    lfo.delayMilliseconds = std::max(0.0, *event.delayMilliseconds);
-  }
-  if (event.delayTicks || event.delayMilliseconds) {
-    lfo.delayIsTempoRelative = event.delayIsTempoRelative;
+  if (event.delayAppliesOnNoteRestartOnly) {
+    if (event.delayTicks) {
+      lfo.noteRestartDelayTicks = *event.delayTicks;
+    }
+    if (event.delayMilliseconds) {
+      lfo.noteRestartDelayMilliseconds = std::max(0.0, *event.delayMilliseconds);
+    }
+    if (event.delayTicks || event.delayMilliseconds) {
+      lfo.noteRestartDelayIsTempoRelative = event.delayIsTempoRelative;
+    }
+  } else {
+    if (event.delayTicks) {
+      lfo.delayTicks = *event.delayTicks;
+    }
+    if (event.delayMilliseconds) {
+      lfo.delayMilliseconds = std::max(0.0, *event.delayMilliseconds);
+    }
+    if (event.delayTicks || event.delayMilliseconds) {
+      lfo.delayIsTempoRelative = event.delayIsTempoRelative;
+    }
   }
   lfo.phaseRunsAtZeroDepth = event.phaseRunsAtZeroDepth;
+  lfo.delayRunsWhileInactive = event.delayRunsWhileInactive;
   lfo.configured = true;
   if (!lfo.started) {
     restartLfo(lfo, tick, fallback);
+  } else if (event.restartPhase) {
+    // Register-level phase clears do not reload a note-triggered delay.
+    resetLfoPhase(lfo, tick, fallback);
   }
+}
+
+void restartNoteLfo(SimulatedLfoState& lfo, u64 tick,
+                    LfoInitialPhaseFallback fallback = LfoInitialPhaseFallback::Zero) {
+  if (lfo.noteRestartDelayTicks) {
+    lfo.delayTicks = *lfo.noteRestartDelayTicks;
+  }
+  if (lfo.noteRestartDelayMilliseconds) {
+    lfo.delayMilliseconds = *lfo.noteRestartDelayMilliseconds;
+  }
+  if (lfo.noteRestartDelayTicks || lfo.noteRestartDelayMilliseconds) {
+    lfo.delayIsTempoRelative = lfo.noteRestartDelayIsTempoRelative;
+  }
+  restartLfo(lfo, tick, fallback);
 }
 
 void setLfoDelay(SimulatedLfoState& lfo, u64 tick, u32 delayTicks, std::optional<double> delayMilliseconds,
@@ -837,6 +889,11 @@ void flushLfo(SimulatedLfoState& lfo, u64 upToTick, const PerformanceTempoMap& t
     const u64 intervalTick = lfo.cursorTick == 0 ? 0 : lfo.cursorTick - 1;
     const double tickSeconds = tempos.tickSeconds(intervalTick);
     const double tickMilliseconds = tickSeconds * 1000.0;
+    const bool inactive =
+        lfo.cyclesPerTick.value_or(lfo.frequencyHz) <= 0.0 || (lfo.depth <= 0.0 && !lfo.phaseRunsAtZeroDepth);
+    if (inactive && !lfo.delayRunsWhileInactive) {
+      continue;
+    }
     if (!lfo.delayIsTempoRelative && lfo.delayMilliseconds) {
       if (lfo.delayCounterMilliseconds < *lfo.delayMilliseconds) {
         lfo.delayCounterMilliseconds =
@@ -852,7 +909,7 @@ void flushLfo(SimulatedLfoState& lfo, u64 upToTick, const PerformanceTempoMap& t
       }
     }
 
-    if (lfo.cyclesPerTick.value_or(lfo.frequencyHz) <= 0.0 || (lfo.depth <= 0.0 && !lfo.phaseRunsAtZeroDepth)) {
+    if (inactive) {
       continue;
     }
 
@@ -924,7 +981,7 @@ void restartSimulatedVibratoForNote(MidiTrack& track, RenderTrackState& state, u
     return;
   }
 
-  restartLfo(state.vibrato, tick);
+  restartNoteLfo(state.vibrato, tick);
   const double previousSemitones = state.simulatedVibratoSemitones;
   const bool startsImmediately = state.vibrato.sampleImmediatelyOnNote && state.vibrato.delayTicks == 0 &&
                                  state.vibrato.delayMilliseconds.value_or(0.0) <= 0.0 &&
@@ -1013,7 +1070,7 @@ void restartSimulatedTremoloForNote(MidiTrack& track, RenderTrackState& state, u
       !state.tremolo.waveform && state.tremoloDepthUnit == RenderTrackState::TremoloDepthUnit::LegacyUnipolar
           ? LfoInitialPhaseFallback::UnipolarTremoloNominalGain
           : LfoInitialPhaseFallback::Zero;
-  restartLfo(state.tremolo, tick, fallback);
+  restartNoteLfo(state.tremolo, tick, fallback);
   const bool delayed = state.tremolo.delayTicks != 0 || state.tremolo.delayMilliseconds.value_or(0.0) > 0.0;
   const double gain = delayed ? 1.0 : tremoloGainAtCurrentPhase(state);
   state.tremolo.producedSample =
@@ -1030,45 +1087,64 @@ bool shouldRestartSimulatedTremoloForNote(const NotePerformanceEvent& note, cons
          state.tremolo.configured;
 }
 
-void addCombinedPan(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
-                    MidiControllerState* automationState = nullptr, bool force = false) {
-  const u8 value = midiPan(state.sourcePanPosition + state.simulatedPanOffset);
-  if (automationState == nullptr && !force && state.lastPanValue && *state.lastPanValue == value) {
-    return;
+void addCombinedPan(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, const MidiExportOptions& options,
+                    ModulationConversionPolicy modulationConversion, MidiControllerState* automationState = nullptr,
+                    bool force = false) {
+  const double position = std::clamp(state.sourcePanPosition + state.simulatedPanOffset, -1.0, 1.0);
+  const PanLaw law = state.panLfo.panLaw != PanLaw::Unspecified ? state.panLfo.panLaw : state.sourcePanLaw;
+  u8 value = midiPan(position);
+  double expressionGain = state.panExpressionGain;
+  if (law != PanLaw::Unspecified) {
+    const LoweredStereoBalance lowered = lowerPositionalPan(law, position);
+    value = lowered.pan;
+    expressionGain = lowered.expressionGain * state.sourcePanLinearGain;
   }
-  addPan(track, automationState, tick, channel, value);
-  state.lastPanValue = value;
+  if (automationState == nullptr && !force && state.lastPanValue && *state.lastPanValue == value) {
+    if (expressionGain == state.panExpressionGain) {
+      return;
+    }
+  } else {
+    addPan(track, automationState, tick, channel, value);
+    state.lastPanValue = value;
+  }
+  if (expressionGain != state.panExpressionGain) {
+    state.panExpressionGain = expressionGain;
+    addCombinedExpression(track, state, tick, channel, options, modulationConversion, automationState);
+  }
 }
 
 void flushSimulatedPan(MidiTrack& track, RenderTrackState& state, u64 upToTick, u8 channel,
-                       const PerformanceTempoMap& tempos) {
+                       const PerformanceTempoMap& tempos, const MidiExportOptions& options,
+                       ModulationConversionPolicy modulationConversion) {
   flushLfo(state.panLfo, upToTick, tempos, [&](u64 tick, double value) {
     state.simulatedPanOffset = state.panLfo.depth * value;
-    addCombinedPan(track, state, tick, channel);
+    addCombinedPan(track, state, tick, channel, options, modulationConversion);
   });
 }
 
-void setSimulatedPanDepth(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, double depth) {
+void setSimulatedPanDepth(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, double depth,
+                          const MidiExportOptions& options, ModulationConversionPolicy modulationConversion) {
   state.panLfo.depth = std::max(0.0, depth);
   if (state.panLfo.depth <= 0.0 && state.simulatedPanOffset != 0.0) {
     state.simulatedPanOffset = 0.0;
-    addCombinedPan(track, state, tick, channel);
+    addCombinedPan(track, state, tick, channel, options, modulationConversion);
   }
 }
 
-void restartSimulatedPanForNote(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel) {
+void restartSimulatedPanForNote(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
+                                const MidiExportOptions& options, ModulationConversionPolicy modulationConversion) {
   if (!state.panLfo.configured) {
     return;
   }
-  restartLfo(state.panLfo, tick);
+  restartNoteLfo(state.panLfo, tick);
   if (state.simulatedPanOffset != 0.0) {
     state.simulatedPanOffset = 0.0;
-    addCombinedPan(track, state, tick, channel);
+    addCombinedPan(track, state, tick, channel, options, modulationConversion);
   }
 }
 
 bool shouldRestartSimulatedPanForNote(const NotePerformanceEvent& note, const RenderTrackState& state) {
-  return !note.extendsPrevious && state.panLfo.configured;
+  return !note.extendsPrevious && note.restartsLfoPhase && state.panLfo.configured;
 }
 
 void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEvent& event, u8 channel,
@@ -1099,10 +1175,12 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                                              modulationConversion);
             }
           }
+          if (shouldRestartSimulatedPanForNote(typedEvent, state)) {
+            restartSimulatedPanForNote(track, state, typedEvent.header.tick, channel, options, modulationConversion);
+          }
           if (extendPreviousNote(track, state, typedEvent, channel)) {
             return;
           }
-          restartSimulatedPanForNote(track, state, typedEvent.header.tick, channel);
           if (options.terminatePreviousVoice && typedEvent.restartsEnvelope && state.lastNoteIndex) {
             track.events.push_back(AllSoundOff{
                 .tick = typedEvent.header.tick,
@@ -1110,12 +1188,17 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             });
           }
           state.lastNoteIndex = track.events.size();
+          u32 duration = typedEvent.durationTicks;
+          if (typedEvent.maximumDurationMilliseconds) {
+            duration = std::min(duration, globalTempos.durationTicksForMilliseconds(
+                                              typedEvent.header.tick, *typedEvent.maximumDurationMilliseconds));
+          }
           track.events.push_back(NoteDuration{
               .tick = typedEvent.header.tick,
               .channel = channel,
               .key = key,
               .velocity = midiVelocity(typedEvent.linearVelocity),
-              .duration = typedEvent.durationTicks,
+              .duration = duration,
           });
         } else if constexpr (std::is_same_v<TypedEvent, TempoPerformanceEvent>) {
           // Tempo is song-wide. Effective changes are written once on the
@@ -1137,19 +1220,21 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           addCombinedExpression(track, state, typedEvent.header.tick, channel, options, modulationConversion,
                                 automationState);
         } else if constexpr (std::is_same_v<TypedEvent, PanPerformanceEvent>) {
-          const LoweredStereoBalance lowered = lowerPositionalPan(typedEvent.law, typedEvent.stereoPosition);
-          state.sourcePanPosition = (static_cast<double>(lowered.pan) / 63.5) - 1.0;
-          addCombinedPan(track, state, typedEvent.header.tick, channel, automationState, automationState == nullptr);
-          const double previousPanExpressionGain = state.panExpressionGain;
-          state.panExpressionGain = lowered.expressionGain * (typedEvent.hasLinearGain ? typedEvent.linearGain : 1.0);
-          if (state.panExpressionGain != previousPanExpressionGain) {
-            addCombinedExpression(track, state, typedEvent.header.tick, channel, options, modulationConversion,
-                                  automationState);
-          }
+          state.sourcePanPosition = typedEvent.stereoPosition;
+          state.sourcePanLinearGain = typedEvent.hasLinearGain ? typedEvent.linearGain : 1.0;
+          state.sourcePanLaw = typedEvent.law;
+          addCombinedPan(track, state, typedEvent.header.tick, channel, options, modulationConversion, automationState,
+                         automationState == nullptr);
         } else if constexpr (std::is_same_v<TypedEvent, StereoBalancePerformanceEvent>) {
           const LoweredStereoBalance lowered = lowerStereoBalance(typedEvent.leftGain, typedEvent.rightGain);
-          state.sourcePanPosition = (static_cast<double>(lowered.pan) / 63.5) - 1.0;
-          addCombinedPan(track, state, typedEvent.header.tick, channel, automationState, automationState == nullptr);
+          const double left = std::max(0.0, typedEvent.leftGain);
+          const double right = std::max(0.0, typedEvent.rightGain);
+          const double sum = left + right;
+          state.sourcePanPosition = sum == 0.0 ? 0.0 : (right - left) / sum;
+          state.sourcePanLinearGain = sum;
+          state.sourcePanLaw = PanLaw::Unspecified;
+          addPan(track, automationState, typedEvent.header.tick, channel, lowered.pan);
+          state.lastPanValue = lowered.pan;
           state.panExpressionGain = lowered.expressionGain;
           addCombinedExpression(track, state, typedEvent.header.tick, channel, options, modulationConversion,
                                 automationState);
@@ -1321,7 +1406,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               case ModulationPerformanceTarget::PanDepth:
                 configureLfo(state.panLfo, typedEvent.header.tick, typedEvent);
                 setSimulatedPanDepth(track, state, typedEvent.header.tick, channel,
-                                     typedEvent.panDepth.value_or(normalizedAmount));
+                                     typedEvent.panDepth.value_or(normalizedAmount), options, modulationConversion);
                 break;
               case ModulationPerformanceTarget::PanRate:
                 configureLfo(state.panLfo, typedEvent.header.tick, typedEvent);
@@ -1334,7 +1419,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             configureLfo(state.panLfo, typedEvent.header.tick, typedEvent);
             if (typedEvent.target == ModulationPerformanceTarget::PanDepth) {
               setSimulatedPanDepth(track, state, typedEvent.header.tick, channel,
-                                   typedEvent.panDepth.value_or(normalizedAmount));
+                                   typedEvent.panDepth.value_or(normalizedAmount), options, modulationConversion);
             }
             return;
           }
@@ -1463,7 +1548,8 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
         flushSimulatedTremolo(midiTrack, renderState, flushTick, assignment.channel, globalTempos, options,
                               modulationConversion);
       }
-      flushSimulatedPan(midiTrack, renderState, flushTick, assignment.channel, globalTempos);
+      flushSimulatedPan(midiTrack, renderState, flushTick, assignment.channel, globalTempos, options,
+                        modulationConversion);
       if (trackIndex == 0) {
         if (const auto* tempo = std::get_if<TempoPerformanceEvent>(event);
             tempo != nullptr && globalTempos.contains(*tempo)) {
@@ -1493,7 +1579,7 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
       flushSimulatedTremolo(midiTrack, renderState, endTick, assignment.channel, globalTempos, options,
                             modulationConversion);
     }
-    flushSimulatedPan(midiTrack, renderState, endTick, assignment.channel, globalTempos);
+    flushSimulatedPan(midiTrack, renderState, endTick, assignment.channel, globalTempos, options, modulationConversion);
     if (trackIndex == 0) {
       for (size_t index = 0; index < globalTempoPoints.size(); ++index) {
         if (renderedTempoPoints[index]) {

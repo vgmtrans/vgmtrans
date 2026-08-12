@@ -270,6 +270,10 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2kLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2kModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2kSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2kSynth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesPatterns.cpp
@@ -324,6 +328,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/HudsonSnes/HudsonSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcade.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2k.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/RareSnes/RareSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/Nds.h

@@ -525,6 +525,56 @@ void performanceMidiRendererLowersDeclaredPanLaws() {
       "constant-sum center pan should retain its lower combined gain when lowered to MIDI equal-power pan");
 }
 
+void performanceMidiRendererRetainsPanLawDuringLfoSimulation() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {PerformanceTrack{
+          .id = TrackId{0},
+          .endTick = 2,
+          .events =
+              {
+                  PanPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0, .sequence = 0},
+                      .stereoPosition = 0.0,
+                      .law = PanLaw::ConstantSum,
+                      .linearGain = 255.0 / 256.0,
+                      .hasLinearGain = true,
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0, .sequence = 1},
+                      .target = ModulationPerformanceTarget::PanRate,
+                      .cyclesPerTick = 0.25,
+                      .waveform = LfoWaveform::Triangle,
+                      .panLaw = PanLaw::ConstantSum,
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0, .sequence = 2},
+                      .target = ModulationPerformanceTarget::PanDepth,
+                      .panDepth = 1.0,
+                      .cyclesPerTick = 0.25,
+                      .waveform = LfoWaveform::Triangle,
+                      .panLaw = PanLaw::ConstantSum,
+                  },
+              },
+      }},
+  };
+
+  const MidiSequence midi =
+      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
+  const auto& events = midi.tracks[0].events;
+  expect(std::ranges::any_of(events,
+                             [](const MidiEvent& event) {
+                               const auto* pan = std::get_if<Pan>(&event);
+                               return pan && pan->tick == 2 && pan->value == 127;
+                             }) &&
+             std::ranges::any_of(events,
+                                 [](const MidiEvent& event) {
+                                   const auto* expression = std::get_if<Expression>(&event);
+                                   return expression && expression->tick == 2 && expression->value == 127;
+                                 }),
+         "constant-sum pan LFO simulation should restore full aggregate gain at a hard-pan peak");
+}
+
 void performanceMidiRendererHonorsMidiExportOptions() {
   PerformanceSequence performance{.timebase = Timebase{.ppqn = 48},
                                   .tracks = {
@@ -2762,6 +2812,7 @@ void runValueMidiTests() {
   performanceMidiRendererWritesPanGainResetWhenRequested();
   performanceMidiRendererCombinesExpressionWithPanGain();
   performanceMidiRendererLowersDeclaredPanLaws();
+  performanceMidiRendererRetainsPanLawDuringLfoSimulation();
   performanceMidiRendererHonorsMidiExportOptions();
   performanceMidiRendererCanTerminatePreviousVoices();
   performanceMidiRendererLowersStructuredScalarAutomationPoints();

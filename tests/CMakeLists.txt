@@ -6,6 +6,7 @@ target_sources(vgmtrans-value-core-tests
     formats/CpsModuleTests.cpp
     formats/KonamiArcadeModuleTests.cpp
     formats/KonamiSnesModuleTests.cpp
+    formats/Mp2kModuleTests.cpp
     formats/NinSnesModuleTests.cpp
     formats/RareSnesModuleTests.cpp
     formats/AkaoSnesModuleTests.cpp
@@ -37,6 +38,13 @@ target_link_libraries(vgmtrans-value-core-tests PRIVATE vgmtransvalueformats vgm
 target_compile_features(vgmtrans-value-core-tests PRIVATE cxx_std_20)
 
 add_test(NAME vgmtrans-value-core-tests COMMAND vgmtrans-value-core-tests)
+
+add_executable(vgmtrans-mp2k-tests
+  formats/Mp2kModuleTests.cpp
+  formats/Mp2kTestMain.cpp)
+target_link_libraries(vgmtrans-mp2k-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
+target_compile_features(vgmtrans-mp2k-tests PRIVATE cxx_std_20)
+add_test(NAME vgmtrans-mp2k-tests COMMAND vgmtrans-mp2k-tests)
 
 add_executable(vgmtrans-hudson-snes-tests
   formats/HudsonSnesModuleTests.cpp

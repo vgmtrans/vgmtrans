@@ -481,7 +481,10 @@ namespace {
       .steppedDepthAttackSteps = context.steppedDepthAttackSteps,
       .sampleImmediatelyOnNote = context.sampleImmediatelyOnNote,
       .directionReversalTicks = context.directionReversalTicks,
+      .delayAppliesOnNoteRestartOnly = context.delayAppliesOnNoteRestartOnly,
+      .restartPhase = context.restartPhase,
       .phaseRunsAtZeroDepth = context.phaseRunsAtZeroDepth,
+      .delayRunsWhileInactive = context.delayRunsWhileInactive,
       .tremoloGainMode = context.tremoloGainMode,
   };
 }
@@ -533,19 +536,24 @@ void PerformanceEmitter::tremoloRateCyclesPerTick(double cycles, LfoPerformanceC
 void PerformanceEmitter::panLfoDepth(double depth, LfoPerformanceContext context) {
   auto event = physicalLfoEvent(ModulationPerformanceTarget::PanDepth, std::move(context));
   event.panDepth = depth;
+  event.panLaw = panLaw_;
   modulation(std::move(event));
 }
 
 void PerformanceEmitter::panLfoRate(double hertz, LfoPerformanceContext context) {
   context.frequencyHz = hertz;
   context.cyclesPerTick.reset();
-  modulation(physicalLfoEvent(ModulationPerformanceTarget::PanRate, std::move(context)));
+  auto event = physicalLfoEvent(ModulationPerformanceTarget::PanRate, std::move(context));
+  event.panLaw = panLaw_;
+  modulation(std::move(event));
 }
 
 void PerformanceEmitter::panLfoRateCyclesPerTick(double cycles, LfoPerformanceContext context) {
   context.frequencyHz.reset();
   context.cyclesPerTick = cycles;
-  modulation(physicalLfoEvent(ModulationPerformanceTarget::PanRate, std::move(context)));
+  auto event = physicalLfoEvent(ModulationPerformanceTarget::PanRate, std::move(context));
+  event.panLaw = panLaw_;
+  modulation(std::move(event));
 }
 
 void PerformanceEmitter::marker(MarkerPerformanceEvent event) {

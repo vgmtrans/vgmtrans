@@ -29,6 +29,7 @@ void suzukiPs1ModuleBuildsFractionallyTunedWdsSynth();
 void runSuzukiSnesModuleTests();
 void runHudsonSnesModuleTests();
 void runWolfTeamSnesModuleTests();
+void runMp2kModuleTests();
 
 void capcomSnesLayoutSelectsSongListAndFixedHeaders();
 void capcomSnesLayoutFallsBackToV2SongList();
@@ -346,6 +347,7 @@ int main() {
     akaoMelodicRegionsDropAdvancingOverlaps();
     akaoSampleSelectionKeepsPreferredAndRequiredCollections();
     akaoScanPublishesStructuralInstrumentSetAndPreparesBoundView();
+    runMp2kModuleTests();
     ndsLayoutResolvesNamesFilesAndDependencies();
     ndsLayoutBoundsMalformedTablesAndPointers();
     ndsSequenceFatRangesHandleNormalEmptyAndRecoveredFiles();

@@ -18,6 +18,7 @@
 #include "value/formats/HudsonSnes/HudsonSnes.h"
 #include "value/formats/KonamiArcade/KonamiArcade.h"
 #include "value/formats/KonamiSnes/KonamiSnes.h"
+#include "value/formats/MP2k/MP2k.h"
 #include "value/formats/NinSnes/NinSnes.h"
 #include "value/formats/RareSnes/RareSnes.h"
 #include "value/formats/NDS/Nds.h"
@@ -94,6 +95,7 @@ void registerValueFormats(core::Session& session, const ValueFormatOptions& opti
   session.registerFormat(akao::akaoDefinition());
   session.registerFormat(konami_arcade::konamiArcadeDefinition());
   session.registerFormat(konami_snes::konamiSnesDefinition());
+  session.registerFormat(mp2k::mp2kDefinition());
   session.registerFormat(nin_snes::definition());
   session.registerFormat(rare_snes::definition());
   session.registerFormat(segsat::segSatDefinition());

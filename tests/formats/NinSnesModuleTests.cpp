@@ -386,7 +386,7 @@ void ninSnesProfilesShareTempoRelativeVibratoClock() {
     bytes[second++] = 4;
     bytes[second++] = opcodes.rest;
     bytes[second++] = opcodes.tempo;
-    bytes[second++] = 0x40;
+    bytes[second++] = static_cast<u8>(0x40 / driver.tempoCommandMultiplier);
     bytes[second++] = 4;
     bytes[second++] = opcodes.rest;
     bytes[second] = 0;
