@@ -525,9 +525,13 @@ std::optional<Layout> findLayout(ByteReader reader) {
   if (loop) {
     u32 bestDistance = std::numeric_limits<u32>::max();
     for (auto candidate = candidates.begin(); candidate != candidates.end(); ++candidate) {
-      if (candidate->address <= *loop && *loop - candidate->address < bestDistance) {
+      if (candidate->address > *loop) {
+        continue;
+      }
+      const u32 distance = static_cast<u32>(*loop - candidate->address);
+      if (distance < bestDistance) {
         selected = candidate;
-        bestDistance = *loop - candidate->address;
+        bestDistance = distance;
       }
     }
   }

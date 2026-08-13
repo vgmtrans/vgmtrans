@@ -272,7 +272,8 @@ struct TimedScriptCursor {
     if (index == 0xff || delay == 0 || --delay != 0) {
       return std::nullopt;
     }
-    if (script.size() < 2 || offset + 1 >= script.size() || static_cast<u8>(script[offset]) == terminator) {
+    if (script.size() < 2 || static_cast<size_t>(offset) + 1 >= script.size() ||
+        static_cast<u8>(script[offset]) == terminator) {
       index = 0xff;
       return std::nullopt;
     }
@@ -533,7 +534,7 @@ struct Playback {
         setDurationRate(static_cast<u8>(script[track.durationScriptOffset++]));
         continue;
       }
-      if (value == 0xfe && track.durationScriptOffset + 1 < script.size()) {
+      if (value == 0xfe && static_cast<size_t>(track.durationScriptOffset) + 1 < script.size()) {
         const u16 raw =
             static_cast<u16>(script[track.durationScriptOffset] | (script[track.durationScriptOffset + 1] << 8));
         const s16 relative = static_cast<s16>(raw);

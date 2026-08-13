@@ -46,6 +46,8 @@ void sourceMapBuilderRecordsAnnotationsFieldsAndLinks() {
   expect(headerAnnotation.localKind == "probe-header", "source map should slugify annotation labels");
   expect(headerAnnotation.fields.size() == 2, "source map should preserve record and derived fields");
   expect(std::get<u64>(headerAnnotation.fields[0].value) == 0xaa, "source map should preserve field values");
+  expect(std::get<std::string>(headerAnnotation.fields[1].value) == "yes",
+         "source map should preserve string literal field values");
   expect(headerAnnotation.fields[0].display == SourceValueDisplay::Hex,
          "source map should preserve field display hints");
   expect(headerAnnotation.fieldsAsChildren && !sourceMap.get(command.id()).fieldsAsChildren,

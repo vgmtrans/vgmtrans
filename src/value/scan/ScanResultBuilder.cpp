@@ -448,6 +448,7 @@ std::string ScanResultBuilder::roleName(DraftRole role) {
     case DraftRole::Misc:
       return "misc";
   }
+  return "unknown";
 }
 
 void ScanResultBuilder::validateDraftReference(AssetId id, DraftRole role) const {

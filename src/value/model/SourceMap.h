@@ -87,6 +87,11 @@ using SourceValue = std::variant<std::monostate, bool, u64, s64, double, std::st
   return SourceValue{value};
 }
 
+template <size_t Size>
+[[nodiscard]] SourceValue makeSourceValue(const char (&value)[Size]) {
+  return SourceValue{std::string(value, Size - 1)};
+}
+
 template <std::integral T>
   requires(!std::same_as<std::remove_cvref_t<T>, bool>)
 [[nodiscard]] SourceValue makeSourceValue(T value) {
