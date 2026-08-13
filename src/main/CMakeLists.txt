@@ -293,6 +293,10 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesProfile.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/PrismSnes/PrismSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/PrismSnes/PrismSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/PrismSnes/PrismSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/PrismSnes/PrismSnesSynth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/RareSnes/RareSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/RareSnes/RareSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/RareSnes/RareSnesSequence.cpp
@@ -346,6 +350,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2k.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/PrismSnes/PrismSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/RareSnes/RareSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/Nds.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SegSat/SegSat.h

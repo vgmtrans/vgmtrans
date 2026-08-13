@@ -11,6 +11,7 @@ target_sources(vgmtrans-value-core-tests
     formats/KonamiSnesModuleTests.cpp
     formats/Mp2kModuleTests.cpp
     formats/NinSnesModuleTests.cpp
+    formats/PrismSnesModuleTests.cpp
     formats/RareSnesModuleTests.cpp
     formats/AkaoSnesModuleTests.cpp
     formats/AkaoFormatTests.cpp
@@ -71,6 +72,14 @@ add_executable(vgmtrans-heartbeat-snes-tests
 target_link_libraries(vgmtrans-heartbeat-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
 target_compile_features(vgmtrans-heartbeat-snes-tests PRIVATE cxx_std_20)
 add_test(NAME vgmtrans-heartbeat-snes-tests COMMAND vgmtrans-heartbeat-snes-tests)
+
+add_executable(vgmtrans-prism-snes-tests
+  formats/PrismSnesModuleTests.cpp
+  formats/PrismSnesTestMain.cpp
+)
+target_link_libraries(vgmtrans-prism-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
+target_compile_features(vgmtrans-prism-snes-tests PRIVATE cxx_std_20)
+add_test(NAME vgmtrans-prism-snes-tests COMMAND vgmtrans-prism-snes-tests)
 
 add_executable(vgmtrans-chun-snes-tests
   formats/ChunSnesModuleTests.cpp

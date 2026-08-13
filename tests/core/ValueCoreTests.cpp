@@ -28,6 +28,7 @@ void suzukiPs1DynamicAdsrUsesAuditedDriverCommands();
 void suzukiPs1ModuleBuildsFractionallyTunedWdsSynth();
 void runSuzukiSnesModuleTests();
 void runHeartBeatSnesModuleTests();
+void runPrismSnesModuleTests();
 void runHudsonSnesModuleTests();
 void runItikitiSnesModuleTests();
 void runCompileSnesModuleTests();
@@ -221,6 +222,7 @@ int main() {
     runHudsonSnesModuleTests();
     runItikitiSnesModuleTests();
     runCompileSnesModuleTests();
+    runPrismSnesModuleTests();
 
     capcomSnesLayoutSelectsSongListAndFixedHeaders();
     capcomSnesLayoutFallsBackToV2SongList();
