@@ -3,6 +3,7 @@ target_sources(vgmtrans-value-core-tests
   PRIVATE
     formats/CapcomSnesModuleTests.cpp
     formats/CompileSnesModuleTests.cpp
+    formats/FalcomSnesModuleTests.cpp
     formats/HeartBeatSnesModuleTests.cpp
     formats/HudsonSnesModuleTests.cpp
     formats/ItikitiSnesModuleTests.cpp
@@ -80,6 +81,14 @@ add_executable(vgmtrans-prism-snes-tests
 target_link_libraries(vgmtrans-prism-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
 target_compile_features(vgmtrans-prism-snes-tests PRIVATE cxx_std_20)
 add_test(NAME vgmtrans-prism-snes-tests COMMAND vgmtrans-prism-snes-tests)
+
+add_executable(vgmtrans-falcom-snes-tests
+  formats/FalcomSnesModuleTests.cpp
+  formats/FalcomSnesTestMain.cpp
+)
+target_link_libraries(vgmtrans-falcom-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
+target_compile_features(vgmtrans-falcom-snes-tests PRIVATE cxx_std_20)
+add_test(NAME vgmtrans-falcom-snes-tests COMMAND vgmtrans-falcom-snes-tests)
 
 add_executable(vgmtrans-chun-snes-tests
   formats/ChunSnesModuleTests.cpp
