@@ -6,8 +6,6 @@
 
 #include "value/formats/FalcomSnes/FalcomSnes.h"
 
-#include <fmt/format.h>
-
 #include <string>
 #include <utility>
 
@@ -24,7 +22,7 @@ namespace {
   }
 
   ScanResultBuilder result(input, "FalcomSnes");
-  const std::string displayName = fmt::format("{} (Ys V)", result.sourceDisplayName());
+  const std::string displayName = result.sourceDisplayName();
   auto sequence = result.sequence(displayName);
   SequenceParse parsed =
       decodeSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics());

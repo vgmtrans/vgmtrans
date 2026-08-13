@@ -6,8 +6,6 @@
 
 #include "value/formats/PrismSnes/PrismSnes.h"
 
-#include <fmt/format.h>
-
 #include <string>
 #include <utility>
 
@@ -24,8 +22,7 @@ namespace {
   }
 
   ScanResultBuilder result(input, "PrismSnes");
-  const std::string displayName =
-      fmt::format("{} ({}, song {})", result.sourceDisplayName(), versionName(layout->version), layout->songIndex);
+  const std::string displayName = result.sourceDisplayName();
   auto sequence = result.sequence(displayName);
   SequenceParse parsed =
       decodeSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics());
