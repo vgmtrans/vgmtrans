@@ -402,6 +402,7 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
       .bytes = std::move(image.data),
       .origin = range,
   });
+  result.disposition = ScanDisposition::Exclusive;
   return result;
 }
 

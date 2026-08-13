@@ -26,6 +26,18 @@ void FormatRegistry::add(FormatDefinition definition) {
 
   // Check every ordinary validation failure before changing either index. This
   // prevents a bad dialect from leaving its module partially registered.
+  std::unordered_set<std::string_view> providedHints;
+  providedHints.reserve(definition.module.formatHints.size());
+  for (const auto& hint : definition.module.formatHints) {
+    if (hint.empty()) {
+      throw std::invalid_argument("Cannot register an empty format hint");
+    }
+    if (!providedHints.insert(hint).second) {
+      throw std::invalid_argument(fmt::format("Duplicate format hint registered by {}: {}",
+                                              definition.module.name, hint));
+    }
+  }
+
   std::unordered_set<std::string_view> providedIds;
   providedIds.reserve(definition.sequenceDialects.size());
   for (const auto& dialect : definition.sequenceDialects) {
@@ -47,6 +59,16 @@ void FormatRegistry::add(FormatDefinition definition) {
 
 void FormatRegistry::seal() noexcept {
   sealed_ = true;
+}
+
+std::vector<const FormatModule*> FormatRegistry::modulesForFormatHint(std::string_view hint) const {
+  std::vector<const FormatModule*> matches;
+  for (const auto& module : modules_) {
+    if (std::ranges::find(module.formatHints, hint) != module.formatHints.end()) {
+      matches.push_back(&module);
+    }
+  }
+  return matches;
 }
 
 const FormatModule* FormatRegistry::findModule(std::string_view name) const {

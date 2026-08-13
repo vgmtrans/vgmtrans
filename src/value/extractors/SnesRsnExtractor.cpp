@@ -101,6 +101,9 @@ using ArchivePtr = std::unique_ptr<ar_archive, ArchiveCloser>;
   if (result.extractedSources.empty() && result.diagnostics.empty()) {
     result.diagnostics.push_back(warning("RSN archive did not contain any extractable entries", sourceRange));
   }
+  if (!result.extractedSources.empty()) {
+    result.disposition = ScanDisposition::Exclusive;
+  }
 
   return result;
 }

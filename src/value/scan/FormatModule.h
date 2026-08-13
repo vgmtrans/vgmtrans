@@ -66,6 +66,9 @@ struct FormatModule {
   std::string name;
   // Used when a request delegates sample filtering to the owning format.
   SampleFilter preferredSampleFilter = SampleFilter::None;
+  // Authoritative hints for derived sources that this module can scan. Sources
+  // without a hint are still offered to every module for normal discovery.
+  std::vector<std::string> formatHints = {};
   Scan scan;
   // Defaults to name when empty. Set this when a resolver intentionally uses a
   // different key prefix for its collections.

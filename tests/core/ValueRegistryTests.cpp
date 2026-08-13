@@ -32,6 +32,8 @@ void formatRegistryStoresCopyableDefinitionsAtomically() {
              copy.findModule("DynamicProbe")->preferredSampleFilter == SampleFilter::SnesDspLowPass,
          "format registry should expose a format's preferred sample filter");
   expect(copy.findModule("Missing") == nullptr, "format registry should report missing modules");
+  expect(copy.modulesForFormatHint("probe").empty(),
+         "format registry should not route an undeclared derived-source hint");
   const auto* dialect = copy.findDialect("probe");
   expect(dialect != nullptr && dialect->execute != nullptr,
          "format registry should copy dialects provided by a definition");
@@ -59,6 +61,46 @@ void formatRegistryStoresCopyableDefinitionsAtomically() {
   }
   expect(threw, "format registry should reject duplicate dialect IDs");
   expect(registry.modules().size() == 2, "a rejected dialect should not leave its module partially registered");
+
+  threw = false;
+  try {
+    registry.add(testFormat(FormatModule{
+        .name = "DuplicateHint",
+        .formatHints = {"same", "same"},
+        .scan = scanProbeSequence,
+    }));
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  expect(threw && registry.modules().size() == 2,
+         "format registry should reject duplicate hints without partially registering a module");
+}
+
+void formatRegistryRoutesAuthoritativeFormatHintsInRegistrationOrder() {
+  FormatRegistry registry;
+  registry.add(testFormat(FormatModule{
+      .name = "First",
+      .formatHints = {"shared", "first-only"},
+      .scan = scanProbeSequence,
+  }));
+  registry.add(testFormat(FormatModule{
+      .name = "Second",
+      .formatHints = {"shared"},
+      .scan = scanProbeSequence,
+  }));
+  registry.add(testFormat(FormatModule{
+      .name = "Unhinted",
+      .scan = scanProbeSequence,
+  }));
+
+  const auto shared = registry.modulesForFormatHint("shared");
+  expect(shared.size() == 2 && shared[0]->name == "First" && shared[1]->name == "Second",
+         "format hints should route to every accepting module in registration order");
+  const auto firstOnly = registry.modulesForFormatHint("first-only");
+  expect(firstOnly.size() == 1 && firstOnly.front()->name == "First",
+         "format hints should exclude modules that did not opt in");
+  expect(registry.modulesForFormatHint("missing").empty(),
+         "an authoritative unknown hint should not fall back to broad probing");
 }
 
 void sessionRegistersOneFormatDefinitionAtTheAuthoringSurface() {
@@ -236,6 +278,7 @@ void scanResultBuilderCursorReportsMalformedFields() {
 
 void runValueRegistryTests() {
   formatRegistryStoresCopyableDefinitionsAtomically();
+  formatRegistryRoutesAuthoritativeFormatHintsInRegistrationOrder();
   sessionRegistersOneFormatDefinitionAtTheAuthoringSurface();
   scanResultBuilderCoversCommonScannerPlumbing();
   scanResultBuilderNamesSourceCollections();

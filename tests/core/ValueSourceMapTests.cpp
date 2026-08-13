@@ -334,6 +334,42 @@ void scanValidationRejectsCrossAssetAnnotationParents() {
          "scan admission should reject annotation parents that cross asset boundaries");
 }
 
+void scanValidationChecksMemoizedInheritedOwnersIndependentOfAnnotationOrder() {
+  SourceStore sources;
+  const SourceId primary = sources.add(SourceFile{.name = "primary.bin"}, {0});
+  const SourceId foreign = sources.add(SourceFile{.name = "foreign.bin"}, {0});
+  const SourceRange assetRange = sources.reader(primary).range(0, 1);
+  ScanResult result{
+      .assets = {MiscAsset{.metadata = AssetMetadata{.id = AssetId{1}, .name = "Owned", .range = assetRange}}},
+      .sourceMap = SourceMap{{
+          SourceAnnotation{
+              .id = SourceAnnotationId{2},
+              .range = sources.reader(foreign).range(0, 1),
+              .label = "Child before parent",
+              .parent = SourceAnnotationId{1},
+          },
+          SourceAnnotation{
+              .id = SourceAnnotationId{1},
+              .range = assetRange,
+              .label = "Owner",
+              .owner = ObjectRefs::misc(AssetId{1}),
+          },
+      }},
+  };
+
+  const ValidationReport report = validateScanResult(primary, result, sources, {});
+  expect(std::ranges::any_of(report.diagnostics(),
+                             [](const Diagnostic& diagnostic) {
+                               return diagnostic.code == "scan.asset.multiple-sources";
+                             }),
+         "ownership validation should check inherited annotations even when a child precedes its parent");
+  expect(!std::ranges::any_of(report.diagnostics(),
+                              [](const Diagnostic& diagnostic) {
+                                return diagnostic.code == "scan.asset.missing-source-annotations";
+                              }),
+         "memoized inherited ownership should count the complete asset annotation graph");
+}
+
 void objectSelectorsHaveDistinctKinds() {
   expect(ObjectRefs::instrumentIndex(2) != ObjectRefs::instrumentProgram(2, 0),
          "an instrument table index should not collide with a bank/program selector");
@@ -413,6 +449,7 @@ void runValueSourceMapTests() {
   scanValidationRejectsSourceAnnotationParentCycles();
   scanValidationRequiresAssetOwnedAnnotationGraphs();
   scanValidationRejectsCrossAssetAnnotationParents();
+  scanValidationChecksMemoizedInheritedOwnersIndependentOfAnnotationOrder();
   objectSelectorsHaveDistinctKinds();
   diagnosticsCanReferenceSourceAnnotationsAndObjects();
   sessionSnapshotCarriesScannerSourceMap();
