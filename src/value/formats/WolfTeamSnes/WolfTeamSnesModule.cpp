@@ -45,7 +45,10 @@ namespace {
 
 FormatDefinition definition() {
   return FormatDefinition{
-      .module = {.name = "WolfTeamSnes", .preferredSampleFilter = SampleFilter::SnesDspLowPass, .scan = scan},
+      .module = {.name = "WolfTeamSnes",
+                 .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+                 .acceptedFormats = {source_formats::kSnesAram},
+                 .scan = scan},
       .sequenceDialects = {sequenceDialect()},
   };
 }

@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "value/scan/FormatDefinition.h"
+#include "value/scan/SourceExtractor.h"
 
 #include <filesystem>
 #include <istream>
@@ -72,6 +72,6 @@ private:
 // testable and useful to callers that obtain ROM members from another store.
 [[nodiscard]] std::vector<u8> assembleRomGroup(const RomGroupDefinition& group, std::vector<std::vector<u8>> members);
 
-[[nodiscard]] core::FormatDefinition mameRomSetExtractorDefinition(RomDatabase database);
+[[nodiscard]] core::SourceExtractor mameRomSetExtractor(RomDatabase database);
 
 }  // namespace vgmtrans::formats::mame

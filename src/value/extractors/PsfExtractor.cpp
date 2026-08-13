@@ -361,17 +361,33 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
   return std::nullopt;
 }
 
+[[nodiscard]] std::string_view extractedFormat(u8 version) {
+  switch (version) {
+    case kPsf1Version:
+      return source_formats::kPlayStationRam;
+    case kSsfVersion:
+      return source_formats::kSaturnRam;
+    case kGsfVersion:
+      return source_formats::kGbaRom;
+    case kNds2sfVersion:
+    case kNcsfVersion:
+      return source_formats::kNintendoDsRom;
+    default:
+      throw std::logic_error("Unsupported PSF version reached extraction");
+  }
+}
+
 }  // namespace
 
-[[nodiscard]] ScanResult scanPsf(const ScanInput& input) {
-  // The scanner emits one derived executable image. Platform-specific format modules then
+[[nodiscard]] ExtractionResult extractPsf(const ExtractionInput& input) {
+  // The extractor emits one derived executable image. Platform-specific format modules then
   // inspect that image exactly as if it came from a ROM/container file.
   const auto bytes = input.reader.slice(0, input.reader.size());
   if (!hasPsfSignature(bytes)) {
     return {};
   }
 
-  ScanResult result;
+  ExtractionResult result;
   const auto range = input.reader.range(0, input.reader.size());
   const auto psf = parsePsf(bytes);
 
@@ -387,6 +403,7 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
   SourceFile file{
       .name = sourceName(input.source),
       .path = input.source.path,
+      .knownFormat = std::string(extractedFormat(psf.version)),
   };
   if (auto title = psf.tags.find("title"); title != psf.tags.end() && !title->second.empty()) {
     file.title = title->second;
@@ -397,17 +414,20 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
   if (psf.version == kGsfVersion) {
     file.attributes.emplace("container-format", "GSF");
   }
-  result.extractedSources.push_back(ExtractedSource{
+  result.sources.push_back(ExtractedSource{
       .file = std::move(file),
       .bytes = std::move(image.data),
       .origin = range,
   });
-  result.disposition = ScanDisposition::Exclusive;
   return result;
 }
 
-FormatDefinition psfExtractorDefinition() {
-  return FormatDefinition{.module = {.name = "PSF", .scan = scanPsf}};
+SourceExtractor psfExtractor() {
+  return SourceExtractor{
+      .name = "PSF",
+      .acceptedFormats = {source_formats::kPsf},
+      .extract = extractPsf,
+  };
 }
 
 }  // namespace vgmtrans::formats::psf

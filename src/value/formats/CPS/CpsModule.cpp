@@ -188,7 +188,7 @@ FormatDefinition cpsDefinition() {
       .module =
           {
               .name = std::string(kCpsFormatName),
-              .formatHints = {"CPS1", "CPS2"},
+              .acceptedFormats = {source_formats::kCps1, source_formats::kCps2},
               .scan = scanCps,
           },
       .sequenceDialects = {cps1V1Dialect(), cpsEarlyDialect(), cpsLateDialect()},

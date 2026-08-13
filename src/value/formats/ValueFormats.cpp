@@ -79,16 +79,16 @@ void registerValueFormats(core::Session& session, const ValueFormatOptions& opti
   const auto mameDatabasePath = options.mameRomDatabase ? options.mameRomDatabase : defaultMameRomDatabasePath();
   if (mameDatabasePath) {
     try {
-      session.registerFormat(mame::mameRomSetExtractorDefinition(mame::RomDatabase::load(*mameDatabasePath)));
+      session.registerExtractor(mame::mameRomSetExtractor(mame::RomDatabase::load(*mameDatabasePath)));
     } catch (const std::exception&) {
       if (options.mameRomDatabase) {
         throw;
       }
     }
   }
-  session.registerFormat(snes_rsn::snesRsnExtractorDefinition());
-  session.registerFormat(snes_spc::snesSpcExtractorDefinition());
-  session.registerFormat(psf::psfExtractorDefinition());
+  session.registerExtractor(snes_rsn::snesRsnExtractor());
+  session.registerExtractor(snes_spc::snesSpcExtractor());
+  session.registerExtractor(psf::psfExtractor());
   session.registerFormat(capcom_snes::capcomSnesDefinition());
   session.registerFormat(chun_snes::definition());
   session.registerFormat(compile_snes::definition());

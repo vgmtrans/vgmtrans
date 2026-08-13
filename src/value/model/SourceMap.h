@@ -249,6 +249,8 @@ private:
     std::unordered_map<u32, size_t> annotationsById;
     std::unordered_map<u32, std::vector<SourceAnnotationId>> annotationsBySource;
     std::unordered_map<u32, std::vector<SourceAnnotationId>> annotationsByParent;
+    std::vector<std::optional<AssetId>> assetOwnerByAnnotation;
+    std::unordered_map<u32, std::vector<SourceAnnotationId>> annotationsByAsset;
   };
 
   struct Part {

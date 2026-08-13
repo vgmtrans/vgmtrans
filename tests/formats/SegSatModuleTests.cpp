@@ -594,15 +594,13 @@ void segSatSsfExtractorUsesFourByteMiniHeader() {
   le32(ssf, 12, checksum);
   std::ranges::copy(compressed, ssf.begin() + 16);
 
-  const auto definition = vgmtrans::formats::psf::psfExtractorDefinition();
-  ScanIdAllocator ids;
-  ScanInput input{
+  const auto extractor = vgmtrans::formats::psf::psfExtractor();
+  ExtractionInput input{
       .source = SourceFile{.id = SourceId{9}, .name = "fixture.ssf", .size = ssf.size()},
       .reader = ByteReader(SourceId{9}, ssf),
-      .ids = ids,
   };
-  const ScanResult result = definition.module.scan(input);
-  expect(result.diagnostics.empty() && result.extractedSources.size() == 1 &&
-             result.extractedSources.front().bytes == std::vector<u8>({0x12, 0x34, 0x56}),
+  const ExtractionResult result = extractor.extract(input);
+  expect(result.diagnostics.empty() && result.sources.size() == 1 &&
+             result.sources.front().bytes == std::vector<u8>({0x12, 0x34, 0x56}),
          "SSF extraction should overlay payload bytes immediately after its four-byte load address");
 }

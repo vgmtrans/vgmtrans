@@ -187,6 +187,7 @@ FormatDefinition segSatDefinition() {
       .module =
           FormatModule{
               .name = std::string(kSegSatFormatName),
+              .acceptedFormats = {source_formats::kSaturnRam},
               .scan = scanSegSat,
               .collectionResolverId = std::string(kSegSatCollectionResolver),
               .prepareCollection = prepareSegSatCollection,

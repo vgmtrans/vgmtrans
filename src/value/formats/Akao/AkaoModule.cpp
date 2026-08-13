@@ -133,6 +133,7 @@ FormatDefinition akaoDefinition() {
           {
               .name = std::string(kAkaoFormatName),
               .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
+              .acceptedFormats = {source_formats::kPlayStationRam},
               .scan = scanAkao,
               .collectionResolverId = std::string(kAkaoCollectionResolver),
               .resolveCollections = resolveAkaoCollections,

@@ -501,13 +501,13 @@ namespace {
   return Diagnostic{.severity = Severity::Warning, .message = std::move(message), .range = range};
 }
 
-[[nodiscard]] ScanResult scanRomSet(const ScanInput& input, const RomDatabase& database) {
+[[nodiscard]] ExtractionResult extractRomSet(const ExtractionInput& input, const RomDatabase& database) {
   const auto archiveBytes = input.reader.slice(0, input.reader.size());
   if (!hasZipSignature(archiveBytes)) {
     return {};
   }
 
-  ScanResult result;
+  ExtractionResult result;
   const auto set = database.find(archiveStem(input.source));
   if (set == nullptr) {
     return result;
@@ -525,6 +525,7 @@ namespace {
       .name = set->name + " ROM regions",
       .title = set->name,
       .path = input.source.path,
+      .knownFormat = set->format,
       .attributes =
           {
               {std::string(kMameGameAttribute), set->name},
@@ -556,13 +557,11 @@ namespace {
     return result;
   }
 
-  result.extractedSources.push_back(ExtractedSource{
+  result.sources.push_back(ExtractedSource{
       .file = std::move(assembledFile),
       .bytes = std::move(assembledBytes),
       .origin = archiveRange,
-      .formatHint = set->format,
   });
-  result.disposition = ScanDisposition::Exclusive;
   return result;
 }
 
@@ -608,13 +607,12 @@ const RomSetDefinition* RomDatabase::find(std::string_view name) const noexcept 
   return found != sets_.end() ? std::addressof(found->second) : nullptr;
 }
 
-FormatDefinition mameRomSetExtractorDefinition(RomDatabase database) {
-  return FormatDefinition{
-      .module =
-          {
-              .name = std::string(kMameExtractorName),
-              .scan = [database = std::move(database)](const ScanInput& input) { return scanRomSet(input, database); },
-          },
+SourceExtractor mameRomSetExtractor(RomDatabase database) {
+  return SourceExtractor{
+      .name = std::string(kMameExtractorName),
+      .acceptedFormats = {source_formats::kMameRomSet},
+      .extract =
+          [database = std::move(database)](const ExtractionInput& input) { return extractRomSet(input, database); },
   };
 }
 

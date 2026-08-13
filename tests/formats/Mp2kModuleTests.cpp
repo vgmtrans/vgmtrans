@@ -623,7 +623,7 @@ void mp2kDirectSoundMasterVolumeAffectsOnlyPcmVoices() {
 
 void gsfExtractorFeedsMp2kValueScanner() {
   Session session;
-  session.registerFormat(vgmtrans::formats::psf::psfExtractorDefinition());
+  session.registerExtractor(vgmtrans::formats::psf::psfExtractor());
   session.registerFormat(mp2kDefinition());
   session.addSource(SourceFile{.name = "mp2k-fixture.gsf"}, gsf(mp2kFixture()));
   session.scanPendingSources();
@@ -637,7 +637,7 @@ void gsfExtractorZeroFillsSparseTail() {
   const std::vector<u8> rom = mp2kFixture();
   constexpr u32 omittedZeroBytes = 12;
   Session session;
-  session.registerFormat(vgmtrans::formats::psf::psfExtractorDefinition());
+  session.registerExtractor(vgmtrans::formats::psf::psfExtractor());
   session.registerFormat(mp2kDefinition());
   session.addSource(SourceFile{.name = "Synthetic sparse-tail GSF"}, gsf(rom, omittedZeroBytes));
   session.scanPendingSources();
@@ -659,7 +659,7 @@ void miniGsfOverlaysLibraryAndNamesSelectedSong() {
   }
 
   Session session;
-  session.registerFormat(vgmtrans::formats::psf::psfExtractorDefinition());
+  session.registerExtractor(vgmtrans::formats::psf::psfExtractor());
   session.registerFormat(mp2kDefinition());
   session.addSource(SourceFile{.name = "selected.minigsf", .path = directory / "selected.minigsf"},
                     miniGsf(0, libraryPath.filename().string()));
@@ -714,7 +714,7 @@ void runMp2kModuleTests() {
 
 void validateMp2kCorpus(const std::filesystem::path& path) {
   Session session;
-  session.registerFormat(vgmtrans::formats::psf::psfExtractorDefinition());
+  session.registerExtractor(vgmtrans::formats::psf::psfExtractor());
   session.registerFormat(mp2kDefinition());
   const SourceId source = session.addSourceFromPath(path);
   ScanIdAllocator ids;
@@ -744,7 +744,7 @@ void validateMp2kCorpus(const std::filesystem::path& path) {
 
 void exportMp2kCorpusSong(const std::filesystem::path& path, size_t song, const std::filesystem::path& directory) {
   Session session;
-  session.registerFormat(vgmtrans::formats::psf::psfExtractorDefinition());
+  session.registerExtractor(vgmtrans::formats::psf::psfExtractor());
   session.registerFormat(mp2kDefinition());
   session.addSourceFromPath(path);
   session.scanPendingSources();

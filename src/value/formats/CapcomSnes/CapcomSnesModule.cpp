@@ -54,6 +54,7 @@ FormatDefinition capcomSnesDefinition() {
   return FormatDefinition{
       .module = {.name = "CapcomSnes",
                  .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+                 .acceptedFormats = {source_formats::kSnesAram},
                  .scan = scanCapcomSnes},
       .sequenceDialects = {capcomSnesSequenceDialect()},
   };

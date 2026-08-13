@@ -358,6 +358,11 @@ void scanValidationChecksMemoizedInheritedOwnersIndependentOfAnnotationOrder() {
   };
 
   const ValidationReport report = validateScanResult(primary, result, sources, {});
+  expect(result.sourceMap.assetOwner(SourceAnnotationId{2}) == AssetId{1},
+         "source map should memoize an inherited owner when a child precedes its parent");
+  expect(result.sourceMap.annotationsForAsset(AssetId{1}) ==
+             std::vector<SourceAnnotationId>{SourceAnnotationId{2}, SourceAnnotationId{1}},
+         "source map should index every annotation that inherits an asset owner");
   expect(std::ranges::any_of(report.diagnostics(),
                              [](const Diagnostic& diagnostic) {
                                return diagnostic.code == "scan.asset.multiple-sources";

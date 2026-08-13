@@ -27,6 +27,14 @@ namespace vgmtrans::core {
 
 namespace {
 
+void prepareDiagnosticRanges(std::vector<Diagnostic>& diagnostics, const SourceFile& source) {
+  for (auto& diagnostic : diagnostics) {
+    if (!diagnostic.range) {
+      diagnostic.range = SourceRange{.source = source.id, .offset = 0, .size = source.size};
+    }
+  }
+}
+
 void prepareDiagnostics(ScanResult& result, const SourceFile& source, const FormatRegistry& formats) {
   for (const auto& asset : result.assets) {
     const auto* sequence = std::get_if<SequenceProgramAsset>(&asset);
@@ -40,11 +48,12 @@ void prepareDiagnostics(ScanResult& result, const SourceFile& source, const Form
         .range = sequence->metadata.range.valid() ? std::optional<SourceRange>{sequence->metadata.range} : std::nullopt,
     });
   }
-  for (auto& diagnostic : result.diagnostics) {
-    if (!diagnostic.range) {
-      diagnostic.range = SourceRange{.source = source.id, .offset = 0, .size = source.size};
-    }
-  }
+  prepareDiagnosticRanges(result.diagnostics, source);
+}
+
+[[nodiscard]] bool accepts(const SourceFile& source, const std::vector<std::string>& acceptedFormats) {
+  return !source.knownFormat ||
+         std::ranges::find(acceptedFormats, *source.knownFormat) != acceptedFormats.end();
 }
 
 }  // namespace
@@ -60,7 +69,14 @@ void Session::registerFormat(FormatDefinition definition) {
   formats_.add(std::move(definition));
 }
 
+void Session::registerExtractor(SourceExtractor extractor) {
+  formats_.add(std::move(extractor));
+}
+
 SourceId Session::addSource(SourceFile file, std::vector<u8> bytes) {
+  if (file.knownFormat && file.knownFormat->empty()) {
+    throw std::invalid_argument("Cannot add a source with an empty known format");
+  }
   sealFormats();
   invalidateSnapshot();
   file.kind = SourceKind::UserLoaded;
@@ -280,7 +296,7 @@ void Session::scanSourceAndDerived(SourceId id) {
 
   const size_t assetsBefore = state_->assets().size();
   const size_t diagnosticsBefore = state_->diagnostics().size();
-  std::vector<PendingSourceScan> queue{{.source = id}};
+  std::vector<SourceId> queue{id};
   std::set<u32> queued{id.value};
 
   for (size_t index = 0; index < queue.size(); ++index) {
@@ -296,16 +312,58 @@ void Session::scanSourceAndDerived(SourceId id) {
   }
 }
 
-// User-loaded and unhinted sources use normal discovery. Extractors can attach
-// an authoritative format hint to a child when its format is already known.
-void Session::scanOneSource(const PendingSourceScan& pending, std::vector<PendingSourceScan>& queue,
-                            std::set<u32>& queued) {
-  const SourceId id = pending.source;
+// Unknown sources use normal discovery. A known format restricts both stages to
+// processors that advertise that representation, independent of source origin.
+void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<u32>& queued) {
   if (!scannedSources_.insert(id.value).second) {
     return;
   }
 
   const auto source = sources_.source(id);
+  bool acceptsKnownFormat = false;
+  const auto addValidationFailure = [&](std::string_view processor, std::string_view operation,
+                                        ValidationReport validation) {
+    auto diagnostics = validation.takeDiagnostics();
+    for (auto& diagnostic : diagnostics) {
+      diagnostic.message = std::string(processor) + " " + std::string(operation) + " failed: " + diagnostic.message;
+      if (!diagnostic.range || !sources_.contains(diagnostic.range->source)) {
+        diagnostic.range = SourceRange{.source = source.id, .offset = 0, .size = source.size};
+      }
+    }
+    state_->addDiagnostics(std::move(diagnostics));
+  };
+
+  // Extraction is a distinct first stage. Producing valid children means the
+  // extractor has consumed the input, so ordinary scanners only see the children.
+  for (const auto& extractor : formats_.extractors()) {
+    if (!accepts(source, extractor.acceptedFormats)) {
+      continue;
+    }
+    acceptsKnownFormat = true;
+    try {
+      ExtractionResult result = extractor.extract(ExtractionInput{
+          .source = source,
+          .reader = sources_.reader(id),
+      });
+      prepareDiagnosticRanges(result.diagnostics, source);
+      auto validation = validateExtractionResult(source.id, result, sources_);
+      if (!validation.empty()) {
+        addValidationFailure(extractor.name, "extraction", std::move(validation));
+        continue;
+      }
+
+      const bool consumed = !result.sources.empty();
+      state_->addDiagnostics(std::move(result.diagnostics));
+      if (consumed) {
+        addExtractedSources(std::move(result.sources), source.id, queue, queued);
+        return;
+      }
+    } catch (const std::exception& ex) {
+      state_->addError(std::string(extractor.name) + " extraction failed: " + ex.what(),
+                       SourceRange{.source = source.id, .offset = 0, .size = source.size});
+    }
+  }
+
   const auto scanModule = [&](const FormatModule& module) {
     try {
       ScanResult result = module.scan(ScanInput{
@@ -317,46 +375,36 @@ void Session::scanOneSource(const PendingSourceScan& pending, std::vector<Pendin
       prepareDiagnostics(result, source, formats_);
       auto validation = validateScanResult(source.id, result, sources_, state_->assets());
       if (!validation.empty()) {
-        auto diagnostics = validation.takeDiagnostics();
-        for (auto& diagnostic : diagnostics) {
-          diagnostic.message = std::string(module.name) + " scan failed: " + diagnostic.message;
-          if (!diagnostic.range || !sources_.contains(diagnostic.range->source)) {
-            diagnostic.range = SourceRange{.source = source.id, .offset = 0, .size = source.size};
-          }
-        }
-        state_->addDiagnostics(std::move(diagnostics));
-        return false;
+        addValidationFailure(module.name, "scan", std::move(validation));
+        return;
       }
-      const ScanDisposition disposition = result.disposition;
-      auto extractedSources = std::exchange(result.extractedSources, {});
       state_->appendScan(source.id, std::move(result));
-      addExtractedSources(std::move(extractedSources), source.id, queue, queued);
-      return disposition == ScanDisposition::Exclusive;
     } catch (const std::exception& ex) {
       state_->addError(std::string(module.name) + " scan failed: " + ex.what(),
                        SourceRange{.source = source.id, .offset = 0, .size = source.size});
-      return false;
     }
   };
 
-  if (pending.formatHint) {
-    for (const FormatModule* module : formats_.modulesForFormatHint(*pending.formatHint)) {
-      if (scanModule(*module)) {
-        break;
-      }
+  for (const auto& module : formats_.modules()) {
+    if (!accepts(source, module.acceptedFormats)) {
+      continue;
     }
-    return;
+    acceptsKnownFormat = true;
+    scanModule(module);
   }
 
-  for (const auto& module : formats_.modules()) {
-    if (scanModule(module)) {
-      break;
-    }
+  if (source.knownFormat && !acceptsKnownFormat) {
+    state_->addDiagnostics({Diagnostic{
+        .severity = Severity::Error,
+        .code = "scan.known-format.unsupported",
+        .message = "No registered processor accepts known source format '" + *source.knownFormat + "'",
+        .range = SourceRange{.source = source.id, .offset = 0, .size = source.size},
+    }});
   }
 }
 
 void Session::addExtractedSources(std::vector<ExtractedSource> extractedSources, SourceId defaultParent,
-                                  std::vector<PendingSourceScan>& queue, std::set<u32>& queued) {
+                                  std::vector<SourceId>& queue, std::set<u32>& queued) {
   for (auto& extracted : extractedSources) {
     SourceId parent = defaultParent;
     if (extracted.origin && extracted.origin->source.valid()) {
@@ -366,7 +414,7 @@ void Session::addExtractedSources(std::vector<ExtractedSource> extractedSources,
     const SourceId derived =
         sources_.addDerived(std::move(extracted.file), std::move(extracted.bytes), parent, extracted.origin);
     if (queued.insert(derived.value).second) {
-      queue.push_back(PendingSourceScan{.source = derived, .formatHint = std::move(extracted.formatHint)});
+      queue.push_back(derived);
     }
   }
 }

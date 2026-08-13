@@ -19,8 +19,10 @@ namespace {
 
 void sessionScansValuesAndDerivedSources() {
   Session session;
-  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
-  session.registerFormat(testFormat(probeMiscModule()));
+  session.registerExtractor(probeSequenceContainerExtractor());
+  auto sequenceModule = probeSequenceModule();
+  sequenceModule.acceptedFormats = {"probe-sequence"};
+  session.registerFormat(testFormat(std::move(sequenceModule), probeSequenceDialect()));
 
   const auto sourceId = session.addSource(SourceFile{.name = "probe.spc"}, {0xaa, 0x34, 0x12});
   expect(sourceId == SourceId{0}, "first source should get SourceId 0");
@@ -35,7 +37,9 @@ void sessionScansValuesAndDerivedSources() {
   expect(snapshot.sources()[1].origin.has_value() && snapshot.sources()[1].origin->source == sourceId &&
              snapshot.sources()[1].origin->offset == 0 && snapshot.sources()[1].origin->size == 1,
          "extracted derived source should preserve its origin range");
-  expect(snapshot.assets().size() == 2, "scan should produce sequence and misc assets");
+  expect(snapshot.sources()[1].knownFormat == "probe-sequence",
+         "extracted source should preserve its authoritative format");
+  expect(snapshot.assets().size() == 1, "the extracted source should produce a sequence asset");
   expect(snapshot.collections().size() == 1, "scan should produce one collection");
   expect(snapshot.diagnostics().size() == 1, "scan should preserve module diagnostics");
 
@@ -52,7 +56,7 @@ void sessionScansValuesAndDerivedSources() {
   expect(snapshot.asset<SequenceProgramAsset>(AssetId{99}) == nullptr,
          "session snapshot should return null for a missing asset id");
   const SourceMap& sourceMap = snapshot.sourceMap();
-  const auto sequenceAnnotations = sourceMap.withRole(sourceId, SourceRole::Sequence);
+  const auto sequenceAnnotations = sourceMap.withRole(snapshot.sources()[1].id, SourceRole::Sequence);
   expect(sequenceAnnotations.size() == 1, "sequence should expose a source-root annotation");
   const SourceAnnotation& sequenceRoot = sourceMap.get(sequenceAnnotations.front());
   expect(sequenceRoot.owner == ObjectRefs::sequence(sequence->metadata.id),
@@ -70,50 +74,45 @@ void sessionScansValuesAndDerivedSources() {
   expect(snapshot.collection(CollectionId{99}) == nullptr,
          "session snapshot should return null for a missing collection id");
 
-  const auto* misc = std::get_if<MiscAsset>(&snapshot.assets()[1]);
-  expect(misc != nullptr, "second asset should be misc from derived source");
-  expect(metadata(snapshot.assets()[1]).id == AssetId{1}, "missing asset id should be assigned");
-
   session.scanPendingSources();
 
   snapshot = session.snapshot();
   expect(snapshot.sources().size() == 2, "pending-source scan should not duplicate already-scanned derived sources");
-  expect(snapshot.assets().size() == 2, "pending-source scan should not duplicate already-scanned assets");
+  expect(snapshot.assets().size() == 1, "pending-source scan should not duplicate already-scanned assets");
   expect(snapshot.collections().size() == 1, "pending-source scan should not duplicate already-resolved collections");
 }
 
-void sessionRoutesExclusiveExtractorChildrenWithoutNarrowingUserSources() {
+void sessionRoutesKnownFormatsAndConsumesExtractedParents() {
   size_t extractorCalls = 0;
   size_t targetCalls = 0;
   size_t unrelatedCalls = 0;
 
   Session session;
-  session.registerFormat(testFormat(FormatModule{
-      .name = "ExclusiveExtractor",
-      .scan =
-          [&](const ScanInput& input) -> ScanResult {
+  session.registerExtractor(SourceExtractor{
+      .name = "ContainerExtractor",
+      .acceptedFormats = {"container-format"},
+      .extract =
+          [&](const ExtractionInput& input) -> ExtractionResult {
             ++extractorCalls;
             if (input.source.derived() || input.reader.empty() || input.reader.u8At(0) != 0xe0) {
               return {};
             }
-            return ScanResult{
-                .extractedSources = {ExtractedSource{
-                    .file = SourceFile{.name = "target.child"},
+            return ExtractionResult{
+                .sources = {ExtractedSource{
+                    .file = SourceFile{.name = "target.child", .knownFormat = "target-format"},
                     .bytes = {0xe1},
                     .origin = input.reader.range(0, 1),
-                    .formatHint = "target-format",
                 }},
-                .disposition = ScanDisposition::Exclusive,
             };
           },
-  }));
+  });
   session.registerFormat(testFormat(FormatModule{
       .name = "Target",
-      .formatHints = {"target-format"},
+      .acceptedFormats = {"target-format"},
       .scan =
           [&](const ScanInput& input) -> ScanResult {
             ++targetCalls;
-            if (!input.source.derived() || input.reader.empty() || input.reader.u8At(0) != 0xe1) {
+            if (input.reader.empty() || input.reader.u8At(0) != 0xe1) {
               return {};
             }
             ScanResultBuilder out(input, "Target");
@@ -136,14 +135,32 @@ void sessionRoutesExclusiveExtractorChildrenWithoutNarrowingUserSources() {
   session.scanPendingSources();
   const SessionSnapshot project = session.snapshot();
   expect(extractorCalls == 1 && targetCalls == 1 && unrelatedCalls == 0,
-         "an admitted exclusive extractor should stop probing its input and route its child by format hint");
+         "successful extraction should consume its input and route its child by known format");
   expect(project.sources().size() == 2 && project.assets().size() == 1,
          "a targeted derived source should remain an ordinary inspectable source with admitted assets");
 
   session.addSource(SourceFile{.name = "ordinary.bin"}, {0x00});
   session.scanPendingSources();
   expect(extractorCalls == 2 && targetCalls == 2 && unrelatedCalls == 1,
-         "an unhinted user source should still be offered to every registered module");
+         "a source without a known format should still be offered to every processor");
+
+  session.addSource(SourceFile{.name = "known-user.bin", .knownFormat = "target-format"}, {0xe1});
+  session.scanPendingSources();
+  expect(extractorCalls == 2 && targetCalls == 3 && unrelatedCalls == 1,
+         "known formats should route user-loaded and derived sources identically");
+}
+
+void sessionDiagnosesUnsupportedKnownFormats() {
+  Session session;
+  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
+  session.addSource(SourceFile{.name = "unsupported.bin", .knownFormat = "unsupported-format"}, {0xaa});
+  session.scanPendingSources();
+
+  const SessionSnapshot snapshot = session.snapshot();
+  expect(snapshot.assets().empty() && snapshot.sources().size() == 1 && snapshot.diagnostics().size() == 1,
+         "an unsupported known format should retain its source with a diagnostic");
+  expect(snapshot.diagnostics().front().code == "scan.known-format.unsupported",
+         "unsupported authoritative routing should preserve a structured diagnostic");
 }
 
 void sessionSharesOneImmutableSnapshotPerRevision() {
@@ -179,7 +196,7 @@ void sessionSharesOneImmutableSnapshotPerRevision() {
          "adding a source should invalidate the materialized snapshot revision");
   expect(afterAdd.sources().size() == afterScan.sources().size() + 1 && afterAdd.assets().size() == 1,
          "the post-add revision should include the pending source without changing scanned assets");
-  expect(afterScan.sources().size() == 2 && afterScan.assets().size() == 1,
+  expect(afterScan.sources().size() == 1 && afterScan.assets().size() == 1,
          "adding a source should leave the previous snapshot revision stable");
   expect(&afterAdd.assets().front() == &afterScan.assets().front() &&
              &afterAdd.sourceMap().annotations().front() == &afterScan.sourceMap().annotations().front(),
@@ -259,17 +276,17 @@ void sessionScansIndividualSourcesWithoutDuplicating() {
 void sessionClosesSourceFamiliesWhenScansFindNoAssets() {
   Session session;
   session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
-  session.registerFormat(testFormat(FormatModule{
+  session.registerExtractor(SourceExtractor{
       .name = "ProbeEmptyExtractor",
-      .scan =
-          [](const ScanInput& input) {
+      .extract =
+          [](const ExtractionInput& input) {
             if (input.reader.size() == 0 || input.reader.u8At(0) != 0x00) {
-              return ScanResult{};
+              return ExtractionResult{};
             }
 
-            ScanResult result;
+            ExtractionResult result;
             if (!input.source.derived()) {
-              result.extractedSources.push_back(ExtractedSource{
+              result.sources.push_back(ExtractedSource{
                   .file = SourceFile{.name = input.source.name + ".empty-child"},
                   .bytes = {0x00},
                   .origin = input.reader.range(0, 1),
@@ -277,7 +294,7 @@ void sessionClosesSourceFamiliesWhenScansFindNoAssets() {
             }
             return result;
           },
-  }));
+  });
 
   const SourceId detected = session.addSource(SourceFile{.name = "detected.probe"}, {0xaa});
   const SourceId empty = session.addSource(SourceFile{.name = "empty.probe"}, {0x00});
@@ -288,8 +305,8 @@ void sessionClosesSourceFamiliesWhenScansFindNoAssets() {
          "a source family with a detected asset should remain open");
   expect(project.source(empty) == nullptr,
          "a source family should close when neither it nor an extracted child contains detected assets");
-  expect(project.sources().size() == 2,
-         "closing an empty family should preserve the detected source and its extracted child");
+  expect(project.sources().size() == 1,
+         "closing an empty family should preserve only the unrelated detected source");
   expect(!session.sources().contains(empty), "closing an empty scan should release its source bytes");
 
   const SourceId individuallyScanned = session.addSource(SourceFile{.name = "individual-empty.probe"}, {0x00});
@@ -387,14 +404,16 @@ void sessionMatchesCollectionsAcrossSeparateSourceScans() {
 
 void sessionRemovesSourceFamilyAndDiscoveredData() {
   Session session;
-  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
-  session.registerFormat(testFormat(probeMiscModule()));
+  session.registerExtractor(probeSequenceContainerExtractor());
+  auto sequenceModule = probeSequenceModule();
+  sequenceModule.acceptedFormats = {"probe-sequence"};
+  session.registerFormat(testFormat(std::move(sequenceModule), probeSequenceDialect()));
 
   const auto source = session.addSource(SourceFile{.name = "remove-me.probe"}, {0xaa, 0x34});
   session.scanSource(source);
   SessionSnapshot project = session.snapshot();
   expect(project.sources().size() == 2, "fixture should scan one user source and one derived source");
-  expect(project.assets().size() == 2, "fixture should scan user and derived assets");
+  expect(project.assets().size() == 1, "fixture should scan the routed derived asset");
   expect(project.matchFacts().empty(), "scanner-known membership should not require a match fact");
   expect(project.collections().size() == 1, "fixture should publish one collection");
   expect(project.diagnostics().size() == 1, "fixture should publish one source-backed diagnostic");
@@ -436,21 +455,48 @@ void sessionRemovesSourceFamilyAndDiscoveredData() {
 
 void sessionRemovesSourceFamilyWithItsLastAsset() {
   Session session;
-  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
-  session.registerFormat(testFormat(probeMiscModule()));
+  session.registerExtractor(SourceExtractor{
+      .name = "ProbeAssetFamily",
+      .extract =
+          [](const ExtractionInput& input) -> ExtractionResult {
+            if (input.source.derived() || !hasProbeMagic(input, 0xaa)) {
+              return {};
+            }
+            return ExtractionResult{
+                .sources = {
+                    ExtractedSource{
+                        .file = SourceFile{.name = input.source.name + ".sequence", .knownFormat = "probe-sequence"},
+                        .bytes = {0xaa, 0x34},
+                        .origin = input.reader.range(0, 1),
+                    },
+                    ExtractedSource{
+                        .file = SourceFile{.name = input.source.name + ".misc", .knownFormat = "probe-misc"},
+                        .bytes = {0xbb, 0x01},
+                        .origin = input.reader.range(0, 1),
+                    },
+                },
+            };
+          },
+  });
+  auto sequenceModule = probeSequenceModule();
+  sequenceModule.acceptedFormats = {"probe-sequence"};
+  session.registerFormat(testFormat(std::move(sequenceModule), probeSequenceDialect()));
+  auto miscModule = probeMiscModule();
+  miscModule.acceptedFormats = {"probe-misc"};
+  session.registerFormat(testFormat(std::move(miscModule)));
 
   const SourceId source = session.addSource(SourceFile{.name = "remove-assets.probe"}, {0xaa, 0x34});
   session.scanSource(source);
   SessionSnapshot project = session.snapshot();
-  expect(project.sources().size() == 2 && project.assets().size() == 2,
-         "asset removal fixture should publish assets from a user and derived source");
+  expect(project.sources().size() == 3 && project.assets().size() == 2,
+         "asset removal fixture should publish two routed child assets");
   const AssetId sequence = metadata(project.assets()[0]).id;
   const AssetId misc = metadata(project.assets()[1]).id;
 
   const std::array firstRemoval{sequence};
   session.removeAssets(firstRemoval);
   project = session.snapshot();
-  expect(project.sources().size() == 2 && project.source(source) != nullptr,
+  expect(project.sources().size() == 3 && project.source(source) != nullptr,
          "a source family should remain while it still owns a detected asset");
   expect(project.assets().size() == 1 && metadata(project.assets().front()).id == misc,
          "removing one detected asset should preserve the other family asset");
@@ -601,17 +647,17 @@ void sessionRejectsDuplicateAssetIdsAtAdmission() {
 
 void sessionRejectsExtractedSourcesWithMissingParents() {
   Session session;
-  session.registerFormat(testFormat(probeBadExtractedSourceModule()));
+  session.registerExtractor(probeBadSourceExtractor());
   session.registerFormat(testFormat(probeMiscModule()));
 
   session.addSource(SourceFile{.name = "bad-derived-parent.probe"}, {0xf1});
   session.scanPendingSources();
   const SessionSnapshot project = session.snapshot();
   expect(project.sources().size() == 1, "bad extracted source should not be added to the session");
-  expect(project.assets().empty(), "bad extracted source should reject staged scan assets before admission");
+  expect(project.assets().empty(), "bad extracted source should be rejected before admission");
   expectDiagnosticRange(
       project.diagnostics(),
-      "ProbeBadExtracted scan failed: Scan result contained extracted source with missing parent source 99",
+      "ProbeBadExtracted extraction failed: Extraction result contained a source with missing parent source 99",
       SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
 }
 
@@ -678,32 +724,22 @@ void scanValidationRejectsMissingAssetRelationTargets() {
          "scan validation should reject asset relations whose typed target is missing");
 }
 
-void scanValidationRequiresExclusiveResultsToExtractSources() {
+void extractionValidationRejectsEmptyKnownFormats() {
   SourceStore sources;
-  const SourceId source = sources.add(SourceFile{.name = "empty-exclusive.probe"}, {0xaa});
-  const ScanResult result{.disposition = ScanDisposition::Exclusive};
-
-  const auto report = validateScanResult(source, result, sources, {});
-  expect(std::ranges::any_of(report.diagnostics(),
-                             [](const Diagnostic& diagnostic) {
-                               return diagnostic.code == "scan.exclusive-without-extracted-source";
-                             }),
-         "exclusive scan disposition should only be valid for successful extraction results");
-
-  const ScanResult emptyHint{
-      .extractedSources = {ExtractedSource{
-          .file = SourceFile{.name = "empty-hint.child"},
+  const SourceId source = sources.add(SourceFile{.name = "empty-format.probe"}, {0xaa});
+  const ExtractionResult result{
+      .sources = {ExtractedSource{
+          .file = SourceFile{.name = "empty-format.child", .knownFormat = ""},
           .bytes = {0xbb},
           .origin = sources.reader(source).range(0, 1),
-          .formatHint = "",
       }},
   };
-  const auto hintReport = validateScanResult(source, emptyHint, sources, {});
-  expect(std::ranges::any_of(hintReport.diagnostics(),
+  const auto report = validateExtractionResult(source, result, sources);
+  expect(std::ranges::any_of(report.diagnostics(),
                              [](const Diagnostic& diagnostic) {
-                               return diagnostic.code == "scan.extracted-source.empty-format-hint";
+                               return diagnostic.code == "scan.extracted-source.empty-known-format";
                              }),
-         "authoritative extracted-source format hints should never be empty");
+         "authoritative extracted-source formats should never be empty");
 }
 
 void scanValidationReportsMultipleAdmissionErrors() {
@@ -835,15 +871,6 @@ void scanValidationReportsMultipleAdmissionErrors() {
           }},
       };
 
-    case 5:
-      return ScanResult{
-          .extractedSources = {ExtractedSource{
-              .file = SourceFile{.name = "bad-range.child"},
-              .bytes = {0xbb},
-              .origin = badRange,
-          }},
-      };
-
     default:
       return {};
   }
@@ -855,7 +882,7 @@ void scanValidationRejectsOutOfBoundsScanResultRanges() {
     std::string_view message;
   };
 
-  const std::array<BadRangeCase, 6> cases{{
+  const std::array<BadRangeCase, 5> cases{{
       BadRangeCase{
           .kind = 0,
           .message = "Scan result contained asset metadata range outside source bounds (source 0, offset 3, size 1, "
@@ -882,11 +909,6 @@ void scanValidationRejectsOutOfBoundsScanResultRanges() {
           .message = "Scan result contained diagnostic range outside source bounds (source 0, offset 3, size 1, source "
                      "size 2)",
       },
-      BadRangeCase{
-          .kind = 5,
-          .message = "Scan result contained extracted source origin range outside source bounds (source 0, offset 3, "
-                     "size 1, source size 2)",
-      },
   }};
 
   for (const auto& testCase : cases) {
@@ -899,6 +921,20 @@ void scanValidationRejectsOutOfBoundsScanResultRanges() {
     const auto message = firstValidationMessage(validateScanResult(source, result, sources, {}));
     expect(message == testCase.message, "scan validation should reject out-of-bounds source ranges");
   }
+
+  SourceStore sources;
+  const auto source = sources.add(SourceFile{.name = "bad-extraction-range.probe"}, {0xf7, 0});
+  const ExtractionResult extraction{
+      .sources = {ExtractedSource{
+          .file = SourceFile{.name = "bad-range.child"},
+          .bytes = {0xbb},
+          .origin = sources.reader(source).range(3, 1),
+      }},
+  };
+  expect(firstValidationMessage(validateExtractionResult(source, extraction, sources)) ==
+             "Extraction result contained extracted source origin range outside source bounds (source 0, offset 3, "
+             "size 1, source size 2)",
+         "extraction validation should reject out-of-bounds source ranges");
 }
 
 void scanValidationRejectsRangeLessSourceAnnotations() {
@@ -1249,7 +1285,8 @@ void snapshotFindsTheFirstCollectionContainingAnAsset() {
 
 void runValueSessionTests() {
   sessionScansValuesAndDerivedSources();
-  sessionRoutesExclusiveExtractorChildrenWithoutNarrowingUserSources();
+  sessionRoutesKnownFormatsAndConsumesExtractedParents();
+  sessionDiagnosesUnsupportedKnownFormats();
   sessionSharesOneImmutableSnapshotPerRevision();
   sessionReportsUnregisteredSequenceDialect();
   sessionScansIndividualSourcesWithoutDuplicating();
@@ -1268,7 +1305,7 @@ void runValueSessionTests() {
   sessionRejectsMatchFactsForMissingAssets();
   sessionRejectsSourceScopedMatchFactsForMissingSources();
   scanValidationRejectsMissingAssetRelationTargets();
-  scanValidationRequiresExclusiveResultsToExtractSources();
+  extractionValidationRejectsEmptyKnownFormats();
   scanValidationReportsMultipleAdmissionErrors();
   scanValidationRejectsOutOfBoundsScanResultRanges();
   scanValidationRejectsRangeLessSourceAnnotations();

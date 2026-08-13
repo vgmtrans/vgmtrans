@@ -202,6 +202,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/session/Session.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/ScanResultBuilder.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/SourceExtractor.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceDialect.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceExecution.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceMotion.h

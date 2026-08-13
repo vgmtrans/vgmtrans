@@ -5,10 +5,10 @@
  */
 #pragma once
 
-#include "value/scan/FormatDefinition.h"
+#include "value/scan/SourceExtractor.h"
 
 namespace vgmtrans::formats::snes_spc {
 
-[[nodiscard]] core::FormatDefinition snesSpcExtractorDefinition();
+[[nodiscard]] core::SourceExtractor snesSpcExtractor();
 
 }  // namespace vgmtrans::formats::snes_spc

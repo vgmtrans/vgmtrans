@@ -23,14 +23,15 @@ namespace {
 // SourceRange is the shared link from parsed values back to SourceStore bytes.
 // Invalid ranges are allowed when a value genuinely has no source bytes, but a
 // valid range must point at active bytes that fit in the source.
-void validateRange(ValidationReport& report, const SourceStore& sources, SourceRange range, std::string_view context) {
+void validateRange(ValidationReport& report, const SourceStore& sources, SourceRange range, std::string_view context,
+                   std::string_view resultKind = "Scan result") {
   if (!range.valid()) {
     return;
   }
 
   if (!sources.contains(range.source)) {
     report.error("scan.range.missing-source",
-                 "Scan result contained " + std::string(context) + " range for missing source " +
+                 std::string(resultKind) + " contained " + std::string(context) + " range for missing source " +
                      std::to_string(range.source.value),
                  range);
     return;
@@ -39,7 +40,7 @@ void validateRange(ValidationReport& report, const SourceStore& sources, SourceR
   const auto sourceSize = sources.source(range.source).size;
   if (range.offset > sourceSize || range.size > sourceSize - range.offset) {
     report.error("scan.range.out-of-bounds",
-                 "Scan result contained " + std::string(context) + " range outside source bounds (source " +
+                 std::string(resultKind) + " contained " + std::string(context) + " range outside source bounds (source " +
                      std::to_string(range.source.value) + ", offset " + std::to_string(range.offset) + ", size " +
                      std::to_string(range.size) + ", source size " + std::to_string(sourceSize) + ")",
                  range);
@@ -90,24 +91,9 @@ void validateSourceMapRanges(ValidationReport& report, const SourceStore& source
   }
 }
 
-[[nodiscard]] std::unordered_set<u32> sourceAnnotationIds(const SourceMap& sourceMap) {
-  std::unordered_set<u32> ids;
-  for (const auto& annotation : sourceMap.annotations()) {
-    if (annotation.id.valid()) {
-      ids.insert(annotation.id.value);
-    }
-  }
-  return ids;
-}
-
-[[nodiscard]] bool containsAnnotationId(const std::unordered_set<u32>& ids, SourceAnnotationId id) {
-  return id.valid() && ids.contains(id.value);
-}
-
 void validateSourceMapReferences(ValidationReport& report, const SourceMap& sourceMap) {
-  const auto annotationIds = sourceAnnotationIds(sourceMap);
   for (const auto& annotation : sourceMap.annotations()) {
-    if (annotation.parent && !containsAnnotationId(annotationIds, *annotation.parent)) {
+    if (annotation.parent && (!annotation.parent->valid() || sourceMap.find(*annotation.parent) == nullptr)) {
       report.error("scan.source-annotation.unknown-parent",
                    "Scan result contained source annotation with missing parent annotation id " +
                        std::to_string(annotation.parent->value),
@@ -116,7 +102,7 @@ void validateSourceMapReferences(ValidationReport& report, const SourceMap& sour
 
     for (const auto& link : annotation.links) {
       if (const auto* target = std::get_if<SourceAnnotationId>(&link.target);
-          target != nullptr && !containsAnnotationId(annotationIds, *target)) {
+          target != nullptr && (!target->valid() || sourceMap.find(*target) == nullptr)) {
         report.error(
             "scan.source-annotation.unknown-target",
             "Scan result contained source annotation link to missing annotation id " + std::to_string(target->value),
@@ -127,25 +113,17 @@ void validateSourceMapReferences(ValidationReport& report, const SourceMap& sour
 }
 
 void validateSourceMapParentCycles(ValidationReport& report, const SourceMap& sourceMap) {
-  std::unordered_map<u32, const SourceAnnotation*> annotations;
-  annotations.reserve(sourceMap.annotations().size());
-  for (const auto& annotation : sourceMap.annotations()) {
-    if (annotation.id.valid()) {
-      annotations.emplace(annotation.id.value, &annotation);
-    }
-  }
-
   // 1 means the annotation is on the current parent path; 2 means its entire
   // parent chain has already been checked.
   std::unordered_map<u32, u8> state;
-  state.reserve(annotations.size());
-  for (const auto& [rootId, root] : annotations) {
-    if (state[rootId] == 2) {
+  state.reserve(sourceMap.annotations().size());
+  for (const auto& root : sourceMap.annotations()) {
+    if (!root.id.valid() || state[root.id.value] == 2) {
       continue;
     }
 
     std::vector<u32> path;
-    const SourceAnnotation* current = root;
+    const SourceAnnotation* current = &root;
     while (current != nullptr) {
       const u32 id = current->id.value;
       if (state[id] == 1) {
@@ -161,8 +139,7 @@ void validateSourceMapParentCycles(ValidationReport& report, const SourceMap& so
       if (!current->parent) {
         break;
       }
-      const auto parent = annotations.find(current->parent->value);
-      current = parent != annotations.end() ? parent->second : nullptr;
+      current = sourceMap.find(*current->parent);
     }
     for (const u32 id : path) {
       state[id] = 2;
@@ -172,9 +149,9 @@ void validateSourceMapParentCycles(ValidationReport& report, const SourceMap& so
 
 void validateDiagnosticAnnotationReferences(ValidationReport& report, const std::vector<Diagnostic>& diagnostics,
                                             const SourceMap& sourceMap) {
-  const auto annotationIds = sourceAnnotationIds(sourceMap);
   for (const auto& diagnostic : diagnostics) {
-    if (diagnostic.annotation && !containsAnnotationId(annotationIds, *diagnostic.annotation)) {
+    if (diagnostic.annotation &&
+        (!diagnostic.annotation->valid() || sourceMap.find(*diagnostic.annotation) == nullptr)) {
       report.error("scan.diagnostic.unknown-annotation",
                    "Scan result contained diagnostic for missing source annotation id " +
                        std::to_string(diagnostic.annotation->value),
@@ -221,64 +198,9 @@ void validateAssetIds(ValidationReport& report, const ScanResult& result,
   }
 }
 
-// Resolves inherited annotation ownership once per annotation without recursion.
-// The memo also bounds malformed parent cycles, which are diagnosed by the
-// dedicated source-map validation pass.
-class AnnotationAssetOwners {
-public:
-  explicit AnnotationAssetOwners(const SourceMap& sourceMap) : sourceMap_(sourceMap) {
-    memo_.reserve(sourceMap.annotations().size());
-  }
-
-  [[nodiscard]] std::optional<AssetId> resolve(SourceAnnotationId id) {
-    if (!id.valid()) {
-      return std::nullopt;
-    }
-
-    path_.clear();
-    const SourceAnnotation* annotation = sourceMap_.find(id);
-    std::optional<AssetId> owner;
-    while (annotation != nullptr && annotation->id.valid()) {
-      const u32 annotationId = annotation->id.value;
-      const auto [known, inserted] = memo_.try_emplace(annotationId);
-      if (!inserted) {
-        if (!known->second.resolving) {
-          owner = known->second.owner;
-        }
-        break;
-      }
-
-      path_.push_back(annotationId);
-      if (annotation->owner && annotation->owner->asset.valid()) {
-        owner = annotation->owner->asset;
-        break;
-      }
-      annotation = annotation->parent ? sourceMap_.find(*annotation->parent) : nullptr;
-    }
-
-    for (const u32 visited : path_) {
-      auto& resolved = memo_.at(visited);
-      resolved.owner = owner;
-      resolved.resolving = false;
-    }
-    return owner;
-  }
-
-private:
-  struct Memo {
-    std::optional<AssetId> owner;
-    bool resolving = true;
-  };
-
-  const SourceMap& sourceMap_;
-  std::unordered_map<u32, Memo> memo_;
-  std::vector<u32> path_;
-};
-
 void validateSourceMapOwnership(ValidationReport& report, const ScanResult& result,
                                 const std::unordered_set<u32>& batchAssetIds) {
   const SourceMap& sourceMap = result.sourceMap;
-  AnnotationAssetOwners owners(sourceMap);
 
   std::unordered_map<u32, SourceId> assetSources;
   assetSources.reserve(result.assets.size());
@@ -295,7 +217,7 @@ void validateSourceMapOwnership(ValidationReport& report, const ScanResult& resu
   std::unordered_set<u32> assetsWithAnnotations;
   assetsWithAnnotations.reserve(result.assets.size());
   for (const auto& annotation : sourceMap.annotations()) {
-    const auto inheritedOwner = owners.resolve(annotation.id);
+    const auto inheritedOwner = sourceMap.assetOwner(annotation.id);
     if (annotation.owner && annotation.owner->asset.valid()) {
       const AssetId explicitOwner = annotation.owner->asset;
       if (!batchAssetIds.contains(explicitOwner.value)) {
@@ -305,7 +227,7 @@ void validateSourceMapOwnership(ValidationReport& report, const ScanResult& resu
                      annotation.range);
       }
       if (annotation.parent) {
-        const auto parentOwner = owners.resolve(*annotation.parent);
+        const auto parentOwner = sourceMap.assetOwner(*annotation.parent);
         if (!parentOwner) {
           report.error("scan.source-annotation.external-asset-parent",
                        "Asset id " + std::to_string(explicitOwner.value) +
@@ -382,29 +304,6 @@ void validateMatchFacts(ValidationReport& report, const ScanResult& result, cons
   }
 }
 
-void validateExtractedSources(ValidationReport& report, const ScanResult& result, const SourceStore& sources) {
-  if (result.disposition == ScanDisposition::Exclusive && result.extractedSources.empty()) {
-    report.error("scan.exclusive-without-extracted-source",
-                 "Scan result claimed exclusive input ownership without extracting a source");
-  }
-  for (const auto& extracted : result.extractedSources) {
-    if (extracted.formatHint && extracted.formatHint->empty()) {
-      report.error("scan.extracted-source.empty-format-hint",
-                   "Scan result contained extracted source with an empty format hint", extracted.origin);
-    }
-    if (extracted.origin && extracted.origin->source.valid() && !sources.contains(extracted.origin->source)) {
-      report.error("scan.extracted-source.missing-parent",
-                   "Scan result contained extracted source with missing parent source " +
-                       std::to_string(extracted.origin->source.value),
-                   extracted.origin);
-    }
-
-    if (extracted.origin && sources.contains(extracted.origin->source)) {
-      validateRange(report, sources, *extracted.origin, "extracted source origin");
-    }
-  }
-}
-
 }  // namespace
 
 ValidationReport validateScanResult(SourceId source, const ScanResult& result, const SourceStore& sources,
@@ -436,7 +335,6 @@ ValidationReport validateScanResult(SourceId source, const ScanResult& result, c
     }
   }
 
-  validateExtractedSources(report, result, sources);
   validateSourceMapRanges(report, sources, result.sourceMap);
   validateSourceMapReferences(report, result.sourceMap);
   validateSourceMapParentCycles(report, result.sourceMap);
@@ -458,6 +356,36 @@ ValidationReport validateScanResult(SourceId source, const ScanResult& result, c
   validateSourceMapOwnership(report, result, batchAssetIds);
   validateMatchFacts(report, result, sources, existingAssetIds, batchAssetIds);
 
+  return report;
+}
+
+ValidationReport validateExtractionResult(SourceId source, const ExtractionResult& result, const SourceStore& sources) {
+  ValidationReport report;
+  if (!sources.contains(source)) {
+    report.error("scan.source.inactive", "Extraction result source is not active");
+  }
+
+  for (const auto& diagnostic : result.diagnostics) {
+    if (diagnostic.range) {
+      validateRange(report, sources, *diagnostic.range, "diagnostic", "Extraction result");
+    }
+  }
+
+  for (const auto& extracted : result.sources) {
+    if (extracted.file.knownFormat && extracted.file.knownFormat->empty()) {
+      report.error("scan.extracted-source.empty-known-format",
+                   "Extraction result contained a source with an empty known format", extracted.origin);
+    }
+    if (extracted.origin && extracted.origin->source.valid() && !sources.contains(extracted.origin->source)) {
+      report.error("scan.extracted-source.missing-parent",
+                   "Extraction result contained a source with missing parent source " +
+                       std::to_string(extracted.origin->source.value),
+                   extracted.origin);
+    }
+    if (extracted.origin && sources.contains(extracted.origin->source)) {
+      validateRange(report, sources, *extracted.origin, "extracted source origin", "Extraction result");
+    }
+  }
   return report;
 }
 
