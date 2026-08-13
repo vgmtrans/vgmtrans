@@ -447,7 +447,7 @@ void soundFontExporterWritesSfbkRiffFile() {
          "SoundFont export should write default preset reverb send");
   expect(chunkSize(result.bytes, "ibag") == 12, "SoundFont ibag chunk should include a global generator zone");
   expect(soundFontBagAt(result.bytes, "ibag", 0, 0, 0), "SoundFont global zone should start at generator index 0");
-  expect(soundFontBagAt(result.bytes, "ibag", 1, 3, 7),
+  expect(soundFontBagAt(result.bytes, "ibag", 1, 8, 7),
          "SoundFont region zone should start after instrument generators and modulators");
   expect(soundFontBagAt(result.bytes, "ibag", 2, 17, 7),
          "SoundFont terminal bag should include all generators and modulators");
@@ -495,6 +495,111 @@ void soundFontExporterWritesSfbkRiffFile() {
          "SoundFont sequence-event simulation export should suppress synth LFO generators");
   expect(!soundFontImodContains(simulatedResult.bytes, 206, 23, 1209),
          "SoundFont sequence-event simulation export should suppress synth vibrato-delay modulators");
+}
+
+void soundFontEnvelopeVariantsShareSampleMappedInstruments() {
+  SourceStore sources;
+  const auto sourceId = sources.add(SourceFile{.name = "variant.pcm"}, {0, 0, 0, 0});
+  SampleCollectionAsset sampleCollection{
+      .metadata = AssetMetadata{.id = AssetId{2}, .format = "Probe", .name = "Probe Samples"},
+      .samples = SampleCollection{.samples = {Sample{
+                                      .name = "Wave",
+                                      .codec = AudioCodec::PcmS8,
+                                      .encodedData = SourceRange{.source = sourceId, .offset = 0, .size = 4},
+                                      .sampleRate = 16000,
+                                  }}},
+  };
+  const Region low{
+      .keyRange = KeyRange{.low = 0, .high = 63},
+      .sample = SampleRef{.collection = sampleCollection.metadata.id, .index = 0},
+      .unityKey = 60.0,
+      .envelope = Envelope{.attackSeconds = 1.0, .decaySeconds = 1.0, .releaseSeconds = 1.0, .sustainAmplitude = 0.5},
+  };
+  Region high = low;
+  high.keyRange = KeyRange{.low = 64, .high = 127};
+  high.unityKey = 61.0;
+
+  Instrument base{
+      .explicitAddress = InstrumentAddress{.bank = 0, .program = 0},
+      .name = "Base",
+      .regions = {low, high},
+  };
+  Instrument uniform = base;
+  uniform.explicitAddress = InstrumentAddress{.bank = 0, .program = 1};
+  uniform.name = "Uniform envelope variant";
+  for (auto& region : uniform.regions) {
+    region.envelope.attackSeconds = 2.0;
+  }
+  InstrumentSetAsset sharedSet{
+      .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe"},
+      .instruments = {base, uniform},
+  };
+  const std::array<const InstrumentSetAsset*, 1> sharedSets{&sharedSet};
+  const std::array<const SampleCollectionAsset*, 1> samples{&sampleCollection};
+  const auto shared = buildSoundFont2(
+      SynthExportInput{.name = "Shared", .instrumentSets = sharedSets, .sampleCollections = samples}, sources);
+
+  expect(shared.diagnostics.empty(), "uniform SoundFont envelope variants should export cleanly");
+  expect(chunkSize(shared.bytes, "phdr") == 3 * 38 && chunkSize(shared.bytes, "inst") == 2 * 22,
+         "two envelope-variant presets should share one sample-mapped SoundFont instrument");
+  expect(chunkSize(shared.bytes, "pgen") == 6 * 4 && soundFontPgenContainsAmount(shared.bytes, 34, 1200),
+         "a two-second attack variant should add 1200 timecents at the preset level");
+  expect(chunkSize(shared.bytes, "ibag") == 4 * 4 && chunkSize(shared.bytes, "igen") == 24 * 4,
+         "a shared two-region instrument should write one global envelope and its sample zones only once");
+
+  Instrument nonuniform = base;
+  nonuniform.explicitAddress = InstrumentAddress{.bank = 0, .program = 2};
+  nonuniform.name = "Region-dependent envelope variant";
+  nonuniform.regions[0].envelope.attackSeconds = 2.0;
+  nonuniform.regions[1].envelope.attackSeconds = 4.0;
+  InstrumentSetAsset independentSet{
+      .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe"},
+      .instruments = {base, nonuniform},
+  };
+  const std::array<const InstrumentSetAsset*, 1> independentSets{&independentSet};
+  const auto independent = buildSoundFont2(
+      SynthExportInput{.name = "Independent", .instrumentSets = independentSets, .sampleCollections = samples},
+      sources);
+
+  expect(independent.diagnostics.empty(), "region-dependent SoundFont envelope variants should export cleanly");
+  expect(chunkSize(independent.bytes, "inst") == 3 * 22 && chunkSize(independent.bytes, "ibag") == 6 * 4,
+         "a variant with different per-region ADSR offsets must retain its own SoundFont instrument");
+  expect(!soundFontPgenContainsAmount(independent.bytes, 34, 1200) &&
+             soundFontIgenContainsAmount(independent.bytes, 34, 2400),
+         "a nonuniform envelope variant should preserve absolute region envelopes instead of an invalid preset delta");
+}
+
+void soundFontIndexOverflowIsRejected() {
+  SourceStore sources;
+  const auto sourceId = sources.add(SourceFile{.name = "overflow.pcm"}, {0});
+  SampleCollectionAsset sampleCollection{
+      .metadata = AssetMetadata{.id = AssetId{2}, .format = "Probe"},
+      .samples = SampleCollection{.samples = {Sample{
+                                      .codec = AudioCodec::PcmS8,
+                                      .encodedData = SourceRange{.source = sourceId, .offset = 0, .size = 1},
+                                      .sampleRate = 16000,
+                                  }}},
+  };
+  Instrument oversized{
+      .explicitAddress = InstrumentAddress{.bank = 0, .program = 0},
+      .name = "Oversized",
+  };
+  oversized.regions.resize(7282, Region{
+                                     .sample = SampleRef{.collection = sampleCollection.metadata.id, .index = 0},
+                                 });
+  InstrumentSetAsset instrumentSet{
+      .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe"},
+      .instruments = {std::move(oversized)},
+  };
+  const std::array<const InstrumentSetAsset*, 1> instrumentSets{&instrumentSet};
+  const std::array<const SampleCollectionAsset*, 1> samples{&sampleCollection};
+  const auto result = buildSoundFont2(
+      SynthExportInput{.name = "Overflow", .instrumentSets = instrumentSets, .sampleCollections = samples}, sources);
+
+  expect(result.bytes.empty(),
+         "SoundFont export must reject 16-bit table overflow instead of clamping zones into empty instruments");
+  static_cast<void>(diagnosticWithMessage(result.diagnostics,
+                                          "SoundFont2 instrument generator table exceeds its 16-bit index limit"));
 }
 
 void dlsExporterWritesDlsRiffFile() {
@@ -1422,6 +1527,8 @@ void runValueSynthExportTests() {
   regionModulationExportsAtTheRegionScope();
   wavExporterWritesPcm16RiffFile();
   soundFontExporterWritesSfbkRiffFile();
+  soundFontEnvelopeVariantsShareSampleMappedInstruments();
+  soundFontIndexOverflowIsRejected();
   dlsExporterWritesDlsRiffFile();
   standaloneSynthExportsKeepNativeModulation();
   collectionSynthExportsCanExportOnlyUsedInstruments();

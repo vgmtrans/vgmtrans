@@ -229,9 +229,22 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
   expect(decodedPcm && decodedPcm->pcm.size() == 16 && decodedPcm->loop.enabled && decodedPcm->loop.start == 8,
          "MP2k DirectSound samples should preserve PCM data and loop points");
   const auto decodedWave = decodeSample(psg->samples.samples.back(), session.sources().bytes(source));
-  expect(decodedWave && decodedWave->pcm.size() == 32 && decodedWave->pcm[0] == -32768 && decodedWave->pcm[16] == 0 &&
-             decodedWave->pcm[30] == 28672,
-         "programmable-wave samples should retain the GBA DAC's exact asymmetric -16..14 range");
+  expect(decodedWave && decodedWave->pcm.size() == 48 && decodedWave->loop.start == 8 &&
+             decodedWave->loop.length == 32 && decodedWave->pcm[8] == -32768 && decodedWave->pcm[24] == 0 &&
+             decodedWave->pcm[38] == 28672 &&
+             std::ranges::equal(decodedWave->pcm.begin(), decodedWave->pcm.begin() + 8, decodedWave->pcm.begin() + 32,
+                                decodedWave->pcm.begin() + 40) &&
+             std::ranges::equal(decodedWave->pcm.begin() + 8, decodedWave->pcm.begin() + 16,
+                                decodedWave->pcm.begin() + 40, decodedWave->pcm.end()),
+         "programmable-wave samples should retain the GBA DAC range and carry eight matching loop guards");
+  const auto decodedSquare = decodeSample(psg->samples.samples[1], session.sources().bytes(source));
+  expect(decodedSquare && decodedSquare->loop.start == 8 &&
+             decodedSquare->pcm.size() == decodedSquare->loop.length + 16 &&
+             std::ranges::equal(decodedSquare->pcm.begin(), decodedSquare->pcm.begin() + 8,
+                                decodedSquare->pcm.end() - 16, decodedSquare->pcm.end() - 8) &&
+             std::ranges::equal(decodedSquare->pcm.begin() + 8, decodedSquare->pcm.begin() + 16,
+                                decodedSquare->pcm.end() - 8, decodedSquare->pcm.end()),
+         "generated square samples should preserve their full period between strict SoundFont loop guards");
 
   const CollectionPlayback playback =
       session.preparePlayback(collection.id, PlaybackRequest{.sequence = {.sequenceLoops = 0}});
@@ -418,8 +431,13 @@ void mp2kNoiseUsesAuditedRegisterClockAndWidth() {
   expect(psg && psg->samples.samples[5].codecParameter == 5,
          "short MP2k noise should reference the 7-bit GBA LFSR sample");
   const auto decoded = decodeSample(psg->samples.samples[5], session.sources().bytes(source));
-  expect(decoded && decoded->pcm.size() == 127 && decoded->loop.enabled && decoded->loop.length == 127,
-         "the short noise sample should contain one exact 7-bit LFSR period");
+  expect(decoded && decoded->pcm.size() == 143 && decoded->loop.enabled && decoded->loop.start == 8 &&
+             decoded->loop.length == 127 &&
+             std::ranges::equal(decoded->pcm.begin(), decoded->pcm.begin() + 8, decoded->pcm.begin() + 127,
+                                decoded->pcm.begin() + 135) &&
+             std::ranges::equal(decoded->pcm.begin() + 8, decoded->pcm.begin() + 16, decoded->pcm.begin() + 135,
+                                decoded->pcm.end()),
+         "the short noise sample should contain one exact 7-bit LFSR period with matching loop guards");
 }
 
 void mp2kCgbFixedToneUsesDacResolutionMask() {
