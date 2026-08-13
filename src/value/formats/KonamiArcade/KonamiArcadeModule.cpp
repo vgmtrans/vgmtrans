@@ -56,6 +56,7 @@ FormatDefinition konamiArcadeDefinition() {
       .module =
           {
               .name = std::string(kKonamiArcadeFormatName),
+              .formatHints = {std::string(kKonamiArcadeFormatName)},
               .scan = scanKonamiArcade,
           },
       .sequenceDialects = {konamiArcadeSequenceDialect()},

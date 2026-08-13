@@ -66,12 +66,17 @@ public:
   [[nodiscard]] const FormatRegistry& formats() const noexcept { return formats_; }
 
 private:
+  struct PendingSourceScan {
+    SourceId source;
+    std::optional<std::string> formatHint = std::nullopt;
+  };
+
   void invalidateSnapshot() noexcept;
   void sealFormats() noexcept;
   void scanSourceAndDerived(SourceId id);
-  void scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<u32>& queued);
+  void scanOneSource(const PendingSourceScan& pending, std::vector<PendingSourceScan>& queue, std::set<u32>& queued);
   void addExtractedSources(std::vector<ExtractedSource> extractedSources, SourceId defaultParent,
-                           std::vector<SourceId>& queue, std::set<u32>& queued);
+                           std::vector<PendingSourceScan>& queue, std::set<u32>& queued);
   void removeSourceFamily(SourceId source, std::vector<SourceId>& removed);
   void rebuildCollections();
 

@@ -142,6 +142,7 @@ constexpr std::string_view kExtendedId666Signature = "xid6";
       .bytes = std::move(ram),
       .origin = origin,
   });
+  result.disposition = ScanDisposition::Exclusive;
   return result;
 }
 

@@ -105,6 +105,9 @@ struct ExtractedSource {
   SourceFile file;
   std::vector<u8> bytes;
   std::optional<SourceRange> origin;
+  // When present, only modules that accept this authoritative hint scan the
+  // derived source. An absent hint retains ordinary format discovery.
+  std::optional<std::string> formatHint = std::nullopt;
 };
 
 class SourceStore {

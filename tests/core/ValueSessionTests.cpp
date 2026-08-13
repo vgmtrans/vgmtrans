@@ -82,6 +82,70 @@ void sessionScansValuesAndDerivedSources() {
   expect(snapshot.collections().size() == 1, "pending-source scan should not duplicate already-resolved collections");
 }
 
+void sessionRoutesExclusiveExtractorChildrenWithoutNarrowingUserSources() {
+  size_t extractorCalls = 0;
+  size_t targetCalls = 0;
+  size_t unrelatedCalls = 0;
+
+  Session session;
+  session.registerFormat(testFormat(FormatModule{
+      .name = "ExclusiveExtractor",
+      .scan =
+          [&](const ScanInput& input) -> ScanResult {
+            ++extractorCalls;
+            if (input.source.derived() || input.reader.empty() || input.reader.u8At(0) != 0xe0) {
+              return {};
+            }
+            return ScanResult{
+                .extractedSources = {ExtractedSource{
+                    .file = SourceFile{.name = "target.child"},
+                    .bytes = {0xe1},
+                    .origin = input.reader.range(0, 1),
+                    .formatHint = "target-format",
+                }},
+                .disposition = ScanDisposition::Exclusive,
+            };
+          },
+  }));
+  session.registerFormat(testFormat(FormatModule{
+      .name = "Target",
+      .formatHints = {"target-format"},
+      .scan =
+          [&](const ScanInput& input) -> ScanResult {
+            ++targetCalls;
+            if (!input.source.derived() || input.reader.empty() || input.reader.u8At(0) != 0xe1) {
+              return {};
+            }
+            ScanResultBuilder out(input, "Target");
+            const auto range = input.reader.range(0, 1);
+            const auto asset = out.misc("Target Asset", range).payload({0xe1});
+            out.sourceMap().annotation(SourceRole::Payload, "Target Asset", range).owner(ObjectRefs::misc(asset.id()));
+            return out.finish();
+          },
+  }));
+  session.registerFormat(testFormat(FormatModule{
+      .name = "Unrelated",
+      .scan =
+          [&](const ScanInput&) {
+            ++unrelatedCalls;
+            return ScanResult{};
+          },
+  }));
+
+  session.addSource(SourceFile{.name = "container.bin"}, {0xe0});
+  session.scanPendingSources();
+  const SessionSnapshot project = session.snapshot();
+  expect(extractorCalls == 1 && targetCalls == 1 && unrelatedCalls == 0,
+         "an admitted exclusive extractor should stop probing its input and route its child by format hint");
+  expect(project.sources().size() == 2 && project.assets().size() == 1,
+         "a targeted derived source should remain an ordinary inspectable source with admitted assets");
+
+  session.addSource(SourceFile{.name = "ordinary.bin"}, {0x00});
+  session.scanPendingSources();
+  expect(extractorCalls == 2 && targetCalls == 2 && unrelatedCalls == 1,
+         "an unhinted user source should still be offered to every registered module");
+}
+
 void sessionSharesOneImmutableSnapshotPerRevision() {
   Session session;
   session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
@@ -612,6 +676,34 @@ void scanValidationRejectsMissingAssetRelationTargets() {
                                       "Scan result contained an asset relation for missing target asset id 99";
                              }),
          "scan validation should reject asset relations whose typed target is missing");
+}
+
+void scanValidationRequiresExclusiveResultsToExtractSources() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "empty-exclusive.probe"}, {0xaa});
+  const ScanResult result{.disposition = ScanDisposition::Exclusive};
+
+  const auto report = validateScanResult(source, result, sources, {});
+  expect(std::ranges::any_of(report.diagnostics(),
+                             [](const Diagnostic& diagnostic) {
+                               return diagnostic.code == "scan.exclusive-without-extracted-source";
+                             }),
+         "exclusive scan disposition should only be valid for successful extraction results");
+
+  const ScanResult emptyHint{
+      .extractedSources = {ExtractedSource{
+          .file = SourceFile{.name = "empty-hint.child"},
+          .bytes = {0xbb},
+          .origin = sources.reader(source).range(0, 1),
+          .formatHint = "",
+      }},
+  };
+  const auto hintReport = validateScanResult(source, emptyHint, sources, {});
+  expect(std::ranges::any_of(hintReport.diagnostics(),
+                             [](const Diagnostic& diagnostic) {
+                               return diagnostic.code == "scan.extracted-source.empty-format-hint";
+                             }),
+         "authoritative extracted-source format hints should never be empty");
 }
 
 void scanValidationReportsMultipleAdmissionErrors() {
@@ -1157,6 +1249,7 @@ void snapshotFindsTheFirstCollectionContainingAnAsset() {
 
 void runValueSessionTests() {
   sessionScansValuesAndDerivedSources();
+  sessionRoutesExclusiveExtractorChildrenWithoutNarrowingUserSources();
   sessionSharesOneImmutableSnapshotPerRevision();
   sessionReportsUnregisteredSequenceDialect();
   sessionScansIndividualSourcesWithoutDuplicating();
@@ -1175,6 +1268,7 @@ void runValueSessionTests() {
   sessionRejectsMatchFactsForMissingAssets();
   sessionRejectsSourceScopedMatchFactsForMissingSources();
   scanValidationRejectsMissingAssetRelationTargets();
+  scanValidationRequiresExclusiveResultsToExtractSources();
   scanValidationReportsMultipleAdmissionErrors();
   scanValidationRejectsOutOfBoundsScanResultRanges();
   scanValidationRejectsRangeLessSourceAnnotations();

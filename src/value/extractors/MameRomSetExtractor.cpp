@@ -560,7 +560,9 @@ namespace {
       .file = std::move(assembledFile),
       .bytes = std::move(assembledBytes),
       .origin = archiveRange,
+      .formatHint = set->format,
   });
+  result.disposition = ScanDisposition::Exclusive;
   return result;
 }
 

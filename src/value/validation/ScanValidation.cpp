@@ -221,38 +221,67 @@ void validateAssetIds(ValidationReport& report, const ScanResult& result,
   }
 }
 
+// Resolves inherited annotation ownership once per annotation without recursion.
+// The memo also bounds malformed parent cycles, which are diagnosed by the
+// dedicated source-map validation pass.
+class AnnotationAssetOwners {
+public:
+  explicit AnnotationAssetOwners(const SourceMap& sourceMap) : sourceMap_(sourceMap) {
+    memo_.reserve(sourceMap.annotations().size());
+  }
+
+  [[nodiscard]] std::optional<AssetId> resolve(SourceAnnotationId id) {
+    if (!id.valid()) {
+      return std::nullopt;
+    }
+
+    path_.clear();
+    const SourceAnnotation* annotation = sourceMap_.find(id);
+    std::optional<AssetId> owner;
+    while (annotation != nullptr && annotation->id.valid()) {
+      const u32 annotationId = annotation->id.value;
+      const auto [known, inserted] = memo_.try_emplace(annotationId);
+      if (!inserted) {
+        if (!known->second.resolving) {
+          owner = known->second.owner;
+        }
+        break;
+      }
+
+      path_.push_back(annotationId);
+      if (annotation->owner && annotation->owner->asset.valid()) {
+        owner = annotation->owner->asset;
+        break;
+      }
+      annotation = annotation->parent ? sourceMap_.find(*annotation->parent) : nullptr;
+    }
+
+    for (const u32 visited : path_) {
+      auto& resolved = memo_.at(visited);
+      resolved.owner = owner;
+      resolved.resolving = false;
+    }
+    return owner;
+  }
+
+private:
+  struct Memo {
+    std::optional<AssetId> owner;
+    bool resolving = true;
+  };
+
+  const SourceMap& sourceMap_;
+  std::unordered_map<u32, Memo> memo_;
+  std::vector<u32> path_;
+};
+
 void validateSourceMapOwnership(ValidationReport& report, const ScanResult& result,
                                 const std::unordered_set<u32>& batchAssetIds) {
   const SourceMap& sourceMap = result.sourceMap;
+  AnnotationAssetOwners owners(sourceMap);
 
-  for (const auto& annotation : sourceMap.annotations()) {
-    if (!annotation.owner || !annotation.owner->asset.valid()) {
-      continue;
-    }
-    const AssetId owner = annotation.owner->asset;
-    if (!batchAssetIds.contains(owner.value)) {
-      report.error("scan.source-annotation.unknown-owner",
-                   "Scan result contained source annotation owned by asset id " + std::to_string(owner.value) +
-                       " that was not produced by the scan",
-                   annotation.range);
-    }
-    if (!annotation.parent) {
-      continue;
-    }
-    const auto parentOwner = sourceMap.assetOwner(*annotation.parent);
-    if (!parentOwner) {
-      report.error("scan.source-annotation.external-asset-parent",
-                   "Asset id " + std::to_string(owner.value) +
-                       " has a source annotation whose parent is outside its owned graph",
-                   annotation.range);
-    } else if (*parentOwner != owner) {
-      report.error("scan.source-annotation.cross-asset-parent",
-                   "Source annotation owned by asset id " + std::to_string(owner.value) +
-                       " is nested inside asset id " + std::to_string(parentOwner->value),
-                   annotation.range);
-    }
-  }
-
+  std::unordered_map<u32, SourceId> assetSources;
+  assetSources.reserve(result.assets.size());
   for (const auto& asset : result.assets) {
     const AssetMetadata& meta = metadata(asset);
     if (!meta.range.valid()) {
@@ -260,26 +289,60 @@ void validateSourceMapOwnership(ValidationReport& report, const ScanResult& resu
                                                    " without a primary source range");
       continue;
     }
+    assetSources.emplace(meta.id.value, meta.range.source);
+  }
 
-    const auto annotations = sourceMap.annotationsForAsset(meta.id);
-    if (annotations.empty()) {
+  std::unordered_set<u32> assetsWithAnnotations;
+  assetsWithAnnotations.reserve(result.assets.size());
+  for (const auto& annotation : sourceMap.annotations()) {
+    const auto inheritedOwner = owners.resolve(annotation.id);
+    if (annotation.owner && annotation.owner->asset.valid()) {
+      const AssetId explicitOwner = annotation.owner->asset;
+      if (!batchAssetIds.contains(explicitOwner.value)) {
+        report.error("scan.source-annotation.unknown-owner",
+                     "Scan result contained source annotation owned by asset id " +
+                         std::to_string(explicitOwner.value) + " that was not produced by the scan",
+                     annotation.range);
+      }
+      if (annotation.parent) {
+        const auto parentOwner = owners.resolve(*annotation.parent);
+        if (!parentOwner) {
+          report.error("scan.source-annotation.external-asset-parent",
+                       "Asset id " + std::to_string(explicitOwner.value) +
+                           " has a source annotation whose parent is outside its owned graph",
+                       annotation.range);
+        } else if (*parentOwner != explicitOwner) {
+          report.error("scan.source-annotation.cross-asset-parent",
+                       "Source annotation owned by asset id " + std::to_string(explicitOwner.value) +
+                           " is nested inside asset id " + std::to_string(parentOwner->value),
+                       annotation.range);
+        }
+      }
+    }
+
+    if (!inheritedOwner) {
+      continue;
+    }
+    const auto assetSource = assetSources.find(inheritedOwner->value);
+    if (assetSource == assetSources.end()) {
+      continue;
+    }
+    assetsWithAnnotations.insert(inheritedOwner->value);
+    if (annotation.range.source != assetSource->second) {
+      report.error("scan.asset.multiple-sources",
+                   "Asset id " + std::to_string(inheritedOwner->value) +
+                       " has source annotations in more than one source",
+                   annotation.range);
+    }
+  }
+
+  for (const auto& asset : result.assets) {
+    const AssetMetadata& meta = metadata(asset);
+    if (meta.range.valid() && !assetsWithAnnotations.contains(meta.id.value)) {
       report.error("scan.asset.missing-source-annotations",
                    "Scan result contained asset id " + std::to_string(meta.id.value) +
                        " without an explicitly owned source annotation",
                    meta.range);
-      continue;
-    }
-
-    for (const SourceAnnotationId id : annotations) {
-      const auto* annotation = sourceMap.find(id);
-      if (annotation == nullptr) {
-        continue;
-      }
-      if (annotation->range.source != meta.range.source) {
-        report.error("scan.asset.multiple-sources",
-                     "Asset id " + std::to_string(meta.id.value) + " has source annotations in more than one source",
-                     annotation->range);
-      }
     }
   }
 }
@@ -320,7 +383,15 @@ void validateMatchFacts(ValidationReport& report, const ScanResult& result, cons
 }
 
 void validateExtractedSources(ValidationReport& report, const ScanResult& result, const SourceStore& sources) {
+  if (result.disposition == ScanDisposition::Exclusive && result.extractedSources.empty()) {
+    report.error("scan.exclusive-without-extracted-source",
+                 "Scan result claimed exclusive input ownership without extracting a source");
+  }
   for (const auto& extracted : result.extractedSources) {
+    if (extracted.formatHint && extracted.formatHint->empty()) {
+      report.error("scan.extracted-source.empty-format-hint",
+                   "Scan result contained extracted source with an empty format hint", extracted.origin);
+    }
     if (extracted.origin && extracted.origin->source.valid() && !sources.contains(extracted.origin->source)) {
       report.error("scan.extracted-source.missing-parent",
                    "Scan result contained extracted source with missing parent source " +

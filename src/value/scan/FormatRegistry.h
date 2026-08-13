@@ -22,9 +22,10 @@ public:
   void add(FormatDefinition definition);
   void seal() noexcept;
 
-  // Order matters: every source is offered to modules in registration order,
-  // including derived sources extracted by earlier modules.
+  // Unhinted sources use every module. Authoritatively hinted derived sources
+  // use only matching modules; both paths preserve registration order.
   [[nodiscard]] const std::vector<FormatModule>& modules() const noexcept { return modules_; }
+  [[nodiscard]] std::vector<const FormatModule*> modulesForFormatHint(std::string_view hint) const;
   [[nodiscard]] const FormatModule* findModule(std::string_view name) const;
   [[nodiscard]] const SequenceDialect* findDialect(std::string_view id) const;
   [[nodiscard]] bool containsDialect(std::string_view id) const;

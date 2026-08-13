@@ -280,7 +280,7 @@ void Session::scanSourceAndDerived(SourceId id) {
 
   const size_t assetsBefore = state_->assets().size();
   const size_t diagnosticsBefore = state_->diagnostics().size();
-  std::vector<SourceId> queue{id};
+  std::vector<PendingSourceScan> queue{{.source = id}};
   std::set<u32> queued{id.value};
 
   for (size_t index = 0; index < queue.size(); ++index) {
@@ -296,16 +296,17 @@ void Session::scanSourceAndDerived(SourceId id) {
   }
 }
 
-// Offer the source to every module. Each scan performs its own cheap recognition
-// checks and returns an empty result when the source does not match.
-void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<u32>& queued) {
+// User-loaded and unhinted sources use normal discovery. Extractors can attach
+// an authoritative format hint to a child when its format is already known.
+void Session::scanOneSource(const PendingSourceScan& pending, std::vector<PendingSourceScan>& queue,
+                            std::set<u32>& queued) {
+  const SourceId id = pending.source;
   if (!scannedSources_.insert(id.value).second) {
     return;
   }
 
   const auto source = sources_.source(id);
-
-  for (const auto& module : formats_.modules()) {
+  const auto scanModule = [&](const FormatModule& module) {
     try {
       ScanResult result = module.scan(ScanInput{
           .source = source,
@@ -324,20 +325,38 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
           }
         }
         state_->addDiagnostics(std::move(diagnostics));
-        continue;
+        return false;
       }
+      const ScanDisposition disposition = result.disposition;
       auto extractedSources = std::exchange(result.extractedSources, {});
       state_->appendScan(source.id, std::move(result));
       addExtractedSources(std::move(extractedSources), source.id, queue, queued);
+      return disposition == ScanDisposition::Exclusive;
     } catch (const std::exception& ex) {
       state_->addError(std::string(module.name) + " scan failed: " + ex.what(),
                        SourceRange{.source = source.id, .offset = 0, .size = source.size});
+      return false;
+    }
+  };
+
+  if (pending.formatHint) {
+    for (const FormatModule* module : formats_.modulesForFormatHint(*pending.formatHint)) {
+      if (scanModule(*module)) {
+        break;
+      }
+    }
+    return;
+  }
+
+  for (const auto& module : formats_.modules()) {
+    if (scanModule(module)) {
+      break;
     }
   }
 }
 
 void Session::addExtractedSources(std::vector<ExtractedSource> extractedSources, SourceId defaultParent,
-                                  std::vector<SourceId>& queue, std::set<u32>& queued) {
+                                  std::vector<PendingSourceScan>& queue, std::set<u32>& queued) {
   for (auto& extracted : extractedSources) {
     SourceId parent = defaultParent;
     if (extracted.origin && extracted.origin->source.valid()) {
@@ -347,7 +366,7 @@ void Session::addExtractedSources(std::vector<ExtractedSource> extractedSources,
     const SourceId derived =
         sources_.addDerived(std::move(extracted.file), std::move(extracted.bytes), parent, extracted.origin);
     if (queued.insert(derived.value).second) {
-      queue.push_back(derived);
+      queue.push_back(PendingSourceScan{.source = derived, .formatHint = std::move(extracted.formatHint)});
     }
   }
 }
