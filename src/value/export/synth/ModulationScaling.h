@@ -48,12 +48,16 @@ enum class SynthSource {
 struct SynthGenerator {
   SynthDestination destination = SynthDestination::Unknown;
   s32 amount = 0;
+
+  friend bool operator==(const SynthGenerator&, const SynthGenerator&) = default;
 };
 
 struct SynthModulator {
   std::optional<SynthSource> source;
   SynthDestination destination = SynthDestination::Unknown;
   s32 amount = 0;
+
+  friend bool operator==(const SynthModulator&, const SynthModulator&) = default;
 };
 
 struct LoweredSynthModulation {

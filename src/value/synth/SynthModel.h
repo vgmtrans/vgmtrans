@@ -27,11 +27,15 @@ constexpr double kDefaultInstrumentReverbSend = 0.25;
 struct KeyRange {
   u8 low = 0;
   u8 high = 127;
+
+  friend bool operator==(const KeyRange&, const KeyRange&) = default;
 };
 
 struct VelocityRange {
   u8 low = 0;
   u8 high = 127;
+
+  friend bool operator==(const VelocityRange&, const VelocityRange&) = default;
 };
 
 struct SampleRef {
@@ -52,6 +56,8 @@ struct Loop {
   bool enabled = false;
   u32 start = 0;
   u32 length = 0;
+
+  friend bool operator==(const Loop&, const Loop&) = default;
 };
 
 struct Region {
