@@ -23,6 +23,7 @@
 #include "value/formats/KonamiSnes/KonamiSnes.h"
 #include "value/formats/MP2k/MP2k.h"
 #include "value/formats/NinSnes/NinSnes.h"
+#include "value/formats/PrismSnes/PrismSnes.h"
 #include "value/formats/RareSnes/RareSnes.h"
 #include "value/formats/NDS/Nds.h"
 #include "value/formats/SegSat/SegSat.h"
@@ -103,6 +104,7 @@ void registerValueFormats(core::Session& session, const ValueFormatOptions& opti
   session.registerFormat(konami_snes::konamiSnesDefinition());
   session.registerFormat(mp2k::mp2kDefinition());
   session.registerFormat(nin_snes::definition());
+  session.registerFormat(prism_snes::definition());
   session.registerFormat(rare_snes::definition());
   session.registerFormat(segsat::segSatDefinition());
   session.registerFormat(sony_ps1::sonyPs1Definition());
