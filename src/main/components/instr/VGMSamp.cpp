@@ -131,7 +131,8 @@ bool VGMSamp::onSaveAsWav() {
 bool VGMSamp::saveAsWav(const std::filesystem::path &filepath) {
   u32 bufSize = uncompressedSize();
 
-  std::vector<u8> uncompSampBuf = toPcm(Signedness::Signed, Endianness::Little, m_bps);
+  const auto wavSignedness = (m_bps == BPS::PCM8) ? Signedness::Unsigned : Signedness::Signed;
+  std::vector<u8> uncompSampBuf = toPcm(wavSignedness, Endianness::Little, m_bps);
   bufSize = static_cast<u32>(uncompSampBuf.size());
 
   u16 blockAlign = bytesPerSample() * channels;
