@@ -407,7 +407,11 @@ constexpr std::array<u8, 14> kNoteDurationsV4{0xc0, 0x60, 0x40, 0x48, 0x30, 0x20
 
 template <size_t Size>
 [[nodiscard]] EventType tableEventType(u8 opcode, u8 firstOpcode, const std::array<EventType, Size>& table) {
-  return opcode >= firstOpcode && opcode - firstOpcode < table.size() ? table[opcode - firstOpcode] : EventType::End;
+  if (opcode < firstOpcode) {
+    return EventType::End;
+  }
+  const size_t index = opcode - firstOpcode;
+  return index < table.size() ? table[index] : EventType::End;
 }
 
 constexpr std::array<EventType, 46> kV1EventTypes{

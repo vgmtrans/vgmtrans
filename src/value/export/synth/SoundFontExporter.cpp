@@ -348,9 +348,9 @@ struct SfLayout {
   };
 }
 
-[[nodiscard]] bool sameSampleMap(const ResolvedSynthInstrument& a, const ResolvedSynthInstrument& b) {
-  return a.generators == b.generators && a.modulators == b.modulators &&
-         std::ranges::equal(a.regions, b.regions, [](const ResolvedSynthRegion& a, const ResolvedSynthRegion& b) {
+[[nodiscard]] bool sameSampleMap(const ResolvedSynthInstrument& lhs, const ResolvedSynthInstrument& rhs) {
+  return lhs.generators == rhs.generators && lhs.modulators == rhs.modulators &&
+         std::ranges::equal(lhs.regions, rhs.regions, [](const ResolvedSynthRegion& a, const ResolvedSynthRegion& b) {
            const auto& x = *a.region;
            const auto& y = *b.region;
            return a.sampleIndex == b.sampleIndex && x.keyRange == y.keyRange && x.velocityRange == y.velocityRange &&

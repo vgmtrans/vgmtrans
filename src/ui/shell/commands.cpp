@@ -989,6 +989,12 @@ std::string_view valueAudioCodecName(vgmtrans::core::AudioCodec codec) {
       return "nds-ima-adpcm";
     case vgmtrans::core::AudioCodec::NdsPsg:
       return "nds-psg";
+    case vgmtrans::core::AudioCodec::GbaBdpcm:
+      return "gba-bdpcm";
+    case vgmtrans::core::AudioCodec::GbaPsg:
+      return "gba-psg";
+    case vgmtrans::core::AudioCodec::GbaPsgWave:
+      return "gba-psg-wave";
   }
   return "unknown";
 }
