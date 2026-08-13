@@ -94,12 +94,182 @@ if(USE_SYSTEM_LIBCHDR)
 else()
   message(STATUS "Using vendored libchdr library")
   set(WITH_SYSTEM_ZLIB ${USE_SYSTEM_ZLIB} CACHE BOOL "[libchdr] Use system provided zlib library" FORCE)
+  set(VGMTRANS_SAVED_BUILD_TESTING "${BUILD_TESTING}")
+  set(BUILD_TESTING OFF CACHE BOOL "[VGMTrans] Disable vendored libchdr tests" FORCE)
   add_subdirectory(${PROJECT_SOURCE_DIR}/lib/libchdr ${CMAKE_CURRENT_BINARY_DIR}/lib/libchdr EXCLUDE_FROM_ALL SYSTEM)
+  set(BUILD_TESTING "${VGMTRANS_SAVED_BUILD_TESTING}" CACHE BOOL "Build the testing tree." FORCE)
+  unset(VGMTRANS_SAVED_BUILD_TESTING)
 endif()
 
 # ~~~
 # Build
 # ~~~
+
+add_library(vgmtransvaluecore STATIC)
+vgmtrans_enable_project_warnings(vgmtransvaluecore)
+target_sources(vgmtransvaluecore
+  PRIVATE
+    ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionResolver.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceEmitter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/model/MatchModel.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/model/SourceMap.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/model/SessionSnapshot.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/session/AssetStore.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/session/CollectionStore.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/session/DiagnosticStore.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/session/ExplicitCollectionStore.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/session/MatchFactStore.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/session/SourceMapStore.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/ParseCursor.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/session/ScanCommit.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/session/Session.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/Scan.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/ScanResultBuilder.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceCursor.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceDialect.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceProgram.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceVm.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/synth/SnesDsp.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/base/Source.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/synth/SynthMath.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/synth/DlsExporter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/Export.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiExporter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/synth/ModulationScaling.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/PerformanceMidiRenderer.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/synth/SoundFontExporter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/synth/SynthExportData.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/audio/WavExporter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/validation/ScanValidation.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/validation/SequenceValidation.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/validation/SnapshotValidation.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/validation/SynthValidation.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/validation/ValidationReport.cpp
+  PUBLIC
+    FILE_SET HEADERS
+    BASE_DIRS ${PROJECT_SOURCE_DIR}/src
+    FILES
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/BytecodeDecode.h
+      ${PROJECT_SOURCE_DIR}/src/value/base/CoreTypes.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionResolver.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/FormatModule.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.h
+      ${PROJECT_SOURCE_DIR}/src/value/base/LevelScale.h
+      ${PROJECT_SOURCE_DIR}/src/value/model/MatchModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/model/MetadataModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/model/SourceMap.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/model/SessionSnapshot.h
+      ${PROJECT_SOURCE_DIR}/src/value/session/AssetStore.h
+      ${PROJECT_SOURCE_DIR}/src/value/session/CollectionStore.h
+      ${PROJECT_SOURCE_DIR}/src/value/session/DiagnosticStore.h
+      ${PROJECT_SOURCE_DIR}/src/value/session/ExplicitCollectionStore.h
+      ${PROJECT_SOURCE_DIR}/src/value/session/MatchFactStore.h
+      ${PROJECT_SOURCE_DIR}/src/value/session/SourceMapStore.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/ParseCursor.h
+      ${PROJECT_SOURCE_DIR}/src/value/session/SourceIdSet.h
+      ${PROJECT_SOURCE_DIR}/src/value/session/Session.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/ScanResultBuilder.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceCursor.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceCursorDialect.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceDialect.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceProgram.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceVm.h
+      ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.h
+      ${PROJECT_SOURCE_DIR}/src/value/synth/SnesDsp.h
+      ${PROJECT_SOURCE_DIR}/src/value/base/Source.h
+      ${PROJECT_SOURCE_DIR}/src/value/synth/SynthModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/synth/SynthMath.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/synth/DlsExporter.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/Export.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/ExportDiagnostics.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/ExportPolicy.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/ExportTypes.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiExporter.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/synth/ModulationScaling.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/midi/PerformanceMidiRenderer.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/synth/SoundFontExporter.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/synth/SynthExportData.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/audio/WavExporter.h
+      ${PROJECT_SOURCE_DIR}/src/value/validation/ScanValidation.h
+      ${PROJECT_SOURCE_DIR}/src/value/validation/SequenceValidation.h
+      ${PROJECT_SOURCE_DIR}/src/value/validation/SnapshotValidation.h
+      ${PROJECT_SOURCE_DIR}/src/value/validation/SynthValidation.h
+      ${PROJECT_SOURCE_DIR}/src/value/validation/ValidationReport.h
+)
+target_include_directories(
+  vgmtransvaluecore
+  PUBLIC
+    ${PROJECT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_features(vgmtransvaluecore PUBLIC cxx_std_20)
+target_link_libraries(vgmtransvaluecore PRIVATE fmt::fmt)
+
+add_library(vgmtransvalueformats STATIC)
+vgmtrans_enable_project_warnings(vgmtransvalueformats)
+target_sources(vgmtransvalueformats
+  PRIVATE
+    ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesRsnExtractor.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/ValueFormats.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoInstrumentSet.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoResolver.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoSequenceDecoder.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoVersion.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSynth.cpp
+    formats/CapcomSnes/CapcomSnesDriverMath.cpp
+  PUBLIC
+    FILE_SET HEADERS
+    BASE_DIRS ${PROJECT_SOURCE_DIR}/src
+    FILES
+      ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesRsnExtractor.h
+      ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/ValueFormats.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoInstrumentSet.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoModule.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoResolver.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoSequence.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoSequenceDecoder.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoSynth.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoTypes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoVersion.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesModule.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequence.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesTypes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesLayout.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSynth.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsLayout.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequence.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSynth.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsTypes.h
+      formats/CapcomSnes/CapcomSnesDriverMath.h
+      ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.h
+)
+target_link_libraries(
+  vgmtransvalueformats
+  PUBLIC vgmtransvaluecore unarr
+  PRIVATE fmt::fmt ZLIB::ZLIB)
+target_compile_features(vgmtransvalueformats PUBLIC cxx_std_20)
 
 add_library(vgmtranscore OBJECT)
 vgmtrans_enable_project_warnings(vgmtranscore)
@@ -562,7 +732,7 @@ configure_file("version.h.in" "version.h")
 target_include_directories(vgmtranscore PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(
   vgmtranscore
-  PUBLIC spdlog::spdlog unarr ZLIB::ZLIB minizip mio chdr-static nlohmann_json::nlohmann_json
+  PUBLIC vgmtransvalueformats vgmtransvaluecore spdlog::spdlog unarr ZLIB::ZLIB minizip mio chdr-static nlohmann_json::nlohmann_json
 )
 target_compile_features(vgmtranscore PUBLIC cxx_std_20)
 

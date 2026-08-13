@@ -1,0 +1,310 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#pragma once
+
+#include "value/base/CoreTypes.h"
+
+#include <concepts>
+#include <optional>
+#include <functional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <unordered_map>
+#include <utility>
+#include <variant>
+#include <vector>
+
+namespace vgmtrans::core {
+
+enum class SourceRole : u8 {
+  Unknown,
+  Source,
+  Section,
+  Header,
+  Sequence,
+  SequenceTrack,
+  Table,
+  TableRow,
+  Field,
+  Pointer,
+  Payload,
+  Padding,
+  DataBlock,
+  Command,
+  Opcode,
+  Operand,
+  InstrumentSet,
+  Instrument,
+  Region,
+  SampleCollection,
+  Sample,
+};
+
+enum class SequenceSemantic : u8 {
+  Unknown,
+  Note,
+  Rest,
+  Wait,
+  Program,
+  Level,
+  Pan,
+  Pitch,
+  Tempo,
+  Modulation,
+  Portamento,
+  Jump,
+  Call,
+  Return,
+  End,
+  Loop,
+  Repeat,
+  RepeatBreak,
+  State,
+  Meta,
+  Unsupported,
+};
+
+using SourceValue = std::variant<std::monostate, bool, u64, s64, double, std::string>;
+
+[[nodiscard]] inline SourceValue makeSourceValue(SourceValue value) {
+  return value;
+}
+
+[[nodiscard]] inline SourceValue makeSourceValue(bool value) {
+  return SourceValue{value};
+}
+
+template <std::integral T>
+  requires(!std::same_as<std::remove_cvref_t<T>, bool>)
+[[nodiscard]] SourceValue makeSourceValue(T value) {
+  if constexpr (std::is_signed_v<T>) {
+    return SourceValue{static_cast<s64>(value)};
+  } else {
+    return SourceValue{static_cast<u64>(value)};
+  }
+}
+
+template <std::floating_point T>
+[[nodiscard]] SourceValue makeSourceValue(T value) {
+  return SourceValue{static_cast<double>(value)};
+}
+
+[[nodiscard]] inline SourceValue makeSourceValue(std::string value) {
+  return SourceValue{std::move(value)};
+}
+
+[[nodiscard]] inline SourceValue makeSourceValue(std::string_view value) {
+  return SourceValue{std::string(value)};
+}
+
+enum class SourceValueDisplay : u8 {
+  Default,
+  Hex,
+  Decimal,
+  SignedDecimal,
+  Boolean,
+  Address,
+  Percent,
+  Cents,
+  Decibels,
+  MidiNote,
+  Ascii,
+  Enum,
+};
+
+struct SourceField {
+  std::string name;
+  SourceRange range;
+  SourceValue value;
+  SourceValueDisplay display = SourceValueDisplay::Default;
+};
+
+enum class SourceLinkRole : u8 {
+  PointsTo,
+  JumpTarget,
+  CallTarget,
+  LoopTarget,
+  RepeatTarget,
+  UsesInstrument,
+  UsesSample,
+  DerivedFrom,
+  Related,
+};
+
+namespace ObjectRefs {
+
+[[nodiscard]] ObjectRef asset(AssetId asset);
+[[nodiscard]] ObjectRef sequence(AssetId sequenceAsset);
+[[nodiscard]] ObjectRef sequenceTrack(AssetId sequenceAsset, u32 trackIndex);
+[[nodiscard]] ObjectRef instrument(AssetId instrumentSetAsset, u32 instrumentIndex);
+[[nodiscard]] ObjectRef instrumentProgram(u32 bank, u32 program);
+[[nodiscard]] ObjectRef sample(AssetId sampleSetAsset, u32 sampleIndex);
+[[nodiscard]] ObjectRef sampleIndex(u32 sampleIndex);
+[[nodiscard]] ObjectRef misc(AssetId miscAsset);
+
+}  // namespace ObjectRefs
+
+using SourceTarget = std::variant<SourceRange, SourceAnnotationId, ObjectRef>;
+
+struct SourceLink {
+  SourceLinkRole role = SourceLinkRole::Related;
+  SourceTarget target;
+  std::string label;
+};
+
+enum class SourceOutlinePolicy : u8 {
+  Auto,
+  Show,
+  Hide,
+};
+
+enum class CommandPlaybackStatus : u8 {
+  SourceOnly,
+  NoOp,
+  AffectsPlayback,
+  AffectsControlFlow,
+  StopsPlayback,
+  Unsupported,
+};
+
+// Persistent source annotations are source-backed: every annotation stored in a
+// session SourceMap must have a valid primary range. Derived/range-less facts
+// should be fields on a source-backed annotation instead of standalone nodes.
+struct SourceAnnotation {
+  SourceAnnotationId id;
+  SourceRange range;
+  SourceRole role = SourceRole::Unknown;
+  std::string label;
+  std::string description;
+  std::optional<SequenceSemantic> sequenceSemantic;
+  std::optional<CommandPlaybackStatus> playbackStatus;
+  std::string localKind;
+  std::string detailKind;
+  std::optional<ObjectRef> owner;
+  std::optional<SourceAnnotationId> parent;
+  SourceOutlinePolicy outline = SourceOutlinePolicy::Auto;
+  std::vector<SourceField> fields;
+  std::vector<SourceLink> links;
+};
+
+class SourceMap {
+public:
+  SourceMap() = default;
+  explicit SourceMap(std::vector<SourceAnnotation> annotations);
+
+  [[nodiscard]] bool empty() const noexcept { return annotations_.empty(); }
+  [[nodiscard]] std::span<const SourceAnnotation> annotations() const noexcept { return annotations_; }
+  [[nodiscard]] const SourceAnnotation* find(SourceAnnotationId id) const;
+  [[nodiscard]] const SourceAnnotation& get(SourceAnnotationId id) const;
+
+  [[nodiscard]] std::vector<SourceAnnotationId> annotationsForSource(SourceId source) const;
+  [[nodiscard]] std::vector<SourceAnnotationId> intersecting(SourceRange range) const;
+  [[nodiscard]] std::vector<SourceAnnotationId> containing(SourceRange range) const;
+  [[nodiscard]] std::vector<SourceAnnotationId> at(SourceId source, u64 offset) const;
+  [[nodiscard]] std::vector<SourceAnnotationId> ownedBy(ObjectRef object) const;
+  [[nodiscard]] std::vector<SourceAnnotationId> childrenOf(SourceAnnotationId parent) const;
+  [[nodiscard]] std::vector<SourceAnnotationId> withRole(SourceId source, SourceRole role) const;
+  [[nodiscard]] std::vector<SourceAnnotationId> withSequenceSemantic(SourceId source,
+                                                                     SequenceSemantic semantic) const;
+  [[nodiscard]] std::vector<SourceLink> linksFrom(SourceAnnotationId id) const;
+  [[nodiscard]] std::vector<SourceAnnotationId> linksTo(const SourceTarget& target) const;
+
+private:
+  void buildIndexes();
+
+  std::vector<SourceAnnotation> annotations_;
+  std::unordered_map<u32, size_t> annotationsById_;
+  std::unordered_map<u32, std::vector<SourceAnnotationId>> annotationsBySource_;
+  std::unordered_map<u32, std::vector<SourceAnnotationId>> annotationsByParent_;
+};
+
+class SourceMapBuilder;
+
+class AnnotationBuilder {
+public:
+  AnnotationBuilder() = default;
+  AnnotationBuilder(SourceMapBuilder& map, SourceAnnotationId id);
+
+  [[nodiscard]] SourceAnnotationId id() const noexcept { return id_; }
+
+  AnnotationBuilder& role(SourceRole role);
+  AnnotationBuilder& range(SourceRange range);
+  AnnotationBuilder& label(std::string_view label);
+  AnnotationBuilder& description(std::string_view description);
+  AnnotationBuilder& kind(std::string_view localKindOverride);
+  AnnotationBuilder& detailKind(std::string_view detailKind);
+  AnnotationBuilder& parent(SourceAnnotationId parent);
+  AnnotationBuilder& owner(ObjectRef owner);
+  AnnotationBuilder& outline(SourceOutlinePolicy policy);
+  AnnotationBuilder& sequenceSemantic(SequenceSemantic semantic);
+  AnnotationBuilder& playbackStatus(CommandPlaybackStatus status);
+  AnnotationBuilder& field(std::string_view name, SourceRange range, SourceValue value,
+                           SourceValueDisplay display = SourceValueDisplay::Default);
+  template <class T>
+  AnnotationBuilder& field(std::string_view name, SourceRange range, T&& value,
+                           SourceValueDisplay display = SourceValueDisplay::Default) {
+    return field(name, range, makeSourceValue(std::forward<T>(value)), display);
+  }
+  template <class T>
+  AnnotationBuilder& field(std::string_view name, const RangedValue<T>& value,
+                           SourceValueDisplay display = SourceValueDisplay::Default) {
+    return value ? field(name, value.range, value.value, display) : *this;
+  }
+  AnnotationBuilder& derived(std::string_view name, SourceValue value,
+                             SourceValueDisplay display = SourceValueDisplay::Default);
+  template <class T>
+  AnnotationBuilder& derived(std::string_view name, T&& value,
+                             SourceValueDisplay display = SourceValueDisplay::Default) {
+    return derived(name, makeSourceValue(std::forward<T>(value)), display);
+  }
+  AnnotationBuilder& link(SourceLinkRole role, SourceTarget target, std::string_view label = {});
+
+private:
+  SourceMapBuilder* map_ = nullptr;
+  SourceAnnotationId id_;
+};
+
+class SourceMapBuilder {
+public:
+  SourceMapBuilder() = default;
+  explicit SourceMapBuilder(std::function<SourceAnnotationId()> nextId);
+
+  [[nodiscard]] AnnotationBuilder source(std::string_view label, SourceRange range);
+  [[nodiscard]] AnnotationBuilder annotation(SourceRole role, std::string_view label, SourceRange range);
+  [[nodiscard]] AnnotationBuilder section(std::string_view label, SourceRange range);
+  [[nodiscard]] AnnotationBuilder header(std::string_view label, SourceRange range);
+  [[nodiscard]] AnnotationBuilder table(std::string_view label, SourceRange range);
+  [[nodiscard]] AnnotationBuilder row(std::string_view label, SourceRange range);
+  [[nodiscard]] AnnotationBuilder field(std::string_view label, SourceRange range, SourceValue value);
+  template <class T>
+  [[nodiscard]] AnnotationBuilder field(std::string_view label, SourceRange range, T&& value) {
+    return field(label, range, makeSourceValue(std::forward<T>(value)));
+  }
+  [[nodiscard]] AnnotationBuilder pointer(std::string_view label, SourceRange range, SourceTarget target);
+  [[nodiscard]] AnnotationBuilder command(std::string_view label, SourceRange range,
+                                          SequenceSemantic semantic = SequenceSemantic::Unknown);
+
+  [[nodiscard]] SourceMap finish();
+
+private:
+  friend class AnnotationBuilder;
+
+  [[nodiscard]] SourceAnnotationId allocateId();
+  [[nodiscard]] AnnotationBuilder add(SourceRole role, std::string_view label, SourceRange range);
+  [[nodiscard]] SourceAnnotation* annotation(SourceAnnotationId id);
+
+  std::function<SourceAnnotationId()> nextId_;
+  u32 nextLocalId_ = 0;
+  std::vector<SourceAnnotation> annotations_;
+  std::unordered_map<u32, size_t> annotationsById_;
+};
+
+[[nodiscard]] std::string sourceLocalKind(std::string_view label);
+
+}  // namespace vgmtrans::core

@@ -213,6 +213,11 @@ u8 convert7bitLinearPercentPanValToStdMidiVal(u8 percentVal, double *ptrVolumeSc
   return convertLinearPercentPanValToStdMidiVal(percentVal / 128.0, ptrVolumeScale);
 }
 
+u8 convert8bitLinearPercentPanValToStdMidiVal(u8 percentVal, double *ptrVolumeScale) {
+  const double percent = percentVal == 255 ? 1.0 : percentVal / 256.0;
+  return convertLinearPercentPanValToStdMidiVal(percent, ptrVolumeScale);
+}
+
 // Convert midi pan to L/R volume balance
 void convertStdMidiPanToVolumeBalance(u8 midiPan, double &percentLeft, double &percentRight) {
   if (midiPan == 0 || midiPan == 1) {

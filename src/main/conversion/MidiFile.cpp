@@ -316,6 +316,12 @@ void MidiTrack::purgePrevNoteOffs() {
   m_prevDurNoteOffs.clear();
 }
 
+void MidiTrack::purgePrevNoteOffsBefore(u32 absTime) {
+  m_prevDurNoteOffs.erase(std::remove_if(m_prevDurNoteOffs.begin(), m_prevDurNoteOffs.end(),
+    [absTime](const NoteEvent *e) { return e && e->absTime < absTime; }),
+    m_prevDurNoteOffs.end());
+}
+
 void MidiTrack::purgePrevNoteOffs(u32 absTime) {
   m_prevDurNoteOffs.erase(std::remove_if(m_prevDurNoteOffs.begin(), m_prevDurNoteOffs.end(),
     [absTime](const NoteEvent *e) { return e && e->absTime <= absTime; }),
@@ -817,7 +823,8 @@ NoteEvent::NoteEvent(MidiTrack *track,
 u32 NoteEvent::writeEvent(std::vector<u8> &buf, u32 time) {
   writeVarLength(buf, absTime - time);
 
-  u8 finalKey = key + ((channel == 9) ? 0 : prntTrk->parentSeq->globalTranspose);
+  const s16 transpose = (channel == 9) ? 0 : prntTrk->parentSeq->globalTranspose;
+  u8 finalKey = static_cast<u8>(std::clamp<s16>(static_cast<s16>(key) + transpose, 0, 127));
 
   if (bNoteDown) {
     buf.push_back(0x90 + channel);

@@ -105,6 +105,7 @@ class MidiTrack {
   void addNoteByDur_TriAce(u8 channel, s8 key, s8 vel, u32 duration);
   void insertNoteByDur(u8 channel, s8 key, s8 vel, u32 duration, u32 absTime);
   void purgePrevNoteOffs();
+  void purgePrevNoteOffsBefore(u32 absTime);
   void purgePrevNoteOffs(u32 absTime);
   void addControllerEvent(u8 channel,
                           u8 controllerNum,
@@ -315,7 +316,7 @@ class NoteEvent
   u32 writeEvent(std::vector<u8> &buf, u32 time) override;
 
   bool bNoteDown;
-  s8 key;
+  u8 key;
   s8 vel;
 };
 

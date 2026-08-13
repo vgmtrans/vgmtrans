@@ -20,10 +20,6 @@ namespace {
 constexpr u16 maxLevelForResolution(Resolution res) {
   return res == Resolution::FourteenBit ? 16383 : 127;
 }
-
-double normalizedLevelFromRaw(u16 rawLevel, Resolution res) {
-  return rawLevel / static_cast<double>(maxLevelForResolution(res));
-}
 }  // namespace
 
 SeqTrack::SeqTrack(VGMSeq *parentFile, u32 offset, u32 length, std::string name)
@@ -56,10 +52,13 @@ void SeqTrack::resetVars() {
   deltaTime = 0;
   vol = 100;
   volResolution = Resolution::SevenBit;
+  volLevel = vol / static_cast<double>(maxLevelForResolution(volResolution));
   expression = 127;
   expressionResolution = Resolution::SevenBit;
+  expressionLevel = 1.0;
   mastVol = 127;
   masterVolResolution = Resolution::SevenBit;
+  masterVolLevel = 1.0;
   prevPan = 64;
   prevReverb = 40;
   channelGroup = 0;
@@ -853,12 +852,26 @@ void SeqTrack::insertNoteByDurNoItem(s8 key, s8 vel, u32 dur, u32 absTime) {
   prevVel = vel;
 }
 
-void SeqTrack::makePrevDurNoteEnd() const {
+void SeqTrack::makePrevDurNoteEnd() {
   makePrevDurNoteEnd(getTime() + (parentSeq->bLoadTickByTick ? deltaTime : 0));
 }
 
-void SeqTrack::makePrevDurNoteEnd(u32 absTime) const {
+void SeqTrack::makePrevDurNoteEnd(u32 absTime) {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
+    if (parentSeq->bLoadTickByTick) {
+      // Tick-by-tick parsers can leave expired duration-note ends in the
+      // pending list until another note is emitted. A tie at this exact tick is
+      // still eligible for extension; notes that ended earlier are stale.
+      const u32 currentTick = getTime();
+      pMidiTrack->purgePrevNoteOffsBefore(currentTick);
+      auto& timeline = parentSeq->timedEventIndex();
+      prevDurEventIndices.erase(
+        std::remove_if(prevDurEventIndices.begin(), prevDurEventIndices.end(),
+          [&timeline, currentTick](SeqEventTimeIndex::Index idx) {
+            return timeline.endTickExclusive(idx) < currentTick;
+          }),
+        prevDurEventIndices.end());
+    }
     for (auto* prevDurNoteOff : pMidiTrack->previousDurNoteOffs()) {
       prevDurNoteOff->absTime = absTime;
     }
@@ -930,14 +943,17 @@ void SeqTrack::addLevelNoItem(double level, LevelController controller, Resoluti
     case LevelController::Volume:
       vol = origLevel;
       volResolution = res;
+      volLevel = level;
       break;
     case LevelController::Expression:
       expression = origLevel;
       expressionResolution = res;
+      expressionLevel = level;
       break;
     case LevelController::MasterVolume:
       mastVol = origLevel;
       masterVolResolution = res;
+      masterVolLevel = level;
       break;
   }
 
@@ -1024,26 +1040,26 @@ void SeqTrack::addLevelNoItem(double level, LevelController controller, Resoluti
 }
 
 void SeqTrack::reapplyStoredLevelNoItem(LevelController controller, int absTime) {
-  u16 rawLevel;
+  double level;
   Resolution resolution;
   switch (controller) {
     case LevelController::Volume:
-      rawLevel = vol;
+      level = volLevel;
       resolution = volResolution;
       break;
     case LevelController::Expression:
-      rawLevel = expression;
+      level = expressionLevel;
       resolution = expressionResolution;
       break;
     case LevelController::MasterVolume:
-      rawLevel = mastVol;
+      level = masterVolLevel;
       resolution = masterVolResolution;
       break;
     default:
       return;
   }
 
-  addLevelNoItem(normalizedLevelFromRaw(rawLevel, resolution), controller, resolution, absTime);
+  addLevelNoItem(level, controller, resolution, absTime);
 }
 
 void SeqTrack::addVol(u32 offset, u32 length, double volPercent, Resolution res, const std::string &sEventName) {
@@ -1112,6 +1128,10 @@ void SeqTrack::addExpression(u32 offset, u32 length, u8 level, const std::string
 void SeqTrack::addExpressionNoItem(u8 level) {
   addLevelNoItem(level / 127.0, LevelController::Expression, Resolution::SevenBit);
   expression = level;
+}
+
+void SeqTrack::addExpressionNoItem(double levelPercent, Resolution res) {
+  addLevelNoItem(levelPercent, LevelController::Expression, res);
 }
 
 void SeqTrack::addExpressionSlide(u32 offset,
@@ -1211,6 +1231,20 @@ void SeqTrack::addPanNoItem(u8 pan) {
     default:
       break;
     }
+  }
+  prevPan = pan;
+}
+
+void SeqTrack::addMidiPan(u32 offset, u32 length, u8 pan, const std::string &sEventName) {
+  bool isNewOffset = onEvent(offset, length);
+
+  recordSeqEvent<PanSeqEvent>(isNewOffset, getTime(), pan, offset, length, sEventName);
+  addMidiPanNoItem(pan);
+}
+
+void SeqTrack::addMidiPanNoItem(u8 pan) {
+  if (readMode == READMODE_CONVERT_TO_MIDI) {
+    pMidiTrack->addPan(channel, pan);
   }
   prevPan = pan;
 }
@@ -1990,6 +2024,8 @@ bool SeqTrack::checkControlStateForInfiniteLoop(u32 offset) {
     // Workaround for tracks that never increment the time - exit on first infinite loop point
     if (getTime() == 0)
       return false;
+    if (parentSeq->conversionContext().sequenceLoops == 0)
+      return false;
     return true;
   }
 
@@ -2070,6 +2106,12 @@ bool SeqTrack::addLoopForever(u32 offset, u32 length, const std::string &sEventN
   }
   else if (readMode == READMODE_FIND_DELTA_LENGTH) {
     totalTicks = getTime();
+    return (this->infiniteLoops <= parentSeq->conversionContext().sequenceLoops);
+  }
+  else if (readMode == READMODE_CONVERT_TO_MIDI) {
+    // Stop immediately when the requested loop budget is exhausted. Waiting for
+    // VGMSeq's tick-end loop check lets same-tick setup events from the loop
+    // target leak into play-once exports.
     return (this->infiniteLoops <= parentSeq->conversionContext().sequenceLoops);
   }
   return true;

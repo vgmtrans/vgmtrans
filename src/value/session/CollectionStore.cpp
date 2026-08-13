@@ -1,0 +1,192 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include "value/session/CollectionStore.h"
+
+#include <algorithm>
+#include <set>
+#include <string>
+#include <utility>
+
+namespace vgmtrans::core {
+
+namespace {
+
+[[nodiscard]] std::string collectionKeyString(const CollectionKey& key) {
+  return key.resolver + '\x1f' + key.value;
+}
+
+[[nodiscard]] bool referencesAnyAsset(const Collection& collection, const std::unordered_set<u32>& assetIds) {
+  const auto referencesOne = [&](std::optional<AssetId> id) { return id && assetIds.contains(id->value); };
+  const auto referencesMany = [&](const std::vector<AssetId>& ids) {
+    return std::ranges::any_of(ids, [&](AssetId id) { return assetIds.contains(id.value); });
+  };
+  return referencesOne(collection.sequence) || referencesMany(collection.instrumentSets) ||
+         referencesMany(collection.sampleCollections) || referencesMany(collection.miscAssets);
+}
+
+[[nodiscard]] bool hasIssueCode(const Collection& collection, std::string_view code) {
+  return std::ranges::any_of(collection.issues, [code](const CollectionIssue& issue) { return issue.code == code; });
+}
+
+}  // namespace
+
+void CollectionStore::reconcile(std::string_view resolverId, std::vector<DesiredCollection> desiredCollections,
+                                const AssetStore& assets, DiagnosticStore& diagnostics, ScanIdAllocator& ids) {
+  std::set<std::string> seenKeys;
+  for (auto& desired : desiredCollections) {
+    if (desired.key.resolver.empty()) {
+      desired.key.resolver = std::string(resolverId);
+    }
+    if (desired.key.resolver != resolverId) {
+      diagnostics.addError("Collection resolver '" + std::string(resolverId) +
+                           "' returned a collection for resolver '" + desired.key.resolver + "'");
+      continue;
+    }
+    if (desired.key.value.empty()) {
+      diagnostics.addError("Collection resolver '" + std::string(resolverId) +
+                           "' returned a collection with an empty key");
+      continue;
+    }
+
+    const auto key = collectionKeyString(desired.key);
+    if (!seenKeys.insert(key).second) {
+      diagnostics.addError("Collection resolver '" + std::string(resolverId) + "' returned duplicate collection key '" +
+                           desired.key.value + "'");
+      continue;
+    }
+
+    validateAssetReferences(resolverId, desired, assets, diagnostics);
+
+    const auto sameKey = [&](const Collection& collection) { return collection.key == desired.key; };
+    if (auto found = std::ranges::find_if(collections_, sameKey); found != collections_.end()) {
+      if (found->origin == CollectionOrigin::UserCreated) {
+        found->status = CollectionStatus::Stale;
+        continue;
+      }
+      found->name = desired.name;
+      found->status = validatedCollectionStatus(desired);
+      found->sequence = desired.sequence;
+      found->instrumentSets = desired.instrumentSets;
+      found->sampleCollections = desired.sampleCollections;
+      found->miscAssets = desired.miscAssets;
+      found->issues = std::move(desired.issues);
+      continue;
+    }
+
+    collections_.push_back(Collection{
+        .id = nextCollectionId(ids),
+        .name = desired.name,
+        .status = validatedCollectionStatus(desired),
+        .origin = CollectionOrigin::Discovered,
+        .key = desired.key,
+        .sequence = desired.sequence,
+        .instrumentSets = desired.instrumentSets,
+        .sampleCollections = desired.sampleCollections,
+        .miscAssets = desired.miscAssets,
+        .issues = std::move(desired.issues),
+    });
+  }
+
+  std::erase_if(collections_, [&](const Collection& collection) {
+    return collection.origin == CollectionOrigin::Discovered && collection.key.resolver == resolverId &&
+           !seenKeys.contains(collectionKeyString(collection.key));
+  });
+}
+
+void CollectionStore::markStaleForAssets(const std::unordered_set<u32>& assetIds) {
+  if (assetIds.empty()) {
+    return;
+  }
+
+  for (auto& collection : collections_) {
+    if (!referencesAnyAsset(collection, assetIds)) {
+      continue;
+    }
+
+    collection.status = CollectionStatus::Stale;
+    if (!hasIssueCode(collection, "removed-asset")) {
+      collection.issues.push_back(removedStaleAssetIssue());
+    }
+  }
+}
+
+CollectionId CollectionStore::nextCollectionId(ScanIdAllocator& ids) {
+  CollectionId id;
+  do {
+    id = ids.nextCollectionId();
+  } while (std::ranges::any_of(collections_, [id](const Collection& collection) { return collection.id == id; }));
+  return id;
+}
+
+void CollectionStore::validateAssetReferences(std::string_view resolverId, DesiredCollection& desired,
+                                              const AssetStore& assets, DiagnosticStore& diagnostics) {
+  const auto addMissingAssetDiagnostic = [&](AssetId id, std::string_view role) {
+    diagnostics.addError("Collection resolver '" + std::string(resolverId) + "' returned " + std::string(role) +
+                         " asset id " + std::to_string(id.value) + " that does not exist");
+    if (role == "sequence") {
+      desired.issues.push_back(missingSequenceIssue(id));
+    } else if (role == "instrument-set") {
+      desired.issues.push_back(missingInstrumentSetIssue(id));
+    } else if (role == "sample-collection") {
+      desired.issues.push_back(missingSampleCollectionIssue(id));
+    } else {
+      desired.issues.push_back(CollectionIssue{
+          .severity = Severity::Error,
+          .code = "missing-" + std::string(role),
+          .message = "Collection references missing " + std::string(role) + " asset " + std::to_string(id.value),
+          .asset = id,
+      });
+    }
+  };
+
+  const auto addWrongTypeAssetDiagnostic = [&](AssetId id, std::string_view role, std::string_view article) {
+    diagnostics.addError("Collection resolver '" + std::string(resolverId) + "' returned " + std::string(role) +
+                         " asset id " + std::to_string(id.value) + " that is not " + std::string(article) + " " +
+                         std::string(role) + " asset");
+    desired.issues.push_back(CollectionIssue{
+        .severity = Severity::Error,
+        .code = "wrong-type-" + std::string(role),
+        .message = "Collection references wrong-type " + std::string(role) + " asset " + std::to_string(id.value),
+        .asset = id,
+    });
+  };
+
+  if (desired.sequence) {
+    if (!assets.contains(*desired.sequence)) {
+      addMissingAssetDiagnostic(*desired.sequence, "sequence");
+      desired.sequence = std::nullopt;
+    } else if (assets.findAs<SequenceProgramAsset>(*desired.sequence) == nullptr) {
+      addWrongTypeAssetDiagnostic(*desired.sequence, "sequence", "a");
+      desired.sequence = std::nullopt;
+    }
+  }
+
+  // Resolvers decide which IDs belong together, but CollectionStore owns the final
+  // sanity check before those IDs become durable collection references.
+  const auto filterAssets = [&](std::vector<AssetId>& ids, std::string_view role, std::string_view article,
+                                auto hasExpectedType) {
+    std::erase_if(ids, [&](AssetId id) {
+      if (!assets.contains(id)) {
+        addMissingAssetDiagnostic(id, role);
+        return true;
+      }
+      if (hasExpectedType(id)) {
+        return false;
+      }
+      addWrongTypeAssetDiagnostic(id, role, article);
+      return true;
+    });
+  };
+
+  filterAssets(desired.instrumentSets, "instrument-set", "an",
+               [&](AssetId id) { return assets.findAs<InstrumentSetAsset>(id) != nullptr; });
+  filterAssets(desired.sampleCollections, "sample-collection", "a",
+               [&](AssetId id) { return assets.findAs<SampleCollectionAsset>(id) != nullptr; });
+  filterAssets(desired.miscAssets, "misc", "a", [&](AssetId id) { return assets.findAs<MiscAsset>(id) != nullptr; });
+}
+
+}  // namespace vgmtrans::core
