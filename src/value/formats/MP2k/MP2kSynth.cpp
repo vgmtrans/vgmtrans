@@ -27,6 +27,7 @@ using namespace core;
 namespace {
 
 constexpr double kPsgSampleFrequency = 440.0;
+constexpr u32 kPsgLoopGuardSamples = 8;
 constexpr u64 kProgrammableWaveKeyBase = u64{1} << 32;
 // Aria routes the summed CGB envelope through one hardware-volume lane while
 // DirectSound mixes independent left and right lanes. With both GBA output
@@ -269,7 +270,7 @@ struct SynthContext {
                                 .codec = AudioCodec::GbaPsgWave,
                                 .encodedData = builder.reader().range(*offset, 16),
                                 .sampleRate = 32 * 440,
-                                .loop = Loop{.enabled = true, .start = 0, .length = 32},
+                                .loop = Loop{.enabled = true, .start = kPsgLoopGuardSamples, .length = 32},
                             });
   entry.source(name, builder.reader().range(*offset, 16), "mp2k-programmable-wave");
   return entry.ref();
@@ -388,7 +389,7 @@ ScanSampleCollectionDraft addMp2kPsgSamples(ScanResultBuilder& builder, u32 samp
                           .codec = AudioCodec::GbaPsg,
                           .encodedData = builder.reader().range(0, 0),
                           .sampleRate = sampleRate,
-                          .loop = Loop{.enabled = true, .start = 0, .length = sampleRate},
+                          .loop = Loop{.enabled = true, .start = kPsgLoopGuardSamples, .length = sampleRate},
                           .codecParameter = duty,
                       });
   }
@@ -403,7 +404,7 @@ ScanSampleCollectionDraft addMp2kPsgSamples(ScanResultBuilder& builder, u32 samp
                          .codec = AudioCodec::GbaPsg,
                          .encodedData = builder.reader().range(0, 0),
                          .sampleRate = sampleRate,
-                         .loop = Loop{.enabled = true, .start = 0, .length = noise[index].second},
+                         .loop = Loop{.enabled = true, .start = kPsgLoopGuardSamples, .length = noise[index].second},
                          .codecParameter = key,
                      });
   }

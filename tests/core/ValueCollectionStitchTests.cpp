@@ -213,8 +213,8 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
       containsAscii(result.soundFont.bytes, "Used Sample 0") && containsAscii(result.soundFont.bytes, "Used Sample 1"),
       "collection-relative sample references should remain bound to their original sample banks");
   expect(chunkSize(result.soundFont.bytes, "phdr") == 7 * 38 && chunkSize(result.soundFont.bytes, "shdr") == 5 * 46 &&
-             soundFontIgenContainsAmount(result.soundFont.bytes, 34, -2400),
-         "instrument-variant policy should materialize each part's dynamic ADSR in the stitched SoundFont");
+             soundFontPgenContainsAmount(result.soundFont.bytes, 34, 30368),
+         "instrument-variant policy should express dynamic ADSR differences on shared SoundFont presets");
   expect(chunkSize(restricted.soundFont.bytes, "phdr") == 3 * 38 &&
              chunkSize(restricted.soundFont.bytes, "shdr") == 3 * 46 &&
              soundFontIgenContainsAmount(restricted.soundFont.bytes, 34, -2400) &&

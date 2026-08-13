@@ -9,8 +9,10 @@
 #include "value/synth/PsxAdpcm.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iterator>
+#include <limits>
 #include <numeric>
 #include <optional>
 
@@ -493,15 +495,30 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
 
 [[nodiscard]] std::optional<DecodedSample> decodeGbaPsg(const Sample& sample) {
   constexpr std::array<double, 4> duties{0.125, 0.25, 0.5, 0.75};
-  const u32 sampleCount = sample.loop.length;
-  DecodedSample decoded{.sampleRate = sample.sampleRate, .channels = 1, .loop = sample.loop};
-  if (sample.codecParameter == 4) {
-    decoded.pcm = synthesizeLfsrNoisePcm16(sampleCount);
-  } else if (sample.codecParameter == 5) {
-    decoded.pcm = synthesizeLfsrNoisePcm16(sampleCount, 0x7f, 0x60);
-  } else {
-    decoded.pcm = synthesizeBandLimitedPulsePcm16(duties[sample.codecParameter & 3], sample.sampleRate, sampleCount);
+  const size_t guard = sample.loop.enabled ? sample.loop.start : 0;
+  const u64 sampleCountWithGuards = static_cast<u64>(guard) * 2 + sample.loop.length;
+  if (sampleCountWithGuards > std::numeric_limits<u32>::max() || guard > sample.loop.length) {
+    return std::nullopt;
   }
+  DecodedSample decoded{.sampleRate = sample.sampleRate, .channels = 1, .loop = sample.loop};
+  std::vector<s16> period;
+  const bool noise = sample.codecParameter == 4 || sample.codecParameter == 5;
+  if (noise && sample.loop.length == std::numeric_limits<u32>::max()) {
+    return std::nullopt;
+  }
+  if (sample.codecParameter == 4) {
+    period = synthesizeLfsrNoisePcm16(sample.loop.length + 1);
+    period.erase(period.begin());
+  } else if (sample.codecParameter == 5) {
+    period = synthesizeLfsrNoisePcm16(sample.loop.length + 1, 0x7f, 0x60);
+    period.erase(period.begin());
+  } else {
+    period = synthesizeBandLimitedPulsePcm16(duties[sample.codecParameter & 3], sample.sampleRate, sample.loop.length);
+  }
+  decoded.pcm.reserve(static_cast<size_t>(sampleCountWithGuards));
+  decoded.pcm.insert(decoded.pcm.end(), period.end() - static_cast<std::ptrdiff_t>(guard), period.end());
+  decoded.pcm.insert(decoded.pcm.end(), period.begin(), period.end());
+  decoded.pcm.insert(decoded.pcm.end(), period.begin(), period.begin() + static_cast<std::ptrdiff_t>(guard));
   return decoded;
 }
 
@@ -512,14 +529,23 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   }
   const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
   DecodedSample decoded{.sampleRate = sample.sampleRate, .channels = 1, .loop = sample.loop};
-  decoded.pcm.reserve(32);
+  std::array<s16, 32> wave{};
+  size_t index = 0;
   for (const u8 packed : encoded) {
     // The GBA wave channel converts each unsigned nibble to 2 * (n - 8).
     // Scaling that exact asymmetric -16..14 DAC range to PCM16 preserves both
     // its zero point and its amplitude relative to the other PSG channels.
-    decoded.pcm.push_back(static_cast<s16>((static_cast<s32>(packed >> 4) - 8) << 12));
-    decoded.pcm.push_back(static_cast<s16>((static_cast<s32>(packed & 0x0f) - 8) << 12));
+    wave[index++] = static_cast<s16>((static_cast<s32>(packed >> 4) - 8) << 12);
+    wave[index++] = static_cast<s16>((static_cast<s32>(packed & 0x0f) - 8) << 12);
   }
+  const size_t guard = sample.loop.enabled ? sample.loop.start : 0;
+  if (guard > wave.size() || (sample.loop.enabled && sample.loop.length != wave.size())) {
+    return std::nullopt;
+  }
+  decoded.pcm.reserve(wave.size() + guard * 2);
+  decoded.pcm.insert(decoded.pcm.end(), wave.end() - static_cast<std::ptrdiff_t>(guard), wave.end());
+  decoded.pcm.insert(decoded.pcm.end(), wave.begin(), wave.end());
+  decoded.pcm.insert(decoded.pcm.end(), wave.begin(), wave.begin() + static_cast<std::ptrdiff_t>(guard));
   return decoded;
 }
 
