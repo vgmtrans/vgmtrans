@@ -16,6 +16,7 @@
 #include "value/formats/ChunSnes/ChunSnes.h"
 #include "value/formats/CompileSnes/CompileSnes.h"
 #include "value/formats/CPS/Cps.h"
+#include "value/formats/FalcomSnes/FalcomSnes.h"
 #include "value/formats/HeartBeatSnes/HeartBeatSnes.h"
 #include "value/formats/HudsonSnes/HudsonSnes.h"
 #include "value/formats/ItikitiSnes/ItikitiSnes.h"
@@ -94,6 +95,7 @@ void registerValueFormats(core::Session& session, const ValueFormatOptions& opti
   session.registerFormat(chun_snes::definition());
   session.registerFormat(compile_snes::definition());
   session.registerFormat(cps::cpsDefinition());
+  session.registerFormat(falcom_snes::definition());
   session.registerFormat(heartbeat_snes::definition());
   session.registerFormat(hudson_snes::definition());
   session.registerFormat(itikiti_snes::definition());
