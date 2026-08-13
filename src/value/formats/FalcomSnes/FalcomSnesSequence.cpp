@@ -26,18 +26,8 @@ namespace {
 
 constexpr u32 kCommandLimit = 32768;
 constexpr u8 kDefaultTempo = 0x78;
-constexpr u32 kPatchStride = 3;
 
 namespace math {
-
-constexpr std::array<u8, 129> kPanTable{
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-    64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 63, 62,
-    61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, 44, 43, 42, 41, 40,
-    39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18,
-    17, 16, 15, 14, 13, 12, 11, 10, 9,  8,  7,  6,  5,  4,  3,  2,  1,  0,  0,
-};
 
 [[nodiscard]] u32 tempoMicroseconds(u8 tempo) {
   // Timer 0 runs every 125 us with target $25; a sequence tick is one 8-bit
@@ -51,11 +41,14 @@ constexpr std::array<u8, 129> kPanTable{
 
 [[nodiscard]] double level(u8 raw) { return std::min<u8>(raw, 0x7f) / 127.0; }
 
+// Ys V's table stays at $40 through index $3f, then falls linearly to zero.
+[[nodiscard]] constexpr u8 panGain(u8 index) { return index < 0x40 ? 0x40 : 0x7f - index; }
+
 [[nodiscard]] StereoBalance pan(u8 raw) {
   raw &= 0x7f;
   return {
-      .leftGain = kPanTable[raw] / 127.0,
-      .rightGain = kPanTable[(0x80 - raw) & 0x7f] / 127.0,
+      .leftGain = panGain(raw) / 127.0,
+      .rightGain = panGain(static_cast<u8>((0x80 - raw) & 0x7f)) / 127.0,
   };
 }
 
@@ -63,6 +56,18 @@ constexpr std::array<u8, 129> kPanTable{
   const StereoBalance balance = pan(raw);
   const double total = balance.leftGain + balance.rightGain;
   return total == 0.0 ? 0.0 : (balance.rightGain - balance.leftGain) / total;
+}
+
+void stepPan(u8& current, bool& descending, u8 low, u8 high, u8 step) {
+  int next = current + (descending ? -static_cast<int>(step) : static_cast<int>(step));
+  if (!descending && next >= high) {
+    next = high;
+    descending = true;
+  } else if (descending && next <= low) {
+    next = low;
+    descending = false;
+  }
+  current = static_cast<u8>(next);
 }
 
 [[nodiscard]] double tuningSemitones(u8 rawKey, u16 pitchScale, s8 offset) {
@@ -123,15 +128,7 @@ constexpr std::array<u8, 129> kPanTable{
     if ((tick + 1) % interval != 0) {
       continue;
     }
-    int next = current + (descending ? -static_cast<int>(step) : static_cast<int>(step));
-    if (!descending && next >= high) {
-      next = high;
-      descending = true;
-    } else if (descending && next <= low) {
-      next = low;
-      descending = false;
-    }
-    current = static_cast<u8>(next);
+    stepPan(current, descending, low, high, step);
   }
   return result;
 }
@@ -144,15 +141,19 @@ struct PatchState {
   u16 pitchScale = 0x100;
 };
 
-[[nodiscard]] PatchState patch(const SequenceProgram& sequence, u8 program) {
-  const u32 index = static_cast<u32>(program) * kPatchStride;
-  if (index + 2 >= sequence.config.driverData.size()) {
+[[nodiscard]] constexpr u32 packPatch(u8 adsr1, u8 adsr2, u16 pitchScale) {
+  return adsr1 | (static_cast<u32>(adsr2) << 8) | (static_cast<u32>(pitchScale) << 16);
+}
+
+[[nodiscard]] PatchState patch(std::span<const u32> patches, u8 program) {
+  if (program >= patches.size()) {
     return {};
   }
+  const u32 raw = patches[program];
   return PatchState{
-      .adsr1 = static_cast<u8>(sequence.config.driverData[index]),
-      .adsr2 = static_cast<u8>(sequence.config.driverData[index + 1]),
-      .pitchScale = static_cast<u16>(sequence.config.driverData[index + 2]),
+      .adsr1 = static_cast<u8>(raw),
+      .adsr2 = static_cast<u8>(raw >> 8),
+      .pitchScale = static_cast<u16>(raw >> 16),
   };
 }
 
@@ -165,7 +166,6 @@ struct ProgramState {
 };
 
 struct VibratoState {
-  u8 delay = 0;
   u8 depth = 0;
   s8 rate = 0;
   bool enabled = false;
@@ -175,31 +175,28 @@ struct PitchEnvelopeState {
   u8 delay = 0;
   u8 depth = 0;
   s8 interval = 0;
-  u8 activeDepth = 0;
   u8 counter = 0;
   double offset = 0.0;
+  bool enabled = false;
 };
 
 struct PanLfoState {
   u8 low = 0x40;
   u8 high = 0x40;
-  u8 savedStep = 0;
   u8 step = 0;
   u8 interval = 0;
   u8 counter = 0;
   bool descending = false;
+  bool enabled = false;
 };
 
 struct TrackState {
   TrackState(const SequenceProgram& sequence, const TrackProgram& source)
-      : sequence(&sequence), trackNumber(source.sourceTrackNumber) {
-    std::ranges::copy_n(source.config.driverData.begin(),
-                        std::min<size_t>(durations.size(), source.config.driverData.size()), durations.begin());
-  }
+      : patches(sequence.config.driverData),
+        voiceBit(static_cast<u8>(1u << std::min(source.sourceTrackNumber, u32{7}))) {}
 
-  const SequenceProgram* sequence;
-  u32 trackNumber;
-  std::array<u8, 7> durations{};
+  std::span<const u32> patches;
+  u8 voiceBit;
   u8 octave = 0;
   u8 quantize = 0;
   u8 volume = 0;
@@ -212,7 +209,7 @@ struct TrackState {
   bool echoEnabled = false;
   bool startupLatch = true;
   bool previousSlurred = false;
-  std::optional<u8> previousRawKey;
+  std::optional<u8> previousKey;
   PerformanceNoteId lastNote;
   VibratoState vibrato;
   PitchEnvelopeState pitchEnvelope;
@@ -228,14 +225,18 @@ struct Playback {
 
   void emitMix() const {
     out.level(math::level(track.volume), ValueQuantization{.levels = 128});
+    emitPan();
+  }
+
+  void emitPan() const {
     const StereoBalance balance = math::pan(track.pan);
     out.stereoBalance(balance.leftGain, balance.rightGain);
   }
 
   void updateEchoVoice() {
-    const u8 bit = static_cast<u8>(1u << std::min(track.trackNumber, u32{7}));
     const u8 mask = program.echo.voiceMask.value_or(0);
-    const u8 next = track.echoEnabled ? static_cast<u8>(mask | bit) : static_cast<u8>(mask & ~bit);
+    const u8 next = track.echoEnabled ? static_cast<u8>(mask | track.voiceBit)
+                                      : static_cast<u8>(mask & ~track.voiceBit);
     if (next != mask) {
       program.echo.voiceMask = next;
       out.reverb(program.echo);
@@ -245,14 +246,13 @@ struct Playback {
   [[nodiscard]] Effects note(u8 rawKey, u8 length, bool slurred, bool rest) {
     if (rest) {
       track.previousSlurred = false;
-      track.previousRawKey.reset();
+      track.previousKey.reset();
       track.lastNote = {};
       return Effects::wait(length);
     }
 
     const u8 driverKey = static_cast<u8>(rawKey + track.octave * 12u);
-    const bool continues =
-        track.previousSlurred && track.previousRawKey == driverKey && track.lastNote.valid();
+    const bool continues = track.previousSlurred && track.previousKey == driverKey && track.lastNote.valid();
     const u32 duration = math::soundingTicks(length, track.quantize, slurred);
     const double key = driverKey + 24.0 + math::tuningSemitones(driverKey, track.pitchScale, track.tuning);
     NotePerformanceEvent event{
@@ -280,14 +280,14 @@ struct Playback {
       track.pitchEnvelope.counter = track.pitchEnvelope.delay;
       track.lastNote = out.note(std::move(event));
     }
-    track.previousRawKey = driverKey;
+    track.previousKey = driverKey;
     track.previousSlurred = slurred;
     return Effects::wait(length);
   }
 
   [[nodiscard]] Effects programChange(u8 value) {
     track.program = value;
-    const PatchState selected = patch(*track.sequence, value);
+    const PatchState selected = patch(track.patches, value);
     track.adsr1 = selected.adsr1;
     track.adsr2 = selected.adsr2;
     track.pitchScale = selected.pitchScale;
@@ -307,47 +307,34 @@ struct Playback {
     return {};
   }
 
-  [[nodiscard]] LfoPerformanceContext vibratoContext(bool restart, bool includeDelay) const {
+  void emitVibrato(LfoRestartMode restart, std::optional<u32> delay = std::nullopt) const {
     const double phase = track.vibrato.rate < 0 ? 0.5 : 0.0;
+    const double cycles = track.vibrato.enabled ? std::abs(static_cast<int>(track.vibrato.rate)) / 256.0 : 0.0;
     LfoPerformanceContext context{
-        .cyclesPerTick = std::abs(static_cast<int>(track.vibrato.rate)) / 256.0,
+        .cyclesPerTick = cycles,
+        .delayTicks = delay,
+        .delayIsTempoRelative = delay.has_value(),
         .shape = math::vibratoShape(track.vibrato.depth),
         .initialPhaseCycles = phase,
         .noteRestartInitialPhaseCycles = phase,
         .sampleImmediatelyOnNote = true,
-        .restartMode = restart ? LfoRestartMode::PhaseAndDelay : LfoRestartMode::None,
+        .restartMode = restart,
         .phaseRunsAtZeroDepth = false,
         .zeroDepthBehavior = LfoZeroDepthBehavior::HoldOutputUntilNextNote,
     };
-    if (includeDelay) {
-      context.delayTicks = static_cast<u32>(track.vibrato.delay) + 1;
-    }
-    return context;
-  }
-
-  void emitVibrato(bool restart, bool includeDelay) const {
-    const auto context = vibratoContext(restart, includeDelay);
     const double depth = track.vibrato.enabled ? math::vibratoDepth(track.vibrato.depth) : 0.0;
-    const double cycles = track.vibrato.enabled ? std::abs(static_cast<int>(track.vibrato.rate)) / 256.0 : 0.0;
     out.vibratoDepth(depth, context);
     out.vibratoRateCyclesPerTick(cycles, context);
-    if (includeDelay) {
-      out.vibratoDelay(VibratoDelayPerformanceEvent{
-          .delayTicks = static_cast<u32>(track.vibrato.delay) + 1,
-          .tempoRelative = true,
-          .updateMode = LfoDelayUpdateMode::CurrentAndFutureNotes,
-      });
-    }
   }
 
   void vibrato(u8 delay, u8 depth, s8 rate) {
-    track.vibrato = {.delay = delay, .depth = depth, .rate = rate, .enabled = rate != 0};
-    emitVibrato(true, true);
+    track.vibrato = {.depth = depth, .rate = rate, .enabled = rate != 0};
+    emitVibrato(LfoRestartMode::PhaseAndDelay, static_cast<u32>(delay) + 1);
   }
 
   void vibratoEnabled(bool enabled) {
     track.vibrato.enabled = enabled && track.vibrato.rate != 0;
-    emitVibrato(false, false);
+    emitVibrato(LfoRestartMode::None);
   }
 
   void setVolume(u8 value) { track.volume = value; }
@@ -358,7 +345,7 @@ struct Playback {
   }
 
   void setPan(u8 value) {
-    if (track.panLfo.step != 0) {
+    if (track.panLfo.enabled) {
       panLfoEnabled(false);
     }
     track.pan = value;
@@ -366,8 +353,7 @@ struct Playback {
 
   void adjustPan(int amount) {
     track.pan = static_cast<u8>(std::clamp<int>(track.pan + amount, 0, 0x7f));
-    const StereoBalance balance = math::pan(track.pan);
-    out.stereoBalance(balance.leftGain, balance.rightGain);
+    emitPan();
   }
 
   void emitPanLfo(u8 start, u8 target, u8 step, u8 interval) const {
@@ -391,24 +377,22 @@ struct Playback {
     track.panLfo = {
         .low = std::min(start, target),
         .high = std::max(start, target),
-        .savedStep = step,
         .step = step,
         .interval = interval,
         .counter = interval,
         .descending = target < start,
+        .enabled = step != 0,
     };
     emitPanLfo(start, target, step, interval);
   }
 
   void panLfoEnabled(bool enabled) {
-    if (enabled) {
-      track.panLfo.step = track.panLfo.savedStep;
+    track.panLfo.enabled = enabled && track.panLfo.step != 0;
+    if (track.panLfo.enabled) {
       const u8 target = track.panLfo.descending ? track.panLfo.low : track.panLfo.high;
       emitPanLfo(track.pan, target, track.panLfo.step, track.panLfo.interval);
     } else {
-      track.panLfo.step = 0;
-      const StereoBalance balance = math::pan(track.pan);
-      out.stereoBalance(balance.leftGain, balance.rightGain);
+      emitPan();
       out.panLfoDepth(0.0, LfoPerformanceContext{.restartMode = LfoRestartMode::None});
       out.panLfoRateCyclesPerTick(0.0, LfoPerformanceContext{.restartMode = LfoRestartMode::None});
     }
@@ -418,12 +402,12 @@ struct Playback {
     track.pitchEnvelope.delay = delay;
     track.pitchEnvelope.depth = depth;
     track.pitchEnvelope.interval = interval;
-    track.pitchEnvelope.activeDepth = depth;
     track.pitchEnvelope.counter = delay;
+    track.pitchEnvelope.enabled = depth != 0;
   }
 
   void pitchEnvelopeEnabled(bool enabled) {
-    track.pitchEnvelope.activeDepth = enabled ? track.pitchEnvelope.depth : 0;
+    track.pitchEnvelope.enabled = enabled && track.pitchEnvelope.depth != 0;
   }
 
   [[nodiscard]] Effects adsr(u8 adsr1, u8 adsr2) {
@@ -455,72 +439,65 @@ struct Playback {
 
   void overwriteFirPreset(u8 preset) { program.overwrittenFirPresets.insert(preset); }
 
-  void echoVolumeEnabled(bool enabled) {
-    const s8 left = enabled ? program.storedEchoLeft : 0;
-    const s8 right = enabled ? program.storedEchoRight : 0;
+  void emitEchoVolume(s8 left, s8 right) const {
     program.echo.leftGain = left / 128.0;
     program.echo.rightGain = right / 128.0;
     program.echo.send = std::min(1.0, std::max(std::abs(left), std::abs(right)) / 127.0);
+    out.reverb(program.echo);
+  }
+
+  void echoVolumeEnabled(bool enabled) {
     if (enabled) {
       program.echo.feedback = program.storedFeedback / 128.0;
     }
-    out.reverb(program.echo);
+    emitEchoVolume(enabled ? program.storedEchoLeft : 0, enabled ? program.storedEchoRight : 0);
   }
 
   void echoVolume(s8 left, s8 right) {
     program.storedEchoLeft = left;
     program.storedEchoRight = right;
-    program.echo.leftGain = left / 128.0;
-    program.echo.rightGain = right / 128.0;
-    program.echo.send = std::min(1.0, std::max(std::abs(left), std::abs(right)) / 127.0);
-    out.reverb(program.echo);
+    emitEchoVolume(left, right);
   }
 
   void repeatStart(Address cell, u8 count) { track.repeatCells[static_cast<u16>(cell.value)] = count; }
 
-  [[nodiscard]] Effects repeatBreak(Address cell, Address destination) {
+  [[nodiscard]] u8* repeatCounter(Address cell) {
     const auto found = track.repeatCells.find(static_cast<u16>(cell.value));
-    return found != track.repeatCells.end() && static_cast<u8>(found->second - 1) == 0
-               ? vm.finiteBranch(destination)
-               : Effects{};
+    return found == track.repeatCells.end() ? nullptr : &found->second;
+  }
+
+  [[nodiscard]] Effects repeatBreak(Address cell, Address destination) {
+    const u8* count = repeatCounter(cell);
+    return count != nullptr && *count == 1 ? vm.finiteBranch(destination) : Effects{};
   }
 
   [[nodiscard]] Effects repeatEnd(Address cell, Address destination) {
-    const auto found = track.repeatCells.find(static_cast<u16>(cell.value));
-    if (found == track.repeatCells.end()) {
+    u8* count = repeatCounter(cell);
+    if (count == nullptr) {
       return {};
     }
-    --found->second;
-    return found->second != 0 ? vm.finiteBranch(destination) : Effects{};
+    return --*count != 0 ? vm.finiteBranch(destination) : Effects{};
   }
 
   void tickPanLfo() {
     PanLfoState& lfo = track.panLfo;
-    if (lfo.step == 0 || --lfo.counter != 0) {
+    if (!lfo.enabled || --lfo.counter != 0) {
       return;
     }
-    int next = track.pan + (lfo.descending ? -static_cast<int>(lfo.step) : static_cast<int>(lfo.step));
-    if (!lfo.descending && next >= lfo.high) {
-      next = lfo.high;
-      lfo.descending = true;
-    } else if (lfo.descending && next <= lfo.low) {
-      next = lfo.low;
-      lfo.descending = false;
-    }
-    track.pan = static_cast<u8>(next);
+    math::stepPan(track.pan, lfo.descending, lfo.low, lfo.high, lfo.step);
     lfo.counter = lfo.interval;
   }
 
   void tickPitchEnvelope() {
     PitchEnvelopeState& envelope = track.pitchEnvelope;
-    if (envelope.activeDepth == 0) {
+    if (!envelope.enabled) {
       return;
     }
     if (envelope.counter != 0) {
       --envelope.counter;
       return;
     }
-    envelope.offset += (envelope.interval < 0 ? -1.0 : 1.0) * envelope.activeDepth / 256.0;
+    envelope.offset += (envelope.interval < 0 ? -1.0 : 1.0) * envelope.depth / 256.0;
     out.pitchBend(envelope.offset);
     envelope.counter = static_cast<u8>(std::abs(static_cast<int>(envelope.interval)));
     --envelope.counter;
@@ -755,16 +732,13 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 }
 
 [[nodiscard]] std::vector<u32> runtimePatches(ByteReader reader, const Layout& layout) {
-  std::vector<u32> result(256 * kPatchStride);
+  std::vector<u32> result(256);
   for (u32 program = 0; program < 256; ++program) {
     const u16 row = static_cast<u16>(layout.instrumentTableAddress + static_cast<u8>(program * 5u));
     if (!reader.has(row, 5)) {
       continue;
     }
-    const u32 index = program * kPatchStride;
-    result[index] = reader.u8At(row);
-    result[index + 1] = reader.u8At(row + 1);
-    result[index + 2] = reader.be16(row + 3);
+    result[program] = packPatch(reader.u8At(row), reader.u8At(row + 1), reader.be16(row + 3));
   }
   return result;
 }
@@ -796,11 +770,9 @@ const SequenceDialect& sequenceDialect() {
 TrackProgram decodeSourceTrack(ByteReader reader, u32 trackNumber, u32 startAddress,
                                std::span<const u8, 7> durations, std::vector<Diagnostic>* diagnostics) {
   const TrackDecodeScope tracks{.reader = reader, .maxCommands = kCommandLimit};
-  TrackProgram track = tracks.reachable(trackNumber, startAddress, [&](u32 offset) {
+  return tracks.reachable(trackNumber, startAddress, [&](u32 offset) {
     return decodeCommand(reader, offset, durations, diagnostics);
   });
-  track.config.driverData.assign(durations.begin(), durations.end());
-  return track;
 }
 
 SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
@@ -823,9 +795,6 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   SequenceProgram program = sequence.finish();
   program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
   program.config.driverData = runtimePatches(reader, layout);
-  for (TrackProgram& track : program.tracks) {
-    track.config.driverData.assign(durations.begin(), durations.end());
-  }
   return SequenceParse{
       .program = std::move(program),
       .programs = std::move(programs),
