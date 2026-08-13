@@ -6,8 +6,6 @@
 
 #include "value/formats/HudsonSnes/HudsonSnes.h"
 
-#include <fmt/format.h>
-
 #include <string>
 
 namespace vgmtrans::formats::hudson_snes {
@@ -22,8 +20,7 @@ namespace {
     return {};
   }
   ScanResultBuilder result(input, "HudsonSnes");
-  const std::string displayName =
-      fmt::format("{} (Hudson {})", result.sourceDisplayName(), versionName(layout->version));
+  const std::string displayName = result.sourceDisplayName();
   auto sequence = result.sequence(displayName);
   SequenceParse parsed =
       decodeSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics());
