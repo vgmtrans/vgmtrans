@@ -123,6 +123,58 @@ SourceMap::Index::Index(const std::vector<SourceAnnotation>& annotations) {
       annotationsByParent[annotations[i].parent->value].push_back(id);
     }
   }
+
+  // Ownership is inherited through parent annotations. Resolve each chain once
+  // while building this immutable index; malformed cycles are reported by scan
+  // validation before the map can enter session state.
+  assetOwnerByAnnotation.resize(annotations.size());
+  std::vector<u8> state(annotations.size());
+  std::vector<size_t> path;
+  for (size_t root = 0; root < annotations.size(); ++root) {
+    if (!annotations[root].id.valid() || state[root] == 2) {
+      continue;
+    }
+
+    path.clear();
+    std::optional<AssetId> owner;
+    size_t current = root;
+    while (true) {
+      if (state[current] == 2) {
+        owner = assetOwnerByAnnotation[current];
+        break;
+      }
+      if (state[current] == 1) {
+        break;
+      }
+
+      state[current] = 1;
+      path.push_back(current);
+      const auto& annotation = annotations[current];
+      if (annotation.owner && annotation.owner->asset.valid()) {
+        owner = annotation.owner->asset;
+        break;
+      }
+      if (!annotation.parent || !annotation.parent->valid()) {
+        break;
+      }
+      const auto parent = annotationsById.find(annotation.parent->value);
+      if (parent == annotationsById.end()) {
+        break;
+      }
+      current = parent->second;
+    }
+
+    for (const size_t index : path) {
+      assetOwnerByAnnotation[index] = owner;
+      state[index] = 2;
+    }
+  }
+
+  for (size_t i = 0; i < annotations.size(); ++i) {
+    if (annotations[i].id.valid() && assetOwnerByAnnotation[i]) {
+      annotationsByAsset[assetOwnerByAnnotation[i]->value].push_back(annotations[i].id);
+    }
+  }
 }
 
 SourceMap::Storage::Storage(std::vector<Part> partsValue) : parts(std::move(partsValue)) {
@@ -210,19 +262,30 @@ std::vector<SourceAnnotationId> SourceMap::ownedBy(ObjectRef object) const {
 }
 
 std::optional<AssetId> SourceMap::assetOwner(SourceAnnotationId id) const {
-  const SourceAnnotation* annotation = find(id);
-  for (size_t depth = 0; annotation != nullptr && depth < annotations().size(); ++depth) {
-    if (annotation->owner && annotation->owner->asset.valid()) {
-      return annotation->owner->asset;
+  if (!id.valid()) {
+    return std::nullopt;
+  }
+  for (const auto& part : storage_->parts) {
+    const auto found = part.index->annotationsById.find(id.value);
+    if (found != part.index->annotationsById.end()) {
+      return part.index->assetOwnerByAnnotation[found->second];
     }
-    annotation = annotation->parent ? find(*annotation->parent) : nullptr;
   }
   return std::nullopt;
 }
 
 std::vector<SourceAnnotationId> SourceMap::annotationsForAsset(AssetId asset) const {
-  return idsFromAnnotations(annotations(),
-                            [&](const SourceAnnotation& annotation) { return assetOwner(annotation.id) == asset; });
+  std::vector<SourceAnnotationId> annotations;
+  if (!asset.valid()) {
+    return annotations;
+  }
+  for (const auto& part : storage_->parts) {
+    const auto found = part.index->annotationsByAsset.find(asset.value);
+    if (found != part.index->annotationsByAsset.end()) {
+      annotations.insert(annotations.end(), found->second.begin(), found->second.end());
+    }
+  }
+  return annotations;
 }
 
 std::vector<SourceAnnotationId> SourceMap::childrenOf(SourceAnnotationId parent) const {

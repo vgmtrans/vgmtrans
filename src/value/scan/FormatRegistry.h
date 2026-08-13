@@ -7,6 +7,7 @@
 #pragma once
 
 #include "value/scan/FormatDefinition.h"
+#include "value/scan/SourceExtractor.h"
 
 #include <string>
 #include <string_view>
@@ -20,18 +21,18 @@ public:
   // Registration is validated as one unit before either the ordered module
   // list or the global dialect index changes.
   void add(FormatDefinition definition);
+  void add(SourceExtractor extractor);
   void seal() noexcept;
 
-  // Unhinted sources use every module. Authoritatively hinted derived sources
-  // use only matching modules; both paths preserve registration order.
+  [[nodiscard]] const std::vector<SourceExtractor>& extractors() const noexcept { return extractors_; }
   [[nodiscard]] const std::vector<FormatModule>& modules() const noexcept { return modules_; }
-  [[nodiscard]] std::vector<const FormatModule*> modulesForFormatHint(std::string_view hint) const;
   [[nodiscard]] const FormatModule* findModule(std::string_view name) const;
   [[nodiscard]] const SequenceDialect* findDialect(std::string_view id) const;
   [[nodiscard]] bool containsDialect(std::string_view id) const;
   [[nodiscard]] bool sealed() const noexcept { return sealed_; }
 
 private:
+  std::vector<SourceExtractor> extractors_;
   std::vector<FormatModule> modules_;
   std::unordered_map<std::string, SequenceDialect> dialects_;
   bool sealed_ = false;

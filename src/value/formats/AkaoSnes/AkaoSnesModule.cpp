@@ -56,6 +56,7 @@ FormatDefinition akaoSnesDefinition() {
   return FormatDefinition{
       .module = {.name = std::string(kAkaoSnesFormatName),
                  .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+                 .acceptedFormats = {source_formats::kSnesAram},
                  .scan = scanAkaoSnes},
       .sequenceDialects = {akaoSnesSequenceDialect()},
   };

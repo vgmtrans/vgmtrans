@@ -53,7 +53,7 @@ using ArchivePtr = std::unique_ptr<ar_archive, ArchiveCloser>;
 
 }  // namespace
 
-[[nodiscard]] ScanResult scanSnesRsn(const ScanInput& input) {
+[[nodiscard]] ExtractionResult extractSnesRsn(const ExtractionInput& input) {
   // RSN is a RAR archive convention for SPC sets. Extract every entry as a derived source
   // so the SPC extractor and SNES format scanners can process them normally.
   const auto bytes = input.reader.slice(0, input.reader.size());
@@ -61,7 +61,7 @@ using ArchivePtr = std::unique_ptr<ar_archive, ArchiveCloser>;
     return {};
   }
 
-  ScanResult result;
+  ExtractionResult result;
   const auto sourceRange = input.reader.range(0, input.reader.size());
 
   StreamPtr stream(ar_open_memory(bytes.data(), bytes.size()));
@@ -91,25 +91,26 @@ using ArchivePtr = std::unique_ptr<ar_archive, ArchiveCloser>;
       continue;
     }
 
-    result.extractedSources.push_back(ExtractedSource{
+    result.sources.push_back(ExtractedSource{
         .file = SourceFile{.name = rawName, .path = input.source.path},
         .bytes = std::move(entryBytes),
         .origin = sourceRange,
     });
   }
 
-  if (result.extractedSources.empty() && result.diagnostics.empty()) {
+  if (result.sources.empty() && result.diagnostics.empty()) {
     result.diagnostics.push_back(warning("RSN archive did not contain any extractable entries", sourceRange));
-  }
-  if (!result.extractedSources.empty()) {
-    result.disposition = ScanDisposition::Exclusive;
   }
 
   return result;
 }
 
-FormatDefinition snesRsnExtractorDefinition() {
-  return FormatDefinition{.module = {.name = "SnesRsn", .scan = scanSnesRsn}};
+SourceExtractor snesRsnExtractor() {
+  return SourceExtractor{
+      .name = "SnesRsn",
+      .acceptedFormats = {source_formats::kRsn},
+      .extract = extractSnesRsn,
+  };
 }
 
 }  // namespace vgmtrans::formats::snes_rsn

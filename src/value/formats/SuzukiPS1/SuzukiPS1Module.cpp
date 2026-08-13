@@ -68,6 +68,7 @@ FormatDefinition suzukiPs1Definition() {
   return FormatDefinition{
       .module = {.name = std::string(kSuzukiPs1FormatName),
                  .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
+                 .acceptedFormats = {source_formats::kPlayStationRam},
                  .scan = scanSuzukiPs1},
       .sequenceDialects = {suzukiPs1SequenceDialect()},
   };

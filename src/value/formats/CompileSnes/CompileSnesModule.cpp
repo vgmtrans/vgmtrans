@@ -40,7 +40,10 @@ namespace {
 
 FormatDefinition definition() {
   return FormatDefinition{
-      .module = {.name = "CompileSnes", .preferredSampleFilter = SampleFilter::SnesDspLowPass, .scan = scan},
+      .module = {.name = "CompileSnes",
+                 .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+                 .acceptedFormats = {source_formats::kSnesAram},
+                 .scan = scan},
       .sequenceDialects = {sequenceDialect()},
   };
 }

@@ -46,7 +46,10 @@ namespace {
 
 FormatDefinition definition() {
   return FormatDefinition{
-      .module = {.name = "ItikitiSnes", .preferredSampleFilter = SampleFilter::SnesDspLowPass, .scan = scan},
+      .module = {.name = "ItikitiSnes",
+                 .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+                 .acceptedFormats = {source_formats::kSnesAram},
+                 .scan = scan},
       .sequenceDialects = {sequenceDialect()},
   };
 }

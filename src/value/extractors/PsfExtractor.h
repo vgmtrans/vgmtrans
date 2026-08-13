@@ -6,10 +6,10 @@
 
 #pragma once
 
-#include "value/scan/FormatDefinition.h"
+#include "value/scan/SourceExtractor.h"
 
 namespace vgmtrans::formats::psf {
 
-[[nodiscard]] core::FormatDefinition psfExtractorDefinition();
+[[nodiscard]] core::SourceExtractor psfExtractor();
 
 }  // namespace vgmtrans::formats::psf

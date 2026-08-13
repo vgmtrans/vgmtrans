@@ -49,21 +49,12 @@ struct ExplicitCollection {
   CollectionMembers members;
 };
 
-enum class ScanDisposition {
-  Continue,
-  // The admitted result fully identifies this source. Later modules must not
-  // probe the same input, though extracted children are still queued normally.
-  Exclusive,
-};
-
 struct ScanResult {
   std::vector<Asset> assets;
   std::vector<MatchFact> matchFacts;
   std::vector<ExplicitCollection> explicitCollections;
   SourceMap sourceMap;
   std::vector<Diagnostic> diagnostics;
-  std::vector<ExtractedSource> extractedSources;
-  ScanDisposition disposition = ScanDisposition::Continue;
 };
 
 void normalizeScanResult(ScanResult& result, ScanIdAllocator& ids);

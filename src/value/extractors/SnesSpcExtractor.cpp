@@ -119,7 +119,7 @@ constexpr std::string_view kExtendedId666Signature = "xid6";
 
 }  // namespace
 
-[[nodiscard]] ScanResult scanSnesSpc(const ScanInput& input) {
+[[nodiscard]] ExtractionResult extractSnesSpc(const ExtractionInput& input) {
   // SPC files are snapshots. The actual format scanners want the 64 KiB ARAM image, so
   // expose RAM as a derived child source and let normal SNES modules scan that.
   const auto spcBytes = input.reader.slice(0, input.reader.size());
@@ -131,23 +131,27 @@ constexpr std::string_view kExtendedId666Signature = "xid6";
   std::vector<u8> ram(ramBytes.begin(), ramBytes.end());
   const auto origin = input.reader.range(kSpcRamOffset, kSpcRamSize);
 
-  ScanResult result;
-  result.extractedSources.push_back(ExtractedSource{
+  ExtractionResult result;
+  result.sources.push_back(ExtractedSource{
       .file =
           SourceFile{
               .name = sourceName(input.source) + " - ram",
               .title = spcTitle(spcBytes),
               .path = input.source.path,
+              .knownFormat = std::string(source_formats::kSnesAram),
           },
       .bytes = std::move(ram),
       .origin = origin,
   });
-  result.disposition = ScanDisposition::Exclusive;
   return result;
 }
 
-FormatDefinition snesSpcExtractorDefinition() {
-  return FormatDefinition{.module = {.name = "SnesSpc", .scan = scanSnesSpc}};
+SourceExtractor snesSpcExtractor() {
+  return SourceExtractor{
+      .name = "SnesSpc",
+      .acceptedFormats = {source_formats::kSpc},
+      .extract = extractSnesSpc,
+  };
 }
 
 }  // namespace vgmtrans::formats::snes_spc

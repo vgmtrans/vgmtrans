@@ -22,6 +22,23 @@ namespace vgmtrans::core {
 
 using SharedSourceBytes = std::shared_ptr<const std::vector<u8>>;
 
+// Stable descriptions of source bytes whose representation is known before
+// scanning. Unknown sources omit knownFormat and retain unrestricted probing.
+namespace source_formats {
+inline constexpr char kCps1[] = "CPS1";
+inline constexpr char kCps2[] = "CPS2";
+inline constexpr char kGbaRom[] = "GbaRom";
+inline constexpr char kKonamiArcade[] = "KonamiArcade";
+inline constexpr char kMameRomSet[] = "MameRomSet";
+inline constexpr char kNintendoDsRom[] = "NintendoDsRom";
+inline constexpr char kPlayStationRam[] = "PlayStationRam";
+inline constexpr char kPsf[] = "Psf";
+inline constexpr char kRsn[] = "Rsn";
+inline constexpr char kSaturnRam[] = "SaturnRam";
+inline constexpr char kSpc[] = "Spc";
+inline constexpr char kSnesAram[] = "SnesAram";
+}  // namespace source_formats
+
 enum class SourceKind {
   UserLoaded,
   Derived,
@@ -56,6 +73,9 @@ struct SourceFile {
   // or PSF executable images. parent/origin record where they came from.
   std::optional<SourceId> parent;
   std::optional<SourceRange> origin;
+  // Authoritative knowledge about the representation of these bytes. Modules
+  // advertise the known formats they accept; an absent value means discovery.
+  std::optional<std::string> knownFormat;
   // Extractor-defined metadata and named regions remain ordinary values owned by
   // the source. Format modules can therefore consume container context without
   // loader pointers or process-global side channels.
@@ -100,14 +120,11 @@ private:
 };
 
 struct ExtractedSource {
-  // Format modules return extracted bytes here. Session appends them as derived
-  // sources so they can be inspected and scanned like user-loaded files.
+  // Source extractors return bytes here. Session appends them as derived sources
+  // so they can be inspected and processed like user-loaded files.
   SourceFile file;
   std::vector<u8> bytes;
   std::optional<SourceRange> origin;
-  // When present, only modules that accept this authoritative hint scan the
-  // derived source. An absent hint retains ordinary format discovery.
-  std::optional<std::string> formatHint = std::nullopt;
 };
 
 class SourceStore {

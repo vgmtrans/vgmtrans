@@ -76,6 +76,7 @@ FormatDefinition definition() {
   return FormatDefinition{
       .module = {.name = "NinSnes",
                  .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+                 .acceptedFormats = {source_formats::kSnesAram},
                  .scan = scan},
       .sequenceDialects = {sequenceDialect()},
   };

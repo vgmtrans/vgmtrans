@@ -124,7 +124,11 @@ void scanNdsLayout(const NdsLayout& layout, ScanResultBuilder& result) {
 
 FormatDefinition ndsDefinition() {
   return FormatDefinition{
-      .module = {.name = std::string(kNdsFormatName), .scan = scanNds},
+      .module = {
+          .name = std::string(kNdsFormatName),
+          .acceptedFormats = {source_formats::kNintendoDsRom},
+          .scan = scanNds,
+      },
       .sequenceDialects = {ndsSequenceDialect()},
   };
 }

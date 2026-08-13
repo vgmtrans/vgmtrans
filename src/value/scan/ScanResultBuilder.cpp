@@ -362,10 +362,6 @@ void ScanResultBuilder::error(std::string message, SourceRange range) {
   diagnostic(Diagnostic{.severity = Severity::Error, .message = std::move(message), .range = range});
 }
 
-void ScanResultBuilder::extractedSource(ExtractedSource source) {
-  result_.extractedSources.push_back(std::move(source));
-}
-
 ScanResult ScanResultBuilder::finish() {
   for (const auto& slot : drafts_) {
     std::visit(

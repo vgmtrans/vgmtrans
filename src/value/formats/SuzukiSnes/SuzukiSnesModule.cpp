@@ -47,6 +47,7 @@ FormatDefinition definition() {
   return FormatDefinition{
       .module = {.name = "SuzukiSnes",
                  .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+                 .acceptedFormats = {source_formats::kSnesAram},
                  .scan = scan},
       .sequenceDialects = {sequenceDialect()},
   };

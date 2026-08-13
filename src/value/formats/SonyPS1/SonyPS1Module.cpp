@@ -109,6 +109,7 @@ FormatDefinition sonyPs1Definition() {
           FormatModule{
               .name = std::string(kSonyPs1FormatName),
               .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
+              .acceptedFormats = {source_formats::kPlayStationRam},
               .scan = scanSonyPs1,
               .collectionResolverId = std::string(kSonyPs1CollectionResolver),
               .resolveCollections = resolveSonyPs1Collections,

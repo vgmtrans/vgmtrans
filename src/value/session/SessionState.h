@@ -71,7 +71,6 @@ private:
   void updateCollectionsForRemovedAssets(const std::unordered_set<u32>& assetIds);
   void validateCollectionAssetReferences(std::string_view resolver, DesiredCollection& desired);
   [[nodiscard]] CollectionId nextCollectionId(ScanIdAllocator& ids) const;
-  [[nodiscard]] std::optional<AssetId> annotationAssetOwner(SourceAnnotationId id) const;
   void rebuildViews();
   void rebuildIndexes();
 
@@ -84,7 +83,6 @@ private:
   std::vector<Diagnostic> diagnostics_;
 
   std::unordered_map<u32, const Asset*> assetsById_;
-  std::unordered_map<u32, const SourceAnnotation*> annotationsById_;
 };
 
 }  // namespace vgmtrans::core

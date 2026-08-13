@@ -5,10 +5,10 @@
  */
 #pragma once
 
-#include "value/scan/FormatDefinition.h"
+#include "value/scan/SourceExtractor.h"
 
 namespace vgmtrans::formats::snes_rsn {
 
-[[nodiscard]] core::FormatDefinition snesRsnExtractorDefinition();
+[[nodiscard]] core::SourceExtractor snesRsnExtractor();
 
 }  // namespace vgmtrans::formats::snes_rsn

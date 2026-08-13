@@ -230,8 +230,28 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   expect(sameRange(*diagnostic.range, expectedRange), "diagnostic should preserve the expected source range");
 }
 
-[[nodiscard]] bool hasProbeMagic(const ScanInput& input, u8 magic, u64 minimumSize = 1) {
+[[nodiscard]] bool hasProbeMagic(const auto& input, u8 magic, u64 minimumSize = 1) {
   return input.reader.size() >= minimumSize && input.reader.u8At(0) == magic;
+}
+
+[[nodiscard]] SourceExtractor probeSequenceContainerExtractor() {
+  return SourceExtractor{
+      .name = "ProbeSequenceContainer",
+      .extract =
+          [](const ExtractionInput& input) -> ExtractionResult {
+            if (input.source.derived() || !hasProbeMagic(input, 0xaa)) {
+              return {};
+            }
+            const auto bytes = input.reader.slice(0, input.reader.size());
+            return ExtractionResult{
+                .sources = {ExtractedSource{
+                    .file = SourceFile{.name = input.source.name + ".child", .knownFormat = "probe-sequence"},
+                    .bytes = std::vector<u8>(bytes.begin(), bytes.end()),
+                    .origin = input.reader.range(0, 1),
+                }},
+            };
+          },
+  };
 }
 
 [[nodiscard]] ScanResult scanProbeSequence(const ScanInput& input) {
@@ -279,14 +299,6 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
       .message = "probe sequence scanned",
       .range = assetRange,
   });
-
-  if (!input.source.derived()) {
-    result.extractedSources.push_back(ExtractedSource{
-        .file = SourceFile{.name = input.source.name + ".child"},
-        .bytes = {0xbb, 0x01},
-        .origin = input.reader.range(0, 1),
-    });
-  }
 
   return result;
 }
@@ -509,41 +521,24 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   };
 }
 
-[[nodiscard]] ScanResult scanProbeBadExtractedSource(const ScanInput& input) {
+[[nodiscard]] ExtractionResult extractProbeBadSource(const ExtractionInput& input) {
   if (!hasProbeMagic(input, 0xf1)) {
     return {};
   }
 
-  const auto assetId = input.ids.nextAssetId();
-  ScanResult result;
-  result.assets.emplace_back(MiscAsset{
-      .metadata =
-          AssetMetadata{
-              .id = assetId,
-              .format = "ProbeBadExtracted",
-              .name = "Rejected asset",
-              .range = input.reader.range(0, input.reader.size()),
-          },
-  });
-  result.sourceMap = SourceMap{{SourceAnnotation{
-      .id = input.ids.nextSourceAnnotationId(),
-      .range = input.reader.range(0, input.reader.size()),
-      .role = SourceRole::Payload,
-      .label = "Rejected asset",
-      .owner = ObjectRefs::misc(assetId),
-  }}};
-  result.extractedSources.push_back(ExtractedSource{
-      .file = SourceFile{.name = "bad-parent.child"},
-      .bytes = {0xbb},
-      .origin = SourceRange{.source = SourceId{99}, .offset = 0, .size = 1},
-  });
-  return result;
+  return ExtractionResult{
+      .sources = {ExtractedSource{
+          .file = SourceFile{.name = "bad-parent.child"},
+          .bytes = {0xbb},
+          .origin = SourceRange{.source = SourceId{99}, .offset = 0, .size = 1},
+      }},
+  };
 }
 
-[[nodiscard]] FormatModule probeBadExtractedSourceModule() {
-  return FormatModule{
+[[nodiscard]] SourceExtractor probeBadSourceExtractor() {
+  return SourceExtractor{
       .name = "ProbeBadExtracted",
-      .scan = scanProbeBadExtractedSource,
+      .extract = extractProbeBadSource,
   };
 }
 
