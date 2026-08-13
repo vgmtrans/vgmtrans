@@ -284,6 +284,20 @@ void instrumentChangesWaitForTheNextAttack() {
          "FE must not interrupt the current GAIN automation before the following tie replaces its table");
 }
 
+void leadingTiesAreSilentDelays() {
+  DriverFixture fixture(Version::Modern);
+  fixture.commands({0xef, 0x20, 0x72, 0xee, 0x02, 0x3c, 0x08, 0xff});
+  const ByteReader reader(SourceId{309}, fixture.data());
+  const auto parsed = decodeSequence(reader, *findLayout(reader), AssetId{309});
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program, sequenceDialect());
+  const PerformanceTrack& track = performance.tracks.front();
+  const auto notes = events<NotePerformanceEvent>(track);
+
+  expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->header.tick == 2 &&
+             !notes.front()->extendsPrevious && events<EnvelopePerformanceEvent>(track).empty(),
+         "a leading tie must consume time without inventing a note or active-voice envelope update");
+}
+
 void moduleBuildsTunedSnesSynth() {
   DriverFixture fixture(Version::Modern);
   fixture.commands({0xfe, 0x02, 0xec, 0xff, 0x3c, 0x08, 0xff});
@@ -335,6 +349,7 @@ void runPrismSnesModuleTests() {
   dynamicDriverFeaturesRenderFromCapturedTables();
   gainTablesControlNoteAmplitude();
   instrumentChangesWaitForTheNextAttack();
+  leadingTiesAreSilentDelays();
   moduleBuildsTunedSnesSynth();
   subtrackTriggersRunTheirChildScore();
 }

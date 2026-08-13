@@ -681,7 +681,7 @@ struct Playback {
 
   [[nodiscard]] Effects tie(u16 length, bool tiesNext) {
     track.gainEnvelope.start(track.tieGainAddress);
-    if (track.gainEnvelope.active) {
+    if (track.gainEnvelope.active && track.lastNote.valid()) {
       out.replaceEnvelope(math::neutralGainEnvelope(), VoiceEnvelopeScope::ActiveVoices);
     }
     tickGainEnvelope();
