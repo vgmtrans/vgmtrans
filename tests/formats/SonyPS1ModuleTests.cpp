@@ -151,7 +151,7 @@ std::vector<const Event*> eventsOfType(const PerformanceTrack& track) {
 
 void sonyPs1SequenceSupportsBothLoopCountGenerations() {
   const auto modern = sequenceFixture({
-      0x00, 0xc0, 0x02,                                                  // program 2
+      0x00, 0xc2, 0x02,                                                  // channel 2, program 2
       0x00, 0x90, 0x3c, 0x64,                                            // note on
       0x0a, 0x3c, 0x00,                                                  // running-status note off
       0x00, 0xb0, 0x63, 0x14,                                            // loop start
@@ -180,6 +180,9 @@ void sonyPs1SequenceSupportsBothLoopCountGenerations() {
          "SonyPS1 source events should be sequence-owned roots rather than children of a synthetic track");
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program, sonyPs1SequenceDialect());
   expect(performance.diagnostics.empty(), "modern SonyPS1 loop fixture should render without diagnostics");
+  expect(std::ranges::any_of(performance.sourceSpans,
+                             [](const SourcePlaybackSpan& span) { return span.channel == 2; }),
+         "SonyPS1 playback spans should retain each event's source channel");
   const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(std::ranges::count(notes, 62.0, [](const NotePerformanceEvent* note) { return note->key; }) == 2,
          "a loop count of two should play the enclosed note twice");

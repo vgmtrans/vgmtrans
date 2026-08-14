@@ -97,7 +97,14 @@ void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder(track);
   builder.addSemantic(Address{0}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{1}), SourceAnnotationId{20});
-  builder.addSemantic(Address{1}, 0, 1, {}, {}, CommandFlow::end(Address{2}), SourceAnnotationId{21});
+  builder.addSemantic(
+      Address{1}, 0, 1, {},
+      {SemanticOperand{
+          .value = u64{6},
+          .name = "channel",
+          .role = SemanticOperandRole::Channel,
+      }},
+      CommandFlow::end(Address{2}), SourceAnnotationId{21});
   const SequenceProgram program{
       .dialect = dialect.id,
       .timebase = dialect.timebase,
@@ -110,9 +117,9 @@ void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
   expect(performance.sourceSpans ==
              std::vector<SourcePlaybackSpan>{
                  {.annotation = SourceAnnotationId{20}, .beginTick = 0, .endTick = 7},
-                 {.annotation = SourceAnnotationId{21}, .beginTick = 7, .endTick = 8},
+                 {.annotation = SourceAnnotationId{21}, .channel = 6, .beginTick = 7, .endTick = 8},
              },
-         "source timeline should preserve waits and zero-time commands without musical events");
+         "source timeline should preserve eventless command timing and semantic channels");
 }
 
 void sequenceVmPreservesPitchMotionThroughNoteRelease() {

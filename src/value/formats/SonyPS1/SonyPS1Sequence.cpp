@@ -280,6 +280,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   } else {
     event.derived("running_status", source.status, SourceValueDisplay::Hex);
   }
+  if ((source.status & 0xf0) != 0xf0) {
+    event.derived("channel", static_cast<u8>(source.status & 0x0f), SemanticOperandRole::Channel);
+  }
   return event;
 }
 

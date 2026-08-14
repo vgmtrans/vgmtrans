@@ -437,7 +437,7 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
   const u8 status = cursor.opcode();
   if (status <= 0x7f) {
     auto event = cursor.command("Note", SequenceSemantic::Note);
-    const u8 channel = event.opcodeBits<0, 4>("channel");
+    const u8 channel = event.opcodeBits<0, 4>("channel", SemanticOperandRole::Channel);
     const u16 durationHigh = static_cast<u16>(event.opcodeBits<6, 1>("duration_high")) << 8;
     const u16 deltaHigh = static_cast<u16>(event.opcodeBits<5, 1>("delta_high")) << 8;
     event.opcodeBits<4, 1>("unknown_bit", SourceValueDisplay::Hex);
@@ -450,7 +450,7 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
 
   if ((status & 0xf0) == 0xb0) {
     auto event = cursor.command("Controller", SequenceSemantic::State);
-    const u8 channel = event.opcodeBits<0, 4>("channel");
+    const u8 channel = event.opcodeBits<0, 4>("channel", SemanticOperandRole::Channel);
     const u8 controller = event.u8("controller");
     const u8 encoded = event.u8("encoded_value");
     const auto valueRole = controller == 32 ? SemanticOperandRole::InstrumentBank : SemanticOperandRole::Level;
@@ -461,7 +461,7 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
 
   if ((status & 0xf0) == 0xc0) {
     auto event = cursor.command("Program", SequenceSemantic::Program);
-    const u8 channel = event.opcodeBits<0, 4>("channel");
+    const u8 channel = event.opcodeBits<0, 4>("channel", SemanticOperandRole::Channel);
     const u8 encodedProgram = event.u8("encoded_program");
     event.derived("program", static_cast<u8>(encodedProgram & 0x7f), SemanticOperandRole::InstrumentProgram);
     const u16 delta = event.u8("delta", SemanticOperandRole::Duration);
@@ -470,7 +470,7 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
 
   if ((status & 0xf0) == 0xd0) {
     auto event = cursor.command("Channel Pressure", SequenceSemantic::State);
-    event.opcodeBits<0, 4>("channel");
+    event.opcodeBits<0, 4>("channel", SemanticOperandRole::Channel);
     const u8 pressure = event.u8("pressure");
     const u16 delta = event.u8("delta", SemanticOperandRole::Duration);
     return event.invoke<&Playback::channelPressure>(pressure, delta).runtimeControlFlow();
@@ -478,7 +478,7 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
 
   if ((status & 0xf0) == 0xe0) {
     auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
-    const u8 channel = event.opcodeBits<0, 4>("channel");
+    const u8 channel = event.opcodeBits<0, 4>("channel", SemanticOperandRole::Channel);
     const u8 encodedBend = event.u8("encoded_bend");
     event.derived("bend", static_cast<u8>(encodedBend & 0x7f), SemanticOperandRole::Pitch);
     const u16 delta = event.u8("delta", SemanticOperandRole::Duration);

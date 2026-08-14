@@ -454,6 +454,11 @@ public:
       return result;
     }
 
+    template <::u8 Shift, ::u8 Width>
+    ::u8 opcodeBits(std::string_view name, SemanticOperandRole role) {
+      return opcodeBits<Shift, Width>(name, SourceValueDisplay::Default, role);
+    }
+
     template <class T>
     T opcodeValue(std::string_view name, T value, SourceValueDisplay display = SourceValueDisplay::Default,
                   SemanticOperandRole role = SemanticOperandRole::Value) {

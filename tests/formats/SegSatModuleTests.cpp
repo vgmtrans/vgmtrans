@@ -87,7 +87,7 @@ std::vector<u8> segSatFixture() {
   };
   append({0xb0, 32, 5, 0});       // source bank 5
   append({0xc0, 0, 0});           // program 0
-  append({0xc0, 0x81, 0});        // flagged program event ignored by the driver
+  append({0xc3, 0x81, 0});        // flagged channel 3 program event ignored by the driver
   append({0xb0, 7, 64, 0});       // channel volume
   append({0xb0, 10, 0, 0});       // hard left
   append({0x00, 60, 64, 10, 0});  // note, source velocity 64
@@ -313,6 +313,9 @@ void segSatCollectionPreparationSuppliesVlTablesToSequence() {
   expect(dialect != nullptr, "SegSat fixture dialect should be registered");
 
   const PerformanceSequence unprepared = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, *dialect);
+  expect(std::ranges::any_of(unprepared.sourceSpans,
+                             [](const SourcePlaybackSpan& span) { return span.channel == 3; }),
+         "SegSat playback spans should retain each event's source channel");
   const auto* sourceNote = firstNote(unprepared);
   expect(sourceNote != nullptr && LevelScale::midi7FromLinear(sourceNote->linearVelocity) == 64,
          "a durable SegSat sequence should retain its source velocity when no collection context is present");

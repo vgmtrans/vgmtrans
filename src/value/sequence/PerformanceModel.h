@@ -633,6 +633,9 @@ struct PerformanceTrack {
 // execution order, with nondecreasing begin ticks.
 struct SourcePlaybackSpan {
   SourceAnnotationId annotation;
+  // Identifies the source channel for commands decoded from an interleaved
+  // stream. Track-based formats leave this empty and use annotation ownership.
+  std::optional<u32> channel;
   u64 beginTick = 0;
   u64 endTick = 0;
 
