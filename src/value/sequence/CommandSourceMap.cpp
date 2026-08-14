@@ -170,9 +170,15 @@ SourceAnnotationId projectDecodedCommand(SourceMapBuilder* sourceMap, const Deco
 
 TrackDecodeSession::TrackDecodeSession(ByteReader reader, u32 trackIndex, u32 startOffset,
                                        std::optional<AssetId> sequenceAsset,
-                                       std::optional<SourceAnnotationId> parentAnnotation, SourceMapBuilder* sourceMap)
+                                       std::optional<SourceAnnotationId> parentAnnotation, SourceMapBuilder* sourceMap,
+                                       bool sourceHasTracks)
     : reader_(reader), startOffset_(startOffset), sourceMap_(sourceMap),
-      annotation_(createTrackAnnotation(reader, trackIndex, startOffset, sequenceAsset, parentAnnotation, sourceMap)),
+      annotation_(sourceHasTracks
+                      ? createTrackAnnotation(reader, trackIndex, startOffset, sequenceAsset, parentAnnotation,
+                                              sourceMap)
+                      : std::nullopt),
+      commandParent_(sourceHasTracks ? annotation_ : parentAnnotation),
+      rootSequenceAsset_(sourceHasTracks || commandParent_ ? std::nullopt : sequenceAsset),
       track_{
           .id = TrackId{trackIndex},
           .sourceTrackNumber = trackIndex,
@@ -181,7 +187,10 @@ TrackDecodeSession::TrackDecodeSession(ByteReader reader, u32 trackIndex, u32 st
 }
 
 DecodedBytecodeCommand TrackDecodeSession::project(DecodedBytecodeCommand command) const {
-  command.annotation = projectDecodedCommand(sourceMap_, command, annotation_);
+  command.annotation = projectDecodedCommand(sourceMap_, command, commandParent_);
+  if (sourceMap_ != nullptr && command.annotation.valid() && rootSequenceAsset_) {
+    AnnotationBuilder{*sourceMap_, command.annotation}.owner(ObjectRefs::sequence(*rootSequenceAsset_));
+  }
   return command;
 }
 

@@ -168,7 +168,16 @@ void sonyPs1SequenceSupportsBothLoopCountGenerations() {
   expect(loopEnd != modernLayout->events.end() && loopEnd->loopCount == 2,
          "later libsnd Data Entry loop counts should be attached to loop end");
 
-  const SequenceProgram program = parseSonyPs1Sequence(modernReader, AssetId{81}, *modernLayout);
+  SourceMapBuilder modernSourceMap;
+  const SequenceProgram program = parseSonyPs1Sequence(modernReader, AssetId{81}, *modernLayout, &modernSourceMap);
+  const SourceMap modernAnnotations = modernSourceMap.finish();
+  const auto modernCommands = modernAnnotations.withRole(SourceId{81}, SourceRole::Command);
+  expect(modernAnnotations.withRole(SourceId{81}, SourceRole::SequenceTrack).empty() && !modernCommands.empty() &&
+             std::ranges::all_of(modernCommands, [&](SourceAnnotationId id) {
+               const SourceAnnotation& command = modernAnnotations.get(id);
+               return !command.parent && command.owner == ObjectRefs::sequence(AssetId{81});
+             }),
+         "SonyPS1 source events should be sequence-owned roots rather than children of a synthetic track");
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program, sonyPs1SequenceDialect());
   expect(performance.diagnostics.empty(), "modern SonyPS1 loop fixture should render without diagnostics");
   const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
