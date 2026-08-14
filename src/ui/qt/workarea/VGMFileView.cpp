@@ -217,8 +217,8 @@ void VGMFileView::onPlaybackPositionChanged(int current, int maximum, PositionCh
       continue;
     }
     annotations.push_back(span.annotation);
-    colors.push_back(
-        QColor::fromHsv(static_cast<int>((playbackTrackIndex(span.annotation) * 43) % 360), 190, 235));
+    const u32 colorIndex = span.channel.value_or(playbackTrackIndex(span.annotation));
+    colors.push_back(QColor::fromHsv(static_cast<int>((colorIndex * 43) % 360), 190, 235));
   }
 
   if (annotations == lastPlaybackAnnotations_ && colors == lastPlaybackColors_) {

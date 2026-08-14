@@ -101,6 +101,19 @@ constexpr u32 kFallbackCommandLimit = 100000;
   return track.addressIndex.find(destination);
 }
 
+[[nodiscard]] std::optional<u32> commandChannel(const SourceCommand& command) {
+  for (const auto& operand : command.operands) {
+    if (operand.role != SemanticOperandRole::Channel) {
+      continue;
+    }
+    if (const auto* value = std::get_if<u64>(&operand.value);
+        value != nullptr && *value <= std::numeric_limits<u32>::max()) {
+      return static_cast<u32>(*value);
+    }
+  }
+  return std::nullopt;
+}
+
 struct VisitState {
   u32 commandIndex = 0;
   std::vector<u32> callStack;
@@ -642,6 +655,7 @@ private:
       }
       targetSequence_.sourceSpans.push_back(SourcePlaybackSpan{
           .annotation = command.annotation,
+          .channel = commandChannel(command),
           .beginTick = beginTick,
           .endTick = endTick,
       });

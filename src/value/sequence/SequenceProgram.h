@@ -223,6 +223,7 @@ struct CommandExecution {
 // projection recognize the few relationships shared by all drivers.
 enum class SemanticOperandRole : u8 {
   Value,
+  Channel,
   NoteKey,
   Duration,
   Pitch,
