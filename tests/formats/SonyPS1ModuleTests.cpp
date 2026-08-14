@@ -244,6 +244,25 @@ void sonyPs1SequenceSupportsBothLoopCountGenerations() {
   const auto noEndNotes = eventsOfType<NotePerformanceEvent>(noEndPerformance.tracks.front());
   expect(noEndNotes.size() == 1 && noEndNotes.front()->durationTicks == 10,
          "a zero-terminated PSF sequence should retain its decoded musical events");
+
+  const auto sustained = sequenceFixture({
+      0x00, 0x90, 0x3c, 0x64,  // note on
+      0x02, 0xb0, 0x40, 0x7f,  // sustain pedal down
+      0x03, 0x90, 0x3c, 0x00,  // note off, held by sustain
+      0x05, 0xb0, 0x40, 0x00,  // sustain pedal up
+      0x01, 0x90, 0x40, 0x64,  // note on with no matching note off
+      0x04, 0xff, 0x2f, 0x00,
+  });
+  const ByteReader sustainedReader(SourceId{90}, sustained);
+  const auto sustainedLayout = readSonyPs1SequenceLayout(sustainedReader, 0);
+  expect(sustainedLayout.has_value(), "SonyPS1 sustain fixture should have a valid sequence layout");
+  const PerformanceSequence sustainedPerformance =
+      SequenceVm(LoopPolicy::PlayOnce)
+          .render(parseSonyPs1Sequence(sustainedReader, AssetId{90}, *sustainedLayout), sonyPs1SequenceDialect());
+  const auto sustainedNotes = eventsOfType<NotePerformanceEvent>(sustainedPerformance.tracks.front());
+  expect(sustainedNotes.size() == 2 && sustainedNotes[0]->durationTicks == 10 && sustainedNotes[1]->header.tick == 11 &&
+             sustainedNotes[1]->durationTicks == 4,
+         "shared Note On/Off state should honor SonyPS1 sustain and close dangling notes at track end");
 }
 
 void sonyPs1SepAndVabLayoutsAreVersionAware() {

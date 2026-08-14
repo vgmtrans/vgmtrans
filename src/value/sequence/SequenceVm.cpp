@@ -5,6 +5,7 @@
  */
 
 #include "value/sequence/SequenceVm.h"
+#include "value/sequence/ActiveNoteTracker.h"
 #include "value/sequence/TempoRelativeModulation.h"
 
 #include <any>
@@ -68,6 +69,7 @@ struct VmTrackRuntime {
   u64 tick = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
+  ActiveNoteTracker activeNotes;
   std::vector<u32> callStack;
   RepeatState repeat;
   CommandId lastCommand;
@@ -530,7 +532,17 @@ public:
     }
   }
 
-  void trimAt(u64 tick, bool retainBoundaryEvents) { endTrackAt(performanceTrack_, tick, retainBoundaryEvents); }
+  void trimAt(u64 tick, bool retainBoundaryEvents) {
+    closeActiveNotesAt(tick);
+    endTrackAt(performanceTrack_, tick, retainBoundaryEvents);
+  }
+
+  void closeActiveNotesAt(u64 tick) {
+    PerformanceEmitter out{
+        performanceTrack_, runtime_.lastCommand, {}, tick, outputSequence_, runtime_.nextNote, runtime_.nextAutomation,
+        behavior_.panLaw,  &runtime_.activeNotes};
+    out.allNotesOff();
+  }
 
   void preservePlaylistLoop(u64 startTick, u64 endTick) {
     addLoopMarker(performanceTrack_, {}, startTick, outputSequence_, "Loop Start");
@@ -538,6 +550,7 @@ public:
   }
 
   [[nodiscard]] RenderedTrack finish() {
+    closeActiveNotesAt(runtime_.tick);
     performanceTrack_.endTick = runtime_.tick;
     // Commands may schedule events inside an earlier note (for example a
     // delayed pitch slide discovered after that note has advanced the VM).
@@ -557,8 +570,9 @@ private:
     if (dialect_.tick == nullptr) {
       return;
     }
-    PerformanceEmitter out{performanceTrack_, command.id,        command.annotation,      runtime_.tick,
-                           outputSequence_,   runtime_.nextNote, runtime_.nextAutomation, behavior_.panLaw};
+    PerformanceEmitter out{performanceTrack_,       command.id,       command.annotation,
+                           runtime_.tick,           outputSequence_,  runtime_.nextNote,
+                           runtime_.nextAutomation, behavior_.panLaw, &runtime_.activeNotes};
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
     if (programState_ == nullptr) {
       warn("Missing sequence program state", command.range);
@@ -580,8 +594,9 @@ private:
       return;
     }
 
-    PerformanceEmitter out{performanceTrack_, command.id,        command.annotation,      runtime_.tick,
-                           outputSequence_,   runtime_.nextNote, runtime_.nextAutomation, behavior_.panLaw};
+    PerformanceEmitter out{performanceTrack_,       command.id,       command.annotation,
+                           runtime_.tick,           outputSequence_,  runtime_.nextNote,
+                           runtime_.nextAutomation, behavior_.panLaw, &runtime_.activeNotes};
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
     if (!dialect_.readyDuringWait(command, *programState_, trackState_, out, vm)) {
       return;
@@ -617,8 +632,9 @@ private:
     const u64 beginTick = runtime_.tick;
     const size_t firstEvent = performanceTrack_.events.size();
     const size_t firstAutomation = performanceTrack_.automations.size();
-    PerformanceEmitter out{performanceTrack_, command.id,        command.annotation,      beginTick,
-                           outputSequence_,   runtime_.nextNote, runtime_.nextAutomation, behavior_.panLaw};
+    PerformanceEmitter out{performanceTrack_,    command.id,        command.annotation,      beginTick,
+                           outputSequence_,      runtime_.nextNote, runtime_.nextAutomation, behavior_.panLaw,
+                           &runtime_.activeNotes};
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
     if (programState_ == nullptr || dialect_.execute == nullptr) {
       warn("Missing sequence dialect executor state", command.range);
@@ -653,12 +669,15 @@ private:
         const auto& automation = performanceTrack_.automations[i];
         endTick = std::max(endTick, automation.realization.endTick);
       }
+      const size_t sourceSpanIndex = targetSequence_.sourceSpans.size();
       targetSequence_.sourceSpans.push_back(SourcePlaybackSpan{
           .annotation = command.annotation,
           .channel = commandChannel(command),
           .beginTick = beginTick,
           .endTick = endTick,
       });
+      runtime_.activeNotes.bindSourceSpan(firstEvent, performanceTrack_.events.size(), targetSequence_.sourceSpans,
+                                          sourceSpanIndex);
     }
     runtime_.lastCommand = command.id;
     const bool endedSection = effectiveTransition->kind == RuntimeTransitionKind::EndSection;
@@ -1174,6 +1193,10 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
       std::vector<PerformanceTrack> tracks;
       tracks.reserve(executors.size());
       if (sequenceEndTick) {
+        for (auto& executor : executors) {
+          const u64 noteEndTick = executor->active() ? *sequenceEndTick : std::min(*sequenceEndTick, executor->tick());
+          executor->closeActiveNotesAt(noteEndTick);
+        }
         endSourceSpansAt(target.sourceSpans, *sequenceEndTick);
       }
       for (auto& executor : executors) {
@@ -1209,7 +1232,8 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
         VmTrackRuntime runtime;
         for (const SourceCommand& command : track.commands) {
           PerformanceEmitter out{output,         command.id,       command.annotation,     0,
-                                 outputSequence, runtime.nextNote, runtime.nextAutomation, behavior.panLaw};
+                                 outputSequence, runtime.nextNote, runtime.nextAutomation, behavior.panLaw,
+                                 &runtime.activeNotes};
           VmApi vm = detail::VmApiAccess::make(runtime, prepass, command);
           static_cast<void>(dialect.execute(command, programState, trackState, out, vm));
         }
