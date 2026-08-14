@@ -5,7 +5,6 @@
  */
 
 #include "value/sequence/SequenceVm.h"
-#include "value/sequence/ActiveNoteTracker.h"
 #include "value/sequence/TempoRelativeModulation.h"
 
 #include <any>
@@ -69,7 +68,7 @@ struct VmTrackRuntime {
   u64 tick = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  ActiveNoteTracker activeNotes;
+  ActiveNoteState activeNotes;
   std::vector<u32> callStack;
   RepeatState repeat;
   CommandId lastCommand;
@@ -537,12 +536,7 @@ public:
     endTrackAt(performanceTrack_, tick, retainBoundaryEvents);
   }
 
-  void closeActiveNotesAt(u64 tick) {
-    PerformanceEmitter out{
-        performanceTrack_, runtime_.lastCommand, {}, tick, outputSequence_, runtime_.nextNote, runtime_.nextAutomation,
-        behavior_.panLaw,  &runtime_.activeNotes};
-    out.allNotesOff();
-  }
+  void closeActiveNotesAt(u64 tick) { outputAt(tick, runtime_.lastCommand).allNotesOff(); }
 
   void preservePlaylistLoop(u64 startTick, u64 endTick) {
     addLoopMarker(performanceTrack_, {}, startTick, outputSequence_, "Loop Start");
@@ -566,13 +560,16 @@ public:
   }
 
 private:
+  [[nodiscard]] PerformanceEmitter outputAt(u64 tick, CommandId command = {}, SourceAnnotationId annotation = {}) {
+    return {performanceTrack_, command, annotation, tick, outputSequence_, runtime_.nextNote, runtime_.nextAutomation,
+            behavior_.panLaw, &runtime_.activeNotes, &targetSequence_.sourceSpans};
+  }
+
   void tickDialect(const SourceCommand& command) {
     if (dialect_.tick == nullptr) {
       return;
     }
-    PerformanceEmitter out{performanceTrack_,       command.id,       command.annotation,
-                           runtime_.tick,           outputSequence_,  runtime_.nextNote,
-                           runtime_.nextAutomation, behavior_.panLaw, &runtime_.activeNotes};
+    auto out = outputAt(runtime_.tick, command.id, command.annotation);
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
     if (programState_ == nullptr) {
       warn("Missing sequence program state", command.range);
@@ -594,9 +591,7 @@ private:
       return;
     }
 
-    PerformanceEmitter out{performanceTrack_,       command.id,       command.annotation,
-                           runtime_.tick,           outputSequence_,  runtime_.nextNote,
-                           runtime_.nextAutomation, behavior_.panLaw, &runtime_.activeNotes};
+    auto out = outputAt(runtime_.tick, command.id, command.annotation);
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
     if (!dialect_.readyDuringWait(command, *programState_, trackState_, out, vm)) {
       return;
@@ -632,9 +627,7 @@ private:
     const u64 beginTick = runtime_.tick;
     const size_t firstEvent = performanceTrack_.events.size();
     const size_t firstAutomation = performanceTrack_.automations.size();
-    PerformanceEmitter out{performanceTrack_,    command.id,        command.annotation,      beginTick,
-                           outputSequence_,      runtime_.nextNote, runtime_.nextAutomation, behavior_.panLaw,
-                           &runtime_.activeNotes};
+    auto out = outputAt(beginTick, command.id, command.annotation);
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
     if (programState_ == nullptr || dialect_.execute == nullptr) {
       warn("Missing sequence dialect executor state", command.range);
@@ -676,8 +669,11 @@ private:
           .beginTick = beginTick,
           .endTick = endTick,
       });
-      runtime_.activeNotes.bindSourceSpan(firstEvent, performanceTrack_.events.size(), targetSequence_.sourceSpans,
-                                          sourceSpanIndex);
+      for (auto& [_, note] : runtime_.activeNotes.notes) {
+        if (note.eventIndex >= firstEvent) {
+          note.sourceSpanIndex = sourceSpanIndex;
+        }
+      }
     }
     runtime_.lastCommand = command.id;
     const bool endedSection = effectiveTransition->kind == RuntimeTransitionKind::EndSection;
