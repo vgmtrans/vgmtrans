@@ -567,6 +567,42 @@ void compilerCursorAnalysisStopsAfterItsScheduledPrepass() {
   expect(executed == 2, "compiled analysis should not execute a discarded output pass after its scheduled prepass");
 }
 
+void trackDecodeSourceHierarchyDistinguishesTrackedAndTracklessFormats() {
+  const std::vector<u8> bytes{0xff};
+
+  SourceMapBuilder trackedSourceMap;
+  const AssetId trackedAsset{31};
+  const TrackDecodeScope tracked{
+      .reader = ByteReader(SourceId{31}, bytes),
+      .sequenceAsset = trackedAsset,
+      .sourceMap = &trackedSourceMap,
+  };
+  const TrackProgram trackedProgram =
+      tracked.reachable(0, 0, [&](u32 offset) { return decodeProbeCommand(tracked.reader, offset, 1); });
+  const SourceMap trackedAnnotations = trackedSourceMap.finish();
+  const auto sourceTracks = trackedAnnotations.withRole(SourceId{31}, SourceRole::SequenceTrack);
+  const auto* trackedCommand = trackedAnnotations.find(trackedProgram.commands.front().annotation);
+  expect(sourceTracks.size() == 1 && trackedCommand != nullptr && trackedCommand->parent == sourceTracks.front() &&
+             trackedAnnotations.assetOwner(trackedCommand->id) == trackedAsset,
+         "tracked decoding should retain its source-track parent and inherited sequence ownership");
+
+  SourceMapBuilder tracklessSourceMap;
+  const AssetId tracklessAsset{32};
+  const TrackDecodeScope trackless{
+      .reader = ByteReader(SourceId{32}, bytes),
+      .sourceHasTracks = false,
+      .sequenceAsset = tracklessAsset,
+      .sourceMap = &tracklessSourceMap,
+  };
+  const TrackProgram tracklessProgram =
+      trackless.reachable(0, 0, [&](u32 offset) { return decodeProbeCommand(trackless.reader, offset, 1); });
+  const SourceMap tracklessAnnotations = tracklessSourceMap.finish();
+  const auto* rootCommand = tracklessAnnotations.find(tracklessProgram.commands.front().annotation);
+  expect(tracklessAnnotations.withRole(SourceId{32}, SourceRole::SequenceTrack).empty() && rootCommand != nullptr &&
+             !rootCommand->parent && rootCommand->owner == ObjectRefs::sequence(tracklessAsset),
+         "trackless decoding should publish sequence-owned commands directly at the source root");
+}
+
 }  // namespace
 
 void runValueCompilerCursorTests() {
@@ -581,4 +617,5 @@ void runValueCompilerCursorTests() {
   compilerCursorComposesFlowDeclarationsInEitherOrder();
   compilerCursorRejectsConflictingComposedFlow();
   compilerCursorAnalysisStopsAfterItsScheduledPrepass();
+  trackDecodeSourceHierarchyDistinguishesTrackedAndTracklessFormats();
 }

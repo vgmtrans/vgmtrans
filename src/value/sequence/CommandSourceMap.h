@@ -38,7 +38,8 @@ private:
   friend struct TrackDecodeScope;
 
   TrackDecodeSession(ByteReader reader, u32 trackIndex, u32 startOffset, std::optional<AssetId> sequenceAsset,
-                     std::optional<SourceAnnotationId> parentAnnotation, SourceMapBuilder* sourceMap);
+                     std::optional<SourceAnnotationId> parentAnnotation, SourceMapBuilder* sourceMap,
+                     bool sourceHasTracks);
 
   [[nodiscard]] DecodedBytecodeCommand project(DecodedBytecodeCommand command) const;
 
@@ -46,22 +47,28 @@ private:
   u32 startOffset_ = 0;
   SourceMapBuilder* sourceMap_ = nullptr;
   std::optional<SourceAnnotationId> annotation_;
+  std::optional<SourceAnnotationId> commandParent_;
+  std::optional<AssetId> rootSequenceAsset_;
   TrackProgram track_;
 };
 
 // Holds the reader, source-map context, and safety limits used to decode a
-// sequence's tracks. Each format still resolves its relative addresses,
-// validates its format-specific bounds, and reports malformed commands.
+// sequence into TrackPrograms. Each format still resolves its relative
+// addresses, validates its format-specific bounds, and reports malformed commands.
 struct TrackDecodeScope {
   ByteReader reader;
   u32 bytecodeEnd = std::numeric_limits<u32>::max();
   u32 maxCommands = 4096;
+  // Controls source annotation hierarchy only. TrackPrograms are still
+  // produced for playback when the encoded sequence has no source tracks.
+  bool sourceHasTracks = true;
   std::optional<AssetId> sequenceAsset;
   std::optional<SourceAnnotationId> parentAnnotation;
   SourceMapBuilder* sourceMap = nullptr;
 
   [[nodiscard]] TrackDecodeSession begin(u32 trackIndex, u32 startOffset) const {
-    return TrackDecodeSession(reader, trackIndex, startOffset, sequenceAsset, parentAnnotation, sourceMap);
+    return TrackDecodeSession(reader, trackIndex, startOffset, sequenceAsset, parentAnnotation, sourceMap,
+                              sourceHasTracks);
   }
 
   // Decode a mostly sequential track. Fallthrough is visited immediately;

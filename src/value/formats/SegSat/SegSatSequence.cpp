@@ -733,6 +733,7 @@ SequenceProgram parseSegSatSequenceProgram(ByteReader reader, AssetId id, const 
       .reader = reader,
       .bytecodeEnd = layout.end,
       .maxCommands = 262144,
+      .sourceHasTracks = false,
       .sequenceAsset = id,
       .sourceMap = sourceMap,
   };
@@ -769,7 +770,6 @@ SequenceProgram parseSegSatSequenceProgram(ByteReader reader, AssetId id, const 
         ->pointer("Normal Track Pointer", reader.range(layout.offset + 4, 2),
                   SourceTarget{reader.range(normalStart, 1)})
         .kind("segsat-normal-track-pointer")
-        .owner(ObjectRefs::sequenceTrack(id, 1))
         .field("stored_destination", reader.range(layout.offset + 4, 2), layout.normalTrack,
                SourceValueDisplay::Address)
         .derived("destination", normalStart, SourceValueDisplay::Address)

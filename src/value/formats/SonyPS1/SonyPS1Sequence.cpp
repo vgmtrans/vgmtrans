@@ -424,6 +424,7 @@ SequenceProgram parseSonyPs1Sequence(ByteReader reader, AssetId id, const SonyPs
       .reader = reader,
       .bytecodeEnd = layout.dataEnd,
       .maxCommands = kMaxCommands,
+      .sourceHasTracks = false,
       .sequenceAsset = id,
       .sourceMap = sourceMap,
   };

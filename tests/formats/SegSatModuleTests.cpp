@@ -302,6 +302,13 @@ void segSatCollectionPreparationSuppliesVlTablesToSequence() {
   expect(snapshot.collections().size() == 1, "SegSat fixture should produce one explicit collection");
   const Collection& collection = snapshot.collections().front();
   const auto& sequence = sequenceAsset(snapshot, collection);
+  const auto sequenceCommands = snapshot.sourceMap().withRole(source, SourceRole::Command);
+  expect(snapshot.sourceMap().withRole(source, SourceRole::SequenceTrack).empty() && !sequenceCommands.empty() &&
+             std::ranges::all_of(sequenceCommands, [&](SourceAnnotationId id) {
+               const SourceAnnotation& command = snapshot.sourceMap().get(id);
+               return !command.parent && snapshot.sourceMap().assetOwner(id) == sequence.metadata.id;
+             }),
+         "SegSat source events should be sequence-owned roots rather than children of synthetic tracks");
   const auto* dialect = session.formats().findDialect(sequence.program.dialect.value);
   expect(dialect != nullptr, "SegSat fixture dialect should be registered");
 
