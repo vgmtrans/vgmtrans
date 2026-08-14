@@ -5,7 +5,6 @@
  */
 
 #include "value/sequence/SequenceVm.h"
-#include "value/sequence/ActiveNoteTracker.h"
 
 #include <algorithm>
 #include <cmath>
@@ -24,6 +23,11 @@ namespace {
   return tick > std::numeric_limits<u64>::max() - ticks ? std::numeric_limits<u64>::max() : tick + ticks;
 }
 
+void reviseNoteEnd(NotePerformanceEvent& note, u64 endTick) {
+  const u64 duration = endTick > note.header.tick ? endTick - note.header.tick : 0;
+  note.durationTicks = static_cast<u32>(std::min<u64>(duration, std::numeric_limits<u32>::max()));
+}
+
 [[nodiscard]] bool reviseNoteEnd(std::vector<PerformanceEvent>& events, std::optional<PerformanceNoteId> target,
                                  u64 endTick) {
   bool found = false;
@@ -33,8 +37,7 @@ namespace {
       continue;
     }
     found = true;
-    const u64 duration = endTick > note->header.tick ? endTick - note->header.tick : 0;
-    note->durationTicks = static_cast<u32>(std::min<u64>(duration, std::numeric_limits<u32>::max()));
+    reviseNoteEnd(*note, endTick);
     if (!note->extendsPrevious) {
       break;
     }
@@ -60,10 +63,11 @@ namespace {
 
 PerformanceEmitter::PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand,
                                        SourceAnnotationId sourceAnnotation, u64 tick, u64& nextSequence, u32& nextNote,
-                                       u32& nextAutomation, PanLaw panLaw, detail::ActiveNoteTracker* activeNotes)
+                                       u32& nextAutomation, PanLaw panLaw, detail::ActiveNoteState* activeNotes,
+                                       std::vector<SourcePlaybackSpan>* sourceSpans)
     : track_(track), sourceCommand_(sourceCommand), sourceAnnotation_(sourceAnnotation), tick_(tick),
       nextSequence_(nextSequence), nextNote_(nextNote), nextAutomation_(nextAutomation), panLaw_(panLaw),
-      activeNotes_(activeNotes) {
+      activeNotes_(activeNotes), sourceSpans_(sourceSpans) {
 }
 
 PerformanceEmitter PerformanceEmitter::at(u64 tick) const {
@@ -103,90 +107,68 @@ PerformanceNoteId PerformanceEmitter::note(double key, double linearVelocity, u3
 }
 
 PerformanceNoteId PerformanceEmitter::noteOn(s32 key, double linearVelocity) {
-  return noteOn(key, NotePerformanceEvent{
-                         .key = static_cast<double>(key),
-                         .linearVelocity = linearVelocity,
-                     });
-}
-
-PerformanceNoteId PerformanceEmitter::noteOn(s32 matchKey, NotePerformanceEvent event) {
-  if (activeNotes_ == nullptr) {
-    throw std::logic_error("Note On requires VM-managed active-note state");
+  auto& state = activeNotes();
+  if (const auto previous = state.notes.find(key); previous != state.notes.end()) {
+    finishActiveNote(previous->second, tick_);
+    state.notes.erase(previous);
   }
 
-  const detail::ActiveNoteTracker::Key key{
-      .lane = event.lane,
-      .value = matchKey,
-  };
-  if (const auto previous = activeNotes_->take(key)) {
-    finishActiveNote(previous->id, previous->sourceSpanIndex, tick_);
-  }
-
-  event.durationTicks = 0;
-  event.extendsPrevious = false;
-  event.note = {};
   const size_t eventIndex = track_.events.size();
-  const PerformanceNoteId id = note(std::move(event));
-  detail::ActiveNoteTracker::Note activeNote{
-      .id = id,
-      .eventIndex = eventIndex,
-  };
-  activeNotes_->insert(key, std::move(activeNote));
+  const PerformanceNoteId id = note(static_cast<double>(key), linearVelocity, 0);
+  state.notes.emplace(key, detail::ActiveNoteState::Note{.eventIndex = eventIndex});
   return id;
 }
 
-bool PerformanceEmitter::noteOff(s32 key, PerformanceLaneId lane) {
-  if (activeNotes_ == nullptr) {
-    throw std::logic_error("Note Off requires VM-managed active-note state");
+void PerformanceEmitter::noteOff(s32 key) {
+  auto& state = activeNotes();
+  const auto active = state.notes.find(key);
+  if (active == state.notes.end()) {
+    return;
+  }
+  if (state.sustain) {
+    active->second.released = true;
+    return;
   }
 
-  const detail::ActiveNoteTracker::Key activeKey{
-      .lane = lane,
-      .value = key,
-  };
-  auto* active = activeNotes_->find(activeKey);
-  if (active == nullptr) {
-    return false;
-  }
-  if (activeNotes_->sustainPedal()) {
-    active->released = true;
-    return true;
-  }
-
-  const auto released = activeNotes_->take(activeKey);
-  finishActiveNote(released->id, released->sourceSpanIndex, tick_);
-  return true;
+  finishActiveNote(active->second, tick_);
+  state.notes.erase(active);
 }
 
 void PerformanceEmitter::sustainPedal(bool down) {
-  if (activeNotes_ == nullptr) {
-    throw std::logic_error("Sustain pedal requires VM-managed active-note state");
-  }
-  if (activeNotes_->sustainPedal() == down) {
+  auto& state = activeNotes();
+  const bool wasDown = std::exchange(state.sustain, down);
+  if (!wasDown || down) {
     return;
   }
-  activeNotes_->setSustainPedal(down);
-  if (down) {
-    return;
-  }
-
-  for (const auto& note : activeNotes_->takeReleased()) {
-    finishActiveNote(note.id, note.sourceSpanIndex, tick_);
-  }
+  std::erase_if(state.notes, [&](const auto& active) {
+    if (!active.second.released) {
+      return false;
+    }
+    finishActiveNote(active.second, tick_);
+    return true;
+  });
 }
 
 void PerformanceEmitter::allNotesOff() {
-  if (activeNotes_ == nullptr) {
-    throw std::logic_error("All Notes Off requires VM-managed active-note state");
+  auto& state = activeNotes();
+  for (const auto& [_, active] : state.notes) {
+    finishActiveNote(active, tick_);
   }
-  for (const auto& note : activeNotes_->takeAll()) {
-    finishActiveNote(note.id, note.sourceSpanIndex, tick_);
-  }
+  state.notes.clear();
 }
 
-void PerformanceEmitter::finishActiveNote(PerformanceNoteId note, std::optional<size_t> sourceSpanIndex, u64 endTick) {
-  if (reviseNoteEnd(track_.events, note, endTick)) {
-    activeNotes_->extendSourceSpan(sourceSpanIndex, endTick);
+detail::ActiveNoteState& PerformanceEmitter::activeNotes() const {
+  if (activeNotes_ == nullptr) {
+    throw std::logic_error("Active-note operations require VM-managed state");
+  }
+  return *activeNotes_;
+}
+
+void PerformanceEmitter::finishActiveNote(const detail::ActiveNoteState::Note& active, u64 endTick) {
+  reviseNoteEnd(std::get<NotePerformanceEvent>(track_.events.at(active.eventIndex)), endTick);
+  if (sourceSpans_ != nullptr && active.sourceSpanIndex && *active.sourceSpanIndex < sourceSpans_->size()) {
+    auto& span = (*sourceSpans_)[*active.sourceSpanIndex];
+    span.endTick = std::max(span.endTick, endTick);
   }
 }
 

@@ -94,7 +94,7 @@ struct Playback {
     }
     auto delayed = out.at(eventTick(delta));
     if (velocity == 0) {
-      static_cast<void>(delayed.noteOff(key));
+      delayed.noteOff(key);
       return after(delta);
     }
     delayed.noteOn(key, LevelScale::linearFromMidi7(std::min<u8>(velocity, 127)));

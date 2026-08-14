@@ -1498,10 +1498,10 @@ void sequenceVmPairsNoteOnAndNoteOffCommands() {
                 out.sustainPedal(true);
                 return Effects::wait(1);
               case 3:
-                static_cast<void>(out.noteOff(60));
+                out.noteOff(60);
                 return Effects::wait(3);
               case 4:
-                static_cast<void>(out.noteOff(64));
+                out.noteOff(64);
                 return Effects::wait(1);
               case 5:
                 out.sustainPedal(false);
@@ -1513,17 +1513,7 @@ void sequenceVmPairsNoteOnAndNoteOffCommands() {
                 out.noteOn(67, 0.25);
                 return Effects::wait(2);
               case 8:
-                static_cast<void>(out.noteOff(70));
-                return Effects::wait(1);
-              case 9:
-                out.noteOn(5, NotePerformanceEvent{
-                                  .key = 72.5,
-                                  .linearVelocity = 0.625,
-                                  .lane = PerformanceLaneId{2},
-                              });
-                return Effects::wait(2);
-              case 10:
-                static_cast<void>(out.noteOff(5, PerformanceLaneId{2}));
+                out.noteOff(70);
                 return Effects::wait(1);
               default:
                 return Effects{};
@@ -1533,11 +1523,11 @@ void sequenceVmPairsNoteOnAndNoteOffCommands() {
 
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder(track);
-  for (u32 address = 0; address < 11; ++address) {
+  for (u32 address = 0; address < 9; ++address) {
     builder.addSemantic(Address{address}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{address + 1}),
                         SourceAnnotationId{100 + address});
   }
-  builder.addSemantic(Address{11}, 0, 1, {}, {}, CommandFlow::end(Address{12}), SourceAnnotationId{111});
+  builder.addSemantic(Address{9}, 0, 1, {}, {}, CommandFlow::end(Address{10}), SourceAnnotationId{109});
 
   const PerformanceSequence performance = SequenceVm().render(
       SequenceProgram{
@@ -1547,7 +1537,7 @@ void sequenceVmPairsNoteOnAndNoteOffCommands() {
       },
       dialect);
   expect(performance.diagnostics.empty(), "Note On/Off pairing should not invent diagnostics for unmatched offs");
-  expect(performance.tracks.size() == 1 && performance.tracks[0].endTick == 22,
+  expect(performance.tracks.size() == 1 && performance.tracks[0].endTick == 19,
          "Note On/Off pairing should retain the VM's ordinary track lifetime");
 
   std::vector<const NotePerformanceEvent*> notes;
@@ -1556,23 +1546,20 @@ void sequenceVmPairsNoteOnAndNoteOffCommands() {
       notes.push_back(note);
     }
   }
-  expect(notes.size() == 5, "Note On/Off pairing should emit one duration event per attack");
+  expect(notes.size() == 4, "Note On/Off pairing should emit one duration event per attack");
   expect(notes[0]->key == 60.0 && notes[0]->header.tick == 0 && notes[0]->durationTicks == 11 &&
              notes[1]->key == 64.0 && notes[1]->header.tick == 4 && notes[1]->durationTicks == 7,
          "the sustain pedal should defer released notes until the pedal rises");
   expect(notes[2]->key == 67.0 && notes[2]->header.tick == 13 && notes[2]->durationTicks == 3 &&
-             notes[3]->key == 67.0 && notes[3]->header.tick == 16 && notes[3]->durationTicks == 6,
+             notes[3]->key == 67.0 && notes[3]->header.tick == 16 && notes[3]->durationTicks == 3,
          "a repeated Note On should end the prior same-key voice and track end should close its replacement");
-  expect(notes[4]->key == 72.5 && notes[4]->header.tick == 19 && notes[4]->durationTicks == 2 &&
-             notes[4]->lane == PerformanceLaneId{2},
-         "the advanced Note On form should match an independent source key and performance lane");
 
   const auto spanEnd = [&](u32 annotation) -> u64 {
     const auto found =
         std::ranges::find(performance.sourceSpans, SourceAnnotationId{annotation}, &SourcePlaybackSpan::annotation);
     return found != performance.sourceSpans.end() ? found->endTick : 0;
   };
-  expect(spanEnd(100) == 11 && spanEnd(101) == 11 && spanEnd(106) == 16 && spanEnd(107) == 22 && spanEnd(109) == 21,
+  expect(spanEnd(100) == 11 && spanEnd(101) == 11 && spanEnd(106) == 16 && spanEnd(107) == 19,
          "closing an active note should revise its Note On command's source playback span");
 }
 

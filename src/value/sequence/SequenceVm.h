@@ -10,6 +10,8 @@
 #include "value/sequence/SequenceDialect.h"
 
 #include <any>
+#include <cstddef>
+#include <map>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -17,7 +19,17 @@ namespace vgmtrans::core {
 class SequenceVm;
 
 namespace detail {
-class ActiveNoteTracker;
+struct ActiveNoteState {
+  struct Note {
+    size_t eventIndex = 0;
+    std::optional<size_t> sourceSpanIndex;
+    bool released = false;
+  };
+
+  std::map<s32, Note> notes;
+  bool sustain = false;
+};
+
 class RepeatState;
 struct VmApiAccess;
 struct VmTrackRuntime;
@@ -57,19 +69,16 @@ class PerformanceEmitter {
 public:
   PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand, SourceAnnotationId sourceAnnotation, u64 tick,
                      u64& nextSequence, u32& nextNote, u32& nextAutomation, PanLaw panLaw = PanLaw::Unspecified,
-                     detail::ActiveNoteTracker* activeNotes = nullptr);
+                     detail::ActiveNoteState* activeNotes = nullptr,
+                     std::vector<SourcePlaybackSpan>* sourceSpans = nullptr);
 
   [[nodiscard]] PerformanceEmitter at(u64 tick) const;
   PerformanceNoteId note(NotePerformanceEvent event);
   PerformanceNoteId note(double key, double linearVelocity, u32 durationTicks, bool extendsPrevious = false);
-  // Source formats with separate Note On and Note Off commands use these
-  // overloads. The VM pairs commands and realizes an ordinary duration note.
+  // The VM pairs separate Note On and Note Off commands into an ordinary
+  // duration note.
   PerformanceNoteId noteOn(s32 key, double linearVelocity);
-  // matchKey is the source identity consumed by Note Off; event.key is the
-  // performed pitch and may differ after source-domain pitch conversion. The
-  // shared tracker assigns the note identity and duration.
-  PerformanceNoteId noteOn(s32 matchKey, NotePerformanceEvent event);
-  bool noteOff(s32 key, PerformanceLaneId lane = PerformanceLaneId{0});
+  void noteOff(s32 key);
   // Note Off defers release while the pedal is down. Raising it closes every
   // released note at this emitter's tick.
   void sustainPedal(bool down);
@@ -202,7 +211,8 @@ private:
   void append(PerformanceEvent event);
   void automationSample(u32 automation, double value);
   void interruptPitchSlidesForNewNote(PerformanceLaneId lane);
-  void finishActiveNote(PerformanceNoteId note, std::optional<size_t> sourceSpanIndex, u64 endTick);
+  [[nodiscard]] detail::ActiveNoteState& activeNotes() const;
+  void finishActiveNote(const detail::ActiveNoteState::Note& note, u64 endTick);
 
   PerformanceTrack& track_;
   CommandId sourceCommand_;
@@ -212,7 +222,8 @@ private:
   u32& nextNote_;
   u32& nextAutomation_;
   PanLaw panLaw_ = PanLaw::Unspecified;
-  detail::ActiveNoteTracker* activeNotes_ = nullptr;
+  detail::ActiveNoteState* activeNotes_ = nullptr;
+  std::vector<SourcePlaybackSpan>* sourceSpans_ = nullptr;
   std::optional<u32> automation_;
 };
 
