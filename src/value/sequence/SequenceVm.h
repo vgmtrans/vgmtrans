@@ -17,6 +17,7 @@ namespace vgmtrans::core {
 class SequenceVm;
 
 namespace detail {
+class ActiveNoteTracker;
 class RepeatState;
 struct VmApiAccess;
 struct VmTrackRuntime;
@@ -55,11 +56,25 @@ private:
 class PerformanceEmitter {
 public:
   PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand, SourceAnnotationId sourceAnnotation, u64 tick,
-                     u64& nextSequence, u32& nextNote, u32& nextAutomation, PanLaw panLaw = PanLaw::Unspecified);
+                     u64& nextSequence, u32& nextNote, u32& nextAutomation, PanLaw panLaw = PanLaw::Unspecified,
+                     detail::ActiveNoteTracker* activeNotes = nullptr);
 
   [[nodiscard]] PerformanceEmitter at(u64 tick) const;
   PerformanceNoteId note(NotePerformanceEvent event);
   PerformanceNoteId note(double key, double linearVelocity, u32 durationTicks, bool extendsPrevious = false);
+  // Source formats with separate Note On and Note Off commands use these
+  // overloads. The VM pairs commands and realizes an ordinary duration note.
+  PerformanceNoteId noteOn(s32 key, double linearVelocity);
+  // matchKey is the source identity consumed by Note Off; event.key is the
+  // performed pitch and may differ after source-domain pitch conversion. The
+  // shared tracker assigns the note identity and duration.
+  PerformanceNoteId noteOn(s32 matchKey, NotePerformanceEvent event);
+  bool noteOff(s32 key, PerformanceLaneId lane = PerformanceLaneId{0});
+  // Note Off defers release while the pedal is down. Raising it closes every
+  // released note at this emitter's tick.
+  void sustainPedal(bool down);
+  // Immediately closes every active note, independent of the pedal state.
+  void allNotesOff();
   // Emits event on an already-sounding source voice and returns the note
   // identity that later automation should address. If event.key is the pitch
   // currently sounding, the existing note is extended. Otherwise a new note
@@ -187,6 +202,7 @@ private:
   void append(PerformanceEvent event);
   void automationSample(u32 automation, double value);
   void interruptPitchSlidesForNewNote(PerformanceLaneId lane);
+  void finishActiveNote(PerformanceNoteId note, std::optional<size_t> sourceSpanIndex, u64 endTick);
 
   PerformanceTrack& track_;
   CommandId sourceCommand_;
@@ -196,6 +212,7 @@ private:
   u32& nextNote_;
   u32& nextAutomation_;
   PanLaw panLaw_ = PanLaw::Unspecified;
+  detail::ActiveNoteTracker* activeNotes_ = nullptr;
   std::optional<u32> automation_;
 };
 

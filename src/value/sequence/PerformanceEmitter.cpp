@@ -5,6 +5,7 @@
  */
 
 #include "value/sequence/SequenceVm.h"
+#include "value/sequence/ActiveNoteTracker.h"
 
 #include <algorithm>
 #include <cmath>
@@ -59,15 +60,15 @@ namespace {
 
 PerformanceEmitter::PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand,
                                        SourceAnnotationId sourceAnnotation, u64 tick, u64& nextSequence, u32& nextNote,
-                                       u32& nextAutomation, PanLaw panLaw)
+                                       u32& nextAutomation, PanLaw panLaw, detail::ActiveNoteTracker* activeNotes)
     : track_(track), sourceCommand_(sourceCommand), sourceAnnotation_(sourceAnnotation), tick_(tick),
-      nextSequence_(nextSequence), nextNote_(nextNote), nextAutomation_(nextAutomation), panLaw_(panLaw) {
+      nextSequence_(nextSequence), nextNote_(nextNote), nextAutomation_(nextAutomation), panLaw_(panLaw),
+      activeNotes_(activeNotes) {
 }
 
 PerformanceEmitter PerformanceEmitter::at(u64 tick) const {
-  auto output = PerformanceEmitter{track_,        sourceCommand_, sourceAnnotation_, tick,
-                                   nextSequence_, nextNote_,      nextAutomation_,   panLaw_};
-  output.automation_ = automation_;
+  auto output = *this;
+  output.tick_ = tick;
   return output;
 }
 
@@ -99,6 +100,94 @@ PerformanceNoteId PerformanceEmitter::note(double key, double linearVelocity, u3
       .durationTicks = durationTicks,
       .extendsPrevious = extendsPrevious,
   });
+}
+
+PerformanceNoteId PerformanceEmitter::noteOn(s32 key, double linearVelocity) {
+  return noteOn(key, NotePerformanceEvent{
+                         .key = static_cast<double>(key),
+                         .linearVelocity = linearVelocity,
+                     });
+}
+
+PerformanceNoteId PerformanceEmitter::noteOn(s32 matchKey, NotePerformanceEvent event) {
+  if (activeNotes_ == nullptr) {
+    throw std::logic_error("Note On requires VM-managed active-note state");
+  }
+
+  const detail::ActiveNoteTracker::Key key{
+      .lane = event.lane,
+      .value = matchKey,
+  };
+  if (const auto previous = activeNotes_->take(key)) {
+    finishActiveNote(previous->id, previous->sourceSpanIndex, tick_);
+  }
+
+  event.durationTicks = 0;
+  event.extendsPrevious = false;
+  event.note = {};
+  const size_t eventIndex = track_.events.size();
+  const PerformanceNoteId id = note(std::move(event));
+  detail::ActiveNoteTracker::Note activeNote{
+      .id = id,
+      .eventIndex = eventIndex,
+  };
+  activeNotes_->insert(key, std::move(activeNote));
+  return id;
+}
+
+bool PerformanceEmitter::noteOff(s32 key, PerformanceLaneId lane) {
+  if (activeNotes_ == nullptr) {
+    throw std::logic_error("Note Off requires VM-managed active-note state");
+  }
+
+  const detail::ActiveNoteTracker::Key activeKey{
+      .lane = lane,
+      .value = key,
+  };
+  auto* active = activeNotes_->find(activeKey);
+  if (active == nullptr) {
+    return false;
+  }
+  if (activeNotes_->sustainPedal()) {
+    active->released = true;
+    return true;
+  }
+
+  const auto released = activeNotes_->take(activeKey);
+  finishActiveNote(released->id, released->sourceSpanIndex, tick_);
+  return true;
+}
+
+void PerformanceEmitter::sustainPedal(bool down) {
+  if (activeNotes_ == nullptr) {
+    throw std::logic_error("Sustain pedal requires VM-managed active-note state");
+  }
+  if (activeNotes_->sustainPedal() == down) {
+    return;
+  }
+  activeNotes_->setSustainPedal(down);
+  if (down) {
+    return;
+  }
+
+  for (const auto& note : activeNotes_->takeReleased()) {
+    finishActiveNote(note.id, note.sourceSpanIndex, tick_);
+  }
+}
+
+void PerformanceEmitter::allNotesOff() {
+  if (activeNotes_ == nullptr) {
+    throw std::logic_error("All Notes Off requires VM-managed active-note state");
+  }
+  for (const auto& note : activeNotes_->takeAll()) {
+    finishActiveNote(note.id, note.sourceSpanIndex, tick_);
+  }
+}
+
+void PerformanceEmitter::finishActiveNote(PerformanceNoteId note, std::optional<size_t> sourceSpanIndex, u64 endTick) {
+  if (reviseNoteEnd(track_.events, note, endTick)) {
+    activeNotes_->extendSourceSpan(sourceSpanIndex, endTick);
+  }
 }
 
 PerformanceNoteId PerformanceEmitter::continueVoice(PerformanceNoteId previousNote, NotePerformanceEvent event) {

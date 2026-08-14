@@ -1348,7 +1348,7 @@ Effects executePlaylistProbe(const SourceCommand& command, std::any&, std::any& 
   }
 
   ++state.persistentValue;
-  out.note(state.sectionsStarted * 10 + state.persistentValue, 1.0, command.opcode);
+  out.noteOn(state.sectionsStarted * 10 + state.persistentValue, 1.0);
   return Effects::wait(command.opcode);
 }
 
@@ -1480,6 +1480,158 @@ void sequenceVmExecutesFiniteAndInfiniteSectionPlaylistRepeats() {
          "a requested playlist loop should replay every section once more");
 }
 
+void sequenceVmPairsNoteOnAndNoteOffCommands() {
+  const SequenceDialect dialect{
+      .id = DialectId{.value = "note-on-off-probe"},
+      .timebase = Timebase{.ppqn = 48},
+      .defaultBehavior = SequenceProgramBehavior{.initialStereoBalance = omitInitialStereoBalance},
+      .execute =
+          [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter& out, VmApi&) {
+            switch (command.address.value) {
+              case 0:
+                out.noteOn(60, 1.0);
+                return Effects::wait(4);
+              case 1:
+                out.noteOn(64, 0.5);
+                return Effects::wait(2);
+              case 2:
+                out.sustainPedal(true);
+                return Effects::wait(1);
+              case 3:
+                static_cast<void>(out.noteOff(60));
+                return Effects::wait(3);
+              case 4:
+                static_cast<void>(out.noteOff(64));
+                return Effects::wait(1);
+              case 5:
+                out.sustainPedal(false);
+                return Effects::wait(2);
+              case 6:
+                out.noteOn(67, 0.75);
+                return Effects::wait(3);
+              case 7:
+                out.noteOn(67, 0.25);
+                return Effects::wait(2);
+              case 8:
+                static_cast<void>(out.noteOff(70));
+                return Effects::wait(1);
+              case 9:
+                out.noteOn(5, NotePerformanceEvent{
+                                  .key = 72.5,
+                                  .linearVelocity = 0.625,
+                                  .lane = PerformanceLaneId{2},
+                              });
+                return Effects::wait(2);
+              case 10:
+                static_cast<void>(out.noteOff(5, PerformanceLaneId{2}));
+                return Effects::wait(1);
+              default:
+                return Effects{};
+            }
+          },
+  };
+
+  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgramBuilder builder(track);
+  for (u32 address = 0; address < 11; ++address) {
+    builder.addSemantic(Address{address}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{address + 1}),
+                        SourceAnnotationId{100 + address});
+  }
+  builder.addSemantic(Address{11}, 0, 1, {}, {}, CommandFlow::end(Address{12}), SourceAnnotationId{111});
+
+  const PerformanceSequence performance = SequenceVm().render(
+      SequenceProgram{
+          .dialect = dialect.id,
+          .timebase = dialect.timebase,
+          .tracks = {track},
+      },
+      dialect);
+  expect(performance.diagnostics.empty(), "Note On/Off pairing should not invent diagnostics for unmatched offs");
+  expect(performance.tracks.size() == 1 && performance.tracks[0].endTick == 22,
+         "Note On/Off pairing should retain the VM's ordinary track lifetime");
+
+  std::vector<const NotePerformanceEvent*> notes;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(note);
+    }
+  }
+  expect(notes.size() == 5, "Note On/Off pairing should emit one duration event per attack");
+  expect(notes[0]->key == 60.0 && notes[0]->header.tick == 0 && notes[0]->durationTicks == 11 &&
+             notes[1]->key == 64.0 && notes[1]->header.tick == 4 && notes[1]->durationTicks == 7,
+         "the sustain pedal should defer released notes until the pedal rises");
+  expect(notes[2]->key == 67.0 && notes[2]->header.tick == 13 && notes[2]->durationTicks == 3 &&
+             notes[3]->key == 67.0 && notes[3]->header.tick == 16 && notes[3]->durationTicks == 6,
+         "a repeated Note On should end the prior same-key voice and track end should close its replacement");
+  expect(notes[4]->key == 72.5 && notes[4]->header.tick == 19 && notes[4]->durationTicks == 2 &&
+             notes[4]->lane == PerformanceLaneId{2},
+         "the advanced Note On form should match an independent source key and performance lane");
+
+  const auto spanEnd = [&](u32 annotation) -> u64 {
+    const auto found =
+        std::ranges::find(performance.sourceSpans, SourceAnnotationId{annotation}, &SourcePlaybackSpan::annotation);
+    return found != performance.sourceSpans.end() ? found->endTick : 0;
+  };
+  expect(spanEnd(100) == 11 && spanEnd(101) == 11 && spanEnd(106) == 16 && spanEnd(107) == 22 && spanEnd(109) == 21,
+         "closing an active note should revise its Note On command's source playback span");
+}
+
+void sequenceVmClosesActiveNotesAtLoopCutoff() {
+  const SequenceDialect dialect{
+      .id = DialectId{.value = "note-on-loop-probe"},
+      .timebase = Timebase{.ppqn = 48},
+      .defaultBehavior = SequenceProgramBehavior{.initialStereoBalance = omitInitialStereoBalance},
+      .execute =
+          [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter& out, VmApi&) {
+            if (command.address.value == 0) {
+              out.noteOn(72, 1.0);
+              return Effects::wait(4);
+            }
+            if (command.address.value == 100) {
+              out.noteOn(60, 1.0);
+              return Effects::wait(2);
+            }
+            return Effects{};
+          },
+  };
+  TrackProgram shortTrack{.id = TrackId{0}, .startAddress = Address{100}};
+  TrackProgramBuilder shortBuilder(shortTrack);
+  shortBuilder.addSemantic(Address{100}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{101}),
+                           SourceAnnotationId{210});
+  shortBuilder.addSemantic(Address{101}, 0, 1, {}, {}, CommandFlow::end(Address{102}), SourceAnnotationId{211});
+
+  TrackProgram loopTrack{.id = TrackId{1}, .startAddress = Address{0}};
+  TrackProgramBuilder loopBuilder(loopTrack);
+  loopBuilder.addSemantic(Address{0}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{1}),
+                          SourceAnnotationId{200});
+  loopBuilder.addSemantic(Address{1}, 0, 1, {}, {},
+                          CommandFlow::jumpTo(Address{0}, Address{2}, JumpSemantics::LoopCandidate),
+                          SourceAnnotationId{201});
+
+  const PerformanceSequence performance = SequenceVm().render(
+      SequenceProgram{
+          .dialect = dialect.id,
+          .timebase = dialect.timebase,
+          .tracks = {shortTrack, loopTrack},
+      },
+      dialect);
+  const auto* shortNote = std::get_if<NotePerformanceEvent>(&performance.tracks[0].events.front());
+  const auto* loopNote = std::get_if<NotePerformanceEvent>(&performance.tracks[1].events.front());
+  expect(performance.tracks[0].endTick == 4 && performance.tracks[0].events.size() == 1 && shortNote != nullptr &&
+             shortNote->durationTicks == 2,
+         "an inactive track should close active notes at its own endpoint, not a later sequence cutoff");
+  expect(performance.tracks[1].endTick == 4 && performance.tracks[1].events.size() == 1 && loopNote != nullptr &&
+             loopNote->durationTicks == 4,
+         "a play-once loop cutoff should close active notes and remove the boundary replay");
+  const auto loopSpan = std::ranges::find(performance.sourceSpans, SourceAnnotationId{200},
+                                          &SourcePlaybackSpan::annotation);
+  const auto shortSpan = std::ranges::find(performance.sourceSpans, SourceAnnotationId{210},
+                                           &SourcePlaybackSpan::annotation);
+  expect(loopSpan != performance.sourceSpans.end() && loopSpan->endTick == 4 &&
+             shortSpan != performance.sourceSpans.end() && shortSpan->endTick == 2,
+         "loop cutoff should retain the finalized Note On source span");
+}
+
 }  // namespace
 
 void runValueSequenceVmTests() {
@@ -1518,4 +1670,6 @@ void runValueSequenceVmTests() {
   sequenceVmCoordinatesSemanticLoopsAtSequenceScope();
   sequenceVmSwitchesParallelSectionsAtTheFirstChannelEnd();
   sequenceVmExecutesFiniteAndInfiniteSectionPlaylistRepeats();
+  sequenceVmPairsNoteOnAndNoteOffCommands();
+  sequenceVmClosesActiveNotesAtLoopCutoff();
 }

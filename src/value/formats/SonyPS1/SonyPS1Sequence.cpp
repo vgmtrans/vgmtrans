@@ -24,7 +24,6 @@ using namespace core;
 namespace {
 
 constexpr u32 kMaxCommands = 1048576;
-constexpr u32 kOpenNoteDuration = std::numeric_limits<u32>::max();
 
 struct ProgramState {
   explicit ProgramState(const SequenceProgram& sequence) {
@@ -38,12 +37,6 @@ struct ProgramState {
   u8 denominator = 4;
 };
 
-struct ActiveNote {
-  PerformanceNoteId id;
-  u8 key = 0;
-  bool released = false;
-};
-
 struct TrackState {
   explicit TrackState(const TrackProgram& program)
       : channel(static_cast<u8>(program.id.value)), program(static_cast<u8>(program.id.value)) {}
@@ -54,9 +47,7 @@ struct TrackState {
   u8 rpnMsb = 127;
   u8 rpnLsb = 127;
   u8 pitchBendRange = 2;
-  bool sustain = false;
   bool initialized = false;
-  std::vector<ActiveNote> activeNotes;
 };
 
 struct PanGains {
@@ -97,48 +88,16 @@ struct Playback {
 
   [[nodiscard]] Effects after(u32 delta) const { return Effects::wait(delta); }
 
-  void closeNote(ActiveNote& note, u64 tick) { static_cast<void>(out.setNoteEnd(note.id, tick)); }
-
-  void releaseHeld(u64 tick) {
-    for (auto& note : track.activeNotes) {
-      if (note.released) {
-        closeNote(note, tick);
-      }
-    }
-    std::erase_if(track.activeNotes, [](const ActiveNote& note) { return note.released; });
-  }
-
-  void allNotesOff(u64 tick) {
-    for (auto& note : track.activeNotes) {
-      closeNote(note, tick);
-    }
-    track.activeNotes.clear();
-  }
-
   Effects note(u8 channel, u8 key, u8 velocity, u32 delta) {
     if (channel != track.channel) {
       return after(delta);
     }
-    const u64 tick = eventTick(delta);
-    auto found = std::ranges::find(track.activeNotes, key, &ActiveNote::key);
+    auto delayed = out.at(eventTick(delta));
     if (velocity == 0) {
-      if (found != track.activeNotes.end()) {
-        if (track.sustain) {
-          found->released = true;
-        } else {
-          closeNote(*found, tick);
-          track.activeNotes.erase(found);
-        }
-      }
+      static_cast<void>(delayed.noteOff(key));
       return after(delta);
     }
-    if (found != track.activeNotes.end()) {
-      closeNote(*found, tick);
-      track.activeNotes.erase(found);
-    }
-    const PerformanceNoteId id =
-        out.at(tick).note(key, LevelScale::linearFromMidi7(std::min<u8>(velocity, 127)), kOpenNoteDuration);
-    track.activeNotes.push_back(ActiveNote{.id = id, .key = key});
+    delayed.noteOn(key, LevelScale::linearFromMidi7(std::min<u8>(velocity, 127)));
     return after(delta);
   }
 
@@ -182,11 +141,7 @@ struct Playback {
         delayed.expression(LevelScale::linearFromMidi7(value));
         break;
       case 64: {
-        const bool enabled = value >= 64;
-        if (track.sustain && !enabled) {
-          releaseHeld(tick);
-        }
-        track.sustain = enabled;
+        delayed.sustainPedal(value >= 64);
         break;
       }
       case 91:
@@ -210,8 +165,7 @@ struct Playback {
         track.bank = 0;
         track.program = track.channel;
         track.pitchBendRange = 2;
-        track.sustain = false;
-        releaseHeld(tick);
+        delayed.sustainPedal(false);
         delayed.instrument(sonyPs1InstrumentIdentity(track.bank, track.program));
         delayed.level(1.0);
         delayed.expression(1.0);
@@ -257,7 +211,6 @@ struct Playback {
   }
 
   Effects end(u32 delta) {
-    allNotesOff(eventTick(delta));
     Effects effects = after(delta);
     effects.flowOverride = vm.end().flowOverride;
     return effects;
