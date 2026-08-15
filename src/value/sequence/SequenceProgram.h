@@ -13,7 +13,6 @@
 
 #include <functional>
 #include <optional>
-#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -187,35 +186,20 @@ struct CommandFlow {
 };
 
 using SemanticOperandValue = std::variant<bool, u64, s64, double, Address, std::string>;
-using CommandExecutor = Effects (*)(std::span<const SemanticOperandValue> arguments, void* playback);
-using CommandPredicateEvaluator = bool (*)(void* playback);
-
-struct CommandAction {
-  // CompilerCursor stores a generated typed thunk directly. Compiled programs
-  // are executable process-local values; no durable meaning is implied by the
-  // callback address.
-  CommandExecutor execute = nullptr;
-  std::vector<SemanticOperandValue> arguments;
-
-  [[nodiscard]] bool valid() const noexcept { return execute != nullptr; }
-};
-
-struct CommandPredicate {
-  CommandPredicateEvaluator evaluate = nullptr;
-
-  [[nodiscard]] bool valid() const noexcept { return evaluate != nullptr; }
-};
+// Compiled programs are process-local executable values. One erased callable
+// retains a source command's typed behavior without a second argument language.
+using CommandBody = std::function<Effects(void* playback)>;
+using CommandPredicate = std::function<bool(void* playback)>;
 
 struct CommandExecution {
-  // One source command may perform several small actions. Keeping them ordered
-  // lets format code state each effect honestly (for example, set state and
-  // then emit a controller) without inventing a hidden compound operation.
-  std::vector<CommandAction> actions;
+  // Cursor helpers compose their operations while decoding. The durable source
+  // command retains only the resulting body, not an inspectable micro-program.
+  CommandBody body;
   // Some drivers poll the next command while the current wait is still active.
   // The predicate is format-owned; SequenceVm only provides the polling timing.
   CommandPredicate duringWait;
 
-  [[nodiscard]] bool valid() const noexcept { return !actions.empty(); }
+  [[nodiscard]] bool valid() const noexcept { return static_cast<bool>(body); }
 };
 
 // The role is intentionally small and format-independent. Operand names are the
@@ -245,7 +229,7 @@ enum class SemanticOperandRole : u8 {
 
 struct SemanticOperand {
   // These values describe the source command for annotations and analysis.
-  // Compiler-cursor playback uses CommandAction::arguments instead. The
+  // Compiler-cursor playback captures its typed values independently. The
   // optional encoded form is useful only when showing both raw and resolved
   // values materially improves the source presentation.
   SemanticOperandValue value;

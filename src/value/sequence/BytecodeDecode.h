@@ -17,6 +17,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -63,10 +64,10 @@ struct EncodedSemanticField {
   return offset <= end && size <= end - offset && reader.has(offset, size);
 }
 
-inline void appendDecodedBytecodeCommand(TrackProgramBuilder& builder, const DecodedBytecodeCommand& decoded,
-                                         u32 offset) {
-  builder.addSemantic(Address{offset}, decoded.opcode, decoded.encodedSize, decoded.range, decoded.operands,
-                      decoded.flow, decoded.annotation, decoded.execution, decoded.presentation.semantic);
+inline void appendDecodedBytecodeCommand(TrackProgramBuilder& builder, DecodedBytecodeCommand decoded, u32 offset) {
+  const SequenceSemantic semantic = decoded.presentation.semantic;
+  builder.addSemantic(Address{offset}, decoded.opcode, decoded.encodedSize, decoded.range, std::move(decoded.operands),
+                      std::move(decoded.flow), decoded.annotation, std::move(decoded.execution), semantic);
 }
 
 // Shared limits for walking source bytecode. Formats still decide what each opcode means.
@@ -136,14 +137,13 @@ template <class DecodeCommand>
     const std::optional<Address> followedJump = decoded.flow.unconditionalJump() && policy.followUnconditionalJumps
                                                     ? decoded.flow.defaultDestination()
                                                     : std::nullopt;
-    appendDecodedBytecodeCommand(builder, decoded, begin);
-
     decoded.flow.forEachDiscoveryTarget([&](Address target) {
       if ((next && target.value == next->value) || (followedJump && target.value == followedJump->value)) {
         return;
       }
       queueSideTarget(target);
     });
+    appendDecodedBytecodeCommand(builder, std::move(decoded), begin);
 
     if (next) {
       offset = next->value;
@@ -209,8 +209,8 @@ template <class DecodeCommand>
     }
   }
 
-  for (const auto& [offset, decoded] : commandsByOffset) {
-    appendDecodedBytecodeCommand(builder, decoded, offset);
+  for (auto& [offset, decoded] : commandsByOffset) {
+    appendDecodedBytecodeCommand(builder, std::move(decoded), offset);
   }
   return track;
 }

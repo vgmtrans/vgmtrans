@@ -364,8 +364,10 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
       return cursor.command("Toggle Triplet", SequenceSemantic::State).toggle<&TrackState::noteTriplet>();
     case 0x01: {
       auto event = cursor.command("Toggle Slur", SequenceSemantic::State);
-      event.toggle<&TrackState::noteSlurred>();
-      return event.emitLegatoPedal(event.state<&TrackState::noteSlurred>());
+      return event.invoke([](Playback& playback) {
+        playback.track.noteSlurred = !playback.track.noteSlurred;
+        playback.out.legatoPedal(playback.track.noteSlurred);
+      });
     }
     case 0x02:
       return cursor.command("Dotted Note", SequenceSemantic::State).set<&TrackState::noteDotted>(true);

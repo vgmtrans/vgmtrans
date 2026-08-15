@@ -583,7 +583,7 @@ private:
       return;
     }
     const SourceCommand& command = track_.commands.at(*current_);
-    if (!command.execution.duringWait.valid()) {
+    if (!command.execution.duringWait) {
       return;
     }
     if (programState_ == nullptr) {

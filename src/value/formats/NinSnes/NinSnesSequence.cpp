@@ -1801,7 +1801,9 @@ struct DecodeContext {
       const u8 times = event.u8("times", SemanticOperandRole::Count);
       const s8 volumeDelta = event.s8("volume_delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
       const s8 pitchDelta = event.s8("pitch_delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
-      event.invoke<&Playback::konamiLoop>(times, volumeDelta, pitchDelta, event.state<&TrackState::konamiLoopStart>());
+      event.invoke([times, volumeDelta, pitchDelta](Playback& playback) {
+        return playback.konamiLoop(times, volumeDelta, pitchDelta, playback.track.konamiLoopStart);
+      });
       return event.runtimeControlFlow();
     }
     case EventType::KonamiAdsrGain: {

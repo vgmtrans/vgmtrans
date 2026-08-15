@@ -172,7 +172,7 @@ void ndsLayoutBoundsMalformedTablesAndPointers();
 void ndsSequenceFatRangesHandleNormalEmptyAndRecoveredFiles();
 void ndsModuleOnlyBuildsDependenciesOfReferencedBanks();
 void ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
-void ndsSequenceDialectComposesPitchBendRangeActions();
+void ndsSequenceDialectComposesPitchBendRangeBehavior();
 void ndsSequenceDialectEmitsStickyDynamicAdsr();
 void ndsSequenceDialectModelsNitroLfoRegisters();
 void ndsSynthModulatorsUseSequenceLfoRanges();
@@ -363,7 +363,7 @@ int main() {
     ndsSequenceFatRangesHandleNormalEmptyAndRecoveredFiles();
     ndsModuleOnlyBuildsDependenciesOfReferencedBanks();
     ndsSequenceDialectDecodesAndRendersNoteWaitCommands();
-    ndsSequenceDialectComposesPitchBendRangeActions();
+    ndsSequenceDialectComposesPitchBendRangeBehavior();
     ndsSequenceDialectEmitsStickyDynamicAdsr();
     ndsSequenceDialectModelsNitroLfoRegisters();
     ndsSynthModulatorsUseSequenceLfoRanges();

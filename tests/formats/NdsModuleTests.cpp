@@ -527,7 +527,7 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
          "NDS expression opcode should render as MIDI expression");
 }
 
-void ndsSequenceDialectComposesPitchBendRangeActions() {
+void ndsSequenceDialectComposesPitchBendRangeBehavior() {
   std::vector<u8> bytes(0x130);
   constexpr u32 sequenceOffset = 0x100;
   constexpr u32 trackStart = sequenceOffset + 0x1c;
@@ -540,8 +540,8 @@ void ndsSequenceDialectComposesPitchBendRangeActions() {
   const SequenceDialect& dialect = ndsSequenceDialect();
   const TrackProgram track =
       decodeTestTrack(ByteReader(SourceId{16}, bytes), sequenceOffset, trackStart + 5, trackStart, 0);
-  expect(track.commands.size() == 3 && track.commands[0].execution.actions.size() == 2,
-         "NDS pitch-bend range should compile its state update and output as two explicit actions");
+  expect(track.commands.size() == 3 && track.commands[0].execution.valid(),
+         "NDS pitch-bend range should compose its state update and output into one command body");
 
   const SequenceProgram program{
       .dialect = dialect.id,
@@ -580,7 +580,7 @@ void ndsSequenceDialectEmitsStickyDynamicAdsr() {
                                                           [](const SourceCommand& command) {
                                                             return command.semantic != SequenceSemantic::Envelope ||
                                                                    (command.encodedSize == 2 &&
-                                                                    command.execution.actions.size() == 1);
+                                                                    command.execution.valid());
                                                           }),
          "NDS D0-D3 should decode as executable two-byte envelope commands");
 

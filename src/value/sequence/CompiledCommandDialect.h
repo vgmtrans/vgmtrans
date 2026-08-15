@@ -11,7 +11,6 @@
 
 #include <any>
 #include <concepts>
-#include <limits>
 #include <stdexcept>
 
 namespace vgmtrans::core {
@@ -71,34 +70,20 @@ struct CompiledCommandDialect {
         playback.beforeCommand();
       }
 
-      Effects combined;
-      for (const CommandAction& action : command.execution.actions) {
-        if (!action.valid()) {
-          throw std::logic_error("Compiled sequence command contained an empty action");
-        }
-        const Effects next = action.execute(action.arguments, &playback);
-        if (next.advanceTicks > std::numeric_limits<u32>::max() - combined.advanceTicks) {
-          throw std::overflow_error("Compiled sequence command advanced time beyond the supported range");
-        }
-        combined.advanceTicks += next.advanceTicks;
-        if (next.flowOverride) {
-          if (combined.flowOverride) {
-            throw std::logic_error("Compiled sequence command produced more than one control-flow override");
-          }
-          combined.flowOverride = next.flowOverride;
-        }
+      if (!command.execution.body) {
+        return Effects{};
       }
-      return combined;
+      return command.execution.body(&playback);
     });
   }
 
   [[nodiscard]] static bool readyDuringWait(const SourceCommand& command, std::any& programState, std::any& trackState,
                                             PerformanceEmitter& out, VmApi& vm) {
-    if (!command.execution.duringWait.valid()) {
+    if (!command.execution.duringWait) {
       return false;
     }
     return withPlayback(programState, trackState, out, vm,
-                        [&](Playback& playback) { return command.execution.duringWait.evaluate(&playback); });
+                        [&](Playback& playback) { return command.execution.duringWait(&playback); });
   }
 
   static void tick(const SourceCommand&, std::any& programState, std::any& trackState, PerformanceEmitter& out,

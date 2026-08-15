@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <functional>
 #include <limits>
-#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -27,14 +26,14 @@ namespace vgmtrans::core {
 namespace detail {
 
 template <class T>
-[[nodiscard]] SemanticOperandValue executableValue(T value) {
+[[nodiscard]] SemanticOperandValue semanticValue(T value) {
   using Value = std::remove_cvref_t<T>;
   if constexpr (std::is_same_v<Value, Address> || std::is_same_v<Value, bool> || std::is_same_v<Value, std::string>) {
     return SemanticOperandValue{std::move(value)};
   } else if constexpr (std::is_same_v<Value, std::string_view>) {
     return SemanticOperandValue{std::string(value)};
   } else if constexpr (std::is_enum_v<Value>) {
-    return executableValue(static_cast<std::underlying_type_t<Value>>(value));
+    return semanticValue(static_cast<std::underlying_type_t<Value>>(value));
   } else if constexpr (std::is_floating_point_v<Value>) {
     return SemanticOperandValue{static_cast<double>(value)};
   } else if constexpr (std::is_signed_v<Value>) {
@@ -45,144 +44,52 @@ template <class T>
 }
 
 template <class T>
-[[nodiscard]] T executableArgument(const SemanticOperandValue& value) {
-  using Value = std::remove_cvref_t<T>;
-  if constexpr (std::is_same_v<Value, Address> || std::is_same_v<Value, bool> || std::is_same_v<Value, std::string>) {
-    return std::get<Value>(value);
-  } else if constexpr (std::is_enum_v<Value>) {
-    return static_cast<Value>(executableArgument<std::underlying_type_t<Value>>(value));
-  } else if constexpr (std::is_floating_point_v<Value>) {
-    return static_cast<Value>(std::get<double>(value));
-  } else if constexpr (std::is_signed_v<Value>) {
-    return static_cast<Value>(std::get<s64>(value));
+[[nodiscard]] auto storedCommandValue(T value) {
+  if constexpr (std::is_same_v<std::remove_cvref_t<T>, std::string_view>) {
+    return std::string(value);
   } else {
-    return static_cast<Value>(std::get<u64>(value));
+    return std::remove_cvref_t<T>(std::move(value));
   }
 }
 
-// Deferred values are tiny expression types whose shape is encoded in the
-// generated executor. Only constants are stored in CommandAction::arguments;
-// state-member identities never enter the durable sequence model.
-template <class T>
-struct ConstantValue {
-  using deferred_value_tag = void;
-  using value_type = T;
+template <class Playback, class Callable, class... Arguments>
+[[nodiscard]] Effects invokeCommand(const Callable& callable, Playback& playback, const Arguments&... arguments) {
+  using Result = std::invoke_result_t<const Callable&, Playback&, const Arguments&...>;
+  static_assert(std::is_same_v<Result, void> || std::is_same_v<Result, Effects>,
+                "A compiled sequence command body must return void or Effects");
+  if constexpr (std::is_same_v<Result, Effects>) {
+    return std::invoke(callable, playback, arguments...);
+  } else {
+    std::invoke(callable, playback, arguments...);
+    return Effects{};
+  }
+}
 
-  T value;
-
-  void store(std::vector<SemanticOperandValue>& arguments) const { arguments.push_back(executableValue(value)); }
-
-  template <class Playback>
-  [[nodiscard]] static T evaluate(std::span<const SemanticOperandValue> arguments, size_t& next, Playback&) {
-    if (next >= arguments.size()) {
-      throw std::logic_error("Compiled sequence expression did not have enough constant arguments");
+template <class Playback, class Callable, class... Arguments>
+[[nodiscard]] CommandBody makeCommandBody(Callable callable, Arguments... arguments) {
+  static_assert(std::is_copy_constructible_v<Callable>, "Compiled sequence command callables must be copyable");
+  auto values = std::tuple{storedCommandValue(std::move(arguments))...};
+  return [callable = std::move(callable), values = std::move(values)](void* erasedPlayback) -> Effects {
+    if (erasedPlayback == nullptr) {
+      throw std::logic_error("Compiled sequence command received no playback state");
     }
-    return executableArgument<T>(arguments[next++]);
-  }
-};
-
-template <class T>
-struct MemberPointerTraits;
-
-template <class Owner, class Value>
-struct MemberPointerTraits<Value Owner::*> {
-  using owner_type = Owner;
-  using value_type = Value;
-};
-
-template <auto Member>
-struct StateValue {
-  using deferred_value_tag = void;
-  using traits = MemberPointerTraits<std::remove_cv_t<decltype(Member)>>;
-  using owner_type = typename traits::owner_type;
-  using value_type = std::remove_cv_t<typename traits::value_type>;
-
-  void store(std::vector<SemanticOperandValue>&) const {}
-
-  template <class Playback>
-  [[nodiscard]] static value_type evaluate(std::span<const SemanticOperandValue>, size_t&, Playback& playback) {
-    return playback.track.*Member;
-  }
-};
-
-template <class T>
-concept DeferredValue = requires { typename std::remove_cvref_t<T>::deferred_value_tag; };
-
-template <class T>
-[[nodiscard]] auto defer(T value) {
-  if constexpr (DeferredValue<T>) {
-    return value;
-  } else if constexpr (std::is_same_v<std::remove_cvref_t<T>, std::string_view>) {
-    return ConstantValue<std::string>{std::string(value)};
-  } else {
-    return ConstantValue<std::remove_cvref_t<T>>{std::move(value)};
-  }
-}
-
-template <class T>
-using DeferredValueType = typename decltype(defer(std::declval<T>()))::value_type;
-
-template <class Playback, auto Operation, class... Values>
-[[nodiscard]] Effects executeOperation(std::span<const SemanticOperandValue> arguments, Playback& playback) {
-  size_t next = 0;
-  // List initialization guarantees that constants are consumed left-to-right.
-  std::tuple<typename Values::value_type...> values{
-      Values::template evaluate<Playback>(arguments, next, playback)...,
+    auto& playback = *static_cast<Playback*>(erasedPlayback);
+    return std::apply([&](const auto&... value) { return invokeCommand(callable, playback, value...); }, values);
   };
-  if (next != arguments.size()) {
-    throw std::logic_error("Compiled sequence expression had unused constant arguments");
-  }
-
-  return std::apply(
-      [&](auto&&... value) -> Effects {
-        if constexpr (std::is_same_v<std::invoke_result_t<decltype(Operation), Playback&, decltype(value)...>,
-                                     Effects>) {
-          return std::invoke(Operation, playback, std::forward<decltype(value)>(value)...);
-        } else {
-          std::invoke(Operation, playback, std::forward<decltype(value)>(value)...);
-          return Effects{};
-        }
-      },
-      std::move(values));
 }
 
-template <class Playback, auto Operation, class... Values>
-[[nodiscard]] Effects executeErased(std::span<const SemanticOperandValue> arguments, void* playback) {
-  if (playback == nullptr) {
-    throw std::logic_error("Compiled sequence action received no playback state");
+[[nodiscard]] inline Effects combineCommandEffects(Effects first, Effects second) {
+  if (second.advanceTicks > std::numeric_limits<u32>::max() - first.advanceTicks) {
+    throw std::overflow_error("Compiled sequence command advanced time beyond the supported range");
   }
-  return executeOperation<Playback, Operation, Values...>(arguments, *static_cast<Playback*>(playback));
-}
-
-template <class Playback, auto Predicate>
-[[nodiscard]] bool evaluateErased(void* playback) {
-  if (playback == nullptr) {
-    throw std::logic_error("Compiled sequence predicate received no playback state");
+  first.advanceTicks += second.advanceTicks;
+  if (second.flowOverride) {
+    if (first.flowOverride) {
+      throw std::logic_error("Compiled sequence command produced more than one control-flow override");
+    }
+    first.flowOverride = second.flowOverride;
   }
-  return std::invoke(Predicate, *static_cast<Playback*>(playback));
-}
-
-template <class Playback, auto Method, class... Arguments>
-[[nodiscard]] Effects invokeMember(Playback& playback, Arguments... arguments) {
-  if constexpr (std::is_same_v<std::invoke_result_t<decltype(Method), Playback&, Arguments...>, Effects>) {
-    return std::invoke(Method, playback, std::move(arguments)...);
-  } else {
-    std::invoke(Method, playback, std::move(arguments)...);
-    return Effects{};
-  }
-}
-
-template <class Playback, class Handler, class... Arguments>
-[[nodiscard]] Effects invokeInline(Playback& playback, Arguments... arguments) {
-  static_assert(std::is_empty_v<Handler> && std::is_default_constructible_v<Handler>,
-                "Inline compiler-cursor handlers must be captureless");
-  Handler handler;
-  if constexpr (std::is_same_v<std::invoke_result_t<Handler&, Playback&, Arguments...>, Effects>) {
-    return std::invoke(handler, playback, std::move(arguments)...);
-  } else {
-    std::invoke(handler, playback, std::move(arguments)...);
-    return Effects{};
-  }
+  return first;
 }
 
 template <class Playback, auto Member, class Argument>
@@ -323,7 +230,7 @@ template <class Playback>
 }  // namespace detail
 
 // CompilerCursor gives formats one imperative command block. Reads add source
-// metadata immediately; event operations append typed executable actions for
+// metadata immediately; event operations compose one typed executable body for
 // later, source-free SequenceVm execution.
 template <class TrackState, class Playback>
 class CompilerCursor {
@@ -462,7 +369,7 @@ public:
     template <class T>
     T opcodeValue(std::string_view name, T value, SourceValueDisplay display = SourceValueDisplay::Default,
                   SemanticOperandRole role = SemanticOperandRole::Value) {
-      cursor_.add(name, detail::executableValue(value), cursor_.opcodeRange_, display, role);
+      cursor_.add(name, detail::semanticValue(value), cursor_.opcodeRange_, display, role);
       return value;
     }
 
@@ -470,7 +377,7 @@ public:
     T derived(std::string_view name, T value, SourceValueDisplay display = SourceValueDisplay::Default,
               SemanticOperandRole role = SemanticOperandRole::Value) {
       if (cursor_.record_.ok()) {
-        cursor_.add(name, detail::executableValue(value), {}, display, role);
+        cursor_.add(name, detail::semanticValue(value), {}, display, role);
       }
       return value;
     }
@@ -495,12 +402,12 @@ public:
                                          SemanticOperandRole role = SemanticOperandRole::Value) {
       if (source.valid) {
         cursor_.operands_.push_back(SemanticOperand{
-            .value = detail::executableValue(resolved),
+            .value = detail::semanticValue(resolved),
             .range = source.range,
             .name = std::string(name),
             .display = display,
             .role = role,
-            .encodedValue = detail::executableValue(source.value),
+            .encodedValue = detail::semanticValue(source.value),
             .encodedName = std::string(source.name),
             .encodedDisplay = source.display,
         });
@@ -532,17 +439,14 @@ public:
       return *this;
     }
 
-    // state() is a deferred read: it observes the member when the action using
-    // it executes, after any preceding set/add/toggle action in this command.
-    template <auto Member>
-    [[nodiscard]] auto state() const {
-      using State = detail::StateValue<Member>;
-      static_assert(std::is_same_v<typename State::owner_type, TrackState>,
-                    "Compiler cursor state members must belong to its TrackState");
-      return State{};
-    }
-
     Event& wait(auto ticks) { return append<&detail::wait<Playback>>(std::move(ticks)); }
+
+    template <auto Member>
+    Event& wait() {
+      return appendCallable([](Playback& playback) {
+        return Effects::wait(static_cast<u32>(playback.track.*Member));
+      });
+    }
 
     Event& emitLevel(auto gain) { return append<&detail::emitLevel<Playback>>(std::move(gain)); }
 
@@ -602,13 +506,13 @@ public:
 
     template <auto Member, class Value>
     Event& set(Value value) {
-      using Argument = detail::DeferredValueType<Value>;
+      using Argument = decltype(detail::storedCommandValue(std::move(value)));
       return append<&detail::setMember<Playback, Member, Argument>>(std::move(value));
     }
 
     template <auto Member, class Value>
     Event& add(Value value) {
-      using Argument = detail::DeferredValueType<Value>;
+      using Argument = decltype(detail::storedCommandValue(std::move(value)));
       return append<&detail::addMember<Playback, Member, Argument>>(std::move(value));
     }
 
@@ -619,17 +523,15 @@ public:
 
     template <auto Method, class... Arguments>
     Event& invoke(Arguments... arguments) {
-      return append<&detail::invokeMember<Playback, Method, detail::DeferredValueType<Arguments>...>>(
-          std::move(arguments)...);
+      return append<Method>(std::move(arguments)...);
     }
 
-    // A captureless inline handler is the locality escape hatch for short,
-    // one-off runtime behavior. Source values remain explicit positional
-    // arguments; no closure object enters the durable command.
+    // Keep short, one-off runtime behavior beside the opcode that defines it.
+    // The callable and explicit arguments are owned by the command body;
+    // captures must own anything that needs to outlive decoding.
     template <class Handler, class... Arguments>
-    Event& invoke(Handler, Arguments... arguments) {
-      return append<&detail::invokeInline<Playback, std::decay_t<Handler>, detail::DeferredValueType<Arguments>...>>(
-          std::move(arguments)...);
+    Event& invoke(Handler handler, Arguments... arguments) {
+      return appendCallable(std::move(handler), std::move(arguments)...);
     }
 
     // The VM may execute this command while the preceding command's wait is
@@ -639,10 +541,15 @@ public:
     Event& duringWaitWhen() {
       static_assert(std::is_same_v<std::invoke_result_t<decltype(Predicate), Playback&>, bool>,
                     "A during-wait predicate must return bool");
-      if (execution_.duringWait.valid()) {
+      if (execution_.duringWait) {
         throw std::logic_error("Compiled sequence command declared more than one during-wait predicate");
       }
-      execution_.duringWait.evaluate = &detail::evaluateErased<Playback, Predicate>;
+      execution_.duringWait = [](void* erasedPlayback) {
+        if (erasedPlayback == nullptr) {
+          throw std::logic_error("Compiled sequence predicate received no playback state");
+        }
+        return std::invoke(Predicate, *static_cast<Playback*>(erasedPlayback));
+      };
       return *this;
     }
 
@@ -678,7 +585,7 @@ public:
 
     // Some drivers use one opcode for both top-level end and subroutine
     // return. Discovery treats it as a block return while a typed runtime
-    // action chooses the actual result from call history.
+    // body chooses the actual result from call history.
     Event& discoverReturn() {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       if (flow_.defaultTransition) {
@@ -689,7 +596,7 @@ public:
       return *this;
     }
 
-    // Marks a typed action whose destination comes from runtime state. Static
+    // Marks a typed body whose destination comes from runtime state. Static
     // discovery still follows the command's ordinary fallthrough.
     Event& runtimeControlFlow() {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
@@ -697,7 +604,7 @@ public:
       return *this;
     }
 
-    // The action must choose a runtime transition even when its chosen address
+    // The body must choose a runtime transition even when its chosen address
     // equals continuation. This preserves the semantic distinction between a
     // jump and an ordinary fallthrough for loop detection.
     Event& requireRuntimeControlFlow() {
@@ -714,7 +621,7 @@ public:
       return *this;
     }
 
-    // Record a conditional branch destination while a format-specific action
+    // Record a conditional branch destination while a format-specific body
     // decides at runtime whether the branch is taken.
     Event& mayBranchTo(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
@@ -723,7 +630,7 @@ public:
       return *this;
     }
 
-    // Records a decoder-only alternative without permitting runtime actions to
+    // Records a decoder-only alternative without permitting runtime behavior to
     // override a static transition.
     Event& discoverTarget(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
@@ -741,21 +648,25 @@ public:
 
     template <auto Operation, class... Arguments>
     Event& append(Arguments... arguments) {
-      return appendDeferred<Operation>(detail::defer(std::move(arguments))...);
+      return appendCallable(Operation, std::move(arguments)...);
     }
 
-    template <auto Operation, class... Values>
-    Event& appendDeferred(Values... values) {
+    template <class Callable, class... Arguments>
+    Event& appendCallable(Callable callable, Arguments... arguments) {
       if (presentation_.playback == CommandPlaybackStatus::SourceOnly ||
           presentation_.playback == CommandPlaybackStatus::NoOp) {
         presentation_.playback = CommandPlaybackStatus::AffectsPlayback;
       }
-      CommandAction action{
-          .execute = &detail::executeErased<Playback, Operation, Values...>,
+      CommandBody next = detail::makeCommandBody<Playback>(std::move(callable), std::move(arguments)...);
+      if (!execution_.body) {
+        execution_.body = std::move(next);
+        return *this;
+      }
+      CommandBody previous = std::move(execution_.body);
+      execution_.body = [previous = std::move(previous), next = std::move(next)](void* playback) {
+        Effects combined = previous(playback);
+        return detail::combineCommandEffects(std::move(combined), next(playback));
       };
-      action.arguments.reserve(sizeof...(Values));
-      (values.store(action.arguments), ...);
-      execution_.actions.push_back(std::move(action));
       return *this;
     }
 
@@ -869,7 +780,7 @@ private:
   template <class T>
   T decoded(const RangedValue<T>& field, std::string_view name, SourceValueDisplay display, SemanticOperandRole role) {
     if (field) {
-      add(name, detail::executableValue(field.value), field.range, display, role);
+      add(name, detail::semanticValue(field.value), field.range, display, role);
     }
     return field.value;
   }

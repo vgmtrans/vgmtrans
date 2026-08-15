@@ -56,7 +56,7 @@ void sourceCommandsRetainOnlySemanticData() {
   expect(track.commands.size() == 1, "track builder should append one source command");
   expect(command.range == range && command.encodedSize == programBytes.size(),
          "source command should retain the range needed to inspect encoded bytes");
-  expect(command.execution.valid(), "source command should retain compiled playback actions");
+  expect(command.execution.valid(), "source command should retain its compiled playback body");
 }
 
 void sequenceSourceRangeIncludesDecodedCommandsFromTheBaseSource() {

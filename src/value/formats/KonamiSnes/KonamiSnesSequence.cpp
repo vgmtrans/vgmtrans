@@ -1246,7 +1246,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       event.label("Note with Pitch Slide");
       appendPitchSlide(event, *slide);
     }
-    return event.wait(event.state<&TrackState::noteLength>());
+    return event.wait<&TrackState::noteLength>();
   }
 
   if (opcode >= 0x70 && opcode <= 0x7f && isLateVersion(version)) {
@@ -1343,7 +1343,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
         appendPitchSlide(event, *slide);
       }
       event.invoke<&Playback::rest>();
-      return event.wait(event.state<&TrackState::noteLength>());
+      return event.wait<&TrackState::noteLength>();
     }
     case 0xe1: {
       auto event = cursor.command("Tie", SequenceSemantic::Note);
@@ -1351,7 +1351,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       const u8 rate = event.u8("duration_rate", SemanticOperandRole::Duration);
       event.set<&TrackState::noteDurationRate>(rate);
       event.invoke<&Playback::tie>();
-      return event.wait(event.state<&TrackState::noteLength>());
+      return event.wait<&TrackState::noteLength>();
     }
     case 0xe2: {
       auto event = cursor.command("Program", SequenceSemantic::Program);
