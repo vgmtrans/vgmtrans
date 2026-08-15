@@ -88,8 +88,6 @@ namespace {
 using detail::RepeatStateSnapshot;
 using detail::VmTrackRuntime;
 
-constexpr u32 kFallbackCommandLimit = 100000;
-
 [[nodiscard]] Diagnostic vmWarning(std::string message, SourceRange range) {
   return Diagnostic{
       .severity = Severity::Warning,
@@ -250,11 +248,11 @@ void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavio
         .precisionHint = LevelPrecisionHint::SevenBit,
     });
   }
-  if (const auto* balance = std::get_if<StereoBalance>(&behavior.initialStereoBalance)) {
+  if (behavior.initialStereoBalance) {
     track.events.emplace_back(StereoBalancePerformanceEvent{
         .header = header,
-        .leftGain = balance->leftGain,
-        .rightGain = balance->rightGain,
+        .leftGain = behavior.initialStereoBalance->leftGain,
+        .rightGain = behavior.initialStereoBalance->rightGain,
     });
   }
   if (behavior.initialMonoModeChannels) {
@@ -434,7 +432,8 @@ public:
                   PerformanceSequence& targetSequence, u64& outputSequence, bool includeGlobalInitialEvents,
                   std::optional<u64> stopTick,
                   std::any* programState = nullptr, bool sequenceCoordinatesLoops = false, bool startsActive = true)
-      : track_(track), sequenceRuntime_(sequenceRuntime), behavior_(behavior), loopPolicy_(behavior.defaultLoopPolicy),
+      : track_(track), sequenceRuntime_(sequenceRuntime), behavior_(behavior),
+        loopPolicy_(options.loopPolicy == LoopPolicy::Default ? behavior.loopPolicy : options.loopPolicy),
         options_(options), targetSequence_(targetSequence), outputSequence_(outputSequence), stopTick_(stopTick),
         performanceTrack_(PerformanceTrack{
             .id = track.id,
@@ -618,7 +617,7 @@ private:
     const SourceCommand& command = track_.commands.at(commandIndex);
     const VisitState visitState = LoopDetector::visitState(commandIndex, runtime_);
     const auto loop = loopDetector_.observe(visitState, command, runtime_, arrivedByControlFlow_);
-    if (sequenceRuntime_.inferLoopsFromRepeatedState && loop) {
+    if (behavior_.inferLoopsFromRepeatedState && loop) {
       if (handleLoop(*loop, commandIndex, visitState).kind == LoopActionKind::StopTrack) {
         return false;
       }
@@ -1088,14 +1087,14 @@ PerformanceSequence SequenceVm::render(const SequenceProgram& program) const {
 
 PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, std::any* analyzedProgramState) const {
   const SequenceRuntime& runtime = program.runtime;
-  const SequenceProgramBehavior behavior = resolvedBehavior(program);
+  const SequenceProgramBehavior& behavior = program.behavior;
   PerformanceSequence sequence{
       .timebase = program.timebase,
       .initialTempoMicrosecondsPerQuarter = behavior.initialTempoMicrosecondsPerQuarter,
-      .preferredPitchTransitionRendering = runtime.preferredPitchTransitionRendering,
+      .preferredPitchTransitionRendering = behavior.preferredPitchTransitionRendering,
   };
 
-  const LoopPolicy loopPolicy = behavior.defaultLoopPolicy;
+  const LoopPolicy loopPolicy = options_.loopPolicy == LoopPolicy::Default ? behavior.loopPolicy : options_.loopPolicy;
 
   if (runtime.valid()) {
     // Some formats must inspect the whole song before the first event can be
@@ -1204,53 +1203,23 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, std::
       return tracks;
     };
 
-    PerformanceSequence prepass{
-        .timebase = program.timebase,
-        .initialTempoMicrosecondsPerQuarter = behavior.initialTempoMicrosecondsPerQuarter,
-    };
-    if (runtime.prepass == SemanticPrepassMode::ScheduledPlayback) {
+    const bool hasPrepass = runtime.finishPrepass != nullptr;
+    if (hasPrepass) {
       // Run commands in normal time order but discard every emitted event. This
-      // preserves song-wide interactions between tracks during collection.
+      // preserves song-wide interactions between tracks during collection,
+      // then lets the format prepare its state for the real render.
+      PerformanceSequence prepass{
+          .timebase = program.timebase,
+          .initialTempoMicrosecondsPerQuarter = behavior.initialTempoMicrosecondsPerQuarter,
+      };
       prepass.tracks = renderSemanticPass(prepass, programState);
-    } else if (runtime.prepass == SemanticPrepassMode::DecodedCommands) {
-      // Some limits must include every valid source block, even when a jump
-      // skips that block during normal playback. Run each already-decoded
-      // command once in stable order and discard its events, timing, and jumps.
-      u64 outputSequence = 0;
-      for (const TrackProgram& track : program.tracks) {
-        std::any trackState = runtime.createTrackState ? runtime.createTrackState(program, track) : std::any{};
-        PerformanceTrack output{
-            .id = track.id,
-            .sourceTrackNumber = track.sourceTrackNumber,
-        };
-        VmTrackRuntime trackRuntime;
-        for (const SourceCommand& command : track.commands) {
-          PerformanceEmitter out{output,
-                                 command.id,
-                                 command.annotation,
-                                 0,
-                                 outputSequence,
-                                 trackRuntime.nextNote,
-                                 trackRuntime.nextAutomation,
-                                 behavior.panLaw,
-                                 &trackRuntime.activeNotes};
-          VmApi vm = detail::VmApiAccess::make(trackRuntime, prepass, command);
-          static_cast<void>(runtime.execute(command, programState, trackState, out, vm));
-        }
-      }
-    }
-    if (runtime.prepass != SemanticPrepassMode::None) {
-      if (runtime.finishPrepass != nullptr) {
-        // Tell the format that collection is complete before fresh track state
-        // is created for the real render.
-        runtime.finishPrepass(programState);
-      }
+      runtime.finishPrepass(programState);
     }
     if (analyzedProgramState != nullptr) {
       // Analysis needs the same control-flow semantics as rendering, but a
       // format with a prepass has already executed everything required to
       // collect its durable result. Do not perform the discarded output pass.
-      if (runtime.prepass == SemanticPrepassMode::None) {
+      if (!hasPrepass) {
         PerformanceSequence analysis{
             .timebase = program.timebase,
             .initialTempoMicrosecondsPerQuarter = behavior.initialTempoMicrosecondsPerQuarter,
@@ -1276,29 +1245,6 @@ std::any detail::analyzeSequenceProgram(const SequenceVm& vm, const SequenceProg
   std::any state;
   static_cast<void>(vm.renderImpl(program, &state));
   return state;
-}
-
-SequenceProgramBehavior SequenceVm::resolvedBehavior(const SequenceProgram& program) const {
-  SequenceProgramBehavior behavior = program.behavior;
-  if (behavior.defaultLoopPolicy == LoopPolicy::Default) {
-    behavior.defaultLoopPolicy = LoopPolicy::PlayOnce;
-  }
-  if (options_.loopPolicy != LoopPolicy::Default) {
-    behavior.defaultLoopPolicy = options_.loopPolicy;
-  }
-
-  if (behavior.commandLimit == 0) {
-    behavior.commandLimit = kFallbackCommandLimit;
-  }
-  if (std::holds_alternative<UnresolvedInitialStereoBalance>(behavior.initialStereoBalance)) {
-    throw std::logic_error("Sequence initial stereo balance remains unresolved");
-  }
-
-  if (behavior.initialTempoMicrosecondsPerQuarter == 0) {
-    behavior.initialTempoMicrosecondsPerQuarter = 500'000;
-  }
-
-  return behavior;
 }
 
 }  // namespace vgmtrans::core

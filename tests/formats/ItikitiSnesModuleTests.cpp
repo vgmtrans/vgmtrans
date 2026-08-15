@@ -63,7 +63,7 @@ PerformanceSequence render(std::vector<u8> bytes, u8 group = 0, u8 echoDelay = 4
   SequenceProgram program{
       .runtime = sequenceRuntime(echoDelay),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {decodeSourceTrack(ByteReader(SourceId{201}, bytes), 0, 0, 0, group)},
   };
   return SequenceVm(LoopPolicy::PlayOnce).render(program);

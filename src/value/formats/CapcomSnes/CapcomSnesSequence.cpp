@@ -8,7 +8,7 @@
 
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/SnesDsp.h"
 
@@ -166,8 +166,7 @@ struct TrackState {
   TrackState() = default;
 
   explicit TrackState(const RuntimeConfig& config)
-      : resetLfoPhaseOnNote(config.version !=
-                            CapcomSnesEngineVersion::v1BgmInList) {}
+      : resetLfoPhaseOnNote(config.version != CapcomSnesEngineVersion::v1BgmInList) {}
 
   u8 durationRate256ths = 0;
   s8 transposeSemitones = 0;
@@ -551,24 +550,20 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
 }  // namespace
 
 const SequenceDialect& capcomSnesSequenceDialect() {
-  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  static const SequenceDialect dialect = SequenceDialect{
       .commandDetailKindPrefix = "capcom-snes",
       .timebase = Timebase{.ppqn = kCapcomSnesPpqn},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .initialReverbSend = 0.0,
-              .initialStereoBalance = omitInitialStereoBalance,
               .initialMonoModeChannels = 0,
           },
-  });
+  };
   return dialect;
 }
 
 SequenceRuntime capcomSnesSequenceRuntime(CapcomSnesEngineVersion version) {
-  SequenceProgram program = capcomSnesSequenceDialect().makeProgram();
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, RuntimeConfig{.version = version});
-  return std::move(program.runtime);
+  return makeCompiledRuntime<TrackState, Playback, ProgramState>(RuntimeConfig{.version = version});
 }
 
 // Decodes one known track directly for focused tests and callers that already
@@ -603,9 +598,7 @@ SequenceProgram decodeCapcomSnesSequence(ByteReader reader, const CapcomSnesLayo
 
     sequence.addLinearTrack(sourceTrackNumber, reader.range(pointerOffset, 2), trackAddress, decode);
   }
-  SequenceProgram program = sequence.finish();
-  program.runtime = capcomSnesSequenceRuntime(layout.version);
-  return program;
+  return sequence.finish(capcomSnesSequenceRuntime(layout.version));
 }
 
 }  // namespace vgmtrans::formats::capcom_snes

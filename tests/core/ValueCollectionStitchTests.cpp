@@ -35,9 +35,9 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
         .metadata = AssetMetadata{.id = sequenceId, .format = "Probe", .name = "Part " + std::to_string(index)},
         .program =
             SequenceProgram{
-                .runtime = dialect.makeProgram().runtime,
+                .runtime = probeSequenceRuntime(),
                 .timebase = dialect.timebase,
-                .behavior = dialect.defaultBehavior,
+                .behavior = dialect.behavior,
                 .tracks = {track},
             },
     });

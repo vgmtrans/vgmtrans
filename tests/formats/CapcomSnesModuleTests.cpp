@@ -367,7 +367,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(sequence->metadata.range.offset == 0x2001, "sequence range should point at fixed BGM header body");
   expect(sequence->program.runtime.valid(), "sequence should carry its executable runtime");
   expect(sequence->program.timebase.ppqn == 48, "sequence should use CapcomSnes PPQN");
-  expect(sequence->program.behavior.defaultLoopPolicy == LoopPolicy::PlayOnce,
+  expect(sequence->program.behavior.loopPolicy == LoopPolicy::PlayOnce,
          "sequence should carry CapcomSnes default loop policy");
   expect(sequence->program.tracks.size() == 8, "sequence should decode all nonzero track pointers");
   const auto sequenceInspection = session.inspect(sequence->metadata.id);
@@ -758,7 +758,7 @@ void capcomSnesCompiledAndPerformanceSnapshotsAreStable() {
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const std::string performance = performanceTrackSnapshot(SequenceVm().render(program).tracks[0]);
@@ -829,7 +829,7 @@ void capcomSnesLfoValuesAreResolvedDuringDecode() {
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -875,7 +875,7 @@ void capcomSnesLfoValuesAreResolvedDuringDecode() {
     const SequenceProgram noteProgram{
         .runtime = capcomSnesSequenceRuntime(noteVersion),
         .timebase = dialect.timebase,
-        .behavior = dialect.defaultBehavior,
+        .behavior = dialect.behavior,
         .tracks = {noteTrack},
     };
     const PerformanceSequence notePerformance = SequenceVm().render(noteProgram);
@@ -906,7 +906,7 @@ void capcomSnesLfoValuesAreResolvedDuringDecode() {
   const SequenceProgram frozenProgram{
       .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {frozenTrack},
   };
   const PerformanceSequence frozenPerformance = SequenceVm().render(frozenProgram);
@@ -932,7 +932,7 @@ void capcomSnesCompiledCommandsDoNotNeedEngineProfile() {
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -1143,7 +1143,7 @@ void capcomSnesSourceDialectDecodesAndRendersDriverCommands() {
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -1185,7 +1185,7 @@ void capcomSnesInitialDurationRateIsFullLength() {
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -1222,7 +1222,7 @@ void capcomSnesPanPerformanceCarriesGainCompensation() {
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -1297,7 +1297,7 @@ void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -1361,7 +1361,7 @@ void capcomSnesReleaseRateIsStickyAcrossInstrumentChanges() {
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
@@ -1458,7 +1458,7 @@ void capcomSnesDialectEmitsStructuredPitchSlides() {
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -1565,8 +1565,7 @@ void capcomSnesDialectEmitsStructuredPitchSlides() {
   };
   const auto bendAtRepeat = lastPitchBendAt(pitchBendMidi, 18);
   const auto completedBend = lastPitchBendAt(pitchBendMidi, 24);
-  expect(bendAtRepeat && completedBend && *bendAtRepeat > 0 && *bendAtRepeat < *completedBend &&
-             *completedBend == 8191,
+  expect(bendAtRepeat && completedBend && *bendAtRepeat > 0 && *bendAtRepeat < *completedBend && *completedBend == 8191,
          "a repeated CapcomSnes target should let the existing pitch-bend glide finish without an immediate snap");
   const auto slideOnly = lastPitchBendAt(pitchBendMidi, 8);
   const auto slideWithVibrato = lastPitchBendAt(simulatedPitchBendMidi, 8);
@@ -1603,7 +1602,7 @@ void capcomSnesDialectExecutesRepeatUntilCommand() {
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -1656,7 +1655,7 @@ void capcomSnesDialectAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken() {
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -1748,7 +1747,7 @@ void capcomSnesV1DialectPreservesUnknownOneByteEvents() {
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);

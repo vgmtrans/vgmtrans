@@ -14,7 +14,8 @@
 #include "value/base/LevelScale.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/midi/ModulationAnalysis.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/SequenceDialect.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 #include "value/synth/SampleDecoder.h"
@@ -223,8 +224,10 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   return input.reader.size() >= minimumSize && input.reader.u8At(0) == magic;
 }
 
-[[nodiscard]] SequenceDialect probeSequenceDialect(SequenceProgramBehavior behavior,
-                                                   InitialStereoBalance initialStereoBalance);
+[[nodiscard]] SequenceDialect probeSequenceDialect(SequenceProgramBehavior behavior = {},
+                                                   std::optional<StereoBalance> initialStereoBalance = std::nullopt);
+[[nodiscard]] SequenceRuntime probeSequenceRuntime();
+[[nodiscard]] SequenceProgram probeSequenceProgram();
 
 [[nodiscard]] SourceExtractor probeSequenceContainerExtractor() {
   return SourceExtractor{
@@ -267,7 +270,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
               .name = input.source.name,
               .range = assetRange,
           },
-      .program = probeSequenceDialect({}, omitInitialStereoBalance).makeProgram(),
+      .program = probeSequenceProgram(),
   };
 
   ScanResult result;
@@ -324,7 +327,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 
   ScanResultBuilder out(input, "ProbeExplicit");
   const auto sequence = out.sequence("Explicit Sequence", input.reader.range(0, 1))
-                            .program(probeSequenceDialect({}, omitInitialStereoBalance).makeProgram());
+                            .program(probeSequenceProgram());
   out.sourceMap()
       .header("Probe Header", input.reader.range(0, 1))
       .owner(ObjectRefs::sequence(sequence.id()))
@@ -371,7 +374,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
               .name = input.source.name,
               .range = input.reader.range(0, input.reader.size()),
           },
-      .program = probeSequenceDialect({}, omitInitialStereoBalance).makeProgram(),
+      .program = probeSequenceProgram(),
   };
 
   ScanResult result;
@@ -828,14 +831,24 @@ using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
   }
 }
 
-[[nodiscard]] SequenceDialect probeSequenceDialect(
-    SequenceProgramBehavior behavior = {}, InitialStereoBalance initialStereoBalance = omitInitialStereoBalance) {
+[[nodiscard]] SequenceDialect probeSequenceDialect(SequenceProgramBehavior behavior,
+                                                   std::optional<StereoBalance> initialStereoBalance) {
   behavior.initialStereoBalance = initialStereoBalance;
-  return makeCompiledDialect<ProbeTrackState, ProbePlayback>(SequenceDialect{
+  return SequenceDialect{
       .commandDetailKindPrefix = "probe",
       .timebase = Timebase{.ppqn = 48},
-      .defaultBehavior = behavior,
-  });
+      .behavior = behavior,
+  };
+}
+
+[[nodiscard]] SequenceRuntime probeSequenceRuntime() {
+  return makeCompiledRuntime<ProbeTrackState, ProbePlayback>();
+}
+
+[[nodiscard]] SequenceProgram probeSequenceProgram() {
+  SequenceProgram program = probeSequenceDialect().makeProgram();
+  program.runtime = probeSequenceRuntime();
+  return program;
 }
 
 [[nodiscard]] SourceRange probeRange(u64 offset, u64 size) {

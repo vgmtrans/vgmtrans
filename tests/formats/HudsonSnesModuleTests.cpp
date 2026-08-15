@@ -93,7 +93,7 @@ PerformanceSequence render(Version version, u8 shift, bool velocity, std::vector
   SequenceProgram program{
       .runtime = sequenceRuntime(version, shift, velocity, std::move(driverData)),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {decodeSourceTrack(ByteReader(SourceId{151}, bytes), version, shift, velocity, 0, 0)},
   };
   program.behavior.initialTempoMicrosecondsPerQuarter = 512000;

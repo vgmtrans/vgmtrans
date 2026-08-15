@@ -127,7 +127,10 @@ public:
 
   [[nodiscard]] std::optional<SourceAnnotationId> headerAnnotation() const noexcept { return headerAnnotation_; }
 
-  [[nodiscard]] SequenceProgram finish() { return std::move(program_); }
+  [[nodiscard]] SequenceProgram finish(SequenceRuntime runtime) {
+    program_.runtime = std::move(runtime);
+    return std::move(program_);
+  }
 
 private:
   void annotateTrackPointer(u32 trackIndex, SourceRange pointerRange, u32 startOffset,

@@ -10,7 +10,7 @@
 
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 
 #include <algorithm>
 #include <array>
@@ -798,12 +798,11 @@ struct DecodeContext {
 }  // namespace
 
 const SequenceDialect& mp2kSequenceDialect() {
-  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  static const SequenceDialect dialect = SequenceDialect{
       .commandDetailKindPrefix = "mp2k",
       .timebase = Timebase{.ppqn = 24},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .commandLimit = kMaxTrackCommands,
               .panLaw = PanLaw::ConstantSum,
               .initialLevel = 0.0,
@@ -813,7 +812,7 @@ const SequenceDialect& mp2kSequenceDialect() {
               .initialTempoMicrosecondsPerQuarter =
                   static_cast<u32>(std::llround(60000000.0 / (kGbaMixerFrameRate * 60.0 / 24.0))),
           },
-  });
+  };
   return dialect;
 }
 
@@ -840,7 +839,7 @@ SequenceProgram parseMp2kSequenceProgram(ByteReader reader, AssetId id, const Mp
         .release = static_cast<u8>(envelope >> 24),
     });
   }
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, std::move(runtime));
+  program.runtime = makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime));
 
   std::optional<SourceAnnotationId> header;
   if (sourceMap && reader.has(song.offset, headerSize)) {

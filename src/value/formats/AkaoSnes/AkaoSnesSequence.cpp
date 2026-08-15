@@ -11,7 +11,7 @@
 #include "value/base/LevelScale.h"
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 #include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
@@ -2083,17 +2083,15 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
 }
 
 [[nodiscard]] const SequenceDialect& sharedDialect() {
-  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  static const SequenceDialect dialect = SequenceDialect{
       .commandDetailKindPrefix = "akao-snes",
       .timebase = Timebase{.ppqn = kAkaoSnesPpqn},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .initialReverbSend = 0.0,
               .initialStereoBalance = StereoBalance{127.0 / 255.0, 128.0 / 255.0},
           },
-      .runtime = SequenceRuntime{.prepass = SemanticPrepassMode::ScheduledPlayback},
-  });
+  };
   return dialect;
 }
 
@@ -2148,10 +2146,8 @@ const SequenceDialect& akaoSnesSequenceDialect() {
 }
 
 SequenceRuntime akaoSnesSequenceRuntime(AkaoSnesProfile profile, std::vector<u32> v1VolumeEnvelopes) {
-  SequenceProgram program = akaoSnesSequenceDialect().makeProgram();
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(
-      program, RuntimeConfig{.profile = profile, .v1VolumeEnvelopes = std::move(v1VolumeEnvelopes)});
-  return std::move(program.runtime);
+  return makeCompiledRuntime<TrackState, Playback, ProgramState>(
+      RuntimeConfig{.profile = profile, .v1VolumeEnvelopes = std::move(v1VolumeEnvelopes)});
 }
 
 TrackProgram decodeAkaoSnesSourceTrack(ByteReader reader, const AkaoSnesTrackDecodeOptions& options) {
@@ -2216,15 +2212,15 @@ SequenceProgram parseAkaoSnesSequence(ByteReader reader, const AkaoSnesLayout& l
         rawTrackAddress);
   }
 
-  SequenceProgram program = session.finish();
-  program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
   RuntimeConfig runtime{.profile = profile};
-  program.behavior.initialTempoMicrosecondsPerQuarter =
-      tempoMicrosecondsPerQuarter(profile.version, profile.minorVersion, kDefaultTempo);
   if (layout.version == AKAOSNES_V1 && layout.volumeEnvelopeTableAddress) {
     runtime.v1VolumeEnvelopes = captureAkaoSnesV1VolumeEnvelopes(reader, *layout.volumeEnvelopeTableAddress);
   }
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, std::move(runtime));
+  SequenceProgram program =
+      session.finish(makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime)));
+  program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
+  program.behavior.initialTempoMicrosecondsPerQuarter =
+      tempoMicrosecondsPerQuarter(profile.version, profile.minorVersion, kDefaultTempo);
 
   return program;
 }

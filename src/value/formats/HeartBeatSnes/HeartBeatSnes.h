@@ -53,6 +53,7 @@ struct SequenceParse {
                                            core::SourceMapBuilder* sourceMap = nullptr,
                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceDialect& sequenceDialect();
+[[nodiscard]] core::SequenceRuntime sequenceRuntime();
 [[nodiscard]] core::Envelope driverEnvelope(u8 adsr1, u8 adsr2);
 [[nodiscard]] std::optional<core::ScanSynthRefs> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
                                                           const std::set<u8>& programs, std::string_view displayName);

@@ -70,7 +70,7 @@ PerformanceSequence renderTracks(AkaoSnesProfile profile, std::vector<TrackProgr
   const SequenceProgram program{
       .runtime = akaoSnesSequenceRuntime(profile, std::move(driverData)),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = std::move(tracks),
   };
   return SequenceVm(options).render(program);
@@ -1189,7 +1189,7 @@ void akaoSnesV4TieExtendsShortenedPreviousNote() {
   const SequenceProgram program{
       .runtime = akaoSnesSequenceRuntime(profile),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 

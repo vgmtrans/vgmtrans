@@ -7,7 +7,7 @@
 #include "ValueTestSupport.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 
 namespace {
 
@@ -20,7 +20,9 @@ struct CompilerProbeState {
 
 struct CompilerProbeProgramState {
   u32 executedCommands = 0;
+};
 
+struct CompilerPrepassProgramState : CompilerProbeProgramState {
   void finishPrepass() {}
 };
 
@@ -44,7 +46,6 @@ struct CompilerProbePlayback {
   void pitchBend(s8 encoded) { out.pitchBend((encoded / 128.0) * track.pitchBendRange); }
 
   void enabledExpression(bool enabled) { out.expression(enabled ? 0.75 : 0.25); }
-
 };
 
 using ProbeCursor = CompilerCursor<CompilerProbeState, CompilerProbePlayback>;
@@ -223,17 +224,24 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
 }
 
 SequenceDialect compilerProbeDialect() {
-  return makeCompiledDialect<CompilerProbeState, CompilerProbePlayback, CompilerProbeProgramState>(SequenceDialect{
+  return SequenceDialect{
       .timebase = Timebase{.ppqn = 48},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
               .panLaw = PanLaw::EqualPower,
-              .initialStereoBalance = omitInitialStereoBalance,
           },
-  });
+  };
+}
+
+SequenceRuntime compilerProbeRuntime() {
+  return makeCompiledRuntime<CompilerProbeState, CompilerProbePlayback, CompilerProbeProgramState>();
 }
 
 u32 projectExecutedCommands(const CompilerProbeProgramState& state) {
+  return state.executedCommands;
+}
+
+u32 projectExecutedCommands(const CompilerPrepassProgramState& state) {
   return state.executedCommands;
 }
 
@@ -278,9 +286,9 @@ void compilerCursorCompilesAndExecutesTypedCommands() {
 
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = compilerProbeRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -332,9 +340,9 @@ void compilerCursorCompilesControlFlow() {
 
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = compilerProbeRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -358,9 +366,9 @@ void compilerCursorCompilesRepeatsAndConditionalFields() {
          "compiled repeats should annotate their destination without a duplicate read-time role");
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = compilerProbeRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -389,9 +397,9 @@ void compilerCursorComposesOperationsIntoOneBody() {
 
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = compilerProbeRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -416,9 +424,9 @@ void compilerCursorReadsRuntimeStateInsideCommandBody() {
 
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = compilerProbeRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -437,9 +445,9 @@ void compilerCursorExecutesEligibleCommandsDuringWaits() {
     const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{16}, source), static_cast<u32>(source.size()));
     const SequenceDialect dialect = compilerProbeDialect();
     const SequenceProgram program{
-        .runtime = dialect.makeProgram().runtime,
+        .runtime = compilerProbeRuntime(),
         .timebase = dialect.timebase,
-        .behavior = dialect.defaultBehavior,
+        .behavior = dialect.behavior,
         .tracks = {track},
     };
     return std::pair{track, SequenceVm().render(program)};
@@ -540,9 +548,9 @@ void compilerCursorRejectsConflictingComposedFlow() {
   const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{13}, bytes), static_cast<u32>(bytes.size()));
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = compilerProbeRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -558,17 +566,15 @@ void compilerCursorRejectsConflictingComposedFlow() {
 void compilerCursorAnalysisStopsAfterItsScheduledPrepass() {
   const std::vector<u8> bytes{0x21, 0xff};
   const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{15}, bytes), static_cast<u32>(bytes.size()));
-  SequenceDialect dialect = compilerProbeDialect();
-  dialect.runtime.prepass = SemanticPrepassMode::ScheduledPlayback;
+  const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = makeCompiledRuntime<CompilerProbeState, CompilerProbePlayback, CompilerPrepassProgramState>(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
-  const u32 executed =
-      analyzeCompiledProgram<CompilerProbeProgramState, u32>(program, projectExecutedCommands);
+  const u32 executed = analyzeCompiledProgram<CompilerPrepassProgramState, u32>(program, projectExecutedCommands);
   expect(executed == 2, "compiled analysis should not execute a discarded output pass after its scheduled prepass");
 }
 

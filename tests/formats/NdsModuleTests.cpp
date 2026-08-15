@@ -239,10 +239,10 @@ SequenceProgram decodeTestSequenceProgram(std::initializer_list<u8> commands) {
   const TrackProgram track =
       decodeTestTrack(ByteReader(SourceId{30}, bytes), sequenceOffset, static_cast<u32>(bytes.size()), trackStart, 0);
   return SequenceProgram{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = ndsSequenceRuntime(),
       .timebase = dialect.timebase,
       .sourceBaseAddress = Address{trackStart},
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 }
@@ -399,7 +399,7 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   bytes[trackStart + 10] = 0xff;
 
   const SequenceDialect& dialect = ndsSequenceDialect();
-  expect(dialect.runtime.valid(), "NDS SSEQ should provide a compiled command runtime");
+  expect(ndsSequenceRuntime().valid(), "NDS SSEQ should provide a compiled command runtime");
 
   ScanIdAllocator annotationIds;
   SourceMapBuilder sourceMap([&annotationIds]() { return annotationIds.nextSourceAnnotationId(); });
@@ -432,10 +432,10 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   expect(decodeDiagnostics.empty(), "NDS SSEQ semantic decode should not emit diagnostics for valid commands");
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = ndsSequenceRuntime(),
       .timebase = dialect.timebase,
       .sourceBaseAddress = Address{trackStart},
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
@@ -518,10 +518,10 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
              commandDetailKind(expressionAnnotations, expressionTrack.commands[0]) == "nds.expression",
          "NDS expression opcode should decode as a musical command");
   const SequenceProgram expressionProgram{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = ndsSequenceRuntime(),
       .timebase = dialect.timebase,
       .sourceBaseAddress = Address{trackStart},
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {expressionTrack},
   };
   const MidiSequence expressionMidi = renderMidiSequence(SequenceVm(LoopPolicy::PlayOnce).render(expressionProgram));
@@ -546,10 +546,10 @@ void ndsSequenceDialectComposesPitchBendRangeBehavior() {
          "NDS pitch-bend range should compose its state update and output into one command body");
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = ndsSequenceRuntime(),
       .timebase = dialect.timebase,
       .sourceBaseAddress = Address{trackStart},
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
@@ -963,10 +963,10 @@ void ndsSequenceDialectExecutesCallAndReturn() {
          "NDS call command should preserve its source range");
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = ndsSequenceRuntime(),
       .timebase = dialect.timebase,
       .sourceBaseAddress = Address{trackStart},
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
@@ -989,10 +989,10 @@ void ndsSequenceDialectExecutesCallAndReturn() {
   expect(linearizedTrack.commands.size() == 6,
          "NDS linearized call fixture should still decode call target and fallthrough blocks");
   const SequenceProgram linearizedProgram{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = ndsSequenceRuntime(),
       .timebase = dialect.timebase,
       .sourceBaseAddress = Address{trackStart},
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {linearizedTrack},
   };
   const PerformanceSequence linearizedPerformance = SequenceVm(LoopPolicy::PlayOnce).render(linearizedProgram);
@@ -1024,10 +1024,10 @@ void ndsSequenceDialectExecutesCallAndReturn() {
   expect(recovery.parent && overlapAnnotations.get(*recovery.parent).role == SourceRole::SequenceTrack,
          "NDS synthetic recovery stop command should be parented under the recovered track annotation");
   const SequenceProgram overlapProgram{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = ndsSequenceRuntime(),
       .timebase = dialect.timebase,
       .sourceBaseAddress = Address{trackStart},
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {overlapTrack},
   };
   const PerformanceSequence overlapPerformance = SequenceVm(LoopPolicy::PlayOnce).render(overlapProgram);
@@ -1276,6 +1276,7 @@ void ndsMalformedRecoveryKeepsExecutableJumps() {
   expect(jump != track.commands.end(), "NDS malformed recovery should preserve recovered jumps as jump commands");
 
   SequenceProgram program = dialect.makeProgram(Address{trackStart});
+  program.runtime = ndsSequenceRuntime();
   program.behavior.commandLimit = 64;
   program.tracks = {track};
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);

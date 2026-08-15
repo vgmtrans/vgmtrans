@@ -91,7 +91,7 @@ PerformanceSequence render(Profile profile, std::vector<u8> bytes, u32 floor = 0
   SequenceProgram program{
       .runtime = sequenceRuntime(profile, 0x80, defaultTimer(profile), monoOutput),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {std::move(track)},
   };
   const double initialChannelGain = profile == Profile::KillerInstinct ? 0.5 : 127.0 / 128.0;
@@ -310,7 +310,7 @@ void rareSnesSignedStereoVolumesPreserveDriverRelativeLevels() {
   SequenceProgram presetProgram{
       .runtime = sequenceRuntime(Profile::DonkeyKongCountry, 0x80, 0x3c),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks =
           {
               decodeSourceTrack(ByteReader(SourceId{94}, firstTrackBytes), Profile::DonkeyKongCountry, 0, 0),

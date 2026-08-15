@@ -9,7 +9,7 @@
 #include "value/base/LevelScale.h"
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 #include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
@@ -1604,23 +1604,20 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
 
 [[nodiscard]] SequenceDialect makeDialect(KonamiSnesVersion version) {
   const PanGains initialBalance = panGains(version, version <= KONAMISNES_V2 ? 10 : 20);
-  return makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  return SequenceDialect{
       .commandDetailKindPrefix = "konami-snes",
       .timebase = Timebase{.ppqn = kKonamiSnesPpqn},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::PlayOnce,
+              .inferLoopsFromRepeatedState = false,
+              .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
               .initialLevel = 0.0,
               .initialReverbSend = 0.0,
               .initialStereoBalance = StereoBalance{initialBalance.left, initialBalance.right},
               .initialPitchBendRangeSemitones = 2,
               .initialTempoMicrosecondsPerQuarter = tempoMicrosecondsPerQuarter(version, kKonamiSnesDefaultTempo),
           },
-      .runtime = SequenceRuntime{
-          .inferLoopsFromRepeatedState = false,
-          .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
-      },
-  });
+  };
 }
 
 }  // namespace
@@ -1653,10 +1650,8 @@ const SequenceDialect& konamiSnesSequenceDialect(KonamiSnesVersion version) {
 }
 
 SequenceRuntime konamiSnesSequenceRuntime(KonamiSnesVersion version, bool indexedEchoFilter) {
-  SequenceProgram program = konamiSnesSequenceDialect(version).makeProgram();
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(
-      program, RuntimeConfig{.version = version, .indexedEchoFilter = indexedEchoFilter});
-  return std::move(program.runtime);
+  return makeCompiledRuntime<TrackState, Playback, ProgramState>(
+      RuntimeConfig{.version = version, .indexedEchoFilter = indexedEchoFilter});
 }
 
 TrackProgram decodeKonamiSnesSourceTrack(ByteReader reader, KonamiSnesVersion version, u32 sourceTrackNumber,
@@ -1717,7 +1712,6 @@ SequenceProgram decodeKonamiSnesSequence(ByteReader reader, const KonamiSnesLayo
     sequence.addLinearTrack(trackNumber, reader.range(pointerOffset, 2), trackAddress, decode);
   }
 
-  SequenceProgram program = sequence.finish();
   RuntimeConfig runtime{
       .version = layout.version,
       .indexedEchoFilter = layout.indexedEchoFilter,
@@ -1730,8 +1724,7 @@ SequenceProgram decodeKonamiSnesSequence(ByteReader reader, const KonamiSnesLayo
         (static_cast<u32>(instrument.adsr1) << 16) | (static_cast<u32>(instrument.adsr2) << 8) | instrument.gain;
     runtime.instruments[offset + 1] = (static_cast<u32>(instrument.pan) << 8) | instrument.volume;
   }
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, std::move(runtime));
-  return program;
+  return sequence.finish(makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime)));
 }
 
 }  // namespace vgmtrans::formats::konami_snes

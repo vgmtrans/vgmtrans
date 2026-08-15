@@ -10,7 +10,7 @@
 #include "value/formats/NDS/NdsEnvelope.h"
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 
 #include <algorithm>
 #include <cmath>
@@ -706,18 +706,20 @@ struct SequenceDecodeContext {
 }  // namespace
 
 const SequenceDialect& ndsSequenceDialect() {
-  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  static const SequenceDialect dialect = SequenceDialect{
       .commandDetailKindPrefix = "nds",
       .timebase = Timebase{.ppqn = 0x30},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .commandLimit = kMaxTrackCommands,
               .panLaw = PanLaw::EqualPower,
-              .initialStereoBalance = omitInitialStereoBalance,
           },
-  });
+  };
   return dialect;
+}
+
+SequenceRuntime ndsSequenceRuntime() {
+  return makeCompiledRuntime<TrackState, Playback, ProgramState>();
 }
 
 // Creates the sequence program, describes its header, and decodes all tracks
@@ -749,6 +751,7 @@ SequenceProgram parseNdsSequenceProgram(ByteReader reader, AssetId id, NdsSequen
       .diagnostics = diagnostics,
   };
   program.tracks = decodeTracks(context);
+  program.runtime = ndsSequenceRuntime();
 
   return program;
 }

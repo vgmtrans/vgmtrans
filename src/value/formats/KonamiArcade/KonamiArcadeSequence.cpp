@@ -8,7 +8,7 @@
 
 #include "value/base/LevelScale.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 #include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 
@@ -355,8 +355,8 @@ struct Playback {
     if (flag == 0 && !enabled) {
       // GX keys off when it reloads the melodic sample. The Z80 opcode resets
       // an ordinary gated voice even if secondary percussion remains active.
-      const bool stopsVoice = isGx() ? wasPercussion && !isPercussion
-                                     : track.driverDurationRate != 0 && track.driverDurationRate < 100;
+      const bool stopsVoice =
+          isGx() ? wasPercussion && !isPercussion : track.driverDurationRate != 0 && track.driverDurationRate < 100;
       if (stopsVoice) {
         interruptVoice();
       }
@@ -1149,18 +1149,16 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
 }
 
 [[nodiscard]] SequenceDialect makeDialect() {
-  return makeCompiledDialect<TrackState, Playback, SequenceState>(SequenceDialect{
+  return SequenceDialect{
       .commandDetailKindPrefix = "konami-arcade",
       .timebase = Timebase{.ppqn = kKonamiArcadePpqn},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .commandLimit = kMaxTrackCommands,
               .initialLevel = 1.0,
               .initialReverbSend = 0.0,
-              .initialStereoBalance = omitInitialStereoBalance,
           },
-  });
+  };
 }
 
 }  // namespace
@@ -1192,10 +1190,8 @@ SequenceProgram decodeKonamiArcadeSequence(ByteReader reader, const KonamiArcade
     sequence.addLinearTrack(track.number, track.pointer, track.offset, decode, track.encodedAddress);
   }
 
-  SequenceProgram program = sequence.finish();
-  bindCompiledRuntime<TrackState, Playback, SequenceState>(program,
-                                                           TrackState::RuntimeConfig{.version = layout.version});
-  return program;
+  return sequence.finish(
+      makeCompiledRuntime<TrackState, Playback, SequenceState>(TrackState::RuntimeConfig{.version = layout.version}));
 }
 
 }  // namespace vgmtrans::formats::konami_arcade

@@ -7,7 +7,7 @@
 #include "value/formats/HeartBeatSnes/HeartBeatSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 #include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
@@ -751,12 +751,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 }  // namespace
 
 const SequenceDialect& sequenceDialect() {
-  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  static const SequenceDialect dialect = SequenceDialect{
       .commandDetailKindPrefix = "heartbeat-snes",
       .timebase = Timebase{.ppqn = kPpqn},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .commandLimit = kCommandLimit,
               .initialSourceInstrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0},
               .initialLevel = math::squaredGain(0xc0),
@@ -765,8 +764,12 @@ const SequenceDialect& sequenceDialect() {
               .initialMonoModeChannels = 0,
               .initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(0x10),
           },
-  });
+  };
   return dialect;
+}
+
+SequenceRuntime sequenceRuntime() {
+  return makeCompiledRuntime<TrackState, Playback, ProgramState>();
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, Version version, u32 trackNumber, u32 startAddress, u32 sequenceBase,
@@ -793,7 +796,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         },
         relative);
   }
-  SequenceProgram program = sequence.finish();
+  SequenceProgram program = sequence.finish(sequenceRuntime());
   program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
   return SequenceParse{
       .program = std::move(program),

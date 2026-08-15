@@ -840,7 +840,7 @@ void scanValidationReportsMultipleAdmissionErrors() {
     }
 
     case 2: {
-      SequenceProgram program = probeSequenceDialect().makeProgram();
+      SequenceProgram program = probeSequenceProgram();
       program.tracks = {TrackProgram{
                           .id = TrackId{0},
                           .commands = {SourceCommand{

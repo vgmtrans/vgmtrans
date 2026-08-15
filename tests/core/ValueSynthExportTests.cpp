@@ -718,9 +718,9 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "Probe", .name = "Usage"},
       .program =
           SequenceProgram{
-              .runtime = dialect.makeProgram().runtime,
+              .runtime = probeSequenceRuntime(),
               .timebase = dialect.timebase,
-              .behavior = dialect.defaultBehavior,
+              .behavior = dialect.behavior,
               .tracks = {track},
           },
   };
@@ -986,9 +986,9 @@ void collectionPreparationAppliesToWholeExport() {
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "Performance Finalizer", .name = "Sequence"},
       .program =
           SequenceProgram{
-              .runtime = dialect.makeProgram().runtime,
+              .runtime = probeSequenceRuntime(),
               .timebase = dialect.timebase,
-              .behavior = dialect.defaultBehavior,
+              .behavior = dialect.behavior,
               .tracks = {track},
           },
   };
@@ -1110,7 +1110,7 @@ u32 synthOnlySequenceExecutions = 0;
 Effects countSynthOnlySequenceExecution(const SourceCommand& command, std::any& programState, std::any& trackState,
                                         PerformanceEmitter& out, VmApi& vm) {
   ++synthOnlySequenceExecutions;
-  static const ExecuteCommand execute = probeSequenceDialect().runtime.execute;
+  static const ExecuteCommand execute = probeSequenceRuntime().execute;
   return execute(command, programState, trackState, out, vm);
 }
 
@@ -1118,8 +1118,9 @@ void synthOnlyExportSkipsSequencesWithoutModulation() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "no-modulation.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
 
-  SequenceDialect dialect = probeSequenceDialect();
-  dialect.runtime.execute = countSynthOnlySequenceExecution;
+  const SequenceDialect dialect = probeSequenceDialect();
+  SequenceRuntime runtime = probeSequenceRuntime();
+  runtime.execute = countSynthOnlySequenceExecution;
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder trackBuilder(track);
   const std::array<u8, 3> noteBytes{0x90, 0x3c, 0x04};
@@ -1131,9 +1132,9 @@ void synthOnlyExportSkipsSequencesWithoutModulation() {
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "Probe", .name = "No Modulation"},
       .program =
           SequenceProgram{
-              .runtime = dialect.makeProgram().runtime,
+              .runtime = std::move(runtime),
               .timebase = dialect.timebase,
-              .behavior = dialect.defaultBehavior,
+              .behavior = dialect.behavior,
               .tracks = {track},
           },
   };
@@ -1320,9 +1321,9 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "Probe", .name = "Playback Sequence"},
       .program =
           SequenceProgram{
-              .runtime = dialect.makeProgram().runtime,
+              .runtime = probeSequenceRuntime(),
               .timebase = dialect.timebase,
-              .behavior = dialect.defaultBehavior,
+              .behavior = dialect.behavior,
               .tracks = {track},
           },
   };

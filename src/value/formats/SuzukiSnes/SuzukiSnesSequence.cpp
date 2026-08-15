@@ -7,7 +7,7 @@
 #include "value/formats/SuzukiSnes/SuzukiSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
 
@@ -960,24 +960,21 @@ struct ParsedHeader {
 }  // namespace
 
 const SequenceDialect& sequenceDialect() {
-  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  static const SequenceDialect dialect{
       .commandDetailKindPrefix = "suzuki-snes",
       .timebase = Timebase{.ppqn = kPpqn},
-      .defaultBehavior = SequenceProgramBehavior{
-          .defaultLoopPolicy = LoopPolicy::PlayOnce,
+      .behavior = SequenceProgramBehavior{
           .initialLevel = math::levelGain(0x3c),
           .initialReverbSend = 0.0,
           .initialStereoBalance = StereoBalance{},
           .initialMonoModeChannels = 0,
       },
-  });
+  };
   return dialect;
 }
 
 SequenceRuntime sequenceRuntime(Version version) {
-  SequenceProgram program = sequenceDialect().makeProgram();
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, version);
-  return std::move(program.runtime);
+  return makeCompiledRuntime<TrackState, Playback, ProgramState>(version);
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, Version version, u32 trackNumber, u32 startAddress,
@@ -1003,8 +1000,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
       return decodeCommand(reader, offset, layout.version, trackLayout, diagnostics);
     });
   }
-  SequenceProgram program = sequence.finish();
-  program.runtime = sequenceRuntime(layout.version);
+  SequenceProgram program = sequence.finish(sequenceRuntime(layout.version));
   program.behavior.initialTempoMicrosecondsPerQuarter =
       math::tempoMicrosecondsPerQuarter(math::initialTempo(layout.version));
   program.behavior.initialSourceInstrument =

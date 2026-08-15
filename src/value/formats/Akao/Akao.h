@@ -185,6 +185,7 @@ struct AkaoSplitSampleLocation {
 };
 
 [[nodiscard]] core::SequenceDialect makeAkaoDialect(AkaoPs1Version version);
+[[nodiscard]] core::SequenceRuntime akaoSequenceRuntime();
 [[nodiscard]] core::TrackProgram decodeAkaoTrack(AkaoPs1Version version, const core::TrackDecodeScope& tracks,
                                                  u32 trackIndex, u32 startOffset,
                                                  std::vector<core::Diagnostic>* diagnostics = nullptr);

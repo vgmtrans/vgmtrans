@@ -8,7 +8,7 @@
 
 #include "value/base/LevelScale.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 
 #include <algorithm>
 #include <array>
@@ -695,15 +695,14 @@ void finalizeSegSatPerformance(PerformanceSequence& performance, std::span<const
 }
 
 const SequenceDialect& segSatSequenceDialect() {
-  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  static const SequenceDialect dialect = SequenceDialect{
       .commandDetailKindPrefix = "segsat",
       .timebase = Timebase{.ppqn = 48},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
               .commandLimit = 1048576,
-              .initialStereoBalance = omitInitialStereoBalance,
           },
-  });
+  };
   return dialect;
 }
 
@@ -763,6 +762,7 @@ SequenceProgram parseSegSatSequenceProgram(ByteReader reader, AssetId id, const 
     copy.sourceTrackNumber = channel;
     program.tracks.push_back(std::move(copy));
   }
+  program.runtime = makeCompiledRuntime<TrackState, Playback, ProgramState>();
 
   if (sourceMap != nullptr && header) {
     sourceMap

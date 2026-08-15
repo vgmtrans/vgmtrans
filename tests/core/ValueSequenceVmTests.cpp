@@ -32,9 +32,9 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
   track.commands.back().annotation = SourceAnnotationId{13};
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -90,12 +90,11 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
 void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
   const SequenceDialect dialect{
       .timebase = Timebase{.ppqn = 48},
-      .defaultBehavior = SequenceProgramBehavior{.initialStereoBalance = omitInitialStereoBalance},
-      .runtime =
-          SequenceRuntime{
+      .behavior = SequenceProgramBehavior{},
+  };
+  const SequenceRuntime runtime{
               .execute = [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter&,
                             VmApi&) { return command.address.value == 0 ? Effects::wait(7) : Effects{}; },
-          },
   };
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder(track);
@@ -108,9 +107,9 @@ void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
                       }},
                       CommandFlow::end(Address{2}), SourceAnnotationId{21});
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = runtime,
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -128,9 +127,9 @@ void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
 void sequenceVmPreservesPitchMotionThroughNoteRelease() {
   const SequenceDialect dialect{
       .timebase = Timebase{.ppqn = 48},
-      .defaultBehavior = SequenceProgramBehavior{.initialStereoBalance = omitInitialStereoBalance},
-      .runtime =
-          SequenceRuntime{
+      .behavior = SequenceProgramBehavior{},
+  };
+  const SequenceRuntime runtime{
               .execute =
                   [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter& out, VmApi&) {
                     if (command.address.value != 0) {
@@ -140,7 +139,6 @@ void sequenceVmPreservesPitchMotionThroughNoteRelease() {
                     out.pitchSlide(note, 60, 64, 4);
                     return Effects::wait(8);
                   },
-          },
   };
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder{track};
@@ -148,9 +146,9 @@ void sequenceVmPreservesPitchMotionThroughNoteRelease() {
   builder.addSemantic(Address{1}, 0, 1, {}, {}, CommandFlow::end(Address{2}));
 
   const PerformanceSequence performance = SequenceVm().render(SequenceProgram{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = runtime,
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   });
   expect(performance.tracks[0].automations.size() == 1 && performance.tracks[0].automations[0].realization.endTick == 4,
@@ -171,9 +169,9 @@ void sequenceVmReplaysInfiniteLoopsWhenRequested() {
   addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -206,9 +204,9 @@ void sequenceVmStopsDeclaredLoopBeforeTargetReplay() {
   addProbeCommand<ProbeDeclaredLoopCommand>(builder, dialect, Address{5}, probeRange(5, loopBytes.size()), loopBytes);
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -245,9 +243,9 @@ void sequenceVmPreservesDeclaredLoopAsPerformanceMarkers() {
                                     .id;
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -281,9 +279,9 @@ void sequenceVmLoopCandidateRequiresVisitedDestination() {
                                              jumpToBodyBytes);
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -295,7 +293,7 @@ void sequenceVmLoopCandidateRequiresVisitedDestination() {
          "loop-candidate should not replay the loop target after detecting the visited destination");
 
   SequenceProgram explicitLoopsOnly = program;
-  explicitLoopsOnly.runtime.inferLoopsFromRepeatedState = false;
+  explicitLoopsOnly.behavior.inferLoopsFromRepeatedState = false;
   const PerformanceSequence explicitPerformance = SequenceVm().render(explicitLoopsOnly);
   expect(explicitPerformance.tracks[0].endTick == 12,
          "disabling repeated-state inference should preserve explicit loop-candidate detection");
@@ -322,9 +320,9 @@ void sequenceVmLoopCandidateIgnoresRepeatState() {
   addProbeCommand<ProbeRepeatCommand>(builder, dialect, Address{20}, probeRange(20, repeatBytes.size()), repeatBytes);
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -353,9 +351,9 @@ void sequenceVmPreservesLoopCandidateAsPerformanceMarkers() {
                                     .id;
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -390,9 +388,9 @@ void sequenceVmPreservesLoopsAsPerformanceMarkers() {
       addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes).id;
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -438,9 +436,8 @@ void sequenceVmPreservesLoopsAsPerformanceMarkers() {
          "performance MIDI renderer should preserve neutral loop markers");
 }
 
-void sequenceVmUsesDialectCommandLimitDefault() {
+void sequenceVmUsesProgramCommandLimit() {
   const SequenceDialect dialect = probeSequenceDialect(SequenceProgramBehavior{
-      .defaultLoopPolicy = LoopPolicy::Default,
       .commandLimit = 2,
   });
   TrackProgram track{
@@ -457,9 +454,9 @@ void sequenceVmUsesDialectCommandLimitDefault() {
   addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes);
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -473,14 +470,14 @@ void sequenceVmUsesDialectCommandLimitDefault() {
   expect(performance.tracks[0].endTick == 12, "command-limit stop should preserve ticks from commands already run");
 }
 
-void sequenceVmResolvesInitialTempoAndGlobalEventOrder() {
+void sequenceVmUsesInitialTempoAndGlobalEventOrder() {
   const SequenceDialect tempoDialect = probeSequenceDialect(SequenceProgramBehavior{
       .initialTempoMicrosecondsPerQuarter = 750'000,
   });
   const SequenceProgram defaultTempoProgram{
-      .runtime = tempoDialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = tempoDialect.timebase,
-      .behavior = tempoDialect.defaultBehavior,
+      .behavior = tempoDialect.behavior,
   };
   expect(SequenceVm().render(defaultTempoProgram).initialTempoMicrosecondsPerQuarter == 750'000,
          "sequence VM should retain a dialect's source initial tempo");
@@ -504,9 +501,9 @@ void sequenceVmResolvesInitialTempoAndGlobalEventOrder() {
     return track;
   };
   const SequenceProgram orderedProgram{
-      .runtime = orderDialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = orderDialect.timebase,
-      .behavior = orderDialect.defaultBehavior,
+      .behavior = orderDialect.behavior,
       .tracks = {makeTrack(0, 0, 1), makeTrack(1, 16, 2)},
   };
   const PerformanceSequence ordered = SequenceVm().render(orderedProgram);
@@ -539,9 +536,9 @@ void sequenceVmFallsThroughBySourceAddressWhenDecodeOrderDiffers() {
   addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{9}, probeRange(9, programBytes.size()), programBytes);
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -555,10 +552,9 @@ void sequenceVmFallsThroughBySourceAddressWhenDecodeOrderDiffers() {
          "source-address fallthrough should reach the earlier-decoded program command");
 }
 
-void sequenceVmEmitsDialectInitialChannelDefaults() {
+void sequenceVmEmitsProgramInitialChannelState() {
   const SequenceDialect dialect = probeSequenceDialect(
       SequenceProgramBehavior{
-          .defaultLoopPolicy = LoopPolicy::Default,
           .initialSourceInstrument = InstrumentIdentity{.domain = "probe", .key = 7},
           .initialLevel = 0.0,
           .initialExpression = 0.5,
@@ -577,16 +573,16 @@ void sequenceVmEmitsDialectInitialChannelDefaults() {
   addProbeCommand<ProbeEndCommand>(builder, dialect, Address{0}, probeRange(0, endBytes.size()), endBytes);
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
   const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.tracks.size() == 1, "initial-default fixture should render one track");
   const auto& events = performance.tracks[0].events;
-  expect(events.size() == 6, "VM should emit dialect initial channel defaults before source commands");
+  expect(events.size() == 6, "VM should emit program initial channel state before source commands");
 
   const auto* reverb = std::get_if<ReverbPerformanceEvent>(&events[0]);
   expect(reverb != nullptr && reverb->send == 0.0 && !reverb->header.sourceCommand.valid(),
@@ -621,21 +617,10 @@ void sequenceVmEmitsDialectInitialChannelDefaults() {
   const auto* midiMono = std::get_if<MonoMode>(&midi.tracks[0].events[6]);
   expect(midiMono != nullptr && midiMono->channel == 0 && midiMono->channels == 0,
          "performance renderer should lower initial mono mode to MIDI CC126");
-
-  bool rejectedUnresolvedBalance = false;
-  try {
-    SequenceProgram unresolvedProgram = probeSequenceDialect({}, unresolvedInitialStereoBalance).makeProgram();
-    unresolvedProgram.tracks = program.tracks;
-    static_cast<void>(SequenceVm().render(unresolvedProgram));
-  } catch (const std::logic_error&) {
-    rejectedUnresolvedBalance = true;
-  }
-  expect(rejectedUnresolvedBalance, "VM should reject an initial stereo balance that remains unresolved");
 }
 
 void sequenceVmEmitsInitialMasterLevelOnce() {
-  const SequenceDialect dialect =
-      probeSequenceDialect(SequenceProgramBehavior{.initialMasterLevel = 0.25}, omitInitialStereoBalance);
+  const SequenceDialect dialect = probeSequenceDialect(SequenceProgramBehavior{.initialMasterLevel = 0.25});
   const auto makeTrack = [&](u32 id) {
     TrackProgram track{.id = TrackId{id}, .sourceTrackNumber = id, .startAddress = Address{0}};
     TrackProgramBuilder builder{track};
@@ -644,9 +629,9 @@ void sequenceVmEmitsInitialMasterLevelOnce() {
     return track;
   };
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {makeTrack(3), makeTrack(4)},
   };
 
@@ -667,9 +652,9 @@ void sequenceVmEmitsInitialMasterLevelOnce() {
 void sequenceVmExposesSubroutineStateFromItsCallStack() {
   const SequenceDialect dialect{
       .timebase = Timebase{.ppqn = 48},
-      .defaultBehavior = SequenceProgramBehavior{.initialStereoBalance = omitInitialStereoBalance},
-      .runtime =
-          SequenceRuntime{
+      .behavior = SequenceProgramBehavior{},
+  };
+  const SequenceRuntime runtime{
               .execute =
                   [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter& out, VmApi& vm) {
                     if (command.address.value != 0) {
@@ -677,7 +662,6 @@ void sequenceVmExposesSubroutineStateFromItsCallStack() {
                     }
                     return Effects{};
                   },
-          },
   };
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder{track};
@@ -686,9 +670,9 @@ void sequenceVmExposesSubroutineStateFromItsCallStack() {
   builder.addSemantic(Address{10}, 0, 1, {}, {}, CommandFlow::return_(Address{11}));
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = runtime,
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -719,9 +703,9 @@ void sequenceVmAllowsRepeatedCallsToSameSubroutine() {
   addProbeCommand<ProbeReturnCommand>(builder, dialect, Address{13}, probeRange(13, returnBytes.size()), returnBytes);
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -756,9 +740,9 @@ void sequenceVmReplaysFiniteRepeatBlocks() {
   addProbeCommand<ProbeEndCommand>(builder, dialect, Address{8}, probeRange(8, endBytes.size()), endBytes);
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -796,6 +780,7 @@ void sequenceVmRepeatReplayUsesCommandAddressesNotSourceOffsets() {
                                     jumpToSelfBytes);
 
   SequenceProgram program = dialect.makeProgram();
+  program.runtime = probeSequenceRuntime();
   program.behavior.commandLimit = 8;
   program.tracks = {track};
 
@@ -824,6 +809,7 @@ void sequenceVmDetectsCycleWhenRepeatCommandsReuseOneCounter() {
   addProbeCommand<ProbeEndCommand>(builder, dialect, Address{13}, probeRange(13, endBytes.size()), endBytes);
 
   SequenceProgram program = dialect.makeProgram();
+  program.runtime = probeSequenceRuntime();
   program.behavior.commandLimit = 100;
   program.tracks = {track};
 
@@ -854,9 +840,9 @@ void sequenceVmExecutesNestedCallInsideRepeat() {
   addProbeCommand<ProbeReturnCommand>(builder, dialect, Address{23}, probeRange(23, returnBytes.size()), returnBytes);
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -889,9 +875,9 @@ void sequenceVmExecutesRepeatInsideCall() {
   addProbeCommand<ProbeReturnCommand>(builder, dialect, Address{28}, probeRange(28, returnBytes.size()), returnBytes);
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -923,9 +909,9 @@ void sequenceVmRunsRepeatBreakSideEffectsOnlyWhenBranchTaken() {
   addProbeCommand<ProbeEndCommand>(builder, dialect, Address{12}, probeRange(12, endBytes.size()), endBytes);
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -966,9 +952,9 @@ void sequenceVmRepeatBreakCanBranchToPreviouslyVisitedCode() {
   addProbeCommand<ProbeEndCommand>(builder, dialect, Address{32}, probeRange(32, endBytes.size()), endBytes);
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -999,9 +985,9 @@ void sequenceVmPreservesLoopMarkersForInteriorJumpTarget() {
       addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{8}, probeRange(8, jumpBytes.size()), jumpBytes).id;
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -1033,9 +1019,9 @@ void sequenceVmDoesNotWrapCommandAddressOverflow() {
   addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{1}, SourceRange{}, noteBytes);
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -1050,9 +1036,12 @@ void sequenceVmDoesNotWrapCommandAddressOverflow() {
 SequenceDialect authoritativeFlowProbeDialect() {
   return SequenceDialect{
       .timebase = Timebase{.ppqn = 48},
-      .defaultBehavior = SequenceProgramBehavior{.initialStereoBalance = omitInitialStereoBalance},
-      .runtime =
-          SequenceRuntime{
+      .behavior = SequenceProgramBehavior{},
+  };
+}
+
+SequenceRuntime authoritativeFlowProbeRuntime() {
+  return SequenceRuntime{
               .execute =
                   [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter& out, VmApi& vm) {
                     if (command.opcode == 0xfe) {
@@ -1069,7 +1058,6 @@ SequenceDialect authoritativeFlowProbeDialect() {
                     }
                     return Effects{};
                   },
-          },
   };
 }
 
@@ -1082,9 +1070,9 @@ void sequenceVmUsesDecodedContinuationInsteadOfSizeOrStorageOrder() {
   builder.addSemantic(Address{200}, 2, 1, {}, {}, CommandFlow::end(Address{201}));
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = authoritativeFlowProbeRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -1105,9 +1093,9 @@ void sequenceVmUsesDecodedCallContinuationAsReturnAddress() {
   builder.addSemantic(Address{20}, 20, 1, {}, {}, CommandFlow::end(Address{21}));
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = authoritativeFlowProbeRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -1128,9 +1116,9 @@ void sequenceVmPreservesExplicitJumpToContinuation() {
   builder.addSemantic(Address{0}, 0xfe, 1, {}, {}, std::move(explicitJump));
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = authoritativeFlowProbeRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm(LoopPolicy::Preserve).render(program);
@@ -1151,9 +1139,9 @@ void sequenceVmEnforcesFlowOverridePolicies() {
     TrackProgramBuilder builder(track);
     builder.addSemantic(Address{0}, opcode, 1, {}, {}, std::move(flow));
     return SequenceVm().render(SequenceProgram{
-        .runtime = dialect.makeProgram().runtime,
+        .runtime = authoritativeFlowProbeRuntime(),
             .timebase = dialect.timebase,
-        .behavior = dialect.defaultBehavior,
+        .behavior = dialect.behavior,
             .tracks = {track},
     });
   };
@@ -1176,9 +1164,9 @@ void sequenceVmEnforcesFlowOverridePolicies() {
   builder.addSemantic(Address{0}, 0xfc, 1, {}, {}, std::move(explicitFallthrough));
   builder.addSemantic(Address{1}, 1, 1, {}, {}, CommandFlow::end(Address{2}));
   const PerformanceSequence fallthrough = SequenceVm().render(SequenceProgram{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = authoritativeFlowProbeRuntime(),
           .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
           .tracks = {track},
   });
   expect(fallthrough.diagnostics.empty() && fallthrough.tracks[0].events.size() == 1,
@@ -1200,9 +1188,9 @@ void sequenceVmReportsMissingJumpTargetAfterEmittedEvents() {
   addProbeCommand<ProbeJumpCommand>(builder, dialect, Address{3}, jumpRange, jumpBytes);
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = probeSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
 
@@ -1240,12 +1228,11 @@ Effects executeScheduledProbe(const SourceCommand& command, std::any& programSta
 void sequenceVmSchedulesSemanticTracksAgainstOneProgramState() {
   const SequenceDialect dialect{
       .timebase = Timebase{.ppqn = 48},
-      .defaultBehavior = SequenceProgramBehavior{.initialStereoBalance = omitInitialStereoBalance},
-      .runtime =
-          SequenceRuntime{
+      .behavior = SequenceProgramBehavior{},
+  };
+  const SequenceRuntime runtime{
               .createProgramState = createScheduledProbeProgramState,
               .execute = executeScheduledProbe,
-          },
   };
 
   TrackProgram track0{.id = TrackId{0}, .startAddress = Address{0}};
@@ -1262,9 +1249,9 @@ void sequenceVmSchedulesSemanticTracksAgainstOneProgramState() {
   builder1.addSemantic(Address{12}, 0, 1, {}, {}, CommandFlow::end(Address{13}));
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = runtime,
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track0, track1},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -1302,9 +1289,9 @@ Effects executeScheduledLoopProbe(const SourceCommand& command, std::any&, std::
 void sequenceVmCoordinatesSemanticLoopsAtSequenceScope() {
   const SequenceDialect dialect{
       .timebase = Timebase{.ppqn = 48},
-      .defaultBehavior = SequenceProgramBehavior{.initialStereoBalance = omitInitialStereoBalance},
-      .runtime = SequenceRuntime{.execute = executeScheduledLoopProbe},
+      .behavior = SequenceProgramBehavior{},
   };
+  const SequenceRuntime runtime{.execute = executeScheduledLoopProbe};
 
   TrackProgram track0{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder0(track0);
@@ -1324,9 +1311,9 @@ void sequenceVmCoordinatesSemanticLoopsAtSequenceScope() {
                        CommandFlow::jumpTo(Address{110}, Address{112}, JumpSemantics::LoopCandidate));
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = runtime,
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track0, track1},
   };
 
@@ -1408,13 +1395,15 @@ TrackProgram playlistProbeTrack(u32 trackId, std::initializer_list<std::pair<u32
 SequenceDialect playlistProbeDialect() {
   return SequenceDialect{
       .timebase = Timebase{.ppqn = 48},
-      .defaultBehavior = SequenceProgramBehavior{.initialStereoBalance = omitInitialStereoBalance},
-      .runtime =
-          SequenceRuntime{
+      .behavior = SequenceProgramBehavior{},
+  };
+}
+
+SequenceRuntime playlistProbeRuntime() {
+  return SequenceRuntime{
               .createTrackState = createPlaylistProbeTrackState,
               .execute = executePlaylistProbe,
               .beginTrackSection = beginPlaylistProbeSection,
-          },
   };
 }
 
@@ -1423,9 +1412,9 @@ void sequenceVmSwitchesParallelSectionsAtTheFirstChannelEnd() {
   const TrackProgram track0 = playlistProbeTrack(0, {{0, 8}});
   const TrackProgram track1 = playlistProbeTrack(1, {{100, 12}, {110, 4}});
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = playlistProbeRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track0, track1},
       .sectionPlaylist =
           SectionPlaylist{
@@ -1469,9 +1458,9 @@ void sequenceVmExecutesFiniteAndInfiniteSectionPlaylistRepeats() {
   const TrackProgram track = playlistProbeTrack(0, {{0, 4}});
   const auto makeProgram = [&](bool infinite) {
     return SequenceProgram{
-        .runtime = dialect.makeProgram().runtime,
+        .runtime = playlistProbeRuntime(),
         .timebase = dialect.timebase,
-        .behavior = dialect.defaultBehavior,
+        .behavior = dialect.behavior,
         .tracks = {track},
         .sectionPlaylist =
             SectionPlaylist{
@@ -1517,9 +1506,9 @@ void sequenceVmExecutesFiniteAndInfiniteSectionPlaylistRepeats() {
 void sequenceVmPairsNoteOnAndNoteOffCommands() {
   const SequenceDialect dialect{
       .timebase = Timebase{.ppqn = 48},
-      .defaultBehavior = SequenceProgramBehavior{.initialStereoBalance = omitInitialStereoBalance},
-      .runtime =
-          SequenceRuntime{
+      .behavior = SequenceProgramBehavior{},
+  };
+  const SequenceRuntime runtime{
               .execute =
                   [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter& out, VmApi&) {
                     switch (command.address.value) {
@@ -1554,7 +1543,6 @@ void sequenceVmPairsNoteOnAndNoteOffCommands() {
                         return Effects{};
                     }
                   },
-          },
   };
 
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
@@ -1566,9 +1554,9 @@ void sequenceVmPairsNoteOnAndNoteOffCommands() {
   builder.addSemantic(Address{9}, 0, 1, {}, {}, CommandFlow::end(Address{10}), SourceAnnotationId{109});
 
   const PerformanceSequence performance = SequenceVm().render(SequenceProgram{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = runtime,
           .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
           .tracks = {track},
   });
   expect(performance.diagnostics.empty(), "Note On/Off pairing should not invent diagnostics for unmatched offs");
@@ -1601,9 +1589,9 @@ void sequenceVmPairsNoteOnAndNoteOffCommands() {
 void sequenceVmClosesActiveNotesAtLoopCutoff() {
   const SequenceDialect dialect{
       .timebase = Timebase{.ppqn = 48},
-      .defaultBehavior = SequenceProgramBehavior{.initialStereoBalance = omitInitialStereoBalance},
-      .runtime =
-          SequenceRuntime{
+      .behavior = SequenceProgramBehavior{},
+  };
+  const SequenceRuntime runtime{
               .execute =
                   [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter& out, VmApi&) {
                     if (command.address.value == 0) {
@@ -1616,7 +1604,6 @@ void sequenceVmClosesActiveNotesAtLoopCutoff() {
                     }
                     return Effects{};
                   },
-          },
   };
   TrackProgram shortTrack{.id = TrackId{0}, .startAddress = Address{100}};
   TrackProgramBuilder shortBuilder(shortTrack);
@@ -1632,9 +1619,9 @@ void sequenceVmClosesActiveNotesAtLoopCutoff() {
                           SourceAnnotationId{201});
 
   const PerformanceSequence performance = SequenceVm().render(SequenceProgram{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = runtime,
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {shortTrack, loopTrack},
   });
   const auto* shortNote = std::get_if<NotePerformanceEvent>(&performance.tracks[0].events.front());
@@ -1645,10 +1632,10 @@ void sequenceVmClosesActiveNotesAtLoopCutoff() {
   expect(performance.tracks[1].endTick == 4 && performance.tracks[1].events.size() == 1 && loopNote != nullptr &&
              loopNote->durationTicks == 4,
          "a play-once loop cutoff should close active notes and remove the boundary replay");
-  const auto loopSpan = std::ranges::find(performance.sourceSpans, SourceAnnotationId{200},
-                                          &SourcePlaybackSpan::annotation);
-  const auto shortSpan = std::ranges::find(performance.sourceSpans, SourceAnnotationId{210},
-                                           &SourcePlaybackSpan::annotation);
+  const auto loopSpan =
+      std::ranges::find(performance.sourceSpans, SourceAnnotationId{200}, &SourcePlaybackSpan::annotation);
+  const auto shortSpan =
+      std::ranges::find(performance.sourceSpans, SourceAnnotationId{210}, &SourcePlaybackSpan::annotation);
   expect(loopSpan != performance.sourceSpans.end() && loopSpan->endTick == 4 &&
              shortSpan != performance.sourceSpans.end() && shortSpan->endTick == 2,
          "loop cutoff should retain the finalized Note On source span");
@@ -1667,10 +1654,10 @@ void runValueSequenceVmTests() {
   sequenceVmLoopCandidateIgnoresRepeatState();
   sequenceVmPreservesLoopCandidateAsPerformanceMarkers();
   sequenceVmPreservesLoopsAsPerformanceMarkers();
-  sequenceVmUsesDialectCommandLimitDefault();
-  sequenceVmResolvesInitialTempoAndGlobalEventOrder();
+  sequenceVmUsesProgramCommandLimit();
+  sequenceVmUsesInitialTempoAndGlobalEventOrder();
   sequenceVmFallsThroughBySourceAddressWhenDecodeOrderDiffers();
-  sequenceVmEmitsDialectInitialChannelDefaults();
+  sequenceVmEmitsProgramInitialChannelState();
   sequenceVmEmitsInitialMasterLevelOnce();
   sequenceVmExposesSubroutineStateFromItsCallStack();
   sequenceVmAllowsRepeatedCallsToSameSubroutine();

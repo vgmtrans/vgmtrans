@@ -8,7 +8,7 @@
 
 #include "value/base/LevelScale.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
@@ -856,20 +856,23 @@ std::optional<AkaoSequenceLayout> readAkaoSequenceLayout(const ScanInput& input,
 SequenceDialect makeAkaoDialect(AkaoPs1Version version) {
   const std::string id = dialectId(version);
   const PanLaw panLaw = defaultPanLaw(version);
-  return makeCompiledDialect<TrackState, Playback>(SequenceDialect{
+  return SequenceDialect{
       .commandDetailKindPrefix = id,
       .timebase = Timebase{.ppqn = kAkaoPpqn},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::Default,
               .commandLimit = kAkaoMaxTrackCommands,
               .panLaw = panLaw,
               .initialLevel = 1.0,
-              .initialStereoBalance = panLaw == PanLaw::ConstantSum ? InitialStereoBalance{StereoBalance{0.5, 0.5}}
-                                                                    : InitialStereoBalance{omitInitialStereoBalance},
+              .initialStereoBalance =
+                  panLaw == PanLaw::ConstantSum ? std::optional{StereoBalance{0.5, 0.5}} : std::nullopt,
               .initialPitchBendRangeSemitones = 12,
           },
-  });
+  };
+}
+
+SequenceRuntime akaoSequenceRuntime() {
+  return makeCompiledRuntime<TrackState, Playback>();
 }
 
 TrackProgram decodeAkaoTrack(AkaoPs1Version version, const TrackDecodeScope& tracks, u32 trackIndex, u32 startOffset,
@@ -983,9 +986,8 @@ AkaoSequenceParse parseAkaoSequence(const ScanInput& input, AssetId id, const Ak
   const SequenceDialect dialect = makeAkaoDialect(analysis.header.version);
   SequenceProgram program = dialect.makeProgram(Address{offset});
   program.behavior.panLaw = determinePanLawFromSource(input.source, analysis.header.version);
-  program.behavior.initialStereoBalance = program.behavior.panLaw == PanLaw::ConstantSum
-                                              ? InitialStereoBalance{StereoBalance{0.5, 0.5}}
-                                              : InitialStereoBalance{omitInitialStereoBalance};
+  program.behavior.initialStereoBalance =
+      program.behavior.panLaw == PanLaw::ConstantSum ? std::optional{StereoBalance{0.5, 0.5}} : std::nullopt;
 
   if (sourceMap != nullptr) {
     auto header = sourceMap->header("AKAO Sequence Header", reader.range(offset, analysis.header.trackHeaderOffset))
@@ -1014,6 +1016,7 @@ AkaoSequenceParse parseAkaoSequence(const ScanInput& input, AssetId id, const Ak
     analysis.references.merge(akaoSequenceReferences(track));
     program.tracks.push_back(std::move(track));
   }
+  program.runtime = akaoSequenceRuntime();
 
   return AkaoSequenceParse{
       .program = std::move(program),

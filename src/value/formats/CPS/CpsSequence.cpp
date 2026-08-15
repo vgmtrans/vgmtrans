@@ -8,7 +8,7 @@
 
 #include "value/formats/CPS/CpsTables.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 
 #include <algorithm>
 #include <array>
@@ -97,8 +97,7 @@ struct ProgramState {
 struct TrackState {
   TrackState(const TrackProgram& trackProgram, const RuntimeConfig& config)
       : version(config.version), synth(trackSynth(version, trackProgram.sourceTrackNumber)),
-        trackStart(trackProgram.startAddress),
-        noteDuration(version == CpsVersion::Cps1V100 ? 0 : 0xff) {}
+        trackStart(trackProgram.startAddress), noteDuration(version == CpsVersion::Cps1V100 ? 0 : 0xff) {}
 
   CpsVersion version = CpsVersion::Unknown;
   SynthKind synth = SynthKind::QSound;
@@ -1019,21 +1018,19 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 [[nodiscard]] SequenceDialect makeDialect(std::string_view prefix, u32 ppqn, u8 initialPitchBendRange,
                                           double initialLevel = 1.0) {
-  return makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  return SequenceDialect{
       .commandDetailKindPrefix = std::string(prefix),
       .timebase = Timebase{.ppqn = ppqn},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .commandLimit = kMaxTrackCommands,
               .panLaw = PanLaw::ConstantSum,
               .initialLevel = initialLevel,
-              .initialStereoBalance = omitInitialStereoBalance,
               .initialMonoModeChannels = 16,
               .initialPitchBendRangeSemitones = initialPitchBendRange,
               .initialTempoMicrosecondsPerQuarter = 500000,
           },
-  });
+  };
 }
 
 }  // namespace
@@ -1073,10 +1070,9 @@ SequenceProgram decodeCpsSequence(ByteReader reader, const CpsLayout& layout, co
           .range = reader.range(sourceSequence.offset, std::min<u32>(headerSize, 1)),
       });
     }
-    SequenceProgram empty = sequence.finish();
+    SequenceProgram empty = sequence.finish(makeCompiledRuntime<TrackState, Playback, ProgramState>(
+        RuntimeConfig{.version = layout.version, .masterVolume = layout.masterVolume}));
     empty.sourceBaseAddress = Address{sourceSequence.offset};
-    bindCompiledRuntime<TrackState, Playback, ProgramState>(
-        empty, RuntimeConfig{.version = layout.version, .masterVolume = layout.masterVolume});
     if (usesLateSequence(layout.version)) {
       empty.behavior.initialExpression = isCps3(layout.version) ? 65.0 / 128.0 : 0.5;
     }
@@ -1119,10 +1115,9 @@ SequenceProgram decodeCpsSequence(ByteReader reader, const CpsLayout& layout, co
       sequence.addLinearTrack(track, reader.range(pointer, 2), start, decode, encoded);
     }
   }
-  SequenceProgram program = sequence.finish();
+  SequenceProgram program = sequence.finish(makeCompiledRuntime<TrackState, Playback, ProgramState>(
+      RuntimeConfig{.version = layout.version, .masterVolume = layout.masterVolume}));
   program.sourceBaseAddress = Address{sourceSequence.offset};
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(
-      program, RuntimeConfig{.version = layout.version, .masterVolume = layout.masterVolume});
   if (usesLateSequence(layout.version)) {
     program.behavior.initialExpression = isCps3(layout.version) ? 65.0 / 128.0 : 0.5;
   }
