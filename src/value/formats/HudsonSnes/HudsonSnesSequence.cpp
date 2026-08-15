@@ -7,7 +7,7 @@
 #include "value/formats/HudsonSnes/HudsonSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 #include "value/synth/SnesDsp.h"
 
 #include <algorithm>
@@ -603,8 +603,8 @@ struct Playback {
     };
     const bool continuesWithoutGlide =
         continuesPreviousVoice && !tie && (track.portamentoSpeed == 0 || portamentoAnchor);
-    track.lastNote = continuesWithoutGlide ? out.continueVoice(previousNote, std::move(event))
-                                           : out.note(std::move(event));
+    track.lastNote =
+        continuesWithoutGlide ? out.continueVoice(previousNote, std::move(event)) : out.note(std::move(event));
     if (!portamentoAnchor && track.portamentoSpeed != 0) {
       applyPortamento(key, driverPitch, previousNote, previousKey, continuesPreviousVoice);
     }
@@ -1489,34 +1489,30 @@ std::vector<u32> RuntimeTables::encode(const ParsedHeader& header) {
 }  // namespace
 
 const SequenceDialect& sequenceDialect() {
-  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  static const SequenceDialect dialect = SequenceDialect{
       .commandDetailKindPrefix = "hudson-snes",
       .timebase = Timebase{.ppqn = kPpqn},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .initialSourceInstrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0},
               .initialLevel = math::levelGain(Version::Early, math::initialVolume(Version::Early)),
               .initialReverbSend = 0.0,
               .initialStereoBalance = math::mixerGains(Version::Early, math::initialVolume(Version::Early), 15),
               .initialMonoModeChannels = 0,
           },
-  });
+  };
   return dialect;
 }
 
 SequenceRuntime sequenceRuntime(Version version, u8 timebaseShift, bool velocityEnabled, std::vector<u32> tables,
                                 u8 initialEchoMask) {
-  SequenceProgram program = sequenceDialect().makeProgram();
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(
-      program, RuntimeConfig{
+  return makeCompiledRuntime<TrackState, Playback, ProgramState>(RuntimeConfig{
                    .version = version,
                    .timebaseShift = timebaseShift,
                    .velocityEnabled = velocityEnabled,
                    .initialEchoMask = initialEchoMask,
                    .tables = std::move(tables),
                });
-  return std::move(program.runtime);
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, Version version, u8 timebaseShift, bool noteVelocity, u32 trackNumber,
@@ -1543,10 +1539,9 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
                            layout.noteLengthTableAddress, diagnostics, &references);
     });
   }
-  SequenceProgram program = sequence.finish();
   supplementLiveRecipes(reader, layout, std::move(references), header->recipes);
-  program.runtime = sequenceRuntime(layout.version, header->timebaseShift, header->noteVelocity,
-                                    RuntimeTables::encode(*header), header->initialEchoMask);
+  SequenceProgram program = sequence.finish(sequenceRuntime(layout.version, header->timebaseShift, header->noteVelocity,
+                                                           RuntimeTables::encode(*header), header->initialEchoMask));
   program.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(120, header->timebaseShift);
   program.behavior.initialLevel = math::levelGain(layout.version, math::initialVolume(layout.version));
   program.behavior.initialStereoBalance = math::mixerGains(layout.version, math::initialVolume(layout.version), 15);

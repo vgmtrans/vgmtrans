@@ -212,7 +212,7 @@ void lateCommandsRenderLoopsSplitsLfoAndDynamicAdsr() {
   expect(performance.diagnostics.empty() && performance.tracks.size() == 1,
          "source-free late playback should finish without VM diagnostics");
   const PerformanceTrack& track = performance.tracks.front();
-  expect(!sequenceDialect().defaultBehavior.initialMonoModeChannels && events<MonoModePerformanceEvent>(track).empty(),
+  expect(!sequenceDialect().behavior.initialMonoModeChannels && events<MonoModePerformanceEvent>(track).empty(),
          "polyphonic Wolf Team tracks must not emit a MIDI mono-mode initialization");
   const auto notes = events<NotePerformanceEvent>(track);
   const auto instruments = events<InstrumentPerformanceEvent>(track);

@@ -17,14 +17,6 @@ namespace vgmtrans::core {
 ValidationReport validateSequenceProgram(const SequenceProgram& program) {
   ValidationReport report;
 
-  for (u32 sourceProgram = 0; sourceProgram < program.sourceProgramMap.size(); ++sourceProgram) {
-    if (!program.sourceProgramMap[sourceProgram].valid()) {
-      report.error("sequence.instrument-map.invalid",
-                   "Sequence source-program map entry " + std::to_string(sourceProgram) +
-                       " had no instrument domain");
-    }
-  }
-
   // Track IDs are used by performance events and lookup helpers, so they need a
   // stable one-to-one relationship with the tracks in this program.
   std::unordered_set<u32> trackIds;

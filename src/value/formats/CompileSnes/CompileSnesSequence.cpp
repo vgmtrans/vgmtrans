@@ -7,7 +7,7 @@
 #include "value/formats/CompileSnes/CompileSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 #include "value/synth/SnesDsp.h"
 
 #include <algorithm>
@@ -195,9 +195,8 @@ namespace math {
   // $0f98 divides half the current DSP pitch by $0490+x, using a
   // quantized 16-bit fallback when the quotient does not fit in A.
   const u16 half = high == static_cast<u8>(target >> 8) ? pitch >> 1 : (high * 0x101u) >> 1;
-  const u16 step = (half >> 8) < divisor
-                       ? std::max<u16>(1, half / divisor)
-                       : static_cast<u16>(((half >> 5) / divisor) << 5);
+  const u16 step =
+      (half >> 8) < divisor ? std::max<u16>(1, half / divisor) : static_cast<u16>(((half >> 5) / divisor) << 5);
   const u16 distance = pitch < target ? target - pitch : pitch - target;
   return distance <= step ? target : static_cast<u16>(pitch < target ? pitch + step : pitch - step);
 }
@@ -671,8 +670,8 @@ struct Playback {
         endPitch = math::advancePortamento(endPitch, targetPitch, track.portamentoDivisor);
         ++frames;
       }
-      const auto timing = PitchSlideTiming::fixedDuration(
-          (frames * math::ticks(track.tempo) + 0xffu) >> 8, frames * 16.0);
+      const auto timing =
+          PitchSlideTiming::fixedDuration((frames * math::ticks(track.tempo) + 0xffu) >> 8, frames * 16.0);
       out.pitchSlide(track.lastNote, keyForPitch(track.currentPitch), key, timing)
           .continueFrom(previous)
           .preferPortamento();
@@ -1292,21 +1291,19 @@ void addPercussionReferences(ByteReader reader, const Layout& layout, Referenced
 }  // namespace
 
 const SequenceDialect& sequenceDialect() {
-  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  static const SequenceDialect dialect = SequenceDialect{
       .commandDetailKindPrefix = "compile-snes",
       .timebase = Timebase{.ppqn = kPpqn},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .commandLimit = kCommandLimit,
               .initialLevel = 1.0,
               .initialReverbSend = 0.0,
-              .initialStereoBalance = omitInitialStereoBalance,
               .initialMonoModeChannels = 0,
               .initialPitchBendRangeSemitones = 12,
               .initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(0x80),
           },
-  });
+  };
   return dialect;
 }
 
@@ -1342,8 +1339,6 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     references.echoPresets.insert(0);
   }
 
-  SequenceProgram program = sequence.finish();
-  program.sourceBaseAddress = Address{layout.songHeaderAddress};
   RuntimeConfig runtime{
       .version = layout.version,
       .echoCapable = layout.hasEchoCommands(),
@@ -1351,7 +1346,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
       .data = runtimeData(reader, layout, references),
       .tracks = std::vector<RuntimeTrackConfig>(count),
   };
-  for (u32 track = 0; track < count && track < program.tracks.size(); ++track) {
+  for (u32 track = 0; track < count; ++track) {
     const u32 item = layout.songHeaderAddress + 1 + track * 14u;
     runtime.tracks[track] = RuntimeTrackConfig{
         .channel = reader.u8At(item),
@@ -1367,7 +1362,9 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         .pan = static_cast<s8>(reader.u8At(item + 12)),
     };
   }
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, std::move(runtime));
+  SequenceProgram program =
+      sequence.finish(makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime)));
+  program.sourceBaseAddress = Address{layout.songHeaderAddress};
   return SequenceParse{.program = std::move(program), .references = std::move(references), .headerRange = header};
 }
 

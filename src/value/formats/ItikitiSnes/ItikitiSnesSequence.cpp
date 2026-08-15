@@ -7,7 +7,7 @@
 #include "value/formats/ItikitiSnes/ItikitiSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
 
@@ -228,7 +228,8 @@ struct Playback {
         .frequencyHz = math::lfoFrequency(interval, polarity),
         .delayTicks = delay,
         .delayIsTempoRelative = true,
-        .shape = LfoShape{
+        .shape =
+            LfoShape{
             .waveform = LfoWaveform::Sine,
             .samples = math::lfoCycleSamples(rawDepth & 0x3f, polarity, target),
         },
@@ -831,12 +832,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 }  // namespace
 
 const SequenceDialect& sequenceDialect() {
-  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  static const SequenceDialect dialect = SequenceDialect{
       .commandDetailKindPrefix = "itikiti-snes",
       .timebase = Timebase{.ppqn = kPpqn},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .commandLimit = kCommandLimit,
               .initialSourceInstrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0},
               .initialLevel = 1.0,
@@ -846,14 +846,12 @@ const SequenceDialect& sequenceDialect() {
               .initialMonoModeChannels = 0,
               .initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(0x80),
           },
-  });
+  };
   return dialect;
 }
 
 SequenceRuntime sequenceRuntime(u8 echoDelay) {
-  SequenceProgram program = sequenceDialect().makeProgram();
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, RuntimeConfig{.echoDelay = echoDelay});
-  return std::move(program.runtime);
+  return makeCompiledRuntime<TrackState, Playback, ProgramState>(RuntimeConfig{.echoDelay = echoDelay});
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, u32 trackNumber, u32 startAddress, u32 sequenceBase, u8 groupIndex,
@@ -881,9 +879,8 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         },
         relative);
   }
-  SequenceProgram program = sequence.finish();
+  SequenceProgram program = sequence.finish(sequenceRuntime(layout.echoDelay));
   program.sourceBaseAddress = Address{layout.sequenceBaseAddress};
-  program.runtime = sequenceRuntime(layout.echoDelay);
   return SequenceParse{.program = std::move(program), .references = std::move(references), .headerRange = header};
 }
 

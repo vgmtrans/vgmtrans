@@ -387,7 +387,6 @@ private:
   friend std::any detail::analyzeSequenceProgram(const SequenceVm&, const SequenceProgram&);
 
   [[nodiscard]] PerformanceSequence renderImpl(const SequenceProgram& program, std::any* analyzedProgramState) const;
-  [[nodiscard]] SequenceProgramBehavior resolvedBehavior(const SequenceProgram& program) const;
 
   SequenceVmOptions options_;
 };

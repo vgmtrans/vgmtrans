@@ -15,17 +15,15 @@ namespace vgmtrans::core {
 struct SequenceDialect {
   std::string commandDetailKindPrefix;
   Timebase timebase;
-  SequenceProgramBehavior defaultBehavior;
-  SequenceRuntime runtime;
+  SequenceProgramBehavior behavior;
 
-  // Formats normally want a program with this dialect's runtime, timebase, and
-  // default VM behavior. Keep that mechanical wiring out of each parser.
+  // Start a program with this dialect's timebase and playback behavior. The
+  // parser attaches its complete, program-specific runtime before publishing.
   [[nodiscard]] SequenceProgram makeProgram(Address sourceBaseAddress = {}) const {
     return SequenceProgram{
-        .runtime = runtime,
         .timebase = timebase,
         .sourceBaseAddress = sourceBaseAddress,
-        .behavior = defaultBehavior,
+        .behavior = behavior,
     };
   }
 };

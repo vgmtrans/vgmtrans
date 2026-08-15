@@ -8,7 +8,7 @@
 
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 #include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
@@ -43,6 +43,7 @@ struct RuntimeConfig {
   u8 tempoTimerTarget = kStandardTimerTarget;
   std::optional<u8> fixedPercussionBase;
   u8 intelliConditionalMask = 0;
+  std::vector<u8> programMap;
 };
 
 [[nodiscard]] constexpr u32 drumInstrumentKey(u8 program) {
@@ -562,8 +563,7 @@ struct ProgramState {
       : selected(profile(config.profile)), tempoTimerTarget(config.tempoTimerTarget),
         fixedPercussionBase(config.fixedPercussionBase), intelliConditionalMask(config.intelliConditionalMask) {
     for (u32 encoded = 0; encoded < basePrograms.size(); ++encoded) {
-      basePrograms[encoded] =
-          encoded < program.sourceProgramMap.size() ? program.sourceProgramMap[encoded].key : encoded;
+      basePrograms[encoded] = encoded < config.programMap.size() ? config.programMap[encoded] : encoded;
     }
     for (const auto& track : program.tracks) {
       for (const auto& command : track.commands) {
@@ -2218,9 +2218,9 @@ struct PlaylistDecode {
   return session.finish();
 }
 
-[[nodiscard]] std::vector<InstrumentIdentity> buildProgramMap(ByteReader reader, const Layout& layout) {
+[[nodiscard]] std::vector<u8> buildProgramMap(ByteReader reader, const Layout& layout) {
   const Profile& selected = profile(layout.profile);
-  std::vector<InstrumentIdentity> map(256);
+  std::vector<u8> map(256);
   for (u16 sourceProgram = 0; sourceProgram < map.size(); ++sourceProgram) {
     u8 resolved = static_cast<u8>(sourceProgram);
     if (selected.programs == ProgramResolver::QuintetActRBase) {
@@ -2231,10 +2231,7 @@ struct PlaylistDecode {
         resolved = reader.u8At(address);
       }
     }
-    map[sourceProgram] = InstrumentIdentity{
-        .domain = std::string(kInstrumentDomain),
-        .key = resolved,
-    };
+    map[sourceProgram] = resolved;
   }
   return map;
 }
@@ -2244,22 +2241,18 @@ struct PlaylistDecode {
 }
 
 [[nodiscard]] SequenceDialect makeDialect() {
-  return makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  return SequenceDialect{
       .commandDetailKindPrefix = "nin-snes",
       .timebase = Timebase{.ppqn = kPpqn},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::PlayOnce,
+              .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
               .panLaw = PanLaw::ConstantSum,
               .initialReverbSend = 0.0,
               .initialPitchBendRangeSemitones = 2,
               .initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(kDefaultTempo),
           },
-      .runtime = SequenceRuntime{
-          .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
-          .prepass = SemanticPrepassMode::ScheduledPlayback,
-      },
-  });
+  };
 }
 
 }  // namespace
@@ -2317,12 +2310,11 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   if (layout.profile == ProfileId::IntelliFe3 && reader.has(0xb9, 1)) {
     runtime.intelliConditionalMask = reader.u8At(0xb9);
   }
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, std::move(runtime));
+  runtime.programMap = buildProgramMap(reader, layout);
   program.behavior.initialTempoMicrosecondsPerQuarter =
       math::tempoMicrosecondsPerQuarter(kDefaultTempo, layout.tempoTimerTarget);
   const auto initialBalance = math::panGains(selected, math::kPan, 10);
   program.behavior.initialStereoBalance = StereoBalance{initialBalance.left, initialBalance.right};
-  program.sourceProgramMap = buildProgramMap(reader, layout);
   program.sectionPlaylist = std::move(playlist.playlist);
   DecodeContext context{
       .reader = reader,
@@ -2344,6 +2336,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     }
     program.tracks.push_back(decodeTrack(reader, track, starts, context, sequenceId, playlist.annotation, sourceMap));
   }
+  program.runtime = makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime));
 
   SequenceRecipes recipes =
       analyzeCompiledProgram<ProgramState, SequenceRecipes>(program, projectRecipes);

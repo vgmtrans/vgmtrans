@@ -126,7 +126,7 @@ PerformanceSequence render(Version version, std::vector<u8> bytes) {
   SequenceProgram program{
       .runtime = sequenceRuntime(version),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {decodeSourceTrack(ByteReader(SourceId{121}, bytes), version, 0, 0)},
   };
   program.behavior.initialTempoMicrosecondsPerQuarter = version == Version::SeikenDensetsu3 ? 576000 : 372000;

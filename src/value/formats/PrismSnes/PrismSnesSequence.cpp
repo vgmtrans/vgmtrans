@@ -7,7 +7,7 @@
 #include "value/formats/PrismSnes/PrismSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 #include "value/synth/SnesDsp.h"
 
 #include <algorithm>
@@ -733,9 +733,7 @@ struct Playback {
     emitPan();
   }
 
-  void defaultPan(bool alternate) {
-    panTable(alternate ? track.data.alternatePanTable : track.data.defaultPanTable);
-  }
+  void defaultPan(bool alternate) { panTable(alternate ? track.data.alternatePanTable : track.data.defaultPanTable); }
 
   void transposeRelative(s8 delta) { track.transpose = static_cast<s8>(track.transpose + delta); }
 
@@ -1594,12 +1592,11 @@ struct WalkState {
 }  // namespace
 
 const SequenceDialect& sequenceDialect() {
-  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  static const SequenceDialect dialect = SequenceDialect{
       .commandDetailKindPrefix = "prism-snes",
       .timebase = Timebase{.ppqn = kPpqn},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .commandLimit = kCommandLimit,
               .initialSourceInstrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0},
               .initialLevel = 0.0,
@@ -1609,7 +1606,7 @@ const SequenceDialect& sequenceDialect() {
               .initialMonoModeChannels = 0,
               .initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(0x82),
           },
-  });
+  };
   return dialect;
 }
 
@@ -1669,7 +1666,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
                                          track.physicalChannelFlags, &programs, diagnostics, scope));
   }
   program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, std::move(runtime));
+  program.runtime = makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime));
   return SequenceParse{
       .program = std::move(program),
       .programs = std::move(programs),

@@ -8,7 +8,7 @@
 #include "value/formats/WolfTeamSnes/WolfTeamSnesGrammar.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 #include "value/synth/SnesDsp.h"
 
 #include <fmt/format.h>
@@ -1016,7 +1016,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 [[nodiscard]] SequenceProgramBehavior behavior(ByteReader reader, const Layout& layout) {
   SequenceProgramBehavior result{
-      .defaultLoopPolicy = LoopPolicy::PlayOnce,
+      .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
       .initialLevel = 1.0,
       .initialExpression = 1.0,
       .initialReverbSend = 0.0,
@@ -1039,22 +1039,19 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 }  // namespace
 
 const SequenceDialect& sequenceDialect() {
-  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  static const SequenceDialect dialect = SequenceDialect{
       .commandDetailKindPrefix = "wolf-team-snes",
       .timebase = Timebase{.ppqn = kPpqn},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::PlayOnce,
+              .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
               .initialLevel = 1.0,
               .initialExpression = 1.0,
               .initialReverbSend = 0.0,
               .initialStereoBalance = StereoBalance{},
               .initialPitchBendRangeSemitones = 12,
           },
-      .runtime = SequenceRuntime{
-          .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
-      },
-  });
+  };
   return dialect;
 }
 
@@ -1133,7 +1130,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     }
     program.tracks.push_back(decodeTrack(reader, layout, channel, sequenceId, headerParent, sourceMap, diagnostics));
   }
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, std::move(runtime));
+  program.runtime = makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime));
   return SequenceParse{.program = std::move(program), .headerRange = headerRange};
 }
 

@@ -8,7 +8,7 @@
 
 #include "value/base/LevelScale.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
@@ -315,10 +315,10 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 }  // namespace
 
 const SequenceDialect& sonyPs1SequenceDialect() {
-  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  static const SequenceDialect dialect = SequenceDialect{
       .commandDetailKindPrefix = std::string(kSonyPs1DialectId),
       .timebase = Timebase{.ppqn = 48},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
               .commandLimit = kMaxCommands,
               .initialLevel = 1.0,
@@ -327,7 +327,7 @@ const SequenceDialect& sonyPs1SequenceDialect() {
               .initialPitchBendRangeSemitones = 2,
               .initialTempoMicrosecondsPerQuarter = 500000,
           },
-  });
+  };
   return dialect;
 }
 
@@ -336,8 +336,7 @@ SequenceProgram parseSonyPs1Sequence(ByteReader reader, AssetId id, const SonyPs
   SequenceProgram program = sonyPs1SequenceDialect().makeProgram(Address{layout.offset});
   program.timebase.ppqn = layout.ppqn;
   program.behavior.initialTempoMicrosecondsPerQuarter = layout.initialTempo;
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(
-      program, RuntimeConfig{
+  program.runtime = makeCompiledRuntime<TrackState, Playback, ProgramState>(RuntimeConfig{
                    .numerator = layout.rhythmNumerator,
                    .denominator = static_cast<u8>(1u << layout.rhythmDenominatorPower),
                });

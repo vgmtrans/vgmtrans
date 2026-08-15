@@ -7,7 +7,7 @@
 #include "value/formats/FalcomSnes/FalcomSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 #include "value/synth/SnesDsp.h"
 
 #include <algorithm>
@@ -745,12 +745,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 }  // namespace
 
 const SequenceDialect& sequenceDialect() {
-  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  static const SequenceDialect dialect{
       .commandDetailKindPrefix = "falcom-snes",
       .timebase = Timebase{.ppqn = kPpqn},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .commandLimit = kCommandLimit,
               .panLaw = PanLaw::ConstantSum,
               .initialSourceInstrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0},
@@ -761,7 +760,7 @@ const SequenceDialect& sequenceDialect() {
               .initialPitchBendRangeSemitones = 24,
               .initialTempoMicrosecondsPerQuarter = math::tempoMicroseconds(kDefaultTempo),
           },
-  });
+  };
   return dialect;
 }
 
@@ -790,10 +789,9 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         track, reader.range(pointer, 2), *layout.trackStarts[track],
         [&](u32 offset) { return decodeCommand(reader, offset, durations, diagnostics, &programs); }, relative);
   }
-  SequenceProgram program = sequence.finish();
+  SequenceProgram program = sequence.finish(
+      makeCompiledRuntime<TrackState, Playback, ProgramState>(RuntimeConfig{.patches = runtimePatches(reader, layout)}));
   program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(program,
-                                                          RuntimeConfig{.patches = runtimePatches(reader, layout)});
   return SequenceParse{
       .program = std::move(program),
       .programs = std::move(programs),

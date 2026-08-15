@@ -8,7 +8,7 @@
 
 #include "value/base/LevelScale.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/PsxSpu.h"
 
@@ -646,18 +646,16 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 }  // namespace
 
 const SequenceDialect& suzukiPs1SequenceDialect() {
-  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  static const SequenceDialect dialect = SequenceDialect{
       .commandDetailKindPrefix = std::string(kSuzukiPs1DialectId),
       .timebase = Timebase{.ppqn = kPpqn},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::Default,
               .commandLimit = kMaxCommands,
               .panLaw = PanLaw::EqualPower,
               .initialLevel = 1.0,
-              .initialStereoBalance = omitInitialStereoBalance,
           },
-  });
+  };
   return dialect;
 }
 
@@ -670,7 +668,7 @@ SequenceProgram parseSuzukiPs1Sequence(ByteReader reader, AssetId id, const Suzu
     runtime.envelopes.emplace((static_cast<u32>(envelope.bank) << 8) | envelope.program,
                               std::pair{envelope.adsr1, envelope.adsr2});
   }
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, std::move(runtime));
+  program.runtime = makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime));
 
   if (sourceMap != nullptr) {
     sourceMap->header("SuzukiPS1 Sequence Header", reader.range(layout.offset, 0x22))

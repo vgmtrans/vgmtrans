@@ -82,7 +82,7 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
   ScanResultBuilder out(input, "ProbeBuilder");
   const auto wholeSource = input.reader.range(0, input.reader.size());
 
-  const auto sequence = out.sequence("Builder Sequence", wholeSource).program(probeSequenceDialect().makeProgram());
+  const auto sequence = out.sequence("Builder Sequence", wholeSource).program(probeSequenceProgram());
   const auto bank = out.instrumentSet("Builder Bank", input.reader.range(0, 1));
   auto samples = out.sampleCollection("Builder Samples", input.reader.range(1, 2));
   samples.add(0, Sample{

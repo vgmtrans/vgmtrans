@@ -707,6 +707,29 @@ void ninSnesIntelligentVoiceTablesUseTypedPlaybackState() {
          "an inline Intelligent Systems voice record should execute from typed command state");
 }
 
+void ninSnesProgramResolutionIsCapturedByRuntime() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+  std::ranges::copy(std::initializer_list<u8>{0xe0, 2, 3, 0x7f, 0x80, 0}, bytes.begin() + 0x300);
+
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::QuintetActR;
+  layout.quintetBgmInstrumentBase = 10;
+  const PerformanceSequence performance = render(std::move(bytes), layout);
+  const auto instrument = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<InstrumentPerformanceEvent>(event);
+  });
+  const auto* change = instrument == performance.tracks[0].events.end()
+                           ? nullptr
+                           : std::get_if<InstrumentPerformanceEvent>(&*instrument);
+  expect(change != nullptr && change->sourceInstrument && change->sourceInstrument->key == 12,
+         "NinSnes runtime configuration should retain the parsed source-program mapping (got " +
+             (change != nullptr && change->sourceInstrument ? std::to_string(change->sourceInstrument->key) : "none") +
+             ")");
+}
+
 void ninSnesFe3ConditionalJumpUsesCapturedDriverState() {
   const auto endTick = [](u8 mask) {
     std::vector<u8> bytes(kAramSize);

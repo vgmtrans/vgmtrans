@@ -94,6 +94,7 @@ void ninSnesKonamiLoopAppliesAndClearsReplayDeltas();
 void ninSnesKonamiAdsrGainEmitsNeutralEnvelopeState();
 void ninSnesNoteVelocityPreservesLegacyCurve();
 void ninSnesIntelligentVoiceTablesUseTypedPlaybackState();
+void ninSnesProgramResolutionIsCapturedByRuntime();
 void ninSnesFe3ConditionalJumpUsesCapturedDriverState();
 void ninSnesControllerFadesRemainInTheSourceDomain();
 void ninSnesPrepassClearsMasterVolumeAutomationBinding();
@@ -284,6 +285,7 @@ int main() {
     ninSnesKonamiAdsrGainEmitsNeutralEnvelopeState();
     ninSnesNoteVelocityPreservesLegacyCurve();
     ninSnesIntelligentVoiceTablesUseTypedPlaybackState();
+    ninSnesProgramResolutionIsCapturedByRuntime();
     ninSnesFe3ConditionalJumpUsesCapturedDriverState();
     ninSnesControllerFadesRemainInTheSourceDomain();
     ninSnesPrepassClearsMasterVolumeAutomationBinding();

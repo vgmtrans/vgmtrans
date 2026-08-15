@@ -60,6 +60,7 @@ struct NdsLayout {
 
 // SSEQ bytecode decoding and playback semantics.
 [[nodiscard]] const core::SequenceDialect& ndsSequenceDialect();
+[[nodiscard]] core::SequenceRuntime ndsSequenceRuntime();
 [[nodiscard]] core::SequenceProgram parseNdsSequenceProgram(core::ByteReader reader, core::AssetId id,
                                                             NdsSequenceRange range,
                                                             core::SourceMapBuilder* sourceMap = nullptr,

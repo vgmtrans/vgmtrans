@@ -7,7 +7,7 @@
 #include "value/formats/RareSnes/RareSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 
 #include <fmt/format.h>
 
@@ -549,12 +549,13 @@ struct RuntimeConfig {
   u8 initialTempo = 0;
   u8 initialTimer = 0;
   bool monoOutput = false;
+  std::vector<u8> srcns;
 };
 
 struct ProgramState {
   ProgramState(const SequenceProgram& program, const RuntimeConfig& config)
       : selected(config.profile), initialTempo(config.initialTempo), initialTimer(config.initialTimer),
-        sourcePrograms(program.sourceProgramMap) {
+        srcns(config.srcns) {
     for (const TrackProgram& track : program.tracks) {
       for (const SourceCommand& command : track.commands) {
         sourceRanges.emplace(command.address.value, command.range);
@@ -580,8 +581,8 @@ struct ProgramState {
   }
 
   [[nodiscard]] u8 srcn(u8 sourceProgram) const {
-    if (sourceProgram < sourcePrograms.size()) {
-      return static_cast<u8>(sourcePrograms[sourceProgram].key);
+    if (sourceProgram < srcns.size()) {
+      return srcns[sourceProgram];
     }
     return sourceProgram;
   }
@@ -617,7 +618,7 @@ struct ProgramState {
   Profile selected;
   u8 initialTempo = 0;
   u8 initialTimer = 0;
-  std::vector<InstrumentIdentity> sourcePrograms;
+  std::vector<u8> srcns;
   std::map<u32, SourceRange> sourceRanges;
   std::map<u32, std::vector<Address>> conditionalDestinations;
   u8 tempo = 0;
@@ -1812,22 +1813,18 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 }
 
 [[nodiscard]] SequenceDialect makeDialect() {
-  return makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  return SequenceDialect{
       .commandDetailKindPrefix = "rare-snes",
       .timebase = Timebase{.ppqn = kPpqn},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::PlayOnce,
+              .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
               .initialLevel = 127.0 / 128.0,
               .initialReverbSend = 0.0,
               .initialPitchBendRangeSemitones = 12,
               .initialTempoMicrosecondsPerQuarter = tempoMicrosecondsPerQuarter(0x20, 0x64),
           },
-      .runtime = SequenceRuntime{
-          .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
-          .prepass = SemanticPrepassMode::ScheduledPlayback,
-      },
-  });
+  };
 }
 
 }  // namespace
@@ -1838,15 +1835,13 @@ const SequenceDialect& sequenceDialect() {
 }
 
 SequenceRuntime sequenceRuntime(Profile profile, u8 initialTempo, u8 initialTimer, bool monoOutput) {
-  SequenceProgram program = sequenceDialect().makeProgram();
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(
-      program, RuntimeConfig{
-                   .profile = profile,
-                   .initialTempo = initialTempo,
-                   .initialTimer = initialTimer,
-                   .monoOutput = monoOutput,
-               });
-  return std::move(program.runtime);
+  return makeCompiledRuntime<TrackState, Playback, ProgramState>(
+      RuntimeConfig{
+          .profile = profile,
+          .initialTempo = initialTempo,
+          .initialTimer = initialTimer,
+          .monoOutput = monoOutput,
+      });
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, Profile profile, u32 trackNumber, u32 startAddress,
@@ -1865,13 +1860,12 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   // Stateful Rare durations require the small custom track walker above, so
   // build an equivalent program and project each track through its shared scope.
   SequenceProgram program = dialect.makeProgram(Address{layout.sequenceHeaderAddress});
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(
-      program, RuntimeConfig{
-                   .profile = layout.profile,
-                   .initialTempo = layout.initialTempo,
-                   .initialTimer = layout.initialTimer,
-                   .monoOutput = layout.monoOutput,
-               });
+  RuntimeConfig runtime{
+      .profile = layout.profile,
+      .initialTempo = layout.initialTempo,
+      .initialTimer = layout.initialTimer,
+      .monoOutput = layout.monoOutput,
+  };
   if (layout.profile == Profile::KillerInstinct) {
     program.behavior.initialLevel = 0.5;
   }
@@ -1910,15 +1904,13 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   }
 
   if (layout.instrumentTableAddress) {
-    program.sourceProgramMap.reserve(256);
+    runtime.srcns.reserve(256);
     for (u32 sourceProgram = 0; sourceProgram < 256 && reader.has(*layout.instrumentTableAddress + sourceProgram, 1);
          ++sourceProgram) {
-      program.sourceProgramMap.push_back(InstrumentIdentity{
-          .domain = "rare-snes.srcn",
-          .key = reader.u8At(*layout.instrumentTableAddress + sourceProgram),
-      });
+      runtime.srcns.push_back(reader.u8At(*layout.instrumentTableAddress + sourceProgram));
     }
   }
+  program.runtime = makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime));
 
   const SequenceRecipes recipes = analyzeCompiledProgram<ProgramState, SequenceRecipes>(
       program, projectRecipes, SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce});

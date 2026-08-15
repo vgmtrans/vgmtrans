@@ -7,13 +7,11 @@
 #pragma once
 
 #include "value/sequence/CompilerCursor.h"
-#include "value/sequence/SequenceDialect.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <any>
 #include <concepts>
 #include <memory>
-#include <stdexcept>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -23,7 +21,7 @@ namespace vgmtrans::core {
 struct EmptyCompiledProgramState {};
 
 template <class TrackState, class Playback, class ProgramState = EmptyCompiledProgramState>
-struct CompiledCommandDialect {
+struct CompiledCommandRuntime {
   [[nodiscard]] static std::any createProgramState(const SequenceProgram& program) {
     // A format can read immutable program settings in its constructor. Formats
     // that need no settings keep working with an ordinary default constructor.
@@ -154,48 +152,60 @@ struct CompiledCommandDialect {
   }
 };
 
-// Fill the mechanical executor hooks while leaving timebase and playback
-// defaults visible in the format's ordinary SequenceDialect value.
-template <class TrackState, class Playback, class ProgramState = EmptyCompiledProgramState>
-[[nodiscard]] SequenceDialect makeCompiledDialect(SequenceDialect dialect) {
-  using Compiled = CompiledCommandDialect<TrackState, Playback, ProgramState>;
-  dialect.runtime.createProgramState = [](const SequenceProgram& program) {
-    return Compiled::createProgramState(program);
-  };
-  dialect.runtime.createTrackState = [](const SequenceProgram& program, const TrackProgram& track) {
-    return Compiled::createTrackState(program, track);
-  };
-  dialect.runtime.execute = Compiled::execute;
-  dialect.runtime.readyDuringWait = Compiled::readyDuringWait;
+namespace detail {
+
+template <class TrackState, class Playback, class ProgramState>
+void installCompiledRuntimeHooks(SequenceRuntime& runtime) {
+  using Compiled = CompiledCommandRuntime<TrackState, Playback, ProgramState>;
+  runtime.execute = Compiled::execute;
+  runtime.readyDuringWait = Compiled::readyDuringWait;
   if constexpr (requires(Playback& playback) { playback.tick(); }) {
-    dialect.runtime.tick = Compiled::tick;
+    runtime.tick = Compiled::tick;
   }
   if constexpr (requires(ProgramState& state) { state.finishPrepass(); }) {
-    dialect.runtime.finishPrepass = Compiled::finishPrepass;
+    runtime.finishPrepass = Compiled::finishPrepass;
   }
   if constexpr (requires(TrackState& state) { state.beginSection(); }) {
-    dialect.runtime.beginTrackSection = Compiled::beginTrackSection;
+    runtime.beginTrackSection = Compiled::beginTrackSection;
   }
   if constexpr (requires(ProgramState& state, PerformanceSequence& performance) {
                   state.finalizePerformance(performance);
                 }) {
-    dialect.runtime.finalizePerformance = Compiled::finalizePerformance;
+    runtime.finalizePerformance = Compiled::finalizePerformance;
   }
-  return dialect;
 }
 
-// Replace only a program's state factories with closures over immutable typed
-// settings. Execution hooks remain the ones selected by makeCompiledDialect.
+}  // namespace detail
+
+// Construct one complete erased runtime for a format whose state needs no
+// program-specific immutable configuration.
+template <class TrackState, class Playback, class ProgramState = EmptyCompiledProgramState>
+[[nodiscard]] SequenceRuntime makeCompiledRuntime() {
+  using Compiled = CompiledCommandRuntime<TrackState, Playback, ProgramState>;
+  SequenceRuntime runtime;
+  runtime.createProgramState = [](const SequenceProgram& program) { return Compiled::createProgramState(program); };
+  runtime.createTrackState = [](const SequenceProgram& program, const TrackProgram& track) {
+    return Compiled::createTrackState(program, track);
+  };
+  detail::installCompiledRuntimeHooks<TrackState, Playback, ProgramState>(runtime);
+  return runtime;
+}
+
+// Construct one complete erased runtime whose state factories close over
+// immutable typed format settings.
 template <class TrackState, class Playback, class ProgramState = EmptyCompiledProgramState, class Config>
-void bindCompiledRuntime(SequenceProgram& program, Config config) {
-  using Compiled = CompiledCommandDialect<TrackState, Playback, ProgramState>;
+[[nodiscard]] SequenceRuntime makeCompiledRuntime(Config config) {
+  using Compiled = CompiledCommandRuntime<TrackState, Playback, ProgramState>;
+  SequenceRuntime runtime;
   auto settings = std::make_shared<const Config>(std::move(config));
-  program.runtime.createProgramState = [settings](const SequenceProgram& sequence) {
+  runtime.createProgramState = [settings](const SequenceProgram& sequence) {
     return Compiled::createProgramState(sequence, *settings);
   };
-  program.runtime.createTrackState = [settings](const SequenceProgram& sequence, const TrackProgram& track) {
+  runtime.createTrackState = [settings](const SequenceProgram& sequence, const TrackProgram& track) {
     return Compiled::createTrackState(sequence, track, *settings);
   };
+  detail::installCompiledRuntimeHooks<TrackState, Playback, ProgramState>(runtime);
+  return runtime;
 }
 
 // Execute a compiled program and project its final typed song state into a

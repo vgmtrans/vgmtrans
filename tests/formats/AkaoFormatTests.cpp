@@ -265,9 +265,9 @@ void akaoVersion10OverlayCommandsUseLegacyLengthsAndProgramChange() {
          "Akao v1.0 overlay voice should require both articulations");
 
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = akaoSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -298,9 +298,9 @@ void akaoPanLawFollowsDriverProfile() {
 
   const SequenceDialect lateDialect = makeAkaoDialect(AkaoPs1Version::Version3_1);
   const SequenceProgram lateProgram{
-      .runtime = lateDialect.makeProgram().runtime,
+      .runtime = akaoSequenceRuntime(),
       .timebase = lateDialect.timebase,
-      .behavior = lateDialect.defaultBehavior,
+      .behavior = lateDialect.behavior,
       .tracks = {decodeFixtureTrack(bytes, AkaoPs1Version::Version3_1, start, 0x40)},
   };
   const PerformanceSequence performance = SequenceVm().render(lateProgram);
@@ -328,9 +328,9 @@ void akaoLoopBranchUsesCurrentRepeatPass() {
   const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_0);
   const TrackProgram track = decodeFixtureTrack(bytes, AkaoPs1Version::Version1_0, start, 0x40);
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = akaoSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -366,9 +366,9 @@ void akaoTieAfterRestDoesNotExtendPreviousNote() {
   const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_2);
   const TrackProgram track = decodeFixtureTrack(bytes, AkaoPs1Version::Version1_2, start, 0x40);
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = akaoSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -395,9 +395,9 @@ void akaoTempoFadeEmitsDriverTickRamp() {
   const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_2);
   const TrackProgram track = decodeFixtureTrack(bytes, AkaoPs1Version::Version1_2, start, 0x40);
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = akaoSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -438,9 +438,9 @@ void akaoPitchSlideAppliesOnceToTheNextNote() {
 
   const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version3_1);
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = akaoSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {decodeFixtureTrack(bytes, AkaoPs1Version::Version3_1, start, 0x40)},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -487,9 +487,9 @@ void akaoPortamentoRetainsPitchTransitionIntent() {
 
   const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_2);
   const SequenceProgram program{
-      .runtime = dialect.makeProgram().runtime,
+      .runtime = akaoSequenceRuntime(),
       .timebase = dialect.timebase,
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {decodeFixtureTrack(bytes, AkaoPs1Version::Version1_2, start, 0x40)},
   };
   const PerformanceSequence performance = SequenceVm().render(program);

@@ -35,18 +35,6 @@ enum class PitchTransitionRenderingHint {
   PitchBend,
 };
 
-enum class SemanticPrepassMode {
-  // Render immediately; the format does not need information from later
-  // commands before it can emit the first event.
-  None,
-  // Run a silent first pass in normal time order. Use this when one track can
-  // change a song-wide value that another track reads.
-  ScheduledPlayback,
-  // Visit every decoded command once in source order. Use this to collect
-  // limits from blocks that normal control flow might skip.
-  DecodedCommands,
-};
-
 using CreateProgramState = std::function<std::any(const SequenceProgram&)>;
 using CreateTrackState = std::function<std::any(const SequenceProgram&, const TrackProgram&)>;
 using ExecuteCommand = Effects (*)(const SourceCommand&, std::any& programState, std::any& trackState,
@@ -63,8 +51,6 @@ using FinalizePerformance = void (*)(std::any& programState, PerformanceSequence
 // Only state creation is closure-backed so immutable typed format settings can
 // be captured without a generic configuration schema.
 struct SequenceRuntime {
-  bool inferLoopsFromRepeatedState = true;
-  PitchTransitionRenderingHint preferredPitchTransitionRendering = PitchTransitionRenderingHint::Portamento;
   CreateProgramState createProgramState;
   CreateTrackState createTrackState;
   ExecuteCommand execute = nullptr;
@@ -73,7 +59,6 @@ struct SequenceRuntime {
   FinishPrepass finishPrepass = nullptr;
   BeginTrackSection beginTrackSection = nullptr;
   FinalizePerformance finalizePerformance = nullptr;
-  SemanticPrepassMode prepass = SemanticPrepassMode::None;
 
   [[nodiscard]] bool valid() const noexcept { return execute != nullptr; }
 };
@@ -382,20 +367,13 @@ struct StereoBalance {
   double rightGain = 1.0;
 };
 
-struct OmitInitialStereoBalance {};
-inline constexpr OmitInitialStereoBalance omitInitialStereoBalance{};
-
-struct UnresolvedInitialStereoBalance {};
-inline constexpr UnresolvedInitialStereoBalance unresolvedInitialStereoBalance{};
-
-using InitialStereoBalance = std::variant<UnresolvedInitialStereoBalance, OmitInitialStereoBalance, StereoBalance>;
-
-// Driver settings that affect playback but are not individual source commands,
-// such as loop policy or initial channel state.
+// Program-level playback and rendering policy that is not an individual source
+// command, such as loop handling, lowering preferences, or initial channel state.
 struct SequenceProgramBehavior {
-  LoopPolicy defaultLoopPolicy = LoopPolicy::Default;
-  // Zero means use the VM fallback.
-  u32 commandLimit = 0;
+  LoopPolicy loopPolicy = LoopPolicy::PlayOnce;
+  u32 commandLimit = 100'000;
+  bool inferLoopsFromRepeatedState = true;
+  PitchTransitionRenderingHint preferredPitchTransitionRendering = PitchTransitionRenderingHint::Portamento;
   // Formats that emit a normalized pan position declare its law once here.
   // Formats with exact left/right gains should emit StereoBalance instead.
   PanLaw panLaw = PanLaw::Unspecified;
@@ -408,15 +386,12 @@ struct SequenceProgramBehavior {
   std::optional<double> initialMasterLevel;
   std::optional<double> initialExpression;
   std::optional<double> initialReverbSend;
-  // Omission must be deliberate. The default sentinel must be resolved before
-  // rendering by the parsed program.
-  InitialStereoBalance initialStereoBalance = unresolvedInitialStereoBalance;
+  std::optional<StereoBalance> initialStereoBalance;
   std::optional<u8> initialMonoModeChannels;
   std::optional<u8> initialPitchBendRangeSemitones;
-  // Zero means use the VM's 120 BPM fallback.
-  // The resolved source tempo also governs tempo-relative effects before the
-  // first explicit tempo command.
-  u32 initialTempoMicrosecondsPerQuarter = 0;
+  // The source tempo also governs tempo-relative effects before the first
+  // explicit tempo command.
+  u32 initialTempoMicrosecondsPerQuarter = 500'000;
 };
 
 struct SequenceProgram {
@@ -424,10 +399,6 @@ struct SequenceProgram {
   Timebase timebase;
   Address sourceBaseAddress;
   SequenceProgramBehavior behavior;
-  // Some drivers translate their encoded program byte through a table before
-  // selecting an instrument. Decode that table once so runtime behavior stays
-  // source-free while still emitting stable source-domain identities.
-  std::vector<InstrumentIdentity> sourceProgramMap;
   std::vector<TrackProgram> tracks;
   std::optional<SectionPlaylist> sectionPlaylist;
 };

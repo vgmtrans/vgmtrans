@@ -7,7 +7,7 @@
 #include "value/formats/ChunSnes/ChunSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandDialect.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
 
@@ -990,12 +990,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 }  // namespace
 
 const SequenceDialect& sequenceDialect() {
-  static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
+  static const SequenceDialect dialect = SequenceDialect{
       .commandDetailKindPrefix = "chun-snes",
       .timebase = Timebase{.ppqn = kPpqn},
-      .defaultBehavior =
+      .behavior =
           SequenceProgramBehavior{
-              .defaultLoopPolicy = LoopPolicy::PlayOnce,
               .commandLimit = 8192,
               .initialSourceInstrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0},
               .initialLevel = math::channelGain(0x60, 0x80, 0xff),
@@ -1003,7 +1002,7 @@ const SequenceDialect& sequenceDialect() {
               .initialStereoBalance = StereoBalance{},
               .initialMonoModeChannels = 0,
           },
-  });
+  };
   return dialect;
 }
 
@@ -1021,15 +1020,13 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         track, reader.range(pointer, 2), start,
         [&](u32 offset) { return decodeCommand(reader, offset, layout.version, diagnostics); }, raw);
   }
-  SequenceProgram program = sequence.finish();
-  program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
   const u8 initialTempo = reader.u8At(layout.sequenceHeaderAddress);
-  bindCompiledRuntime<TrackState, Playback, ProgramState>(
-      program, RuntimeConfig{
-                   .version = layout.version,
-                   .tables = RuntimeTables::encode(reader, layout),
-                   .baseTempo = initialTempo,
-               });
+  SequenceProgram program = sequence.finish(makeCompiledRuntime<TrackState, Playback, ProgramState>(RuntimeConfig{
+      .version = layout.version,
+      .tables = RuntimeTables::encode(reader, layout),
+      .baseTempo = initialTempo,
+  }));
+  program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
   program.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicroseconds(initialTempo);
   return {.program = std::move(program), .headerRange = headerRange};
 }

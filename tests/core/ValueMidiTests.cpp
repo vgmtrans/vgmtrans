@@ -2438,9 +2438,9 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
           },
       .program =
           SequenceProgram{
-              .runtime = dialect.makeProgram().runtime,
+              .runtime = probeSequenceRuntime(),
               .timebase = dialect.timebase,
-              .behavior = dialect.defaultBehavior,
+              .behavior = dialect.behavior,
               .tracks = {track},
           },
   });
@@ -2495,9 +2495,9 @@ void standaloneSequenceExportDoesNotRequireACollection() {
           },
       .program =
           SequenceProgram{
-              .runtime = dialect.makeProgram().runtime,
+              .runtime = probeSequenceRuntime(),
               .timebase = dialect.timebase,
-              .behavior = dialect.defaultBehavior,
+              .behavior = dialect.behavior,
               .tracks = {track},
           },
   });

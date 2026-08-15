@@ -310,7 +310,7 @@ PerformanceSequence renderKonamiSnesTrack(std::span<const u8> commandBytes) {
       .runtime = konamiSnesSequenceRuntime(KONAMISNES_V6),
       .timebase = dialect.timebase,
       .sourceBaseAddress = Address{0},
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = {track},
   };
   return SequenceVm(LoopPolicy::PlayOnce).render(program);
@@ -329,7 +329,7 @@ PerformanceSequence renderKonamiSnesProgram(KonamiSnesVersion version, const std
       .runtime = konamiSnesSequenceRuntime(version, indexedEchoFilter),
       .timebase = dialect.timebase,
       .sourceBaseAddress = Address{0},
-      .behavior = dialect.defaultBehavior,
+      .behavior = dialect.behavior,
       .tracks = std::move(programTracks),
   };
   return SequenceVm(SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = sequenceLoops})
@@ -1077,7 +1077,7 @@ void konamiSnesPreservesLateEnvelopeRegisterState() {
 }
 
 void konamiSnesMixerAndPanFollowVersionedDriverMath() {
-  expect(konamiSnesSequenceDialect(KONAMISNES_V1).defaultBehavior.initialLevel == 0.0,
+  expect(konamiSnesSequenceDialect(KONAMISNES_V1).behavior.initialLevel == 0.0,
          "Konami tracks should begin at the driver's zero volume");
 
   const auto lastLevel = [](const PerformanceSequence& performance) {
