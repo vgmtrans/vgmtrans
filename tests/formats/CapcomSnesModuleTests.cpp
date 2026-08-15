@@ -349,8 +349,6 @@ void capcomSnesLayoutReadsOldAndRejectsMalformedDspInit() {
 void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   Session session;
   vgmtrans::formats::registerValueFormats(session);
-  expect(session.formats().containsDialect("capcom-snes"),
-         "value format registration should include the CapcomSnes sequence dialect");
   const auto capcomModule = std::ranges::find_if(
       session.formats().modules(), [](const FormatModule& module) { return module.name == "CapcomSnes"; });
   expect(capcomModule != session.formats().modules().end(), "value format registration should include CapcomSnes");
@@ -367,7 +365,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(sequence != nullptr, "first CapcomSnes asset should be sequence");
   expect(sequence->metadata.format == "CapcomSnes", "sequence should retain format name");
   expect(sequence->metadata.range.offset == 0x2001, "sequence range should point at fixed BGM header body");
-  expect(sequence->program.dialect.value == "capcom-snes", "sequence should carry the CapcomSnes dialect family");
+  expect(sequence->program.runtime.valid(), "sequence should carry its executable runtime");
   expect(sequence->program.timebase.ppqn == 48, "sequence should use CapcomSnes PPQN");
   expect(sequence->program.behavior.defaultLoopPolicy == LoopPolicy::PlayOnce,
          "sequence should carry CapcomSnes default loop policy");
@@ -377,9 +375,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
              sequenceInspection->bytes().size() == 0x1010,
          "sequence inspection should cover its header and decoded tracks");
 
-  const auto* dialect = session.formats().findDialect(sequence->program.dialect.value);
-  expect(dialect != nullptr, "registered dialect should interpret the scanned sequence program");
-  expect(dialect->execute != nullptr, "CapcomSnes should register a compiled command executor");
+  expect(sequence->program.runtime.valid(), "CapcomSnes should attach a compiled command runtime");
   const auto& firstTrack = sequence->program.tracks[0];
   expect(firstTrack.commands.size() == 8, "track should decode all fixture commands");
   constexpr std::array<std::string_view, 8> expectedCommandDetailKinds{
@@ -488,7 +484,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(samplePayload != nullptr && samplePayload->range.offset == 0x6000 && samplePayload->range.size == 9,
          "CapcomSnes scan should annotate BRR sample payloads");
 
-  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program, *dialect);
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program);
   const auto instrumentEvent = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<InstrumentPerformanceEvent>(event);
   });
@@ -760,13 +756,12 @@ void capcomSnesCompiledAndPerformanceSnapshotsAreStable() {
   expect(decoded == expectedDecoded, "CapcomSnes decoded-command golden changed:\n" + decoded);
 
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
       .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const std::string performance = performanceTrackSnapshot(SequenceVm().render(program, dialect).tracks[0]);
+  const std::string performance = performanceTrackSnapshot(SequenceVm().render(program).tracks[0]);
   constexpr std::string_view expectedPerformance =
       "reverb@0=0|mono@0=0|tempo@0=42191|instrument@0=capcom-snes.instrument:0|"
       "level@0=0.403921569/q256|balance@0=0.6328125,0.6328125|mod@0:0=0|mod@0:1=0|"
@@ -832,12 +827,12 @@ void capcomSnesLfoValuesAreResolvedDuringDecode() {
 
   const SequenceDialect& dialect = capcomSnesSequenceDialect();
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   const auto emittedTremolo = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
     return modulation != nullptr && modulation->target == ModulationPerformanceTarget::TremoloDepth &&
@@ -878,12 +873,12 @@ void capcomSnesLfoValuesAreResolvedDuringDecode() {
     const TrackProgram noteTrack = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, noteBytes), noteVersion,
                                                                CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
     const SequenceProgram noteProgram{
-        .dialect = dialect.id,
+        .runtime = capcomSnesSequenceRuntime(noteVersion),
         .timebase = dialect.timebase,
-        .config = SequenceProgramConfig{.profile = static_cast<u32>(noteVersion)},
+        .behavior = dialect.defaultBehavior,
         .tracks = {noteTrack},
     };
-    const PerformanceSequence notePerformance = SequenceVm().render(noteProgram, dialect);
+    const PerformanceSequence notePerformance = SequenceVm().render(noteProgram);
     std::vector<bool> flags;
     for (const auto& event : notePerformance.tracks[0].events) {
       if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
@@ -909,12 +904,12 @@ void capcomSnesLfoValuesAreResolvedDuringDecode() {
   const TrackProgram frozenTrack = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, frozenBytes), version,
                                                                CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
   const SequenceProgram frozenProgram{
-      .dialect = dialect.id,
+      .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
+      .behavior = dialect.defaultBehavior,
       .tracks = {frozenTrack},
   };
-  const PerformanceSequence frozenPerformance = SequenceVm().render(frozenProgram, dialect);
+  const PerformanceSequence frozenPerformance = SequenceVm().render(frozenProgram);
   const auto activeFrozenTremolo =
       std::ranges::find_if(frozenPerformance.tracks[0].events, [](const PerformanceEvent& event) {
         const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
@@ -935,12 +930,13 @@ void capcomSnesCompiledCommandsDoNotNeedEngineProfile() {
   const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version,
                                                          CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
 
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.diagnostics.empty() && performance.tracks[0].endTick == 6,
          "compiled CapcomSnes commands should render without reopening source-version configuration");
 }
@@ -1061,8 +1057,6 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
   expect(sequence != nullptr, "CapcomSnes note-state scan should produce a sequence");
   expect(!sequence->program.tracks.empty(), "CapcomSnes note-state scan should decode tracks");
 
-  const auto* dialect = session.formats().findDialect(sequence->program.dialect.value);
-  expect(dialect != nullptr, "CapcomSnes note-state scan should have a registered dialect");
   const auto& track = sequence->program.tracks[0];
   const auto& commands = track.commands;
   expect(commands.size() == 4, "CapcomSnes note-state fixture should decode four commands");
@@ -1093,7 +1087,7 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
   expect(project.sourceMap().get(*attributeAnnotationId).label == "Note Attributes",
          "note-attribute annotation should carry a readable name");
 
-  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program, *dialect);
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program);
   const MidiSequence midiSequence = renderMidiSequence(performance);
   expect(midiSequence.diagnostics.empty(), "CapcomSnes note-state emission should not report diagnostics");
   expect(!midiSequence.tracks.empty(), "CapcomSnes note-state emission should preserve tracks");
@@ -1147,12 +1141,12 @@ void capcomSnesSourceDialectDecodesAndRendersDriverCommands() {
   expect(commandAnnotation(annotations, track.commands[1]).label == "Instrument",
          "CapcomSnes dialect should describe commands through local command code");
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.diagnostics.empty(), "CapcomSnes source dialect fixture should render without diagnostics");
   expect(performance.tracks.size() == 1, "CapcomSnes source dialect fixture should render one track");
   expect(performance.tracks[0].endTick == 18,
@@ -1189,12 +1183,12 @@ void capcomSnesInitialDurationRateIsFullLength() {
   expect(track.commands.size() == 2, "CapcomSnes duration fixture should decode note and end");
 
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.diagnostics.empty(), "CapcomSnes duration fixture should render without diagnostics");
 
   const auto note = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
@@ -1226,12 +1220,12 @@ void capcomSnesPanPerformanceCarriesGainCompensation() {
          "CapcomSnes pan annotation should expose the source engine's stereo gains");
 
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.diagnostics.empty(), "CapcomSnes pan fixture should render without diagnostics");
   expect(performance.tracks[0].events.size() == 3,
          "CapcomSnes pan fixture should emit initial defaults and one pan event");
@@ -1301,12 +1295,12 @@ void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
          "CapcomSnes no-op command should persist no-op playback status");
 
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.diagnostics.empty(), "CapcomSnes source-only commands should render without diagnostics");
   expect(performance.tracks[0].events.size() == 7,
          "CapcomSnes source-only commands should emit semantic performance events where possible");
@@ -1365,12 +1359,12 @@ void capcomSnesReleaseRateIsStickyAcrossInstrumentChanges() {
          "CapcomSnes $1D should expose the driver's OR-$A0 GAIN byte and its physical release time");
 
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program, dialect);
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
   expect(performance.diagnostics.empty(), "CapcomSnes dynamic release fixture should render without diagnostics");
 
   std::vector<const EnvelopePerformanceEvent*> envelopes;
@@ -1462,12 +1456,12 @@ void capcomSnesDialectEmitsStructuredPitchSlides() {
          "CapcomSnes portamento fixture should decode tempo, portamento, vibrato, slur, notes, and end");
 
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.diagnostics.empty(), "CapcomSnes portamento fixture should render without diagnostics");
   std::vector<const NotePerformanceEvent*> notes;
   for (const auto& event : performance.tracks[0].events) {
@@ -1607,12 +1601,12 @@ void capcomSnesDialectExecutesRepeatUntilCommand() {
          "CapcomSnes repeat display should preserve slot, count, and destination in source annotations");
 
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.diagnostics.empty(), "CapcomSnes finite repeat should render without diagnostics");
   expect(performance.tracks[0].events.size() == 5,
          "CapcomSnes repeat count should emit initial defaults and replay the loop body");
@@ -1660,12 +1654,12 @@ void capcomSnesDialectAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken() {
          "CapcomSnes repeat-break display should preserve slot, attributes, and destination in source annotations");
 
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.diagnostics.empty(), "CapcomSnes repeat-break should render without diagnostics");
   expect(performance.tracks[0].events.size() >= 5,
          "CapcomSnes repeat-break should emit initial defaults and repeated notes");
@@ -1752,12 +1746,12 @@ void capcomSnesV1DialectPreservesUnknownOneByteEvents() {
          "CapcomSnes V1 ignored event should preserve its opcode and operand bytes in source annotations");
 
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = capcomSnesSequenceRuntime(version),
       .timebase = dialect.timebase,
-      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.diagnostics.empty(), "CapcomSnes V1 unknown one-byte events should render without diagnostics");
   expect(performance.tracks[0].events.size() == 3,
          "CapcomSnes V1 fixture should emit initial defaults and still reach the later note");

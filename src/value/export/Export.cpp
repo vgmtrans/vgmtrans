@@ -270,7 +270,7 @@ Artifact exportStandaloneSequenceMidi(const SessionSnapshot& snapshot, AssetId s
     };
   }
 
-  const auto rendering = renderSequence(*sequence, formats, request);
+  const auto rendering = renderSequence(*sequence, request);
   const auto midi = renderMidi(rendering, {}, request.midi, ModulationConversionPolicy::SequenceEventSimulation);
   return exportMidi(artifactBaseName(*sequence), rendering, midi, ModulationScalingPolicy::FullFormatRange,
                     ModulationConversionPolicy::SequenceEventSimulation);
@@ -399,7 +399,7 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
       .dynamicEnvelopes = request.dynamicEnvelopes,
       .sampleFiltering = request.sampleFiltering,
   };
-  auto rendering = renderCollection(prepared, formats, exportRequest.sequence);
+  auto rendering = renderCollection(prepared, exportRequest.sequence);
   auto dynamicEnvelopes = materializeCollectionDynamicEnvelopes(prepared, rendering, exportRequest.dynamicEnvelopes);
   const auto* preparedPerformance =
       dynamicEnvelopes ? &dynamicEnvelopes->performance : (rendering.performance ? &*rendering.performance : nullptr);
@@ -454,7 +454,7 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
 
   const auto requireRendering = [&]() -> const RenderedCollection& {
     if (!rendering) {
-      rendering = renderCollection(prepared, formats, request.sequence);
+      rendering = renderCollection(prepared, request.sequence);
     }
     return *rendering;
   };

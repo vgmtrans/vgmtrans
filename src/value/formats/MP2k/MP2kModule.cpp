@@ -88,14 +88,11 @@ void scanLayout(const Mp2kLayout& layout, ScanResultBuilder& result) {
 
 }  // namespace
 
-FormatDefinition mp2kDefinition() {
-  return FormatDefinition{
-      .module = {
-          .name = std::string(kMp2kFormatName),
-          .acceptedFormats = {source_formats::kGbaRom},
-          .scan = scanMp2k,
-      },
-      .sequenceDialects = {mp2kSequenceDialect()},
+FormatModule mp2kModule() {
+  return FormatModule{
+      .name = std::string(kMp2kFormatName),
+      .acceptedFormats = {source_formats::kGbaRom},
+      .scan = scanMp2k,
   };
 }
 

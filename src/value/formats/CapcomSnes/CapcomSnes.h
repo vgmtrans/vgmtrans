@@ -7,7 +7,7 @@
 #pragma once
 
 #include "value/base/Source.h"
-#include "value/scan/FormatDefinition.h"
+#include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceDialect.h"
 
@@ -53,6 +53,7 @@ struct CapcomSnesInstrumentInfo {
 [[nodiscard]] std::optional<CapcomSnesLayout> findCapcomSnesLayout(core::ByteReader reader);
 
 [[nodiscard]] const core::SequenceDialect& capcomSnesSequenceDialect();
+[[nodiscard]] core::SequenceRuntime capcomSnesSequenceRuntime(CapcomSnesEngineVersion version);
 
 // Focused seam for command-decoder tests. Whole-format parsing uses one shared
 // TrackDecodeScope internally rather than rebuilding these values per track.
@@ -78,6 +79,6 @@ struct CapcomSnesTrackDecodeOptions {
                                                                     u32 instrumentTableAddress, u32 spcDirAddress,
                                                                     std::string_view displayName);
 
-[[nodiscard]] core::FormatDefinition capcomSnesDefinition();
+[[nodiscard]] core::FormatModule capcomSnesModule();
 
 }  // namespace vgmtrans::formats::capcom_snes

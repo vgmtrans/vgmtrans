@@ -30,10 +30,6 @@ namespace {
 
 constexpr u32 kMaxTrackCommands = 262144;
 constexpr size_t kToneCount = 128;
-constexpr size_t kToneWaveBase = kToneCount;
-constexpr size_t kToneEnvelopeBase = kToneCount * 2;
-constexpr size_t kReverbIndex = kToneCount * 3;
-constexpr size_t kDriverDataSize = kReverbIndex + 1;
 constexpr ValueQuantization kMp2kLevelQuantization{.levels = 128};
 constexpr std::array<u8, 49> kClockTable{
     0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
@@ -52,31 +48,13 @@ struct ToneState {
   u8 release = 0;
 };
 
+struct RuntimeConfig {
+  std::vector<ToneState> tones;
+  double reverbSend = 0.0;
+};
+
 struct ProgramState {
-  explicit ProgramState(const SequenceProgram& program) {
-    const auto& data = program.config.driverData;
-    const auto word = [&](size_t index) { return index < data.size() ? data[index] : u32{0}; };
-    const size_t toneCount = std::min(kToneCount, data.size());
-    tones.reserve(toneCount);
-    for (size_t index = 0; index < toneCount; ++index) {
-      const u32 packed = word(index);
-      const u32 envelope = word(kToneEnvelopeBase + index);
-      tones.push_back(ToneState{
-          .type = static_cast<u8>(packed),
-          .key = static_cast<u8>(packed >> 8),
-          .length = static_cast<u8>(packed >> 16),
-          .panSweep = static_cast<u8>(packed >> 24),
-          .wave = word(kToneWaveBase + index),
-          .attack = static_cast<u8>(envelope),
-          .decay = static_cast<u8>(envelope >> 8),
-          .sustain = static_cast<u8>(envelope >> 16),
-          .release = static_cast<u8>(envelope >> 24),
-      });
-    }
-    if (data.size() > kReverbIndex) {
-      reverbSend = data[kReverbIndex] / 127.0;
-    }
-  }
+  explicit ProgramState(const RuntimeConfig& config) : tones(config.tones), reverbSend(config.reverbSend) {}
 
   std::vector<ToneState> tones;
   double reverbSend = 0.0;
@@ -821,7 +799,6 @@ struct DecodeContext {
 
 const SequenceDialect& mp2kSequenceDialect() {
   static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{.value = std::string(kMp2kSequenceDialectId)},
       .commandDetailKindPrefix = "mp2k",
       .timebase = Timebase{.ppqn = 24},
       .defaultBehavior =
@@ -845,15 +822,25 @@ SequenceProgram parseMp2kSequenceProgram(ByteReader reader, AssetId id, const Mp
   const SequenceDialect& dialect = mp2kSequenceDialect();
   const u32 headerSize = 8 + song.declaredTracks * 4;
   SequenceProgram program = dialect.makeProgram(Address{song.offset});
-  program.behavior = dialect.defaultBehavior;
-  program.config.driverData.resize(kDriverDataSize);
+  RuntimeConfig runtime{.reverbSend = song.reverb / 127.0};
+  runtime.tones.reserve(kToneCount);
   for (u32 index = 0; index < kToneCount && reader.has(song.bankOffset + index * 12, 8); ++index) {
     const u32 tone = song.bankOffset + index * 12;
-    program.config.driverData[index] = reader.le32(tone);
-    program.config.driverData[kToneWaveBase + index] = reader.le32(tone + 4);
-    program.config.driverData[kToneEnvelopeBase + index] = reader.le32(tone + 8);
+    const u32 packed = reader.le32(tone);
+    const u32 envelope = reader.le32(tone + 8);
+    runtime.tones.push_back(ToneState{
+        .type = static_cast<u8>(packed),
+        .key = static_cast<u8>(packed >> 8),
+        .length = static_cast<u8>(packed >> 16),
+        .panSweep = static_cast<u8>(packed >> 24),
+        .wave = reader.le32(tone + 4),
+        .attack = static_cast<u8>(envelope),
+        .decay = static_cast<u8>(envelope >> 8),
+        .sustain = static_cast<u8>(envelope >> 16),
+        .release = static_cast<u8>(envelope >> 24),
+    });
   }
-  program.config.driverData[kReverbIndex] = song.reverb;
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, std::move(runtime));
 
   std::optional<SourceAnnotationId> header;
   if (sourceMap && reader.has(song.offset, headerSize)) {

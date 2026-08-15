@@ -11,6 +11,7 @@
 #include "value/model/SourceMap.h"
 #include "value/sequence/SequenceExecution.h"
 
+#include <any>
 #include <functional>
 #include <optional>
 #include <string>
@@ -22,12 +23,59 @@
 namespace vgmtrans::core {
 
 class ByteReader;
+class PerformanceEmitter;
+class VmApi;
+struct PerformanceSequence;
+struct SequenceProgram;
+struct SourceCommand;
+struct TrackProgram;
 
-struct DialectId {
-  std::string value;
+enum class PitchTransitionRenderingHint {
+  Portamento,
+  PitchBend,
+};
 
-  [[nodiscard]] bool valid() const noexcept { return !value.empty(); }
-  friend bool operator==(const DialectId&, const DialectId&) noexcept = default;
+enum class SemanticPrepassMode {
+  // Render immediately; the format does not need information from later
+  // commands before it can emit the first event.
+  None,
+  // Run a silent first pass in normal time order. Use this when one track can
+  // change a song-wide value that another track reads.
+  ScheduledPlayback,
+  // Visit every decoded command once in source order. Use this to collect
+  // limits from blocks that normal control flow might skip.
+  DecodedCommands,
+};
+
+using CreateProgramState = std::function<std::any(const SequenceProgram&)>;
+using CreateTrackState = std::function<std::any(const SequenceProgram&, const TrackProgram&)>;
+using ExecuteCommand = Effects (*)(const SourceCommand&, std::any& programState, std::any& trackState,
+                                   PerformanceEmitter& out, VmApi& vm);
+using CommandReadyDuringWait = bool (*)(const SourceCommand&, std::any& programState, std::any& trackState,
+                                        PerformanceEmitter& out, VmApi& vm);
+using TickTrackState = void (*)(const SourceCommand&, std::any& programState, std::any& trackState,
+                                PerformanceEmitter& out, VmApi& vm);
+using FinishPrepass = void (*)(std::any& programState);
+using BeginTrackSection = void (*)(std::any& trackState);
+using FinalizePerformance = void (*)(std::any& programState, PerformanceSequence& performance);
+
+// A parsed program owns the exact process-local runtime that executes it.
+// Only state creation is closure-backed so immutable typed format settings can
+// be captured without a generic configuration schema.
+struct SequenceRuntime {
+  bool inferLoopsFromRepeatedState = true;
+  PitchTransitionRenderingHint preferredPitchTransitionRendering = PitchTransitionRenderingHint::Portamento;
+  CreateProgramState createProgramState;
+  CreateTrackState createTrackState;
+  ExecuteCommand execute = nullptr;
+  CommandReadyDuringWait readyDuringWait = nullptr;
+  TickTrackState tick = nullptr;
+  FinishPrepass finishPrepass = nullptr;
+  BeginTrackSection beginTrackSection = nullptr;
+  FinalizePerformance finalizePerformance = nullptr;
+  SemanticPrepassMode prepass = SemanticPrepassMode::None;
+
+  [[nodiscard]] bool valid() const noexcept { return execute != nullptr; }
 };
 
 enum class StaticTransitionKind {
@@ -273,20 +321,12 @@ struct AddressIndex {
   [[nodiscard]] std::optional<u32> find(Address address) const;
 };
 
-struct TrackProgramConfig {
-  // Small format-defined state captured for this track.
-  u32 driverState = 0;
-  // Larger source-free lookup tables used to initialize format playback.
-  std::vector<u32> driverData;
-};
-
 struct TrackProgram {
   TrackId id;
   u32 sourceTrackNumber = 0;
   Address startAddress;
   std::vector<SourceCommand> commands;
   AddressIndex addressIndex;
-  TrackProgramConfig config;
 };
 
 // Some drivers arrange a song as a playlist of parallel track sections. A
@@ -329,8 +369,8 @@ struct SectionPlaylist {
 };
 
 // Positional pan needs a source-domain law to define its channel gains.
-// Unspecified is an internal sentinel used while program and dialect behavior
-// are being resolved; emitting positional pan with it is an error.
+// Unspecified means the program has not declared one; emitting positional pan
+// with it is an error.
 enum class PanLaw {
   Unspecified,
   ConstantSum,
@@ -354,7 +394,7 @@ using InitialStereoBalance = std::variant<UnresolvedInitialStereoBalance, OmitIn
 // such as loop policy or initial channel state.
 struct SequenceProgramBehavior {
   LoopPolicy defaultLoopPolicy = LoopPolicy::Default;
-  // Zero means "use the next default": program -> dialect -> VM fallback.
+  // Zero means use the VM fallback.
   u32 commandLimit = 0;
   // Formats that emit a normalized pan position declare its law once here.
   // Formats with exact left/right gains should emit StereoBalance instead.
@@ -369,31 +409,20 @@ struct SequenceProgramBehavior {
   std::optional<double> initialExpression;
   std::optional<double> initialReverbSend;
   // Omission must be deliberate. The default sentinel must be resolved before
-  // rendering by either the dialect or the parsed program.
+  // rendering by the parsed program.
   InitialStereoBalance initialStereoBalance = unresolvedInitialStereoBalance;
   std::optional<u8> initialMonoModeChannels;
   std::optional<u8> initialPitchBendRangeSemitones;
-  // Zero means "use the next default": program -> dialect -> MIDI's 120 BPM.
+  // Zero means use the VM's 120 BPM fallback.
   // The resolved source tempo also governs tempo-relative effects before the
   // first explicit tempo command.
   u32 initialTempoMicrosecondsPerQuarter = 0;
 };
 
-// Driver/profile selection belongs to the parsed program, not the registered
-// executor. A single dialect can therefore execute every version of a format.
-struct SequenceProgramConfig {
-  u32 profile = 0;
-  // Small format-defined state captured alongside the sequence.
-  u32 driverState = 0;
-  // Larger source-free lookup tables used by format playback.
-  std::vector<u32> driverData;
-};
-
 struct SequenceProgram {
-  DialectId dialect;
+  SequenceRuntime runtime;
   Timebase timebase;
   Address sourceBaseAddress;
-  SequenceProgramConfig config;
   SequenceProgramBehavior behavior;
   // Some drivers translate their encoded program byte through a table before
   // selecting an instrument. Decode that table once so runtime behavior stays

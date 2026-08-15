@@ -128,7 +128,7 @@ SequenceParse parse(const std::vector<u8>& bytes) {
 
 PerformanceSequence render(const std::vector<u8>& bytes) {
   SequenceParse parsed = parse(bytes);
-  return SequenceVm(LoopPolicy::PlayOnce).render(parsed.program, sequenceDialect());
+  return SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
 }
 
 void layoutAndModuleUseLiveSongState() {
@@ -140,7 +140,7 @@ void layoutAndModuleUseLiveSongState() {
          "CompileSnes should recover its revision, live song, tables, fixed pitch base, and DIR");
 
   Session session;
-  session.registerFormat(definition());
+  session.registerFormat(module());
   session.addSource(SourceFile{.name = "CompileSnes fixture.aram"}, bytes);
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
@@ -217,7 +217,8 @@ void trackAndPercussionFlagsDoNotBecomeStereoPhase() {
 
   const auto balances = events<StereoBalancePerformanceEvent>(render(bytes).tracks.front());
   expect(balances.size() >= 2 &&
-             std::ranges::all_of(balances, [](const auto* balance) {
+             std::ranges::all_of(
+                 balances, [](const auto* balance) {
                return balance->leftGain > 0.49 && balance->rightGain > 0.49;
              }),
          "track and percussion flags must not be mistaken for the separate stereo-phase register");
@@ -271,8 +272,8 @@ void portamentoUsesDriverRateAndRetriggersFirstNote() {
                           : pitchTransitionIntent(performance.tracks.front().automations.back());
   const auto* timing =
       slide == nullptr ? nullptr : std::get_if<FixedDurationPitchSlideTiming>(&slide->timing.physical);
-  const MidiSequence midi = renderMidiSequence(
-      performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  const MidiSequence midi =
+      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   const auto noteCount = std::ranges::count_if(
       midi.tracks.front().events, [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); });
   const auto portamentoCount = std::ranges::count_if(midi.tracks.front().events, [](const MidiEvent& event) {

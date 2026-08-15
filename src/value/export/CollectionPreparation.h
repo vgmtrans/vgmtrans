@@ -46,10 +46,10 @@ struct RenderedCollection {
 
 [[nodiscard]] PreparedCollection prepareCollection(const SessionSnapshot& snapshot, CollectionId collection,
                                                    const SourceStore& sources, const FormatRegistry& formats);
-[[nodiscard]] RenderedCollection renderSequence(const SequenceProgramAsset& sequence, const FormatRegistry& formats,
+[[nodiscard]] RenderedCollection renderSequence(const SequenceProgramAsset& sequence,
                                                 const SequenceRenderOptions& options,
                                                 const FinalizeCollectionPerformance* finalize = nullptr);
-[[nodiscard]] RenderedCollection renderCollection(const PreparedCollection& prepared, const FormatRegistry& formats,
+[[nodiscard]] RenderedCollection renderCollection(const PreparedCollection& prepared,
                                                   const SequenceRenderOptions& options);
 [[nodiscard]] std::optional<DynamicEnvelopeMaterialization> materializeCollectionDynamicEnvelopes(
     PreparedCollection& prepared, const RenderedCollection& rendering, DynamicEnvelopePolicy policy);

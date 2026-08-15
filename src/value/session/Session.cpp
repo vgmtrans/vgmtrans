@@ -35,16 +35,16 @@ void prepareDiagnosticRanges(std::vector<Diagnostic>& diagnostics, const SourceF
   }
 }
 
-void prepareDiagnostics(ScanResult& result, const SourceFile& source, const FormatRegistry& formats) {
+void prepareDiagnostics(ScanResult& result, const SourceFile& source) {
   for (const auto& asset : result.assets) {
     const auto* sequence = std::get_if<SequenceProgramAsset>(&asset);
-    if (sequence == nullptr || formats.containsDialect(sequence->program.dialect.value)) {
+    if (sequence == nullptr || sequence->program.runtime.valid()) {
       continue;
     }
 
     result.diagnostics.push_back(Diagnostic{
         .severity = Severity::Error,
-        .message = "No sequence dialect registered for '" + sequence->program.dialect.value + "'",
+        .message = "Sequence program has no runtime executor",
         .range = sequence->metadata.range.valid() ? std::optional<SourceRange>{sequence->metadata.range} : std::nullopt,
     });
   }
@@ -65,8 +65,8 @@ Session::~Session() = default;
 Session::Session(Session&&) noexcept = default;
 Session& Session::operator=(Session&&) noexcept = default;
 
-void Session::registerFormat(FormatDefinition definition) {
-  formats_.add(std::move(definition));
+void Session::registerFormat(FormatModule module) {
+  formats_.add(std::move(module));
 }
 
 void Session::registerExtractor(SourceExtractor extractor) {
@@ -372,7 +372,7 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
           .ids = ids_,
       });
       normalizeScanResult(result, ids_);
-      prepareDiagnostics(result, source, formats_);
+      prepareDiagnostics(result, source);
       auto validation = validateScanResult(source.id, result, sources_, state_->assets());
       if (!validation.empty()) {
         addValidationFailure(module.name, "scan", std::move(validation));

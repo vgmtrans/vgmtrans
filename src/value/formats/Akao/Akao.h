@@ -8,7 +8,6 @@
 
 #include "value/base/CoreTypes.h"
 #include "value/scan/FormatModule.h"
-#include "value/scan/FormatDefinition.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/SequenceDialect.h"
@@ -197,8 +196,6 @@ struct AkaoSplitSampleLocation {
                                                   const AkaoSequenceLayout& layout,
                                                   core::SourceMapBuilder* sourceMap = nullptr,
                                                   std::vector<core::Diagnostic>* diagnostics = nullptr);
-[[nodiscard]] std::vector<core::SequenceDialect> akaoSequenceDialects();
-
 [[nodiscard]] std::optional<AkaoSplitSampleLocation> ff7HardcodedAkaoSampleLocation(core::ByteReader reader);
 [[nodiscard]] bool isPossibleAkaoSampleCollection(core::ByteReader reader, u32 offset);
 [[nodiscard]] std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollectionData(const core::ScanInput& input,
@@ -227,6 +224,6 @@ struct AkaoSplitSampleLocation {
 [[nodiscard]] std::vector<core::DesiredCollection> resolveAkaoCollections(const core::MatchContext& context);
 [[nodiscard]] core::PreparedCollectionAssets prepareAkaoCollection(const core::CollectionPrepareContext& context);
 
-[[nodiscard]] core::FormatDefinition akaoDefinition();
+[[nodiscard]] core::FormatModule akaoModule();
 
 }  // namespace vgmtrans::formats::akao

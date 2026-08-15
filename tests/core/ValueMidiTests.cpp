@@ -1765,7 +1765,9 @@ void performanceMidiRendererResolvesSourceInstrumentIdentityAtExport() {
              std::get<ProgramChange>(midi.tracks[0].events[2]).program == 9 &&
              std::get<PitchBendRange>(midi.tracks[0].events[3]).cents == 2400 &&
              std::get<PitchBend>(midi.tracks[0].events[5]).value == -384 &&
-             std::ranges::count_if(midi.tracks[0].events, [](const MidiEvent& event) {
+             std::ranges::count_if(
+                 midi.tracks[0].events,
+                 [](const MidiEvent& event) {
                return std::holds_alternative<PitchBendRange>(event);
              }) == 1,
          "an automated bend should retain the selected instrument's pitch-wheel sensitivity");
@@ -2436,8 +2438,9 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
           },
       .program =
           SequenceProgram{
-              .dialect = dialect.id,
+              .runtime = dialect.makeProgram().runtime,
               .timebase = dialect.timebase,
+              .behavior = dialect.defaultBehavior,
               .tracks = {track},
           },
   });
@@ -2450,7 +2453,7 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
 
   SourceStore sources;
   FormatRegistry formats;
-  formats.add(testFormat(probeSequenceModule(), dialect));
+  formats.add(probeSequenceModule());
 
   const auto artifacts = exportCollection(project, sources, CollectionId{0},
                                           ExportRequest{
@@ -2492,8 +2495,9 @@ void standaloneSequenceExportDoesNotRequireACollection() {
           },
       .program =
           SequenceProgram{
-              .dialect = dialect.id,
+              .runtime = dialect.makeProgram().runtime,
               .timebase = dialect.timebase,
+              .behavior = dialect.defaultBehavior,
               .tracks = {track},
           },
   });
@@ -2501,7 +2505,7 @@ void standaloneSequenceExportDoesNotRequireACollection() {
   expect(snapshot.collections().empty(), "standalone MIDI fixture should not contain a collection");
 
   FormatRegistry formats;
-  formats.add(testFormat(probeSequenceModule(), dialect));
+  formats.add(probeSequenceModule());
   const SourceStore sources;
   const Artifact artifact = exportSequenceMidi(snapshot, sources, AssetId{7}, SequenceExportRequest{}, formats);
 

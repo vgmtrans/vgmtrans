@@ -48,14 +48,11 @@ using namespace core;
   return result.finish();
 }
 
-FormatDefinition konamiSnesDefinition() {
-  return FormatDefinition{
-      .module = {.name = "KonamiSnes",
-                 .preferredSampleFilter = SampleFilter::SnesDspLowPass,
-                 .acceptedFormats = {source_formats::kSnesAram},
-                 .scan = scanKonamiSnes},
-      .sequenceDialects = konamiSnesSequenceDialects(),
-  };
+FormatModule konamiSnesModule() {
+  return FormatModule{.name = "KonamiSnes",
+                      .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+                      .acceptedFormats = {source_formats::kSnesAram},
+                      .scan = scanKonamiSnes};
 }
 
 }  // namespace vgmtrans::formats::konami_snes

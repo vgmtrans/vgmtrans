@@ -716,7 +716,13 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
 
   const SequenceProgramAsset sequence{
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "Probe", .name = "Usage"},
-      .program = SequenceProgram{.dialect = dialect.id, .timebase = dialect.timebase, .tracks = {track}},
+      .program =
+          SequenceProgram{
+              .runtime = dialect.makeProgram().runtime,
+              .timebase = dialect.timebase,
+              .behavior = dialect.defaultBehavior,
+              .tracks = {track},
+          },
   };
   const AssetId sampleCollectionId{2};
   const auto sample = [&](std::string name, u64 offset) {
@@ -766,7 +772,7 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
           },
   });
   FormatRegistry formats;
-  formats.add(testFormat(probeSequenceModule(), dialect));
+  formats.add(probeSequenceModule());
   const SessionSnapshot snapshot = builder.finish();
 
   const auto complete = exportCollection(snapshot, sources, CollectionId{0},
@@ -899,16 +905,23 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
              exactBankData.samples.size() == 1 && exactBankData.samples[0].name == "Noise Wave",
          "a large logical instrument bank should not be reinterpreted as packed MIDI");
 
+  SequenceProgramAsset missingRuntimeSequence = sequence;
+  missingRuntimeSequence.program.runtime = {};
+  test::SessionSnapshotBuilder missingRuntimeBuilder;
+  missingRuntimeBuilder.assets = {missingRuntimeSequence, instruments, samples};
+  missingRuntimeBuilder.collections = snapshot.collections();
+  const SessionSnapshot missingRuntimeSnapshot = missingRuntimeBuilder.finish();
+
   for (const auto kind : {ExportKind::SoundFont2, ExportKind::Dls}) {
-    const auto failed = exportCollection(snapshot, sources, CollectionId{0},
+    const auto failed = exportCollection(missingRuntimeSnapshot, sources, CollectionId{0},
                                          ExportRequest{
                                              .kinds = {kind},
                                              .exportOnlyUsedInstruments = true,
                                          },
-                                         FormatRegistry{});
+                                         formats);
     expect(failed.size() == 1 && failed[0].bytes.empty(),
            "used-instrument export should stop when sequence rendering fails");
-    diagnosticWithMessage(failed[0].diagnostics, "No sequence dialect registered for 'probe'");
+    diagnosticWithMessage(failed[0].diagnostics, "Sequence program has no runtime executor");
     expect(std::ranges::none_of(failed[0].diagnostics,
                                 [](const Diagnostic& diagnostic) {
                                   return diagnostic.message.starts_with("No decodable samples available");
@@ -971,7 +984,13 @@ void collectionPreparationAppliesToWholeExport() {
 
   const SequenceProgramAsset sequence{
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "Performance Finalizer", .name = "Sequence"},
-      .program = SequenceProgram{.dialect = dialect.id, .timebase = dialect.timebase, .tracks = {track}},
+      .program =
+          SequenceProgram{
+              .runtime = dialect.makeProgram().runtime,
+              .timebase = dialect.timebase,
+              .behavior = dialect.defaultBehavior,
+              .tracks = {track},
+          },
   };
   const InstrumentSetAsset instruments{
       .metadata = AssetMetadata{.id = AssetId{1}, .format = "Performance Finalizer", .name = "Durable Bank"},
@@ -1011,13 +1030,11 @@ void collectionPreparationAppliesToWholeExport() {
   builder.collections.push_back(std::move(failingCollection));
 
   FormatRegistry formats;
-  formats.add(testFormat(
-      FormatModule{
-          .name = "Performance Finalizer",
-          .scan = scanNoSources,
-          .prepareCollection = preparePerformanceFinalizer,
-      },
-      dialect));
+  formats.add(FormatModule{
+      .name = "Performance Finalizer",
+      .scan = scanNoSources,
+      .prepareCollection = preparePerformanceFinalizer,
+  });
   formats.seal();
   const SessionSnapshot snapshot = builder.finish();
   const CollectionPlayback playback =
@@ -1070,11 +1087,11 @@ void collectionPreparationReplacesDurableInstrumentSets() {
   });
 
   FormatRegistry formats;
-  formats.add(testFormat(FormatModule{
+  formats.add(FormatModule{
       .name = "Prepared Probe",
       .scan = scanNoSources,
       .prepareCollection = prepareReplacementInstrumentSet,
-  }));
+  });
   formats.seal();
   const auto artifacts =
       exportCollection(builder.finish(), sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Dls}}, formats);
@@ -1093,7 +1110,7 @@ u32 synthOnlySequenceExecutions = 0;
 Effects countSynthOnlySequenceExecution(const SourceCommand& command, std::any& programState, std::any& trackState,
                                         PerformanceEmitter& out, VmApi& vm) {
   ++synthOnlySequenceExecutions;
-  static const ExecuteCommand execute = probeSequenceDialect().execute;
+  static const ExecuteCommand execute = probeSequenceDialect().runtime.execute;
   return execute(command, programState, trackState, out, vm);
 }
 
@@ -1102,8 +1119,7 @@ void synthOnlyExportSkipsSequencesWithoutModulation() {
   const SourceId source = sources.add(SourceFile{.name = "no-modulation.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
 
   SequenceDialect dialect = probeSequenceDialect();
-  dialect.id = DialectId{.value = "probe-no-modulation"};
-  dialect.execute = countSynthOnlySequenceExecution;
+  dialect.runtime.execute = countSynthOnlySequenceExecution;
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder trackBuilder(track);
   const std::array<u8, 3> noteBytes{0x90, 0x3c, 0x04};
@@ -1113,7 +1129,13 @@ void synthOnlyExportSkipsSequencesWithoutModulation() {
 
   const SequenceProgramAsset sequence{
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "Probe", .name = "No Modulation"},
-      .program = SequenceProgram{.dialect = dialect.id, .timebase = dialect.timebase, .tracks = {track}},
+      .program =
+          SequenceProgram{
+              .runtime = dialect.makeProgram().runtime,
+              .timebase = dialect.timebase,
+              .behavior = dialect.defaultBehavior,
+              .tracks = {track},
+          },
   };
   const SampleCollectionAsset samples{
       .metadata = AssetMetadata{.id = AssetId{2}, .format = "Probe", .name = "Samples"},
@@ -1145,7 +1167,7 @@ void synthOnlyExportSkipsSequencesWithoutModulation() {
           },
   });
   FormatRegistry formats;
-  formats.add(testFormat(probeSequenceModule(), dialect));
+  formats.add(probeSequenceModule());
 
   synthOnlySequenceExecutions = 0;
   const auto artifacts = exportCollection(builder.finish(), sources, CollectionId{0},
@@ -1296,7 +1318,13 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
 
   const SequenceProgramAsset sequence{
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "Probe", .name = "Playback Sequence"},
-      .program = SequenceProgram{.dialect = dialect.id, .timebase = dialect.timebase, .tracks = {track}},
+      .program =
+          SequenceProgram{
+              .runtime = dialect.makeProgram().runtime,
+              .timebase = dialect.timebase,
+              .behavior = dialect.defaultBehavior,
+              .tracks = {track},
+          },
   };
   const SampleCollectionAsset samples{
       .metadata = AssetMetadata{.id = AssetId{2}, .format = "Probe", .name = "Playback Samples"},
@@ -1330,7 +1358,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
           },
   });
   FormatRegistry formats;
-  formats.add(testFormat(probeSequenceModule(), dialect));
+  formats.add(probeSequenceModule());
 
   const auto playback =
       prepareCollectionPlayback(builder.finish(), sources, CollectionId{0}, PlaybackRequest{}, formats);

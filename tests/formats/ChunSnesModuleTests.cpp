@@ -73,7 +73,7 @@ void runChunSnesModuleTests() {
   expect(track.commands.size() == 15 && track.commands[6].opcode == 0xfb && track.commands[10].opcode == 0x51,
          "top-level pattern end should preserve the following commands");
 
-  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program, sequenceDialect());
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
   expect(performance.diagnostics.empty(), "ChunSnes compiled playback should be source-free and diagnostic-free");
   expect(performance.tracks.size() == 1 && performance.tracks.front().endTick == 168,
          "ChunSnes note length and track end should follow the 48 PPQN driver timeline");
@@ -131,8 +131,7 @@ void runChunSnesModuleTests() {
                                                         .sequenceHeaderAddress = 0x400,
                                                     },
                                                     AssetId{2});
-  const PerformanceSequence synchronizedPerformance =
-      SequenceVm(LoopPolicy::PlayOnce).render(synchronized.program, sequenceDialect());
+  const PerformanceSequence synchronizedPerformance = SequenceVm(LoopPolicy::PlayOnce).render(synchronized.program);
   expect(synchronizedPerformance.tracks.size() == 3, "duration-copy regression should render all three tracks");
   for (const PerformanceTrack& synchronizedTrack : synchronizedPerformance.tracks) {
     const auto note = std::ranges::find_if(synchronizedTrack.events, [](const PerformanceEvent& event) {

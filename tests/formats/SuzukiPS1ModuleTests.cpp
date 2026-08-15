@@ -143,7 +143,7 @@ void suzukiPs1DynamicAdsrUsesAuditedDriverCommands() {
   expect(c1 != track.commands.end() && c1->encodedSize == 4 && c3 != track.commands.end() && c3->encodedSize == 2,
          "audited C1 and C3 operand lengths should keep the stream synchronized");
 
-  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program, suzukiPs1SequenceDialect());
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
   expect(performance.diagnostics.empty(), "SuzukiPS1 ADSR fixture should render without diagnostics");
   const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(performance.tracks.front());
   expect(envelopes.size() == 12,
@@ -162,7 +162,7 @@ void suzukiPs1DynamicAdsrUsesAuditedDriverCommands() {
 
 void suzukiPs1ModuleBuildsFractionallyTunedWdsSynth() {
   Session session;
-  session.registerFormat(suzukiPs1Definition());
+  session.registerFormat(suzukiPs1Module());
   session.addSource(SourceFile{.name = "SuzukiPS1 fixture.bin"}, scannerFixture());
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();

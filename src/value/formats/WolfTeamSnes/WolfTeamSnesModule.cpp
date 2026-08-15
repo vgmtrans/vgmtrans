@@ -43,14 +43,11 @@ namespace {
 
 }  // namespace
 
-FormatDefinition definition() {
-  return FormatDefinition{
-      .module = {.name = "WolfTeamSnes",
-                 .preferredSampleFilter = SampleFilter::SnesDspLowPass,
-                 .acceptedFormats = {source_formats::kSnesAram},
-                 .scan = scan},
-      .sequenceDialects = {sequenceDialect()},
-  };
+FormatModule module() {
+  return FormatModule{.name = "WolfTeamSnes",
+                      .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+                      .acceptedFormats = {source_formats::kSnesAram},
+                      .scan = scan};
 }
 
 }  // namespace vgmtrans::formats::wolf_team_snes

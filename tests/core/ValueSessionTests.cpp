@@ -22,7 +22,7 @@ void sessionScansValuesAndDerivedSources() {
   session.registerExtractor(probeSequenceContainerExtractor());
   auto sequenceModule = probeSequenceModule();
   sequenceModule.acceptedFormats = {"probe-sequence"};
-  session.registerFormat(testFormat(std::move(sequenceModule), probeSequenceDialect()));
+  session.registerFormat(std::move(sequenceModule));
 
   const auto sourceId = session.addSource(SourceFile{.name = "probe.spc"}, {0xaa, 0x34, 0x12});
   expect(sourceId == SourceId{0}, "first source should get SourceId 0");
@@ -106,7 +106,7 @@ void sessionRoutesKnownFormatsAndConsumesExtractedParents() {
             };
           },
   });
-  session.registerFormat(testFormat(FormatModule{
+  session.registerFormat(FormatModule{
       .name = "Target",
       .acceptedFormats = {"target-format"},
       .scan =
@@ -121,15 +121,15 @@ void sessionRoutesKnownFormatsAndConsumesExtractedParents() {
             out.sourceMap().annotation(SourceRole::Payload, "Target Asset", range).owner(ObjectRefs::misc(asset.id()));
             return out.finish();
           },
-  }));
-  session.registerFormat(testFormat(FormatModule{
+  });
+  session.registerFormat(FormatModule{
       .name = "Unrelated",
       .scan =
           [&](const ScanInput&) {
             ++unrelatedCalls;
             return ScanResult{};
           },
-  }));
+  });
 
   session.addSource(SourceFile{.name = "container.bin"}, {0xe0});
   session.scanPendingSources();
@@ -152,7 +152,7 @@ void sessionRoutesKnownFormatsAndConsumesExtractedParents() {
 
 void sessionDiagnosesUnsupportedKnownFormats() {
   Session session;
-  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
+  session.registerFormat(probeSequenceModule());
   session.addSource(SourceFile{.name = "unsupported.bin", .knownFormat = "unsupported-format"}, {0xaa});
   session.scanPendingSources();
 
@@ -165,7 +165,7 @@ void sessionDiagnosesUnsupportedKnownFormats() {
 
 void sessionSharesOneImmutableSnapshotPerRevision() {
   Session session;
-  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
+  session.registerFormat(probeSequenceModule());
 
   const auto firstSource = session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
   const SessionSnapshot beforeScan = session.snapshot();
@@ -218,34 +218,44 @@ void sessionSharesOneImmutableSnapshotPerRevision() {
          "removal should retain the backing of unaffected chunks");
 }
 
-void sessionReportsUnregisteredSequenceDialect() {
+void sessionReportsMissingSequenceRuntime() {
   Session session;
-  session.registerFormat(testFormat(probeSequenceModule()));
+  auto module = probeSequenceModule();
+  module.scan = [](const ScanInput& input) {
+    ScanResult result = scanProbeSequence(input);
+    for (auto& asset : result.assets) {
+      if (auto* sequence = std::get_if<SequenceProgramAsset>(&asset)) {
+        sequence->program.runtime = {};
+      }
+    }
+    return result;
+  };
+  session.registerFormat(std::move(module));
 
-  session.addSource(SourceFile{.name = "missing-dialect.probe"}, {0xaa});
+  session.addSource(SourceFile{.name = "missing-runtime.probe"}, {0xaa});
   session.scanPendingSources();
   const SessionSnapshot project = session.snapshot();
-  expect(project.collections().size() == 1, "missing dialect fixture should still scan sequence collections");
-  expect(project.diagnostics().size() == 2, "missing dialect fixture should keep scan and registration diagnostics");
+  expect(project.collections().size() == 1, "missing runtime fixture should still scan sequence collections");
+  expect(project.diagnostics().size() == 2, "missing runtime fixture should keep scan and validation diagnostics");
 
-  const auto& diagnostic = diagnosticWithMessage(project.diagnostics(), "No sequence dialect registered for 'probe'");
-  expect(diagnostic.severity == Severity::Error, "missing sequence dialect should be reported as an error");
+  const auto& diagnostic = diagnosticWithMessage(project.diagnostics(), "Sequence program has no runtime executor");
+  expect(diagnostic.severity == Severity::Error, "missing sequence runtime should be reported as an error");
   expect(diagnostic.range && diagnostic.range->source == SourceId{0} && diagnostic.range->offset == 0 &&
              diagnostic.range->size == 1,
-         "missing sequence dialect diagnostic should point at the sequence asset range");
+         "missing sequence runtime diagnostic should point at the sequence asset range");
 
   const auto exports = session.exportAllCollections(ExportRequest{
       .kinds = {ExportKind::Midi},
   });
-  expect(exports.size() == 1, "missing dialect fixture should still attempt collection export");
-  expect(exports[0].artifacts.size() == 1, "missing dialect fixture should still return one MIDI artifact");
-  expectDiagnosticRange(exports[0].artifacts[0].diagnostics, "No sequence dialect registered for 'probe'",
+  expect(exports.size() == 1, "missing runtime fixture should still attempt collection export");
+  expect(exports[0].artifacts.size() == 1, "missing runtime fixture should still return one MIDI artifact");
+  expectDiagnosticRange(exports[0].artifacts[0].diagnostics, "Sequence program has no runtime executor",
                         SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
 }
 
 void sessionScansIndividualSourcesWithoutDuplicating() {
   Session session;
-  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
+  session.registerFormat(probeSequenceModule());
 
   const auto first = session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
   session.scanSource(first);
@@ -275,7 +285,7 @@ void sessionScansIndividualSourcesWithoutDuplicating() {
 
 void sessionClosesSourceFamiliesWhenScansFindNoAssets() {
   Session session;
-  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
+  session.registerFormat(probeSequenceModule());
   session.registerExtractor(SourceExtractor{
       .name = "ProbeEmptyExtractor",
       .extract =
@@ -318,7 +328,7 @@ void sessionClosesSourceFamiliesWhenScansFindNoAssets() {
 
 void sessionKeepsScannerKnownCollectionsWithoutResolver() {
   Session session;
-  session.registerFormat(testFormat(probeExplicitCollectionModule(), probeSequenceDialect()));
+  session.registerFormat(probeExplicitCollectionModule());
 
   const auto source = session.addSource(SourceFile{.name = "explicit.probe"}, {0xab});
   session.scanSource(source);
@@ -336,8 +346,8 @@ void sessionKeepsScannerKnownCollectionsWithoutResolver() {
 
 void sessionCreatesUserCollectionsFromDetectedAssets() {
   Session session;
-  session.registerFormat(testFormat(probeBankSequenceModule(), probeSequenceDialect()));
-  session.registerFormat(testFormat(probeBankInstrumentModule()));
+  session.registerFormat(probeBankSequenceModule());
+  session.registerFormat(probeBankInstrumentModule());
 
   const SourceId sequenceSource = session.addSource(SourceFile{.name = "manual.seq"}, {0xcc, 4});
   const SourceId instrumentSource = session.addSource(SourceFile{.name = "manual.instr"}, {0xdd, 4});
@@ -374,8 +384,8 @@ void sessionCreatesUserCollectionsFromDetectedAssets() {
 
 void sessionMatchesCollectionsAcrossSeparateSourceScans() {
   Session session;
-  session.registerFormat(testFormat(probeBankSequenceModule(), probeSequenceDialect()));
-  session.registerFormat(testFormat(probeBankInstrumentModule()));
+  session.registerFormat(probeBankSequenceModule());
+  session.registerFormat(probeBankInstrumentModule());
 
   const auto instrument = session.addSource(SourceFile{.name = "bank-7.instr"}, {0xdd, 7});
   session.scanSource(instrument);
@@ -407,7 +417,7 @@ void sessionRemovesSourceFamilyAndDiscoveredData() {
   session.registerExtractor(probeSequenceContainerExtractor());
   auto sequenceModule = probeSequenceModule();
   sequenceModule.acceptedFormats = {"probe-sequence"};
-  session.registerFormat(testFormat(std::move(sequenceModule), probeSequenceDialect()));
+  session.registerFormat(std::move(sequenceModule));
 
   const auto source = session.addSource(SourceFile{.name = "remove-me.probe"}, {0xaa, 0x34});
   session.scanSource(source);
@@ -480,10 +490,10 @@ void sessionRemovesSourceFamilyWithItsLastAsset() {
   });
   auto sequenceModule = probeSequenceModule();
   sequenceModule.acceptedFormats = {"probe-sequence"};
-  session.registerFormat(testFormat(std::move(sequenceModule), probeSequenceDialect()));
+  session.registerFormat(std::move(sequenceModule));
   auto miscModule = probeMiscModule();
   miscModule.acceptedFormats = {"probe-misc"};
-  session.registerFormat(testFormat(std::move(miscModule)));
+  session.registerFormat(std::move(miscModule));
 
   const SourceId source = session.addSource(SourceFile{.name = "remove-assets.probe"}, {0xaa, 0x34});
   session.scanSource(source);
@@ -522,8 +532,8 @@ void sessionRemovesSourceFamilyWithItsLastAsset() {
 
 void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
   Session session;
-  session.registerFormat(testFormat(probeBankSequenceModule(), probeSequenceDialect()));
-  session.registerFormat(testFormat(probeBankInstrumentModule()));
+  session.registerFormat(probeBankSequenceModule());
+  session.registerFormat(probeBankInstrumentModule());
 
   const auto instrument = session.addSource(SourceFile{.name = "bank-9.instr"}, {0xdd, 9});
   const auto sequence = session.addSource(SourceFile{.name = "bank-9.seq"}, {0xcc, 9});
@@ -560,7 +570,7 @@ void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
 
 void sessionResolverFailureDoesNotWipeExistingCollections() {
   Session session;
-  session.registerFormat(testFormat(fragileProbeSequenceModule(), probeSequenceDialect()));
+  session.registerFormat(fragileProbeSequenceModule());
 
   const auto first = session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
   session.scanSource(first);
@@ -579,7 +589,7 @@ void sessionResolverFailureDoesNotWipeExistingCollections() {
 
 void sessionMarksCollectionsStaleWhenRemovalCannotReconcile() {
   Session session;
-  session.registerFormat(testFormat(fragileProbeSequenceModule(), probeSequenceDialect()));
+  session.registerFormat(fragileProbeSequenceModule());
 
   const auto source = session.addSource(SourceFile{.name = "stale-on-failure.probe"}, {0xaa});
   session.scanSource(source);
@@ -604,13 +614,13 @@ void sessionMarksCollectionsStaleWhenRemovalCannotReconcile() {
 
 void sessionRejectsLateRegistryMutation() {
   Session session;
-  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
+  session.registerFormat(probeSequenceModule());
 
   session.addSource(SourceFile{.name = "sealed.probe"}, {0xaa});
 
   bool formatFailed = false;
   try {
-    session.registerFormat(testFormat(probeMiscModule()));
+    session.registerFormat(probeMiscModule());
   } catch (const std::logic_error&) {
     formatFailed = true;
   }
@@ -621,7 +631,7 @@ void sessionRejectsLateRegistryMutation() {
 
   bool emptyScanSealed = false;
   try {
-    scannedEmptySession.registerFormat(testFormat(probeSequenceModule()));
+    scannedEmptySession.registerFormat(probeSequenceModule());
   } catch (const std::logic_error&) {
     emptyScanSealed = true;
   }
@@ -630,7 +640,7 @@ void sessionRejectsLateRegistryMutation() {
 
 void sessionRejectsDuplicateAssetIdsAtAdmission() {
   Session session;
-  session.registerFormat(testFormat(probeDuplicateAssetModule()));
+  session.registerFormat(probeDuplicateAssetModule());
 
   session.addSource(SourceFile{.name = "duplicate.probe"}, {0xee});
   session.scanPendingSources();
@@ -648,7 +658,7 @@ void sessionRejectsDuplicateAssetIdsAtAdmission() {
 void sessionRejectsExtractedSourcesWithMissingParents() {
   Session session;
   session.registerExtractor(probeBadSourceExtractor());
-  session.registerFormat(testFormat(probeMiscModule()));
+  session.registerFormat(probeMiscModule());
 
   session.addSource(SourceFile{.name = "bad-derived-parent.probe"}, {0xf1});
   session.scanPendingSources();
@@ -663,7 +673,7 @@ void sessionRejectsExtractedSourcesWithMissingParents() {
 
 void sessionRejectsMatchFactsForMissingAssets() {
   Session session;
-  session.registerFormat(testFormat(probeBadFactAssetModule()));
+  session.registerFormat(probeBadFactAssetModule());
 
   session.addSource(SourceFile{.name = "bad-fact-asset.probe"}, {0xf2});
   session.scanPendingSources();
@@ -677,7 +687,7 @@ void sessionRejectsMatchFactsForMissingAssets() {
 
 void sessionRejectsSourceScopedMatchFactsForMissingSources() {
   Session session;
-  session.registerFormat(testFormat(probeBadFactSourceModule()));
+  session.registerFormat(probeBadFactSourceModule());
 
   session.addSource(SourceFile{.name = "bad-fact-source.probe"}, {0xf3});
   session.scanPendingSources();
@@ -829,24 +839,22 @@ void scanValidationReportsMultipleAdmissionErrors() {
       };
     }
 
-    case 2:
-      return ScanResult{
-          .assets = {SequenceProgramAsset{
-              .metadata = badRangeMetadata(assetId, "Bad Command Range", goodRange),
-              .program =
-                  SequenceProgram{
-                      .dialect = DialectId{.value = "probe"},
-                      .timebase = Timebase{.ppqn = 48},
-                      .tracks = {TrackProgram{
+    case 2: {
+      SequenceProgram program = probeSequenceDialect().makeProgram();
+      program.tracks = {TrackProgram{
                           .id = TrackId{0},
                           .commands = {SourceCommand{
                               .id = CommandId{0},
                               .range = badRange,
                           }},
-                      }},
-                  },
+      }};
+      return ScanResult{
+          .assets = {SequenceProgramAsset{
+              .metadata = badRangeMetadata(assetId, "Bad Command Range", goodRange),
+              .program = std::move(program),
           }},
       };
+    }
 
     case 3:
       return ScanResult{
@@ -1016,7 +1024,7 @@ void scanValidationRejectsDanglingSourceAnnotationReferences() {
 
 void sessionReportsDesiredCollectionMissingAssetReferences() {
   Session session;
-  session.registerFormat(testFormat(missingAssetCollectionResolverModule()));
+  session.registerFormat(missingAssetCollectionResolverModule());
 
   session.addSource(SourceFile{.name = "missing-refs.probe"}, {0x00});
   session.scanPendingSources();
@@ -1044,8 +1052,8 @@ void sessionReportsDesiredCollectionMissingAssetReferences() {
 
 void sessionReportsDesiredCollectionWrongTypeReferences() {
   Session session;
-  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
-  session.registerFormat(testFormat(wrongTypeCollectionResolverModule()));
+  session.registerFormat(probeSequenceModule());
+  session.registerFormat(wrongTypeCollectionResolverModule());
 
   session.addSource(SourceFile{.name = "wrong-type.probe"}, {0xaa});
   session.scanPendingSources();
@@ -1075,7 +1083,7 @@ void sessionReportsDesiredCollectionWrongTypeReferences() {
 
 void sessionReportsDuplicateDesiredCollectionKeys() {
   Session session;
-  session.registerFormat(testFormat(duplicateKeyCollectionResolverModule()));
+  session.registerFormat(duplicateKeyCollectionResolverModule());
 
   session.addSource(SourceFile{.name = "duplicate-keys.probe"}, {0x00});
   session.scanPendingSources();
@@ -1189,7 +1197,7 @@ void sessionAddsSourceFromPath() {
   }
 
   Session session;
-  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
+  session.registerFormat(probeSequenceModule());
 
   const auto sourceId = session.addSourceFromPath(path);
   expect(sourceId == SourceId{0}, "path source should get SourceId 0");
@@ -1211,7 +1219,7 @@ void sessionAddsSourceFromPath() {
 
 void sessionExportsAllCollections() {
   Session session;
-  session.registerFormat(testFormat(probeSequenceModule(), probeSequenceDialect()));
+  session.registerFormat(probeSequenceModule());
 
   session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
   session.addSource(SourceFile{.name = "second.probe"}, {0xaa});
@@ -1232,7 +1240,7 @@ void sessionExportsAllCollections() {
            "collection export should keep collection-derived artifact names");
     expect(exports[i].artifacts[0].mediaType == "audio/midi", "collection export should keep artifact media types");
     expect(exports[i].artifacts[0].diagnostics.empty(),
-           "registered probe sequence exports should not report missing dialect diagnostics");
+           "a probe sequence with an owned runtime should not report missing-runtime diagnostics");
   }
 }
 
@@ -1245,7 +1253,7 @@ void sessionExportsASequenceWithoutACollection() {
     result.explicitCollections.clear();
     return result;
   };
-  session.registerFormat(testFormat(std::move(format), probeSequenceDialect()));
+  session.registerFormat(std::move(format));
 
   session.addSource(SourceFile{.name = "loose.probe"}, {0xaa});
   session.scanPendingSources();
@@ -1288,7 +1296,7 @@ void runValueSessionTests() {
   sessionRoutesKnownFormatsAndConsumesExtractedParents();
   sessionDiagnosesUnsupportedKnownFormats();
   sessionSharesOneImmutableSnapshotPerRevision();
-  sessionReportsUnregisteredSequenceDialect();
+  sessionReportsMissingSequenceRuntime();
   sessionScansIndividualSourcesWithoutDuplicating();
   sessionClosesSourceFamiliesWhenScansFindNoAssets();
   sessionKeepsScannerKnownCollectionsWithoutResolver();

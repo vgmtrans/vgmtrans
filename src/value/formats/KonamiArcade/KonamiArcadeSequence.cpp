@@ -167,8 +167,12 @@ struct VibratoState {
 };
 
 struct TrackState {
-  TrackState(const SequenceProgram& program, const TrackProgram& track)
-      : version(static_cast<KonamiArcadeVersion>(program.config.profile)), sourceTrackNumber(track.sourceTrackNumber) {
+  struct RuntimeConfig {
+    KonamiArcadeVersion version = KonamiArcadeVersion::MysticWarrior;
+  };
+
+  TrackState(const TrackProgram& track, const RuntimeConfig& config)
+      : version(config.version), sourceTrackNumber(track.sourceTrackNumber) {
     pan.setCurrent(8.0);
   }
 
@@ -1146,7 +1150,6 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
 
 [[nodiscard]] SequenceDialect makeDialect() {
   return makeCompiledDialect<TrackState, Playback, SequenceState>(SequenceDialect{
-      .id = DialectId{.value = std::string(kKonamiArcadeSequenceDialectId)},
       .commandDetailKindPrefix = "konami-arcade",
       .timebase = Timebase{.ppqn = kKonamiArcadePpqn},
       .defaultBehavior =
@@ -1190,7 +1193,8 @@ SequenceProgram decodeKonamiArcadeSequence(ByteReader reader, const KonamiArcade
   }
 
   SequenceProgram program = sequence.finish();
-  program.config.profile = static_cast<u32>(layout.version);
+  bindCompiledRuntime<TrackState, Playback, SequenceState>(program,
+                                                           TrackState::RuntimeConfig{.version = layout.version});
   return program;
 }
 

@@ -72,14 +72,11 @@ namespace {
 
 }  // namespace
 
-FormatDefinition definition() {
-  return FormatDefinition{
-      .module = {.name = "NinSnes",
-                 .preferredSampleFilter = SampleFilter::SnesDspLowPass,
-                 .acceptedFormats = {source_formats::kSnesAram},
-                 .scan = scan},
-      .sequenceDialects = {sequenceDialect()},
-  };
+FormatModule module() {
+  return FormatModule{.name = "NinSnes",
+                      .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+                      .acceptedFormats = {source_formats::kSnesAram},
+                      .scan = scan};
 }
 
 }  // namespace vgmtrans::formats::nin_snes

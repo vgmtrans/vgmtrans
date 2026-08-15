@@ -265,11 +265,12 @@ void akaoVersion10OverlayCommandsUseLegacyLengthsAndProgramChange() {
          "Akao v1.0 overlay voice should require both articulations");
 
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = dialect.makeProgram().runtime,
       .timebase = dialect.timebase,
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   const auto instrument = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<InstrumentPerformanceEvent>(event);
   });
@@ -297,11 +298,12 @@ void akaoPanLawFollowsDriverProfile() {
 
   const SequenceDialect lateDialect = makeAkaoDialect(AkaoPs1Version::Version3_1);
   const SequenceProgram lateProgram{
-      .dialect = lateDialect.id,
+      .runtime = lateDialect.makeProgram().runtime,
       .timebase = lateDialect.timebase,
+      .behavior = lateDialect.defaultBehavior,
       .tracks = {decodeFixtureTrack(bytes, AkaoPs1Version::Version3_1, start, 0x40)},
   };
-  const PerformanceSequence performance = SequenceVm().render(lateProgram, lateDialect);
+  const PerformanceSequence performance = SequenceVm().render(lateProgram);
   const auto pan = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<PanPerformanceEvent>(event);
   });
@@ -326,11 +328,12 @@ void akaoLoopBranchUsesCurrentRepeatPass() {
   const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_0);
   const TrackProgram track = decodeFixtureTrack(bytes, AkaoPs1Version::Version1_0, start, 0x40);
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = dialect.makeProgram().runtime,
       .timebase = dialect.timebase,
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
 
   size_t skippedPhraseNotes = 0;
   bool sawExitNote = false;
@@ -363,11 +366,12 @@ void akaoTieAfterRestDoesNotExtendPreviousNote() {
   const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_2);
   const TrackProgram track = decodeFixtureTrack(bytes, AkaoPs1Version::Version1_2, start, 0x40);
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = dialect.makeProgram().runtime,
       .timebase = dialect.timebase,
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.diagnostics.empty(), "Akao tie-after-rest fixture should render without diagnostics");
 
   const auto noteCount = std::ranges::count_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
@@ -391,11 +395,12 @@ void akaoTempoFadeEmitsDriverTickRamp() {
   const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_2);
   const TrackProgram track = decodeFixtureTrack(bytes, AkaoPs1Version::Version1_2, start, 0x40);
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = dialect.makeProgram().runtime,
       .timebase = dialect.timebase,
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.diagnostics.empty(), "Akao tempo-fade fixture should render without diagnostics");
 
   std::vector<TempoPerformanceEvent> tempos;
@@ -433,11 +438,12 @@ void akaoPitchSlideAppliesOnceToTheNextNote() {
 
   const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version3_1);
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = dialect.makeProgram().runtime,
       .timebase = dialect.timebase,
+      .behavior = dialect.defaultBehavior,
       .tracks = {decodeFixtureTrack(bytes, AkaoPs1Version::Version3_1, start, 0x40)},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.diagnostics.empty(), "Akao pitch-slide fixture should render without diagnostics");
 
   std::vector<const NotePerformanceEvent*> notes;
@@ -481,11 +487,12 @@ void akaoPortamentoRetainsPitchTransitionIntent() {
 
   const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_2);
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = dialect.makeProgram().runtime,
       .timebase = dialect.timebase,
+      .behavior = dialect.defaultBehavior,
       .tracks = {decodeFixtureTrack(bytes, AkaoPs1Version::Version1_2, start, 0x40)},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.diagnostics.empty(), "Akao portamento fixture should render without diagnostics");
 
   std::vector<const NotePerformanceEvent*> notes;
@@ -673,7 +680,7 @@ void akaoScanPublishesStructuralInstrumentSetAndPreparesBoundView() {
   bytes[sampleDataOffset + 1] = 1;
 
   Session session;
-  session.registerFormat(akaoDefinition());
+  session.registerFormat(akaoModule());
   session.addSource(SourceFile{.name = "Chrono Cross synthetic.psf"}, bytes);
   session.scanPendingSources();
   const SessionSnapshot project = session.snapshot();

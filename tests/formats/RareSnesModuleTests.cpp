@@ -89,19 +89,14 @@ PerformanceSequence render(Profile profile, std::vector<u8> bytes, u32 floor = 0
   const auto& dialect = sequenceDialect();
   TrackProgram track = decodeSourceTrack(ByteReader(SourceId{90}, bytes), profile, trackNumber, 0, floor);
   SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = sequenceRuntime(profile, 0x80, defaultTimer(profile), monoOutput),
       .timebase = dialect.timebase,
-      .config =
-          SequenceProgramConfig{
-              .profile = static_cast<u32>(profile),
-              .driverState = 0x80u | (static_cast<u32>(defaultTimer(profile)) << 8) | (monoOutput ? (1u << 16) : 0),
-          },
       .behavior = dialect.defaultBehavior,
       .tracks = {std::move(track)},
   };
   const double initialChannelGain = profile == Profile::KillerInstinct ? 0.5 : 127.0 / 128.0;
   program.behavior.initialStereoBalance = StereoBalance{initialChannelGain, initialChannelGain};
-  return SequenceVm(LoopPolicy::PlayOnce).render(program, dialect);
+  return SequenceVm(LoopPolicy::PlayOnce).render(program);
 }
 
 template <class Event>
@@ -313,13 +308,8 @@ void rareSnesSignedStereoVolumesPreserveDriverRelativeLevels() {
       0x1c, 0x10, 0x08, 0x8e, 0xe0, 0x81, 2, 0x00,
   };
   SequenceProgram presetProgram{
-      .dialect = dialect.id,
+      .runtime = sequenceRuntime(Profile::DonkeyKongCountry, 0x80, 0x3c),
       .timebase = dialect.timebase,
-      .config =
-          SequenceProgramConfig{
-              .profile = static_cast<u32>(Profile::DonkeyKongCountry),
-              .driverState = 0x80u | (0x3cu << 8),
-          },
       .behavior = dialect.defaultBehavior,
       .tracks =
           {
@@ -328,7 +318,7 @@ void rareSnesSignedStereoVolumesPreserveDriverRelativeLevels() {
           },
   };
   presetProgram.behavior.initialStereoBalance = StereoBalance{127.0 / 128.0, 127.0 / 128.0};
-  const PerformanceSequence localPresets = SequenceVm(LoopPolicy::PlayOnce).render(presetProgram, dialect);
+  const PerformanceSequence localPresets = SequenceVm(LoopPolicy::PlayOnce).render(presetProgram);
   const auto firstTrackBalances = events<StereoBalancePerformanceEvent>(localPresets);
   expect(localPresets.diagnostics.empty() && firstTrackBalances.size() == 2 &&
              std::abs(firstTrackBalances.back()->leftGain - 0.5) < 0.000001 &&

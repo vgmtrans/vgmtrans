@@ -289,6 +289,12 @@ struct TimedScriptCursor {
   }
 };
 
+struct RuntimeConfig {
+  Version version = Version::Summer;
+  std::vector<u32> tables;
+  u8 baseTempo = 1;
+};
+
 struct ProgramState {
   struct DurationState {
     u64 tick = 0;
@@ -296,9 +302,8 @@ struct ProgramState {
     u8 rate = 0xcc;
   };
 
-  explicit ProgramState(const SequenceProgram& sequence)
-      : version(static_cast<Version>(sequence.config.profile)), tables(sequence.config.driverData),
-        baseTempo(static_cast<u8>(sequence.config.driverState)) {
+  explicit ProgramState(const RuntimeConfig& config)
+      : version(config.version), tables(config.tables), baseTempo(config.baseTempo) {
     for (auto& timeline : durationTimeline) {
       timeline.push_back(DurationState{});
     }
@@ -986,7 +991,6 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 const SequenceDialect& sequenceDialect() {
   static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{.value = "chun-snes"},
       .commandDetailKindPrefix = "chun-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .defaultBehavior =
@@ -1019,10 +1023,13 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   }
   SequenceProgram program = sequence.finish();
   program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
-  program.config.profile = static_cast<u32>(layout.version);
   const u8 initialTempo = reader.u8At(layout.sequenceHeaderAddress);
-  program.config.driverState = initialTempo;
-  program.config.driverData = RuntimeTables::encode(reader, layout);
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(
+      program, RuntimeConfig{
+                   .version = layout.version,
+                   .tables = RuntimeTables::encode(reader, layout),
+                   .baseTempo = initialTempo,
+               });
   program.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicroseconds(initialTempo);
   return {.program = std::move(program), .headerRange = headerRange};
 }

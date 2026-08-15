@@ -106,7 +106,7 @@ std::vector<const Event*> events(const PerformanceTrack& track) {
 PerformanceSequence render(const Layout& layout, std::vector<u8> bytes) {
   const ByteReader reader(SourceId{170}, bytes);
   SequenceParse parsed = decodeSequence(reader, layout, AssetId{170});
-  return SequenceVm(LoopPolicy::PlayOnce).render(parsed.program, sequenceDialect());
+  return SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
 }
 
 std::vector<u8> lateScannerFixture() {
@@ -430,7 +430,7 @@ void latePitchBendClampsToTheLegacyTwelveSemitoneWheel() {
 
 void scannerBuildsTunedSynthAndCollection() {
   Session session;
-  session.registerFormat(definition());
+  session.registerFormat(module());
   session.addSource(SourceFile{.name = "Wolf Team fixture.aram"}, lateScannerFixture());
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
@@ -484,7 +484,7 @@ void scannerBuildsTunedSynthAndCollection() {
 
 void scannerBuildsArcusPitchModel() {
   Session session;
-  session.registerFormat(definition());
+  session.registerFormat(module());
   session.addSource(SourceFile{.name = "Arcus fixture.aram"}, arcusScannerFixture());
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
@@ -575,9 +575,8 @@ void streamListsStayOutOfCommandAnnotations() {
            });
   };
   expect(validateSequenceProgram(parsed.program).empty() && !hasRuntimeTargetOperand(parsed.program) &&
-             hasOnlyEndBoundaries(parsed.program, 0x91, 3) &&
-             parsed.program.tracks.front().config.driverState == 0x80 &&
-             parsed.program.tracks.front().config.driverData == std::vector<u32>({0x3000, 0x3040, 0x3080}),
+             hasOnlyEndBoundaries(parsed.program, 0x91, 3) && parsed.program.runtime.valid() &&
+             parsed.program.tracks.front().startAddress.value == 0x3000,
          "phrase ordering belongs to compact track runtime state, while each source boundary remains context-neutral");
 
   std::vector<u8> segmented(kAramSize);
@@ -590,9 +589,8 @@ void streamListsStayOutOfCommandAnnotations() {
       decodeSequence(ByteReader(SourceId{191}, segmented), segmentedLayout, AssetId{191});
   expect(validateSequenceProgram(segmentedParsed.program).empty() &&
              !hasRuntimeTargetOperand(segmentedParsed.program) &&
-             hasOnlyEndBoundaries(segmentedParsed.program, 0xfd, 3) &&
-             segmentedParsed.program.tracks.front().config.driverState == 1 &&
-             segmentedParsed.program.tracks.front().config.driverData == std::vector<u32>({0x3000, 0x3040, 0x3080}),
+             hasOnlyEndBoundaries(segmentedParsed.program, 0xfd, 3) && segmentedParsed.program.runtime.valid() &&
+             segmentedParsed.program.tracks.front().startAddress.value == 0x3000,
          "segment ordering belongs to compact track runtime state, not control-command annotations");
 }
 

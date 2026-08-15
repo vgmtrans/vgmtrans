@@ -25,13 +25,13 @@ namespace {
 
 constexpr u32 kMaxCommands = 1048576;
 
+struct RuntimeConfig {
+  u8 numerator = 4;
+  u8 denominator = 4;
+};
+
 struct ProgramState {
-  explicit ProgramState(const SequenceProgram& sequence) {
-    if (sequence.config.driverData.size() >= 2) {
-      numerator = static_cast<u8>(sequence.config.driverData[0]);
-      denominator = static_cast<u8>(sequence.config.driverData[1]);
-    }
-  }
+  explicit ProgramState(const RuntimeConfig& config) : numerator(config.numerator), denominator(config.denominator) {}
 
   u8 numerator = 4;
   u8 denominator = 4;
@@ -316,7 +316,6 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 const SequenceDialect& sonyPs1SequenceDialect() {
   static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{.value = std::string(kSonyPs1DialectId)},
       .commandDetailKindPrefix = std::string(kSonyPs1DialectId),
       .timebase = Timebase{.ppqn = 48},
       .defaultBehavior =
@@ -337,10 +336,11 @@ SequenceProgram parseSonyPs1Sequence(ByteReader reader, AssetId id, const SonyPs
   SequenceProgram program = sonyPs1SequenceDialect().makeProgram(Address{layout.offset});
   program.timebase.ppqn = layout.ppqn;
   program.behavior.initialTempoMicrosecondsPerQuarter = layout.initialTempo;
-  program.config.driverData = {
-      layout.rhythmNumerator,
-      static_cast<u32>(1u << layout.rhythmDenominatorPower),
-  };
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(
+      program, RuntimeConfig{
+                   .numerator = layout.rhythmNumerator,
+                   .denominator = static_cast<u8>(1u << layout.rhythmDenominatorPower),
+               });
 
   if (sourceMap != nullptr) {
     const u32 headerSize = layout.dataOffset - layout.offset;

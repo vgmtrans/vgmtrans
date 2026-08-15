@@ -7,11 +7,14 @@
 #pragma once
 
 #include "value/sequence/CompilerCursor.h"
+#include "value/sequence/SequenceDialect.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <any>
 #include <concepts>
+#include <memory>
 #include <stdexcept>
+#include <utility>
 
 namespace vgmtrans::core {
 
@@ -26,22 +29,51 @@ struct CompiledCommandDialect {
     // that need no settings keep working with an ordinary default constructor.
     if constexpr (std::constructible_from<ProgramState, const SequenceProgram&>) {
       return ProgramState{program};
-    } else {
+    } else if constexpr (std::default_initializable<ProgramState>) {
       return ProgramState{};
+    } else {
+      return std::any{};
+    }
+  }
+
+  template <class Config>
+  [[nodiscard]] static std::any createProgramState(const SequenceProgram& program, const Config& config) {
+    if constexpr (std::constructible_from<ProgramState, const SequenceProgram&, const Config&>) {
+      return ProgramState{program, config};
+    } else if constexpr (std::constructible_from<ProgramState, const Config&>) {
+      return ProgramState{config};
+    } else {
+      return createProgramState(program);
     }
   }
 
   [[nodiscard]] static std::any createTrackState(const SequenceProgram& program, const TrackProgram& track) {
     // Choose the most informative constructor the state type provides. This
-    // keeps version and track identity out of loosely typed extra settings.
+    // keeps track identity out of runtime configuration.
     if constexpr (std::constructible_from<TrackState, const SequenceProgram&, const TrackProgram&>) {
       return TrackState{program, track};
     } else if constexpr (std::constructible_from<TrackState, const SequenceProgram&>) {
       return TrackState{program};
     } else if constexpr (std::constructible_from<TrackState, const TrackProgram&>) {
       return TrackState{track};
-    } else {
+    } else if constexpr (std::default_initializable<TrackState>) {
       return TrackState{};
+    } else {
+      return std::any{};
+    }
+  }
+
+  template <class Config>
+  [[nodiscard]] static std::any createTrackState(const SequenceProgram& program, const TrackProgram& track,
+                                                 const Config& config) {
+    if constexpr (std::constructible_from<TrackState, const SequenceProgram&, const TrackProgram&, const Config&>) {
+      return TrackState{program, track, config};
+    } else if constexpr (std::constructible_from<TrackState, const TrackProgram&, const Config&>) {
+      return TrackState{track, config};
+    } else if constexpr (std::constructible_from<TrackState, const Config&>) {
+      return TrackState{config};
+    } else {
+      return createTrackState(program, track);
     }
   }
 
@@ -122,30 +154,48 @@ struct CompiledCommandDialect {
   }
 };
 
-// Fill the mechanical executor hooks while leaving identity, timebase, and
-// playback defaults visible in the format's ordinary SequenceDialect value.
+// Fill the mechanical executor hooks while leaving timebase and playback
+// defaults visible in the format's ordinary SequenceDialect value.
 template <class TrackState, class Playback, class ProgramState = EmptyCompiledProgramState>
 [[nodiscard]] SequenceDialect makeCompiledDialect(SequenceDialect dialect) {
   using Compiled = CompiledCommandDialect<TrackState, Playback, ProgramState>;
-  dialect.createProgramState = Compiled::createProgramState;
-  dialect.createTrackState = Compiled::createTrackState;
-  dialect.execute = Compiled::execute;
-  dialect.readyDuringWait = Compiled::readyDuringWait;
+  dialect.runtime.createProgramState = [](const SequenceProgram& program) {
+    return Compiled::createProgramState(program);
+  };
+  dialect.runtime.createTrackState = [](const SequenceProgram& program, const TrackProgram& track) {
+    return Compiled::createTrackState(program, track);
+  };
+  dialect.runtime.execute = Compiled::execute;
+  dialect.runtime.readyDuringWait = Compiled::readyDuringWait;
   if constexpr (requires(Playback& playback) { playback.tick(); }) {
-    dialect.tick = Compiled::tick;
+    dialect.runtime.tick = Compiled::tick;
   }
   if constexpr (requires(ProgramState& state) { state.finishPrepass(); }) {
-    dialect.finishPrepass = Compiled::finishPrepass;
+    dialect.runtime.finishPrepass = Compiled::finishPrepass;
   }
   if constexpr (requires(TrackState& state) { state.beginSection(); }) {
-    dialect.beginTrackSection = Compiled::beginTrackSection;
+    dialect.runtime.beginTrackSection = Compiled::beginTrackSection;
   }
   if constexpr (requires(ProgramState& state, PerformanceSequence& performance) {
                   state.finalizePerformance(performance);
                 }) {
-    dialect.finalizePerformance = Compiled::finalizePerformance;
+    dialect.runtime.finalizePerformance = Compiled::finalizePerformance;
   }
   return dialect;
+}
+
+// Replace only a program's state factories with closures over immutable typed
+// settings. Execution hooks remain the ones selected by makeCompiledDialect.
+template <class TrackState, class Playback, class ProgramState = EmptyCompiledProgramState, class Config>
+void bindCompiledRuntime(SequenceProgram& program, Config config) {
+  using Compiled = CompiledCommandDialect<TrackState, Playback, ProgramState>;
+  auto settings = std::make_shared<const Config>(std::move(config));
+  program.runtime.createProgramState = [settings](const SequenceProgram& sequence) {
+    return Compiled::createProgramState(sequence, *settings);
+  };
+  program.runtime.createTrackState = [settings](const SequenceProgram& sequence, const TrackProgram& track) {
+    return Compiled::createTrackState(sequence, track, *settings);
+  };
 }
 
 // Execute a compiled program and project its final typed song state into a
@@ -153,9 +203,9 @@ template <class TrackState, class Playback, class ProgramState = EmptyCompiledPr
 // similar analysis that must share playback's calls, repeats, and timing. The
 // format-facing projector remains fully typed; only this adapter touches any.
 template <class ProgramState, class Result>
-[[nodiscard]] Result analyzeCompiledProgram(const SequenceProgram& program, const SequenceDialect& dialect,
-                                            Result (*project)(const ProgramState&), SequenceVmOptions options = {}) {
-  const std::any state = detail::analyzeSequenceProgram(SequenceVm(options), program, dialect);
+[[nodiscard]] Result analyzeCompiledProgram(const SequenceProgram& program, Result (*project)(const ProgramState&),
+                                            SequenceVmOptions options = {}) {
+  const std::any state = detail::analyzeSequenceProgram(SequenceVm(options), program);
   return project(std::any_cast<const ProgramState&>(state));
 }
 

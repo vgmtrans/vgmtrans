@@ -307,14 +307,13 @@ PerformanceSequence renderKonamiSnesTrack(std::span<const u8> commandBytes) {
   const auto& dialect = konamiSnesSequenceDialect(KONAMISNES_V6);
   TrackProgram track = decodeKonamiSnesSourceTrack(ByteReader(SourceId{9}, bytes), KONAMISNES_V6, 0, 0);
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = konamiSnesSequenceRuntime(KONAMISNES_V6),
       .timebase = dialect.timebase,
       .sourceBaseAddress = Address{0},
-      .config = SequenceProgramConfig{.profile = KONAMISNES_V6},
       .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  return SequenceVm(LoopPolicy::PlayOnce).render(program, dialect);
+  return SequenceVm(LoopPolicy::PlayOnce).render(program);
 }
 
 PerformanceSequence renderKonamiSnesProgram(KonamiSnesVersion version, const std::vector<std::vector<u8>>& tracks,
@@ -327,26 +326,21 @@ PerformanceSequence renderKonamiSnesProgram(KonamiSnesVersion version, const std
                                                         version, trackIndex, 0));
   }
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = konamiSnesSequenceRuntime(version, indexedEchoFilter),
       .timebase = dialect.timebase,
       .sourceBaseAddress = Address{0},
-      .config =
-          SequenceProgramConfig{
-              .profile = static_cast<u32>(version),
-              .driverState = indexedEchoFilter,
-          },
       .behavior = dialect.defaultBehavior,
       .tracks = std::move(programTracks),
   };
   return SequenceVm(SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = sequenceLoops})
-      .render(program, dialect);
+      .render(program);
 }
 
 PerformanceSequence renderKonamiSnesAramSequence(const std::vector<u8>& bytes, const KonamiSnesLayout& layout,
                                                  AssetId asset = AssetId{33}) {
   const auto& dialect = konamiSnesSequenceDialect(layout.version);
   const SequenceProgram program = decodeKonamiSnesSequence(ByteReader(SourceId{asset.value}, bytes), layout, asset);
-  return SequenceVm(LoopPolicy::PlayOnce).render(program, dialect);
+  return SequenceVm(LoopPolicy::PlayOnce).render(program);
 }
 
 }  // namespace
@@ -390,8 +384,8 @@ void konamiSnesBatmanReturnsAramUsesV2LayoutAndBoundedBank() {
   expect(headerRange.offset == 0x3900 && headerRange.size == 2,
          "Batman Returns streamed header should infer one source track");
   const SequenceProgram program = decodeKonamiSnesSequence(reader, *layout, AssetId{33});
-  expect(program.dialect.value == "konami-snes:v2" && program.tracks.size() == 1,
-         "Batman Returns sequence should retain the V2 dialect and decoded track");
+  expect(program.runtime.valid() && program.tracks.size() == 1,
+         "Batman Returns sequence should own an executable decoded track");
   const TrackProgram& track = program.tracks.front();
   expect(track.commands.size() == 5 && track.commands[2].opcode == 0xfc && track.commands[2].encodedSize == 3 &&
              track.commands[3].opcode == 0x3c && track.commands[3].address.value == 0x3909,
@@ -415,8 +409,6 @@ void konamiSnesBatmanReturnsAramUsesV2LayoutAndBoundedBank() {
 void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   Session session;
   vgmtrans::formats::registerValueFormats(session);
-  expect(session.formats().containsDialect("konami-snes:v6"),
-         "value format registration should include KonamiSnes sequence dialects");
 
   const SourceId source = session.addSource(SourceFile{.name = "Axelay.spc"}, makeKonamiSnesAram());
   session.scanPendingSources();
@@ -430,7 +422,7 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(sequence->metadata.format == "KonamiSnes", "sequence should retain format name");
   expect(sequence->metadata.range.offset == 0x2000 && sequence->metadata.range.size == 2,
          "sequence range should cover the inferred one-track header");
-  expect(sequence->program.dialect.value == "konami-snes:v6", "sequence should carry the detected dialect");
+  expect(sequence->program.runtime.valid(), "sequence should carry its executable runtime");
   expect(sequence->program.timebase.ppqn == 48, "KonamiSnes sequence should use the SNES value PPQN");
   expect(sequence->program.tracks.size() == 1, "fixture should decode one nonzero source track");
 
@@ -444,9 +436,8 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
            "track should decode KonamiSnes command " + std::to_string(index));
   }
 
-  const auto* dialect = session.formats().findDialect(sequence->program.dialect.value);
-  expect(dialect != nullptr, "registered KonamiSnes dialect should render the scanned sequence");
-  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program, *dialect);
+  expect(sequence->program.runtime.valid(), "scanned KonamiSnes sequence should retain its runtime");
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program);
   expect(performance.diagnostics.empty(), "KonamiSnes performance render should not report diagnostics");
   expect(performance.tracks.size() == 1 && performance.tracks[0].endTick == 6,
          "KonamiSnes note duration should use the decoded duration rate");
@@ -872,8 +863,8 @@ void konamiSnesProportionalPortamentoMatchesDriverCurve() {
   expect(hasMidiEvent<PitchBend>(pitchBend.tracks[0]) && hasMidiEvent<PortamentoControl>(portamento.tracks[0]),
          "V3 proportional portamento should render in both MIDI transition modes");
 
-  const PerformanceSequence interrupted =
-      renderKonamiSnesProgram(KONAMISNES_V3, {{0x28, 1, 0x7d, 0x7d, 0xf0, 1, 0x2f, 1, 0x7d, 0x7d,
+  const PerformanceSequence interrupted = renderKonamiSnesProgram(
+      KONAMISNES_V3, {{0x28, 1, 0x7d, 0x7d, 0xf0, 1, 0x2f, 1, 0x7d, 0x7d,
                                                0x30, 8, 0x7d, 0x7d, 0xff}});
   expect(interrupted.tracks[0].automations.size() == 2,
          "each note should restart persistent proportional portamento");
@@ -1029,7 +1020,7 @@ void konamiSnesDynamicAdsrMatchesEachDriverFamily() {
     };
     const auto& dialect = konamiSnesSequenceDialect(layout.version);
     const SequenceProgram program = decodeKonamiSnesSequence(ByteReader(SourceId{33}, bytes), layout, AssetId{33});
-    return SequenceVm(LoopPolicy::PlayOnce).render(program, dialect);
+    return SequenceVm(LoopPolicy::PlayOnce).render(program);
   };
 
   const auto v6 = envelopesFor(renderV6Instrument(0x8f));
@@ -1164,8 +1155,9 @@ void konamiSnesZeroNotesAndLegatoMatchDriverGating() {
                                                0xf0, 3,                 // persistent portamento
                                                0x3e, 4, 100, 0x7f, 0xff}});
   const auto portamentoNotes = performanceEvents<NotePerformanceEvent>(portamentoAfterRest.tracks.front());
-  const auto transition = std::ranges::find_if(portamentoAfterRest.tracks.front().automations,
-                                                [](const PerformanceAutomation& automation) {
+  const auto transition = std::ranges::find_if(
+      portamentoAfterRest.tracks.front().automations,
+      [](const PerformanceAutomation& automation) {
                                                   return pitchTransitionIntent(automation) != nullptr;
                                                 });
   expect(portamentoNotes.size() == 2 && portamentoNotes[0]->note != portamentoNotes[1]->note &&
@@ -1357,7 +1349,9 @@ void konamiSnesHeldNoteUsesRealizedInlineSlidePitch() {
   expect(notes.size() == 3 && notes[1]->extendsPrevious && notes[2]->extendsPrevious &&
              notes[0]->note == notes[1]->note && notes[1]->note == notes[2]->note,
          "a held note at an inline slide's realized target should extend the sounding voice");
-  expect(std::ranges::count_if(performance.tracks[0].automations, [](const PerformanceAutomation& automation) {
+  expect(std::ranges::count_if(
+             performance.tracks[0].automations,
+             [](const PerformanceAutomation& automation) {
            return pitchTransitionIntent(automation) != nullptr;
          }) == 1,
          "a completed inline slide should not be repeated at the next held-note boundary");
@@ -1371,7 +1365,9 @@ void konamiSnesHeldNoteUsesRealizedInlineSlidePitch() {
 
   const MidiSequence portamento =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
-  expect(std::ranges::count_if(portamento.tracks[0].events, [](const MidiEvent& event) {
+  expect(std::ranges::count_if(
+             portamento.tracks[0].events,
+             [](const MidiEvent& event) {
            return std::holds_alternative<PortamentoControl>(event);
          }) == 1 &&
              std::ranges::none_of(portamento.tracks[0].events, [](const MidiEvent& event) {
@@ -1393,7 +1389,9 @@ void konamiSnesHeldNoteRestartsPitchEnvelopeWithoutRetrigger() {
   const auto notes = performanceEvents<NotePerformanceEvent>(performance.tracks[0]);
   expect(notes.size() == 3 && notes[1]->note == notes[2]->note && notes[2]->extendsPrevious,
          "a repeated held key should retain its sounding voice while the pitch envelope restarts");
-  expect(std::ranges::count_if(performance.tracks[0].automations, [](const PerformanceAutomation& automation) {
+  expect(std::ranges::count_if(
+             performance.tracks[0].automations,
+             [](const PerformanceAutomation& automation) {
            return pitchTransitionIntent(automation) != nullptr;
          }) == 2,
          "every held source note should restart the persistent pitch envelope");

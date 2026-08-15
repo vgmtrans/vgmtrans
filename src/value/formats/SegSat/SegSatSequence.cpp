@@ -696,7 +696,6 @@ void finalizeSegSatPerformance(PerformanceSequence& performance, std::span<const
 
 const SequenceDialect& segSatSequenceDialect() {
   static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{std::string(kSegSatSequenceDialectId)},
       .commandDetailKindPrefix = "segsat",
       .timebase = Timebase{.ppqn = 48},
       .defaultBehavior =

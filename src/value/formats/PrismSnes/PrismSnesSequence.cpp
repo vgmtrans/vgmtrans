@@ -32,8 +32,6 @@ using namespace core;
 namespace {
 
 constexpr u32 kCommandLimit = 32768;
-constexpr u32 kRuntimeMagic = 0x50524953;
-constexpr u32 kRuntimeHeaderWords = 5;
 
 namespace math {
 
@@ -77,52 +75,51 @@ namespace math {
 
 }  // namespace math
 
-class RuntimeData {
-public:
-  RuntimeData() = default;
-  explicit RuntimeData(std::span<const u32> data) : data_(data) {}
+struct RuntimeData {
+  std::shared_ptr<const std::array<u8, kAramSize>> aram;
+  u16 adsr1Table = 0;
+  u16 adsr2Table = 0;
+  u16 alternatePanTable = 0;
+  u16 defaultPanTable = 0;
+  u8 echoDelay = 0;
+  u8 echoFilter = 0;
 
-  [[nodiscard]] bool valid() const {
-    return data_.size() >= kRuntimeHeaderWords + kAramSize / 4 && data_[0] == kRuntimeMagic;
-  }
-
-  [[nodiscard]] u16 adsr1Table() const { return valid() ? static_cast<u16>(data_[1]) : 0; }
-  [[nodiscard]] u16 adsr2Table() const { return valid() ? static_cast<u16>(data_[1] >> 16) : 0; }
-  [[nodiscard]] u16 tuningHighTable() const { return valid() ? static_cast<u16>(data_[2]) : 0; }
-  [[nodiscard]] u16 tuningLowTable() const { return valid() ? static_cast<u16>(data_[2] >> 16) : 0; }
-  [[nodiscard]] u16 alternatePanTable() const { return valid() ? static_cast<u16>(data_[3]) : 0; }
-  [[nodiscard]] u16 defaultPanTable() const { return valid() ? static_cast<u16>(data_[3] >> 16) : 0; }
-  [[nodiscard]] u8 echoDelay() const { return valid() ? static_cast<u8>(data_[4]) : 0; }
-  [[nodiscard]] u8 echoFilter() const { return valid() ? static_cast<u8>(data_[4] >> 8) : 0; }
-
-  [[nodiscard]] u8 u8At(u16 address) const {
-    if (!valid()) {
-      return 0;
-    }
-    const u32 packed = data_[kRuntimeHeaderWords + address / 4];
-    return static_cast<u8>(packed >> ((address & 3) * 8));
-  }
+  [[nodiscard]] u8 u8At(u16 address) const { return (*aram)[address]; }
 
   [[nodiscard]] u16 le16(u16 address) const {
     return static_cast<u16>(u8At(address) | (u8At(static_cast<u16>(address + 1)) << 8));
   }
 
-  [[nodiscard]] static std::vector<u32> encode(ByteReader reader, const Layout& layout) {
-    std::vector<u32> result(kRuntimeHeaderWords + kAramSize / 4);
-    result[0] = kRuntimeMagic;
-    result[1] = layout.adsr1TableAddress | (static_cast<u32>(layout.adsr2TableAddress) << 16);
-    result[2] = layout.tuningHighTableAddress | (static_cast<u32>(layout.tuningLowTableAddress) << 16);
-    result[3] = layout.alternatePanTableAddress | (static_cast<u32>(layout.defaultPanTableAddress) << 16);
-    result[4] = layout.echoDelay | (static_cast<u32>(layout.echoFilter) << 8);
-    for (u32 address = 0; address < kAramSize; address += 4) {
-      result[kRuntimeHeaderWords + address / 4] = reader.u8At(address) | (reader.u8At(address + 1) << 8) |
-                                                  (reader.u8At(address + 2) << 16) | (reader.u8At(address + 3) << 24);
+  [[nodiscard]] static RuntimeData capture(ByteReader reader, const Layout& layout) {
+    auto aram = std::make_shared<std::array<u8, kAramSize>>();
+    for (u32 address = 0; address < kAramSize; ++address) {
+      (*aram)[address] = reader.u8At(address);
     }
-    return result;
+    return RuntimeData{
+        .aram = std::move(aram),
+        .adsr1Table = layout.adsr1TableAddress,
+        .adsr2Table = layout.adsr2TableAddress,
+        .alternatePanTable = layout.alternatePanTableAddress,
+        .defaultPanTable = layout.defaultPanTableAddress,
+        .echoDelay = layout.echoDelay,
+        .echoFilter = layout.echoFilter,
+    };
   }
+};
 
-private:
-  std::span<const u32> data_;
+struct RuntimeTrackConfig {
+  u8 logicalChannel = 0;
+  u8 physicalChannelFlags = 0;
+};
+
+struct RuntimeConfig {
+  Version version = Version::Modern;
+  RuntimeData data;
+  std::vector<RuntimeTrackConfig> tracks;
+
+  [[nodiscard]] const RuntimeTrackConfig& track(const TrackProgram& source) const {
+    return tracks.at(source.sourceTrackNumber);
+  }
 };
 
 struct VolumeEnvelope {
@@ -196,10 +193,9 @@ struct MasterFade {
 };
 
 struct ProgramState {
-  explicit ProgramState(const SequenceProgram& sequence)
-      : version(static_cast<Version>(sequence.config.profile)), data(sequence.config.driverData) {
-    echo.delay = data.echoDelay();
-    echo.filter = data.echoFilter();
+  ProgramState(const SequenceProgram&, const RuntimeConfig& config) : version(config.version), data(config.data) {
+    echo.delay = data.echoDelay;
+    echo.filter = data.echoFilter;
   }
 
   Version version = Version::Modern;
@@ -218,19 +214,19 @@ struct ProgramState {
 struct RuntimeTrack;
 
 struct TrackState {
-  TrackState(const SequenceProgram& sequence, const TrackProgram& source)
-      : TrackState(static_cast<Version>(sequence.config.profile), RuntimeData(sequence.config.driverData),
-                   static_cast<u8>(source.config.driverState), static_cast<u8>(source.config.driverState >> 8)) {}
+  TrackState(const TrackProgram& source, const RuntimeConfig& config)
+      : TrackState(config.version, config.data, config.track(source).logicalChannel,
+                   config.track(source).physicalChannelFlags) {}
 
   TrackState(Version newVersion, RuntimeData runtimeData, u8 newLogicalChannel, u8 newPhysicalChannelFlags)
       : version(newVersion), data(runtimeData), logicalChannel(newLogicalChannel),
-        physicalChannelFlags(newPhysicalChannelFlags), panTable(data.defaultPanTable()) {
+        physicalChannelFlags(newPhysicalChannelFlags), panTable(data.defaultPanTable) {
     loadDefaultAdsr();
   }
 
   void loadDefaultAdsr() {
-    adsr1 = data.u8At(static_cast<u16>(data.adsr1Table() + program));
-    adsr2 = data.u8At(static_cast<u16>(data.adsr2Table() + program));
+    adsr1 = data.u8At(static_cast<u16>(data.adsr1Table + program));
+    adsr2 = data.u8At(static_cast<u16>(data.adsr2Table + program));
   }
 
   Version version = Version::Modern;
@@ -738,7 +734,7 @@ struct Playback {
   }
 
   void defaultPan(bool alternate) {
-    panTable(alternate ? track.data.alternatePanTable() : track.data.defaultPanTable());
+    panTable(alternate ? track.data.alternatePanTable : track.data.defaultPanTable);
   }
 
   void transposeRelative(s8 delta) { track.transpose = static_cast<s8>(track.transpose + delta); }
@@ -1592,7 +1588,6 @@ struct WalkState {
     session.append(std::move(command), offset);
   }
   TrackProgram track = session.finish();
-  track.config.driverState = logicalChannel | (static_cast<u32>(physicalChannelFlags) << 8);
   return track;
 }
 
@@ -1600,7 +1595,6 @@ struct WalkState {
 
 const SequenceDialect& sequenceDialect() {
   static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{.value = "prism-snes"},
       .commandDetailKindPrefix = "prism-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .defaultBehavior =
@@ -1644,9 +1638,18 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
       .sourceMap = sourceMap,
   };
   SequenceProgram program = sequenceDialect().makeProgram();
+  RuntimeConfig runtime{
+      .version = layout.version,
+      .data = RuntimeData::capture(reader, layout),
+  };
+  runtime.tracks.reserve(layout.tracks.size());
   std::set<u8> programs{0};
   for (u32 index = 0; index < layout.tracks.size(); ++index) {
     const TrackHeader& track = layout.tracks[index];
+    runtime.tracks.push_back(RuntimeTrackConfig{
+        .logicalChannel = track.logicalChannel,
+        .physicalChannelFlags = track.physicalChannelFlags,
+    });
     if (sourceMap != nullptr) {
       auto pointer = sourceMap
                          ->pointer("Track Pointer", reader.range(static_cast<u32>(track.range.offset) + 2, 2),
@@ -1666,8 +1669,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
                                          track.physicalChannelFlags, &programs, diagnostics, scope));
   }
   program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
-  program.config.profile = static_cast<u32>(layout.version);
-  program.config.driverData = RuntimeData::encode(reader, layout);
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, std::move(runtime));
   return SequenceParse{
       .program = std::move(program),
       .programs = std::move(programs),

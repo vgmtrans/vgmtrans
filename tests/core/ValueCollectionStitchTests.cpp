@@ -16,7 +16,6 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
   const SourceId source = sources.add(SourceFile{.name = "stitch.pcm"}, {0, 0, 0, 0});
   const SequenceDialect dialect48 = probeSequenceDialect();
   SequenceDialect dialect96 = dialect48;
-  dialect96.id = DialectId{.value = "probe-96"};
   dialect96.timebase.ppqn = 96;
 
   test::SessionSnapshotBuilder builder;
@@ -34,7 +33,13 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
     const AssetId samplesId{index * 3 + 2};
     builder.assets.emplace_back(SequenceProgramAsset{
         .metadata = AssetMetadata{.id = sequenceId, .format = "Probe", .name = "Part " + std::to_string(index)},
-        .program = SequenceProgram{.dialect = dialect.id, .timebase = dialect.timebase, .tracks = {track}},
+        .program =
+            SequenceProgram{
+                .runtime = dialect.makeProgram().runtime,
+                .timebase = dialect.timebase,
+                .behavior = dialect.defaultBehavior,
+                .tracks = {track},
+            },
     });
     builder.assets.emplace_back(InstrumentSetAsset{
         .metadata = AssetMetadata{.id = instrumentId, .format = "Probe"},
@@ -134,10 +139,7 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
             },
     };
   };
-  formats.add(FormatDefinition{
-      .module = std::move(module),
-      .sequenceDialects = {dialect48, dialect96},
-  });
+  formats.add(std::move(module));
   const std::array collections{CollectionId{0}, CollectionId{1}};
   const auto snapshot = builder.finish();
   const ExportRequest request{.dynamicEnvelopes = DynamicEnvelopePolicy::InstrumentVariants};

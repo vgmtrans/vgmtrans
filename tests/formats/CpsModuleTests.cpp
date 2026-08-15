@@ -458,7 +458,7 @@ ScanResult scan(const Fixture& fixture) {
   SourceStore sources;
   const SourceId source = sources.add(fixture.source, fixture.bytes);
   ScanIdAllocator ids;
-  auto result = cpsDefinition().module.scan(ScanInput{
+  auto result = cpsModule().scan(ScanInput{
       .source = sources.source(source),
       .reader = sources.reader(source),
       .ids = ids,
@@ -621,9 +621,9 @@ void cps1ModuleRetainsYm2151AndOkiDomains() {
          "CPS1 patch bytes should become a typed canonical YM2151 voice");
 
   const auto& sequence = onlySequence(result);
-  expect(sequence.program.dialect.value == kCpsEarlyDialectId && sequence.program.tracks.size() == 1,
-         "CPS1 V4.25 should use the shared early interpreter");
-  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, cpsEarlyDialect());
+  expect(sequence.program.runtime.valid() && sequence.program.tracks.size() == 1,
+         "CPS1 V4.25 should own an executable single-track program");
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program);
   const auto notes =
       std::count_if(performance.tracks[0].events.begin(), performance.tracks[0].events.end(),
                     [](const PerformanceEvent& event) { return std::holds_alternative<NotePerformanceEvent>(event); });
@@ -639,7 +639,7 @@ void cps1V1DefaultsAndPitchWrappingMatchLegacyDriver() {
          "CPS1 V1 misc sequence table should decode its little-endian pointers");
 
   const auto& sequence = onlySequence(result);
-  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, cps1V1Dialect());
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program);
   const auto note = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<NotePerformanceEvent>(event);
   });
@@ -700,7 +700,7 @@ void cps2EarlyModuleUsesPhysicalModulation() {
          "CPS2 articulation misc asset should expose meaningful rows and their exact fields");
 
   const auto& sequence = onlySequence(result);
-  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, cpsEarlyDialect());
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program);
   bool physicalVibrato = false;
   bool physicalTremolo = false;
   bool physicalPan = false;
@@ -762,7 +762,7 @@ void cps2EarlyZeroRateSlursRemainLinked() {
              semanticOperand(*firstNote, "note") == nullptr,
          "early CPS annotations should identify the encoded note index without presenting it as an absolute MIDI key");
 
-  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, cpsEarlyDialect());
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program);
   std::vector<const NotePerformanceEvent*> notes;
   for (const auto& event : performance.tracks[0].events) {
     if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
@@ -817,8 +817,7 @@ void cps2EarlyZeroRateSlursRemainLinked() {
          "native-portamento export should retain all three zero-rate target changes");
 
   const auto slowResult = scan(earlyCps2SlurFixture(1));
-  const auto slowPerformance =
-      SequenceVm(LoopPolicy::PlayOnce).render(onlySequence(slowResult).program, cpsEarlyDialect());
+  const auto slowPerformance = SequenceVm(LoopPolicy::PlayOnce).render(onlySequence(slowResult).program);
   const auto& slowAutomations = slowPerformance.tracks[0].automations;
   const auto* first = slowAutomations.empty() ? nullptr : pitchTransitionIntent(slowAutomations[0]);
   const auto* second = slowAutomations.size() < 2 ? nullptr : pitchTransitionIntent(slowAutomations[1]);
@@ -835,7 +834,7 @@ void cps2EarlyPortamentoStartsOnFirstTiedNote() {
   // Independent note, rate, enter tie state, program, fine bend, destination note.
   bytesAt(fixture.bytes, 0x1121, {0x09, 0x03, 0xcc, 0x0d, 0x28, 0x04, 0x40, 0x08, 0x1b, 0x0c, 0x01, 0xe9, 0x17});
   const auto result = scan(fixture);
-  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(onlySequence(result).program, cpsEarlyDialect());
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(onlySequence(result).program);
 
   const auto* transition = performance.tracks[0].automations.empty()
                                ? nullptr
@@ -866,7 +865,7 @@ void cps2LateDriverSemanticsRemainProfileSpecific() {
   expect(result.diagnostics.empty(), result.diagnostics.empty()
                                          ? "complete late CPS2 fixture should scan without diagnostics"
                                          : result.diagnostics.front().message);
-  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(onlySequence(result).program, cpsLateDialect());
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(onlySequence(result).program);
 
   const NotePerformanceEvent* note = nullptr;
   bool initialExpression = false;
@@ -925,8 +924,8 @@ void cps3ModuleDecodesDelayPrefixesLegatoAndRegions() {
          "CPS3 sample-info misc asset should expose its big-endian 32-bit fields");
 
   const auto& sequence = onlySequence(result);
-  expect(sequence.program.dialect.value == kCpsLateDialectId && sequence.program.tracks.size() == 1,
-         "CPS3 should use the late interpreter");
+  expect(sequence.program.runtime.valid() && sequence.program.tracks.size() == 1,
+         "CPS3 should own an executable single-track program");
   const auto& commands = sequence.program.tracks[0].commands;
   expect(std::ranges::any_of(commands,
                              [](const SourceCommand& command) {
@@ -934,7 +933,7 @@ void cps3ModuleDecodesDelayPrefixesLegatoAndRegions() {
                              }),
          "late low-bit bytes should decode as delay prefixes rather than rest opcodes");
 
-  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, cpsLateDialect());
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program);
   std::vector<const NotePerformanceEvent*> notes;
   bool linearTremolo = false;
   bool hardLeftBalance = false;
@@ -974,7 +973,7 @@ void cps3HeldNotesRetargetOneVoiceWithoutLosingPitch() {
   const auto result = scan(cps3HeldPitchChainFixture());
   expect(result.diagnostics.empty(), "sfiii2 held-note regression fixture should scan without diagnostics");
   const auto& sequence = onlySequence(result);
-  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, cpsLateDialect());
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program);
 
   std::vector<const NotePerformanceEvent*> sourceNotes;
   for (const auto& event : performance.tracks[0].events) {
@@ -1051,8 +1050,7 @@ void cps3HeldNotesRetargetOneVoiceWithoutLosingPitch() {
   be16(portamentoFixture.bytes, 0x901, 0x1f);
   bytesAt(portamentoFixture.bytes, 0x91f, {0xc9, 1});
   const auto portamentoResult = scan(portamentoFixture);
-  const auto portamentoPerformance =
-      SequenceVm(LoopPolicy::PlayOnce).render(onlySequence(portamentoResult).program, cpsLateDialect());
+  const auto portamentoPerformance = SequenceVm(LoopPolicy::PlayOnce).render(onlySequence(portamentoResult).program);
   const auto& slides = portamentoPerformance.tracks[0].automations;
   const auto* interrupted = slides.size() < 3 ? nullptr : pitchTransitionIntent(slides[2]);
   expect(interrupted != nullptr && interrupted->startKey == 93.0 && interrupted->targetKey == 95.0,
@@ -1063,7 +1061,7 @@ void cpsLateRepeatBreakUsesEndOfCommandBase() {
   const auto result = scan(cps3RepeatBreakFixture());
   expect(result.diagnostics.empty(), "complete CPS3 repeat-break fixture should scan without diagnostics");
   const auto& sequence = onlySequence(result);
-  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, cpsLateDialect());
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program);
   std::vector<std::pair<u64, double>> notes;
   for (const auto& event : performance.tracks[0].events) {
     if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
@@ -1084,8 +1082,8 @@ void cps3TerminalMaxRepeatActsAsPracticalLoop() {
   expect(repeat != commands.end() && repeat->flow.unconditionalJump(),
          "a terminal CPS3 D4 7E repeat should decode through the declared-loop path");
 
-  const auto performance = SequenceVm(SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = 1})
-                               .render(sequence.program, cpsLateDialect());
+  const auto performance =
+      SequenceVm(SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = 1}).render(sequence.program);
   const auto notes = std::ranges::count_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<NotePerformanceEvent>(event);
   });

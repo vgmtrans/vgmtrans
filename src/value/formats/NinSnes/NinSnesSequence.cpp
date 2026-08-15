@@ -37,14 +37,13 @@ constexpr u8 kMelodicKeyCorrection = 24;
 constexpr u8 kIntelliDrumSlots = 16;
 constexpr u8 kDefaultTempo = 0x20;
 constexpr u16 kNoPercussionSourceNote = 0x100;
-constexpr u32 kTempoTimerTargetShift = 8;
-constexpr u32 kFixedPercussionBaseFlag = 1u << 16;
-constexpr u32 kFixedPercussionBaseShift = 24;
 
-[[nodiscard]] constexpr u8 decodeTempoTimerTarget(u32 driverState) {
-  const u8 target = static_cast<u8>(driverState >> kTempoTimerTargetShift);
-  return target == 0 ? kStandardTimerTarget : target;
-}
+struct RuntimeConfig {
+  ProfileId profile = ProfileId::Standard;
+  u8 tempoTimerTarget = kStandardTimerTarget;
+  std::optional<u8> fixedPercussionBase;
+  u8 intelliConditionalMask = 0;
+};
 
 [[nodiscard]] constexpr u32 drumInstrumentKey(u8 program) {
   return (0x7fu << 7) | program;
@@ -559,14 +558,9 @@ private:
 };
 
 struct ProgramState {
-  explicit ProgramState(const SequenceProgram& program)
-      : selected(profile(static_cast<ProfileId>(program.config.profile))),
-        tempoTimerTarget(decodeTempoTimerTarget(program.config.driverState)),
-        fixedPercussionBase(
-            (program.config.driverState & kFixedPercussionBaseFlag) != 0
-                ? std::optional<u8>{static_cast<u8>(program.config.driverState >> kFixedPercussionBaseShift)}
-                : std::nullopt),
-        intelliConditionalMask(static_cast<u8>(program.config.driverState)) {
+  ProgramState(const SequenceProgram& program, const RuntimeConfig& config)
+      : selected(profile(config.profile)), tempoTimerTarget(config.tempoTimerTarget),
+        fixedPercussionBase(config.fixedPercussionBase), intelliConditionalMask(config.intelliConditionalMask) {
     for (u32 encoded = 0; encoded < basePrograms.size(); ++encoded) {
       basePrograms[encoded] =
           encoded < program.sourceProgramMap.size() ? program.sourceProgramMap[encoded].key : encoded;
@@ -2251,7 +2245,6 @@ struct PlaylistDecode {
 
 [[nodiscard]] SequenceDialect makeDialect() {
   return makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{.value = "nin-snes"},
       .commandDetailKindPrefix = "nin-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .defaultBehavior =
@@ -2262,8 +2255,10 @@ struct PlaylistDecode {
               .initialPitchBendRangeSemitones = 2,
               .initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(kDefaultTempo),
           },
-      .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
-      .prepass = SemanticPrepassMode::ScheduledPlayback,
+      .runtime = SequenceRuntime{
+          .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
+          .prepass = SemanticPrepassMode::ScheduledPlayback,
+      },
   });
 }
 
@@ -2314,15 +2309,15 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   PlaylistDecode playlist = decodePlaylist(reader, layout, sequenceId, sourceMap, diagnostics);
 
   SequenceProgram program = sequenceDialect().makeProgram(Address{layout.playlistAddress});
-  program.config.profile = static_cast<u32>(layout.profile);
-  program.config.driverState = static_cast<u32>(layout.tempoTimerTarget) << kTempoTimerTargetShift;
+  RuntimeConfig runtime{
+      .profile = layout.profile,
+      .tempoTimerTarget = layout.tempoTimerTarget,
+      .fixedPercussionBase = layout.fixedPercussionBase,
+  };
   if (layout.profile == ProfileId::IntelliFe3 && reader.has(0xb9, 1)) {
-    program.config.driverState |= reader.u8At(0xb9);
+    runtime.intelliConditionalMask = reader.u8At(0xb9);
   }
-  if (layout.fixedPercussionBase) {
-    program.config.driverState |=
-        kFixedPercussionBaseFlag | (static_cast<u32>(*layout.fixedPercussionBase) << kFixedPercussionBaseShift);
-  }
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, std::move(runtime));
   program.behavior.initialTempoMicrosecondsPerQuarter =
       math::tempoMicrosecondsPerQuarter(kDefaultTempo, layout.tempoTimerTarget);
   const auto initialBalance = math::panGains(selected, math::kPan, 10);
@@ -2351,7 +2346,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   }
 
   SequenceRecipes recipes =
-      analyzeCompiledProgram<ProgramState, SequenceRecipes>(program, sequenceDialect(), projectRecipes);
+      analyzeCompiledProgram<ProgramState, SequenceRecipes>(program, projectRecipes);
   return SequenceParse{
       .program = std::move(program),
       .recipes = std::move(recipes),

@@ -7,7 +7,7 @@
 #pragma once
 
 #include "value/base/Source.h"
-#include "value/scan/FormatDefinition.h"
+#include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceDialect.h"
 
@@ -19,7 +19,6 @@
 namespace vgmtrans::formats::segsat {
 
 inline constexpr std::string_view kSegSatFormatName = "SegSat";
-inline constexpr auto kSegSatSequenceDialectId = "segsat:sequence";
 inline constexpr std::string_view kSegSatCollectionResolver = "SegSat";
 inline constexpr std::string_view kSegSatInstrumentDomain = "segsat";
 
@@ -166,6 +165,6 @@ void finalizeSegSatPerformance(core::PerformanceSequence& performance, std::span
                                                                core::SourceMapBuilder* sourceMap = nullptr,
                                                                std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceDialect& segSatSequenceDialect();
-[[nodiscard]] core::FormatDefinition segSatDefinition();
+[[nodiscard]] core::FormatModule segSatModule();
 
 }  // namespace vgmtrans::formats::segsat

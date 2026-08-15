@@ -7,7 +7,7 @@
 #pragma once
 
 #include "value/base/Source.h"
-#include "value/scan/FormatDefinition.h"
+#include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceDialect.h"
 
@@ -83,6 +83,6 @@ struct SuzukiPs1ScannedBank {
     const std::vector<SuzukiPs1EnvelopeRegisters>& envelopes = {}, core::SourceMapBuilder* sourceMap = nullptr,
     std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceDialect& suzukiPs1SequenceDialect();
-[[nodiscard]] core::FormatDefinition suzukiPs1Definition();
+[[nodiscard]] core::FormatModule suzukiPs1Module();
 
 }  // namespace vgmtrans::formats::suzuki_ps1

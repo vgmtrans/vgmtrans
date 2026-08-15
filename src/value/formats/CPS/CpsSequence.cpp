@@ -81,10 +81,13 @@ struct StereoGains {
   return SynthKind::OkiM6295;
 }
 
+struct RuntimeConfig {
+  CpsVersion version = CpsVersion::Unknown;
+  u8 masterVolume = 127;
+};
+
 struct ProgramState {
-  explicit ProgramState(const SequenceProgram& program)
-      : version(static_cast<CpsVersion>(program.config.profile)),
-        masterVolume(static_cast<u8>(program.config.driverState & 0xff)) {}
+  explicit ProgramState(const RuntimeConfig& config) : version(config.version), masterVolume(config.masterVolume) {}
 
   CpsVersion version = CpsVersion::Unknown;
   u8 masterVolume = 127;
@@ -92,9 +95,9 @@ struct ProgramState {
 };
 
 struct TrackState {
-  TrackState(const SequenceProgram& program, const TrackProgram& trackProgram)
-      : version(static_cast<CpsVersion>(program.config.profile)),
-        synth(trackSynth(version, trackProgram.sourceTrackNumber)), trackStart(trackProgram.startAddress),
+  TrackState(const TrackProgram& trackProgram, const RuntimeConfig& config)
+      : version(config.version), synth(trackSynth(version, trackProgram.sourceTrackNumber)),
+        trackStart(trackProgram.startAddress),
         noteDuration(version == CpsVersion::Cps1V100 ? 0 : 0xff) {}
 
   CpsVersion version = CpsVersion::Unknown;
@@ -1014,10 +1017,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   }
 }
 
-[[nodiscard]] SequenceDialect makeDialect(std::string_view id, std::string_view prefix, u32 ppqn,
-                                          u8 initialPitchBendRange, double initialLevel = 1.0) {
+[[nodiscard]] SequenceDialect makeDialect(std::string_view prefix, u32 ppqn, u8 initialPitchBendRange,
+                                          double initialLevel = 1.0) {
   return makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{std::string(id)},
       .commandDetailKindPrefix = std::string(prefix),
       .timebase = Timebase{.ppqn = ppqn},
       .defaultBehavior =
@@ -1031,24 +1033,23 @@ using Cursor = CompilerCursor<TrackState, Playback>;
               .initialPitchBendRangeSemitones = initialPitchBendRange,
               .initialTempoMicrosecondsPerQuarter = 500000,
           },
-      .preferredPitchTransitionRendering = PitchTransitionRenderingHint::Portamento,
   });
 }
 
 }  // namespace
 
 const SequenceDialect& cps1V1Dialect() {
-  static const SequenceDialect dialect = makeDialect(kCps1V1DialectId, "cps.cps1-v1", 24, 2);
+  static const SequenceDialect dialect = makeDialect("cps.cps1-v1", 24, 2);
   return dialect;
 }
 
 const SequenceDialect& cpsEarlyDialect() {
-  static const SequenceDialect dialect = makeDialect(kCpsEarlyDialectId, "cps.early", kCpsPpqn, 2);
+  static const SequenceDialect dialect = makeDialect("cps.early", kCpsPpqn, 2);
   return dialect;
 }
 
 const SequenceDialect& cpsLateDialect() {
-  static const SequenceDialect dialect = makeDialect(kCpsLateDialectId, "cps.late", kCpsPpqn, 12, 0.0);
+  static const SequenceDialect dialect = makeDialect("cps.late", kCpsPpqn, 12, 0.0);
   return dialect;
 }
 
@@ -1074,8 +1075,8 @@ SequenceProgram decodeCpsSequence(ByteReader reader, const CpsLayout& layout, co
     }
     SequenceProgram empty = sequence.finish();
     empty.sourceBaseAddress = Address{sourceSequence.offset};
-    empty.config.profile = static_cast<u32>(layout.version);
-    empty.config.driverState = layout.masterVolume;
+    bindCompiledRuntime<TrackState, Playback, ProgramState>(
+        empty, RuntimeConfig{.version = layout.version, .masterVolume = layout.masterVolume});
     if (usesLateSequence(layout.version)) {
       empty.behavior.initialExpression = isCps3(layout.version) ? 65.0 / 128.0 : 0.5;
     }
@@ -1120,8 +1121,8 @@ SequenceProgram decodeCpsSequence(ByteReader reader, const CpsLayout& layout, co
   }
   SequenceProgram program = sequence.finish();
   program.sourceBaseAddress = Address{sourceSequence.offset};
-  program.config.profile = static_cast<u32>(layout.version);
-  program.config.driverState = layout.masterVolume;
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(
+      program, RuntimeConfig{.version = layout.version, .masterVolume = layout.masterVolume});
   if (usesLateSequence(layout.version)) {
     program.behavior.initialExpression = isCps3(layout.version) ? 65.0 / 128.0 : 0.5;
   }

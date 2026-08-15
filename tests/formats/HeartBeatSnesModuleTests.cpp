@@ -131,12 +131,12 @@ private:
 PerformanceSequence render(Version version, std::vector<u8> bytes) {
   const SequenceDialect& dialect = sequenceDialect();
   SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = dialect.makeProgram().runtime,
       .timebase = dialect.timebase,
       .behavior = dialect.defaultBehavior,
       .tracks = {decodeSourceTrack(ByteReader(SourceId{181}, bytes), version, 0, 0, 0)},
   };
-  return SequenceVm(LoopPolicy::PlayOnce).render(program, dialect);
+  return SequenceVm(LoopPolicy::PlayOnce).render(program);
 }
 
 void layoutsRecoverVersionedDriverState() {
@@ -172,7 +172,7 @@ void layoutsRecoverVersionedDriverState() {
 void scannerBuildsAuditedDynamicInstruments() {
   const DriverFixture fixture(Version::DragonQuest3);
   Session session;
-  session.registerFormat(definition());
+  session.registerFormat(module());
   session.addSource(SourceFile{.name = "HeartBeatSnes fixture.aram"}, fixture.data());
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();

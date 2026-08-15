@@ -7,7 +7,7 @@
 #pragma once
 
 #include "value/base/Source.h"
-#include "value/scan/FormatDefinition.h"
+#include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceDialect.h"
 
@@ -21,7 +21,6 @@
 namespace vgmtrans::formats::konami_arcade {
 
 inline constexpr std::string_view kKonamiArcadeFormatName = "KonamiArcade";
-inline constexpr std::string_view kKonamiArcadeSequenceDialectId = "konami-arcade:k054539";
 inline constexpr std::string_view kKonamiArcadeInstrumentDomain = "konami-arcade:instrument";
 inline constexpr u32 kKonamiArcadePpqn = 48;
 inline constexpr u32 kKonamiArcadeSampleRate = 24000;
@@ -117,6 +116,6 @@ struct KonamiArcadeLayout {
 [[nodiscard]] core::ScanSynthRefs addKonamiArcadeSynth(core::ScanResultBuilder& builder,
                                                        const KonamiArcadeLayout& layout);
 
-[[nodiscard]] core::FormatDefinition konamiArcadeDefinition();
+[[nodiscard]] core::FormatModule konamiArcadeModule();
 
 }  // namespace vgmtrans::formats::konami_arcade

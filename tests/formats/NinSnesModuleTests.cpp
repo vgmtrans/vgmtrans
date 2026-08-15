@@ -74,7 +74,7 @@ void writeSection(std::vector<u8>& bytes, u16 address, std::initializer_list<std
 
 PerformanceSequence render(std::vector<u8> bytes, const Layout& layout = standardLayout()) {
   SequenceParse parsed = decodeSequence(ByteReader(SourceId{7}, bytes), layout, AssetId{1});
-  return SequenceVm(LoopPolicy::PlayOnce).render(parsed.program, sequenceDialect());
+  return SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
 }
 
 double ninSnesLevelGain(u8 raw) {
@@ -194,8 +194,7 @@ void ninSnesProfilesDescribeEverySupportedDriverFamily() {
 
 void ninSnesKonamiClockControlsTempo() {
   std::vector<u8> direct(32);
-  std::ranges::copy(
-      std::initializer_list<u8>{0xe8, 0xf0, 0xc4, 0xf1, 0xe8, 0x40, 0xc4, 0xfa, 0xe8, 0x01, 0xc4, 0xf1},
+  std::ranges::copy(std::initializer_list<u8>{0xe8, 0xf0, 0xc4, 0xf1, 0xe8, 0x40, 0xc4, 0xfa, 0xe8, 0x01, 0xc4, 0xf1},
       direct.begin());
   std::vector<u8> absolute(32);
   std::ranges::copy(std::initializer_list<u8>{0xe8, 0xf0, 0xc5, 0xf1, 0x00, 0xe8, 0x20, 0xc5, 0xfa, 0x00, 0xe8,
@@ -917,8 +916,9 @@ void ninSnesKonamiZeroDurationRateContinuesHeldVoice() {
     }
     standardHasHold |= std::holds_alternative<LegatoPedalPerformanceEvent>(event);
   }
-  const bool standardHasContinuation =
-      std::ranges::any_of(standardPerformance.tracks[0].automations, [](const PerformanceAutomation& automation) {
+  const bool standardHasContinuation = std::ranges::any_of(
+      standardPerformance.tracks[0].automations,
+      [](const PerformanceAutomation& automation) {
         return pitchTransitionIntent(automation) != nullptr;
       });
   expect(standardDurations == std::vector<u32>{2, 1, 1, 2} && !standardHasHold && !standardHasContinuation,
@@ -1273,8 +1273,8 @@ void ninSnesEarlierPercussionUsesSeparateSixByteTable() {
   });
   expect(drumSource != scan.sourceMap.annotations().end() && drumSource->fieldsAsChildren,
          "NinSnes drum records should opt their exact fields into TreeView child projection");
-  const auto sourceBackedFields = std::ranges::count_if(
-      drumSource->fields, [](const SourceField& field) { return field.range.valid(); });
+  const auto sourceBackedFields =
+      std::ranges::count_if(drumSource->fields, [](const SourceField& field) { return field.range.valid(); });
   expect(sourceBackedFields == 6 && drumSource->fields[0].name == "srcn" &&
              drumSource->fields[5].name == "note" && drumSource->fields[5].range.offset == 0x400a,
          "a prototype drum record should retain all six individually selectable source fields");

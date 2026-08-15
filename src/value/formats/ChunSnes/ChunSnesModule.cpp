@@ -40,14 +40,11 @@ namespace {
 
 }  // namespace
 
-FormatDefinition definition() {
-  return FormatDefinition{
-      .module = {.name = "ChunSnes",
-                 .preferredSampleFilter = SampleFilter::SnesDspLowPass,
-                 .acceptedFormats = {source_formats::kSnesAram},
-                 .scan = scan},
-      .sequenceDialects = {sequenceDialect()},
-  };
+FormatModule module() {
+  return FormatModule{.name = "ChunSnes",
+                      .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+                      .acceptedFormats = {source_formats::kSnesAram},
+                      .scan = scan};
 }
 
 }  // namespace vgmtrans::formats::chun_snes

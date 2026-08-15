@@ -52,14 +52,11 @@ using namespace core;
   return result.finish();
 }
 
-FormatDefinition akaoSnesDefinition() {
-  return FormatDefinition{
-      .module = {.name = std::string(kAkaoSnesFormatName),
-                 .preferredSampleFilter = SampleFilter::SnesDspLowPass,
-                 .acceptedFormats = {source_formats::kSnesAram},
-                 .scan = scanAkaoSnes},
-      .sequenceDialects = {akaoSnesSequenceDialect()},
-  };
+FormatModule akaoSnesModule() {
+  return FormatModule{.name = std::string(kAkaoSnesFormatName),
+                      .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+                      .acceptedFormats = {source_formats::kSnesAram},
+                      .scan = scanAkaoSnes};
 }
 
 }  // namespace vgmtrans::formats::akao_snes

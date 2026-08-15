@@ -41,14 +41,11 @@ namespace {
 
 }  // namespace
 
-FormatDefinition definition() {
-  return FormatDefinition{
-      .module = {.name = "FalcomSnes",
-                 .preferredSampleFilter = SampleFilter::SnesDspLowPass,
-                 .acceptedFormats = {source_formats::kSnesAram},
-                 .scan = scan},
-      .sequenceDialects = {sequenceDialect()},
-  };
+FormatModule module() {
+  return FormatModule{.name = "FalcomSnes",
+                      .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+                      .acceptedFormats = {source_formats::kSnesAram},
+                      .scan = scan};
 }
 
 }  // namespace vgmtrans::formats::falcom_snes

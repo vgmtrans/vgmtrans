@@ -7,7 +7,7 @@
 #pragma once
 
 #include "value/base/Source.h"
-#include "value/scan/FormatDefinition.h"
+#include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceDialect.h"
 
@@ -18,7 +18,6 @@
 namespace vgmtrans::formats::mp2k {
 
 inline constexpr std::string_view kMp2kFormatName = "MP2k";
-inline constexpr std::string_view kMp2kSequenceDialectId = "mp2k:mplay";
 
 struct Mp2kEngine {
   u32 settingsOffset = 0;
@@ -62,6 +61,6 @@ struct Mp2kLayout {
     core::ScanResultBuilder& builder, const Mp2kBank& bank, u32 sampleRate, u8 directSoundMasterVolume, u8 dacBits,
     core::ScanSampleCollectionDraft& psgSamples, std::optional<core::ScanSampleCollectionDraft>& pcmSamples);
 
-[[nodiscard]] core::FormatDefinition mp2kDefinition();
+[[nodiscard]] core::FormatModule mp2kModule();
 
 }  // namespace vgmtrans::formats::mp2k

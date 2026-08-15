@@ -127,19 +127,15 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
 
 }  // namespace
 
-FormatDefinition akaoDefinition() {
-  return FormatDefinition{
-      .module =
-          {
-              .name = std::string(kAkaoFormatName),
-              .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
-              .acceptedFormats = {source_formats::kPlayStationRam},
-              .scan = scanAkao,
-              .collectionResolverId = std::string(kAkaoCollectionResolver),
-              .resolveCollections = resolveAkaoCollections,
-              .prepareCollection = prepareAkaoCollection,
-          },
-      .sequenceDialects = akaoSequenceDialects(),
+FormatModule akaoModule() {
+  return FormatModule{
+      .name = std::string(kAkaoFormatName),
+      .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
+      .acceptedFormats = {source_formats::kPlayStationRam},
+      .scan = scanAkao,
+      .collectionResolverId = std::string(kAkaoCollectionResolver),
+      .resolveCollections = resolveAkaoCollections,
+      .prepareCollection = prepareAkaoCollection,
   };
 }
 

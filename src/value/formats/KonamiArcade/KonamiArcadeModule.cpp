@@ -51,15 +51,11 @@ namespace {
 
 }  // namespace
 
-FormatDefinition konamiArcadeDefinition() {
-  return FormatDefinition{
-      .module =
-          {
-              .name = std::string(kKonamiArcadeFormatName),
-              .acceptedFormats = {source_formats::kKonamiArcade},
-              .scan = scanKonamiArcade,
-          },
-      .sequenceDialects = {konamiArcadeSequenceDialect()},
+FormatModule konamiArcadeModule() {
+  return FormatModule{
+      .name = std::string(kKonamiArcadeFormatName),
+      .acceptedFormats = {source_formats::kKonamiArcade},
+      .scan = scanKonamiArcade,
   };
 }
 

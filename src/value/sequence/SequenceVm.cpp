@@ -429,18 +429,18 @@ private:
 // whole-sequence coordination, such as synchronized stopping across tracks.
 class VmTrackExecutor {
 public:
-  VmTrackExecutor(const SequenceProgram& program, const TrackProgram& track, const SequenceDialect& dialect,
+  VmTrackExecutor(const SequenceProgram& program, const TrackProgram& track, const SequenceRuntime& sequenceRuntime,
                   const SequenceProgramBehavior& behavior, const SequenceVmOptions& options,
                   PerformanceSequence& targetSequence, u64& outputSequence, bool includeGlobalInitialEvents,
                   std::optional<u64> stopTick,
                   std::any* programState = nullptr, bool sequenceCoordinatesLoops = false, bool startsActive = true)
-      : track_(track), dialect_(dialect), behavior_(behavior), loopPolicy_(behavior.defaultLoopPolicy),
+      : track_(track), sequenceRuntime_(sequenceRuntime), behavior_(behavior), loopPolicy_(behavior.defaultLoopPolicy),
         options_(options), targetSequence_(targetSequence), outputSequence_(outputSequence), stopTick_(stopTick),
         performanceTrack_(PerformanceTrack{
             .id = track.id,
             .sourceTrackNumber = track.sourceTrackNumber,
         }),
-        trackState_(dialect.createTrackState != nullptr ? dialect.createTrackState(program, track) : std::any{}),
+        trackState_(sequenceRuntime.createTrackState ? sequenceRuntime.createTrackState(program, track) : std::any{}),
         programState_(programState),
         current_(startsActive ? destinationIndex(track, track.startAddress) : std::optional<u32>{}),
         sequenceCoordinatesLoops_(sequenceCoordinatesLoops) {
@@ -523,8 +523,8 @@ public:
     firstLoopTick_.reset();
     loopStopTick_.reset();
     loopRepeats_ = 0;
-    if (dialect_.beginTrackSection != nullptr) {
-      dialect_.beginTrackSection(trackState_);
+    if (sequenceRuntime_.beginTrackSection != nullptr) {
+      sequenceRuntime_.beginTrackSection(trackState_);
     }
     if (start && !current_) {
       warn(fmt::format("Sequence section target ${:04X} was not decoded", start->value), {});
@@ -566,7 +566,7 @@ private:
   }
 
   void tickDialect(const SourceCommand& command) {
-    if (dialect_.tick == nullptr) {
+    if (sequenceRuntime_.tick == nullptr) {
       return;
     }
     auto out = outputAt(runtime_.tick, command.id, command.annotation);
@@ -575,11 +575,11 @@ private:
       warn("Missing sequence program state", command.range);
       return;
     }
-    dialect_.tick(command, *programState_, trackState_, out, vm);
+    sequenceRuntime_.tick(command, *programState_, trackState_, out, vm);
   }
 
   void executeReadyCommandDuringWait() {
-    if (pendingTicks_ == 0 || !current_ || dialect_.readyDuringWait == nullptr) {
+    if (pendingTicks_ == 0 || !current_ || sequenceRuntime_.readyDuringWait == nullptr) {
       return;
     }
     const SourceCommand& command = track_.commands.at(*current_);
@@ -593,7 +593,7 @@ private:
 
     auto out = outputAt(runtime_.tick, command.id, command.annotation);
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
-    if (!dialect_.readyDuringWait(command, *programState_, trackState_, out, vm)) {
+    if (!sequenceRuntime_.readyDuringWait(command, *programState_, trackState_, out, vm)) {
       return;
     }
     static_cast<void>(executeCommand(true));
@@ -618,7 +618,7 @@ private:
     const SourceCommand& command = track_.commands.at(commandIndex);
     const VisitState visitState = LoopDetector::visitState(commandIndex, runtime_);
     const auto loop = loopDetector_.observe(visitState, command, runtime_, arrivedByControlFlow_);
-    if (dialect_.inferLoopsFromRepeatedState && loop) {
+    if (sequenceRuntime_.inferLoopsFromRepeatedState && loop) {
       if (handleLoop(*loop, commandIndex, visitState).kind == LoopActionKind::StopTrack) {
         return false;
       }
@@ -629,12 +629,12 @@ private:
     const size_t firstAutomation = performanceTrack_.automations.size();
     auto out = outputAt(beginTick, command.id, command.annotation);
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
-    if (programState_ == nullptr || dialect_.execute == nullptr) {
-      warn("Missing sequence dialect executor state", command.range);
+    if (programState_ == nullptr || sequenceRuntime_.execute == nullptr) {
+      warn("Missing sequence runtime executor state", command.range);
       current_ = std::nullopt;
       return false;
     }
-    const Effects effects = dialect_.execute(command, *programState_, trackState_, out, vm);
+    const Effects effects = sequenceRuntime_.execute(command, *programState_, trackState_, out, vm);
     if (duringWait) {
       if (effects.advanceTicks != 0 || effects.flowOverride || !command.flow.defaultTransition ||
           command.flow.defaultTransition->kind != StaticTransitionKind::Fallthrough) {
@@ -924,7 +924,7 @@ private:
   }
 
   const TrackProgram& track_;
-  const SequenceDialect& dialect_;
+  const SequenceRuntime& sequenceRuntime_;
   const SequenceProgramBehavior& behavior_;
   LoopPolicy loopPolicy_;
   const SequenceVmOptions& options_;
@@ -1082,36 +1082,35 @@ SequenceVm::SequenceVm(LoopPolicy loopPolicy) : options_(SequenceVmOptions{.loop
 SequenceVm::SequenceVm(SequenceVmOptions options) : options_(options) {
 }
 
-PerformanceSequence SequenceVm::render(const SequenceProgram& program, const SequenceDialect& dialect) const {
-  return renderImpl(program, dialect, nullptr);
+PerformanceSequence SequenceVm::render(const SequenceProgram& program) const {
+  return renderImpl(program, nullptr);
 }
 
-PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const SequenceDialect& dialect,
-                                           std::any* analyzedProgramState) const {
-  const SequenceProgramBehavior behavior = resolvedBehavior(program, dialect);
+PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, std::any* analyzedProgramState) const {
+  const SequenceRuntime& runtime = program.runtime;
+  const SequenceProgramBehavior behavior = resolvedBehavior(program);
   PerformanceSequence sequence{
       .timebase = program.timebase,
       .initialTempoMicrosecondsPerQuarter = behavior.initialTempoMicrosecondsPerQuarter,
-      .preferredPitchTransitionRendering = dialect.preferredPitchTransitionRendering,
+      .preferredPitchTransitionRendering = runtime.preferredPitchTransitionRendering,
   };
 
   const LoopPolicy loopPolicy = behavior.defaultLoopPolicy;
 
-  if (dialect.execute != nullptr) {
+  if (runtime.valid()) {
     // Some formats must inspect the whole song before the first event can be
     // exported. Keep one song-wide state object across an optional silent pass
     // and the real render so collected information is retained.
-    std::any programState = dialect.createProgramState != nullptr ? dialect.createProgramState(program) : std::any{};
+    std::any programState = runtime.createProgramState ? runtime.createProgramState(program) : std::any{};
     const auto renderSemanticPass = [&](PerformanceSequence& target, std::any& passProgramState) {
       u64 outputSequence = 0;
       std::vector<std::unique_ptr<VmTrackExecutor>> executors;
       executors.reserve(program.tracks.size());
       const bool hasSectionPlaylist = program.sectionPlaylist.has_value();
       for (const TrackProgram& track : program.tracks) {
-        executors.push_back(std::make_unique<VmTrackExecutor>(program, track, dialect, behavior, options_, target,
-                                                              outputSequence, executors.empty(), std::nullopt,
-                                                              &passProgramState,
-                                                              loopPolicy == LoopPolicy::PlayOnce, !hasSectionPlaylist));
+        executors.push_back(std::make_unique<VmTrackExecutor>(
+            program, track, runtime, behavior, options_, target, outputSequence, executors.empty(), std::nullopt,
+            &passProgramState, loopPolicy == LoopPolicy::PlayOnce, !hasSectionPlaylist));
       }
 
       std::optional<SectionPlaylistRunner> playlist;
@@ -1209,44 +1208,49 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
         .timebase = program.timebase,
         .initialTempoMicrosecondsPerQuarter = behavior.initialTempoMicrosecondsPerQuarter,
     };
-    if (dialect.prepass == SemanticPrepassMode::ScheduledPlayback) {
+    if (runtime.prepass == SemanticPrepassMode::ScheduledPlayback) {
       // Run commands in normal time order but discard every emitted event. This
       // preserves song-wide interactions between tracks during collection.
       prepass.tracks = renderSemanticPass(prepass, programState);
-    } else if (dialect.prepass == SemanticPrepassMode::DecodedCommands) {
+    } else if (runtime.prepass == SemanticPrepassMode::DecodedCommands) {
       // Some limits must include every valid source block, even when a jump
       // skips that block during normal playback. Run each already-decoded
       // command once in stable order and discard its events, timing, and jumps.
       u64 outputSequence = 0;
       for (const TrackProgram& track : program.tracks) {
-        std::any trackState =
-            dialect.createTrackState != nullptr ? dialect.createTrackState(program, track) : std::any{};
+        std::any trackState = runtime.createTrackState ? runtime.createTrackState(program, track) : std::any{};
         PerformanceTrack output{
             .id = track.id,
             .sourceTrackNumber = track.sourceTrackNumber,
         };
-        VmTrackRuntime runtime;
+        VmTrackRuntime trackRuntime;
         for (const SourceCommand& command : track.commands) {
-          PerformanceEmitter out{output,         command.id,       command.annotation,     0,
-                                 outputSequence, runtime.nextNote, runtime.nextAutomation, behavior.panLaw,
-                                 &runtime.activeNotes};
-          VmApi vm = detail::VmApiAccess::make(runtime, prepass, command);
-          static_cast<void>(dialect.execute(command, programState, trackState, out, vm));
+          PerformanceEmitter out{output,
+                                 command.id,
+                                 command.annotation,
+                                 0,
+                                 outputSequence,
+                                 trackRuntime.nextNote,
+                                 trackRuntime.nextAutomation,
+                                 behavior.panLaw,
+                                 &trackRuntime.activeNotes};
+          VmApi vm = detail::VmApiAccess::make(trackRuntime, prepass, command);
+          static_cast<void>(runtime.execute(command, programState, trackState, out, vm));
         }
       }
     }
-    if (dialect.prepass != SemanticPrepassMode::None) {
-      if (dialect.finishPrepass != nullptr) {
+    if (runtime.prepass != SemanticPrepassMode::None) {
+      if (runtime.finishPrepass != nullptr) {
         // Tell the format that collection is complete before fresh track state
         // is created for the real render.
-        dialect.finishPrepass(programState);
+        runtime.finishPrepass(programState);
       }
     }
     if (analyzedProgramState != nullptr) {
       // Analysis needs the same control-flow semantics as rendering, but a
       // format with a prepass has already executed everything required to
       // collect its durable result. Do not perform the discarded output pass.
-      if (dialect.prepass == SemanticPrepassMode::None) {
+      if (runtime.prepass == SemanticPrepassMode::None) {
         PerformanceSequence analysis{
             .timebase = program.timebase,
             .initialTempoMicrosecondsPerQuarter = behavior.initialTempoMicrosecondsPerQuarter,
@@ -1257,107 +1261,41 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
       return sequence;
     }
     sequence.tracks = renderSemanticPass(sequence, programState);
-    if (dialect.finalizePerformance != nullptr) {
-      dialect.finalizePerformance(programState, sequence);
+    if (runtime.finalizePerformance != nullptr) {
+      runtime.finalizePerformance(programState, sequence);
     }
     resolveTempoRelativeModulation(sequence);
     return sequence;
   }
 
-  sequence.diagnostics.push_back(vmWarning("Sequence dialect has no executor", {}));
+  sequence.diagnostics.push_back(vmWarning("Sequence program has no runtime executor", {}));
   return sequence;
 }
 
-std::any detail::analyzeSequenceProgram(const SequenceVm& vm, const SequenceProgram& program,
-                                        const SequenceDialect& dialect) {
+std::any detail::analyzeSequenceProgram(const SequenceVm& vm, const SequenceProgram& program) {
   std::any state;
-  static_cast<void>(vm.renderImpl(program, dialect, &state));
+  static_cast<void>(vm.renderImpl(program, &state));
   return state;
 }
 
-SequenceProgramBehavior SequenceVm::resolvedBehavior(const SequenceProgram& program,
-                                                     const SequenceDialect& dialect) const {
-  SequenceProgramBehavior behavior{
-      .defaultLoopPolicy = LoopPolicy::PlayOnce,
-      .commandLimit = kFallbackCommandLimit,
-      .initialTempoMicrosecondsPerQuarter = 500000,
-  };
-
-  if (program.behavior.defaultLoopPolicy != LoopPolicy::Default) {
-    behavior.defaultLoopPolicy = program.behavior.defaultLoopPolicy;
-  } else if (dialect.defaultBehavior.defaultLoopPolicy != LoopPolicy::Default) {
-    behavior.defaultLoopPolicy = dialect.defaultBehavior.defaultLoopPolicy;
+SequenceProgramBehavior SequenceVm::resolvedBehavior(const SequenceProgram& program) const {
+  SequenceProgramBehavior behavior = program.behavior;
+  if (behavior.defaultLoopPolicy == LoopPolicy::Default) {
+    behavior.defaultLoopPolicy = LoopPolicy::PlayOnce;
   }
   if (options_.loopPolicy != LoopPolicy::Default) {
     behavior.defaultLoopPolicy = options_.loopPolicy;
   }
 
-  if (program.behavior.commandLimit != 0) {
-    behavior.commandLimit = program.behavior.commandLimit;
-  } else if (dialect.defaultBehavior.commandLimit != 0) {
-    behavior.commandLimit = dialect.defaultBehavior.commandLimit;
-  }
-
-  if (program.behavior.panLaw != PanLaw::Unspecified) {
-    behavior.panLaw = program.behavior.panLaw;
-  } else if (dialect.defaultBehavior.panLaw != PanLaw::Unspecified) {
-    behavior.panLaw = dialect.defaultBehavior.panLaw;
-  }
-
-  if (program.behavior.initialSourceInstrument) {
-    behavior.initialSourceInstrument = program.behavior.initialSourceInstrument;
-  } else if (dialect.defaultBehavior.initialSourceInstrument) {
-    behavior.initialSourceInstrument = dialect.defaultBehavior.initialSourceInstrument;
-  }
-
-  if (program.behavior.initialReverbSend) {
-    behavior.initialReverbSend = program.behavior.initialReverbSend;
-  } else if (dialect.defaultBehavior.initialReverbSend) {
-    behavior.initialReverbSend = dialect.defaultBehavior.initialReverbSend;
-  }
-
-  if (program.behavior.initialLevel) {
-    behavior.initialLevel = program.behavior.initialLevel;
-  } else if (dialect.defaultBehavior.initialLevel) {
-    behavior.initialLevel = dialect.defaultBehavior.initialLevel;
-  }
-
-  if (program.behavior.initialMasterLevel) {
-    behavior.initialMasterLevel = program.behavior.initialMasterLevel;
-  } else if (dialect.defaultBehavior.initialMasterLevel) {
-    behavior.initialMasterLevel = dialect.defaultBehavior.initialMasterLevel;
-  }
-
-  if (program.behavior.initialExpression) {
-    behavior.initialExpression = program.behavior.initialExpression;
-  } else if (dialect.defaultBehavior.initialExpression) {
-    behavior.initialExpression = dialect.defaultBehavior.initialExpression;
-  }
-
-  behavior.initialStereoBalance = program.behavior.initialStereoBalance;
-  if (std::holds_alternative<UnresolvedInitialStereoBalance>(behavior.initialStereoBalance)) {
-    behavior.initialStereoBalance = dialect.defaultBehavior.initialStereoBalance;
+  if (behavior.commandLimit == 0) {
+    behavior.commandLimit = kFallbackCommandLimit;
   }
   if (std::holds_alternative<UnresolvedInitialStereoBalance>(behavior.initialStereoBalance)) {
     throw std::logic_error("Sequence initial stereo balance remains unresolved");
   }
 
-  if (program.behavior.initialMonoModeChannels) {
-    behavior.initialMonoModeChannels = program.behavior.initialMonoModeChannels;
-  } else if (dialect.defaultBehavior.initialMonoModeChannels) {
-    behavior.initialMonoModeChannels = dialect.defaultBehavior.initialMonoModeChannels;
-  }
-
-  if (program.behavior.initialPitchBendRangeSemitones) {
-    behavior.initialPitchBendRangeSemitones = program.behavior.initialPitchBendRangeSemitones;
-  } else if (dialect.defaultBehavior.initialPitchBendRangeSemitones) {
-    behavior.initialPitchBendRangeSemitones = dialect.defaultBehavior.initialPitchBendRangeSemitones;
-  }
-
-  if (program.behavior.initialTempoMicrosecondsPerQuarter != 0) {
-    behavior.initialTempoMicrosecondsPerQuarter = program.behavior.initialTempoMicrosecondsPerQuarter;
-  } else if (dialect.defaultBehavior.initialTempoMicrosecondsPerQuarter != 0) {
-    behavior.initialTempoMicrosecondsPerQuarter = dialect.defaultBehavior.initialTempoMicrosecondsPerQuarter;
+  if (behavior.initialTempoMicrosecondsPerQuarter == 0) {
+    behavior.initialTempoMicrosecondsPerQuarter = 500'000;
   }
 
   return behavior;

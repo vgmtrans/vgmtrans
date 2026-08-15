@@ -91,19 +91,13 @@ PerformanceSequence render(Version version, u8 shift, bool velocity, std::vector
     driverData = runtimeData();
   }
   SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = sequenceRuntime(version, shift, velocity, std::move(driverData)),
       .timebase = dialect.timebase,
-      .config =
-          SequenceProgramConfig{
-              .profile = static_cast<u32>(version),
-              .driverState = static_cast<u32>(shift) | (velocity ? 0x100u : 0u),
-              .driverData = std::move(driverData),
-          },
       .behavior = dialect.defaultBehavior,
       .tracks = {decodeSourceTrack(ByteReader(SourceId{151}, bytes), version, shift, velocity, 0, 0)},
   };
   program.behavior.initialTempoMicrosecondsPerQuarter = 512000;
-  return SequenceVm(LoopPolicy::PlayOnce).render(program, dialect);
+  return SequenceVm(LoopPolicy::PlayOnce).render(program);
 }
 
 std::vector<u8> v2ScannerFixture() {
@@ -161,12 +155,11 @@ void scannerBuildsACompleteV2Collection() {
   };
   expect(std::ranges::any_of(parsed.recipes.instruments, [](const InstrumentRow& row) { return row.program == 7; }) &&
              contains(parsed.recipes.pitchScripts, 2) && contains(parsed.recipes.customWaveforms, 3) &&
-             contains(parsed.recipes.customWaveforms, 4) && contains(parsed.recipes.volumeCurves, 5) &&
-             parsed.program.config.driverData[7] == 0x8fe08a,
+             contains(parsed.recipes.customWaveforms, 4) && contains(parsed.recipes.volumeCurves, 5),
          "sequence decoding should collect typed references to the driver's live resource tables");
 
   Session session;
-  session.registerFormat(definition());
+  session.registerFormat(module());
   session.addSource(SourceFile{.name = "HudsonSnes fixture.aram"}, bytes);
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
@@ -247,9 +240,7 @@ void headerDecodesEveryVersionTwoRecipe() {
   const SequenceParse parsed = decodeSequence(
       reader, Layout{.version = Version::V2, .sequenceHeaderAddress = 0x100, .noteLengthTableAddress = 0x340},
       AssetId{155});
-  expect(parsed.program.config.driverData[0] == 0x8fe080,
-         "1.x/2.x zero-ADSR rows should resolve through the driver's built-in instrument presets");
-  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program, sequenceDialect());
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
   const auto reverbs = events<ReverbPerformanceEvent>(performance.tracks.front());
   const auto levels = events<LevelPerformanceEvent>(performance.tracks.front());
   const ReverbPerformanceEvent* reverb = reverbs.empty() ? nullptr : reverbs.back();
@@ -492,13 +483,12 @@ void optionalRealCorpusSmokeTest() {
       std::vector<Diagnostic> diagnostics;
       const SequenceParse parsed = decodeSequence(reader, *layout, AssetId{154 + files}, nullptr, &diagnostics);
       decoded += !parsed.program.tracks.empty();
-      const PerformanceSequence performance =
-          SequenceVm(LoopPolicy::PlayOnce).render(parsed.program, sequenceDialect());
+      const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
       rendered += !performance.tracks.empty();
       clean += diagnostics.empty() && performance.diagnostics.empty();
       unsupported += sequenceUsesSemantic(parsed.program, SequenceSemantic::Unsupported);
       Session session;
-      session.registerFormat(definition());
+      session.registerFormat(module());
       session.addSource(SourceFile{.name = entry.path().filename().string()}, aram);
       session.scanPendingSources();
       const SessionSnapshot snapshot = session.snapshot();

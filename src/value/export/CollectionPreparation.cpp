@@ -106,15 +106,13 @@ PreparedCollection prepareCollection(const SessionSnapshot& snapshot, Collection
   return prepared;
 }
 
-RenderedCollection renderSequence(const SequenceProgramAsset& sequence, const FormatRegistry& formats,
-                                  const SequenceRenderOptions& options, const FinalizeCollectionPerformance* finalize) {
-  const auto* dialect = formats.findDialect(sequence.program.dialect.value);
-  if (dialect == nullptr) {
+RenderedCollection renderSequence(const SequenceProgramAsset& sequence, const SequenceRenderOptions& options,
+                                  const FinalizeCollectionPerformance* finalize) {
+  if (!sequence.program.runtime.valid()) {
     return RenderedCollection{
         .diagnostics =
             {
-                exportError("No sequence dialect registered for '" + sequence.program.dialect.value + "'",
-                            validDiagnosticRange(sequence.metadata.range)),
+                exportError("Sequence program has no runtime executor", validDiagnosticRange(sequence.metadata.range)),
             },
     };
   }
@@ -123,7 +121,7 @@ RenderedCollection renderSequence(const SequenceProgramAsset& sequence, const Fo
                                     .loopPolicy = options.loopPolicy,
                                     .sequenceLoops = options.sequenceLoops,
                                 })
-                         .render(sequence.program, *dialect);
+                         .render(sequence.program);
   if (finalize != nullptr && *finalize) {
     try {
       (*finalize)(performance);
@@ -143,8 +141,7 @@ RenderedCollection renderSequence(const SequenceProgramAsset& sequence, const Fo
   return RenderedCollection{.performance = std::move(performance), .modulation = std::move(modulation)};
 }
 
-RenderedCollection renderCollection(const PreparedCollection& prepared, const FormatRegistry& formats,
-                                    const SequenceRenderOptions& options) {
+RenderedCollection renderCollection(const PreparedCollection& prepared, const SequenceRenderOptions& options) {
   if (prepared.sequence == nullptr) {
     auto diagnostics = prepared.diagnostics.sequence;
     if (diagnostics.empty()) {
@@ -152,7 +149,7 @@ RenderedCollection renderCollection(const PreparedCollection& prepared, const Fo
     }
     return RenderedCollection{.diagnostics = std::move(diagnostics)};
   }
-  return renderSequence(*prepared.sequence, formats, options, &prepared.finalizePerformance);
+  return renderSequence(*prepared.sequence, options, &prepared.finalizePerformance);
 }
 
 std::optional<DynamicEnvelopeMaterialization> materializeCollectionDynamicEnvelopes(PreparedCollection& prepared,

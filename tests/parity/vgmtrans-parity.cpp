@@ -4041,18 +4041,12 @@ std::string performanceEventLocation(const SequenceProgram& program, const Perfo
   return out.str();
 }
 
-PerformanceModulationStats performanceModulationStats(const SequenceProgram& program, const FormatRegistry& formats,
-                                                      u32 sequenceLoops) {
-  const auto* dialect = formats.findDialect(program.dialect.value);
-  if (dialect == nullptr) {
-    throw std::runtime_error("No sequence dialect registered for '" + program.dialect.value + "'");
-  }
-
+PerformanceModulationStats performanceModulationStats(const SequenceProgram& program, u32 sequenceLoops) {
   const PerformanceSequence performance = SequenceVm(SequenceVmOptions{
                                                          .loopPolicy = LoopPolicy::PlayOnce,
                                                          .sequenceLoops = sequenceLoops,
                                                      })
-                                              .render(program, *dialect);
+                                              .render(program);
   if (!performance.diagnostics.empty()) {
     throw std::runtime_error("performance render reported: " + performance.diagnostics.front().message);
   }
@@ -4164,7 +4158,7 @@ std::map<std::string, PerformanceModulationStats> valueFormatPerformanceModulati
     const auto* sequence = project.asset<SequenceProgramAsset>(*collection.members.sequence);
     const std::string key = valueMidiCollectionKey(project, collection);
     auto [_, inserted] =
-        statsByCollection.emplace(key, performanceModulationStats(sequence->program, session.formats(), sequenceLoops));
+        statsByCollection.emplace(key, performanceModulationStats(sequence->program, sequenceLoops));
     if (!inserted) {
       throw std::runtime_error("duplicate " + std::string(label) + " performance collection key: " + key);
     }

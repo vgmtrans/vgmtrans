@@ -7,7 +7,7 @@
 #pragma once
 
 #include "value/base/Source.h"
-#include "value/scan/FormatDefinition.h"
+#include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceDialect.h"
 
@@ -65,6 +65,6 @@ struct SequenceParse {
 [[nodiscard]] const core::SequenceDialect& sequenceDialect();
 [[nodiscard]] std::optional<core::ScanSynthRefs> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
                                                           std::string_view displayName);
-[[nodiscard]] core::FormatDefinition definition();
+[[nodiscard]] core::FormatModule module();
 
 }  // namespace vgmtrans::formats::chun_snes
