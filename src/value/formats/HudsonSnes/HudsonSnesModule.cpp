@@ -39,14 +39,11 @@ namespace {
 
 }  // namespace
 
-FormatDefinition definition() {
-  return FormatDefinition{
-      .module = {.name = "HudsonSnes",
-                 .preferredSampleFilter = SampleFilter::SnesDspLowPass,
-                 .acceptedFormats = {source_formats::kSnesAram},
-                 .scan = scan},
-      .sequenceDialects = {sequenceDialect()},
-  };
+FormatModule module() {
+  return FormatModule{.name = "HudsonSnes",
+                      .preferredSampleFilter = SampleFilter::SnesDspLowPass,
+                      .acceptedFormats = {source_formats::kSnesAram},
+                      .scan = scan};
 }
 
 }  // namespace vgmtrans::formats::hudson_snes

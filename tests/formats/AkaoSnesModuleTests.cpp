@@ -68,16 +68,12 @@ PerformanceSequence renderTracks(AkaoSnesProfile profile, std::vector<TrackProgr
                                  std::vector<u32> driverData = {}) {
   const auto& dialect = akaoSnesSequenceDialect();
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = akaoSnesSequenceRuntime(profile, std::move(driverData)),
       .timebase = dialect.timebase,
-      .config =
-          SequenceProgramConfig{
-              .profile = encodeAkaoSnesProfile(profile),
-              .driverData = std::move(driverData),
-          },
+      .behavior = dialect.defaultBehavior,
       .tracks = std::move(tracks),
   };
-  return SequenceVm(options).render(program, dialect);
+  return SequenceVm(options).render(program);
 }
 
 template <class Event>
@@ -186,7 +182,8 @@ std::vector<u8> makeLateAkaoSnesLayoutAram() {
 
   constexpr std::array<u8, 26> readPercussionTableRS3{
       0x8d, 0x03, 0xcf, 0xfd, 0xf5, 0xc0, 0xf2, 0xd0, 0x06, 0xf6, 0x22, 0xf1, 0xd5,
-      0x41, 0xf2, 0xf6, 0x21, 0xf1, 0xc4, 0xa6, 0xf6, 0x20, 0xf1, 0x3f, 0x64, 0x1b};
+      0x41, 0xf2, 0xf6, 0x21, 0xf1, 0xc4, 0xa6, 0xf6, 0x20, 0xf1, 0x3f, 0x64, 0x1b,
+  };
   writeBytes(bytes, 0x0400, readPercussionTableRS3);
 
   return bytes;
@@ -234,9 +231,8 @@ void akaoSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(sequence->program.timebase.ppqn == kAkaoSnesPpqn, "AkaoSnes sequence should use SNES PPQN");
   expect(sequence->program.tracks.size() == 1, "null V1 track pointers should be skipped");
 
-  const auto* dialect = session.formats().findDialect(sequence->program.dialect.value);
-  expect(dialect != nullptr, "registered AkaoSnes dialect should render the scanned sequence");
-  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program, *dialect);
+  expect(sequence->program.runtime.valid(), "scanned AkaoSnes sequence should retain its runtime");
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program);
   expect(performance.diagnostics.empty(), "AkaoSnes performance render should not report diagnostics");
   expect(!performance.tracks.empty(), "AkaoSnes performance should contain a track");
   const bool hasNote = std::ranges::any_of(performance.tracks[0].events, [](const PerformanceEvent& event) {
@@ -464,8 +460,7 @@ void akaoSnesDynamicAdsrCoversHardwareFields() {
          "Secret of Mana EE 00 should disable held-note decay");
 
   std::vector<u8> ff6Bytes(0x40, 0xec);
-  std::ranges::copy(
-      std::initializer_list<u8>{0xdc, 4, 0xdd, 0xff, 0xde, 0xfe, 0xdf, 0xfd, 0xe0, 0xe5, 0xe1, 0xec},
+  std::ranges::copy(std::initializer_list<u8>{0xdc, 4, 0xdd, 0xff, 0xde, 0xfe, 0xdf, 0xfd, 0xe0, 0xe5, 0xe1, 0xec},
       ff6Bytes.begin() + start);
   const AkaoSnesProfile ff6{.version = AKAOSNES_V4, .minorVersion = AKAOSNES_V4_FF6};
   const TrackProgram ff6Track = decodeTrack(ff6Bytes, ff6, start, start + 12);
@@ -1192,13 +1187,13 @@ void akaoSnesV4TieExtendsShortenedPreviousNote() {
       ByteReader(SourceId{8}, bytes),
       AkaoSnesTrackDecodeOptions{.profile = profile, .startAddress = start, .bytecodeEnd = 0x40});
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = akaoSnesSequenceRuntime(profile),
       .timebase = dialect.timebase,
-      .config = SequenceProgramConfig{.profile = encodeAkaoSnesProfile(profile)},
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
 
-  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program, dialect);
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
   expect(performance.diagnostics.empty(), "AkaoSnes V4 tie fixture should render without diagnostics");
 
   const MidiSequence midi = renderMidiSequence(performance);

@@ -752,7 +752,6 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 const SequenceDialect& sequenceDialect() {
   static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{.value = "heartbeat-snes"},
       .commandDetailKindPrefix = "heartbeat-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .defaultBehavior =

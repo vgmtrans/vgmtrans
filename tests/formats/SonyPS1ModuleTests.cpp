@@ -178,7 +178,7 @@ void sonyPs1SequenceSupportsBothLoopCountGenerations() {
                return !command.parent && command.owner == ObjectRefs::sequence(AssetId{81});
              }),
          "SonyPS1 source events should be sequence-owned roots rather than children of a synthetic track");
-  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program, sonyPs1SequenceDialect());
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
   expect(performance.diagnostics.empty(), "modern SonyPS1 loop fixture should render without diagnostics");
   expect(std::ranges::any_of(performance.sourceSpans,
                              [](const SourcePlaybackSpan& span) { return span.channel == 2; }),
@@ -225,8 +225,7 @@ void sonyPs1SequenceSupportsBothLoopCountGenerations() {
   expect(rippedLayout && rippedLayout->events.size() == 5 && rippedLayout->length == 34,
          "an infinite Sony loop should terminate layout discovery when a PSF rip omits End of Track");
   const PerformanceSequence rippedPerformance =
-      SequenceVm(LoopPolicy::PlayOnce)
-          .render(parseSonyPs1Sequence(rippedReader, AssetId{86}, *rippedLayout), sonyPs1SequenceDialect());
+      SequenceVm(LoopPolicy::PlayOnce).render(parseSonyPs1Sequence(rippedReader, AssetId{86}, *rippedLayout));
   expect(rippedPerformance.diagnostics.empty(), "a ripped sequence ending at its infinite loop should render cleanly");
 
   const auto rippedWithoutEndOrLoop = sequenceFixture({
@@ -238,8 +237,7 @@ void sonyPs1SequenceSupportsBothLoopCountGenerations() {
   expect(noEndLayout && noEndLayout->events.size() == 3 && noEndLayout->length == 25,
          "ten zero-filled bytes should retain the legacy boundary for a PSF rip without End of Track");
   const PerformanceSequence noEndPerformance =
-      SequenceVm(LoopPolicy::PlayOnce)
-          .render(parseSonyPs1Sequence(noEndReader, AssetId{89}, *noEndLayout), sonyPs1SequenceDialect());
+      SequenceVm(LoopPolicy::PlayOnce).render(parseSonyPs1Sequence(noEndReader, AssetId{89}, *noEndLayout));
   expect(noEndPerformance.diagnostics.empty(), "a zero-terminated PSF sequence should render cleanly");
   const auto noEndNotes = eventsOfType<NotePerformanceEvent>(noEndPerformance.tracks.front());
   expect(noEndNotes.size() == 1 && noEndNotes.front()->durationTicks == 10,
@@ -257,8 +255,7 @@ void sonyPs1SequenceSupportsBothLoopCountGenerations() {
   const auto sustainedLayout = readSonyPs1SequenceLayout(sustainedReader, 0);
   expect(sustainedLayout.has_value(), "SonyPS1 sustain fixture should have a valid sequence layout");
   const PerformanceSequence sustainedPerformance =
-      SequenceVm(LoopPolicy::PlayOnce)
-          .render(parseSonyPs1Sequence(sustainedReader, AssetId{90}, *sustainedLayout), sonyPs1SequenceDialect());
+      SequenceVm(LoopPolicy::PlayOnce).render(parseSonyPs1Sequence(sustainedReader, AssetId{90}, *sustainedLayout));
   const auto sustainedNotes = eventsOfType<NotePerformanceEvent>(sustainedPerformance.tracks.front());
   expect(sustainedNotes.size() == 2 && sustainedNotes[0]->durationTicks == 10 && sustainedNotes[1]->header.tick == 11 &&
              sustainedNotes[1]->durationTicks == 4,
@@ -326,7 +323,7 @@ void sonyPs1SepAndVabLayoutsAreVersionAware() {
 
 void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
   Session combined;
-  combined.registerFormat(sonyPs1Definition());
+  combined.registerFormat(sonyPs1Module());
   combined.addSource(SourceFile{.name = "combined.VAB"}, vabFixture(7, true));
   combined.scanPendingSources();
   const SessionSnapshot combinedSnapshot = combined.snapshot();
@@ -356,7 +353,7 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
          "VAB program and tone attributes should appear as selectable virtual children");
 
   Session split;
-  split.registerFormat(sonyPs1Definition());
+  split.registerFormat(sonyPs1Module());
   split.addSource(SourceFile{.name = "BANK.VH", .path = "/fixture/BANK.VH"}, vabFixture(7, false));
   std::vector<u8> body(kFixtureVagSize, 0);
   fillVag(body, 0);
@@ -379,7 +376,7 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
   std::ranges::copy(sequenceBytes, pairedBytes.begin() + secondSequence);
 
   Session paired;
-  paired.registerFormat(sonyPs1Definition());
+  paired.registerFormat(sonyPs1Module());
   paired.addSource(SourceFile{.name = "paired.psf"}, std::move(pairedBytes));
   paired.scanPendingSources();
   const SessionSnapshot pairedSnapshot = paired.snapshot();

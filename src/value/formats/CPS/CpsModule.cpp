@@ -183,15 +183,11 @@ void annotateArticulationTable(SourceMapBuilder& sourceMap, ByteReader reader, c
 
 }  // namespace
 
-FormatDefinition cpsDefinition() {
-  return FormatDefinition{
-      .module =
-          {
-              .name = std::string(kCpsFormatName),
-              .acceptedFormats = {source_formats::kCps1, source_formats::kCps2},
-              .scan = scanCps,
-          },
-      .sequenceDialects = {cps1V1Dialect(), cpsEarlyDialect(), cpsLateDialect()},
+FormatModule cpsModule() {
+  return FormatModule{
+      .name = std::string(kCpsFormatName),
+      .acceptedFormats = {source_formats::kCps1, source_formats::kCps2},
+      .scan = scanCps,
   };
 }
 

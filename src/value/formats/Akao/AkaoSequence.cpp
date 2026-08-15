@@ -857,7 +857,6 @@ SequenceDialect makeAkaoDialect(AkaoPs1Version version) {
   const std::string id = dialectId(version);
   const PanLaw panLaw = defaultPanLaw(version);
   return makeCompiledDialect<TrackState, Playback>(SequenceDialect{
-      .id = DialectId{.value = id},
       .commandDetailKindPrefix = id,
       .timebase = Timebase{.ppqn = kAkaoPpqn},
       .defaultBehavior =
@@ -983,7 +982,6 @@ AkaoSequenceParse parseAkaoSequence(const ScanInput& input, AssetId id, const Ak
   const u32 sequenceEnd = offset + analysis.header.length;
   const SequenceDialect dialect = makeAkaoDialect(analysis.header.version);
   SequenceProgram program = dialect.makeProgram(Address{offset});
-  program.config.profile = static_cast<u32>(analysis.header.version);
   program.behavior.panLaw = determinePanLawFromSource(input.source, analysis.header.version);
   program.behavior.initialStereoBalance = program.behavior.panLaw == PanLaw::ConstantSum
                                               ? InitialStereoBalance{StereoBalance{0.5, 0.5}}
@@ -1020,15 +1018,6 @@ AkaoSequenceParse parseAkaoSequence(const ScanInput& input, AssetId id, const Ak
   return AkaoSequenceParse{
       .program = std::move(program),
       .analysis = std::move(analysis),
-  };
-}
-
-std::vector<SequenceDialect> akaoSequenceDialects() {
-  return {
-      makeAkaoDialect(AkaoPs1Version::Version1_0), makeAkaoDialect(AkaoPs1Version::Version1_1),
-      makeAkaoDialect(AkaoPs1Version::Version1_2), makeAkaoDialect(AkaoPs1Version::Version2),
-      makeAkaoDialect(AkaoPs1Version::Version3_0), makeAkaoDialect(AkaoPs1Version::Version3_1),
-      makeAkaoDialect(AkaoPs1Version::Version3_2),
   };
 }
 

@@ -6,7 +6,6 @@
 
 #include "application/WorkspaceController.h"
 #include "models/ValueModels.h"
-#include "value/scan/FormatDefinition.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 
@@ -67,12 +66,9 @@ void workspacePublishesModelsAndRemovesSourceFamilies() {
   source.close();
 
   WorkspaceController workspace([](Session& session) {
-    session.registerFormat(FormatDefinition{
-        .module =
-            FormatModule{
-                .name = "UI Probe",
-                .scan = scanUiProbe,
-            },
+    session.registerFormat(FormatModule{
+        .name = "UI Probe",
+        .scan = scanUiProbe,
     });
   });
   SourceTableModel sources(workspace);
@@ -172,12 +168,9 @@ void workspaceDoesNotPublishEmptyScansAsSources() {
   source.close();
 
   WorkspaceController workspace([](Session& session) {
-    session.registerFormat(FormatDefinition{
-        .module =
-            FormatModule{
-                .name = "UI Probe",
-                .scan = scanUiProbe,
-            },
+    session.registerFormat(FormatModule{
+        .name = "UI Probe",
+        .scan = scanUiProbe,
     });
   });
   SourceTableModel sources(workspace);

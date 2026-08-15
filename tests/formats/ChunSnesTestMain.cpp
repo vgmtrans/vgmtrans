@@ -15,8 +15,7 @@ void runChunSnesModuleTests();
 int main(int argc, char** argv) {
   try {
     if (argc == 2) {
-      return vgmtrans::tests::scanValueFormatArchive(
-          argv[1], {.format = "ChunSnes", .dialect = vgmtrans::formats::chun_snes::sequenceDialect()});
+      return vgmtrans::tests::scanValueFormatArchive(argv[1], {.format = "ChunSnes"});
     }
     runChunSnesModuleTests();
   } catch (const std::exception& error) {

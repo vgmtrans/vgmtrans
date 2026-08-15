@@ -114,7 +114,7 @@ void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulation
     return false;
   }
 
-  auto rendering = renderCollection(prepared, formats, request.sequence);
+  auto rendering = renderCollection(prepared, request.sequence);
   if (!rendering.performance) {
     append(diagnostics, prepared.diagnostics);
     append(diagnostics, rendering.diagnostics);

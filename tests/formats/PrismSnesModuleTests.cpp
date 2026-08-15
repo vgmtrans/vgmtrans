@@ -196,7 +196,7 @@ void dynamicDriverFeaturesRenderFromCapturedTables() {
   const ByteReader reader(SourceId{305}, fixture.data());
   const Layout layout = *findLayout(reader);
   SequenceParse parsed = decodeSequence(reader, layout, AssetId{305});
-  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program, sequenceDialect());
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
   const PerformanceTrack& track = performance.tracks.front();
 
   const auto tempo = events<TempoPerformanceEvent>(track);
@@ -228,7 +228,7 @@ void gainTablesControlNoteAmplitude() {
   const ByteReader reader(SourceId{307}, fixture.data());
   const Layout layout = *findLayout(reader);
   SequenceParse parsed = decodeSequence(reader, layout, AssetId{307});
-  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program, sequenceDialect());
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
   const PerformanceTrack& track = performance.tracks.front();
   const auto expression = events<ExpressionPerformanceEvent>(track);
   expect(
@@ -259,7 +259,7 @@ void instrumentChangesWaitForTheNextAttack() {
   const ByteReader reader(SourceId{308}, fixture.data());
   const Layout layout = *findLayout(reader);
   SequenceParse parsed = decodeSequence(reader, layout, AssetId{308});
-  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program, sequenceDialect());
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
   const PerformanceTrack& track = performance.tracks.front();
   const auto instruments = events<InstrumentPerformanceEvent>(track);
   const auto envelopes = events<EnvelopePerformanceEvent>(track);
@@ -289,7 +289,7 @@ void leadingTiesAreSilentDelays() {
   fixture.commands({0xef, 0x20, 0x72, 0xee, 0x02, 0x3c, 0x08, 0xff});
   const ByteReader reader(SourceId{309}, fixture.data());
   const auto parsed = decodeSequence(reader, *findLayout(reader), AssetId{309});
-  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program, sequenceDialect());
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
   const PerformanceTrack& track = performance.tracks.front();
   const auto notes = events<NotePerformanceEvent>(track);
 
@@ -302,7 +302,7 @@ void moduleBuildsTunedSnesSynth() {
   DriverFixture fixture(Version::Modern);
   fixture.commands({0xfe, 0x02, 0xec, 0xff, 0x3c, 0x08, 0xff});
   Session session;
-  session.registerFormat(definition());
+  session.registerFormat(module());
   session.addSource(SourceFile{.name = "PrismSnes fixture.aram"}, fixture.data());
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
@@ -330,7 +330,7 @@ void subtrackTriggersRunTheirChildScore() {
       parsed.program.tracks.front().commands.size() == 4 && parsed.program.tracks.front().commands[2].encodedSize == 2,
       "ED must reset manual duration before decoding its trigger notes");
 
-  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program, sequenceDialect());
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
   const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
   const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->key == 60.0 &&

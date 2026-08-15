@@ -123,11 +123,11 @@ void synthSampleFilteringHonorsPolicyAndFormat() {
          "SNES and PlayStation filtering should retain their distinct hardware responses");
 
   FormatRegistry formats;
-  formats.add(testFormat(FormatModule{
+  formats.add(FormatModule{
       .name = "PsxProbe",
       .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
       .scan = scanProbeSequence,
-  }));
+  });
   const auto automatic = prepareSynthData(
       SynthExportInput{
           .sampleCollections = collections,
@@ -141,10 +141,10 @@ void synthSampleFilteringHonorsPolicyAndFormat() {
 }
 
 void psxFormatsPreferSpuFiltering() {
-  const auto akao = vgmtrans::formats::akao::akaoDefinition();
-  const auto suzuki = vgmtrans::formats::suzuki_ps1::suzukiPs1Definition();
-  expect(akao.module.preferredSampleFilter == SampleFilter::PsxSpuLowPass &&
-             suzuki.module.preferredSampleFilter == SampleFilter::PsxSpuLowPass,
+  const auto akao = vgmtrans::formats::akao::akaoModule();
+  const auto suzuki = vgmtrans::formats::suzuki_ps1::suzukiPs1Module();
+  expect(akao.preferredSampleFilter == SampleFilter::PsxSpuLowPass &&
+             suzuki.preferredSampleFilter == SampleFilter::PsxSpuLowPass,
          "PlayStation formats should recommend the SPU response filter");
 }
 

@@ -64,14 +64,11 @@ namespace {
 
 }  // namespace
 
-FormatDefinition suzukiPs1Definition() {
-  return FormatDefinition{
-      .module = {.name = std::string(kSuzukiPs1FormatName),
-                 .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
-                 .acceptedFormats = {source_formats::kPlayStationRam},
-                 .scan = scanSuzukiPs1},
-      .sequenceDialects = {suzukiPs1SequenceDialect()},
-  };
+FormatModule suzukiPs1Module() {
+  return FormatModule{.name = std::string(kSuzukiPs1FormatName),
+                      .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
+                      .acceptedFormats = {source_formats::kPlayStationRam},
+                      .scan = scanSuzukiPs1};
 }
 
 }  // namespace vgmtrans::formats::suzuki_ps1

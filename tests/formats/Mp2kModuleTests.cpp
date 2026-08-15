@@ -176,7 +176,7 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
   constexpr double gbaFrameRate = 16777216.0 / 280896.0;
   const std::vector<u8> bytes = mp2kFixture();
   Session session;
-  session.registerFormat(mp2kDefinition());
+  session.registerFormat(mp2kModule());
   const SourceId source = session.addSource(SourceFile{.name = "mp2k-fixture.gba"}, bytes);
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
@@ -387,7 +387,7 @@ void mp2kFixedReverseDirectSoundUsesMixerRate() {
   std::vector<u8> bytes = mp2kFixture();
   bytes[0x400] = 0x18;  // DirectSound FIX | REV
   Session session;
-  session.registerFormat(mp2kDefinition());
+  session.registerFormat(mp2kModule());
   const SourceId source = session.addSource(SourceFile{.name = "mp2k-fixed-reverse.gba"}, bytes);
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
@@ -412,7 +412,7 @@ void mp2kNoiseUsesAuditedRegisterClockAndWidth() {
   bytes[0x418] = 4;       // CGB noise
   le32(bytes, 0x41c, 1);  // 7-bit/short LFSR
   Session session;
-  session.registerFormat(mp2kDefinition());
+  session.registerFormat(mp2kModule());
   const SourceId source = session.addSource(SourceFile{.name = "mp2k-noise.gba"}, bytes);
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
@@ -444,7 +444,7 @@ void mp2kCgbFixedToneUsesDacResolutionMask() {
   std::vector<u8> bytes = mp2kFixture();
   bytes[0x418] = 0x0a;  // channel 2 | FIX
   Session session;
-  session.registerFormat(mp2kDefinition());
+  session.registerFormat(mp2kModule());
   session.addSource(SourceFile{.name = "mp2k-cgb-fixed.gba"}, bytes);
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
@@ -463,7 +463,7 @@ void mp2kCgbLengthClampsSequenceGateInPhysicalTime() {
   const std::array<u8, 15> track{0xbb, 75, 0xbd, 2, 0xcd, 10, 32, 0xff, 60, 100, 0xb0, 0xb1, 0, 0, 0};
   std::copy(track.begin(), track.end(), bytes.begin() + 0x320);
   Session session;
-  session.registerFormat(mp2kDefinition());
+  session.registerFormat(mp2kModule());
   session.addSource(SourceFile{.name = "mp2k-cgb-length.gba"}, bytes);
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
@@ -487,7 +487,7 @@ void mp2kCgbVolumeUsesCombinedHardwareQuantization() {
   };
   std::copy(track.begin(), track.end(), bytes.begin() + 0x320);
   Session session;
-  session.registerFormat(mp2kDefinition());
+  session.registerFormat(mp2kModule());
   session.addSource(SourceFile{.name = "mp2k-cgb-volume.gba"}, bytes);
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
@@ -537,7 +537,7 @@ void mp2kUndefinedJumpSlotsUseFine() {
   const std::array<u8, 12> track{0xbd, 0, 0xbe, 127, 0xd4, 60, 127, 0xb6, 0xd4, 64, 127, 0xb1};
   std::copy(track.begin(), track.end(), bytes.begin() + 0x320);
   Session session;
-  session.registerFormat(mp2kDefinition());
+  session.registerFormat(mp2kModule());
   session.addSource(SourceFile{.name = "mp2k-undefined-fine.gba"}, bytes);
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
@@ -557,7 +557,7 @@ void mp2kPortConsumesItsRegisterOperands() {
   const std::array<u8, 12> track{0xbd, 0, 0xbe, 127, 0xcc, 0x20, 0x77, 0xd4, 60, 127, 0x81, 0xb1};
   std::copy(track.begin(), track.end(), bytes.begin() + 0x320);
   Session session;
-  session.registerFormat(mp2kDefinition());
+  session.registerFormat(mp2kModule());
   session.addSource(SourceFile{.name = "mp2k-port.gba"}, bytes);
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
@@ -573,7 +573,7 @@ void mp2kUnknownMemaccDoesNotConsumeAJumpPointer() {
   const std::array<u8, 14> track{0xbd, 0, 0xbe, 127, 0xb9, 18, 0, 0, 0xd4, 60, 127, 0x81, 0xb1, 0};
   std::copy(track.begin(), track.end(), bytes.begin() + 0x320);
   Session session;
-  session.registerFormat(mp2kDefinition());
+  session.registerFormat(mp2kModule());
   session.addSource(SourceFile{.name = "mp2k-memacc.gba"}, bytes);
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
@@ -625,7 +625,7 @@ void mp2kSongSelectLiteralsFindSparseTableAndRespectPlayerCapacity() {
 
 void mp2kDirectSoundMasterVolumeAffectsOnlyPcmVoices() {
   Session session;
-  session.registerFormat(mp2kDefinition());
+  session.registerFormat(mp2kModule());
   session.addSource(SourceFile{.name = "mp2k-master-volume.gba"}, mp2kFixture(7));
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
@@ -642,7 +642,7 @@ void mp2kDirectSoundMasterVolumeAffectsOnlyPcmVoices() {
 void gsfExtractorFeedsMp2kValueScanner() {
   Session session;
   session.registerExtractor(vgmtrans::formats::psf::psfExtractor());
-  session.registerFormat(mp2kDefinition());
+  session.registerFormat(mp2kModule());
   session.addSource(SourceFile{.name = "mp2k-fixture.gsf"}, gsf(mp2kFixture()));
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
@@ -656,7 +656,7 @@ void gsfExtractorZeroFillsSparseTail() {
   constexpr u32 omittedZeroBytes = 12;
   Session session;
   session.registerExtractor(vgmtrans::formats::psf::psfExtractor());
-  session.registerFormat(mp2kDefinition());
+  session.registerFormat(mp2kModule());
   session.addSource(SourceFile{.name = "Synthetic sparse-tail GSF"}, gsf(rom, omittedZeroBytes));
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
@@ -678,7 +678,7 @@ void miniGsfOverlaysLibraryAndNamesSelectedSong() {
 
   Session session;
   session.registerExtractor(vgmtrans::formats::psf::psfExtractor());
-  session.registerFormat(mp2kDefinition());
+  session.registerFormat(mp2kModule());
   session.addSource(SourceFile{.name = "selected.minigsf", .path = directory / "selected.minigsf"},
                     miniGsf(0, libraryPath.filename().string()));
   session.scanPendingSources();
@@ -699,7 +699,7 @@ void mp2kSkipsEmptyPcmCollections() {
   bytes[0x3a0] = 0xb1;
 
   Session session;
-  session.registerFormat(mp2kDefinition());
+  session.registerFormat(mp2kModule());
   session.addSource(SourceFile{.name = "mp2k-empty-pcm-bank.gba"}, bytes);
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
@@ -733,7 +733,7 @@ void runMp2kModuleTests() {
 void validateMp2kCorpus(const std::filesystem::path& path) {
   Session session;
   session.registerExtractor(vgmtrans::formats::psf::psfExtractor());
-  session.registerFormat(mp2kDefinition());
+  session.registerFormat(mp2kModule());
   const SourceId source = session.addSourceFromPath(path);
   ScanIdAllocator ids;
   ScanInput input{
@@ -763,7 +763,7 @@ void validateMp2kCorpus(const std::filesystem::path& path) {
 void exportMp2kCorpusSong(const std::filesystem::path& path, size_t song, const std::filesystem::path& directory) {
   Session session;
   session.registerExtractor(vgmtrans::formats::psf::psfExtractor());
-  session.registerFormat(mp2kDefinition());
+  session.registerFormat(mp2kModule());
   session.addSourceFromPath(path);
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();

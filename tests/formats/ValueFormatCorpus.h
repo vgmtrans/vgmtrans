@@ -23,7 +23,6 @@ namespace vgmtrans::tests {
 
 struct ValueFormatCorpus {
   std::string_view format;
-  const core::SequenceDialect& dialect;
   std::optional<core::ExportRequest> exports;
   std::optional<std::filesystem::path> outputDirectory;
 };
@@ -46,7 +45,7 @@ inline int scanValueFormatArchive(const std::filesystem::path& path, const Value
       continue;
     }
     sequences.push_back(metadata(asset).id);
-    const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program, corpus.dialect);
+    const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program);
     renderFailures += performance.tracks.empty() || !performance.diagnostics.empty();
   }
 

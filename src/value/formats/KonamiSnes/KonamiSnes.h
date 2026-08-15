@@ -9,7 +9,7 @@
 #include "value/base/Types.h"
 #include "value/base/Source.h"
 #include "value/platform/SnesSampleDirectory.h"
-#include "value/scan/FormatDefinition.h"
+#include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceDialect.h"
 
@@ -184,7 +184,8 @@ struct KonamiSnesInstrumentInfo {
 [[nodiscard]] const char* konamiSnesVersionName(KonamiSnesVersion version);
 
 [[nodiscard]] const core::SequenceDialect& konamiSnesSequenceDialect(KonamiSnesVersion version);
-[[nodiscard]] std::vector<core::SequenceDialect> konamiSnesSequenceDialects();
+[[nodiscard]] core::SequenceRuntime konamiSnesSequenceRuntime(KonamiSnesVersion version,
+                                                              bool indexedEchoFilter = false);
 [[nodiscard]] core::TrackProgram decodeKonamiSnesSourceTrack(
     core::ByteReader reader, KonamiSnesVersion version, u32 sourceTrackNumber, u32 startAddress,
     core::SourceMapBuilder* sourceMap = nullptr, std::vector<core::Diagnostic>* diagnostics = nullptr,
@@ -204,6 +205,6 @@ struct KonamiSnesInstrumentInfo {
                                                                     const KonamiSnesLayout& layout,
                                                                     std::string_view displayName);
 
-[[nodiscard]] core::FormatDefinition konamiSnesDefinition();
+[[nodiscard]] core::FormatModule konamiSnesModule();
 
 }  // namespace vgmtrans::formats::konami_snes

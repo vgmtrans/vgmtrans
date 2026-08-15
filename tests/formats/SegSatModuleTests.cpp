@@ -294,7 +294,7 @@ void segSatVlCurveMatchesMm8Saturation() {
 
 void segSatCollectionPreparationSuppliesVlTablesToSequence() {
   Session session;
-  session.registerFormat(segSatDefinition());
+  session.registerFormat(segSatModule());
   const SourceId source = session.addSource(SourceFile{.name = "segsat-fixture.bin"}, segSatFixture());
   session.scanPendingSources();
 
@@ -309,10 +309,7 @@ void segSatCollectionPreparationSuppliesVlTablesToSequence() {
                return !command.parent && snapshot.sourceMap().assetOwner(id) == sequence.metadata.id;
              }),
          "SegSat source events should be sequence-owned roots rather than children of synthetic tracks");
-  const auto* dialect = session.formats().findDialect(sequence.program.dialect.value);
-  expect(dialect != nullptr, "SegSat fixture dialect should be registered");
-
-  const PerformanceSequence unprepared = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, *dialect);
+  const PerformanceSequence unprepared = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program);
   expect(std::ranges::any_of(unprepared.sourceSpans,
                              [](const SourcePlaybackSpan& span) { return span.channel == 3; }),
          "SegSat playback spans should retain each event's source channel");
@@ -353,8 +350,9 @@ void segSatCollectionPreparationSuppliesVlTablesToSequence() {
   });
   const auto* pitch =
       bend != playback.performance.tracks[0].events.end() ? std::get_if<PitchBendPerformanceEvent>(&*bend) : nullptr;
-  const auto pitchCount =
-      std::ranges::count_if(playback.performance.tracks[0].events, [](const PerformanceEvent& event) {
+  const auto pitchCount = std::ranges::count_if(
+      playback.performance.tracks[0].events,
+      [](const PerformanceEvent& event) {
         return std::holds_alternative<PitchBendPerformanceEvent>(event);
       });
   expect(pitchCount == 1 && pitch != nullptr && std::abs(pitch->semitones - (-0.09375)) < 0.000001 &&
@@ -410,7 +408,7 @@ void segSatCollectionPreparationSuppliesVlTablesToSequence() {
 
 void segSatRuntimeMapSelectsBankInsideAnotherSampleSpan() {
   Session session;
-  session.registerFormat(segSatDefinition());
+  session.registerFormat(segSatModule());
   session.addSource(SourceFile{.name = "segsat-overlap.bin"}, overlappingBankFixture());
   session.scanPendingSources();
 
@@ -448,7 +446,7 @@ void segSatRuntimeMapSelectsBankInsideAnotherSampleSpan() {
 
 void segSatMultiBankPlaybackUsesTheActiveBanksVlTable() {
   Session session;
-  session.registerFormat(segSatDefinition());
+  session.registerFormat(segSatModule());
   session.addSource(SourceFile{.name = "segsat-multi-bank.bin"}, multiBankVelocityFixture());
   session.scanPendingSources();
 
@@ -545,8 +543,8 @@ void segSatCollectionPreparationReadsVelocityBanksFromSeparateSources() {
   builder.collections = {collection};
   const SessionSnapshot snapshot = builder.finish();
 
-  const FormatDefinition format = segSatDefinition();
-  const PreparedCollectionAssets prepared = format.module.prepareCollection(CollectionPrepareContext{
+  const FormatModule format = segSatModule();
+  const PreparedCollectionAssets prepared = format.prepareCollection(CollectionPrepareContext{
       .sources = sources,
       .snapshot = snapshot,
       .collection = snapshot.collections().front(),
@@ -554,7 +552,7 @@ void segSatCollectionPreparationReadsVelocityBanksFromSeparateSources() {
   expect(prepared.diagnostics.empty() && prepared.finalizePerformance,
          "SegSat preparation should read attached banks from separate sources");
 
-  PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, segSatSequenceDialect());
+  PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program);
   prepared.finalizePerformance(performance);
   std::vector<const NotePerformanceEvent*> notes;
   for (const auto& event : performance.tracks.front().events) {

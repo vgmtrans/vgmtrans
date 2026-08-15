@@ -61,13 +61,12 @@ std::vector<const ModulationPerformanceEvent*> modulationEvents(const Performanc
 PerformanceSequence render(std::vector<u8> bytes, u8 group = 0, u8 echoDelay = 4) {
   const SequenceDialect& dialect = sequenceDialect();
   SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = sequenceRuntime(echoDelay),
       .timebase = dialect.timebase,
-      .config = SequenceProgramConfig{.profile = group, .driverState = echoDelay},
       .behavior = dialect.defaultBehavior,
       .tracks = {decodeSourceTrack(ByteReader(SourceId{201}, bytes), 0, 0, 0, group)},
   };
-  return SequenceVm(LoopPolicy::PlayOnce).render(program, dialect);
+  return SequenceVm(LoopPolicy::PlayOnce).render(program);
 }
 
 std::vector<u8> scannerFixture() {
@@ -105,7 +104,7 @@ void layoutAndSynthFollowRelocatedDriverTables() {
          "ItikitiSnes signatures should recover the header, sequence base, tables, DIR, voices, and EDL");
 
   Session session;
-  session.registerFormat(definition());
+  session.registerFormat(module());
   session.addSource(SourceFile{.name = "ItikitiSnes fixture.aram"}, bytes);
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();

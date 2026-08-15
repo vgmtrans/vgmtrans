@@ -141,11 +141,15 @@ struct RepeatFrame {
   u16 remaining = 0;
 };
 
+struct RuntimeConfig {
+  u8 echoDelay = 0;
+};
+
 struct ProgramState {
-  explicit ProgramState(const SequenceProgram& sequence) {
+  ProgramState(const SequenceProgram&, const RuntimeConfig& config) {
     tempo.reset(0x80);
     echo.voiceMask = 0;
-    echo.delayMilliseconds = (sequence.config.driverState & 0x0fu) * 16.0;
+    echo.delayMilliseconds = (config.echoDelay & 0x0fu) * 16.0;
   }
 
   PerformanceBoundValue<SequenceFixedPointAutomation<s32>> tempo;
@@ -828,7 +832,6 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 const SequenceDialect& sequenceDialect() {
   static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{.value = "itikiti-snes"},
       .commandDetailKindPrefix = "itikiti-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .defaultBehavior =
@@ -845,6 +848,12 @@ const SequenceDialect& sequenceDialect() {
           },
   });
   return dialect;
+}
+
+SequenceRuntime sequenceRuntime(u8 echoDelay) {
+  SequenceProgram program = sequenceDialect().makeProgram();
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, RuntimeConfig{.echoDelay = echoDelay});
+  return std::move(program.runtime);
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, u32 trackNumber, u32 startAddress, u32 sequenceBase, u8 groupIndex,
@@ -874,8 +883,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   }
   SequenceProgram program = sequence.finish();
   program.sourceBaseAddress = Address{layout.sequenceBaseAddress};
-  program.config.profile = layout.groupIndex;
-  program.config.driverState = layout.echoDelay;
+  program.runtime = sequenceRuntime(layout.echoDelay);
   return SequenceParse{.program = std::move(program), .references = std::move(references), .headerRange = header};
 }
 

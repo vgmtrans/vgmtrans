@@ -7,7 +7,7 @@
 #pragma once
 
 #include "value/base/Source.h"
-#include "value/scan/FormatDefinition.h"
+#include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceDialect.h"
 
@@ -73,6 +73,6 @@ struct SequenceParse {
 [[nodiscard]] core::Envelope driverEnvelope(u8 adsr1, u8 adsr2);
 [[nodiscard]] std::optional<core::ScanSynthRefs> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
                                                           const std::set<u8>& programs, std::string_view displayName);
-[[nodiscard]] core::FormatDefinition definition();
+[[nodiscard]] core::FormatModule module();
 
 }  // namespace vgmtrans::formats::prism_snes

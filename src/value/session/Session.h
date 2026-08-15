@@ -10,7 +10,6 @@
 #include "value/export/Export.h"
 #include "value/model/SessionSnapshot.h"
 #include "value/model/SourceInspection.h"
-#include "value/scan/FormatDefinition.h"
 #include "value/scan/FormatRegistry.h"
 #include "value/scan/ScanTypes.h"
 
@@ -40,7 +39,7 @@ public:
   Session(const Session&) = delete;
   Session& operator=(const Session&) = delete;
 
-  void registerFormat(FormatDefinition definition);
+  void registerFormat(FormatModule module);
   void registerExtractor(SourceExtractor extractor);
 
   SourceId addSource(SourceFile file, std::vector<u8> bytes);

@@ -707,7 +707,6 @@ struct SequenceDecodeContext {
 
 const SequenceDialect& ndsSequenceDialect() {
   static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{.value = std::string(kNdsSequenceDialectId)},
       .commandDetailKindPrefix = "nds",
       .timebase = Timebase{.ppqn = 0x30},
       .defaultBehavior =

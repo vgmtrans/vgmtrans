@@ -156,13 +156,17 @@ struct ProgramState {
   u32 tempoMicrosecondsPerQuarter = 500000;
 };
 
+struct RuntimeConfig {
+  CapcomSnesEngineVersion version = CapcomSnesEngineVersion::none;
+};
+
 // Only registers that persist from one executed command to the next belong in
 // track state. Source bounds and engine-version conversions are decode concerns.
 struct TrackState {
   TrackState() = default;
 
-  explicit TrackState(const SequenceProgram& program)
-      : resetLfoPhaseOnNote(static_cast<CapcomSnesEngineVersion>(program.config.profile) !=
+  explicit TrackState(const RuntimeConfig& config)
+      : resetLfoPhaseOnNote(config.version !=
                             CapcomSnesEngineVersion::v1BgmInList) {}
 
   u8 durationRate256ths = 0;
@@ -548,7 +552,6 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
 
 const SequenceDialect& capcomSnesSequenceDialect() {
   static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{.value = "capcom-snes"},
       .commandDetailKindPrefix = "capcom-snes",
       .timebase = Timebase{.ppqn = kCapcomSnesPpqn},
       .defaultBehavior =
@@ -560,6 +563,12 @@ const SequenceDialect& capcomSnesSequenceDialect() {
           },
   });
   return dialect;
+}
+
+SequenceRuntime capcomSnesSequenceRuntime(CapcomSnesEngineVersion version) {
+  SequenceProgram program = capcomSnesSequenceDialect().makeProgram();
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, RuntimeConfig{.version = version});
+  return std::move(program.runtime);
 }
 
 // Decodes one known track directly for focused tests and callers that already
@@ -595,7 +604,7 @@ SequenceProgram decodeCapcomSnesSequence(ByteReader reader, const CapcomSnesLayo
     sequence.addLinearTrack(sourceTrackNumber, reader.range(pointerOffset, 2), trackAddress, decode);
   }
   SequenceProgram program = sequence.finish();
-  program.config.profile = static_cast<u32>(layout.version);
+  program.runtime = capcomSnesSequenceRuntime(layout.version);
   return program;
 }
 

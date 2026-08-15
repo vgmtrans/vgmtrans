@@ -827,8 +827,13 @@ struct SharedTempoChange {
   u64 order = 0;
 };
 
+struct RuntimeConfig {
+  AkaoSnesProfile profile;
+  std::vector<u32> v1VolumeEnvelopes;
+};
+
 struct ProgramState {
-  explicit ProgramState(const SequenceProgram& program) : profile(decodeAkaoSnesProfile(program.config.profile)) {
+  ProgramState(const SequenceProgram& program, const RuntimeConfig& config) : profile(config.profile) {
     for (const TrackProgram& track : program.tracks) {
       for (const SourceCommand& command : track.commands) {
         const Address fallthrough = command.flow.continuation;
@@ -930,11 +935,10 @@ struct PitchEnvelopeState {
 };
 
 struct TrackState {
-  TrackState(const SequenceProgram& program, const TrackProgram& track)
+  TrackState(const SequenceProgram&, const TrackProgram& track, const RuntimeConfig& config)
       : sourceTrack(track),
-        trackNumber(track.sourceTrackNumber),
-        pan8Bit(akaoSnesUses8BitPan(decodeAkaoSnesProfile(program.config.profile))),
-        v1Envelope(program.config.driverData) {
+        trackNumber(track.sourceTrackNumber), pan8Bit(akaoSnesUses8BitPan(config.profile)),
+        v1Envelope(config.v1VolumeEnvelopes) {
     volume.reset(0xff);
     pan.reset(0x80);
     tempoState.reset(kDefaultTempo);
@@ -2080,7 +2084,6 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
 
 [[nodiscard]] const SequenceDialect& sharedDialect() {
   static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{.value = "akao-snes"},
       .commandDetailKindPrefix = "akao-snes",
       .timebase = Timebase{.ppqn = kAkaoSnesPpqn},
       .defaultBehavior =
@@ -2089,7 +2092,7 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
               .initialReverbSend = 0.0,
               .initialStereoBalance = StereoBalance{127.0 / 255.0, 128.0 / 255.0},
           },
-      .prepass = SemanticPrepassMode::ScheduledPlayback,
+      .runtime = SequenceRuntime{.prepass = SemanticPrepassMode::ScheduledPlayback},
   });
   return dialect;
 }
@@ -2142,6 +2145,13 @@ struct SequenceHeaderInfo {
 
 const SequenceDialect& akaoSnesSequenceDialect() {
   return sharedDialect();
+}
+
+SequenceRuntime akaoSnesSequenceRuntime(AkaoSnesProfile profile, std::vector<u32> v1VolumeEnvelopes) {
+  SequenceProgram program = akaoSnesSequenceDialect().makeProgram();
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(
+      program, RuntimeConfig{.profile = profile, .v1VolumeEnvelopes = std::move(v1VolumeEnvelopes)});
+  return std::move(program.runtime);
 }
 
 TrackProgram decodeAkaoSnesSourceTrack(ByteReader reader, const AkaoSnesTrackDecodeOptions& options) {
@@ -2208,12 +2218,13 @@ SequenceProgram parseAkaoSnesSequence(ByteReader reader, const AkaoSnesLayout& l
 
   SequenceProgram program = session.finish();
   program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
-  program.config.profile = encodeAkaoSnesProfile(profile);
+  RuntimeConfig runtime{.profile = profile};
   program.behavior.initialTempoMicrosecondsPerQuarter =
       tempoMicrosecondsPerQuarter(profile.version, profile.minorVersion, kDefaultTempo);
   if (layout.version == AKAOSNES_V1 && layout.volumeEnvelopeTableAddress) {
-    program.config.driverData = captureAkaoSnesV1VolumeEnvelopes(reader, *layout.volumeEnvelopeTableAddress);
+    runtime.v1VolumeEnvelopes = captureAkaoSnesV1VolumeEnvelopes(reader, *layout.volumeEnvelopeTableAddress);
   }
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, std::move(runtime));
 
   return program;
 }

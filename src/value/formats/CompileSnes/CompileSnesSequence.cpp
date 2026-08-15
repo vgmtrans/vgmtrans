@@ -45,8 +45,6 @@ constexpr size_t kPercussionBase = kAdsrBase + 128;
 constexpr size_t kDescriptorBase = kPercussionBase + 30 * 2;
 constexpr size_t kDescriptorStride = 256 * 2;
 constexpr size_t kPayloadBase = kDescriptorBase + static_cast<size_t>(Table::Count) * kDescriptorStride;
-constexpr u32 kEchoCapable = 1u << 0;
-constexpr u32 kStereoEnabled = 1u << 1;
 
 [[nodiscard]] size_t descriptor(Table table, u8 index) {
   return kDescriptorBase + static_cast<size_t>(table) * kDescriptorStride + index * 2u;
@@ -316,9 +314,30 @@ struct CurveState {
   }
 };
 
+struct RuntimeTrackConfig {
+  u8 channel = 0;
+  u8 flags = 0;
+  u8 volume = 0;
+  u8 volumeEnvelope = 0;
+  u8 vibrato = 0;
+  s8 transpose = 0;
+  u8 tempo = 0;
+  u8 branchId = 0;
+  u8 program = 0;
+  u8 adsr = 0;
+  s8 pan = 0;
+};
+
+struct RuntimeConfig {
+  Version version = Version::JakiCrush;
+  bool echoCapable = false;
+  bool stereoEnabled = false;
+  std::vector<u32> data;
+  std::vector<RuntimeTrackConfig> tracks;
+};
+
 struct ProgramState {
-  explicit ProgramState(const SequenceProgram& sequence)
-      : data(&sequence.config.driverData), echoCapable((sequence.config.driverState & kEchoCapable) != 0) {
+  explicit ProgramState(const RuntimeConfig& config) : data(&config.data), echoCapable(config.echoCapable) {
     const auto preset = table(*data, Table::Echo, 0);
     if (preset.size() >= 16) {
       echo.delayMilliseconds = (preset[1] & 0x0f) * 16.0;
@@ -337,23 +356,22 @@ struct ProgramState {
 };
 
 struct TrackState {
-  TrackState(const SequenceProgram& sequence, const TrackProgram& source)
-      : trackNumber(source.sourceTrackNumber), early(sequence.config.profile <= static_cast<u32>(Version::JakiCrush)),
-        stereoEnabled((sequence.config.driverState & kStereoEnabled) != 0) {
-    const auto& data = source.config.driverData;
-    const auto at = [&](size_t index) { return index < data.size() ? data[index] : 0u; };
-    channel = static_cast<u8>(at(0));
-    headerFlags = static_cast<u8>(at(1));
-    volume = static_cast<u8>(at(2) & 0x1f);
-    volumeEnvelope.reset(static_cast<u8>(at(3)), 31);
-    vibrato.reset(static_cast<u8>(at(4)), 0);
-    transpose = static_cast<s8>(at(5));
-    tempo = static_cast<u8>(at(6));
+  TrackState(const TrackProgram& source, const RuntimeConfig& config)
+      : trackNumber(source.sourceTrackNumber), early(config.version <= Version::JakiCrush),
+        stereoEnabled(config.stereoEnabled) {
+    const auto& track = config.tracks.at(source.sourceTrackNumber);
+    channel = track.channel;
+    headerFlags = track.flags;
+    volume = static_cast<u8>(track.volume & 0x1f);
+    volumeEnvelope.reset(track.volumeEnvelope, 31);
+    vibrato.reset(track.vibrato, 0);
+    transpose = track.transpose;
+    tempo = track.tempo;
     tempoAccumulator = static_cast<u8>(tempo - 1u);
-    branchId = static_cast<u8>(at(7));
-    program = static_cast<u8>(at(8));
-    adsr = static_cast<u8>(at(9));
-    pan = stereoEnabled ? static_cast<s8>(at(10)) : 0;
+    branchId = track.branchId;
+    program = track.program;
+    adsr = track.adsr;
+    pan = stereoEnabled ? track.pan : 0;
     slur = (headerFlags & 0x10) != 0;
   }
 
@@ -1275,7 +1293,6 @@ void addPercussionReferences(ByteReader reader, const Layout& layout, Referenced
 
 const SequenceDialect& sequenceDialect() {
   static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{.value = "compile-snes"},
       .commandDetailKindPrefix = "compile-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .defaultBehavior =
@@ -1327,19 +1344,30 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
 
   SequenceProgram program = sequence.finish();
   program.sourceBaseAddress = Address{layout.songHeaderAddress};
-  program.config.profile = static_cast<u32>(layout.version);
-  program.config.driverState =
-      (layout.hasEchoCommands() ? kEchoCapable : 0) | (layout.stereoEnabled ? kStereoEnabled : 0);
-  program.config.driverData = runtimeData(reader, layout, references);
+  RuntimeConfig runtime{
+      .version = layout.version,
+      .echoCapable = layout.hasEchoCommands(),
+      .stereoEnabled = layout.stereoEnabled,
+      .data = runtimeData(reader, layout, references),
+      .tracks = std::vector<RuntimeTrackConfig>(count),
+  };
   for (u32 track = 0; track < count && track < program.tracks.size(); ++track) {
     const u32 item = layout.songHeaderAddress + 1 + track * 14u;
-    program.tracks[track].config.driverData = {
-        reader.u8At(item),      reader.u8At(item + 1),  reader.u8At(item + 2),
-        reader.u8At(item + 3),  reader.u8At(item + 4),  static_cast<u8>(reader.u8At(item + 5) + layout.globalTranspose),
-        reader.u8At(item + 6),  reader.u8At(item + 7),  reader.u8At(item + 10),
-        reader.u8At(item + 11), reader.u8At(item + 12),
+    runtime.tracks[track] = RuntimeTrackConfig{
+        .channel = reader.u8At(item),
+        .flags = reader.u8At(item + 1),
+        .volume = reader.u8At(item + 2),
+        .volumeEnvelope = reader.u8At(item + 3),
+        .vibrato = reader.u8At(item + 4),
+        .transpose = static_cast<s8>(reader.u8At(item + 5) + layout.globalTranspose),
+        .tempo = reader.u8At(item + 6),
+        .branchId = reader.u8At(item + 7),
+        .program = reader.u8At(item + 10),
+        .adsr = reader.u8At(item + 11),
+        .pan = static_cast<s8>(reader.u8At(item + 12)),
     };
   }
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, std::move(runtime));
   return SequenceParse{.program = std::move(program), .references = std::move(references), .headerRange = header};
 }
 

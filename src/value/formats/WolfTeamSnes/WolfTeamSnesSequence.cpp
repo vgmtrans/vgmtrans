@@ -40,11 +40,6 @@ constexpr u32 kSegmentedPitchEntries = 14;
 constexpr u32 kPitchUnityIndex = 72;
 constexpr u16 kMinUnityPitch = 0x0e00;
 constexpr u16 kMaxUnityPitch = 0x1200;
-constexpr u32 kDriverHeaderTempo = 0;
-constexpr u32 kDriverTimerScale = 1;
-constexpr u32 kDriverInstrumentPitch = 2;
-constexpr u32 kDriverPitchCount = kDriverInstrumentPitch + kInstrumentCount;
-constexpr u32 kDriverPitchTable = kDriverPitchCount + 1;
 // Repeat slots 0 and 1 mirror the driver's two nested loop markers. The VM
 // includes repeat state in its visit key, so a reserved third slot carries the
 // runtime phrase/segment index when two table entries share one source address.
@@ -206,23 +201,25 @@ constexpr u8 kSourcePositionRepeatSlot = 2;
   return kDefaultPitchTable;
 }
 
+struct RuntimeTrackConfig {
+  u8 status = 0;
+  std::vector<Address> streamStarts;
+};
+
+struct RuntimeConfig {
+  Variant variant = Variant::LateFamily;
+  LateTraits lateTraits;
+  u8 headerTempo = 0;
+  u8 timerScale = 0x40;
+  std::array<s16, kInstrumentCount> instrumentPitch{};
+  std::vector<u16> pitchTable;
+  std::map<u32, RuntimeTrackConfig> tracks;
+};
+
 struct ProgramState {
-  explicit ProgramState(const SequenceProgram& sequence) : variant(static_cast<Variant>(sequence.config.profile)) {
-    const auto& data = sequence.config.driverData;
-    if (data.size() < kDriverPitchTable) {
-      return;
-    }
-    headerTempo = static_cast<u8>(data[kDriverHeaderTempo]);
-    timerScale = static_cast<u8>(data[kDriverTimerScale]);
-    for (u32 program = 0; program < kInstrumentCount; ++program) {
-      instrumentPitch[program] = static_cast<s16>(data[kDriverInstrumentPitch + program]) - 128;
-    }
-    const u32 count = std::min<u32>(data[kDriverPitchCount], data.size() - kDriverPitchTable);
-    pitchTable.reserve(count);
-    for (u32 index = 0; index < count; ++index) {
-      pitchTable.push_back(static_cast<u16>(data[kDriverPitchTable + index]));
-    }
-  }
+  explicit ProgramState(const RuntimeConfig& config)
+      : variant(config.variant), headerTempo(config.headerTempo), timerScale(config.timerScale),
+        instrumentPitch(config.instrumentPitch), pitchTable(config.pitchTable) {}
 
   [[nodiscard]] bool middle() const noexcept { return isMiddleSegmentedVariant(variant); }
 
@@ -262,19 +259,13 @@ struct RuntimeLoopMarker {
 };
 
 struct TrackState {
-  TrackState(const SequenceProgram& sequence, const TrackProgram& trackProgram)
-      : variant(static_cast<Variant>(sequence.config.profile)) {
-    lateTraits.specialInstrumentUpper = static_cast<u8>(sequence.config.driverState);
-    lateTraits.remapHighInstrumentIds = (sequence.config.driverState & (1u << 8)) != 0;
-    lateTraits.hasInstrument5KeySplit = (sequence.config.driverState & (1u << 9)) != 0;
-    lateTraits.programChangeHasDelay = (sequence.config.driverState & (1u << 10)) != 0;
+  TrackState(const TrackProgram& trackProgram, const RuntimeConfig& config)
+      : variant(config.variant), lateTraits(config.lateTraits) {
+    const RuntimeTrackConfig& track = config.tracks.at(trackProgram.sourceTrackNumber);
     if (!segmented()) {
-      vibratoEnabled = (trackProgram.config.driverState & 0x01) != 0;
+      vibratoEnabled = (track.status & 0x01) != 0;
     }
-    streamStarts.reserve(trackProgram.config.driverData.size());
-    for (const u32 start : trackProgram.config.driverData) {
-      streamStarts.push_back(Address{start});
-    }
+    streamStarts = track.streamStarts;
   }
 
   [[nodiscard]] bool segmented() const noexcept { return isSegmentedVariant(variant); }
@@ -978,17 +969,18 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   for (auto& [offset, command] : commands) {
     session.append(std::move(command), offset);
   }
-  TrackProgram track = session.finish();
-  track.config.driverState = channel.status;
-  track.config.driverData.assign(channel.streamStarts.begin(), channel.streamStarts.end());
-  return track;
+  return session.finish();
 }
 
-[[nodiscard]] std::vector<u32> driverData(ByteReader reader, const Layout& layout) {
-  std::vector<u32> data(kDriverPitchTable);
-  data[kDriverHeaderTempo] = reader.u8At(layout.sequenceHeaderAddress + 0x22);
-  data[kDriverTimerScale] =
-      layout.middleSegmented() ? 0x40 : (layout.variant == Variant::Arcus ? reader.u8At(0xe2) : 0x40);
+[[nodiscard]] RuntimeConfig runtimeConfig(ByteReader reader, const Layout& layout) {
+  RuntimeConfig config{
+      .variant = layout.variant,
+      .lateTraits = layout.lateTraits,
+      .headerTempo = reader.u8At(layout.sequenceHeaderAddress + 0x22),
+      .timerScale =
+          layout.middleSegmented() ? u8{0x40}
+                                   : (layout.variant == Variant::Arcus ? reader.u8At(0xe2) : u8{0x40}),
+  };
 
   for (u32 programNumber = 0; programNumber < kInstrumentCount; ++programNumber) {
     s16 pitch = 0;
@@ -1010,16 +1002,16 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         pitch = signedByte(raw);
       }
     }
-    data[kDriverInstrumentPitch + programNumber] = static_cast<u32>(pitch + 128);
+    config.instrumentPitch[programNumber] = pitch;
   }
 
   const u32 pitchTable = layout.segmented() ? kSegmentedPitchTable : findPitchTable(reader, layout.variant);
   const u32 pitchCount = layout.segmented() ? kSegmentedPitchEntries : kLatePitchEntries;
-  data[kDriverPitchCount] = pitchCount;
+  config.pitchTable.reserve(pitchCount);
   for (u32 index = 0; index < pitchCount; ++index) {
-    data.push_back(reader.has(pitchTable + index * 2, 2) ? reader.le16(pitchTable + index * 2) : 0);
+    config.pitchTable.push_back(reader.has(pitchTable + index * 2, 2) ? reader.le16(pitchTable + index * 2) : 0);
   }
-  return data;
+  return config;
 }
 
 [[nodiscard]] SequenceProgramBehavior behavior(ByteReader reader, const Layout& layout) {
@@ -1048,7 +1040,6 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 const SequenceDialect& sequenceDialect() {
   static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{.value = "wolf-team-snes"},
       .commandDetailKindPrefix = "wolf-team-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .defaultBehavior =
@@ -1060,7 +1051,9 @@ const SequenceDialect& sequenceDialect() {
               .initialStereoBalance = StereoBalance{},
               .initialPitchBendRangeSemitones = 12,
           },
-      .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
+      .runtime = SequenceRuntime{
+          .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
+      },
   });
   return dialect;
 }
@@ -1075,14 +1068,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   const SourceRange headerRange = reader.range(layout.sequenceHeaderAddress, layout.headerLength);
   const auto& dialect = sequenceDialect();
   SequenceProgram program = dialect.makeProgram(Address{layout.sequenceHeaderAddress});
-  program.config = SequenceProgramConfig{
-      .profile = static_cast<u32>(layout.variant),
-      .driverState = static_cast<u32>(layout.lateTraits.specialInstrumentUpper) |
-                     (layout.lateTraits.remapHighInstrumentIds ? 1u << 8 : 0) |
-                     (layout.lateTraits.hasInstrument5KeySplit ? 1u << 9 : 0) |
-                     (layout.lateTraits.programChangeHasDelay ? 1u << 10 : 0),
-      .driverData = driverData(reader, layout),
-  };
+  RuntimeConfig runtime = runtimeConfig(reader, layout);
   program.behavior = behavior(reader, layout);
 
   std::optional<SourceAnnotationId> headerParent;
@@ -1105,6 +1091,12 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     if ((channel.status & activeMask) == 0 || channel.streamStarts.empty()) {
       continue;
     }
+    RuntimeTrackConfig trackRuntime{.status = channel.status};
+    trackRuntime.streamStarts.reserve(channel.streamStarts.size());
+    for (const u16 start : channel.streamStarts) {
+      trackRuntime.streamStarts.push_back(Address{start});
+    }
+    runtime.tracks.emplace(channel.index, std::move(trackRuntime));
     if (sourceMap != nullptr && headerParent) {
       const SourceRange statusRange = reader.range(channel.descriptorRange.offset, 1);
       const SourceRange tablePointerRange = reader.range(channel.descriptorRange.offset + 1, 2);
@@ -1141,6 +1133,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     }
     program.tracks.push_back(decodeTrack(reader, layout, channel, sequenceId, headerParent, sourceMap, diagnostics));
   }
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, std::move(runtime));
   return SequenceParse{.program = std::move(program), .headerRange = headerRange};
 }
 

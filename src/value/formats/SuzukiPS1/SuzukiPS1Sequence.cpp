@@ -144,13 +144,13 @@ struct TrackLayout {
   return layout;
 }
 
+struct RuntimeConfig {
+  u16 defaultBank = 0;
+  std::map<u32, std::pair<u16, u16>> envelopes;
+};
+
 struct ProgramState {
-  explicit ProgramState(const SequenceProgram& sequence) {
-    for (std::size_t i = 0; i + 2 < sequence.config.driverData.size(); i += 3) {
-      envelopes.emplace(sequence.config.driverData[i], std::pair{static_cast<u16>(sequence.config.driverData[i + 1]),
-                                                                 static_cast<u16>(sequence.config.driverData[i + 2])});
-    }
-  }
+  explicit ProgramState(const RuntimeConfig& config) : envelopes(config.envelopes) {}
 
   [[nodiscard]] std::optional<std::pair<u16, u16>> envelope(u16 bank, u8 program) const {
     const auto found = envelopes.find((static_cast<u32>(bank) << 8) | program);
@@ -161,7 +161,7 @@ struct ProgramState {
 };
 
 struct TrackState {
-  explicit TrackState(const SequenceProgram& sequence) : bank(static_cast<u16>(sequence.config.driverState)) {}
+  explicit TrackState(const RuntimeConfig& config) : bank(config.defaultBank) {}
 
   u8 octave = 3;
   u16 bank = 0;
@@ -647,7 +647,6 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 const SequenceDialect& suzukiPs1SequenceDialect() {
   static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{.value = std::string(kSuzukiPs1DialectId)},
       .commandDetailKindPrefix = std::string(kSuzukiPs1DialectId),
       .timebase = Timebase{.ppqn = kPpqn},
       .defaultBehavior =
@@ -666,13 +665,12 @@ SequenceProgram parseSuzukiPs1Sequence(ByteReader reader, AssetId id, const Suzu
                                        const std::vector<SuzukiPs1EnvelopeRegisters>& envelopes,
                                        SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   SequenceProgram program = suzukiPs1SequenceDialect().makeProgram(Address{layout.offset});
-  program.config.driverState = layout.defaultBank;
-  program.config.driverData.reserve(envelopes.size() * 3);
+  RuntimeConfig runtime{.defaultBank = layout.defaultBank};
   for (const auto& envelope : envelopes) {
-    program.config.driverData.push_back((static_cast<u32>(envelope.bank) << 8) | envelope.program);
-    program.config.driverData.push_back(envelope.adsr1);
-    program.config.driverData.push_back(envelope.adsr2);
+    runtime.envelopes.emplace((static_cast<u32>(envelope.bank) << 8) | envelope.program,
+                              std::pair{envelope.adsr1, envelope.adsr2});
   }
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, std::move(runtime));
 
   if (sourceMap != nullptr) {
     sourceMap->header("SuzukiPS1 Sequence Header", reader.range(layout.offset, 0x22))

@@ -291,10 +291,15 @@ struct LfoState {
   SequenceLfoDepthFadeState depthState;
 };
 
+struct RuntimeConfig {
+  KonamiSnesVersion version = KONAMISNES_NONE;
+  bool indexedEchoFilter = false;
+  std::vector<u32> instruments;
+};
+
 struct ProgramState {
-  explicit ProgramState(const SequenceProgram& program)
-      : instruments(program.config.driverData), version(static_cast<KonamiSnesVersion>(program.config.profile)),
-        indexedEchoFilter(program.config.driverState != 0) {}
+  explicit ProgramState(const RuntimeConfig& config)
+      : instruments(config.instruments), version(config.version), indexedEchoFilter(config.indexedEchoFilter) {}
 
   [[nodiscard]] std::optional<RuntimeInstrument> instrument(size_t index) const {
     return runtimeInstrument(instruments, index, version);
@@ -368,10 +373,9 @@ struct TrackEnvelopeState {
 
 // Only values that persist from one executed command to the next live here.
 struct TrackState {
-  TrackState(const SequenceProgram& program, const TrackProgram& track)
-      : version(static_cast<KonamiSnesVersion>(program.config.profile)),
-        voiceBit(static_cast<u8>(1u << std::min<u32>(track.sourceTrackNumber, 7))) {
-    const auto initialInstrument = runtimeInstrument(program.config.driverData, 0, version);
+  TrackState(const TrackProgram& track, const RuntimeConfig& config)
+      : version(config.version), voiceBit(static_cast<u8>(1u << std::min<u32>(track.sourceTrackNumber, 7))) {
+    const auto initialInstrument = runtimeInstrument(config.instruments, 0, version);
     envelope.selectInstrument(version, initialInstrument);
     instrumentVolume = initialInstrument ? initialInstrument->volume : 0;
     pan.reset(version <= KONAMISNES_V2 ? 10 : 20);
@@ -1598,14 +1602,9 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
   }
 }
 
-[[nodiscard]] std::string dialectId(KonamiSnesVersion version) {
-  return fmt::format("konami-snes:{}", konamiSnesVersionName(version));
-}
-
 [[nodiscard]] SequenceDialect makeDialect(KonamiSnesVersion version) {
   const PanGains initialBalance = panGains(version, version <= KONAMISNES_V2 ? 10 : 20);
   return makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{.value = dialectId(version)},
       .commandDetailKindPrefix = "konami-snes",
       .timebase = Timebase{.ppqn = kKonamiSnesPpqn},
       .defaultBehavior =
@@ -1617,8 +1616,10 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
               .initialPitchBendRangeSemitones = 2,
               .initialTempoMicrosecondsPerQuarter = tempoMicrosecondsPerQuarter(version, kKonamiSnesDefaultTempo),
           },
-      .inferLoopsFromRepeatedState = false,
-      .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
+      .runtime = SequenceRuntime{
+          .inferLoopsFromRepeatedState = false,
+          .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
+      },
   });
 }
 
@@ -1651,13 +1652,11 @@ const SequenceDialect& konamiSnesSequenceDialect(KonamiSnesVersion version) {
   return none;
 }
 
-std::vector<SequenceDialect> konamiSnesSequenceDialects() {
-  return {
-      konamiSnesSequenceDialect(KONAMISNES_NONE), konamiSnesSequenceDialect(KONAMISNES_V1),
-      konamiSnesSequenceDialect(KONAMISNES_V2),   konamiSnesSequenceDialect(KONAMISNES_V3),
-      konamiSnesSequenceDialect(KONAMISNES_V4),   konamiSnesSequenceDialect(KONAMISNES_V5),
-      konamiSnesSequenceDialect(KONAMISNES_V6),
-  };
+SequenceRuntime konamiSnesSequenceRuntime(KonamiSnesVersion version, bool indexedEchoFilter) {
+  SequenceProgram program = konamiSnesSequenceDialect(version).makeProgram();
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(
+      program, RuntimeConfig{.version = version, .indexedEchoFilter = indexedEchoFilter});
+  return std::move(program.runtime);
 }
 
 TrackProgram decodeKonamiSnesSourceTrack(ByteReader reader, KonamiSnesVersion version, u32 sourceTrackNumber,
@@ -1719,18 +1718,19 @@ SequenceProgram decodeKonamiSnesSequence(ByteReader reader, const KonamiSnesLayo
   }
 
   SequenceProgram program = sequence.finish();
-  // Track and playback state use the profile to select the already-decoded
-  // engine rules; they never reopen the source bytes to identify the version.
-  program.config.profile = static_cast<u32>(layout.version);
-  program.config.driverState = layout.indexedEchoFilter;
-  program.config.driverData.assign(kInstrumentEnvelopeCount * kRuntimeInstrumentWords, kUnknownRuntimeInstrument);
+  RuntimeConfig runtime{
+      .version = layout.version,
+      .indexedEchoFilter = layout.indexedEchoFilter,
+      .instruments = std::vector<u32>(kInstrumentEnvelopeCount * kRuntimeInstrumentWords, kUnknownRuntimeInstrument),
+  };
   for (const auto& instrument : parseKonamiSnesInstrumentInfos(reader, layout)) {
     const size_t index = instrument.percussion ? kPercussionEnvelopeBase + instrument.percussionNote : instrument.index;
     const size_t offset = index * kRuntimeInstrumentWords;
-    program.config.driverData[offset] =
+    runtime.instruments[offset] =
         (static_cast<u32>(instrument.adsr1) << 16) | (static_cast<u32>(instrument.adsr2) << 8) | instrument.gain;
-    program.config.driverData[offset + 1] = (static_cast<u32>(instrument.pan) << 8) | instrument.volume;
+    runtime.instruments[offset + 1] = (static_cast<u32>(instrument.pan) << 8) | instrument.volume;
   }
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, std::move(runtime));
   return program;
 }
 

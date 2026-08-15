@@ -7,7 +7,7 @@
 #pragma once
 
 #include "value/base/Source.h"
-#include "value/scan/FormatDefinition.h"
+#include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceDialect.h"
 
@@ -21,7 +21,6 @@
 namespace vgmtrans::formats::akao_snes {
 
 inline constexpr std::string_view kAkaoSnesFormatName = "AkaoSnes";
-inline constexpr auto kAkaoSnesSequenceDialectId = "akao-snes";
 
 enum AkaoSnesVersion : u8 {
   AKAOSNES_NONE = 0,
@@ -209,6 +208,8 @@ struct AkaoSnesTrackDecodeOptions {
 
 [[nodiscard]] std::optional<AkaoSnesLayout> findAkaoSnesLayout(core::ByteReader reader);
 [[nodiscard]] const core::SequenceDialect& akaoSnesSequenceDialect();
+[[nodiscard]] core::SequenceRuntime akaoSnesSequenceRuntime(AkaoSnesProfile profile,
+                                                            std::vector<u32> v1VolumeEnvelopes = {});
 [[nodiscard]] core::TrackProgram decodeAkaoSnesSourceTrack(core::ByteReader reader,
                                                            const AkaoSnesTrackDecodeOptions& options);
 [[nodiscard]] core::SequenceProgram parseAkaoSnesSequence(core::ByteReader reader, const AkaoSnesLayout& layout,
@@ -218,6 +219,6 @@ struct AkaoSnesTrackDecodeOptions {
 [[nodiscard]] std::optional<core::ScanSynthRefs> addAkaoSnesSynth(core::ScanResultBuilder& builder,
                                                                   const AkaoSnesLayout& layout,
                                                                   std::string_view displayName);
-[[nodiscard]] core::FormatDefinition akaoSnesDefinition();
+[[nodiscard]] core::FormatModule akaoSnesModule();
 
 }  // namespace vgmtrans::formats::akao_snes

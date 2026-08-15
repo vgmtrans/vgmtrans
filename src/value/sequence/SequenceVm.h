@@ -7,7 +7,6 @@
 #pragma once
 
 #include "value/sequence/PerformanceModel.h"
-#include "value/sequence/SequenceDialect.h"
 
 #include <any>
 #include <cstddef>
@@ -33,8 +32,7 @@ struct ActiveNoteState {
 class RepeatState;
 struct VmApiAccess;
 struct VmTrackRuntime;
-[[nodiscard]] std::any analyzeSequenceProgram(const SequenceVm& vm, const SequenceProgram& program,
-                                              const SequenceDialect& dialect);
+[[nodiscard]] std::any analyzeSequenceProgram(const SequenceVm& vm, const SequenceProgram& program);
 }  // namespace detail
 
 struct BranchResult {
@@ -383,15 +381,13 @@ public:
   explicit SequenceVm(LoopPolicy loopPolicy);
   explicit SequenceVm(SequenceVmOptions options);
 
-  [[nodiscard]] PerformanceSequence render(const SequenceProgram& program, const SequenceDialect& dialect) const;
+  [[nodiscard]] PerformanceSequence render(const SequenceProgram& program) const;
 
 private:
-  friend std::any detail::analyzeSequenceProgram(const SequenceVm&, const SequenceProgram&, const SequenceDialect&);
+  friend std::any detail::analyzeSequenceProgram(const SequenceVm&, const SequenceProgram&);
 
-  [[nodiscard]] PerformanceSequence renderImpl(const SequenceProgram& program, const SequenceDialect& dialect,
-                                               std::any* analyzedProgramState) const;
-  [[nodiscard]] SequenceProgramBehavior resolvedBehavior(const SequenceProgram& program,
-                                                         const SequenceDialect& dialect) const;
+  [[nodiscard]] PerformanceSequence renderImpl(const SequenceProgram& program, std::any* analyzedProgramState) const;
+  [[nodiscard]] SequenceProgramBehavior resolvedBehavior(const SequenceProgram& program) const;
 
   SequenceVmOptions options_;
 };

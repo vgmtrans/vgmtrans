@@ -365,13 +365,15 @@ void scanValidationChecksMemoizedInheritedOwnersIndependentOfAnnotationOrder() {
   expect(result.sourceMap.annotationsForAsset(AssetId{1}) ==
              std::vector<SourceAnnotationId>{SourceAnnotationId{2}, SourceAnnotationId{1}},
          "source map should index every annotation that inherits an asset owner");
-  expect(std::ranges::any_of(report.diagnostics(),
-                             [](const Diagnostic& diagnostic) {
+  expect(std::ranges::any_of(
+             report.diagnostics(),
+             [](const Diagnostic& diagnostic) {
                                return diagnostic.code == "scan.asset.multiple-sources";
                              }),
          "ownership validation should check inherited annotations even when a child precedes its parent");
-  expect(!std::ranges::any_of(report.diagnostics(),
-                              [](const Diagnostic& diagnostic) {
+  expect(!std::ranges::any_of(
+             report.diagnostics(),
+             [](const Diagnostic& diagnostic) {
                                 return diagnostic.code == "scan.asset.missing-source-annotations";
                               }),
          "memoized inherited ownership should count the complete asset annotation graph");
@@ -414,7 +416,7 @@ void diagnosticsCanReferenceSourceAnnotationsAndObjects() {
 
 void sessionSnapshotCarriesScannerSourceMap() {
   Session session;
-  session.registerFormat(testFormat(probeExplicitCollectionModule(), probeSequenceDialect()));
+  session.registerFormat(probeExplicitCollectionModule());
 
   const auto source = session.addSource(SourceFile{.name = "annotated.probe"}, {0xab, 0x01, 0x02});
   session.scanSource(source);

@@ -46,17 +46,6 @@ void expect(bool condition, const std::string& message) {
   }
 }
 
-[[nodiscard]] FormatDefinition testFormat(FormatModule module) {
-  return FormatDefinition{.module = std::move(module)};
-}
-
-[[nodiscard]] FormatDefinition testFormat(FormatModule module, SequenceDialect dialect) {
-  return FormatDefinition{
-      .module = std::move(module),
-      .sequenceDialects = {std::move(dialect)},
-  };
-}
-
 u32 readLe32(const std::vector<u8>& bytes, size_t offset) {
   return static_cast<u32>(bytes[offset]) | (static_cast<u32>(bytes[offset + 1]) << 8) |
          (static_cast<u32>(bytes[offset + 2]) << 16) | (static_cast<u32>(bytes[offset + 3]) << 24);
@@ -234,6 +223,9 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   return input.reader.size() >= minimumSize && input.reader.u8At(0) == magic;
 }
 
+[[nodiscard]] SequenceDialect probeSequenceDialect(SequenceProgramBehavior behavior,
+                                                   InitialStereoBalance initialStereoBalance);
+
 [[nodiscard]] SourceExtractor probeSequenceContainerExtractor() {
   return SourceExtractor{
       .name = "ProbeSequenceContainer",
@@ -275,11 +267,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
               .name = input.source.name,
               .range = assetRange,
           },
-      .program =
-          SequenceProgram{
-              .dialect = DialectId{.value = "probe"},
-              .timebase = Timebase{.ppqn = 48},
-          },
+      .program = probeSequenceDialect({}, omitInitialStereoBalance).makeProgram(),
   };
 
   ScanResult result;
@@ -336,10 +324,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 
   ScanResultBuilder out(input, "ProbeExplicit");
   const auto sequence = out.sequence("Explicit Sequence", input.reader.range(0, 1))
-                            .program(SequenceProgram{
-                                .dialect = DialectId{.value = "probe"},
-                                .timebase = Timebase{.ppqn = 48},
-                            });
+                            .program(probeSequenceDialect({}, omitInitialStereoBalance).makeProgram());
   out.sourceMap()
       .header("Probe Header", input.reader.range(0, 1))
       .owner(ObjectRefs::sequence(sequence.id()))
@@ -386,11 +371,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
               .name = input.source.name,
               .range = input.reader.range(0, input.reader.size()),
           },
-      .program =
-          SequenceProgram{
-              .dialect = DialectId{.value = "probe"},
-              .timebase = Timebase{.ppqn = 48},
-          },
+      .program = probeSequenceDialect({}, omitInitialStereoBalance).makeProgram(),
   };
 
   ScanResult result;
@@ -851,7 +832,6 @@ using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
     SequenceProgramBehavior behavior = {}, InitialStereoBalance initialStereoBalance = omitInitialStereoBalance) {
   behavior.initialStereoBalance = initialStereoBalance;
   return makeCompiledDialect<ProbeTrackState, ProbePlayback>(SequenceDialect{
-      .id = DialectId{.value = "probe"},
       .commandDetailKindPrefix = "probe",
       .timebase = Timebase{.ppqn = 48},
       .defaultBehavior = behavior,

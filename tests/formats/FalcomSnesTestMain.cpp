@@ -20,7 +20,6 @@ int main(int argc, char** argv) {
       return vgmtrans::tests::scanValueFormatArchive(
           argv[1], vgmtrans::tests::ValueFormatCorpus{
                        .format = "FalcomSnes",
-                       .dialect = vgmtrans::formats::falcom_snes::sequenceDialect(),
                        .exports =
                            vgmtrans::core::ExportRequest{
                                .kinds = {vgmtrans::core::ExportKind::Midi, vgmtrans::core::ExportKind::SoundFont2},

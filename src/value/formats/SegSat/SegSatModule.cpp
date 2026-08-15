@@ -182,17 +182,13 @@ struct BankAssets {
 
 }  // namespace
 
-FormatDefinition segSatDefinition() {
-  return FormatDefinition{
-      .module =
-          FormatModule{
-              .name = std::string(kSegSatFormatName),
-              .acceptedFormats = {source_formats::kSaturnRam},
-              .scan = scanSegSat,
-              .collectionResolverId = std::string(kSegSatCollectionResolver),
-              .prepareCollection = prepareSegSatCollection,
-          },
-      .sequenceDialects = {segSatSequenceDialect()},
+FormatModule segSatModule() {
+  return FormatModule{
+      .name = std::string(kSegSatFormatName),
+      .acceptedFormats = {source_formats::kSaturnRam},
+      .scan = scanSegSat,
+      .collectionResolverId = std::string(kSegSatCollectionResolver),
+      .prepareCollection = prepareSegSatCollection,
   };
 }
 

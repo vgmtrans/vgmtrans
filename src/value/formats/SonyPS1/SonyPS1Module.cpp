@@ -103,19 +103,15 @@ constexpr std::string_view kInstrumentSamplesFact = "sony-ps1.instrument-samples
 
 }  // namespace
 
-FormatDefinition sonyPs1Definition() {
-  return FormatDefinition{
-      .module =
-          FormatModule{
-              .name = std::string(kSonyPs1FormatName),
-              .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
-              .acceptedFormats = {source_formats::kPlayStationRam},
-              .scan = scanSonyPs1,
-              .collectionResolverId = std::string(kSonyPs1CollectionResolver),
-              .resolveCollections = resolveSonyPs1Collections,
-              .prepareCollection = prepareSonyPs1Collection,
-          },
-      .sequenceDialects = {sonyPs1SequenceDialect()},
+FormatModule sonyPs1Module() {
+  return FormatModule{
+      .name = std::string(kSonyPs1FormatName),
+      .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
+      .acceptedFormats = {source_formats::kPlayStationRam},
+      .scan = scanSonyPs1,
+      .collectionResolverId = std::string(kSonyPs1CollectionResolver),
+      .resolveCollections = resolveSonyPs1Collections,
+      .prepareCollection = prepareSonyPs1Collection,
   };
 }
 

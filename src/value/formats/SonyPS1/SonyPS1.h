@@ -7,7 +7,7 @@
 #pragma once
 
 #include "value/base/Source.h"
-#include "value/scan/FormatDefinition.h"
+#include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceDialect.h"
 #include "value/synth/PsxAdpcm.h"
@@ -115,8 +115,7 @@ struct SonyPs1ScannedBank {
                                                          std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceDialect& sonyPs1SequenceDialect();
 [[nodiscard]] std::vector<core::DesiredCollection> resolveSonyPs1Collections(const core::MatchContext& context);
-[[nodiscard]] core::PreparedCollectionAssets prepareSonyPs1Collection(
-    const core::CollectionPrepareContext& context);
-[[nodiscard]] core::FormatDefinition sonyPs1Definition();
+[[nodiscard]] core::PreparedCollectionAssets prepareSonyPs1Collection(const core::CollectionPrepareContext& context);
+[[nodiscard]] core::FormatModule sonyPs1Module();
 
 }  // namespace vgmtrans::formats::sony_ps1

@@ -187,7 +187,6 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/platform/SnesSampleDirectory.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/BytePattern.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionResolver.h
-      ${PROJECT_SOURCE_DIR}/src/value/scan/FormatDefinition.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatModule.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.h
       ${PROJECT_SOURCE_DIR}/src/value/base/LevelScale.h

@@ -29,7 +29,6 @@ namespace {
 
 constexpr u32 kMaxTrackCommands = 32768;
 constexpr double kTimerQuantumSeconds = 0.000125;
-constexpr u32 kMonoOutputState = 1u << 16;
 
 enum class Kind : u8 {
   Invalid,
@@ -545,11 +544,17 @@ struct BattlemaniacsPercussion {
   return static_cast<u16>(std::clamp(std::lround(pitch), 1l, 65535l));
 }
 
+struct RuntimeConfig {
+  Profile profile = Profile::Unknown;
+  u8 initialTempo = 0;
+  u8 initialTimer = 0;
+  bool monoOutput = false;
+};
+
 struct ProgramState {
-  explicit ProgramState(const SequenceProgram& program)
-      : selected(static_cast<Profile>(program.config.profile)),
-        initialTempo(static_cast<u8>(program.config.driverState)),
-        initialTimer(static_cast<u8>(program.config.driverState >> 8)), sourcePrograms(program.sourceProgramMap) {
+  ProgramState(const SequenceProgram& program, const RuntimeConfig& config)
+      : selected(config.profile), initialTempo(config.initialTempo), initialTimer(config.initialTimer),
+        sourcePrograms(program.sourceProgramMap) {
     for (const TrackProgram& track : program.tracks) {
       for (const SourceCommand& command : track.commands) {
         sourceRanges.emplace(command.address.value, command.range);
@@ -632,10 +637,9 @@ struct ProgramState {
 };
 
 struct TrackState {
-  TrackState(const SequenceProgram& program, const TrackProgram& track)
-      : profile(static_cast<Profile>(program.config.profile)), trackNumber(track.sourceTrackNumber),
-        monoOutput(profile == Profile::BattletoadsDoubleDragon ||
-                   (program.config.driverState & kMonoOutputState) != 0) {
+  TrackState(const TrackProgram& track, const RuntimeConfig& config)
+      : profile(config.profile), trackNumber(track.sourceTrackNumber),
+        monoOutput(profile == Profile::BattletoadsDoubleDragon || config.monoOutput) {
     if (profile == Profile::WinningRun) {
       adsr1 = 0x8f;
       adsr2 = 0xe0;
@@ -1809,7 +1813,6 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 [[nodiscard]] SequenceDialect makeDialect() {
   return makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{.value = "rare-snes"},
       .commandDetailKindPrefix = "rare-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .defaultBehavior =
@@ -1820,8 +1823,10 @@ using Cursor = CompilerCursor<TrackState, Playback>;
               .initialPitchBendRangeSemitones = 12,
               .initialTempoMicrosecondsPerQuarter = tempoMicrosecondsPerQuarter(0x20, 0x64),
           },
-      .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
-      .prepass = SemanticPrepassMode::ScheduledPlayback,
+      .runtime = SequenceRuntime{
+          .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
+          .prepass = SemanticPrepassMode::ScheduledPlayback,
+      },
   });
 }
 
@@ -1830,6 +1835,18 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 const SequenceDialect& sequenceDialect() {
   static const SequenceDialect dialect = makeDialect();
   return dialect;
+}
+
+SequenceRuntime sequenceRuntime(Profile profile, u8 initialTempo, u8 initialTimer, bool monoOutput) {
+  SequenceProgram program = sequenceDialect().makeProgram();
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(
+      program, RuntimeConfig{
+                   .profile = profile,
+                   .initialTempo = initialTempo,
+                   .initialTimer = initialTimer,
+                   .monoOutput = monoOutput,
+               });
+  return std::move(program.runtime);
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, Profile profile, u32 trackNumber, u32 startAddress,
@@ -1848,12 +1865,13 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   // Stateful Rare durations require the small custom track walker above, so
   // build an equivalent program and project each track through its shared scope.
   SequenceProgram program = dialect.makeProgram(Address{layout.sequenceHeaderAddress});
-  program.config = SequenceProgramConfig{
-      .profile = static_cast<u32>(layout.profile),
-      .driverState = static_cast<u32>(layout.initialTempo) | (static_cast<u32>(layout.initialTimer) << 8) |
-                     (layout.monoOutput ? kMonoOutputState : 0),
-  };
-  program.behavior = dialect.defaultBehavior;
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(
+      program, RuntimeConfig{
+                   .profile = layout.profile,
+                   .initialTempo = layout.initialTempo,
+                   .initialTimer = layout.initialTimer,
+                   .monoOutput = layout.monoOutput,
+               });
   if (layout.profile == Profile::KillerInstinct) {
     program.behavior.initialLevel = 0.5;
   }
@@ -1903,7 +1921,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   }
 
   const SequenceRecipes recipes = analyzeCompiledProgram<ProgramState, SequenceRecipes>(
-      program, dialect, projectRecipes, SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce});
+      program, projectRecipes, SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce});
   return SequenceParse{
       .program = std::move(program),
       .recipes = recipes,

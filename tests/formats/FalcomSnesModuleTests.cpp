@@ -93,7 +93,7 @@ PerformanceSequence render(std::initializer_list<u8> commands) {
   const auto layout = findLayout(reader);
   expect(layout.has_value(), "FalcomSnes test driver should match its audited signatures");
   SequenceParse parsed = decodeSequence(reader, *layout, AssetId{240});
-  return SequenceVm(LoopPolicy::PlayOnce).render(parsed.program, sequenceDialect());
+  return SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
 }
 
 void layoutAndScannerBuildTheCompleteYsVCollection() {
@@ -106,7 +106,7 @@ void layoutAndScannerBuildTheCompleteYsVCollection() {
          "FalcomSnes signatures should recover the live sequence, dynamic instrument map, patch table, and DIR");
 
   Session session;
-  session.registerFormat(definition());
+  session.registerFormat(module());
   session.addSource(SourceFile{.name = "Ys V fixture.aram"}, fixture.data());
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
@@ -168,7 +168,8 @@ void modulationDynamicAdsrAndEchoRemainPhysical() {
          "vibrato and pan LFO events should retain the driver's integer waveforms, delay, depth, and tick rates");
 
   const auto envelopes = events<EnvelopePerformanceEvent>(track);
-  const auto dynamic = std::ranges::find_if(envelopes, [](const EnvelopePerformanceEvent* event) {
+  const auto dynamic = std::ranges::find_if(
+      envelopes, [](const EnvelopePerformanceEvent* event) {
     return event->update.values.has_value();
   });
   expect(dynamic != envelopes.end() && (*dynamic)->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&

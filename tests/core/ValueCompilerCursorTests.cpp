@@ -224,7 +224,6 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
 
 SequenceDialect compilerProbeDialect() {
   return makeCompiledDialect<CompilerProbeState, CompilerProbePlayback, CompilerProbeProgramState>(SequenceDialect{
-      .id = DialectId{.value = "compiler-probe"},
       .timebase = Timebase{.ppqn = 48},
       .defaultBehavior =
           SequenceProgramBehavior{
@@ -279,11 +278,12 @@ void compilerCursorCompilesAndExecutesTypedCommands() {
 
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = dialect.makeProgram().runtime,
       .timebase = dialect.timebase,
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.diagnostics.empty(), "compiled probe should render without diagnostics");
   expect(performance.tracks.size() == 1 && performance.tracks[0].endTick == 7,
          "compiled waits and local note behavior should advance VM time");
@@ -332,11 +332,12 @@ void compilerCursorCompilesControlFlow() {
 
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = dialect.makeProgram().runtime,
       .timebase = dialect.timebase,
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.diagnostics.empty() && performance.tracks[0].endTick == 3,
          "compiled call, return, wait, and jump should execute through SequenceVm");
   expect(performance.tracks[0].events.size() == 1 &&
@@ -357,11 +358,12 @@ void compilerCursorCompilesRepeatsAndConditionalFields() {
          "compiled repeats should annotate their destination without a duplicate read-time role");
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = dialect.makeProgram().runtime,
       .timebase = dialect.timebase,
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.tracks[0].endTick == 2 && performance.tracks[0].events.size() == 2,
          "compiled counted repeat should replay through shared VM state");
 
@@ -387,11 +389,12 @@ void compilerCursorComposesOperationsIntoOneBody() {
 
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = dialect.makeProgram().runtime,
       .timebase = dialect.timebase,
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.diagnostics.empty() && performance.tracks[0].endTick == 4,
          "composed operations should execute through one source command before VM scheduling continues");
   const auto& events = performance.tracks[0].events;
@@ -413,11 +416,12 @@ void compilerCursorReadsRuntimeStateInsideCommandBody() {
 
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = dialect.makeProgram().runtime,
       .timebase = dialect.timebase,
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
-  const PerformanceSequence performance = SequenceVm().render(program, dialect);
+  const PerformanceSequence performance = SequenceVm().render(program);
   const auto& events = performance.tracks[0].events;
   expect(events.size() == 4 && std::get<LegatoPedalPerformanceEvent>(events[0]).enabled &&
              !std::get<LegatoPedalPerformanceEvent>(events[2]).enabled,
@@ -433,11 +437,12 @@ void compilerCursorExecutesEligibleCommandsDuringWaits() {
     const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{16}, source), static_cast<u32>(source.size()));
     const SequenceDialect dialect = compilerProbeDialect();
     const SequenceProgram program{
-        .dialect = dialect.id,
+        .runtime = dialect.makeProgram().runtime,
         .timebase = dialect.timebase,
+        .behavior = dialect.defaultBehavior,
         .tracks = {track},
     };
-    return std::pair{track, SequenceVm().render(program, dialect)};
+    return std::pair{track, SequenceVm().render(program)};
   };
 
   const auto [gatedTrack, gated] = render({0x2a, 0x02, 0x50, 0x04, 0x2b, 0x20, 0x2b, 0x40, 0xff});
@@ -535,14 +540,15 @@ void compilerCursorRejectsConflictingComposedFlow() {
   const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{13}, bytes), static_cast<u32>(bytes.size()));
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = dialect.makeProgram().runtime,
       .timebase = dialect.timebase,
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
 
   bool rejected = false;
   try {
-    static_cast<void>(SequenceVm().render(program, dialect));
+    static_cast<void>(SequenceVm().render(program));
   } catch (const std::logic_error&) {
     rejected = true;
   }
@@ -553,15 +559,16 @@ void compilerCursorAnalysisStopsAfterItsScheduledPrepass() {
   const std::vector<u8> bytes{0x21, 0xff};
   const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{15}, bytes), static_cast<u32>(bytes.size()));
   SequenceDialect dialect = compilerProbeDialect();
-  dialect.prepass = SemanticPrepassMode::ScheduledPlayback;
+  dialect.runtime.prepass = SemanticPrepassMode::ScheduledPlayback;
   const SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = dialect.makeProgram().runtime,
       .timebase = dialect.timebase,
+      .behavior = dialect.defaultBehavior,
       .tracks = {track},
   };
 
   const u32 executed =
-      analyzeCompiledProgram<CompilerProbeProgramState, u32>(program, dialect, projectExecutedCommands);
+      analyzeCompiledProgram<CompilerProbeProgramState, u32>(program, projectExecutedCommands);
   expect(executed == 2, "compiled analysis should not execute a discarded output pass after its scheduled prepass");
 }
 

@@ -6,20 +6,20 @@
 
 #include "ValueTestSupport.h"
 
-#include "value/scan/FormatDefinition.h"
+#include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/session/Session.h"
 
 namespace {
 
-void formatRegistryStoresCopyableDefinitionsAtomically() {
+void formatRegistryStoresCopyableModulesAtomically() {
   FormatRegistry registry;
-  registry.add(testFormat(probeSequenceModule(), probeSequenceDialect()));
-  registry.add(testFormat(FormatModule{
+  registry.add(probeSequenceModule());
+  registry.add(FormatModule{
       .name = std::string("DynamicProbe"),
       .preferredSampleFilter = SampleFilter::SnesDspLowPass,
       .scan = scanProbeSequence,
-  }));
+  });
   registry.add(SourceExtractor{
       .name = "DynamicExtractor",
       .acceptedFormats = {"probe-container"},
@@ -39,15 +39,9 @@ void formatRegistryStoresCopyableDefinitionsAtomically() {
   expect(copy.findModule("Missing") == nullptr, "format registry should report missing modules");
   expect(copy.extractors().size() == 1 && copy.extractors().front().name == "DynamicExtractor",
          "format registry should copy source extractor values");
-  const auto* dialect = copy.findDialect("probe");
-  expect(dialect != nullptr && dialect->execute != nullptr,
-         "format registry should copy dialects provided by a definition");
-  expect(copy.findDialect("Missing") == nullptr && !copy.containsDialect("Missing"),
-         "format registry should report missing dialects");
-
   bool threw = false;
   try {
-    registry.add(testFormat(FormatModule{.name = "Broken"}));
+    registry.add(FormatModule{.name = "Broken"});
   } catch (const std::invalid_argument&) {
     threw = true;
   }
@@ -55,25 +49,11 @@ void formatRegistryStoresCopyableDefinitionsAtomically() {
 
   threw = false;
   try {
-    registry.add(testFormat(
-        FormatModule{
-            .name = "DuplicateDialect",
-            .scan = scanProbeSequence,
-        },
-        probeSequenceDialect()));
-  } catch (const std::invalid_argument&) {
-    threw = true;
-  }
-  expect(threw, "format registry should reject duplicate dialect IDs");
-  expect(registry.modules().size() == 2, "a rejected dialect should not leave its module partially registered");
-
-  threw = false;
-  try {
-    registry.add(testFormat(FormatModule{
+    registry.add(FormatModule{
         .name = "DuplicateAcceptedFormat",
         .acceptedFormats = {"same", "same"},
         .scan = scanProbeSequence,
-    }));
+    });
   } catch (const std::invalid_argument&) {
     threw = true;
   }
@@ -81,16 +61,12 @@ void formatRegistryStoresCopyableDefinitionsAtomically() {
          "format registry should reject duplicate accepted formats without partially registering a module");
 }
 
-void sessionRegistersOneFormatDefinitionAtTheAuthoringSurface() {
+void sessionRegistersOneFormatModuleAtTheAuthoringSurface() {
   Session session;
-  session.registerFormat(FormatDefinition{
-      .module = probeSequenceModule(),
-      .sequenceDialects = {probeSequenceDialect()},
-  });
+  session.registerFormat(probeSequenceModule());
 
   expect(session.formats().modules().size() == 1 && session.formats().modules()[0].name == "ProbeSequence",
-         "format definition should register its scanner");
-  expect(session.formats().containsDialect("probe"), "format definition should register its executor family");
+         "format module should register its scanner");
 }
 
 void scanResultBuilderCoversCommonScannerPlumbing() {
@@ -106,11 +82,7 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
   ScanResultBuilder out(input, "ProbeBuilder");
   const auto wholeSource = input.reader.range(0, input.reader.size());
 
-  const auto sequence = out.sequence("Builder Sequence", wholeSource)
-                            .program(SequenceProgram{
-                                .dialect = DialectId{.value = "probe"},
-                                .timebase = Timebase{.ppqn = 48},
-                            });
+  const auto sequence = out.sequence("Builder Sequence", wholeSource).program(probeSequenceDialect().makeProgram());
   const auto bank = out.instrumentSet("Builder Bank", input.reader.range(0, 1));
   auto samples = out.sampleCollection("Builder Samples", input.reader.range(1, 2));
   samples.add(0, Sample{
@@ -255,8 +227,8 @@ void scanResultBuilderCursorReportsMalformedFields() {
 }  // namespace
 
 void runValueRegistryTests() {
-  formatRegistryStoresCopyableDefinitionsAtomically();
-  sessionRegistersOneFormatDefinitionAtTheAuthoringSurface();
+  formatRegistryStoresCopyableModulesAtomically();
+  sessionRegistersOneFormatModuleAtTheAuthoringSurface();
   scanResultBuilderCoversCommonScannerPlumbing();
   scanResultBuilderNamesSourceCollections();
   scanResultBuilderRejectsIncompleteSequenceDrafts();

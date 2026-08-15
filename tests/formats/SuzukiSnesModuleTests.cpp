@@ -124,9 +124,8 @@ std::vector<const Event*> events(const PerformanceTrack& track) {
 PerformanceSequence render(Version version, std::vector<u8> bytes) {
   const auto& dialect = sequenceDialect();
   SequenceProgram program{
-      .dialect = dialect.id,
+      .runtime = sequenceRuntime(version),
       .timebase = dialect.timebase,
-      .config = SequenceProgramConfig{.profile = static_cast<u32>(version)},
       .behavior = dialect.defaultBehavior,
       .tracks = {decodeSourceTrack(ByteReader(SourceId{121}, bytes), version, 0, 0)},
   };
@@ -138,7 +137,7 @@ PerformanceSequence render(Version version, std::vector<u8> bytes) {
   program.behavior.initialLevel = version == Version::SeikenDensetsu3
                                       ? 0x3c / 128.0
                                       : (version == Version::BahamutLagoon ? 0x50 / 128.0 : 0x64 / 128.0);
-  return SequenceVm(LoopPolicy::PlayOnce).render(program, dialect);
+  return SequenceVm(LoopPolicy::PlayOnce).render(program);
 }
 
 void layoutsAndHeadersAreVersioned() {
@@ -180,7 +179,8 @@ void playbackUsesAuditedGatingPitchAndLoops() {
   const auto notes = events<NotePerformanceEvent>(gated.tracks.front());
   const auto tunings = events<TuningPerformanceEvent>(gated.tracks.front());
   const auto instruments = events<InstrumentPerformanceEvent>(gated.tracks.front());
-  expect(gated.diagnostics.empty() && notes.size() == 1 && notes.front()->key == 60.0 &&
+  expect(
+      gated.diagnostics.empty() && notes.size() == 1 && notes.front()->key == 60.0 &&
              notes.front()->durationTicks == 2,
          "duration rate 8 should gate a three-tick percussion note after two ticks");
   expect(!tunings.empty() && std::abs(tunings.back()->cents - 75.0) < 0.000001,
@@ -473,7 +473,7 @@ void modulationMathMatchesEachDriverRevision() {
 
 void scannerBuildsSequenceDerivedDrumKit() {
   Session session;
-  session.registerFormat(definition());
+  session.registerFormat(module());
   session.addSource(SourceFile{.name = "SuzukiSnes fixture.aram"}, sd3Fixture());
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();

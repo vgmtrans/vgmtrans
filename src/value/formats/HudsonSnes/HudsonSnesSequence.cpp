@@ -273,10 +273,17 @@ namespace math {
 
 }  // namespace math
 
+struct RuntimeConfig {
+  Version version = Version::Early;
+  u8 timebaseShift = 2;
+  bool velocityEnabled = false;
+  u8 initialEchoMask = 0;
+  std::vector<u32> tables;
+};
+
 struct ProgramState {
-  explicit ProgramState(const SequenceProgram& sequence)
-      : tables(sequence.config.driverData),
-        echo(tables.initialEcho(static_cast<u8>(sequence.config.driverState >> 16))) {}
+  explicit ProgramState(const RuntimeConfig& config)
+      : tables(config.tables), echo(tables.initialEcho(config.initialEchoMask)) {}
 
   u8 tempo = 120;
   std::array<u8, 256> registers{};
@@ -288,12 +295,12 @@ struct ProgramState {
 };
 
 struct TrackState {
-  TrackState(const SequenceProgram& sequence, const TrackProgram& sourceTrack)
-      : version(static_cast<Version>(sequence.config.profile)), timebaseShift(sequence.config.driverState & 3),
-        velocityEnabled((sequence.config.driverState & 0x100) != 0), volume(math::initialVolume(version)),
-        initialEcho((sequence.config.driverState & (0x10000u << sourceTrack.sourceTrackNumber)) != 0),
+  TrackState(const TrackProgram& sourceTrack, const RuntimeConfig& config)
+      : version(config.version), timebaseShift(config.timebaseShift), velocityEnabled(config.velocityEnabled),
+        volume(math::initialVolume(version)),
+        initialEcho((config.initialEchoMask & (1u << sourceTrack.sourceTrackNumber)) != 0),
         voiceBit(static_cast<u8>(1u << sourceTrack.sourceTrackNumber)), loopPoint(sourceTrack.startAddress) {
-    if (const auto instrument = RuntimeTables(sequence.config.driverData).instrument(0)) {
+    if (const auto instrument = RuntimeTables(config.tables).instrument(0)) {
       envelope = *instrument;
     }
   }
@@ -1483,7 +1490,6 @@ std::vector<u32> RuntimeTables::encode(const ParsedHeader& header) {
 
 const SequenceDialect& sequenceDialect() {
   static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{.value = "hudson-snes"},
       .commandDetailKindPrefix = "hudson-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .defaultBehavior =
@@ -1499,6 +1505,20 @@ const SequenceDialect& sequenceDialect() {
   return dialect;
 }
 
+SequenceRuntime sequenceRuntime(Version version, u8 timebaseShift, bool velocityEnabled, std::vector<u32> tables,
+                                u8 initialEchoMask) {
+  SequenceProgram program = sequenceDialect().makeProgram();
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(
+      program, RuntimeConfig{
+                   .version = version,
+                   .timebaseShift = timebaseShift,
+                   .velocityEnabled = velocityEnabled,
+                   .initialEchoMask = initialEchoMask,
+                   .tables = std::move(tables),
+               });
+  return std::move(program.runtime);
+}
+
 TrackProgram decodeSourceTrack(ByteReader reader, Version version, u8 timebaseShift, bool noteVelocity, u32 trackNumber,
                                u32 startAddress, std::vector<Diagnostic>* diagnostics) {
   const TrackDecodeScope tracks{.reader = reader, .maxCommands = 32768};
@@ -1511,9 +1531,8 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
                              std::vector<Diagnostic>* diagnostics) {
   auto header = parseHeader(reader, layout.version, layout.sequenceHeaderAddress);
   if (!header) {
-    SequenceProgram empty;
-    empty.dialect = sequenceDialect().id;
-    empty.timebase = sequenceDialect().timebase;
+    SequenceProgram empty = sequenceDialect().makeProgram();
+    empty.runtime = sequenceRuntime(layout.version, 2, false, {});
     return SequenceParse{.program = std::move(empty)};
   }
   SequenceReferences references;
@@ -1526,10 +1545,8 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   }
   SequenceProgram program = sequence.finish();
   supplementLiveRecipes(reader, layout, std::move(references), header->recipes);
-  program.config.profile = static_cast<u32>(layout.version);
-  program.config.driverState =
-      header->timebaseShift | (header->noteVelocity ? 0x100 : 0) | (static_cast<u32>(header->initialEchoMask) << 16);
-  program.config.driverData = RuntimeTables::encode(*header);
+  program.runtime = sequenceRuntime(layout.version, header->timebaseShift, header->noteVelocity,
+                                    RuntimeTables::encode(*header), header->initialEchoMask);
   program.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(120, header->timebaseShift);
   program.behavior.initialLevel = math::levelGain(layout.version, math::initialVolume(layout.version));
   program.behavior.initialStereoBalance = math::mixerGains(layout.version, math::initialVolume(layout.version), 15);

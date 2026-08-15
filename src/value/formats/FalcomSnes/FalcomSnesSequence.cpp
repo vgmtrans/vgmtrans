@@ -190,10 +190,13 @@ struct PanLfoState {
   bool enabled = false;
 };
 
+struct RuntimeConfig {
+  std::vector<u32> patches;
+};
+
 struct TrackState {
-  TrackState(const SequenceProgram& sequence, const TrackProgram& source)
-      : patches(sequence.config.driverData),
-        voiceBit(static_cast<u8>(1u << std::min(source.sourceTrackNumber, u32{7}))) {}
+  TrackState(const TrackProgram& source, const RuntimeConfig& config)
+      : patches(config.patches), voiceBit(static_cast<u8>(1u << std::min(source.sourceTrackNumber, u32{7}))) {}
 
   std::span<const u32> patches;
   u8 voiceBit;
@@ -636,9 +639,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       }
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
       event.derived("counter", cell, SourceValueDisplay::Address, SemanticOperandRole::Address);
-      return event.invoke<&Playback::repeatBreak>(cell, destination)
-          .mayBranchTo(destination)
-          .runtimeControlFlow();
+      return event.invoke<&Playback::repeatBreak>(cell, destination).mayBranchTo(destination).runtimeControlFlow();
     }
     case 0xef: {
       auto event = cursor.command("Repeat End", SequenceSemantic::Repeat);
@@ -648,9 +649,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const Address destination{static_cast<u16>(cell.value + 1)};
       event.derived("counter", cell, SourceValueDisplay::Address, SemanticOperandRole::Address);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-      return event.invoke<&Playback::repeatEnd>(cell, destination)
-          .mayBranchTo(destination)
-          .runtimeControlFlow();
+      return event.invoke<&Playback::repeatEnd>(cell, destination).mayBranchTo(destination).runtimeControlFlow();
     }
     case 0xf0: {
       auto event = cursor.command("Pitch Envelope", SequenceSemantic::Pitch);
@@ -747,7 +746,6 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 const SequenceDialect& sequenceDialect() {
   static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{.value = "falcom-snes"},
       .commandDetailKindPrefix = "falcom-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .defaultBehavior =
@@ -794,7 +792,8 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   }
   SequenceProgram program = sequence.finish();
   program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
-  program.config.driverData = runtimePatches(reader, layout);
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(program,
+                                                          RuntimeConfig{.patches = runtimePatches(reader, layout)});
   return SequenceParse{
       .program = std::move(program),
       .programs = std::move(programs),

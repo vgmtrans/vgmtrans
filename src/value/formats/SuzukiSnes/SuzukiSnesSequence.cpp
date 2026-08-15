@@ -313,16 +313,15 @@ struct TrackLayout {
 }
 
 struct ProgramState {
-  explicit ProgramState(const SequenceProgram& program)
-      : version(static_cast<Version>(program.config.profile)), tempo(math::initialTempo(version)) {}
+  explicit ProgramState(Version newVersion) : version(newVersion), tempo(math::initialTempo(version)) {}
 
   Version version;
   u8 tempo = 0;
 };
 
 struct TrackState {
-  explicit TrackState(const SequenceProgram& program)
-      : version(static_cast<Version>(program.config.profile)), durationRate(math::initialDurationRate(version)),
+  explicit TrackState(Version newVersion)
+      : version(newVersion), durationRate(math::initialDurationRate(version)),
         sourceProgram(math::initialProgram(version)) {
     volume.reset(math::initialVolume(version));
     pan.reset(0x80);
@@ -962,7 +961,6 @@ struct ParsedHeader {
 
 const SequenceDialect& sequenceDialect() {
   static const SequenceDialect dialect = makeCompiledDialect<TrackState, Playback, ProgramState>(SequenceDialect{
-      .id = DialectId{.value = "suzuki-snes"},
       .commandDetailKindPrefix = "suzuki-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .defaultBehavior = SequenceProgramBehavior{
@@ -974,6 +972,12 @@ const SequenceDialect& sequenceDialect() {
       },
   });
   return dialect;
+}
+
+SequenceRuntime sequenceRuntime(Version version) {
+  SequenceProgram program = sequenceDialect().makeProgram();
+  bindCompiledRuntime<TrackState, Playback, ProgramState>(program, version);
+  return std::move(program.runtime);
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, Version version, u32 trackNumber, u32 startAddress,
@@ -1000,7 +1004,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     });
   }
   SequenceProgram program = sequence.finish();
-  program.config.profile = static_cast<u32>(layout.version);
+  program.runtime = sequenceRuntime(layout.version);
   program.behavior.initialTempoMicrosecondsPerQuarter =
       math::tempoMicrosecondsPerQuarter(math::initialTempo(layout.version));
   program.behavior.initialSourceInstrument =

@@ -7,7 +7,7 @@
 #pragma once
 
 #include "value/base/Source.h"
-#include "value/scan/FormatDefinition.h"
+#include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceDialect.h"
 
@@ -20,7 +20,6 @@
 namespace vgmtrans::formats::nds {
 
 inline constexpr std::string_view kNdsFormatName = "NDS";
-inline constexpr auto kNdsSequenceDialectId = "nds:sseq";
 
 struct NdsSequenceRange {
   u32 offset = 0;
@@ -76,6 +75,6 @@ struct NdsLayout {
     core::ScanResultBuilder& builder, core::SourceRange range, std::string_view name,
     const core::ScanSampleCollectionDraft& psgCollection,
     const std::array<std::optional<core::ScanSampleCollectionDraft>, 4>& waveCollections);
-[[nodiscard]] core::FormatDefinition ndsDefinition();
+[[nodiscard]] core::FormatModule ndsModule();
 
 }  // namespace vgmtrans::formats::nds

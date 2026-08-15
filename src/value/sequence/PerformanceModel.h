@@ -285,11 +285,6 @@ struct PortamentoControlPerformanceEvent {
   double previousKey = 0.0;
 };
 
-enum class PitchTransitionRenderingHint {
-  Portamento,
-  PitchBend,
-};
-
 struct PitchTransitionSettingsPerformanceEvent {
   PerformanceEventHeader header;
   // Physical glide time retained independently of its eventual MIDI

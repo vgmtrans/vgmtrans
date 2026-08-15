@@ -15,8 +15,7 @@ void runWolfTeamSnesModuleTests();
 int main(int argc, char** argv) {
   try {
     if (argc == 2) {
-      return vgmtrans::tests::scanValueFormatArchive(
-          argv[1], {.format = "WolfTeamSnes", .dialect = vgmtrans::formats::wolf_team_snes::sequenceDialect()});
+      return vgmtrans::tests::scanValueFormatArchive(argv[1], {.format = "WolfTeamSnes"});
     }
     runWolfTeamSnesModuleTests();
   } catch (const std::exception& error) {

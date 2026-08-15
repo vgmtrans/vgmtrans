@@ -257,8 +257,8 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
       .reader = ByteReader(fixture.source.id, fixture.bytes),
       .ids = ids,
   };
-  const auto definition = konamiArcadeDefinition();
-  const ScanResult result = definition.module.scan(input);
+  const auto module = konamiArcadeModule();
+  const ScanResult result = module.scan(input);
   expect(result.diagnostics.empty(), "complete KonamiArcade scan should not report diagnostics");
   expect(result.assets.size() == 3 && result.explicitCollections.size() == 1,
          "KonamiArcade scan should publish sequence, instruments, samples, and a collection");
@@ -268,7 +268,7 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
   const auto* samples = firstAsset<SampleCollectionAsset>(result);
   expect(sequence != nullptr && instruments != nullptr && samples != nullptr,
          "KonamiArcade result should use the core value asset types");
-  expect(sequence->program.dialect.value == kKonamiArcadeSequenceDialectId && sequence->program.tracks.size() == 1 &&
+  expect(sequence->program.runtime.valid() && sequence->program.tracks.size() == 1 &&
              sequence->program.tracks[0].commands.size() == 37,
          "KonamiArcade sequence should compile the source track into typed command values");
   expect(instruments->instruments.size() == 2,
@@ -287,8 +287,7 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
              *instruments->instruments[1].regions[0].envelope.releaseSeconds == 0.0,
          "KonamiArcade instruments should remain practical outside their source sequence");
 
-  const PerformanceSequence performance =
-      SequenceVm(LoopPolicy::PlayOnce).render(sequence->program, konamiArcadeSequenceDialect());
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program);
   expect(performance.diagnostics.empty() && performance.tracks.size() == 1 && performance.tracks[0].endTick == 37,
          "KonamiArcade playback should execute loops and retain MysticWarrior command alignment");
   const SequenceModulationProfile modulationProfile = analyzeSequenceModulation(performance);
@@ -350,8 +349,8 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
     return InstrumentAddress{.bank = invalidIdValue, .program = invalidIdValue};
   };
   const auto finiteRelease = selectedAddress(notes[5]->note);
-  const auto restoredRelease = std::ranges::find_if(
-      materialized.performance.tracks[0].events, [&](const PerformanceEvent& event) {
+  const auto restoredRelease =
+      std::ranges::find_if(materialized.performance.tracks[0].events, [&](const PerformanceEvent& event) {
         const auto* note = std::get_if<NotePerformanceEvent>(&event);
         return note != nullptr && note->note == notes.back()->note;
       });
@@ -398,8 +397,7 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
       transitions.push_back(transition);
     }
   }
-  expect(
-      transitions.size() == 2 && transitions[0]->startKey == 64.0 && transitions[0]->targetKey == 66.0 &&
+  expect(transitions.size() == 2 && transitions[0]->startKey == 64.0 && transitions[0]->targetKey == 66.0 &&
           !transitions[0]->previousNote && transitions[0]->nativePortamento.useCurrentTiming &&
           transitions[1]->startKey == 70.0 && transitions[1]->targetKey == 72.0 &&
           std::holds_alternative<FixedDurationPitchSlideTiming>(transitions[1]->timing.physical),
@@ -519,8 +517,7 @@ void konamiArcadeGxLfosMatchDriverState() {
   expect(diagnostics.empty() && program.tracks.size() == 1 && program.tracks[0].commands.size() == 11,
          "GX LFO commands should decode into typed sequence commands");
 
-  const PerformanceSequence performance =
-      SequenceVm(LoopPolicy::PlayOnce).render(program, konamiArcadeSequenceDialect());
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
   expect(performance.diagnostics.empty() && performance.tracks.size() == 1,
          "GX LFO playback should render without diagnostics");
 
@@ -614,8 +611,7 @@ void konamiArcadeGxDriverQuirksRemainRepresented() {
   expect(diagnostics.empty() && program.tracks.size() == 1 && program.tracks[0].commands.size() == 21,
          "valid GX state and DSP commands should not truncate sequence decoding");
 
-  const PerformanceSequence performance =
-      SequenceVm(LoopPolicy::PlayOnce).render(program, konamiArcadeSequenceDialect());
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
   expect(performance.diagnostics.empty() && performance.tracks.size() == 1,
          "GX driver-state commands should render without diagnostics");
   const auto slide = std::ranges::find_if(performance.tracks[0].automations, [](const auto& automation) {
@@ -700,8 +696,7 @@ void konamiArcadeExpressionPersistsThroughSoftwareRelease() {
 
   const SequenceProgram program = decodeKonamiArcadeSequence(ByteReader(fixture.source.id, fixture.bytes), *layout,
                                                              layout->sequences[0], AssetId{1}, nullptr, &diagnostics);
-  const PerformanceSequence performance =
-      SequenceVm(LoopPolicy::PlayOnce).render(program, konamiArcadeSequenceDialect());
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
   expect(diagnostics.empty() && performance.diagnostics.empty() && performance.tracks.size() == 1,
          "MysticWarrior expression-release fixture should render without diagnostics");
 
@@ -743,8 +738,7 @@ void konamiArcadeZeroReleaseUsesHardwareVoiceLifetime() {
   const SequenceProgram mysticProgram =
       decodeKonamiArcadeSequence(ByteReader(mysticFixture.source.id, mysticFixture.bytes), *mysticLayout,
                                  mysticLayout->sequences[0], AssetId{1}, nullptr, &diagnostics);
-  const PerformanceSequence mystic =
-      SequenceVm(LoopPolicy::PlayOnce).render(mysticProgram, konamiArcadeSequenceDialect());
+  const PerformanceSequence mystic = SequenceVm(LoopPolicy::PlayOnce).render(mysticProgram);
   expect(diagnostics.empty() && mystic.diagnostics.empty() && mystic.tracks.size() == 1,
          "MysticWarrior zero-release fixture should render without diagnostics");
 
@@ -796,8 +790,7 @@ void konamiArcadeZeroReleaseUsesHardwareVoiceLifetime() {
   diagnostics.clear();
   const SequenceProgram gxProgram = decodeKonamiArcadeSequence(ByteReader(gxSource.id, gxBytes), gxLayout,
                                                                gxSequenceLayout, AssetId{2}, nullptr, &diagnostics);
-  const PerformanceSequence gx =
-      SequenceVm(LoopPolicy::PlayOnce).render(gxProgram, konamiArcadeSequenceDialect());
+  const PerformanceSequence gx = SequenceVm(LoopPolicy::PlayOnce).render(gxProgram);
   expect(diagnostics.empty() && gx.diagnostics.empty() && gx.tracks.size() == 1,
          "GX zero-release fixture should render without diagnostics");
 
@@ -856,8 +849,7 @@ void konamiArcadeTempoSlidesAreCanceledAcrossTracks() {
   std::vector<Diagnostic> diagnostics;
   const SequenceProgram program = decodeKonamiArcadeSequence(ByteReader(source.id, bytes), layout, sequenceLayout,
                                                              AssetId{1}, nullptr, &diagnostics);
-  const PerformanceSequence performance =
-      SequenceVm(LoopPolicy::PlayOnce).render(program, konamiArcadeSequenceDialect());
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
   expect(diagnostics.empty() && performance.diagnostics.empty() && performance.tracks.size() == 2,
          "the cross-track tempo-slide fixture should render without diagnostics");
 
@@ -868,8 +860,8 @@ void konamiArcadeTempoSlidesAreCanceledAcrossTracks() {
   expect(automation != performance.tracks[0].automations.end() && automation->realization.endTick == 1 &&
              automation->realization.endReason == PerformanceAutomationEndReason::Interrupted,
          "an immediate tempo command on another channel should interrupt the one shared tempo slide");
-  const u32 steadyTempo = static_cast<u32>(
-      std::lround((256.0 / 0x80) / layout.nmiRateHertz * kKonamiArcadePpqn * 1'000'000.0));
+  const u32 steadyTempo =
+      static_cast<u32>(std::lround((256.0 / 0x80) / layout.nmiRateHertz * kKonamiArcadePpqn * 1'000'000.0));
   expect(std::ranges::all_of(performance.tracks, [&](const PerformanceTrack& track) {
     return std::ranges::none_of(track.events, [&](const PerformanceEvent& event) {
       const auto* tempo = std::get_if<TempoPerformanceEvent>(&event);
@@ -898,8 +890,7 @@ void konamiArcadeMysticDrumPitchSlidesUseTablePitch() {
 
   const SequenceProgram program = decodeKonamiArcadeSequence(ByteReader(fixture.source.id, fixture.bytes), *layout,
                                                              layout->sequences[0], AssetId{1}, nullptr, &diagnostics);
-  const PerformanceSequence performance =
-      SequenceVm(LoopPolicy::PlayOnce).render(program, konamiArcadeSequenceDialect());
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
   expect(diagnostics.empty() && performance.diagnostics.empty() && performance.tracks.size() == 1,
          "MysticWarrior drum-slide fixture should render without diagnostics");
 

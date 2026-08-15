@@ -7,7 +7,7 @@
 #pragma once
 
 #include "value/base/Source.h"
-#include "value/scan/FormatDefinition.h"
+#include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceDialect.h"
 
@@ -22,9 +22,6 @@ inline constexpr std::string_view kCpsFormatName = "CPS";
 inline constexpr std::string_view kCps1Ym2151Domain = "cps1:ym2151";
 inline constexpr std::string_view kCps1OkiDomain = "cps1:oki";
 inline constexpr std::string_view kCpsQSoundDomain = "cps:qsound";
-inline constexpr std::string_view kCps1V1DialectId = "cps:cps1-v1";
-inline constexpr std::string_view kCpsEarlyDialectId = "cps:early";
-inline constexpr std::string_view kCpsLateDialectId = "cps:late";
 inline constexpr u32 kCpsPpqn = 48;
 inline constexpr double kCps2DriverRateHertz = 62.5;
 inline constexpr double kCps3DriverRateHertz = 59.599491;
@@ -118,6 +115,6 @@ struct Cps1SynthRefs {
 [[nodiscard]] const core::SequenceDialect& cps1V1Dialect();
 [[nodiscard]] const core::SequenceDialect& cpsEarlyDialect();
 [[nodiscard]] const core::SequenceDialect& cpsLateDialect();
-[[nodiscard]] core::FormatDefinition cpsDefinition();
+[[nodiscard]] core::FormatModule cpsModule();
 
 }  // namespace vgmtrans::formats::cps
