@@ -763,6 +763,11 @@ struct ProbePlayback {
   PerformanceEmitter& out;
   VmApi& vm;
 
+  void programChange(u8 program) {
+    track.program = program;
+    out.instrument(0, program);
+  }
+
   Effects note(u8 key, u32 duration) {
     out.note(static_cast<double>(track.program * 12 + key), 0.5, duration);
     return Effects::wait(duration);
@@ -788,8 +793,7 @@ using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
   switch (cursor.opcode()) {
     case 0x80: {
       auto event = cursor.command(ProbeProgramCommand::name, SequenceSemantic::Program, {}, "program");
-      event.set<&ProbeTrackState::program>(event.u8("program"));
-      return event.emitInstrument(0, event.state<&ProbeTrackState::program>());
+      return event.invoke<&ProbePlayback::programChange>(event.u8("program"));
     }
     case 0x90: {
       auto event = cursor.command(ProbeNoteCommand::name, SequenceSemantic::Note, {}, "note");

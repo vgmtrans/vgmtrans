@@ -396,12 +396,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       if (!layout.repeatPoint) {
         return event.end();
       }
-      return event.set<&TrackState::octave>(event.state<&TrackState::repeatPointOctave>())
+      return event.invoke([](Playback& playback) { playback.track.octave = playback.track.repeatPointOctave; })
           .loopCandidate(*layout.repeatPoint);
     }
     case 0x91: {
       auto event = cursor.command("Track Repeat Point", SequenceSemantic::Loop);
-      return event.set<&TrackState::repeatPointOctave>(event.state<&TrackState::octave>());
+      return event.invoke([](Playback& playback) { playback.track.repeatPointOctave = playback.track.octave; });
     }
     case 0x94: {
       auto event = cursor.command("Set Octave", SequenceSemantic::Pitch);

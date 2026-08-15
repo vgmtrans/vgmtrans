@@ -39,13 +39,12 @@ struct CompilerProbePlayback {
 
   [[nodiscard]] bool readyDuringWait() const { return vm.tick() >= track.readyDuringWaitAtTick; }
 
-  void deferredExpression(u8 value) { out.expression(value / 127.0); }
+  void duringWaitExpression(u8 value) { out.expression(value / 127.0); }
 
   void pitchBend(s8 encoded) { out.pitchBend((encoded / 128.0) * track.pitchBendRange); }
 
   void enabledExpression(bool enabled) { out.expression(enabled ? 0.75 : 0.25); }
 
-  [[nodiscard]] Effects deferredWait() { return Effects::wait(1); }
 };
 
 using ProbeCursor = CompilerCursor<CompilerProbeState, CompilerProbePlayback>;
@@ -85,8 +84,8 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
     }
     case 0x25: {
       auto event = cursor.command("Inline Handler", SequenceSemantic::Pan);
-      return event.invoke([](CompilerProbePlayback& playback, u8 pan) { playback.out.pan((pan / 63.5) - 1.0); },
-                          event.u8("pan"));
+      const u8 pan = event.u8("pan");
+      return event.invoke([pan](CompilerProbePlayback& playback) { playback.out.pan((pan / 63.5) - 1.0); });
     }
     case 0x26: {
       auto event = cursor.command("Conflicting Flow", SequenceSemantic::State);
@@ -95,11 +94,12 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
           .runtimeControlFlow();
     }
     case 0x27: {
-      auto event = cursor.command("Deferred State", SequenceSemantic::State);
-      const auto enabled = event.state<&CompilerProbeState::enabled>();
-      event.toggle<&CompilerProbeState::enabled>();
-      event.emitLegatoPedal(enabled);
-      return event.invoke<&CompilerProbePlayback::enabledExpression>(enabled);
+      auto event = cursor.command("Runtime State", SequenceSemantic::State);
+      return event.invoke([](CompilerProbePlayback& playback) {
+        playback.track.enabled = !playback.track.enabled;
+        playback.out.legatoPedal(playback.track.enabled);
+        playback.enabledExpression(playback.track.enabled);
+      });
     }
     case 0x28:
       return cursor.sourceOnly("Promoted Action").set<&CompilerProbeState::enabled>(true);
@@ -114,13 +114,15 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
     }
     case 0x2b: {
       auto event = cursor.command("During-Wait Expression", SequenceSemantic::State);
-      return event.invoke<&CompilerProbePlayback::deferredExpression>(event.u8("value"))
+      return event.invoke<&CompilerProbePlayback::duringWaitExpression>(event.u8("value"))
           .duringWaitWhen<&CompilerProbePlayback::readyDuringWait>();
     }
-    case 0x2c:
-      return cursor.command("Invalid During-Wait Wait", SequenceSemantic::State)
-          .invoke<&CompilerProbePlayback::deferredWait>()
+    case 0x2c: {
+      auto event = cursor.command("Invalid During-Wait Wait", SequenceSemantic::State);
+      event.set<&CompilerProbeState::readyDuringWaitAtTick>(1);
+      return event.wait<&CompilerProbeState::readyDuringWaitAtTick>()
           .duringWaitWhen<&CompilerProbePlayback::readyDuringWait>();
+    }
     case 0x40:
     case 0x41:
     case 0x42:
@@ -263,7 +265,7 @@ void compilerCursorCompilesAndExecutesTypedCommands() {
   expect(track.commands.size() == 8, "compiler cursor should decode every probe command once");
   expect(track.commands[0].execution.valid() && track.commands[1].execution.valid() &&
              track.commands[2].execution.valid() && track.commands[3].execution.valid(),
-         "output, state, toggle, and local handlers should compile to direct executors");
+         "output, state, toggle, and local handlers should compile to command bodies");
 
   const auto annotations = sourceMap.withRole(SourceId{7}, SourceRole::Command);
   expect(annotations.size() == 8, "compiler cursor should project one annotation per source command");
@@ -273,7 +275,7 @@ void compilerCursorCompilesAndExecutesTypedCommands() {
          "field reads should automatically preserve names and exact source ranges");
   expect(sourceMap.get(annotations[5]).playbackStatus == CommandPlaybackStatus::AffectsPlayback &&
              sourceMap.get(annotations[6]).playbackStatus == CommandPlaybackStatus::SourceOnly,
-         "compiled actions should promote source-only presentation unless the event is explicitly ignored");
+         "compiled behavior should promote source-only presentation unless the event is explicitly ignored");
 
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
@@ -312,9 +314,9 @@ void compilerCursorCompilesControlFlow() {
   expect(track.commands.size() == 6, "reachable decoding should compile call and jump targets");
   expect(track.commands[0].flow.callTarget() && track.commands[2].flow.unconditionalJump(),
          "compiled flow should preserve discovery targets beside runtime behavior");
-  expect(track.commands[0].execution.actions.empty() && track.commands[2].execution.actions.empty() &&
-             track.commands[4].execution.actions.empty() && track.commands[5].execution.actions.empty(),
-         "static call, jump, return, and end flow should compile no redundant runtime actions");
+  expect(!track.commands[0].execution.valid() && !track.commands[2].execution.valid() &&
+             !track.commands[4].execution.valid() && !track.commands[5].execution.valid(),
+         "static call, jump, return, and end flow should compile no redundant runtime bodies");
   const SourceAnnotation& callAnnotation = sourceMap.get(track.commands[0].annotation);
   const SourceAnnotation& jumpAnnotation = sourceMap.get(track.commands[2].annotation);
   const SourceAnnotation& returnAnnotation = sourceMap.get(track.commands[4].annotation);
@@ -370,19 +372,18 @@ void compilerCursorCompilesRepeatsAndConditionalFields() {
          "imperative compiler cursor should naturally decode conditional field layouts");
 }
 
-void compilerCursorComposesChainedAndSeparateActions() {
+void compilerCursorComposesOperationsIntoOneBody() {
   const std::vector<u8> bytes{
       0x22, 0x0c,  // set and emit pitch-bend range
       0x23, 0x40,  // bend halfway across that range
-      0x24, 0x03,  // separate state, expression, and wait actions
+      0x24, 0x03,  // separate state, expression, and wait operations
       0x40, 0x01,  // note after the wait, using the new transpose
-      0x25, 0x7f,  // captureless inline handler
+      0x25, 0x7f,  // value-capturing inline body
       0xff,
   };
   const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{12}, bytes), static_cast<u32>(bytes.size()));
-  expect(track.commands.size() == 6 && track.commands[0].execution.actions.size() == 2 &&
-             track.commands[2].execution.actions.size() == 3,
-         "chained and separate compiler-cursor calls should retain the same ordered action list");
+  expect(track.commands.size() == 6 && track.commands[0].execution.valid() && track.commands[2].execution.valid(),
+         "chained and separate compiler-cursor calls should compose into one command body");
 
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
@@ -392,26 +393,23 @@ void compilerCursorComposesChainedAndSeparateActions() {
   };
   const PerformanceSequence performance = SequenceVm().render(program, dialect);
   expect(performance.diagnostics.empty() && performance.tracks[0].endTick == 4,
-         "composed actions should execute through one source command before VM scheduling continues");
+         "composed operations should execute through one source command before VM scheduling continues");
   const auto& events = performance.tracks[0].events;
   expect(events.size() == 5 && std::get<PitchBendRangePerformanceEvent>(events[0]).cents == 1200 &&
              std::get<PitchBendPerformanceEvent>(events[1]).semitones == 6.0 &&
              std::get<ExpressionPerformanceEvent>(events[2]).linearGain == 0.5,
-         "composed state and output actions should execute in their written order");
+         "composed state and output operations should execute in their written order");
   expect(std::get<NotePerformanceEvent>(events[3]).header.tick == 3 &&
              std::get<NotePerformanceEvent>(events[3]).key == 63.0 &&
              std::get<PanPerformanceEvent>(events[4]).stereoPosition == 1.0,
-         "separate state calls and captureless inline handlers should preserve typed runtime behavior");
+         "separate state calls and a value-capturing body should preserve typed runtime behavior");
 }
 
-void compilerCursorEvaluatesDeferredStateInActionOrder() {
+void compilerCursorReadsRuntimeStateInsideCommandBody() {
   const std::vector<u8> bytes{0x27, 0x27, 0xff};
   const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{14}, bytes), static_cast<u32>(bytes.size()));
-  expect(track.commands.size() == 3 && track.commands[0].execution.actions.size() == 3,
-         "deferred-state fixture should compile toggle and both outputs as separate actions");
-  expect(track.commands[0].execution.actions[1].arguments.empty() &&
-             track.commands[0].execution.actions[2].arguments.empty(),
-         "deferred state-member identities should require no durable arguments");
+  expect(track.commands.size() == 3 && track.commands[0].execution.valid(),
+         "runtime-state fixture should compile its related effects into one body");
 
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
@@ -423,7 +421,7 @@ void compilerCursorEvaluatesDeferredStateInActionOrder() {
   const auto& events = performance.tracks[0].events;
   expect(events.size() == 4 && std::get<LegatoPedalPerformanceEvent>(events[0]).enabled &&
              !std::get<LegatoPedalPerformanceEvent>(events[2]).enabled,
-         "state() should observe each toggle immediately before the dependent output action");
+         "a command body should observe the track state immediately after updating it");
   expect(std::get<ExpressionPerformanceEvent>(events[1]).linearGain == 0.75 &&
              std::get<ExpressionPerformanceEvent>(events[3]).linearGain == 0.25,
          "a local playback operation should select output from runtime state");
@@ -443,8 +441,8 @@ void compilerCursorExecutesEligibleCommandsDuringWaits() {
   };
 
   const auto [gatedTrack, gated] = render({0x2a, 0x02, 0x50, 0x04, 0x2b, 0x20, 0x2b, 0x40, 0xff});
-  expect(gatedTrack.commands.size() == 5 && gatedTrack.commands[2].execution.duringWait.valid() &&
-             gatedTrack.commands[3].execution.duringWait.valid(),
+  expect(gatedTrack.commands.size() == 5 && gatedTrack.commands[2].execution.duringWait &&
+             gatedTrack.commands[3].execution.duringWait,
          "during-wait eligibility should remain attached to each independently decoded command");
   const auto& gatedEvents = gated.tracks[0].events;
   expect(gated.tracks[0].endTick == 4 && gatedEvents.size() == 2 &&
@@ -609,8 +607,8 @@ void runValueCompilerCursorTests() {
   compilerCursorCompilesAndExecutesTypedCommands();
   compilerCursorCompilesControlFlow();
   compilerCursorCompilesRepeatsAndConditionalFields();
-  compilerCursorComposesChainedAndSeparateActions();
-  compilerCursorEvaluatesDeferredStateInActionOrder();
+  compilerCursorComposesOperationsIntoOneBody();
+  compilerCursorReadsRuntimeStateInsideCommandBody();
   compilerCursorExecutesEligibleCommandsDuringWaits();
   compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior();
   compilerCursorKeepsExactTargetOperandRoles();

@@ -580,6 +580,13 @@ struct Playback {
     track.durationTieCanceled = false;
   }
 
+  [[nodiscard]] Effects noteWithPreviousTiming(u8 sourceKey, bool durationSpecified, u8 velocity, s8 initialAttenuation,
+                                               s8 initialTranspose, u8 drumDuration, u8 drumPan, double drumPitch) {
+    note(sourceKey, track.previousDelta, track.previousDurationParameter, durationSpecified, velocity,
+         initialAttenuation, initialTranspose, drumDuration, drumPan, drumPitch);
+    return Effects::wait(track.previousDelta);
+  }
+
   void hold(u8 delta, u8 rate) {
     const u32 scaled = static_cast<u32>(delta) * rate / 100;
     const u32 nominalExtension = isGx() ? std::max<u32>(1, scaled) : scaled;
@@ -847,11 +854,9 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
     }
 
     const KonamiArcadeDrum& drum = layout.drums[key];
-    event.invoke<&Playback::note>(key, event.state<&TrackState::previousDelta>(),
-                                  event.state<&TrackState::previousDurationParameter>(), durationSpecified, velocity,
-                                  sequence.initialAttenuation, sequence.initialTranspose, drum.defaultDuration,
-                                  drum.pan, konamiArcadeDrumPitch(layout.version, drum));
-    return event.wait(event.state<&TrackState::previousDelta>());
+    return event.invoke<&Playback::noteWithPreviousTiming>(
+        key, durationSpecified, velocity, sequence.initialAttenuation, sequence.initialTranspose, drum.defaultDuration,
+        drum.pan, konamiArcadeDrumPitch(layout.version, drum));
   }
 
   switch (opcode) {

@@ -951,7 +951,7 @@ void ninSnesF9UsesSharedPitchTransitions() {
   const auto& commands = parsed.program.tracks[0].commands;
   const auto decodedSlide = std::ranges::find(commands, u8{0xf9}, &SourceCommand::opcode);
   expect(decodedSlide != commands.end() && decodedSlide->encodedSize == 4 && decodedSlide->address.value == 0x303 &&
-             decodedSlide->execution.duringWait.valid(),
+             decodedSlide->execution.duringWait,
          "F9 should remain an independent source command with generic during-wait eligibility");
   const auto* sampled = transition == nullptr ? nullptr : std::get_if<SampledAutomationCurve>(&transition->curve);
   expect(sampled != nullptr && sampled->samples.size() == 4 && sampled->samples[0].tickOffset == 0 &&

@@ -1005,7 +1005,9 @@ struct DurationValue {
   if (opcode >= 0xde) {
     auto event = cursor.command("Duration / Repeat Note", SequenceSemantic::Note);
     const DurationValue duration = parseDuration(event, opcode);
-    return event.invoke<&Playback::note>(event.state<&TrackState::rawNote>(), duration.ticks, duration.gate, true);
+    return event.invoke([duration](Playback& playback) {
+      return playback.note(playback.track.rawNote, duration.ticks, duration.gate, true);
+    });
   }
 
   switch (opcode) {

@@ -1355,7 +1355,7 @@ void capcomSnesReleaseRateIsStickyAcrossInstrumentChanges() {
   const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version,
                                                          CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
   expect(track.commands.size() == 6 && track.commands.front().semantic == SequenceSemantic::Envelope &&
-             track.commands.front().encodedSize == 2 && track.commands.front().execution.actions.size() == 1,
+             track.commands.front().encodedSize == 2 && track.commands.front().execution.valid(),
          "CapcomSnes $1D should decode as an executable two-byte envelope command");
   const SemanticOperand* gain = semanticOperand(track.commands.front(), "gain");
   const SemanticOperand* releaseSeconds = semanticOperand(track.commands.front(), "release_seconds");
