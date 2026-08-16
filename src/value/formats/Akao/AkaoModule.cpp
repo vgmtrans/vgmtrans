@@ -135,7 +135,7 @@ FormatModule akaoModule() {
       .scan = scanAkao,
       .collectionResolverId = std::string(kAkaoCollectionResolver),
       .resolveCollections = resolveAkaoCollections,
-      .prepareCollection = prepareAkaoCollection,
+      .bindCollection = bindAkaoCollection,
   };
 }
 

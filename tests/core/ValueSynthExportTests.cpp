@@ -8,6 +8,7 @@
 
 #include "SessionSnapshotBuilder.h"
 
+#include "value/export/CollectionResolution.h"
 #include "value/export/synth/ModulationScaling.h"
 #include "value/export/synth/SynthExportData.h"
 #include "value/synth/PsxSpu.h"
@@ -122,9 +123,9 @@ void adsrApproximationLowersUnsupportedStages() {
   const Envelope contraEnvelope = approximateEnvelopeAsAdsr(nativeContraEnvelope);
   expect(nativeContraEnvelope.decaySeconds && nativeContraEnvelope.secondDecaySeconds &&
              std::abs(*nativeContraEnvelope.decaySeconds - 1.819910) < 0.000001 &&
-             std::abs(*nativeContraEnvelope.secondDecaySeconds - 25.330971) < 0.000001 &&
-             contraEnvelope.decaySeconds && std::abs(*contraEnvelope.decaySeconds - 4.140138) < 0.000001 &&
-             !contraEnvelope.secondDecaySeconds && contraEnvelope.sustainAmplitude == 0.0,
+             std::abs(*nativeContraEnvelope.secondDecaySeconds - 25.330971) < 0.000001 && contraEnvelope.decaySeconds &&
+             std::abs(*contraEnvelope.decaySeconds - 4.140138) < 0.000001 && !contraEnvelope.secondDecaySeconds &&
+             contraEnvelope.sustainAmplitude == 0.0,
          "a 0.33-second SNES first decay should be fitted independently of its long quieter tail");
 
   // Star Fox, Continue, track 0, instrument 20 at ARAM $3d78: DF 34.
@@ -223,11 +224,12 @@ void physicalModulationLowersToLegacySynthControls() {
       "physical vibrato and no-boost tremolo should preserve the legacy synth modulator records");
 
   const auto noise = lowerSynthModulation(InstrumentModulation{
-      .vibrato = VibratoSpec{
-          .maxDepthCents = 100.0,
-          .rateHertz = {1.0, 1.0},
-          .waveform = LfoWaveform::Noise,
-      },
+      .vibrato =
+          VibratoSpec{
+              .maxDepthCents = 100.0,
+              .rateHertz = {1.0, 1.0},
+              .waveform = LfoWaveform::Noise,
+          },
   });
   expect(noise.generators.empty() && noise.modulators.empty(),
          "noise modulation should remain in the model when the synth target cannot represent it");
@@ -243,15 +245,18 @@ void fixedPhysicalLfoValuesNeedNoZeroRangeModulators() {
               .depthMode = ModulationDepthMode::Fixed,
           },
   });
-  expect(std::ranges::any_of(lowered.generators, [](const SynthGenerator& generator) {
-           return generator.destination == SynthDestination::VibratoDepth && generator.amount == 100;
-         }),
+  expect(std::ranges::any_of(lowered.generators,
+                             [](const SynthGenerator& generator) {
+                               return generator.destination == SynthDestination::VibratoDepth &&
+                                      generator.amount == 100;
+                             }),
          "a hardware-fixed LFO depth should lower to an unconditional synth generator");
-  expect(std::ranges::none_of(lowered.modulators, [](const SynthModulator& modulator) {
-           return modulator.destination == SynthDestination::VibratoDepth ||
-                  modulator.destination == SynthDestination::VibratoRate ||
-                  modulator.destination == SynthDestination::VibratoDelay;
-         }),
+  expect(std::ranges::none_of(lowered.modulators,
+                              [](const SynthModulator& modulator) {
+                                return modulator.destination == SynthDestination::VibratoDepth ||
+                                       modulator.destination == SynthDestination::VibratoRate ||
+                                       modulator.destination == SynthDestination::VibratoDelay;
+                              }),
          "fixed physical depth, rate, and delay should live entirely in synth base generators");
 }
 
@@ -673,10 +678,11 @@ void standaloneSynthExportsKeepNativeModulation() {
       .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe", .name = "Instruments"},
       .instruments = {Instrument{
           .regions = {Region{.sample = SampleRef{.collection = samples.metadata.id, .index = 0}}},
-          .modulation = InstrumentModulation{.vibrato = VibratoSpec{
-                                                 .maxDepthCents = 100.0,
-                                                 .rateHertz = {lfoStepHertz, lfoStepHertz},
-                                             }},
+          .modulation = InstrumentModulation{.vibrato =
+                                                 VibratoSpec{
+                                                     .maxDepthCents = 100.0,
+                                                     .rateHertz = {lfoStepHertz, lfoStepHertz},
+                                                 }},
       }},
   };
 
@@ -706,10 +712,8 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   const std::array<u8, 2> selectLead{0x80, 0x01};
   const std::array<u8, 3> leadNote{0x90, 0x40, 0x01};
   const std::array<u8, 1> end{0xff};
-  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, defaultNote.size()),
-                                    defaultNote);
-  addProbeCommand<ProbeProgramCommand>(track, config, Address{3}, probeRange(3, selectLead.size()),
-                                       selectLead);
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, defaultNote.size()), defaultNote);
+  addProbeCommand<ProbeProgramCommand>(track, config, Address{3}, probeRange(3, selectLead.size()), selectLead);
   addProbeCommand<ProbeNoteCommand>(track, config, Address{5}, probeRange(5, leadNote.size()), leadNote);
   addProbeCommand<ProbeEndCommand>(track, config, Address{8}, probeRange(8, end.size()), end);
 
@@ -734,11 +738,12 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   };
   const SampleCollectionAsset samples{
       .metadata = AssetMetadata{.id = sampleCollectionId, .format = "Probe", .name = "Samples"},
-      .samples = SampleCollection{.samples = {
-                                      sample("Piano Wave", 0),
-                                      sample("Lead Wave", 1),
-                                      sample("Noise Wave", 2),
-                                  }},
+      .samples = SampleCollection{.samples =
+                                      {
+                                          sample("Piano Wave", 0),
+                                          sample("Lead Wave", 1),
+                                          sample("Noise Wave", 2),
+                                      }},
   };
   const auto instrument = [&](std::string name, u32 program, u32 sampleIndex) {
     return Instrument{
@@ -749,11 +754,12 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   };
   const InstrumentSetAsset instruments{
       .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe", .name = "Instruments"},
-      .instruments = {
-          instrument("Piano", 0, 0),
-          instrument("Lead", 1, 1),
-          instrument("Noise", 2, 2),
-      },
+      .instruments =
+          {
+              instrument("Piano", 0, 0),
+              instrument("Lead", 1, 1),
+              instrument("Noise", 2, 2),
+          },
   };
 
   test::SessionSnapshotBuilder builder;
@@ -841,10 +847,11 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   semanticInstruments.instruments[2].identity = semanticIdentity;
   PerformanceSequence semanticPerformance{
       .tracks = {PerformanceTrack{
-          .events = {
-              InstrumentPerformanceEvent{.sourceInstrument = semanticIdentity},
-              NotePerformanceEvent{},
-          },
+          .events =
+              {
+                  InstrumentPerformanceEvent{.sourceInstrument = semanticIdentity},
+                  NotePerformanceEvent{},
+              },
       }},
   };
   const std::array<const InstrumentSetAsset*, 1> semanticSets{&semanticInstruments};
@@ -864,10 +871,11 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   logicalBankInstruments.instruments[1].explicitAddress = InstrumentAddress{.bank = 1, .program = 1};
   PerformanceSequence logicalBankPerformance{
       .tracks = {PerformanceTrack{
-          .events = {
-              InstrumentPerformanceEvent{.bank = 1, .program = 1},
-              NotePerformanceEvent{},
-          },
+          .events =
+              {
+                  InstrumentPerformanceEvent{.bank = 1, .program = 1},
+                  NotePerformanceEvent{},
+              },
       }},
   };
   const std::array<const InstrumentSetAsset*, 1> logicalBankSets{&logicalBankInstruments};
@@ -886,10 +894,11 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   exactBankInstruments.instruments[2].explicitAddress = InstrumentAddress{.bank = 1 << 7, .program = 1};
   PerformanceSequence exactBankPerformance{
       .tracks = {PerformanceTrack{
-          .events = {
-              InstrumentPerformanceEvent{.bank = 1 << 7, .program = 1},
-              NotePerformanceEvent{},
-          },
+          .events =
+              {
+                  InstrumentPerformanceEvent{.bank = 1 << 7, .program = 1},
+                  NotePerformanceEvent{},
+              },
       }},
   };
   const std::array<const InstrumentSetAsset*, 1> exactBankSets{&exactBankInstruments};
@@ -929,48 +938,51 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   }
 }
 
-PreparedCollectionAssets prepareReplacementInstrumentSet(const CollectionPrepareContext& context) {
+void bindReplacementInstrumentSet(CollectionBindingContext& context) {
   const AssetId samples = context.collection.members.sampleCollections.front();
-  return PreparedCollectionAssets{
-      .replacementInstrumentSets = std::vector<InstrumentSetAsset>{InstrumentSetAsset{
-          .metadata = AssetMetadata{.format = "Prepared Probe", .name = "Prepared Bank"},
-          .instruments = {Instrument{
-              .name = "Prepared Instrument",
-              .regions = {Region{.sample = SampleRef{.collection = samples, .index = 0}}},
-          }},
+  context.instrumentSets = {InstrumentSetAsset{
+      .metadata = AssetMetadata{.format = "Prepared Probe", .name = "Prepared Bank"},
+      .instruments = {Instrument{
+          .name = "Prepared Instrument",
+          .regions = {Region{.sample = SampleRef{.collection = samples, .index = 0}}},
       }},
-  };
+  }};
 }
 
-PreparedCollectionAssets preparePerformanceFinalizer(const CollectionPrepareContext& context) {
-  const bool shouldFail = context.collection.key.value == "failure";
-  return PreparedCollectionAssets{
-      .finalizePerformance =
-          [shouldFail](PerformanceSequence& performance) {
-            if (shouldFail) {
-              throw std::runtime_error("test finalizer failure");
-            }
-            for (auto& track : performance.tracks) {
-              track.hasPhysicalModulation = true;
-              track.events.emplace_back(ModulationPerformanceEvent{
-                  .target = ModulationPerformanceTarget::VibratoDepth,
-                  .pitchDepthSemitones = 1.0,
-              });
-              track.events.emplace_back(ModulationPerformanceEvent{
-                  .target = ModulationPerformanceTarget::VibratoRate,
-                  .frequencyHz = 6.0,
-              });
-            }
-          },
-      .diagnostics = {{.severity = Severity::Warning, .message = "Collection preparation warning"}},
-  };
+struct PreparedProbeProgramState {
+  PreparedProbeProgramState(const SequenceProgram&, bool fail) : shouldFail(fail) {}
+
+  void finalizePerformance(PerformanceSequence& performance) const {
+    if (shouldFail) {
+      throw std::runtime_error("test finalizer failure");
+    }
+    for (auto& track : performance.tracks) {
+      track.hasPhysicalModulation = true;
+      track.events.emplace_back(ModulationPerformanceEvent{
+          .target = ModulationPerformanceTarget::VibratoDepth,
+          .pitchDepthSemitones = 1.0,
+      });
+      track.events.emplace_back(ModulationPerformanceEvent{
+          .target = ModulationPerformanceTarget::VibratoRate,
+          .frequencyHz = 6.0,
+      });
+    }
+  }
+
+  bool shouldFail = false;
+};
+
+void bindPerformanceRuntime(CollectionBindingContext& context) {
+  context.sequenceRuntime =
+      makeCompiledRuntime<ProbeCompilerCursor, PreparedProbeProgramState>(context.collection.key.value == "failure");
+  context.diagnostics.push_back({.severity = Severity::Warning, .message = "Collection binding warning"});
 }
 
 ScanResult scanNoSources(const ScanInput&) {
   return {};
 }
 
-void collectionPreparationAppliesToWholeExport() {
+void collectionBindingAppliesToWholeExport() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "performance-finalizer.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
   const SequenceProgramConfig config = probeSequenceConfig();
@@ -1031,26 +1043,25 @@ void collectionPreparationAppliesToWholeExport() {
   formats.add(FormatModule{
       .name = "Performance Finalizer",
       .scan = scanNoSources,
-      .prepareCollection = preparePerformanceFinalizer,
+      .bindCollection = bindPerformanceRuntime,
   });
   formats.seal();
   const SessionSnapshot snapshot = builder.finish();
   const CollectionPlayback playback =
       prepareCollectionPlayback(snapshot, sources, CollectionId{0}, PlaybackRequest{}, formats);
   expect(playback.soundFont.size() >= 12 && containsAscii(playback.soundFont, "Durable Instrument"),
-         "a performance-only collection preparer should preserve durable instrument sets for synth export");
+         "a runtime-only collection binding should preserve durable instrument sets for synth export");
   expect(soundFontImodContains(playback.soundFont, 129, 6, 100),
-         "collection preparation should run before sequence modulation is analyzed");
+         "collection binding should run before sequence modulation is analyzed");
 
   const auto failed =
       exportCollection(snapshot, sources, CollectionId{1}, ExportRequest{.kinds = {ExportKind::Midi}}, formats);
   expect(failed.size() == 1, "a failing collection performance finalizer should produce one MIDI artifact");
-  diagnosticWithMessage(failed.front().diagnostics, "Collection preparation warning");
-  diagnosticWithMessage(failed.front().diagnostics,
-                        "Collection performance finalization failed: test finalizer failure");
+  diagnosticWithMessage(failed.front().diagnostics, "Collection binding warning");
+  diagnosticWithMessage(failed.front().diagnostics, "Sequence rendering failed: test finalizer failure");
 }
 
-void collectionPreparationReplacesDurableInstrumentSets() {
+void collectionBindingProducesAnImmutableInstrumentView() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "zero.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
   const SampleCollectionAsset samples{
@@ -1088,19 +1099,24 @@ void collectionPreparationReplacesDurableInstrumentSets() {
   formats.add(FormatModule{
       .name = "Prepared Probe",
       .scan = scanNoSources,
-      .prepareCollection = prepareReplacementInstrumentSet,
+      .bindCollection = bindReplacementInstrumentSet,
   });
   formats.seal();
+  const SessionSnapshot snapshot = builder.finish();
+  const auto resolved = resolveCollection(snapshot, CollectionId{0}, sources, formats);
+  expect(resolved.instrumentSets().size() == 1 &&
+             resolved.instrumentSets().front().instruments.front().name == "Prepared Instrument" &&
+             snapshot.asset<InstrumentSetAsset>(durable.metadata.id)->instruments.front().name == "Durable Instrument",
+         "collection binding should publish an authoritative view without mutating durable assets");
   const auto artifacts =
-      exportCollection(builder.finish(), sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Dls}}, formats);
+      exportCollection(snapshot, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Dls}}, formats);
 
-  expect(artifacts.size() == 1 && !artifacts.front().bytes.empty(),
-         "collection preparation replacement fixture should export a DLS");
+  expect(artifacts.size() == 1 && !artifacts.front().bytes.empty(), "collection binding fixture should export a DLS");
   const auto& dls = artifacts.front().bytes;
   expect(readLe32(dls, asciiOffset(dls, "colh") + 8) == 1,
-         "prepared instrument sets should replace durable sets instead of being appended");
+         "bound instrument sets should replace durable sets instead of being appended");
   expect(containsAscii(dls, "Prepared Instrument") && !containsAscii(dls, "Durable Instrument"),
-         "collection export should use only the preparer's authoritative instrument view");
+         "collection export should use only the resolver's authoritative instrument view");
 }
 
 u32 synthOnlySequenceExecutions = 0;
@@ -1436,11 +1452,11 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
   });
   const auto missingSequence =
       prepareCollectionPlayback(synthOnlyBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{}, formats);
-  expect(!missingSequence.playable() &&
-             std::ranges::any_of(missingSequence.diagnostics,
-                                 [](const Diagnostic& diagnostic) {
-                                   return diagnostic.message == "Collection does not reference a sequence asset";
-                                 }),
+  expect(!missingSequence.playable() && std::ranges::any_of(missingSequence.diagnostics,
+                                                            [](const Diagnostic& diagnostic) {
+                                                              return diagnostic.message ==
+                                                                     "Collection does not reference a sequence asset";
+                                                            }),
          "playback preparation should preserve a useful MIDI failure diagnostic");
 }
 
@@ -1460,8 +1476,8 @@ void runValueSynthExportTests() {
   dlsExporterWritesDlsRiffFile();
   standaloneSynthExportsKeepNativeModulation();
   collectionSynthExportsCanExportOnlyUsedInstruments();
-  collectionPreparationAppliesToWholeExport();
-  collectionPreparationReplacesDurableInstrumentSets();
+  collectionBindingAppliesToWholeExport();
+  collectionBindingProducesAnImmutableInstrumentView();
   synthOnlyExportSkipsSequencesWithoutModulation();
   exportDiagnosticsPreserveSourceRanges();
   collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair();

@@ -115,7 +115,7 @@ struct SonyPs1ScannedBank {
                                                          std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& sonyPs1SequenceConfig();
 [[nodiscard]] std::vector<core::DesiredCollection> resolveSonyPs1Collections(const core::MatchContext& context);
-[[nodiscard]] core::PreparedCollectionAssets prepareSonyPs1Collection(const core::CollectionPrepareContext& context);
+void bindSonyPs1Collection(core::CollectionBindingContext& context);
 [[nodiscard]] core::FormatModule sonyPs1Module();
 
 }  // namespace vgmtrans::formats::sony_ps1

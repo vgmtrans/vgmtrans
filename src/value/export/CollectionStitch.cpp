@@ -6,7 +6,8 @@
 
 #include "value/export/CollectionStitch.h"
 
-#include "value/export/CollectionPreparation.h"
+#include "value/export/CollectionResolution.h"
+#include "value/export/DynamicEnvelope.h"
 #include "value/export/ExportDiagnostics.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/midi/ModulationAnalysis.h"
@@ -57,7 +58,7 @@ void fail(CollectionStitchResult& result, std::string message) {
   result.soundFont.diagnostics.push_back(diagnostic);
 }
 
-void append(std::vector<Diagnostic>& destination, const PreparedCollectionDiagnostics& source) {
+void append(std::vector<Diagnostic>& destination, const CollectionResolutionDiagnostics& source) {
   append(destination, source.collection);
   append(destination, source.sequence);
   append(destination, source.instrumentSets);
@@ -69,7 +70,7 @@ void append(std::vector<Diagnostic>& destination, const PreparedCollectionDiagno
                              [](const Diagnostic& diagnostic) { return diagnostic.severity == Severity::Error; });
 }
 
-[[nodiscard]] bool hasErrors(const PreparedCollectionDiagnostics& diagnostics) {
+[[nodiscard]] bool hasErrors(const CollectionResolutionDiagnostics& diagnostics) {
   return hasErrors(diagnostics.collection) || hasErrors(diagnostics.sequence) ||
          hasErrors(diagnostics.instrumentSets) || hasErrors(diagnostics.sampleCollections);
 }
@@ -98,37 +99,44 @@ void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulation
 [[nodiscard]] bool preparePart(StitchPart& part, const SessionSnapshot& snapshot, const SourceStore& sources,
                                const ExportRequest& request, const FormatRegistry& formats,
                                std::vector<Diagnostic>& diagnostics) {
-  auto prepared = prepareCollection(snapshot, part.collection, sources, formats);
-  if (hasErrors(prepared.diagnostics)) {
-    append(diagnostics, prepared.diagnostics);
+  const auto resolved = resolveCollection(snapshot, part.collection, sources, formats);
+  if (hasErrors(resolved.diagnostics())) {
+    append(diagnostics, resolved.diagnostics());
     return false;
   }
-  if (prepared.sequence == nullptr) {
-    append(diagnostics, prepared.diagnostics);
+  if (resolved.sequence() == nullptr) {
+    append(diagnostics, resolved.diagnostics());
     diagnostics.push_back(exportError("A stitched collection does not contain a sequence"));
     return false;
   }
-  if (prepared.instrumentSets.empty()) {
-    append(diagnostics, prepared.diagnostics);
+  if (resolved.instrumentSets().empty()) {
+    append(diagnostics, resolved.diagnostics());
     diagnostics.push_back(exportError("A stitched collection does not contain instruments"));
     return false;
   }
 
-  auto rendering = renderCollection(prepared, request.sequence);
+  auto rendering = renderCollection(resolved, request.sequence);
   if (!rendering.performance) {
-    append(diagnostics, prepared.diagnostics);
+    append(diagnostics, resolved.diagnostics());
     append(diagnostics, rendering.diagnostics);
     return false;
   }
 
+  std::vector<InstrumentSetAsset> instrumentSets = resolved.instrumentSets();
   const PerformanceSequence* performance = &*rendering.performance;
-  auto materialization = materializeCollectionDynamicEnvelopes(prepared, rendering, request.dynamicEnvelopes);
-  if (materialization) {
+  std::optional<DynamicEnvelopeMaterialization> materialization;
+  if (request.dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants) {
+    materialization = materializeDynamicEnvelopes(*rendering.performance, instrumentSets);
     performance = &materialization->performance;
+    append(diagnostics, materialization->diagnostics);
   }
 
   if (request.modulationConversion == ModulationConversionPolicy::SynthModulators) {
-    applyCollectionSequenceModulation(prepared, rendering.modulation);
+    if (rendering.modulation.hasSynthModulation()) {
+      for (auto& instrumentSet : instrumentSets) {
+        applySequenceModulation(instrumentSet, rendering.modulation);
+      }
+    }
     if (request.modulationScaling == ModulationScalingPolicy::ObservedSequenceRange) {
       auto usage = analyzePerformanceModulationUsage(*performance, &rendering.modulation);
       if (hasMidiModulationUsage(usage)) {
@@ -137,13 +145,17 @@ void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulation
     }
   }
 
-  const auto instrumentView = prepared.instrumentView();
-  part.midi = renderMidiSequence(*performance, request.sequence.midi, request.modulationConversion, instrumentView,
+  std::vector<const InstrumentSetAsset*> instruments;
+  instruments.reserve(instrumentSets.size());
+  for (const auto& instrumentSet : instrumentSets) {
+    instruments.push_back(&instrumentSet);
+  }
+  part.midi = renderMidiSequence(*performance, request.sequence.midi, request.modulationConversion, instruments,
                                  &rendering.modulation);
   if (request.exportOnlyUsedInstruments) {
-    const auto selected = selectSynthInstruments(instrumentView, performance);
+    const auto selected = selectSynthInstruments(instruments, performance);
     const std::unordered_set<const Instrument*> used(selected.begin(), selected.end());
-    for (auto& set : prepared.instrumentSets) {
+    for (auto& set : instrumentSets) {
       std::vector<Instrument> retained;
       retained.reserve(set.instruments.size());
       for (auto& instrument : set.instruments) {
@@ -153,12 +165,12 @@ void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulation
       }
       set.instruments = std::move(retained);
     }
-    std::erase_if(prepared.instrumentSets, [](const InstrumentSetAsset& set) { return set.instruments.empty(); });
+    std::erase_if(instrumentSets, [](const InstrumentSetAsset& set) { return set.instruments.empty(); });
   }
 
-  part.instruments = std::move(prepared.instrumentSets);
-  part.samples = std::move(prepared.sampleCollections);
-  append(diagnostics, prepared.diagnostics);
+  part.instruments = std::move(instrumentSets);
+  part.samples = resolved.sampleCollections();
+  append(diagnostics, resolved.diagnostics());
   return true;
 }
 

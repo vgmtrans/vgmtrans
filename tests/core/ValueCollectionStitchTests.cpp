@@ -11,6 +11,52 @@
 
 namespace {
 
+struct StitchProgramState {
+  StitchProgramState(const SequenceProgram&, bool dirtyMidiState) : leaveDirtyMidiState(dirtyMidiState) {}
+
+  void finalizePerformance(PerformanceSequence& performance) const {
+    for (auto& track : performance.tracks) {
+      auto position = track.events.insert(track.events.begin(), InstrumentPerformanceEvent{
+                                                                    .bank = 127,
+                                                                    .program = 0,
+                                                                    .forceBankSelect = true,
+                                                                });
+      position = track.events.insert(
+          ++position, EnvelopePerformanceEvent{
+                          .update = EnvelopeUpdate::set(Envelope{.attackSeconds = 0.25}, EnvelopeFields::Attack),
+                      });
+      track.events.insert(++position, ModulationPerformanceEvent{
+                                          .target = ModulationPerformanceTarget::VibratoDepth,
+                                          .amount = leaveDirtyMidiState ? 0.25 : 0.5,
+                                      });
+      if (leaveDirtyMidiState) {
+        track.events.push_back(TuningPerformanceEvent{
+            .header = PerformanceEventHeader{.tick = 1},
+            .cents = 25.0,
+        });
+        track.events.push_back(PitchBendRangePerformanceEvent{
+            .header = PerformanceEventHeader{.tick = 1},
+            .cents = 1200,
+        });
+        track.events.push_back(PitchBendPerformanceEvent{
+            .header = PerformanceEventHeader{.tick = 1},
+            .semitones = 6.0,
+        });
+        track.events.push_back(PortamentoEnablePerformanceEvent{
+            .header = PerformanceEventHeader{.tick = 1},
+            .enabled = true,
+        });
+        track.events.push_back(LegatoPedalPerformanceEvent{
+            .header = PerformanceEventHeader{.tick = 1},
+            .enabled = true,
+        });
+      }
+    }
+  }
+
+  bool leaveDirtyMidiState = false;
+};
+
 void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "stitch.pcm"}, {0, 0, 0, 0});
@@ -92,51 +138,9 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
 
   FormatRegistry formats;
   auto module = probeSequenceModule();
-  module.prepareCollection = [](const CollectionPrepareContext& context) {
+  module.bindCollection = [](CollectionBindingContext& context) {
     const bool leaveDirtyMidiState = context.collection.id == CollectionId{0};
-    return PreparedCollectionAssets{
-        .finalizePerformance =
-            [leaveDirtyMidiState](PerformanceSequence& performance) {
-              for (auto& track : performance.tracks) {
-                auto position = track.events.insert(track.events.begin(), InstrumentPerformanceEvent{
-                                                                              .bank = 127,
-                                                                              .program = 0,
-                                                                              .forceBankSelect = true,
-                                                                          });
-                position = track.events.insert(
-                    ++position,
-                    EnvelopePerformanceEvent{
-                        .update = EnvelopeUpdate::set(Envelope{.attackSeconds = 0.25}, EnvelopeFields::Attack),
-                    });
-                track.events.insert(++position, ModulationPerformanceEvent{
-                                                    .target = ModulationPerformanceTarget::VibratoDepth,
-                                                    .amount = leaveDirtyMidiState ? 0.25 : 0.5,
-                                                });
-                if (leaveDirtyMidiState) {
-                  track.events.push_back(TuningPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 1},
-                      .cents = 25.0,
-                  });
-                  track.events.push_back(PitchBendRangePerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 1},
-                      .cents = 1200,
-                  });
-                  track.events.push_back(PitchBendPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 1},
-                      .semitones = 6.0,
-                  });
-                  track.events.push_back(PortamentoEnablePerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 1},
-                      .enabled = true,
-                  });
-                  track.events.push_back(LegatoPedalPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 1},
-                      .enabled = true,
-                  });
-                }
-              }
-            },
-    };
+    context.sequenceRuntime = makeCompiledRuntime<ProbeCompilerCursor, StitchProgramState>(leaveDirtyMidiState);
   };
   formats.add(std::move(module));
   const std::array collections{CollectionId{0}, CollectionId{1}};

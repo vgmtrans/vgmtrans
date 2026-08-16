@@ -117,8 +117,8 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/PitchTransitionMidiLowering.h
     ${PROJECT_SOURCE_DIR}/src/value/export/BinaryWriter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/BinaryWriter.h
-    ${PROJECT_SOURCE_DIR}/src/value/export/CollectionPreparation.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/export/CollectionPreparation.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/CollectionResolution.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/CollectionResolution.h
     ${PROJECT_SOURCE_DIR}/src/value/export/CollectionStitch.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/DynamicEnvelope.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/ExportDiagnostics.h

@@ -135,6 +135,13 @@ struct SegSatControllerChange {
   u8 value = 0;
 };
 
+// Collection-local data captured by the sequence runtime before rendering.
+struct SegSatRuntimeConfig {
+  std::vector<SegSatVelocityBank> velocityBanks;
+  SegSatVolumeModel volumeModel = SegSatVolumeModel::V1_33;
+  std::vector<SegSatControllerChange> controllerChanges;
+};
+
 // Mega Man 8's driver converts a VL-table result into the MIDI velocity used
 // by the legacy exporter. This is public so the velocity math can be tested on
 // its own.
@@ -159,12 +166,14 @@ struct SegSatControllerChange {
 [[nodiscard]] std::vector<SegSatControllerChange> segSatControllerChanges(const core::SequenceProgram& program);
 void finalizeSegSatPerformance(core::PerformanceSequence& performance, std::span<const SegSatVelocityBank> banks,
                                SegSatVolumeModel model, std::span<const SegSatControllerChange> controllerChanges);
+[[nodiscard]] core::SequenceRuntime segSatSequenceRuntime(SegSatRuntimeConfig config);
 
 [[nodiscard]] core::SequenceProgram parseSegSatSequenceProgram(core::ByteReader reader, core::AssetId id,
                                                                const SegSatSequenceLayout& layout,
                                                                core::SourceMapBuilder* sourceMap = nullptr,
                                                                std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& segSatSequenceConfig();
+void bindSegSatCollection(core::CollectionBindingContext& context);
 [[nodiscard]] core::FormatModule segSatModule();
 
 }  // namespace vgmtrans::formats::segsat

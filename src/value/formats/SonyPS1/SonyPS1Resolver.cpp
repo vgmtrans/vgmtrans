@@ -244,30 +244,23 @@ std::vector<DesiredCollection> resolveSonyPs1Collections(const MatchContext& con
   return collections;
 }
 
-PreparedCollectionAssets prepareSonyPs1Collection(const CollectionPrepareContext& context) {
+void bindSonyPs1Collection(CollectionBindingContext& context) {
   // Scan-time bank numbers describe every VAB in a source. Collections load
   // their selected VABs into bank slots in member order.
-  std::vector<InstrumentSetAsset> instrumentSets;
-  instrumentSets.reserve(context.collection.members.instrumentSets.size());
-  for (size_t index = 0; index < context.collection.members.instrumentSets.size(); ++index) {
-    const auto* source = context.snapshot.asset<InstrumentSetAsset>(context.collection.members.instrumentSets[index]);
-    if (source == nullptr) {
-      return {};
-    }
-    instrumentSets.push_back(*source);
-    auto& prepared = instrumentSets.back();
-    if (prepared.metadata.format != kSonyPs1FormatName) {
+  for (size_t index = 0; index < context.instrumentSets.size(); ++index) {
+    auto& instruments = context.instrumentSets[index];
+    if (instruments.metadata.format != kSonyPs1FormatName) {
       continue;
     }
     const u32 bank = static_cast<u32>(index);
-    for (auto& instrument : prepared.instruments) {
+    for (auto& instrument : instruments.instruments) {
       const u32 program = instrument.explicitAddress ? instrument.explicitAddress->program
-                                                     : instrument.identity ? instrument.identity->key & 0xff : 0;
+                          : instrument.identity      ? instrument.identity->key & 0xff
+                                                     : 0;
       instrument.explicitAddress = InstrumentAddress{.bank = bank, .program = program};
       instrument.identity = sonyPs1InstrumentIdentity(static_cast<u16>(bank), static_cast<u8>(program));
     }
   }
-  return PreparedCollectionAssets{.replacementInstrumentSets = std::move(instrumentSets)};
 }
 
 }  // namespace vgmtrans::formats::sony_ps1

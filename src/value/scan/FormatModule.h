@@ -11,14 +11,12 @@
 #include "value/synth/SampleFiltering.h"
 
 #include <functional>
-#include <optional>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace vgmtrans::core {
-
-struct PerformanceSequence;
 
 // Lightweight read-only view used while rebuilding collections. It borrows the
 // source store and cheaply shares the Session's immutable asset and fact views
@@ -38,22 +36,17 @@ private:
   SharedSequence<MatchFact> matchFacts_;
 };
 
-struct CollectionPrepareContext {
+// Formats bind collection-local meaning into copies owned by the resolver.
+// This context exists only while a ResolvedCollection is being built; the
+// published result exposes these values read-only.
+struct CollectionBindingContext {
   const SourceStore& sources;
-  const SessionSnapshot& snapshot;
   const Collection& collection;
-};
-
-// A format can adjust sequence playback using other assets in the collection.
-// This runs after sequence rendering and before modulation analysis or export.
-using FinalizeCollectionPerformance = std::function<void(PerformanceSequence&)>;
-
-struct PreparedCollectionAssets {
-  // If set, these replace the collection's original instrument sets. If not
-  // set, the originals are kept. An empty vector removes all instrument sets.
-  std::optional<std::vector<InstrumentSetAsset>> replacementInstrumentSets;
-  FinalizeCollectionPerformance finalizePerformance;
-  std::vector<Diagnostic> diagnostics;
+  const SequenceProgramAsset* sequence;
+  SequenceRuntime& sequenceRuntime;
+  std::vector<InstrumentSetAsset>& instrumentSets;
+  std::span<const SampleCollectionAsset* const> sampleCollections;
+  std::vector<Diagnostic>& diagnostics;
 };
 
 struct FormatModule {
@@ -61,7 +54,7 @@ struct FormatModule {
   // of scan(), which returns an empty result when the source does not match.
   using Scan = std::function<ScanResult(const ScanInput& input)>;
   using ResolveCollections = std::function<std::vector<DesiredCollection>(const MatchContext& context)>;
-  using PrepareCollection = std::function<PreparedCollectionAssets(const CollectionPrepareContext& context)>;
+  using BindCollection = std::function<void(CollectionBindingContext& context)>;
 
   std::string name;
   // Used when a request delegates sample filtering to the owning format.
@@ -74,7 +67,7 @@ struct FormatModule {
   // different key prefix for its collections.
   std::string collectionResolverId;
   ResolveCollections resolveCollections;
-  PrepareCollection prepareCollection;
+  BindCollection bindCollection;
 };
 
 }  // namespace vgmtrans::core

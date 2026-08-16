@@ -208,6 +208,7 @@ void updateChannelLevel(SegSatVolumeModel model, ChannelLevel& channel, u8 contr
 
 struct ProgramState {
   explicit ProgramState(const SequenceProgram&) {}
+  ProgramState(const SequenceProgram&, const SegSatRuntimeConfig& config) : config(config) {}
 
   void finalizePerformance(PerformanceSequence& performance) {
     if (performance.tracks.size() != 17) {
@@ -258,12 +259,16 @@ struct ProgramState {
       return std::pair{a.tick, a.sequence} < std::pair{b.tick, b.sequence};
     });
     performance.tracks = std::move(channels);
+    if (config) {
+      finalizeSegSatPerformance(performance, config->velocityBanks, config->volumeModel, config->controllerChanges);
+    }
   }
+
+  std::optional<SegSatRuntimeConfig> config;
 };
 
 struct TrackState {
-  explicit TrackState(const TrackProgram& program)
-      : channel(static_cast<u8>(program.sourceTrackNumber)) {}
+  explicit TrackState(const TrackProgram& program) : channel(static_cast<u8>(program.sourceTrackNumber)) {}
 
   u8 channel = 0;
   u8 bank = 0;
@@ -496,8 +501,7 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
                                                 SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
       const u8 count = event.u8("event_count", SemanticOperandRole::Count);
       const Address continuation = event.nextAddress();
-      return event.invoke<&Playback::beginCountedLoop>(destination, count, continuation)
-          .mayBranchTo(destination);
+      return event.invoke<&Playback::beginCountedLoop>(destination, count, continuation).mayBranchTo(destination);
     }
     case 0x82: {
       auto event = cursor.command("Forever Loop", SequenceSemantic::Loop);
@@ -536,6 +540,10 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
 }
 
 }  // namespace
+
+SequenceRuntime segSatSequenceRuntime(SegSatRuntimeConfig config) {
+  return makeCompiledRuntime<SegSatCursor, ProgramState>(std::move(config));
+}
 
 double segSatLinearGain(SegSatVolumeModel model, u8 velocity, const SegSatVlTable& table, u8 totalLevel, s8 volumeBias,
                         u8 volume, u8 expression) {
