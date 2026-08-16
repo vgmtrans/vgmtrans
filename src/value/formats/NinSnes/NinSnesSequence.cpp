@@ -2191,8 +2191,8 @@ struct PlaylistDecode {
   return map;
 }
 
-[[nodiscard]] SequenceDialect makeDialect() {
-  return SequenceDialect{
+[[nodiscard]] SequenceProgramConfig makeSequenceConfig() {
+  return SequenceProgramConfig{
       .commandDetailKindPrefix = "nin-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
@@ -2208,9 +2208,9 @@ struct PlaylistDecode {
 
 }  // namespace
 
-const SequenceDialect& sequenceDialect() {
-  static const SequenceDialect dialect = makeDialect();
-  return dialect;
+const SequenceProgramConfig& sequenceConfig() {
+  static const SequenceProgramConfig config = makeSequenceConfig();
+  return config;
 }
 
 bool isValidPlaylist(ByteReader reader, const Layout& layout) {
@@ -2251,7 +2251,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   const Definition definition = makeDefinition(layout);
   PlaylistDecode playlist = decodePlaylist(reader, layout, sequenceId, sourceMap, diagnostics);
 
-  SequenceProgram program = sequenceDialect().makeProgram();
+  SequenceProgram program = sequenceConfig().makeProgram();
   RuntimeConfig runtime{
       .profile = layout.profile,
       .tempoTimerTarget = layout.tempoTimerTarget,

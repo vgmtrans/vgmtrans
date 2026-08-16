@@ -702,8 +702,8 @@ struct SequenceDecodeContext {
 
 }  // namespace
 
-const SequenceDialect& ndsSequenceDialect() {
-  static const SequenceDialect dialect = SequenceDialect{
+const SequenceProgramConfig& ndsSequenceConfig() {
+  static const SequenceProgramConfig config = SequenceProgramConfig{
       .commandDetailKindPrefix = "nds",
       .timebase = Timebase{.ppqn = 0x30},
       .behavior =
@@ -712,7 +712,7 @@ const SequenceDialect& ndsSequenceDialect() {
               .panLaw = PanLaw::EqualPower,
           },
   };
-  return dialect;
+  return config;
 }
 
 SequenceRuntime ndsSequenceRuntime() {
@@ -723,9 +723,9 @@ SequenceRuntime ndsSequenceRuntime() {
 // within the selected file range.
 SequenceProgram parseNdsSequenceProgram(ByteReader reader, AssetId id, NdsSequenceRange range,
                                         SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
-  const SequenceDialect& dialect = ndsSequenceDialect();
+  const SequenceProgramConfig& config = ndsSequenceConfig();
   const u32 sequenceOffset = range.offset;
-  SequenceProgram program = dialect.makeProgram();
+  SequenceProgram program = config.makeProgram();
 
   if (sourceMap != nullptr && reader.has(sequenceOffset, kSseqHeaderSize)) {
     sourceMap->header("SSEQ Header", reader.range(sequenceOffset, kSseqHeaderSize))

@@ -11,7 +11,7 @@
 #include "value/platform/SnesSampleDirectory.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
-#include "value/sequence/SequenceDialect.h"
+#include "value/sequence/SequenceProgramConfig.h"
 
 #include <algorithm>
 #include <optional>
@@ -183,7 +183,7 @@ struct KonamiSnesInstrumentInfo {
 [[nodiscard]] std::optional<KonamiSnesLayout> findKonamiSnesLayout(core::ByteReader reader);
 [[nodiscard]] const char* konamiSnesVersionName(KonamiSnesVersion version);
 
-[[nodiscard]] const core::SequenceDialect& konamiSnesSequenceDialect(KonamiSnesVersion version);
+[[nodiscard]] const core::SequenceProgramConfig& konamiSnesSequenceConfig(KonamiSnesVersion version);
 [[nodiscard]] core::SequenceRuntime konamiSnesSequenceRuntime(KonamiSnesVersion version,
                                                               bool indexedEchoFilter = false);
 [[nodiscard]] core::TrackProgram decodeKonamiSnesSourceTrack(

@@ -740,7 +740,7 @@ void capcomSnesModuleWarnsWhenDetectedSynthIsEmpty() {
 void capcomSnesCompiledAndPerformanceSnapshotsAreStable() {
   const auto bytes = makeCapcomSnesAram();
   constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
-  const auto& dialect = capcomSnesSequenceDialect();
+  const auto& config = capcomSnesSequenceConfig();
   const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{7}, bytes), version,
                                                          CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
   const std::string decoded = decodedTrackSnapshot(track);
@@ -757,8 +757,8 @@ void capcomSnesCompiledAndPerformanceSnapshotsAreStable() {
 
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const std::string performance = performanceTrackSnapshot(SequenceVm().render(program).tracks[0]);
@@ -825,11 +825,11 @@ void capcomSnesLfoValuesAreResolvedDuringDecode() {
   expect(resetPhase != nullptr && !std::get<bool>(resetPhase->value),
          "CapcomSnes selector 3 should decode the per-note phase-reset flag");
 
-  const SequenceDialect& dialect = capcomSnesSequenceDialect();
+  const SequenceProgramConfig& config = capcomSnesSequenceConfig();
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -874,8 +874,8 @@ void capcomSnesLfoValuesAreResolvedDuringDecode() {
                                                                CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
     const SequenceProgram noteProgram{
         .runtime = capcomSnesSequenceRuntime(noteVersion),
-        .timebase = dialect.timebase,
-        .behavior = dialect.behavior,
+        .timebase = config.timebase,
+        .behavior = config.behavior,
         .tracks = {noteTrack},
     };
     const PerformanceSequence notePerformance = SequenceVm().render(noteProgram);
@@ -905,8 +905,8 @@ void capcomSnesLfoValuesAreResolvedDuringDecode() {
                                                                CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
   const SequenceProgram frozenProgram{
       .runtime = capcomSnesSequenceRuntime(version),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {frozenTrack},
   };
   const PerformanceSequence frozenPerformance = SequenceVm().render(frozenProgram);
@@ -926,13 +926,13 @@ void capcomSnesCompiledCommandsDoNotNeedEngineProfile() {
   bytes[0x3001] = 0x17;
 
   constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
-  const SequenceDialect& dialect = capcomSnesSequenceDialect();
+  const SequenceProgramConfig& config = capcomSnesSequenceConfig();
   const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version,
                                                          CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -1106,7 +1106,7 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
          "CapcomSnes note-state emission should still advance by the decoded note length");
 }
 
-void capcomSnesSourceDialectDecodesAndRendersDriverCommands() {
+void capcomSnesSourceDecoderDecodesAndRendersDriverCommands() {
   std::vector<u8> bytes(0x4000);
   bytes[0x3000] = 0x05;
   bytes[0x3001] = 0x12;
@@ -1123,40 +1123,41 @@ void capcomSnesSourceDialectDecodesAndRendersDriverCommands() {
   bytes[0x300c] = 0x17;
 
   constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
-  const SequenceDialect& dialect = capcomSnesSequenceDialect();
+  const SequenceProgramConfig& config = capcomSnesSequenceConfig();
   SourceMapBuilder sourceMap;
   const TrackProgram track = decodeCapcomSnesSourceTrack(
       ByteReader(SourceId{8}, bytes), version,
       CapcomSnesTrackDecodeOptions{.trackIndex = 2, .startOffset = 0x3000, .sourceMap = &sourceMap});
   const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 7,
-         "CapcomSnes source dialect should decode the fixture commands, got " + std::to_string(track.commands.size()));
+         "CapcomSnes source decoder should decode the fixture commands, got " +
+             std::to_string(track.commands.size()));
   expect(track.commandIndex(Address{0x3009}).has_value(),
-         "CapcomSnes source dialect should index decoded command addresses");
+         "CapcomSnes source decoder should index decoded command addresses");
   const SourceAnnotation& programAnnotation = commandAnnotation(annotations, track.commands[1]);
   const SourceField* instrument = fieldWithName(programAnnotation, "instrument");
   expect(fieldEquals(instrument, u64{0x85}),
          "CapcomSnes source command should preserve its source instrument identity");
 
   expect(commandAnnotation(annotations, track.commands[1]).label == "Instrument",
-         "CapcomSnes dialect should describe commands through local command code");
+         "CapcomSnes source decoder should describe commands through local command code");
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
-  expect(performance.diagnostics.empty(), "CapcomSnes source dialect fixture should render without diagnostics");
-  expect(performance.tracks.size() == 1, "CapcomSnes source dialect fixture should render one track");
+  expect(performance.diagnostics.empty(), "CapcomSnes source fixture should render without diagnostics");
+  expect(performance.tracks.size() == 1, "CapcomSnes source fixture should render one track");
   expect(performance.tracks[0].endTick == 18,
-         "CapcomSnes source dialect should apply one-shot dotted timing before the end command");
+         "CapcomSnes sequence should apply one-shot dotted timing before the end command");
 
   const auto note = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     const auto* typed = std::get_if<NotePerformanceEvent>(&event);
     return typed != nullptr;
   });
-  expect(note != performance.tracks[0].events.end(), "CapcomSnes source dialect should emit a note event");
+  expect(note != performance.tracks[0].events.end(), "CapcomSnes sequence should emit a note event");
   const auto& noteEvent = std::get<NotePerformanceEvent>(*note);
   expect(noteEvent.key == 3.0 && noteEvent.durationTicks == 18,
          "CapcomSnes note event should reflect source key and dotted duration");
@@ -1177,15 +1178,15 @@ void capcomSnesInitialDurationRateIsFullLength() {
   bytes[0x3001] = 0x17;
 
   constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
-  const SequenceDialect& dialect = capcomSnesSequenceDialect();
+  const SequenceProgramConfig& config = capcomSnesSequenceConfig();
   const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version,
                                                          CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
   expect(track.commands.size() == 2, "CapcomSnes duration fixture should decode note and end");
 
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -1207,7 +1208,7 @@ void capcomSnesPanPerformanceCarriesGainCompensation() {
   bytes[0x3002] = 0x17;
 
   constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
-  const SequenceDialect& dialect = capcomSnesSequenceDialect();
+  const SequenceProgramConfig& config = capcomSnesSequenceConfig();
   SourceMapBuilder sourceMap;
   const TrackProgram track =
       decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version,
@@ -1221,8 +1222,8 @@ void capcomSnesPanPerformanceCarriesGainCompensation() {
 
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -1242,7 +1243,7 @@ void capcomSnesPanPerformanceCarriesGainCompensation() {
          "CapcomSnes pan renderer should quantize the source gain compensation as expression");
 }
 
-void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
+void capcomSnesSequenceEmitsSourceOnlyDriverSemantics() {
   std::vector<u8> bytes(0x4000);
   bytes[0x3000] = 0x0c;
   bytes[0x3001] = 0x80;
@@ -1263,7 +1264,7 @@ void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
   bytes[0x3010] = 0x17;
 
   constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
-  const SequenceDialect& dialect = capcomSnesSequenceDialect();
+  const SequenceProgramConfig& config = capcomSnesSequenceConfig();
   SourceMapBuilder sourceMap;
   const TrackProgram track =
       decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version,
@@ -1296,8 +1297,8 @@ void capcomSnesDialectEmitsSourceOnlyDriverSemantics() {
 
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -1345,7 +1346,7 @@ void capcomSnesReleaseRateIsStickyAcrossInstrumentChanges() {
              });
 
   constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
-  const SequenceDialect& dialect = capcomSnesSequenceDialect();
+  const SequenceProgramConfig& config = capcomSnesSequenceConfig();
   const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version,
                                                          CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
   expect(track.commands.size() == 6 && track.commands.front().semantic == SequenceSemantic::Envelope &&
@@ -1360,8 +1361,8 @@ void capcomSnesReleaseRateIsStickyAcrossInstrumentChanges() {
 
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
@@ -1424,7 +1425,7 @@ void capcomSnesReleaseRateIsStickyAcrossInstrumentChanges() {
   }
 }
 
-void capcomSnesDialectEmitsStructuredPitchSlides() {
+void capcomSnesSequenceEmitsStructuredPitchSlides() {
   std::vector<u8> bytes(0x4000);
   bytes[0x3000] = 0x05;
   bytes[0x3001] = 0x03;
@@ -1449,7 +1450,7 @@ void capcomSnesDialectEmitsStructuredPitchSlides() {
   bytes[0x3014] = 0x17;
 
   constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
-  const SequenceDialect& dialect = capcomSnesSequenceDialect();
+  const SequenceProgramConfig& config = capcomSnesSequenceConfig();
   const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version,
                                                          CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
   expect(track.commands.size() == 12,
@@ -1457,8 +1458,8 @@ void capcomSnesDialectEmitsStructuredPitchSlides() {
 
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -1573,7 +1574,7 @@ void capcomSnesDialectEmitsStructuredPitchSlides() {
          "CapcomSnes simulated vibrato should oscillate around an active pitch-bend slide");
 }
 
-void capcomSnesDialectExecutesRepeatUntilCommand() {
+void capcomSnesSequenceExecutesRepeatUntilCommand() {
   std::vector<u8> bytes(0x4000);
   bytes[0x3000] = 0x41;
   bytes[0x3001] = 0x0e;
@@ -1583,7 +1584,7 @@ void capcomSnesDialectExecutesRepeatUntilCommand() {
   bytes[0x3005] = 0x17;
 
   constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
-  const SequenceDialect& dialect = capcomSnesSequenceDialect();
+  const SequenceProgramConfig& config = capcomSnesSequenceConfig();
   SourceMapBuilder sourceMap;
   const TrackProgram track =
       decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version,
@@ -1601,8 +1602,8 @@ void capcomSnesDialectExecutesRepeatUntilCommand() {
 
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -1620,7 +1621,7 @@ void capcomSnesDialectExecutesRepeatUntilCommand() {
   }
 }
 
-void capcomSnesDialectAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken() {
+void capcomSnesSequenceAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken() {
   std::vector<u8> bytes(0x4000);
   bytes[0x3000] = 0x41;
   bytes[0x3001] = 0x12;
@@ -1636,7 +1637,7 @@ void capcomSnesDialectAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken() {
   bytes[0x300b] = 0x17;
 
   constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
-  const SequenceDialect& dialect = capcomSnesSequenceDialect();
+  const SequenceProgramConfig& config = capcomSnesSequenceConfig();
   SourceMapBuilder sourceMap;
   const TrackProgram track =
       decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version,
@@ -1654,8 +1655,8 @@ void capcomSnesDialectAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken() {
 
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -1674,7 +1675,7 @@ void capcomSnesDialectAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken() {
       "CapcomSnes repeat-break branch should apply note attributes before the branch target plays");
 }
 
-void capcomSnesDialectDecodesRepeatBreakSideTargets() {
+void capcomSnesSequenceDecodesRepeatBreakSideTargets() {
   std::vector<u8> bytes(0x4000);
   bytes[0x3000] = 0x12;
   bytes[0x3001] = 0x00;
@@ -1714,7 +1715,7 @@ void capcomSnesDialectDecodesRepeatBreakSideTargets() {
          "CapcomSnes repeat-break source link should point at the out-of-line target");
 }
 
-void capcomSnesV1DialectPreservesUnknownOneByteEvents() {
+void capcomSnesV1SequencePreservesUnknownOneByteEvents() {
   std::vector<u8> bytes(0x4000);
   bytes[0x3000] = 0x1e;
   bytes[0x3001] = 0xab;
@@ -1724,7 +1725,7 @@ void capcomSnesV1DialectPreservesUnknownOneByteEvents() {
   bytes[0x3005] = 0x17;
 
   constexpr auto version = CapcomSnesEngineVersion::v1BgmInList;
-  const SequenceDialect& dialect = capcomSnesSequenceDialect();
+  const SequenceProgramConfig& config = capcomSnesSequenceConfig();
   SourceMapBuilder sourceMap;
   const TrackProgram track =
       decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version,
@@ -1746,8 +1747,8 @@ void capcomSnesV1DialectPreservesUnknownOneByteEvents() {
 
   const SequenceProgram program{
       .runtime = capcomSnesSequenceRuntime(version),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);

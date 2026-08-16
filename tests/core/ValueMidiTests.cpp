@@ -2416,15 +2416,15 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
   expect(ExportRequest{}.sequence.midi.wideTuning == MidiWideTuningRendering::PitchBend,
          "wide tuning should default to compatible pitch-bend rendering");
 
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .startAddress = Address{0},
   };
 
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfe, 0x00, 0x00};
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeJumpCommand>(track, dialect, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeJumpCommand>(track, config, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
 
   test::SessionSnapshotBuilder snapshotBuilder;
   snapshotBuilder.assets.emplace_back(SequenceProgramAsset{
@@ -2437,8 +2437,8 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
       .program =
           SequenceProgram{
               .runtime = probeSequenceRuntime(),
-              .timebase = dialect.timebase,
-              .behavior = dialect.behavior,
+              .timebase = config.timebase,
+              .behavior = config.behavior,
               .tracks = {track},
           },
   });
@@ -2471,15 +2471,15 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
 }
 
 void standaloneSequenceExportDoesNotRequireACollection() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .startAddress = Address{0},
   };
 
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeEndCommand>(track, dialect, Address{3}, probeRange(3, endBytes.size()), endBytes);
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeEndCommand>(track, config, Address{3}, probeRange(3, endBytes.size()), endBytes);
 
   test::SessionSnapshotBuilder snapshotBuilder;
   snapshotBuilder.assets.emplace_back(SequenceProgramAsset{
@@ -2492,8 +2492,8 @@ void standaloneSequenceExportDoesNotRequireACollection() {
       .program =
           SequenceProgram{
               .runtime = probeSequenceRuntime(),
-              .timebase = dialect.timebase,
-              .behavior = dialect.behavior,
+              .timebase = config.timebase,
+              .behavior = config.behavior,
               .tracks = {track},
           },
   });

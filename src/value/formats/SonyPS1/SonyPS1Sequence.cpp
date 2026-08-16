@@ -236,7 +236,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 [[nodiscard]] DecodedBytecodeCommand decodeEvent(ByteReader reader, u32 begin, u32 end,
                                                  const SonyPs1EventLayout& source,
                                                  std::vector<Diagnostic>* diagnostics) {
-  Cursor cursor(reader, begin, end, kSonyPs1DialectId, diagnostics);
+  Cursor cursor(reader, begin, end, kSonyPs1CommandKindPrefix, diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
   }
@@ -309,9 +309,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 }  // namespace
 
-const SequenceDialect& sonyPs1SequenceDialect() {
-  static const SequenceDialect dialect = SequenceDialect{
-      .commandDetailKindPrefix = std::string(kSonyPs1DialectId),
+const SequenceProgramConfig& sonyPs1SequenceConfig() {
+  static const SequenceProgramConfig config = SequenceProgramConfig{
+      .commandDetailKindPrefix = std::string(kSonyPs1CommandKindPrefix),
       .timebase = Timebase{.ppqn = 48},
       .behavior =
           SequenceProgramBehavior{
@@ -323,12 +323,12 @@ const SequenceDialect& sonyPs1SequenceDialect() {
               .initialTempoMicrosecondsPerQuarter = 500000,
           },
   };
-  return dialect;
+  return config;
 }
 
 SequenceProgram parseSonyPs1Sequence(ByteReader reader, AssetId id, const SonyPs1SequenceLayout& layout,
                                      SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
-  SequenceProgram program = sonyPs1SequenceDialect().makeProgram();
+  SequenceProgram program = sonyPs1SequenceConfig().makeProgram();
   program.timebase.ppqn = layout.ppqn;
   program.behavior.initialTempoMicrosecondsPerQuarter = layout.initialTempo;
   program.runtime = makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{
@@ -385,7 +385,7 @@ SequenceProgram parseSonyPs1Sequence(ByteReader reader, AssetId id, const SonyPs
   auto track = tracks.decode(0, layout.dataOffset, [&](u32 offset) -> DecodedBytecodeCommand {
     const auto* event = eventAt(offset);
     if (event == nullptr) {
-      Cursor cursor(reader, offset, layout.dataEnd, kSonyPs1DialectId, diagnostics);
+      Cursor cursor(reader, offset, layout.dataEnd, kSonyPs1CommandKindPrefix, diagnostics);
       return cursor.unsupported("Invalid Sony PS1 Event Address").stop();
     }
     auto decoded = decodeEvent(reader, offset, layout.dataEnd, *event, diagnostics);

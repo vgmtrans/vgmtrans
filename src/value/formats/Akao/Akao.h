@@ -10,7 +10,7 @@
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/SequenceDialect.h"
+#include "value/sequence/SequenceProgramConfig.h"
 #include "value/synth/SynthModel.h"
 
 #include <cstddef>
@@ -93,7 +93,7 @@ struct AkaoProfile {
 };
 
 [[nodiscard]] std::string versionName(AkaoPs1Version version);
-[[nodiscard]] std::string dialectId(AkaoPs1Version version);
+[[nodiscard]] std::string commandKindPrefix(AkaoPs1Version version);
 [[nodiscard]] AkaoPs1Version determineVersionFromSource(const core::SourceFile& source);
 [[nodiscard]] core::PanLaw defaultPanLaw(AkaoPs1Version version);
 [[nodiscard]] core::PanLaw determinePanLawFromSource(const core::SourceFile& source, AkaoPs1Version version);
@@ -184,7 +184,7 @@ struct AkaoSplitSampleLocation {
   u32 articulationCount = 0;
 };
 
-[[nodiscard]] core::SequenceDialect makeAkaoDialect(AkaoPs1Version version);
+[[nodiscard]] core::SequenceProgramConfig makeAkaoConfig(AkaoPs1Version version);
 [[nodiscard]] core::SequenceRuntime akaoSequenceRuntime();
 [[nodiscard]] core::TrackProgram decodeAkaoTrack(AkaoPs1Version version, const core::TrackDecodeScope& tracks,
                                                  u32 trackIndex, u32 startOffset,

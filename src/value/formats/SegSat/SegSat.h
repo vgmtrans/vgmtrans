@@ -9,7 +9,7 @@
 #include "value/base/Source.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
-#include "value/sequence/SequenceDialect.h"
+#include "value/sequence/SequenceProgramConfig.h"
 
 #include <optional>
 #include <span>
@@ -164,7 +164,7 @@ void finalizeSegSatPerformance(core::PerformanceSequence& performance, std::span
                                                                const SegSatSequenceLayout& layout,
                                                                core::SourceMapBuilder* sourceMap = nullptr,
                                                                std::vector<core::Diagnostic>* diagnostics = nullptr);
-[[nodiscard]] const core::SequenceDialect& segSatSequenceDialect();
+[[nodiscard]] const core::SequenceProgramConfig& segSatSequenceConfig();
 [[nodiscard]] core::FormatModule segSatModule();
 
 }  // namespace vgmtrans::formats::segsat

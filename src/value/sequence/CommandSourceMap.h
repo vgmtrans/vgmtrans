@@ -19,7 +19,7 @@
 namespace vgmtrans::core {
 
 class SourceMapBuilder;
-struct SequenceDialect;
+struct SequenceProgramConfig;
 
 // One track's annotation and command-projection lifecycle. Most formats use
 // TrackDecodeScope::decode; exceptional walkers can begin a session
@@ -101,7 +101,7 @@ class SequenceDecodeSession {
 public:
   // maxTrackCommands is a safety cap for damaged control flow. Formats with
   // unusually large valid tracks can raise it without replacing shared assembly.
-  SequenceDecodeSession(ByteReader reader, const SequenceDialect& dialect, AssetId sequenceAsset,
+  SequenceDecodeSession(ByteReader reader, const SequenceProgramConfig& config, AssetId sequenceAsset,
                         SourceRange headerRange, SourceMapBuilder* sourceMap, u32 maxTrackCommands = 4096,
                         u32 bytecodeEnd = std::numeric_limits<u32>::max());
 

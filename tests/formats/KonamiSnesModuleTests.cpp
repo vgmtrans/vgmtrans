@@ -304,12 +304,12 @@ std::vector<u8> makeKonamiSnesBuilderAram() {
 
 PerformanceSequence renderKonamiSnesTrack(std::span<const u8> commandBytes) {
   std::vector<u8> bytes(commandBytes.begin(), commandBytes.end());
-  const auto& dialect = konamiSnesSequenceDialect(KONAMISNES_V6);
+  const auto& config = konamiSnesSequenceConfig(KONAMISNES_V6);
   TrackProgram track = decodeKonamiSnesSourceTrack(ByteReader(SourceId{9}, bytes), KONAMISNES_V6, 0, 0);
   const SequenceProgram program{
       .runtime = konamiSnesSequenceRuntime(KONAMISNES_V6),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   return SequenceVm(LoopPolicy::PlayOnce).render(program);
@@ -317,7 +317,7 @@ PerformanceSequence renderKonamiSnesTrack(std::span<const u8> commandBytes) {
 
 PerformanceSequence renderKonamiSnesProgram(KonamiSnesVersion version, const std::vector<std::vector<u8>>& tracks,
                                             u32 sequenceLoops = 0, bool indexedEchoFilter = false) {
-  const auto& dialect = konamiSnesSequenceDialect(version);
+  const auto& config = konamiSnesSequenceConfig(version);
   std::vector<TrackProgram> programTracks;
   programTracks.reserve(tracks.size());
   for (u32 trackIndex = 0; trackIndex < tracks.size(); ++trackIndex) {
@@ -326,8 +326,8 @@ PerformanceSequence renderKonamiSnesProgram(KonamiSnesVersion version, const std
   }
   const SequenceProgram program{
       .runtime = konamiSnesSequenceRuntime(version, indexedEchoFilter),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = std::move(programTracks),
   };
   return SequenceVm(SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = sequenceLoops})
@@ -336,7 +336,7 @@ PerformanceSequence renderKonamiSnesProgram(KonamiSnesVersion version, const std
 
 PerformanceSequence renderKonamiSnesAramSequence(const std::vector<u8>& bytes, const KonamiSnesLayout& layout,
                                                  AssetId asset = AssetId{33}) {
-  const auto& dialect = konamiSnesSequenceDialect(layout.version);
+  const auto& config = konamiSnesSequenceConfig(layout.version);
   const SequenceProgram program = decodeKonamiSnesSequence(ByteReader(SourceId{asset.value}, bytes), layout, asset);
   return SequenceVm(LoopPolicy::PlayOnce).render(program);
 }
@@ -369,7 +369,7 @@ void konamiSnesBatmanReturnsAramUsesV2LayoutAndBoundedBank() {
   const ByteReader reader(SourceId{8}, aram);
   const auto layout = findKonamiSnesLayout(reader);
   expect(layout.has_value(), "Batman Returns selector should be recognized as a KonamiSnes layout");
-  expect(layout->version == KONAMISNES_V2, "Batman Returns should use the V2 command dialect");
+  expect(layout->version == KONAMISNES_V2, "Batman Returns should use the V2 command set");
   expect(layout->sequenceHeaderAddress == 0x3900,
          "Batman Returns song row 0x7c should resolve the streamed music header");
   expect(layout->spcDirAddress == 0x4c00, "Batman Returns layout should recover the live DSP sample directory");
@@ -1016,7 +1016,7 @@ void konamiSnesDynamicAdsrMatchesEachDriverFamily() {
         .firstBankedInstrument = 5,
         .percussionInstrumentTableAddress = 0x4300,
     };
-    const auto& dialect = konamiSnesSequenceDialect(layout.version);
+    const auto& config = konamiSnesSequenceConfig(layout.version);
     const SequenceProgram program = decodeKonamiSnesSequence(ByteReader(SourceId{33}, bytes), layout, AssetId{33});
     return SequenceVm(LoopPolicy::PlayOnce).render(program);
   };
@@ -1075,7 +1075,7 @@ void konamiSnesPreservesLateEnvelopeRegisterState() {
 }
 
 void konamiSnesMixerAndPanFollowVersionedDriverMath() {
-  expect(konamiSnesSequenceDialect(KONAMISNES_V1).behavior.initialLevel == 0.0,
+  expect(konamiSnesSequenceConfig(KONAMISNES_V1).behavior.initialLevel == 0.0,
          "Konami tracks should begin at the driver's zero volume");
 
   const auto lastLevel = [](const PerformanceSequence& performance) {

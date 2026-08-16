@@ -15,7 +15,7 @@
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/midi/ModulationAnalysis.h"
 #include "value/sequence/CompiledCommandRuntime.h"
-#include "value/sequence/SequenceDialect.h"
+#include "value/sequence/SequenceProgramConfig.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 #include "value/synth/SampleDecoder.h"
@@ -224,7 +224,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   return input.reader.size() >= minimumSize && input.reader.u8At(0) == magic;
 }
 
-[[nodiscard]] SequenceDialect probeSequenceDialect(SequenceProgramBehavior behavior = {},
+[[nodiscard]] SequenceProgramConfig probeSequenceConfig(SequenceProgramBehavior behavior = {},
                                                    std::optional<StereoBalance> initialStereoBalance = std::nullopt);
 [[nodiscard]] SequenceRuntime probeSequenceRuntime();
 [[nodiscard]] SequenceProgram probeSequenceProgram();
@@ -831,10 +831,10 @@ using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
   }
 }
 
-[[nodiscard]] SequenceDialect probeSequenceDialect(SequenceProgramBehavior behavior,
+[[nodiscard]] SequenceProgramConfig probeSequenceConfig(SequenceProgramBehavior behavior,
                                                    std::optional<StereoBalance> initialStereoBalance) {
   behavior.initialStereoBalance = initialStereoBalance;
-  return SequenceDialect{
+  return SequenceProgramConfig{
       .commandDetailKindPrefix = "probe",
       .timebase = Timebase{.ppqn = 48},
       .behavior = behavior,
@@ -846,7 +846,7 @@ using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
 }
 
 [[nodiscard]] SequenceProgram probeSequenceProgram() {
-  SequenceProgram program = probeSequenceDialect().makeProgram();
+  SequenceProgram program = probeSequenceConfig().makeProgram();
   program.runtime = probeSequenceRuntime();
   return program;
 }
@@ -879,10 +879,10 @@ CommandId appendTestCommand(TrackProgram& track, Address address, u8 opcode, Sou
 }
 
 template <class Command, size_t Size>
-CommandId addProbeCommand(TrackProgram& track, const SequenceDialect& dialect, Address address, SourceRange range,
+CommandId addProbeCommand(TrackProgram& track, const SequenceProgramConfig& config, Address address, SourceRange range,
                           const std::array<u8, Size>& bytes) {
   static_cast<void>(Command::kind);
-  static_cast<void>(dialect);
+  static_cast<void>(config);
   const ByteReader reader(range.source, std::span<const u8>{bytes});
   auto decoded = decodeProbeCommand(reader, 0);
   // This helper decodes an isolated command buffer and then places the command

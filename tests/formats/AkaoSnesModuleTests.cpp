@@ -66,11 +66,11 @@ TrackProgram decodeTrack(const std::vector<u8>& bytes, AkaoSnesProfile profile, 
 PerformanceSequence renderTracks(AkaoSnesProfile profile, std::vector<TrackProgram> tracks,
                                  SequenceVmOptions options = SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce},
                                  std::vector<u32> driverData = {}) {
-  const auto& dialect = akaoSnesSequenceDialect();
+  const auto& config = akaoSnesSequenceConfig();
   const SequenceProgram program{
       .runtime = akaoSnesSequenceRuntime(profile, std::move(driverData)),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = std::move(tracks),
   };
   return SequenceVm(options).render(program);
@@ -1181,15 +1181,15 @@ void akaoSnesV4TieExtendsShortenedPreviousNote() {
   bytes[start + 1] = 0xac;
   bytes[start + 2] = 0xeb;
 
-  const auto& dialect = akaoSnesSequenceDialect();
+  const auto& config = akaoSnesSequenceConfig();
   const AkaoSnesProfile profile{.version = AKAOSNES_V4, .minorVersion = AKAOSNES_V4_FF6};
   const TrackProgram track = decodeAkaoSnesSourceTrack(
       ByteReader(SourceId{8}, bytes),
       AkaoSnesTrackDecodeOptions{.profile = profile, .startAddress = start, .bytecodeEnd = 0x40});
   const SequenceProgram program{
       .runtime = akaoSnesSequenceRuntime(profile),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 

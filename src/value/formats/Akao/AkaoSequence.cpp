@@ -401,7 +401,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end, const AkaoProfile& profile,
                                                    RepeatStack& repeats, std::vector<Diagnostic>* diagnostics) {
-  AkaoCursor cursor(reader, begin, end, dialectId(profile.version), diagnostics);
+  AkaoCursor cursor(reader, begin, end, commandKindPrefix(profile.version), diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
   }
@@ -853,11 +853,11 @@ std::optional<AkaoSequenceLayout> readAkaoSequenceLayout(const ScanInput& input,
   return layout;
 }
 
-SequenceDialect makeAkaoDialect(AkaoPs1Version version) {
-  const std::string id = dialectId(version);
+SequenceProgramConfig makeAkaoConfig(AkaoPs1Version version) {
+  const std::string prefix = commandKindPrefix(version);
   const PanLaw panLaw = defaultPanLaw(version);
-  return SequenceDialect{
-      .commandDetailKindPrefix = id,
+  return SequenceProgramConfig{
+      .commandDetailKindPrefix = prefix,
       .timebase = Timebase{.ppqn = kAkaoPpqn},
       .behavior =
           SequenceProgramBehavior{
@@ -983,8 +983,8 @@ AkaoSequenceParse parseAkaoSequence(const ScanInput& input, AssetId id, const Ak
   AkaoSequenceAnalysis analysis{.header = layout.header};
   const AkaoProfile profile{.version = analysis.header.version};
   const u32 sequenceEnd = offset + analysis.header.length;
-  const SequenceDialect dialect = makeAkaoDialect(analysis.header.version);
-  SequenceProgram program = dialect.makeProgram();
+  const SequenceProgramConfig config = makeAkaoConfig(analysis.header.version);
+  SequenceProgram program = config.makeProgram();
   program.behavior.panLaw = determinePanLawFromSource(input.source, analysis.header.version);
   program.behavior.initialStereoBalance =
       program.behavior.panLaw == PanLaw::ConstantSum ? std::optional{StereoBalance{0.5, 0.5}} : std::nullopt;

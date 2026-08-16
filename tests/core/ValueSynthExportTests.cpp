@@ -700,26 +700,26 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "usage.pcm"}, {0, 0, 0});
 
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{.startAddress = Address{0}};
   const std::array<u8, 3> defaultNote{0x90, 0x3c, 0x01};
   const std::array<u8, 2> selectLead{0x80, 0x01};
   const std::array<u8, 3> leadNote{0x90, 0x40, 0x01};
   const std::array<u8, 1> end{0xff};
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, defaultNote.size()),
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, defaultNote.size()),
                                     defaultNote);
-  addProbeCommand<ProbeProgramCommand>(track, dialect, Address{3}, probeRange(3, selectLead.size()),
+  addProbeCommand<ProbeProgramCommand>(track, config, Address{3}, probeRange(3, selectLead.size()),
                                        selectLead);
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{5}, probeRange(5, leadNote.size()), leadNote);
-  addProbeCommand<ProbeEndCommand>(track, dialect, Address{8}, probeRange(8, end.size()), end);
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{5}, probeRange(5, leadNote.size()), leadNote);
+  addProbeCommand<ProbeEndCommand>(track, config, Address{8}, probeRange(8, end.size()), end);
 
   const SequenceProgramAsset sequence{
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "Probe", .name = "Usage"},
       .program =
           SequenceProgram{
               .runtime = probeSequenceRuntime(),
-              .timebase = dialect.timebase,
-              .behavior = dialect.behavior,
+              .timebase = config.timebase,
+              .behavior = config.behavior,
               .tracks = {track},
           },
   };
@@ -973,20 +973,20 @@ ScanResult scanNoSources(const ScanInput&) {
 void collectionPreparationAppliesToWholeExport() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "performance-finalizer.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{.startAddress = Address{0}};
   const std::array<u8, 3> noteBytes{0x90, 0x3c, 0x04};
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeEndCommand>(track, dialect, Address{3}, probeRange(3, endBytes.size()), endBytes);
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeEndCommand>(track, config, Address{3}, probeRange(3, endBytes.size()), endBytes);
 
   const SequenceProgramAsset sequence{
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "Performance Finalizer", .name = "Sequence"},
       .program =
           SequenceProgram{
               .runtime = probeSequenceRuntime(),
-              .timebase = dialect.timebase,
-              .behavior = dialect.behavior,
+              .timebase = config.timebase,
+              .behavior = config.behavior,
               .tracks = {track},
           },
   };
@@ -1116,22 +1116,22 @@ void synthOnlyExportSkipsSequencesWithoutModulation() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "no-modulation.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
 
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   SequenceRuntime runtime = probeSequenceRuntime();
   runtime.execute = countSynthOnlySequenceExecution;
   TrackProgram track{.startAddress = Address{0}};
   const std::array<u8, 3> noteBytes{0x90, 0x3c, 0x04};
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeEndCommand>(track, dialect, Address{3}, probeRange(3, endBytes.size()), endBytes);
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeEndCommand>(track, config, Address{3}, probeRange(3, endBytes.size()), endBytes);
 
   const SequenceProgramAsset sequence{
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "Probe", .name = "No Modulation"},
       .program =
           SequenceProgram{
               .runtime = std::move(runtime),
-              .timebase = dialect.timebase,
-              .behavior = dialect.behavior,
+              .timebase = config.timebase,
+              .behavior = config.behavior,
               .tracks = {track},
           },
   };
@@ -1304,13 +1304,13 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "playback.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
 
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{.sourceTrackNumber = 3, .startAddress = Address{0}};
   const std::array<u8, 3> noteBytes{0x90, 0x3c, 0x04};
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
   track.commands.back().annotation = SourceAnnotationId{40};
-  addProbeCommand<ProbeEndCommand>(track, dialect, Address{3}, probeRange(3, endBytes.size()), endBytes);
+  addProbeCommand<ProbeEndCommand>(track, config, Address{3}, probeRange(3, endBytes.size()), endBytes);
   track.commands.back().annotation = SourceAnnotationId{41};
 
   const SequenceProgramAsset sequence{
@@ -1318,8 +1318,8 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
       .program =
           SequenceProgram{
               .runtime = probeSequenceRuntime(),
-              .timebase = dialect.timebase,
-              .behavior = dialect.behavior,
+              .timebase = config.timebase,
+              .behavior = config.behavior,
               .tracks = {track},
           },
   };

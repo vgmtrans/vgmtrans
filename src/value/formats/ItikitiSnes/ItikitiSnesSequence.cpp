@@ -828,8 +828,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 }  // namespace
 
-const SequenceDialect& sequenceDialect() {
-  static const SequenceDialect dialect = SequenceDialect{
+const SequenceProgramConfig& sequenceConfig() {
+  static const SequenceProgramConfig config = SequenceProgramConfig{
       .commandDetailKindPrefix = "itikiti-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
@@ -844,7 +844,7 @@ const SequenceDialect& sequenceDialect() {
               .initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(0x80),
           },
   };
-  return dialect;
+  return config;
 }
 
 SequenceRuntime sequenceRuntime(u8 echoDelay) {
@@ -864,7 +864,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   const u32 headerSize = 2 + layout.trackCount * 2u;
   const SourceRange header = reader.range(layout.sequenceHeaderAddress, headerSize);
   ReferencedPrograms references{{0}};
-  SequenceDecodeSession sequence{reader, sequenceDialect(), sequenceId, header, sourceMap, kCommandLimit, kAramSize};
+  SequenceDecodeSession sequence{reader, sequenceConfig(), sequenceId, header, sourceMap, kCommandLimit, kAramSize};
   for (u32 track = 0; track < layout.trackCount; ++track) {
     const u32 pointer = layout.sequenceHeaderAddress + 2 + track * 2;
     const u16 relative = reader.le16(pointer);

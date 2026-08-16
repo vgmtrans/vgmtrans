@@ -790,8 +790,8 @@ struct DecodeContext {
 
 }  // namespace
 
-const SequenceDialect& mp2kSequenceDialect() {
-  static const SequenceDialect dialect = SequenceDialect{
+const SequenceProgramConfig& mp2kSequenceConfig() {
+  static const SequenceProgramConfig config = SequenceProgramConfig{
       .commandDetailKindPrefix = "mp2k",
       .timebase = Timebase{.ppqn = 24},
       .behavior =
@@ -806,14 +806,14 @@ const SequenceDialect& mp2kSequenceDialect() {
                   static_cast<u32>(std::llround(60000000.0 / (kGbaMixerFrameRate * 60.0 / 24.0))),
           },
   };
-  return dialect;
+  return config;
 }
 
 SequenceProgram parseMp2kSequenceProgram(ByteReader reader, AssetId id, const Mp2kSong& song,
                                          SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
-  const SequenceDialect& dialect = mp2kSequenceDialect();
+  const SequenceProgramConfig& config = mp2kSequenceConfig();
   const u32 headerSize = 8 + song.declaredTracks * 4;
-  SequenceProgram program = dialect.makeProgram();
+  SequenceProgram program = config.makeProgram();
   RuntimeConfig runtime{.reverbSend = song.reverb / 127.0};
   runtime.tones.reserve(kToneCount);
   for (u32 index = 0; index < kToneCount && reader.has(song.bankOffset + index * 12, 8); ++index) {

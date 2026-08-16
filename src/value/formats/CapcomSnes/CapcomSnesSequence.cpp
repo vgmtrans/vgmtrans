@@ -549,8 +549,8 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
 
 }  // namespace
 
-const SequenceDialect& capcomSnesSequenceDialect() {
-  static const SequenceDialect dialect = SequenceDialect{
+const SequenceProgramConfig& capcomSnesSequenceConfig() {
+  static const SequenceProgramConfig config = SequenceProgramConfig{
       .commandDetailKindPrefix = "capcom-snes",
       .timebase = Timebase{.ppqn = kCapcomSnesPpqn},
       .behavior =
@@ -559,7 +559,7 @@ const SequenceDialect& capcomSnesSequenceDialect() {
               .initialMonoModeChannels = 0,
           },
   };
-  return dialect;
+  return config;
 }
 
 SequenceRuntime capcomSnesSequenceRuntime(CapcomSnesEngineVersion version) {
@@ -583,7 +583,7 @@ TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, CapcomSnesEngineVers
 SequenceProgram decodeCapcomSnesSequence(ByteReader reader, const CapcomSnesLayout& layout, AssetId sequenceId,
                                          SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   SequenceDecodeSession sequence{
-      reader, capcomSnesSequenceDialect(), sequenceId, layout.sequenceHeaderRange, sourceMap,
+      reader, capcomSnesSequenceConfig(), sequenceId, layout.sequenceHeaderRange, sourceMap,
   };
   const auto decode = [&](u32 offset) { return decodeCommand(reader, offset, layout.version, diagnostics); };
 

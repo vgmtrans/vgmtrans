@@ -1577,8 +1577,8 @@ struct WalkState {
 
 }  // namespace
 
-const SequenceDialect& sequenceDialect() {
-  static const SequenceDialect dialect = SequenceDialect{
+const SequenceProgramConfig& sequenceConfig() {
+  static const SequenceProgramConfig config = SequenceProgramConfig{
       .commandDetailKindPrefix = "prism-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
@@ -1593,7 +1593,7 @@ const SequenceDialect& sequenceDialect() {
               .initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(0x82),
           },
   };
-  return dialect;
+  return config;
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, Version version, u32 trackNumber, u32 startAddress, u8 logicalChannel,
@@ -1620,7 +1620,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
       .sequenceAsset = sequenceId,
       .sourceMap = sourceMap,
   };
-  SequenceProgram program = sequenceDialect().makeProgram();
+  SequenceProgram program = sequenceConfig().makeProgram();
   RuntimeConfig runtime{
       .version = layout.version,
       .data = RuntimeData::capture(reader, layout),

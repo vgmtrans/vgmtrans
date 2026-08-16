@@ -93,7 +93,7 @@ AkaoSequenceAnalysis analyzeFixtureTrack(const std::vector<u8>& bytes, AkaoPs1Ve
 
 }  // namespace
 
-void akaoDialectDecodesLegacyRelativeJumpTargets() {
+void akaoSequenceDecodesLegacyRelativeJumpTargets() {
   std::vector<u8> bytes(0x40, 0xa0);
   constexpr u32 start = 0x20;
   constexpr u32 target = 0x30;
@@ -111,7 +111,7 @@ void akaoDialectDecodesLegacyRelativeJumpTargets() {
          "Akao legacy jump should expose the static target to the cursor walker");
 }
 
-void akaoDialectDecodesConditionalBranchSideTargets() {
+void akaoSequenceDecodesConditionalBranchSideTargets() {
   std::vector<u8> bytes(0x70, 0xa0);
   constexpr u32 start = 0x40;
   constexpr u32 fallthrough = 0x45;
@@ -186,7 +186,7 @@ void akaoTablePointersUseNonControlSourceLinks() {
   expect(!hasLinkRole(drum, SourceLinkRole::JumpTarget), "Akao drum table command should not expose a jump target");
 }
 
-void akaoDialectDecodesRepeatFlowWithoutManualLayerLeaks() {
+void akaoSequenceDecodesRepeatFlowWithoutManualLayerLeaks() {
   std::vector<u8> bytes(0x40, 0xa0);
   constexpr u32 start = 0x20;
   bytes[start] = 0xc8;
@@ -251,7 +251,7 @@ void akaoVersion10OverlayCommandsUseLegacyLengthsAndProgramChange() {
   bytes[start + 6] = 0x04;
   bytes[start + 7] = 0xa0;
 
-  const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_0);
+  const SequenceProgramConfig config = makeAkaoConfig(AkaoPs1Version::Version1_0);
   const TrackProgram track = decodeFixtureTrack(bytes, AkaoPs1Version::Version1_0, start, 0x40);
   expect(track.commands.size() == 4, "Akao v1.0 overlay fixture should decode all commands");
   expect(track.commands[0].range.size == 3 && track.commands[1].range.size == 2,
@@ -266,8 +266,8 @@ void akaoVersion10OverlayCommandsUseLegacyLengthsAndProgramChange() {
 
   const SequenceProgram program{
       .runtime = akaoSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -296,11 +296,11 @@ void akaoPanLawFollowsDriverProfile() {
   bytes[start + 1] = 64;
   bytes[start + 2] = 0xa0;
 
-  const SequenceDialect lateDialect = makeAkaoDialect(AkaoPs1Version::Version3_1);
+  const SequenceProgramConfig lateConfig = makeAkaoConfig(AkaoPs1Version::Version3_1);
   const SequenceProgram lateProgram{
       .runtime = akaoSequenceRuntime(),
-      .timebase = lateDialect.timebase,
-      .behavior = lateDialect.behavior,
+      .timebase = lateConfig.timebase,
+      .behavior = lateConfig.behavior,
       .tracks = {decodeFixtureTrack(bytes, AkaoPs1Version::Version3_1, start, 0x40)},
   };
   const PerformanceSequence performance = SequenceVm().render(lateProgram);
@@ -325,12 +325,12 @@ void akaoLoopBranchUsesCurrentRepeatPass() {
   bytes[start + 9] = 0x1e;
   bytes[start + 10] = 0xa0;
 
-  const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_0);
+  const SequenceProgramConfig config = makeAkaoConfig(AkaoPs1Version::Version1_0);
   const TrackProgram track = decodeFixtureTrack(bytes, AkaoPs1Version::Version1_0, start, 0x40);
   const SequenceProgram program{
       .runtime = akaoSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -363,12 +363,12 @@ void akaoTieAfterRestDoesNotExtendPreviousNote() {
   bytes[start + 3] = 0x8c;
   bytes[start + 4] = 0xa0;
 
-  const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_2);
+  const SequenceProgramConfig config = makeAkaoConfig(AkaoPs1Version::Version1_2);
   const TrackProgram track = decodeFixtureTrack(bytes, AkaoPs1Version::Version1_2, start, 0x40);
   const SequenceProgram program{
       .runtime = akaoSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -392,12 +392,12 @@ void akaoTempoFadeEmitsDriverTickRamp() {
   writeLe16(bytes, start + 7, 0x6000);
   bytes[start + 9] = 0xa0;
 
-  const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_2);
+  const SequenceProgramConfig config = makeAkaoConfig(AkaoPs1Version::Version1_2);
   const TrackProgram track = decodeFixtureTrack(bytes, AkaoPs1Version::Version1_2, start, 0x40);
   const SequenceProgram program{
       .runtime = akaoSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -436,11 +436,11 @@ void akaoPitchSlideAppliesOnceToTheNextNote() {
   bytes[start + 6] = 0x38;
   bytes[start + 7] = 0xa0;
 
-  const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version3_1);
+  const SequenceProgramConfig config = makeAkaoConfig(AkaoPs1Version::Version3_1);
   const SequenceProgram program{
       .runtime = akaoSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {decodeFixtureTrack(bytes, AkaoPs1Version::Version3_1, start, 0x40)},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -485,11 +485,11 @@ void akaoPortamentoRetainsPitchTransitionIntent() {
   bytes[start + 5] = 0x1e;
   bytes[start + 6] = 0xa0;
 
-  const SequenceDialect dialect = makeAkaoDialect(AkaoPs1Version::Version1_2);
+  const SequenceProgramConfig config = makeAkaoConfig(AkaoPs1Version::Version1_2);
   const SequenceProgram program{
       .runtime = akaoSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {decodeFixtureTrack(bytes, AkaoPs1Version::Version1_2, start, 0x40)},
   };
   const PerformanceSequence performance = SequenceVm().render(program);

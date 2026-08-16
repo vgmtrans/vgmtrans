@@ -86,14 +86,14 @@ std::vector<u32> runtimeData() {
 
 PerformanceSequence render(Version version, u8 shift, bool velocity, std::vector<u8> bytes,
                            std::vector<u32> driverData = {}) {
-  const SequenceDialect& dialect = sequenceDialect();
+  const SequenceProgramConfig& config = sequenceConfig();
   if (driverData.empty()) {
     driverData = runtimeData();
   }
   SequenceProgram program{
       .runtime = sequenceRuntime(version, shift, velocity, std::move(driverData)),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {decodeSourceTrack(ByteReader(SourceId{151}, bytes), version, shift, velocity, 0, 0)},
   };
   program.behavior.initialTempoMicrosecondsPerQuarter = 512000;

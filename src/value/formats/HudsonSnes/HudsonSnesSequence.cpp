@@ -187,7 +187,7 @@ namespace math {
 [[nodiscard]] u32 tempoMicrosecondsPerQuarter(u8 rawTempo, u8 timebaseShift) {
   // Timer 0 runs at 250 Hz. The tempo accumulator advances by step/256 per
   // timer tick, and one driver music tick represents 2^timebase normalized
-  // ticks at the fixed 48 PPQN used by the value dialect.
+  // ticks at the fixed 48 PPQN used by the decoded program.
   const double result = static_cast<double>(kPpqn) * 256.0 * 1'000'000.0 /
                         (250.0 * math::tempoStep(rawTempo, timebaseShift) * (1u << timebaseShift));
   return std::max<u32>(1, static_cast<u32>(std::lround(result)));
@@ -1480,8 +1480,8 @@ std::vector<u32> RuntimeTables::encode(const ParsedHeader& header) {
 
 }  // namespace
 
-const SequenceDialect& sequenceDialect() {
-  static const SequenceDialect dialect = SequenceDialect{
+const SequenceProgramConfig& sequenceConfig() {
+  static const SequenceProgramConfig config = SequenceProgramConfig{
       .commandDetailKindPrefix = "hudson-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
@@ -1493,7 +1493,7 @@ const SequenceDialect& sequenceDialect() {
               .initialMonoModeChannels = 0,
           },
   };
-  return dialect;
+  return config;
 }
 
 SequenceRuntime sequenceRuntime(Version version, u8 timebaseShift, bool velocityEnabled, std::vector<u32> tables,
@@ -1519,12 +1519,12 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
                              std::vector<Diagnostic>* diagnostics) {
   auto header = parseHeader(reader, layout.version, layout.sequenceHeaderAddress);
   if (!header) {
-    SequenceProgram empty = sequenceDialect().makeProgram();
+    SequenceProgram empty = sequenceConfig().makeProgram();
     empty.runtime = sequenceRuntime(layout.version, 2, false, {});
     return SequenceParse{.program = std::move(empty)};
   }
   SequenceReferences references;
-  SequenceDecodeSession sequence{reader, sequenceDialect(), sequenceId, header->range, sourceMap, 32768};
+  SequenceDecodeSession sequence{reader, sequenceConfig(), sequenceId, header->range, sourceMap, 32768};
   for (const auto& [track, start] : header->tracks) {
     sequence.addTrack(track, header->range, start, [&](u32 offset) {
       return decodeCommand(reader, offset, layout.version, header->timebaseShift, header->noteVelocity,

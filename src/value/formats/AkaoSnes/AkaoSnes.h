@@ -9,7 +9,7 @@
 #include "value/base/Source.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
-#include "value/sequence/SequenceDialect.h"
+#include "value/sequence/SequenceProgramConfig.h"
 
 #include <algorithm>
 #include <cmath>
@@ -207,7 +207,7 @@ struct AkaoSnesTrackDecodeOptions {
 };
 
 [[nodiscard]] std::optional<AkaoSnesLayout> findAkaoSnesLayout(core::ByteReader reader);
-[[nodiscard]] const core::SequenceDialect& akaoSnesSequenceDialect();
+[[nodiscard]] const core::SequenceProgramConfig& akaoSnesSequenceConfig();
 [[nodiscard]] core::SequenceRuntime akaoSnesSequenceRuntime(AkaoSnesProfile profile,
                                                             std::vector<u32> v1VolumeEnvelopes = {});
 [[nodiscard]] core::TrackProgram decodeAkaoSnesSourceTrack(core::ByteReader reader,

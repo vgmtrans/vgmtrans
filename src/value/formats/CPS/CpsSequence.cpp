@@ -1000,9 +1000,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   }
 }
 
-[[nodiscard]] SequenceDialect makeDialect(std::string_view prefix, u32 ppqn, u8 initialPitchBendRange,
-                                          double initialLevel = 1.0) {
-  return SequenceDialect{
+[[nodiscard]] SequenceProgramConfig makeSequenceConfig(std::string_view prefix, u32 ppqn,
+                                                       u8 initialPitchBendRange, double initialLevel = 1.0) {
+  return SequenceProgramConfig{
       .commandDetailKindPrefix = std::string(prefix),
       .timebase = Timebase{.ppqn = ppqn},
       .behavior =
@@ -1019,31 +1019,32 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 }  // namespace
 
-const SequenceDialect& cps1V1Dialect() {
-  static const SequenceDialect dialect = makeDialect("cps.cps1-v1", 24, 2);
-  return dialect;
+const SequenceProgramConfig& cps1V1SequenceConfig() {
+  static const SequenceProgramConfig config = makeSequenceConfig("cps.cps1-v1", 24, 2);
+  return config;
 }
 
-const SequenceDialect& cpsEarlyDialect() {
-  static const SequenceDialect dialect = makeDialect("cps.early", kCpsPpqn, 2);
-  return dialect;
+const SequenceProgramConfig& cpsEarlySequenceConfig() {
+  static const SequenceProgramConfig config = makeSequenceConfig("cps.early", kCpsPpqn, 2);
+  return config;
 }
 
-const SequenceDialect& cpsLateDialect() {
-  static const SequenceDialect dialect = makeDialect("cps.late", kCpsPpqn, 12, 0.0);
-  return dialect;
+const SequenceProgramConfig& cpsLateSequenceConfig() {
+  static const SequenceProgramConfig config = makeSequenceConfig("cps.late", kCpsPpqn, 12, 0.0);
+  return config;
 }
 
 SequenceProgram decodeCpsSequence(ByteReader reader, const CpsLayout& layout, const CpsSequenceInfo& sourceSequence,
                                   AssetId sequenceAsset, SourceMapBuilder* sourceMap,
                                   std::vector<Diagnostic>* diagnostics) {
   const bool v1 = layout.version == CpsVersion::Cps1V100;
-  const SequenceDialect& dialect =
-      v1 ? cps1V1Dialect() : (usesLateSequence(layout.version) ? cpsLateDialect() : cpsEarlyDialect());
+  const SequenceProgramConfig& config = v1 ? cps1V1SequenceConfig()
+                                           : (usesLateSequence(layout.version) ? cpsLateSequenceConfig()
+                                                                               : cpsEarlySequenceConfig());
   const u32 maxTracks = isCps1(layout.version) ? (v1 ? 8 : 12) : 16;
   const u32 headerSize = 1 + maxTracks * 2;
   const u32 availableHeaderSize = static_cast<u32>(std::min<u64>(headerSize, reader.size() - sourceSequence.offset));
-  SequenceDecodeSession sequence(reader, dialect, sequenceAsset,
+  SequenceDecodeSession sequence(reader, config, sequenceAsset,
                                  reader.range(sourceSequence.offset, availableHeaderSize), sourceMap, kMaxTrackCommands,
                                  static_cast<u32>(layout.program.endOffset()));
   if (!reader.has(sourceSequence.offset, headerSize) || (reader.u8At(sourceSequence.offset) & 0x80) != 0) {

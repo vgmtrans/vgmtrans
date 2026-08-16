@@ -2082,8 +2082,8 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
   return cursor.truncated();
 }
 
-[[nodiscard]] const SequenceDialect& sharedDialect() {
-  static const SequenceDialect dialect = SequenceDialect{
+[[nodiscard]] const SequenceProgramConfig& sharedConfig() {
+  static const SequenceProgramConfig config = SequenceProgramConfig{
       .commandDetailKindPrefix = "akao-snes",
       .timebase = Timebase{.ppqn = kAkaoSnesPpqn},
       .behavior =
@@ -2092,7 +2092,7 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
               .initialStereoBalance = StereoBalance{127.0 / 255.0, 128.0 / 255.0},
           },
   };
-  return dialect;
+  return config;
 }
 
 struct SequenceHeaderInfo {
@@ -2141,8 +2141,8 @@ struct SequenceHeaderInfo {
 
 }  // namespace
 
-const SequenceDialect& akaoSnesSequenceDialect() {
-  return sharedDialect();
+const SequenceProgramConfig& akaoSnesSequenceConfig() {
+  return sharedConfig();
 }
 
 SequenceRuntime akaoSnesSequenceRuntime(AkaoSnesProfile profile, std::vector<u32> v1VolumeEnvelopes) {
@@ -2169,7 +2169,7 @@ SequenceProgram parseAkaoSnesSequence(ByteReader reader, const AkaoSnesLayout& l
                                       SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const SequenceHeaderInfo header = sequenceHeaderInfo(reader, layout);
   const SourceRange headerRange = reader.range(header.headerOffset, header.headerSize);
-  SequenceDecodeSession session(reader, sharedDialect(), sequenceId, headerRange, sourceMap, 16384, header.sequenceEnd);
+  SequenceDecodeSession session(reader, sharedConfig(), sequenceId, headerRange, sourceMap, 16384, header.sequenceEnd);
   if (sourceMap != nullptr) {
     if (const auto annotation = session.headerAnnotation()) {
       auto source = AnnotationBuilder{*sourceMap, *annotation}

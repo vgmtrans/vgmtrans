@@ -9,7 +9,7 @@
 #include "value/base/Source.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
-#include "value/sequence/SequenceDialect.h"
+#include "value/sequence/SequenceProgramConfig.h"
 
 #include <optional>
 #include <string_view>
@@ -50,7 +50,7 @@ struct Mp2kLayout {
 
 [[nodiscard]] std::vector<Mp2kLayout> findMp2kLayouts(core::ScanResultBuilder& builder);
 
-[[nodiscard]] const core::SequenceDialect& mp2kSequenceDialect();
+[[nodiscard]] const core::SequenceProgramConfig& mp2kSequenceConfig();
 [[nodiscard]] core::SequenceProgram parseMp2kSequenceProgram(core::ByteReader reader, core::AssetId id,
                                                              const Mp2kSong& song,
                                                              core::SourceMapBuilder* sourceMap = nullptr,

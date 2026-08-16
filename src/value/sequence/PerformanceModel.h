@@ -136,7 +136,7 @@ struct LevelPerformanceEvent {
   PerformanceEventHeader header;
   // Interpreted loudness as linear amplitude/gain, not a MIDI controller value.
   double linearGain = 1.0;
-  // Legacy destination-shaped hint for cursor dialects. Semantic formats use
+  // Legacy destination-shaped hint for older cursor formats. Semantic formats use
   // sourceQuantization, and export options may override either one.
   LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit;
   std::optional<ValueQuantization> sourceQuantization;
@@ -146,7 +146,7 @@ struct ExpressionPerformanceEvent {
   PerformanceEventHeader header;
   // Interpreted expression as linear amplitude/gain, not a MIDI controller value.
   double linearGain = 1.0;
-  // Legacy destination-shaped hint for cursor dialects. Semantic formats use
+  // Legacy destination-shaped hint for older cursor formats. Semantic formats use
   // sourceQuantization, and export options may override either one.
   LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit;
   std::optional<ValueQuantization> sourceQuantization;

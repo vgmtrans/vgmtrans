@@ -9,7 +9,7 @@
 #include "value/base/Source.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
-#include "value/sequence/SequenceDialect.h"
+#include "value/sequence/SequenceProgramConfig.h"
 
 #include <optional>
 #include <string>
@@ -112,9 +112,9 @@ struct Cps1SynthRefs {
 [[nodiscard]] Cps1SynthRefs addCps1Synth(core::ScanResultBuilder& builder, CpsLayout& layout);
 [[nodiscard]] core::ScanSynthRefs addCpsQSoundSynth(core::ScanResultBuilder& builder, const CpsLayout& layout);
 
-[[nodiscard]] const core::SequenceDialect& cps1V1Dialect();
-[[nodiscard]] const core::SequenceDialect& cpsEarlyDialect();
-[[nodiscard]] const core::SequenceDialect& cpsLateDialect();
+[[nodiscard]] const core::SequenceProgramConfig& cps1V1SequenceConfig();
+[[nodiscard]] const core::SequenceProgramConfig& cpsEarlySequenceConfig();
+[[nodiscard]] const core::SequenceProgramConfig& cpsLateSequenceConfig();
 [[nodiscard]] core::FormatModule cpsModule();
 
 }  // namespace vgmtrans::formats::cps
