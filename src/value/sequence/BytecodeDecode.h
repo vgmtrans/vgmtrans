@@ -36,7 +36,7 @@ struct DecodedCommandPresentation {
 };
 
 // Temporary decoded form used while a bytecode decoder is deciding control flow.
-// TrackProgramBuilder still owns the final immutable source-command snapshot.
+// TrackProgram retains the final source-command snapshot.
 struct DecodedBytecodeCommand {
   SourceRange range;
   SourceAnnotationId annotation;
@@ -63,10 +63,10 @@ struct EncodedSemanticField {
   return offset <= end && size <= end - offset && reader.has(offset, size);
 }
 
-inline void appendDecodedBytecodeCommand(TrackProgramBuilder& builder, DecodedBytecodeCommand decoded, u32 offset) {
+inline void appendDecodedBytecodeCommand(TrackProgram& track, DecodedBytecodeCommand decoded, u32 offset) {
   const SequenceSemantic semantic = decoded.presentation.semantic;
-  builder.addSemantic(Address{offset}, decoded.opcode, decoded.range, std::move(decoded.operands),
-                      std::move(decoded.flow), decoded.annotation, std::move(decoded.execution), semantic);
+  track.addCommand(Address{offset}, decoded.opcode, decoded.range, std::move(decoded.operands),
+                   std::move(decoded.flow), decoded.annotation, std::move(decoded.execution), semantic);
 }
 
 // Shared limits for walking source bytecode. Formats still decide what each opcode means.
@@ -86,7 +86,6 @@ template <class DecodeCommand>
       .sourceTrackNumber = sourceTrackNumber,
       .startAddress = Address{startAddress},
   };
-  TrackProgramBuilder builder{track};
   std::set<u32> visitedOffsets;
   std::vector<u32> pendingOffsets;
   u32 offset = startAddress;
@@ -142,7 +141,7 @@ template <class DecodeCommand>
       }
       queueSideTarget(target);
     });
-    appendDecodedBytecodeCommand(builder, std::move(decoded), begin);
+    appendDecodedBytecodeCommand(track, std::move(decoded), begin);
 
     if (next) {
       offset = next->value;
@@ -180,7 +179,6 @@ template <class DecodeCommand>
       .sourceTrackNumber = trackIndex,
       .startAddress = Address{startOffset},
   };
-  TrackProgramBuilder builder{track};
   std::map<u32, DecodedBytecodeCommand> commandsByOffset;
   std::vector<u32> pendingBlocks{startOffset};
   size_t decodedCommands = 0;
@@ -209,7 +207,7 @@ template <class DecodeCommand>
   }
 
   for (auto& [offset, decoded] : commandsByOffset) {
-    appendDecodedBytecodeCommand(builder, std::move(decoded), offset);
+    appendDecodedBytecodeCommand(track, std::move(decoded), offset);
   }
   return track;
 }

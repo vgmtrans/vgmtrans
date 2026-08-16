@@ -156,20 +156,21 @@ public:
     };
   }
 
-  [[nodiscard]] std::optional<LoopPoint> observe(const VisitState& state, const SourceCommand& command,
-                                                 const VmTrackRuntime& runtime, bool arrivedByControlFlow) {
+  [[nodiscard]] std::optional<LoopPoint> observe(const VisitState& state, const VmTrackRuntime& runtime,
+                                                 bool arrivedByControlFlow) {
+    const CommandId commandId{state.commandIndex};
     if (const auto previous = visited_.find(state); previous != visited_.end()) {
       if (!arrivedByControlFlow) {
         return std::nullopt;
       }
       return LoopPoint{
           .start = previous->second,
-          .endCommand = runtime.lastCommand.valid() ? runtime.lastCommand : command.id,
+          .endCommand = runtime.lastCommand.valid() ? runtime.lastCommand : commandId,
           .endTick = runtime.tick,
       };
     }
 
-    visited_.emplace(state, VisitRecord{.tick = runtime.tick, .command = command.id});
+    visited_.emplace(state, VisitRecord{.tick = runtime.tick, .command = commandId});
     return std::nullopt;
   }
 
@@ -424,7 +425,7 @@ class VmTrackExecutor {
 public:
   VmTrackExecutor(const SequenceProgram& program, const TrackProgram& track, const SequenceVmOptions& options,
                   PerformanceSequence& targetSequence, u64& outputSequence, bool includeGlobalInitialEvents,
-                  std::any& programState, bool sequenceCoordinatesLoops = false, bool startsActive = true)
+                  std::any& programState, bool startsActive = true)
       : track_(track), sequenceRuntime_(program.runtime), behavior_(program.behavior),
         loopPolicy_(options.loopPolicy == LoopPolicy::Default ? behavior_.loopPolicy : options.loopPolicy),
         options_(options), targetSequence_(targetSequence), outputSequence_(outputSequence),
@@ -434,8 +435,7 @@ public:
         }),
         trackState_(sequenceRuntime_.createTrackState ? sequenceRuntime_.createTrackState(program, track) : std::any{}),
         programState_(programState),
-        current_(startsActive ? destinationIndex(track, track.startAddress) : std::optional<u32>{}),
-        sequenceCoordinatesLoops_(sequenceCoordinatesLoops) {
+        current_(startsActive ? destinationIndex(track, track.startAddress) : std::optional<u32>{}) {
     addInitialTrackEvents(performanceTrack_, behavior_, includeGlobalInitialEvents);
     for (auto& event : performanceTrack_.events) {
       std::visit([&](auto& typedEvent) { typedEvent.header.sequence = outputSequence_++; }, event);
@@ -463,7 +463,7 @@ public:
       if (runtime_.tick != std::numeric_limits<u64>::max()) {
         ++runtime_.tick;
       }
-      tickRuntime(track_.commands.at(pendingTickCommand_));
+      tickRuntime(pendingTickCommand_);
       if (pendingTicks_ > 1) {
         executeReadyCommandDuringWait();
       }
@@ -504,7 +504,6 @@ public:
     current_ = start ? destinationIndex(track_, *start) : std::optional<u32>{};
     arrivedByControlFlow_ = true;
     loopDetector_.clear();
-    firstLoopTick_.reset();
     loopStopTick_.reset();
     loopRepeats_ = 0;
     if (sequenceRuntime_.beginTrackSection != nullptr) {
@@ -546,11 +545,12 @@ private:
             behavior_.panLaw, &runtime_.activeNotes, &targetSequence_.sourceSpans};
   }
 
-  void tickRuntime(const SourceCommand& command) {
+  void tickRuntime(u32 commandIndex) {
     if (sequenceRuntime_.tick == nullptr) {
       return;
     }
-    auto out = outputAt(runtime_.tick, command.id, command.annotation);
+    const SourceCommand& command = track_.commands.at(commandIndex);
+    auto out = outputAt(runtime_.tick, CommandId{commandIndex}, command.annotation);
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
     sequenceRuntime_.tick(command, programState_, trackState_, out, vm);
   }
@@ -559,11 +559,12 @@ private:
     if (pendingTicks_ == 0 || !current_ || sequenceRuntime_.readyDuringWait == nullptr) {
       return;
     }
-    const SourceCommand& command = track_.commands.at(*current_);
+    const u32 commandIndex = *current_;
+    const SourceCommand& command = track_.commands.at(commandIndex);
     if (!command.execution.duringWait) {
       return;
     }
-    auto out = outputAt(runtime_.tick, command.id, command.annotation);
+    auto out = outputAt(runtime_.tick, CommandId{commandIndex}, command.annotation);
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
     if (!sequenceRuntime_.readyDuringWait(command, programState_, trackState_, out, vm)) {
       return;
@@ -582,9 +583,10 @@ private:
       return false;
     }
     const u32 commandIndex = *current_;
+    const CommandId commandId{commandIndex};
     const SourceCommand& command = track_.commands.at(commandIndex);
     const VisitState visitState = LoopDetector::visitState(commandIndex, runtime_);
-    const auto loop = loopDetector_.observe(visitState, command, runtime_, arrivedByControlFlow_);
+    const auto loop = loopDetector_.observe(visitState, runtime_, arrivedByControlFlow_);
     if (behavior_.inferLoopsFromRepeatedState && loop) {
       if (handleLoop(*loop, commandIndex, visitState).kind == LoopActionKind::StopTrack) {
         return false;
@@ -594,7 +596,7 @@ private:
     const u64 beginTick = runtime_.tick;
     const size_t firstEvent = performanceTrack_.events.size();
     const size_t firstAutomation = performanceTrack_.automations.size();
-    auto out = outputAt(beginTick, command.id, command.annotation);
+    auto out = outputAt(beginTick, commandId, command.annotation);
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
     const Effects effects = sequenceRuntime_.execute(command, programState_, trackState_, out, vm);
     if (duringWait) {
@@ -633,9 +635,9 @@ private:
         }
       }
     }
-    runtime_.lastCommand = command.id;
+    runtime_.lastCommand = commandId;
     const bool endedSection = effectiveTransition.kind == CommandTransitionKind::EndSection;
-    applyTransition(command, effectiveTransition);
+    applyTransition(commandId, command, effectiveTransition);
 
     ++executedCommands_;
     return endedSection;
@@ -645,10 +647,6 @@ private:
                                       std::optional<VisitState> recordAfterClear = std::nullopt) {
     // Once a loop is identified, all loop sources use the same export policy:
     // preserve markers, replay for the requested loop count, or stop the track.
-    if (!firstLoopTick_) {
-      firstLoopTick_ = loop.endTick;
-    }
-
     if (loopPolicy_ == LoopPolicy::Preserve) {
       addLoopMarker(performanceTrack_, loop.start.command, loop.start.tick, outputSequence_, "Loop Start");
       addLoopMarker(performanceTrack_, loop.endCommand, loop.endTick, outputSequence_, "Loop End");
@@ -662,14 +660,14 @@ private:
       loopDetector_.clear();
       if (recordAfterClear) {
         loopDetector_.record(*recordAfterClear,
-                             VisitRecord{.tick = loop.endTick, .command = track_.commands.at(replayIndex).id});
+                             VisitRecord{.tick = loop.endTick, .command = CommandId{replayIndex}});
       }
       current_ = replayIndex;
       arrivedByControlFlow_ = true;
       return LoopAction{.kind = LoopActionKind::ContinueExecution};
     }
 
-    if (sequenceCoordinatesLoops_ && loopPolicy_ == LoopPolicy::PlayOnce) {
+    if (loopPolicy_ == LoopPolicy::PlayOnce) {
       // Keep shorter channel loops running while the scheduler discovers the
       // longest requested endpoint. The sequence-level cutoff removes any
       // temporary events rendered past that common boundary.
@@ -679,7 +677,7 @@ private:
       loopDetector_.clear();
       if (recordAfterClear) {
         loopDetector_.record(*recordAfterClear,
-                             VisitRecord{.tick = loop.endTick, .command = track_.commands.at(replayIndex).id});
+                             VisitRecord{.tick = loop.endTick, .command = CommandId{replayIndex}});
       }
       current_ = replayIndex;
       arrivedByControlFlow_ = true;
@@ -692,7 +690,7 @@ private:
     return LoopAction{.kind = LoopActionKind::StopTrack};
   }
 
-  void applyTransition(const SourceCommand& command, const CommandTransition& transition) {
+  void applyTransition(CommandId commandId, const SourceCommand& command, const CommandTransition& transition) {
     switch (transition.kind) {
       case CommandTransitionKind::Fallthrough:
         current_ = destinationIndex(track_, command.flow.continuation);
@@ -714,7 +712,7 @@ private:
         break;
 
       case CommandTransitionKind::Jump:
-        applyJump(command, transition.destination, transition.jumpSemantics);
+        applyJump(commandId, command, transition.destination, transition.jumpSemantics);
         break;
 
       case CommandTransitionKind::Call:
@@ -754,7 +752,8 @@ private:
     pendingTickCommand_ = commandIndex;
   }
 
-  void applyJump(const SourceCommand& command, Address destinationAddress, JumpSemantics semantics) {
+  void applyJump(CommandId commandId, const SourceCommand& command, Address destinationAddress,
+                 JumpSemantics semantics) {
     switch (semantics) {
       case JumpSemantics::Normal:
         applyPlainJump(command, destinationAddress, true, "jump");
@@ -763,10 +762,10 @@ private:
         applyPlainJump(command, destinationAddress, false, "branch");
         break;
       case JumpSemantics::LoopCandidate:
-        applyLoopCandidateJump(command, destinationAddress);
+        applyLoopCandidateJump(commandId, command, destinationAddress);
         break;
       case JumpSemantics::DeclaredLoop:
-        applyDeclaredLoop(command, destinationAddress);
+        applyDeclaredLoop(commandId, command, destinationAddress);
         break;
     }
   }
@@ -781,7 +780,7 @@ private:
     }
   }
 
-  void applyLoopCandidateJump(const SourceCommand& command, Address destinationAddress) {
+  void applyLoopCandidateJump(CommandId commandId, const SourceCommand& command, Address destinationAddress) {
     const auto destination = destinationIndex(track_, destinationAddress);
     if (!destination) {
       warn(fmt::format("Sequence jump target ${:04X} was not decoded", destinationAddress.value), command.range);
@@ -800,13 +799,13 @@ private:
 
     const LoopPoint loop{
         .start = *previousVisit,
-        .endCommand = command.id,
+        .endCommand = commandId,
         .endTick = runtime_.tick,
     };
     static_cast<void>(handleLoop(loop, *destination));
   }
 
-  void applyDeclaredLoop(const SourceCommand& command, Address destinationAddress) {
+  void applyDeclaredLoop(CommandId commandId, const SourceCommand& command, Address destinationAddress) {
     const auto destination = destinationIndex(track_, destinationAddress);
     if (!destination) {
       warn(fmt::format("Sequence loop target ${:04X} was not decoded", destinationAddress.value), command.range);
@@ -815,10 +814,9 @@ private:
       return;
     }
 
-    const SourceCommand& destinationCommand = track_.commands.at(*destination);
     VisitRecord start{
         .tick = runtime_.tick,
-        .command = destinationCommand.id,
+        .command = CommandId{*destination},
     };
     if (const auto* previous = loopDetector_.findExact(LoopDetector::visitState(*destination, runtime_))) {
       start = *previous;
@@ -826,7 +824,7 @@ private:
 
     const LoopPoint loop{
         .start = start,
-        .endCommand = command.id,
+        .endCommand = commandId,
         .endTick = runtime_.tick,
     };
     static_cast<void>(handleLoop(loop, *destination));
@@ -852,11 +850,9 @@ private:
   u32 pendingTicks_ = 0;
   u32 pendingTickCommand_ = 0;
   u32 executedCommands_ = 0;
-  std::optional<u64> firstLoopTick_;
   std::optional<u64> loopStopTick_;
   u32 loopRepeats_ = 0;
   bool arrivedByControlFlow_ = true;
-  bool sequenceCoordinatesLoops_ = false;
 };
 
 }  // namespace
@@ -1021,8 +1017,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, std::
       const bool hasSectionPlaylist = program.sectionPlaylist.has_value();
       for (const TrackProgram& track : program.tracks) {
         executors.push_back(std::make_unique<VmTrackExecutor>(program, track, options_, target, outputSequence,
-                                                             executors.empty(), passProgramState,
-                                                             loopPolicy == LoopPolicy::PlayOnce, !hasSectionPlaylist));
+                                                             executors.empty(), passProgramState, !hasSectionPlaylist));
       }
 
       std::optional<SectionPlaylistRunner> playlist;

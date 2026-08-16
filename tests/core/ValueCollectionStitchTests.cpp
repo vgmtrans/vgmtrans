@@ -22,11 +22,10 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
   for (u32 index = 0; index < 2; ++index) {
     const SequenceDialect& dialect = index == 0 ? dialect48 : dialect96;
     TrackProgram track{.id = TrackId{index}, .startAddress = Address{0}};
-    TrackProgramBuilder commands(track);
     const std::array<u8, 3> note{0x90, static_cast<u8>(0x3c + index), 0x04};
     const std::array<u8, 1> end{0xff};
-    addProbeCommand<ProbeNoteCommand>(commands, dialect, Address{0}, probeRange(index * 4, note.size()), note);
-    addProbeCommand<ProbeEndCommand>(commands, dialect, Address{3}, probeRange(index * 4 + 3, end.size()), end);
+    addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(index * 4, note.size()), note);
+    addProbeCommand<ProbeEndCommand>(track, dialect, Address{3}, probeRange(index * 4 + 3, end.size()), end);
 
     const AssetId sequenceId{index * 3};
     const AssetId instrumentId{index * 3 + 1};

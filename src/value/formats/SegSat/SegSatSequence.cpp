@@ -600,7 +600,9 @@ std::vector<SegSatControllerChange> segSatControllerChanges(const SequenceProgra
 
   // Every channel is a copy of the same normal event stream, so command IDs
   // from the first copy also identify controller events on the other copies.
-  for (const auto& command : program.tracks[1].commands) {
+  const auto& commands = program.tracks[1].commands;
+  for (u32 commandIndex = 0; commandIndex < commands.size(); ++commandIndex) {
+    const auto& command = commands[commandIndex];
     const auto* controller = semanticOperand(command, "controller");
     const auto* value = semanticOperand(command, "value");
     if (controller == nullptr || value == nullptr) {
@@ -613,7 +615,7 @@ std::vector<SegSatControllerChange> segSatControllerChanges(const SequenceProgra
       continue;
     }
     changes.push_back(SegSatControllerChange{
-        .command = command.id.value,
+        .command = commandIndex,
         .controller = static_cast<u8>(*controllerNumber),
         .value = static_cast<u8>(*controllerValue),
     });

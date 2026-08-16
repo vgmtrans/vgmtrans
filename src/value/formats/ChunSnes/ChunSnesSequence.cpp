@@ -733,8 +733,6 @@ struct Playback {
     return {};
   }
 
-  [[nodiscard]] Effects repeatBreak(Address destination) { return vm.countedRepeatBreak(1, destination).effects; }
-
   [[nodiscard]] Effects return_() { return vm.inSubroutine() ? vm.return_() : vm.fallthrough(); }
 
   [[nodiscard]] Effects returnOrEnd() { return vm.inSubroutine() ? vm.return_() : vm.end(); }
@@ -806,8 +804,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const s16 relative = event.s16le("relative");
       const Address destination = relativeTarget(relative, begin + 3);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-      event.mayBranchTo(destination);
-      return event.invoke<&Playback::repeatBreak>(destination);
+      return event.repeatBreak(1, destination);
     }
     case 0xdc: {
       if (version == Version::Summer) {

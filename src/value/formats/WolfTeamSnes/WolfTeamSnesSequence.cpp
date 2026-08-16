@@ -507,8 +507,6 @@ struct Playback {
     return Effects::wait(delay);
   }
 
-  [[nodiscard]] Effects wait(u8 delay) { return Effects::wait(delay); }
-
   [[nodiscard]] Effects rest(u8 delay) {
     keyOff();
     return Effects::wait(delay);
@@ -685,7 +683,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   switch (opcode) {
     case 0x90: {
       auto event = cursor.command("Wait", SequenceSemantic::Rest);
-      return event.invoke<&Playback::wait>(event.u8("delay", SemanticOperandRole::Duration));
+      return event.wait(event.u8("delay", SemanticOperandRole::Duration));
     }
     case 0x91:
     case 0xfd: {

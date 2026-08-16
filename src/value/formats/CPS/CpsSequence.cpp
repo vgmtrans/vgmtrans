@@ -411,8 +411,6 @@ struct Playback {
     }
   }
 
-  [[nodiscard]] Effects lateWait(u32 ticks) { return Effects::wait(ticks); }
-
   [[nodiscard]] Effects lateNote(u8 velocity, u8 encodedKey, u32 duration) {
     const bool hold = (encodedKey & 0x80) != 0;
     const bool continuesPreviousVoice = track.held && track.previousKey && track.previousNote.valid();
@@ -443,10 +441,6 @@ struct Playback {
 
   void latePortamento(u8 raw) {
     track.portamentoRate = raw == 0 ? 0 : static_cast<u16>(raw) + (isCps3(track.version) ? 1 : 0);
-  }
-
-  [[nodiscard]] Effects repeatBreak(u8 slot, Address destination) {
-    return vm.countedRepeatBreak(slot, destination).effects;
   }
 
   [[nodiscard]] Effects conditionalStartRepeat() {
@@ -525,8 +519,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const auto stored = event.rawU16le("stored_destination", SourceValueDisplay::Address);
       const Address destination = event.resolvedValue("destination", stored, Address{programBase + stored.value},
                                                       SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-      event.mayBranchTo(destination);
-      return event.invoke<&Playback::repeatBreak>(0, destination);
+      return event.repeatBreak(0, destination);
     }
     case 0x03:
     case 0x04:
@@ -714,8 +707,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
                                       ? Address{programBase + raw}
                                       : relative16(event.nextAddress().value, raw);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-      event.mayBranchTo(destination);
-      return event.invoke<&Playback::repeatBreak>(slot, destination);
+      return event.repeatBreak(slot, destination);
     }
     case 0x16: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
@@ -816,7 +808,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       ticks = (ticks << 7) | event.u8("continuation", SemanticOperandRole::Duration);
     }
     event.derived("ticks", ticks, SemanticOperandRole::Duration);
-    return event.invoke<&Playback::lateWait>(ticks);
+    return event.wait(ticks);
   }
   if (opcode < 0xc0) {
     auto event = cursor.command("Note", SequenceSemantic::Note);
@@ -945,8 +937,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const s32 displacement = isCps3(version) ? relative : static_cast<s16>(relative);
       const Address destination{static_cast<u32>(event.nextAddress().value + displacement)};
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-      event.mayBranchTo(destination);
-      return event.invoke<&Playback::repeatBreak>(slot, destination);
+      return event.repeatBreak(slot, destination);
     }
     case 0xdc: {
       auto event = cursor.command("Set Transpose", SequenceSemantic::Pitch);

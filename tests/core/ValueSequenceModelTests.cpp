@@ -47,13 +47,12 @@ void byteReaderChecksBoundsAndEndian() {
 void sourceCommandsRetainOnlySemanticData() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
-  TrackProgramBuilder builder{track};
   const std::array<u8, 2> programBytes{0x80, 0x05};
   const SourceRange range = probeRange(0, programBytes.size());
-  const SourceCommand& command =
-      addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, range, programBytes);
+  const CommandId commandId = addProbeCommand<ProbeProgramCommand>(track, dialect, Address{0}, range, programBytes);
+  const SourceCommand& command = track.commands.at(commandId.value);
 
-  expect(track.commands.size() == 1, "track builder should append one source command");
+  expect(track.commands.size() == 1, "track should append one source command");
   expect(command.range == range && command.range.size == programBytes.size(),
          "source command should retain the range needed to inspect encoded bytes");
   expect(command.execution.valid(), "source command should retain its compiled playback body");
@@ -81,22 +80,21 @@ void sequenceSourceRangeIncludesDecodedCommandsFromTheBaseSource() {
          "sequence source range should span its base range and same-source decoded commands only");
 }
 
-void trackProgramBuilderRejectsDuplicateCommandAddresses() {
+void trackProgramRejectsDuplicateCommandAddresses() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
-  TrackProgramBuilder builder{track};
 
   const std::array<u8, 2> programBytes{0x80, 0x05};
-  addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, probeRange(0, programBytes.size()), programBytes);
+  addProbeCommand<ProbeProgramCommand>(track, dialect, Address{0}, probeRange(0, programBytes.size()), programBytes);
 
   bool rejectedDuplicateAddress = false;
   try {
-    static_cast<void>(addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0},
+    static_cast<void>(addProbeCommand<ProbeProgramCommand>(track, dialect, Address{0},
                                                            probeRange(2, programBytes.size()), programBytes));
   } catch (const std::invalid_argument&) {
     rejectedDuplicateAddress = true;
   }
-  expect(rejectedDuplicateAddress, "track builder should reject duplicate source command addresses");
+  expect(rejectedDuplicateAddress, "track should reject duplicate source command addresses");
   expect(track.commands.size() == 1, "duplicate-address rejection should not mutate the track program");
 }
 
@@ -418,7 +416,7 @@ void runValueSequenceModelTests() {
   byteReaderChecksBoundsAndEndian();
   sourceCommandsRetainOnlySemanticData();
   sequenceSourceRangeIncludesDecodedCommandsFromTheBaseSource();
-  trackProgramBuilderRejectsDuplicateCommandAddresses();
+  trackProgramRejectsDuplicateCommandAddresses();
   collectionIssuesDeriveResolutionIndependentlyFromFreshness();
   performanceAutomationRetainsIntentAlongsideOneEventTimeline();
   performanceEmitterBindsScalarAutomationWithoutExposingStorage();
