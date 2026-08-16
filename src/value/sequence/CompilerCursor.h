@@ -228,6 +228,11 @@ template <class Playback>
   return playback.vm.countedRepeatUntil(slot, totalPlays, destination);
 }
 
+template <class Playback>
+[[nodiscard]] Effects repeatBreak(Playback& playback, u8 slot, Address destination) {
+  return playback.vm.countedRepeatBreak(slot, destination).effects;
+}
+
 }  // namespace detail
 
 // CompilerCursor gives formats one imperative command block. Reads add source
@@ -612,6 +617,13 @@ public:
     Event& repeatUntil(::u8 slot, u32 totalPlays, Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       append<&detail::repeatUntil<Playback>>(slot, totalPlays, destination);
+      flow_.additionalTargets.push_back(destination);
+      return *this;
+    }
+
+    Event& repeatBreak(::u8 slot, Address destination) {
+      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
+      append<&detail::repeatBreak<Playback>>(slot, destination);
       flow_.additionalTargets.push_back(destination);
       return *this;
     }

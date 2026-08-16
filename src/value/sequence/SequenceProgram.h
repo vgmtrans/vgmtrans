@@ -225,7 +225,6 @@ struct SemanticOperand {
 // and source-free execution data. Encoded bytes remain in SourceStore and are
 // reached through range when a view needs them.
 struct SourceCommand {
-  CommandId id;
   u8 opcode = 0;
   Address address;
   SourceRange range;
@@ -255,6 +254,10 @@ struct TrackProgram {
   Address startAddress;
   std::vector<SourceCommand> commands;
   AddressIndex addressIndex;
+
+  CommandId addCommand(Address address, u8 opcode, SourceRange range, std::vector<SemanticOperand> operands,
+                       CommandFlow flow, SourceAnnotationId annotation = {}, CommandExecution execution = {},
+                       SequenceSemantic semantic = SequenceSemantic::Unknown);
 };
 
 // Some drivers arrange a song as a playlist of parallel track sections. A
@@ -354,19 +357,6 @@ struct SequenceProgram {
 struct SequenceProgramAsset {
   AssetMetadata metadata;
   SequenceProgram program;
-};
-
-class TrackProgramBuilder {
-public:
-  explicit TrackProgramBuilder(TrackProgram& track);
-
-  const SourceCommand& addSemantic(Address address, u8 opcode, SourceRange range,
-                                   std::vector<SemanticOperand> operands, CommandFlow flow,
-                                   SourceAnnotationId annotation = {}, CommandExecution execution = {},
-                                   SequenceSemantic semantic = SequenceSemantic::Unknown);
-
-private:
-  TrackProgram& track_;
 };
 
 }  // namespace vgmtrans::core

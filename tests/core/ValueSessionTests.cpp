@@ -844,7 +844,6 @@ void scanValidationReportsMultipleAdmissionErrors() {
       program.tracks = {TrackProgram{
                           .id = TrackId{0},
                           .commands = {SourceCommand{
-                              .id = CommandId{0},
                               .range = badRange,
                           }},
       }};

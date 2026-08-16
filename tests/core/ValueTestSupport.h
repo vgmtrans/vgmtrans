@@ -860,8 +860,8 @@ using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
 }
 
 template <class Command, size_t Size>
-const SourceCommand& addProbeCommand(TrackProgramBuilder& builder, const SequenceDialect& dialect, Address address,
-                                     SourceRange range, const std::array<u8, Size>& bytes) {
+CommandId addProbeCommand(TrackProgram& track, const SequenceDialect& dialect, Address address, SourceRange range,
+                          const std::array<u8, Size>& bytes) {
   static_cast<void>(Command::kind);
   static_cast<void>(dialect);
   const ByteReader reader(range.source, std::span<const u8>{bytes});
@@ -870,8 +870,8 @@ const SourceCommand& addProbeCommand(TrackProgramBuilder& builder, const Sequenc
   // at its fixture address. Rebase only its physical continuation; encoded
   // flow destinations already use the fixture's track address space.
   decoded.flow.continuation.value += address.value;
-  return builder.addSemantic(address, decoded.opcode, range, std::move(decoded.operands),
-                             std::move(decoded.flow), decoded.annotation, std::move(decoded.execution));
+  return track.addCommand(address, decoded.opcode, range, std::move(decoded.operands),
+                          std::move(decoded.flow), decoded.annotation, std::move(decoded.execution));
 }
 
 [[nodiscard]] size_t countProbeNotesAt(const PerformanceTrack& track, u64 tick) {

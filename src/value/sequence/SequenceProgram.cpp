@@ -46,19 +46,10 @@ const TrackProgram* trackById(const SequenceProgram& program, TrackId id) {
 }
 
 const SourceCommand* sourceCommandById(const TrackProgram& track, CommandId id) {
-  if (id.valid() && id.value < track.commands.size()) {
-    const auto& command = track.commands[id.value];
-    if (command.id == id) {
-      return &command;
-    }
-  }
-
-  const auto found =
-      std::ranges::find_if(track.commands, [id](const SourceCommand& command) { return command.id == id; });
-  if (found == track.commands.end()) {
+  if (!id.valid() || id.value >= track.commands.size()) {
     return nullptr;
   }
-  return &*found;
+  return &track.commands[id.value];
 }
 
 bool trackUsesSemantic(const TrackProgram& track, SequenceSemantic semantic) {
@@ -104,20 +95,16 @@ SourceValue semanticOperandSourceValue(const SemanticOperandValue& value) {
       value);
 }
 
-TrackProgramBuilder::TrackProgramBuilder(TrackProgram& track) : track_(track) {
-}
-
-const SourceCommand& TrackProgramBuilder::addSemantic(Address address, u8 opcode, SourceRange range,
-                                                      std::vector<SemanticOperand> operands, CommandFlow flow,
-                                                      SourceAnnotationId annotation, CommandExecution execution,
-                                                      SequenceSemantic semantic) {
-  if (track_.addressIndex.find(address)) {
+CommandId TrackProgram::addCommand(Address address, u8 opcode, SourceRange range,
+                                   std::vector<SemanticOperand> operands, CommandFlow flow,
+                                   SourceAnnotationId annotation, CommandExecution execution,
+                                   SequenceSemantic semantic) {
+  if (addressIndex.find(address)) {
     throw std::invalid_argument("Sequence command address was decoded more than once");
   }
 
-  const auto commandIndex = static_cast<u32>(track_.commands.size());
-  track_.commands.push_back(SourceCommand{
-      .id = CommandId{commandIndex},
+  const auto commandIndex = static_cast<u32>(commands.size());
+  commands.push_back(SourceCommand{
       .opcode = opcode,
       .address = address,
       .range = range,
@@ -127,8 +114,8 @@ const SourceCommand& TrackProgramBuilder::addSemantic(Address address, u8 opcode
       .flow = std::move(flow),
       .execution = std::move(execution),
   });
-  track_.addressIndex.add(address, commandIndex);
-  return track_.commands.back();
+  addressIndex.add(address, commandIndex);
+  return CommandId{commandIndex};
 }
 
 }  // namespace vgmtrans::core

@@ -617,10 +617,6 @@ struct Playback {
     return effects;
   }
 
-  [[nodiscard]] Effects repeatBreak(u8 slot, Address destination) {
-    return vm.countedRepeatBreak(slot, destination).effects;
-  }
-
   void tick() {
     if (track.pitchSlideActive && vm.tick() >= track.pitchSlideEndTick) {
       if (track.pitchSlideRepeat) {
@@ -768,8 +764,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         return event.ignore();
       }
       event.derived("destination", found->second.end, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-      event.mayBranchTo(found->second.end);
-      return event.invoke<&Playback::repeatBreak>(found->second.slot, found->second.end);
+      return event.repeatBreak(found->second.slot, found->second.end);
     }
     case 0xd7:
       return cursor.sourceOnly("Loop Point", "loop-point").ignore();

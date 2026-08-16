@@ -2421,12 +2421,11 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
       .id = TrackId{0},
       .startAddress = Address{0},
   };
-  TrackProgramBuilder trackBuilder{track};
 
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfe, 0x00, 0x00};
-  addProbeCommand<ProbeNoteCommand>(trackBuilder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeJumpCommand>(trackBuilder, dialect, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
+  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeJumpCommand>(track, dialect, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
 
   test::SessionSnapshotBuilder snapshotBuilder;
   snapshotBuilder.assets.emplace_back(SequenceProgramAsset{
@@ -2478,12 +2477,11 @@ void standaloneSequenceExportDoesNotRequireACollection() {
       .id = TrackId{0},
       .startAddress = Address{0},
   };
-  TrackProgramBuilder trackBuilder{track};
 
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeNoteCommand>(trackBuilder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeEndCommand>(trackBuilder, dialect, Address{3}, probeRange(3, endBytes.size()), endBytes);
+  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeEndCommand>(track, dialect, Address{3}, probeRange(3, endBytes.size()), endBytes);
 
   test::SessionSnapshotBuilder snapshotBuilder;
   snapshotBuilder.assets.emplace_back(SequenceProgramAsset{

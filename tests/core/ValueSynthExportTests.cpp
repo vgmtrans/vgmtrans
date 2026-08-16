@@ -702,17 +702,16 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
 
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
-  TrackProgramBuilder trackBuilder(track);
   const std::array<u8, 3> defaultNote{0x90, 0x3c, 0x01};
   const std::array<u8, 2> selectLead{0x80, 0x01};
   const std::array<u8, 3> leadNote{0x90, 0x40, 0x01};
   const std::array<u8, 1> end{0xff};
-  addProbeCommand<ProbeNoteCommand>(trackBuilder, dialect, Address{0}, probeRange(0, defaultNote.size()),
+  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, defaultNote.size()),
                                     defaultNote);
-  addProbeCommand<ProbeProgramCommand>(trackBuilder, dialect, Address{3}, probeRange(3, selectLead.size()),
+  addProbeCommand<ProbeProgramCommand>(track, dialect, Address{3}, probeRange(3, selectLead.size()),
                                        selectLead);
-  addProbeCommand<ProbeNoteCommand>(trackBuilder, dialect, Address{5}, probeRange(5, leadNote.size()), leadNote);
-  addProbeCommand<ProbeEndCommand>(trackBuilder, dialect, Address{8}, probeRange(8, end.size()), end);
+  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{5}, probeRange(5, leadNote.size()), leadNote);
+  addProbeCommand<ProbeEndCommand>(track, dialect, Address{8}, probeRange(8, end.size()), end);
 
   const SequenceProgramAsset sequence{
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "Probe", .name = "Usage"},
@@ -976,11 +975,10 @@ void collectionPreparationAppliesToWholeExport() {
   const SourceId source = sources.add(SourceFile{.name = "performance-finalizer.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
-  TrackProgramBuilder trackBuilder(track);
   const std::array<u8, 3> noteBytes{0x90, 0x3c, 0x04};
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeNoteCommand>(trackBuilder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeEndCommand>(trackBuilder, dialect, Address{3}, probeRange(3, endBytes.size()), endBytes);
+  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeEndCommand>(track, dialect, Address{3}, probeRange(3, endBytes.size()), endBytes);
 
   const SequenceProgramAsset sequence{
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "Performance Finalizer", .name = "Sequence"},
@@ -1122,11 +1120,10 @@ void synthOnlyExportSkipsSequencesWithoutModulation() {
   SequenceRuntime runtime = probeSequenceRuntime();
   runtime.execute = countSynthOnlySequenceExecution;
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
-  TrackProgramBuilder trackBuilder(track);
   const std::array<u8, 3> noteBytes{0x90, 0x3c, 0x04};
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeNoteCommand>(trackBuilder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeEndCommand>(trackBuilder, dialect, Address{3}, probeRange(3, endBytes.size()), endBytes);
+  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeEndCommand>(track, dialect, Address{3}, probeRange(3, endBytes.size()), endBytes);
 
   const SequenceProgramAsset sequence{
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "Probe", .name = "No Modulation"},
@@ -1309,12 +1306,11 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
 
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{.id = TrackId{0}, .sourceTrackNumber = 3, .startAddress = Address{0}};
-  TrackProgramBuilder trackBuilder(track);
   const std::array<u8, 3> noteBytes{0x90, 0x3c, 0x04};
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeNoteCommand>(trackBuilder, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
   track.commands.back().annotation = SourceAnnotationId{40};
-  addProbeCommand<ProbeEndCommand>(trackBuilder, dialect, Address{3}, probeRange(3, endBytes.size()), endBytes);
+  addProbeCommand<ProbeEndCommand>(track, dialect, Address{3}, probeRange(3, endBytes.size()), endBytes);
   track.commands.back().annotation = SourceAnnotationId{41};
 
   const SequenceProgramAsset sequence{

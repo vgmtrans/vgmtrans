@@ -196,8 +196,7 @@ DecodedBytecodeCommand TrackDecodeSession::project(DecodedBytecodeCommand comman
 
 void TrackDecodeSession::append(DecodedBytecodeCommand command, u32 offset) {
   command = project(std::move(command));
-  TrackProgramBuilder builder{track_};
-  appendDecodedBytecodeCommand(builder, std::move(command), offset);
+  appendDecodedBytecodeCommand(track_, std::move(command), offset);
 }
 
 TrackProgram TrackDecodeSession::finish() {

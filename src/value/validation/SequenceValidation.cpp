@@ -30,21 +30,10 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
                    "Sequence program contained duplicate track id " + std::to_string(track.id.value));
     }
 
-    std::unordered_set<u32> commandIds;
-    commandIds.reserve(track.commands.size());
     // Operand names are unique and source-bounded. Names deliberately serve as
     // identity so format code does not maintain a second numeric operand
     // vocabulary solely for execution.
     for (const auto& command : track.commands) {
-      if (!command.id.valid()) {
-        report.error("sequence.command.missing-id", "Sequence program contained a command without an id",
-                     command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
-      } else if (!commandIds.insert(command.id.value).second) {
-        report.error("sequence.command.duplicate-id",
-                     "Sequence program contained duplicate command id " + std::to_string(command.id.value),
-                     command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
-      }
-
       std::unordered_set<std::string> operandNames;
       operandNames.reserve(command.operands.size());
       for (const auto& operand : command.operands) {
