@@ -331,7 +331,7 @@ SequenceProgram parseSonyPs1Sequence(ByteReader reader, AssetId id, const SonyPs
   SequenceProgram program = sonyPs1SequenceDialect().makeProgram();
   program.timebase.ppqn = layout.ppqn;
   program.behavior.initialTempoMicrosecondsPerQuarter = layout.initialTempo;
-  program.runtime = makeCompiledRuntime<TrackState, Playback, ProgramState>(RuntimeConfig{
+  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{
                    .numerator = layout.rhythmNumerator,
                    .denominator = static_cast<u8>(1u << layout.rhythmDenominatorPower),
                });

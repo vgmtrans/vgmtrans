@@ -1820,7 +1820,7 @@ const SequenceDialect& sequenceDialect() {
 }
 
 SequenceRuntime sequenceRuntime(Profile profile, u8 initialTempo, u8 initialTimer, bool monoOutput) {
-  return makeCompiledRuntime<TrackState, Playback, ProgramState>(
+  return makeCompiledRuntime<Cursor, ProgramState>(
       RuntimeConfig{
           .profile = profile,
           .initialTempo = initialTempo,
@@ -1895,7 +1895,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
       runtime.srcns.push_back(reader.u8At(*layout.instrumentTableAddress + sourceProgram));
     }
   }
-  program.runtime = makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime));
+  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime));
 
   const SequenceRecipes recipes = analyzeCompiledProgram<ProgramState>(
       program, &ProgramState::recipes, SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce});

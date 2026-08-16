@@ -872,7 +872,7 @@ SequenceDialect makeAkaoDialect(AkaoPs1Version version) {
 }
 
 SequenceRuntime akaoSequenceRuntime() {
-  return makeCompiledRuntime<TrackState, Playback>();
+  return makeCompiledRuntime<AkaoCursor>();
 }
 
 TrackProgram decodeAkaoTrack(AkaoPs1Version version, const TrackDecodeScope& tracks, u32 trackIndex, u32 startOffset,

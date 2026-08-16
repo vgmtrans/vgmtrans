@@ -848,7 +848,7 @@ const SequenceDialect& sequenceDialect() {
 }
 
 SequenceRuntime sequenceRuntime(u8 echoDelay) {
-  return makeCompiledRuntime<TrackState, Playback, ProgramState>(RuntimeConfig{.echoDelay = echoDelay});
+  return makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{.echoDelay = echoDelay});
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, u32 trackNumber, u32 startAddress, u32 sequenceBase, u8 groupIndex,

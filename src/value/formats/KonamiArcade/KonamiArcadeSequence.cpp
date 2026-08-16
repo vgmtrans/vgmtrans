@@ -1189,7 +1189,7 @@ SequenceProgram decodeKonamiArcadeSequence(ByteReader reader, const KonamiArcade
   }
 
   return sequence.finish(
-      makeCompiledRuntime<TrackState, Playback, SequenceState>(TrackState::RuntimeConfig{.version = layout.version}));
+      makeCompiledRuntime<KonamiArcadeCursor, SequenceState>(TrackState::RuntimeConfig{.version = layout.version}));
 }
 
 }  // namespace vgmtrans::formats::konami_arcade

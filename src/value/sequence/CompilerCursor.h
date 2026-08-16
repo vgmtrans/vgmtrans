@@ -238,9 +238,12 @@ template <class Playback>
 // CompilerCursor gives formats one imperative command block. Reads add source
 // metadata immediately; event operations compose one typed executable body for
 // later, source-free SequenceVm execution.
-template <class TrackState, class Playback>
+template <class TrackStateType, class PlaybackType>
 class CompilerCursor {
 public:
+  using TrackState = TrackStateType;
+  using Playback = PlaybackType;
+
   class Event {
   public:
     // Source reads consume bytes immediately. Do not place multiple reads in

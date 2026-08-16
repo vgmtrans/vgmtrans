@@ -1054,7 +1054,7 @@ SequenceProgram decodeCpsSequence(ByteReader reader, const CpsLayout& layout, co
           .range = reader.range(sourceSequence.offset, std::min<u32>(headerSize, 1)),
       });
     }
-    SequenceProgram empty = sequence.finish(makeCompiledRuntime<TrackState, Playback, ProgramState>(
+    SequenceProgram empty = sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(
         RuntimeConfig{.version = layout.version, .masterVolume = layout.masterVolume}));
     if (usesLateSequence(layout.version)) {
       empty.behavior.initialExpression = isCps3(layout.version) ? 65.0 / 128.0 : 0.5;
@@ -1098,7 +1098,7 @@ SequenceProgram decodeCpsSequence(ByteReader reader, const CpsLayout& layout, co
       sequence.addTrack(track, reader.range(pointer, 2), start, decode, encoded);
     }
   }
-  SequenceProgram program = sequence.finish(makeCompiledRuntime<TrackState, Playback, ProgramState>(
+  SequenceProgram program = sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(
       RuntimeConfig{.version = layout.version, .masterVolume = layout.masterVolume}));
   if (usesLateSequence(layout.version)) {
     program.behavior.initialExpression = isCps3(layout.version) ? 65.0 / 128.0 : 0.5;

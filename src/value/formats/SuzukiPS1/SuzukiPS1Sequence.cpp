@@ -666,7 +666,7 @@ SequenceProgram parseSuzukiPs1Sequence(ByteReader reader, AssetId id, const Suzu
     runtime.envelopes.emplace((static_cast<u32>(envelope.bank) << 8) | envelope.program,
                               std::pair{envelope.adsr1, envelope.adsr2});
   }
-  program.runtime = makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime));
+  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime));
 
   if (sourceMap != nullptr) {
     sourceMap->header("SuzukiPS1 Sequence Header", reader.range(layout.offset, 0x22))

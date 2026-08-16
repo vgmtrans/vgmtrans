@@ -179,8 +179,10 @@ void installCompiledRuntimeHooks(SequenceRuntime& runtime) {
 
 // Construct one complete erased runtime for a format whose state needs no
 // program-specific immutable configuration.
-template <class TrackState, class Playback, class ProgramState = EmptyCompiledProgramState>
+template <class Cursor, class ProgramState = EmptyCompiledProgramState>
 [[nodiscard]] SequenceRuntime makeCompiledRuntime() {
+  using TrackState = typename Cursor::TrackState;
+  using Playback = typename Cursor::Playback;
   using Compiled = CompiledCommandRuntime<TrackState, Playback, ProgramState>;
   SequenceRuntime runtime;
   runtime.createProgramState = [](const SequenceProgram& program) { return Compiled::createProgramState(program); };
@@ -193,8 +195,10 @@ template <class TrackState, class Playback, class ProgramState = EmptyCompiledPr
 
 // Construct one complete erased runtime whose state factories close over
 // immutable typed format settings.
-template <class TrackState, class Playback, class ProgramState = EmptyCompiledProgramState, class Config>
+template <class Cursor, class ProgramState = EmptyCompiledProgramState, class Config>
 [[nodiscard]] SequenceRuntime makeCompiledRuntime(Config config) {
+  using TrackState = typename Cursor::TrackState;
+  using Playback = typename Cursor::Playback;
   using Compiled = CompiledCommandRuntime<TrackState, Playback, ProgramState>;
   constexpr bool programConsumesConfig =
       std::constructible_from<ProgramState, const SequenceProgram&, const Config&> ||

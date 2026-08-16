@@ -1118,7 +1118,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     }
     program.tracks.push_back(decodeTrack(reader, layout, channel, sequenceId, headerParent, sourceMap, diagnostics));
   }
-  program.runtime = makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime));
+  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime));
   return SequenceParse{.program = std::move(program), .headerRange = headerRange};
 }
 

@@ -209,7 +209,7 @@ SequenceDialect compilerProbeDialect() {
 }
 
 SequenceRuntime compilerProbeRuntime() {
-  return makeCompiledRuntime<CompilerProbeState, CompilerProbePlayback, CompilerProbeProgramState>();
+  return makeCompiledRuntime<ProbeCursor, CompilerProbeProgramState>();
 }
 
 TrackProgram decodeProbeTrack(ByteReader reader, u32 end, SourceMapBuilder* sourceMap = nullptr,
@@ -520,7 +520,7 @@ void compilerCursorAnalysisStopsAfterItsScheduledPrepass() {
   const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{15}, bytes), static_cast<u32>(bytes.size()));
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
-      .runtime = makeCompiledRuntime<CompilerProbeState, CompilerProbePlayback, CompilerPrepassProgramState>(),
+      .runtime = makeCompiledRuntime<ProbeCursor, CompilerPrepassProgramState>(),
       .timebase = dialect.timebase,
       .behavior = dialect.behavior,
       .tracks = {track},

@@ -716,7 +716,7 @@ const SequenceDialect& ndsSequenceDialect() {
 }
 
 SequenceRuntime ndsSequenceRuntime() {
-  return makeCompiledRuntime<TrackState, Playback, ProgramState>();
+  return makeCompiledRuntime<NdsCompilerCursor, ProgramState>();
 }
 
 // Creates the sequence program, describes its header, and decodes all tracks

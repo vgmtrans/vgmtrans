@@ -563,7 +563,7 @@ const SequenceDialect& capcomSnesSequenceDialect() {
 }
 
 SequenceRuntime capcomSnesSequenceRuntime(CapcomSnesEngineVersion version) {
-  return makeCompiledRuntime<TrackState, Playback, ProgramState>(RuntimeConfig{.version = version});
+  return makeCompiledRuntime<CapcomCursor, ProgramState>(RuntimeConfig{.version = version});
 }
 
 // Decodes one known track directly for focused tests and callers that already

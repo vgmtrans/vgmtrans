@@ -786,7 +786,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         [&](u32 offset) { return decodeCommand(reader, offset, durations, diagnostics, &programs); }, relative);
   }
   SequenceProgram program = sequence.finish(
-      makeCompiledRuntime<TrackState, Playback, ProgramState>(RuntimeConfig{.patches = runtimePatches(reader, layout)}));
+      makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{.patches = runtimePatches(reader, layout)}));
   return SequenceParse{
       .program = std::move(program),
       .programs = std::move(programs),

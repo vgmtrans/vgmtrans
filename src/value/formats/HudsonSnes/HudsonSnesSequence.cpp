@@ -1498,7 +1498,7 @@ const SequenceDialect& sequenceDialect() {
 
 SequenceRuntime sequenceRuntime(Version version, u8 timebaseShift, bool velocityEnabled, std::vector<u32> tables,
                                 u8 initialEchoMask) {
-  return makeCompiledRuntime<TrackState, Playback, ProgramState>(RuntimeConfig{
+  return makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{
                    .version = version,
                    .timebaseShift = timebaseShift,
                    .velocityEnabled = velocityEnabled,

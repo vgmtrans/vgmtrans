@@ -2146,7 +2146,7 @@ const SequenceDialect& akaoSnesSequenceDialect() {
 }
 
 SequenceRuntime akaoSnesSequenceRuntime(AkaoSnesProfile profile, std::vector<u32> v1VolumeEnvelopes) {
-  return makeCompiledRuntime<TrackState, Playback, ProgramState>(
+  return makeCompiledRuntime<AkaoSnesCursor, ProgramState>(
       RuntimeConfig{.profile = profile, .v1VolumeEnvelopes = std::move(v1VolumeEnvelopes)});
 }
 
@@ -2217,7 +2217,7 @@ SequenceProgram parseAkaoSnesSequence(ByteReader reader, const AkaoSnesLayout& l
     runtime.v1VolumeEnvelopes = captureAkaoSnesV1VolumeEnvelopes(reader, *layout.volumeEnvelopeTableAddress);
   }
   SequenceProgram program =
-      session.finish(makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime)));
+      session.finish(makeCompiledRuntime<AkaoSnesCursor, ProgramState>(std::move(runtime)));
   program.behavior.initialTempoMicrosecondsPerQuarter =
       tempoMicrosecondsPerQuarter(profile.version, profile.minorVersion, kDefaultTempo);
 

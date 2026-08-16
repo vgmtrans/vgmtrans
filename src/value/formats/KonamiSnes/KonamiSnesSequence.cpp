@@ -1644,7 +1644,7 @@ const SequenceDialect& konamiSnesSequenceDialect(KonamiSnesVersion version) {
 }
 
 SequenceRuntime konamiSnesSequenceRuntime(KonamiSnesVersion version, bool indexedEchoFilter) {
-  return makeCompiledRuntime<TrackState, Playback, ProgramState>(
+  return makeCompiledRuntime<KonamiCursor, ProgramState>(
       RuntimeConfig{.version = version, .indexedEchoFilter = indexedEchoFilter});
 }
 
@@ -1718,7 +1718,7 @@ SequenceProgram decodeKonamiSnesSequence(ByteReader reader, const KonamiSnesLayo
         (static_cast<u32>(instrument.adsr1) << 16) | (static_cast<u32>(instrument.adsr2) << 8) | instrument.gain;
     runtime.instruments[offset + 1] = (static_cast<u32>(instrument.pan) << 8) | instrument.volume;
   }
-  return sequence.finish(makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime)));
+  return sequence.finish(makeCompiledRuntime<KonamiCursor, ProgramState>(std::move(runtime)));
 }
 
 }  // namespace vgmtrans::formats::konami_snes

@@ -1018,7 +1018,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         [&](u32 offset) { return decodeCommand(reader, offset, layout.version, diagnostics); }, raw);
   }
   const u8 initialTempo = reader.u8At(layout.sequenceHeaderAddress);
-  SequenceProgram program = sequence.finish(makeCompiledRuntime<TrackState, Playback, ProgramState>(RuntimeConfig{
+  SequenceProgram program = sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{
       .version = layout.version,
       .tables = RuntimeTables::encode(reader, layout),
       .baseTempo = initialTempo,
