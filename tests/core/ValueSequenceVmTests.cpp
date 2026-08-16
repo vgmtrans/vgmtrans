@@ -1206,7 +1206,7 @@ Effects executeScheduledProbe(const SourceCommand& command, std::any& programSta
   auto& state = std::any_cast<ScheduledProbeProgramState&>(programState);
   if (command.address.value == 0 || command.address.value == 2) {
     state.sharedValue = command.opcode;
-    return Effects::none();
+    return {};
   }
   if (command.address.value == 1) {
     return Effects::wait(command.opcode);

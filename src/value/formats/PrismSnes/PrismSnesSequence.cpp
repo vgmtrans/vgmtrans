@@ -836,7 +836,7 @@ struct Playback {
   void condition() { program.condition = true; }
 
   [[nodiscard]] Effects conditionalJump(Address destination) {
-    return program.condition ? vm.jump(destination) : vm.fallthrough();
+    return program.condition ? vm.jump(destination) : Effects{};
   }
 
   [[nodiscard]] Effects return_() { return vm.inSubroutine() ? vm.return_() : vm.fallthrough(); }

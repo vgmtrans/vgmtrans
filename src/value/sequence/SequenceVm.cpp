@@ -430,8 +430,8 @@ public:
   VmTrackExecutor(const SequenceProgram& program, const TrackProgram& track, const SequenceRuntime& sequenceRuntime,
                   const SequenceProgramBehavior& behavior, const SequenceVmOptions& options,
                   PerformanceSequence& targetSequence, u64& outputSequence, bool includeGlobalInitialEvents,
-                  std::optional<u64> stopTick,
-                  std::any* programState = nullptr, bool sequenceCoordinatesLoops = false, bool startsActive = true)
+                  std::optional<u64> stopTick, std::any& programState, bool sequenceCoordinatesLoops = false,
+                  bool startsActive = true)
       : track_(track), sequenceRuntime_(sequenceRuntime), behavior_(behavior),
         loopPolicy_(options.loopPolicy == LoopPolicy::Default ? behavior.loopPolicy : options.loopPolicy),
         options_(options), targetSequence_(targetSequence), outputSequence_(outputSequence), stopTick_(stopTick),
@@ -570,11 +570,7 @@ private:
     }
     auto out = outputAt(runtime_.tick, command.id, command.annotation);
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
-    if (programState_ == nullptr) {
-      warn("Missing sequence program state", command.range);
-      return;
-    }
-    sequenceRuntime_.tick(command, *programState_, trackState_, out, vm);
+    sequenceRuntime_.tick(command, programState_, trackState_, out, vm);
   }
 
   void executeReadyCommandDuringWait() {
@@ -585,14 +581,9 @@ private:
     if (!command.execution.duringWait) {
       return;
     }
-    if (programState_ == nullptr) {
-      warn("Missing sequence program state", command.range);
-      return;
-    }
-
     auto out = outputAt(runtime_.tick, command.id, command.annotation);
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
-    if (!sequenceRuntime_.readyDuringWait(command, *programState_, trackState_, out, vm)) {
+    if (!sequenceRuntime_.readyDuringWait(command, programState_, trackState_, out, vm)) {
       return;
     }
     static_cast<void>(executeCommand(true));
@@ -628,12 +619,7 @@ private:
     const size_t firstAutomation = performanceTrack_.automations.size();
     auto out = outputAt(beginTick, command.id, command.annotation);
     VmApi vm = detail::VmApiAccess::make(runtime_, targetSequence_, command);
-    if (programState_ == nullptr || sequenceRuntime_.execute == nullptr) {
-      warn("Missing sequence runtime executor state", command.range);
-      current_ = std::nullopt;
-      return false;
-    }
-    const Effects effects = sequenceRuntime_.execute(command, *programState_, trackState_, out, vm);
+    const Effects effects = sequenceRuntime_.execute(command, programState_, trackState_, out, vm);
     if (duringWait) {
       if (effects.advanceTicks != 0 || effects.flowOverride ||
           command.flow.defaultTransition.kind != CommandTransitionKind::Fallthrough) {
@@ -883,7 +869,7 @@ private:
   std::optional<u64> stopTick_;
   PerformanceTrack performanceTrack_;
   std::any trackState_;
-  std::any* programState_ = nullptr;
+  std::any& programState_;
   VmTrackRuntime runtime_;
   LoopDetector loopDetector_;
   std::optional<u32> current_;
@@ -1060,7 +1046,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, std::
       for (const TrackProgram& track : program.tracks) {
         executors.push_back(std::make_unique<VmTrackExecutor>(
             program, track, runtime, behavior, options_, target, outputSequence, executors.empty(), std::nullopt,
-            &passProgramState, loopPolicy == LoopPolicy::PlayOnce, !hasSectionPlaylist));
+            passProgramState, loopPolicy == LoopPolicy::PlayOnce, !hasSectionPlaylist));
       }
 
       std::optional<SectionPlaylistRunner> playlist;

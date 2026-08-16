@@ -445,7 +445,7 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
     const u8 velocity = event.u8("velocity", SemanticOperandRole::Level);
     const u16 duration = durationHigh | event.u8("duration_low", SemanticOperandRole::Duration);
     const u16 delta = deltaHigh | event.u8("delta_low", SemanticOperandRole::Duration);
-    return event.invoke<&Playback::note>(channel, key, velocity, duration, delta).runtimeControlFlow();
+    return event.invokeFlow<&Playback::note>(channel, key, velocity, duration, delta);
   }
 
   if ((status & 0xf0) == 0xb0) {
@@ -456,7 +456,7 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
     const auto valueRole = controller == 32 ? SemanticOperandRole::InstrumentBank : SemanticOperandRole::Level;
     const u8 value = event.derived("value", static_cast<u8>(encoded & 0x7f), valueRole);
     const u16 delta = event.u8("delta", SemanticOperandRole::Duration);
-    return event.invoke<&Playback::controller>(channel, controller, value, delta).runtimeControlFlow();
+    return event.invokeFlow<&Playback::controller>(channel, controller, value, delta);
   }
 
   if ((status & 0xf0) == 0xc0) {
@@ -465,7 +465,7 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
     const u8 encodedProgram = event.u8("encoded_program");
     event.derived("program", static_cast<u8>(encodedProgram & 0x7f), SemanticOperandRole::InstrumentProgram);
     const u16 delta = event.u8("delta", SemanticOperandRole::Duration);
-    return event.invoke<&Playback::programChange>(channel, encodedProgram, delta).runtimeControlFlow();
+    return event.invokeFlow<&Playback::programChange>(channel, encodedProgram, delta);
   }
 
   if ((status & 0xf0) == 0xd0) {
@@ -473,7 +473,7 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
     event.opcodeBits<0, 4>("channel", SemanticOperandRole::Channel);
     const u8 pressure = event.u8("pressure");
     const u16 delta = event.u8("delta", SemanticOperandRole::Duration);
-    return event.invoke<&Playback::channelPressure>(pressure, delta).runtimeControlFlow();
+    return event.invokeFlow<&Playback::channelPressure>(pressure, delta);
   }
 
   if ((status & 0xf0) == 0xe0) {
@@ -482,7 +482,7 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
     const u8 encodedBend = event.u8("encoded_bend");
     event.derived("bend", static_cast<u8>(encodedBend & 0x7f), SemanticOperandRole::Pitch);
     const u16 delta = event.u8("delta", SemanticOperandRole::Duration);
-    return event.invoke<&Playback::pitchBend>(channel, encodedBend, delta).runtimeControlFlow();
+    return event.invokeFlow<&Playback::pitchBend>(channel, encodedBend, delta);
   }
 
   switch (status) {
@@ -500,7 +500,7 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Forever Loop", SequenceSemantic::Loop);
       const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
       const Address continuation = event.nextAddress();
-      return event.invoke<&Playback::foreverLoop>(delta, continuation).runtimeControlFlow();
+      return event.invokeFlow<&Playback::foreverLoop>(delta, continuation);
     }
     case 0x83:
       return cursor.command("End", SequenceSemantic::End).end();

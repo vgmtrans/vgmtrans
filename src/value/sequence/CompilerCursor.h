@@ -66,6 +66,10 @@ template <class Playback, class Callable, class... Arguments>
 }
 
 template <class Playback, class Callable, class... Arguments>
+using CommandResult = std::invoke_result_t<
+    const Callable&, Playback&, const decltype(storedCommandValue(std::declval<Arguments>()))&...>;
+
+template <class Playback, class Callable, class... Arguments>
 [[nodiscard]] CommandBody makeCommandBody(Callable callable, Arguments... arguments) {
   static_assert(std::is_copy_constructible_v<Callable>, "Compiled sequence command callables must be copyable");
   auto values = std::tuple{storedCommandValue(std::move(arguments))...};
@@ -535,6 +539,18 @@ public:
       return appendCallable(std::move(handler), std::move(arguments)...);
     }
 
+    // Invoke behavior that may choose the command's runtime path. The decoded
+    // default still applies when the handler returns no flow override.
+    template <auto Method, class... Arguments>
+    Event& invokeFlow(Arguments... arguments) {
+      return appendFlowCallable(Method, std::move(arguments)...);
+    }
+
+    template <class Handler, class... Arguments>
+    Event& invokeFlow(Handler handler, Arguments... arguments) {
+      return appendFlowCallable(std::move(handler), std::move(arguments)...);
+    }
+
     // The VM may execute this command while the preceding command's wait is
     // still active. It polls at most once when the wait begins and once per
     // nonfinal wait tick, and executes the command only when Predicate is true.
@@ -557,6 +573,12 @@ public:
     Event& jump(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       setDefaultTransition(CommandTransition::jump(destination));
+      return *this;
+    }
+
+    Event& finiteBranch(Address destination) {
+      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
+      setDefaultTransition(CommandTransition::jump(destination, JumpSemantics::FiniteBranch));
       return *this;
     }
 
@@ -590,13 +612,6 @@ public:
     Event& discoverReturn() {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       setDefaultTransition(CommandTransition::return_());
-      return *this;
-    }
-
-    // Marks a typed body whose path comes from runtime state. Discovery still
-    // follows the command's decoded default and additional targets.
-    Event& runtimeControlFlow() {
-      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       return *this;
     }
 
@@ -652,6 +667,14 @@ public:
         return detail::combineCommandEffects(std::move(combined), next(playback));
       };
       return *this;
+    }
+
+    template <class Callable, class... Arguments>
+    Event& appendFlowCallable(Callable callable, Arguments... arguments) {
+      static_assert(std::is_same_v<detail::CommandResult<Playback, Callable, Arguments...>, Effects>,
+                    "A runtime control-flow handler must return Effects");
+      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
+      return appendCallable(std::move(callable), std::move(arguments)...);
     }
 
     void setDefaultTransition(CommandTransition transition) {

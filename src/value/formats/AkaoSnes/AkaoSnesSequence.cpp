@@ -1941,7 +1941,7 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
           count, event.nextAddress());
     }
     case EventType::LoopEnd:
-      return cursor.command("Loop End", SequenceSemantic::Repeat).invoke<&Playback::loopEnd>().runtimeControlFlow();
+      return cursor.command("Loop End", SequenceSemantic::Repeat).invokeFlow<&Playback::loopEnd>();
     case EventType::OneTimeDuration: {
       auto event = cursor.command("Duration One-Time", SequenceSemantic::Meta);
       return event.set<&TrackState::onetimeDuration>(event.u8("duration"));

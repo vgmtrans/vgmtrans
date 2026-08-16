@@ -122,35 +122,24 @@ struct CompiledCommandRuntime {
                    VmApi& vm) {
     // Rebuild the lightweight Playback view for each elapsed tick so active
     // fades can use the current emitter and VM position without storing either.
-    static_cast<void>(withPlayback(programState, trackState, out, vm, [](Playback& playback) {
-      if constexpr (requires { playback.tick(); }) {
-        playback.tick();
-      }
-      return Effects{};
-    }));
+    withPlayback(programState, trackState, out, vm, [](Playback& playback) { playback.tick(); });
   }
 
   static void finishPrepass(std::any& programState) {
     auto& typedProgramState = std::any_cast<ProgramState&>(programState);
     // Give the format one clear boundary between silent collection and the
     // real render. Collected results remain in the same typed object.
-    if constexpr (requires { typedProgramState.finishPrepass(); }) {
-      typedProgramState.finishPrepass();
-    }
+    typedProgramState.finishPrepass();
   }
 
   static void beginTrackSection(std::any& trackState) {
     auto& typedTrackState = std::any_cast<TrackState&>(trackState);
-    if constexpr (requires { typedTrackState.beginSection(); }) {
-      typedTrackState.beginSection();
-    }
+    typedTrackState.beginSection();
   }
 
   static void finalizePerformance(std::any& programState, PerformanceSequence& performance) {
     auto& typedProgramState = std::any_cast<ProgramState&>(programState);
-    if constexpr (requires { typedProgramState.finalizePerformance(performance); }) {
-      typedProgramState.finalizePerformance(performance);
-    }
+    typedProgramState.finalizePerformance(performance);
   }
 };
 

@@ -879,12 +879,10 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xca:
       return cursor.command("Conditional Restart", SequenceSemantic::Jump)
-          .invoke<&Playback::conditionalStartRepeat>()
-          .runtimeControlFlow();
+          .invokeFlow<&Playback::conditionalStartRepeat>();
     case 0xcb:
       return cursor.command("Conditional End", SequenceSemantic::End)
-          .invoke<&Playback::conditionalEnd>()
-          .runtimeControlFlow();
+          .invokeFlow<&Playback::conditionalEnd>();
     case 0xcc:
     case 0xcd: {
       auto event = cursor.command(opcode == 0xcc ? "Branch On First Pass" : "Branch On Repeat", SequenceSemantic::Jump);
