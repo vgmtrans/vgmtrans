@@ -18,13 +18,8 @@
 
 namespace vgmtrans::core {
 
+class SourceMapBuilder;
 struct SequenceDialect;
-
-// Project one already-decoded semantic command into the durable SourceMap.
-// Format decoders provide data; this function owns the annotation mechanics.
-[[nodiscard]] SourceAnnotationId projectDecodedCommand(SourceMapBuilder* sourceMap,
-                                                       const DecodedBytecodeCommand& command,
-                                                       std::optional<SourceAnnotationId> parent = std::nullopt);
 
 // One track's annotation and command-projection lifecycle. Most formats use
 // TrackDecodeScope::decode; exceptional walkers can begin a session

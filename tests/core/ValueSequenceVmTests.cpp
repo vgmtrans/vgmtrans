@@ -93,8 +93,8 @@ void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
                             VmApi&) { return command.address.value == 0 ? Effects::wait(7) : Effects{}; },
   };
   TrackProgram track{.startAddress = Address{0}};
-  track.addCommand(Address{0}, 0, {}, {}, CommandFlow::fallthroughTo(Address{1}), SourceAnnotationId{20});
-  track.addCommand(Address{1}, 0, {},
+  appendTestCommand(track, Address{0}, 0, {}, {}, CommandFlow::fallthroughTo(Address{1}), SourceAnnotationId{20});
+  appendTestCommand(track, Address{1}, 0, {},
                       {SemanticOperand{
                           .value = u64{6},
                           .name = "channel",
@@ -136,8 +136,8 @@ void sequenceVmPreservesPitchMotionThroughNoteRelease() {
                   },
   };
   TrackProgram track{.startAddress = Address{0}};
-  track.addCommand(Address{0}, 0, {}, {}, CommandFlow::fallthroughTo(Address{1}));
-  track.addCommand(Address{1}, 0, {}, {}, CommandFlow::end(Address{2}));
+  appendTestCommand(track, Address{0}, 0, {}, {}, CommandFlow::fallthroughTo(Address{1}));
+  appendTestCommand(track, Address{1}, 0, {}, {}, CommandFlow::end(Address{2}));
 
   const PerformanceSequence performance = SequenceVm().render(SequenceProgram{
       .runtime = runtime,
@@ -596,9 +596,9 @@ void sequenceVmExposesSubroutineStateFromItsCallStack() {
                   },
   };
   TrackProgram track{.startAddress = Address{0}};
-  track.addCommand(Address{0}, 0, {}, {}, CommandFlow::call(Address{10}, Address{1}));
-  track.addCommand(Address{1}, 0, {}, {}, CommandFlow::end(Address{2}));
-  track.addCommand(Address{10}, 0, {}, {}, CommandFlow::return_(Address{11}));
+  appendTestCommand(track, Address{0}, 0, {}, {}, CommandFlow::call(Address{10}, Address{1}));
+  appendTestCommand(track, Address{1}, 0, {}, {}, CommandFlow::end(Address{2}));
+  appendTestCommand(track, Address{10}, 0, {}, {}, CommandFlow::return_(Address{11}));
 
   const SequenceProgram program{
       .runtime = runtime,
@@ -975,9 +975,9 @@ SequenceRuntime authoritativeFlowProbeRuntime() {
 void sequenceVmUsesDecodedContinuationInsteadOfSizeOrStorageOrder() {
   const SequenceDialect dialect = authoritativeFlowProbeDialect();
   TrackProgram track{.startAddress = Address{100}};
-  track.addCommand(Address{100}, 1, {}, {}, CommandFlow::fallthroughTo(Address{200}));
-  track.addCommand(Address{101}, 99, {}, {}, CommandFlow::end(Address{102}));
-  track.addCommand(Address{200}, 2, {}, {}, CommandFlow::end(Address{201}));
+  appendTestCommand(track, Address{100}, 1, {}, {}, CommandFlow::fallthroughTo(Address{200}));
+  appendTestCommand(track, Address{101}, 99, {}, {}, CommandFlow::end(Address{102}));
+  appendTestCommand(track, Address{200}, 2, {}, {}, CommandFlow::end(Address{201}));
 
   const SequenceProgram program{
       .runtime = authoritativeFlowProbeRuntime(),
@@ -996,10 +996,10 @@ void sequenceVmUsesDecodedContinuationInsteadOfSizeOrStorageOrder() {
 void sequenceVmUsesDecodedCallContinuationAsReturnAddress() {
   const SequenceDialect dialect = authoritativeFlowProbeDialect();
   TrackProgram track{.startAddress = Address{0}};
-  track.addCommand(Address{0}, 0, {}, {}, CommandFlow::call(Address{10}, Address{20}));
-  track.addCommand(Address{1}, 99, {}, {}, CommandFlow::end(Address{2}));
-  track.addCommand(Address{10}, 10, {}, {}, CommandFlow::return_(Address{11}));
-  track.addCommand(Address{20}, 20, {}, {}, CommandFlow::end(Address{21}));
+  appendTestCommand(track, Address{0}, 0, {}, {}, CommandFlow::call(Address{10}, Address{20}));
+  appendTestCommand(track, Address{1}, 99, {}, {}, CommandFlow::end(Address{2}));
+  appendTestCommand(track, Address{10}, 10, {}, {}, CommandFlow::return_(Address{11}));
+  appendTestCommand(track, Address{20}, 20, {}, {}, CommandFlow::end(Address{21}));
 
   const SequenceProgram program{
       .runtime = authoritativeFlowProbeRuntime(),
@@ -1019,8 +1019,8 @@ void sequenceVmPreservesExplicitJumpToContinuation() {
   const SequenceDialect dialect = authoritativeFlowProbeDialect();
   TrackProgram track{.startAddress = Address{1}};
   CommandFlow explicitJump = CommandFlow::fallthroughTo(Address{1});
-  track.addCommand(Address{0}, 0xfe, {}, {}, std::move(explicitJump));
-  track.addCommand(Address{1}, 1, {}, {}, CommandFlow::fallthroughTo(Address{0}));
+  appendTestCommand(track, Address{0}, 0xfe, {}, {}, std::move(explicitJump));
+  appendTestCommand(track, Address{1}, 1, {}, {}, CommandFlow::fallthroughTo(Address{0}));
 
   const SequenceProgram program{
       .runtime = authoritativeFlowProbeRuntime(),
@@ -1043,7 +1043,7 @@ void sequenceVmPrefersRuntimeFlowAndOtherwiseUsesTheDecodedDefault() {
   const SequenceDialect dialect = authoritativeFlowProbeDialect();
   const auto render = [&](u8 opcode, CommandFlow flow) {
     TrackProgram track{.startAddress = Address{0}};
-    track.addCommand(Address{0}, opcode, {}, {}, std::move(flow));
+    appendTestCommand(track, Address{0}, opcode, {}, {}, std::move(flow));
     return SequenceVm().render(SequenceProgram{
         .runtime = authoritativeFlowProbeRuntime(),
             .timebase = dialect.timebase,
@@ -1060,8 +1060,8 @@ void sequenceVmPrefersRuntimeFlowAndOtherwiseUsesTheDecodedDefault() {
 
   TrackProgram track{.startAddress = Address{0}};
   CommandFlow explicitFallthrough = CommandFlow::end(Address{1});
-  track.addCommand(Address{0}, 0xfc, {}, {}, std::move(explicitFallthrough));
-  track.addCommand(Address{1}, 1, {}, {}, CommandFlow::end(Address{2}));
+  appendTestCommand(track, Address{0}, 0xfc, {}, {}, std::move(explicitFallthrough));
+  appendTestCommand(track, Address{1}, 1, {}, {}, CommandFlow::end(Address{2}));
   const PerformanceSequence fallthrough = SequenceVm().render(SequenceProgram{
       .runtime = authoritativeFlowProbeRuntime(),
           .timebase = dialect.timebase,
@@ -1133,15 +1133,15 @@ void sequenceVmSchedulesSemanticTracksAgainstOneProgramState() {
   };
 
   TrackProgram track0{.startAddress = Address{0}};
-  track0.addCommand(Address{0}, 7, {}, {}, CommandFlow::fallthroughTo(Address{1}));
-  track0.addCommand(Address{1}, 4, {}, {}, CommandFlow::fallthroughTo(Address{2}));
-  track0.addCommand(Address{2}, 9, {}, {}, CommandFlow::fallthroughTo(Address{3}));
-  track0.addCommand(Address{3}, 0, {}, {}, CommandFlow::end(Address{4}));
+  appendTestCommand(track0, Address{0}, 7, {}, {}, CommandFlow::fallthroughTo(Address{1}));
+  appendTestCommand(track0, Address{1}, 4, {}, {}, CommandFlow::fallthroughTo(Address{2}));
+  appendTestCommand(track0, Address{2}, 9, {}, {}, CommandFlow::fallthroughTo(Address{3}));
+  appendTestCommand(track0, Address{3}, 0, {}, {}, CommandFlow::end(Address{4}));
 
   TrackProgram track1{.sourceTrackNumber = 1, .startAddress = Address{10}};
-  track1.addCommand(Address{10}, 2, {}, {}, CommandFlow::fallthroughTo(Address{11}));
-  track1.addCommand(Address{11}, 0, {}, {}, CommandFlow::fallthroughTo(Address{12}));
-  track1.addCommand(Address{12}, 0, {}, {}, CommandFlow::end(Address{13}));
+  appendTestCommand(track1, Address{10}, 2, {}, {}, CommandFlow::fallthroughTo(Address{11}));
+  appendTestCommand(track1, Address{11}, 0, {}, {}, CommandFlow::fallthroughTo(Address{12}));
+  appendTestCommand(track1, Address{12}, 0, {}, {}, CommandFlow::end(Address{13}));
 
   const SequenceProgram program{
       .runtime = runtime,
@@ -1189,18 +1189,18 @@ void sequenceVmCoordinatesSemanticLoopsAtSequenceScope() {
   const SequenceRuntime runtime{.execute = executeScheduledLoopProbe};
 
   TrackProgram track0{.startAddress = Address{0}};
-  track0.addCommand(Address{0}, 0, {}, {}, CommandFlow::fallthroughTo(Address{1}));
-  track0.addCommand(Address{1}, 0, {}, {},
+  appendTestCommand(track0, Address{0}, 0, {}, {}, CommandFlow::fallthroughTo(Address{1}));
+  appendTestCommand(track0, Address{1}, 0, {}, {},
                        CommandFlow::jumpTo(Address{0}, Address{2}, JumpSemantics::LoopCandidate));
 
   // This track first jumps into an unvisited block. A per-track loop detector
   // stops track 0 too early while this track is still establishing its loop.
   TrackProgram track1{.startAddress = Address{100}};
-  track1.addCommand(Address{100}, 0, {}, {}, CommandFlow::fallthroughTo(Address{101}));
-  track1.addCommand(Address{101}, 0, {}, {},
+  appendTestCommand(track1, Address{100}, 0, {}, {}, CommandFlow::fallthroughTo(Address{101}));
+  appendTestCommand(track1, Address{101}, 0, {}, {},
                        CommandFlow::jumpTo(Address{110}, Address{102}, JumpSemantics::LoopCandidate));
-  track1.addCommand(Address{110}, 0, {}, {}, CommandFlow::fallthroughTo(Address{111}));
-  track1.addCommand(Address{111}, 0, {}, {},
+  appendTestCommand(track1, Address{110}, 0, {}, {}, CommandFlow::fallthroughTo(Address{111}));
+  appendTestCommand(track1, Address{111}, 0, {}, {},
                        CommandFlow::jumpTo(Address{110}, Address{112}, JumpSemantics::LoopCandidate));
 
   const SequenceProgram program{
@@ -1277,8 +1277,8 @@ TrackProgram playlistProbeTrack(u32 trackId, std::initializer_list<std::pair<u32
       .startAddress = Address{sections.begin()->first},
   };
   for (const auto [address, duration] : sections) {
-    track.addCommand(Address{address}, duration, {}, {}, CommandFlow::fallthroughTo(Address{address + 1}));
-    track.addCommand(Address{address + 1}, 0, {}, {}, CommandFlow::endSection(Address{address + 2}));
+    appendTestCommand(track, Address{address}, duration, {}, {}, CommandFlow::fallthroughTo(Address{address + 1}));
+    appendTestCommand(track, Address{address + 1}, 0, {}, {}, CommandFlow::endSection(Address{address + 2}));
   }
   return track;
 }
@@ -1435,10 +1435,10 @@ void sequenceVmPairsNoteOnAndNoteOffCommands() {
 
   TrackProgram track{.startAddress = Address{0}};
   for (u32 address = 0; address < 9; ++address) {
-    track.addCommand(Address{address}, 0, {}, {}, CommandFlow::fallthroughTo(Address{address + 1}),
+    appendTestCommand(track, Address{address}, 0, {}, {}, CommandFlow::fallthroughTo(Address{address + 1}),
                         SourceAnnotationId{100 + address});
   }
-  track.addCommand(Address{9}, 0, {}, {}, CommandFlow::end(Address{10}), SourceAnnotationId{109});
+  appendTestCommand(track, Address{9}, 0, {}, {}, CommandFlow::end(Address{10}), SourceAnnotationId{109});
 
   const PerformanceSequence performance = SequenceVm().render(SequenceProgram{
       .runtime = runtime,
@@ -1493,13 +1493,13 @@ void sequenceVmClosesActiveNotesAtLoopCutoff() {
                   },
   };
   TrackProgram shortTrack{.startAddress = Address{100}};
-  shortTrack.addCommand(Address{100}, 0, {}, {}, CommandFlow::fallthroughTo(Address{101}),
+  appendTestCommand(shortTrack, Address{100}, 0, {}, {}, CommandFlow::fallthroughTo(Address{101}),
                            SourceAnnotationId{210});
-  shortTrack.addCommand(Address{101}, 0, {}, {}, CommandFlow::end(Address{102}), SourceAnnotationId{211});
+  appendTestCommand(shortTrack, Address{101}, 0, {}, {}, CommandFlow::end(Address{102}), SourceAnnotationId{211});
 
   TrackProgram loopTrack{.startAddress = Address{0}};
-  loopTrack.addCommand(Address{0}, 0, {}, {}, CommandFlow::fallthroughTo(Address{1}), SourceAnnotationId{200});
-  loopTrack.addCommand(Address{1}, 0, {}, {},
+  appendTestCommand(loopTrack, Address{0}, 0, {}, {}, CommandFlow::fallthroughTo(Address{1}), SourceAnnotationId{200});
+  appendTestCommand(loopTrack, Address{1}, 0, {}, {},
                           CommandFlow::jumpTo(Address{0}, Address{2}, JumpSemantics::LoopCandidate),
                           SourceAnnotationId{201});
 

@@ -247,10 +247,6 @@ struct TrackProgram {
 
   [[nodiscard]] std::optional<u32> commandIndex(Address address) const;
   [[nodiscard]] const SourceCommand* command(CommandId id) const;
-
-  CommandId addCommand(Address address, u8 opcode, SourceRange range, std::vector<SemanticOperand> operands,
-                       CommandFlow flow, SourceAnnotationId annotation = {}, CommandExecution execution = {},
-                       SequenceSemantic semantic = SequenceSemantic::Unknown);
 };
 
 // Some drivers arrange a song as a playlist of parallel track sections. A play
