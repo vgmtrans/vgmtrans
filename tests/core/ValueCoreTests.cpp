@@ -168,7 +168,7 @@ void akaoPortamentoRetainsPitchTransitionIntent();
 void akaoRequiredArticulationsComeFromInstrumentRows();
 void akaoMelodicRegionsDropAdvancingOverlaps();
 void akaoSampleSelectionKeepsPreferredAndRequiredCollections();
-void akaoScanPublishesStructuralInstrumentSetAndPreparesBoundView();
+void akaoScanPublishesStructuralInstrumentSetAndBindsResolvedView();
 void ndsLayoutResolvesNamesFilesAndDependencies();
 void ndsLayoutBoundsMalformedTablesAndPointers();
 void ndsSequenceFatRangesHandleNormalEmptyAndRecoveredFiles();
@@ -196,10 +196,10 @@ void ndsWaveArchiveReportsTruncatedSampleHeaders();
 void ndsSynthBuilderPreservesSparseWaveIndexesAcrossArchives();
 void segSatVlCurveMatchesMm8Saturation();
 void segSatTempoDeltaBytesPreserveSourceOrder();
-void segSatCollectionPreparationSuppliesVlTablesToSequence();
+void segSatCollectionBindingSuppliesVlTablesToSequence();
 void segSatRuntimeMapSelectsBankInsideAnotherSampleSpan();
 void segSatMultiBankPlaybackUsesTheActiveBanksVlTable();
-void segSatCollectionPreparationReadsVelocityBanksFromSeparateSources();
+void segSatCollectionBindingReadsVelocityBanksFromSeparateSources();
 void segSatSsfExtractorUsesFourByteMiniHeader();
 
 int main() {
@@ -361,7 +361,7 @@ int main() {
     akaoRequiredArticulationsComeFromInstrumentRows();
     akaoMelodicRegionsDropAdvancingOverlaps();
     akaoSampleSelectionKeepsPreferredAndRequiredCollections();
-    akaoScanPublishesStructuralInstrumentSetAndPreparesBoundView();
+    akaoScanPublishesStructuralInstrumentSetAndBindsResolvedView();
     runMp2kModuleTests();
     ndsLayoutResolvesNamesFilesAndDependencies();
     ndsLayoutBoundsMalformedTablesAndPointers();
@@ -390,10 +390,10 @@ int main() {
     ndsSynthBuilderPreservesSparseWaveIndexesAcrossArchives();
     segSatVlCurveMatchesMm8Saturation();
     segSatTempoDeltaBytesPreserveSourceOrder();
-    segSatCollectionPreparationSuppliesVlTablesToSequence();
+    segSatCollectionBindingSuppliesVlTablesToSequence();
     segSatRuntimeMapSelectsBankInsideAnotherSampleSpan();
     segSatMultiBankPlaybackUsesTheActiveBanksVlTable();
-    segSatCollectionPreparationReadsVelocityBanksFromSeparateSources();
+    segSatCollectionBindingReadsVelocityBanksFromSeparateSources();
     segSatSsfExtractorUsesFourByteMiniHeader();
     suzukiPs1DynamicAdsrUsesAuditedDriverCommands();
     suzukiPs1ModuleBuildsFractionallyTunedWdsSynth();

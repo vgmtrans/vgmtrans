@@ -96,8 +96,7 @@ using detail::VmTrackRuntime;
   };
 }
 
-[[nodiscard]] std::optional<u32> continuationIndex(const TrackProgram& track, CommandId command,
-                                                   Address continuation) {
+[[nodiscard]] std::optional<u32> continuationIndex(const TrackProgram& track, CommandId command, Address continuation) {
   const size_t next = static_cast<size_t>(command.value) + 1;
   if (next < track.commands.size() && track.commands[next].address.value == continuation.value) {
     return static_cast<u32>(next);
@@ -221,8 +220,7 @@ void addLoopMarker(PerformanceTrack& track, CommandId sourceCommand, u64 tick, u
   });
 }
 
-void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavior& behavior,
-                           bool includeGlobalEvents) {
+void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavior& behavior, bool includeGlobalEvents) {
   const PerformanceEventHeader header{
       .track = track.id,
       .tick = 0,
@@ -418,10 +416,11 @@ private:
 // whole-sequence coordination, such as synchronized stopping across tracks.
 class VmTrackExecutor {
 public:
-  VmTrackExecutor(const SequenceProgram& program, TrackId trackId, const TrackProgram& track,
-                  const SequenceVmOptions& options, PerformanceSequence& targetSequence, u64& outputSequence,
-                  bool includeGlobalInitialEvents, std::any& programState, bool startsActive = true)
-      : track_(track), sequenceRuntime_(program.runtime), behavior_(program.behavior),
+  VmTrackExecutor(const SequenceProgram& program, const SequenceRuntime& runtime, TrackId trackId,
+                  const TrackProgram& track, const SequenceVmOptions& options, PerformanceSequence& targetSequence,
+                  u64& outputSequence, bool includeGlobalInitialEvents, std::any& programState,
+                  bool startsActive = true)
+      : track_(track), sequenceRuntime_(runtime), behavior_(program.behavior),
         loopPolicy_(options.loopPolicy == LoopPolicy::Default ? behavior_.loopPolicy : options.loopPolicy),
         options_(options), targetSequence_(targetSequence), outputSequence_(outputSequence),
         performanceTrack_(PerformanceTrack{
@@ -536,8 +535,16 @@ public:
 
 private:
   [[nodiscard]] PerformanceEmitter outputAt(u64 tick, CommandId command = {}, SourceAnnotationId annotation = {}) {
-    return {performanceTrack_, command, annotation, tick, outputSequence_, runtime_.nextNote, runtime_.nextAutomation,
-            behavior_.panLaw, &runtime_.activeNotes, &targetSequence_.sourceSpans};
+    return {performanceTrack_,
+            command,
+            annotation,
+            tick,
+            outputSequence_,
+            runtime_.nextNote,
+            runtime_.nextAutomation,
+            behavior_.panLaw,
+            &runtime_.activeNotes,
+            &targetSequence_.sourceSpans};
   }
 
   void tickRuntime(u32 commandIndex) {
@@ -654,8 +661,7 @@ private:
       ++loopRepeats_;
       loopDetector_.clear();
       if (recordAfterClear) {
-        loopDetector_.record(*recordAfterClear,
-                             VisitRecord{.tick = loop.endTick, .command = CommandId{replayIndex}});
+        loopDetector_.record(*recordAfterClear, VisitRecord{.tick = loop.endTick, .command = CommandId{replayIndex}});
       }
       current_ = replayIndex;
       arrivedByControlFlow_ = true;
@@ -671,8 +677,7 @@ private:
       }
       loopDetector_.clear();
       if (recordAfterClear) {
-        loopDetector_.record(*recordAfterClear,
-                             VisitRecord{.tick = loop.endTick, .command = CommandId{replayIndex}});
+        loopDetector_.record(*recordAfterClear, VisitRecord{.tick = loop.endTick, .command = CommandId{replayIndex}});
       }
       current_ = replayIndex;
       arrivedByControlFlow_ = true;
@@ -986,11 +991,15 @@ SequenceVm::SequenceVm(SequenceVmOptions options) : options_(options) {
 }
 
 PerformanceSequence SequenceVm::render(const SequenceProgram& program) const {
-  return renderImpl(program, nullptr);
+  return renderImpl(program, program.runtime, nullptr);
 }
 
-PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, std::any* analyzedProgramState) const {
-  const SequenceRuntime& runtime = program.runtime;
+PerformanceSequence SequenceVm::render(const SequenceProgram& program, const SequenceRuntime& runtime) const {
+  return renderImpl(program, runtime, nullptr);
+}
+
+PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const SequenceRuntime& runtime,
+                                           std::any* analyzedProgramState) const {
   const SequenceProgramBehavior& behavior = program.behavior;
   PerformanceSequence sequence{
       .timebase = program.timebase,
@@ -1012,7 +1021,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, std::
       const bool hasSectionPlaylist = program.sectionPlaylist.has_value();
       for (size_t trackIndex = 0; trackIndex < program.tracks.size(); ++trackIndex) {
         executors.push_back(std::make_unique<VmTrackExecutor>(
-            program, TrackId{static_cast<u32>(trackIndex)}, program.tracks[trackIndex], options_, target,
+            program, runtime, TrackId{static_cast<u32>(trackIndex)}, program.tracks[trackIndex], options_, target,
             outputSequence, executors.empty(), passProgramState, !hasSectionPlaylist));
       }
 
@@ -1022,8 +1031,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, std::
         const PlaylistAdvance first = playlist->advance(0);
         if (first.trackStarts != nullptr) {
           for (size_t i = 0; i < executors.size(); ++i) {
-            const std::optional<Address> start =
-                i < first.trackStarts->size() ? (*first.trackStarts)[i] : std::nullopt;
+            const std::optional<Address> start = i < first.trackStarts->size() ? (*first.trackStarts)[i] : std::nullopt;
             executors[i]->beginSection(start, 0);
           }
         }
@@ -1068,8 +1076,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, std::
             break;
           }
           for (size_t i = 0; i < executors.size(); ++i) {
-            const std::optional<Address> start =
-                i < next.trackStarts->size() ? (*next.trackStarts)[i] : std::nullopt;
+            const std::optional<Address> start = i < next.trackStarts->size() ? (*next.trackStarts)[i] : std::nullopt;
             executors[i]->beginSection(start, boundary);
           }
           continue;
@@ -1152,7 +1159,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, std::
 std::any detail::analyzeSequenceProgram(const SequenceVm& vm, const SequenceProgram& program,
                                         std::vector<Diagnostic>* diagnostics) {
   std::any state;
-  const PerformanceSequence analysis = vm.renderImpl(program, &state);
+  const PerformanceSequence analysis = vm.renderImpl(program, program.runtime, &state);
   if (diagnostics != nullptr) {
     diagnostics->insert(diagnostics->end(), analysis.diagnostics.begin(), analysis.diagnostics.end());
   }

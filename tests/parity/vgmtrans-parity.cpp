@@ -1634,19 +1634,37 @@ AkaoSummary valueAkaoSummary(const std::filesystem::path& path, std::ostream& di
         .instrumentSetCount = static_cast<u32>(collection.members.instrumentSets.size()),
         .sampleCollectionCount = static_cast<u32>(collection.members.sampleCollections.size()),
     };
-    const auto prepared = vgmtrans::formats::akao::prepareAkaoCollection(CollectionPrepareContext{
+    SequenceRuntime runtime = sequence->program.runtime;
+    std::vector<InstrumentSetAsset> resolvedInstruments;
+    for (const AssetId id : collection.members.instrumentSets) {
+      if (const auto* instruments = project.asset<InstrumentSetAsset>(id)) {
+        resolvedInstruments.push_back(*instruments);
+      }
+    }
+    std::vector<const SampleCollectionAsset*> resolvedSamples;
+    for (const AssetId id : collection.members.sampleCollections) {
+      if (const auto* samples = project.asset<SampleCollectionAsset>(id)) {
+        resolvedSamples.push_back(samples);
+      }
+    }
+    std::vector<Diagnostic> bindingDiagnostics;
+    CollectionBindingContext binding{
         .sources = session.sources(),
-        .snapshot = project,
         .collection = collection,
-    });
-    for (const auto& diagnostic : prepared.diagnostics) {
-      diagnostics << "value preparation diagnostic: " << diagnostic.message << "\n";
+        .sequence = sequence,
+        .sequenceRuntime = runtime,
+        .instrumentSets = resolvedInstruments,
+        .sampleCollections = resolvedSamples,
+        .diagnostics = bindingDiagnostics,
+    };
+    vgmtrans::formats::akao::bindAkaoCollection(binding);
+    for (const auto& diagnostic : bindingDiagnostics) {
+      diagnostics << "value binding diagnostic: " << diagnostic.message << "\n";
     }
-    if (!prepared.replacementInstrumentSets) {
-      throw std::runtime_error("Akao collection preparation did not provide resolved instrument sets");
+    if (resolvedInstruments.empty()) {
+      throw std::runtime_error("Akao collection binding did not provide resolved instrument sets");
     }
-    const auto detailed =
-        valueCapcomSnesSummary(project, session.sources(), collection, *prepared.replacementInstrumentSets);
+    const auto detailed = valueCapcomSnesSummary(project, session.sources(), collection, resolvedInstruments);
     shape.sampleCount = static_cast<u32>(detailed.samples.size());
     shape.samples = detailed.samples;
     for (auto& sample : shape.samples) {
@@ -3140,8 +3158,7 @@ bool compareSf2(std::span<const u8> legacyBytes, std::span<const u8> valueBytes,
             continue;
           }
           const bool combinedDecayApproximation = valueGenerator.operation == 36;
-          const bool combinedSustainApproximation =
-              valueGenerator.operation == 37 && valueGenerator.amount == 1000;
+          const bool combinedSustainApproximation = valueGenerator.operation == 37 && valueGenerator.amount == 1000;
           const bool stoppedEnvelopeStage = (valueGenerator.operation == 34 || valueGenerator.operation == 38) &&
                                             valueGenerator.amount == std::numeric_limits<s16>::min();
           const bool correctedCps3Sustain = correctedCps3Instrument && valueGenerator.operation == 37;
@@ -3291,8 +3308,7 @@ bool compareDls(std::span<const u8> legacyBytes, std::span<const u8> valueBytes,
     // placeholder is not useful and shared synth preparation intentionally
     // omits it. Compare the playable instrument set on both paths.
     const auto removeEmptyInstruments = [](NormalizedDls& dls) {
-      std::erase_if(dls.instruments,
-                    [](const DlsInstrumentSummary& instrument) { return instrument.regions.empty(); });
+      std::erase_if(dls.instruments, [](const DlsInstrumentSummary& instrument) { return instrument.regions.empty(); });
     };
     removeEmptyInstruments(legacy);
     removeEmptyInstruments(value);
@@ -4157,8 +4173,7 @@ std::map<std::string, PerformanceModulationStats> valueFormatPerformanceModulati
     }
     const auto* sequence = project.asset<SequenceProgramAsset>(*collection.members.sequence);
     const std::string key = valueMidiCollectionKey(project, collection);
-    auto [_, inserted] =
-        statsByCollection.emplace(key, performanceModulationStats(sequence->program, sequenceLoops));
+    auto [_, inserted] = statsByCollection.emplace(key, performanceModulationStats(sequence->program, sequenceLoops));
     if (!inserted) {
       throw std::runtime_error("duplicate " + std::string(label) + " performance collection key: " + key);
     }
@@ -4602,12 +4617,10 @@ bool compareMidi(std::span<const u8> legacyBytes, std::span<const u8> valueBytes
         return event.kind == "note" && event.tick == finalLegacyEventTick;
       });
 
-      const bool tailsBoundedByValueEnd =
-          std::ranges::all_of(valueOnly, [&](const NormalizedMidiEvent& event) {
-            return event.track < valueMidi.endOfTrackTicks.size() &&
-                   event.tick <= valueMidi.endOfTrackTicks[event.track] &&
-                   event.c <= valueMidi.endOfTrackTicks[event.track] - event.tick;
-          });
+      const bool tailsBoundedByValueEnd = std::ranges::all_of(valueOnly, [&](const NormalizedMidiEvent& event) {
+        return event.track < valueMidi.endOfTrackTicks.size() && event.tick <= valueMidi.endOfTrackTicks[event.track] &&
+               event.c <= valueMidi.endOfTrackTicks[event.track] - event.tick;
+      });
       if (sameFinalDriverTick && tailsBoundedByValueEnd) {
         // The same VGMSeqNoTrks stop check can lose notes after the first
         // command that reaches totalTicks, even though the Saturn driver

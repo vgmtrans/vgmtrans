@@ -220,7 +220,7 @@ void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceFa
   }
 }
 
-[[nodiscard]] Diagnostic preparationWarning(std::string message, std::optional<SourceRange> range = std::nullopt) {
+[[nodiscard]] Diagnostic bindingWarning(std::string message, std::optional<SourceRange> range = std::nullopt) {
   return Diagnostic{
       .severity = Severity::Warning,
       .message = std::move(message),
@@ -228,7 +228,7 @@ void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceFa
   };
 }
 
-[[nodiscard]] std::optional<ScanInput> inputFor(const CollectionPrepareContext& context, SourceRange range,
+[[nodiscard]] std::optional<ScanInput> inputFor(const CollectionBindingContext& context, SourceRange range,
                                                 ScanIdAllocator& ids) {
   if (!range.valid() || !context.sources.contains(range.source)) {
     return std::nullopt;
@@ -241,13 +241,13 @@ void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceFa
 }
 
 [[nodiscard]] std::optional<AkaoSampleCollectionParse> parseSampleCollectionForBinding(
-    const CollectionPrepareContext& context, ScanIdAllocator& ids, const SampleCollectionAsset& sampleCollection,
+    const CollectionBindingContext& context, ScanIdAllocator& ids, const SampleCollectionAsset& sampleCollection,
     std::vector<Diagnostic>& diagnostics) {
   const SourceRange range = sampleCollection.metadata.range;
   auto input = inputFor(context, range, ids);
   if (!input) {
-    diagnostics.push_back(preparationWarning("Akao preparation could not read selected sample collection source",
-                                             range.valid() ? std::optional<SourceRange>{range} : std::nullopt));
+    diagnostics.push_back(bindingWarning("Akao binding could not read selected sample collection source",
+                                         range.valid() ? std::optional<SourceRange>{range} : std::nullopt));
     return std::nullopt;
   }
 
@@ -261,7 +261,7 @@ void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceFa
 
   if (range.offset > std::numeric_limits<u32>::max()) {
     diagnostics.push_back(
-        preparationWarning("Akao sample collection source offset is outside the supported address range", range));
+        bindingWarning("Akao sample collection source offset is outside the supported address range", range));
     return std::nullopt;
   }
 
@@ -272,19 +272,15 @@ void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceFa
   return parseAkaoSampleCollectionData(*input, ref, static_cast<u32>(range.offset), version);
 }
 
-[[nodiscard]] AkaoArticulationMap buildResolvedArticulations(const CollectionPrepareContext& context,
+[[nodiscard]] AkaoArticulationMap buildResolvedArticulations(const CollectionBindingContext& context,
                                                              ScanIdAllocator& ids,
                                                              std::vector<Diagnostic>& diagnostics) {
   AkaoArticulationMap articulations;
-  for (const AssetId id : context.collection.members.sampleCollections) {
-    const auto* sampleCollection = context.snapshot.asset<SampleCollectionAsset>(id);
-    if (sampleCollection == nullptr) {
-      continue;
-    }
+  for (const auto* sampleCollection : context.sampleCollections) {
     auto parsed = parseSampleCollectionForBinding(context, ids, *sampleCollection, diagnostics);
     if (!parsed) {
-      diagnostics.push_back(preparationWarning("Akao preparation could not parse selected sample collection",
-                                               sampleCollection->metadata.range));
+      diagnostics.push_back(
+          bindingWarning("Akao binding could not parse selected sample collection", sampleCollection->metadata.range));
       continue;
     }
     for (const auto& articulation : parsed->articulations) {
@@ -393,65 +389,58 @@ std::vector<DesiredCollection> resolveAkaoCollections(const MatchContext& contex
   return collections;
 }
 
-PreparedCollectionAssets prepareAkaoCollection(const CollectionPrepareContext& context) {
-  PreparedCollectionAssets prepared;
-  const auto& members = context.collection.members;
-  if (!members.sequence || members.instrumentSets.empty() || members.sampleCollections.empty()) {
-    return prepared;
+void bindAkaoCollection(CollectionBindingContext& context) {
+  if (context.sequence == nullptr || context.instrumentSets.empty() || context.sampleCollections.empty()) {
+    return;
   }
 
-  const auto* sequence = context.snapshot.asset<SequenceProgramAsset>(*members.sequence);
-  const auto* detectedInstrumentSet = context.snapshot.asset<InstrumentSetAsset>(members.instrumentSets.front());
-  if (sequence == nullptr || detectedInstrumentSet == nullptr) {
-    return prepared;
-  }
+  const auto& sequence = *context.sequence;
+  const std::string instrumentSetName = context.instrumentSets.front().metadata.name;
 
   ScanIdAllocator ids;
-  const SourceRange sequenceRange = sequence->metadata.range;
+  const SourceRange sequenceRange = sequence.metadata.range;
   auto input = inputFor(context, sequenceRange, ids);
   if (!input) {
-    prepared.diagnostics.push_back(
-        preparationWarning("Akao preparation could not read sequence source",
-                           sequenceRange.valid() ? std::optional<SourceRange>{sequenceRange} : std::nullopt));
-    return prepared;
+    context.diagnostics.push_back(
+        bindingWarning("Akao binding could not read sequence source",
+                       sequenceRange.valid() ? std::optional<SourceRange>{sequenceRange} : std::nullopt));
+    return;
   }
   if (sequenceRange.offset > std::numeric_limits<u32>::max()) {
-    prepared.diagnostics.push_back(
-        preparationWarning("Akao sequence source offset is outside the supported address range", sequenceRange));
-    return prepared;
+    context.diagnostics.push_back(
+        bindingWarning("Akao sequence source offset is outside the supported address range", sequenceRange));
+    return;
   }
 
-  auto analysis = analyzeAkaoSequence(*input, *sequence);
+  auto analysis = analyzeAkaoSequence(*input, sequence);
   if (!analysis) {
-    prepared.diagnostics.push_back(preparationWarning("Akao preparation could not re-analyze sequence", sequenceRange));
-    return prepared;
+    context.diagnostics.push_back(bindingWarning("Akao binding could not re-analyze sequence", sequenceRange));
+    return;
   }
 
   // The scanned bank owns the durable layout and source annotations. Rebuild
   // the same values here only to bind their articulation ids to the sample
   // collections selected for this particular collection.
-  auto articulations = buildResolvedArticulations(context, ids, prepared.diagnostics);
+  auto articulations = buildResolvedArticulations(context, ids, context.diagnostics);
   if (articulations.empty()) {
-    prepared.diagnostics.push_back(
-        preparationWarning("Akao preparation produced no articulation bindings", sequenceRange));
-    return prepared;
+    context.diagnostics.push_back(bindingWarning("Akao binding produced no articulation bindings", sequenceRange));
+    return;
   }
 
-  InstrumentSetBuilder instruments(AssetId{}, nullptr, &prepared.diagnostics);
+  InstrumentSetBuilder instruments(AssetId{}, nullptr, &context.diagnostics);
   (void)buildAkaoInstrumentSet(*input, *analysis, articulations, instruments);
   auto built = std::move(instruments).finish();
-  prepared.replacementInstrumentSets = std::vector<InstrumentSetAsset>{
+  context.instrumentSets = {
       InstrumentSetAsset{
           .metadata =
               AssetMetadata{
                   .format = std::string(kAkaoFormatName),
-                  .name = detectedInstrumentSet->metadata.name,
+                  .name = instrumentSetName,
                   .range = built.range,
               },
           .instruments = std::move(built.values),
       },
   };
-  return prepared;
 }
 
 }  // namespace vgmtrans::formats::akao

@@ -94,7 +94,7 @@ struct BankAssets {
   return result.finish();
 }
 
-[[nodiscard]] Diagnostic preparationWarning(std::string message, SourceRange range = {}) {
+[[nodiscard]] Diagnostic bindingWarning(std::string message, SourceRange range = {}) {
   return Diagnostic{
       .severity = Severity::Warning,
       .message = std::move(message),
@@ -102,85 +102,71 @@ struct BankAssets {
   };
 }
 
-[[nodiscard]] PreparedCollectionAssets prepareSegSatCollection(const CollectionPrepareContext& context) {
-  PreparedCollectionAssets prepared;
-  const auto& members = context.collection.members;
-  if (!members.sequence) {
-    return prepared;
+}  // namespace
+
+void bindSegSatCollection(CollectionBindingContext& context) {
+  if (context.sequence == nullptr) {
+    return;
   }
-  const auto* sequence = context.snapshot.asset<SequenceProgramAsset>(*members.sequence);
-  if (sequence == nullptr) {
-    return prepared;
-  }
+  const auto& sequence = *context.sequence;
 
   SegSatVolumeModel volumeModel = SegSatVolumeModel::V1_33;
-  if (sequence->metadata.range.valid() && context.sources.contains(sequence->metadata.range.source)) {
-    volumeModel = determineSegSatVolumeModel(context.sources.reader(sequence->metadata.range.source));
+  if (sequence.metadata.range.valid() && context.sources.contains(sequence.metadata.range.source)) {
+    volumeModel = determineSegSatVolumeModel(context.sources.reader(sequence.metadata.range.source));
   }
-  std::vector<SegSatControllerChange> controllerChanges = segSatControllerChanges(sequence->program);
+  std::vector<SegSatControllerChange> controllerChanges = segSatControllerChanges(sequence.program);
 
   std::vector<SegSatVelocityBank> velocityBanks;
-  velocityBanks.reserve(members.instrumentSets.size());
-  const std::vector<u8> bankAliases = segSatSequenceBanks(sequence->program);
-  if (bankAliases.size() != members.instrumentSets.size()) {
-    prepared.diagnostics.push_back(preparationWarning(
-        fmt::format("SegSat sequence refers to {} banks, but the collection contains {} instrument sets",
-                    bankAliases.size(), members.instrumentSets.size()),
-        sequence->metadata.range));
+  velocityBanks.reserve(context.instrumentSets.size());
+  const std::vector<u8> bankAliases = segSatSequenceBanks(sequence.program);
+  if (bankAliases.size() != context.instrumentSets.size()) {
+    context.diagnostics.push_back(
+        bindingWarning(fmt::format("SegSat sequence refers to {} banks, but the collection contains {} instrument sets",
+                                   bankAliases.size(), context.instrumentSets.size()),
+                       sequence.metadata.range));
   }
-  auto& replacementInstrumentSets = prepared.replacementInstrumentSets.emplace();
-  replacementInstrumentSets.reserve(members.instrumentSets.size());
-  for (size_t bankIndex = 0; bankIndex < members.instrumentSets.size(); ++bankIndex) {
-    const AssetId asset = members.instrumentSets[bankIndex];
-    const auto* instruments = context.snapshot.asset<InstrumentSetAsset>(asset);
-    if (instruments == nullptr) {
-      continue;
-    }
-    InstrumentSetAsset replacement = *instruments;
+  for (size_t bankIndex = 0; bankIndex < context.instrumentSets.size(); ++bankIndex) {
+    auto& instruments = context.instrumentSets[bankIndex];
     const u8 durableBank =
-        static_cast<u8>(replacement.instruments.empty() || !replacement.instruments.front().explicitAddress
+        static_cast<u8>(instruments.instruments.empty() || !instruments.instruments.front().explicitAddress
                             ? 0
-                            : replacement.instruments.front().explicitAddress->bank);
+                            : instruments.instruments.front().explicitAddress->bank);
     const u8 sourceBank = bankIndex < bankAliases.size() ? bankAliases[bankIndex] : durableBank;
-    const u8 exportBank = members.instrumentSets.size() == 1 ? 0 : sourceBank;
-    for (auto& instrument : replacement.instruments) {
+    const u8 exportBank = context.instrumentSets.size() == 1 ? 0 : sourceBank;
+    for (auto& instrument : instruments.instruments) {
       const auto address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
       instrument.explicitAddress = InstrumentAddress{.bank = exportBank, .program = address.program};
       instrument.identity = segSatInstrumentIdentity(sourceBank, static_cast<u8>(address.program));
     }
-    replacementInstrumentSets.push_back(std::move(replacement));
 
-    if (!instruments->metadata.range.valid() || !context.sources.contains(instruments->metadata.range.source)) {
-      prepared.diagnostics.push_back(preparationWarning("SegSat preparation could not read an instrument bank source",
-                                                        instruments->metadata.range));
+    if (!instruments.metadata.range.valid() || !context.sources.contains(instruments.metadata.range.source)) {
+      context.diagnostics.push_back(
+          bindingWarning("SegSat binding could not read an instrument bank source", instruments.metadata.range));
       continue;
     }
-    if (instruments->metadata.range.offset > std::numeric_limits<u32>::max()) {
-      prepared.diagnostics.push_back(
-          preparationWarning("SegSat instrument bank offset is too large", instruments->metadata.range));
+    if (instruments.metadata.range.offset > std::numeric_limits<u32>::max()) {
+      context.diagnostics.push_back(
+          bindingWarning("SegSat instrument bank offset is too large", instruments.metadata.range));
       continue;
     }
-    const ByteReader reader = context.sources.reader(instruments->metadata.range.source);
-    const auto layout = readSegSatBankLayout(reader, static_cast<u32>(instruments->metadata.range.offset));
+    const ByteReader reader = context.sources.reader(instruments.metadata.range.source);
+    const auto layout = readSegSatBankLayout(reader, static_cast<u32>(instruments.metadata.range.offset));
     if (!layout) {
-      prepared.diagnostics.push_back(preparationWarning(
-          "SegSat preparation could not read the selected instrument bank", instruments->metadata.range));
+      context.diagnostics.push_back(
+          bindingWarning("SegSat binding could not read the selected instrument bank", instruments.metadata.range));
       continue;
     }
     velocityBanks.push_back(readSegSatVelocityBank(reader, *layout, sourceBank, volumeModel));
   }
 
   if (!velocityBanks.empty()) {
-    prepared.finalizePerformance = [velocityBanks = std::move(velocityBanks), volumeModel,
-                                    controllerChanges =
-                                        std::move(controllerChanges)](PerformanceSequence& performance) {
-      finalizeSegSatPerformance(performance, velocityBanks, volumeModel, controllerChanges);
-    };
+    context.sequenceRuntime = segSatSequenceRuntime(SegSatRuntimeConfig{
+        .velocityBanks = std::move(velocityBanks),
+        .volumeModel = volumeModel,
+        .controllerChanges = std::move(controllerChanges),
+    });
   }
-  return prepared;
 }
-
-}  // namespace
 
 FormatModule segSatModule() {
   return FormatModule{
@@ -188,7 +174,7 @@ FormatModule segSatModule() {
       .acceptedFormats = {source_formats::kSaturnRam},
       .scan = scanSegSat,
       .collectionResolverId = std::string(kSegSatCollectionResolver),
-      .prepareCollection = prepareSegSatCollection,
+      .bindCollection = bindSegSatCollection,
   };
 }
 

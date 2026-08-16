@@ -646,7 +646,7 @@ void akaoSampleSelectionKeepsPreferredAndRequiredCollections() {
          "Akao sample selection should combine the preferred sample set with required-articulation coverage");
 }
 
-void akaoScanPublishesStructuralInstrumentSetAndPreparesBoundView() {
+void akaoScanPublishesStructuralInstrumentSetAndBindsResolvedView() {
   std::vector<u8> bytes(0x280);
 
   constexpr u32 sequenceOffset = 0x00;
@@ -714,7 +714,7 @@ void akaoScanPublishesStructuralInstrumentSetAndPreparesBoundView() {
          "Akao detected instrument set should expose parsed instruments");
   expect(detectedInstrumentSet->instruments.front().regions.size() == 1 &&
              detectedInstrumentSet->instruments.front().regions.front().sample.index == invalidIdValue,
-         "Akao structural regions should remain explicitly unbound until collection preparation");
+         "Akao structural regions should remain explicitly unbound until collection binding");
   expect(project.collections().size() == 1, "Akao synthetic scan should resolve one collection");
   const auto& collection = project.collections().front();
   expect(collection.members.sequence == sequenceId, "Akao collection should reference the scanned sequence");
@@ -760,7 +760,7 @@ void akaoScanPublishesStructuralInstrumentSetAndPreparesBoundView() {
   const auto* instrument =
       annotationWithKind(project.sourceMap(), SourceId{0}, SourceRole::Instrument, "akao-instrument");
   expect(instrument != nullptr && instrument->range.offset == melodicRegionOffset && instrument->range.size == 8,
-         "Akao scan should annotate parsed instrument data before export preparation");
+         "Akao scan should annotate parsed instrument data before collection binding");
   expect(instrument->owner == ObjectRefs::instrument(instrumentSetId, 0),
          "Akao instrument annotations should point into the detected bank");
   const auto* region = annotationWithKind(project.sourceMap(), SourceId{0}, SourceRole::Region, "akao-region");
@@ -771,7 +771,7 @@ void akaoScanPublishesStructuralInstrumentSetAndPreparesBoundView() {
   expect(fieldEquals(fieldWithName(*region, "articulation_id"), u64{5}),
          "Akao region annotation should expose the articulation id");
   expect(!hasLinkRole(*region, SourceLinkRole::UsesSample),
-         "Akao structural regions should not claim a sample binding before collection preparation");
+         "Akao structural regions should not claim a sample binding before collection resolution");
   const auto inspection = session.inspect(instrumentSetId);
   expect(inspection != nullptr && inspection->metadata().id == instrumentSetId &&
              inspection->range().offset == instrumentTableOffset && inspection->bytes().size() == 0x28,
@@ -799,17 +799,30 @@ void akaoScanPublishesStructuralInstrumentSetAndPreparesBoundView() {
   expect(requirement != project.matchFacts().end(),
          "Akao articulation requirements should remain sequence matching facts");
 
-  const auto prepared = prepareAkaoCollection(CollectionPrepareContext{
+  const auto* sequence = project.asset<SequenceProgramAsset>(sequenceId);
+  SequenceRuntime runtime = sequence->program.runtime;
+  std::vector<InstrumentSetAsset> resolvedInstruments{
+      *project.asset<InstrumentSetAsset>(collection.members.instrumentSets.front())};
+  std::vector<const SampleCollectionAsset*> resolvedSamples;
+  for (const AssetId id : collection.members.sampleCollections) {
+    resolvedSamples.push_back(project.asset<SampleCollectionAsset>(id));
+  }
+  std::vector<Diagnostic> bindingDiagnostics;
+  CollectionBindingContext binding{
       .sources = session.sources(),
-      .snapshot = project,
       .collection = collection,
-  });
-  expect(prepared.replacementInstrumentSets && prepared.replacementInstrumentSets->size() == 1 &&
-             prepared.replacementInstrumentSets->front().instruments.size() == 1 &&
-             prepared.replacementInstrumentSets->front().instruments.front().regions.size() == 1 &&
-             prepared.replacementInstrumentSets->front().instruments.front().regions.front().sample.collection ==
+      .sequence = sequence,
+      .sequenceRuntime = runtime,
+      .instrumentSets = resolvedInstruments,
+      .sampleCollections = resolvedSamples,
+      .diagnostics = bindingDiagnostics,
+  };
+  bindAkaoCollection(binding);
+  expect(resolvedInstruments.size() == 1 && resolvedInstruments.front().instruments.size() == 1 &&
+             resolvedInstruments.front().instruments.front().regions.size() == 1 &&
+             resolvedInstruments.front().instruments.front().regions.front().sample.collection ==
                  collection.members.sampleCollections.front(),
-         "Akao collection preparation should bind the detected structure to its selected samples");
+         "Akao collection binding should connect the detected structure to its selected samples");
 
   const auto artifacts = session.exportCollection(collection.id, ExportRequest{.kinds = {ExportKind::Dls}});
   expect(artifacts.size() == 1 && !artifacts[0].bytes.empty(),
@@ -817,5 +830,5 @@ void akaoScanPublishesStructuralInstrumentSetAndPreparesBoundView() {
   const auto directInstrumentExport =
       session.exportInstrumentSet(instrumentSetId, SynthExportFormat::Dls, ExportRequest{});
   expect(!directInstrumentExport.bytes.empty(),
-         "direct Akao instrument-set export should use the collection-prepared bound view");
+         "direct Akao instrument-set export should use the resolved collection view");
 }

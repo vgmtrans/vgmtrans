@@ -189,8 +189,8 @@ public:
                                        PitchSlideTiming timing, PerformanceLaneId lane = PerformanceLaneId{0});
   // Returns the pitch reached by note's latest transition at this emitter's
   // tick, or no value if note has no transition.
-  [[nodiscard]] std::optional<double> currentPitchTransitionKey(
-      PerformanceNoteId note, PerformanceLaneId lane = PerformanceLaneId{0}) const;
+  [[nodiscard]] std::optional<double> currentPitchTransitionKey(PerformanceNoteId note,
+                                                                PerformanceLaneId lane = PerformanceLaneId{0}) const;
 
   [[nodiscard]] PerformanceAutomationBinding fade(PerformanceAutomationTarget target, double targetValue,
                                                   u32 durationTicks, u32 delayTicks = 0);
@@ -382,12 +382,15 @@ public:
   explicit SequenceVm(SequenceVmOptions options);
 
   [[nodiscard]] PerformanceSequence render(const SequenceProgram& program) const;
+  // Collection binding may derive runtime state from the other selected
+  // assets without copying the decoded command graph.
+  [[nodiscard]] PerformanceSequence render(const SequenceProgram& program, const SequenceRuntime& runtime) const;
 
 private:
-  friend std::any detail::analyzeSequenceProgram(const SequenceVm&, const SequenceProgram&,
-                                                 std::vector<Diagnostic>*);
+  friend std::any detail::analyzeSequenceProgram(const SequenceVm&, const SequenceProgram&, std::vector<Diagnostic>*);
 
-  [[nodiscard]] PerformanceSequence renderImpl(const SequenceProgram& program, std::any* analyzedProgramState) const;
+  [[nodiscard]] PerformanceSequence renderImpl(const SequenceProgram& program, const SequenceRuntime& runtime,
+                                               std::any* analyzedProgramState) const;
 
   SequenceVmOptions options_;
 };

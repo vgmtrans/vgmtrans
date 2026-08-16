@@ -173,15 +173,15 @@ void sonyPs1SequenceSupportsBothLoopCountGenerations() {
   const SourceMap modernAnnotations = modernSourceMap.finish();
   const auto modernCommands = modernAnnotations.withRole(SourceId{81}, SourceRole::Command);
   expect(modernAnnotations.withRole(SourceId{81}, SourceRole::SequenceTrack).empty() && !modernCommands.empty() &&
-             std::ranges::all_of(modernCommands, [&](SourceAnnotationId id) {
-               const SourceAnnotation& command = modernAnnotations.get(id);
-               return !command.parent && command.owner == ObjectRefs::sequence(AssetId{81});
-             }),
+             std::ranges::all_of(modernCommands,
+                                 [&](SourceAnnotationId id) {
+                                   const SourceAnnotation& command = modernAnnotations.get(id);
+                                   return !command.parent && command.owner == ObjectRefs::sequence(AssetId{81});
+                                 }),
          "SonyPS1 source events should be sequence-owned roots rather than children of a synthetic track");
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
   expect(performance.diagnostics.empty(), "modern SonyPS1 loop fixture should render without diagnostics");
-  expect(std::ranges::any_of(performance.sourceSpans,
-                             [](const SourcePlaybackSpan& span) { return span.channel == 2; }),
+  expect(std::ranges::any_of(performance.sourceSpans, [](const SourcePlaybackSpan& span) { return span.channel == 2; }),
          "SonyPS1 playback spans should retain each event's source channel");
   const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(std::ranges::count(notes, 62.0, [](const NotePerformanceEvent* note) { return note->key; }) == 2,
@@ -264,8 +264,16 @@ void sonyPs1SequenceSupportsBothLoopCountGenerations() {
 
 void sonyPs1TempoBytesPreserveSourceOrder() {
   const auto bytes = sequenceFixture({
-      0x00, 0xff, 0x51, 0x01, 0x23, 0x45,
-      0x00, 0xff, 0x2f, 0x00,
+      0x00,
+      0xff,
+      0x51,
+      0x01,
+      0x23,
+      0x45,
+      0x00,
+      0xff,
+      0x2f,
+      0x00,
   });
   const ByteReader reader(SourceId{91}, bytes);
   const auto layout = readSonyPs1SequenceLayout(reader, 0);
@@ -414,14 +422,25 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
   };
   expect(bankForSequence(secondSequence) == secondBank && bankForSequence(firstSequence) == 0,
          "same-source SonyPS1 sequences and VABs should pair in descending offset order");
-  const auto prepared = prepareSonyPs1Collection(CollectionPrepareContext{
+  const auto* sequence = pairedSnapshot.asset<SequenceProgramAsset>(*latestCollection->members.sequence);
+  SequenceRuntime runtime = sequence->program.runtime;
+  std::vector<InstrumentSetAsset> resolvedInstruments{
+      *pairedSnapshot.asset<InstrumentSetAsset>(latestCollection->members.instrumentSets.front())};
+  std::vector<const SampleCollectionAsset*> resolvedSamples{
+      pairedSnapshot.asset<SampleCollectionAsset>(latestCollection->members.sampleCollections.front())};
+  std::vector<Diagnostic> bindingDiagnostics;
+  CollectionBindingContext binding{
       .sources = paired.sources(),
-      .snapshot = pairedSnapshot,
       .collection = *latestCollection,
-  });
-  expect(prepared.replacementInstrumentSets && prepared.replacementInstrumentSets->size() == 1,
-         "resolved SonyPS1 preparation should retain its selected VAB");
-  const auto& instrument = prepared.replacementInstrumentSets->front().instruments.front();
+      .sequence = sequence,
+      .sequenceRuntime = runtime,
+      .instrumentSets = resolvedInstruments,
+      .sampleCollections = resolvedSamples,
+      .diagnostics = bindingDiagnostics,
+  };
+  bindSonyPs1Collection(binding);
+  expect(resolvedInstruments.size() == 1, "resolved SonyPS1 binding should retain its selected VAB");
+  const auto& instrument = resolvedInstruments.front().instruments.front();
   expect(instrument.explicitAddress && instrument.explicitAddress->bank == 0,
          "the selected VAB should be rebased from scan bank 1 to collection bank 0");
 }

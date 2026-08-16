@@ -111,7 +111,7 @@ FormatModule sonyPs1Module() {
       .scan = scanSonyPs1,
       .collectionResolverId = std::string(kSonyPs1CollectionResolver),
       .resolveCollections = resolveSonyPs1Collections,
-      .prepareCollection = prepareSonyPs1Collection,
+      .bindCollection = bindSonyPs1Collection,
   };
 }
 

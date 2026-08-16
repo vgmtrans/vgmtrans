@@ -96,7 +96,7 @@ std::vector<u8> segSatFixture() {
   append({0x83});
 
   // The sound-RAM bank map gives the bank its source-domain number. A sole
-  // attached bank is remapped to bank zero during collection preparation.
+  // attached bank is remapped to bank zero during collection binding.
   be32(bytes, 0x500, (5u << 24) | bank);
   be32(bytes, 0x508, 0xff000000);
 
@@ -137,8 +137,7 @@ std::vector<u8> segSatFixture() {
   return bytes;
 }
 
-void writeOneInstrumentBank(std::vector<u8>& bytes, u32 bank, u32 sampleRelative, u16 sampleFrames,
-                            u8 totalLevel) {
+void writeOneInstrumentBank(std::vector<u8>& bytes, u32 bank, u32 sampleRelative, u16 sampleFrames, u8 totalLevel) {
   be16(bytes, bank, 0x0a);
   be16(bytes, bank + 2, 0x1c);
   be16(bytes, bank + 4, 0x26);
@@ -201,8 +200,7 @@ std::vector<u8> multiBankVelocityFixture() {
   be16(bytes, sequence + 6, 0);
   size_t command = sequence + 8;
   const std::initializer_list<u8> commands{
-      0xb0, 32, 6, 0, 0xc0, 0, 0, 0x00, 60, 64, 10, 0,
-      0xb0, 32, 5, 0,             0x00, 60, 64, 10, 0, 0x83,
+      0xb0, 32, 6, 0, 0xc0, 0, 0, 0x00, 60, 64, 10, 0, 0xb0, 32, 5, 0, 0x00, 60, 64, 10, 0, 0x83,
   };
   std::ranges::copy(commands, bytes.begin() + static_cast<std::ptrdiff_t>(command));
 
@@ -327,7 +325,7 @@ void segSatTempoDeltaBytesPreserveSourceOrder() {
          "SegSat should assemble tempo delta bytes in encoded high-to-low order");
 }
 
-void segSatCollectionPreparationSuppliesVlTablesToSequence() {
+void segSatCollectionBindingSuppliesVlTablesToSequence() {
   Session session;
   session.registerFormat(segSatModule());
   const SourceId source = session.addSource(SourceFile{.name = "segsat-fixture.bin"}, segSatFixture());
@@ -339,14 +337,15 @@ void segSatCollectionPreparationSuppliesVlTablesToSequence() {
   const auto& sequence = sequenceAsset(snapshot, collection);
   const auto sequenceCommands = snapshot.sourceMap().withRole(source, SourceRole::Command);
   expect(snapshot.sourceMap().withRole(source, SourceRole::SequenceTrack).empty() && !sequenceCommands.empty() &&
-             std::ranges::all_of(sequenceCommands, [&](SourceAnnotationId id) {
-               const SourceAnnotation& command = snapshot.sourceMap().get(id);
-               return !command.parent && snapshot.sourceMap().assetOwner(id) == sequence.metadata.id;
-             }),
+             std::ranges::all_of(sequenceCommands,
+                                 [&](SourceAnnotationId id) {
+                                   const SourceAnnotation& command = snapshot.sourceMap().get(id);
+                                   return !command.parent &&
+                                          snapshot.sourceMap().assetOwner(id) == sequence.metadata.id;
+                                 }),
          "SegSat source events should be sequence-owned roots rather than children of synthetic tracks");
   const PerformanceSequence unprepared = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program);
-  expect(std::ranges::any_of(unprepared.sourceSpans,
-                             [](const SourcePlaybackSpan& span) { return span.channel == 3; }),
+  expect(std::ranges::any_of(unprepared.sourceSpans, [](const SourcePlaybackSpan& span) { return span.channel == 3; }),
          "SegSat playback spans should retain each event's source channel");
   const auto* sourceNote = firstNote(unprepared);
   expect(sourceNote != nullptr && LevelScale::midi7FromLinear(sourceNote->linearVelocity) == 64,
@@ -360,7 +359,7 @@ void segSatCollectionPreparationSuppliesVlTablesToSequence() {
   expect(playback.playable() && preparedNote != nullptr && preparedLevel != nullptr &&
              LevelScale::midi7FromLinear(preparedNote->linearVelocity) == 33 &&
              std::abs(preparedNote->linearVelocity * preparedLevel->linearGain - expectedNoteGain) < 0.000000001,
-         "collection preparation should combine the VL curve and channel volume exactly at note-on");
+         "collection binding should combine the VL curve and channel volume exactly at note-on");
 
   const auto balance = std::ranges::find_if(playback.performance.tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<StereoBalancePerformanceEvent>(event);
@@ -387,9 +386,7 @@ void segSatCollectionPreparationSuppliesVlTablesToSequence() {
       bend != playback.performance.tracks[0].events.end() ? std::get_if<PitchBendPerformanceEvent>(&*bend) : nullptr;
   const auto pitchCount = std::ranges::count_if(
       playback.performance.tracks[0].events,
-      [](const PerformanceEvent& event) {
-        return std::holds_alternative<PitchBendPerformanceEvent>(event);
-      });
+      [](const PerformanceEvent& event) { return std::holds_alternative<PitchBendPerformanceEvent>(event); });
   expect(pitchCount == 1 && pitch != nullptr && std::abs(pitch->semitones - (-0.09375)) < 0.000001 &&
              pitch->normalizedWheelPosition && std::abs(*pitch->normalizedWheelPosition - (-0.046875)) < 0.000001,
          "SegSat should retain its raw pitch-wheel position for collection-aware lowering");
@@ -523,7 +520,7 @@ void segSatMultiBankPlaybackUsesTheActiveBanksVlTable() {
       "source bank aliases should remain paired with sorted collection banks regardless of command order");
 }
 
-void segSatCollectionPreparationReadsVelocityBanksFromSeparateSources() {
+void segSatCollectionBindingReadsVelocityBanksFromSeparateSources() {
   SourceStore sources;
   const SourceId bank5Source = sources.add(SourceFile{.name = "bank-5.bin"}, velocityBankSource(0));
   const SourceId bank6Source = sources.add(SourceFile{.name = "bank-6.bin"}, velocityBankSource(128));
@@ -579,16 +576,24 @@ void segSatCollectionPreparationReadsVelocityBanksFromSeparateSources() {
   const SessionSnapshot snapshot = builder.finish();
 
   const FormatModule format = segSatModule();
-  const PreparedCollectionAssets prepared = format.prepareCollection(CollectionPrepareContext{
+  SequenceRuntime runtime = sequence.program.runtime;
+  std::vector<InstrumentSetAsset> instrumentSets{bank5, bank6};
+  std::vector<const SampleCollectionAsset*> sampleCollections;
+  std::vector<Diagnostic> bindingDiagnostics;
+  CollectionBindingContext binding{
       .sources = sources,
-      .snapshot = snapshot,
       .collection = snapshot.collections().front(),
-  });
-  expect(prepared.diagnostics.empty() && prepared.finalizePerformance,
-         "SegSat preparation should read attached banks from separate sources");
+      .sequence = &sequence,
+      .sequenceRuntime = runtime,
+      .instrumentSets = instrumentSets,
+      .sampleCollections = sampleCollections,
+      .diagnostics = bindingDiagnostics,
+  };
+  format.bindCollection(binding);
+  expect(bindingDiagnostics.empty() && runtime.valid(),
+         "SegSat binding should read attached banks from separate sources");
 
-  PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program);
-  prepared.finalizePerformance(performance);
+  PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, runtime);
   std::vector<const NotePerformanceEvent*> notes;
   for (const auto& event : performance.tracks.front().events) {
     if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {

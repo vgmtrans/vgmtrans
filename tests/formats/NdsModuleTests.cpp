@@ -565,11 +565,16 @@ void ndsSequenceEmitsStickyDynamicAdsr() {
   expect(expected.has_value(), "NDS dynamic ADSR fixture should use valid SBNK envelope bytes");
 
   const SequenceProgram program = decodeTestSequenceProgram({
-      0xd0, attack,   // attack override
-      0xd1, decay,    // decay override
-      0xd2, sustain,  // sustain override
-      0xd3, release,  // release override
-      0x81, 0x01,     // subsequent program changes retain the overrides
+      0xd0,
+      attack,  // attack override
+      0xd1,
+      decay,  // decay override
+      0xd2,
+      sustain,  // sustain override
+      0xd3,
+      release,  // release override
+      0x81,
+      0x01,  // subsequent program changes retain the overrides
       0xff,
   });
 
@@ -577,12 +582,11 @@ void ndsSequenceEmitsStickyDynamicAdsr() {
   const auto envelopeCommandCount = std::ranges::count(commands, SequenceSemantic::Envelope, &SourceCommand::semantic);
   expect(
       envelopeCommandCount == 4 && std::ranges::all_of(commands,
-                                                          [](const SourceCommand& command) {
-                                                            return command.semantic != SequenceSemantic::Envelope ||
-                                                                   (command.range.size == 2 &&
-                                                                    command.execution.valid());
-                                                          }),
-         "NDS D0-D3 should decode as executable two-byte envelope commands");
+                                                       [](const SourceCommand& command) {
+                                                         return command.semantic != SequenceSemantic::Envelope ||
+                                                                (command.range.size == 2 && command.execution.valid());
+                                                       }),
+      "NDS D0-D3 should decode as executable two-byte envelope commands");
 
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
   expect(performance.diagnostics.empty(), "NDS dynamic ADSR fixture should render without diagnostics");
@@ -644,8 +648,8 @@ void ndsSequenceModelsNitroLfoRegisters() {
     if (modulation->target == ModulationPerformanceTarget::VibratoDepth && modulation->pitchDepthSemitones &&
         *modulation->pitchDepthSemitones > 0.0) {
       pitch = modulation;
-    } else if (modulation->target == ModulationPerformanceTarget::TremoloDepth &&
-               modulation->volumeDepthDecibels && *modulation->volumeDepthDecibels > 0.0) {
+    } else if (modulation->target == ModulationPerformanceTarget::TremoloDepth && modulation->volumeDepthDecibels &&
+               *modulation->volumeDepthDecibels > 0.0) {
       volume = modulation;
     } else if (modulation->target == ModulationPerformanceTarget::PanDepth && modulation->panDepth &&
                *modulation->panDepth > 0.0) {
@@ -669,8 +673,7 @@ void ndsSequenceModelsNitroLfoRegisters() {
 }
 
 void ndsSynthModulatorsUseSequenceLfoRanges() {
-  expect(!ndsModule().prepareCollection,
-         "NDS modulation should not require a format-specific collection preparer");
+  expect(!ndsModule().bindCollection, "NDS modulation should not require format-specific collection binding");
   const SequenceProgram program = decodeTestSequenceProgram({
       0xcb,
       0x20,  // speed 32 -> 12 Hz
@@ -697,14 +700,13 @@ void ndsSynthModulatorsUseSequenceLfoRanges() {
              std::abs(profile.maxPanDepth - 1.0) < 0.000001,
          "shared LFO analysis should retain each NDS target's sequence-wide physical depth");
   expect(profile.instruments.vibrato->rateHertz.minimum == 6.0 &&
-             profile.instruments.vibrato->rateHertz.maximum == 12.0 &&
-             profile.instruments.vibrato->delaySeconds &&
+             profile.instruments.vibrato->rateHertz.maximum == 12.0 && profile.instruments.vibrato->delaySeconds &&
              profile.instruments.vibrato->delaySeconds->minimum == 0.0 &&
              std::abs(profile.instruments.vibrato->delaySeconds->maximum - 0.25) < 0.000001,
          "shared LFO analysis should retain the NDS sequence's physical rate and delay range");
 
-  const MidiSequence midi = renderMidiSequence(performance, MidiExportOptions{},
-                                               ModulationConversionPolicy::SynthModulators, {}, &profile);
+  const MidiSequence midi =
+      renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SynthModulators, {}, &profile);
   u8 maxVibratoDepth = 0;
   u8 maxTremoloDepth = 0;
   u8 maxVibratoFrequency = 0;

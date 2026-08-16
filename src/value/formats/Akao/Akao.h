@@ -223,7 +223,7 @@ struct AkaoSplitSampleLocation {
                                                       core::InstrumentSetBuilder& instruments);
 
 [[nodiscard]] std::vector<core::DesiredCollection> resolveAkaoCollections(const core::MatchContext& context);
-[[nodiscard]] core::PreparedCollectionAssets prepareAkaoCollection(const core::CollectionPrepareContext& context);
+void bindAkaoCollection(core::CollectionBindingContext& context);
 
 [[nodiscard]] core::FormatModule akaoModule();
 
