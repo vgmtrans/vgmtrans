@@ -670,12 +670,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xf4: {
       auto event = cursor.sourceOnly("DSP FLG / Noise", "noise");
       static_cast<void>(event.u8("flg", SourceValueDisplay::Hex));
-      return event.ignore();
+      return event;
     }
     case 0xf5: {
       auto event = cursor.sourceOnly("DSP Pitch Modulation", "pitch-modulation");
       static_cast<void>(event.u8("enabled"));
-      return event.ignore();
+      return event;
     }
     case 0xf6: {
       auto event = cursor.command("Echo Voice On/Off", SequenceSemantic::State);
@@ -763,7 +763,7 @@ const SequenceDialect& sequenceDialect() {
 TrackProgram decodeSourceTrack(ByteReader reader, u32 trackNumber, u32 startAddress,
                                std::span<const u8, 7> durations, std::vector<Diagnostic>* diagnostics) {
   const TrackDecodeScope tracks{.reader = reader, .maxCommands = kCommandLimit};
-  return tracks.reachable(trackNumber, startAddress, [&](u32 offset) {
+  return tracks.decode(trackNumber, startAddress, [&](u32 offset) {
     return decodeCommand(reader, offset, durations, diagnostics);
   });
 }
@@ -781,7 +781,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     }
     const u32 pointer = layout.sequenceHeaderAddress + track * 2;
     const u16 relative = reader.le16(pointer);
-    sequence.addReachableTrack(
+    sequence.addTrack(
         track, reader.range(pointer, 2), *layout.trackStarts[track],
         [&](u32 offset) { return decodeCommand(reader, offset, durations, diagnostics, &programs); }, relative);
   }

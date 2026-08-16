@@ -1391,7 +1391,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       if (profile == Profile::Battlemaniacs && trackNumber == 5) {
         auto event = cursor.noOp("Percussion Fine Tuning NOP", "percussion-tuning-nop");
         static_cast<void>(event.rawBytes("reserved", 1));
-        return event.ignore();
+        return event;
       }
       auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
       return event.invoke<&Playback::tuning>(
@@ -1424,18 +1424,18 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case Kind::EchoFir: {
       auto event = cursor.sourceOnly("Echo FIR", "echo-fir");
       static_cast<void>(event.rawBytes("coefficients", 8));
-      return event.ignore();
+      return event;
     }
     case Kind::NoiseClock: {
       auto event = cursor.sourceOnly(profile == Profile::Battlemaniacs ? "Noise Clock / Echo Writes" : "Noise Clock",
                                      "noise-clock");
       event.u8("clock", SourceValueDisplay::Hex, SemanticOperandRole::State);
-      return event.ignore();
+      return event;
     }
     case Kind::NoiseOn:
-      return cursor.sourceOnly("Noise On", "noise-on").ignore();
+      return cursor.sourceOnly("Noise On", "noise-on");
     case Kind::NoiseOff:
-      return cursor.sourceOnly("Noise Off", "noise-off").ignore();
+      return cursor.sourceOnly("Noise Off", "noise-off");
     case Kind::AltNote1:
     case Kind::AltNote2: {
       auto event =
@@ -1560,12 +1560,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case Kind::Nop2: {
       auto event = cursor.noOp("NOP", "nop");
       static_cast<void>(event.rawBytes("reserved", 2));
-      return event.ignore();
+      return event;
     }
     case Kind::Nop4: {
       auto event = cursor.noOp("NOP", "nop");
       static_cast<void>(event.rawBytes("reserved", 4));
-      return event.ignore();
+      return event;
     }
     case Kind::DriverReset:
       return cursor.sourceOnly("Driver Reset", "driver-reset").end();
@@ -1627,7 +1627,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case Kind::BtmCpuPort: {
       auto event = cursor.sourceOnly("Write SNES Port", "write-port");
       event.u8("value", SourceValueDisplay::Hex);
-      return event.ignore();
+      return event;
     }
     case Kind::BtmGlobalTranspose: {
       auto event = cursor.command("Global Transpose", SequenceSemantic::Pitch);

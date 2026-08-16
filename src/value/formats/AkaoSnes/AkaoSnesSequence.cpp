@@ -2159,7 +2159,7 @@ TrackProgram decodeAkaoSnesSourceTrack(ByteReader reader, const AkaoSnesTrackDec
       .parentAnnotation = options.parentAnnotation,
       .sourceMap = options.sourceMap,
   };
-  return tracks.reachable(options.sourceTrackNumber, options.startAddress, [&](u32 offset) {
+  return tracks.decode(options.sourceTrackNumber, options.startAddress, [&](u32 offset) {
     return decodeCommand(reader, offset, options.bytecodeEnd, options.profile, options.romRelocBase,
                          options.apuRelocBase, options.diagnostics);
   });
@@ -2203,7 +2203,7 @@ SequenceProgram parseAkaoSnesSequence(ByteReader reader, const AkaoSnesLayout& l
       continue;
     }
 
-    session.addReachableTrack(
+    session.addTrack(
         trackNumber, reader.range(pointerOffset, 2), trackAddress,
         [&](u32 offset) {
           return decodeCommand(reader, offset, header.sequenceEnd, profile, header.romRelocBase, header.apuRelocBase,

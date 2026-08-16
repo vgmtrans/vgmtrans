@@ -629,7 +629,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xde:
       if (version == Version::DragonQuest3) {
-        return cursor.sourceOnly("DSP Pitch Modulation On", "pitch-modulation-on").ignore();
+        return cursor.sourceOnly("DSP Pitch Modulation On", "pitch-modulation-on");
       }
       return cursor.ignored("Reserved", 2, "reserved");
     case 0xdf: {
@@ -694,7 +694,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xec:
       if (version == Version::DragonQuest3) {
-        return cursor.sourceOnly("DSP Pitch Modulation Off", "pitch-modulation-off").ignore();
+        return cursor.sourceOnly("DSP Pitch Modulation Off", "pitch-modulation-off");
       }
       return cursor.ignored("Reserved", 3, "reserved");
     case 0xed:
@@ -733,14 +733,14 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return cursor.command("Return", SequenceSemantic::Return).return_();
     case 0xf5:
     case 0xf6:
-      return cursor.sourceOnly(opcode == 0xf5 ? "DSP Noise On" : "DSP Noise Off", "noise").ignore();
+      return cursor.sourceOnly(opcode == 0xf5 ? "DSP Noise On" : "DSP Noise Off", "noise");
     case 0xf7: {
       auto event = cursor.sourceOnly("DSP Noise Frequency", "noise-frequency");
       static_cast<void>(event.u8("clock", SourceValueDisplay::Hex));
-      return event.ignore();
+      return event;
     }
     case 0xf8:
-      return cursor.sourceOnly("Note-Keyed DSP Noise On", "keyed-noise").ignore();
+      return cursor.sourceOnly("Note-Keyed DSP Noise On", "keyed-noise");
     case 0xf9:
       return decodeExtendedCommand(cursor, sequenceBase);
     default:
@@ -775,7 +775,7 @@ SequenceRuntime sequenceRuntime() {
 TrackProgram decodeSourceTrack(ByteReader reader, Version version, u32 trackNumber, u32 startAddress, u32 sequenceBase,
                                std::vector<Diagnostic>* diagnostics) {
   const TrackDecodeScope tracks{.reader = reader, .maxCommands = kCommandLimit};
-  return tracks.reachable(trackNumber, startAddress, [&](u32 offset) {
+  return tracks.decode(trackNumber, startAddress, [&](u32 offset) {
     return decodeCommand(reader, offset, version, sequenceBase, diagnostics);
   });
 }
@@ -789,7 +789,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   for (u32 track = 0; track < layout.trackCount; ++track) {
     const u32 pointer = layout.sequenceHeaderAddress + 2 + track * 2;
     const u16 relative = reader.le16(pointer);
-    sequence.addReachableTrack(
+    sequence.addTrack(
         track, reader.range(pointer, 2), static_cast<u16>(layout.sequenceHeaderAddress + relative),
         [&](u32 offset) {
           return decodeCommand(reader, offset, layout.version, layout.sequenceHeaderAddress, diagnostics, &programs);

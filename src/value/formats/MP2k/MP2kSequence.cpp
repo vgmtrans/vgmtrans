@@ -763,7 +763,7 @@ struct DecodeContext {
     case 0xba: {
       auto event = cursor.sourceOnly("Priority");
       static_cast<void>(event.u8("priority"));
-      return event.ignore();
+      return event;
     }
     case 0xbb: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
@@ -785,7 +785,7 @@ struct DecodeContext {
       .reader = tracks.reader,
       .end = static_cast<u32>(std::min<u64>(tracks.reader.size(), std::numeric_limits<u32>::max())),
       .diagnostics = diagnostics};
-  return tracks.reachable(index, start, [&](u32 offset) { return decodeCommand(context, offset, state); });
+  return tracks.decode(index, start, [&](u32 offset) { return decodeCommand(context, offset, state); });
 }
 
 }  // namespace

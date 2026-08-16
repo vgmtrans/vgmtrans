@@ -9,7 +9,6 @@
 #include "value/sequence/SequenceProgram.h"
 
 #include <string>
-#include <type_traits>
 #include <unordered_set>
 
 namespace vgmtrans::core {
@@ -47,27 +46,6 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
 
   if (program.sectionPlaylist) {
     const SectionPlaylist& playlist = *program.sectionPlaylist;
-    std::unordered_set<u64> sectionAddresses;
-    for (const auto& section : playlist.sections) {
-      if (!sectionAddresses.insert(section.address.value).second) {
-        report.error("sequence.playlist.duplicate-section",
-                     "Sequence playlist contained duplicate section address " +
-                         std::to_string(section.address.value));
-      }
-      if (section.trackStarts.size() != program.tracks.size()) {
-        report.error("sequence.playlist.track-count",
-                     "Sequence section track entries did not match the program track count");
-        continue;
-      }
-      for (size_t trackIndex = 0; trackIndex < section.trackStarts.size(); ++trackIndex) {
-        if (section.trackStarts[trackIndex] &&
-            !program.tracks[trackIndex].commandIndex(*section.trackStarts[trackIndex])) {
-          report.error("sequence.playlist.missing-track-start",
-                       "Sequence section referenced a track start that was not decoded");
-        }
-      }
-    }
-
     std::unordered_set<u64> playlistAddresses;
     for (const auto& command : playlist.commands) {
       if (!playlistAddresses.insert(command.address.value).second) {
@@ -83,30 +61,36 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
     }
 
     for (const auto& command : playlist.commands) {
-      std::visit(
-          [&](const auto& operation) {
-            using T = std::decay_t<decltype(operation)>;
-            if constexpr (std::is_same_v<T, PlaylistPlaySection>) {
-              if (!sectionAddresses.contains(operation.section.value)) {
-                report.error("sequence.playlist.missing-section",
-                             "Sequence playlist referenced a section that was not decoded", command.range);
-              }
-              if (!playlistAddresses.contains(command.fallthrough.value)) {
-                report.error("sequence.playlist.missing-fallthrough",
-                             "Sequence playlist play command had no decoded fallthrough", command.range);
-              }
-            } else if constexpr (std::is_same_v<T, PlaylistRepeat>) {
-              if (!playlistAddresses.contains(operation.destination.value)) {
-                report.error("sequence.playlist.missing-repeat-target",
-                             "Sequence playlist repeat target was not decoded", command.range);
-              }
-              if (!operation.infinite && !playlistAddresses.contains(command.fallthrough.value)) {
-                report.error("sequence.playlist.missing-fallthrough",
-                             "Sequence playlist repeat command had no decoded fallthrough", command.range);
-              }
+      if (command.kind == PlaylistCommandKind::PlaySection) {
+        if (command.trackStarts.empty()) {
+          report.error("sequence.playlist.missing-section",
+                       "Sequence playlist referenced a section that was not decoded", command.range);
+        } else if (command.trackStarts.size() != program.tracks.size()) {
+          report.error("sequence.playlist.track-count",
+                       "Sequence play command track entries did not match the program track count", command.range);
+        } else {
+          for (size_t trackIndex = 0; trackIndex < command.trackStarts.size(); ++trackIndex) {
+            if (command.trackStarts[trackIndex] &&
+                !program.tracks[trackIndex].commandIndex(*command.trackStarts[trackIndex])) {
+              report.error("sequence.playlist.missing-track-start",
+                           "Sequence play command referenced a track start that was not decoded", command.range);
             }
-          },
-          command.operation);
+          }
+        }
+        if (!playlistAddresses.contains(command.fallthrough.value)) {
+          report.error("sequence.playlist.missing-fallthrough",
+                       "Sequence playlist play command had no decoded fallthrough", command.range);
+        }
+      } else if (command.kind == PlaylistCommandKind::Repeat) {
+        if (!playlistAddresses.contains(command.target.value)) {
+          report.error("sequence.playlist.missing-repeat-target",
+                       "Sequence playlist repeat target was not decoded", command.range);
+        }
+        if (command.additionalPlays != 0 && !playlistAddresses.contains(command.fallthrough.value)) {
+          report.error("sequence.playlist.missing-fallthrough",
+                       "Sequence playlist repeat command had no decoded fallthrough", command.range);
+        }
+      }
     }
   }
 

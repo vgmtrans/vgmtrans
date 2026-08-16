@@ -773,7 +773,7 @@ public:
                                                std::string_view localKind = {}) {
     auto event = sourceOnly(label, localKind);
     static_cast<void>(event.rawBytes("bytes", operandBytes));
-    return event.ignore();
+    return event;
   }
 
   [[nodiscard]] DecodedBytecodeCommand truncated() {

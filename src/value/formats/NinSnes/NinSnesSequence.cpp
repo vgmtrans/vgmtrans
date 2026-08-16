@@ -1507,7 +1507,7 @@ struct DecodeContext {
   for (u8 index = 0; index < arguments; ++index) {
     event.u8(fmt::format("arg{}", index + 1), SourceValueDisplay::Hex);
   }
-  return event.ignore();
+  return event;
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeNoteParameters(Cursor& cursor, const DecodeContext& context, EventType type,
@@ -1817,7 +1817,7 @@ struct DecodeContext {
       event.u8("adsr1", SourceValueDisplay::Hex);
       event.u8("sustain_rate");
       event.u8("sustain_level");
-      return event.ignore();
+      return event;
     }
     case EventType::IntelliEchoOn:
       return cursor.command("Echo On", SequenceSemantic::State).emitReverb(40.0 / 127.0);
@@ -1850,14 +1850,14 @@ struct DecodeContext {
     case EventType::IntelliWritePort: {
       auto event = cursor.sourceOnly("Write APU Port");
       event.u8("value");
-      return event.ignore();
+      return event;
     }
     case EventType::IntelliFe3F9: {
       auto event = cursor.sourceOnly("Unknown FE3 Table", "unknown");
       for (u8 index = 0; index < 36; ++index) {
         event.u8(fmt::format("byte_{}", index + 1), SourceValueDisplay::Hex);
       }
-      return event.ignore();
+      return event;
     }
     case EventType::IntelliDefineVoice: {
       auto event = cursor.command("Voice Parameter Definition", SequenceSemantic::Program);
@@ -1900,7 +1900,7 @@ struct DecodeContext {
       auto event = cursor.sourceOnly("ADSR");
       event.u8("adsr1", SourceValueDisplay::Hex);
       event.u8("adsr2", SourceValueDisplay::Hex);
-      return event.ignore();
+      return event;
     }
     case EventType::IntelliGainDurationRate: {
       auto event = cursor.command("GAIN Duration Rate", SequenceSemantic::State);
@@ -1919,7 +1919,7 @@ struct DecodeContext {
     case EventType::IntelliGain: {
       auto event = cursor.sourceOnly("GAIN");
       event.u8("gain", SourceValueDisplay::Hex);
-      return event.ignore();
+      return event;
     }
     case EventType::IntelliCustomPercussion: {
       auto event = cursor.command("Custom Percussion Table", SequenceSemantic::State);
@@ -1964,11 +1964,11 @@ struct DecodeContext {
       return event.ignore();
     }
     case EventType::Nop:
-      return cursor.sourceOnly("NOP").ignore();
+      return cursor.sourceOnly("NOP");
     case EventType::Nop1: {
       auto event = cursor.sourceOnly("NOP");
       event.u8("argument", SourceValueDisplay::Hex);
-      return event.ignore();
+      return event;
     }
     case EventType::Unknown1:
       return unknownCommand(cursor, 1);
@@ -1993,7 +1993,8 @@ struct PlaylistDecode {
                                             SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const Profile& selected = profile(layout.profile);
   std::map<u32, PlaylistCommand> commands;
-  std::map<u32, SequenceSection> sections;
+  using SectionTracks = std::vector<std::optional<Address>>;
+  std::map<u32, SectionTracks> sections;
   std::vector<u32> pending{layout.playlistAddress};
 
   const auto warn = [&](std::string message, SourceRange range) {
@@ -2010,16 +2011,13 @@ struct PlaylistDecode {
       pending.push_back(address);
     }
   };
-  const auto decodeSection = [&](u16 address) -> std::optional<SequenceSection> {
+  const auto decodeSection = [&](u16 address) -> std::optional<SectionTracks> {
     if (!reader.has(address, kTrackCount * 2)) {
       warn(fmt::format("NinSnes section ${:04X} did not contain eight track pointers", address),
            reader.range(address, reader.has(address, 1) ? 1 : 0));
       return std::nullopt;
     }
-    SequenceSection section{
-        .address = Address{address},
-        .trackStarts = std::vector<std::optional<Address>>(kTrackCount),
-    };
+    SectionTracks trackStarts(kTrackCount);
     bool active = false;
     for (u8 track = 0; track < kTrackCount; ++track) {
       const u16 raw = reader.le16(address + track * 2);
@@ -2032,10 +2030,10 @@ struct PlaylistDecode {
              reader.range(address + track * 2, 2));
         continue;
       }
-      section.trackStarts[track] = Address{start};
+      trackStarts[track] = Address{start};
       active = true;
     }
-    return active ? std::optional<SequenceSection>{std::move(section)} : std::nullopt;
+    return active ? std::optional<SectionTracks>{std::move(trackStarts)} : std::nullopt;
   };
 
   while (!pending.empty() && commands.size() < 4096) {
@@ -2050,36 +2048,36 @@ struct PlaylistDecode {
         .fallthrough = Address{address + 2},
         .range = reader.range(address, 2),
     };
-    if (value == 0) {
-      command.operation = PlaylistEnd{};
-    } else if (value <= 0xff) {
+    if (value != 0 && value <= 0xff) {
       if (!reader.has(address, 4)) {
         warn("NinSnes playlist repeat was truncated", reader.range(address, 2));
-        command.operation = PlaylistEnd{};
       } else {
         const u16 storedDestination = reader.le16(address + 2);
         const u16 destination = layout.resolveAddress(storedDestination);
         const bool infinite = isInfinitePlaylistRepeat(selected.playlist, value);
         command.fallthrough = Address{address + 4};
         command.range = reader.range(address, 4);
-        command.operation = PlaylistRepeat{
-            .additionalPlays = value,
-            .destination = Address{destination},
-            .infinite = infinite,
-        };
+        command.kind = PlaylistCommandKind::Repeat;
+        command.target = Address{destination};
+        command.additionalPlays = infinite ? 0 : value;
         queue(destination);
         // Infinite repeats never reach their encoded fallthrough, which may be adjacent song data.
         if (!infinite) {
           queue(address + 4);
         }
       }
-    } else {
+    } else if (value > 0xff) {
       const u16 sectionAddress = layout.resolveAddress(value);
-      command.operation = PlaylistPlaySection{.section = Address{sectionAddress}};
-      if (!sections.contains(sectionAddress)) {
-        if (auto section = decodeSection(sectionAddress)) {
-          sections.emplace(sectionAddress, std::move(*section));
+      command.kind = PlaylistCommandKind::PlaySection;
+      command.target = Address{sectionAddress};
+      auto section = sections.find(sectionAddress);
+      if (section == sections.end()) {
+        if (auto decodedSection = decodeSection(sectionAddress)) {
+          section = sections.emplace(sectionAddress, std::move(*decodedSection)).first;
         }
+      }
+      if (section != sections.end()) {
+        command.trackStarts = section->second;
       }
       queue(address + 2);
     }
@@ -2092,9 +2090,6 @@ struct PlaylistDecode {
               .startAddress = Address{layout.playlistAddress},
           },
   };
-  for (auto& [_, section] : sections) {
-    decoded.playlist.sections.push_back(std::move(section));
-  }
   for (auto& [_, command] : commands) {
     decoded.playlist.commands.push_back(std::move(command));
   }
@@ -2119,44 +2114,41 @@ struct PlaylistDecode {
                            .id();
 
   for (auto& command : decoded.playlist.commands) {
+    const bool play = command.kind == PlaylistCommandKind::PlaySection;
+    const bool repeat = command.kind == PlaylistCommandKind::Repeat;
     auto annotation = sourceMap
-                          ->command(std::holds_alternative<PlaylistPlaySection>(command.operation)
-                                        ? "Play Section"
-                                        : (std::holds_alternative<PlaylistRepeat>(command.operation) ? "Repeat Playlist"
-                                                                                                     : "Playlist End"),
-                                    command.range,
-                                    std::holds_alternative<PlaylistRepeat>(command.operation) ? SequenceSemantic::Repeat
-                                                                                              : SequenceSemantic::Meta)
+                          ->command(play ? "Play Section" : (repeat ? "Repeat Playlist" : "Playlist End"),
+                                    command.range, repeat ? SequenceSemantic::Repeat : SequenceSemantic::Meta)
                           .kind("nin-snes-playlist-command")
                           .parent(*decoded.annotation)
                           .field("value", reader.range(command.range.offset, 2), reader.le16(command.range.offset),
                                  SourceValueDisplay::Hex);
-    if (const auto* play = std::get_if<PlaylistPlaySection>(&command.operation)) {
-      annotation.derived("section", play->section.value, SourceValueDisplay::Address)
-          .link(SourceLinkRole::PointsTo, SourceTarget{reader.range(play->section.value, kTrackCount * 2)});
-    } else if (const auto* repeat = std::get_if<PlaylistRepeat>(&command.operation)) {
+    if (play) {
+      annotation.derived("section", command.target.value, SourceValueDisplay::Address)
+          .link(SourceLinkRole::PointsTo, SourceTarget{reader.range(command.target.value, kTrackCount * 2)});
+    } else if (repeat) {
       annotation
-          .field("destination", reader.range(command.range.offset + 2, 2), repeat->destination.value,
+          .field("destination", reader.range(command.range.offset + 2, 2), command.target.value,
                  SourceValueDisplay::Address)
-          .derived("additional_plays", repeat->additionalPlays)
-          .derived("infinite", repeat->infinite)
-          .link(SourceLinkRole::RepeatTarget, SourceTarget{reader.range(repeat->destination.value, 2)});
+          .derived("additional_plays", command.additionalPlays)
+          .derived("infinite", command.additionalPlays == 0)
+          .link(SourceLinkRole::RepeatTarget, SourceTarget{reader.range(command.target.value, 2)});
     }
     static_cast<void>(annotation.id());
   }
 
-  for (const auto& section : decoded.playlist.sections) {
-    auto annotation = sourceMap->header("Section", reader.range(section.address.value, kTrackCount * 2))
+  for (const auto& [address, trackStarts] : sections) {
+    auto annotation = sourceMap->header("Section", reader.range(address, kTrackCount * 2))
                           .kind("nin-snes-section")
                           .parent(*decoded.annotation)
                           .owner(ObjectRefs::sequence(sequenceId));
-    for (u8 track = 0; track < section.trackStarts.size(); ++track) {
-      const SourceRange range = reader.range(section.address.value + track * 2, 2);
-      if (section.trackStarts[track]) {
+    for (u8 track = 0; track < trackStarts.size(); ++track) {
+      const SourceRange range = reader.range(address + track * 2, 2);
+      if (trackStarts[track]) {
         annotation
-            .field(fmt::format("track_{}", track + 1), range, section.trackStarts[track]->value,
+            .field(fmt::format("track_{}", track + 1), range, trackStarts[track]->value,
                    SourceValueDisplay::Address)
-            .link(SourceLinkRole::PointsTo, SourceTarget{reader.range(section.trackStarts[track]->value, 1)});
+            .link(SourceLinkRole::PointsTo, SourceTarget{reader.range(trackStarts[track]->value, 1)});
       } else {
         annotation.field(fmt::format("track_{}", track + 1), range, 0, SourceValueDisplay::Address);
       }
@@ -2178,7 +2170,7 @@ struct PlaylistDecode {
       .parentAnnotation = parent,
       .sourceMap = sourceMap,
   };
-  return scope.reachable(trackNumber, starts, [&](u32 address) { return decodeCommand(context, address); });
+  return scope.decode(trackNumber, starts, [&](u32 address) { return decodeCommand(context, address); });
 }
 
 [[nodiscard]] std::vector<u8> buildProgramMap(ByteReader reader, const Layout& layout) {
@@ -2223,30 +2215,29 @@ const SequenceDialect& sequenceDialect() {
 
 bool isValidPlaylist(ByteReader reader, const Layout& layout) {
   const SectionPlaylist& playlist = decodePlaylist(reader, layout, AssetId{}, nullptr, nullptr).playlist;
-  if (playlist.commands.empty() || playlist.sections.empty()) {
+  if (playlist.commands.empty() ||
+      std::ranges::none_of(playlist.commands, [](const PlaylistCommand& command) {
+        return command.kind == PlaylistCommandKind::PlaySection && !command.trackStarts.empty();
+      })) {
     return false;
   }
 
   std::set<u64> commandAddresses;
-  std::set<u64> sectionAddresses;
   for (const PlaylistCommand& command : playlist.commands) {
     commandAddresses.insert(command.address.value);
-  }
-  for (const SequenceSection& section : playlist.sections) {
-    sectionAddresses.insert(section.address.value);
   }
   if (!commandAddresses.contains(playlist.startAddress.value)) {
     return false;
   }
 
   for (const PlaylistCommand& command : playlist.commands) {
-    if (const auto* play = std::get_if<PlaylistPlaySection>(&command.operation)) {
-      if (!sectionAddresses.contains(play->section.value) || !commandAddresses.contains(command.fallthrough.value)) {
+    if (command.kind == PlaylistCommandKind::PlaySection) {
+      if (command.trackStarts.size() != kTrackCount || !commandAddresses.contains(command.fallthrough.value)) {
         return false;
       }
-    } else if (const auto* repeat = std::get_if<PlaylistRepeat>(&command.operation)) {
-      if (!commandAddresses.contains(repeat->destination.value) ||
-          (!repeat->infinite && !commandAddresses.contains(command.fallthrough.value))) {
+    } else if (command.kind == PlaylistCommandKind::Repeat) {
+      if (!commandAddresses.contains(command.target.value) ||
+          (command.additionalPlays != 0 && !commandAddresses.contains(command.fallthrough.value))) {
         return false;
       }
     }
@@ -2286,11 +2277,13 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   program.tracks.reserve(kTrackCount);
   for (u8 track = 0; track < kTrackCount; ++track) {
     std::vector<Address> starts;
-    for (const SequenceSection& section : program.sectionPlaylist->sections) {
-      if (section.trackStarts[track] && std::ranges::find_if(starts, [&](Address address) {
-                                          return address.value == section.trackStarts[track]->value;
-                                        }) == starts.end()) {
-        starts.push_back(*section.trackStarts[track]);
+    for (const PlaylistCommand& command : program.sectionPlaylist->commands) {
+      if (command.kind == PlaylistCommandKind::PlaySection && track < command.trackStarts.size() &&
+          command.trackStarts[track] &&
+          std::ranges::find_if(starts, [&](Address address) {
+            return address.value == command.trackStarts[track]->value;
+          }) == starts.end()) {
+        starts.push_back(*command.trackStarts[track]);
       }
     }
     program.tracks.push_back(decodeTrack(reader, track, starts, context, sequenceId, playlist.annotation, sourceMap));

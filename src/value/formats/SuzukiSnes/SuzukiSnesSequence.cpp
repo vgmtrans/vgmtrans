@@ -679,7 +679,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
           (version == Version::SuperMarioRpg && opcode == 0xff)) {
         return cursor.command("Octave Up", SequenceSemantic::Pitch).add<&TrackState::octave>(1);
       }
-      return cursor.sourceOnly("Unknown Command").ignore();
+      return cursor.sourceOnly("Unknown Command");
     case 0xf6:
       if (version == Version::SeikenDensetsu3) {
         return cursor.command("Octave Up", SequenceSemantic::Pitch).add<&TrackState::octave>(1);
@@ -702,11 +702,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return cursor.ignored(opcode == 0xc8 ? "Noise Frequency" : "Relative Noise Frequency", 1, "noise");
     case 0xc9:
     case 0xca:
-      return cursor.sourceOnly(opcode == 0xc9 ? "Noise On" : "Noise Off", "noise").ignore();
+      return cursor.sourceOnly(opcode == 0xc9 ? "Noise On" : "Noise Off", "noise");
     case 0xcb:
     case 0xcc:
-      return cursor.sourceOnly(opcode == 0xcb ? "Pitch Modulation On" : "Pitch Modulation Off", "pitch-modulation")
-          .ignore();
+      return cursor.sourceOnly(opcode == 0xcb ? "Pitch Modulation On" : "Pitch Modulation Off",
+                               "pitch-modulation");
     case 0xcd:
     case 0xce: {
       auto event = cursor.unsupported(opcode == 0xcd ? "Jump to Low SFX" : "Jump to High SFX", "sfx-jump");
@@ -767,7 +767,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return event.repeatBreak(found->second.slot, found->second.end);
     }
     case 0xd7:
-      return cursor.sourceOnly("Loop Point", "loop-point").ignore();
+      return cursor.sourceOnly("Loop Point", "loop-point");
     case 0xd8:
       return cursor.command("Restore Instrument ADSR", SequenceSemantic::Envelope)
           .restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
@@ -975,7 +975,7 @@ TrackProgram decodeSourceTrack(ByteReader reader, Version version, u32 trackNumb
                                std::vector<Diagnostic>* diagnostics) {
   const TrackLayout layout = inspectTrack(reader, version, startAddress);
   const TrackDecodeScope tracks{.reader = reader, .maxCommands = 32768};
-  return tracks.linear(trackNumber, startAddress,
+  return tracks.decode(trackNumber, startAddress,
                        [&](u32 offset) { return decodeCommand(reader, offset, version, layout, diagnostics); });
 }
 
@@ -990,7 +990,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
       continue;
     }
     const TrackLayout trackLayout = inspectTrack(reader, layout.version, start);
-    sequence.addLinearTrack(track, reader.range(pointer, 2), start, [&](u32 offset) {
+    sequence.addTrack(track, reader.range(pointer, 2), start, [&](u32 offset) {
       return decodeCommand(reader, offset, layout.version, trackLayout, diagnostics);
     });
   }

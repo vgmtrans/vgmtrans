@@ -761,12 +761,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xad: {
       auto event = cursor.command("Phase/Surround", SequenceSemantic::Pan, CommandPlaybackStatus::SourceOnly);
       static_cast<void>(event.u8("mode"));
-      return event.ignore();
+      return event;
     }
     case 0xae: {
       auto event = cursor.command("Random Volume", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly);
       static_cast<void>(event.u8("enabled"));
-      return event.ignore();
+      return event;
     }
     case 0xaf: {
       auto event = cursor.command("ADSR Override", SequenceSemantic::Envelope);
@@ -780,7 +780,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xb2: {
       auto event = cursor.command("Gate Jitter", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly);
       static_cast<void>(event.u8("enabled"));
-      return event.ignore();
+      return event;
     }
     default:
       return cursor.unsupported("Invalid Late-Family Opcode", "invalid").stop();
@@ -820,7 +820,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       if (middle) {
         return command("End", SequenceSemantic::End).invoke<&Playback::endTrack>().end();
       }
-      return command("No Operation", SequenceSemantic::Meta, CommandPlaybackStatus::NoOp, "nop").ignore();
+      return cursor.noOp("No Operation", "nop");
     case 0xe1: {
       auto event = command("Volume", SequenceSemantic::Level);
       const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
@@ -856,24 +856,24 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       }
       auto event = command("Driver Flag", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly, "driver-flag");
       static_cast<void>(event.u8("enabled"));
-      return event.ignore();
+      return event;
     }
     case 0xe6:
       if (middle) {
         auto event = command("Control E6", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly, "control");
         static_cast<void>(event.rawBytes("bytes", 2));
-        return event.ignore();
+        return event;
       }
-      return command("No Operation", SequenceSemantic::Meta, CommandPlaybackStatus::NoOp, "nop").ignore();
+      return cursor.noOp("No Operation", "nop");
     case 0xe8:
     case 0xe9:
       if (middle) {
         auto event = command(opcode == 0xe8 ? "Control E8" : "Control E9", SequenceSemantic::State,
                              CommandPlaybackStatus::SourceOnly, "control");
         static_cast<void>(event.rawBytes("bytes", 3));
-        return event.ignore();
+        return event;
       }
-      return command("No Operation", SequenceSemantic::Meta, CommandPlaybackStatus::NoOp, "nop").ignore();
+      return cursor.noOp("No Operation", "nop");
     case 0xe5: {
       auto event = command("Vibrato Parameters", SequenceSemantic::Modulation);
       const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
@@ -889,9 +889,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       if (middle) {
         auto event = command("Control F2", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly, "control");
         static_cast<void>(event.rawBytes("bytes", 1));
-        return event.ignore();
+        return event;
       }
-      return command("No Operation", SequenceSemantic::Meta, CommandPlaybackStatus::NoOp, "nop").ignore();
+      return cursor.noOp("No Operation", "nop");
     case 0xf8: {
       auto event = command("Return to Saved Segment", SequenceSemantic::Repeat);
       return event.invokeFlow<&Playback::returnSaved>();
@@ -907,17 +907,17 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       if (middle) {
         static_cast<void>(event.u8("unknown"));
       }
-      return event.ignore();
+      return event;
     }
     case 0xe3: {
       auto event =
           command("Release/Modulation Flag", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly, "driver-flag");
       static_cast<void>(event.u8("value"));
-      return event.ignore();
+      return event;
     }
     default:
       if (!middle) {
-        return command("No Operation", SequenceSemantic::Meta, CommandPlaybackStatus::NoOp, "nop").ignore();
+        return cursor.noOp("No Operation", "nop");
       }
       return cursor.unsupported("Invalid Middle-Family Opcode", "invalid").stop();
   }

@@ -380,7 +380,7 @@ SequenceProgram parseSonyPs1Sequence(ByteReader reader, AssetId id, const SonyPs
     const auto found = std::ranges::lower_bound(layout.events, offset, {}, &SonyPs1EventLayout::offset);
     return found != layout.events.end() && found->offset == offset ? &*found : nullptr;
   };
-  auto track = tracks.reachable(0, layout.dataOffset, [&](u32 offset) -> DecodedBytecodeCommand {
+  auto track = tracks.decode(0, layout.dataOffset, [&](u32 offset) -> DecodedBytecodeCommand {
     const auto* event = eventAt(offset);
     if (event == nullptr) {
       Cursor cursor(reader, offset, layout.dataEnd, kSonyPs1DialectId, diagnostics);

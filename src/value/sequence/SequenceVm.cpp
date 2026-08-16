@@ -327,7 +327,7 @@ struct PlaylistVisitState {
 };
 
 struct PlaylistAdvance {
-  const SequenceSection* section = nullptr;
+  const std::vector<std::optional<Address>>* trackStarts = nullptr;
   std::optional<u64> preservedLoopStart;
 };
 
@@ -363,23 +363,20 @@ public:
       }
 
       const PlaylistCommand& command = playlist_.commands[*current_];
-      if (const auto* play = std::get_if<PlaylistPlaySection>(&command.operation)) {
+      if (command.kind == PlaylistCommandKind::PlaySection) {
         current_ = commandIndex(command.fallthrough);
-        const auto section = sectionByAddress(play->section);
-        return PlaylistAdvance{
-            .section = section,
-        };
+        return PlaylistAdvance{.trackStarts = &command.trackStarts};
       }
-      if (const auto* repeat = std::get_if<PlaylistRepeat>(&command.operation)) {
-        if (repeat->infinite) {
-          current_ = commandIndex(repeat->destination);
+      if (command.kind == PlaylistCommandKind::Repeat) {
+        if (command.additionalPlays == 0) {
+          current_ = commandIndex(command.target);
           continue;
         }
 
-        const auto [counter, _] = repeatRemaining_.try_emplace(*current_, repeat->additionalPlays);
+        const auto [counter, _] = repeatRemaining_.try_emplace(*current_, command.additionalPlays);
         if (counter->second != 0) {
           --counter->second;
-          current_ = commandIndex(repeat->destination);
+          current_ = commandIndex(command.target);
         } else {
           repeatRemaining_.erase(*current_);
           current_ = commandIndex(command.fallthrough);
@@ -401,13 +398,6 @@ private:
       return std::nullopt;
     }
     return static_cast<u32>(std::distance(playlist_.commands.begin(), found));
-  }
-
-  [[nodiscard]] const SequenceSection* sectionByAddress(Address address) const {
-    const auto found = std::ranges::find_if(playlist_.sections, [address](const SequenceSection& section) {
-      return section.address.value == address.value;
-    });
-    return found == playlist_.sections.end() ? nullptr : &*found;
   }
 
   const SectionPlaylist& playlist_;
@@ -1025,10 +1015,10 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, std::
       if (program.sectionPlaylist) {
         playlist.emplace(*program.sectionPlaylist, loopPolicy, options_);
         const PlaylistAdvance first = playlist->advance(0);
-        if (first.section != nullptr) {
+        if (first.trackStarts != nullptr) {
           for (size_t i = 0; i < executors.size(); ++i) {
             const std::optional<Address> start =
-                i < first.section->trackStarts.size() ? first.section->trackStarts[i] : std::nullopt;
+                i < first.trackStarts->size() ? (*first.trackStarts)[i] : std::nullopt;
             executors[i]->beginSection(start, 0);
           }
         }
@@ -1068,13 +1058,13 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, std::
               executor->preservePlaylistLoop(*next.preservedLoopStart, boundary);
             }
           }
-          if (next.section == nullptr) {
+          if (next.trackStarts == nullptr) {
             sequenceEndTick = boundary;
             break;
           }
           for (size_t i = 0; i < executors.size(); ++i) {
             const std::optional<Address> start =
-                i < next.section->trackStarts.size() ? next.section->trackStarts[i] : std::nullopt;
+                i < next.trackStarts->size() ? (*next.trackStarts)[i] : std::nullopt;
             executors[i]->beginSection(start, boundary);
           }
           continue;

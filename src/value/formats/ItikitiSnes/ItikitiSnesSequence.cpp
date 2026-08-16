@@ -639,7 +639,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return event.invoke<&Playback::echoFeedback>(feedback, event.u8("selector"));
     }
     case 0x05:
-      return cursor.sourceOnly("Set Unused Voice Flag", "unused-voice-flag").ignore();
+      return cursor.sourceOnly("Set Unused Voice Flag", "unused-voice-flag");
     case 0x06: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
       return event.invoke<&Playback::tempo>(event.u8("tempo"));
@@ -652,7 +652,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x08: {
       auto event = cursor.sourceOnly("DSP Noise Frequency (Driver Bug)", "noise-frequency");
       static_cast<void>(event.u8("clock", SourceValueDisplay::Hex));
-      return event.ignore();
+      return event;
     }
     case 0x09: {
       auto event = cursor.command("Note Length Set", SequenceSemantic::State);
@@ -761,12 +761,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return cursor.command("Pan LFO Off", SequenceSemantic::Modulation).invoke<&Playback::panLfoOff>();
     case 0x1f:
     case 0x20:
-      return cursor.sourceOnly(opcode == 0x1f ? "DSP Noise On" : "DSP Noise Off", "noise").ignore();
+      return cursor.sourceOnly(opcode == 0x1f ? "DSP Noise On" : "DSP Noise Off", "noise");
     case 0x21:
     case 0x22:
-      return cursor
-          .sourceOnly(opcode == 0x21 ? "DSP Pitch Modulation On" : "DSP Pitch Modulation Off", "pitch-modulation")
-          .ignore();
+      return cursor.sourceOnly(opcode == 0x21 ? "DSP Pitch Modulation On" : "DSP Pitch Modulation Off",
+                               "pitch-modulation");
     case 0x23:
     case 0x24:
       return cursor.command(opcode == 0x23 ? "Echo On" : "Echo Off", SequenceSemantic::State)
@@ -796,7 +795,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x2b: {
       auto event = cursor.sourceOnly("Main CPU Output Cursor", "cpu-output-cursor");
       static_cast<void>(event.u16le("cursor", SourceValueDisplay::Address));
-      return event.ignore();
+      return event;
     }
     case 0x2c: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
@@ -855,7 +854,7 @@ SequenceRuntime sequenceRuntime(u8 echoDelay) {
 TrackProgram decodeSourceTrack(ByteReader reader, u32 trackNumber, u32 startAddress, u32 sequenceBase, u8 groupIndex,
                                std::vector<Diagnostic>* diagnostics) {
   const TrackDecodeScope tracks{.reader = reader, .maxCommands = kCommandLimit};
-  return tracks.reachable(trackNumber, startAddress, [&](u32 offset) {
+  return tracks.decode(trackNumber, startAddress, [&](u32 offset) {
     return decodeCommand(reader, offset, sequenceBase, groupIndex, diagnostics);
   });
 }
@@ -870,7 +869,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     const u32 pointer = layout.sequenceHeaderAddress + 2 + track * 2;
     const u16 relative = reader.le16(pointer);
     const u16 start = static_cast<u16>(layout.sequenceBaseAddress + relative);
-    sequence.addReachableTrack(
+    sequence.addTrack(
         track, reader.range(pointer, 2), start,
         [&](u32 offset) {
           return decodeCommand(reader, offset, layout.sequenceBaseAddress, layout.groupIndex, diagnostics, &references);

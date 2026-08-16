@@ -742,7 +742,7 @@ SequenceProgram parseSegSatSequenceProgram(ByteReader reader, AssetId id, const 
       .startAddress = Address{tempoStart},
   };
   if (layout.tempoEventCount != 0) {
-    tempo = tracks.linear(0, tempoStart, [&](u32 offset) {
+    tempo = tracks.decode(0, tempoStart, [&](u32 offset) {
       const u32 index = (offset - tempoStart) / 8;
       return decodeTempo(reader, offset, layout.offset + layout.normalTrack, index + 1 >= layout.tempoEventCount,
                          diagnostics);
@@ -752,7 +752,7 @@ SequenceProgram parseSegSatSequenceProgram(ByteReader reader, AssetId id, const 
   program.tracks.push_back(std::move(tempo));
 
   const u32 normalStart = layout.offset + layout.normalTrack;
-  auto normal = tracks.reachable(
+  auto normal = tracks.decode(
       1, normalStart, [&](u32 offset) { return decodeNormal(reader, offset, layout.end, normalStart, diagnostics); });
   normal.sourceTrackNumber = 0;
   program.tracks.push_back(normal);

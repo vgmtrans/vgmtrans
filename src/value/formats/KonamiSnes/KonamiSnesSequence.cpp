@@ -1210,7 +1210,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
   for (u8 index = 0; index < argumentCount; ++index) {
     event.u8(fmt::format("arg{}", index + 1), SourceValueDisplay::Hex);
   }
-  return event.ignore();
+  return event;
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, KonamiSnesVersion version,
@@ -1387,7 +1387,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       auto event = cursor.sourceOnly("Random Pitch");
       event.u8("rate");
       event.u16be("pitch_mask", SourceValueDisplay::Hex);
-      return event.ignore();
+      return event;
     }
     case 0xe6: {
       auto event = cursor.command("Loop Start", SequenceSemantic::Loop);
@@ -1541,11 +1541,11 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
         auto event = cursor.sourceOnly("Linear Pitch Envelope");
         event.u8("delta_fraction");
         event.s8("delta_integer", SourceValueDisplay::SignedDecimal);
-        return event.ignore();
+        return event;
       } else {
         auto event = cursor.sourceOnly("Pitch Modulation");
         event.u8("voice_mask", SourceValueDisplay::Hex);
-        return event.ignore();
+        return event;
       }
     case 0xfc:
       // Konami repeatedly reassigned opcode 0xfc. Keep each version next to the
@@ -1561,7 +1561,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
         auto event = cursor.sourceOnly("Linear Pitch Envelope");
         event.u8("delta_fraction");
         event.s8("delta_integer", SourceValueDisplay::SignedDecimal);
-        return event.ignore();
+        return event;
       }
       if (version >= KONAMISNES_V5) {
         auto event = cursor.command("Program And Volume", SequenceSemantic::Program);
@@ -1662,7 +1662,7 @@ TrackProgram decodeKonamiSnesSourceTrack(ByteReader reader, KonamiSnesVersion ve
       .parentAnnotation = parentAnnotation,
       .sourceMap = sourceMap,
   };
-  return tracks.linear(sourceTrackNumber, startAddress,
+  return tracks.decode(sourceTrackNumber, startAddress,
                        [&](u32 offset) { return decodeCommand(reader, offset, version, diagnostics); });
 }
 
@@ -1703,7 +1703,7 @@ SequenceProgram decodeKonamiSnesSequence(ByteReader reader, const KonamiSnesLayo
     if (trackAddress == 0 || !reader.has(trackAddress, 1)) {
       continue;
     }
-    sequence.addLinearTrack(trackNumber, reader.range(pointerOffset, 2), trackAddress, decode);
+    sequence.addTrack(trackNumber, reader.range(pointerOffset, 2), trackAddress, decode);
   }
 
   RuntimeConfig runtime{

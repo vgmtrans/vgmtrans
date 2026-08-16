@@ -1236,7 +1236,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       } else {
         auto event = cursor.sourceOnly("Ignored Parameter", "nop");
         event.u8("unused");
-        return event.ignore();
+        return event;
       }
     case 0xd9: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
@@ -1510,7 +1510,7 @@ SequenceRuntime sequenceRuntime(Version version, u8 timebaseShift, bool velocity
 TrackProgram decodeSourceTrack(ByteReader reader, Version version, u8 timebaseShift, bool noteVelocity, u32 trackNumber,
                                u32 startAddress, std::vector<Diagnostic>* diagnostics) {
   const TrackDecodeScope tracks{.reader = reader, .maxCommands = 32768};
-  return tracks.linear(trackNumber, startAddress, [&](u32 offset) {
+  return tracks.decode(trackNumber, startAddress, [&](u32 offset) {
     return decodeCommand(reader, offset, version, timebaseShift, noteVelocity, kAramSize, diagnostics);
   });
 }
@@ -1526,7 +1526,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   SequenceReferences references;
   SequenceDecodeSession sequence{reader, sequenceDialect(), sequenceId, header->range, sourceMap, 32768};
   for (const auto& [track, start] : header->tracks) {
-    sequence.addLinearTrack(track, header->range, start, [&](u32 offset) {
+    sequence.addTrack(track, header->range, start, [&](u32 offset) {
       return decodeCommand(reader, offset, layout.version, header->timebaseShift, header->noteVelocity,
                            layout.noteLengthTableAddress, diagnostics, &references);
     });

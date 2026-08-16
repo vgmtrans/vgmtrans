@@ -1347,24 +1347,23 @@ void sequenceVmSwitchesParallelSectionsAtTheFirstChannelEnd() {
       .sectionPlaylist =
           SectionPlaylist{
               .startAddress = Address{1000},
-              .sections =
-                  {
-                      SequenceSection{.address = Address{500}, .trackStarts = {Address{0}, Address{100}}},
-                      SequenceSection{.address = Address{600}, .trackStarts = {std::nullopt, Address{110}}},
-                  },
               .commands =
                   {
                       PlaylistCommand{
                           .address = Address{1000},
                           .fallthrough = Address{1002},
-                          .operation = PlaylistPlaySection{.section = Address{500}},
+                          .kind = PlaylistCommandKind::PlaySection,
+                          .target = Address{500},
+                          .trackStarts = {Address{0}, Address{100}},
                       },
                       PlaylistCommand{
                           .address = Address{1002},
                           .fallthrough = Address{1004},
-                          .operation = PlaylistPlaySection{.section = Address{600}},
+                          .kind = PlaylistCommandKind::PlaySection,
+                          .target = Address{600},
+                          .trackStarts = {std::nullopt, Address{110}},
                       },
-                      PlaylistCommand{.address = Address{1004}, .operation = PlaylistEnd{}},
+                      PlaylistCommand{.address = Address{1004}},
                   },
           },
   };
@@ -1393,25 +1392,23 @@ void sequenceVmExecutesFiniteAndInfiniteSectionPlaylistRepeats() {
         .sectionPlaylist =
             SectionPlaylist{
                 .startAddress = Address{1000},
-                .sections = {SequenceSection{.address = Address{500}, .trackStarts = {Address{0}}}},
                 .commands =
                     {
                         PlaylistCommand{
                             .address = Address{1000},
                             .fallthrough = Address{1002},
-                            .operation = PlaylistPlaySection{.section = Address{500}},
+                            .kind = PlaylistCommandKind::PlaySection,
+                            .target = Address{500},
+                            .trackStarts = {Address{0}},
                         },
                         PlaylistCommand{
                             .address = Address{1002},
                             .fallthrough = Address{1004},
-                            .operation =
-                                PlaylistRepeat{
-                                    .additionalPlays = infinite ? 0u : 1u,
-                                    .destination = Address{1000},
-                                    .infinite = infinite,
-                                },
+                            .kind = PlaylistCommandKind::Repeat,
+                            .target = Address{1000},
+                            .additionalPlays = infinite ? 0u : 1u,
                         },
-                        PlaylistCommand{.address = Address{1004}, .operation = PlaylistEnd{}},
+                        PlaylistCommand{.address = Address{1004}},
                     },
             },
     };
