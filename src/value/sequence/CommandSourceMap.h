@@ -10,6 +10,7 @@
 
 #include <array>
 #include <limits>
+#include <map>
 #include <optional>
 #include <span>
 #include <string>
@@ -30,11 +31,9 @@ struct SequenceDialect;
 // and append the commands they discover themselves.
 class TrackDecodeSession {
 public:
-  [[nodiscard]] std::optional<SourceAnnotationId> annotation() const noexcept { return annotation_; }
-
-  void append(DecodedBytecodeCommand command, u32 offset);
+  [[nodiscard]] bool hasCommand(u32 offset) const { return commands_.contains(offset); }
+  const DecodedBytecodeCommand& append(DecodedBytecodeCommand command, u32 offset);
   [[nodiscard]] TrackProgram finish();
-  [[nodiscard]] TrackProgram finish(TrackProgram track);
 
 private:
   friend struct TrackDecodeScope;
@@ -43,15 +42,14 @@ private:
                      std::optional<SourceAnnotationId> parentAnnotation, SourceMapBuilder* sourceMap,
                      bool sourceHasTracks);
 
-  [[nodiscard]] DecodedBytecodeCommand project(DecodedBytecodeCommand command) const;
-
   ByteReader reader_;
   u32 startOffset_ = 0;
   SourceMapBuilder* sourceMap_ = nullptr;
   std::optional<SourceAnnotationId> annotation_;
   std::optional<SourceAnnotationId> commandParent_;
   std::optional<AssetId> rootSequenceAsset_;
-  TrackProgram track_;
+  u32 trackIndex_ = 0;
+  std::map<u32, DecodedBytecodeCommand> commands_;
 };
 
 // Holds the reader, source-map context, and safety limits used to decode a
@@ -92,12 +90,11 @@ struct TrackDecodeScope {
       return TrackProgram{.sourceTrackNumber = trackIndex};
     }
     auto session = begin(trackIndex, static_cast<u32>(startAddresses.front().value));
-    const auto decodeAndProject = [&](u32 offset) { return session.project(decodeCommand(offset)); };
     const u32 end = bytecodeEnd == std::numeric_limits<u32>::max()
                         ? static_cast<u32>(reader.size())
                         : std::min(static_cast<u32>(reader.size()), bytecodeEnd);
-    auto track = decodeBytecodeTrack(reader, end, startAddresses, trackIndex, maxCommands, decodeAndProject);
-    return session.finish(std::move(track));
+    decodeBytecode(reader, end, startAddresses, maxCommands, session, std::move(decodeCommand));
+    return session.finish();
   }
 };
 

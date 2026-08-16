@@ -936,7 +936,6 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       .sourceMap = sourceMap,
   };
   auto session = scope.begin(channel.index, start);
-  std::map<u32, DecodedBytecodeCommand> commands;
 
   for (const u16 streamStart : channel.streamStarts) {
     u32 offset = streamStart;
@@ -945,12 +944,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const detail::CommandShape shape = detail::commandShape(layout.variant, layout.lateTraits, opcode);
       if (shape.size == 0 || !reader.has(offset, shape.size)) {
         Cursor invalid(reader, offset, "wolf-team-snes", diagnostics);
-        commands.try_emplace(offset, invalid.unsupported("Truncated or Invalid Command", "invalid").stop());
+        session.append(invalid.unsupported("Truncated or Invalid Command", "invalid").stop(), offset);
         break;
       }
       DecodedBytecodeCommand decoded = layout.segmented() ? decodeSegmentedCommand(reader, offset, layout, diagnostics)
                                                           : decodeLateCommand(reader, offset, layout, diagnostics);
-      commands.try_emplace(offset, std::move(decoded));
+      session.append(std::move(decoded), offset);
       offset += shape.size;
       if (shape.terminatesStream) {
         break;
@@ -958,9 +957,6 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
   }
 
-  for (auto& [offset, command] : commands) {
-    session.append(std::move(command), offset);
-  }
   return session.finish();
 }
 

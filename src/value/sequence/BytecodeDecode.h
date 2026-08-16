@@ -10,7 +10,6 @@
 #include "value/sequence/SequenceProgram.h"
 
 #include <cstddef>
-#include <map>
 #include <span>
 #include <string>
 #include <string_view>
@@ -60,23 +59,11 @@ struct EncodedSemanticField {
   return offset <= end && size <= end - offset && reader.has(offset, size);
 }
 
-inline void appendDecodedBytecodeCommand(TrackProgram& track, DecodedBytecodeCommand decoded, u32 offset) {
-  const SequenceSemantic semantic = decoded.presentation.semantic;
-  track.addCommand(Address{offset}, decoded.opcode, decoded.range, std::move(decoded.operands),
-                   std::move(decoded.flow), decoded.annotation, std::move(decoded.execution), semantic);
-}
-
 // Follow the track start, jumps, and calls to find every command that can be reached.
-// Commands are appended in address order so the parsed result is stable.
-template <class DecodeCommand>
-[[nodiscard]] TrackProgram decodeBytecodeTrack(ByteReader reader, u32 bytecodeEnd,
-                                               std::span<const Address> startAddresses, u32 trackIndex,
-                                               u32 maxCommands, DecodeCommand decodeCommand) {
-  TrackProgram track{
-      .sourceTrackNumber = trackIndex,
-      .startAddress = startAddresses.empty() ? Address{} : startAddresses.front(),
-  };
-  std::map<u32, DecodedBytecodeCommand> commandsByOffset;
+// The caller owns the ordered command buffer and final TrackProgram assembly.
+template <class CommandBuffer, class DecodeCommand>
+void decodeBytecode(ByteReader reader, u32 bytecodeEnd, std::span<const Address> startAddresses, u32 maxCommands,
+                    CommandBuffer& commands, DecodeCommand decodeCommand) {
   std::vector<u32> pendingBlocks;
   pendingBlocks.reserve(startAddresses.size());
   for (const Address start : startAddresses) {
@@ -87,30 +74,25 @@ template <class DecodeCommand>
   while (!pendingBlocks.empty() && decodedCommands < maxCommands) {
     u32 offset = pendingBlocks.back();
     pendingBlocks.pop_back();
-    while (hasBytecodeBytes(reader, offset, 1, bytecodeEnd) && !commandsByOffset.contains(offset) &&
+    while (hasBytecodeBytes(reader, offset, 1, bytecodeEnd) && !commands.hasCommand(offset) &&
            decodedCommands < maxCommands) {
       auto decoded = decodeCommand(offset);
       ++decodedCommands;
       // Jump and call targets start new blocks. The next sequential command stays
       // in this inner loop.
       decoded.flow.forEachDiscoveryTarget([&](Address target) {
-        if (target.value < bytecodeEnd && !commandsByOffset.contains(target.value)) {
+        if (target.value < bytecodeEnd && !commands.hasCommand(static_cast<u32>(target.value))) {
           pendingBlocks.push_back(target.value);
         }
       });
       const auto next = decoded.flow.discoveryContinuation();
-      commandsByOffset.emplace(offset, std::move(decoded));
+      commands.append(std::move(decoded), offset);
       if (!next) {
         break;
       }
       offset = next->value;
     }
   }
-
-  for (auto& [offset, decoded] : commandsByOffset) {
-    appendDecodedBytecodeCommand(track, std::move(decoded), offset);
-  }
-  return track;
 }
 
 }  // namespace vgmtrans::core

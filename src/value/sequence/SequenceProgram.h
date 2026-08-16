@@ -16,7 +16,6 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -242,10 +241,9 @@ struct SourceCommand {
 struct TrackProgram {
   u32 sourceTrackNumber = 0;
   Address startAddress;
+  // Commands are stored in strictly increasing source-address order, allowing
+  // address lookup without a parallel index. CommandId is stable positional identity.
   std::vector<SourceCommand> commands;
-  // The VM uses this for jumps, calls, and finding the next command by source
-  // address when vector order differs from bytecode order.
-  std::unordered_map<u64, u32> commandIndexesByAddress;
 
   [[nodiscard]] std::optional<u32> commandIndex(Address address) const;
   [[nodiscard]] const SourceCommand* command(CommandId id) const;
