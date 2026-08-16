@@ -179,33 +179,29 @@ TrackDecodeSession::TrackDecodeSession(ByteReader reader, u32 trackIndex, u32 st
                       : std::nullopt),
       commandParent_(sourceHasTracks ? annotation_ : parentAnnotation),
       rootSequenceAsset_(sourceHasTracks || commandParent_ ? std::nullopt : sequenceAsset),
-      track_{
-          .sourceTrackNumber = trackIndex,
-          .startAddress = Address{startOffset},
-      } {
+      trackIndex_(trackIndex) {
 }
 
-DecodedBytecodeCommand TrackDecodeSession::project(DecodedBytecodeCommand command) const {
-  command.annotation = projectDecodedCommand(sourceMap_, command, commandParent_);
-  if (sourceMap_ != nullptr && command.annotation.valid() && rootSequenceAsset_) {
-    AnnotationBuilder{*sourceMap_, command.annotation}.owner(ObjectRefs::sequence(*rootSequenceAsset_));
-  }
-  return command;
-}
-
-void TrackDecodeSession::append(DecodedBytecodeCommand command, u32 offset) {
-  command = project(std::move(command));
-  appendDecodedBytecodeCommand(track_, std::move(command), offset);
+const DecodedBytecodeCommand& TrackDecodeSession::append(DecodedBytecodeCommand command, u32 offset) {
+  return commands_.try_emplace(offset, std::move(command)).first->second;
 }
 
 TrackProgram TrackDecodeSession::finish() {
-  finishTrackAnnotation(reader_, startOffset_, sourceMap_, annotation_, track_);
-  return std::move(track_);
-}
-
-TrackProgram TrackDecodeSession::finish(TrackProgram track) {
-  track_ = std::move(track);
-  return finish();
+  TrackProgram track{
+      .sourceTrackNumber = trackIndex_,
+      .startAddress = Address{startOffset_},
+  };
+  for (auto& [offset, decoded] : commands_) {
+    decoded.annotation = projectDecodedCommand(sourceMap_, decoded, commandParent_);
+    if (sourceMap_ != nullptr && decoded.annotation.valid() && rootSequenceAsset_) {
+      AnnotationBuilder{*sourceMap_, decoded.annotation}.owner(ObjectRefs::sequence(*rootSequenceAsset_));
+    }
+    const SequenceSemantic semantic = decoded.presentation.semantic;
+    track.addCommand(Address{offset}, decoded.opcode, decoded.range, std::move(decoded.operands),
+                     std::move(decoded.flow), decoded.annotation, std::move(decoded.execution), semantic);
+  }
+  finishTrackAnnotation(reader_, startOffset_, sourceMap_, annotation_, track);
+  return track;
 }
 
 SequenceDecodeSession::SequenceDecodeSession(ByteReader reader, const SequenceDialect& dialect,

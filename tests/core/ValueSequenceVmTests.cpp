@@ -487,43 +487,6 @@ void sequenceVmUsesInitialTempoAndGlobalEventOrder() {
          "sequence VM event order should be song-wide so same-tick global state changes order across channels");
 }
 
-void sequenceVmFallsThroughBySourceAddressWhenDecodeOrderDiffers() {
-  const SequenceDialect dialect = probeSequenceDialect();
-  TrackProgram track{
-      .startAddress = Address{0},
-  };
-
-  const std::array<u8, 2> programBytes{0x80, 0x05};
-  const std::array<u8, 1> endBytes{0xff};
-  const std::array<u8, 3> noteBytes{0x90, 0x00, 0x0c};
-
-  // Jump/call decoding often discovers a later source block first. Fallthrough
-  // must still use source addresses, not command-vector order.
-  addProbeCommand<ProbeProgramCommand>(track, dialect, Address{11}, probeRange(11, programBytes.size()),
-                                       programBytes);
-  addProbeCommand<ProbeEndCommand>(track, dialect, Address{13}, probeRange(13, endBytes.size()), endBytes);
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{3}, probeRange(3, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{6}, probeRange(6, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeProgramCommand>(track, dialect, Address{9}, probeRange(9, programBytes.size()), programBytes);
-
-  const SequenceProgram program{
-      .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
-      .tracks = {track},
-  };
-
-  const PerformanceSequence performance = SequenceVm().render(program);
-  expect(performance.diagnostics.empty(), "out-of-order source fallthrough fixture should not report diagnostics");
-  expect(performance.tracks[0].events.size() == 5,
-         "VM should execute source-contiguous commands across decoded-block order");
-
-  const auto* finalProgram = std::get_if<InstrumentPerformanceEvent>(&performance.tracks[0].events[4]);
-  expect(finalProgram != nullptr && finalProgram->header.tick == 36,
-         "source-address fallthrough should reach the earlier-decoded program command");
-}
-
 void sequenceVmEmitsProgramInitialChannelState() {
   const SequenceDialect dialect = probeSequenceDialect(
       SequenceProgramBehavior{
@@ -959,12 +922,12 @@ void sequenceVmDoesNotWrapCommandAddressOverflow() {
   };
 
   const std::array<u8, 3> noteBytes{0x90, 0x00, 0x04};
+  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{1}, SourceRange{}, noteBytes);
   addProbeCommand<ProbeNoteCommand>(track, dialect, Address{std::numeric_limits<u64>::max() - 1}, SourceRange{},
                                     noteBytes);
   // The decoded continuation is authoritative and must not wrap to the other
   // command merely because address + source size would overflow.
   track.commands.back().flow.continuation = Address{std::numeric_limits<u64>::max()};
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{1}, SourceRange{}, noteBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
@@ -1055,9 +1018,9 @@ void sequenceVmUsesDecodedCallContinuationAsReturnAddress() {
 void sequenceVmPreservesExplicitJumpToContinuation() {
   const SequenceDialect dialect = authoritativeFlowProbeDialect();
   TrackProgram track{.startAddress = Address{1}};
-  track.addCommand(Address{1}, 1, {}, {}, CommandFlow::fallthroughTo(Address{0}));
   CommandFlow explicitJump = CommandFlow::fallthroughTo(Address{1});
   track.addCommand(Address{0}, 0xfe, {}, {}, std::move(explicitJump));
+  track.addCommand(Address{1}, 1, {}, {}, CommandFlow::fallthroughTo(Address{0}));
 
   const SequenceProgram program{
       .runtime = authoritativeFlowProbeRuntime(),
@@ -1578,7 +1541,6 @@ void runValueSequenceVmTests() {
   sequenceVmPreservesLoopsAsPerformanceMarkers();
   sequenceVmUsesProgramCommandLimit();
   sequenceVmUsesInitialTempoAndGlobalEventOrder();
-  sequenceVmFallsThroughBySourceAddressWhenDecodeOrderDiffers();
   sequenceVmEmitsProgramInitialChannelState();
   sequenceVmEmitsInitialMasterLevelOnce();
   sequenceVmExposesSubroutineStateFromItsCallStack();

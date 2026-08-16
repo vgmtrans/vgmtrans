@@ -531,6 +531,35 @@ void compilerCursorAnalysisStopsAfterItsScheduledPrepass() {
   expect(executed == 2, "compiled analysis should not execute a discarded output pass after its scheduled prepass");
 }
 
+void trackDecodeSessionOrdersExceptionalWalkerCommands() {
+  const std::vector<u8> bytes{0x40, 0x01, 0xff};
+  const u32 end = static_cast<u32>(bytes.size());
+  const ByteReader reader(SourceId{30}, bytes);
+  const TrackDecodeScope tracks{
+      .reader = reader,
+      .bytecodeEnd = end,
+  };
+  auto session = tracks.begin(0, 0);
+  session.append(decodeProbeCommand(reader, 2, end), 2);
+  session.append(decodeProbeCommand(reader, 0, end), 0);
+  const TrackProgram track = session.finish();
+
+  expect(track.commands.size() == 2 && track.commands[0].address.value == 0 &&
+             track.commands[1].address.value == 2,
+         "track decode session should order exceptional-walker commands by source address");
+
+  const SequenceDialect dialect = compilerProbeDialect();
+  const PerformanceSequence performance = SequenceVm().render(SequenceProgram{
+      .runtime = compilerProbeRuntime(),
+      .timebase = dialect.timebase,
+      .behavior = dialect.behavior,
+      .tracks = {track},
+  });
+  expect(performance.diagnostics.empty() && performance.tracks[0].events.size() == 1 &&
+             performance.tracks[0].endTick == 1,
+         "ordered exceptional-walker commands should retain their decoded execution flow");
+}
+
 void trackDecodeSourceHierarchyDistinguishesTrackedAndTracklessFormats() {
   const std::vector<u8> bytes{0xff};
 
@@ -581,5 +610,6 @@ void runValueCompilerCursorTests() {
   compilerCursorRejectsConflictingDefaultFlowDeclarations();
   compilerCursorRejectsConflictingComposedFlow();
   compilerCursorAnalysisStopsAfterItsScheduledPrepass();
+  trackDecodeSessionOrdersExceptionalWalkerCommands();
   trackDecodeSourceHierarchyDistinguishesTrackedAndTracklessFormats();
 }

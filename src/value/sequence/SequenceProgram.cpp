@@ -16,11 +16,12 @@
 namespace vgmtrans::core {
 
 std::optional<u32> TrackProgram::commandIndex(Address address) const {
-  const auto found = commandIndexesByAddress.find(address.value);
-  if (found == commandIndexesByAddress.end()) {
+  const auto found = std::ranges::lower_bound(commands, address.value, {},
+                                              [](const SourceCommand& command) { return command.address.value; });
+  if (found == commands.end() || found->address.value != address.value) {
     return std::nullopt;
   }
-  return found->second;
+  return static_cast<u32>(std::distance(commands.begin(), found));
 }
 
 const SourceCommand* TrackProgram::command(CommandId id) const {
@@ -77,8 +78,8 @@ CommandId TrackProgram::addCommand(Address address, u8 opcode, SourceRange range
                                    std::vector<SemanticOperand> operands, CommandFlow flow,
                                    SourceAnnotationId annotation, CommandExecution execution,
                                    SequenceSemantic semantic) {
-  if (commandIndex(address)) {
-    throw std::invalid_argument("Sequence command address was decoded more than once");
+  if (!commands.empty() && commands.back().address.value >= address.value) {
+    throw std::invalid_argument("Sequence commands must be appended in increasing source-address order");
   }
 
   const auto commandIndex = static_cast<u32>(commands.size());
@@ -92,7 +93,6 @@ CommandId TrackProgram::addCommand(Address address, u8 opcode, SourceRange range
       .flow = std::move(flow),
       .execution = std::move(execution),
   });
-  commandIndexesByAddress.emplace(address.value, commandIndex);
   return CommandId{commandIndex};
 }
 

@@ -1496,10 +1496,10 @@ struct WalkState {
 [[nodiscard]] TrackProgram decodeTrack(ByteReader reader, Version version, u32 trackNumber, u32 startAddress,
                                        u8 logicalChannel, u8 physicalChannelFlags, std::set<u8>* programs,
                                        std::vector<Diagnostic>* diagnostics, const TrackDecodeScope& scope) {
+  auto session = scope.begin(trackNumber, startAddress);
   std::deque<WalkState> pending{{.offset = startAddress}};
   std::set<WalkState> visited;
   std::map<u32, DecodeState> states;
-  std::map<u32, DecodedBytecodeCommand> commands;
 
   const auto queue = [&](u32 offset, const DecodeState& state, u32 returnAddress) {
     if (reader.has(offset, 1)) {
@@ -1524,11 +1524,9 @@ struct WalkState {
       continue;
     }
     states.try_emplace(walk.offset, walk.decode);
-    auto command =
-        commands
-            .try_emplace(walk.offset, decodeCommand(reader, walk.offset, version, walk.decode, programs, diagnostics))
-            .first;
-    const u32 continuation = static_cast<u32>(command->second.flow.continuation.value);
+    const DecodedBytecodeCommand& command =
+        session.append(decodeCommand(reader, walk.offset, version, walk.decode, programs, diagnostics), walk.offset);
+    const u32 continuation = static_cast<u32>(command.flow.continuation.value);
     DecodeState next = walk.decode;
     if (opcode == 0xdc) {
       next.defaultLength = 0;
@@ -1573,12 +1571,7 @@ struct WalkState {
     }
   }
 
-  auto session = scope.begin(trackNumber, startAddress);
-  for (auto& [offset, command] : commands) {
-    session.append(std::move(command), offset);
-  }
-  TrackProgram track = session.finish();
-  return track;
+  return session.finish();
 }
 
 }  // namespace

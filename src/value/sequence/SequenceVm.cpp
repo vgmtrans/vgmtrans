@@ -96,8 +96,13 @@ using detail::VmTrackRuntime;
   };
 }
 
-[[nodiscard]] std::optional<u32> destinationIndex(const TrackProgram& track, Address destination) {
-  return track.commandIndex(destination);
+[[nodiscard]] std::optional<u32> continuationIndex(const TrackProgram& track, CommandId command,
+                                                   Address continuation) {
+  const size_t next = static_cast<size_t>(command.value) + 1;
+  if (next < track.commands.size() && track.commands[next].address.value == continuation.value) {
+    return static_cast<u32>(next);
+  }
+  return track.commandIndex(continuation);
 }
 
 [[nodiscard]] std::optional<u32> commandChannel(const SourceCommand& command) {
@@ -425,7 +430,7 @@ public:
         }),
         trackState_(sequenceRuntime_.createTrackState ? sequenceRuntime_.createTrackState(program, track) : std::any{}),
         programState_(programState),
-        current_(startsActive ? destinationIndex(track, track.startAddress) : std::optional<u32>{}) {
+        current_(startsActive ? track.commandIndex(track.startAddress) : std::optional<u32>{}) {
     addInitialTrackEvents(performanceTrack_, behavior_, includeGlobalInitialEvents);
     for (auto& event : performanceTrack_.events) {
       std::visit([&](auto& typedEvent) { typedEvent.header.sequence = outputSequence_++; }, event);
@@ -491,7 +496,7 @@ public:
     runtime_.repeat.clear();
     runtime_.lastCommand = {};
     pendingTicks_ = 0;
-    current_ = start ? destinationIndex(track_, *start) : std::optional<u32>{};
+    current_ = start ? track_.commandIndex(*start) : std::optional<u32>{};
     arrivedByControlFlow_ = true;
     loopDetector_.clear();
     loopStopTick_.reset();
@@ -683,7 +688,7 @@ private:
   void applyTransition(CommandId commandId, const SourceCommand& command, const CommandTransition& transition) {
     switch (transition.kind) {
       case CommandTransitionKind::Fallthrough:
-        current_ = destinationIndex(track_, command.flow.continuation);
+        current_ = continuationIndex(track_, commandId, command.flow.continuation);
         arrivedByControlFlow_ = false;
         if (!current_) {
           warn(fmt::format("Sequence continuation ${:04X} was not decoded", command.flow.continuation.value),
@@ -706,7 +711,7 @@ private:
         break;
 
       case CommandTransitionKind::Call:
-        if (const auto returnIndex = destinationIndex(track_, command.flow.continuation)) {
+        if (const auto returnIndex = continuationIndex(track_, commandId, command.flow.continuation)) {
           runtime_.callStack.push_back(*returnIndex);
         } else {
           warn(fmt::format("Sequence call continuation ${:04X} was not decoded", command.flow.continuation.value),
@@ -715,7 +720,7 @@ private:
           arrivedByControlFlow_ = false;
           break;
         }
-        current_ = destinationIndex(track_, transition.destination);
+        current_ = track_.commandIndex(transition.destination);
         arrivedByControlFlow_ = true;
         if (!current_) {
           warn(fmt::format("Sequence call target ${:04X} was not decoded", transition.destination.value),
@@ -762,7 +767,7 @@ private:
 
   void applyPlainJump(const SourceCommand& command, Address destinationAddress, bool arrivedByControlFlow,
                       std::string_view targetName) {
-    current_ = destinationIndex(track_, destinationAddress);
+    current_ = track_.commandIndex(destinationAddress);
     arrivedByControlFlow_ = arrivedByControlFlow;
     if (!current_) {
       warn(fmt::format("Sequence {} target ${:04X} was not decoded", targetName, destinationAddress.value),
@@ -771,7 +776,7 @@ private:
   }
 
   void applyLoopCandidateJump(CommandId commandId, const SourceCommand& command, Address destinationAddress) {
-    const auto destination = destinationIndex(track_, destinationAddress);
+    const auto destination = track_.commandIndex(destinationAddress);
     if (!destination) {
       warn(fmt::format("Sequence jump target ${:04X} was not decoded", destinationAddress.value), command.range);
       current_ = std::nullopt;
@@ -796,7 +801,7 @@ private:
   }
 
   void applyDeclaredLoop(CommandId commandId, const SourceCommand& command, Address destinationAddress) {
-    const auto destination = destinationIndex(track_, destinationAddress);
+    const auto destination = track_.commandIndex(destinationAddress);
     if (!destination) {
       warn(fmt::format("Sequence loop target ${:04X} was not decoded", destinationAddress.value), command.range);
       current_ = std::nullopt;

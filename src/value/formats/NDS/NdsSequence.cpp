@@ -582,7 +582,6 @@ struct SequenceDecodeContext {
 [[nodiscard]] TrackProgram decodeMalformedSdatRangeTrack(const SequenceDecodeContext& context, u32 trackIndex,
                                                          u32 startOffset) {
   auto track = context.tracks.begin(trackIndex, startOffset);
-  std::set<u32> decodedOffsets;
   std::set<u32> callTargetOffsets;
   std::vector<PendingBlock> pendingBlocks{{.offset = startOffset}};
   u32 decodedCommands = 0;
@@ -595,7 +594,7 @@ struct SequenceDecodeContext {
     while (hasBytecodeBytes(context.reader(), offset, 1, context.tracks.bytecodeEnd) &&
            decodedCommands++ < context.tracks.maxCommands) {
       const u32 begin = offset;
-      if (!decodedOffsets.insert(begin).second) {
+      if (track.hasCommand(begin)) {
         break;
       }
 
@@ -609,25 +608,24 @@ struct SequenceDecodeContext {
         }
       }
 
-      if (decoded.flow.unconditionalJump()) {
-        const u32 destination = decoded.flow.defaultDestination()->value;
-        track.append(std::move(decoded), begin);
-        if (decodedOffsets.contains(destination)) {
+      const DecodedBytecodeCommand& command = track.append(std::move(decoded), begin);
+      if (command.flow.unconditionalJump()) {
+        const u32 destination = command.flow.defaultDestination()->value;
+        if (track.hasCommand(destination)) {
           break;
         }
         offset = destination;
         continue;
       }
 
-      if (decoded.flow.callTarget()) {
-        const u32 destination = decoded.flow.defaultDestination()->value;
-        if (!decodedOffsets.contains(destination) && callTargetOffsets.insert(destination).second) {
+      if (command.flow.callTarget()) {
+        const u32 destination = command.flow.defaultDestination()->value;
+        if (!track.hasCommand(destination) && callTargetOffsets.insert(destination).second) {
           pendingBlocks.push_back(PendingBlock{.offset = destination, .callTarget = true});
         }
       }
 
-      const auto next = decoded.flow.discoveryContinuation();
-      track.append(std::move(decoded), begin);
+      const auto next = command.flow.discoveryContinuation();
       if (!next) {
         break;
       }
