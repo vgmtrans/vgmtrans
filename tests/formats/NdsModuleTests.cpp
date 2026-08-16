@@ -407,7 +407,7 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
                                              trackStart, 0, false, &sourceMap, &decodeDiagnostics);
   expect(track.startAddress.value == trackStart && track.commands.size() == 5,
          "NDS SSEQ parser should find the primary track and decode all fixture commands");
-  expect(std::ranges::all_of(track.commands, [](const SourceCommand& command) { return command.encodedSize != 0; }),
+  expect(std::ranges::all_of(track.commands, [](const SourceCommand& command) { return command.range.size != 0; }),
          "NDS SSEQ should store every complete command as named semantic data");
   const SourceMap annotations = sourceMap.finish();
   expect(commandDetailKind(annotations, track.commands[0]) == "nds.note-wait",
@@ -579,7 +579,7 @@ void ndsSequenceDialectEmitsStickyDynamicAdsr() {
       envelopeCommandCount == 4 && std::ranges::all_of(commands,
                                                           [](const SourceCommand& command) {
                                                             return command.semantic != SequenceSemantic::Envelope ||
-                                                                   (command.encodedSize == 2 &&
+                                                                   (command.range.size == 2 &&
                                                                     command.execution.valid());
                                                           }),
          "NDS D0-D3 should decode as executable two-byte envelope commands");
@@ -1009,7 +1009,7 @@ void ndsSequenceDialectExecutesCallAndReturn() {
   const SourceMap overlapAnnotations = overlapSourceMap.finish();
   expect(overlapTrack.commands.size() == 4,
          "NDS linearized overlap fixture should split fallthrough from call-target bytes");
-  expect(overlapTrack.commands[1].range.offset == trackStart + 4 && overlapTrack.commands[1].encodedSize == 1,
+  expect(overlapTrack.commands[1].range.offset == trackStart + 4 && overlapTrack.commands[1].range.size == 1,
          "NDS linearized overlap fixture should stop before overlapping a queued call target");
   const SourceAnnotation& recovery = commandAnnotation(overlapAnnotations, overlapTrack.commands[1]);
   expect(recovery.detailKind == "nds.recovery-stop" && recovery.sequenceSemantic == SequenceSemantic::Unsupported &&
@@ -1107,7 +1107,7 @@ void ndsSequenceDialectAnnotatesModulationDelayOperands() {
   const SourceCommand& command = track.commands[0];
   expect(commandDetailKind(annotations, command) == "nds.modulation-delay",
          "NDS modulation delay should stay annotated as its source-driver command");
-  expect(command.encodedSize == 3 && command.execution.valid(),
+  expect(command.range.size == 3 && command.execution.valid(),
          "NDS modulation delay should retain executable playback behavior");
   const SemanticOperand* delay = semanticOperand(command, "delay");
   expect(delay != nullptr && std::get<u64>(delay->value) == 0x3412,

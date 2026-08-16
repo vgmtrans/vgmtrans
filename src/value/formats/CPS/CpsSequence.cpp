@@ -162,8 +162,6 @@ struct Playback {
     emitLfoRate();
   }
 
-  void setResetLfo(u8 raw) { track.resetLfoOnNote = raw != 0; }
-
   [[nodiscard]] double ticksPerSecond() const {
     return kCpsPpqn * 1'000'000.0 / std::max<u32>(1, program.tempoMicrosecondsPerQuarter);
   }
@@ -349,9 +347,6 @@ struct Playback {
     return Effects::wait(delta);
   }
 
-  void v1TieCount(u8 count) { track.tieCount = static_cast<u8>(count + 1); }
-  void v1Shorten(u8 count) { track.shortenCount = count; }
-
   void earlyVolume(u8 raw) {
     if (track.synth == SynthKind::OkiM6295) {
       constexpr std::array<u8, 16> attenuation{32, 22, 16, 11, 8, 6, 4, 3, 2, 0, 0, 0, 0, 0, 0, 0};
@@ -505,11 +500,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Shorten Events", SequenceSemantic::State);
       const u8 count =
           event.opcodeValue("count", opcode & 0x0f, SourceValueDisplay::Default, SemanticOperandRole::Count);
-      return event.invoke<&Playback::v1Shorten>(count);
+      return event.set<&TrackState::shortenCount>(count);
     }
     auto event = cursor.command("Tie Notes", SequenceSemantic::State);
     const u8 count = event.opcodeValue("count", opcode & 0x0f, SourceValueDisplay::Default, SemanticOperandRole::Count);
-    return event.invoke<&Playback::v1TieCount>(count);
+    return event.set<&TrackState::tieCount>(static_cast<u8>(count + 1));
   }
 
   switch (opcode) {
@@ -765,7 +760,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         case 2:
           return event.invoke<&Playback::setLfoRate>(value);
         case 3:
-          return event.invoke<&Playback::setResetLfo>(value);
+          return event.set<&TrackState::resetLfoOnNote>(value != 0);
         default:
           return event.ignore();
       }
@@ -792,7 +787,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         return cursor.ignored("LFO Driver State", 1);
       }
       auto event = cursor.command("Reset LFO On Note", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::setResetLfo>(event.u8("enabled"));
+      return event.set<&TrackState::resetLfoOnNote>(event.u8("enabled") != 0);
     }
     case 0x1f: {
       if (isCps1(version)) {
@@ -971,7 +966,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xe0: {
       auto event = cursor.command("Reset LFO On Note", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::setResetLfo>(event.u8("enabled"));
+      return event.set<&TrackState::resetLfoOnNote>(event.u8("enabled") != 0);
     }
     case 0xe1: {
       auto event = cursor.command("LFO Rate", SequenceSemantic::Modulation);

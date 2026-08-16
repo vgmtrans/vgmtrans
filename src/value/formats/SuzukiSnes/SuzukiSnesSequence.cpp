@@ -563,8 +563,6 @@ struct Playback {
 
   void restartPanLfo() { panLfo(track.panLfoPeriod, track.panLfoStep); }
 
-  void automaticPortamento(u8 length) { track.automaticPortamentoLength = length; }
-
   void activatePitchSlide(PitchSlideBinding slide, PerformanceNoteId note, double start, double target, u32 length) {
     slide.preferPitchBend();
     track.pitchSlideBinding = slide;
@@ -692,7 +690,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       }
       {
         auto event = cursor.command("Automatic Portamento", SequenceSemantic::Portamento);
-        return event.invoke<&Playback::automaticPortamento>(event.u8("length", SemanticOperandRole::Duration));
+        return event.set<&TrackState::automaticPortamentoLength>(
+            event.u8("length", SemanticOperandRole::Duration));
       }
     case 0xc5:
       return cursor.command("Octave Down", SequenceSemantic::Pitch).add<&TrackState::octave>(-1);

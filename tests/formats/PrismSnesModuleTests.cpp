@@ -169,22 +169,22 @@ void profileSpecificOperandLengthsRemainAligned() {
   cosmo.commands({0xc0, 0xfb, 1, 2, 3, 4, 5, 0xff});
   TrackProgram cosmoTrack =
       decodeSourceTrack(ByteReader(SourceId{302}, cosmo.data()), Version::CosmoGang, 0, 0x5200, 0, 0x10);
-  expect(cosmoTrack.commands.size() == 3 && cosmoTrack.commands[0].encodedSize == 1 &&
-             cosmoTrack.commands[1].encodedSize == 6,
+  expect(cosmoTrack.commands.size() == 3 && cosmoTrack.commands[0].range.size == 1 &&
+             cosmoTrack.commands[1].range.size == 6,
          "Cosmo Gang C0-D0 aliases and five-operand FB must follow its distinct dispatch table");
 
   DriverFixture dualOrb(Version::DualOrb);
   dualOrb.commands({0xc0, 0x03, 0x52, 0xff});
   TrackProgram dualOrbTrack =
       decodeSourceTrack(ByteReader(SourceId{303}, dualOrb.data()), Version::DualOrb, 0, 0x5200, 0, 0x10);
-  expect(dualOrbTrack.commands.size() == 2 && dualOrbTrack.commands.front().encodedSize == 3,
+  expect(dualOrbTrack.commands.size() == 2 && dualOrbTrack.commands.front().range.size == 3,
          "Dual Orb C0-C5 must remain two-byte conditional jumps rather than later-driver tempo commands");
 
   DriverFixture modern(Version::Modern);
   modern.commands({0xc0, 0x82, 0xff});
   TrackProgram modernTrack =
       decodeSourceTrack(ByteReader(SourceId{304}, modern.data()), Version::Modern, 0, 0x5200, 0, 0x10);
-  expect(modernTrack.commands.size() == 2 && modernTrack.commands.front().encodedSize == 2,
+  expect(modernTrack.commands.size() == 2 && modernTrack.commands.front().range.size == 2,
          "later Prism drivers must decode C0-C4 as one-operand timer-target tempo commands");
 }
 
@@ -327,7 +327,7 @@ void subtrackTriggersRunTheirChildScore() {
   const Layout layout = *findLayout(reader);
   SequenceParse parsed = decodeSequence(reader, layout, AssetId{306});
   expect(
-      parsed.program.tracks.front().commands.size() == 4 && parsed.program.tracks.front().commands[2].encodedSize == 2,
+      parsed.program.tracks.front().commands.size() == 4 && parsed.program.tracks.front().commands[2].range.size == 2,
       "ED must reset manual duration before decoding its trigger notes");
 
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);

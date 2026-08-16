@@ -41,7 +41,6 @@ struct DecodedBytecodeCommand {
   SourceRange range;
   SourceAnnotationId annotation;
   u8 opcode = 0;
-  u32 encodedSize = 0;
   CommandFlow flow;
   std::vector<SemanticOperand> operands;
   CommandExecution execution;
@@ -66,7 +65,7 @@ struct EncodedSemanticField {
 
 inline void appendDecodedBytecodeCommand(TrackProgramBuilder& builder, DecodedBytecodeCommand decoded, u32 offset) {
   const SequenceSemantic semantic = decoded.presentation.semantic;
-  builder.addSemantic(Address{offset}, decoded.opcode, decoded.encodedSize, decoded.range, std::move(decoded.operands),
+  builder.addSemantic(Address{offset}, decoded.opcode, decoded.range, std::move(decoded.operands),
                       std::move(decoded.flow), decoded.annotation, std::move(decoded.execution), semantic);
 }
 

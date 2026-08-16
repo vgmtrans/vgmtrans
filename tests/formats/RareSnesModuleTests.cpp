@@ -222,7 +222,7 @@ void rareSnesProfilesDecodeTheirDistinctOpcodeTails() {
   };
   const TrackProgram battletoadsNop =
       decodeSourceTrack(ByteReader(SourceId{93}, battletoadsNopBytes), Profile::BattletoadsDoubleDragon, 0, 0);
-  expect(battletoadsNop.commands.size() == 3 && battletoadsNop.commands.front().encodedSize == 5,
+  expect(battletoadsNop.commands.size() == 3 && battletoadsNop.commands.front().range.size == 5,
          "Battletoads/Double Dragon opcode 15 should consume its four reserved bytes");
 
   const PerformanceSequence dkc = render(
@@ -246,7 +246,7 @@ void rareSnesProfilesDecodeTheirDistinctOpcodeTails() {
   };
   TrackProgram winningTrack = decodeSourceTrack(ByteReader(SourceId{91}, winningBytes), Profile::WinningRun, 0, 0);
   const auto nop = std::ranges::find(winningTrack.commands, u8{0x22}, &SourceCommand::opcode);
-  expect(nop != winningTrack.commands.end() && nop->encodedSize == 3,
+  expect(nop != winningTrack.commands.end() && nop->range.size == 3,
          "Winning Run opcode 22 is a two-operand NOP, not legacy's three-operand unknown");
   const PerformanceSequence winning = render(Profile::WinningRun, winningBytes);
   expect(winning.diagnostics.empty() && events<MasterLevelPerformanceEvent>(winning).size() == 1,

@@ -573,8 +573,6 @@ struct Playback {
     out.tempo(math::tempoMicrosecondsPerQuarter(value));
   }
 
-  void transposeAdd(s8 value) { track.transpose = static_cast<s8>(track.transpose + value); }
-
   void tuning(s16 value) {
     if (value == 0) {
       track.tuning = 0;
@@ -585,8 +583,6 @@ struct Playback {
     }
     emitPitch();
   }
-
-  void pitchSweep(s8 value) { track.pitchSweep = value; }
 
   void flags(u8 value) {
     track.headerFlags = value;
@@ -599,7 +595,6 @@ struct Playback {
     track.stereoPhase = value & 3;
     emitPan();
   }
-  void gate(u8 value) { track.gate = value; }
   void portamento(u8 divisor) {
     track.portamentoDivisor = divisor;
     if (divisor != 0) {
@@ -715,7 +710,7 @@ struct Playback {
     const u8 pitchControl = static_cast<u8>(first >> 24);
     const u8 percussionFlags = static_cast<u8>(second);
     if ((percussionFlags & 0x80) != 0) {
-      pitchSweep(static_cast<s8>(pitchControl));
+      track.pitchSweep = static_cast<s8>(pitchControl);
     } else {
       vibrato(pitchControl);
     }
@@ -784,8 +779,6 @@ struct Playback {
     programState.echoGloballyEnabled = enabled != 0;
     emitEcho();
   }
-
-  void percussionPanLock(bool locked) { track.percussionPanLocked = locked; }
 
   void emitEcho() const {
     const double left = std::abs(programState.echo.leftGain.value_or(0));
@@ -1071,7 +1064,7 @@ struct DurationValue {
     }
     case 0x89: {
       auto event = cursor.command("Transpose Add", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::transposeAdd>(event.s8("semitones", SemanticOperandRole::Pitch));
+      return event.add<&TrackState::transpose>(event.s8("semitones", SemanticOperandRole::Pitch));
     }
     case 0x8a: {
       auto event = cursor.command("Volume Add", SequenceSemantic::Level);
@@ -1115,7 +1108,7 @@ struct DurationValue {
     }
     case 0x94: {
       auto event = cursor.command("Pitch Sweep", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::pitchSweep>(event.s8("rate_and_direction", SemanticOperandRole::Pitch));
+      return event.set<&TrackState::pitchSweep>(event.s8("rate_and_direction", SemanticOperandRole::Pitch));
     }
     case 0x95: {
       auto event = cursor.command("Jump Until Volume Target", SequenceSemantic::Jump);
@@ -1152,7 +1145,8 @@ struct DurationValue {
     }
     case 0x9d: {
       auto event = cursor.command("Gate", SequenceSemantic::State);
-      return event.invoke<&Playback::gate>(event.u8("gate", SourceValueDisplay::Hex, SemanticOperandRole::Duration));
+      return event.set<&TrackState::gate>(
+          event.u8("gate", SourceValueDisplay::Hex, SemanticOperandRole::Duration));
     }
     case 0x9e: {
       auto event = cursor.command("Conditional Jump", SequenceSemantic::Jump);
@@ -1249,7 +1243,7 @@ struct DurationValue {
     case 0xae:
     case 0xaf:
       return cursor.command(opcode == 0xae ? "Percussion Pan Unlock" : "Percussion Pan Lock", SequenceSemantic::Pan)
-          .invoke<&Playback::percussionPanLock>(opcode == 0xaf);
+          .set<&TrackState::percussionPanLocked>(opcode == 0xaf);
     case 0xb0:
       if (layout.hasEchoCommands()) {
         auto event = cursor.command("Global Echo", SequenceSemantic::State);

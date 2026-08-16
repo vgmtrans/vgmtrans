@@ -564,7 +564,6 @@ struct SequenceDecodeContext {
   return DecodedBytecodeCommand{
       .range = context.reader().range(offset, 1),
       .opcode = context.reader().u8At(offset),
-      .encodedSize = 1,
       .flow = CommandFlow::end(Address{offset + 1}),
       .presentation =
           DecodedCommandPresentation{

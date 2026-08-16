@@ -973,7 +973,7 @@ void ninSnesF9UsesSharedPitchTransitions() {
                                               standardLayout(), AssetId{1});
   const auto& commands = parsed.program.tracks[0].commands;
   const auto decodedSlide = std::ranges::find(commands, u8{0xf9}, &SourceCommand::opcode);
-  expect(decodedSlide != commands.end() && decodedSlide->encodedSize == 4 && decodedSlide->address.value == 0x303 &&
+  expect(decodedSlide != commands.end() && decodedSlide->range.size == 4 && decodedSlide->address.value == 0x303 &&
              decodedSlide->execution.duringWait,
          "F9 should remain an independent source command with generic during-wait eligibility");
   const auto* sampled = transition == nullptr ? nullptr : std::get_if<SampledAutomationCurve>(&transition->curve);
@@ -1156,7 +1156,7 @@ void ninSnesFixedPercussionBaseIgnoresFaOperand() {
     layout.fixedPercussionBase = fixedBase;
     const SequenceParse parsed = decodeSequence(ByteReader(SourceId{7}, sequenceBytes), layout, AssetId{1});
     const auto command = std::ranges::find(parsed.program.tracks[0].commands, u8{0xfa}, &SourceCommand::opcode);
-    expect(command != parsed.program.tracks[0].commands.end() && command->encodedSize == 2,
+    expect(command != parsed.program.tracks[0].commands.end() && command->range.size == 2,
            "FA should still consume its operand in fixed-base drivers");
     expect(parsed.recipes.drumKits.size() == 1 && parsed.recipes.drumKits[0].slots.size() == 1,
            "the percussion fixture should produce one drum mapping");
@@ -1204,7 +1204,7 @@ void ninSnesKonamiPercussionUsesDriverMapAndNeutralTuning() {
   const SequenceParse parsed = decodeSequence(ByteReader(SourceId{7}, bytes), layout, AssetId{1});
   const auto fa = std::ranges::find(parsed.program.tracks[0].commands, u8{0xfa}, &SourceCommand::opcode);
   const auto parameters = std::ranges::find(parsed.program.tracks[0].commands, u8{4}, &SourceCommand::opcode);
-  expect(fa != parsed.program.tracks[0].commands.end() && fa->encodedSize == 1 &&
+  expect(fa != parsed.program.tracks[0].commands.end() && fa->range.size == 1 &&
              parameters != parsed.program.tracks[0].commands.end() && parameters->address.value == 0x301,
          "Konami FA should remain a zero-operand NOP without swallowing the following note parameters");
   expect(parsed.recipes.drumKits.size() == 1 && parsed.recipes.drumKits[0].slots.size() == 1 &&

@@ -741,9 +741,6 @@ struct Playback {
     track.patchSource = source;
   }
 
-  void transpose(s8 value) { track.transpose = value; }
-  void transposeAdd(s8 value) { track.transpose = static_cast<s8>(track.transpose + value); }
-
   void tempo(u8 value) {
     program.tempo = value;
     out.tempo(tempoMicrosecondsPerQuarter(program.tempo, program.timer));
@@ -801,8 +798,6 @@ struct Playback {
     };
   }
 
-  void vibratoOff() { track.vibrato = {}; }
-
   void emitTremolo() {
     if (!track.tremolo.enabled || track.tremolo.period == 0) {
       out.tremoloLinearGainDepth(0.0);
@@ -830,12 +825,10 @@ struct Playback {
     };
   }
 
-  void tremoloOff() { track.tremolo = {}; }
-
   void allLfoOff() {
     track.pitch = {};
-    vibratoOff();
-    tremoloOff();
+    track.vibrato = {};
+    track.tremolo = {};
   }
 
   void configurePitch(bool inverted, u8 delay, u8 interval, u8 steps, s8 delta, u8 invertedSteps, u8 pitchUnit) {
@@ -849,8 +842,6 @@ struct Playback {
         .pitchUnit = pitchUnit,
     };
   }
-
-  void pitchOff() { track.pitch = {}; }
 
   [[nodiscard]] PatchRecipe currentPatch() const {
     return PatchRecipe{
@@ -1034,8 +1025,6 @@ struct Playback {
     program.masterRight = audibleRight;
     out.masterLevel(std::max(signedGain(audibleLeft), signedGain(audibleRight)));
   }
-
-  void masterScalar(u8 value) { out.masterLevel(value / 100.0); }
 
   void echoParameters(s8 feedback, s8 left, s8 right, std::optional<u8> delay = std::nullopt) {
     program.echoFeedback = feedback;
@@ -1359,7 +1348,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
                                                      invertedSteps, u8{1});
     }
     case Kind::PitchSlideOff:
-      return cursor.command("Pitch Envelope Off", SequenceSemantic::Pitch).invoke<&Playback::pitchOff>();
+      return cursor.command("Pitch Envelope Off", SequenceSemantic::Pitch)
+          .set<&TrackState::pitch>(PitchEffect{});
     case Kind::Tempo: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
       return event.invoke<&Playback::tempo>(event.u8("tempo"));
@@ -1379,7 +1369,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
                                               delay, static_cast<u8>(battlemaniacs ? 8 : 1));
     }
     case Kind::VibratoOff:
-      return cursor.command("Vibrato Off", SequenceSemantic::Modulation).invoke<&Playback::vibratoOff>();
+      return cursor.command("Vibrato Off", SequenceSemantic::Modulation).set<&TrackState::vibrato>(Vibrato{});
     case Kind::Adsr: {
       auto event = cursor.command("ADSR", SequenceSemantic::State);
       const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
@@ -1395,7 +1385,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case Kind::MasterVolumeScalar: {
       auto event = cursor.command("Master Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::masterScalar>(event.u8("percent", SemanticOperandRole::Level));
+      return event.emitMasterLevel(event.u8("percent", SemanticOperandRole::Level) / 100.0);
     }
     case Kind::Tuning: {
       if (profile == Profile::Battlemaniacs && trackNumber == 5) {
@@ -1409,12 +1399,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case Kind::Transpose: {
       auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::transpose>(
+      return event.set<&TrackState::transpose>(
           event.s8("semitones", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
     }
     case Kind::TransposeAdd: {
       auto event = cursor.command("Relative Transpose", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::transposeAdd>(
+      return event.add<&TrackState::transpose>(
           event.s8("semitones", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
     }
     case Kind::EchoParameters: {
@@ -1520,7 +1510,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return event.invoke<&Playback::tremolo>(period, interval, delta, delay);
     }
     case Kind::TremoloOff:
-      return cursor.command("Tremolo Off", SequenceSemantic::Modulation).invoke<&Playback::tremoloOff>();
+      return cursor.command("Tremolo Off", SequenceSemantic::Modulation).set<&TrackState::tremolo>(Tremolo{});
     case Kind::AllLfoOff:
       return cursor.command("All Pitch/Volume LFOs Off", SequenceSemantic::Modulation).invoke<&Playback::allLfoOff>();
     case Kind::ResetAdsr:
@@ -1731,7 +1721,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         decodeCommand(reader, profile, trackNumber, point.offset, sequenceDataFloor, nextState, nullptr);
     const Kind selected = kind(profile, decoded.opcode);
     const auto [existing, inserted] = commands.try_emplace(point.offset, decoded);
-    if (!inserted && existing->second.encodedSize != decoded.encodedSize) {
+    if (!inserted && existing->second.range.size != decoded.range.size) {
       if (diagnostics != nullptr) {
         diagnostics->push_back(Diagnostic{
             .severity = Severity::Warning,

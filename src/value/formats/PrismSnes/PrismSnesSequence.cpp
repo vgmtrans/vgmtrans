@@ -708,8 +708,6 @@ struct Playback {
     out.legatoPedal(enabled);
   }
 
-  void suppressNextAttack() { track.suppressAttack = true; }
-
   void volume(s8 delta, bool relative) {
     track.volume = relative ? static_cast<u8>(std::clamp<int>(track.volume + delta, 0, 255)) : static_cast<u8>(delta);
     if (track.version != Version::CosmoGang) {
@@ -734,10 +732,6 @@ struct Playback {
   }
 
   void defaultPan(bool alternate) { panTable(alternate ? track.data.alternatePanTable : track.data.defaultPanTable); }
-
-  void transposeRelative(s8 delta) { track.transpose = static_cast<s8>(track.transpose + delta); }
-
-  void tuning(u8 fraction) { out.tuning(math::tuningCents(fraction)); }
 
   void vibratoDelay(u8 delay) {
     track.vibrato.delay = delay;
@@ -769,8 +763,6 @@ struct Playback {
     track.specialLogicalChannel = logicalChannel;
     track.specialTable = table;
   }
-
-  void specialSequenceOff() { track.specialSequence = false; }
 
   void release(u8 time, u8 gain) {
     track.releaseTime = time;
@@ -997,7 +989,7 @@ void Playback::tickRuntimeTrack(RuntimeTrack& runtime) {
           child.defaultPan(opcode == 0xd0);
           break;
         case 0xd2:
-          child.specialSequenceOff();
+          runtime.state.specialSequence = false;
           break;
         case 0xd3:
         case 0xd4:
@@ -1008,7 +1000,7 @@ void Playback::tickRuntimeTrack(RuntimeTrack& runtime) {
           static_cast<void>(read8());
           break;
         case 0xd8:
-          child.transposeRelative(readS8());
+          runtime.state.transpose = static_cast<s8>(runtime.state.transpose + readS8());
           break;
         case 0xd9: {
           const u16 address = read16();
@@ -1058,7 +1050,7 @@ void Playback::tickRuntimeTrack(RuntimeTrack& runtime) {
           runtime.state.transpose = readS8();
           break;
         case 0xe4:
-          child.tuning(read8());
+          out.tuning(math::tuningCents(read8()));
           break;
         case 0xe5:
           child.vibratoDelay(read8());
@@ -1126,7 +1118,7 @@ void Playback::tickRuntimeTrack(RuntimeTrack& runtime) {
           break;
         }
         case 0xf5:
-          child.suppressNextAttack();
+          runtime.state.suppressAttack = true;
           break;
         case 0xf6:
           child.gainAddress(1, read16());
@@ -1317,7 +1309,7 @@ struct WalkState {
           .invoke<&Playback::defaultPan>(opcode == 0xd0);
     case 0xd2:
       return cursor.command("Subtrack Trigger Mode Off", SequenceSemantic::State)
-          .invoke<&Playback::specialSequenceOff>();
+          .set<&TrackState::specialSequence>(false);
     case 0xd3:
     case 0xd4:
       return cursor.sourceOnly(opcode == 0xd3 ? "Increment APU Port 3" : "Increment APU Port 2").ignore();
@@ -1330,7 +1322,7 @@ struct WalkState {
     }
     case 0xd8: {
       auto event = cursor.command("Relative Transpose", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::transposeRelative>(event.s8("semitones", SemanticOperandRole::Pitch));
+      return event.add<&TrackState::transpose>(event.s8("semitones", SemanticOperandRole::Pitch));
     }
     case 0xd9: {
       auto event = cursor.command("Pan Envelope", SequenceSemantic::Pan);
@@ -1375,7 +1367,7 @@ struct WalkState {
     }
     case 0xe4: {
       auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::tuning>(event.u8("fraction", SemanticOperandRole::Pitch));
+      return event.emitTuning(math::tuningCents(event.u8("fraction", SemanticOperandRole::Pitch)));
     }
     case 0xe5: {
       auto event = cursor.command("Vibrato Delay", SequenceSemantic::Modulation);
@@ -1446,7 +1438,7 @@ struct WalkState {
       return event.invoke<&Playback::extend>(timing.length, timing.durationTimer, tieFollows(event));
     }
     case 0xf5:
-      return cursor.command("Suppress Next Attack", SequenceSemantic::State).invoke<&Playback::suppressNextAttack>();
+      return cursor.command("Suppress Next Attack", SequenceSemantic::State).set<&TrackState::suppressAttack>(true);
     case 0xf6: {
       auto event = cursor.command("Sustain GAIN Sequence", SequenceSemantic::Envelope);
       return event.invoke<&Playback::gainAddress>(1, event.u16le("envelope", SourceValueDisplay::Address));
@@ -1536,7 +1528,7 @@ struct WalkState {
         commands
             .try_emplace(walk.offset, decodeCommand(reader, walk.offset, version, walk.decode, programs, diagnostics))
             .first;
-    const u32 continuation = walk.offset + command->second.encodedSize;
+    const u32 continuation = static_cast<u32>(command->second.flow.continuation.value);
     DecodeState next = walk.decode;
     if (opcode == 0xdc) {
       next.defaultLength = 0;
