@@ -698,8 +698,8 @@ void finalizeSegSatPerformance(PerformanceSequence& performance, std::span<const
   }
 }
 
-const SequenceDialect& segSatSequenceDialect() {
-  static const SequenceDialect dialect = SequenceDialect{
+const SequenceProgramConfig& segSatSequenceConfig() {
+  static const SequenceProgramConfig config = SequenceProgramConfig{
       .commandDetailKindPrefix = "segsat",
       .timebase = Timebase{.ppqn = 48},
       .behavior =
@@ -707,12 +707,12 @@ const SequenceDialect& segSatSequenceDialect() {
               .commandLimit = 1048576,
           },
   };
-  return dialect;
+  return config;
 }
 
 SequenceProgram parseSegSatSequenceProgram(ByteReader reader, AssetId id, const SegSatSequenceLayout& layout,
                                            SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
-  SequenceProgram program = segSatSequenceDialect().makeProgram();
+  SequenceProgram program = segSatSequenceConfig().makeProgram();
   program.timebase.ppqn = layout.ppqn;
 
   std::optional<SourceAnnotationId> header;

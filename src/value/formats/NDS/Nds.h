@@ -9,7 +9,7 @@
 #include "value/base/Source.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
-#include "value/sequence/SequenceDialect.h"
+#include "value/sequence/SequenceProgramConfig.h"
 
 #include <array>
 #include <optional>
@@ -59,7 +59,7 @@ struct NdsLayout {
 [[nodiscard]] NdsSequenceRange ndsSequenceRangeForFatEntry(core::ByteReader reader, core::SourceRange file);
 
 // SSEQ bytecode decoding and playback semantics.
-[[nodiscard]] const core::SequenceDialect& ndsSequenceDialect();
+[[nodiscard]] const core::SequenceProgramConfig& ndsSequenceConfig();
 [[nodiscard]] core::SequenceRuntime ndsSequenceRuntime();
 [[nodiscard]] core::SequenceProgram parseNdsSequenceProgram(core::ByteReader reader, core::AssetId id,
                                                             NdsSequenceRange range,

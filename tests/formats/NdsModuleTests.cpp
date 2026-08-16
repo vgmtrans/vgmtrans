@@ -235,13 +235,13 @@ SequenceProgram decodeTestSequenceProgram(std::initializer_list<u8> commands) {
   std::vector<u8> bytes(trackStart + commands.size());
   std::ranges::copy(commands, bytes.begin() + trackStart);
 
-  const SequenceDialect& dialect = ndsSequenceDialect();
+  const SequenceProgramConfig& config = ndsSequenceConfig();
   const TrackProgram track =
       decodeTestTrack(ByteReader(SourceId{30}, bytes), sequenceOffset, static_cast<u32>(bytes.size()), trackStart, 0);
   return SequenceProgram{
       .runtime = ndsSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 }
@@ -381,7 +381,7 @@ void ndsModuleOnlyBuildsDependenciesOfReferencedBanks() {
          "NDS module should not emit orphan assets owned only by an unused bank");
 }
 
-void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
+void ndsSequenceDecodesAndRendersNoteWaitCommands() {
   std::vector<u8> bytes(0x140);
   constexpr u32 sequenceOffset = 0x100;
   constexpr u32 trackStart = sequenceOffset + 0x1c;
@@ -397,7 +397,7 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   bytes[trackStart + 9] = 0x06;
   bytes[trackStart + 10] = 0xff;
 
-  const SequenceDialect& dialect = ndsSequenceDialect();
+  const SequenceProgramConfig& config = ndsSequenceConfig();
   expect(ndsSequenceRuntime().valid(), "NDS SSEQ should provide a compiled command runtime");
 
   ScanIdAllocator annotationIds;
@@ -411,9 +411,9 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
          "NDS SSEQ should store every complete command as named semantic data");
   const SourceMap annotations = sourceMap.finish();
   expect(commandDetailKind(annotations, track.commands[0]) == "nds.note-wait",
-         "NDS SSEQ dialect should decode note-wait as a local command");
+         "NDS SSEQ decoder should decode note-wait as a local command");
   expect(commandDetailKind(annotations, track.commands[1]) == "nds.note",
-         "NDS SSEQ dialect should decode source note opcodes as local commands");
+         "NDS SSEQ decoder should decode source note opcodes as local commands");
   const auto noteAnnotations = annotations.withSequenceSemantic(SourceId{4}, SequenceSemantic::Note);
   expect(noteAnnotations.size() == 1, "NDS SSEQ note command should publish a source annotation");
   const auto& noteAnnotation = annotations.get(noteAnnotations[0]);
@@ -432,8 +432,8 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
 
   const SequenceProgram program{
       .runtime = ndsSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
@@ -517,8 +517,8 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
          "NDS expression opcode should decode as a musical command");
   const SequenceProgram expressionProgram{
       .runtime = ndsSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {expressionTrack},
   };
   const MidiSequence expressionMidi = renderMidiSequence(SequenceVm(LoopPolicy::PlayOnce).render(expressionProgram));
@@ -526,7 +526,7 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
          "NDS expression opcode should render as MIDI expression");
 }
 
-void ndsSequenceDialectComposesPitchBendRangeBehavior() {
+void ndsSequenceComposesPitchBendRangeBehavior() {
   std::vector<u8> bytes(0x130);
   constexpr u32 sequenceOffset = 0x100;
   constexpr u32 trackStart = sequenceOffset + 0x1c;
@@ -536,7 +536,7 @@ void ndsSequenceDialectComposesPitchBendRangeBehavior() {
   bytes[trackStart + 3] = 0x40;
   bytes[trackStart + 4] = 0xff;
 
-  const SequenceDialect& dialect = ndsSequenceDialect();
+  const SequenceProgramConfig& config = ndsSequenceConfig();
   const TrackProgram track =
       decodeTestTrack(ByteReader(SourceId{16}, bytes), sequenceOffset, trackStart + 5, trackStart, 0);
   expect(track.commands.size() == 3 && track.commands[0].execution.valid(),
@@ -544,8 +544,8 @@ void ndsSequenceDialectComposesPitchBendRangeBehavior() {
 
   const SequenceProgram program{
       .runtime = ndsSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
@@ -556,7 +556,7 @@ void ndsSequenceDialectComposesPitchBendRangeBehavior() {
          "NDS pitch bend should observe the range state set by the preceding explicit action");
 }
 
-void ndsSequenceDialectEmitsStickyDynamicAdsr() {
+void ndsSequenceEmitsStickyDynamicAdsr() {
   constexpr u8 attack = 0x6d;
   constexpr u8 decay = 0x20;
   constexpr u8 sustain = 0x40;
@@ -613,7 +613,7 @@ void ndsSequenceDialectEmitsStickyDynamicAdsr() {
          "NDS program changes should preserve the track's dynamic ADSR overrides");
 }
 
-void ndsSequenceDialectModelsNitroLfoRegisters() {
+void ndsSequenceModelsNitroLfoRegisters() {
   const PerformanceSequence performance = renderTestPerformance({
       0xcb,
       0x20,  // speed 32 -> 12 Hz
@@ -780,7 +780,7 @@ void ndsSynthModulatorsUseSequenceLfoRanges() {
          "NDS tremolo metadata should lower to an explicit synth depth modulator");
 }
 
-void ndsSequenceDialectRevealsRunningSineLfoAtDepthChange() {
+void ndsSequenceRevealsRunningSineLfoAtDepthChange() {
   const PerformanceSequence performance = renderTestPerformance({
       0xc7,
       0x00,  // notes do not advance the sequence clock
@@ -810,7 +810,7 @@ void ndsSequenceDialectRevealsRunningSineLfoAtDepthChange() {
          "NDS CA should reveal the already-running default 6 Hz sine LFO instead of restarting it");
 }
 
-void ndsSequenceDialectPreservesPortamentoTimingIntent() {
+void ndsSequencePreservesPortamentoTimingIntent() {
   const PerformanceSequence performance = renderTestPerformance({
       0xc7, 0x01,        // note wait
       0xc9, 0x3c,        // portamento source C4 (and enable)
@@ -877,7 +877,7 @@ void ndsSequenceDialectPreservesPortamentoTimingIntent() {
          "pitch-bend lowering should reproduce NDS portamento without native portamento events");
 }
 
-void ndsSequenceDialectPreservesTiedSweepVoices() {
+void ndsSequencePreservesTiedSweepVoices() {
   const PerformanceSequence performance = renderTestPerformance({
       0xc7, 0x01,        // note wait
       0xc8, 0x01,        // tie on
@@ -922,7 +922,7 @@ void ndsSequenceDialectPreservesTiedSweepVoices() {
          "pitch-bend lowering should keep tied NDS key changes on one MIDI attack");
 }
 
-void ndsSequenceDialectExecutesCallAndReturn() {
+void ndsSequenceExecutesCallAndReturn() {
   std::vector<u8> bytes(0x160);
   constexpr u32 sequenceOffset = 0x100;
   constexpr u32 trackStart = sequenceOffset + 0x1c;
@@ -944,7 +944,7 @@ void ndsSequenceDialectExecutesCallAndReturn() {
   bytes[subroutineOffset + 2] = 0x05;
   bytes[subroutineOffset + 3] = 0xfd;
 
-  const SequenceDialect& dialect = ndsSequenceDialect();
+  const SequenceProgramConfig& config = ndsSequenceConfig();
   SourceMapBuilder sourceMap;
   const TrackProgram track = decodeTestTrack(ByteReader(SourceId{5}, bytes), sequenceOffset, subroutineOffset + 4,
                                              trackStart, 0, false, &sourceMap);
@@ -960,8 +960,8 @@ void ndsSequenceDialectExecutesCallAndReturn() {
 
   const SequenceProgram program{
       .runtime = ndsSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
@@ -985,8 +985,8 @@ void ndsSequenceDialectExecutesCallAndReturn() {
          "NDS linearized call fixture should still decode call target and fallthrough blocks");
   const SequenceProgram linearizedProgram{
       .runtime = ndsSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {linearizedTrack},
   };
   const PerformanceSequence linearizedPerformance = SequenceVm(LoopPolicy::PlayOnce).render(linearizedProgram);
@@ -1019,8 +1019,8 @@ void ndsSequenceDialectExecutesCallAndReturn() {
          "NDS synthetic recovery stop command should be parented under the recovered track annotation");
   const SequenceProgram overlapProgram{
       .runtime = ndsSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {overlapTrack},
   };
   const PerformanceSequence overlapPerformance = SequenceVm(LoopPolicy::PlayOnce).render(overlapProgram);
@@ -1028,7 +1028,7 @@ void ndsSequenceDialectExecutesCallAndReturn() {
          "NDS linearized overlap fixture should render without unpaired-return diagnostics");
 }
 
-void ndsSequenceDialectDiscoversSecondaryTrackAddresses() {
+void ndsSequenceDiscoversSecondaryTrackAddresses() {
   std::vector<u8> bytes(0x180);
   constexpr u32 sequenceOffset = 0x100;
   constexpr u32 trackStart = sequenceOffset + 0x1c;
@@ -1087,7 +1087,7 @@ void ndsSequenceTrackAddressDiscoveryKeepsMalformedBootstrapCommands() {
          "NDS malformed bootstrap command should be preserved as a truncated source command");
 }
 
-void ndsSequenceDialectAnnotatesModulationDelayOperands() {
+void ndsSequenceAnnotatesModulationDelayOperands() {
   std::vector<u8> bytes(0x130);
   constexpr u32 sequenceOffset = 0x100;
   constexpr u32 trackStart = sequenceOffset + 0x1c;
@@ -1120,7 +1120,7 @@ void ndsSequenceDialectAnnotatesModulationDelayOperands() {
          "NDS modulation-delay annotation should preserve its source range");
 }
 
-void ndsSequenceDialectAnnotatesPartialModulationDelayOperands() {
+void ndsSequenceAnnotatesPartialModulationDelayOperands() {
   std::vector<u8> bytes(0x130);
   constexpr u32 sequenceOffset = 0x100;
   constexpr u32 trackStart = sequenceOffset + 0x1c;
@@ -1142,7 +1142,7 @@ void ndsSequenceDialectAnnotatesPartialModulationDelayOperands() {
          "NDS partial modulation delay should diagnose the missing operand byte");
 }
 
-void ndsSequenceDialectKeepsEmptyPlaceholderTrack() {
+void ndsSequenceKeepsEmptyPlaceholderTrack() {
   std::vector<u8> bytes(0x130);
   constexpr u32 sequenceOffset = 0x100;
   constexpr u32 trackStart = sequenceOffset + 0x1c;
@@ -1153,7 +1153,7 @@ void ndsSequenceDialectKeepsEmptyPlaceholderTrack() {
          "NDS empty placeholder sequences should keep one empty primary track");
 }
 
-void ndsSequenceDialectMarksUnterminatedVarLenAsTruncated() {
+void ndsSequenceMarksUnterminatedVarLenAsTruncated() {
   std::vector<u8> bytes(0x130);
   constexpr u32 sequenceOffset = 0x100;
   constexpr u32 trackStart = sequenceOffset + 0x1c;
@@ -1171,7 +1171,7 @@ void ndsSequenceDialectMarksUnterminatedVarLenAsTruncated() {
   expect(track.commands[0].range.size == 2, "NDS truncated command should preserve its available partial source range");
 }
 
-void ndsSequenceDialectDoesNotLinkInvalidControlTargets() {
+void ndsSequenceDoesNotLinkInvalidControlTargets() {
   constexpr u32 sequenceOffset = 0x100;
   constexpr u32 trackStart = sequenceOffset + 0x1c;
   constexpr u32 invalidRelativeTarget = 0x80;
@@ -1258,7 +1258,7 @@ void ndsMalformedRecoveryKeepsExecutableJumps() {
   bytes[subroutineOffset + 5] = static_cast<u8>((subroutineRelative >> 8) & 0xff);
   bytes[subroutineOffset + 6] = static_cast<u8>((subroutineRelative >> 16) & 0xff);
 
-  const SequenceDialect& dialect = ndsSequenceDialect();
+  const SequenceProgramConfig& config = ndsSequenceConfig();
   SourceMapBuilder sourceMap;
   const TrackProgram track = decodeTestTrack(ByteReader(SourceId{9}, bytes), sequenceOffset, subroutineOffset + 7,
                                              trackStart, 0, true, &sourceMap);
@@ -1268,7 +1268,7 @@ void ndsMalformedRecoveryKeepsExecutableJumps() {
   });
   expect(jump != track.commands.end(), "NDS malformed recovery should preserve recovered jumps as jump commands");
 
-  SequenceProgram program = dialect.makeProgram();
+  SequenceProgram program = config.makeProgram();
   program.runtime = ndsSequenceRuntime();
   program.behavior.commandLimit = 64;
   program.tracks = {track};

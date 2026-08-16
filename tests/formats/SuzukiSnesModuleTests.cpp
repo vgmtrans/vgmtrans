@@ -122,11 +122,11 @@ std::vector<const Event*> events(const PerformanceTrack& track) {
 }
 
 PerformanceSequence render(Version version, std::vector<u8> bytes) {
-  const auto& dialect = sequenceDialect();
+  const auto& config = sequenceConfig();
   SequenceProgram program{
       .runtime = sequenceRuntime(version),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {decodeSourceTrack(ByteReader(SourceId{121}, bytes), version, 0, 0)},
   };
   program.behavior.initialTempoMicrosecondsPerQuarter = version == Version::SeikenDensetsu3 ? 576000 : 372000;

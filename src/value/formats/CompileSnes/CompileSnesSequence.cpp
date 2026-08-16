@@ -1280,8 +1280,8 @@ void addPercussionReferences(ByteReader reader, const Layout& layout, Referenced
 
 }  // namespace
 
-const SequenceDialect& sequenceDialect() {
-  static const SequenceDialect dialect = SequenceDialect{
+const SequenceProgramConfig& sequenceConfig() {
+  static const SequenceProgramConfig config = SequenceProgramConfig{
       .commandDetailKindPrefix = "compile-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
@@ -1294,7 +1294,7 @@ const SequenceDialect& sequenceDialect() {
               .initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(0x80),
           },
   };
-  return dialect;
+  return config;
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, u32 trackNumber, u32 startAddress,
@@ -1309,7 +1309,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   const u8 count = reader.u8At(layout.songHeaderAddress);
   const SourceRange header = reader.range(layout.songHeaderAddress, 1 + count * 14u);
   ReferencedData references;
-  SequenceDecodeSession sequence{reader, sequenceDialect(), sequenceId, header, sourceMap, kCommandLimit, kAramSize};
+  SequenceDecodeSession sequence{reader, sequenceConfig(), sequenceId, header, sourceMap, kCommandLimit, kAramSize};
   for (u32 track = 0; track < count; ++track) {
     const u32 item = layout.songHeaderAddress + 1 + track * 14u;
     const u16 start = reader.le16(item + 8);

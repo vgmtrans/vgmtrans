@@ -1146,8 +1146,8 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
   }
 }
 
-[[nodiscard]] SequenceDialect makeDialect() {
-  return SequenceDialect{
+[[nodiscard]] SequenceProgramConfig makeSequenceConfig() {
+  return SequenceProgramConfig{
       .commandDetailKindPrefix = "konami-arcade",
       .timebase = Timebase{.ppqn = kKonamiArcadePpqn},
       .behavior =
@@ -1161,9 +1161,9 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
 
 }  // namespace
 
-const SequenceDialect& konamiArcadeSequenceDialect() {
-  static const SequenceDialect dialect = makeDialect();
-  return dialect;
+const SequenceProgramConfig& konamiArcadeSequenceConfig() {
+  static const SequenceProgramConfig config = makeSequenceConfig();
+  return config;
 }
 
 SequenceProgram decodeKonamiArcadeSequence(ByteReader reader, const KonamiArcadeLayout& layout,
@@ -1171,7 +1171,7 @@ SequenceProgram decodeKonamiArcadeSequence(ByteReader reader, const KonamiArcade
                                            SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   SequenceDecodeSession sequence{
       reader,
-      konamiArcadeSequenceDialect(),
+      konamiArcadeSequenceConfig(),
       sequenceAsset,
       sequenceLayout.trackTable,
       sourceMap,

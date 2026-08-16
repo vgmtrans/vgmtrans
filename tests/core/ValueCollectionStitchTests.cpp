@@ -14,18 +14,18 @@ namespace {
 void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "stitch.pcm"}, {0, 0, 0, 0});
-  const SequenceDialect dialect48 = probeSequenceDialect();
-  SequenceDialect dialect96 = dialect48;
-  dialect96.timebase.ppqn = 96;
+  const SequenceProgramConfig config48 = probeSequenceConfig();
+  SequenceProgramConfig config96 = config48;
+  config96.timebase.ppqn = 96;
 
   test::SessionSnapshotBuilder builder;
   for (u32 index = 0; index < 2; ++index) {
-    const SequenceDialect& dialect = index == 0 ? dialect48 : dialect96;
+    const SequenceProgramConfig& config = index == 0 ? config48 : config96;
     TrackProgram track{.sourceTrackNumber = index, .startAddress = Address{0}};
     const std::array<u8, 3> note{0x90, static_cast<u8>(0x3c + index), 0x04};
     const std::array<u8, 1> end{0xff};
-    addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(index * 4, note.size()), note);
-    addProbeCommand<ProbeEndCommand>(track, dialect, Address{3}, probeRange(index * 4 + 3, end.size()), end);
+    addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(index * 4, note.size()), note);
+    addProbeCommand<ProbeEndCommand>(track, config, Address{3}, probeRange(index * 4 + 3, end.size()), end);
 
     const AssetId sequenceId{index * 3};
     const AssetId instrumentId{index * 3 + 1};
@@ -35,8 +35,8 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
         .program =
             SequenceProgram{
                 .runtime = probeSequenceRuntime(),
-                .timebase = dialect.timebase,
-                .behavior = dialect.behavior,
+                .timebase = config.timebase,
+                .behavior = config.behavior,
                 .tracks = {track},
             },
     });

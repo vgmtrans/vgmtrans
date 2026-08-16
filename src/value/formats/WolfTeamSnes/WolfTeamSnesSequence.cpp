@@ -1026,8 +1026,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 }  // namespace
 
-const SequenceDialect& sequenceDialect() {
-  static const SequenceDialect dialect = SequenceDialect{
+const SequenceProgramConfig& sequenceConfig() {
+  static const SequenceProgramConfig config = SequenceProgramConfig{
       .commandDetailKindPrefix = "wolf-team-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
@@ -1040,7 +1040,7 @@ const SequenceDialect& sequenceDialect() {
               .initialPitchBendRangeSemitones = 12,
           },
   };
-  return dialect;
+  return config;
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, const ChannelLayout& channel,
@@ -1051,8 +1051,8 @@ TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, const Ch
 SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
                              std::vector<Diagnostic>* diagnostics) {
   const SourceRange headerRange = reader.range(layout.sequenceHeaderAddress, layout.headerLength);
-  const auto& dialect = sequenceDialect();
-  SequenceProgram program = dialect.makeProgram();
+  const auto& config = sequenceConfig();
+  SequenceProgram program = config.makeProgram();
   RuntimeConfig runtime = runtimeConfig(reader, layout);
   program.behavior = behavior(reader, layout);
 

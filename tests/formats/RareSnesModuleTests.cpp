@@ -86,12 +86,12 @@ u8 defaultTimer(Profile profile) {
 
 PerformanceSequence render(Profile profile, std::vector<u8> bytes, u32 floor = 0, u32 trackNumber = 0,
                            bool monoOutput = false) {
-  const auto& dialect = sequenceDialect();
+  const auto& config = sequenceConfig();
   TrackProgram track = decodeSourceTrack(ByteReader(SourceId{90}, bytes), profile, trackNumber, 0, floor);
   SequenceProgram program{
       .runtime = sequenceRuntime(profile, 0x80, defaultTimer(profile), monoOutput),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {std::move(track)},
   };
   const double initialChannelGain = profile == Profile::KillerInstinct ? 0.5 : 127.0 / 128.0;
@@ -300,7 +300,7 @@ void rareSnesSignedStereoVolumesPreserveDriverRelativeLevels() {
              std::abs(dkc2MonoBalance.back()->rightGain - 0.375) < 0.000001,
          "later Rare mono mode should average absolute signed channel magnitudes exactly as the driver");
 
-  const auto& dialect = sequenceDialect();
+  const auto& config = sequenceConfig();
   const std::vector<u8> firstTrackBytes{
       0x1c, 0x40, 0x20, 0x8f, 0xe0, 0x80, 1, 0x21, 0x81, 1, 0x00,
   };
@@ -309,8 +309,8 @@ void rareSnesSignedStereoVolumesPreserveDriverRelativeLevels() {
   };
   SequenceProgram presetProgram{
       .runtime = sequenceRuntime(Profile::DonkeyKongCountry, 0x80, 0x3c),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks =
           {
               decodeSourceTrack(ByteReader(SourceId{94}, firstTrackBytes), Profile::DonkeyKongCountry, 0, 0),

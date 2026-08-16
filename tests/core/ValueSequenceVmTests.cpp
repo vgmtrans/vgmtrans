@@ -9,7 +9,7 @@
 namespace {
 
 void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .sourceTrackNumber = 7,
       .startAddress = Address{0},
@@ -19,20 +19,20 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfe, 0x02, 0x00};
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeProgramCommand>(track, dialect, Address{0}, probeRange(0, programBytes.size()), programBytes);
+  addProbeCommand<ProbeProgramCommand>(track, config, Address{0}, probeRange(0, programBytes.size()), programBytes);
   track.commands.back().annotation = SourceAnnotationId{10};
   const CommandId noteCommandId =
-      addProbeCommand<ProbeNoteCommand>(track, dialect, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
+      addProbeCommand<ProbeNoteCommand>(track, config, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
   track.commands.back().annotation = SourceAnnotationId{11};
-  addProbeCommand<ProbeJumpCommand>(track, dialect, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes);
+  addProbeCommand<ProbeJumpCommand>(track, config, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes);
   track.commands.back().annotation = SourceAnnotationId{12};
-  addProbeCommand<ProbeEndCommand>(track, dialect, Address{8}, probeRange(8, endBytes.size()), endBytes);
+  addProbeCommand<ProbeEndCommand>(track, config, Address{8}, probeRange(8, endBytes.size()), endBytes);
   track.commands.back().annotation = SourceAnnotationId{13};
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -58,7 +58,7 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
   const auto* note = std::get_if<NotePerformanceEvent>(&renderedTrack.events[1]);
   expect(note != nullptr, "note command should emit a target-neutral note event");
   expect(note->key == 64.0 && note->linearVelocity == 0.5 && note->durationTicks == 12,
-         "note event should use driver state and dialect context while staying MIDI-neutral");
+         "note event should use driver state and config context while staying MIDI-neutral");
   expect(note->header.sourceCommand == noteCommandId && note->header.tick == 0,
          "note event should link back to the source command that emitted it");
   expect(program.tracks[0].command(noteCommandId) == &program.tracks[0].commands[1],
@@ -84,7 +84,7 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
 }
 
 void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
-  const SequenceDialect dialect{
+  const SequenceProgramConfig config{
       .timebase = Timebase{.ppqn = 48},
       .behavior = SequenceProgramBehavior{},
   };
@@ -103,8 +103,8 @@ void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
                       CommandFlow::end(Address{2}), SourceAnnotationId{21});
   const SequenceProgram program{
       .runtime = runtime,
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -120,7 +120,7 @@ void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
 }
 
 void sequenceVmPreservesPitchMotionThroughNoteRelease() {
-  const SequenceDialect dialect{
+  const SequenceProgramConfig config{
       .timebase = Timebase{.ppqn = 48},
       .behavior = SequenceProgramBehavior{},
   };
@@ -141,8 +141,8 @@ void sequenceVmPreservesPitchMotionThroughNoteRelease() {
 
   const PerformanceSequence performance = SequenceVm().render(SequenceProgram{
       .runtime = runtime,
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   });
   expect(performance.tracks[0].automations.size() == 1 && performance.tracks[0].automations[0].realization.endTick == 4,
@@ -150,20 +150,20 @@ void sequenceVmPreservesPitchMotionThroughNoteRelease() {
 }
 
 void sequenceVmReplaysInfiniteLoopsWhenRequested() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .startAddress = Address{0},
   };
 
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfe, 0x00, 0x00};
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeJumpCommand>(track, dialect, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeJumpCommand>(track, config, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -181,7 +181,7 @@ void sequenceVmReplaysInfiniteLoopsWhenRequested() {
 }
 
 void sequenceVmStopsDeclaredLoopBeforeTargetReplay() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .startAddress = Address{0},
   };
@@ -189,14 +189,14 @@ void sequenceVmStopsDeclaredLoopBeforeTargetReplay() {
   const std::array<u8, 2> programBytes{0x80, 0x05};
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> loopBytes{0xfb, 0x00, 0x00};
-  addProbeCommand<ProbeProgramCommand>(track, dialect, Address{0}, probeRange(0, programBytes.size()), programBytes);
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeDeclaredLoopCommand>(track, dialect, Address{5}, probeRange(5, loopBytes.size()), loopBytes);
+  addProbeCommand<ProbeProgramCommand>(track, config, Address{0}, probeRange(0, programBytes.size()), programBytes);
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeDeclaredLoopCommand>(track, config, Address{5}, probeRange(5, loopBytes.size()), loopBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -217,7 +217,7 @@ void sequenceVmStopsDeclaredLoopBeforeTargetReplay() {
 }
 
 void sequenceVmPreservesDeclaredLoopAsPerformanceMarkers() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .startAddress = Address{0},
   };
@@ -225,14 +225,14 @@ void sequenceVmPreservesDeclaredLoopAsPerformanceMarkers() {
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> loopBytes{0xfb, 0x00, 0x00};
   const CommandId noteCommand =
-      addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  const CommandId loopCommand = addProbeCommand<ProbeDeclaredLoopCommand>(track, dialect, Address{3},
+      addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  const CommandId loopCommand = addProbeCommand<ProbeDeclaredLoopCommand>(track, config, Address{3},
                                                                           probeRange(3, loopBytes.size()), loopBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -249,7 +249,7 @@ void sequenceVmPreservesDeclaredLoopAsPerformanceMarkers() {
 }
 
 void sequenceVmLoopCandidateRequiresVisitedDestination() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .startAddress = Address{10},
   };
@@ -257,16 +257,16 @@ void sequenceVmLoopCandidateRequiresVisitedDestination() {
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> jumpToStartBytes{0xfc, 0x00, 0x00};
   const std::array<u8, 3> jumpToBodyBytes{0xfc, 0x00, 0x00};
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeLoopCandidateCommand>(track, dialect, Address{3}, probeRange(3, jumpToStartBytes.size()),
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeLoopCandidateCommand>(track, config, Address{3}, probeRange(3, jumpToStartBytes.size()),
                                              jumpToStartBytes);
-  addProbeCommand<ProbeLoopCandidateCommand>(track, dialect, Address{10}, probeRange(10, jumpToBodyBytes.size()),
+  addProbeCommand<ProbeLoopCandidateCommand>(track, config, Address{10}, probeRange(10, jumpToBodyBytes.size()),
                                              jumpToBodyBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -285,7 +285,7 @@ void sequenceVmLoopCandidateRequiresVisitedDestination() {
 }
 
 void sequenceVmLoopCandidateIgnoresRepeatState() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .startAddress = Address{0},
   };
@@ -295,17 +295,17 @@ void sequenceVmLoopCandidateIgnoresRepeatState() {
   const std::array<u8, 3> loopCandidateBytes{0xfc, 0x00, 0x00};
   const std::array<u8, 5> repeatBytes{0xf0, 0x00, 0x02, 0x0a, 0x00};
 
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeJumpCommand>(track, dialect, Address{3}, probeRange(3, jumpToRepeatBytes.size()),
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeJumpCommand>(track, config, Address{3}, probeRange(3, jumpToRepeatBytes.size()),
                                     jumpToRepeatBytes);
-  addProbeCommand<ProbeLoopCandidateCommand>(track, dialect, Address{10}, probeRange(10, loopCandidateBytes.size()),
+  addProbeCommand<ProbeLoopCandidateCommand>(track, config, Address{10}, probeRange(10, loopCandidateBytes.size()),
                                              loopCandidateBytes);
-  addProbeCommand<ProbeRepeatCommand>(track, dialect, Address{20}, probeRange(20, repeatBytes.size()), repeatBytes);
+  addProbeCommand<ProbeRepeatCommand>(track, config, Address{20}, probeRange(20, repeatBytes.size()), repeatBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -318,7 +318,7 @@ void sequenceVmLoopCandidateIgnoresRepeatState() {
 }
 
 void sequenceVmPreservesLoopCandidateAsPerformanceMarkers() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .startAddress = Address{0},
   };
@@ -326,14 +326,14 @@ void sequenceVmPreservesLoopCandidateAsPerformanceMarkers() {
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfc, 0x00, 0x00};
   const CommandId noteCommand =
-      addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  const CommandId jumpCommand = addProbeCommand<ProbeLoopCandidateCommand>(track, dialect, Address{3},
+      addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  const CommandId jumpCommand = addProbeCommand<ProbeLoopCandidateCommand>(track, config, Address{3},
                                                                            probeRange(3, jumpBytes.size()), jumpBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -350,7 +350,7 @@ void sequenceVmPreservesLoopCandidateAsPerformanceMarkers() {
 }
 
 void sequenceVmPreservesLoopsAsPerformanceMarkers() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .sourceTrackNumber = 7,
       .startAddress = Address{0},
@@ -359,16 +359,16 @@ void sequenceVmPreservesLoopsAsPerformanceMarkers() {
   const std::array<u8, 2> programBytes{0x80, 0x05};
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfe, 0x02, 0x00};
-  addProbeCommand<ProbeProgramCommand>(track, dialect, Address{0}, probeRange(0, programBytes.size()), programBytes);
+  addProbeCommand<ProbeProgramCommand>(track, config, Address{0}, probeRange(0, programBytes.size()), programBytes);
   const CommandId noteCommand =
-      addProbeCommand<ProbeNoteCommand>(track, dialect, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
+      addProbeCommand<ProbeNoteCommand>(track, config, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
   const CommandId jumpCommand =
-      addProbeCommand<ProbeJumpCommand>(track, dialect, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes);
+      addProbeCommand<ProbeJumpCommand>(track, config, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -415,7 +415,7 @@ void sequenceVmPreservesLoopsAsPerformanceMarkers() {
 }
 
 void sequenceVmUsesProgramCommandLimit() {
-  const SequenceDialect dialect = probeSequenceDialect(SequenceProgramBehavior{
+  const SequenceProgramConfig config = probeSequenceConfig(SequenceProgramBehavior{
       .commandLimit = 2,
   });
   TrackProgram track{
@@ -425,14 +425,14 @@ void sequenceVmUsesProgramCommandLimit() {
   const std::array<u8, 2> programBytes{0x80, 0x05};
   const std::array<u8, 3> noteBytes{0x90, 0x04, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfe, 0x02, 0x00};
-  addProbeCommand<ProbeProgramCommand>(track, dialect, Address{0}, probeRange(0, programBytes.size()), programBytes);
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeJumpCommand>(track, dialect, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes);
+  addProbeCommand<ProbeProgramCommand>(track, config, Address{0}, probeRange(0, programBytes.size()), programBytes);
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeJumpCommand>(track, config, Address{5}, probeRange(5, jumpBytes.size()), jumpBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -442,42 +442,42 @@ void sequenceVmUsesProgramCommandLimit() {
                  "Sequence VM command limit reached: track=0, address=$0005, tick=12, executed=2, limit=2",
          "sequence VM should report the track, address, tick, and active command limit");
   expect(performance.tracks[0].events.size() == 2,
-         "dialect command limit should stop execution before the looping jump command");
+         "config command limit should stop execution before the looping jump command");
   expect(performance.tracks[0].endTick == 12, "command-limit stop should preserve ticks from commands already run");
 }
 
 void sequenceVmUsesInitialTempoAndGlobalEventOrder() {
-  const SequenceDialect tempoDialect = probeSequenceDialect(SequenceProgramBehavior{
+  const SequenceProgramConfig tempoConfig = probeSequenceConfig(SequenceProgramBehavior{
       .initialTempoMicrosecondsPerQuarter = 750'000,
   });
   const SequenceProgram defaultTempoProgram{
       .runtime = probeSequenceRuntime(),
-      .timebase = tempoDialect.timebase,
-      .behavior = tempoDialect.behavior,
+      .timebase = tempoConfig.timebase,
+      .behavior = tempoConfig.behavior,
   };
   expect(SequenceVm().render(defaultTempoProgram).initialTempoMicrosecondsPerQuarter == 750'000,
-         "sequence VM should retain a dialect's source initial tempo");
+         "sequence VM should retain a config's source initial tempo");
 
   SequenceProgram overriddenTempoProgram = defaultTempoProgram;
   overriddenTempoProgram.behavior.initialTempoMicrosecondsPerQuarter = 600'000;
   expect(SequenceVm().render(overriddenTempoProgram).initialTempoMicrosecondsPerQuarter == 600'000,
-         "a parsed program should be able to override its dialect's initial tempo");
+         "a parsed program should be able to override its config's initial tempo");
 
-  const SequenceDialect orderDialect = probeSequenceDialect();
+  const SequenceProgramConfig orderConfig = probeSequenceConfig();
   const auto makeTrack = [&](u32 trackNumber, u32 address, u8 program) {
     TrackProgram track{
         .sourceTrackNumber = trackNumber,
         .startAddress = Address{address},
     };
     const std::array<u8, 2> bytes{0x80, program};
-    addProbeCommand<ProbeProgramCommand>(track, orderDialect, Address{address}, probeRange(address, bytes.size()),
+    addProbeCommand<ProbeProgramCommand>(track, orderConfig, Address{address}, probeRange(address, bytes.size()),
                                          bytes);
     return track;
   };
   const SequenceProgram orderedProgram{
       .runtime = probeSequenceRuntime(),
-      .timebase = orderDialect.timebase,
-      .behavior = orderDialect.behavior,
+      .timebase = orderConfig.timebase,
+      .behavior = orderConfig.behavior,
       .tracks = {makeTrack(0, 0, 1), makeTrack(1, 16, 2)},
   };
   const PerformanceSequence ordered = SequenceVm().render(orderedProgram);
@@ -488,7 +488,7 @@ void sequenceVmUsesInitialTempoAndGlobalEventOrder() {
 }
 
 void sequenceVmEmitsProgramInitialChannelState() {
-  const SequenceDialect dialect = probeSequenceDialect(
+  const SequenceProgramConfig config = probeSequenceConfig(
       SequenceProgramBehavior{
           .initialSourceInstrument = InstrumentIdentity{.domain = "probe", .key = 7},
           .initialLevel = 0.0,
@@ -503,12 +503,12 @@ void sequenceVmEmitsProgramInitialChannelState() {
   };
 
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeEndCommand>(track, dialect, Address{0}, probeRange(0, endBytes.size()), endBytes);
+  addProbeCommand<ProbeEndCommand>(track, config, Address{0}, probeRange(0, endBytes.size()), endBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -553,17 +553,17 @@ void sequenceVmEmitsProgramInitialChannelState() {
 }
 
 void sequenceVmEmitsInitialMasterLevelOnce() {
-  const SequenceDialect dialect = probeSequenceDialect(SequenceProgramBehavior{.initialMasterLevel = 0.25});
+  const SequenceProgramConfig config = probeSequenceConfig(SequenceProgramBehavior{.initialMasterLevel = 0.25});
   const auto makeTrack = [&](u32 id) {
     TrackProgram track{.sourceTrackNumber = id, .startAddress = Address{0}};
     const std::array<u8, 1> endBytes{0xff};
-    addProbeCommand<ProbeEndCommand>(track, dialect, Address{0}, probeRange(id, endBytes.size()), endBytes);
+    addProbeCommand<ProbeEndCommand>(track, config, Address{0}, probeRange(id, endBytes.size()), endBytes);
     return track;
   };
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {makeTrack(3), makeTrack(4)},
   };
 
@@ -582,7 +582,7 @@ void sequenceVmEmitsInitialMasterLevelOnce() {
 }
 
 void sequenceVmExposesSubroutineStateFromItsCallStack() {
-  const SequenceDialect dialect{
+  const SequenceProgramConfig config{
       .timebase = Timebase{.ppqn = 48},
       .behavior = SequenceProgramBehavior{},
   };
@@ -602,8 +602,8 @@ void sequenceVmExposesSubroutineStateFromItsCallStack() {
 
   const SequenceProgram program{
       .runtime = runtime,
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -616,7 +616,7 @@ void sequenceVmExposesSubroutineStateFromItsCallStack() {
 }
 
 void sequenceVmAllowsRepeatedCallsToSameSubroutine() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .startAddress = Address{0},
   };
@@ -625,16 +625,16 @@ void sequenceVmAllowsRepeatedCallsToSameSubroutine() {
   const std::array<u8, 1> endBytes{0xff};
   const std::array<u8, 3> noteBytes{0x90, 0x05, 0x04};
   const std::array<u8, 1> returnBytes{0xfd};
-  addProbeCommand<ProbeCallCommand>(track, dialect, Address{0}, probeRange(0, callBytes.size()), callBytes);
-  addProbeCommand<ProbeCallCommand>(track, dialect, Address{3}, probeRange(3, callBytes.size()), callBytes);
-  addProbeCommand<ProbeEndCommand>(track, dialect, Address{6}, probeRange(6, endBytes.size()), endBytes);
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{10}, probeRange(10, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeReturnCommand>(track, dialect, Address{13}, probeRange(13, returnBytes.size()), returnBytes);
+  addProbeCommand<ProbeCallCommand>(track, config, Address{0}, probeRange(0, callBytes.size()), callBytes);
+  addProbeCommand<ProbeCallCommand>(track, config, Address{3}, probeRange(3, callBytes.size()), callBytes);
+  addProbeCommand<ProbeEndCommand>(track, config, Address{6}, probeRange(6, endBytes.size()), endBytes);
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{10}, probeRange(10, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeReturnCommand>(track, config, Address{13}, probeRange(13, returnBytes.size()), returnBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -654,7 +654,7 @@ void sequenceVmAllowsRepeatedCallsToSameSubroutine() {
 }
 
 void sequenceVmReplaysFiniteRepeatBlocks() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .startAddress = Address{0},
   };
@@ -662,14 +662,14 @@ void sequenceVmReplaysFiniteRepeatBlocks() {
   const std::array<u8, 3> noteBytes{0x90, 0x00, 0x0c};
   const std::array<u8, 5> repeatBytes{0xf0, 0x00, 0x03, 0x00, 0x00};
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeRepeatCommand>(track, dialect, Address{3}, probeRange(3, repeatBytes.size()), repeatBytes);
-  addProbeCommand<ProbeEndCommand>(track, dialect, Address{8}, probeRange(8, endBytes.size()), endBytes);
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeRepeatCommand>(track, config, Address{3}, probeRange(3, repeatBytes.size()), repeatBytes);
+  addProbeCommand<ProbeEndCommand>(track, config, Address{8}, probeRange(8, endBytes.size()), endBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -688,7 +688,7 @@ void sequenceVmReplaysFiniteRepeatBlocks() {
 }
 
 void sequenceVmRepeatReplayUsesCommandAddressesNotSourceOffsets() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .startAddress = Address{1003},
   };
@@ -697,14 +697,14 @@ void sequenceVmRepeatReplayUsesCommandAddressesNotSourceOffsets() {
   const std::array<u8, 5> repeatBytes{0xf0, 0x00, 0x02, 0xe8, 0x03};
   const std::array<u8, 3> jumpToSelfBytes{0xfe, 0xd0, 0x07};
 
-  addProbeCommand<ProbeJumpCommand>(track, dialect, Address{1000}, probeRange(100, jumpToOutsideBytes.size()),
+  addProbeCommand<ProbeJumpCommand>(track, config, Address{1000}, probeRange(100, jumpToOutsideBytes.size()),
                                     jumpToOutsideBytes);
-  addProbeCommand<ProbeRepeatCommand>(track, dialect, Address{1003}, probeRange(103, repeatBytes.size()),
+  addProbeCommand<ProbeRepeatCommand>(track, config, Address{1003}, probeRange(103, repeatBytes.size()),
                                       repeatBytes);
-  addProbeCommand<ProbeJumpCommand>(track, dialect, Address{2000}, probeRange(200, jumpToSelfBytes.size()),
+  addProbeCommand<ProbeJumpCommand>(track, config, Address{2000}, probeRange(200, jumpToSelfBytes.size()),
                                     jumpToSelfBytes);
 
-  SequenceProgram program = dialect.makeProgram();
+  SequenceProgram program = config.makeProgram();
   program.runtime = probeSequenceRuntime();
   program.behavior.commandLimit = 8;
   program.tracks = {track};
@@ -715,7 +715,7 @@ void sequenceVmRepeatReplayUsesCommandAddressesNotSourceOffsets() {
 }
 
 void sequenceVmDetectsCycleWhenRepeatCommandsReuseOneCounter() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .startAddress = Address{0},
   };
@@ -724,14 +724,14 @@ void sequenceVmDetectsCycleWhenRepeatCommandsReuseOneCounter() {
   const std::array<u8, 5> shortRepeatBytes{0xf0, 0x00, 0x02, 0x00, 0x00};
   const std::array<u8, 5> outerRepeatBytes{0xf0, 0x00, 0x04, 0x00, 0x00};
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeRepeatCommand>(track, dialect, Address{3}, probeRange(3, shortRepeatBytes.size()),
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeRepeatCommand>(track, config, Address{3}, probeRange(3, shortRepeatBytes.size()),
                                       shortRepeatBytes);
-  addProbeCommand<ProbeRepeatCommand>(track, dialect, Address{8}, probeRange(8, outerRepeatBytes.size()),
+  addProbeCommand<ProbeRepeatCommand>(track, config, Address{8}, probeRange(8, outerRepeatBytes.size()),
                                       outerRepeatBytes);
-  addProbeCommand<ProbeEndCommand>(track, dialect, Address{13}, probeRange(13, endBytes.size()), endBytes);
+  addProbeCommand<ProbeEndCommand>(track, config, Address{13}, probeRange(13, endBytes.size()), endBytes);
 
-  SequenceProgram program = dialect.makeProgram();
+  SequenceProgram program = config.makeProgram();
   program.runtime = probeSequenceRuntime();
   program.behavior.commandLimit = 100;
   program.tracks = {track};
@@ -744,7 +744,7 @@ void sequenceVmDetectsCycleWhenRepeatCommandsReuseOneCounter() {
 }
 
 void sequenceVmExecutesNestedCallInsideRepeat() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .startAddress = Address{0},
   };
@@ -754,16 +754,16 @@ void sequenceVmExecutesNestedCallInsideRepeat() {
   const std::array<u8, 1> endBytes{0xff};
   const std::array<u8, 3> noteBytes{0x90, 0x05, 0x04};
   const std::array<u8, 1> returnBytes{0xfd};
-  addProbeCommand<ProbeCallCommand>(track, dialect, Address{0}, probeRange(0, callBytes.size()), callBytes);
-  addProbeCommand<ProbeRepeatCommand>(track, dialect, Address{3}, probeRange(3, repeatBytes.size()), repeatBytes);
-  addProbeCommand<ProbeEndCommand>(track, dialect, Address{8}, probeRange(8, endBytes.size()), endBytes);
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{20}, probeRange(20, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeReturnCommand>(track, dialect, Address{23}, probeRange(23, returnBytes.size()), returnBytes);
+  addProbeCommand<ProbeCallCommand>(track, config, Address{0}, probeRange(0, callBytes.size()), callBytes);
+  addProbeCommand<ProbeRepeatCommand>(track, config, Address{3}, probeRange(3, repeatBytes.size()), repeatBytes);
+  addProbeCommand<ProbeEndCommand>(track, config, Address{8}, probeRange(8, endBytes.size()), endBytes);
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{20}, probeRange(20, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeReturnCommand>(track, config, Address{23}, probeRange(23, returnBytes.size()), returnBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -777,7 +777,7 @@ void sequenceVmExecutesNestedCallInsideRepeat() {
 }
 
 void sequenceVmExecutesRepeatInsideCall() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .startAddress = Address{0},
   };
@@ -787,16 +787,16 @@ void sequenceVmExecutesRepeatInsideCall() {
   const std::array<u8, 3> noteBytes{0x90, 0x05, 0x04};
   const std::array<u8, 5> repeatBytes{0xf0, 0x00, 0x03, 0x14, 0x00};
   const std::array<u8, 1> returnBytes{0xfd};
-  addProbeCommand<ProbeCallCommand>(track, dialect, Address{0}, probeRange(0, callBytes.size()), callBytes);
-  addProbeCommand<ProbeEndCommand>(track, dialect, Address{3}, probeRange(3, endBytes.size()), endBytes);
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{20}, probeRange(20, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeRepeatCommand>(track, dialect, Address{23}, probeRange(23, repeatBytes.size()), repeatBytes);
-  addProbeCommand<ProbeReturnCommand>(track, dialect, Address{28}, probeRange(28, returnBytes.size()), returnBytes);
+  addProbeCommand<ProbeCallCommand>(track, config, Address{0}, probeRange(0, callBytes.size()), callBytes);
+  addProbeCommand<ProbeEndCommand>(track, config, Address{3}, probeRange(3, endBytes.size()), endBytes);
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{20}, probeRange(20, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeRepeatCommand>(track, config, Address{23}, probeRange(23, repeatBytes.size()), repeatBytes);
+  addProbeCommand<ProbeReturnCommand>(track, config, Address{28}, probeRange(28, returnBytes.size()), returnBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -810,7 +810,7 @@ void sequenceVmExecutesRepeatInsideCall() {
 }
 
 void sequenceVmRunsRepeatBreakSideEffectsOnlyWhenBranchTaken() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .startAddress = Address{0},
   };
@@ -819,16 +819,16 @@ void sequenceVmRunsRepeatBreakSideEffectsOnlyWhenBranchTaken() {
   const std::array<u8, 4> repeatBreakBytes{0xf1, 0x00, 0x0c, 0x00};
   const std::array<u8, 5> repeatBytes{0xf0, 0x00, 0x03, 0x00, 0x00};
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeRepeatBreakCommand>(track, dialect, Address{3}, probeRange(3, repeatBreakBytes.size()),
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeRepeatBreakCommand>(track, config, Address{3}, probeRange(3, repeatBreakBytes.size()),
                                            repeatBreakBytes);
-  addProbeCommand<ProbeRepeatCommand>(track, dialect, Address{7}, probeRange(7, repeatBytes.size()), repeatBytes);
-  addProbeCommand<ProbeEndCommand>(track, dialect, Address{12}, probeRange(12, endBytes.size()), endBytes);
+  addProbeCommand<ProbeRepeatCommand>(track, config, Address{7}, probeRange(7, repeatBytes.size()), repeatBytes);
+  addProbeCommand<ProbeEndCommand>(track, config, Address{12}, probeRange(12, endBytes.size()), endBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -848,7 +848,7 @@ void sequenceVmRunsRepeatBreakSideEffectsOnlyWhenBranchTaken() {
 }
 
 void sequenceVmRepeatBreakCanBranchToPreviouslyVisitedCode() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .startAddress = Address{0},
   };
@@ -858,18 +858,18 @@ void sequenceVmRepeatBreakCanBranchToPreviouslyVisitedCode() {
   const std::array<u8, 4> repeatBreakBytes{0xf1, 0x00, 0x00, 0x00};
   const std::array<u8, 5> repeatBytes{0xf0, 0x00, 0x02, 0x14, 0x00};
   const std::array<u8, 1> endBytes{0xff};
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeJumpCommand>(track, dialect, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{20}, probeRange(20, noteBytes.size()), noteBytes);
-  addProbeCommand<ProbeRepeatBreakCommand>(track, dialect, Address{23}, probeRange(23, repeatBreakBytes.size()),
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeJumpCommand>(track, config, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{20}, probeRange(20, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeRepeatBreakCommand>(track, config, Address{23}, probeRange(23, repeatBreakBytes.size()),
                                            repeatBreakBytes);
-  addProbeCommand<ProbeRepeatCommand>(track, dialect, Address{27}, probeRange(27, repeatBytes.size()), repeatBytes);
-  addProbeCommand<ProbeEndCommand>(track, dialect, Address{32}, probeRange(32, endBytes.size()), endBytes);
+  addProbeCommand<ProbeRepeatCommand>(track, config, Address{27}, probeRange(27, repeatBytes.size()), repeatBytes);
+  addProbeCommand<ProbeEndCommand>(track, config, Address{32}, probeRange(32, endBytes.size()), endBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -882,7 +882,7 @@ void sequenceVmRepeatBreakCanBranchToPreviouslyVisitedCode() {
 }
 
 void sequenceVmPreservesLoopMarkersForInteriorJumpTarget() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .startAddress = Address{0},
   };
@@ -890,17 +890,17 @@ void sequenceVmPreservesLoopMarkersForInteriorJumpTarget() {
   const std::array<u8, 2> programBytes{0x80, 0x05};
   const std::array<u8, 3> noteBytes{0x90, 0x00, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfe, 0x05, 0x00};
-  addProbeCommand<ProbeProgramCommand>(track, dialect, Address{0}, probeRange(0, programBytes.size()), programBytes);
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeProgramCommand>(track, config, Address{0}, probeRange(0, programBytes.size()), programBytes);
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{2}, probeRange(2, noteBytes.size()), noteBytes);
   const CommandId loopStartCommand =
-      addProbeCommand<ProbeNoteCommand>(track, dialect, Address{5}, probeRange(5, noteBytes.size()), noteBytes);
+      addProbeCommand<ProbeNoteCommand>(track, config, Address{5}, probeRange(5, noteBytes.size()), noteBytes);
   const CommandId jumpCommand =
-      addProbeCommand<ProbeJumpCommand>(track, dialect, Address{8}, probeRange(8, jumpBytes.size()), jumpBytes);
+      addProbeCommand<ProbeJumpCommand>(track, config, Address{8}, probeRange(8, jumpBytes.size()), jumpBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -916,14 +916,14 @@ void sequenceVmPreservesLoopMarkersForInteriorJumpTarget() {
 }
 
 void sequenceVmDoesNotWrapCommandAddressOverflow() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .startAddress = Address{std::numeric_limits<u64>::max() - 1},
   };
 
   const std::array<u8, 3> noteBytes{0x90, 0x00, 0x04};
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{1}, SourceRange{}, noteBytes);
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{std::numeric_limits<u64>::max() - 1}, SourceRange{},
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{1}, SourceRange{}, noteBytes);
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{std::numeric_limits<u64>::max() - 1}, SourceRange{},
                                     noteBytes);
   // The decoded continuation is authoritative and must not wrap to the other
   // command merely because address + source size would overflow.
@@ -931,8 +931,8 @@ void sequenceVmDoesNotWrapCommandAddressOverflow() {
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -944,8 +944,8 @@ void sequenceVmDoesNotWrapCommandAddressOverflow() {
          "source-address fallthrough should not wrap around the address space");
 }
 
-SequenceDialect authoritativeFlowProbeDialect() {
-  return SequenceDialect{
+SequenceProgramConfig authoritativeFlowProbeConfig() {
+  return SequenceProgramConfig{
       .timebase = Timebase{.ppqn = 48},
       .behavior = SequenceProgramBehavior{},
   };
@@ -973,7 +973,7 @@ SequenceRuntime authoritativeFlowProbeRuntime() {
 }
 
 void sequenceVmUsesDecodedContinuationInsteadOfSizeOrStorageOrder() {
-  const SequenceDialect dialect = authoritativeFlowProbeDialect();
+  const SequenceProgramConfig config = authoritativeFlowProbeConfig();
   TrackProgram track{.startAddress = Address{100}};
   appendTestCommand(track, Address{100}, 1, {}, {}, CommandFlow::fallthroughTo(Address{200}));
   appendTestCommand(track, Address{101}, 99, {}, {}, CommandFlow::end(Address{102}));
@@ -981,8 +981,8 @@ void sequenceVmUsesDecodedContinuationInsteadOfSizeOrStorageOrder() {
 
   const SequenceProgram program{
       .runtime = authoritativeFlowProbeRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -994,7 +994,7 @@ void sequenceVmUsesDecodedContinuationInsteadOfSizeOrStorageOrder() {
 }
 
 void sequenceVmUsesDecodedCallContinuationAsReturnAddress() {
-  const SequenceDialect dialect = authoritativeFlowProbeDialect();
+  const SequenceProgramConfig config = authoritativeFlowProbeConfig();
   TrackProgram track{.startAddress = Address{0}};
   appendTestCommand(track, Address{0}, 0, {}, {}, CommandFlow::call(Address{10}, Address{20}));
   appendTestCommand(track, Address{1}, 99, {}, {}, CommandFlow::end(Address{2}));
@@ -1003,8 +1003,8 @@ void sequenceVmUsesDecodedCallContinuationAsReturnAddress() {
 
   const SequenceProgram program{
       .runtime = authoritativeFlowProbeRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -1016,7 +1016,7 @@ void sequenceVmUsesDecodedCallContinuationAsReturnAddress() {
 }
 
 void sequenceVmPreservesExplicitJumpToContinuation() {
-  const SequenceDialect dialect = authoritativeFlowProbeDialect();
+  const SequenceProgramConfig config = authoritativeFlowProbeConfig();
   TrackProgram track{.startAddress = Address{1}};
   CommandFlow explicitJump = CommandFlow::fallthroughTo(Address{1});
   appendTestCommand(track, Address{0}, 0xfe, {}, {}, std::move(explicitJump));
@@ -1024,8 +1024,8 @@ void sequenceVmPreservesExplicitJumpToContinuation() {
 
   const SequenceProgram program{
       .runtime = authoritativeFlowProbeRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm(LoopPolicy::Preserve).render(program);
@@ -1040,14 +1040,14 @@ void sequenceVmPreservesExplicitJumpToContinuation() {
 }
 
 void sequenceVmPrefersRuntimeFlowAndOtherwiseUsesTheDecodedDefault() {
-  const SequenceDialect dialect = authoritativeFlowProbeDialect();
+  const SequenceProgramConfig config = authoritativeFlowProbeConfig();
   const auto render = [&](u8 opcode, CommandFlow flow) {
     TrackProgram track{.startAddress = Address{0}};
     appendTestCommand(track, Address{0}, opcode, {}, {}, std::move(flow));
     return SequenceVm().render(SequenceProgram{
         .runtime = authoritativeFlowProbeRuntime(),
-            .timebase = dialect.timebase,
-        .behavior = dialect.behavior,
+            .timebase = config.timebase,
+        .behavior = config.behavior,
             .tracks = {track},
     });
   };
@@ -1064,8 +1064,8 @@ void sequenceVmPrefersRuntimeFlowAndOtherwiseUsesTheDecodedDefault() {
   appendTestCommand(track, Address{1}, 1, {}, {}, CommandFlow::end(Address{2}));
   const PerformanceSequence fallthrough = SequenceVm().render(SequenceProgram{
       .runtime = authoritativeFlowProbeRuntime(),
-          .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+          .timebase = config.timebase,
+      .behavior = config.behavior,
           .tracks = {track},
   });
   expect(fallthrough.diagnostics.empty() && fallthrough.tracks[0].events.size() == 1,
@@ -1073,21 +1073,21 @@ void sequenceVmPrefersRuntimeFlowAndOtherwiseUsesTheDecodedDefault() {
 }
 
 void sequenceVmReportsMissingJumpTargetAfterEmittedEvents() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
       .startAddress = Address{0},
   };
 
   const std::array<u8, 3> noteBytes{0x90, 0x00, 0x0c};
   const std::array<u8, 3> jumpBytes{0xfe, 0x63, 0x00};
-  addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
+  addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
   const SourceRange jumpRange = probeRange(3, jumpBytes.size());
-  addProbeCommand<ProbeJumpCommand>(track, dialect, Address{3}, jumpRange, jumpBytes);
+  addProbeCommand<ProbeJumpCommand>(track, config, Address{3}, jumpRange, jumpBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -1123,7 +1123,7 @@ Effects executeScheduledProbe(const SourceCommand& command, std::any& programSta
 }
 
 void sequenceVmSchedulesSemanticTracksAgainstOneProgramState() {
-  const SequenceDialect dialect{
+  const SequenceProgramConfig config{
       .timebase = Timebase{.ppqn = 48},
       .behavior = SequenceProgramBehavior{},
   };
@@ -1145,8 +1145,8 @@ void sequenceVmSchedulesSemanticTracksAgainstOneProgramState() {
 
   const SequenceProgram program{
       .runtime = runtime,
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track0, track1},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -1182,7 +1182,7 @@ Effects executeScheduledLoopProbe(const SourceCommand& command, std::any&, std::
 }
 
 void sequenceVmCoordinatesSemanticLoopsAtSequenceScope() {
-  const SequenceDialect dialect{
+  const SequenceProgramConfig config{
       .timebase = Timebase{.ppqn = 48},
       .behavior = SequenceProgramBehavior{},
   };
@@ -1205,8 +1205,8 @@ void sequenceVmCoordinatesSemanticLoopsAtSequenceScope() {
 
   const SequenceProgram program{
       .runtime = runtime,
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track0, track1},
   };
 
@@ -1283,8 +1283,8 @@ TrackProgram playlistProbeTrack(u32 trackId, std::initializer_list<std::pair<u32
   return track;
 }
 
-SequenceDialect playlistProbeDialect() {
-  return SequenceDialect{
+SequenceProgramConfig playlistProbeConfig() {
+  return SequenceProgramConfig{
       .timebase = Timebase{.ppqn = 48},
       .behavior = SequenceProgramBehavior{},
   };
@@ -1299,13 +1299,13 @@ SequenceRuntime playlistProbeRuntime() {
 }
 
 void sequenceVmSwitchesParallelSectionsAtTheFirstChannelEnd() {
-  const SequenceDialect dialect = playlistProbeDialect();
+  const SequenceProgramConfig config = playlistProbeConfig();
   const TrackProgram track0 = playlistProbeTrack(0, {{0, 8}});
   const TrackProgram track1 = playlistProbeTrack(1, {{100, 12}, {110, 4}});
   const SequenceProgram program{
       .runtime = playlistProbeRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track0, track1},
       .sectionPlaylist =
           SectionPlaylist{
@@ -1344,13 +1344,13 @@ void sequenceVmSwitchesParallelSectionsAtTheFirstChannelEnd() {
 }
 
 void sequenceVmExecutesFiniteAndInfiniteSectionPlaylistRepeats() {
-  const SequenceDialect dialect = playlistProbeDialect();
+  const SequenceProgramConfig config = playlistProbeConfig();
   const TrackProgram track = playlistProbeTrack(0, {{0, 4}});
   const auto makeProgram = [&](bool infinite) {
     return SequenceProgram{
         .runtime = playlistProbeRuntime(),
-        .timebase = dialect.timebase,
-        .behavior = dialect.behavior,
+        .timebase = config.timebase,
+        .behavior = config.behavior,
         .tracks = {track},
         .sectionPlaylist =
             SectionPlaylist{
@@ -1392,7 +1392,7 @@ void sequenceVmExecutesFiniteAndInfiniteSectionPlaylistRepeats() {
 }
 
 void sequenceVmPairsNoteOnAndNoteOffCommands() {
-  const SequenceDialect dialect{
+  const SequenceProgramConfig config{
       .timebase = Timebase{.ppqn = 48},
       .behavior = SequenceProgramBehavior{},
   };
@@ -1442,8 +1442,8 @@ void sequenceVmPairsNoteOnAndNoteOffCommands() {
 
   const PerformanceSequence performance = SequenceVm().render(SequenceProgram{
       .runtime = runtime,
-          .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+          .timebase = config.timebase,
+      .behavior = config.behavior,
           .tracks = {track},
   });
   expect(performance.diagnostics.empty(), "Note On/Off pairing should not invent diagnostics for unmatched offs");
@@ -1474,7 +1474,7 @@ void sequenceVmPairsNoteOnAndNoteOffCommands() {
 }
 
 void sequenceVmClosesActiveNotesAtLoopCutoff() {
-  const SequenceDialect dialect{
+  const SequenceProgramConfig config{
       .timebase = Timebase{.ppqn = 48},
       .behavior = SequenceProgramBehavior{},
   };
@@ -1505,8 +1505,8 @@ void sequenceVmClosesActiveNotesAtLoopCutoff() {
 
   const PerformanceSequence performance = SequenceVm().render(SequenceProgram{
       .runtime = runtime,
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {shortTrack, loopTrack},
   });
   const auto* shortNote = std::get_if<NotePerformanceEvent>(&performance.tracks[0].events.front());

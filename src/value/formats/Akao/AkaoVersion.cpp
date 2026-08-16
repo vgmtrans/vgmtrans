@@ -63,7 +63,7 @@ std::string versionName(AkaoPs1Version version) {
   return "unknown";
 }
 
-std::string dialectId(AkaoPs1Version version) {
+std::string commandKindPrefix(AkaoPs1Version version) {
   return "akao-ps1-" + versionName(version);
 }
 

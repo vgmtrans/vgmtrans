@@ -361,7 +361,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end, const TrackLayout& layout,
                                                    std::vector<Diagnostic>* diagnostics) {
-  Cursor cursor(reader, begin, end, kSuzukiPs1DialectId, diagnostics);
+  Cursor cursor(reader, begin, end, kSuzukiPs1CommandKindPrefix, diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
   }
@@ -643,9 +643,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 }  // namespace
 
-const SequenceDialect& suzukiPs1SequenceDialect() {
-  static const SequenceDialect dialect = SequenceDialect{
-      .commandDetailKindPrefix = std::string(kSuzukiPs1DialectId),
+const SequenceProgramConfig& suzukiPs1SequenceConfig() {
+  static const SequenceProgramConfig config = SequenceProgramConfig{
+      .commandDetailKindPrefix = std::string(kSuzukiPs1CommandKindPrefix),
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
           SequenceProgramBehavior{
@@ -654,13 +654,13 @@ const SequenceDialect& suzukiPs1SequenceDialect() {
               .initialLevel = 1.0,
           },
   };
-  return dialect;
+  return config;
 }
 
 SequenceProgram parseSuzukiPs1Sequence(ByteReader reader, AssetId id, const SuzukiPs1SequenceLayout& layout,
                                        const std::vector<SuzukiPs1EnvelopeRegisters>& envelopes,
                                        SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
-  SequenceProgram program = suzukiPs1SequenceDialect().makeProgram();
+  SequenceProgram program = suzukiPs1SequenceConfig().makeProgram();
   RuntimeConfig runtime{.defaultBank = layout.defaultBank};
   for (const auto& envelope : envelopes) {
     runtime.envelopes.emplace((static_cast<u32>(envelope.bank) << 8) | envelope.program,

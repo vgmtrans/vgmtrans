@@ -9,7 +9,7 @@
 #include "value/base/Source.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
-#include "value/sequence/SequenceDialect.h"
+#include "value/sequence/SequenceProgramConfig.h"
 #include "value/synth/PsxAdpcm.h"
 
 #include <optional>
@@ -22,7 +22,7 @@ namespace vgmtrans::formats::sony_ps1 {
 inline constexpr std::string_view kSonyPs1FormatName = "SonyPS1";
 inline constexpr std::string_view kSonyPs1CollectionResolver = "sony-ps1";
 inline constexpr std::string_view kSonyPs1InstrumentDomain = "sony-ps1.instrument";
-inline constexpr std::string_view kSonyPs1DialectId = "sony-ps1:sequence";
+inline constexpr std::string_view kSonyPs1CommandKindPrefix = "sony-ps1:sequence";
 
 [[nodiscard]] inline core::InstrumentIdentity sonyPs1InstrumentIdentity(u16 bank, u8 program) {
   return core::InstrumentIdentity{
@@ -113,7 +113,7 @@ struct SonyPs1ScannedBank {
                                                          const SonyPs1SequenceLayout& layout,
                                                          core::SourceMapBuilder* sourceMap = nullptr,
                                                          std::vector<core::Diagnostic>* diagnostics = nullptr);
-[[nodiscard]] const core::SequenceDialect& sonyPs1SequenceDialect();
+[[nodiscard]] const core::SequenceProgramConfig& sonyPs1SequenceConfig();
 [[nodiscard]] std::vector<core::DesiredCollection> resolveSonyPs1Collections(const core::MatchContext& context);
 [[nodiscard]] core::PreparedCollectionAssets prepareSonyPs1Collection(const core::CollectionPrepareContext& context);
 [[nodiscard]] core::FormatModule sonyPs1Module();

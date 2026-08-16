@@ -46,11 +46,11 @@ void byteReaderChecksBoundsAndEndian() {
 }
 
 void sourceCommandsRetainOnlySemanticData() {
-  const SequenceDialect dialect = probeSequenceDialect();
+  const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{.startAddress = Address{0}};
   const std::array<u8, 2> programBytes{0x80, 0x05};
   const SourceRange range = probeRange(0, programBytes.size());
-  const CommandId commandId = addProbeCommand<ProbeProgramCommand>(track, dialect, Address{0}, range, programBytes);
+  const CommandId commandId = addProbeCommand<ProbeProgramCommand>(track, config, Address{0}, range, programBytes);
   const SourceCommand& command = track.commands.at(commandId.value);
 
   expect(track.commands.size() == 1, "track should append one source command");

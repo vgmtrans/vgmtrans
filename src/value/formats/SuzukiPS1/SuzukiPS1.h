@@ -9,7 +9,7 @@
 #include "value/base/Source.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
-#include "value/sequence/SequenceDialect.h"
+#include "value/sequence/SequenceProgramConfig.h"
 
 #include <optional>
 #include <string>
@@ -20,7 +20,7 @@ namespace vgmtrans::formats::suzuki_ps1 {
 
 inline constexpr std::string_view kSuzukiPs1FormatName = "SuzukiPS1";
 inline constexpr std::string_view kSuzukiPs1InstrumentDomain = "suzuki-ps1.instrument";
-inline constexpr std::string_view kSuzukiPs1DialectId = "suzuki-ps1:sequence";
+inline constexpr std::string_view kSuzukiPs1CommandKindPrefix = "suzuki-ps1:sequence";
 
 [[nodiscard]] inline core::InstrumentIdentity suzukiPs1InstrumentIdentity(u16 bank, u8 program) {
   return core::InstrumentIdentity{
@@ -82,7 +82,7 @@ struct SuzukiPs1ScannedBank {
     core::ByteReader reader, core::AssetId id, const SuzukiPs1SequenceLayout& layout,
     const std::vector<SuzukiPs1EnvelopeRegisters>& envelopes = {}, core::SourceMapBuilder* sourceMap = nullptr,
     std::vector<core::Diagnostic>* diagnostics = nullptr);
-[[nodiscard]] const core::SequenceDialect& suzukiPs1SequenceDialect();
+[[nodiscard]] const core::SequenceProgramConfig& suzukiPs1SequenceConfig();
 [[nodiscard]] core::FormatModule suzukiPs1Module();
 
 }  // namespace vgmtrans::formats::suzuki_ps1

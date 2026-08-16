@@ -198,8 +198,8 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
   }
 }
 
-SequenceDialect compilerProbeDialect() {
-  return SequenceDialect{
+SequenceProgramConfig compilerProbeConfig() {
+  return SequenceProgramConfig{
       .timebase = Timebase{.ppqn = 48},
       .behavior =
           SequenceProgramBehavior{
@@ -251,11 +251,11 @@ void compilerCursorCompilesAndExecutesTypedCommands() {
              sourceMap.get(annotations[6]).playbackStatus == CommandPlaybackStatus::SourceOnly,
          "compiled behavior should promote source-only presentation unless the event is explicitly ignored");
 
-  const SequenceDialect dialect = compilerProbeDialect();
+  const SequenceProgramConfig config = compilerProbeConfig();
   const SequenceProgram program{
       .runtime = compilerProbeRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -305,11 +305,11 @@ void compilerCursorCompilesControlFlow() {
              jumpDestination != nullptr && jumpDestination->role == SemanticOperandRole::JumpTarget,
          "target roles declared at operand creation should remain attached to the exact operands");
 
-  const SequenceDialect dialect = compilerProbeDialect();
+  const SequenceProgramConfig config = compilerProbeConfig();
   const SequenceProgram program{
       .runtime = compilerProbeRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -331,11 +331,11 @@ void compilerCursorCompilesRepeatsAndConditionalFields() {
   const SemanticOperand* repeatDestination = semanticOperand(track.commands[1], "destination");
   expect(repeatDestination != nullptr && repeatDestination->role == SemanticOperandRole::RepeatTarget,
          "compiled repeats should annotate their destination without a duplicate read-time role");
-  const SequenceDialect dialect = compilerProbeDialect();
+  const SequenceProgramConfig config = compilerProbeConfig();
   const SequenceProgram program{
       .runtime = compilerProbeRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -362,11 +362,11 @@ void compilerCursorComposesOperationsIntoOneBody() {
   expect(track.commands.size() == 6 && track.commands[0].execution.valid() && track.commands[2].execution.valid(),
          "chained and separate compiler-cursor calls should compose into one command body");
 
-  const SequenceDialect dialect = compilerProbeDialect();
+  const SequenceProgramConfig config = compilerProbeConfig();
   const SequenceProgram program{
       .runtime = compilerProbeRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -389,11 +389,11 @@ void compilerCursorReadsRuntimeStateInsideCommandBody() {
   expect(track.commands.size() == 3 && track.commands[0].execution.valid(),
          "runtime-state fixture should compile its related effects into one body");
 
-  const SequenceDialect dialect = compilerProbeDialect();
+  const SequenceProgramConfig config = compilerProbeConfig();
   const SequenceProgram program{
       .runtime = compilerProbeRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
   const PerformanceSequence performance = SequenceVm().render(program);
@@ -410,11 +410,11 @@ void compilerCursorExecutesEligibleCommandsDuringWaits() {
   const auto render = [](std::initializer_list<u8> bytes) {
     const std::vector<u8> source(bytes);
     const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{16}, source), static_cast<u32>(source.size()));
-    const SequenceDialect dialect = compilerProbeDialect();
+    const SequenceProgramConfig config = compilerProbeConfig();
     const SequenceProgram program{
         .runtime = compilerProbeRuntime(),
-        .timebase = dialect.timebase,
-        .behavior = dialect.behavior,
+        .timebase = config.timebase,
+        .behavior = config.behavior,
         .tracks = {track},
     };
     return std::pair{track, SequenceVm().render(program)};
@@ -498,11 +498,11 @@ void compilerCursorRejectsConflictingComposedFlow() {
   const SourceMap sourceMap = sourceMapBuilder.finish();
   expect(sourceMap.get(track.commands[0].annotation).playbackStatus == CommandPlaybackStatus::AffectsControlFlow,
          "runtime-selected flow should be classified as control flow without a separate annotation call");
-  const SequenceDialect dialect = compilerProbeDialect();
+  const SequenceProgramConfig config = compilerProbeConfig();
   const SequenceProgram program{
       .runtime = compilerProbeRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -518,11 +518,11 @@ void compilerCursorRejectsConflictingComposedFlow() {
 void compilerCursorAnalysisStopsAfterItsScheduledPrepass() {
   const std::vector<u8> bytes{0x21, 0xff};
   const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{15}, bytes), static_cast<u32>(bytes.size()));
-  const SequenceDialect dialect = compilerProbeDialect();
+  const SequenceProgramConfig config = compilerProbeConfig();
   const SequenceProgram program{
       .runtime = makeCompiledRuntime<ProbeCursor, CompilerPrepassProgramState>(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -534,11 +534,11 @@ void compilerCursorAnalysisStopsAfterItsScheduledPrepass() {
 void compilerCursorAnalysisReportsPrepassDiagnostics() {
   const std::vector<u8> bytes{0x60, 0x00, 0x20};
   const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{16}, bytes), static_cast<u32>(bytes.size()));
-  const SequenceDialect dialect = compilerProbeDialect();
+  const SequenceProgramConfig config = compilerProbeConfig();
   const SequenceProgram program{
       .runtime = makeCompiledRuntime<ProbeCursor, CompilerPrepassProgramState>(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   };
 
@@ -567,11 +567,11 @@ void trackDecodeSessionOrdersExceptionalWalkerCommands() {
              track.commands[1].address.value == 2,
          "track decode session should retain the first command per address and order commands by source address");
 
-  const SequenceDialect dialect = compilerProbeDialect();
+  const SequenceProgramConfig config = compilerProbeConfig();
   const PerformanceSequence performance = SequenceVm().render(SequenceProgram{
       .runtime = compilerProbeRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {track},
   });
   expect(performance.diagnostics.empty() && performance.tracks[0].events.size() == 1 &&

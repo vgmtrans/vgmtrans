@@ -9,7 +9,7 @@
 #include "value/base/Source.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
-#include "value/sequence/SequenceDialect.h"
+#include "value/sequence/SequenceProgramConfig.h"
 
 #include <optional>
 #include <string_view>
@@ -78,7 +78,7 @@ struct SequenceParse {
 [[nodiscard]] SequenceParse decodeSequence(core::ByteReader reader, const Layout& layout, core::AssetId sequenceId,
                                            core::SourceMapBuilder* sourceMap = nullptr,
                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
-[[nodiscard]] const core::SequenceDialect& sequenceDialect();
+[[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
 [[nodiscard]] core::SequenceRuntime sequenceRuntime(Profile profile, u8 initialTempo, u8 initialTimer,
                                                     bool monoOutput = false);
 [[nodiscard]] std::optional<core::ScanSynthRefs> addSynth(core::ScanResultBuilder& builder, const Layout& layout,

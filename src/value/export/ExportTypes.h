@@ -54,7 +54,7 @@ enum class MidiWideTuningRendering {
 
 struct MidiExportOptions {
   // Auto follows neutral source quantization when available, then falls back
-  // to the legacy precision hint used by unmigrated dialects.
+  // to the legacy precision hint used by unmigrated formats.
   MidiLevelResolution volumeResolution = MidiLevelResolution::Auto;
   MidiLevelResolution expressionResolution = MidiLevelResolution::Auto;
   bool skipChannel10 = true;

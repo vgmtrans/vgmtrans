@@ -953,8 +953,8 @@ struct ParsedHeader {
 
 }  // namespace
 
-const SequenceDialect& sequenceDialect() {
-  static const SequenceDialect dialect{
+const SequenceProgramConfig& sequenceConfig() {
+  static const SequenceProgramConfig config{
       .commandDetailKindPrefix = "suzuki-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior = SequenceProgramBehavior{
@@ -964,7 +964,7 @@ const SequenceDialect& sequenceDialect() {
           .initialMonoModeChannels = 0,
       },
   };
-  return dialect;
+  return config;
 }
 
 SequenceRuntime sequenceRuntime(Version version) {
@@ -982,7 +982,7 @@ TrackProgram decodeSourceTrack(ByteReader reader, Version version, u32 trackNumb
 SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
                              std::vector<Diagnostic>* diagnostics) {
   ParsedHeader header = parseHeader(reader, layout);
-  SequenceDecodeSession sequence{reader, sequenceDialect(), sequenceId, header.range, sourceMap, 32768};
+  SequenceDecodeSession sequence{reader, sequenceConfig(), sequenceId, header.range, sourceMap, 32768};
   for (u32 track = 0; track < kTrackCount; ++track) {
     const u32 pointer = header.pointerTable + track * 2;
     const u16 start = reader.le16(pointer);

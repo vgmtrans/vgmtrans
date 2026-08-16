@@ -129,11 +129,11 @@ private:
 };
 
 PerformanceSequence render(Version version, std::vector<u8> bytes) {
-  const SequenceDialect& dialect = sequenceDialect();
+  const SequenceProgramConfig& config = sequenceConfig();
   SequenceProgram program{
       .runtime = sequenceRuntime(),
-      .timebase = dialect.timebase,
-      .behavior = dialect.behavior,
+      .timebase = config.timebase,
+      .behavior = config.behavior,
       .tracks = {decodeSourceTrack(ByteReader(SourceId{181}, bytes), version, 0, 0, 0)},
   };
   return SequenceVm(LoopPolicy::PlayOnce).render(program);

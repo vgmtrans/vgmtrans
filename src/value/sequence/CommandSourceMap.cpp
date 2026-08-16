@@ -7,7 +7,7 @@
 #include "value/sequence/CommandSourceMap.h"
 
 #include "value/model/SourceMap.h"
-#include "value/sequence/SequenceDialect.h"
+#include "value/sequence/SequenceProgramConfig.h"
 
 #include <algorithm>
 #include <limits>
@@ -212,7 +212,7 @@ TrackProgram TrackDecodeSession::finish() {
   return track;
 }
 
-SequenceDecodeSession::SequenceDecodeSession(ByteReader reader, const SequenceDialect& dialect,
+SequenceDecodeSession::SequenceDecodeSession(ByteReader reader, const SequenceProgramConfig& config,
                                              AssetId sequenceAsset, SourceRange headerRange,
                                              SourceMapBuilder* sourceMap, u32 maxTrackCommands, u32 bytecodeEnd)
     : tracks_{
@@ -222,7 +222,7 @@ SequenceDecodeSession::SequenceDecodeSession(ByteReader reader, const SequenceDi
           .sequenceAsset = sequenceAsset,
           .sourceMap = sourceMap,
       },
-      program_(dialect.makeProgram()), sourceKindPrefix_(dialect.commandDetailKindPrefix) {
+      program_(config.makeProgram()), sourceKindPrefix_(config.commandDetailKindPrefix) {
   if (tracks_.sourceMap == nullptr) {
     return;
   }

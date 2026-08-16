@@ -1797,8 +1797,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   return session.finish();
 }
 
-[[nodiscard]] SequenceDialect makeDialect() {
-  return SequenceDialect{
+[[nodiscard]] SequenceProgramConfig makeSequenceConfig() {
+  return SequenceProgramConfig{
       .commandDetailKindPrefix = "rare-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
@@ -1814,9 +1814,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 }  // namespace
 
-const SequenceDialect& sequenceDialect() {
-  static const SequenceDialect dialect = makeDialect();
-  return dialect;
+const SequenceProgramConfig& sequenceConfig() {
+  static const SequenceProgramConfig config = makeSequenceConfig();
+  return config;
 }
 
 SequenceRuntime sequenceRuntime(Profile profile, u8 initialTempo, u8 initialTimer, bool monoOutput) {
@@ -1837,14 +1837,14 @@ TrackProgram decodeSourceTrack(ByteReader reader, Profile profile, u32 trackNumb
 
 SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
                              std::vector<Diagnostic>* diagnostics) {
-  const auto& dialect = sequenceDialect();
+  const auto& config = sequenceConfig();
   const u32 sequenceDataFloor =
       std::max<u32>(layout.sequenceHeaderAddress + static_cast<u32>(layout.trackStarts.size()) * 2 + 2, 1);
 
   // SequenceDecodeSession owns the standard header/pointer source hierarchy.
   // Stateful Rare durations require the small custom track walker above, so
   // build an equivalent program and project each track through its shared scope.
-  SequenceProgram program = dialect.makeProgram();
+  SequenceProgram program = config.makeProgram();
   RuntimeConfig runtime{
       .profile = layout.profile,
       .initialTempo = layout.initialTempo,

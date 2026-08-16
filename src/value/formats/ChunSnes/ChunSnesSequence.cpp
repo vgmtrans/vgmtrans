@@ -986,8 +986,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 }  // namespace
 
-const SequenceDialect& sequenceDialect() {
-  static const SequenceDialect dialect = SequenceDialect{
+const SequenceProgramConfig& sequenceConfig() {
+  static const SequenceProgramConfig config = SequenceProgramConfig{
       .commandDetailKindPrefix = "chun-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
@@ -1000,14 +1000,14 @@ const SequenceDialect& sequenceDialect() {
               .initialMonoModeChannels = 0,
           },
   };
-  return dialect;
+  return config;
 }
 
 SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
                              std::vector<Diagnostic>* diagnostics) {
   const u32 headerSize = 2 + reader.u8At(layout.sequenceHeaderAddress + 1) * 2;
   const SourceRange headerRange = reader.range(layout.sequenceHeaderAddress, headerSize);
-  SequenceDecodeSession sequence{reader, sequenceDialect(), sequenceId, headerRange, sourceMap, 32768};
+  SequenceDecodeSession sequence{reader, sequenceConfig(), sequenceId, headerRange, sourceMap, 32768};
   const u8 tracks = reader.u8At(layout.sequenceHeaderAddress + 1);
   for (u32 track = 0; track < tracks; ++track) {
     const u32 pointer = layout.sequenceHeaderAddress + 2 + track * 2;

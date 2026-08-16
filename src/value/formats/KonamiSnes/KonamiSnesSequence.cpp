@@ -1596,9 +1596,9 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
   }
 }
 
-[[nodiscard]] SequenceDialect makeDialect(KonamiSnesVersion version) {
+[[nodiscard]] SequenceProgramConfig makeSequenceConfig(KonamiSnesVersion version) {
   const PanGains initialBalance = panGains(version, version <= KONAMISNES_V2 ? 10 : 20);
-  return SequenceDialect{
+  return SequenceProgramConfig{
       .commandDetailKindPrefix = "konami-snes",
       .timebase = Timebase{.ppqn = kKonamiSnesPpqn},
       .behavior =
@@ -1616,14 +1616,14 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
 
 }  // namespace
 
-const SequenceDialect& konamiSnesSequenceDialect(KonamiSnesVersion version) {
-  static const SequenceDialect none = makeDialect(KONAMISNES_NONE);
-  static const SequenceDialect v1 = makeDialect(KONAMISNES_V1);
-  static const SequenceDialect v2 = makeDialect(KONAMISNES_V2);
-  static const SequenceDialect v3 = makeDialect(KONAMISNES_V3);
-  static const SequenceDialect v4 = makeDialect(KONAMISNES_V4);
-  static const SequenceDialect v5 = makeDialect(KONAMISNES_V5);
-  static const SequenceDialect v6 = makeDialect(KONAMISNES_V6);
+const SequenceProgramConfig& konamiSnesSequenceConfig(KonamiSnesVersion version) {
+  static const SequenceProgramConfig none = makeSequenceConfig(KONAMISNES_NONE);
+  static const SequenceProgramConfig v1 = makeSequenceConfig(KONAMISNES_V1);
+  static const SequenceProgramConfig v2 = makeSequenceConfig(KONAMISNES_V2);
+  static const SequenceProgramConfig v3 = makeSequenceConfig(KONAMISNES_V3);
+  static const SequenceProgramConfig v4 = makeSequenceConfig(KONAMISNES_V4);
+  static const SequenceProgramConfig v5 = makeSequenceConfig(KONAMISNES_V5);
+  static const SequenceProgramConfig v6 = makeSequenceConfig(KONAMISNES_V6);
   switch (version) {
     case KONAMISNES_V1:
       return v1;
@@ -1692,9 +1692,9 @@ SequenceProgram decodeKonamiSnesSequence(ByteReader reader, const KonamiSnesLayo
   const SourceRange headerRange = konamiSnesSequenceHeaderRange(reader, layout);
   const u32 trackCount = headerRange.size / 2;
 
-  const auto& dialect = konamiSnesSequenceDialect(layout.version);
+  const auto& config = konamiSnesSequenceConfig(layout.version);
   SequenceDecodeSession sequence{
-      reader, dialect, sequenceId, headerRange, sourceMap, kMaxTrackCommands,
+      reader, config, sequenceId, headerRange, sourceMap, kMaxTrackCommands,
   };
   const auto decode = [&](u32 offset) { return decodeCommand(reader, offset, layout.version, diagnostics); };
   for (u32 trackNumber = 0; trackNumber < trackCount; ++trackNumber) {

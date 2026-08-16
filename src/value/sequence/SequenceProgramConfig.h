@@ -12,12 +12,12 @@
 
 namespace vgmtrans::core {
 
-struct SequenceDialect {
+struct SequenceProgramConfig {
   std::string commandDetailKindPrefix;
   Timebase timebase;
   SequenceProgramBehavior behavior;
 
-  // Start a program with this dialect's timebase and playback behavior. The
+  // Start a program with this configuration's timebase and playback behavior. The
   // parser attaches its complete, program-specific runtime before publishing.
   [[nodiscard]] SequenceProgram makeProgram() const {
     return SequenceProgram{

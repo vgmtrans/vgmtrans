@@ -9,7 +9,7 @@
 #include "value/base/Source.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
-#include "value/sequence/SequenceDialect.h"
+#include "value/sequence/SequenceProgramConfig.h"
 
 #include <array>
 #include <map>
@@ -105,7 +105,7 @@ struct KonamiArcadeLayout {
 [[nodiscard]] std::optional<KonamiArcadeLayout> findKonamiArcadeLayout(
     const core::SourceFile& source, core::ByteReader reader, std::vector<core::Diagnostic>* diagnostics = nullptr);
 
-[[nodiscard]] const core::SequenceDialect& konamiArcadeSequenceDialect();
+[[nodiscard]] const core::SequenceProgramConfig& konamiArcadeSequenceConfig();
 [[nodiscard]] core::SequenceProgram decodeKonamiArcadeSequence(core::ByteReader reader,
                                                                const KonamiArcadeLayout& layout,
                                                                const KonamiArcadeSequenceLayout& sequence,

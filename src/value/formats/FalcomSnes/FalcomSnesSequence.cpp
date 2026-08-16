@@ -740,8 +740,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 }  // namespace
 
-const SequenceDialect& sequenceDialect() {
-  static const SequenceDialect dialect{
+const SequenceProgramConfig& sequenceConfig() {
+  static const SequenceProgramConfig config{
       .commandDetailKindPrefix = "falcom-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
@@ -757,7 +757,7 @@ const SequenceDialect& sequenceDialect() {
               .initialTempoMicrosecondsPerQuarter = math::tempoMicroseconds(kDefaultTempo),
           },
   };
-  return dialect;
+  return config;
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, u32 trackNumber, u32 startAddress,
@@ -774,7 +774,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   std::array<u8, 7> durations;
   std::ranges::copy(reader.slice(layout.sequenceHeaderAddress + 0x18, durations.size()), durations.begin());
   std::set<u8> programs{0};
-  SequenceDecodeSession sequence{reader, sequenceDialect(), sequenceId, header, sourceMap, kCommandLimit, kAramSize};
+  SequenceDecodeSession sequence{reader, sequenceConfig(), sequenceId, header, sourceMap, kCommandLimit, kAramSize};
   for (u32 track = 0; track < kTrackCount; ++track) {
     if (!layout.trackStarts[track]) {
       continue;

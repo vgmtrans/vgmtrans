@@ -9,7 +9,7 @@
 #include "value/base/Source.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
-#include "value/sequence/SequenceDialect.h"
+#include "value/sequence/SequenceProgramConfig.h"
 
 #include <optional>
 #include <string_view>
@@ -52,7 +52,7 @@ struct CapcomSnesInstrumentInfo {
 
 [[nodiscard]] std::optional<CapcomSnesLayout> findCapcomSnesLayout(core::ByteReader reader);
 
-[[nodiscard]] const core::SequenceDialect& capcomSnesSequenceDialect();
+[[nodiscard]] const core::SequenceProgramConfig& capcomSnesSequenceConfig();
 [[nodiscard]] core::SequenceRuntime capcomSnesSequenceRuntime(CapcomSnesEngineVersion version);
 
 // Focused seam for command-decoder tests. Whole-format parsing uses one shared
