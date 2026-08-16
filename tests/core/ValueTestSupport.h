@@ -859,6 +859,25 @@ using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
   };
 }
 
+CommandId appendTestCommand(TrackProgram& track, Address address, u8 opcode, SourceRange range,
+                            std::vector<SemanticOperand> operands, CommandFlow flow, SourceAnnotationId annotation = {},
+                            CommandExecution execution = {}, SequenceSemantic semantic = SequenceSemantic::Unknown) {
+  expect(track.commands.empty() || track.commands.back().address.value < address.value,
+         "test commands must be appended in increasing source-address order");
+  const CommandId id{static_cast<u32>(track.commands.size())};
+  track.commands.push_back(SourceCommand{
+      .opcode = opcode,
+      .address = address,
+      .range = range,
+      .annotation = annotation,
+      .semantic = semantic,
+      .operands = std::move(operands),
+      .flow = std::move(flow),
+      .execution = std::move(execution),
+  });
+  return id;
+}
+
 template <class Command, size_t Size>
 CommandId addProbeCommand(TrackProgram& track, const SequenceDialect& dialect, Address address, SourceRange range,
                           const std::array<u8, Size>& bytes) {
@@ -870,8 +889,8 @@ CommandId addProbeCommand(TrackProgram& track, const SequenceDialect& dialect, A
   // at its fixture address. Rebase only its physical continuation; encoded
   // flow destinations already use the fixture's track address space.
   decoded.flow.continuation.value += address.value;
-  return track.addCommand(address, decoded.opcode, range, std::move(decoded.operands),
-                          std::move(decoded.flow), decoded.annotation, std::move(decoded.execution));
+  return appendTestCommand(track, address, decoded.opcode, range, std::move(decoded.operands), std::move(decoded.flow),
+                           {}, std::move(decoded.execution));
 }
 
 [[nodiscard]] size_t countProbeNotesAt(const PerformanceTrack& track, u64 tick) {

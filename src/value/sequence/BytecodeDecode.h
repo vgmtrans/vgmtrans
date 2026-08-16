@@ -18,11 +18,8 @@
 
 namespace vgmtrans::core {
 
-class SourceMapBuilder;
-
-// Presentation is transient decode output. The durable command keeps semantic
-// operands and an annotation ID; this metadata lets one shared projector build
-// the annotation without teaching format execution about SourceMapBuilder.
+// Presentation is transient decode output used by one shared projector to build
+// source annotations without teaching format execution about SourceMapBuilder.
 struct DecodedCommandPresentation {
   std::string label;
   std::string localKind;
@@ -35,7 +32,6 @@ struct DecodedCommandPresentation {
 // TrackProgram retains the final source-command snapshot.
 struct DecodedBytecodeCommand {
   SourceRange range;
-  SourceAnnotationId annotation;
   u8 opcode = 0;
   CommandFlow flow;
   std::vector<SemanticOperand> operands;

@@ -9,7 +9,6 @@
 #include "value/base/Source.h"
 
 #include <algorithm>
-#include <stdexcept>
 #include <type_traits>
 #include <utility>
 
@@ -72,28 +71,6 @@ SourceValue semanticOperandSourceValue(const SemanticOperandValue& value) {
         }
       },
       value);
-}
-
-CommandId TrackProgram::addCommand(Address address, u8 opcode, SourceRange range,
-                                   std::vector<SemanticOperand> operands, CommandFlow flow,
-                                   SourceAnnotationId annotation, CommandExecution execution,
-                                   SequenceSemantic semantic) {
-  if (!commands.empty() && commands.back().address.value >= address.value) {
-    throw std::invalid_argument("Sequence commands must be appended in increasing source-address order");
-  }
-
-  const auto commandIndex = static_cast<u32>(commands.size());
-  commands.push_back(SourceCommand{
-      .opcode = opcode,
-      .address = address,
-      .range = range,
-      .annotation = annotation,
-      .semantic = semantic,
-      .operands = std::move(operands),
-      .flow = std::move(flow),
-      .execution = std::move(execution),
-  });
-  return CommandId{commandIndex};
 }
 
 }  // namespace vgmtrans::core

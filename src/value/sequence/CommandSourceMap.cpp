@@ -119,10 +119,9 @@ void projectOperand(AnnotationBuilder& annotation, const SemanticOperand& operan
   }
 }
 
-}  // namespace
-
-SourceAnnotationId projectDecodedCommand(SourceMapBuilder* sourceMap, const DecodedBytecodeCommand& command,
-                                         std::optional<SourceAnnotationId> parent) {
+[[nodiscard]] SourceAnnotationId projectDecodedCommand(SourceMapBuilder* sourceMap,
+                                                       const DecodedBytecodeCommand& command,
+                                                       std::optional<SourceAnnotationId> parent) {
   if (sourceMap == nullptr || !command.range.valid()) {
     return {};
   }
@@ -168,6 +167,8 @@ SourceAnnotationId projectDecodedCommand(SourceMapBuilder* sourceMap, const Deco
   return annotation.id();
 }
 
+}  // namespace
+
 TrackDecodeSession::TrackDecodeSession(ByteReader reader, u32 trackIndex, u32 startOffset,
                                        std::optional<AssetId> sequenceAsset,
                                        std::optional<SourceAnnotationId> parentAnnotation, SourceMapBuilder* sourceMap,
@@ -192,13 +193,20 @@ TrackProgram TrackDecodeSession::finish() {
       .startAddress = Address{startOffset_},
   };
   for (auto& [offset, decoded] : commands_) {
-    decoded.annotation = projectDecodedCommand(sourceMap_, decoded, commandParent_);
-    if (sourceMap_ != nullptr && decoded.annotation.valid() && rootSequenceAsset_) {
-      AnnotationBuilder{*sourceMap_, decoded.annotation}.owner(ObjectRefs::sequence(*rootSequenceAsset_));
+    const SourceAnnotationId annotation = projectDecodedCommand(sourceMap_, decoded, commandParent_);
+    if (sourceMap_ != nullptr && annotation.valid() && rootSequenceAsset_) {
+      AnnotationBuilder{*sourceMap_, annotation}.owner(ObjectRefs::sequence(*rootSequenceAsset_));
     }
-    const SequenceSemantic semantic = decoded.presentation.semantic;
-    track.addCommand(Address{offset}, decoded.opcode, decoded.range, std::move(decoded.operands),
-                     std::move(decoded.flow), decoded.annotation, std::move(decoded.execution), semantic);
+    track.commands.push_back(SourceCommand{
+        .opcode = decoded.opcode,
+        .address = Address{offset},
+        .range = decoded.range,
+        .annotation = annotation,
+        .semantic = decoded.presentation.semantic,
+        .operands = std::move(decoded.operands),
+        .flow = std::move(decoded.flow),
+        .execution = std::move(decoded.execution),
+    });
   }
   finishTrackAnnotation(reader_, startOffset_, sourceMap_, annotation_, track);
   return track;

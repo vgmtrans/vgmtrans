@@ -80,37 +80,6 @@ void sequenceSourceRangeIncludesDecodedCommandsFromTheBaseSource() {
          "sequence source range should span its base range and same-source decoded commands only");
 }
 
-void trackProgramRejectsUnorderedCommandAddresses() {
-  const SequenceDialect dialect = probeSequenceDialect();
-  TrackProgram track{.startAddress = Address{0}};
-
-  const std::array<u8, 2> programBytes{0x80, 0x05};
-  addProbeCommand<ProbeProgramCommand>(track, dialect, Address{0}, probeRange(0, programBytes.size()), programBytes);
-
-  bool rejectedDuplicateAddress = false;
-  try {
-    static_cast<void>(addProbeCommand<ProbeProgramCommand>(track, dialect, Address{0},
-                                                           probeRange(2, programBytes.size()), programBytes));
-  } catch (const std::invalid_argument&) {
-    rejectedDuplicateAddress = true;
-  }
-  expect(rejectedDuplicateAddress, "track should reject duplicate source command addresses");
-  expect(track.commands.size() == 1, "duplicate-address rejection should not mutate the track program");
-
-  TrackProgram descending{.startAddress = Address{1}};
-  addProbeCommand<ProbeProgramCommand>(descending, dialect, Address{1}, probeRange(1, programBytes.size()),
-                                       programBytes);
-  bool rejectedDescendingAddress = false;
-  try {
-    static_cast<void>(addProbeCommand<ProbeProgramCommand>(descending, dialect, Address{0},
-                                                            probeRange(0, programBytes.size()), programBytes));
-  } catch (const std::invalid_argument&) {
-    rejectedDescendingAddress = true;
-  }
-  expect(rejectedDescendingAddress, "track should enforce increasing source command addresses");
-  expect(descending.commands.size() == 1, "descending-address rejection should not mutate the track program");
-}
-
 void collectionIssuesDeriveResolutionIndependentlyFromFreshness() {
   const CollectionIssue missingSequence = missingSequenceIssue();
   expect(missingSequence.impact == CollectionIssueImpact::Incomplete && missingSequence.severity == Severity::Warning &&
@@ -429,7 +398,6 @@ void runValueSequenceModelTests() {
   byteReaderChecksBoundsAndEndian();
   sourceCommandsRetainOnlySemanticData();
   sequenceSourceRangeIncludesDecodedCommandsFromTheBaseSource();
-  trackProgramRejectsUnorderedCommandAddresses();
   collectionIssuesDeriveResolutionIndependentlyFromFreshness();
   performanceAutomationRetainsIntentAlongsideOneEventTimeline();
   performanceEmitterBindsScalarAutomationWithoutExposingStorage();
