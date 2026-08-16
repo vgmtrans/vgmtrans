@@ -2290,7 +2290,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   }
   program.runtime = makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime));
 
-  SequenceRecipes recipes = analyzeCompiledProgram<ProgramState>(program, &ProgramState::recipes);
+  SequenceRecipes recipes = analyzeCompiledProgram<ProgramState>(program, &ProgramState::recipes, diagnostics);
   return SequenceParse{
       .program = std::move(program),
       .recipes = std::move(recipes),

@@ -32,7 +32,8 @@ struct ActiveNoteState {
 class RepeatState;
 struct VmApiAccess;
 struct VmTrackRuntime;
-[[nodiscard]] std::any analyzeSequenceProgram(const SequenceVm& vm, const SequenceProgram& program);
+[[nodiscard]] std::any analyzeSequenceProgram(const SequenceVm& vm, const SequenceProgram& program,
+                                              std::vector<Diagnostic>* diagnostics);
 }  // namespace detail
 
 struct BranchResult {
@@ -384,7 +385,8 @@ public:
   [[nodiscard]] PerformanceSequence render(const SequenceProgram& program) const;
 
 private:
-  friend std::any detail::analyzeSequenceProgram(const SequenceVm&, const SequenceProgram&);
+  friend std::any detail::analyzeSequenceProgram(const SequenceVm&, const SequenceProgram&,
+                                                 std::vector<Diagnostic>*);
 
   [[nodiscard]] PerformanceSequence renderImpl(const SequenceProgram& program, std::any* analyzedProgramState) const;
 

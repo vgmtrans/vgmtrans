@@ -227,8 +227,9 @@ template <class Cursor, class ProgramState = EmptyCompiledProgramState, class Co
 // format-facing projector remains fully typed; only this adapter touches any.
 template <class ProgramState, class Project>
 [[nodiscard]] std::remove_cvref_t<std::invoke_result_t<Project&, const ProgramState&>> analyzeCompiledProgram(
-    const SequenceProgram& program, Project project, SequenceVmOptions options = {}) {
-  const std::any state = detail::analyzeSequenceProgram(SequenceVm(options), program);
+    const SequenceProgram& program, Project project, std::vector<Diagnostic>* diagnostics = nullptr,
+    SequenceVmOptions options = {}) {
+  const std::any state = detail::analyzeSequenceProgram(SequenceVm(options), program, diagnostics);
   return std::invoke(project, std::any_cast<const ProgramState&>(state));
 }
 

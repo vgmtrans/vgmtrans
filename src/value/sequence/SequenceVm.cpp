@@ -1117,6 +1117,9 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, std::
           .initialTempoMicrosecondsPerQuarter = behavior.initialTempoMicrosecondsPerQuarter,
       };
       prepass.tracks = renderSemanticPass(prepass, programState);
+      if (analyzedProgramState != nullptr) {
+        sequence.diagnostics = std::move(prepass.diagnostics);
+      }
       runtime.finishPrepass(programState);
     }
     if (analyzedProgramState != nullptr) {
@@ -1129,6 +1132,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, std::
             .initialTempoMicrosecondsPerQuarter = behavior.initialTempoMicrosecondsPerQuarter,
         };
         analysis.tracks = renderSemanticPass(analysis, programState);
+        sequence.diagnostics = std::move(analysis.diagnostics);
       }
       *analyzedProgramState = std::move(programState);
       return sequence;
@@ -1145,9 +1149,13 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, std::
   return sequence;
 }
 
-std::any detail::analyzeSequenceProgram(const SequenceVm& vm, const SequenceProgram& program) {
+std::any detail::analyzeSequenceProgram(const SequenceVm& vm, const SequenceProgram& program,
+                                        std::vector<Diagnostic>* diagnostics) {
   std::any state;
-  static_cast<void>(vm.renderImpl(program, &state));
+  const PerformanceSequence analysis = vm.renderImpl(program, &state);
+  if (diagnostics != nullptr) {
+    diagnostics->insert(diagnostics->end(), analysis.diagnostics.begin(), analysis.diagnostics.end());
+  }
   return state;
 }
 

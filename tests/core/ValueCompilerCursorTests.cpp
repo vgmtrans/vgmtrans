@@ -531,6 +531,24 @@ void compilerCursorAnalysisStopsAfterItsScheduledPrepass() {
   expect(executed == 2, "compiled analysis should not execute a discarded output pass after its scheduled prepass");
 }
 
+void compilerCursorAnalysisReportsPrepassDiagnostics() {
+  const std::vector<u8> bytes{0x60, 0x00, 0x20};
+  const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{16}, bytes), static_cast<u32>(bytes.size()));
+  const SequenceDialect dialect = compilerProbeDialect();
+  const SequenceProgram program{
+      .runtime = makeCompiledRuntime<ProbeCursor, CompilerPrepassProgramState>(),
+      .timebase = dialect.timebase,
+      .behavior = dialect.behavior,
+      .tracks = {track},
+  };
+
+  std::vector<Diagnostic> diagnostics;
+  static_cast<void>(analyzeCompiledProgram<CompilerPrepassProgramState>(
+      program, &CompilerPrepassProgramState::executedCommands, &diagnostics));
+  expect(diagnostics.size() == 1 && diagnostics.front().message == "Sequence jump target $0020 was not decoded",
+         "compiled analysis should preserve diagnostics from its discarded prepass");
+}
+
 void trackDecodeSessionOrdersExceptionalWalkerCommands() {
   const std::vector<u8> bytes{0x40, 0x01, 0xff};
   const u32 end = static_cast<u32>(bytes.size());
@@ -610,6 +628,7 @@ void runValueCompilerCursorTests() {
   compilerCursorRejectsConflictingDefaultFlowDeclarations();
   compilerCursorRejectsConflictingComposedFlow();
   compilerCursorAnalysisStopsAfterItsScheduledPrepass();
+  compilerCursorAnalysisReportsPrepassDiagnostics();
   trackDecodeSessionOrdersExceptionalWalkerCommands();
   trackDecodeSourceHierarchyDistinguishesTrackedAndTracklessFormats();
 }
