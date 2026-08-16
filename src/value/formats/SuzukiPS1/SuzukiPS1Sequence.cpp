@@ -435,7 +435,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         return event.ignore();
       }
       event.derived("destination", found->second.start, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-      event.mayBranchTo(found->second.start).runtimeControlFlow();
+      event.mayBranchTo(found->second.start);
       return event.invoke<&Playback::endRepeat>(found->second.slot, found->second.plays, found->second.start);
     }
     case 0x9a: {
@@ -445,7 +445,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         return event.ignore();
       }
       event.derived("destination", found->second.end, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-      event.mayBranchTo(found->second.end).runtimeControlFlow();
+      event.mayBranchTo(found->second.end);
       return event.invoke<&Playback::repeatBreak>(found->second.slot, found->second.end);
     }
     case 0xa0: {
@@ -662,7 +662,7 @@ const SequenceDialect& suzukiPs1SequenceDialect() {
 SequenceProgram parseSuzukiPs1Sequence(ByteReader reader, AssetId id, const SuzukiPs1SequenceLayout& layout,
                                        const std::vector<SuzukiPs1EnvelopeRegisters>& envelopes,
                                        SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
-  SequenceProgram program = suzukiPs1SequenceDialect().makeProgram(Address{layout.offset});
+  SequenceProgram program = suzukiPs1SequenceDialect().makeProgram();
   RuntimeConfig runtime{.defaultBank = layout.defaultBank};
   for (const auto& envelope : envelopes) {
     runtime.envelopes.emplace((static_cast<u32>(envelope.bank) << 8) | envelope.program,

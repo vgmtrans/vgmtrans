@@ -1112,7 +1112,6 @@ void sequenceVmPreservesExplicitJumpToContinuation() {
   TrackProgramBuilder builder(track);
   builder.addSemantic(Address{1}, 1, 1, {}, {}, CommandFlow::fallthroughTo(Address{0}));
   CommandFlow explicitJump = CommandFlow::fallthroughTo(Address{1});
-  explicitJump.overridePolicy = FlowOverridePolicy::Required;
   builder.addSemantic(Address{0}, 0xfe, 1, {}, {}, std::move(explicitJump));
 
   const SequenceProgram program{
@@ -1132,7 +1131,7 @@ void sequenceVmPreservesExplicitJumpToContinuation() {
          "a runtime jump to the continuation should remain explicit for loop detection");
 }
 
-void sequenceVmEnforcesFlowOverridePolicies() {
+void sequenceVmPrefersRuntimeFlowAndOtherwiseUsesTheDecodedDefault() {
   const SequenceDialect dialect = authoritativeFlowProbeDialect();
   const auto render = [&](u8 opcode, CommandFlow flow) {
     TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
@@ -1146,21 +1145,15 @@ void sequenceVmEnforcesFlowOverridePolicies() {
     });
   };
 
-  CommandFlow required = CommandFlow::end(Address{1});
-  required.overridePolicy = FlowOverridePolicy::Required;
-  const PerformanceSequence missing = render(0, required);
-  expect(missing.diagnostics.size() == 1 && missing.diagnostics.front().message.find("required") != std::string::npos,
-         "a missing required runtime override should stop with a focused diagnostic");
+  const PerformanceSequence fallback = render(0, CommandFlow::end(Address{1}));
+  expect(fallback.diagnostics.empty(), "a command without a runtime transition should use its decoded default");
 
-  const PerformanceSequence forbidden = render(0xfd, CommandFlow::end(Address{1}));
-  expect(
-      forbidden.diagnostics.size() == 1 && forbidden.diagnostics.front().message.find("forbidden") != std::string::npos,
-      "a forbidden runtime override should stop with a focused diagnostic");
+  const PerformanceSequence override = render(0xfd, CommandFlow::end(Address{1}));
+  expect(override.diagnostics.empty(), "a runtime transition should be able to replace its decoded default");
 
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder(track);
   CommandFlow explicitFallthrough = CommandFlow::end(Address{1});
-  explicitFallthrough.overridePolicy = FlowOverridePolicy::Required;
   builder.addSemantic(Address{0}, 0xfc, 1, {}, {}, std::move(explicitFallthrough));
   builder.addSemantic(Address{1}, 1, 1, {}, {}, CommandFlow::end(Address{2}));
   const PerformanceSequence fallthrough = SequenceVm().render(SequenceProgram{
@@ -1170,7 +1163,7 @@ void sequenceVmEnforcesFlowOverridePolicies() {
           .tracks = {track},
   });
   expect(fallthrough.diagnostics.empty() && fallthrough.tracks[0].events.size() == 1,
-         "a required runtime transition should be able to select the decoded continuation explicitly");
+         "an explicit runtime fallthrough should select the decoded continuation");
 }
 
 void sequenceVmReportsMissingJumpTargetAfterEmittedEvents() {
@@ -1673,7 +1666,7 @@ void runValueSequenceVmTests() {
   sequenceVmUsesDecodedContinuationInsteadOfSizeOrStorageOrder();
   sequenceVmUsesDecodedCallContinuationAsReturnAddress();
   sequenceVmPreservesExplicitJumpToContinuation();
-  sequenceVmEnforcesFlowOverridePolicies();
+  sequenceVmPrefersRuntimeFlowAndOtherwiseUsesTheDecodedDefault();
   sequenceVmReportsMissingJumpTargetAfterEmittedEvents();
   sequenceVmSchedulesSemanticTracksAgainstOneProgramState();
   sequenceVmCoordinatesSemanticLoopsAtSequenceScope();

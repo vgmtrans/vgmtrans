@@ -759,7 +759,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       }
       event.derived("destination", found->second.start, SourceValueDisplay::Address,
                     SemanticOperandRole::RepeatTarget);
-      event.mayBranchTo(found->second.start).runtimeControlFlow();
+      event.mayBranchTo(found->second.start);
       return event.invoke<&Playback::endRepeat>(found->second.slot, found->second.totalPlays, found->second.start);
     }
     case 0xd6: {
@@ -769,7 +769,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         return event.ignore();
       }
       event.derived("destination", found->second.end, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-      event.mayBranchTo(found->second.end).runtimeControlFlow();
+      event.mayBranchTo(found->second.end);
       return event.invoke<&Playback::repeatBreak>(found->second.slot, found->second.end);
     }
     case 0xd7:

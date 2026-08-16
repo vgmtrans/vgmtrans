@@ -423,19 +423,20 @@ public:
     Event& ignore() {
       execution_ = {};
       flow_ = {};
+      hasDefaultTransition_ = false;
       presentation_.playback = initialPlayback_;
       return *this;
     }
 
     Event& stop() {
-      setDefaultTransition(StaticTransition::end());
+      setDefaultTransition(CommandTransition::end());
       return *this;
     }
 
     Event& end() {
       presentation_.semantic = SequenceSemantic::End;
       presentation_.playback = CommandPlaybackStatus::StopsPlayback;
-      setDefaultTransition(StaticTransition::end());
+      setDefaultTransition(CommandTransition::end());
       return *this;
     }
 
@@ -555,31 +556,31 @@ public:
 
     Event& jump(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      setDefaultTransition(StaticTransition::jump(destination));
+      setDefaultTransition(CommandTransition::jump(destination));
       return *this;
     }
 
     Event& loopCandidate(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      setDefaultTransition(StaticTransition::jump(destination, JumpSemantics::LoopCandidate));
+      setDefaultTransition(CommandTransition::jump(destination, JumpSemantics::LoopCandidate));
       return *this;
     }
 
     Event& declaredLoop(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      setDefaultTransition(StaticTransition::jump(destination, JumpSemantics::DeclaredLoop));
+      setDefaultTransition(CommandTransition::jump(destination, JumpSemantics::DeclaredLoop));
       return *this;
     }
 
     Event& call(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      setDefaultTransition(StaticTransition::call(destination));
+      setDefaultTransition(CommandTransition::call(destination));
       return *this;
     }
 
     Event& return_() {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      setDefaultTransition(StaticTransition::return_());
+      setDefaultTransition(CommandTransition::return_());
       return *this;
     }
 
@@ -588,28 +589,14 @@ public:
     // body chooses the actual result from call history.
     Event& discoverReturn() {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      if (flow_.defaultTransition) {
-        throw std::logic_error("Compiled sequence command cannot be both a return boundary and a static transition");
-      }
-      flow_.discovery = DiscoveryDisposition::ReturnBoundary;
-      requireRuntimeOverride();
+      setDefaultTransition(CommandTransition::return_());
       return *this;
     }
 
-    // Marks a typed body whose destination comes from runtime state. Static
-    // discovery still follows the command's ordinary fallthrough.
+    // Marks a typed body whose path comes from runtime state. Discovery still
+    // follows the command's decoded default and additional targets.
     Event& runtimeControlFlow() {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      allowRuntimeOverride();
-      return *this;
-    }
-
-    // The body must choose a runtime transition even when its chosen address
-    // equals continuation. This preserves the semantic distinction between a
-    // jump and an ordinary fallthrough for loop detection.
-    Event& requireRuntimeControlFlow() {
-      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      requireRuntimeOverride();
       return *this;
     }
 
@@ -617,7 +604,6 @@ public:
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       append<&detail::repeatUntil<Playback>>(slot, totalPlays, destination);
       flow_.additionalTargets.push_back(destination);
-      allowRuntimeOverride();
       return *this;
     }
 
@@ -626,12 +612,10 @@ public:
     Event& mayBranchTo(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       flow_.additionalTargets.push_back(destination);
-      allowRuntimeOverride();
       return *this;
     }
 
-    // Records a decoder-only alternative without permitting runtime behavior to
-    // override a static transition.
+    // Records a decoder-only alternative that is not the command's default path.
     Event& discoverTarget(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       flow_.additionalTargets.push_back(destination);
@@ -670,23 +654,13 @@ public:
       return *this;
     }
 
-    void setDefaultTransition(StaticTransition transition) {
-      if (flow_.discovery == DiscoveryDisposition::ReturnBoundary) {
-        throw std::logic_error("Compiled sequence command cannot be both a return boundary and a static transition");
-      }
-      if (flow_.defaultTransition) {
-        throw std::logic_error("Compiled sequence command declared more than one static transition");
+    void setDefaultTransition(CommandTransition transition) {
+      if (hasDefaultTransition_) {
+        throw std::logic_error("Compiled sequence command declared more than one default transition");
       }
       flow_.defaultTransition = transition;
+      hasDefaultTransition_ = true;
     }
-
-    void allowRuntimeOverride() {
-      if (flow_.overridePolicy == FlowOverridePolicy::Forbidden) {
-        flow_.overridePolicy = FlowOverridePolicy::Optional;
-      }
-    }
-
-    void requireRuntimeOverride() { flow_.overridePolicy = FlowOverridePolicy::Required; }
 
     template <class T>
     [[nodiscard]] static EncodedSemanticField<T> field(const RangedValue<T>& source, std::string_view name,
@@ -713,6 +687,7 @@ public:
     CommandPlaybackStatus initialPlayback_;
     CommandExecution execution_;
     CommandFlow flow_;
+    bool hasDefaultTransition_ = false;
     bool finished_ = false;
   };
 
@@ -825,8 +800,6 @@ private:
       presentation = truncatedPresentation();
       execution = {};
       flow = CommandFlow::end(Address{record_.position()});
-    } else if (!flow.defaultTransition && flow.discovery != DiscoveryDisposition::ReturnBoundary) {
-      flow.defaultTransition = StaticTransition::fallthrough();
     }
 
     return DecodedBytecodeCommand{

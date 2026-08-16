@@ -1336,7 +1336,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xec:
       return cursor.command("Jump to Loop Point", SequenceSemantic::Repeat)
           .invoke<&Playback::jumpLoopPoint>()
-          .requireRuntimeControlFlow();
+          .runtimeControlFlow();
     case 0xed:
       return cursor.command("Jump to Loop Point Once", SequenceSemantic::Repeat)
           .invoke<&Playback::jumpLoopPointOnce>()

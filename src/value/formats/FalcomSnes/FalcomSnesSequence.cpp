@@ -639,7 +639,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       }
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
       event.derived("counter", cell, SourceValueDisplay::Address, SemanticOperandRole::Address);
-      return event.invoke<&Playback::repeatBreak>(cell, destination).mayBranchTo(destination).runtimeControlFlow();
+      return event.invoke<&Playback::repeatBreak>(cell, destination).mayBranchTo(destination);
     }
     case 0xef: {
       auto event = cursor.command("Repeat End", SequenceSemantic::Repeat);
@@ -649,7 +649,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const Address destination{static_cast<u16>(cell.value + 1)};
       event.derived("counter", cell, SourceValueDisplay::Address, SemanticOperandRole::Address);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-      return event.invoke<&Playback::repeatEnd>(cell, destination).mayBranchTo(destination).runtimeControlFlow();
+      return event.invoke<&Playback::repeatEnd>(cell, destination).mayBranchTo(destination);
     }
     case 0xf0: {
       auto event = cursor.command("Pitch Envelope", SequenceSemantic::Pitch);
@@ -791,7 +791,6 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   }
   SequenceProgram program = sequence.finish(
       makeCompiledRuntime<TrackState, Playback, ProgramState>(RuntimeConfig{.patches = runtimePatches(reader, layout)}));
-  program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
   return SequenceParse{
       .program = std::move(program),
       .programs = std::move(programs),

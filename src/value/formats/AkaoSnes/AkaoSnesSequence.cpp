@@ -2013,7 +2013,7 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Loop Break", SequenceSemantic::RepeatBreak);
       const u8 count = event.u8("count");
       const Address destination = relocated(event, SemanticOperandRole::JumpTarget);
-      return event.invoke<&Playback::loopBreak>(count, destination).mayBranchTo(destination).runtimeControlFlow();
+      return event.invoke<&Playback::loopBreak>(count, destination).mayBranchTo(destination);
     }
     case EventType::Goto: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
@@ -2218,7 +2218,6 @@ SequenceProgram parseAkaoSnesSequence(ByteReader reader, const AkaoSnesLayout& l
   }
   SequenceProgram program =
       session.finish(makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime)));
-  program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
   program.behavior.initialTempoMicrosecondsPerQuarter =
       tempoMicrosecondsPerQuarter(profile.version, profile.minorVersion, kDefaultTempo);
 

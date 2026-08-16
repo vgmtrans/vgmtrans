@@ -494,8 +494,7 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
       const u8 count = event.u8("event_count", SemanticOperandRole::Count);
       const Address continuation = event.nextAddress();
       return event.invoke<&Playback::beginCountedLoop>(destination, count, continuation)
-          .mayBranchTo(destination)
-          .runtimeControlFlow();
+          .mayBranchTo(destination);
     }
     case 0x82: {
       auto event = cursor.command("Forever Loop", SequenceSemantic::Loop);
@@ -708,7 +707,7 @@ const SequenceDialect& segSatSequenceDialect() {
 
 SequenceProgram parseSegSatSequenceProgram(ByteReader reader, AssetId id, const SegSatSequenceLayout& layout,
                                            SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
-  SequenceProgram program = segSatSequenceDialect().makeProgram(Address{layout.offset});
+  SequenceProgram program = segSatSequenceDialect().makeProgram();
   program.timebase.ppqn = layout.ppqn;
 
   std::optional<SourceAnnotationId> header;

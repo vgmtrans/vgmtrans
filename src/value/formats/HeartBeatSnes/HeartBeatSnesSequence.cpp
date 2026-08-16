@@ -512,7 +512,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x01: {
       event.label("Repeat End");
       const Address destination = readRelativeTarget(event, sequenceBase, SemanticOperandRole::RepeatTarget);
-      return event.invoke<&Playback::conditionalLoop>(destination).mayBranchTo(destination).runtimeControlFlow();
+      return event.invoke<&Playback::conditionalLoop>(destination).mayBranchTo(destination);
     }
     case 0x02:
       return event.label("No Operation").ignore();
@@ -797,7 +797,6 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         relative);
   }
   SequenceProgram program = sequence.finish(sequenceRuntime());
-  program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
   return SequenceParse{
       .program = std::move(program),
       .programs = std::move(programs),

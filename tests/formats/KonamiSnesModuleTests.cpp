@@ -309,7 +309,6 @@ PerformanceSequence renderKonamiSnesTrack(std::span<const u8> commandBytes) {
   const SequenceProgram program{
       .runtime = konamiSnesSequenceRuntime(KONAMISNES_V6),
       .timebase = dialect.timebase,
-      .sourceBaseAddress = Address{0},
       .behavior = dialect.behavior,
       .tracks = {track},
   };
@@ -328,7 +327,6 @@ PerformanceSequence renderKonamiSnesProgram(KonamiSnesVersion version, const std
   const SequenceProgram program{
       .runtime = konamiSnesSequenceRuntime(version, indexedEchoFilter),
       .timebase = dialect.timebase,
-      .sourceBaseAddress = Address{0},
       .behavior = dialect.behavior,
       .tracks = std::move(programTracks),
   };

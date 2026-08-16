@@ -1586,8 +1586,7 @@ struct DecodeContext {
                 SemanticOperandRole::JumpTarget);
   event.derived("custom_destination", customDestination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
   event.invoke<&Playback::fe3ParameterFlow>(standardDestination, customDestination);
-  event.mayBranchTo(standardDestination);
-  return event.requireRuntimeControlFlow();
+  return event.mayBranchTo(standardDestination);
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(const DecodeContext& context, u32 begin) {
@@ -1836,7 +1835,7 @@ struct DecodeContext {
       const u8 distance = event.u8("distance");
       const Address destination{event.nextAddress().value + distance};
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-      return event.invoke<&Playback::intelliConditionalJump>(destination).mayBranchTo(destination).runtimeControlFlow();
+      return event.invoke<&Playback::intelliConditionalJump>(destination).mayBranchTo(destination);
     }
     case EventType::IntelliJump: {
       auto event = cursor.command("Short Jump", SequenceSemantic::Jump);
@@ -2236,10 +2235,6 @@ struct PlaylistDecode {
   return map;
 }
 
-[[nodiscard]] SequenceRecipes projectRecipes(const ProgramState& state) {
-  return state.recipes;
-}
-
 [[nodiscard]] SequenceDialect makeDialect() {
   return SequenceDialect{
       .commandDetailKindPrefix = "nin-snes",
@@ -2301,7 +2296,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   const Definition definition = makeDefinition(layout);
   PlaylistDecode playlist = decodePlaylist(reader, layout, sequenceId, sourceMap, diagnostics);
 
-  SequenceProgram program = sequenceDialect().makeProgram(Address{layout.playlistAddress});
+  SequenceProgram program = sequenceDialect().makeProgram();
   RuntimeConfig runtime{
       .profile = layout.profile,
       .tempoTimerTarget = layout.tempoTimerTarget,
@@ -2338,8 +2333,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   }
   program.runtime = makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime));
 
-  SequenceRecipes recipes =
-      analyzeCompiledProgram<ProgramState, SequenceRecipes>(program, projectRecipes);
+  SequenceRecipes recipes = analyzeCompiledProgram<ProgramState>(program, &ProgramState::recipes);
   return SequenceParse{
       .program = std::move(program),
       .recipes = std::move(recipes),

@@ -812,7 +812,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u16 relative = event.u16le("relative", SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
       const Address destination = relativeTarget(sequenceBase, relative);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-      return event.invoke<&Playback::conditionalSignalJump>(destination).mayBranchTo(destination).runtimeControlFlow();
+      return event.invoke<&Playback::conditionalSignalJump>(destination).mayBranchTo(destination);
     }
     case 0x2e:
       return cursor.command("Repeat End", SequenceSemantic::Repeat).invoke<&Playback::repeatEnd>().runtimeControlFlow();
@@ -822,7 +822,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u16 relative = event.u16le("relative", SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
       const Address destination = relativeTarget(sequenceBase, relative);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-      return event.invoke<&Playback::repeatBreak>(count, destination).mayBranchTo(destination).runtimeControlFlow();
+      return event.invoke<&Playback::repeatBreak>(count, destination).mayBranchTo(destination);
     }
     default:
       return cursor.unsupported("Invalid Command").stop();
@@ -880,7 +880,6 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         relative);
   }
   SequenceProgram program = sequence.finish(sequenceRuntime(layout.echoDelay));
-  program.sourceBaseAddress = Address{layout.sequenceBaseAddress};
   return SequenceParse{.program = std::move(program), .references = std::move(references), .headerRange = header};
 }
 

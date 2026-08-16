@@ -1665,7 +1665,6 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     program.tracks.push_back(decodeTrack(reader, layout.version, index, track.startAddress, track.logicalChannel,
                                          track.physicalChannelFlags, &programs, diagnostics, scope));
   }
-  program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
   program.runtime = makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime));
   return SequenceParse{
       .program = std::move(program),

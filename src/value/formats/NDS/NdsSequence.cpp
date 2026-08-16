@@ -728,7 +728,7 @@ SequenceProgram parseNdsSequenceProgram(ByteReader reader, AssetId id, NdsSequen
                                         SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const SequenceDialect& dialect = ndsSequenceDialect();
   const u32 sequenceOffset = range.offset;
-  SequenceProgram program = dialect.makeProgram(Address{sequenceOffset + kSseqHeaderSize});
+  SequenceProgram program = dialect.makeProgram();
 
   if (sourceMap != nullptr && reader.has(sequenceOffset, kSseqHeaderSize)) {
     sourceMap->header("SSEQ Header", reader.range(sequenceOffset, kSseqHeaderSize))

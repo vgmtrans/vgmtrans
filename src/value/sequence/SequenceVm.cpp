@@ -635,18 +635,14 @@ private:
     }
     const Effects effects = sequenceRuntime_.execute(command, *programState_, trackState_, out, vm);
     if (duringWait) {
-      if (effects.advanceTicks != 0 || effects.flowOverride || !command.flow.defaultTransition ||
-          command.flow.defaultTransition->kind != StaticTransitionKind::Fallthrough) {
+      if (effects.advanceTicks != 0 || effects.flowOverride ||
+          command.flow.defaultTransition.kind != CommandTransitionKind::Fallthrough) {
         throw std::logic_error("A command executed during a wait must not advance time or alter control flow");
       }
     } else {
       scheduleTicks(commandIndex, effects.advanceTicks);
     }
-    const auto effectiveTransition = resolveTransition(command, effects);
-    if (!effectiveTransition) {
-      current_ = std::nullopt;
-      return false;
-    }
+    const CommandTransition effectiveTransition = effects.flowOverride.value_or(command.flow.defaultTransition);
     if (command.annotation.valid()) {
       u64 endTick = beginTick == std::numeric_limits<u64>::max() ? beginTick : beginTick + 1;
       if (beginTick <= std::numeric_limits<u64>::max() - effects.advanceTicks) {
@@ -675,56 +671,11 @@ private:
       }
     }
     runtime_.lastCommand = command.id;
-    const bool endedSection = effectiveTransition->kind == RuntimeTransitionKind::EndSection;
-    applyTransition(command, *effectiveTransition);
+    const bool endedSection = effectiveTransition.kind == CommandTransitionKind::EndSection;
+    applyTransition(command, effectiveTransition);
 
     ++executedCommands_;
     return endedSection;
-  }
-
-  [[nodiscard]] std::optional<RuntimeTransition> resolveTransition(const SourceCommand& command,
-                                                                   const Effects& effects) {
-    switch (command.flow.overridePolicy) {
-      case FlowOverridePolicy::Forbidden:
-        if (effects.flowOverride) {
-          warn("Sequence command produced a forbidden runtime flow override", command.range);
-          return std::nullopt;
-        }
-        break;
-      case FlowOverridePolicy::Optional:
-        break;
-      case FlowOverridePolicy::Required:
-        if (!effects.flowOverride) {
-          warn("Sequence command did not produce its required runtime flow override", command.range);
-          return std::nullopt;
-        }
-        break;
-    }
-
-    if (effects.flowOverride) {
-      return effects.flowOverride;
-    }
-    if (!command.flow.defaultTransition) {
-      warn("Sequence command had no default transition", command.range);
-      return std::nullopt;
-    }
-
-    const StaticTransition& transition = *command.flow.defaultTransition;
-    switch (transition.kind) {
-      case StaticTransitionKind::Fallthrough:
-        return RuntimeTransition::fallthrough();
-      case StaticTransitionKind::Jump:
-        return RuntimeTransition::jump(transition.destination, transition.jumpSemantics);
-      case StaticTransitionKind::Call:
-        return RuntimeTransition::call(transition.destination);
-      case StaticTransitionKind::Return:
-        return RuntimeTransition::return_();
-      case StaticTransitionKind::End:
-        return RuntimeTransition::end();
-      case StaticTransitionKind::EndSection:
-        return RuntimeTransition::endSection();
-    }
-    return std::nullopt;
   }
 
   [[nodiscard]] LoopAction handleLoop(const LoopPoint& loop, u32 replayIndex,
@@ -778,9 +729,9 @@ private:
     return LoopAction{.kind = LoopActionKind::StopTrack};
   }
 
-  void applyTransition(const SourceCommand& command, const RuntimeTransition& transition) {
+  void applyTransition(const SourceCommand& command, const CommandTransition& transition) {
     switch (transition.kind) {
-      case RuntimeTransitionKind::Fallthrough:
+      case CommandTransitionKind::Fallthrough:
         current_ = destinationIndex(track_, command.flow.continuation);
         arrivedByControlFlow_ = false;
         if (!current_) {
@@ -789,21 +740,21 @@ private:
         }
         break;
 
-      case RuntimeTransitionKind::End:
+      case CommandTransitionKind::End:
         current_ = std::nullopt;
         arrivedByControlFlow_ = false;
         break;
 
-      case RuntimeTransitionKind::EndSection:
+      case CommandTransitionKind::EndSection:
         current_ = std::nullopt;
         arrivedByControlFlow_ = false;
         break;
 
-      case RuntimeTransitionKind::Jump:
+      case CommandTransitionKind::Jump:
         applyJump(command, transition.destination, transition.jumpSemantics);
         break;
 
-      case RuntimeTransitionKind::Call:
+      case CommandTransitionKind::Call:
         if (const auto returnIndex = destinationIndex(track_, command.flow.continuation)) {
           runtime_.callStack.push_back(*returnIndex);
         } else {
@@ -821,7 +772,7 @@ private:
         }
         break;
 
-      case RuntimeTransitionKind::Return:
+      case CommandTransitionKind::Return:
         if (runtime_.callStack.empty()) {
           warn("Sequence return had no active call", command.range);
           current_ = std::nullopt;
@@ -980,39 +931,39 @@ void RepeatCounter::finish() {
 }
 
 Effects VmApi::fallthrough() const noexcept {
-  return Effects{.flowOverride = RuntimeTransition::fallthrough()};
+  return Effects{.flowOverride = CommandTransition::fallthrough()};
 }
 
 Effects VmApi::end() const noexcept {
-  return Effects{.flowOverride = RuntimeTransition::end()};
+  return Effects{.flowOverride = CommandTransition::end()};
 }
 
 Effects VmApi::endSection() const noexcept {
-  return Effects{.flowOverride = RuntimeTransition::endSection()};
+  return Effects{.flowOverride = CommandTransition::endSection()};
 }
 
 Effects VmApi::jump(Address destination) const noexcept {
-  return Effects{.flowOverride = RuntimeTransition::jump(destination)};
+  return Effects{.flowOverride = CommandTransition::jump(destination)};
 }
 
 Effects VmApi::finiteBranch(Address destination) const noexcept {
-  return Effects{.flowOverride = RuntimeTransition::jump(destination, JumpSemantics::FiniteBranch)};
+  return Effects{.flowOverride = CommandTransition::jump(destination, JumpSemantics::FiniteBranch)};
 }
 
 Effects VmApi::loopCandidate(Address destination) const noexcept {
-  return Effects{.flowOverride = RuntimeTransition::jump(destination, JumpSemantics::LoopCandidate)};
+  return Effects{.flowOverride = CommandTransition::jump(destination, JumpSemantics::LoopCandidate)};
 }
 
 Effects VmApi::declaredLoop(Address destination) const noexcept {
-  return Effects{.flowOverride = RuntimeTransition::jump(destination, JumpSemantics::DeclaredLoop)};
+  return Effects{.flowOverride = CommandTransition::jump(destination, JumpSemantics::DeclaredLoop)};
 }
 
 Effects VmApi::call(Address destination) const noexcept {
-  return Effects{.flowOverride = RuntimeTransition::call(destination)};
+  return Effects{.flowOverride = CommandTransition::call(destination)};
 }
 
 Effects VmApi::return_() const noexcept {
-  return Effects{.flowOverride = RuntimeTransition::return_()};
+  return Effects{.flowOverride = CommandTransition::return_()};
 }
 
 bool VmApi::inSubroutine() const noexcept {
