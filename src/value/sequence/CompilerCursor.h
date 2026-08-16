@@ -243,6 +243,9 @@ class CompilerCursor {
 public:
   class Event {
   public:
+    // Source reads consume bytes immediately. Do not place multiple reads in
+    // sibling operands or function arguments: C++ does not generally define
+    // their order. Read those fields into locals first.
     [[nodiscard]] bool ok() const noexcept { return cursor_.record_.ok(); }
 
     ::u8 u8(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,

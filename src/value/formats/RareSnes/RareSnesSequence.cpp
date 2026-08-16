@@ -1290,9 +1290,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
         return event.invoke<&Playback::btmPercussionVolume>(slot, left, right);
       }
-      return event.invoke<&Playback::volume>(
-          event.s8("left", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level),
-          event.s8("right", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level));
+      const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      return event.invoke<&Playback::volume>(left, right);
     }
     case Kind::CenterVolume: {
       auto event = cursor.command("Centered Volume", SequenceSemantic::Level);
@@ -1379,9 +1379,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case Kind::MasterVolumeStereo:
     case Kind::BtmMasterVolume: {
       auto event = cursor.command("Master Volume L/R", SequenceSemantic::Level);
-      return event.invoke<&Playback::masterStereo>(
-          event.s8("left", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level),
-          event.s8("right", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level));
+      const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      return event.invoke<&Playback::masterStereo>(left, right);
     }
     case Kind::MasterVolumeScalar: {
       auto event = cursor.command("Master Volume", SequenceSemantic::Level);
@@ -1541,11 +1541,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case Kind::VolumePresets: {
       auto event = cursor.command("Volume Presets", SequenceSemantic::State);
-      return event.invoke<&Playback::volumePresets>(
-          event.s8("left_1", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level),
-          event.s8("right_1", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level),
-          event.s8("left_2", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level),
-          event.s8("right_2", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level));
+      const s8 left1 = event.s8("left_1", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      const s8 right1 = event.s8("right_1", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      const s8 left2 = event.s8("left_2", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      const s8 right2 = event.s8("right_2", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      return event.invoke<&Playback::volumePresets>(left1, right1, left2, right2);
     }
     case Kind::BoundedVolumeMotion: {
       auto event = cursor.command("Bounded Stereo Volume Motion", SequenceSemantic::Level);

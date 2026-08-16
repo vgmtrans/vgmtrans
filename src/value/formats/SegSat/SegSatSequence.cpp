@@ -419,9 +419,12 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
     return cursor.truncated();
   }
   auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-  const u32 delta = (static_cast<u32>(event.opcodeValue("delta_high", cursor.opcode())) << 24) |
-                    (static_cast<u32>(event.u8("delta_mid_high")) << 16) |
-                    (static_cast<u32>(event.u8("delta_mid_low")) << 8) | event.u8("delta_low");
+  const u8 deltaHigh = event.opcodeValue("delta_high", cursor.opcode());
+  const u8 deltaMidHigh = event.u8("delta_mid_high");
+  const u8 deltaMidLow = event.u8("delta_mid_low");
+  const u8 deltaLow = event.u8("delta_low");
+  const u32 delta = (static_cast<u32>(deltaHigh) << 24) | (static_cast<u32>(deltaMidHigh) << 16) |
+                    (static_cast<u32>(deltaMidLow) << 8) | deltaLow;
   const u32 tempo = event.u32be("microseconds_per_quarter");
   event.invoke<&Playback::tempo>(tempo, delta);
   return final ? event.stop() : static_cast<DecodedBytecodeCommand>(event);
