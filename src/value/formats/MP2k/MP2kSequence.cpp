@@ -349,8 +349,6 @@ struct Playback {
 
   void pitchBend(u8 raw) { out.pitchBend((static_cast<s32>(raw) - 64) * track.bendRange / 64.0); }
 
-  void tune(u8 raw) { out.tuning((static_cast<s32>(raw) - 64) * 100.0 / 64.0); }
-
   void closeNote(PerformanceNoteId id, u64 tick) {
     static_cast<void>(out.setNoteEnd(id, tick));
     if (const auto found = std::ranges::find(track.activeNotes, id, &ActiveNote::id);
@@ -417,15 +415,9 @@ struct Playback {
 
   void toneType(u8 type) { track.tone.type = type; }
 
-  void pseudoEchoVolume(u8 volume) { track.pseudoEchoVolume = volume; }
-
-  void pseudoEchoLength(u8 length) { track.pseudoEchoLength = length; }
-
   void toneLength(u8 length) { track.tone.length = length; }
 
   void tonePanSweep(u8 panSweep) { track.tone.panSweep = panSweep; }
-
-  void sampleStart(u32 start) { track.sampleStart = start; }
 
   void port(u8 address, u8 value) { track.soundRegisters[address] = value; }
 
@@ -651,7 +643,8 @@ struct DecodeContext {
     }
     case 0xc8: {
       auto event = cursor.command("Tune", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::tune>(parameter(cursor, event, running, "tune"));
+      const u8 raw = parameter(cursor, event, running, "tune");
+      return event.emitTuning((static_cast<s32>(raw) - 64) * 100.0 / 64.0);
     }
     case 0xcd: {
       auto event = cursor.command("Extended Command", SequenceSemantic::State);
@@ -673,9 +666,9 @@ struct DecodeContext {
         case 7:
           return event.invoke<&Playback::release>(event.u8("release"));
         case 8:
-          return event.invoke<&Playback::pseudoEchoVolume>(event.u8("pseudo_echo_volume"));
+          return event.set<&TrackState::pseudoEchoVolume>(event.u8("pseudo_echo_volume"));
         case 9:
-          return event.invoke<&Playback::pseudoEchoLength>(event.u8("pseudo_echo_length"));
+          return event.set<&TrackState::pseudoEchoLength>(event.u8("pseudo_echo_length"));
         case 10:
           return event.invoke<&Playback::toneLength>(event.u8("length"));
         case 11:
@@ -683,7 +676,7 @@ struct DecodeContext {
         case 12:
           return event.wait(event.u16le("ticks", SourceValueDisplay::Default, SemanticOperandRole::Duration));
         case 13:
-          return event.invoke<&Playback::sampleStart>(event.u32le("sample_start"));
+          return event.set<&TrackState::sampleStart>(event.u32le("sample_start"));
         default:
           event.warning("Unknown MP2k extended command stopped playback");
           return event.stop();

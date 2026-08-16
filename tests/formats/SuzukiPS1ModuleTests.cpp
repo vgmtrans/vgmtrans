@@ -140,7 +140,7 @@ void suzukiPs1DynamicAdsrUsesAuditedDriverCommands() {
       std::ranges::find_if(track.commands, [](const SourceCommand& command) { return command.opcode == 0xc1; });
   const auto c3 =
       std::ranges::find_if(track.commands, [](const SourceCommand& command) { return command.opcode == 0xc3; });
-  expect(c1 != track.commands.end() && c1->encodedSize == 4 && c3 != track.commands.end() && c3->encodedSize == 2,
+  expect(c1 != track.commands.end() && c1->range.size == 4 && c3 != track.commands.end() && c3->range.size == 2,
          "audited C1 and C3 operand lengths should keep the stream synchronized");
 
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);

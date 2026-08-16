@@ -98,8 +98,8 @@ void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
   };
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder(track);
-  builder.addSemantic(Address{0}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{1}), SourceAnnotationId{20});
-  builder.addSemantic(Address{1}, 0, 1, {},
+  builder.addSemantic(Address{0}, 0, {}, {}, CommandFlow::fallthroughTo(Address{1}), SourceAnnotationId{20});
+  builder.addSemantic(Address{1}, 0, {},
                       {SemanticOperand{
                           .value = u64{6},
                           .name = "channel",
@@ -142,8 +142,8 @@ void sequenceVmPreservesPitchMotionThroughNoteRelease() {
   };
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder{track};
-  builder.addSemantic(Address{0}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{1}));
-  builder.addSemantic(Address{1}, 0, 1, {}, {}, CommandFlow::end(Address{2}));
+  builder.addSemantic(Address{0}, 0, {}, {}, CommandFlow::fallthroughTo(Address{1}));
+  builder.addSemantic(Address{1}, 0, {}, {}, CommandFlow::end(Address{2}));
 
   const PerformanceSequence performance = SequenceVm().render(SequenceProgram{
       .runtime = runtime,
@@ -665,9 +665,9 @@ void sequenceVmExposesSubroutineStateFromItsCallStack() {
   };
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder{track};
-  builder.addSemantic(Address{0}, 0, 1, {}, {}, CommandFlow::call(Address{10}, Address{1}));
-  builder.addSemantic(Address{1}, 0, 1, {}, {}, CommandFlow::end(Address{2}));
-  builder.addSemantic(Address{10}, 0, 1, {}, {}, CommandFlow::return_(Address{11}));
+  builder.addSemantic(Address{0}, 0, {}, {}, CommandFlow::call(Address{10}, Address{1}));
+  builder.addSemantic(Address{1}, 0, {}, {}, CommandFlow::end(Address{2}));
+  builder.addSemantic(Address{10}, 0, {}, {}, CommandFlow::return_(Address{11}));
 
   const SequenceProgram program{
       .runtime = runtime,
@@ -1014,7 +1014,7 @@ void sequenceVmDoesNotWrapCommandAddressOverflow() {
   addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{std::numeric_limits<u64>::max() - 1}, SourceRange{},
                                     noteBytes);
   // The decoded continuation is authoritative and must not wrap to the other
-  // command merely because address + encodedSize would overflow.
+  // command merely because address + source size would overflow.
   track.commands.back().flow.continuation = Address{std::numeric_limits<u64>::max()};
   addProbeCommand<ProbeNoteCommand>(builder, dialect, Address{1}, SourceRange{}, noteBytes);
 
@@ -1065,9 +1065,9 @@ void sequenceVmUsesDecodedContinuationInsteadOfSizeOrStorageOrder() {
   const SequenceDialect dialect = authoritativeFlowProbeDialect();
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{100}};
   TrackProgramBuilder builder(track);
-  builder.addSemantic(Address{100}, 1, 37, {}, {}, CommandFlow::fallthroughTo(Address{200}));
-  builder.addSemantic(Address{101}, 99, 1, {}, {}, CommandFlow::end(Address{102}));
-  builder.addSemantic(Address{200}, 2, 1, {}, {}, CommandFlow::end(Address{201}));
+  builder.addSemantic(Address{100}, 1, {}, {}, CommandFlow::fallthroughTo(Address{200}));
+  builder.addSemantic(Address{101}, 99, {}, {}, CommandFlow::end(Address{102}));
+  builder.addSemantic(Address{200}, 2, {}, {}, CommandFlow::end(Address{201}));
 
   const SequenceProgram program{
       .runtime = authoritativeFlowProbeRuntime(),
@@ -1087,10 +1087,10 @@ void sequenceVmUsesDecodedCallContinuationAsReturnAddress() {
   const SequenceDialect dialect = authoritativeFlowProbeDialect();
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder(track);
-  builder.addSemantic(Address{0}, 0, 1, {}, {}, CommandFlow::call(Address{10}, Address{20}));
-  builder.addSemantic(Address{1}, 99, 1, {}, {}, CommandFlow::end(Address{2}));
-  builder.addSemantic(Address{10}, 10, 1, {}, {}, CommandFlow::return_(Address{11}));
-  builder.addSemantic(Address{20}, 20, 1, {}, {}, CommandFlow::end(Address{21}));
+  builder.addSemantic(Address{0}, 0, {}, {}, CommandFlow::call(Address{10}, Address{20}));
+  builder.addSemantic(Address{1}, 99, {}, {}, CommandFlow::end(Address{2}));
+  builder.addSemantic(Address{10}, 10, {}, {}, CommandFlow::return_(Address{11}));
+  builder.addSemantic(Address{20}, 20, {}, {}, CommandFlow::end(Address{21}));
 
   const SequenceProgram program{
       .runtime = authoritativeFlowProbeRuntime(),
@@ -1110,9 +1110,9 @@ void sequenceVmPreservesExplicitJumpToContinuation() {
   const SequenceDialect dialect = authoritativeFlowProbeDialect();
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{1}};
   TrackProgramBuilder builder(track);
-  builder.addSemantic(Address{1}, 1, 1, {}, {}, CommandFlow::fallthroughTo(Address{0}));
+  builder.addSemantic(Address{1}, 1, {}, {}, CommandFlow::fallthroughTo(Address{0}));
   CommandFlow explicitJump = CommandFlow::fallthroughTo(Address{1});
-  builder.addSemantic(Address{0}, 0xfe, 1, {}, {}, std::move(explicitJump));
+  builder.addSemantic(Address{0}, 0xfe, {}, {}, std::move(explicitJump));
 
   const SequenceProgram program{
       .runtime = authoritativeFlowProbeRuntime(),
@@ -1136,7 +1136,7 @@ void sequenceVmPrefersRuntimeFlowAndOtherwiseUsesTheDecodedDefault() {
   const auto render = [&](u8 opcode, CommandFlow flow) {
     TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
     TrackProgramBuilder builder(track);
-    builder.addSemantic(Address{0}, opcode, 1, {}, {}, std::move(flow));
+    builder.addSemantic(Address{0}, opcode, {}, {}, std::move(flow));
     return SequenceVm().render(SequenceProgram{
         .runtime = authoritativeFlowProbeRuntime(),
             .timebase = dialect.timebase,
@@ -1154,8 +1154,8 @@ void sequenceVmPrefersRuntimeFlowAndOtherwiseUsesTheDecodedDefault() {
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder(track);
   CommandFlow explicitFallthrough = CommandFlow::end(Address{1});
-  builder.addSemantic(Address{0}, 0xfc, 1, {}, {}, std::move(explicitFallthrough));
-  builder.addSemantic(Address{1}, 1, 1, {}, {}, CommandFlow::end(Address{2}));
+  builder.addSemantic(Address{0}, 0xfc, {}, {}, std::move(explicitFallthrough));
+  builder.addSemantic(Address{1}, 1, {}, {}, CommandFlow::end(Address{2}));
   const PerformanceSequence fallthrough = SequenceVm().render(SequenceProgram{
       .runtime = authoritativeFlowProbeRuntime(),
           .timebase = dialect.timebase,
@@ -1230,16 +1230,16 @@ void sequenceVmSchedulesSemanticTracksAgainstOneProgramState() {
 
   TrackProgram track0{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder0(track0);
-  builder0.addSemantic(Address{0}, 7, 1, {}, {}, CommandFlow::fallthroughTo(Address{1}));
-  builder0.addSemantic(Address{1}, 4, 1, {}, {}, CommandFlow::fallthroughTo(Address{2}));
-  builder0.addSemantic(Address{2}, 9, 1, {}, {}, CommandFlow::fallthroughTo(Address{3}));
-  builder0.addSemantic(Address{3}, 0, 1, {}, {}, CommandFlow::end(Address{4}));
+  builder0.addSemantic(Address{0}, 7, {}, {}, CommandFlow::fallthroughTo(Address{1}));
+  builder0.addSemantic(Address{1}, 4, {}, {}, CommandFlow::fallthroughTo(Address{2}));
+  builder0.addSemantic(Address{2}, 9, {}, {}, CommandFlow::fallthroughTo(Address{3}));
+  builder0.addSemantic(Address{3}, 0, {}, {}, CommandFlow::end(Address{4}));
 
   TrackProgram track1{.id = TrackId{1}, .sourceTrackNumber = 1, .startAddress = Address{10}};
   TrackProgramBuilder builder1(track1);
-  builder1.addSemantic(Address{10}, 2, 1, {}, {}, CommandFlow::fallthroughTo(Address{11}));
-  builder1.addSemantic(Address{11}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{12}));
-  builder1.addSemantic(Address{12}, 0, 1, {}, {}, CommandFlow::end(Address{13}));
+  builder1.addSemantic(Address{10}, 2, {}, {}, CommandFlow::fallthroughTo(Address{11}));
+  builder1.addSemantic(Address{11}, 0, {}, {}, CommandFlow::fallthroughTo(Address{12}));
+  builder1.addSemantic(Address{12}, 0, {}, {}, CommandFlow::end(Address{13}));
 
   const SequenceProgram program{
       .runtime = runtime,
@@ -1288,19 +1288,19 @@ void sequenceVmCoordinatesSemanticLoopsAtSequenceScope() {
 
   TrackProgram track0{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder0(track0);
-  builder0.addSemantic(Address{0}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{1}));
-  builder0.addSemantic(Address{1}, 0, 1, {}, {},
+  builder0.addSemantic(Address{0}, 0, {}, {}, CommandFlow::fallthroughTo(Address{1}));
+  builder0.addSemantic(Address{1}, 0, {}, {},
                        CommandFlow::jumpTo(Address{0}, Address{2}, JumpSemantics::LoopCandidate));
 
   // This track first jumps into an unvisited block. A per-track loop detector
   // stops track 0 too early while this track is still establishing its loop.
   TrackProgram track1{.id = TrackId{1}, .startAddress = Address{100}};
   TrackProgramBuilder builder1(track1);
-  builder1.addSemantic(Address{100}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{101}));
-  builder1.addSemantic(Address{101}, 0, 1, {}, {},
+  builder1.addSemantic(Address{100}, 0, {}, {}, CommandFlow::fallthroughTo(Address{101}));
+  builder1.addSemantic(Address{101}, 0, {}, {},
                        CommandFlow::jumpTo(Address{110}, Address{102}, JumpSemantics::LoopCandidate));
-  builder1.addSemantic(Address{110}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{111}));
-  builder1.addSemantic(Address{111}, 0, 1, {}, {},
+  builder1.addSemantic(Address{110}, 0, {}, {}, CommandFlow::fallthroughTo(Address{111}));
+  builder1.addSemantic(Address{111}, 0, {}, {},
                        CommandFlow::jumpTo(Address{110}, Address{112}, JumpSemantics::LoopCandidate));
 
   const SequenceProgram program{
@@ -1379,8 +1379,8 @@ TrackProgram playlistProbeTrack(u32 trackId, std::initializer_list<std::pair<u32
   };
   TrackProgramBuilder builder(track);
   for (const auto [address, duration] : sections) {
-    builder.addSemantic(Address{address}, duration, 1, {}, {}, CommandFlow::fallthroughTo(Address{address + 1}));
-    builder.addSemantic(Address{address + 1}, 0, 1, {}, {}, CommandFlow::endSection(Address{address + 2}));
+    builder.addSemantic(Address{address}, duration, {}, {}, CommandFlow::fallthroughTo(Address{address + 1}));
+    builder.addSemantic(Address{address + 1}, 0, {}, {}, CommandFlow::endSection(Address{address + 2}));
   }
   return track;
 }
@@ -1541,10 +1541,10 @@ void sequenceVmPairsNoteOnAndNoteOffCommands() {
   TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
   TrackProgramBuilder builder(track);
   for (u32 address = 0; address < 9; ++address) {
-    builder.addSemantic(Address{address}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{address + 1}),
+    builder.addSemantic(Address{address}, 0, {}, {}, CommandFlow::fallthroughTo(Address{address + 1}),
                         SourceAnnotationId{100 + address});
   }
-  builder.addSemantic(Address{9}, 0, 1, {}, {}, CommandFlow::end(Address{10}), SourceAnnotationId{109});
+  builder.addSemantic(Address{9}, 0, {}, {}, CommandFlow::end(Address{10}), SourceAnnotationId{109});
 
   const PerformanceSequence performance = SequenceVm().render(SequenceProgram{
       .runtime = runtime,
@@ -1600,14 +1600,14 @@ void sequenceVmClosesActiveNotesAtLoopCutoff() {
   };
   TrackProgram shortTrack{.id = TrackId{0}, .startAddress = Address{100}};
   TrackProgramBuilder shortBuilder(shortTrack);
-  shortBuilder.addSemantic(Address{100}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{101}),
+  shortBuilder.addSemantic(Address{100}, 0, {}, {}, CommandFlow::fallthroughTo(Address{101}),
                            SourceAnnotationId{210});
-  shortBuilder.addSemantic(Address{101}, 0, 1, {}, {}, CommandFlow::end(Address{102}), SourceAnnotationId{211});
+  shortBuilder.addSemantic(Address{101}, 0, {}, {}, CommandFlow::end(Address{102}), SourceAnnotationId{211});
 
   TrackProgram loopTrack{.id = TrackId{1}, .startAddress = Address{0}};
   TrackProgramBuilder loopBuilder(loopTrack);
-  loopBuilder.addSemantic(Address{0}, 0, 1, {}, {}, CommandFlow::fallthroughTo(Address{1}), SourceAnnotationId{200});
-  loopBuilder.addSemantic(Address{1}, 0, 1, {}, {},
+  loopBuilder.addSemantic(Address{0}, 0, {}, {}, CommandFlow::fallthroughTo(Address{1}), SourceAnnotationId{200});
+  loopBuilder.addSemantic(Address{1}, 0, {}, {},
                           CommandFlow::jumpTo(Address{0}, Address{2}, JumpSemantics::LoopCandidate),
                           SourceAnnotationId{201});
 

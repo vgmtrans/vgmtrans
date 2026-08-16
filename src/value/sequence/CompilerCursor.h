@@ -74,9 +74,6 @@ template <class Playback, class Callable, class... Arguments>
   static_assert(std::is_copy_constructible_v<Callable>, "Compiled sequence command callables must be copyable");
   auto values = std::tuple{storedCommandValue(std::move(arguments))...};
   return [callable = std::move(callable), values = std::move(values)](void* erasedPlayback) -> Effects {
-    if (erasedPlayback == nullptr) {
-      throw std::logic_error("Compiled sequence command received no playback state");
-    }
     auto& playback = *static_cast<Playback*>(erasedPlayback);
     return std::apply([&](const auto&... value) { return invokeCommand(callable, playback, value...); }, values);
   };
@@ -562,9 +559,6 @@ public:
         throw std::logic_error("Compiled sequence command declared more than one during-wait predicate");
       }
       execution_.duringWait = [](void* erasedPlayback) {
-        if (erasedPlayback == nullptr) {
-          throw std::logic_error("Compiled sequence predicate received no playback state");
-        }
         return std::invoke(Predicate, *static_cast<Playback*>(erasedPlayback));
       };
       return *this;
@@ -828,7 +822,6 @@ private:
     return DecodedBytecodeCommand{
         .range = record_.range(),
         .opcode = opcode_,
-        .encodedSize = std::max<u32>(1, record_.size()),
         .flow = std::move(flow),
         .operands = std::move(operands_),
         .execution = std::move(execution),

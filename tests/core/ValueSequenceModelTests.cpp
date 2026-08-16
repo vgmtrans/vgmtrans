@@ -54,7 +54,7 @@ void sourceCommandsRetainOnlySemanticData() {
       addProbeCommand<ProbeProgramCommand>(builder, dialect, Address{0}, range, programBytes);
 
   expect(track.commands.size() == 1, "track builder should append one source command");
-  expect(command.range == range && command.encodedSize == programBytes.size(),
+  expect(command.range == range && command.range.size == programBytes.size(),
          "source command should retain the range needed to inspect encoded bytes");
   expect(command.execution.valid(), "source command should retain its compiled playback body");
 }

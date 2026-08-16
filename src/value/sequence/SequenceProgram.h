@@ -228,7 +228,6 @@ struct SourceCommand {
   CommandId id;
   u8 opcode = 0;
   Address address;
-  u32 encodedSize = 0;
   SourceRange range;
   SourceAnnotationId annotation;
   SequenceSemantic semantic = SequenceSemantic::Unknown;
@@ -361,7 +360,7 @@ class TrackProgramBuilder {
 public:
   explicit TrackProgramBuilder(TrackProgram& track);
 
-  const SourceCommand& addSemantic(Address address, u8 opcode, u32 encodedSize, SourceRange range,
+  const SourceCommand& addSemantic(Address address, u8 opcode, SourceRange range,
                                    std::vector<SemanticOperand> operands, CommandFlow flow,
                                    SourceAnnotationId annotation = {}, CommandExecution execution = {},
                                    SequenceSemantic semantic = SequenceSemantic::Unknown);

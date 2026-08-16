@@ -1366,8 +1366,6 @@ struct Playback {
     track.pitchEnvelope = PitchEnvelope{mode, delay, length, semitones};
   }
 
-  void pitchEnvelopeOff() { track.pitchEnvelope = {}; }
-
   [[nodiscard]] Effects konamiLoop(u8 times, s8 volumeDelta, s8 pitchDelta, Address destination) {
     RepeatCounter counter = vm.repeatCounter(0);
     if (counter.firstVisit()) {
@@ -1743,7 +1741,8 @@ struct DecodeContext {
           semitones);
     }
     case EventType::PitchEnvelopeOff:
-      return cursor.command("Pitch Envelope Off", SequenceSemantic::Pitch).invoke<&Playback::pitchEnvelopeOff>();
+      return cursor.command("Pitch Envelope Off", SequenceSemantic::Pitch)
+          .set<&TrackState::pitchEnvelope>(PitchEnvelope{});
     case EventType::Tuning: {
       auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
       const u8 tuning = event.u8("tuning", SemanticOperandRole::Pitch);

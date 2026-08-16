@@ -595,7 +595,7 @@ void akaoSnesCompilerCursorCoversRemapsUnknownsAndTruncation() {
     }
     bytes[start + 1 + unknown.operandCount] = endOpcode(unknown.profile);
     const TrackProgram track = decodeTrack(bytes, unknown.profile, start, start + 2 + unknown.operandCount);
-    expect(!track.commands.empty() && track.commands.front().encodedSize == 1 + unknown.operandCount &&
+    expect(!track.commands.empty() && track.commands.front().range.size == 1 + unknown.operandCount &&
                !track.commands.front().execution.valid(),
            "bounded unknown AkaoSnes commands should retain their exact length as non-executable semantic IR");
   }

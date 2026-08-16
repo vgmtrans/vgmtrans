@@ -256,7 +256,7 @@ void disassemblyCommandSetsHaveAuditedSizes() {
   expect(arcusTrack.commands.size() == 31 &&
              std::all_of(arcusTrack.commands.begin() + 12, arcusTrack.commands.begin() + 27,
                          [](const SourceCommand& command) {
-                           return command.encodedSize == 1 && command.semantic == SequenceSemantic::Meta;
+                           return command.range.size == 1 && command.semantic == SequenceSemantic::Meta;
                          }) &&
              arcusTrack.commands[27].opcode == 0xf4,
          "Arcus's 80-df fallback and every disassembled undefined high command must remain one-byte NOPs");

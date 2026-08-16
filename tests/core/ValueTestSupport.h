@@ -870,7 +870,7 @@ const SourceCommand& addProbeCommand(TrackProgramBuilder& builder, const Sequenc
   // at its fixture address. Rebase only its physical continuation; encoded
   // flow destinations already use the fixture's track address space.
   decoded.flow.continuation.value += address.value;
-  return builder.addSemantic(address, decoded.opcode, decoded.encodedSize, range, std::move(decoded.operands),
+  return builder.addSemantic(address, decoded.opcode, range, std::move(decoded.operands),
                              std::move(decoded.flow), decoded.annotation, std::move(decoded.execution));
 }
 

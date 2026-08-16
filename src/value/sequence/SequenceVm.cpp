@@ -316,11 +316,6 @@ void endSourceSpansAt(std::vector<SourcePlaybackSpan>& spans, u64 endTick) {
                                                                   : header.tick + duration;
 }
 
-struct RenderedTrack {
-  PerformanceTrack track;
-  std::optional<u64> loopStopTick;
-};
-
 struct PlaylistVisitState {
   u32 commandIndex = 0;
   std::map<u32, u32> repeatRemaining;
@@ -427,19 +422,17 @@ private:
 // whole-sequence coordination, such as synchronized stopping across tracks.
 class VmTrackExecutor {
 public:
-  VmTrackExecutor(const SequenceProgram& program, const TrackProgram& track, const SequenceRuntime& sequenceRuntime,
-                  const SequenceProgramBehavior& behavior, const SequenceVmOptions& options,
+  VmTrackExecutor(const SequenceProgram& program, const TrackProgram& track, const SequenceVmOptions& options,
                   PerformanceSequence& targetSequence, u64& outputSequence, bool includeGlobalInitialEvents,
-                  std::optional<u64> stopTick, std::any& programState, bool sequenceCoordinatesLoops = false,
-                  bool startsActive = true)
-      : track_(track), sequenceRuntime_(sequenceRuntime), behavior_(behavior),
-        loopPolicy_(options.loopPolicy == LoopPolicy::Default ? behavior.loopPolicy : options.loopPolicy),
-        options_(options), targetSequence_(targetSequence), outputSequence_(outputSequence), stopTick_(stopTick),
+                  std::any& programState, bool sequenceCoordinatesLoops = false, bool startsActive = true)
+      : track_(track), sequenceRuntime_(program.runtime), behavior_(program.behavior),
+        loopPolicy_(options.loopPolicy == LoopPolicy::Default ? behavior_.loopPolicy : options.loopPolicy),
+        options_(options), targetSequence_(targetSequence), outputSequence_(outputSequence),
         performanceTrack_(PerformanceTrack{
             .id = track.id,
             .sourceTrackNumber = track.sourceTrackNumber,
         }),
-        trackState_(sequenceRuntime.createTrackState ? sequenceRuntime.createTrackState(program, track) : std::any{}),
+        trackState_(sequenceRuntime_.createTrackState ? sequenceRuntime_.createTrackState(program, track) : std::any{}),
         programState_(programState),
         current_(startsActive ? destinationIndex(track, track.startAddress) : std::optional<u32>{}),
         sequenceCoordinatesLoops_(sequenceCoordinatesLoops) {
@@ -450,14 +443,6 @@ public:
     if (startsActive && !current_ && !track_.commands.empty()) {
       warn(fmt::format("Sequence track start ${:04X} was not decoded", track_.startAddress.value), {});
     }
-  }
-
-  [[nodiscard]] RenderedTrack render() {
-    while (active()) {
-      static_cast<void>(executeNext());
-    }
-
-    return finish();
   }
 
   [[nodiscard]] bool active() const noexcept { return current_.has_value() || pendingTicks_ != 0; }
@@ -478,7 +463,7 @@ public:
       if (runtime_.tick != std::numeric_limits<u64>::max()) {
         ++runtime_.tick;
       }
-      tickDialect(track_.commands.at(pendingTickCommand_));
+      tickRuntime(track_.commands.at(pendingTickCommand_));
       if (pendingTicks_ > 1) {
         executeReadyCommandDuringWait();
       }
@@ -542,7 +527,7 @@ public:
     addLoopMarker(performanceTrack_, runtime_.lastCommand, endTick, outputSequence_, "Loop End");
   }
 
-  [[nodiscard]] RenderedTrack finish() {
+  [[nodiscard]] PerformanceTrack finish() {
     closeActiveNotesAt(runtime_.tick);
     performanceTrack_.endTick = runtime_.tick;
     // Commands may schedule events inside an earlier note (for example a
@@ -552,10 +537,7 @@ public:
     std::ranges::stable_sort(performanceTrack_.events, [](const PerformanceEvent& lhs, const PerformanceEvent& rhs) {
       return performanceEventHeader(lhs).tick < performanceEventHeader(rhs).tick;
     });
-    return RenderedTrack{
-        .track = std::move(performanceTrack_),
-        .loopStopTick = loopStopTick_ ? loopStopTick_ : firstLoopTick_,
-    };
+    return std::move(performanceTrack_);
   }
 
 private:
@@ -564,7 +546,7 @@ private:
             behavior_.panLaw, &runtime_.activeNotes, &targetSequence_.sourceSpans};
   }
 
-  void tickDialect(const SourceCommand& command) {
+  void tickRuntime(const SourceCommand& command) {
     if (sequenceRuntime_.tick == nullptr) {
       return;
     }
@@ -599,11 +581,6 @@ private:
       current_ = std::nullopt;
       return false;
     }
-    if (stopTick_ && runtime_.tick >= *stopTick_) {
-      current_ = std::nullopt;
-      return false;
-    }
-
     const u32 commandIndex = *current_;
     const SourceCommand& command = track_.commands.at(commandIndex);
     const VisitState visitState = LoopDetector::visitState(commandIndex, runtime_);
@@ -866,7 +843,6 @@ private:
   const SequenceVmOptions& options_;
   PerformanceSequence& targetSequence_;
   u64& outputSequence_;
-  std::optional<u64> stopTick_;
   PerformanceTrack performanceTrack_;
   std::any trackState_;
   std::any& programState_;
@@ -1044,9 +1020,9 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, std::
       executors.reserve(program.tracks.size());
       const bool hasSectionPlaylist = program.sectionPlaylist.has_value();
       for (const TrackProgram& track : program.tracks) {
-        executors.push_back(std::make_unique<VmTrackExecutor>(
-            program, track, runtime, behavior, options_, target, outputSequence, executors.empty(), std::nullopt,
-            passProgramState, loopPolicy == LoopPolicy::PlayOnce, !hasSectionPlaylist));
+        executors.push_back(std::make_unique<VmTrackExecutor>(program, track, options_, target, outputSequence,
+                                                             executors.empty(), passProgramState,
+                                                             loopPolicy == LoopPolicy::PlayOnce, !hasSectionPlaylist));
       }
 
       std::optional<SectionPlaylistRunner> playlist;
@@ -1131,11 +1107,11 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, std::
         endSourceSpansAt(target.sourceSpans, *sequenceEndTick);
       }
       for (auto& executor : executors) {
-        auto rendered = executor->finish();
+        auto track = executor->finish();
         if (sequenceEndTick) {
-          endTrackAt(rendered.track, *sequenceEndTick);
+          endTrackAt(track, *sequenceEndTick);
         }
-        tracks.push_back(std::move(rendered.track));
+        tracks.push_back(std::move(track));
       }
       return tracks;
     };

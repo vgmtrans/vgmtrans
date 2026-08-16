@@ -79,7 +79,7 @@ std::string decodedTrackSnapshot(const TrackProgram& track) {
       snapshot += '|';
     }
     snapshot += hexAddress(command.address.value) + ':' + std::to_string(command.opcode) + ':' +
-                std::to_string(command.encodedSize);
+                std::to_string(command.range.size);
     for (const auto& operand : command.operands) {
       snapshot += ',' + operand.name + '=' + semanticValueSnapshot(operand.value);
       if (operand.encodedValue) {
@@ -1349,7 +1349,7 @@ void capcomSnesReleaseRateIsStickyAcrossInstrumentChanges() {
   const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version,
                                                          CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
   expect(track.commands.size() == 6 && track.commands.front().semantic == SequenceSemantic::Envelope &&
-             track.commands.front().encodedSize == 2 && track.commands.front().execution.valid(),
+             track.commands.front().range.size == 2 && track.commands.front().execution.valid(),
          "CapcomSnes $1D should decode as an executable two-byte envelope command");
   const SemanticOperand* gain = semanticOperand(track.commands.front(), "gain");
   const SemanticOperand* releaseSeconds = semanticOperand(track.commands.front(), "release_seconds");

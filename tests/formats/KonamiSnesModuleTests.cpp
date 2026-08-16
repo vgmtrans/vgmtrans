@@ -385,7 +385,7 @@ void konamiSnesBatmanReturnsAramUsesV2LayoutAndBoundedBank() {
   expect(program.runtime.valid() && program.tracks.size() == 1,
          "Batman Returns sequence should own an executable decoded track");
   const TrackProgram& track = program.tracks.front();
-  expect(track.commands.size() == 5 && track.commands[2].opcode == 0xfc && track.commands[2].encodedSize == 3 &&
+  expect(track.commands.size() == 5 && track.commands[2].opcode == 0xfc && track.commands[2].range.size == 3 &&
              track.commands[3].opcode == 0x3c && track.commands[3].address.value == 0x3909,
          "V2 opcode 0xfc should consume two operands without misaligning the following note");
 
@@ -919,7 +919,7 @@ void konamiSnesCompilerCursorDecodesVersionedFlowAndTruncation() {
          "Konami conditional jump should expose both decoded branch targets");
   expect(call.flow.callTarget() && call.flow.defaultDestination()->value == 12,
          "Konami call should expose its decoded little-endian target");
-  expect(std::ranges::all_of(flow.commands, [](const SourceCommand& command) { return command.encodedSize != 0; }),
+  expect(std::ranges::all_of(flow.commands, [](const SourceCommand& command) { return command.range.size != 0; }),
          "valid Konami compiler commands should retain semantic IR and source ranges");
 
   const std::vector<u8> truncatedBytes{0xe4, 0x01, 0x20};
@@ -936,7 +936,7 @@ void konamiSnesCompilerCursorDecodesVersionedFlowAndTruncation() {
 void konamiSnesCompilerCursorUsesVersionedOperandLengths() {
   const auto firstSize = [](KonamiSnesVersion version, std::vector<u8> bytes) {
     const TrackProgram track = decodeKonamiSnesSourceTrack(ByteReader(SourceId{32}, bytes), version, 0, 0);
-    return track.commands.front().encodedSize;
+    return track.commands.front().range.size;
   };
 
   expect(firstSize(KONAMISNES_V1, {0xf3, 0x00, 0x02, 0x40, 0xff}) == 4,

@@ -417,8 +417,6 @@ struct Playback {
     out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::FutureAttacks);
   }
 
-  void tuning(s8 value) { out.tuning(math::fineTuningCents(value)); }
-
   void transposeAdd(s8 value) {
     track.transpose = static_cast<s8>(std::clamp<int>(track.transpose + value, -128, 127));
   }
@@ -708,7 +706,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0x11: {
       auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::tuning>(event.s8("fraction", SemanticOperandRole::Pitch));
+      return event.emitTuning(math::fineTuningCents(event.s8("fraction", SemanticOperandRole::Pitch)));
     }
     case 0x12: {
       auto event = cursor.command("Attack Rate", SequenceSemantic::Envelope);

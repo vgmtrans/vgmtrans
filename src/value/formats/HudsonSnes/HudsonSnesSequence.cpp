@@ -884,10 +884,6 @@ struct Playback {
     track.pitchScriptDelay = delay;
   }
 
-  void pitchScriptScale(u8 scale) { track.pitchScriptScale = scale; }
-
-  void volumeCurve(u8 index) { track.noteVolumeCurve = static_cast<s8>(index); }
-
   void portamento(u8 speed) {
     track.portamentoSpeed = speed == 0 ? 0 : static_cast<u8>(speed + 1);
     track.portamentoNeedsAnchor = track.version != Version::V2 && track.portamentoSpeed != 0;
@@ -951,8 +947,6 @@ struct Playback {
   }
 
   [[nodiscard]] Effects endOrReturn() { return vm.inSubroutine() ? vm.return_() : vm.end(); }
-
-  void setLoopPoint(Address point) { track.loopPoint = point; }
 
   [[nodiscard]] Effects jumpLoopPoint() { return vm.declaredLoop(track.loopPoint); }
 
@@ -1118,7 +1112,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       if (references != nullptr) {
         references->volumeCurves.insert(curve);
       }
-      return event.invoke<&Playback::volumeCurve>(curve);
+      return event.set<&TrackState::noteVolumeCurve>(static_cast<s8>(curve));
     }
     case 0x10: {
       event.label("Move Immediate");
@@ -1332,7 +1326,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return cursor.command("Pitch Attack Envelope Off", SequenceSemantic::Pitch).invoke<&Playback::pitchAttackOff>();
     case 0xeb:
       return cursor.command("Set Loop Point", SequenceSemantic::Repeat)
-          .invoke<&Playback::setLoopPoint>(Address{begin + 1});
+          .set<&TrackState::loopPoint>(Address{begin + 1});
     case 0xec:
       return cursor.command("Jump to Loop Point", SequenceSemantic::Repeat)
           .invokeFlow<&Playback::jumpLoopPoint>();
@@ -1362,7 +1356,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         return cursor.noOp("No Operation", "nop");
       } else {
         auto event = cursor.command("Pitch Script Range", SequenceSemantic::Pitch);
-        return event.invoke<&Playback::pitchScriptScale>(event.u8("semitones"));
+        return event.set<&TrackState::pitchScriptScale>(event.u8("semitones"));
       }
     case 0xf1:
       if (version == Version::Early) {

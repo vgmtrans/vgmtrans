@@ -575,8 +575,6 @@ struct Playback {
     }
   }
 
-  void echoSend(bool enabled) { out.reverb(enabled ? 40.0 / 127.0 : 0.0); }
-
   void echoMode(u8 mode) {
     static constexpr std::array<u8, 6> depth{0, 40, 40, 40, 40, 64};
     out.reverb((mode < depth.size() ? depth[mode] : 40) / 127.0);
@@ -758,7 +756,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xa3: {
       auto event = cursor.command("Echo Send", SequenceSemantic::State);
-      return event.invoke<&Playback::echoSend>(event.u8("enabled") != 0);
+      return event.emitReverb(event.u8("enabled") != 0 ? 40.0 / 127.0 : 0.0);
     }
     case 0xaa:
       return cursor.ignored("Echo Feedback/FIR", 2, "echo-feedback-fir");

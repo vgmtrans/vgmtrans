@@ -929,7 +929,7 @@ void cps3ModuleDecodesDelayPrefixesLegatoAndRegions() {
   const auto& commands = sequence.program.tracks[0].commands;
   expect(std::ranges::any_of(commands,
                              [](const SourceCommand& command) {
-                               return command.semantic == SequenceSemantic::Wait && command.encodedSize == 1;
+                               return command.semantic == SequenceSemantic::Wait && command.range.size == 1;
                              }),
          "late low-bit bytes should decode as delay prefixes rather than rest opcodes");
 

@@ -637,16 +637,10 @@ struct Playback {
     applyEffectiveTuning();
   }
 
-  void setDefaultDuration(u8 rate) { track.noteDurationRate = rate; }
-
-  void setDefaultNoteVolume(u8 volume) { track.defaultNoteVolume = static_cast<u8>(volume & 0x7f); }
-
   void setDefaults(u8 rate, u8 volume) {
-    setDefaultDuration(rate);
-    setDefaultNoteVolume(volume);
+    track.noteDurationRate = rate;
+    track.defaultNoteVolume = static_cast<u8>(volume & 0x7f);
   }
-
-  void setInstrumentPanEnabled(bool enabled) { track.instrumentPanEnabled = enabled; }
 
   void setEchoVoice(bool enabled) {
     program.setEchoVoice(track.voiceBit, enabled);
@@ -1287,13 +1281,15 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       }
       if (version == KONAMISNES_V1) {
         auto event = cursor.command("Default Duration", SequenceSemantic::State);
-        return event.invoke<&Playback::setDefaultDuration>(event.u8("duration_rate", SemanticOperandRole::Duration));
+        return event.set<&TrackState::noteDurationRate>(
+            event.u8("duration_rate", SemanticOperandRole::Duration));
       }
       return unknownCommand(cursor, 0);
     case 0x63: {
       if (version == KONAMISNES_V1) {
         auto event = cursor.command("Default Note Volume", SequenceSemantic::State);
-        return event.invoke<&Playback::setDefaultNoteVolume>(event.u8("volume", SemanticOperandRole::Level));
+        return event.set<&TrackState::defaultNoteVolume>(
+            static_cast<u8>(event.u8("volume", SemanticOperandRole::Level) & 0x7f));
       }
       if (version == KONAMISNES_V6) {
         return cursor.command("Echo Voice On", SequenceSemantic::State).invoke<&Playback::setEchoVoice>(true);
@@ -1374,7 +1370,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       event.derived("instrument_pan_off", instrumentPanOff);
       event.derived("instrument_pan_on", instrumentPanOn);
       if (instrumentPanOff || instrumentPanOn) {
-        return event.invoke<&Playback::setInstrumentPanEnabled>(instrumentPanOn);
+        return event.set<&TrackState::instrumentPanEnabled>(instrumentPanOn);
       }
       return event.invoke<&Playback::pan>(raw);
     }

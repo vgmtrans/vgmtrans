@@ -45,11 +45,6 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
                      command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
       }
 
-      if (command.range.valid() && command.encodedSize != command.range.size) {
-        report.error("sequence.command.semantic-size",
-                     "Semantic sequence command encoded size did not match its source range", command.range);
-      }
-
       std::unordered_set<std::string> operandNames;
       operandNames.reserve(command.operands.size());
       for (const auto& operand : command.operands) {

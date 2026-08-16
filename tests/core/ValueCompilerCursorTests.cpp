@@ -234,7 +234,7 @@ void compilerCursorCompilesAndExecutesTypedCommands() {
     sourceMap = sourceMapBuilder.finish();
   }
 
-  expect(std::ranges::all_of(track.commands, [](const SourceCommand& command) { return command.encodedSize != 0; }),
+  expect(std::ranges::all_of(track.commands, [](const SourceCommand& command) { return command.range.size != 0; }),
          "compiler-cursor commands should retain source ranges instead of source bytes");
   expect(track.commands.size() == 8, "compiler cursor should decode every probe command once");
   expect(track.commands[0].execution.valid() && track.commands[1].execution.valid() &&
@@ -345,7 +345,7 @@ void compilerCursorCompilesRepeatsAndConditionalFields() {
   const std::vector<u8> conditionalBytes{0x70, 0x01, 0x12, 0x34, 0xff};
   const TrackProgram conditional =
       decodeProbeTrack(ByteReader(SourceId{10}, conditionalBytes), static_cast<u32>(conditionalBytes.size()));
-  expect(conditional.commands[0].operands.size() == 2 && conditional.commands[0].encodedSize == 4,
+  expect(conditional.commands[0].operands.size() == 2 && conditional.commands[0].range.size == 4,
          "imperative compiler cursor should naturally decode conditional field layouts");
 }
 

@@ -107,13 +107,10 @@ SourceValue semanticOperandSourceValue(const SemanticOperandValue& value) {
 TrackProgramBuilder::TrackProgramBuilder(TrackProgram& track) : track_(track) {
 }
 
-const SourceCommand& TrackProgramBuilder::addSemantic(Address address, u8 opcode, u32 encodedSize, SourceRange range,
+const SourceCommand& TrackProgramBuilder::addSemantic(Address address, u8 opcode, SourceRange range,
                                                       std::vector<SemanticOperand> operands, CommandFlow flow,
                                                       SourceAnnotationId annotation, CommandExecution execution,
                                                       SequenceSemantic semantic) {
-  if (encodedSize == 0) {
-    throw std::invalid_argument("Semantic sequence commands must include an opcode byte");
-  }
   if (track_.addressIndex.find(address)) {
     throw std::invalid_argument("Sequence command address was decoded more than once");
   }
@@ -123,7 +120,6 @@ const SourceCommand& TrackProgramBuilder::addSemantic(Address address, u8 opcode
       .id = CommandId{commandIndex},
       .opcode = opcode,
       .address = address,
-      .encodedSize = encodedSize,
       .range = range,
       .annotation = annotation,
       .semantic = semantic,

@@ -214,8 +214,6 @@ struct Playback {
     out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
 
-  void setBank(u8 bank) { track.bank = bank; }
-
   void resetAdsr() {
     loadEnvelope();
     // C0 calls the same complete instrument loader as AC. This matters after
@@ -622,7 +620,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xfe: {
       auto event = cursor.command("WDS Bank", SequenceSemantic::Program);
-      return event.invoke<&Playback::setBank>(event.u8("bank", SemanticOperandRole::InstrumentBank));
+      return event.set<&TrackState::bank>(event.u8("bank", SemanticOperandRole::InstrumentBank));
     }
     default:
       return cursor.ignored("Driver Command", kCommandSize[status - 0x80] - 1, "driver-command");

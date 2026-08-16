@@ -340,8 +340,6 @@ struct Playback {
     emitVibrato(LfoRestartMode::None);
   }
 
-  void setVolume(u8 value) { track.volume = value; }
-
   void adjustVolume(int amount) {
     track.volume = static_cast<u8>(std::clamp<int>(track.volume + amount, 0, 0x7f));
     out.level(math::level(track.volume), ValueQuantization{.levels = 128});
@@ -428,8 +426,6 @@ struct Playback {
     const Envelope envelope = snesDspEnvelope(adsr1, track.adsr2, 0);
     out.updateEnvelope(envelope, EnvelopeFields::Decay, VoiceEnvelopeScope::ActiveVoices);
   }
-
-  void echoEnabled(bool enabled) { track.echoEnabled = enabled; }
 
   void echoParameters(u8 delay, s8 feedback, u8 filter) {
     track.echoEnabled = true;
@@ -577,7 +573,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xde: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::setVolume>(event.u8("volume", SemanticOperandRole::Level));
+      return event.set<&TrackState::volume>(event.u8("volume", SemanticOperandRole::Level));
     }
     case 0xdf:
     case 0xe0:
@@ -683,7 +679,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xf6: {
       auto event = cursor.command("Echo Voice On/Off", SequenceSemantic::State);
-      return event.invoke<&Playback::echoEnabled>(event.u8("enabled") != 0);
+      return event.set<&TrackState::echoEnabled>(event.u8("enabled") != 0);
     }
     case 0xf7: {
       auto event = cursor.command("Echo Parameters", SequenceSemantic::State);
