@@ -1353,7 +1353,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     };
   }
   SequenceProgram program =
-      sequence.finish(makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime)));
+      sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime)));
   return SequenceParse{.program = std::move(program), .references = std::move(references), .headerRange = header};
 }
 

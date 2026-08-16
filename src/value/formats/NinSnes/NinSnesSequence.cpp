@@ -2288,7 +2288,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     }
     program.tracks.push_back(decodeTrack(reader, track, starts, context, sequenceId, playlist.annotation, sourceMap));
   }
-  program.runtime = makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime));
+  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime));
 
   SequenceRecipes recipes = analyzeCompiledProgram<ProgramState>(program, &ProgramState::recipes);
   return SequenceParse{

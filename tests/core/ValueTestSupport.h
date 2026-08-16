@@ -842,7 +842,7 @@ using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
 }
 
 [[nodiscard]] SequenceRuntime probeSequenceRuntime() {
-  return makeCompiledRuntime<ProbeTrackState, ProbePlayback>();
+  return makeCompiledRuntime<ProbeCompilerCursor>();
 }
 
 [[nodiscard]] SequenceProgram probeSequenceProgram() {

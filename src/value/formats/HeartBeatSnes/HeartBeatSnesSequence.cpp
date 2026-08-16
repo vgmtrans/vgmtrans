@@ -769,7 +769,7 @@ const SequenceDialect& sequenceDialect() {
 }
 
 SequenceRuntime sequenceRuntime() {
-  return makeCompiledRuntime<TrackState, Playback, ProgramState>();
+  return makeCompiledRuntime<Cursor, ProgramState>();
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, Version version, u32 trackNumber, u32 startAddress, u32 sequenceBase,

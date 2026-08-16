@@ -832,7 +832,7 @@ SequenceProgram parseMp2kSequenceProgram(ByteReader reader, AssetId id, const Mp
         .release = static_cast<u8>(envelope >> 24),
     });
   }
-  program.runtime = makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime));
+  program.runtime = makeCompiledRuntime<Mp2kCursor, ProgramState>(std::move(runtime));
 
   std::optional<SourceAnnotationId> header;
   if (sourceMap && reader.has(song.offset, headerSize)) {

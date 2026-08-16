@@ -764,7 +764,7 @@ SequenceProgram parseSegSatSequenceProgram(ByteReader reader, AssetId id, const 
     copy.sourceTrackNumber = channel;
     program.tracks.push_back(std::move(copy));
   }
-  program.runtime = makeCompiledRuntime<TrackState, Playback, ProgramState>();
+  program.runtime = makeCompiledRuntime<SegSatCursor, ProgramState>();
 
   if (sourceMap != nullptr && header) {
     sourceMap
