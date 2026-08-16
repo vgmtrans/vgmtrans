@@ -70,7 +70,6 @@ struct Effects {
   // instead of the decoded default.
   std::optional<CommandTransition> flowOverride;
 
-  [[nodiscard]] static constexpr Effects none() noexcept { return Effects{}; }
   [[nodiscard]] static constexpr Effects wait(u32 ticks) noexcept { return Effects{.advanceTicks = ticks}; }
 };
 

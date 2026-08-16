@@ -209,12 +209,6 @@ struct Playback {
     }
     return effects;
   }
-
-  Effects end(u32 delta) {
-    Effects effects = after(delta);
-    effects.flowOverride = vm.end().flowOverride;
-    return effects;
-  }
 };
 
 using Cursor = CompilerCursor<TrackState, Playback>;
@@ -306,7 +300,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     if (source.dataBytes > 1) {
       event.u8("terminator", SourceValueDisplay::Hex);
     }
-    return event.invoke<&Playback::end>(source.delta).runtimeControlFlow();
+    return event.wait(source.delta).end();
   }
   return cursor.unsupported("Unsupported Sony PS1 Event").stop();
 }

@@ -728,21 +728,20 @@ struct Playback {
   void loopSet(u8 slot, u8 count) { track.loops[slot] = count; }
   [[nodiscard]] Effects loopEnd(u8 slot, Address destination) {
     --track.loops[slot];
-    return track.loops[slot] != 0 ? vm.finiteBranch(destination) : vm.fallthrough();
+    return track.loops[slot] != 0 ? vm.finiteBranch(destination) : Effects{};
   }
   [[nodiscard]] Effects loopBreak(u8 slot, Address destination) {
     --track.loops[slot];
-    return track.loops[slot] == 0 ? vm.finiteBranch(destination) : vm.fallthrough();
+    return track.loops[slot] == 0 ? vm.finiteBranch(destination) : Effects{};
   }
   [[nodiscard]] Effects conditionalBranch(u8 value, Address destination) {
-    return value == track.branchId ? vm.finiteBranch(destination) : vm.fallthrough();
+    return value == track.branchId ? vm.finiteBranch(destination) : Effects{};
   }
   [[nodiscard]] Effects conditionalDo(u8 value, Address skip) {
-    return value != track.branchId ? vm.finiteBranch(skip) : vm.fallthrough();
+    return value != track.branchId ? vm.finiteBranch(skip) : Effects{};
   }
-  [[nodiscard]] Effects unconditionalConditionalJump(Address destination) { return vm.finiteBranch(destination); }
   [[nodiscard]] Effects volumeTargetBranch(Address destination) {
-    return track.volume != track.volumeTarget ? vm.finiteBranch(destination) : vm.fallthrough();
+    return track.volume != track.volumeTarget ? vm.finiteBranch(destination) : Effects{};
   }
 
   void volumeSweep(u8 targetAndDirection, u8 speed) {
@@ -1158,8 +1157,7 @@ struct DurationValue {
     case 0x9e: {
       auto event = cursor.command("Conditional Jump", SequenceSemantic::Jump);
       const Address destination = event.addressLe("destination", SemanticOperandRole::JumpTarget);
-      return event.invoke<&Playback::unconditionalConditionalJump>(destination)
-          .mayBranchTo(destination);
+      return event.finiteBranch(destination);
     }
     case 0x9f: {
       auto event = cursor.command("ADSR / Dynamic GAIN", SequenceSemantic::Envelope);

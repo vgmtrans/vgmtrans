@@ -1504,8 +1504,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
             event.addressLe(fmt::format("destination_{}", index), SemanticOperandRole::JumpTarget);
         event.mayBranchTo(destination);
       }
-      event.invoke<&Playback::conditional>(source);
-      return event.runtimeControlFlow();
+      return event.invokeFlow<&Playback::conditional>(source);
     }
     case Kind::SetCondition: {
       auto event = cursor.command("Set Conditional Index", SequenceSemantic::State);

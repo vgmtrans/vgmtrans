@@ -540,12 +540,12 @@ struct Playback {
         .remaining = count == 0 ? u16{0} : static_cast<u16>(count + 1u),
     };
     track.alternativeCounter = 0;
-    return Effects::none();
+    return {};
   }
 
   [[nodiscard]] Effects repeatEnd() {
     if (track.repeatDepth == 0) {
-      return vm.fallthrough();
+      return {};
     }
     RepeatFrame& repeat = track.repeats[track.repeatDepth - 1];
     if (repeat.remaining == 0) {
@@ -555,18 +555,18 @@ struct Playback {
       return vm.finiteBranch(repeat.start);
     }
     --track.repeatDepth;
-    return vm.fallthrough();
+    return {};
   }
 
   [[nodiscard]] Effects conditionalSignalJump(Address) {
     // $0158 is written by the main CPU, so an extracted sequence has no
     // deterministic branch value. Preserve both source paths and play the
     // driver's ordinary fallthrough case.
-    return vm.fallthrough();
+    return {};
   }
 
   [[nodiscard]] Effects repeatBreak(u8 count, Address destination) {
-    return ++track.alternativeCounter == count ? vm.finiteBranch(destination) : vm.fallthrough();
+    return ++track.alternativeCounter == count ? vm.finiteBranch(destination) : Effects{};
   }
 
   void tick() {
@@ -793,7 +793,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x2a: {
       auto event = cursor.command("Repeat Start", SequenceSemantic::Repeat);
       const u8 count = event.u8("count", SemanticOperandRole::Count);
-      return event.invoke<&Playback::repeatStart>(count, Address{static_cast<u16>(begin + 2)}).runtimeControlFlow();
+      return event.invokeFlow<&Playback::repeatStart>(count, Address{static_cast<u16>(begin + 2)});
     }
     case 0x2b: {
       auto event = cursor.sourceOnly("Main CPU Output Cursor", "cpu-output-cursor");
@@ -815,7 +815,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return event.invoke<&Playback::conditionalSignalJump>(destination).mayBranchTo(destination);
     }
     case 0x2e:
-      return cursor.command("Repeat End", SequenceSemantic::Repeat).invoke<&Playback::repeatEnd>().runtimeControlFlow();
+      return cursor.command("Repeat End", SequenceSemantic::Repeat).invokeFlow<&Playback::repeatEnd>();
     case 0x2f: {
       auto event = cursor.command("Repeat Break", SequenceSemantic::RepeatBreak);
       const u8 count = event.u8("count", SemanticOperandRole::Count);

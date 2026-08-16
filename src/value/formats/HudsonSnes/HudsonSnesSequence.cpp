@@ -1267,7 +1267,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return event.invoke<&Playback::beginLoop>(count, Address{begin + 2});
     }
     case 0xde:
-      return cursor.command("Loop End", SequenceSemantic::Repeat).invoke<&Playback::endLoop>().runtimeControlFlow();
+      return cursor.command("Loop End", SequenceSemantic::Repeat).invokeFlow<&Playback::endLoop>();
     case 0xdf: {
       auto event = cursor.command("Pattern Call", SequenceSemantic::Call);
       const Address destination = event.addressLe("destination", SemanticOperandRole::CallTarget);
@@ -1335,12 +1335,10 @@ using Cursor = CompilerCursor<TrackState, Playback>;
           .invoke<&Playback::setLoopPoint>(Address{begin + 1});
     case 0xec:
       return cursor.command("Jump to Loop Point", SequenceSemantic::Repeat)
-          .invoke<&Playback::jumpLoopPoint>()
-          .runtimeControlFlow();
+          .invokeFlow<&Playback::jumpLoopPoint>();
     case 0xed:
       return cursor.command("Jump to Loop Point Once", SequenceSemantic::Repeat)
-          .invoke<&Playback::jumpLoopPointOnce>()
-          .runtimeControlFlow();
+          .invokeFlow<&Playback::jumpLoopPointOnce>();
     case 0xee:
       if (version == Version::V2) {
         return cursor.noOp("No Operation", "nop");

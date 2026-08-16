@@ -90,9 +90,8 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
     }
     case 0x26: {
       auto event = cursor.command("Conflicting Flow", SequenceSemantic::State);
-      return event.invoke([](CompilerProbePlayback& playback) { return playback.vm.end(); })
-          .invoke([](CompilerProbePlayback& playback) { return playback.vm.return_(); })
-          .runtimeControlFlow();
+      return event.invokeFlow([](CompilerProbePlayback& playback) { return playback.vm.end(); })
+          .invoke([](CompilerProbePlayback& playback) { return playback.vm.return_(); });
     }
     case 0x27: {
       auto event = cursor.command("Runtime State", SequenceSemantic::State);
@@ -492,7 +491,13 @@ void compilerCursorRejectsConflictingDefaultFlowDeclarations() {
 
 void compilerCursorRejectsConflictingComposedFlow() {
   const std::vector<u8> bytes{0x26, 0xff};
-  const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{13}, bytes), static_cast<u32>(bytes.size()));
+  ScanIdAllocator ids;
+  SourceMapBuilder sourceMapBuilder([&ids]() { return ids.nextSourceAnnotationId(); });
+  const TrackProgram track =
+      decodeProbeTrack(ByteReader(SourceId{13}, bytes), static_cast<u32>(bytes.size()), &sourceMapBuilder);
+  const SourceMap sourceMap = sourceMapBuilder.finish();
+  expect(sourceMap.get(track.commands[0].annotation).playbackStatus == CommandPlaybackStatus::AffectsControlFlow,
+         "runtime-selected flow should be classified as control flow without a separate annotation call");
   const SequenceDialect dialect = compilerProbeDialect();
   const SequenceProgram program{
       .runtime = compilerProbeRuntime(),

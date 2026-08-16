@@ -463,7 +463,8 @@ struct Playback {
 
   [[nodiscard]] Effects pattern(Address destination) {
     if (track.patternDepth == 3) {
-      return finish();
+      finish();
+      return vm.end();
     }
     ++track.patternDepth;
     return vm.call(destination);
@@ -477,7 +478,7 @@ struct Playback {
     return vm.return_();
   }
 
-  [[nodiscard]] Effects finish() {
+  void finish() {
     for (const auto& note : track.activeNotes) {
       if (note.endTick > vm.tick()) {
         static_cast<void>(out.setNoteEnd(note.id, vm.tick()));
@@ -485,7 +486,6 @@ struct Playback {
     }
     track.activeNotes.clear();
     track.tiedNotes.clear();
-    return vm.end();
   }
 
   [[nodiscard]] Effects memAccess(u8 operation, u8 address, u8 data, Address destination) {
@@ -659,7 +659,7 @@ struct DecodeContext {
       switch (sub) {
         case 0:
         case 3:
-          return event.invoke<&Playback::finish>();
+          return event.invoke<&Playback::finish>().end();
         case 1:
           return event.invoke<&Playback::toneWave>(event.u32le("wave", SourceValueDisplay::Address));
         case 2:
@@ -701,7 +701,7 @@ struct DecodeContext {
       return event.invoke<&Playback::endTie>(key);
     }
     default:
-      return cursor.command("Undefined MP2k Command", SequenceSemantic::End).invoke<&Playback::finish>();
+      return cursor.command("Undefined MP2k Command", SequenceSemantic::End).invoke<&Playback::finish>().end();
   }
 }
 
@@ -722,7 +722,7 @@ struct DecodeContext {
   Mp2kCursor cursor(context.reader, begin, context.end, "mp2k", context.diagnostics);
   switch (opcode) {
     case 0xb1:
-      return cursor.command("End", SequenceSemantic::End).invoke<&Playback::finish>();
+      return cursor.command("End", SequenceSemantic::End).invoke<&Playback::finish>().end();
     case 0xb2: {
       auto event = cursor.command("Goto", SequenceSemantic::Jump);
       const auto destination = pointer(event, context.reader, "destination", SemanticOperandRole::JumpTarget);
@@ -781,7 +781,7 @@ struct DecodeContext {
       return event.set<&TrackState::transpose>(event.s8("semitones"));
     }
     default:
-      return cursor.command("Undefined MP2k Command", SequenceSemantic::End).invoke<&Playback::finish>();
+      return cursor.command("Undefined MP2k Command", SequenceSemantic::End).invoke<&Playback::finish>().end();
   }
 }
 
