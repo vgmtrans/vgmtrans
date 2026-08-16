@@ -82,7 +82,7 @@ void decodeBytecode(ByteReader reader, u32 bytecodeEnd, std::span<const Address>
         }
       });
       const auto next = decoded.flow.discoveryContinuation();
-      commands.append(std::move(decoded), offset);
+      commands.findOrAppend(std::move(decoded), offset);
       if (!next) {
         break;
       }
