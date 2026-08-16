@@ -238,12 +238,12 @@ ScanCollectionBuilder& ScanCollectionBuilder::misc(const ScanMiscDraft& asset) {
   return misc(asset.ref());
 }
 
-ScanResultBuilder::ScanResultBuilder(const ScanInput& input, std::string format)
-    : ScanResultBuilder(input, std::move(format), {}) {
+ScanResultBuilder::ScanResultBuilder(ScanInput input, std::string format)
+    : ScanResultBuilder(std::move(input), std::move(format), {}) {
 }
 
-ScanResultBuilder::ScanResultBuilder(const ScanInput& input, std::string format, std::string collectionResolver)
-    : input_(input), format_(std::move(format)),
+ScanResultBuilder::ScanResultBuilder(ScanInput input, std::string format, std::string collectionResolver)
+    : input_(std::move(input)), format_(std::move(format)),
       collectionResolver_(collectionResolver.empty() ? format_ : std::move(collectionResolver)),
       sourceMap_([this]() { return input_.ids.nextSourceAnnotationId(); }) {
 }
