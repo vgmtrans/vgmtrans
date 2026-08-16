@@ -76,13 +76,12 @@ namespace math {
 }  // namespace math
 
 struct RuntimeData {
-  std::shared_ptr<const std::array<u8, kAramSize>> aram;
-  u16 adsr1Table = 0;
-  u16 adsr2Table = 0;
-  u16 alternatePanTable = 0;
-  u16 defaultPanTable = 0;
-  u8 echoDelay = 0;
-  u8 echoFilter = 0;
+  u16 adsr1Table;
+  u16 adsr2Table;
+  u16 alternatePanTable;
+  u16 defaultPanTable;
+  u8 echoDelay;
+  u8 echoFilter;
 
   [[nodiscard]] u8 u8At(u16 address) const { return (*aram)[address]; }
 
@@ -95,16 +94,16 @@ struct RuntimeData {
     for (u32 address = 0; address < kAramSize; ++address) {
       (*aram)[address] = reader.u8At(address);
     }
-    return RuntimeData{
-        .aram = std::move(aram),
-        .adsr1Table = layout.adsr1TableAddress,
-        .adsr2Table = layout.adsr2TableAddress,
-        .alternatePanTable = layout.alternatePanTableAddress,
-        .defaultPanTable = layout.defaultPanTableAddress,
-        .echoDelay = layout.echoDelay,
-        .echoFilter = layout.echoFilter,
-    };
+    return RuntimeData(std::move(aram), layout);
   }
+
+private:
+  RuntimeData(std::shared_ptr<const std::array<u8, kAramSize>> capturedAram, const Layout& layout)
+      : adsr1Table(layout.adsr1TableAddress), adsr2Table(layout.adsr2TableAddress),
+        alternatePanTable(layout.alternatePanTableAddress), defaultPanTable(layout.defaultPanTableAddress),
+        echoDelay(layout.echoDelay), echoFilter(layout.echoFilter), aram(std::move(capturedAram)) {}
+
+  std::shared_ptr<const std::array<u8, kAramSize>> aram;
 };
 
 struct RuntimeTrackConfig {
@@ -118,6 +117,7 @@ struct RuntimeConfig {
   std::vector<RuntimeTrackConfig> tracks;
 
   [[nodiscard]] const RuntimeTrackConfig& track(const TrackProgram& source) const {
+    // decodeSequence builds both vectors in dense source-track-number order.
     return tracks.at(source.sourceTrackNumber);
   }
 };
