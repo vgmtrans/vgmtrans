@@ -364,7 +364,7 @@ struct SequenceDecodeContext {
       auto event = cursor.sourceOnly("Open Track");
       event.u8("track");
       static_cast<void>(targetAddress(context, event, SemanticOperandRole::Address));
-      return event.ignore();
+      return event;
     }
     case 0x94:
     case 0x95: {
@@ -546,7 +546,7 @@ struct SequenceDecodeContext {
     case 0xfe: {
       auto event = cursor.sourceOnly("Allocate Track");
       event.u16le("track_mask");
-      return event.ignore();
+      return event;
     }
     case 0xff:
       return cursor.command("End", SequenceSemantic::End).end();
@@ -644,7 +644,7 @@ struct SequenceDecodeContext {
   if (context.range.recoverMalformedSdatRange) {
     return decodeMalformedSdatRangeTrack(context, trackIndex, startOffset);
   }
-  return context.tracks.reachable(trackIndex, startOffset, [&](u32 offset) { return decodeCommand(context, offset); });
+  return context.tracks.decode(trackIndex, startOffset, [&](u32 offset) { return decodeCommand(context, offset); });
 }
 
 // Reads the opening track setup and returns the start of the main track followed

@@ -1048,7 +1048,7 @@ struct DurationValue {
     case 0x85: {
       auto event = cursor.sourceOnly("Main CPU Command", "cpu-command");
       static_cast<void>(event.rawBytes("arguments", 3));
-      return event.ignore();
+      return event;
     }
     case 0x87: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
@@ -1073,10 +1073,10 @@ struct DurationValue {
     case 0x8b: {
       auto event = cursor.sourceOnly("Voice DSP Control", "voice-dsp-control");
       static_cast<void>(event.rawBytes("arguments", 2));
-      return event.ignore();
+      return event;
     }
     case 0x8c:
-      return cursor.sourceOnly("NOP", "nop").ignore();
+      return cursor.sourceOnly("NOP", "nop");
     case 0x8d: {
       auto event = cursor.command("Loop Count", SequenceSemantic::Repeat);
       const u8 slot = event.u8("slot");
@@ -1086,7 +1086,7 @@ struct DurationValue {
     case 0x8f: {
       auto event = cursor.sourceOnly(opcode == 0x8e ? "Noise Clock Envelope" : "Noise Clock Add", "noise");
       static_cast<void>(event.u8("value", SourceValueDisplay::Hex));
-      return event.ignore();
+      return event;
     }
     case 0x90: {
       auto event = cursor.command("Track Flags", SequenceSemantic::State);
@@ -1095,7 +1095,7 @@ struct DurationValue {
     case 0x91: {
       auto event = cursor.sourceOnly("CPU Flags", "cpu-flags");
       static_cast<void>(event.u8("flags", SourceValueDisplay::Hex));
-      return event.ignore();
+      return event;
     }
     case 0x92: {
       auto event = cursor.command("Stereo Phase", SequenceSemantic::Pan);
@@ -1141,7 +1141,7 @@ struct DurationValue {
     case 0x9c: {
       auto event = cursor.sourceOnly("Table Transpose", "table-transpose");
       static_cast<void>(event.rawBytes("arguments", 2));
-      return event.ignore();
+      return event;
     }
     case 0x9d: {
       auto event = cursor.command("Gate", SequenceSemantic::State);
@@ -1184,7 +1184,7 @@ struct DurationValue {
     }
     case 0xa4:
       if (layout.version == Version::Aleste) {
-        return cursor.sourceOnly("Internal Flag", "internal-flag").ignore();
+        return cursor.sourceOnly("Internal Flag", "internal-flag");
       } else {
         auto event = cursor.command("Conditional Do", SequenceSemantic::Jump);
         const u8 branch = event.u8("branch_id");
@@ -1195,7 +1195,7 @@ struct DurationValue {
       }
     case 0xa5:
       if (layout.version == Version::Aleste) {
-        return cursor.sourceOnly("Internal Flag", "internal-flag").ignore();
+        return cursor.sourceOnly("Internal Flag", "internal-flag");
       } else {
         auto event = cursor.command("Branch ID Jump", SequenceSemantic::Jump);
         const u8 branch = event.u8("branch_id");
@@ -1205,8 +1205,8 @@ struct DurationValue {
       }
     case 0xa6:
     case 0xa7:
-      return cursor.sourceOnly(opcode == 0xa6 ? "Pitch Modulation On" : "Pitch Modulation Off", "pitch-modulation")
-          .ignore();
+      return cursor.sourceOnly(opcode == 0xa6 ? "Pitch Modulation On" : "Pitch Modulation Off",
+                               "pitch-modulation");
     case 0xa8:
       if (layout.hasEchoCommands()) {
         auto event = cursor.command("Echo Preset", SequenceSemantic::State);
@@ -1216,15 +1216,15 @@ struct DurationValue {
         }
         return event.invoke<&Playback::echoPreset>(index);
       }
-      return cursor.sourceOnly("NOP", "nop").ignore();
+      return cursor.sourceOnly("NOP", "nop");
     case 0xa9:
       return layout.hasEchoCommands()
                  ? cursor.command("Echo On", SequenceSemantic::State).invoke<&Playback::echoVoice>(true)
-                 : cursor.sourceOnly("NOP", "nop").ignore();
+                 : cursor.sourceOnly("NOP", "nop");
     case 0xaa:
       return layout.hasEchoCommands()
                  ? cursor.command("Echo Off", SequenceSemantic::State).invoke<&Playback::echoVoice>(false)
-                 : cursor.sourceOnly("NOP", "nop").ignore();
+                 : cursor.sourceOnly("NOP", "nop");
     case 0xab: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
       return event.invoke<&Playback::pan>(event.s8("pan", SemanticOperandRole::Pan));
@@ -1232,7 +1232,7 @@ struct DurationValue {
     case 0xac: {
       auto event = cursor.sourceOnly("Noise Clock", "noise");
       static_cast<void>(event.u8("clock", SourceValueDisplay::Hex));
-      return event.ignore();
+      return event;
     }
     case 0xad: {
       auto event = cursor.command("Loop Break", SequenceSemantic::RepeatBreak);
@@ -1249,11 +1249,11 @@ struct DurationValue {
         auto event = cursor.command("Global Echo", SequenceSemantic::State);
         return event.invoke<&Playback::echoGlobal>(event.u8("enabled"));
       }
-      return cursor.sourceOnly("NOP", "nop").ignore();
+      return cursor.sourceOnly("NOP", "nop");
     case 0xb1: {
       auto event = cursor.sourceOnly("CPU / SFX Control", "cpu-sfx-control");
       static_cast<void>(event.u8("value", SourceValueDisplay::Hex));
-      return event.ignore();
+      return event;
     }
     default:
       return cursor.unsupported("Invalid Command").stop();
@@ -1300,7 +1300,7 @@ const SequenceDialect& sequenceDialect() {
 TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, u32 trackNumber, u32 startAddress,
                                std::vector<Diagnostic>* diagnostics) {
   const TrackDecodeScope tracks{.reader = reader, .maxCommands = kCommandLimit};
-  return tracks.reachable(trackNumber, startAddress,
+  return tracks.decode(trackNumber, startAddress,
                           [&](u32 offset) { return decodeCommand(reader, offset, layout, diagnostics); });
 }
 
@@ -1320,7 +1320,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     if (adsr > 0x80) {
       references.gainEnvelopes.insert(adsr & 0x7f);
     }
-    sequence.addReachableTrack(
+    sequence.addTrack(
         track, reader.range(item, 14), start,
         [&](u32 offset) { return decodeCommand(reader, offset, layout, diagnostics, &references); }, start);
   }

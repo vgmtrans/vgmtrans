@@ -1312,13 +1312,13 @@ struct WalkState {
           .set<&TrackState::specialSequence>(false);
     case 0xd3:
     case 0xd4:
-      return cursor.sourceOnly(opcode == 0xd3 ? "Increment APU Port 3" : "Increment APU Port 2").ignore();
+      return cursor.sourceOnly(opcode == 0xd3 ? "Increment APU Port 3" : "Increment APU Port 2");
     case 0xd5:
     case 0xd6:
     case 0xd7: {
       auto event = cursor.sourceOnly("Start Song");
       static_cast<void>(event.u8("song_index"));
-      return event.ignore();
+      return event;
     }
     case 0xd8: {
       auto event = cursor.command("Relative Transpose", SequenceSemantic::Pitch);
@@ -1336,11 +1336,11 @@ struct WalkState {
     case 0xdb:
       return cursor.ignored("Driver Parameters", 2, "driver-parameters");
     case 0xdc:
-      return cursor.sourceOnly("Default Length Off", "default-length-off").ignore();
+      return cursor.sourceOnly("Default Length Off", "default-length-off");
     case 0xdd: {
       auto event = cursor.sourceOnly("Default Length", "default-length");
       static_cast<void>(event.u8("length", SemanticOperandRole::Duration));
-      return event.ignore();
+      return event;
     }
     case 0xde:
     case 0xdf: {
@@ -1424,13 +1424,13 @@ struct WalkState {
       return event.invoke<&Playback::release>(time, event.u8("gain", SourceValueDisplay::Hex));
     }
     case 0xf1:
-      return cursor.sourceOnly("Automatic Duration", "automatic-duration").ignore();
+      return cursor.sourceOnly("Automatic Duration", "automatic-duration");
     case 0xf2:
-      return cursor.sourceOnly("Manual Duration", "manual-duration").ignore();
+      return cursor.sourceOnly("Manual Duration", "manual-duration");
     case 0xf3: {
       auto event = cursor.sourceOnly("Automatic Duration Threshold", "automatic-duration-threshold");
       static_cast<void>(event.u8("threshold", SemanticOperandRole::Duration));
-      return event.ignore();
+      return event;
     }
     case 0xf4: {
       auto event = cursor.command("Tie With Duration", SequenceSemantic::Note);

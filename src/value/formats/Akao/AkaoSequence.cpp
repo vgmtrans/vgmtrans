@@ -669,7 +669,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
       if (profile.legacyFamily()) {
         auto event = cursor.sourceOnly("Reverb Depth");
         event.u16le("depth");
-        return event.ignore();
+        return event;
       }
       break;
     case 0xec:
@@ -732,7 +732,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
       if (profile.version == AkaoPs1Version::Version1_0) {
         auto event = cursor.sourceOnly("Overlay Volume Balance");
         event.u8("balance");
-        return event.ignore();
+        return event;
       }
       break;
     case 0xf7:
@@ -741,7 +741,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
         const u8 rawDuration = event.u8("duration");
         event.derived("duration_ticks", akaoZeroAs256(rawDuration));
         event.u8("balance");
-        return event.ignore();
+        return event;
       }
       break;
     case 0xfc:
@@ -884,7 +884,7 @@ TrackProgram decodeAkaoTrack(AkaoPs1Version version, const TrackDecodeScope& tra
   const auto command = [&](u32 offset) {
     return decodeCommand(tracks.reader, offset, bytecodeEnd, profile, repeats, diagnostics);
   };
-  return tracks.reachable(trackIndex, startOffset, command);
+  return tracks.decode(trackIndex, startOffset, command);
 }
 
 AkaoSequenceReferences akaoSequenceReferences(const TrackProgram& track) {

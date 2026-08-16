@@ -517,7 +517,7 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.sourceOnly("Echo Param");
       event.u8("argument", SourceValueDisplay::Hex);
       event.u8("preset", SourceValueDisplay::Hex);
-      return event.ignore();
+      return event;
     }
     case 0x1c: {
       auto event = cursor.command("Echo On/Off", SequenceSemantic::Meta);
@@ -574,7 +574,7 @@ TrackProgram decodeCapcomSnesSourceTrack(ByteReader reader, CapcomSnesEngineVers
       .reader = reader,
       .sourceMap = options.sourceMap,
   };
-  return tracks.linear(options.trackIndex, options.startOffset,
+  return tracks.decode(options.trackIndex, options.startOffset,
                        [&](u32 offset) { return decodeCommand(reader, offset, version, options.diagnostics); });
 }
 
@@ -596,7 +596,7 @@ SequenceProgram decodeCapcomSnesSequence(ByteReader reader, const CapcomSnesLayo
       continue;
     }
 
-    sequence.addLinearTrack(sourceTrackNumber, reader.range(pointerOffset, 2), trackAddress, decode);
+    sequence.addTrack(sourceTrackNumber, reader.range(pointerOffset, 2), trackAddress, decode);
   }
   return sequence.finish(capcomSnesSequenceRuntime(layout.version));
 }

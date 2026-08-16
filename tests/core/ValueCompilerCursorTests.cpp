@@ -186,7 +186,7 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
       } else {
         event.u8("value");
       }
-      return event.ignore();
+      return event;
     }
     case 0xff:
       return cursor.command("End", SequenceSemantic::End).end();
@@ -219,7 +219,7 @@ TrackProgram decodeProbeTrack(ByteReader reader, u32 end, SourceMapBuilder* sour
       .bytecodeEnd = end,
       .sourceMap = sourceMap,
   };
-  return tracks.reachable(0, 0, [=](u32 offset) { return decodeProbeCommand(reader, offset, end, diagnostics); });
+  return tracks.decode(0, 0, [=](u32 offset) { return decodeProbeCommand(reader, offset, end, diagnostics); });
 }
 
 void compilerCursorCompilesAndExecutesTypedCommands() {
@@ -542,7 +542,7 @@ void trackDecodeSourceHierarchyDistinguishesTrackedAndTracklessFormats() {
       .sourceMap = &trackedSourceMap,
   };
   const TrackProgram trackedProgram =
-      tracked.reachable(0, 0, [&](u32 offset) { return decodeProbeCommand(tracked.reader, offset, 1); });
+      tracked.decode(0, 0, [&](u32 offset) { return decodeProbeCommand(tracked.reader, offset, 1); });
   const SourceMap trackedAnnotations = trackedSourceMap.finish();
   const auto sourceTracks = trackedAnnotations.withRole(SourceId{31}, SourceRole::SequenceTrack);
   const auto* trackedCommand = trackedAnnotations.find(trackedProgram.commands.front().annotation);
@@ -559,7 +559,7 @@ void trackDecodeSourceHierarchyDistinguishesTrackedAndTracklessFormats() {
       .sourceMap = &tracklessSourceMap,
   };
   const TrackProgram tracklessProgram =
-      trackless.reachable(0, 0, [&](u32 offset) { return decodeProbeCommand(trackless.reader, offset, 1); });
+      trackless.decode(0, 0, [&](u32 offset) { return decodeProbeCommand(trackless.reader, offset, 1); });
   const SourceMap tracklessAnnotations = tracklessSourceMap.finish();
   const auto* rootCommand = tracklessAnnotations.find(tracklessProgram.commands.front().annotation);
   expect(tracklessAnnotations.withRole(SourceId{32}, SourceRole::SequenceTrack).empty() && rootCommand != nullptr &&

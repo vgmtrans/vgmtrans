@@ -255,42 +255,33 @@ struct TrackProgram {
                        SequenceSemantic semantic = SequenceSemantic::Unknown);
 };
 
-// Some drivers arrange a song as a playlist of parallel track sections. A
-// section starts every listed channel at once, and the first EndSection command
-// advances the whole playlist. Track state survives that boundary; call stacks
-// and other control-flow state do not.
-struct SequenceSection {
-  Address address;
-  // Entries align with SequenceProgram::tracks. nullopt means that channel is
-  // inactive for this section.
-  std::vector<std::optional<Address>> trackStarts;
+// Some drivers arrange a song as a playlist of parallel track sections. A play
+// command starts every listed channel at once, and the first EndSection command
+// advances the playlist. Track state survives that boundary; call stacks and
+// other control-flow state do not.
+enum class PlaylistCommandKind {
+  PlaySection,
+  Repeat,
+  End,
 };
-
-struct PlaylistPlaySection {
-  Address section;
-};
-
-struct PlaylistRepeat {
-  // Number of additional jumps after the first pass through the destination.
-  u32 additionalPlays = 0;
-  Address destination;
-  bool infinite = false;
-};
-
-struct PlaylistEnd {};
-
-using PlaylistOperation = std::variant<PlaylistPlaySection, PlaylistRepeat, PlaylistEnd>;
 
 struct PlaylistCommand {
   Address address;
   Address fallthrough;
   SourceRange range;
-  PlaylistOperation operation;
+  PlaylistCommandKind kind = PlaylistCommandKind::End;
+  // A play command retains the source section address for attribution and
+  // carries its normalized entries directly. A repeat command targets another
+  // playlist command.
+  Address target;
+  std::vector<std::optional<Address>> trackStarts;
+  // Repeat only: zero denotes an infinite repeat; positive values are the
+  // number of additional jumps after the first pass through the destination.
+  u32 additionalPlays = 0;
 };
 
 struct SectionPlaylist {
   Address startAddress;
-  std::vector<SequenceSection> sections;
   std::vector<PlaylistCommand> commands;
 };
 

@@ -527,24 +527,24 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xd2: {
       auto event = cursor.command("Pitch Parameter", SequenceSemantic::Pitch, CommandPlaybackStatus::SourceOnly);
       event.s8("value", SemanticOperandRole::Pitch);
-      return event.ignore();
+      return event;
     }
     case 0xd4: {
       auto event = cursor.command("Portamento", SequenceSemantic::Portamento, CommandPlaybackStatus::SourceOnly);
       event.u8("duration", SemanticOperandRole::Duration);
       event.s8("depth", SemanticOperandRole::Pitch);
-      return event.ignore();
+      return event;
     }
     case 0xd6: {
       auto event = cursor.command("Detune Parameter", SequenceSemantic::Pitch, CommandPlaybackStatus::SourceOnly);
       event.s8("value", SemanticOperandRole::Pitch);
-      return event.ignore();
+      return event;
     }
     case 0xd7: {
       auto event =
           cursor.command("Pitch Modulation Depth", SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
       event.u8("depth", SemanticOperandRole::Modulation);
-      return event.ignore();
+      return event;
     }
     case 0xd8:
     case 0xd9: {
@@ -553,7 +553,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       event.u8("parameter_1", SemanticOperandRole::Modulation);
       event.u8("parameter_2", SemanticOperandRole::Modulation);
       event.u8("parameter_3", SemanticOperandRole::Modulation);
-      return event.ignore();
+      return event;
     }
     case 0xe0: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
@@ -564,7 +564,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       auto event =
           cursor.command("Relative Volume Parameter", SequenceSemantic::Level, CommandPlaybackStatus::SourceOnly);
       event.s8("value", SemanticOperandRole::Level);
-      return event.ignore();
+      return event;
     }
     case 0xe2: {
       auto event = cursor.command("Volume Slide", SequenceSemantic::Level);
@@ -576,7 +576,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       auto event =
           cursor.command("Volume Modulation Depth", SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
       event.u8("depth", SemanticOperandRole::Modulation);
-      return event.ignore();
+      return event;
     }
     case 0xe4:
     case 0xe5: {
@@ -585,7 +585,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       event.u8("parameter_1", SemanticOperandRole::Modulation);
       event.u8("parameter_2", SemanticOperandRole::Modulation);
       event.u8("parameter_3", SemanticOperandRole::Modulation);
-      return event.ignore();
+      return event;
     }
     case 0xe8: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
@@ -595,7 +595,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xe9: {
       auto event = cursor.command("Relative Pan Parameter", SequenceSemantic::Pan, CommandPlaybackStatus::SourceOnly);
       event.s8("value", SemanticOperandRole::Pan);
-      return event.ignore();
+      return event;
     }
     case 0xea: {
       auto event = cursor.command("Pan Slide", SequenceSemantic::Pan);
@@ -607,7 +607,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       auto event =
           cursor.command("Pan Modulation Depth", SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
       event.u8("depth", SemanticOperandRole::Modulation);
-      return event.ignore();
+      return event;
     }
     case 0xec:
     case 0xed: {
@@ -616,7 +616,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       event.u8("parameter_1", SemanticOperandRole::Modulation);
       event.u8("parameter_2", SemanticOperandRole::Modulation);
       event.u8("parameter_3", SemanticOperandRole::Modulation);
-      return event.ignore();
+      return event;
     }
     case 0xfe: {
       auto event = cursor.command("WDS Bank", SequenceSemantic::Program);
@@ -637,7 +637,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       .sequenceAsset = sequence,
       .sourceMap = sourceMap,
   };
-  return tracks.reachable(trackIndex, start,
+  return tracks.decode(trackIndex, start,
                           [&](u32 offset) { return decodeCommand(reader, offset, end, layout, diagnostics); });
 }
 

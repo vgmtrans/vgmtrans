@@ -21,11 +21,11 @@ namespace {
   u64 first = layout.playlistAddress;
   u64 last = first + 2;
   if (program.sectionPlaylist) {
-    for (const SequenceSection& section : program.sectionPlaylist->sections) {
-      first = std::min(first, section.address.value);
-      last = std::max(last, section.address.value + kTrackCount * 2);
-    }
     for (const PlaylistCommand& command : program.sectionPlaylist->commands) {
+      if (command.kind == PlaylistCommandKind::PlaySection && !command.trackStarts.empty()) {
+        first = std::min(first, command.target.value);
+        last = std::max(last, command.target.value + kTrackCount * 2);
+      }
       if (!command.range.valid()) {
         continue;
       }

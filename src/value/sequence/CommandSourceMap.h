@@ -26,7 +26,7 @@ struct SequenceDialect;
                                                        std::optional<SourceAnnotationId> parent = std::nullopt);
 
 // One track's annotation and command-projection lifecycle. Most formats use
-// TrackDecodeScope::linear/reachable; exceptional walkers can begin a session
+// TrackDecodeScope::decode; exceptional walkers can begin a session
 // and append the commands they discover themselves.
 class TrackDecodeSession {
 public:
@@ -73,33 +73,21 @@ struct TrackDecodeScope {
                               sourceHasTracks);
   }
 
-  // Decode a mostly sequential track. Fallthrough is visited immediately;
-  // branch and call targets are queued and decoded afterward. Commands remain
-  // in discovery order, and the reader itself supplies the bytecode boundary.
-  template <class DecodeCommand>
-  [[nodiscard]] TrackProgram linear(u32 trackIndex, u32 startOffset, DecodeCommand decodeCommand) const {
-    auto session = begin(trackIndex, startOffset);
-    const auto decodeAndProject = [&](u32 offset) { return session.project(decodeCommand(offset)); };
-    auto track = decodeLinearBytecodeTrack(reader, trackIndex, startOffset,
-                                           LinearBytecodeDecodePolicy{.maxCommands = maxCommands}, decodeAndProject);
-    return session.finish(std::move(track));
-  }
-
   // Decode every block reachable from the track start within bytecodeEnd.
   // Fallthrough, jumps, and calls all contribute reachable blocks; commands
   // are stored in address order so the resulting program is stable.
   template <class DecodeCommand>
-  [[nodiscard]] TrackProgram reachable(u32 trackIndex, u32 startOffset, DecodeCommand decodeCommand) const {
+  [[nodiscard]] TrackProgram decode(u32 trackIndex, u32 startOffset, DecodeCommand decodeCommand) const {
     const std::array starts{Address{startOffset}};
-    return reachable(trackIndex, std::span<const Address>{starts}, std::move(decodeCommand));
+    return decode(trackIndex, std::span<const Address>{starts}, std::move(decodeCommand));
   }
 
   // Decode every block reachable from any of several entry points into one
   // track. This is used by formats whose sections select different roots for
   // the same persistent channel.
   template <class DecodeCommand>
-  [[nodiscard]] TrackProgram reachable(u32 trackIndex, std::span<const Address> startAddresses,
-                                       DecodeCommand decodeCommand) const {
+  [[nodiscard]] TrackProgram decode(u32 trackIndex, std::span<const Address> startAddresses,
+                                    DecodeCommand decodeCommand) const {
     if (startAddresses.empty()) {
       return TrackProgram{.sourceTrackNumber = trackIndex};
     }
@@ -108,9 +96,7 @@ struct TrackDecodeScope {
     const u32 end = bytecodeEnd == std::numeric_limits<u32>::max()
                         ? static_cast<u32>(reader.size())
                         : std::min(static_cast<u32>(reader.size()), bytecodeEnd);
-    auto track = decodeReachableBytecodeBlocks(reader, end, startAddresses, trackIndex,
-                                               ReachableBytecodeDecodePolicy{.maxCommands = maxCommands},
-                                               decodeAndProject);
+    auto track = decodeBytecodeTrack(reader, end, startAddresses, trackIndex, maxCommands, decodeAndProject);
     return session.finish(std::move(track));
   }
 };
@@ -127,17 +113,10 @@ public:
                         u32 bytecodeEnd = std::numeric_limits<u32>::max());
 
   template <class DecodeCommand>
-  void addLinearTrack(u32 trackIndex, SourceRange pointerRange, u32 startOffset, DecodeCommand decodeCommand,
-                      std::optional<u64> encodedStartOffset = std::nullopt) {
+  void addTrack(u32 trackIndex, SourceRange pointerRange, u32 startOffset, DecodeCommand decodeCommand,
+                std::optional<u64> encodedStartOffset = std::nullopt) {
     annotateTrackPointer(trackIndex, pointerRange, startOffset, encodedStartOffset);
-    program_.tracks.push_back(tracks_.linear(trackIndex, startOffset, std::move(decodeCommand)));
-  }
-
-  template <class DecodeCommand>
-  void addReachableTrack(u32 trackIndex, SourceRange pointerRange, u32 startOffset, DecodeCommand decodeCommand,
-                         std::optional<u64> encodedStartOffset = std::nullopt) {
-    annotateTrackPointer(trackIndex, pointerRange, startOffset, encodedStartOffset);
-    program_.tracks.push_back(tracks_.reachable(trackIndex, startOffset, std::move(decodeCommand)));
+    program_.tracks.push_back(tracks_.decode(trackIndex, startOffset, std::move(decodeCommand)));
   }
 
   [[nodiscard]] std::optional<SourceAnnotationId> headerAnnotation() const noexcept { return headerAnnotation_; }

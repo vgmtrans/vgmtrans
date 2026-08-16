@@ -1083,19 +1083,19 @@ SequenceProgram decodeCpsSequence(ByteReader reader, const CpsLayout& layout, co
         return decodeCps1V1Command(reader, offset, static_cast<u32>(layout.program.offset),
                                    layout.cps1InstrumentTransposes, diagnostics);
       };
-      sequence.addLinearTrack(track, reader.range(pointer, 2), start, decode, encoded);
+      sequence.addTrack(track, reader.range(pointer, 2), start, decode, encoded);
     } else if (usesLateSequence(layout.version)) {
       std::array<Address, 4> loopStarts;
       const auto decode = [&](u32 offset) {
         return decodeLateCommand(reader, offset, layout.version, loopStarts, diagnostics);
       };
-      sequence.addLinearTrack(track, reader.range(pointer, 2), start, decode, encoded);
+      sequence.addTrack(track, reader.range(pointer, 2), start, decode, encoded);
     } else {
       const auto decode = [&](u32 offset) {
         return decodeEarlyCommand(reader, offset, layout.version, static_cast<u32>(layout.program.offset),
                                   layout.cps1InstrumentTransposes, diagnostics);
       };
-      sequence.addLinearTrack(track, reader.range(pointer, 2), start, decode, encoded);
+      sequence.addTrack(track, reader.range(pointer, 2), start, decode, encoded);
     }
   }
   SequenceProgram program = sequence.finish(makeCompiledRuntime<TrackState, Playback, ProgramState>(

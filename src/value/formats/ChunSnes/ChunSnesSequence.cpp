@@ -842,14 +842,14 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return event.invoke<&Playback::conditional>(destination, value);
     }
     case 0xe1:
-      return cursor.sourceOnly("Increment CPU Counter", "cpu-counter").ignore();
+      return cursor.sourceOnly("Increment CPU Counter", "cpu-counter");
     case 0xe2: {
       auto event = cursor.command("Pitch Envelope / Vibrato", SequenceSemantic::Modulation);
       return event.invoke<&Playback::pitchEnvelope>(event.u8("script"));
     }
     case 0xe3:
     case 0xe4:
-      return cursor.sourceOnly(opcode == 0xe3 ? "Noise On" : "Noise Off", "noise").ignore();
+      return cursor.sourceOnly(opcode == 0xe3 ? "Noise On" : "Noise Off", "noise");
     case 0xe5: {
       auto event = cursor.command("Master Volume Rate", SequenceSemantic::Level);
       return event.invoke<&Playback::masterFade>(event.s8("rate"));
@@ -1013,7 +1013,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     const u32 pointer = layout.sequenceHeaderAddress + 2 + track * 2;
     const u16 raw = reader.le16(pointer);
     const u32 start = layout.version == Version::Summer ? raw : layout.sequenceHeaderAddress + raw;
-    sequence.addReachableTrack(
+    sequence.addTrack(
         track, reader.range(pointer, 2), start,
         [&](u32 offset) { return decodeCommand(reader, offset, layout.version, diagnostics); }, raw);
   }

@@ -811,7 +811,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
   for (u8 index = 0; index < bytes; ++index) {
     event.u8("data_" + std::to_string(index + 1), SourceValueDisplay::Hex);
   }
-  return event.ignore();
+  return event;
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, const KonamiArcadeLayout& layout,
@@ -978,7 +978,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       const u8 maskLow = event.u8("mask_low", SourceValueDisplay::Hex, SemanticOperandRole::Modulation);
       const u16 mask = static_cast<u16>((static_cast<u16>(maskHigh) << 8) | maskLow);
       static_cast<void>(event.derived("maximum_offset_semitones", mask / 256.0, SemanticOperandRole::Pitch));
-      return event.ignore();
+      return event;
     }
     case 0xe6:
     case 0xe8: {
@@ -1185,7 +1185,7 @@ SequenceProgram decodeKonamiArcadeSequence(ByteReader reader, const KonamiArcade
     const auto decode = [&](u32 offset) {
       return decodeCommand(reader, offset, layout, sequenceLayout, discoveredLoops, discoveredSubroutine, diagnostics);
     };
-    sequence.addLinearTrack(track.number, track.pointer, track.offset, decode, track.encodedAddress);
+    sequence.addTrack(track.number, track.pointer, track.offset, decode, track.encodedAddress);
   }
 
   return sequence.finish(
