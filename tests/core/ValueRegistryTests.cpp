@@ -59,6 +59,30 @@ void formatRegistryStoresCopyableModulesAtomically() {
   }
   expect(threw && registry.modules().size() == 2,
          "format registry should reject duplicate accepted formats without partially registering a module");
+
+  threw = false;
+  try {
+    registry.add(FormatModule{
+        .name = "ProbeSequence",
+        .scan = scanProbeSequence,
+    });
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  expect(threw && registry.modules().size() == 2,
+         "format registry should reject duplicate module names without partially registering a module");
+
+  threw = false;
+  try {
+    registry.add(SourceExtractor{
+        .name = "DynamicExtractor",
+        .extract = [](const ExtractionInput&) { return ExtractionResult{}; },
+    });
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  expect(threw && registry.extractors().size() == 1,
+         "format registry should reject duplicate extractor names without partially registering an extractor");
 }
 
 void sessionRegistersOneFormatModuleAtTheAuthoringSurface() {

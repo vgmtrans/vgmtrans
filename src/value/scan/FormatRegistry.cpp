@@ -40,6 +40,9 @@ void FormatRegistry::add(FormatModule module) {
   if (module.name.empty() || !module.scan) {
     throw std::invalid_argument("Cannot register an incomplete FormatModule");
   }
+  if (std::ranges::find(modules_, module.name, &FormatModule::name) != modules_.end()) {
+    throw std::invalid_argument(fmt::format("Duplicate FormatModule name: {}", module.name));
+  }
 
   validateAcceptedFormats(module.name, module.acceptedFormats);
   modules_.push_back(std::move(module));
@@ -51,6 +54,9 @@ void FormatRegistry::add(SourceExtractor extractor) {
   }
   if (extractor.name.empty() || !extractor.extract) {
     throw std::invalid_argument("Cannot register an incomplete SourceExtractor");
+  }
+  if (std::ranges::find(extractors_, extractor.name, &SourceExtractor::name) != extractors_.end()) {
+    throw std::invalid_argument(fmt::format("Duplicate SourceExtractor name: {}", extractor.name));
   }
   validateAcceptedFormats(extractor.name, extractor.acceptedFormats);
   extractors_.push_back(std::move(extractor));
