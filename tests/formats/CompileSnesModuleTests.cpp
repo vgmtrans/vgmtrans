@@ -215,7 +215,8 @@ void trackAndPercussionFlagsDoNotBecomeStereoPhase() {
   bytes[0x2102] = 0x01;
   writeBytes(bytes, 0x2211, {0, 0, 0, 0, 0x20, 0, 0, 0x60});
 
-  const auto balances = events<StereoBalancePerformanceEvent>(render(bytes).tracks.front());
+  const PerformanceSequence performance = render(bytes);
+  const auto balances = events<StereoBalancePerformanceEvent>(performance.tracks.front());
   expect(balances.size() >= 2 &&
              std::ranges::all_of(
                  balances, [](const auto* balance) {
@@ -229,7 +230,8 @@ void monoModeForcesCenterAndIgnoresStereoPhase() {
   bytes[1] = 0;
 
   const auto layout = findLayout(ByteReader(SourceId{306}, bytes));
-  const auto balances = events<StereoBalancePerformanceEvent>(render(bytes).tracks.front());
+  const PerformanceSequence performance = render(bytes);
+  const auto balances = events<StereoBalancePerformanceEvent>(performance.tracks.front());
   expect(layout && !layout->stereoEnabled && !balances.empty() &&
              std::ranges::all_of(
                  balances, [](const auto* balance) { return balance->leftGain > 0.49 && balance->rightGain > 0.49; }),

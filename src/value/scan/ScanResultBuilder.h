@@ -176,8 +176,8 @@ private:
 // asset metadata setup, diagnostics, and simple collection-member facts.
 class ScanResultBuilder {
 public:
-  ScanResultBuilder(const ScanInput& input, std::string format);
-  ScanResultBuilder(const ScanInput& input, std::string format, std::string collectionResolver);
+  ScanResultBuilder(ScanInput input, std::string format);
+  ScanResultBuilder(ScanInput input, std::string format, std::string collectionResolver);
   ~ScanResultBuilder();
 
   [[nodiscard]] SourceId source() const noexcept { return input_.source.id; }
@@ -237,7 +237,7 @@ private:
   [[nodiscard]] SampleCollectionBuilder& sampleDraft(size_t slot);
   [[nodiscard]] const SampleCollectionBuilder& sampleDraft(size_t slot) const;
 
-  const ScanInput& input_;
+  ScanInput input_;
   std::string format_;
   std::string collectionResolver_;
   ScanResult result_;
