@@ -263,7 +263,7 @@ struct ProgramState {
 
 struct TrackState {
   explicit TrackState(const TrackProgram& program)
-      : channel(program.id.value == 0 ? 0 : static_cast<u8>(program.id.value - 1)) {}
+      : channel(static_cast<u8>(program.sourceTrackNumber)) {}
 
   u8 channel = 0;
   u8 bank = 0;
@@ -738,7 +738,6 @@ SequenceProgram parseSegSatSequenceProgram(ByteReader reader, AssetId id, const 
   };
   const u32 tempoStart = layout.offset + 8;
   TrackProgram tempo{
-      .id = TrackId{0},
       .sourceTrackNumber = 0,
       .startAddress = Address{tempoStart},
   };
@@ -759,7 +758,6 @@ SequenceProgram parseSegSatSequenceProgram(ByteReader reader, AssetId id, const 
   program.tracks.push_back(normal);
   for (u32 channel = 1; channel < 16; ++channel) {
     TrackProgram copy = normal;
-    copy.id = TrackId{channel + 1};
     copy.sourceTrackNumber = channel;
     program.tracks.push_back(std::move(copy));
   }

@@ -909,8 +909,8 @@ void konamiSnesCompilerCursorDecodesVersionedFlowAndTruncation() {
       0xff,                                // alternate target
   };
   const TrackProgram flow = decodeKonamiSnesSourceTrack(ByteReader(SourceId{30}, flowBytes), KONAMISNES_V1, 0, 0);
-  const auto conditionalIndex = flow.addressIndex.find(Address{0});
-  const auto callIndex = flow.addressIndex.find(Address{8});
+  const auto conditionalIndex = flow.commandIndex(Address{0});
+  const auto callIndex = flow.commandIndex(Address{8});
   expect(conditionalIndex && callIndex, "Konami compiler decoding should retain reachable branch and call blocks");
   const SourceCommand& conditional = flow.commands[*conditionalIndex];
   const SourceCommand& call = flow.commands[*callIndex];

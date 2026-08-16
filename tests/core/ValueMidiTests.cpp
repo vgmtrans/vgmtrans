@@ -2418,7 +2418,6 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
 
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{0},
   };
 
@@ -2474,7 +2473,6 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
 void standaloneSequenceExportDoesNotRequireACollection() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{0},
   };
 

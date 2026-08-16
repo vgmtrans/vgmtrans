@@ -97,7 +97,7 @@ using detail::VmTrackRuntime;
 }
 
 [[nodiscard]] std::optional<u32> destinationIndex(const TrackProgram& track, Address destination) {
-  return track.addressIndex.find(destination);
+  return track.commandIndex(destination);
 }
 
 [[nodiscard]] std::optional<u32> commandChannel(const SourceCommand& command) {
@@ -423,14 +423,14 @@ private:
 // whole-sequence coordination, such as synchronized stopping across tracks.
 class VmTrackExecutor {
 public:
-  VmTrackExecutor(const SequenceProgram& program, const TrackProgram& track, const SequenceVmOptions& options,
-                  PerformanceSequence& targetSequence, u64& outputSequence, bool includeGlobalInitialEvents,
-                  std::any& programState, bool startsActive = true)
+  VmTrackExecutor(const SequenceProgram& program, TrackId trackId, const TrackProgram& track,
+                  const SequenceVmOptions& options, PerformanceSequence& targetSequence, u64& outputSequence,
+                  bool includeGlobalInitialEvents, std::any& programState, bool startsActive = true)
       : track_(track), sequenceRuntime_(program.runtime), behavior_(program.behavior),
         loopPolicy_(options.loopPolicy == LoopPolicy::Default ? behavior_.loopPolicy : options.loopPolicy),
         options_(options), targetSequence_(targetSequence), outputSequence_(outputSequence),
         performanceTrack_(PerformanceTrack{
-            .id = track.id,
+            .id = trackId,
             .sourceTrackNumber = track.sourceTrackNumber,
         }),
         trackState_(sequenceRuntime_.createTrackState ? sequenceRuntime_.createTrackState(program, track) : std::any{}),
@@ -1015,9 +1015,10 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, std::
       std::vector<std::unique_ptr<VmTrackExecutor>> executors;
       executors.reserve(program.tracks.size());
       const bool hasSectionPlaylist = program.sectionPlaylist.has_value();
-      for (const TrackProgram& track : program.tracks) {
-        executors.push_back(std::make_unique<VmTrackExecutor>(program, track, options_, target, outputSequence,
-                                                             executors.empty(), passProgramState, !hasSectionPlaylist));
+      for (size_t trackIndex = 0; trackIndex < program.tracks.size(); ++trackIndex) {
+        executors.push_back(std::make_unique<VmTrackExecutor>(
+            program, TrackId{static_cast<u32>(trackIndex)}, program.tracks[trackIndex], options_, target,
+            outputSequence, executors.empty(), passProgramState, !hasSectionPlaylist));
       }
 
       std::optional<SectionPlaylistRunner> playlist;

@@ -798,7 +798,7 @@ struct LfoState {
 [[nodiscard]] u16 followingV1TieDuration(const TrackProgram& track, Address address) {
   u16 duration = 0;
   for (u32 scanned = 0; scanned < 0x100; ++scanned) {
-    const auto index = track.addressIndex.find(address);
+    const auto index = track.commandIndex(address);
     if (!index) {
       break;
     }
@@ -837,7 +837,7 @@ struct ProgramState {
     for (const TrackProgram& track : program.tracks) {
       for (const SourceCommand& command : track.commands) {
         const Address fallthrough = command.flow.continuation;
-        const auto nextIndex = track.addressIndex.find(fallthrough);
+        const auto nextIndex = track.commandIndex(fallthrough);
         if (!nextIndex) {
           continue;
         }
@@ -852,7 +852,7 @@ struct ProgramState {
           continue;
         }
         const Address afterOff = next.flow.continuation;
-        const auto afterIndex = track.addressIndex.find(afterOff);
+        const auto afterIndex = track.commandIndex(afterOff);
         if (!afterIndex) {
           continue;
         }

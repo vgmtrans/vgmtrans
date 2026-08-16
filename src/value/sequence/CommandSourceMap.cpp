@@ -180,7 +180,6 @@ TrackDecodeSession::TrackDecodeSession(ByteReader reader, u32 trackIndex, u32 st
       commandParent_(sourceHasTracks ? annotation_ : parentAnnotation),
       rootSequenceAsset_(sourceHasTracks || commandParent_ ? std::nullopt : sequenceAsset),
       track_{
-          .id = TrackId{trackIndex},
           .sourceTrackNumber = trackIndex,
           .startAddress = Address{startOffset},
       } {

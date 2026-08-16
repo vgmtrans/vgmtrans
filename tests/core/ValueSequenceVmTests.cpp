@@ -11,7 +11,6 @@ namespace {
 void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{2},
       .sourceTrackNumber = 7,
       .startAddress = Address{0},
   };
@@ -43,8 +42,8 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
              (performance.diagnostics.empty() ? std::string{} : ": " + performance.diagnostics.front().message));
   expect(performance.tracks.size() == 1, "sequence VM should render one performance track");
   const PerformanceTrack& renderedTrack = performance.tracks[0];
-  expect(renderedTrack.id == TrackId{2} && renderedTrack.sourceTrackNumber == 7,
-         "performance track should preserve source track identity");
+  expect(renderedTrack.id == TrackId{0} && renderedTrack.sourceTrackNumber == 7,
+         "performance track should use positional identity while preserving its source track number");
   expect(renderedTrack.endTick == 12,
          "default play-once loop policy should stop at the first repeated command; end tick was " +
              std::to_string(renderedTrack.endTick));
@@ -62,19 +61,17 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
          "note event should use driver state and dialect context while staying MIDI-neutral");
   expect(note->header.sourceCommand == noteCommandId && note->header.tick == 0,
          "note event should link back to the source command that emitted it");
-  expect(trackById(program, TrackId{2}) == &program.tracks[0],
-         "sequence program helper should resolve tracks by stable track id");
-  expect(sourceCommandById(program.tracks[0], noteCommandId) == &program.tracks[0].commands[1],
-         "sequence program helper should resolve source commands by stable command id");
+  expect(program.tracks[0].command(noteCommandId) == &program.tracks[0].commands[1],
+         "track program should resolve source commands by positional command id");
   expect(sourceCommandForEvent(program, note->header) == &program.tracks[0].commands[1],
          "performance event source links should resolve back to source commands");
 
   const auto noteEvents = performanceEventsForCommand(renderedTrack, noteCommandId);
   expect(noteEvents.size() == 1 && noteEvents[0] == &renderedTrack.events[1],
          "performance helper should collect events emitted by one source command");
-  expect(performanceTrackById(performance, TrackId{2}) == &performance.tracks[0],
+  expect(performanceTrackById(performance, TrackId{0}) == &performance.tracks[0],
          "performance helper should resolve rendered tracks by stable track id");
-  expect(sourceCommandForEvent(program, PerformanceEventHeader{.sourceCommand = CommandId{99}, .track = TrackId{2}}) ==
+  expect(sourceCommandForEvent(program, PerformanceEventHeader{.sourceCommand = CommandId{99}, .track = TrackId{0}}) ==
              nullptr,
          "performance source-link helper should return null for a missing command");
 
@@ -95,7 +92,7 @@ void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
               .execute = [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter&,
                             VmApi&) { return command.address.value == 0 ? Effects::wait(7) : Effects{}; },
   };
-  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgram track{.startAddress = Address{0}};
   track.addCommand(Address{0}, 0, {}, {}, CommandFlow::fallthroughTo(Address{1}), SourceAnnotationId{20});
   track.addCommand(Address{1}, 0, {},
                       {SemanticOperand{
@@ -138,7 +135,7 @@ void sequenceVmPreservesPitchMotionThroughNoteRelease() {
                     return Effects::wait(8);
                   },
   };
-  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgram track{.startAddress = Address{0}};
   track.addCommand(Address{0}, 0, {}, {}, CommandFlow::fallthroughTo(Address{1}));
   track.addCommand(Address{1}, 0, {}, {}, CommandFlow::end(Address{2}));
 
@@ -155,7 +152,6 @@ void sequenceVmPreservesPitchMotionThroughNoteRelease() {
 void sequenceVmReplaysInfiniteLoopsWhenRequested() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{0},
   };
 
@@ -187,7 +183,6 @@ void sequenceVmReplaysInfiniteLoopsWhenRequested() {
 void sequenceVmStopsDeclaredLoopBeforeTargetReplay() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{0},
   };
 
@@ -224,7 +219,6 @@ void sequenceVmStopsDeclaredLoopBeforeTargetReplay() {
 void sequenceVmPreservesDeclaredLoopAsPerformanceMarkers() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{0},
   };
 
@@ -257,7 +251,6 @@ void sequenceVmPreservesDeclaredLoopAsPerformanceMarkers() {
 void sequenceVmLoopCandidateRequiresVisitedDestination() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{10},
   };
 
@@ -294,7 +287,6 @@ void sequenceVmLoopCandidateRequiresVisitedDestination() {
 void sequenceVmLoopCandidateIgnoresRepeatState() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{0},
   };
 
@@ -328,7 +320,6 @@ void sequenceVmLoopCandidateIgnoresRepeatState() {
 void sequenceVmPreservesLoopCandidateAsPerformanceMarkers() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{0},
   };
 
@@ -361,7 +352,6 @@ void sequenceVmPreservesLoopCandidateAsPerformanceMarkers() {
 void sequenceVmPreservesLoopsAsPerformanceMarkers() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{2},
       .sourceTrackNumber = 7,
       .startAddress = Address{0},
   };
@@ -429,7 +419,6 @@ void sequenceVmUsesProgramCommandLimit() {
       .commandLimit = 2,
   });
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{0},
   };
 
@@ -477,7 +466,6 @@ void sequenceVmUsesInitialTempoAndGlobalEventOrder() {
   const SequenceDialect orderDialect = probeSequenceDialect();
   const auto makeTrack = [&](u32 trackNumber, u32 address, u8 program) {
     TrackProgram track{
-        .id = TrackId{trackNumber},
         .sourceTrackNumber = trackNumber,
         .startAddress = Address{address},
     };
@@ -502,7 +490,6 @@ void sequenceVmUsesInitialTempoAndGlobalEventOrder() {
 void sequenceVmFallsThroughBySourceAddressWhenDecodeOrderDiffers() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{0},
   };
 
@@ -548,7 +535,6 @@ void sequenceVmEmitsProgramInitialChannelState() {
       },
       StereoBalance{0.25, 0.75});
   TrackProgram track{
-      .id = TrackId{3},
       .sourceTrackNumber = 4,
       .startAddress = Address{0},
   };
@@ -606,7 +592,7 @@ void sequenceVmEmitsProgramInitialChannelState() {
 void sequenceVmEmitsInitialMasterLevelOnce() {
   const SequenceDialect dialect = probeSequenceDialect(SequenceProgramBehavior{.initialMasterLevel = 0.25});
   const auto makeTrack = [&](u32 id) {
-    TrackProgram track{.id = TrackId{id}, .sourceTrackNumber = id, .startAddress = Address{0}};
+    TrackProgram track{.sourceTrackNumber = id, .startAddress = Address{0}};
     const std::array<u8, 1> endBytes{0xff};
     addProbeCommand<ProbeEndCommand>(track, dialect, Address{0}, probeRange(id, endBytes.size()), endBytes);
     return track;
@@ -646,7 +632,7 @@ void sequenceVmExposesSubroutineStateFromItsCallStack() {
                     return Effects{};
                   },
   };
-  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgram track{.startAddress = Address{0}};
   track.addCommand(Address{0}, 0, {}, {}, CommandFlow::call(Address{10}, Address{1}));
   track.addCommand(Address{1}, 0, {}, {}, CommandFlow::end(Address{2}));
   track.addCommand(Address{10}, 0, {}, {}, CommandFlow::return_(Address{11}));
@@ -669,7 +655,6 @@ void sequenceVmExposesSubroutineStateFromItsCallStack() {
 void sequenceVmAllowsRepeatedCallsToSameSubroutine() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{0},
   };
 
@@ -708,7 +693,6 @@ void sequenceVmAllowsRepeatedCallsToSameSubroutine() {
 void sequenceVmReplaysFiniteRepeatBlocks() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{0},
   };
 
@@ -743,7 +727,6 @@ void sequenceVmReplaysFiniteRepeatBlocks() {
 void sequenceVmRepeatReplayUsesCommandAddressesNotSourceOffsets() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{1003},
   };
 
@@ -771,7 +754,6 @@ void sequenceVmRepeatReplayUsesCommandAddressesNotSourceOffsets() {
 void sequenceVmDetectsCycleWhenRepeatCommandsReuseOneCounter() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{0},
   };
 
@@ -801,7 +783,6 @@ void sequenceVmDetectsCycleWhenRepeatCommandsReuseOneCounter() {
 void sequenceVmExecutesNestedCallInsideRepeat() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{0},
   };
 
@@ -835,7 +816,6 @@ void sequenceVmExecutesNestedCallInsideRepeat() {
 void sequenceVmExecutesRepeatInsideCall() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{0},
   };
 
@@ -869,7 +849,6 @@ void sequenceVmExecutesRepeatInsideCall() {
 void sequenceVmRunsRepeatBreakSideEffectsOnlyWhenBranchTaken() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{0},
   };
 
@@ -908,7 +887,6 @@ void sequenceVmRunsRepeatBreakSideEffectsOnlyWhenBranchTaken() {
 void sequenceVmRepeatBreakCanBranchToPreviouslyVisitedCode() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{0},
   };
 
@@ -943,7 +921,6 @@ void sequenceVmRepeatBreakCanBranchToPreviouslyVisitedCode() {
 void sequenceVmPreservesLoopMarkersForInteriorJumpTarget() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{0},
   };
 
@@ -978,7 +955,6 @@ void sequenceVmPreservesLoopMarkersForInteriorJumpTarget() {
 void sequenceVmDoesNotWrapCommandAddressOverflow() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{std::numeric_limits<u64>::max() - 1},
   };
 
@@ -1035,7 +1011,7 @@ SequenceRuntime authoritativeFlowProbeRuntime() {
 
 void sequenceVmUsesDecodedContinuationInsteadOfSizeOrStorageOrder() {
   const SequenceDialect dialect = authoritativeFlowProbeDialect();
-  TrackProgram track{.id = TrackId{0}, .startAddress = Address{100}};
+  TrackProgram track{.startAddress = Address{100}};
   track.addCommand(Address{100}, 1, {}, {}, CommandFlow::fallthroughTo(Address{200}));
   track.addCommand(Address{101}, 99, {}, {}, CommandFlow::end(Address{102}));
   track.addCommand(Address{200}, 2, {}, {}, CommandFlow::end(Address{201}));
@@ -1056,7 +1032,7 @@ void sequenceVmUsesDecodedContinuationInsteadOfSizeOrStorageOrder() {
 
 void sequenceVmUsesDecodedCallContinuationAsReturnAddress() {
   const SequenceDialect dialect = authoritativeFlowProbeDialect();
-  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgram track{.startAddress = Address{0}};
   track.addCommand(Address{0}, 0, {}, {}, CommandFlow::call(Address{10}, Address{20}));
   track.addCommand(Address{1}, 99, {}, {}, CommandFlow::end(Address{2}));
   track.addCommand(Address{10}, 10, {}, {}, CommandFlow::return_(Address{11}));
@@ -1078,7 +1054,7 @@ void sequenceVmUsesDecodedCallContinuationAsReturnAddress() {
 
 void sequenceVmPreservesExplicitJumpToContinuation() {
   const SequenceDialect dialect = authoritativeFlowProbeDialect();
-  TrackProgram track{.id = TrackId{0}, .startAddress = Address{1}};
+  TrackProgram track{.startAddress = Address{1}};
   track.addCommand(Address{1}, 1, {}, {}, CommandFlow::fallthroughTo(Address{0}));
   CommandFlow explicitJump = CommandFlow::fallthroughTo(Address{1});
   track.addCommand(Address{0}, 0xfe, {}, {}, std::move(explicitJump));
@@ -1103,7 +1079,7 @@ void sequenceVmPreservesExplicitJumpToContinuation() {
 void sequenceVmPrefersRuntimeFlowAndOtherwiseUsesTheDecodedDefault() {
   const SequenceDialect dialect = authoritativeFlowProbeDialect();
   const auto render = [&](u8 opcode, CommandFlow flow) {
-    TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+    TrackProgram track{.startAddress = Address{0}};
     track.addCommand(Address{0}, opcode, {}, {}, std::move(flow));
     return SequenceVm().render(SequenceProgram{
         .runtime = authoritativeFlowProbeRuntime(),
@@ -1119,7 +1095,7 @@ void sequenceVmPrefersRuntimeFlowAndOtherwiseUsesTheDecodedDefault() {
   const PerformanceSequence override = render(0xfd, CommandFlow::end(Address{1}));
   expect(override.diagnostics.empty(), "a runtime transition should be able to replace its decoded default");
 
-  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgram track{.startAddress = Address{0}};
   CommandFlow explicitFallthrough = CommandFlow::end(Address{1});
   track.addCommand(Address{0}, 0xfc, {}, {}, std::move(explicitFallthrough));
   track.addCommand(Address{1}, 1, {}, {}, CommandFlow::end(Address{2}));
@@ -1136,7 +1112,6 @@ void sequenceVmPrefersRuntimeFlowAndOtherwiseUsesTheDecodedDefault() {
 void sequenceVmReportsMissingJumpTargetAfterEmittedEvents() {
   const SequenceDialect dialect = probeSequenceDialect();
   TrackProgram track{
-      .id = TrackId{0},
       .startAddress = Address{0},
   };
 
@@ -1194,13 +1169,13 @@ void sequenceVmSchedulesSemanticTracksAgainstOneProgramState() {
               .execute = executeScheduledProbe,
   };
 
-  TrackProgram track0{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgram track0{.startAddress = Address{0}};
   track0.addCommand(Address{0}, 7, {}, {}, CommandFlow::fallthroughTo(Address{1}));
   track0.addCommand(Address{1}, 4, {}, {}, CommandFlow::fallthroughTo(Address{2}));
   track0.addCommand(Address{2}, 9, {}, {}, CommandFlow::fallthroughTo(Address{3}));
   track0.addCommand(Address{3}, 0, {}, {}, CommandFlow::end(Address{4}));
 
-  TrackProgram track1{.id = TrackId{1}, .sourceTrackNumber = 1, .startAddress = Address{10}};
+  TrackProgram track1{.sourceTrackNumber = 1, .startAddress = Address{10}};
   track1.addCommand(Address{10}, 2, {}, {}, CommandFlow::fallthroughTo(Address{11}));
   track1.addCommand(Address{11}, 0, {}, {}, CommandFlow::fallthroughTo(Address{12}));
   track1.addCommand(Address{12}, 0, {}, {}, CommandFlow::end(Address{13}));
@@ -1250,14 +1225,14 @@ void sequenceVmCoordinatesSemanticLoopsAtSequenceScope() {
   };
   const SequenceRuntime runtime{.execute = executeScheduledLoopProbe};
 
-  TrackProgram track0{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgram track0{.startAddress = Address{0}};
   track0.addCommand(Address{0}, 0, {}, {}, CommandFlow::fallthroughTo(Address{1}));
   track0.addCommand(Address{1}, 0, {}, {},
                        CommandFlow::jumpTo(Address{0}, Address{2}, JumpSemantics::LoopCandidate));
 
   // This track first jumps into an unvisited block. A per-track loop detector
   // stops track 0 too early while this track is still establishing its loop.
-  TrackProgram track1{.id = TrackId{1}, .startAddress = Address{100}};
+  TrackProgram track1{.startAddress = Address{100}};
   track1.addCommand(Address{100}, 0, {}, {}, CommandFlow::fallthroughTo(Address{101}));
   track1.addCommand(Address{101}, 0, {}, {},
                        CommandFlow::jumpTo(Address{110}, Address{102}, JumpSemantics::LoopCandidate));
@@ -1335,7 +1310,6 @@ void beginPlaylistProbeSection(std::any& trackState) {
 
 TrackProgram playlistProbeTrack(u32 trackId, std::initializer_list<std::pair<u32, u8>> sections) {
   TrackProgram track{
-      .id = TrackId{trackId},
       .sourceTrackNumber = trackId,
       .startAddress = Address{sections.begin()->first},
   };
@@ -1499,7 +1473,7 @@ void sequenceVmPairsNoteOnAndNoteOffCommands() {
                   },
   };
 
-  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgram track{.startAddress = Address{0}};
   for (u32 address = 0; address < 9; ++address) {
     track.addCommand(Address{address}, 0, {}, {}, CommandFlow::fallthroughTo(Address{address + 1}),
                         SourceAnnotationId{100 + address});
@@ -1558,12 +1532,12 @@ void sequenceVmClosesActiveNotesAtLoopCutoff() {
                     return Effects{};
                   },
   };
-  TrackProgram shortTrack{.id = TrackId{0}, .startAddress = Address{100}};
+  TrackProgram shortTrack{.startAddress = Address{100}};
   shortTrack.addCommand(Address{100}, 0, {}, {}, CommandFlow::fallthroughTo(Address{101}),
                            SourceAnnotationId{210});
   shortTrack.addCommand(Address{101}, 0, {}, {}, CommandFlow::end(Address{102}), SourceAnnotationId{211});
 
-  TrackProgram loopTrack{.id = TrackId{1}, .startAddress = Address{0}};
+  TrackProgram loopTrack{.startAddress = Address{0}};
   loopTrack.addCommand(Address{0}, 0, {}, {}, CommandFlow::fallthroughTo(Address{1}), SourceAnnotationId{200});
   loopTrack.addCommand(Address{1}, 0, {}, {},
                           CommandFlow::jumpTo(Address{0}, Address{2}, JumpSemantics::LoopCandidate),

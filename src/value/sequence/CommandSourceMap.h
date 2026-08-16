@@ -8,8 +8,10 @@
 
 #include "value/sequence/BytecodeDecode.h"
 
+#include <array>
 #include <limits>
 #include <optional>
+#include <span>
 #include <string>
 #include <utility>
 
@@ -88,14 +90,27 @@ struct TrackDecodeScope {
   // are stored in address order so the resulting program is stable.
   template <class DecodeCommand>
   [[nodiscard]] TrackProgram reachable(u32 trackIndex, u32 startOffset, DecodeCommand decodeCommand) const {
-    auto session = begin(trackIndex, startOffset);
+    const std::array starts{Address{startOffset}};
+    return reachable(trackIndex, std::span<const Address>{starts}, std::move(decodeCommand));
+  }
+
+  // Decode every block reachable from any of several entry points into one
+  // track. This is used by formats whose sections select different roots for
+  // the same persistent channel.
+  template <class DecodeCommand>
+  [[nodiscard]] TrackProgram reachable(u32 trackIndex, std::span<const Address> startAddresses,
+                                       DecodeCommand decodeCommand) const {
+    if (startAddresses.empty()) {
+      return TrackProgram{.sourceTrackNumber = trackIndex};
+    }
+    auto session = begin(trackIndex, static_cast<u32>(startAddresses.front().value));
     const auto decodeAndProject = [&](u32 offset) { return session.project(decodeCommand(offset)); };
     const u32 end = bytecodeEnd == std::numeric_limits<u32>::max()
                         ? static_cast<u32>(reader.size())
                         : std::min(static_cast<u32>(reader.size()), bytecodeEnd);
-    auto track =
-        decodeReachableBytecodeBlocks(reader, end, startOffset, trackIndex,
-                                      ReachableBytecodeDecodePolicy{.maxCommands = maxCommands}, decodeAndProject);
+    auto track = decodeReachableBytecodeBlocks(reader, end, startAddresses, trackIndex,
+                                               ReachableBytecodeDecodePolicy{.maxCommands = maxCommands},
+                                               decodeAndProject);
     return session.finish(std::move(track));
   }
 };

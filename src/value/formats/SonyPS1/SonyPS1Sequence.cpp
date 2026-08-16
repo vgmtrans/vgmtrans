@@ -39,7 +39,7 @@ struct ProgramState {
 
 struct TrackState {
   explicit TrackState(const TrackProgram& program)
-      : channel(static_cast<u8>(program.id.value)), program(static_cast<u8>(program.id.value)) {}
+      : channel(static_cast<u8>(program.sourceTrackNumber)), program(static_cast<u8>(program.sourceTrackNumber)) {}
 
   u8 channel = 0;
   u8 bank = 0;
@@ -396,7 +396,6 @@ SequenceProgram parseSonyPs1Sequence(ByteReader reader, AssetId id, const SonyPs
   program.tracks.push_back(track);
   for (u32 channel = 1; channel < 16; ++channel) {
     TrackProgram copy = track;
-    copy.id = TrackId{channel};
     copy.sourceTrackNumber = channel;
     program.tracks.push_back(std::move(copy));
   }

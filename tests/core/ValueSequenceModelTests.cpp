@@ -46,7 +46,7 @@ void byteReaderChecksBoundsAndEndian() {
 
 void sourceCommandsRetainOnlySemanticData() {
   const SequenceDialect dialect = probeSequenceDialect();
-  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgram track{.startAddress = Address{0}};
   const std::array<u8, 2> programBytes{0x80, 0x05};
   const SourceRange range = probeRange(0, programBytes.size());
   const CommandId commandId = addProbeCommand<ProbeProgramCommand>(track, dialect, Address{0}, range, programBytes);
@@ -82,7 +82,7 @@ void sequenceSourceRangeIncludesDecodedCommandsFromTheBaseSource() {
 
 void trackProgramRejectsDuplicateCommandAddresses() {
   const SequenceDialect dialect = probeSequenceDialect();
-  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgram track{.startAddress = Address{0}};
 
   const std::array<u8, 2> programBytes{0x80, 0x05};
   addProbeCommand<ProbeProgramCommand>(track, dialect, Address{0}, probeRange(0, programBytes.size()), programBytes);
