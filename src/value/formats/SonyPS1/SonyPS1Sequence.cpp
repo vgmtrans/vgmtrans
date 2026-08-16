@@ -288,8 +288,10 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   if (source.status == 0xff && source.data1 == 0x51) {
     auto event = beginEvent(cursor, source, "Tempo", SequenceSemantic::Tempo);
     event.u8("meta_type", SourceValueDisplay::Hex);
-    const u32 tempo = (static_cast<u32>(event.u8("tempo_high")) << 16) |
-                      (static_cast<u32>(event.u8("tempo_middle")) << 8) | event.u8("tempo_low");
+    const u8 high = event.u8("tempo_high");
+    const u8 middle = event.u8("tempo_middle");
+    const u8 low = event.u8("tempo_low");
+    const u32 tempo = (static_cast<u32>(high) << 16) | (static_cast<u32>(middle) << 8) | low;
     event.derived("microseconds_per_quarter", tempo);
     return event.invoke<&Playback::tempo>(tempo, source.delta);
   }

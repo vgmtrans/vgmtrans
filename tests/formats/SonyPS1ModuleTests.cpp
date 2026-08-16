@@ -262,6 +262,22 @@ void sonyPs1SequenceSupportsBothLoopCountGenerations() {
          "shared Note On/Off state should honor SonyPS1 sustain and close dangling notes at track end");
 }
 
+void sonyPs1TempoBytesPreserveSourceOrder() {
+  const auto bytes = sequenceFixture({
+      0x00, 0xff, 0x51, 0x01, 0x23, 0x45,
+      0x00, 0xff, 0x2f, 0x00,
+  });
+  const ByteReader reader(SourceId{91}, bytes);
+  const auto layout = readSonyPs1SequenceLayout(reader, 0);
+  expect(layout.has_value(), "SonyPS1 tempo fixture should have a valid sequence layout");
+
+  const PerformanceSequence performance =
+      SequenceVm(LoopPolicy::PlayOnce).render(parseSonyPs1Sequence(reader, AssetId{91}, *layout));
+  const auto tempos = eventsOfType<TempoPerformanceEvent>(performance.tracks.front());
+  expect(performance.diagnostics.empty() && tempos.size() == 1 && tempos.front()->microsecondsPerQuarter == 0x012345,
+         "SonyPS1 should assemble tempo bytes in encoded high-to-low order");
+}
+
 void sonyPs1SepAndVabLayoutsAreVersionAware() {
   const std::vector<u8> end{0x00, 0xff, 0x2f, 0x00};
   std::vector<u8> sep(19 + end.size() + 13 + end.size(), 0);

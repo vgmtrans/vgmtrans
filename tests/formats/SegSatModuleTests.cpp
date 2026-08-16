@@ -292,6 +292,41 @@ void segSatVlCurveMatchesMm8Saturation() {
          "MM8 byte arithmetic should saturate 0xc0..0xff to zero before SCSP attenuation conversion");
 }
 
+void segSatTempoDeltaBytesPreserveSourceOrder() {
+  std::vector<u8> bytes(17);
+  be16(bytes, 0, 48);
+  be16(bytes, 2, 1);
+  be16(bytes, 4, 16);
+  be16(bytes, 6, 0);
+  bytes[8] = 0x00;
+  bytes[9] = 0x00;
+  bytes[10] = 0x01;
+  bytes[11] = 0x02;
+  be32(bytes, 12, 400'000);
+  bytes[16] = 0x83;
+
+  const ByteReader reader(SourceId{100}, bytes);
+  const SequenceProgram program = parseSegSatSequenceProgram(reader, AssetId{100},
+                                                             SegSatSequenceLayout{
+                                                                 .offset = 0,
+                                                                 .end = static_cast<u32>(bytes.size()),
+                                                                 .ppqn = 48,
+                                                                 .tempoEventCount = 1,
+                                                                 .normalTrack = 16,
+                                                                 .normalTrackEnd = 17,
+                                                                 .tempoLoop = 0,
+                                                             });
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
+  const auto tempo = std::ranges::find_if(performance.tracks.front().events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<TempoPerformanceEvent>(event);
+  });
+  const auto* value =
+      tempo == performance.tracks.front().events.end() ? nullptr : std::get_if<TempoPerformanceEvent>(&*tempo);
+  expect(performance.diagnostics.empty() && value != nullptr && value->microsecondsPerQuarter == 400'000 &&
+             performance.tracks.front().endTick == 0x00000102,
+         "SegSat should assemble tempo delta bytes in encoded high-to-low order");
+}
+
 void segSatCollectionPreparationSuppliesVlTablesToSequence() {
   Session session;
   session.registerFormat(segSatModule());
