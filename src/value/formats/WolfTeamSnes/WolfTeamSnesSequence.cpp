@@ -944,12 +944,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const detail::CommandShape shape = detail::commandShape(layout.variant, layout.lateTraits, opcode);
       if (shape.size == 0 || !reader.has(offset, shape.size)) {
         Cursor invalid(reader, offset, "wolf-team-snes", diagnostics);
-        session.append(invalid.unsupported("Truncated or Invalid Command", "invalid").stop(), offset);
+        session.findOrAppend(invalid.unsupported("Truncated or Invalid Command", "invalid").stop(), offset);
         break;
       }
       DecodedBytecodeCommand decoded = layout.segmented() ? decodeSegmentedCommand(reader, offset, layout, diagnostics)
                                                           : decodeLateCommand(reader, offset, layout, diagnostics);
-      session.append(std::move(decoded), offset);
+      session.findOrAppend(std::move(decoded), offset);
       offset += shape.size;
       if (shape.terminatesStream) {
         break;

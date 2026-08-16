@@ -6,6 +6,7 @@
 
 #include "ValueTestSupport.h"
 #include "value/sequence/SequenceMotion.h"
+#include "value/validation/SequenceValidation.h"
 
 namespace {
 
@@ -78,6 +79,33 @@ void sequenceSourceRangeIncludesDecodedCommandsFromTheBaseSource() {
 
   expect(sequenceSourceRange(reader, baseRange, program) == reader.range(4, 19),
          "sequence source range should span its base range and same-source decoded commands only");
+}
+
+void sequenceValidationProtectsPositionalCommandStorage() {
+  const SequenceProgram program{
+      .tracks =
+          {
+              TrackProgram{
+                  .startAddress = Address{2},
+                  .commands =
+                      {
+                          SourceCommand{.address = Address{2}},
+                          SourceCommand{.address = Address{2}},
+                          SourceCommand{.address = Address{1}},
+                      },
+              },
+              TrackProgram{
+                  .startAddress = Address{0},
+                  .commands = {SourceCommand{.address = Address{1}}},
+              },
+          },
+  };
+
+  const ValidationReport validation = validateSequenceProgram(program);
+  const auto diagnostics = validation.diagnostics();
+  expect(std::ranges::count(diagnostics, "sequence.track.command-order", &Diagnostic::code) == 2 &&
+             std::ranges::count(diagnostics, "sequence.track.missing-start", &Diagnostic::code) == 1,
+         "sequence validation should reject duplicate, out-of-order, and missing-start command storage");
 }
 
 void collectionIssuesDeriveResolutionIndependentlyFromFreshness() {
@@ -398,6 +426,7 @@ void runValueSequenceModelTests() {
   byteReaderChecksBoundsAndEndian();
   sourceCommandsRetainOnlySemanticData();
   sequenceSourceRangeIncludesDecodedCommandsFromTheBaseSource();
+  sequenceValidationProtectsPositionalCommandStorage();
   collectionIssuesDeriveResolutionIndependentlyFromFreshness();
   performanceAutomationRetainsIntentAlongsideOneEventTimeline();
   performanceEmitterBindsScalarAutomationWithoutExposingStorage();

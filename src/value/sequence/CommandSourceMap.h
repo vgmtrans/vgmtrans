@@ -27,7 +27,8 @@ struct SequenceDialect;
 class TrackDecodeSession {
 public:
   [[nodiscard]] bool hasCommand(u32 offset) const { return commands_.contains(offset); }
-  const DecodedBytecodeCommand& append(DecodedBytecodeCommand command, u32 offset);
+  // Revisited offsets retain their first decoded interpretation.
+  const DecodedBytecodeCommand& findOrAppend(DecodedBytecodeCommand command, u32 offset);
   [[nodiscard]] TrackProgram finish();
 
 private:

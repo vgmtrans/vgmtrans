@@ -1792,7 +1792,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
           .range = command.range,
       });
     }
-    session.append(std::move(command), offset);
+    session.findOrAppend(std::move(command), offset);
   }
   return session.finish();
 }

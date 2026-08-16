@@ -558,13 +558,14 @@ void trackDecodeSessionOrdersExceptionalWalkerCommands() {
       .bytecodeEnd = end,
   };
   auto session = tracks.begin(0, 0);
-  session.append(decodeProbeCommand(reader, 2, end), 2);
-  session.append(decodeProbeCommand(reader, 0, end), 0);
+  session.findOrAppend(decodeProbeCommand(reader, 2, end), 2);
+  session.findOrAppend(decodeProbeCommand(reader, 0, end), 0);
+  const DecodedBytecodeCommand& retained = session.findOrAppend(decodeProbeCommand(reader, 1, end), 0);
   const TrackProgram track = session.finish();
 
-  expect(track.commands.size() == 2 && track.commands[0].address.value == 0 &&
+  expect(retained.opcode == 0x40 && track.commands.size() == 2 && track.commands[0].address.value == 0 &&
              track.commands[1].address.value == 2,
-         "track decode session should order exceptional-walker commands by source address");
+         "track decode session should retain the first command per address and order commands by source address");
 
   const SequenceDialect dialect = compilerProbeDialect();
   const PerformanceSequence performance = SequenceVm().render(SequenceProgram{

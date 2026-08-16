@@ -8,6 +8,7 @@
 
 #include "value/sequence/SequenceProgram.h"
 
+#include <algorithm>
 #include <string>
 #include <unordered_set>
 
@@ -17,6 +18,24 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
   ValidationReport report;
 
   for (const auto& track : program.tracks) {
+    for (size_t i = 1; i < track.commands.size(); ++i) {
+      const SourceCommand& previous = track.commands[i - 1];
+      const SourceCommand& command = track.commands[i];
+      if (previous.address.value >= command.address.value) {
+        report.error("sequence.track.command-order",
+                     "Sequence track contained duplicate or out-of-order command address " +
+                         std::to_string(command.address.value),
+                     command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
+      }
+    }
+    if (!track.commands.empty() &&
+        std::ranges::none_of(track.commands, [&](const SourceCommand& command) {
+          return command.address.value == track.startAddress.value;
+        })) {
+      report.error("sequence.track.missing-start",
+                   "Sequence track start address did not reference a decoded command");
+    }
+
     // Operand names are unique and source-bounded. Names deliberately serve as
     // identity so format code does not maintain a second numeric operand
     // vocabulary solely for execution.

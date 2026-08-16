@@ -183,7 +183,7 @@ TrackDecodeSession::TrackDecodeSession(ByteReader reader, u32 trackIndex, u32 st
       trackIndex_(trackIndex) {
 }
 
-const DecodedBytecodeCommand& TrackDecodeSession::append(DecodedBytecodeCommand command, u32 offset) {
+const DecodedBytecodeCommand& TrackDecodeSession::findOrAppend(DecodedBytecodeCommand command, u32 offset) {
   return commands_.try_emplace(offset, std::move(command)).first->second;
 }
 

@@ -603,12 +603,12 @@ struct SequenceDecodeContext {
         const auto overlap = std::ranges::find_if(
             callTargetOffsets, [&](u32 target) { return begin < target && target < decoded.range.endOffset(); });
         if (overlap != callTargetOffsets.end()) {
-          track.append(terminalRecoveryCommand(context, begin), begin);
+          track.findOrAppend(terminalRecoveryCommand(context, begin), begin);
           break;
         }
       }
 
-      const DecodedBytecodeCommand& command = track.append(std::move(decoded), begin);
+      const DecodedBytecodeCommand& command = track.findOrAppend(std::move(decoded), begin);
       if (command.flow.unconditionalJump()) {
         const u32 destination = command.flow.defaultDestination()->value;
         if (track.hasCommand(destination)) {

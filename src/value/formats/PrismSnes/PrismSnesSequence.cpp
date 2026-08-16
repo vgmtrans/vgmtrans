@@ -1525,7 +1525,8 @@ struct WalkState {
     }
     states.try_emplace(walk.offset, walk.decode);
     const DecodedBytecodeCommand& command =
-        session.append(decodeCommand(reader, walk.offset, version, walk.decode, programs, diagnostics), walk.offset);
+        session.findOrAppend(decodeCommand(reader, walk.offset, version, walk.decode, programs, diagnostics),
+                             walk.offset);
     const u32 continuation = static_cast<u32>(command.flow.continuation.value);
     DecodeState next = walk.decode;
     if (opcode == 0xdc) {
