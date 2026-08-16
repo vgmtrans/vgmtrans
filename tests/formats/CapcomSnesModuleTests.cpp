@@ -1131,7 +1131,7 @@ void capcomSnesSourceDialectDecodesAndRendersDriverCommands() {
   const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 7,
          "CapcomSnes source dialect should decode the fixture commands, got " + std::to_string(track.commands.size()));
-  expect(track.addressIndex.find(Address{0x3009}).has_value(),
+  expect(track.commandIndex(Address{0x3009}).has_value(),
          "CapcomSnes source dialect should index decoded command addresses");
   const SourceAnnotation& programAnnotation = commandAnnotation(annotations, track.commands[1]);
   const SourceField* instrument = fieldWithName(programAnnotation, "instrument");

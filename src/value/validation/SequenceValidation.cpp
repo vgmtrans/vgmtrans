@@ -17,19 +17,7 @@ namespace vgmtrans::core {
 ValidationReport validateSequenceProgram(const SequenceProgram& program) {
   ValidationReport report;
 
-  // Track IDs are used by performance events and lookup helpers, so they need a
-  // stable one-to-one relationship with the tracks in this program.
-  std::unordered_set<u32> trackIds;
-  trackIds.reserve(program.tracks.size());
-
   for (const auto& track : program.tracks) {
-    if (!track.id.valid()) {
-      report.error("sequence.track.missing-id", "Sequence program contained a track without an id");
-    } else if (!trackIds.insert(track.id.value).second) {
-      report.error("sequence.track.duplicate-id",
-                   "Sequence program contained duplicate track id " + std::to_string(track.id.value));
-    }
-
     // Operand names are unique and source-bounded. Names deliberately serve as
     // identity so format code does not maintain a second numeric operand
     // vocabulary solely for execution.
@@ -73,7 +61,7 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
       }
       for (size_t trackIndex = 0; trackIndex < section.trackStarts.size(); ++trackIndex) {
         if (section.trackStarts[trackIndex] &&
-            !program.tracks[trackIndex].addressIndex.find(*section.trackStarts[trackIndex])) {
+            !program.tracks[trackIndex].commandIndex(*section.trackStarts[trackIndex])) {
           report.error("sequence.playlist.missing-track-start",
                        "Sequence section referenced a track start that was not decoded");
         }

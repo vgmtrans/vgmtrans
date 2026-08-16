@@ -10,11 +10,13 @@
 #include "value/sequence/SequenceProgram.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <limits>
 #include <map>
 #include <optional>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -82,7 +84,6 @@ template <class DecodeCommand>
 [[nodiscard]] TrackProgram decodeLinearBytecodeTrack(ByteReader reader, u32 sourceTrackNumber, u32 startAddress,
                                                      LinearBytecodeDecodePolicy policy, DecodeCommand decodeCommand) {
   TrackProgram track{
-      .id = TrackId{sourceTrackNumber},
       .sourceTrackNumber = sourceTrackNumber,
       .startAddress = Address{startAddress},
   };
@@ -171,16 +172,20 @@ struct ReachableBytecodeDecodePolicy {
 // Follow the track start, jumps, and calls to find every command that can be reached.
 // Commands are appended in address order so the parsed result is stable.
 template <class DecodeCommand>
-[[nodiscard]] TrackProgram decodeReachableBytecodeBlocks(ByteReader reader, u32 bytecodeEnd, u32 startOffset,
-                                                         u32 trackIndex, ReachableBytecodeDecodePolicy policy,
+[[nodiscard]] TrackProgram decodeReachableBytecodeBlocks(ByteReader reader, u32 bytecodeEnd,
+                                                         std::span<const Address> startAddresses, u32 trackIndex,
+                                                         ReachableBytecodeDecodePolicy policy,
                                                          DecodeCommand decodeCommand) {
   TrackProgram track{
-      .id = TrackId{trackIndex},
       .sourceTrackNumber = trackIndex,
-      .startAddress = Address{startOffset},
+      .startAddress = startAddresses.empty() ? Address{} : startAddresses.front(),
   };
   std::map<u32, DecodedBytecodeCommand> commandsByOffset;
-  std::vector<u32> pendingBlocks{startOffset};
+  std::vector<u32> pendingBlocks;
+  pendingBlocks.reserve(startAddresses.size());
+  for (const Address start : startAddresses) {
+    pendingBlocks.push_back(static_cast<u32>(start.value));
+  }
   size_t decodedCommands = 0;
 
   while (!pendingBlocks.empty() && decodedCommands < policy.maxCommands) {
@@ -210,6 +215,15 @@ template <class DecodeCommand>
     appendDecodedBytecodeCommand(track, std::move(decoded), offset);
   }
   return track;
+}
+
+template <class DecodeCommand>
+[[nodiscard]] TrackProgram decodeReachableBytecodeBlocks(ByteReader reader, u32 bytecodeEnd, u32 startOffset,
+                                                         u32 trackIndex, ReachableBytecodeDecodePolicy policy,
+                                                         DecodeCommand decodeCommand) {
+  const std::array starts{Address{startOffset}};
+  return decodeReachableBytecodeBlocks(reader, bytecodeEnd, std::span<const Address>{starts}, trackIndex, policy,
+                                       std::move(decodeCommand));
 }
 
 }  // namespace vgmtrans::core

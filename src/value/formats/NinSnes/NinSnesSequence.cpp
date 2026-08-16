@@ -2168,40 +2168,9 @@ struct PlaylistDecode {
 [[nodiscard]] TrackProgram decodeTrack(ByteReader reader, u32 trackNumber, const std::vector<Address>& starts,
                                        const DecodeContext& context, AssetId sequenceId,
                                        std::optional<SourceAnnotationId> parent, SourceMapBuilder* sourceMap) {
-  if (starts.empty()) {
-    return TrackProgram{
-        .id = TrackId{trackNumber},
-        .sourceTrackNumber = trackNumber,
-    };
-  }
-
   // A channel can begin at a different address in every section. Discover all
   // roots into one immutable program, then the playlist selects the right root
   // each time that section starts.
-  std::map<u32, DecodedBytecodeCommand> commands;
-  std::vector<u32> pending;
-  for (const Address start : starts) {
-    pending.push_back(static_cast<u32>(start.value));
-  }
-  while (!pending.empty() && commands.size() < kMaxTrackCommands) {
-    u32 address = pending.back();
-    pending.pop_back();
-    while (reader.has(address, 1) && !commands.contains(address) && commands.size() < kMaxTrackCommands) {
-      DecodedBytecodeCommand command = decodeCommand(context, address);
-      command.flow.forEachDiscoveryTarget([&](Address target) {
-        if (reader.has(target.value, 1) && !commands.contains(static_cast<u32>(target.value))) {
-          pending.push_back(static_cast<u32>(target.value));
-        }
-      });
-      const auto fallthrough = command.flow.discoveryContinuation();
-      commands.emplace(address, std::move(command));
-      if (!fallthrough) {
-        break;
-      }
-      address = static_cast<u32>(fallthrough->value);
-    }
-  }
-
   const TrackDecodeScope scope{
       .reader = reader,
       .maxCommands = kMaxTrackCommands,
@@ -2209,11 +2178,7 @@ struct PlaylistDecode {
       .parentAnnotation = parent,
       .sourceMap = sourceMap,
   };
-  auto session = scope.begin(trackNumber, static_cast<u32>(starts.front().value));
-  for (auto& [address, command] : commands) {
-    session.append(std::move(command), address);
-  }
-  return session.finish();
+  return scope.reachable(trackNumber, starts, [&](u32 address) { return decodeCommand(context, address); });
 }
 
 [[nodiscard]] std::vector<u8> buildProgramMap(ByteReader reader, const Layout& layout) {

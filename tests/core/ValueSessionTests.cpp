@@ -842,7 +842,6 @@ void scanValidationReportsMultipleAdmissionErrors() {
     case 2: {
       SequenceProgram program = probeSequenceProgram();
       program.tracks = {TrackProgram{
-                          .id = TrackId{0},
                           .commands = {SourceCommand{
                               .range = badRange,
                           }},

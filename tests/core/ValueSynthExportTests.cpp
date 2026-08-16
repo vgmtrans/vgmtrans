@@ -701,7 +701,7 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   const SourceId source = sources.add(SourceFile{.name = "usage.pcm"}, {0, 0, 0});
 
   const SequenceDialect dialect = probeSequenceDialect();
-  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgram track{.startAddress = Address{0}};
   const std::array<u8, 3> defaultNote{0x90, 0x3c, 0x01};
   const std::array<u8, 2> selectLead{0x80, 0x01};
   const std::array<u8, 3> leadNote{0x90, 0x40, 0x01};
@@ -974,7 +974,7 @@ void collectionPreparationAppliesToWholeExport() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "performance-finalizer.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
   const SequenceDialect dialect = probeSequenceDialect();
-  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgram track{.startAddress = Address{0}};
   const std::array<u8, 3> noteBytes{0x90, 0x3c, 0x04};
   const std::array<u8, 1> endBytes{0xff};
   addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
@@ -1119,7 +1119,7 @@ void synthOnlyExportSkipsSequencesWithoutModulation() {
   const SequenceDialect dialect = probeSequenceDialect();
   SequenceRuntime runtime = probeSequenceRuntime();
   runtime.execute = countSynthOnlySequenceExecution;
-  TrackProgram track{.id = TrackId{0}, .startAddress = Address{0}};
+  TrackProgram track{.startAddress = Address{0}};
   const std::array<u8, 3> noteBytes{0x90, 0x3c, 0x04};
   const std::array<u8, 1> endBytes{0xff};
   addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
@@ -1305,7 +1305,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
   const SourceId source = sources.add(SourceFile{.name = "playback.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
 
   const SequenceDialect dialect = probeSequenceDialect();
-  TrackProgram track{.id = TrackId{0}, .sourceTrackNumber = 3, .startAddress = Address{0}};
+  TrackProgram track{.sourceTrackNumber = 3, .startAddress = Address{0}};
   const std::array<u8, 3> noteBytes{0x90, 0x3c, 0x04};
   const std::array<u8, 1> endBytes{0xff};
   addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(0, noteBytes.size()), noteBytes);

@@ -21,7 +21,7 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
   test::SessionSnapshotBuilder builder;
   for (u32 index = 0; index < 2; ++index) {
     const SequenceDialect& dialect = index == 0 ? dialect48 : dialect96;
-    TrackProgram track{.id = TrackId{index}, .startAddress = Address{0}};
+    TrackProgram track{.sourceTrackNumber = index, .startAddress = Address{0}};
     const std::array<u8, 3> note{0x90, static_cast<u8>(0x3c + index), 0x04};
     const std::array<u8, 1> end{0xff};
     addProbeCommand<ProbeNoteCommand>(track, dialect, Address{0}, probeRange(index * 4, note.size()), note);

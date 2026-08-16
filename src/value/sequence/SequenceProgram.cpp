@@ -15,41 +15,19 @@
 
 namespace vgmtrans::core {
 
-void AddressIndex::add(Address address, u32 commandIndex) {
-  const auto [_, inserted] = commandByAddress.emplace(address.value, commandIndex);
-  if (!inserted) {
-    throw std::invalid_argument("Sequence command address was decoded more than once");
-  }
-}
-
-std::optional<u32> AddressIndex::find(Address address) const {
-  const auto found = commandByAddress.find(address.value);
-  if (found == commandByAddress.end()) {
+std::optional<u32> TrackProgram::commandIndex(Address address) const {
+  const auto found = commandIndexesByAddress.find(address.value);
+  if (found == commandIndexesByAddress.end()) {
     return std::nullopt;
   }
   return found->second;
 }
 
-const TrackProgram* trackById(const SequenceProgram& program, TrackId id) {
-  if (id.valid() && id.value < program.tracks.size()) {
-    const auto& track = program.tracks[id.value];
-    if (track.id == id) {
-      return &track;
-    }
-  }
-
-  const auto found = std::ranges::find_if(program.tracks, [id](const TrackProgram& track) { return track.id == id; });
-  if (found == program.tracks.end()) {
+const SourceCommand* TrackProgram::command(CommandId id) const {
+  if (!id.valid() || id.value >= commands.size()) {
     return nullptr;
   }
-  return &*found;
-}
-
-const SourceCommand* sourceCommandById(const TrackProgram& track, CommandId id) {
-  if (!id.valid() || id.value >= track.commands.size()) {
-    return nullptr;
-  }
-  return &track.commands[id.value];
+  return &commands[id.value];
 }
 
 bool trackUsesSemantic(const TrackProgram& track, SequenceSemantic semantic) {
@@ -99,7 +77,7 @@ CommandId TrackProgram::addCommand(Address address, u8 opcode, SourceRange range
                                    std::vector<SemanticOperand> operands, CommandFlow flow,
                                    SourceAnnotationId annotation, CommandExecution execution,
                                    SequenceSemantic semantic) {
-  if (addressIndex.find(address)) {
+  if (commandIndex(address)) {
     throw std::invalid_argument("Sequence command address was decoded more than once");
   }
 
@@ -114,7 +92,7 @@ CommandId TrackProgram::addCommand(Address address, u8 opcode, SourceRange range
       .flow = std::move(flow),
       .execution = std::move(execution),
   });
-  addressIndex.add(address, commandIndex);
+  commandIndexesByAddress.emplace(address.value, commandIndex);
   return CommandId{commandIndex};
 }
 

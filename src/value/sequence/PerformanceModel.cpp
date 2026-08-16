@@ -177,11 +177,10 @@ const PerformanceTrack* performanceTrackById(const PerformanceSequence& sequence
 }
 
 const SourceCommand* sourceCommandForEvent(const SequenceProgram& program, const PerformanceEventHeader& header) {
-  const TrackProgram* track = trackById(program, header.track);
-  if (track == nullptr) {
+  if (!header.track.valid() || header.track.value >= program.tracks.size()) {
     return nullptr;
   }
-  return sourceCommandById(*track, header.sourceCommand);
+  return program.tracks[header.track.value].command(header.sourceCommand);
 }
 
 std::vector<const PerformanceEvent*> performanceEventsForCommand(const PerformanceTrack& track, CommandId command) {

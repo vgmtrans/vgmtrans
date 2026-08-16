@@ -239,21 +239,16 @@ struct SourceCommand {
 // This lookup is not part of compiler-cursor playback.
 [[nodiscard]] const SemanticOperand* semanticOperand(const SourceCommand& command, std::string_view name);
 
-// Maps source addresses to command indexes. The VM uses this for jumps, calls,
-// and finding the next command by source address when vector order is different.
-struct AddressIndex {
-  std::unordered_map<u64, u32> commandByAddress;
-
-  void add(Address address, u32 commandIndex);
-  [[nodiscard]] std::optional<u32> find(Address address) const;
-};
-
 struct TrackProgram {
-  TrackId id;
   u32 sourceTrackNumber = 0;
   Address startAddress;
   std::vector<SourceCommand> commands;
-  AddressIndex addressIndex;
+  // The VM uses this for jumps, calls, and finding the next command by source
+  // address when vector order differs from bytecode order.
+  std::unordered_map<u64, u32> commandIndexesByAddress;
+
+  [[nodiscard]] std::optional<u32> commandIndex(Address address) const;
+  [[nodiscard]] const SourceCommand* command(CommandId id) const;
 
   CommandId addCommand(Address address, u8 opcode, SourceRange range, std::vector<SemanticOperand> operands,
                        CommandFlow flow, SourceAnnotationId annotation = {}, CommandExecution execution = {},
@@ -344,12 +339,12 @@ struct SequenceProgram {
   SequenceRuntime runtime;
   Timebase timebase;
   SequenceProgramBehavior behavior;
+  // A track's position is its TrackId. sourceTrackNumber separately preserves
+  // the channel or slot identity encoded by the source format.
   std::vector<TrackProgram> tracks;
   std::optional<SectionPlaylist> sectionPlaylist;
 };
 
-[[nodiscard]] const TrackProgram* trackById(const SequenceProgram& program, TrackId id);
-[[nodiscard]] const SourceCommand* sourceCommandById(const TrackProgram& track, CommandId id);
 [[nodiscard]] bool trackUsesSemantic(const TrackProgram& track, SequenceSemantic semantic);
 [[nodiscard]] bool sequenceUsesSemantic(const SequenceProgram& program, SequenceSemantic semantic);
 [[nodiscard]] SourceRange sequenceSourceRange(ByteReader reader, SourceRange baseRange, const SequenceProgram& program);
