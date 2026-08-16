@@ -160,30 +160,6 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
       event.u16be("count", SourceValueDisplay::Default, SemanticOperandRole::Count);
       return event.jump(destination);
     }
-    case 0x65: {
-      auto event = cursor.command("Optional Flow Before Jump", SequenceSemantic::Jump);
-      const Address destination = event.address("destination", SemanticOperandRole::JumpTarget);
-      event.runtimeControlFlow();
-      return event.jump(destination);
-    }
-    case 0x66: {
-      auto event = cursor.command("Optional Flow After Jump", SequenceSemantic::Jump);
-      const Address destination = event.address("destination", SemanticOperandRole::JumpTarget);
-      event.jump(destination);
-      return event.runtimeControlFlow();
-    }
-    case 0x67: {
-      auto event = cursor.command("Required Flow Before Target", SequenceSemantic::Jump);
-      const Address destination = event.address("destination", SemanticOperandRole::JumpTarget);
-      event.requireRuntimeControlFlow();
-      return event.mayBranchTo(destination);
-    }
-    case 0x68: {
-      auto event = cursor.command("Required Flow After Target", SequenceSemantic::Jump);
-      const Address destination = event.address("destination", SemanticOperandRole::JumpTarget);
-      event.mayBranchTo(destination);
-      return event.requireRuntimeControlFlow();
-    }
     case 0x69: {
       auto event = cursor.command("Duplicate Static Flow", SequenceSemantic::Jump);
       const Address jumpDestination = event.address("jump_destination", SemanticOperandRole::JumpTarget);
@@ -235,14 +211,6 @@ SequenceDialect compilerProbeDialect() {
 
 SequenceRuntime compilerProbeRuntime() {
   return makeCompiledRuntime<CompilerProbeState, CompilerProbePlayback, CompilerProbeProgramState>();
-}
-
-u32 projectExecutedCommands(const CompilerProbeProgramState& state) {
-  return state.executedCommands;
-}
-
-u32 projectExecutedCommands(const CompilerPrepassProgramState& state) {
-  return state.executedCommands;
 }
 
 TrackProgram decodeProbeTrack(ByteReader reader, u32 end, SourceMapBuilder* sourceMap = nullptr,
@@ -503,32 +471,11 @@ void compilerCursorKeepsExactTargetOperandRoles() {
          "flow declaration must not relabel a different operand with the same numeric value");
 }
 
-void compilerCursorComposesFlowDeclarationsInEitherOrder() {
+void compilerCursorRejectsConflictingDefaultFlowDeclarations() {
   const auto decode = [](std::initializer_list<u8> source) {
     const std::vector<u8> bytes(source);
     return decodeProbeCommand(ByteReader(SourceId{18}, bytes), 0, static_cast<u32>(bytes.size()));
   };
-
-  const DecodedBytecodeCommand optionalBefore = decode({0x65, 0x12, 0x34});
-  const DecodedBytecodeCommand optionalAfter = decode({0x66, 0x12, 0x34});
-  expect(
-      optionalBefore.flow.overridePolicy == FlowOverridePolicy::Optional &&
-          optionalAfter.flow.overridePolicy == FlowOverridePolicy::Optional && optionalBefore.flow.defaultTransition &&
-          optionalBefore.flow.defaultTransition->kind == StaticTransitionKind::Jump &&
-          optionalBefore.flow.defaultTransition->destination.value == 0x1234 && optionalAfter.flow.defaultTransition &&
-          optionalAfter.flow.defaultTransition->kind == StaticTransitionKind::Jump &&
-          optionalAfter.flow.defaultTransition->destination.value == 0x1234,
-      "static flow and optional runtime flow should compose independently of declaration order");
-
-  const DecodedBytecodeCommand requiredBefore = decode({0x67, 0x12, 0x34});
-  const DecodedBytecodeCommand requiredAfter = decode({0x68, 0x12, 0x34});
-  expect(requiredBefore.flow.overridePolicy == FlowOverridePolicy::Required &&
-             requiredAfter.flow.overridePolicy == FlowOverridePolicy::Required &&
-             requiredBefore.flow.additionalTargets.size() == 1 &&
-             requiredBefore.flow.additionalTargets[0].value == 0x1234 &&
-             requiredAfter.flow.additionalTargets.size() == 1 &&
-             requiredAfter.flow.additionalTargets[0].value == 0x1234,
-         "an optional branch declaration must not downgrade a required runtime transition");
 
   const auto rejects = [&](std::initializer_list<u8> source) {
     try {
@@ -538,9 +485,9 @@ void compilerCursorComposesFlowDeclarationsInEitherOrder() {
       return true;
     }
   };
-  expect(rejects({0x69, 0x00, 0x01, 0x00, 0x02}), "a command should reject a second static transition");
+  expect(rejects({0x69, 0x00, 0x01, 0x00, 0x02}), "a command should reject a second default transition");
   expect(rejects({0x6a, 0x00, 0x01}) && rejects({0x6b, 0x00, 0x01}),
-         "a return discovery boundary should conflict with a static transition in either declaration order");
+         "a discover-return command should conflict with another default transition in either declaration order");
 }
 
 void compilerCursorRejectsConflictingComposedFlow() {
@@ -574,7 +521,8 @@ void compilerCursorAnalysisStopsAfterItsScheduledPrepass() {
       .tracks = {track},
   };
 
-  const u32 executed = analyzeCompiledProgram<CompilerPrepassProgramState, u32>(program, projectExecutedCommands);
+  const u32 executed =
+      analyzeCompiledProgram<CompilerPrepassProgramState>(program, &CompilerPrepassProgramState::executedCommands);
   expect(executed == 2, "compiled analysis should not execute a discarded output pass after its scheduled prepass");
 }
 
@@ -625,7 +573,7 @@ void runValueCompilerCursorTests() {
   compilerCursorExecutesEligibleCommandsDuringWaits();
   compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior();
   compilerCursorKeepsExactTargetOperandRoles();
-  compilerCursorComposesFlowDeclarationsInEitherOrder();
+  compilerCursorRejectsConflictingDefaultFlowDeclarations();
   compilerCursorRejectsConflictingComposedFlow();
   compilerCursorAnalysisStopsAfterItsScheduledPrepass();
   trackDecodeSourceHierarchyDistinguishesTrackedAndTracklessFormats();

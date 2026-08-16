@@ -63,72 +63,19 @@ struct SequenceRuntime {
   [[nodiscard]] bool valid() const noexcept { return execute != nullptr; }
 };
 
-enum class StaticTransitionKind {
-  Fallthrough,
-  Jump,
-  Call,
-  Return,
-  End,
-  EndSection,
-};
-
-struct StaticTransition {
-  StaticTransitionKind kind = StaticTransitionKind::Fallthrough;
-  Address destination;
-  JumpSemantics jumpSemantics = JumpSemantics::Normal;
-
-  [[nodiscard]] static constexpr StaticTransition fallthrough() noexcept { return {}; }
-  [[nodiscard]] static constexpr StaticTransition jump(Address destination,
-                                                       JumpSemantics semantics = JumpSemantics::Normal) noexcept {
-    return StaticTransition{
-        .kind = StaticTransitionKind::Jump,
-        .destination = destination,
-        .jumpSemantics = semantics,
-    };
-  }
-  [[nodiscard]] static constexpr StaticTransition call(Address destination) noexcept {
-    return StaticTransition{
-        .kind = StaticTransitionKind::Call,
-        .destination = destination,
-    };
-  }
-  [[nodiscard]] static constexpr StaticTransition return_() noexcept {
-    return StaticTransition{.kind = StaticTransitionKind::Return};
-  }
-  [[nodiscard]] static constexpr StaticTransition end() noexcept {
-    return StaticTransition{.kind = StaticTransitionKind::End};
-  }
-  [[nodiscard]] static constexpr StaticTransition endSection() noexcept {
-    return StaticTransition{.kind = StaticTransitionKind::EndSection};
-  }
-};
-
-enum class FlowOverridePolicy {
-  Forbidden,
-  Optional,
-  Required,
-};
-
-enum class DiscoveryDisposition {
-  FromDefaultTransition,
-  ReturnBoundary,
-};
-
-// Static command flow is authoritative for both discovery and ordinary
-// execution. continuation is recorded independently because every encoded
-// command has a physical successor even when its default transition is a jump,
-// call, return, or end.
+// Decoded command flow drives discovery and supplies the runtime default.
+// continuation is recorded independently because every encoded command has a
+// physical successor even when its default transition is a jump, call, return,
+// or end.
 struct CommandFlow {
   Address continuation;
-  std::optional<StaticTransition> defaultTransition;
-  FlowOverridePolicy overridePolicy = FlowOverridePolicy::Forbidden;
+  CommandTransition defaultTransition;
   std::vector<Address> additionalTargets;
-  DiscoveryDisposition discovery = DiscoveryDisposition::FromDefaultTransition;
 
   [[nodiscard]] static CommandFlow fallthroughTo(Address continuation) {
     return CommandFlow{
         .continuation = continuation,
-        .defaultTransition = StaticTransition::fallthrough(),
+        .defaultTransition = CommandTransition::fallthrough(),
     };
   }
 
@@ -136,50 +83,47 @@ struct CommandFlow {
                                           JumpSemantics semantics = JumpSemantics::Normal) {
     return CommandFlow{
         .continuation = continuation,
-        .defaultTransition = StaticTransition::jump(destination, semantics),
+        .defaultTransition = CommandTransition::jump(destination, semantics),
     };
   }
 
   [[nodiscard]] static CommandFlow call(Address destination, Address continuation) {
     return CommandFlow{
         .continuation = continuation,
-        .defaultTransition = StaticTransition::call(destination),
+        .defaultTransition = CommandTransition::call(destination),
     };
   }
 
   [[nodiscard]] static CommandFlow return_(Address continuation) {
     return CommandFlow{
         .continuation = continuation,
-        .defaultTransition = StaticTransition::return_(),
+        .defaultTransition = CommandTransition::return_(),
     };
   }
 
   [[nodiscard]] static CommandFlow end(Address continuation) {
     return CommandFlow{
         .continuation = continuation,
-        .defaultTransition = StaticTransition::end(),
+        .defaultTransition = CommandTransition::end(),
     };
   }
 
   [[nodiscard]] static CommandFlow endSection(Address continuation) {
     return CommandFlow{
         .continuation = continuation,
-        .defaultTransition = StaticTransition::endSection(),
+        .defaultTransition = CommandTransition::endSection(),
     };
   }
 
   [[nodiscard]] std::optional<Address> discoveryContinuation() const noexcept {
-    if (discovery == DiscoveryDisposition::ReturnBoundary || !defaultTransition) {
-      return std::nullopt;
-    }
-    switch (defaultTransition->kind) {
-      case StaticTransitionKind::Fallthrough:
-      case StaticTransitionKind::Call:
+    switch (defaultTransition.kind) {
+      case CommandTransitionKind::Fallthrough:
+      case CommandTransitionKind::Call:
         return continuation;
-      case StaticTransitionKind::Jump:
-      case StaticTransitionKind::Return:
-      case StaticTransitionKind::End:
-      case StaticTransitionKind::EndSection:
+      case CommandTransitionKind::Jump:
+      case CommandTransitionKind::Return:
+      case CommandTransitionKind::End:
+      case CommandTransitionKind::EndSection:
         return std::nullopt;
     }
     return std::nullopt;
@@ -187,9 +131,9 @@ struct CommandFlow {
 
   template <class Visitor>
   void forEachDiscoveryTarget(Visitor&& visitor) const {
-    if (defaultTransition && (defaultTransition->kind == StaticTransitionKind::Jump ||
-                              defaultTransition->kind == StaticTransitionKind::Call)) {
-      std::invoke(visitor, defaultTransition->destination);
+    if (defaultTransition.kind == CommandTransitionKind::Jump ||
+        defaultTransition.kind == CommandTransitionKind::Call) {
+      std::invoke(visitor, defaultTransition.destination);
     }
     for (const Address target : additionalTargets) {
       std::invoke(visitor, target);
@@ -197,24 +141,24 @@ struct CommandFlow {
   }
 
   [[nodiscard]] bool endsPlayback() const noexcept {
-    return defaultTransition && (defaultTransition->kind == StaticTransitionKind::End ||
-                                 defaultTransition->kind == StaticTransitionKind::EndSection);
+    return defaultTransition.kind == CommandTransitionKind::End ||
+           defaultTransition.kind == CommandTransitionKind::EndSection;
   }
 
   [[nodiscard]] bool unconditionalJump() const noexcept {
-    return defaultTransition && defaultTransition->kind == StaticTransitionKind::Jump;
+    return defaultTransition.kind == CommandTransitionKind::Jump;
   }
 
   [[nodiscard]] bool callTarget() const noexcept {
-    return defaultTransition && defaultTransition->kind == StaticTransitionKind::Call;
+    return defaultTransition.kind == CommandTransitionKind::Call;
   }
 
   [[nodiscard]] std::optional<Address> defaultDestination() const noexcept {
-    if (!defaultTransition || (defaultTransition->kind != StaticTransitionKind::Jump &&
-                               defaultTransition->kind != StaticTransitionKind::Call)) {
+    if (defaultTransition.kind != CommandTransitionKind::Jump &&
+        defaultTransition.kind != CommandTransitionKind::Call) {
       return std::nullopt;
     }
-    return defaultTransition->destination;
+    return defaultTransition.destination;
   }
 };
 
@@ -397,7 +341,6 @@ struct SequenceProgramBehavior {
 struct SequenceProgram {
   SequenceRuntime runtime;
   Timebase timebase;
-  Address sourceBaseAddress;
   SequenceProgramBehavior behavior;
   std::vector<TrackProgram> tracks;
   std::optional<SectionPlaylist> sectionPlaylist;

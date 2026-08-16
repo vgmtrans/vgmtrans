@@ -1505,7 +1505,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         event.mayBranchTo(destination);
       }
       event.invoke<&Playback::conditional>(source);
-      return event.requireRuntimeControlFlow();
+      return event.runtimeControlFlow();
     }
     case Kind::SetCondition: {
       auto event = cursor.command("Set Conditional Index", SequenceSemantic::State);
@@ -1808,10 +1808,6 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   return session.finish();
 }
 
-[[nodiscard]] SequenceRecipes projectRecipes(const ProgramState& state) {
-  return state.recipes;
-}
-
 [[nodiscard]] SequenceDialect makeDialect() {
   return SequenceDialect{
       .commandDetailKindPrefix = "rare-snes",
@@ -1859,7 +1855,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   // SequenceDecodeSession owns the standard header/pointer source hierarchy.
   // Stateful Rare durations require the small custom track walker above, so
   // build an equivalent program and project each track through its shared scope.
-  SequenceProgram program = dialect.makeProgram(Address{layout.sequenceHeaderAddress});
+  SequenceProgram program = dialect.makeProgram();
   RuntimeConfig runtime{
       .profile = layout.profile,
       .initialTempo = layout.initialTempo,
@@ -1912,8 +1908,8 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   }
   program.runtime = makeCompiledRuntime<TrackState, Playback, ProgramState>(std::move(runtime));
 
-  const SequenceRecipes recipes = analyzeCompiledProgram<ProgramState, SequenceRecipes>(
-      program, projectRecipes, SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce});
+  const SequenceRecipes recipes = analyzeCompiledProgram<ProgramState>(
+      program, &ProgramState::recipes, SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce});
   return SequenceParse{
       .program = std::move(program),
       .recipes = recipes,

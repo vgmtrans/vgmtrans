@@ -11,7 +11,9 @@
 
 #include <any>
 #include <concepts>
+#include <functional>
 #include <memory>
+#include <type_traits>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -212,11 +214,11 @@ template <class TrackState, class Playback, class ProgramState = EmptyCompiledPr
 // durable value. This is intended for sequence-defined synth preparation and
 // similar analysis that must share playback's calls, repeats, and timing. The
 // format-facing projector remains fully typed; only this adapter touches any.
-template <class ProgramState, class Result>
-[[nodiscard]] Result analyzeCompiledProgram(const SequenceProgram& program, Result (*project)(const ProgramState&),
-                                            SequenceVmOptions options = {}) {
+template <class ProgramState, class Project>
+[[nodiscard]] std::remove_cvref_t<std::invoke_result_t<Project&, const ProgramState&>> analyzeCompiledProgram(
+    const SequenceProgram& program, Project project, SequenceVmOptions options = {}) {
   const std::any state = detail::analyzeSequenceProgram(SequenceVm(options), program);
-  return project(std::any_cast<const ProgramState&>(state));
+  return std::invoke(project, std::any_cast<const ProgramState&>(state));
 }
 
 }  // namespace vgmtrans::core

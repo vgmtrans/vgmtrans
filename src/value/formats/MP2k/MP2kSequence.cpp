@@ -732,7 +732,7 @@ struct DecodeContext {
       auto event = cursor.command("Pattern", SequenceSemantic::Call);
       const auto destination = pointer(event, context.reader, "destination", SemanticOperandRole::CallTarget);
       return destination
-                 ? event.invoke<&Playback::pattern>(*destination).mayBranchTo(*destination).requireRuntimeControlFlow()
+                 ? event.invoke<&Playback::pattern>(*destination).mayBranchTo(*destination)
                  : event.stop();
     }
     case 0xb4: {
@@ -748,7 +748,7 @@ struct DecodeContext {
       const u8 count = event.u8("count");
       const auto destination = pointer(event, context.reader, "destination", SemanticOperandRole::JumpTarget);
       return destination
-                 ? event.invoke<&Playback::repeat>(count, *destination).mayBranchTo(*destination).runtimeControlFlow()
+                 ? event.invoke<&Playback::repeat>(count, *destination).mayBranchTo(*destination)
                  : event.stop();
     }
     case 0xb9: {
@@ -763,7 +763,7 @@ struct DecodeContext {
           return event.stop();
         }
         destination = *parsed;
-        event.mayBranchTo(destination).runtimeControlFlow();
+        event.mayBranchTo(destination);
       }
       return event.invoke<&Playback::memAccess>(operation, address, data, destination);
     }
@@ -820,7 +820,7 @@ SequenceProgram parseMp2kSequenceProgram(ByteReader reader, AssetId id, const Mp
                                          SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const SequenceDialect& dialect = mp2kSequenceDialect();
   const u32 headerSize = 8 + song.declaredTracks * 4;
-  SequenceProgram program = dialect.makeProgram(Address{song.offset});
+  SequenceProgram program = dialect.makeProgram();
   RuntimeConfig runtime{.reverbSend = song.reverb / 127.0};
   runtime.tones.reserve(kToneCount);
   for (u32 index = 0; index < kToneCount && reader.has(song.bankOffset + index * 12, 8); ++index) {

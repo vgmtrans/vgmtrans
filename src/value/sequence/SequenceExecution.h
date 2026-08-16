@@ -12,13 +12,13 @@
 
 namespace vgmtrans::core {
 
-enum class RuntimeTransitionKind {
+enum class CommandTransitionKind {
   Fallthrough,
-  End,
-  EndSection,
   Jump,
   Call,
   Return,
+  End,
+  EndSection,
 };
 
 enum class JumpSemantics {
@@ -28,47 +28,47 @@ enum class JumpSemantics {
   DeclaredLoop,
 };
 
-// A RuntimeTransition is selected while executing one command. Most commands
-// do not produce one: SequenceVm applies their static CommandFlow instead.
-struct RuntimeTransition {
-  RuntimeTransitionKind kind = RuntimeTransitionKind::Fallthrough;
+// A command has one decoded default transition. Its runtime body may return
+// another transition when mutable driver state selects the actual path.
+struct CommandTransition {
+  CommandTransitionKind kind = CommandTransitionKind::Fallthrough;
   Address destination;
   JumpSemantics jumpSemantics = JumpSemantics::Normal;
 
-  [[nodiscard]] static constexpr RuntimeTransition fallthrough() noexcept {
-    return RuntimeTransition{.kind = RuntimeTransitionKind::Fallthrough};
+  [[nodiscard]] static constexpr CommandTransition fallthrough() noexcept {
+    return CommandTransition{.kind = CommandTransitionKind::Fallthrough};
   }
-  [[nodiscard]] static constexpr RuntimeTransition end() noexcept {
-    return RuntimeTransition{.kind = RuntimeTransitionKind::End};
+  [[nodiscard]] static constexpr CommandTransition end() noexcept {
+    return CommandTransition{.kind = CommandTransitionKind::End};
   }
-  [[nodiscard]] static constexpr RuntimeTransition endSection() noexcept {
-    return RuntimeTransition{.kind = RuntimeTransitionKind::EndSection};
+  [[nodiscard]] static constexpr CommandTransition endSection() noexcept {
+    return CommandTransition{.kind = CommandTransitionKind::EndSection};
   }
-  [[nodiscard]] static constexpr RuntimeTransition jump(Address destination,
-                                                        JumpSemantics semantics = JumpSemantics::Normal) noexcept {
-    return RuntimeTransition{
-        .kind = RuntimeTransitionKind::Jump,
+  [[nodiscard]] static constexpr CommandTransition jump(
+      Address destination, JumpSemantics semantics = JumpSemantics::Normal) noexcept {
+    return CommandTransition{
+        .kind = CommandTransitionKind::Jump,
         .destination = destination,
         .jumpSemantics = semantics,
     };
   }
-  [[nodiscard]] static constexpr RuntimeTransition call(Address destination) noexcept {
-    return RuntimeTransition{
-        .kind = RuntimeTransitionKind::Call,
+  [[nodiscard]] static constexpr CommandTransition call(Address destination) noexcept {
+    return CommandTransition{
+        .kind = CommandTransitionKind::Call,
         .destination = destination,
     };
   }
-  [[nodiscard]] static constexpr RuntimeTransition return_() noexcept {
-    return RuntimeTransition{.kind = RuntimeTransitionKind::Return};
+  [[nodiscard]] static constexpr CommandTransition return_() noexcept {
+    return CommandTransition{.kind = CommandTransitionKind::Return};
   }
 };
 
 struct Effects {
   u32 advanceTicks = 0;
-  // Empty means "use the command's static transition." An explicit
+  // Empty means "use the command's decoded default transition." An explicit
   // Fallthrough remains distinct when runtime state selects the continuation
-  // instead of the static default.
-  std::optional<RuntimeTransition> flowOverride;
+  // instead of the decoded default.
+  std::optional<CommandTransition> flowOverride;
 
   [[nodiscard]] static constexpr Effects none() noexcept { return Effects{}; }
   [[nodiscard]] static constexpr Effects wait(u32 ticks) noexcept { return Effects{.advanceTicks = ticks}; }

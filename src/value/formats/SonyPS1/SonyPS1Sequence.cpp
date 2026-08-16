@@ -286,8 +286,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       event.derived("repeat_count", source.loopCount, SemanticOperandRole::Count);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
       event.invoke<&Playback::loopEnd>(source.loopCount, destination, source.delta)
-          .mayBranchTo(destination)
-          .runtimeControlFlow();
+          .mayBranchTo(destination);
       return event;
     }
     return event.invoke<&Playback::controller>(channel, controller, value, source.delta);
@@ -333,7 +332,7 @@ const SequenceDialect& sonyPs1SequenceDialect() {
 
 SequenceProgram parseSonyPs1Sequence(ByteReader reader, AssetId id, const SonyPs1SequenceLayout& layout,
                                      SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
-  SequenceProgram program = sonyPs1SequenceDialect().makeProgram(Address{layout.offset});
+  SequenceProgram program = sonyPs1SequenceDialect().makeProgram();
   program.timebase.ppqn = layout.ppqn;
   program.behavior.initialTempoMicrosecondsPerQuarter = layout.initialTempo;
   program.runtime = makeCompiledRuntime<TrackState, Playback, ProgramState>(RuntimeConfig{

@@ -806,7 +806,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const s16 relative = event.s16le("relative");
       const Address destination = relativeTarget(relative, begin + 3);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-      event.mayBranchTo(destination).runtimeControlFlow();
+      event.mayBranchTo(destination);
       return event.invoke<&Playback::repeatBreak>(destination);
     }
     case 0xdc: {
@@ -841,7 +841,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 value = event.u8("value");
       const Address destination = relativeTarget(relative, begin + 4);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-      event.mayBranchTo(destination).runtimeControlFlow();
+      event.mayBranchTo(destination);
       return event.invoke<&Playback::conditional>(destination, value);
     }
     case 0xe1:
@@ -1026,7 +1026,6 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
       .tables = RuntimeTables::encode(reader, layout),
       .baseTempo = initialTempo,
   }));
-  program.sourceBaseAddress = Address{layout.sequenceHeaderAddress};
   program.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicroseconds(initialTempo);
   return {.program = std::move(program), .headerRange = headerRange};
 }

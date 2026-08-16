@@ -241,7 +241,6 @@ SequenceProgram decodeTestSequenceProgram(std::initializer_list<u8> commands) {
   return SequenceProgram{
       .runtime = ndsSequenceRuntime(),
       .timebase = dialect.timebase,
-      .sourceBaseAddress = Address{trackStart},
       .behavior = dialect.behavior,
       .tracks = {track},
   };
@@ -434,7 +433,6 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   const SequenceProgram program{
       .runtime = ndsSequenceRuntime(),
       .timebase = dialect.timebase,
-      .sourceBaseAddress = Address{trackStart},
       .behavior = dialect.behavior,
       .tracks = {track},
   };
@@ -520,7 +518,6 @@ void ndsSequenceDialectDecodesAndRendersNoteWaitCommands() {
   const SequenceProgram expressionProgram{
       .runtime = ndsSequenceRuntime(),
       .timebase = dialect.timebase,
-      .sourceBaseAddress = Address{trackStart},
       .behavior = dialect.behavior,
       .tracks = {expressionTrack},
   };
@@ -548,7 +545,6 @@ void ndsSequenceDialectComposesPitchBendRangeBehavior() {
   const SequenceProgram program{
       .runtime = ndsSequenceRuntime(),
       .timebase = dialect.timebase,
-      .sourceBaseAddress = Address{trackStart},
       .behavior = dialect.behavior,
       .tracks = {track},
   };
@@ -965,7 +961,6 @@ void ndsSequenceDialectExecutesCallAndReturn() {
   const SequenceProgram program{
       .runtime = ndsSequenceRuntime(),
       .timebase = dialect.timebase,
-      .sourceBaseAddress = Address{trackStart},
       .behavior = dialect.behavior,
       .tracks = {track},
   };
@@ -991,7 +986,6 @@ void ndsSequenceDialectExecutesCallAndReturn() {
   const SequenceProgram linearizedProgram{
       .runtime = ndsSequenceRuntime(),
       .timebase = dialect.timebase,
-      .sourceBaseAddress = Address{trackStart},
       .behavior = dialect.behavior,
       .tracks = {linearizedTrack},
   };
@@ -1026,7 +1020,6 @@ void ndsSequenceDialectExecutesCallAndReturn() {
   const SequenceProgram overlapProgram{
       .runtime = ndsSequenceRuntime(),
       .timebase = dialect.timebase,
-      .sourceBaseAddress = Address{trackStart},
       .behavior = dialect.behavior,
       .tracks = {overlapTrack},
   };
@@ -1275,7 +1268,7 @@ void ndsMalformedRecoveryKeepsExecutableJumps() {
   });
   expect(jump != track.commands.end(), "NDS malformed recovery should preserve recovered jumps as jump commands");
 
-  SequenceProgram program = dialect.makeProgram(Address{trackStart});
+  SequenceProgram program = dialect.makeProgram();
   program.runtime = ndsSequenceRuntime();
   program.behavior.commandLimit = 64;
   program.tracks = {track};

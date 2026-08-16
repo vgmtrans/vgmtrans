@@ -19,10 +19,9 @@ struct SequenceDialect {
 
   // Start a program with this dialect's timebase and playback behavior. The
   // parser attaches its complete, program-specific runtime before publishing.
-  [[nodiscard]] SequenceProgram makeProgram(Address sourceBaseAddress = {}) const {
+  [[nodiscard]] SequenceProgram makeProgram() const {
     return SequenceProgram{
         .timebase = timebase,
-        .sourceBaseAddress = sourceBaseAddress,
         .behavior = behavior,
     };
   }

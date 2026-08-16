@@ -1072,7 +1072,6 @@ SequenceProgram decodeCpsSequence(ByteReader reader, const CpsLayout& layout, co
     }
     SequenceProgram empty = sequence.finish(makeCompiledRuntime<TrackState, Playback, ProgramState>(
         RuntimeConfig{.version = layout.version, .masterVolume = layout.masterVolume}));
-    empty.sourceBaseAddress = Address{sourceSequence.offset};
     if (usesLateSequence(layout.version)) {
       empty.behavior.initialExpression = isCps3(layout.version) ? 65.0 / 128.0 : 0.5;
     }
@@ -1117,7 +1116,6 @@ SequenceProgram decodeCpsSequence(ByteReader reader, const CpsLayout& layout, co
   }
   SequenceProgram program = sequence.finish(makeCompiledRuntime<TrackState, Playback, ProgramState>(
       RuntimeConfig{.version = layout.version, .masterVolume = layout.masterVolume}));
-  program.sourceBaseAddress = Address{sourceSequence.offset};
   if (usesLateSequence(layout.version)) {
     program.behavior.initialExpression = isCps3(layout.version) ? 65.0 / 128.0 : 0.5;
   }

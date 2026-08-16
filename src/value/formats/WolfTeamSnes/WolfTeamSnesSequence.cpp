@@ -695,7 +695,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x91:
     case 0xfd: {
       auto event = cursor.command("Phrase Boundary", SequenceSemantic::End);
-      return event.invoke<&Playback::advancePhrase>().requireRuntimeControlFlow();
+      return event.invoke<&Playback::advancePhrase>().runtimeControlFlow();
     }
     case 0x92: {
       auto event = cursor.command("Loop Marker", SequenceSemantic::Repeat, CommandPlaybackStatus::AffectsControlFlow);
@@ -822,11 +822,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xfd: {
       auto event = command("Segment Boundary", SequenceSemantic::End);
-      return event.invoke<&Playback::advanceSegment>().requireRuntimeControlFlow();
+      return event.invoke<&Playback::advanceSegment>().runtimeControlFlow();
     }
     case 0xf1:
       if (middle) {
-        return command("End", SequenceSemantic::End).invoke<&Playback::endTrack>().requireRuntimeControlFlow();
+        return command("End", SequenceSemantic::End).invoke<&Playback::endTrack>().runtimeControlFlow();
       }
       return command("No Operation", SequenceSemantic::Meta, CommandPlaybackStatus::NoOp, "nop").ignore();
     case 0xe1: {
@@ -902,7 +902,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return command("No Operation", SequenceSemantic::Meta, CommandPlaybackStatus::NoOp, "nop").ignore();
     case 0xf8: {
       auto event = command("Return to Saved Segment", SequenceSemantic::Repeat);
-      return event.invoke<&Playback::returnSaved>().requireRuntimeControlFlow();
+      return event.invoke<&Playback::returnSaved>().runtimeControlFlow();
     }
     case 0xf9: {
       auto event = command("Save Segment", SequenceSemantic::Repeat, CommandPlaybackStatus::AffectsControlFlow);
@@ -1064,7 +1064,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
                              std::vector<Diagnostic>* diagnostics) {
   const SourceRange headerRange = reader.range(layout.sequenceHeaderAddress, layout.headerLength);
   const auto& dialect = sequenceDialect();
-  SequenceProgram program = dialect.makeProgram(Address{layout.sequenceHeaderAddress});
+  SequenceProgram program = dialect.makeProgram();
   RuntimeConfig runtime = runtimeConfig(reader, layout);
   program.behavior = behavior(reader, layout);
 

@@ -86,7 +86,7 @@ std::string decodedTrackSnapshot(const TrackProgram& track) {
         snapshot += '<' + semanticValueSnapshot(*operand.encodedValue) + '>';
       }
     }
-    const auto kind = command.flow.defaultTransition ? static_cast<int>(command.flow.defaultTransition->kind) : -1;
+    const auto kind = static_cast<int>(command.flow.defaultTransition.kind);
     snapshot += ",flow=" + std::to_string(kind);
     if (command.flow.discoveryContinuation()) {
       snapshot += "->" + hexAddress(command.flow.continuation.value);
