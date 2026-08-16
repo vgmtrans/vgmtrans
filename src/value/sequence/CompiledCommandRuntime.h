@@ -22,6 +22,13 @@ namespace vgmtrans::core {
 // commands and Playback methods remain fully typed.
 struct EmptyCompiledProgramState {};
 
+namespace detail {
+
+template <class Type>
+inline constexpr bool alwaysFalse = false;
+
+}  // namespace detail
+
 template <class TrackState, class Playback, class ProgramState = EmptyCompiledProgramState>
 struct CompiledCommandRuntime {
   [[nodiscard]] static std::any createProgramState(const SequenceProgram& program) {
@@ -32,7 +39,7 @@ struct CompiledCommandRuntime {
     } else if constexpr (std::default_initializable<ProgramState>) {
       return ProgramState{};
     } else {
-      return std::any{};
+      static_assert(detail::alwaysFalse<ProgramState>, "ProgramState has no supported construction path");
     }
   }
 
@@ -59,7 +66,7 @@ struct CompiledCommandRuntime {
     } else if constexpr (std::default_initializable<TrackState>) {
       return TrackState{};
     } else {
-      return std::any{};
+      static_assert(detail::alwaysFalse<TrackState>, "TrackState has no supported construction path");
     }
   }
 
@@ -87,9 +94,11 @@ struct CompiledCommandRuntime {
     if constexpr (requires { Playback{typedTrackState, out, vm, typedProgramState}; }) {
       Playback playback{typedTrackState, out, vm, typedProgramState};
       return execute(playback);
-    } else {
+    } else if constexpr (requires { Playback{typedTrackState, out, vm}; }) {
       Playback playback{typedTrackState, out, vm};
       return execute(playback);
+    } else {
+      static_assert(detail::alwaysFalse<Playback>, "Playback has no supported construction path");
     }
   }
 
@@ -187,6 +196,15 @@ template <class TrackState, class Playback, class ProgramState = EmptyCompiledPr
 template <class TrackState, class Playback, class ProgramState = EmptyCompiledProgramState, class Config>
 [[nodiscard]] SequenceRuntime makeCompiledRuntime(Config config) {
   using Compiled = CompiledCommandRuntime<TrackState, Playback, ProgramState>;
+  constexpr bool programConsumesConfig =
+      std::constructible_from<ProgramState, const SequenceProgram&, const Config&> ||
+      std::constructible_from<ProgramState, const Config&>;
+  constexpr bool trackConsumesConfig =
+      std::constructible_from<TrackState, const SequenceProgram&, const TrackProgram&, const Config&> ||
+      std::constructible_from<TrackState, const TrackProgram&, const Config&> ||
+      std::constructible_from<TrackState, const Config&>;
+  static_assert(programConsumesConfig || trackConsumesConfig,
+                "A supplied runtime Config must be consumed by ProgramState or TrackState");
   SequenceRuntime runtime;
   auto settings = std::make_shared<const Config>(std::move(config));
   runtime.createProgramState = [settings](const SequenceProgram& sequence) {
