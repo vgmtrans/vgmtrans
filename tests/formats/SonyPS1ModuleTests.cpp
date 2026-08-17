@@ -431,7 +431,6 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
   std::vector<Diagnostic> bindingDiagnostics;
   CollectionBindingContext binding{
       .sources = paired.sources(),
-      .collection = *latestCollection,
       .sequence = sequence,
       .sequenceRuntime = runtime,
       .instrumentSets = resolvedInstruments,

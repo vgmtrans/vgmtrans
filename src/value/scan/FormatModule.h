@@ -41,7 +41,6 @@ private:
 // published result exposes these values read-only.
 struct CollectionBindingContext {
   const SourceStore& sources;
-  const Collection& collection;
   const SequenceProgramAsset* sequence;
   SequenceRuntime& sequenceRuntime;
   std::vector<InstrumentSetAsset>& instrumentSets;

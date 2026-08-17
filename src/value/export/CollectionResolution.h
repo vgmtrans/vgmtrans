@@ -30,8 +30,9 @@ struct CollectionResolutionDiagnostics {
 // from confusing target-specific projections with collection binding.
 class ResolvedCollection {
 public:
+  [[nodiscard]] bool valid() const noexcept { return id_.valid(); }
+  [[nodiscard]] CollectionId id() const noexcept { return id_; }
   [[nodiscard]] const std::string& baseName() const noexcept { return baseName_; }
-  [[nodiscard]] const Collection* collection() const noexcept { return collection_; }
   [[nodiscard]] const SequenceProgramAsset* sequence() const noexcept { return sequence_; }
   [[nodiscard]] const SequenceRuntime& sequenceRuntime() const noexcept { return sequenceRuntime_; }
   [[nodiscard]] const std::vector<InstrumentSetAsset>& instrumentSets() const noexcept { return instrumentSets_; }
@@ -44,15 +45,15 @@ private:
   friend ResolvedCollection resolveCollection(const SessionSnapshot&, CollectionId, const SourceStore&,
                                               const FormatRegistry&);
 
-  ResolvedCollection(SessionSnapshot snapshot, std::string baseName, const Collection* collection,
+  ResolvedCollection(SessionSnapshot snapshot, CollectionId id, std::string baseName,
                      const SequenceProgramAsset* sequence, SequenceRuntime sequenceRuntime,
                      std::vector<InstrumentSetAsset> instrumentSets,
                      std::vector<const SampleCollectionAsset*> sampleCollections,
                      CollectionResolutionDiagnostics diagnostics);
 
   SessionSnapshot snapshot_;
+  CollectionId id_;
   std::string baseName_;
-  const Collection* collection_ = nullptr;
   const SequenceProgramAsset* sequence_ = nullptr;
   SequenceRuntime sequenceRuntime_;
   std::vector<InstrumentSetAsset> instrumentSets_;

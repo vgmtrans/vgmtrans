@@ -582,7 +582,6 @@ void segSatCollectionBindingReadsVelocityBanksFromSeparateSources() {
   std::vector<Diagnostic> bindingDiagnostics;
   CollectionBindingContext binding{
       .sources = sources,
-      .collection = snapshot.collections().front(),
       .sequence = &sequence,
       .sequenceRuntime = runtime,
       .instrumentSets = instrumentSets,
