@@ -66,7 +66,10 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
   const CollectionBinder binder = [](CollectionBindingContext& context) {
     const auto* sequence = context.sequence;
     const bool leaveDirtyMidiState = sequence != nullptr && sequence->metadata.name == "Part 0";
-    context.sequenceRuntime = makeCompiledRuntime<ProbeCompilerCursor, StitchProgramState>(leaveDirtyMidiState);
+    if (!context.replaceSequenceRuntime(
+            makeCompiledRuntime<ProbeCompilerCursor, StitchProgramState>(leaveDirtyMidiState))) {
+      return;
+    }
   };
 
   test::SessionSnapshotBuilder builder;
@@ -85,7 +88,7 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
         .metadata = AssetMetadata{.id = sequenceId, .format = "Probe", .name = "Part " + std::to_string(index)},
         .program =
             SequenceProgram{
-                .runtime = probeSequenceRuntime(),
+                .runtime = makeCompiledRuntime<ProbeCompilerCursor, StitchProgramState>(false),
                 .timebase = config.timebase,
                 .behavior = config.behavior,
                 .tracks = {track},

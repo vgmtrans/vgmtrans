@@ -110,13 +110,7 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
                                     : sequence != nullptr             ? sequence->metadata.format
                                                                       : "Collection";
     try {
-      CollectionBindingContext context{
-          .sequence = sequence,
-          .sequenceRuntime = sequenceRuntime,
-          .instrumentSets = instrumentSets,
-          .sampleCollections = sampleCollections,
-          .diagnostics = diagnostics,
-      };
+      CollectionBindingContext context{sequence, sequenceRuntime, instrumentSets, sampleCollections, diagnostics};
       collection->binder(context);
       failed = context.failed;
     } catch (const std::exception& error) {
