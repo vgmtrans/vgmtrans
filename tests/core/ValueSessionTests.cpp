@@ -571,6 +571,11 @@ void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
          "removed instrument source should be removed from the collection");
   expect(!project.collections()[0].issues.empty(), "incomplete collection should explain what is missing");
 
+  const auto exports = session.exportAllCollections(ExportRequest{.kinds = {ExportKind::Midi}});
+  expect(exports.size() == 1 && exports.front().artifacts.size() == 1,
+         "an incomplete collection should remain exportable when its requested artifact can be produced");
+  diagnosticWithMessage(exports.front().artifacts.front().diagnostics, "Collection has no instrument set asset");
+
   session.removeSource(sequence);
 
   project = session.snapshot();

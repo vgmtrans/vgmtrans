@@ -1171,6 +1171,16 @@ void collectionBindingProducesAnImmutableInstrumentView() {
   expect(!threw.collection,
          "an exception should abort collection binding instead of publishing the callback's partial changes");
   diagnosticWithMessage(threw.diagnostics, "Prepared Probe collection binding failed: expected binding exception");
+
+  const auto changedIdentity = bindCollection(snapshotWithBinder([](CollectionBindingContext& context) {
+                                                context.instrumentSets.front().metadata.id = AssetId{99};
+                                                context.instrumentSets.front().metadata.format = "Changed";
+                                              }),
+                                              CollectionId{0});
+  expect(!changedIdentity.collection,
+         "collection binding should reject changes to selected instrument identity or order");
+  diagnosticWithMessage(changedIdentity.diagnostics,
+                        "Collection binding changed instrument set identity, format, or order");
 }
 
 u32 synthOnlySequenceExecutions = 0;
