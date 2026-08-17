@@ -80,4 +80,11 @@ const FormatModule* FormatRegistry::findModule(std::string_view name) const {
   return found != modules_.end() ? &*found : nullptr;
 }
 
+CollectionBinder FormatRegistry::collectionBinder(std::string_view resolver) const {
+  const auto found = std::ranges::find_if(modules_, [&](const FormatModule& module) {
+    return module.bindCollection && module.collectionResolver() == resolver;
+  });
+  return found != modules_.end() ? found->bindCollection : CollectionBinder{};
+}
+
 }  // namespace vgmtrans::core

@@ -247,9 +247,8 @@ std::vector<DesiredCollection> resolveSonyPs1Collections(const MatchContext& con
 void bindSonyPs1Collection(CollectionBindingContext& context) {
   // Scan-time bank numbers describe every VAB in a source. Collections load
   // their selected VABs into bank slots in member order.
-  const auto instrumentSets = context.instrumentSets();
   u32 bank = 0;
-  for (auto& instruments : instrumentSets) {
+  for (auto& instruments : context.instrumentSets) {
     if (instruments.metadata.format != kSonyPs1FormatName) {
       continue;
     }

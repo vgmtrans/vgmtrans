@@ -690,11 +690,10 @@ void standaloneSynthExportsKeepNativeModulation() {
   builder.assets.emplace_back(instruments);
   builder.assets.emplace_back(samples);
   const SessionSnapshot snapshot = builder.finish();
-  const FormatRegistry formats;
-  const Artifact soundFont = exportInstrumentSet(snapshot, sources, instruments.metadata.id,
-                                                 SynthExportFormat::SoundFont2, ExportRequest{}, formats);
+  const Artifact soundFont =
+      exportInstrumentSet(snapshot, sources, instruments.metadata.id, SynthExportFormat::SoundFont2, ExportRequest{});
   const Artifact dls =
-      exportInstrumentSet(snapshot, sources, instruments.metadata.id, SynthExportFormat::Dls, ExportRequest{}, formats);
+      exportInstrumentSet(snapshot, sources, instruments.metadata.id, SynthExportFormat::Dls, ExportRequest{});
 
   expect(soundFontIgenContainsAmount(soundFont.bytes, 24, -8479),
          "standalone SoundFont export should retain native modulation when no MIDI replacement exists");
@@ -776,18 +775,15 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
               .sampleCollections = {samples.metadata.id},
           },
   });
-  FormatRegistry formats;
-  formats.add(probeSequenceModule());
   const SessionSnapshot snapshot = builder.finish();
 
   const auto complete = exportCollection(snapshot, sources, CollectionId{0},
-                                         ExportRequest{.kinds = {ExportKind::SoundFont2, ExportKind::Dls}}, formats);
+                                         ExportRequest{.kinds = {ExportKind::SoundFont2, ExportKind::Dls}});
   const auto restricted = exportCollection(snapshot, sources, CollectionId{0},
                                            ExportRequest{
                                                .kinds = {ExportKind::SoundFont2, ExportKind::Dls},
                                                .exportOnlyUsedInstruments = true,
-                                           },
-                                           formats);
+                                           });
 
   expect(complete.size() == 2 && restricted.size() == 2, "collection fixture should export SF2 and DLS pairs");
   expect(chunkSize(complete[0].bytes, "phdr") == 4 * 38 && chunkSize(complete[0].bytes, "shdr") == 4 * 46,
@@ -808,9 +804,9 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
 
   const ExportRequest onlyUsed{.exportOnlyUsedInstruments = true};
   const auto uniqueSoundFont =
-      exportInstrumentSet(snapshot, sources, instruments.metadata.id, SynthExportFormat::SoundFont2, onlyUsed, formats);
+      exportInstrumentSet(snapshot, sources, instruments.metadata.id, SynthExportFormat::SoundFont2, onlyUsed);
   const auto uniqueDls =
-      exportInstrumentSet(snapshot, sources, instruments.metadata.id, SynthExportFormat::Dls, onlyUsed, formats);
+      exportInstrumentSet(snapshot, sources, instruments.metadata.id, SynthExportFormat::Dls, onlyUsed);
   expect(chunkSize(uniqueSoundFont.bytes, "phdr") == 3 * 38 && chunkSize(uniqueSoundFont.bytes, "shdr") == 3 * 46 &&
              readLe32(uniqueDls.bytes, asciiOffset(uniqueDls.bytes, "colh") + 8) == 2 &&
              chunkSize(uniqueDls.bytes, "ptbl") == 16,
@@ -832,10 +828,10 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
       },
   };
   const SessionSnapshot ambiguousSnapshot = ambiguousBuilder.finish();
-  const auto ambiguousSoundFont = exportInstrumentSet(ambiguousSnapshot, sources, instruments.metadata.id,
-                                                      SynthExportFormat::SoundFont2, onlyUsed, formats);
-  const auto ambiguousDls = exportInstrumentSet(ambiguousSnapshot, sources, instruments.metadata.id,
-                                                SynthExportFormat::Dls, onlyUsed, formats);
+  const auto ambiguousSoundFont =
+      exportInstrumentSet(ambiguousSnapshot, sources, instruments.metadata.id, SynthExportFormat::SoundFont2, onlyUsed);
+  const auto ambiguousDls =
+      exportInstrumentSet(ambiguousSnapshot, sources, instruments.metadata.id, SynthExportFormat::Dls, onlyUsed);
   expect(chunkSize(ambiguousSoundFont.bytes, "phdr") == 4 * 38 &&
              chunkSize(ambiguousSoundFont.bytes, "shdr") == 4 * 46 &&
              readLe32(ambiguousDls.bytes, asciiOffset(ambiguousDls.bytes, "colh") + 8) == 3 &&
@@ -920,8 +916,8 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   missingRuntimeBuilder.collections = snapshot.collections();
   const SessionSnapshot missingRuntimeSnapshot = missingRuntimeBuilder.finish();
 
-  const auto baseline = exportCollection(missingRuntimeSnapshot, sources, CollectionId{0},
-                                         ExportRequest{.kinds = {ExportKind::Dls}}, formats);
+  const auto baseline =
+      exportCollection(missingRuntimeSnapshot, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Dls}});
   expect(baseline.size() == 1 && !baseline[0].bytes.empty(),
          "ordinary full-bank synth export should survive a sequence rendering failure");
   diagnosticWithMessage(baseline[0].diagnostics, "Sequence program has no runtime executor");
@@ -931,8 +927,7 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
                                          ExportRequest{
                                              .kinds = {kind},
                                              .exportOnlyUsedInstruments = true,
-                                         },
-                                         formats);
+                                         });
     expect(failed.size() == 1 && failed[0].bytes.empty(),
            "used-instrument export should stop when sequence rendering fails");
     diagnosticWithMessage(failed[0].diagnostics, "Sequence program has no runtime executor");
@@ -945,8 +940,8 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
 }
 
 void bindInstrumentSet(CollectionBindingContext& context) {
-  const AssetId samples = context.sampleCollections().front()->metadata.id;
-  auto& instruments = context.instrumentSets().front();
+  const AssetId samples = context.sampleCollections.front()->metadata.id;
+  auto& instruments = context.instrumentSets.front();
   instruments.instruments = {Instrument{
       .name = "Prepared Instrument",
       .regions = {Region{.sample = SampleRef{.collection = samples, .index = 0}}},
@@ -977,22 +972,10 @@ struct PreparedProbeProgramState {
 };
 
 void bindPerformanceRuntime(CollectionBindingContext& context) {
-  const auto* sequence = context.sequence();
+  const auto* sequence = context.sequence;
   const bool fail = sequence != nullptr && sequence->metadata.name == "Failing Sequence";
-  context.replaceSequenceRuntime(makeCompiledRuntime<ProbeCompilerCursor, PreparedProbeProgramState>(fail));
+  context.sequenceRuntime = makeCompiledRuntime<ProbeCompilerCursor, PreparedProbeProgramState>(fail);
   context.warning("Collection binding warning");
-}
-
-struct IncompatibleProbePlayback {
-  ProbeTrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
-};
-
-using IncompatibleProbeCompilerCursor = CompilerCursor<ProbeTrackState, IncompatibleProbePlayback>;
-
-ScanResult scanNoSources(const ScanInput&) {
-  return {};
 }
 
 void collectionBindingAppliesToWholeExport() {
@@ -1040,6 +1023,7 @@ void collectionBindingAppliesToWholeExport() {
       .id = CollectionId{0},
       .name = "Performance Finalizer",
       .key = CollectionKey{.resolver = "Performance Finalizer", .value = "one"},
+      .binder = bindPerformanceRuntime,
       .members =
           {
               .sequence = sequence.metadata.id,
@@ -1057,23 +1041,15 @@ void collectionBindingAppliesToWholeExport() {
   failingCollection.members.sequence = failingSequence.metadata.id;
   builder.collections.push_back(std::move(failingCollection));
 
-  FormatRegistry formats;
-  formats.add(FormatModule{
-      .name = "Performance Finalizer",
-      .scan = scanNoSources,
-      .bindCollection = bindPerformanceRuntime,
-  });
-  formats.seal();
   const SessionSnapshot snapshot = builder.finish();
-  const CollectionPlayback playback =
-      prepareCollectionPlayback(snapshot, sources, CollectionId{0}, PlaybackRequest{}, formats);
+  const CollectionPlayback playback = prepareCollectionPlayback(snapshot, sources, CollectionId{0}, PlaybackRequest{});
   expect(playback.soundFont.size() >= 12 && containsAscii(playback.soundFont, "Durable Instrument"),
          "a runtime-only collection binding should preserve durable instrument sets for synth export");
   expect(soundFontImodContains(playback.soundFont, 129, 6, 100),
          "collection binding should run before sequence modulation is analyzed");
 
   const auto synthOnly =
-      exportCollection(snapshot, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::SoundFont2}}, formats);
+      exportCollection(snapshot, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::SoundFont2}});
   expect(synthOnly.size() == 1 && !synthOnly[0].bytes.empty() && soundFontImodContains(synthOnly[0].bytes, 129, 6, 100),
          "synth-only export should render the authoritative bound runtime before applying modulation");
 
@@ -1083,32 +1059,16 @@ void collectionBindingAppliesToWholeExport() {
   };
   auto reverseRequest = forwardRequest;
   reverseRequest.kinds = {ExportKind::Dls, ExportKind::SoundFont2, ExportKind::Midi};
-  const auto forward = exportCollection(snapshot, sources, CollectionId{0}, forwardRequest, formats);
-  const auto reverse = exportCollection(snapshot, sources, CollectionId{0}, reverseRequest, formats);
+  const auto forward = exportCollection(snapshot, sources, CollectionId{0}, forwardRequest);
+  const auto reverse = exportCollection(snapshot, sources, CollectionId{0}, reverseRequest);
   expect(forward.size() == 3 && reverse.size() == 3 && forward[0].bytes == reverse[2].bytes &&
              forward[1].bytes == reverse[1].bytes && forward[2].bytes == reverse[0].bytes,
          "collection binding should make multi-artifact export independent of requested output order");
 
-  const auto failed =
-      exportCollection(snapshot, sources, CollectionId{1}, ExportRequest{.kinds = {ExportKind::Midi}}, formats);
+  const auto failed = exportCollection(snapshot, sources, CollectionId{1}, ExportRequest{.kinds = {ExportKind::Midi}});
   expect(failed.size() == 1, "a failing collection performance finalizer should produce one MIDI artifact");
   diagnosticWithMessage(failed.front().diagnostics, "Collection binding warning");
   diagnosticWithMessage(failed.front().diagnostics, "Sequence rendering failed: test finalizer failure");
-
-  FormatRegistry incompatibleFormats;
-  incompatibleFormats.add(FormatModule{
-      .name = "Performance Finalizer",
-      .scan = scanNoSources,
-      .bindCollection =
-          [](CollectionBindingContext& context) {
-            context.replaceSequenceRuntime(makeCompiledRuntime<IncompatibleProbeCompilerCursor>());
-          },
-  });
-  const auto incompatible = bindCollection(snapshot, CollectionId{0}, incompatibleFormats);
-  expect(!incompatible.collection,
-         "collection binding should reject a runtime for a different compiled-command playback type");
-  diagnosticWithMessage(incompatible.diagnostics.collection,
-                        "Collection binder supplied an incompatible sequence runtime");
 }
 
 void collectionBindingProducesAnImmutableInstrumentView() {
@@ -1145,22 +1105,20 @@ void collectionBindingProducesAnImmutableInstrumentView() {
           },
   });
 
-  FormatRegistry formats;
-  formats.add(FormatModule{
-      .name = "Prepared Probe",
-      .scan = scanNoSources,
-      .bindCollection = bindInstrumentSet,
-  });
-  formats.seal();
-  const SessionSnapshot snapshot = builder.finish();
-  const auto binding = bindCollection(snapshot, CollectionId{0}, formats);
+  const auto snapshotWithBinder = [&](CollectionBinder binder) {
+    auto copy = builder;
+    copy.collections.front().binder = std::move(binder);
+    return copy.finish();
+  };
+  const SessionSnapshot snapshot = snapshotWithBinder(bindInstrumentSet);
+  const auto binding = bindCollection(snapshot, CollectionId{0});
   expect(binding.collection && binding.collection->instrumentSets().size() == 1 &&
              binding.collection->instrumentSets().front().metadata.id == durable.metadata.id &&
              binding.collection->instrumentSets().front().instruments.front().name == "Prepared Instrument" &&
              snapshot.asset<InstrumentSetAsset>(durable.metadata.id)->instruments.front().name == "Durable Instrument",
          "collection binding should preserve selected asset identity without mutating durable assets");
   const auto artifacts =
-      exportCollection(snapshot, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Dls}}, formats);
+      exportCollection(snapshot, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Dls}});
 
   expect(artifacts.size() == 1 && !artifacts.front().bytes.empty(), "collection binding fixture should export a DLS");
   const auto& dls = artifacts.front().bytes;
@@ -1169,67 +1127,24 @@ void collectionBindingProducesAnImmutableInstrumentView() {
   expect(containsAscii(dls, "Prepared Instrument") && !containsAscii(dls, "Durable Instrument"),
          "collection export should use only the binder's authoritative instrument view");
 
-  FormatRegistry failedFormats;
-  failedFormats.add(FormatModule{
-      .name = "Prepared Probe",
-      .scan = scanNoSources,
-      .bindCollection =
-          [](CollectionBindingContext& context) {
-            context.instrumentSets().front().instruments.front().name = "Partially Bound";
-            context.fail("expected binding failure");
-          },
-  });
-  const auto failed = bindCollection(snapshot, CollectionId{0}, failedFormats);
+  const auto failed = bindCollection(snapshotWithBinder([](CollectionBindingContext& context) {
+                                       context.instrumentSets.front().instruments.front().name = "Partially Bound";
+                                       context.fail("expected binding failure");
+                                     }),
+                                     CollectionId{0});
   expect(!failed.collection &&
              snapshot.asset<InstrumentSetAsset>(durable.metadata.id)->instruments.front().name == "Durable Instrument",
          "an explicit binding failure should publish neither a partial collection nor durable mutations");
-  diagnosticWithMessage(failed.diagnostics.collection, "expected binding failure");
+  diagnosticWithMessage(failed.diagnostics, "expected binding failure");
 
-  FormatRegistry throwingFormats;
-  throwingFormats.add(FormatModule{
-      .name = "Prepared Probe",
-      .scan = scanNoSources,
-      .bindCollection =
-          [](CollectionBindingContext& context) {
-            context.instrumentSets().front().instruments.front().name = "Partially Bound";
-            throw std::runtime_error("expected binding exception");
-          },
-  });
-  const auto threw = bindCollection(snapshot, CollectionId{0}, throwingFormats);
+  const auto threw = bindCollection(snapshotWithBinder([](CollectionBindingContext& context) {
+                                      context.instrumentSets.front().instruments.front().name = "Partially Bound";
+                                      throw std::runtime_error("expected binding exception");
+                                    }),
+                                    CollectionId{0});
   expect(!threw.collection,
          "an exception should abort collection binding instead of publishing the callback's partial changes");
-  diagnosticWithMessage(threw.diagnostics.collection,
-                        "Prepared Probe collection binding failed: expected binding exception");
-
-  FormatRegistry identityFormats;
-  identityFormats.add(FormatModule{
-      .name = "Prepared Probe",
-      .scan = scanNoSources,
-      .bindCollection =
-          [](CollectionBindingContext& context) { context.instrumentSets().front().metadata.id = AssetId{99}; },
-  });
-  const auto changedIdentity = bindCollection(snapshot, CollectionId{0}, identityFormats);
-  expect(!changedIdentity.collection,
-         "collection binding should reject attempts to replace or reorder fixed instrument-set membership");
-  diagnosticWithMessage(changedIdentity.diagnostics.collection,
-                        "Collection binder changed the identity or order of an instrument-set member");
-
-  auto firstAddressedBank = durable;
-  firstAddressedBank.instruments.front().explicitAddress = InstrumentAddress{.bank = 3, .program = 4};
-  auto secondAddressedBank = firstAddressedBank;
-  secondAddressedBank.metadata.id = AssetId{4};
-  test::SessionSnapshotBuilder duplicateBuilder;
-  duplicateBuilder.assets = {firstAddressedBank, secondAddressedBank};
-  duplicateBuilder.collections.push_back(Collection{
-      .id = CollectionId{0},
-      .name = "Duplicate Addresses",
-      .members = {.instrumentSets = {firstAddressedBank.metadata.id, secondAddressedBank.metadata.id}},
-  });
-  const auto duplicateAddresses = bindCollection(duplicateBuilder.finish(), CollectionId{0}, FormatRegistry{});
-  expect(duplicateAddresses.collection.has_value(),
-         "duplicate instrument addresses should remain a diagnosable nonfatal binding condition");
-  diagnosticWithMessage(duplicateAddresses.diagnostics.collection,
-                        "Collection contains duplicate instrument address 3:4");
+  diagnosticWithMessage(threw.diagnostics, "Prepared Probe collection binding failed: expected binding exception");
 }
 
 u32 synthOnlySequenceExecutions = 0;
@@ -1293,17 +1208,13 @@ void synthOnlyExportRendersSequencesWithoutOriginalModulation() {
               .sampleCollections = {samples.metadata.id},
           },
   });
-  FormatRegistry formats;
-  formats.add(probeSequenceModule());
-
   synthOnlySequenceExecutions = 0;
   const auto artifacts = exportCollection(builder.finish(), sources, CollectionId{0},
                                           ExportRequest{
                                               .kinds = {ExportKind::Dls},
                                               .modulationScaling = ModulationScalingPolicy::ObservedSequenceRange,
                                               .modulationConversion = ModulationConversionPolicy::SynthModulators,
-                                          },
-                                          formats);
+                                          });
   expect(artifacts.size() == 1 && !artifacts[0].bytes.empty(),
          "synth-only export should still write an instrument artifact without sequence modulation");
   expect(synthOnlySequenceExecutions > 0,
@@ -1341,9 +1252,8 @@ void exportDiagnosticsPreserveSourceRanges() {
   });
   const SessionSnapshot project = builder.finish();
 
-  const FormatRegistry formats;
   const auto wavArtifacts =
-      exportCollection(project, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Wav}}, formats);
+      exportCollection(project, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Wav}});
   expect(wavArtifacts.size() == 1, "WAV export should return one artifact for one sample");
   expectDiagnosticRange(wavArtifacts[0].diagnostics, "Sample source was not found", missingSampleRange);
 
@@ -1483,11 +1393,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
               .sampleCollections = {samples.metadata.id},
           },
   });
-  FormatRegistry formats;
-  formats.add(probeSequenceModule());
-
-  const auto playback =
-      prepareCollectionPlayback(builder.finish(), sources, CollectionId{0}, PlaybackRequest{}, formats);
+  const auto playback = prepareCollectionPlayback(builder.finish(), sources, CollectionId{0}, PlaybackRequest{});
   expect(playback.playable() && playback.diagnostics.empty(),
          "valid collection playback should prepare clean MIDI and SoundFont data");
   expect(playback.collection == CollectionId{0} && playback.sequence == sequence.metadata.id &&
@@ -1516,7 +1422,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
       .members = {.sequence = sequence.metadata.id},
   });
   const auto missingSynth =
-      prepareCollectionPlayback(sequenceOnlyBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{}, formats);
+      prepareCollectionPlayback(sequenceOnlyBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{});
   expect(!missingSynth.playable() &&
              std::ranges::any_of(missingSynth.diagnostics,
                                  [](const Diagnostic& diagnostic) {
@@ -1542,7 +1448,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
           },
   });
   const auto sampleOnlySynth =
-      prepareCollectionPlayback(sampleOnlySynthBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{}, formats);
+      prepareCollectionPlayback(sampleOnlySynthBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{});
   expect(!sampleOnlySynth.playable() && sampleOnlySynth.soundFont.empty() &&
              std::ranges::any_of(sampleOnlySynth.diagnostics,
                                  [](const Diagnostic& diagnostic) {
@@ -1564,7 +1470,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
           },
   });
   const auto missingSequence =
-      prepareCollectionPlayback(synthOnlyBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{}, formats);
+      prepareCollectionPlayback(synthOnlyBuilder.finish(), sources, CollectionId{0}, PlaybackRequest{});
   expect(!missingSequence.playable() && std::ranges::any_of(missingSequence.diagnostics,
                                                             [](const Diagnostic& diagnostic) {
                                                               return diagnostic.message ==

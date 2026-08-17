@@ -24,6 +24,7 @@ public:
   [[nodiscard]] const std::vector<SourceExtractor>& extractors() const noexcept { return extractors_; }
   [[nodiscard]] const std::vector<FormatModule>& modules() const noexcept { return modules_; }
   [[nodiscard]] const FormatModule* findModule(std::string_view name) const;
+  [[nodiscard]] CollectionBinder collectionBinder(std::string_view resolver) const;
   [[nodiscard]] bool sealed() const noexcept { return sealed_; }
 
 private:

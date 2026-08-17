@@ -52,10 +52,6 @@ using FinalizePerformance = void (*)(std::any& programState, PerformanceSequence
 struct SequenceRuntime {
   CreateProgramState createProgramState;
   CreateTrackState createTrackState;
-  // Stored command bodies erase a pointer to their compiler cursor's Playback
-  // type. A collection binder may replace runtime configuration only when this
-  // process-local token still identifies that same command-facing type.
-  const void* commandPlaybackType = nullptr;
   ExecuteCommand execute = nullptr;
   CommandReadyDuringWait readyDuringWait = nullptr;
   TickTrackState tick = nullptr;
@@ -152,9 +148,7 @@ struct CommandFlow {
     return defaultTransition.kind == CommandTransitionKind::Jump;
   }
 
-  [[nodiscard]] bool callTarget() const noexcept {
-    return defaultTransition.kind == CommandTransitionKind::Call;
-  }
+  [[nodiscard]] bool callTarget() const noexcept { return defaultTransition.kind == CommandTransitionKind::Call; }
 
   [[nodiscard]] std::optional<Address> defaultDestination() const noexcept {
     if (defaultTransition.kind != CommandTransitionKind::Jump &&

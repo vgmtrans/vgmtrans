@@ -11,7 +11,6 @@
 
 namespace vgmtrans::core {
 
-class FormatRegistry;
 class SessionSnapshot;
 class SourceStore;
 
@@ -33,23 +32,20 @@ struct CollectionPlayback {
 };
 
 [[nodiscard]] Artifact exportSequenceMidi(const SessionSnapshot& snapshot, const SourceStore& sources, AssetId sequence,
-                                          const SequenceExportRequest& request, const FormatRegistry& formats);
+                                          const SequenceExportRequest& request);
 
 [[nodiscard]] Artifact exportInstrumentSet(const SessionSnapshot& snapshot, const SourceStore& sources,
                                            AssetId instrumentSet, SynthExportFormat format,
-                                           const ExportRequest& request, const FormatRegistry& formats);
+                                           const ExportRequest& request);
 
 [[nodiscard]] CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, const SourceStore& sources,
-                                                           CollectionId collection, const PlaybackRequest& request,
-                                                           const FormatRegistry& formats);
+                                                           CollectionId collection, const PlaybackRequest& request);
 
 [[nodiscard]] std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const SourceStore& sources,
-                                                     CollectionId collection, const ExportRequest& request,
-                                                     const FormatRegistry& formats);
+                                                     CollectionId collection, const ExportRequest& request);
 
 [[nodiscard]] std::vector<CollectionExport> exportAllCollections(const SessionSnapshot& snapshot,
                                                                  const SourceStore& sources,
-                                                                 const ExportRequest& request,
-                                                                 const FormatRegistry& formats);
+                                                                 const ExportRequest& request);
 
 }  // namespace vgmtrans::core

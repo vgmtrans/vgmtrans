@@ -63,6 +63,11 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
   const SequenceProgramConfig config48 = probeSequenceConfig();
   SequenceProgramConfig config96 = config48;
   config96.timebase.ppqn = 96;
+  const CollectionBinder binder = [](CollectionBindingContext& context) {
+    const auto* sequence = context.sequence;
+    const bool leaveDirtyMidiState = sequence != nullptr && sequence->metadata.name == "Part 0";
+    context.sequenceRuntime = makeCompiledRuntime<ProbeCompilerCursor, StitchProgramState>(leaveDirtyMidiState);
+  };
 
   test::SessionSnapshotBuilder builder;
   for (u32 index = 0; index < 2; ++index) {
@@ -127,6 +132,7 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
         .id = CollectionId{index},
         .name = "Part " + std::to_string(index),
         .key = CollectionKey{.resolver = "ProbeSequence"},
+        .binder = binder,
         .members =
             {
                 .sequence = sequenceId,
@@ -136,25 +142,17 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
     });
   }
 
-  FormatRegistry formats;
-  auto module = probeSequenceModule();
-  module.bindCollection = [](CollectionBindingContext& context) {
-    const auto* sequence = context.sequence();
-    const bool leaveDirtyMidiState = sequence != nullptr && sequence->metadata.name == "Part 0";
-    context.replaceSequenceRuntime(makeCompiledRuntime<ProbeCompilerCursor, StitchProgramState>(leaveDirtyMidiState));
-  };
-  formats.add(std::move(module));
   const std::array collections{CollectionId{0}, CollectionId{1}};
   const auto snapshot = builder.finish();
   const ExportRequest request{.dynamicEnvelopes = DynamicEnvelopePolicy::InstrumentVariants};
-  const auto result = stitchCollections(snapshot, sources, collections, request, formats);
+  const auto result = stitchCollections(snapshot, sources, collections, request);
 
   auto restrictedRequest = request;
   restrictedRequest.exportOnlyUsedInstruments = true;
-  const auto restricted = stitchCollections(snapshot, sources, collections, restrictedRequest, formats);
+  const auto restricted = stitchCollections(snapshot, sources, collections, restrictedRequest);
   auto observedRequest = request;
   observedRequest.modulationScaling = ModulationScalingPolicy::ObservedSequenceRange;
-  const auto observed = stitchCollections(snapshot, sources, collections, observedRequest, formats);
+  const auto observed = stitchCollections(snapshot, sources, collections, observedRequest);
 
   expect(result.complete(), "stitching should compact sparse source banks instead of reserving their numeric gaps");
   expect(restricted.complete(), "used-only stitched export should retain each part's playable instrument data");

@@ -13,7 +13,6 @@
 
 namespace vgmtrans::core {
 
-class FormatRegistry;
 class SessionSnapshot;
 class SourceStore;
 
@@ -43,6 +42,6 @@ struct CollectionStitchResult {
 // and filtering policies, while request.kinds is intentionally ignored.
 [[nodiscard]] CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const SourceStore& sources,
                                                        std::span<const CollectionId> collections,
-                                                       const ExportRequest& request, const FormatRegistry& formats);
+                                                       const ExportRequest& request);
 
 }  // namespace vgmtrans::core

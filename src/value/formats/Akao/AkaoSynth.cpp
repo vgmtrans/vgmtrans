@@ -372,7 +372,7 @@ void emitSampleCollection(const ScanInput& input, ScanResultBuilder& result, Par
                       SourceTarget{ObjectRefs::sample(parsed.parse.ref.id, articulation.sampleIndex)});
     }
   }
-  samples.data(AkaoSampleBindingData{.articulations = std::move(parsed.articulations)});
+  samples.data(std::move(parsed.articulations));
 }
 
 [[nodiscard]] std::optional<ParsedSampleCollection> parseSampleCollectionValues(const ScanInput& input, u32 offset,

@@ -7,32 +7,15 @@
 #include "value/export/CollectionBinding.h"
 
 #include "value/export/ExportDiagnostics.h"
-#include "value/scan/FormatRegistry.h"
+#include "value/scan/FormatModule.h"
 #include "value/sequence/SequenceVm.h"
 
-#include <algorithm>
 #include <exception>
-#include <set>
 #include <utility>
 
 namespace vgmtrans::core {
 
 namespace {
-
-[[nodiscard]] const FormatModule* bindingModule(const Collection& collection, const SequenceProgramAsset* sequence,
-                                                const FormatRegistry& formats) {
-  if (collection.origin == CollectionOrigin::UserCreated && sequence != nullptr) {
-    const auto* module = formats.findModule(sequence->metadata.format);
-    if (module != nullptr && module->bindCollection) {
-      return module;
-    }
-  }
-
-  const auto found = std::ranges::find_if(formats.modules(), [&](const FormatModule& module) {
-    return module.bindCollection && module.collectionResolver() == collection.key.resolver;
-  });
-  return found == formats.modules().end() ? nullptr : &*found;
-}
 
 [[nodiscard]] RenderedCollection renderSequence(const SequenceProgramAsset& sequence, const SequenceRuntime& runtime,
                                                 const SequenceRenderOptions& options) {
@@ -66,39 +49,6 @@ namespace {
   return RenderedCollection{.performance = std::move(performance), .modulation = std::move(modulation)};
 }
 
-[[nodiscard]] bool preservesInstrumentMembership(std::span<const InstrumentSetAsset> instrumentSets,
-                                                 std::span<const AssetId> expectedIds,
-                                                 std::span<const std::string> expectedFormats,
-                                                 std::vector<Diagnostic>& diagnostics) {
-  for (size_t index = 0; index < instrumentSets.size(); ++index) {
-    if (instrumentSets[index].metadata.id == expectedIds[index] &&
-        instrumentSets[index].metadata.format == expectedFormats[index]) {
-      continue;
-    }
-    diagnostics.push_back(
-        exportError("Collection binder changed the identity or order of an instrument-set member"));
-    return false;
-  }
-  return true;
-}
-
-void diagnoseDuplicateInstrumentAddresses(std::span<const InstrumentSetAsset> instrumentSets,
-                                          std::vector<Diagnostic>& diagnostics) {
-  std::set<std::pair<u32, u32>> addresses;
-  std::set<std::pair<u32, u32>> reported;
-  for (const auto& instrumentSet : instrumentSets) {
-    for (const auto& instrument : instrumentSet.instruments) {
-      const auto address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
-      const auto key = std::pair{address.bank, address.program};
-      if (!addresses.insert(key).second && reported.insert(key).second) {
-        diagnostics.push_back(exportWarning("Collection contains duplicate instrument address " +
-                                            std::to_string(address.bank) + ":" +
-                                            std::to_string(address.program)));
-      }
-    }
-  }
-}
-
 }  // namespace
 
 BoundCollection::BoundCollection(SessionSnapshot snapshot, CollectionId id, std::string baseName,
@@ -110,12 +60,11 @@ BoundCollection::BoundCollection(SessionSnapshot snapshot, CollectionId id, std:
       sampleCollections_(std::move(sampleCollections)) {
 }
 
-CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, CollectionId collectionId,
-                                       const FormatRegistry& formats) {
-  CollectionBindingDiagnostics diagnostics;
+CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, CollectionId collectionId) {
+  std::vector<Diagnostic> diagnostics;
   const Collection* collection = snapshot.collection(collectionId);
   if (collection == nullptr) {
-    diagnostics.collection.push_back(exportError("CollectionId was not found in the SessionSnapshot"));
+    diagnostics.push_back(exportError("CollectionId was not found in the SessionSnapshot"));
     return CollectionBindingResult{.diagnostics = std::move(diagnostics)};
   }
 
@@ -128,7 +77,7 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
   if (members.sequence) {
     sequence = snapshot.asset<SequenceProgramAsset>(*members.sequence);
     if (sequence == nullptr) {
-      diagnostics.sequence.push_back(exportError("Collection sequence asset was not found"));
+      diagnostics.push_back(exportError("Collection sequence asset was not found"));
       failed = true;
     } else {
       sequenceRuntime = sequence->program.runtime;
@@ -136,15 +85,12 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
   }
 
   std::vector<InstrumentSetAsset> instrumentSets;
-  std::vector<std::string> instrumentFormats;
   instrumentSets.reserve(members.instrumentSets.size());
-  instrumentFormats.reserve(members.instrumentSets.size());
   for (const AssetId assetId : members.instrumentSets) {
     if (const auto* instruments = snapshot.asset<InstrumentSetAsset>(assetId)) {
       instrumentSets.push_back(*instruments);
-      instrumentFormats.push_back(instruments->metadata.format);
     } else {
-      diagnostics.instrumentSets.push_back(exportError("Collection instrument set asset was not found"));
+      diagnostics.push_back(exportError("Collection instrument set asset was not found"));
       failed = true;
     }
   }
@@ -154,45 +100,39 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
     if (const auto* samples = snapshot.asset<SampleCollectionAsset>(assetId)) {
       sampleCollections.push_back(samples);
     } else {
-      diagnostics.sampleCollections.push_back(exportError("Collection sample collection asset was not found"));
+      diagnostics.push_back(exportError("Collection sample collection asset was not found"));
       failed = true;
     }
   }
 
-  if (!failed) {
-    const auto* module = bindingModule(*collection, sequence, formats);
-    if (module != nullptr) {
-      try {
-        CollectionBindingContext context{
-            sequence,
-            sequenceRuntime,
-            instrumentSets,
-            sampleCollections,
-            diagnostics.collection,
-        };
-        module->bindCollection(context);
-        failed = context.failed();
-        if (!failed) {
-          failed = !preservesInstrumentMembership(instrumentSets, members.instrumentSets, instrumentFormats,
-                                                  diagnostics.collection);
-        }
-      } catch (const std::exception& error) {
-        diagnostics.collection.push_back(exportError(module->name + " collection binding failed: " + error.what()));
-        failed = true;
-      } catch (...) {
-        diagnostics.collection.push_back(exportError(module->name + " collection binding failed"));
-        failed = true;
-      }
+  if (!failed && collection->binder) {
+    const std::string bindingName = !collection->key.resolver.empty() ? collection->key.resolver
+                                    : sequence != nullptr             ? sequence->metadata.format
+                                                                      : "Collection";
+    try {
+      CollectionBindingContext context{
+          .sequence = sequence,
+          .sequenceRuntime = sequenceRuntime,
+          .instrumentSets = instrumentSets,
+          .sampleCollections = sampleCollections,
+          .diagnostics = diagnostics,
+      };
+      collection->binder(context);
+      failed = context.failed;
+    } catch (const std::exception& error) {
+      diagnostics.push_back(exportError(bindingName + " collection binding failed: " + error.what()));
+      failed = true;
+    } catch (...) {
+      diagnostics.push_back(exportError(bindingName + " collection binding failed"));
+      failed = true;
     }
   }
   if (failed) {
     return CollectionBindingResult{.diagnostics = std::move(diagnostics)};
   }
-  diagnoseDuplicateInstrumentAddresses(instrumentSets, diagnostics.collection);
   return CollectionBindingResult{
-      .collection = BoundCollection(snapshot, collection->id, std::move(baseName), sequence,
-                                    std::move(sequenceRuntime), std::move(instrumentSets),
-                                    std::move(sampleCollections)),
+      .collection = BoundCollection(snapshot, collection->id, std::move(baseName), sequence, std::move(sequenceRuntime),
+                                    std::move(instrumentSets), std::move(sampleCollections)),
       .diagnostics = std::move(diagnostics),
   };
 }

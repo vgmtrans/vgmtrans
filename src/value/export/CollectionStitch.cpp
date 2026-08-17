@@ -15,7 +15,6 @@
 #include "value/export/synth/ModulationScaling.h"
 #include "value/export/synth/SynthExportData.h"
 #include "value/model/SessionSnapshot.h"
-#include "value/scan/FormatRegistry.h"
 
 #include <algorithm>
 #include <limits>
@@ -58,13 +57,6 @@ void fail(CollectionStitchResult& result, std::string message) {
   result.soundFont.diagnostics.push_back(diagnostic);
 }
 
-void append(std::vector<Diagnostic>& destination, const CollectionBindingDiagnostics& source) {
-  append(destination, source.collection);
-  append(destination, source.sequence);
-  append(destination, source.instrumentSets);
-  append(destination, source.sampleCollections);
-}
-
 void mergeRange(ObservedValueRange& destination, const ObservedValueRange& source) {
   if (!source.observed) {
     return;
@@ -87,8 +79,8 @@ void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulation
 }
 
 [[nodiscard]] bool preparePart(StitchPart& part, const SessionSnapshot& snapshot, const ExportRequest& request,
-                               const FormatRegistry& formats, std::vector<Diagnostic>& diagnostics) {
-  auto binding = bindCollection(snapshot, part.collection, formats);
+                               std::vector<Diagnostic>& diagnostics) {
+  auto binding = bindCollection(snapshot, part.collection);
   if (!binding.collection) {
     append(diagnostics, binding.diagnostics);
     return false;
@@ -390,8 +382,7 @@ void remapPart(StitchPart& part, MidiBankSelectStyle style) {
 }  // namespace
 
 CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const SourceStore& sources,
-                                         std::span<const CollectionId> collections, const ExportRequest& request,
-                                         const FormatRegistry& formats) {
+                                         std::span<const CollectionId> collections, const ExportRequest& request) {
   CollectionStitchResult result{
       .midi = Artifact{.filename = "stitched-collections.mid", .mediaType = "audio/midi"},
       .soundFont = Artifact{.filename = "stitched-collections.sf2", .mediaType = "audio/soundfont"},
@@ -405,7 +396,7 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
   parts.reserve(collections.size());
   for (const CollectionId collection : collections) {
     StitchPart part{.collection = collection};
-    if (!preparePart(part, snapshot, request, formats, result.midi.diagnostics)) {
+    if (!preparePart(part, snapshot, request, result.midi.diagnostics)) {
       result.soundFont.diagnostics = result.midi.diagnostics;
       return result;
     }

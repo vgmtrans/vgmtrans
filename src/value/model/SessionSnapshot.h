@@ -13,6 +13,7 @@
 #include "value/sequence/SequenceProgram.h"
 #include "value/synth/SynthModel.h"
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -22,6 +23,9 @@
 
 namespace vgmtrans::core {
 
+struct CollectionBindingContext;
+using CollectionBinder = std::function<void(CollectionBindingContext&)>;
+
 namespace detail {
 class SessionSnapshotAccess;
 }
@@ -29,7 +33,6 @@ class SessionSnapshotAccess;
 struct MiscAsset {
   AssetMetadata metadata;
   std::vector<u8> payload;
-  AssetPrivateData privateData;
 };
 
 using Asset = std::variant<SequenceProgramAsset, InstrumentSetAsset, SampleCollectionAsset, MiscAsset>;
@@ -40,6 +43,9 @@ struct Collection {
   CollectionFreshness freshness = CollectionFreshness::Current;
   CollectionOrigin origin = CollectionOrigin::Discovered;
   CollectionKey key;
+  // Chosen during session resolution so binding never has to recover format
+  // behavior from a registry.
+  CollectionBinder binder;
   // Collections are the export units. A sequence may be paired with instrument
   // sets and sample collections loaded from the same or separate sources.
   CollectionMembers members;

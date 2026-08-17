@@ -2450,8 +2450,6 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
   const SessionSnapshot project = snapshotBuilder.finish();
 
   SourceStore sources;
-  FormatRegistry formats;
-  formats.add(probeSequenceModule());
 
   const auto artifacts = exportCollection(project, sources, CollectionId{0},
                                           ExportRequest{
@@ -2461,8 +2459,7 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
                                                       .loopPolicy = LoopPolicy::PlayOnce,
                                                       .sequenceLoops = 2,
                                                   },
-                                          },
-                                          formats);
+                                          });
 
   expect(artifacts.size() == 1 && artifacts[0].diagnostics.empty(),
          "MIDI export with configured sequence loops should produce one clean artifact");
@@ -2500,10 +2497,8 @@ void standaloneSequenceExportDoesNotRequireACollection() {
   const SessionSnapshot snapshot = snapshotBuilder.finish();
   expect(snapshot.collections().empty(), "standalone MIDI fixture should not contain a collection");
 
-  FormatRegistry formats;
-  formats.add(probeSequenceModule());
   const SourceStore sources;
-  const Artifact artifact = exportSequenceMidi(snapshot, sources, AssetId{7}, SequenceExportRequest{}, formats);
+  const Artifact artifact = exportSequenceMidi(snapshot, sources, AssetId{7}, SequenceExportRequest{});
 
   expect(artifact.filename == "Loose_Sequence.mid",
          "standalone sequence export should derive a safe filename from sequence metadata");

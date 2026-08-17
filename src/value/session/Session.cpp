@@ -186,7 +186,14 @@ void Session::removeAssets(std::span<const AssetId> assets) {
 
 CollectionId Session::createUserCollection(std::string name, CollectionMembers members) {
   sealFormats();
-  const CollectionId id = state_->createUserCollection(std::move(name), std::move(members), ids_);
+  CollectionBinder binder;
+  if (members.sequence) {
+    const auto* sequence = state_->asset<SequenceProgramAsset>(*members.sequence);
+    if (sequence != nullptr) {
+      binder = formats_.collectionBinder(sequence->metadata.format);
+    }
+  }
+  const CollectionId id = state_->createUserCollection(std::move(name), std::move(members), std::move(binder), ids_);
   invalidateSnapshot();
   return id;
 }
@@ -253,30 +260,30 @@ std::shared_ptr<const SourceInspection> Session::inspect(AssetId asset) const {
 
 CollectionPlayback Session::preparePlayback(CollectionId id, const PlaybackRequest& request) const {
   const auto current = snapshot();
-  return core::prepareCollectionPlayback(current, sources_, id, request, formats_);
+  return core::prepareCollectionPlayback(current, sources_, id, request);
 }
 
 Artifact Session::exportSequenceMidi(AssetId id, const SequenceExportRequest& request) const {
-  return core::exportSequenceMidi(snapshot(), sources_, id, request, formats_);
+  return core::exportSequenceMidi(snapshot(), sources_, id, request);
 }
 
 Artifact Session::exportInstrumentSet(AssetId id, SynthExportFormat format, const ExportRequest& request) const {
-  return core::exportInstrumentSet(snapshot(), sources_, id, format, request, formats_);
+  return core::exportInstrumentSet(snapshot(), sources_, id, format, request);
 }
 
 std::vector<Artifact> Session::exportCollection(CollectionId id, const ExportRequest& request) const {
   const auto current = snapshot();
-  return core::exportCollection(current, sources_, id, request, formats_);
+  return core::exportCollection(current, sources_, id, request);
 }
 
 std::vector<CollectionExport> Session::exportAllCollections(const ExportRequest& request) const {
   const auto current = snapshot();
-  return core::exportAllCollections(current, sources_, request, formats_);
+  return core::exportAllCollections(current, sources_, request);
 }
 
 CollectionStitchResult Session::stitchCollections(std::span<const CollectionId> collections,
                                                   const ExportRequest& request) const {
-  return core::stitchCollections(snapshot(), sources_, collections, request, formats_);
+  return core::stitchCollections(snapshot(), sources_, collections, request);
 }
 
 void Session::sealFormats() noexcept {
@@ -460,7 +467,8 @@ void Session::rebuildCollections() {
     if (failedResolvers.contains(resolverId)) {
       continue;
     }
-    state_->reconcileCollections(resolverId, std::move(desiredCollections), ids_);
+    state_->reconcileCollections(resolverId, std::move(desiredCollections), formats_.collectionBinder(resolverId),
+                                 ids_);
   }
 }
 

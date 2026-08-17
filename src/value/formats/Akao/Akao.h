@@ -187,9 +187,7 @@ struct AkaoSampleCollectionParse {
   u32 articulationCount = 0;
 };
 
-struct AkaoSampleBindingData {
-  std::vector<AkaoArticulation> articulations;
-};
+using AkaoSampleBindingData = std::vector<AkaoArticulation>;
 
 struct AkaoArticulationBinding {
   core::ScanSampleCollectionRef collection;
