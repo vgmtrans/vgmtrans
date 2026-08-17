@@ -5,6 +5,7 @@
  */
 
 #include "value/base/LevelScale.h"
+#include "value/export/CollectionBinding.h"
 #include "value/export/Export.h"
 #include "value/extractors/PsfExtractor.h"
 #include "value/formats/SegSat/SegSat.h"
@@ -526,7 +527,7 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
   const SourceId bank5Source = sources.add(SourceFile{.name = "bank-5.bin"}, velocityBankSource(0));
   const SourceId bank6Source = sources.add(SourceFile{.name = "bank-6.bin"}, velocityBankSource(128));
 
-  const std::vector<u8> sequenceBytes = multiBankVelocityFixture();
+  const std::vector<u8> sequenceBytes = multiBankVelocityFixture(4);
   const ByteReader sequenceReader(SourceId{99}, sequenceBytes);
   const auto sequenceLayouts = findSegSatSequences(sequenceReader);
   expect(sequenceLayouts.size() == 1, "multi-source fixture should contain one sequence");
@@ -538,7 +539,7 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
   };
   sequence.privateData = AssetPrivateData::make(SegSatSequenceBindingData{
       .volumeModel = SegSatVolumeModel::V1_33,
-      .referencedBanks = {5, 6},
+      .referencedBanks = {4, 6},
       .controllerChanges = std::move(parsedSequence.controllerChanges),
   });
   const auto bank5Layout = readSegSatBankLayout(sources.reader(bank5Source), 0x100);
@@ -581,13 +582,16 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
           .name = "Foreign Instrument",
       }},
   };
+  // Manual collections need not list physical banks in logical-reference order.
   const Collection collection{
       .id = CollectionId{0},
       .name = "Multi-source SegSat",
+      .origin = CollectionOrigin::UserCreated,
+      .binder = bindSegSatCollection,
       .members =
           {
               .sequence = sequence.metadata.id,
-              .instrumentSets = {bank5.metadata.id, foreignBank.metadata.id, bank6.metadata.id},
+              .instrumentSets = {bank6.metadata.id, foreignBank.metadata.id, bank5.metadata.id},
           },
   };
   test::SessionSnapshotBuilder builder;
@@ -596,23 +600,20 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
   builder.collections = {collection};
   const SessionSnapshot snapshot = builder.finish();
 
-  const FormatModule format = segSatModule();
-  SequenceRuntime runtime = sequence.program.runtime;
-  std::vector<InstrumentSetAsset> instrumentSets{bank5, foreignBank, bank6};
-  std::vector<const SampleCollectionAsset*> sampleCollections;
-  std::vector<Diagnostic> bindingDiagnostics;
-  CollectionBindingContext binding{
-      &sequence, runtime, instrumentSets, sampleCollections, bindingDiagnostics,
-  };
-  format.bindCollection(binding);
-  expect(bindingDiagnostics.empty() && runtime.valid(),
+  const auto binding = bindCollection(snapshot, collection.id);
+  expect(binding.diagnostics.empty() && binding.collection,
          "SegSat binding should use retained bank data without reopening its source files");
+  const auto& instrumentSets = binding.collection->instrumentSets();
   expect(instrumentSets.size() == 3 && instrumentSets[1].metadata.id == foreignBank.metadata.id &&
              instrumentSets[1].instruments.front().explicitAddress == InstrumentAddress{.bank = 42, .program = 7} &&
              instrumentSets[1].instruments.front().name == "Foreign Instrument",
          "SegSat binding should preserve the identity, order, and contents of foreign collection members");
 
-  PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, runtime);
+  const auto rendering =
+      renderCollection(*binding.collection, SequenceRenderOptions{.loopPolicy = LoopPolicy::PlayOnce});
+  expect(rendering.diagnostics.empty() && rendering.performance,
+         "the manually ordered SegSat collection should render after binding");
+  const auto& performance = *rendering.performance;
   std::vector<const NotePerformanceEvent*> notes;
   for (const auto& event : performance.tracks.front().events) {
     if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
