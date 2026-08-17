@@ -46,7 +46,7 @@ private:
   std::any value_;
 };
 
-// Common metadata for sequences, instrument sets, sample collections, and misc
+// Common metadata for sequences, sound banks, sample pools, and misc
 // assets. range identifies the asset's primary source structure; SourceInspection
 // expands it across the asset-owned annotation graph when presenting its bytes.
 struct AssetMetadata {

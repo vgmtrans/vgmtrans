@@ -55,8 +55,8 @@ struct ParsedNdsRegion {
 // All SBNK region kinds end with the same ten-byte body. Drum and key-split
 // entries add a two-byte type prefix, which is retained in the source record.
 [[nodiscard]] std::optional<ParsedNdsRegion> parseNdsRegion(
-    ScanResultBuilder& builder, SourceRange range, InstrumentType type, const ScanSampleCollectionDraft& psgCollection,
-    const std::array<std::optional<ScanSampleCollectionDraft>, 4>& waveCollections, KeyRange keys = {}) {
+    ScanResultBuilder& builder, SourceRange range, InstrumentType type, const ScanSamplePoolDraft& psgCollection,
+    const std::array<std::optional<ScanSamplePoolDraft>, 4>& waveCollections, KeyRange keys = {}) {
   if ((range.size != 10 && range.size != 12) || range.endOffset() > std::numeric_limits<u32>::max()) {
     return std::nullopt;
   }
@@ -126,7 +126,7 @@ struct ParsedNdsRegion {
 }
 
 // Reads one SWAV entry and adds it under the source index used by SBNK records.
-void addNdsWave(ScanResultBuilder& builder, RecordReader& archive, SampleCollectionBuilder& samples, u32 relativeOffset,
+void addNdsWave(ScanResultBuilder& builder, RecordReader& archive, SamplePoolBuilder& samples, u32 relativeOffset,
                 SourceRange headerRange, u32 sampleIndex, SourceAnnotationId parent) {
   if (headerRange.endOffset() > std::numeric_limits<u32>::max()) {
     return;
@@ -211,8 +211,8 @@ void addNdsWave(ScanResultBuilder& builder, RecordReader& archive, SampleCollect
 
 // Creates the built-in pulse and noise sounds used by NDS instruments that do
 // not refer to a wave archive.
-ScanSampleCollectionDraft addNdsPsgSamples(ScanResultBuilder& builder) {
-  auto samples = builder.sampleCollection("NDS PSG samples");
+ScanSamplePoolDraft addNdsPsgSamples(ScanResultBuilder& builder) {
+  auto samples = builder.samplePool("NDS PSG samples");
   for (u32 i = 0; i <= 8; ++i) {
     samples.add(i, Sample{
                        .name = fmt::format("PSG_duty_{}", i),
@@ -229,14 +229,14 @@ ScanSampleCollectionDraft addNdsPsgSamples(ScanResultBuilder& builder) {
 
 // Reads every valid sample from one NDS wave archive and adds the resulting
 // collection to the scan result.
-std::optional<ScanSampleCollectionDraft> addNdsWaveArchive(ScanResultBuilder& builder, SourceRange range,
-                                                           std::string_view name) {
+std::optional<ScanSamplePoolDraft> addNdsWaveArchive(ScanResultBuilder& builder, SourceRange range,
+                                                     std::string_view name) {
   const ByteReader reader = builder.reader();
   if (!matchesBytes(reader, range.offset, kSwarSignature)) {
     return std::nullopt;
   }
 
-  auto samples = builder.sampleCollection(std::string(name));
+  auto samples = builder.samplePool(std::string(name));
   samples.include(range);
 
   if (range.endOffset() > std::numeric_limits<u32>::max()) {
@@ -287,10 +287,9 @@ std::optional<ScanSampleCollectionDraft> addNdsWaveArchive(ScanResultBuilder& bu
 
 // Reads the instruments in one NDS bank, including single-sample, pulse, noise,
 // drum, and key-split instruments.
-std::optional<ScanInstrumentSetDraft> addNdsInstrumentSet(
-    ScanResultBuilder& builder, SourceRange range, std::string_view name,
-    const ScanSampleCollectionDraft& psgCollection,
-    const std::array<std::optional<ScanSampleCollectionDraft>, 4>& waveCollections) {
+std::optional<ScanSoundBankDraft> addNdsInstrumentSet(
+    ScanResultBuilder& builder, SourceRange range, std::string_view name, const ScanSamplePoolDraft& psgCollection,
+    const std::array<std::optional<ScanSamplePoolDraft>, 4>& waveCollections) {
   const ByteReader reader = builder.reader();
   if (range.endOffset() > std::numeric_limits<u32>::max()) {
     return std::nullopt;
@@ -307,7 +306,7 @@ std::optional<ScanInstrumentSetDraft> addNdsInstrumentSet(
     return std::nullopt;
   }
 
-  auto instruments = builder.instrumentSet(std::string(name));
+  auto instruments = builder.soundBank(std::string(name));
   instruments.include(range);
   auto pointerTable = instruments
                           .source(SourceRole::Table, "SBNK Instrument Pointer Table", *pointerTableRange,

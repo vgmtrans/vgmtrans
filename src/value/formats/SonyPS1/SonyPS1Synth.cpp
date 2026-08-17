@@ -71,11 +71,11 @@ struct PanGains {
 
 }  // namespace
 
-SonyPs1ScannedBank addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLayout& layout, u16 bank) {
+ScanSoundBankRef addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLayout& layout, u16 bank) {
   const ByteReader reader = result.reader();
   const std::string name = fmt::format("Sony PS1 VAB {}", bank);
-  std::optional<ScanSampleCollectionRef> sampleCollection;
-  std::map<u32, SampleRef> samplesByIndex;
+  auto instruments = result.soundBank(name);
+  auto& samples = instruments.samples();
 
   if (layout.hasSampleBody) {
     std::vector<std::pair<u32, PsxAdpcmStream>> streams;
@@ -91,10 +91,9 @@ SonyPs1ScannedBank addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLa
     }
 
     if (!streams.empty()) {
-      auto samples = result.sampleCollection(name + " Samples");
       const SourceRange body = reader.range(layout.sampleDataOffset, layout.expectedSampleBytes);
       const SourceAnnotationId root =
-          samples.source(SourceRole::SampleCollection, "VAB Sample Body", body, "sony-ps1-vab-body").id();
+          samples.source(SourceRole::SamplePool, "VAB Sample Body", body, "sony-ps1-vab-body").id();
       for (const auto& [index, stream] : streams) {
         auto entry = samples.add(index, Sample{
                                             .name = fmt::format("VAG {}", index + 1),
@@ -106,13 +105,10 @@ SonyPs1ScannedBank addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLa
                                             .loop = stream.loop,
                                         });
         entry.source(fmt::format("VAG {}", index + 1), stream.encodedData, "sony-ps1-vag").parent(root);
-        samplesByIndex.emplace(index, entry.ref());
       }
-      sampleCollection = samples.ref();
     }
   }
 
-  auto instruments = result.instrumentSet(name + " Instruments");
   instruments.include(reader.range(layout.offset, layout.headerSize));
   instruments
       .source(SourceRole::Header, "VAB Header", reader.range(layout.offset, kVabHeaderSize), "sony-ps1-vab-header")
@@ -183,13 +179,13 @@ SonyPs1ScannedBank addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLa
         continue;
       }
       const u32 sampleIndex = static_cast<u32>(vag - 1);
-      SampleRef sample{.index = sampleIndex};
+      SampleRef sample = SampleRef::unbound(sampleIndex);
       if (layout.hasSampleBody) {
-        const auto found = samplesByIndex.find(sampleIndex);
-        if (found == samplesByIndex.end()) {
+        const auto found = samples.find(sampleIndex);
+        if (!found) {
           continue;
         }
-        sample = found->second;
+        sample = *found;
       }
 
       const auto [pan, panGain] = regionPan(programPan, tonePan);
@@ -222,23 +218,20 @@ SonyPs1ScannedBank addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLa
     }
   }
 
-  return SonyPs1ScannedBank{
-      .instruments = instruments.ref(),
-      .samples = sampleCollection,
-  };
+  return instruments.ref();
 }
 
-std::optional<ScanSampleCollectionRef> addSonyPs1RawSampleBody(ScanResultBuilder& result) {
+std::optional<ScanSamplePoolRef> addSonyPs1RawSampleBody(ScanResultBuilder& result) {
   const ByteReader reader = result.reader();
   const auto streams = inspectRawBody(reader);
   if (streams.empty()) {
     return std::nullopt;
   }
 
-  auto samples = result.sampleCollection(result.sourceDisplayName() + " VAG Samples");
+  auto samples = result.samplePool(result.sourceDisplayName() + " VAG Samples");
   const SourceRange body = reader.range(0, reader.size());
   const SourceAnnotationId root =
-      samples.source(SourceRole::SampleCollection, "VAB Sample Body", body, "sony-ps1-vab-body").id();
+      samples.source(SourceRole::SamplePool, "VAB Sample Body", body, "sony-ps1-vab-body").id();
   samples.include(body);
   for (u32 index = 0; index < streams.size(); ++index) {
     const auto& stream = streams[index];

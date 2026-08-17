@@ -143,7 +143,7 @@ struct SongChoice {
   return reader.has(address, version == Version::Summer ? 1 : 2) ? static_cast<u16>(address) : 0;
 }
 
-[[nodiscard]] bool instrumentSetHasPrograms(ByteReader reader, u16 set, u16 srcns, Version version) {
+[[nodiscard]] bool soundBankHasPrograms(ByteReader reader, u16 set, u16 srcns, Version version) {
   if (set == 0 || !reader.has(set, version == Version::Summer ? 1 : 2)) {
     return false;
   }
@@ -227,12 +227,12 @@ std::optional<Layout> findLayout(ByteReader reader) {
     return std::nullopt;
   }
 
-  u16 instrumentSets = 0;
+  u16 soundBanks = 0;
   u16 srcns = 0;
   u16 sampleInfo = 0;
-  u8 instrumentSetIndex = 0;
+  u8 soundBankIndex = 0;
   if (version == Version::Summer) {
-    instrumentSets = static_cast<u16>(reader.u8At(*program + 14) | (reader.u8At(*program + 17) << 8));
+    soundBanks = static_cast<u16>(reader.u8At(*program + 14) | (reader.u8At(*program + 17) << 8));
     srcns = reader.le16(*program + 47);
     sampleInfo = static_cast<u16>(reader.u8At(*program + 67) | (reader.u8At(*program + 70) << 8));
   } else {
@@ -240,7 +240,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
     if (!reader.has(tablePointer, 2)) {
       return std::nullopt;
     }
-    instrumentSets = reader.le16(tablePointer);
+    soundBanks = reader.le16(tablePointer);
     srcns = reader.le16(*program + 58);
     sampleInfo = static_cast<u16>(reader.u8At(*program + 97) | (reader.u8At(*program + 100) << 8));
   }
@@ -250,17 +250,17 @@ std::optional<Layout> findLayout(ByteReader reader) {
     u8 slot = reader.u8At(trackSlotAddress);
     slot = slot == 0xff ? 0 : slot;
     if (reader.has(setIndexAddress + slot, 1)) {
-      instrumentSetIndex = reader.u8At(setIndexAddress + slot);
+      soundBankIndex = reader.u8At(setIndexAddress + slot);
     }
   }
-  u16 instrumentSet = resolveInstrumentSet(reader, instrumentSets, instrumentSetIndex, version);
-  if (!instrumentSetHasPrograms(reader, instrumentSet, srcns, version)) {
-    const u16 songSet = resolveInstrumentSet(reader, instrumentSets, song->index, version);
-    if (instrumentSetHasPrograms(reader, songSet, srcns, version)) {
-      instrumentSet = songSet;
+  u16 soundBank = resolveInstrumentSet(reader, soundBanks, soundBankIndex, version);
+  if (!soundBankHasPrograms(reader, soundBank, srcns, version)) {
+    const u16 songSet = resolveInstrumentSet(reader, soundBanks, song->index, version);
+    if (soundBankHasPrograms(reader, songSet, srcns, version)) {
+      soundBank = songSet;
     }
   }
-  if (instrumentSet == 0 || !reader.has(srcns, 1) || !reader.has(sampleInfo, 8)) {
+  if (soundBank == 0 || !reader.has(srcns, 1) || !reader.has(sampleInfo, 8)) {
     return std::nullopt;
   }
 
@@ -285,7 +285,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
   return Layout{
       .version = version,
       .sequenceHeaderAddress = song->header,
-      .instrumentSetAddress = instrumentSet,
+      .soundBankAddress = soundBank,
       .srcnTableAddress = srcns,
       .sampleInfoTableAddress = sampleInfo,
       .spcDirAddress = static_cast<u16>(dir << 8),

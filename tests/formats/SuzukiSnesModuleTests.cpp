@@ -42,10 +42,9 @@ void writeLe16(std::vector<u8>& bytes, u32 offset, u16 value) {
 
 void addCommonDriverTables(std::vector<u8>& bytes) {
   writeBytes(bytes, 0x0300, {0x8f, 0x5d, 0xf2, 0x8f, 0x60, 0xf3});
-  writeBytes(bytes, 0x0400,
-             {0xd6, 0x48, 0x01, 0x5d, 0xf5, 0x00, 0x50, 0x1c, 0x5d, 0xf5, 0x01, 0x51, 0xd6, 0x60,
-              0x01, 0xeb, 0x23, 0xf5, 0x00, 0x52, 0xd6, 0x78, 0x01, 0xf5, 0x01, 0x52, 0xd6, 0x79,
-              0x01, 0xf5, 0x00, 0x53, 0xd6, 0xa8, 0x01, 0xf5, 0x01, 0x53, 0xd6, 0xa9, 0x01});
+  writeBytes(bytes, 0x0400, {0xd6, 0x48, 0x01, 0x5d, 0xf5, 0x00, 0x50, 0x1c, 0x5d, 0xf5, 0x01, 0x51, 0xd6, 0x60,
+                             0x01, 0xeb, 0x23, 0xf5, 0x00, 0x52, 0xd6, 0x78, 0x01, 0xf5, 0x01, 0x52, 0xd6, 0x79,
+                             0x01, 0xf5, 0x00, 0x53, 0xd6, 0xa8, 0x01, 0xf5, 0x01, 0x53, 0xd6, 0xa9, 0x01});
 
   std::fill(bytes.begin() + 0x5000, bytes.begin() + 0x5080, 0xff);
   bytes[0x5000] = 0;
@@ -63,24 +62,111 @@ void addCommonDriverTables(std::vector<u8>& bytes) {
 
 void addSd3SongLoader(std::vector<u8>& bytes, u16 header) {
   writeBytes(bytes, 0x0100,
-             {0xfa, 0xf5, 0x5c, 0xfa, 0x5c, 0xf5, 0x3f, 0x0f, 0x0a, 0xcd, 0x00, 0xe4, 0x1a, 0x1c,
-              0xfd, 0xf5, static_cast<u8>(header), static_cast<u8>(header >> 8), 0xd6, 0x79, 0x1b, 0xf5,
-              0x01, 0x20, 0xd6, 0x7a, 0x1b, 0x3d, 0x3d});
+             {0xfa,
+              0xf5,
+              0x5c,
+              0xfa,
+              0x5c,
+              0xf5,
+              0x3f,
+              0x0f,
+              0x0a,
+              0xcd,
+              0x00,
+              0xe4,
+              0x1a,
+              0x1c,
+              0xfd,
+              0xf5,
+              static_cast<u8>(header),
+              static_cast<u8>(header >> 8),
+              0xd6,
+              0x79,
+              0x1b,
+              0xf5,
+              0x01,
+              0x20,
+              0xd6,
+              0x7a,
+              0x1b,
+              0x3d,
+              0x3d});
 }
 
 void addLaterSongLoader(std::vector<u8>& bytes, u16 header) {
   writeBytes(bytes, 0x0100,
-             {0xfa, 0xf5, 0x5f, 0x3f, 0xfe, 0x09, 0x3f, 0x8a, 0x04, 0x8f, 0x08, 0x06, 0xe4, 0x1d,
-              0x1c, 0x5d, 0xf6, static_cast<u8>(header), static_cast<u8>(header >> 8), 0xd5, 0x4c, 0x1b,
-              0xf6, 0x01, 0x20, 0xd5, 0x4d, 0x1b, 0x3d, 0x3d});
+             {0xfa,
+              0xf5,
+              0x5f,
+              0x3f,
+              0xfe,
+              0x09,
+              0x3f,
+              0x8a,
+              0x04,
+              0x8f,
+              0x08,
+              0x06,
+              0xe4,
+              0x1d,
+              0x1c,
+              0x5d,
+              0xf6,
+              static_cast<u8>(header),
+              static_cast<u8>(header >> 8),
+              0xd5,
+              0x4c,
+              0x1b,
+              0xf6,
+              0x01,
+              0x20,
+              0xd5,
+              0x4d,
+              0x1b,
+              0x3d,
+              0x3d});
 }
 
 void addLaterDispatch(std::vector<u8>& bytes, u16 lengths) {
   writeBytes(bytes, 0x0700,
-             {0x80, 0xa8, 0xc4, 0x2d, 0x5d, 0xf5, static_cast<u8>(lengths), static_cast<u8>(lengths >> 8),
-              0x28, 0x07, 0xc4, 0x06, 0x8d, 0x00, 0xcd, 0x00, 0x8b, 0x06, 0xf0, 0x09, 0xf7, 0x29,
-              0xd4, 0x0e, 0x3a, 0x29, 0x3d, 0x2f, 0xf3, 0xae, 0x1c, 0x5d, 0x60, 0xeb, 0x1e, 0x1f,
-              0xa9, 0x16});
+             {0x80,
+              0xa8,
+              0xc4,
+              0x2d,
+              0x5d,
+              0xf5,
+              static_cast<u8>(lengths),
+              static_cast<u8>(lengths >> 8),
+              0x28,
+              0x07,
+              0xc4,
+              0x06,
+              0x8d,
+              0x00,
+              0xcd,
+              0x00,
+              0x8b,
+              0x06,
+              0xf0,
+              0x09,
+              0xf7,
+              0x29,
+              0xd4,
+              0x0e,
+              0x3a,
+              0x29,
+              0x3d,
+              0x2f,
+              0xf3,
+              0xae,
+              0x1c,
+              0x5d,
+              0x60,
+              0xeb,
+              0x1e,
+              0x1f,
+              0xa9,
+              0x16});
 }
 
 std::vector<u8> sd3Fixture() {
@@ -163,26 +249,25 @@ void layoutsAndHeadersAreVersioned() {
 
 void playbackUsesAuditedGatingPitchAndLoops() {
   const PerformanceSequence gated = render(Version::SeikenDensetsu3, {
-                                                                            0xdd,
-                                                                            0x08,
-                                                                            0xcf,
-                                                                            0x08,
-                                                                            0xec,
-                                                                            0x01,
-                                                                            0xde,
-                                                                            0x03,
-                                                                            0xee,
-                                                                            0xa8,
-                                                                            0xef,
-                                                                            0xd0,
-                                                                        });
+                                                                         0xdd,
+                                                                         0x08,
+                                                                         0xcf,
+                                                                         0x08,
+                                                                         0xec,
+                                                                         0x01,
+                                                                         0xde,
+                                                                         0x03,
+                                                                         0xee,
+                                                                         0xa8,
+                                                                         0xef,
+                                                                         0xd0,
+                                                                     });
   const auto notes = events<NotePerformanceEvent>(gated.tracks.front());
   const auto tunings = events<TuningPerformanceEvent>(gated.tracks.front());
   const auto instruments = events<InstrumentPerformanceEvent>(gated.tracks.front());
   expect(
-      gated.diagnostics.empty() && notes.size() == 1 && notes.front()->key == 60.0 &&
-             notes.front()->durationTicks == 2,
-         "duration rate 8 should gate a three-tick percussion note after two ticks");
+      gated.diagnostics.empty() && notes.size() == 1 && notes.front()->key == 60.0 && notes.front()->durationTicks == 2,
+      "duration rate 8 should gate a three-tick percussion note after two ticks");
   expect(!tunings.empty() && std::abs(tunings.back()->cents - 75.0) < 0.000001,
          "CF sixteenth-semitone tuning and EC quarter-semitone transpose should retain their fractions");
   expect(instruments.size() >= 4 && instruments[instruments.size() - 2]->sourceInstrument->key == kDrumKitKey &&
@@ -190,14 +275,14 @@ void playbackUsesAuditedGatingPitchAndLoops() {
          "percussion mode should select the derived kit and restore the last melodic program afterward");
 
   const PerformanceSequence repeated = render(Version::SeikenDensetsu3, {
-                                                                               0xd4,
-                                                                               0x02,
-                                                                               0xa8,
-                                                                               0xd6,
-                                                                               0xc4,
-                                                                               0xd5,
-                                                                               0xd0,
-                                                                           });
+                                                                            0xd4,
+                                                                            0x02,
+                                                                            0xa8,
+                                                                            0xd6,
+                                                                            0xc4,
+                                                                            0xd5,
+                                                                            0xd0,
+                                                                        });
   const auto repeatedNotes = events<NotePerformanceEvent>(repeated.tracks.front());
   expect(repeated.diagnostics.empty() && repeatedNotes.size() == 2 && repeatedNotes[0]->key == 72.0 &&
              repeatedNotes[1]->key == 72.0,
@@ -331,7 +416,7 @@ void laterE0UsesTheSustainRateAsAGatedRelease() {
              std::abs(*envelopes.front()->update.values->releaseSeconds - snesDspAdsrSustainSeconds(0x1b)) < 0.000001,
          "later-driver E0 should hold the sustain during the note and apply its rate only at gate release");
 
-  std::vector<InstrumentSetAsset> sets{InstrumentSetAsset{
+  std::vector<SoundBankAsset> sets{SoundBankAsset{
       .instruments = {Instrument{
           .explicitAddress = InstrumentAddress{.bank = 0, .program = 30},
           .identity = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 30},
@@ -397,8 +482,7 @@ void modulationMathMatchesEachDriverRevision() {
 
   // And My Name's Booster, track 0 at ARAM $202A: F4 07 36. Its $36 step
   // wraps the 7-bit volume accumulator several times before each reversal.
-  const PerformanceSequence booster =
-      render(Version::SuperMarioRpg, {0xf4, 0x07, 0x36, 0xde, 0x5e, 0xb6, 0x20, 0xd0});
+  const PerformanceSequence booster = render(Version::SuperMarioRpg, {0xf4, 0x07, 0x36, 0xde, 0x5e, 0xb6, 0x20, 0xd0});
   const auto* boosterDepth = modulationValue(booster, ModulationPerformanceTarget::TremoloDepth);
   const auto* boosterRate = modulationValue(booster, ModulationPerformanceTarget::TremoloRate);
   expect(boosterDepth && boosterDepth->volumeDepthLinearGain == 1.0 && boosterDepth->shape &&
@@ -409,15 +493,12 @@ void modulationMathMatchesEachDriverRevision() {
              std::abs(boosterRate->cyclesPerTick.value_or(0.0) - (0x36 / 128.0)) < 0.000001,
          "SMR F4 07 36 should preserve the fast carrier created by its wrapped 7-bit volume steps");
   const SequenceModulationProfile boosterProfile = analyzeSequenceModulation(booster);
-  expect(boosterProfile.instruments.tremolo &&
-             boosterProfile.instruments.tremolo->gainMode == TremoloGainMode::NoBoost,
+  expect(boosterProfile.instruments.tremolo && boosterProfile.instruments.tremolo->gainMode == TremoloGainMode::NoBoost,
          "linear-gain tremolo planning should retain Suzuki's attenuation-first oscillator");
-  const MidiSequence boosterMidi =
-      renderMidiSequence(booster, {}, ModulationConversionPolicy::SequenceEventSimulation);
+  const MidiSequence boosterMidi = renderMidiSequence(booster, {}, ModulationConversionPolicy::SequenceEventSimulation);
   const auto boosterExpressionAt = [&](u64 tick) -> std::optional<u8> {
     for (const MidiEvent& event : boosterMidi.tracks.front().events) {
-      if (const auto* expression = std::get_if<Expression>(&event);
-          expression != nullptr && expression->tick == tick) {
+      if (const auto* expression = std::get_if<Expression>(&event); expression != nullptr && expression->tick == tick) {
         return expression->value;
       }
     }
@@ -428,14 +509,12 @@ void modulationMathMatchesEachDriverRevision() {
              boosterExpressionAt(14) == 127,
          "SMR folded-tremolo simulation should reverse after seven ticks and return to nominal after fourteen");
 
-  const PerformanceSequence shortTremolo =
-      render(Version::SuperMarioRpg, {0xf4, 0x04, 0x10, 0xb6, 0x10, 0xd0});
+  const PerformanceSequence shortTremolo = render(Version::SuperMarioRpg, {0xf4, 0x04, 0x10, 0xb6, 0x10, 0xd0});
   const MidiSequence shortTremoloMidi =
       renderMidiSequence(shortTremolo, {}, ModulationConversionPolicy::SequenceEventSimulation);
   const auto expressionAt = [&](u64 tick) -> std::optional<u8> {
     for (const MidiEvent& event : shortTremoloMidi.tracks.front().events) {
-      if (const auto* expression = std::get_if<Expression>(&event);
-          expression != nullptr && expression->tick == tick) {
+      if (const auto* expression = std::get_if<Expression>(&event); expression != nullptr && expression->tick == tick) {
         return expression->value;
       }
     }
@@ -479,11 +558,11 @@ void scannerBuildsSequenceDerivedDrumKit() {
   const SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.collections().size() == 1, "SuzukiSnes fixture should publish one complete source collection");
   const Collection& collection = snapshot.collections().front();
-  expect(collection.members.sequence && collection.members.instrumentSets.size() == 1 &&
-             collection.members.sampleCollections.size() == 1,
-         "SuzukiSnes collection should connect its sequence, instruments, and BRR samples");
+  expect(collection.members.sequence && collection.members.soundBanks.size() == 1 &&
+             collection.members.samplePools.empty(),
+         "SuzukiSnes collection should connect its sequence and self-contained sound bank");
 
-  const auto* set = snapshot.asset<InstrumentSetAsset>(collection.members.instrumentSets.front());
+  const auto* set = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
   expect(set != nullptr && set->instruments.size() == 2,
          "one melodic program and its sequence-derived drum kit should share one immutable instrument set");
   const auto kit = std::ranges::find_if(set->instruments, [](const Instrument& instrument) {

@@ -16,9 +16,8 @@ namespace {
 
 [[nodiscard]] bool collectionContains(const Collection& collection, AssetId asset) {
   const auto& members = collection.members;
-  return members.sequence == asset ||
-         std::ranges::find(members.instrumentSets, asset) != members.instrumentSets.end() ||
-         std::ranges::find(members.sampleCollections, asset) != members.sampleCollections.end() ||
+  return members.sequence == asset || std::ranges::find(members.soundBanks, asset) != members.soundBanks.end() ||
+         std::ranges::find(members.samplePools, asset) != members.samplePools.end() ||
          std::ranges::find(members.miscAssets, asset) != members.miscAssets.end();
 }
 

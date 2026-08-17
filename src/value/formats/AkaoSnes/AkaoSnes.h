@@ -216,9 +216,9 @@ struct AkaoSnesTrackDecodeOptions {
                                                           core::AssetId sequenceId,
                                                           core::SourceMapBuilder* sourceMap = nullptr,
                                                           std::vector<core::Diagnostic>* diagnostics = nullptr);
-[[nodiscard]] std::optional<core::ScanSynthRefs> addAkaoSnesSynth(core::ScanResultBuilder& builder,
-                                                                  const AkaoSnesLayout& layout,
-                                                                  std::string_view displayName);
+[[nodiscard]] std::optional<core::ScanSoundBankRef> addAkaoSnesSynth(core::ScanResultBuilder& builder,
+                                                                     const AkaoSnesLayout& layout,
+                                                                     std::string_view displayName);
 [[nodiscard]] core::FormatModule akaoSnesModule();
 
 }  // namespace vgmtrans::formats::akao_snes

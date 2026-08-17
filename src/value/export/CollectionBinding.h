@@ -30,27 +30,24 @@ public:
   [[nodiscard]] std::optional<AssetId> sequenceId() const noexcept {
     return sequence_ != nullptr ? std::optional{sequence_->metadata.id} : std::nullopt;
   }
-  [[nodiscard]] const std::vector<InstrumentSetAsset>& instrumentSets() const noexcept { return instrumentSets_; }
-  [[nodiscard]] const std::vector<const SampleCollectionAsset*>& sampleCollections() const noexcept {
-    return sampleCollections_;
-  }
+  [[nodiscard]] const std::vector<SoundBankAsset>& soundBanks() const noexcept { return soundBanks_; }
+  [[nodiscard]] const std::vector<const SamplePoolAsset*>& samplePools() const noexcept { return samplePools_; }
 
 private:
   friend CollectionBindingResult bindCollection(const SessionSnapshot&, CollectionId);
   friend RenderedCollection renderCollection(const BoundCollection&, const SequenceRenderOptions&);
 
-  BoundCollection(SessionSnapshot snapshot, CollectionId id, std::string baseName,
-                  const SequenceProgramAsset* sequence, SequenceRuntime sequenceRuntime,
-                  std::vector<InstrumentSetAsset> instrumentSets,
-                  std::vector<const SampleCollectionAsset*> sampleCollections);
+  BoundCollection(SessionSnapshot snapshot, CollectionId id, std::string baseName, const SequenceProgramAsset* sequence,
+                  SequenceRuntime sequenceRuntime, std::vector<SoundBankAsset> soundBanks,
+                  std::vector<const SamplePoolAsset*> samplePools);
 
   SessionSnapshot snapshot_;
   CollectionId id_;
   std::string baseName_;
   const SequenceProgramAsset* sequence_ = nullptr;
   SequenceRuntime sequenceRuntime_;
-  std::vector<InstrumentSetAsset> instrumentSets_;
-  std::vector<const SampleCollectionAsset*> sampleCollections_;
+  std::vector<SoundBankAsset> soundBanks_;
+  std::vector<const SamplePoolAsset*> samplePools_;
 };
 
 // A BoundCollection exists only after every fatal membership and format-binding

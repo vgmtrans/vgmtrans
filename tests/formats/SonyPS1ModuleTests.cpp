@@ -6,6 +6,7 @@
 
 #include "value/formats/SonyPS1/SonyPS1.h"
 
+#include "value/export/CollectionBinding.h"
 #include "value/session/Session.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/PsxSpu.h"
@@ -353,11 +354,11 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
   const SessionSnapshot combinedSnapshot = combined.snapshot();
   expect(combinedSnapshot.collections().size() == 1, "a standalone combined VAB should produce a synth collection");
   const Collection& combinedCollection = combinedSnapshot.collections().front();
-  expect(
-      combinedCollection.members.instrumentSets.size() == 1 && combinedCollection.members.sampleCollections.size() == 1,
-      "combined VAB instruments and sample body should remain paired");
-  const auto* instruments = combinedSnapshot.asset<InstrumentSetAsset>(combinedCollection.members.instrumentSets[0]);
-  expect(instruments && instruments->instruments.size() == 1 && instruments->instruments[0].regions.size() == 1,
+  expect(combinedCollection.members.soundBanks.size() == 1 && combinedCollection.members.samplePools.empty(),
+         "a combined VAB should publish one self-contained sound bank");
+  const auto* instruments = combinedSnapshot.asset<SoundBankAsset>(combinedCollection.members.soundBanks[0]);
+  expect(instruments && instruments->localSamples.samples.size() == 1 && instruments->instruments.size() == 1 &&
+             instruments->instruments[0].regions.size() == 1,
          "the VAB program and tone tables should build one playable region");
   const Region& region = instruments->instruments[0].regions[0];
   expect(std::abs(region.unityKey - 59.5) < 0.000001,
@@ -384,9 +385,15 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
   split.addSource(SourceFile{.name = "BANK.VB", .path = "/fixture/BANK.VB"}, body);
   split.scanPendingSources();
   const SessionSnapshot splitSnapshot = split.snapshot();
-  expect(splitSnapshot.collections().size() == 1 && splitSnapshot.collections()[0].members.instrumentSets.size() == 1 &&
-             splitSnapshot.collections()[0].members.sampleCollections.size() == 1,
+  expect(splitSnapshot.collections().size() == 1 && splitSnapshot.collections()[0].members.soundBanks.size() == 1 &&
+             splitSnapshot.collections()[0].members.samplePools.size() == 1,
          "matching split VH and VB sources should resolve into one exportable synth collection");
+  const Collection& splitCollection = splitSnapshot.collections()[0];
+  const auto splitBinding = bindCollection(splitSnapshot, splitCollection.id);
+  expect(splitBinding.collection.has_value(), "split VH/VB collection should bind successfully");
+  const auto& splitRegion = splitBinding.collection->soundBanks()[0].instruments[0].regions[0];
+  expect(splitRegion.sample.externalPool == splitCollection.members.samplePools[0],
+         "split VH regions should bind explicitly to the selected VB sample pool");
 
   const auto bankBytes = vabFixture(7, true);
   const auto sequenceBytes = sequenceFixture({0x00, 0xff, 0x2f, 0x00});
@@ -412,10 +419,9 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
         if (sequenceOffset == secondSequence) {
           latestCollection = &collection;
         }
-        expect(collection.members.instrumentSets.size() == 1 && collection.members.sampleCollections.size() == 1,
-               "each same-source SonyPS1 sequence should resolve to one VAB pair");
-        return pairedSnapshot.asset<InstrumentSetAsset>(collection.members.instrumentSets.front())
-            ->metadata.range.offset;
+        expect(collection.members.soundBanks.size() == 1 && collection.members.samplePools.empty(),
+               "each same-source SonyPS1 sequence should resolve to one combined VAB");
+        return pairedSnapshot.asset<SoundBankAsset>(collection.members.soundBanks.front())->metadata.range.offset;
       }
     }
     return std::numeric_limits<u64>::max();
@@ -424,19 +430,18 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
          "same-source SonyPS1 sequences and VABs should pair in descending offset order");
   const auto* sequence = pairedSnapshot.asset<SequenceProgramAsset>(*latestCollection->members.sequence);
   SequenceRuntime runtime = sequence->program.runtime;
-  const InstrumentSetAsset foreignBank{
+  const SoundBankAsset foreignBank{
       .metadata = AssetMetadata{.id = AssetId{999}, .format = "Foreign", .name = "Foreign Bank"},
       .instruments = {Instrument{
           .explicitAddress = InstrumentAddress{.bank = 42, .program = 7},
           .name = "Foreign Instrument",
       }},
   };
-  std::vector<InstrumentSetAsset> resolvedInstruments{
+  std::vector<SoundBankAsset> resolvedInstruments{
       foreignBank,
-      *pairedSnapshot.asset<InstrumentSetAsset>(latestCollection->members.instrumentSets.front()),
+      *pairedSnapshot.asset<SoundBankAsset>(latestCollection->members.soundBanks.front()),
   };
-  std::vector<const SampleCollectionAsset*> resolvedSamples{
-      pairedSnapshot.asset<SampleCollectionAsset>(latestCollection->members.sampleCollections.front())};
+  std::vector<const SamplePoolAsset*> resolvedSamples;
   std::vector<Diagnostic> bindingDiagnostics;
   CollectionBindingContext binding{
       sequence, runtime, resolvedInstruments, resolvedSamples, bindingDiagnostics,

@@ -111,11 +111,11 @@ constexpr u8 kDriverInstrumentAttenuation = 16;
 
 }  // namespace
 
-ScanSynthRefs addKonamiArcadeSynth(ScanResultBuilder& builder, const KonamiArcadeLayout& layout) {
+ScanSoundBankRef addKonamiArcadeSynth(ScanResultBuilder& builder, const KonamiArcadeLayout& layout) {
   const ByteReader reader = builder.reader();
   const u32 melodicCount = std::min<u32>(layout.melodicSampleCount, static_cast<u32>(layout.sampleInfos.size()));
-  auto instruments = builder.instrumentSet(layout.game + " Instruments");
-  auto samples = builder.sampleCollection(layout.game + " Samples", layout.sound);
+  auto instruments = builder.soundBank(layout.game + " Sound Bank");
+  auto& samples = instruments.samples();
 
   for (u32 index = 0; index < layout.sampleInfos.size(); ++index) {
     const auto& info = layout.sampleInfos[index];
@@ -250,10 +250,7 @@ ScanSynthRefs addKonamiArcadeSynth(ScanResultBuilder& builder, const KonamiArcad
   if (instruments.empty()) {
     instruments.warning("KonamiArcade layout contained no usable instruments", layout.code);
   }
-  return ScanSynthRefs{
-      .instruments = instruments.ref(),
-      .samples = samples.ref(),
-  };
+  return instruments.ref();
 }
 
 }  // namespace vgmtrans::formats::konami_arcade

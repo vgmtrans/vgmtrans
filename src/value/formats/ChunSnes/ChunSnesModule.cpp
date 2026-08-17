@@ -30,9 +30,9 @@ namespace {
 
   auto collection = result.sourceCollection(displayName).sequence(sequence);
   if (const auto synth = addSynth(result, *layout, displayName)) {
-    collection.instrumentSet(synth->instruments).samples(synth->samples);
+    collection.soundBank(*synth);
   } else {
-    result.warning("ChunSnes sequence found, but its active instrument set did not contain usable samples",
+    result.warning("ChunSnes sequence found, but its active sound bank did not contain usable samples",
                    input.reader.range(0, input.reader.size()));
   }
   return result.finish();

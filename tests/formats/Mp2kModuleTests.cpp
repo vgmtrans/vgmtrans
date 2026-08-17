@@ -182,10 +182,10 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
   const SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.collections().size() == 1, "MP2k fixture should produce one collection");
   const Collection& collection = snapshot.collections().front();
-  expect(collection.members.instrumentSets.size() == 1 && collection.members.sampleCollections.size() == 2,
-         "MP2k collection should attach its bank, PCM samples, and shared PSG samples");
+  expect(collection.members.soundBanks.size() == 1 && collection.members.samplePools.size() == 1,
+         "MP2k collection should attach its PCM-owning bank and shared PSG samples");
 
-  const auto* instruments = snapshot.asset<InstrumentSetAsset>(collection.members.instrumentSets.front());
+  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
   expect(instruments != nullptr && instruments->instruments.size() == 3,
          "MP2k bank should retain DirectSound, wave-RAM, and square programs");
   expect(instruments->instruments[0].modulation.vibrato && instruments->instruments[0].modulation.tremolo &&
@@ -211,11 +211,8 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
   expect(std::abs(directAttackSeconds(127) - 258.0 / (255.0 * gbaFrameRate)) < 1e-12,
          "DirectSound attack conversion must retain the final partial integer step");
 
-  const auto* firstSamples = snapshot.asset<SampleCollectionAsset>(collection.members.sampleCollections[0]);
-  const auto* secondSamples = snapshot.asset<SampleCollectionAsset>(collection.members.sampleCollections[1]);
-  const auto* psg = firstSamples && firstSamples->samples.samples.size() > 1 ? firstSamples : secondSamples;
-  const auto* pcm = psg == firstSamples ? secondSamples : firstSamples;
-  expect(psg != nullptr && psg->samples.samples.size() == 7 && pcm != nullptr && pcm->samples.samples.size() == 1,
+  const auto* psg = snapshot.asset<SamplePoolAsset>(collection.members.samplePools[0]);
+  expect(psg != nullptr && psg->pool.samples.size() == 7 && instruments->localSamples.samples.size() == 1,
          "MP2k synth should generate square and both noise-width PSG sounds plus the referenced wave-RAM sound");
   expect(instruments->instruments[1].regions.size() == 128 && instruments->instruments[2].regions.size() == 128,
          "melodic PSG regions should retain the driver's key-clamped hardware frequency registers");
@@ -225,10 +222,10 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
   const double squareA4Hertz = 440.0 * std::exp2((69.0 - squareA4.unityKey) / 12.0);
   expect(std::abs(waveA4Hertz - 65536.0 / 298.0) < 1e-9 && std::abs(squareA4Hertz - 131072.0 / 298.0) < 1e-9,
          "programmable wave must use half the square clock after the exact MP2k frequency-table lookup");
-  const auto decodedPcm = decodeSample(pcm->samples.samples.front(), session.sources().bytes(source));
+  const auto decodedPcm = decodeSample(instruments->localSamples.samples.front(), session.sources().bytes(source));
   expect(decodedPcm && decodedPcm->pcm.size() == 16 && decodedPcm->loop.enabled && decodedPcm->loop.start == 8,
          "MP2k DirectSound samples should preserve PCM data and loop points");
-  const auto decodedWave = decodeSample(psg->samples.samples.back(), session.sources().bytes(source));
+  const auto decodedWave = decodeSample(psg->pool.samples.back(), session.sources().bytes(source));
   expect(decodedWave && decodedWave->pcm.size() == 48 && decodedWave->loop.start == 8 &&
              decodedWave->loop.length == 32 && decodedWave->pcm[8] == -32768 && decodedWave->pcm[24] == 0 &&
              decodedWave->pcm[38] == 28672 &&
@@ -237,7 +234,7 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
              std::ranges::equal(decodedWave->pcm.begin() + 8, decodedWave->pcm.begin() + 16,
                                 decodedWave->pcm.begin() + 40, decodedWave->pcm.end()),
          "programmable-wave samples should retain the GBA DAC range and carry eight matching loop guards");
-  const auto decodedSquare = decodeSample(psg->samples.samples[1], session.sources().bytes(source));
+  const auto decodedSquare = decodeSample(psg->pool.samples[1], session.sources().bytes(source));
   expect(decodedSquare && decodedSquare->loop.start == 8 &&
              decodedSquare->pcm.size() == decodedSquare->loop.length + 16 &&
              std::ranges::equal(decodedSquare->pcm.begin(), decodedSquare->pcm.begin() + 8,
@@ -392,17 +389,15 @@ void mp2kFixedReverseDirectSoundUsesMixerRate() {
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
   const Collection& collection = snapshot.collections().front();
-  const auto* instruments = snapshot.asset<InstrumentSetAsset>(collection.members.instrumentSets.front());
+  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
   expect(instruments && instruments->instruments[0].regions.size() == 128 &&
              instruments->instruments[0].regions[60].keyRange.low == 60 &&
              instruments->instruments[0].regions[60].unityKey == 60.0,
          "DirectSound FIX should preserve the mixer-rate pitch independently for every played key");
-  const auto* firstSamples = snapshot.asset<SampleCollectionAsset>(collection.members.sampleCollections[0]);
-  const auto* secondSamples = snapshot.asset<SampleCollectionAsset>(collection.members.sampleCollections[1]);
-  const auto* pcm = firstSamples && firstSamples->samples.samples.size() == 1 ? firstSamples : secondSamples;
-  expect(pcm && pcm->samples.samples.front().reverse && !pcm->samples.samples.front().loop.enabled,
+  const Sample* pcm = instruments->localSamples.samples.empty() ? nullptr : &instruments->localSamples.samples.front();
+  expect(pcm && pcm->reverse && !pcm->loop.enabled,
          "reverse DirectSound should walk the sample backward and bypass the forward-only loop branch");
-  const auto decoded = decodeSample(pcm->samples.samples.front(), session.sources().bytes(source));
+  const auto decoded = decodeSample(*pcm, session.sources().bytes(source));
   expect(decoded && decoded->pcm.front() == 56 * 256 && decoded->pcm.back() == -64 * 256,
          "reverse PCM should expose the same order SoundMainRAM mixes");
 }
@@ -417,7 +412,7 @@ void mp2kNoiseUsesAuditedRegisterClockAndWidth() {
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
   const Collection& collection = snapshot.collections().front();
-  const auto* instruments = snapshot.asset<InstrumentSetAsset>(collection.members.instrumentSets.front());
+  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
   expect(instruments && instruments->instruments.size() == 3 && instruments->instruments[2].regions.size() == 128,
          "MP2k noise should preserve the key-clamped register table with one region per key");
   const Region& noiseA4 = instruments->instruments[2].regions[69];
@@ -425,12 +420,10 @@ void mp2kNoiseUsesAuditedRegisterClockAndWidth() {
   const double hardwareClock = 524288.0 / 7.0 / 4.0;  // gNoiseTable[48] = 0x17
   expect(std::abs(renderedClock - hardwareClock) < 1e-9 && noiseA4.sample.index == 5,
          "noise key 69 should use register 0x17 and the tone's short-LFSR selector");
-  const auto* firstSamples = snapshot.asset<SampleCollectionAsset>(collection.members.sampleCollections[0]);
-  const auto* secondSamples = snapshot.asset<SampleCollectionAsset>(collection.members.sampleCollections[1]);
-  const auto* psg = firstSamples && firstSamples->samples.samples.size() >= 6 ? firstSamples : secondSamples;
-  expect(psg && psg->samples.samples[5].codecParameter == 5,
+  const auto* psg = snapshot.asset<SamplePoolAsset>(collection.members.samplePools[0]);
+  expect(psg && psg->pool.samples[5].codecParameter == 5,
          "short MP2k noise should reference the 7-bit GBA LFSR sample");
-  const auto decoded = decodeSample(psg->samples.samples[5], session.sources().bytes(source));
+  const auto decoded = decodeSample(psg->pool.samples[5], session.sources().bytes(source));
   expect(decoded && decoded->pcm.size() == 143 && decoded->loop.enabled && decoded->loop.start == 8 &&
              decoded->loop.length == 127 &&
              std::ranges::equal(decoded->pcm.begin(), decoded->pcm.begin() + 8, decoded->pcm.begin() + 127,
@@ -449,7 +442,7 @@ void mp2kCgbFixedToneUsesDacResolutionMask() {
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
   const Collection& collection = snapshot.collections().front();
-  const auto* instruments = snapshot.asset<InstrumentSetAsset>(collection.members.instrumentSets.front());
+  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
   expect(instruments && instruments->instruments.size() == 3 && instruments->instruments[2].regions.size() == 128,
          "CGB FIX fixture should retain singleton hardware-pitch regions");
   const Region& key37 = instruments->instruments[2].regions[37];
@@ -629,8 +622,7 @@ void mp2kDirectSoundMasterVolumeAffectsOnlyPcmVoices() {
   session.addSource(SourceFile{.name = "mp2k-master-volume.gba"}, mp2kFixture(7));
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
-  const auto* instruments =
-      snapshot.asset<InstrumentSetAsset>(snapshot.collections().front().members.instrumentSets.front());
+  const auto* instruments = snapshot.asset<SoundBankAsset>(snapshot.collections().front().members.soundBanks.front());
   expect(instruments && instruments->instruments.size() == 3 && !instruments->instruments[0].regions.empty() &&
              !instruments->instruments[1].regions.empty(),
          "MP2k master-volume fixture should retain its PCM and CGB instruments");

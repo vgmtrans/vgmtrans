@@ -73,14 +73,14 @@ ObjectRef ObjectRefs::sequenceTrack(AssetId sequenceAsset, u32 trackIndex) {
   return ObjectRef{.kind = ObjectKind::SequenceTrack, .asset = sequenceAsset, .index0 = trackIndex};
 }
 
-ObjectRef ObjectRefs::instrument(AssetId instrumentSetAsset, u32 instrumentIndex) {
-  return ObjectRef{.kind = ObjectKind::Instrument, .asset = instrumentSetAsset, .index0 = instrumentIndex};
+ObjectRef ObjectRefs::instrument(AssetId soundBankAsset, u32 instrumentIndex) {
+  return ObjectRef{.kind = ObjectKind::Instrument, .asset = soundBankAsset, .index0 = instrumentIndex};
 }
 
-ObjectRef ObjectRefs::region(AssetId instrumentSetAsset, u32 instrumentIndex, u32 regionIndex) {
+ObjectRef ObjectRefs::region(AssetId soundBankAsset, u32 instrumentIndex, u32 regionIndex) {
   return ObjectRef{
       .kind = ObjectKind::Region,
-      .asset = instrumentSetAsset,
+      .asset = soundBankAsset,
       .index0 = instrumentIndex,
       .index1 = regionIndex,
   };

@@ -410,9 +410,9 @@ struct PanAndAttenuation {
 
 }  // namespace
 
-std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const SegSatBankLayout& layout,
-                                               SegSatDriverVersion version, SegSatVolumeModel volumeModel,
-                                               u8 exportBank) {
+std::optional<ScanSoundBankRef> addSegSatBank(ScanResultBuilder& builder, const SegSatBankLayout& layout,
+                                              SegSatDriverVersion version, SegSatVolumeModel volumeModel,
+                                              u8 exportBank) {
   const ByteReader reader = builder.reader();
   auto parsed = parseInstruments(reader, layout, version);
   if (parsed.empty()) {
@@ -431,8 +431,8 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
   SegSatVelocityBank velocityBank =
       readSegSatVelocityBank(reader, layout, layout.sourceBank.value_or(exportBank), volumeModel);
 
-  auto instruments = builder.instrumentSet(fmt::format("SegSat Bank {} Instruments", exportBank));
-  auto samples = builder.sampleCollection(fmt::format("SegSat Bank {} Samples", exportBank));
+  auto instruments = builder.soundBank(fmt::format("SegSat Sound Bank {}", exportBank));
+  auto& samples = instruments.samples();
   for (const auto& [offset, parsedRegion] : uniqueSamples) {
     const std::string name = fmt::format("Sample 0x{:X}", offset);
     samples
@@ -459,7 +459,7 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
       layout.offset,
       std::min<u32>(layout.instrumentDataEnd - layout.offset, static_cast<u32>(reader.size() - layout.offset)));
   instruments.include(headerRange);
-  instruments.source(SourceRole::InstrumentSet, "SegSat Instrument Bank", headerRange, "segsat-instrument-bank")
+  instruments.source(SourceRole::SoundBank, "SegSat Instrument Bank", headerRange, "segsat-instrument-bank")
       .derived("source_bank", layout.sourceBank.value_or(exportBank))
       .derived("export_bank", exportBank)
       .derived("instrument_count", layout.instrumentCount)
@@ -495,10 +495,7 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
     }
   }
   instruments.data(std::move(velocityBank));
-  return SegSatScannedBank{
-      .instruments = instruments.ref(),
-      .samples = samples.ref(),
-  };
+  return instruments.ref();
 }
 
 SegSatVelocityBank readSegSatVelocityBank(ByteReader reader, const SegSatBankLayout& layout, u8 sourceBank,

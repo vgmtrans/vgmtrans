@@ -24,6 +24,6 @@ struct DynamicEnvelopeMaterialization {
 // Appends only the instrument variants used by fresh note attacks. The returned
 // performance is export-only; the input performance remains unchanged.
 [[nodiscard]] DynamicEnvelopeMaterialization materializeDynamicEnvelopes(const PerformanceSequence& performance,
-                                                                         std::span<InstrumentSetAsset> instrumentSets);
+                                                                         std::span<SoundBankAsset> soundBanks);
 
 }  // namespace vgmtrans::core

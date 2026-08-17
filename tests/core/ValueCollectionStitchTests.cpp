@@ -94,26 +94,26 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
                 .tracks = {track},
             },
     });
-    builder.assets.emplace_back(InstrumentSetAsset{
+    builder.assets.emplace_back(SoundBankAsset{
         .metadata = AssetMetadata{.id = instrumentId, .format = "Probe"},
         .instruments =
             {
                 Instrument{
                     .explicitAddress = InstrumentAddress{.bank = 0, .program = 0},
                     .name = "Melodic " + std::to_string(index),
-                    .regions = {Region{.sample = SampleRef{.index = 1}}},
+                    .regions = {Region{.sample = SampleRef::external(samplesId, 1)}},
                 },
                 Instrument{
                     .explicitAddress = InstrumentAddress{.bank = 127, .program = 0},
                     .name = "Drums " + std::to_string(index),
-                    .regions = {Region{.sample = SampleRef{.index = 0}}},
+                    .regions = {Region{.sample = SampleRef::external(samplesId, 0)}},
                 },
             },
     });
-    builder.assets.emplace_back(SampleCollectionAsset{
+    builder.assets.emplace_back(SamplePoolAsset{
         .metadata = AssetMetadata{.id = samplesId, .format = "Probe"},
-        .samples =
-            SampleCollection{
+        .pool =
+            SamplePool{
                 .samples =
                     {
                         Sample{
@@ -139,8 +139,8 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
         .members =
             {
                 .sequence = sequenceId,
-                .instrumentSets = {instrumentId},
-                .sampleCollections = {samplesId},
+                .soundBanks = {instrumentId},
+                .samplePools = {samplesId},
             },
     });
   }

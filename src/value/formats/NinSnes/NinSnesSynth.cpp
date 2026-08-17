@@ -282,8 +282,7 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
   for (const InstrumentInfo& info : infos) {
     auto sample = samples.findSrcn(info.srcn);
     if (!sample) {
-      builder.warning(fmt::format("Instrument {} sample {} was not found", info.program, info.srcn),
-                      info.source.range);
+      builder.warning(fmt::format("Instrument {} sample {} was not found", info.program, info.srcn), info.source.range);
       continue;
     }
     const bool rateBasedGain = (info.adsr1 & 0x80) == 0 && (info.gain & 0x80) != 0;
@@ -363,8 +362,8 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
 
 }  // namespace
 
-std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& layout, const SequenceRecipes& recipes,
-                                      std::string_view displayName) {
+std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layout& layout,
+                                         const SequenceRecipes& recipes, std::string_view displayName) {
   if (!layout.instrumentTableAddress || !layout.spcDirAddress) {
     return std::nullopt;
   }
@@ -379,14 +378,10 @@ std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& 
     return std::nullopt;
   }
 
-  auto instrumentDraft = builder.instrumentSet(fmt::format("{} Instruments", displayName));
-  auto samples = builder.sampleCollection(fmt::format("{} Samples", displayName));
-  const SnesBrrSampleRefs sampleRefs = addSnesBrrSamples(samples.builder(), reader, catalog);
+  auto instrumentDraft = builder.soundBank(fmt::format("{} Instruments", displayName));
+  const SnesBrrSampleRefs sampleRefs = addSnesBrrSamples(instrumentDraft.samples(), reader, catalog);
   addInstruments(instrumentDraft.builder(), reader, layout, recipes, instruments, sampleRefs);
-  return ScanSynthRefs{
-      .instruments = instrumentDraft.ref(),
-      .samples = samples.ref(),
-  };
+  return instrumentDraft.ref();
 }
 
 }  // namespace vgmtrans::formats::nin_snes

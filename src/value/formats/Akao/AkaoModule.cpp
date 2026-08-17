@@ -28,7 +28,7 @@ namespace {
   return offsets;
 }
 
-void addSampleFacts(ScanResultBuilder& result, const AkaoSampleCollectionParse& parsed) {
+void addSampleFacts(ScanResultBuilder& result, const AkaoSamplePoolParse& parsed) {
   if (parsed.sampleSetId) {
     result.sourceFact(parsed.ref.id,
                       IdMatchFact{.domain = std::string(kAkaoSampleSetDomain), .value = *parsed.sampleSetId});
@@ -62,33 +62,33 @@ void addSequenceFacts(ScanResultBuilder& result, ScanSequenceRef sequence, const
   }
 }
 
-void addInstrumentSetFacts(ScanResultBuilder& result, ScanInstrumentSetRef instruments, ScanSequenceRef sequence) {
+void addInstrumentSetFacts(ScanResultBuilder& result, ScanSoundBankRef instruments, ScanSequenceRef sequence) {
   result.sourceFact(instruments.id, AssetRelationFact{
                                         .domain = std::string(kAkaoInstrumentSequenceDomain),
                                         .target = sequence.id,
                                     });
 }
 
-void scanSampleCollections(const ScanInput& input, ScanResultBuilder& result, std::span<const u32> offsets,
-                           std::optional<AkaoSplitSampleLocation> hardcodedSampleLocation) {
+void scanSamplePools(const ScanInput& input, ScanResultBuilder& result, std::span<const u32> offsets,
+                     std::optional<AkaoSplitSampleLocation> hardcodedSampleLocation) {
   const AkaoPs1Version sourceVersion = determineVersionFromSource(input.source);
 
   for (const u32 offset : offsets) {
-    if (input.reader.le16(offset + 6) != 0 || !isPossibleAkaoSampleCollection(input.reader, offset)) {
+    if (input.reader.le16(offset + 6) != 0 || !isPossibleAkaoSamplePool(input.reader, offset)) {
       continue;
     }
     const AkaoPs1Version version =
         sourceVersion == AkaoPs1Version::Unknown ? guessSampleVersion(input.reader, offset) : sourceVersion;
-    if (auto parsed = parseAkaoSampleCollection(input, result, offset, version)) {
+    if (auto parsed = parseAkaoSamplePool(input, result, offset, version)) {
       addSampleFacts(result, *parsed);
     } else {
-      result.warning("Akao sample collection header was detected but sample data could not be parsed",
+      result.warning("Akao sample pool header was detected but sample data could not be parsed",
                      input.reader.range(offset, 0x40));
     }
   }
 
   if (hardcodedSampleLocation) {
-    if (auto parsed = parseAkaoSampleCollection(input, result, *hardcodedSampleLocation)) {
+    if (auto parsed = parseAkaoSamplePool(input, result, *hardcodedSampleLocation)) {
       addSampleFacts(result, *parsed);
     }
   }
@@ -104,7 +104,7 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
     const std::string sequenceName = fmt::format("Akao Seq {:02X}", layout->header.sequenceId);
     auto sequence = result.sequence(sequenceName, input.reader.range(offset, layout->header.length));
     auto parsed = parseAkaoSequence(input, sequence.id(), *layout, &result.sourceMap(), &result.diagnostics());
-    auto instruments = result.instrumentSet(akaoInstrumentSetName(parsed.analysis));
+    auto instruments = result.soundBank(akaoInstrumentSetName(parsed.analysis));
     auto built = buildAkaoInstrumentSet(input, parsed.analysis, instruments.builder());
     parsed.analysis.requiredArticulations = std::move(built.requiredArticulations);
     addSequenceFacts(result, sequence.ref(), parsed.analysis, parsed.analysis.requiredArticulations);
@@ -123,7 +123,7 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
   }
 
   ScanResultBuilder result(input, std::string(kAkaoFormatName), std::string(kAkaoCollectionResolver));
-  scanSampleCollections(input, result, offsets, hardcodedSampleLocation);
+  scanSamplePools(input, result, offsets, hardcodedSampleLocation);
   scanSequences(input, result, offsets);
   return result.finish();
 }

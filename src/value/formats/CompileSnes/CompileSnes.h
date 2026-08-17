@@ -82,9 +82,9 @@ struct SequenceParse {
                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
 [[nodiscard]] core::Envelope driverEnvelope(u8 adsr1, u8 adsr2, u8 gain = 0);
-[[nodiscard]] std::optional<core::ScanSynthRefs> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
-                                                          const ReferencedData& references,
-                                                          std::string_view displayName);
+[[nodiscard]] std::optional<core::ScanSoundBankRef> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
+                                                             const ReferencedData& references,
+                                                             std::string_view displayName);
 [[nodiscard]] core::FormatModule module();
 
 }  // namespace vgmtrans::formats::compile_snes

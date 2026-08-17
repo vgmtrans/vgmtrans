@@ -307,11 +307,11 @@ u32 AkaoProfile::legacySampleEndingArticulationId(ByteReader reader, u32 offset)
   return stored == 0 ? 0x100 : stored;
 }
 
-u32 AkaoProfile::spuDestinationAddress(ByteReader reader, u32 sampleCollectionOffset) const {
+u32 AkaoProfile::spuDestinationAddress(ByteReader reader, u32 samplePoolOffset) const {
   if (version == AkaoPs1Version::Version1_0) {
-    return reader.has(sampleCollectionOffset, 4) ? reader.le32(sampleCollectionOffset) : 0;
+    return reader.has(samplePoolOffset, 4) ? reader.le32(samplePoolOffset) : 0;
   }
-  return reader.has(sampleCollectionOffset + 0x10, 4) ? reader.le32(sampleCollectionOffset + 0x10) : 0;
+  return reader.has(samplePoolOffset + 0x10, 4) ? reader.le32(samplePoolOffset + 0x10) : 0;
 }
 
 u32 AkaoProfile::legacyDrumRegionBytes() const noexcept {

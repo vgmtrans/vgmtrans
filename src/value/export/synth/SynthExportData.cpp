@@ -24,7 +24,18 @@ namespace {
 using SynthSampleIndexKey = std::pair<u32, u32>;
 using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
 using SynthSampleIndexList = std::vector<SynthSampleIndexKey>;
-using SynthInstrumentList = std::vector<const Instrument*>;
+
+struct SelectedInstrument {
+  const SoundBankAsset* bank;
+  const Instrument* instrument;
+};
+
+using SelectedInstrumentList = std::vector<SelectedInstrument>;
+
+struct SamplePoolView {
+  AssetId owner;
+  const SamplePool* pool;
+};
 
 constexpr double kPerceivedHalfLoudnessDb = 10.0;
 
@@ -33,29 +44,29 @@ constexpr double kPerceivedHalfLoudnessDb = 10.0;
 }
 
 template <typename Predicate>
-bool markMatchingInstruments(SynthInstrumentList& used, std::span<const Instrument* const> instruments,
+bool markMatchingInstruments(SelectedInstrumentList& used, std::span<const SelectedInstrument> instruments,
                              Predicate matches) {
   bool found = false;
-  for (const auto* instrument : instruments) {
-    if (matches(*instrument)) {
+  for (const auto& selected : instruments) {
+    if (matches(*selected.instrument)) {
       found = true;
-      if (std::ranges::find(used, instrument) == used.end()) {
-        used.push_back(instrument);
+      if (std::ranges::find(used, selected.instrument, &SelectedInstrument::instrument) == used.end()) {
+        used.push_back(selected);
       }
     }
   }
   return found;
 }
 
-void markInstrumentAddress(InstrumentAddress address, std::span<const Instrument* const> instruments,
-                           SynthInstrumentList& used) {
+void markInstrumentAddress(InstrumentAddress address, std::span<const SelectedInstrument> instruments,
+                           SelectedInstrumentList& used) {
   markMatchingInstruments(used, instruments, [&](const Instrument& instrument) {
     return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == address;
   });
 }
 
-void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::span<const Instrument* const> instruments,
-                            SynthInstrumentList& used) {
+void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
+                            std::span<const SelectedInstrument> instruments, SelectedInstrumentList& used) {
   if (selection.sourceInstrument) {
     if (markMatchingInstruments(used, instruments, [&](const Instrument& instrument) {
           return instrument.identity && *instrument.identity == *selection.sourceInstrument;
@@ -72,22 +83,22 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::sp
   markInstrumentAddress(InstrumentAddress{.bank = selection.bank, .program = selection.program}, instruments, used);
 }
 
-[[nodiscard]] SynthInstrumentList selectInstruments(std::span<const InstrumentSetAsset* const> instrumentSets,
-                                                    const PerformanceSequence* sequenceUsage) {
-  SynthInstrumentList instruments;
-  for (const auto* instrumentSet : instrumentSets) {
-    if (instrumentSet == nullptr) {
+[[nodiscard]] SelectedInstrumentList selectInstruments(std::span<const SoundBankAsset* const> soundBanks,
+                                                       const PerformanceSequence* sequenceUsage) {
+  SelectedInstrumentList instruments;
+  for (const auto* soundBank : soundBanks) {
+    if (soundBank == nullptr) {
       continue;
     }
-    for (const auto& instrument : instrumentSet->instruments) {
-      instruments.push_back(&instrument);
+    for (const auto& instrument : soundBank->instruments) {
+      instruments.push_back(SelectedInstrument{.bank = soundBank, .instrument = &instrument});
     }
   }
   if (sequenceUsage == nullptr) {
     return instruments;
   }
 
-  SynthInstrumentList used;
+  SelectedInstrumentList used;
   for (const auto& track : sequenceUsage->tracks) {
     // A track uses bank/program zero until its first instrument change.
     InstrumentPerformanceEvent selection;
@@ -103,31 +114,34 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::sp
       }
     }
   }
-  std::erase_if(instruments,
-                [&](const Instrument* instrument) { return std::ranges::find(used, instrument) == used.end(); });
+  std::erase_if(instruments, [&](const SelectedInstrument& selected) {
+    return std::ranges::find(used, selected.instrument, &SelectedInstrument::instrument) == used.end();
+  });
   return instruments;
 }
 
-[[nodiscard]] std::vector<DecodedSynthSample> decodeSynthSamples(
-    std::span<const SampleCollectionAsset* const> sampleCollections, const SourceStore& sources,
-    std::vector<Diagnostic>& diagnostics, const SynthSampleDecodeOptions& options,
-    const SynthSampleIndexList* sampleFilter, SampleFilteringPolicy filtering) {
+[[nodiscard]] std::vector<DecodedSynthSample> decodeSynthSamples(std::span<const SamplePoolView> samplePools,
+                                                                 const SourceStore& sources,
+                                                                 std::vector<Diagnostic>& diagnostics,
+                                                                 const SynthSampleDecodeOptions& options,
+                                                                 const SynthSampleIndexList* sampleFilter,
+                                                                 SampleFilteringPolicy filtering) {
   // Decode once into a flat vector. Container exporters then decide how to lay out that
   // PCM, but all of them share the same source-range diagnostics.
   std::vector<DecodedSynthSample> samples;
 
-  for (const auto* collection : sampleCollections) {
-    if (collection == nullptr) {
+  for (const auto& view : samplePools) {
+    if (view.pool == nullptr) {
       continue;
     }
-    const SampleFilter selectedFilter = resolveSampleFilter(filtering, collection->preferredFilter);
+    const SampleFilter selectedFilter = resolveSampleFilter(filtering, view.pool->preferredFilter);
 
-    for (u32 sampleIndex = 0; sampleIndex < collection->samples.samples.size(); ++sampleIndex) {
-      const SynthSampleIndexKey sampleKey{collection->metadata.id.value, sampleIndex};
+    for (u32 sampleIndex = 0; sampleIndex < view.pool->samples.size(); ++sampleIndex) {
+      const SynthSampleIndexKey sampleKey{view.owner.value, sampleIndex};
       if (sampleFilter != nullptr && std::ranges::find(*sampleFilter, sampleKey) == sampleFilter->end()) {
         continue;
       }
-      const auto& sample = collection->samples.samples[sampleIndex];
+      const auto& sample = view.pool->samples[sampleIndex];
       if (!sources.contains(sample.encodedData.source)) {
         diagnostics.push_back(exportError("Sample source was not found", validDiagnosticRange(sample.encodedData)));
         continue;
@@ -149,7 +163,7 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::sp
       applySampleFilter(*decoded, selectedFilter);
 
       samples.push_back(DecodedSynthSample{
-          .collectionId = collection->metadata.id,
+          .owner = view.owner,
           .localIndex = sampleIndex,
           .name = sample.name,
           .pitch = sample.pitch,
@@ -167,32 +181,17 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::sp
   // sample table, so keep a map from original reference identity to flat index.
   SynthSampleIndexMap indexes;
   for (u32 i = 0; i < samples.size(); ++i) {
-    indexes[{samples[i].collectionId.value, samples[i].localIndex}] = clampU16(i);
+    indexes[{samples[i].owner.value, samples[i].localIndex}] = clampU16(i);
   }
   return indexes;
 }
 
-[[nodiscard]] std::optional<AssetId> firstSampleCollectionId(
-    std::span<const SampleCollectionAsset* const> sampleCollections) {
-  for (const auto* collection : sampleCollections) {
-    if (collection != nullptr) {
-      return collection->metadata.id;
-    }
-  }
-  return std::nullopt;
-}
-
-[[nodiscard]] SynthSampleIndexList referencedSamples(std::span<const Instrument* const> instruments,
-                                                     std::span<const SampleCollectionAsset* const> sampleCollections) {
+[[nodiscard]] SynthSampleIndexList referencedSamples(std::span<const SelectedInstrument> instruments) {
   SynthSampleIndexList samples;
-  const auto fallbackCollection = firstSampleCollectionId(sampleCollections);
-  for (const auto* instrument : instruments) {
-    for (const auto& region : instrument->regions) {
-      const auto collection = region.sample.collection ? region.sample.collection : fallbackCollection;
-      if (!collection) {
-        continue;
-      }
-      const SynthSampleIndexKey sample{collection->value, region.sample.index};
+  for (const auto& selected : instruments) {
+    for (const auto& region : selected.instrument->regions) {
+      const AssetId owner = region.sample.externalPool.value_or(selected.bank->metadata.id);
+      const SynthSampleIndexKey sample{owner.value, region.sample.index};
       if (std::ranges::find(samples, sample) == samples.end()) {
         samples.push_back(sample);
       }
@@ -201,20 +200,11 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::sp
   return samples;
 }
 
-[[nodiscard]] std::optional<u16> resolveRegionSampleIndex(const Region& region,
-                                                          std::optional<AssetId> fallbackCollection,
+[[nodiscard]] std::optional<u16> resolveRegionSampleIndex(const Region& region, AssetId localBank,
                                                           const SynthSampleIndexMap& samples,
                                                           std::vector<Diagnostic>& diagnostics) {
-  // Older formats often imply "the first sample collection in the collection" rather than
-  // storing an explicit collection id on every region.
-  const std::optional<AssetId> collectionId = region.sample.collection ? region.sample.collection : fallbackCollection;
-  if (!collectionId) {
-    diagnostics.push_back(
-        exportError("Region does not reference a sample collection", validDiagnosticRange(region.range)));
-    return std::nullopt;
-  }
-
-  const auto found = samples.find({collectionId->value, region.sample.index});
+  const AssetId owner = region.sample.externalPool.value_or(localBank);
+  const auto found = samples.find({owner.value, region.sample.index});
   if (found == samples.end()) {
     diagnostics.push_back(exportError("Region sample reference was not found", validDiagnosticRange(region.range)));
     return std::nullopt;
@@ -224,15 +214,13 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::sp
 }
 
 [[nodiscard]] std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
-    std::span<const Instrument* const> selectedInstruments,
-    std::span<const SampleCollectionAsset* const> sampleCollections, const SynthSampleIndexMap& samples,
+    std::span<const SelectedInstrument> selectedInstruments, const SynthSampleIndexMap& samples,
     std::vector<Diagnostic>& diagnostics) {
   // Drop only regions whose samples cannot be resolved. The rest of the instrument can
   // still produce a useful partial export.
   std::vector<ResolvedSynthInstrument> instruments;
-  const auto fallbackCollection = firstSampleCollectionId(sampleCollections);
-
-  for (const auto* instrument : selectedInstruments) {
+  for (const auto& selected : selectedInstruments) {
+    const auto* instrument = selected.instrument;
     auto modulation = lowerSynthModulation(instrument->modulation);
     ResolvedSynthInstrument resolvedInstrument{
         .instrument = instrument,
@@ -241,7 +229,7 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::sp
         .modulators = std::move(modulation.modulators),
     };
     for (const auto& region : instrument->regions) {
-      const auto sampleIndex = resolveRegionSampleIndex(region, fallbackCollection, samples, diagnostics);
+      const auto sampleIndex = resolveRegionSampleIndex(region, selected.bank->metadata.id, samples, diagnostics);
       if (!sampleIndex) {
         continue;
       }
@@ -325,9 +313,15 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::sp
 
 }  // namespace
 
-std::vector<const Instrument*> selectSynthInstruments(std::span<const InstrumentSetAsset* const> instrumentSets,
+std::vector<const Instrument*> selectSynthInstruments(std::span<const SoundBankAsset* const> soundBanks,
                                                       const PerformanceSequence* sequenceUsage) {
-  return selectInstruments(instrumentSets, sequenceUsage);
+  const auto selected = selectInstruments(soundBanks, sequenceUsage);
+  std::vector<const Instrument*> instruments;
+  instruments.reserve(selected.size());
+  for (const auto& value : selected) {
+    instruments.push_back(value.instrument);
+  }
+  return instruments;
 }
 
 Envelope approximateEnvelopeAsAdsr(Envelope envelope, double attenuationRangeDb) {
@@ -396,16 +390,27 @@ Envelope approximateEnvelopeAsAdsr(Envelope envelope, double attenuationRangeDb)
 PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceStore& sources,
                                    const SynthSampleDecodeOptions& options) {
   PreparedSynthData prepared;
-  const auto instruments = selectSynthInstruments(input.instrumentSets, input.sequenceUsage);
+  const auto instruments = selectInstruments(input.soundBanks, input.sequenceUsage);
+  std::vector<SamplePoolView> samplePools;
+  samplePools.reserve(input.soundBanks.size() + input.samplePools.size());
+  for (const auto* bank : input.soundBanks) {
+    if (bank != nullptr) {
+      samplePools.push_back(SamplePoolView{.owner = bank->metadata.id, .pool = &bank->localSamples});
+    }
+  }
+  for (const auto* pool : input.samplePools) {
+    if (pool != nullptr) {
+      samplePools.push_back(SamplePoolView{.owner = pool->metadata.id, .pool = &pool->pool});
+    }
+  }
   std::optional<SynthSampleIndexList> sampleFilter;
   if (input.sequenceUsage != nullptr || input.filterSamplesToReferencedInstruments) {
-    sampleFilter = referencedSamples(instruments, input.sampleCollections);
+    sampleFilter = referencedSamples(instruments);
   }
-  prepared.samples = decodeSynthSamples(input.sampleCollections, sources, prepared.diagnostics, options,
+  prepared.samples = decodeSynthSamples(samplePools, sources, prepared.diagnostics, options,
                                         sampleFilter ? &*sampleFilter : nullptr, input.sampleFiltering);
   const auto samplesByReference = synthSampleIndexMap(prepared.samples);
-  prepared.instruments =
-      resolveSynthInstruments(instruments, input.sampleCollections, samplesByReference, prepared.diagnostics);
+  prepared.instruments = resolveSynthInstruments(instruments, samplesByReference, prepared.diagnostics);
   return prepared;
 }
 

@@ -40,9 +40,10 @@ void validateRange(ValidationReport& report, const SourceStore& sources, SourceR
   const auto sourceSize = sources.source(range.source).size;
   if (range.offset > sourceSize || range.size > sourceSize - range.offset) {
     report.error("scan.range.out-of-bounds",
-                 std::string(resultKind) + " contained " + std::string(context) + " range outside source bounds (source " +
-                     std::to_string(range.source.value) + ", offset " + std::to_string(range.offset) + ", size " +
-                     std::to_string(range.size) + ", source size " + std::to_string(sourceSize) + ")",
+                 std::string(resultKind) + " contained " + std::string(context) +
+                     " range outside source bounds (source " + std::to_string(range.source.value) + ", offset " +
+                     std::to_string(range.offset) + ", size " + std::to_string(range.size) + ", source size " +
+                     std::to_string(sourceSize) + ")",
                  range);
   }
 }
@@ -55,19 +56,20 @@ void validateSequenceRanges(ValidationReport& report, const SourceStore& sources
   }
 }
 
-void validateInstrumentSetRanges(ValidationReport& report, const SourceStore& sources,
-                                 const InstrumentSetAsset& instrumentSet) {
-  for (const auto& instrument : instrumentSet.instruments) {
+void validateSoundBankRanges(ValidationReport& report, const SourceStore& sources, const SoundBankAsset& soundBank) {
+  for (const auto& instrument : soundBank.instruments) {
     validateRange(report, sources, instrument.range, "instrument");
     for (const auto& region : instrument.regions) {
       validateRange(report, sources, region.range, "instrument region");
     }
   }
+  for (const auto& sample : soundBank.localSamples.samples) {
+    validateRange(report, sources, sample.encodedData, "local sample encoded data");
+  }
 }
 
-void validateSampleCollectionRanges(ValidationReport& report, const SourceStore& sources,
-                                    const SampleCollectionAsset& sampleCollection) {
-  for (const auto& sample : sampleCollection.samples.samples) {
+void validateSamplePoolRanges(ValidationReport& report, const SourceStore& sources, const SamplePoolAsset& samplePool) {
+  for (const auto& sample : samplePool.pool.samples) {
     validateRange(report, sources, sample.encodedData, "sample encoded data");
   }
 }
@@ -169,12 +171,12 @@ void validateAsset(ValidationReport& report, const SourceStore& sources, const A
   if (const auto* sequence = std::get_if<SequenceProgramAsset>(&asset)) {
     validateSequenceRanges(report, sources, sequence->program);
     report.merge(validateSequenceProgram(sequence->program));
-  } else if (const auto* instrumentSet = std::get_if<InstrumentSetAsset>(&asset)) {
-    validateInstrumentSetRanges(report, sources, *instrumentSet);
-    report.merge(validateInstrumentSet(*instrumentSet));
-  } else if (const auto* sampleCollection = std::get_if<SampleCollectionAsset>(&asset)) {
-    validateSampleCollectionRanges(report, sources, *sampleCollection);
-    report.merge(validateSampleCollection(*sampleCollection));
+  } else if (const auto* soundBank = std::get_if<SoundBankAsset>(&asset)) {
+    validateSoundBankRanges(report, sources, *soundBank);
+    report.merge(validateSoundBank(*soundBank));
+  } else if (const auto* samplePool = std::get_if<SamplePoolAsset>(&asset)) {
+    validateSamplePoolRanges(report, sources, *samplePool);
+    report.merge(validateSamplePool(*samplePool));
   }
 }
 
@@ -251,10 +253,10 @@ void validateSourceMapOwnership(ValidationReport& report, const ScanResult& resu
     }
     assetsWithAnnotations.insert(inheritedOwner->value);
     if (annotation.range.source != assetSource->second) {
-      report.error("scan.asset.multiple-sources",
-                   "Asset id " + std::to_string(inheritedOwner->value) +
-                       " has source annotations in more than one source",
-                   annotation.range);
+      report.error(
+          "scan.asset.multiple-sources",
+          "Asset id " + std::to_string(inheritedOwner->value) + " has source annotations in more than one source",
+          annotation.range);
     }
   }
 

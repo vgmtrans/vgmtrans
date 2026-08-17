@@ -309,8 +309,8 @@ void addAkaoSnesInstruments(InstrumentSetBuilder& instruments, ByteReader reader
 
 }  // namespace
 
-std::optional<ScanSynthRefs> addAkaoSnesSynth(ScanResultBuilder& builder, const AkaoSnesLayout& layout,
-                                              std::string_view displayName) {
+std::optional<ScanSoundBankRef> addAkaoSnesSynth(ScanResultBuilder& builder, const AkaoSnesLayout& layout,
+                                                 std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const auto instrumentInfos = parseAkaoSnesInstrumentInfos(reader, layout, &builder.diagnostics());
   if (instrumentInfos.empty() || !layout.spcDirAddress) {
@@ -321,16 +321,12 @@ std::optional<ScanSynthRefs> addAkaoSnesSynth(ScanResultBuilder& builder, const 
     return std::nullopt;
   }
 
-  auto instruments = builder.instrumentSet(fmt::format("{} Instruments", displayName));
-  auto samples = builder.sampleCollection(fmt::format("{} Samples", displayName));
-  const auto sampleRefs = addSnesBrrSamples(samples.builder(), reader, sampleCatalog, "akao-snes-sample-dir-entry");
+  auto instruments = builder.soundBank(fmt::format("{} Instruments", displayName));
+  const auto sampleRefs = addSnesBrrSamples(instruments.samples(), reader, sampleCatalog, "akao-snes-sample-dir-entry");
 
   addAkaoSnesInstruments(instruments.builder(), reader, layout, instrumentInfos, sampleRefs);
 
-  return ScanSynthRefs{
-      .instruments = instruments.ref(),
-      .samples = samples.ref(),
-  };
+  return instruments.ref();
 }
 
 }  // namespace vgmtrans::formats::akao_snes

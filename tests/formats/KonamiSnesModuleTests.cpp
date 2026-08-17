@@ -189,9 +189,8 @@ std::vector<u8> makeBatmanReturnsAram() {
   // Batman Returns enters its music setup path for table indexes 0x7c and
   // above. Keep earlier rows empty and make row 0x7c playable.
   constexpr std::array<u8, 38> readSongList{
-      0xe4, 0x0c, 0x8f, 0xe5, 0x04, 0x8f, 0x03, 0x05, 0x9c, 0x8d, 0x05, 0xcf, 0x7a,
-      0x04, 0xda, 0x04, 0x8d, 0x00, 0xcd, 0x00, 0xf7, 0x04, 0xc4, 0x1c, 0xfc, 0xf7,
-      0x04, 0xc4, 0x06, 0xe4, 0x0c, 0x68, 0x7c, 0x90, 0x03, 0x5f, 0x6d, 0x1b,
+      0xe4, 0x0c, 0x8f, 0xe5, 0x04, 0x8f, 0x03, 0x05, 0x9c, 0x8d, 0x05, 0xcf, 0x7a, 0x04, 0xda, 0x04, 0x8d, 0x00, 0xcd,
+      0x00, 0xf7, 0x04, 0xc4, 0x1c, 0xfc, 0xf7, 0x04, 0xc4, 0x06, 0xe4, 0x0c, 0x68, 0x7c, 0x90, 0x03, 0x5f, 0x6d, 0x1b,
   };
   writeBytes(bytes, 0x1aba, readSongList);
   writeLe16(bytes, 0x03e5 + 0x7c * 5 + 3, 0x3900);
@@ -200,9 +199,8 @@ std::vector<u8> makeBatmanReturnsAram() {
   // lengths. Its 0xfc entry is two operands, which keeps the following note
   // aligned at 0x3909.
   constexpr std::array<u8, 34> vcmdLengths{
-      0x00, 0x00, 0x01, 0x02, 0x01, 0x01, 0x03, 0x03, 0x00, 0x03, 0x00, 0x03,
-      0x01, 0x02, 0x01, 0x03, 0x01, 0x02, 0x01, 0x03, 0x01, 0x03, 0x03, 0x03,
-      0x00, 0x00, 0x02, 0x01, 0x03, 0x01, 0x01, 0x02, 0x02, 0x00,
+      0x00, 0x00, 0x01, 0x02, 0x01, 0x01, 0x03, 0x03, 0x00, 0x03, 0x00, 0x03, 0x01, 0x02, 0x01, 0x03, 0x01,
+      0x02, 0x01, 0x03, 0x01, 0x03, 0x03, 0x03, 0x00, 0x00, 0x02, 0x01, 0x03, 0x01, 0x01, 0x02, 0x02, 0x00,
   };
   writeBytes(bytes, 0x0e60, vcmdLengths);
   constexpr std::array<u8, 16> branchForVcmd6x{
@@ -223,12 +221,10 @@ std::vector<u8> makeBatmanReturnsAram() {
   // The loader routes programs 0x10-0x18 through the selected bank and returns
   // to the common table at 0x19. The bank pointer is selected by RAM byte 0x26.
   constexpr std::array<u8, 76> loadInstrument{
-      0x09, 0x1c, 0x13, 0xd5, 0x96, 0x02, 0x68, 0x19, 0xb0, 0x04, 0x68, 0x10, 0xb0,
-      0x11, 0xe8, 0x17, 0xc4, 0x04, 0xe8, 0x07, 0xc4, 0x05, 0xf5, 0x96, 0x02, 0x3f,
-      0x64, 0x0f, 0x5f, 0xe4, 0x0c, 0xe5, 0x26, 0x00, 0x1c, 0xfd, 0xf6, 0x0d, 0x07,
-      0xc4, 0x04, 0xf6, 0x0e, 0x07, 0xc4, 0x05, 0xf5, 0x96, 0x02, 0x80, 0xa8, 0x10,
-      0x3f, 0x64, 0x0f, 0x5f, 0xe4, 0x0c, 0xe8, 0xdf, 0xc4, 0x04, 0xe8, 0x07, 0xc4,
-      0x05, 0xf5, 0x96, 0x02, 0x8d, 0x08, 0xcf, 0x7a, 0x04, 0xda, 0x04,
+      0x09, 0x1c, 0x13, 0xd5, 0x96, 0x02, 0x68, 0x19, 0xb0, 0x04, 0x68, 0x10, 0xb0, 0x11, 0xe8, 0x17, 0xc4, 0x04, 0xe8,
+      0x07, 0xc4, 0x05, 0xf5, 0x96, 0x02, 0x3f, 0x64, 0x0f, 0x5f, 0xe4, 0x0c, 0xe5, 0x26, 0x00, 0x1c, 0xfd, 0xf6, 0x0d,
+      0x07, 0xc4, 0x04, 0xf6, 0x0e, 0x07, 0xc4, 0x05, 0xf5, 0x96, 0x02, 0x80, 0xa8, 0x10, 0x3f, 0x64, 0x0f, 0x5f, 0xe4,
+      0x0c, 0xe8, 0xdf, 0xc4, 0x04, 0xe8, 0x07, 0xc4, 0x05, 0xf5, 0x96, 0x02, 0x8d, 0x08, 0xcf, 0x7a, 0x04, 0xda, 0x04,
   };
   writeBytes(bytes, 0x0f1f, loadInstrument);
   bytes[0x0026] = 0x04;
@@ -390,8 +386,7 @@ void konamiSnesBatmanReturnsAramUsesV2LayoutAndBoundedBank() {
          "V2 opcode 0xfc should consume two operands without misaligning the following note");
 
   const auto infos = parseKonamiSnesInstrumentInfos(reader, *layout);
-  constexpr std::array<u32, 9> expectedMelodicPrograms{0x00, 0x10, 0x11, 0x12, 0x13,
-                                                       0x14, 0x15, 0x16, 0x19};
+  constexpr std::array<u32, 9> expectedMelodicPrograms{0x00, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x19};
   expect(infos.size() == expectedMelodicPrograms.size() + 1,
          "Batman Returns should retain the bounded melodic bank and one percussion row");
   for (size_t index = 0; index < expectedMelodicPrograms.size(); ++index) {
@@ -413,7 +408,7 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const SessionSnapshot project = session.snapshot();
   expect(project.diagnostics().empty(), "KonamiSnes scan should not report diagnostics for the complete fixture");
   expect(project.collections().size() == 1, "KonamiSnes scan should produce one collection");
-  expect(project.assets().size() == 3, "KonamiSnes scan should produce sequence, instrument set, and samples");
+  expect(project.assets().size() == 2, "KonamiSnes scan should produce a sequence and sound bank");
 
   const auto* sequence = std::get_if<SequenceProgramAsset>(&project.assets()[0]);
   expect(sequence != nullptr, "first KonamiSnes asset should be a sequence");
@@ -480,7 +475,7 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(hasNonZeroPitchBendAtOrAfter(simulatedMidi.tracks[0], 2),
          "sequence-event modulation policy should emit nonzero vibrato pitch bend after delay");
 
-  const auto* instruments = std::get_if<InstrumentSetAsset>(&project.assets()[1]);
+  const auto* instruments = std::get_if<SoundBankAsset>(&project.assets()[1]);
   expect(instruments != nullptr, "second KonamiSnes asset should be an instrument set");
   expect(instruments->instruments.size() == 1, "instrument set should parse one valid melodic instrument");
   const Instrument& instrument = instruments->instruments.front();
@@ -491,21 +486,19 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(instrument.regions.size() == 1, "instrument should contain one sample-backed region");
   expect(!instrument.modulation.vibrato,
          "scanned KonamiSnes instruments should not carry sequence-independent modulation guesses");
-  InstrumentSetAsset preparedInstruments = *instruments;
+  SoundBankAsset preparedInstruments = *instruments;
   applySequenceModulation(preparedInstruments, modulationProfile);
   expect(preparedInstruments.instruments.front().modulation.vibrato &&
              preparedInstruments.instruments.front().modulation.vibrato->maxDepthCents > 0.0 &&
              preparedInstruments.instruments.front().modulation.vibrato->delaySeconds,
          "shared collection planning should add the sequence's physical vibrato range");
 
-  const auto* samples = std::get_if<SampleCollectionAsset>(&project.assets()[2]);
-  expect(samples != nullptr, "third KonamiSnes asset should be a sample collection");
-  expect(samples->samples.samples.size() == 1, "sample collection should parse one referenced BRR sample");
-  expect(samples->samples.samples.front().encodedData.offset == 0x6000 &&
-             samples->samples.samples.front().encodedData.size == 9,
+  const SamplePool& samples = instruments->localSamples;
+  expect(samples.samples.size() == 1, "sound bank should parse one referenced BRR sample");
+  expect(samples.samples.front().encodedData.offset == 0x6000 && samples.samples.front().encodedData.size == 9,
          "sample should preserve the one-block BRR payload range");
-  expect(!samples->samples.samples.front().loop.enabled && samples->samples.samples.front().loop.start == 0 &&
-             samples->samples.samples.front().loop.length == 0,
+  expect(!samples.samples.front().loop.enabled && samples.samples.front().loop.start == 0 &&
+             samples.samples.front().loop.length == 0,
          "non-looping KonamiSnes BRR samples should keep a zero loop span");
 
   const SourceMap& sourceMap = project.sourceMap();
@@ -607,11 +600,10 @@ void konamiSnesSynthBuilderGroupsPercussionAndPreservesSampleRules() {
   expect(synth.has_value(), "KonamiSnes builder fixture should produce a complete synth");
   const ScanResult scan = result.finish();
 
-  const auto* instruments = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
-  const auto* samples = std::get_if<SampleCollectionAsset>(&scan.assets[1]);
-  expect(instruments != nullptr && samples != nullptr && instruments->instruments.size() == 4 &&
-             samples->samples.samples.size() == 5,
-         "KonamiSnes builder should retain three melodic programs, one grouped kit, and every source sample");
+  const auto* instruments = std::get_if<SoundBankAsset>(&scan.assets[0]);
+  expect(
+      instruments != nullptr && instruments->instruments.size() == 4 && instruments->localSamples.samples.size() == 5,
+      "KonamiSnes builder should retain three melodic programs, one grouped kit, and every source sample");
   expect(instruments->instruments[0].regions[0].sample.index == 2,
          "KonamiSnes instruments should resolve samples directly by their SRCN");
   expect(instruments->instruments[1].regions[0].sample.index == 0,
@@ -629,13 +621,13 @@ void konamiSnesSynthBuilderGroupsPercussionAndPreservesSampleRules() {
              percussion.regions[2].sample.index == 4,
          "percussion regions should retain their direct source sample references");
 
-  const auto sparseSources = scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->instruments.id, 1));
+  const auto sparseSources = scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->id, 1));
   expect(sparseSources.size() == 1 && scan.sourceMap.get(sparseSources[0]).range.offset == 0x401c,
          "sparse source program 4 should use dense instrument owner 1");
-  expect(scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->instruments.id, 4)).empty(),
+  expect(scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->id, 4)).empty(),
          "a sparse source program must not be mistaken for a dense annotation owner");
 
-  const auto percussionSources = scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->instruments.id, 3));
+  const auto percussionSources = scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->id, 3));
   expect(percussionSources.size() == 3, "every percussion source entry should point back to the one durable drum kit");
   for (const SourceAnnotationId id : percussionSources) {
     const SourceAnnotation& annotation = scan.sourceMap.get(id);
@@ -645,7 +637,7 @@ void konamiSnesSynthBuilderGroupsPercussionAndPreservesSampleRules() {
            "each drum-kit source record should expose the kit's complete, deduplicated sample relationship");
   }
   for (u32 regionIndex = 0; regionIndex < percussion.regions.size(); ++regionIndex) {
-    expect(scan.sourceMap.ownedBy(ObjectRefs::region(synth->instruments.id, 3, regionIndex)).size() == 1,
+    expect(scan.sourceMap.ownedBy(ObjectRefs::region(synth->id, 3, regionIndex)).size() == 1,
            "each grouped percussion region should retain its own stable source owner");
   }
 }
@@ -846,8 +838,7 @@ void konamiSnesProportionalPortamentoMatchesDriverCurve() {
   const auto* proportionalIntent = pitchTransitionIntent(proportional.tracks[0].automations.front());
   expect(proportionalIntent != nullptr, "V3 proportional portamento should use shared pitch-transition intent");
   const auto* physicalDuration = std::get_if<FixedDurationPitchSlideTiming>(&proportionalIntent->timing.physical);
-  const auto* sampledCurve =
-      std::get_if<SampledAutomationCurve>(&proportionalIntent->curve);
+  const auto* sampledCurve = std::get_if<SampledAutomationCurve>(&proportionalIntent->curve);
   expect(physicalDuration != nullptr && physicalDuration->milliseconds == 40.0 &&
              proportionalIntent->timing.timelineTicks == 3 && sampledCurve != nullptr &&
              sampledCurve->samples.size() == 4 && sampledCurve->samples[1].value == 46.56640625 &&
@@ -862,10 +853,8 @@ void konamiSnesProportionalPortamentoMatchesDriverCurve() {
          "V3 proportional portamento should render in both MIDI transition modes");
 
   const PerformanceSequence interrupted = renderKonamiSnesProgram(
-      KONAMISNES_V3, {{0x28, 1, 0x7d, 0x7d, 0xf0, 1, 0x2f, 1, 0x7d, 0x7d,
-                                               0x30, 8, 0x7d, 0x7d, 0xff}});
-  expect(interrupted.tracks[0].automations.size() == 2,
-         "each note should restart persistent proportional portamento");
+      KONAMISNES_V3, {{0x28, 1, 0x7d, 0x7d, 0xf0, 1, 0x2f, 1, 0x7d, 0x7d, 0x30, 8, 0x7d, 0x7d, 0xff}});
+  expect(interrupted.tracks[0].automations.size() == 2, "each note should restart persistent proportional portamento");
   const auto* retargeted = pitchTransitionIntent(interrupted.tracks[0].automations.back());
   expect(retargeted != nullptr && retargeted->targetKey == 48.0 && retargeted->startKey < 41.0,
          "a new note should continue from an interrupted proportional glide, not its old target");
@@ -1155,9 +1144,7 @@ void konamiSnesZeroNotesAndLegatoMatchDriverGating() {
   const auto portamentoNotes = performanceEvents<NotePerformanceEvent>(portamentoAfterRest.tracks.front());
   const auto transition = std::ranges::find_if(
       portamentoAfterRest.tracks.front().automations,
-      [](const PerformanceAutomation& automation) {
-                                                  return pitchTransitionIntent(automation) != nullptr;
-                                                });
+      [](const PerformanceAutomation& automation) { return pitchTransitionIntent(automation) != nullptr; });
   expect(portamentoNotes.size() == 2 && portamentoNotes[0]->note != portamentoNotes[1]->note &&
              transition != portamentoAfterRest.tracks.front().automations.end() &&
              pitchTransitionIntent(*transition)->note == portamentoNotes[1]->note &&
@@ -1349,29 +1336,27 @@ void konamiSnesHeldNoteUsesRealizedInlineSlidePitch() {
          "a held note at an inline slide's realized target should extend the sounding voice");
   expect(std::ranges::count_if(
              performance.tracks[0].automations,
-             [](const PerformanceAutomation& automation) {
-           return pitchTransitionIntent(automation) != nullptr;
-         }) == 1,
+             [](const PerformanceAutomation& automation) { return pitchTransitionIntent(automation) != nullptr; }) == 1,
          "a completed inline slide should not be repeated at the next held-note boundary");
 
   const MidiSequence pitchBend = renderMidiSequence(performance);
-  expect(std::ranges::none_of(pitchBend.tracks[0].events, [](const MidiEvent& event) {
-           const auto* bend = std::get_if<PitchBend>(&event);
-           return bend != nullptr && bend->tick == 0x60;
-         }),
+  expect(std::ranges::none_of(pitchBend.tracks[0].events,
+                              [](const MidiEvent& event) {
+                                const auto* bend = std::get_if<PitchBend>(&event);
+                                return bend != nullptr && bend->tick == 0x60;
+                              }),
          "the retained inline-slide bend should not be doubled at tick 96");
 
   const MidiSequence portamento =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
   expect(std::ranges::count_if(
              portamento.tracks[0].events,
-             [](const MidiEvent& event) {
-           return std::holds_alternative<PortamentoControl>(event);
-         }) == 1 &&
-             std::ranges::none_of(portamento.tracks[0].events, [](const MidiEvent& event) {
-               const auto* note = std::get_if<NoteDuration>(&event);
-               return note != nullptr && note->tick == 0x60;
-             }),
+             [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) == 1 &&
+             std::ranges::none_of(portamento.tracks[0].events,
+                                  [](const MidiEvent& event) {
+                                    const auto* note = std::get_if<NoteDuration>(&event);
+                                    return note != nullptr && note->tick == 0x60;
+                                  }),
          "native portamento should not retrigger and immediately silence the slide target at tick 96");
 }
 
@@ -1389,17 +1374,16 @@ void konamiSnesHeldNoteRestartsPitchEnvelopeWithoutRetrigger() {
          "a repeated held key should retain its sounding voice while the pitch envelope restarts");
   expect(std::ranges::count_if(
              performance.tracks[0].automations,
-             [](const PerformanceAutomation& automation) {
-           return pitchTransitionIntent(automation) != nullptr;
-         }) == 2,
+             [](const PerformanceAutomation& automation) { return pitchTransitionIntent(automation) != nullptr; }) == 2,
          "every held source note should restart the persistent pitch envelope");
 
   const MidiSequence midi =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
-  expect(std::ranges::none_of(midi.tracks[0].events, [](const MidiEvent& event) {
-           const auto* note = std::get_if<NoteDuration>(&event);
-           return note != nullptr && note->tick == 42;
-         }),
+  expect(std::ranges::none_of(midi.tracks[0].events,
+                              [](const MidiEvent& event) {
+                                const auto* note = std::get_if<NoteDuration>(&event);
+                                return note != nullptr && note->tick == 42;
+                              }),
          "restarting a held pitch envelope should not retrigger its MIDI note");
 }
 

@@ -110,10 +110,10 @@ void layoutAndSynthFollowRelocatedDriverTables() {
   const SessionSnapshot snapshot = session.snapshot();
   const Collection* collection = snapshot.collections().empty() ? nullptr : &snapshot.collections().front();
   expect(snapshot.diagnostics().empty() && snapshot.collections().size() == 1 && collection->members.sequence &&
-             collection->members.instrumentSets.size() == 1 && collection->members.sampleCollections.size() == 1,
-         "ItikitiSnes scanning should publish one complete sequence, instrument, and sample collection");
+             collection->members.soundBanks.size() == 1 && collection->members.samplePools.empty(),
+         "ItikitiSnes scanning should publish one sequence and self-contained sound bank");
 
-  const auto* set = snapshot.asset<InstrumentSetAsset>(collection->members.instrumentSets.front());
+  const auto* set = snapshot.asset<SoundBankAsset>(collection->members.soundBanks.front());
   const auto found = set == nullptr ? std::vector<Instrument>::const_iterator{}
                                     : std::ranges::find(set->instruments, u64{2}, [](const Instrument& value) {
                                         return value.identity ? value.identity->key : ~u64{0};

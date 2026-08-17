@@ -127,7 +127,7 @@ std::optional<SampleRef> SnesBrrSampleRefs::findSrcn(u8 srcn) const {
   return found == entries_.end() ? std::nullopt : std::optional<SampleRef>{found->sample};
 }
 
-SnesBrrSampleRefs addSnesBrrSamples(SampleCollectionBuilder& samples, ByteReader reader, const SnesBrrCatalog& catalog,
+SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reader, const SnesBrrCatalog& catalog,
                                     std::string_view directoryEntryKind) {
   samples.include(catalog.directoryRange);
   const SourceAnnotationId root =
@@ -191,10 +191,9 @@ SnesBrrSampleRefs addSnesBrrSamples(SampleCollectionBuilder& samples, ByteReader
   return refs;
 }
 
-SampleCollection buildSnesBrrSampleCollection(ByteReader reader, const SnesBrrCatalog& catalog,
-                                              AssetId sampleCollectionId, SourceMapBuilder& sourceMap,
-                                              std::string_view directoryEntryKind) {
-  SampleCollectionBuilder samples{sampleCollectionId, &sourceMap};
+SamplePool buildSnesBrrSamplePool(ByteReader reader, const SnesBrrCatalog& catalog, AssetId samplePoolId,
+                                  SourceMapBuilder& sourceMap, std::string_view directoryEntryKind) {
+  SamplePoolBuilder samples{samplePoolId, &sourceMap};
   [[maybe_unused]] const auto refs = addSnesBrrSamples(samples, reader, catalog, directoryEntryKind);
   return std::move(samples).finish().value;
 }

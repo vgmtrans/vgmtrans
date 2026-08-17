@@ -34,9 +34,8 @@ struct CollectionPlayback {
 [[nodiscard]] Artifact exportSequenceMidi(const SessionSnapshot& snapshot, const SourceStore& sources, AssetId sequence,
                                           const SequenceExportRequest& request);
 
-[[nodiscard]] Artifact exportInstrumentSet(const SessionSnapshot& snapshot, const SourceStore& sources,
-                                           AssetId instrumentSet, SynthExportFormat format,
-                                           const ExportRequest& request);
+[[nodiscard]] Artifact exportSoundBank(const SessionSnapshot& snapshot, const SourceStore& sources, AssetId soundBank,
+                                       SynthExportFormat format, const ExportRequest& request);
 
 [[nodiscard]] CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, const SourceStore& sources,
                                                            CollectionId collection, const PlaybackRequest& request);

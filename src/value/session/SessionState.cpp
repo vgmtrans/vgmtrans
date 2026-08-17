@@ -52,10 +52,10 @@ template <typename T, typename Predicate>
     const auto found = std::ranges::find_if(ids, [&](AssetId id) { return assetIds.contains(id.value); });
     return found != ids.end() ? std::optional{*found} : std::nullopt;
   };
-  if (auto found = find(members.instrumentSets)) {
+  if (auto found = find(members.soundBanks)) {
     return found;
   }
-  if (auto found = find(members.sampleCollections)) {
+  if (auto found = find(members.samplePools)) {
     return found;
   }
   return find(members.miscAssets);
@@ -181,8 +181,8 @@ CollectionId SessionState::createUserCollection(std::string name, CollectionMemb
   if (asset<SequenceProgramAsset>(*members.sequence) == nullptr) {
     throw std::invalid_argument("The selected sequence asset does not exist or has the wrong type");
   }
-  if (members.instrumentSets.empty()) {
-    throw std::invalid_argument("A user-created collection must contain an instrument set");
+  if (members.soundBanks.empty()) {
+    throw std::invalid_argument("A user-created collection must contain a sound bank");
   }
 
   const auto validate = [](const std::vector<AssetId>& values, auto expected, std::string_view role) {
@@ -196,9 +196,8 @@ CollectionId SessionState::createUserCollection(std::string name, CollectionMemb
       }
     }
   };
-  validate(members.instrumentSets, [this](AssetId id) { return asset<InstrumentSetAsset>(id); }, "instrument set");
-  validate(
-      members.sampleCollections, [this](AssetId id) { return asset<SampleCollectionAsset>(id); }, "sample collection");
+  validate(members.soundBanks, [this](AssetId id) { return asset<SoundBankAsset>(id); }, "sound bank");
+  validate(members.samplePools, [this](AssetId id) { return asset<SamplePoolAsset>(id); }, "sample pool");
   validate(members.miscAssets, [this](AssetId id) { return asset<MiscAsset>(id); }, "miscellaneous");
 
   const CollectionId id = nextCollectionId(ids);
@@ -431,10 +430,10 @@ void SessionState::validateCollectionAssetReferences(std::string_view resolver, 
              std::to_string(id.value) + " that does not exist");
     if (role == "sequence") {
       desired.issues.push_back(missingSequenceIssue(id));
-    } else if (role == "instrument-set") {
-      desired.issues.push_back(missingInstrumentSetIssue(id));
-    } else if (role == "sample-collection") {
-      desired.issues.push_back(missingSampleCollectionIssue(id));
+    } else if (role == "sound-bank") {
+      desired.issues.push_back(missingSoundBankIssue(id));
+    } else if (role == "sample-pool") {
+      desired.issues.push_back(missingSamplePoolIssue(id));
     } else {
       desired.issues.push_back(CollectionIssue{
           .impact = CollectionIssueImpact::Incomplete,
@@ -481,10 +480,10 @@ void SessionState::validateCollectionAssetReferences(std::string_view resolver, 
       return true;
     });
   };
-  filter(desired.members.instrumentSets, "instrument-set", "an",
-         [&](AssetId id) { return asset<InstrumentSetAsset>(id) != nullptr; });
-  filter(desired.members.sampleCollections, "sample-collection", "a",
-         [&](AssetId id) { return asset<SampleCollectionAsset>(id) != nullptr; });
+  filter(desired.members.soundBanks, "sound-bank", "a",
+         [&](AssetId id) { return asset<SoundBankAsset>(id) != nullptr; });
+  filter(desired.members.samplePools, "sample-pool", "a",
+         [&](AssetId id) { return asset<SamplePoolAsset>(id) != nullptr; });
   filter(desired.members.miscAssets, "misc", "a", [&](AssetId id) { return asset<MiscAsset>(id) != nullptr; });
 }
 

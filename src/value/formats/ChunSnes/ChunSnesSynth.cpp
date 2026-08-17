@@ -40,8 +40,8 @@ struct Patch {
 }
 
 [[nodiscard]] std::vector<Patch> collectPatches(ByteReader reader, const Layout& layout) {
-  const u32 mapping = layout.instrumentSetAddress + (layout.version == Version::Summer ? 1 : 2);
-  const u32 count = reader.u8At(layout.instrumentSetAddress);
+  const u32 mapping = layout.soundBankAddress + (layout.version == Version::Summer ? 1 : 2);
+  const u32 count = reader.u8At(layout.soundBankAddress);
   std::vector<Patch> result;
   result.reserve(count);
   for (u32 program = 0; program < count && reader.has(mapping + program, 1); ++program) {
@@ -89,7 +89,8 @@ struct Patch {
 
 }  // namespace
 
-std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& layout, std::string_view displayName) {
+std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layout& layout,
+                                         std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const std::vector<Patch> patches = collectPatches(reader, layout);
   if (patches.empty()) {
@@ -100,9 +101,9 @@ std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& 
     return std::nullopt;
   }
 
-  auto instruments = builder.instrumentSet(fmt::format("{} Instruments", displayName));
-  auto sampleCollection = builder.sampleCollection(fmt::format("{} Samples", displayName));
-  const SnesBrrSampleRefs samples = addSnesBrrSamples(sampleCollection.builder(), reader, catalog);
+  auto instruments = builder.soundBank(fmt::format("{} Instruments", displayName));
+  auto& samplePool = instruments.samples();
+  const SnesBrrSampleRefs samples = addSnesBrrSamples(samplePool, reader, catalog);
   for (const Patch& patch : patches) {
     const auto sample = samples.findSrcn(patch.srcn);
     if (!sample) {
@@ -135,7 +136,7 @@ std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& 
   if (instruments.builder().empty()) {
     return std::nullopt;
   }
-  return ScanSynthRefs{.instruments = instruments.ref(), .samples = sampleCollection.ref()};
+  return instruments.ref();
 }
 
 }  // namespace vgmtrans::formats::chun_snes

@@ -135,16 +135,16 @@ public:
   CollectionAssembly(CollectionKey key, std::string name);
 
   CollectionAssembly& sequence(AssetId id);
-  CollectionAssembly& instrumentSet(AssetId id);
-  CollectionAssembly& sampleCollection(AssetId id);
+  CollectionAssembly& soundBank(AssetId id);
+  CollectionAssembly& samplePool(AssetId id);
   CollectionAssembly& misc(AssetId id);
   CollectionAssembly& issue(CollectionIssue issue);
   CollectionAssembly& incomplete(CollectionIssue issue);
   CollectionAssembly& ambiguous(std::string message, std::optional<AssetId> asset = std::nullopt,
                                 std::optional<SourceRange> range = std::nullopt);
   CollectionAssembly& requireSequence();
-  CollectionAssembly& requireInstrumentSet();
-  CollectionAssembly& requireSampleCollection();
+  CollectionAssembly& requireSoundBank();
+  CollectionAssembly& requireSamplePool();
 
   [[nodiscard]] DesiredCollection finish() &&;
 

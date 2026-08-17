@@ -47,9 +47,9 @@ struct SequenceParse {
                                            core::SourceMapBuilder* sourceMap = nullptr,
                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
-[[nodiscard]] std::optional<core::ScanSynthRefs> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
-                                                          const std::set<u8>& programs,
-                                                          std::string_view displayName);
+[[nodiscard]] std::optional<core::ScanSoundBankRef> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
+                                                             const std::set<u8>& programs,
+                                                             std::string_view displayName);
 [[nodiscard]] core::FormatModule module();
 
 }  // namespace vgmtrans::formats::falcom_snes

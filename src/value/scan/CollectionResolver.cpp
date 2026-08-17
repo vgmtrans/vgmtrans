@@ -50,13 +50,13 @@ CollectionAssembly& CollectionAssembly::sequence(AssetId id) {
   return *this;
 }
 
-CollectionAssembly& CollectionAssembly::instrumentSet(AssetId id) {
-  addUnique(collection_.members.instrumentSets, id);
+CollectionAssembly& CollectionAssembly::soundBank(AssetId id) {
+  addUnique(collection_.members.soundBanks, id);
   return *this;
 }
 
-CollectionAssembly& CollectionAssembly::sampleCollection(AssetId id) {
-  addUnique(collection_.members.sampleCollections, id);
+CollectionAssembly& CollectionAssembly::samplePool(AssetId id) {
+  addUnique(collection_.members.samplePools, id);
   return *this;
 }
 
@@ -89,16 +89,16 @@ CollectionAssembly& CollectionAssembly::requireSequence() {
   return *this;
 }
 
-CollectionAssembly& CollectionAssembly::requireInstrumentSet() {
-  if (collection_.members.instrumentSets.empty()) {
-    incomplete(missingInstrumentSetIssue());
+CollectionAssembly& CollectionAssembly::requireSoundBank() {
+  if (collection_.members.soundBanks.empty()) {
+    incomplete(missingSoundBankIssue());
   }
   return *this;
 }
 
-CollectionAssembly& CollectionAssembly::requireSampleCollection() {
-  if (collection_.members.sampleCollections.empty()) {
-    incomplete(missingSampleCollectionIssue());
+CollectionAssembly& CollectionAssembly::requireSamplePool() {
+  if (collection_.members.samplePools.empty()) {
+    incomplete(missingSamplePoolIssue());
   }
   return *this;
 }

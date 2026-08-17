@@ -436,10 +436,10 @@ void scannerBuildsTunedSynthAndCollection() {
   const SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.collections().size() == 1, "Wolf Team scanner should publish one source collection");
   const Collection& collection = snapshot.collections().front();
-  expect(collection.members.sequence && collection.members.instrumentSets.size() == 1 &&
-             collection.members.sampleCollections.size() == 1,
-         "the collection should connect the decoded sequence, patch set, and BRR sample collection");
-  const auto* set = snapshot.asset<InstrumentSetAsset>(collection.members.instrumentSets.front());
+  expect(collection.members.sequence && collection.members.soundBanks.size() == 1 &&
+             collection.members.samplePools.empty(),
+         "the collection should connect the decoded sequence and self-contained sound bank");
+  const auto* set = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
   expect(set != nullptr && set->instruments.size() == 1 && set->instruments.front().regions.size() == 1,
          "invalid sparse sample slots must not hide the one valid late instrument");
   const Region& region = set->instruments.front().regions.front();
@@ -490,8 +490,8 @@ void scannerBuildsArcusPitchModel() {
   const SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.collections().size() == 1, "Arcus scanner fixture should publish one source collection");
   const Collection& collection = snapshot.collections().front();
-  expect(collection.members.instrumentSets.size() == 1, "Arcus collection should include its segmented patch set");
-  const auto* set = snapshot.asset<InstrumentSetAsset>(collection.members.instrumentSets.front());
+  expect(collection.members.soundBanks.size() == 1, "Arcus collection should include its segmented patch set");
+  const auto* set = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
   expect(set != nullptr && set->instruments.size() == 1 && set->instruments.front().regions.size() == 1,
          "Arcus SRCN map should retain the one valid BRR-backed patch");
   const Region& region = set->instruments.front().regions.front();

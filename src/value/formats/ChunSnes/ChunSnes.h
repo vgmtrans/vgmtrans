@@ -41,7 +41,7 @@ struct EchoState {
 struct Layout {
   Version version = Version::Summer;
   u16 sequenceHeaderAddress = 0;
-  u16 instrumentSetAddress = 0;
+  u16 soundBankAddress = 0;
   u16 srcnTableAddress = 0;
   u16 sampleInfoTableAddress = 0;
   u16 spcDirAddress = 0;
@@ -63,8 +63,8 @@ struct SequenceParse {
                                            core::SourceMapBuilder* sourceMap = nullptr,
                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
-[[nodiscard]] std::optional<core::ScanSynthRefs> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
-                                                          std::string_view displayName);
+[[nodiscard]] std::optional<core::ScanSoundBankRef> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
+                                                             std::string_view displayName);
 [[nodiscard]] core::FormatModule module();
 
 }  // namespace vgmtrans::formats::chun_snes

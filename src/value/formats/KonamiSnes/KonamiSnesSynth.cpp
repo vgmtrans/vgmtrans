@@ -287,27 +287,23 @@ void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader read
 
 }  // namespace
 
-std::optional<ScanSynthRefs> addKonamiSnesSynth(ScanResultBuilder& builder, const KonamiSnesLayout& layout,
-                                                std::string_view displayName) {
+std::optional<ScanSoundBankRef> addKonamiSnesSynth(ScanResultBuilder& builder, const KonamiSnesLayout& layout,
+                                                   std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const auto instrumentInfos = parseKonamiSnesInstrumentInfos(reader, layout);
   const auto sampleCatalog = parseKonamiSnesSampleInfos(reader, *layout.spcDirAddress, instrumentInfos);
-  // Do not publish half of a synth. An instrument set without sample data (or
+  // Do not publish half of a synth. A sound bank without sample data (or
   // vice versa) cannot produce a usable export.
   if (instrumentInfos.empty() || sampleCatalog.samples.empty()) {
     return std::nullopt;
   }
 
-  auto instruments = builder.instrumentSet(fmt::format("{} Instruments", displayName));
-  auto samples = builder.sampleCollection(fmt::format("{} Samples", displayName));
-  const auto sampleRefs = addSnesBrrSamples(samples.builder(), reader, sampleCatalog);
+  auto instruments = builder.soundBank(fmt::format("{} Instruments", displayName));
+  const auto sampleRefs = addSnesBrrSamples(instruments.samples(), reader, sampleCatalog);
 
   addKonamiSnesInstruments(instruments.builder(), reader, instrumentInfos, sampleRefs);
 
-  return ScanSynthRefs{
-      .instruments = instruments.ref(),
-      .samples = samples.ref(),
-  };
+  return instruments.ref();
 }
 
 }  // namespace vgmtrans::formats::konami_snes

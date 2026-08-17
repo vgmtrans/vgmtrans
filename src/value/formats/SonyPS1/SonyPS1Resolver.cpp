@@ -24,7 +24,6 @@ namespace {
 
 constexpr std::string_view kSequenceFact = "sony-ps1.sequence";
 constexpr std::string_view kSampleBytesFact = "sony-ps1.sample-bytes";
-constexpr std::string_view kInstrumentSamplesFact = "sony-ps1.instrument-samples";
 
 struct SequenceEntry {
   AssetId asset;
@@ -40,7 +39,7 @@ struct InstrumentEntry {
   const SourceFile* file = nullptr;
   u64 offset = 0;
   u32 sampleBytes = 0;
-  std::optional<AssetId> samples;
+  bool needsExternalSamples = false;
 };
 
 struct SampleEntry {
@@ -49,6 +48,13 @@ struct SampleEntry {
   const SourceFile* file = nullptr;
   u32 sampleBytes = 0;
 };
+
+[[nodiscard]] bool needsExternalSamples(const SoundBankAsset& bank) {
+  return std::ranges::any_of(bank.instruments, [](const Instrument& instrument) {
+    return std::ranges::any_of(instrument.regions,
+                               [](const Region& region) { return region.sample.needsExternalBinding(); });
+  });
+}
 
 [[nodiscard]] std::filesystem::path sourcePath(const SourceFile* source) {
   if (source == nullptr) {
@@ -88,7 +94,7 @@ struct SampleEntry {
 
 [[nodiscard]] std::vector<InstrumentEntry> instruments(const MatchFactIndex& index) {
   std::vector<InstrumentEntry> entries;
-  for (const auto& facts : index.assets<InstrumentSetAsset>(kSonyPs1FormatName)) {
+  for (const auto& facts : index.assets<SoundBankAsset>(kSonyPs1FormatName)) {
     const auto sampleBytes = facts.id(kSampleBytesFact);
     if (sampleBytes) {
       entries.push_back(InstrumentEntry{
@@ -97,7 +103,7 @@ struct SampleEntry {
           .file = facts.source,
           .offset = facts.asset().metadata.range.offset,
           .sampleBytes = *sampleBytes,
-          .samples = facts.relation(kInstrumentSamplesFact),
+          .needsExternalSamples = needsExternalSamples(facts.asset()),
       });
     }
   }
@@ -106,7 +112,7 @@ struct SampleEntry {
 
 [[nodiscard]] std::vector<SampleEntry> samples(const MatchFactIndex& index) {
   std::vector<SampleEntry> entries;
-  for (const auto& facts : index.assets<SampleCollectionAsset>(kSonyPs1FormatName)) {
+  for (const auto& facts : index.assets<SamplePoolAsset>(kSonyPs1FormatName)) {
     const auto sampleBytes = facts.id(kSampleBytesFact);
     if (sampleBytes) {
       entries.push_back(SampleEntry{
@@ -150,10 +156,6 @@ struct SampleEntry {
 }
 
 [[nodiscard]] const SampleEntry* chooseSamples(const InstrumentEntry& bank, const std::vector<SampleEntry>& bodies) {
-  if (bank.samples) {
-    const auto related = std::ranges::find(bodies, *bank.samples, &SampleEntry::asset);
-    return related == bodies.end() ? nullptr : &*related;
-  }
   std::vector<const SampleEntry*> compatible;
   for (const auto& body : bodies) {
     if (body.sampleBytes == bank.sampleBytes) {
@@ -181,9 +183,11 @@ struct SampleEntry {
 }
 
 void attachBank(CollectionAssembly& collection, const InstrumentEntry& bank, const std::vector<SampleEntry>& bodies) {
-  collection.instrumentSet(bank.asset);
-  if (const auto* body = chooseSamples(bank, bodies)) {
-    collection.sampleCollection(body->asset);
+  collection.soundBank(bank.asset);
+  if (bank.needsExternalSamples) {
+    if (const auto* body = chooseSamples(bank, bodies)) {
+      collection.samplePool(body->asset);
+    }
   }
 }
 
@@ -210,12 +214,13 @@ std::vector<DesiredCollection> resolveSonyPs1Collections(const MatchContext& con
       attachBank(collection, *bank, sampleEntries);
     }
     if (banks.empty()) {
-      collection.requireInstrumentSet();
+      collection.requireSoundBank();
     }
-    const bool allBanksHaveSamples = std::ranges::all_of(
-        banks, [&](const InstrumentEntry* bank) { return chooseSamples(*bank, sampleEntries) != nullptr; });
+    const bool allBanksHaveSamples = std::ranges::all_of(banks, [&](const InstrumentEntry* bank) {
+      return !bank->needsExternalSamples || chooseSamples(*bank, sampleEntries) != nullptr;
+    });
     if (!banks.empty() && !allBanksHaveSamples) {
-      collection.requireSampleCollection();
+      collection.requireSamplePool();
     }
     collections.push_back(std::move(collection).finish());
   }
@@ -236,8 +241,8 @@ std::vector<DesiredCollection> resolveSonyPs1Collections(const MatchContext& con
         },
         bank.file == nullptr ? "Sony PS1 VAB" : bank.file->name);
     attachBank(collection, bank, sampleEntries);
-    if (chooseSamples(bank, sampleEntries) == nullptr) {
-      collection.requireSampleCollection();
+    if (bank.needsExternalSamples && chooseSamples(bank, sampleEntries) == nullptr) {
+      collection.requireSamplePool();
     }
     collections.push_back(std::move(collection).finish());
   }
@@ -248,7 +253,8 @@ void bindSonyPs1Collection(CollectionBindingContext& context) {
   // Scan-time bank numbers describe every VAB in a source. Collections load
   // their selected VABs into bank slots in member order.
   u32 bank = 0;
-  for (auto& instruments : context.instrumentSets) {
+  auto samplePool = context.samplePools.begin();
+  for (auto& instruments : context.soundBanks) {
     if (instruments.metadata.format != kSonyPs1FormatName) {
       continue;
     }
@@ -258,6 +264,28 @@ void bindSonyPs1Collection(CollectionBindingContext& context) {
                                                      : 0;
       instrument.explicitAddress = InstrumentAddress{.bank = bank, .program = program};
       instrument.identity = sonyPs1InstrumentIdentity(static_cast<u16>(bank), static_cast<u8>(program));
+    }
+    if (needsExternalSamples(instruments)) {
+      while (samplePool != context.samplePools.end() && (*samplePool)->metadata.format != kSonyPs1FormatName) {
+        ++samplePool;
+      }
+      if (samplePool == context.samplePools.end()) {
+        context.fail("Sony PS1 sound bank has no matching external sample pool", instruments.metadata.range);
+        return;
+      }
+      const auto& pool = **samplePool++;
+      for (auto& instrument : instruments.instruments) {
+        for (auto& region : instrument.regions) {
+          if (!region.sample.needsExternalBinding()) {
+            continue;
+          }
+          if (region.sample.index >= pool.pool.samples.size()) {
+            context.fail("Sony PS1 sound bank refers outside its external sample pool", region.range);
+            return;
+          }
+          region.sample = SampleRef::external(pool.metadata.id, region.sample.index);
+        }
+      }
     }
     ++bank;
   }

@@ -195,10 +195,10 @@ void ninSnesProfilesDescribeEverySupportedDriverFamily() {
 void ninSnesKonamiClockControlsTempo() {
   std::vector<u8> direct(32);
   std::ranges::copy(std::initializer_list<u8>{0xe8, 0xf0, 0xc4, 0xf1, 0xe8, 0x40, 0xc4, 0xfa, 0xe8, 0x01, 0xc4, 0xf1},
-      direct.begin());
+                    direct.begin());
   std::vector<u8> absolute(32);
-  std::ranges::copy(std::initializer_list<u8>{0xe8, 0xf0, 0xc5, 0xf1, 0x00, 0xe8, 0x20, 0xc5, 0xfa, 0x00, 0xe8,
-                                              0x01, 0xc5, 0xf1, 0x00},
+  std::ranges::copy(std::initializer_list<u8>{0xe8, 0xf0, 0xc5, 0xf1, 0x00, 0xe8, 0x20, 0xc5, 0xfa, 0x00, 0xe8, 0x01,
+                                              0xc5, 0xf1, 0x00},
                     absolute.begin());
   expect(detectKonamiTempoTimerTarget(ByteReader(SourceId{1}, direct)) == 0x40 &&
              detectKonamiTempoTimerTarget(ByteReader(SourceId{1}, absolute)) == 0x20,
@@ -491,11 +491,24 @@ void ninSnesStandardEchoUsesMaskLevelAndDisable() {
 
   std::ranges::copy(
       std::initializer_list<u8>{
-          0xf5, 0x03, 0x40, 0x20,  // EON 0/1, EVOL +64/+32
-          0xf7, 0x03, 0xc0, 0x02,  // 48 ms, EFB -0.5, FIR 2
-          0xf8, 0x04, 0x00, 0xe0,  // fade EVOL to 0/-32
-          4,    0xc9, 0xf6,        // finish the fade, then disable echo
-          4,    0xc9, 0,
+          0xf5,
+          0x03,
+          0x40,
+          0x20,  // EON 0/1, EVOL +64/+32
+          0xf7,
+          0x03,
+          0xc0,
+          0x02,  // 48 ms, EFB -0.5, FIR 2
+          0xf8,
+          0x04,
+          0x00,
+          0xe0,  // fade EVOL to 0/-32
+          4,
+          0xc9,
+          0xf6,  // finish the fade, then disable echo
+          4,
+          0xc9,
+          0,
       },
       bytes.begin() + 0x300);
   std::ranges::copy(std::initializer_list<u8>{8, 0x7f, 0x80, 0}, bytes.begin() + 0x320);
@@ -532,8 +545,7 @@ void ninSnesStandardEchoUsesMaskLevelAndDisable() {
     return std::abs(*change->leftGain) < 0.0001 && std::abs(*change->rightGain + (32.0 / 127.0)) < 0.0001 &&
            std::abs(change->send - (32.0 / 127.0)) < 0.0001;
   });
-  expect(reachedFadeTarget,
-         "standard N-SPC F8 should reach its signed stereo target over the requested duration");
+  expect(reachedFadeTarget, "standard N-SPC F8 should reach its signed stereo target over the requested duration");
 }
 
 void ninSnesKonamiLoopAppliesAndClearsReplayDeltas() {
@@ -802,17 +814,21 @@ void ninSnesPrepassClearsMasterVolumeAutomationBinding() {
   // performance bindings while retaining the reset source-domain value.
   std::ranges::copy(
       std::initializer_list<u8>{
-          0xe5, 0xff,        // master volume
-          0xe6, 4, 0x80,    // master volume fade
-          4,    0xc9, 0,    // wait for the fade, then end
+          0xe5,
+          0xff,  // master volume
+          0xe6,
+          4,
+          0x80,  // master volume fade
+          4,
+          0xc9,
+          0,  // wait for the fade, then end
       },
       bytes.begin() + 0x300);
 
   const PerformanceSequence performance = render(std::move(bytes));
   expect(performance.tracks[0].automations.size() == 1,
          "the real render should replace the discarded prepass master-volume binding");
-  const auto* automation =
-      std::get_if<ScalarPerformanceAutomationIntent>(&performance.tracks[0].automations[0].intent);
+  const auto* automation = std::get_if<ScalarPerformanceAutomationIntent>(&performance.tracks[0].automations[0].intent);
   expect(automation != nullptr && automation->target == PerformanceAutomationTarget::MasterLevel &&
              automation->durationTicks == 4,
          "the real render should retain the structured master-volume fade");
@@ -941,9 +957,7 @@ void ninSnesKonamiZeroDurationRateContinuesHeldVoice() {
   }
   const bool standardHasContinuation = std::ranges::any_of(
       standardPerformance.tracks[0].automations,
-      [](const PerformanceAutomation& automation) {
-        return pitchTransitionIntent(automation) != nullptr;
-      });
+      [](const PerformanceAutomation& automation) { return pitchTransitionIntent(automation) != nullptr; });
   expect(standardDurations == std::vector<u32>{2, 1, 1, 2} && !standardHasHold && !standardHasContinuation,
          "zero duration rate should retain ordinary one-tick gates outside the Konami driver");
 }
@@ -1212,7 +1226,7 @@ void ninSnesKonamiPercussionUsesDriverMapAndNeutralTuning() {
          "Konami percussion should use its fixed program base and per-slot played note");
 
   const ScanResult scan = scanSynth(std::move(bytes), layout, "Konami percussion", parsed.recipes);
-  const auto* instruments = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
+  const auto* instruments = std::get_if<SoundBankAsset>(&scan.assets[0]);
   expect(instruments != nullptr, "Konami synth fixture should produce an instrument set");
   const auto melodic = std::ranges::find_if(instruments->instruments, [](const Instrument& instrument) {
     return instrument.explicitAddress == InstrumentAddress{.bank = 0, .program = 20};
@@ -1274,7 +1288,7 @@ void ninSnesEarlierPercussionUsesSeparateSixByteTable() {
   expect(synth.has_value(), "prototype percussion should produce an exportable drum kit");
 
   const ScanResult scan = result.finish();
-  const auto* instruments = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
+  const auto* instruments = std::get_if<SoundBankAsset>(&scan.assets[0]);
   expect(instruments != nullptr && instruments->instruments.size() == 2,
          "the separate percussion row should remain an internal drum source");
   const auto melodic = std::ranges::find_if(instruments->instruments, [](const Instrument& instrument) {
@@ -1298,8 +1312,8 @@ void ninSnesEarlierPercussionUsesSeparateSixByteTable() {
          "NinSnes drum records should opt their exact fields into TreeView child projection");
   const auto sourceBackedFields =
       std::ranges::count_if(drumSource->fields, [](const SourceField& field) { return field.range.valid(); });
-  expect(sourceBackedFields == 6 && drumSource->fields[0].name == "srcn" &&
-             drumSource->fields[5].name == "note" && drumSource->fields[5].range.offset == 0x400a,
+  expect(sourceBackedFields == 6 && drumSource->fields[0].name == "srcn" && drumSource->fields[5].name == "note" &&
+             drumSource->fields[5].range.offset == 0x400a,
          "a prototype drum record should retain all six individually selectable source fields");
 }
 
@@ -1324,7 +1338,7 @@ void ninSnesGainModeInstrumentsUseDspEnvelope() {
   layout.spcDirAddress = 0x5000;
 
   const ScanResult scan = scanSynth(std::move(bytes), layout, "GAIN");
-  const auto* instruments = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
+  const auto* instruments = std::get_if<SoundBankAsset>(&scan.assets[0]);
   expect(
       instruments != nullptr && instruments->instruments.size() == 1 && instruments->instruments[0].regions.size() == 1,
       "direct-GAIN fixture should produce one instrument region");
@@ -1359,7 +1373,7 @@ void ninSnesIdentityMappedSilentSlotsAreSparse() {
   layout.spcDirAddress = kDirectory;
 
   const ScanResult scan = scanSynth(std::move(bytes), layout, "Sparse");
-  const auto* instruments = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
+  const auto* instruments = std::get_if<SoundBankAsset>(&scan.assets[0]);
   expect(instruments != nullptr && instruments->instruments.size() == 2 &&
              instruments->instruments[0].explicitAddress == InstrumentAddress{.bank = 0, .program = 0} &&
              instruments->instruments[1].explicitAddress == InstrumentAddress{.bank = 0, .program = 2},

@@ -46,12 +46,12 @@ class CollectionContentsModel;
 class StitchPlanModel;
 class CollectionTableModel;
 class WorkspaceController;
-}
+}  // namespace vgmtrans::ui
 
 namespace vgmtrans::core {
 struct Artifact;
 enum class SynthExportFormat;
-}
+}  // namespace vgmtrans::core
 
 class MainWindow final : public QMainWindow {
   Q_OBJECT
@@ -75,12 +75,12 @@ signals:
   void seekModifierActiveChanged(bool active);
 
 protected:
-  void dragEnterEvent(QDragEnterEvent *event) override;
-  void dragMoveEvent(QDragMoveEvent *event) override;
-  void dragLeaveEvent(QDragLeaveEvent *event) override;
-  void dropEvent(QDropEvent *event) override;
-  void closeEvent(QCloseEvent *event) override;
-  void resizeEvent(QResizeEvent *event) override;
+  void dragEnterEvent(QDragEnterEvent* event) override;
+  void dragMoveEvent(QDragMoveEvent* event) override;
+  void dragLeaveEvent(QDragLeaveEvent* event) override;
+  void dropEvent(QDropEvent* event) override;
+  void closeEvent(QCloseEvent* event) override;
+  void resizeEvent(QResizeEvent* event) override;
   bool eventFilter(QObject* obj, QEvent* event) override;
 
 private:
@@ -108,14 +108,13 @@ private:
   void removeSelectedSources();
   void removeSelectedAssets();
   void saveOriginal(QAbstractItemView* view, OriginalItemKind kind);
-  void saveArtifact(const QModelIndex& index, vgmtrans::core::Artifact artifact,
-                    const QString& failureMessage, const char* extension);
+  void saveArtifact(const QModelIndex& index, vgmtrans::core::Artifact artifact, const QString& failureMessage,
+                    const char* extension);
   [[nodiscard]] QAbstractItemView* activeAssetView() const;
   void exportSequenceMidi(const QModelIndex& index);
-  void exportInstrumentSet(const QModelIndex& index, vgmtrans::core::SynthExportFormat format);
+  void exportSoundBank(const QModelIndex& index, vgmtrans::core::SynthExportFormat format);
   void togglePlayback();
-  void updateSelectionStatus(const QModelIndex& index,
-                             SelectionStatusKind kind);
+  void updateSelectionStatus(const QModelIndex& index, SelectionStatusKind kind);
 
   vgmtrans::ui::WorkspaceController& m_workspace;
   TableView* m_rawfile_listview{};
@@ -127,19 +126,19 @@ private:
   vgmtrans::ui::StitchPlanModel* m_stitch_plan_model{};
   vgmtrans::ui::CollectionContentsModel* m_collection_contents_model{};
 
-  QDockWidget *m_rawfile_dock{};
-  QDockWidget *m_vgmfile_dock{};
-  QDockWidget *m_coll_dock{};
-  QDockWidget *m_coll_view_dock{};
-  MenuBar *m_menu_bar{};
-  PlaybackControls *m_playback_controls{};
-  SequencePlayer *m_sequence_player{};
-  StatusBarContent *statusBarContent{};
-  Logger *m_logger{};
-  QToolButton *m_stitchButton{};
-  ToastHost *m_toastHost{};
-  WindowBar *m_windowBar{};
-  QWidget *m_dragOverlay{};
-  QWK::WidgetWindowAgent *m_windowAgent{};
-  MainWindowDockLayout *m_dockLayout{};
+  QDockWidget* m_rawfile_dock{};
+  QDockWidget* m_vgmfile_dock{};
+  QDockWidget* m_coll_dock{};
+  QDockWidget* m_coll_view_dock{};
+  MenuBar* m_menu_bar{};
+  PlaybackControls* m_playback_controls{};
+  SequencePlayer* m_sequence_player{};
+  StatusBarContent* statusBarContent{};
+  Logger* m_logger{};
+  QToolButton* m_stitchButton{};
+  ToastHost* m_toastHost{};
+  WindowBar* m_windowBar{};
+  QWidget* m_dragOverlay{};
+  QWK::WidgetWindowAgent* m_windowAgent{};
+  MainWindowDockLayout* m_dockLayout{};
 };

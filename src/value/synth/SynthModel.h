@@ -40,13 +40,26 @@ struct VelocityRange {
 };
 
 struct SampleRef {
-  // index is local to collection. collection may be empty when a format implies
-  // "use the collection paired with this instrument set". An invalid index
-  // represents a structural region whose sample has not been bound yet.
-  std::optional<AssetId> collection;
-  u32 index = 0;
+  // An absent pool identifies a sample local to the owning SoundBankAsset.
+  // External pools have their own asset identity. An invalid pool identity
+  // retains an external sample index that collection binding has not resolved.
+  std::optional<AssetId> externalPool;
+  u32 index = invalidIdValue;
 
-  [[nodiscard]] bool valid() const noexcept { return index != invalidIdValue; }
+  [[nodiscard]] static SampleRef local(u32 index) noexcept { return SampleRef{.index = index}; }
+  [[nodiscard]] static SampleRef external(AssetId pool, u32 index) noexcept {
+    return SampleRef{.externalPool = pool, .index = index};
+  }
+  [[nodiscard]] static SampleRef unbound(u32 index = invalidIdValue) noexcept {
+    return SampleRef{.externalPool = AssetId{}, .index = index};
+  }
+
+  [[nodiscard]] bool valid() const noexcept {
+    return index != invalidIdValue && (!externalPool || externalPool->valid());
+  }
+  [[nodiscard]] bool needsExternalBinding() const noexcept {
+    return index != invalidIdValue && externalPool && !externalPool->valid();
+  }
 };
 
 struct Tuning {
@@ -99,12 +112,6 @@ struct Instrument {
   InstrumentModulation modulation;
 };
 
-struct InstrumentSetAsset {
-  AssetMetadata metadata;
-  std::vector<Instrument> instruments;
-  AssetPrivateData privateData;
-};
-
 enum class AudioCodec {
   Unknown,
   PcmS8,
@@ -141,14 +148,21 @@ struct Sample {
   double attenuationDb = 0.0;
 };
 
-struct SampleCollection {
+struct SamplePool {
   std::vector<Sample> samples;
+  SampleFilter preferredFilter = SampleFilter::None;
 };
 
-struct SampleCollectionAsset {
+struct SoundBankAsset {
   AssetMetadata metadata;
-  SampleCollection samples;
-  SampleFilter preferredFilter = SampleFilter::None;
+  std::vector<Instrument> instruments;
+  SamplePool localSamples;
+  AssetPrivateData privateData;
+};
+
+struct SamplePoolAsset {
+  AssetMetadata metadata;
+  SamplePool pool;
   AssetPrivateData privateData;
 };
 

@@ -36,9 +36,8 @@ void validateEnvelope(ValidationReport& report, const Envelope& envelope, Source
   checkSeconds(envelope.secondDecaySeconds, "synth.envelope.second-decay", "second decay");
   checkSeconds(envelope.releaseSeconds, "synth.envelope.release", "release");
 
-  if (envelope.sustainAmplitude &&
-      (!std::isfinite(*envelope.sustainAmplitude) || *envelope.sustainAmplitude < 0.0 ||
-       *envelope.sustainAmplitude > 1.0)) {
+  if (envelope.sustainAmplitude && (!std::isfinite(*envelope.sustainAmplitude) || *envelope.sustainAmplitude < 0.0 ||
+                                    *envelope.sustainAmplitude > 1.0)) {
     report.error("synth.envelope.sustain", "Synth envelope sustain amplitude was outside the 0.0 to 1.0 range",
                  validRange(range));
   }
@@ -77,13 +76,25 @@ void validateYm2151Voice(ValidationReport& report, const Ym2151Voice& voice, Sou
   }
 }
 
+void validateSamples(ValidationReport& report, const SamplePool& pool) {
+  for (const auto& sample : pool.samples) {
+    if (sample.channels == 0) {
+      report.error("synth.sample.channels", "Synth sample had zero channels", validRange(sample.encodedData));
+    }
+    if (!std::isfinite(sample.attenuationDb)) {
+      report.error("synth.sample.attenuation", "Synth sample attenuation was not finite",
+                   validRange(sample.encodedData));
+    }
+  }
+}
+
 }  // namespace
 
-ValidationReport validateInstrumentSet(const InstrumentSetAsset& instrumentSet) {
+ValidationReport validateSoundBank(const SoundBankAsset& soundBank) {
   ValidationReport report;
   std::set<std::pair<std::string, u32>> identities;
 
-  for (const auto& instrument : instrumentSet.instruments) {
+  for (const auto& instrument : soundBank.instruments) {
     if (instrument.identity) {
       if (!instrument.identity->valid()) {
         report.error("synth.instrument.identity", "Synth instrument had an empty identity domain",
@@ -123,22 +134,15 @@ ValidationReport validateInstrumentSet(const InstrumentSetAsset& instrumentSet) 
       validateEnvelope(report, region.envelope, region.range);
     }
   }
+  validateSamples(report, soundBank.localSamples);
 
   return report;
 }
 
-ValidationReport validateSampleCollection(const SampleCollectionAsset& sampleCollection) {
+ValidationReport validateSamplePool(const SamplePoolAsset& samplePool) {
   ValidationReport report;
 
-  for (const auto& sample : sampleCollection.samples.samples) {
-    if (sample.channels == 0) {
-      report.error("synth.sample.channels", "Synth sample had zero channels", validRange(sample.encodedData));
-    }
-    if (!std::isfinite(sample.attenuationDb)) {
-      report.error("synth.sample.attenuation", "Synth sample attenuation was not finite",
-                   validRange(sample.encodedData));
-    }
-  }
+  validateSamples(report, samplePool.pool);
 
   return report;
 }

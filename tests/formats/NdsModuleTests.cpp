@@ -745,16 +745,16 @@ void ndsSynthModulatorsUseSequenceLfoRanges() {
   };
   ScanResultBuilder out(input, "NDS");
   const auto psg = addNdsPsgSamples(out);
-  std::array<std::optional<ScanSampleCollectionDraft>, 4> waves{};
+  std::array<std::optional<ScanSamplePoolDraft>, 4> waves{};
   waves[0] = psg;
   const auto bankRef = addNdsInstrumentSet(out, input.reader.range(0, bytes.size()), "Bank", psg, waves);
   expect(bankRef.has_value(), "NDS should build a bank for sequence-derived LFO metadata");
 
   const ScanResult result = out.finish();
-  const auto* bank = assetWithId<InstrumentSetAsset>(result, bankRef->id());
+  const auto* bank = assetWithId<SoundBankAsset>(result, bankRef->id());
   expect(bank != nullptr && bank->instruments.size() == 1,
          "NDS should retain every parsed instrument for shared collection preparation");
-  InstrumentSetAsset preparedBank = *bank;
+  SoundBankAsset preparedBank = *bank;
   applySequenceModulation(preparedBank, profile);
   const InstrumentModulation& modulation = preparedBank.instruments[0].modulation;
   expect(modulation.vibrato && modulation.tremolo,
@@ -1301,7 +1301,7 @@ void ndsSynthParserConvertsMaximumReleaseRate() {
   };
   ScanResultBuilder out(input, "NDS");
   const auto psg = addNdsPsgSamples(out);
-  std::array<std::optional<ScanSampleCollectionDraft>, 4> waves{};
+  std::array<std::optional<ScanSamplePoolDraft>, 4> waves{};
   waves[0] = psg;
 
   const auto bankRef = addNdsInstrumentSet(out, input.reader.range(0, bytes.size()), "Bank", psg, waves);
@@ -1313,8 +1313,8 @@ void ndsSynthParserConvertsMaximumReleaseRate() {
   expect(malformedBankRef.has_value(), "NDS synth parser should retain an empty malformed bank");
 
   const ScanResult result = out.finish();
-  const auto* bank = assetWithId<InstrumentSetAsset>(result, bankRef->id());
-  const auto* malformedBank = assetWithId<InstrumentSetAsset>(result, malformedBankRef->id());
+  const auto* bank = assetWithId<SoundBankAsset>(result, bankRef->id());
+  const auto* malformedBank = assetWithId<SoundBankAsset>(result, malformedBankRef->id());
   expect(bank != nullptr && bank->instruments.size() == 1 && bank->instruments[0].regions.size() == 1,
          "NDS synth parser should keep a valid instrument with the maximum release rate");
   const Envelope& envelope = bank->instruments[0].regions[0].envelope;
@@ -1322,7 +1322,7 @@ void ndsSynthParserConvertsMaximumReleaseRate() {
   expect(envelope.releaseSeconds && std::isfinite(*envelope.releaseSeconds) &&
              std::abs(*envelope.releaseSeconds - expectedReleaseSeconds) < 0.000001,
          "NDS release 0x7f should convert to one short finite envelope interval");
-  expect(validateInstrumentSet(*bank).empty(), "NDS maximum release rate should pass synth validation");
+  expect(validateSoundBank(*bank).empty(), "NDS maximum release rate should pass synth validation");
   expect(malformedBank != nullptr && malformedBank->instruments.empty(),
          "NDS synth parser should skip regions with malformed envelope-rate bytes");
 
@@ -1389,11 +1389,11 @@ void ndsSynthParserDerivesAdpcmLengthsSafely() {
   expect(malformedLoopRef.has_value(), "NDS parser should retain a SWAR containing an invalid loop");
 
   const ScanResult result = out.finish();
-  const auto* wave = assetWithId<SampleCollectionAsset>(result, waveRef->id());
-  const auto* malformedLoop = assetWithId<SampleCollectionAsset>(result, malformedLoopRef->id());
-  expect(wave != nullptr && wave->samples.samples.size() == 1,
+  const auto* wave = assetWithId<SamplePoolAsset>(result, waveRef->id());
+  const auto* malformedLoop = assetWithId<SamplePoolAsset>(result, malformedLoopRef->id());
+  expect(wave != nullptr && wave->pool.samples.size() == 1,
          "NDS parser should keep non-looping ADPCM with loop offset zero");
-  const Sample& sample = wave->samples.samples[0];
+  const Sample& sample = wave->pool.samples[0];
   expect(sample.encodedData.offset == 0x50 && sample.encodedData.size == 4,
          "NDS ADPCM encoded data should skip the predictor header");
   expect(!sample.loop.enabled && sample.loop.start == 0 && sample.loop.length == 9,
@@ -1410,7 +1410,7 @@ void ndsSynthParserDerivesAdpcmLengthsSafely() {
   expect(sampleHeader != nullptr && sampleHeader->range.offset == 0x40 && sampleHeader->range.size == 0x0c,
          "NDS SWAR parser should annotate parsed sample headers");
 
-  expect(malformedLoop != nullptr && malformedLoop->samples.samples.empty(),
+  expect(malformedLoop != nullptr && malformedLoop->pool.samples.empty(),
          "NDS parser should skip looped ADPCM with an unusable loop offset instead of underflowing");
 }
 
@@ -1439,8 +1439,8 @@ void ndsWaveArchiveReportsTruncatedSampleHeaders() {
   expect(waveRef.has_value(), "NDS parser should retain a SWAR with truncated samples");
 
   const ScanResult result = out.finish();
-  const auto* wave = assetWithId<SampleCollectionAsset>(result, waveRef->id());
-  expect(wave != nullptr && wave->samples.samples.empty(), "NDS parser should skip truncated SWAR sample headers");
+  const auto* wave = assetWithId<SamplePoolAsset>(result, waveRef->id());
+  expect(wave != nullptr && wave->pool.samples.empty(), "NDS parser should skip truncated SWAR sample headers");
   expect(!result.diagnostics.empty(), "NDS parser should diagnose truncated SWAR sample headers");
   expect(result.diagnostics[0].message.find("SWAR sample header") != std::string::npos,
          "NDS SWAR diagnostic should name the truncated field");
@@ -1508,16 +1508,16 @@ void ndsSynthBuilderPreservesSparseWaveIndexesAcrossArchives() {
   expect(!firstWave->find(1) && laterFirstWaveSample && laterFirstWaveSample->index == 1,
          "a skipped SWAR entry must not shift the lookup for a later source sample index");
 
-  std::array<std::optional<ScanSampleCollectionDraft>, 4> waves{};
+  std::array<std::optional<ScanSamplePoolDraft>, 4> waves{};
   waves[0] = *firstWave;
   waves[2] = *secondWave;
   const auto bankRef = addNdsInstrumentSet(out, input.reader.range(0x200, 0x100), "Sparse Bank", psg, waves);
   expect(bankRef.has_value(), "NDS builder fixture should create its instrument bank");
   const ScanResult result = out.finish();
 
-  const auto* firstSamples = assetWithId<SampleCollectionAsset>(result, firstWave->id());
-  const auto* bank = assetWithId<InstrumentSetAsset>(result, bankRef->id());
-  expect(firstSamples != nullptr && firstSamples->samples.samples.size() == 2,
+  const auto* firstSamples = assetWithId<SamplePoolAsset>(result, firstWave->id());
+  const auto* bank = assetWithId<SoundBankAsset>(result, bankRef->id());
+  expect(firstSamples != nullptr && firstSamples->pool.samples.size() == 2,
          "NDS builder should retain the two valid samples around a malformed SWAR entry");
   expect(bank != nullptr && bank->instruments.size() == 2,
          "sparse SBNK programs should become two dense instruments without losing their program addresses");
@@ -1527,11 +1527,11 @@ void ndsSynthBuilderPreservesSparseWaveIndexesAcrossArchives() {
                              }),
          "an SBNK reference to a rejected SWAR entry should produce an understandable warning");
   expect(bank->instruments[0].explicitAddress == InstrumentAddress{.bank = 0, .program = 2} &&
-             bank->instruments[0].regions[0].sample.collection == firstWave->id() &&
+             bank->instruments[0].regions[0].sample.externalPool == firstWave->id() &&
              bank->instruments[0].regions[0].sample.index == 1,
          "SBNK program 2 should resolve source sample 2 to its actual dense sample index");
   expect(bank->instruments[1].explicitAddress == InstrumentAddress{.bank = 0, .program = 4} &&
-             bank->instruments[1].regions[0].sample.collection == secondWave->id() &&
+             bank->instruments[1].regions[0].sample.externalPool == secondWave->id() &&
              bank->instruments[1].regions[0].sample.index == 0,
          "an SBNK should resolve a region through any of its four independent SWAR slots");
 

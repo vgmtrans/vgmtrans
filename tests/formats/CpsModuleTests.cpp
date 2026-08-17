@@ -480,8 +480,8 @@ std::vector<const AssetType*> assets(const ScanResult& result) {
   return found;
 }
 
-const InstrumentSetAsset* instrumentDomain(const ScanResult& result, std::string_view domain) {
-  for (const auto* set : assets<InstrumentSetAsset>(result)) {
+const SoundBankAsset* instrumentDomain(const ScanResult& result, std::string_view domain) {
+  for (const auto* set : assets<SoundBankAsset>(result)) {
     if (!set->instruments.empty() && set->instruments.front().identity &&
         set->instruments.front().identity->domain == domain) {
       return set;
@@ -583,22 +583,20 @@ void cps1ModuleRetainsYm2151AndOkiDomains() {
   const auto fixture = cps1Fixture();
   const auto result = scan(fixture);
   expect(result.diagnostics.empty(), "complete CPS1 fixture should scan without diagnostics");
-  expect(result.assets.size() == 5 && result.explicitCollections.size() == 1 &&
+  expect(result.assets.size() == 4 && result.explicitCollections.size() == 1 &&
              result.explicitCollections[0].members.miscAssets.size() == 1 &&
              assets<MiscAsset>(result).front()->metadata.range.offset == 0x106,
          "CPS1 should publish and collect its sequence table alongside sequence, synth, and sample assets");
 
   const auto* ym = instrumentDomain(result, kCps1Ym2151Domain);
   const auto* oki = instrumentDomain(result, kCps1OkiDomain);
-  const auto sampleSets = assets<SampleCollectionAsset>(result);
   expect(ym != nullptr && ym->instruments.size() == 1 && oki != nullptr && oki->instruments.size() == 1,
          "CPS1 should keep FM and sample playback as separate instrument identity domains");
-  expect(sampleSets.size() == 1 && sampleSets[0]->samples.samples.size() == 127 &&
-             sampleSets[0]->samples.samples[0].codec == AudioCodec::OkiAdpcm &&
-             sampleSets[0]->samples.samples[0].encodedData.offset == 0x2400,
+  expect(oki->localSamples.samples.size() == 127 && oki->localSamples.samples[0].codec == AudioCodec::OkiAdpcm &&
+             oki->localSamples.samples[0].encodedData.offset == 0x2400,
          "CPS1 OKI directory addresses should resolve relative to the sample ROM segment");
-  const auto decodedOki = decodeSample(sampleSets[0]->samples.samples[0], fixture.bytes);
-  const auto decodedEmpty = decodeSample(sampleSets[0]->samples.samples[1], fixture.bytes);
+  const auto decodedOki = decodeSample(oki->localSamples.samples[0], fixture.bytes);
+  const auto decodedEmpty = decodeSample(oki->localSamples.samples[1], fixture.bytes);
   expect(decodedOki && decodedOki->sampleRate == 7576 && decodedOki->pcm.size() == 32 &&
              std::ranges::any_of(decodedOki->pcm, [](s16 frame) { return frame != 0; }) && decodedEmpty &&
              decodedEmpty->pcm.size() == 8 &&
@@ -735,8 +733,7 @@ void cps2ShortEnvelopeIncludesItsCompletionTick() {
   const auto result = scan(fixture);
   expect(result.diagnostics.empty(), "Vampire Savior envelope fixture should scan without diagnostics");
   const auto* instruments = instrumentDomain(result, kCpsQSoundDomain);
-  expect(instruments != nullptr && !instruments->instruments.empty() &&
-             !instruments->instruments[0].regions.empty(),
+  expect(instruments != nullptr && !instruments->instruments.empty() && !instruments->instruments[0].regions.empty(),
          "Vampire Savior envelope fixture should produce its QSound region");
 
   const Envelope& native = instruments->instruments[0].regions[0].envelope;
@@ -744,9 +741,8 @@ void cps2ShortEnvelopeIncludesItsCompletionTick() {
   constexpr double expectedSeconds = 0.6906696619169267;
   expect(native.decaySeconds && native.secondDecaySeconds &&
              std::abs(*native.decaySeconds - expectedSeconds) < 0.000001 &&
-             std::abs(*native.secondDecaySeconds - expectedSeconds) < 0.000001 &&
-             exported.decaySeconds && std::abs(*exported.decaySeconds - expectedSeconds) < 0.000001 &&
-             exported.sustainAmplitude == 0.0,
+             std::abs(*native.secondDecaySeconds - expectedSeconds) < 0.000001 && exported.decaySeconds &&
+             std::abs(*exported.decaySeconds - expectedSeconds) < 0.000001 && exported.sustainAmplitude == 0.0,
          "short QSound decays should retain the final driver update through ADSR export");
 }
 

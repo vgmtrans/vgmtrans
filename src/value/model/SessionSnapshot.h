@@ -35,7 +35,7 @@ struct MiscAsset {
   std::vector<u8> payload;
 };
 
-using Asset = std::variant<SequenceProgramAsset, InstrumentSetAsset, SampleCollectionAsset, MiscAsset>;
+using Asset = std::variant<SequenceProgramAsset, SoundBankAsset, SamplePoolAsset, MiscAsset>;
 
 struct Collection {
   CollectionId id;
@@ -47,7 +47,7 @@ struct Collection {
   // behavior from a registry.
   CollectionBinder binder;
   // Collections are the export units. A sequence may be paired with instrument
-  // sets and sample collections loaded from the same or separate sources.
+  // banks and sample pools loaded from the same or separate sources.
   CollectionMembers members;
   std::vector<CollectionIssue> issues;
 

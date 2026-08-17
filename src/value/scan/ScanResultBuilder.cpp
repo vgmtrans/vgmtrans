@@ -26,16 +26,17 @@ struct PendingSequence {
   std::optional<SequenceProgram> program;
 };
 
-struct PendingInstrumentSet {
+struct PendingSoundBank {
   AssetId id;
   std::string name;
   InstrumentSetBuilder instruments;
+  SamplePoolBuilder samples;
 };
 
-struct PendingSampleCollection {
+struct PendingSamplePool {
   AssetId id;
   std::string name;
-  SampleCollectionBuilder samples;
+  SamplePoolBuilder samples;
 };
 
 struct PendingMisc {
@@ -48,7 +49,7 @@ struct PendingMisc {
 }  // namespace
 
 struct ScanResultBuilder::DraftSlot {
-  using Value = std::variant<PendingSequence, PendingInstrumentSet, PendingSampleCollection, PendingMisc>;
+  using Value = std::variant<PendingSequence, PendingSoundBank, PendingSamplePool, PendingMisc>;
 
   explicit DraftSlot(Value value) : value(std::move(value)) {}
 
@@ -70,121 +71,129 @@ ScanSequenceDraft& ScanSequenceDraft::program(SequenceProgram program) {
   return *this;
 }
 
-ScanInstrumentSetDraft::ScanInstrumentSetDraft(ScanResultBuilder& out, size_t slot, AssetId id)
+ScanSoundBankDraft::ScanSoundBankDraft(ScanResultBuilder& out, size_t slot, AssetId id)
     : out_(&out), slot_(slot), id_(id) {
 }
 
-InstrumentSetBuilder::Entry ScanInstrumentSetDraft::append(Instrument instrument) {
+InstrumentSetBuilder::Entry ScanSoundBankDraft::append(Instrument instrument) {
   return builder().append(std::move(instrument));
 }
 
-InstrumentSetBuilder::Entry ScanInstrumentSetDraft::add(u64 groupingKey, Instrument instrument) {
+InstrumentSetBuilder::Entry ScanSoundBankDraft::add(u64 groupingKey, Instrument instrument) {
   return builder().add(groupingKey, std::move(instrument));
 }
 
-InstrumentSetBuilder::Entry ScanInstrumentSetDraft::getOrAdd(u64 groupingKey, Instrument initialValue) {
+InstrumentSetBuilder::Entry ScanSoundBankDraft::getOrAdd(u64 groupingKey, Instrument initialValue) {
   return builder().getOrAdd(groupingKey, std::move(initialValue));
 }
 
-std::optional<InstrumentSetBuilder::Entry> ScanInstrumentSetDraft::find(u64 groupingKey) {
+std::optional<InstrumentSetBuilder::Entry> ScanSoundBankDraft::find(u64 groupingKey) {
   return builder().find(groupingKey);
 }
 
-AnnotationBuilder ScanInstrumentSetDraft::source(SourceRole role, std::string_view label, SourceRange range,
-                                                 std::string_view kind) {
+AnnotationBuilder ScanSoundBankDraft::source(SourceRole role, std::string_view label, SourceRange range,
+                                             std::string_view kind) {
   return builder().source(role, label, range, kind);
 }
 
-AnnotationBuilder ScanInstrumentSetDraft::source(SourceRole role, std::string_view label, const SourceRecord& record,
-                                                 std::string_view kind) {
+AnnotationBuilder ScanSoundBankDraft::source(SourceRole role, std::string_view label, const SourceRecord& record,
+                                             std::string_view kind) {
   return builder().source(role, label, record, kind);
 }
 
-ScanInstrumentSetDraft& ScanInstrumentSetDraft::include(SourceRange range) {
+ScanSoundBankDraft& ScanSoundBankDraft::include(SourceRange range) {
   builder().include(range);
   return *this;
 }
 
-SourceRange ScanInstrumentSetDraft::range() const noexcept {
+SourceRange ScanSoundBankDraft::range() const noexcept {
   return out_->instrumentDraft(slot_).range();
 }
 
-bool ScanInstrumentSetDraft::empty() const noexcept {
+bool ScanSoundBankDraft::empty() const noexcept {
   return out_->instrumentDraft(slot_).empty();
 }
 
-size_t ScanInstrumentSetDraft::size() const noexcept {
+size_t ScanSoundBankDraft::size() const noexcept {
   return out_->instrumentDraft(slot_).size();
 }
 
-void ScanInstrumentSetDraft::warning(std::string message, SourceRange range) {
+void ScanSoundBankDraft::warning(std::string message, SourceRange range) {
   builder().warning(std::move(message), range);
 }
 
-void ScanInstrumentSetDraft::error(std::string message, SourceRange range) {
+void ScanSoundBankDraft::error(std::string message, SourceRange range) {
   builder().error(std::move(message), range);
 }
 
-InstrumentSetBuilder& ScanInstrumentSetDraft::builder() {
+InstrumentSetBuilder& ScanSoundBankDraft::builder() {
   return out_->instrumentDraft(slot_);
 }
 
-ScanSampleCollectionDraft::ScanSampleCollectionDraft(ScanResultBuilder& out, size_t slot, AssetId id)
+SamplePoolBuilder& ScanSoundBankDraft::samples() {
+  return out_->localSampleDraft(slot_);
+}
+
+const SamplePoolBuilder& ScanSoundBankDraft::samples() const {
+  return out_->localSampleDraft(slot_);
+}
+
+ScanSamplePoolDraft::ScanSamplePoolDraft(ScanResultBuilder& out, size_t slot, AssetId id)
     : out_(&out), slot_(slot), id_(id) {
 }
 
-SampleCollectionBuilder::Entry ScanSampleCollectionDraft::add(u64 sourceKey, Sample sample) {
+SamplePoolBuilder::Entry ScanSamplePoolDraft::add(u64 sourceKey, Sample sample) {
   return builder().add(sourceKey, std::move(sample));
 }
 
-SampleCollectionBuilder::Entry ScanSampleCollectionDraft::alias(u64 aliasKey, u64 existingKey) {
+SamplePoolBuilder::Entry ScanSamplePoolDraft::alias(u64 aliasKey, u64 existingKey) {
   return builder().alias(aliasKey, existingKey);
 }
 
-std::optional<SampleRef> ScanSampleCollectionDraft::find(u64 sourceKey) const {
+std::optional<SampleRef> ScanSamplePoolDraft::find(u64 sourceKey) const {
   return builder().find(sourceKey);
 }
 
-AnnotationBuilder ScanSampleCollectionDraft::source(SourceRole role, std::string_view label, SourceRange range,
-                                                    std::string_view kind) {
+AnnotationBuilder ScanSamplePoolDraft::source(SourceRole role, std::string_view label, SourceRange range,
+                                              std::string_view kind) {
   return builder().source(role, label, range, kind);
 }
 
-AnnotationBuilder ScanSampleCollectionDraft::source(SourceRole role, std::string_view label, const SourceRecord& record,
-                                                    std::string_view kind) {
+AnnotationBuilder ScanSamplePoolDraft::source(SourceRole role, std::string_view label, const SourceRecord& record,
+                                              std::string_view kind) {
   return builder().source(role, label, record, kind);
 }
 
-ScanSampleCollectionDraft& ScanSampleCollectionDraft::include(SourceRange range) {
+ScanSamplePoolDraft& ScanSamplePoolDraft::include(SourceRange range) {
   builder().include(range);
   return *this;
 }
 
-SourceRange ScanSampleCollectionDraft::range() const noexcept {
+SourceRange ScanSamplePoolDraft::range() const noexcept {
   return builder().range();
 }
 
-bool ScanSampleCollectionDraft::empty() const noexcept {
+bool ScanSamplePoolDraft::empty() const noexcept {
   return builder().empty();
 }
 
-size_t ScanSampleCollectionDraft::size() const noexcept {
+size_t ScanSamplePoolDraft::size() const noexcept {
   return builder().size();
 }
 
-void ScanSampleCollectionDraft::warning(std::string message, SourceRange range) {
+void ScanSamplePoolDraft::warning(std::string message, SourceRange range) {
   builder().warning(std::move(message), range);
 }
 
-void ScanSampleCollectionDraft::error(std::string message, SourceRange range) {
+void ScanSamplePoolDraft::error(std::string message, SourceRange range) {
   builder().error(std::move(message), range);
 }
 
-SampleCollectionBuilder& ScanSampleCollectionDraft::builder() {
+SamplePoolBuilder& ScanSamplePoolDraft::builder() {
   return out_->sampleDraft(slot_);
 }
 
-const SampleCollectionBuilder& ScanSampleCollectionDraft::builder() const {
+const SamplePoolBuilder& ScanSamplePoolDraft::builder() const {
   return out_->sampleDraft(slot_);
 }
 
@@ -209,24 +218,24 @@ ScanCollectionBuilder& ScanCollectionBuilder::sequence(const ScanSequenceDraft& 
   return sequence(asset.ref());
 }
 
-ScanCollectionBuilder& ScanCollectionBuilder::instrumentSet(ScanInstrumentSetRef asset) {
-  out_.validateDraftReference(asset.id, ScanResultBuilder::DraftRole::InstrumentSet);
-  out_.explicitCollection(index_).members.instrumentSets.push_back(asset.id);
+ScanCollectionBuilder& ScanCollectionBuilder::soundBank(ScanSoundBankRef asset) {
+  out_.validateDraftReference(asset.id, ScanResultBuilder::DraftRole::SoundBank);
+  out_.explicitCollection(index_).members.soundBanks.push_back(asset.id);
   return *this;
 }
 
-ScanCollectionBuilder& ScanCollectionBuilder::instrumentSet(const ScanInstrumentSetDraft& asset) {
-  return instrumentSet(asset.ref());
+ScanCollectionBuilder& ScanCollectionBuilder::soundBank(const ScanSoundBankDraft& asset) {
+  return soundBank(asset.ref());
 }
 
-ScanCollectionBuilder& ScanCollectionBuilder::samples(ScanSampleCollectionRef asset) {
-  out_.validateDraftReference(asset.id, ScanResultBuilder::DraftRole::SampleCollection);
-  out_.explicitCollection(index_).members.sampleCollections.push_back(asset.id);
+ScanCollectionBuilder& ScanCollectionBuilder::samplePool(ScanSamplePoolRef asset) {
+  out_.validateDraftReference(asset.id, ScanResultBuilder::DraftRole::SamplePool);
+  out_.explicitCollection(index_).members.samplePools.push_back(asset.id);
   return *this;
 }
 
-ScanCollectionBuilder& ScanCollectionBuilder::samples(const ScanSampleCollectionDraft& asset) {
-  return samples(asset.ref());
+ScanCollectionBuilder& ScanCollectionBuilder::samplePool(const ScanSamplePoolDraft& asset) {
+  return samplePool(asset.ref());
 }
 
 ScanCollectionBuilder& ScanCollectionBuilder::misc(ScanMiscAssetRef asset) {
@@ -271,30 +280,31 @@ ScanSequenceDraft ScanResultBuilder::sequence(std::string name, SourceRange rang
   return ScanSequenceDraft(*this, slot, id);
 }
 
-ScanInstrumentSetDraft ScanResultBuilder::instrumentSet(std::string name, SourceRange range) {
+ScanSoundBankDraft ScanResultBuilder::soundBank(std::string name, SourceRange range) {
   const AssetId id = input_.ids.nextAssetId();
   const size_t slot = drafts_.size();
-  drafts_.push_back(std::make_unique<DraftSlot>(PendingInstrumentSet{
+  drafts_.push_back(std::make_unique<DraftSlot>(PendingSoundBank{
       .id = id,
       .name = std::move(name),
       .instruments = InstrumentSetBuilder{id, &sourceMap_, &result_.diagnostics},
+      .samples = SamplePoolBuilder::local(id, &sourceMap_, &result_.diagnostics),
   }));
-  ScanInstrumentSetDraft draft(*this, slot, id);
+  ScanSoundBankDraft draft(*this, slot, id);
   if (range.valid()) {
     draft.include(range);
   }
   return draft;
 }
 
-ScanSampleCollectionDraft ScanResultBuilder::sampleCollection(std::string name, SourceRange range) {
+ScanSamplePoolDraft ScanResultBuilder::samplePool(std::string name, SourceRange range) {
   const AssetId id = input_.ids.nextAssetId();
   const size_t slot = drafts_.size();
-  drafts_.push_back(std::make_unique<DraftSlot>(PendingSampleCollection{
+  drafts_.push_back(std::make_unique<DraftSlot>(PendingSamplePool{
       .id = id,
       .name = std::move(name),
-      .samples = SampleCollectionBuilder{id, &sourceMap_, &result_.diagnostics},
+      .samples = SamplePoolBuilder{id, &sourceMap_, &result_.diagnostics},
   }));
-  ScanSampleCollectionDraft draft(*this, slot, id);
+  ScanSamplePoolDraft draft(*this, slot, id);
   if (range.valid()) {
     draft.include(range);
   }
@@ -393,18 +403,21 @@ ScanResult ScanResultBuilder::finish() {
                 .program = std::move(*pending.program),
                 .privateData = std::move(privateData),
             };
-          } else if constexpr (std::is_same_v<Pending, PendingInstrumentSet>) {
-            auto built = std::move(pending.instruments).finish();
-            return InstrumentSetAsset{
-                .metadata = metadata(pending.id, std::move(pending.name), built.range),
-                .instruments = std::move(built.values),
+          } else if constexpr (std::is_same_v<Pending, PendingSoundBank>) {
+            auto instruments = std::move(pending.instruments).finish();
+            auto samples = std::move(pending.samples).finish();
+            const SourceRange primaryRange = instruments.range.valid() ? instruments.range : samples.range;
+            return SoundBankAsset{
+                .metadata = metadata(pending.id, std::move(pending.name), primaryRange),
+                .instruments = std::move(instruments.values),
+                .localSamples = std::move(samples.value),
                 .privateData = std::move(privateData),
             };
-          } else if constexpr (std::is_same_v<Pending, PendingSampleCollection>) {
+          } else if constexpr (std::is_same_v<Pending, PendingSamplePool>) {
             auto built = std::move(pending.samples).finish();
-            return SampleCollectionAsset{
+            return SamplePoolAsset{
                 .metadata = metadata(pending.id, std::move(pending.name), built.range),
-                .samples = std::move(built.value),
+                .pool = std::move(built.value),
                 .privateData = std::move(privateData),
             };
           } else {
@@ -454,10 +467,10 @@ std::string ScanResultBuilder::roleName(DraftRole role) {
   switch (role) {
     case DraftRole::Sequence:
       return "sequence";
-    case DraftRole::InstrumentSet:
-      return "instrument-set";
-    case DraftRole::SampleCollection:
-      return "sample-collection";
+    case DraftRole::SoundBank:
+      return "sound-bank";
+    case DraftRole::SamplePool:
+      return "sample-pool";
     case DraftRole::Misc:
       return "misc";
   }
@@ -475,10 +488,10 @@ void ScanResultBuilder::validateDraftReference(AssetId id, DraftRole role) const
           using Pending = std::decay_t<decltype(pending)>;
           if constexpr (std::is_same_v<Pending, PendingSequence>) {
             return DraftRole::Sequence;
-          } else if constexpr (std::is_same_v<Pending, PendingInstrumentSet>) {
-            return DraftRole::InstrumentSet;
-          } else if constexpr (std::is_same_v<Pending, PendingSampleCollection>) {
-            return DraftRole::SampleCollection;
+          } else if constexpr (std::is_same_v<Pending, PendingSoundBank>) {
+            return DraftRole::SoundBank;
+          } else if constexpr (std::is_same_v<Pending, PendingSamplePool>) {
+            return DraftRole::SamplePool;
           } else {
             return DraftRole::Misc;
           }
@@ -514,19 +527,27 @@ void ScanResultBuilder::setMiscPayload(size_t slot, std::vector<u8> payload) {
 }
 
 InstrumentSetBuilder& ScanResultBuilder::instrumentDraft(size_t slot) {
-  return std::get<PendingInstrumentSet>(drafts_.at(slot)->value).instruments;
+  return std::get<PendingSoundBank>(drafts_.at(slot)->value).instruments;
 }
 
 const InstrumentSetBuilder& ScanResultBuilder::instrumentDraft(size_t slot) const {
-  return std::get<PendingInstrumentSet>(drafts_.at(slot)->value).instruments;
+  return std::get<PendingSoundBank>(drafts_.at(slot)->value).instruments;
 }
 
-SampleCollectionBuilder& ScanResultBuilder::sampleDraft(size_t slot) {
-  return std::get<PendingSampleCollection>(drafts_.at(slot)->value).samples;
+SamplePoolBuilder& ScanResultBuilder::localSampleDraft(size_t slot) {
+  return std::get<PendingSoundBank>(drafts_.at(slot)->value).samples;
 }
 
-const SampleCollectionBuilder& ScanResultBuilder::sampleDraft(size_t slot) const {
-  return std::get<PendingSampleCollection>(drafts_.at(slot)->value).samples;
+const SamplePoolBuilder& ScanResultBuilder::localSampleDraft(size_t slot) const {
+  return std::get<PendingSoundBank>(drafts_.at(slot)->value).samples;
+}
+
+SamplePoolBuilder& ScanResultBuilder::sampleDraft(size_t slot) {
+  return std::get<PendingSamplePool>(drafts_.at(slot)->value).samples;
+}
+
+const SamplePoolBuilder& ScanResultBuilder::sampleDraft(size_t slot) const {
+  return std::get<PendingSamplePool>(drafts_.at(slot)->value).samples;
 }
 
 }  // namespace vgmtrans::core

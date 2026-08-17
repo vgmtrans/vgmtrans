@@ -43,7 +43,7 @@ namespace {
 
     auto collection = result.collection(sourceSequence.name, collectionKey(input.source.id, sourceSequence.index));
     collection.sequence(sequence);
-    collection.instrumentSet(synth.instruments).samples(synth.samples);
+    collection.soundBank(synth);
   }
 
   return result.finish();

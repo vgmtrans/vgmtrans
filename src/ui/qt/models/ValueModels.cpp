@@ -31,25 +31,24 @@ const QIcon& collectionIcon() {
 }
 
 const QIcon& playingCollectionIcon() {
-  static const QIcon icon(new TintableSvgIconEngine(
-      QStringLiteral(":/icons/play.svg"), UIColors::PlayingIconColor));
+  static const QIcon icon(new TintableSvgIconEngine(QStringLiteral(":/icons/play.svg"), UIColors::PlayingIconColor));
   return icon;
 }
 
 const QIcon& assetIcon(const core::Asset& asset) {
   static const QIcon sequence(QStringLiteral(":/icons/sequence.svg"));
-  static const QIcon instrumentSet(QStringLiteral(":/icons/instrument-set.svg"));
-  static const QIcon sampleCollection(QStringLiteral(":/icons/sample-collection.svg"));
+  static const QIcon soundBank(QStringLiteral(":/icons/instrument-set.svg"));
+  static const QIcon samplePool(QStringLiteral(":/icons/sample-collection.svg"));
   static const QIcon miscellaneous(QStringLiteral(":/icons/binary.svg"));
 
   if (std::holds_alternative<core::SequenceProgramAsset>(asset)) {
     return sequence;
   }
-  if (std::holds_alternative<core::InstrumentSetAsset>(asset)) {
-    return instrumentSet;
+  if (std::holds_alternative<core::SoundBankAsset>(asset)) {
+    return soundBank;
   }
-  if (std::holds_alternative<core::SampleCollectionAsset>(asset)) {
-    return sampleCollection;
+  if (std::holds_alternative<core::SamplePoolAsset>(asset)) {
+    return samplePool;
   }
   return miscellaneous;
 }
@@ -255,8 +254,7 @@ QVariant CollectionTableModel::data(const QModelIndex& index, int role) const {
     return collection.id.value;
   }
   if (role == Qt::DecorationRole) {
-    return playingCollection_ == collection.id ? playingCollectionIcon()
-                                               : collectionIcon();
+    return playingCollection_ == collection.id ? playingCollectionIcon() : collectionIcon();
   }
   if (role == Qt::DisplayRole || role == Qt::EditRole) {
     return QString::fromStdString(collection.name);
@@ -271,15 +269,13 @@ QVariant CollectionTableModel::headerData(int section, Qt::Orientation orientati
   return horizontalHeader(section, role, std::array{"Name"});
 }
 
-CollectionFilterProxyModel::CollectionFilterProxyModel(
-    WorkspaceController& workspace, QObject* parent)
+CollectionFilterProxyModel::CollectionFilterProxyModel(WorkspaceController& workspace, QObject* parent)
     : QSortFilterProxyModel(parent), workspace_(workspace) {
   setFilterCaseSensitivity(Qt::CaseInsensitive);
   setFilterKeyColumn(0);
 }
 
-bool CollectionFilterProxyModel::filterAcceptsRow(
-    int sourceRow, const QModelIndex& sourceParent) const {
+bool CollectionFilterProxyModel::filterAcceptsRow(int sourceRow, const QModelIndex& sourceParent) const {
   if (filterRegularExpression().pattern().isEmpty()) {
     return true;
   }
@@ -295,9 +291,7 @@ bool CollectionFilterProxyModel::filterAcceptsRow(
   }
   const auto* sequence = workspace_.snapshot().asset(*collection->members.sequence);
   return sequence != nullptr &&
-      filterRegularExpression()
-          .match(QString::fromStdString(core::metadata(*sequence).name))
-          .hasMatch();
+         filterRegularExpression().match(QString::fromStdString(core::metadata(*sequence).name)).hasMatch();
 }
 
 CollectionContentsModel::CollectionContentsModel(WorkspaceController& workspace, QObject* parent)
@@ -410,11 +404,11 @@ void CollectionContentsModel::rebuild() {
   for (const auto id : collection->members.miscAssets) {
     entries_.push_back({QStringLiteral("Miscellaneous"), id});
   }
-  for (const auto id : collection->members.instrumentSets) {
-    entries_.push_back({QStringLiteral("Instrument set"), id});
+  for (const auto id : collection->members.soundBanks) {
+    entries_.push_back({QStringLiteral("Sound bank"), id});
   }
-  for (const auto id : collection->members.sampleCollections) {
-    entries_.push_back({QStringLiteral("Sample collection"), id});
+  for (const auto id : collection->members.samplePools) {
+    entries_.push_back({QStringLiteral("Sample pool"), id});
   }
   if (collection->members.sequence) {
     entries_.push_back({QStringLiteral("Sequence"), *collection->members.sequence});

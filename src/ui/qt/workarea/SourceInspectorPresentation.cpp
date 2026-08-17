@@ -193,12 +193,12 @@ QString iconPath(const SourceAnnotation& annotation) {
     case SourceRole::Sequence:
     case SourceRole::SequenceTrack:
       return QStringLiteral(":/icons/sequence.svg");
-    case SourceRole::InstrumentSet:
+    case SourceRole::SoundBank:
       return QStringLiteral(":/icons/instrument-set.svg");
     case SourceRole::Instrument:
     case SourceRole::Region:
       return QStringLiteral(":/icons/instr.svg");
-    case SourceRole::SampleCollection:
+    case SourceRole::SamplePool:
     case SourceRole::Sample:
       return QStringLiteral(":/icons/sample-collection.svg");
     default:
@@ -285,8 +285,7 @@ CapsuleText description(const SourceAnnotation& annotation) {
       if (annotation.role == SourceRole::Command && field.name == "opcode") {
         continue;
       }
-      text.capsules.push_back(
-          QStringLiteral("%1: %2").arg(fieldName(field.name), valueText(field)));
+      text.capsules.push_back(QStringLiteral("%1: %2").arg(fieldName(field.name), valueText(field)));
     }
   }
   return text;

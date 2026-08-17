@@ -22,7 +22,7 @@ struct SequenceModulationProfile;
 [[nodiscard]] MidiSequence renderMidiSequence(
     const PerformanceSequence& performance, MidiExportOptions options = {},
     ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators,
-    std::span<const InstrumentSetAsset* const> instrumentSets = {},
+    std::span<const SoundBankAsset* const> soundBanks = {},
     const SequenceModulationProfile* modulationProfile = nullptr);
 
 }  // namespace vgmtrans::core

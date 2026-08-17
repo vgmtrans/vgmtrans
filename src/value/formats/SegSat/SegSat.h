@@ -105,11 +105,6 @@ struct SegSatSequenceLayout {
   std::vector<u8> referencedBanks;
 };
 
-struct SegSatScannedBank {
-  core::ScanInstrumentSetRef instruments;
-  core::ScanSampleCollectionRef samples;
-};
-
 struct SegSatVelocityRegion {
   u8 keyLow = 0;
   u8 keyHigh = 127;
@@ -169,10 +164,10 @@ struct SegSatRuntimeConfig {
 [[nodiscard]] std::vector<SegSatSequenceLayout> findSegSatSequences(core::ByteReader reader);
 [[nodiscard]] SegSatDriverVersion determineSegSatDriverVersion(core::ByteReader reader);
 [[nodiscard]] SegSatVolumeModel determineSegSatVolumeModel(core::ByteReader reader);
-[[nodiscard]] std::optional<SegSatScannedBank> addSegSatBank(core::ScanResultBuilder& builder,
-                                                             const SegSatBankLayout& layout,
-                                                             SegSatDriverVersion version, SegSatVolumeModel volumeModel,
-                                                             u8 exportBank);
+[[nodiscard]] std::optional<core::ScanSoundBankRef> addSegSatBank(core::ScanResultBuilder& builder,
+                                                                  const SegSatBankLayout& layout,
+                                                                  SegSatDriverVersion version,
+                                                                  SegSatVolumeModel volumeModel, u8 exportBank);
 [[nodiscard]] SegSatVelocityBank readSegSatVelocityBank(core::ByteReader reader, const SegSatBankLayout& layout,
                                                         u8 sourceBank, SegSatVolumeModel volumeModel);
 void finalizeSegSatPerformance(core::PerformanceSequence& performance, std::span<const SegSatVelocityBank> banks,

@@ -51,9 +51,8 @@ std::vector<const ModulationPerformanceEvent*> modulationEvents(const Performanc
 class DriverFixture {
 public:
   explicit DriverFixture(std::initializer_list<u8> commands) : data_(kAramSize) {
-    write(0x0100,
-          {0x4b, 0x67, 0xf7, 0xb9, 0xd4, 0x73, 0xc4, 0x00, 0xfc, 0xf7, 0xb9, 0xc4, 0x01, 0x60, 0x84, 0xba,
-           0xd4, 0x7d, 0x09, 0x01, 0x00, 0xf0, 0x03, 0x18, 0x80, 0x67, 0xfc, 0x3d, 0xc8, 0x08, 0xd0, 0xe0});
+    write(0x0100, {0x4b, 0x67, 0xf7, 0xb9, 0xd4, 0x73, 0xc4, 0x00, 0xfc, 0xf7, 0xb9, 0xc4, 0x01, 0x60, 0x84, 0xba,
+                   0xd4, 0x7d, 0x09, 0x01, 0x00, 0xf0, 0x03, 0x18, 0x80, 0x67, 0xfc, 0x3d, 0xc8, 0x08, 0xd0, 0xe0});
     write(0x0200, {0xe8, 0x60, 0x8f, 0x5d, 0xf2, 0xc4, 0xf3});
     write(0x0300, {0xcd, 0x00, 0x75, 0x00, 0x30, 0xf0, 0x03, 0x3d, 0x2f, 0xf8, 0x8d, 0x05,
                    0xcf, 0xfd, 0x7d, 0xf8, 0x00, 0xd5, 0x00, 0x00, 0xf6, 0x00, 0x40});
@@ -80,9 +79,7 @@ private:
     data_[offset + 1] = static_cast<u8>(value >> 8);
   }
 
-  void write(u32 offset, std::initializer_list<u8> values) {
-    std::ranges::copy(values, data_.begin() + offset);
-  }
+  void write(u32 offset, std::initializer_list<u8> values) { std::ranges::copy(values, data_.begin() + offset); }
 
   std::vector<u8> data_;
 };
@@ -112,10 +109,10 @@ void layoutAndScannerBuildTheCompleteYsVCollection() {
   const SessionSnapshot snapshot = session.snapshot();
   const Collection* collection = snapshot.collections().empty() ? nullptr : &snapshot.collections().front();
   expect(snapshot.collections().size() == 1 && collection->members.sequence &&
-             collection->members.instrumentSets.size() == 1 && collection->members.sampleCollections.size() == 1,
-         "FalcomSnes scanning should publish a sequence, referenced instruments, and BRR samples");
+             collection->members.soundBanks.size() == 1 && collection->members.samplePools.empty(),
+         "FalcomSnes scanning should publish a sequence and self-contained sound bank");
 
-  const auto* set = snapshot.asset<InstrumentSetAsset>(collection->members.instrumentSets.front());
+  const auto* set = snapshot.asset<SoundBankAsset>(collection->members.soundBanks.front());
   const Instrument* instrument = set != nullptr && set->instruments.size() == 1 ? &set->instruments.front() : nullptr;
   const Region* region =
       instrument != nullptr && instrument->regions.size() == 1 ? &instrument->regions.front() : nullptr;
@@ -131,8 +128,8 @@ void noteTimingLegatoAndMixerStateMatchTheDriver() {
       render({0xd2, 0xd8, 3, 0xde, 0x7f, 0xe7, 0x40, 0xdd, 0x80, 0x08, 8, 0x00, 8, 0xfc, 0, 0});
   const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 2 && notes[0]->header.tick == 3 &&
-             std::abs(notes[0]->key - 48.0) < 0.000001 && notes[0]->durationTicks == 8 &&
-             notes[1]->header.tick == 11 && notes[1]->durationTicks == 4 && notes[1]->extendsPrevious,
+             std::abs(notes[0]->key - 48.0) < 0.000001 && notes[0]->durationTicks == 8 && notes[1]->header.tick == 11 &&
+             notes[1]->durationTicks == 4 && notes[1]->extendsPrevious,
          "octave, first-program startup delay, slur ties, and quantized key-off timing should match the SPC700");
 
   const auto levels = events<LevelPerformanceEvent>(performance.tracks.front());
@@ -150,8 +147,8 @@ void noteTimingLegatoAndMixerStateMatchTheDriver() {
 
 void modulationDynamicAdsrAndEchoRemainPhysical() {
   const PerformanceSequence performance = render({
-      0xd8, 3, 0xd9, 1, 65, 64, 0xea, 127, 8, 2, 0xf0, 0, 128, 2, 0xf2, 0x8f, 0xe0,
-      0xf9, 32, 0xe0, 0xf7, 9, 0xc0, 2, 0xf6, 1, 0x00, 8, 0xfc, 0, 0,
+      0xd8, 3,    0xd9, 1,    65,   64, 0xea, 127, 8,    2, 0xf0, 0, 128,  2, 0xf2, 0x8f,
+      0xe0, 0xf9, 32,   0xe0, 0xf7, 9,  0xc0, 2,   0xf6, 1, 0x00, 8, 0xfc, 0, 0,
   });
   const PerformanceTrack& track = performance.tracks.front();
   const auto vibratoDepth = modulationEvents(track, ModulationPerformanceTarget::VibratoDepth);
@@ -159,8 +156,7 @@ void modulationDynamicAdsrAndEchoRemainPhysical() {
   const auto panDepth = modulationEvents(track, ModulationPerformanceTarget::PanDepth);
   const auto panRate = modulationEvents(track, ModulationPerformanceTarget::PanRate);
   expect(performance.diagnostics.empty() && vibratoDepth.size() == 1 && vibratoRate.size() == 1 &&
-             vibratoDepth[0]->pitchDepthSemitones &&
-             std::abs(*vibratoDepth[0]->pitchDepthSemitones - 1.0) < 0.000001 &&
+             vibratoDepth[0]->pitchDepthSemitones && std::abs(*vibratoDepth[0]->pitchDepthSemitones - 1.0) < 0.000001 &&
              vibratoDepth[0]->delayTicks == 2 && vibratoDepth[0]->shape &&
              vibratoDepth[0]->shape->samples.size() == 256 && vibratoRate[0]->cyclesPerTick == 0.25 &&
              panDepth.size() == 1 && panDepth[0]->panDepth == 1.0 && panDepth[0]->shape &&
@@ -169,9 +165,7 @@ void modulationDynamicAdsrAndEchoRemainPhysical() {
 
   const auto envelopes = events<EnvelopePerformanceEvent>(track);
   const auto dynamic = std::ranges::find_if(
-      envelopes, [](const EnvelopePerformanceEvent* event) {
-    return event->update.values.has_value();
-  });
+      envelopes, [](const EnvelopePerformanceEvent* event) { return event->update.values.has_value(); });
   expect(dynamic != envelopes.end() && (*dynamic)->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
              (*dynamic)->update.values->releaseSeconds == snesDspEnvelope(0x8f, 0xe0, 0).releaseSeconds,
          "F2 should immediately replace the active voice ADSR and retain it for future attacks");
@@ -183,15 +177,30 @@ void modulationDynamicAdsrAndEchoRemainPhysical() {
 
   const auto reverbs = events<ReverbPerformanceEvent>(track);
   const ReverbPerformanceEvent* echo = reverbs.empty() ? nullptr : reverbs.back();
-  expect(echo != nullptr && echo->voiceMask == 1 && echo->delayMilliseconds == 112.0 &&
-             echo->feedback == -0.5 && echo->filterIndex == 2 && echo->leftGain == 0.25 &&
-             echo->rightGain == -0.25 && std::abs(echo->send - 32.0 / 127.0) < 0.000001,
+  expect(echo != nullptr && echo->voiceMask == 1 && echo->delayMilliseconds == 112.0 && echo->feedback == -0.5 &&
+             echo->filterIndex == 2 && echo->leftGain == 0.25 && echo->rightGain == -0.25 &&
+             std::abs(echo->send - 32.0 / 127.0) < 0.000001,
          "echo should preserve EON, clamped EDL, signed EFB/EVOL, wet send, and FIR preset identity");
 }
 
 void loopsAndMutableFirPresetsFollowDriverMemory() {
   const PerformanceSequence loop = render({
-      0xed, 2, 0, 0x00, 1, 0xee, 5, 0, 0x00, 1, 0xef, 0xf5, 0xff, 0xfc, 0, 0,
+      0xed,
+      2,
+      0,
+      0x00,
+      1,
+      0xee,
+      5,
+      0,
+      0x00,
+      1,
+      0xef,
+      0xf5,
+      0xff,
+      0xfc,
+      0,
+      0,
   });
   const auto loopNotes = events<NotePerformanceEvent>(loop.tracks.front());
   expect(loop.diagnostics.empty() && loopNotes.size() == 3,

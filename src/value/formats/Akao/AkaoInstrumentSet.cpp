@@ -43,7 +43,7 @@ void applyArticulationToRegion(Region& region, const AkaoArticulationBinding* bi
     return;
   }
   const AkaoArticulation& articulation = binding->articulation;
-  region.sample = SampleRef{.collection = binding->collection.id, .index = binding->sampleIndex};
+  region.sample = SampleRef{.externalPool = binding->collection.id, .index = binding->sampleIndex};
   const double rootKey =
       drum ? articulation.unityKey + region.keyRange.low - drumRelativeUnityKey : articulation.unityKey;
   region.unityKey = rootKey - (articulation.fineTuneCents / 100.0);
@@ -232,7 +232,7 @@ void addSyntheticArticulationInstruments(std::vector<Instrument>& instruments,
     Region region{
         .keyRange = KeyRange{.low = 0, .high = 127},
         .velocityRange = VelocityRange{.low = 0, .high = 127},
-        .sample = SampleRef{.collection = binding.collection.id, .index = binding.sampleIndex},
+        .sample = SampleRef{.externalPool = binding.collection.id, .index = binding.sampleIndex},
         .range = binding.articulation.source.range,
         .unityKey = binding.articulation.unityKey - (binding.articulation.fineTuneCents / 100.0),
         .envelope = psxSpuEnvelope(binding.articulation.adsr1, binding.articulation.adsr2),
@@ -253,8 +253,8 @@ void addSyntheticArticulationInstruments(std::vector<Instrument>& instruments,
   const AkaoProfile profile{.version = sequence.header.version};
   const u32 sequenceEnd = sequence.header.offset + sequence.header.length;
 
-  if (sequence.header.instrumentSetOffset) {
-    const u32 instrSetOffset = *sequence.header.instrumentSetOffset;
+  if (sequence.header.soundBankOffset) {
+    const u32 instrSetOffset = *sequence.header.soundBankOffset;
     for (u32 program = 0; program < 16; ++program) {
       const u64 pointerOffset = static_cast<u64>(instrSetOffset) + program * 2;
       if (pointerOffset + 2 > sequenceEnd || !reader.has(pointerOffset, 2)) {
@@ -329,8 +329,8 @@ void includeSpan(std::optional<SourceRange>& span, SourceRange range) {
   return span;
 }
 
-[[nodiscard]] SourceRange instrumentSetRange(ByteReader reader, const AkaoSequenceAnalysis& sequence,
-                                             const std::vector<Instrument>& instruments) {
+[[nodiscard]] SourceRange soundBankRange(ByteReader reader, const AkaoSequenceAnalysis& sequence,
+                                         const std::vector<Instrument>& instruments) {
   std::optional<SourceRange> span = instrumentSpan(instruments);
   const u64 sequenceEnd = static_cast<u64>(sequence.header.offset) + sequence.header.length;
   const auto includeAnchor = [&](u32 offset) {
@@ -339,8 +339,8 @@ void includeSpan(std::optional<SourceRange>& span, SourceRange range) {
     }
   };
 
-  if (sequence.header.instrumentSetOffset) {
-    const u32 offset = *sequence.header.instrumentSetOffset;
+  if (sequence.header.soundBankOffset) {
+    const u32 offset = *sequence.header.soundBankOffset;
     if (offset < sequenceEnd && reader.has(offset, 0)) {
       includeSpan(span, reader.range(offset, std::min<u64>(0x20, sequenceEnd - offset)));
     }
@@ -383,10 +383,10 @@ void annotateArticulation(ByteReader reader, AnnotationBuilder& annotation, cons
 
 void annotateInstrumentPointerTable(ByteReader reader, const AkaoSequenceAnalysis& sequence,
                                     InstrumentSetBuilder& instruments, SourceAnnotationId parent) {
-  if (!sequence.header.instrumentSetOffset) {
+  if (!sequence.header.soundBankOffset) {
     return;
   }
-  const u32 tableOffset = *sequence.header.instrumentSetOffset;
+  const u32 tableOffset = *sequence.header.soundBankOffset;
   const u64 sequenceEnd = static_cast<u64>(sequence.header.offset) + sequence.header.length;
   if (tableOffset >= sequenceEnd || !reader.has(tableOffset, 2)) {
     return;
@@ -440,15 +440,14 @@ std::string akaoInstrumentSetName(const AkaoSequenceAnalysis& sequence) {
 AkaoInstrumentSetBuild buildAkaoInstrumentSet(const ScanInput& input, const AkaoSequenceAnalysis& sequence,
                                               InstrumentSetBuilder& instruments) {
   auto parsed = parseInstrumentTables(input.reader, sequence);
-  const SourceRange range = instrumentSetRange(input.reader, sequence, parsed.instruments);
+  const SourceRange range = soundBankRange(input.reader, sequence, parsed.instruments);
 
   instruments.include(range);
-  auto root =
-      instruments.source(SourceRole::InstrumentSet, akaoInstrumentSetName(sequence), range, "akao-instrument-set")
-          .derived("instrument_count", parsed.instruments.size())
-          .derived("required_articulation_count", parsed.requiredArticulations.size())
-          .derived("uses_individual_articulations", sequence.references.usesIndividualArticulations,
-                   SourceValueDisplay::Boolean);
+  auto root = instruments.source(SourceRole::SoundBank, akaoInstrumentSetName(sequence), range, "akao-instrument-set")
+                  .derived("instrument_count", parsed.instruments.size())
+                  .derived("required_articulation_count", parsed.requiredArticulations.size())
+                  .derived("uses_individual_articulations", sequence.references.usesIndividualArticulations,
+                           SourceValueDisplay::Boolean);
   annotateInstrumentPointerTable(input.reader, sequence, instruments, root.id());
 
   for (auto& instrument : parsed.instruments) {
@@ -464,7 +463,7 @@ AkaoInstrumentSetBuild buildAkaoInstrumentSet(const ScanInput& input, const Akao
   };
 }
 
-bool applyAkaoArticulations(InstrumentSetAsset& instruments, const AkaoInstrumentSetBindingData& recipe,
+bool applyAkaoArticulations(SoundBankAsset& instruments, const AkaoInstrumentSetBindingData& recipe,
                             const AkaoArticulationMap& articulations) {
   if (instruments.instruments.size() != recipe.regions.size()) {
     return false;

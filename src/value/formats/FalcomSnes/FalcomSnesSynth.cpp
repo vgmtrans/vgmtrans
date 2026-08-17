@@ -33,7 +33,7 @@ struct Patch {
 };
 
 [[nodiscard]] std::optional<std::pair<u8, SourceRange>> mappedSrcn(ByteReader reader, const Layout& layout,
-                                                                  u8 program) {
+                                                                   u8 program) {
   // The loader maintains at most 32 dynamic DIR entries and terminates the
   // instrument-ID list with FF. The dispatch loop returns the matching index,
   // which is also the live SRCN.
@@ -49,8 +49,7 @@ struct Patch {
   return std::nullopt;
 }
 
-[[nodiscard]] std::vector<Patch> collectPatches(ByteReader reader, const Layout& layout,
-                                                const std::set<u8>& programs) {
+[[nodiscard]] std::vector<Patch> collectPatches(ByteReader reader, const Layout& layout, const std::set<u8>& programs) {
   std::vector<Patch> result;
   for (const u8 program : programs) {
     const auto srcn = mappedSrcn(reader, layout, program);
@@ -85,8 +84,8 @@ struct Patch {
 
 }  // namespace
 
-std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& layout,
-                                      const std::set<u8>& programs, std::string_view displayName) {
+std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layout& layout, const std::set<u8>& programs,
+                                         std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const std::vector<Patch> patches = collectPatches(reader, layout, programs);
   if (patches.empty()) {
@@ -102,9 +101,8 @@ std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& 
     return std::nullopt;
   }
 
-  auto instruments = builder.instrumentSet(fmt::format("{} Instruments", displayName));
-  auto samples = builder.sampleCollection(fmt::format("{} Samples", displayName));
-  const SnesBrrSampleRefs sampleRefs = addSnesBrrSamples(samples.builder(), reader, catalog);
+  auto instruments = builder.soundBank(fmt::format("{} Instruments", displayName));
+  const SnesBrrSampleRefs sampleRefs = addSnesBrrSamples(instruments.samples(), reader, catalog);
   for (const Patch& patch : patches) {
     const auto sample = sampleRefs.findSrcn(patch.srcn);
     if (!sample) {
@@ -131,7 +129,7 @@ std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& 
         .source("Region", patch.source, "falcom-snes-region")
         .description(fmt::format("SRCN {}, 8.8 pitch scale ${:04X}", patch.srcn, patch.pitchScale));
   }
-  return ScanSynthRefs{.instruments = instruments.ref(), .samples = samples.ref()};
+  return instruments.ref();
 }
 
 }  // namespace vgmtrans::formats::falcom_snes

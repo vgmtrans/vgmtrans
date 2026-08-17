@@ -42,8 +42,7 @@ void appendEnumOptions(QMenu* parent, const QString& title, Enum selected,
 
 }  // namespace
 
-MenuBar::MenuBar(QWidget* parent, const QList<QDockWidget*>& dockWidgets)
-    : QMenuBar(parent) {
+MenuBar::MenuBar(QWidget* parent, const QList<QDockWidget*>& dockWidgets) : QMenuBar(parent) {
   appendFileMenu();
   appendViewMenu(dockWidgets);
   appendOptionsMenu();
@@ -85,20 +84,17 @@ void MenuBar::appendViewMenu(const QList<QDockWidget*>& dockWidgets) {
   m_increaseHexFont = m_viewMenu->addAction(tr("Increase Font Size in Hex View"));
   m_increaseHexFont->setShortcut(QKeySequence::ZoomIn);
   m_increaseHexFont->setShortcutContext(Qt::WidgetShortcut);
-  connect(m_increaseHexFont, &QAction::triggered, this,
-          &MenuBar::increaseHexFontRequested);
+  connect(m_increaseHexFont, &QAction::triggered, this, &MenuBar::increaseHexFontRequested);
 
   m_decreaseHexFont = m_viewMenu->addAction(tr("Decrease Font Size in Hex View"));
   m_decreaseHexFont->setShortcut(QKeySequence::ZoomOut);
   m_decreaseHexFont->setShortcutContext(Qt::WidgetShortcut);
-  connect(m_decreaseHexFont, &QAction::triggered, this,
-          &MenuBar::decreaseHexFontRequested);
+  connect(m_decreaseHexFont, &QAction::triggered, this, &MenuBar::decreaseHexFontRequested);
 
   m_resetHexFont = m_viewMenu->addAction(tr("Reset Font Size in Hex View"));
   m_resetHexFont->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
   m_resetHexFont->setShortcutContext(Qt::WidgetShortcut);
-  connect(m_resetHexFont, &QAction::triggered, this,
-          &MenuBar::resetHexFontRequested);
+  connect(m_resetHexFont, &QAction::triggered, this, &MenuBar::resetHexFontRequested);
   setHexViewAvailable(false);
 #if defined(Q_OS_MACOS)
   // Add a separator between these actions and the automatically added "Enter Full Screen" action.
@@ -119,8 +115,8 @@ void MenuBar::appendOptionsMenu() {
   auto* bankGroup = new QActionGroup(bank);
   bankGroup->setExclusive(true);
   const BankSelectStyle savedStyle = Settings::the()->conversion.bankSelectStyle();
-  for (const auto& option : std::array<std::pair<const char*, BankSelectStyle>, 2>{{
-           {"GS (Default)", BankSelectStyle::GS}, {"MMA", BankSelectStyle::MMA}}}) {
+  for (const auto& option : std::array<std::pair<const char*, BankSelectStyle>, 2>{
+           {{"GS (Default)", BankSelectStyle::GS}, {"MMA", BankSelectStyle::MMA}}}) {
     QAction* action = bank->addAction(tr(option.first));
     action->setData(static_cast<int>(option.second));
     action->setCheckable(true);
@@ -138,53 +134,43 @@ void MenuBar::appendOptionsMenu() {
   });
 
   using vgmtrans::core::MidiPitchTransitionRendering;
-  appendEnumOptions(
-      m_optionsMenu, tr("Pitch Transition Rendering"),
-      Settings::the()->conversion.pitchTransitionRendering(),
-      std::array{
-          std::pair{tr("Preserve Format (Default)"), MidiPitchTransitionRendering::PreserveFormat},
-          std::pair{tr("Portamento"), MidiPitchTransitionRendering::Portamento},
-          std::pair{tr("Pitch Bend"), MidiPitchTransitionRendering::PitchBend},
-      },
-      [](MidiPitchTransitionRendering rendering) {
-        Settings::the()->conversion.setPitchTransitionRendering(rendering);
-      });
+  appendEnumOptions(m_optionsMenu, tr("Pitch Transition Rendering"),
+                    Settings::the()->conversion.pitchTransitionRendering(),
+                    std::array{
+                        std::pair{tr("Preserve Format (Default)"), MidiPitchTransitionRendering::PreserveFormat},
+                        std::pair{tr("Portamento"), MidiPitchTransitionRendering::Portamento},
+                        std::pair{tr("Pitch Bend"), MidiPitchTransitionRendering::PitchBend},
+                    },
+                    [](MidiPitchTransitionRendering rendering) {
+                      Settings::the()->conversion.setPitchTransitionRendering(rendering);
+                    });
 
   using vgmtrans::core::MidiWideTuningRendering;
   appendEnumOptions(
-      m_optionsMenu, tr("Wide Tuning Rendering"),
-      Settings::the()->conversion.wideTuningRendering(),
+      m_optionsMenu, tr("Wide Tuning Rendering"), Settings::the()->conversion.wideTuningRendering(),
       std::array{
           std::pair{tr("Pitch Bend (Compatible, Default)"), MidiWideTuningRendering::PitchBend},
           std::pair{tr("Coarse Tune RPN"), MidiWideTuningRendering::CoarseTune},
       },
-      [](MidiWideTuningRendering rendering) {
-        Settings::the()->conversion.setWideTuningRendering(rendering);
-      });
+      [](MidiWideTuningRendering rendering) { Settings::the()->conversion.setWideTuningRendering(rendering); });
 
   using vgmtrans::core::ModulationConversionPolicy;
   appendEnumOptions(
-      m_optionsMenu, tr("Modulation Conversion"),
-      Settings::the()->conversion.modulationConversion(),
+      m_optionsMenu, tr("Modulation Conversion"), Settings::the()->conversion.modulationConversion(),
       std::array{
           std::pair{tr("Synth Modulators (Default)"), ModulationConversionPolicy::SynthModulators},
           std::pair{tr("Sequence Event Simulation"), ModulationConversionPolicy::SequenceEventSimulation},
       },
-      [](ModulationConversionPolicy conversion) {
-        Settings::the()->conversion.setModulationConversion(conversion);
-      });
+      [](ModulationConversionPolicy conversion) { Settings::the()->conversion.setModulationConversion(conversion); });
 
   using vgmtrans::core::DynamicEnvelopePolicy;
   appendEnumOptions(
-      m_optionsMenu, tr("Dynamic Envelope Conversion"),
-      Settings::the()->conversion.dynamicEnvelopeConversion(),
+      m_optionsMenu, tr("Dynamic Envelope Conversion"), Settings::the()->conversion.dynamicEnvelopeConversion(),
       std::array{
           std::pair{tr("Ignore (Default)"), DynamicEnvelopePolicy::Ignore},
           std::pair{tr("Instrument Variants"), DynamicEnvelopePolicy::InstrumentVariants},
       },
-      [](DynamicEnvelopePolicy conversion) {
-        Settings::the()->conversion.setDynamicEnvelopeConversion(conversion);
-      });
+      [](DynamicEnvelopePolicy conversion) { Settings::the()->conversion.setDynamicEnvelopeConversion(conversion); });
 
   QMenu* loops = m_optionsMenu->addMenu(tr("Sequence Loops"));
   auto* loopsGroup = new QActionGroup(loops);
@@ -247,16 +233,14 @@ void MenuBar::appendOptionsMenu() {
   QAction* onlyUsedInstruments = m_optionsMenu->addAction(tr("Export used instrument data only"));
   onlyUsedInstruments->setCheckable(true);
   onlyUsedInstruments->setChecked(Settings::the()->conversion.exportOnlyUsedInstruments());
-  connect(onlyUsedInstruments, &QAction::toggled, this, [](bool checked) {
-    Settings::the()->conversion.setExportOnlyUsedInstruments(checked);
-  });
+  connect(onlyUsedInstruments, &QAction::toggled, this,
+          [](bool checked) { Settings::the()->conversion.setExportOnlyUsedInstruments(checked); });
 
   QAction* terminatePreviousVoice = m_optionsMenu->addAction(tr("Terminate previous voice on new attack"));
   terminatePreviousVoice->setCheckable(true);
   terminatePreviousVoice->setChecked(Settings::the()->conversion.terminatePreviousVoice());
-  connect(terminatePreviousVoice, &QAction::toggled, this, [](bool checked) {
-    Settings::the()->conversion.setTerminatePreviousVoice(checked);
-  });
+  connect(terminatePreviousVoice, &QAction::toggled, this,
+          [](bool checked) { Settings::the()->conversion.setTerminatePreviousVoice(checked); });
 
   QAction* skipChannel10 = m_optionsMenu->addAction(tr("Skip MIDI channel 10"));
   skipChannel10->setCheckable(true);
@@ -265,22 +249,20 @@ void MenuBar::appendOptionsMenu() {
     Settings::the()->conversion.setSkipChannel10(checked);
     if (!checked) {
       qWarning("Tracks using MIDI channel 10 will be silent during in-app playback.");
-      emit showToastRequested(
-          tr("Tracks using MIDI channel 10 will be silent during in-app playback."),
-          ToastType::Info, 3000);
+      emit showToastRequested(tr("Tracks using MIDI channel 10 will be silent during in-app playback."),
+                              ToastType::Info, 3000);
     }
   });
 
   using vgmtrans::core::SampleFilteringPolicy;
-  appendEnumOptions(
-      m_optionsMenu, tr("Sample Filtering"), Settings::the()->conversion.sampleFiltering(),
-      std::array{
-          std::pair{tr("Automatic (format recommended)"), SampleFilteringPolicy::FormatPreferred},
-          std::pair{tr("None"), SampleFilteringPolicy::None},
-          std::pair{tr("SNES S-DSP low-pass"), SampleFilteringPolicy::SnesDspLowPass},
-          std::pair{tr("PlayStation SPU low-pass"), SampleFilteringPolicy::PsxSpuLowPass},
-      },
-      [](SampleFilteringPolicy filtering) { Settings::the()->conversion.setSampleFiltering(filtering); });
+  appendEnumOptions(m_optionsMenu, tr("Sample Filtering"), Settings::the()->conversion.sampleFiltering(),
+                    std::array{
+                        std::pair{tr("Automatic (format recommended)"), SampleFilteringPolicy::FormatPreferred},
+                        std::pair{tr("None"), SampleFilteringPolicy::None},
+                        std::pair{tr("SNES S-DSP low-pass"), SampleFilteringPolicy::SnesDspLowPass},
+                        std::pair{tr("PlayStation SPU low-pass"), SampleFilteringPolicy::PsxSpuLowPass},
+                    },
+                    [](SampleFilteringPolicy filtering) { Settings::the()->conversion.setSampleFiltering(filtering); });
 }
 
 void MenuBar::appendInfoMenu() {
@@ -308,16 +290,14 @@ void MenuBar::appendContextualCommands(Context context) {
     return;
   }
 
-  const auto addAction = [this](const QStringList& path, const QString& text,
-                                bool enabled, const QList<QKeySequence>& shortcuts,
-                                const std::function<void()>& invoke = {}) {
+  const auto addAction = [this](const QStringList& path, const QString& text, bool enabled,
+                                const QList<QKeySequence>& shortcuts, const std::function<void()>& invoke = {}) {
     QMenu* target = ensureMenuForPath(path);
     if (target == nullptr) {
       return static_cast<QAction*>(nullptr);
     }
-    if (m_contextActions[target].empty() &&
-        std::find(m_dynamicTopLevelMenus.begin(), m_dynamicTopLevelMenus.end(), target) ==
-            m_dynamicTopLevelMenus.end()) {
+    if (m_contextActions[target].empty() && std::find(m_dynamicTopLevelMenus.begin(), m_dynamicTopLevelMenus.end(),
+                                                      target) == m_dynamicTopLevelMenus.end()) {
       QAction* separator = target->addSeparator();
       m_contextSeparators[target] = separator;
     }
@@ -346,8 +326,7 @@ void MenuBar::appendContextualCommands(Context context) {
   const QStringList convert{tr("Convert")};
   const QStringList file{tr("File")};
   if (context == Context::Source) {
-    addAction(convert, tr("Save as Original Format"), true, {},
-              [this] { emit saveSelectedSourceOriginal(); });
+    addAction(convert, tr("Save as Original Format"), true, {}, [this] { emit saveSelectedSourceOriginal(); });
     QAction* close = addAction(file, tr("Close"), true, {Qt::Key_Backspace, Qt::Key_Delete},
                                [this] { emit closeSelectedSources(); });
     close->setShortcutContext(Qt::WidgetShortcut);
@@ -355,42 +334,31 @@ void MenuBar::appendContextualCommands(Context context) {
   }
 
   if (context == Context::Sequence) {
-    addAction(convert, tr("Save as MIDI"), true, {},
-              [this] { emit exportSelectedSequenceMidi(); });
-    addAction(convert, tr("Save as Original Format"), true, {},
-              [this] { emit saveSelectedAssetOriginal(); });
+    addAction(convert, tr("Save as MIDI"), true, {}, [this] { emit exportSelectedSequenceMidi(); });
+    addAction(convert, tr("Save as Original Format"), true, {}, [this] { emit saveSelectedAssetOriginal(); });
     addSeparator(convert);
     addAction(convert, tr("Stitch"), false, {});
-  } else if (context == Context::InstrumentSet) {
-    addAction(convert, tr("Save as SF2"), true, {},
-              [this] { emit exportSelectedInstrumentSetSf2(); });
-    addAction(convert, tr("Save as DLS"), true, {},
-              [this] { emit exportSelectedInstrumentSetDls(); });
-    addAction(convert, tr("Save as Original Format"), true, {},
-              [this] { emit saveSelectedAssetOriginal(); });
-  } else if (context == Context::SampleCollection) {
+  } else if (context == Context::SoundBank) {
+    addAction(convert, tr("Save as SF2"), true, {}, [this] { emit exportSelectedSoundBankSf2(); });
+    addAction(convert, tr("Save as DLS"), true, {}, [this] { emit exportSelectedSoundBankDls(); });
+    addAction(convert, tr("Save as Original Format"), true, {}, [this] { emit saveSelectedAssetOriginal(); });
+  } else if (context == Context::SamplePool) {
     addAction(convert, tr("Save all samples as WAV"), false, {});
-    addAction(convert, tr("Save as Original Format"), true, {},
-              [this] { emit saveSelectedAssetOriginal(); });
+    addAction(convert, tr("Save as Original Format"), true, {}, [this] { emit saveSelectedAssetOriginal(); });
   } else if (context == Context::Misc) {
-    addAction(convert, tr("Save as Original Format"), true, {},
-              [this] { emit saveSelectedAssetOriginal(); });
+    addAction(convert, tr("Save as Original Format"), true, {}, [this] { emit saveSelectedAssetOriginal(); });
   } else if (context == Context::Collection) {
-    addAction(convert, tr("Export as MIDI and SF2"), true, {},
-              [this] { emit exportSelectedCollection(0); });
-    addAction(convert, tr("Export as MIDI and DLS"), true, {},
-              [this] { emit exportSelectedCollection(1); });
-    addAction(convert, tr("Export as MIDI, SF2, and DLS"), true, {},
-              [this] { emit exportSelectedCollection(2); });
+    addAction(convert, tr("Export as MIDI and SF2"), true, {}, [this] { emit exportSelectedCollection(0); });
+    addAction(convert, tr("Export as MIDI and DLS"), true, {}, [this] { emit exportSelectedCollection(1); });
+    addAction(convert, tr("Export as MIDI, SF2, and DLS"), true, {}, [this] { emit exportSelectedCollection(2); });
     addSeparator(convert);
     addAction(convert, tr("Stitch"), true, {}, [this] { emit stitchSelectedCollections(); });
     return;
   }
 
-  addAction(file, tr("Open Analysis"), true, {Qt::Key_Return},
-            [this] { emit openSelectedAsset(); });
-  QAction* remove = addAction(file, tr("Remove"), true, {Qt::Key_Backspace, Qt::Key_Delete},
-                              [this] { emit removeSelectedAssets(); });
+  addAction(file, tr("Open Analysis"), true, {Qt::Key_Return}, [this] { emit openSelectedAsset(); });
+  QAction* remove =
+      addAction(file, tr("Remove"), true, {Qt::Key_Backspace, Qt::Key_Delete}, [this] { emit removeSelectedAssets(); });
   remove->setShortcutContext(Qt::WidgetShortcut);
 }
 
@@ -505,8 +473,7 @@ void MenuBar::updateRecentFilesMenu() {
       display.replace(0, home.size(), QStringLiteral("~"));
     }
     QAction* action = m_recentFilesMenu->addAction(display);
-    connect(action, &QAction::triggered, this,
-            [this, file] { emit openRecentFile(file); });
+    connect(action, &QAction::triggered, this, [this, file] { emit openRecentFile(file); });
   }
   m_recentFilesMenu->addSeparator();
   QAction* clear = m_recentFilesMenu->addAction(tr("Clear Items"));

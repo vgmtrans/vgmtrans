@@ -26,7 +26,6 @@ namespace {
 constexpr std::string_view kSequenceFact = "sony-ps1.sequence";
 constexpr std::string_view kSampleBytesFact = "sony-ps1.sample-bytes";
 constexpr std::string_view kBankFact = "sony-ps1.bank";
-constexpr std::string_view kInstrumentSamplesFact = "sony-ps1.instrument-samples";
 
 [[nodiscard]] bool rawVbSource(const SourceFile& source) {
   std::filesystem::path path = source.path.empty() ? std::filesystem::path(source.name) : source.path;
@@ -77,16 +76,10 @@ constexpr std::string_view kInstrumentSamplesFact = "sony-ps1.instrument-samples
   for (u32 index = 0; index < bankLayouts.size(); ++index) {
     const auto& layout = bankLayouts[index];
     const u16 bank = numbers[index];
-    SonyPs1ScannedBank scanned = addSonyPs1Bank(result, layout, bank);
-    result.sourceFact(scanned.instruments.id,
+    const ScanSoundBankRef scanned = addSonyPs1Bank(result, layout, bank);
+    result.sourceFact(scanned.id,
                       IdMatchFact{.domain = std::string(kSampleBytesFact), .value = layout.expectedSampleBytes});
-    result.sourceFact(scanned.instruments.id, IdMatchFact{.domain = std::string(kBankFact), .value = bank});
-    if (scanned.samples) {
-      result.sourceFact(scanned.samples->id,
-                        IdMatchFact{.domain = std::string(kSampleBytesFact), .value = layout.expectedSampleBytes});
-      result.sourceFact(scanned.instruments.id, AssetRelationFact{.domain = std::string(kInstrumentSamplesFact),
-                                                                  .target = scanned.samples->id});
-    }
+    result.sourceFact(scanned.id, IdMatchFact{.domain = std::string(kBankFact), .value = bank});
   }
 
   for (const auto& layout : sequenceLayouts) {

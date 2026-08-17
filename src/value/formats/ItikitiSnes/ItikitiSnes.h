@@ -55,9 +55,9 @@ struct SequenceParse {
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
 [[nodiscard]] core::SequenceRuntime sequenceRuntime(u8 echoDelay);
 [[nodiscard]] core::Envelope driverEnvelope(u8 adsr1, u8 adsr2);
-[[nodiscard]] std::optional<core::ScanSynthRefs> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
-                                                          const ReferencedPrograms& references,
-                                                          std::string_view displayName);
+[[nodiscard]] std::optional<core::ScanSoundBankRef> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
+                                                             const ReferencedPrograms& references,
+                                                             std::string_view displayName);
 [[nodiscard]] core::FormatModule module();
 
 }  // namespace vgmtrans::formats::itikiti_snes

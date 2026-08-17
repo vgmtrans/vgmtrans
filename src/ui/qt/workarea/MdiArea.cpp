@@ -37,10 +37,10 @@ QIcon assetIcon(const vgmtrans::core::Asset& asset) {
   if (std::holds_alternative<vgmtrans::core::SequenceProgramAsset>(asset)) {
     return QIcon(QStringLiteral(":/icons/sequence.svg"));
   }
-  if (std::holds_alternative<vgmtrans::core::InstrumentSetAsset>(asset)) {
+  if (std::holds_alternative<vgmtrans::core::SoundBankAsset>(asset)) {
     return QIcon(QStringLiteral(":/icons/instrument-set.svg"));
   }
-  if (std::holds_alternative<vgmtrans::core::SampleCollectionAsset>(asset)) {
+  if (std::holds_alternative<vgmtrans::core::SamplePoolAsset>(asset)) {
     return QIcon(QStringLiteral(":/icons/sample-collection.svg"));
   }
   return QIcon(QStringLiteral(":/icons/binary.svg"));
@@ -66,25 +66,19 @@ struct DetailedInstructionLayout {
   int rowWidth = 0;
   int rowSpacing = 0;
 
-  DetailedInstructionLayout(const DetailedInstruction &instruction, QFont headingFont,
-                            QFont subFont)
-      : instruction(instruction),
-        headingFont(std::move(headingFont)),
-        subFont(std::move(subFont)),
-        headingMetrics(this->headingFont),
-        subMetrics(this->subFont) {}
+  DetailedInstructionLayout(const DetailedInstruction& instruction, QFont headingFont, QFont subFont)
+      : instruction(instruction), headingFont(std::move(headingFont)), subFont(std::move(subFont)),
+        headingMetrics(this->headingFont), subMetrics(this->subFont) {}
 };
 
-DetailedInstructionLayout computeDetailedInstructionLayout(const DetailedInstruction &instruction,
-                                                           const QFont &baseFont) {
-  QFont headingFont = prepareInstructionFont(baseFont, 1.8, QFont::Normal, 0,
-                                             QStringLiteral("Helvetica Neue"));
-  QFont subFont = prepareInstructionFont(baseFont, 1.25, QFont::Normal, 0,
-                                         QStringLiteral("Helvetica Neue"));
+DetailedInstructionLayout computeDetailedInstructionLayout(const DetailedInstruction& instruction,
+                                                           const QFont& baseFont) {
+  QFont headingFont = prepareInstructionFont(baseFont, 1.8, QFont::Normal, 0, QStringLiteral("Helvetica Neue"));
+  QFont subFont = prepareInstructionFont(baseFont, 1.25, QFont::Normal, 0, QStringLiteral("Helvetica Neue"));
   DetailedInstructionLayout layout(instruction, headingFont, subFont);
 
-  layout.iconSide = std::max(layout.headingMetrics.height(),
-                             static_cast<int>(std::round(layout.headingMetrics.height() * 1.1)));
+  layout.iconSide =
+      std::max(layout.headingMetrics.height(), static_cast<int>(std::round(layout.headingMetrics.height() * 1.1)));
   layout.iconGap = std::max(8, static_cast<int>(std::round(layout.headingMetrics.height() * 0.45)));
   layout.headingLeft = layout.iconSide + layout.iconGap;
 
@@ -100,15 +94,13 @@ DetailedInstructionLayout computeDetailedInstructionLayout(const DetailedInstruc
   return layout;
 }
 
-void paintDetailedInstruction(QPainter &painter, const DetailedInstructionLayout &layout,
-                              const QPoint &origin, const QColor &accent, int blockWidth) {
+void paintDetailedInstruction(QPainter& painter, const DetailedInstructionLayout& layout, const QPoint& origin,
+                              const QColor& accent, int blockWidth) {
   const int rowLeft = origin.x();
   const int headingTop = origin.y();
   const QSize iconSize(layout.iconSide, layout.iconSide);
-  const qreal devicePixelRatio =
-      painter.device() ? painter.device()->devicePixelRatioF() : qreal(1.0);
-  const QPixmap icon = tintedIconPixmap(QIcon(layout.instruction.iconPath), iconSize, accent,
-                                        devicePixelRatio);
+  const qreal devicePixelRatio = painter.device() ? painter.device()->devicePixelRatioF() : qreal(1.0);
+  const QPixmap icon = tintedIconPixmap(QIcon(layout.instruction.iconPath), iconSize, accent, devicePixelRatio);
   if (!icon.isNull()) {
     const int iconY = headingTop + (layout.headingMetrics.height() - layout.iconSide) / 2;
     painter.drawPixmap(rowLeft, iconY, icon);
@@ -116,18 +108,18 @@ void paintDetailedInstruction(QPainter &painter, const DetailedInstructionLayout
 
   painter.setFont(layout.headingFont);
   painter.setPen(accent);
-  const QRect headingRect(rowLeft + layout.headingLeft, headingTop,
-                          blockWidth - layout.headingLeft, layout.headingMetrics.height());
+  const QRect headingRect(rowLeft + layout.headingLeft, headingTop, blockWidth - layout.headingLeft,
+                          layout.headingMetrics.height());
   painter.drawText(headingRect, Qt::AlignLeft | Qt::AlignTop, layout.instruction.heading);
   painter.setFont(layout.subFont);
-  const QRect subRect(rowLeft + layout.headingLeft, headingTop + layout.subTopOffset,
-                      blockWidth - layout.headingLeft, layout.subMetrics.height());
+  const QRect subRect(rowLeft + layout.headingLeft, headingTop + layout.subTopOffset, blockWidth - layout.headingLeft,
+                      layout.subMetrics.height());
   painter.drawText(subRect, Qt::AlignLeft | Qt::AlignTop, layout.instruction.subText);
 }
 
-} // namespace
+}  // namespace
 
-MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
+MdiArea::MdiArea(QWidget* parent) : QMdiArea(parent) {
   setViewMode(QMdiArea::TabbedView);
   setDocumentMode(true);
   setTabsMovable(true);
@@ -136,7 +128,7 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
 
   connect(this, &QMdiArea::subWindowActivated, this, &MdiArea::onSubWindowActivated);
 
-  if (auto *tab_bar = findChild<QTabBar *>()) {
+  if (auto* tab_bar = findChild<QTabBar*>()) {
     tab_bar->setStyleSheet(QString{"QTabBar::tab { height: %1; }"}.arg(Size::VTab));
     tab_bar->setExpanding(false);
     tab_bar->setUsesScrollButtons(true);
@@ -146,55 +138,43 @@ MdiArea::MdiArea(QWidget *parent) : QMdiArea(parent) {
   }
 
   // Create OS-specific keyboard shortcuts
-  auto addShortcut = [this](const QKeySequence &seq, auto slot)
-  {
-    auto *sc = new QShortcut(seq, this);
+  auto addShortcut = [this](const QKeySequence& seq, auto slot) {
+    auto* sc = new QShortcut(seq, this);
     sc->setContext(Qt::WindowShortcut);
     connect(sc, &QShortcut::activated, this, slot);
   };
 
 #ifdef Q_OS_MAC
   // Cmd ⇧ [  /  Cmd ⇧ ]
-  addShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_BracketLeft),
-              &QMdiArea::activatePreviousSubWindow);
-  addShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_BracketRight),
-              &QMdiArea::activateNextSubWindow);
+  addShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_BracketLeft), &QMdiArea::activatePreviousSubWindow);
+  addShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_BracketRight), &QMdiArea::activateNextSubWindow);
 
   // Cmd ⌥ ←  /  Cmd ⌥ →
-  addShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Left),
-              &QMdiArea::activatePreviousSubWindow);
-  addShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Right),
-              &QMdiArea::activateNextSubWindow);
+  addShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Left), &QMdiArea::activatePreviousSubWindow);
+  addShortcut(QKeySequence(Qt::CTRL | Qt::ALT | Qt::Key_Right), &QMdiArea::activateNextSubWindow);
 
   // Ctrl + PageDown / Ctrl + PageUp
-  addShortcut(QKeySequence(Qt::META | Qt::Key_PageDown),
-              &QMdiArea::activateNextSubWindow);
-  addShortcut(QKeySequence(Qt::META | Qt::Key_PageUp),
-              &QMdiArea::activatePreviousSubWindow);
-#else   // Windows & Linux
+  addShortcut(QKeySequence(Qt::META | Qt::Key_PageDown), &QMdiArea::activateNextSubWindow);
+  addShortcut(QKeySequence(Qt::META | Qt::Key_PageUp), &QMdiArea::activatePreviousSubWindow);
+#else  // Windows & Linux
   // Ctrl + Tab  /  Ctrl + Shift + Tab
-  addShortcut(QKeySequence(Qt::CTRL | Qt::Key_Tab),
-              &QMdiArea::activateNextSubWindow);
-  addShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Tab),
-              &QMdiArea::activatePreviousSubWindow);
+  addShortcut(QKeySequence(Qt::CTRL | Qt::Key_Tab), &QMdiArea::activateNextSubWindow);
+  addShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Tab), &QMdiArea::activatePreviousSubWindow);
 
   // Ctrl + PageDown / Ctrl + PageUp
-  addShortcut(QKeySequence(Qt::CTRL | Qt::Key_PageDown),
-              &QMdiArea::activateNextSubWindow);
-  addShortcut(QKeySequence(Qt::CTRL | Qt::Key_PageUp),
-              &QMdiArea::activatePreviousSubWindow);
+  addShortcut(QKeySequence(Qt::CTRL | Qt::Key_PageDown), &QMdiArea::activateNextSubWindow);
+  addShortcut(QKeySequence(Qt::CTRL | Qt::Key_PageUp), &QMdiArea::activatePreviousSubWindow);
 #endif
 }
 
-void MdiArea::changeEvent(QEvent *event) {
-  if (event->type() == QEvent::PaletteChange ||
-      event->type() == QEvent::ApplicationPaletteChange) {
+void MdiArea::changeEvent(QEvent* event) {
+  if (event->type() == QEvent::PaletteChange || event->type() == QEvent::ApplicationPaletteChange) {
     updateBackgroundColor();
   }
   QMdiArea::changeEvent(event);
 }
 
-void MdiArea::paintEvent(QPaintEvent *event) {
+void MdiArea::paintEvent(QPaintEvent* event) {
   QMdiArea::paintEvent(event);
 
   if (!subWindowList().isEmpty()) {
@@ -209,14 +189,12 @@ void MdiArea::paintEvent(QPaintEvent *event) {
   accent.setAlphaF(0.4);
 
   const bool hasRawFiles = m_workspace != nullptr && !m_workspace->snapshot().sources().empty();
-  const bool hasCollections =
-      m_workspace != nullptr && !m_workspace->snapshot().collections().empty();
+  const bool hasCollections = m_workspace != nullptr && !m_workspace->snapshot().collections().empty();
   const QRect areaRect = viewport()->rect();
   const QFont baseFont = painter.font();
 
   if (!hasRawFiles) {
-    InstructionHint dropHint{QStringLiteral(":/icons/tray-arrow-down.svg"), tr("Drop files to scan"),
-                             2, 4.0, 0.3};
+    InstructionHint dropHint{QStringLiteral(":/icons/tray-arrow-down.svg"), tr("Drop files to scan"), 2, 4.0, 0.3};
     const InstructionMetrics metrics = computeInstructionMetrics(dropHint, baseFont);
     const int left = areaRect.center().x() - metrics.size.width() / 2;
     const int top = areaRect.center().y() - metrics.size.height() / 2;
@@ -227,19 +205,17 @@ void MdiArea::paintEvent(QPaintEvent *event) {
   std::vector<DetailedInstruction> instructions;
   instructions.reserve(3);
   if (hasCollections) {
-    instructions.push_back({QStringLiteral(":/icons/volume-high.svg"), tr("Preview"),
-                            tr("Double-click a collection")});
+    instructions.push_back({QStringLiteral(":/icons/volume-high.svg"), tr("Preview"), tr("Double-click a collection")});
   }
-  instructions.push_back({QStringLiteral(":/icons/midi-port.svg"), tr("Convert"),
-                          tr("Right-click a detected file or collection")});
-  instructions.push_back({QStringLiteral(":/icons/magnify.svg"), tr("Analyze"),
-                          tr("Double-click a detected file")});
+  instructions.push_back(
+      {QStringLiteral(":/icons/midi-port.svg"), tr("Convert"), tr("Right-click a detected file or collection")});
+  instructions.push_back({QStringLiteral(":/icons/magnify.svg"), tr("Analyze"), tr("Double-click a detected file")});
 
   std::vector<DetailedInstructionLayout> layouts;
   layouts.reserve(instructions.size());
   int blockWidth = 0;
   int blockHeight = 0;
-  for (const auto &instruction : instructions) {
+  for (const auto& instruction : instructions) {
     DetailedInstructionLayout layout = computeDetailedInstructionLayout(instruction, baseFont);
     blockWidth = std::max(blockWidth, layout.rowWidth);
     if (!layouts.empty()) {
@@ -310,22 +286,18 @@ void MdiArea::newView(vgmtrans::core::AssetId asset) {
   inspector->setSeekModifierActive(m_seekModifierActive);
   if (asset == m_playbackSequence) {
     inspector->setPlaybackTimeline(m_playbackSpans);
-    inspector->onPlaybackPositionChanged(
-        m_playbackPosition, m_playbackMaximum, PositionChangeOrigin::HexView);
+    inspector->onPlaybackPositionChanged(m_playbackPosition, m_playbackMaximum, PositionChangeOrigin::HexView);
   }
   const QString name = inspector->windowTitle();
   QMdiSubWindow* window = addSubWindow(inspector, Qt::SubWindow);
   window->setWindowIcon(assetIcon(*value));
   assetToWindowMap.emplace(asset.value, InspectorWindow{.window = window, .content = inspector});
   windowToAssetMap.emplace(window, asset.value);
-  connect(inspector, &VGMFileView::statusChanged, this,
-          &MdiArea::inspectorStatusChanged);
-  connect(inspector, &VGMFileView::playbackSeekRequested, this,
-          &MdiArea::playbackSeekRequested);
+  connect(inspector, &VGMFileView::statusChanged, this, &MdiArea::inspectorStatusChanged);
+  connect(inspector, &VGMFileView::playbackSeekRequested, this, &MdiArea::playbackSeekRequested);
   connect(window, &QObject::destroyed, this, [this, assetValue = asset.value, window]() {
     const auto found = assetToWindowMap.find(assetValue);
-    if (found != assetToWindowMap.end() &&
-        (found->second.window.isNull() || found->second.window.data() == window)) {
+    if (found != assetToWindowMap.end() && (found->second.window.isNull() || found->second.window.data() == window)) {
       assetToWindowMap.erase(found);
     }
     windowToAssetMap.erase(window);
@@ -363,9 +335,8 @@ void MdiArea::workspaceChanged() {
   viewport()->update();
 }
 
-void MdiArea::onSubWindowActivated(QMdiSubWindow *window) {
-  emit hexViewAvailableChanged(window != nullptr &&
-                               qobject_cast<VGMFileView*>(window->widget()) != nullptr);
+void MdiArea::onSubWindowActivated(QMdiSubWindow* window) {
+  emit hexViewAvailableChanged(window != nullptr && qobject_cast<VGMFileView*>(window->widget()) != nullptr);
   if (!window) {
     emit inspectorStatusChanged({}, {}, {}, -1, -1);
     return;
@@ -420,14 +391,12 @@ void MdiArea::setSeekModifierActive(bool active) {
   }
 }
 
-void MdiArea::setPlaybackSequence(
-    vgmtrans::core::AssetId sequence,
-    std::span<const vgmtrans::core::SourcePlaybackSpan> timeline) {
+void MdiArea::setPlaybackSequence(vgmtrans::core::AssetId sequence,
+                                  std::span<const vgmtrans::core::SourcePlaybackSpan> timeline) {
   if (m_playbackSequence.valid() && m_playbackSequence != sequence) {
     const auto previous = assetToWindowMap.find(m_playbackSequence.value);
     if (previous != assetToWindowMap.end()) {
-      if (auto* view =
-              qobject_cast<VGMFileView*>(previous->second.content.data())) {
+      if (auto* view = qobject_cast<VGMFileView*>(previous->second.content.data())) {
         view->setPlaybackTimeline({});
       }
     }
@@ -440,14 +409,12 @@ void MdiArea::setPlaybackSequence(
   if (current != assetToWindowMap.end()) {
     if (auto* view = qobject_cast<VGMFileView*>(current->second.content.data())) {
       view->setPlaybackTimeline(m_playbackSpans);
-      view->onPlaybackPositionChanged(
-          m_playbackPosition, m_playbackMaximum, PositionChangeOrigin::HexView);
+      view->onPlaybackPositionChanged(m_playbackPosition, m_playbackMaximum, PositionChangeOrigin::HexView);
     }
   }
 }
 
-void MdiArea::setPlaybackPosition(int current, int maximum,
-                                  PositionChangeOrigin origin) {
+void MdiArea::setPlaybackPosition(int current, int maximum, PositionChangeOrigin origin) {
   m_playbackPosition = current;
   m_playbackMaximum = maximum;
   if (!m_playbackSequence.valid()) {
@@ -497,8 +464,8 @@ void MdiArea::selectAsset(vgmtrans::core::AssetId asset, QWidget* caller) {
   }
 
   QWidget* focusedWidget = QApplication::focusWidget();
-  const bool callerHadFocus = caller != nullptr && focusedWidget != nullptr &&
-      (focusedWidget == caller || caller->isAncestorOf(focusedWidget));
+  const bool callerHadFocus =
+      caller != nullptr && focusedWidget != nullptr && (focusedWidget == caller || caller->isAncestorOf(focusedWidget));
   setActiveSubWindow(window.data());
 
   // Selecting an item may activate its analysis tab, but keyboard focus stays
@@ -508,7 +475,7 @@ void MdiArea::selectAsset(vgmtrans::core::AssetId asset, QWidget* caller) {
   }
 }
 
-void MdiArea::ensureMaximizedSubWindow(QMdiSubWindow *window) {
+void MdiArea::ensureMaximizedSubWindow(QMdiSubWindow* window) {
   if (window && !window->isMaximized()) {
     window->showMaximized();
   }

@@ -158,8 +158,8 @@ void addDrums(InstrumentSetBuilder& instruments, const SequenceRecipes& recipes,
 
 }  // namespace
 
-std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& layout, const SequenceRecipes& recipes,
-                                      std::string_view displayName) {
+std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layout& layout,
+                                         const SequenceRecipes& recipes, std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const std::vector<Patch> patches = collectPatches(reader, layout, recipes);
   if (patches.empty()) {
@@ -169,15 +169,15 @@ std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& 
   if (catalog.samples.empty()) {
     return std::nullopt;
   }
-  auto instruments = builder.instrumentSet(fmt::format("{} Instruments", displayName));
-  auto sampleCollection = builder.sampleCollection(fmt::format("{} Samples", displayName));
-  const SnesBrrSampleRefs samples = addSnesBrrSamples(sampleCollection.builder(), reader, catalog);
+  auto instruments = builder.soundBank(fmt::format("{} Instruments", displayName));
+  auto& samplePool = instruments.samples();
+  const SnesBrrSampleRefs samples = addSnesBrrSamples(samplePool, reader, catalog);
   addMelodic(instruments.builder(), patches, samples);
   addDrums(instruments.builder(), recipes, patches, samples);
   if (instruments.builder().empty()) {
     return std::nullopt;
   }
-  return ScanSynthRefs{.instruments = instruments.ref(), .samples = sampleCollection.ref()};
+  return instruments.ref();
 }
 
 }  // namespace vgmtrans::formats::hudson_snes

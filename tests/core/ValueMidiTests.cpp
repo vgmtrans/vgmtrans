@@ -317,8 +317,8 @@ void performanceMidiRendererSelectsWideTuningRepresentation() {
              compatibleFine[1]->cents == 100.0 && compatibleFine[2]->cents == 14.0625,
          "compatible tuning should keep the fine-tuning range out of coarse RPN");
   expect(compatibleBends.size() == 3 && compatibleBends[0]->tick == 6 && compatibleBends[0]->value == 2048 &&
-             compatibleBends[1]->tick == 12 && compatibleBends[1]->value == 6720 &&
-             compatibleBends[2]->tick == 18 && compatibleBends[2]->value == 2048,
+             compatibleBends[1]->tick == 12 && compatibleBends[1]->value == 6720 && compatibleBends[2]->tick == 18 &&
+             compatibleBends[2]->value == 2048,
          "compatible wide tuning should add its excess to source pitch bend and remove it when tuning narrows");
 
   MidiExportOptions coarseOptions;
@@ -694,9 +694,7 @@ void performanceMidiRendererCanTerminatePreviousVoices() {
   MidiExportOptions options;
   options.terminatePreviousVoice = true;
   const MidiSequence terminated = renderMidiSequence(performance, options);
-  const auto isSoundOff = [](const MidiEvent& event) {
-    return std::holds_alternative<AllSoundOff>(event);
-  };
+  const auto isSoundOff = [](const MidiEvent& event) { return std::holds_alternative<AllSoundOff>(event); };
   const auto soundOff = std::ranges::find_if(terminated.tracks[0].events, isSoundOff);
   expect(std::ranges::count_if(terminated.tracks[0].events, isSoundOff) == 1 &&
              soundOff != terminated.tracks[0].events.end() && std::get<AllSoundOff>(*soundOff).tick == 8,
@@ -943,10 +941,11 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
   const auto portamentoTime = std::ranges::find_if(
       native.tracks[0].events, [](const MidiEvent& event) { return std::holds_alternative<PortamentoTime14>(event); });
   expect(portamentoTime != native.tracks[0].events.end() && std::get<PortamentoTime14>(*portamentoTime).value == 63 &&
-             std::ranges::any_of(native.tracks[0].events, [](const MidiEvent& event) {
-               const auto* bank = std::get_if<BankSelect>(&event);
-               return bank != nullptr && bank->bank == (3 << 7);
-             }) &&
+             std::ranges::any_of(native.tracks[0].events,
+                                 [](const MidiEvent& event) {
+                                   const auto* bank = std::get_if<BankSelect>(&event);
+                                   return bank != nullptr && bank->bank == (3 << 7);
+                                 }) &&
              std::ranges::any_of(
                  native.tracks[0].events,
                  [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) &&
@@ -979,10 +978,8 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
            lhs.header.automation == rhs.header.automation && lhs.key == rhs.key &&
            lhs.linearVelocity == rhs.linearVelocity && lhs.durationTicks == rhs.durationTicks &&
            lhs.extendsPrevious == rhs.extendsPrevious && lhs.instrumentAddress == rhs.instrumentAddress &&
-           lhs.restartsLfoPhase == rhs.restartsLfoPhase &&
-           lhs.restartsVibratoLfoPhase == rhs.restartsVibratoLfoPhase &&
-           lhs.restartsTremoloLfoPhase == rhs.restartsTremoloLfoPhase &&
-           lhs.note == rhs.note && lhs.lane == rhs.lane;
+           lhs.restartsLfoPhase == rhs.restartsLfoPhase && lhs.restartsVibratoLfoPhase == rhs.restartsVibratoLfoPhase &&
+           lhs.restartsTremoloLfoPhase == rhs.restartsTremoloLfoPhase && lhs.note == rhs.note && lhs.lane == rhs.lane;
   };
   expect(sourceNote != performance.tracks[0].events.end() && loweredNote != bendLowering.tracks[0].events.end() &&
              notesMatch(std::get<NotePerformanceEvent>(*sourceNote), std::get<NotePerformanceEvent>(*loweredNote)),
@@ -1742,39 +1739,36 @@ void performanceMidiRendererResolvesSourceInstrumentIdentityAtExport() {
                       .durationTicks = 4,
                   },
                   PitchBendPerformanceEvent{
-                      .header =
-                          PerformanceEventHeader{.tick = 2, .automation = PerformanceAutomationId{0}},
+                      .header = PerformanceEventHeader{.tick = 2, .automation = PerformanceAutomationId{0}},
                       .semitones = -0.09375,
                       .normalizedWheelPosition = -0.046875,
                   },
               },
       }},
   };
-  const InstrumentSetAsset instrumentSet{
+  const SoundBankAsset soundBank{
       .instruments = {Instrument{
           .explicitAddress = InstrumentAddress{.bank = 3, .program = 9},
           .identity = InstrumentIdentity{.domain = "probe.instrument", .key = 5},
           .pitchBendRangeCents = 2400,
       }},
   };
-  const std::array<const InstrumentSetAsset*, 1> instrumentSets{&instrumentSet};
+  const std::array<const SoundBankAsset*, 1> soundBanks{&soundBank};
 
   const MidiSequence midi =
-      renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, instrumentSets);
+      renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, soundBanks);
   expect(std::get<BankSelect>(midi.tracks[0].events[1]).bank == (3 << 7) &&
              std::get<ProgramChange>(midi.tracks[0].events[2]).program == 9 &&
              std::get<PitchBendRange>(midi.tracks[0].events[3]).cents == 2400 &&
              std::get<PitchBend>(midi.tracks[0].events[5]).value == -384 &&
              std::ranges::count_if(
                  midi.tracks[0].events,
-                 [](const MidiEvent& event) {
-               return std::holds_alternative<PitchBendRange>(event);
-             }) == 1,
+                 [](const MidiEvent& event) { return std::holds_alternative<PitchBendRange>(event); }) == 1,
          "an automated bend should retain the selected instrument's pitch-wheel sensitivity");
 
   const MidiSequence mmaMidi =
       renderMidiSequence(performance, MidiExportOptions{.bankSelectStyle = MidiBankSelectStyle::MsbAndLsb},
-                         ModulationConversionPolicy::SynthModulators, instrumentSets);
+                         ModulationConversionPolicy::SynthModulators, soundBanks);
   expect(std::get<BankSelect>(mmaMidi.tracks[0].events[1]).bank == 3,
          "MSB/LSB MIDI lowering should retain the logical collection instrument bank");
 }
@@ -2619,16 +2613,13 @@ void physicalModulationProfileDrivesMidiAndSynthFromOnePlan() {
 
   expect(track.hasPhysicalModulation && profile.instruments.vibrato && profile.instruments.tremolo,
          "physical LFO authoring should opt the track into one shared sequence plan");
-  expect(profile.instruments.vibrato->maxDepthCents == 200.0 &&
-             profile.instruments.vibrato->rateHertz.minimum == 2.0 &&
+  expect(profile.instruments.vibrato->maxDepthCents == 200.0 && profile.instruments.vibrato->rateHertz.minimum == 2.0 &&
              profile.instruments.vibrato->rateHertz.maximum == 8.0 &&
              profile.instruments.vibrato->waveform == LfoWaveform::SawtoothUp &&
-             profile.instruments.vibrato->delaySeconds &&
-             profile.instruments.vibrato->delaySeconds->minimum == 0.0 &&
+             profile.instruments.vibrato->delaySeconds && profile.instruments.vibrato->delaySeconds->minimum == 0.0 &&
              profile.instruments.vibrato->delaySeconds->maximum == 0.4,
          "the shared plan should preserve physical vibrato depth, rate, and delay");
-  expect(profile.instruments.tremolo->maxDepthDb == 12.0 &&
-             profile.instruments.tremolo->rateHertz.minimum == 4.0 &&
+  expect(profile.instruments.tremolo->maxDepthDb == 12.0 && profile.instruments.tremolo->rateHertz.minimum == 4.0 &&
              profile.instruments.tremolo->rateHertz.maximum == 16.0 &&
              profile.instruments.tremolo->waveform == LfoWaveform::Square &&
              profile.instruments.tremolo->gainMode == TremoloGainMode::NoBoost,
@@ -2662,15 +2653,15 @@ void physicalModulationProfileDrivesMidiAndSynthFromOnePlan() {
       }
     }
   }
-  expect(firstVibratoDepth == 32 && lastVibratoDepth == 127 && firstVibratoRate == 0 &&
-             lastVibratoRate == 127 && firstVibratoDelay == 0 && lastVibratoDelay == 127,
+  expect(firstVibratoDepth == 32 && lastVibratoDepth == 127 && firstVibratoRate == 0 && lastVibratoRate == 127 &&
+             firstVibratoDelay == 0 && lastVibratoDelay == 127,
          "MIDI controls should normalize the sequence plan while retaining its full useful resolution");
 
-  InstrumentSetAsset instrumentSet{
+  SoundBankAsset soundBank{
       .instruments = {Instrument{}},
   };
-  applySequenceModulation(instrumentSet, profile);
-  const auto& appliedModulation = instrumentSet.instruments[0].modulation;
+  applySequenceModulation(soundBank, profile);
+  const auto& appliedModulation = soundBank.instruments[0].modulation;
   expect(appliedModulation.vibrato && appliedModulation.tremolo &&
              appliedModulation.vibrato->maxDepthCents == profile.instruments.vibrato->maxDepthCents &&
              appliedModulation.vibrato->rateHertz.minimum == profile.instruments.vibrato->rateHertz.minimum &&
@@ -2678,12 +2669,16 @@ void physicalModulationProfileDrivesMidiAndSynthFromOnePlan() {
              appliedModulation.tremolo->gainMode == profile.instruments.tremolo->gainMode,
          "synth preparation should apply the exact same physical plan used by MIDI");
   const LoweredSynthModulation lowered = lowerSynthModulation(appliedModulation);
-  expect(std::ranges::any_of(lowered.modulators, [](const SynthModulator& modulator) {
-           return modulator.destination == SynthDestination::VibratoDepth && modulator.amount == 200;
-         }) &&
-             std::ranges::any_of(lowered.modulators, [](const SynthModulator& modulator) {
-               return modulator.destination == SynthDestination::TremoloDepth && modulator.amount == 120;
-             }),
+  expect(std::ranges::any_of(lowered.modulators,
+                             [](const SynthModulator& modulator) {
+                               return modulator.destination == SynthDestination::VibratoDepth &&
+                                      modulator.amount == 200;
+                             }) &&
+             std::ranges::any_of(lowered.modulators,
+                                 [](const SynthModulator& modulator) {
+                                   return modulator.destination == SynthDestination::TremoloDepth &&
+                                          modulator.amount == 120;
+                                 }),
          "synth lowering should retain the physical depths chosen by the shared plan");
 
   PerformanceTrack ordinaryTrack{
@@ -2758,16 +2753,14 @@ void tempoRelativeModulationFollowsTheGlobalTempoTimeline() {
   }
 
   expect(rates.size() == 3 && rates[0]->header.tick == 0 && rates[0]->frequencyHz &&
-             std::abs(*rates[0]->frequencyHz - 25.0) < 0.0001 && rates[1]->header.tick == 10 &&
-             rates[1]->frequencyHz && std::abs(*rates[1]->frequencyHz - 50.0) < 0.0001 &&
-             rates[1]->header.sequence == 2 && rates[2]->header.tick == 20 && rates[2]->frequencyHz &&
-             std::abs(*rates[2]->frequencyHz - 7.0) < 0.0001,
+             std::abs(*rates[0]->frequencyHz - 25.0) < 0.0001 && rates[1]->header.tick == 10 && rates[1]->frequencyHz &&
+             std::abs(*rates[1]->frequencyHz - 50.0) < 0.0001 && rates[1]->header.sequence == 2 &&
+             rates[2]->header.tick == 20 && rates[2]->frequencyHz && std::abs(*rates[2]->frequencyHz - 7.0) < 0.0001,
          "tempo-relative LFO rates should follow cross-track tempo changes in global execution order");
-  expect(delays.size() == 3 && delays[0]->milliseconds &&
-             std::abs(*delays[0]->milliseconds - 100.0) < 0.0001 && delays[1]->header.tick == 10 &&
-             delays[1]->milliseconds && std::abs(*delays[1]->milliseconds - 50.0) < 0.0001 &&
-             delays[2]->header.tick == 30 && delays[2]->milliseconds &&
-             std::abs(*delays[2]->milliseconds - 25.0) < 0.0001 &&
+  expect(delays.size() == 3 && delays[0]->milliseconds && std::abs(*delays[0]->milliseconds - 100.0) < 0.0001 &&
+             delays[1]->header.tick == 10 && delays[1]->milliseconds &&
+             std::abs(*delays[1]->milliseconds - 50.0) < 0.0001 && delays[2]->header.tick == 30 &&
+             delays[2]->milliseconds && std::abs(*delays[2]->milliseconds - 25.0) < 0.0001 &&
              std::ranges::all_of(delays, [](const auto* delay) { return delay->tempoRelative; }),
          "tempo-relative LFO delays should retain ticks while exposing physical synth delay values");
 

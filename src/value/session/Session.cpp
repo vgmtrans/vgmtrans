@@ -52,8 +52,7 @@ void prepareDiagnostics(ScanResult& result, const SourceFile& source) {
 }
 
 [[nodiscard]] bool accepts(const SourceFile& source, const std::vector<std::string>& acceptedFormats) {
-  return !source.knownFormat ||
-         std::ranges::find(acceptedFormats, *source.knownFormat) != acceptedFormats.end();
+  return !source.knownFormat || std::ranges::find(acceptedFormats, *source.knownFormat) != acceptedFormats.end();
 }
 
 }  // namespace
@@ -267,8 +266,8 @@ Artifact Session::exportSequenceMidi(AssetId id, const SequenceExportRequest& re
   return core::exportSequenceMidi(snapshot(), sources_, id, request);
 }
 
-Artifact Session::exportInstrumentSet(AssetId id, SynthExportFormat format, const ExportRequest& request) const {
-  return core::exportInstrumentSet(snapshot(), sources_, id, format, request);
+Artifact Session::exportSoundBank(AssetId id, SynthExportFormat format, const ExportRequest& request) const {
+  return core::exportSoundBank(snapshot(), sources_, id, format, request);
 }
 
 std::vector<Artifact> Session::exportCollection(CollectionId id, const ExportRequest& request) const {
@@ -379,8 +378,10 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
           .ids = ids_,
       });
       for (auto& asset : result.assets) {
-        if (auto* samples = std::get_if<SampleCollectionAsset>(&asset)) {
-          samples->preferredFilter = module.preferredSampleFilter;
+        if (auto* bank = std::get_if<SoundBankAsset>(&asset)) {
+          bank->localSamples.preferredFilter = module.preferredSampleFilter;
+        } else if (auto* samples = std::get_if<SamplePoolAsset>(&asset)) {
+          samples->pool.preferredFilter = module.preferredSampleFilter;
         }
       }
       normalizeScanResult(result, ids_);
