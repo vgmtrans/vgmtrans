@@ -139,7 +139,7 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
   FormatRegistry formats;
   auto module = probeSequenceModule();
   module.bindCollection = [](CollectionBindingContext& context) {
-    const bool leaveDirtyMidiState = context.collection.id == CollectionId{0};
+    const bool leaveDirtyMidiState = context.sequence != nullptr && context.sequence->metadata.name == "Part 0";
     context.sequenceRuntime = makeCompiledRuntime<ProbeCompilerCursor, StitchProgramState>(leaveDirtyMidiState);
   };
   formats.add(std::move(module));

@@ -70,12 +70,12 @@ namespace {
 
 }  // namespace
 
-ResolvedCollection::ResolvedCollection(SessionSnapshot snapshot, std::string baseName, const Collection* collection,
+ResolvedCollection::ResolvedCollection(SessionSnapshot snapshot, CollectionId id, std::string baseName,
                                        const SequenceProgramAsset* sequence, SequenceRuntime sequenceRuntime,
                                        std::vector<InstrumentSetAsset> instrumentSets,
                                        std::vector<const SampleCollectionAsset*> sampleCollections,
                                        CollectionResolutionDiagnostics diagnostics)
-    : snapshot_(std::move(snapshot)), baseName_(std::move(baseName)), collection_(collection), sequence_(sequence),
+    : snapshot_(std::move(snapshot)), id_(id), baseName_(std::move(baseName)), sequence_(sequence),
       sequenceRuntime_(std::move(sequenceRuntime)), instrumentSets_(std::move(instrumentSets)),
       sampleCollections_(std::move(sampleCollections)), diagnostics_(std::move(diagnostics)) {
 }
@@ -86,7 +86,7 @@ ResolvedCollection resolveCollection(const SessionSnapshot& snapshot, Collection
   const Collection* collection = snapshot.collection(collectionId);
   if (collection == nullptr) {
     diagnostics.collection.push_back(exportError("CollectionId was not found in the SessionSnapshot"));
-    return ResolvedCollection(snapshot, {}, nullptr, nullptr, {}, {}, {}, std::move(diagnostics));
+    return ResolvedCollection(snapshot, {}, {}, nullptr, {}, {}, {}, std::move(diagnostics));
   }
 
   const CollectionMembers& members = collection->members;
@@ -126,7 +126,6 @@ ResolvedCollection resolveCollection(const SessionSnapshot& snapshot, Collection
     try {
       CollectionBindingContext context{
           .sources = sources,
-          .collection = *collection,
           .sequence = sequence,
           .sequenceRuntime = sequenceRuntime,
           .instrumentSets = instrumentSets,
@@ -140,7 +139,7 @@ ResolvedCollection resolveCollection(const SessionSnapshot& snapshot, Collection
       diagnostics.collection.push_back(exportError(module->name + " collection binding failed"));
     }
   }
-  return ResolvedCollection(snapshot, std::move(baseName), collection, sequence, std::move(sequenceRuntime),
+  return ResolvedCollection(snapshot, collection->id, std::move(baseName), sequence, std::move(sequenceRuntime),
                             std::move(instrumentSets), std::move(sampleCollections), std::move(diagnostics));
 }
 

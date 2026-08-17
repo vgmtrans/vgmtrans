@@ -395,7 +395,6 @@ void bindAkaoCollection(CollectionBindingContext& context) {
   }
 
   const auto& sequence = *context.sequence;
-  const std::string instrumentSetName = context.instrumentSets.front().metadata.name;
 
   ScanIdAllocator ids;
   const SourceRange sequenceRange = sequence.metadata.range;
@@ -430,17 +429,8 @@ void bindAkaoCollection(CollectionBindingContext& context) {
   InstrumentSetBuilder instruments(AssetId{}, nullptr, &context.diagnostics);
   (void)buildAkaoInstrumentSet(*input, *analysis, articulations, instruments);
   auto built = std::move(instruments).finish();
-  context.instrumentSets = {
-      InstrumentSetAsset{
-          .metadata =
-              AssetMetadata{
-                  .format = std::string(kAkaoFormatName),
-                  .name = instrumentSetName,
-                  .range = built.range,
-              },
-          .instruments = std::move(built.values),
-      },
-  };
+  context.instrumentSets.front().instruments = std::move(built.values);
+  context.instrumentSets.resize(1);
 }
 
 }  // namespace vgmtrans::formats::akao

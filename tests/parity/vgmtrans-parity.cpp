@@ -1650,7 +1650,6 @@ AkaoSummary valueAkaoSummary(const std::filesystem::path& path, std::ostream& di
     std::vector<Diagnostic> bindingDiagnostics;
     CollectionBindingContext binding{
         .sources = session.sources(),
-        .collection = collection,
         .sequence = sequence,
         .sequenceRuntime = runtime,
         .instrumentSets = resolvedInstruments,

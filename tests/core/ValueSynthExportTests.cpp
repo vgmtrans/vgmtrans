@@ -938,14 +938,14 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   }
 }
 
-void bindReplacementInstrumentSet(CollectionBindingContext& context) {
-  const AssetId samples = context.collection.members.sampleCollections.front();
-  context.instrumentSets = {InstrumentSetAsset{
-      .metadata = AssetMetadata{.format = "Prepared Probe", .name = "Prepared Bank"},
-      .instruments = {Instrument{
-          .name = "Prepared Instrument",
-          .regions = {Region{.sample = SampleRef{.collection = samples, .index = 0}}},
-      }},
+void bindInstrumentSet(CollectionBindingContext& context) {
+  const AssetId samples = context.sampleCollections.front()->metadata.id;
+  auto& instruments = context.instrumentSets.front();
+  instruments.metadata.format = "Prepared Probe";
+  instruments.metadata.name = "Prepared Bank";
+  instruments.instruments = {Instrument{
+      .name = "Prepared Instrument",
+      .regions = {Region{.sample = SampleRef{.collection = samples, .index = 0}}},
   }};
 }
 
@@ -973,8 +973,8 @@ struct PreparedProbeProgramState {
 };
 
 void bindPerformanceRuntime(CollectionBindingContext& context) {
-  context.sequenceRuntime =
-      makeCompiledRuntime<ProbeCompilerCursor, PreparedProbeProgramState>(context.collection.key.value == "failure");
+  const bool fail = context.sequence != nullptr && context.sequence->metadata.name == "Failing Sequence";
+  context.sequenceRuntime = makeCompiledRuntime<ProbeCompilerCursor, PreparedProbeProgramState>(fail);
   context.diagnostics.push_back({.severity = Severity::Warning, .message = "Collection binding warning"});
 }
 
@@ -1034,9 +1034,14 @@ void collectionBindingAppliesToWholeExport() {
               .sampleCollections = {samples.metadata.id},
           },
   });
+  auto failingSequence = sequence;
+  failingSequence.metadata.id = AssetId{3};
+  failingSequence.metadata.name = "Failing Sequence";
+  builder.assets.emplace_back(failingSequence);
   auto failingCollection = builder.collections.front();
   failingCollection.id = CollectionId{1};
   failingCollection.key.value = "failure";
+  failingCollection.members.sequence = failingSequence.metadata.id;
   builder.collections.push_back(std::move(failingCollection));
 
   FormatRegistry formats;
@@ -1053,6 +1058,18 @@ void collectionBindingAppliesToWholeExport() {
          "a runtime-only collection binding should preserve durable instrument sets for synth export");
   expect(soundFontImodContains(playback.soundFont, 129, 6, 100),
          "collection binding should run before sequence modulation is analyzed");
+
+  const ExportRequest forwardRequest{
+      .kinds = {ExportKind::Midi, ExportKind::SoundFont2, ExportKind::Dls},
+      .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
+  };
+  auto reverseRequest = forwardRequest;
+  reverseRequest.kinds = {ExportKind::Dls, ExportKind::SoundFont2, ExportKind::Midi};
+  const auto forward = exportCollection(snapshot, sources, CollectionId{0}, forwardRequest, formats);
+  const auto reverse = exportCollection(snapshot, sources, CollectionId{0}, reverseRequest, formats);
+  expect(forward.size() == 3 && reverse.size() == 3 && forward[0].bytes == reverse[2].bytes &&
+             forward[1].bytes == reverse[1].bytes && forward[2].bytes == reverse[0].bytes,
+         "collection preparation should make multi-artifact export independent of requested output order");
 
   const auto failed =
       exportCollection(snapshot, sources, CollectionId{1}, ExportRequest{.kinds = {ExportKind::Midi}}, formats);
@@ -1099,22 +1116,23 @@ void collectionBindingProducesAnImmutableInstrumentView() {
   formats.add(FormatModule{
       .name = "Prepared Probe",
       .scan = scanNoSources,
-      .bindCollection = bindReplacementInstrumentSet,
+      .bindCollection = bindInstrumentSet,
   });
   formats.seal();
   const SessionSnapshot snapshot = builder.finish();
   const auto resolved = resolveCollection(snapshot, CollectionId{0}, sources, formats);
   expect(resolved.instrumentSets().size() == 1 &&
+             resolved.instrumentSets().front().metadata.id == durable.metadata.id &&
              resolved.instrumentSets().front().instruments.front().name == "Prepared Instrument" &&
              snapshot.asset<InstrumentSetAsset>(durable.metadata.id)->instruments.front().name == "Durable Instrument",
-         "collection binding should publish an authoritative view without mutating durable assets");
+         "collection binding should preserve selected asset identity without mutating durable assets");
   const auto artifacts =
       exportCollection(snapshot, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Dls}}, formats);
 
   expect(artifacts.size() == 1 && !artifacts.front().bytes.empty(), "collection binding fixture should export a DLS");
   const auto& dls = artifacts.front().bytes;
   expect(readLe32(dls, asciiOffset(dls, "colh") + 8) == 1,
-         "bound instrument sets should replace durable sets instead of being appended");
+         "bound instrument data should replace durable data instead of being appended");
   expect(containsAscii(dls, "Prepared Instrument") && !containsAscii(dls, "Durable Instrument"),
          "collection export should use only the resolver's authoritative instrument view");
 }

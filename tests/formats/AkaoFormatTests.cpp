@@ -810,7 +810,6 @@ void akaoScanPublishesStructuralInstrumentSetAndBindsResolvedView() {
   std::vector<Diagnostic> bindingDiagnostics;
   CollectionBindingContext binding{
       .sources = session.sources(),
-      .collection = collection,
       .sequence = sequence,
       .sequenceRuntime = runtime,
       .instrumentSets = resolvedInstruments,
@@ -818,11 +817,13 @@ void akaoScanPublishesStructuralInstrumentSetAndBindsResolvedView() {
       .diagnostics = bindingDiagnostics,
   };
   bindAkaoCollection(binding);
-  expect(resolvedInstruments.size() == 1 && resolvedInstruments.front().instruments.size() == 1 &&
+  expect(resolvedInstruments.size() == 1 &&
+             resolvedInstruments.front().metadata.id == collection.members.instrumentSets.front() &&
+             resolvedInstruments.front().instruments.size() == 1 &&
              resolvedInstruments.front().instruments.front().regions.size() == 1 &&
              resolvedInstruments.front().instruments.front().regions.front().sample.collection ==
                  collection.members.sampleCollections.front(),
-         "Akao collection binding should connect the detected structure to its selected samples");
+         "Akao collection binding should preserve the selected bank identity and connect it to its samples");
 
   const auto artifacts = session.exportCollection(collection.id, ExportRequest{.kinds = {ExportKind::Dls}});
   expect(artifacts.size() == 1 && !artifacts[0].bytes.empty(),
