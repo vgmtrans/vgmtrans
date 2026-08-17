@@ -185,7 +185,7 @@ std::vector<u8> overlappingBankFixture() {
   return bytes;
 }
 
-std::vector<u8> multiBankVelocityFixture() {
+std::vector<u8> multiBankVelocityFixture(u8 secondSelectedBank = 5) {
   constexpr u32 sequenceTable = 0x400;
   constexpr u32 sequence = sequenceTable + 6;
   constexpr u32 bank5 = 0x1000;
@@ -199,8 +199,8 @@ std::vector<u8> multiBankVelocityFixture() {
   be16(bytes, sequence + 4, 8);
   be16(bytes, sequence + 6, 0);
   size_t command = sequence + 8;
-  const std::initializer_list<u8> commands{
-      0xb0, 32, 6, 0, 0xc0, 0, 0, 0x00, 60, 64, 10, 0, 0xb0, 32, 5, 0, 0x00, 60, 64, 10, 0, 0x83,
+  const std::vector<u8> commands{
+      0xb0, 32, 6, 0, 0xc0, 0, 0, 0x00, 60, 64, 10, 0, 0xb0, 32, secondSelectedBank, 0, 0x00, 60, 64, 10, 0, 0x83,
   };
   std::ranges::copy(commands, bytes.begin() + static_cast<std::ptrdiff_t>(command));
 
@@ -480,7 +480,7 @@ void segSatRuntimeMapSelectsBankInsideAnotherSampleSpan() {
 void segSatMultiBankPlaybackUsesTheActiveBanksVlTable() {
   Session session;
   session.registerFormat(segSatModule());
-  session.addSource(SourceFile{.name = "segsat-multi-bank.bin"}, multiBankVelocityFixture());
+  session.addSource(SourceFile{.name = "segsat-multi-bank.bin"}, multiBankVelocityFixture(7));
   session.scanPendingSources();
 
   const SessionSnapshot snapshot = session.snapshot();
@@ -515,10 +515,10 @@ void segSatMultiBankPlaybackUsesTheActiveBanksVlTable() {
       .rate3 = 2,
   };
   expect(
-      notes.size() == 2 && notes[0].first == 6 && notes[1].first == 5 &&
+      notes.size() == 2 && notes[0].first == 6 && notes[1].first == 7 &&
           LevelScale::midi7FromLinear(notes[0].second->linearVelocity) == normalizedSegSatVelocity(64, identity, 128) &&
           LevelScale::midi7FromLinear(notes[1].second->linearVelocity) == normalizedSegSatVelocity(64, identity, 0),
-      "source bank aliases should remain paired with sorted collection banks regardless of command order");
+      "a fallback physical bank should retain its velocity data under the sequence's logical bank alias");
 }
 
 void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
