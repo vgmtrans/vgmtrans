@@ -551,9 +551,23 @@ void HexView::clearCurrentSelection(bool animateSelection) {
 // Set selected item, update selection, and scroll it into view when needed.
 void HexView::setSelectedItem(vgmtrans::core::SourceInspectionItem item) {
   m_selectedItem = item;
-  const auto selectedRange = visibleRange(m_inspection->range(item));
   if (m_inspection->annotation(item) == nullptr ||
-      (item.isField() && m_inspection->field(item) == nullptr) || !selectedRange) {
+      (item.isField() && m_inspection->field(item) == nullptr)) {
+    m_selectedItem = {};
+    clearCurrentSelection(true);
+    return;
+  }
+  applySelectedRange(m_inspection->range(item));
+}
+
+void HexView::setSelectedRange(vgmtrans::core::SourceRange range) {
+  m_selectedItem = {};
+  applySelectedRange(range);
+}
+
+void HexView::applySelectedRange(vgmtrans::core::SourceRange range) {
+  const auto selectedRange = visibleRange(range);
+  if (!selectedRange) {
     m_selectedItem = {};
     clearCurrentSelection(true);
     return;

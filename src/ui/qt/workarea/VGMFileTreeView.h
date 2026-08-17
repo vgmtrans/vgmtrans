@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "value/model/SessionSnapshot.h"
 #include "value/model/SourceInspection.h"
 
 #include <memory>
@@ -20,9 +21,11 @@ class VGMFileTreeView final : public QTreeWidget {
   Q_OBJECT
 public:
   explicit VGMFileTreeView(std::shared_ptr<const vgmtrans::core::SourceInspection> inspection,
+                           const vgmtrans::core::Asset& asset,
                            QWidget* parent = nullptr);
 
   [[nodiscard]] vgmtrans::core::SourceInspectionItem sourceItemForItem(const QTreeWidgetItem* item) const;
+  [[nodiscard]] vgmtrans::core::SourceRange rangeForItem(const QTreeWidgetItem* item) const;
   [[nodiscard]] vgmtrans::core::SourceAnnotationId annotationForItem(const QTreeWidgetItem* item) const;
   void setSelectedItem(vgmtrans::core::SourceInspectionItem item);
   void setSelectedAnnotation(vgmtrans::core::SourceAnnotationId annotation);

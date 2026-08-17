@@ -45,6 +45,7 @@ public:
   ~HexView() override;
   [[nodiscard]] static QFont defaultViewFont();
   void setSelectedItem(vgmtrans::core::SourceInspectionItem item);
+  void setSelectedRange(vgmtrans::core::SourceRange range);
   void setSelectedAnnotation(vgmtrans::core::SourceAnnotationId annotation);
   void setSelectedAnnotations(
       const std::vector<vgmtrans::core::SourceAnnotationId>& annotations,
@@ -129,6 +130,7 @@ private:
                         bool markSelectionDirty = false,
                         bool markPlaybackDirty = false);
   void clearCurrentSelection(bool animateSelection);
+  void applySelectedRange(vgmtrans::core::SourceRange range);
   void scrollRangeIntoView(SelectionRange range);
   void updateLayout();
   void updateScrollBars();
