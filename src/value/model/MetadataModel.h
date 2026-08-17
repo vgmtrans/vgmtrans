@@ -38,6 +38,8 @@ public:
     return owned != nullptr ? owned->get() : nullptr;
   }
 
+  [[nodiscard]] bool empty() const noexcept { return !value_.has_value(); }
+
 private:
   explicit AssetPrivateData(std::any value) : value_(std::move(value)) {}
 

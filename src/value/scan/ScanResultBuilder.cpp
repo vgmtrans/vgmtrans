@@ -423,7 +423,11 @@ ScanResult ScanResultBuilder::finish() {
 }
 
 void ScanResultBuilder::setPrivateData(size_t slot, AssetPrivateData data) {
-  drafts_.at(slot)->privateData = std::move(data);
+  auto& privateData = drafts_.at(slot)->privateData;
+  if (!privateData.empty()) {
+    throw std::logic_error("ScanResultBuilder asset draft was given more than one private data value");
+  }
+  privateData = std::move(data);
 }
 
 AssetMetadata ScanResultBuilder::metadata(AssetId id, std::string name, SourceRange range) const {

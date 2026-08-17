@@ -133,9 +133,16 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
   ScanResultBuilder out(input, "ProbeBuilder");
   const auto wholeSource = input.reader.range(0, input.reader.size());
 
-  const auto sequence = out.sequence("Builder Sequence", wholeSource)
-                            .data(BuilderPrivateData{.value = 11})
-                            .program(probeSequenceProgram());
+  auto sequence = out.sequence("Builder Sequence", wholeSource)
+                      .data(BuilderPrivateData{.value = 11})
+                      .program(probeSequenceProgram());
+  bool rejectedSecondData = false;
+  try {
+    sequence.data(BuilderPrivateData{.value = 99});
+  } catch (const std::logic_error&) {
+    rejectedSecondData = true;
+  }
+  expect(rejectedSecondData, "scan result builder should reject a second private data value for one asset");
   const auto bank = out.instrumentSet("Builder Bank", input.reader.range(0, 1)).data(BuilderPrivateData{.value = 22});
   auto samples = out.sampleCollection("Builder Samples", input.reader.range(1, 2));
   samples.data(BuilderPrivateData{.value = 33});
