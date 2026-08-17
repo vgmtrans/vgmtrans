@@ -212,8 +212,6 @@ struct AkaoSplitSampleLocation {
                                                  u32 trackIndex, u32 startOffset,
                                                  std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] AkaoSequenceReferences akaoSequenceReferences(const core::TrackProgram& track);
-[[nodiscard]] std::optional<AkaoSequenceAnalysis> analyzeAkaoSequence(const core::ScanInput& input,
-                                                                      const core::SequenceProgramAsset& sequence);
 [[nodiscard]] std::optional<AkaoSequenceLayout> readAkaoSequenceLayout(const core::ScanInput& input, u32 offset);
 [[nodiscard]] AkaoSequenceParse parseAkaoSequence(const core::ScanInput& input, core::AssetId id,
                                                   const AkaoSequenceLayout& layout,

@@ -957,22 +957,6 @@ void AkaoSequenceReferences::merge(const AkaoSequenceReferences& other) {
   usesIndividualArticulations = usesIndividualArticulations || other.usesIndividualArticulations;
 }
 
-std::optional<AkaoSequenceAnalysis> analyzeAkaoSequence(const ScanInput& input, const SequenceProgramAsset& sequence) {
-  if (sequence.metadata.range.offset > std::numeric_limits<u32>::max()) {
-    return std::nullopt;
-  }
-  auto layout = readAkaoSequenceLayout(input, static_cast<u32>(sequence.metadata.range.offset));
-  if (!layout) {
-    return std::nullopt;
-  }
-
-  AkaoSequenceAnalysis analysis{.header = layout->header};
-  for (const auto& track : sequence.program.tracks) {
-    analysis.references.merge(akaoSequenceReferences(track));
-  }
-  return analysis;
-}
-
 // The layout is deliberately read before a draft is created. From this point
 // onward malformed track data is part of a recognized sequence and is reported
 // through the shared diagnostics rather than retracting the asset.
