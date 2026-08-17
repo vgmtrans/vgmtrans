@@ -67,6 +67,17 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
     diagnostics.push_back(exportError("CollectionId was not found in the SessionSnapshot"));
     return CollectionBindingResult{.diagnostics = std::move(diagnostics)};
   }
+  for (const auto& issue : collection->issues) {
+    diagnostics.push_back(Diagnostic{
+        .severity = issue.severity,
+        .code = issue.code,
+        .message = issue.message,
+        .range = issue.range,
+        .object = issue.asset && snapshot.asset(*issue.asset) != nullptr
+                      ? std::optional<ObjectRef>{ObjectRefs::asset(*issue.asset)}
+                      : std::nullopt,
+    });
+  }
 
   const CollectionMembers& members = collection->members;
   std::string baseName =
@@ -85,10 +96,13 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
   }
 
   std::vector<InstrumentSetAsset> instrumentSets;
+  std::vector<std::pair<AssetId, std::string>> instrumentIdentities;
   instrumentSets.reserve(members.instrumentSets.size());
+  instrumentIdentities.reserve(members.instrumentSets.size());
   for (const AssetId assetId : members.instrumentSets) {
     if (const auto* instruments = snapshot.asset<InstrumentSetAsset>(assetId)) {
       instrumentSets.push_back(*instruments);
+      instrumentIdentities.emplace_back(instruments->metadata.id, instruments->metadata.format);
     } else {
       diagnostics.push_back(exportError("Collection instrument set asset was not found"));
       failed = true;
@@ -113,6 +127,15 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
       CollectionBindingContext context{sequence, sequenceRuntime, instrumentSets, sampleCollections, diagnostics};
       collection->binder(context);
       failed = context.failed;
+      for (size_t index = 0; index < instrumentSets.size(); ++index) {
+        const auto& metadata = instrumentSets[index].metadata;
+        const auto& [id, format] = instrumentIdentities[index];
+        if (metadata.id != id || metadata.format != format) {
+          diagnostics.push_back(exportError("Collection binding changed instrument set identity, format, or order"));
+          failed = true;
+          break;
+        }
+      }
     } catch (const std::exception& error) {
       diagnostics.push_back(exportError(bindingName + " collection binding failed: " + error.what()));
       failed = true;
