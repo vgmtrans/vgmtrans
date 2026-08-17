@@ -17,8 +17,10 @@
 namespace vgmtrans::core {
 
 class FormatRegistry;
+struct CollectionBindingResult;
+struct RenderedCollection;
 
-struct CollectionResolutionDiagnostics {
+struct CollectionBindingDiagnostics {
   std::vector<Diagnostic> collection;
   std::vector<Diagnostic> sequence;
   std::vector<Diagnostic> instrumentSets;
@@ -28,28 +30,27 @@ struct CollectionResolutionDiagnostics {
 // Final, collection-local input to rendering and export. The retained snapshot
 // keeps every borrowed asset alive, while private storage prevents exporters
 // from confusing target-specific projections with collection binding.
-class ResolvedCollection {
+class BoundCollection {
 public:
-  [[nodiscard]] bool valid() const noexcept { return id_.valid(); }
   [[nodiscard]] CollectionId id() const noexcept { return id_; }
   [[nodiscard]] const std::string& baseName() const noexcept { return baseName_; }
-  [[nodiscard]] const SequenceProgramAsset* sequence() const noexcept { return sequence_; }
-  [[nodiscard]] const SequenceRuntime& sequenceRuntime() const noexcept { return sequenceRuntime_; }
+  [[nodiscard]] bool hasSequence() const noexcept { return sequence_ != nullptr; }
+  [[nodiscard]] std::optional<AssetId> sequenceId() const noexcept {
+    return sequence_ != nullptr ? std::optional{sequence_->metadata.id} : std::nullopt;
+  }
   [[nodiscard]] const std::vector<InstrumentSetAsset>& instrumentSets() const noexcept { return instrumentSets_; }
   [[nodiscard]] const std::vector<const SampleCollectionAsset*>& sampleCollections() const noexcept {
     return sampleCollections_;
   }
-  [[nodiscard]] const CollectionResolutionDiagnostics& diagnostics() const noexcept { return diagnostics_; }
 
 private:
-  friend ResolvedCollection resolveCollection(const SessionSnapshot&, CollectionId, const SourceStore&,
-                                              const FormatRegistry&);
+  friend CollectionBindingResult bindCollection(const SessionSnapshot&, CollectionId, const FormatRegistry&);
+  friend RenderedCollection renderCollection(const BoundCollection&, const SequenceRenderOptions&);
 
-  ResolvedCollection(SessionSnapshot snapshot, CollectionId id, std::string baseName,
-                     const SequenceProgramAsset* sequence, SequenceRuntime sequenceRuntime,
-                     std::vector<InstrumentSetAsset> instrumentSets,
-                     std::vector<const SampleCollectionAsset*> sampleCollections,
-                     CollectionResolutionDiagnostics diagnostics);
+  BoundCollection(SessionSnapshot snapshot, CollectionId id, std::string baseName,
+                  const SequenceProgramAsset* sequence, SequenceRuntime sequenceRuntime,
+                  std::vector<InstrumentSetAsset> instrumentSets,
+                  std::vector<const SampleCollectionAsset*> sampleCollections);
 
   SessionSnapshot snapshot_;
   CollectionId id_;
@@ -58,7 +59,14 @@ private:
   SequenceRuntime sequenceRuntime_;
   std::vector<InstrumentSetAsset> instrumentSets_;
   std::vector<const SampleCollectionAsset*> sampleCollections_;
-  CollectionResolutionDiagnostics diagnostics_;
+};
+
+// A BoundCollection exists only after every fatal membership and format-binding
+// check succeeds. Diagnostics remain available for both successful warnings and
+// failures that intentionally publish no partially bound value.
+struct CollectionBindingResult {
+  std::optional<BoundCollection> collection;
+  CollectionBindingDiagnostics diagnostics;
 };
 
 struct RenderedCollection {
@@ -67,11 +75,11 @@ struct RenderedCollection {
   std::vector<Diagnostic> diagnostics;
 };
 
-[[nodiscard]] ResolvedCollection resolveCollection(const SessionSnapshot& snapshot, CollectionId collection,
-                                                   const SourceStore& sources, const FormatRegistry& formats);
+[[nodiscard]] CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, CollectionId collection,
+                                                     const FormatRegistry& formats);
 [[nodiscard]] RenderedCollection renderSequence(const SequenceProgramAsset& sequence,
                                                 const SequenceRenderOptions& options);
-[[nodiscard]] RenderedCollection renderCollection(const ResolvedCollection& resolved,
+[[nodiscard]] RenderedCollection renderCollection(const BoundCollection& collection,
                                                   const SequenceRenderOptions& options);
 
 }  // namespace vgmtrans::core

@@ -55,6 +55,9 @@ public:
   ScanSequenceDraft& range(SourceRange range);
   ScanSequenceDraft& program(SequenceProgram program);
 
+  template <typename T>
+  ScanSequenceDraft& data(T value);
+
 private:
   friend class ScanResultBuilder;
 
@@ -91,6 +94,9 @@ public:
   // directly. The draft remains its owner and finish() remains scan-owned.
   [[nodiscard]] InstrumentSetBuilder& builder();
 
+  template <typename T>
+  ScanInstrumentSetDraft& data(T value);
+
 private:
   friend class ScanResultBuilder;
 
@@ -125,6 +131,9 @@ public:
   [[nodiscard]] SampleCollectionBuilder& builder();
   [[nodiscard]] const SampleCollectionBuilder& builder() const;
 
+  template <typename T>
+  ScanSampleCollectionDraft& data(T value);
+
 private:
   friend class ScanResultBuilder;
 
@@ -140,6 +149,9 @@ public:
   [[nodiscard]] ScanMiscAssetRef ref() const noexcept { return ScanMiscAssetRef{.id = id_}; }
   [[nodiscard]] AssetId id() const noexcept { return id_; }
   ScanMiscDraft& payload(std::vector<u8> payload);
+
+  template <typename T>
+  ScanMiscDraft& data(T value);
 
 private:
   friend class ScanResultBuilder;
@@ -231,6 +243,7 @@ private:
   void validateDraftReference(AssetId id, DraftRole role) const;
   void setSequenceRange(size_t slot, SourceRange range);
   void setSequenceProgram(size_t slot, SequenceProgram program);
+  void setPrivateData(size_t slot, AssetPrivateData data);
   void setMiscPayload(size_t slot, std::vector<u8> payload);
   [[nodiscard]] InstrumentSetBuilder& instrumentDraft(size_t slot);
   [[nodiscard]] const InstrumentSetBuilder& instrumentDraft(size_t slot) const;
@@ -248,5 +261,29 @@ private:
   // a stable address even while the list of published drafts grows.
   std::vector<std::unique_ptr<DraftSlot>> drafts_;
 };
+
+template <typename T>
+ScanSequenceDraft& ScanSequenceDraft::data(T value) {
+  out_->setPrivateData(slot_, AssetPrivateData::make(std::move(value)));
+  return *this;
+}
+
+template <typename T>
+ScanInstrumentSetDraft& ScanInstrumentSetDraft::data(T value) {
+  out_->setPrivateData(slot_, AssetPrivateData::make(std::move(value)));
+  return *this;
+}
+
+template <typename T>
+ScanSampleCollectionDraft& ScanSampleCollectionDraft::data(T value) {
+  out_->setPrivateData(slot_, AssetPrivateData::make(std::move(value)));
+  return *this;
+}
+
+template <typename T>
+ScanMiscDraft& ScanMiscDraft::data(T value) {
+  out_->setPrivateData(slot_, AssetPrivateData::make(std::move(value)));
+  return *this;
+}
 
 }  // namespace vgmtrans::core

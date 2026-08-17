@@ -105,10 +105,13 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
     auto sequence = result.sequence(sequenceName, input.reader.range(offset, layout->header.length));
     auto parsed = parseAkaoSequence(input, sequence.id(), *layout, &result.sourceMap(), &result.diagnostics());
     auto instruments = result.instrumentSet(akaoInstrumentSetName(parsed.analysis));
-    parsed.analysis.requiredArticulations = buildAkaoInstrumentSet(input, parsed.analysis, {}, instruments.builder());
+    auto built = buildAkaoInstrumentSet(input, parsed.analysis, instruments.builder());
+    parsed.analysis.requiredArticulations = std::move(built.requiredArticulations);
     addSequenceFacts(result, sequence.ref(), parsed.analysis, parsed.analysis.requiredArticulations);
     addInstrumentSetFacts(result, instruments.ref(), sequence.ref());
-    sequence.program(std::move(parsed.program));
+    sequence.data(AkaoSequenceBindingData{.structuralInstrumentSet = instruments.id()})
+        .program(std::move(parsed.program));
+    instruments.data(std::move(built.binding));
   }
 }
 

@@ -63,11 +63,20 @@ void requireArticulation(std::set<u32>& required, u32 articulationId) {
   }
 }
 
-[[nodiscard]] std::vector<Region> readMelodicRegions(ByteReader reader, u32 offset, u32 endOffset,
-                                                     const AkaoProfile& profile,
-                                                     const AkaoArticulationMap& articulations,
-                                                     std::set<u32>& required) {
-  std::vector<Region> regions;
+struct ParsedRegions {
+  std::vector<Region> values;
+  std::vector<AkaoRegionBindingData> binding;
+};
+
+struct ParsedInstrumentSet {
+  std::vector<Instrument> instruments;
+  std::vector<std::vector<AkaoRegionBindingData>> binding;
+  std::vector<u32> requiredArticulations;
+};
+
+[[nodiscard]] ParsedRegions readMelodicRegions(ByteReader reader, u32 offset, u32 endOffset, const AkaoProfile& profile,
+                                               std::set<u32>& required) {
+  ParsedRegions parsed;
   for (u32 i = 0; i < 128 && offset + i * 8 + 8 <= endOffset && reader.has(offset + i * 8, 8); ++i) {
     const u32 regionOffset = offset + i * 8;
     if (!profile.version3OrLater() && reader.u8At(regionOffset) >= 0x80) {
@@ -87,11 +96,15 @@ void requireArticulation(std::set<u32>& required, u32 articulationId) {
         .attenuationDb = linearAmplitudeToAttenuationDb(
             reader.u8At(regionOffset + 7) == 0 ? 1.0 : reader.u8At(regionOffset + 7) / 128.0),
     };
-    applyArticulationToRegion(region, findArticulation(articulations, articulationId), reader.u8At(regionOffset + 3),
-                              reader.u8At(regionOffset + 4), reader.u8At(regionOffset + 5),
-                              reader.u8At(regionOffset + 6), false);
-    if (!regions.empty()) {
-      Region& previous = regions.back();
+    AkaoRegionBindingData binding{
+        .articulationId = articulationId,
+        .attackRate = reader.u8At(regionOffset + 3),
+        .sustainRate = reader.u8At(regionOffset + 4),
+        .sustainMode = reader.u8At(regionOffset + 5),
+        .releaseRate = reader.u8At(regionOffset + 6),
+    };
+    if (!parsed.values.empty()) {
+      Region& previous = parsed.values.back();
       // Some tables contain stale or overlapping entries. The driver advances
       // only when the next entry extends the covered key range, and fills any
       // gap from the preceding entry's end.
@@ -99,43 +112,47 @@ void requireArticulation(std::set<u32>& required, u32 articulationId) {
         if (region.keyRange.low > previous.keyRange.high + 1) {
           region.keyRange.low = static_cast<u8>(previous.keyRange.high + 1);
         }
-        regions.push_back(region);
+        parsed.values.push_back(region);
+        parsed.binding.push_back(binding);
       }
     } else {
-      regions.push_back(region);
+      parsed.values.push_back(region);
+      parsed.binding.push_back(binding);
     }
   }
-  if (!regions.empty()) {
-    regions.front().keyRange.low = 0;
-    regions.back().keyRange.high = 127;
+  if (!parsed.values.empty()) {
+    parsed.values.front().keyRange.low = 0;
+    parsed.values.back().keyRange.high = 127;
   }
-  return regions;
+  return parsed;
 }
 
 void addMelodicInstrument(std::vector<Instrument>& instruments, ByteReader reader, u32 offset, u32 endOffset,
-                          const AkaoProfile& profile, const AkaoArticulationMap& articulations, std::set<u32>& required,
-                          u32 program) {
-  auto regions = readMelodicRegions(reader, offset, endOffset, profile, articulations, required);
-  if (regions.empty()) {
+                          const AkaoProfile& profile, std::set<u32>& required,
+                          std::vector<std::vector<AkaoRegionBindingData>>& binding, u32 program) {
+  auto regions = readMelodicRegions(reader, offset, endOffset, profile, required);
+  if (regions.values.empty()) {
     return;
   }
-  const auto& last = regions.back();
+  const auto& last = regions.values.back();
   instruments.push_back(Instrument{
       .explicitAddress = InstrumentAddress{.bank = 1, .program = program},
       .name = fmt::format("Instrument {}", program),
       .range = reader.range(offset, static_cast<u32>(last.range.offset + last.range.size - offset)),
-      .regions = std::move(regions),
+      .regions = std::move(regions.values),
   });
+  binding.push_back(std::move(regions.binding));
 }
 
 void addDrumInstrument(std::vector<Instrument>& instruments, ByteReader reader, u32 offset, u32 endOffset,
-                       const AkaoProfile& profile, const AkaoArticulationMap& articulations, std::set<u32>& required,
-                       u32 program = 127) {
+                       const AkaoProfile& profile, std::set<u32>& required,
+                       std::vector<std::vector<AkaoRegionBindingData>>& binding, u32 program = 127) {
   Instrument drum{
       .explicitAddress = InstrumentAddress{.bank = 127, .program = program},
       .name = "Drum Kit",
       .range = reader.range(offset, 0),
   };
+  std::vector<AkaoRegionBindingData> regionBinding;
   if (profile.version3OrLater()) {
     const u8 attackRate = reader.u8At(offset + 2);
     const u8 sustainRate = reader.u8At(offset + 3);
@@ -163,9 +180,15 @@ void addDrumInstrument(std::vector<Instrument>& instruments, ByteReader reader, 
           .attenuationDb = linearAmplitudeToAttenuationDb(
               reader.u8At(regionOffset + 6) == 0 ? 1.0 : reader.u8At(regionOffset + 6) / 128.0),
       };
-      applyArticulationToRegion(region, findArticulation(articulations, articulationId), attackRate, sustainRate,
-                                sustainMode, releaseRate, true, reader.u8At(regionOffset + 1));
       drum.regions.push_back(region);
+      regionBinding.push_back(AkaoRegionBindingData{
+          .articulationId = articulationId,
+          .attackRate = attackRate,
+          .sustainRate = sustainRate,
+          .sustainMode = sustainMode,
+          .releaseRate = releaseRate,
+          .drumRelativeUnityKey = reader.u8At(regionOffset + 1),
+      });
     }
   } else {
     const u32 regionSize = profile.legacyDrumRegionBytes();
@@ -188,15 +211,18 @@ void addDrumInstrument(std::vector<Instrument>& instruments, ByteReader reader, 
           .pan = panPositionFrom7Bit(reader.u8At(regionOffset + 4)),
           .attenuationDb = linearAmplitudeToAttenuationDb(reader.le16(regionOffset + 2) / (127.0 * 128.0)),
       };
-      applyArticulationToRegion(region, findArticulation(articulations, articulationId), 0, 0, 0, 0, true,
-                                reader.u8At(regionOffset + 1));
       drum.regions.push_back(region);
+      regionBinding.push_back(AkaoRegionBindingData{
+          .articulationId = articulationId,
+          .drumRelativeUnityKey = reader.u8At(regionOffset + 1),
+      });
     }
   }
   if (!drum.regions.empty()) {
     const auto& last = drum.regions.back();
     drum.range.size = static_cast<u32>(last.range.offset + last.range.size - offset);
     instruments.push_back(std::move(drum));
+    binding.push_back(std::move(regionBinding));
   }
 }
 
@@ -221,13 +247,7 @@ void addSyntheticArticulationInstruments(std::vector<Instrument>& instruments,
   }
 }
 
-struct ParsedInstrumentSet {
-  std::vector<Instrument> instruments;
-  std::vector<u32> requiredArticulations;
-};
-
-[[nodiscard]] ParsedInstrumentSet parseInstrumentTables(ByteReader reader, const AkaoSequenceAnalysis& sequence,
-                                                        const AkaoArticulationMap& articulations) {
+[[nodiscard]] ParsedInstrumentSet parseInstrumentTables(ByteReader reader, const AkaoSequenceAnalysis& sequence) {
   ParsedInstrumentSet parsed;
   std::set<u32> required;
   const AkaoProfile profile{.version = sequence.header.version};
@@ -246,28 +266,28 @@ struct ParsedInstrumentSet {
       }
       const u64 instrOffset = static_cast<u64>(instrSetOffset) + 0x20 + pointer;
       if (instrOffset < sequenceEnd && reader.has(instrOffset, 8)) {
-        addMelodicInstrument(parsed.instruments, reader, static_cast<u32>(instrOffset), sequenceEnd, profile,
-                             articulations, required, program);
+        addMelodicInstrument(parsed.instruments, reader, static_cast<u32>(instrOffset), sequenceEnd, profile, required,
+                             parsed.binding, program);
       }
     }
   } else {
     u32 program = 0;
     for (const u32 instrOffset : sequence.references.customInstrumentTableOffsets) {
       if (instrOffset < sequenceEnd && reader.has(instrOffset, 8)) {
-        addMelodicInstrument(parsed.instruments, reader, instrOffset, sequenceEnd, profile, articulations, required,
+        addMelodicInstrument(parsed.instruments, reader, instrOffset, sequenceEnd, profile, required, parsed.binding,
                              program++);
       }
     }
   }
 
   if (sequence.header.drumSetOffset && *sequence.header.drumSetOffset < sequenceEnd) {
-    addDrumInstrument(parsed.instruments, reader, *sequence.header.drumSetOffset, sequenceEnd, profile, articulations,
-                      required);
+    addDrumInstrument(parsed.instruments, reader, *sequence.header.drumSetOffset, sequenceEnd, profile, required,
+                      parsed.binding);
   } else {
     u32 drumIndex = 0;
     for (const u32 drumOffset : sequence.references.drumInstrumentTableOffsets) {
       if (drumOffset < sequenceEnd && reader.has(drumOffset, 5)) {
-        addDrumInstrument(parsed.instruments, reader, drumOffset, sequenceEnd, profile, articulations, required,
+        addDrumInstrument(parsed.instruments, reader, drumOffset, sequenceEnd, profile, required, parsed.binding,
                           127 - drumIndex++);
       }
     }
@@ -417,13 +437,10 @@ std::string akaoInstrumentSetName(const AkaoSequenceAnalysis& sequence) {
   return fmt::format("Akao Instr Set {:02X}", sequence.header.sequenceId);
 }
 
-std::vector<u32> buildAkaoInstrumentSet(const ScanInput& input, const AkaoSequenceAnalysis& sequence,
-                                        const AkaoArticulationMap& articulations, InstrumentSetBuilder& instruments) {
-  auto parsed = parseInstrumentTables(input.reader, sequence, articulations);
+AkaoInstrumentSetBuild buildAkaoInstrumentSet(const ScanInput& input, const AkaoSequenceAnalysis& sequence,
+                                              InstrumentSetBuilder& instruments) {
+  auto parsed = parseInstrumentTables(input.reader, sequence);
   const SourceRange range = instrumentSetRange(input.reader, sequence, parsed.instruments);
-  if (sequence.references.usesIndividualArticulations) {
-    addSyntheticArticulationInstruments(parsed.instruments, articulations);
-  }
 
   instruments.include(range);
   auto root =
@@ -437,7 +454,39 @@ std::vector<u32> buildAkaoInstrumentSet(const ScanInput& input, const AkaoSequen
   for (auto& instrument : parsed.instruments) {
     publishInstrument(input.reader, instruments, root.id(), std::move(instrument));
   }
-  return parsed.requiredArticulations;
+  return AkaoInstrumentSetBuild{
+      .requiredArticulations = std::move(parsed.requiredArticulations),
+      .binding =
+          AkaoInstrumentSetBindingData{
+              .regions = std::move(parsed.binding),
+              .usesIndividualArticulations = sequence.references.usesIndividualArticulations,
+          },
+  };
+}
+
+bool applyAkaoArticulations(InstrumentSetAsset& instruments, const AkaoInstrumentSetBindingData& recipe,
+                            const AkaoArticulationMap& articulations) {
+  if (instruments.instruments.size() != recipe.regions.size()) {
+    return false;
+  }
+  for (size_t instrumentIndex = 0; instrumentIndex < instruments.instruments.size(); ++instrumentIndex) {
+    auto& instrument = instruments.instruments[instrumentIndex];
+    const auto& regionRecipes = recipe.regions[instrumentIndex];
+    if (instrument.regions.size() != regionRecipes.size()) {
+      return false;
+    }
+    for (size_t regionIndex = 0; regionIndex < instrument.regions.size(); ++regionIndex) {
+      auto& region = instrument.regions[regionIndex];
+      const auto& binding = regionRecipes[regionIndex];
+      applyArticulationToRegion(region, findArticulation(articulations, binding.articulationId), binding.attackRate,
+                                binding.sustainRate, binding.sustainMode, binding.releaseRate,
+                                binding.drumRelativeUnityKey.has_value(), binding.drumRelativeUnityKey.value_or(0));
+    }
+  }
+  if (recipe.usesIndividualArticulations) {
+    addSyntheticArticulationInstruments(instruments.instruments, articulations);
+  }
+  return true;
 }
 
 }  // namespace vgmtrans::formats::akao

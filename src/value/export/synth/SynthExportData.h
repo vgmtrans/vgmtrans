@@ -18,14 +18,11 @@
 namespace vgmtrans::core {
 
 struct PerformanceSequence;
-class FormatRegistry;
 
 struct SynthExportInput {
   std::string name;
   std::span<const InstrumentSetAsset* const> instrumentSets;
   std::span<const SampleCollectionAsset* const> sampleCollections;
-  // Resolves FormatPreferred independently for each sample collection.
-  const FormatRegistry* formats = nullptr;
   // Null retains every instrument. A performance selects the instruments used
   // by its notes; sample filtering can also be requested independently.
   const PerformanceSequence* sequenceUsage = nullptr;

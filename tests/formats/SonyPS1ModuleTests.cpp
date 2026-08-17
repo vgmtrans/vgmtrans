@@ -424,22 +424,29 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
          "same-source SonyPS1 sequences and VABs should pair in descending offset order");
   const auto* sequence = pairedSnapshot.asset<SequenceProgramAsset>(*latestCollection->members.sequence);
   SequenceRuntime runtime = sequence->program.runtime;
+  const InstrumentSetAsset foreignBank{
+      .metadata = AssetMetadata{.id = AssetId{999}, .format = "Foreign", .name = "Foreign Bank"},
+      .instruments = {Instrument{
+          .explicitAddress = InstrumentAddress{.bank = 42, .program = 7},
+          .name = "Foreign Instrument",
+      }},
+  };
   std::vector<InstrumentSetAsset> resolvedInstruments{
-      *pairedSnapshot.asset<InstrumentSetAsset>(latestCollection->members.instrumentSets.front())};
+      foreignBank,
+      *pairedSnapshot.asset<InstrumentSetAsset>(latestCollection->members.instrumentSets.front()),
+  };
   std::vector<const SampleCollectionAsset*> resolvedSamples{
       pairedSnapshot.asset<SampleCollectionAsset>(latestCollection->members.sampleCollections.front())};
   std::vector<Diagnostic> bindingDiagnostics;
   CollectionBindingContext binding{
-      .sources = paired.sources(),
-      .sequence = sequence,
-      .sequenceRuntime = runtime,
-      .instrumentSets = resolvedInstruments,
-      .sampleCollections = resolvedSamples,
-      .diagnostics = bindingDiagnostics,
+      sequence, runtime, resolvedInstruments, resolvedSamples, bindingDiagnostics,
   };
   bindSonyPs1Collection(binding);
-  expect(resolvedInstruments.size() == 1, "resolved SonyPS1 binding should retain its selected VAB");
-  const auto& instrument = resolvedInstruments.front().instruments.front();
+  expect(resolvedInstruments.size() == 2 && resolvedInstruments.front().metadata.id == foreignBank.metadata.id &&
+             resolvedInstruments.front().instruments.front().explicitAddress ==
+                 InstrumentAddress{.bank = 42, .program = 7},
+         "SonyPS1 binding should preserve foreign banks and their addresses");
+  const auto& instrument = resolvedInstruments.back().instruments.front();
   expect(instrument.explicitAddress && instrument.explicitAddress->bank == 0,
-         "the selected VAB should be rebased from scan bank 1 to collection bank 0");
+         "the selected VAB should be rebased among Sony banks without foreign members shifting its slot");
 }

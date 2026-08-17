@@ -24,18 +24,21 @@ struct PendingSequence {
   std::string name;
   SourceRange range;
   std::optional<SequenceProgram> program;
+  AssetPrivateData privateData;
 };
 
 struct PendingInstrumentSet {
   AssetId id;
   std::string name;
   InstrumentSetBuilder instruments;
+  AssetPrivateData privateData;
 };
 
 struct PendingSampleCollection {
   AssetId id;
   std::string name;
   SampleCollectionBuilder samples;
+  AssetPrivateData privateData;
 };
 
 struct PendingMisc {
@@ -43,6 +46,7 @@ struct PendingMisc {
   std::string name;
   SourceRange range;
   std::optional<std::vector<u8>> payload;
+  AssetPrivateData privateData;
 };
 
 }  // namespace
@@ -389,23 +393,27 @@ ScanResult ScanResultBuilder::finish() {
             return SequenceProgramAsset{
                 .metadata = metadata(pending.id, std::move(pending.name), pending.range),
                 .program = std::move(*pending.program),
+                .privateData = std::move(pending.privateData),
             };
           } else if constexpr (std::is_same_v<Pending, PendingInstrumentSet>) {
             auto built = std::move(pending.instruments).finish();
             return InstrumentSetAsset{
                 .metadata = metadata(pending.id, std::move(pending.name), built.range),
                 .instruments = std::move(built.values),
+                .privateData = std::move(pending.privateData),
             };
           } else if constexpr (std::is_same_v<Pending, PendingSampleCollection>) {
             auto built = std::move(pending.samples).finish();
             return SampleCollectionAsset{
                 .metadata = metadata(pending.id, std::move(pending.name), built.range),
                 .samples = std::move(built.value),
+                .privateData = std::move(pending.privateData),
             };
           } else {
             return MiscAsset{
                 .metadata = metadata(pending.id, std::move(pending.name), pending.range),
                 .payload = std::move(*pending.payload),
+                .privateData = std::move(pending.privateData),
             };
           }
         },
@@ -415,6 +423,10 @@ ScanResult ScanResultBuilder::finish() {
 
   result_.sourceMap = sourceMap_.finish();
   return std::move(result_);
+}
+
+void ScanResultBuilder::setPrivateData(size_t slot, AssetPrivateData data) {
+  std::visit([&](auto& pending) { pending.privateData = std::move(data); }, drafts_.at(slot)->value);
 }
 
 AssetMetadata ScanResultBuilder::metadata(AssetId id, std::string name, SourceRange range) const {

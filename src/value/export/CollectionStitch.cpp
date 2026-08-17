@@ -6,7 +6,7 @@
 
 #include "value/export/CollectionStitch.h"
 
-#include "value/export/CollectionResolution.h"
+#include "value/export/CollectionBinding.h"
 #include "value/export/DynamicEnvelope.h"
 #include "value/export/ExportDiagnostics.h"
 #include "value/export/midi/MidiExporter.h"
@@ -58,21 +58,11 @@ void fail(CollectionStitchResult& result, std::string message) {
   result.soundFont.diagnostics.push_back(diagnostic);
 }
 
-void append(std::vector<Diagnostic>& destination, const CollectionResolutionDiagnostics& source) {
+void append(std::vector<Diagnostic>& destination, const CollectionBindingDiagnostics& source) {
   append(destination, source.collection);
   append(destination, source.sequence);
   append(destination, source.instrumentSets);
   append(destination, source.sampleCollections);
-}
-
-[[nodiscard]] bool hasErrors(const std::vector<Diagnostic>& diagnostics) {
-  return std::ranges::any_of(diagnostics,
-                             [](const Diagnostic& diagnostic) { return diagnostic.severity == Severity::Error; });
-}
-
-[[nodiscard]] bool hasErrors(const CollectionResolutionDiagnostics& diagnostics) {
-  return hasErrors(diagnostics.collection) || hasErrors(diagnostics.sequence) ||
-         hasErrors(diagnostics.instrumentSets) || hasErrors(diagnostics.sampleCollections);
 }
 
 void mergeRange(ObservedValueRange& destination, const ObservedValueRange& source) {
@@ -96,33 +86,33 @@ void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulation
   mergeRange(destination.tremoloRate, source.tremoloRate);
 }
 
-[[nodiscard]] bool preparePart(StitchPart& part, const SessionSnapshot& snapshot, const SourceStore& sources,
-                               const ExportRequest& request, const FormatRegistry& formats,
-                               std::vector<Diagnostic>& diagnostics) {
-  const auto resolved = resolveCollection(snapshot, part.collection, sources, formats);
-  if (hasErrors(resolved.diagnostics())) {
-    append(diagnostics, resolved.diagnostics());
+[[nodiscard]] bool preparePart(StitchPart& part, const SessionSnapshot& snapshot, const ExportRequest& request,
+                               const FormatRegistry& formats, std::vector<Diagnostic>& diagnostics) {
+  auto binding = bindCollection(snapshot, part.collection, formats);
+  if (!binding.collection) {
+    append(diagnostics, binding.diagnostics);
     return false;
   }
-  if (resolved.sequence() == nullptr) {
-    append(diagnostics, resolved.diagnostics());
+  const auto& bound = *binding.collection;
+  if (!bound.hasSequence()) {
+    append(diagnostics, binding.diagnostics);
     diagnostics.push_back(exportError("A stitched collection does not contain a sequence"));
     return false;
   }
-  if (resolved.instrumentSets().empty()) {
-    append(diagnostics, resolved.diagnostics());
+  if (bound.instrumentSets().empty()) {
+    append(diagnostics, binding.diagnostics);
     diagnostics.push_back(exportError("A stitched collection does not contain instruments"));
     return false;
   }
 
-  auto rendering = renderCollection(resolved, request.sequence);
+  auto rendering = renderCollection(bound, request.sequence);
   if (!rendering.performance) {
-    append(diagnostics, resolved.diagnostics());
+    append(diagnostics, binding.diagnostics);
     append(diagnostics, rendering.diagnostics);
     return false;
   }
 
-  std::vector<InstrumentSetAsset> instrumentSets = resolved.instrumentSets();
+  std::vector<InstrumentSetAsset> instrumentSets = bound.instrumentSets();
   const PerformanceSequence* performance = &*rendering.performance;
   std::optional<DynamicEnvelopeMaterialization> materialization;
   if (request.dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants) {
@@ -169,8 +159,8 @@ void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulation
   }
 
   part.instruments = std::move(instrumentSets);
-  part.samples = resolved.sampleCollections();
-  append(diagnostics, resolved.diagnostics());
+  part.samples = bound.sampleCollections();
+  append(diagnostics, binding.diagnostics);
   return true;
 }
 
@@ -415,7 +405,7 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
   parts.reserve(collections.size());
   for (const CollectionId collection : collections) {
     StitchPart part{.collection = collection};
-    if (!preparePart(part, snapshot, sources, request, formats, result.midi.diagnostics)) {
+    if (!preparePart(part, snapshot, request, formats, result.midi.diagnostics)) {
       result.soundFont.diagnostics = result.midi.diagnostics;
       return result;
     }
@@ -475,7 +465,6 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
           .name = "Stitched Collections",
           .instrumentSets = instruments,
           .sampleCollections = samples,
-          .formats = &formats,
           .filterSamplesToReferencedInstruments = request.exportOnlyUsedInstruments,
           .midiModulationUsage = modulationUsage ? &*modulationUsage : nullptr,
           .modulationScaling = request.modulationScaling,

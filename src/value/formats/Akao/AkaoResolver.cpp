@@ -8,9 +8,8 @@
 #include "value/scan/CollectionResolver.h"
 
 #include <algorithm>
-#include <cstddef>
 #include <cctype>
-#include <limits>
+#include <cstddef>
 #include <optional>
 #include <set>
 #include <string>
@@ -220,70 +219,14 @@ void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceFa
   }
 }
 
-[[nodiscard]] Diagnostic bindingWarning(std::string message, std::optional<SourceRange> range = std::nullopt) {
-  return Diagnostic{
-      .severity = Severity::Warning,
-      .message = std::move(message),
-      .range = range,
-  };
-}
-
-[[nodiscard]] std::optional<ScanInput> inputFor(const CollectionBindingContext& context, SourceRange range,
-                                                ScanIdAllocator& ids) {
-  if (!range.valid() || !context.sources.contains(range.source)) {
-    return std::nullopt;
-  }
-  return ScanInput{
-      .source = context.sources.source(range.source),
-      .reader = context.sources.reader(range.source),
-      .ids = ids,
-  };
-}
-
-[[nodiscard]] std::optional<AkaoSampleCollectionParse> parseSampleCollectionForBinding(
-    const CollectionBindingContext& context, ScanIdAllocator& ids, const SampleCollectionAsset& sampleCollection,
-    std::vector<Diagnostic>& diagnostics) {
-  const SourceRange range = sampleCollection.metadata.range;
-  auto input = inputFor(context, range, ids);
-  if (!input) {
-    diagnostics.push_back(bindingWarning("Akao binding could not read selected sample collection source",
-                                         range.valid() ? std::optional<SourceRange>{range} : std::nullopt));
-    return std::nullopt;
-  }
-
-  const ScanSampleCollectionRef ref{.id = sampleCollection.metadata.id};
-  if (const auto hardcoded = ff7HardcodedAkaoSampleLocation(input->reader)) {
-    const u32 hardcodedOffset = std::min(hardcoded->sampleHeaderOffset, hardcoded->articulationTableOffset);
-    if (range.offset == hardcodedOffset) {
-      return parseAkaoSampleCollectionData(*input, ref, *hardcoded);
-    }
-  }
-
-  if (range.offset > std::numeric_limits<u32>::max()) {
-    diagnostics.push_back(
-        bindingWarning("Akao sample collection source offset is outside the supported address range", range));
-    return std::nullopt;
-  }
-
-  AkaoPs1Version version = determineVersionFromSource(input->source);
-  if (version == AkaoPs1Version::Unknown) {
-    version = guessSampleVersion(input->reader, static_cast<u32>(range.offset));
-  }
-  return parseAkaoSampleCollectionData(*input, ref, static_cast<u32>(range.offset), version);
-}
-
-[[nodiscard]] AkaoArticulationMap buildResolvedArticulations(const CollectionBindingContext& context,
-                                                             ScanIdAllocator& ids,
-                                                             std::vector<Diagnostic>& diagnostics) {
+[[nodiscard]] AkaoArticulationMap selectedArticulations(const CollectionBindingContext& context) {
   AkaoArticulationMap articulations;
-  for (const auto* sampleCollection : context.sampleCollections) {
-    auto parsed = parseSampleCollectionForBinding(context, ids, *sampleCollection, diagnostics);
-    if (!parsed) {
-      diagnostics.push_back(
-          bindingWarning("Akao binding could not parse selected sample collection", sampleCollection->metadata.range));
+  for (const auto* sampleCollection : context.sampleCollections()) {
+    const auto* data = sampleCollection->privateData.get<AkaoSampleBindingData>();
+    if (data == nullptr) {
       continue;
     }
-    for (const auto& articulation : parsed->articulations) {
+    for (const auto& articulation : data->articulations) {
       articulations[articulation.articulationId] = AkaoArticulationBinding{
           .collection = ScanSampleCollectionRef{.id = sampleCollection->metadata.id},
           .sampleIndex = articulation.sampleIndex,
@@ -390,47 +333,54 @@ std::vector<DesiredCollection> resolveAkaoCollections(const MatchContext& contex
 }
 
 void bindAkaoCollection(CollectionBindingContext& context) {
-  if (context.sequence == nullptr || context.instrumentSets.empty() || context.sampleCollections.empty()) {
+  const auto* sequence = context.sequence();
+  if (sequence == nullptr) {
+    return;
+  }
+  const auto* sequenceData = sequence->privateData.get<AkaoSequenceBindingData>();
+  if (sequenceData == nullptr) {
+    context.fail("Akao sequence is missing retained collection-binding data", sequence->metadata.range);
+    return;
+  }
+  auto* instruments = context.instrumentSet(sequenceData->structuralInstrumentSet);
+  if (instruments == nullptr) {
+    context.fail("Akao collection does not contain the sequence's structural instrument set", sequence->metadata.range);
+    return;
+  }
+  const auto* instrumentData = instruments->privateData.get<AkaoInstrumentSetBindingData>();
+  if (instrumentData == nullptr) {
+    context.fail("Akao instrument set is missing retained collection-binding data", instruments->metadata.range);
     return;
   }
 
-  const auto& sequence = *context.sequence;
-
-  ScanIdAllocator ids;
-  const SourceRange sequenceRange = sequence.metadata.range;
-  auto input = inputFor(context, sequenceRange, ids);
-  if (!input) {
-    context.diagnostics.push_back(
-        bindingWarning("Akao binding could not read sequence source",
-                       sequenceRange.valid() ? std::optional<SourceRange>{sequenceRange} : std::nullopt));
-    return;
+  for (const auto* samples : context.sampleCollections()) {
+    if (samples->metadata.format == kAkaoFormatName && samples->privateData.get<AkaoSampleBindingData>() == nullptr) {
+      context.fail("Akao sample collection is missing retained collection-binding data", samples->metadata.range);
+      return;
+    }
   }
-  if (sequenceRange.offset > std::numeric_limits<u32>::max()) {
-    context.diagnostics.push_back(
-        bindingWarning("Akao sequence source offset is outside the supported address range", sequenceRange));
+
+  const auto articulations = selectedArticulations(context);
+  if (!applyAkaoArticulations(*instruments, *instrumentData, articulations)) {
+    context.fail("Akao retained instrument recipe does not match its structural bank", instruments->metadata.range);
     return;
   }
 
-  auto analysis = analyzeAkaoSequence(*input, sequence);
-  if (!analysis) {
-    context.diagnostics.push_back(bindingWarning("Akao binding could not re-analyze sequence", sequenceRange));
-    return;
+  std::set<u32> missing;
+  for (const auto& regions : instrumentData->regions) {
+    for (const auto& region : regions) {
+      if (region.articulationId != 0 && !articulations.contains(region.articulationId)) {
+        missing.insert(region.articulationId);
+      }
+    }
   }
-
-  // The scanned bank owns the durable layout and source annotations. Rebuild
-  // the same values here only to bind their articulation ids to the sample
-  // collections selected for this particular collection.
-  auto articulations = buildResolvedArticulations(context, ids, context.diagnostics);
-  if (articulations.empty()) {
-    context.diagnostics.push_back(bindingWarning("Akao binding produced no articulation bindings", sequenceRange));
-    return;
+  if (!missing.empty()) {
+    std::string message = "Akao collection does not provide required articulations:";
+    for (const u32 articulation : missing) {
+      message += " " + std::to_string(articulation);
+    }
+    context.warning(std::move(message), sequence->metadata.range);
   }
-
-  InstrumentSetBuilder instruments(AssetId{}, nullptr, &context.diagnostics);
-  (void)buildAkaoInstrumentSet(*input, *analysis, articulations, instruments);
-  auto built = std::move(instruments).finish();
-  context.instrumentSets.front().instruments = std::move(built.values);
-  context.instrumentSets.resize(1);
 }
 
 }  // namespace vgmtrans::formats::akao

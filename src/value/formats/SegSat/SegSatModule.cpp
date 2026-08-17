@@ -9,9 +9,6 @@
 #include <fmt/format.h>
 
 #include <algorithm>
-#include <cstddef>
-#include <limits>
-#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -65,8 +62,17 @@ struct BankAssets {
     const std::string name = fmt::format("{} {}_{}", sourceName, sequence.tableIndex, sequence.sequenceIndex);
     auto sequenceDraft =
         result.sequence(name, input.reader.range(sequence.offset, sequence.normalTrackEnd - sequence.offset));
-    sequenceDraft.program(parseSegSatSequenceProgram(input.reader, sequenceDraft.id(), sequence, &result.sourceMap(),
-                                                     &result.diagnostics()));
+    auto parsed =
+        parseSegSatSequence(input.reader, sequenceDraft.id(), sequence, &result.sourceMap(), &result.diagnostics());
+    const std::vector<u8> referencedBanks =
+        sequence.referencedBanks.empty() ? std::vector<u8>{0} : sequence.referencedBanks;
+    sequenceDraft
+        .data(SegSatSequenceBindingData{
+            .volumeModel = volumeModel,
+            .referencedBanks = referencedBanks,
+            .controllerChanges = std::move(parsed.controllerChanges),
+        })
+        .program(std::move(parsed.program));
 
     auto collection = result.collection(name, collectionKey(result.source(), sequence)).sequence(sequenceDraft);
     if (banks.size() == 1) {
@@ -76,8 +82,6 @@ struct BankAssets {
 
     // A stream without an explicit bank command begins on the driver's bank
     // zero. Treat that implicit dependency exactly like a referenced bank.
-    const std::vector<u8> referencedBanks =
-        sequence.referencedBanks.empty() ? std::vector<u8>{0} : sequence.referencedBanks;
     for (const u8 referencedBank : referencedBanks) {
       auto selected =
           std::ranges::find_if(banks, [&](const BankAssets& bank) { return bank.layout.sourceBank == referencedBank; });
@@ -94,77 +98,66 @@ struct BankAssets {
   return result.finish();
 }
 
-[[nodiscard]] Diagnostic bindingWarning(std::string message, SourceRange range = {}) {
-  return Diagnostic{
-      .severity = Severity::Warning,
-      .message = std::move(message),
-      .range = range.valid() ? std::optional<SourceRange>{range} : std::nullopt,
-  };
-}
-
 }  // namespace
 
 void bindSegSatCollection(CollectionBindingContext& context) {
-  if (context.sequence == nullptr) {
+  const auto* sequence = context.sequence();
+  if (sequence == nullptr) {
     return;
   }
-  const auto& sequence = *context.sequence;
-
-  SegSatVolumeModel volumeModel = SegSatVolumeModel::V1_33;
-  if (sequence.metadata.range.valid() && context.sources.contains(sequence.metadata.range.source)) {
-    volumeModel = determineSegSatVolumeModel(context.sources.reader(sequence.metadata.range.source));
+  const auto* sequenceData = sequence->privateData.get<SegSatSequenceBindingData>();
+  if (sequenceData == nullptr) {
+    context.fail("SegSat sequence is missing retained collection-binding data", sequence->metadata.range);
+    return;
   }
-  std::vector<SegSatControllerChange> controllerChanges = segSatControllerChanges(sequence.program);
 
+  struct SelectedBank {
+    InstrumentSetAsset* instruments = nullptr;
+    const SegSatBankBindingData* data = nullptr;
+  };
+  std::vector<SelectedBank> banks;
+  for (auto& instruments : context.instrumentSets()) {
+    if (instruments.metadata.format != kSegSatFormatName) {
+      continue;
+    }
+    const auto* data = instruments.privateData.get<SegSatBankBindingData>();
+    if (data == nullptr) {
+      context.fail("SegSat instrument set is missing retained collection-binding data", instruments.metadata.range);
+      return;
+    }
+    banks.push_back(SelectedBank{.instruments = &instruments, .data = data});
+  }
+
+  if (banks.empty() && !sequenceData->referencedBanks.empty()) {
+    context.fail("SegSat collection does not contain a retained SegSat instrument bank", sequence->metadata.range);
+    return;
+  }
+
+  if (sequenceData->referencedBanks.size() != banks.size()) {
+    context.warning(fmt::format("SegSat sequence refers to {} banks, but the collection contains {} SegSat banks",
+                                sequenceData->referencedBanks.size(), banks.size()),
+                    sequence->metadata.range);
+  }
   std::vector<SegSatVelocityBank> velocityBanks;
-  velocityBanks.reserve(context.instrumentSets.size());
-  const std::vector<u8> bankAliases = segSatSequenceBanks(sequence.program);
-  if (bankAliases.size() != context.instrumentSets.size()) {
-    context.diagnostics.push_back(
-        bindingWarning(fmt::format("SegSat sequence refers to {} banks, but the collection contains {} instrument sets",
-                                   bankAliases.size(), context.instrumentSets.size()),
-                       sequence.metadata.range));
-  }
-  for (size_t bankIndex = 0; bankIndex < context.instrumentSets.size(); ++bankIndex) {
-    auto& instruments = context.instrumentSets[bankIndex];
-    const u8 durableBank =
-        static_cast<u8>(instruments.instruments.empty() || !instruments.instruments.front().explicitAddress
-                            ? 0
-                            : instruments.instruments.front().explicitAddress->bank);
-    const u8 sourceBank = bankIndex < bankAliases.size() ? bankAliases[bankIndex] : durableBank;
-    const u8 exportBank = context.instrumentSets.size() == 1 ? 0 : sourceBank;
+  velocityBanks.reserve(banks.size());
+  for (const auto& bank : banks) {
+    auto& instruments = *bank.instruments;
+    const u8 sourceBank = bank.data->velocityBank.sourceBank;
+    const u8 exportBank = banks.size() == 1 ? 0 : sourceBank;
     for (auto& instrument : instruments.instruments) {
       const auto address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
       instrument.explicitAddress = InstrumentAddress{.bank = exportBank, .program = address.program};
       instrument.identity = segSatInstrumentIdentity(sourceBank, static_cast<u8>(address.program));
     }
-
-    if (!instruments.metadata.range.valid() || !context.sources.contains(instruments.metadata.range.source)) {
-      context.diagnostics.push_back(
-          bindingWarning("SegSat binding could not read an instrument bank source", instruments.metadata.range));
-      continue;
-    }
-    if (instruments.metadata.range.offset > std::numeric_limits<u32>::max()) {
-      context.diagnostics.push_back(
-          bindingWarning("SegSat instrument bank offset is too large", instruments.metadata.range));
-      continue;
-    }
-    const ByteReader reader = context.sources.reader(instruments.metadata.range.source);
-    const auto layout = readSegSatBankLayout(reader, static_cast<u32>(instruments.metadata.range.offset));
-    if (!layout) {
-      context.diagnostics.push_back(
-          bindingWarning("SegSat binding could not read the selected instrument bank", instruments.metadata.range));
-      continue;
-    }
-    velocityBanks.push_back(readSegSatVelocityBank(reader, *layout, sourceBank, volumeModel));
+    velocityBanks.push_back(bank.data->velocityBank);
   }
 
   if (!velocityBanks.empty()) {
-    context.sequenceRuntime = segSatSequenceRuntime(SegSatRuntimeConfig{
+    context.replaceSequenceRuntime(segSatSequenceRuntime(SegSatRuntimeConfig{
         .velocityBanks = std::move(velocityBanks),
-        .volumeModel = volumeModel,
-        .controllerChanges = std::move(controllerChanges),
-    });
+        .volumeModel = sequenceData->volumeModel,
+        .controllerChanges = sequenceData->controllerChanges,
+    }));
   }
 }
 

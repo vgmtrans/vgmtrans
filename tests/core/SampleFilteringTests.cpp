@@ -122,16 +122,10 @@ void synthSampleFilteringHonorsPolicyAndFormat() {
   expect(snesFiltered.samples.front().decoded.pcm != psxFiltered.samples.front().decoded.pcm,
          "SNES and PlayStation filtering should retain their distinct hardware responses");
 
-  FormatRegistry formats;
-  formats.add(FormatModule{
-      .name = "PsxProbe",
-      .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
-      .scan = scanProbeSequence,
-  });
+  collection.preferredFilter = SampleFilter::PsxSpuLowPass;
   const auto automatic = prepareSynthData(
       SynthExportInput{
           .sampleCollections = collections,
-          .formats = &formats,
           .sampleFiltering = SampleFilteringPolicy::FormatPreferred,
       },
       sources);

@@ -10,6 +10,7 @@
 #include "value/model/InstrumentIdentity.h"
 #include "value/model/MetadataModel.h"
 #include "value/model/ModulationModel.h"
+#include "value/synth/SampleFiltering.h"
 #include "value/synth/Ym2151.h"
 
 #include <optional>
@@ -101,6 +102,7 @@ struct Instrument {
 struct InstrumentSetAsset {
   AssetMetadata metadata;
   std::vector<Instrument> instruments;
+  AssetPrivateData privateData;
 };
 
 enum class AudioCodec {
@@ -146,6 +148,8 @@ struct SampleCollection {
 struct SampleCollectionAsset {
   AssetMetadata metadata;
   SampleCollection samples;
+  SampleFilter preferredFilter = SampleFilter::None;
+  AssetPrivateData privateData;
 };
 
 struct DecodedSample {

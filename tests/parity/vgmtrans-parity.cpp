@@ -1649,12 +1649,7 @@ AkaoSummary valueAkaoSummary(const std::filesystem::path& path, std::ostream& di
     }
     std::vector<Diagnostic> bindingDiagnostics;
     CollectionBindingContext binding{
-        .sources = session.sources(),
-        .sequence = sequence,
-        .sequenceRuntime = runtime,
-        .instrumentSets = resolvedInstruments,
-        .sampleCollections = resolvedSamples,
-        .diagnostics = bindingDiagnostics,
+        sequence, runtime, resolvedInstruments, resolvedSamples, bindingDiagnostics,
     };
     vgmtrans::formats::akao::bindAkaoCollection(binding);
     for (const auto& diagnostic : bindingDiagnostics) {
