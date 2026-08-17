@@ -280,7 +280,7 @@ void regionModulationExportsAtTheRegionScope() {
               {
                   Region{
                       .keyRange = {.low = 0, .high = 63},
-                      .sample = SampleRef{.externalPool = samples.metadata.id, .index = 0},
+                      .sample = SampleRef{.owner = samples.metadata.id, .index = 0},
                       .modulation =
                           InstrumentModulation{
                               .vibrato =
@@ -293,7 +293,7 @@ void regionModulationExportsAtTheRegionScope() {
                   },
                   Region{
                       .keyRange = {.low = 64, .high = 127},
-                      .sample = SampleRef{.externalPool = samples.metadata.id, .index = 0},
+                      .sample = SampleRef{.owner = samples.metadata.id, .index = 0},
                       .modulation =
                           InstrumentModulation{
                               .vibrato =
@@ -376,7 +376,7 @@ void soundFontExporterWritesSfbkRiffFile() {
           .name = "Lead",
           .regions = {Region{
               .keyRange = KeyRange{.low = 24, .high = 96},
-              .sample = SampleRef{.externalPool = samplePool.metadata.id, .index = 0},
+              .sample = SampleRef{.owner = samplePool.metadata.id, .index = 0},
               .unityKey = 58.75,
               .envelope =
                   Envelope{
@@ -547,7 +547,7 @@ void dlsExporterWritesDlsRiffFile() {
           .name = "Lead",
           .regions = {Region{
               .keyRange = KeyRange{.low = 24, .high = 96},
-              .sample = SampleRef{.externalPool = samplePool.metadata.id, .index = 0},
+              .sample = SampleRef{.owner = samplePool.metadata.id, .index = 0},
               .unityKey = 58.75,
               .envelope =
                   Envelope{
@@ -677,7 +677,7 @@ void standaloneSynthExportsKeepNativeModulation() {
   SoundBankAsset instruments{
       .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe", .name = "Instruments"},
       .instruments = {Instrument{
-          .regions = {Region{.sample = SampleRef{.externalPool = samples.metadata.id, .index = 0}}},
+          .regions = {Region{.sample = SampleRef{.owner = samples.metadata.id, .index = 0}}},
           .modulation = InstrumentModulation{.vibrato =
                                                  VibratoSpec{
                                                      .maxDepthCents = 100.0,
@@ -748,7 +748,7 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
     return Instrument{
         .explicitAddress = InstrumentAddress{.bank = 0, .program = program},
         .name = std::move(name),
-        .regions = {Region{.sample = SampleRef{.externalPool = samplePoolId, .index = sampleIndex}}},
+        .regions = {Region{.sample = SampleRef{.owner = samplePoolId, .index = sampleIndex}}},
     };
   };
   const SoundBankAsset instruments{
@@ -943,7 +943,7 @@ void bindInstrumentSet(CollectionBindingContext& context) {
   auto& instruments = context.soundBanks.front();
   instruments.instruments = {Instrument{
       .name = "Prepared Instrument",
-      .regions = {Region{.sample = SampleRef{.externalPool = samples, .index = 0}}},
+      .regions = {Region{.sample = SampleRef{.owner = samples, .index = 0}}},
   }};
 }
 
@@ -1015,7 +1015,7 @@ void collectionBindingAppliesToWholeExport() {
       .instruments = {Instrument{
           .explicitAddress = InstrumentAddress{.bank = 0, .program = 0},
           .name = "Durable Instrument",
-          .regions = {Region{.sample = SampleRef{.externalPool = AssetId{2}, .index = 0}}},
+          .regions = {Region{.sample = SampleRef{.owner = AssetId{2}, .index = 0}}},
       }},
   };
   const SamplePoolAsset samples{
@@ -1112,7 +1112,7 @@ void collectionBindingProducesAnImmutableInstrumentView() {
       .metadata = AssetMetadata{.id = AssetId{1}, .format = "Prepared Probe", .name = "Durable Bank"},
       .instruments = {Instrument{
           .name = "Durable Instrument",
-          .regions = {Region{.sample = SampleRef{.externalPool = samples.metadata.id, .index = 0}}},
+          .regions = {Region{.sample = SampleRef{.owner = samples.metadata.id, .index = 0}}},
       }},
   };
 
@@ -1225,7 +1225,7 @@ void synthOnlyExportRendersSequencesWithoutOriginalModulation() {
   const SoundBankAsset instruments{
       .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe", .name = "Instruments"},
       .instruments = {Instrument{
-          .regions = {Region{.sample = SampleRef{.externalPool = samples.metadata.id, .index = 0}}},
+          .regions = {Region{.sample = SampleRef{.owner = samples.metadata.id, .index = 0}}},
       }},
   };
 
@@ -1291,7 +1291,27 @@ void exportDiagnosticsPreserveSourceRanges() {
       exportCollection(project, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Wav}});
   expect(wavArtifacts.size() == 1, "WAV export should return one artifact for one sample");
   expectDiagnosticRange(wavArtifacts[0].diagnostics, "Sample source was not found", missingSampleRange);
+  const auto directPoolWav = exportSamples(project, sources, missingSamplePool.metadata.id);
+  expect(directPoolWav.size() == 1, "direct sample-pool export should return one artifact per sample");
+  expectDiagnosticRange(directPoolWav[0].diagnostics, "Sample source was not found", missingSampleRange);
 
+  const SoundBankAsset localSampleBank{
+      .metadata = AssetMetadata{.id = AssetId{4}, .format = "Probe", .name = "Local Samples"},
+      .localSamples =
+          SamplePool{
+              .samples = {Sample{
+                  .name = "Zero",
+                  .codec = AudioCodec::SnesBrr,
+                  .encodedData = SourceRange{.source = validSource, .offset = 0, .size = 9},
+                  .sampleRate = 32000,
+              }},
+          },
+  };
+  test::SessionSnapshotBuilder localSampleBuilder;
+  localSampleBuilder.assets.push_back(localSampleBank);
+  const auto localBankWav = exportSamples(localSampleBuilder.finish(), sources, localSampleBank.metadata.id);
+  expect(localBankWav.size() == 1 && containsAscii(localBankWav[0].bytes, "WAVE"),
+         "direct sound-bank sample export should decode its contained sample pool");
   const std::array<const SamplePoolAsset*, 1> missingSamples{&missingSamplePool};
   const auto sf2MissingSample = buildSoundFont2(
       SynthExportInput{
@@ -1339,7 +1359,7 @@ void exportDiagnosticsPreserveSourceRanges() {
           .explicitAddress = InstrumentAddress{.bank = 0, .program = 0},
           .name = "Lead",
           .regions = {Region{
-              .sample = SampleRef{.externalPool = validSamplePool.metadata.id, .index = 9},
+              .sample = SampleRef{.owner = validSamplePool.metadata.id, .index = 9},
               .range = regionRange,
           }},
       }},
@@ -1410,7 +1430,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
       .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe", .name = "Playback Instruments"},
       .instruments = {Instrument{
           .explicitAddress = InstrumentAddress{.bank = 0, .program = 0},
-          .regions = {Region{.sample = SampleRef{.externalPool = samples.metadata.id, .index = 0}}},
+          .regions = {Region{.sample = SampleRef{.owner = samples.metadata.id, .index = 0}}},
       }},
   };
 

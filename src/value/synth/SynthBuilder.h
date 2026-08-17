@@ -31,19 +31,17 @@ void annotateSynthValue(AnnotationBuilder annotation, const Region& region);
 class SampleRefLookup {
 public:
   [[nodiscard]] std::optional<SampleRef> find(u64 sourceKey) const;
-  [[nodiscard]] bool empty() const noexcept { return indexes_.empty(); }
 
 private:
   friend class SamplePoolBuilder;
 
-  SampleRefLookup(std::optional<AssetId> externalPool, std::unordered_map<u64, u32> indexes);
+  SampleRefLookup(AssetId owner, std::unordered_map<u64, u32> indexes);
 
-  std::optional<AssetId> externalPool_;
+  AssetId owner_;
   std::unordered_map<u64, u32> indexes_;
 };
 
 struct BuiltSamplePool {
-  AssetId asset;
   SamplePool value;
   SampleRefLookup refs;
   SourceRange range;
@@ -57,8 +55,6 @@ public:
 
   explicit SamplePoolBuilder(AssetId asset, SourceMapBuilder* sourceMap = nullptr,
                              std::vector<Diagnostic>* diagnostics = nullptr);
-  [[nodiscard]] static SamplePoolBuilder local(AssetId owner, SourceMapBuilder* sourceMap = nullptr,
-                                               std::vector<Diagnostic>* diagnostics = nullptr);
 
   SamplePoolBuilder(const SamplePoolBuilder&) = delete;
   SamplePoolBuilder& operator=(const SamplePoolBuilder&) = delete;
@@ -77,7 +73,6 @@ public:
 
   SamplePoolBuilder& include(SourceRange range);
   [[nodiscard]] SourceRange range() const noexcept;
-  [[nodiscard]] AssetId assetId() const noexcept { return asset_; }
   [[nodiscard]] bool empty() const noexcept { return samples_.empty(); }
   [[nodiscard]] size_t size() const noexcept { return samples_.size(); }
 
@@ -109,9 +104,6 @@ public:
 private:
   friend class Entry;
 
-  SamplePoolBuilder(AssetId owner, std::optional<AssetId> externalPool, SourceMapBuilder* sourceMap,
-                    std::vector<Diagnostic>* diagnostics);
-
   struct EntryState {
     std::vector<SourceAnnotationId> sources;
   };
@@ -125,7 +117,6 @@ private:
   void report(Severity severity, std::string code, std::string message, SourceRange range);
 
   AssetId asset_;
-  std::optional<AssetId> externalPool_;
   SourceMapBuilder* sourceMap_ = nullptr;
   std::vector<Diagnostic>* diagnostics_ = nullptr;
   std::vector<Sample> samples_;
@@ -137,7 +128,6 @@ private:
 };
 
 struct BuiltInstrumentSet {
-  AssetId asset;
   std::vector<Instrument> values;
   SourceRange range;
 };
@@ -168,7 +158,6 @@ public:
 
   InstrumentSetBuilder& include(SourceRange range);
   [[nodiscard]] SourceRange range() const noexcept;
-  [[nodiscard]] AssetId assetId() const noexcept { return asset_; }
   [[nodiscard]] bool empty() const noexcept { return instruments_.empty(); }
   [[nodiscard]] size_t size() const noexcept { return instruments_.size(); }
 

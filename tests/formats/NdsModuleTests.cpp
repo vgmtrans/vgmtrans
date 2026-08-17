@@ -1527,11 +1527,11 @@ void ndsSynthBuilderPreservesSparseWaveIndexesAcrossArchives() {
                              }),
          "an SBNK reference to a rejected SWAR entry should produce an understandable warning");
   expect(bank->instruments[0].explicitAddress == InstrumentAddress{.bank = 0, .program = 2} &&
-             bank->instruments[0].regions[0].sample.externalPool == firstWave->id() &&
+             bank->instruments[0].regions[0].sample.owner == firstWave->id() &&
              bank->instruments[0].regions[0].sample.index == 1,
          "SBNK program 2 should resolve source sample 2 to its actual dense sample index");
   expect(bank->instruments[1].explicitAddress == InstrumentAddress{.bank = 0, .program = 4} &&
-             bank->instruments[1].regions[0].sample.externalPool == secondWave->id() &&
+             bank->instruments[1].regions[0].sample.owner == secondWave->id() &&
              bank->instruments[1].regions[0].sample.index == 0,
          "an SBNK should resolve a region through any of its four independent SWAR slots");
 

@@ -39,8 +39,8 @@ std::optional<SourceRange> diagnosticRange(SourceRange range) {
   return range.valid() ? std::optional<SourceRange>{range} : std::nullopt;
 }
 
-SourceTarget sampleTarget(SampleRef sample, AssetId localBank) {
-  return SourceTarget{ObjectRefs::sample(sample.externalPool.value_or(localBank), sample.index)};
+SourceTarget sampleTarget(SampleRef sample) {
+  return SourceTarget{ObjectRefs::sample(sample.owner, sample.index)};
 }
 
 void annotateLoop(AnnotationBuilder& annotation, const Loop& loop) {
@@ -166,8 +166,8 @@ void annotateSynthValue(AnnotationBuilder annotation, const Region& region) {
   annotateEnvelope(annotation, region.envelope);
 }
 
-SampleRefLookup::SampleRefLookup(std::optional<AssetId> externalPool, std::unordered_map<u64, u32> indexes)
-    : externalPool_(externalPool), indexes_(std::move(indexes)) {
+SampleRefLookup::SampleRefLookup(AssetId owner, std::unordered_map<u64, u32> indexes)
+    : owner_(owner), indexes_(std::move(indexes)) {
 }
 
 std::optional<SampleRef> SampleRefLookup::find(u64 sourceKey) const {
@@ -175,21 +175,11 @@ std::optional<SampleRef> SampleRefLookup::find(u64 sourceKey) const {
   if (found == indexes_.end()) {
     return std::nullopt;
   }
-  return SampleRef{.externalPool = externalPool_, .index = found->second};
+  return SampleRef{.owner = owner_, .index = found->second};
 }
 
 SamplePoolBuilder::SamplePoolBuilder(AssetId asset, SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics)
-    : SamplePoolBuilder(asset, asset, sourceMap, diagnostics) {
-}
-
-SamplePoolBuilder SamplePoolBuilder::local(AssetId owner, SourceMapBuilder* sourceMap,
-                                           std::vector<Diagnostic>* diagnostics) {
-  return SamplePoolBuilder(owner, std::nullopt, sourceMap, diagnostics);
-}
-
-SamplePoolBuilder::SamplePoolBuilder(AssetId owner, std::optional<AssetId> externalPool, SourceMapBuilder* sourceMap,
-                                     std::vector<Diagnostic>* diagnostics)
-    : asset_(owner), externalPool_(externalPool), sourceMap_(sourceMap), diagnostics_(diagnostics) {
+    : asset_(asset), sourceMap_(sourceMap), diagnostics_(diagnostics) {
 }
 
 SamplePoolBuilder::Entry SamplePoolBuilder::add(u64 sourceKey, Sample sample) {
@@ -235,7 +225,7 @@ std::optional<SampleRef> SamplePoolBuilder::find(u64 sourceKey) const {
   if (found == indexes_.end()) {
     return std::nullopt;
   }
-  return SampleRef{.externalPool = externalPool_, .index = found->second};
+  return SampleRef{.owner = asset_, .index = found->second};
 }
 
 AnnotationBuilder SamplePoolBuilder::source(SourceRole role, std::string_view label, SourceRange range,
@@ -285,9 +275,8 @@ BuiltSamplePool SamplePoolBuilder::finish() && {
   const SourceRange finalRange = range();
   finished_ = true;
   return BuiltSamplePool{
-      .asset = asset_,
       .value = SamplePool{.samples = std::move(samples_)},
-      .refs = SampleRefLookup{externalPool_, std::move(indexes_)},
+      .refs = SampleRefLookup{asset_, std::move(indexes_)},
       .range = finalRange,
   };
 }
@@ -303,7 +292,7 @@ SampleRef SamplePoolBuilder::Entry::ref() const {
   if (!*this) {
     throw std::logic_error("Invalid SamplePoolBuilder entry");
   }
-  return SampleRef{.externalPool = builder_->externalPool_, .index = index_};
+  return SampleRef{.owner = builder_->asset_, .index = index_};
 }
 
 const Sample& SamplePoolBuilder::Entry::value() const {
@@ -478,7 +467,6 @@ BuiltInstrumentSet InstrumentSetBuilder::finish() && {
   const SourceRange finalRange = range();
   finished_ = true;
   return BuiltInstrumentSet{
-      .asset = asset_,
       .values = std::move(instruments_),
       .range = finalRange,
   };
@@ -674,7 +662,7 @@ void InstrumentSetBuilder::linkInstrumentSamples(u32 instrumentIndex, SourceAnno
 
 void InstrumentSetBuilder::linkSample(SourceAnnotationId annotation, SampleRef sample, std::string_view label) {
   if (sourceMap_ != nullptr && annotation.valid() && sample.valid()) {
-    AnnotationBuilder{*sourceMap_, annotation}.link(SourceLinkRole::UsesSample, sampleTarget(sample, asset_), label);
+    AnnotationBuilder{*sourceMap_, annotation}.link(SourceLinkRole::UsesSample, sampleTarget(sample), label);
   }
 }
 

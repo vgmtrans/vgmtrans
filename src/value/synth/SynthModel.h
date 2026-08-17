@@ -40,26 +40,17 @@ struct VelocityRange {
 };
 
 struct SampleRef {
-  // An absent pool identifies a sample local to the owning SoundBankAsset.
-  // External pools have their own asset identity. An invalid pool identity
-  // retains an external sample index that collection binding has not resolved.
-  std::optional<AssetId> externalPool;
+  // Local samples use their sound-bank asset as owner; independent pools use
+  // their own asset. An invalid owner retains an index for collection binding.
+  AssetId owner;
   u32 index = invalidIdValue;
 
-  [[nodiscard]] static SampleRef local(u32 index) noexcept { return SampleRef{.index = index}; }
-  [[nodiscard]] static SampleRef external(AssetId pool, u32 index) noexcept {
-    return SampleRef{.externalPool = pool, .index = index};
-  }
   [[nodiscard]] static SampleRef unbound(u32 index = invalidIdValue) noexcept {
-    return SampleRef{.externalPool = AssetId{}, .index = index};
+    return SampleRef{.index = index};
   }
 
-  [[nodiscard]] bool valid() const noexcept {
-    return index != invalidIdValue && (!externalPool || externalPool->valid());
-  }
-  [[nodiscard]] bool needsExternalBinding() const noexcept {
-    return index != invalidIdValue && externalPool && !externalPool->valid();
-  }
+  [[nodiscard]] bool valid() const noexcept { return owner.valid() && index != invalidIdValue; }
+  [[nodiscard]] bool needsBinding() const noexcept { return !owner.valid() && index != invalidIdValue; }
 };
 
 struct Tuning {

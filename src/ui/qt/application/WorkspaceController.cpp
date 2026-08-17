@@ -137,6 +137,10 @@ core::Artifact WorkspaceController::exportSoundBank(core::AssetId id, core::Synt
   return session_.exportSoundBank(id, format, request);
 }
 
+std::vector<core::Artifact> WorkspaceController::exportSamples(core::AssetId id) const {
+  return session_.exportSamples(id);
+}
+
 std::vector<core::Artifact> WorkspaceController::exportCollection(core::CollectionId id,
                                                                   const core::ExportRequest& request) const {
   return session_.exportCollection(id, request);

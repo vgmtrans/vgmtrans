@@ -14,6 +14,7 @@
 
 #include <filesystem>
 #include <span>
+#include <vector>
 
 class QWidget;
 class QAbstractItemView;
@@ -110,9 +111,12 @@ private:
   void saveOriginal(QAbstractItemView* view, OriginalItemKind kind);
   void saveArtifact(const QModelIndex& index, vgmtrans::core::Artifact artifact, const QString& failureMessage,
                     const char* extension);
+  void saveArtifacts(const QModelIndex& index, std::vector<vgmtrans::core::Artifact> artifacts,
+                     const QString& failureMessage);
   [[nodiscard]] QAbstractItemView* activeAssetView() const;
   void exportSequenceMidi(const QModelIndex& index);
   void exportSoundBank(const QModelIndex& index, vgmtrans::core::SynthExportFormat format);
+  void exportSamples(const QModelIndex& index);
   void togglePlayback();
   void updateSelectionStatus(const QModelIndex& index, SelectionStatusKind kind);
 

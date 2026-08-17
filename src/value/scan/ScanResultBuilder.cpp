@@ -114,16 +114,8 @@ bool ScanSoundBankDraft::empty() const noexcept {
   return out_->instrumentDraft(slot_).empty();
 }
 
-size_t ScanSoundBankDraft::size() const noexcept {
-  return out_->instrumentDraft(slot_).size();
-}
-
 void ScanSoundBankDraft::warning(std::string message, SourceRange range) {
   builder().warning(std::move(message), range);
-}
-
-void ScanSoundBankDraft::error(std::string message, SourceRange range) {
-  builder().error(std::move(message), range);
 }
 
 InstrumentSetBuilder& ScanSoundBankDraft::builder() {
@@ -131,10 +123,6 @@ InstrumentSetBuilder& ScanSoundBankDraft::builder() {
 }
 
 SamplePoolBuilder& ScanSoundBankDraft::samples() {
-  return out_->localSampleDraft(slot_);
-}
-
-const SamplePoolBuilder& ScanSoundBankDraft::samples() const {
   return out_->localSampleDraft(slot_);
 }
 
@@ -169,24 +157,8 @@ ScanSamplePoolDraft& ScanSamplePoolDraft::include(SourceRange range) {
   return *this;
 }
 
-SourceRange ScanSamplePoolDraft::range() const noexcept {
-  return builder().range();
-}
-
-bool ScanSamplePoolDraft::empty() const noexcept {
-  return builder().empty();
-}
-
-size_t ScanSamplePoolDraft::size() const noexcept {
-  return builder().size();
-}
-
 void ScanSamplePoolDraft::warning(std::string message, SourceRange range) {
   builder().warning(std::move(message), range);
-}
-
-void ScanSamplePoolDraft::error(std::string message, SourceRange range) {
-  builder().error(std::move(message), range);
 }
 
 SamplePoolBuilder& ScanSamplePoolDraft::builder() {
@@ -287,7 +259,7 @@ ScanSoundBankDraft ScanResultBuilder::soundBank(std::string name, SourceRange ra
       .id = id,
       .name = std::move(name),
       .instruments = InstrumentSetBuilder{id, &sourceMap_, &result_.diagnostics},
-      .samples = SamplePoolBuilder::local(id, &sourceMap_, &result_.diagnostics),
+      .samples = SamplePoolBuilder{id, &sourceMap_, &result_.diagnostics},
   }));
   ScanSoundBankDraft draft(*this, slot, id);
   if (range.valid()) {
@@ -535,10 +507,6 @@ const InstrumentSetBuilder& ScanResultBuilder::instrumentDraft(size_t slot) cons
 }
 
 SamplePoolBuilder& ScanResultBuilder::localSampleDraft(size_t slot) {
-  return std::get<PendingSoundBank>(drafts_.at(slot)->value).samples;
-}
-
-const SamplePoolBuilder& ScanResultBuilder::localSampleDraft(size_t slot) const {
   return std::get<PendingSoundBank>(drafts_.at(slot)->value).samples;
 }
 

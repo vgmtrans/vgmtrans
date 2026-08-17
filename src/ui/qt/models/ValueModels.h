@@ -87,7 +87,6 @@ public:
 
 private:
   struct Entry {
-    QString role;
     core::AssetId asset;
   };
 

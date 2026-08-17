@@ -90,6 +90,7 @@ void workspacePublishesModelsAndRemovesSourceFamilies() {
   expect(opened.opened.size() == 1 && opened.failures.empty(), "workspace should open the probe source");
   expect(sources.rowCount() == 1, "source model should publish the loaded source");
   expect(assets.rowCount() == 1, "asset model should publish the scanned asset");
+  expect(assets.columnCount() == 2, "asset contents should be structural rows rather than a summary column");
   expect(collections.rowCount() == 1, "collection model should publish the resolved collection");
   collectionFilter.setFilterFixedString(QStringLiteral("Probe collection"));
   expect(collectionFilter.rowCount() == 1, "collection filtering should retain matching collections");

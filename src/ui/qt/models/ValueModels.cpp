@@ -402,16 +402,16 @@ void CollectionContentsModel::rebuild() {
     return;
   }
   for (const auto id : collection->members.miscAssets) {
-    entries_.push_back({QStringLiteral("Miscellaneous"), id});
+    entries_.push_back({id});
   }
   for (const auto id : collection->members.soundBanks) {
-    entries_.push_back({QStringLiteral("Sound bank"), id});
+    entries_.push_back({id});
   }
   for (const auto id : collection->members.samplePools) {
-    entries_.push_back({QStringLiteral("Sample pool"), id});
+    entries_.push_back({id});
   }
   if (collection->members.sequence) {
-    entries_.push_back({QStringLiteral("Sequence"), *collection->members.sequence});
+    entries_.push_back({*collection->members.sequence});
   }
 }
 

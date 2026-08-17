@@ -72,7 +72,7 @@ bool needsExternalSamples(const vgmtrans::core::SessionSnapshot& snapshot,
     }
     for (const auto& instrument : set->instruments) {
       for (const auto& region : instrument.regions) {
-        if (region.sample.externalPool) {
+        if (region.sample.owner != set->metadata.id) {
           return true;
         }
       }

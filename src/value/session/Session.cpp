@@ -270,6 +270,10 @@ Artifact Session::exportSoundBank(AssetId id, SynthExportFormat format, const Ex
   return core::exportSoundBank(snapshot(), sources_, id, format, request);
 }
 
+std::vector<Artifact> Session::exportSamples(AssetId id) const {
+  return core::exportSamples(snapshot(), sources_, id);
+}
+
 std::vector<Artifact> Session::exportCollection(CollectionId id, const ExportRequest& request) const {
   const auto current = snapshot();
   return core::exportCollection(current, sources_, id, request);

@@ -341,9 +341,10 @@ void MenuBar::appendContextualCommands(Context context) {
   } else if (context == Context::SoundBank) {
     addAction(convert, tr("Save as SF2"), true, {}, [this] { emit exportSelectedSoundBankSf2(); });
     addAction(convert, tr("Save as DLS"), true, {}, [this] { emit exportSelectedSoundBankDls(); });
+    addAction(convert, tr("Save contained samples as WAV"), true, {}, [this] { emit exportSelectedSamplesWav(); });
     addAction(convert, tr("Save as Original Format"), true, {}, [this] { emit saveSelectedAssetOriginal(); });
   } else if (context == Context::SamplePool) {
-    addAction(convert, tr("Save all samples as WAV"), false, {});
+    addAction(convert, tr("Save all samples as WAV"), true, {}, [this] { emit exportSelectedSamplesWav(); });
     addAction(convert, tr("Save as Original Format"), true, {}, [this] { emit saveSelectedAssetOriginal(); });
   } else if (context == Context::Misc) {
     addAction(convert, tr("Save as Original Format"), true, {}, [this] { emit saveSelectedAssetOriginal(); });

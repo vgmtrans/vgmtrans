@@ -97,10 +97,4 @@ private:
                                                   const SnesBrrCatalog& catalog,
                                                   std::string_view directoryEntryKind = "snes-sample-dir-entry");
 
-// Build the neutral samples and their standard DIR/BRR source annotations.
-// Kept as a compatibility adapter for formats not yet migrated to the builder.
-[[nodiscard]] SamplePool buildSnesBrrSamplePool(ByteReader reader, const SnesBrrCatalog& catalog, AssetId samplePoolId,
-                                                SourceMapBuilder& sourceMap,
-                                                std::string_view directoryEntryKind = "snes-sample-dir-entry");
-
 }  // namespace vgmtrans::core
