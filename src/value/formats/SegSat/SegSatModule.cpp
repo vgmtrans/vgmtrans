@@ -111,10 +111,25 @@ void bindSegSatCollection(CollectionBindingContext& context) {
     return;
   }
 
-  const auto bankCount =
-      static_cast<size_t>(std::ranges::count_if(context.instrumentSets, [](const InstrumentSetAsset& asset) {
-        return asset.metadata.format == kSegSatFormatName;
-      }));
+  struct SelectedBank {
+    InstrumentSetAsset* instruments;
+    SegSatVelocityBank runtime;
+    bool exactMatch = false;
+  };
+  std::vector<SelectedBank> selectedBanks;
+  for (auto& instruments : context.instrumentSets) {
+    if (instruments.metadata.format != kSegSatFormatName) {
+      continue;
+    }
+    const auto* data = instruments.privateData.get<SegSatBankBindingData>();
+    if (data == nullptr) {
+      context.fail("SegSat instrument set is missing retained collection-binding data", instruments.metadata.range);
+      return;
+    }
+    selectedBanks.push_back(SelectedBank{.instruments = &instruments, .runtime = *data});
+  }
+
+  const size_t bankCount = selectedBanks.size();
   if (bankCount == 0 && !sequenceData->referencedBanks.empty()) {
     context.fail("SegSat collection does not contain a retained SegSat instrument bank", sequence->metadata.range);
     return;
@@ -125,30 +140,36 @@ void bindSegSatCollection(CollectionBindingContext& context) {
                                 sequenceData->referencedBanks.size(), bankCount),
                     sequence->metadata.range);
   }
+
+  std::vector<u8> unmatchedReferences = sequenceData->referencedBanks;
+  // Reserve every exact physical match before an earlier missing role can
+  // consume that bank as its fallback.
+  for (auto& bank : selectedBanks) {
+    const auto exact = std::ranges::find(unmatchedReferences, bank.runtime.sourceBank);
+    if (exact != unmatchedReferences.end()) {
+      bank.exactMatch = true;
+      unmatchedReferences.erase(exact);
+    }
+  }
+  auto fallback = unmatchedReferences.begin();
+  for (auto& bank : selectedBanks) {
+    if (!bank.exactMatch && fallback != unmatchedReferences.end()) {
+      bank.runtime.sourceBank = *fallback++;
+    }
+  }
+
   std::vector<SegSatVelocityBank> velocityBanks;
   velocityBanks.reserve(bankCount);
-  size_t bankIndex = 0;
-  for (auto& instruments : context.instrumentSets) {
-    if (instruments.metadata.format != kSegSatFormatName) {
-      continue;
-    }
-    const auto* data = instruments.privateData.get<SegSatBankBindingData>();
-    if (data == nullptr) {
-      context.fail("SegSat instrument set is missing retained collection-binding data", instruments.metadata.range);
-      return;
-    }
-    const u8 logicalBank =
-        bankIndex < sequenceData->referencedBanks.size() ? sequenceData->referencedBanks[bankIndex] : data->sourceBank;
-    ++bankIndex;
+  for (auto& bank : selectedBanks) {
+    auto& instruments = *bank.instruments;
+    const u8 logicalBank = bank.runtime.sourceBank;
     const u8 exportBank = bankCount == 1 ? 0 : logicalBank;
     for (auto& instrument : instruments.instruments) {
       const auto address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
       instrument.explicitAddress = InstrumentAddress{.bank = exportBank, .program = address.program};
       instrument.identity = segSatInstrumentIdentity(logicalBank, static_cast<u8>(address.program));
     }
-    auto runtimeBank = *data;
-    runtimeBank.sourceBank = logicalBank;
-    velocityBanks.push_back(std::move(runtimeBank));
+    velocityBanks.push_back(std::move(bank.runtime));
   }
 
   if (!velocityBanks.empty()) {
