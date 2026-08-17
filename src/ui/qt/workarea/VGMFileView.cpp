@@ -32,7 +32,8 @@ int boundedInt(u64 value) {
 
 }  // namespace
 
-VGMFileView::VGMFileView(std::shared_ptr<const vgmtrans::core::SourceInspection> inspection, QWidget* parent)
+VGMFileView::VGMFileView(std::shared_ptr<const vgmtrans::core::SourceInspection> inspection,
+                         const vgmtrans::core::Asset& asset, QWidget* parent)
     : QWidget(parent), inspection_(std::move(inspection)) {
   Q_ASSERT(inspection_);
   setWindowTitle(QString::fromStdString(inspection_->metadata().name));
@@ -41,7 +42,7 @@ VGMFileView::VGMFileView(std::shared_ptr<const vgmtrans::core::SourceInspection>
 
   splitter_ = new SnappingSplitter(Qt::Horizontal, this);
   hexView_ = new HexView(inspection_, splitter_);
-  treeView_ = new VGMFileTreeView(inspection_, splitter_);
+  treeView_ = new VGMFileTreeView(inspection_, asset, splitter_);
 
   hexView_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   splitter_->addWidget(hexView_);
@@ -67,7 +68,14 @@ VGMFileView::VGMFileView(std::shared_ptr<const vgmtrans::core::SourceInspection>
   connect(treeView_, &VGMFileTreeView::seekToAnnotationRequested, this, &VGMFileView::seekToAnnotation);
   connect(treeView_, &VGMFileTreeView::statusItemChanged, this, &VGMFileView::updateStatus);
   connect(treeView_, &QTreeWidget::currentItemChanged, this,
-          [this](QTreeWidgetItem* item, QTreeWidgetItem*) { onSelectionChange(treeView_->sourceItemForItem(item)); });
+          [this](QTreeWidgetItem* item, QTreeWidgetItem*) {
+            const auto sourceItem = treeView_->sourceItemForItem(item);
+            if (sourceItem.valid()) {
+              onSelectionChange(sourceItem);
+            } else {
+              hexView_->setSelectedRange(treeView_->rangeForItem(item));
+            }
+          });
 
   connect(new QShortcut(QKeySequence::ZoomIn, this), &QShortcut::activated, this, &VGMFileView::increaseHexViewFont);
   connect(new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Equal), this), &QShortcut::activated, this,
@@ -139,7 +147,9 @@ void VGMFileView::decreaseHexViewFont() {
 void VGMFileView::onSelectionChange(vgmtrans::core::SourceInspectionItem item) {
   hexView_->setSelectedItem(item);
   const QSignalBlocker blocker(treeView_);
-  treeView_->setSelectedItem(item);
+  if (treeView_->sourceItemForItem(treeView_->currentItem()) != item) {
+    treeView_->setSelectedItem(item);
+  }
   updateStatus(item);
 }
 

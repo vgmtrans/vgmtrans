@@ -55,13 +55,16 @@ class VGMTreeItem final : public QTreeWidgetItem {
 public:
   static constexpr auto ItemType = QTreeWidgetItem::UserType + 1;
 
-  explicit VGMTreeItem(vgmtrans::core::SourceInspectionItem item)
-      : QTreeWidgetItem(ItemType), item_(item) {}
+  explicit VGMTreeItem(vgmtrans::core::SourceInspectionItem item,
+                       vgmtrans::core::SourceRange range = {})
+      : QTreeWidgetItem(ItemType), item_(item), range_(range) {}
 
   [[nodiscard]] vgmtrans::core::SourceInspectionItem sourceItem() const noexcept { return item_; }
+  [[nodiscard]] vgmtrans::core::SourceRange range() const noexcept { return range_; }
 
 private:
   vgmtrans::core::SourceInspectionItem item_;
+  vgmtrans::core::SourceRange range_;
 };
 
 class VGMTreeDisplayItem final : public QStyledItemDelegate {
@@ -225,7 +228,8 @@ QSize VGMTreeDisplayItem::sizeHint(const QStyleOptionViewItem& option, const QMo
                             (treeTextMargin * 2)));
 }
 
-VGMFileTreeView::VGMFileTreeView(std::shared_ptr<const vgmtrans::core::SourceInspection> inspection, QWidget* parent)
+VGMFileTreeView::VGMFileTreeView(std::shared_ptr<const vgmtrans::core::SourceInspection> inspection,
+                                 const vgmtrans::core::Asset& asset, QWidget* parent)
     : QTreeWidget(parent), inspection_(std::move(inspection)) {
   Q_ASSERT(inspection_);
   setHeaderLabel("File structure");
@@ -239,6 +243,90 @@ VGMFileTreeView::VGMFileTreeView(std::shared_ptr<const vgmtrans::core::SourceIns
   for (const auto root : inspection_->roots()) {
     appendItem(invisibleRootItem(), vgmtrans::core::SourceInspectionItem::forAnnotation(root));
   }
+
+  const auto addGroup = [&](const auto& objects, vgmtrans::core::ObjectKind kind, const QString& groupName,
+                            const QString& itemName, const QString& groupIcon, const QString& itemIcon,
+                            auto rangeOf) {
+    if (objects.empty()) {
+      return;
+    }
+
+    vgmtrans::core::SourceRange span;
+    for (const auto& object : objects) {
+      const auto range = rangeOf(object);
+      if (!range.valid() || (span.valid() && range.source != span.source)) {
+        continue;
+      }
+      if (!span.valid()) {
+        span = range;
+      } else {
+        const u64 begin = std::min(span.offset, range.offset);
+        const u64 end = std::max(span.endOffset(), range.endOffset());
+        span.offset = begin;
+        span.size = end - begin;
+      }
+    }
+
+    const auto sourceItemForObject = [&](u32 index) {
+      const auto range = rangeOf(objects[index]);
+      const auto& annotations = inspection_->annotations();
+      const auto source = std::ranges::find_if(annotations, [&](const auto& annotation) {
+        return annotation.owner && annotation.owner->kind == kind &&
+               annotation.owner->asset == inspection_->asset() && annotation.owner->index0 == index &&
+               annotation.range == range;
+      });
+      return source == annotations.end() ? vgmtrans::core::SourceInspectionItem{}
+                                         : vgmtrans::core::SourceInspectionItem::forAnnotation(source->id);
+    };
+
+    auto* group = new VGMTreeItem({}, span);
+    setItemText(group);
+    group->setText(0, groupName);
+    group->setIcon(0, QIcon(groupIcon));
+    group->setExpanded(true);
+
+    for (u32 index = 0; index < objects.size(); ++index) {
+      const auto& object = objects[index];
+      const auto sourceItem = sourceItemForObject(index);
+
+      auto* item = sourceItem.valid() ? treeItem(sourceItem) : nullptr;
+      if (item == nullptr) {
+        item = new QTreeWidgetItem(group);
+        item->setFlags(item->flags() & ~Qt::ItemIsSelectable);
+      } else {
+        if (auto* parent = item->parent()) {
+          parent->removeChild(item);
+        } else {
+          takeTopLevelItem(indexOfTopLevelItem(item));
+        }
+        group->addChild(item);
+      }
+      item->setText(0, object.name.empty() ? QStringLiteral("%1 %2").arg(itemName).arg(index)
+                                           : QString::fromStdString(object.name));
+      item->setIcon(0, QIcon(itemIcon));
+    }
+
+    const auto offset = rangeForItem(group).offset;
+    int position = 0;
+    while (position < topLevelItemCount() && rangeForItem(topLevelItem(position)).offset <= offset) {
+      ++position;
+    }
+    insertTopLevelItem(position, group);
+  };
+
+  if (const auto* bank = std::get_if<vgmtrans::core::SoundBankAsset>(&asset)) {
+    addGroup(bank->instruments, vgmtrans::core::ObjectKind::Instrument, QStringLiteral("Instruments"),
+             QStringLiteral("Instrument"), QStringLiteral(":/icons/instrument-set.svg"),
+             QStringLiteral(":/icons/instr.svg"), [](const auto& instrument) { return instrument.range; });
+    addGroup(bank->localSamples.samples, vgmtrans::core::ObjectKind::Sample, QStringLiteral("Samples"),
+             QStringLiteral("Sample"), QStringLiteral(":/icons/sample-collection.svg"),
+             QStringLiteral(":/icons/sample.svg"), [](const auto& sample) { return sample.encodedData; });
+  } else if (const auto* pool = std::get_if<vgmtrans::core::SamplePoolAsset>(&asset)) {
+    addGroup(pool->pool.samples, vgmtrans::core::ObjectKind::Sample, QStringLiteral("Samples"),
+             QStringLiteral("Sample"), QStringLiteral(":/icons/sample-collection.svg"),
+             QStringLiteral(":/icons/sample.svg"), [](const auto& sample) { return sample.encodedData; });
+  }
+
   connect(Settings::the(), &Settings::vgmFileTreeShowDetailsChanged, this, &VGMFileTreeView::onShowDetailsChanged);
 }
 
@@ -311,6 +399,14 @@ vgmtrans::core::SourceInspectionItem VGMFileTreeView::sourceItemForItem(const QT
     return {};
   }
   return static_cast<const VGMTreeItem*>(item)->sourceItem();
+}
+
+vgmtrans::core::SourceRange VGMFileTreeView::rangeForItem(const QTreeWidgetItem* item) const {
+  if (item == nullptr || item->type() != VGMTreeItem::ItemType) {
+    return {};
+  }
+  const auto* treeItem = static_cast<const VGMTreeItem*>(item);
+  return treeItem->range().valid() ? treeItem->range() : inspection_->range(treeItem->sourceItem());
 }
 
 vgmtrans::core::SourceAnnotationId VGMFileTreeView::annotationForItem(const QTreeWidgetItem* item) const {
@@ -424,6 +520,12 @@ void VGMFileTreeView::seekToTreeItem(QTreeWidgetItem* item, bool allowRepeat) {
 void VGMFileTreeView::setItemText(QTreeWidgetItem* item) const {
   const auto sourceItem = sourceItemForItem(item);
   const auto* annotation = inspection_->annotation(sourceItem);
+  const auto range = rangeForItem(item);
+  item->setData(0, RangeRole,
+                QStringLiteral("Offset: 0x%1 | Length: 0x%2")
+                    .arg(range.offset, 0, 16)
+                    .arg(range.size, 0, 16));
+  item->setData(0, ShowDetailsRole, showDetails_);
   if (annotation == nullptr) {
     return;
   }
@@ -439,13 +541,7 @@ void VGMFileTreeView::setItemText(QTreeWidgetItem* item) const {
     item->setIcon(0, SourceInspectorPresentation::icon(*annotation));
     item->setToolTip(0, description.plainText());
   }
-  const auto range = inspection_->range(sourceItem);
   item->setData(0, DescriptionRole, QVariant::fromValue(description));
-  item->setData(0, RangeRole,
-                QStringLiteral("Offset: 0x%1 | Length: 0x%2")
-                    .arg(range.offset, 0, 16)
-                    .arg(range.size, 0, 16));
-  item->setData(0, ShowDetailsRole, showDetails_);
 }
 
 void VGMFileTreeView::onShowDetailsChanged(bool show) {

@@ -9,6 +9,7 @@
 #include "PlaybackPosition.h"
 #include "util/CapsuleText.h"
 #include "value/model/SourceInspection.h"
+#include "value/model/SessionSnapshot.h"
 #include "value/sequence/PerformanceModel.h"
 
 #include <memory>
@@ -30,6 +31,7 @@ class VGMFileView final : public QWidget {
 
 public:
   explicit VGMFileView(std::shared_ptr<const vgmtrans::core::SourceInspection> inspection,
+                       const vgmtrans::core::Asset& asset,
                        QWidget* parent = nullptr);
 
   [[nodiscard]] vgmtrans::core::AssetId asset() const noexcept { return inspection_->asset(); }

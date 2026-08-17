@@ -282,7 +282,7 @@ void MdiArea::newView(vgmtrans::core::AssetId asset) {
   if (!inspection) {
     return;
   }
-  auto* inspector = new VGMFileView(std::move(inspection));
+  auto* inspector = new VGMFileView(std::move(inspection), *value);
   inspector->setSeekModifierActive(m_seekModifierActive);
   if (asset == m_playbackSequence) {
     inspector->setPlaybackTimeline(m_playbackSpans);
