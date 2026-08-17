@@ -95,6 +95,8 @@ void formatRegistryStoresCopyableModulesAtomically() {
       .collectionResolverId = "SharedResolver",
       .bindCollection = [](CollectionBindingContext&) {},
   });
+  expect(static_cast<bool>(binderRegistry.collectionBinderForFormat("FirstBinder")),
+         "format lookup should find a binder whose resolver id differs from its module name");
   threw = false;
   try {
     binderRegistry.add(FormatModule{

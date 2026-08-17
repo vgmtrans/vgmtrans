@@ -127,6 +127,7 @@ void bindSegSatCollection(CollectionBindingContext& context) {
   }
   std::vector<SegSatVelocityBank> velocityBanks;
   velocityBanks.reserve(bankCount);
+  size_t bankIndex = 0;
   for (auto& instruments : context.instrumentSets) {
     if (instruments.metadata.format != kSegSatFormatName) {
       continue;
@@ -136,14 +137,18 @@ void bindSegSatCollection(CollectionBindingContext& context) {
       context.fail("SegSat instrument set is missing retained collection-binding data", instruments.metadata.range);
       return;
     }
-    const u8 sourceBank = data->sourceBank;
-    const u8 exportBank = bankCount == 1 ? 0 : sourceBank;
+    const u8 logicalBank =
+        bankIndex < sequenceData->referencedBanks.size() ? sequenceData->referencedBanks[bankIndex] : data->sourceBank;
+    ++bankIndex;
+    const u8 exportBank = bankCount == 1 ? 0 : logicalBank;
     for (auto& instrument : instruments.instruments) {
       const auto address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
       instrument.explicitAddress = InstrumentAddress{.bank = exportBank, .program = address.program};
-      instrument.identity = segSatInstrumentIdentity(sourceBank, static_cast<u8>(address.program));
+      instrument.identity = segSatInstrumentIdentity(logicalBank, static_cast<u8>(address.program));
     }
-    velocityBanks.push_back(*data);
+    auto runtimeBank = *data;
+    runtimeBank.sourceBank = logicalBank;
+    velocityBanks.push_back(std::move(runtimeBank));
   }
 
   if (!velocityBanks.empty()) {

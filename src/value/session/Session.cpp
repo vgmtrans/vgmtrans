@@ -190,7 +190,7 @@ CollectionId Session::createUserCollection(std::string name, CollectionMembers m
   if (members.sequence) {
     const auto* sequence = state_->asset<SequenceProgramAsset>(*members.sequence);
     if (sequence != nullptr) {
-      binder = formats_.collectionBinder(sequence->metadata.format);
+      binder = formats_.collectionBinderForFormat(sequence->metadata.format);
     }
   }
   const CollectionId id = state_->createUserCollection(std::move(name), std::move(members), std::move(binder), ids_);

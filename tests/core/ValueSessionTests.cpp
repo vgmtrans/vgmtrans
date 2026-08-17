@@ -347,6 +347,15 @@ void sessionKeepsScannerKnownCollectionsWithoutResolver() {
 void sessionCreatesUserCollectionsFromDetectedAssets() {
   Session session;
   auto sequenceModule = probeBankSequenceModule();
+  sequenceModule.name = "ProbeBank";
+  sequenceModule.collectionResolverId = "probe-bank";
+  sequenceModule.resolveCollections = [](const MatchContext& context) {
+    auto collections = resolveProbeBankCollections(context);
+    for (auto& collection : collections) {
+      collection.key.resolver = "probe-bank";
+    }
+    return collections;
+  };
   sequenceModule.bindCollection = [](CollectionBindingContext& context) { context.warning("user collection bound"); };
   session.registerFormat(std::move(sequenceModule));
   session.registerFormat(probeBankInstrumentModule());

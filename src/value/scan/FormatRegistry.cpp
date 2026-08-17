@@ -87,4 +87,9 @@ CollectionBinder FormatRegistry::collectionBinder(std::string_view resolver) con
   return found != modules_.end() ? found->bindCollection : CollectionBinder{};
 }
 
+CollectionBinder FormatRegistry::collectionBinderForFormat(std::string_view format) const {
+  const auto* module = findModule(format);
+  return module != nullptr ? collectionBinder(module->collectionResolver()) : CollectionBinder{};
+}
+
 }  // namespace vgmtrans::core
