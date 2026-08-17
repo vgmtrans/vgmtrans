@@ -37,6 +37,9 @@ struct CollectionPlayback {
 [[nodiscard]] Artifact exportSoundBank(const SessionSnapshot& snapshot, const SourceStore& sources, AssetId soundBank,
                                        SynthExportFormat format, const ExportRequest& request);
 
+[[nodiscard]] std::vector<Artifact> exportSamples(const SessionSnapshot& snapshot, const SourceStore& sources,
+                                                  AssetId owner);
+
 [[nodiscard]] CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, const SourceStore& sources,
                                                            CollectionId collection, const PlaybackRequest& request);
 

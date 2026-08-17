@@ -878,8 +878,8 @@ bool printValueCollections(const vgmtrans::core::SessionSnapshot& project, const
 }
 
 std::string valueSampleRefName(const vgmtrans::core::SampleRef& sample) {
-  if (sample.externalPool) {
-    return fmt::format("collection {} sample {}", sample.externalPool->value, sample.index);
+  if (sample.owner.valid()) {
+    return fmt::format("owner {} sample {}", sample.owner.value, sample.index);
   }
   return fmt::format("sample {}", sample.index);
 }

@@ -52,7 +52,7 @@ struct SampleEntry {
 [[nodiscard]] bool needsExternalSamples(const SoundBankAsset& bank) {
   return std::ranges::any_of(bank.instruments, [](const Instrument& instrument) {
     return std::ranges::any_of(instrument.regions,
-                               [](const Region& region) { return region.sample.needsExternalBinding(); });
+                               [](const Region& region) { return region.sample.needsBinding(); });
   });
 }
 
@@ -276,14 +276,14 @@ void bindSonyPs1Collection(CollectionBindingContext& context) {
       const auto& pool = **samplePool++;
       for (auto& instrument : instruments.instruments) {
         for (auto& region : instrument.regions) {
-          if (!region.sample.needsExternalBinding()) {
+          if (!region.sample.needsBinding()) {
             continue;
           }
           if (region.sample.index >= pool.pool.samples.size()) {
             context.fail("Sony PS1 sound bank refers outside its external sample pool", region.range);
             return;
           }
-          region.sample = SampleRef::external(pool.metadata.id, region.sample.index);
+          region.sample.owner = pool.metadata.id;
         }
       }
     }

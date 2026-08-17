@@ -80,16 +80,13 @@ public:
   ScanSoundBankDraft& include(SourceRange range);
   [[nodiscard]] SourceRange range() const noexcept;
   [[nodiscard]] bool empty() const noexcept;
-  [[nodiscard]] size_t size() const noexcept;
 
   void warning(std::string message, SourceRange range = {});
-  void error(std::string message, SourceRange range = {});
 
   // Existing reusable synth helpers may operate on the domain builder
   // directly. The draft remains its owner and finish() remains scan-owned.
   [[nodiscard]] InstrumentSetBuilder& builder();
   [[nodiscard]] SamplePoolBuilder& samples();
-  [[nodiscard]] const SamplePoolBuilder& samples() const;
 
   template <typename T>
   ScanSoundBankDraft& data(T value);
@@ -118,12 +115,8 @@ public:
                            std::string_view kind = {});
 
   ScanSamplePoolDraft& include(SourceRange range);
-  [[nodiscard]] SourceRange range() const noexcept;
-  [[nodiscard]] bool empty() const noexcept;
-  [[nodiscard]] size_t size() const noexcept;
 
   void warning(std::string message, SourceRange range = {});
-  void error(std::string message, SourceRange range = {});
 
   [[nodiscard]] SamplePoolBuilder& builder();
   [[nodiscard]] const SamplePoolBuilder& builder() const;
@@ -242,7 +235,6 @@ private:
   [[nodiscard]] InstrumentSetBuilder& instrumentDraft(size_t slot);
   [[nodiscard]] const InstrumentSetBuilder& instrumentDraft(size_t slot) const;
   [[nodiscard]] SamplePoolBuilder& localSampleDraft(size_t slot);
-  [[nodiscard]] const SamplePoolBuilder& localSampleDraft(size_t slot) const;
   [[nodiscard]] SamplePoolBuilder& sampleDraft(size_t slot);
   [[nodiscard]] const SamplePoolBuilder& sampleDraft(size_t slot) const;
 

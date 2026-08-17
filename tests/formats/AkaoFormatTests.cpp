@@ -825,7 +825,7 @@ void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView() {
              boundInstruments.back().metadata.id == collection.members.soundBanks.front() &&
              boundInstruments.back().instruments.size() == 1 &&
              boundInstruments.back().instruments.front().regions.size() == 1 &&
-             boundInstruments.back().instruments.front().regions.front().sample.externalPool ==
+             boundInstruments.back().instruments.front().regions.front().sample.owner ==
                  collection.members.samplePools.front(),
          "Akao binding should locate its exact structural bank, preserve foreign members, and connect its samples");
 

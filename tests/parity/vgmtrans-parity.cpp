@@ -1008,8 +1008,7 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
 
       for (const auto& region : instrument.regions) {
         u32 sampleSourceOffset = 0;
-        const AssetId owner = region.sample.externalPool.value_or(soundBank->metadata.id);
-        const auto samplePool = samplePoolsById.find(owner.value);
+        const auto samplePool = samplePoolsById.find(region.sample.owner.value);
         if (samplePool != samplePoolsById.end() && region.sample.index < samplePool->second->samples.size()) {
           sampleSourceOffset =
               sourceRelativeOffset(sources, samplePool->second->samples[region.sample.index].encodedData);

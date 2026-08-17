@@ -56,6 +56,7 @@ signals:
   void exportSelectedSequenceMidi();
   void exportSelectedSoundBankSf2();
   void exportSelectedSoundBankDls();
+  void exportSelectedSamplesWav();
   void exportSelectedCollection(int choice);
   void stitchSelectedCollections();
   void increaseHexFontRequested();

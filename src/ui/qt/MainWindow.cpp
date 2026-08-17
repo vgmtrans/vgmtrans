@@ -690,6 +690,47 @@ void MainWindow::saveArtifact(const QModelIndex& index, vgmtrans::core::Artifact
   statusBarContent->setStatus(title, tr("Wrote %1").arg(pathText(path)));
 }
 
+void MainWindow::saveArtifacts(const QModelIndex& index, std::vector<vgmtrans::core::Artifact> artifacts,
+                               const QString& failureMessage) {
+  const QString title = index.data(Qt::DisplayRole).toString();
+  QStringList errors;
+  for (const auto& artifact : artifacts) {
+    if (artifact.bytes.empty()) {
+      errors.push_back(diagnosticMessages(artifact.diagnostics, failureMessage));
+    }
+  }
+  if (std::ranges::none_of(artifacts, [](const auto& artifact) { return !artifact.bytes.empty(); })) {
+    const QString message = errors.isEmpty() ? failureMessage : errors.join(QLatin1Char('\n'));
+    statusBarContent->setStatus(title, message);
+    showToast(message, ToastType::Error, 15000);
+    return;
+  }
+
+  const std::filesystem::path directory = openSaveDirDialog();
+  if (directory.empty()) {
+    return;
+  }
+
+  size_t written = 0;
+  for (const auto& artifact : artifacts) {
+    if (artifact.bytes.empty()) {
+      continue;
+    }
+    QSaveFile file(pathText(directory / artifact.filename));
+    const auto size = static_cast<qsizetype>(artifact.bytes.size());
+    if (!file.open(QIODevice::WriteOnly) ||
+        file.write(reinterpret_cast<const char*>(artifact.bytes.data()), size) != size || !file.commit()) {
+      errors.push_back(file.errorString());
+    } else {
+      ++written;
+    }
+  }
+  statusBarContent->setStatus(title, tr("Wrote %1 file(s)").arg(static_cast<qulonglong>(written)));
+  if (!errors.isEmpty()) {
+    showToast(errors.join(QLatin1Char('\n')), ToastType::Error, 15000);
+  }
+}
+
 QAbstractItemView* MainWindow::activeAssetView() const {
   const QWidget* focused = QApplication::focusWidget();
   return focused != nullptr && (focused == m_coll_view || m_coll_view->isAncestorOf(focused))
@@ -751,6 +792,14 @@ void MainWindow::exportSoundBank(const QModelIndex& index, vgmtrans::core::Synth
     statusBarContent->setStatus(index.data(Qt::DisplayRole).toString(), message);
     showToast(message, ToastType::Error, 10000);
   }
+}
+
+void MainWindow::exportSamples(const QModelIndex& index) {
+  if (!index.isValid()) {
+    return;
+  }
+  saveArtifacts(index, m_workspace.exportSamples(vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()}),
+                tr("The samples could not be exported as WAV."));
 }
 
 void MainWindow::togglePlayback() {
@@ -964,31 +1013,12 @@ void MainWindow::routeSignals() {
       return;
     }
 
-    const std::filesystem::path directory = openSaveDirDialog();
-    if (directory.empty()) {
-      return;
-    }
     applyCollectionExportSettings(request);
 
     const auto collection = vgmtrans::core::CollectionId{current.data(vgmtrans::ui::IdRole).toUInt()};
     try {
-      const auto artifacts = m_workspace.exportCollection(collection, request);
-      size_t written = 0;
-      for (const auto& artifact : artifacts) {
-        if (artifact.bytes.empty()) {
-          continue;
-        }
-        QSaveFile file(pathText(directory / artifact.filename));
-        if (!file.open(QIODevice::WriteOnly)) {
-          continue;
-        }
-        const auto size = static_cast<qsizetype>(artifact.bytes.size());
-        if (file.write(reinterpret_cast<const char*>(artifact.bytes.data()), size) == size && file.commit()) {
-          ++written;
-        }
-      }
-      statusBarContent->setStatus(current.data(Qt::DisplayRole).toString(),
-                                  tr("Wrote %1 file(s)").arg(static_cast<qulonglong>(written)));
+      saveArtifacts(current, m_workspace.exportCollection(collection, request),
+                    tr("The collection could not be exported."));
     } catch (const std::exception& error) {
       statusBarContent->setStatus(current.data(Qt::DisplayRole).toString(), QString::fromUtf8(error.what()));
     }
@@ -1001,6 +1031,8 @@ void MainWindow::routeSignals() {
   });
   connect(m_menu_bar, &MenuBar::exportSelectedSoundBankDls, this,
           [this] { exportSoundBank(activeAssetView()->currentIndex(), vgmtrans::core::SynthExportFormat::Dls); });
+  connect(m_menu_bar, &MenuBar::exportSelectedSamplesWav, this,
+          [this] { exportSamples(activeAssetView()->currentIndex()); });
   connect(m_menu_bar, &MenuBar::openSelectedAsset, this, [this] {
     const QModelIndex current = activeAssetView()->currentIndex();
     if (current.isValid() && !current.data(vgmtrans::ui::IsCollectionRole).toBool()) {
@@ -1108,6 +1140,7 @@ void MainWindow::routeSignals() {
     QAction* saveMidi = nullptr;
     QAction* saveSf2 = nullptr;
     QAction* saveDls = nullptr;
+    QAction* saveWav = nullptr;
     QAction* saveOriginalAction = nullptr;
     if (context == MenuBar::Context::Sequence) {
       saveMidi = menu.addAction(tr("Save as MIDI"));
@@ -1117,9 +1150,10 @@ void MainWindow::routeSignals() {
     } else if (context == MenuBar::Context::SoundBank) {
       saveSf2 = menu.addAction(tr("Save as SF2"));
       saveDls = menu.addAction(tr("Save as DLS"));
+      saveWav = menu.addAction(tr("Save contained samples as WAV"));
       saveOriginalAction = menu.addAction(tr("Save as Original Format"));
     } else if (context == MenuBar::Context::SamplePool) {
-      addDisabled(menu, tr("Save all samples as WAV"));
+      saveWav = menu.addAction(tr("Save all samples as WAV"));
       saveOriginalAction = menu.addAction(tr("Save as Original Format"));
     } else {
       saveOriginalAction = menu.addAction(tr("Save as Original Format"));
@@ -1138,6 +1172,8 @@ void MainWindow::routeSignals() {
       exportSoundBank(current, vgmtrans::core::SynthExportFormat::SoundFont2);
     } else if (saveDls != nullptr && chosen == saveDls) {
       exportSoundBank(current, vgmtrans::core::SynthExportFormat::Dls);
+    } else if (saveWav != nullptr && chosen == saveWav) {
+      exportSamples(current);
     } else if (chosen == saveOriginalAction) {
       saveOriginal(view, OriginalItemKind::Asset);
     } else if (chosen == remove) {

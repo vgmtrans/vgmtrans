@@ -49,24 +49,17 @@ namespace {
   return name;
 }
 
-[[nodiscard]] std::string artifactBaseName(const SequenceProgramAsset& sequence) {
-  if (!sequence.metadata.name.empty()) {
-    return filenamePart(sequence.metadata.name);
+[[nodiscard]] std::string artifactBaseName(const AssetMetadata& metadata, std::string_view fallback) {
+  if (!metadata.name.empty()) {
+    return filenamePart(metadata.name);
   }
-  return "sequence-" + std::to_string(sequence.metadata.id.value);
+  return std::string(fallback) + "-" + std::to_string(metadata.id.value);
 }
 
-[[nodiscard]] std::string artifactBaseName(const SoundBankAsset& soundBank) {
-  if (!soundBank.metadata.name.empty()) {
-    return filenamePart(soundBank.metadata.name);
-  }
-  return "sound-bank-" + std::to_string(soundBank.metadata.id.value);
-}
-
-[[nodiscard]] std::string sampleArtifactName(const std::string& baseName, const Sample& sample, u32 sampleIndex) {
+[[nodiscard]] std::string sampleArtifactName(std::string_view baseName, const Sample& sample, u32 sampleIndex) {
   std::string sampleName = sample.name.empty() ? "sample-" + std::to_string(sampleIndex) : sample.name;
-  return filenamePart(baseName) + "-" + std::to_string(sampleIndex) + "-" + filenamePart(std::move(sampleName)) +
-         ".wav";
+  return filenamePart(std::string(baseName)) + "-" + std::to_string(sampleIndex) + "-" +
+         filenamePart(std::move(sampleName)) + ".wav";
 }
 
 [[nodiscard]] std::vector<ExportKind> requestedKinds(const ExportRequest& request) {
@@ -154,39 +147,41 @@ struct SynthCollectionView {
   };
 }
 
+void appendWavArtifacts(std::vector<Artifact>& artifacts, std::string_view baseName, const SamplePool& pool,
+                        const SourceStore& sources) {
+  for (const auto& sample : pool.samples) {
+    const auto sampleIndex = static_cast<u32>(artifacts.size());
+    Artifact artifact{
+        .filename = sampleArtifactName(baseName, sample, sampleIndex),
+        .mediaType = "audio/wav",
+    };
+
+    try {
+      // Sample bytes stay in SourceStore so WAV export can report source-backed decode errors.
+      if (!sources.contains(sample.encodedData.source)) {
+        artifact.diagnostics.push_back(
+            exportError("Sample source was not found", validDiagnosticRange(sample.encodedData)));
+      } else if (auto decoded = decodeSample(sample, sources.bytes(sample.encodedData.source))) {
+        artifact.bytes = encodePcm16Wav(*decoded);
+      } else {
+        artifact.diagnostics.push_back(
+            exportError("Unsupported sample codec", validDiagnosticRange(sample.encodedData)));
+      }
+    } catch (const std::exception& ex) {
+      artifact.diagnostics.push_back(exportError(ex.what(), validDiagnosticRange(sample.encodedData)));
+    }
+
+    artifacts.push_back(std::move(artifact));
+  }
+}
+
 [[nodiscard]] std::vector<Artifact> exportWav(const BoundCollection& collection, const SourceStore& sources) {
   std::vector<Artifact> artifacts;
-  u32 sampleIndex = 0;
-  const auto appendPool = [&](const SamplePool& pool) {
-    for (const auto& sample : pool.samples) {
-      Artifact artifact{
-          .filename = sampleArtifactName(collection.baseName(), sample, sampleIndex++),
-          .mediaType = "audio/wav",
-      };
-
-      try {
-        // Sample bytes stay in SourceStore so WAV export can report source-backed decode errors.
-        if (!sources.contains(sample.encodedData.source)) {
-          artifact.diagnostics.push_back(
-              exportError("Sample source was not found", validDiagnosticRange(sample.encodedData)));
-        } else if (auto decoded = decodeSample(sample, sources.bytes(sample.encodedData.source))) {
-          artifact.bytes = encodePcm16Wav(*decoded);
-        } else {
-          artifact.diagnostics.push_back(
-              exportError("Unsupported sample codec", validDiagnosticRange(sample.encodedData)));
-        }
-      } catch (const std::exception& ex) {
-        artifact.diagnostics.push_back(exportError(ex.what(), validDiagnosticRange(sample.encodedData)));
-      }
-
-      artifacts.push_back(std::move(artifact));
-    }
-  };
   for (const auto& bank : collection.soundBanks()) {
-    appendPool(bank.localSamples);
+    appendWavArtifacts(artifacts, collection.baseName(), bank.localSamples, sources);
   }
   for (const auto* samplePool : collection.samplePools()) {
-    appendPool(samplePool->pool);
+    appendWavArtifacts(artifacts, collection.baseName(), samplePool->pool, sources);
   }
 
   if (artifacts.empty()) {
@@ -262,7 +257,8 @@ Artifact exportStandaloneSequenceMidi(const SessionSnapshot& snapshot, AssetId s
 
   const auto rendering = renderSequence(*sequence, request);
   const auto midi = renderMidi(rendering, {}, request.midi, ModulationConversionPolicy::SequenceEventSimulation);
-  return exportMidi(artifactBaseName(*sequence), rendering, midi, ModulationScalingPolicy::FullFormatRange,
+  return exportMidi(artifactBaseName(sequence->metadata, "sequence"), rendering, midi,
+                    ModulationScalingPolicy::FullFormatRange,
                     ModulationConversionPolicy::SequenceEventSimulation);
 }
 
@@ -285,12 +281,12 @@ Artifact exportSequenceMidi(const SessionSnapshot& snapshot, const SourceStore& 
                                     });
   if (artifacts.empty()) {
     return Artifact{
-        .filename = artifactBaseName(*sequence) + ".mid",
+        .filename = artifactBaseName(sequence->metadata, "sequence") + ".mid",
         .mediaType = "audio/midi",
         .diagnostics = {exportError("Collection MIDI export produced no artifact")},
     };
   }
-  artifacts.front().filename = artifactBaseName(*sequence) + ".mid";
+  artifacts.front().filename = artifactBaseName(sequence->metadata, "sequence") + ".mid";
   return std::move(artifacts.front());
 }
 
@@ -310,7 +306,7 @@ Artifact exportSoundBank(const SessionSnapshot& snapshot, const SourceStore& sou
     };
   }
 
-  const std::string baseName = artifactBaseName(*soundBank);
+  const std::string baseName = artifactBaseName(soundBank->metadata, "sound-bank");
   if (const auto* collection = snapshot.firstCollectionContaining(soundBankId)) {
     auto collectionRequest = request;
     collectionRequest.kinds = {kind};
@@ -335,11 +331,11 @@ Artifact exportSoundBank(const SessionSnapshot& snapshot, const SourceStore& sou
   std::vector<AssetId> sampleIds;
   for (const auto& instrument : soundBank->instruments) {
     for (const auto& region : instrument.regions) {
-      if (!region.sample.externalPool || !region.sample.externalPool->valid() ||
-          std::ranges::find(sampleIds, *region.sample.externalPool) != sampleIds.end()) {
+      if (!region.sample.owner.valid() || region.sample.owner == soundBankId ||
+          std::ranges::find(sampleIds, region.sample.owner) != sampleIds.end()) {
         continue;
       }
-      const AssetId sampleId = *region.sample.externalPool;
+      const AssetId sampleId = region.sample.owner;
       sampleIds.push_back(sampleId);
       if (const auto* samples = snapshot.asset<SamplePoolAsset>(sampleId)) {
         samplePools.push_back(samples);
@@ -356,6 +352,34 @@ Artifact exportSoundBank(const SessionSnapshot& snapshot, const SourceStore& sou
                       : exportDls(synth, sources, request, nullptr, ModulationConversionPolicy::SynthModulators);
   artifact.diagnostics.insert(artifact.diagnostics.begin(), diagnostics.begin(), diagnostics.end());
   return artifact;
+}
+
+std::vector<Artifact> exportSamples(const SessionSnapshot& snapshot, const SourceStore& sources, AssetId ownerId) {
+  const auto* asset = snapshot.asset(ownerId);
+  const SamplePool* pool = nullptr;
+  std::string baseName;
+  if (const auto* bank = asset != nullptr ? std::get_if<SoundBankAsset>(asset) : nullptr) {
+    pool = &bank->localSamples;
+    baseName = artifactBaseName(bank->metadata, "sound-bank");
+  } else if (const auto* samples = asset != nullptr ? std::get_if<SamplePoolAsset>(asset) : nullptr) {
+    pool = &samples->pool;
+    baseName = artifactBaseName(samples->metadata, "samples");
+  }
+
+  std::vector<Artifact> artifacts;
+  if (pool != nullptr) {
+    appendWavArtifacts(artifacts, baseName, *pool, sources);
+  }
+  if (artifacts.empty()) {
+    artifacts.push_back(Artifact{
+        .filename = (baseName.empty() ? "samples-" + std::to_string(ownerId.value) : baseName) + "-samples.wav",
+        .mediaType = "audio/wav",
+        .diagnostics = {exportError(asset == nullptr              ? "Sample owner asset was not found"
+                                    : pool == nullptr             ? "Asset does not contain samples"
+                                                                  : "Asset does not contain any samples")},
+    });
+  }
+  return artifacts;
 }
 
 CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, const SourceStore& sources,

@@ -392,7 +392,7 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
   const auto splitBinding = bindCollection(splitSnapshot, splitCollection.id);
   expect(splitBinding.collection.has_value(), "split VH/VB collection should bind successfully");
   const auto& splitRegion = splitBinding.collection->soundBanks()[0].instruments[0].regions[0];
-  expect(splitRegion.sample.externalPool == splitCollection.members.samplePools[0],
+  expect(splitRegion.sample.owner == splitCollection.members.samplePools[0],
          "split VH regions should bind explicitly to the selected VB sample pool");
 
   const auto bankBytes = vabFixture(7, true);

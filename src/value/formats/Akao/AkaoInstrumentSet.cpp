@@ -43,7 +43,7 @@ void applyArticulationToRegion(Region& region, const AkaoArticulationBinding* bi
     return;
   }
   const AkaoArticulation& articulation = binding->articulation;
-  region.sample = SampleRef{.externalPool = binding->collection.id, .index = binding->sampleIndex};
+  region.sample = SampleRef{.owner = binding->collection.id, .index = binding->sampleIndex};
   const double rootKey =
       drum ? articulation.unityKey + region.keyRange.low - drumRelativeUnityKey : articulation.unityKey;
   region.unityKey = rootKey - (articulation.fineTuneCents / 100.0);
@@ -232,7 +232,7 @@ void addSyntheticArticulationInstruments(std::vector<Instrument>& instruments,
     Region region{
         .keyRange = KeyRange{.low = 0, .high = 127},
         .velocityRange = VelocityRange{.low = 0, .high = 127},
-        .sample = SampleRef{.externalPool = binding.collection.id, .index = binding.sampleIndex},
+        .sample = SampleRef{.owner = binding.collection.id, .index = binding.sampleIndex},
         .range = binding.articulation.source.range,
         .unityKey = binding.articulation.unityKey - (binding.articulation.fineTuneCents / 100.0),
         .envelope = psxSpuEnvelope(binding.articulation.adsr1, binding.articulation.adsr2),

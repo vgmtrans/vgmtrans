@@ -191,11 +191,4 @@ SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reade
   return refs;
 }
 
-SamplePool buildSnesBrrSamplePool(ByteReader reader, const SnesBrrCatalog& catalog, AssetId samplePoolId,
-                                  SourceMapBuilder& sourceMap, std::string_view directoryEntryKind) {
-  SamplePoolBuilder samples{samplePoolId, &sourceMap};
-  [[maybe_unused]] const auto refs = addSnesBrrSamples(samples, reader, catalog, directoryEntryKind);
-  return std::move(samples).finish().value;
-}
-
 }  // namespace vgmtrans::core
