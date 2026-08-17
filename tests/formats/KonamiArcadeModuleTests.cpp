@@ -260,23 +260,21 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
   const auto module = konamiArcadeModule();
   const ScanResult result = module.scan(input);
   expect(result.diagnostics.empty(), "complete KonamiArcade scan should not report diagnostics");
-  expect(result.assets.size() == 3 && result.explicitCollections.size() == 1,
-         "KonamiArcade scan should publish sequence, instruments, samples, and a collection");
+  expect(result.assets.size() == 2 && result.explicitCollections.size() == 1,
+         "KonamiArcade scan should publish a sequence, sound bank, and collection");
 
   const auto* sequence = firstAsset<SequenceProgramAsset>(result);
-  const auto* instruments = firstAsset<InstrumentSetAsset>(result);
-  const auto* samples = firstAsset<SampleCollectionAsset>(result);
-  expect(sequence != nullptr && instruments != nullptr && samples != nullptr,
-         "KonamiArcade result should use the core value asset types");
+  const auto* instruments = firstAsset<SoundBankAsset>(result);
+  expect(sequence != nullptr && instruments != nullptr, "KonamiArcade result should use the core value asset types");
   expect(sequence->program.runtime.valid() && sequence->program.tracks.size() == 1 &&
              sequence->program.tracks[0].commands.size() == 37,
          "KonamiArcade sequence should compile the source track into typed command values");
   expect(instruments->instruments.size() == 2,
          "KonamiArcade synth should contain one melodic instrument and one drum kit");
-  expect(samples->samples.samples.size() == 2 && samples->samples.samples[0].codec == AudioCodec::PcmS8 &&
-             samples->samples.samples[0].encodedData.size == 4 && !samples->samples.samples[0].loop.enabled &&
-             samples->samples.samples[0].loop.start == 0 && samples->samples.samples[0].loop.length == 0 &&
-             std::abs(samples->samples.samples[0].attenuationDb) < 0.0001,
+  const auto& samples = instruments->localSamples.samples;
+  expect(samples.size() == 2 && samples[0].codec == AudioCodec::PcmS8 && samples[0].encodedData.size == 4 &&
+             !samples[0].loop.enabled && samples[0].loop.start == 0 && samples[0].loop.length == 0 &&
+             std::abs(samples[0].attenuationDb) < 0.0001,
          "MysticWarrior samples should preserve codec and bounds without GX's fixed attenuation");
   expect(instruments->instruments[1].regions.size() == 1 &&
              std::abs(instruments->instruments[1].regions[0].unityKey - 22.0) < 0.0001,
@@ -299,7 +297,7 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
          "KonamiArcade E4 should preserve physical triangle-LFO depth, tempo-relative rate, and delay");
   expect(!instruments->instruments.front().modulation.vibrato,
          "scanned KonamiArcade instruments should not guess sequence-independent vibrato");
-  InstrumentSetAsset preparedInstruments = *instruments;
+  SoundBankAsset preparedInstruments = *instruments;
   applySequenceModulation(preparedInstruments, modulationProfile);
   expect(preparedInstruments.instruments.front().modulation.vibrato &&
              std::abs(preparedInstruments.instruments.front().modulation.vibrato->maxDepthCents - 100.0) < 0.0001,
@@ -337,7 +335,7 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
   expect(notes[6]->linearVelocity < notes[5]->linearVelocity,
          "the full signed range of loop loudness deltas should survive attenuation-domain conversion");
 
-  std::array<InstrumentSetAsset, 1> dynamicInstruments{*instruments};
+  std::array<SoundBankAsset, 1> dynamicInstruments{*instruments};
   const auto materialized = materializeDynamicEnvelopes(performance, dynamicInstruments);
   const auto selectedAddress = [&](PerformanceNoteId note) {
     for (const auto& event : materialized.performance.tracks[0].events) {
@@ -359,11 +357,13 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
              restoredRelease != materialized.performance.tracks[0].events.end() &&
              !std::get<NotePerformanceEvent>(*restoredRelease).instrumentAddress,
          "FA zero should leave later notes on the instant-release instrument selected after percussion mode");
-  expect(std::ranges::all_of(dynamicInstruments[0].instruments, [](const Instrument& instrument) {
-    return std::ranges::all_of(instrument.regions, [](const Region& region) {
-      return !region.envelope.releaseSeconds || !std::isinf(*region.envelope.releaseSeconds);
-    });
-  }), "dynamic materialization should not create impractical infinite-release KonamiArcade instruments");
+  expect(std::ranges::all_of(dynamicInstruments[0].instruments,
+                             [](const Instrument& instrument) {
+                               return std::ranges::all_of(instrument.regions, [](const Region& region) {
+                                 return !region.envelope.releaseSeconds || !std::isinf(*region.envelope.releaseSeconds);
+                               });
+                             }),
+         "dynamic materialization should not create impractical infinite-release KonamiArcade instruments");
   expect(std::ranges::any_of(performance.tracks[0].events,
                              [](const PerformanceEvent& event) {
                                const auto* reverb = std::get_if<ReverbPerformanceEvent>(&event);
@@ -398,10 +398,10 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
     }
   }
   expect(transitions.size() == 2 && transitions[0]->startKey == 64.0 && transitions[0]->targetKey == 66.0 &&
-          !transitions[0]->previousNote && transitions[0]->nativePortamento.useCurrentTiming &&
-          transitions[1]->startKey == 70.0 && transitions[1]->targetKey == 72.0 &&
-          std::holds_alternative<FixedDurationPitchSlideTiming>(transitions[1]->timing.physical),
-      "continuous and delayed slides should retain typed intent without linking across a release gap");
+             !transitions[0]->previousNote && transitions[0]->nativePortamento.useCurrentTiming &&
+             transitions[1]->startKey == 70.0 && transitions[1]->targetKey == 72.0 &&
+             std::holds_alternative<FixedDurationPitchSlideTiming>(transitions[1]->timing.physical),
+         "continuous and delayed slides should retain typed intent without linking across a release gap");
   expect(std::ranges::none_of(performance.tracks[0].events,
                               [](const PerformanceEvent& event) {
                                 return std::holds_alternative<PortamentoPerformanceEvent>(event) ||
@@ -409,10 +409,10 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
                               }),
          "KonamiArcade format code should not preselect a MIDI slide representation");
 
-  const std::array<const InstrumentSetAsset*, 1> instrumentSets{instruments};
+  const std::array<const SoundBankAsset*, 1> soundBanks{instruments};
   const MidiSequence midi = renderMidiSequence(
       performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PreserveFormat},
-      ModulationConversionPolicy::SynthModulators, instrumentSets, &modulationProfile);
+      ModulationConversionPolicy::SynthModulators, soundBanks, &modulationProfile);
   expect(
       std::ranges::any_of(midi.tracks[0].events,
                           [](const MidiEvent& event) { return std::holds_alternative<VibratoDepth>(event); }) &&
@@ -453,7 +453,7 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
 
   const MidiSequence pitchBendMidi =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend},
-                         ModulationConversionPolicy::SynthModulators, instrumentSets);
+                         ModulationConversionPolicy::SynthModulators, soundBanks);
   expect(std::ranges::none_of(pitchBendMidi.tracks[0].events,
                               [](const MidiEvent& event) {
                                 return std::holds_alternative<PortamentoTime>(event) ||
@@ -617,8 +617,8 @@ void konamiArcadeGxDriverQuirksRemainRepresented() {
   const auto slide = std::ranges::find_if(performance.tracks[0].automations, [](const auto& automation) {
     return pitchTransitionIntent(automation) != nullptr;
   });
-  expect(slide != performance.tracks[0].automations.end() &&
-             pitchTransitionIntent(*slide)->startKey == 74.0 && pitchTransitionIntent(*slide)->targetKey == 72.0,
+  expect(slide != performance.tracks[0].automations.end() && pitchTransitionIntent(*slide)->startKey == 74.0 &&
+             pitchTransitionIntent(*slide)->targetKey == 72.0,
          "GX F3 look-ahead should slide toward its channel-transposed target without applying initial transpose");
 
   std::vector<const NotePerformanceEvent*> notes;
@@ -650,10 +650,11 @@ void konamiArcadeGxDriverQuirksRemainRepresented() {
              envelopes[0]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
              envelopes[1]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks,
          "GX FA should convert nonzero increments to timed releases and restore zero to voice-hold behavior");
-  expect(instruments.size() == 2 &&
-             std::ranges::all_of(instruments, [](const InstrumentPerformanceEvent* instrument) {
-               return instrument->envelopeMode == InstrumentEnvelopeMode::PreserveDynamicOverride;
-             }),
+  expect(instruments.size() == 2 && std::ranges::all_of(instruments,
+                                                        [](const InstrumentPerformanceEvent* instrument) {
+                                                          return instrument->envelopeMode ==
+                                                                 InstrumentEnvelopeMode::PreserveDynamicOverride;
+                                                        }),
          "KonamiArcade instrument changes should preserve the track-level release rate");
   expect(notes.size() == 5 && notes[0]->key == 74.0 && notes[1]->key == 72.0 && notes[2]->key == 73.0 &&
              notes[3]->key == 74.0 && notes[4]->key == 24.0 && notes[0]->durationTicks == 3 &&
@@ -766,12 +767,23 @@ void konamiArcadeZeroReleaseUsesHardwareVoiceLifetime() {
   writeBe32(gxBytes, 0x20, 0x80);
   writeBytes(gxBytes, 0x80,
              {
-                 0xea, 0x80,
-                 0x30, 0x04, 0x32, 0x7f,  // zero-release voice
-                 0xe0, 0x08,              // rest keeps it sounding
-                 0xe2, 0x01,              // GX program loading keys the channel off
-                 0xe1, 0x04, 0x32,        // even a hold must not revive the stopped voice
-                 0x32, 0x04, 0x32, 0x7f,
+                 0xea,
+                 0x80,
+                 0x30,
+                 0x04,
+                 0x32,
+                 0x7f,  // zero-release voice
+                 0xe0,
+                 0x08,  // rest keeps it sounding
+                 0xe2,
+                 0x01,  // GX program loading keys the channel off
+                 0xe1,
+                 0x04,
+                 0x32,  // even a hold must not revive the stopped voice
+                 0x32,
+                 0x04,
+                 0x32,
+                 0x7f,
                  0xff,
              });
   const SourceFile gxSource{
@@ -811,18 +823,27 @@ void konamiArcadeTempoSlidesAreCanceledAcrossTracks() {
   writeBe32(bytes, 0x24, 0xa0);
   writeBytes(bytes, 0x80,
              {
-                 0xea, 0x80,        // establish the shared tempo
-                 0xe0, 0x01,        // let every channel finish its initial setup
-                 0xeb, 0x40, 0x01,  // begin a long global slowdown
-                 0xe0, 0x10,
+                 0xea,
+                 0x80,  // establish the shared tempo
+                 0xe0,
+                 0x01,  // let every channel finish its initial setup
+                 0xeb,
+                 0x40,
+                 0x01,  // begin a long global slowdown
+                 0xe0,
+                 0x10,
                  0xff,
              });
   writeBytes(bytes, 0xa0,
              {
-                 0xea, 0x80,
-                 0xe0, 0x01,
-                 0xea, 0x80,  // any channel's immediate tempo cancels the global slide
-                 0xe0, 0x10,
+                 0xea,
+                 0x80,
+                 0xe0,
+                 0x01,
+                 0xea,
+                 0x80,  // any channel's immediate tempo cancels the global slide
+                 0xe0,
+                 0x10,
                  0xff,
              });
 
@@ -862,23 +883,33 @@ void konamiArcadeTempoSlidesAreCanceledAcrossTracks() {
          "an immediate tempo command on another channel should interrupt the one shared tempo slide");
   const u32 steadyTempo =
       static_cast<u32>(std::lround((256.0 / 0x80) / layout.nmiRateHertz * kKonamiArcadePpqn * 1'000'000.0));
-  expect(std::ranges::all_of(performance.tracks, [&](const PerformanceTrack& track) {
-    return std::ranges::none_of(track.events, [&](const PerformanceEvent& event) {
-      const auto* tempo = std::get_if<TempoPerformanceEvent>(&event);
-      return tempo != nullptr && tempo->microsecondsPerQuarter != steadyTempo;
-    });
-  }), "a same-tick cross-channel tempo command should prevent the canceled slide from emitting any falling tempo");
+  expect(std::ranges::all_of(performance.tracks,
+                             [&](const PerformanceTrack& track) {
+                               return std::ranges::none_of(track.events, [&](const PerformanceEvent& event) {
+                                 const auto* tempo = std::get_if<TempoPerformanceEvent>(&event);
+                                 return tempo != nullptr && tempo->microsecondsPerQuarter != steadyTempo;
+                               });
+                             }),
+         "a same-tick cross-channel tempo command should prevent the canceled slide from emitting any falling tempo");
 }
 
 void konamiArcadeMysticDrumPitchSlidesUseTablePitch() {
   auto fixture = makeMysticWarriorFixture();
   writeBytes(fixture.bytes, 0x320,
              {
-                 0xea, 0x80,                    // tempo
-                 0xde, 0x01,                    // secondary percussion flag on
-                 0x61,                          // primary percussion flag off
-                 0x00, 0x60, 0x63, 0x7f,        // drum 0 for 96 ticks
-                 0xf3, 0x0a, 0x23, 0x1f,        // slide to driver note 31
+                 0xea,
+                 0x80,  // tempo
+                 0xde,
+                 0x01,  // secondary percussion flag on
+                 0x61,  // primary percussion flag off
+                 0x00,
+                 0x60,
+                 0x63,
+                 0x7f,  // drum 0 for 96 ticks
+                 0xf3,
+                 0x0a,
+                 0x23,
+                 0x1f,  // slide to driver note 31
                  0xff,
              });
 
@@ -905,10 +936,12 @@ void konamiArcadeMysticDrumPitchSlidesUseTablePitch() {
 
   const MidiSequence midi =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
-  expect(std::ranges::any_of(midi.tracks[0].events, [](const MidiEvent& event) {
-    const auto* bend = std::get_if<PitchBend>(&event);
-    return bend != nullptr && bend->value < 0;
-  }), "MIDI lowering should preserve the drum slide's downward direction");
+  expect(std::ranges::any_of(midi.tracks[0].events,
+                             [](const MidiEvent& event) {
+                               const auto* bend = std::get_if<PitchBend>(&event);
+                               return bend != nullptr && bend->value < 0;
+                             }),
+         "MIDI lowering should preserve the drum slide's downward direction");
 }
 
 void konamiArcadeAdpcmDecoderSupportsForwardAndReverseSamples() {

@@ -203,10 +203,10 @@ const char* valueAssetKindName(const vgmtrans::core::Asset& asset) {
   if (std::holds_alternative<SequenceProgramAsset>(asset)) {
     return "sequence";
   }
-  if (std::holds_alternative<InstrumentSetAsset>(asset)) {
+  if (std::holds_alternative<SoundBankAsset>(asset)) {
     return "instrument-set";
   }
-  if (std::holds_alternative<SampleCollectionAsset>(asset)) {
+  if (std::holds_alternative<SamplePoolAsset>(asset)) {
     return "sample-collection";
   }
   return "misc";
@@ -275,12 +275,12 @@ void printValueSessionSummary(const vgmtrans::core::SessionSnapshot& project) {
     if (std::holds_alternative<vgmtrans::core::SequenceProgramAsset>(asset)) {
       const auto& sequence = std::get<vgmtrans::core::SequenceProgramAsset>(asset);
       fmt::print(" tracks={}", sequence.program.tracks.size());
-    } else if (std::holds_alternative<vgmtrans::core::InstrumentSetAsset>(asset)) {
-      const auto& instrumentSet = std::get<vgmtrans::core::InstrumentSetAsset>(asset);
-      fmt::print(" instruments={}", instrumentSet.instruments.size());
-    } else if (std::holds_alternative<vgmtrans::core::SampleCollectionAsset>(asset)) {
-      const auto& samples = std::get<vgmtrans::core::SampleCollectionAsset>(asset);
-      fmt::print(" samples={}", samples.samples.samples.size());
+    } else if (std::holds_alternative<vgmtrans::core::SoundBankAsset>(asset)) {
+      const auto& soundBank = std::get<vgmtrans::core::SoundBankAsset>(asset);
+      fmt::print(" instruments={}", soundBank.instruments.size());
+    } else if (std::holds_alternative<vgmtrans::core::SamplePoolAsset>(asset)) {
+      const auto& samples = std::get<vgmtrans::core::SamplePoolAsset>(asset);
+      fmt::print(" samples={}", samples.pool.samples.size());
     }
     fmt::print("\n");
   }
@@ -288,10 +288,9 @@ void printValueSessionSummary(const vgmtrans::core::SessionSnapshot& project) {
   for (size_t i = 0; i < project.collections().size(); ++i) {
     const auto& collection = project.collections()[i];
     const auto& members = collection.members;
-    fmt::println("collection #{} id={} name='{}' sequence={} instrumentSets={} sampleCollections={}", i,
-                 collection.id.value, collection.name,
-                 members.sequence ? std::to_string(members.sequence->value) : std::string("-"),
-                 members.instrumentSets.size(), members.sampleCollections.size());
+    fmt::println("collection #{} id={} name='{}' sequence={} soundBanks={} samplePools={}", i, collection.id.value,
+                 collection.name, members.sequence ? std::to_string(members.sequence->value) : std::string("-"),
+                 members.soundBanks.size(), members.samplePools.size());
   }
 }
 
@@ -400,10 +399,10 @@ bool valueSourceOutlineAutoVisible(vgmtrans::core::SourceRole role) {
     case vgmtrans::core::SourceRole::Payload:
     case vgmtrans::core::SourceRole::DataBlock:
     case vgmtrans::core::SourceRole::Command:
-    case vgmtrans::core::SourceRole::InstrumentSet:
+    case vgmtrans::core::SourceRole::SoundBank:
     case vgmtrans::core::SourceRole::Instrument:
     case vgmtrans::core::SourceRole::Region:
-    case vgmtrans::core::SourceRole::SampleCollection:
+    case vgmtrans::core::SourceRole::SamplePool:
     case vgmtrans::core::SourceRole::Sample:
       return true;
   }
@@ -834,11 +833,11 @@ void printValueCollectionInfo(const vgmtrans::core::SessionSnapshot& project,
     fmt::println("  Sequence: none");
   }
 
-  for (size_t i = 0; i < members.instrumentSets.size(); ++i) {
-    printValueCollectionAssetRef(project, "InstrumentSet", i, members.instrumentSets[i]);
+  for (size_t i = 0; i < members.soundBanks.size(); ++i) {
+    printValueCollectionAssetRef(project, "SoundBank", i, members.soundBanks[i]);
   }
-  for (size_t i = 0; i < members.sampleCollections.size(); ++i) {
-    printValueCollectionAssetRef(project, "SampleCollection", i, members.sampleCollections[i]);
+  for (size_t i = 0; i < members.samplePools.size(); ++i) {
+    printValueCollectionAssetRef(project, "SamplePool", i, members.samplePools[i]);
   }
   for (size_t i = 0; i < members.miscAssets.size(); ++i) {
     printValueCollectionAssetRef(project, "Misc", i, members.miscAssets[i]);
@@ -855,10 +854,10 @@ bool printValueCollections(const vgmtrans::core::SessionSnapshot& project, const
     for (size_t i = 0; i < project.collections().size(); ++i) {
       const auto& collection = project.collections()[i];
       const auto& members = collection.members;
-      fmt::println("collection #{} id={} name='{}' sequence={} instrumentSets={} sampleCollections={} misc={}", i,
+      fmt::println("collection #{} id={} name='{}' sequence={} soundBanks={} samplePools={} misc={}", i,
                    collection.id.value, collection.name,
                    members.sequence ? std::to_string(members.sequence->value) : std::string("-"),
-                   members.instrumentSets.size(), members.sampleCollections.size(), members.miscAssets.size());
+                   members.soundBanks.size(), members.samplePools.size(), members.miscAssets.size());
     }
     return true;
   }
@@ -879,8 +878,8 @@ bool printValueCollections(const vgmtrans::core::SessionSnapshot& project, const
 }
 
 std::string valueSampleRefName(const vgmtrans::core::SampleRef& sample) {
-  if (sample.collection) {
-    return fmt::format("collection {} sample {}", sample.collection->value, sample.index);
+  if (sample.externalPool) {
+    return fmt::format("collection {} sample {}", sample.externalPool->value, sample.index);
   }
   return fmt::format("sample {}", sample.index);
 }
@@ -930,22 +929,22 @@ bool printValueInstruments(const vgmtrans::core::SessionSnapshot& project, const
       return false;
     }
 
-    const auto* instrumentSetAsset =
-        std::get_if<vgmtrans::core::InstrumentSetAsset>(&project.assets()[static_cast<size_t>(assetIndex)]);
-    if (instrumentSetAsset == nullptr) {
-      fmt::println("Asset is not an instrument set");
+    const auto* soundBankAsset =
+        std::get_if<vgmtrans::core::SoundBankAsset>(&project.assets()[static_cast<size_t>(assetIndex)]);
+    if (soundBankAsset == nullptr) {
+      fmt::println("Asset is not a sound bank");
       return false;
     }
 
-    const auto& meta = instrumentSetAsset->metadata;
-    fmt::println("instrument-set asset #{} id={} format={} name='{}' range=0x{:x}:0x{:x} instruments={}", assetIndex,
+    const auto& meta = soundBankAsset->metadata;
+    fmt::println("sound-bank asset #{} id={} format={} name='{}' range=0x{:x}:0x{:x} instruments={}", assetIndex,
                  meta.id.value, meta.format, meta.name, meta.range.offset, meta.range.size,
-                 instrumentSetAsset->instruments.size());
+                 soundBankAsset->instruments.size());
 
     const size_t instrumentArgIndex = assetArgIndex + 1;
     if (args.size() <= instrumentArgIndex) {
-      for (size_t i = 0; i < instrumentSetAsset->instruments.size(); ++i) {
-        const auto& instrument = instrumentSetAsset->instruments[i];
+      for (size_t i = 0; i < soundBankAsset->instruments.size(); ++i) {
+        const auto& instrument = soundBankAsset->instruments[i];
         const auto address = vgmtrans::core::resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
         fmt::println("  instrument #{} bank={} program={} regions={} name='{}' range=0x{:x}:0x{:x}", i, address.bank,
                      address.program, instrument.regions.size(), instrument.name, instrument.range.offset,
@@ -955,12 +954,12 @@ bool printValueInstruments(const vgmtrans::core::SessionSnapshot& project, const
     }
 
     const int instrumentIndex = std::stoi(args[instrumentArgIndex]);
-    if (instrumentIndex < 0 || static_cast<size_t>(instrumentIndex) >= instrumentSetAsset->instruments.size()) {
+    if (instrumentIndex < 0 || static_cast<size_t>(instrumentIndex) >= soundBankAsset->instruments.size()) {
       fmt::println("Instrument index out of bounds");
       return false;
     }
 
-    printValueInstrument(instrumentSetAsset->instruments[static_cast<size_t>(instrumentIndex)],
+    printValueInstrument(soundBankAsset->instruments[static_cast<size_t>(instrumentIndex)],
                          static_cast<size_t>(instrumentIndex));
     return true;
   } catch (...) {
@@ -1024,21 +1023,21 @@ bool printValueSamples(const vgmtrans::core::SessionSnapshot& project, const std
     }
 
     const auto* sampleAsset =
-        std::get_if<vgmtrans::core::SampleCollectionAsset>(&project.assets()[static_cast<size_t>(assetIndex)]);
+        std::get_if<vgmtrans::core::SamplePoolAsset>(&project.assets()[static_cast<size_t>(assetIndex)]);
     if (sampleAsset == nullptr) {
-      fmt::println("Asset is not a sample collection");
+      fmt::println("Asset is not a sample pool");
       return false;
     }
 
     const auto& meta = sampleAsset->metadata;
-    fmt::println("sample-collection asset #{} id={} format={} name='{}' range=0x{:x}:0x{:x} samples={}", assetIndex,
+    fmt::println("sample-pool asset #{} id={} format={} name='{}' range=0x{:x}:0x{:x} samples={}", assetIndex,
                  meta.id.value, meta.format, meta.name, meta.range.offset, meta.range.size,
-                 sampleAsset->samples.samples.size());
+                 sampleAsset->pool.samples.size());
 
     const size_t sampleArgIndex = assetArgIndex + 1;
     if (args.size() <= sampleArgIndex) {
-      for (size_t i = 0; i < sampleAsset->samples.samples.size(); ++i) {
-        const auto& sample = sampleAsset->samples.samples[i];
+      for (size_t i = 0; i < sampleAsset->pool.samples.size(); ++i) {
+        const auto& sample = sampleAsset->pool.samples[i];
         fmt::println("  sample #{} name='{}' codec={} data=0x{:x}:0x{:x} rate={}Hz channels={} bits={}", i, sample.name,
                      valueAudioCodecName(sample.codec), sample.encodedData.offset, sample.encodedData.size,
                      sample.sampleRate, sample.channels, sample.bitsPerSample);
@@ -1047,12 +1046,12 @@ bool printValueSamples(const vgmtrans::core::SessionSnapshot& project, const std
     }
 
     const int sampleIndex = std::stoi(args[sampleArgIndex]);
-    if (sampleIndex < 0 || static_cast<size_t>(sampleIndex) >= sampleAsset->samples.samples.size()) {
+    if (sampleIndex < 0 || static_cast<size_t>(sampleIndex) >= sampleAsset->pool.samples.size()) {
       fmt::println("Sample index out of bounds");
       return false;
     }
 
-    printValueSample(sampleAsset->samples.samples[static_cast<size_t>(sampleIndex)], static_cast<size_t>(sampleIndex));
+    printValueSample(sampleAsset->pool.samples[static_cast<size_t>(sampleIndex)], static_cast<size_t>(sampleIndex));
     return true;
   } catch (...) {
     fmt::println("Invalid arguments");
@@ -2044,14 +2043,14 @@ void registerCommands() {
        {"collections", "<rawfile_idx> [collection_idx]", "List or inspect value collections", 3, value_collections},
        {"collections-path", "<path> [collection_idx]", "List or inspect value collections from a filesystem path", 3,
         value_collections_path},
-       {"instruments", "<rawfile_idx> <asset_idx> [instrument_idx]", "List or inspect a value instrument set", 4,
+       {"instruments", "<rawfile_idx> <asset_idx> [instrument_idx]", "List or inspect a value sound bank", 4,
         value_instruments},
        {"instruments-path", "<path> <asset_idx> [instrument_idx]",
-        "List or inspect a value instrument set from a filesystem path", 4, value_instruments_path},
-       {"samples", "<rawfile_idx> <asset_idx> [sample_idx]", "List or inspect a value sample collection", 4,
+        "List or inspect a value sound bank from a filesystem path", 4, value_instruments_path},
+       {"samples", "<rawfile_idx> <asset_idx> [sample_idx]", "List or inspect a value sample pool", 4,
         value_samples},
        {"samples-path", "<path> <asset_idx> [sample_idx]",
-        "List or inspect a value sample collection from a filesystem path", 4, value_samples_path},
+        "List or inspect a value sample pool from a filesystem path", 4, value_samples_path},
        {"export",
         "<rawfile_idx> <collection_idx> <dir> [all|midi|sf2|dls|wav; default midi] "
         "[--modulation-scaling full|observed] [--dynamic-envelopes] [--terminate-previous-voice]",

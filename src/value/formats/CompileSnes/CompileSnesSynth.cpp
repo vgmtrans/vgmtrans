@@ -95,8 +95,8 @@ struct Patch {
 
 }  // namespace
 
-std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& layout,
-                                      const ReferencedData& references, std::string_view displayName) {
+std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layout& layout,
+                                         const ReferencedData& references, std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const std::vector<Patch> patches = collectPatches(reader, layout, references);
   if (patches.empty()) {
@@ -107,9 +107,9 @@ std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& 
     return std::nullopt;
   }
 
-  auto instruments = builder.instrumentSet(fmt::format("{} Instruments", displayName));
-  auto sampleCollection = builder.sampleCollection(fmt::format("{} Samples", displayName));
-  const SnesBrrSampleRefs samples = addSnesBrrSamples(sampleCollection.builder(), reader, catalog);
+  auto instruments = builder.soundBank(fmt::format("{} Instruments", displayName));
+  auto& samplePool = instruments.samples();
+  const SnesBrrSampleRefs samples = addSnesBrrSamples(samplePool, reader, catalog);
   for (const Patch& patch : patches) {
     const auto sample = samples.findSrcn(patch.srcn);
     if (!sample) {
@@ -138,7 +138,7 @@ std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& 
         .source("Region", patch.source, "compile-snes-region")
         .description(fmt::format("SRCN {}, unity key {:.3f}", patch.srcn, patch.unityKey));
   }
-  return ScanSynthRefs{.instruments = instruments.ref(), .samples = sampleCollection.ref()};
+  return instruments.ref();
 }
 
 }  // namespace vgmtrans::formats::compile_snes

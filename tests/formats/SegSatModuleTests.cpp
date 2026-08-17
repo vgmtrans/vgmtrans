@@ -393,13 +393,11 @@ void segSatCollectionBindingSuppliesVlTablesToSequence() {
              pitch->normalizedWheelPosition && std::abs(*pitch->normalizedWheelPosition - (-0.046875)) < 0.000001,
          "SegSat should retain its raw pitch-wheel position for collection-aware lowering");
 
-  expect(collection.members.sampleCollections.size() == 1, "SegSat fixture should attach its parsed sample collection");
-  const auto* samples = snapshot.asset<SampleCollectionAsset>(collection.members.sampleCollections.front());
-  expect(samples != nullptr && samples->samples.samples.size() == 1,
-         "SegSat fixture should expose its one unique sample");
-  expect(collection.members.instrumentSets.size() == 1, "SegSat fixture should attach its instrument set");
-  const auto* instruments = snapshot.asset<InstrumentSetAsset>(collection.members.instrumentSets.front());
+  expect(collection.members.samplePools.empty(), "SegSat samples should be local to their sound bank");
+  expect(collection.members.soundBanks.size() == 1, "SegSat fixture should attach its instrument set");
+  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
   expect(instruments != nullptr && instruments->instruments.size() == 2 &&
+             instruments->localSamples.samples.size() == 1 &&
              instruments->instruments.front().pitchBendRangeCents == 2400 &&
              instruments->instruments.back().regions.empty(),
          "SegSat instruments should decode bend range and preserve an empty 0xff-sentinel program");
@@ -435,7 +433,7 @@ void segSatCollectionBindingSuppliesVlTablesToSequence() {
              parsedRegion.envelope.sustainAmplitude &&
              std::abs(*parsedRegion.envelope.sustainAmplitude - expectedSustain) < 0.000001,
          "SegSat regions should retain SCSP full-scale decay rates, levels, KRS, holds, and endless D2");
-  const auto decoded = decodeSample(samples->samples.samples.front(), session.sources().bytes(source));
+  const auto decoded = decodeSample(instruments->localSamples.samples.front(), session.sources().bytes(source));
   expect(decoded && decoded->pcm.size() == 4 && decoded->pcm[0] == 0x1234 && decoded->pcm[1] == -292,
          "SegSat PCM16 samples should decode in the SCSP's big-endian byte order");
 }
@@ -449,9 +447,9 @@ void segSatRuntimeMapSelectsBankInsideAnotherSampleSpan() {
   const SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.collections().size() == 1, "overlapping SegSat fixture should produce one collection");
   const Collection& collection = snapshot.collections().front();
-  expect(collection.members.instrumentSets.size() == 1,
+  expect(collection.members.soundBanks.size() == 1,
          "an implicit bank-zero sequence should attach only its runtime-mapped instrument bank");
-  const auto* instruments = snapshot.asset<InstrumentSetAsset>(collection.members.instrumentSets.front());
+  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
   expect(instruments != nullptr && instruments->metadata.range.offset == 0x1200,
          "runtime bank zero should remain discoverable inside an earlier bank's sample span");
 
@@ -485,7 +483,7 @@ void segSatMultiBankPlaybackUsesTheActiveBanksVlTable() {
   session.scanPendingSources();
 
   const SessionSnapshot snapshot = session.snapshot();
-  expect(snapshot.collections().size() == 1 && snapshot.collections().front().members.instrumentSets.size() == 2,
+  expect(snapshot.collections().size() == 1 && snapshot.collections().front().members.soundBanks.size() == 2,
          "a two-bank SegSat sequence should attach both runtime-mapped instrument sets");
   const CollectionPlayback playback =
       session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{.sequence = {.sequenceLoops = 0}});
@@ -545,7 +543,7 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
   const auto bank5Layout = readSegSatBankLayout(sources.reader(bank5Source), 0x100);
   const auto bank6Layout = readSegSatBankLayout(sources.reader(bank6Source), 0x100);
   expect(bank5Layout && bank6Layout, "multi-source fixture should contain two velocity banks");
-  const InstrumentSetAsset bank5{
+  const SoundBankAsset bank5{
       .metadata =
           AssetMetadata{
               .id = AssetId{1},
@@ -560,7 +558,7 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
       .privateData = AssetPrivateData::make(
           readSegSatVelocityBank(sources.reader(bank5Source), *bank5Layout, 5, SegSatVolumeModel::V1_33)),
   };
-  const InstrumentSetAsset bank6{
+  const SoundBankAsset bank6{
       .metadata =
           AssetMetadata{
               .id = AssetId{2},
@@ -575,7 +573,7 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
       .privateData = AssetPrivateData::make(
           readSegSatVelocityBank(sources.reader(bank6Source), *bank6Layout, 6, SegSatVolumeModel::V1_33)),
   };
-  const InstrumentSetAsset foreignBank{
+  const SoundBankAsset foreignBank{
       .metadata = AssetMetadata{.id = AssetId{3}, .format = "Foreign", .name = "Foreign Bank"},
       .instruments = {Instrument{
           .explicitAddress = InstrumentAddress{.bank = 42, .program = 7},
@@ -591,7 +589,7 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
       .members =
           {
               .sequence = sequence.metadata.id,
-              .instrumentSets = {bank6.metadata.id, foreignBank.metadata.id, bank5.metadata.id},
+              .soundBanks = {bank6.metadata.id, foreignBank.metadata.id, bank5.metadata.id},
           },
   };
   test::SessionSnapshotBuilder builder;
@@ -603,10 +601,10 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
   const auto binding = bindCollection(snapshot, collection.id);
   expect(binding.diagnostics.empty() && binding.collection,
          "SegSat binding should use retained bank data without reopening its source files");
-  const auto& instrumentSets = binding.collection->instrumentSets();
-  expect(instrumentSets.size() == 3 && instrumentSets[1].metadata.id == foreignBank.metadata.id &&
-             instrumentSets[1].instruments.front().explicitAddress == InstrumentAddress{.bank = 42, .program = 7} &&
-             instrumentSets[1].instruments.front().name == "Foreign Instrument",
+  const auto& soundBanks = binding.collection->soundBanks();
+  expect(soundBanks.size() == 3 && soundBanks[1].metadata.id == foreignBank.metadata.id &&
+             soundBanks[1].instruments.front().explicitAddress == InstrumentAddress{.bank = 42, .program = 7} &&
+             soundBanks[1].instruments.front().name == "Foreign Instrument",
          "SegSat binding should preserve the identity, order, and contents of foreign collection members");
 
   const auto rendering =

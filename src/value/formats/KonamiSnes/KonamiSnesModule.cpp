@@ -35,7 +35,7 @@ using namespace core;
                               layout->bankedInstrumentTableAddress && layout->percussionInstrumentTableAddress;
   if (hasSynthLayout) {
     if (const auto synth = addKonamiSnesSynth(result, *layout, displayName)) {
-      collection.instrumentSet(synth->instruments).samples(synth->samples);
+      collection.soundBank(*synth);
     } else {
       result.warning("KonamiSnes sequence found, but no valid instruments or samples were discovered",
                      input.reader.range(0, input.reader.size()));

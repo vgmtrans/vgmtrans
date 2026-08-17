@@ -39,11 +39,8 @@ std::optional<SourceRange> diagnosticRange(SourceRange range) {
   return range.valid() ? std::optional<SourceRange>{range} : std::nullopt;
 }
 
-SourceTarget sampleTarget(SampleRef sample) {
-  if (sample.collection && sample.collection->valid()) {
-    return SourceTarget{ObjectRefs::sample(*sample.collection, sample.index)};
-  }
-  return SourceTarget{ObjectRefs::sampleIndex(sample.index)};
+SourceTarget sampleTarget(SampleRef sample, AssetId localBank) {
+  return SourceTarget{ObjectRefs::sample(sample.externalPool.value_or(localBank), sample.index)};
 }
 
 void annotateLoop(AnnotationBuilder& annotation, const Loop& loop) {
@@ -169,8 +166,8 @@ void annotateSynthValue(AnnotationBuilder annotation, const Region& region) {
   annotateEnvelope(annotation, region.envelope);
 }
 
-SampleRefLookup::SampleRefLookup(AssetId collection, std::unordered_map<u64, u32> indexes)
-    : collection_(collection), indexes_(std::move(indexes)) {
+SampleRefLookup::SampleRefLookup(std::optional<AssetId> externalPool, std::unordered_map<u64, u32> indexes)
+    : externalPool_(externalPool), indexes_(std::move(indexes)) {
 }
 
 std::optional<SampleRef> SampleRefLookup::find(u64 sourceKey) const {
@@ -178,17 +175,26 @@ std::optional<SampleRef> SampleRefLookup::find(u64 sourceKey) const {
   if (found == indexes_.end()) {
     return std::nullopt;
   }
-  return SampleRef{.collection = collection_, .index = found->second};
+  return SampleRef{.externalPool = externalPool_, .index = found->second};
 }
 
-SampleCollectionBuilder::SampleCollectionBuilder(AssetId asset, SourceMapBuilder* sourceMap,
-                                                 std::vector<Diagnostic>* diagnostics)
-    : asset_(asset), sourceMap_(sourceMap), diagnostics_(diagnostics) {
+SamplePoolBuilder::SamplePoolBuilder(AssetId asset, SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics)
+    : SamplePoolBuilder(asset, asset, sourceMap, diagnostics) {
 }
 
-SampleCollectionBuilder::Entry SampleCollectionBuilder::add(u64 sourceKey, Sample sample) {
+SamplePoolBuilder SamplePoolBuilder::local(AssetId owner, SourceMapBuilder* sourceMap,
+                                           std::vector<Diagnostic>* diagnostics) {
+  return SamplePoolBuilder(owner, std::nullopt, sourceMap, diagnostics);
+}
+
+SamplePoolBuilder::SamplePoolBuilder(AssetId owner, std::optional<AssetId> externalPool, SourceMapBuilder* sourceMap,
+                                     std::vector<Diagnostic>* diagnostics)
+    : asset_(owner), externalPool_(externalPool), sourceMap_(sourceMap), diagnostics_(diagnostics) {
+}
+
+SamplePoolBuilder::Entry SamplePoolBuilder::add(u64 sourceKey, Sample sample) {
   if (finished_) {
-    throw std::logic_error("Cannot add a sample after SampleCollectionBuilder::finish()");
+    throw std::logic_error("Cannot add a sample after SamplePoolBuilder::finish()");
   }
   if (indexes_.contains(sourceKey)) {
     report(Severity::Error, "synth.sample-key.duplicate", "Duplicate sample source key " + std::to_string(sourceKey),
@@ -204,9 +210,9 @@ SampleCollectionBuilder::Entry SampleCollectionBuilder::add(u64 sourceKey, Sampl
   return Entry{*this, index};
 }
 
-SampleCollectionBuilder::Entry SampleCollectionBuilder::alias(u64 aliasKey, u64 existingKey) {
+SamplePoolBuilder::Entry SamplePoolBuilder::alias(u64 aliasKey, u64 existingKey) {
   if (finished_) {
-    throw std::logic_error("Cannot add a sample alias after SampleCollectionBuilder::finish()");
+    throw std::logic_error("Cannot add a sample alias after SamplePoolBuilder::finish()");
   }
   if (indexes_.contains(aliasKey)) {
     report(Severity::Error, "synth.sample-key.duplicate", "Duplicate sample source key " + std::to_string(aliasKey),
@@ -224,16 +230,16 @@ SampleCollectionBuilder::Entry SampleCollectionBuilder::alias(u64 aliasKey, u64 
   return Entry{*this, found->second};
 }
 
-std::optional<SampleRef> SampleCollectionBuilder::find(u64 sourceKey) const {
+std::optional<SampleRef> SamplePoolBuilder::find(u64 sourceKey) const {
   const auto found = indexes_.find(sourceKey);
   if (found == indexes_.end()) {
     return std::nullopt;
   }
-  return SampleRef{.collection = asset_, .index = found->second};
+  return SampleRef{.externalPool = externalPool_, .index = found->second};
 }
 
-AnnotationBuilder SampleCollectionBuilder::source(SourceRole role, std::string_view label, SourceRange range,
-                                                  std::string_view kind) {
+AnnotationBuilder SamplePoolBuilder::source(SourceRole role, std::string_view label, SourceRange range,
+                                            std::string_view kind) {
   recordRange(range, false);
   if (sourceMap_ == nullptr || !range.valid()) {
     return {};
@@ -245,84 +251,84 @@ AnnotationBuilder SampleCollectionBuilder::source(SourceRole role, std::string_v
   return annotation;
 }
 
-AnnotationBuilder SampleCollectionBuilder::source(SourceRole role, std::string_view label, const SourceRecord& record,
-                                                  std::string_view kind) {
+AnnotationBuilder SamplePoolBuilder::source(SourceRole role, std::string_view label, const SourceRecord& record,
+                                            std::string_view kind) {
   return source(role, label, record.range, kind).fields(record.fields);
 }
 
-SampleCollectionBuilder& SampleCollectionBuilder::include(SourceRange range) {
+SamplePoolBuilder& SamplePoolBuilder::include(SourceRange range) {
   recordRange(range, true);
   return *this;
 }
 
-SourceRange SampleCollectionBuilder::range() const noexcept {
+SourceRange SamplePoolBuilder::range() const noexcept {
   if (includedRange_) {
     return *includedRange_;
   }
   return observedRange_.value_or(SourceRange{});
 }
 
-void SampleCollectionBuilder::warning(std::string message, SourceRange range) {
+void SamplePoolBuilder::warning(std::string message, SourceRange range) {
   report(Severity::Warning, {}, std::move(message), range);
 }
 
-void SampleCollectionBuilder::error(std::string message, SourceRange range) {
+void SamplePoolBuilder::error(std::string message, SourceRange range) {
   report(Severity::Error, {}, std::move(message), range);
 }
 
-BuiltSampleCollection SampleCollectionBuilder::finish() && {
+BuiltSamplePool SamplePoolBuilder::finish() && {
   if (finished_) {
-    throw std::logic_error("SampleCollectionBuilder was finished more than once");
+    throw std::logic_error("SamplePoolBuilder was finished more than once");
   }
   addFallbackSources();
   annotateValues();
   const SourceRange finalRange = range();
   finished_ = true;
-  return BuiltSampleCollection{
+  return BuiltSamplePool{
       .asset = asset_,
-      .value = SampleCollection{.samples = std::move(samples_)},
-      .refs = SampleRefLookup{asset_, std::move(indexes_)},
+      .value = SamplePool{.samples = std::move(samples_)},
+      .refs = SampleRefLookup{externalPool_, std::move(indexes_)},
       .range = finalRange,
   };
 }
 
-SampleCollectionBuilder::Entry::Entry(SampleCollectionBuilder& builder, u32 index) : builder_(&builder), index_(index) {
+SamplePoolBuilder::Entry::Entry(SamplePoolBuilder& builder, u32 index) : builder_(&builder), index_(index) {
 }
 
-SampleCollectionBuilder::Entry::operator bool() const noexcept {
+SamplePoolBuilder::Entry::operator bool() const noexcept {
   return builder_ != nullptr && builder_->validIndex(index_);
 }
 
-SampleRef SampleCollectionBuilder::Entry::ref() const {
+SampleRef SamplePoolBuilder::Entry::ref() const {
   if (!*this) {
-    throw std::logic_error("Invalid SampleCollectionBuilder entry");
+    throw std::logic_error("Invalid SamplePoolBuilder entry");
   }
-  return SampleRef{.collection = builder_->asset_, .index = index_};
+  return SampleRef{.externalPool = builder_->externalPool_, .index = index_};
 }
 
-const Sample& SampleCollectionBuilder::Entry::value() const {
+const Sample& SamplePoolBuilder::Entry::value() const {
   if (!*this) {
-    throw std::logic_error("Invalid SampleCollectionBuilder entry");
+    throw std::logic_error("Invalid SamplePoolBuilder entry");
   }
   return builder_->samples_[index_];
 }
 
-AnnotationBuilder SampleCollectionBuilder::Entry::source(std::string_view label, SourceRange range,
-                                                         std::string_view kind) const {
+AnnotationBuilder SamplePoolBuilder::Entry::source(std::string_view label, SourceRange range,
+                                                   std::string_view kind) const {
   return *this ? builder_->addEntrySource(index_, label, range, kind) : AnnotationBuilder{};
 }
 
-AnnotationBuilder SampleCollectionBuilder::Entry::source(std::string_view label, const SourceRecord& record,
-                                                         std::string_view kind) const {
+AnnotationBuilder SamplePoolBuilder::Entry::source(std::string_view label, const SourceRecord& record,
+                                                   std::string_view kind) const {
   return source(label, record.range, kind).fields(record.fields);
 }
 
-bool SampleCollectionBuilder::validIndex(u32 index) const noexcept {
+bool SamplePoolBuilder::validIndex(u32 index) const noexcept {
   return !finished_ && index < samples_.size();
 }
 
-AnnotationBuilder SampleCollectionBuilder::addEntrySource(u32 index, std::string_view label, SourceRange range,
-                                                          std::string_view kind) {
+AnnotationBuilder SamplePoolBuilder::addEntrySource(u32 index, std::string_view label, SourceRange range,
+                                                    std::string_view kind) {
   recordRange(range, false);
   if (sourceMap_ == nullptr || !range.valid()) {
     return {};
@@ -335,7 +341,7 @@ AnnotationBuilder SampleCollectionBuilder::addEntrySource(u32 index, std::string
   return annotation;
 }
 
-void SampleCollectionBuilder::addFallbackSources() {
+void SamplePoolBuilder::addFallbackSources() {
   if (sourceMap_ == nullptr) {
     return;
   }
@@ -350,7 +356,7 @@ void SampleCollectionBuilder::addFallbackSources() {
   }
 }
 
-void SampleCollectionBuilder::annotateValues() {
+void SamplePoolBuilder::annotateValues() {
   if (sourceMap_ == nullptr) {
     return;
   }
@@ -361,11 +367,11 @@ void SampleCollectionBuilder::annotateValues() {
   }
 }
 
-void SampleCollectionBuilder::recordRange(SourceRange range, bool explicitlyIncluded) {
+void SamplePoolBuilder::recordRange(SourceRange range, bool explicitlyIncluded) {
   mergeRange(explicitlyIncluded ? includedRange_ : observedRange_, range);
 }
 
-void SampleCollectionBuilder::report(Severity severity, std::string code, std::string message, SourceRange range) {
+void SamplePoolBuilder::report(Severity severity, std::string code, std::string message, SourceRange range) {
   if (diagnostics_ == nullptr) {
     return;
   }
@@ -668,7 +674,7 @@ void InstrumentSetBuilder::linkInstrumentSamples(u32 instrumentIndex, SourceAnno
 
 void InstrumentSetBuilder::linkSample(SourceAnnotationId annotation, SampleRef sample, std::string_view label) {
   if (sourceMap_ != nullptr && annotation.valid() && sample.valid()) {
-    AnnotationBuilder{*sourceMap_, annotation}.link(SourceLinkRole::UsesSample, sampleTarget(sample), label);
+    AnnotationBuilder{*sourceMap_, annotation}.link(SourceLinkRole::UsesSample, sampleTarget(sample, asset_), label);
   }
 }
 

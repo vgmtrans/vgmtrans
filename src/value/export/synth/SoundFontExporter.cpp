@@ -74,7 +74,6 @@ constexpr std::array<u16, kEnvelopeInstrumentRegionGenerators> kSfEnvelopeGenera
 using Chunk = RiffChunk;
 
 struct DecodedSfSample {
-  AssetId collectionId;
   u32 localIndex = 0;
   std::string name;
   Tuning pitch;
@@ -471,7 +470,6 @@ struct SfLayout {
   samples.reserve(decodedSamples.size());
   for (auto& sample : decodedSamples) {
     samples.push_back(DecodedSfSample{
-        .collectionId = sample.collectionId,
         .localIndex = sample.localIndex,
         .name = sf2Name(std::move(sample.name), "Sample"),
         .pitch = sample.pitch,

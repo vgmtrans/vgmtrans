@@ -38,12 +38,12 @@ CollectionIssue missingSequenceIssue(std::optional<AssetId> asset) {
   return missingRoleIssue("missing-sequence", "sequence", asset);
 }
 
-CollectionIssue missingInstrumentSetIssue(std::optional<AssetId> asset) {
-  return missingRoleIssue("missing-instrument-set", "instrument set", asset);
+CollectionIssue missingSoundBankIssue(std::optional<AssetId> asset) {
+  return missingRoleIssue("missing-sound-bank", "sound bank", asset);
 }
 
-CollectionIssue missingSampleCollectionIssue(std::optional<AssetId> asset) {
-  return missingRoleIssue("missing-sample-collection", "sample collection", asset);
+CollectionIssue missingSamplePoolIssue(std::optional<AssetId> asset) {
+  return missingRoleIssue("missing-sample-pool", "sample pool", asset);
 }
 
 CollectionIssue ambiguousMatchIssue(std::string message, std::optional<AssetId> asset,

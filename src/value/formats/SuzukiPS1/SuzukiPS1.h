@@ -66,8 +66,7 @@ struct SuzukiPs1EnvelopeRegisters {
 };
 
 struct SuzukiPs1ScannedBank {
-  core::ScanInstrumentSetRef instruments;
-  core::ScanSampleCollectionRef samples;
+  core::ScanSoundBankRef bank;
   std::vector<SuzukiPs1EnvelopeRegisters> envelopes;
 };
 

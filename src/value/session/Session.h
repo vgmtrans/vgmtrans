@@ -56,7 +56,7 @@ public:
 
   [[nodiscard]] CollectionPlayback preparePlayback(CollectionId id, const PlaybackRequest& request) const;
   [[nodiscard]] Artifact exportSequenceMidi(AssetId id, const SequenceExportRequest& request) const;
-  [[nodiscard]] Artifact exportInstrumentSet(AssetId id, SynthExportFormat format, const ExportRequest& request) const;
+  [[nodiscard]] Artifact exportSoundBank(AssetId id, SynthExportFormat format, const ExportRequest& request) const;
   [[nodiscard]] std::vector<Artifact> exportCollection(CollectionId id, const ExportRequest& request) const;
   [[nodiscard]] std::vector<CollectionExport> exportAllCollections(const ExportRequest& request) const;
   [[nodiscard]] CollectionStitchResult stitchCollections(std::span<const CollectionId> collections,

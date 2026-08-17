@@ -17,7 +17,7 @@
 namespace vgmtrans::core {
 
 class SourceMapBuilder;
-struct SampleCollection;
+struct SamplePool;
 
 struct SnesBrrStream {
   SourceRange encodedData;
@@ -81,8 +81,7 @@ public:
   [[nodiscard]] std::optional<SampleRef> findSrcn(u8 srcn) const;
 
 private:
-  friend SnesBrrSampleRefs addSnesBrrSamples(SampleCollectionBuilder&, ByteReader, const SnesBrrCatalog&,
-                                             std::string_view);
+  friend SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder&, ByteReader, const SnesBrrCatalog&, std::string_view);
 
   struct Entry {
     u8 srcn = 0;
@@ -94,14 +93,14 @@ private:
 
 // Populate the generic sample builder with neutral BRR samples and the standard
 // DIR/payload source structure used by SNES formats.
-[[nodiscard]] SnesBrrSampleRefs addSnesBrrSamples(SampleCollectionBuilder& samples, ByteReader reader,
+[[nodiscard]] SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reader,
                                                   const SnesBrrCatalog& catalog,
                                                   std::string_view directoryEntryKind = "snes-sample-dir-entry");
 
 // Build the neutral samples and their standard DIR/BRR source annotations.
 // Kept as a compatibility adapter for formats not yet migrated to the builder.
-[[nodiscard]] SampleCollection buildSnesBrrSampleCollection(
-    ByteReader reader, const SnesBrrCatalog& catalog, AssetId sampleCollectionId, SourceMapBuilder& sourceMap,
-    std::string_view directoryEntryKind = "snes-sample-dir-entry");
+[[nodiscard]] SamplePool buildSnesBrrSamplePool(ByteReader reader, const SnesBrrCatalog& catalog, AssetId samplePoolId,
+                                                SourceMapBuilder& sourceMap,
+                                                std::string_view directoryEntryKind = "snes-sample-dir-entry");
 
 }  // namespace vgmtrans::core

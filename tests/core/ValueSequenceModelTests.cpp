@@ -117,7 +117,7 @@ void collectionIssuesDeriveResolutionIndependentlyFromFreshness() {
   expect(collectionResolution(missingIssues) == CollectionResolution::Incomplete,
          "missing issues should make collection resolution incomplete");
 
-  const CollectionIssue missingInstrument = missingInstrumentSetIssue(AssetId{7});
+  const CollectionIssue missingInstrument = missingSoundBankIssue(AssetId{7});
   expect(missingInstrument.severity == Severity::Error && missingInstrument.asset == AssetId{7},
          "missing instrument helper should preserve a broken asset reference");
 
@@ -131,7 +131,7 @@ void collectionIssuesDeriveResolutionIndependentlyFromFreshness() {
   const CollectionIssue removed = removedStaleAssetIssue();
   Collection stale{
       .freshness = CollectionFreshness::Stale,
-      .issues = {missingSampleCollectionIssue()},
+      .issues = {missingSamplePoolIssue()},
   };
   expect(removed.impact == CollectionIssueImpact::Incomplete, "removed asset issue should make resolution incomplete");
   expect(stale.freshness == CollectionFreshness::Stale && stale.resolution() == CollectionResolution::Incomplete,
@@ -258,12 +258,10 @@ void performanceBoundValueOwnsReplacementLifecycle() {
   PerformanceBoundValue<SequenceAutomatedValue<double>> value;
   value.reset(0.0);
 
-  static_cast<void>(
-      value.begin(out.fade(PerformanceAutomationTarget::Level, 1.0, 8),
-                  SequenceMotionPlan<double>::targetOverTicks(1.0, 8)));
-  static_cast<void>(
-      value.begin(out.at(3).fade(PerformanceAutomationTarget::Level, 0.5, 4),
-                  SequenceMotionPlan<double>::targetOverTicks(0.5, 4)));
+  static_cast<void>(value.begin(out.fade(PerformanceAutomationTarget::Level, 1.0, 8),
+                                SequenceMotionPlan<double>::targetOverTicks(1.0, 8)));
+  static_cast<void>(value.begin(out.at(3).fade(PerformanceAutomationTarget::Level, 0.5, 4),
+                                SequenceMotionPlan<double>::targetOverTicks(0.5, 4)));
   value.setCurrentAt(5, 0.25);
 
   expect(track.automations.size() == 2 && track.automations[0].realization.endTick == 3 &&
@@ -346,11 +344,11 @@ void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
   const PerformanceNoteId replacedNote = out.at(50).note(76, 1.0, 10);
   out.at(50).pitchSlide(replacedNote, 74, 76, 6);
   out.at(52).retargetPitchSlide(replacedNote, 76, 79, 3);
-  expect(track.automations[6].realization.endTick == 52 &&
-             track.automations[6].realization.endReason == PerformanceAutomationEndReason::Continued &&
-             std::abs(std::get<PitchTransitionIntent>(track.automations[7].intent).startKey - (74.0 + 2.0 / 3.0)) <
-                 0.0001,
-         "replacement motion should start from the prior transition's shared linear value");
+  expect(
+      track.automations[6].realization.endTick == 52 &&
+          track.automations[6].realization.endReason == PerformanceAutomationEndReason::Continued &&
+          std::abs(std::get<PitchTransitionIntent>(track.automations[7].intent).startKey - (74.0 + 2.0 / 3.0)) < 0.0001,
+      "replacement motion should start from the prior transition's shared linear value");
 
   const PerformanceNoteId stoppedNote = out.at(60).note(81, 1.0, 10);
   const auto stopped = out.at(60).pitchSlide(stoppedNote, 79, 81, 6);
@@ -384,13 +382,13 @@ void continuedVoiceResolvesPriorPitchMotion() {
 
   const PerformanceNoteId first = out.note(60, 1.0, 8);
   out.pitchSlide(first, 60, 62, 4);
-  const PerformanceNoteId samePitch = out.at(4).continueVoice(
-      first, NotePerformanceEvent{.key = 62, .linearVelocity = 1.0, .durationTicks = 4});
+  const PerformanceNoteId samePitch =
+      out.at(4).continueVoice(first, NotePerformanceEvent{.key = 62, .linearVelocity = 1.0, .durationTicks = 4});
   expect(samePitch == first && std::get<NotePerformanceEvent>(track.events.back()).extendsPrevious,
          "continuing at a completed slide target should extend the existing note identity");
 
-  const PerformanceNoteId changedPitch = out.at(8).continueVoice(
-      samePitch, NotePerformanceEvent{.key = 64, .linearVelocity = 1.0, .durationTicks = 4});
+  const PerformanceNoteId changedPitch =
+      out.at(8).continueVoice(samePitch, NotePerformanceEvent{.key = 64, .linearVelocity = 1.0, .durationTicks = 4});
   const auto& transition = std::get<PitchTransitionIntent>(track.automations.back().intent);
   expect(changedPitch != samePitch && transition.previousNote == samePitch && transition.startKey == 62 &&
              transition.targetKey == 64 && transition.timing.timelineTicks == 0,

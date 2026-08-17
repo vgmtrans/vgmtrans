@@ -26,11 +26,11 @@ struct ScanSequenceRef {
   AssetId id;
 };
 
-struct ScanInstrumentSetRef {
+struct ScanSoundBankRef {
   AssetId id;
 };
 
-struct ScanSampleCollectionRef {
+struct ScanSamplePoolRef {
   AssetId id;
 };
 
@@ -38,16 +38,11 @@ struct ScanMiscAssetRef {
   AssetId id;
 };
 
-struct ScanSynthRefs {
-  ScanInstrumentSetRef instruments;
-  ScanSampleCollectionRef samples;
-};
-
 class ScanResultBuilder;
 
 // Drafts are lightweight views into result-owned pending assets. Creating a
 // draft is the publication decision: ScanResultBuilder::finish() materializes
-// it even when an instrument set or sample collection remains empty.
+// it even when a sound bank or sample pool remains empty.
 class ScanSequenceDraft {
 public:
   [[nodiscard]] ScanSequenceRef ref() const noexcept { return ScanSequenceRef{.id = id_}; }
@@ -68,9 +63,9 @@ private:
   AssetId id_;
 };
 
-class ScanInstrumentSetDraft {
+class ScanSoundBankDraft {
 public:
-  [[nodiscard]] ScanInstrumentSetRef ref() const noexcept { return ScanInstrumentSetRef{.id = id_}; }
+  [[nodiscard]] ScanSoundBankRef ref() const noexcept { return ScanSoundBankRef{.id = id_}; }
   [[nodiscard]] AssetId id() const noexcept { return id_; }
 
   InstrumentSetBuilder::Entry append(Instrument instrument);
@@ -82,7 +77,7 @@ public:
   AnnotationBuilder source(SourceRole role, std::string_view label, const SourceRecord& record,
                            std::string_view kind = {});
 
-  ScanInstrumentSetDraft& include(SourceRange range);
+  ScanSoundBankDraft& include(SourceRange range);
   [[nodiscard]] SourceRange range() const noexcept;
   [[nodiscard]] bool empty() const noexcept;
   [[nodiscard]] size_t size() const noexcept;
@@ -93,34 +88,36 @@ public:
   // Existing reusable synth helpers may operate on the domain builder
   // directly. The draft remains its owner and finish() remains scan-owned.
   [[nodiscard]] InstrumentSetBuilder& builder();
+  [[nodiscard]] SamplePoolBuilder& samples();
+  [[nodiscard]] const SamplePoolBuilder& samples() const;
 
   template <typename T>
-  ScanInstrumentSetDraft& data(T value);
+  ScanSoundBankDraft& data(T value);
 
 private:
   friend class ScanResultBuilder;
 
-  ScanInstrumentSetDraft(ScanResultBuilder& out, size_t slot, AssetId id);
+  ScanSoundBankDraft(ScanResultBuilder& out, size_t slot, AssetId id);
 
   ScanResultBuilder* out_ = nullptr;
   size_t slot_ = 0;
   AssetId id_;
 };
 
-class ScanSampleCollectionDraft {
+class ScanSamplePoolDraft {
 public:
-  [[nodiscard]] ScanSampleCollectionRef ref() const noexcept { return ScanSampleCollectionRef{.id = id_}; }
+  [[nodiscard]] ScanSamplePoolRef ref() const noexcept { return ScanSamplePoolRef{.id = id_}; }
   [[nodiscard]] AssetId id() const noexcept { return id_; }
 
-  SampleCollectionBuilder::Entry add(u64 sourceKey, Sample sample);
-  SampleCollectionBuilder::Entry alias(u64 aliasKey, u64 existingKey);
+  SamplePoolBuilder::Entry add(u64 sourceKey, Sample sample);
+  SamplePoolBuilder::Entry alias(u64 aliasKey, u64 existingKey);
   [[nodiscard]] std::optional<SampleRef> find(u64 sourceKey) const;
 
   AnnotationBuilder source(SourceRole role, std::string_view label, SourceRange range, std::string_view kind = {});
   AnnotationBuilder source(SourceRole role, std::string_view label, const SourceRecord& record,
                            std::string_view kind = {});
 
-  ScanSampleCollectionDraft& include(SourceRange range);
+  ScanSamplePoolDraft& include(SourceRange range);
   [[nodiscard]] SourceRange range() const noexcept;
   [[nodiscard]] bool empty() const noexcept;
   [[nodiscard]] size_t size() const noexcept;
@@ -128,16 +125,16 @@ public:
   void warning(std::string message, SourceRange range = {});
   void error(std::string message, SourceRange range = {});
 
-  [[nodiscard]] SampleCollectionBuilder& builder();
-  [[nodiscard]] const SampleCollectionBuilder& builder() const;
+  [[nodiscard]] SamplePoolBuilder& builder();
+  [[nodiscard]] const SamplePoolBuilder& builder() const;
 
   template <typename T>
-  ScanSampleCollectionDraft& data(T value);
+  ScanSamplePoolDraft& data(T value);
 
 private:
   friend class ScanResultBuilder;
 
-  ScanSampleCollectionDraft(ScanResultBuilder& out, size_t slot, AssetId id);
+  ScanSamplePoolDraft(ScanResultBuilder& out, size_t slot, AssetId id);
 
   ScanResultBuilder* out_ = nullptr;
   size_t slot_ = 0;
@@ -168,10 +165,10 @@ public:
 
   ScanCollectionBuilder& sequence(ScanSequenceRef asset);
   ScanCollectionBuilder& sequence(const ScanSequenceDraft& asset);
-  ScanCollectionBuilder& instrumentSet(ScanInstrumentSetRef asset);
-  ScanCollectionBuilder& instrumentSet(const ScanInstrumentSetDraft& asset);
-  ScanCollectionBuilder& samples(ScanSampleCollectionRef asset);
-  ScanCollectionBuilder& samples(const ScanSampleCollectionDraft& asset);
+  ScanCollectionBuilder& soundBank(ScanSoundBankRef asset);
+  ScanCollectionBuilder& soundBank(const ScanSoundBankDraft& asset);
+  ScanCollectionBuilder& samplePool(ScanSamplePoolRef asset);
+  ScanCollectionBuilder& samplePool(const ScanSamplePoolDraft& asset);
   ScanCollectionBuilder& misc(ScanMiscAssetRef asset);
   ScanCollectionBuilder& misc(const ScanMiscDraft& asset);
 
@@ -198,8 +195,8 @@ public:
   [[nodiscard]] std::vector<Diagnostic>& diagnostics() noexcept { return result_.diagnostics; }
 
   [[nodiscard]] ScanSequenceDraft sequence(std::string name, SourceRange range = {});
-  [[nodiscard]] ScanInstrumentSetDraft instrumentSet(std::string name, SourceRange range = {});
-  [[nodiscard]] ScanSampleCollectionDraft sampleCollection(std::string name, SourceRange range = {});
+  [[nodiscard]] ScanSoundBankDraft soundBank(std::string name, SourceRange range = {});
+  [[nodiscard]] ScanSamplePoolDraft samplePool(std::string name, SourceRange range = {});
   [[nodiscard]] ScanMiscDraft misc(std::string name, SourceRange range);
 
   [[nodiscard]] ScanCollectionBuilder collection(std::string name);
@@ -221,14 +218,14 @@ public:
 private:
   friend class ScanCollectionBuilder;
   friend class ScanSequenceDraft;
-  friend class ScanInstrumentSetDraft;
-  friend class ScanSampleCollectionDraft;
+  friend class ScanSoundBankDraft;
+  friend class ScanSamplePoolDraft;
   friend class ScanMiscDraft;
 
   enum class DraftRole {
     Sequence,
-    InstrumentSet,
-    SampleCollection,
+    SoundBank,
+    SamplePool,
     Misc,
   };
 
@@ -244,8 +241,10 @@ private:
   void setMiscPayload(size_t slot, std::vector<u8> payload);
   [[nodiscard]] InstrumentSetBuilder& instrumentDraft(size_t slot);
   [[nodiscard]] const InstrumentSetBuilder& instrumentDraft(size_t slot) const;
-  [[nodiscard]] SampleCollectionBuilder& sampleDraft(size_t slot);
-  [[nodiscard]] const SampleCollectionBuilder& sampleDraft(size_t slot) const;
+  [[nodiscard]] SamplePoolBuilder& localSampleDraft(size_t slot);
+  [[nodiscard]] const SamplePoolBuilder& localSampleDraft(size_t slot) const;
+  [[nodiscard]] SamplePoolBuilder& sampleDraft(size_t slot);
+  [[nodiscard]] const SamplePoolBuilder& sampleDraft(size_t slot) const;
 
   ScanInput input_;
   std::string format_;
@@ -266,13 +265,13 @@ ScanSequenceDraft& ScanSequenceDraft::data(T value) {
 }
 
 template <typename T>
-ScanInstrumentSetDraft& ScanInstrumentSetDraft::data(T value) {
+ScanSoundBankDraft& ScanSoundBankDraft::data(T value) {
   out_->setPrivateData(slot_, AssetPrivateData::make(std::move(value)));
   return *this;
 }
 
 template <typename T>
-ScanSampleCollectionDraft& ScanSampleCollectionDraft::data(T value) {
+ScanSamplePoolDraft& ScanSamplePoolDraft::data(T value) {
   out_->setPrivateData(slot_, AssetPrivateData::make(std::move(value)));
   return *this;
 }

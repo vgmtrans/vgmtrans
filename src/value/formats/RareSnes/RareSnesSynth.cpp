@@ -38,8 +38,8 @@ namespace {
 
 }  // namespace
 
-std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& layout, const SequenceRecipes& recipes,
-                                      std::string_view displayName) {
+std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layout& layout,
+                                         const SequenceRecipes& recipes, std::string_view displayName) {
   if (!layout.spcDirAddress || recipes.patches.empty()) {
     return std::nullopt;
   }
@@ -51,9 +51,8 @@ std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& 
     return std::nullopt;
   }
 
-  auto instrumentDraft = builder.instrumentSet(fmt::format("{} Instruments", displayName));
-  auto sampleDraft = builder.sampleCollection(fmt::format("{} Samples", displayName));
-  const SnesBrrSampleRefs samples = addSnesBrrSamples(sampleDraft.builder(), reader, catalog);
+  auto instrumentDraft = builder.soundBank(fmt::format("{} Instruments", displayName));
+  const SnesBrrSampleRefs samples = addSnesBrrSamples(instrumentDraft.samples(), reader, catalog);
 
   for (const PatchRecipe& patch : recipes.patches) {
     const auto sample = samples.findSrcn(patch.srcn);
@@ -91,10 +90,7 @@ std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& 
   if (instrumentDraft.builder().empty()) {
     return std::nullopt;
   }
-  return ScanSynthRefs{
-      .instruments = instrumentDraft.ref(),
-      .samples = sampleDraft.ref(),
-  };
+  return instrumentDraft.ref();
 }
 
 }  // namespace vgmtrans::formats::rare_snes

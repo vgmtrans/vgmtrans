@@ -39,7 +39,7 @@ using namespace core;
                               (layout->version == AKAOSNES_V1 || layout->adsrTableAddress);
   if (hasSynthLayout) {
     if (const auto synth = addAkaoSnesSynth(result, *layout, displayName)) {
-      collection.instrumentSet(synth->instruments).samples(synth->samples);
+      collection.soundBank(*synth);
     } else {
       result.warning("AkaoSnes sequence found, but no valid instruments or samples were discovered",
                      input.reader.range(0, input.reader.size()));

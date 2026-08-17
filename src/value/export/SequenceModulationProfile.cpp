@@ -29,9 +29,7 @@ struct ObservedRange {
     maximum = std::max(maximum, value);
   }
 
-  [[nodiscard]] bool observed() const noexcept {
-    return std::isfinite(minimum) && std::isfinite(maximum);
-  }
+  [[nodiscard]] bool observed() const noexcept { return std::isfinite(minimum) && std::isfinite(maximum); }
 
   [[nodiscard]] std::optional<ModulationRange> range(bool requirePositiveMaximum = false) const {
     if (!observed() || (requirePositiveMaximum && maximum <= 0.0)) {
@@ -88,9 +86,8 @@ template <class Convert>
 }
 
 [[nodiscard]] double normalizedSeconds(double seconds, const ModulationRange& range) noexcept {
-  return normalizedSynthRange(seconds, range, [](double value) {
-    return synthAmountFromSeconds(synthSecondsRangeMinimum(value));
-  });
+  return normalizedSynthRange(seconds, range,
+                              [](double value) { return synthAmountFromSeconds(synthSecondsRangeMinimum(value)); });
 }
 
 [[nodiscard]] u8 midi7(double normalized) noexcept {
@@ -274,8 +271,8 @@ u8 tremoloDelayControllerValue(const TremoloDelayPerformanceEvent& event,
   return midi7(normalizedSeconds(*event.milliseconds / 1000.0, *profile->instruments.tremolo->delaySeconds));
 }
 
-void applySequenceModulation(InstrumentSetAsset& instrumentSet, const SequenceModulationProfile& profile) {
-  for (auto& instrument : instrumentSet.instruments) {
+void applySequenceModulation(SoundBankAsset& soundBank, const SequenceModulationProfile& profile) {
+  for (auto& instrument : soundBank.instruments) {
     if (profile.instruments.vibrato) {
       instrument.modulation.vibrato = profile.instruments.vibrato;
     }

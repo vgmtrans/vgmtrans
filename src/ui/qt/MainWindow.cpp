@@ -150,10 +150,8 @@ QStringList retrievePortalDroppedFiles([[maybe_unused]] const QMimeData* mimeDat
   }
 
   QDBusMessage msg = QDBusMessage::createMethodCall(
-      QStringLiteral("org.freedesktop.portal.Documents"),
-      QStringLiteral("/org/freedesktop/portal/documents"),
-      QStringLiteral("org.freedesktop.portal.FileTransfer"),
-      QStringLiteral("RetrieveFiles"));
+      QStringLiteral("org.freedesktop.portal.Documents"), QStringLiteral("/org/freedesktop/portal/documents"),
+      QStringLiteral("org.freedesktop.portal.FileTransfer"), QStringLiteral("RetrieveFiles"));
   QVariantMap options;
   msg << key << options;
 
@@ -207,8 +205,7 @@ public:
   explicit CollectionTreeDelegate(int itemHeight, QObject* parent = nullptr)
       : FixedHeightListDelegate(itemHeight, parent) {}
 
-  void paint(QPainter* painter, const QStyleOptionViewItem& option,
-             const QModelIndex& index) const override {
+  void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override {
     QStyleOptionViewItem itemOption(option);
     initStyleOption(&itemOption, index);
     if (index.data(vgmtrans::ui::IsCollectionRole).toBool()) {
@@ -228,35 +225,30 @@ public:
     painter->setPen(pen);
     const int branchX = rowRect.left() + indent / 2;
     const int centerY = rowRect.center().y();
-    const int branchEndX = branchX +
-        (itemOption.rect.left() + itemOption.decorationSize.width() / 2 - branchX) / 1.5;
-    const int trunkEndY = index.data(vgmtrans::ui::IsLastItemRole).toBool()
-                              ? centerY
-                              : rowRect.bottom();
+    const int branchEndX = branchX + (itemOption.rect.left() + itemOption.decorationSize.width() / 2 - branchX) / 1.5;
+    const int trunkEndY = index.data(vgmtrans::ui::IsLastItemRole).toBool() ? centerY : rowRect.bottom();
     painter->drawLine(branchX, rowRect.top(), branchX, trunkEndY);
     painter->drawLine(branchX, centerY, branchEndX, centerY);
     painter->restore();
   }
 };
 
-MenuBar::Context contextForAsset(vgmtrans::ui::WorkspaceController& workspace,
-                                 const QModelIndex& index) {
+MenuBar::Context contextForAsset(vgmtrans::ui::WorkspaceController& workspace, const QModelIndex& index) {
   if (!index.isValid()) {
     return MenuBar::Context::None;
   }
-  const auto* asset = workspace.snapshot().asset(
-      vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()});
+  const auto* asset = workspace.snapshot().asset(vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()});
   if (asset == nullptr) {
     return MenuBar::Context::None;
   }
   if (std::holds_alternative<vgmtrans::core::SequenceProgramAsset>(*asset)) {
     return MenuBar::Context::Sequence;
   }
-  if (std::holds_alternative<vgmtrans::core::InstrumentSetAsset>(*asset)) {
-    return MenuBar::Context::InstrumentSet;
+  if (std::holds_alternative<vgmtrans::core::SoundBankAsset>(*asset)) {
+    return MenuBar::Context::SoundBank;
   }
-  if (std::holds_alternative<vgmtrans::core::SampleCollectionAsset>(*asset)) {
-    return MenuBar::Context::SampleCollection;
+  if (std::holds_alternative<vgmtrans::core::SamplePoolAsset>(*asset)) {
+    return MenuBar::Context::SamplePool;
   }
   return MenuBar::Context::Misc;
 }
@@ -278,16 +270,14 @@ QModelIndex indexForId(const QAbstractItemView* view, u32 id, bool assetOnly) {
   return {};
 }
 
-bool selectIdInView(QAbstractItemView* view, u32 id, bool assetOnly,
-                    bool clearWhenMissing) {
+bool selectIdInView(QAbstractItemView* view, u32 id, bool assetOnly, bool clearWhenMissing) {
   if (view == nullptr || view->selectionModel() == nullptr) {
     return false;
   }
   const QModelIndex index = indexForId(view, id, assetOnly);
   if (index.isValid()) {
     const QSignalBlocker blocker(view->selectionModel());
-    view->selectionModel()->setCurrentIndex(
-        index, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+    view->selectionModel()->setCurrentIndex(index, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
     view->scrollTo(index, QAbstractItemView::EnsureVisible);
     return true;
   }
@@ -298,8 +288,7 @@ bool selectIdInView(QAbstractItemView* view, u32 id, bool assetOnly,
   return false;
 }
 
-QString diagnosticMessages(const std::vector<vgmtrans::core::Diagnostic>& diagnostics,
-                           const QString& fallback) {
+QString diagnosticMessages(const std::vector<vgmtrans::core::Diagnostic>& diagnostics, const QString& fallback) {
   QStringList messages;
   for (const auto& diagnostic : diagnostics) {
     const QString message = QString::fromStdString(diagnostic.message);
@@ -335,8 +324,7 @@ void applyCollectionExportSettings(vgmtrans::core::ExportRequest& request) {
 
 }  // namespace
 
-MainWindow::MainWindow(vgmtrans::ui::WorkspaceController& workspace)
-    : QMainWindow(nullptr), m_workspace(workspace) {
+MainWindow::MainWindow(vgmtrans::ui::WorkspaceController& workspace) : QMainWindow(nullptr), m_workspace(workspace) {
   setWindowTitle("VGMTrans");
   setWindowIcon(QIcon(":/vgmtrans.png"));
   setAttribute(Qt::WA_DontCreateNativeAncestors);
@@ -349,15 +337,14 @@ MainWindow::MainWindow(vgmtrans::ui::WorkspaceController& workspace)
   m_windowAgent->setup(this);
 
   createElements();
-  m_dockLayout = new MainWindowDockLayout(this,
-                                          {
-                                              .rawFiles = m_rawfile_dock,
-                                              .vgmFiles = m_vgmfile_dock,
-                                              .collections = m_coll_dock,
-                                              .collectionContents = m_coll_view_dock,
-                                              .logs = m_logger,
-                                              .collectionListView = m_coll_listview,
-                                          });
+  m_dockLayout = new MainWindowDockLayout(this, {
+                                                    .rawFiles = m_rawfile_dock,
+                                                    .vgmFiles = m_vgmfile_dock,
+                                                    .collections = m_coll_dock,
+                                                    .collectionContents = m_coll_view_dock,
+                                                    .logs = m_logger,
+                                                    .collectionListView = m_coll_listview,
+                                                });
   m_dockLayout->restoreWindowGeometry();
   configureWindowAgent();
   routeSignals();
@@ -371,8 +358,7 @@ MainWindow::MainWindow(vgmtrans::ui::WorkspaceController& workspace)
   updateDragOverlayAppearance();
   updateDragOverlayGeometry();
 
-  qInfo("Running %s (%s, %s), Qt %s", VGMTRANS_VERSION, VGMTRANS_REVISION,
-        VGMTRANS_BRANCH, qVersion());
+  qInfo("Running %s (%s, %s), Qt %s", VGMTRANS_VERSION, VGMTRANS_REVISION, VGMTRANS_BRANCH, qVersion());
 }
 
 void MainWindow::createElements() {
@@ -382,10 +368,9 @@ void MainWindow::createElements() {
   setCorner(Qt::BottomLeftCorner, Qt::BottomDockWidgetArea);
   setCorner(Qt::BottomRightCorner, Qt::BottomDockWidgetArea);
 
-  const auto installTitleBar = [](QDockWidget *dock, const QString& title,
-                                      TitleBar::Buttons buttons,
-                                      const QString& newToolTip = QString()) {
-    auto *titleBar = new TitleBar(title, buttons, dock, newToolTip);
+  const auto installTitleBar = [](QDockWidget* dock, const QString& title, TitleBar::Buttons buttons,
+                                  const QString& newToolTip = QString()) {
+    auto* titleBar = new TitleBar(title, buttons, dock, newToolTip);
     connect(titleBar, &TitleBar::hideRequested, dock, &QDockWidget::hide);
     dock->setTitleBarWidget(titleBar);
     return titleBar;
@@ -414,8 +399,7 @@ void MainWindow::createElements() {
 
   m_coll_listview = new CollectionListView();
   m_collection_model = new vgmtrans::ui::CollectionTableModel(m_workspace, m_coll_listview);
-  m_collection_filter =
-      new vgmtrans::ui::CollectionFilterProxyModel(m_workspace, m_coll_listview);
+  m_collection_filter = new vgmtrans::ui::CollectionFilterProxyModel(m_workspace, m_coll_listview);
   m_stitch_plan_model = new vgmtrans::ui::StitchPlanModel(m_coll_listview);
   m_stitch_plan_model->setSourceModel(m_collection_model);
   m_collection_filter->setSourceModel(m_stitch_plan_model);
@@ -427,17 +411,15 @@ void MainWindow::createElements() {
   ItemViewDensity::apply(m_coll_view);
   m_coll_view->setSpacing(0);
   m_coll_view->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-  m_collection_contents_model =
-      new vgmtrans::ui::CollectionContentsModel(m_workspace, m_coll_view);
+  m_collection_contents_model = new vgmtrans::ui::CollectionContentsModel(m_workspace, m_coll_view);
   m_coll_view->setModel(m_collection_contents_model);
   m_coll_view->setItemDelegate(new CollectionTreeDelegate(
-      ItemViewDensity::listItemHeight(m_coll_view) + ItemViewDensity::listSpacing(m_coll_view),
-      m_coll_view));
+      ItemViewDensity::listItemHeight(m_coll_view) + ItemViewDensity::listSpacing(m_coll_view), m_coll_view));
   m_playback_controls = new PlaybackControls();
   m_sequence_player = new SequencePlayer(this);
 
-  auto *central_wrapper = new QWidget(this);
-  auto *central_layout = new QVBoxLayout();
+  auto* central_wrapper = new QWidget(this);
+  auto* central_layout = new QVBoxLayout();
   central_layout->setContentsMargins(0, 0, 0, 0);
   central_layout->setSpacing(0);
   MdiArea::the()->setWorkspace(&m_workspace);
@@ -451,11 +433,9 @@ void MainWindow::createElements() {
   m_coll_dock->setWidget(m_coll_listview);
   m_coll_dock->setContentsMargins(0, 0, 0, 0);
   addDockWidget(Qt::BottomDockWidgetArea, m_coll_dock);
-  TitleBar *collTitleBar = installTitleBar(
-      m_coll_dock, "Collections", TitleBar::HideButton | TitleBar::NewButton,
-      QStringLiteral("New collection"));
-  connect(collTitleBar, &TitleBar::newRequested, this,
-          &MainWindow::manualCollectionRequested);
+  TitleBar* collTitleBar = installTitleBar(m_coll_dock, "Collections", TitleBar::HideButton | TitleBar::NewButton,
+                                           QStringLiteral("New collection"));
+  connect(collTitleBar, &TitleBar::newRequested, this, &MainWindow::manualCollectionRequested);
 
   auto* collLeadingControls = new QWidget(collTitleBar);
   auto* collLeadingLayout = new QHBoxLayout(collLeadingControls);
@@ -463,8 +443,7 @@ void MainWindow::createElements() {
   collLeadingLayout->setSpacing(kCollectionTitleControlSpacing);
 
   m_stitchButton = new QToolButton(collLeadingControls);
-  configureToolButton(m_stitchButton, QStringLiteral("Stitch collections"),
-                      QSize(22, 20), QSize(16, 16));
+  configureToolButton(m_stitchButton, QStringLiteral("Stitch collections"), QSize(22, 20), QSize(16, 16));
   m_stitchButton->setCheckable(true);
   m_stitchButton->setChecked(false);
 
@@ -481,46 +460,40 @@ void MainWindow::createElements() {
 #endif
   const int searchControlHeight = m_stitchButton->height();
   collSearchEdit->setFixedHeight(searchControlHeight);
-  QAction* collSearchIconAction =
-      collSearchEdit->addAction(QIcon(), QLineEdit::LeadingPosition);
+  QAction* collSearchIconAction = collSearchEdit->addAction(QIcon(), QLineEdit::LeadingPosition);
 
   collLeadingLayout->addWidget(m_stitchButton);
   collLeadingLayout->addWidget(collSearchEdit);
   collTitleBar->addLeadingWidget(collLeadingControls);
 
-  const auto refreshCollectionTitleControls =
-      [collTitleBar, this, collSearchEdit, collSearchIconAction]() {
+  const auto refreshCollectionTitleControls = [collTitleBar, this, collSearchEdit, collSearchIconAction]() {
     const QPalette titleBarPalette = collTitleBar->palette();
     const QColor titleBarBackground = titleBarPalette.color(QPalette::Window);
     const QColor borderColor = blendColors(titleBarPalette.color(QPalette::Text), titleBarBackground, 0.08);
     const QColor focusBorderColor = blendColors(titleBarPalette.color(QPalette::Highlight), titleBarBackground, 0.84);
     const QColor focusBackground = blendColors(titleBarBackground, titleBarPalette.color(QPalette::Text), 0.96);
-    collSearchEdit->setStyleSheet(QStringLiteral(
-        "QLineEdit {"
-        "  background-color: %1;"
-        "  border: 1px solid %2;"
-        "  border-radius: 5px;"
-        "  padding: 0px 6px 0px 0px;"
-        "}"
-        "QLineEdit:focus {"
-        "  border: 2px solid %3;"
-        "  background-color: %4;"
-        "}")
+    collSearchEdit->setStyleSheet(QStringLiteral("QLineEdit {"
+                                                 "  background-color: %1;"
+                                                 "  border: 1px solid %2;"
+                                                 "  border-radius: 5px;"
+                                                 "  padding: 0px 6px 0px 0px;"
+                                                 "}"
+                                                 "QLineEdit:focus {"
+                                                 "  border: 2px solid %3;"
+                                                 "  background-color: %4;"
+                                                 "}")
                                       .arg(cssColor(titleBarBackground))
                                       .arg(cssColor(borderColor))
                                       .arg(cssColor(focusBorderColor))
                                       .arg(cssColor(focusBackground)));
-    refreshStencilToolButton(m_stitchButton, QStringLiteral(":/icons/stitch.svg"),
-                             titleBarPalette, true);
-    collSearchIconAction->setIcon(stencilSvgIcon(QStringLiteral(":/icons/magnify.svg"),
-                                                 toolBarButtonIconColor(titleBarPalette)));
+    refreshStencilToolButton(m_stitchButton, QStringLiteral(":/icons/stitch.svg"), titleBarPalette, true);
+    collSearchIconAction->setIcon(
+        stencilSvgIcon(QStringLiteral(":/icons/magnify.svg"), toolBarButtonIconColor(titleBarPalette)));
   };
   refreshCollectionTitleControls();
   connect(collTitleBar, &TitleBar::appearanceChanged, this, refreshCollectionTitleControls);
-  connect(collSearchEdit, &QLineEdit::textChanged, m_coll_listview,
-          &CollectionListView::setFilterText);
-  connect(m_stitchButton, &QToolButton::clicked, this,
-          &MainWindow::collectionStitchRequested);
+  connect(collSearchEdit, &QLineEdit::textChanged, m_coll_listview, &CollectionListView::setFilterText);
+  connect(m_stitchButton, &QToolButton::clicked, this, &MainWindow::collectionStitchRequested);
   m_stitchButton->setEnabled(m_workspace.snapshot().collections().size() >= 2);
 
   m_coll_view_dock = new QDockWidget("Collection Contents");
@@ -547,7 +520,7 @@ void MainWindow::createElements() {
   splitDockWidget(m_coll_view_dock, m_coll_dock, Qt::Horizontal);
   splitDockWidget(m_coll_dock, m_logger, Qt::Horizontal);
 
-  const QList<QDockWidget *> viewMenuDocks{
+  const QList<QDockWidget*> viewMenuDocks{
       m_vgmfile_dock, m_coll_dock, m_coll_view_dock, m_rawfile_dock, m_logger,
   };
   m_windowBar = new WindowBar(this);
@@ -576,11 +549,11 @@ void MainWindow::createElements() {
 void MainWindow::configureWindowAgent() {
   m_windowAgent->setTitleBar(m_windowBar);
   m_windowAgent->setHitTestVisible(m_windowBar->dockControls(), true);
-  if (QWidget *menuBarWidget = m_windowBar->menuBarWidget()) {
+  if (QWidget* menuBarWidget = m_windowBar->menuBarWidget()) {
     m_windowAgent->setHitTestVisible(menuBarWidget, true);
   }
-  if (QWidget *centerWidget = m_windowBar->centerWidget()) {
-    for (QWidget *child : centerWidget->findChildren<QWidget *>(Qt::FindDirectChildrenOnly)) {
+  if (QWidget* centerWidget = m_windowBar->centerWidget()) {
+    for (QWidget* child : centerWidget->findChildren<QWidget*>(Qt::FindDirectChildrenOnly)) {
       m_windowAgent->setHitTestVisible(child, true);
     }
   }
@@ -626,8 +599,7 @@ void MainWindow::removeSelectedSources() {
   std::vector<vgmtrans::core::SourceId> sources;
   sources.reserve(static_cast<size_t>(rows.size()));
   for (const QModelIndex& row : rows) {
-    sources.push_back(vgmtrans::core::SourceId{
-        row.data(vgmtrans::ui::IdRole).toUInt()});
+    sources.push_back(vgmtrans::core::SourceId{row.data(vgmtrans::ui::IdRole).toUInt()});
   }
   static_cast<void>(m_workspace.removeSources(sources));
 }
@@ -637,8 +609,7 @@ void MainWindow::removeSelectedAssets() {
   std::vector<vgmtrans::core::AssetId> assets;
   assets.reserve(static_cast<size_t>(rows.size()));
   for (const QModelIndex& row : rows) {
-    assets.push_back(vgmtrans::core::AssetId{
-        row.data(vgmtrans::ui::IdRole).toUInt()});
+    assets.push_back(vgmtrans::core::AssetId{row.data(vgmtrans::ui::IdRole).toUInt()});
   }
   static_cast<void>(m_workspace.removeAssets(assets));
 }
@@ -664,32 +635,28 @@ void MainWindow::saveOriginal(QAbstractItemView* view, OriginalItemKind kind) {
   size_t written = 0;
   for (const QModelIndex& row : rows) {
     const u32 id = row.data(vgmtrans::ui::IdRole).toUInt();
-    const auto inspection = kind == OriginalItemKind::Asset
-                                ? m_workspace.inspect(vgmtrans::core::AssetId{id})
-                                : nullptr;
+    const auto inspection =
+        kind == OriginalItemKind::Asset ? m_workspace.inspect(vgmtrans::core::AssetId{id}) : nullptr;
     if (kind == OriginalItemKind::Asset && inspection == nullptr) {
       errors.push_back(tr("%1 could not be inspected.").arg(row.data(Qt::DisplayRole).toString()));
       continue;
     }
-    const std::span<const u8> bytes = inspection != nullptr
-                                         ? inspection->bytes()
-                                         : m_workspace.sourceBytes(vgmtrans::core::SourceId{id});
+    const std::span<const u8> bytes =
+        inspection != nullptr ? inspection->bytes() : m_workspace.sourceBytes(vgmtrans::core::SourceId{id});
     const std::filesystem::path path =
         single ? destination : destination / safeFileName(row.data(Qt::DisplayRole).toString());
     QSaveFile file(pathText(path));
     const auto size = static_cast<qsizetype>(bytes.size());
     if (!file.open(QIODevice::WriteOnly) ||
-        (!bytes.empty() && file.write(reinterpret_cast<const char*>(bytes.data()), size) != size) ||
-        !file.commit()) {
+        (!bytes.empty() && file.write(reinterpret_cast<const char*>(bytes.data()), size) != size) || !file.commit()) {
       errors.push_back(file.errorString());
       continue;
     }
     ++written;
   }
 
-  const QString title = rows.size() == 1
-                            ? rows.front().data(Qt::DisplayRole).toString()
-                            : tr("%1 items").arg(rows.size());
+  const QString title =
+      rows.size() == 1 ? rows.front().data(Qt::DisplayRole).toString() : tr("%1 items").arg(rows.size());
   statusBarContent->setStatus(title, tr("Wrote %1 file(s)").arg(static_cast<qulonglong>(written)));
   if (!errors.isEmpty()) {
     showToast(errors.join(QLatin1Char('\n')), ToastType::Error, 15000);
@@ -714,8 +681,7 @@ void MainWindow::saveArtifact(const QModelIndex& index, vgmtrans::core::Artifact
   QSaveFile file(pathText(path));
   const auto size = static_cast<qsizetype>(artifact.bytes.size());
   if (!file.open(QIODevice::WriteOnly) ||
-      file.write(reinterpret_cast<const char*>(artifact.bytes.data()), size) != size ||
-      !file.commit()) {
+      file.write(reinterpret_cast<const char*>(artifact.bytes.data()), size) != size || !file.commit()) {
     const QString message = file.errorString();
     statusBarContent->setStatus(title, message);
     showToast(message, ToastType::Error, 15000);
@@ -740,10 +706,10 @@ void MainWindow::exportSequenceMidi(const QModelIndex& index) {
   applyMidiExportSettings(request);
 
   try {
-    saveArtifact(index,
-                 m_workspace.exportSequenceMidi(
-                     vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()}, request),
-                 tr("The sequence could not be exported as MIDI."), "mid");
+    saveArtifact(
+        index,
+        m_workspace.exportSequenceMidi(vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()}, request),
+        tr("The sequence could not be exported as MIDI."), "mid");
   } catch (const std::exception& error) {
     const QString message = QString::fromUtf8(error.what());
     statusBarContent->setStatus(index.data(Qt::DisplayRole).toString(), message);
@@ -751,13 +717,12 @@ void MainWindow::exportSequenceMidi(const QModelIndex& index) {
   }
 }
 
-void MainWindow::exportInstrumentSet(const QModelIndex& index, vgmtrans::core::SynthExportFormat format) {
+void MainWindow::exportSoundBank(const QModelIndex& index, vgmtrans::core::SynthExportFormat format) {
   if (!index.isValid()) {
     return;
   }
 
-  const auto instrumentSet =
-      vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()};
+  const auto soundBank = vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()};
   vgmtrans::core::ExportRequest request;
   const bool fromDetectedFiles = index.model() == m_vgmfile_listview->model();
   if (fromDetectedFiles) {
@@ -766,19 +731,18 @@ void MainWindow::exportInstrumentSet(const QModelIndex& index, vgmtrans::core::S
     applySequenceRenderSettings(request.sequence);
     request.sampleFiltering = Settings::the()->conversion.sampleFiltering();
   }
-  const bool ambiguousCollection =
-      fromDetectedFiles && request.exportOnlyUsedInstruments &&
-      m_workspace.snapshot().countCollectionsContaining(instrumentSet) > 1;
+  const bool ambiguousCollection = fromDetectedFiles && request.exportOnlyUsedInstruments &&
+                                   m_workspace.snapshot().countCollectionsContaining(soundBank) > 1;
   const bool soundFont = format == vgmtrans::core::SynthExportFormat::SoundFont2;
   try {
-    auto artifact = m_workspace.exportInstrumentSet(instrumentSet, format, request);
+    auto artifact = m_workspace.exportSoundBank(soundBank, format, request);
     const bool exportable = !artifact.bytes.empty();
     saveArtifact(index, std::move(artifact),
-                 soundFont ? tr("The instrument set could not be exported as SF2.")
-                           : tr("The instrument set could not be exported as DLS."),
+                 soundFont ? tr("The sound bank could not be exported as SF2.")
+                           : tr("The sound bank could not be exported as DLS."),
                  soundFont ? "sf2" : "dls");
     if (ambiguousCollection && exportable) {
-      showToast(tr("No instrument data was excluded because this instrument set is used by multiple collections."
+      showToast(tr("No instrument data was excluded because this sound bank is used by multiple collections."
                    "\n\nExport directly from a collection to resolve this ambiguity."),
                 ToastType::Info, 10000);
     }
@@ -801,8 +765,7 @@ void MainWindow::togglePlayback() {
     return;
   }
 
-  const auto collection = vgmtrans::core::CollectionId{
-      current.data(vgmtrans::ui::IdRole).toUInt()};
+  const auto collection = vgmtrans::core::CollectionId{current.data(vgmtrans::ui::IdRole).toUInt()};
   if (m_sequence_player->activeCollection() == collection) {
     m_sequence_player->toggle();
     return;
@@ -816,15 +779,14 @@ void MainWindow::togglePlayback() {
   try {
     auto playback = m_workspace.preparePlayback(collection, request);
     if (!playback.playable()) {
-      const QString message = diagnosticMessages(
-          playback.diagnostics, tr("The collection could not be prepared for playback."));
+      const QString message =
+          diagnosticMessages(playback.diagnostics, tr("The collection could not be prepared for playback."));
       statusBarContent->setStatus(current.data(Qt::DisplayRole).toString(), message);
       showToast(message, ToastType::Error, 15000);
       return;
     }
     if (m_sequence_player->load(std::move(playback))) {
-      MdiArea::the()->setPlaybackSequence(m_sequence_player->activeSequence(),
-                                          m_sequence_player->activeSourceSpans());
+      MdiArea::the()->setPlaybackSequence(m_sequence_player->activeSequence(), m_sequence_player->activeSourceSpans());
     }
   } catch (const std::exception& error) {
     const QString message = QString::fromUtf8(error.what());
@@ -840,15 +802,14 @@ void MainWindow::routeSignals() {
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     connect(dialog, &QDialog::accepted, this, [this, dialog] {
       if (dialog->mayBeSilent()) {
-        showToast(tr("The created collection does not contain a sample collection. "
-                     "The instrument bank may be silent."),
+        showToast(tr("The created collection does not contain a required sample pool. "
+                     "The sound bank may be silent."),
                   ToastType::Warning);
       }
       if (const auto collection = dialog->createdCollection()) {
         const QModelIndex index = indexForId(m_coll_listview, collection->value, false);
         if (index.isValid()) {
-          m_coll_listview->selectionModel()->setCurrentIndex(
-              index, QItemSelectionModel::ClearAndSelect);
+          m_coll_listview->selectionModel()->setCurrentIndex(index, QItemSelectionModel::ClearAndSelect);
           m_coll_listview->scrollTo(index, QAbstractItemView::EnsureVisible);
         }
       }
@@ -867,13 +828,13 @@ void MainWindow::routeSignals() {
     static_cast<void>(stitchui::toggleCollectionStitchBalloon(
         m_workspace, collections, request,
         stitchui::Callbacks{
-            .showToast = [this](const QString& message, ToastType type, int duration) {
-              showToast(message, type, duration);
-            },
+            .showToast = [this](const QString& message, ToastType type,
+                                int duration) { showToast(message, type, duration); },
             .visibilityChanged = [this](bool visible) { setCollectionStitchOpen(visible); },
-            .planChanged = [this](std::span<const vgmtrans::core::CollectionId> plan) {
-              m_stitch_plan_model->setCollections(plan);
-            },
+            .planChanged =
+                [this](std::span<const vgmtrans::core::CollectionId> plan) {
+                  m_stitch_plan_model->setCollections(plan);
+                },
         },
         this, m_stitchButton, m_stitchButton));
   });
@@ -889,55 +850,39 @@ void MainWindow::routeSignals() {
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->show();
   });
-  connect(m_menu_bar, &MenuBar::showToastRequested, this,
-          &MainWindow::showToast);
+  connect(m_menu_bar, &MenuBar::showToastRequested, this, &MainWindow::showToast);
   connect(m_menu_bar, &MenuBar::stitchSelectedCollections, this, &MainWindow::collectionStitchRequested);
   connect(m_menu_bar, &MenuBar::resetDockLayout, m_dockLayout, &MainWindowDockLayout::resetToDefault);
-  connect(m_menu_bar, &MenuBar::increaseHexFontRequested, mdiArea,
-          &MdiArea::increaseActiveHexFont);
-  connect(m_menu_bar, &MenuBar::decreaseHexFontRequested, mdiArea,
-          &MdiArea::decreaseActiveHexFont);
-  connect(m_menu_bar, &MenuBar::resetHexFontRequested, mdiArea,
-          &MdiArea::resetActiveHexFont);
-  connect(mdiArea, &MdiArea::hexViewAvailableChanged, m_menu_bar,
-          &MenuBar::setHexViewAvailable);
-  connect(this, &MainWindow::seekModifierActiveChanged, mdiArea,
-          &MdiArea::setSeekModifierActive);
-  connect(mdiArea, &MdiArea::playbackSeekRequested,
-          m_sequence_player, &SequencePlayer::seek);
-  connect(m_sequence_player, &SequencePlayer::stateChanged,
-          m_playback_controls, &PlaybackControls::setPlaybackState);
+  connect(m_menu_bar, &MenuBar::increaseHexFontRequested, mdiArea, &MdiArea::increaseActiveHexFont);
+  connect(m_menu_bar, &MenuBar::decreaseHexFontRequested, mdiArea, &MdiArea::decreaseActiveHexFont);
+  connect(m_menu_bar, &MenuBar::resetHexFontRequested, mdiArea, &MdiArea::resetActiveHexFont);
+  connect(mdiArea, &MdiArea::hexViewAvailableChanged, m_menu_bar, &MenuBar::setHexViewAvailable);
+  connect(this, &MainWindow::seekModifierActiveChanged, mdiArea, &MdiArea::setSeekModifierActive);
+  connect(mdiArea, &MdiArea::playbackSeekRequested, m_sequence_player, &SequencePlayer::seek);
+  connect(m_sequence_player, &SequencePlayer::stateChanged, m_playback_controls, &PlaybackControls::setPlaybackState);
   connect(m_sequence_player, &SequencePlayer::stateChanged, m_collection_model,
           [this](bool playing, bool hasActiveCollection) {
-            const auto collection = playing && hasActiveCollection
-                                        ? std::optional{m_sequence_player->activeCollection()}
-                                        : std::nullopt;
+            const auto collection =
+                playing && hasActiveCollection ? std::optional{m_sequence_player->activeCollection()} : std::nullopt;
             m_collection_model->setPlayingCollection(collection);
             m_stitch_plan_model->setPlayingCollection(collection);
           });
-  connect(m_sequence_player, &SequencePlayer::stateChanged, mdiArea,
-          [mdiArea](bool, bool hasActiveCollection) {
-            if (!hasActiveCollection) {
-              mdiArea->clearPlayback();
-            }
-          });
-  connect(m_sequence_player, &SequencePlayer::positionChanged,
-          m_playback_controls, &PlaybackControls::setPlaybackPosition);
-  connect(m_sequence_player, &SequencePlayer::positionChanged,
-          mdiArea, &MdiArea::setPlaybackPosition);
+  connect(m_sequence_player, &SequencePlayer::stateChanged, mdiArea, [mdiArea](bool, bool hasActiveCollection) {
+    if (!hasActiveCollection) {
+      mdiArea->clearPlayback();
+    }
+  });
+  connect(m_sequence_player, &SequencePlayer::positionChanged, m_playback_controls,
+          &PlaybackControls::setPlaybackPosition);
+  connect(m_sequence_player, &SequencePlayer::positionChanged, mdiArea, &MdiArea::setPlaybackPosition);
   connect(m_sequence_player, &SequencePlayer::errorOccurred, this,
-          [this](const QString& message) {
-            showToast(message, ToastType::Error, 15000);
-          });
+          [this](const QString& message) { showToast(message, ToastType::Error, 15000); });
   connect(mdiArea, &MdiArea::inspectorStatusChanged, this,
-          [this](const QString& name, const CapsuleText& description, const QIcon& icon,
-                 int offset, int size) {
-            statusBarContent->setInspectorStatus(
-                name, description, icon.isNull() ? nullptr : &icon, offset, size);
+          [this](const QString& name, const CapsuleText& description, const QIcon& icon, int offset, int size) {
+            statusBarContent->setInspectorStatus(name, description, icon.isNull() ? nullptr : &icon, offset, size);
           });
 
-  const auto synchronizeAssetSelection =
-      [this](vgmtrans::core::AssetId assetId, QWidget* caller) {
+  const auto synchronizeAssetSelection = [this](vgmtrans::core::AssetId assetId, QWidget* caller) {
     const auto& snapshot = m_workspace.snapshot();
     const auto* asset = snapshot.asset(assetId);
     if (asset == nullptr) {
@@ -948,8 +893,7 @@ void MainWindow::routeSignals() {
       if (const auto* collection = snapshot.firstCollectionContaining(assetId)) {
         const QModelIndex index = indexForId(m_coll_listview, collection->id.value, false);
         if (index.isValid()) {
-          m_coll_listview->selectionModel()->setCurrentIndex(
-              index, QItemSelectionModel::ClearAndSelect);
+          m_coll_listview->selectionModel()->setCurrentIndex(index, QItemSelectionModel::ClearAndSelect);
           m_coll_listview->scrollTo(index, QAbstractItemView::EnsureVisible);
         } else {
           m_coll_listview->selectionModel()->clearSelection();
@@ -977,28 +921,21 @@ void MainWindow::routeSignals() {
     }
   };
 
-  connect(m_playback_controls, &PlaybackControls::playToggle, this,
-          &MainWindow::togglePlayback);
-  connect(m_playback_controls, &PlaybackControls::stopPressed,
-          m_sequence_player, &SequencePlayer::stop);
-  connect(m_playback_controls, &PlaybackControls::seekingTo,
-          m_sequence_player, &SequencePlayer::seek);
+  connect(m_playback_controls, &PlaybackControls::playToggle, this, &MainWindow::togglePlayback);
+  connect(m_playback_controls, &PlaybackControls::stopPressed, m_sequence_player, &SequencePlayer::stop);
+  connect(m_playback_controls, &PlaybackControls::seekingTo, m_sequence_player, &SequencePlayer::seek);
   auto* playShortcut = new QShortcut(QKeySequence(Qt::Key_Space), this);
   playShortcut->setContext(Qt::WindowShortcut);
   connect(playShortcut, &QShortcut::activated, this, &MainWindow::togglePlayback);
 
-  for (const QKeySequence& key : {QKeySequence(Qt::Key_Return),
-                                  QKeySequence(Qt::Key_Enter)}) {
+  for (const QKeySequence& key : {QKeySequence(Qt::Key_Return), QKeySequence(Qt::Key_Enter)}) {
     auto* selectionPlayShortcut = new QShortcut(key, m_coll_listview);
     selectionPlayShortcut->setContext(Qt::WidgetWithChildrenShortcut);
-    connect(selectionPlayShortcut, &QShortcut::activated, this,
-            &MainWindow::togglePlayback);
+    connect(selectionPlayShortcut, &QShortcut::activated, this, &MainWindow::togglePlayback);
   }
-  auto* selectionStopShortcut =
-      new QShortcut(QKeySequence(Qt::Key_Escape), m_coll_listview);
+  auto* selectionStopShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), m_coll_listview);
   selectionStopShortcut->setContext(Qt::WidgetWithChildrenShortcut);
-  connect(selectionStopShortcut, &QShortcut::activated,
-          m_sequence_player, &SequencePlayer::stop);
+  connect(selectionStopShortcut, &QShortcut::activated, m_sequence_player, &SequencePlayer::stop);
 
   const auto closeSelectedSources = [this] { removeSelectedSources(); };
   const auto removeSelectedAssets = [this] { this->removeSelectedAssets(); };
@@ -1006,9 +943,8 @@ void MainWindow::routeSignals() {
   connect(m_menu_bar, &MenuBar::removeSelectedAssets, this, removeSelectedAssets);
   connect(m_menu_bar, &MenuBar::saveSelectedSourceOriginal, this,
           [this] { saveOriginal(m_rawfile_listview, OriginalItemKind::Source); });
-  connect(m_menu_bar, &MenuBar::saveSelectedAssetOriginal, this, [this] {
-    saveOriginal(activeAssetView(), OriginalItemKind::Asset);
-  });
+  connect(m_menu_bar, &MenuBar::saveSelectedAssetOriginal, this,
+          [this] { saveOriginal(activeAssetView(), OriginalItemKind::Asset); });
 
   const auto exportSelectedCollection = [this](int choice) {
     const QModelIndex current = m_coll_listview->currentIndex();
@@ -1018,14 +954,11 @@ void MainWindow::routeSignals() {
 
     vgmtrans::core::ExportRequest request;
     if (choice == 0) {
-      request.kinds = {vgmtrans::core::ExportKind::Midi,
-                       vgmtrans::core::ExportKind::SoundFont2};
+      request.kinds = {vgmtrans::core::ExportKind::Midi, vgmtrans::core::ExportKind::SoundFont2};
     } else if (choice == 1) {
-      request.kinds = {vgmtrans::core::ExportKind::Midi,
-                       vgmtrans::core::ExportKind::Dls};
+      request.kinds = {vgmtrans::core::ExportKind::Midi, vgmtrans::core::ExportKind::Dls};
     } else if (choice == 2) {
-      request.kinds = {vgmtrans::core::ExportKind::Midi,
-                       vgmtrans::core::ExportKind::SoundFont2,
+      request.kinds = {vgmtrans::core::ExportKind::Midi, vgmtrans::core::ExportKind::SoundFont2,
                        vgmtrans::core::ExportKind::Dls};
     } else {
       return;
@@ -1037,8 +970,7 @@ void MainWindow::routeSignals() {
     }
     applyCollectionExportSettings(request);
 
-    const auto collection = vgmtrans::core::CollectionId{
-        current.data(vgmtrans::ui::IdRole).toUInt()};
+    const auto collection = vgmtrans::core::CollectionId{current.data(vgmtrans::ui::IdRole).toUInt()};
     try {
       const auto artifacts = m_workspace.exportCollection(collection, request);
       size_t written = 0;
@@ -1051,36 +983,28 @@ void MainWindow::routeSignals() {
           continue;
         }
         const auto size = static_cast<qsizetype>(artifact.bytes.size());
-        if (file.write(reinterpret_cast<const char*>(artifact.bytes.data()), size) == size &&
-            file.commit()) {
+        if (file.write(reinterpret_cast<const char*>(artifact.bytes.data()), size) == size && file.commit()) {
           ++written;
         }
       }
-      statusBarContent->setStatus(
-          current.data(Qt::DisplayRole).toString(),
-          tr("Wrote %1 file(s)").arg(static_cast<qulonglong>(written)));
-    } catch (const std::exception& error) {
       statusBarContent->setStatus(current.data(Qt::DisplayRole).toString(),
-                                  QString::fromUtf8(error.what()));
+                                  tr("Wrote %1 file(s)").arg(static_cast<qulonglong>(written)));
+    } catch (const std::exception& error) {
+      statusBarContent->setStatus(current.data(Qt::DisplayRole).toString(), QString::fromUtf8(error.what()));
     }
   };
-  connect(m_menu_bar, &MenuBar::exportSelectedCollection, this,
-          exportSelectedCollection);
-  connect(m_menu_bar, &MenuBar::exportSelectedSequenceMidi, this, [this] {
-    exportSequenceMidi(activeAssetView()->currentIndex());
+  connect(m_menu_bar, &MenuBar::exportSelectedCollection, this, exportSelectedCollection);
+  connect(m_menu_bar, &MenuBar::exportSelectedSequenceMidi, this,
+          [this] { exportSequenceMidi(activeAssetView()->currentIndex()); });
+  connect(m_menu_bar, &MenuBar::exportSelectedSoundBankSf2, this, [this] {
+    exportSoundBank(activeAssetView()->currentIndex(), vgmtrans::core::SynthExportFormat::SoundFont2);
   });
-  connect(m_menu_bar, &MenuBar::exportSelectedInstrumentSetSf2, this, [this] {
-    exportInstrumentSet(activeAssetView()->currentIndex(),
-                        vgmtrans::core::SynthExportFormat::SoundFont2);
-  });
-  connect(m_menu_bar, &MenuBar::exportSelectedInstrumentSetDls, this, [this] {
-    exportInstrumentSet(activeAssetView()->currentIndex(), vgmtrans::core::SynthExportFormat::Dls);
-  });
+  connect(m_menu_bar, &MenuBar::exportSelectedSoundBankDls, this,
+          [this] { exportSoundBank(activeAssetView()->currentIndex(), vgmtrans::core::SynthExportFormat::Dls); });
   connect(m_menu_bar, &MenuBar::openSelectedAsset, this, [this] {
     const QModelIndex current = activeAssetView()->currentIndex();
     if (current.isValid() && !current.data(vgmtrans::ui::IsCollectionRole).toBool()) {
-      MdiArea::the()->newView(
-          vgmtrans::core::AssetId{current.data(vgmtrans::ui::IdRole).toUInt()});
+      MdiArea::the()->newView(vgmtrans::core::AssetId{current.data(vgmtrans::ui::IdRole).toUInt()});
     }
   });
 
@@ -1101,16 +1025,14 @@ void MainWindow::routeSignals() {
           });
   connect(m_rawfile_listview->selectionModel(), &QItemSelectionModel::currentChanged, this,
           [this](const QModelIndex& current) {
-            m_menu_bar->setContext(current.isValid() ? MenuBar::Context::Source
-                                                     : MenuBar::Context::None);
+            m_menu_bar->setContext(current.isValid() ? MenuBar::Context::Source : MenuBar::Context::None);
             updateSelectionStatus(current, SelectionStatusKind::Source);
           });
   connect(m_vgmfile_listview->selectionModel(), &QItemSelectionModel::currentChanged, this,
           [this, synchronizeAssetSelection](const QModelIndex& current) {
             m_menu_bar->setContext(contextForAsset(m_workspace, current));
             if (current.isValid()) {
-              const auto asset = vgmtrans::core::AssetId{
-                  current.data(vgmtrans::ui::IdRole).toUInt()};
+              const auto asset = vgmtrans::core::AssetId{current.data(vgmtrans::ui::IdRole).toUInt()};
               synchronizeAssetSelection(asset, m_vgmfile_listview);
               MdiArea::the()->selectAsset(asset, m_vgmfile_listview);
             }
@@ -1118,41 +1040,33 @@ void MainWindow::routeSignals() {
           });
   connect(m_coll_view->selectionModel(), &QItemSelectionModel::currentChanged, this,
           [this, synchronizeAssetSelection](const QModelIndex& current) {
-            m_menu_bar->setContext(
-                current.data(vgmtrans::ui::IsCollectionRole).toBool()
-                    ? MenuBar::Context::Collection
-                    : contextForAsset(m_workspace, current));
-            if (current.isValid() &&
-                !current.data(vgmtrans::ui::IsCollectionRole).toBool()) {
-              const auto asset = vgmtrans::core::AssetId{
-                  current.data(vgmtrans::ui::IdRole).toUInt()};
+            m_menu_bar->setContext(current.data(vgmtrans::ui::IsCollectionRole).toBool()
+                                       ? MenuBar::Context::Collection
+                                       : contextForAsset(m_workspace, current));
+            if (current.isValid() && !current.data(vgmtrans::ui::IsCollectionRole).toBool()) {
+              const auto asset = vgmtrans::core::AssetId{current.data(vgmtrans::ui::IdRole).toUInt()};
               synchronizeAssetSelection(asset, m_coll_view);
               MdiArea::the()->selectAsset(asset, m_coll_view);
             }
             updateSelectionStatus(current, SelectionStatusKind::CollectionContents);
           });
 
-  connect(m_coll_listview, &QAbstractItemView::doubleClicked, this,
-          [this](const QModelIndex& index) {
-            if (index.isValid()) {
-              togglePlayback();
-            }
-          });
+  connect(m_coll_listview, &QAbstractItemView::doubleClicked, this, [this](const QModelIndex& index) {
+    if (index.isValid()) {
+      togglePlayback();
+    }
+  });
 
-  connect(m_vgmfile_listview, &QAbstractItemView::doubleClicked, this,
-          [](const QModelIndex& index) {
-            if (index.isValid()) {
-              MdiArea::the()->newView(
-                  vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()});
-            }
-          });
-  connect(m_coll_view, &QAbstractItemView::doubleClicked, this,
-          [](const QModelIndex& index) {
-            if (index.isValid() && !index.data(vgmtrans::ui::IsCollectionRole).toBool()) {
-              MdiArea::the()->newView(
-                  vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()});
-            }
-          });
+  connect(m_vgmfile_listview, &QAbstractItemView::doubleClicked, this, [](const QModelIndex& index) {
+    if (index.isValid()) {
+      MdiArea::the()->newView(vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()});
+    }
+  });
+  connect(m_coll_view, &QAbstractItemView::doubleClicked, this, [](const QModelIndex& index) {
+    if (index.isValid() && !index.data(vgmtrans::ui::IsCollectionRole).toBool()) {
+      MdiArea::the()->newView(vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()});
+    }
+  });
 
   m_rawfile_listview->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(m_rawfile_listview, &QWidget::customContextMenuRequested, this,
@@ -1175,9 +1089,8 @@ void MainWindow::routeSignals() {
             }
           });
 
-  const auto showAssetContextMenu = [this, removeSelectedAssets](QAbstractItemView* view,
-                                                                const QModelIndex& current,
-                                                                const QPoint& position) {
+  const auto showAssetContextMenu = [this, removeSelectedAssets](QAbstractItemView* view, const QModelIndex& current,
+                                                                 const QPoint& position) {
     const MenuBar::Context context = contextForAsset(m_workspace, current);
     if (context == MenuBar::Context::None) {
       return;
@@ -1201,11 +1114,11 @@ void MainWindow::routeSignals() {
       saveOriginalAction = menu.addAction(tr("Save as Original Format"));
       menu.addSeparator();
       addDisabled(menu, tr("Stitch"));
-    } else if (context == MenuBar::Context::InstrumentSet) {
+    } else if (context == MenuBar::Context::SoundBank) {
       saveSf2 = menu.addAction(tr("Save as SF2"));
       saveDls = menu.addAction(tr("Save as DLS"));
       saveOriginalAction = menu.addAction(tr("Save as Original Format"));
-    } else if (context == MenuBar::Context::SampleCollection) {
+    } else if (context == MenuBar::Context::SamplePool) {
       addDisabled(menu, tr("Save all samples as WAV"));
       saveOriginalAction = menu.addAction(tr("Save as Original Format"));
     } else {
@@ -1218,14 +1131,13 @@ void MainWindow::routeSignals() {
 
     const QAction* chosen = menu.exec(view->viewport()->mapToGlobal(position));
     if (chosen == open) {
-      MdiArea::the()->newView(
-          vgmtrans::core::AssetId{current.data(vgmtrans::ui::IdRole).toUInt()});
+      MdiArea::the()->newView(vgmtrans::core::AssetId{current.data(vgmtrans::ui::IdRole).toUInt()});
     } else if (saveMidi != nullptr && chosen == saveMidi) {
       exportSequenceMidi(current);
     } else if (saveSf2 != nullptr && chosen == saveSf2) {
-      exportInstrumentSet(current, vgmtrans::core::SynthExportFormat::SoundFont2);
+      exportSoundBank(current, vgmtrans::core::SynthExportFormat::SoundFont2);
     } else if (saveDls != nullptr && chosen == saveDls) {
-      exportInstrumentSet(current, vgmtrans::core::SynthExportFormat::Dls);
+      exportSoundBank(current, vgmtrans::core::SynthExportFormat::Dls);
     } else if (chosen == saveOriginalAction) {
       saveOriginal(view, OriginalItemKind::Asset);
     } else if (chosen == remove) {
@@ -1236,8 +1148,7 @@ void MainWindow::routeSignals() {
   m_vgmfile_listview->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(m_vgmfile_listview, &QWidget::customContextMenuRequested, this,
           [this, showAssetContextMenu](const QPoint& position) {
-            showAssetContextMenu(m_vgmfile_listview, m_vgmfile_listview->currentIndex(),
-                                 position);
+            showAssetContextMenu(m_vgmfile_listview, m_vgmfile_listview->currentIndex(), position);
           });
 
   m_coll_listview->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -1310,36 +1221,30 @@ void MainWindow::routeSignals() {
             }
           });
 
-  connect(&m_workspace, &vgmtrans::ui::WorkspaceController::snapshotChanged,
-          MdiArea::the(), &MdiArea::workspaceChanged);
+  connect(&m_workspace, &vgmtrans::ui::WorkspaceController::snapshotChanged, MdiArea::the(),
+          &MdiArea::workspaceChanged);
+  connect(&m_workspace, &vgmtrans::ui::WorkspaceController::snapshotChanged, this,
+          [this] { setCollectionStitchAvailable(m_workspace.snapshot().collections().size() >= 2); });
   connect(&m_workspace, &vgmtrans::ui::WorkspaceController::snapshotChanged, this, [this] {
-    setCollectionStitchAvailable(m_workspace.snapshot().collections().size() >= 2);
+    if (!m_sequence_player->hasActiveCollection()) {
+      return;
+    }
+    const auto* collection = m_workspace.snapshot().collection(m_sequence_player->activeCollection());
+    std::vector<vgmtrans::core::AssetId> assets;
+    if (collection != nullptr && collection->members.sequence) {
+      assets.push_back(*collection->members.sequence);
+      assets.insert(assets.end(), collection->members.soundBanks.begin(), collection->members.soundBanks.end());
+      assets.insert(assets.end(), collection->members.samplePools.begin(), collection->members.samplePools.end());
+    }
+    const auto activeAssets = m_sequence_player->activeAssets();
+    const bool assetsChanged =
+        !std::ranges::equal(assets, activeAssets) || std::ranges::any_of(activeAssets, [this](const auto asset) {
+          return m_workspace.snapshot().asset(asset) == nullptr;
+        });
+    if (collection == nullptr || assetsChanged) {
+      m_sequence_player->stop();
+    }
   });
-  connect(&m_workspace, &vgmtrans::ui::WorkspaceController::snapshotChanged,
-          this, [this] {
-            if (!m_sequence_player->hasActiveCollection()) {
-              return;
-            }
-            const auto* collection = m_workspace.snapshot().collection(
-                m_sequence_player->activeCollection());
-            std::vector<vgmtrans::core::AssetId> assets;
-            if (collection != nullptr && collection->members.sequence) {
-              assets.push_back(*collection->members.sequence);
-              assets.insert(assets.end(), collection->members.instrumentSets.begin(),
-                            collection->members.instrumentSets.end());
-              assets.insert(assets.end(), collection->members.sampleCollections.begin(),
-                            collection->members.sampleCollections.end());
-            }
-            const auto activeAssets = m_sequence_player->activeAssets();
-            const bool assetsChanged =
-                !std::ranges::equal(assets, activeAssets) ||
-                std::ranges::any_of(activeAssets, [this](const auto asset) {
-                  return m_workspace.snapshot().asset(asset) == nullptr;
-                });
-            if (collection == nullptr || assetsChanged) {
-              m_sequence_player->stop();
-            }
-          });
   connect(MdiArea::the(), &MdiArea::assetSelected, this,
           [synchronizeAssetSelection](vgmtrans::core::AssetId asset, QWidget* caller) {
             synchronizeAssetSelection(asset, caller);
@@ -1348,8 +1253,8 @@ void MainWindow::routeSignals() {
 
 bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
   if (event->type() == QEvent::MouseButtonPress) {
-    auto *mouseEvent = static_cast<QMouseEvent *>(event);
-    auto *widget = qobject_cast<QWidget *>(obj);
+    auto* mouseEvent = static_cast<QMouseEvent*>(event);
+    auto* widget = qobject_cast<QWidget*>(obj);
     if (mouseEvent->button() == Qt::LeftButton && widget && (widget == this || isAncestorOf(widget)) &&
         isDockSeparatorCursor(cursor().shape())) {
       m_dockLayout->beginSeparatorDrag();
@@ -1357,7 +1262,7 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
   } else if (event->type() == QEvent::MouseMove) {
     m_dockLayout->handleSeparatorMouseMove();
   } else if (event->type() == QEvent::MouseButtonRelease) {
-    auto *mouseEvent = static_cast<QMouseEvent *>(event);
+    auto* mouseEvent = static_cast<QMouseEvent*>(event);
     if (mouseEvent->button() == Qt::LeftButton) {
       m_dockLayout->endSeparatorDrag();
     }
@@ -1398,7 +1303,7 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event) {
   return QMainWindow::eventFilter(obj, event);
 }
 
-void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
+void MainWindow::dragEnterEvent(QDragEnterEvent* event) {
   if (!event) {
     return;
   }
@@ -1412,7 +1317,7 @@ void MainWindow::dragEnterEvent(QDragEnterEvent *event) {
   showDragOverlay();
 }
 
-void MainWindow::dragMoveEvent(QDragMoveEvent *event) {
+void MainWindow::dragMoveEvent(QDragMoveEvent* event) {
   if (!event) {
     return;
   }
@@ -1426,12 +1331,12 @@ void MainWindow::dragMoveEvent(QDragMoveEvent *event) {
   showDragOverlay();
 }
 
-void MainWindow::dragLeaveEvent(QDragLeaveEvent *event) {
+void MainWindow::dragLeaveEvent(QDragLeaveEvent* event) {
   event->accept();
   hideDragOverlay();
 }
 
-void MainWindow::dropEvent(QDropEvent *event) {
+void MainWindow::dropEvent(QDropEvent* event) {
   hideDragOverlay();
   if (!event) {
     return;
@@ -1458,7 +1363,7 @@ void MainWindow::dropEvent(QDropEvent *event) {
   event->acceptProposedAction();
 }
 
-void MainWindow::closeEvent(QCloseEvent *event) {
+void MainWindow::closeEvent(QCloseEvent* event) {
   m_dockLayout->saveOnClose();
   QMainWindow::closeEvent(event);
 }
@@ -1482,7 +1387,7 @@ void MainWindow::handleDroppedUrls(const QList<QUrl>& urls) {
     return;
   }
 
-  for (const auto &url : urls) {
+  for (const auto& url : urls) {
     if (!url.isLocalFile()) {
       continue;
     }
@@ -1496,13 +1401,13 @@ void MainWindow::handleDroppedUrls(const QList<QUrl>& urls) {
 
 void MainWindow::openFile() {
   auto filenames = QFileDialog::getOpenFileNames(
-      this, "Select a file...", QStandardPaths::writableLocation(QStandardPaths::MusicLocation),
-      "All files (*)");
+      this, "Select a file...", QStandardPaths::writableLocation(QStandardPaths::MusicLocation), "All files (*)");
 
-  if (filenames.isEmpty())
+  if (filenames.isEmpty()) {
     return;
+  }
 
-  for (QString &filename : filenames) {
+  for (QString& filename : filenames) {
     openFileInternal(filename);
   }
 }
@@ -1518,8 +1423,7 @@ void MainWindow::openPaths(std::span<const std::filesystem::path> paths) {
   }
   if (!result.opened.empty()) {
     m_menu_bar->updateRecentFilesMenu();
-    statusBarContent->setStatus(
-        tr("Scanned %1 file(s)").arg(static_cast<qulonglong>(result.opened.size())), {});
+    statusBarContent->setStatus(tr("Scanned %1 file(s)").arg(static_cast<qulonglong>(result.opened.size())), {});
   }
   if (!result.failures.empty()) {
     const auto& failure = result.failures.front();
@@ -1541,8 +1445,7 @@ void MainWindow::openFileInternal(const QString& filename) {
   if (file_info.completeSuffix().contains("img")) {
     QMessageBox user_choice(QMessageBox::Icon::Warning, "File format might be unsopported",
                             UNSUPPORTED_RAW_IMAGE_WARNING.arg(file_info.fileName()),
-                            QMessageBox::StandardButton::Yes | QMessageBox::StandardButton::No,
-                            this);
+                            QMessageBox::StandardButton::Yes | QMessageBox::StandardButton::No, this);
     user_choice.setInformativeText(UNSUPPORTED_RAW_IMAGE_DESCRIPTION);
     user_choice.setWindowModality(Qt::WindowModal);
     user_choice.exec();
@@ -1556,8 +1459,7 @@ void MainWindow::openFileInternal(const QString& filename) {
   openPaths(path);
 }
 
-void MainWindow::updateSelectionStatus(const QModelIndex& index,
-                                       SelectionStatusKind kind) {
+void MainWindow::updateSelectionStatus(const QModelIndex& index, SelectionStatusKind kind) {
   if (!index.isValid()) {
     statusBarContent->setStatus({}, {});
     return;
@@ -1565,43 +1467,35 @@ void MainWindow::updateSelectionStatus(const QModelIndex& index,
 
   QIcon icon = index.siblingAtColumn(0).data(Qt::DecorationRole).value<QIcon>();
   const QIcon* iconPointer = icon.isNull() ? nullptr : &icon;
-  const QString displayName =
-      index.siblingAtColumn(0).data(Qt::DisplayRole).toString();
+  const QString displayName = index.siblingAtColumn(0).data(Qt::DisplayRole).toString();
 
   if (kind == SelectionStatusKind::Source) {
-    const auto* source = m_workspace.snapshot().source(vgmtrans::core::SourceId{
-        index.data(vgmtrans::ui::IdRole).toUInt()});
-    const int size = source != nullptr
-        ? static_cast<int>(std::min<u64>(source->size,
-                                        std::numeric_limits<int>::max()))
-        : -1;
+    const auto* source =
+        m_workspace.snapshot().source(vgmtrans::core::SourceId{index.data(vgmtrans::ui::IdRole).toUInt()});
+    const int size =
+        source != nullptr ? static_cast<int>(std::min<u64>(source->size, std::numeric_limits<int>::max())) : -1;
     statusBarContent->setStatus(displayName, {}, iconPointer, -1, size);
     return;
   }
 
-  const bool isCollection = kind == SelectionStatusKind::Collection ||
-      (kind == SelectionStatusKind::CollectionContents &&
-       index.data(vgmtrans::ui::IsCollectionRole).toBool());
+  const bool isCollection =
+      kind == SelectionStatusKind::Collection ||
+      (kind == SelectionStatusKind::CollectionContents && index.data(vgmtrans::ui::IsCollectionRole).toBool());
   if (isCollection) {
-    statusBarContent->setStatus(
-        QStringLiteral("<b>%1</b>").arg(displayName), {}, iconPointer);
+    statusBarContent->setStatus(QStringLiteral("<b>%1</b>").arg(displayName), {}, iconPointer);
     return;
   }
 
-  const auto* asset = m_workspace.snapshot().asset(vgmtrans::core::AssetId{
-      index.data(vgmtrans::ui::IdRole).toUInt()});
+  const auto* asset = m_workspace.snapshot().asset(vgmtrans::core::AssetId{index.data(vgmtrans::ui::IdRole).toUInt()});
   if (asset == nullptr) {
     statusBarContent->setStatus(displayName, {}, iconPointer);
     return;
   }
   const auto& metadata = vgmtrans::core::metadata(*asset);
-  const int offset = static_cast<int>(std::min<u64>(
-      metadata.range.offset, std::numeric_limits<int>::max()));
-  const int size = static_cast<int>(std::min<u64>(
-      metadata.range.size, std::numeric_limits<int>::max()));
-  statusBarContent->setStatus(
-      QStringLiteral("<b>%1</b>").arg(displayName),
-      QString::fromStdString(metadata.format), iconPointer, offset, size);
+  const int offset = static_cast<int>(std::min<u64>(metadata.range.offset, std::numeric_limits<int>::max()));
+  const int size = static_cast<int>(std::min<u64>(metadata.range.size, std::numeric_limits<int>::max()));
+  statusBarContent->setStatus(QStringLiteral("<b>%1</b>").arg(displayName), QString::fromStdString(metadata.format),
+                              iconPointer, offset, size);
 }
 
 void MainWindow::setCollectionStitchAvailable(bool available) {
@@ -1620,7 +1514,7 @@ void MainWindow::showToast(const QString& message, ToastType type, int durationM
   m_toastHost->showToast(message, type, durationMs);
 }
 
-void MainWindow::resizeEvent(QResizeEvent *event) {
+void MainWindow::resizeEvent(QResizeEvent* event) {
   QMainWindow::resizeEvent(event);
   updateDragOverlayGeometry();
   m_dockLayout->handleResize(event->oldSize(), event->size());

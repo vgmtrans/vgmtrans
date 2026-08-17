@@ -53,11 +53,11 @@ namespace {
 
 BoundCollection::BoundCollection(SessionSnapshot snapshot, CollectionId id, std::string baseName,
                                  const SequenceProgramAsset* sequence, SequenceRuntime sequenceRuntime,
-                                 std::vector<InstrumentSetAsset> instrumentSets,
-                                 std::vector<const SampleCollectionAsset*> sampleCollections)
+                                 std::vector<SoundBankAsset> soundBanks,
+                                 std::vector<const SamplePoolAsset*> samplePools)
     : snapshot_(std::move(snapshot)), id_(id), baseName_(std::move(baseName)), sequence_(sequence),
-      sequenceRuntime_(std::move(sequenceRuntime)), instrumentSets_(std::move(instrumentSets)),
-      sampleCollections_(std::move(sampleCollections)) {
+      sequenceRuntime_(std::move(sequenceRuntime)), soundBanks_(std::move(soundBanks)),
+      samplePools_(std::move(samplePools)) {
 }
 
 CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, CollectionId collectionId) {
@@ -95,26 +95,26 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
     }
   }
 
-  std::vector<InstrumentSetAsset> instrumentSets;
-  std::vector<std::pair<AssetId, std::string>> instrumentIdentities;
-  instrumentSets.reserve(members.instrumentSets.size());
-  instrumentIdentities.reserve(members.instrumentSets.size());
-  for (const AssetId assetId : members.instrumentSets) {
-    if (const auto* instruments = snapshot.asset<InstrumentSetAsset>(assetId)) {
-      instrumentSets.push_back(*instruments);
-      instrumentIdentities.emplace_back(instruments->metadata.id, instruments->metadata.format);
+  std::vector<SoundBankAsset> soundBanks;
+  std::vector<std::pair<AssetId, std::string>> bankIdentities;
+  soundBanks.reserve(members.soundBanks.size());
+  bankIdentities.reserve(members.soundBanks.size());
+  for (const AssetId assetId : members.soundBanks) {
+    if (const auto* bank = snapshot.asset<SoundBankAsset>(assetId)) {
+      soundBanks.push_back(*bank);
+      bankIdentities.emplace_back(bank->metadata.id, bank->metadata.format);
     } else {
-      diagnostics.push_back(exportError("Collection instrument set asset was not found"));
+      diagnostics.push_back(exportError("Collection sound bank asset was not found"));
       failed = true;
     }
   }
-  std::vector<const SampleCollectionAsset*> sampleCollections;
-  sampleCollections.reserve(members.sampleCollections.size());
-  for (const AssetId assetId : members.sampleCollections) {
-    if (const auto* samples = snapshot.asset<SampleCollectionAsset>(assetId)) {
-      sampleCollections.push_back(samples);
+  std::vector<const SamplePoolAsset*> samplePools;
+  samplePools.reserve(members.samplePools.size());
+  for (const AssetId assetId : members.samplePools) {
+    if (const auto* samples = snapshot.asset<SamplePoolAsset>(assetId)) {
+      samplePools.push_back(samples);
     } else {
-      diagnostics.push_back(exportError("Collection sample collection asset was not found"));
+      diagnostics.push_back(exportError("Collection sample pool asset was not found"));
       failed = true;
     }
   }
@@ -124,14 +124,14 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
                                     : sequence != nullptr             ? sequence->metadata.format
                                                                       : "Collection";
     try {
-      CollectionBindingContext context{sequence, sequenceRuntime, instrumentSets, sampleCollections, diagnostics};
+      CollectionBindingContext context{sequence, sequenceRuntime, soundBanks, samplePools, diagnostics};
       collection->binder(context);
       failed = context.failed;
-      for (size_t index = 0; index < instrumentSets.size(); ++index) {
-        const auto& metadata = instrumentSets[index].metadata;
-        const auto& [id, format] = instrumentIdentities[index];
+      for (size_t index = 0; index < soundBanks.size(); ++index) {
+        const auto& metadata = soundBanks[index].metadata;
+        const auto& [id, format] = bankIdentities[index];
         if (metadata.id != id || metadata.format != format) {
-          diagnostics.push_back(exportError("Collection binding changed instrument set identity, format, or order"));
+          diagnostics.push_back(exportError("Collection binding changed sound bank identity, format, or order"));
           failed = true;
           break;
         }
@@ -149,7 +149,7 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
   }
   return CollectionBindingResult{
       .collection = BoundCollection(snapshot, collection->id, std::move(baseName), sequence, std::move(sequenceRuntime),
-                                    std::move(instrumentSets), std::move(sampleCollections)),
+                                    std::move(soundBanks), std::move(samplePools)),
       .diagnostics = std::move(diagnostics),
   };
 }

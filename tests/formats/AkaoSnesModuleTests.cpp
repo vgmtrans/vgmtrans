@@ -171,9 +171,8 @@ std::vector<u8> makeLateAkaoSnesLayoutAram() {
   constexpr std::array<u8, 8> readNoteLengthV4{0xcd, 0x0e, 0x9e, 0xf8, 0xa2, 0xf6, 0xaa, 0x16};
   writeBytes(bytes, 0x0100, readNoteLengthV4);
 
-  constexpr std::array<u8, 21> vcmdExecRS3{0xa8, 0xc4, 0xc4, 0xa6, 0x1c, 0xfd, 0xf6,
-                                           0x56, 0x16, 0x2d, 0xf6, 0x55, 0x16, 0x2d,
-                                           0xeb, 0xa6, 0xf6, 0xcd, 0x16, 0xd0, 0x01};
+  constexpr std::array<u8, 21> vcmdExecRS3{0xa8, 0xc4, 0xc4, 0xa6, 0x1c, 0xfd, 0xf6, 0x56, 0x16, 0x2d, 0xf6,
+                                           0x55, 0x16, 0x2d, 0xeb, 0xa6, 0xf6, 0xcd, 0x16, 0xd0, 0x01};
   writeBytes(bytes, 0x0200, vcmdExecRS3);
 
   constexpr std::array<u8, 18> readSeqHeaderV4{0xe5, 0x00, 0x1c, 0xc4, 0x00, 0xe5, 0x01, 0x1c, 0xc4,
@@ -208,10 +207,8 @@ void akaoSnesLayoutDiscoversFf4StyleAram() {
 void akaoSnesLayoutDiscoversLatePercussionTable() {
   const auto bytes = makeLateAkaoSnesLayoutAram();
   const auto layout = findAkaoSnesLayout(ByteReader(SourceId{8}, bytes));
-  expect(layout && layout->version == AKAOSNES_V4,
-         "late AkaoSnes synthetic ARAM should be classified as V4");
-  expect(layout->percussionTableAddress == 0xf120,
-         "RS3-style pan handling should not hide the percussion table");
+  expect(layout && layout->version == AKAOSNES_V4, "late AkaoSnes synthetic ARAM should be classified as V4");
+  expect(layout->percussionTableAddress == 0xf120, "RS3-style pan handling should not hide the percussion table");
 }
 
 void akaoSnesModuleDiscoversSequenceInstrumentsAndSamples() {
@@ -223,7 +220,7 @@ void akaoSnesModuleDiscoversSequenceInstrumentsAndSamples() {
 
   expect(project.diagnostics().empty(), "AkaoSnes synthetic scan should not report diagnostics");
   expect(project.collections().size() == 1, "AkaoSnes synthetic scan should produce one collection");
-  expect(project.assets().size() == 3, "AkaoSnes synthetic scan should produce sequence, instrument set, and samples");
+  expect(project.assets().size() == 2, "AkaoSnes synthetic scan should produce a sequence and sound bank");
 
   const auto* sequence = std::get_if<SequenceProgramAsset>(&project.assets()[0]);
   expect(sequence != nullptr, "first AkaoSnes asset should be a sequence");
@@ -240,13 +237,12 @@ void akaoSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   });
   expect(hasNote, "AkaoSnes synthetic track should render a note event");
 
-  const auto* instrumentSet = std::get_if<InstrumentSetAsset>(&project.assets()[1]);
-  expect(instrumentSet != nullptr, "second AkaoSnes asset should be an instrument set");
-  expect(!instrumentSet->instruments.empty(), "AkaoSnes instrument set should contain at least one instrument");
+  const auto* soundBank = std::get_if<SoundBankAsset>(&project.assets()[1]);
+  expect(soundBank != nullptr, "second AkaoSnes asset should be an instrument set");
+  expect(!soundBank->instruments.empty(), "AkaoSnes instrument set should contain at least one instrument");
 
-  const auto* samples = std::get_if<SampleCollectionAsset>(&project.assets()[2]);
-  expect(samples != nullptr, "third AkaoSnes asset should be a sample collection");
-  expect(samples->samples.samples.size() == 1, "AkaoSnes synthetic scan should collect one used BRR sample");
+  expect(soundBank->localSamples.samples.size() == 1,
+         "AkaoSnes synthetic scan should collect one used BRR sample in its sound bank");
 
   const auto pointers = project.sourceMap().withRole(source, SourceRole::Pointer);
   expect(pointers.size() == 1, "AkaoSnes source map should retain the one non-null track pointer");
@@ -268,7 +264,7 @@ void akaoSnesModuleDiscoversSequenceInstrumentsAndSamples() {
 
   const SourceAnnotation* region =
       annotationWithKind(project.sourceMap(), source, SourceRole::Region, "akao-snes-region");
-  expect(region != nullptr && region->owner == ObjectRefs::region(instrumentSet->metadata.id, 0, 0) &&
+  expect(region != nullptr && region->owner == ObjectRefs::region(soundBank->metadata.id, 0, 0) &&
              hasLinkRole(*region, SourceLinkRole::UsesSample),
          "AkaoSnes region annotations should own stable dense objects and link to their samples");
   const SourceAnnotation* directory =
@@ -417,8 +413,7 @@ void akaoSnesCompilerCursorCoversVersionBoundariesAndDurations() {
 void akaoSnesDynamicAdsrCoversHardwareFields() {
   constexpr u32 start = 0x20;
   std::vector<u8> bytes(0x40, 0xf2);
-  std::ranges::copy(std::initializer_list<u8>{0xea, 4, 0xeb, 0xff, 0xee, 0xe5, 0xef, 0xf2},
-                    bytes.begin() + start);
+  std::ranges::copy(std::initializer_list<u8>{0xea, 4, 0xeb, 0xff, 0xee, 0xe5, 0xef, 0xf2}, bytes.begin() + start);
 
   const AkaoSnesProfile ff5{.version = AKAOSNES_V3, .minorVersion = AKAOSNES_V3_FF5};
   const TrackProgram ff5Track = decodeTrack(bytes, ff5, start, start + 8);
@@ -431,8 +426,7 @@ void akaoSnesDynamicAdsrCoversHardwareFields() {
   const PerformanceSequence ff5Performance = renderTracks(ff5, {ff5Track});
   const auto instruments = eventsOfType<InstrumentPerformanceEvent>(ff5Performance.tracks.front());
   const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(ff5Performance.tracks.front());
-  expect(instruments.size() == 1 &&
-             instruments[0]->envelopeMode == InstrumentEnvelopeMode::UseInstrumentEnvelope,
+  expect(instruments.size() == 1 && instruments[0]->envelopeMode == InstrumentEnvelopeMode::UseInstrumentEnvelope,
          "FF5 program changes should select the instrument's native envelope");
   expect(envelopes.size() == 3, "FF5 ADSR attack, sustain rate, and default should emit envelope state");
 
@@ -445,8 +439,8 @@ void akaoSnesDynamicAdsrCoversHardwareFields() {
              envelopes[1]->update.fields == EnvelopeFields::SecondDecay &&
              envelopes[1]->update.values == Envelope{.secondDecaySeconds = snesDspAdsrSustainSeconds(5)},
          "FF5 ADSR sustain rate should control held-note decay rather than note-off release");
-  expect(envelopes[2]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
-             !envelopes[2]->update.values && envelopes[2]->update.fields == EnvelopeFields::All,
+  expect(envelopes[2]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks && !envelopes[2]->update.values &&
+             envelopes[2]->update.fields == EnvelopeFields::All,
          "FF5 ADSR default should restore the instrument envelope for active and future voices");
 
   std::vector<u8> sd2Bytes(0x40, 0xf2);
@@ -461,7 +455,7 @@ void akaoSnesDynamicAdsrCoversHardwareFields() {
 
   std::vector<u8> ff6Bytes(0x40, 0xec);
   std::ranges::copy(std::initializer_list<u8>{0xdc, 4, 0xdd, 0xff, 0xde, 0xfe, 0xdf, 0xfd, 0xe0, 0xe5, 0xe1, 0xec},
-      ff6Bytes.begin() + start);
+                    ff6Bytes.begin() + start);
   const AkaoSnesProfile ff6{.version = AKAOSNES_V4, .minorVersion = AKAOSNES_V4_FF6};
   const TrackProgram ff6Track = decodeTrack(ff6Bytes, ff6, start, start + 12);
   expect(std::get<u64>(semanticOperand(ff6Track.commands[1], "dsp_attack_rate")->value) == 15 &&
@@ -474,19 +468,16 @@ void akaoSnesDynamicAdsrCoversHardwareFields() {
   const auto ff6Envelopes = eventsOfType<EnvelopePerformanceEvent>(ff6Performance.tracks.front());
   expect(ff6Envelopes.size() == 5, "FF6 ADSR field commands and default should emit envelope state");
   expect(ff6Envelopes[0]->update.fields == EnvelopeFields::Attack &&
-             ff6Envelopes[0]->update.values ==
-                 Envelope{.attackSeconds = snesDspAdsrAttackSeconds(15)},
+             ff6Envelopes[0]->update.values == Envelope{.attackSeconds = snesDspAdsrAttackSeconds(15)},
          "FF6 DD should set the hardware attack rate");
   expect(ff6Envelopes[1]->update.fields == EnvelopeFields::Decay &&
-             ff6Envelopes[1]->update.values ==
-                 Envelope{.decaySeconds = snesDspAdsrDecaySeconds(6)},
+             ff6Envelopes[1]->update.values == Envelope{.decaySeconds = snesDspAdsrDecaySeconds(6)},
          "FF6 DE should set the hardware decay rate");
   expect(ff6Envelopes[2]->update.fields == EnvelopeFields::Sustain &&
              ff6Envelopes[2]->update.values == Envelope{.sustainAmplitude = 0.75},
          "FF6 DF should set the hardware sustain level");
   expect(ff6Envelopes[3]->update.fields == EnvelopeFields::SecondDecay &&
-             ff6Envelopes[3]->update.values ==
-                 Envelope{.secondDecaySeconds = snesDspAdsrSustainSeconds(5)},
+             ff6Envelopes[3]->update.values == Envelope{.secondDecaySeconds = snesDspAdsrSustainSeconds(5)},
          "FF6 E0 should set held-note decay, not note-off release");
   expect(!ff6Envelopes[4]->update.values && ff6Envelopes[4]->update.fields == EnvelopeFields::All,
          "FF6 E1 should restore the selected instrument's ADSR envelope");
@@ -535,8 +526,7 @@ void akaoSnesV1SoftwareEnvelopesDriveLevelWithoutDynamicInstruments() {
          "DE 50 should switch to B1 after half of an eight-tick note");
 
   std::vector<u8> tieBytes(0x40, 0xf1);
-  std::ranges::copy(std::initializer_list<u8>{0xdc, 0, 0xdd, 0, 0xde, 50, 0x0b, 0xce, 0xf1},
-                    tieBytes.begin() + start);
+  std::ranges::copy(std::initializer_list<u8>{0xdc, 0, 0xdd, 0, 0xde, 50, 0x0b, 0xce, 0xf1}, tieBytes.begin() + start);
   const PerformanceSequence tiedEnvelope =
       renderTracks(ff4, {decodeTrack(tieBytes, ff4, start, start + 9)}, {}, driverData);
   expect(levelAt(tiedEnvelope.tracks.front(), 5) > 0.99 && levelAt(tiedEnvelope.tracks.front(), 9) < 0.99,
@@ -761,8 +751,7 @@ void akaoSnesV4LfosPreserveDriverFamiliesAndPackedModes() {
     bytes[start + 9] = 0xec;
     return renderTracks(profile, {decodeTrack(bytes, profile, start, start + 10)});
   };
-  const auto modulation = [](const PerformanceSequence& performance, ModulationPerformanceTarget target,
-                             bool depth) {
+  const auto modulation = [](const PerformanceSequence& performance, ModulationPerformanceTarget target, bool depth) {
     const auto events = eventsOfType<ModulationPerformanceEvent>(performance.tracks.front());
     const auto found = std::ranges::find_if(events, [&](const ModulationPerformanceEvent* event) {
       return event->target == target &&
@@ -855,16 +844,13 @@ void akaoSnesV4LfosPreserveDriverFamiliesAndPackedModes() {
       const auto* bend = std::get_if<PitchBend>(&event);
       return bend != nullptr && bend->value > 0;
     });
-    expect(bendsDown == (test.polarity != LfoPolarity::Positive) &&
-               bendsUp == (test.polarity != LfoPolarity::Negative),
+    expect(bendsDown == (test.polarity != LfoPolarity::Positive) && bendsUp == (test.polarity != LfoPolarity::Negative),
            "AkaoSnes V4 MIDI simulation should preserve each packed direction mode");
   }
 
-  const AkaoSnesV4Lfo gunHazard =
-      akaoSnesV4Lfo({AKAOSNES_V4, AKAOSNES_V4_GH}, 0x0c, 0xcb, 0x30);
+  const AkaoSnesV4Lfo gunHazard = akaoSnesV4Lfo({AKAOSNES_V4, AKAOSNES_V4_GH}, 0x0c, 0xcb, 0x30);
   const double gunHazardNegativePitchRatio = 15.0 * 24.0 / 65536.0;
-  expect(std::abs(gunHazard.vibratoDepthSemitones + 12.0 * std::log2(1.0 - gunHazardNegativePitchRatio)) <
-                 0.000001 &&
+  expect(std::abs(gunHazard.vibratoDepthSemitones + 12.0 * std::log2(1.0 - gunHazardNegativePitchRatio)) < 0.000001 &&
              gunHazard.context.polarity == LfoPolarity::Bipolar &&
              std::abs(gunHazard.rateHertz - (8000.0 / 39.0 / 24.0)) < 0.000001,
          "Gun Hazard vibrato should retain its two-stage pitch scaling and held-value rate");
@@ -1169,8 +1155,8 @@ void akaoSnesSecretOfManaEchoEventsEmitReverb() {
 
   const PerformanceSequence performance = renderTracks(sd2, {decodeTrack(bytes, sd2, start, 0x40)});
   const auto echo = eventsOfType<ReverbPerformanceEvent>(performance.tracks.front());
-  expect(echo.size() == 3 && std::abs(echo[1]->send - 40.0 / 127.0) < 0.000001 &&
-             echo[2]->header.tick == 3 && echo[2]->send == 0.0,
+  expect(echo.size() == 3 && std::abs(echo[1]->send - 40.0 / 127.0) < 0.000001 && echo[2]->header.tick == 3 &&
+             echo[2]->send == 0.0,
          "Secret of Mana echo on/off should emit audible reverb followed by a dry send");
 }
 

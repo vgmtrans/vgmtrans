@@ -39,7 +39,7 @@ void matchFactsAreJoinedOncePerAsset() {
               .range = sources.reader(source).range(4, 8),
           },
   });
-  builder.assets.push_back(SampleCollectionAsset{
+  builder.assets.push_back(SamplePoolAsset{
       .metadata =
           AssetMetadata{
               .id = samplesId,
@@ -75,7 +75,7 @@ void matchFactsAreJoinedOncePerAsset() {
              sequences[0].requirements("articulation") == std::vector<u32>({5, 7, 8}),
          "an asset fact set should join ids, typed relations, and deduplicated requirements without caller maps");
 
-  const auto sampleSets = index.assets<SampleCollectionAsset>("Probe");
+  const auto sampleSets = index.assets<SamplePoolAsset>("Probe");
   const auto coverage = sampleSets[0].coverage("articulation");
   expect(sampleSets.size() == 1 && coverage && coverage->first == 5 && coverage->count == 4,
          "sample coverage should be available from the same aggregated fact surface");

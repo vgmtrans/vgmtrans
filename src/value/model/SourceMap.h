@@ -43,10 +43,10 @@ enum class SourceRole : u8 {
   Command,
   Opcode,
   Operand,
-  InstrumentSet,
+  SoundBank,
   Instrument,
   Region,
-  SampleCollection,
+  SamplePool,
   Sample,
 };
 
@@ -163,8 +163,8 @@ namespace ObjectRefs {
 [[nodiscard]] ObjectRef asset(AssetId asset);
 [[nodiscard]] ObjectRef sequence(AssetId sequenceAsset);
 [[nodiscard]] ObjectRef sequenceTrack(AssetId sequenceAsset, u32 trackIndex);
-[[nodiscard]] ObjectRef instrument(AssetId instrumentSetAsset, u32 instrumentIndex);
-[[nodiscard]] ObjectRef region(AssetId instrumentSetAsset, u32 instrumentIndex, u32 regionIndex);
+[[nodiscard]] ObjectRef instrument(AssetId soundBankAsset, u32 instrumentIndex);
+[[nodiscard]] ObjectRef region(AssetId soundBankAsset, u32 instrumentIndex, u32 regionIndex);
 [[nodiscard]] ObjectRef instrumentIndex(u32 instrumentIndex);
 [[nodiscard]] ObjectRef instrumentProgram(u32 bank, u32 program);
 [[nodiscard]] ObjectRef sample(AssetId sampleSetAsset, u32 sampleIndex);

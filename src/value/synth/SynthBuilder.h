@@ -34,34 +34,36 @@ public:
   [[nodiscard]] bool empty() const noexcept { return indexes_.empty(); }
 
 private:
-  friend class SampleCollectionBuilder;
+  friend class SamplePoolBuilder;
 
-  SampleRefLookup(AssetId collection, std::unordered_map<u64, u32> indexes);
+  SampleRefLookup(std::optional<AssetId> externalPool, std::unordered_map<u64, u32> indexes);
 
-  AssetId collection_;
+  std::optional<AssetId> externalPool_;
   std::unordered_map<u64, u32> indexes_;
 };
 
-struct BuiltSampleCollection {
+struct BuiltSamplePool {
   AssetId asset;
-  SampleCollection value;
+  SamplePool value;
   SampleRefLookup refs;
   SourceRange range;
 };
 
-// Builds one sample collection while keeping sparse source keys, dense model
+// Builds one sample pool while keeping sparse source keys, dense model
 // indexes, and source annotations synchronized.
-class SampleCollectionBuilder {
+class SamplePoolBuilder {
 public:
   class Entry;
 
-  explicit SampleCollectionBuilder(AssetId asset, SourceMapBuilder* sourceMap = nullptr,
-                                   std::vector<Diagnostic>* diagnostics = nullptr);
+  explicit SamplePoolBuilder(AssetId asset, SourceMapBuilder* sourceMap = nullptr,
+                             std::vector<Diagnostic>* diagnostics = nullptr);
+  [[nodiscard]] static SamplePoolBuilder local(AssetId owner, SourceMapBuilder* sourceMap = nullptr,
+                                               std::vector<Diagnostic>* diagnostics = nullptr);
 
-  SampleCollectionBuilder(const SampleCollectionBuilder&) = delete;
-  SampleCollectionBuilder& operator=(const SampleCollectionBuilder&) = delete;
-  SampleCollectionBuilder(SampleCollectionBuilder&&) noexcept = default;
-  SampleCollectionBuilder& operator=(SampleCollectionBuilder&&) noexcept = default;
+  SamplePoolBuilder(const SamplePoolBuilder&) = delete;
+  SamplePoolBuilder& operator=(const SamplePoolBuilder&) = delete;
+  SamplePoolBuilder(SamplePoolBuilder&&) noexcept = default;
+  SamplePoolBuilder& operator=(SamplePoolBuilder&&) noexcept = default;
 
   Entry add(u64 sourceKey, Sample sample);
   Entry alias(u64 aliasKey, u64 existingKey);
@@ -73,7 +75,7 @@ public:
   AnnotationBuilder source(SourceRole role, std::string_view label, const SourceRecord& record,
                            std::string_view kind = {});
 
-  SampleCollectionBuilder& include(SourceRange range);
+  SamplePoolBuilder& include(SourceRange range);
   [[nodiscard]] SourceRange range() const noexcept;
   [[nodiscard]] AssetId assetId() const noexcept { return asset_; }
   [[nodiscard]] bool empty() const noexcept { return samples_.empty(); }
@@ -82,7 +84,7 @@ public:
   void warning(std::string message, SourceRange range = {});
   void error(std::string message, SourceRange range = {});
 
-  [[nodiscard]] BuiltSampleCollection finish() &&;
+  [[nodiscard]] BuiltSamplePool finish() &&;
 
   class Entry {
   public:
@@ -96,16 +98,19 @@ public:
     AnnotationBuilder source(std::string_view label, const SourceRecord& record, std::string_view kind = {}) const;
 
   private:
-    friend class SampleCollectionBuilder;
+    friend class SamplePoolBuilder;
 
-    Entry(SampleCollectionBuilder& builder, u32 index);
+    Entry(SamplePoolBuilder& builder, u32 index);
 
-    SampleCollectionBuilder* builder_ = nullptr;
+    SamplePoolBuilder* builder_ = nullptr;
     u32 index_ = 0;
   };
 
 private:
   friend class Entry;
+
+  SamplePoolBuilder(AssetId owner, std::optional<AssetId> externalPool, SourceMapBuilder* sourceMap,
+                    std::vector<Diagnostic>* diagnostics);
 
   struct EntryState {
     std::vector<SourceAnnotationId> sources;
@@ -120,6 +125,7 @@ private:
   void report(Severity severity, std::string code, std::string message, SourceRange range);
 
   AssetId asset_;
+  std::optional<AssetId> externalPool_;
   SourceMapBuilder* sourceMap_ = nullptr;
   std::vector<Diagnostic>* diagnostics_ = nullptr;
   std::vector<Sample> samples_;
@@ -136,7 +142,7 @@ struct BuiltInstrumentSet {
   SourceRange range;
 };
 
-// Builds one instrument set while assigning durable dense identities to
+// Builds one bank's instruments while assigning durable dense identities to
 // instruments and regions and projecting their sample relationships.
 class InstrumentSetBuilder {
 public:

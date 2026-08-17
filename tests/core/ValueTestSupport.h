@@ -208,7 +208,7 @@ const Diagnostic& diagnosticWithMessage(const std::vector<Diagnostic>& diagnosti
   const auto found = std::ranges::find_if(
       diagnostics, [message](const Diagnostic& diagnostic) { return diagnostic.message == message; });
   if (found == diagnostics.end()) {
-    throw std::runtime_error("expected diagnostic was not found");
+    throw std::runtime_error("expected diagnostic was not found: " + std::string(message));
   }
   return *found;
 }
@@ -224,28 +224,27 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   return input.reader.size() >= minimumSize && input.reader.u8At(0) == magic;
 }
 
-[[nodiscard]] SequenceProgramConfig probeSequenceConfig(SequenceProgramBehavior behavior = {},
-                                                   std::optional<StereoBalance> initialStereoBalance = std::nullopt);
+[[nodiscard]] SequenceProgramConfig probeSequenceConfig(
+    SequenceProgramBehavior behavior = {}, std::optional<StereoBalance> initialStereoBalance = std::nullopt);
 [[nodiscard]] SequenceRuntime probeSequenceRuntime();
 [[nodiscard]] SequenceProgram probeSequenceProgram();
 
 [[nodiscard]] SourceExtractor probeSequenceContainerExtractor() {
   return SourceExtractor{
       .name = "ProbeSequenceContainer",
-      .extract =
-          [](const ExtractionInput& input) -> ExtractionResult {
-            if (input.source.derived() || !hasProbeMagic(input, 0xaa)) {
-              return {};
-            }
-            const auto bytes = input.reader.slice(0, input.reader.size());
-            return ExtractionResult{
-                .sources = {ExtractedSource{
-                    .file = SourceFile{.name = input.source.name + ".child", .knownFormat = "probe-sequence"},
-                    .bytes = std::vector<u8>(bytes.begin(), bytes.end()),
-                    .origin = input.reader.range(0, 1),
-                }},
-            };
-          },
+      .extract = [](const ExtractionInput& input) -> ExtractionResult {
+        if (input.source.derived() || !hasProbeMagic(input, 0xaa)) {
+          return {};
+        }
+        const auto bytes = input.reader.slice(0, input.reader.size());
+        return ExtractionResult{
+            .sources = {ExtractedSource{
+                .file = SourceFile{.name = input.source.name + ".child", .knownFormat = "probe-sequence"},
+                .bytes = std::vector<u8>(bytes.begin(), bytes.end()),
+                .origin = input.reader.range(0, 1),
+            }},
+        };
+      },
   };
 }
 
@@ -326,8 +325,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   }
 
   ScanResultBuilder out(input, "ProbeExplicit");
-  const auto sequence = out.sequence("Explicit Sequence", input.reader.range(0, 1))
-                            .program(probeSequenceProgram());
+  const auto sequence = out.sequence("Explicit Sequence", input.reader.range(0, 1)).program(probeSequenceProgram());
   out.sourceMap()
       .header("Probe Header", input.reader.range(0, 1))
       .owner(ObjectRefs::sequence(sequence.id()))
@@ -398,7 +396,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   const auto assetId = input.ids.nextAssetId();
   const auto bank = input.reader.u8At(1);
   ScanResult result;
-  result.assets.emplace_back(InstrumentSetAsset{
+  result.assets.emplace_back(SoundBankAsset{
       .metadata =
           AssetMetadata{
               .id = assetId,
@@ -410,7 +408,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   result.sourceMap = SourceMap{{SourceAnnotation{
       .id = input.ids.nextSourceAnnotationId(),
       .range = input.reader.range(0, input.reader.size()),
-      .role = SourceRole::InstrumentSet,
+      .role = SourceRole::SoundBank,
       .label = input.source.name,
       .owner = ObjectRefs::asset(assetId),
   }}};
@@ -440,16 +438,16 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
 
     if (index.asset<SequenceProgramAsset>(fact.asset) != nullptr) {
       found->members.sequence = fact.asset;
-    } else if (index.asset<InstrumentSetAsset>(fact.asset) != nullptr) {
-      found->members.instrumentSets.push_back(fact.asset);
+    } else if (index.asset<SoundBankAsset>(fact.asset) != nullptr) {
+      found->members.soundBanks.push_back(fact.asset);
     }
   }
   for (auto& collection : collections) {
     if (!collection.members.sequence) {
       collection.issues.push_back(missingSequenceIssue());
     }
-    if (collection.members.instrumentSets.empty()) {
-      collection.issues.push_back(missingInstrumentSetIssue());
+    if (collection.members.soundBanks.empty()) {
+      collection.issues.push_back(missingSoundBankIssue());
     }
   }
   return collections;
@@ -614,8 +612,8 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
       .members =
           {
               .sequence = AssetId{99},
-              .instrumentSets = {AssetId{98}},
-              .sampleCollections = {AssetId{97}},
+              .soundBanks = {AssetId{98}},
+              .samplePools = {AssetId{97}},
               .miscAssets = {AssetId{96}},
           },
   }};
@@ -646,8 +644,8 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
       .name = "Wrong Type Assets",
       .members =
           {
-              .instrumentSets = {*sequence},
-              .sampleCollections = {*sequence},
+              .soundBanks = {*sequence},
+              .samplePools = {*sequence},
               .miscAssets = {*sequence},
           },
   }};
@@ -832,7 +830,7 @@ using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
 }
 
 [[nodiscard]] SequenceProgramConfig probeSequenceConfig(SequenceProgramBehavior behavior,
-                                                   std::optional<StereoBalance> initialStereoBalance) {
+                                                        std::optional<StereoBalance> initialStereoBalance) {
   behavior.initialStereoBalance = initialStereoBalance;
   return SequenceProgramConfig{
       .commandDetailKindPrefix = "probe",

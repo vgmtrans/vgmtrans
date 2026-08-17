@@ -165,9 +165,9 @@ void scannerBuildsACompleteV2Collection() {
   const SessionSnapshot snapshot = session.snapshot();
   const Collection* collection = snapshot.collections().empty() ? nullptr : &snapshot.collections().front();
   expect(snapshot.collections().size() == 1 && collection->members.sequence &&
-             collection->members.instrumentSets.size() == 1 && collection->members.sampleCollections.size() == 1,
-         "HudsonSnes scanning should publish a connected sequence, instrument set, and BRR sample collection");
-  const auto* instruments = snapshot.asset<InstrumentSetAsset>(collection->members.instrumentSets.front());
+             collection->members.soundBanks.size() == 1 && collection->members.samplePools.empty(),
+         "HudsonSnes scanning should publish a connected sequence and self-contained sound bank");
+  const auto* instruments = snapshot.asset<SoundBankAsset>(collection->members.soundBanks.front());
   const Envelope* envelope =
       instruments != nullptr && !instruments->instruments.empty() && !instruments->instruments.front().regions.empty()
           ? &instruments->instruments.front().regions.front().envelope
@@ -388,10 +388,10 @@ void v1MixerAndPitchPipelineMatchesSuperBomberman3() {
   const auto* attack = attacks.empty() ? nullptr : attacks.back();
   const auto* timing =
       attack == nullptr ? nullptr : std::get_if<FixedDurationPitchSlideTiming>(&attack->timing.physical);
-  expect(pitched.diagnostics.empty() && notes.size() == 2 && !notes.back()->restartsLfoPhase &&
-             attacks.size() == 1 && timing != nullptr && timing->milliseconds == 508.0 &&
-             attack->targetKey - attack->startKey > 10.0 && vibrato != nullptr && vibrato->delayTicks == 0 &&
-             vibrato->pitchRangeSemitones->minimum < 0.0 && vibrato->pitchRangeSemitones->maximum > 0.0,
+  expect(pitched.diagnostics.empty() && notes.size() == 2 && !notes.back()->restartsLfoPhase && attacks.size() == 1 &&
+             timing != nullptr && timing->milliseconds == 508.0 && attack->targetKey - attack->startKey > 10.0 &&
+             vibrato != nullptr && vibrato->delayTicks == 0 && vibrato->pitchRangeSemitones->minimum < 0.0 &&
+             vibrato->pitchRangeSemitones->maximum > 0.0,
          "Hudson 1.x should retain pitch state across slurs and express raw DSP pitch envelopes and vibrato");
 }
 
@@ -494,8 +494,8 @@ void optionalRealCorpusSmokeTest() {
       const SessionSnapshot snapshot = session.snapshot();
       if (!snapshot.collections().empty()) {
         const CollectionMembers& members = snapshot.collections().front().members;
-        const bool connected =
-            members.sequence && !members.instrumentSets.empty() && !members.sampleCollections.empty();
+        const auto* bank = members.soundBanks.empty() ? nullptr : snapshot.asset<SoundBankAsset>(members.soundBanks[0]);
+        const bool connected = members.sequence && bank != nullptr && !bank->localSamples.samples.empty();
         synthConnected += connected;
         synthGames[entry.path().parent_path().filename().string()] += connected;
       }

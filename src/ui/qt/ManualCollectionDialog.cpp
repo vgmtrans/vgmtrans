@@ -63,16 +63,16 @@ std::vector<vgmtrans::core::AssetId> checkedAssets(const QListWidget& list) {
   return assets;
 }
 
-bool usesSamples(const vgmtrans::core::SessionSnapshot& snapshot,
-                 const std::vector<vgmtrans::core::AssetId>& instrumentSets) {
-  for (const auto id : instrumentSets) {
-    const auto* set = snapshot.asset<vgmtrans::core::InstrumentSetAsset>(id);
+bool needsExternalSamples(const vgmtrans::core::SessionSnapshot& snapshot,
+                          const std::vector<vgmtrans::core::AssetId>& soundBanks) {
+  for (const auto id : soundBanks) {
+    const auto* set = snapshot.asset<vgmtrans::core::SoundBankAsset>(id);
     if (set == nullptr) {
       continue;
     }
     for (const auto& instrument : set->instruments) {
       for (const auto& region : instrument.regions) {
-        if (region.sample.valid()) {
+        if (region.sample.externalPool) {
           return true;
         }
       }
@@ -100,12 +100,12 @@ ManualCollectionDialog::ManualCollectionDialog(vgmtrans::ui::WorkspaceController
   auto* sequenceList = makeAssetList<vgmtrans::core::SequenceProgramAsset>(workspace.snapshot(), m_seq_buttons, this);
   sequenceLabel->setBuddy(sequenceList);
 
-  auto* instrumentLabel = new QLabel(tr("&Instrument sets"), this);
-  m_instr_list = makeAssetList<vgmtrans::core::InstrumentSetAsset>(workspace.snapshot(), nullptr, this);
+  auto* instrumentLabel = new QLabel(tr("&Sound banks"), this);
+  m_instr_list = makeAssetList<vgmtrans::core::SoundBankAsset>(workspace.snapshot(), nullptr, this);
   instrumentLabel->setBuddy(m_instr_list);
 
-  auto* sampleLabel = new QLabel(tr("Sample &collections"), this);
-  m_samp_list = makeAssetList<vgmtrans::core::SampleCollectionAsset>(workspace.snapshot(), nullptr, this);
+  auto* sampleLabel = new QLabel(tr("Sample &pools"), this);
+  m_samp_list = makeAssetList<vgmtrans::core::SamplePoolAsset>(workspace.snapshot(), nullptr, this);
   sampleLabel->setBuddy(m_samp_list);
 
   auto* buttons = new QDialogButtonBox(QDialogButtonBox::Cancel, this);
@@ -138,15 +138,15 @@ void ManualCollectionDialog::createCollection() {
 
   vgmtrans::core::CollectionMembers members{
       .sequence = vgmtrans::core::AssetId{sequence->property("assetId").toUInt()},
-      .instrumentSets = checkedAssets(*m_instr_list),
-      .sampleCollections = checkedAssets(*m_samp_list),
+      .soundBanks = checkedAssets(*m_instr_list),
+      .samplePools = checkedAssets(*m_samp_list),
   };
-  if (members.instrumentSets.empty()) {
-    QMessageBox::critical(this, tr("Error creating collection"), tr("At least one instrument set must be selected"));
+  if (members.soundBanks.empty()) {
+    QMessageBox::critical(this, tr("Error creating collection"), tr("At least one sound bank must be selected"));
     return;
   }
 
-  m_may_be_silent = members.sampleCollections.empty() && usesSamples(m_workspace.snapshot(), members.instrumentSets);
+  m_may_be_silent = members.samplePools.empty() && needsExternalSamples(m_workspace.snapshot(), members.soundBanks);
   try {
     m_created_collection =
         m_workspace.createUserCollection(m_name_field->text().trimmed().toStdString(), std::move(members));

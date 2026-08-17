@@ -263,16 +263,16 @@ void fixedPhysicalLfoValuesNeedNoZeroRangeModulators() {
 void regionModulationExportsAtTheRegionScope() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "region-lfo.pcm"}, {0});
-  const SampleCollectionAsset samples{
+  const SamplePoolAsset samples{
       .metadata = AssetMetadata{.id = AssetId{2}, .format = "Probe", .name = "Samples"},
-      .samples = SampleCollection{.samples = {Sample{
-                                      .name = "Zero",
-                                      .codec = AudioCodec::PcmS8,
-                                      .encodedData = SourceRange{.source = source, .offset = 0, .size = 1},
-                                      .sampleRate = 16000,
-                                  }}},
+      .pool = SamplePool{.samples = {Sample{
+                             .name = "Zero",
+                             .codec = AudioCodec::PcmS8,
+                             .encodedData = SourceRange{.source = source, .offset = 0, .size = 1},
+                             .sampleRate = 16000,
+                         }}},
   };
-  const InstrumentSetAsset instruments{
+  const SoundBankAsset instruments{
       .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe", .name = "Instruments"},
       .instruments = {Instrument{
           .name = "Layered LFO",
@@ -280,7 +280,7 @@ void regionModulationExportsAtTheRegionScope() {
               {
                   Region{
                       .keyRange = {.low = 0, .high = 63},
-                      .sample = SampleRef{.collection = samples.metadata.id, .index = 0},
+                      .sample = SampleRef{.externalPool = samples.metadata.id, .index = 0},
                       .modulation =
                           InstrumentModulation{
                               .vibrato =
@@ -293,7 +293,7 @@ void regionModulationExportsAtTheRegionScope() {
                   },
                   Region{
                       .keyRange = {.low = 64, .high = 127},
-                      .sample = SampleRef{.collection = samples.metadata.id, .index = 0},
+                      .sample = SampleRef{.externalPool = samples.metadata.id, .index = 0},
                       .modulation =
                           InstrumentModulation{
                               .vibrato =
@@ -307,12 +307,12 @@ void regionModulationExportsAtTheRegionScope() {
               },
       }},
   };
-  const std::array<const InstrumentSetAsset*, 1> instrumentSets{&instruments};
-  const std::array<const SampleCollectionAsset*, 1> sampleCollections{&samples};
+  const std::array<const SoundBankAsset*, 1> soundBanks{&instruments};
+  const std::array<const SamplePoolAsset*, 1> samplePools{&samples};
   const SynthExportInput input{
       .name = "Region LFO",
-      .instrumentSets = instrumentSets,
-      .sampleCollections = sampleCollections,
+      .soundBanks = soundBanks,
+      .samplePools = samplePools,
   };
 
   const auto soundFont = buildSoundFont2(input, sources);
@@ -346,15 +346,15 @@ void soundFontExporterWritesSfbkRiffFile() {
   SourceStore sources;
   const auto sourceId = sources.add(SourceFile{.name = "zero.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
 
-  SampleCollectionAsset sampleCollection{
+  SamplePoolAsset samplePool{
       .metadata =
           AssetMetadata{
               .id = AssetId{2},
               .format = "Probe",
               .name = "Probe Samples",
           },
-      .samples =
-          SampleCollection{
+      .pool =
+          SamplePool{
               .samples = {Sample{
                   .name = "Zero",
                   .codec = AudioCodec::SnesBrr,
@@ -364,7 +364,7 @@ void soundFontExporterWritesSfbkRiffFile() {
               }},
           },
   };
-  InstrumentSetAsset instrumentSet{
+  SoundBankAsset soundBank{
       .metadata =
           AssetMetadata{
               .id = AssetId{1},
@@ -376,7 +376,7 @@ void soundFontExporterWritesSfbkRiffFile() {
           .name = "Lead",
           .regions = {Region{
               .keyRange = KeyRange{.low = 24, .high = 96},
-              .sample = SampleRef{.collection = sampleCollection.metadata.id, .index = 0},
+              .sample = SampleRef{.externalPool = samplePool.metadata.id, .index = 0},
               .unityKey = 58.75,
               .envelope =
                   Envelope{
@@ -407,8 +407,8 @@ void soundFontExporterWritesSfbkRiffFile() {
       }},
   };
 
-  const std::array<const InstrumentSetAsset*, 1> instrumentSets{&instrumentSet};
-  const std::array<const SampleCollectionAsset*, 1> samples{&sampleCollection};
+  const std::array<const SoundBankAsset*, 1> soundBanks{&soundBank};
+  const std::array<const SamplePoolAsset*, 1> samples{&samplePool};
   const MidiModulationUsage midiModulationUsage{
       .vibratoDepth = ObservedValueRange{.observed = true, .min = 4, .max = 38},
       .vibratoRate = ObservedValueRange{.observed = true, .min = 5, .max = 12},
@@ -418,8 +418,8 @@ void soundFontExporterWritesSfbkRiffFile() {
   const auto result = buildSoundFont2(
       SynthExportInput{
           .name = "Probe",
-          .instrumentSets = instrumentSets,
-          .sampleCollections = samples,
+          .soundBanks = soundBanks,
+          .samplePools = samples,
           .midiModulationUsage = &midiModulationUsage,
           .modulationScaling = ModulationScalingPolicy::ObservedSequenceRange,
       },
@@ -487,8 +487,8 @@ void soundFontExporterWritesSfbkRiffFile() {
   const auto simulatedResult = buildSoundFont2(
       SynthExportInput{
           .name = "Probe",
-          .instrumentSets = instrumentSets,
-          .sampleCollections = samples,
+          .soundBanks = soundBanks,
+          .samplePools = samples,
           .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
       },
       sources);
@@ -501,12 +501,12 @@ void soundFontExporterWritesSfbkRiffFile() {
   expect(!soundFontImodContains(simulatedResult.bytes, 206, 23, 1209),
          "SoundFont sequence-event simulation export should suppress synth vibrato-delay modulators");
 
-  Instrument variant = instrumentSet.instruments.front();
+  Instrument variant = soundBank.instruments.front();
   variant.explicitAddress = InstrumentAddress{.bank = 1, .program = 6};
   variant.regions.front().envelope.attackSeconds = 2.0;
-  instrumentSet.instruments.push_back(std::move(variant));
-  const auto shared = buildSoundFont2(
-      SynthExportInput{.name = "Probe", .instrumentSets = instrumentSets, .sampleCollections = samples}, sources);
+  soundBank.instruments.push_back(std::move(variant));
+  const auto shared =
+      buildSoundFont2(SynthExportInput{.name = "Probe", .soundBanks = soundBanks, .samplePools = samples}, sources);
   expect(chunkSize(shared.bytes, "phdr") == 3 * 38 && chunkSize(shared.bytes, "inst") == 2 * 22 &&
              soundFontPgenContainsAmount(shared.bytes, 34, 1200),
          "SoundFont envelope variants should share one sample-mapped instrument through preset ADSR offsets");
@@ -517,15 +517,15 @@ void dlsExporterWritesDlsRiffFile() {
   SourceStore sources;
   const auto sourceId = sources.add(SourceFile{.name = "zero.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
 
-  SampleCollectionAsset sampleCollection{
+  SamplePoolAsset samplePool{
       .metadata =
           AssetMetadata{
               .id = AssetId{2},
               .format = "Probe",
               .name = "Probe Samples",
           },
-      .samples =
-          SampleCollection{
+      .pool =
+          SamplePool{
               .samples = {Sample{
                   .name = "Zero",
                   .codec = AudioCodec::SnesBrr,
@@ -535,7 +535,7 @@ void dlsExporterWritesDlsRiffFile() {
               }},
           },
   };
-  InstrumentSetAsset instrumentSet{
+  SoundBankAsset soundBank{
       .metadata =
           AssetMetadata{
               .id = AssetId{1},
@@ -547,7 +547,7 @@ void dlsExporterWritesDlsRiffFile() {
           .name = "Lead",
           .regions = {Region{
               .keyRange = KeyRange{.low = 24, .high = 96},
-              .sample = SampleRef{.collection = sampleCollection.metadata.id, .index = 0},
+              .sample = SampleRef{.externalPool = samplePool.metadata.id, .index = 0},
               .unityKey = 58.75,
               .envelope =
                   Envelope{
@@ -578,8 +578,8 @@ void dlsExporterWritesDlsRiffFile() {
       }},
   };
 
-  const std::array<const InstrumentSetAsset*, 1> instrumentSets{&instrumentSet};
-  const std::array<const SampleCollectionAsset*, 1> samples{&sampleCollection};
+  const std::array<const SoundBankAsset*, 1> soundBanks{&soundBank};
+  const std::array<const SamplePoolAsset*, 1> samples{&samplePool};
   const MidiModulationUsage midiModulationUsage{
       .vibratoDepth = ObservedValueRange{.observed = true, .min = 4, .max = 38},
       .vibratoRate = ObservedValueRange{.observed = true, .min = 5, .max = 12},
@@ -589,8 +589,8 @@ void dlsExporterWritesDlsRiffFile() {
   const auto result = buildDls(
       SynthExportInput{
           .name = "Probe",
-          .instrumentSets = instrumentSets,
-          .sampleCollections = samples,
+          .soundBanks = soundBanks,
+          .samplePools = samples,
           .midiModulationUsage = &midiModulationUsage,
           .modulationScaling = ModulationScalingPolicy::ObservedSequenceRange,
       },
@@ -649,8 +649,8 @@ void dlsExporterWritesDlsRiffFile() {
   const auto simulatedResult = buildDls(
       SynthExportInput{
           .name = "Probe",
-          .instrumentSets = instrumentSets,
-          .sampleCollections = samples,
+          .soundBanks = soundBanks,
+          .samplePools = samples,
           .modulationConversion = ModulationConversionPolicy::SequenceEventSimulation,
       },
       sources);
@@ -666,18 +666,18 @@ void standaloneSynthExportsKeepNativeModulation() {
   constexpr double lfoStepHertz = 1000.0 / 16384.0;
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "zero.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
-  SampleCollectionAsset samples{
+  SamplePoolAsset samples{
       .metadata = AssetMetadata{.id = AssetId{2}, .format = "Probe", .name = "Samples"},
-      .samples = SampleCollection{.samples = {Sample{
-                                      .codec = AudioCodec::SnesBrr,
-                                      .encodedData = SourceRange{.source = source, .offset = 0, .size = 9},
-                                      .sampleRate = 16000,
-                                  }}},
+      .pool = SamplePool{.samples = {Sample{
+                             .codec = AudioCodec::SnesBrr,
+                             .encodedData = SourceRange{.source = source, .offset = 0, .size = 9},
+                             .sampleRate = 16000,
+                         }}},
   };
-  InstrumentSetAsset instruments{
+  SoundBankAsset instruments{
       .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe", .name = "Instruments"},
       .instruments = {Instrument{
-          .regions = {Region{.sample = SampleRef{.collection = samples.metadata.id, .index = 0}}},
+          .regions = {Region{.sample = SampleRef{.externalPool = samples.metadata.id, .index = 0}}},
           .modulation = InstrumentModulation{.vibrato =
                                                  VibratoSpec{
                                                      .maxDepthCents = 100.0,
@@ -691,9 +691,9 @@ void standaloneSynthExportsKeepNativeModulation() {
   builder.assets.emplace_back(samples);
   const SessionSnapshot snapshot = builder.finish();
   const Artifact soundFont =
-      exportInstrumentSet(snapshot, sources, instruments.metadata.id, SynthExportFormat::SoundFont2, ExportRequest{});
+      exportSoundBank(snapshot, sources, instruments.metadata.id, SynthExportFormat::SoundFont2, ExportRequest{});
   const Artifact dls =
-      exportInstrumentSet(snapshot, sources, instruments.metadata.id, SynthExportFormat::Dls, ExportRequest{});
+      exportSoundBank(snapshot, sources, instruments.metadata.id, SynthExportFormat::Dls, ExportRequest{});
 
   expect(soundFontIgenContainsAmount(soundFont.bytes, 24, -8479),
          "standalone SoundFont export should retain native modulation when no MIDI replacement exists");
@@ -726,7 +726,7 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
               .tracks = {track},
           },
   };
-  const AssetId sampleCollectionId{2};
+  const AssetId samplePoolId{2};
   const auto sample = [&](std::string name, u64 offset) {
     return Sample{
         .name = std::move(name),
@@ -735,23 +735,23 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
         .sampleRate = 16000,
     };
   };
-  const SampleCollectionAsset samples{
-      .metadata = AssetMetadata{.id = sampleCollectionId, .format = "Probe", .name = "Samples"},
-      .samples = SampleCollection{.samples =
-                                      {
-                                          sample("Piano Wave", 0),
-                                          sample("Lead Wave", 1),
-                                          sample("Noise Wave", 2),
-                                      }},
+  const SamplePoolAsset samples{
+      .metadata = AssetMetadata{.id = samplePoolId, .format = "Probe", .name = "Samples"},
+      .pool = SamplePool{.samples =
+                             {
+                                 sample("Piano Wave", 0),
+                                 sample("Lead Wave", 1),
+                                 sample("Noise Wave", 2),
+                             }},
   };
   const auto instrument = [&](std::string name, u32 program, u32 sampleIndex) {
     return Instrument{
         .explicitAddress = InstrumentAddress{.bank = 0, .program = program},
         .name = std::move(name),
-        .regions = {Region{.sample = SampleRef{.collection = sampleCollectionId, .index = sampleIndex}}},
+        .regions = {Region{.sample = SampleRef{.externalPool = samplePoolId, .index = sampleIndex}}},
     };
   };
-  const InstrumentSetAsset instruments{
+  const SoundBankAsset instruments{
       .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe", .name = "Instruments"},
       .instruments =
           {
@@ -771,8 +771,8 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
       .members =
           {
               .sequence = sequence.metadata.id,
-              .instrumentSets = {instruments.metadata.id},
-              .sampleCollections = {samples.metadata.id},
+              .soundBanks = {instruments.metadata.id},
+              .samplePools = {samples.metadata.id},
           },
   });
   const SessionSnapshot snapshot = builder.finish();
@@ -804,9 +804,8 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
 
   const ExportRequest onlyUsed{.exportOnlyUsedInstruments = true};
   const auto uniqueSoundFont =
-      exportInstrumentSet(snapshot, sources, instruments.metadata.id, SynthExportFormat::SoundFont2, onlyUsed);
-  const auto uniqueDls =
-      exportInstrumentSet(snapshot, sources, instruments.metadata.id, SynthExportFormat::Dls, onlyUsed);
+      exportSoundBank(snapshot, sources, instruments.metadata.id, SynthExportFormat::SoundFont2, onlyUsed);
+  const auto uniqueDls = exportSoundBank(snapshot, sources, instruments.metadata.id, SynthExportFormat::Dls, onlyUsed);
   expect(chunkSize(uniqueSoundFont.bytes, "phdr") == 3 * 38 && chunkSize(uniqueSoundFont.bytes, "shdr") == 3 * 46 &&
              readLe32(uniqueDls.bytes, asciiOffset(uniqueDls.bytes, "colh") + 8) == 2 &&
              chunkSize(uniqueDls.bytes, "ptbl") == 16,
@@ -822,16 +821,16 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
           .members =
               {
                   .sequence = sequence.metadata.id,
-                  .instrumentSets = {instruments.metadata.id},
-                  .sampleCollections = {samples.metadata.id},
+                  .soundBanks = {instruments.metadata.id},
+                  .samplePools = {samples.metadata.id},
               },
       },
   };
   const SessionSnapshot ambiguousSnapshot = ambiguousBuilder.finish();
   const auto ambiguousSoundFont =
-      exportInstrumentSet(ambiguousSnapshot, sources, instruments.metadata.id, SynthExportFormat::SoundFont2, onlyUsed);
+      exportSoundBank(ambiguousSnapshot, sources, instruments.metadata.id, SynthExportFormat::SoundFont2, onlyUsed);
   const auto ambiguousDls =
-      exportInstrumentSet(ambiguousSnapshot, sources, instruments.metadata.id, SynthExportFormat::Dls, onlyUsed);
+      exportSoundBank(ambiguousSnapshot, sources, instruments.metadata.id, SynthExportFormat::Dls, onlyUsed);
   expect(chunkSize(ambiguousSoundFont.bytes, "phdr") == 4 * 38 &&
              chunkSize(ambiguousSoundFont.bytes, "shdr") == 4 * 46 &&
              readLe32(ambiguousDls.bytes, asciiOffset(ambiguousDls.bytes, "colh") + 8) == 3 &&
@@ -850,12 +849,12 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
               },
       }},
   };
-  const std::array<const InstrumentSetAsset*, 1> semanticSets{&semanticInstruments};
-  const std::array<const SampleCollectionAsset*, 1> sampleSets{&samples};
+  const std::array<const SoundBankAsset*, 1> semanticSets{&semanticInstruments};
+  const std::array<const SamplePoolAsset*, 1> sampleSets{&samples};
   const auto semanticData = prepareSynthData(
       SynthExportInput{
-          .instrumentSets = semanticSets,
-          .sampleCollections = sampleSets,
+          .soundBanks = semanticSets,
+          .samplePools = sampleSets,
           .sequenceUsage = &semanticPerformance,
       },
       sources);
@@ -874,11 +873,11 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
               },
       }},
   };
-  const std::array<const InstrumentSetAsset*, 1> logicalBankSets{&logicalBankInstruments};
+  const std::array<const SoundBankAsset*, 1> logicalBankSets{&logicalBankInstruments};
   const auto logicalBankData = prepareSynthData(
       SynthExportInput{
-          .instrumentSets = logicalBankSets,
-          .sampleCollections = sampleSets,
+          .soundBanks = logicalBankSets,
+          .samplePools = sampleSets,
           .sequenceUsage = &logicalBankPerformance,
       },
       sources);
@@ -897,11 +896,11 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
               },
       }},
   };
-  const std::array<const InstrumentSetAsset*, 1> exactBankSets{&exactBankInstruments};
+  const std::array<const SoundBankAsset*, 1> exactBankSets{&exactBankInstruments};
   const auto exactBankData = prepareSynthData(
       SynthExportInput{
-          .instrumentSets = exactBankSets,
-          .sampleCollections = sampleSets,
+          .soundBanks = exactBankSets,
+          .samplePools = sampleSets,
           .sequenceUsage = &exactBankPerformance,
       },
       sources);
@@ -940,11 +939,11 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
 }
 
 void bindInstrumentSet(CollectionBindingContext& context) {
-  const AssetId samples = context.sampleCollections.front()->metadata.id;
-  auto& instruments = context.instrumentSets.front();
+  const AssetId samples = context.samplePools.front()->metadata.id;
+  auto& instruments = context.soundBanks.front();
   instruments.instruments = {Instrument{
       .name = "Prepared Instrument",
-      .regions = {Region{.sample = SampleRef{.collection = samples, .index = 0}}},
+      .regions = {Region{.sample = SampleRef{.externalPool = samples, .index = 0}}},
   }};
 }
 
@@ -1011,22 +1010,22 @@ void collectionBindingAppliesToWholeExport() {
               .tracks = {track},
           },
   };
-  const InstrumentSetAsset instruments{
+  const SoundBankAsset instruments{
       .metadata = AssetMetadata{.id = AssetId{1}, .format = "Performance Finalizer", .name = "Durable Bank"},
       .instruments = {Instrument{
           .explicitAddress = InstrumentAddress{.bank = 0, .program = 0},
           .name = "Durable Instrument",
-          .regions = {Region{.sample = SampleRef{.collection = AssetId{2}, .index = 0}}},
+          .regions = {Region{.sample = SampleRef{.externalPool = AssetId{2}, .index = 0}}},
       }},
   };
-  const SampleCollectionAsset samples{
+  const SamplePoolAsset samples{
       .metadata = AssetMetadata{.id = AssetId{2}, .format = "Performance Finalizer", .name = "Samples"},
-      .samples = SampleCollection{.samples = {Sample{
-                                      .name = "Zero",
-                                      .codec = AudioCodec::SnesBrr,
-                                      .encodedData = SourceRange{.source = source, .offset = 0, .size = 9},
-                                      .sampleRate = 16000,
-                                  }}},
+      .pool = SamplePool{.samples = {Sample{
+                             .name = "Zero",
+                             .codec = AudioCodec::SnesBrr,
+                             .encodedData = SourceRange{.source = source, .offset = 0, .size = 9},
+                             .sampleRate = 16000,
+                         }}},
   };
   test::SessionSnapshotBuilder builder;
   builder.assets.emplace_back(sequence);
@@ -1040,8 +1039,8 @@ void collectionBindingAppliesToWholeExport() {
       .members =
           {
               .sequence = sequence.metadata.id,
-              .instrumentSets = {instruments.metadata.id},
-              .sampleCollections = {samples.metadata.id},
+              .soundBanks = {instruments.metadata.id},
+              .samplePools = {samples.metadata.id},
           },
   });
   auto failingSequence = sequence;
@@ -1100,20 +1099,20 @@ void collectionBindingAppliesToWholeExport() {
 void collectionBindingProducesAnImmutableInstrumentView() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "zero.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
-  const SampleCollectionAsset samples{
+  const SamplePoolAsset samples{
       .metadata = AssetMetadata{.id = AssetId{2}, .format = "Prepared Probe", .name = "Samples"},
-      .samples = SampleCollection{.samples = {Sample{
-                                      .name = "Zero",
-                                      .codec = AudioCodec::SnesBrr,
-                                      .encodedData = SourceRange{.source = source, .offset = 0, .size = 9},
-                                      .sampleRate = 16000,
-                                  }}},
+      .pool = SamplePool{.samples = {Sample{
+                             .name = "Zero",
+                             .codec = AudioCodec::SnesBrr,
+                             .encodedData = SourceRange{.source = source, .offset = 0, .size = 9},
+                             .sampleRate = 16000,
+                         }}},
   };
-  const InstrumentSetAsset durable{
+  const SoundBankAsset durable{
       .metadata = AssetMetadata{.id = AssetId{1}, .format = "Prepared Probe", .name = "Durable Bank"},
       .instruments = {Instrument{
           .name = "Durable Instrument",
-          .regions = {Region{.sample = SampleRef{.collection = samples.metadata.id, .index = 0}}},
+          .regions = {Region{.sample = SampleRef{.externalPool = samples.metadata.id, .index = 0}}},
       }},
   };
 
@@ -1126,8 +1125,8 @@ void collectionBindingProducesAnImmutableInstrumentView() {
       .key = CollectionKey{.resolver = "Prepared Probe", .value = "one"},
       .members =
           {
-              .instrumentSets = {durable.metadata.id},
-              .sampleCollections = {samples.metadata.id},
+              .soundBanks = {durable.metadata.id},
+              .samplePools = {samples.metadata.id},
           },
   });
 
@@ -1138,10 +1137,10 @@ void collectionBindingProducesAnImmutableInstrumentView() {
   };
   const SessionSnapshot snapshot = snapshotWithBinder(bindInstrumentSet);
   const auto binding = bindCollection(snapshot, CollectionId{0});
-  expect(binding.collection && binding.collection->instrumentSets().size() == 1 &&
-             binding.collection->instrumentSets().front().metadata.id == durable.metadata.id &&
-             binding.collection->instrumentSets().front().instruments.front().name == "Prepared Instrument" &&
-             snapshot.asset<InstrumentSetAsset>(durable.metadata.id)->instruments.front().name == "Durable Instrument",
+  expect(binding.collection && binding.collection->soundBanks().size() == 1 &&
+             binding.collection->soundBanks().front().metadata.id == durable.metadata.id &&
+             binding.collection->soundBanks().front().instruments.front().name == "Prepared Instrument" &&
+             snapshot.asset<SoundBankAsset>(durable.metadata.id)->instruments.front().name == "Durable Instrument",
          "collection binding should preserve selected asset identity without mutating durable assets");
   const auto artifacts =
       exportCollection(snapshot, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Dls}});
@@ -1154,17 +1153,17 @@ void collectionBindingProducesAnImmutableInstrumentView() {
          "collection export should use only the binder's authoritative instrument view");
 
   const auto failed = bindCollection(snapshotWithBinder([](CollectionBindingContext& context) {
-                                       context.instrumentSets.front().instruments.front().name = "Partially Bound";
+                                       context.soundBanks.front().instruments.front().name = "Partially Bound";
                                        context.fail("expected binding failure");
                                      }),
                                      CollectionId{0});
   expect(!failed.collection &&
-             snapshot.asset<InstrumentSetAsset>(durable.metadata.id)->instruments.front().name == "Durable Instrument",
+             snapshot.asset<SoundBankAsset>(durable.metadata.id)->instruments.front().name == "Durable Instrument",
          "an explicit binding failure should publish neither a partial collection nor durable mutations");
   diagnosticWithMessage(failed.diagnostics, "expected binding failure");
 
   const auto threw = bindCollection(snapshotWithBinder([](CollectionBindingContext& context) {
-                                      context.instrumentSets.front().instruments.front().name = "Partially Bound";
+                                      context.soundBanks.front().instruments.front().name = "Partially Bound";
                                       throw std::runtime_error("expected binding exception");
                                     }),
                                     CollectionId{0});
@@ -1173,14 +1172,14 @@ void collectionBindingProducesAnImmutableInstrumentView() {
   diagnosticWithMessage(threw.diagnostics, "Prepared Probe collection binding failed: expected binding exception");
 
   const auto changedIdentity = bindCollection(snapshotWithBinder([](CollectionBindingContext& context) {
-                                                context.instrumentSets.front().metadata.id = AssetId{99};
-                                                context.instrumentSets.front().metadata.format = "Changed";
+                                                context.soundBanks.front().metadata.id = AssetId{99};
+                                                context.soundBanks.front().metadata.format = "Changed";
                                               }),
                                               CollectionId{0});
   expect(!changedIdentity.collection,
          "collection binding should reject changes to selected instrument identity or order");
   diagnosticWithMessage(changedIdentity.diagnostics,
-                        "Collection binding changed instrument set identity, format, or order");
+                        "Collection binding changed sound bank identity, format, or order");
 }
 
 u32 synthOnlySequenceExecutions = 0;
@@ -1215,18 +1214,18 @@ void synthOnlyExportRendersSequencesWithoutOriginalModulation() {
               .tracks = {track},
           },
   };
-  const SampleCollectionAsset samples{
+  const SamplePoolAsset samples{
       .metadata = AssetMetadata{.id = AssetId{2}, .format = "Probe", .name = "Samples"},
-      .samples = SampleCollection{.samples = {Sample{
-                                      .codec = AudioCodec::SnesBrr,
-                                      .encodedData = SourceRange{.source = source, .offset = 0, .size = 9},
-                                      .sampleRate = 16000,
-                                  }}},
+      .pool = SamplePool{.samples = {Sample{
+                             .codec = AudioCodec::SnesBrr,
+                             .encodedData = SourceRange{.source = source, .offset = 0, .size = 9},
+                             .sampleRate = 16000,
+                         }}},
   };
-  const InstrumentSetAsset instruments{
+  const SoundBankAsset instruments{
       .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe", .name = "Instruments"},
       .instruments = {Instrument{
-          .regions = {Region{.sample = SampleRef{.collection = samples.metadata.id, .index = 0}}},
+          .regions = {Region{.sample = SampleRef{.externalPool = samples.metadata.id, .index = 0}}},
       }},
   };
 
@@ -1240,8 +1239,8 @@ void synthOnlyExportRendersSequencesWithoutOriginalModulation() {
       .members =
           {
               .sequence = sequence.metadata.id,
-              .instrumentSets = {instruments.metadata.id},
-              .sampleCollections = {samples.metadata.id},
+              .soundBanks = {instruments.metadata.id},
+              .samplePools = {samples.metadata.id},
           },
   });
   synthOnlySequenceExecutions = 0;
@@ -1262,15 +1261,15 @@ void exportDiagnosticsPreserveSourceRanges() {
   const auto validSource = sources.add(SourceFile{.name = "zero.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
 
   const SourceRange missingSampleRange{.source = SourceId{99}, .offset = 0x12, .size = 9};
-  SampleCollectionAsset missingSampleCollection{
+  SamplePoolAsset missingSamplePool{
       .metadata =
           AssetMetadata{
               .id = AssetId{2},
               .format = "Probe",
               .name = "Missing Samples",
           },
-      .samples =
-          SampleCollection{
+      .pool =
+          SamplePool{
               .samples = {Sample{
                   .name = "Missing",
                   .codec = AudioCodec::SnesBrr,
@@ -1280,11 +1279,11 @@ void exportDiagnosticsPreserveSourceRanges() {
   };
 
   test::SessionSnapshotBuilder builder;
-  builder.assets.push_back(missingSampleCollection);
+  builder.assets.push_back(missingSamplePool);
   builder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Probe",
-      .members = {.sampleCollections = {missingSampleCollection.metadata.id}},
+      .members = {.samplePools = {missingSamplePool.metadata.id}},
   });
   const SessionSnapshot project = builder.finish();
 
@@ -1293,11 +1292,11 @@ void exportDiagnosticsPreserveSourceRanges() {
   expect(wavArtifacts.size() == 1, "WAV export should return one artifact for one sample");
   expectDiagnosticRange(wavArtifacts[0].diagnostics, "Sample source was not found", missingSampleRange);
 
-  const std::array<const SampleCollectionAsset*, 1> missingSamples{&missingSampleCollection};
+  const std::array<const SamplePoolAsset*, 1> missingSamples{&missingSamplePool};
   const auto sf2MissingSample = buildSoundFont2(
       SynthExportInput{
           .name = "Probe",
-          .sampleCollections = missingSamples,
+          .samplePools = missingSamples,
       },
       sources);
   expectDiagnosticRange(sf2MissingSample.diagnostics, "Sample source was not found", missingSampleRange);
@@ -1305,22 +1304,22 @@ void exportDiagnosticsPreserveSourceRanges() {
   const auto dlsMissingSample = buildDls(
       SynthExportInput{
           .name = "Probe",
-          .sampleCollections = missingSamples,
+          .samplePools = missingSamples,
       },
       sources);
   expectDiagnosticRange(dlsMissingSample.diagnostics, "Sample source was not found", missingSampleRange);
 
   const SourceRange sampleRange{.source = validSource, .offset = 0, .size = 9};
   const SourceRange regionRange{.source = validSource, .offset = 0x40, .size = 6};
-  SampleCollectionAsset validSampleCollection{
+  SamplePoolAsset validSamplePool{
       .metadata =
           AssetMetadata{
               .id = AssetId{3},
               .format = "Probe",
               .name = "Valid Samples",
           },
-      .samples =
-          SampleCollection{
+      .pool =
+          SamplePool{
               .samples = {Sample{
                   .name = "Zero",
                   .codec = AudioCodec::SnesBrr,
@@ -1329,7 +1328,7 @@ void exportDiagnosticsPreserveSourceRanges() {
               }},
           },
   };
-  InstrumentSetAsset badRegionSet{
+  SoundBankAsset badRegionSet{
       .metadata =
           AssetMetadata{
               .id = AssetId{1},
@@ -1340,19 +1339,19 @@ void exportDiagnosticsPreserveSourceRanges() {
           .explicitAddress = InstrumentAddress{.bank = 0, .program = 0},
           .name = "Lead",
           .regions = {Region{
-              .sample = SampleRef{.collection = validSampleCollection.metadata.id, .index = 9},
+              .sample = SampleRef{.externalPool = validSamplePool.metadata.id, .index = 9},
               .range = regionRange,
           }},
       }},
   };
 
-  const std::array<const InstrumentSetAsset*, 1> instrumentSets{&badRegionSet};
-  const std::array<const SampleCollectionAsset*, 1> validSamples{&validSampleCollection};
+  const std::array<const SoundBankAsset*, 1> soundBanks{&badRegionSet};
+  const std::array<const SamplePoolAsset*, 1> validSamples{&validSamplePool};
   const auto sf2BadRegion = buildSoundFont2(
       SynthExportInput{
           .name = "Probe",
-          .instrumentSets = instrumentSets,
-          .sampleCollections = validSamples,
+          .soundBanks = soundBanks,
+          .samplePools = validSamples,
       },
       sources);
   expectDiagnosticRange(sf2BadRegion.diagnostics, "Region sample reference was not found", regionRange);
@@ -1364,8 +1363,8 @@ void exportDiagnosticsPreserveSourceRanges() {
   const auto dlsBadRegion = buildDls(
       SynthExportInput{
           .name = "Probe",
-          .instrumentSets = instrumentSets,
-          .sampleCollections = validSamples,
+          .soundBanks = soundBanks,
+          .samplePools = validSamples,
       },
       sources);
   expectDiagnosticRange(dlsBadRegion.diagnostics, "Region sample reference was not found", regionRange);
@@ -1398,20 +1397,20 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
               .tracks = {track},
           },
   };
-  const SampleCollectionAsset samples{
+  const SamplePoolAsset samples{
       .metadata = AssetMetadata{.id = AssetId{2}, .format = "Probe", .name = "Playback Samples"},
-      .samples = SampleCollection{.samples = {Sample{
-                                      .name = "Zero",
-                                      .codec = AudioCodec::SnesBrr,
-                                      .encodedData = SourceRange{.source = source, .offset = 0, .size = 9},
-                                      .sampleRate = 16000,
-                                  }}},
+      .pool = SamplePool{.samples = {Sample{
+                             .name = "Zero",
+                             .codec = AudioCodec::SnesBrr,
+                             .encodedData = SourceRange{.source = source, .offset = 0, .size = 9},
+                             .sampleRate = 16000,
+                         }}},
   };
-  const InstrumentSetAsset instruments{
+  const SoundBankAsset instruments{
       .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe", .name = "Playback Instruments"},
       .instruments = {Instrument{
           .explicitAddress = InstrumentAddress{.bank = 0, .program = 0},
-          .regions = {Region{.sample = SampleRef{.collection = samples.metadata.id, .index = 0}}},
+          .regions = {Region{.sample = SampleRef{.externalPool = samples.metadata.id, .index = 0}}},
       }},
   };
 
@@ -1425,8 +1424,8 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
       .members =
           {
               .sequence = sequence.metadata.id,
-              .instrumentSets = {instruments.metadata.id},
-              .sampleCollections = {samples.metadata.id},
+              .soundBanks = {instruments.metadata.id},
+              .samplePools = {samples.metadata.id},
           },
   });
   const auto playback = prepareCollectionPlayback(builder.finish(), sources, CollectionId{0}, PlaybackRequest{});
@@ -1466,7 +1465,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
                                  }),
          "playback preparation should preserve a useful SoundFont failure diagnostic");
 
-  const InstrumentSetAsset emptyInstruments{
+  const SoundBankAsset emptyInstruments{
       .metadata = AssetMetadata{.id = AssetId{3}, .format = "Probe", .name = "Empty Instruments"},
   };
   test::SessionSnapshotBuilder sampleOnlySynthBuilder;
@@ -1479,8 +1478,8 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
       .members =
           {
               .sequence = sequence.metadata.id,
-              .instrumentSets = {emptyInstruments.metadata.id},
-              .sampleCollections = {samples.metadata.id},
+              .soundBanks = {emptyInstruments.metadata.id},
+              .samplePools = {samples.metadata.id},
           },
   });
   const auto sampleOnlySynth =
@@ -1501,8 +1500,8 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
       .name = "Missing Sequence",
       .members =
           {
-              .instrumentSets = {instruments.metadata.id},
-              .sampleCollections = {samples.metadata.id},
+              .soundBanks = {instruments.metadata.id},
+              .samplePools = {samples.metadata.id},
           },
   });
   const auto missingSequence =

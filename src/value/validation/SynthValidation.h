@@ -10,11 +10,11 @@
 
 namespace vgmtrans::core {
 
-struct InstrumentSetAsset;
-struct SampleCollectionAsset;
+struct SoundBankAsset;
+struct SamplePoolAsset;
 
 // Checks synth values whose meaning is independent of SF2, DLS, or another export target.
-[[nodiscard]] ValidationReport validateInstrumentSet(const InstrumentSetAsset& instrumentSet);
-[[nodiscard]] ValidationReport validateSampleCollection(const SampleCollectionAsset& sampleCollection);
+[[nodiscard]] ValidationReport validateSoundBank(const SoundBankAsset& soundBank);
+[[nodiscard]] ValidationReport validateSamplePool(const SamplePoolAsset& samplePool);
 
 }  // namespace vgmtrans::core

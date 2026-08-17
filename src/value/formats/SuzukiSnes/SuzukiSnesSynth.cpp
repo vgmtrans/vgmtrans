@@ -133,12 +133,13 @@ void addMelodicInstruments(InstrumentSetBuilder& instruments, const std::vector<
     entry.source("Tuning", patch.tuningSource, "suzuki-snes-instrument-tuning").parent(root);
 
     entry
-        .region(*sample, Region{
-                             .range = patch.programSource,
-                             .unityKey = unityKey(patch.tuning),
-                             .envelope = snesDspEnvelope(patch.adsr1, patch.adsr2, 0),
-                             .attenuationDb = attenuation(patch.volume),
-                         })
+        .region(*sample,
+                Region{
+                    .range = patch.programSource,
+                    .unityKey = unityKey(patch.tuning),
+                    .envelope = snesDspEnvelope(patch.adsr1, patch.adsr2, 0),
+                    .attenuationDb = attenuation(patch.volume),
+                })
         .source("Region", patch.programSource, "suzuki-snes-region")
         .description(fmt::format("SRCN {}", patch.srcn));
   }
@@ -170,24 +171,25 @@ void addDrumKit(InstrumentSetBuilder& instruments, const SequenceRecipes& recipe
     const u8 outputKey = static_cast<u8>(drum.note + kDrumKeyBias);
     const double root = unityKey(patch->tuning) + outputKey - drum.sourceKey;
     (*kit)
-        .region(*sample, Region{
-                             .keyRange = KeyRange{.low = outputKey, .high = outputKey},
-                             .range = drum.source,
-                             .unityKey = root,
-                             .envelope = snesDspEnvelope(patch->adsr1, patch->adsr2, 0),
-                             .pan = drum.pan / 256.0,
-                             .attenuationDb = attenuation(drum.volume),
-                         })
+        .region(*sample,
+                Region{
+                    .keyRange = KeyRange{.low = outputKey, .high = outputKey},
+                    .range = drum.source,
+                    .unityKey = root,
+                    .envelope = snesDspEnvelope(patch->adsr1, patch->adsr2, 0),
+                    .pan = drum.pan / 256.0,
+                    .attenuationDb = attenuation(drum.volume),
+                })
         .source(fmt::format("Drum {}", drum.note), drum.source, "suzuki-snes-drum-region")
-        .description(fmt::format("Program {}, source key {}, SRCN {}", drum.sourceProgram, drum.sourceKey,
-                                 patch->srcn));
+        .description(
+            fmt::format("Program {}, source key {}, SRCN {}", drum.sourceProgram, drum.sourceKey, patch->srcn));
   }
 }
 
 }  // namespace
 
-std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& layout,
-                                      const SequenceRecipes& recipes, std::string_view displayName) {
+std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layout& layout,
+                                         const SequenceRecipes& recipes, std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const std::vector<Patch> patches = collectPatches(reader, layout);
   if (patches.empty()) {
@@ -198,15 +200,15 @@ std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& 
     return std::nullopt;
   }
 
-  auto instruments = builder.instrumentSet(fmt::format("{} Instruments", displayName));
-  auto sampleCollection = builder.sampleCollection(fmt::format("{} Samples", displayName));
-  const SnesBrrSampleRefs samples = addSnesBrrSamples(sampleCollection.builder(), reader, catalog);
+  auto instruments = builder.soundBank(fmt::format("{} Instruments", displayName));
+  auto& samplePool = instruments.samples();
+  const SnesBrrSampleRefs samples = addSnesBrrSamples(samplePool, reader, catalog);
   addMelodicInstruments(instruments.builder(), patches, samples);
   addDrumKit(instruments.builder(), recipes, patches, samples);
   if (instruments.builder().empty()) {
     return std::nullopt;
   }
-  return ScanSynthRefs{.instruments = instruments.ref(), .samples = sampleCollection.ref()};
+  return instruments.ref();
 }
 
 }  // namespace vgmtrans::formats::suzuki_snes

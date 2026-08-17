@@ -68,14 +68,14 @@ struct NdsLayout {
 
 // SBNK instruments and SWAR/PSG samples remain live drafts until the containing
 // scan finishes, so sparse wave indexes stay available to later bank parsing.
-[[nodiscard]] core::ScanSampleCollectionDraft addNdsPsgSamples(core::ScanResultBuilder& builder);
-[[nodiscard]] std::optional<core::ScanSampleCollectionDraft> addNdsWaveArchive(core::ScanResultBuilder& builder,
-                                                                               core::SourceRange range,
-                                                                               std::string_view name);
-[[nodiscard]] std::optional<core::ScanInstrumentSetDraft> addNdsInstrumentSet(
+[[nodiscard]] core::ScanSamplePoolDraft addNdsPsgSamples(core::ScanResultBuilder& builder);
+[[nodiscard]] std::optional<core::ScanSamplePoolDraft> addNdsWaveArchive(core::ScanResultBuilder& builder,
+                                                                         core::SourceRange range,
+                                                                         std::string_view name);
+[[nodiscard]] std::optional<core::ScanSoundBankDraft> addNdsInstrumentSet(
     core::ScanResultBuilder& builder, core::SourceRange range, std::string_view name,
-    const core::ScanSampleCollectionDraft& psgCollection,
-    const std::array<std::optional<core::ScanSampleCollectionDraft>, 4>& waveCollections);
+    const core::ScanSamplePoolDraft& psgCollection,
+    const std::array<std::optional<core::ScanSamplePoolDraft>, 4>& waveCollections);
 [[nodiscard]] core::FormatModule ndsModule();
 
 }  // namespace vgmtrans::formats::nds

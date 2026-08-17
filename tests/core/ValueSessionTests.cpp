@@ -91,36 +91,34 @@ void sessionRoutesKnownFormatsAndConsumesExtractedParents() {
   session.registerExtractor(SourceExtractor{
       .name = "ContainerExtractor",
       .acceptedFormats = {"container-format"},
-      .extract =
-          [&](const ExtractionInput& input) -> ExtractionResult {
-            ++extractorCalls;
-            if (input.source.derived() || input.reader.empty() || input.reader.u8At(0) != 0xe0) {
-              return {};
-            }
-            return ExtractionResult{
-                .sources = {ExtractedSource{
-                    .file = SourceFile{.name = "target.child", .knownFormat = "target-format"},
-                    .bytes = {0xe1},
-                    .origin = input.reader.range(0, 1),
-                }},
-            };
-          },
+      .extract = [&](const ExtractionInput& input) -> ExtractionResult {
+        ++extractorCalls;
+        if (input.source.derived() || input.reader.empty() || input.reader.u8At(0) != 0xe0) {
+          return {};
+        }
+        return ExtractionResult{
+            .sources = {ExtractedSource{
+                .file = SourceFile{.name = "target.child", .knownFormat = "target-format"},
+                .bytes = {0xe1},
+                .origin = input.reader.range(0, 1),
+            }},
+        };
+      },
   });
   session.registerFormat(FormatModule{
       .name = "Target",
       .acceptedFormats = {"target-format"},
-      .scan =
-          [&](const ScanInput& input) -> ScanResult {
-            ++targetCalls;
-            if (input.reader.empty() || input.reader.u8At(0) != 0xe1) {
-              return {};
-            }
-            ScanResultBuilder out(input, "Target");
-            const auto range = input.reader.range(0, 1);
-            const auto asset = out.misc("Target Asset", range).payload({0xe1});
-            out.sourceMap().annotation(SourceRole::Payload, "Target Asset", range).owner(ObjectRefs::misc(asset.id()));
-            return out.finish();
-          },
+      .scan = [&](const ScanInput& input) -> ScanResult {
+        ++targetCalls;
+        if (input.reader.empty() || input.reader.u8At(0) != 0xe1) {
+          return {};
+        }
+        ScanResultBuilder out(input, "Target");
+        const auto range = input.reader.range(0, 1);
+        const auto asset = out.misc("Target Asset", range).payload({0xe1});
+        out.sourceMap().annotation(SourceRole::Payload, "Target Asset", range).owner(ObjectRefs::misc(asset.id()));
+        return out.finish();
+      },
   });
   session.registerFormat(FormatModule{
       .name = "Unrelated",
@@ -315,8 +313,7 @@ void sessionClosesSourceFamiliesWhenScansFindNoAssets() {
          "a source family with a detected asset should remain open");
   expect(project.source(empty) == nullptr,
          "a source family should close when neither it nor an extracted child contains detected assets");
-  expect(project.sources().size() == 1,
-         "closing an empty family should preserve only the unrelated detected source");
+  expect(project.sources().size() == 1, "closing an empty family should preserve only the unrelated detected source");
   expect(!session.sources().contains(empty), "closing an empty scan should release its source bytes");
 
   const SourceId individuallyScanned = session.addSource(SourceFile{.name = "individual-empty.probe"}, {0x00});
@@ -367,12 +364,12 @@ void sessionCreatesUserCollectionsFromDetectedAssets() {
   const SessionSnapshot before = session.snapshot();
   expect(before.collections().size() == 1, "matched fixture assets should begin in one discovered collection");
   const auto* sequence = std::get_if<SequenceProgramAsset>(&before.assets()[0]);
-  const auto* instruments = std::get_if<InstrumentSetAsset>(&before.assets()[1]);
+  const auto* instruments = std::get_if<SoundBankAsset>(&before.assets()[1]);
   expect(sequence != nullptr && instruments != nullptr, "manual collection fixture should expose compatible assets");
 
   const CollectionMembers members{
       .sequence = sequence->metadata.id,
-      .instrumentSets = {instruments->metadata.id},
+      .soundBanks = {instruments->metadata.id},
   };
   const CollectionId created = session.createUserCollection("Hand-picked", members);
   const SessionSnapshot after = session.snapshot();
@@ -382,9 +379,8 @@ void sessionCreatesUserCollectionsFromDetectedAssets() {
          "creating a collection should publish a new immutable snapshot revision");
   expect(collection->name == "Hand-picked" && collection->origin == CollectionOrigin::UserCreated,
          "manual collection should preserve its name and user-created origin");
-  expect(
-      collection->members.sequence == members.sequence && collection->members.instrumentSets == members.instrumentSets,
-      "manual collection should preserve the selected asset ids");
+  expect(collection->members.sequence == members.sequence && collection->members.soundBanks == members.soundBanks,
+         "manual collection should preserve the selected asset ids");
   expect(static_cast<bool>(collection->binder), "manual collection should retain its sequence format's binder");
 
   session.removeSource(instrumentSource);
@@ -406,7 +402,7 @@ void sessionMatchesCollectionsAcrossSeparateSourceScans() {
   expect(project.collections().size() == 1, "resolver should keep an incomplete collection for a partial match");
   expect(project.collections()[0].resolution() == CollectionResolution::Incomplete,
          "instrument-only bank collection should be marked incomplete");
-  expect(project.collections()[0].members.instrumentSets.size() == 1,
+  expect(project.collections()[0].members.soundBanks.size() == 1,
          "instrument-only bank collection should reference the instrument set");
   const CollectionId bankCollection = project.collections()[0].id;
 
@@ -420,7 +416,7 @@ void sessionMatchesCollectionsAcrossSeparateSourceScans() {
          "bank collection should become complete when sequence and instruments are both present");
   expect(project.collections()[0].members.sequence.has_value(),
          "completed bank collection should reference the sequence");
-  expect(project.collections()[0].members.instrumentSets.size() == 1,
+  expect(project.collections()[0].members.soundBanks.size() == 1,
          "completed bank collection should retain the instrument reference");
 }
 
@@ -479,13 +475,13 @@ void sessionRemovesSourceFamilyWithItsLastAsset() {
   Session session;
   session.registerExtractor(SourceExtractor{
       .name = "ProbeAssetFamily",
-      .extract =
-          [](const ExtractionInput& input) -> ExtractionResult {
-            if (input.source.derived() || !hasProbeMagic(input, 0xaa)) {
-              return {};
-            }
-            return ExtractionResult{
-                .sources = {
+      .extract = [](const ExtractionInput& input) -> ExtractionResult {
+        if (input.source.derived() || !hasProbeMagic(input, 0xaa)) {
+          return {};
+        }
+        return ExtractionResult{
+            .sources =
+                {
                     ExtractedSource{
                         .file = SourceFile{.name = input.source.name + ".sequence", .knownFormat = "probe-sequence"},
                         .bytes = {0xaa, 0x34},
@@ -497,8 +493,8 @@ void sessionRemovesSourceFamilyWithItsLastAsset() {
                         .origin = input.reader.range(0, 1),
                     },
                 },
-            };
-          },
+        };
+      },
   });
   auto sequenceModule = probeSequenceModule();
   sequenceModule.acceptedFormats = {"probe-sequence"};
@@ -567,14 +563,14 @@ void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
   expect(project.collections()[0].resolution() == CollectionResolution::Incomplete,
          "remaining sequence-only collection should become incomplete");
   expect(project.collections()[0].members.sequence.has_value(), "remaining collection should keep the sequence asset");
-  expect(project.collections()[0].members.instrumentSets.empty(),
+  expect(project.collections()[0].members.soundBanks.empty(),
          "removed instrument source should be removed from the collection");
   expect(!project.collections()[0].issues.empty(), "incomplete collection should explain what is missing");
 
   const auto exports = session.exportAllCollections(ExportRequest{.kinds = {ExportKind::Midi}});
   expect(exports.size() == 1 && exports.front().artifacts.size() == 1,
          "an incomplete collection should remain exportable when its requested artifact can be produced");
-  diagnosticWithMessage(exports.front().artifacts.front().diagnostics, "Collection has no instrument set asset");
+  diagnosticWithMessage(exports.front().artifacts.front().diagnostics, "Collection has no sound bank asset");
 
   session.removeSource(sequence);
 
@@ -859,9 +855,9 @@ void scanValidationReportsMultipleAdmissionErrors() {
     case 2: {
       SequenceProgram program = probeSequenceProgram();
       program.tracks = {TrackProgram{
-                          .commands = {SourceCommand{
-                              .range = badRange,
-                          }},
+          .commands = {SourceCommand{
+              .range = badRange,
+          }},
       }};
       return ScanResult{
           .assets = {SequenceProgramAsset{
@@ -873,10 +869,10 @@ void scanValidationReportsMultipleAdmissionErrors() {
 
     case 3:
       return ScanResult{
-          .assets = {SampleCollectionAsset{
+          .assets = {SamplePoolAsset{
               .metadata = badRangeMetadata(assetId, "Bad Sample Range", goodRange),
-              .samples =
-                  SampleCollection{
+              .pool =
+                  SamplePool{
                       .samples = {Sample{
                           .name = "Bad Sample",
                           .encodedData = badRange,
@@ -1048,18 +1044,18 @@ void sessionReportsDesiredCollectionMissingAssetReferences() {
   expect(project.collections()[0].resolution() == CollectionResolution::Incomplete,
          "collection with missing asset references should be incomplete");
   expect(!project.collections()[0].members.sequence, "missing sequence reference should be stripped");
-  expect(project.collections()[0].members.instrumentSets.empty(), "missing instrument reference should be stripped");
-  expect(project.collections()[0].members.sampleCollections.empty(), "missing sample reference should be stripped");
+  expect(project.collections()[0].members.soundBanks.empty(), "missing instrument reference should be stripped");
+  expect(project.collections()[0].members.samplePools.empty(), "missing sample reference should be stripped");
   expect(project.collections()[0].members.miscAssets.empty(), "missing misc reference should be stripped");
   expect(project.collections()[0].issues.size() == 4, "missing references should be recorded as collection issues");
   static_cast<void>(diagnosticWithMessage(
       project.diagnostics(),
       "Collection resolver 'ProbeMissingRefs' returned sequence asset id 99 that does not exist"));
   static_cast<void>(diagnosticWithMessage(project.diagnostics(),
-                                          "Collection resolver 'ProbeMissingRefs' returned instrument-set asset id 98 "
+                                          "Collection resolver 'ProbeMissingRefs' returned sound-bank asset id 98 "
                                           "that does not exist"));
   static_cast<void>(diagnosticWithMessage(
-      project.diagnostics(), "Collection resolver 'ProbeMissingRefs' returned sample-collection asset id 97 that does "
+      project.diagnostics(), "Collection resolver 'ProbeMissingRefs' returned sample-pool asset id 97 that does "
                              "not exist"));
   static_cast<void>(diagnosticWithMessage(
       project.diagnostics(), "Collection resolver 'ProbeMissingRefs' returned misc asset id 96 that does not exist"));
@@ -1079,18 +1075,17 @@ void sessionReportsDesiredCollectionWrongTypeReferences() {
   expect(found != project.collections().end(), "wrong-type resolver should publish a collection shell");
   expect(found->resolution() == CollectionResolution::Incomplete,
          "collection with wrong-type references should be incomplete");
-  expect(found->members.instrumentSets.empty(), "wrong-type instrument reference should be stripped");
-  expect(found->members.sampleCollections.empty(), "wrong-type sample reference should be stripped");
+  expect(found->members.soundBanks.empty(), "wrong-type instrument reference should be stripped");
+  expect(found->members.samplePools.empty(), "wrong-type sample reference should be stripped");
   expect(found->members.miscAssets.empty(), "wrong-type misc reference should be stripped");
   expect(found->issues.size() == 3, "wrong-type references should be recorded as collection issues");
 
   static_cast<void>(diagnosticWithMessage(project.diagnostics(),
-                                          "Collection resolver 'ProbeWrongTypeRefs' returned instrument-set asset id 0 "
-                                          "that is not an instrument-set asset"));
+                                          "Collection resolver 'ProbeWrongTypeRefs' returned sound-bank asset id 0 "
+                                          "that is not a sound-bank asset"));
   static_cast<void>(diagnosticWithMessage(
-      project.diagnostics(),
-      "Collection resolver 'ProbeWrongTypeRefs' returned sample-collection asset id 0 that is not a "
-      "sample-collection asset"));
+      project.diagnostics(), "Collection resolver 'ProbeWrongTypeRefs' returned sample-pool asset id 0 that is not a "
+                             "sample-pool asset"));
   static_cast<void>(diagnosticWithMessage(project.diagnostics(),
                                           "Collection resolver 'ProbeWrongTypeRefs' returned misc asset id 0 that is "
                                           "not a misc asset"));
@@ -1161,7 +1156,7 @@ void sessionStateRebuildsLookupIndexAfterRemoval() {
                                 });
 
   std::vector<Asset> secondSourceAssets;
-  secondSourceAssets.emplace_back(SampleCollectionAsset{
+  secondSourceAssets.emplace_back(SamplePoolAsset{
       .metadata =
           AssetMetadata{
               .id = AssetId{2},
@@ -1187,7 +1182,7 @@ void sessionStateRebuildsLookupIndexAfterRemoval() {
                                         },
                                 });
 
-  expect(state.asset<SampleCollectionAsset>(AssetId{2}) == std::get_if<SampleCollectionAsset>(&state.assets()[2]),
+  expect(state.asset<SamplePoolAsset>(AssetId{2}) == std::get_if<SamplePoolAsset>(&state.assets()[2]),
          "session state should look up assets by id before removal");
   expect(state.matchFacts().size() == 1, "session state fixture should contain its cross-source asset relation");
 
@@ -1196,7 +1191,7 @@ void sessionStateRebuildsLookupIndexAfterRemoval() {
   expect(!state.containsAsset(AssetId{0}) && !state.containsAsset(AssetId{1}),
          "session state should remove deleted asset ids from the lookup index");
   expect(state.assets().size() == 1 &&
-             state.asset<SampleCollectionAsset>(AssetId{2}) == std::get_if<SampleCollectionAsset>(&state.assets()[0]),
+             state.asset<SamplePoolAsset>(AssetId{2}) == std::get_if<SamplePoolAsset>(&state.assets()[0]),
          "session state lookup index should be rebuilt after removal compacts the asset vector");
   expect(state.matchFacts().empty(), "removing an asset should remove relations that target it");
 }

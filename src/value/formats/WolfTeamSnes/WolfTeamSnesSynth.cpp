@@ -174,7 +174,8 @@ void addInstruments(InstrumentSetBuilder& instruments, const std::vector<Patch>&
 
 }  // namespace
 
-std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& layout, std::string_view displayName) {
+std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layout& layout,
+                                         std::string_view displayName) {
   if (!layout.instruments.confirmed) {
     return std::nullopt;
   }
@@ -206,15 +207,14 @@ std::optional<ScanSynthRefs> addSynth(ScanResultBuilder& builder, const Layout& 
     return std::nullopt;
   }
 
-  auto instruments = builder.instrumentSet(fmt::format("{} Instruments", displayName));
-  auto sampleCollection = builder.sampleCollection(fmt::format("{} Samples", displayName));
-  const SnesBrrSampleRefs samples =
-      addSnesBrrSamples(sampleCollection.builder(), reader, catalog, "wolf-team-snes-sample-dir-entry");
+  auto instruments = builder.soundBank(fmt::format("{} Instruments", displayName));
+  auto& samplePool = instruments.samples();
+  const SnesBrrSampleRefs samples = addSnesBrrSamples(samplePool, reader, catalog, "wolf-team-snes-sample-dir-entry");
   addInstruments(instruments.builder(), patches, samples, layout);
   if (instruments.builder().empty()) {
     return std::nullopt;
   }
-  return ScanSynthRefs{.instruments = instruments.ref(), .samples = sampleCollection.ref()};
+  return instruments.ref();
 }
 
 }  // namespace vgmtrans::formats::wolf_team_snes

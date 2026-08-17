@@ -10,7 +10,7 @@
 
 namespace vgmtrans::core {
 
-struct InstrumentSetAsset;
+struct SoundBankAsset;
 
 // One physical LFO description derived from the rendered song. The same
 // description drives MIDI controller normalization and synth construction.
@@ -22,9 +22,7 @@ struct SequenceModulationProfile {
   [[nodiscard]] bool hasSynthModulation() const noexcept {
     return instruments.vibrato.has_value() || instruments.tremolo.has_value();
   }
-  [[nodiscard]] bool empty() const noexcept {
-    return !hasSynthModulation() && maxPanDepth <= 0.0 && !panRateHertz;
-  }
+  [[nodiscard]] bool empty() const noexcept { return !hasSynthModulation() && maxPanDepth <= 0.0 && !panRateHertz; }
 };
 
 [[nodiscard]] SequenceModulationProfile analyzeSequenceModulation(const PerformanceSequence& sequence);
@@ -41,6 +39,6 @@ struct SequenceModulationProfile {
 
 // Adds the song-derived LFO behavior to every playable instrument in a
 // collection. Targets absent from the profile are left unchanged.
-void applySequenceModulation(InstrumentSetAsset& instrumentSet, const SequenceModulationProfile& profile);
+void applySequenceModulation(SoundBankAsset& soundBank, const SequenceModulationProfile& profile);
 
 }  // namespace vgmtrans::core

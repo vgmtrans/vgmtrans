@@ -93,11 +93,6 @@ struct SonyPs1SampleBodyLayout {
   std::vector<SonyPs1SampleLayout> samples;
 };
 
-struct SonyPs1ScannedBank {
-  core::ScanInstrumentSetRef instruments;
-  std::optional<core::ScanSampleCollectionRef> samples;
-};
-
 [[nodiscard]] std::optional<SonyPs1SequenceLayout> readSonyPs1SequenceLayout(core::ByteReader reader, u32 offset);
 [[nodiscard]] std::vector<SonyPs1SequenceLayout> findSonyPs1Sequences(core::ByteReader reader);
 [[nodiscard]] std::optional<SonyPs1BankLayout> readSonyPs1BankLayout(core::ByteReader reader, u32 offset);
@@ -106,9 +101,9 @@ struct SonyPs1ScannedBank {
 [[nodiscard]] std::optional<u32> matchSonyPs1SampleBody(core::ByteReader reader, u32 preferredOffset,
                                                         const std::vector<u32>& sampleSizes, bool forceSingle = false);
 
-[[nodiscard]] SonyPs1ScannedBank addSonyPs1Bank(core::ScanResultBuilder& result, const SonyPs1BankLayout& layout,
-                                                u16 bank);
-[[nodiscard]] std::optional<core::ScanSampleCollectionRef> addSonyPs1RawSampleBody(core::ScanResultBuilder& result);
+[[nodiscard]] core::ScanSoundBankRef addSonyPs1Bank(core::ScanResultBuilder& result, const SonyPs1BankLayout& layout,
+                                                    u16 bank);
+[[nodiscard]] std::optional<core::ScanSamplePoolRef> addSonyPs1RawSampleBody(core::ScanResultBuilder& result);
 [[nodiscard]] core::SequenceProgram parseSonyPs1Sequence(core::ByteReader reader, core::AssetId id,
                                                          const SonyPs1SequenceLayout& layout,
                                                          core::SourceMapBuilder* sourceMap = nullptr,

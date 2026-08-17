@@ -178,10 +178,10 @@ void scannerBuildsAuditedDynamicInstruments() {
   const SessionSnapshot snapshot = session.snapshot();
   const Collection* collection = snapshot.collections().empty() ? nullptr : &snapshot.collections().front();
   expect(snapshot.collections().size() == 1 && collection->members.sequence &&
-             collection->members.instrumentSets.size() == 1 && collection->members.sampleCollections.size() == 1,
-         "HeartBeatSnes scanning should publish a complete sequence, instrument, and BRR collection");
+             collection->members.soundBanks.size() == 1 && collection->members.samplePools.empty(),
+         "HeartBeatSnes scanning should publish a sequence and self-contained sound bank");
 
-  const auto* set = snapshot.asset<InstrumentSetAsset>(collection->members.instrumentSets.front());
+  const auto* set = snapshot.asset<SoundBankAsset>(collection->members.soundBanks.front());
   const Instrument* instrument = set != nullptr && set->instruments.size() == 1 ? &set->instruments.front() : nullptr;
   const Region* region =
       instrument != nullptr && instrument->regions.size() == 1 ? &instrument->regions.front() : nullptr;

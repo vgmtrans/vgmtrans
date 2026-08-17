@@ -168,11 +168,11 @@ void suzukiPs1ModuleBuildsFractionallyTunedWdsSynth() {
   const SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.collections().size() == 1, "SuzukiPS1 fixture should produce one collection");
   const Collection& collection = snapshot.collections().front();
-  expect(collection.members.sequence.has_value() && collection.members.instrumentSets.size() == 1 &&
-             collection.members.sampleCollections.size() == 1,
-         "SuzukiPS1 collection should connect its sequence, WDS instruments, and samples");
+  expect(collection.members.sequence.has_value() && collection.members.soundBanks.size() == 1 &&
+             collection.members.samplePools.empty(),
+         "SuzukiPS1 collection should connect its sequence and self-contained WDS sound bank");
 
-  const auto* instruments = snapshot.asset<InstrumentSetAsset>(collection.members.instrumentSets.front());
+  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
   expect(instruments != nullptr && instruments->instruments.size() == 1 &&
              instruments->instruments.front().identity == suzukiPs1InstrumentIdentity(3, 0) &&
              instruments->instruments.front().regions.size() == 1,

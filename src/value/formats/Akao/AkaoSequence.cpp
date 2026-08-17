@@ -826,7 +826,7 @@ std::optional<AkaoSequenceLayout> readAkaoSequenceLayout(const ScanInput& input,
     const u32 instrumentTable = reader.le32(offset + 0x30);
     const u32 drumTable = reader.le32(offset + 0x34);
     if (instrumentTable != 0) {
-      layout.header.instrumentSetOffset = offset + 0x30 + instrumentTable;
+      layout.header.soundBankOffset = offset + 0x30 + instrumentTable;
     }
     if (drumTable != 0) {
       layout.header.drumSetOffset = offset + 0x34 + drumTable;

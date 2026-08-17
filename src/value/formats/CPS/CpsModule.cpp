@@ -150,7 +150,7 @@ void annotateArticulationTable(SourceMapBuilder& sourceMap, ByteReader reader, c
   }
 
   Cps1SynthRefs cps1Synth;
-  std::optional<ScanSynthRefs> qsoundSynth;
+  std::optional<ScanSoundBankRef> qsoundSynth;
   if (isCps1(layout->version)) {
     cps1Synth = addCps1Synth(result, *layout);
   } else {
@@ -166,13 +166,13 @@ void annotateArticulationTable(SourceMapBuilder& sourceMap, ByteReader reader, c
     collection.sequence(sequence);
     if (isCps1(layout->version)) {
       if (cps1Synth.ym2151) {
-        collection.instrumentSet(*cps1Synth.ym2151);
+        collection.soundBank(*cps1Synth.ym2151);
       }
       if (cps1Synth.oki) {
-        collection.instrumentSet(cps1Synth.oki->instruments).samples(cps1Synth.oki->samples);
+        collection.soundBank(*cps1Synth.oki);
       }
     } else if (qsoundSynth) {
-      collection.instrumentSet(qsoundSynth->instruments).samples(qsoundSynth->samples);
+      collection.soundBank(*qsoundSynth);
     }
     for (const auto misc : miscAssets) {
       collection.misc(misc);

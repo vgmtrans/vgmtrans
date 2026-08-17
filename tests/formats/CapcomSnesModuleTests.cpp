@@ -359,7 +359,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const SessionSnapshot project = session.snapshot();
   expect(project.diagnostics().empty(), "CapcomSnes scan should not report diagnostics for complete fixture");
   expect(project.collections().size() == 1, "CapcomSnes scan should produce one collection");
-  expect(project.assets().size() == 3, "CapcomSnes scan should produce sequence, instrument set, and samples");
+  expect(project.assets().size() == 2, "CapcomSnes scan should produce a sequence and sound bank");
 
   const auto* sequence = std::get_if<SequenceProgramAsset>(&project.assets()[0]);
   expect(sequence != nullptr, "first CapcomSnes asset should be sequence");
@@ -637,12 +637,12 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
              std::vector<u8>{'D', 'L', 'S', ' '},
          "DLS artifact should use DLS RIFF type");
 
-  const auto* instruments = std::get_if<InstrumentSetAsset>(&project.assets()[1]);
+  const auto* instruments = std::get_if<SoundBankAsset>(&project.assets()[1]);
   expect(instruments != nullptr, "second CapcomSnes asset should be instrument set");
   const Artifact individualSf2 =
-      session.exportInstrumentSet(instruments->metadata.id, SynthExportFormat::SoundFont2, ExportRequest{});
+      session.exportSoundBank(instruments->metadata.id, SynthExportFormat::SoundFont2, ExportRequest{});
   const Artifact individualDls =
-      session.exportInstrumentSet(instruments->metadata.id, SynthExportFormat::Dls, ExportRequest{});
+      session.exportSoundBank(instruments->metadata.id, SynthExportFormat::Dls, ExportRequest{});
   expect(individualSf2.bytes == sf2Artifacts[0].bytes && individualDls.bytes == dlsArtifacts[0].bytes,
          "individual instrument export should use its first collection's complete synth context");
   expect(instruments->instruments.size() == 1, "instrument set should parse one valid instrument");
@@ -663,7 +663,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(envelope.releaseSeconds == 0.0, "instrument envelope should match Capcom legacy gain-based release handling");
   expect(!instrument.modulation.vibrato && !instrument.modulation.tremolo,
          "scanned instruments should not contain sequence-independent Capcom LFO ranges");
-  InstrumentSetAsset preparedInstruments = *instruments;
+  SoundBankAsset preparedInstruments = *instruments;
   applySequenceModulation(preparedInstruments, modulationProfile);
   expect(preparedInstruments.instruments[0].modulation.vibrato &&
              preparedInstruments.instruments[0].modulation.vibrato->maxDepthCents == 300.0 &&
@@ -697,16 +697,15 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(adsrAnnotation.range.offset == 0x4001 && adsrAnnotation.range.size == 3,
          "ADSR/Gain annotation should preserve the raw byte range");
 
-  const auto* samples = std::get_if<SampleCollectionAsset>(&project.assets()[2]);
-  expect(samples != nullptr, "third CapcomSnes asset should be sample collection");
-  expect(samples->samples.samples.size() == 1, "sample collection should include referenced sample");
-  expect(samples->samples.samples[0].codec == AudioCodec::SnesBrr, "sample should preserve BRR codec");
-  expect(samples->samples.samples[0].encodedData.offset == 0x6000, "sample should point at encoded BRR bytes");
-  expect(samples->samples.samples[0].encodedData.size == 9, "sample should preserve encoded BRR byte length");
+  const SamplePool& samples = instruments->localSamples;
+  expect(samples.samples.size() == 1, "sound bank should include its referenced sample");
+  expect(samples.samples[0].codec == AudioCodec::SnesBrr, "sample should preserve BRR codec");
+  expect(samples.samples[0].encodedData.offset == 0x6000, "sample should point at encoded BRR bytes");
+  expect(samples.samples[0].encodedData.size == 9, "sample should preserve encoded BRR byte length");
 
-  const auto* sampleCollectionAnnotation = annotationWithKind(sourceMap, source, SourceRole::Table, "snes-sample-dir");
-  expect(sampleCollectionAnnotation != nullptr, "sample collection source map should expose the sample DIR root");
-  expect(sampleCollectionAnnotation->range.offset == 0x5000 && sampleCollectionAnnotation->range.size == 4,
+  const auto* samplePoolAnnotation = annotationWithKind(sourceMap, source, SourceRole::Table, "snes-sample-dir");
+  expect(samplePoolAnnotation != nullptr, "sample collection source map should expose the sample DIR root");
+  expect(samplePoolAnnotation->range.offset == 0x5000 && samplePoolAnnotation->range.size == 4,
          "sample collection root should preserve the DIR table source range");
   const auto* sampleAnnotation = annotationWithKind(sourceMap, source, SourceRole::Payload, "snes-brr-payload");
   expect(sampleAnnotation != nullptr, "sample collection source map should expose sample payload annotations");
@@ -714,10 +713,10 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "sample payload node should preserve the encoded BRR source range");
 
   expect(project.collections()[0].members.sequence == sequence->metadata.id, "collection should reference sequence");
-  expect(project.collections()[0].members.instrumentSets == std::vector<AssetId>{instruments->metadata.id},
+  expect(project.collections()[0].members.soundBanks == std::vector<AssetId>{instruments->metadata.id},
          "collection should reference instrument set");
-  expect(project.collections()[0].members.sampleCollections == std::vector<AssetId>{samples->metadata.id},
-         "collection should reference sample collection");
+  expect(project.collections()[0].members.samplePools.empty(),
+         "local samples should not require a separate collection member");
 }
 
 void capcomSnesModuleWarnsWhenDetectedSynthIsEmpty() {
@@ -962,17 +961,17 @@ void capcomSnesModuleScansSpcThroughVirtualAramSource() {
 
   expect(project.collections().size() == 1, "SPC-backed scan should produce one collection");
   expect(project.collections()[0].name == "Capcom Logo", "SPC-backed collection should use the SPC title tag");
-  expect(project.assets().size() == 3, "SPC-backed scan should produce CapcomSnes assets from derived ARAM");
+  expect(project.assets().size() == 2, "SPC-backed scan should produce CapcomSnes assets from derived ARAM");
   const auto* sequence = std::get_if<SequenceProgramAsset>(&project.assets()[0]);
   expect(sequence != nullptr, "SPC-backed scan should produce a sequence");
   expect(sequence->metadata.name == "Capcom Logo", "SPC-backed sequence should use the SPC title tag");
   expect(sequence->metadata.range.source == SourceId{1}, "sequence range should point at derived ARAM source");
   expect(sequence->metadata.range.offset == 0x2001, "sequence range should preserve ARAM-relative address");
 
-  const auto* samples = std::get_if<SampleCollectionAsset>(&project.assets()[2]);
-  expect(samples != nullptr, "SPC-backed scan should produce samples");
-  expect(!samples->samples.samples.empty(), "SPC-backed scan should discover sample data");
-  expect(samples->samples.samples[0].encodedData.source == SourceId{1},
+  const auto* bank = std::get_if<SoundBankAsset>(&project.assets()[1]);
+  expect(bank != nullptr, "SPC-backed scan should produce a sound bank");
+  expect(!bank->localSamples.samples.empty(), "SPC-backed scan should discover sample data");
+  expect(bank->localSamples.samples[0].encodedData.source == SourceId{1},
          "sample encoded data should point at derived ARAM source");
 }
 
@@ -1001,17 +1000,17 @@ void capcomSnesInstrumentTableSkipsBlankSlotsLikeLegacy() {
   const auto synth = addCapcomSnesSynth(result, 0x4000, 0x5000, "Sparse");
   expect(synth.has_value(), "CapcomSnes synth builder fixture should accept sparse instrument entries");
   const ScanResult scan = result.finish();
-  const auto* builtInstruments = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
+  const auto* builtInstruments = std::get_if<SoundBankAsset>(&scan.assets[0]);
   expect(builtInstruments != nullptr && builtInstruments->instruments.size() == 2,
          "CapcomSnes builder should retain both sparse instruments");
   expect(builtInstruments->instruments[1].identity && builtInstruments->instruments[1].identity->key == 2,
          "a sparse source identity should remain distinct from its dense model position");
-  const auto secondInstrumentSources = scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->instruments.id, 1));
+  const auto secondInstrumentSources = scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->id, 1));
   expect(secondInstrumentSources.size() == 1 && scan.sourceMap.get(secondInstrumentSources[0]).range.offset == 0x400c,
          "CapcomSnes annotations should use dense instrument ownership while preserving sparse source ranges");
-  expect(scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->instruments.id, 2)).empty(),
+  expect(scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->id, 2)).empty(),
          "a sparse source program must not leak into the dense annotation owner");
-  expect(scan.sourceMap.ownedBy(ObjectRefs::region(synth->instruments.id, 1, 0)).size() == 1,
+  expect(scan.sourceMap.ownedBy(ObjectRefs::region(synth->id, 1, 0)).size() == 1,
          "CapcomSnes sparse instruments should expose stable region ownership");
 
   std::vector<u8> fullTable(0x10000);
@@ -1130,8 +1129,7 @@ void capcomSnesSourceDecoderDecodesAndRendersDriverCommands() {
       CapcomSnesTrackDecodeOptions{.trackIndex = 2, .startOffset = 0x3000, .sourceMap = &sourceMap});
   const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 7,
-         "CapcomSnes source decoder should decode the fixture commands, got " +
-             std::to_string(track.commands.size()));
+         "CapcomSnes source decoder should decode the fixture commands, got " + std::to_string(track.commands.size()));
   expect(track.commandIndex(Address{0x3009}).has_value(),
          "CapcomSnes source decoder should index decoded command addresses");
   const SourceAnnotation& programAnnotation = commandAnnotation(annotations, track.commands[1]);
@@ -1389,7 +1387,7 @@ void capcomSnesReleaseRateIsStickyAcrossInstrumentChanges() {
                                                         }),
          "CapcomSnes instrument changes should preserve the track-level release override");
 
-  std::vector<InstrumentSetAsset> sets{InstrumentSetAsset{
+  std::vector<SoundBankAsset> sets{SoundBankAsset{
       .instruments =
           {
               Instrument{

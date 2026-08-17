@@ -144,8 +144,8 @@ void layoutAndModuleUseLiveSongState() {
   session.addSource(SourceFile{.name = "CompileSnes fixture.aram"}, bytes);
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
-  expect(snapshot.diagnostics().empty() && snapshot.collections().size() == 1 && snapshot.assets().size() == 3,
-         "CompileSnes scanning should publish a complete sequence, synth, and sample collection");
+  expect(snapshot.diagnostics().empty() && snapshot.collections().size() == 1 && snapshot.assets().size() == 2,
+         "CompileSnes scanning should publish a sequence and self-contained sound bank");
 }
 
 void commandWidthsFollowEachDriverRevision() {
@@ -219,9 +219,7 @@ void trackAndPercussionFlagsDoNotBecomeStereoPhase() {
   const auto balances = events<StereoBalancePerformanceEvent>(performance.tracks.front());
   expect(balances.size() >= 2 &&
              std::ranges::all_of(
-                 balances, [](const auto* balance) {
-               return balance->leftGain > 0.49 && balance->rightGain > 0.49;
-             }),
+                 balances, [](const auto* balance) { return balance->leftGain > 0.49 && balance->rightGain > 0.49; }),
          "track and percussion flags must not be mistaken for the separate stereo-phase register");
 }
 
@@ -272,8 +270,7 @@ void portamentoUsesDriverRateAndRetriggersFirstNote() {
   const auto* slide = performance.tracks.front().automations.empty()
                           ? nullptr
                           : pitchTransitionIntent(performance.tracks.front().automations.back());
-  const auto* timing =
-      slide == nullptr ? nullptr : std::get_if<FixedDurationPitchSlideTiming>(&slide->timing.physical);
+  const auto* timing = slide == nullptr ? nullptr : std::get_if<FixedDurationPitchSlideTiming>(&slide->timing.physical);
   const MidiSequence midi =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   const auto noteCount = std::ranges::count_if(

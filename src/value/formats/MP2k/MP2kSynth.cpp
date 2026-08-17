@@ -74,16 +74,8 @@ struct SynthContext {
   u32 sampleRate = 0;
   u8 directSoundMasterVolume = 15;
   u8 dacBits = 8;
-  ScanSampleCollectionDraft& psg;
-  std::optional<ScanSampleCollectionDraft>& pcm;
-  u32 bankOffset = 0;
-
-  [[nodiscard]] ScanSampleCollectionDraft& pcmSamples() {
-    if (!pcm) {
-      pcm.emplace(builder.sampleCollection(fmt::format("MP2k samples {:#x}", bankOffset)));
-    }
-    return *pcm;
-  }
+  ScanSamplePoolDraft& psg;
+  SamplePoolBuilder& pcm;
 };
 
 [[nodiscard]] std::optional<u32> romOffset(u32 address, ByteReader reader, u32 size = 1) {
@@ -205,12 +197,10 @@ struct SynthContext {
     return std::nullopt;
   }
   const u64 sampleKey = reverse ? (u64{1} << 63) | *offset : *offset;
-  if (context.pcm) {
-    if (const auto existing = context.pcm->find(sampleKey)) {
-      const u32 frequency = builder.reader().le32(*offset + 4);
-      unityKey = frequency == 0 ? 60.0 : 60.0 + 12.0 * std::log2(context.sampleRate * 1024.0 / frequency);
-      return existing;
-    }
+  if (const auto existing = context.pcm.find(sampleKey)) {
+    const u32 frequency = builder.reader().le32(*offset + 4);
+    unityKey = frequency == 0 ? 60.0 : 60.0 + 12.0 * std::log2(context.sampleRate * 1024.0 / frequency);
+    return existing;
   }
 
   RecordReader header(builder.reader(), *offset, *offset + 16, &builder.diagnostics());
@@ -239,7 +229,7 @@ struct SynthContext {
   unityKey = 60.0 + 12.0 * std::log2(context.sampleRate * 1024.0 / *frequency);
   const auto source = std::move(header).finish();
   const std::string name = fmt::format("Sample {:#x}", *offset);
-  auto entry = context.pcmSamples().add(
+  auto entry = context.pcm.add(
       sampleKey, Sample{
                      .name = name,
                      .codec = compressed ? AudioCodec::GbaBdpcm : AudioCodec::PcmS8,
@@ -254,7 +244,7 @@ struct SynthContext {
   return entry.ref();
 }
 
-[[nodiscard]] std::optional<SampleRef> programmableWave(ScanResultBuilder& builder, ScanSampleCollectionDraft& psg,
+[[nodiscard]] std::optional<SampleRef> programmableWave(ScanResultBuilder& builder, ScanSamplePoolDraft& psg,
                                                         u32 pointer) {
   const auto offset = romOffset(pointer, builder.reader(), 16);
   if (!offset) {
@@ -380,8 +370,8 @@ void addRhythmRegions(SynthContext& context, InstrumentSetBuilder::Entry instrum
 
 }  // namespace
 
-ScanSampleCollectionDraft addMp2kPsgSamples(ScanResultBuilder& builder, u32 sampleRate) {
-  auto samples = builder.sampleCollection("MP2k PSG samples");
+ScanSamplePoolDraft addMp2kPsgSamples(ScanResultBuilder& builder, u32 sampleRate) {
+  auto samples = builder.samplePool("MP2k PSG samples");
   constexpr std::array<std::string_view, 4> names{"12.5%", "25%", "50%", "75%"};
   for (u32 duty = 0; duty < names.size(); ++duty) {
     samples.add(duty, Sample{
@@ -411,18 +401,16 @@ ScanSampleCollectionDraft addMp2kPsgSamples(ScanResultBuilder& builder, u32 samp
   return samples;
 }
 
-ScanInstrumentSetDraft addMp2kInstrumentSet(ScanResultBuilder& builder, const Mp2kBank& bank, u32 sampleRate,
-                                            u8 directSoundMasterVolume, u8 dacBits, ScanSampleCollectionDraft& psg,
-                                            std::optional<ScanSampleCollectionDraft>& pcmAsset) {
-  auto instruments = builder.instrumentSet(fmt::format("MP2k bank {:#x}", bank.offset));
+ScanSoundBankDraft addMp2kInstrumentSet(ScanResultBuilder& builder, const Mp2kBank& bank, u32 sampleRate,
+                                        u8 directSoundMasterVolume, u8 dacBits, ScanSamplePoolDraft& psg) {
+  auto instruments = builder.soundBank(fmt::format("MP2k bank {:#x}", bank.offset));
   SynthContext context{
       .builder = builder,
       .sampleRate = sampleRate,
       .directSoundMasterVolume = directSoundMasterVolume,
       .dacBits = dacBits,
       .psg = psg,
-      .pcm = pcmAsset,
-      .bankOffset = bank.offset,
+      .pcm = instruments.samples(),
   };
   instruments.include(builder.reader().range(bank.offset, static_cast<u64>(bank.instrumentCount) * 12));
   instruments.source(SourceRole::Table, "Voicegroup", instruments.range(), "mp2k-voicegroup")

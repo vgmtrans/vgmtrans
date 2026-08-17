@@ -396,8 +396,8 @@ struct InstrumentSynthSummary {
 struct CapcomSnesSummary {
   u32 sequenceCount = 0;
   std::vector<u32> trackCounts;
-  u32 instrumentSetCount = 0;
-  u32 sampleCollectionCount = 0;
+  u32 soundBankCount = 0;
+  u32 samplePoolCount = 0;
   std::vector<SampleSummary> samples;
   std::vector<RegionSummary> regions;
   std::vector<InstrumentSynthSummary> instrumentSynths;
@@ -408,8 +408,8 @@ struct CapcomSnesSummary {
 struct AkaoCollectionSummary {
   u32 sequenceOffset = 0;
   u32 trackCount = 0;
-  u32 instrumentSetCount = 0;
-  u32 sampleCollectionCount = 0;
+  u32 soundBankCount = 0;
+  u32 samplePoolCount = 0;
   u32 sampleCount = 0;
   std::vector<SampleSummary> samples;
   std::vector<RegionSummary> regions;
@@ -677,14 +677,14 @@ void appendUnique(std::vector<T*>& items, std::span<T* const> newItems) {
 }
 
 void appendLegacySamples(CapcomSnesSummary& summary, std::vector<VGMSamp*>& samples,
-                         std::span<VGMSampColl* const> sampleCollections) {
-  for (auto* sampleCollection : sampleCollections) {
-    if (sampleCollection == nullptr) {
+                         std::span<VGMSampColl* const> samplePools) {
+  for (auto* samplePool : samplePools) {
+    if (samplePool == nullptr) {
       continue;
     }
 
-    ++summary.sampleCollectionCount;
-    for (auto* sample : sampleCollection->samples()) {
+    ++summary.samplePoolCount;
+    for (auto* sample : samplePool->samples()) {
       appendUnique(samples, sample);
     }
   }
@@ -732,15 +732,15 @@ void appendLegacySamples(CapcomSnesSummary& summary, std::vector<VGMSamp*>& samp
   }
 }
 
-void appendLegacyInstruments(CapcomSnesSummary& summary, std::span<VGMInstrSet* const> instrumentSets,
+void appendLegacyInstruments(CapcomSnesSummary& summary, std::span<VGMInstrSet* const> soundBanks,
                              std::span<VGMSamp* const> samples, bool useExportInstruments = false) {
-  for (const auto* instrumentSet : instrumentSets) {
-    if (instrumentSet == nullptr) {
+  for (const auto* soundBank : soundBanks) {
+    if (soundBank == nullptr) {
       continue;
     }
 
-    ++summary.instrumentSetCount;
-    const auto instruments = useExportInstruments ? instrumentSet->exportInstrs() : instrumentSet->instrs();
+    ++summary.soundBankCount;
+    const auto instruments = useExportInstruments ? soundBank->exportInstrs() : soundBank->instrs();
     for (const auto* instrument : instruments) {
       InstrumentSynthSummary synth{
           .bank = instrument->bank,
@@ -757,8 +757,7 @@ void appendLegacyInstruments(CapcomSnesSummary& summary, std::span<VGMInstrSet* 
 
       for (const auto* region : instrument->regions()) {
         auto sampleSourceOffset = legacyRegionSampleOffset(*region, samples);
-        if (instrumentSet->format() != nullptr && instrumentSet->format()->getName() == "SegSat" &&
-            region->sampOffset >= 0) {
+        if (soundBank->format() != nullptr && soundBank->format()->getName() == "SegSat" && region->sampOffset >= 0) {
           // SegSat regions store an already-absolute sound-RAM address. The
           // generic legacy summary helper otherwise adds the collection base a
           // second time and falls back to sample zero.
@@ -830,18 +829,18 @@ CapcomSnesSummary legacyCapcomSnesCollectionSummary(const VGMColl& collection) {
     summary.trackCounts.push_back(static_cast<u32>(sequence->trackCount()));
   }
 
-  std::vector<VGMInstrSet*> instrumentSets;
-  appendUnique(instrumentSets, collection.instrSets());
+  std::vector<VGMInstrSet*> soundBanks;
+  appendUnique(soundBanks, collection.instrSets());
 
-  std::vector<VGMSampColl*> sampleCollections;
-  appendUnique(sampleCollections, collection.sampColls());
-  for (const auto* instrumentSet : instrumentSets) {
-    appendUnique(sampleCollections, instrumentSet->sampColl());
+  std::vector<VGMSampColl*> samplePools;
+  appendUnique(samplePools, collection.sampColls());
+  for (const auto* soundBank : soundBanks) {
+    appendUnique(samplePools, soundBank->sampColl());
   }
 
   std::vector<VGMSamp*> samples;
-  appendLegacySamples(summary, samples, sampleCollections);
-  appendLegacyInstruments(summary, instrumentSets, samples);
+  appendLegacySamples(summary, samples, samplePools);
+  appendLegacyInstruments(summary, soundBanks, samples);
   normalizeSummary(summary);
 
   return summary;
@@ -855,25 +854,25 @@ CapcomSnesSummary legacyPreparedCollectionSummary(const VGMColl& collection) {
     summary.trackCounts.push_back(static_cast<u32>(sequence->trackCount()));
   }
 
-  std::vector<VGMInstrSet*> instrumentSets;
-  appendUnique(instrumentSets, collection.instrSets());
-  for (auto* instrumentSet : instrumentSets) {
-    instrumentSet->prepareForExport(&collection);
+  std::vector<VGMInstrSet*> soundBanks;
+  appendUnique(soundBanks, collection.instrSets());
+  for (auto* soundBank : soundBanks) {
+    soundBank->prepareForExport(&collection);
   }
 
-  std::vector<VGMSampColl*> sampleCollections;
-  appendUnique(sampleCollections, collection.sampColls());
-  for (const auto* instrumentSet : instrumentSets) {
-    appendUnique(sampleCollections, instrumentSet->sampColl());
+  std::vector<VGMSampColl*> samplePools;
+  appendUnique(samplePools, collection.sampColls());
+  for (const auto* soundBank : soundBanks) {
+    appendUnique(samplePools, soundBank->sampColl());
   }
 
   std::vector<VGMSamp*> samples;
-  appendLegacySamples(summary, samples, sampleCollections);
-  appendLegacyInstruments(summary, instrumentSets, samples, true);
+  appendLegacySamples(summary, samples, samplePools);
+  appendLegacyInstruments(summary, soundBanks, samples, true);
   normalizeSummary(summary);
 
-  for (auto* instrumentSet : instrumentSets) {
-    instrumentSet->cleanupAfterExport();
+  for (auto* soundBank : soundBanks) {
+    soundBank->cleanupAfterExport();
   }
 
   return summary;
@@ -883,8 +882,8 @@ CapcomSnesSummary legacyCapcomSnesSummary(std::span<const u8> aramBytes, const s
   const auto root = scanLegacyCapcomSnes(aramBytes, name);
 
   CapcomSnesSummary summary;
-  std::vector<VGMInstrSet*> instrumentSets;
-  std::vector<VGMSampColl*> sampleCollections;
+  std::vector<VGMInstrSet*> soundBanks;
+  std::vector<VGMSampColl*> samplePools;
 
   for (const auto& file : root->vgmFiles()) {
     if (const auto* sequenceSlot = std::get_if<VGMSeq*>(&file); sequenceSlot != nullptr && *sequenceSlot != nullptr) {
@@ -892,20 +891,20 @@ CapcomSnesSummary legacyCapcomSnesSummary(std::span<const u8> aramBytes, const s
       summary.trackCounts.push_back(static_cast<u32>((*sequenceSlot)->trackCount()));
     } else if (const auto* sampleSlot = std::get_if<VGMSampColl*>(&file);
                sampleSlot != nullptr && *sampleSlot != nullptr) {
-      appendUnique(sampleCollections, *sampleSlot);
+      appendUnique(samplePools, *sampleSlot);
     } else if (const auto* instrumentSlot = std::get_if<VGMInstrSet*>(&file);
                instrumentSlot != nullptr && *instrumentSlot != nullptr) {
-      appendUnique(instrumentSets, *instrumentSlot);
+      appendUnique(soundBanks, *instrumentSlot);
     }
   }
 
-  for (const auto* instrumentSet : instrumentSets) {
-    appendUnique(sampleCollections, instrumentSet->sampColl());
+  for (const auto* soundBank : soundBanks) {
+    appendUnique(samplePools, soundBank->sampColl());
   }
 
   std::vector<VGMSamp*> samples;
-  appendLegacySamples(summary, samples, sampleCollections);
-  appendLegacyInstruments(summary, instrumentSets, samples);
+  appendLegacySamples(summary, samples, samplePools);
+  appendLegacyInstruments(summary, soundBanks, samples);
   normalizeSummary(summary);
   return summary;
 }
@@ -933,10 +932,9 @@ std::map<std::string, CapcomSnesSummary> legacyCapcomSnesRsnSummaries(const std:
 
 CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const SourceStore& sources,
                                          const Collection& collection,
-                                         std::span<const InstrumentSetAsset> preparedInstrumentSets = {}) {
+                                         std::span<const SoundBankAsset> preparedInstrumentSets = {}) {
   CapcomSnesSummary summary;
-  std::map<u32, const SampleCollectionAsset*> sampleCollectionsById;
-  std::optional<AssetId> fallbackSampleCollection;
+  std::map<u32, const SamplePool*> samplePoolsById;
 
   if (collection.members.sequence) {
     if (const auto* sequenceProgram = project.asset<SequenceProgramAsset>(*collection.members.sequence)) {
@@ -945,19 +943,11 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
     }
   }
 
-  for (const auto sampleCollectionId : collection.members.sampleCollections) {
-    const auto* sampleCollection = project.asset<SampleCollectionAsset>(sampleCollectionId);
-    if (sampleCollection == nullptr) {
-      continue;
-    }
-
-    ++summary.sampleCollectionCount;
-    if (!fallbackSampleCollection) {
-      fallbackSampleCollection = sampleCollection->metadata.id;
-    }
-    sampleCollectionsById[sampleCollection->metadata.id.value] = sampleCollection;
-    for (u32 i = 0; i < sampleCollection->samples.samples.size(); ++i) {
-      const auto& sample = sampleCollection->samples.samples[i];
+  const auto appendSamples = [&](AssetId owner, const SamplePool& samplePool) {
+    ++summary.samplePoolCount;
+    samplePoolsById[owner.value] = &samplePool;
+    for (u32 i = 0; i < samplePool.samples.size(); ++i) {
+      const auto& sample = samplePool.samples[i];
       const auto decoded = decodeSample(sample, sources.bytes(sample.encodedData.source));
       expect(decoded.has_value(), "value sample summary expected decodable sample");
       summary.samples.push_back(SampleSummary{
@@ -973,24 +963,34 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
           .pcmHash = fnv1aPcm16(decoded->pcm),
       });
     }
+  };
+  for (const auto samplePoolId : collection.members.samplePools) {
+    if (const auto* samplePool = project.asset<SamplePoolAsset>(samplePoolId)) {
+      appendSamples(samplePool->metadata.id, samplePool->pool);
+    }
   }
 
-  std::vector<const InstrumentSetAsset*> instrumentSets;
+  std::vector<const SoundBankAsset*> soundBanks;
   if (preparedInstrumentSets.empty()) {
-    for (const auto instrumentSetId : collection.members.instrumentSets) {
-      if (const auto* instrumentSet = project.asset<InstrumentSetAsset>(instrumentSetId)) {
-        instrumentSets.push_back(instrumentSet);
+    for (const auto soundBankId : collection.members.soundBanks) {
+      if (const auto* soundBank = project.asset<SoundBankAsset>(soundBankId)) {
+        soundBanks.push_back(soundBank);
       }
     }
   } else {
-    for (const auto& instrumentSet : preparedInstrumentSets) {
-      instrumentSets.push_back(&instrumentSet);
+    for (const auto& soundBank : preparedInstrumentSets) {
+      soundBanks.push_back(&soundBank);
+    }
+  }
+  for (const auto* soundBank : soundBanks) {
+    if (!soundBank->localSamples.samples.empty()) {
+      appendSamples(soundBank->metadata.id, soundBank->localSamples);
     }
   }
 
-  for (const auto* instrumentSet : instrumentSets) {
-    ++summary.instrumentSetCount;
-    for (const auto& instrument : instrumentSet->instruments) {
+  for (const auto* soundBank : soundBanks) {
+    ++summary.soundBankCount;
+    for (const auto& instrument : soundBank->instruments) {
       const InstrumentAddress address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
       InstrumentSynthSummary synth{
           .bank = address.bank,
@@ -1008,15 +1008,11 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
 
       for (const auto& region : instrument.regions) {
         u32 sampleSourceOffset = 0;
-        const auto regionSampleCollection =
-            region.sample.collection ? region.sample.collection : fallbackSampleCollection;
-        if (regionSampleCollection) {
-          const auto sampleCollection = sampleCollectionsById.find(regionSampleCollection->value);
-          if (sampleCollection != sampleCollectionsById.end() &&
-              region.sample.index < sampleCollection->second->samples.samples.size()) {
-            sampleSourceOffset = sourceRelativeOffset(
-                sources, sampleCollection->second->samples.samples[region.sample.index].encodedData);
-          }
+        const AssetId owner = region.sample.externalPool.value_or(soundBank->metadata.id);
+        const auto samplePool = samplePoolsById.find(owner.value);
+        if (samplePool != samplePoolsById.end() && region.sample.index < samplePool->second->samples.size()) {
+          sampleSourceOffset =
+              sourceRelativeOffset(sources, samplePool->second->samples[region.sample.index].encodedData);
         }
 
         const s32 tuningCents = static_cast<s32>(std::lround((region.unityKey - 96.0) * 100.0));
@@ -1184,11 +1180,11 @@ bool compareSummary(const CapcomSnesSummary& legacy, const CapcomSnesSummary& va
 
   out << label << " summary parity mismatch\n";
   out << "legacy counts: sequences=" << legacy.sequenceCount << " trackCounts=" << legacy.trackCounts.size()
-      << " instrumentSets=" << legacy.instrumentSetCount << " sampleCollections=" << legacy.sampleCollectionCount
+      << " soundBanks=" << legacy.soundBankCount << " samplePools=" << legacy.samplePoolCount
       << " regions=" << legacy.regions.size() << " synths=" << legacy.instrumentSynths.size()
       << " samples=" << legacy.samples.size() << "\n";
   out << "value counts:  sequences=" << value.sequenceCount << " trackCounts=" << value.trackCounts.size()
-      << " instrumentSets=" << value.instrumentSetCount << " sampleCollections=" << value.sampleCollectionCount
+      << " soundBanks=" << value.soundBankCount << " samplePools=" << value.samplePoolCount
       << " regions=" << value.regions.size() << " synths=" << value.instrumentSynths.size()
       << " samples=" << value.samples.size() << "\n";
 
@@ -1585,8 +1581,8 @@ AkaoSummary legacyAkaoSummary(const std::filesystem::path& path) {
     AkaoCollectionSummary shape{
         .sequenceOffset = collection->seq()->offset(),
         .trackCount = static_cast<u32>(collection->seq()->trackCount()),
-        .instrumentSetCount = static_cast<u32>(collection->instrSets().size()),
-        .sampleCollectionCount = static_cast<u32>(collection->sampColls().size()),
+        .soundBankCount = static_cast<u32>(collection->instrSets().size()),
+        .samplePoolCount = static_cast<u32>(collection->sampColls().size()),
     };
     const auto detailed = legacyPreparedCollectionSummary(*collection);
     shape.sampleCount = static_cast<u32>(detailed.samples.size());
@@ -1631,19 +1627,19 @@ AkaoSummary valueAkaoSummary(const std::filesystem::path& path, std::ostream& di
     AkaoCollectionSummary shape{
         .sequenceOffset = static_cast<u32>(sequence->metadata.range.offset),
         .trackCount = static_cast<u32>(sequence->program.tracks.size()),
-        .instrumentSetCount = static_cast<u32>(collection.members.instrumentSets.size()),
-        .sampleCollectionCount = static_cast<u32>(collection.members.sampleCollections.size()),
+        .soundBankCount = static_cast<u32>(collection.members.soundBanks.size()),
+        .samplePoolCount = static_cast<u32>(collection.members.samplePools.size()),
     };
     SequenceRuntime runtime = sequence->program.runtime;
-    std::vector<InstrumentSetAsset> resolvedInstruments;
-    for (const AssetId id : collection.members.instrumentSets) {
-      if (const auto* instruments = project.asset<InstrumentSetAsset>(id)) {
+    std::vector<SoundBankAsset> resolvedInstruments;
+    for (const AssetId id : collection.members.soundBanks) {
+      if (const auto* instruments = project.asset<SoundBankAsset>(id)) {
         resolvedInstruments.push_back(*instruments);
       }
     }
-    std::vector<const SampleCollectionAsset*> resolvedSamples;
-    for (const AssetId id : collection.members.sampleCollections) {
-      if (const auto* samples = project.asset<SampleCollectionAsset>(id)) {
+    std::vector<const SamplePoolAsset*> resolvedSamples;
+    for (const AssetId id : collection.members.samplePools) {
+      if (const auto* samples = project.asset<SamplePoolAsset>(id)) {
         resolvedSamples.push_back(samples);
       }
     }
@@ -1670,14 +1666,13 @@ AkaoSummary valueAkaoSummary(const std::filesystem::path& path, std::ostream& di
     shape.instrumentSynths = detailed.instrumentSynths;
     summary.collections.push_back(shape);
   }
-  if (std::ranges::any_of(summary.collections, [](const AkaoCollectionSummary& collection) {
-        return collection.sampleCollectionCount == 0;
-      })) {
+  if (std::ranges::any_of(summary.collections,
+                          [](const AkaoCollectionSummary& collection) { return collection.samplePoolCount == 0; })) {
     u32 sampleAssets = 0;
     u32 sampleFacts = 0;
     for (const auto& asset : project.assets()) {
-      if (const auto* sampleCollection = std::get_if<SampleCollectionAsset>(&asset);
-          sampleCollection != nullptr && sampleCollection->metadata.format == "Akao") {
+      if (const auto* samplePool = std::get_if<SamplePoolAsset>(&asset);
+          samplePool != nullptr && samplePool->metadata.format == "Akao") {
         ++sampleAssets;
       }
     }
@@ -1701,15 +1696,15 @@ AkaoSummary valueAkaoSummary(const std::filesystem::path& path, std::ostream& di
 std::string describeAkaoCollection(const AkaoCollectionSummary& summary) {
   std::ostringstream out;
   out << "seq=0x" << std::hex << summary.sequenceOffset << std::dec << " tracks=" << summary.trackCount
-      << " instrSets=" << summary.instrumentSetCount << " sampleCollections=" << summary.sampleCollectionCount
+      << " instrSets=" << summary.soundBankCount << " samplePools=" << summary.samplePoolCount
       << " samples=" << summary.sampleCount << " regions=" << summary.regions.size()
       << " synths=" << summary.instrumentSynths.size();
   return out.str();
 }
 
 bool describeAkaoCollectionMismatch(const AkaoCollectionSummary& legacy, const AkaoCollectionSummary& value) {
-  if (legacy.trackCount != value.trackCount || legacy.instrumentSetCount != value.instrumentSetCount ||
-      legacy.sampleCollectionCount != value.sampleCollectionCount || legacy.sampleCount != value.sampleCount) {
+  if (legacy.trackCount != value.trackCount || legacy.soundBankCount != value.soundBankCount ||
+      legacy.samplePoolCount != value.samplePoolCount || legacy.sampleCount != value.sampleCount) {
     return false;
   }
 
@@ -1887,6 +1882,16 @@ std::map<std::string, SynthExportBytes> legacyAkaoCollectionSynthExports(const s
   return exports;
 }
 
+bool valueCollectionHasSamples(const SessionSnapshot& project, const Collection& collection) {
+  if (!collection.members.samplePools.empty()) {
+    return true;
+  }
+  return std::ranges::any_of(collection.members.soundBanks, [&](AssetId id) {
+    const auto* bank = project.asset<SoundBankAsset>(id);
+    return bank != nullptr && !bank->localSamples.samples.empty();
+  });
+}
+
 std::map<std::string, SynthExportBytes> valueAkaoCollectionSynthExports(const std::filesystem::path& path) {
   Session session;
   vgmtrans::formats::registerValueFormats(session);
@@ -1906,8 +1911,8 @@ std::map<std::string, SynthExportBytes> valueAkaoCollectionSynthExports(const st
 
   std::map<std::string, SynthExportBytes> exports;
   for (const auto& collection : project.collections()) {
-    if (!collection.members.sequence || collection.members.instrumentSets.empty() ||
-        collection.members.sampleCollections.empty()) {
+    if (!collection.members.sequence || collection.members.soundBanks.empty() ||
+        !valueCollectionHasSamples(project, collection)) {
       continue;
     }
     const auto* sequence = project.asset<SequenceProgramAsset>(*collection.members.sequence);
@@ -2236,7 +2241,7 @@ std::map<std::string, SynthExportBytes> valueCollectionSynthExports(const std::f
 
   std::map<std::string, SynthExportBytes> exports;
   for (const auto& collection : project.collections()) {
-    if (collection.members.instrumentSets.empty() || collection.members.sampleCollections.empty()) {
+    if (collection.members.soundBanks.empty() || !valueCollectionHasSamples(project, collection)) {
       continue;
     }
     auto [_, inserted] = exports.emplace(collection.name, valueCapcomSnesSynthExports(session, collection.id));
@@ -2272,8 +2277,8 @@ std::map<std::string, SynthExportBytes> valueFormatCollectionSynthExports(const 
 
   std::map<std::string, SynthExportBytes> exports;
   for (const auto& collection : project.collections()) {
-    if (!valueCollectionHasSequenceFormat(project, collection, formatName) ||
-        collection.members.instrumentSets.empty() || collection.members.sampleCollections.empty()) {
+    if (!valueCollectionHasSequenceFormat(project, collection, formatName) || collection.members.soundBanks.empty() ||
+        !valueCollectionHasSamples(project, collection)) {
       continue;
     }
     const std::string key = uniqueCollectionKey(exports, valueMidiCollectionKey(project, collection));
@@ -2306,9 +2311,14 @@ bool endsWith(std::string_view text, std::string_view suffix) {
 
 u32 valueSampleCount(const SessionSnapshot& project, const Collection& collection) {
   u32 sampleCount = 0;
-  for (const auto sampleCollectionId : collection.members.sampleCollections) {
-    if (const auto* sampleCollection = project.asset<SampleCollectionAsset>(sampleCollectionId)) {
-      sampleCount += static_cast<u32>(sampleCollection->samples.samples.size());
+  for (const auto soundBankId : collection.members.soundBanks) {
+    if (const auto* soundBank = project.asset<SoundBankAsset>(soundBankId)) {
+      sampleCount += static_cast<u32>(soundBank->localSamples.samples.size());
+    }
+  }
+  for (const auto samplePoolId : collection.members.samplePools) {
+    if (const auto* samplePool = project.asset<SamplePoolAsset>(samplePoolId)) {
+      sampleCount += static_cast<u32>(samplePool->pool.samples.size());
     }
   }
   return sampleCount;
@@ -4732,7 +4742,7 @@ void normalizeCpsPlaceholderSamples(SummaryCollectionMap& summaries) {
         sample.sampleRate = 0;
       }
     }
-    if (summary.instrumentSetCount == 2) {
+    if (summary.soundBankCount == 2) {
       std::map<std::pair<u32, u32>, std::set<u32>> okiInstrumentOffsets;
       for (auto& region : summary.regions) {
         if (region.envelopeRelease == 10'000'000) {

@@ -21,8 +21,7 @@ namespace {
 
 struct BankAssets {
   SegSatBankLayout layout;
-  ScanInstrumentSetRef instruments;
-  ScanSampleCollectionRef samples;
+  ScanSoundBankRef bank;
 };
 
 [[nodiscard]] CollectionKey collectionKey(SourceId source, const SegSatSequenceLayout& sequence) {
@@ -50,8 +49,7 @@ struct BankAssets {
     if (scanned) {
       banks.push_back(BankAssets{
           .layout = layout,
-          .instruments = scanned->instruments,
-          .samples = scanned->samples,
+          .bank = *scanned,
       });
     }
   }
@@ -76,7 +74,7 @@ struct BankAssets {
 
     auto collection = result.collection(name, collectionKey(result.source(), sequence)).sequence(sequenceDraft);
     if (banks.size() == 1) {
-      collection.instrumentSet(banks.front().instruments).samples(banks.front().samples);
+      collection.soundBank(banks.front().bank);
       continue;
     }
 
@@ -91,7 +89,7 @@ struct BankAssets {
         selected = banks.begin();
       }
       if (selected != banks.end()) {
-        collection.instrumentSet(selected->instruments).samples(selected->samples);
+        collection.soundBank(selected->bank);
       }
     }
   }
@@ -112,18 +110,18 @@ void bindSegSatCollection(CollectionBindingContext& context) {
   }
 
   struct SelectedBank {
-    InstrumentSetAsset* instruments;
+    SoundBankAsset* instruments;
     SegSatVelocityBank runtime;
     bool exactMatch = false;
   };
   std::vector<SelectedBank> selectedBanks;
-  for (auto& instruments : context.instrumentSets) {
+  for (auto& instruments : context.soundBanks) {
     if (instruments.metadata.format != kSegSatFormatName) {
       continue;
     }
     const auto* data = instruments.privateData.get<SegSatBankBindingData>();
     if (data == nullptr) {
-      context.fail("SegSat instrument set is missing retained collection-binding data", instruments.metadata.range);
+      context.fail("SegSat sound bank is missing retained collection-binding data", instruments.metadata.range);
       return;
     }
     selectedBanks.push_back(SelectedBank{.instruments = &instruments, .runtime = *data});

@@ -308,9 +308,9 @@ void moduleBuildsTunedSnesSynth() {
   const SessionSnapshot snapshot = session.snapshot();
   const Collection* collection = snapshot.collections().empty() ? nullptr : &snapshot.collections().front();
   expect(snapshot.collections().size() == 1 && collection->members.sequence &&
-             collection->members.instrumentSets.size() == 1 && collection->members.sampleCollections.size() == 1,
-         "PrismSnes scanning should publish one sequence, SRCN instrument set, BRR samples, and explicit collection");
-  const auto* set = snapshot.asset<InstrumentSetAsset>(collection->members.instrumentSets.front());
+             collection->members.soundBanks.size() == 1 && collection->members.samplePools.empty(),
+         "PrismSnes scanning should publish one sequence, sound bank, and explicit collection");
+  const auto* set = snapshot.asset<SoundBankAsset>(collection->members.soundBanks.front());
   const Region* region = set != nullptr && !set->instruments.empty() && !set->instruments.front().regions.empty()
                              ? &set->instruments.front().regions.front()
                              : nullptr;

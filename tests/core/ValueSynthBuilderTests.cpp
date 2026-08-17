@@ -56,7 +56,7 @@ void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
   const AssetId asset{40};
   SourceMapBuilder sourceMap;
   std::vector<Diagnostic> diagnostics;
-  SampleCollectionBuilder samples(asset, &sourceMap, &diagnostics);
+  SamplePoolBuilder samples(asset, &sourceMap, &diagnostics);
   const SourceRange directory{.source = source, .offset = 8, .size = 16};
   samples.include(directory);
   const auto root = samples.source(SourceRole::Table, "Sample Table", directory, "probe-sample-table");
@@ -133,24 +133,24 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
 
   auto kit = instruments.getOrAdd(
       700, Instrument{.explicitAddress = InstrumentAddress{.bank = 127, .program = 5}, .name = "Drum Kit"});
-  auto firstRegion = kit.region(SampleRef{.collection = samplesAsset, .index = 3},
+  auto firstRegion = kit.region(SampleRef{.externalPool = samplesAsset, .index = 3},
                                 Region{.keyRange = KeyRange{.low = 36, .high = 36}});
-  const auto firstRegionSource = firstRegion.source(
-      "Kick",
-      SourceRecord{
-          .range = SourceRange{.source = source, .offset = 20, .size = 4},
-          .fields = {SourceField{
-              .name = "sample",
-              .range = SourceRange{.source = source, .offset = 20, .size = 1},
-              .value = makeSourceValue(u8{3}),
-          }},
-      },
-      "probe-kick");
+  const auto firstRegionSource =
+      firstRegion.source("Kick",
+                         SourceRecord{
+                             .range = SourceRange{.source = source, .offset = 20, .size = 4},
+                             .fields = {SourceField{
+                                 .name = "sample",
+                                 .range = SourceRange{.source = source, .offset = 20, .size = 1},
+                                 .value = makeSourceValue(u8{3}),
+                             }},
+                         },
+                         "probe-kick");
   firstRegion.source("Kick Tuning", SourceRange{.source = source, .offset = 60, .size = 2}, "probe-kick-tuning");
 
   const auto instrumentSource =
       kit.source("Drum Kit", SourceRange{.source = source, .offset = 16, .size = 8}, "probe-drum-kit");
-  auto secondRegion = kit.region(SampleRef{.collection = samplesAsset, .index = 4}, Region{});
+  auto secondRegion = kit.region(SampleRef{.externalPool = samplesAsset, .index = 4}, Region{});
   const auto secondRegionSource =
       secondRegion.source("Snare", SourceRange{.source = source, .offset = 24, .size = 4}, "probe-snare");
 
@@ -164,7 +164,7 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
                            .name = "Sparse",
                            .range = SourceRange{.source = source, .offset = 40, .size = 8},
                            .regions = {Region{
-                               .sample = SampleRef{.collection = samplesAsset, .index = 8},
+                               .sample = SampleRef{.externalPool = samplesAsset, .index = 8},
                                .range = SourceRange{.source = source, .offset = 42, .size = 2},
                            }},
                        });
@@ -219,6 +219,35 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
          "genuinely derived values without ranges should not receive fabricated annotations");
 }
 
+void soundBankOwnsNoncontiguousSamplesWithoutInventingOneSourceRange() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "noncontiguous-bank.probe"}, std::vector<u8>(256));
+  ScanIdAllocator ids;
+  ScanInput input{
+      .source = sources.source(source),
+      .reader = sources.reader(source),
+      .ids = ids,
+  };
+  ScanResultBuilder result(input, "SynthBuilderProbe");
+  const SourceRange instrumentTable = input.reader.range(8, 8);
+  const SourceRange sampleData = input.reader.range(192, 9);
+  auto bank = result.soundBank("Noncontiguous Bank", instrumentTable);
+  const auto sample = bank.samples().add(4, Sample{.name = "Local Sample", .encodedData = sampleData});
+  bank.add(0, Instrument{.name = "Instrument"}).region(sample.ref(), Region{});
+
+  const ScanResult scan = result.finish();
+  const auto* soundBank = std::get_if<SoundBankAsset>(&scan.assets.front());
+  expect(scan.assets.size() == 1 && soundBank != nullptr,
+         "a bank and its local samples should publish as one asset");
+  expect(soundBank->metadata.range == instrumentTable &&
+             soundBank->localSamples.samples.front().encodedData == sampleData,
+         "bank metadata may keep its primary table range while each noncontiguous sample keeps its exact range");
+  expect(!soundBank->instruments.front().regions.front().sample.externalPool,
+         "a sample produced by a sound bank should remain explicitly local to that bank");
+  expect(!scan.sourceMap.ownedBy(ObjectRefs::sample(soundBank->metadata.id, 0)).empty(),
+         "local sample provenance should use the owning sound bank identity");
+}
+
 void scanResultBuilderOwnsSynthDraftsUntilFinish() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "synth-builder.probe"}, std::vector<u8>(64));
@@ -229,8 +258,8 @@ void scanResultBuilderOwnsSynthDraftsUntilFinish() {
       .ids = ids,
   };
   ScanResultBuilder result(input, "SynthBuilderProbe");
-  auto instruments = result.instrumentSet("Probe Instruments", input.reader.range(8, 8));
-  auto samples = result.sampleCollection("Probe Samples", input.reader.range(0, 8));
+  auto instruments = result.soundBank("Probe Instruments", input.reader.range(8, 8));
+  auto samples = result.samplePool("Probe Samples", input.reader.range(0, 8));
   const auto instrumentRef = instruments.ref();
   const auto sampleRef = samples.ref();
 
@@ -249,8 +278,8 @@ void scanResultBuilderOwnsSynthDraftsUntilFinish() {
   const ScanResult scan = result.finish();
 
   expect(scan.assets.size() == 2, "finish should materialize the two result-owned synth drafts");
-  const auto* instrumentAsset = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
-  const auto* sampleAsset = std::get_if<SampleCollectionAsset>(&scan.assets[1]);
+  const auto* instrumentAsset = std::get_if<SoundBankAsset>(&scan.assets[0]);
+  const auto* sampleAsset = std::get_if<SamplePoolAsset>(&scan.assets[1]);
   expect(instrumentAsset != nullptr && sampleAsset != nullptr,
          "draft creation order should determine materialized asset order");
   expect(
@@ -258,7 +287,7 @@ void scanResultBuilderOwnsSynthDraftsUntilFinish() {
       "instrument materialization should use the draft's stable id and accumulated range");
   expect(sampleAsset->metadata.id == sampleRef.id && sampleAsset->metadata.range == input.reader.range(0, 8),
          "sample materialization should use the draft's stable id and included range");
-  expect(instrumentAsset->instruments[0].regions[0].sample.collection == sampleRef.id,
+  expect(instrumentAsset->instruments[0].regions[0].sample.externalPool == sampleRef.id,
          "concrete sample references should survive the finish boundary");
   expect(!scan.sourceMap.ownedBy(ObjectRefs::region(instrumentRef.id, 0, 0)).empty(),
          "scan-time builders should publish stable region ownership into the finished source map");
@@ -275,18 +304,18 @@ void scanResultBuilderRetainsSampleKeysAndExposesExistingRegions() {
   };
   ScanResultBuilder result(input, "SynthBuilderProbe");
 
-  auto samples = result.sampleCollection("Sparse Samples");
+  auto samples = result.samplePool("Sparse Samples");
   const AssetId samplesAsset = samples.id();
   samples.add(12, Sample{.name = "Sparse Sample", .encodedData = input.reader.range(32, 4)});
   samples.alias(20, 12);
   const auto sample = samples.find(20);
-  expect(sample && sample->collection == samplesAsset && sample->index == 0,
+  expect(sample && sample->externalPool == samplesAsset && sample->index == 0,
          "a sample draft should retain sparse and alias keys for later instrument tables");
   if (!samples.find(99)) {
     samples.warning("Required sample 99 was not found", input.reader.range(4, 1));
   }
 
-  auto instruments = result.instrumentSet("Prebuilt Instruments");
+  auto instruments = result.soundBank("Prebuilt Instruments");
   const AssetId instrumentsAsset = instruments.id();
   auto instrument = instruments.add(7, Instrument{
                                            .name = "Prebuilt Instrument",
@@ -322,18 +351,15 @@ void entryValuesAreReadOnlyAndInitialRangesRemainAuthoritative() {
       .ids = ids,
   };
   ScanResultBuilder result(input, "SynthBuilderProbe");
-  auto instruments = result.instrumentSet("Late Instruments");
-  auto samples = result.sampleCollection("Late Samples");
+  auto instruments = result.soundBank("Late Instruments");
+  auto samples = result.samplePool("Late Samples");
   const auto instrumentRef = instruments.ref();
   const auto sampleRef = samples.ref();
 
-  auto sample =
-      samples.add(0, Sample{.name = "Sample", .encodedData = input.reader.range(32, 9)});
-  auto instrument = instruments.add(
-      0, Instrument{.name = "Instrument", .range = input.reader.range(8, 4)});
+  auto sample = samples.add(0, Sample{.name = "Sample", .encodedData = input.reader.range(32, 9)});
+  auto instrument = instruments.add(0, Instrument{.name = "Instrument", .range = input.reader.range(8, 4)});
   instrument.source("Instrument", input.reader.range(8, 4));
-  auto region =
-      instrument.region(sample.ref(), Region{.range = input.reader.range(12, 4)});
+  auto region = instrument.region(sample.ref(), Region{.range = input.reader.range(12, 4)});
   region.source("Region", input.reader.range(12, 4));
 
   static_assert(std::is_same_v<decltype(sample.value()), const Sample&>);
@@ -341,8 +367,8 @@ void entryValuesAreReadOnlyAndInitialRangesRemainAuthoritative() {
   static_assert(std::is_same_v<decltype(region.value()), const Region&>);
 
   const ScanResult scan = result.finish();
-  const auto* instrumentAsset = std::get_if<InstrumentSetAsset>(&scan.assets[0]);
-  const auto* sampleAsset = std::get_if<SampleCollectionAsset>(&scan.assets[1]);
+  const auto* instrumentAsset = std::get_if<SoundBankAsset>(&scan.assets[0]);
+  const auto* sampleAsset = std::get_if<SamplePoolAsset>(&scan.assets[1]);
   expect(instrumentAsset != nullptr && instrumentAsset->metadata.range == input.reader.range(8, 8),
          "instrument and region ranges should contribute to final asset metadata when inserted");
   expect(sampleAsset != nullptr && sampleAsset->metadata.range == input.reader.range(32, 9),
@@ -366,7 +392,7 @@ void scanResultBuilderDraftViewsRemainStableAsTheResultGrows() {
       .ids = ids,
   };
   ScanResultBuilder result(input, "SynthBuilderProbe");
-  auto samples = result.sampleCollection("Stable Samples");
+  auto samples = result.samplePool("Stable Samples");
   auto sample = samples.add(7, Sample{.name = "Stable Sample", .encodedData = input.reader.range(32, 4)});
 
   // Growing the result must not invalidate a draft proxy or an entry returned
@@ -379,9 +405,9 @@ void scanResultBuilderDraftViewsRemainStableAsTheResultGrows() {
   const auto alias = samples.find(9);
 
   const ScanResult scan = result.finish();
-  const auto& sampleAsset = std::get<SampleCollectionAsset>(scan.assets.front());
-  expect(sampleAsset.samples.samples.size() == 1 && samples.id() == sampleAsset.metadata.id &&
-             alias && alias->collection == samples.id() && alias->index == 0,
+  const auto& sampleAsset = std::get<SamplePoolAsset>(scan.assets.front());
+  expect(sampleAsset.pool.samples.size() == 1 && samples.id() == sampleAsset.metadata.id && alias &&
+             alias->externalPool == samples.id() && alias->index == 0,
          "draft proxies and sparse lookups should survive growth of the result-owned draft list");
   expect(scan.sourceMap.ownedBy(ObjectRefs::sample(samples.id(), 0)).size() == 1,
          "entries obtained before result growth should still publish their source annotations");
@@ -390,7 +416,7 @@ void scanResultBuilderDraftViewsRemainStableAsTheResultGrows() {
 void detachedBuildersUseTheSameAuthoringSurface() {
   const SourceId source{32};
   std::vector<Diagnostic> diagnostics;
-  SampleCollectionBuilder samples(AssetId{60}, nullptr, &diagnostics);
+  SamplePoolBuilder samples(AssetId{60}, nullptr, &diagnostics);
   auto sample = samples.add(4, Sample{
                                    .name = "Detached Sample",
                                    .encodedData = SourceRange{.source = source, .offset = 100, .size = 9},
@@ -423,6 +449,7 @@ void runValueSynthBuilderTests() {
   recordReaderFinishesOnePortableSourceValue();
   sampleBuilderKeepsKeysDenseAndAnnotationsOwned();
   instrumentBuilderGroupsEntriesAndProjectsRegionIdentity();
+  soundBankOwnsNoncontiguousSamplesWithoutInventingOneSourceRange();
   scanResultBuilderOwnsSynthDraftsUntilFinish();
   scanResultBuilderRetainsSampleKeysAndExposesExistingRegions();
   entryValuesAreReadOnlyAndInitialRangesRemainAuthoritative();

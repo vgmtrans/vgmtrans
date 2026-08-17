@@ -143,8 +143,8 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
     rejectedSecondData = true;
   }
   expect(rejectedSecondData, "scan result builder should reject a second private data value for one asset");
-  const auto bank = out.instrumentSet("Builder Bank", input.reader.range(0, 1)).data(BuilderPrivateData{.value = 22});
-  auto samples = out.sampleCollection("Builder Samples", input.reader.range(1, 2));
+  const auto bank = out.soundBank("Builder Bank", input.reader.range(0, 1)).data(BuilderPrivateData{.value = 22});
+  auto samples = out.samplePool("Builder Samples", input.reader.range(1, 2));
   samples.data(BuilderPrivateData{.value = 33});
   samples.add(0, Sample{
                      .name = "Builder Sample",
@@ -158,8 +158,8 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
 
   out.collection("Builder Song", CollectionKey{.resolver = "ProbeBuilder", .value = "song:1"})
       .sequence(sequence)
-      .instrumentSet(bank)
-      .samples(samples)
+      .soundBank(bank)
+      .samplePool(samples)
       .misc(misc);
   out.warning("builder warning", input.reader.range(0, 1));
 
@@ -171,19 +171,19 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
   expect(metadata(result.assets[2]).id == AssetId{2}, "scan result builder should assign sample metadata");
   expect(metadata(result.assets[3]).id == AssetId{3}, "scan result builder should assign misc metadata");
   const auto* sequenceData = std::get<SequenceProgramAsset>(result.assets[0]).privateData.get<BuilderPrivateData>();
-  const auto* instrumentData = std::get<InstrumentSetAsset>(result.assets[1]).privateData.get<BuilderPrivateData>();
-  const auto* sampleData = std::get<SampleCollectionAsset>(result.assets[2]).privateData.get<BuilderPrivateData>();
+  const auto* instrumentData = std::get<SoundBankAsset>(result.assets[1]).privateData.get<BuilderPrivateData>();
+  const auto* sampleData = std::get<SamplePoolAsset>(result.assets[2]).privateData.get<BuilderPrivateData>();
   expect(sequenceData != nullptr && sequenceData->value == 11 && instrumentData != nullptr &&
              instrumentData->value == 22 && sampleData != nullptr && sampleData->value == 33 &&
-             std::get<SampleCollectionAsset>(result.assets[2]).privateData.get<std::string>() == nullptr,
+             std::get<SamplePoolAsset>(result.assets[2]).privateData.get<std::string>() == nullptr,
          "sequence, instrument, and sample drafts should retain an immutable typed private payload");
   expect(result.matchFacts.empty(), "scan result builder should not need match facts for explicit collections");
   expect(result.explicitCollections.size() == 1, "scan result builder should emit one explicit collection");
   expect(result.explicitCollections[0].members.sequence == sequence.id(),
          "scan result builder should preserve the collection sequence");
-  expect(result.explicitCollections[0].members.instrumentSets == std::vector<AssetId>{bank.id()},
+  expect(result.explicitCollections[0].members.soundBanks == std::vector<AssetId>{bank.id()},
          "scan result builder should preserve the collection instrument set");
-  expect(result.explicitCollections[0].members.sampleCollections == std::vector<AssetId>{samples.id()},
+  expect(result.explicitCollections[0].members.samplePools == std::vector<AssetId>{samples.id()},
          "scan result builder should preserve the collection sample collection");
   expect(result.explicitCollections[0].members.miscAssets == std::vector<AssetId>{misc.id()},
          "scan result builder should preserve the collection misc asset");
@@ -199,7 +199,7 @@ void sessionStoresTheOwningFormatsPreferredSampleFilter() {
       .scan =
           [](const ScanInput& input) {
             ScanResultBuilder out(input, "FilteredSamples");
-            auto samples = out.sampleCollection("Filtered Samples", input.reader.range(0, 1));
+            auto samples = out.samplePool("Filtered Samples", input.reader.range(0, 1));
             samples.add(0, Sample{
                                .name = "Filtered Sample",
                                .codec = AudioCodec::PcmS8,
@@ -214,8 +214,8 @@ void sessionStoresTheOwningFormatsPreferredSampleFilter() {
 
   const auto snapshot = session.snapshot();
   expect(!snapshot.assets().empty(), "filtered sample fixture should publish one sample collection");
-  const auto* samples = std::get_if<SampleCollectionAsset>(&snapshot.assets().front());
-  expect(samples != nullptr && samples->preferredFilter == SampleFilter::PsxSpuLowPass,
+  const auto* samples = std::get_if<SamplePoolAsset>(&snapshot.assets().front());
+  expect(samples != nullptr && samples->pool.preferredFilter == SampleFilter::PsxSpuLowPass,
          "sample assets should retain their owning format's preferred export filter");
 }
 
@@ -270,7 +270,7 @@ void scanResultBuilderRejectsWrongRoleHandleReuse() {
 
   bool threw = false;
   try {
-    out.collection("Broken").instrumentSet(ScanInstrumentSetRef{.id = sequence.id()});
+    out.collection("Broken").soundBank(ScanSoundBankRef{.id = sequence.id()});
   } catch (const std::logic_error&) {
     threw = true;
   }
@@ -284,14 +284,14 @@ void scanResultBuilderPublishesEmptySynthDrafts() {
   ScanInput input{.source = sources.source(source), .reader = sources.reader(source), .ids = ids};
 
   ScanResultBuilder out(input, "ProbeBuilder");
-  const auto samples = out.sampleCollection("Recognized Samples");
-  const auto instruments = out.instrumentSet("Recognized Instruments");
+  const auto samples = out.samplePool("Recognized Samples");
+  const auto instruments = out.soundBank("Recognized Instruments");
   const ScanResult result = out.finish();
   expect(result.assets.size() == 2 && metadata(result.assets[0]).id == samples.id() &&
              metadata(result.assets[1]).id == instruments.id(),
          "creating a synth draft should publish it in creation order even when it remains empty");
-  expect(std::get<SampleCollectionAsset>(result.assets[0]).samples.samples.empty() &&
-             std::get<InstrumentSetAsset>(result.assets[1]).instruments.empty(),
+  expect(std::get<SamplePoolAsset>(result.assets[0]).pool.samples.empty() &&
+             std::get<SoundBankAsset>(result.assets[1]).instruments.empty(),
          "empty published synth assets should remain ordinary visible assets");
 }
 

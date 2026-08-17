@@ -29,14 +29,13 @@ public:
     None,
     Source,
     Sequence,
-    InstrumentSet,
-    SampleCollection,
+    SoundBank,
+    SamplePool,
     Misc,
     Collection,
   };
 
-  explicit MenuBar(QWidget* parent = nullptr,
-                   const QList<QDockWidget*>& dockWidgets = {});
+  explicit MenuBar(QWidget* parent = nullptr, const QList<QDockWidget*>& dockWidgets = {});
   void updateRecentFilesMenu();
   void setShortcutHost(QWidget* host);
   void setContext(Context context);
@@ -55,8 +54,8 @@ signals:
   void saveSelectedSourceOriginal();
   void saveSelectedAssetOriginal();
   void exportSelectedSequenceMidi();
-  void exportSelectedInstrumentSetSf2();
-  void exportSelectedInstrumentSetDls();
+  void exportSelectedSoundBankSf2();
+  void exportSelectedSoundBankDls();
   void exportSelectedCollection(int choice);
   void stitchSelectedCollections();
   void increaseHexFontRequested();

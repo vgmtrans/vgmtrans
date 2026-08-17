@@ -33,7 +33,7 @@ namespace {
 
   auto collection = result.sourceCollection(displayName).sequence(sequence);
   if (const auto synth = addSynth(result, *layout, parsed.programs, displayName)) {
-    collection.instrumentSet(synth->instruments).samples(synth->samples);
+    collection.soundBank(*synth);
   } else {
     result.warning("HeartBeatSnes sequence found, but no valid instruments or samples were discovered",
                    input.reader.range(0, input.reader.size()));

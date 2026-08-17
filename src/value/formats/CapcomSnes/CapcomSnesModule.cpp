@@ -38,7 +38,7 @@ namespace {
   } else {
     if (const auto synth =
             addCapcomSnesSynth(result, *layout->instrumentTableAddress, *layout->spcDirAddress, displayName)) {
-      collection.instrumentSet(synth->instruments).samples(synth->samples);
+      collection.soundBank(*synth);
     } else {
       result.warning("CapcomSnes sequence found, but no valid instruments or samples were discovered",
                      input.reader.range(0, input.reader.size()));

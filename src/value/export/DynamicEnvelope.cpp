@@ -110,10 +110,10 @@ void applyEnvelopeUpdate(EnvelopeOverride& state, const EnvelopeUpdate& update) 
 }
 
 template <typename Predicate>
-[[nodiscard]] std::optional<InstrumentRef> findInstrument(std::span<const InstrumentSetAsset> instrumentSets,
+[[nodiscard]] std::optional<InstrumentRef> findInstrument(std::span<const SoundBankAsset> soundBanks,
                                                           Predicate matches) {
-  for (u32 setIndex = 0; setIndex < instrumentSets.size(); ++setIndex) {
-    for (const auto& instrument : instrumentSets[setIndex].instruments) {
+  for (u32 setIndex = 0; setIndex < soundBanks.size(); ++setIndex) {
+    for (const auto& instrument : soundBanks[setIndex].instruments) {
       if (matches(instrument)) {
         return InstrumentRef{.set = setIndex, .instrument = &instrument};
       }
@@ -127,30 +127,30 @@ template <typename Predicate>
 }
 
 [[nodiscard]] std::optional<InstrumentRef> resolveSelection(const InstrumentPerformanceEvent& selection,
-                                                            std::span<const InstrumentSetAsset> instrumentSets) {
+                                                            std::span<const SoundBankAsset> soundBanks) {
   if (selection.sourceInstrument) {
-    if (auto resolved = findInstrument(instrumentSets, [&](const Instrument& instrument) {
+    if (auto resolved = findInstrument(soundBanks, [&](const Instrument& instrument) {
           return instrument.identity && *instrument.identity == *selection.sourceInstrument;
         })) {
       return resolved;
     }
     const auto fallback = resolveInstrumentAddress({}, selection.sourceInstrument);
-    return findInstrument(instrumentSets, [&](const Instrument& instrument) {
+    return findInstrument(soundBanks, [&](const Instrument& instrument) {
       return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == fallback;
     });
   }
 
   const InstrumentAddress address{.bank = selection.bank, .program = selection.program};
-  return findInstrument(instrumentSets, [&](const Instrument& instrument) {
+  return findInstrument(soundBanks, [&](const Instrument& instrument) {
     return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == address;
   });
 }
 
 class AddressAllocator {
 public:
-  AddressAllocator(std::span<const InstrumentSetAsset> instrumentSets, const PerformanceSequence& performance) {
-    for (const auto& instrumentSet : instrumentSets) {
-      for (const auto& instrument : instrumentSet.instruments) {
+  AddressAllocator(std::span<const SoundBankAsset> soundBanks, const PerformanceSequence& performance) {
+    for (const auto& soundBank : soundBanks) {
+      for (const auto& instrument : soundBank.instruments) {
         reserve(resolveInstrumentAddress(instrument.explicitAddress, instrument.identity));
       }
     }
@@ -218,17 +218,17 @@ struct VariantRecord {
 }  // namespace
 
 DynamicEnvelopeMaterialization materializeDynamicEnvelopes(const PerformanceSequence& performance,
-                                                           std::span<InstrumentSetAsset> instrumentSets) {
+                                                           std::span<SoundBankAsset> soundBanks) {
   DynamicEnvelopeMaterialization result{
       .performance = performance,
   };
-  AddressAllocator addresses{instrumentSets, performance};
+  AddressAllocator addresses{soundBanks, performance};
   std::vector<VariantRecord> variants;
   std::set<u64> activeVoiceWarnings;
   std::set<const Instrument*> regionlessInstrumentWarnings;
 
   for (auto& track : result.performance.tracks) {
-    auto selectedInstrument = resolveSelection({}, instrumentSets);
+    auto selectedInstrument = resolveSelection({}, soundBanks);
     std::unordered_map<PerformanceLaneId, EnvelopeOverride> envelopeStates;
     std::unordered_map<PerformanceLaneId, u64> voiceEnds;
     bool warnedMissingInstrument = false;
@@ -236,7 +236,7 @@ DynamicEnvelopeMaterialization materializeDynamicEnvelopes(const PerformanceSequ
 
     for (auto& event : track.events) {
       if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event)) {
-        selectedInstrument = resolveSelection(*selection, instrumentSets);
+        selectedInstrument = resolveSelection(*selection, soundBanks);
         variantSelected = false;
         if (selection->envelopeMode == InstrumentEnvelopeMode::UseInstrumentEnvelope) {
           envelopeStates.clear();
@@ -347,7 +347,7 @@ DynamicEnvelopeMaterialization materializeDynamicEnvelopes(const PerformanceSequ
   }
 
   for (auto& variant : variants) {
-    instrumentSets[variant.base.set].instruments.push_back(std::move(variant.instrument));
+    soundBanks[variant.base.set].instruments.push_back(std::move(variant.instrument));
   }
   return result;
 }

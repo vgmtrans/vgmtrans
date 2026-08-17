@@ -55,7 +55,7 @@ namespace {
     // A source can contain several WDS uploads and switch between them with
     // FE. Keeping them in one collection preserves those source bank IDs.
     for (const auto& bank : banks) {
-      collection.instrumentSet(bank.instruments).samples(bank.samples);
+      collection.soundBank(bank.bank);
     }
   }
 

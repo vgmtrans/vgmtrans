@@ -44,22 +44,20 @@ private:
 struct CollectionBindingContext {
 public:
   CollectionBindingContext(const SequenceProgramAsset* sequence, SequenceRuntime& sequenceRuntime,
-                           std::span<InstrumentSetAsset> instrumentSets,
-                           std::span<const SampleCollectionAsset* const> sampleCollections,
+                           std::span<SoundBankAsset> soundBanks, std::span<const SamplePoolAsset* const> samplePools,
                            std::vector<Diagnostic>& diagnostics)
-      : sequence(sequence), instrumentSets(instrumentSets), sampleCollections(sampleCollections),
-        diagnostics(diagnostics), sequenceRuntime_(sequenceRuntime) {}
+      : sequence(sequence), soundBanks(soundBanks), samplePools(samplePools), diagnostics(diagnostics),
+        sequenceRuntime_(sequenceRuntime) {}
 
   const SequenceProgramAsset* sequence;
-  std::span<InstrumentSetAsset> instrumentSets;
-  std::span<const SampleCollectionAsset* const> sampleCollections;
+  std::span<SoundBankAsset> soundBanks;
+  std::span<const SamplePoolAsset* const> samplePools;
   std::vector<Diagnostic>& diagnostics;
   bool failed = false;
 
-  [[nodiscard]] InstrumentSetAsset* instrumentSet(AssetId id) const noexcept {
-    const auto found =
-        std::ranges::find(instrumentSets, id, [](const InstrumentSetAsset& asset) { return asset.metadata.id; });
-    return found == instrumentSets.end() ? nullptr : &*found;
+  [[nodiscard]] SoundBankAsset* soundBank(AssetId id) const noexcept {
+    const auto found = std::ranges::find(soundBanks, id, [](const SoundBankAsset& asset) { return asset.metadata.id; });
+    return found == soundBanks.end() ? nullptr : &*found;
   }
 
   [[nodiscard]] bool replaceSequenceRuntime(SequenceRuntime replacement) {

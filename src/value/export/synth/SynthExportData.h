@@ -21,8 +21,8 @@ struct PerformanceSequence;
 
 struct SynthExportInput {
   std::string name;
-  std::span<const InstrumentSetAsset* const> instrumentSets;
-  std::span<const SampleCollectionAsset* const> sampleCollections;
+  std::span<const SoundBankAsset* const> soundBanks;
+  std::span<const SamplePoolAsset* const> samplePools;
   // Null retains every instrument. A performance selects the instruments used
   // by its notes; sample filtering can also be requested independently.
   const PerformanceSequence* sequenceUsage = nullptr;
@@ -46,10 +46,10 @@ struct SynthSampleDecodeOptions {
   std::string nonMonoWarning;
 };
 
-// Decoded sample plus its original collection/index identity. Synth exporters use
+// Decoded sample plus its original owner/index identity. Synth exporters use
 // this to build one flat sample table without losing region references.
 struct DecodedSynthSample {
-  AssetId collectionId;
+  AssetId owner;
   u32 localIndex = 0;
   std::string name;
   Tuning pitch;
@@ -80,8 +80,8 @@ struct PreparedSynthData {
 
 // Apply the same performance-based instrument selection used by SF2 and DLS
 // preparation without decoding samples or lowering a container.
-[[nodiscard]] std::vector<const Instrument*> selectSynthInstruments(
-    std::span<const InstrumentSetAsset* const> instrumentSets, const PerformanceSequence* sequenceUsage);
+[[nodiscard]] std::vector<const Instrument*> selectSynthInstruments(std::span<const SoundBankAsset* const> soundBanks,
+                                                                    const PerformanceSequence* sequenceUsage);
 
 // SF2 and DLS have one decay followed by a fixed sustain level. Approximate a
 // richer envelope using both endpoint timing and perceptual salience, without

@@ -74,8 +74,8 @@ struct MatchFact {
 
 struct CollectionMembers {
   std::optional<AssetId> sequence;
-  std::vector<AssetId> instrumentSets;
-  std::vector<AssetId> sampleCollections;
+  std::vector<AssetId> soundBanks;
+  std::vector<AssetId> samplePools;
   std::vector<AssetId> miscAssets;
 };
 
@@ -118,8 +118,8 @@ struct DesiredCollection {
 };
 
 [[nodiscard]] CollectionIssue missingSequenceIssue(std::optional<AssetId> asset = std::nullopt);
-[[nodiscard]] CollectionIssue missingInstrumentSetIssue(std::optional<AssetId> asset = std::nullopt);
-[[nodiscard]] CollectionIssue missingSampleCollectionIssue(std::optional<AssetId> asset = std::nullopt);
+[[nodiscard]] CollectionIssue missingSoundBankIssue(std::optional<AssetId> asset = std::nullopt);
+[[nodiscard]] CollectionIssue missingSamplePoolIssue(std::optional<AssetId> asset = std::nullopt);
 [[nodiscard]] CollectionIssue ambiguousMatchIssue(std::string message = "Collection has ambiguous matches",
                                                   std::optional<AssetId> asset = std::nullopt,
                                                   std::optional<SourceRange> range = std::nullopt);

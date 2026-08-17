@@ -51,15 +51,15 @@ InstrumentAddress selectedAddressForNote(const PerformanceSequence& performance,
 }
 
 size_t selectedInstrumentForNote(const DynamicEnvelopeMaterialization& materialized, PerformanceNoteId note,
-                                 const InstrumentSetAsset& instrumentSet) {
+                                 const SoundBankAsset& soundBank) {
   const InstrumentAddress address = selectedAddressForNote(materialized.performance, note);
-  const auto instrument = std::ranges::find_if(instrumentSet.instruments, [&](const Instrument& candidate) {
+  const auto instrument = std::ranges::find_if(soundBank.instruments, [&](const Instrument& candidate) {
     return resolveInstrumentAddress(candidate.explicitAddress, candidate.identity) == address;
   });
-  if (instrument == instrumentSet.instruments.end()) {
+  if (instrument == soundBank.instruments.end()) {
     throw std::runtime_error("Dynamic-envelope test instrument was not found");
   }
-  return static_cast<size_t>(std::distance(instrumentSet.instruments.begin(), instrument));
+  return static_cast<size_t>(std::distance(soundBank.instruments.begin(), instrument));
 }
 
 void dynamicEnvelopeMaterializationIsIncrementalAndDeduplicated() {
@@ -75,7 +75,7 @@ void dynamicEnvelopeMaterializationIsIncrementalAndDeduplicated() {
       .releaseSeconds = 7.0,
       .sustainAmplitude = 0.4,
   };
-  std::vector<InstrumentSetAsset> sets{InstrumentSetAsset{
+  std::vector<SoundBankAsset> sets{SoundBankAsset{
       .instruments = {testInstrument(5, firstBase, secondBase)},
   }};
 
@@ -170,7 +170,7 @@ void dynamicEnvelopeMaterializationIsIncrementalAndDeduplicated() {
 }
 
 void dynamicEnvelopeInstrumentSelectionControlsOverrideCarry() {
-  std::vector<InstrumentSetAsset> sets{InstrumentSetAsset{
+  std::vector<SoundBankAsset> sets{SoundBankAsset{
       .instruments =
           {
               testInstrument(0, Envelope{.attackSeconds = 1.0}),
@@ -234,7 +234,7 @@ void dynamicEnvelopeInstrumentSelectionControlsOverrideCarry() {
 }
 
 void dynamicEnvelopeActiveVoiceLimitationIsExplicit() {
-  std::vector<InstrumentSetAsset> sets{InstrumentSetAsset{
+  std::vector<SoundBankAsset> sets{SoundBankAsset{
       .instruments = {testInstrument(0, Envelope{.attackSeconds = 1.0})},
   }};
   auto performance = sequenceWithEvents({
@@ -272,7 +272,7 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero() {
   for (u32 program = 0; program < 128; ++program) {
     instruments.push_back(testInstrument(program, Envelope{.attackSeconds = 1.0}));
   }
-  std::vector<InstrumentSetAsset> sets{InstrumentSetAsset{
+  std::vector<SoundBankAsset> sets{SoundBankAsset{
       .instruments = std::move(instruments),
   }};
 
@@ -315,7 +315,7 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero() {
              sets[0].instruments.back().explicitAddress == std::optional{InstrumentAddress{.bank = 1, .program = 0}},
          "the allocator should move to the next free bank after bank zero is occupied");
 
-  std::vector<const InstrumentSetAsset*> views{&sets[0]};
+  std::vector<const SoundBankAsset*> views{&sets[0]};
   const MidiSequence midi =
       renderMidiSequence(materialized.performance, {}, ModulationConversionPolicy::SynthModulators, views);
   std::vector<std::pair<u64, u16>> banks;
@@ -339,9 +339,9 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero() {
 }
 
 void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments() {
-  std::vector<InstrumentSetAsset> sets{InstrumentSetAsset{
-      .instruments = {testInstrument(0, Envelope{.attackSeconds = 1.0})},
-  }};
+  Instrument instrument = testInstrument(0, Envelope{.attackSeconds = 1.0});
+  instrument.regions[0].sample = SampleRef::external(AssetId{10}, 0);
+  std::vector<SoundBankAsset> sets{SoundBankAsset{.instruments = {std::move(instrument)}}};
   auto performance = sequenceWithEvents({
       EnvelopePerformanceEvent{
           .header = eventHeader(0, 0),
@@ -360,20 +360,20 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments() {
 
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "dynamic-envelope.pcm"}, std::vector<u8>{0});
-  const SampleCollectionAsset samples{
+  const SamplePoolAsset samples{
       .metadata = AssetMetadata{.id = AssetId{10}},
-      .samples = SampleCollection{.samples = {Sample{
-                                      .codec = AudioCodec::PcmS8,
-                                      .encodedData = SourceRange{.source = source, .offset = 0, .size = 1},
-                                      .sampleRate = 32000,
-                                  }}},
+      .pool = SamplePool{.samples = {Sample{
+                             .codec = AudioCodec::PcmS8,
+                             .encodedData = SourceRange{.source = source, .offset = 0, .size = 1},
+                             .sampleRate = 32000,
+                         }}},
   };
-  std::vector<const InstrumentSetAsset*> instrumentViews{&sets[0]};
-  std::vector<const SampleCollectionAsset*> sampleViews{&samples};
+  std::vector<const SoundBankAsset*> instrumentViews{&sets[0]};
+  std::vector<const SamplePoolAsset*> sampleViews{&samples};
   const auto prepared = prepareSynthData(
       SynthExportInput{
-          .instrumentSets = instrumentViews,
-          .sampleCollections = sampleViews,
+          .soundBanks = instrumentViews,
+          .samplePools = sampleViews,
           .sequenceUsage = &materialized.performance,
       },
       sources);

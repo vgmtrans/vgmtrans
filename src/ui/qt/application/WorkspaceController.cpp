@@ -132,9 +132,9 @@ core::Artifact WorkspaceController::exportSequenceMidi(core::AssetId id,
   return session_.exportSequenceMidi(id, request);
 }
 
-core::Artifact WorkspaceController::exportInstrumentSet(core::AssetId id, core::SynthExportFormat format,
-                                                        const core::ExportRequest& request) const {
-  return session_.exportInstrumentSet(id, format, request);
+core::Artifact WorkspaceController::exportSoundBank(core::AssetId id, core::SynthExportFormat format,
+                                                    const core::ExportRequest& request) const {
+  return session_.exportSoundBank(id, format, request);
 }
 
 std::vector<core::Artifact> WorkspaceController::exportCollection(core::CollectionId id,
@@ -142,8 +142,8 @@ std::vector<core::Artifact> WorkspaceController::exportCollection(core::Collecti
   return session_.exportCollection(id, request);
 }
 
-core::CollectionStitchResult WorkspaceController::stitchCollections(
-    std::span<const core::CollectionId> collections, const core::ExportRequest& request) const {
+core::CollectionStitchResult WorkspaceController::stitchCollections(std::span<const core::CollectionId> collections,
+                                                                    const core::ExportRequest& request) const {
   return session_.stitchCollections(collections, request);
 }
 

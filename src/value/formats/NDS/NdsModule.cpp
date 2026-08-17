@@ -19,8 +19,8 @@ using namespace core;
 namespace {
 
 struct BankAssets {
-  std::optional<ScanInstrumentSetDraft> instruments;
-  std::array<std::optional<ScanSampleCollectionDraft>, 4> samples;
+  std::optional<ScanSoundBankDraft> instruments;
+  std::array<std::optional<ScanSamplePoolDraft>, 4> samples;
 };
 
 // Gives each sequence collection a stable identity within its source SDAT.
@@ -56,7 +56,7 @@ void scanNdsLayout(const NdsLayout& layout, ScanResultBuilder& result) {
     }
   }
 
-  std::vector<std::optional<ScanSampleCollectionDraft>> waveAssets(layout.waveArchives.size());
+  std::vector<std::optional<ScanSamplePoolDraft>> waveAssets(layout.waveArchives.size());
   for (const u16 waveIndex : referencedWaves) {
     const auto& wave = layout.waveArchives[waveIndex];
     if (wave.file) {
@@ -92,18 +92,18 @@ void scanNdsLayout(const NdsLayout& layout, ScanResultBuilder& result) {
 
     auto collection =
         result.collection(sequence.name, ndsCollectionKey(result.source(), layout.range.offset, sequenceIndex));
-    collection.sequence(sequenceAsset).samples(psg);
+    collection.sequence(sequenceAsset).samplePool(psg);
     if (!sequence.bank) {
       continue;
     }
 
     const auto& assets = bankAssets[*sequence.bank];
     if (assets.instruments) {
-      collection.instrumentSet(*assets.instruments);
+      collection.soundBank(*assets.instruments);
     }
     for (const auto sample : assets.samples) {
       if (sample) {
-        collection.samples(*sample);
+        collection.samplePool(*sample);
       }
     }
   }
