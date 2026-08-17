@@ -42,8 +42,15 @@ private:
 // Formats bind collection-local meaning into private instrument copies and a
 // copied sequence runtime. Member lists themselves were fixed during matching.
 struct CollectionBindingContext {
+public:
+  CollectionBindingContext(const SequenceProgramAsset* sequence, SequenceRuntime& sequenceRuntime,
+                           std::span<InstrumentSetAsset> instrumentSets,
+                           std::span<const SampleCollectionAsset* const> sampleCollections,
+                           std::vector<Diagnostic>& diagnostics)
+      : sequence(sequence), instrumentSets(instrumentSets), sampleCollections(sampleCollections),
+        diagnostics(diagnostics), sequenceRuntime_(sequenceRuntime) {}
+
   const SequenceProgramAsset* sequence;
-  SequenceRuntime& sequenceRuntime;
   std::span<InstrumentSetAsset> instrumentSets;
   std::span<const SampleCollectionAsset* const> sampleCollections;
   std::vector<Diagnostic>& diagnostics;
@@ -53,6 +60,25 @@ struct CollectionBindingContext {
     const auto found =
         std::ranges::find(instrumentSets, id, [](const InstrumentSetAsset& asset) { return asset.metadata.id; });
     return found == instrumentSets.end() ? nullptr : &*found;
+  }
+
+  [[nodiscard]] bool replaceSequenceRuntime(SequenceRuntime replacement) {
+    const SourceRange range = sequence != nullptr ? sequence->metadata.range : SourceRange{};
+    if (!sequenceRuntime_.valid()) {
+      fail("Collection binding cannot replace a sequence runtime with no executor", range);
+      return false;
+    }
+    if (!replacement.valid()) {
+      fail("Collection binding produced a replacement sequence runtime with no executor", range);
+      return false;
+    }
+    if (sequenceRuntime_.family == nullptr || replacement.family == nullptr ||
+        sequenceRuntime_.family != replacement.family) {
+      fail("Collection binding produced an incompatible sequence runtime family", range);
+      return false;
+    }
+    sequenceRuntime_ = std::move(replacement);
+    return true;
   }
 
   void warning(std::string message, SourceRange range = {}) { report(Severity::Warning, std::move(message), range); }
@@ -70,6 +96,8 @@ private:
         .range = range.valid() ? std::optional<SourceRange>{range} : std::nullopt,
     });
   }
+
+  SequenceRuntime& sequenceRuntime_;
 };
 
 struct FormatModule {

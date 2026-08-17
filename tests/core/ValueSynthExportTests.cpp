@@ -971,10 +971,23 @@ struct PreparedProbeProgramState {
   bool shouldFail = false;
 };
 
+struct ForeignRuntimeTrackState {};
+
+struct ForeignRuntimePlayback {
+  ForeignRuntimePlayback(ForeignRuntimeTrackState&, PerformanceEmitter&, VmApi&) {}
+};
+
+struct ForeignRuntimeCursor {
+  using TrackState = ForeignRuntimeTrackState;
+  using Playback = ForeignRuntimePlayback;
+};
+
 void bindPerformanceRuntime(CollectionBindingContext& context) {
   const auto* sequence = context.sequence;
   const bool fail = sequence != nullptr && sequence->metadata.name == "Failing Sequence";
-  context.sequenceRuntime = makeCompiledRuntime<ProbeCompilerCursor, PreparedProbeProgramState>(fail);
+  if (!context.replaceSequenceRuntime(makeCompiledRuntime<ProbeCompilerCursor, PreparedProbeProgramState>(fail))) {
+    return;
+  }
   context.warning("Collection binding warning");
 }
 
@@ -992,7 +1005,7 @@ void collectionBindingAppliesToWholeExport() {
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "Performance Finalizer", .name = "Sequence"},
       .program =
           SequenceProgram{
-              .runtime = probeSequenceRuntime(),
+              .runtime = makeCompiledRuntime<ProbeCompilerCursor, PreparedProbeProgramState>(false),
               .timebase = config.timebase,
               .behavior = config.behavior,
               .tracks = {track},
@@ -1040,6 +1053,15 @@ void collectionBindingAppliesToWholeExport() {
   failingCollection.key.value = "failure";
   failingCollection.members.sequence = failingSequence.metadata.id;
   builder.collections.push_back(std::move(failingCollection));
+  auto mismatchedCollection = builder.collections.front();
+  mismatchedCollection.id = CollectionId{2};
+  mismatchedCollection.key.value = "runtime-mismatch";
+  mismatchedCollection.binder = [](CollectionBindingContext& context) {
+    if (!context.replaceSequenceRuntime(makeCompiledRuntime<ForeignRuntimeCursor>())) {
+      return;
+    }
+  };
+  builder.collections.push_back(std::move(mismatchedCollection));
 
   const SessionSnapshot snapshot = builder.finish();
   const CollectionPlayback playback = prepareCollectionPlayback(snapshot, sources, CollectionId{0}, PlaybackRequest{});
@@ -1069,6 +1091,10 @@ void collectionBindingAppliesToWholeExport() {
   expect(failed.size() == 1, "a failing collection performance finalizer should produce one MIDI artifact");
   diagnosticWithMessage(failed.front().diagnostics, "Collection binding warning");
   diagnosticWithMessage(failed.front().diagnostics, "Sequence rendering failed: test finalizer failure");
+
+  const auto mismatched = bindCollection(snapshot, CollectionId{2});
+  expect(!mismatched.collection, "an incompatible runtime should fail at collection binding before VM execution");
+  diagnosticWithMessage(mismatched.diagnostics, "Collection binding produced an incompatible sequence runtime family");
 }
 
 void collectionBindingProducesAnImmutableInstrumentView() {

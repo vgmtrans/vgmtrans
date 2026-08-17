@@ -50,6 +50,9 @@ using FinalizePerformance = void (*)(std::any& programState, PerformanceSequence
 // Only state creation is closure-backed so immutable typed format settings can
 // be captured without a generic configuration schema.
 struct SequenceRuntime {
+  // Runtimes created by the same typed adapter family share this token even
+  // when their state factories capture different immutable settings.
+  const void* family = nullptr;
   CreateProgramState createProgramState;
   CreateTrackState createTrackState;
   ExecuteCommand execute = nullptr;

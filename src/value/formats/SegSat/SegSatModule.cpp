@@ -152,11 +152,13 @@ void bindSegSatCollection(CollectionBindingContext& context) {
   }
 
   if (!velocityBanks.empty()) {
-    context.sequenceRuntime = segSatSequenceRuntime(SegSatRuntimeConfig{
-        .velocityBanks = std::move(velocityBanks),
-        .volumeModel = sequenceData->volumeModel,
-        .controllerChanges = sequenceData->controllerChanges,
-    });
+    if (!context.replaceSequenceRuntime(segSatSequenceRuntime(SegSatRuntimeConfig{
+            .velocityBanks = std::move(velocityBanks),
+            .volumeModel = sequenceData->volumeModel,
+            .controllerChanges = sequenceData->controllerChanges,
+        }))) {
+      return;
+    }
   }
 }
 
