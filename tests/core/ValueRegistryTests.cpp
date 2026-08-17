@@ -145,8 +145,7 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
                      .channels = 1,
                      .bitsPerSample = 8,
                  });
-  const auto misc =
-      out.misc("Builder Misc", input.reader.range(0, 1)).data(BuilderPrivateData{.value = 44}).payload({0xaa});
+  const auto misc = out.misc("Builder Misc", input.reader.range(0, 1)).payload({0xaa});
 
   out.collection("Builder Song", CollectionKey{.resolver = "ProbeBuilder", .value = "song:1"})
       .sequence(sequence)
@@ -165,12 +164,10 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
   const auto* sequenceData = std::get<SequenceProgramAsset>(result.assets[0]).privateData.get<BuilderPrivateData>();
   const auto* instrumentData = std::get<InstrumentSetAsset>(result.assets[1]).privateData.get<BuilderPrivateData>();
   const auto* sampleData = std::get<SampleCollectionAsset>(result.assets[2]).privateData.get<BuilderPrivateData>();
-  const auto* miscData = std::get<MiscAsset>(result.assets[3]).privateData.get<BuilderPrivateData>();
   expect(sequenceData != nullptr && sequenceData->value == 11 && instrumentData != nullptr &&
-             instrumentData->value == 22 && sampleData != nullptr && sampleData->value == 33 && miscData != nullptr &&
-             miscData->value == 44 &&
+             instrumentData->value == 22 && sampleData != nullptr && sampleData->value == 33 &&
              std::get<SampleCollectionAsset>(result.assets[2]).privateData.get<std::string>() == nullptr,
-         "scan drafts should retain one immutable typed private payload on each published asset");
+         "sequence, instrument, and sample drafts should retain an immutable typed private payload");
   expect(result.matchFacts.empty(), "scan result builder should not need match facts for explicit collections");
   expect(result.explicitCollections.size() == 1, "scan result builder should emit one explicit collection");
   expect(result.explicitCollections[0].members.sequence == sequence.id(),

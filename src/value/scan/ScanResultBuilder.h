@@ -150,9 +150,6 @@ public:
   [[nodiscard]] AssetId id() const noexcept { return id_; }
   ScanMiscDraft& payload(std::vector<u8> payload);
 
-  template <typename T>
-  ScanMiscDraft& data(T value);
-
 private:
   friend class ScanResultBuilder;
 
@@ -276,12 +273,6 @@ ScanInstrumentSetDraft& ScanInstrumentSetDraft::data(T value) {
 
 template <typename T>
 ScanSampleCollectionDraft& ScanSampleCollectionDraft::data(T value) {
-  out_->setPrivateData(slot_, AssetPrivateData::make(std::move(value)));
-  return *this;
-}
-
-template <typename T>
-ScanMiscDraft& ScanMiscDraft::data(T value) {
   out_->setPrivateData(slot_, AssetPrivateData::make(std::move(value)));
   return *this;
 }

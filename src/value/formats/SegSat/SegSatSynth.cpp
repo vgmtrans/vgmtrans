@@ -494,7 +494,7 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
       entry.region(*sample, std::move(parsedRegion.region)).source("Region", parsedRegion.source, "segsat-region");
     }
   }
-  instruments.data(SegSatBankBindingData{.velocityBank = std::move(velocityBank)});
+  instruments.data(std::move(velocityBank));
   return SegSatScannedBank{
       .instruments = instruments.ref(),
       .samples = samples.ref(),

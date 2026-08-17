@@ -221,12 +221,12 @@ void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceFa
 
 [[nodiscard]] AkaoArticulationMap selectedArticulations(const CollectionBindingContext& context) {
   AkaoArticulationMap articulations;
-  for (const auto* sampleCollection : context.sampleCollections()) {
+  for (const auto* sampleCollection : context.sampleCollections) {
     const auto* data = sampleCollection->privateData.get<AkaoSampleBindingData>();
     if (data == nullptr) {
       continue;
     }
-    for (const auto& articulation : data->articulations) {
+    for (const auto& articulation : *data) {
       articulations[articulation.articulationId] = AkaoArticulationBinding{
           .collection = ScanSampleCollectionRef{.id = sampleCollection->metadata.id},
           .sampleIndex = articulation.sampleIndex,
@@ -333,7 +333,7 @@ std::vector<DesiredCollection> resolveAkaoCollections(const MatchContext& contex
 }
 
 void bindAkaoCollection(CollectionBindingContext& context) {
-  const auto* sequence = context.sequence();
+  const auto* sequence = context.sequence;
   if (sequence == nullptr) {
     return;
   }
@@ -353,7 +353,7 @@ void bindAkaoCollection(CollectionBindingContext& context) {
     return;
   }
 
-  for (const auto* samples : context.sampleCollections()) {
+  for (const auto* samples : context.sampleCollections) {
     if (samples->metadata.format == kAkaoFormatName && samples->privateData.get<AkaoSampleBindingData>() == nullptr) {
       context.fail("Akao sample collection is missing retained collection-binding data", samples->metadata.range);
       return;

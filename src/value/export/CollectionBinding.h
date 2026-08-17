@@ -8,7 +8,7 @@
 
 #include "value/export/ExportTypes.h"
 #include "value/export/SequenceModulationProfile.h"
-#include "value/scan/FormatModule.h"
+#include "value/model/SessionSnapshot.h"
 
 #include <optional>
 #include <string>
@@ -16,16 +16,8 @@
 
 namespace vgmtrans::core {
 
-class FormatRegistry;
 struct CollectionBindingResult;
 struct RenderedCollection;
-
-struct CollectionBindingDiagnostics {
-  std::vector<Diagnostic> collection;
-  std::vector<Diagnostic> sequence;
-  std::vector<Diagnostic> instrumentSets;
-  std::vector<Diagnostic> sampleCollections;
-};
 
 // Final, collection-local input to rendering and export. The retained snapshot
 // keeps every borrowed asset alive, while private storage prevents exporters
@@ -44,7 +36,7 @@ public:
   }
 
 private:
-  friend CollectionBindingResult bindCollection(const SessionSnapshot&, CollectionId, const FormatRegistry&);
+  friend CollectionBindingResult bindCollection(const SessionSnapshot&, CollectionId);
   friend RenderedCollection renderCollection(const BoundCollection&, const SequenceRenderOptions&);
 
   BoundCollection(SessionSnapshot snapshot, CollectionId id, std::string baseName,
@@ -66,7 +58,7 @@ private:
 // failures that intentionally publish no partially bound value.
 struct CollectionBindingResult {
   std::optional<BoundCollection> collection;
-  CollectionBindingDiagnostics diagnostics;
+  std::vector<Diagnostic> diagnostics;
 };
 
 struct RenderedCollection {
@@ -75,8 +67,7 @@ struct RenderedCollection {
   std::vector<Diagnostic> diagnostics;
 };
 
-[[nodiscard]] CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, CollectionId collection,
-                                                     const FormatRegistry& formats);
+[[nodiscard]] CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, CollectionId collection);
 [[nodiscard]] RenderedCollection renderSequence(const SequenceProgramAsset& sequence,
                                                 const SequenceRenderOptions& options);
 [[nodiscard]] RenderedCollection renderCollection(const BoundCollection& collection,

@@ -146,9 +146,7 @@ struct SegSatSequenceBindingData {
   std::vector<SegSatControllerChange> controllerChanges;
 };
 
-struct SegSatBankBindingData {
-  SegSatVelocityBank velocityBank;
-};
+using SegSatBankBindingData = SegSatVelocityBank;
 
 // Collection-local data captured by the sequence runtime before rendering.
 struct SegSatRuntimeConfig {

@@ -39,75 +39,37 @@ private:
   SharedSequence<MatchFact> matchFacts_;
 };
 
-// Formats bind collection-local meaning into private instrument copies and an
-// optional compatible runtime. Membership was fixed earlier by matching, so a
-// binder can edit asset contents but cannot add, remove, or reorder members.
-class CollectionBindingContext {
-public:
-  CollectionBindingContext(const SequenceProgramAsset* sequence, SequenceRuntime& sequenceRuntime,
-                           std::span<InstrumentSetAsset> instrumentSets,
-                           std::span<const SampleCollectionAsset* const> sampleCollections,
-                           std::vector<Diagnostic>& diagnostics)
-      : sequence_(sequence), sequenceRuntime_(sequenceRuntime), instrumentSets_(instrumentSets),
-        sampleCollections_(sampleCollections), diagnostics_(diagnostics) {}
-
-  [[nodiscard]] const SequenceProgramAsset* sequence() const noexcept { return sequence_; }
-  [[nodiscard]] std::span<InstrumentSetAsset> instrumentSets() const noexcept { return instrumentSets_; }
-  [[nodiscard]] std::span<const SampleCollectionAsset* const> sampleCollections() const noexcept {
-    return sampleCollections_;
-  }
+// Formats bind collection-local meaning into private instrument copies and a
+// copied sequence runtime. Member lists themselves were fixed during matching.
+struct CollectionBindingContext {
+  const SequenceProgramAsset* sequence;
+  SequenceRuntime& sequenceRuntime;
+  std::span<InstrumentSetAsset> instrumentSets;
+  std::span<const SampleCollectionAsset* const> sampleCollections;
+  std::vector<Diagnostic>& diagnostics;
+  bool failed = false;
 
   [[nodiscard]] InstrumentSetAsset* instrumentSet(AssetId id) const noexcept {
     const auto found =
-        std::ranges::find(instrumentSets_, id, [](const InstrumentSetAsset& asset) { return asset.metadata.id; });
-    return found == instrumentSets_.end() ? nullptr : &*found;
+        std::ranges::find(instrumentSets, id, [](const InstrumentSetAsset& asset) { return asset.metadata.id; });
+    return found == instrumentSets.end() ? nullptr : &*found;
   }
 
-  // Stored command closures require the original compiler cursor's Playback
-  // type. Runtime configuration may change, but that command-facing ABI may not.
-  void replaceSequenceRuntime(SequenceRuntime replacement) {
-    if (sequence_ == nullptr) {
-      fail("Cannot replace the runtime of a collection without a sequence");
-      return;
-    }
-    if (!replacement.valid()) {
-      fail("Collection binder supplied an invalid sequence runtime", sequence_->metadata.range);
-      return;
-    }
-    const void* expected = sequence_->program.runtime.commandPlaybackType;
-    if (expected == nullptr || replacement.commandPlaybackType != expected) {
-      fail("Collection binder supplied an incompatible sequence runtime", sequence_->metadata.range);
-      return;
-    }
-    sequenceRuntime_ = std::move(replacement);
-  }
-
-  void warning(std::string message, SourceRange range = {}) {
-    diagnostics_.push_back(Diagnostic{
-        .severity = Severity::Warning,
-        .message = std::move(message),
-        .range = range.valid() ? std::optional<SourceRange>{range} : std::nullopt,
-    });
-  }
+  void warning(std::string message, SourceRange range = {}) { report(Severity::Warning, std::move(message), range); }
 
   void fail(std::string message, SourceRange range = {}) {
-    failed_ = true;
-    diagnostics_.push_back(Diagnostic{
-        .severity = Severity::Error,
+    failed = true;
+    report(Severity::Error, std::move(message), range);
+  }
+
+private:
+  void report(Severity severity, std::string message, SourceRange range) {
+    diagnostics.push_back(Diagnostic{
+        .severity = severity,
         .message = std::move(message),
         .range = range.valid() ? std::optional<SourceRange>{range} : std::nullopt,
     });
   }
-
-  [[nodiscard]] bool failed() const noexcept { return failed_; }
-
-private:
-  const SequenceProgramAsset* sequence_ = nullptr;
-  SequenceRuntime& sequenceRuntime_;
-  std::span<InstrumentSetAsset> instrumentSets_;
-  std::span<const SampleCollectionAsset* const> sampleCollections_;
-  std::vector<Diagnostic>& diagnostics_;
-  bool failed_ = false;
 };
 
 struct FormatModule {
@@ -115,7 +77,6 @@ struct FormatModule {
   // of scan(), which returns an empty result when the source does not match.
   using Scan = std::function<ScanResult(const ScanInput& input)>;
   using ResolveCollections = std::function<std::vector<DesiredCollection>(const MatchContext& context)>;
-  using BindCollection = std::function<void(CollectionBindingContext& context)>;
 
   std::string name;
   // Used when a request delegates sample filtering to the owning format.
@@ -128,7 +89,8 @@ struct FormatModule {
   // different key prefix for its collections.
   std::string collectionResolverId;
   ResolveCollections resolveCollections;
-  BindCollection bindCollection;
+  // Session resolution installs this closure directly on matching collections.
+  CollectionBinder bindCollection;
 
   [[nodiscard]] std::string_view collectionResolver() const noexcept {
     return collectionResolverId.empty() ? std::string_view(name) : std::string_view(collectionResolverId);

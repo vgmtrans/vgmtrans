@@ -24,21 +24,18 @@ struct PendingSequence {
   std::string name;
   SourceRange range;
   std::optional<SequenceProgram> program;
-  AssetPrivateData privateData;
 };
 
 struct PendingInstrumentSet {
   AssetId id;
   std::string name;
   InstrumentSetBuilder instruments;
-  AssetPrivateData privateData;
 };
 
 struct PendingSampleCollection {
   AssetId id;
   std::string name;
   SampleCollectionBuilder samples;
-  AssetPrivateData privateData;
 };
 
 struct PendingMisc {
@@ -46,7 +43,6 @@ struct PendingMisc {
   std::string name;
   SourceRange range;
   std::optional<std::vector<u8>> payload;
-  AssetPrivateData privateData;
 };
 
 }  // namespace
@@ -57,6 +53,7 @@ struct ScanResultBuilder::DraftSlot {
   explicit DraftSlot(Value value) : value(std::move(value)) {}
 
   Value value;
+  AssetPrivateData privateData;
 };
 
 ScanSequenceDraft::ScanSequenceDraft(ScanResultBuilder& out, size_t slot, AssetId id)
@@ -386,34 +383,34 @@ ScanResult ScanResultBuilder::finish() {
 
   result_.assets.reserve(result_.assets.size() + drafts_.size());
   for (auto& slot : drafts_) {
+    auto privateData = std::move(slot->privateData);
     Asset asset = std::visit(
-        [this](auto& pending) -> Asset {
+        [this, &privateData](auto& pending) -> Asset {
           using Pending = std::decay_t<decltype(pending)>;
           if constexpr (std::is_same_v<Pending, PendingSequence>) {
             return SequenceProgramAsset{
                 .metadata = metadata(pending.id, std::move(pending.name), pending.range),
                 .program = std::move(*pending.program),
-                .privateData = std::move(pending.privateData),
+                .privateData = std::move(privateData),
             };
           } else if constexpr (std::is_same_v<Pending, PendingInstrumentSet>) {
             auto built = std::move(pending.instruments).finish();
             return InstrumentSetAsset{
                 .metadata = metadata(pending.id, std::move(pending.name), built.range),
                 .instruments = std::move(built.values),
-                .privateData = std::move(pending.privateData),
+                .privateData = std::move(privateData),
             };
           } else if constexpr (std::is_same_v<Pending, PendingSampleCollection>) {
             auto built = std::move(pending.samples).finish();
             return SampleCollectionAsset{
                 .metadata = metadata(pending.id, std::move(pending.name), built.range),
                 .samples = std::move(built.value),
-                .privateData = std::move(pending.privateData),
+                .privateData = std::move(privateData),
             };
           } else {
             return MiscAsset{
                 .metadata = metadata(pending.id, std::move(pending.name), pending.range),
                 .payload = std::move(*pending.payload),
-                .privateData = std::move(pending.privateData),
             };
           }
         },
@@ -426,7 +423,7 @@ ScanResult ScanResultBuilder::finish() {
 }
 
 void ScanResultBuilder::setPrivateData(size_t slot, AssetPrivateData data) {
-  std::visit([&](auto& pending) { pending.privateData = std::move(data); }, drafts_.at(slot)->value);
+  drafts_.at(slot)->privateData = std::move(data);
 }
 
 AssetMetadata ScanResultBuilder::metadata(AssetId id, std::string name, SourceRange range) const {

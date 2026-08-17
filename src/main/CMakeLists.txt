@@ -182,7 +182,6 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/sequence/CompiledCommandRuntime.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/CompilerCursor.h
       ${PROJECT_SOURCE_DIR}/src/value/base/CoreTypes.h
-      ${PROJECT_SOURCE_DIR}/src/value/base/TypeToken.h
       ${PROJECT_SOURCE_DIR}/src/value/base/Types.h
       ${PROJECT_SOURCE_DIR}/src/value/base/RecordReader.h
       ${PROJECT_SOURCE_DIR}/src/value/platform/SnesSampleDirectory.h

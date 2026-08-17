@@ -346,7 +346,9 @@ void sessionKeepsScannerKnownCollectionsWithoutResolver() {
 
 void sessionCreatesUserCollectionsFromDetectedAssets() {
   Session session;
-  session.registerFormat(probeBankSequenceModule());
+  auto sequenceModule = probeBankSequenceModule();
+  sequenceModule.bindCollection = [](CollectionBindingContext& context) { context.warning("user collection bound"); };
+  session.registerFormat(std::move(sequenceModule));
   session.registerFormat(probeBankInstrumentModule());
 
   const SourceId sequenceSource = session.addSource(SourceFile{.name = "manual.seq"}, {0xcc, 4});
@@ -374,6 +376,7 @@ void sessionCreatesUserCollectionsFromDetectedAssets() {
   expect(
       collection->members.sequence == members.sequence && collection->members.instrumentSets == members.instrumentSets,
       "manual collection should preserve the selected asset ids");
+  expect(static_cast<bool>(collection->binder), "manual collection should retain its sequence format's binder");
 
   session.removeSource(instrumentSource);
   const SessionSnapshot removed = session.snapshot();

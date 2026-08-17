@@ -170,7 +170,8 @@ void SessionState::removeSources(std::span<const SourceId> sources) {
   removeDiscoveredData(sourceIds, removedAssets);
 }
 
-CollectionId SessionState::createUserCollection(std::string name, CollectionMembers members, ScanIdAllocator& ids) {
+CollectionId SessionState::createUserCollection(std::string name, CollectionMembers members, CollectionBinder binder,
+                                                ScanIdAllocator& ids) {
   if (name.empty()) {
     throw std::invalid_argument("A user-created collection must have a name");
   }
@@ -205,6 +206,7 @@ CollectionId SessionState::createUserCollection(std::string name, CollectionMemb
       .id = id,
       .name = std::move(name),
       .origin = CollectionOrigin::UserCreated,
+      .binder = std::move(binder),
       .members = std::move(members),
   });
   return id;
@@ -249,7 +251,7 @@ std::map<std::string, std::vector<DesiredCollection>> SessionState::desiredColle
 }
 
 void SessionState::reconcileCollections(std::string_view resolver, std::vector<DesiredCollection> desired,
-                                        ScanIdAllocator& ids) {
+                                        CollectionBinder binder, ScanIdAllocator& ids) {
   std::set<std::string> seenKeys;
   for (auto& candidate : desired) {
     if (candidate.key.resolver.empty()) {
@@ -281,6 +283,7 @@ void SessionState::reconcileCollections(std::string_view resolver, std::vector<D
       }
       found->name = std::move(candidate.name);
       found->freshness = CollectionFreshness::Current;
+      found->binder = binder;
       found->members = std::move(candidate.members);
       found->issues = std::move(candidate.issues);
       continue;
@@ -291,6 +294,7 @@ void SessionState::reconcileCollections(std::string_view resolver, std::vector<D
         .name = std::move(candidate.name),
         .origin = CollectionOrigin::Discovered,
         .key = std::move(candidate.key),
+        .binder = binder,
         .members = std::move(candidate.members),
         .issues = std::move(candidate.issues),
     });

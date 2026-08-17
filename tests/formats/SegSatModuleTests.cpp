@@ -556,10 +556,8 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
           .explicitAddress = InstrumentAddress{.bank = 5, .program = 0},
           .identity = segSatInstrumentIdentity(5, 0),
       }},
-      .privateData = AssetPrivateData::make(SegSatBankBindingData{
-          .velocityBank =
-              readSegSatVelocityBank(sources.reader(bank5Source), *bank5Layout, 5, SegSatVolumeModel::V1_33),
-      }),
+      .privateData = AssetPrivateData::make(
+          readSegSatVelocityBank(sources.reader(bank5Source), *bank5Layout, 5, SegSatVolumeModel::V1_33)),
   };
   const InstrumentSetAsset bank6{
       .metadata =
@@ -573,10 +571,8 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
           .explicitAddress = InstrumentAddress{.bank = 6, .program = 0},
           .identity = segSatInstrumentIdentity(6, 0),
       }},
-      .privateData = AssetPrivateData::make(SegSatBankBindingData{
-          .velocityBank =
-              readSegSatVelocityBank(sources.reader(bank6Source), *bank6Layout, 6, SegSatVolumeModel::V1_33),
-      }),
+      .privateData = AssetPrivateData::make(
+          readSegSatVelocityBank(sources.reader(bank6Source), *bank6Layout, 6, SegSatVolumeModel::V1_33)),
   };
   const InstrumentSetAsset foreignBank{
       .metadata = AssetMetadata{.id = AssetId{3}, .format = "Foreign", .name = "Foreign Bank"},
