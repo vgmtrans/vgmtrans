@@ -52,6 +52,10 @@ using FinalizePerformance = void (*)(std::any& programState, PerformanceSequence
 struct SequenceRuntime {
   CreateProgramState createProgramState;
   CreateTrackState createTrackState;
+  // Stored command bodies erase a pointer to their compiler cursor's Playback
+  // type. A collection binder may replace runtime configuration only when this
+  // process-local token still identifies that same command-facing type.
+  const void* commandPlaybackType = nullptr;
   ExecuteCommand execute = nullptr;
   CommandReadyDuringWait readyDuringWait = nullptr;
   TickTrackState tick = nullptr;
@@ -337,6 +341,7 @@ struct SequenceProgram {
 struct SequenceProgramAsset {
   AssetMetadata metadata;
   SequenceProgram program;
+  AssetPrivateData privateData;
 };
 
 }  // namespace vgmtrans::core

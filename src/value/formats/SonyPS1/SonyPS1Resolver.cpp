@@ -247,12 +247,12 @@ std::vector<DesiredCollection> resolveSonyPs1Collections(const MatchContext& con
 void bindSonyPs1Collection(CollectionBindingContext& context) {
   // Scan-time bank numbers describe every VAB in a source. Collections load
   // their selected VABs into bank slots in member order.
-  for (size_t index = 0; index < context.instrumentSets.size(); ++index) {
-    auto& instruments = context.instrumentSets[index];
+  const auto instrumentSets = context.instrumentSets();
+  u32 bank = 0;
+  for (auto& instruments : instrumentSets) {
     if (instruments.metadata.format != kSonyPs1FormatName) {
       continue;
     }
-    const u32 bank = static_cast<u32>(index);
     for (auto& instrument : instruments.instruments) {
       const u32 program = instrument.explicitAddress ? instrument.explicitAddress->program
                           : instrument.identity      ? instrument.identity->key & 0xff
@@ -260,6 +260,7 @@ void bindSonyPs1Collection(CollectionBindingContext& context) {
       instrument.explicitAddress = InstrumentAddress{.bank = bank, .program = program};
       instrument.identity = sonyPs1InstrumentIdentity(static_cast<u16>(bank), static_cast<u8>(program));
     }
+    ++bank;
   }
 }
 

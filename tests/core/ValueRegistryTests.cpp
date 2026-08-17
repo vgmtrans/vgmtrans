@@ -12,6 +12,10 @@
 
 namespace {
 
+struct BuilderPrivateData {
+  u32 value = 0;
+};
+
 void formatRegistryStoresCopyableModulesAtomically() {
   FormatRegistry registry;
   registry.add(probeSequenceModule());
@@ -83,6 +87,27 @@ void formatRegistryStoresCopyableModulesAtomically() {
   }
   expect(threw && registry.extractors().size() == 1,
          "format registry should reject duplicate extractor names without partially registering an extractor");
+
+  FormatRegistry binderRegistry;
+  binderRegistry.add(FormatModule{
+      .name = "FirstBinder",
+      .scan = scanProbeSequence,
+      .collectionResolverId = "SharedResolver",
+      .bindCollection = [](CollectionBindingContext&) {},
+  });
+  threw = false;
+  try {
+    binderRegistry.add(FormatModule{
+        .name = "SecondBinder",
+        .scan = scanProbeSequence,
+        .collectionResolverId = "SharedResolver",
+        .bindCollection = [](CollectionBindingContext&) {},
+    });
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  expect(threw && binderRegistry.modules().size() == 1,
+         "format registry should allow only one collection binder per effective resolver id");
 }
 
 void sessionRegistersOneFormatModuleAtTheAuthoringSurface() {
@@ -106,9 +131,12 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
   ScanResultBuilder out(input, "ProbeBuilder");
   const auto wholeSource = input.reader.range(0, input.reader.size());
 
-  const auto sequence = out.sequence("Builder Sequence", wholeSource).program(probeSequenceProgram());
-  const auto bank = out.instrumentSet("Builder Bank", input.reader.range(0, 1));
+  const auto sequence = out.sequence("Builder Sequence", wholeSource)
+                            .data(BuilderPrivateData{.value = 11})
+                            .program(probeSequenceProgram());
+  const auto bank = out.instrumentSet("Builder Bank", input.reader.range(0, 1)).data(BuilderPrivateData{.value = 22});
   auto samples = out.sampleCollection("Builder Samples", input.reader.range(1, 2));
+  samples.data(BuilderPrivateData{.value = 33});
   samples.add(0, Sample{
                      .name = "Builder Sample",
                      .codec = AudioCodec::PcmS8,
@@ -117,19 +145,32 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
                      .channels = 1,
                      .bitsPerSample = 8,
                  });
+  const auto misc =
+      out.misc("Builder Misc", input.reader.range(0, 1)).data(BuilderPrivateData{.value = 44}).payload({0xaa});
 
   out.collection("Builder Song", CollectionKey{.resolver = "ProbeBuilder", .value = "song:1"})
       .sequence(sequence)
       .instrumentSet(bank)
-      .samples(samples);
+      .samples(samples)
+      .misc(misc);
   out.warning("builder warning", input.reader.range(0, 1));
 
   ScanResult result = out.finish();
-  expect(result.assets.size() == 3, "scan result builder should add sequence, instrument, and sample assets");
+  expect(result.assets.size() == 4, "scan result builder should add sequence, instrument, sample, and misc assets");
   expect(metadata(result.assets[0]).id == AssetId{0} && metadata(result.assets[0]).format == "ProbeBuilder",
          "scan result builder should assign sequence metadata");
   expect(metadata(result.assets[1]).id == AssetId{1}, "scan result builder should assign instrument metadata");
   expect(metadata(result.assets[2]).id == AssetId{2}, "scan result builder should assign sample metadata");
+  expect(metadata(result.assets[3]).id == AssetId{3}, "scan result builder should assign misc metadata");
+  const auto* sequenceData = std::get<SequenceProgramAsset>(result.assets[0]).privateData.get<BuilderPrivateData>();
+  const auto* instrumentData = std::get<InstrumentSetAsset>(result.assets[1]).privateData.get<BuilderPrivateData>();
+  const auto* sampleData = std::get<SampleCollectionAsset>(result.assets[2]).privateData.get<BuilderPrivateData>();
+  const auto* miscData = std::get<MiscAsset>(result.assets[3]).privateData.get<BuilderPrivateData>();
+  expect(sequenceData != nullptr && sequenceData->value == 11 && instrumentData != nullptr &&
+             instrumentData->value == 22 && sampleData != nullptr && sampleData->value == 33 && miscData != nullptr &&
+             miscData->value == 44 &&
+             std::get<SampleCollectionAsset>(result.assets[2]).privateData.get<std::string>() == nullptr,
+         "scan drafts should retain one immutable typed private payload on each published asset");
   expect(result.matchFacts.empty(), "scan result builder should not need match facts for explicit collections");
   expect(result.explicitCollections.size() == 1, "scan result builder should emit one explicit collection");
   expect(result.explicitCollections[0].members.sequence == sequence.id(),
@@ -138,8 +179,38 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
          "scan result builder should preserve the collection instrument set");
   expect(result.explicitCollections[0].members.sampleCollections == std::vector<AssetId>{samples.id()},
          "scan result builder should preserve the collection sample collection");
+  expect(result.explicitCollections[0].members.miscAssets == std::vector<AssetId>{misc.id()},
+         "scan result builder should preserve the collection misc asset");
   expect(result.diagnostics.size() == 1 && result.diagnostics[0].message == "builder warning",
          "scan result builder should preserve diagnostics");
+}
+
+void sessionStoresTheOwningFormatsPreferredSampleFilter() {
+  Session session;
+  session.registerFormat(FormatModule{
+      .name = "FilteredSamples",
+      .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
+      .scan =
+          [](const ScanInput& input) {
+            ScanResultBuilder out(input, "FilteredSamples");
+            auto samples = out.sampleCollection("Filtered Samples", input.reader.range(0, 1));
+            samples.add(0, Sample{
+                               .name = "Filtered Sample",
+                               .codec = AudioCodec::PcmS8,
+                               .encodedData = input.reader.range(0, 1),
+                               .sampleRate = 8000,
+                           });
+            return out.finish();
+          },
+  });
+  session.addSource(SourceFile{.name = "samples.bin"}, {0});
+  session.scanPendingSources();
+
+  const auto snapshot = session.snapshot();
+  expect(!snapshot.assets().empty(), "filtered sample fixture should publish one sample collection");
+  const auto* samples = std::get_if<SampleCollectionAsset>(&snapshot.assets().front());
+  expect(samples != nullptr && samples->preferredFilter == SampleFilter::PsxSpuLowPass,
+         "sample assets should retain their owning format's preferred export filter");
 }
 
 void scanResultBuilderNamesSourceCollections() {
@@ -259,4 +330,5 @@ void runValueRegistryTests() {
   scanResultBuilderRejectsWrongRoleHandleReuse();
   scanResultBuilderPublishesEmptySynthDrafts();
   scanResultBuilderCursorReportsMalformedFields();
+  sessionStoresTheOwningFormatsPreferredSampleFilter();
 }

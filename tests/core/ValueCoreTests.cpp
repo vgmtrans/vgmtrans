@@ -168,7 +168,7 @@ void akaoPortamentoRetainsPitchTransitionIntent();
 void akaoRequiredArticulationsComeFromInstrumentRows();
 void akaoMelodicRegionsDropAdvancingOverlaps();
 void akaoSampleSelectionKeepsPreferredAndRequiredCollections();
-void akaoScanPublishesStructuralInstrumentSetAndBindsResolvedView();
+void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView();
 void ndsLayoutResolvesNamesFilesAndDependencies();
 void ndsLayoutBoundsMalformedTablesAndPointers();
 void ndsSequenceFatRangesHandleNormalEmptyAndRecoveredFiles();
@@ -199,7 +199,7 @@ void segSatTempoDeltaBytesPreserveSourceOrder();
 void segSatCollectionBindingSuppliesVlTablesToSequence();
 void segSatRuntimeMapSelectsBankInsideAnotherSampleSpan();
 void segSatMultiBankPlaybackUsesTheActiveBanksVlTable();
-void segSatCollectionBindingReadsVelocityBanksFromSeparateSources();
+void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources();
 void segSatSsfExtractorUsesFourByteMiniHeader();
 
 int main() {
@@ -361,7 +361,7 @@ int main() {
     akaoRequiredArticulationsComeFromInstrumentRows();
     akaoMelodicRegionsDropAdvancingOverlaps();
     akaoSampleSelectionKeepsPreferredAndRequiredCollections();
-    akaoScanPublishesStructuralInstrumentSetAndBindsResolvedView();
+    akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView();
     runMp2kModuleTests();
     ndsLayoutResolvesNamesFilesAndDependencies();
     ndsLayoutBoundsMalformedTablesAndPointers();
@@ -393,7 +393,7 @@ int main() {
     segSatCollectionBindingSuppliesVlTablesToSequence();
     segSatRuntimeMapSelectsBankInsideAnotherSampleSpan();
     segSatMultiBankPlaybackUsesTheActiveBanksVlTable();
-    segSatCollectionBindingReadsVelocityBanksFromSeparateSources();
+    segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources();
     segSatSsfExtractorUsesFourByteMiniHeader();
     suzukiPs1DynamicAdsrUsesAuditedDriverCommands();
     suzukiPs1ModuleBuildsFractionallyTunedWdsSynth();

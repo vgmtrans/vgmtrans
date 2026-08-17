@@ -8,10 +8,44 @@
 
 #include "value/base/Types.h"
 #include "value/base/CoreTypes.h"
+#include "value/base/TypeToken.h"
 
+#include <memory>
 #include <string>
+#include <type_traits>
+#include <utility>
 
 namespace vgmtrans::core {
+
+// One immutable, format-owned value retained with a scanned asset. The core
+// deliberately cannot inspect or serialize it; typed format code uses it to
+// carry source meaning needed after collection matching without reparsing.
+class AssetPrivateData {
+public:
+  AssetPrivateData() = default;
+
+  template <typename T>
+  [[nodiscard]] static AssetPrivateData make(T value) {
+    using Value = std::remove_cvref_t<T>;
+    static_assert(std::is_object_v<Value>);
+    auto owned = std::make_shared<const Value>(std::move(value));
+    return AssetPrivateData(detail::typeToken<Value>(), std::move(owned));
+  }
+
+  template <typename T>
+  [[nodiscard]] const std::remove_cvref_t<T>* get() const noexcept {
+    using Value = std::remove_cvref_t<T>;
+    return type_ == detail::typeToken<Value>() ? static_cast<const Value*>(value_.get()) : nullptr;
+  }
+
+  [[nodiscard]] bool empty() const noexcept { return value_ == nullptr; }
+
+private:
+  AssetPrivateData(const void* type, std::shared_ptr<const void> value) : type_(type), value_(std::move(value)) {}
+
+  const void* type_ = nullptr;
+  std::shared_ptr<const void> value_;
+};
 
 // Common metadata for sequences, instrument sets, sample collections, and misc
 // assets. range identifies the asset's primary source structure; SourceInspection

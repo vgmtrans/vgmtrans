@@ -117,8 +117,8 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/PitchTransitionMidiLowering.h
     ${PROJECT_SOURCE_DIR}/src/value/export/BinaryWriter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/BinaryWriter.h
-    ${PROJECT_SOURCE_DIR}/src/value/export/CollectionResolution.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/export/CollectionResolution.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/CollectionBinding.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/CollectionBinding.h
     ${PROJECT_SOURCE_DIR}/src/value/export/CollectionStitch.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/DynamicEnvelope.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/ExportDiagnostics.h
@@ -182,6 +182,7 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/sequence/CompiledCommandRuntime.h
       ${PROJECT_SOURCE_DIR}/src/value/sequence/CompilerCursor.h
       ${PROJECT_SOURCE_DIR}/src/value/base/CoreTypes.h
+      ${PROJECT_SOURCE_DIR}/src/value/base/TypeToken.h
       ${PROJECT_SOURCE_DIR}/src/value/base/Types.h
       ${PROJECT_SOURCE_DIR}/src/value/base/RecordReader.h
       ${PROJECT_SOURCE_DIR}/src/value/platform/SnesSampleDirectory.h

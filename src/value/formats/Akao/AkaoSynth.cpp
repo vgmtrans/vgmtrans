@@ -43,6 +43,7 @@ struct ParsedSample {
 
 struct ParsedSampleCollection {
   AkaoSampleCollectionParse parse;
+  std::vector<AkaoArticulation> articulations;
   std::vector<ParsedSample> samples;
   std::string name;
   SourceRange range;
@@ -320,8 +321,8 @@ struct ParsedSampleCollection {
               .version = version,
               .firstArticulationId = table.firstArticulationId,
               .articulationCount = table.articulationCount,
-              .articulations = std::move(articulations),
           },
+      .articulations = std::move(articulations),
       .samples = std::move(samples),
       .name = std::move(name),
       .range = range,
@@ -353,7 +354,7 @@ void emitSampleCollection(const ScanInput& input, ScanResultBuilder& result, Par
                                                    .derived("first_articulation_id", parsed.table.firstArticulationId)
                                                    .derived("articulation_count", parsed.table.articulationCount)
                                                    .id();
-  for (const AkaoArticulation& articulation : parsed.parse.articulations) {
+  for (const AkaoArticulation& articulation : parsed.articulations) {
     auto annotation = result.sourceMap()
                           .annotation(SourceRole::TableEntry,
                                       fmt::format("Articulation {}", articulation.articulationId), articulation.source)
@@ -371,6 +372,7 @@ void emitSampleCollection(const ScanInput& input, ScanResultBuilder& result, Par
                       SourceTarget{ObjectRefs::sample(parsed.parse.ref.id, articulation.sampleIndex)});
     }
   }
+  samples.data(AkaoSampleBindingData{.articulations = std::move(parsed.articulations)});
 }
 
 [[nodiscard]] std::optional<ParsedSampleCollection> parseSampleCollectionValues(const ScanInput& input, u32 offset,
@@ -432,28 +434,6 @@ bool isPossibleAkaoSampleCollection(ByteReader reader, u32 offset) {
   }
   const u32 firstDest = reader.le32(offset + 0x40);
   return firstDest == 0 || firstDest == reader.le32(offset + 0x10);
-}
-
-std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollectionData(const ScanInput& input,
-                                                                       ScanSampleCollectionRef ref, u32 offset,
-                                                                       AkaoPs1Version version) {
-  auto parsed = parseSampleCollectionValues(input, offset, version);
-  if (!parsed) {
-    return std::nullopt;
-  }
-  parsed->parse.ref = ref;
-  return std::move(parsed->parse);
-}
-
-std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollectionData(const ScanInput& input,
-                                                                       ScanSampleCollectionRef ref,
-                                                                       AkaoSplitSampleLocation location) {
-  auto parsed = parseSampleCollectionValues(input, location);
-  if (!parsed) {
-    return std::nullopt;
-  }
-  parsed->parse.ref = ref;
-  return std::move(parsed->parse);
 }
 
 std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollection(const ScanInput& input, ScanResultBuilder& result,

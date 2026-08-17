@@ -7,7 +7,6 @@
 #include "value/export/synth/SynthExportData.h"
 
 #include "value/export/ExportDiagnostics.h"
-#include "value/scan/FormatRegistry.h"
 #include "value/sequence/PerformanceModel.h"
 #include "value/synth/SampleDecoder.h"
 
@@ -109,17 +108,10 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::sp
   return instruments;
 }
 
-[[nodiscard]] SampleFilter sampleFilterFor(const SampleCollectionAsset& collection, SampleFilteringPolicy policy,
-                                           const FormatRegistry* formats) {
-  const auto* module = formats != nullptr ? formats->findModule(collection.metadata.format) : nullptr;
-  const SampleFilter preferred = module != nullptr ? module->preferredSampleFilter : SampleFilter::None;
-  return resolveSampleFilter(policy, preferred);
-}
-
 [[nodiscard]] std::vector<DecodedSynthSample> decodeSynthSamples(
     std::span<const SampleCollectionAsset* const> sampleCollections, const SourceStore& sources,
     std::vector<Diagnostic>& diagnostics, const SynthSampleDecodeOptions& options,
-    const SynthSampleIndexList* sampleFilter, SampleFilteringPolicy filtering, const FormatRegistry* formats) {
+    const SynthSampleIndexList* sampleFilter, SampleFilteringPolicy filtering) {
   // Decode once into a flat vector. Container exporters then decide how to lay out that
   // PCM, but all of them share the same source-range diagnostics.
   std::vector<DecodedSynthSample> samples;
@@ -128,7 +120,7 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection, std::sp
     if (collection == nullptr) {
       continue;
     }
-    const SampleFilter selectedFilter = sampleFilterFor(*collection, filtering, formats);
+    const SampleFilter selectedFilter = resolveSampleFilter(filtering, collection->preferredFilter);
 
     for (u32 sampleIndex = 0; sampleIndex < collection->samples.samples.size(); ++sampleIndex) {
       const SynthSampleIndexKey sampleKey{collection->metadata.id.value, sampleIndex};
@@ -410,7 +402,7 @@ PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceSt
     sampleFilter = referencedSamples(instruments, input.sampleCollections);
   }
   prepared.samples = decodeSynthSamples(input.sampleCollections, sources, prepared.diagnostics, options,
-                                        sampleFilter ? &*sampleFilter : nullptr, input.sampleFiltering, input.formats);
+                                        sampleFilter ? &*sampleFilter : nullptr, input.sampleFiltering);
   const auto samplesByReference = synthSampleIndexMap(prepared.samples);
   prepared.instruments =
       resolveSynthInstruments(instruments, input.sampleCollections, samplesByReference, prepared.diagnostics);

@@ -371,6 +371,11 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
           .reader = sources_.reader(id),
           .ids = ids_,
       });
+      for (auto& asset : result.assets) {
+        if (auto* samples = std::get_if<SampleCollectionAsset>(&asset)) {
+          samples->preferredFilter = module.preferredSampleFilter;
+        }
+      }
       normalizeScanResult(result, ids_);
       prepareDiagnostics(result, source);
       auto validation = validateScanResult(source.id, result, sources_, state_->assets());
@@ -439,8 +444,7 @@ void Session::rebuildCollections() {
       continue;
     }
 
-    const std::string resolverId =
-        !module.collectionResolverId.empty() ? std::string(module.collectionResolverId) : std::string(module.name);
+    const std::string resolverId(module.collectionResolver());
     auto& desiredCollections = desiredByResolver[resolverId];
     try {
       auto desired = module.resolveCollections(context);

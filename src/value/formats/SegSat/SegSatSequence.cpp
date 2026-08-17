@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <iterator>
 #include <limits>
 #include <optional>
 #include <string_view>
@@ -417,6 +418,12 @@ struct Playback {
 
 using SegSatCursor = CompilerCursor<TrackState, Playback>;
 
+struct DecodedControllerChange {
+  Address address;
+  u8 controller = 0;
+  u8 value = 0;
+};
+
 [[nodiscard]] DecodedBytecodeCommand decodeTempo(ByteReader reader, u32 begin, u32 end, bool final,
                                                  std::vector<Diagnostic>* diagnostics) {
   SegSatCursor cursor(reader, begin, end, "segsat", diagnostics);
@@ -436,6 +443,7 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeNormal(ByteReader reader, u32 begin, u32 end, u32 normalStart,
+                                                  std::vector<DecodedControllerChange>& controllerChanges,
                                                   std::vector<Diagnostic>* diagnostics) {
   SegSatCursor cursor(reader, begin, end, "segsat", diagnostics);
   if (!cursor.hasOpcode()) {
@@ -464,6 +472,13 @@ using SegSatCursor = CompilerCursor<TrackState, Playback>;
     const auto valueRole = controller == 32 ? SemanticOperandRole::InstrumentBank : SemanticOperandRole::Level;
     const u8 value = event.derived("value", static_cast<u8>(encoded & 0x7f), valueRole);
     const u16 delta = event.u8("delta", SemanticOperandRole::Duration);
+    if (controller == 7 || controller == 11) {
+      controllerChanges.push_back(DecodedControllerChange{
+          .address = Address{begin},
+          .controller = controller,
+          .value = value,
+      });
+    }
     return event.invokeFlow<&Playback::controller>(channel, controller, value, delta);
   }
 
@@ -572,68 +587,6 @@ u8 segSatMidiVelocity(u8 velocity, const SegSatVlTable& table, u8 totalLevel, s8
   return LevelScale::midi7FromLinear(gain);
 }
 
-std::vector<u8> segSatSequenceBanks(const SequenceProgram& program) {
-  std::vector<u8> banks;
-  if (program.tracks.size() > 1) {
-    // Track zero is the tempo stream. Track one is the first copy of the normal
-    // stream; the remaining tracks contain the same commands for other channels.
-    for (const auto& command : program.tracks[1].commands) {
-      const auto bank =
-          std::ranges::find(command.operands, SemanticOperandRole::InstrumentBank, &SemanticOperand::role);
-      if (bank == command.operands.end()) {
-        continue;
-      }
-      const auto* value = std::get_if<u64>(&bank->value);
-      if (value == nullptr || *value > std::numeric_limits<u8>::max()) {
-        continue;
-      }
-      const u8 number = static_cast<u8>(*value);
-      if (std::ranges::find(banks, number) == banks.end()) {
-        banks.push_back(number);
-      }
-    }
-  }
-
-  if (banks.empty()) {
-    banks.push_back(0);
-  } else {
-    // Collections attach banks in numeric order.
-    std::ranges::sort(banks);
-  }
-  return banks;
-}
-
-std::vector<SegSatControllerChange> segSatControllerChanges(const SequenceProgram& program) {
-  std::vector<SegSatControllerChange> changes;
-  if (program.tracks.size() < 2) {
-    return changes;
-  }
-
-  // Every channel is a copy of the same normal event stream, so command IDs
-  // from the first copy also identify controller events on the other copies.
-  const auto& commands = program.tracks[1].commands;
-  for (u32 commandIndex = 0; commandIndex < commands.size(); ++commandIndex) {
-    const auto& command = commands[commandIndex];
-    const auto* controller = semanticOperand(command, "controller");
-    const auto* value = semanticOperand(command, "value");
-    if (controller == nullptr || value == nullptr) {
-      continue;
-    }
-    const auto* controllerNumber = std::get_if<u64>(&controller->value);
-    const auto* controllerValue = std::get_if<u64>(&value->value);
-    if (controllerNumber == nullptr || controllerValue == nullptr || *controllerNumber > 127 ||
-        *controllerValue > 127) {
-      continue;
-    }
-    changes.push_back(SegSatControllerChange{
-        .command = commandIndex,
-        .controller = static_cast<u8>(*controllerNumber),
-        .value = static_cast<u8>(*controllerValue),
-    });
-  }
-  return changes;
-}
-
 void finalizeSegSatPerformance(PerformanceSequence& performance, std::span<const SegSatVelocityBank> banks,
                                SegSatVolumeModel model, std::span<const SegSatControllerChange> controllerChanges) {
   const std::vector<VoiceLevel> voices = possibleVoices(banks);
@@ -718,9 +671,10 @@ const SequenceProgramConfig& segSatSequenceConfig() {
   return config;
 }
 
-SequenceProgram parseSegSatSequenceProgram(ByteReader reader, AssetId id, const SegSatSequenceLayout& layout,
-                                           SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+SegSatSequenceParse parseSegSatSequence(ByteReader reader, AssetId id, const SegSatSequenceLayout& layout,
+                                        SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   SequenceProgram program = segSatSequenceConfig().makeProgram();
+  std::vector<DecodedControllerChange> decodedControllerChanges;
   program.timebase.ppqn = layout.ppqn;
 
   std::optional<SourceAnnotationId> header;
@@ -763,8 +717,27 @@ SequenceProgram parseSegSatSequenceProgram(ByteReader reader, AssetId id, const 
   program.tracks.push_back(std::move(tempo));
 
   const u32 normalStart = layout.offset + layout.normalTrack;
-  auto normal = tracks.decode(
-      1, normalStart, [&](u32 offset) { return decodeNormal(reader, offset, layout.end, normalStart, diagnostics); });
+  auto normal = tracks.decode(1, normalStart, [&](u32 offset) {
+    return decodeNormal(reader, offset, layout.end, normalStart, decodedControllerChanges, diagnostics);
+  });
+  std::vector<SegSatControllerChange> controllerChanges;
+  controllerChanges.reserve(decodedControllerChanges.size());
+  for (const auto& decoded : decodedControllerChanges) {
+    const auto command = std::ranges::find_if(normal.commands, [&](const SourceCommand& candidate) {
+      return candidate.address.value == decoded.address.value;
+    });
+    if (command == normal.commands.end()) {
+      continue;
+    }
+    controllerChanges.push_back(SegSatControllerChange{
+        .command = static_cast<u32>(std::distance(normal.commands.begin(), command)),
+        .controller = decoded.controller,
+        .value = decoded.value,
+    });
+  }
+  std::ranges::sort(controllerChanges, {}, &SegSatControllerChange::command);
+  const auto duplicate = std::ranges::unique(controllerChanges, {}, &SegSatControllerChange::command);
+  controllerChanges.erase(duplicate.begin(), duplicate.end());
   normal.sourceTrackNumber = 0;
   program.tracks.push_back(normal);
   for (u32 channel = 1; channel < 16; ++channel) {
@@ -784,7 +757,10 @@ SequenceProgram parseSegSatSequenceProgram(ByteReader reader, AssetId id, const 
         .derived("destination", normalStart, SourceValueDisplay::Address)
         .parent(*header);
   }
-  return program;
+  return SegSatSequenceParse{
+      .program = std::move(program),
+      .controllerChanges = std::move(controllerChanges),
+  };
 }
 
 }  // namespace vgmtrans::formats::segsat

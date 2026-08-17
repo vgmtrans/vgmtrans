@@ -141,6 +141,27 @@ struct AkaoSequenceParse {
   AkaoSequenceAnalysis analysis;
 };
 
+// Only collection-local information survives scanning. Source layout and
+// matching data remain scan concerns; binding needs the exact structural bank.
+struct AkaoSequenceBindingData {
+  core::AssetId structuralInstrumentSet;
+};
+
+struct AkaoRegionBindingData {
+  u32 articulationId = 0;
+  u8 attackRate = 0;
+  u8 sustainRate = 0;
+  u8 sustainMode = 0;
+  u8 releaseRate = 0;
+  std::optional<u8> drumRelativeUnityKey;
+};
+
+struct AkaoInstrumentSetBindingData {
+  // Parallel to the durable instrument and region vectors built during scan.
+  std::vector<std::vector<AkaoRegionBindingData>> regions;
+  bool usesIndividualArticulations = false;
+};
+
 // An articulation is Akao's complete description of one playable sample:
 // its location, tuning, loop, and envelope all travel together.
 struct AkaoArticulation {
@@ -164,6 +185,9 @@ struct AkaoSampleCollectionParse {
   AkaoPs1Version version = AkaoPs1Version::Unknown;
   u32 firstArticulationId = 0;
   u32 articulationCount = 0;
+};
+
+struct AkaoSampleBindingData {
   std::vector<AkaoArticulation> articulations;
 };
 
@@ -199,13 +223,6 @@ struct AkaoSplitSampleLocation {
                                                   std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] std::optional<AkaoSplitSampleLocation> ff7HardcodedAkaoSampleLocation(core::ByteReader reader);
 [[nodiscard]] bool isPossibleAkaoSampleCollection(core::ByteReader reader, u32 offset);
-[[nodiscard]] std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollectionData(const core::ScanInput& input,
-                                                                                     core::ScanSampleCollectionRef ref,
-                                                                                     u32 offset,
-                                                                                     AkaoPs1Version version);
-[[nodiscard]] std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollectionData(const core::ScanInput& input,
-                                                                                     core::ScanSampleCollectionRef ref,
-                                                                                     AkaoSplitSampleLocation location);
 [[nodiscard]] std::optional<AkaoSampleCollectionParse> parseAkaoSampleCollection(const core::ScanInput& input,
                                                                                  core::ScanResultBuilder& result,
                                                                                  u32 offset, AkaoPs1Version version);
@@ -214,13 +231,19 @@ struct AkaoSplitSampleLocation {
                                                                                  AkaoSplitSampleLocation location);
 
 [[nodiscard]] std::string akaoInstrumentSetName(const AkaoSequenceAnalysis& sequence);
-// An empty articulation map publishes the source-stable structure used during
-// scanning. Selected articulations turn the same structure into a bound export
-// view. The return value is the set of articulation ids the structure requires.
-[[nodiscard]] std::vector<u32> buildAkaoInstrumentSet(const core::ScanInput& input,
-                                                      const AkaoSequenceAnalysis& sequence,
-                                                      const AkaoArticulationMap& articulations,
-                                                      core::InstrumentSetBuilder& instruments);
+struct AkaoInstrumentSetBuild {
+  std::vector<u32> requiredArticulations;
+  AkaoInstrumentSetBindingData binding;
+};
+
+// Publish the source-stable structural bank and, in parallel, the small recipe
+// needed to bind selected articulations without rereading its source tables.
+[[nodiscard]] AkaoInstrumentSetBuild buildAkaoInstrumentSet(const core::ScanInput& input,
+                                                            const AkaoSequenceAnalysis& sequence,
+                                                            core::InstrumentSetBuilder& instruments);
+[[nodiscard]] bool applyAkaoArticulations(core::InstrumentSetAsset& instruments,
+                                          const AkaoInstrumentSetBindingData& recipe,
+                                          const AkaoArticulationMap& articulations);
 
 [[nodiscard]] std::vector<core::DesiredCollection> resolveAkaoCollections(const core::MatchContext& context);
 void bindAkaoCollection(core::CollectionBindingContext& context);

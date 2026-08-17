@@ -428,7 +428,7 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
   if (uniqueSamples.empty()) {
     return std::nullopt;
   }
-  const SegSatVelocityBank velocityBank =
+  SegSatVelocityBank velocityBank =
       readSegSatVelocityBank(reader, layout, layout.sourceBank.value_or(exportBank), volumeModel);
 
   auto instruments = builder.instrumentSet(fmt::format("SegSat Bank {} Instruments", exportBank));
@@ -494,6 +494,7 @@ std::optional<SegSatScannedBank> addSegSatBank(ScanResultBuilder& builder, const
       entry.region(*sample, std::move(parsedRegion.region)).source("Region", parsedRegion.source, "segsat-region");
     }
   }
+  instruments.data(SegSatBankBindingData{.velocityBank = std::move(velocityBank)});
   return SegSatScannedBank{
       .instruments = instruments.ref(),
       .samples = samples.ref(),

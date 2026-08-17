@@ -304,16 +304,17 @@ void segSatTempoDeltaBytesPreserveSourceOrder() {
   bytes[16] = 0x83;
 
   const ByteReader reader(SourceId{100}, bytes);
-  const SequenceProgram program = parseSegSatSequenceProgram(reader, AssetId{100},
-                                                             SegSatSequenceLayout{
-                                                                 .offset = 0,
-                                                                 .end = static_cast<u32>(bytes.size()),
-                                                                 .ppqn = 48,
-                                                                 .tempoEventCount = 1,
-                                                                 .normalTrack = 16,
-                                                                 .normalTrackEnd = 17,
-                                                                 .tempoLoop = 0,
-                                                             });
+  const SequenceProgram program = parseSegSatSequence(reader, AssetId{100},
+                                                      SegSatSequenceLayout{
+                                                          .offset = 0,
+                                                          .end = static_cast<u32>(bytes.size()),
+                                                          .ppqn = 48,
+                                                          .tempoEventCount = 1,
+                                                          .normalTrack = 16,
+                                                          .normalTrackEnd = 17,
+                                                          .tempoLoop = 0,
+                                                      })
+                                      .program;
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
   const auto tempo = std::ranges::find_if(performance.tracks.front().events, [](const PerformanceEvent& event) {
     return std::holds_alternative<TempoPerformanceEvent>(event);
@@ -520,7 +521,7 @@ void segSatMultiBankPlaybackUsesTheActiveBanksVlTable() {
       "source bank aliases should remain paired with sorted collection banks regardless of command order");
 }
 
-void segSatCollectionBindingReadsVelocityBanksFromSeparateSources() {
+void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
   SourceStore sources;
   const SourceId bank5Source = sources.add(SourceFile{.name = "bank-5.bin"}, velocityBankSource(0));
   const SourceId bank6Source = sources.add(SourceFile{.name = "bank-6.bin"}, velocityBankSource(128));
@@ -530,10 +531,19 @@ void segSatCollectionBindingReadsVelocityBanksFromSeparateSources() {
   const auto sequenceLayouts = findSegSatSequences(sequenceReader);
   expect(sequenceLayouts.size() == 1, "multi-source fixture should contain one sequence");
 
-  const SequenceProgramAsset sequence{
+  auto parsedSequence = parseSegSatSequence(sequenceReader, AssetId{0}, sequenceLayouts.front());
+  SequenceProgramAsset sequence{
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "SegSat", .name = "Sequence"},
-      .program = parseSegSatSequenceProgram(sequenceReader, AssetId{0}, sequenceLayouts.front()),
+      .program = std::move(parsedSequence.program),
   };
+  sequence.privateData = AssetPrivateData::make(SegSatSequenceBindingData{
+      .volumeModel = SegSatVolumeModel::V1_33,
+      .referencedBanks = {5, 6},
+      .controllerChanges = std::move(parsedSequence.controllerChanges),
+  });
+  const auto bank5Layout = readSegSatBankLayout(sources.reader(bank5Source), 0x100);
+  const auto bank6Layout = readSegSatBankLayout(sources.reader(bank6Source), 0x100);
+  expect(bank5Layout && bank6Layout, "multi-source fixture should contain two velocity banks");
   const InstrumentSetAsset bank5{
       .metadata =
           AssetMetadata{
@@ -546,6 +556,10 @@ void segSatCollectionBindingReadsVelocityBanksFromSeparateSources() {
           .explicitAddress = InstrumentAddress{.bank = 5, .program = 0},
           .identity = segSatInstrumentIdentity(5, 0),
       }},
+      .privateData = AssetPrivateData::make(SegSatBankBindingData{
+          .velocityBank =
+              readSegSatVelocityBank(sources.reader(bank5Source), *bank5Layout, 5, SegSatVolumeModel::V1_33),
+      }),
   };
   const InstrumentSetAsset bank6{
       .metadata =
@@ -559,6 +573,17 @@ void segSatCollectionBindingReadsVelocityBanksFromSeparateSources() {
           .explicitAddress = InstrumentAddress{.bank = 6, .program = 0},
           .identity = segSatInstrumentIdentity(6, 0),
       }},
+      .privateData = AssetPrivateData::make(SegSatBankBindingData{
+          .velocityBank =
+              readSegSatVelocityBank(sources.reader(bank6Source), *bank6Layout, 6, SegSatVolumeModel::V1_33),
+      }),
+  };
+  const InstrumentSetAsset foreignBank{
+      .metadata = AssetMetadata{.id = AssetId{3}, .format = "Foreign", .name = "Foreign Bank"},
+      .instruments = {Instrument{
+          .explicitAddress = InstrumentAddress{.bank = 42, .program = 7},
+          .name = "Foreign Instrument",
+      }},
   };
   const Collection collection{
       .id = CollectionId{0},
@@ -566,31 +591,30 @@ void segSatCollectionBindingReadsVelocityBanksFromSeparateSources() {
       .members =
           {
               .sequence = sequence.metadata.id,
-              .instrumentSets = {bank5.metadata.id, bank6.metadata.id},
+              .instrumentSets = {bank5.metadata.id, foreignBank.metadata.id, bank6.metadata.id},
           },
   };
   test::SessionSnapshotBuilder builder;
   builder.sources = sources.sourceFiles();
-  builder.assets = {sequence, bank5, bank6};
+  builder.assets = {sequence, bank5, foreignBank, bank6};
   builder.collections = {collection};
   const SessionSnapshot snapshot = builder.finish();
 
   const FormatModule format = segSatModule();
   SequenceRuntime runtime = sequence.program.runtime;
-  std::vector<InstrumentSetAsset> instrumentSets{bank5, bank6};
+  std::vector<InstrumentSetAsset> instrumentSets{bank5, foreignBank, bank6};
   std::vector<const SampleCollectionAsset*> sampleCollections;
   std::vector<Diagnostic> bindingDiagnostics;
   CollectionBindingContext binding{
-      .sources = sources,
-      .sequence = &sequence,
-      .sequenceRuntime = runtime,
-      .instrumentSets = instrumentSets,
-      .sampleCollections = sampleCollections,
-      .diagnostics = bindingDiagnostics,
+      &sequence, runtime, instrumentSets, sampleCollections, bindingDiagnostics,
   };
   format.bindCollection(binding);
   expect(bindingDiagnostics.empty() && runtime.valid(),
-         "SegSat binding should read attached banks from separate sources");
+         "SegSat binding should use retained bank data without reopening its source files");
+  expect(instrumentSets.size() == 3 && instrumentSets[1].metadata.id == foreignBank.metadata.id &&
+             instrumentSets[1].instruments.front().explicitAddress == InstrumentAddress{.bank = 42, .program = 7} &&
+             instrumentSets[1].instruments.front().name == "Foreign Instrument",
+         "SegSat binding should preserve the identity, order, and contents of foreign collection members");
 
   PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program, runtime);
   std::vector<const NotePerformanceEvent*> notes;

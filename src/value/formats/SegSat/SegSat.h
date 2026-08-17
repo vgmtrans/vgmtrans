@@ -135,6 +135,21 @@ struct SegSatControllerChange {
   u8 value = 0;
 };
 
+struct SegSatSequenceParse {
+  core::SequenceProgram program;
+  std::vector<SegSatControllerChange> controllerChanges;
+};
+
+struct SegSatSequenceBindingData {
+  SegSatVolumeModel volumeModel = SegSatVolumeModel::V1_33;
+  std::vector<u8> referencedBanks;
+  std::vector<SegSatControllerChange> controllerChanges;
+};
+
+struct SegSatBankBindingData {
+  SegSatVelocityBank velocityBank;
+};
+
 // Collection-local data captured by the sequence runtime before rendering.
 struct SegSatRuntimeConfig {
   std::vector<SegSatVelocityBank> velocityBanks;
@@ -162,16 +177,14 @@ struct SegSatRuntimeConfig {
                                                              u8 exportBank);
 [[nodiscard]] SegSatVelocityBank readSegSatVelocityBank(core::ByteReader reader, const SegSatBankLayout& layout,
                                                         u8 sourceBank, SegSatVolumeModel volumeModel);
-[[nodiscard]] std::vector<u8> segSatSequenceBanks(const core::SequenceProgram& program);
-[[nodiscard]] std::vector<SegSatControllerChange> segSatControllerChanges(const core::SequenceProgram& program);
 void finalizeSegSatPerformance(core::PerformanceSequence& performance, std::span<const SegSatVelocityBank> banks,
                                SegSatVolumeModel model, std::span<const SegSatControllerChange> controllerChanges);
 [[nodiscard]] core::SequenceRuntime segSatSequenceRuntime(SegSatRuntimeConfig config);
 
-[[nodiscard]] core::SequenceProgram parseSegSatSequenceProgram(core::ByteReader reader, core::AssetId id,
-                                                               const SegSatSequenceLayout& layout,
-                                                               core::SourceMapBuilder* sourceMap = nullptr,
-                                                               std::vector<core::Diagnostic>* diagnostics = nullptr);
+[[nodiscard]] SegSatSequenceParse parseSegSatSequence(core::ByteReader reader, core::AssetId id,
+                                                      const SegSatSequenceLayout& layout,
+                                                      core::SourceMapBuilder* sourceMap = nullptr,
+                                                      std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& segSatSequenceConfig();
 void bindSegSatCollection(core::CollectionBindingContext& context);
 [[nodiscard]] core::FormatModule segSatModule();

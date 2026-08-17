@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "value/base/TypeToken.h"
 #include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceVm.h"
 
@@ -185,6 +186,7 @@ template <class Cursor, class ProgramState = EmptyCompiledProgramState>
   using Playback = typename Cursor::Playback;
   using Compiled = CompiledCommandRuntime<TrackState, Playback, ProgramState>;
   SequenceRuntime runtime;
+  runtime.commandPlaybackType = detail::typeToken<Playback>();
   runtime.createProgramState = [](const SequenceProgram& program) { return Compiled::createProgramState(program); };
   runtime.createTrackState = [](const SequenceProgram& program, const TrackProgram& track) {
     return Compiled::createTrackState(program, track);
@@ -210,6 +212,7 @@ template <class Cursor, class ProgramState = EmptyCompiledProgramState, class Co
   static_assert(programConsumesConfig || trackConsumesConfig,
                 "A supplied runtime Config must be consumed by ProgramState or TrackState");
   SequenceRuntime runtime;
+  runtime.commandPlaybackType = detail::typeToken<Playback>();
   auto settings = std::make_shared<const Config>(std::move(config));
   runtime.createProgramState = [settings](const SequenceProgram& sequence) {
     return Compiled::createProgramState(sequence, *settings);
