@@ -12,21 +12,12 @@
 #include <optional>
 #include <span>
 #include <string>
-#include <variant>
 #include <vector>
 
 namespace vgmtrans::core {
 
 struct CollectionBindingContext;
 using CollectionBinder = std::function<void(CollectionBindingContext&)>;
-
-// Scanners emit MatchFact records when assets may belong together. Collection
-// resolvers read the accumulated facts and decide which collections should exist.
-
-enum class MatchScopeKind {
-  Session,
-  Source,
-};
 
 struct CollectionKey {
   // Stable identity for a resolved collection. The same key updates the same
@@ -35,45 +26,6 @@ struct CollectionKey {
   std::string value;
 
   friend bool operator==(const CollectionKey&, const CollectionKey&) noexcept = default;
-};
-
-struct MatchScope {
-  MatchScopeKind kind = MatchScopeKind::Session;
-  std::optional<SourceId> source;
-
-  friend bool operator==(const MatchScope&, const MatchScope&) noexcept = default;
-};
-
-struct IdMatchFact {
-  std::string domain;
-  u32 value = 0;
-};
-
-// A durable relationship between the asset carrying this fact and another
-// asset. Keeping the target typed lets validation and removal follow it.
-struct AssetRelationFact {
-  std::string domain;
-  AssetId target;
-};
-
-struct SampleCoverageFact {
-  std::string domain;
-  u32 first = 0;
-  u32 count = 0;
-};
-
-struct SampleRequirementFact {
-  std::string domain;
-  std::vector<u32> required;
-};
-
-using MatchFactPayload = std::variant<IdMatchFact, AssetRelationFact, SampleCoverageFact, SampleRequirementFact>;
-
-struct MatchFact {
-  AssetId asset;
-  std::string format;
-  MatchScope scope;
-  MatchFactPayload payload;
 };
 
 struct CollectionMembers {

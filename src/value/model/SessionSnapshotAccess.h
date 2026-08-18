@@ -17,11 +17,10 @@ namespace vgmtrans::core::detail {
 class SessionSnapshotAccess {
 public:
   [[nodiscard]] static SessionSnapshot create(std::vector<SourceFile> sources, SharedSequence<Asset> assets,
-                                              SharedSequence<MatchFact> matchFacts, std::vector<Collection> collections,
-                                              SourceMap sourceMap, std::vector<Diagnostic> diagnostics) {
+                                              std::vector<Collection> collections, SourceMap sourceMap,
+                                              std::vector<Diagnostic> diagnostics) {
     return SessionSnapshot{
-        std::move(sources),     std::move(assets),    std::move(matchFacts),
-        std::move(collections), std::move(sourceMap), std::move(diagnostics),
+        std::move(sources), std::move(assets), std::move(collections), std::move(sourceMap), std::move(diagnostics),
     };
   }
 };

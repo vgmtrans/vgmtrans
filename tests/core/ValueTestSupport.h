@@ -8,7 +8,7 @@
 
 #include "value/export/Export.h"
 #include "value/export/SequenceModulationProfile.h"
-#include "value/scan/CollectionResolver.h"
+#include "value/scan/CollectionDiscovery.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/base/LevelScale.h"
@@ -348,14 +348,9 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   };
 }
 
-[[nodiscard]] MatchFact probeBankFact(const ScanInput& input, AssetId asset, u32 bank) {
-  return MatchFact{
-      .asset = asset,
-      .format = "ProbeBank",
-      .scope = MatchScope{.kind = MatchScopeKind::Session},
-      .payload = IdMatchFact{.domain = "probe.bank", .value = bank},
-  };
-}
+struct ProbeBankData {
+  u32 bank = 0;
+};
 
 [[nodiscard]] ScanResult scanProbeBankSequence(const ScanInput& input) {
   if (!hasProbeMagic(input, 0xcc, 2)) {
@@ -373,6 +368,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
               .range = input.reader.range(0, input.reader.size()),
           },
       .program = probeSequenceProgram(),
+      .privateData = AssetPrivateData::make(ProbeBankData{.bank = bank}),
   };
 
   ScanResult result;
@@ -384,7 +380,6 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
       .label = input.source.name,
       .owner = ObjectRefs::sequence(assetId),
   }}};
-  result.matchFacts.push_back(probeBankFact(input, assetId, bank));
   return result;
 }
 
@@ -404,6 +399,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
               .name = input.source.name,
               .range = input.reader.range(0, input.reader.size()),
           },
+      .privateData = AssetPrivateData::make(ProbeBankData{.bank = bank}),
   });
   result.sourceMap = SourceMap{{SourceAnnotation{
       .id = input.ids.nextSourceAnnotationId(),
@@ -412,35 +408,29 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
       .label = input.source.name,
       .owner = ObjectRefs::asset(assetId),
   }}};
-  result.matchFacts.push_back(probeBankFact(input, assetId, bank));
   return result;
 }
 
-[[nodiscard]] std::vector<DesiredCollection> resolveProbeBankCollections(const MatchContext& context) {
-  const MatchFactIndex index(context);
+[[nodiscard]] std::vector<DesiredCollection> resolveProbeBankCollections(const CollectionDiscoveryContext& context) {
   std::vector<DesiredCollection> collections;
-  for (const auto& fact : context.matchFacts()) {
-    const auto* id = std::get_if<IdMatchFact>(&fact.payload);
-    if (id == nullptr || fact.format != "ProbeBank" || id->domain != "probe.bank") {
-      continue;
-    }
-
-    const CollectionKey key{.resolver = "ProbeBank", .value = "bank:" + std::to_string(id->value)};
+  const auto attach = [&](const auto& entry) {
+    const CollectionKey key{.resolver = "ProbeBank", .value = "bank:" + std::to_string(entry.data->bank)};
     auto found =
         std::ranges::find_if(collections, [&](const DesiredCollection& collection) { return collection.key == key; });
     if (found == collections.end()) {
       collections.push_back(DesiredCollection{
           .key = key,
-          .name = "Probe Bank " + std::to_string(id->value),
+          .name = "Probe Bank " + std::to_string(entry.data->bank),
       });
       found = std::prev(collections.end());
     }
-
-    if (index.asset<SequenceProgramAsset>(fact.asset) != nullptr) {
-      found->members.sequence = fact.asset;
-    } else if (index.asset<SoundBankAsset>(fact.asset) != nullptr) {
-      found->members.soundBanks.push_back(fact.asset);
-    }
+    return found;
+  };
+  for (const auto& sequence : context.assetsWithData<SequenceProgramAsset, ProbeBankData>("ProbeBank")) {
+    attach(sequence)->members.sequence = sequence.id();
+  }
+  for (const auto& bank : context.assetsWithData<SoundBankAsset, ProbeBankData>("ProbeBank")) {
+    attach(bank)->members.soundBanks.push_back(bank.id());
   }
   for (auto& collection : collections) {
     if (!collection.members.sequence) {
@@ -524,73 +514,12 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   };
 }
 
-[[nodiscard]] ScanResult scanProbeBadFactAsset(const ScanInput& input) {
-  if (!hasProbeMagic(input, 0xf2)) {
-    return {};
-  }
-
-  return ScanResult{
-      .matchFacts = {MatchFact{
-          .asset = AssetId{99},
-          .format = "ProbeBadFact",
-          .scope = MatchScope{.kind = MatchScopeKind::Session},
-          .payload = IdMatchFact{.domain = "probe.bad", .value = 1},
-      }},
-  };
-}
-
-[[nodiscard]] FormatModule probeBadFactAssetModule() {
-  return FormatModule{
-      .name = "ProbeBadFactAsset",
-      .scan = scanProbeBadFactAsset,
-  };
-}
-
-[[nodiscard]] ScanResult scanProbeBadFactSource(const ScanInput& input) {
-  if (!hasProbeMagic(input, 0xf3)) {
-    return {};
-  }
-
-  const auto assetId = input.ids.nextAssetId();
-  return ScanResult{
-      .assets = {MiscAsset{
-          .metadata =
-              AssetMetadata{
-                  .id = assetId,
-                  .format = "ProbeBadFact",
-                  .name = "Bad source fact",
-                  .range = input.reader.range(0, input.reader.size()),
-              },
-      }},
-      .matchFacts = {MatchFact{
-          .asset = assetId,
-          .format = "ProbeBadFact",
-          .scope = MatchScope{.kind = MatchScopeKind::Source, .source = SourceId{99}},
-          .payload = IdMatchFact{.domain = "probe.bad", .value = 2},
-      }},
-      .sourceMap = SourceMap{{SourceAnnotation{
-          .id = input.ids.nextSourceAnnotationId(),
-          .range = input.reader.range(0, input.reader.size()),
-          .role = SourceRole::Payload,
-          .label = "Bad source fact",
-          .owner = ObjectRefs::misc(assetId),
-      }}},
-  };
-}
-
-[[nodiscard]] FormatModule probeBadFactSourceModule() {
-  return FormatModule{
-      .name = "ProbeBadFactSource",
-      .scan = scanProbeBadFactSource,
-  };
-}
-
 [[nodiscard]] ScanResult scanNothing(const ScanInput&) {
   return {};
 }
 
-[[nodiscard]] std::vector<DesiredCollection> fragileProbeSequenceResolver(const MatchContext& context) {
-  if (context.assets().empty() || context.assets().size() > 1) {
+[[nodiscard]] std::vector<DesiredCollection> fragileProbeSequenceResolver(const CollectionDiscoveryContext& context) {
+  if (context.allAssets().empty() || context.allAssets().size() > 1) {
     throw std::runtime_error("resolver exploded");
   }
   return {};
@@ -605,7 +534,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   };
 }
 
-[[nodiscard]] std::vector<DesiredCollection> missingAssetCollectionResolver(const MatchContext&) {
+[[nodiscard]] std::vector<DesiredCollection> missingAssetCollectionResolver(const CollectionDiscoveryContext&) {
   return {DesiredCollection{
       .key = CollectionKey{.resolver = "ProbeMissingRefs", .value = "missing-assets"},
       .name = "Missing Assets",
@@ -627,13 +556,11 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   };
 }
 
-[[nodiscard]] std::vector<DesiredCollection> wrongTypeCollectionResolver(const MatchContext& context) {
+[[nodiscard]] std::vector<DesiredCollection> wrongTypeCollectionResolver(const CollectionDiscoveryContext& context) {
   std::optional<AssetId> sequence;
-  for (const auto& asset : context.assets()) {
-    if (const auto* typed = std::get_if<SequenceProgramAsset>(&asset)) {
-      sequence = typed->metadata.id;
-      break;
-    }
+  for (const auto* asset : context.assets<SequenceProgramAsset>()) {
+    sequence = asset->metadata.id;
+    break;
   }
   if (!sequence) {
     return {};
@@ -659,7 +586,7 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
   };
 }
 
-[[nodiscard]] std::vector<DesiredCollection> duplicateKeyCollectionResolver(const MatchContext&) {
+[[nodiscard]] std::vector<DesiredCollection> duplicateKeyCollectionResolver(const CollectionDiscoveryContext&) {
   return {DesiredCollection{
               .key = CollectionKey{.resolver = "ProbeDuplicateKeys", .value = "same-key"},
               .name = "First",

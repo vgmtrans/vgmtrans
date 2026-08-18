@@ -9,6 +9,7 @@
 #include "value/export/CollectionStitch.h"
 #include "value/export/Export.h"
 #include "value/model/SessionSnapshotAccess.h"
+#include "value/scan/CollectionDiscovery.h"
 #include "value/scan/FormatModule.h"
 #include "value/session/SessionState.h"
 #include "value/validation/ScanValidation.h"
@@ -238,9 +239,8 @@ void Session::scanPendingSources() {
 
 SessionSnapshot Session::snapshot() const {
   if (!snapshotCache_) {
-    snapshotCache_.emplace(detail::SessionSnapshotAccess::create(sources_.sourceFiles(), state_->assets(),
-                                                                 state_->matchFacts(), state_->collections(),
-                                                                 state_->sourceMap(), state_->diagnostics()));
+    snapshotCache_.emplace(detail::SessionSnapshotAccess::create(
+        sources_.sourceFiles(), state_->assets(), state_->collections(), state_->sourceMap(), state_->diagnostics()));
   }
   return *snapshotCache_;
 }
@@ -444,10 +444,10 @@ void Session::removeSourceFamily(SourceId source, std::vector<SourceId>& removed
   removedSources.insert(removedSources.end(), family.begin(), family.end());
 }
 
-// Ask registered formats which collections should exist for the current assets and
-// match facts, then merge those answers into the session.
+// Ask registered formats which collections should exist for the current assets,
+// then merge those answers into the session.
 void Session::rebuildCollections() {
-  const MatchContext context{sources_, state_->assets(), state_->matchFacts()};
+  const CollectionDiscoveryContext context{sources_, state_->assets()};
 
   auto desiredByResolver = state_->desiredCollectionsByResolver();
   std::set<std::string> failedResolvers;

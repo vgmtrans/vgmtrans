@@ -8,6 +8,7 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <string>
 #include <utility>
 #include <vector>
@@ -28,47 +29,6 @@ namespace {
   return offsets;
 }
 
-void addSampleFacts(ScanResultBuilder& result, const AkaoSamplePoolParse& parsed) {
-  if (parsed.sampleSetId) {
-    result.sourceFact(parsed.ref.id,
-                      IdMatchFact{.domain = std::string(kAkaoSampleSetDomain), .value = *parsed.sampleSetId});
-  }
-  result.sourceFact(parsed.ref.id, SampleCoverageFact{
-                                       .domain = std::string(kAkaoArticulationDomain),
-                                       .first = parsed.firstArticulationId,
-                                       .count = parsed.articulationCount,
-                                   });
-}
-
-void addSequenceFacts(ScanResultBuilder& result, ScanSequenceRef sequence, const AkaoSequenceAnalysis& analysis,
-                      std::span<const u32> requiredArticulations) {
-  result.sourceFact(sequence.id,
-                    IdMatchFact{.domain = std::string(kAkaoSequenceIdDomain), .value = analysis.header.sequenceId});
-  if (analysis.header.sampleSetId) {
-    result.sourceFact(sequence.id,
-                      IdMatchFact{.domain = std::string(kAkaoSampleSetDomain), .value = *analysis.header.sampleSetId});
-  }
-  std::vector<u32> required;
-  for (const u32 articulation : requiredArticulations) {
-    if (articulation != 0) {
-      required.push_back(articulation);
-    }
-  }
-  if (!required.empty()) {
-    result.sourceFact(sequence.id, SampleRequirementFact{
-                                       .domain = std::string(kAkaoArticulationDomain),
-                                       .required = std::move(required),
-                                   });
-  }
-}
-
-void addInstrumentSetFacts(ScanResultBuilder& result, ScanSoundBankRef instruments, ScanSequenceRef sequence) {
-  result.sourceFact(instruments.id, AssetRelationFact{
-                                        .domain = std::string(kAkaoInstrumentSequenceDomain),
-                                        .target = sequence.id,
-                                    });
-}
-
 void scanSamplePools(const ScanInput& input, ScanResultBuilder& result, std::span<const u32> offsets,
                      std::optional<AkaoSplitSampleLocation> hardcodedSampleLocation) {
   const AkaoPs1Version sourceVersion = determineVersionFromSource(input.source);
@@ -79,18 +39,14 @@ void scanSamplePools(const ScanInput& input, ScanResultBuilder& result, std::spa
     }
     const AkaoPs1Version version =
         sourceVersion == AkaoPs1Version::Unknown ? guessSampleVersion(input.reader, offset) : sourceVersion;
-    if (auto parsed = parseAkaoSamplePool(input, result, offset, version)) {
-      addSampleFacts(result, *parsed);
-    } else {
+    if (!parseAkaoSamplePool(input, result, offset, version)) {
       result.warning("Akao sample pool header was detected but sample data could not be parsed",
                      input.reader.range(offset, 0x40));
     }
   }
 
   if (hardcodedSampleLocation) {
-    if (auto parsed = parseAkaoSamplePool(input, result, *hardcodedSampleLocation)) {
-      addSampleFacts(result, *parsed);
-    }
+    static_cast<void>(parseAkaoSamplePool(input, result, *hardcodedSampleLocation));
   }
 }
 
@@ -107,11 +63,19 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
     auto instruments = result.soundBank(akaoInstrumentSetName(parsed.analysis));
     auto built = buildAkaoInstrumentSet(input, parsed.analysis, instruments.builder());
     parsed.analysis.requiredArticulations = std::move(built.requiredArticulations);
-    addSequenceFacts(result, sequence.ref(), parsed.analysis, parsed.analysis.requiredArticulations);
-    addInstrumentSetFacts(result, instruments.ref(), sequence.ref());
-    sequence.data(AkaoSequenceBindingData{.structuralInstrumentSet = instruments.id()})
+    std::erase(parsed.analysis.requiredArticulations, 0);
+    std::ranges::sort(parsed.analysis.requiredArticulations);
+    parsed.analysis.requiredArticulations.erase(std::ranges::unique(parsed.analysis.requiredArticulations).begin(),
+                                                parsed.analysis.requiredArticulations.end());
+    sequence
+        .data(AkaoSequenceData{
+            .sequenceId = parsed.analysis.header.sequenceId,
+            .sampleSetId = parsed.analysis.header.sampleSetId,
+            .requiredArticulations = parsed.analysis.requiredArticulations,
+            .structuralInstrumentSet = instruments.id(),
+        })
         .program(std::move(parsed.program));
-    instruments.data(std::move(built.binding));
+    instruments.data(AkaoSoundBankData{.binding = std::move(built.binding)});
   }
 }
 

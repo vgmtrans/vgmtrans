@@ -18,14 +18,12 @@ class SessionSnapshotBuilder {
 public:
   std::vector<SourceFile> sources;
   std::vector<Asset> assets;
-  std::vector<MatchFact> matchFacts;
   std::vector<Collection> collections;
   SourceMap sourceMap;
   std::vector<Diagnostic> diagnostics;
 
   [[nodiscard]] SessionSnapshot finish() {
     return detail::SessionSnapshotAccess::create(std::move(sources), SharedSequence<Asset>{std::move(assets)},
-                                                 SharedSequence<MatchFact>{std::move(matchFacts)},
                                                  std::move(collections), std::move(sourceMap), std::move(diagnostics));
   }
 };

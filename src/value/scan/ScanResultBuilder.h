@@ -140,6 +140,9 @@ public:
   [[nodiscard]] AssetId id() const noexcept { return id_; }
   ScanMiscDraft& payload(std::vector<u8> payload);
 
+  template <typename T>
+  ScanMiscDraft& data(T value);
+
 private:
   friend class ScanResultBuilder;
 
@@ -197,10 +200,6 @@ public:
   // Use when a scanner produces one collection per source and its display name
   // should not affect collection identity.
   [[nodiscard]] ScanCollectionBuilder sourceCollection(std::string name);
-
-  void fact(AssetId asset, MatchScope scope, MatchFactPayload payload);
-  void sourceFact(AssetId asset, MatchFactPayload payload);
-  void sessionFact(AssetId asset, MatchFactPayload payload);
 
   void diagnostic(Diagnostic diagnostic);
   void warning(std::string message, SourceRange range);
@@ -264,6 +263,12 @@ ScanSoundBankDraft& ScanSoundBankDraft::data(T value) {
 
 template <typename T>
 ScanSamplePoolDraft& ScanSamplePoolDraft::data(T value) {
+  out_->setPrivateData(slot_, AssetPrivateData::make(std::move(value)));
+  return *this;
+}
+
+template <typename T>
+ScanMiscDraft& ScanMiscDraft::data(T value) {
   out_->setPrivateData(slot_, AssetPrivateData::make(std::move(value)));
   return *this;
 }

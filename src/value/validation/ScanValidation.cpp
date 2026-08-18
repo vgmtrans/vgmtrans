@@ -273,41 +273,6 @@ void validateSourceMapOwnership(ValidationReport& report, const ScanResult& resu
   }
 }
 
-void validateMatchFacts(ValidationReport& report, const ScanResult& result, const SourceStore& sources,
-                        const std::unordered_set<u32>& existingAssetIds, const std::unordered_set<u32>& batchAssetIds) {
-  // Match facts may point at assets from this scan or assets already accepted
-  // from earlier source loads. They must never point at a missing source.
-  for (const auto& fact : result.matchFacts) {
-    if (!fact.asset.valid()) {
-      report.error("scan.match-fact.missing-asset", "Scan result contained a match fact without an asset id");
-    } else if (!batchAssetIds.contains(fact.asset.value) && !existingAssetIds.contains(fact.asset.value)) {
-      report.error("scan.match-fact.unknown-asset",
-                   "Scan result contained a match fact for missing asset id " + std::to_string(fact.asset.value));
-    }
-
-    if (const auto* relation = std::get_if<AssetRelationFact>(&fact.payload)) {
-      if (!relation->target.valid()) {
-        report.error("scan.match-fact.missing-related-asset",
-                     "Scan result contained an asset relation without a target asset id");
-      } else if (!batchAssetIds.contains(relation->target.value) &&
-                 !existingAssetIds.contains(relation->target.value)) {
-        report.error("scan.match-fact.unknown-related-asset",
-                     "Scan result contained an asset relation for missing target asset id " +
-                         std::to_string(relation->target.value));
-      }
-    }
-
-    if (fact.scope.kind == MatchScopeKind::Source && !fact.scope.source) {
-      report.error("scan.match-fact.missing-source-scope",
-                   "Scan result contained a source-scoped match fact without a source id");
-    }
-    if (fact.scope.source && !sources.contains(*fact.scope.source)) {
-      report.error("scan.match-fact.unknown-source", "Scan result contained a match fact for missing source id " +
-                                                         std::to_string(fact.scope.source->value));
-    }
-  }
-}
-
 }  // namespace
 
 ValidationReport validateScanResult(SourceId source, const ScanResult& result, const SourceStore& sources,
@@ -351,7 +316,7 @@ ValidationReport validateScanResult(SourceId source, const ScanResult& result, c
   validateDiagnosticAnnotationReferences(report, result.diagnostics, result.sourceMap);
 
   std::unordered_set<u32> existingAssetIds;
-  if (!result.assets.empty() || !result.matchFacts.empty()) {
+  if (!result.assets.empty()) {
     existingAssetIds.reserve(existingAssets.size());
     for (const auto& asset : existingAssets) {
       const AssetId id = metadata(asset).id;
@@ -364,7 +329,6 @@ ValidationReport validateScanResult(SourceId source, const ScanResult& result, c
   std::unordered_set<u32> batchAssetIds;
   validateAssetIds(report, result, existingAssetIds, batchAssetIds);
   validateSourceMapOwnership(report, result, batchAssetIds);
-  validateMatchFacts(report, result, sources, existingAssetIds, batchAssetIds);
 
   return report;
 }

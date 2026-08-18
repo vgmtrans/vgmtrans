@@ -110,7 +110,7 @@ vgmtrans_enable_project_warnings(vgmtransvaluecore)
 target_sources(vgmtransvaluecore
   PRIVATE
     ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionResolver.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionDiscovery.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.h
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/PitchTransitionMidiLowering.cpp
@@ -124,7 +124,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/export/ExportDiagnostics.h
     ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceEmitter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.cpp
-    ${PROJECT_SOURCE_DIR}/src/value/model/MatchModel.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/model/CollectionModel.cpp
     ${PROJECT_SOURCE_DIR}/src/value/model/SourceMap.cpp
     ${PROJECT_SOURCE_DIR}/src/value/model/SourceInspection.cpp
     ${PROJECT_SOURCE_DIR}/src/value/model/SessionSnapshot.cpp
@@ -186,11 +186,11 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/base/RecordReader.h
       ${PROJECT_SOURCE_DIR}/src/value/platform/SnesSampleDirectory.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/BytePattern.h
-      ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionResolver.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionDiscovery.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatModule.h
       ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.h
       ${PROJECT_SOURCE_DIR}/src/value/base/LevelScale.h
-      ${PROJECT_SOURCE_DIR}/src/value/model/MatchModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/model/CollectionModel.h
       ${PROJECT_SOURCE_DIR}/src/value/model/EnvelopeModel.h
       ${PROJECT_SOURCE_DIR}/src/value/model/InstrumentIdentity.h
       ${PROJECT_SOURCE_DIR}/src/value/model/MetadataModel.h

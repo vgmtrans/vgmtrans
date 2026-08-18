@@ -26,10 +26,6 @@ namespace vgmtrans::formats::akao {
 
 inline constexpr std::string_view kAkaoFormatName = "Akao";
 inline constexpr std::string_view kAkaoCollectionResolver = "Akao";
-inline constexpr std::string_view kAkaoSequenceIdDomain = "akao.sequence-id";
-inline constexpr std::string_view kAkaoSampleSetDomain = "akao.sample-set";
-inline constexpr std::string_view kAkaoArticulationDomain = "akao.articulation";
-inline constexpr std::string_view kAkaoInstrumentSequenceDomain = "akao.instrument-sequence";
 
 struct AkaoSampleCoverageProvider {
   std::size_t index = 0;
@@ -141,9 +137,12 @@ struct AkaoSequenceParse {
   AkaoSequenceAnalysis analysis;
 };
 
-// Only collection-local information survives scanning. Source layout and
-// matching data remain scan concerns; binding needs the exact structural bank.
-struct AkaoSequenceBindingData {
+// The one format-owned value retained on a sequence. Collection discovery and
+// binding read the same data instead of maintaining parallel matching records.
+struct AkaoSequenceData {
+  u32 sequenceId = 0;
+  std::optional<u16> sampleSetId;
+  std::vector<u32> requiredArticulations;
   core::AssetId structuralInstrumentSet;
 };
 
@@ -162,6 +161,10 @@ struct AkaoInstrumentSetBindingData {
   bool usesIndividualArticulations = false;
 };
 
+struct AkaoSoundBankData {
+  AkaoInstrumentSetBindingData binding;
+};
+
 // An articulation is Akao's complete description of one playable sample:
 // its location, tuning, loop, and envelope all travel together.
 struct AkaoArticulation {
@@ -177,17 +180,12 @@ struct AkaoArticulation {
   u32 sampleIndex = 0;
 };
 
-struct AkaoSamplePoolParse {
-  core::ScanSamplePoolRef ref;
+struct AkaoSamplePoolData {
   std::optional<u16> sampleSetId;
-  u32 offset = 0;
-  u32 length = 0;
-  AkaoPs1Version version = AkaoPs1Version::Unknown;
   u32 firstArticulationId = 0;
   u32 articulationCount = 0;
+  std::vector<AkaoArticulation> articulations;
 };
-
-using AkaoSampleBindingData = std::vector<AkaoArticulation>;
 
 struct AkaoArticulationBinding {
   core::ScanSamplePoolRef collection;
@@ -219,12 +217,10 @@ struct AkaoSplitSampleLocation {
                                                   std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] std::optional<AkaoSplitSampleLocation> ff7HardcodedAkaoSampleLocation(core::ByteReader reader);
 [[nodiscard]] bool isPossibleAkaoSamplePool(core::ByteReader reader, u32 offset);
-[[nodiscard]] std::optional<AkaoSamplePoolParse> parseAkaoSamplePool(const core::ScanInput& input,
-                                                                     core::ScanResultBuilder& result, u32 offset,
-                                                                     AkaoPs1Version version);
-[[nodiscard]] std::optional<AkaoSamplePoolParse> parseAkaoSamplePool(const core::ScanInput& input,
-                                                                     core::ScanResultBuilder& result,
-                                                                     AkaoSplitSampleLocation location);
+[[nodiscard]] bool parseAkaoSamplePool(const core::ScanInput& input, core::ScanResultBuilder& result, u32 offset,
+                                       AkaoPs1Version version);
+[[nodiscard]] bool parseAkaoSamplePool(const core::ScanInput& input, core::ScanResultBuilder& result,
+                                       AkaoSplitSampleLocation location);
 
 [[nodiscard]] std::string akaoInstrumentSetName(const AkaoSequenceAnalysis& sequence);
 struct AkaoInstrumentSetBuild {
@@ -240,7 +236,8 @@ struct AkaoInstrumentSetBuild {
 [[nodiscard]] bool applyAkaoArticulations(core::SoundBankAsset& instruments, const AkaoInstrumentSetBindingData& recipe,
                                           const AkaoArticulationMap& articulations);
 
-[[nodiscard]] std::vector<core::DesiredCollection> resolveAkaoCollections(const core::MatchContext& context);
+[[nodiscard]] std::vector<core::DesiredCollection> resolveAkaoCollections(
+    const core::CollectionDiscoveryContext& context);
 void bindAkaoCollection(core::CollectionBindingContext& context);
 
 [[nodiscard]] core::FormatModule akaoModule();

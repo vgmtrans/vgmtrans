@@ -316,23 +316,6 @@ ScanCollectionBuilder ScanResultBuilder::sourceCollection(std::string name) {
   return collection(std::move(name), std::move(key));
 }
 
-void ScanResultBuilder::fact(AssetId asset, MatchScope scope, MatchFactPayload payload) {
-  result_.matchFacts.push_back(MatchFact{
-      .asset = asset,
-      .format = format_,
-      .scope = std::move(scope),
-      .payload = std::move(payload),
-  });
-}
-
-void ScanResultBuilder::sourceFact(AssetId asset, MatchFactPayload payload) {
-  fact(asset, MatchScope{.kind = MatchScopeKind::Source, .source = input_.source.id}, std::move(payload));
-}
-
-void ScanResultBuilder::sessionFact(AssetId asset, MatchFactPayload payload) {
-  fact(asset, MatchScope{.kind = MatchScopeKind::Session}, std::move(payload));
-}
-
 void ScanResultBuilder::diagnostic(Diagnostic diagnostic) {
   result_.diagnostics.push_back(std::move(diagnostic));
 }
@@ -396,6 +379,7 @@ ScanResult ScanResultBuilder::finish() {
             return MiscAsset{
                 .metadata = metadata(pending.id, std::move(pending.name), pending.range),
                 .payload = std::move(*pending.payload),
+                .privateData = std::move(privateData),
             };
           }
         },

@@ -115,7 +115,8 @@ struct SonyPs1SampleBodyLayout {
                                                          core::SourceMapBuilder* sourceMap = nullptr,
                                                          std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& sonyPs1SequenceConfig();
-[[nodiscard]] std::vector<core::DesiredCollection> resolveSonyPs1Collections(const core::MatchContext& context);
+[[nodiscard]] std::vector<core::DesiredCollection> resolveSonyPs1Collections(
+    const core::CollectionDiscoveryContext& context);
 void bindSonyPs1Collection(core::CollectionBindingContext& context);
 [[nodiscard]] core::FormatModule sonyPs1Module();
 

@@ -6,7 +6,7 @@
 
 #include "value/formats/Akao/Akao.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
-#include "value/scan/CollectionResolver.h"
+#include "value/scan/CollectionDiscovery.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 
@@ -790,15 +790,10 @@ void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView() {
   expect(hasLinkRole(*articulationEntry, SourceLinkRole::UsesSample),
          "Akao articulation annotation should link to the sample it resolves to");
 
-  const auto requirement = std::ranges::find_if(project.matchFacts(), [&](const MatchFact& fact) {
-    const auto* payload = std::get_if<SampleRequirementFact>(&fact.payload);
-    return fact.format == kAkaoFormatName && fact.asset == sequenceId && payload != nullptr &&
-           payload->domain == kAkaoArticulationDomain && payload->required == std::vector<u32>{5};
-  });
-  expect(requirement != project.matchFacts().end(),
-         "Akao articulation requirements should remain sequence matching facts");
-
   const auto* sequence = project.asset<SequenceProgramAsset>(sequenceId);
+  const auto* sequenceData = sequence->privateData.get<AkaoSequenceData>();
+  expect(sequenceData != nullptr && sequenceData->requiredArticulations == std::vector<u32>{5},
+         "Akao articulation requirements should remain typed sequence data");
   SequenceRuntime runtime = sequence->program.runtime;
   const SoundBankAsset foreignBank{
       .metadata = AssetMetadata{.id = AssetId{999}, .format = "Foreign", .name = "Foreign Bank"},
@@ -817,7 +812,7 @@ void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView() {
   }
   std::vector<Diagnostic> bindingDiagnostics;
   CollectionBindingContext binding{
-      sequence, runtime, boundInstruments, boundSamples, bindingDiagnostics,
+      sequence, runtime, boundInstruments, boundSamples, {}, bindingDiagnostics,
   };
   bindAkaoCollection(binding);
   expect(boundInstruments.size() == 2 && boundInstruments.front().metadata.id == foreignBank.metadata.id &&

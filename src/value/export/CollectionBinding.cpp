@@ -56,10 +56,11 @@ namespace {
 BoundCollection::BoundCollection(SessionSnapshot snapshot, CollectionId id, std::string baseName,
                                  const SequenceProgramAsset* sequence, SequenceRuntime sequenceRuntime,
                                  std::vector<SoundBankAsset> soundBanks,
-                                 std::vector<const SamplePoolAsset*> samplePools)
+                                 std::vector<const SamplePoolAsset*> samplePools,
+                                 std::vector<const MiscAsset*> miscAssets)
     : snapshot_(std::move(snapshot)), id_(id), baseName_(std::move(baseName)), sequence_(sequence),
       sequenceRuntime_(std::move(sequenceRuntime)), soundBanks_(std::move(soundBanks)),
-      samplePools_(std::move(samplePools)) {
+      samplePools_(std::move(samplePools)), miscAssets_(std::move(miscAssets)) {
 }
 
 CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, CollectionId collectionId) {
@@ -120,13 +121,23 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
       failed = true;
     }
   }
+  std::vector<const MiscAsset*> miscAssets;
+  miscAssets.reserve(members.miscAssets.size());
+  for (const AssetId assetId : members.miscAssets) {
+    if (const auto* misc = snapshot.asset<MiscAsset>(assetId)) {
+      miscAssets.push_back(misc);
+    } else {
+      diagnostics.push_back(exportError("Collection miscellaneous asset was not found"));
+      failed = true;
+    }
+  }
 
   if (!failed && collection->binder) {
     const std::string bindingName = !collection->key.resolver.empty() ? collection->key.resolver
                                     : sequence != nullptr             ? sequence->metadata.format
                                                                       : "Collection";
     try {
-      CollectionBindingContext context{sequence, sequenceRuntime, soundBanks, samplePools, diagnostics};
+      CollectionBindingContext context{sequence, sequenceRuntime, soundBanks, samplePools, miscAssets, diagnostics};
       collection->binder(context);
       failed = context.failed;
       for (size_t index = 0; index < soundBanks.size(); ++index) {
@@ -161,7 +172,7 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
   }
   return CollectionBindingResult{
       .collection = BoundCollection(snapshot, collection->id, std::move(baseName), sequence, std::move(sequenceRuntime),
-                                    std::move(soundBanks), std::move(samplePools)),
+                                    std::move(soundBanks), std::move(samplePools), std::move(miscAssets)),
       .diagnostics = std::move(diagnostics),
   };
 }

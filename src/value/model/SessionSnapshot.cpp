@@ -32,18 +32,18 @@ const AssetMetadata& metadata(const Asset& asset) {
 }
 
 SessionSnapshot::Storage::Storage(std::vector<SourceFile> sourcesValue, SharedSequence<Asset> assetsValue,
-                                  SharedSequence<MatchFact> matchFactsValue, std::vector<Collection> collectionsValue,
-                                  SourceMap sourceMapValue, std::vector<Diagnostic> diagnosticsValue)
-    : sources(std::move(sourcesValue)), assets(std::move(assetsValue)), matchFacts(std::move(matchFactsValue)),
-      collections(std::move(collectionsValue)), sourceMap(std::move(sourceMapValue)),
-      diagnostics(std::move(diagnosticsValue)), index(buildIndex(sources, assets, collections)) {
+                                  std::vector<Collection> collectionsValue, SourceMap sourceMapValue,
+                                  std::vector<Diagnostic> diagnosticsValue)
+    : sources(std::move(sourcesValue)), assets(std::move(assetsValue)), collections(std::move(collectionsValue)),
+      sourceMap(std::move(sourceMapValue)), diagnostics(std::move(diagnosticsValue)),
+      index(buildIndex(sources, assets, collections)) {
 }
 
 SessionSnapshot::SessionSnapshot(std::vector<SourceFile> sources, SharedSequence<Asset> assets,
-                                 SharedSequence<MatchFact> matchFacts, std::vector<Collection> collections,
-                                 SourceMap sourceMap, std::vector<Diagnostic> diagnostics)
-    : storage_(std::make_shared<const Storage>(std::move(sources), std::move(assets), std::move(matchFacts),
-                                               std::move(collections), std::move(sourceMap), std::move(diagnostics))) {
+                                 std::vector<Collection> collections, SourceMap sourceMap,
+                                 std::vector<Diagnostic> diagnostics)
+    : storage_(std::make_shared<const Storage>(std::move(sources), std::move(assets), std::move(collections),
+                                               std::move(sourceMap), std::move(diagnostics))) {
 }
 
 SessionSnapshot::Index SessionSnapshot::buildIndex(const std::vector<SourceFile>& sources,

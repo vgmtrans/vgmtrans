@@ -480,7 +480,7 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
   std::vector<const SamplePoolAsset*> resolvedSamples;
   std::vector<Diagnostic> bindingDiagnostics;
   CollectionBindingContext binding{
-      sequence, runtime, resolvedInstruments, resolvedSamples, bindingDiagnostics,
+      sequence, runtime, resolvedInstruments, resolvedSamples, {}, bindingDiagnostics,
   };
   bindSonyPs1Collection(binding);
   expect(resolvedInstruments.size() == 2 && resolvedInstruments.front().metadata.id == foreignBank.metadata.id &&
@@ -528,7 +528,7 @@ void runSonyPs1CollectionBindingTests() {
                              std::vector<const SamplePoolAsset*> selectedPools, std::string_view message) {
       SequenceRuntime runtime = sequence->program.runtime;
       std::vector<Diagnostic> diagnostics;
-      CollectionBindingContext context{sequence, runtime, selectedBanks, selectedPools, diagnostics};
+      CollectionBindingContext context{sequence, runtime, selectedBanks, selectedPools, {}, diagnostics};
       collection.binder(context);
       expect(context.failed && diagnosticContains(diagnostics, message),
              "SonyPS1 binding should reject an invalid captured relationship");
@@ -542,7 +542,7 @@ void runSonyPs1CollectionBindingTests() {
   {
     FormatModule module = sonyPs1Module();
     auto resolver = module.resolveCollections;
-    module.resolveCollections = [resolver = std::move(resolver)](const MatchContext& context) {
+    module.resolveCollections = [resolver = std::move(resolver)](const CollectionDiscoveryContext& context) {
       auto collections = resolver(context);
       for (auto& collection : collections) {
         std::ranges::reverse(collection.members.samplePools);

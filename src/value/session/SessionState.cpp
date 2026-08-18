@@ -111,10 +111,9 @@ void SessionState::appendScan(SourceId origin, ScanResult result) {
 
   assetsById_.reserve(assetsById_.size() + result.assets.size());
 
-  if (!result.assets.empty() || !result.matchFacts.empty() || !result.sourceMap.empty()) {
+  if (!result.assets.empty() || !result.sourceMap.empty()) {
     scanChunks_.push_back(ScanChunk{
         .assets = sharedVector(std::move(result.assets)),
-        .matchFacts = sharedVector(std::move(result.matchFacts)),
         .sourceMap = std::move(result.sourceMap),
     });
     const auto& chunk = scanChunks_.back();
@@ -325,13 +324,6 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
     const AssetId id = metadata(value).id;
     return id.valid() && assetIds.contains(id.value);
   };
-  const auto removesFact = [&](const MatchFact& fact) {
-    const bool removedSource = fact.scope.source && sourceIds.contains(fact.scope.source->value);
-    const auto* relation = std::get_if<AssetRelationFact>(&fact.payload);
-    const bool removedTarget =
-        relation != nullptr && relation->target.valid() && assetIds.contains(relation->target.value);
-    return removedSource || removedTarget || (fact.asset.valid() && assetIds.contains(fact.asset.value));
-  };
   const auto removesLink = [&](const SourceLink& link) {
     if (const auto* target = std::get_if<SourceRange>(&link.target)) {
       return target->valid() && sourceIds.contains(target->source.value);
@@ -358,7 +350,6 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
   remainingChunks.reserve(scanChunks_.size());
   for (const auto& chunk : scanChunks_) {
     auto assets = without(chunk.assets, removesAsset);
-    auto matchFacts = without(chunk.matchFacts, removesFact);
 
     SourceMap sourceMap = chunk.sourceMap;
     const bool sourceMapChanged = std::ranges::any_of(sourceMap.annotations(), [&](const SourceAnnotation& annotation) {
@@ -383,14 +374,13 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
       sourceMap = SourceMap{std::move(annotations)};
     }
 
-    const bool changed = assets != chunk.assets || matchFacts != chunk.matchFacts || sourceMapChanged;
+    const bool changed = assets != chunk.assets || sourceMapChanged;
     if (!changed) {
       remainingChunks.push_back(chunk);
       continue;
     }
     ScanChunk filtered{
         .assets = std::move(assets),
-        .matchFacts = std::move(matchFacts),
         .sourceMap = std::move(sourceMap),
     };
     if (!filtered.empty()) {
@@ -498,22 +488,17 @@ CollectionId SessionState::nextCollectionId(ScanIdAllocator& ids) const {
 
 void SessionState::rebuildViews() {
   std::vector<std::shared_ptr<const std::vector<Asset>>> assetChunks;
-  std::vector<std::shared_ptr<const std::vector<MatchFact>>> factChunks;
   std::vector<SourceMap> sourceMaps;
   assetChunks.reserve(scanChunks_.size());
-  factChunks.reserve(scanChunks_.size());
   sourceMaps.reserve(scanChunks_.size());
   for (const auto& chunk : scanChunks_) {
     assetChunks.push_back(chunk.assets);
-    factChunks.push_back(chunk.matchFacts);
     sourceMaps.push_back(chunk.sourceMap);
   }
 
   auto assets = detail::SharedSequenceAccess::fromChunks(std::move(assetChunks));
-  auto matchFacts = detail::SharedSequenceAccess::fromChunks(std::move(factChunks));
   auto sourceMap = SourceMap::join(sourceMaps);
   assets_ = std::move(assets);
-  matchFacts_ = std::move(matchFacts);
   sourceMap_ = std::move(sourceMap);
 }
 

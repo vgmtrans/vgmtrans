@@ -7,7 +7,7 @@
 #pragma once
 
 #include "value/base/Source.h"
-#include "value/model/MatchModel.h"
+#include "value/model/CollectionModel.h"
 #include "value/model/SharedSequence.h"
 #include "value/model/SourceMap.h"
 #include "value/sequence/SequenceProgram.h"
@@ -29,6 +29,7 @@ class SessionSnapshotAccess;
 struct MiscAsset {
   AssetMetadata metadata;
   std::vector<u8> payload;
+  AssetPrivateData privateData;
 };
 
 using Asset = std::variant<SequenceProgramAsset, SoundBankAsset, SamplePoolAsset, MiscAsset>;
@@ -58,7 +59,6 @@ class SessionSnapshot {
 public:
   [[nodiscard]] const std::vector<SourceFile>& sources() const noexcept { return storage_->sources; }
   [[nodiscard]] const SharedSequence<Asset>& assets() const noexcept { return storage_->assets; }
-  [[nodiscard]] const SharedSequence<MatchFact>& matchFacts() const noexcept { return storage_->matchFacts; }
   [[nodiscard]] const std::vector<Collection>& collections() const noexcept { return storage_->collections; }
   [[nodiscard]] const SourceMap& sourceMap() const noexcept { return storage_->sourceMap; }
   [[nodiscard]] const std::vector<Diagnostic>& diagnostics() const noexcept { return storage_->diagnostics; }
@@ -86,20 +86,19 @@ private:
   };
 
   struct Storage {
-    Storage(std::vector<SourceFile> sources, SharedSequence<Asset> assets, SharedSequence<MatchFact> matchFacts,
-            std::vector<Collection> collections, SourceMap sourceMap, std::vector<Diagnostic> diagnostics);
+    Storage(std::vector<SourceFile> sources, SharedSequence<Asset> assets, std::vector<Collection> collections,
+            SourceMap sourceMap, std::vector<Diagnostic> diagnostics);
 
     std::vector<SourceFile> sources;
     SharedSequence<Asset> assets;
-    SharedSequence<MatchFact> matchFacts;
     std::vector<Collection> collections;
     SourceMap sourceMap;
     std::vector<Diagnostic> diagnostics;
     Index index;
   };
 
-  SessionSnapshot(std::vector<SourceFile> sources, SharedSequence<Asset> assets, SharedSequence<MatchFact> matchFacts,
-                  std::vector<Collection> collections, SourceMap sourceMap, std::vector<Diagnostic> diagnostics);
+  SessionSnapshot(std::vector<SourceFile> sources, SharedSequence<Asset> assets, std::vector<Collection> collections,
+                  SourceMap sourceMap, std::vector<Diagnostic> diagnostics);
 
   [[nodiscard]] static Index buildIndex(const std::vector<SourceFile>& sources, const SharedSequence<Asset>& assets,
                                         const std::vector<Collection>& collections);
