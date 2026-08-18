@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/model/MatchModel.h"
+#include "value/model/CollectionModel.h"
 
 #include <string>
 #include <utility>

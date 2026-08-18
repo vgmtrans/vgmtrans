@@ -145,6 +145,8 @@ public:
   [[nodiscard]] size_t sourceCount() const noexcept;
   [[nodiscard]] std::vector<SourceFile> sourceFiles() const;
   [[nodiscard]] std::vector<SourceId> sourceFamily(SourceId id) const;
+  [[nodiscard]] SourceId rootSource(SourceId id) const noexcept;
+  [[nodiscard]] bool sameSourceTree(SourceId left, SourceId right) const noexcept;
   [[nodiscard]] std::vector<SourceId> activeUserSources() const;
 
 private:

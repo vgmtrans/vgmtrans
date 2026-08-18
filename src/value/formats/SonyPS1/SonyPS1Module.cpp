@@ -23,10 +23,6 @@ using namespace core;
 
 namespace {
 
-constexpr std::string_view kSequenceFact = "sony-ps1.sequence";
-constexpr std::string_view kSampleBytesFact = "sony-ps1.sample-bytes";
-constexpr std::string_view kBankFact = "sony-ps1.bank";
-
 [[nodiscard]] bool rawVbSource(const SourceFile& source) {
   std::filesystem::path path = source.path.empty() ? std::filesystem::path(source.name) : source.path;
   std::string extension = path.extension().string();
@@ -64,10 +60,7 @@ constexpr std::string_view kBankFact = "sony-ps1.bank";
 
   ScanResultBuilder result(input, std::string(kSonyPs1FormatName), std::string(kSonyPs1CollectionResolver));
   if (rawBody) {
-    if (auto samples = addSonyPs1RawSampleBody(result)) {
-      result.sourceFact(samples->id, IdMatchFact{.domain = std::string(kSampleBytesFact),
-                                                 .value = static_cast<u32>(input.reader.size())});
-    } else {
+    if (!addSonyPs1RawSampleBody(result)) {
       return {};
     }
   }
@@ -76,10 +69,7 @@ constexpr std::string_view kBankFact = "sony-ps1.bank";
   for (u32 index = 0; index < bankLayouts.size(); ++index) {
     const auto& layout = bankLayouts[index];
     const u16 bank = numbers[index];
-    const ScanSoundBankRef scanned = addSonyPs1Bank(result, layout, bank);
-    result.sourceFact(scanned.id,
-                      IdMatchFact{.domain = std::string(kSampleBytesFact), .value = layout.expectedSampleBytes});
-    result.sourceFact(scanned.id, IdMatchFact{.domain = std::string(kBankFact), .value = bank});
+    static_cast<void>(addSonyPs1Bank(result, layout, bank));
   }
 
   for (const auto& layout : sequenceLayouts) {
@@ -89,7 +79,6 @@ constexpr std::string_view kBankFact = "sony-ps1.bank";
     auto sequence = result.sequence(name, input.reader.range(layout.offset, layout.length));
     sequence.program(
         parseSonyPs1Sequence(input.reader, sequence.id(), layout, &result.sourceMap(), &result.diagnostics()));
-    result.sourceFact(sequence.id(), IdMatchFact{.domain = std::string(kSequenceFact), .value = layout.offset});
   }
   return result.finish();
 }

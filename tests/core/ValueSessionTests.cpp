@@ -330,7 +330,6 @@ void sessionKeepsScannerKnownCollectionsWithoutResolver() {
   const auto source = session.addSource(SourceFile{.name = "explicit.probe"}, {0xab});
   session.scanSource(source);
   SessionSnapshot project = session.snapshot();
-  expect(project.matchFacts().empty(), "explicit scanner-known collection should not need match facts");
   expect(project.collections().size() == 1, "explicit scanner-known collection should be published");
   expect(project.collections()[0].key.resolver == "ProbeExplicit",
          "explicit scanner-known collection should use its scanner resolver key");
@@ -346,7 +345,7 @@ void sessionCreatesUserCollectionsFromDetectedAssets() {
   auto sequenceModule = probeBankSequenceModule();
   sequenceModule.name = "ProbeBank";
   sequenceModule.collectionResolverId = "probe-bank";
-  sequenceModule.resolveCollections = [](const MatchContext& context) {
+  sequenceModule.resolveCollections = [](const CollectionDiscoveryContext& context) {
     auto collections = resolveProbeBankCollections(context);
     for (auto& collection : collections) {
       collection.key.resolver = "probe-bank";
@@ -410,7 +409,7 @@ void sessionMatchesCollectionsAcrossSeparateSourceScans() {
   session.scanSource(sequence);
   project = session.snapshot();
   expect(project.assets().size() == 2, "second source scan should add the matching sequence asset");
-  expect(project.collections().size() == 1, "matching facts should update the existing bank collection");
+  expect(project.collections().size() == 1, "typed asset data should update the existing bank collection");
   expect(project.collections()[0].id == bankCollection, "resolver update should preserve the collection id");
   expect(project.collections()[0].resolution() == CollectionResolution::Resolved,
          "bank collection should become complete when sequence and instruments are both present");
@@ -432,7 +431,6 @@ void sessionRemovesSourceFamilyAndDiscoveredData() {
   SessionSnapshot project = session.snapshot();
   expect(project.sources().size() == 2, "fixture should scan one user source and one derived source");
   expect(project.assets().size() == 1, "fixture should scan the routed derived asset");
-  expect(project.matchFacts().empty(), "scanner-known membership should not require a match fact");
   expect(project.collections().size() == 1, "fixture should publish one collection");
   expect(project.diagnostics().size() == 1, "fixture should publish one source-backed diagnostic");
 
@@ -441,7 +439,6 @@ void sessionRemovesSourceFamilyAndDiscoveredData() {
   project = session.snapshot();
   expect(project.sources().empty(), "removed source family should disappear from snapshots");
   expect(project.assets().empty(), "removed source family should remove discovered assets");
-  expect(project.matchFacts().empty(), "removed source family should remove match facts");
   expect(project.collections().empty(), "removed source family should remove discovered collections");
   expect(project.diagnostics().empty(), "removed source family should remove source-backed diagnostics");
   expect(session.sources().sourceCount() == 0, "source store should count only active sources");
@@ -557,8 +554,7 @@ void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
   project = session.snapshot();
   expect(project.sources().size() == 1, "removing one matched source should leave the other source active");
   expect(project.assets().size() == 1, "removing one matched source should leave the other asset active");
-  expect(project.matchFacts().size() == 1, "removing one matched source should leave the other match fact active");
-  expect(project.collections().size() == 1, "remaining match fact should keep the bank collection alive");
+  expect(project.collections().size() == 1, "the remaining typed asset should keep the bank collection alive");
   expect(project.collections()[0].id == collectionId, "collection id should be preserved for the same key");
   expect(project.collections()[0].resolution() == CollectionResolution::Incomplete,
          "remaining sequence-only collection should become incomplete");
@@ -577,8 +573,7 @@ void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
   project = session.snapshot();
   expect(project.sources().empty(), "removing the last matched source should leave no active sources");
   expect(project.assets().empty(), "removing the last matched source should leave no assets");
-  expect(project.matchFacts().empty(), "removing the last matched source should leave no match facts");
-  expect(project.collections().empty(), "resolver-owned discovered collection should disappear when no facts remain");
+  expect(project.collections().empty(), "resolver-owned discovered collection should disappear when no assets remain");
 }
 
 void sessionResolverFailureDoesNotWipeExistingCollections() {
@@ -615,7 +610,6 @@ void sessionMarksCollectionsStaleWhenRemovalCannotReconcile() {
   project = session.snapshot();
   expect(project.sources().empty(), "failed reconcile after removal should still remove sources");
   expect(project.assets().empty(), "failed reconcile after removal should still remove assets");
-  expect(project.matchFacts().empty(), "failed reconcile after removal should still remove match facts");
   expect(project.collections().size() == 1, "resolver failure should keep the previous collection inspectable");
   expect(project.collections()[0].id == originalCollection, "stale collection should keep its id");
   expect(project.collections()[0].freshness == CollectionFreshness::Stale,
@@ -684,69 +678,6 @@ void sessionRejectsExtractedSourcesWithMissingParents() {
       SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
 }
 
-void sessionRejectsMatchFactsForMissingAssets() {
-  Session session;
-  session.registerFormat(probeBadFactAssetModule());
-
-  session.addSource(SourceFile{.name = "bad-fact-asset.probe"}, {0xf2});
-  session.scanPendingSources();
-  const SessionSnapshot project = session.snapshot();
-  expect(project.assets().empty(), "invalid match fact should reject the whole scan result before admission");
-  expect(project.matchFacts().empty(), "invalid match fact should not be committed");
-  expectDiagnosticRange(project.diagnostics(),
-                        "ProbeBadFactAsset scan failed: Scan result contained a match fact for missing asset id 99",
-                        SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
-}
-
-void sessionRejectsSourceScopedMatchFactsForMissingSources() {
-  Session session;
-  session.registerFormat(probeBadFactSourceModule());
-
-  session.addSource(SourceFile{.name = "bad-fact-source.probe"}, {0xf3});
-  session.scanPendingSources();
-  const SessionSnapshot project = session.snapshot();
-  expect(project.assets().empty(), "source-scoped invalid fact should reject the whole scan result before admission");
-  expect(project.matchFacts().empty(), "source-scoped invalid fact should not be committed");
-  expectDiagnosticRange(project.diagnostics(),
-                        "ProbeBadFactSource scan failed: Scan result contained a match fact for missing source id 99",
-                        SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
-}
-
-void scanValidationRejectsMissingAssetRelationTargets() {
-  SourceStore sources;
-  const SourceId source = sources.add(SourceFile{.name = "bad-relation.probe"}, {0xaa});
-  const SourceRange range = sources.reader(source).range(0, 1);
-  ScanResult result{
-      .assets =
-          {
-              MiscAsset{.metadata =
-                            AssetMetadata{
-                                .id = AssetId{0},
-                                .format = "ProbeValidation",
-                                .name = "Relation owner",
-                                .range = range,
-                            }},
-          },
-      .matchFacts =
-          {
-              MatchFact{
-                  .asset = AssetId{0},
-                  .format = "ProbeValidation",
-                  .scope = MatchScope{.kind = MatchScopeKind::Session},
-                  .payload = AssetRelationFact{.domain = "probe.target", .target = AssetId{99}},
-              },
-          },
-  };
-
-  const auto report = validateScanResult(source, result, sources, {});
-  expect(std::ranges::any_of(report.diagnostics(),
-                             [](const Diagnostic& diagnostic) {
-                               return diagnostic.message ==
-                                      "Scan result contained an asset relation for missing target asset id 99";
-                             }),
-         "scan validation should reject asset relations whose typed target is missing");
-}
-
 void extractionValidationRejectsEmptyKnownFormats() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "empty-format.probe"}, {0xaa});
@@ -789,15 +720,6 @@ void scanValidationReportsMultipleAdmissionErrors() {
                                 .range = sources.reader(foreignSource).range(0, 1),
                             }},
           },
-      .matchFacts =
-          {
-              MatchFact{
-                  .asset = AssetId{99},
-                  .format = "ProbeValidation",
-                  .scope = MatchScope{.kind = MatchScopeKind::Source, .source = SourceId{99}},
-                  .payload = IdMatchFact{.domain = "probe", .value = 1},
-              },
-          },
   };
 
   const auto report = validateScanResult(source, result, sources, {});
@@ -805,20 +727,12 @@ void scanValidationReportsMultipleAdmissionErrors() {
 
   bool sawDuplicateAsset = false;
   bool sawForeignSource = false;
-  bool sawMissingFactAsset = false;
-  bool sawMissingFactSource = false;
   for (const auto& diagnostic : report.diagnostics()) {
     sawDuplicateAsset = sawDuplicateAsset || diagnostic.message == "Scan result contained duplicate asset id 7";
     sawForeignSource = sawForeignSource || diagnostic.code == "scan.asset.foreign-source";
-    sawMissingFactAsset =
-        sawMissingFactAsset || diagnostic.message == "Scan result contained a match fact for missing asset id 99";
-    sawMissingFactSource =
-        sawMissingFactSource || diagnostic.message == "Scan result contained a match fact for missing source id 99";
   }
   expect(sawDuplicateAsset, "scan validation should report duplicate asset ids");
   expect(sawForeignSource, "scan validation should reject assets whose primary range belongs to another source");
-  expect(sawMissingFactAsset, "scan validation should report match facts for missing assets");
-  expect(sawMissingFactSource, "scan validation should report match facts for missing sources");
 }
 
 [[nodiscard]] AssetMetadata badRangeMetadata(AssetId id, std::string name, SourceRange range) {
@@ -1167,24 +1081,10 @@ void sessionStateRebuildsLookupIndexAfterRemoval() {
   });
   state.appendScan(SourceId{1}, ScanResult{
                                     .assets = std::move(secondSourceAssets),
-                                    .matchFacts =
-                                        {
-                                            MatchFact{
-                                                .asset = AssetId{2},
-                                                .format = "Probe",
-                                                .scope = MatchScope{.kind = MatchScopeKind::Session},
-                                                .payload =
-                                                    AssetRelationFact{
-                                                        .domain = "probe.sequence",
-                                                        .target = AssetId{0},
-                                                    },
-                                            },
-                                        },
                                 });
 
   expect(state.asset<SamplePoolAsset>(AssetId{2}) == std::get_if<SamplePoolAsset>(&state.assets()[2]),
          "session state should look up assets by id before removal");
-  expect(state.matchFacts().size() == 1, "session state fixture should contain its cross-source asset relation");
 
   const std::array removedSources{SourceId{0}};
   state.removeSources(removedSources);
@@ -1193,7 +1093,6 @@ void sessionStateRebuildsLookupIndexAfterRemoval() {
   expect(state.assets().size() == 1 &&
              state.asset<SamplePoolAsset>(AssetId{2}) == std::get_if<SamplePoolAsset>(&state.assets()[0]),
          "session state lookup index should be rebuilt after removal compacts the asset vector");
-  expect(state.matchFacts().empty(), "removing an asset should remove relations that target it");
 }
 
 void sessionAddsSourceFromPath() {
@@ -1320,9 +1219,6 @@ void runValueSessionTests() {
   sessionRejectsLateRegistryMutation();
   sessionRejectsDuplicateAssetIdsAtAdmission();
   sessionRejectsExtractedSourcesWithMissingParents();
-  sessionRejectsMatchFactsForMissingAssets();
-  sessionRejectsSourceScopedMatchFactsForMissingSources();
-  scanValidationRejectsMissingAssetRelationTargets();
   extractionValidationRejectsEmptyKnownFormats();
   scanValidationReportsMultipleAdmissionErrors();
   scanValidationRejectsOutOfBoundsScanResultRanges();

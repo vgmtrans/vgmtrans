@@ -1644,7 +1644,7 @@ AkaoSummary valueAkaoSummary(const std::filesystem::path& path, std::ostream& di
     }
     std::vector<Diagnostic> bindingDiagnostics;
     CollectionBindingContext binding{
-        sequence, runtime, resolvedInstruments, resolvedSamples, bindingDiagnostics,
+        sequence, runtime, resolvedInstruments, resolvedSamples, {}, bindingDiagnostics,
     };
     vgmtrans::formats::akao::bindAkaoCollection(binding);
     for (const auto& diagnostic : bindingDiagnostics) {
@@ -1668,22 +1668,13 @@ AkaoSummary valueAkaoSummary(const std::filesystem::path& path, std::ostream& di
   if (std::ranges::any_of(summary.collections,
                           [](const AkaoCollectionSummary& collection) { return collection.samplePoolCount == 0; })) {
     u32 sampleAssets = 0;
-    u32 sampleFacts = 0;
     for (const auto& asset : project.assets()) {
       if (const auto* samplePool = std::get_if<SamplePoolAsset>(&asset);
           samplePool != nullptr && samplePool->metadata.format == "Akao") {
         ++sampleAssets;
       }
     }
-    for (const auto& fact : project.matchFacts()) {
-      if (fact.format == "Akao") {
-        if (std::holds_alternative<SampleCoverageFact>(fact.payload)) {
-          ++sampleFacts;
-        }
-      }
-    }
-    diagnostics << "value Akao unresolved sample context: sampleAssets=" << sampleAssets
-                << " sampleFacts=" << sampleFacts << "\n";
+    diagnostics << "value Akao unresolved sample context: sampleAssets=" << sampleAssets << "\n";
   }
   std::ranges::sort(summary.collections, {}, &AkaoCollectionSummary::sequenceOffset);
   if (summary.collections.empty()) {

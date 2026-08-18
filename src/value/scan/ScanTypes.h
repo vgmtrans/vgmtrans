@@ -51,7 +51,6 @@ struct ExplicitCollection {
 
 struct ScanResult {
   std::vector<Asset> assets;
-  std::vector<MatchFact> matchFacts;
   std::vector<ExplicitCollection> explicitCollections;
   SourceMap sourceMap;
   std::vector<Diagnostic> diagnostics;

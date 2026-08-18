@@ -6,7 +6,7 @@
 
 #include "value/formats/SonyPS1/SonyPS1.h"
 
-#include "value/scan/CollectionResolver.h"
+#include "value/scan/CollectionDiscovery.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -20,9 +20,6 @@ namespace vgmtrans::formats::sony_ps1 {
 using namespace core;
 
 namespace {
-
-constexpr std::string_view kSequenceFact = "sony-ps1.sequence";
-constexpr std::string_view kSampleBytesFact = "sony-ps1.sample-bytes";
 
 struct SequenceEntry {
   AssetId asset;
@@ -79,53 +76,48 @@ struct SonySampleBinding {
   return !a.empty() && !b.empty() && a.parent_path() == b.parent_path() && a.stem() == b.stem();
 }
 
-[[nodiscard]] std::vector<SequenceEntry> sequences(const MatchFactIndex& index) {
+[[nodiscard]] std::optional<SourceId> sourceId(const AssetMetadata& metadata) {
+  return metadata.range.valid() ? std::optional{metadata.range.source} : std::nullopt;
+}
+
+[[nodiscard]] std::vector<SequenceEntry> sequences(const CollectionDiscoveryContext& context) {
   std::vector<SequenceEntry> entries;
-  for (const auto& facts : index.assets<SequenceProgramAsset>(kSonyPs1FormatName)) {
-    const auto offset = facts.id(kSequenceFact);
-    if (offset) {
-      entries.push_back(SequenceEntry{
-          .asset = facts.asset().metadata.id,
-          .name = facts.asset().metadata.name,
-          .source = facts.sourceId,
-          .file = facts.source,
-          .offset = *offset,
-      });
-    }
+  for (const auto* asset : context.assets<SequenceProgramAsset>(kSonyPs1FormatName)) {
+    entries.push_back(SequenceEntry{
+        .asset = asset->metadata.id,
+        .name = asset->metadata.name,
+        .source = sourceId(asset->metadata),
+        .file = context.sourceFor(asset->metadata),
+        .offset = static_cast<u32>(asset->metadata.range.offset),
+    });
   }
   return entries;
 }
 
-[[nodiscard]] std::vector<InstrumentEntry> instruments(const MatchFactIndex& index) {
+[[nodiscard]] std::vector<InstrumentEntry> instruments(const CollectionDiscoveryContext& context) {
   std::vector<InstrumentEntry> entries;
-  for (const auto& facts : index.assets<SoundBankAsset>(kSonyPs1FormatName)) {
-    const auto sampleBytes = facts.id(kSampleBytesFact);
-    if (sampleBytes) {
-      entries.push_back(InstrumentEntry{
-          .asset = facts.asset().metadata.id,
-          .source = facts.sourceId,
-          .file = facts.source,
-          .offset = facts.asset().metadata.range.offset,
-          .sampleBytes = *sampleBytes,
-          .needsExternalSamples = needsExternalSamples(facts.asset()),
-      });
-    }
+  for (const auto& entry : context.assetsWithData<SoundBankAsset, SonyPs1SampleSize>(kSonyPs1FormatName)) {
+    entries.push_back(InstrumentEntry{
+        .asset = entry.id(),
+        .source = entry.sourceId(),
+        .file = entry.source,
+        .offset = entry.asset->metadata.range.offset,
+        .sampleBytes = entry.data->bytes,
+        .needsExternalSamples = needsExternalSamples(*entry.asset),
+    });
   }
   return entries;
 }
 
-[[nodiscard]] std::vector<SampleEntry> samples(const MatchFactIndex& index) {
+[[nodiscard]] std::vector<SampleEntry> samples(const CollectionDiscoveryContext& context) {
   std::vector<SampleEntry> entries;
-  for (const auto& facts : index.assets<SamplePoolAsset>(kSonyPs1FormatName)) {
-    const auto sampleBytes = facts.id(kSampleBytesFact);
-    if (sampleBytes) {
-      entries.push_back(SampleEntry{
-          .asset = facts.asset().metadata.id,
-          .source = facts.sourceId,
-          .file = facts.source,
-          .sampleBytes = *sampleBytes,
-      });
-    }
+  for (const auto& entry : context.assetsWithData<SamplePoolAsset, SonyPs1SampleSize>(kSonyPs1FormatName)) {
+    entries.push_back(SampleEntry{
+        .asset = entry.id(),
+        .source = entry.sourceId(),
+        .file = entry.source,
+        .sampleBytes = entry.data->bytes,
+    });
   }
   return entries;
 }
@@ -270,11 +262,10 @@ void applySonyPs1Bindings(CollectionBindingContext& context, std::span<const Son
 
 }  // namespace
 
-std::vector<DesiredCollection> resolveSonyPs1Collections(const MatchContext& context) {
-  const MatchFactIndex index(context);
-  const auto sequenceEntries = sequences(index);
-  const auto instrumentEntries = instruments(index);
-  const auto sampleEntries = samples(index);
+std::vector<DesiredCollection> resolveSonyPs1Collections(const CollectionDiscoveryContext& context) {
+  const auto sequenceEntries = sequences(context);
+  const auto instrumentEntries = instruments(context);
+  const auto sampleEntries = samples(context);
   std::vector<DesiredCollection> collections;
 
   for (const auto& sequence : sequenceEntries) {

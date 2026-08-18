@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/scan/CollectionResolver.h"
+#include "value/scan/CollectionDiscovery.h"
 
 #include <algorithm>
 #include <optional>
@@ -13,9 +13,10 @@
 
 namespace vgmtrans::core {
 
-MatchFactIndex::MatchFactIndex(const MatchContext& context) : context_(context) {
-  assetsById_.reserve(context.assets().size());
-  for (const auto& asset : context.assets()) {
+CollectionDiscoveryContext::CollectionDiscoveryContext(const SourceStore& sources, SharedSequence<Asset> assets)
+    : sources_(sources), assets_(std::move(assets)) {
+  assetsById_.reserve(assets_.size());
+  for (const auto& asset : assets_) {
     const AssetId id = metadata(asset).id;
     if (id.valid()) {
       assetsById_.emplace(id.value, &asset);
@@ -23,7 +24,7 @@ MatchFactIndex::MatchFactIndex(const MatchContext& context) : context_(context) 
   }
 }
 
-const Asset* MatchFactIndex::asset(AssetId id) const noexcept {
+const Asset* CollectionDiscoveryContext::asset(AssetId id) const noexcept {
   if (!id.valid()) {
     return nullptr;
   }
@@ -31,11 +32,11 @@ const Asset* MatchFactIndex::asset(AssetId id) const noexcept {
   return found != assetsById_.end() ? found->second : nullptr;
 }
 
-const SourceFile* MatchFactIndex::sourceFor(const MatchFact& fact) const {
-  if (!fact.scope.source) {
+const SourceFile* CollectionDiscoveryContext::sourceFor(const AssetMetadata& metadata) const noexcept {
+  if (!metadata.range.valid() || !sources_.contains(metadata.range.source)) {
     return nullptr;
   }
-  return context_.sources().contains(*fact.scope.source) ? &context_.sources().source(*fact.scope.source) : nullptr;
+  return &sources_.source(metadata.range.source);
 }
 
 CollectionAssembly::CollectionAssembly(CollectionKey key, std::string name)

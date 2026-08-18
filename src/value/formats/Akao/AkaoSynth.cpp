@@ -42,7 +42,7 @@ struct ParsedSample {
 };
 
 struct ParsedSamplePool {
-  AkaoSamplePoolParse parse;
+  ScanSamplePoolRef ref;
   std::vector<AkaoArticulation> articulations;
   std::vector<ParsedSample> samples;
   std::string name;
@@ -312,15 +312,6 @@ struct ParsedSamplePool {
 
   const SourceRange range = input.reader.range(offset, length);
   return ParsedSamplePool{
-      .parse =
-          AkaoSamplePoolParse{
-              .sampleSetId = table.sampleSetId,
-              .offset = offset,
-              .length = length,
-              .version = version,
-              .firstArticulationId = table.firstArticulationId,
-              .articulationCount = table.articulationCount,
-          },
       .articulations = std::move(articulations),
       .samples = std::move(samples),
       .name = std::move(name),
@@ -331,7 +322,7 @@ struct ParsedSamplePool {
 
 void emitSamplePool(const ScanInput& input, ScanResultBuilder& result, ParsedSamplePool& parsed) {
   auto samples = result.samplePool(parsed.name, parsed.range);
-  parsed.parse.ref = samples.ref();
+  parsed.ref = samples.ref();
   const SourceAnnotationId root =
       samples.source(SourceRole::SamplePool, parsed.name, parsed.range, "akao-sample-collection").id();
   for (auto& parsedSample : parsed.samples) {
@@ -368,10 +359,15 @@ void emitSamplePool(const ScanInput& input, ScanResultBuilder& result, ParsedSam
                           .derived("effective_adsr2", articulation.adsr2, SourceValueDisplay::Hex);
     if (articulation.sampleIndex < parsed.samples.size()) {
       annotation.link(SourceLinkRole::UsesSample,
-                      SourceTarget{ObjectRefs::sample(parsed.parse.ref.id, articulation.sampleIndex)});
+                      SourceTarget{ObjectRefs::sample(parsed.ref.id, articulation.sampleIndex)});
     }
   }
-  samples.data(std::move(parsed.articulations));
+  samples.data(AkaoSamplePoolData{
+      .sampleSetId = parsed.table.sampleSetId,
+      .firstArticulationId = parsed.table.firstArticulationId,
+      .articulationCount = parsed.table.articulationCount,
+      .articulations = std::move(parsed.articulations),
+  });
 }
 
 [[nodiscard]] std::optional<ParsedSamplePool> parseSamplePoolValues(const ScanInput& input, u32 offset,
@@ -435,24 +431,22 @@ bool isPossibleAkaoSamplePool(ByteReader reader, u32 offset) {
   return firstDest == 0 || firstDest == reader.le32(offset + 0x10);
 }
 
-std::optional<AkaoSamplePoolParse> parseAkaoSamplePool(const ScanInput& input, ScanResultBuilder& result, u32 offset,
-                                                       AkaoPs1Version version) {
+bool parseAkaoSamplePool(const ScanInput& input, ScanResultBuilder& result, u32 offset, AkaoPs1Version version) {
   auto parsed = parseSamplePoolValues(input, offset, version);
   if (!parsed) {
-    return std::nullopt;
+    return false;
   }
   emitSamplePool(input, result, *parsed);
-  return std::move(parsed->parse);
+  return true;
 }
 
-std::optional<AkaoSamplePoolParse> parseAkaoSamplePool(const ScanInput& input, ScanResultBuilder& result,
-                                                       AkaoSplitSampleLocation location) {
+bool parseAkaoSamplePool(const ScanInput& input, ScanResultBuilder& result, AkaoSplitSampleLocation location) {
   auto parsed = parseSamplePoolValues(input, location);
   if (!parsed) {
-    return std::nullopt;
+    return false;
   }
   emitSamplePool(input, result, *parsed);
-  return std::move(parsed->parse);
+  return true;
 }
 
 }  // namespace vgmtrans::formats::akao

@@ -26,7 +26,6 @@ namespace vgmtrans::core {
 class SessionState {
 public:
   [[nodiscard]] const SharedSequence<Asset>& assets() const noexcept { return assets_; }
-  [[nodiscard]] const SharedSequence<MatchFact>& matchFacts() const noexcept { return matchFacts_; }
   [[nodiscard]] const std::vector<Collection>& collections() const noexcept { return collections_; }
   [[nodiscard]] const std::vector<Diagnostic>& diagnostics() const noexcept { return diagnostics_; }
 
@@ -58,10 +57,9 @@ public:
 private:
   struct ScanChunk {
     std::shared_ptr<const std::vector<Asset>> assets;
-    std::shared_ptr<const std::vector<MatchFact>> matchFacts;
     SourceMap sourceMap;
 
-    [[nodiscard]] bool empty() const noexcept { return assets->empty() && matchFacts->empty() && sourceMap.empty(); }
+    [[nodiscard]] bool empty() const noexcept { return assets->empty() && sourceMap.empty(); }
   };
 
   struct ExplicitCollectionEntry {
@@ -78,7 +76,6 @@ private:
 
   std::vector<ScanChunk> scanChunks_;
   SharedSequence<Asset> assets_;
-  SharedSequence<MatchFact> matchFacts_;
   SourceMap sourceMap_;
   std::vector<ExplicitCollectionEntry> explicitCollections_;
   std::vector<Collection> collections_;

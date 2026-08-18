@@ -21,23 +21,7 @@
 
 namespace vgmtrans::core {
 
-// Lightweight read-only view used while rebuilding collections. It borrows the
-// source store and cheaply shares the Session's immutable asset and fact views
-// instead of materializing a public SessionSnapshot.
-class MatchContext {
-public:
-  MatchContext(const SourceStore& sources, SharedSequence<Asset> assets, SharedSequence<MatchFact> matchFacts)
-      : sources_(sources), assets_(std::move(assets)), matchFacts_(std::move(matchFacts)) {}
-
-  [[nodiscard]] const SourceStore& sources() const noexcept { return sources_; }
-  [[nodiscard]] const SharedSequence<Asset>& assets() const noexcept { return assets_; }
-  [[nodiscard]] const SharedSequence<MatchFact>& matchFacts() const noexcept { return matchFacts_; }
-
-private:
-  const SourceStore& sources_;
-  SharedSequence<Asset> assets_;
-  SharedSequence<MatchFact> matchFacts_;
-};
+class CollectionDiscoveryContext;
 
 // Formats bind collection-local meaning into private instrument copies and a
 // copied sequence runtime. Member lists themselves were fixed during matching.
@@ -45,13 +29,14 @@ struct CollectionBindingContext {
 public:
   CollectionBindingContext(const SequenceProgramAsset* sequence, SequenceRuntime& sequenceRuntime,
                            std::span<SoundBankAsset> soundBanks, std::span<const SamplePoolAsset* const> samplePools,
-                           std::vector<Diagnostic>& diagnostics)
-      : sequence(sequence), soundBanks(soundBanks), samplePools(samplePools), diagnostics(diagnostics),
-        sequenceRuntime_(sequenceRuntime) {}
+                           std::span<const MiscAsset* const> miscAssets, std::vector<Diagnostic>& diagnostics)
+      : sequence(sequence), soundBanks(soundBanks), samplePools(samplePools), miscAssets(miscAssets),
+        diagnostics(diagnostics), sequenceRuntime_(sequenceRuntime) {}
 
   const SequenceProgramAsset* sequence;
   std::span<SoundBankAsset> soundBanks;
   std::span<const SamplePoolAsset* const> samplePools;
+  std::span<const MiscAsset* const> miscAssets;
   std::vector<Diagnostic>& diagnostics;
   bool failed = false;
 
@@ -65,6 +50,11 @@ public:
       return asset->metadata.id;
     });
     return found == samplePools.end() ? nullptr : *found;
+  }
+
+  [[nodiscard]] const MiscAsset* misc(AssetId id) const noexcept {
+    const auto found = std::ranges::find(miscAssets, id, [](const MiscAsset* asset) { return asset->metadata.id; });
+    return found == miscAssets.end() ? nullptr : *found;
   }
 
   [[nodiscard]] bool replaceSequenceRuntime(SequenceRuntime replacement) {
@@ -109,7 +99,7 @@ struct FormatModule {
   // Function table registered by one format. Recognition belongs at the start
   // of scan(), which returns an empty result when the source does not match.
   using Scan = std::function<ScanResult(const ScanInput& input)>;
-  using ResolveCollections = std::function<std::vector<DesiredCollection>(const MatchContext& context)>;
+  using ResolveCollections = std::function<std::vector<DesiredCollection>(const CollectionDiscoveryContext& context)>;
 
   std::string name;
   // Used when a request delegates sample filtering to the owning format.

@@ -5,7 +5,7 @@
  */
 
 #include "value/formats/Akao/Akao.h"
-#include "value/scan/CollectionResolver.h"
+#include "value/scan/CollectionDiscovery.h"
 
 #include <algorithm>
 #include <cctype>
@@ -22,31 +22,8 @@ using namespace core;
 
 namespace {
 
-struct SequenceFactEntry {
-  AssetId asset;
-  std::string name;
-  std::optional<SourceId> sourceId;
-  const SourceFile* source = nullptr;
-  u32 sequenceId = 0;
-  std::optional<u32> sampleSetId;
-  u32 offset = 0;
-  std::vector<u32> requiredArticulations;
-};
-
-struct SampleFactEntry {
-  AssetId asset;
-  std::optional<SourceId> sourceId;
-  const SourceFile* source = nullptr;
-  std::optional<u32> sampleSetId;
-  u32 firstArticulationId = 0;
-  u32 articulationCount = 0;
-  u32 sourceOffset = 0;
-};
-
-struct InstrumentSetFactEntry {
-  AssetId asset;
-  AssetId sequenceAsset;
-};
+using SequenceEntry = AssetWithData<SequenceProgramAsset, AkaoSequenceData>;
+using SampleEntry = AssetWithData<SamplePoolAsset, AkaoSamplePoolData>;
 
 [[nodiscard]] bool covers(const AkaoSampleCoverageProvider& provider, u32 value) {
   return value >= provider.first && static_cast<u64>(value) < static_cast<u64>(provider.first) + provider.count;
@@ -71,94 +48,36 @@ void markCovered(std::set<u32>& remaining, const AkaoSampleCoverageProvider& pro
   return ext == ".psf" || ext == ".minipsf" || ext == ".psflib";
 }
 
-[[nodiscard]] CollectionKey collectionKey(const SequenceFactEntry& sequence) {
+[[nodiscard]] CollectionKey collectionKey(const SequenceEntry& sequence) {
   return CollectionKey{
       .resolver = std::string(kAkaoCollectionResolver),
-      .value = "seq:" + std::to_string(sequence.sequenceId) +
-               ":source:" + std::to_string(sequence.sourceId ? sequence.sourceId->value : 0) +
-               ":offset:" + std::to_string(sequence.offset),
+      .value = "seq:" + std::to_string(sequence.data->sequenceId) +
+               ":source:" + std::to_string(sequence.sourceId() ? sequence.sourceId()->value : 0) +
+               ":offset:" + std::to_string(sequence.asset->metadata.range.offset),
   };
 }
 
-[[nodiscard]] std::string missingSampleMessage(const SequenceFactEntry& sequence) {
-  if (sequence.sampleSetId) {
-    return "Akao sequence references sample set " + std::to_string(*sequence.sampleSetId) +
+[[nodiscard]] std::string missingSampleMessage(const SequenceEntry& sequence) {
+  if (sequence.data->sampleSetId) {
+    return "Akao sequence references sample set " + std::to_string(*sequence.data->sampleSetId) +
            ", but no matching sample pool was found";
   }
   return "Akao sequence has no matching sample pool";
 }
 
-[[nodiscard]] std::vector<SequenceFactEntry> sequenceFacts(const MatchFactIndex& index) {
-  std::vector<SequenceFactEntry> entries;
-  for (const auto& facts : index.assets<SequenceProgramAsset>(kAkaoFormatName)) {
-    const auto sequenceId = facts.id(kAkaoSequenceIdDomain);
-    if (!sequenceId) {
-      continue;
-    }
-    auto required = facts.requirements(kAkaoArticulationDomain);
-    std::erase(required, 0);
-    entries.push_back(SequenceFactEntry{
-        .asset = facts.asset().metadata.id,
-        .name = facts.asset().metadata.name,
-        .sourceId = facts.sourceId,
-        .source = facts.source,
-        .sequenceId = *sequenceId,
-        .sampleSetId = facts.id(kAkaoSampleSetDomain),
-        .offset = static_cast<u32>(facts.asset().metadata.range.offset),
-        .requiredArticulations = std::move(required),
-    });
-  }
-  return entries;
-}
-
-[[nodiscard]] std::vector<SampleFactEntry> sampleFacts(const MatchFactIndex& index) {
-  std::vector<SampleFactEntry> entries;
-  for (const auto& facts : index.assets<SamplePoolAsset>(kAkaoFormatName)) {
-    const auto coverage = facts.coverage(kAkaoArticulationDomain);
-    if (!coverage) {
-      continue;
-    }
-    entries.push_back(SampleFactEntry{
-        .asset = facts.asset().metadata.id,
-        .sourceId = facts.sourceId,
-        .source = facts.source,
-        .sampleSetId = facts.id(kAkaoSampleSetDomain),
-        .firstArticulationId = coverage->first,
-        .articulationCount = coverage->count,
-        .sourceOffset = static_cast<u32>(facts.asset().metadata.range.offset),
-    });
-  }
-  std::ranges::sort(entries, {}, &SampleFactEntry::sourceOffset);
-  return entries;
-}
-
-[[nodiscard]] std::vector<InstrumentSetFactEntry> soundBankFacts(const MatchFactIndex& index) {
-  std::vector<InstrumentSetFactEntry> entries;
-  for (const auto& facts : index.assets<SoundBankAsset>(kAkaoFormatName)) {
-    const auto sequenceAsset = facts.relation(kAkaoInstrumentSequenceDomain);
-    if (!sequenceAsset) {
-      continue;
-    }
-    entries.push_back(InstrumentSetFactEntry{
-        .asset = facts.asset().metadata.id,
-        .sequenceAsset = *sequenceAsset,
-    });
-  }
-  return entries;
-}
-
-std::vector<SampleFactEntry> chooseSamplesForSequence(const SequenceFactEntry& sequence,
-                                                      const std::vector<SampleFactEntry>& samples,
-                                                      std::set<u32>& remaining, CollectionAssembly& collection) {
-  std::vector<SampleFactEntry> candidates;
+std::vector<SampleEntry> chooseSamplesForSequence(const SequenceEntry& sequence,
+                                                  const std::vector<SampleEntry>& samples, std::set<u32>& remaining,
+                                                  CollectionAssembly& collection) {
+  std::vector<SampleEntry> candidates;
   const bool isolated = psfLike(sequence.source);
   for (const auto& sample : samples) {
-    const bool sameSource = sequence.sourceId && sample.sourceId && *sequence.sourceId == *sample.sourceId;
+    const bool sameSource = sequence.sourceId() && sample.sourceId() && sequence.sourceId() == sample.sourceId();
     if (!isolated || sameSource) {
       candidates.push_back(sample);
     }
   }
-  std::ranges::sort(candidates, std::ranges::greater{}, &SampleFactEntry::sourceOffset);
+  std::ranges::sort(candidates, std::ranges::greater{},
+                    [](const SampleEntry& value) { return value.asset->metadata.range.offset; });
 
   std::vector<AkaoSampleCoverageProvider> providers;
   providers.reserve(candidates.size());
@@ -166,26 +85,26 @@ std::vector<SampleFactEntry> chooseSamplesForSequence(const SequenceFactEntry& s
     const auto& candidate = candidates[i];
     providers.push_back(AkaoSampleCoverageProvider{
         .index = i,
-        .sampleSetId = candidate.sampleSetId,
-        .first = candidate.firstArticulationId,
-        .count = candidate.articulationCount,
-        .sourceOffset = candidate.sourceOffset,
+        .sampleSetId = candidate.data->sampleSetId,
+        .first = candidate.data->firstArticulationId,
+        .count = candidate.data->articulationCount,
+        .sourceOffset = candidate.asset->metadata.range.offset,
     });
   }
 
   std::vector<u32> required(remaining.begin(), remaining.end());
-  const auto selection = selectAkaoSampleCoverage(sequence.sampleSetId, required, providers);
-  if (sequence.sampleSetId && *sequence.sampleSetId > 0 && !psfLike(sequence.source) &&
+  const auto selection = selectAkaoSampleCoverage(sequence.data->sampleSetId, required, providers);
+  if (sequence.data->sampleSetId && *sequence.data->sampleSetId > 0 && !psfLike(sequence.source) &&
       !selection.requestedSampleSetFound) {
     collection.incomplete(CollectionIssue{
         .severity = Severity::Warning,
         .code = "missing-preferred-sample-set",
         .message = missingSampleMessage(sequence),
-        .asset = sequence.asset,
+        .asset = sequence.id(),
     });
   }
 
-  std::vector<SampleFactEntry> selected;
+  std::vector<SampleEntry> selected;
   for (const std::size_t selectedIndex : selection.providers) {
     selected.push_back(candidates[selectedIndex]);
   }
@@ -193,17 +112,17 @@ std::vector<SampleFactEntry> chooseSamplesForSequence(const SequenceFactEntry& s
   return selected;
 }
 
-void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceFactEntry& sequence,
-                                const std::vector<SampleFactEntry>& selected, const std::set<u32>& remaining) {
+void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceEntry& sequence,
+                                const std::vector<SampleEntry>& selected, const std::set<u32>& remaining) {
   for (const auto& sample : selected) {
-    collection.samplePool(sample.asset);
+    collection.samplePool(sample.id());
   }
   if (selected.empty()) {
     collection.incomplete(CollectionIssue{
         .severity = Severity::Warning,
         .code = "missing-sample-collection",
         .message = missingSampleMessage(sequence),
-        .asset = sequence.asset,
+        .asset = sequence.id(),
     });
   } else if (!remaining.empty()) {
     std::string message = "Akao sample pools do not cover required articulation ids:";
@@ -214,7 +133,7 @@ void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceFa
         .severity = Severity::Warning,
         .code = "missing-articulation-coverage",
         .message = std::move(message),
-        .asset = sequence.asset,
+        .asset = sequence.id(),
     });
   }
 }
@@ -222,11 +141,11 @@ void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceFa
 [[nodiscard]] AkaoArticulationMap selectedArticulations(const CollectionBindingContext& context) {
   AkaoArticulationMap articulations;
   for (const auto* samplePool : context.samplePools) {
-    const auto* data = samplePool->privateData.get<AkaoSampleBindingData>();
+    const auto* data = samplePool->privateData.get<AkaoSamplePoolData>();
     if (data == nullptr) {
       continue;
     }
-    for (const auto& articulation : *data) {
+    for (const auto& articulation : data->articulations) {
       articulations[articulation.articulationId] = AkaoArticulationBinding{
           .collection = ScanSamplePoolRef{.id = samplePool->metadata.id},
           .sampleIndex = articulation.sampleIndex,
@@ -299,29 +218,29 @@ AkaoSampleCoverageSelection selectAkaoSampleCoverage(std::optional<u32> requeste
   return result;
 }
 
-std::vector<DesiredCollection> resolveAkaoCollections(const MatchContext& context) {
-  const MatchFactIndex index(context);
-  const auto sequences = sequenceFacts(index);
-  const auto soundBanks = soundBankFacts(index);
-  const auto samples = sampleFacts(index);
+std::vector<DesiredCollection> resolveAkaoCollections(const CollectionDiscoveryContext& context) {
+  const auto sequences = context.assetsWithData<SequenceProgramAsset, AkaoSequenceData>(kAkaoFormatName);
+  const auto samples = context.assetsWithData<SamplePoolAsset, AkaoSamplePoolData>(kAkaoFormatName);
 
   std::vector<DesiredCollection> collections;
   for (const auto& sequence : sequences) {
-    CollectionAssembly collection(collectionKey(sequence), sequence.name.empty() ? "Akao Collection" : sequence.name);
-    collection.sequence(sequence.asset);
-    const auto soundBank = std::ranges::find(soundBanks, sequence.asset, &InstrumentSetFactEntry::sequenceAsset);
-    if (soundBank != soundBanks.end()) {
-      collection.soundBank(soundBank->asset);
+    CollectionAssembly collection(collectionKey(sequence), sequence.asset->metadata.name.empty()
+                                                               ? "Akao Collection"
+                                                               : sequence.asset->metadata.name);
+    collection.sequence(sequence.id());
+    const auto* soundBank = context.asset<SoundBankAsset>(sequence.data->structuralInstrumentSet);
+    if (soundBank != nullptr && soundBank->metadata.format == kAkaoFormatName) {
+      collection.soundBank(soundBank->metadata.id);
     } else {
       collection.incomplete(CollectionIssue{
           .severity = Severity::Warning,
           .code = "missing-instrument-set",
           .message = "Akao sequence has no detected sound bank",
-          .asset = sequence.asset,
+          .asset = sequence.id(),
       });
     }
 
-    std::set<u32> remaining(sequence.requiredArticulations.begin(), sequence.requiredArticulations.end());
+    std::set<u32> remaining(sequence.data->requiredArticulations.begin(), sequence.data->requiredArticulations.end());
 
     const auto selected = chooseSamplesForSequence(sequence, samples, remaining, collection);
     attachSamplesAndReportGaps(collection, sequence, selected, remaining);
@@ -336,7 +255,7 @@ void bindAkaoCollection(CollectionBindingContext& context) {
   if (sequence == nullptr) {
     return;
   }
-  const auto* sequenceData = sequence->privateData.get<AkaoSequenceBindingData>();
+  const auto* sequenceData = sequence->privateData.get<AkaoSequenceData>();
   if (sequenceData == nullptr) {
     context.fail("Akao sequence is missing retained collection-binding data", sequence->metadata.range);
     return;
@@ -346,14 +265,15 @@ void bindAkaoCollection(CollectionBindingContext& context) {
     context.fail("Akao collection does not contain the sequence's structural sound bank", sequence->metadata.range);
     return;
   }
-  const auto* instrumentData = instruments->privateData.get<AkaoInstrumentSetBindingData>();
+  const auto* soundBankData = instruments->privateData.get<AkaoSoundBankData>();
+  const auto* instrumentData = soundBankData != nullptr ? &soundBankData->binding : nullptr;
   if (instrumentData == nullptr) {
     context.fail("Akao sound bank is missing retained collection-binding data", instruments->metadata.range);
     return;
   }
 
   for (const auto* samples : context.samplePools) {
-    if (samples->metadata.format == kAkaoFormatName && samples->privateData.get<AkaoSampleBindingData>() == nullptr) {
+    if (samples->metadata.format == kAkaoFormatName && samples->privateData.get<AkaoSamplePoolData>() == nullptr) {
       context.fail("Akao sample pool is missing retained collection-binding data", samples->metadata.range);
       return;
     }

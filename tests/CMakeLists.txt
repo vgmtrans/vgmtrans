@@ -23,7 +23,7 @@ target_sources(vgmtrans-value-core-tests
     formats/SuzukiSnesModuleTests.cpp
     formats/WolfTeamSnesModuleTests.cpp
     core/SessionSnapshotBuilder.h
-    core/ValueCollectionResolverTests.cpp
+    core/ValueCollectionDiscoveryTests.cpp
     core/ValueCollectionStitchTests.cpp
     core/ValueCompilerCursorTests.cpp
     core/ValueDynamicEnvelopeTests.cpp

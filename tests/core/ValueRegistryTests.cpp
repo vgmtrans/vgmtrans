@@ -110,6 +110,27 @@ void formatRegistryStoresCopyableModulesAtomically() {
   }
   expect(threw && binderRegistry.modules().size() == 1,
          "format registry should allow only one collection binder per effective resolver id");
+
+  FormatRegistry resolverRegistry;
+  resolverRegistry.add(FormatModule{
+      .name = "FirstResolver",
+      .scan = scanProbeSequence,
+      .collectionResolverId = "SharedResolver",
+      .resolveCollections = [](const CollectionDiscoveryContext&) { return std::vector<DesiredCollection>{}; },
+  });
+  threw = false;
+  try {
+    resolverRegistry.add(FormatModule{
+        .name = "SecondResolver",
+        .scan = scanProbeSequence,
+        .collectionResolverId = "SharedResolver",
+        .resolveCollections = [](const CollectionDiscoveryContext&) { return std::vector<DesiredCollection>{}; },
+    });
+  } catch (const std::invalid_argument&) {
+    threw = true;
+  }
+  expect(threw && resolverRegistry.modules().size() == 1,
+         "format registry should allow only one collection resolver owner per effective resolver id");
 }
 
 void sessionRegistersOneFormatModuleAtTheAuthoringSurface() {
@@ -154,7 +175,8 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
                      .channels = 1,
                      .bitsPerSample = 8,
                  });
-  const auto misc = out.misc("Builder Misc", input.reader.range(0, 1)).payload({0xaa});
+  const auto misc =
+      out.misc("Builder Misc", input.reader.range(0, 1)).data(BuilderPrivateData{.value = 44}).payload({0xaa});
 
   out.collection("Builder Song", CollectionKey{.resolver = "ProbeBuilder", .value = "song:1"})
       .sequence(sequence)
@@ -173,11 +195,12 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
   const auto* sequenceData = std::get<SequenceProgramAsset>(result.assets[0]).privateData.get<BuilderPrivateData>();
   const auto* instrumentData = std::get<SoundBankAsset>(result.assets[1]).privateData.get<BuilderPrivateData>();
   const auto* sampleData = std::get<SamplePoolAsset>(result.assets[2]).privateData.get<BuilderPrivateData>();
+  const auto* miscData = std::get<MiscAsset>(result.assets[3]).privateData.get<BuilderPrivateData>();
   expect(sequenceData != nullptr && sequenceData->value == 11 && instrumentData != nullptr &&
-             instrumentData->value == 22 && sampleData != nullptr && sampleData->value == 33 &&
+             instrumentData->value == 22 && sampleData != nullptr && sampleData->value == 33 && miscData != nullptr &&
+             miscData->value == 44 &&
              std::get<SamplePoolAsset>(result.assets[2]).privateData.get<std::string>() == nullptr,
-         "sequence, instrument, and sample drafts should retain an immutable typed private payload");
-  expect(result.matchFacts.empty(), "scan result builder should not need match facts for explicit collections");
+         "every asset draft should retain an immutable typed private payload");
   expect(result.explicitCollections.size() == 1, "scan result builder should emit one explicit collection");
   expect(result.explicitCollections[0].members.sequence == sequence.id(),
          "scan result builder should preserve the collection sequence");

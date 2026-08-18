@@ -1218,10 +1218,16 @@ void collectionBindingProducesAnImmutableInstrumentView() {
           .regions = {Region{.sample = SampleRef::resolved(samples.metadata.id, 0)}},
       }},
   };
+  const MiscAsset manifest{
+      .metadata = AssetMetadata{.id = AssetId{3}, .format = "Prepared Probe", .name = "Manifest"},
+      .payload = {0x2a},
+      .privateData = AssetPrivateData::make(u32{42}),
+  };
 
   test::SessionSnapshotBuilder builder;
   builder.assets.emplace_back(durable);
   builder.assets.emplace_back(samples);
+  builder.assets.emplace_back(manifest);
   builder.collections.push_back(Collection{
       .id = CollectionId{0},
       .name = "Prepared Probe",
@@ -1230,6 +1236,7 @@ void collectionBindingProducesAnImmutableInstrumentView() {
           {
               .soundBanks = {durable.metadata.id},
               .samplePools = {samples.metadata.id},
+              .miscAssets = {manifest.metadata.id},
           },
   });
 
@@ -1245,6 +1252,19 @@ void collectionBindingProducesAnImmutableInstrumentView() {
              binding.collection->soundBanks().front().instruments.front().name == "Prepared Instrument" &&
              snapshot.asset<SoundBankAsset>(durable.metadata.id)->instruments.front().name == "Durable Instrument",
          "collection binding should preserve selected asset identity without mutating durable assets");
+
+  const auto miscBinding =
+      bindCollection(snapshotWithBinder([id = manifest.metadata.id](CollectionBindingContext& context) {
+                       const auto* selected = context.misc(id);
+                       if (selected == nullptr || selected->privateData.get<u32>() == nullptr ||
+                           *selected->privateData.get<u32>() != 42) {
+                         context.fail("miscellaneous asset was not available during binding");
+                       }
+                     }),
+                     CollectionId{0});
+  expect(miscBinding.collection && miscBinding.collection->miscAssets().size() == 1 &&
+             miscBinding.collection->miscAssets().front()->metadata.id == manifest.metadata.id,
+         "collection binding should expose selected typed miscellaneous assets and retain them in the bound view");
   const auto artifacts =
       exportCollection(snapshot, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Dls}});
 
