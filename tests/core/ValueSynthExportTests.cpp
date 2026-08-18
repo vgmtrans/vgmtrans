@@ -699,6 +699,27 @@ void standaloneSynthExportsKeepNativeModulation() {
          "standalone SoundFont export should retain native modulation when no MIDI replacement exists");
   expect(dlsArt2ContainsConnection(dls.bytes, 0x0000, 0x0114, -8479 * 65536),
          "standalone DLS export should retain native modulation when no MIDI replacement exists");
+
+  auto unresolved = instruments;
+  unresolved.metadata.id = AssetId{3};
+  unresolved.instruments.front().regions.front().sample = SampleRef::unbound(0);
+  test::SessionSnapshotBuilder unresolvedBuilder;
+  unresolvedBuilder.assets.emplace_back(unresolved);
+  const auto unresolvedExport = exportSoundBank(unresolvedBuilder.finish(), sources, unresolved.metadata.id,
+                                                SynthExportFormat::SoundFont2, ExportRequest{});
+  expect(unresolvedExport.bytes.empty(), "an uncollected sound bank should not export unresolved sample references");
+  diagnosticWithMessage(unresolvedExport.diagnostics, "Standalone sound bank has an unresolved sample reference");
+
+  auto selfContained = instruments;
+  selfContained.metadata.id = AssetId{4};
+  selfContained.localSamples = samples.pool;
+  selfContained.instruments.front().regions.front().sample.owner = selfContained.metadata.id;
+  test::SessionSnapshotBuilder selfContainedBuilder;
+  selfContainedBuilder.assets.emplace_back(selfContained);
+  const auto selfContainedExport = exportSoundBank(selfContainedBuilder.finish(), sources, selfContained.metadata.id,
+                                                   SynthExportFormat::SoundFont2, ExportRequest{});
+  expect(!selfContainedExport.bytes.empty() && selfContainedExport.diagnostics.empty(),
+         "an uncollected self-contained sound bank should export directly");
 }
 
 void collectionSynthExportsCanExportOnlyUsedInstruments() {
@@ -812,17 +833,28 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
          "instrument-set export should cull data when exactly one collection supplies sequence context");
 
   test::SessionSnapshotBuilder ambiguousBuilder;
-  ambiguousBuilder.assets = {sequence, instruments, samples};
+  auto otherSamples = samples;
+  otherSamples.metadata.id = AssetId{3};
+  ambiguousBuilder.assets = {sequence, instruments, samples, otherSamples};
   ambiguousBuilder.collections = {
       snapshot.collections().front(),
       Collection{
           .id = CollectionId{1},
           .name = "Other Usage",
+          .binder = [pool = otherSamples.metadata.id](CollectionBindingContext& context) {
+            auto& bank = context.soundBanks.front();
+            for (auto& instrument : bank.instruments) {
+              instrument.explicitAddress->bank = 7;
+              for (auto& region : instrument.regions) {
+                region.sample.owner = pool;
+              }
+            }
+          },
           .members =
               {
                   .sequence = sequence.metadata.id,
                   .soundBanks = {instruments.metadata.id},
-                  .samplePools = {samples.metadata.id},
+                  .samplePools = {otherSamples.metadata.id},
               },
       },
   };
@@ -831,11 +863,12 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
       exportSoundBank(ambiguousSnapshot, sources, instruments.metadata.id, SynthExportFormat::SoundFont2, onlyUsed);
   const auto ambiguousDls =
       exportSoundBank(ambiguousSnapshot, sources, instruments.metadata.id, SynthExportFormat::Dls, onlyUsed);
-  expect(chunkSize(ambiguousSoundFont.bytes, "phdr") == 4 * 38 &&
-             chunkSize(ambiguousSoundFont.bytes, "shdr") == 4 * 46 &&
-             readLe32(ambiguousDls.bytes, asciiOffset(ambiguousDls.bytes, "colh") + 8) == 3 &&
-             chunkSize(ambiguousDls.bytes, "ptbl") == 20,
-         "instrument-set export should retain all data when multiple collections could supply sequence context");
+  expect(ambiguousSoundFont.bytes.empty() && ambiguousDls.bytes.empty(),
+         "sound-bank export should not choose between collections with different pools and addresses");
+  diagnosticWithMessage(ambiguousSoundFont.diagnostics,
+                        "Sound bank belongs to multiple collections; export a specific collection instead");
+  diagnosticWithMessage(ambiguousDls.diagnostics,
+                        "Sound bank belongs to multiple collections; export a specific collection instead");
 
   const InstrumentIdentity semanticIdentity{.domain = "probe.instrument", .key = 2};
   auto semanticInstruments = instruments;
