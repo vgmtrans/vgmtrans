@@ -63,14 +63,10 @@ template <typename T, typename Predicate>
 
 [[nodiscard]] DesiredCollection desiredCollection(const ExplicitCollection& collection) {
   return DesiredCollection{
-      .key = collection.key,
+      .localKey = collection.key.value,
       .name = collection.name,
       .members = collection.members,
   };
-}
-
-[[nodiscard]] std::string collectionKeyString(const CollectionKey& key) {
-  return key.resolver + '\x1f' + key.value;
 }
 
 }  // namespace
@@ -252,36 +248,26 @@ void SessionState::reconcileCollections(std::string_view resolver, std::vector<D
                                         CollectionBinder binder, ScanIdAllocator& ids) {
   std::set<std::string> seenKeys;
   for (auto& candidate : desired) {
-    if (candidate.key.resolver.empty()) {
-      candidate.key.resolver = std::string(resolver);
-    }
-    if (candidate.key.resolver != resolver) {
-      addError("Collection resolver '" + std::string(resolver) + "' returned a collection for resolver '" +
-               candidate.key.resolver + "'");
-      continue;
-    }
-    if (candidate.key.value.empty()) {
+    if (candidate.localKey.empty()) {
       addError("Collection resolver '" + std::string(resolver) + "' returned a collection with an empty key");
       continue;
     }
 
-    const auto key = collectionKeyString(candidate.key);
-    if (!seenKeys.insert(key).second) {
+    if (!seenKeys.insert(candidate.localKey).second) {
       addError("Collection resolver '" + std::string(resolver) + "' returned duplicate collection key '" +
-               candidate.key.value + "'");
+               candidate.localKey + "'");
       continue;
     }
 
     validateCollectionAssetReferences(resolver, candidate);
     CollectionBinder candidateBinder = candidate.binder ? std::move(candidate.binder) : binder;
-    const auto sameKey = [&](const Collection& collection) { return collection.key == candidate.key; };
+    CollectionKey key{
+        .resolver = std::string(resolver),
+        .value = std::move(candidate.localKey),
+    };
+    const auto sameKey = [&](const Collection& collection) { return collection.key == key; };
     if (auto found = std::ranges::find_if(collections_, sameKey); found != collections_.end()) {
-      if (found->origin == CollectionOrigin::UserCreated) {
-        found->freshness = CollectionFreshness::Stale;
-        continue;
-      }
       found->name = std::move(candidate.name);
-      found->freshness = CollectionFreshness::Current;
       found->binder = std::move(candidateBinder);
       found->members = std::move(candidate.members);
       found->issues = std::move(candidate.issues);
@@ -292,7 +278,7 @@ void SessionState::reconcileCollections(std::string_view resolver, std::vector<D
         .id = nextCollectionId(ids),
         .name = std::move(candidate.name),
         .origin = CollectionOrigin::Discovered,
-        .key = std::move(candidate.key),
+        .key = std::move(key),
         .binder = std::move(candidateBinder),
         .members = std::move(candidate.members),
         .issues = std::move(candidate.issues),
@@ -301,7 +287,7 @@ void SessionState::reconcileCollections(std::string_view resolver, std::vector<D
 
   std::erase_if(collections_, [&](const Collection& collection) {
     return collection.origin == CollectionOrigin::Discovered && collection.key.resolver == resolver &&
-           !seenKeys.contains(collectionKeyString(collection.key));
+           !seenKeys.contains(collection.key.value);
   });
 }
 
@@ -391,28 +377,11 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
 
   std::erase_if(diagnostics_, removesDiagnostic);
 
-  updateCollectionsForRemovedAssets(assetIds);
+  std::erase_if(collections_, [&](const Collection& collection) {
+    return collection.origin == CollectionOrigin::UserCreated && referencedAsset(collection.members, assetIds);
+  });
   rebuildViews();
   rebuildIndexes();
-}
-
-void SessionState::updateCollectionsForRemovedAssets(const std::unordered_set<u32>& assetIds) {
-  if (assetIds.empty()) {
-    return;
-  }
-
-  std::erase_if(collections_, [&](Collection& collection) {
-    const auto removedAsset = referencedAsset(collection.members, assetIds);
-    if (!removedAsset) {
-      return false;
-    }
-    if (collection.origin == CollectionOrigin::UserCreated) {
-      return true;
-    }
-    collection.freshness = CollectionFreshness::Stale;
-    collection.issues.push_back(removedStaleAssetIssue(*removedAsset));
-    return false;
-  });
 }
 
 void SessionState::validateCollectionAssetReferences(std::string_view resolver, DesiredCollection& desired) {

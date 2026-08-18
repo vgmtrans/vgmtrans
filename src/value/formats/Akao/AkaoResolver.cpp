@@ -48,13 +48,10 @@ void markCovered(std::set<u32>& remaining, const AkaoSampleCoverageProvider& pro
   return ext == ".psf" || ext == ".minipsf" || ext == ".psflib";
 }
 
-[[nodiscard]] CollectionKey collectionKey(const SequenceEntry& sequence) {
-  return CollectionKey{
-      .resolver = std::string(kAkaoCollectionResolver),
-      .value = "seq:" + std::to_string(sequence.data->sequenceId) +
-               ":source:" + std::to_string(sequence.sourceId() ? sequence.sourceId()->value : 0) +
-               ":offset:" + std::to_string(sequence.asset->metadata.range.offset),
-  };
+[[nodiscard]] std::string collectionKey(const SequenceEntry& sequence) {
+  return "seq:" + std::to_string(sequence.data->sequenceId) +
+         ":source:" + std::to_string(sequence.sourceId() ? sequence.sourceId()->value : 0) +
+         ":offset:" + std::to_string(sequence.asset->metadata.range.offset);
 }
 
 [[nodiscard]] std::string missingSampleMessage(const SequenceEntry& sequence) {
@@ -70,14 +67,18 @@ std::vector<SampleEntry> chooseSamplesForSequence(const SequenceEntry& sequence,
                                                   CollectionAssembly& collection) {
   std::vector<SampleEntry> candidates;
   const bool isolated = psfLike(sequence.source);
+  const auto sequenceSource = sequence.sourceId();
   for (const auto& sample : samples) {
-    const bool sameSource = sequence.sourceId() && sample.sourceId() && sequence.sourceId() == sample.sourceId();
+    const bool sameSource = sequenceSource && sample.sourceId() && sequenceSource == sample.sourceId();
     if (!isolated || sameSource) {
       candidates.push_back(sample);
     }
   }
-  std::ranges::sort(candidates, std::ranges::greater{},
-                    [](const SampleEntry& value) { return value.asset->metadata.range.offset; });
+  std::ranges::sort(candidates, [&](const SampleEntry& left, const SampleEntry& right) {
+    const bool leftLocal = sequenceSource && left.sourceId() == sequenceSource;
+    const bool rightLocal = sequenceSource && right.sourceId() == sequenceSource;
+    return leftLocal != rightLocal ? leftLocal : left.id().value > right.id().value;
+  });
 
   std::vector<AkaoSampleCoverageProvider> providers;
   providers.reserve(candidates.size());
@@ -88,13 +89,13 @@ std::vector<SampleEntry> chooseSamplesForSequence(const SequenceEntry& sequence,
         .sampleSetId = candidate.data->sampleSetId,
         .first = candidate.data->firstArticulationId,
         .count = candidate.data->articulationCount,
-        .sourceOffset = candidate.asset->metadata.range.offset,
     });
   }
 
-  std::vector<u32> required(remaining.begin(), remaining.end());
+  const std::vector<u32> required(remaining.begin(), remaining.end());
   const auto selection = selectAkaoSampleCoverage(sequence.data->sampleSetId, required, providers);
-  if (sequence.data->sampleSetId && *sequence.data->sampleSetId > 0 && !psfLike(sequence.source) &&
+
+  if (sequence.data->sampleSetId && *sequence.data->sampleSetId > 0 && !isolated &&
       !selection.requestedSampleSetFound) {
     collection.incomplete(CollectionIssue{
         .severity = Severity::Warning,
@@ -164,14 +165,13 @@ AkaoSampleCoverageSelection selectAkaoSampleCoverage(std::optional<u32> requeste
   // An Akao sequence refers to articulation IDs, while each discovered sample
   // collection supplies only a range of those IDs. A sequence may therefore
   // need several collections. If the sequence header specifies a sample-set
-  // ID, first select the matching collection with the greatest source offset.
-  // Then examine the remaining collections in order from greatest to smallest
-  // source offset. Select one when its sample-set ID matches the ID from the
-  // sequence header or when it supplies an articulation the sequence still
-  // needs. Return any required articulation IDs that remain uncovered so the
-  // resolver can explain an incomplete match.
-  std::vector<AkaoSampleCoverageProvider> ordered = providers;
-  std::ranges::sort(ordered, std::ranges::greater{}, &AkaoSampleCoverageProvider::sourceOffset);
+  // ID, first select the first matching collection. Providers arrive in
+  // matching priority order: collections from the sequence's source first,
+  // then most recently discovered collections. Continue in that order when
+  // selecting collections that supply required articulations. Return any
+  // required articulation IDs that remain uncovered so the resolver can
+  // explain an incomplete match.
+  const auto& ordered = providers;
 
   std::set<u32> remaining(required.begin(), required.end());
   std::vector<AkaoSampleCoverageProvider> selected;
@@ -196,7 +196,7 @@ AkaoSampleCoverageSelection selectAkaoSampleCoverage(std::optional<u32> requeste
     }
     const bool sameSampleSet = requestedSampleSetId.value_or(0) == provider.sampleSetId.value_or(0);
     const bool contributes = std::ranges::any_of(remaining, [&](u32 value) { return covers(provider, value); });
-    if (!sameSampleSet && !contributes) {
+    if ((!sameSampleSet || !selected.empty()) && !contributes) {
       continue;
     }
     selected.push_back(provider);
@@ -219,8 +219,8 @@ AkaoSampleCoverageSelection selectAkaoSampleCoverage(std::optional<u32> requeste
 }
 
 std::vector<DesiredCollection> resolveAkaoCollections(const CollectionDiscoveryContext& context) {
-  const auto sequences = context.assetsWithData<SequenceProgramAsset, AkaoSequenceData>(kAkaoFormatName);
-  const auto samples = context.assetsWithData<SamplePoolAsset, AkaoSamplePoolData>(kAkaoFormatName);
+  const auto sequences = context.assetsWithData<SequenceProgramAsset, AkaoSequenceData>();
+  const auto samples = context.assetsWithData<SamplePoolAsset, AkaoSamplePoolData>();
 
   std::vector<DesiredCollection> collections;
   for (const auto& sequence : sequences) {
@@ -244,7 +244,6 @@ std::vector<DesiredCollection> resolveAkaoCollections(const CollectionDiscoveryC
 
     const auto selected = chooseSamplesForSequence(sequence, samples, remaining, collection);
     attachSamplesAndReportGaps(collection, sequence, selected, remaining);
-    collection.requireSequence().requireSoundBank().requireSamplePool();
     collections.push_back(std::move(collection).finish());
   }
   return collections;

@@ -52,32 +52,18 @@ void discoveryExposesTypedAssetDataAndSources() {
   });
 
   const CollectionDiscoveryContext context(sources, SharedSequence<Asset>{std::move(assets)});
-  const auto sequences = context.assetsWithData<SequenceProgramAsset, ProbeData>("Probe");
+  const auto sequences = context.assetsWithData<SequenceProgramAsset, ProbeData>();
   expect(sequences.size() == 1 && sequences[0].id() == sequenceId && sequences[0].data->value == 9 &&
              sequences[0].sourceId() == source && sequences[0].source == &sources.source(source),
          "collection discovery should expose typed data and source metadata directly from an asset");
   expect(context.asset<SequenceProgramAsset>(sequenceId) == sequences[0].asset &&
              context.asset<SamplePoolAsset>(samplesId) != nullptr &&
-             context.assetsWithData<SamplePoolAsset, ProbeData>("Probe").empty(),
+             context.assetsWithData<SamplePoolAsset, ProbeData>().empty(),
          "collection discovery should provide typed id lookup and omit assets without the requested private data");
-}
-
-void sourceTreesIdentifyContainerRoots() {
-  SourceStore sources;
-  const SourceId firstRoot = sources.add(SourceFile{.name = "first.iso"}, {0});
-  const SourceId child = sources.addDerived(SourceFile{.name = "music.sq"}, {1}, firstRoot, std::nullopt);
-  const SourceId grandchild = sources.addDerived(SourceFile{.name = "ram.bin"}, {2}, child, std::nullopt);
-  const SourceId secondRoot = sources.add(SourceFile{.name = "second.iso"}, {3});
-
-  expect(sources.rootSource(grandchild) == firstRoot && sources.sameSourceTree(child, grandchild),
-         "derived source ancestry should resolve to its user-loaded root");
-  expect(!sources.sameSourceTree(grandchild, secondRoot) && !sources.rootSource(SourceId{99}).valid(),
-         "separate user sources and missing sources should not share a source tree");
 }
 
 }  // namespace
 
 void runValueCollectionDiscoveryTests() {
   discoveryExposesTypedAssetDataAndSources();
-  sourceTreesIdentifyContainerRoots();
 }

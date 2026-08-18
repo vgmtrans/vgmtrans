@@ -169,6 +169,7 @@ void akaoPortamentoRetainsPitchTransitionIntent();
 void akaoRequiredArticulationsComeFromInstrumentRows();
 void akaoMelodicRegionsDropAdvancingOverlaps();
 void akaoSampleSelectionKeepsPreferredAndRequiredCollections();
+void akaoCollectionPrefersCompleteSamplesFromSequenceSource();
 void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView();
 void ndsLayoutResolvesNamesFilesAndDependencies();
 void ndsLayoutBoundsMalformedTablesAndPointers();
@@ -363,6 +364,7 @@ int main() {
     akaoRequiredArticulationsComeFromInstrumentRows();
     akaoMelodicRegionsDropAdvancingOverlaps();
     akaoSampleSelectionKeepsPreferredAndRequiredCollections();
+    akaoCollectionPrefersCompleteSamplesFromSequenceSource();
     akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView();
     runMp2kModuleTests();
     ndsLayoutResolvesNamesFilesAndDependencies();

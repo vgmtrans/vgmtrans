@@ -414,22 +414,22 @@ struct ProbeBankData {
 [[nodiscard]] std::vector<DesiredCollection> resolveProbeBankCollections(const CollectionDiscoveryContext& context) {
   std::vector<DesiredCollection> collections;
   const auto attach = [&](const auto& entry) {
-    const CollectionKey key{.resolver = "ProbeBank", .value = "bank:" + std::to_string(entry.data->bank)};
-    auto found =
-        std::ranges::find_if(collections, [&](const DesiredCollection& collection) { return collection.key == key; });
+    const std::string key = "bank:" + std::to_string(entry.data->bank);
+    auto found = std::ranges::find_if(collections,
+                                      [&](const DesiredCollection& collection) { return collection.localKey == key; });
     if (found == collections.end()) {
       collections.push_back(DesiredCollection{
-          .key = key,
+          .localKey = key,
           .name = "Probe Bank " + std::to_string(entry.data->bank),
       });
       found = std::prev(collections.end());
     }
     return found;
   };
-  for (const auto& sequence : context.assetsWithData<SequenceProgramAsset, ProbeBankData>("ProbeBank")) {
+  for (const auto& sequence : context.assetsWithData<SequenceProgramAsset, ProbeBankData>()) {
     attach(sequence)->members.sequence = sequence.id();
   }
-  for (const auto& bank : context.assetsWithData<SoundBankAsset, ProbeBankData>("ProbeBank")) {
+  for (const auto& bank : context.assetsWithData<SoundBankAsset, ProbeBankData>()) {
     attach(bank)->members.soundBanks.push_back(bank.id());
   }
   for (auto& collection : collections) {
@@ -519,10 +519,15 @@ struct ProbeBankData {
 }
 
 [[nodiscard]] std::vector<DesiredCollection> fragileProbeSequenceResolver(const CollectionDiscoveryContext& context) {
-  if (context.allAssets().empty() || context.allAssets().size() > 1) {
+  const auto sequences = context.assets<SequenceProgramAsset>();
+  if (sequences.empty() || sequences.size() > 1) {
     throw std::runtime_error("resolver exploded");
   }
-  return {};
+  return {DesiredCollection{
+      .localKey = "dynamic",
+      .name = "Dynamic Probe Collection",
+      .members = {.sequence = sequences.front()->metadata.id},
+  }};
 }
 
 [[nodiscard]] FormatModule fragileProbeSequenceModule() {
@@ -536,7 +541,7 @@ struct ProbeBankData {
 
 [[nodiscard]] std::vector<DesiredCollection> missingAssetCollectionResolver(const CollectionDiscoveryContext&) {
   return {DesiredCollection{
-      .key = CollectionKey{.resolver = "ProbeMissingRefs", .value = "missing-assets"},
+      .localKey = "missing-assets",
       .name = "Missing Assets",
       .members =
           {
@@ -567,7 +572,7 @@ struct ProbeBankData {
   }
 
   return {DesiredCollection{
-      .key = CollectionKey{.resolver = "ProbeWrongTypeRefs", .value = "wrong-type-assets"},
+      .localKey = "wrong-type-assets",
       .name = "Wrong Type Assets",
       .members =
           {
@@ -588,11 +593,11 @@ struct ProbeBankData {
 
 [[nodiscard]] std::vector<DesiredCollection> duplicateKeyCollectionResolver(const CollectionDiscoveryContext&) {
   return {DesiredCollection{
-              .key = CollectionKey{.resolver = "ProbeDuplicateKeys", .value = "same-key"},
+              .localKey = "same-key",
               .name = "First",
           },
           DesiredCollection{
-              .key = CollectionKey{.resolver = "ProbeDuplicateKeys", .value = "same-key"},
+              .localKey = "same-key",
               .name = "Second",
           }};
 }

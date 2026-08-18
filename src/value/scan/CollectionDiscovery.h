@@ -19,8 +19,8 @@
 namespace vgmtrans::core {
 
 // One format-owned value joined to its asset at the heterogeneous asset
-// boundary. Collection discovery receives normal C++ types; the core does not
-// interpret or duplicate format matching data.
+// boundary. This borrowed view is valid only during discovery; durable binders
+// capture stable IDs or owned values instead.
 template <class AssetT, class DataT>
 struct AssetWithData {
   const AssetT* asset = nullptr;
@@ -40,8 +40,6 @@ class CollectionDiscoveryContext {
 public:
   CollectionDiscoveryContext(const SourceStore& sources, SharedSequence<Asset> assets);
 
-  [[nodiscard]] const SourceStore& sources() const noexcept { return sources_; }
-  [[nodiscard]] const SharedSequence<Asset>& allAssets() const noexcept { return assets_; }
   [[nodiscard]] const SourceFile* sourceFor(const AssetMetadata& metadata) const noexcept;
   [[nodiscard]] const Asset* asset(AssetId id) const noexcept;
 
@@ -65,9 +63,9 @@ public:
   }
 
   template <class AssetT, class DataT>
-  [[nodiscard]] std::vector<AssetWithData<AssetT, DataT>> assetsWithData(std::string_view format = {}) const {
+  [[nodiscard]] std::vector<AssetWithData<AssetT, DataT>> assetsWithData() const {
     std::vector<AssetWithData<AssetT, DataT>> matches;
-    for (const AssetT* value : assets<AssetT>(format)) {
+    for (const AssetT* value : assets<AssetT>()) {
       if (const auto* data = value->privateData.template get<DataT>()) {
         matches.push_back(AssetWithData<AssetT, DataT>{
             .asset = value,
@@ -90,20 +88,19 @@ private:
 // resolver remains responsible for format-specific matching policy.
 class CollectionAssembly {
 public:
-  CollectionAssembly(CollectionKey key, std::string name);
+  CollectionAssembly(std::string localKey, std::string name);
 
   CollectionAssembly& sequence(AssetId id);
   CollectionAssembly& soundBank(AssetId id);
   CollectionAssembly& samplePool(AssetId id);
   CollectionAssembly& misc(AssetId id);
-  CollectionAssembly& issue(CollectionIssue issue);
   CollectionAssembly& incomplete(CollectionIssue issue);
+  // The binder outlives discovery. Capture only stable IDs and owned values,
+  // then recover current collection members through CollectionBindingContext.
   CollectionAssembly& bind(CollectionBinder binder);
   CollectionAssembly& ambiguous(std::string message, std::optional<AssetId> asset = std::nullopt,
                                 std::optional<SourceRange> range = std::nullopt);
-  CollectionAssembly& requireSequence();
   CollectionAssembly& requireSoundBank();
-  CollectionAssembly& requireSamplePool();
 
   [[nodiscard]] DesiredCollection finish() &&;
 

@@ -184,7 +184,7 @@ void validateAsset(ValidationReport& report, const SourceStore& sources, const A
 
 void validateAssetIds(ValidationReport& report, const ScanResult& result,
                       const std::unordered_set<u32>& existingAssetIds, std::unordered_set<u32>& batchAssetIds) {
-  // IDs are stable references used by match facts and collections, so a scan
+  // IDs are stable references used by collections, so a scan
   // result must be internally unique and must not reuse IDs already in Session.
   batchAssetIds.reserve(result.assets.size());
   for (const auto& asset : result.assets) {

@@ -108,7 +108,7 @@ void sequenceValidationProtectsPositionalCommandStorage() {
          "sequence validation should reject duplicate, out-of-order, and missing-start command storage");
 }
 
-void collectionIssuesDeriveResolutionIndependentlyFromFreshness() {
+void collectionIssuesDeriveResolution() {
   const CollectionIssue missingSequence = missingSequenceIssue();
   expect(missingSequence.impact == CollectionIssueImpact::Incomplete && missingSequence.severity == Severity::Warning &&
              missingSequence.code == "missing-sequence",
@@ -128,14 +128,9 @@ void collectionIssuesDeriveResolutionIndependentlyFromFreshness() {
   expect(collectionResolution(std::vector{missingSequence, ambiguous}) == CollectionResolution::Ambiguous,
          "ambiguity should take precedence when a collection is also incomplete");
 
-  const CollectionIssue removed = removedStaleAssetIssue();
-  Collection stale{
-      .freshness = CollectionFreshness::Stale,
-      .issues = {missingSamplePoolIssue()},
-  };
-  expect(removed.impact == CollectionIssueImpact::Incomplete, "removed asset issue should make resolution incomplete");
-  expect(stale.freshness == CollectionFreshness::Stale && stale.resolution() == CollectionResolution::Incomplete,
-         "freshness and resolution should remain independent collection properties");
+  const Collection incomplete{.issues = {missingSamplePoolIssue()}};
+  expect(incomplete.resolution() == CollectionResolution::Incomplete,
+         "collection resolution should be derived from its issues");
 }
 
 void performanceAutomationRetainsIntentAlongsideOneEventTimeline() {
@@ -425,7 +420,7 @@ void runValueSequenceModelTests() {
   sourceCommandsRetainOnlySemanticData();
   sequenceSourceRangeIncludesDecodedCommandsFromTheBaseSource();
   sequenceValidationProtectsPositionalCommandStorage();
-  collectionIssuesDeriveResolutionIndependentlyFromFreshness();
+  collectionIssuesDeriveResolution();
   performanceAutomationRetainsIntentAlongsideOneEventTimeline();
   performanceEmitterBindsScalarAutomationWithoutExposingStorage();
   performanceBoundValueOwnsReplacementLifecycle();

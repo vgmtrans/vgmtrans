@@ -209,23 +209,6 @@ std::vector<SourceId> SourceStore::sourceFamily(SourceId id) const {
   return family;
 }
 
-SourceId SourceStore::rootSource(SourceId id) const noexcept {
-  if (!contains(id)) {
-    return {};
-  }
-  SourceId root = id;
-  while (entries_[root.value].file.parent && contains(*entries_[root.value].file.parent)) {
-    root = *entries_[root.value].file.parent;
-  }
-  return root;
-}
-
-bool SourceStore::sameSourceTree(SourceId left, SourceId right) const noexcept {
-  const SourceId leftRoot = rootSource(left);
-  const SourceId rightRoot = rootSource(right);
-  return leftRoot.valid() && leftRoot == rightRoot;
-}
-
 std::vector<SourceId> SourceStore::activeUserSources() const {
   std::vector<SourceId> sources;
   for (const auto& entry : entries_) {

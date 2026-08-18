@@ -37,7 +37,6 @@ using Asset = std::variant<SequenceProgramAsset, SoundBankAsset, SamplePoolAsset
 struct Collection {
   CollectionId id;
   std::string name;
-  CollectionFreshness freshness = CollectionFreshness::Current;
   CollectionOrigin origin = CollectionOrigin::Discovered;
   CollectionKey key;
   // Chosen during session resolution so binding never has to recover format

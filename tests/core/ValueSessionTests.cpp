@@ -345,13 +345,7 @@ void sessionCreatesUserCollectionsFromDetectedAssets() {
   auto sequenceModule = probeBankSequenceModule();
   sequenceModule.name = "ProbeBank";
   sequenceModule.collectionResolverId = "probe-bank";
-  sequenceModule.resolveCollections = [](const CollectionDiscoveryContext& context) {
-    auto collections = resolveProbeBankCollections(context);
-    for (auto& collection : collections) {
-      collection.key.resolver = "probe-bank";
-    }
-    return collections;
-  };
+  sequenceModule.resolveCollections = resolveProbeBankCollections;
   sequenceModule.bindCollection = [](CollectionBindingContext& context) { context.warning("user collection bound"); };
   session.registerFormat(std::move(sequenceModule));
   session.registerFormat(probeBankInstrumentModule());
@@ -576,45 +570,50 @@ void sessionRemovalUpdatesCrossSourceCollectionLifecycle() {
   expect(project.collections().empty(), "resolver-owned discovered collection should disappear when no assets remain");
 }
 
-void sessionResolverFailureDoesNotWipeExistingCollections() {
+void sessionResolverFailureKeepsExplicitCollections() {
   Session session;
   session.registerFormat(fragileProbeSequenceModule());
 
   const auto first = session.addSource(SourceFile{.name = "first.probe"}, {0xaa});
   session.scanSource(first);
   SessionSnapshot project = session.snapshot();
-  expect(project.collections().size() == 1, "initial scan should create a collection");
-  const CollectionId originalCollection = project.collections()[0].id;
+  expect(project.collections().size() == 2,
+         "initial scan should create scanner-supplied and resolver-supplied collections");
+  const auto originalExplicit = std::ranges::find_if(
+      project.collections(), [](const Collection& collection) { return collection.key.value.starts_with("source:"); });
+  expect(originalExplicit != project.collections().end(), "initial scan should publish its explicit collection");
+  const CollectionId originalExplicitId = originalExplicit->id;
 
   session.addSource(SourceFile{.name = "second.probe"}, {0xaa});
   session.scanPendingSources();
   project = session.snapshot();
-  expect(project.collections().size() == 1, "resolver failure should preserve previous collections");
-  expect(project.collections()[0].id == originalCollection, "preserved collection should keep its id");
+  expect(project.collections().size() == 2,
+         "resolver failure should not discard collections supplied directly by scanners");
+  expect(std::ranges::find(project.collections(), originalExplicitId, &Collection::id) != project.collections().end(),
+         "an existing scanner-supplied collection should keep its id");
+  expect(std::ranges::none_of(project.collections(),
+                              [](const Collection& collection) { return collection.key.value == "dynamic"; }),
+         "a resolver failure should remove its previous dynamic collection");
   static_cast<void>(diagnosticWithMessage(project.diagnostics(),
                                           "ProbeSequenceFragileResolver resolveCollections failed: resolver exploded"));
 }
 
-void sessionMarksCollectionsStaleWhenRemovalCannotReconcile() {
+void sessionResolverFailureDropsRemovedCollections() {
   Session session;
   session.registerFormat(fragileProbeSequenceModule());
 
-  const auto source = session.addSource(SourceFile{.name = "stale-on-failure.probe"}, {0xaa});
+  const auto source = session.addSource(SourceFile{.name = "removed-on-failure.probe"}, {0xaa});
   session.scanSource(source);
   SessionSnapshot project = session.snapshot();
-  expect(project.collections().size() == 1, "initial scan should create a collection");
-  const CollectionId originalCollection = project.collections()[0].id;
-
+  expect(project.collections().size() == 2,
+         "initial scan should create scanner-supplied and resolver-supplied collections");
   session.removeSource(source);
 
   project = session.snapshot();
   expect(project.sources().empty(), "failed reconcile after removal should still remove sources");
   expect(project.assets().empty(), "failed reconcile after removal should still remove assets");
-  expect(project.collections().size() == 1, "resolver failure should keep the previous collection inspectable");
-  expect(project.collections()[0].id == originalCollection, "stale collection should keep its id");
-  expect(project.collections()[0].freshness == CollectionFreshness::Stale,
-         "collection should be marked stale when cleanup cannot reconcile its resolver");
-  expect(!project.collections()[0].issues.empty(), "stale collection should explain why it is stale");
+  expect(project.collections().empty(),
+         "a removed scanner-supplied collection should not survive a later resolver failure");
   static_cast<void>(diagnosticWithMessage(project.diagnostics(),
                                           "ProbeSequenceFragileResolver resolveCollections failed: resolver exploded"));
 }
@@ -1214,8 +1213,8 @@ void runValueSessionTests() {
   sessionRemovesSourceFamilyAndDiscoveredData();
   sessionRemovesSourceFamilyWithItsLastAsset();
   sessionRemovalUpdatesCrossSourceCollectionLifecycle();
-  sessionResolverFailureDoesNotWipeExistingCollections();
-  sessionMarksCollectionsStaleWhenRemovalCannotReconcile();
+  sessionResolverFailureKeepsExplicitCollections();
+  sessionResolverFailureDropsRemovedCollections();
   sessionRejectsLateRegistryMutation();
   sessionRejectsDuplicateAssetIdsAtAdmission();
   sessionRejectsExtractedSourcesWithMissingParents();

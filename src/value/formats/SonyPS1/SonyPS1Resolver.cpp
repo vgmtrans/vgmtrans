@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -52,8 +53,7 @@ struct SonySampleBinding {
 
 [[nodiscard]] bool needsExternalSamples(const SoundBankAsset& bank) {
   return std::ranges::any_of(bank.instruments, [](const Instrument& instrument) {
-    return std::ranges::any_of(instrument.regions,
-                               [](const Region& region) { return region.sample.needsBinding(); });
+    return std::ranges::any_of(instrument.regions, [](const Region& region) { return region.sample.needsBinding(); });
   });
 }
 
@@ -96,7 +96,7 @@ struct SonySampleBinding {
 
 [[nodiscard]] std::vector<InstrumentEntry> instruments(const CollectionDiscoveryContext& context) {
   std::vector<InstrumentEntry> entries;
-  for (const auto& entry : context.assetsWithData<SoundBankAsset, SonyPs1SampleSize>(kSonyPs1FormatName)) {
+  for (const auto& entry : context.assetsWithData<SoundBankAsset, SonyPs1SampleSize>()) {
     entries.push_back(InstrumentEntry{
         .asset = entry.id(),
         .source = entry.sourceId(),
@@ -111,7 +111,7 @@ struct SonySampleBinding {
 
 [[nodiscard]] std::vector<SampleEntry> samples(const CollectionDiscoveryContext& context) {
   std::vector<SampleEntry> entries;
-  for (const auto& entry : context.assetsWithData<SamplePoolAsset, SonyPs1SampleSize>(kSonyPs1FormatName)) {
+  for (const auto& entry : context.assetsWithData<SamplePoolAsset, SonyPs1SampleSize>()) {
     entries.push_back(SampleEntry{
         .asset = entry.id(),
         .source = entry.sourceId(),
@@ -255,9 +255,8 @@ void applySonyPs1Bindings(CollectionBindingContext& context, std::span<const Son
 }
 
 [[nodiscard]] CollectionBinder sonyPs1Binder(std::vector<SonySampleBinding> bindings) {
-  return [bindings = std::move(bindings)](CollectionBindingContext& context) {
-    applySonyPs1Bindings(context, bindings);
-  };
+  return
+      [bindings = std::move(bindings)](CollectionBindingContext& context) { applySonyPs1Bindings(context, bindings); };
 }
 
 }  // namespace
@@ -267,19 +266,17 @@ std::vector<DesiredCollection> resolveSonyPs1Collections(const CollectionDiscove
   const auto instrumentEntries = instruments(context);
   const auto sampleEntries = samples(context);
   std::vector<DesiredCollection> collections;
+  std::unordered_set<u32> pairedBanks;
 
   for (const auto& sequence : sequenceEntries) {
-    CollectionAssembly collection(
-        CollectionKey{
-            .resolver = std::string(kSonyPs1CollectionResolver),
-            .value = "source:" + std::to_string(sequence.source ? sequence.source->value : 0) +
-                     ":sequence:" + std::to_string(sequence.offset),
-        },
-        sequence.name);
+    CollectionAssembly collection("source:" + std::to_string(sequence.source ? sequence.source->value : 0) +
+                                      ":sequence:" + std::to_string(sequence.offset),
+                                  sequence.name);
     collection.sequence(sequence.asset);
     std::vector<SonySampleBinding> bindings;
     const auto banks = chooseInstruments(sequence, sequenceEntries, instrumentEntries);
     for (const auto* bank : banks) {
+      pairedBanks.insert(bank->asset.value);
       attachBank(collection, *bank, sampleEntries, bindings);
     }
     if (banks.empty()) {
@@ -290,19 +287,11 @@ std::vector<DesiredCollection> resolveSonyPs1Collections(const CollectionDiscove
   }
 
   for (const auto& bank : instrumentEntries) {
-    const bool pairedWithSequence = std::ranges::any_of(sequenceEntries, [&](const SequenceEntry& sequence) {
-      const auto selected = chooseInstruments(sequence, sequenceEntries, instrumentEntries);
-      return std::ranges::find(selected, &bank) != selected.end();
-    });
-    if (pairedWithSequence) {
+    if (pairedBanks.contains(bank.asset.value)) {
       continue;
     }
     CollectionAssembly collection(
-        CollectionKey{
-            .resolver = std::string(kSonyPs1CollectionResolver),
-            .value = "source:" + std::to_string(bank.source ? bank.source->value : 0) +
-                     ":bank:" + std::to_string(bank.asset.value),
-        },
+        "source:" + std::to_string(bank.source ? bank.source->value : 0) + ":bank:" + std::to_string(bank.asset.value),
         bank.file == nullptr ? "Sony PS1 VAB" : bank.file->name);
     std::vector<SonySampleBinding> bindings;
     attachBank(collection, bank, sampleEntries, bindings);

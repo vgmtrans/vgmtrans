@@ -39,9 +39,9 @@ const SourceFile* CollectionDiscoveryContext::sourceFor(const AssetMetadata& met
   return &sources_.source(metadata.range.source);
 }
 
-CollectionAssembly::CollectionAssembly(CollectionKey key, std::string name)
+CollectionAssembly::CollectionAssembly(std::string localKey, std::string name)
     : collection_(DesiredCollection{
-          .key = std::move(key),
+          .localKey = std::move(localKey),
           .name = std::move(name),
       }) {
 }
@@ -66,11 +66,6 @@ CollectionAssembly& CollectionAssembly::misc(AssetId id) {
   return *this;
 }
 
-CollectionAssembly& CollectionAssembly::issue(CollectionIssue issue) {
-  collection_.issues.push_back(std::move(issue));
-  return *this;
-}
-
 CollectionAssembly& CollectionAssembly::incomplete(CollectionIssue issue) {
   issue.impact = CollectionIssueImpact::Incomplete;
   collection_.issues.push_back(std::move(issue));
@@ -88,23 +83,9 @@ CollectionAssembly& CollectionAssembly::ambiguous(std::string message, std::opti
   return *this;
 }
 
-CollectionAssembly& CollectionAssembly::requireSequence() {
-  if (!collection_.members.sequence) {
-    incomplete(missingSequenceIssue());
-  }
-  return *this;
-}
-
 CollectionAssembly& CollectionAssembly::requireSoundBank() {
   if (collection_.members.soundBanks.empty()) {
     incomplete(missingSoundBankIssue());
-  }
-  return *this;
-}
-
-CollectionAssembly& CollectionAssembly::requireSamplePool() {
-  if (collection_.members.samplePools.empty()) {
-    incomplete(missingSamplePoolIssue());
   }
   return *this;
 }

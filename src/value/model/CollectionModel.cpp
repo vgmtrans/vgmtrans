@@ -58,25 +58,6 @@ CollectionIssue ambiguousMatchIssue(std::string message, std::optional<AssetId> 
   };
 }
 
-CollectionIssue removedStaleAssetIssue(std::optional<AssetId> asset) {
-  if (asset) {
-    return CollectionIssue{
-        .impact = CollectionIssueImpact::Incomplete,
-        .severity = Severity::Error,
-        .code = "removed-asset",
-        .message = "Collection references removed or stale asset " + std::to_string(asset->value),
-        .asset = asset,
-    };
-  }
-
-  return CollectionIssue{
-      .impact = CollectionIssueImpact::Incomplete,
-      .severity = Severity::Error,
-      .code = "removed-asset",
-      .message = "Collection references an asset from a removed source",
-  };
-}
-
 CollectionResolution collectionResolution(std::span<const CollectionIssue> issues) noexcept {
   CollectionResolution resolution = CollectionResolution::Resolved;
   for (const auto& issue : issues) {

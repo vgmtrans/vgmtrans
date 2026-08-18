@@ -450,7 +450,6 @@ void Session::rebuildCollections() {
   const CollectionDiscoveryContext context{sources_, state_->assets()};
 
   auto desiredByResolver = state_->desiredCollectionsByResolver();
-  std::set<std::string> failedResolvers;
   for (const auto& module : formats_.modules()) {
     if (!module.resolveCollections) {
       continue;
@@ -463,15 +462,11 @@ void Session::rebuildCollections() {
       desiredCollections.insert(desiredCollections.end(), std::make_move_iterator(desired.begin()),
                                 std::make_move_iterator(desired.end()));
     } catch (const std::exception& ex) {
-      failedResolvers.insert(resolverId);
       state_->addError(std::string(module.name) + " resolveCollections failed: " + ex.what());
     }
   }
 
   for (auto& [resolverId, desiredCollections] : desiredByResolver) {
-    if (failedResolvers.contains(resolverId)) {
-      continue;
-    }
     state_->reconcileCollections(resolverId, std::move(desiredCollections), formats_.collectionBinder(resolverId),
                                  ids_);
   }
