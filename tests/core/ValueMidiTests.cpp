@@ -2488,6 +2488,11 @@ void standaloneSequenceExportDoesNotRequireACollection() {
               .tracks = {track},
           },
   });
+  auto ambiguousBuilder = snapshotBuilder;
+  ambiguousBuilder.collections = {
+      Collection{.id = CollectionId{0}, .name = "First", .members = {.sequence = AssetId{7}}},
+      Collection{.id = CollectionId{1}, .name = "Second", .members = {.sequence = AssetId{7}}},
+  };
   const SessionSnapshot snapshot = snapshotBuilder.finish();
   expect(snapshot.collections().empty(), "standalone MIDI fixture should not contain a collection");
 
@@ -2500,6 +2505,12 @@ void standaloneSequenceExportDoesNotRequireACollection() {
   expect(artifact.diagnostics.empty(), "standalone sequence export should not require collection diagnostics");
   expect(artifact.bytes.size() > 14 && std::string(artifact.bytes.begin(), artifact.bytes.begin() + 4) == "MThd",
          "standalone sequence export should produce a Standard MIDI file");
+
+  const Artifact ambiguous =
+      exportSequenceMidi(ambiguousBuilder.finish(), sources, AssetId{7}, SequenceExportRequest{});
+  expect(ambiguous.bytes.empty(), "direct sequence export should not choose the first of several collections");
+  diagnosticWithMessage(ambiguous.diagnostics,
+                        "Sequence belongs to multiple collections; export a specific collection instead");
 }
 
 PerformanceSequence observedModulationPerformance() {

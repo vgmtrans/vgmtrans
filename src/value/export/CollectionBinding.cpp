@@ -148,7 +148,9 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
   }
   if (!failed) {
     for (const auto& bank : soundBanks) {
-      auto additions = validateSampleReferences(bank, samplePools).takeDiagnostics();
+      auto validation = validateSoundBank(bank);
+      validation.merge(validateSampleReferences(bank, samplePools));
+      auto additions = validation.takeDiagnostics();
       failed = failed || !additions.empty();
       diagnostics.insert(diagnostics.end(), std::make_move_iterator(additions.begin()),
                          std::make_move_iterator(additions.end()));

@@ -883,6 +883,25 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
              chunkSize(uniqueDls.bytes, "ptbl") == 16,
          "instrument-set export should cull data when exactly one collection supplies sequence context");
 
+  auto otherBank = instruments;
+  otherBank.metadata.id = AssetId{3};
+  otherBank.instruments = {instrument("Other Bank", 7, 2)};
+  test::SessionSnapshotBuilder multiBankBuilder;
+  multiBankBuilder.assets = {sequence, instruments, samples, otherBank};
+  auto multiBankCollection = snapshot.collections().front();
+  multiBankCollection.members.soundBanks.push_back(otherBank.metadata.id);
+  multiBankBuilder.collections.push_back(std::move(multiBankCollection));
+  const auto multiBankSnapshot = multiBankBuilder.finish();
+  const auto firstBank = exportSoundBank(multiBankSnapshot, sources, instruments.metadata.id,
+                                         SynthExportFormat::SoundFont2, ExportRequest{});
+  const auto secondBank = exportSoundBank(multiBankSnapshot, sources, otherBank.metadata.id,
+                                          SynthExportFormat::SoundFont2, ExportRequest{});
+  expect(containsAscii(firstBank.bytes, "Piano") && !containsAscii(firstBank.bytes, "Other Bank"),
+         "direct export of the first bank should exclude the other collection bank");
+  expect(containsAscii(secondBank.bytes, "Other Bank"), "direct export should contain the selected second bank");
+  expect(!containsAscii(secondBank.bytes, "Piano"),
+         "direct export of the second bank should exclude the first collection bank");
+
   test::SessionSnapshotBuilder ambiguousBuilder;
   auto otherSamples = samples;
   otherSamples.metadata.id = AssetId{3};
@@ -1278,6 +1297,14 @@ void collectionBindingProducesAnImmutableInstrumentView() {
                                          CollectionId{0});
   expect(!unresolved.collection, "collection binding should reject an unresolved reference left by its binder");
   diagnosticWithMessage(unresolved.diagnostics, "Synth region has an unresolved sample reference");
+
+  const auto malformed = bindCollection(snapshotWithBinder([](CollectionBindingContext& context) {
+                                          context.soundBanks.front().instruments.front().regions.front().pan =
+                                              std::numeric_limits<double>::quiet_NaN();
+                                        }),
+                                        CollectionId{0});
+  expect(!malformed.collection, "collection binding should revalidate the complete synthesized bank");
+  diagnosticWithMessage(malformed.diagnostics, "Synth region pan was outside the 0.0 to 1.0 range");
 }
 
 u32 synthOnlySequenceExecutions = 0;

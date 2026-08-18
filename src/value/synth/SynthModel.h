@@ -61,7 +61,7 @@ public:
   [[nodiscard]] constexpr AssetId owner() const noexcept { return owner_; }
   [[nodiscard]] constexpr u32 index() const noexcept { return index_; }
   [[nodiscard]] constexpr bool empty() const noexcept { return !owner_.valid() && index_ == invalidIdValue; }
-  [[nodiscard]] constexpr bool valid() const noexcept { return owner_.valid(); }
+  [[nodiscard]] constexpr bool valid() const noexcept { return owner_.valid() && index_ != invalidIdValue; }
   [[nodiscard]] constexpr bool needsBinding() const noexcept { return !owner_.valid() && index_ != invalidIdValue; }
 
 private:

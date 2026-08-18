@@ -563,7 +563,10 @@ void runSonyPs1CollectionBindingTests() {
   {
     Session session = sonyPs1CollectionSession({"BANK.VH"}, {"X.VB", "Y.VB"});
     const SessionSnapshot snapshot = session.snapshot();
-    CollectionMembers members = sonyPs1Collection(snapshot, 1, 0).members;
+    const Collection& discovered = sonyPs1Collection(snapshot, 1, 0);
+    expect(discovered.resolution() == CollectionResolution::Ambiguous,
+           "equally compatible SonyPS1 pools should be reported as ambiguous");
+    CollectionMembers members = discovered.members;
     for (const auto& asset : snapshot.assets()) {
       if (const auto* pool = std::get_if<SamplePoolAsset>(&asset)) {
         members.samplePools.push_back(pool->metadata.id);
@@ -575,5 +578,13 @@ void runSonyPs1CollectionBindingTests() {
     const auto binding = bindCollection(session.snapshot(), collection);
     expect(!binding.collection && diagnosticContains(binding.diagnostics, "matches multiple external sample pools"),
            "a user-created SonyPS1 collection should fail explicitly when its pool mapping is ambiguous");
+  }
+
+  {
+    Session session = sonyPs1CollectionSession({"BANK.VH"}, {"BANK.VB", "BANK.VB"});
+    const SessionSnapshot snapshot = session.snapshot();
+    const Collection& collection = sonyPs1Collection(snapshot, 1, 0);
+    expect(collection.resolution() == CollectionResolution::Ambiguous && collection.members.samplePools.empty(),
+           "multiple same-stem SonyPS1 pools should not produce an arbitrary captured relationship");
   }
 }

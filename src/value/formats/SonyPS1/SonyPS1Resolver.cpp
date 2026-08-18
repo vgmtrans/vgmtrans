@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <filesystem>
-#include <iterator>
 #include <optional>
 #include <string>
 #include <utility>
@@ -160,31 +159,27 @@ struct SonySampleBinding {
   return selected;
 }
 
-[[nodiscard]] const SampleEntry* chooseSamples(const InstrumentEntry& bank, const std::vector<SampleEntry>& bodies) {
-  std::vector<const SampleEntry*> compatible;
+[[nodiscard]] std::vector<const SampleEntry*> chooseSamples(const InstrumentEntry& bank,
+                                                            const std::vector<SampleEntry>& bodies) {
+  std::vector<const SampleEntry*> selected;
+  int bestAffinity = -1;
   for (const auto& body : bodies) {
-    if (body.sampleBytes == bank.sampleBytes) {
-      compatible.push_back(&body);
+    if (body.sampleBytes != bank.sampleBytes) {
+      continue;
+    }
+    // Compare successively weaker stem, source, and directory evidence.
+    const int affinity = (sameStem(bank.file, body.file) ? 4 : 0) +
+                         (bank.source && body.source && *bank.source == *body.source ? 2 : 0) +
+                         (sameDirectory(bank.file, body.file) ? 1 : 0);
+    if (affinity > bestAffinity) {
+      selected.clear();
+      bestAffinity = affinity;
+    }
+    if (affinity == bestAffinity) {
+      selected.push_back(&body);
     }
   }
-  const auto byStem =
-      std::ranges::find_if(compatible, [&](const SampleEntry* body) { return sameStem(bank.file, body->file); });
-  if (byStem != compatible.end()) {
-    return *byStem;
-  }
-  const auto sameSource = std::ranges::find_if(compatible, [&](const SampleEntry* body) {
-    return bank.source && body->source && *bank.source == *body->source;
-  });
-  if (sameSource != compatible.end()) {
-    return *sameSource;
-  }
-  std::vector<const SampleEntry*> local;
-  std::ranges::copy_if(compatible, std::back_inserter(local),
-                       [&](const SampleEntry* body) { return sameDirectory(bank.file, body->file); });
-  if (local.size() == 1) {
-    return local.front();
-  }
-  return compatible.size() == 1 ? compatible.front() : nullptr;
+  return selected;
 }
 
 void attachBank(CollectionAssembly& collection, const InstrumentEntry& bank, const std::vector<SampleEntry>& bodies,
@@ -193,9 +188,14 @@ void attachBank(CollectionAssembly& collection, const InstrumentEntry& bank, con
   if (!bank.needsExternalSamples) {
     return;
   }
-  if (const auto* body = chooseSamples(bank, bodies)) {
-    collection.samplePool(body->asset);
-    bindings.push_back(SonySampleBinding{.soundBank = bank.asset, .samplePool = body->asset});
+  const auto candidates = chooseSamples(bank, bodies);
+  if (candidates.size() == 1) {
+    collection.samplePool(candidates.front()->asset);
+    bindings.push_back(SonySampleBinding{.soundBank = bank.asset, .samplePool = candidates.front()->asset});
+    return;
+  }
+  if (!candidates.empty()) {
+    collection.ambiguous("Sony PS1 sound bank matches multiple external sample pools", bank.asset);
     return;
   }
   collection.incomplete(CollectionIssue{

@@ -114,6 +114,7 @@ struct SynthCollectionView {
   std::string_view name;
   std::span<const SoundBankAsset* const> soundBanks;
   std::span<const SamplePoolAsset* const> samplePools;
+  bool referencedSamplesOnly = false;
 };
 
 [[nodiscard]] Artifact exportMidi(std::string_view baseName, const RenderedCollection& rendering,
@@ -205,6 +206,7 @@ void appendWavArtifacts(std::vector<Artifact>& artifacts, std::string_view baseN
       .soundBanks = collection.soundBanks,
       .samplePools = collection.samplePools,
       .sequenceUsage = sequenceUsage,
+      .filterSamplesToReferencedInstruments = collection.referencedSamplesOnly,
       .midiModulationUsage = midiModulation,
       .modulationScaling = request.modulationScaling,
       .modulationConversion = modulationConversion,
@@ -263,17 +265,29 @@ Artifact exportStandaloneSequenceMidi(const SessionSnapshot& snapshot, AssetId s
                     ModulationConversionPolicy::SequenceEventSimulation);
 }
 
+[[nodiscard]] std::vector<Artifact> exportCollectionImpl(const SessionSnapshot& snapshot, const SourceStore& sources,
+                                                         CollectionId collection, const ExportRequest& request,
+                                                         std::optional<AssetId> soundBank);
+
 }  // namespace
 
 Artifact exportSequenceMidi(const SessionSnapshot& snapshot, const SourceStore& sources, AssetId sequenceId,
                             const SequenceExportRequest& request) {
   const auto* sequence = snapshot.asset<SequenceProgramAsset>(sequenceId);
-  const auto* collection = snapshot.firstCollectionContaining(sequenceId);
-  if (sequence == nullptr || collection == nullptr) {
+  const size_t collectionCount = snapshot.countCollectionsContaining(sequenceId);
+  if (sequence == nullptr || collectionCount == 0) {
     return exportStandaloneSequenceMidi(snapshot, sequenceId, request);
   }
+  if (collectionCount > 1) {
+    return Artifact{
+        .filename = artifactBaseName(sequence->metadata, "sequence") + ".mid",
+        .mediaType = "audio/midi",
+        .diagnostics = {exportError("Sequence belongs to multiple collections; export a specific collection instead",
+                                    validDiagnosticRange(sequence->metadata.range))},
+    };
+  }
 
-  auto artifacts = exportCollection(snapshot, sources, collection->id,
+  auto artifacts = exportCollection(snapshot, sources, snapshot.firstCollectionContaining(sequenceId)->id,
                                     ExportRequest{
                                         .kinds = {ExportKind::Midi},
                                         .sequence = request,
@@ -325,7 +339,7 @@ Artifact exportSoundBank(const SessionSnapshot& snapshot, const SourceStore& sou
     const auto* collection = snapshot.firstCollectionContaining(soundBankId);
     auto collectionRequest = request;
     collectionRequest.kinds = {kind};
-    auto artifacts = exportCollection(snapshot, sources, collection->id, collectionRequest);
+    auto artifacts = exportCollectionImpl(snapshot, sources, collection->id, collectionRequest, soundBankId);
     if (!artifacts.empty()) {
       artifacts.front().filename = baseName + extension;
       return std::move(artifacts.front());
@@ -461,8 +475,11 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
   return playback;
 }
 
-std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const SourceStore& sources,
-                                       CollectionId collection, const ExportRequest& request) {
+namespace {
+
+std::vector<Artifact> exportCollectionImpl(const SessionSnapshot& snapshot, const SourceStore& sources,
+                                           CollectionId collection, const ExportRequest& request,
+                                           std::optional<AssetId> selectedSoundBank) {
   auto binding = bindCollection(snapshot, collection);
   if (!binding.collection) {
     return {Artifact{
@@ -497,6 +514,11 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
   }
 
   const auto instruments = bankView(soundBanks);
+  auto exportedBanks = instruments;
+  if (selectedSoundBank) {
+    std::erase_if(exportedBanks,
+                  [&](const SoundBankAsset* bank) { return bank->metadata.id != *selectedSoundBank; });
+  }
   std::optional<MidiSequence> loweredMidi;
   if (exportsMidi) {
     loweredMidi =
@@ -533,7 +555,7 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
                            SynthExportResult{.diagnostics = rendering.diagnostics}, extension, mediaType);
     }
 
-    const SynthCollectionView synth{bound.baseName(), instruments, bound.samplePools()};
+    const SynthCollectionView synth{bound.baseName(), exportedBanks, bound.samplePools(), selectedSoundBank.has_value()};
     auto artifact = soundFont ? exportSoundFont2(synth, sources, request, observedUsage, synthConversion, sequenceUsage)
                               : exportDls(synth, sources, request, observedUsage, synthConversion, sequenceUsage);
     if (!rendering.performance) {
@@ -570,6 +592,13 @@ std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const So
     artifact.diagnostics.insert(artifact.diagnostics.begin(), diagnostics.begin(), diagnostics.end());
   }
   return artifacts;
+}
+
+}  // namespace
+
+std::vector<Artifact> exportCollection(const SessionSnapshot& snapshot, const SourceStore& sources,
+                                       CollectionId collection, const ExportRequest& request) {
+  return exportCollectionImpl(snapshot, sources, collection, request, std::nullopt);
 }
 
 std::vector<CollectionExport> exportAllCollections(const SessionSnapshot& snapshot, const SourceStore& sources,
