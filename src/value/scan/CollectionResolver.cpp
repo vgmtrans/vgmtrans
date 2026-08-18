@@ -76,6 +76,11 @@ CollectionAssembly& CollectionAssembly::incomplete(CollectionIssue issue) {
   return *this;
 }
 
+CollectionAssembly& CollectionAssembly::bind(CollectionBinder binder) {
+  collection_.binder = std::move(binder);
+  return *this;
+}
+
 CollectionAssembly& CollectionAssembly::ambiguous(std::string message, std::optional<AssetId> asset,
                                                   std::optional<SourceRange> range) {
   collection_.issues.push_back(ambiguousMatchIssue(std::move(message), asset, range));

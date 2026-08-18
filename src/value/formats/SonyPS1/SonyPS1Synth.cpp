@@ -75,6 +75,7 @@ ScanSoundBankRef addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLayo
   const ByteReader reader = result.reader();
   const std::string name = fmt::format("Sony PS1 VAB {}", bank);
   auto instruments = result.soundBank(name);
+  instruments.data(SonyPs1SampleSize{.bytes = layout.expectedSampleBytes});
   auto& samples = instruments.samples();
 
   if (layout.hasSampleBody) {
@@ -229,6 +230,7 @@ std::optional<ScanSamplePoolRef> addSonyPs1RawSampleBody(ScanResultBuilder& resu
   }
 
   auto samples = result.samplePool(result.sourceDisplayName() + " VAG Samples");
+  samples.data(SonyPs1SampleSize{.bytes = static_cast<u32>(reader.size())});
   const SourceRange body = reader.range(0, reader.size());
   const SourceAnnotationId root =
       samples.source(SourceRole::SamplePool, "VAB Sample Body", body, "sony-ps1-vab-body").id();

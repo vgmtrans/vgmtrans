@@ -137,6 +137,42 @@ std::vector<u8> vabFixture(u32 version, bool body) {
   return bytes;
 }
 
+bool diagnosticContains(const std::vector<Diagnostic>& diagnostics, std::string_view text) {
+  return std::ranges::any_of(diagnostics, [&](const Diagnostic& diagnostic) {
+    return diagnostic.message.find(text) != std::string::npos;
+  });
+}
+
+Session sonyPs1CollectionSession(std::initializer_list<std::string_view> banks,
+                                 std::initializer_list<std::string_view> pools,
+                                 FormatModule module = sonyPs1Module()) {
+  Session session;
+  session.registerFormat(std::move(module));
+  const auto add = [&](std::string name, std::vector<u8> bytes) {
+    session.addSource(SourceFile{.name = name, .path = "/fixture/" + name}, std::move(bytes));
+  };
+  add("SONG.SEQ", sequenceFixture({0x00, 0xff, 0x2f, 0x00}));
+  for (const auto name : banks) {
+    add(std::string(name), vabFixture(7, false));
+  }
+  for (const auto name : pools) {
+    std::vector<u8> body(kFixtureVagSize, 0);
+    fillVag(body, 0);
+    add(std::string(name), std::move(body));
+  }
+  session.scanPendingSources();
+  return session;
+}
+
+const Collection& sonyPs1Collection(const SessionSnapshot& snapshot, size_t banks, size_t pools) {
+  const auto found = std::ranges::find_if(snapshot.collections(), [&](const Collection& collection) {
+    return collection.members.sequence && collection.members.soundBanks.size() == banks &&
+           collection.members.samplePools.size() == pools;
+  });
+  expect(found != snapshot.collections().end(), "the expected SonyPS1 collection should be discovered");
+  return *found;
+}
+
 template <class Event>
 std::vector<const Event*> eventsOfType(const PerformanceTrack& track) {
   std::vector<const Event*> events;
@@ -454,4 +490,90 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
   const auto& instrument = resolvedInstruments.back().instruments.front();
   expect(instrument.explicitAddress && instrument.explicitAddress->bank == 0,
          "the selected VAB should be rebased among Sony banks without foreign members shifting its slot");
+}
+
+void runSonyPs1CollectionBindingTests() {
+  {
+    Session session = sonyPs1CollectionSession({"A.VH", "B.VH"}, {"COMMON.VB"});
+    const SessionSnapshot snapshot = session.snapshot();
+    const Collection& collection = sonyPs1Collection(snapshot, 2, 1);
+    const AssetId poolId = collection.members.samplePools.front();
+    const auto resolved = bindCollection(snapshot, collection.id);
+    const auto usesPool = [poolId](const BoundCollection& bound) {
+      return std::ranges::all_of(bound.soundBanks(), [poolId](const SoundBankAsset& bank) {
+        return bank.instruments.front().regions.front().sample.owner == poolId;
+      });
+    };
+    expect(resolved.collection && usesPool(*resolved.collection),
+           "a discovered SonyPS1 collection should preserve both edges to one deduplicated pool");
+
+    const CollectionId manualId = session.createUserCollection(
+        "Manual Sony Collection",
+        CollectionMembers{
+            .sequence = collection.members.sequence,
+            .soundBanks = collection.members.soundBanks,
+            .samplePools = collection.members.samplePools,
+        });
+    const auto manual = bindCollection(session.snapshot(), manualId);
+    expect(manual.collection && usesPool(*manual.collection),
+           "a user-created SonyPS1 collection should reuse one uniquely compatible pool for both banks");
+
+    const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.members.sequence);
+    std::vector<SoundBankAsset> banks;
+    for (const AssetId id : collection.members.soundBanks) {
+      banks.push_back(*snapshot.asset<SoundBankAsset>(id));
+    }
+    std::vector<const SamplePoolAsset*> pools{snapshot.asset<SamplePoolAsset>(poolId)};
+    const auto rejects = [&](std::vector<SoundBankAsset> selectedBanks,
+                             std::vector<const SamplePoolAsset*> selectedPools, std::string_view message) {
+      SequenceRuntime runtime = sequence->program.runtime;
+      std::vector<Diagnostic> diagnostics;
+      CollectionBindingContext context{sequence, runtime, selectedBanks, selectedPools, diagnostics};
+      collection.binder(context);
+      expect(context.failed && diagnosticContains(diagnostics, message),
+             "SonyPS1 binding should reject an invalid captured relationship");
+    };
+    rejects({banks.front()}, pools, "missing sound bank");
+    rejects(banks, {}, "missing sample pool");
+    banks.front().instruments.front().regions.front().sample.index = 1;
+    rejects(banks, pools, "outside its external sample pool");
+  }
+
+  {
+    FormatModule module = sonyPs1Module();
+    auto resolver = module.resolveCollections;
+    module.resolveCollections = [resolver = std::move(resolver)](const MatchContext& context) {
+      auto collections = resolver(context);
+      for (auto& collection : collections) {
+        std::ranges::reverse(collection.members.samplePools);
+      }
+      return collections;
+    };
+    Session session = sonyPs1CollectionSession({"A.VH", "B.VH"}, {"A.VB", "B.VB"}, std::move(module));
+    const SessionSnapshot snapshot = session.snapshot();
+    const Collection& collection = sonyPs1Collection(snapshot, 2, 2);
+    const auto binding = bindCollection(snapshot, collection.id);
+    expect(binding.collection.has_value(), "SonyPS1 binding should not depend on pool member order");
+    const auto& banks = binding.collection->soundBanks();
+    expect(banks[0].instruments.front().regions.front().sample.owner == collection.members.samplePools[1] &&
+               banks[1].instruments.front().regions.front().sample.owner == collection.members.samplePools[0],
+           "each SonyPS1 bank should bind to its resolver-selected pool ID after member reordering");
+  }
+
+  {
+    Session session = sonyPs1CollectionSession({"BANK.VH"}, {"X.VB", "Y.VB"});
+    const SessionSnapshot snapshot = session.snapshot();
+    CollectionMembers members = sonyPs1Collection(snapshot, 1, 0).members;
+    for (const auto& asset : snapshot.assets()) {
+      if (const auto* pool = std::get_if<SamplePoolAsset>(&asset)) {
+        members.samplePools.push_back(pool->metadata.id);
+      }
+    }
+    expect(members.sequence && members.soundBanks.size() == 1 && members.samplePools.size() == 2,
+           "the ambiguity fixture should publish one bank and two compatible pools");
+    const CollectionId collection = session.createUserCollection("Ambiguous Sony Collection", std::move(members));
+    const auto binding = bindCollection(session.snapshot(), collection);
+    expect(!binding.collection && diagnosticContains(binding.diagnostics, "matches multiple external sample pools"),
+           "a user-created SonyPS1 collection should fail explicitly when its pool mapping is ambiguous");
+  }
 }

@@ -60,6 +60,13 @@ public:
     return found == soundBanks.end() ? nullptr : &*found;
   }
 
+  [[nodiscard]] const SamplePoolAsset* samplePool(AssetId id) const noexcept {
+    const auto found = std::ranges::find(samplePools, id, [](const SamplePoolAsset* asset) {
+      return asset->metadata.id;
+    });
+    return found == samplePools.end() ? nullptr : *found;
+  }
+
   [[nodiscard]] bool replaceSequenceRuntime(SequenceRuntime replacement) {
     const SourceRange range = sequence != nullptr ? sequence->metadata.range : SourceRange{};
     if (!sequenceRuntime_.valid()) {

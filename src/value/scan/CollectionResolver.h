@@ -140,6 +140,7 @@ public:
   CollectionAssembly& misc(AssetId id);
   CollectionAssembly& issue(CollectionIssue issue);
   CollectionAssembly& incomplete(CollectionIssue issue);
+  CollectionAssembly& bind(CollectionBinder binder);
   CollectionAssembly& ambiguous(std::string message, std::optional<AssetId> asset = std::nullopt,
                                 std::optional<SourceRange> range = std::nullopt);
   CollectionAssembly& requireSequence();

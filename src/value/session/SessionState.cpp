@@ -274,6 +274,7 @@ void SessionState::reconcileCollections(std::string_view resolver, std::vector<D
     }
 
     validateCollectionAssetReferences(resolver, candidate);
+    CollectionBinder candidateBinder = candidate.binder ? std::move(candidate.binder) : binder;
     const auto sameKey = [&](const Collection& collection) { return collection.key == candidate.key; };
     if (auto found = std::ranges::find_if(collections_, sameKey); found != collections_.end()) {
       if (found->origin == CollectionOrigin::UserCreated) {
@@ -282,7 +283,7 @@ void SessionState::reconcileCollections(std::string_view resolver, std::vector<D
       }
       found->name = std::move(candidate.name);
       found->freshness = CollectionFreshness::Current;
-      found->binder = binder;
+      found->binder = std::move(candidateBinder);
       found->members = std::move(candidate.members);
       found->issues = std::move(candidate.issues);
       continue;
@@ -293,7 +294,7 @@ void SessionState::reconcileCollections(std::string_view resolver, std::vector<D
         .name = std::move(candidate.name),
         .origin = CollectionOrigin::Discovered,
         .key = std::move(candidate.key),
-        .binder = binder,
+        .binder = std::move(candidateBinder),
         .members = std::move(candidate.members),
         .issues = std::move(candidate.issues),
     });
