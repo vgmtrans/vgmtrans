@@ -9,8 +9,10 @@
 #include "value/export/ExportDiagnostics.h"
 #include "value/scan/FormatModule.h"
 #include "value/sequence/SequenceVm.h"
+#include "value/validation/SynthValidation.h"
 
 #include <exception>
+#include <iterator>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -142,6 +144,14 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
     } catch (...) {
       diagnostics.push_back(exportError(bindingName + " collection binding failed"));
       failed = true;
+    }
+  }
+  if (!failed) {
+    for (const auto& bank : soundBanks) {
+      auto additions = validateSampleReferences(bank, samplePools).takeDiagnostics();
+      failed = failed || !additions.empty();
+      diagnostics.insert(diagnostics.end(), std::make_move_iterator(additions.begin()),
+                         std::make_move_iterator(additions.end()));
     }
   }
   if (failed) {

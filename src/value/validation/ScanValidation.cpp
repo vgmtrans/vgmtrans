@@ -162,7 +162,8 @@ void validateDiagnosticAnnotationReferences(ValidationReport& report, const std:
   }
 }
 
-void validateAsset(ValidationReport& report, const SourceStore& sources, const Asset& asset) {
+void validateAsset(ValidationReport& report, const SourceStore& sources, const Asset& asset,
+                   std::span<const SamplePoolAsset* const> samplePools) {
   const auto& meta = metadata(asset);
   validateRange(report, sources, meta.range, "asset metadata");
 
@@ -174,6 +175,7 @@ void validateAsset(ValidationReport& report, const SourceStore& sources, const A
   } else if (const auto* soundBank = std::get_if<SoundBankAsset>(&asset)) {
     validateSoundBankRanges(report, sources, *soundBank);
     report.merge(validateSoundBank(*soundBank));
+    report.merge(validateSampleReferences(*soundBank, samplePools, true));
   } else if (const auto* samplePool = std::get_if<SamplePoolAsset>(&asset)) {
     validateSamplePoolRanges(report, sources, *samplePool);
     report.merge(validateSamplePool(*samplePool));
@@ -319,8 +321,14 @@ ValidationReport validateScanResult(SourceId source, const ScanResult& result, c
     report.error("scan.source.inactive", "Scan result source is not active");
   }
 
+  std::vector<const SamplePoolAsset*> samplePools;
   for (const auto& asset : result.assets) {
-    validateAsset(report, sources, asset);
+    if (const auto* pool = std::get_if<SamplePoolAsset>(&asset)) {
+      samplePools.push_back(pool);
+    }
+  }
+  for (const auto& asset : result.assets) {
+    validateAsset(report, sources, asset, samplePools);
     const auto& range = metadata(asset).range;
     if (range.valid() && range.source != source) {
       report.error("scan.asset.foreign-source",

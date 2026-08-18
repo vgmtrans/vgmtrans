@@ -13,6 +13,7 @@
 #include "value/export/synth/SynthExportData.h"
 #include "value/synth/PsxSpu.h"
 #include "value/synth/SnesDsp.h"
+#include "value/validation/SynthValidation.h"
 
 namespace {
 
@@ -708,7 +709,19 @@ void standaloneSynthExportsKeepNativeModulation() {
   const auto unresolvedExport = exportSoundBank(unresolvedBuilder.finish(), sources, unresolved.metadata.id,
                                                 SynthExportFormat::SoundFont2, ExportRequest{});
   expect(unresolvedExport.bytes.empty(), "an uncollected sound bank should not export unresolved sample references");
-  diagnosticWithMessage(unresolvedExport.diagnostics, "Standalone sound bank has an unresolved sample reference");
+  diagnosticWithMessage(unresolvedExport.diagnostics, "Synth region has an unresolved sample reference");
+
+  auto wrongOwner = instruments;
+  wrongOwner.metadata.id = AssetId{5};
+  wrongOwner.instruments.front().regions.front().sample = SampleRef{.owner = AssetId{6}, .index = 0};
+  test::SessionSnapshotBuilder wrongOwnerBuilder;
+  wrongOwnerBuilder.assets.emplace_back(wrongOwner);
+  wrongOwnerBuilder.assets.emplace_back(MiscAsset{.metadata = AssetMetadata{.id = AssetId{6}}});
+  const auto wrongOwnerExport = exportSoundBank(wrongOwnerBuilder.finish(), sources, wrongOwner.metadata.id,
+                                                SynthExportFormat::SoundFont2, ExportRequest{});
+  expect(wrongOwnerExport.bytes.empty(), "standalone export should reject a sample owner of another asset type");
+  diagnosticWithMessage(wrongOwnerExport.diagnostics,
+                        "Synth region sample owner is not a selected external sample pool");
 
   auto selfContained = instruments;
   selfContained.metadata.id = AssetId{4};
@@ -720,6 +733,46 @@ void standaloneSynthExportsKeepNativeModulation() {
                                                    SynthExportFormat::SoundFont2, ExportRequest{});
   expect(!selfContainedExport.bytes.empty() && selfContainedExport.diagnostics.empty(),
          "an uncollected self-contained sound bank should export directly");
+}
+
+void sampleReferenceValidationEnforcesOwnership() {
+  SamplePoolAsset external{
+      .metadata = AssetMetadata{.id = AssetId{2}},
+      .pool = SamplePool{.samples = {Sample{}}},
+  };
+  SoundBankAsset bank{
+      .metadata = AssetMetadata{.id = AssetId{1}},
+      .instruments = {Instrument{.regions = {Region{}}}},
+      .localSamples = SamplePool{.samples = {Sample{}}},
+  };
+  const SoundBankAsset otherBank{.metadata = AssetMetadata{.id = AssetId{3}}};
+  const std::array<const SamplePoolAsset*, 1> selected{&external};
+  struct ReferenceCase {
+    SampleRef sample;
+    std::span<const SamplePoolAsset* const> pools;
+    bool allowUnbound = false;
+    std::string_view error;
+  };
+  const ReferenceCase cases[] = {
+      {SampleRef{.owner = bank.metadata.id, .index = 1}, {}, false, "synth.sample-reference.out-of-range"},
+      {SampleRef{.owner = bank.metadata.id}, {}, false, "synth.sample-reference.missing-index"},
+      {SampleRef::unbound(0), {}, false, "synth.sample-reference.unresolved"},
+      {SampleRef::unbound(0), {}, true, {}},
+      {SampleRef::unbound(), {}, false, {}},
+      {SampleRef{.owner = external.metadata.id, .index = 0}, selected, false, {}},
+      {SampleRef{.owner = external.metadata.id, .index = 1}, selected, false,
+       "synth.sample-reference.out-of-range"},
+      {SampleRef{.owner = otherBank.metadata.id, .index = 0}, {}, false,
+       "synth.sample-reference.external-owner"},
+  };
+
+  for (const auto& test : cases) {
+    bank.instruments.front().regions.front().sample = test.sample;
+    const auto report = validateSampleReferences(bank, test.pools, test.allowUnbound);
+    const bool matches = test.error.empty() ? report.empty()
+                                            : !report.empty() && report.diagnostics().front().code == test.error;
+    expect(matches, "sample-reference validation should enforce every owner/index state");
+  }
 }
 
 void collectionSynthExportsCanExportOnlyUsedInstruments() {
@@ -1213,6 +1266,20 @@ void collectionBindingProducesAnImmutableInstrumentView() {
          "collection binding should reject changes to selected instrument identity or order");
   diagnosticWithMessage(changedIdentity.diagnostics,
                         "Collection binding changed sound bank identity, format, or order");
+
+  auto missingPoolBuilder = builder;
+  missingPoolBuilder.collections.front().members.samplePools.clear();
+  const auto missingPool = bindCollection(missingPoolBuilder.finish(), CollectionId{0});
+  expect(!missingPool.collection, "collection binding should reject an external pool outside its membership");
+  diagnosticWithMessage(missingPool.diagnostics, "Synth region sample owner is not a selected external sample pool");
+
+  const auto unresolved = bindCollection(snapshotWithBinder([](CollectionBindingContext& context) {
+                                           context.soundBanks.front().instruments.front().regions.front().sample =
+                                               SampleRef::unbound(0);
+                                         }),
+                                         CollectionId{0});
+  expect(!unresolved.collection, "collection binding should reject an unresolved reference left by its binder");
+  diagnosticWithMessage(unresolved.diagnostics, "Synth region has an unresolved sample reference");
 }
 
 u32 synthOnlySequenceExecutions = 0;
@@ -1582,6 +1649,7 @@ void runValueSynthExportTests() {
   soundFontExporterWritesSfbkRiffFile();
   dlsExporterWritesDlsRiffFile();
   standaloneSynthExportsKeepNativeModulation();
+  sampleReferenceValidationEnforcesOwnership();
   collectionSynthExportsCanExportOnlyUsedInstruments();
   collectionBindingAppliesToWholeExport();
   collectionBindingProducesAnImmutableInstrumentView();

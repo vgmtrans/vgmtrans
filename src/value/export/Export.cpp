@@ -14,6 +14,7 @@
 #include "value/export/synth/SynthExportData.h"
 #include "value/model/SessionSnapshot.h"
 #include "value/synth/SampleDecoder.h"
+#include "value/validation/SynthValidation.h"
 #include "value/base/Source.h"
 #include "value/export/synth/ModulationScaling.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
@@ -333,38 +334,23 @@ Artifact exportSoundBank(const SessionSnapshot& snapshot, const SourceStore& sou
   }
 
   std::vector<const SamplePoolAsset*> samplePools;
-  std::vector<Diagnostic> diagnostics;
   for (const auto& instrument : soundBank->instruments) {
     for (const auto& region : instrument.regions) {
-      if (!region.sample.valid()) {
-        diagnostics.push_back(exportError("Standalone sound bank has an unresolved sample reference",
-                                          validDiagnosticRange(region.range)));
+      if (!region.sample.owner.valid() || region.sample.owner == soundBankId) {
         continue;
       }
-
-      const SamplePool* pool = &soundBank->localSamples;
-      if (region.sample.owner != soundBankId) {
-        const auto* samples = snapshot.asset<SamplePoolAsset>(region.sample.owner);
-        if (samples == nullptr) {
-          diagnostics.push_back(
-              exportError("Sound bank sample pool asset was not found", validDiagnosticRange(region.range)));
-          continue;
-        }
-        pool = &samples->pool;
-        const auto alreadySelected = std::ranges::find(samplePools, region.sample.owner,
-                                                       [](const SamplePoolAsset* pool) { return pool->metadata.id; });
-        if (alreadySelected == samplePools.end()) {
+      const auto alreadySelected = std::ranges::find(samplePools, region.sample.owner,
+                                                     [](const SamplePoolAsset* pool) { return pool->metadata.id; });
+      if (alreadySelected == samplePools.end()) {
+        if (const auto* samples = snapshot.asset<SamplePoolAsset>(region.sample.owner)) {
           samplePools.push_back(samples);
         }
       }
-      if (region.sample.index >= pool->samples.size()) {
-        diagnostics.push_back(exportError("Sound bank sample reference is outside its sample pool",
-                                          validDiagnosticRange(region.range)));
-      }
     }
   }
-  if (!diagnostics.empty()) {
-    return failedArtifact(std::move(diagnostics));
+  auto validation = validateSampleReferences(*soundBank, samplePools);
+  if (!validation.empty()) {
+    return failedArtifact(validation.takeDiagnostics());
   }
   std::vector<SoundBankAsset> soundBanks{*soundBank};
   const auto banks = bankView(soundBanks);

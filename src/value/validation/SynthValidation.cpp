@@ -8,6 +8,7 @@
 
 #include "value/synth/SynthModel.h"
 
+#include <algorithm>
 #include <cmath>
 #include <set>
 #include <type_traits>
@@ -89,6 +90,47 @@ void validateSamples(ValidationReport& report, const SamplePool& pool) {
 }
 
 }  // namespace
+
+ValidationReport validateSampleReferences(const SoundBankAsset& soundBank,
+                                          std::span<const SamplePoolAsset* const> externalPools,
+                                          bool allowUnboundSampleReferences) {
+  ValidationReport report;
+  for (const auto& instrument : soundBank.instruments) {
+    for (const auto& region : instrument.regions) {
+      const SampleRef& sample = region.sample;
+      if (!sample.owner.valid()) {
+        if (sample.needsBinding() && !allowUnboundSampleReferences) {
+          report.error("synth.sample-reference.unresolved", "Synth region has an unresolved sample reference",
+                       validRange(region.range));
+        }
+        continue;
+      }
+      if (!sample.valid()) {
+        report.error("synth.sample-reference.missing-index", "Synth region sample owner has no sample index",
+                     validRange(region.range));
+        continue;
+      }
+
+      const SamplePool* pool = &soundBank.localSamples;
+      if (sample.owner != soundBank.metadata.id) {
+        const auto found = std::ranges::find_if(externalPools, [&](const SamplePoolAsset* candidate) {
+          return candidate != nullptr && candidate->metadata.id == sample.owner;
+        });
+        if (found == externalPools.end()) {
+          report.error("synth.sample-reference.external-owner",
+                       "Synth region sample owner is not a selected external sample pool", validRange(region.range));
+          continue;
+        }
+        pool = &(*found)->pool;
+      }
+      if (sample.index >= pool->samples.size()) {
+        report.error("synth.sample-reference.out-of-range", "Synth region sample index is out of range",
+                     validRange(region.range));
+      }
+    }
+  }
+  return report;
+}
 
 ValidationReport validateSoundBank(const SoundBankAsset& soundBank) {
   ValidationReport report;
