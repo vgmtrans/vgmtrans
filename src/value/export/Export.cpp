@@ -307,50 +307,72 @@ Artifact exportSoundBank(const SessionSnapshot& snapshot, const SourceStore& sou
   }
 
   const std::string baseName = artifactBaseName(soundBank->metadata, "sound-bank");
-  if (const auto* collection = snapshot.firstCollectionContaining(soundBankId)) {
+  const auto failedArtifact = [&](std::vector<Diagnostic> diagnostics) {
+    return Artifact{
+        .filename = baseName + extension,
+        .mediaType = mediaType,
+        .diagnostics = std::move(diagnostics),
+    };
+  };
+  const size_t collectionCount = snapshot.countCollectionsContaining(soundBankId);
+  if (collectionCount > 1) {
+    return failedArtifact(
+        {exportError("Sound bank belongs to multiple collections; export a specific collection instead",
+                     validDiagnosticRange(soundBank->metadata.range))});
+  }
+  if (collectionCount == 1) {
+    const auto* collection = snapshot.firstCollectionContaining(soundBankId);
     auto collectionRequest = request;
     collectionRequest.kinds = {kind};
-    if (snapshot.countCollectionsContaining(soundBankId) > 1) {
-      collectionRequest.exportOnlyUsedInstruments = false;
-    }
     auto artifacts = exportCollection(snapshot, sources, collection->id, collectionRequest);
     if (!artifacts.empty()) {
       artifacts.front().filename = baseName + extension;
       return std::move(artifacts.front());
     }
-    return Artifact{
-        .filename = baseName + extension,
-        .mediaType = mediaType,
-        .diagnostics = {exportError("Collection sound bank export produced no artifact")},
-    };
+    return failedArtifact({exportError("Collection sound bank export produced no artifact")});
   }
 
-  std::vector<SoundBankAsset> soundBanks{*soundBank};
   std::vector<const SamplePoolAsset*> samplePools;
   std::vector<Diagnostic> diagnostics;
-  std::vector<AssetId> sampleIds;
   for (const auto& instrument : soundBank->instruments) {
     for (const auto& region : instrument.regions) {
-      if (!region.sample.owner.valid() || region.sample.owner == soundBankId ||
-          std::ranges::find(sampleIds, region.sample.owner) != sampleIds.end()) {
+      if (!region.sample.valid()) {
+        diagnostics.push_back(exportError("Standalone sound bank has an unresolved sample reference",
+                                          validDiagnosticRange(region.range)));
         continue;
       }
-      const AssetId sampleId = region.sample.owner;
-      sampleIds.push_back(sampleId);
-      if (const auto* samples = snapshot.asset<SamplePoolAsset>(sampleId)) {
-        samplePools.push_back(samples);
-      } else {
-        diagnostics.push_back(exportError("Sound bank sample pool asset was not found"));
+
+      const SamplePool* pool = &soundBank->localSamples;
+      if (region.sample.owner != soundBankId) {
+        const auto* samples = snapshot.asset<SamplePoolAsset>(region.sample.owner);
+        if (samples == nullptr) {
+          diagnostics.push_back(
+              exportError("Sound bank sample pool asset was not found", validDiagnosticRange(region.range)));
+          continue;
+        }
+        pool = &samples->pool;
+        const auto alreadySelected = std::ranges::find(samplePools, region.sample.owner,
+                                                       [](const SamplePoolAsset* pool) { return pool->metadata.id; });
+        if (alreadySelected == samplePools.end()) {
+          samplePools.push_back(samples);
+        }
+      }
+      if (region.sample.index >= pool->samples.size()) {
+        diagnostics.push_back(exportError("Sound bank sample reference is outside its sample pool",
+                                          validDiagnosticRange(region.range)));
       }
     }
   }
+  if (!diagnostics.empty()) {
+    return failedArtifact(std::move(diagnostics));
+  }
+  std::vector<SoundBankAsset> soundBanks{*soundBank};
   const auto banks = bankView(soundBanks);
   const SynthCollectionView synth{baseName, banks, samplePools};
 
   auto artifact = soundFont
                       ? exportSoundFont2(synth, sources, request, nullptr, ModulationConversionPolicy::SynthModulators)
                       : exportDls(synth, sources, request, nullptr, ModulationConversionPolicy::SynthModulators);
-  artifact.diagnostics.insert(artifact.diagnostics.begin(), diagnostics.begin(), diagnostics.end());
   return artifact;
 }
 
