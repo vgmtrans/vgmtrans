@@ -93,6 +93,45 @@ AkaoSequenceAnalysis analyzeFixtureTrack(const std::vector<u8>& bytes, AkaoPs1Ve
 
 }  // namespace
 
+void akaoSequenceLayoutRejectsFalsePositiveHeaders() {
+  ScanIdAllocator ids;
+  const auto layout = [&](const std::vector<u8>& bytes) {
+    const SourceId source{31};
+    return readAkaoSequenceLayout(
+        ScanInput{
+            .source = SourceFile{.id = source, .name = "Final Fantasy VIII fixture"},
+            .reader = ByteReader(source, bytes),
+            .ids = ids,
+        },
+        0);
+  };
+
+  std::vector<u8> wrongProfile(0x100);
+  writeBe32(wrongProfile, 0, kAkaoSignature);
+  writeLe16(wrongProfile, 4, 0xf109);
+  writeLe16(wrongProfile, 6, 0x80);
+  writeLe32(wrongProfile, 0x10, 1);
+  writeLe32(wrongProfile, 0x1c, 1);
+  writeLe32(wrongProfile, 0x20, 1);
+  writeLe32(wrongProfile, 0x2c, 1);
+  writeLe16(wrongProfile, 0x40, 0x10);
+  expect(!layout(wrongProfile), "Akao layout should validate a header against the source's effective profile");
+
+  std::vector<u8> partialTracks(0x100);
+  writeBe32(partialTracks, 0, kAkaoSignature);
+  writeLe16(partialTracks, 6, 0x80);
+  writeLe32(partialTracks, 0x20, 3);
+  writeLe16(partialTracks, 0x40, 0x10);
+  writeLe16(partialTracks, 0x42, 0x40);
+  expect(!layout(partialTracks), "Akao layout should reject a sequence when any declared track pointer is invalid");
+
+  partialTracks.resize(0x60);
+  writeLe32(partialTracks, 0x20, 1);
+  const auto truncated = layout(partialTracks);
+  expect(truncated && truncated->header.length == partialTracks.size() && truncated->trackAddresses.size() == 1,
+         "Akao layout should retain an optimized PSF whose declared track tail is truncated");
+}
+
 void akaoSequenceDecodesLegacyRelativeJumpTargets() {
   std::vector<u8> bytes(0x40, 0xa0);
   constexpr u32 start = 0x20;
