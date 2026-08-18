@@ -183,7 +183,7 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
   SynthSampleIndexList samples;
   for (const auto* instrument : instruments) {
     for (const auto& region : instrument->regions) {
-      const SynthSampleIndexKey sample{region.sample.owner.value, region.sample.index};
+      const SynthSampleIndexKey sample{region.sample.owner().value, region.sample.index()};
       if (std::ranges::find(samples, sample) == samples.end()) {
         samples.push_back(sample);
       }
@@ -194,7 +194,7 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
 
 [[nodiscard]] std::optional<u16> resolveRegionSampleIndex(const Region& region, const SynthSampleIndexMap& samples,
                                                           std::vector<Diagnostic>& diagnostics) {
-  const auto found = samples.find({region.sample.owner.value, region.sample.index});
+  const auto found = samples.find({region.sample.owner().value, region.sample.index()});
   if (found == samples.end()) {
     diagnostics.push_back(exportError("Region sample reference was not found", validDiagnosticRange(region.range)));
     return std::nullopt;

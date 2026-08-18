@@ -321,7 +321,7 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
     }
     instrument.region(*sample, region)
         .source("Region", info.source, "nin-snes-region")
-        .description(fmt::format("Sample {}", sample->index));
+        .description(fmt::format("Sample {}", sample->index()));
   }
 
   for (const DrumKit& kit : recipes.drumKits) {

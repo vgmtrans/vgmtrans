@@ -98,23 +98,18 @@ ValidationReport validateSampleReferences(const SoundBankAsset& soundBank,
   for (const auto& instrument : soundBank.instruments) {
     for (const auto& region : instrument.regions) {
       const SampleRef& sample = region.sample;
-      if (!sample.owner.valid()) {
-        if (sample.needsBinding() && !allowUnboundSampleReferences) {
+      if (!sample.valid()) {
+        if (!sample.empty() && !allowUnboundSampleReferences) {
           report.error("synth.sample-reference.unresolved", "Synth region has an unresolved sample reference",
                        validRange(region.range));
         }
         continue;
       }
-      if (!sample.valid()) {
-        report.error("synth.sample-reference.missing-index", "Synth region sample owner has no sample index",
-                     validRange(region.range));
-        continue;
-      }
 
       const SamplePool* pool = &soundBank.localSamples;
-      if (sample.owner != soundBank.metadata.id) {
+      if (sample.owner() != soundBank.metadata.id) {
         const auto found = std::ranges::find_if(externalPools, [&](const SamplePoolAsset* candidate) {
-          return candidate != nullptr && candidate->metadata.id == sample.owner;
+          return candidate != nullptr && candidate->metadata.id == sample.owner();
         });
         if (found == externalPools.end()) {
           report.error("synth.sample-reference.external-owner",
@@ -123,7 +118,7 @@ ValidationReport validateSampleReferences(const SoundBankAsset& soundBank,
         }
         pool = &(*found)->pool;
       }
-      if (sample.index >= pool->samples.size()) {
+      if (sample.index() >= pool->samples.size()) {
         report.error("synth.sample-reference.out-of-range", "Synth region sample index is out of range",
                      validRange(region.range));
       }

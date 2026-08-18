@@ -713,8 +713,8 @@ void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView() {
   expect(detectedInstrumentSet != nullptr && detectedInstrumentSet->instruments.size() == 1,
          "Akao detected instrument set should expose parsed instruments");
   expect(detectedInstrumentSet->instruments.front().regions.size() == 1 &&
-             detectedInstrumentSet->instruments.front().regions.front().sample.index == invalidIdValue,
-         "Akao structural regions should remain explicitly unbound until collection binding");
+             detectedInstrumentSet->instruments.front().regions.front().sample.empty(),
+         "Akao structural regions should remain without samples until collection binding");
   expect(project.collections().size() == 1, "Akao synthetic scan should resolve one collection");
   const auto& collection = project.collections().front();
   expect(collection.members.sequence == sequenceId, "Akao collection should reference the scanned sequence");
@@ -825,7 +825,7 @@ void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView() {
              boundInstruments.back().metadata.id == collection.members.soundBanks.front() &&
              boundInstruments.back().instruments.size() == 1 &&
              boundInstruments.back().instruments.front().regions.size() == 1 &&
-             boundInstruments.back().instruments.front().regions.front().sample.owner ==
+             boundInstruments.back().instruments.front().regions.front().sample.owner() ==
                  collection.members.samplePools.front(),
          "Akao binding should locate its exact structural bank, preserve foreign members, and connect its samples");
 

@@ -65,7 +65,7 @@ void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
                                   .name = "First",
                                   .encodedData = SourceRange{.source = source, .offset = 100, .size = 9},
                               });
-  expect(first.ref().index == 0, "first sample source key should receive dense index zero");
+  expect(first.ref().index() == 0, "first sample source key should receive dense index zero");
   const SourceRecord firstRecord{
       .range = SourceRange{.source = source, .offset = 8, .size = 4},
       .fields = {SourceField{
@@ -84,7 +84,7 @@ void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
                                     .name = "Fallback",
                                     .encodedData = SourceRange{.source = source, .offset = 200, .size = 18},
                                 });
-  expect(second.ref().index == 1, "a sparse source key should still receive the next dense index");
+  expect(second.ref().index() == 1, "a sparse source key should still receive the next dense index");
   expect(!samples.add(7, Sample{}), "a duplicate source key should not return a usable entry");
   expect(!samples.alias(11, 99), "an alias to a missing key should not return a usable entry");
   expect(samples.size() == 2, "rejected sample keys must not change later dense indexes");
@@ -96,9 +96,9 @@ void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
   const SourceMap annotations = sourceMap.finish();
   expect(built.range == directory, "finish should return the final sample collection range");
   expect(collection.samples.size() == 2, "sample builder should finish ordinary sample values");
-  expect(retained.find(7) && retained.find(7)->index == 0 && retained.find(9) && retained.find(9)->index == 0,
+  expect(retained.find(7) && retained.find(7)->index() == 0 && retained.find(9) && retained.find(9)->index() == 0,
          "retained lookup should preserve direct and alias mappings after finish");
-  expect(retained.find(20) && retained.find(20)->index == 1,
+  expect(retained.find(20) && retained.find(20)->index() == 1,
          "retained lookup should preserve sparse source keys after finish");
   expect(diagnostics.size() == 2 && diagnostics[0].code == "synth.sample-key.duplicate" &&
              diagnostics[1].code == "synth.sample-alias.missing-target",
@@ -133,7 +133,7 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
 
   auto kit = instruments.getOrAdd(
       700, Instrument{.explicitAddress = InstrumentAddress{.bank = 127, .program = 5}, .name = "Drum Kit"});
-  auto firstRegion = kit.region(SampleRef{.owner = samplesAsset, .index = 3},
+  auto firstRegion = kit.region(SampleRef::resolved(samplesAsset, 3),
                                 Region{.keyRange = KeyRange{.low = 36, .high = 36}});
   const auto firstRegionSource =
       firstRegion.source("Kick",
@@ -150,7 +150,7 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
 
   const auto instrumentSource =
       kit.source("Drum Kit", SourceRange{.source = source, .offset = 16, .size = 8}, "probe-drum-kit");
-  auto secondRegion = kit.region(SampleRef{.owner = samplesAsset, .index = 4}, Region{});
+  auto secondRegion = kit.region(SampleRef::resolved(samplesAsset, 4), Region{});
   const auto secondRegionSource =
       secondRegion.source("Snare", SourceRange{.source = source, .offset = 24, .size = 4}, "probe-snare");
 
@@ -164,7 +164,7 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
                            .name = "Sparse",
                            .range = SourceRange{.source = source, .offset = 40, .size = 8},
                            .regions = {Region{
-                               .sample = SampleRef{.owner = samplesAsset, .index = 8},
+                               .sample = SampleRef::resolved(samplesAsset, 8),
                                .range = SourceRange{.source = source, .offset = 42, .size = 2},
                            }},
                        });
@@ -242,7 +242,7 @@ void soundBankOwnsNoncontiguousSamplesWithoutInventingOneSourceRange() {
   expect(soundBank->metadata.range == instrumentTable &&
              soundBank->localSamples.samples.front().encodedData == sampleData,
          "bank metadata may keep its primary table range while each noncontiguous sample keeps its exact range");
-  expect(soundBank->instruments.front().regions.front().sample.owner == soundBank->metadata.id,
+  expect(soundBank->instruments.front().regions.front().sample.owner() == soundBank->metadata.id,
          "a sample produced by a sound bank should remain explicitly local to that bank");
   expect(!scan.sourceMap.ownedBy(ObjectRefs::sample(soundBank->metadata.id, 0)).empty(),
          "local sample provenance should use the owning sound bank identity");
@@ -287,7 +287,7 @@ void scanResultBuilderOwnsSynthDraftsUntilFinish() {
       "instrument materialization should use the draft's stable id and accumulated range");
   expect(sampleAsset->metadata.id == sampleRef.id && sampleAsset->metadata.range == input.reader.range(0, 8),
          "sample materialization should use the draft's stable id and included range");
-  expect(instrumentAsset->instruments[0].regions[0].sample.owner == sampleRef.id,
+  expect(instrumentAsset->instruments[0].regions[0].sample.owner() == sampleRef.id,
          "concrete sample references should survive the finish boundary");
   expect(!scan.sourceMap.ownedBy(ObjectRefs::region(instrumentRef.id, 0, 0)).empty(),
          "scan-time builders should publish stable region ownership into the finished source map");
@@ -309,7 +309,7 @@ void scanResultBuilderRetainsSampleKeysAndExposesExistingRegions() {
   samples.add(12, Sample{.name = "Sparse Sample", .encodedData = input.reader.range(32, 4)});
   samples.alias(20, 12);
   const auto sample = samples.find(20);
-  expect(sample && sample->owner == samplesAsset && sample->index == 0,
+  expect(sample && sample->owner() == samplesAsset && sample->index() == 0,
          "a sample draft should retain sparse and alias keys for later instrument tables");
   if (!samples.find(99)) {
     samples.warning("Required sample 99 was not found", input.reader.range(4, 1));
@@ -407,7 +407,7 @@ void scanResultBuilderDraftViewsRemainStableAsTheResultGrows() {
   const ScanResult scan = result.finish();
   const auto& sampleAsset = std::get<SamplePoolAsset>(scan.assets.front());
   expect(sampleAsset.pool.samples.size() == 1 && samples.id() == sampleAsset.metadata.id && alias &&
-             alias->owner == samples.id() && alias->index == 0,
+             alias->owner() == samples.id() && alias->index() == 0,
          "draft proxies and sparse lookups should survive growth of the result-owned draft list");
   expect(scan.sourceMap.ownedBy(ObjectRefs::sample(samples.id(), 0)).size() == 1,
          "entries obtained before result growth should still publish their source annotations");

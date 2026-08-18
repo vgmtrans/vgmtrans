@@ -155,7 +155,7 @@ std::optional<ScanSoundBankRef> addCapcomSnesSynth(ScanResultBuilder& builder, u
                     .envelope = capcomInstrumentEnvelope(info.adsr1, info.adsr2, info.gain),
                 })
         .source("Region", range, "capcom-snes-region")
-        .description(fmt::format("Sample {}", sample->index));
+        .description(fmt::format("Sample {}", sample->index()));
 
     auto envelopeAnnotation = builder.sourceMap()
                                   .annotation(SourceRole::DataBlock, "ADSR/Gain", reader.range(range.offset + 1, 3))

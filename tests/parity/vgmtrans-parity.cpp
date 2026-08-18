@@ -1008,10 +1008,10 @@ CapcomSnesSummary valueCapcomSnesSummary(const SessionSnapshot& project, const S
 
       for (const auto& region : instrument.regions) {
         u32 sampleSourceOffset = 0;
-        const auto samplePool = samplePoolsById.find(region.sample.owner.value);
-        if (samplePool != samplePoolsById.end() && region.sample.index < samplePool->second->samples.size()) {
+        const auto samplePool = samplePoolsById.find(region.sample.owner().value);
+        if (samplePool != samplePoolsById.end() && region.sample.index() < samplePool->second->samples.size()) {
           sampleSourceOffset =
-              sourceRelativeOffset(sources, samplePool->second->samples[region.sample.index].encodedData);
+              sourceRelativeOffset(sources, samplePool->second->samples[region.sample.index()].encodedData);
         }
 
         const s32 tuningCents = static_cast<s32>(std::lround((region.unityKey - 96.0) * 100.0));

@@ -604,11 +604,11 @@ void konamiSnesSynthBuilderGroupsPercussionAndPreservesSampleRules() {
   expect(
       instruments != nullptr && instruments->instruments.size() == 4 && instruments->localSamples.samples.size() == 5,
       "KonamiSnes builder should retain three melodic programs, one grouped kit, and every source sample");
-  expect(instruments->instruments[0].regions[0].sample.index == 2,
+  expect(instruments->instruments[0].regions[0].sample.index() == 2,
          "KonamiSnes instruments should resolve samples directly by their SRCN");
-  expect(instruments->instruments[1].regions[0].sample.index == 0,
+  expect(instruments->instruments[1].regions[0].sample.index() == 0,
          "two SRCNs that name one BRR stream should resolve to the same canonical sample");
-  expect(instruments->instruments[2].regions[0].sample.index == 3,
+  expect(instruments->instruments[2].regions[0].sample.index() == 3,
          "ordinary Konami sample lookup should retain the SRCN's concrete sample reference");
   expect(instruments->instruments[0].regions[0].envelope == snesDspEnvelope(0x00, 0x9f, 0x9f) &&
              instruments->instruments[0].regions[0].attenuationDb == 0.0,
@@ -617,8 +617,8 @@ void konamiSnesSynthBuilderGroupsPercussionAndPreservesSampleRules() {
   const Instrument& percussion = instruments->instruments[3];
   expect(percussion.explicitAddress == InstrumentAddress{.bank = 127, .program = 0} && percussion.regions.size() == 3,
          "percussion source entries should form one drum kit through getOrAdd");
-  expect(percussion.regions[0].sample.index == 0 && percussion.regions[1].sample.index == 3 &&
-             percussion.regions[2].sample.index == 4,
+  expect(percussion.regions[0].sample.index() == 0 && percussion.regions[1].sample.index() == 3 &&
+             percussion.regions[2].sample.index() == 4,
          "percussion regions should retain their direct source sample references");
 
   const auto sparseSources = scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->id, 1));

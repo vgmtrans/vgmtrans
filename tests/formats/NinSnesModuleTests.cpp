@@ -1300,7 +1300,7 @@ void ninSnesEarlierPercussionUsesSeparateSixByteTable() {
   expect(melodic != instruments->instruments.end() && drum != instruments->instruments.end() &&
              melodic->regions.size() == 1 && drum->regions.size() == 1 && drum->regions[0].keyRange.low == 0x24 &&
              drum->regions[0].keyRange.high == 0x24 &&
-             drum->regions[0].sample.index != melodic->regions[0].sample.index,
+             drum->regions[0].sample.index() != melodic->regions[0].sample.index(),
          "the drum kit should use the percussion sample on its MIDI drum key");
   expect(std::abs(drum->regions[0].unityKey - (melodic->regions[0].unityKey - 28.0)) < 0.0001,
          "the percussion row's sixth byte should determine the exported drum pitch");

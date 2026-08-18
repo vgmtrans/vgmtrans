@@ -228,7 +228,7 @@ ScanSoundBankRef addKonamiArcadeSynth(ScanResultBuilder& builder, const KonamiAr
       const auto& drum = layout.drums[index];
       const u32 sourceSample = melodicCount + drum.sample;
       const auto sample = samples.find(sourceSample);
-      const SampleRef sampleRef = sample.value_or(SampleRef{.index = invalidIdValue});
+      const SampleRef sampleRef = sample.value_or(SampleRef::none());
       const u8 key = static_cast<u8>(index + 24);
       const double driverPitch = konamiArcadeDrumPitch(layout.version, drum);
       auto region = drumKit.region(sampleRef, Region{

@@ -336,13 +336,13 @@ Artifact exportSoundBank(const SessionSnapshot& snapshot, const SourceStore& sou
   std::vector<const SamplePoolAsset*> samplePools;
   for (const auto& instrument : soundBank->instruments) {
     for (const auto& region : instrument.regions) {
-      if (!region.sample.owner.valid() || region.sample.owner == soundBankId) {
+      if (!region.sample.owner().valid() || region.sample.owner() == soundBankId) {
         continue;
       }
-      const auto alreadySelected = std::ranges::find(samplePools, region.sample.owner,
+      const auto alreadySelected = std::ranges::find(samplePools, region.sample.owner(),
                                                      [](const SamplePoolAsset* pool) { return pool->metadata.id; });
       if (alreadySelected == samplePools.end()) {
-        if (const auto* samples = snapshot.asset<SamplePoolAsset>(region.sample.owner)) {
+        if (const auto* samples = snapshot.asset<SamplePoolAsset>(region.sample.owner())) {
           samplePools.push_back(samples);
         }
       }
