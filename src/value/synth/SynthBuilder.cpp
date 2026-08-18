@@ -40,7 +40,7 @@ std::optional<SourceRange> diagnosticRange(SourceRange range) {
 }
 
 SourceTarget sampleTarget(SampleRef sample) {
-  return SourceTarget{ObjectRefs::sample(sample.owner, sample.index)};
+  return SourceTarget{ObjectRefs::sample(sample.owner(), sample.index())};
 }
 
 void annotateLoop(AnnotationBuilder& annotation, const Loop& loop) {
@@ -175,7 +175,7 @@ std::optional<SampleRef> SampleRefLookup::find(u64 sourceKey) const {
   if (found == indexes_.end()) {
     return std::nullopt;
   }
-  return SampleRef{.owner = owner_, .index = found->second};
+  return SampleRef::resolved(owner_, found->second);
 }
 
 SamplePoolBuilder::SamplePoolBuilder(AssetId asset, SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics)
@@ -225,7 +225,7 @@ std::optional<SampleRef> SamplePoolBuilder::find(u64 sourceKey) const {
   if (found == indexes_.end()) {
     return std::nullopt;
   }
-  return SampleRef{.owner = asset_, .index = found->second};
+  return SampleRef::resolved(asset_, found->second);
 }
 
 AnnotationBuilder SamplePoolBuilder::source(SourceRole role, std::string_view label, SourceRange range,
@@ -292,7 +292,7 @@ SampleRef SamplePoolBuilder::Entry::ref() const {
   if (!*this) {
     throw std::logic_error("Invalid SamplePoolBuilder entry");
   }
-  return SampleRef{.owner = builder_->asset_, .index = index_};
+  return SampleRef::resolved(builder_->asset_, index_);
 }
 
 const Sample& SamplePoolBuilder::Entry::value() const {

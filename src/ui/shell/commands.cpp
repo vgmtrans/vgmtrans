@@ -878,10 +878,13 @@ bool printValueCollections(const vgmtrans::core::SessionSnapshot& project, const
 }
 
 std::string valueSampleRefName(const vgmtrans::core::SampleRef& sample) {
-  if (sample.owner.valid()) {
-    return fmt::format("owner {} sample {}", sample.owner.value, sample.index);
+  if (sample.empty()) {
+    return "no sample";
   }
-  return fmt::format("sample {}", sample.index);
+  if (sample.needsBinding()) {
+    return fmt::format("unbound sample {}", sample.index());
+  }
+  return fmt::format("owner {} sample {}", sample.owner().value, sample.index());
 }
 
 std::string valueEnvelopeName(const vgmtrans::core::Envelope& envelope) {

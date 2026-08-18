@@ -101,12 +101,12 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
                 Instrument{
                     .explicitAddress = InstrumentAddress{.bank = 0, .program = 0},
                     .name = "Melodic " + std::to_string(index),
-                    .regions = {Region{.sample = SampleRef{.owner = samplesId, .index = 1}}},
+                    .regions = {Region{.sample = SampleRef::resolved(samplesId, 1)}},
                 },
                 Instrument{
                     .explicitAddress = InstrumentAddress{.bank = 127, .program = 0},
                     .name = "Drums " + std::to_string(index),
-                    .regions = {Region{.sample = SampleRef{.owner = samplesId, .index = 0}}},
+                    .regions = {Region{.sample = SampleRef::resolved(samplesId, 0)}},
                 },
             },
     });

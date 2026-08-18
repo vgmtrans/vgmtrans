@@ -13,6 +13,7 @@
 #include "value/synth/SampleFiltering.h"
 #include "value/synth/Ym2151.h"
 
+#include <cassert>
 #include <optional>
 #include <string>
 #include <variant>
@@ -39,18 +40,35 @@ struct VelocityRange {
   friend bool operator==(const VelocityRange&, const VelocityRange&) = default;
 };
 
-struct SampleRef {
-  // Local samples use their sound-bank asset as owner; independent pools use
-  // their own asset. An invalid owner retains an index for collection binding.
-  AssetId owner;
-  u32 index = invalidIdValue;
+class SampleRef {
+public:
+  // A reference is empty, unbound with an index for collection binding, or
+  // resolved to either its local sound bank or an independent sample pool.
+  constexpr SampleRef() noexcept = default;
 
-  [[nodiscard]] static SampleRef unbound(u32 index = invalidIdValue) noexcept {
-    return SampleRef{.index = index};
+  [[nodiscard]] static constexpr SampleRef none() noexcept { return {}; }
+
+  [[nodiscard]] static SampleRef resolved(AssetId owner, u32 index) noexcept {
+    assert(owner.valid() && index != invalidIdValue);
+    return SampleRef(owner, index);
   }
 
-  [[nodiscard]] bool valid() const noexcept { return owner.valid() && index != invalidIdValue; }
-  [[nodiscard]] bool needsBinding() const noexcept { return !owner.valid() && index != invalidIdValue; }
+  [[nodiscard]] static SampleRef unbound(u32 index) noexcept {
+    assert(index != invalidIdValue);
+    return SampleRef({}, index);
+  }
+
+  [[nodiscard]] constexpr AssetId owner() const noexcept { return owner_; }
+  [[nodiscard]] constexpr u32 index() const noexcept { return index_; }
+  [[nodiscard]] constexpr bool empty() const noexcept { return !owner_.valid() && index_ == invalidIdValue; }
+  [[nodiscard]] constexpr bool valid() const noexcept { return owner_.valid(); }
+  [[nodiscard]] constexpr bool needsBinding() const noexcept { return !owner_.valid() && index_ != invalidIdValue; }
+
+private:
+  constexpr SampleRef(AssetId owner, u32 index) noexcept : owner_(owner), index_(index) {}
+
+  AssetId owner_{};
+  u32 index_ = invalidIdValue;
 };
 
 struct Tuning {

@@ -1505,7 +1505,7 @@ void ndsSynthBuilderPreservesSparseWaveIndexesAcrossArchives() {
   const auto secondWave = addNdsWaveArchive(out, input.reader.range(0x100, 0x100), "Second Wave");
   expect(firstWave && secondWave, "NDS builder fixture should create both wave archives");
   const auto laterFirstWaveSample = firstWave->find(2);
-  expect(!firstWave->find(1) && laterFirstWaveSample && laterFirstWaveSample->index == 1,
+  expect(!firstWave->find(1) && laterFirstWaveSample && laterFirstWaveSample->index() == 1,
          "a skipped SWAR entry must not shift the lookup for a later source sample index");
 
   std::array<std::optional<ScanSamplePoolDraft>, 4> waves{};
@@ -1527,12 +1527,12 @@ void ndsSynthBuilderPreservesSparseWaveIndexesAcrossArchives() {
                              }),
          "an SBNK reference to a rejected SWAR entry should produce an understandable warning");
   expect(bank->instruments[0].explicitAddress == InstrumentAddress{.bank = 0, .program = 2} &&
-             bank->instruments[0].regions[0].sample.owner == firstWave->id() &&
-             bank->instruments[0].regions[0].sample.index == 1,
+             bank->instruments[0].regions[0].sample.owner() == firstWave->id() &&
+             bank->instruments[0].regions[0].sample.index() == 1,
          "SBNK program 2 should resolve source sample 2 to its actual dense sample index");
   expect(bank->instruments[1].explicitAddress == InstrumentAddress{.bank = 0, .program = 4} &&
-             bank->instruments[1].regions[0].sample.owner == secondWave->id() &&
-             bank->instruments[1].regions[0].sample.index == 0,
+             bank->instruments[1].regions[0].sample.owner() == secondWave->id() &&
+             bank->instruments[1].regions[0].sample.index() == 0,
          "an SBNK should resolve a region through any of its four independent SWAR slots");
 
   expect(result.sourceMap.ownedBy(ObjectRefs::instrument(bankRef->id(), 0)).size() == 1 &&

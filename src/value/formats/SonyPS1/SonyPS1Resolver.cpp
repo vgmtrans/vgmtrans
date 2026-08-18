@@ -212,11 +212,11 @@ void applySampleBinding(CollectionBindingContext& context, SoundBankAsset& bank,
       if (!region.sample.needsBinding()) {
         continue;
       }
-      if (region.sample.index >= pool.pool.samples.size()) {
+      if (region.sample.index() >= pool.pool.samples.size()) {
         context.fail("Sony PS1 sound bank refers outside its external sample pool", region.range);
         return;
       }
-      region.sample.owner = pool.metadata.id;
+      region.sample = SampleRef::resolved(pool.metadata.id, region.sample.index());
     }
   }
 }

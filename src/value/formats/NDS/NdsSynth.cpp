@@ -363,7 +363,7 @@ std::optional<ScanSoundBankDraft> addNdsInstrumentSet(
         if (type == InstrumentType::Sample) {
           instrument.name = "Single-Region Instrument";
         } else if (type == InstrumentType::PsgWave) {
-          const u32 dutyCycle = region ? region->region.sample.index : 0;
+          const u32 dutyCycle = region ? region->region.sample.index() : 0;
           instrument.name = "PSG Wave (" + std::string(kDutyNames[dutyCycle]) + ")";
         } else {
           instrument.name = "PSG Noise";

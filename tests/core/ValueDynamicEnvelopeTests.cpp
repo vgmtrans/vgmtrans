@@ -340,7 +340,7 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero() {
 
 void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments() {
   Instrument instrument = testInstrument(0, Envelope{.attackSeconds = 1.0});
-  instrument.regions[0].sample = SampleRef{.owner = AssetId{10}, .index = 0};
+  instrument.regions[0].sample = SampleRef::resolved(AssetId{10}, 0);
   std::vector<SoundBankAsset> sets{SoundBankAsset{.instruments = {std::move(instrument)}}};
   auto performance = sequenceWithEvents({
       EnvelopePerformanceEvent{

@@ -281,7 +281,7 @@ void regionModulationExportsAtTheRegionScope() {
               {
                   Region{
                       .keyRange = {.low = 0, .high = 63},
-                      .sample = SampleRef{.owner = samples.metadata.id, .index = 0},
+                      .sample = SampleRef::resolved(samples.metadata.id, 0),
                       .modulation =
                           InstrumentModulation{
                               .vibrato =
@@ -294,7 +294,7 @@ void regionModulationExportsAtTheRegionScope() {
                   },
                   Region{
                       .keyRange = {.low = 64, .high = 127},
-                      .sample = SampleRef{.owner = samples.metadata.id, .index = 0},
+                      .sample = SampleRef::resolved(samples.metadata.id, 0),
                       .modulation =
                           InstrumentModulation{
                               .vibrato =
@@ -377,7 +377,7 @@ void soundFontExporterWritesSfbkRiffFile() {
           .name = "Lead",
           .regions = {Region{
               .keyRange = KeyRange{.low = 24, .high = 96},
-              .sample = SampleRef{.owner = samplePool.metadata.id, .index = 0},
+              .sample = SampleRef::resolved(samplePool.metadata.id, 0),
               .unityKey = 58.75,
               .envelope =
                   Envelope{
@@ -548,7 +548,7 @@ void dlsExporterWritesDlsRiffFile() {
           .name = "Lead",
           .regions = {Region{
               .keyRange = KeyRange{.low = 24, .high = 96},
-              .sample = SampleRef{.owner = samplePool.metadata.id, .index = 0},
+              .sample = SampleRef::resolved(samplePool.metadata.id, 0),
               .unityKey = 58.75,
               .envelope =
                   Envelope{
@@ -678,7 +678,7 @@ void standaloneSynthExportsKeepNativeModulation() {
   SoundBankAsset instruments{
       .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe", .name = "Instruments"},
       .instruments = {Instrument{
-          .regions = {Region{.sample = SampleRef{.owner = samples.metadata.id, .index = 0}}},
+          .regions = {Region{.sample = SampleRef::resolved(samples.metadata.id, 0)}},
           .modulation = InstrumentModulation{.vibrato =
                                                  VibratoSpec{
                                                      .maxDepthCents = 100.0,
@@ -713,7 +713,7 @@ void standaloneSynthExportsKeepNativeModulation() {
 
   auto wrongOwner = instruments;
   wrongOwner.metadata.id = AssetId{5};
-  wrongOwner.instruments.front().regions.front().sample = SampleRef{.owner = AssetId{6}, .index = 0};
+  wrongOwner.instruments.front().regions.front().sample = SampleRef::resolved(AssetId{6}, 0);
   test::SessionSnapshotBuilder wrongOwnerBuilder;
   wrongOwnerBuilder.assets.emplace_back(wrongOwner);
   wrongOwnerBuilder.assets.emplace_back(MiscAsset{.metadata = AssetMetadata{.id = AssetId{6}}});
@@ -726,7 +726,8 @@ void standaloneSynthExportsKeepNativeModulation() {
   auto selfContained = instruments;
   selfContained.metadata.id = AssetId{4};
   selfContained.localSamples = samples.pool;
-  selfContained.instruments.front().regions.front().sample.owner = selfContained.metadata.id;
+  auto& selfContainedSample = selfContained.instruments.front().regions.front().sample;
+  selfContainedSample = SampleRef::resolved(selfContained.metadata.id, selfContainedSample.index());
   test::SessionSnapshotBuilder selfContainedBuilder;
   selfContainedBuilder.assets.emplace_back(selfContained);
   const auto selfContainedExport = exportSoundBank(selfContainedBuilder.finish(), sources, selfContained.metadata.id,
@@ -754,16 +755,13 @@ void sampleReferenceValidationEnforcesOwnership() {
     std::string_view error;
   };
   const ReferenceCase cases[] = {
-      {SampleRef{.owner = bank.metadata.id, .index = 1}, {}, false, "synth.sample-reference.out-of-range"},
-      {SampleRef{.owner = bank.metadata.id}, {}, false, "synth.sample-reference.missing-index"},
+      {SampleRef::resolved(bank.metadata.id, 1), {}, false, "synth.sample-reference.out-of-range"},
       {SampleRef::unbound(0), {}, false, "synth.sample-reference.unresolved"},
       {SampleRef::unbound(0), {}, true, {}},
-      {SampleRef::unbound(), {}, false, {}},
-      {SampleRef{.owner = external.metadata.id, .index = 0}, selected, false, {}},
-      {SampleRef{.owner = external.metadata.id, .index = 1}, selected, false,
-       "synth.sample-reference.out-of-range"},
-      {SampleRef{.owner = otherBank.metadata.id, .index = 0}, {}, false,
-       "synth.sample-reference.external-owner"},
+      {SampleRef::none(), {}, false, {}},
+      {SampleRef::resolved(external.metadata.id, 0), selected, false, {}},
+      {SampleRef::resolved(external.metadata.id, 1), selected, false, "synth.sample-reference.out-of-range"},
+      {SampleRef::resolved(otherBank.metadata.id, 0), {}, false, "synth.sample-reference.external-owner"},
   };
 
   for (const auto& test : cases) {
@@ -822,7 +820,7 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
     return Instrument{
         .explicitAddress = InstrumentAddress{.bank = 0, .program = program},
         .name = std::move(name),
-        .regions = {Region{.sample = SampleRef{.owner = samplePoolId, .index = sampleIndex}}},
+        .regions = {Region{.sample = SampleRef::resolved(samplePoolId, sampleIndex)}},
     };
   };
   const SoundBankAsset instruments{
@@ -899,7 +897,7 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
             for (auto& instrument : bank.instruments) {
               instrument.explicitAddress->bank = 7;
               for (auto& region : instrument.regions) {
-                region.sample.owner = pool;
+                region.sample = SampleRef::resolved(pool, region.sample.index());
               }
             }
           },
@@ -1029,7 +1027,7 @@ void bindInstrumentSet(CollectionBindingContext& context) {
   auto& instruments = context.soundBanks.front();
   instruments.instruments = {Instrument{
       .name = "Prepared Instrument",
-      .regions = {Region{.sample = SampleRef{.owner = samples, .index = 0}}},
+      .regions = {Region{.sample = SampleRef::resolved(samples, 0)}},
   }};
 }
 
@@ -1101,7 +1099,7 @@ void collectionBindingAppliesToWholeExport() {
       .instruments = {Instrument{
           .explicitAddress = InstrumentAddress{.bank = 0, .program = 0},
           .name = "Durable Instrument",
-          .regions = {Region{.sample = SampleRef{.owner = AssetId{2}, .index = 0}}},
+          .regions = {Region{.sample = SampleRef::resolved(AssetId{2}, 0)}},
       }},
   };
   const SamplePoolAsset samples{
@@ -1198,7 +1196,7 @@ void collectionBindingProducesAnImmutableInstrumentView() {
       .metadata = AssetMetadata{.id = AssetId{1}, .format = "Prepared Probe", .name = "Durable Bank"},
       .instruments = {Instrument{
           .name = "Durable Instrument",
-          .regions = {Region{.sample = SampleRef{.owner = samples.metadata.id, .index = 0}}},
+          .regions = {Region{.sample = SampleRef::resolved(samples.metadata.id, 0)}},
       }},
   };
 
@@ -1325,7 +1323,7 @@ void synthOnlyExportRendersSequencesWithoutOriginalModulation() {
   const SoundBankAsset instruments{
       .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe", .name = "Instruments"},
       .instruments = {Instrument{
-          .regions = {Region{.sample = SampleRef{.owner = samples.metadata.id, .index = 0}}},
+          .regions = {Region{.sample = SampleRef::resolved(samples.metadata.id, 0)}},
       }},
   };
 
@@ -1459,7 +1457,7 @@ void exportDiagnosticsPreserveSourceRanges() {
           .explicitAddress = InstrumentAddress{.bank = 0, .program = 0},
           .name = "Lead",
           .regions = {Region{
-              .sample = SampleRef{.owner = validSamplePool.metadata.id, .index = 9},
+              .sample = SampleRef::resolved(validSamplePool.metadata.id, 9),
               .range = regionRange,
           }},
       }},
@@ -1530,7 +1528,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
       .metadata = AssetMetadata{.id = AssetId{1}, .format = "Probe", .name = "Playback Instruments"},
       .instruments = {Instrument{
           .explicitAddress = InstrumentAddress{.bank = 0, .program = 0},
-          .regions = {Region{.sample = SampleRef{.owner = samples.metadata.id, .index = 0}}},
+          .regions = {Region{.sample = SampleRef::resolved(samples.metadata.id, 0)}},
       }},
   };
 

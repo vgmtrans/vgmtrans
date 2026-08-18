@@ -428,7 +428,7 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
   const auto splitBinding = bindCollection(splitSnapshot, splitCollection.id);
   expect(splitBinding.collection.has_value(), "split VH/VB collection should bind successfully");
   const auto& splitRegion = splitBinding.collection->soundBanks()[0].instruments[0].regions[0];
-  expect(splitRegion.sample.owner == splitCollection.members.samplePools[0],
+  expect(splitRegion.sample.owner() == splitCollection.members.samplePools[0],
          "split VH regions should bind explicitly to the selected VB sample pool");
 
   const auto bankBytes = vabFixture(7, true);
@@ -501,7 +501,7 @@ void runSonyPs1CollectionBindingTests() {
     const auto resolved = bindCollection(snapshot, collection.id);
     const auto usesPool = [poolId](const BoundCollection& bound) {
       return std::ranges::all_of(bound.soundBanks(), [poolId](const SoundBankAsset& bank) {
-        return bank.instruments.front().regions.front().sample.owner == poolId;
+        return bank.instruments.front().regions.front().sample.owner() == poolId;
       });
     };
     expect(resolved.collection && usesPool(*resolved.collection),
@@ -535,7 +535,7 @@ void runSonyPs1CollectionBindingTests() {
     };
     rejects({banks.front()}, pools, "missing sound bank");
     rejects(banks, {}, "missing sample pool");
-    banks.front().instruments.front().regions.front().sample.index = 1;
+    banks.front().instruments.front().regions.front().sample = SampleRef::unbound(1);
     rejects(banks, pools, "outside its external sample pool");
   }
 
@@ -555,8 +555,8 @@ void runSonyPs1CollectionBindingTests() {
     const auto binding = bindCollection(snapshot, collection.id);
     expect(binding.collection.has_value(), "SonyPS1 binding should not depend on pool member order");
     const auto& banks = binding.collection->soundBanks();
-    expect(banks[0].instruments.front().regions.front().sample.owner == collection.members.samplePools[1] &&
-               banks[1].instruments.front().regions.front().sample.owner == collection.members.samplePools[0],
+    expect(banks[0].instruments.front().regions.front().sample.owner() == collection.members.samplePools[1] &&
+               banks[1].instruments.front().regions.front().sample.owner() == collection.members.samplePools[0],
            "each SonyPS1 bank should bind to its resolver-selected pool ID after member reordering");
   }
 

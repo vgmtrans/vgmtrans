@@ -418,7 +418,7 @@ void mp2kNoiseUsesAuditedRegisterClockAndWidth() {
   const Region& noiseA4 = instruments->instruments[2].regions[69];
   const double renderedClock = 26758.0 * std::exp2((69.0 - noiseA4.unityKey) / 12.0);
   const double hardwareClock = 524288.0 / 7.0 / 4.0;  // gNoiseTable[48] = 0x17
-  expect(std::abs(renderedClock - hardwareClock) < 1e-9 && noiseA4.sample.index == 5,
+  expect(std::abs(renderedClock - hardwareClock) < 1e-9 && noiseA4.sample.index() == 5,
          "noise key 69 should use register 0x17 and the tone's short-LFSR selector");
   const auto* psg = snapshot.asset<SamplePoolAsset>(collection.members.samplePools[0]);
   expect(psg && psg->pool.samples[5].codecParameter == 5,

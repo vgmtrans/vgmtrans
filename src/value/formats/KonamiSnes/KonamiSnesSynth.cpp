@@ -281,7 +281,7 @@ void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader read
     }
     instrument.region(*sample, std::move(region))
         .source("Region", entryRange, "konami-snes-region")
-        .description(fmt::format("Sample {}", sample->index));
+        .description(fmt::format("Sample {}", sample->index()));
   }
 }
 
