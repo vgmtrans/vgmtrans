@@ -175,7 +175,7 @@ private:
 
 // Convenience wrapper for the normal scanner path. It still produces ordinary
 // ScanResult values, but keeps format modules away from repetitive ID allocation,
-// asset metadata setup, diagnostics, and simple collection-member facts.
+// asset metadata setup, diagnostics, and scanner-known collections.
 class ScanResultBuilder {
 public:
   ScanResultBuilder(ScanInput input, std::string format);

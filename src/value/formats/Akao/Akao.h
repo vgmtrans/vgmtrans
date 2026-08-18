@@ -32,7 +32,6 @@ struct AkaoSampleCoverageProvider {
   std::optional<u32> sampleSetId;
   u32 first = 0;
   u32 count = 0;
-  u64 sourceOffset = 0;
 };
 
 struct AkaoSampleCoverageSelection {

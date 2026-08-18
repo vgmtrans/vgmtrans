@@ -35,11 +35,6 @@ struct CollectionMembers {
   std::vector<AssetId> miscAssets;
 };
 
-enum class CollectionFreshness {
-  Current,
-  Stale,
-};
-
 enum class CollectionResolution {
   Resolved,
   Incomplete,
@@ -67,12 +62,15 @@ struct CollectionIssue {
 };
 
 struct DesiredCollection {
-  CollectionKey key;
+  // Stable identity within the resolver that produced this collection. The
+  // session supplies the resolver namespace during reconciliation.
+  std::string localKey;
   std::string name;
   CollectionMembers members;
   std::vector<CollectionIssue> issues;
   // Preserves resolver-specific decisions that member lists cannot express.
-  // Reconciliation uses the resolver's default binder when this is empty.
+  // Reconciliation uses the resolver's default binder when this is empty. The
+  // closure outlives discovery and must capture only stable IDs or owned values.
   CollectionBinder binder;
 };
 
@@ -82,7 +80,6 @@ struct DesiredCollection {
 [[nodiscard]] CollectionIssue ambiguousMatchIssue(std::string message = "Collection has ambiguous matches",
                                                   std::optional<AssetId> asset = std::nullopt,
                                                   std::optional<SourceRange> range = std::nullopt);
-[[nodiscard]] CollectionIssue removedStaleAssetIssue(std::optional<AssetId> asset = std::nullopt);
 
 // Resolution summarizes the semantic effect of the issues. Ambiguity takes
 // precedence when a collection has more than one kind of problem.

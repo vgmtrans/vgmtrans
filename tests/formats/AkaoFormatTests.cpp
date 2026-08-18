@@ -634,9 +634,9 @@ void akaoMelodicRegionsDropAdvancingOverlaps() {
 
 void akaoSampleSelectionKeepsPreferredAndRequiredCollections() {
   const std::vector<AkaoSampleCoverageProvider> candidates{
-      AkaoSampleCoverageProvider{.index = 0, .sampleSetId = 0, .first = 0, .count = 32, .sourceOffset = 0},
-      AkaoSampleCoverageProvider{.index = 1, .sampleSetId = 5, .first = 32, .count = 81, .sourceOffset = 1},
-      AkaoSampleCoverageProvider{.index = 2, .sampleSetId = 29, .first = 128, .count = 22, .sourceOffset = 2},
+      AkaoSampleCoverageProvider{.index = 0, .sampleSetId = 0, .first = 0, .count = 32},
+      AkaoSampleCoverageProvider{.index = 1, .sampleSetId = 5, .first = 32, .count = 81},
+      AkaoSampleCoverageProvider{.index = 2, .sampleSetId = 29, .first = 128, .count = 22},
   };
   const std::vector<u32> required{32, 128};
 
@@ -644,6 +644,56 @@ void akaoSampleSelectionKeepsPreferredAndRequiredCollections() {
   expect(selected.providers == std::vector<std::size_t>{1, 2} && selected.missing.empty() &&
              selected.requestedSampleSetFound,
          "Akao sample selection should combine the preferred sample set with required-articulation coverage");
+}
+
+void akaoCollectionPrefersCompleteSamplesFromSequenceSource() {
+  SourceStore sources;
+  const SourceId sequenceSource = sources.add(SourceFile{.name = "sequence.bin"}, std::vector<u8>(1024));
+  const SourceId unrelatedSource = sources.add(SourceFile{.name = "unrelated.bin"}, std::vector<u8>(1024));
+  const AssetId sequenceId{1};
+  const AssetId bankId{2};
+  const AssetId localSamplesId{3};
+  const AssetId unrelatedSamplesId{4};
+
+  std::vector<Asset> assets;
+  assets.emplace_back(SequenceProgramAsset{
+      .metadata = AssetMetadata{.id = sequenceId,
+                                .format = std::string(kAkaoFormatName),
+                                .name = "Sequence",
+                                .range = sources.reader(sequenceSource).range(10, 20)},
+      .privateData = AssetPrivateData::make(AkaoSequenceData{
+          .sequenceId = 1,
+          .sampleSetId = 7,
+          .requiredArticulations = {5},
+          .structuralInstrumentSet = bankId,
+      }),
+  });
+  assets.emplace_back(SoundBankAsset{
+      .metadata = AssetMetadata{.id = bankId,
+                                .format = std::string(kAkaoFormatName),
+                                .name = "Bank",
+                                .range = sources.reader(sequenceSource).range(40, 20)},
+  });
+  const auto samples = [&](AssetId id, SourceId source, u64 offset) {
+    return SamplePoolAsset{
+        .metadata = AssetMetadata{.id = id,
+                                  .format = std::string(kAkaoFormatName),
+                                  .name = "Samples",
+                                  .range = sources.reader(source).range(offset, 20)},
+        .privateData = AssetPrivateData::make(AkaoSamplePoolData{
+            .sampleSetId = 7,
+            .firstArticulationId = 0,
+            .articulationCount = 16,
+        }),
+    };
+  };
+  assets.emplace_back(samples(localSamplesId, sequenceSource, 100));
+  assets.emplace_back(samples(unrelatedSamplesId, unrelatedSource, 900));
+
+  const CollectionDiscoveryContext context(sources, SharedSequence<Asset>{std::move(assets)});
+  const auto collections = resolveAkaoCollections(context);
+  expect(collections.size() == 1 && collections.front().members.samplePools == std::vector{localSamplesId},
+         "Akao matching should not let a newer unrelated pool outrank complete local samples");
 }
 
 void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView() {

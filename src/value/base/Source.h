@@ -67,6 +67,8 @@ struct SourceFile {
   SourceStatus status = SourceStatus::Active;
   std::string name;
   std::optional<std::string> title;
+  // Host filesystem location. Derived sources retain their outer container's
+  // path; a future container member path should be modeled separately.
   std::filesystem::path path;
   u64 size = 0;
   // Derived sources are real session entries, such as archive members, SPC RAM,
@@ -145,8 +147,6 @@ public:
   [[nodiscard]] size_t sourceCount() const noexcept;
   [[nodiscard]] std::vector<SourceFile> sourceFiles() const;
   [[nodiscard]] std::vector<SourceId> sourceFamily(SourceId id) const;
-  [[nodiscard]] SourceId rootSource(SourceId id) const noexcept;
-  [[nodiscard]] bool sameSourceTree(SourceId left, SourceId right) const noexcept;
   [[nodiscard]] std::vector<SourceId> activeUserSources() const;
 
 private:

@@ -27,8 +27,8 @@ class SessionState;
 struct CollectionStitchResult;
 
 // Session is the mutable state for one loaded workspace. It owns the source
-// bytes, the assets found inside them, the facts used to match related assets,
-// the collections built from those matches, and the format registry.
+// bytes, the assets found inside them, their collections, and the format
+// registry.
 // Call snapshot() when UI, tests, or export need a stable read-only view.
 class Session {
 public:
