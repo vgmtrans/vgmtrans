@@ -13,7 +13,6 @@
 #include "value/sequence/SequenceProgram.h"
 #include "value/synth/SynthModel.h"
 
-#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -22,9 +21,6 @@
 #include <vector>
 
 namespace vgmtrans::core {
-
-struct CollectionBindingContext;
-using CollectionBinder = std::function<void(CollectionBindingContext&)>;
 
 namespace detail {
 class SessionSnapshotAccess;

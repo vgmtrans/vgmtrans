@@ -8,6 +8,7 @@
 
 #include "value/base/CoreTypes.h"
 
+#include <functional>
 #include <optional>
 #include <span>
 #include <string>
@@ -15,6 +16,9 @@
 #include <vector>
 
 namespace vgmtrans::core {
+
+struct CollectionBindingContext;
+using CollectionBinder = std::function<void(CollectionBindingContext&)>;
 
 // Scanners emit MatchFact records when assets may belong together. Collection
 // resolvers read the accumulated facts and decide which collections should exist.
@@ -115,6 +119,9 @@ struct DesiredCollection {
   std::string name;
   CollectionMembers members;
   std::vector<CollectionIssue> issues;
+  // Preserves resolver-specific decisions that member lists cannot express.
+  // Reconciliation uses the resolver's default binder when this is empty.
+  CollectionBinder binder;
 };
 
 [[nodiscard]] CollectionIssue missingSequenceIssue(std::optional<AssetId> asset = std::nullopt);

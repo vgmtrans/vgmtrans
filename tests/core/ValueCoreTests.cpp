@@ -25,6 +25,7 @@ void sonyPs1SequenceSupportsBothLoopCountGenerations();
 void sonyPs1TempoBytesPreserveSourceOrder();
 void sonyPs1SepAndVabLayoutsAreVersionAware();
 void sonyPs1ModuleBuildsCombinedAndSplitVabSynths();
+void runSonyPs1CollectionBindingTests();
 void suzukiPs1DynamicAdsrUsesAuditedDriverCommands();
 void suzukiPs1ModuleBuildsFractionallyTunedWdsSynth();
 void runSuzukiSnesModuleTests();
@@ -222,6 +223,7 @@ int main() {
     sonyPs1TempoBytesPreserveSourceOrder();
     sonyPs1SepAndVabLayoutsAreVersionAware();
     sonyPs1ModuleBuildsCombinedAndSplitVabSynths();
+    runSonyPs1CollectionBindingTests();
     runSuzukiSnesModuleTests();
     runFalcomSnesModuleTests();
     runHeartBeatSnesModuleTests();
