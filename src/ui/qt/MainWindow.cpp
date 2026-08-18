@@ -772,21 +772,13 @@ void MainWindow::exportSoundBank(const QModelIndex& index, vgmtrans::core::Synth
     applySequenceRenderSettings(request.sequence);
     request.sampleFiltering = Settings::the()->conversion.sampleFiltering();
   }
-  const bool ambiguousCollection = fromDetectedFiles && request.exportOnlyUsedInstruments &&
-                                   m_workspace.snapshot().countCollectionsContaining(soundBank) > 1;
   const bool soundFont = format == vgmtrans::core::SynthExportFormat::SoundFont2;
   try {
     auto artifact = m_workspace.exportSoundBank(soundBank, format, request);
-    const bool exportable = !artifact.bytes.empty();
     saveArtifact(index, std::move(artifact),
                  soundFont ? tr("The sound bank could not be exported as SF2.")
                            : tr("The sound bank could not be exported as DLS."),
                  soundFont ? "sf2" : "dls");
-    if (ambiguousCollection && exportable) {
-      showToast(tr("No instrument data was excluded because this sound bank is used by multiple collections."
-                   "\n\nExport directly from a collection to resolve this ambiguity."),
-                ToastType::Info, 10000);
-    }
   } catch (const std::exception& error) {
     const QString message = QString::fromUtf8(error.what());
     statusBarContent->setStatus(index.data(Qt::DisplayRole).toString(), message);

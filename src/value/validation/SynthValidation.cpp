@@ -98,11 +98,19 @@ ValidationReport validateSampleReferences(const SoundBankAsset& soundBank,
   for (const auto& instrument : soundBank.instruments) {
     for (const auto& region : instrument.regions) {
       const SampleRef& sample = region.sample;
-      if (!sample.valid()) {
-        if (!sample.empty() && !allowUnboundSampleReferences) {
+      if (sample.empty()) {
+        continue;
+      }
+      if (sample.needsBinding()) {
+        if (!allowUnboundSampleReferences) {
           report.error("synth.sample-reference.unresolved", "Synth region has an unresolved sample reference",
                        validRange(region.range));
         }
+        continue;
+      }
+      if (!sample.valid()) {
+        report.error("synth.sample-reference.malformed", "Synth region has a malformed sample reference",
+                     validRange(region.range));
         continue;
       }
 
