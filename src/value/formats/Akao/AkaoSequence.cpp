@@ -771,21 +771,22 @@ std::optional<AkaoSequenceLayout> readAkaoSequenceLayout(const ScanInput& input,
     return std::nullopt;
   }
 
-  // Use the header's own profile for false-positive filtering. A known source
-  // may identify a more exact driver version below, but it should not make an
-  // unrelated AKAO block look more sequence-like than its bytes do.
+  const auto plausibleHeader = [&](const AkaoProfile& profile) {
+    const u32 bitsOffset = profile.trackAllocationBitsOffset();
+    if (!reader.has(offset + bitsOffset, 4)) {
+      return false;
+    }
+    if (!profile.version3OrLater()) {
+      return (reader.le32(offset + bitsOffset) & ~0xffffffu) == 0;
+    }
+    return reader.has(offset, 0x40) && reader.le32(offset + 0x28) == 0 && reader.le32(offset + 0x2c) == 0 &&
+           reader.le32(offset + 0x38) == 0 && reader.le32(offset + 0x3c) == 0;
+  };
+
+  // First validate the profile suggested by the bytes themselves. A known
+  // source must not make an unrelated AKAO signature look sequence-like.
   const AkaoProfile candidateProfile{.version = guessSequenceVersion(reader, offset)};
-  const u32 candidateBitsOffset = candidateProfile.trackAllocationBitsOffset();
-  if (!reader.has(offset + candidateBitsOffset, 4)) {
-    return std::nullopt;
-  }
-  const u32 candidateTrackBits = reader.le32(offset + candidateBitsOffset);
-  if (!candidateProfile.version3OrLater() && (candidateTrackBits & ~0xffffffu) != 0) {
-    return std::nullopt;
-  }
-  if (candidateProfile.version3OrLater() &&
-      (!reader.has(offset + 0x40, 1) || reader.le32(offset + 0x28) != 0 || reader.le32(offset + 0x2c) != 0 ||
-       reader.le32(offset + 0x38) != 0 || reader.le32(offset + 0x3c) != 0)) {
+  if (!plausibleHeader(candidateProfile)) {
     return std::nullopt;
   }
 
@@ -800,13 +801,22 @@ std::optional<AkaoSequenceLayout> readAkaoSequenceLayout(const ScanInput& input,
   }
 
   const AkaoProfile profile{.version = version};
-  const u32 minimumHeaderSize = profile.version3OrLater() ? 0x38 : profile.trackAllocationBitsOffset() + 4;
-  if (!reader.has(offset, minimumHeaderSize)) {
+  if (!plausibleHeader(profile)) {
     return std::nullopt;
   }
   const u32 trackBits = reader.le32(offset + profile.trackAllocationBitsOffset());
+  const u32 trackCount = std::popcount(trackBits);
+  if (trackCount == 0) {
+    return std::nullopt;
+  }
   const u32 declaredLength = profile.sequenceLength(reader, offset);
   if (declaredLength == 0) {
+    return std::nullopt;
+  }
+
+  const u64 pointerTableEnd = static_cast<u64>(profile.trackHeaderOffset()) + trackCount * 2ull;
+  const u64 pointerTable = static_cast<u64>(offset) + profile.trackHeaderOffset();
+  if (pointerTableEnd > declaredLength || !reader.has(pointerTable, trackCount * 2ull)) {
     return std::nullopt;
   }
 
@@ -833,22 +843,17 @@ std::optional<AkaoSequenceLayout> readAkaoSequenceLayout(const ScanInput& input,
     }
   }
 
-  const u32 trackCount = std::popcount(layout.header.trackBits);
-  const u32 pointerTable = offset + layout.header.trackHeaderOffset;
-  if (!reader.has(pointerTable, trackCount * 2ull)) {
-    return std::nullopt;
-  }
-
-  const u32 sequenceEnd = offset + layout.header.length;
   layout.trackAddresses.reserve(trackCount);
   for (u32 i = 0; i < trackCount; ++i) {
     const u32 pointerOffset = layout.header.trackHeaderOffset + i * 2;
     const u32 base = pointerOffset + (profile.version3OrLater() ? 0 : 2);
     const u32 relative = reader.le16(offset + pointerOffset);
-    const u32 trackAddress = offset + base + relative;
-    if (trackAddress < sequenceEnd && reader.has(trackAddress, 1)) {
-      layout.trackAddresses.push_back(trackAddress);
+    const u64 trackRelative = static_cast<u64>(base) + relative;
+    const u64 trackAddress = static_cast<u64>(offset) + trackRelative;
+    if (trackRelative < pointerTableEnd || trackRelative >= declaredLength || !reader.has(trackAddress, 1)) {
+      return std::nullopt;
     }
+    layout.trackAddresses.push_back(static_cast<u32>(trackAddress));
   }
   return layout;
 }
