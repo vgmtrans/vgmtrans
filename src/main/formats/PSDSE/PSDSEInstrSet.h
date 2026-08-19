@@ -21,7 +21,7 @@ public:
 class PSDSEInstrSet : public VGMInstrSet {
 public:
   PSDSEInstrSet(RawFile *file, const SWDLHeader &header);
-  ~PSDSEInstrSet() override;
+  ~PSDSEInstrSet() override = default;
 
   bool parseHeader() override;
   bool parseInstrPointers() override;
@@ -30,6 +30,7 @@ public:
 };
 
 struct PSDSELFO {
+  uint8_t enabled;
   uint8_t dest;
   uint8_t wshape;
   uint16_t rate;

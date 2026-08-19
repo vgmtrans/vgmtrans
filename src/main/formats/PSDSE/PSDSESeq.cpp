@@ -4,6 +4,7 @@
 
 PSDSESeq::PSDSESeq(RawFile *file, uint32_t offset, uint32_t length, std::string name)
     : VGMSeq(PSDSEFormat::name, file, offset, length, name) {
+  m_endianness = PSDSE::magicInfo(file->readWordBE(offset)).endianness;
   bLoadTickByTick = true;
   setAllowDiscontinuousTrackData(true);
   setPPQN(48);
@@ -17,15 +18,21 @@ void PSDSESeq::resetVars(void) {
 bool PSDSESeq::parseHeader(void) {
   uint32_t curOffset = offset();
 
-  // "smdl" magic
-  if (readWordBE(curOffset) != 0x736D646C) {
+  const PSDSE::MagicInfo magic = PSDSE::magicInfo(readWordBE(curOffset));
+  if (magic.kind != PSDSE::FileKind::Sequence) {
     return false;
   }
+  m_endianness = magic.endianness;
+  const uint32_t fileLength = PSDSE::readU32(rawFile(), curOffset + 0x08, m_endianness);
+  if (fileLength < 0x40 || fileLength > rawFile()->size() - curOffset) {
+    return false;
+  }
+  setLength(fileLength);
 
   VGMHeader *header = addHeader(curOffset, 0x40, "SMDL Header");
   header->addChild(curOffset, 4, "Magic");
   header->addChild(curOffset + 0x08, 4, "File Length");
-  version = readShort(curOffset + 0x0C);
+  version = PSDSE::readU16(rawFile(), curOffset + 0x0C, m_endianness);
   header->addChild(curOffset + 0x0C, 2, "Version");
   header->addChild(curOffset + 0x0E, 2, "Bank ID");
   char fname[17];
@@ -70,20 +77,19 @@ bool PSDSESeq::parseHeader(void) {
 bool PSDSESeq::parseTrackPointers(void) {
   uint32_t curOffset = offset() + 0x40;  // Skip SMDL header
   uint32_t eof = offset() + length();
-  if (length() == 0) {
-    eof = readWord(offset() + 0x08) + offset();
-  }
 
   while (curOffset < eof) {
     uint32_t chunkType = readWordBE(curOffset);
     if (chunkType == 0x74726B20) {  // "trk "
-      uint32_t chunkLen = readWord(curOffset + 0x0C);
+      uint32_t chunkLen = PSDSE::readU32(rawFile(), curOffset + 0x0C, m_endianness);
+      if (chunkLen < 4 || curOffset + 0x10 > eof || chunkLen > eof - (curOffset + 0x10)) {
+        return false;
+      }
 
-      PSDSETrack *track = new PSDSETrack(this, curOffset + 0x10, chunkLen);
-      // Assign channel based on track index (0-15).
-      // TODO: Check if this is correct
-      track->channel = aTracks.size() % 16;
-      aTracks.push_back(track);
+      // The first four data bytes are a track preamble (track ID, MIDI
+      // channel, two unknowns), not sequence events.
+      addTrack<PSDSETrack>(this, curOffset + 0x14, chunkLen - 4,
+                           readByte(curOffset + 0x11) & 0x0F);
 
       // Skip to next chunk, aligned to 4 bytes
       curOffset += 0x10 + chunkLen;
@@ -96,16 +102,25 @@ bool PSDSESeq::parseTrackPointers(void) {
     }
   }
 
-  return !aTracks.empty();
+  return hasTracks();
 }
 
 // ************
 // PSDSETrack
 // ************
 
-PSDSETrack::PSDSETrack(PSDSESeq *parentSeq, long offset, long length)
-    : SeqTrack(parentSeq, offset, length) {
+PSDSETrack::PSDSETrack(PSDSESeq *parentSeq, long offset, long length, uint8_t channel)
+    : SeqTrack(parentSeq, offset, length), m_channel(channel) {
   resetVars();
+}
+
+void PSDSETrack::setChannelAndGroupFromTrkNum(int trackNum) {
+  (void)trackNum;
+  channel = m_channel;
+  channelGroup = 0;
+  if (readMode == READMODE_CONVERT_TO_MIDI) {
+    pMidiTrack->setChannelGroup(channelGroup);
+  }
 }
 
 void PSDSETrack::resetVars(void) {
@@ -179,10 +194,12 @@ bool PSDSETrack::readEvent(void) {
       addTime(lastWaitDuration);
       break;
     case 0x91: {
-      int8_t ticks = readByte(curOffset++);
-      (void)ticks;
-      addUnknown(beginOffset, curOffset - beginOffset, "Repeat Last Wait + Ticks");
-      // addTime(lastWait + ticks); seems unneeded?
+      const int8_t ticks = static_cast<int8_t>(readByte(curOffset++));
+      const int64_t adjusted = static_cast<int64_t>(lastWaitDuration) + ticks;
+      lastWaitDuration = static_cast<uint32_t>(std::max<int64_t>(0, adjusted));
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Repeat Last Wait + Ticks", "",
+                      VGMItem::Type::Rest);
+      addTime(lastWaitDuration);
     } break;
     case 0x92: {
       uint8_t ticks = readByte(curOffset++);
@@ -259,9 +276,9 @@ bool PSDSETrack::readEvent(void) {
                       VGMItem::Type::Unknown);
     } break;
     case 0xA9: {
-      uint8_t bankHi = readByte(curOffset++);
-      addBankSelectNoItem(bankHi * 128);  // Approximation?
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Bank Hi", "",
+      const uint8_t swdl = readByte(curOffset++);
+      (void)swdl;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set SWDL", "",
                       VGMItem::Type::Unknown);
     } break;
     case 0xAA: {
@@ -272,82 +289,90 @@ bool PSDSETrack::readEvent(void) {
                       VGMItem::Type::Unknown);
     } break;
     case 0xAB: {
-      // No-op
-      addGenericEvent(beginOffset, curOffset - beginOffset, "No-op", "", VGMItem::Type::Unknown);
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Skip Byte", "",
+                      VGMItem::Type::Unknown);
     } break;
     case 0xAC:  // Program Change
     {
       uint8_t prog = readByte(curOffset++);
       addProgramChange(beginOffset, curOffset - beginOffset, prog);
     } break;
-    case 0xB2:  // Loop Point (Dal Segno)
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Point", "",
-                      VGMItem::Type::Marker);
-      break;
-    case 0xB3:  // Fine Loop
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Fine Loop", "", VGMItem::Type::Marker);
-      break;
-
-    case 0xC0:  // Pan (Often same as E8?)
-    {
-      uint8_t pan = readByte(curOffset++);
-      addPan(beginOffset, curOffset - beginOffset, pan);
-    } break;
-    case 0xC3:  // Transpose
-    {
-      int8_t transp = readByte(curOffset++);
-      addTranspose(beginOffset, curOffset - beginOffset, transp);
-    } break;
-    case 0xC4:  // Pitch Bend Range
-    {
-      uint8_t range = readByte(curOffset++);
-      addPitchBendRange(beginOffset, curOffset - beginOffset, range * 100);
-    } break;
-    case 0xC5:      // Mono/Poly?
-      curOffset++;  // 1 byte param
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Mono/Poly Mode", "",
+    case 0xAF:
+      curOffset += 3;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Fade Song Volume", "",
                       VGMItem::Type::Unknown);
       break;
-
-    case 0xC8:      // Random
-      curOffset++;  // 1 byte param
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Random", "", VGMItem::Type::Unknown);
-      break;
-
-    case 0xCA:  // Variable
-      curOffset +=
-          2;  // 2 byte param? Check docs. Assuming 2 based on other complex ops or just generic.
-      // Actually commonly 2 bytes: Op, Value.
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Variable Op", "",
+    case 0xB0:
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Disable Envelope", "",
                       VGMItem::Type::Unknown);
       break;
-
-    case 0xD0:  // Tie
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Tie", "", VGMItem::Type::Unknown);
-      break;
-    case 0xD1:  // Portamento
-    {
-      uint8_t val = readByte(curOffset++);
-      addPortamento(beginOffset, curOffset - beginOffset, val != 0);
-      addPortamentoTime(beginOffset, curOffset - beginOffset,
-                        val);  // Reuse val as time? Usually it's boolean or time. DSE specific.
-    } break;
-    case 0xD2:  // Modulation (Vibrato)
-    {
-      uint8_t depth = readByte(curOffset++);
-      addModulation(beginOffset, curOffset - beginOffset, depth);
-    } break;
-
-    case 0xD4:  // Envelope Override
-    {
-      curOffset += 5;  // A, D, S, R, ?
+    case 0xB1:
+    case 0xB2:
+    case 0xB3:
+    case 0xB5:
+    case 0xB6:
+      curOffset++;
       addGenericEvent(beginOffset, curOffset - beginOffset, "Envelope Override", "",
                       VGMItem::Type::Unknown);
+      break;
+    case 0xB4:
+      curOffset += 2;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Envelope Decay/Sustain", "",
+                      VGMItem::Type::Unknown);
+      break;
+    case 0xBC: {
+      const uint8_t vol = readByte(curOffset++);
+      addVol(beginOffset, curOffset - beginOffset, vol);
     } break;
-
-    case 0xD8:      // LFO
-      curOffset++;  // 1 byte?
-      addGenericEvent(beginOffset, curOffset - beginOffset, "LFO Config", "",
+    case 0xBE: {
+      const uint8_t pan = readByte(curOffset++);
+      addPan(beginOffset, curOffset - beginOffset, pan);
+    } break;
+    case 0xBF:
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Unknown BF", "",
+                      VGMItem::Type::Unknown);
+      break;
+    case 0xC0:
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Unknown C0", "",
+                      VGMItem::Type::Unknown);
+      break;
+    case 0xC3: {
+      const uint8_t vol = readByte(curOffset++);
+      addVol(beginOffset, curOffset - beginOffset, vol);
+    } break;
+    case 0xCB:
+      curOffset += 2;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Skip Two Bytes", "",
+                      VGMItem::Type::Unknown);
+      break;
+    case 0xD0:
+    case 0xD1:
+    case 0xD2:
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tuning", "",
+                      VGMItem::Type::FineTune);
+      break;
+    case 0xD3:
+      curOffset += 2;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Add Coarse Tuning", "",
+                      VGMItem::Type::FineTune);
+      break;
+    case 0xD4:
+      curOffset += 3;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Sweep Tuning", "",
+                      VGMItem::Type::FineTune);
+      break;
+    case 0xD5:
+    case 0xD6:
+      curOffset += 2;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Random Tuning Range", "",
+                      VGMItem::Type::Unknown);
+      break;
+    case 0xD8:
+      curOffset += 2;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Unknown D8", "",
                       VGMItem::Type::Unknown);
       break;
 
@@ -382,11 +407,44 @@ bool PSDSETrack::readEvent(void) {
       // range is in semitones
       addPitchBendRange(beginOffset, curOffset - beginOffset, range * 100);
     } break;
+    case 0xDC:
+    case 0xE4:
+    case 0xEC:
+      curOffset += 5;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set LFO", "",
+                      VGMItem::Type::Unknown);
+      break;
+    case 0xDD:
+    case 0xE5:
+    case 0xED:
+      curOffset += 4;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set LFO Delay/Fade", "",
+                      VGMItem::Type::Unknown);
+      break;
+    case 0xDF:
+    case 0xE7:
+    case 0xEF:
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Route LFO", "",
+                      VGMItem::Type::Unknown);
+      break;
     case 0xE0:  // Volume
     {
       uint8_t vol = readByte(curOffset++);
       addVol(beginOffset, curOffset - beginOffset, vol);
     } break;
+    case 0xE1:
+    case 0xE9:
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Relative Controller Change", "",
+                      VGMItem::Type::Unknown);
+      break;
+    case 0xE2:
+    case 0xEA:
+      curOffset += 3;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Controller Sweep", "",
+                      VGMItem::Type::Unknown);
+      break;
     case 0xE3:  // Expression
     {
       uint8_t expr = readByte(curOffset++);

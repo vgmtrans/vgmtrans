@@ -18,12 +18,8 @@ PSDSEInstrSet::PSDSEInstrSet(RawFile *file, const SWDLHeader &header)
     : VGMInstrSet("PSDSE", file, header.offset, 0, header.intName), m_header(header) {
 }
 
-PSDSEInstrSet::~PSDSEInstrSet() {
-  sampColl = nullptr;
-}
-
 bool PSDSEInstrSet::parseHeader() {
-  uint32_t flen = readWord(offset() + 0x08);
+  uint32_t flen = PSDSE::readU32(rawFile(), offset() + 0x08, m_header.endianness);
   if (flen > rawFile()->size() - offset()) {
     flen = rawFile()->size() - offset();
   }
@@ -55,7 +51,8 @@ bool PSDSEInstrSet::parseInstrPointers() {
       break;
     }
 
-    uint16_t ptroffset = readShort(chunkDataStart + i * 2);
+    uint16_t ptroffset =
+        PSDSE::readU16(rawFile(), chunkDataStart + i * 2, m_header.endianness);
     if (ptroffset != 0) {
       uint32_t instrOffset = chunkDataStart + ptroffset;
 
@@ -68,12 +65,15 @@ bool PSDSEInstrSet::parseInstrPointers() {
 
       L_DEBUG("PSDSE: found instr {} at {:x} (ptr {:x})", i, instrOffset, ptroffset);
 
-      PSDSEInstr *instr = new PSDSEInstr(this, instrOffset, 1, 0, i);
-      aInstrs.push_back(instr);
+      addInstr<PSDSEInstr>(this, instrOffset, 1, 0, i);
+      // FluidSynth always addresses MIDI channel 10 through SF2 bank 128.
+      // DSE can select any preset on that channel, so mirror every available
+      // preset rather than assuming only program 127 is percussion.
+      addInstr<PSDSEInstr>(this, instrOffset, 1, 128, i);
     }
   }
 
-  L_INFO("PSDSE: total instruments found: {}", aInstrs.size());
+  L_INFO("PSDSE: total instruments found: {}", instrCount());
 
   return true;
 }
@@ -88,7 +88,7 @@ PSDSESampColl::PSDSESampColl(const std::string &format, RawFile *rawfile, const 
 }
 
 bool PSDSESampColl::parseHeader() {
-  setLength(rawFile()->size());
+  setLength(m_header.fileLength);
   return true;
 }
 
@@ -128,11 +128,11 @@ bool PSDSESampColl::parseSampleInfo() {
   }
 
   for (int i = 0; i < numSlots; i++) {
-    uint16_t relativeOffset = readShort(wavTableOffset + i * 2);
+    uint16_t relativeOffset =
+        PSDSE::readU16(rawFile(), wavTableOffset + i * 2, m_header.endianness);
 
     if (relativeOffset == 0) {
-      VGMSamp *samp = new PSDSEEmptySamp(this);
-      samples.push_back(samp);
+      addSamp<PSDSEEmptySamp>(this);
     } else {
       uint32_t sampleInfoOffset = wavTableOffset + relativeOffset;
 
@@ -160,23 +160,23 @@ bool PSDSESampColl::parseSampleInfo() {
         rootKey = readByte(sampleInfoOffset + 0x04);
         volume = readByte(sampleInfoOffset + 0x06);
         pan = readByte(sampleInfoOffset + 0x07);
-        smplfmt = readShort(sampleInfoOffset + 0x08);
+        smplfmt = PSDSE::readU16(rawFile(), sampleInfoOffset + 0x08, m_header.endianness);
         loopFlag = readByte(sampleInfoOffset + 0x11);
-        smplRate = readShort(sampleInfoOffset + 0x12);
-        smplPos = readWord(sampleInfoOffset + 0x14);
-        loopBeg = readWord(sampleInfoOffset + 0x18);
-        loopLen = readWord(sampleInfoOffset + 0x1C);
+        smplRate = PSDSE::readU16(rawFile(), sampleInfoOffset + 0x12, m_header.endianness);
+        smplPos = PSDSE::readU32(rawFile(), sampleInfoOffset + 0x14, m_header.endianness);
+        loopBeg = PSDSE::readU32(rawFile(), sampleInfoOffset + 0x18, m_header.endianness);
+        loopLen = PSDSE::readU32(rawFile(), sampleInfoOffset + 0x1C, m_header.endianness);
       } else {
         // v415 structure (longer offsets, confirmed for PMD Sky)
         rootKey = readByte(sampleInfoOffset + 0x06);
         volume = readByte(sampleInfoOffset + 0x08);
         pan = readByte(sampleInfoOffset + 0x09);
-        smplfmt = readShort(sampleInfoOffset + 0x12);
+        smplfmt = PSDSE::readU16(rawFile(), sampleInfoOffset + 0x12, m_header.endianness);
         loopFlag = readByte(sampleInfoOffset + 0x15);
-        smplRate = readWord(sampleInfoOffset + 0x20);
-        smplPos = readWord(sampleInfoOffset + 0x24);
-        loopBeg = readWord(sampleInfoOffset + 0x28);
-        loopLen = readWord(sampleInfoOffset + 0x2C);
+        smplRate = PSDSE::readU32(rawFile(), sampleInfoOffset + 0x20, m_header.endianness);
+        smplPos = PSDSE::readU32(rawFile(), sampleInfoOffset + 0x24, m_header.endianness);
+        loopBeg = PSDSE::readU32(rawFile(), sampleInfoOffset + 0x28, m_header.endianness);
+        loopLen = PSDSE::readU32(rawFile(), sampleInfoOffset + 0x2C, m_header.endianness);
       }
 
       // Calculate absolute data offset
@@ -203,17 +203,20 @@ bool PSDSESampColl::parseSampleInfo() {
         bps = BPS::PCM8;
       }
 
-      if (dataOffset + dataLength > rawFile()->size()) {
-        dataLength = rawFile()->size() - dataOffset;
+      const uint32_t bankEnd = m_header.offset + m_header.fileLength;
+      if (dataOffset >= bankEnd) {
+        continue;
+      }
+      if (dataLength > bankEnd - dataOffset) {
+        dataLength = bankEnd - dataOffset;
       }
 
-      PSDSESamp *samp = new PSDSESamp(this, sampleInfoOffset, 64, dataOffset, dataLength, 1, bps,
-                                      smplRate, waveType, sampleName);
+      PSDSESamp *samp = addSamp<PSDSESamp>(
+          this, sampleInfoOffset, 64, dataOffset, dataLength, 1, bps, smplRate, waveType,
+          sampleName);
       samp->unityKey = rootKey;
       samp->pan = pan;
       samp->setVolume(volume / 127.0);
-      samples.push_back(samp);
-
       if (loopFlag) {
         samp->setLoopStatus(1);
 
@@ -379,7 +382,7 @@ bool PSDSEInstr::loadInstr() {
     lfoTableOffset = offset() + 0x90;
   } else {
     // v415 structure
-    nbsplits = readShort(offset() + 0x02);
+    nbsplits = PSDSE::readU16(rawFile(), offset() + 0x02, pInstrSet->m_header.endianness);
     nblfos = readByte(offset() + 0x0B);
     splitsOffset = offset() + 0x10 + (nblfos * 16) + 16;
     lfoTableOffset = offset() + 0x10;
@@ -390,20 +393,21 @@ bool PSDSEInstr::loadInstr() {
   for (int i = 0; i < nblfos; i++) {
     uint32_t currLfo = lfoTableOffset + (i * 16);
     PSDSELFO lfo;
+    lfo.enabled = readByte(currLfo + 0x01);
     lfo.dest = readByte(currLfo + 0x02);
     lfo.wshape = readByte(currLfo + 0x03);
-    lfo.rate = readShort(currLfo + 0x04);
-    lfo.depth = readShort(currLfo + 0x08);
-    lfo.delay = readShort(currLfo + 0x0A);
-    lfo.fade = readShort(currLfo + 0x0C);
+    lfo.rate = PSDSE::readU16(rawFile(), currLfo + 0x04, pInstrSet->m_header.endianness);
+    lfo.depth = PSDSE::readU16(rawFile(), currLfo + 0x08, pInstrSet->m_header.endianness);
+    lfo.delay = PSDSE::readU16(rawFile(), currLfo + 0x0A, pInstrSet->m_header.endianness);
+    lfo.fade = static_cast<int16_t>(
+        PSDSE::readU16(rawFile(), currLfo + 0x0C, pInstrSet->m_header.endianness));
     lfos.push_back(lfo);
   }
 
   for (int i = 0; i < nbsplits; i++) {
     uint32_t splitOff = splitsOffset + i * 48;
-    PSDSERgn *rgn = new PSDSERgn(this, splitOff);
+    PSDSERgn *rgn = addRgn<PSDSERgn>(this, splitOff);
     rgn->loadRgn();
-    addRgn(rgn);
   }
 
   return true;
@@ -526,7 +530,7 @@ bool PSDSERgn::loadRgn() {
     addChild(offset() + 0x0C, 4, "Padding (0x0C)");
     addChild(offset() + 0x10, 2, "Padding (0x10)");
 
-    smplID = readShort(offset() + 0x12);
+    smplID = PSDSE::readU16(rawFile(), offset() + 0x12, pInstrSet->m_header.endianness);
     addChild(offset() + 0x12, 2, "Sample ID");
 
     ftune = readByte(offset() + 0x14);
@@ -549,18 +553,19 @@ bool PSDSERgn::loadRgn() {
     addChild(offset() + 0x21, 1, "Envelope Multiplier");
     addChild(offset() + 0x22, 7, "Unknown 0x22");
 
-    // ADSR per PMD2 docs: 0x29=attack, 0x2A=decay, 0x2B=sustain, 0x2E=release
-    // Plus 0x2C=hold, 0x2D=decay2 (sustain_time)
+    // ADSR: 0x29=attack, 0x2A=decay, 0x2B=sustain, 0x2E=release.
+    // Plus 0x2C=hold and 0x2D=decay2 (fade while the note remains held).
+    addChild(offset() + 0x28, 1, "Attack Level");
     attack = readByte(offset() + 0x29);
-    addChild(offset() + 0x29, 1, "Attack Level?");
+    addChild(offset() + 0x29, 1, "Attack Time");
     decay = readByte(offset() + 0x2A);
-    addChild(offset() + 0x2A, 1, "Attack Time");
+    addChild(offset() + 0x2A, 1, "Decay Time");
     sustain = readByte(offset() + 0x2B);
-    addChild(offset() + 0x2B, 1, "Decay Time");
+    addChild(offset() + 0x2B, 1, "Sustain Level");
     hold = readByte(offset() + 0x2C);
     addChild(offset() + 0x2C, 1, "Hold Time");
     decay2 = readByte(offset() + 0x2D);
-    addChild(offset() + 0x2D, 1, "Sustain Hold?");
+    addChild(offset() + 0x2D, 1, "Second Decay Time");
     release = readByte(offset() + 0x2E);
     addChild(offset() + 0x2E, 1, "Release Time");
     addChild(offset() + 0x2F, 1, "Unknown 0x2F");
@@ -572,37 +577,54 @@ bool PSDSERgn::loadRgn() {
 
   setSampNum(smplID);
 
-  // Apply transpose and tuning from Split Entry
-  // ftune: proportion of a semitone (255 == 100 cents)
-  // ctune: coarse tuning (semitones, bias of -7)
-  // ktps: key transpose (semitones) -> not sure what's the purpose of this
+  // DSE tuning contains the pitch adjustment that expresses a sample's playback
+  // rate relative to the engine's 32728.5 Hz reference. SF2 already expresses
+  // that adjustment in the sample-rate field, so retain only the residual region
+  // tuning. ktps is derived metadata (60 - rootKey), not an audible transpose.
 
   if (pInstrSet->m_header.version == 0x415) {
-    addCoarseTune(ktps, offset() + 0x17);
-
-    if (ctune != -7) {
-      addCoarseTune(ctune + 7, offset() + 0x15);
+    const int rawTuneCents = static_cast<int>(ctune) * 100 +
+                             static_cast<int>(std::lround(ftune / 255.0 * 100.0));
+    int baseTuneCents = 0;
+    const uint32_t waviTableOffset = pInstrSet->m_header.waviOffset + 0x10;
+    const uint32_t pointerOffset = waviTableOffset + static_cast<uint32_t>(smplID) * 2;
+    if (pInstrSet->m_header.waviOffset != 0 && smplID < pInstrSet->m_header.nbwavislots &&
+        pointerOffset + 2 <= rawFile()->size()) {
+      const uint16_t relativeOffset =
+          PSDSE::readU16(rawFile(), pointerOffset, pInstrSet->m_header.endianness);
+      if (relativeOffset != 0) {
+        const uint32_t sampleInfoOffset = waviTableOffset + relativeOffset;
+        const uint32_t sampleRate = pInstrSet->m_header.version == 0x0402
+                                        ? PSDSE::readU16(rawFile(), sampleInfoOffset + 0x12,
+                                                        pInstrSet->m_header.endianness)
+                                        : PSDSE::readU32(rawFile(), sampleInfoOffset + 0x20,
+                                                        pInstrSet->m_header.endianness);
+        if (sampleRate != 0) {
+          baseTuneCents = static_cast<int>(
+              std::lround(1200.0 * std::log2(static_cast<double>(sampleRate) / 32728.5)));
+        }
+      }
     }
 
-    if (ftune != 0) {
-      addFineTune(std::round(ftune / 255.0 * 100.0), offset() + 0x14);
+    const int tuneCents = rawTuneCents - baseTuneCents;
+    const int coarseTune = tuneCents / 100;
+    const int fineTune = tuneCents - coarseTune * 100;
+    if (coarseTune != 0) {
+      addCoarseTune(coarseTune, offset() + 0x15);
+    }
+    if (fineTune != 0) {
+      addFineTune(fineTune, offset() + 0x14);
     }
   }
+  (void)ktps;
 
   (void)envon;
-  (void)envmult;
-  (void)hold;
-  (void)decay2;
 
   if (vol == 0) {
-    // Infinite attenuation (mute)
-    setAttenuation(144.0);  // SF2 max attenuation in dB
-  } else if (vol == 127) {
-    setAttenuation(0.0);  // Full volume
+    setAttenuation(144.0);
   } else {
-    // Map vol (0-127) to attenuation (25dB - 0dB)
-    double attenDb = 25.0 - (static_cast<double>(vol) * 25.0 / 127.0);
-    setAttenuation(attenDb);
+    // NDS mixer volume is a linear amplitude multiplier.
+    setVolume(vol / 127.0);
   }
 
   setPan(pan);
@@ -610,18 +632,20 @@ bool PSDSERgn::loadRgn() {
   if (pInstrSet->m_header.version == 0x0402 || pInstrSet->m_header.version == 0x0415) {
     auto *instr = static_cast<PSDSEInstr *>(parInstr);
     for (const auto &lfo : instr->lfos) {
-      if (lfo.dest == 0x01) {  // Pitch / Vibrato
+      if (lfo.enabled != 0 && lfo.dest == 0x01) {  // Pitch / Vibrato
         setLfoVibDelaySeconds(lfo.delay / 1000.0);
 
-        // Rate and Depth conversion
+        // Pitch LFO entries encode pitch depth in the field conventionally
+        // called rate, while the depth field is frequency in 1/16 Hz units.
+        // For example, PMD's (10, 90) string vibrato is 10 cents at 5.625 Hz.
         // PSDSE LFOs have a 'wshape' parameter (Square, Triangle, etc.), but
         // VGMRgn currently maps purely to "Vibrato LFO" which has format-specific behaviors:
         // - SF2: Fixed Triangle wave.
         // - DLS: Default Sine wave (Level 1).
         // We cannot easily enforce the PSDSE wave shape on the output formats.
 
-        setLfoVibFreqHz(lfo.rate / 64.0);
-        setLfoVibDepthCents(lfo.depth);
+        setLfoVibFreqHz(lfo.depth / 16.0);
+        setLfoVibDepthCents(lfo.rate);
       }
     }
   }
@@ -638,35 +662,30 @@ bool PSDSERgn::loadRgn() {
   // If decay2 is active (nonzero and not 0x7F), the instrument decays to silence (Sustain Level =
   // 0). The total decay time becomes decay1 + decay2.
 
-  bool combinedDecay = false;
+  bool decayToSilence = false;
   if (decay != 0 && decay2 != 0 && decay2 != 0x7F) {
-    combinedDecay = true;
-    this->decay_time = dseTimeToSeconds(decay) + dseTimeToSeconds(decay2);
-  } else if (decay == 0x7F) {
-    this->decay_time = 0.0;
-    this->sustain_level = 1.0;
-  } else {
+    decayToSilence = true;
+    if (decay == 0x7F) {
+      this->decay_time = dseTimeToSeconds(decay2);
+    } else if (sustain == 0) {
+      this->decay_time = dseTimeToSeconds(decay);
+    } else {
+      this->decay_time = dseTimeToSeconds(decay) + dseTimeToSeconds(decay2);
+    }
+  } else if (decay != 0) {
     this->decay_time = dseTimeToSeconds(decay);
-  }
-
-  // Sustain Level
-  // DSE Sustain is a volume level (0-127).
-  // We use the same logarithmic attenuation formula as for the main volume.
-  double sustainAttenDb = 0.0;
-
-  if (combinedDecay) {
-    // If we used combined decay, we must decay to silence (max attenuation)
-    sustainAttenDb = 144.0;
-  } else if (sustain == 0) {
-    sustainAttenDb = 25.0;
-  } else if (sustain == 127) {
-    sustainAttenDb = 0.0;
+  } else if (decay2 != 0x7F) {
+    decayToSilence = true;
+    this->decay_time = dseTimeToSeconds(decay2);
   } else {
-    sustainAttenDb = 25.0 - (static_cast<double>(sustain) * 25.0 / 127.0);
+    this->decay_time = 0.0;
   }
 
-  // Convert dB attenuation to linear amplitude for sustain_level (0.0 - 1.0)
-  this->sustain_level = std::pow(10.0, -sustainAttenDb / 20.0);
+  if (decayToSilence) {
+    this->sustain_level = 0.0;
+  } else {
+    this->sustain_level = sustain / 127.0;
+  }
 
   this->release_time = dseTimeToSeconds(release);
 

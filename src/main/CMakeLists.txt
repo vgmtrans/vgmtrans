@@ -239,6 +239,10 @@ target_sources(vgmtranscore
     formats/PS1/PS1Seq.cpp
     formats/PS1/PS1SeqScanner.cpp
     formats/PS1/Vab.cpp
+    formats/PSDSE/PSDSEFormat.cpp
+    formats/PSDSE/PSDSEInstrSet.cpp
+    formats/PSDSE/PSDSEScanner.cpp
+    formats/PSDSE/PSDSESeq.cpp
     formats/PandoraBoxSnes/PandoraBoxSnesInstr.cpp
     formats/PandoraBoxSnes/PandoraBoxSnesScanner.cpp
     formats/PandoraBoxSnes/PandoraBoxSnesSeq.cpp
@@ -428,6 +432,12 @@ target_sources(vgmtranscore
       formats/PS1/PS1Seq.h
       formats/PS1/PS1SeqScanner.h
       formats/PS1/Vab.h
+      formats/PSDSE/PSDSEEnvelopeCurve.h
+      formats/PSDSE/PSDSEFormat.h
+      formats/PSDSE/PSDSEHeader.h
+      formats/PSDSE/PSDSEInstrSet.h
+      formats/PSDSE/PSDSEScanner.h
+      formats/PSDSE/PSDSESeq.h
       formats/PandoraBoxSnes/PandoraBoxSnesFormat.h
       formats/PandoraBoxSnes/PandoraBoxSnesInstr.h
       formats/PandoraBoxSnes/PandoraBoxSnesScanner.h
