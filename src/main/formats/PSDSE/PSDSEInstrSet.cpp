@@ -330,13 +330,13 @@ std::vector<uint8_t> PSDSESamp::decodeImaAdpcm() {
   // The header (initial PCM and index) is located 4 bytes *before* dataOff.
   // dataOff was adjusted in parseSampleInfo to point to the actual compressed nibbles.
   uint32_t sampHeader = getWord(dataOff - 4);
-  int decompSample = (int16_t)(sampHeader & 0xFFFF);  // Initial PCM sample
+  int decompSample = static_cast<int16_t>(sampHeader & 0xFFFF);  // Initial PCM sample
   int stepIndex = (sampHeader >> 16) & 0x7F;          // Initial step index (7-bit)
 
   uint32_t curOffset = dataOff;
 
   // The first sample is the initial PCM sample from the header.
-  output[destOff++] = (int16_t)decompSample;
+  output[destOff++] = static_cast<int16_t>(decompSample);
 
   uint8_t compByte;
   // dataLength is bytes of compressed data.
@@ -345,11 +345,11 @@ std::vector<uint8_t> PSDSESamp::decodeImaAdpcm() {
 
     // Process lower nibble first
     process_nibble(compByte & 0x0F, stepIndex, decompSample);
-    output[destOff++] = (int16_t)decompSample;
+    output[destOff++] = static_cast<int16_t>(decompSample);
 
     // Process upper nibble
     process_nibble((compByte & 0xF0) >> 4, stepIndex, decompSample);
-    output[destOff++] = (int16_t)decompSample;
+    output[destOff++] = static_cast<int16_t>(decompSample);
   }
 
   return samples;
@@ -449,17 +449,22 @@ bool PSDSERgn::loadRgn() {
     // 0x2B sustain
     // 0x2E release
 
-    addChild(offset() + 0x00, 4, "Unknown 0x00");
+    addChild(offset() + 0x00, 2, "ID");
+    addChild(offset() + 0x02, 1, "Bend Sensitivity");
+    addChild(offset() + 0x03, 1, "field_0x3");
     lowKey = readByte(offset() + 0x04);
     addChild(offset() + 0x04, 1, "Low Key");
     hiKey = readByte(offset() + 0x05);
     addChild(offset() + 0x05, 1, "High Key");
-    addChild(offset() + 0x06, 2, "Unknown 0x06");
+    addChild(offset() + 0x06, 1, "Low Key 2");
+    addChild(offset() + 0x07, 1, "High Key 2");
     lowVel = readByte(offset() + 0x08);
     addChild(offset() + 0x08, 1, "Low Velocity");
     hiVel = readByte(offset() + 0x09);
     addChild(offset() + 0x09, 1, "High Velocity");
-    addChild(offset() + 0x0A, 7, "Unknown 0x0A");
+    addChild(offset() + 0x0A, 1, "Low Velocity 2");
+    addChild(offset() + 0x0B, 1, "High Velocity 2");
+    addChild(offset() + 0x0C, 5, "Padding");
 
     smplID = readByte(offset() + 0x11);
     addChild(offset() + 0x11, 1, "Sample ID");
@@ -469,13 +474,20 @@ bool PSDSERgn::loadRgn() {
     ctune = readByte(offset() + 0x13);
     addChild(offset() + 0x13, 1, "Coarse Tune");
     rootKey = readByte(offset() + 0x14);
-    addChild(offset() + 0x15, 1, "Unknown 0x15");
+    addChild(offset() + 0x15, 1, "Key Transpose");
 
     vol = readByte(offset() + 0x16);
     addChild(offset() + 0x16, 1, "Sample Volume");
     pan = readByte(offset() + 0x17);
     addChild(offset() + 0x17, 1, "Sample Pan");
-    addChild(offset() + 0x18, 17, "Unknown 0x18");
+    addChild(offset() + 0x18, 1, "Key Group ID");
+    addChild(offset() + 0x19, 5, "field_0x1B[5]");
+    addChild(offset() + 0x1E, 1, "Envelope On");
+    addChild(offset() + 0x1F, 1, "Envelope Multiplier");
+    addChild(offset() + 0x20, 2, "unk_0x2");
+    addChild(offset() + 0x22, 4, "unk_0x4");
+    addChild(offset() + 0x26, 2, "Reserved");
+    addChild(offset() + 0x28, 1, "Attack Begin");
 
     attack = readByte(offset() + 0x29);
     addChild(offset() + 0x29, 1, "Attack Time");
@@ -483,10 +495,11 @@ bool PSDSERgn::loadRgn() {
     addChild(offset() + 0x2A, 1, "Decay Time");
     sustain = readByte(offset() + 0x2B);
     addChild(offset() + 0x2B, 1, "Sustain Level");
-    addChild(offset() + 0x2C, 2, "Unknown 0x2C");
+    addChild(offset() + 0x2C, 1, "Hold Time");
+    addChild(offset() + 0x2D, 1, "Sustain Time");
     release = readByte(offset() + 0x2E);
     addChild(offset() + 0x2E, 1, "Release Time");
-    addChild(offset() + 0x2F, 1, "Unknown 0x2F");
+    addChild(offset() + 0x2F, 1, "unk_0xf");
   } else {
     // v415 split entry is 48 bytes
     // 0x00 ID (2)
@@ -513,8 +526,8 @@ bool PSDSERgn::loadRgn() {
     // ...
 
     addChild(offset() + 0x00, 2, "ID");
-    addChild(offset() + 0x02, 1, "Pitch Bend Range");
-    addChild(offset() + 0x03, 1, "Unknown 0x03");
+    addChild(offset() + 0x02, 1, "Bend Sensitivity");
+    addChild(offset() + 0x03, 1, "field_0x3");
     lowKey = readByte(offset() + 0x04);
     addChild(offset() + 0x04, 1, "Low Key");
     hiKey = readByte(offset() + 0x05);
@@ -544,14 +557,15 @@ bool PSDSERgn::loadRgn() {
     pan = readByte(offset() + 0x19);
     addChild(offset() + 0x19, 1, "Sample Pan");
     addChild(offset() + 0x1A, 1, "Key Group ID");
-    addChild(offset() + 0x1B, 5, "Unknown 0x1B");
+    addChild(offset() + 0x1B, 5, "field_0x1B[5]");
 
     // Envelope flags/multipliers
     envon = readByte(offset() + 0x20);
     addChild(offset() + 0x20, 1, "Envelope On");
     envmult = readByte(offset() + 0x21);
     addChild(offset() + 0x21, 1, "Envelope Multiplier");
-    addChild(offset() + 0x22, 7, "Unknown 0x22");
+    addChild(offset() + 0x22, 2, "unk_0x2");
+    addChild(offset() + 0x24, 4, "unk_0x4");
 
     // ADSR: 0x29=attack, 0x2A=decay, 0x2B=sustain, 0x2E=release.
     // Plus 0x2C=hold and 0x2D=decay2 (fade while the note remains held).
@@ -568,7 +582,7 @@ bool PSDSERgn::loadRgn() {
     addChild(offset() + 0x2D, 1, "Sustain Time");
     release = readByte(offset() + 0x2E);
     addChild(offset() + 0x2E, 1, "Release Time");
-    addChild(offset() + 0x2F, 1, "Unknown 0x2F");
+    addChild(offset() + 0x2F, 1, "unk_0xf");
   }
 
   setLength(48);

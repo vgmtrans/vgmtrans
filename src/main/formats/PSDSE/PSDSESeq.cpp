@@ -31,10 +31,16 @@ bool PSDSESeq::parseHeader(void) {
 
   VGMHeader *header = addHeader(curOffset, 0x40, "SMDL Header");
   header->addChild(curOffset, 4, "Magic");
+  header->addChild(curOffset + 0x04, 4, "Reserved");
   header->addChild(curOffset + 0x08, 4, "File Length");
   version = PSDSE::readU16(rawFile(), curOffset + 0x0C, m_endianness);
   header->addChild(curOffset + 0x0C, 2, "Version");
   header->addChild(curOffset + 0x0E, 2, "Bank ID");
+  header->addChild(curOffset + 0x10, 8, "Reserved");
+  header->addChild(curOffset + 0x18, 2, "DSE Version");
+  header->addChild(curOffset + 0x1A, 2, "Reserved");
+  header->addChild(curOffset + 0x1C, 2, "Reserved");
+  header->addChild(curOffset + 0x1E, 2, "Reserved");
   char fname[17];
   readBytes(curOffset + 0x20, 16, fname);
   fname[16] = '\0';
@@ -43,30 +49,38 @@ bool PSDSESeq::parseHeader(void) {
     setName(intName);
   }
   header->addChild(curOffset + 0x20, 16, "File Name");
+  header->addChild(curOffset + 0x30, 16, "Reserved");
 
-  // After the header, there should be a "song" chunk
+  // After the header, there should be a "song" chunk. A chunk header is 0x10
+  // bytes: label (4), version (4, always 0x01000000 LE), alignment byte (1),
+  // 0xFF (1), padding (2), chunk length (4, LE). The song chunk's payload is
+  // the 0x30-byte "seqinfo" struct.
   curOffset += 0x40;
   if (readWordBE(curOffset) == 0x736F6E67) {  // "song"
-    uint32_t songChunkLen = 0x10;
-    VGMHeader *songChunk = addHeader(curOffset, songChunkLen, "Song Chunk");
+    VGMHeader *songChunk = addHeader(curOffset, 0x10, "Song Chunk");
     songChunk->addChild(curOffset, 4, "Label");
-    // The remaining fields of the song chunk header are unknown,
-    // seen in the wild as 0x1000000, 0xFF10, 0xFFFFFFB0
+    songChunk->addChild(curOffset + 0x04, 4, "Chunk Version");
+    songChunk->addChild(curOffset + 0x08, 1, "Alignment");
+    songChunk->addChild(curOffset + 0x09, 3, "Reserved");
+    songChunk->addChild(curOffset + 0x0C, 4, "Chunk Length");
     curOffset += 0x10;
 
-    // The "seqinfo" struct follows, length depends on version
+    // The "seqinfo" struct follows, length depends on version. Field offsets
+    // are from DseSequence_LoadSong (0x0206E554).
     if (version == 0x0415) {
       VGMHeader *seqInfo = addHeader(curOffset, 0x30, "Seq Info");
-      seqInfo->addChild(curOffset + 0x02, 2, "Offset to Tracks");
+      seqInfo->addChild(curOffset + 0x00, 2, "Bank ID");
+      seqInfo->addChild(curOffset + 0x02, 2, "Ticks Per Quarter Beat");
+      seqInfo->addChild(curOffset + 0x04, 1, "field_0x11");
       seqInfo->addChild(curOffset + 0x06, 1, "Num Tracks");
-      // The rest of seqinfo is unknown,
-      // but examples in the wild all look the same.
-      // Note that we don't use the offset field above, we just scan for "trk " chunks
-      // because we can.
+      seqInfo->addChild(curOffset + 0x07, 1, "Num Channels");
+      seqInfo->addChild(curOffset + 0x18, 1, "Loop Flag");
+      seqInfo->addChild(curOffset + 0x19, 1, "Global Volume Index");
+      seqInfo->addChild(curOffset + 0x1A, 1, "Effect ID");
+      seqInfo->addChild(curOffset + 0x1B, 1, "field_0x12");
       curOffset += 0x30;
     } else if (version == 0x0402) {
       addHeader(curOffset, 0x10, "Seq Info");
-      // Similar story here
       curOffset += 0x10;
     }
   }
@@ -86,8 +100,9 @@ bool PSDSESeq::parseTrackPointers(void) {
         return false;
       }
 
-      // The first four data bytes are a track preamble (track ID, MIDI
-      // channel, two unknowns), not sequence events.
+      // The first four data bytes are a track preamble, not sequence events:
+      //   [0x10] track ID, [0x11] channel ID, [0x12]/[0x13] reserved.
+      // (DseSequence_LoadSong reads [0x10] and [0x11] only.)
       addTrack<PSDSETrack>(this, curOffset + 0x14, chunkLen - 4,
                            readByte(curOffset + 0x11) & 0x0F);
 
@@ -416,11 +431,12 @@ bool PSDSETrack::readEvent(void) {
       addGenericEvent(beginOffset, curOffset - beginOffset, "Set Tuning Jitter Amplitude", "",
                       VGMItem::Type::Unknown);
       break;
-    case 0xD8:
+    case 0xD8:  // DseTrackEvent_SetUnknown2: stores a 16-bit value to channel field 0x56
+    {
       curOffset += 2;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Tuning Unknown (D8)", "",
-                      VGMItem::Type::Unknown);
-      break;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Channel Field 0x56", "",
+                      VGMItem::Type::FineTune);
+    } break;
 
     case 0xD7:  // Set Key Bend (a per-key pitch detune, not a MIDI pitch bend)
     {
@@ -435,44 +451,89 @@ bool PSDSETrack::readEvent(void) {
       addGenericEvent(beginOffset, curOffset - beginOffset, "Set Key Bend Range", "",
                       VGMItem::Type::FineTune);
     } break;
-    case 0xDC:
-    case 0xE4:
-    case 0xEC:
+    case 0xDC:  // Setup Key Bend LFO (pitch)
+    {
       curOffset += 5;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Set LFO", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Setup Key Bend LFO", "",
                       VGMItem::Type::Unknown);
-      break;
-    case 0xDD:
-    case 0xE5:
-    case 0xED:
+    } break;
+    case 0xE4:  // Setup Volume LFO
+    {
+      curOffset += 5;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Setup Volume LFO", "",
+                      VGMItem::Type::Unknown);
+    } break;
+    case 0xEC:  // Setup Pan LFO
+    {
+      curOffset += 5;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Setup Pan LFO", "",
+                      VGMItem::Type::Unknown);
+    } break;
+    case 0xDD:  // Setup Key Bend LFO Envelope
+    {
       curOffset += 4;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Set LFO Delay/Fade", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Setup Key Bend LFO Envelope", "",
                       VGMItem::Type::Unknown);
-      break;
-    case 0xDF:
-    case 0xE7:
-    case 0xEF:
+    } break;
+    case 0xE5:  // Setup Volume LFO Envelope
+    {
+      curOffset += 4;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Setup Volume LFO Envelope", "",
+                      VGMItem::Type::Unknown);
+    } break;
+    case 0xED:  // Setup Pan LFO Envelope
+    {
+      curOffset += 4;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Setup Pan LFO Envelope", "",
+                      VGMItem::Type::Unknown);
+    } break;
+    case 0xDF:  // Use Key Bend LFO
+    {
       curOffset++;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Route LFO", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Use Key Bend LFO", "",
                       VGMItem::Type::Unknown);
-      break;
+    } break;
+    case 0xE7:  // Use Volume LFO
+    {
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Use Volume LFO", "",
+                      VGMItem::Type::Unknown);
+    } break;
+    case 0xEF:  // Use Pan LFO
+    {
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Use Pan LFO", "",
+                      VGMItem::Type::Unknown);
+    } break;
     case 0xE0:  // Volume
     {
       uint8_t vol = readByte(curOffset++);
       addVol(beginOffset, curOffset - beginOffset, vol);
     } break;
-    case 0xE1:
-    case 0xE9:
+    case 0xE1:  // Volume Delta
+    {
       curOffset++;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Relative Controller Change", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Volume Delta", "",
                       VGMItem::Type::Unknown);
-      break;
-    case 0xE2:
-    case 0xEA:
+    } break;
+    case 0xE9:  // Pan Delta
+    {
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan Delta", "",
+                      VGMItem::Type::Unknown);
+    } break;
+    case 0xE2:  // Volume Fade
+    {
       curOffset += 3;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Controller Sweep", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Volume Fade", "",
                       VGMItem::Type::Unknown);
-      break;
+    } break;
+    case 0xEA:  // Pan Fade
+    {
+      curOffset += 3;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Pan Fade", "",
+                      VGMItem::Type::Unknown);
+    } break;
     case 0xE3:  // Expression
     {
       uint8_t expr = readByte(curOffset++);
@@ -483,28 +544,28 @@ bool PSDSETrack::readEvent(void) {
       uint8_t pan = readByte(curOffset++);
       addPan(beginOffset, curOffset - beginOffset, pan);
     } break;
-    case 0xF0:  // Replace LFO
+    case 0xF0:  // Setup LFO (generic, selected by channel lfo index)
     {
       curOffset += 5;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Replace LFO", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Setup LFO", "",
                       VGMItem::Type::Unknown);
     } break;
-    case 0xF1:  // Set LFO Delay/Fade
+    case 0xF1:  // Setup LFO Envelope
     {
       curOffset += 4;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Set LFO Delay/Fade", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Setup LFO Envelope", "",
                       VGMItem::Type::Unknown);
     } break;
-    case 0xF2:  // Set LFO Param
+    case 0xF2:  // Set LFO Parameter
     {
       curOffset += 2;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Set LFO Param", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set LFO Parameter", "",
                       VGMItem::Type::Unknown);
     } break;
-    case 0xF3:  // Set LFO Route
+    case 0xF3:  // Use LFO
     {
       curOffset += 3;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Set LFO Route", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Use LFO", "",
                       VGMItem::Type::Unknown);
     } break;
 
@@ -522,7 +583,8 @@ bool PSDSETrack::readEvent(void) {
                       VGMItem::Type::Unknown);
     } break;
     default: {
-      addUnknown(beginOffset, curOffset - beginOffset);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Invalid Opcode", "",
+                      VGMItem::Type::Unknown);
     } break;
   }
 
