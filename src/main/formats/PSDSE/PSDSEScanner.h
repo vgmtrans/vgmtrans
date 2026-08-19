@@ -15,8 +15,8 @@ public:
 
   virtual void scan(RawFile *file, void *offset = nullptr) override;
 
-  void onSampCollClose(PSDSESampColl *sampColl);
-  void onInstrSetClose(PSDSEInstrSet *instrSet);
+  static void onSampCollClose(PSDSESampColl *sampColl);
+  static void onInstrSetClose(PSDSEInstrSet *instrSet);
 
   static std::vector<PSDSESampColl *> g_loadedSampColls;
   static std::vector<PSDSEInstrSet *> g_loadedInstrSets;

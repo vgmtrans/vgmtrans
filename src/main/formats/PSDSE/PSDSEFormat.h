@@ -1,5 +1,6 @@
 #pragma once
 #include "Format.h"
+#include "PSDSEMatcher.h"
 #include "PSDSEScanner.h"
 #include "VGMColl.h"
 
@@ -11,4 +12,5 @@
 
 BEGIN_FORMAT(PSDSE)
 USING_SCANNER(PSDSEScanner)
+USING_MATCHER(PSDSEMatcher)
 END_FORMAT()
