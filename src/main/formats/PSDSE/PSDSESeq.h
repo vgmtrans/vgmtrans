@@ -36,5 +36,5 @@ private:
   int8_t currentOctave;
   uint32_t lastNoteDuration;
   uint32_t lastWaitDuration;
-  uint32_t pitchBendRangeSemitones;
+  uint8_t noteDurationMultiplier;
 };

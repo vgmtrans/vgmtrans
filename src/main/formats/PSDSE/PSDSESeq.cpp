@@ -128,8 +128,8 @@ void PSDSETrack::resetVars(void) {
   // Best-guess default values
   currentOctave = 4;
   lastNoteDuration = 48;
-  pitchBendRangeSemitones = 2;
   lastWaitDuration = 0;
+  noteDurationMultiplier = 127;
 }
 
 bool PSDSETrack::readEvent(void) {
@@ -171,7 +171,19 @@ bool PSDSETrack::readEvent(void) {
     uint8_t noteIdx = lowNybble;
     uint8_t key = currentOctave * 12 + noteIdx;
 
-    addNoteByDur(beginOffset, curOffset - beginOffset, key, velocity, duration);
+    // DSE scales each note's duration by the track's note-duration multiplier
+    // (opcode 0xBC, default 127). The engine computes (all 32-bit arithmetic):
+    //   scaled = rawDuration * noteDurationMultiplier
+    //   hi     = (scaled * 0x02040811) >> 32
+    //   ticks  = (hi + ((scaled - hi) >> 1)) >> 6
+    // 0x02040811 is the fixed-point reciprocal of 127, so this is
+    // (rawDuration * multiplier / 127), which is the identity at the default.
+    const uint64_t product = static_cast<uint64_t>(duration) * noteDurationMultiplier;
+    const uint32_t scaled = static_cast<uint32_t>(product);
+    const uint32_t hi = static_cast<uint32_t>((product * 0x02040811ULL) >> 32);
+    const uint32_t noteDuration = (hi + ((scaled - hi) >> 1)) >> 6;
+
+    addNoteByDur(beginOffset, curOffset - beginOffset, key, velocity, noteDuration);
     // Note: Do NOT addTime(duration) here, Wait events handle that
 
     return true;
@@ -226,29 +238,31 @@ bool PSDSETrack::readEvent(void) {
       addTime(ticks);
     } break;
     case 0x95: {
-      int8_t tickInterval = readByte(curOffset++);
-      (void)tickInterval;
-      // Pause until all notes are released and check at the tick rate specified by  tickInterval
-      addUnknown(beginOffset, curOffset - beginOffset, "Pause until all notes are released");
+      // Wait Until Fadeout: pause until all notes have been released, checking
+      // every `tickInterval` ticks. The interval byte has no MIDI equivalent.
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Wait Until Fadeout", "",
+                      VGMItem::Type::Rest);
     } break;
     case 0x98:
       addEndOfTrack(beginOffset, curOffset - beginOffset);
       return false;
     case 0x99:
-      // TODO: Actually implement loop points
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Loop Point", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Main Loop Begin", "",
                       VGMItem::Type::Marker);
       break;
     case 0x9C: {
-      uint8_t nRepeats = readByte(curOffset++);
-      (void)nRepeats;
-      addUnknown(beginOffset, curOffset - beginOffset, "Segno");
+      curOffset++;  // sub-loop repeat count
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Sub Loop Begin", "",
+                      VGMItem::Type::Marker);
     } break;
     case 0x9D: {
-      addUnknown(beginOffset, curOffset - beginOffset, "Dal Segno");
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Sub Loop End", "",
+                      VGMItem::Type::Marker);
     } break;
     case 0x9E: {
-      addUnknown(beginOffset, curOffset - beginOffset, "To Coda");
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Sub Loop Break On Last Iteration", "",
+                      VGMItem::Type::Marker);
     } break;
     case 0xA0: {
       uint8_t octave = readByte(curOffset++);
@@ -268,29 +282,24 @@ bool PSDSETrack::readEvent(void) {
       addTempoBPM(beginOffset, curOffset - beginOffset, bpm);
     } break;
     case 0xA8: {
-      uint8_t swdl = readByte(curOffset++);
-      uint8_t bank = readByte(curOffset++);
-      (void)swdl;
-      (void)bank;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Set SWDL and Bank", "",
+      // 16-bit bank (SWDL) id, big-endian: (byte0 << 8) | byte1.
+      curOffset += 2;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Bank", "",
                       VGMItem::Type::Unknown);
     } break;
     case 0xA9: {
-      const uint8_t swdl = readByte(curOffset++);
-      (void)swdl;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Set SWDL", "",
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Bank MSB", "",
                       VGMItem::Type::Unknown);
     } break;
     case 0xAA: {
-      uint8_t bankLo = readByte(curOffset++);
-      (void)bankLo;
-      // TODO: VGMSeq doesn't have this
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Bank Lo", "",
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Bank LSB", "",
                       VGMItem::Type::Unknown);
     } break;
     case 0xAB: {
       curOffset++;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Skip Byte", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Dummy Byte", "",
                       VGMItem::Type::Unknown);
     } break;
     case 0xAC:  // Program Change
@@ -300,112 +309,131 @@ bool PSDSETrack::readEvent(void) {
     } break;
     case 0xAF:
       curOffset += 3;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Fade Song Volume", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Song Volume Fade", "",
                       VGMItem::Type::Unknown);
       break;
     case 0xB0:
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Disable Envelope", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Restore Envelope Defaults", "",
                       VGMItem::Type::Unknown);
       break;
     case 0xB1:
-    case 0xB2:
-    case 0xB3:
-    case 0xB5:
-    case 0xB6:
       curOffset++;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Envelope Override", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Envelope Attack Begin", "",
+                      VGMItem::Type::Unknown);
+      break;
+    case 0xB2:
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Envelope Attack Time", "",
+                      VGMItem::Type::Unknown);
+      break;
+    case 0xB3:
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Envelope Hold Time", "",
                       VGMItem::Type::Unknown);
       break;
     case 0xB4:
       curOffset += 2;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Envelope Decay/Sustain", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Envelope Decay Time And Sustain Level",
+                      "", VGMItem::Type::Unknown);
+      break;
+    case 0xB5:
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Envelope Sustain Time", "",
+                      VGMItem::Type::Unknown);
+      break;
+    case 0xB6:
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Envelope Release Time", "",
                       VGMItem::Type::Unknown);
       break;
     case 0xBC: {
-      const uint8_t vol = readByte(curOffset++);
-      addVol(beginOffset, curOffset - beginOffset, vol);
+      // Set Note Duration Multiplier: scales subsequent note durations by
+      // value/127 (default is 127, i.e. no scaling).
+      noteDurationMultiplier = readByte(curOffset++);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Note Duration Multiplier", "",
+                      VGMItem::Type::Unknown);
     } break;
     case 0xBE: {
-      const uint8_t pan = readByte(curOffset++);
-      addPan(beginOffset, curOffset - beginOffset, pan);
+      // Force LFO Envelope Level: forces the channel LFO to a constant
+      // envelope level (signed byte). No MIDI equivalent.
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Force LFO Envelope Level", "",
+                      VGMItem::Type::Unknown);
     } break;
     case 0xBF:
       curOffset++;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Unknown BF", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Hold Notes", "",
                       VGMItem::Type::Unknown);
       break;
     case 0xC0:
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Unknown C0", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Flag Bit 1", "",
                       VGMItem::Type::Unknown);
       break;
     case 0xC3: {
-      const uint8_t vol = readByte(curOffset++);
-      addVol(beginOffset, curOffset - beginOffset, vol);
+      // Set Optional Volume: a secondary channel volume used only by special
+      // driver modes, not the primary track volume (that is opcode 0xE0).
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Optional Volume", "",
+                      VGMItem::Type::Unknown);
     } break;
     case 0xCB:
       curOffset += 2;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Skip Two Bytes", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Dummy 2 Bytes", "",
                       VGMItem::Type::Unknown);
       break;
     case 0xD0:
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Tuning", "",
+                      VGMItem::Type::FineTune);
+      break;
     case 0xD1:
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tuning Delta Coarse", "",
+                      VGMItem::Type::FineTune);
+      break;
     case 0xD2:
       curOffset++;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Tuning", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tuning Delta Fine", "",
                       VGMItem::Type::FineTune);
       break;
     case 0xD3:
       curOffset += 2;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Add Coarse Tuning", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tuning Delta Full", "",
                       VGMItem::Type::FineTune);
       break;
     case 0xD4:
       curOffset += 3;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Sweep Tuning", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Tuning Fade", "",
                       VGMItem::Type::FineTune);
       break;
     case 0xD5:
+      curOffset += 2;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Note Random Region", "",
+                      VGMItem::Type::Unknown);
+      break;
     case 0xD6:
       curOffset += 2;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Random Tuning Range", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Tuning Jitter Amplitude", "",
                       VGMItem::Type::Unknown);
       break;
     case 0xD8:
       curOffset += 2;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Unknown D8", "",
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Tuning Unknown (D8)", "",
                       VGMItem::Type::Unknown);
       break;
 
-    case 0xD7:  // Pitch Bend
+    case 0xD7:  // Set Key Bend (a per-key pitch detune, not a MIDI pitch bend)
     {
-      int16_t bend = getShortBE(curOffset);
       curOffset += 2;
-
-      // "500 == 1 semitone. Negative val, means increase pitch, positive the opposite."
-      // So first, invert the sign.
-      double semitones = static_cast<double>(-bend) / 500.0;
-
-      // Calculate MIDI deflection based on current pitch bend range
-      // deflection = (semitones / range) * 8192
-      // If range is 0, deflection is 0.
-      double deflection = 0.0;
-      if (pitchBendRangeSemitones > 0) {
-        deflection = (semitones / static_cast<double>(pitchBendRangeSemitones)) * 8192.0;
-      }
-
-      uint16_t midiBend = std::clamp(8192 + static_cast<int>(deflection), 0, 16383);
-      uint8_t lo = midiBend & 0x7F;
-      uint8_t hi = (midiBend >> 7) & 0x7F;
-      addPitchBendMidiFormat(beginOffset, curOffset - beginOffset, lo, hi);
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Key Bend", "",
+                      VGMItem::Type::FineTune);
     } break;
 
-    case 0xDB:  // Set Pitch Bend Range
+    case 0xDB:  // Set Key Bend Range
     {
-      uint8_t range = readByte(curOffset++);
-      pitchBendRangeSemitones = range;
-      // Add RPN event to set pitch bend range in the MIDI output
-      // range is in semitones
-      addPitchBendRange(beginOffset, curOffset - beginOffset, range * 100);
+      curOffset++;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Set Key Bend Range", "",
+                      VGMItem::Type::FineTune);
     } break;
     case 0xDC:
     case 0xE4:
@@ -480,16 +508,18 @@ bool PSDSETrack::readEvent(void) {
                       VGMItem::Type::Unknown);
     } break;
 
-    case 0xF6:  // Sync/Unknown
+    case 0xF6:  // Signal
     {
-      curOffset += 1;
-      addGenericEvent(beginOffset, curOffset - beginOffset, "Sync/Unknown (F6)", "",
+      curOffset++;  // signal id
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Signal", "",
                       VGMItem::Type::Unknown);
     } break;
 
-    case 0xF8:  // Skip next 2 bytes
+    case 0xF8:  // Dummy 2 Bytes
     {
       curOffset += 2;
+      addGenericEvent(beginOffset, curOffset - beginOffset, "Dummy 2 Bytes", "",
+                      VGMItem::Type::Unknown);
     } break;
     default: {
       addUnknown(beginOffset, curOffset - beginOffset);

@@ -478,11 +478,11 @@ bool PSDSERgn::loadRgn() {
     addChild(offset() + 0x18, 17, "Unknown 0x18");
 
     attack = readByte(offset() + 0x29);
-    addChild(offset() + 0x29, 1, "Attack Level?");
+    addChild(offset() + 0x29, 1, "Attack Time");
     decay = readByte(offset() + 0x2A);
-    addChild(offset() + 0x2A, 1, "Attack Time");
+    addChild(offset() + 0x2A, 1, "Decay Time");
     sustain = readByte(offset() + 0x2B);
-    addChild(offset() + 0x2B, 1, "Decay Time");
+    addChild(offset() + 0x2B, 1, "Sustain Level");
     addChild(offset() + 0x2C, 2, "Unknown 0x2C");
     release = readByte(offset() + 0x2E);
     addChild(offset() + 0x2E, 1, "Release Time");
@@ -555,7 +555,7 @@ bool PSDSERgn::loadRgn() {
 
     // ADSR: 0x29=attack, 0x2A=decay, 0x2B=sustain, 0x2E=release.
     // Plus 0x2C=hold and 0x2D=decay2 (fade while the note remains held).
-    addChild(offset() + 0x28, 1, "Attack Level");
+    addChild(offset() + 0x28, 1, "Attack Begin");
     attack = readByte(offset() + 0x29);
     addChild(offset() + 0x29, 1, "Attack Time");
     decay = readByte(offset() + 0x2A);
@@ -565,7 +565,7 @@ bool PSDSERgn::loadRgn() {
     hold = readByte(offset() + 0x2C);
     addChild(offset() + 0x2C, 1, "Hold Time");
     decay2 = readByte(offset() + 0x2D);
-    addChild(offset() + 0x2D, 1, "Second Decay Time");
+    addChild(offset() + 0x2D, 1, "Sustain Time");
     release = readByte(offset() + 0x2E);
     addChild(offset() + 0x2E, 1, "Release Time");
     addChild(offset() + 0x2F, 1, "Unknown 0x2F");
