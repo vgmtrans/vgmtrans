@@ -300,11 +300,11 @@ struct CurveState {
         cursor -= static_cast<u8>(bytes[cursor + 1]);
         continue;
       }
-      if (cursor < 0x83) {
+      if (command == 0x82) {
         cursor = 0;
         continue;
       }
-      if (cursor == 0x83) {
+      if (command == 0x83) {
         if (noteActive) {
           position = static_cast<s16>(cursor - 1);
           counter = 1;
