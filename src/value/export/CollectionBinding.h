@@ -8,6 +8,7 @@
 
 #include "value/export/ExportTypes.h"
 #include "value/export/SequenceModulationProfile.h"
+#include "value/export/midi/ModulationAnalysis.h"
 #include "value/model/SessionSnapshot.h"
 
 #include <optional>
@@ -18,6 +19,7 @@ namespace vgmtrans::core {
 
 struct CollectionBindingResult;
 struct RenderedCollection;
+class CollectionWorkspace;
 
 // Final, collection-local input to rendering and export. The retained snapshot
 // keeps every borrowed asset alive, while private storage prevents exporters
@@ -37,6 +39,7 @@ public:
 private:
   friend CollectionBindingResult bindCollection(const SessionSnapshot&, CollectionId);
   friend RenderedCollection renderCollection(const BoundCollection&, const SequenceRenderOptions&);
+  friend class CollectionWorkspace;
 
   BoundCollection(SessionSnapshot snapshot, CollectionId id, std::string baseName, const SequenceProgramAsset* sequence,
                   SequenceRuntime sequenceRuntime, std::vector<SoundBankAsset> soundBanks,
@@ -63,6 +66,29 @@ struct CollectionBindingResult {
 struct RenderedCollection {
   std::optional<PerformanceSequence> performance;
   SequenceModulationProfile modulation;
+  std::vector<Diagnostic> diagnostics;
+};
+
+// Move-owned preparation shared by playback, ordinary export, and stitching.
+// The canonical rendering remains separate from its export-only projection.
+class CollectionWorkspace {
+public:
+  CollectionWorkspace(BoundCollection collection, std::vector<Diagnostic> diagnostics);
+
+  CollectionWorkspace(const CollectionWorkspace&) = delete;
+  CollectionWorkspace(CollectionWorkspace&&) noexcept = default;
+
+  void render(const SequenceRenderOptions& options, DynamicEnvelopePolicy dynamicEnvelopes);
+  void prepareSynth(ModulationConversionPolicy conversion, ModulationScalingPolicy scaling);
+
+  [[nodiscard]] const PerformanceSequence* performance() const noexcept;
+  [[nodiscard]] std::vector<const SoundBankAsset*> soundBankView() const;
+  [[nodiscard]] std::vector<SoundBankAsset>& soundBanks() noexcept { return collection.soundBanks_; }
+
+  BoundCollection collection;
+  RenderedCollection rendering;
+  std::optional<PerformanceSequence> exportPerformance;
+  std::optional<MidiModulationUsage> modulationUsage;
   std::vector<Diagnostic> diagnostics;
 };
 

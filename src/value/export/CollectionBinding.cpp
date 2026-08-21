@@ -6,6 +6,7 @@
 
 #include "value/export/CollectionBinding.h"
 
+#include "value/export/DynamicEnvelope.h"
 #include "value/export/ExportDiagnostics.h"
 #include "value/scan/FormatModule.h"
 #include "value/sequence/SequenceVm.h"
@@ -188,6 +189,55 @@ RenderedCollection renderCollection(const BoundCollection& collection, const Seq
     };
   }
   return renderSequence(*collection.sequence_, collection.sequenceRuntime_, options);
+}
+
+CollectionWorkspace::CollectionWorkspace(BoundCollection collection, std::vector<Diagnostic> diagnostics)
+    : collection(std::move(collection)), diagnostics(std::move(diagnostics)) {
+}
+
+void CollectionWorkspace::render(const SequenceRenderOptions& options, DynamicEnvelopePolicy dynamicEnvelopes) {
+  rendering = renderCollection(collection, options);
+  if (dynamicEnvelopes != DynamicEnvelopePolicy::InstrumentVariants || !rendering.performance) {
+    return;
+  }
+
+  auto materialized = materializeDynamicEnvelopes(*rendering.performance, collection.soundBanks_);
+  exportPerformance = std::move(materialized.performance);
+  diagnostics.insert(diagnostics.end(), std::make_move_iterator(materialized.diagnostics.begin()),
+                     std::make_move_iterator(materialized.diagnostics.end()));
+}
+
+void CollectionWorkspace::prepareSynth(ModulationConversionPolicy conversion, ModulationScalingPolicy scaling) {
+  if (conversion != ModulationConversionPolicy::SynthModulators || !rendering.performance) {
+    return;
+  }
+  if (rendering.modulation.hasSynthModulation()) {
+    for (auto& soundBank : collection.soundBanks_) {
+      applySequenceModulation(soundBank, rendering.modulation);
+    }
+  }
+  if (scaling == ModulationScalingPolicy::ObservedSequenceRange) {
+    auto usage = analyzePerformanceModulationUsage(*performance(), &rendering.modulation);
+    if (hasMidiModulationUsage(usage)) {
+      modulationUsage = std::move(usage);
+    }
+  }
+}
+
+const PerformanceSequence* CollectionWorkspace::performance() const noexcept {
+  if (exportPerformance) {
+    return &*exportPerformance;
+  }
+  return rendering.performance ? &*rendering.performance : nullptr;
+}
+
+std::vector<const SoundBankAsset*> CollectionWorkspace::soundBankView() const {
+  std::vector<const SoundBankAsset*> view;
+  view.reserve(collection.soundBanks_.size());
+  for (const auto& soundBank : collection.soundBanks_) {
+    view.push_back(&soundBank);
+  }
+  return view;
 }
 
 }  // namespace vgmtrans::core
