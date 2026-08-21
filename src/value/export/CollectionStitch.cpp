@@ -110,7 +110,7 @@ void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulation
   part.midi = renderMidiSequence(*performance, request.sequence.midi, request.modulationConversion, instruments,
                                  &workspace.rendering.modulation);
   part.modulationUsage = std::move(workspace.modulationUsage);
-  auto soundBanks = std::move(workspace.soundBanks());
+  auto& soundBanks = workspace.soundBanks();
   if (request.exportOnlyUsedInstruments) {
     const auto selected = selectSynthInstruments(instruments, performance);
     const std::unordered_set<const Instrument*> used(selected.begin(), selected.end());

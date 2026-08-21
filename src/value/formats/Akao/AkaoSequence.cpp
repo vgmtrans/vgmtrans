@@ -922,7 +922,7 @@ void collectReferences(const DecodedBytecodeCommand& command, AkaoSequenceRefere
     (bank == 127 ? references.drumInstrumentTableOffsets : references.customInstrumentTableOffsets)
         .insert(*instrumentTable);
   }
-  if (bank != 0) {
+  if (bank != 0 || programs.empty()) {
     return;
   }
   references.usesIndividualArticulations = true;

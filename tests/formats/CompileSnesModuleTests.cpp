@@ -197,6 +197,23 @@ void frameCurvesDynamicAdsrAndEchoRenderPhysically() {
          "echo presets should preserve EDL, signed EVOL, feedback, voice mask, and global enable");
 }
 
+void curveControlBytesAreComparedAsCommands() {
+  std::vector<u8> releaseBytes = fixture({0x88, 0x01, 0x60, 0xde, 2, 0x00, 0xde, 4, 0x82});
+  writeBytes(releaseBytes, 0x2500, {0x83, 1, 15, 0x80});
+  const auto releaseLevels = events<LevelPerformanceEvent>(render(releaseBytes).tracks.front());
+  expect(std::ranges::any_of(releaseLevels, [](const LevelPerformanceEvent* level) { return level->header.tick >= 2; }),
+         "curve command 83 should wait for note release and then continue the table");
+
+  std::vector<u8> resetBytes = fixture({0x88, 0x01, 0x00, 0xde, 80, 0x82});
+  for (u32 step = 0; step < 66; ++step) {
+    writeBytes(resetBytes, 0x2500 + step * 2, {1, 31});
+  }
+  writeBytes(resetBytes, 0x2500 + 132, {0x82, 1, 15, 0x80});
+  const auto resetLevels = events<LevelPerformanceEvent>(render(resetBytes).tracks.front());
+  expect(std::ranges::none_of(resetLevels, [](const LevelPerformanceEvent* level) { return level->header.tick != 0; }),
+         "curve command 82 should restart the table even when it appears beyond offset 82");
+}
+
 void standaloneDurationsRepeatTheCurrentNoteAndGate() {
   const PerformanceSequence repeated = render(fixture({0x60, 0xdf, 0xdf, 0x82}));
   const auto repeatedNotes = events<NotePerformanceEvent>(repeated.tracks.front());
@@ -300,6 +317,7 @@ void runCompileSnesModuleTests() {
   layoutAndModuleUseLiveSongState();
   commandWidthsFollowEachDriverRevision();
   frameCurvesDynamicAdsrAndEchoRenderPhysically();
+  curveControlBytesAreComparedAsCommands();
   standaloneDurationsRepeatTheCurrentNoteAndGate();
   trackAndPercussionFlagsDoNotBecomeStereoPhase();
   monoModeForcesCenterAndIgnoresStereoPhase();

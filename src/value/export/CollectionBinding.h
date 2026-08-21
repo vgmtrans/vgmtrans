@@ -71,6 +71,7 @@ struct RenderedCollection {
 
 // Move-owned preparation shared by playback, ordinary export, and stitching.
 // The canonical rendering remains separate from its export-only projection.
+// Callers invoke each preparation phase at most once on a fresh instance.
 class CollectionWorkspace {
 public:
   CollectionWorkspace(BoundCollection collection, std::vector<Diagnostic> diagnostics);

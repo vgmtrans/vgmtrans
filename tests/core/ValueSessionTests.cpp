@@ -1017,6 +1017,24 @@ void sessionReportsDuplicateDesiredCollectionKeys() {
       project.diagnostics(), "Collection resolver 'ProbeDuplicateKeys' returned duplicate collection key 'same-key'"));
 }
 
+void retainedSourceOwnsStableCopiedBytes() {
+  RetainedSource retained = [] {
+    const std::vector<u8> bytes{0x12, 0x34, 0x56};
+    return RetainedSource::copyOf(ByteReader(SourceId{27}, bytes));
+  }();
+  RetainedSource copied = retained;
+  RetainedSource moved = std::move(retained);
+
+  const ByteReader copiedReader = copied.reader();
+  const ByteReader movedReader = moved.reader();
+  expect(copiedReader.source() == SourceId{27} && copiedReader.size() == 3 && copiedReader.le16(0) == 0x3412 &&
+             copiedReader.range(1, 2) == SourceRange{.source = SourceId{27}, .offset = 1, .size = 2},
+         "a retained-source copy should preserve its source coordinate space after the borrowed bytes expire");
+  expect(movedReader.source() == copiedReader.source() &&
+             std::ranges::equal(movedReader.slice(0, 3), copiedReader.slice(0, 3)),
+         "copying and moving retained sources should continue to share the same immutable bytes");
+}
+
 void sourceStoreRejectsMissingOrRemovedDerivedParents() {
   SourceStore store;
 
@@ -1226,6 +1244,7 @@ void runValueSessionTests() {
   sessionReportsDesiredCollectionMissingAssetReferences();
   sessionReportsDesiredCollectionWrongTypeReferences();
   sessionReportsDuplicateDesiredCollectionKeys();
+  retainedSourceOwnsStableCopiedBytes();
   sourceStoreRejectsMissingOrRemovedDerivedParents();
   sessionStateRebuildsLookupIndexAfterRemoval();
   sessionAddsSourceFromPath();
