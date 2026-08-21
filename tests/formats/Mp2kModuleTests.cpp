@@ -320,14 +320,14 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
   expect(std::ranges::any_of(events,
                              [](const PerformanceEvent& event) {
                                const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
-                               return modulation && modulation->shape &&
-                                      modulation->shape->waveform == LfoWaveform::Triangle &&
-                                      modulation->cyclesPerTick &&
-                                      std::abs(*modulation->cyclesPerTick - 22.0 / 256.0) < 1e-12 &&
-                                      modulation->delayTicks == 3 &&
-                                      modulation->delayUpdateMode == LfoDelayUpdateMode::FutureNotesOnly &&
-                                      !modulation->delayRunsWhileInactive &&
-                                      modulation->initialPhaseCycles == 22.0 / 256.0;
+                               return modulation && modulation->context.shape &&
+                                      modulation->context.shape->waveform == LfoWaveform::Triangle &&
+                                      modulation->context.cyclesPerTick &&
+                                      std::abs(*modulation->context.cyclesPerTick - 22.0 / 256.0) < 1e-12 &&
+                                      modulation->context.delayTicks == 3 &&
+                                      modulation->context.delayUpdateMode == LfoDelayUpdateMode::FutureNotesOnly &&
+                                      !modulation->context.delayRunsWhileInactive &&
+                                      modulation->context.initialPhaseCycles == 22.0 / 256.0;
                              }),
          "MP2k LFO commands should retain the audited pre-incremented phase and note-loaded delay");
   expect(std::ranges::any_of(events,
@@ -335,7 +335,7 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
                                const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
                                return modulation && modulation->target == ModulationPerformanceTarget::TremoloDepth &&
                                       modulation->volumeDepthLinearGain == 16.0 / 128.0 &&
-                                      modulation->tremoloGainMode == TremoloGainMode::BipolarAroundNominal;
+                                      modulation->context.tremoloGainMode == TremoloGainMode::BipolarAroundNominal;
                              }) &&
              std::ranges::any_of(events,
                                  [](const PerformanceEvent& event) {

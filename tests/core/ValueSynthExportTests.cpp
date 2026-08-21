@@ -1065,7 +1065,7 @@ struct PreparedProbeProgramState {
       });
       track.events.emplace_back(ModulationPerformanceEvent{
           .target = ModulationPerformanceTarget::VibratoRate,
-          .frequencyHz = 6.0,
+          .context = LfoPerformanceContext{.frequencyHz = 6.0},
       });
     }
   }

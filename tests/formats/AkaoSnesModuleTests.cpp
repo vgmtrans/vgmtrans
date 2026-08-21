@@ -688,15 +688,17 @@ void akaoSnesV3VibratoPreservesSquareWaveModesAndSteppedAttack() {
     const PerformanceSequence performance = renderVibrato(0, 0x0c, mode.depth);
     expect(performance.diagnostics.empty(), "valid AkaoSnes V3 vibrato should render without diagnostics");
     const ModulationPerformanceEvent* depth = depthEvent(performance);
-    expect(depth != nullptr && depth->shape && depth->shape->waveform == LfoWaveform::Square &&
-               depth->initialPhaseCycles == mode.initialPhase && depth->pitchRangeSemitones &&
-               depth->steppedDepthAttackSteps == 0,
+    expect(depth != nullptr && depth->context.shape && depth->context.shape->waveform == LfoWaveform::Square &&
+               depth->context.initialPhaseCycles == mode.initialPhase && depth->context.pitchRangeSemitones &&
+               depth->context.steppedDepthAttackSteps == 0,
            "AkaoSnes V3 vibrato should retain its square waveform, phase, and packed direction mode");
     expect(
-        (depth->pitchRangeSemitones->minimum < 0.0) == mode.hasDownwardExcursion &&
-            (depth->pitchRangeSemitones->maximum > 0.0) == mode.hasUpwardExcursion && depth->pitchDepthSemitones &&
-            std::abs(*depth->pitchDepthSemitones - std::max(std::abs(depth->pitchRangeSemitones->minimum),
-                                                            std::abs(depth->pitchRangeSemitones->maximum))) < 0.000001,
+        (depth->context.pitchRangeSemitones->minimum < 0.0) == mode.hasDownwardExcursion &&
+            (depth->context.pitchRangeSemitones->maximum > 0.0) == mode.hasUpwardExcursion &&
+            depth->pitchDepthSemitones &&
+            std::abs(*depth->pitchDepthSemitones -
+                     std::max(std::abs(depth->context.pitchRangeSemitones->minimum),
+                              std::abs(depth->context.pitchRangeSemitones->maximum))) < 0.000001,
         "AkaoSnes V3 packed depth modes should retain their full asymmetric pitch endpoints");
 
     const auto rates = eventsOfType<ModulationPerformanceEvent>(performance.tracks.front());
@@ -704,7 +706,8 @@ void akaoSnesV3VibratoPreservesSquareWaveModesAndSteppedAttack() {
       return event->target == ModulationPerformanceTarget::VibratoRate;
     });
     const double expectedRate = akaoSnesFrameRateHz(0x24) / 26.0;
-    expect(rate != rates.end() && (*rate)->frequencyHz && std::abs(*(*rate)->frequencyHz - expectedRate) < 0.000001,
+    expect(rate != rates.end() && (*rate)->context.frequencyHz &&
+               std::abs(*(*rate)->context.frequencyHz - expectedRate) < 0.000001,
            "AkaoSnes V3 vibrato rate should use rate plus one driver frames per held state");
 
     const MidiSequence midi =
@@ -724,7 +727,7 @@ void akaoSnesV3VibratoPreservesSquareWaveModesAndSteppedAttack() {
 
   const PerformanceSequence delayed = renderVibrato(1, 0x1f, 0x7f);
   const ModulationPerformanceEvent* delayedDepth = depthEvent(delayed);
-  expect(delayedDepth != nullptr && delayedDepth->steppedDepthAttackSteps == 4,
+  expect(delayedDepth != nullptr && delayedDepth->context.steppedDepthAttackSteps == 4,
          "a nonzero AkaoSnes V3 delay should configure the four-stage per-note depth attack");
   expect(std::ranges::count_if(delayed.tracks.front().events,
                                [](const PerformanceEvent& event) {
@@ -766,7 +769,7 @@ void akaoSnesV4LfosPreserveDriverFamiliesAndPackedModes() {
     const auto found = std::ranges::find_if(events, [&](const ModulationPerformanceEvent* event) {
       return event->target == target &&
              (depth ? event->pitchDepthSemitones.has_value() || event->volumeDepthLinearGain.has_value()
-                    : event->frequencyHz.has_value());
+                    : event->context.frequencyHz.has_value());
     });
     expect(found != events.end(), "AkaoSnes V4 should emit the requested physical LFO event");
     return *found;
@@ -830,18 +833,21 @@ void akaoSnesV4LfosPreserveDriverFamiliesAndPackedModes() {
     const ModulationPerformanceEvent* tremoloRate =
         modulation(performance, ModulationPerformanceTarget::TremoloRate, false);
 
-    expect(vibratoDepth->shape && vibratoDepth->shape->waveform == test.waveform &&
-               vibratoDepth->polarity == test.polarity && vibratoDepth->initialPhaseCycles == test.initialPhase &&
-               vibratoDepth->steppedDepthAttackSteps == test.attackSteps && vibratoDepth->pitchRangeSemitones &&
+    expect(vibratoDepth->context.shape && vibratoDepth->context.shape->waveform == test.waveform &&
+               vibratoDepth->context.polarity == test.polarity &&
+               vibratoDepth->context.initialPhaseCycles == test.initialPhase &&
+               vibratoDepth->context.steppedDepthAttackSteps == test.attackSteps &&
+               vibratoDepth->context.pitchRangeSemitones &&
                vibratoDepth->pitchDepthSemitones == expected.vibratoDepthSemitones,
            std::string(akaoSnesMinorVersionName(test.profile.minorVersion)) +
                " vibrato should preserve its waveform, packed direction, phase, and attack");
-    expect(tremoloDepth->shape && tremoloDepth->shape->waveform == test.waveform &&
-               tremoloDepth->polarity == test.polarity &&
+    expect(tremoloDepth->context.shape && tremoloDepth->context.shape->waveform == test.waveform &&
+               tremoloDepth->context.polarity == test.polarity &&
                tremoloDepth->volumeDepthLinearGain == expected.tremoloDepthLinearGain &&
                !tremoloDepth->volumeDepthDecibels,
            "AkaoSnes V4 tremolo should use the matching driver waveform and exact signed linear gain");
-    expect(vibratoRate->frequencyHz == expected.rateHertz && tremoloRate->frequencyHz == expected.rateHertz,
+    expect(vibratoRate->context.frequencyHz == expected.rateHertz &&
+               tremoloRate->context.frequencyHz == expected.rateHertz,
            "AkaoSnes V4 LFO rate should follow the selected driver's counter semantics");
 
     const MidiSequence midi =

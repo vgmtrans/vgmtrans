@@ -157,10 +157,11 @@ void modulationDynamicAdsrAndEchoRemainPhysical() {
   const auto panRate = modulationEvents(track, ModulationPerformanceTarget::PanRate);
   expect(performance.diagnostics.empty() && vibratoDepth.size() == 1 && vibratoRate.size() == 1 &&
              vibratoDepth[0]->pitchDepthSemitones && std::abs(*vibratoDepth[0]->pitchDepthSemitones - 1.0) < 0.000001 &&
-             vibratoDepth[0]->delayTicks == 2 && vibratoDepth[0]->shape &&
-             vibratoDepth[0]->shape->samples.size() == 256 && vibratoRate[0]->cyclesPerTick == 0.25 &&
-             panDepth.size() == 1 && panDepth[0]->panDepth == 1.0 && panDepth[0]->shape &&
-             panDepth[0]->shape->samples.size() == 32 && panRate[0]->cyclesPerTick == 0.03125,
+             vibratoDepth[0]->context.delayTicks == 2 && vibratoDepth[0]->context.shape &&
+             vibratoDepth[0]->context.shape->samples.size() == 256 &&
+             vibratoRate[0]->context.cyclesPerTick == 0.25 && panDepth.size() == 1 &&
+             panDepth[0]->panDepth == 1.0 && panDepth[0]->context.shape &&
+             panDepth[0]->context.shape->samples.size() == 32 && panRate[0]->context.cyclesPerTick == 0.03125,
          "vibrato and pan LFO events should retain the driver's integer waveforms, delay, depth, and tick rates");
 
   const auto envelopes = events<EnvelopePerformanceEvent>(track);

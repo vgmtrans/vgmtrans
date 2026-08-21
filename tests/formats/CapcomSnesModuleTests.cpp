@@ -551,7 +551,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
              std::get<ModulationPerformanceEvent>(*vibratoDepth).pitchDepthSemitones == 3.0,
          "CapcomSnes vibrato depth should retain the driver's physical pitch range");
   expect(vibratoRate != performance.tracks[0].events.end() &&
-             std::get<ModulationPerformanceEvent>(*vibratoRate).frequencyHz == 1.953125,
+             std::get<ModulationPerformanceEvent>(*vibratoRate).context.frequencyHz == 1.953125,
          "CapcomSnes vibrato rate should retain the driver's physical LFO frequency");
 
   const MidiSequence simulatedMidi =
@@ -857,9 +857,9 @@ void capcomSnesLfoValuesAreResolvedDuringDecode() {
                  std::get<double>(tremoloDepth->value),
          "CapcomSnes playback should emit the physical tremolo depth resolved by decode");
   const auto& tremoloEvent = std::get<ModulationPerformanceEvent>(*emittedTremolo);
-  expect(tremoloEvent.shape && tremoloEvent.shape->waveform == LfoWaveform::Triangle &&
-             tremoloEvent.initialPhaseCycles == 0.75 && tremoloEvent.phaseRunsAtZeroDepth &&
-             tremoloEvent.tremoloGainMode == TremoloGainMode::NoBoost,
+  expect(tremoloEvent.context.shape && tremoloEvent.context.shape->waveform == LfoWaveform::Triangle &&
+             tremoloEvent.context.initialPhaseCycles == 0.75 && tremoloEvent.context.phaseRunsAtZeroDepth &&
+             tremoloEvent.context.tremoloGainMode == TremoloGainMode::NoBoost,
          "CapcomSnes playback should preserve its trough-first subtractive folded-triangle behavior");
   const auto emittedNote = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<NotePerformanceEvent>(event);
