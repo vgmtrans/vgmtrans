@@ -94,13 +94,7 @@ void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
   };
   TrackProgram track{.startAddress = Address{0}};
   appendTestCommand(track, Address{0}, 0, {}, {}, CommandFlow::fallthroughTo(Address{1}), SourceAnnotationId{20});
-  appendTestCommand(track, Address{1}, 0, {},
-                      {SemanticOperand{
-                          .value = u64{6},
-                          .name = "channel",
-                          .role = SemanticOperandRole::Channel,
-                      }},
-                      CommandFlow::end(Address{2}), SourceAnnotationId{21});
+  appendTestCommand(track, Address{1}, 0, {}, 6u, CommandFlow::end(Address{2}), SourceAnnotationId{21});
   const SequenceProgram program{
       .runtime = runtime,
       .timebase = config.timebase,

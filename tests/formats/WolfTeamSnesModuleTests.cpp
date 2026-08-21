@@ -555,17 +555,6 @@ void streamListsStayOutOfCommandAnnotations() {
 
   const Layout layout = directLateLayout(Variant::TalesOfPhantasia, {0x3000, 0x3040, 0x3080});
   const SequenceParse parsed = decodeSequence(ByteReader(SourceId{190}, bytes), layout, AssetId{190});
-  const auto hasRuntimeTargetOperand = [](const SequenceProgram& program) {
-    return std::ranges::any_of(program.tracks, [](const TrackProgram& track) {
-      return std::ranges::any_of(track.commands, [](const SourceCommand& command) {
-        return std::ranges::any_of(command.operands, [](const SemanticOperand& operand) {
-          const std::string_view name = operand.name;
-          return name.starts_with("phrase_target_") || name.starts_with("segment_target_") ||
-                 name.starts_with("repeat_target_");
-        });
-      });
-    });
-  };
   const auto hasOnlyEndBoundaries = [](const SequenceProgram& program, u8 opcode, size_t expected) {
     const auto& commands = program.tracks.front().commands;
     return std::ranges::count_if(
@@ -574,9 +563,8 @@ void streamListsStayOutOfCommandAnnotations() {
              return command.opcode == opcode && command.semantic != SequenceSemantic::End;
            });
   };
-  expect(validateSequenceProgram(parsed.program).empty() && !hasRuntimeTargetOperand(parsed.program) &&
-             hasOnlyEndBoundaries(parsed.program, 0x91, 3) && parsed.program.runtime.valid() &&
-             parsed.program.tracks.front().startAddress.value == 0x3000,
+  expect(validateSequenceProgram(parsed.program).empty() && hasOnlyEndBoundaries(parsed.program, 0x91, 3) &&
+             parsed.program.runtime.valid() && parsed.program.tracks.front().startAddress.value == 0x3000,
          "phrase ordering belongs to compact track runtime state, while each source boundary remains context-neutral");
 
   std::vector<u8> segmented(kAramSize);
@@ -588,7 +576,6 @@ void streamListsStayOutOfCommandAnnotations() {
   const SequenceParse segmentedParsed =
       decodeSequence(ByteReader(SourceId{191}, segmented), segmentedLayout, AssetId{191});
   expect(validateSequenceProgram(segmentedParsed.program).empty() &&
-             !hasRuntimeTargetOperand(segmentedParsed.program) &&
              hasOnlyEndBoundaries(segmentedParsed.program, 0xfd, 3) && segmentedParsed.program.runtime.valid() &&
              segmentedParsed.program.tracks.front().startAddress.value == 0x3000,
          "segment ordering belongs to compact track runtime state, not control-command annotations");

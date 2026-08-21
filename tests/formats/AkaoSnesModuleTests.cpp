@@ -53,12 +53,13 @@ u8 endOpcode(AkaoSnesProfile profile) {
 }
 
 TrackProgram decodeTrack(const std::vector<u8>& bytes, AkaoSnesProfile profile, u32 start, u32 end, u32 trackNumber = 0,
-                         std::vector<Diagnostic>* diagnostics = nullptr) {
+                         std::vector<Diagnostic>* diagnostics = nullptr, SourceMapBuilder* sourceMap = nullptr) {
   return decodeAkaoSnesSourceTrack(ByteReader(SourceId{8}, bytes), AkaoSnesTrackDecodeOptions{
                                                                        .profile = profile,
                                                                        .sourceTrackNumber = trackNumber,
                                                                        .startAddress = start,
                                                                        .bytecodeEnd = end,
+                                                                       .sourceMap = sourceMap,
                                                                        .diagnostics = diagnostics,
                                                                    });
 }
@@ -326,6 +327,7 @@ void akaoSnesCompilerCursorResolvesRelocatedBranchesWithoutRetainingBytes() {
   writeLe16(breakBytes, start + 2, 0x10);
   breakBytes[start + 4] = 0xec;
   breakBytes[0x40] = 0xec;
+  SourceMapBuilder breakSourceMapBuilder;
   const TrackProgram loopBreak =
       decodeAkaoSnesSourceTrack(ByteReader(SourceId{8}, breakBytes),
                                 AkaoSnesTrackDecodeOptions{
@@ -334,13 +336,12 @@ void akaoSnesCompilerCursorResolvesRelocatedBranchesWithoutRetainingBytes() {
                                     .bytecodeEnd = static_cast<u32>(breakBytes.size()),
                                     .romRelocBase = 0x10,
                                     .apuRelocBase = 0x40,
+                                    .sourceMap = &breakSourceMapBuilder,
                                 });
-  const SemanticOperand* breakTarget = semanticOperand(loopBreak.commands.front(), "destination");
-  const auto* storedBreakTarget =
-      breakTarget == nullptr || !breakTarget->encodedValue ? nullptr : std::get_if<u64>(&*breakTarget->encodedValue);
-  const auto* effectiveBreakTarget = breakTarget == nullptr ? nullptr : std::get_if<Address>(&breakTarget->value);
-  expect(storedBreakTarget != nullptr && *storedBreakTarget == 0x10 && effectiveBreakTarget != nullptr &&
-             effectiveBreakTarget->value == 0x40,
+  const SourceMap breakSourceMap = breakSourceMapBuilder.finish();
+  const SourceAnnotation& breakAnnotation = commandAnnotation(breakSourceMap, loopBreak.commands.front());
+  expect(fieldEquals(fieldWithName(breakAnnotation, "stored_destination"), u64{0x10}) &&
+             fieldEquals(fieldWithName(breakAnnotation, "destination"), u64{0x40}),
          "relocated loop breaks should retain stored targets and execute with effective targets");
 }
 
@@ -403,9 +404,13 @@ void akaoSnesCompilerCursorCoversVersionBoundariesAndDurations() {
     boundaryBytes[start + 3] = 0;
     boundaryBytes[start + 4] = 0;
     boundaryBytes[start + 5] = endOpcode(versionCase.profile);
-    const TrackProgram boundary = decodeTrack(boundaryBytes, versionCase.profile, start, start + 6);
-    expect(boundary.commands.size() >= 2 && semanticOperand(boundary.commands[0], "note_index") != nullptr &&
-               semanticOperand(boundary.commands[1], "note_index") == nullptr,
+    SourceMapBuilder boundarySourceMapBuilder;
+    const TrackProgram boundary =
+        decodeTrack(boundaryBytes, versionCase.profile, start, start + 6, 0, nullptr, &boundarySourceMapBuilder);
+    const SourceMap boundarySourceMap = boundarySourceMapBuilder.finish();
+    expect(boundary.commands.size() >= 2 &&
+               fieldWithName(commandAnnotation(boundarySourceMap, boundary.commands[0]), "note_index") != nullptr &&
+               fieldWithName(commandAnnotation(boundarySourceMap, boundary.commands[1]), "note_index") == nullptr,
            "each AkaoSnes version should switch from status notes to commands at its exact opcode boundary");
   }
 }
@@ -416,12 +421,13 @@ void akaoSnesDynamicAdsrCoversHardwareFields() {
   std::ranges::copy(std::initializer_list<u8>{0xea, 4, 0xeb, 0xff, 0xee, 0xe5, 0xef, 0xf2}, bytes.begin() + start);
 
   const AkaoSnesProfile ff5{.version = AKAOSNES_V3, .minorVersion = AKAOSNES_V3_FF5};
-  const TrackProgram ff5Track = decodeTrack(bytes, ff5, start, start + 8);
-  const SemanticOperand* attackRate = semanticOperand(ff5Track.commands[1], "dsp_attack_rate");
-  const SemanticOperand* sustainRate = semanticOperand(ff5Track.commands[2], "dsp_sustain_rate");
-  expect(attackRate != nullptr && std::get<u64>(attackRate->value) == 15 && sustainRate != nullptr &&
-             std::get<u64>(sustainRate->value) == 5,
-         "FF5 ADSR commands should apply the driver's four- and five-bit rate masks");
+  SourceMapBuilder ff5SourceMapBuilder;
+  const TrackProgram ff5Track = decodeTrack(bytes, ff5, start, start + 8, 0, nullptr, &ff5SourceMapBuilder);
+  const SourceMap ff5SourceMap = ff5SourceMapBuilder.finish();
+  expect(
+      fieldEquals(fieldWithName(commandAnnotation(ff5SourceMap, ff5Track.commands[1]), "dsp_attack_rate"), u64{15}) &&
+          fieldEquals(fieldWithName(commandAnnotation(ff5SourceMap, ff5Track.commands[2]), "dsp_sustain_rate"), u64{5}),
+      "FF5 ADSR commands should apply the driver's four- and five-bit rate masks");
 
   const PerformanceSequence ff5Performance = renderTracks(ff5, {ff5Track});
   const auto instruments = eventsOfType<InstrumentPerformanceEvent>(ff5Performance.tracks.front());
@@ -457,12 +463,16 @@ void akaoSnesDynamicAdsrCoversHardwareFields() {
   std::ranges::copy(std::initializer_list<u8>{0xdc, 4, 0xdd, 0xff, 0xde, 0xfe, 0xdf, 0xfd, 0xe0, 0xe5, 0xe1, 0xec},
                     ff6Bytes.begin() + start);
   const AkaoSnesProfile ff6{.version = AKAOSNES_V4, .minorVersion = AKAOSNES_V4_FF6};
-  const TrackProgram ff6Track = decodeTrack(ff6Bytes, ff6, start, start + 12);
-  expect(std::get<u64>(semanticOperand(ff6Track.commands[1], "dsp_attack_rate")->value) == 15 &&
-             std::get<u64>(semanticOperand(ff6Track.commands[2], "dsp_decay_rate")->value) == 6 &&
-             std::get<u64>(semanticOperand(ff6Track.commands[3], "dsp_sustain_level")->value) == 5 &&
-             std::get<u64>(semanticOperand(ff6Track.commands[4], "dsp_sustain_rate")->value) == 5,
-         "FF6 ADSR commands should apply the DSP field masks");
+  SourceMapBuilder ff6SourceMapBuilder;
+  const TrackProgram ff6Track = decodeTrack(ff6Bytes, ff6, start, start + 12, 0, nullptr, &ff6SourceMapBuilder);
+  const SourceMap ff6SourceMap = ff6SourceMapBuilder.finish();
+  expect(
+      fieldEquals(fieldWithName(commandAnnotation(ff6SourceMap, ff6Track.commands[1]), "dsp_attack_rate"), u64{15}) &&
+          fieldEquals(fieldWithName(commandAnnotation(ff6SourceMap, ff6Track.commands[2]), "dsp_decay_rate"), u64{6}) &&
+          fieldEquals(fieldWithName(commandAnnotation(ff6SourceMap, ff6Track.commands[3]), "dsp_sustain_level"),
+                      u64{5}) &&
+          fieldEquals(fieldWithName(commandAnnotation(ff6SourceMap, ff6Track.commands[4]), "dsp_sustain_rate"), u64{5}),
+      "FF6 ADSR commands should apply the DSP field masks");
 
   const PerformanceSequence ff6Performance = renderTracks(ff6, {ff6Track});
   const auto ff6Envelopes = eventsOfType<EnvelopePerformanceEvent>(ff6Performance.tracks.front());
@@ -974,11 +984,13 @@ void akaoSnesCompilerCursorCoversLoopsAndCpuBranches() {
   cpuBranch[start + 4] = 0xec;
   cpuBranch[0x30] = 0x0d;
   cpuBranch[0x31] = 0xec;
-  const TrackProgram branch = decodeTrack(cpuBranch, profile, start, static_cast<u32>(cpuBranch.size()));
+  SourceMapBuilder branchSourceMapBuilder;
+  const TrackProgram branch =
+      decodeTrack(cpuBranch, profile, start, static_cast<u32>(cpuBranch.size()), 0, nullptr, &branchSourceMapBuilder);
+  const SourceMap branchSourceMap = branchSourceMapBuilder.finish();
   expect(branch.commands.size() == 5 && branch.commands.front().flow.discoveryContinuation() &&
              branch.commands.front().flow.continuation.value == 0x23 &&
-             branch.commands.front().flow.additionalTargets.size() == 1 &&
-             branch.commands.front().flow.additionalTargets.front().value == 0x30,
+             hasLinkRole(commandAnnotation(branchSourceMap, branch.commands.front()), SourceLinkRole::JumpTarget),
          "CPU-controlled AkaoSnes jumps should retain both indeterminate fallthrough and branch blocks");
 }
 
@@ -1087,9 +1099,6 @@ void akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo() {
   std::vector<u8> offThenEnd = envelopeBytes(0xe6);
   offThenEnd[start + 6] = 0xf1;
   TrackProgram offThenEndTrack = decodeTrack(offThenEnd, ff4, start, start + 7);
-  const SemanticOperand* envelopeOff = semanticOperand(offThenEndTrack.commands[2], "pitch_envelope_off");
-  expect(envelopeOff != nullptr && std::get<bool>(envelopeOff->value),
-         "pitch-envelope-off should carry an explicit semantic marker for source-free boundary analysis");
   const PerformanceSequence terminalEnvelope = renderTracks(ff4, {std::move(offThenEndTrack)});
   const auto terminalBends = eventsOfType<PitchBendPerformanceEvent>(terminalEnvelope.tracks.front());
   expect(

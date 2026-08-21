@@ -846,9 +846,7 @@ struct ProgramState {
           terminalPitchBoundaries.insert(fallthrough.value);
           continue;
         }
-        const SemanticOperand* envelopeOff = semanticOperand(next, "pitch_envelope_off");
-        const bool* clearsEnvelope = envelopeOff == nullptr ? nullptr : std::get_if<bool>(&envelopeOff->value);
-        if (clearsEnvelope == nullptr || !*clearsEnvelope) {
+        if (eventType(profile.version, profile.minorVersion, next.opcode) != EventType::PitchEnvelopeOff) {
           continue;
         }
         const Address afterOff = next.flow.continuation;
@@ -1738,7 +1736,6 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
     }
     case EventType::PitchEnvelopeOff: {
       auto event = cursor.command("Pitch Envelope Off", SequenceSemantic::Pitch);
-      event.derived("pitch_envelope_off", true, SemanticOperandRole::State);
       return event.invoke([](Playback& playback) {
         playback.track.pitchEnvelope = {};
         playback.track.pitchEnvelopeAutomation.clear();

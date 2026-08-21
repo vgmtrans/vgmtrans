@@ -1111,10 +1111,6 @@ void ndsSequenceAnnotatesModulationDelayOperands() {
          "NDS modulation delay should stay annotated as its source-driver command");
   expect(command.range.size == 3 && command.execution.valid(),
          "NDS modulation delay should retain executable playback behavior");
-  const SemanticOperand* delay = semanticOperand(command, "delay");
-  expect(delay != nullptr && std::get<u64>(delay->value) == 0x3412,
-         "NDS modulation delay should retain its little-endian operand");
-
   const SourceField* delayField = fieldWithName(commandAnnotation(annotations, command), "delay");
   expect(fieldEquals(delayField, u64{0x3412}),
          "NDS modulation delay should preserve its operand as source annotation data");

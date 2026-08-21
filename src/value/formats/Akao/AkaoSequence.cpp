@@ -880,20 +880,9 @@ SequenceRuntime akaoSequenceRuntime() {
   return makeCompiledRuntime<AkaoCursor>();
 }
 
-TrackProgram decodeAkaoTrack(AkaoPs1Version version, const TrackDecodeScope& tracks, u32 trackIndex, u32 startOffset,
-                             std::vector<Diagnostic>* diagnostics) {
-  RepeatStack repeats;
-  const AkaoProfile profile{.version = version};
-  const u32 bytecodeEnd = tracks.bytecodeEnd == std::numeric_limits<u32>::max() ? static_cast<u32>(tracks.reader.size())
-                                                                                : tracks.bytecodeEnd;
-  const auto command = [&](u32 offset) {
-    return decodeCommand(tracks.reader, offset, bytecodeEnd, profile, repeats, diagnostics);
-  };
-  return tracks.decode(trackIndex, startOffset, command);
-}
+namespace {
 
-AkaoSequenceReferences akaoSequenceReferences(const TrackProgram& track) {
-  AkaoSequenceReferences references;
+void collectReferences(const DecodedBytecodeCommand& command, AkaoSequenceReferences& references) {
   const auto unsignedValue = [](const SemanticOperand& operand) -> std::optional<u32> {
     u64 value = 0;
     if (const auto* address = std::get_if<Address>(&operand.value)) {
@@ -903,63 +892,63 @@ AkaoSequenceReferences akaoSequenceReferences(const TrackProgram& track) {
     } else {
       return std::nullopt;
     }
-    if (value > std::numeric_limits<u32>::max()) {
-      return std::nullopt;
-    }
-    return static_cast<u32>(value);
+    return value <= std::numeric_limits<u32>::max() ? std::optional{static_cast<u32>(value)} : std::nullopt;
   };
 
-  for (const auto& command : track.commands) {
-    std::optional<u32> bank;
-    std::optional<u32> instrumentTable;
-    std::vector<u32> programs;
-    for (const auto& operand : command.operands) {
-      const auto value = unsignedValue(operand);
-      if (!value) {
-        continue;
-      }
-      switch (operand.role) {
-        case SemanticOperandRole::InstrumentBank:
-          bank = *value;
-          break;
-        case SemanticOperandRole::InstrumentTablePointer:
-          instrumentTable = *value;
-          break;
-        case SemanticOperandRole::InstrumentProgram:
-          programs.push_back(*value);
-          break;
-        default:
-          break;
-      }
-    }
-
-    if (instrumentTable) {
-      if (bank == 127) {
-        references.drumInstrumentTableOffsets.insert(*instrumentTable);
-      } else {
-        references.customInstrumentTableOffsets.insert(*instrumentTable);
-      }
-    }
-
-    if (bank != 0) {
+  std::optional<u32> bank;
+  std::optional<u32> instrumentTable;
+  std::vector<u32> programs;
+  for (const auto& operand : command.operands) {
+    const auto value = unsignedValue(operand);
+    if (!value) {
       continue;
     }
-    for (const u32 articulation : programs) {
-      references.usesIndividualArticulations = true;
-      if (articulation != 0) {
-        references.individualArticulationIds.insert(articulation);
-      }
+    switch (operand.role) {
+      case SemanticOperandRole::InstrumentBank:
+        bank = *value;
+        break;
+      case SemanticOperandRole::InstrumentTablePointer:
+        instrumentTable = *value;
+        break;
+      case SemanticOperandRole::InstrumentProgram:
+        programs.push_back(*value);
+        break;
+      default:
+        break;
     }
   }
-  return references;
+
+  if (instrumentTable) {
+    (bank == 127 ? references.drumInstrumentTableOffsets : references.customInstrumentTableOffsets)
+        .insert(*instrumentTable);
+  }
+  if (bank != 0) {
+    return;
+  }
+  references.usesIndividualArticulations = true;
+  for (const u32 articulation : programs) {
+    if (articulation != 0) {
+      references.individualArticulationIds.insert(articulation);
+    }
+  }
 }
 
-void AkaoSequenceReferences::merge(const AkaoSequenceReferences& other) {
-  customInstrumentTableOffsets.insert(other.customInstrumentTableOffsets.begin(),
-                                      other.customInstrumentTableOffsets.end());
-  drumInstrumentTableOffsets.insert(other.drumInstrumentTableOffsets.begin(), other.drumInstrumentTableOffsets.end());
-  individualArticulationIds.insert(other.individualArticulationIds.begin(), other.individualArticulationIds.end());
-  usesIndividualArticulations = usesIndividualArticulations || other.usesIndividualArticulations;
+}  // namespace
+
+TrackProgram decodeAkaoTrack(AkaoPs1Version version, const TrackDecodeScope& tracks, u32 trackIndex, u32 startOffset,
+                             std::vector<Diagnostic>* diagnostics, AkaoSequenceReferences* references) {
+  RepeatStack repeats;
+  const AkaoProfile profile{.version = version};
+  const u32 bytecodeEnd = tracks.bytecodeEnd == std::numeric_limits<u32>::max() ? static_cast<u32>(tracks.reader.size())
+                                                                                : tracks.bytecodeEnd;
+  const auto command = [&](u32 offset) {
+    auto decoded = decodeCommand(tracks.reader, offset, bytecodeEnd, profile, repeats, diagnostics);
+    if (references != nullptr) {
+      collectReferences(decoded, *references);
+    }
+    return decoded;
+  };
+  return tracks.decode(trackIndex, startOffset, command);
 }
 
 // The layout is deliberately read before a draft is created. From this point
@@ -999,10 +988,9 @@ AkaoSequenceParse parseAkaoSequence(const ScanInput& input, AssetId id, const Ak
       .sourceMap = sourceMap,
   };
   for (u32 trackIndex = 0; trackIndex < layout.trackAddresses.size(); ++trackIndex) {
-    auto track =
-        decodeAkaoTrack(analysis.header.version, tracks, trackIndex, layout.trackAddresses[trackIndex], diagnostics);
+    auto track = decodeAkaoTrack(analysis.header.version, tracks, trackIndex, layout.trackAddresses[trackIndex],
+                                 diagnostics, &analysis.references);
     track.sourceTrackNumber = trackIndex;
-    analysis.references.merge(akaoSequenceReferences(track));
     program.tracks.push_back(std::move(track));
   }
   program.runtime = akaoSequenceRuntime();

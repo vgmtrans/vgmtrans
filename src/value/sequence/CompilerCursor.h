@@ -435,6 +435,7 @@ public:
     Event& ignore() {
       execution_ = {};
       flow_ = {};
+      discoveryTargets_.clear();
       hasDefaultTransition_ = false;
       presentation_.playback = initialPlayback_;
       return *this;
@@ -623,14 +624,14 @@ public:
     Event& repeatUntil(::u8 slot, u32 totalPlays, Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       append<&detail::repeatUntil<Playback>>(slot, totalPlays, destination);
-      flow_.additionalTargets.push_back(destination);
+      discoveryTargets_.push_back(destination);
       return *this;
     }
 
     Event& repeatBreak(::u8 slot, Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       append<&detail::repeatBreak<Playback>>(slot, destination);
-      flow_.additionalTargets.push_back(destination);
+      discoveryTargets_.push_back(destination);
       return *this;
     }
 
@@ -638,14 +639,14 @@ public:
     // decides at runtime whether the branch is taken.
     Event& mayBranchTo(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      flow_.additionalTargets.push_back(destination);
+      discoveryTargets_.push_back(destination);
       return *this;
     }
 
     // Records a decoder-only alternative that is not the command's default path.
     Event& discoverTarget(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      flow_.additionalTargets.push_back(destination);
+      discoveryTargets_.push_back(destination);
       return *this;
     }
 
@@ -714,7 +715,8 @@ public:
         throw std::logic_error("Compiler cursor event was finalized more than once");
       }
       finished_ = true;
-      return cursor_.finish(std::move(presentation_), std::move(execution_), std::move(flow_));
+      return cursor_.finish(std::move(presentation_), std::move(execution_), std::move(flow_),
+                            std::move(discoveryTargets_));
     }
 
     CompilerCursor& cursor_;
@@ -722,6 +724,7 @@ public:
     CommandPlaybackStatus initialPlayback_;
     CommandExecution execution_;
     CommandFlow flow_;
+    std::vector<Address> discoveryTargets_;
     bool hasDefaultTransition_ = false;
     bool finished_ = false;
   };
@@ -783,7 +786,7 @@ public:
   }
 
   [[nodiscard]] DecodedBytecodeCommand truncated() {
-    return finish(truncatedPresentation(), {}, CommandFlow::end(Address{record_.position()}));
+    return finish(truncatedPresentation(), {}, CommandFlow::end(Address{record_.position()}), {});
   }
 
 private:
@@ -828,19 +831,21 @@ private:
   }
 
   [[nodiscard]] DecodedBytecodeCommand finish(DecodedCommandPresentation presentation, CommandExecution execution,
-                                              CommandFlow flow) {
+                                              CommandFlow flow, std::vector<Address> discoveryTargets) {
     const bool truncated = !record_.ok();
     flow.continuation = Address{record_.position()};
     if (truncated) {
       presentation = truncatedPresentation();
       execution = {};
       flow = CommandFlow::end(Address{record_.position()});
+      discoveryTargets.clear();
     }
 
     return DecodedBytecodeCommand{
         .range = record_.range(),
         .opcode = opcode_,
         .flow = std::move(flow),
+        .discoveryTargets = std::move(discoveryTargets),
         .operands = std::move(operands_),
         .execution = std::move(execution),
         .presentation = std::move(presentation),

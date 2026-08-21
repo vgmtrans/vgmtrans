@@ -35,32 +35,6 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
       report.error("sequence.track.missing-start",
                    "Sequence track start address did not reference a decoded command");
     }
-
-    // Operand names are unique and source-bounded. Names deliberately serve as
-    // identity so format code does not maintain a second numeric operand
-    // vocabulary solely for execution.
-    for (const auto& command : track.commands) {
-      std::unordered_set<std::string> operandNames;
-      operandNames.reserve(command.operands.size());
-      for (const auto& operand : command.operands) {
-        if (operand.name.empty() || !operandNames.insert(operand.name).second) {
-          report.error("sequence.command.operand-name",
-                       "Semantic sequence command had a missing or duplicate operand name",
-                       command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
-        }
-        if (operand.encodedValue && !operand.range.valid()) {
-          report.error("sequence.command.operand-encoded-range",
-                       "Semantic operand retained an encoded value without a source range",
-                       command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
-        }
-        if (operand.range.valid() && command.range.valid() &&
-            (operand.range.source != command.range.source || operand.range.offset < command.range.offset ||
-             operand.range.endOffset() > command.range.endOffset())) {
-          report.error("sequence.command.operand-range", "Semantic operand range was outside its command range",
-                       operand.range);
-        }
-      }
-    }
   }
 
   if (program.sectionPlaylist) {

@@ -53,16 +53,16 @@ std::string snapshotNumber(double value) {
   return out.str();
 }
 
-std::string semanticValueSnapshot(const SemanticOperandValue& value) {
+std::string sourceValueSnapshot(const SourceValue& value) {
   return std::visit(
       [](const auto& typedValue) {
         using T = std::decay_t<decltype(typedValue)>;
-        if constexpr (std::is_same_v<T, bool>) {
+        if constexpr (std::is_same_v<T, std::monostate>) {
+          return std::string{};
+        } else if constexpr (std::is_same_v<T, bool>) {
           return std::string(typedValue ? "true" : "false");
         } else if constexpr (std::is_same_v<T, std::string>) {
           return typedValue;
-        } else if constexpr (std::is_same_v<T, Address>) {
-          return "@" + hexAddress(typedValue.value);
         } else if constexpr (std::is_same_v<T, double>) {
           return snapshotNumber(typedValue);
         } else {
@@ -72,7 +72,7 @@ std::string semanticValueSnapshot(const SemanticOperandValue& value) {
       value);
 }
 
-std::string decodedTrackSnapshot(const TrackProgram& track) {
+std::string decodedTrackSnapshot(const TrackProgram& track, const SourceMap& sourceMap) {
   std::string snapshot;
   for (const auto& command : track.commands) {
     if (!snapshot.empty()) {
@@ -80,10 +80,9 @@ std::string decodedTrackSnapshot(const TrackProgram& track) {
     }
     snapshot += hexAddress(command.address.value) + ':' + std::to_string(command.opcode) + ':' +
                 std::to_string(command.range.size);
-    for (const auto& operand : command.operands) {
-      snapshot += ',' + operand.name + '=' + semanticValueSnapshot(operand.value);
-      if (operand.encodedValue) {
-        snapshot += '<' + semanticValueSnapshot(*operand.encodedValue) + '>';
+    for (const SourceField& field : commandAnnotation(sourceMap, command).fields) {
+      if (field.name != "opcode") {
+        snapshot += ',' + field.name + '=' + sourceValueSnapshot(field.value);
       }
     }
     const auto kind = static_cast<int>(command.flow.defaultTransition.kind);
@@ -91,7 +90,9 @@ std::string decodedTrackSnapshot(const TrackProgram& track) {
     if (command.flow.discoveryContinuation()) {
       snapshot += "->" + hexAddress(command.flow.continuation.value);
     }
-    command.flow.forEachDiscoveryTarget([&](Address target) { snapshot += "=>" + hexAddress(target.value); });
+    if (const auto target = command.flow.defaultDestination()) {
+      snapshot += "=>" + hexAddress(target->value);
+    }
   }
   return snapshot;
 }
@@ -387,15 +388,14 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
            "track should decode command " + std::to_string(index));
   }
   expect(firstTrack.commands[0].opcode == 0x05, "CapcomSnes tempo should be a compiled command with source metadata");
-  const SemanticOperand* tempo = semanticOperand(firstTrack.commands[0], "tempo");
+  const SourceAnnotation& tempoCommandAnnotation = commandAnnotation(project.sourceMap(), firstTrack.commands[0]);
+  const SourceField* tempo = fieldWithName(tempoCommandAnnotation, "tempo");
+  const SourceField* rawTempo = fieldWithName(tempoCommandAnnotation, "raw");
   expect(tempo != nullptr && std::abs(std::get<double>(tempo->value) - 1422.10424024) < 0.000001 &&
-             tempo->display == SourceValueDisplay::BeatsPerMinute && tempo->encodedValue &&
-             std::get<u64>(*tempo->encodedValue) == 0x1234,
+             tempo->display == SourceValueDisplay::BeatsPerMinute && fieldEquals(rawTempo, u64{0x1234}),
          "tempo command should retain readable BPM and its encoded value");
-  expect(tempo->name == "tempo" && tempo->encodedName == "raw",
-         "semantic operands should retain generic SourceMap presentation metadata");
-  expect(tempo->range.offset == 0x3001 && tempo->range.size == 2,
-         "typed operands should retain their exact source range");
+  expect(rawTempo != nullptr && rawTempo->range.offset == 0x3001 && rawTempo->range.size == 2,
+         "projected command fields should retain their exact source range");
   expect(
       firstTrack.commands[0].flow.discoveryContinuation() && firstTrack.commands[0].flow.continuation.value == 0x3003,
       "semantic commands should retain decode-time control flow");
@@ -740,15 +740,20 @@ void capcomSnesCompiledAndPerformanceSnapshotsAreStable() {
   const auto bytes = makeCapcomSnesAram();
   constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
   const auto& config = capcomSnesSequenceConfig();
+  SourceMapBuilder sourceMapBuilder;
   const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{7}, bytes), version,
-                                                         CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
-  const std::string decoded = decodedTrackSnapshot(track);
-  constexpr std::string_view expectedDecoded = "3000:5:3,tempo=1422.10424<4660>,flow=0->3003|"
+                                                         CapcomSnesTrackDecodeOptions{
+                                                             .startOffset = 0x3000,
+                                                             .sourceMap = &sourceMapBuilder,
+                                                         });
+  const SourceMap sourceMap = sourceMapBuilder.finish();
+  const std::string decoded = decodedTrackSnapshot(track, sourceMap);
+  constexpr std::string_view expectedDecoded = "3000:5:3,raw=4660,tempo=1422.10424,flow=0->3003|"
                                                "3003:8:2,instrument=0,flow=0->3005|"
-                                               "3005:7:2,linear_gain=0.403921569<64>,flow=0->3007|"
-                                               "3007:24:2,left_gain=0.6328125<0>,right_gain=0.6328125,flow=0->3009|"
-                                               "3009:26:3,type=0,pitch_depth_semitones=3<32>,flow=0->300C|"
-                                               "300C:26:3,type=2,phase_advancing=true<32>,frequency_hz=1.953125,"
+                                               "3005:7:2,raw=64,linear_gain=0.403921569,flow=0->3007|"
+                                               "3007:24:2,raw=0,left_gain=0.6328125,right_gain=0.6328125,flow=0->3009|"
+                                               "3009:26:3,type=0,value=32,pitch_depth_semitones=3,flow=0->300C|"
+                                               "300C:26:3,type=2,value=32,phase_advancing=true,frequency_hz=1.953125,"
                                                "tremolo_frequency_hz=3.90625,flow=0->300F|"
                                                "300F:65:1,duration_index=2,key_index=1,flow=0->3010|"
                                                "3010:23:1,flow=4";
@@ -786,41 +791,51 @@ void capcomSnesLfoValuesAreResolvedDuringDecode() {
   bytes[0x300d] = 0x17;
 
   constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
+  SourceMapBuilder sourceMapBuilder;
   const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version,
-                                                         CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
+                                                         CapcomSnesTrackDecodeOptions{
+                                                             .startOffset = 0x3000,
+                                                             .sourceMap = &sourceMapBuilder,
+                                                         });
+  const SourceMap sourceMap = sourceMapBuilder.finish();
   expect(track.commands.size() == 6, "CapcomSnes LFO fixture should decode four parameters, a note, and end");
 
-  const SemanticOperand* vibratoDepth = semanticOperand(track.commands[0], "pitch_depth_semitones");
-  expect(vibratoDepth != nullptr && std::get<double>(vibratoDepth->value) == 3.0 &&
-             vibratoDepth->encodedName == "value" && vibratoDepth->encodedValue &&
-             std::get<u64>(*vibratoDepth->encodedValue) == 0xa0,
+  const auto field = [&](size_t command, std::string_view name) {
+    return fieldWithName(commandAnnotation(sourceMap, track.commands[command]), name);
+  };
+  const SourceField* vibratoDepth = field(0, "pitch_depth_semitones");
+  expect(fieldEquals(vibratoDepth, 3.0) && fieldEquals(field(0, "value"), u64{0xa0}),
          "CapcomSnes vibrato decode should retain raw depth and resolve its physical pitch range");
 
-  const SemanticOperand* tremoloDepth = semanticOperand(track.commands[1], "depth_decibels");
+  const SourceField* tremoloDepth = field(1, "depth_decibels");
   const double expectedHalfDepthDecibels = 10.0 * std::log10(250.0 / 106.0);
   expect(tremoloDepth != nullptr &&
              std::abs(std::get<double>(tremoloDepth->value) - expectedHalfDepthDecibels) < 0.000001 &&
-             tremoloDepth->encodedName == "value" && tremoloDepth->encodedValue &&
-             std::get<u64>(*tremoloDepth->encodedValue) == 0x3c,
+             fieldEquals(field(1, "value"), u64{0x3c}),
          "CapcomSnes tremolo decode should retain half the driver's peak-to-trough attenuation for a bipolar LFO");
 
+  SourceMapBuilder version1SourceMapBuilder;
   const TrackProgram version1Track =
       decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), CapcomSnesEngineVersion::v1BgmInList,
-                                  CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
-  const SemanticOperand* version1TremoloDepth = semanticOperand(version1Track.commands[1], "depth_decibels");
+                                  CapcomSnesTrackDecodeOptions{
+                                      .startOffset = 0x3000,
+                                      .sourceMap = &version1SourceMapBuilder,
+                                  });
+  const SourceMap version1SourceMap = version1SourceMapBuilder.finish();
+  const SourceField* version1TremoloDepth =
+      fieldWithName(commandAnnotation(version1SourceMap, version1Track.commands[1]), "depth_decibels");
   expect(version1TremoloDepth != nullptr &&
              std::get<double>(version1TremoloDepth->value) != std::get<double>(tremoloDepth->value),
          "CapcomSnes tremolo should resolve version-dependent driver math during decode");
 
-  const SemanticOperand* phaseAdvancing = semanticOperand(track.commands[2], "phase_advancing");
-  const SemanticOperand* frequency = semanticOperand(track.commands[2], "frequency_hz");
-  const SemanticOperand* tremoloFrequency = semanticOperand(track.commands[2], "tremolo_frequency_hz");
-  expect(phaseAdvancing != nullptr && std::get<bool>(phaseAdvancing->value) && phaseAdvancing->encodedName == "value" &&
-             phaseAdvancing->encodedValue && std::get<u64>(*phaseAdvancing->encodedValue) == 0x20 &&
-             frequency != nullptr && std::get<double>(frequency->value) == 1.953125 && tremoloFrequency != nullptr &&
-             std::get<double>(tremoloFrequency->value) == 3.90625,
+  const SourceField* phaseAdvancing = field(2, "phase_advancing");
+  const SourceField* frequency = field(2, "frequency_hz");
+  const SourceField* tremoloFrequency = field(2, "tremolo_frequency_hz");
+  expect(phaseAdvancing != nullptr && std::get<bool>(phaseAdvancing->value) &&
+             fieldEquals(field(2, "value"), u64{0x20}) && fieldEquals(frequency, 1.953125) &&
+             fieldEquals(tremoloFrequency, 3.90625),
          "CapcomSnes LFO rate decode should resolve phase motion and physical target frequencies");
-  const SemanticOperand* resetPhase = semanticOperand(track.commands[3], "reset_phase_on_note");
+  const SourceField* resetPhase = field(3, "reset_phase_on_note");
   expect(resetPhase != nullptr && !std::get<bool>(resetPhase->value),
          "CapcomSnes selector 3 should decode the per-note phase-reset flag");
 
@@ -1345,15 +1360,21 @@ void capcomSnesReleaseRateIsStickyAcrossInstrumentChanges() {
 
   constexpr auto version = CapcomSnesEngineVersion::v3BgmFixedLocation;
   const SequenceProgramConfig& config = capcomSnesSequenceConfig();
+  SourceMapBuilder sourceMapBuilder;
   const TrackProgram track = decodeCapcomSnesSourceTrack(ByteReader(SourceId{8}, bytes), version,
-                                                         CapcomSnesTrackDecodeOptions{.startOffset = 0x3000});
+                                                         CapcomSnesTrackDecodeOptions{
+                                                             .startOffset = 0x3000,
+                                                             .sourceMap = &sourceMapBuilder,
+                                                         });
+  const SourceMap sourceMap = sourceMapBuilder.finish();
   expect(track.commands.size() == 6 && track.commands.front().semantic == SequenceSemantic::Envelope &&
              track.commands.front().range.size == 2 && track.commands.front().execution.valid(),
          "CapcomSnes $1D should decode as an executable two-byte envelope command");
-  const SemanticOperand* gain = semanticOperand(track.commands.front(), "gain");
-  const SemanticOperand* releaseSeconds = semanticOperand(track.commands.front(), "release_seconds");
+  const SourceAnnotation& releaseAnnotation = commandAnnotation(sourceMap, track.commands.front());
+  const SourceField* gain = fieldWithName(releaseAnnotation, "gain");
+  const SourceField* releaseSeconds = fieldWithName(releaseAnnotation, "release_seconds");
   const double expectedReleaseSeconds = snesDspGainEnvelopeSeconds(0xb0, 0x7ff, 0);
-  expect(gain != nullptr && std::get<u64>(gain->value) == 0xb0 && releaseSeconds != nullptr &&
+  expect(fieldEquals(gain, u64{0xb0}) && releaseSeconds != nullptr &&
              std::abs(std::get<double>(releaseSeconds->value) - expectedReleaseSeconds) < 0.000001,
          "CapcomSnes $1D should expose the driver's OR-$A0 GAIN byte and its physical release time");
 

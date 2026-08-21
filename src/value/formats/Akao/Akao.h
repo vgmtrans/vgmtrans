@@ -114,8 +114,6 @@ struct AkaoSequenceReferences {
   std::set<u32> drumInstrumentTableOffsets;
   std::set<u32> individualArticulationIds;
   bool usesIndividualArticulations = false;
-
-  void merge(const AkaoSequenceReferences& other);
 };
 
 struct AkaoSequenceAnalysis {
@@ -207,8 +205,8 @@ struct AkaoSplitSampleLocation {
 [[nodiscard]] core::SequenceRuntime akaoSequenceRuntime();
 [[nodiscard]] core::TrackProgram decodeAkaoTrack(AkaoPs1Version version, const core::TrackDecodeScope& tracks,
                                                  u32 trackIndex, u32 startOffset,
-                                                 std::vector<core::Diagnostic>* diagnostics = nullptr);
-[[nodiscard]] AkaoSequenceReferences akaoSequenceReferences(const core::TrackProgram& track);
+                                                 std::vector<core::Diagnostic>* diagnostics = nullptr,
+                                                 AkaoSequenceReferences* references = nullptr);
 [[nodiscard]] std::optional<AkaoSequenceLayout> readAkaoSequenceLayout(const core::ScanInput& input, u32 offset);
 [[nodiscard]] AkaoSequenceParse parseAkaoSequence(const core::ScanInput& input, core::AssetId id,
                                                   const AkaoSequenceLayout& layout,

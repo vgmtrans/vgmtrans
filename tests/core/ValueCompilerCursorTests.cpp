@@ -212,6 +212,14 @@ SequenceRuntime compilerProbeRuntime() {
   return makeCompiledRuntime<ProbeCursor, CompilerProbeProgramState>();
 }
 
+bool hasLinkRole(const SourceAnnotation& annotation, SourceLinkRole role) {
+  return std::ranges::any_of(annotation.links, [role](const SourceLink& link) { return link.role == role; });
+}
+
+bool hasField(const SourceAnnotation& annotation, std::string_view name) {
+  return std::ranges::any_of(annotation.fields, [name](const SourceField& field) { return field.name == name; });
+}
+
 TrackProgram decodeProbeTrack(ByteReader reader, u32 end, SourceMapBuilder* sourceMap = nullptr,
                               std::vector<Diagnostic>* diagnostics = nullptr) {
   const TrackDecodeScope tracks{
@@ -299,11 +307,9 @@ void compilerCursorCompilesControlFlow() {
              jumpAnnotation.playbackStatus == CommandPlaybackStatus::AffectsControlFlow &&
              returnAnnotation.playbackStatus == CommandPlaybackStatus::AffectsControlFlow,
          "compiler-cursor flow operations should annotate their playback status automatically");
-  const SemanticOperand* callDestination = semanticOperand(track.commands[0], "destination");
-  const SemanticOperand* jumpDestination = semanticOperand(track.commands[2], "destination");
-  expect(callDestination != nullptr && callDestination->role == SemanticOperandRole::CallTarget &&
-             jumpDestination != nullptr && jumpDestination->role == SemanticOperandRole::JumpTarget,
-         "target roles declared at operand creation should remain attached to the exact operands");
+  expect(hasLinkRole(callAnnotation, SourceLinkRole::CallTarget) &&
+             hasLinkRole(jumpAnnotation, SourceLinkRole::JumpTarget),
+         "target roles declared at operand creation should project to the matching source links");
 
   const SequenceProgramConfig config = compilerProbeConfig();
   const SequenceProgram program{
@@ -326,11 +332,12 @@ void compilerCursorCompilesRepeatsAndConditionalFields() {
       0x61, 0x00, 0x02, 0x00, 0x00,  // play twice from address zero
       0xff,
   };
-  const TrackProgram track =
-      decodeProbeTrack(ByteReader(SourceId{9}, repeatBytes), static_cast<u32>(repeatBytes.size()));
-  const SemanticOperand* repeatDestination = semanticOperand(track.commands[1], "destination");
-  expect(repeatDestination != nullptr && repeatDestination->role == SemanticOperandRole::RepeatTarget,
-         "compiled repeats should annotate their destination without a duplicate read-time role");
+  SourceMapBuilder repeatSourceMapBuilder;
+  const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{9}, repeatBytes),
+                                              static_cast<u32>(repeatBytes.size()), &repeatSourceMapBuilder);
+  const SourceMap repeatSourceMap = repeatSourceMapBuilder.finish();
+  expect(hasLinkRole(repeatSourceMap.get(track.commands[1].annotation), SourceLinkRole::RepeatTarget),
+         "compiled repeats should project their destination to a repeat source link");
   const SequenceProgramConfig config = compilerProbeConfig();
   const SequenceProgram program{
       .runtime = compilerProbeRuntime(),
@@ -343,9 +350,14 @@ void compilerCursorCompilesRepeatsAndConditionalFields() {
          "compiled counted repeat should replay through shared VM state");
 
   const std::vector<u8> conditionalBytes{0x70, 0x01, 0x12, 0x34, 0xff};
+  SourceMapBuilder conditionalSourceMapBuilder;
   const TrackProgram conditional =
-      decodeProbeTrack(ByteReader(SourceId{10}, conditionalBytes), static_cast<u32>(conditionalBytes.size()));
-  expect(conditional.commands[0].operands.size() == 2 && conditional.commands[0].range.size == 4,
+      decodeProbeTrack(ByteReader(SourceId{10}, conditionalBytes), static_cast<u32>(conditionalBytes.size()),
+                       &conditionalSourceMapBuilder);
+  const SourceMap conditionalSourceMap = conditionalSourceMapBuilder.finish();
+  const SourceAnnotation& conditionalAnnotation = conditionalSourceMap.get(conditional.commands[0].annotation);
+  expect(hasField(conditionalAnnotation, "wide") && hasField(conditionalAnnotation, "value") &&
+             conditional.commands[0].range.size == 4,
          "imperative compiler cursor should naturally decode conditional field layouts");
 }
 
@@ -462,11 +474,11 @@ void compilerCursorStopsTruncatedCommandsWithoutExecutableBehavior() {
 
 void compilerCursorKeepsExactTargetOperandRoles() {
   const std::vector<u8> bytes{0x64, 0x12, 0x34, 0x12, 0x34};
-  const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{17}, bytes), static_cast<u32>(bytes.size()));
-  expect(track.commands.size() == 1 && track.commands[0].operands.size() == 2,
-         "equal-valued target fixture should decode both operands");
-  expect(track.commands[0].operands[0].role == SemanticOperandRole::JumpTarget &&
-             track.commands[0].operands[1].role == SemanticOperandRole::Count,
+  const DecodedBytecodeCommand command =
+      decodeProbeCommand(ByteReader(SourceId{17}, bytes), 0, static_cast<u32>(bytes.size()));
+  expect(command.operands.size() == 2, "equal-valued target fixture should decode both operands");
+  expect(command.operands[0].role == SemanticOperandRole::JumpTarget &&
+             command.operands[1].role == SemanticOperandRole::Count,
          "flow declaration must not relabel a different operand with the same numeric value");
 }
 
@@ -574,9 +586,9 @@ void trackDecodeSessionOrdersExceptionalWalkerCommands() {
       .behavior = config.behavior,
       .tracks = {track},
   });
-  expect(performance.diagnostics.empty() && performance.tracks[0].events.size() == 1 &&
-             performance.tracks[0].endTick == 1,
-         "ordered exceptional-walker commands should retain their decoded execution flow");
+  expect(
+      performance.diagnostics.empty() && performance.tracks[0].events.size() == 1 && performance.tracks[0].endTick == 1,
+      "ordered exceptional-walker commands should retain their decoded execution flow");
 }
 
 void trackDecodeSourceHierarchyDistinguishesTrackedAndTracklessFormats() {

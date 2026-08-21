@@ -13,6 +13,8 @@
 #include "value/synth/SampleDecoder.h"
 #include "value/validation/ScanValidation.h"
 
+#include "ValueFormatTestSupport.h"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -541,6 +543,13 @@ bool pointsTo(const SourceAnnotation& annotation, u64 offset) {
   });
 }
 
+bool linksTo(const SourceAnnotation& annotation, SourceLinkRole role, u64 offset) {
+  return std::ranges::any_of(annotation.links, [&](const SourceLink& link) {
+    const auto* range = std::get_if<SourceRange>(&link.target);
+    return link.role == role && range != nullptr && range->offset == offset;
+  });
+}
+
 }  // namespace
 
 void cps3MameDecryptionUsesDriverAddressMask() {
@@ -753,9 +762,11 @@ void cps2EarlyZeroRateSlursRemainLinked() {
   const auto& commands = sequence.program.tracks[0].commands;
   const auto firstNote = std::ranges::find_if(
       commands, [](const SourceCommand& command) { return command.semantic == SequenceSemantic::Note; });
-  const auto* noteIndex = firstNote == commands.end() ? nullptr : semanticOperand(*firstNote, "note_index");
+  const auto* noteIndex = firstNote == commands.end()
+                              ? nullptr
+                              : fieldWithName(commandAnnotation(result.sourceMap, *firstNote), "note_index");
   expect(noteIndex != nullptr && noteIndex->display == SourceValueDisplay::Default &&
-             semanticOperand(*firstNote, "note") == nullptr,
+             fieldWithName(commandAnnotation(result.sourceMap, *firstNote), "note") == nullptr,
          "early CPS annotations should identify the encoded note index without presenting it as an absolute MIDI key");
 
   const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence.program);
@@ -1092,15 +1103,15 @@ void cpsLateControlFlowOffsetsFollowEachDriver() {
   const auto& cps2Commands = onlySequence(cps2Result).program.tracks[0].commands;
   const auto cps2Break =
       std::ranges::find_if(cps2Commands, [](const SourceCommand& command) { return command.address.value == 0x1121; });
-  expect(cps2Break != cps2Commands.end() && cps2Break->flow.additionalTargets.size() == 1 &&
-             cps2Break->flow.additionalTargets[0].value == 0x1121,
+  expect(cps2Break != cps2Commands.end() &&
+             linksTo(commandAnnotation(cps2Result.sourceMap, *cps2Break), SourceLinkRole::RepeatTarget, 0x1121),
          "late CPS2 repeat breaks should sign-extend their 16-bit displacement");
 
   const auto cps3Result = scan(cps3ByteSignedBranchFixture());
   const auto& cps3Commands = onlySequence(cps3Result).program.tracks[0].commands;
   const auto cps3Branch =
       std::ranges::find_if(cps3Commands, [](const SourceCommand& command) { return command.address.value == 0x921; });
-  expect(cps3Branch != cps3Commands.end() && cps3Branch->flow.additionalTargets.size() == 1 &&
-             cps3Branch->flow.additionalTargets[0].value == 0x921,
+  expect(cps3Branch != cps3Commands.end() &&
+             linksTo(commandAnnotation(cps3Result.sourceMap, *cps3Branch), SourceLinkRole::JumpTarget, 0x921),
          "CPS3 CD should preserve the driver's independent sign extension of its low displacement byte");
 }

@@ -104,19 +104,6 @@ using detail::VmTrackRuntime;
   return track.commandIndex(continuation);
 }
 
-[[nodiscard]] std::optional<u32> commandChannel(const SourceCommand& command) {
-  for (const auto& operand : command.operands) {
-    if (operand.role != SemanticOperandRole::Channel) {
-      continue;
-    }
-    if (const auto* value = std::get_if<u64>(&operand.value);
-        value != nullptr && *value <= std::numeric_limits<u32>::max()) {
-      return static_cast<u32>(*value);
-    }
-  }
-  return std::nullopt;
-}
-
 struct VisitState {
   u32 commandIndex = 0;
   std::vector<u32> callStack;
@@ -627,7 +614,7 @@ private:
       const size_t sourceSpanIndex = targetSequence_.sourceSpans.size();
       targetSequence_.sourceSpans.push_back(SourcePlaybackSpan{
           .annotation = command.annotation,
-          .channel = commandChannel(command),
+          .channel = command.sourceChannel,
           .beginTick = beginTick,
           .endTick = endTick,
       });
