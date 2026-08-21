@@ -7,7 +7,6 @@
 #include "value/export/CollectionStitch.h"
 
 #include "value/export/CollectionBinding.h"
-#include "value/export/DynamicEnvelope.h"
 #include "value/export/ExportDiagnostics.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/midi/ModulationAnalysis.h"
@@ -85,55 +84,33 @@ void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulation
     append(diagnostics, binding.diagnostics);
     return false;
   }
-  const auto& bound = *binding.collection;
+  CollectionWorkspace workspace{std::move(*binding.collection), std::move(binding.diagnostics)};
+  const auto& bound = workspace.collection;
   if (!bound.hasSequence()) {
-    append(diagnostics, binding.diagnostics);
+    append(diagnostics, workspace.diagnostics);
     diagnostics.push_back(exportError("A stitched collection does not contain a sequence"));
     return false;
   }
   if (bound.soundBanks().empty()) {
-    append(diagnostics, binding.diagnostics);
+    append(diagnostics, workspace.diagnostics);
     diagnostics.push_back(exportError("A stitched collection does not contain instruments"));
     return false;
   }
 
-  auto rendering = renderCollection(bound, request.sequence);
-  if (!rendering.performance) {
-    append(diagnostics, binding.diagnostics);
-    append(diagnostics, rendering.diagnostics);
+  workspace.render(request.sequence, request.dynamicEnvelopes);
+  if (!workspace.performance()) {
+    append(diagnostics, workspace.diagnostics);
+    append(diagnostics, workspace.rendering.diagnostics);
     return false;
   }
 
-  std::vector<SoundBankAsset> soundBanks = bound.soundBanks();
-  const PerformanceSequence* performance = &*rendering.performance;
-  std::optional<DynamicEnvelopeMaterialization> materialization;
-  if (request.dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants) {
-    materialization = materializeDynamicEnvelopes(*rendering.performance, soundBanks);
-    performance = &materialization->performance;
-    append(diagnostics, materialization->diagnostics);
-  }
-
-  if (request.modulationConversion == ModulationConversionPolicy::SynthModulators) {
-    if (rendering.modulation.hasSynthModulation()) {
-      for (auto& soundBank : soundBanks) {
-        applySequenceModulation(soundBank, rendering.modulation);
-      }
-    }
-    if (request.modulationScaling == ModulationScalingPolicy::ObservedSequenceRange) {
-      auto usage = analyzePerformanceModulationUsage(*performance, &rendering.modulation);
-      if (hasMidiModulationUsage(usage)) {
-        part.modulationUsage = std::move(usage);
-      }
-    }
-  }
-
-  std::vector<const SoundBankAsset*> instruments;
-  instruments.reserve(soundBanks.size());
-  for (const auto& soundBank : soundBanks) {
-    instruments.push_back(&soundBank);
-  }
+  workspace.prepareSynth(request.modulationConversion, request.modulationScaling);
+  const PerformanceSequence* performance = workspace.performance();
+  const auto instruments = workspace.soundBankView();
   part.midi = renderMidiSequence(*performance, request.sequence.midi, request.modulationConversion, instruments,
-                                 &rendering.modulation);
+                                 &workspace.rendering.modulation);
+  part.modulationUsage = std::move(workspace.modulationUsage);
+  auto soundBanks = std::move(workspace.soundBanks());
   if (request.exportOnlyUsedInstruments) {
     const auto selected = selectSynthInstruments(instruments, performance);
     const std::unordered_set<const Instrument*> used(selected.begin(), selected.end());
@@ -152,7 +129,7 @@ void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulation
 
   part.instruments = std::move(soundBanks);
   part.samples = bound.samplePools();
-  append(diagnostics, binding.diagnostics);
+  append(diagnostics, workspace.diagnostics);
   return true;
 }
 
