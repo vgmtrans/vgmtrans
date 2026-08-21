@@ -380,6 +380,7 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
           .source = source,
           .reader = sources_.reader(id),
           .ids = ids_,
+          .retained = RetainedSource{id, sources_.sharedBytes(id)},
       });
       for (auto& asset : result.assets) {
         if (auto* bank = std::get_if<SoundBankAsset>(&asset)) {

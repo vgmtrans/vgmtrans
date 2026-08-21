@@ -27,7 +27,6 @@ constexpr std::array<u8, 22> kDurationRates{
     0x0d, 0x1a, 0x26, 0x33, 0x40, 0x4d, 0x5a, 0x66, 0x73, 0x80, 0x8c,
     0x99, 0xa6, 0xb3, 0xbf, 0xcc, 0xd9, 0xe6, 0xf2, 0xfe, 0xff, 0x00,
 };
-constexpr u32 kRuntimeMagic = 0x4348554e;
 
 namespace math {
 
@@ -178,83 +177,54 @@ namespace math {
   return 0;
 }
 
-class RuntimeTables {
+using ScriptLength = u32 (*)(ByteReader, u16);
+
+[[nodiscard]] std::vector<SourceRange> scriptTable(ByteReader reader, u16 table, ScriptLength scriptLength) {
+  std::vector<SourceRange> scripts(pointerCount(reader, table));
+  for (u32 index = 0; index < scripts.size(); ++index) {
+    const u16 address = reader.le16(table + index * 2);
+    scripts[index] = reader.range(address, scriptLength(reader, address));
+  }
+  return scripts;
+}
+
+// Immutable driver data needed after scanning. Scripts remain source bytes;
+// only their ranges are indexed for cheap playback lookup.
+class DriverData {
 public:
-  explicit RuntimeTables(std::span<const u32> data) : data_(data) {}
-
-  [[nodiscard]] std::span<const u32> pitch(u8 index) const { return blob(index, 0); }
-  [[nodiscard]] std::span<const u32> mini(u8 index) const { return blob(index, 1); }
-  [[nodiscard]] std::span<const u32> duration(u8 index) const { return blob(index, 2); }
-  [[nodiscard]] std::span<const u32> gain(u8 index) const { return blob(index, 3); }
-
-  [[nodiscard]] EchoState echo() const {
-    const u32 packed = valid() ? data_[1] : 0;
-    return EchoState{
-        .left = static_cast<s8>(packed),
-        .right = static_cast<s8>(packed >> 8),
-        .feedback = static_cast<s8>(packed >> 16),
-        .delay = static_cast<u8>(packed >> 24),
-    };
+  DriverData(RetainedSource source, const Layout& layout, u8 baseTempo)
+      : source_(std::move(source)), version_(layout.version), baseTempo_(baseTempo), echo_(layout.echo) {
+    const ByteReader reader = source_.reader();
+    pitch_ = scriptTable(reader, layout.pitchEnvelopeTableAddress, pitchScriptLength);
+    mini_ = scriptTable(reader, layout.miniSequenceTableAddress, miniScriptLength);
+    duration_ = scriptTable(reader, layout.durationScriptTableAddress, durationScriptLength);
+    gain_ = scriptTable(reader, layout.gainEnvelopeTableAddress, pitchScriptLength);
   }
 
-  [[nodiscard]] static std::vector<u32> encode(ByteReader reader, const Layout& layout) {
-    const u32 pitchCount = pointerCount(reader, layout.pitchEnvelopeTableAddress);
-    const u32 miniCount = pointerCount(reader, layout.miniSequenceTableAddress);
-    const u32 durationCount = pointerCount(reader, layout.durationScriptTableAddress);
-    const u32 gainCount = pointerCount(reader, layout.gainEnvelopeTableAddress);
-    const u32 echo = static_cast<u8>(layout.echo.left) | (static_cast<u32>(static_cast<u8>(layout.echo.right)) << 8) |
-                     (static_cast<u32>(static_cast<u8>(layout.echo.feedback)) << 16) |
-                     (static_cast<u32>(layout.echo.delay) << 24);
-    std::vector<u32> result{kRuntimeMagic, echo, pitchCount, miniCount, durationCount, gainCount};
-    result.resize(kHeaderSize + (pitchCount + miniCount + durationCount + gainCount) * 2);
-
-    u32 descriptor = kHeaderSize;
-    const auto append = [&](u16 table, u32 count, auto scriptLength) {
-      for (u32 index = 0; index < count; ++index) {
-        const u16 pointer = reader.le16(table + index * 2);
-        const u32 length = scriptLength(reader, pointer);
-        result[descriptor++] = result.size();
-        result[descriptor++] = length;
-        for (u32 byte = 0; byte < length; ++byte) {
-          result.push_back(reader.u8At(pointer + byte));
-        }
-      }
-    };
-    append(layout.pitchEnvelopeTableAddress, pitchCount, pitchScriptLength);
-    append(layout.miniSequenceTableAddress, miniCount, miniScriptLength);
-    append(layout.durationScriptTableAddress, durationCount, durationScriptLength);
-    append(layout.gainEnvelopeTableAddress, gainCount, pitchScriptLength);
-    return result;
-  }
+  [[nodiscard]] Version version() const noexcept { return version_; }
+  [[nodiscard]] u8 baseTempo() const noexcept { return baseTempo_; }
+  [[nodiscard]] EchoState echo() const noexcept { return echo_; }
+  [[nodiscard]] std::span<const u8> pitch(u8 index) const { return script(pitch_, index); }
+  [[nodiscard]] std::span<const u8> mini(u8 index) const { return script(mini_, index); }
+  [[nodiscard]] std::span<const u8> duration(u8 index) const { return script(duration_, index); }
+  [[nodiscard]] std::span<const u8> gain(u8 index) const { return script(gain_, index); }
 
 private:
-  static constexpr u32 kTableCount = 4;
-  static constexpr u32 kHeaderSize = 2 + kTableCount;
-
-  [[nodiscard]] bool valid() const { return data_.size() >= kHeaderSize && data_[0] == kRuntimeMagic; }
-
-  [[nodiscard]] std::span<const u32> blob(u32 index, u32 kind) const {
-    if (!valid() || kind >= kTableCount) {
+  [[nodiscard]] std::span<const u8> script(const std::vector<SourceRange>& scripts, u8 index) const {
+    if (index >= scripts.size() || scripts[index].size == 0) {
       return {};
     }
-    if (index >= data_[2 + kind]) {
-      return {};
-    }
-    u32 descriptor = kHeaderSize;
-    for (u32 prior = 0; prior < kind; ++prior) {
-      descriptor += data_[2 + prior] * 2;
-    }
-    descriptor += index * 2;
-    if (descriptor + 1 >= data_.size()) {
-      return {};
-    }
-    const u32 offset = data_[descriptor];
-    const u32 size = data_[descriptor + 1];
-    return offset <= data_.size() && size <= data_.size() - offset ? data_.subspan(offset, size)
-                                                                   : std::span<const u32>{};
+    return source_.reader().slice(scripts[index]);
   }
 
-  std::span<const u32> data_;
+  RetainedSource source_;
+  Version version_ = Version::Summer;
+  u8 baseTempo_ = 1;
+  EchoState echo_;
+  std::vector<SourceRange> pitch_;
+  std::vector<SourceRange> mini_;
+  std::vector<SourceRange> duration_;
+  std::vector<SourceRange> gain_;
 };
 
 struct TimedScriptCursor {
@@ -268,7 +238,7 @@ struct TimedScriptCursor {
     delay = script == 0xff ? 0 : 1;
   }
 
-  [[nodiscard]] std::optional<u8> advance(std::span<const u32> script, u8 terminator) {
+  [[nodiscard]] std::optional<u8> advance(std::span<const u8> script, u8 terminator) {
     if (index == 0xff || delay == 0 || --delay != 0) {
       return std::nullopt;
     }
@@ -289,12 +259,6 @@ struct TimedScriptCursor {
   }
 };
 
-struct RuntimeConfig {
-  Version version = Version::Summer;
-  std::vector<u32> tables;
-  u8 baseTempo = 1;
-};
-
 struct ProgramState {
   struct DurationState {
     u64 tick = 0;
@@ -302,16 +266,15 @@ struct ProgramState {
     u8 rate = 0xcc;
   };
 
-  explicit ProgramState(const RuntimeConfig& config)
-      : version(config.version), tables(config.tables), baseTempo(config.baseTempo) {
+  explicit ProgramState(const DriverData& driver)
+      : driver(&driver), version(driver.version()), baseTempo(driver.baseTempo()), echo(driver.echo()) {
     for (auto& timeline : durationTimeline) {
       timeline.push_back(DurationState{});
     }
-    echo = tables.echo();
   }
 
+  const DriverData* driver;
   Version version;
-  RuntimeTables tables;
   u8 baseTempo = 1;
   u8 condition = 0;
   u8 masterVolume = 0x80;
@@ -528,7 +491,7 @@ struct Playback {
   }
 
   void advanceDurationScript() {
-    const auto script = program.tables.duration(track.durationScript);
+    const auto script = program.driver->duration(track.durationScript);
     for (u32 controls = 0; controls < 32 && track.durationScriptOffset < script.size(); ++controls) {
       const u8 value = static_cast<u8>(script[track.durationScriptOffset++]);
       if (value == 0xff) {
@@ -567,7 +530,7 @@ struct Playback {
   }
 
   void advanceGainEnvelope() {
-    const auto gain = track.gainEnvelope.advance(program.tables.gain(track.gainEnvelope.index), 0xff);
+    const auto gain = track.gainEnvelope.advance(program.driver->gain(track.gainEnvelope.index), 0xff);
     if (!gain) {
       return;
     }
@@ -660,7 +623,7 @@ struct Playback {
   }
 
   void preset(u8 index) {
-    const auto script = program.tables.mini(index);
+    const auto script = program.driver->mini(index);
     for (u32 offset = 0; offset < script.size();) {
       const u8 opcode = static_cast<u8>(script[offset]);
       const u32 size = miniCommandSize(opcode);
@@ -753,7 +716,7 @@ struct Playback {
 
     advanceGainEnvelope();
 
-    const auto pitch = track.pitchEnvelope.advance(program.tables.pitch(track.pitchEnvelope.index), 0x80);
+    const auto pitch = track.pitchEnvelope.advance(program.driver->pitch(track.pitchEnvelope.index), 0x80);
     if (pitch) {
       track.tuning = static_cast<s8>(*pitch);
       emitPitchOffset();
@@ -1003,8 +966,9 @@ const SequenceProgramConfig& sequenceConfig() {
   return config;
 }
 
-SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
-                             std::vector<Diagnostic>* diagnostics) {
+SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetId sequenceId,
+                             SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+  const ByteReader reader = source.reader();
   const u32 headerSize = 2 + reader.u8At(layout.sequenceHeaderAddress + 1) * 2;
   const SourceRange headerRange = reader.range(layout.sequenceHeaderAddress, headerSize);
   SequenceDecodeSession sequence{reader, sequenceConfig(), sequenceId, headerRange, sourceMap, 32768};
@@ -1018,11 +982,8 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         [&](u32 offset) { return decodeCommand(reader, offset, layout.version, diagnostics); }, raw);
   }
   const u8 initialTempo = reader.u8At(layout.sequenceHeaderAddress);
-  SequenceProgram program = sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{
-      .version = layout.version,
-      .tables = RuntimeTables::encode(reader, layout),
-      .baseTempo = initialTempo,
-  }));
+  SequenceProgram program =
+      sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(DriverData{std::move(source), layout, initialTempo}));
   program.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicroseconds(initialTempo);
   return {.program = std::move(program), .headerRange = headerRange};
 }

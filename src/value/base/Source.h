@@ -116,9 +116,26 @@ public:
 private:
   void require(u64 offset, u64 size) const;
 
-  // ByteReader does not own bytes; SourceStore owns storage for the reader lifetime.
+  // ByteReader does not own bytes; its caller keeps the backing storage alive.
   SourceId source_;
   std::span<const u8> bytes_;
+};
+
+// Owns immutable source bytes for work that may outlive the scan that found it.
+// ByteReader remains a cheap non-owning view; deferred runtimes retain this
+// value explicitly and create readers only where they decode source data.
+class RetainedSource {
+public:
+  RetainedSource() = default;
+  RetainedSource(SourceId source, SharedSourceBytes bytes);
+
+  [[nodiscard]] static RetainedSource copyOf(ByteReader reader);
+  [[nodiscard]] ByteReader reader() const noexcept;
+  [[nodiscard]] explicit operator bool() const noexcept { return bytes_ != nullptr; }
+
+private:
+  SourceId source_;
+  SharedSourceBytes bytes_;
 };
 
 struct ExtractedSource {

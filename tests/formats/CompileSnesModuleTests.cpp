@@ -123,7 +123,7 @@ SequenceParse parse(const std::vector<u8>& bytes) {
   const ByteReader reader(SourceId{301}, bytes);
   const auto layout = findLayout(reader);
   expect(layout.has_value(), "CompileSnes fixture should be recognized");
-  return decodeSequence(reader, *layout, AssetId{1});
+  return decodeSequence(RetainedSource::copyOf(reader), *layout, AssetId{1});
 }
 
 PerformanceSequence render(const std::vector<u8>& bytes) {
@@ -284,6 +284,16 @@ void portamentoUsesDriverRateAndRetriggersFirstNote() {
          "Compile portamento should use driver-rate timing, retrigger its first note, and lower cleanly to pitch bend");
 }
 
+void sourceBackedRuntimeOutlivesItsInputBuffer() {
+  SequenceProgram program = [] {
+    const std::vector<u8> bytes = fixture();
+    return parse(bytes).program;
+  }();
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
+  expect(performance.diagnostics.empty() && !performance.tracks.empty(),
+         "deferred playback should retain the source tables it reads");
+}
+
 }  // namespace
 
 void runCompileSnesModuleTests() {
@@ -295,4 +305,5 @@ void runCompileSnesModuleTests() {
   monoModeForcesCenterAndIgnoresStereoPhase();
   pitchSweepAdvancesThroughThePitchTable();
   portamentoUsesDriverRateAndRetriggersFirstNote();
+  sourceBackedRuntimeOutlivesItsInputBuffer();
 }

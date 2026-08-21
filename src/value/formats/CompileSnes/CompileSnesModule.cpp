@@ -22,7 +22,7 @@ namespace {
   const std::string displayName = result.sourceDisplayName();
   auto sequence = result.sequence(displayName);
   SequenceParse parsed =
-      decodeSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics());
+      decodeSequence(input.retain(), *layout, sequence.id(), &result.sourceMap(), &result.diagnostics());
   sequence.range(sequenceSourceRange(input.reader, parsed.headerRange, parsed.program))
       .program(std::move(parsed.program));
 

@@ -41,6 +41,11 @@ struct ScanInput {
   SourceFile source;
   ByteReader reader;
   ScanIdAllocator& ids;
+  RetainedSource retained;
+
+  // Session supplies retained storage. Direct scanner tests over borrowed
+  // buffers take an explicit immutable snapshot only if a format needs it.
+  [[nodiscard]] RetainedSource retain() const { return retained ? retained : RetainedSource::copyOf(reader); }
 };
 
 struct ExplicitCollection {
