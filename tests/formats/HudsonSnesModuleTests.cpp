@@ -308,8 +308,8 @@ void v2PlaybackUsesAuditedTempoLfosAndDynamicAdsr() {
   expect(performance.diagnostics.empty() && !tempos.empty() && tempos.back()->microsecondsPerQuarter == 512000 &&
              notes.size() == 1 && notes.front()->durationTicks == 20 &&
              std::abs(notes.front()->linearVelocity - 0.5) < 0.000001 && envelopes.size() == 5 &&
-             tremolo != modulation.end() && (*tremolo)->frequencyHz &&
-             std::abs(*(*tremolo)->frequencyHz - 0.9765625) < 0.000001,
+             tremolo != modulation.end() && (*tremolo)->context.frequencyHz &&
+             std::abs(*(*tremolo)->context.frequencyHz - 0.9765625) < 0.000001,
          "Hudson 2.x playback should use the timer-derived tempo, velocity, tremolo, and all dynamic envelope fields");
 }
 
@@ -375,7 +375,7 @@ void v1MixerAndPitchPipelineMatchesSuperBomberman3() {
   const auto modulation = events<ModulationPerformanceEvent>(pitched.tracks.front());
   const ModulationPerformanceEvent* vibrato = nullptr;
   for (const auto* event : modulation) {
-    if (event->target == ModulationPerformanceTarget::VibratoDepth && event->pitchRangeSemitones &&
+    if (event->target == ModulationPerformanceTarget::VibratoDepth && event->context.pitchRangeSemitones &&
         event->pitchDepthSemitones && *event->pitchDepthSemitones > 0.4) {
       vibrato = event;
       break;
@@ -387,8 +387,9 @@ void v1MixerAndPitchPipelineMatchesSuperBomberman3() {
       attack == nullptr ? nullptr : std::get_if<FixedDurationPitchSlideTiming>(&attack->timing.physical);
   expect(pitched.diagnostics.empty() && notes.size() == 2 && !notes.back()->restartsLfoPhase && attacks.size() == 1 &&
              timing != nullptr && timing->milliseconds == 508.0 && attack->targetKey - attack->startKey > 10.0 &&
-             vibrato != nullptr && vibrato->delayTicks == 0 && vibrato->pitchRangeSemitones->minimum < 0.0 &&
-             vibrato->pitchRangeSemitones->maximum > 0.0,
+             vibrato != nullptr && vibrato->context.delayTicks == 0 &&
+             vibrato->context.pitchRangeSemitones->minimum < 0.0 &&
+             vibrato->context.pitchRangeSemitones->maximum > 0.0,
          "Hudson 1.x should retain pitch state across slurs and express raw DSP pitch envelopes and vibrato");
 }
 

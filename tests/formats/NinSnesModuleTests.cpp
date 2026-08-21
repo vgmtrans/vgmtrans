@@ -407,10 +407,12 @@ void ninSnesProfilesShareTempoRelativeVibratoClock() {
       }
     }
     const std::string label(driver.name);
-    expect(rates.size() == 2 && rates[0]->cyclesPerTick && rates[1]->cyclesPerTick && rates[0]->frequencyHz &&
-               rates[1]->frequencyHz && std::abs(*rates[0]->cyclesPerTick - 0.125) < 0.0001 &&
-               std::abs(*rates[1]->cyclesPerTick - 0.125) < 0.0001 &&
-               std::abs(*rates[0]->frequencyHz - 7.8125) < 0.0001 && std::abs(*rates[1]->frequencyHz - 15.625) < 0.0001,
+    expect(rates.size() == 2 && rates[0]->context.cyclesPerTick && rates[1]->context.cyclesPerTick &&
+               rates[0]->context.frequencyHz && rates[1]->context.frequencyHz &&
+               std::abs(*rates[0]->context.cyclesPerTick - 0.125) < 0.0001 &&
+               std::abs(*rates[1]->context.cyclesPerTick - 0.125) < 0.0001 &&
+               std::abs(*rates[0]->context.frequencyHz - 7.8125) < 0.0001 &&
+               std::abs(*rates[1]->context.frequencyHz - 15.625) < 0.0001,
            label + " should share the sequence-clocked N-SPC vibrato behavior");
   }
 }
@@ -468,14 +470,15 @@ void ninSnesProfilesEmitSubtractiveTremolo() {
     expect(depths.size() == 2, label + " should emit tremolo-on and tremolo-off depth events");
     expect(depths[0]->volumeDepthDecibels && std::abs(*depths[0]->volumeDepthDecibels - expectedDepth) < 0.0001,
            label + " should convert N-SPC tremolo depth to physical decibels");
-    expect(depths[0]->shape && depths[0]->shape->waveform == LfoWaveform::Triangle &&
-               depths[0]->initialPhaseCycles == 0.25 && !depths[0]->phaseRunsAtZeroDepth &&
-               depths[0]->tremoloGainMode == TremoloGainMode::NoBoost,
+    expect(depths[0]->context.shape && depths[0]->context.shape->waveform == LfoWaveform::Triangle &&
+               depths[0]->context.initialPhaseCycles == 0.25 && !depths[0]->context.phaseRunsAtZeroDepth &&
+               depths[0]->context.tremoloGainMode == TremoloGainMode::NoBoost,
            label + " should emit a subtractive triangle beginning at nominal gain");
     expect(depths[1]->volumeDepthDecibels == 0.0, label + " should disable tremolo by clearing its depth");
-    expect(rate != nullptr && rate->cyclesPerTick && rate->frequencyHz &&
-               std::abs(*rate->cyclesPerTick - 0.125) < 0.0001 && std::abs(*rate->frequencyHz - 7.8125) < 0.0001 &&
-               rate->initialPhaseCycles == 0.25,
+    expect(rate != nullptr && rate->context.cyclesPerTick && rate->context.frequencyHz &&
+               std::abs(*rate->context.cyclesPerTick - 0.125) < 0.0001 &&
+               std::abs(*rate->context.frequencyHz - 7.8125) < 0.0001 &&
+               rate->context.initialPhaseCycles == 0.25,
            label + " should use the sequence-clocked N-SPC tremolo rate");
     expect(delay != nullptr && delay->delayTicks == kDelay && delay->milliseconds &&
                std::abs(*delay->milliseconds - 48.0) < 0.0001 && delay->tempoRelative,

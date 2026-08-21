@@ -239,10 +239,10 @@ void modulationRemainsPhysical() {
   const double expectedTremolo = 1.0 - std::pow(128.0 / 255.0, 2.0);
   expect(modulation.diagnostics.empty() && !vibratoDepth.empty() && !vibratoRate.empty() && !tremoloDepth.empty() &&
              !tremoloRate.empty() && std::abs(*vibratoDepth.front()->pitchDepthSemitones - 127.0 / 256.0) < 0.000001 &&
-             std::abs(*vibratoRate.front()->cyclesPerTick - 0.25) < 0.000001 &&
+             std::abs(*vibratoRate.front()->context.cyclesPerTick - 0.25) < 0.000001 &&
              std::abs(*tremoloDepth.front()->volumeDepthLinearGain - expectedTremolo) < 0.000001 &&
-             std::abs(*tremoloRate.front()->cyclesPerTick - 0.125) < 0.000001 &&
-             tremoloDepth.front()->tremoloGainMode == TremoloGainMode::NoBoost,
+             std::abs(*tremoloRate.front()->context.cyclesPerTick - 0.125) < 0.000001 &&
+             tremoloDepth.front()->context.tremoloGainMode == TremoloGainMode::NoBoost,
          "vibrato and tremolo should retain their audited triangle rate, depth, delay, and attenuation polarity");
   expect(vibratoDepth.size() == 6 && vibratoDepth[2]->header.tick == 2 && vibratoDepth[3]->header.tick == 3 &&
              vibratoDepth[4]->header.tick == 4 && vibratoDepth[5]->header.tick == 5 && fade != nullptr &&

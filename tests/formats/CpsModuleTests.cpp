@@ -715,8 +715,8 @@ void cps2EarlyModuleUsesPhysicalModulation() {
   bool markerWorkaround = false;
   for (const auto& event : performance.tracks[0].events) {
     if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
-      physicalVibrato |= modulation->pitchDepthSemitones.has_value() && modulation->phaseRunsAtZeroDepth;
-      physicalTremolo |= modulation->volumeDepthLinearGain.has_value() && modulation->phaseRunsAtZeroDepth;
+      physicalVibrato |= modulation->pitchDepthSemitones.has_value() && modulation->context.phaseRunsAtZeroDepth;
+      physicalTremolo |= modulation->volumeDepthLinearGain.has_value() && modulation->context.phaseRunsAtZeroDepth;
     } else if (const auto* balance = std::get_if<StereoBalancePerformanceEvent>(&event)) {
       physicalPan |= balance->leftGain == 1.0 && balance->rightGain == 0.0;
       physicalCenter |= balance->leftGain == 1.0 && balance->rightGain == 1.0;
@@ -892,7 +892,7 @@ void cps2LateDriverSemanticsRemainProfileSpecific() {
     } else if (const auto* balance = std::get_if<StereoBalancePerformanceEvent>(&event)) {
       quantizedPan |= std::abs(balance->leftGain - 1.0 / 16.0) < 0.0001 && balance->rightGain == 1.0;
     } else if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
-      runningLfo |= modulation->phaseRunsAtZeroDepth;
+      runningLfo |= modulation->context.phaseRunsAtZeroDepth;
     }
   }
   expect(note != nullptr && note->key == 67.0 && initialExpression && sourceExpression && nonlinearVolume &&
@@ -950,7 +950,7 @@ void cps3ModuleDecodesDelayPrefixesLegatoAndRegions() {
     if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
       notes.push_back(note);
     } else if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
-      linearTremolo |= modulation->volumeDepthLinearGain.has_value() && !modulation->phaseRunsAtZeroDepth;
+      linearTremolo |= modulation->volumeDepthLinearGain.has_value() && !modulation->context.phaseRunsAtZeroDepth;
     } else if (const auto* balance = std::get_if<StereoBalancePerformanceEvent>(&event)) {
       hardLeftBalance |= balance->leftGain == 1.0 && balance->rightGain == 0.0;
     } else if (const auto* expression = std::get_if<ExpressionPerformanceEvent>(&event)) {

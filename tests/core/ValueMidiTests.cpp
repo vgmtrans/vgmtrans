@@ -550,17 +550,21 @@ void performanceMidiRendererRetainsPanLawDuringLfoSimulation() {
                   ModulationPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0, .sequence = 1},
                       .target = ModulationPerformanceTarget::PanRate,
-                      .cyclesPerTick = 0.25,
-                      .shape = LfoShape{.waveform = LfoWaveform::Triangle},
-                      .panLaw = PanLaw::ConstantSum,
+                      .context = LfoPerformanceContext{
+                          .cyclesPerTick = 0.25,
+                          .shape = LfoShape{.waveform = LfoWaveform::Triangle},
+                          .panLaw = PanLaw::ConstantSum,
+                      },
                   },
                   ModulationPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0, .sequence = 2},
                       .target = ModulationPerformanceTarget::PanDepth,
                       .panDepth = 1.0,
-                      .cyclesPerTick = 0.25,
-                      .shape = LfoShape{.waveform = LfoWaveform::Triangle},
-                      .panLaw = PanLaw::ConstantSum,
+                      .context = LfoPerformanceContext{
+                          .cyclesPerTick = 0.25,
+                          .shape = LfoShape{.waveform = LfoWaveform::Triangle},
+                          .panLaw = PanLaw::ConstantSum,
+                      },
                   },
               },
       }},
@@ -1240,7 +1244,7 @@ void performanceMidiRendererCombinesPitchSlidesWithSimulatedVibrato() {
   out.modulation(ModulationPerformanceEvent{
       .target = ModulationPerformanceTarget::VibratoRate,
       .amount = 1.0,
-      .frequencyHz = 12.5,
+      .context = LfoPerformanceContext{.frequencyHz = 12.5},
   });
   out.modulation(ModulationPerformanceEvent{
       .target = ModulationPerformanceTarget::VibratoDepth,
@@ -1291,7 +1295,7 @@ void performanceMidiRendererUsesOnlyFrozenVibratoOffsetForPitchRange() {
                   ModulationPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
                       .target = ModulationPerformanceTarget::VibratoRate,
-                      .frequencyHz = 0.0,
+                      .context = LfoPerformanceContext{.frequencyHz = 0.0},
                   },
                   ModulationPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
@@ -1305,7 +1309,7 @@ void performanceMidiRendererUsesOnlyFrozenVibratoOffsetForPitchRange() {
                   ModulationPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 2},
                       .target = ModulationPerformanceTarget::VibratoRate,
-                      .frequencyHz = 1.0,
+                      .context = LfoPerformanceContext{.frequencyHz = 1.0},
                   },
               },
       }},
@@ -1368,7 +1372,7 @@ void performanceMidiRendererDoesNotRestartVibratoAtAHeldPitchSlideBoundary() {
   out.modulation(ModulationPerformanceEvent{
       .target = ModulationPerformanceTarget::VibratoRate,
       .amount = 1.0,
-      .frequencyHz = 25.0,
+      .context = LfoPerformanceContext{.frequencyHz = 25.0},
   });
   out.modulation(ModulationPerformanceEvent{
       .target = ModulationPerformanceTarget::VibratoDepth,
@@ -1916,7 +1920,7 @@ void performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape() {
                       .header = PerformanceEventHeader{.tick = 0},
                       .target = ModulationPerformanceTarget::VibratoRate,
                       .amount = 1.0,
-                      .frequencyHz = 12.5,
+                      .context = LfoPerformanceContext{.frequencyHz = 12.5},
                   },
                   ModulationPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
@@ -1959,15 +1963,17 @@ void performanceMidiRendererHonorsSpecifiedLfoWaveform() {
           .header = PerformanceEventHeader{.tick = 0},
           .target = ModulationPerformanceTarget::VibratoRate,
           .amount = 1.0,
-          .frequencyHz = 12.5,
-          .shape = LfoShape{.waveform = LfoWaveform::Sine},
+          .context = LfoPerformanceContext{
+              .frequencyHz = 12.5,
+              .shape = LfoShape{.waveform = LfoWaveform::Sine},
+          },
       },
       ModulationPerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
           .target = ModulationPerformanceTarget::VibratoDepth,
           .amount = 0.5,
           .pitchDepthSemitones = 1.0,
-          .shape = LfoShape{.waveform = LfoWaveform::Sine},
+          .context = LfoPerformanceContext{.shape = LfoShape{.waveform = LfoWaveform::Sine}},
       },
       NotePerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
@@ -1991,16 +1997,20 @@ void performanceMidiRendererHonorsSteppedLfoSamplesAndHeldDisableValue() {
       ModulationPerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
           .target = ModulationPerformanceTarget::VibratoRate,
-          .frequencyHz = 25.0,
-          .shape = shape,
-          .sampleImmediatelyOnNote = true,
+          .context = LfoPerformanceContext{
+              .frequencyHz = 25.0,
+              .shape = shape,
+              .sampleImmediatelyOnNote = true,
+          },
       },
       ModulationPerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
           .target = ModulationPerformanceTarget::VibratoDepth,
           .pitchDepthSemitones = 1.0,
-          .shape = shape,
-          .sampleImmediatelyOnNote = true,
+          .context = LfoPerformanceContext{
+              .shape = shape,
+              .sampleImmediatelyOnNote = true,
+          },
       },
       NotePerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
@@ -2011,8 +2021,10 @@ void performanceMidiRendererHonorsSteppedLfoSamplesAndHeldDisableValue() {
           .header = PerformanceEventHeader{.tick = 1},
           .target = ModulationPerformanceTarget::VibratoDepth,
           .pitchDepthSemitones = 0.0,
-          .shape = shape,
-          .zeroDepthBehavior = LfoZeroDepthBehavior::HoldOutputUntilNextNote,
+          .context = LfoPerformanceContext{
+              .shape = shape,
+              .zeroDepthBehavior = LfoZeroDepthBehavior::HoldOutputUntilNextNote,
+          },
       },
       NotePerformanceEvent{
           .header = PerformanceEventHeader{.tick = 3},
@@ -2040,16 +2052,20 @@ void performanceMidiRendererReplacesSampledLfoWithNamedWaveform() {
       ModulationPerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
           .target = ModulationPerformanceTarget::VibratoRate,
-          .frequencyHz = 25.0,
-          .shape = sampledShape,
-          .sampleImmediatelyOnNote = true,
+          .context = LfoPerformanceContext{
+              .frequencyHz = 25.0,
+              .shape = sampledShape,
+              .sampleImmediatelyOnNote = true,
+          },
       },
       ModulationPerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
           .target = ModulationPerformanceTarget::VibratoDepth,
           .pitchDepthSemitones = 1.0,
-          .shape = sampledShape,
-          .sampleImmediatelyOnNote = true,
+          .context = LfoPerformanceContext{
+              .shape = sampledShape,
+              .sampleImmediatelyOnNote = true,
+          },
       },
       NotePerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
@@ -2059,9 +2075,11 @@ void performanceMidiRendererReplacesSampledLfoWithNamedWaveform() {
       ModulationPerformanceEvent{
           .header = PerformanceEventHeader{.tick = 1},
           .target = ModulationPerformanceTarget::VibratoRate,
-          .frequencyHz = 25.0,
-          .shape = LfoShape{.waveform = LfoWaveform::Sine},
-          .sampleImmediatelyOnNote = true,
+          .context = LfoPerformanceContext{
+              .frequencyHz = 25.0,
+              .shape = LfoShape{.waveform = LfoWaveform::Sine},
+              .sampleImmediatelyOnNote = true,
+          },
       },
   };
   const MidiSequence midi = renderSimulatedModulation(2, std::move(events));
@@ -2100,7 +2118,7 @@ void performanceMidiRendererDoesNotDoubleDelayVibrato() {
                       .header = PerformanceEventHeader{.tick = 0},
                       .target = ModulationPerformanceTarget::VibratoRate,
                       .amount = 1.0,
-                      .frequencyHz = 12.5,
+                      .context = LfoPerformanceContext{.frequencyHz = 12.5},
                   },
                   NotePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
@@ -2156,7 +2174,7 @@ void performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes() {
                       .header = PerformanceEventHeader{.tick = 0},
                       .target = ModulationPerformanceTarget::VibratoRate,
                       .amount = 1.0,
-                      .frequencyHz = 12.5,
+                      .context = LfoPerformanceContext{.frequencyHz = 12.5},
                   },
                   ModulationPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
@@ -2208,16 +2226,20 @@ void performanceMidiRendererReplacesSavedNoteDelay() {
       ModulationPerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
           .target = ModulationPerformanceTarget::VibratoRate,
-          .frequencyHz = 25.0,
-          .shape = shape,
-          .sampleImmediatelyOnNote = true,
+          .context = LfoPerformanceContext{
+              .frequencyHz = 25.0,
+              .shape = shape,
+              .sampleImmediatelyOnNote = true,
+          },
       },
       ModulationPerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
           .target = ModulationPerformanceTarget::VibratoDepth,
           .pitchDepthSemitones = 1.0,
-          .shape = shape,
-          .sampleImmediatelyOnNote = true,
+          .context = LfoPerformanceContext{
+              .shape = shape,
+              .sampleImmediatelyOnNote = true,
+          },
       },
       NotePerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
@@ -2271,7 +2293,7 @@ void performanceMidiRendererSimulatesTremoloUsingGlobalTempo() {
                               .header = PerformanceEventHeader{.tick = 0},
                               .target = ModulationPerformanceTarget::TremoloRate,
                               .amount = 1.0,
-                              .frequencyHz = 25.0,
+                              .context = LfoPerformanceContext{.frequencyHz = 25.0},
                           },
                           ModulationPerformanceEvent{
                               .header = PerformanceEventHeader{.tick = 0},
@@ -2330,17 +2352,21 @@ void performanceMidiRendererHonorsNoBoostTremoloPhaseAndResetPolicy() {
                   ModulationPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
                       .target = ModulationPerformanceTarget::TremoloRate,
-                      .frequencyHz = 25.0,
-                      .shape = LfoShape{.waveform = LfoWaveform::Triangle},
-                      .initialPhaseCycles = 0.75,
+                      .context = LfoPerformanceContext{
+                          .frequencyHz = 25.0,
+                          .shape = LfoShape{.waveform = LfoWaveform::Triangle},
+                          .initialPhaseCycles = 0.75,
+                      },
                   },
                   ModulationPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
                       .target = ModulationPerformanceTarget::TremoloDepth,
                       .volumeDepthDecibels = 3.0,
-                      .shape = LfoShape{.waveform = LfoWaveform::Triangle},
-                      .initialPhaseCycles = 0.75,
-                      .tremoloGainMode = TremoloGainMode::NoBoost,
+                      .context = LfoPerformanceContext{
+                          .shape = LfoShape{.waveform = LfoWaveform::Triangle},
+                          .initialPhaseCycles = 0.75,
+                          .tremoloGainMode = TremoloGainMode::NoBoost,
+                      },
                   },
                   NotePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
@@ -2718,7 +2744,7 @@ void tempoRelativeModulationFollowsTheGlobalTempoTimeline() {
                           ModulationPerformanceEvent{
                               .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 0, .sequence = 0},
                               .target = ModulationPerformanceTarget::VibratoRate,
-                              .cyclesPerTick = 0.25,
+                              .context = LfoPerformanceContext{.cyclesPerTick = 0.25},
                           },
                           VibratoDelayPerformanceEvent{
                               .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 0, .sequence = 1},
@@ -2728,7 +2754,7 @@ void tempoRelativeModulationFollowsTheGlobalTempoTimeline() {
                           ModulationPerformanceEvent{
                               .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 20, .sequence = 4},
                               .target = ModulationPerformanceTarget::VibratoRate,
-                              .frequencyHz = 7.0,
+                              .context = LfoPerformanceContext{.frequencyHz = 7.0},
                           },
                       },
               },
@@ -2763,10 +2789,11 @@ void tempoRelativeModulationFollowsTheGlobalTempoTimeline() {
     }
   }
 
-  expect(rates.size() == 3 && rates[0]->header.tick == 0 && rates[0]->frequencyHz &&
-             std::abs(*rates[0]->frequencyHz - 25.0) < 0.0001 && rates[1]->header.tick == 10 && rates[1]->frequencyHz &&
-             std::abs(*rates[1]->frequencyHz - 50.0) < 0.0001 && rates[1]->header.sequence == 2 &&
-             rates[2]->header.tick == 20 && rates[2]->frequencyHz && std::abs(*rates[2]->frequencyHz - 7.0) < 0.0001,
+  expect(rates.size() == 3 && rates[0]->header.tick == 0 && rates[0]->context.frequencyHz &&
+             std::abs(*rates[0]->context.frequencyHz - 25.0) < 0.0001 && rates[1]->header.tick == 10 &&
+             rates[1]->context.frequencyHz && std::abs(*rates[1]->context.frequencyHz - 50.0) < 0.0001 &&
+             rates[1]->header.sequence == 2 && rates[2]->header.tick == 20 && rates[2]->context.frequencyHz &&
+             std::abs(*rates[2]->context.frequencyHz - 7.0) < 0.0001,
          "tempo-relative LFO rates should follow cross-track tempo changes in global execution order");
   expect(delays.size() == 3 && delays[0]->milliseconds && std::abs(*delays[0]->milliseconds - 100.0) < 0.0001 &&
              delays[1]->header.tick == 10 && delays[1]->milliseconds &&
@@ -2791,7 +2818,7 @@ void tempoRelativeModulationFollowsTheGlobalTempoTimeline() {
                             ModulationPerformanceEvent{
                                 .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 0, .sequence = 0},
                                 .target = ModulationPerformanceTarget::VibratoRate,
-                                .cyclesPerTick = 0.125,
+                                .context = LfoPerformanceContext{.cyclesPerTick = 0.125},
                             },
                             ModulationPerformanceEvent{
                                 .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 0, .sequence = 1},

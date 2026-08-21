@@ -693,7 +693,7 @@ void konamiSnesEarlyVibratoQuantizesRateAtCommandTempo() {
   const auto vibratoRate = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
     return modulation != nullptr && modulation->target == ModulationPerformanceTarget::VibratoRate &&
-           modulation->frequencyHz && *modulation->frequencyHz > 0.0;
+           modulation->context.frequencyHz && *modulation->context.frequencyHz > 0.0;
   });
   expect(vibratoRate != performance.tracks[0].events.end(),
          "KonamiSnes legacy vibrato should emit a rate modulation event");
@@ -737,7 +737,8 @@ void konamiSnesEarlyVibratoQuantizesRateAtCommandTempo() {
       sameTickRates.push_back(modulation);
     }
   }
-  expect(sameTickRates.size() == 1 && sameTickRates[0]->frequencyHz && !sameTickRates[0]->cyclesPerTick,
+  expect(sameTickRates.size() == 1 && sameTickRates[0]->context.frequencyHz &&
+             !sameTickRates[0]->context.cyclesPerTick,
          "an unrelated tempo event should not synthesize a replacement for an early driver's stored vibrato step");
 
   const PerformanceSequence direction =
@@ -765,10 +766,12 @@ void konamiSnesEarlyVibratoQuantizesRateAtCommandTempo() {
       directionRates.push_back(modulation);
     }
   }
-  expect(directionRates.size() == 2 && directionRates[0]->frequencyHz && directionRates[1]->frequencyHz &&
-             std::abs(*directionRates[0]->frequencyHz - (250.0 * 127.0 / 256.0)) < 0.0001 &&
-             std::abs(*directionRates[1]->frequencyHz - (250.0 * 2.0 / 256.0)) < 0.0001 &&
-             directionRates[0]->initialPhaseCycles == 0.0 && directionRates[1]->initialPhaseCycles == 0.5,
+  expect(directionRates.size() == 2 && directionRates[0]->context.frequencyHz &&
+             directionRates[1]->context.frequencyHz &&
+             std::abs(*directionRates[0]->context.frequencyHz - (250.0 * 127.0 / 256.0)) < 0.0001 &&
+             std::abs(*directionRates[1]->context.frequencyHz - (250.0 * 2.0 / 256.0)) < 0.0001 &&
+             directionRates[0]->context.initialPhaseCycles == 0.0 &&
+             directionRates[1]->context.initialPhaseCycles == 0.5,
          "early KonamiSnes high rates should fold only after tempo multiplication and preserve triangle direction");
 }
 

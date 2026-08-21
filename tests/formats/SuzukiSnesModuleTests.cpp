@@ -476,8 +476,8 @@ void modulationMathMatchesEachDriverRevision() {
 
   const PerformanceSequence blOneSided = render(Version::BahamutLagoon, {0xe9, 0x88, 0x04, 0xd0});
   const auto* blPan = modulationValue(blOneSided, ModulationPerformanceTarget::PanDepth);
-  expect(blPan && blPan->panDepth == 0.25 && blPan->cyclesPerTick == 0.0625 &&
-             blPan->polarity == LfoPolarity::Positive && blPan->initialPhaseCycles == 0.75,
+  expect(blPan && blPan->panDepth == 0.25 && blPan->context.cyclesPerTick == 0.0625 &&
+             blPan->context.polarity == LfoPolarity::Positive && blPan->context.initialPhaseCycles == 0.75,
          "BL's high pan-LFO period bit should select a one-sided two-period triangle");
 
   // And My Name's Booster, track 0 at ARAM $202A: F4 07 36. Its $36 step
@@ -485,12 +485,13 @@ void modulationMathMatchesEachDriverRevision() {
   const PerformanceSequence booster = render(Version::SuperMarioRpg, {0xf4, 0x07, 0x36, 0xde, 0x5e, 0xb6, 0x20, 0xd0});
   const auto* boosterDepth = modulationValue(booster, ModulationPerformanceTarget::TremoloDepth);
   const auto* boosterRate = modulationValue(booster, ModulationPerformanceTarget::TremoloRate);
-  expect(boosterDepth && boosterDepth->volumeDepthLinearGain == 1.0 && boosterDepth->shape &&
-             boosterDepth->shape->waveform == LfoWaveform::SawtoothDown &&
-             boosterDepth->polarity == LfoPolarity::Negative && boosterDepth->initialPhaseCycles == 0.0 &&
-             boosterDepth->sampleImmediatelyOnNote && boosterDepth->directionReversalTicks == 7 &&
-             boosterDepth->tremoloGainMode == TremoloGainMode::NoBoost && boosterRate &&
-             std::abs(boosterRate->cyclesPerTick.value_or(0.0) - (0x36 / 128.0)) < 0.000001,
+  expect(boosterDepth && boosterDepth->volumeDepthLinearGain == 1.0 && boosterDepth->context.shape &&
+             boosterDepth->context.shape->waveform == LfoWaveform::SawtoothDown &&
+             boosterDepth->context.polarity == LfoPolarity::Negative &&
+             boosterDepth->context.initialPhaseCycles == 0.0 && boosterDepth->context.sampleImmediatelyOnNote &&
+             boosterDepth->context.directionReversalTicks == 7 &&
+             boosterDepth->context.tremoloGainMode == TremoloGainMode::NoBoost && boosterRate &&
+             std::abs(boosterRate->context.cyclesPerTick.value_or(0.0) - (0x36 / 128.0)) < 0.000001,
          "SMR F4 07 36 should preserve the fast carrier created by its wrapped 7-bit volume steps");
   const SequenceModulationProfile boosterProfile = analyzeSequenceModulation(booster);
   expect(boosterProfile.instruments.tremolo && boosterProfile.instruments.tremolo->gainMode == TremoloGainMode::NoBoost,
@@ -525,12 +526,13 @@ void modulationMathMatchesEachDriverRevision() {
 
   const PerformanceSequence wrappedPeriod = render(Version::SuperMarioRpg, {0xf4, 0x00, 0x01, 0xd0});
   const auto* wrappedRate = modulationValue(wrappedPeriod, ModulationPerformanceTarget::TremoloRate);
-  expect(wrappedRate && std::abs(wrappedRate->cyclesPerTick.value_or(0.0) - (1.0 / 128.0)) < 0.000001,
+  expect(wrappedRate && std::abs(wrappedRate->context.cyclesPerTick.value_or(0.0) - (1.0 / 128.0)) < 0.000001,
          "a zero counter reload should retain the wrapped accumulator's step-driven carrier");
 
   const PerformanceSequence sd3Folded = render(Version::SeikenDensetsu3, {0xf4, 0x07, 0x36, 0xd0});
   const auto* sd3FoldedRate = modulationValue(sd3Folded, ModulationPerformanceTarget::TremoloRate);
-  expect(sd3FoldedRate && std::abs(sd3FoldedRate->cyclesPerTick.value_or(0.0) - (0x36 / 256.0)) < 0.000001,
+  expect(sd3FoldedRate &&
+             std::abs(sd3FoldedRate->context.cyclesPerTick.value_or(0.0) - (0x36 / 256.0)) < 0.000001,
          "SD3 folded tremolo should retain its eight-bit accumulator carrier");
 
   const PerformanceSequence restarted = render(Version::SeikenDensetsu3, {0xe9, 0x08, 0x04, 0xeb, 0xea, 0xd0});

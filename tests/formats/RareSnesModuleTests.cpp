@@ -334,25 +334,28 @@ void rareSnesPhysicalLfosAndPitchEnvelopesUseTimerClock() {
   const auto modulation = events<ModulationPerformanceEvent>(performance);
   const bool vibratoDepth = std::ranges::any_of(modulation, [](const ModulationPerformanceEvent* event) {
     return event->target == ModulationPerformanceTarget::VibratoDepth && event->pitchDepthSemitones &&
-           *event->pitchDepthSemitones > 0.0 && event->delayMilliseconds;
+           *event->pitchDepthSemitones > 0.0 && event->context.delayMilliseconds;
   });
   const bool vibratoRate = std::ranges::any_of(modulation, [](const ModulationPerformanceEvent* event) {
-    return event->target == ModulationPerformanceTarget::VibratoRate && event->frequencyHz && *event->frequencyHz > 0.0;
+    return event->target == ModulationPerformanceTarget::VibratoRate && event->context.frequencyHz &&
+           *event->context.frequencyHz > 0.0;
   });
   const bool tremoloDepth = std::ranges::any_of(modulation, [](const ModulationPerformanceEvent* event) {
     return event->target == ModulationPerformanceTarget::TremoloDepth && event->volumeDepthLinearGain &&
            *event->volumeDepthLinearGain > 0.0;
   });
   const bool tremoloRate = std::ranges::any_of(modulation, [](const ModulationPerformanceEvent* event) {
-    return event->target == ModulationPerformanceTarget::TremoloRate && event->frequencyHz && *event->frequencyHz > 0.0;
+    return event->target == ModulationPerformanceTarget::TremoloRate && event->context.frequencyHz &&
+           *event->context.frequencyHz > 0.0;
   });
   expect(performance.diagnostics.empty() && vibratoDepth && vibratoRate && tremoloDepth && tremoloRate,
          "Rare vibrato and tremolo should retain physical triangle depth, rate, and delay");
   const auto activeRate = std::ranges::find_if(modulation, [](const ModulationPerformanceEvent* event) {
-    return event->target == ModulationPerformanceTarget::VibratoRate && event->frequencyHz.value_or(0.0) > 0.0;
+    return event->target == ModulationPerformanceTarget::VibratoRate &&
+           event->context.frequencyHz.value_or(0.0) > 0.0;
   });
   expect(activeRate != modulation.end() &&
-             std::abs((*activeRate)->frequencyHz.value() - (1.0 / (8 * 2 * 2 * 0.0075))) < 0.000001,
+             std::abs((*activeRate)->context.frequencyHz.value() - (1.0 / (8 * 2 * 2 * 0.0075))) < 0.000001,
          "Rare triangle LFO rate should include both halves of its driver period");
   expect(std::ranges::any_of(performance.tracks.front().automations,
                              [](const PerformanceAutomation& automation) {

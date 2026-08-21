@@ -801,51 +801,53 @@ void applyLfoDelayUpdate(SimulatedLfoState& lfo, SimulatedLfoDelay delay, LfoDel
 
 void configureLfo(SimulatedLfoState& lfo, u64 tick, const ModulationPerformanceEvent& event,
                   LfoInitialPhaseFallback fallback = LfoInitialPhaseFallback::Zero) {
-  if (event.cyclesPerTick) {
-    lfo.cyclesPerTick = std::max(0.0, *event.cyclesPerTick);
-  } else if (event.frequencyHz) {
+  const LfoPerformanceContext& context = event.context;
+  if (context.cyclesPerTick) {
+    lfo.cyclesPerTick = std::max(0.0, *context.cyclesPerTick);
+  } else if (context.frequencyHz) {
     lfo.cyclesPerTick.reset();
   }
-  if (event.frequencyHz) {
-    lfo.frequencyHz = std::max(0.0, *event.frequencyHz);
+  if (context.frequencyHz) {
+    lfo.frequencyHz = std::max(0.0, *context.frequencyHz);
   }
-  if (event.shape) {
-    lfo.shape = event.shape;
+  if (context.shape) {
+    lfo.shape = context.shape;
   }
-  if (event.polarity) {
-    lfo.polarity = *event.polarity;
+  if (context.polarity) {
+    lfo.polarity = *context.polarity;
   }
-  if (event.initialPhaseCycles) {
-    lfo.initialPhaseCycles = event.initialPhaseCycles;
+  if (context.initialPhaseCycles) {
+    lfo.initialPhaseCycles = context.initialPhaseCycles;
   }
-  if (event.noteRestartInitialPhaseCycles) {
-    lfo.noteRestartInitialPhaseCycles = event.noteRestartInitialPhaseCycles;
+  if (context.noteRestartInitialPhaseCycles) {
+    lfo.noteRestartInitialPhaseCycles = context.noteRestartInitialPhaseCycles;
   }
-  if (event.pitchRangeSemitones) {
-    lfo.pitchRangeSemitones = event.pitchRangeSemitones;
+  if (context.pitchRangeSemitones) {
+    lfo.pitchRangeSemitones = context.pitchRangeSemitones;
   }
-  if (event.steppedDepthAttackSteps) {
-    lfo.steppedDepthAttackSteps = *event.steppedDepthAttackSteps;
+  if (context.steppedDepthAttackSteps) {
+    lfo.steppedDepthAttackSteps = *context.steppedDepthAttackSteps;
   }
-  lfo.sampleImmediatelyOnNote = event.sampleImmediatelyOnNote;
-  if (event.directionReversalTicks) {
-    lfo.directionReversalTicks = *event.directionReversalTicks;
+  lfo.sampleImmediatelyOnNote = context.sampleImmediatelyOnNote;
+  if (context.directionReversalTicks) {
+    lfo.directionReversalTicks = *context.directionReversalTicks;
   }
-  if (event.panLaw != PanLaw::Unspecified) {
-    lfo.panLaw = event.panLaw;
+  if (context.panLaw != PanLaw::Unspecified) {
+    lfo.panLaw = context.panLaw;
   }
-  if (event.delayTicks || event.delayMilliseconds) {
+  if (context.delayTicks || context.delayMilliseconds) {
     SimulatedLfoDelay delay{
-        .ticks = event.delayTicks.value_or(0),
-        .milliseconds = event.delayMilliseconds ? std::optional{std::max(0.0, *event.delayMilliseconds)} : std::nullopt,
-        .tempoRelative = event.delayIsTempoRelative,
+        .ticks = context.delayTicks.value_or(0),
+        .milliseconds = context.delayMilliseconds ? std::optional{std::max(0.0, *context.delayMilliseconds)}
+                                                  : std::nullopt,
+        .tempoRelative = context.delayIsTempoRelative,
     };
-    applyLfoDelayUpdate(lfo, std::move(delay), event.delayUpdateMode);
+    applyLfoDelayUpdate(lfo, std::move(delay), context.delayUpdateMode);
   }
-  lfo.phaseRunsAtZeroDepth = event.phaseRunsAtZeroDepth;
-  lfo.delayRunsWhileInactive = event.delayRunsWhileInactive;
+  lfo.phaseRunsAtZeroDepth = context.phaseRunsAtZeroDepth;
+  lfo.delayRunsWhileInactive = context.delayRunsWhileInactive;
   lfo.configured = true;
-  applyLfoRestart(lfo, tick, lfo.started ? event.restartMode : LfoRestartMode::PhaseAndDelay, fallback);
+  applyLfoRestart(lfo, tick, lfo.started ? context.restartMode : LfoRestartMode::PhaseAndDelay, fallback);
 }
 
 void restartNoteLfo(SimulatedLfoState& lfo, u64 tick,
@@ -977,9 +979,9 @@ void setSimulatedVibratoDepth(MidiTrack& track, RenderTrackState& state, u64 tic
 
 void sampleRestartedVibrato(MidiTrack& track, RenderTrackState& state, const ModulationPerformanceEvent& event,
                             u8 channel) {
-  const bool immediate = event.restartMode == LfoRestartMode::PhaseAndDelay && state.vibrato.sampleImmediatelyOnNote &&
-                         state.vibrato.delay.ticks == 0 && state.vibrato.delay.milliseconds.value_or(0.0) <= 0.0 &&
-                         state.vibrato.depth > 0.0 &&
+  const bool immediate = event.context.restartMode == LfoRestartMode::PhaseAndDelay &&
+                         state.vibrato.sampleImmediatelyOnNote && state.vibrato.delay.ticks == 0 &&
+                         state.vibrato.delay.milliseconds.value_or(0.0) <= 0.0 && state.vibrato.depth > 0.0 &&
                          state.vibrato.cyclesPerTick.value_or(state.vibrato.frequencyHz) > 0.0;
   if (!immediate) {
     return;
@@ -1406,14 +1408,14 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                 setSimulatedVibratoDepth(
                     track, state, typedEvent.header.tick, channel,
                     typedEvent.pitchDepthSemitones.value_or(std::clamp(typedEvent.amount, 0.0, 1.0) * 2.0),
-                    typedEvent.zeroDepthBehavior);
+                    typedEvent.context.zeroDepthBehavior);
                 sampleRestartedVibrato(track, state, typedEvent, channel);
                 break;
               }
               case ModulationPerformanceTarget::TremoloDepth: {
                 const bool physicalDecibels = typedEvent.volumeDepthDecibels.has_value();
                 const bool physicalLinearGain = typedEvent.volumeDepthLinearGain.has_value();
-                const auto fallback = !typedEvent.shape && !physicalDecibels && !physicalLinearGain
+                const auto fallback = !typedEvent.context.shape && !physicalDecibels && !physicalLinearGain
                                           ? LfoInitialPhaseFallback::UnipolarTremoloNominalGain
                                           : LfoInitialPhaseFallback::Zero;
                 configureLfo(state.tremolo, typedEvent.header.tick, typedEvent, fallback);
@@ -1426,7 +1428,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                     physicalDecibels ? *typedEvent.volumeDepthDecibels
                                      : (physicalLinearGain ? *typedEvent.volumeDepthLinearGain
                                                            : std::clamp(typedEvent.amount, 0.0, 1.0) * 0.5),
-                    unit, typedEvent.tremoloGainMode, typedEvent.zeroDepthBehavior, options, modulationConversion);
+                    unit, typedEvent.context.tremoloGainMode, typedEvent.context.zeroDepthBehavior, options,
+                    modulationConversion);
                 break;
               }
               case ModulationPerformanceTarget::VibratoRate:
@@ -1437,8 +1440,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                 break;
               case ModulationPerformanceTarget::TremoloRate:
                 configureLfo(state.tremolo, typedEvent.header.tick, typedEvent,
-                             typedEvent.shape ? LfoInitialPhaseFallback::Zero
-                                              : LfoInitialPhaseFallback::UnipolarTremoloNominalGain);
+                             typedEvent.context.shape ? LfoInitialPhaseFallback::Zero
+                                                      : LfoInitialPhaseFallback::UnipolarTremoloNominalGain);
                 break;
               case ModulationPerformanceTarget::PanDepth:
                 configureLfo(state.panLfo, typedEvent.header.tick, typedEvent);

@@ -96,7 +96,7 @@ template <class Convert>
 }
 
 [[nodiscard]] std::optional<LfoWaveform> standardWaveform(const ModulationPerformanceEvent& event) {
-  return event.shape ? std::optional{event.shape->waveform} : std::nullopt;
+  return event.context.shape ? std::optional{event.context.shape->waveform} : std::nullopt;
 }
 
 void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& vibrato, LfoObservation& tremolo,
@@ -110,8 +110,8 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
       break;
     case ModulationPerformanceTarget::VibratoRate:
       vibrato.observeWaveform(standardWaveform(event));
-      if (event.frequencyHz) {
-        vibrato.rate.observe(*event.frequencyHz);
+      if (event.context.frequencyHz) {
+        vibrato.rate.observe(*event.context.frequencyHz);
       }
       break;
     case ModulationPerformanceTarget::TremoloDepth:
@@ -119,20 +119,20 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
       if (event.volumeDepthDecibels) {
         tremolo.maxDepth = std::max(tremolo.maxDepth, std::abs(*event.volumeDepthDecibels));
         if (std::abs(*event.volumeDepthDecibels) > 0.0) {
-          tremolo.gainMode = event.tremoloGainMode;
+          tremolo.gainMode = event.context.tremoloGainMode;
         }
       } else if (event.volumeDepthLinearGain) {
         const double depth = std::clamp(std::abs(*event.volumeDepthLinearGain), 0.0, 1.0 - 1e-9);
         tremolo.maxDepth = std::max(tremolo.maxDepth, -20.0 * std::log10(1.0 - depth));
         if (depth > 0.0) {
-          tremolo.gainMode = event.tremoloGainMode;
+          tremolo.gainMode = event.context.tremoloGainMode;
         }
       }
       break;
     case ModulationPerformanceTarget::TremoloRate:
       tremolo.observeWaveform(standardWaveform(event));
-      if (event.frequencyHz) {
-        tremolo.rate.observe(*event.frequencyHz);
+      if (event.context.frequencyHz) {
+        tremolo.rate.observe(*event.context.frequencyHz);
       }
       break;
     case ModulationPerformanceTarget::PanDepth:
@@ -141,8 +141,8 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
       }
       break;
     case ModulationPerformanceTarget::PanRate:
-      if (event.frequencyHz) {
-        pan.rate.observe(*event.frequencyHz);
+      if (event.context.frequencyHz) {
+        pan.rate.observe(*event.context.frequencyHz);
       }
       break;
   }
@@ -243,9 +243,9 @@ double modulationControllerAmount(const ModulationPerformanceEvent& event,
     case ModulationPerformanceTarget::VibratoRate:
     case ModulationPerformanceTarget::TremoloRate:
     case ModulationPerformanceTarget::PanRate:
-      if (event.frequencyHz) {
+      if (event.context.frequencyHz) {
         if (const auto* range = rateRange(event, *profile)) {
-          return normalizedHertz(*event.frequencyHz, *range);
+          return normalizedHertz(*event.context.frequencyHz, *range);
         }
       }
       break;

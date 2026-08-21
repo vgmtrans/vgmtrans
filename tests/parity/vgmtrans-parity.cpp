@@ -4131,8 +4131,8 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
           ++stats.vibratoRateEvents;
           stats.maxVibratoRateNormalizedAmount = std::max(stats.maxVibratoRateNormalizedAmount,
                                                           modulationControllerAmount(*modulation, &modulationProfile));
-          if (modulation->frequencyHz) {
-            stats.maxVibratoRateHz = std::max(stats.maxVibratoRateHz, *modulation->frequencyHz);
+          if (modulation->context.frequencyHz) {
+            stats.maxVibratoRateHz = std::max(stats.maxVibratoRateHz, *modulation->context.frequencyHz);
           }
         }
       }

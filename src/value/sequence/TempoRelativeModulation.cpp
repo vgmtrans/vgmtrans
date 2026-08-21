@@ -84,17 +84,17 @@ struct TrackModulationState {
 }
 
 void resolveContext(ModulationPerformanceEvent& event, double secondsPerTick) {
-  if (event.cyclesPerTick) {
-    event.frequencyHz = hertz(*event.cyclesPerTick, secondsPerTick);
+  if (event.context.cyclesPerTick) {
+    event.context.frequencyHz = hertz(*event.context.cyclesPerTick, secondsPerTick);
   }
-  if (event.delayIsTempoRelative && event.delayTicks) {
-    event.delayMilliseconds = delayMilliseconds(*event.delayTicks, secondsPerTick);
+  if (event.context.delayIsTempoRelative && event.context.delayTicks) {
+    event.context.delayMilliseconds = delayMilliseconds(*event.context.delayTicks, secondsPerTick);
   }
 }
 
 [[nodiscard]] bool isTempoRelative(const PerformanceEvent& event) {
   if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
-    return modulation->cyclesPerTick.has_value() || modulation->delayIsTempoRelative;
+    return modulation->context.cyclesPerTick.has_value() || modulation->context.delayIsTempoRelative;
   }
   if (const auto* delay = std::get_if<VibratoDelayPerformanceEvent>(&event)) {
     return delay->tempoRelative;
@@ -169,7 +169,7 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
         }
         auto& trackState = states[trackIndex];
         const auto appendRate = [&](const std::optional<ModulationPerformanceEvent>& rate) {
-          if (!rate || !rate->cyclesPerTick) {
+          if (!rate || !rate->context.cyclesPerTick) {
             return;
           }
           auto update = *rate;
@@ -206,7 +206,7 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
     if (auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
       resolveContext(*modulation, secondsPerTick);
       if (auto* rate = relativeRate(state, modulation->target)) {
-        if (modulation->cyclesPerTick) {
+        if (modulation->context.cyclesPerTick) {
           *rate = *modulation;
         } else {
           rate->reset();
