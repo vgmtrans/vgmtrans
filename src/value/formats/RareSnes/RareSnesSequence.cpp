@@ -559,9 +559,6 @@ struct ProgramState {
     for (const TrackProgram& track : program.tracks) {
       for (const SourceCommand& command : track.commands) {
         sourceRanges.emplace(command.address.value, command.range);
-        if (command.semantic == SequenceSemantic::Jump && !command.flow.additionalTargets.empty()) {
-          conditionalDestinations.emplace(command.address.value, command.flow.additionalTargets);
-        }
       }
     }
     resetRuntime();
@@ -620,7 +617,6 @@ struct ProgramState {
   u8 initialTimer = 0;
   std::vector<u8> srcns;
   std::map<u32, SourceRange> sourceRanges;
-  std::map<u32, std::vector<Address>> conditionalDestinations;
   u8 tempo = 0;
   u8 timer = 0;
   s8 masterLeft = 0x7f;
@@ -957,13 +953,12 @@ struct Playback {
     return vm.return_();
   }
 
-  [[nodiscard]] Effects conditional(Address command) {
-    const auto found = program.conditionalDestinations.find(command.value);
-    if (found == program.conditionalDestinations.end() || found->second.empty()) {
+  [[nodiscard]] Effects conditional(const std::vector<Address>& destinations) {
+    if (destinations.empty()) {
       return vm.end();
     }
-    const size_t index = std::min<size_t>(program.condition, found->second.size() - 1);
-    return vm.finiteBranch(found->second[index]);
+    const size_t index = std::min<size_t>(program.condition, destinations.size() - 1);
+    return vm.finiteBranch(destinations[index]);
   }
 
   void savePreset(u8 slot, s8 left, s8 right, u8 adsr1, u8 adsr2, u8 keyoff, Address source) {
@@ -1247,16 +1242,16 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   return event.invoke<&Playback::note>(encoded, duration);
 }
 
-[[nodiscard]] std::vector<Address> conditionalDestinations(ByteReader reader, u32 position, u32 floor) {
-  std::vector<Address> result;
+[[nodiscard]] u32 conditionalDestinationCount(ByteReader reader, u32 position, u32 floor) {
+  u32 count = 0;
   for (u32 index = 0; index < 16 && reader.has(position + index * 2, 2); ++index) {
     const u16 address = reader.le16(position + index * 2);
     if (address < floor || !reader.has(address, 1)) {
       break;
     }
-    result.push_back(Address{address});
+    ++count;
   }
-  return result;
+  return count;
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, Profile profile, u32 trackNumber, u32 begin,
@@ -1488,13 +1483,16 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case Kind::ConditionalJump: {
       auto event = cursor.command("Conditional Jump", SequenceSemantic::Jump);
-      const auto destinations = conditionalDestinations(reader, begin + 1, sequenceDataFloor);
-      for (u32 index = 0; index < destinations.size(); ++index) {
+      const u32 destinationCount = conditionalDestinationCount(reader, begin + 1, sequenceDataFloor);
+      std::vector<Address> destinations;
+      destinations.reserve(destinationCount);
+      for (u32 index = 0; index < destinationCount; ++index) {
         const Address destination =
             event.addressLe(fmt::format("destination_{}", index), SemanticOperandRole::JumpTarget);
         event.mayBranchTo(destination);
+        destinations.push_back(destination);
       }
-      return event.invokeFlow<&Playback::conditional>(source);
+      return event.invokeFlow<&Playback::conditional>(std::move(destinations));
     }
     case Kind::SetCondition: {
       auto event = cursor.command("Set Conditional Index", SequenceSemantic::State);
@@ -1770,7 +1768,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         }
         break;
       case Kind::ConditionalJump:
-        for (const Address destination : decoded.flow.additionalTargets) {
+        for (const Address destination : decoded.discoveryTargets) {
           queue(destination, nextState, point.returns);
         }
         break;

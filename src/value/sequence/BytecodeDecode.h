@@ -14,6 +14,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -28,12 +29,51 @@ struct DecodedCommandPresentation {
   CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback;
 };
 
-// Temporary decoded form used while a bytecode decoder is deciding control flow.
-// TrackProgram retains the final source-command snapshot.
+using SemanticOperandValue = std::variant<bool, u64, s64, double, Address, std::string>;
+
+// The role is intentionally small and format-independent. Operand names are
+// each format's vocabulary; roles let generic projection and transient format
+// analysis recognize the few relationships shared by all drivers.
+enum class SemanticOperandRole : u8 {
+  Value,
+  Channel,
+  NoteKey,
+  Duration,
+  Pitch,
+  Level,
+  Pan,
+  Modulation,
+  State,
+  Count,
+  Address,
+  JumpTarget,
+  CallTarget,
+  LoopTarget,
+  RepeatTarget,
+  Instrument,
+  InstrumentBank,
+  InstrumentProgram,
+  InstrumentTablePointer,
+};
+
+struct SemanticOperand {
+  SemanticOperandValue value;
+  SourceRange range;
+  std::string name;
+  SourceValueDisplay display = SourceValueDisplay::Default;
+  SemanticOperandRole role = SemanticOperandRole::Value;
+  std::optional<SemanticOperandValue> encodedValue;
+  std::string encodedName;
+  SourceValueDisplay encodedDisplay = SourceValueDisplay::Default;
+};
+
+// Temporary decoded form used for reachability, source annotation projection,
+// and any format-specific analysis that must observe command fields.
 struct DecodedBytecodeCommand {
   SourceRange range;
   u8 opcode = 0;
   CommandFlow flow;
+  std::vector<Address> discoveryTargets;
   std::vector<SemanticOperand> operands;
   CommandExecution execution;
   DecodedCommandPresentation presentation;
@@ -76,11 +116,15 @@ void decodeBytecode(ByteReader reader, u32 bytecodeEnd, std::span<const Address>
       ++decodedCommands;
       // Jump and call targets start new blocks. The next sequential command stays
       // in this inner loop.
-      decoded.flow.forEachDiscoveryTarget([&](Address target) {
+      if (const auto target = decoded.flow.defaultDestination();
+          target && target->value < bytecodeEnd && !commands.hasCommand(target->value)) {
+        pendingBlocks.push_back(target->value);
+      }
+      for (const Address target : decoded.discoveryTargets) {
         if (target.value < bytecodeEnd && !commands.hasCommand(static_cast<u32>(target.value))) {
           pendingBlocks.push_back(target.value);
         }
-      });
+      }
       const auto next = decoded.flow.discoveryContinuation();
       commands.findOrAppend(std::move(decoded), offset);
       if (!next) {

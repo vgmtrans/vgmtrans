@@ -70,14 +70,15 @@ const SourceAnnotation* annotationWithKind(const SourceMap& sourceMap, SourceId 
 }
 
 TrackProgram decodeFixtureTrack(const std::vector<u8>& bytes, AkaoPs1Version version, u32 start, u32 end,
-                                SourceMapBuilder* sourceMap = nullptr, SourceId source = SourceId{20}) {
+                                SourceMapBuilder* sourceMap = nullptr, SourceId source = SourceId{20},
+                                AkaoSequenceReferences* references = nullptr) {
   const TrackDecodeScope tracks{
       .reader = ByteReader(source, bytes),
       .bytecodeEnd = end,
       .maxCommands = 64,
       .sourceMap = sourceMap,
   };
-  return decodeAkaoTrack(version, tracks, 0, start);
+  return decodeAkaoTrack(version, tracks, 0, start, nullptr, references);
 }
 
 AkaoSequenceAnalysis analyzeFixtureTrack(const std::vector<u8>& bytes, AkaoPs1Version version, u32 start, u32 end) {
@@ -87,7 +88,7 @@ AkaoSequenceAnalysis analyzeFixtureTrack(const std::vector<u8>& bytes, AkaoPs1Ve
       .length = end,
       .version = version,
   };
-  analysis.references = akaoSequenceReferences(decodeFixtureTrack(bytes, version, start, end));
+  static_cast<void>(decodeFixtureTrack(bytes, version, start, end, nullptr, SourceId{20}, &analysis.references));
   return analysis;
 }
 

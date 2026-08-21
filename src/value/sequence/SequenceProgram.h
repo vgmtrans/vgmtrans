@@ -15,8 +15,6 @@
 #include <functional>
 #include <optional>
 #include <string>
-#include <string_view>
-#include <variant>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -65,14 +63,13 @@ struct SequenceRuntime {
   [[nodiscard]] bool valid() const noexcept { return execute != nullptr; }
 };
 
-// Decoded command flow drives discovery and supplies the runtime default.
-// continuation is recorded independently because every encoded command has a
-// physical successor even when its default transition is a jump, call, return,
-// or end.
+// Executable command flow supplies the runtime default and primary discovery
+// path. continuation is recorded independently because every encoded command
+// has a physical successor even when its default transition is a jump, call,
+// return, or end. Decoder-only alternatives never reach this durable value.
 struct CommandFlow {
   Address continuation;
   CommandTransition defaultTransition;
-  std::vector<Address> additionalTargets;
 
   [[nodiscard]] static CommandFlow fallthroughTo(Address continuation) {
     return CommandFlow{
@@ -131,17 +128,6 @@ struct CommandFlow {
     return std::nullopt;
   }
 
-  template <class Visitor>
-  void forEachDiscoveryTarget(Visitor&& visitor) const {
-    if (defaultTransition.kind == CommandTransitionKind::Jump ||
-        defaultTransition.kind == CommandTransitionKind::Call) {
-      std::invoke(visitor, defaultTransition.destination);
-    }
-    for (const Address target : additionalTargets) {
-      std::invoke(visitor, target);
-    }
-  }
-
   [[nodiscard]] bool endsPlayback() const noexcept {
     return defaultTransition.kind == CommandTransitionKind::End ||
            defaultTransition.kind == CommandTransitionKind::EndSection;
@@ -162,7 +148,6 @@ struct CommandFlow {
   }
 };
 
-using SemanticOperandValue = std::variant<bool, u64, s64, double, Address, std::string>;
 // Compiled programs are process-local executable values. One erased callable
 // retains a source command's typed behavior without a second argument language.
 using CommandBody = std::function<Effects(void* playback)>;
@@ -179,65 +164,19 @@ struct CommandExecution {
   [[nodiscard]] bool valid() const noexcept { return static_cast<bool>(body); }
 };
 
-// The role is intentionally small and format-independent. Operand names are the
-// executor's precise vocabulary; roles let generic analysis and SourceMap
-// projection recognize the few relationships shared by all drivers.
-enum class SemanticOperandRole : u8 {
-  Value,
-  Channel,
-  NoteKey,
-  Duration,
-  Pitch,
-  Level,
-  Pan,
-  Modulation,
-  State,
-  Count,
-  Address,
-  JumpTarget,
-  CallTarget,
-  LoopTarget,
-  RepeatTarget,
-  Instrument,
-  InstrumentBank,
-  InstrumentProgram,
-  InstrumentTablePointer,
-};
-
-struct SemanticOperand {
-  // These values describe the source command for annotations and analysis.
-  // Compiler-cursor playback captures its typed values independently. The
-  // optional encoded form is useful only when showing both raw and resolved
-  // values materially improves the source presentation.
-  SemanticOperandValue value;
-  SourceRange range;
-  std::string name;
-  SourceValueDisplay display = SourceValueDisplay::Default;
-  SemanticOperandRole role = SemanticOperandRole::Value;
-  std::optional<SemanticOperandValue> encodedValue;
-  std::string encodedName;
-  SourceValueDisplay encodedDisplay = SourceValueDisplay::Default;
-};
-
-[[nodiscard]] SourceValue semanticOperandSourceValue(const SemanticOperandValue& value);
-
-// One decoded source opcode. Commands retain source metadata, discovery flow,
-// and source-free execution data. Encoded bytes remain in SourceStore and are
-// reached through range when a view needs them.
+// One executable source opcode. Detailed decoded fields and alternative
+// discovery targets are projected into SourceMap and discarded before this
+// durable program is assembled.
 struct SourceCommand {
   u8 opcode = 0;
   Address address;
   SourceRange range;
   SourceAnnotationId annotation;
   SequenceSemantic semantic = SequenceSemantic::Unknown;
-  std::vector<SemanticOperand> operands;
+  std::optional<u32> sourceChannel;
   CommandFlow flow;
   CommandExecution execution;
 };
-
-// Operand names are presentation vocabulary for source inspection and analysis.
-// This lookup is not part of compiler-cursor playback.
-[[nodiscard]] const SemanticOperand* semanticOperand(const SourceCommand& command, std::string_view name);
 
 struct TrackProgram {
   u32 sourceTrackNumber = 0;

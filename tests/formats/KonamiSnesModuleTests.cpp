@@ -897,15 +897,23 @@ void konamiSnesCompilerCursorDecodesVersionedFlowAndTruncation() {
       0xff,                                // return from the call
       0xff,                                // alternate target
   };
-  const TrackProgram flow = decodeKonamiSnesSourceTrack(ByteReader(SourceId{30}, flowBytes), KONAMISNES_V1, 0, 0);
+  SourceMapBuilder flowSourceMapBuilder;
+  const TrackProgram flow =
+      decodeKonamiSnesSourceTrack(ByteReader(SourceId{30}, flowBytes), KONAMISNES_V1, 0, 0, &flowSourceMapBuilder);
+  const SourceMap flowSourceMap = flowSourceMapBuilder.finish();
   const auto conditionalIndex = flow.commandIndex(Address{0});
   const auto callIndex = flow.commandIndex(Address{8});
   expect(conditionalIndex && callIndex, "Konami compiler decoding should retain reachable branch and call blocks");
   const SourceCommand& conditional = flow.commands[*conditionalIndex];
   const SourceCommand& call = flow.commands[*callIndex];
-  expect(conditional.flow.defaultDestination() && conditional.flow.defaultDestination()->value == 8 &&
-             conditional.flow.additionalTargets.size() == 1 && conditional.flow.additionalTargets.front().value == 12,
-         "Konami conditional jump should expose both decoded branch targets");
+  const SourceAnnotation& conditionalAnnotation = commandAnnotation(flowSourceMap, conditional);
+  const bool hasAlternateTarget = std::ranges::any_of(conditionalAnnotation.links, [](const SourceLink& link) {
+    const auto* range = std::get_if<SourceRange>(&link.target);
+    return link.role == SourceLinkRole::JumpTarget && range != nullptr && range->offset == 12;
+  });
+  expect(
+      conditional.flow.defaultDestination() && conditional.flow.defaultDestination()->value == 8 && hasAlternateTarget,
+      "Konami conditional jump should expose both decoded branch targets");
   expect(call.flow.callTarget() && call.flow.defaultDestination()->value == 12,
          "Konami call should expose its decoded little-endian target");
   expect(std::ranges::all_of(flow.commands, [](const SourceCommand& command) { return command.range.size != 0; }),

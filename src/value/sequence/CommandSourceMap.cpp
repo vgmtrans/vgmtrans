@@ -14,10 +14,24 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 namespace vgmtrans::core {
 
 namespace {
+
+[[nodiscard]] SourceValue sourceValue(const SemanticOperandValue& value) {
+  return std::visit(
+      [](const auto& typedValue) -> SourceValue {
+        using T = std::decay_t<decltype(typedValue)>;
+        if constexpr (std::is_same_v<T, Address>) {
+          return makeSourceValue(typedValue.value);
+        } else {
+          return makeSourceValue(typedValue);
+        }
+      },
+      value);
+}
 
 [[nodiscard]] std::optional<SourceAnnotationId> createTrackAnnotation(
     ByteReader reader, u32 trackIndex, u32 startOffset, std::optional<AssetId> sequenceAsset,
@@ -105,18 +119,23 @@ void projectOperand(AnnotationBuilder& annotation, const SemanticOperand& operan
     const std::string_view encodedName =
         operand.encodedName.empty() ? std::string_view{operand.name} : std::string_view{operand.encodedName};
     if (operand.range.valid()) {
-      annotation.field(encodedName, operand.range, semanticOperandSourceValue(*operand.encodedValue),
-                       operand.encodedDisplay);
+      annotation.field(encodedName, operand.range, sourceValue(*operand.encodedValue), operand.encodedDisplay);
     }
-    annotation.derived(operand.name, semanticOperandSourceValue(operand.value), operand.display);
+    annotation.derived(operand.name, sourceValue(operand.value), operand.display);
     return;
   }
 
   if (operand.range.valid()) {
-    annotation.field(operand.name, operand.range, semanticOperandSourceValue(operand.value), operand.display);
+    annotation.field(operand.name, operand.range, sourceValue(operand.value), operand.display);
   } else {
-    annotation.derived(operand.name, semanticOperandSourceValue(operand.value), operand.display);
+    annotation.derived(operand.name, sourceValue(operand.value), operand.display);
   }
+}
+
+[[nodiscard]] std::optional<u32> sourceChannel(const DecodedBytecodeCommand& command) {
+  const auto found = std::ranges::find_if(
+      command.operands, [](const SemanticOperand& operand) { return operand.role == SemanticOperandRole::Channel; });
+  return found == command.operands.end() ? std::nullopt : operandUnsigned32(*found);
 }
 
 [[nodiscard]] SourceAnnotationId projectDecodedCommand(SourceMapBuilder* sourceMap,
@@ -203,7 +222,7 @@ TrackProgram TrackDecodeSession::finish() {
         .range = decoded.range,
         .annotation = annotation,
         .semantic = decoded.presentation.semantic,
-        .operands = std::move(decoded.operands),
+        .sourceChannel = sourceChannel(decoded),
         .flow = std::move(decoded.flow),
         .execution = std::move(decoded.execution),
     });

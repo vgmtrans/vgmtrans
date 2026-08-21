@@ -9,7 +9,6 @@
 #include "value/base/Source.h"
 
 #include <algorithm>
-#include <type_traits>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -52,25 +51,6 @@ SourceRange sequenceSourceRange(ByteReader reader, SourceRange baseRange, const 
     }
   }
   return reader.range(first, last - first);
-}
-
-const SemanticOperand* semanticOperand(const SourceCommand& command, std::string_view name) {
-  const auto found =
-      std::ranges::find_if(command.operands, [name](const SemanticOperand& operand) { return operand.name == name; });
-  return found != command.operands.end() ? &*found : nullptr;
-}
-
-SourceValue semanticOperandSourceValue(const SemanticOperandValue& value) {
-  return std::visit(
-      [](const auto& typedValue) -> SourceValue {
-        using T = std::decay_t<decltype(typedValue)>;
-        if constexpr (std::is_same_v<T, Address>) {
-          return makeSourceValue(typedValue.value);
-        } else {
-          return makeSourceValue(typedValue);
-        }
-      },
-      value);
 }
 
 }  // namespace vgmtrans::core
