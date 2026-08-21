@@ -38,6 +38,18 @@ std::optional<SourceRange> SourceFile::segmentRange(std::string_view segmentName
 ByteReader::ByteReader(SourceId source, std::span<const u8> bytes) : source_(source), bytes_(bytes) {
 }
 
+RetainedSource::RetainedSource(SourceId source, SharedSourceBytes bytes) : source_(source), bytes_(std::move(bytes)) {
+}
+
+RetainedSource RetainedSource::copyOf(ByteReader reader) {
+  const auto bytes = reader.slice(0, reader.size());
+  return RetainedSource{reader.source(), std::make_shared<const std::vector<u8>>(bytes.begin(), bytes.end())};
+}
+
+ByteReader RetainedSource::reader() const noexcept {
+  return ByteReader{source_, bytes_ ? std::span<const u8>{*bytes_} : std::span<const u8>{}};
+}
+
 bool ByteReader::has(u64 offset, u64 size) const noexcept {
   if (offset > bytes_.size()) {
     return false;

@@ -141,8 +141,7 @@ void supplementLiveRecipes(core::ByteReader reader, const Layout& layout, Sequen
                                            core::SourceMapBuilder* sourceMap = nullptr,
                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
-[[nodiscard]] core::SequenceRuntime sequenceRuntime(Version version, u8 timebaseShift, bool velocityEnabled,
-                                                    std::vector<u32> tables, u8 initialEchoMask = 0);
+[[nodiscard]] core::SequenceRuntime sequenceRuntime(Version version, ParsedHeader header);
 [[nodiscard]] std::optional<core::ScanSoundBankRef> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
                                                              const SequenceRecipes& recipes,
                                                              std::string_view displayName);

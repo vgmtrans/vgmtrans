@@ -14,7 +14,6 @@
 #include <array>
 #include <cmath>
 #include <limits>
-#include <span>
 #include <string>
 #include <utility>
 
@@ -29,66 +28,17 @@ constexpr std::array<u8, 32> kVolumeTable{
     0x1f, 0x24, 0x28, 0x2d, 0x31, 0x36, 0x3a, 0x3f, 0x47, 0x4f, 0x57, 0x5f, 0x67, 0x6f, 0x77, 0x7f,
 };
 
-enum class Table : u8 {
-  Pitch,
+enum class Curve : u8 {
   Volume,
   Vibrato,
   Gain,
   Pan,
   Echo,
-  Count,
 };
-
-constexpr size_t kPatchBase = 0;
-constexpr size_t kAdsrBase = kPatchBase + 64;
-constexpr size_t kPercussionBase = kAdsrBase + 128;
-constexpr size_t kDescriptorBase = kPercussionBase + 30 * 2;
-constexpr size_t kDescriptorStride = 256 * 2;
-constexpr size_t kPayloadBase = kDescriptorBase + static_cast<size_t>(Table::Count) * kDescriptorStride;
-
-[[nodiscard]] size_t descriptor(Table table, u8 index) {
-  return kDescriptorBase + static_cast<size_t>(table) * kDescriptorStride + index * 2u;
-}
-
-[[nodiscard]] std::span<const u32> table(const std::vector<u32>& data, Table kind, u8 index) {
-  const size_t desc = descriptor(kind, index);
-  if (desc + 1 >= data.size()) {
-    return {};
-  }
-  const size_t offset = data[desc];
-  const size_t count = data[desc + 1];
-  if (offset > data.size() || count > data.size() - offset) {
-    return {};
-  }
-  return std::span{data}.subspan(offset, count);
-}
-
-void appendTable(std::vector<u32>& data, Table kind, u8 index, std::vector<u32> values) {
-  if (values.empty()) {
-    return;
-  }
-  const size_t desc = descriptor(kind, index);
-  data[desc] = static_cast<u32>(data.size());
-  data[desc + 1] = static_cast<u32>(values.size());
-  data.insert(data.end(), values.begin(), values.end());
-}
 
 [[nodiscard]] u16 pointer(ByteReader reader, u16 list, u8 index) {
   const u32 address = list + index * 2u;
   return reader.has(address, 2) ? reader.le16(address) : u16{0};
-}
-
-[[nodiscard]] std::vector<u32> copyBytes(ByteReader reader, u16 address, u32 count = 256) {
-  std::vector<u32> result;
-  if (address == 0 || reader.size() != kAramSize) {
-    return result;
-  }
-  count = std::min<u32>(count, kAramSize);
-  result.reserve(count);
-  for (u32 index = 0; index < count; ++index) {
-    result.push_back(reader.u8At(static_cast<u16>(address + index)));
-  }
-  return result;
 }
 
 [[nodiscard]] u16 pitchAddress(ByteReader reader, const Layout& layout, u8 index) {
@@ -99,73 +49,133 @@ void appendTable(std::vector<u32>& data, Table kind, u8 index, std::vector<u32> 
   return reader.has(address, 242) ? address : layout.regularPitchTableAddress;
 }
 
-[[nodiscard]] std::vector<u32> runtimeData(ByteReader reader, const Layout& layout, const ReferencedData& references) {
-  std::vector<u32> data(kPayloadBase);
-  std::set<u8> pitchTables{0};
-  for (u32 srcn = 0; srcn < 64; ++srcn) {
-    const u32 address = layout.tuningTableAddress + srcn * (layout.early() ? 1u : 2u);
-    if (!reader.has(address, layout.early() ? 1 : 2)) {
-      continue;
-    }
-    const u8 pitchIndex = layout.early() ? 0 : reader.u8At(address + 1);
-    data[kPatchBase + srcn] = reader.u8At(address) | (static_cast<u32>(pitchIndex) << 8);
-    if (references.programs.contains(static_cast<u8>(srcn))) {
-      pitchTables.insert(pitchIndex);
-    }
+struct TrackHeader {
+  u8 channel = 0;
+  u8 flags = 0;
+  u8 volume = 0;
+  u8 volumeEnvelope = 0;
+  u8 vibrato = 0;
+  s8 transpose = 0;
+  u8 tempo = 0;
+  u8 branchId = 0;
+  u8 program = 0;
+  u8 adsr = 0;
+  s8 pan = 0;
+};
+
+// A bounded, wrapping view of one SPC700 driver table.
+class DriverTable {
+public:
+  DriverTable() = default;
+  DriverTable(ByteReader reader, u16 address, size_t size) : reader_(reader), address_(address), size_(size) {}
+
+  [[nodiscard]] bool empty() const noexcept { return size_ == 0; }
+  [[nodiscard]] size_t size() const noexcept { return size_; }
+  [[nodiscard]] u16 address() const noexcept { return address_; }
+  [[nodiscard]] u8 operator[](size_t index) const {
+    return reader_.u8At(static_cast<u16>(address_ + static_cast<u16>(index)));
   }
-  for (u32 index = 0; index < 128; ++index) {
-    const u32 address = layout.adsrTableAddress + index * 2u;
-    if (reader.has(address, 2)) {
-      data[kAdsrBase + index] = reader.u8At(address) | (static_cast<u32>(reader.u8At(address + 1)) << 8);
+
+private:
+  ByteReader reader_;
+  u16 address_ = 0;
+  size_t size_ = 0;
+};
+
+// Typed access to the original driver tables replaces the private packed-word
+// image previously assembled solely for deferred playback.
+class DriverData {
+public:
+  DriverData(RetainedSource source, Layout layout) : source_(std::move(source)), layout_(std::move(layout)) {}
+
+  [[nodiscard]] bool early() const noexcept { return layout_.early(); }
+  [[nodiscard]] bool echoCapable() const noexcept { return layout_.hasEchoCommands(); }
+  [[nodiscard]] bool stereoEnabled() const noexcept { return layout_.stereoEnabled; }
+
+  [[nodiscard]] TrackHeader trackHeader(u32 index) const {
+    const ByteReader reader = source_.reader();
+    const u32 item = layout_.songHeaderAddress + 1 + index * 14u;
+    if (!reader.has(item, 14)) {
+      return {};
     }
+    return TrackHeader{
+        .channel = reader.u8At(item),
+        .flags = reader.u8At(item + 1),
+        .volume = reader.u8At(item + 2),
+        .volumeEnvelope = reader.u8At(item + 3),
+        .vibrato = reader.u8At(item + 4),
+        .transpose = static_cast<s8>(reader.u8At(item + 5) + layout_.globalTranspose),
+        .tempo = reader.u8At(item + 6),
+        .branchId = reader.u8At(item + 7),
+        .program = reader.u8At(item + 10),
+        .adsr = reader.u8At(item + 11),
+        .pan = static_cast<s8>(reader.u8At(item + 12)),
+    };
   }
-  for (u32 index = 0; index < 30; ++index) {
-    const u32 address = layout.percussionTableAddress + index * 8u;
-    if (!reader.has(address, 8)) {
-      continue;
+
+  [[nodiscard]] u32 patch(u8 srcn) const {
+    if (srcn >= 64) {
+      return 0;
     }
-    u32 first = 0;
-    u32 second = 0;
-    for (u32 byte = 0; byte < 4; ++byte) {
-      first |= static_cast<u32>(reader.u8At(address + byte)) << (byte * 8);
-      second |= static_cast<u32>(reader.u8At(address + 4 + byte)) << (byte * 8);
+    const ByteReader reader = source_.reader();
+    const u32 address = layout_.tuningTableAddress + srcn * (early() ? 1u : 2u);
+    if (!reader.has(address, early() ? 1 : 2)) {
+      return 0;
     }
-    data[kPercussionBase + index * 2] = first;
-    data[kPercussionBase + index * 2 + 1] = second;
+    const u8 pitchIndex = early() ? 0 : reader.u8At(address + 1);
+    return reader.u8At(address) | (static_cast<u32>(pitchIndex) << 8);
   }
-  for (const u8 index : pitchTables) {
-    const u16 address = pitchAddress(reader, layout, index);
-    std::vector<u32> values(121);
-    for (u32 key = 0; key <= 120 && reader.has(address + key * 2u, 2); ++key) {
-      values[key] = reader.le16(address + key * 2u);
-    }
-    appendTable(data, Table::Pitch, index, std::move(values));
+
+  [[nodiscard]] u16 pitch(u8 tableIndex, u8 key) const {
+    const ByteReader reader = source_.reader();
+    const u16 table = pitchAddress(reader, layout_, tableIndex);
+    const u32 address = table + key * 2u;
+    return key <= 120 && reader.has(address, 2) ? reader.le16(address) : u16{0};
   }
-  const auto addCurves = [&](Table kind, u16 list, const std::set<u8>& indices) {
-    for (const u8 index : indices) {
-      if (index != 0) {
-        appendTable(data, kind, index, copyBytes(reader, pointer(reader, list, index)));
-      }
-    }
-  };
-  addCurves(Table::Volume, layout.volumeEnvelopeTableAddress, references.volumeEnvelopes);
-  addCurves(Table::Vibrato, layout.vibratoTableAddress, references.vibratos);
-  addCurves(Table::Gain, layout.gainEnvelopeTableAddress, references.gainEnvelopes);
-  for (const u8 index : references.panEnvelopes) {
-    if (index == 0) {
-      continue;
-    }
-    const u16 address = pointer(reader, layout.panEnvelopeTableAddress, index);
-    std::vector<u32> curve{address};
-    std::vector<u32> bytes = copyBytes(reader, address);
-    curve.insert(curve.end(), bytes.begin(), bytes.end());
-    appendTable(data, Table::Pan, index, std::move(curve));
+
+  [[nodiscard]] u16 adsr(u8 index) const {
+    const ByteReader reader = source_.reader();
+    const u32 address = layout_.adsrTableAddress + index * 2u;
+    return index < 128 && reader.has(address, 2) ? reader.le16(address) : u16{0};
   }
-  for (const u8 index : references.echoPresets) {
-    appendTable(data, Table::Echo, index, copyBytes(reader, pointer(reader, layout.echoPresetTableAddress, index), 16));
+
+  [[nodiscard]] std::pair<u32, u32> percussion(u8 index) const {
+    const ByteReader reader = source_.reader();
+    const u32 address = layout_.percussionTableAddress + index * 8u;
+    return index < 30 && reader.has(address, 8) ? std::pair{reader.le32(address), reader.le32(address + 4)}
+                                                : std::pair<u32, u32>{};
   }
-  return data;
-}
+
+  [[nodiscard]] DriverTable curve(Curve kind, u8 index) const {
+    u16 list = 0;
+    size_t size = 256;
+    switch (kind) {
+      case Curve::Volume:
+        list = layout_.volumeEnvelopeTableAddress;
+        break;
+      case Curve::Vibrato:
+        list = layout_.vibratoTableAddress;
+        break;
+      case Curve::Gain:
+        list = layout_.gainEnvelopeTableAddress;
+        break;
+      case Curve::Pan:
+        list = layout_.panEnvelopeTableAddress;
+        break;
+      case Curve::Echo:
+        list = layout_.echoPresetTableAddress;
+        size = 16;
+        break;
+    }
+    const ByteReader reader = source_.reader();
+    const u16 address = pointer(reader, list, index);
+    return address != 0 && reader.size() == kAramSize ? DriverTable{reader, address, size} : DriverTable{};
+  }
+
+private:
+  RetainedSource source_;
+  Layout layout_{};
+};
 
 namespace math {
 
@@ -251,7 +261,7 @@ struct CurveState {
     position = -1;
   }
 
-  [[nodiscard]] bool advance(std::span<const u32> bytes, bool noteActive = false) {
+  [[nodiscard]] bool advance(const DriverTable& bytes, bool noteActive = false) {
     if (index == 0 || bytes.empty()) {
       return false;
     }
@@ -313,31 +323,12 @@ struct CurveState {
   }
 };
 
-struct RuntimeTrackConfig {
-  u8 channel = 0;
-  u8 flags = 0;
-  u8 volume = 0;
-  u8 volumeEnvelope = 0;
-  u8 vibrato = 0;
-  s8 transpose = 0;
-  u8 tempo = 0;
-  u8 branchId = 0;
-  u8 program = 0;
-  u8 adsr = 0;
-  s8 pan = 0;
-};
-
-struct RuntimeConfig {
-  Version version = Version::JakiCrush;
-  bool echoCapable = false;
-  bool stereoEnabled = false;
-  std::vector<u32> data;
-  std::vector<RuntimeTrackConfig> tracks;
-};
-
 struct ProgramState {
-  explicit ProgramState(const RuntimeConfig& config) : data(&config.data), echoCapable(config.echoCapable) {
-    const auto preset = table(*data, Table::Echo, 0);
+  explicit ProgramState(const DriverData& data) : data(&data), echoCapable(data.echoCapable()) {
+    if (!echoCapable) {
+      return;
+    }
+    const auto preset = data.curve(Curve::Echo, 0);
     if (preset.size() >= 16) {
       echo.delayMilliseconds = (preset[1] & 0x0f) * 16.0;
       const StereoBalance pan = math::panGains(static_cast<s8>(preset[3]), static_cast<u8>(preset[7]));
@@ -348,29 +339,28 @@ struct ProgramState {
     }
   }
 
-  const std::vector<u32>* data;
+  const DriverData* data;
   bool echoCapable = false;
   bool echoGloballyEnabled = false;
   ReverbPerformanceEvent echo;
 };
 
 struct TrackState {
-  TrackState(const TrackProgram& source, const RuntimeConfig& config)
-      : trackNumber(source.sourceTrackNumber), early(config.version <= Version::JakiCrush),
-        stereoEnabled(config.stereoEnabled) {
-    const auto& track = config.tracks.at(source.sourceTrackNumber);
-    channel = track.channel;
-    headerFlags = track.flags;
-    volume = static_cast<u8>(track.volume & 0x1f);
-    volumeEnvelope.reset(track.volumeEnvelope, 31);
-    vibrato.reset(track.vibrato, 0);
-    transpose = track.transpose;
-    tempo = track.tempo;
+  TrackState(const TrackProgram& source, const DriverData& data)
+      : trackNumber(source.sourceTrackNumber), early(data.early()), stereoEnabled(data.stereoEnabled()) {
+    const TrackHeader header = data.trackHeader(source.sourceTrackNumber);
+    channel = header.channel;
+    headerFlags = header.flags;
+    volume = static_cast<u8>(header.volume & 0x1f);
+    volumeEnvelope.reset(header.volumeEnvelope, 31);
+    vibrato.reset(header.vibrato, 0);
+    transpose = header.transpose;
+    tempo = header.tempo;
     tempoAccumulator = static_cast<u8>(tempo - 1u);
-    branchId = track.branchId;
-    program = track.program;
-    adsr = track.adsr;
-    pan = stereoEnabled ? track.pan : 0;
+    branchId = header.branchId;
+    program = header.program;
+    adsr = header.adsr;
+    pan = stereoEnabled ? header.pan : 0;
     slur = (headerFlags & 0x10) != 0;
   }
 
@@ -425,7 +415,7 @@ struct Playback {
   VmApi& vm;
   ProgramState& programState;
 
-  [[nodiscard]] const std::vector<u32>& data() const { return *programState.data; }
+  [[nodiscard]] const DriverData& data() const { return *programState.data; }
 
   void beforeCommand() {
     if (track.initialized) {
@@ -443,15 +433,14 @@ struct Playback {
     }
   }
 
-  [[nodiscard]] u32 patch(u8 srcn) const { return srcn < 64 ? data()[kPatchBase + srcn] : 0; }
+  [[nodiscard]] u32 patch(u8 srcn) const { return data().patch(srcn); }
 
   [[nodiscard]] u16 pitchForSequenceNote(u8 note) const {
     const u32 patchData = patch(track.program);
     const s8 patchTranspose = static_cast<s8>(patchData & 0xff);
     const u8 pitchIndex = static_cast<u8>((patchData >> 8) & 0xff);
     const u8 key = static_cast<u8>(note + patchTranspose);
-    const auto pitches = table(data(), Table::Pitch, pitchIndex);
-    return key > 0 && key < 0x79 && key < pitches.size() ? static_cast<u16>(pitches[key]) : 0;
+    return key > 0 && key < 0x79 ? data().pitch(pitchIndex, key) : 0;
   }
 
   [[nodiscard]] u8 sequenceNote(u8 rawNote) const { return static_cast<u8>(rawNote + track.transpose); }
@@ -462,15 +451,15 @@ struct Playback {
     const u32 patchData = patch(track.program);
     const s8 patchTranspose = static_cast<s8>(patchData & 0xff);
     const u8 pitchIndex = static_cast<u8>((patchData >> 8) & 0xff);
-    const auto pitches = table(data(), Table::Pitch, pitchIndex);
     u32 nearest = 1;
     u16 pitch = 0;
     unsigned distance = std::numeric_limits<unsigned>::max();
-    for (u32 key = 1; key <= 120 && key < pitches.size(); ++key) {
-      const unsigned candidate = static_cast<unsigned>(std::abs(static_cast<int>(pitches[key]) - 0x1000));
+    for (u8 key = 1; key <= 120; ++key) {
+      const u16 candidatePitch = data().pitch(pitchIndex, key);
+      const unsigned candidate = static_cast<unsigned>(std::abs(static_cast<int>(candidatePitch) - 0x1000));
       if (candidate < distance) {
         nearest = key;
-        pitch = static_cast<u16>(pitches[key]);
+        pitch = candidatePitch;
         distance = candidate;
       }
     }
@@ -502,7 +491,7 @@ struct Playback {
     track.adsr = index;
     track.gainEnvelope.reset(0);
     if (index < 0x80) {
-      const u32 pair = data()[kAdsrBase + index];
+      const u16 pair = data().adsr(index);
       out.replaceEnvelope(driverEnvelope(static_cast<u8>(pair), static_cast<u8>(pair >> 8)),
                           VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
       return;
@@ -556,8 +545,7 @@ struct Playback {
       emitPan();
       return;
     }
-    const auto packed = table(data(), Table::Pan, index);
-    const auto curve = packed.size() > 1 ? packed.subspan(1) : std::span<const u32>{};
+    const auto curve = data().curve(Curve::Pan, index);
     track.panEnvelopeIndex = index;
     track.panPosition = 0;
     track.panAccumulator = 0x80;
@@ -698,12 +686,10 @@ struct Playback {
   }
 
   [[nodiscard]] Effects percussion(u8 index, u8 raw, u32 duration, u8 gate, bool updateDuration) {
-    const size_t base = kPercussionBase + index * 2u;
-    if (base + 1 >= data().size()) {
+    if (index >= 30) {
       return note(raw, duration, gate, updateDuration);
     }
-    const u32 first = data()[base];
-    const u32 second = data()[base + 1];
+    const auto [first, second] = data().percussion(index);
     program(static_cast<u8>(first));
     setAdsr(static_cast<u8>(first >> 8));
     volumeEnvelope(static_cast<u8>(first >> 16));
@@ -750,7 +736,7 @@ struct Playback {
     if (!programState.echoCapable) {
       return;
     }
-    const auto preset = table(data(), Table::Echo, index);
+    const auto preset = data().curve(Curve::Echo, index);
     if (preset.size() < 16) {
       return;
     }
@@ -791,8 +777,7 @@ struct Playback {
     if (!track.panEnvelopeActive) {
       return;
     }
-    const auto packed = table(data(), Table::Pan, track.panEnvelopeIndex);
-    const auto curve = packed.size() > 1 ? packed.subspan(1) : std::span<const u32>{};
+    const auto curve = data().curve(Curve::Pan, track.panEnvelopeIndex);
     const size_t p = track.panPosition;
     if (p + 7 >= curve.size()) {
       track.panEnvelopeActive = false;
@@ -818,11 +803,11 @@ struct Playback {
       return;
     }
     const u16 destination = static_cast<u16>(curve[p + 6] | (curve[p + 7] << 8));
-    if (destination == 0 || destination < packed[0] || destination - packed[0] >= curve.size()) {
+    if (destination == 0 || destination < curve.address() || destination - curve.address() >= curve.size()) {
       track.panEnvelopeActive = false;
       return;
     }
-    track.panPosition = static_cast<u16>(destination - packed[0]);
+    track.panPosition = static_cast<u16>(destination - curve.address());
     track.pan = static_cast<s8>(curve[track.panPosition]);
   }
 
@@ -847,9 +832,9 @@ struct Playback {
     bool gainChanged = false;
     for (u32 frame = 0; frame < frames; ++frame) {
       const bool active = track.rawNote != 0 && vm.tick() < track.activeUntil;
-      levelChanged |= track.volumeEnvelope.advance(table(data(), Table::Volume, track.volumeEnvelope.index), active);
-      pitchChanged |= track.vibrato.advance(table(data(), Table::Vibrato, track.vibrato.index), active);
-      gainChanged |= track.gainEnvelope.advance(table(data(), Table::Gain, track.gainEnvelope.index), active);
+      levelChanged |= track.volumeEnvelope.advance(data().curve(Curve::Volume, track.volumeEnvelope.index), active);
+      pitchChanged |= track.vibrato.advance(data().curve(Curve::Vibrato, track.vibrato.index), active);
+      gainChanged |= track.gainEnvelope.advance(data().curve(Curve::Gain, track.gainEnvelope.index), active);
       const s8 oldPan = track.pan;
       advancePanFrame();
       panChanged |= oldPan != track.pan;
@@ -1145,8 +1130,7 @@ struct DurationValue {
     }
     case 0x9d: {
       auto event = cursor.command("Gate", SequenceSemantic::State);
-      return event.set<&TrackState::gate>(
-          event.u8("gate", SourceValueDisplay::Hex, SemanticOperandRole::Duration));
+      return event.set<&TrackState::gate>(event.u8("gate", SourceValueDisplay::Hex, SemanticOperandRole::Duration));
     }
     case 0x9e: {
       auto event = cursor.command("Conditional Jump", SequenceSemantic::Jump);
@@ -1200,13 +1184,11 @@ struct DurationValue {
         auto event = cursor.command("Branch ID Jump", SequenceSemantic::Jump);
         const u8 branch = event.u8("branch_id");
         const Address destination = event.addressLe("destination", SemanticOperandRole::JumpTarget);
-        return event.invoke<&Playback::conditionalBranch>(branch, destination)
-            .mayBranchTo(destination);
+        return event.invoke<&Playback::conditionalBranch>(branch, destination).mayBranchTo(destination);
       }
     case 0xa6:
     case 0xa7:
-      return cursor.sourceOnly(opcode == 0xa6 ? "Pitch Modulation On" : "Pitch Modulation Off",
-                               "pitch-modulation");
+      return cursor.sourceOnly(opcode == 0xa6 ? "Pitch Modulation On" : "Pitch Modulation Off", "pitch-modulation");
     case 0xa8:
       if (layout.hasEchoCommands()) {
         auto event = cursor.command("Echo Preset", SequenceSemantic::State);
@@ -1301,11 +1283,12 @@ TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, u32 trac
                                std::vector<Diagnostic>* diagnostics) {
   const TrackDecodeScope tracks{.reader = reader, .maxCommands = kCommandLimit};
   return tracks.decode(trackNumber, startAddress,
-                          [&](u32 offset) { return decodeCommand(reader, offset, layout, diagnostics); });
+                       [&](u32 offset) { return decodeCommand(reader, offset, layout, diagnostics); });
 }
 
-SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
-                             std::vector<Diagnostic>* diagnostics) {
+SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetId sequenceId,
+                             SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+  const ByteReader reader = source.reader();
   const u8 count = reader.u8At(layout.songHeaderAddress);
   const SourceRange header = reader.range(layout.songHeaderAddress, 1 + count * 14u);
   ReferencedData references;
@@ -1329,31 +1312,8 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     references.echoPresets.insert(0);
   }
 
-  RuntimeConfig runtime{
-      .version = layout.version,
-      .echoCapable = layout.hasEchoCommands(),
-      .stereoEnabled = layout.stereoEnabled,
-      .data = runtimeData(reader, layout, references),
-      .tracks = std::vector<RuntimeTrackConfig>(count),
-  };
-  for (u32 track = 0; track < count; ++track) {
-    const u32 item = layout.songHeaderAddress + 1 + track * 14u;
-    runtime.tracks[track] = RuntimeTrackConfig{
-        .channel = reader.u8At(item),
-        .flags = reader.u8At(item + 1),
-        .volume = reader.u8At(item + 2),
-        .volumeEnvelope = reader.u8At(item + 3),
-        .vibrato = reader.u8At(item + 4),
-        .transpose = static_cast<s8>(reader.u8At(item + 5) + layout.globalTranspose),
-        .tempo = reader.u8At(item + 6),
-        .branchId = reader.u8At(item + 7),
-        .program = reader.u8At(item + 10),
-        .adsr = reader.u8At(item + 11),
-        .pan = static_cast<s8>(reader.u8At(item + 12)),
-    };
-  }
   SequenceProgram program =
-      sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime)));
+      sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(DriverData{std::move(source), layout}));
   return SequenceParse{.program = std::move(program), .references = std::move(references), .headerRange = header};
 }
 

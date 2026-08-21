@@ -67,14 +67,14 @@ void runChunSnesModuleTests() {
       .pitchEnvelopeTableAddress = 0x300,
       .echo = EchoState{.left = 32, .right = 24, .feedback = -16, .delay = 2},
   };
-  const SequenceParse parsed = decodeSequence(reader, layout, AssetId{1});
+  const SequenceParse parsed = decodeSequence(RetainedSource::copyOf(reader), layout, AssetId{1});
   expect(parsed.program.tracks.size() == 1, "ChunSnes should decode the active track");
   const TrackProgram& track = parsed.program.tracks.front();
   expect(track.commands.size() == 15 && track.commands[6].opcode == 0xfb && track.commands[10].opcode == 0x51,
          "top-level pattern end should preserve the following commands");
 
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
-  expect(performance.diagnostics.empty(), "ChunSnes compiled playback should be source-free and diagnostic-free");
+  expect(performance.diagnostics.empty(), "ChunSnes compiled playback should be diagnostic-free");
   expect(performance.tracks.size() == 1 && performance.tracks.front().endTick == 168,
          "ChunSnes note length and track end should follow the 48 PPQN driver timeline");
 
@@ -125,7 +125,7 @@ void runChunSnesModuleTests() {
   std::ranges::copy(follower, synchronizedAram.begin() + 0x420);
   std::ranges::copy(follower, synchronizedAram.begin() + 0x430);
 
-  const SequenceParse synchronized = decodeSequence(ByteReader(SourceId{2}, synchronizedAram),
+  const SequenceParse synchronized = decodeSequence(RetainedSource::copyOf(ByteReader(SourceId{2}, synchronizedAram)),
                                                     Layout{
                                                         .version = Version::Winter,
                                                         .sequenceHeaderAddress = 0x400,

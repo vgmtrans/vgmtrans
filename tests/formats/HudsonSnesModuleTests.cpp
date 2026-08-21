@@ -77,21 +77,19 @@ std::vector<const PitchTransitionIntent*> pitchTransitions(const PerformanceTrac
   return result;
 }
 
-std::vector<u32> runtimeData() {
-  std::vector<u32> data(512);
-  std::fill(data.begin() + 384, data.end(), 0xffffffffu);
-  data[0] = 0x8fe080;
+ParsedHeader runtimeData() {
+  ParsedHeader data;
+  data.recipes.instruments.push_back(InstrumentRow{.program = 0, .adsr1 = 0x8f, .adsr2 = 0xe0, .gain = 0x80});
   return data;
 }
 
 PerformanceSequence render(Version version, u8 shift, bool velocity, std::vector<u8> bytes,
-                           std::vector<u32> driverData = {}) {
+                           ParsedHeader driverData = runtimeData()) {
   const SequenceProgramConfig& config = sequenceConfig();
-  if (driverData.empty()) {
-    driverData = runtimeData();
-  }
+  driverData.timebaseShift = shift;
+  driverData.noteVelocity = velocity;
   SequenceProgram program{
-      .runtime = sequenceRuntime(version, shift, velocity, std::move(driverData)),
+      .runtime = sequenceRuntime(version, std::move(driverData)),
       .timebase = config.timebase,
       .behavior = config.behavior,
       .tracks = {decodeSourceTrack(ByteReader(SourceId{151}, bytes), version, shift, velocity, 0, 0)},
@@ -178,8 +176,8 @@ void scannerBuildsACompleteV2Collection() {
 }
 
 void earlyGateReleaseStateMachineMatchesSuperBomberman2() {
-  std::vector<u32> instruments = runtimeData();
-  instruments[0] = 0x8fe08a;
+  ParsedHeader instruments = runtimeData();
+  instruments.recipes.instruments.front().gain = 0x8a;
   const PerformanceSequence performance =
       render(Version::Early, 1, false, {0xd5, 8, 0x40, 3, 0x40, 3, 0xff}, std::move(instruments));
   const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
@@ -335,9 +333,8 @@ void conditionalDispatchAndEarlyOperandLayoutsMatchTheDriver() {
 }
 
 void customPitchAttackAndPercussionPreserveDriverCurvesAndMixerRows() {
-  std::vector<u32> customWave = runtimeData();
-  customWave[128] = (512u << 16) | (static_cast<u32>(LfoWaveform::Sine) << 8) | 3;
-  customWave.insert(customWave.end(), {static_cast<u8>(-64), 0, 64});
+  ParsedHeader customWave = runtimeData();
+  customWave.recipes.customWaveforms.push_back(CustomWaveform{.index = 0, .samples = {-64, 0, 64}});
   const PerformanceSequence attack =
       render(Version::V2, 2, false, {0xe9, 64, 128, 0x80, 0x10, 6, 0xff}, std::move(customWave));
   const auto* transition = attack.tracks.front().automations.empty()
@@ -350,8 +347,8 @@ void customPitchAttackAndPercussionPreserveDriverCurvesAndMixerRows() {
              std::abs(curve->samples.back().value - (24.0 + 32.0 / 127.0)) < 0.000001,
          "custom Hudson pitch attacks should retain the driver's sampled waveform and physical pitch curve");
 
-  std::vector<u32> drums = runtimeData();
-  drums[384 + 24] = (0u << 24) | (60u << 16) | (32u << 8) | 0;
+  ParsedHeader drums = runtimeData();
+  drums.recipes.drums.push_back(DrumSlot{.note = 24, .sourceProgram = 0, .sourceKey = 60, .volume = 32, .pan = 0});
   const PerformanceSequence percussion = render(Version::V2, 2, false, {0xfe, 0x03, 0x10, 6, 0xff}, std::move(drums));
   const auto levels = events<LevelPerformanceEvent>(percussion.tracks.front());
   const auto balances = events<StereoBalancePerformanceEvent>(percussion.tracks.front());
@@ -362,8 +359,8 @@ void customPitchAttackAndPercussionPreserveDriverCurvesAndMixerRows() {
 }
 
 void v1MixerAndPitchPipelineMatchesSuperBomberman3() {
-  std::vector<u32> drums = runtimeData();
-  drums[384 + 24] = (60u << 16) | (0x80u << 8) | 15;
+  ParsedHeader drums = runtimeData();
+  drums.recipes.drums.push_back(DrumSlot{.note = 24, .sourceProgram = 0, .sourceKey = 60, .volume = 0x80, .pan = 15});
   const PerformanceSequence percussion = render(Version::V1, 2, false, {0xfe, 0x03, 0x10, 6, 0xff}, std::move(drums));
   const auto levels = events<LevelPerformanceEvent>(percussion.tracks.front());
   const auto balances = events<StereoBalancePerformanceEvent>(percussion.tracks.front());
@@ -396,9 +393,8 @@ void v1MixerAndPitchPipelineMatchesSuperBomberman3() {
 }
 
 void pitchScriptsUseDriverDefaultsAndZeroMeans256Ticks() {
-  std::vector<u32> script = runtimeData();
-  script[256] = (512u << 8) | 1;
-  script.push_back(127);
+  ParsedHeader script = runtimeData();
+  script.recipes.pitchScripts.push_back(PitchScript{.index = 0, .steps = {{.duration = 0, .target = 127}}});
   const PerformanceSequence performance = render(Version::V2, 2, false, {0xef, 0, 1, 0x10, 6, 0xff}, std::move(script));
   const auto* transition = performance.tracks.front().automations.empty()
                                ? nullptr
