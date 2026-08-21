@@ -198,43 +198,16 @@ struct RawEnvelopeRegisters {
 };
 
 struct RuntimeInstrument {
-  RawEnvelopeRegisters envelope;
-  u8 savedCompanion = 0;
-  u8 pan = 0;
-  u8 volume = 0;
+  u8 adsr1;
+  u8 adsr2;
+  u8 gain;
+  u8 pan;
+  u8 volume;
 };
 
 constexpr size_t kPercussionEnvelopeBase = 0x100;
 constexpr size_t kInstrumentEnvelopeCount = kPercussionEnvelopeBase + 0x60;
-constexpr size_t kRuntimeInstrumentWords = 2;
-constexpr u32 kUnknownRuntimeInstrument = std::numeric_limits<u32>::max();
-
-[[nodiscard]] std::optional<RuntimeInstrument> runtimeInstrument(const std::vector<u32>& data, size_t index,
-                                                                 KonamiSnesVersion version) {
-  const size_t offset = index * kRuntimeInstrumentWords;
-  if (offset + 1 >= data.size() || data[offset] == kUnknownRuntimeInstrument) {
-    return std::nullopt;
-  }
-  const u32 envelope = data[offset];
-  const u32 mix = data[offset + 1];
-  const u8 adsr1 = static_cast<u8>(envelope >> 16);
-  const u8 adsr2 = static_cast<u8>(envelope >> 8);
-  const u8 gain = static_cast<u8>(envelope);
-  const u8 companion = usesLegacyInstrumentLayout(version) ? gain : ((adsr1 & 0x80) != 0 ? adsr2 : gain);
-  return RuntimeInstrument{
-      .envelope =
-          RawEnvelopeRegisters{
-              .adsr1 = adsr1,
-              // Early rows load both physical registers. Late rows load only
-              // the register selected by ADSR1; the other remains untouched.
-              .adsr2 = usesLegacyInstrumentLayout(version) || (adsr1 & 0x80) != 0 ? std::optional{adsr2} : std::nullopt,
-              .gain = usesLegacyInstrumentLayout(version) || (adsr1 & 0x80) == 0 ? std::optional{gain} : std::nullopt,
-          },
-      .savedCompanion = companion,
-      .pan = static_cast<u8>(mix >> 8),
-      .volume = static_cast<u8>(mix),
-  };
-}
+using RuntimeInstruments = std::array<std::optional<RuntimeInstrument>, kInstrumentEnvelopeCount>;
 
 [[nodiscard]] u8 clampPan(KonamiSnesVersion version, u8 pan) {
   return std::min(pan, version <= KONAMISNES_V2 ? u8{20} : u8{40});
@@ -294,15 +267,15 @@ struct LfoState {
 struct RuntimeConfig {
   KonamiSnesVersion version = KONAMISNES_NONE;
   bool indexedEchoFilter = false;
-  std::vector<u32> instruments;
+  RuntimeInstruments instruments;
 };
 
 struct ProgramState {
   explicit ProgramState(const RuntimeConfig& config)
-      : instruments(config.instruments), version(config.version), indexedEchoFilter(config.indexedEchoFilter) {}
+      : instruments(config.instruments), indexedEchoFilter(config.indexedEchoFilter) {}
 
   [[nodiscard]] std::optional<RuntimeInstrument> instrument(size_t index) const {
-    return runtimeInstrument(instruments, index, version);
+    return index < instruments.size() ? instruments[index] : std::nullopt;
   }
 
   void setEcho(u8 mask, u8 left, u8 right) {
@@ -331,8 +304,7 @@ struct ProgramState {
   }
 
   ReverbPerformanceEvent echo{.voiceMask = 0};
-  const std::vector<u32>& instruments;
-  KonamiSnesVersion version = KONAMISNES_NONE;
+  const RuntimeInstruments& instruments;
   bool indexedEchoFilter = false;
 };
 
@@ -342,20 +314,25 @@ struct TrackEnvelopeState {
       registers.reset();
       savedCompanion.reset();
     } else if (usesLegacyInstrumentLayout(version)) {
-      registers = instrument->envelope;
-      savedCompanion = instrument->savedCompanion;
+      registers = RawEnvelopeRegisters{
+          .adsr1 = instrument->adsr1,
+          .adsr2 = instrument->adsr2,
+          .gain = instrument->gain,
+      };
+      savedCompanion = instrument->gain;
     } else {
       // A late seven-byte row writes only ADSR2 or GAIN. Preserve the inactive
       // physical register because ED can later switch ADSR1 without writing it.
       RawEnvelopeRegisters selected = registers.value_or(RawEnvelopeRegisters{});
-      selected.adsr1 = instrument->envelope.adsr1;
+      selected.adsr1 = instrument->adsr1;
+      const u8 companion = (selected.adsr1 & 0x80) != 0 ? instrument->adsr2 : instrument->gain;
       if ((selected.adsr1 & 0x80) != 0) {
-        selected.adsr2 = instrument->savedCompanion;
+        selected.adsr2 = companion;
       } else {
-        selected.gain = instrument->savedCompanion;
+        selected.gain = companion;
       }
       registers = selected;
-      savedCompanion = instrument->savedCompanion;
+      savedCompanion = companion;
     }
     // V1-V2 keep their software release accumulator step across instrument
     // loads. V3 and later explicitly clear their release control.
@@ -375,7 +352,7 @@ struct TrackEnvelopeState {
 struct TrackState {
   TrackState(const TrackProgram& track, const RuntimeConfig& config)
       : version(config.version), voiceBit(static_cast<u8>(1u << std::min<u32>(track.sourceTrackNumber, 7))) {
-    const auto initialInstrument = runtimeInstrument(config.instruments, 0, version);
+    const auto& initialInstrument = config.instruments.front();
     envelope.selectInstrument(version, initialInstrument);
     instrumentVolume = initialInstrument ? initialInstrument->volume : 0;
     pan.reset(version <= KONAMISNES_V2 ? 10 : 20);
@@ -1709,14 +1686,16 @@ SequenceProgram decodeKonamiSnesSequence(ByteReader reader, const KonamiSnesLayo
   RuntimeConfig runtime{
       .version = layout.version,
       .indexedEchoFilter = layout.indexedEchoFilter,
-      .instruments = std::vector<u32>(kInstrumentEnvelopeCount * kRuntimeInstrumentWords, kUnknownRuntimeInstrument),
   };
   for (const auto& instrument : parseKonamiSnesInstrumentInfos(reader, layout)) {
     const size_t index = instrument.percussion ? kPercussionEnvelopeBase + instrument.percussionNote : instrument.index;
-    const size_t offset = index * kRuntimeInstrumentWords;
-    runtime.instruments[offset] =
-        (static_cast<u32>(instrument.adsr1) << 16) | (static_cast<u32>(instrument.adsr2) << 8) | instrument.gain;
-    runtime.instruments[offset + 1] = (static_cast<u32>(instrument.pan) << 8) | instrument.volume;
+    runtime.instruments[index] = RuntimeInstrument{
+        .adsr1 = instrument.adsr1,
+        .adsr2 = instrument.adsr2,
+        .gain = instrument.gain,
+        .pan = instrument.pan,
+        .volume = instrument.volume,
+    };
   }
   return sequence.finish(makeCompiledRuntime<KonamiCursor, ProgramState>(std::move(runtime)));
 }
