@@ -136,26 +136,12 @@ void stepPan(u8& current, bool& descending, u8 low, u8 high, u8 step) {
 }  // namespace math
 
 struct PatchState {
-  u8 adsr1 = 0;
-  u8 adsr2 = 0;
-  u16 pitchScale = 0x100;
+  u8 adsr1;
+  u8 adsr2;
+  u16 pitchScale;
 };
 
-[[nodiscard]] constexpr u32 packPatch(u8 adsr1, u8 adsr2, u16 pitchScale) {
-  return adsr1 | (static_cast<u32>(adsr2) << 8) | (static_cast<u32>(pitchScale) << 16);
-}
-
-[[nodiscard]] PatchState patch(std::span<const u32> patches, u8 program) {
-  if (program >= patches.size()) {
-    return {};
-  }
-  const u32 raw = patches[program];
-  return PatchState{
-      .adsr1 = static_cast<u8>(raw),
-      .adsr2 = static_cast<u8>(raw >> 8),
-      .pitchScale = static_cast<u16>(raw >> 16),
-  };
-}
+using RuntimePatches = std::array<PatchState, 256>;
 
 struct ProgramState {
   ReverbPerformanceEvent echo{.voiceMask = u8{0}, .send = 0.0, .leftGain = 0.0, .rightGain = 0.0};
@@ -191,14 +177,14 @@ struct PanLfoState {
 };
 
 struct RuntimeConfig {
-  std::vector<u32> patches;
+  RuntimePatches patches;
 };
 
 struct TrackState {
   TrackState(const TrackProgram& source, const RuntimeConfig& config)
       : patches(config.patches), voiceBit(static_cast<u8>(1u << std::min(source.sourceTrackNumber, u32{7}))) {}
 
-  std::span<const u32> patches;
+  std::span<const PatchState> patches;
   u8 voiceBit;
   u8 octave = 0;
   u8 quantize = 0;
@@ -290,7 +276,7 @@ struct Playback {
 
   [[nodiscard]] Effects programChange(u8 value) {
     track.program = value;
-    const PatchState selected = patch(track.patches, value);
+    const PatchState& selected = track.patches[value];
     track.adsr1 = selected.adsr1;
     track.adsr2 = selected.adsr2;
     track.pitchScale = selected.pitchScale;
@@ -726,14 +712,18 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   }
 }
 
-[[nodiscard]] std::vector<u32> runtimePatches(ByteReader reader, const Layout& layout) {
-  std::vector<u32> result(256);
+[[nodiscard]] RuntimePatches runtimePatches(ByteReader reader, const Layout& layout) {
+  RuntimePatches result{};
   for (u32 program = 0; program < 256; ++program) {
     const u16 row = static_cast<u16>(layout.instrumentTableAddress + static_cast<u8>(program * 5u));
     if (!reader.has(row, 5)) {
       continue;
     }
-    result[program] = packPatch(reader.u8At(row), reader.u8At(row + 1), reader.be16(row + 3));
+    result[program] = PatchState{
+        .adsr1 = reader.u8At(row),
+        .adsr2 = reader.u8At(row + 1),
+        .pitchScale = reader.be16(row + 3),
+    };
   }
   return result;
 }
