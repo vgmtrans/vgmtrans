@@ -53,15 +53,6 @@ constexpr std::array<u8, 80> kV2MixerCurve{
 
 constexpr u32 kTableEntries = 128;
 
-struct RuntimeInstrument {
-  u8 adsr1 = 0;
-  u8 adsr2 = 0;
-  u8 gain = 0;
-  u16 pitchScale = 0x0100;
-  s8 coarseTuning = 0;
-  s8 fineTuning = 0;
-};
-
 // Playback consumes the same typed header data produced by parsing. This avoids
 // serializing those values into an undocumented private word layout.
 class DriverData {
@@ -73,23 +64,13 @@ public:
   [[nodiscard]] bool noteVelocity() const noexcept { return header_.noteVelocity; }
   [[nodiscard]] u8 initialEchoMask() const noexcept { return header_.initialEchoMask; }
 
-  [[nodiscard]] std::optional<RuntimeInstrument> instrument(u8 program) const {
+  [[nodiscard]] std::optional<InstrumentRow> instrument(u8 program) const {
     if (program >= kTableEntries) {
       return std::nullopt;
     }
     const auto found = std::ranges::find(header_.recipes.instruments.rbegin(), header_.recipes.instruments.rend(),
                                          program, &InstrumentRow::program);
-    if (found == header_.recipes.instruments.rend()) {
-      return std::nullopt;
-    }
-    return RuntimeInstrument{
-        .adsr1 = found->adsr1,
-        .adsr2 = found->adsr2,
-        .gain = found->gain,
-        .pitchScale = found->pitchScale,
-        .coarseTuning = found->coarseTuning,
-        .fineTuning = found->fineTuning,
-    };
+    return found == header_.recipes.instruments.rend() ? std::nullopt : std::optional{*found};
   }
 
   [[nodiscard]] const DrumSlot* drum(u8 note) const {
@@ -214,7 +195,7 @@ namespace math {
   };
 }
 
-[[nodiscard]] double driverPitch(RuntimeInstrument instrument, double sourceKey) {
+[[nodiscard]] double driverPitch(const InstrumentRow& instrument, double sourceKey) {
   if (instrument.pitchScale == 0) {
     return 0.0;
   }
@@ -241,7 +222,7 @@ namespace math {
   return duration == 0 ? 256 : duration;
 }
 
-[[nodiscard]] Envelope envelope(RuntimeInstrument instrument, bool pseudoRelease = false) {
+[[nodiscard]] Envelope envelope(const InstrumentRow& instrument, bool pseudoRelease = false) {
   Envelope result = driverEnvelope(instrument.adsr1, instrument.adsr2, instrument.gain);
   if (pseudoRelease) {
     result.releaseSeconds = driverPseudoReleaseSeconds(instrument.gain);
@@ -290,7 +271,7 @@ struct TrackState {
   u8 voiceBit = 1;
   s8 fineTuning = 0;
   s8 transpose = 0;
-  std::optional<RuntimeInstrument> envelope;
+  std::optional<InstrumentRow> envelope;
   std::optional<u8> pseudoReleaseGain;
 
   bool previousSlurred = false;
@@ -980,31 +961,29 @@ struct Playback {
   }
 
   void attackRate(u8 value) {
-    editEnvelope([&](RuntimeInstrument& envelope) {
-      envelope.adsr1 = static_cast<u8>((envelope.adsr1 & 0xf0) | (value & 0x0f));
-    });
+    editEnvelope(
+        [&](InstrumentRow& envelope) { envelope.adsr1 = static_cast<u8>((envelope.adsr1 & 0xf0) | (value & 0x0f)); });
   }
 
   void decayRate(u8 value) {
-    editEnvelope([&](RuntimeInstrument& envelope) {
+    editEnvelope([&](InstrumentRow& envelope) {
       envelope.adsr1 = static_cast<u8>(0x80 | (envelope.adsr1 & 0x0f) | ((value & 7) << 4));
     });
   }
 
   void sustainLevel(u8 value) {
-    editEnvelope([&](RuntimeInstrument& envelope) {
+    editEnvelope([&](InstrumentRow& envelope) {
       envelope.adsr2 = static_cast<u8>((envelope.adsr2 & 0x1f) | ((value & 7) << 5));
     });
   }
 
   void sustainRate(u8 value) {
-    editEnvelope([&](RuntimeInstrument& envelope) {
-      envelope.adsr2 = static_cast<u8>((envelope.adsr2 & 0xe0) | (value & 0x1f));
-    });
+    editEnvelope(
+        [&](InstrumentRow& envelope) { envelope.adsr2 = static_cast<u8>((envelope.adsr2 & 0xe0) | (value & 0x1f)); });
   }
 
   void releaseRate(u8 value) {
-    editEnvelope([&](RuntimeInstrument& envelope) { envelope.gain = static_cast<u8>(0xa0 | (value & 0x1f)); });
+    editEnvelope([&](InstrumentRow& envelope) { envelope.gain = static_cast<u8>(0xa0 | (value & 0x1f)); });
   }
 
   void tick() {

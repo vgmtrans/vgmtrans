@@ -56,18 +56,20 @@ struct SuzukiPs1BankLayout {
   SuzukiPs1BankKind kind = SuzukiPs1BankKind::Dwds;
 };
 
-// Native register state is retained so sequence ADSR commands can modify the
-// exact selected instrument state during playback.
-struct SuzukiPs1EnvelopeRegisters {
+struct SuzukiPs1Instrument {
   u16 bank = 0;
   u8 program = 0;
+  u32 sampleOffset = 0;
+  u32 loopOffset = 0;
+  double unityKey = 60.0;
   u16 adsr1 = 0;
   u16 adsr2 = 0;
+  core::SourceRecord source;
 };
 
 struct SuzukiPs1ScannedBank {
   core::ScanSoundBankRef bank;
-  std::vector<SuzukiPs1EnvelopeRegisters> envelopes;
+  std::vector<SuzukiPs1Instrument> instruments;
 };
 
 [[nodiscard]] std::optional<SuzukiPs1SequenceLayout> readSuzukiPs1SequenceLayout(core::ByteReader reader, u32 offset);
@@ -77,10 +79,11 @@ struct SuzukiPs1ScannedBank {
 
 [[nodiscard]] std::optional<SuzukiPs1ScannedBank> addSuzukiPs1Bank(core::ScanResultBuilder& result,
                                                                    const SuzukiPs1BankLayout& layout);
-[[nodiscard]] core::SequenceProgram parseSuzukiPs1Sequence(
-    core::ByteReader reader, core::AssetId id, const SuzukiPs1SequenceLayout& layout,
-    const std::vector<SuzukiPs1EnvelopeRegisters>& envelopes = {}, core::SourceMapBuilder* sourceMap = nullptr,
-    std::vector<core::Diagnostic>* diagnostics = nullptr);
+[[nodiscard]] core::SequenceProgram parseSuzukiPs1Sequence(core::ByteReader reader, core::AssetId id,
+                                                           const SuzukiPs1SequenceLayout& layout,
+                                                           const std::vector<SuzukiPs1Instrument>& instruments = {},
+                                                           core::SourceMapBuilder* sourceMap = nullptr,
+                                                           std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& suzukiPs1SequenceConfig();
 [[nodiscard]] core::FormatModule suzukiPs1Module();
 

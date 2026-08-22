@@ -332,8 +332,9 @@ PerformanceSequence renderKonamiSnesProgram(KonamiSnesVersion version, const std
 
 PerformanceSequence renderKonamiSnesAramSequence(const std::vector<u8>& bytes, const KonamiSnesLayout& layout,
                                                  AssetId asset = AssetId{33}) {
-  const auto& config = konamiSnesSequenceConfig(layout.version);
-  const SequenceProgram program = decodeKonamiSnesSequence(ByteReader(SourceId{asset.value}, bytes), layout, asset);
+  const ByteReader reader(SourceId{asset.value}, bytes);
+  const SequenceProgram program =
+      decodeKonamiSnesSequence(reader, layout, asset, parseKonamiSnesInstrumentInfos(reader, layout));
   return SequenceVm(LoopPolicy::PlayOnce).render(program);
 }
 
@@ -377,7 +378,8 @@ void konamiSnesBatmanReturnsAramUsesV2LayoutAndBoundedBank() {
   const SourceRange headerRange = konamiSnesSequenceHeaderRange(reader, *layout);
   expect(headerRange.offset == 0x3900 && headerRange.size == 2,
          "Batman Returns streamed header should infer one source track");
-  const SequenceProgram program = decodeKonamiSnesSequence(reader, *layout, AssetId{33});
+  const auto infos = parseKonamiSnesInstrumentInfos(reader, *layout);
+  const SequenceProgram program = decodeKonamiSnesSequence(reader, *layout, AssetId{33}, infos);
   expect(program.runtime.valid() && program.tracks.size() == 1,
          "Batman Returns sequence should own an executable decoded track");
   const TrackProgram& track = program.tracks.front();
@@ -385,7 +387,6 @@ void konamiSnesBatmanReturnsAramUsesV2LayoutAndBoundedBank() {
              track.commands[3].opcode == 0x3c && track.commands[3].address.value == 0x3909,
          "V2 opcode 0xfc should consume two operands without misaligning the following note");
 
-  const auto infos = parseKonamiSnesInstrumentInfos(reader, *layout);
   constexpr std::array<u32, 9> expectedMelodicPrograms{0x00, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x19};
   expect(infos.size() == expectedMelodicPrograms.size() + 1,
          "Batman Returns should retain the bounded melodic bank and one percussion row");
@@ -596,7 +597,8 @@ void konamiSnesSynthBuilderGroupsPercussionAndPreservesSampleRules() {
       .firstBankedInstrument = 5,
       .percussionInstrumentTableAddress = 0x4300,
   };
-  const auto synth = addKonamiSnesSynth(result, layout, "Builder Probe");
+  const auto instrumentInfos = parseKonamiSnesInstrumentInfos(result.reader(), layout);
+  const auto synth = addKonamiSnesSynth(result, layout, instrumentInfos, "Builder Probe");
   expect(synth.has_value(), "KonamiSnes builder fixture should produce a complete synth");
   const ScanResult scan = result.finish();
 
@@ -737,8 +739,7 @@ void konamiSnesEarlyVibratoQuantizesRateAtCommandTempo() {
       sameTickRates.push_back(modulation);
     }
   }
-  expect(sameTickRates.size() == 1 && sameTickRates[0]->context.frequencyHz &&
-             !sameTickRates[0]->context.cyclesPerTick,
+  expect(sameTickRates.size() == 1 && sameTickRates[0]->context.frequencyHz && !sameTickRates[0]->context.cyclesPerTick,
          "an unrelated tempo event should not synthesize a replacement for an early driver's stored vibrato step");
 
   const PerformanceSequence direction =
@@ -766,13 +767,12 @@ void konamiSnesEarlyVibratoQuantizesRateAtCommandTempo() {
       directionRates.push_back(modulation);
     }
   }
-  expect(directionRates.size() == 2 && directionRates[0]->context.frequencyHz &&
-             directionRates[1]->context.frequencyHz &&
-             std::abs(*directionRates[0]->context.frequencyHz - (250.0 * 127.0 / 256.0)) < 0.0001 &&
-             std::abs(*directionRates[1]->context.frequencyHz - (250.0 * 2.0 / 256.0)) < 0.0001 &&
-             directionRates[0]->context.initialPhaseCycles == 0.0 &&
-             directionRates[1]->context.initialPhaseCycles == 0.5,
-         "early KonamiSnes high rates should fold only after tempo multiplication and preserve triangle direction");
+  expect(
+      directionRates.size() == 2 && directionRates[0]->context.frequencyHz && directionRates[1]->context.frequencyHz &&
+          std::abs(*directionRates[0]->context.frequencyHz - (250.0 * 127.0 / 256.0)) < 0.0001 &&
+          std::abs(*directionRates[1]->context.frequencyHz - (250.0 * 2.0 / 256.0)) < 0.0001 &&
+          directionRates[0]->context.initialPhaseCycles == 0.0 && directionRates[1]->context.initialPhaseCycles == 0.5,
+      "early KonamiSnes high rates should fold only after tempo multiplication and preserve triangle direction");
 }
 
 void konamiSnesEchoPreservesGlobalDspState() {
@@ -1016,8 +1016,9 @@ void konamiSnesDynamicAdsrMatchesEachDriverFamily() {
         .firstBankedInstrument = 5,
         .percussionInstrumentTableAddress = 0x4300,
     };
-    const auto& config = konamiSnesSequenceConfig(layout.version);
-    const SequenceProgram program = decodeKonamiSnesSequence(ByteReader(SourceId{33}, bytes), layout, AssetId{33});
+    const ByteReader reader(SourceId{33}, bytes);
+    const SequenceProgram program =
+        decodeKonamiSnesSequence(reader, layout, AssetId{33}, parseKonamiSnesInstrumentInfos(reader, layout));
     return SequenceVm(LoopPolicy::PlayOnce).render(program);
   };
 

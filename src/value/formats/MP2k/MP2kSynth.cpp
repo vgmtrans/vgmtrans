@@ -33,11 +33,6 @@ constexpr u64 kProgrammableWaveKeyBase = u64{1} << 32;
 // DirectSound mixes independent left and right lanes. With both GBA output
 // ratios at full scale, the CGB path is therefore one half of DirectSound.
 constexpr double kPsgDacAttenuationDb = 6.020599913279624;
-constexpr u8 kToneCgbMask = 0x07;
-constexpr u8 kToneFixed = 0x08;
-constexpr u8 kToneReverse = 0x10;
-constexpr u8 kToneSplit = 0x40;
-constexpr u8 kToneRhythm = 0x80;
 constexpr std::array<u8, 60> kNoiseRegisters{
     0xd7, 0xd6, 0xd5, 0xd4, 0xc7, 0xc6, 0xc5, 0xc4, 0xb7, 0xb6, 0xb5, 0xb4, 0xa7, 0xa6, 0xa5,
     0xa4, 0x97, 0x96, 0x95, 0x94, 0x87, 0x86, 0x85, 0x84, 0x77, 0x76, 0x75, 0x74, 0x67, 0x66,
@@ -46,27 +41,6 @@ constexpr std::array<u8, 60> kNoiseRegisters{
 };
 constexpr std::array<s16, 12> kCgbFrequencyTable{
     -2004, -1891, -1785, -1685, -1591, -1501, -1417, -1337, -1262, -1192, -1125, -1062,
-};
-
-struct Tone {
-  u8 type = 0;
-  u8 key = 60;
-  u8 length = 0;
-  u8 panSweep = 0;
-  u32 wave = 0;
-  u8 attack = 0;
-  u8 decay = 0;
-  u8 sustain = 0;
-  u8 release = 0;
-  SourceRange range;
-  SourceRecord source;
-
-  [[nodiscard]] u8 cgbType() const { return type & kToneCgbMask; }
-  [[nodiscard]] bool fixed() const { return (type & kToneFixed) != 0; }
-  [[nodiscard]] bool reverse() const { return (type & kToneReverse) != 0; }
-  [[nodiscard]] bool split() const { return (type & kToneSplit) != 0; }
-  [[nodiscard]] bool rhythm() const { return (type & kToneRhythm) != 0; }
-  [[nodiscard]] bool table() const { return split() || rhythm(); }
 };
 
 struct SynthContext {
@@ -78,6 +52,9 @@ struct SynthContext {
   SamplePoolBuilder& pcm;
 };
 
+[[nodiscard]] std::optional<Mp2kTone> parseMp2kTone(ByteReader reader, u32 offset,
+                                                    std::vector<Diagnostic>* diagnostics);
+
 [[nodiscard]] std::optional<u32> romOffset(u32 address, ByteReader reader, u32 size = 1) {
   if ((address & 0xfe000000) != 0x08000000) {
     return std::nullopt;
@@ -86,40 +63,7 @@ struct SynthContext {
   return reader.has(offset, size) ? std::optional<u32>{offset} : std::nullopt;
 }
 
-[[nodiscard]] std::optional<Tone> readTone(ScanResultBuilder& builder, u32 offset) {
-  if (!builder.reader().has(offset, 12)) {
-    return std::nullopt;
-  }
-  RecordReader record(builder.reader(), offset, offset + 12, &builder.diagnostics());
-  const auto type = record.u8("type", SourceValueDisplay::Hex);
-  const auto key = record.u8("key", SourceValueDisplay::MidiNote);
-  const auto length = record.u8("length");
-  const auto panSweep = record.u8("pan_sweep", SourceValueDisplay::Hex);
-  const auto wave = record.u32le("wave", SourceValueDisplay::Address);
-  const auto attack = record.u8("attack");
-  const auto decay = record.u8("decay");
-  const auto sustain = record.u8("sustain");
-  const auto release = record.u8("release");
-  if (!record.ok()) {
-    return std::nullopt;
-  }
-  Tone tone{
-      .type = *type,
-      .key = *key,
-      .length = *length,
-      .panSweep = *panSweep,
-      .wave = *wave,
-      .attack = *attack,
-      .decay = *decay,
-      .sustain = *sustain,
-      .release = *release,
-      .range = builder.reader().range(offset, 12),
-  };
-  tone.source = std::move(record).finish();
-  return tone;
-}
-
-[[nodiscard]] Envelope envelopeFor(const Tone& tone, bool cgb) {
+[[nodiscard]] Envelope envelopeFor(const Mp2kTone& tone, bool cgb) {
   return Envelope{
       .attackSeconds = cgb ? cgbEnvelopeSeconds(tone.attack) : directAttackSeconds(tone.attack),
       // DirectSound changes ATK to DEC on the frame that reaches 0xff; decay
@@ -266,7 +210,7 @@ struct SynthContext {
   return entry.ref();
 }
 
-[[nodiscard]] std::optional<Region> regionForTone(SynthContext& context, const Tone& tone, KeyRange keys,
+[[nodiscard]] std::optional<Region> regionForTone(SynthContext& context, const Mp2kTone& tone, KeyRange keys,
                                                   std::optional<u8> rhythmKey = std::nullopt) {
   const u8 cgbType = tone.cgbType();
   std::optional<SampleRef> sample;
@@ -306,7 +250,7 @@ struct SynthContext {
   return Region{
       .keyRange = keys,
       .sample = *sample,
-      .range = tone.range,
+      .range = tone.source.range,
       .unityKey = unity,
       .envelope = envelopeFor(tone, cgbType != 0),
       .pan = pan,
@@ -317,7 +261,7 @@ struct SynthContext {
   };
 }
 
-void addToneRegion(SynthContext& context, InstrumentSetBuilder::Entry instrument, const Tone& tone, KeyRange keys,
+void addToneRegion(SynthContext& context, InstrumentSetBuilder::Entry instrument, const Mp2kTone& tone, KeyRange keys,
                    std::optional<u8> rhythmKey = std::nullopt) {
   const u8 cgbType = tone.cgbType();
   const bool separateKeys = keys.low != keys.high && ((cgbType >= 1 && cgbType <= 4) || (cgbType == 0 && tone.fixed()));
@@ -335,9 +279,10 @@ void addToneRegion(SynthContext& context, InstrumentSetBuilder::Entry instrument
   }
 }
 
-void addSplitRegions(SynthContext& context, InstrumentSetBuilder::Entry instrument, const Tone& tone) {
+void addSplitRegions(SynthContext& context, InstrumentSetBuilder::Entry instrument, const Mp2kTone& tone) {
   const auto tones = romOffset(tone.wave, context.builder.reader(), 12);
-  const auto keymap = romOffset(context.builder.reader().le32(tone.range.offset + 8), context.builder.reader(), 128);
+  const auto keymap =
+      romOffset(context.builder.reader().le32(tone.source.range.offset + 8), context.builder.reader(), 128);
   if (!tones || !keymap) {
     return;
   }
@@ -348,24 +293,71 @@ void addSplitRegions(SynthContext& context, InstrumentSetBuilder::Entry instrume
     while (high + 1 < 128 && context.builder.reader().u8At(*keymap + high + 1) == index) {
       ++high;
     }
-    if (const auto sub = readTone(context.builder, *tones + static_cast<u32>(index) * 12); sub && !sub->table()) {
+    if (const auto sub = parseMp2kTone(context.builder.reader(), *tones + static_cast<u32>(index) * 12,
+                                       &context.builder.diagnostics());
+        sub && !sub->table()) {
       addToneRegion(context, instrument, *sub, KeyRange{.low = static_cast<u8>(low), .high = static_cast<u8>(high)});
     }
     low = high + 1;
   }
 }
 
-void addRhythmRegions(SynthContext& context, InstrumentSetBuilder::Entry instrument, const Tone& tone) {
+void addRhythmRegions(SynthContext& context, InstrumentSetBuilder::Entry instrument, const Mp2kTone& tone) {
   const auto tones = romOffset(tone.wave, context.builder.reader(), 128 * 12);
   if (!tones) {
     return;
   }
   for (u32 key = 0; key < 128; ++key) {
-    if (const auto drum = readTone(context.builder, *tones + key * 12); drum && !drum->table()) {
+    if (const auto drum = parseMp2kTone(context.builder.reader(), *tones + key * 12, &context.builder.diagnostics());
+        drum && !drum->table()) {
       addToneRegion(context, instrument, *drum, KeyRange{.low = static_cast<u8>(key), .high = static_cast<u8>(key)},
                     static_cast<u8>(key));
     }
   }
+}
+
+std::optional<Mp2kTone> parseMp2kTone(ByteReader reader, u32 offset, std::vector<Diagnostic>* diagnostics) {
+  if (!reader.has(offset, 12)) {
+    return std::nullopt;
+  }
+  RecordReader record(reader, offset, offset + 12, diagnostics);
+  const auto type = record.u8("type", SourceValueDisplay::Hex);
+  const auto key = record.u8("key", SourceValueDisplay::MidiNote);
+  const auto length = record.u8("length");
+  const auto panSweep = record.u8("pan_sweep", SourceValueDisplay::Hex);
+  const auto wave = record.u32le("wave", SourceValueDisplay::Address);
+  const auto attack = record.u8("attack");
+  const auto decay = record.u8("decay");
+  const auto sustain = record.u8("sustain");
+  const auto release = record.u8("release");
+  if (!record.ok()) {
+    return std::nullopt;
+  }
+  return Mp2kTone{
+      .type = *type,
+      .key = *key,
+      .length = *length,
+      .panSweep = *panSweep,
+      .wave = *wave,
+      .attack = *attack,
+      .decay = *decay,
+      .sustain = *sustain,
+      .release = *release,
+      .source = std::move(record).finish(),
+  };
+}
+
+std::vector<Mp2kTone> parseMp2kTones(ByteReader reader, const Mp2kBank& bank, std::vector<Diagnostic>* diagnostics) {
+  std::vector<Mp2kTone> result;
+  result.reserve(bank.instrumentCount);
+  for (u32 program = 0; program < bank.instrumentCount; ++program) {
+    auto tone = parseMp2kTone(reader, bank.offset + program * 12, diagnostics);
+    if (!tone) {
+      break;
+    }
+    result.push_back(std::move(*tone));
+  }
+  return result;
 }
 
 }  // namespace
@@ -401,8 +393,9 @@ ScanSamplePoolDraft addMp2kPsgSamples(ScanResultBuilder& builder, u32 sampleRate
   return samples;
 }
 
-ScanSoundBankDraft addMp2kInstrumentSet(ScanResultBuilder& builder, const Mp2kBank& bank, u32 sampleRate,
-                                        u8 directSoundMasterVolume, u8 dacBits, ScanSamplePoolDraft& psg) {
+Mp2kScannedBank addMp2kInstrumentSet(ScanResultBuilder& builder, const Mp2kBank& bank, u32 sampleRate,
+                                     u8 directSoundMasterVolume, u8 dacBits, ScanSamplePoolDraft& psg) {
+  std::vector<Mp2kTone> tones = parseMp2kTones(builder.reader(), bank, &builder.diagnostics());
   auto instruments = builder.soundBank(fmt::format("MP2k bank {:#x}", bank.offset));
   SynthContext context{
       .builder = builder,
@@ -416,16 +409,16 @@ ScanSoundBankDraft addMp2kInstrumentSet(ScanResultBuilder& builder, const Mp2kBa
   instruments.source(SourceRole::Table, "Voicegroup", instruments.range(), "mp2k-voicegroup")
       .derived("instrument_count", bank.instrumentCount);
 
-  for (u32 program = 0; program < bank.instrumentCount; ++program) {
-    const auto tone = readTone(builder, bank.offset + program * 12);
-    if (!tone || (tone->type == 1 && tone->wave == 2 && builder.reader().le32(tone->range.offset + 8) == 0x000f0000)) {
+  for (u32 program = 0; program < tones.size(); ++program) {
+    const Mp2kTone& tone = tones[program];
+    if (tone.type == 1 && tone.wave == 2 && builder.reader().le32(tone.source.range.offset + 8) == 0x000f0000) {
       continue;
     }
-    const u8 cgbType = tone->cgbType();
-    const bool tableTone = tone->table();
+    const u8 cgbType = tone.cgbType();
+    const bool tableTone = tone.table();
     const bool playable = tableTone || cgbType == 1 || cgbType == 2 || cgbType == 4 ||
-                          (cgbType == 0 && romOffset(tone->wave, builder.reader(), 16)) ||
-                          (cgbType == 3 && romOffset(tone->wave, builder.reader(), 16));
+                          (cgbType == 0 && romOffset(tone.wave, builder.reader(), 16)) ||
+                          (cgbType == 3 && romOffset(tone.wave, builder.reader(), 16));
     if (!playable) {
       continue;
     }
@@ -433,21 +426,21 @@ ScanSoundBankDraft addMp2kInstrumentSet(ScanResultBuilder& builder, const Mp2kBa
         .explicitAddress = InstrumentAddress{.bank = 0, .program = program},
         .reverb = 0.0,
         .name = fmt::format("Program {}", program),
-        .range = tone->range,
+        .range = tone.source.range,
         .modulation = mp2kModulation(),
     };
     auto instrument = instruments.builder().append(std::move(value));
-    instrument.source("Tone", tone->source, "mp2k-tone");
+    instrument.source("Tone", tone.source, "mp2k-tone");
 
-    if (tone->split() && !tone->rhythm()) {
-      addSplitRegions(context, instrument, *tone);
-    } else if (tone->rhythm()) {
-      addRhythmRegions(context, instrument, *tone);
+    if (tone.split() && !tone.rhythm()) {
+      addSplitRegions(context, instrument, tone);
+    } else if (tone.rhythm()) {
+      addRhythmRegions(context, instrument, tone);
     } else {
-      addToneRegion(context, instrument, *tone, {});
+      addToneRegion(context, instrument, tone, {});
     }
   }
-  return instruments;
+  return Mp2kScannedBank{.instruments = instruments, .tones = std::move(tones)};
 }
 
 }  // namespace vgmtrans::formats::mp2k

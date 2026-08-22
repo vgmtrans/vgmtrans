@@ -27,17 +27,7 @@ namespace {
 constexpr u32 kBankHeaderSize = 0x30;
 constexpr u32 kInstrumentSize = 0x10;
 
-struct ParsedInstrument {
-  u8 program = 0;
-  u32 sampleOffset = 0;
-  u32 loopOffset = 0;
-  double unityKey = 60.0;
-  u16 adsr1 = 0;
-  u16 adsr2 = 0;
-  SourceRecord source;
-};
-
-[[nodiscard]] ParsedInstrument readInstrument(ByteReader reader, const SuzukiPs1BankLayout& layout, u8 program) {
+[[nodiscard]] SuzukiPs1Instrument readInstrument(ByteReader reader, const SuzukiPs1BankLayout& layout, u8 program) {
   const u32 offset = layout.offset + kBankHeaderSize + static_cast<u32>(program) * kInstrumentSize;
   RecordReader record(reader, offset, offset + kInstrumentSize);
   const u32 unit = layout.kind == SuzukiPs1BankKind::Wds ? 8 : 1;
@@ -75,7 +65,8 @@ struct ParsedInstrument {
   }
   record.derived("adsr1", adsr1, SourceValueDisplay::Hex);
   record.derived("adsr2", adsr2, SourceValueDisplay::Hex);
-  return ParsedInstrument{
+  return SuzukiPs1Instrument{
+      .bank = layout.bank,
       .program = program,
       .sampleOffset = sampleOffset,
       .loopOffset = loopOffset,
@@ -92,7 +83,7 @@ struct ParsedInstrument {
 
 std::optional<SuzukiPs1ScannedBank> addSuzukiPs1Bank(ScanResultBuilder& result, const SuzukiPs1BankLayout& layout) {
   const ByteReader reader = result.reader();
-  std::vector<ParsedInstrument> parsed;
+  std::vector<SuzukiPs1Instrument> parsed;
   parsed.reserve(layout.highestProgram + 1);
   std::set<u32> sampleOffsets;
   for (u32 program = 0; program <= layout.highestProgram; ++program) {
@@ -161,14 +152,7 @@ std::optional<SuzukiPs1ScannedBank> addSuzukiPs1Bank(ScanResultBuilder& result, 
       .field("sample_size", reader.range(layout.offset + 0x14, 4), layout.sampleSize)
       .field("highest_program", reader.range(layout.offset + 0x1c, 4), layout.highestProgram)
       .field("bank", reader.range(layout.offset + 0x20, 4), layout.bank);
-  std::vector<SuzukiPs1EnvelopeRegisters> envelopes;
-  for (const ParsedInstrument& source : parsed) {
-    envelopes.push_back(SuzukiPs1EnvelopeRegisters{
-        .bank = layout.bank,
-        .program = source.program,
-        .adsr1 = source.adsr1,
-        .adsr2 = source.adsr2,
-    });
+  for (const SuzukiPs1Instrument& source : parsed) {
     const auto sample = sampleRefs.find(source.sampleOffset);
     if (sample == sampleRefs.end()) {
       continue;
@@ -206,7 +190,7 @@ std::optional<SuzukiPs1ScannedBank> addSuzukiPs1Bank(ScanResultBuilder& result, 
 
   return SuzukiPs1ScannedBank{
       .bank = instruments.ref(),
-      .envelopes = std::move(envelopes),
+      .instruments = std::move(parsed),
   };
 }
 

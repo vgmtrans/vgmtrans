@@ -17,6 +17,7 @@
 #include <cmath>
 #include <map>
 #include <optional>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -146,18 +147,20 @@ struct TrackLayout {
 
 struct RuntimeConfig {
   u16 defaultBank = 0;
-  std::map<u32, std::pair<u16, u16>> envelopes;
+  std::vector<SuzukiPs1Instrument> instruments;
 };
 
 struct ProgramState {
-  explicit ProgramState(const RuntimeConfig& config) : envelopes(config.envelopes) {}
+  explicit ProgramState(const RuntimeConfig& config) : instruments(config.instruments) {}
 
-  [[nodiscard]] std::optional<std::pair<u16, u16>> envelope(u16 bank, u8 program) const {
-    const auto found = envelopes.find((static_cast<u32>(bank) << 8) | program);
-    return found == envelopes.end() ? std::nullopt : std::optional{found->second};
+  [[nodiscard]] const SuzukiPs1Instrument* instrument(u16 bank, u8 program) const {
+    const auto found = std::ranges::find_if(instruments, [&](const SuzukiPs1Instrument& candidate) {
+      return candidate.bank == bank && candidate.program == program;
+    });
+    return found == instruments.end() ? nullptr : &*found;
   }
 
-  std::map<u32, std::pair<u16, u16>> envelopes;
+  std::span<const SuzukiPs1Instrument> instruments;
 };
 
 struct TrackState {
@@ -194,11 +197,11 @@ struct Playback {
   }
 
   void loadEnvelope() {
-    const auto envelope = programState.envelope(track.bank, track.program);
-    track.hasEnvelope = envelope.has_value();
-    if (envelope) {
-      track.adsr1 = envelope->first;
-      track.adsr2 = envelope->second;
+    const auto* instrument = programState.instrument(track.bank, track.program);
+    track.hasEnvelope = instrument != nullptr;
+    if (instrument != nullptr) {
+      track.adsr1 = instrument->adsr1;
+      track.adsr2 = instrument->adsr2;
     }
   }
 
@@ -638,7 +641,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       .sourceMap = sourceMap,
   };
   return tracks.decode(trackIndex, start,
-                          [&](u32 offset) { return decodeCommand(reader, offset, end, layout, diagnostics); });
+                       [&](u32 offset) { return decodeCommand(reader, offset, end, layout, diagnostics); });
 }
 
 }  // namespace
@@ -658,14 +661,10 @@ const SequenceProgramConfig& suzukiPs1SequenceConfig() {
 }
 
 SequenceProgram parseSuzukiPs1Sequence(ByteReader reader, AssetId id, const SuzukiPs1SequenceLayout& layout,
-                                       const std::vector<SuzukiPs1EnvelopeRegisters>& envelopes,
-                                       SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+                                       const std::vector<SuzukiPs1Instrument>& instruments, SourceMapBuilder* sourceMap,
+                                       std::vector<Diagnostic>* diagnostics) {
   SequenceProgram program = suzukiPs1SequenceConfig().makeProgram();
-  RuntimeConfig runtime{.defaultBank = layout.defaultBank};
-  for (const auto& envelope : envelopes) {
-    runtime.envelopes.emplace((static_cast<u32>(envelope.bank) << 8) | envelope.program,
-                              std::pair{envelope.adsr1, envelope.adsr2});
-  }
+  RuntimeConfig runtime{.defaultBank = layout.defaultBank, .instruments = instruments};
   program.runtime = makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime));
 
   if (sourceMap != nullptr) {

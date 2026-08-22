@@ -39,10 +39,14 @@ namespace math {
   return slurred || quantize == 0 ? length : length - (static_cast<u32>(length) * quantize >> 8);
 }
 
-[[nodiscard]] double level(u8 raw) { return std::min<u8>(raw, 0x7f) / 127.0; }
+[[nodiscard]] double level(u8 raw) {
+  return std::min<u8>(raw, 0x7f) / 127.0;
+}
 
 // Ys V's table stays at $40 through index $3f, then falls linearly to zero.
-[[nodiscard]] constexpr u8 panGain(u8 index) { return index < 0x40 ? 0x40 : 0x7f - index; }
+[[nodiscard]] constexpr u8 panGain(u8 index) {
+  return index < 0x40 ? 0x40 : 0x7f - index;
+}
 
 [[nodiscard]] StereoBalance pan(u8 raw) {
   raw &= 0x7f;
@@ -135,14 +139,6 @@ void stepPan(u8& current, bool& descending, u8 low, u8 high, u8 step) {
 
 }  // namespace math
 
-struct PatchState {
-  u8 adsr1;
-  u8 adsr2;
-  u16 pitchScale;
-};
-
-using RuntimePatches = std::array<PatchState, 256>;
-
 struct ProgramState {
   ReverbPerformanceEvent echo{.voiceMask = u8{0}, .send = 0.0, .leftGain = 0.0, .rightGain = 0.0};
   s8 storedEchoLeft = 0;
@@ -177,14 +173,14 @@ struct PanLfoState {
 };
 
 struct RuntimeConfig {
-  RuntimePatches patches;
+  PatchTable patches;
 };
 
 struct TrackState {
   TrackState(const TrackProgram& source, const RuntimeConfig& config)
       : patches(config.patches), voiceBit(static_cast<u8>(1u << std::min(source.sourceTrackNumber, u32{7}))) {}
 
-  std::span<const PatchState> patches;
+  std::span<const Patch> patches;
   u8 voiceBit;
   u8 octave = 0;
   u8 quantize = 0;
@@ -224,8 +220,8 @@ struct Playback {
 
   void updateEchoVoice() {
     const u8 mask = program.echo.voiceMask.value_or(0);
-    const u8 next = track.echoEnabled ? static_cast<u8>(mask | track.voiceBit)
-                                      : static_cast<u8>(mask & ~track.voiceBit);
+    const u8 next =
+        track.echoEnabled ? static_cast<u8>(mask | track.voiceBit) : static_cast<u8>(mask & ~track.voiceBit);
     if (next != mask) {
       program.echo.voiceMask = next;
       out.reverb(program.echo);
@@ -276,7 +272,7 @@ struct Playback {
 
   [[nodiscard]] Effects programChange(u8 value) {
     track.program = value;
-    const PatchState& selected = track.patches[value];
+    const Patch& selected = track.patches[value];
     track.adsr1 = selected.adsr1;
     track.adsr2 = selected.adsr2;
     track.pitchScale = selected.pitchScale;
@@ -393,9 +389,7 @@ struct Playback {
     track.pitchEnvelope.enabled = depth != 0;
   }
 
-  void pitchEnvelopeEnabled(bool enabled) {
-    track.pitchEnvelope.enabled = enabled && track.pitchEnvelope.depth != 0;
-  }
+  void pitchEnvelopeEnabled(bool enabled) { track.pitchEnvelope.enabled = enabled && track.pitchEnvelope.depth != 0; }
 
   [[nodiscard]] Effects adsr(u8 adsr1, u8 adsr2) {
     track.adsr1 = adsr1;
@@ -515,9 +509,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     const u8 rawKey = event.opcodeValue("key", static_cast<u8>(opcode >> 4), SourceValueDisplay::Default,
                                         SemanticOperandRole::NoteKey);
     const bool slurred = event.opcodeValue("slurred", (opcode & 8) != 0);
-    const u8 length = lengthIndex == 0 ? event.u8("length", SemanticOperandRole::Duration)
-                                       : event.derived("length", durations[lengthIndex - 1],
-                                                       SemanticOperandRole::Duration);
+    const u8 length = lengthIndex == 0
+                          ? event.u8("length", SemanticOperandRole::Duration)
+                          : event.derived("length", durations[lengthIndex - 1], SemanticOperandRole::Duration);
     return event.invoke<&Playback::note>(rawKey, length, slurred, rawKey == 12);
   }
   if (opcode <= 0xd6) {
@@ -612,8 +606,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xee: {
       auto event = cursor.command("Repeat Break", SequenceSemantic::RepeatBreak);
-      const s16 relative = event.s16le("relative", SourceValueDisplay::SignedDecimal,
-                                      SemanticOperandRole::JumpTarget);
+      const s16 relative = event.s16le("relative", SourceValueDisplay::SignedDecimal, SemanticOperandRole::JumpTarget);
       const Address destination = relativeTarget(begin + 3, relative);
       Address cell{};
       if (destination.value >= 2 && reader.has(destination.value - 2, 2)) {
@@ -625,8 +618,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xef: {
       auto event = cursor.command("Repeat End", SequenceSemantic::Repeat);
-      const s16 relative = event.s16le("relative", SourceValueDisplay::SignedDecimal,
-                                      SemanticOperandRole::RepeatTarget);
+      const s16 relative =
+          event.s16le("relative", SourceValueDisplay::SignedDecimal, SemanticOperandRole::RepeatTarget);
       const Address cell = relativeTarget(begin + 3, relative);
       const Address destination{static_cast<u16>(cell.value + 1)};
       event.derived("counter", cell, SourceValueDisplay::Address, SemanticOperandRole::Address);
@@ -637,8 +630,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Pitch Envelope", SequenceSemantic::Pitch);
       const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
       const u8 depth = event.u8("step", SemanticOperandRole::Pitch);
-      return event.invoke<&Playback::pitchEnvelope>(delay, depth,
-                                                    event.s8("interval", SemanticOperandRole::Duration));
+      return event.invoke<&Playback::pitchEnvelope>(delay, depth, event.s8("interval", SemanticOperandRole::Duration));
     }
     case 0xf1: {
       auto event = cursor.command("Pitch Envelope On/Off", SequenceSemantic::Pitch);
@@ -698,8 +690,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return cursor.ignored("No Operation", 1, "nop");
     case 0xfc: {
       auto event = cursor.command("Goto / End", SequenceSemantic::Jump);
-      const s16 relative = event.s16le("relative", SourceValueDisplay::SignedDecimal,
-                                      SemanticOperandRole::JumpTarget);
+      const s16 relative = event.s16le("relative", SourceValueDisplay::SignedDecimal, SemanticOperandRole::JumpTarget);
       if (relative == 0) {
         return event.label("End").end();
       }
@@ -710,22 +701,6 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     default:
       return cursor.unsupported("Invalid Command").stop();
   }
-}
-
-[[nodiscard]] RuntimePatches runtimePatches(ByteReader reader, const Layout& layout) {
-  RuntimePatches result{};
-  for (u32 program = 0; program < 256; ++program) {
-    const u16 row = static_cast<u16>(layout.instrumentTableAddress + static_cast<u8>(program * 5u));
-    if (!reader.has(row, 5)) {
-      continue;
-    }
-    result[program] = PatchState{
-        .adsr1 = reader.u8At(row),
-        .adsr2 = reader.u8At(row + 1),
-        .pitchScale = reader.be16(row + 3),
-    };
-  }
-  return result;
 }
 
 }  // namespace
@@ -750,12 +725,11 @@ const SequenceProgramConfig& sequenceConfig() {
   return config;
 }
 
-TrackProgram decodeSourceTrack(ByteReader reader, u32 trackNumber, u32 startAddress,
-                               std::span<const u8, 7> durations, std::vector<Diagnostic>* diagnostics) {
+TrackProgram decodeSourceTrack(ByteReader reader, u32 trackNumber, u32 startAddress, std::span<const u8, 7> durations,
+                               std::vector<Diagnostic>* diagnostics) {
   const TrackDecodeScope tracks{.reader = reader, .maxCommands = kCommandLimit};
-  return tracks.decode(trackNumber, startAddress, [&](u32 offset) {
-    return decodeCommand(reader, offset, durations, diagnostics);
-  });
+  return tracks.decode(trackNumber, startAddress,
+                       [&](u32 offset) { return decodeCommand(reader, offset, durations, diagnostics); });
 }
 
 SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
@@ -764,6 +738,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   std::array<u8, 7> durations;
   std::ranges::copy(reader.slice(layout.sequenceHeaderAddress + 0x18, durations.size()), durations.begin());
   std::set<u8> programs{0};
+  PatchTable patches = parsePatches(reader, layout);
   SequenceDecodeSession sequence{reader, sequenceConfig(), sequenceId, header, sourceMap, kCommandLimit, kAramSize};
   for (u32 track = 0; track < kTrackCount; ++track) {
     if (!layout.trackStarts[track]) {
@@ -775,11 +750,12 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         track, reader.range(pointer, 2), *layout.trackStarts[track],
         [&](u32 offset) { return decodeCommand(reader, offset, durations, diagnostics, &programs); }, relative);
   }
-  SequenceProgram program = sequence.finish(
-      makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{.patches = runtimePatches(reader, layout)}));
+  SequenceProgram program =
+      sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{.patches = patches}));
   return SequenceParse{
       .program = std::move(program),
       .programs = std::move(programs),
+      .patches = std::move(patches),
       .headerRange = header,
   };
 }

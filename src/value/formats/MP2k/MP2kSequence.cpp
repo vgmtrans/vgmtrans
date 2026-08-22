@@ -29,34 +29,21 @@ using namespace core;
 namespace {
 
 constexpr u32 kMaxTrackCommands = 262144;
-constexpr size_t kToneCount = 128;
 constexpr ValueQuantization kMp2kLevelQuantization{.levels = 128};
 constexpr std::array<u8, 49> kClockTable{
     0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
     28, 30, 32, 36, 40, 42, 44, 48, 52, 54, 56, 60, 64, 66, 68, 72, 76, 78, 80, 84, 88, 90, 92, 96,
 };
 
-struct ToneState {
-  u8 type = 0;
-  u8 key = 0;
-  u8 length = 0;
-  u8 panSweep = 0;
-  u32 wave = 0;
-  u8 attack = 0;
-  u8 decay = 0;
-  u8 sustain = 0;
-  u8 release = 0;
-};
-
 struct RuntimeConfig {
-  std::vector<ToneState> tones;
+  std::vector<Mp2kTone> tones;
   double reverbSend = 0.0;
 };
 
 struct ProgramState {
   explicit ProgramState(const RuntimeConfig& config) : tones(config.tones), reverbSend(config.reverbSend) {}
 
-  std::vector<ToneState> tones;
+  std::span<const Mp2kTone> tones;
   double reverbSend = 0.0;
   std::array<u8, 256> memory{};
 };
@@ -86,7 +73,7 @@ struct TrackState {
   s32 transpose = 0;
   u8 bendRange = 2;
   u8 program = 0;
-  ToneState tone{.type = 1};
+  Mp2kTone tone{.type = 1};
   u8 previousKey = 0;
   u8 previousVelocity = 0;
   u8 patternDepth = 0;
@@ -328,7 +315,7 @@ struct Playback {
 
   void program(u8 number) {
     track.program = number;
-    track.tone = number < programState.tones.size() ? programState.tones[number] : ToneState{};
+    track.tone = number < programState.tones.size() ? programState.tones[number] : Mp2kTone{};
     out.instrument(0, number, InstrumentEnvelopeMode::UseInstrumentEnvelope);
     out.reverb(cgbTone() ? 0.0 : programState.reverbSend);
     emitLevel();
@@ -724,9 +711,7 @@ struct DecodeContext {
     case 0xb3: {
       auto event = cursor.command("Pattern", SequenceSemantic::Call);
       const auto destination = pointer(event, context.reader, "destination", SemanticOperandRole::CallTarget);
-      return destination
-                 ? event.invoke<&Playback::pattern>(*destination).mayBranchTo(*destination)
-                 : event.stop();
+      return destination ? event.invoke<&Playback::pattern>(*destination).mayBranchTo(*destination) : event.stop();
     }
     case 0xb4: {
       auto event = cursor.command("Pattern End", SequenceSemantic::Return);
@@ -740,9 +725,8 @@ struct DecodeContext {
       auto event = cursor.command("Repeat", SequenceSemantic::Repeat);
       const u8 count = event.u8("count");
       const auto destination = pointer(event, context.reader, "destination", SemanticOperandRole::JumpTarget);
-      return destination
-                 ? event.invoke<&Playback::repeat>(count, *destination).mayBranchTo(*destination)
-                 : event.stop();
+      return destination ? event.invoke<&Playback::repeat>(count, *destination).mayBranchTo(*destination)
+                         : event.stop();
     }
     case 0xb9: {
       auto event = cursor.command("Memory Access", SequenceSemantic::State);
@@ -810,28 +794,15 @@ const SequenceProgramConfig& mp2kSequenceConfig() {
 }
 
 SequenceProgram parseMp2kSequenceProgram(ByteReader reader, AssetId id, const Mp2kSong& song,
-                                         SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+                                         std::span<const Mp2kTone> tones, SourceMapBuilder* sourceMap,
+                                         std::vector<Diagnostic>* diagnostics) {
   const SequenceProgramConfig& config = mp2kSequenceConfig();
   const u32 headerSize = 8 + song.declaredTracks * 4;
   SequenceProgram program = config.makeProgram();
-  RuntimeConfig runtime{.reverbSend = song.reverb / 127.0};
-  runtime.tones.reserve(kToneCount);
-  for (u32 index = 0; index < kToneCount && reader.has(song.bankOffset + index * 12, 8); ++index) {
-    const u32 tone = song.bankOffset + index * 12;
-    const u32 packed = reader.le32(tone);
-    const u32 envelope = reader.le32(tone + 8);
-    runtime.tones.push_back(ToneState{
-        .type = static_cast<u8>(packed),
-        .key = static_cast<u8>(packed >> 8),
-        .length = static_cast<u8>(packed >> 16),
-        .panSweep = static_cast<u8>(packed >> 24),
-        .wave = reader.le32(tone + 4),
-        .attack = static_cast<u8>(envelope),
-        .decay = static_cast<u8>(envelope >> 8),
-        .sustain = static_cast<u8>(envelope >> 16),
-        .release = static_cast<u8>(envelope >> 24),
-    });
-  }
+  RuntimeConfig runtime{
+      .tones = std::vector<Mp2kTone>(tones.begin(), tones.end()),
+      .reverbSend = song.reverb / 127.0,
+  };
   program.runtime = makeCompiledRuntime<Mp2kCursor, ProgramState>(std::move(runtime));
 
   std::optional<SourceAnnotationId> header;

@@ -33,9 +33,22 @@ struct Layout {
   std::array<std::optional<u16>, kTrackCount> trackStarts;
 };
 
+struct Patch {
+  u8 program = 0;
+  std::optional<u8> srcn;
+  u8 adsr1 = 0;
+  u8 adsr2 = 0;
+  u16 pitchScale = 0;
+  core::SourceRange source;
+  std::optional<core::SourceRange> srcnSource;
+};
+
+using PatchTable = std::array<Patch, 256>;
+
 struct SequenceParse {
   core::SequenceProgram program;
   std::set<u8> programs;
+  PatchTable patches;
   core::SourceRange headerRange;
 };
 
@@ -47,8 +60,9 @@ struct SequenceParse {
                                            core::SourceMapBuilder* sourceMap = nullptr,
                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
+[[nodiscard]] PatchTable parsePatches(core::ByteReader reader, const Layout& layout);
 [[nodiscard]] std::optional<core::ScanSoundBankRef> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
-                                                             const std::set<u8>& programs,
+                                                             const std::set<u8>& programs, const PatchTable& patches,
                                                              std::string_view displayName);
 [[nodiscard]] core::FormatModule module();
 
