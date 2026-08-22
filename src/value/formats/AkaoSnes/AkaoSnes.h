@@ -12,6 +12,7 @@
 #include "value/sequence/SequenceProgramConfig.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <optional>
@@ -21,6 +22,8 @@
 namespace vgmtrans::formats::akao_snes {
 
 inline constexpr std::string_view kAkaoSnesFormatName = "AkaoSnes";
+inline constexpr size_t kAkaoSnesV1VolumeEnvelopeCount = 0x20;
+using AkaoSnesV1VolumeEnvelopes = std::array<std::optional<std::vector<u8>>, kAkaoSnesV1VolumeEnvelopeCount>;
 
 enum AkaoSnesVersion : u8 {
   AKAOSNES_NONE = 0,
@@ -208,8 +211,8 @@ struct AkaoSnesTrackDecodeOptions {
 
 [[nodiscard]] std::optional<AkaoSnesLayout> findAkaoSnesLayout(core::ByteReader reader);
 [[nodiscard]] const core::SequenceProgramConfig& akaoSnesSequenceConfig();
-[[nodiscard]] core::SequenceRuntime akaoSnesSequenceRuntime(AkaoSnesProfile profile,
-                                                            std::vector<u32> v1VolumeEnvelopes = {});
+[[nodiscard]] core::SequenceRuntime akaoSnesSequenceRuntime(
+    AkaoSnesProfile profile, std::optional<AkaoSnesV1VolumeEnvelopes> v1VolumeEnvelopes = std::nullopt);
 [[nodiscard]] core::TrackProgram decodeAkaoSnesSourceTrack(core::ByteReader reader,
                                                            const AkaoSnesTrackDecodeOptions& options);
 [[nodiscard]] core::SequenceProgram parseAkaoSnesSequence(core::ByteReader reader, const AkaoSnesLayout& layout,

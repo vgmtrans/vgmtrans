@@ -66,7 +66,7 @@ TrackProgram decodeTrack(const std::vector<u8>& bytes, AkaoSnesProfile profile, 
 
 PerformanceSequence renderTracks(AkaoSnesProfile profile, std::vector<TrackProgram> tracks,
                                  SequenceVmOptions options = SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce},
-                                 std::vector<u32> driverData = {}) {
+                                 std::optional<AkaoSnesV1VolumeEnvelopes> driverData = std::nullopt) {
   const auto& config = akaoSnesSequenceConfig();
   const SequenceProgram program{
       .runtime = akaoSnesSequenceRuntime(profile, std::move(driverData)),
@@ -497,18 +497,10 @@ void akaoSnesV1SoftwareEnvelopesDriveLevelWithoutDynamicInstruments() {
   constexpr u32 start = 0x20;
   const AkaoSnesProfile ff4{.version = AKAOSNES_V1, .minorVersion = AKAOSNES_V1_FF4};
 
-  std::vector<u32> driverData(0x20);
-  driverData[0] = static_cast<u32>(driverData.size());
-  driverData.push_back(64);
-  driverData.push_back(0x40);
-  driverData.push_back(0x80);
-  driverData.push_back(0xc0);
-  for (size_t i = 0; i < 61; ++i) {
-    driverData.push_back(0xff);
-  }
-  driverData[1] = static_cast<u32>(driverData.size());
-  driverData.push_back(1);
-  driverData.push_back(0xff);
+  AkaoSnesV1VolumeEnvelopes driverData;
+  driverData[0] = std::vector<u8>{0x40, 0x80, 0xc0};
+  driverData[0]->insert(driverData[0]->end(), 61, 0xff);
+  driverData[1] = std::vector<u8>{0xff};
 
   const auto levelAt = [](const PerformanceTrack& track, u64 tick) {
     double level = 1.0;
