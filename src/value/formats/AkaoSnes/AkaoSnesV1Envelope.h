@@ -11,11 +11,10 @@
 
 #include <optional>
 #include <span>
+#include <utility>
 #include <vector>
 
 namespace vgmtrans::formats::akao_snes {
-
-inline constexpr size_t kAkaoSnesV1VolumeEnvelopeCount = 0x20;
 
 [[nodiscard]] constexpr u8 akaoSnesV1Gain(u8 parameter) {
   return static_cast<u8>(0xa0 | (parameter & 0x1f));
@@ -28,8 +27,9 @@ inline constexpr size_t kAkaoSnesV1VolumeEnvelopeCount = 0x20;
   return parameter == 100 ? parameter : static_cast<u8>((static_cast<u16>(parameter) << 8) / 100);
 }
 
-[[nodiscard]] inline std::vector<u32> captureAkaoSnesV1VolumeEnvelopes(core::ByteReader reader, u32 tableAddress) {
-  std::vector<u32> data(kAkaoSnesV1VolumeEnvelopeCount);
+[[nodiscard]] inline AkaoSnesV1VolumeEnvelopes captureAkaoSnesV1VolumeEnvelopes(core::ByteReader reader,
+                                                                                u32 tableAddress) {
+  AkaoSnesV1VolumeEnvelopes result;
   for (size_t index = 0; index < kAkaoSnesV1VolumeEnvelopeCount; ++index) {
     const u32 pointerAddress = tableAddress + static_cast<u32>(index * 2);
     if (!reader.has(pointerAddress, 2)) {
@@ -37,22 +37,17 @@ inline constexpr size_t kAkaoSnesV1VolumeEnvelopeCount = 0x20;
     }
 
     const u32 curveAddress = reader.le16(pointerAddress);
-    const size_t dataStart = data.size();
-    data.push_back(0);
+    std::vector<u8> curve;
     for (u32 offset = 0; offset < 0x100 && reader.has(curveAddress + offset, 1); ++offset) {
       const u8 value = reader.u8At(curveAddress + offset);
       if (value == 0) {
-        data[index] = static_cast<u32>(dataStart);
-        data[dataStart] = static_cast<u32>(data.size() - dataStart - 1);
+        result[index] = std::move(curve);
         break;
       }
-      data.push_back(value);
-    }
-    if (data[index] == 0) {
-      data.resize(dataStart);
+      curve.push_back(value);
     }
   }
-  return data;
+  return result;
 }
 
 // FF4 multiplies track volume by DC's per-note software table. Its terminator
@@ -60,7 +55,7 @@ inline constexpr size_t kAkaoSnesV1VolumeEnvelopeCount = 0x20;
 // B1 at a duration-relative point.
 class AkaoSnesV1EnvelopeState {
 public:
-  explicit AkaoSnesV1EnvelopeState(std::span<const u32> envelopes = {}) : envelopes(envelopes) {}
+  explicit AkaoSnesV1EnvelopeState(const AkaoSnesV1VolumeEnvelopes* envelopes = nullptr) : envelopes(envelopes) {}
 
   void selectVolumeEnvelope(u8 index) { selectedVolumeEnvelope = index; }
   void selectGain(u8 parameter) { selectedGain = akaoSnesV1Gain(parameter); }
@@ -74,9 +69,7 @@ public:
     releaseTicks = static_cast<u16>((duration * selectedDurationRate) >> 8);
 
     activeCurve = selectedVolumeEnvelope ? volumeEnvelope(*selectedVolumeEnvelope) : std::nullopt;
-    volumeMultiplier = envelopes.size() < kAkaoSnesV1VolumeEnvelopeCount
-                           ? 0xff
-                           : (!activeCurve || activeCurve->empty() ? 0 : static_cast<u8>(activeCurve->front()));
+    volumeMultiplier = envelopes == nullptr ? 0xff : (!activeCurve || activeCurve->empty() ? 0 : activeCurve->front());
   }
 
   [[nodiscard]] double level() const {
@@ -92,10 +85,10 @@ public:
     if (activeCurve) {
       const size_t index = static_cast<size_t>(elapsedSeconds / kVolumeEnvelopeStepSeconds);
       if (index < activeCurve->size()) {
-        volumeMultiplier = static_cast<u8>((*activeCurve)[index]);
+        volumeMultiplier = (*activeCurve)[index];
       } else {
         if (!activeCurve->empty()) {
-          volumeMultiplier = static_cast<u8>(activeCurve->back());
+          volumeMultiplier = activeCurve->back();
         }
         if (!gainStartSeconds) {
           startGain(activeGain, activeCurve->size() * kVolumeEnvelopeStepSeconds);
@@ -114,17 +107,12 @@ public:
   }
 
 private:
-  [[nodiscard]] std::optional<std::span<const u32>> volumeEnvelope(u8 index) const {
-    // Each table entry points to a length followed by that curve's values.
-    if (envelopes.size() < kAkaoSnesV1VolumeEnvelopeCount || index >= kAkaoSnesV1VolumeEnvelopeCount) {
+  [[nodiscard]] std::optional<std::span<const u8>> volumeEnvelope(u8 index) const {
+    if (envelopes == nullptr || index >= envelopes->size()) {
       return std::nullopt;
     }
-    const size_t offset = envelopes[index];
-    if (offset < kAkaoSnesV1VolumeEnvelopeCount || offset >= envelopes.size()) {
-      return std::nullopt;
-    }
-    const size_t size = envelopes[offset];
-    return size <= envelopes.size() - offset - 1 ? std::optional{envelopes.subspan(offset + 1, size)} : std::nullopt;
+    const auto& curve = (*envelopes)[index];
+    return curve ? std::optional{std::span<const u8>{*curve}} : std::nullopt;
   }
 
   [[nodiscard]] s16 gainEnvelopeAt(double seconds) const {
@@ -143,14 +131,14 @@ private:
       2.0 / akaoSnesFrameRateHz(akaoSnesTimer0Frequency(AKAOSNES_V1, AKAOSNES_V1_FF4));
 
   std::optional<u8> selectedVolumeEnvelope;
-  const std::span<const u32> envelopes;
+  const AkaoSnesV1VolumeEnvelopes* envelopes;
   u8 selectedGain = 0;
   u8 selectedDurationRate = 0;
 
   u8 activeGain = 0;
   u8 volumeMultiplier = 0xff;
   u16 releaseTicks = 0;
-  std::optional<std::span<const u32>> activeCurve;
+  std::optional<std::span<const u8>> activeCurve;
   double elapsedSeconds = 0.0;
   std::optional<double> gainStartSeconds;
   s16 gainStartEnvelope = kDspEnvelopeMaximum;

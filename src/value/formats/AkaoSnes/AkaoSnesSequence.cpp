@@ -829,7 +829,7 @@ struct SharedTempoChange {
 
 struct RuntimeConfig {
   AkaoSnesProfile profile;
-  std::vector<u32> v1VolumeEnvelopes;
+  std::optional<AkaoSnesV1VolumeEnvelopes> v1VolumeEnvelopes;
 };
 
 struct ProgramState {
@@ -934,9 +934,8 @@ struct PitchEnvelopeState {
 
 struct TrackState {
   TrackState(const SequenceProgram&, const TrackProgram& track, const RuntimeConfig& config)
-      : sourceTrack(track),
-        trackNumber(track.sourceTrackNumber), pan8Bit(akaoSnesUses8BitPan(config.profile)),
-        v1Envelope(config.v1VolumeEnvelopes) {
+      : sourceTrack(track), trackNumber(track.sourceTrackNumber), pan8Bit(akaoSnesUses8BitPan(config.profile)),
+        v1Envelope(config.v1VolumeEnvelopes ? &*config.v1VolumeEnvelopes : nullptr) {
     volume.reset(0xff);
     pan.reset(0x80);
     tempoState.reset(kDefaultTempo);
@@ -2142,7 +2141,8 @@ const SequenceProgramConfig& akaoSnesSequenceConfig() {
   return sharedConfig();
 }
 
-SequenceRuntime akaoSnesSequenceRuntime(AkaoSnesProfile profile, std::vector<u32> v1VolumeEnvelopes) {
+SequenceRuntime akaoSnesSequenceRuntime(AkaoSnesProfile profile,
+                                        std::optional<AkaoSnesV1VolumeEnvelopes> v1VolumeEnvelopes) {
   return makeCompiledRuntime<AkaoSnesCursor, ProgramState>(
       RuntimeConfig{.profile = profile, .v1VolumeEnvelopes = std::move(v1VolumeEnvelopes)});
 }
