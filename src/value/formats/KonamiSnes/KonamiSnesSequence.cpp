@@ -197,17 +197,7 @@ struct RawEnvelopeRegisters {
   std::optional<u8> gain;
 };
 
-struct RuntimeInstrument {
-  u8 adsr1;
-  u8 adsr2;
-  u8 gain;
-  u8 pan;
-  u8 volume;
-};
-
 constexpr size_t kPercussionEnvelopeBase = 0x100;
-constexpr size_t kInstrumentEnvelopeCount = kPercussionEnvelopeBase + 0x60;
-using RuntimeInstruments = std::array<std::optional<RuntimeInstrument>, kInstrumentEnvelopeCount>;
 
 [[nodiscard]] u8 clampPan(KonamiSnesVersion version, u8 pan) {
   return std::min(pan, version <= KONAMISNES_V2 ? u8{20} : u8{40});
@@ -267,16 +257,23 @@ struct LfoState {
 struct RuntimeConfig {
   KonamiSnesVersion version = KONAMISNES_NONE;
   bool indexedEchoFilter = false;
-  RuntimeInstruments instruments;
+  std::vector<KonamiSnesInstrumentInfo> instruments;
+
+  [[nodiscard]] const KonamiSnesInstrumentInfo* instrument(size_t index) const {
+    const bool percussion = index >= kPercussionEnvelopeBase;
+    const size_t sourceIndex = percussion ? index - kPercussionEnvelopeBase : index;
+    const auto found = std::ranges::find_if(instruments, [&](const KonamiSnesInstrumentInfo& candidate) {
+      return candidate.percussion == percussion &&
+             (percussion ? candidate.percussionNote : candidate.index) == sourceIndex;
+    });
+    return found == instruments.end() ? nullptr : &*found;
+  }
 };
 
 struct ProgramState {
-  explicit ProgramState(const RuntimeConfig& config)
-      : instruments(config.instruments), indexedEchoFilter(config.indexedEchoFilter) {}
+  explicit ProgramState(const RuntimeConfig& config) : config(config), indexedEchoFilter(config.indexedEchoFilter) {}
 
-  [[nodiscard]] std::optional<RuntimeInstrument> instrument(size_t index) const {
-    return index < instruments.size() ? instruments[index] : std::nullopt;
-  }
+  [[nodiscard]] const KonamiSnesInstrumentInfo* instrument(size_t index) const { return config.instrument(index); }
 
   void setEcho(u8 mask, u8 left, u8 right) {
     const double leftGain = static_cast<s8>(left) / 127.0;
@@ -304,13 +301,13 @@ struct ProgramState {
   }
 
   ReverbPerformanceEvent echo{.voiceMask = 0};
-  const RuntimeInstruments& instruments;
+  const RuntimeConfig& config;
   bool indexedEchoFilter = false;
 };
 
 struct TrackEnvelopeState {
-  void selectInstrument(KonamiSnesVersion version, const std::optional<RuntimeInstrument>& instrument) {
-    if (!instrument) {
+  void selectInstrument(KonamiSnesVersion version, const KonamiSnesInstrumentInfo* instrument) {
+    if (instrument == nullptr) {
       registers.reset();
       savedCompanion.reset();
     } else if (usesLegacyInstrumentLayout(version)) {
@@ -352,9 +349,9 @@ struct TrackEnvelopeState {
 struct TrackState {
   TrackState(const TrackProgram& track, const RuntimeConfig& config)
       : version(config.version), voiceBit(static_cast<u8>(1u << std::min<u32>(track.sourceTrackNumber, 7))) {
-    const auto& initialInstrument = config.instruments.front();
+    const auto* initialInstrument = config.instrument(0);
     envelope.selectInstrument(version, initialInstrument);
-    instrumentVolume = initialInstrument ? initialInstrument->volume : 0;
+    instrumentVolume = initialInstrument == nullptr ? 0 : initialInstrument->volume;
     pan.reset(version <= KONAMISNES_V2 ? 10 : 20);
     volume.reset(0);
     tempoState.reset(kKonamiSnesDefaultTempo);
@@ -542,7 +539,7 @@ struct Playback {
     const u8 duration = track.noteDuration(track.noteLength);
     beginSoftwareRelease(duration);
     const double key = track.previousNoteWasPercussion ? static_cast<double>(*track.previousNoteKey)
-                                                      : track.noteSemitones(*track.previousNoteKey, false);
+                                                       : track.noteSemitones(*track.previousNoteKey, false);
     track.pitchNote = out.note(NotePerformanceEvent{
         .key = key,
         .linearVelocity = 1.0,
@@ -555,7 +552,7 @@ struct Playback {
                                               !isHeldDuration(track.version, track.noteDurationRate);
   }
 
-  void selectInstrument(u32 bank, u32 programNumber, const std::optional<RuntimeInstrument>& instrument) {
+  void selectInstrument(u32 bank, u32 programNumber, const KonamiSnesInstrumentInfo* instrument) {
     loadInstrument(instrument);
     out.instrument(bank, programNumber, true);
     emitPersistentRelease();
@@ -942,10 +939,10 @@ private:
     output.level(LevelScale::linearFromLinear(mixedLevel(trackVolume)), LevelPrecisionHint::FourteenBit);
   }
 
-  void loadInstrument(const std::optional<RuntimeInstrument>& instrument) {
+  void loadInstrument(const KonamiSnesInstrumentInfo* instrument) {
     track.envelope.selectInstrument(track.version, instrument);
-    track.instrumentVolume = instrument ? instrument->volume : 0;
-    if (instrument && track.instrumentPanEnabled) {
+    track.instrumentVolume = instrument == nullptr ? 0 : instrument->volume;
+    if (instrument != nullptr && track.instrumentPanEnabled) {
       pan(instrument->pan);
     }
   }
@@ -1258,8 +1255,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       }
       if (version == KONAMISNES_V1) {
         auto event = cursor.command("Default Duration", SequenceSemantic::State);
-        return event.set<&TrackState::noteDurationRate>(
-            event.u8("duration_rate", SemanticOperandRole::Duration));
+        return event.set<&TrackState::noteDurationRate>(event.u8("duration_rate", SemanticOperandRole::Duration));
       }
       return unknownCommand(cursor, 0);
     case 0x63: {
@@ -1665,6 +1661,7 @@ SourceRange konamiSnesSequenceHeaderRange(ByteReader reader, const KonamiSnesLay
 }
 
 SequenceProgram decodeKonamiSnesSequence(ByteReader reader, const KonamiSnesLayout& layout, AssetId sequenceId,
+                                         const std::vector<KonamiSnesInstrumentInfo>& instruments,
                                          SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const SourceRange headerRange = konamiSnesSequenceHeaderRange(reader, layout);
   const u32 trackCount = headerRange.size / 2;
@@ -1686,17 +1683,8 @@ SequenceProgram decodeKonamiSnesSequence(ByteReader reader, const KonamiSnesLayo
   RuntimeConfig runtime{
       .version = layout.version,
       .indexedEchoFilter = layout.indexedEchoFilter,
+      .instruments = instruments,
   };
-  for (const auto& instrument : parseKonamiSnesInstrumentInfos(reader, layout)) {
-    const size_t index = instrument.percussion ? kPercussionEnvelopeBase + instrument.percussionNote : instrument.index;
-    runtime.instruments[index] = RuntimeInstrument{
-        .adsr1 = instrument.adsr1,
-        .adsr2 = instrument.adsr2,
-        .gain = instrument.gain,
-        .pan = instrument.pan,
-        .volume = instrument.volume,
-    };
-  }
   return sequence.finish(makeCompiledRuntime<KonamiCursor, ProgramState>(std::move(runtime)));
 }
 

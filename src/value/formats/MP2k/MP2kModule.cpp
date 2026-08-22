@@ -41,11 +41,10 @@ namespace {
 
 void scanLayout(const Mp2kLayout& layout, ScanResultBuilder& result) {
   auto psg = addMp2kPsgSamples(result, layout.engine.sampleRate);
-  std::map<u32, ScanSoundBankDraft> banks;
+  std::map<u32, Mp2kScannedBank> banks;
   for (const auto& bank : layout.banks) {
-    auto instruments = addMp2kInstrumentSet(result, bank, layout.engine.sampleRate,
-                                            layout.engine.directSoundMasterVolume, layout.engine.dacBits, psg);
-    banks.emplace(bank.offset, instruments);
+    banks.emplace(bank.offset, addMp2kInstrumentSet(result, bank, layout.engine.sampleRate,
+                                                    layout.engine.directSoundMasterVolume, layout.engine.dacBits, psg));
   }
 
   const auto selected = selectedSong(result.sourceFile());
@@ -57,14 +56,16 @@ void scanLayout(const Mp2kLayout& layout, ScanResultBuilder& result) {
     const std::string name = titled ? *result.sourceFile().title : fmt::format("MP2k Song #{:03}", song.index);
     const u32 headerSize = 8 + song.declaredTracks * 4;
     auto sequence = result.sequence(name, result.reader().range(song.offset, headerSize));
-    sequence.program(
-        parseMp2kSequenceProgram(result.reader(), sequence.id(), song, &result.sourceMap(), &result.diagnostics()));
+    const auto bank = banks.find(song.bankOffset);
+    const std::span<const Mp2kTone> tones = bank == banks.end() ? std::span<const Mp2kTone>{} : bank->second.tones;
+    sequence.program(parseMp2kSequenceProgram(result.reader(), sequence.id(), song, tones, &result.sourceMap(),
+                                              &result.diagnostics()));
 
     auto collection =
         result.collection(name, collectionKey(result.source(), layout.engine.songTableOffset, song.index));
     collection.sequence(sequence).samplePool(psg);
-    if (const auto found = banks.find(song.bankOffset); found != banks.end()) {
-      collection.soundBank(found->second);
+    if (bank != banks.end()) {
+      collection.soundBank(bank->second.instruments);
     }
   }
 }

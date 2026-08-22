@@ -288,9 +288,9 @@ void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader read
 }  // namespace
 
 std::optional<ScanSoundBankRef> addKonamiSnesSynth(ScanResultBuilder& builder, const KonamiSnesLayout& layout,
+                                                   const std::vector<KonamiSnesInstrumentInfo>& instrumentInfos,
                                                    std::string_view displayName) {
   const ByteReader reader = builder.reader();
-  const auto instrumentInfos = parseKonamiSnesInstrumentInfos(reader, layout);
   const auto sampleCatalog = parseKonamiSnesSampleInfos(reader, *layout.spcDirAddress, instrumentInfos);
   // Do not publish half of a synth. A sound bank without sample data (or
   // vice versa) cannot produce a usable export.

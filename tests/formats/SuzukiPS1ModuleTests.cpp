@@ -132,8 +132,8 @@ void suzukiPs1DynamicAdsrUsesAuditedDriverCommands() {
   const SequenceProgram program = parseSuzukiPs1Sequence(
       reader, AssetId{71}, *layout,
       {
-          SuzukiPs1EnvelopeRegisters{.bank = 3, .program = 0, .adsr1 = initialAdsr1, .adsr2 = initialAdsr2},
-          SuzukiPs1EnvelopeRegisters{.bank = 4, .program = 0, .adsr1 = initialAdsr1, .adsr2 = initialAdsr2},
+          SuzukiPs1Instrument{.bank = 3, .program = 0, .adsr1 = initialAdsr1, .adsr2 = initialAdsr2},
+          SuzukiPs1Instrument{.bank = 4, .program = 0, .adsr1 = initialAdsr1, .adsr2 = initialAdsr2},
       });
   const TrackProgram& track = program.tracks.front();
   const auto c1 =

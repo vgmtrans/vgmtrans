@@ -26,12 +26,14 @@ namespace {
   }
 
   ScanResultBuilder result(input, std::string(kSuzukiPs1FormatName));
-  std::vector<SuzukiPs1ScannedBank> banks;
-  std::vector<SuzukiPs1EnvelopeRegisters> envelopes;
+  std::vector<ScanSoundBankRef> banks;
+  std::vector<SuzukiPs1Instrument> instruments;
   for (const auto& layout : bankLayouts) {
     if (auto bank = addSuzukiPs1Bank(result, layout)) {
-      envelopes.insert(envelopes.end(), bank->envelopes.begin(), bank->envelopes.end());
-      banks.push_back(std::move(*bank));
+      for (auto& instrument : bank->instruments) {
+        instruments.push_back(std::move(instrument));
+      }
+      banks.push_back(bank->bank);
     } else {
       result.warning("SuzukiPS1 WDS header was recognized, but no playable instruments were found",
                      input.reader.range(layout.offset, layout.length));
@@ -42,7 +44,7 @@ namespace {
     const std::string name =
         layout.title.empty() ? fmt::format("SuzukiPS1 Sequence {:X}", layout.offset) : layout.title;
     auto sequence = result.sequence(name, input.reader.range(layout.offset, layout.length));
-    sequence.program(parseSuzukiPs1Sequence(input.reader, sequence.id(), layout, envelopes, &result.sourceMap(),
+    sequence.program(parseSuzukiPs1Sequence(input.reader, sequence.id(), layout, instruments, &result.sourceMap(),
                                             &result.diagnostics()));
     auto collection =
         result
@@ -54,8 +56,8 @@ namespace {
 
     // A source can contain several WDS uploads and switch between them with
     // FE. Keeping them in one collection preserves those source bank IDs.
-    for (const auto& bank : banks) {
-      collection.soundBank(bank.bank);
+    for (const auto bank : banks) {
+      collection.soundBank(bank);
     }
   }
 

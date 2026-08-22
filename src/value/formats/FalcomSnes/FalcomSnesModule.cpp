@@ -30,7 +30,7 @@ namespace {
       .program(std::move(parsed.program));
 
   auto collection = result.sourceCollection(displayName).sequence(sequence);
-  if (const auto synth = addSynth(result, *layout, parsed.programs, displayName)) {
+  if (const auto synth = addSynth(result, *layout, parsed.programs, parsed.patches, displayName)) {
     collection.soundBank(*synth);
   } else {
     result.warning("FalcomSnes sequence found, but no valid instruments or samples were discovered",

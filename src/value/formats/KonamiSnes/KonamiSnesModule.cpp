@@ -22,9 +22,10 @@ using namespace core;
 
   ScanResultBuilder result(input, "KonamiSnes");
   const std::string displayName = result.sourceDisplayName();
+  const auto instruments = parseKonamiSnesInstrumentInfos(input.reader, *layout);
   auto sequence = result.sequence(displayName, konamiSnesSequenceHeaderRange(input.reader, *layout));
-  sequence.program(
-      decodeKonamiSnesSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics()));
+  sequence.program(decodeKonamiSnesSequence(input.reader, *layout, sequence.id(), instruments, &result.sourceMap(),
+                                            &result.diagnostics()));
 
   // A sequence is useful on its own, so publish it even when the snapshot does
   // not contain enough information to reconstruct instruments and samples.
@@ -34,7 +35,7 @@ using namespace core;
   const bool hasSynthLayout = layout->spcDirAddress && layout->commonInstrumentTableAddress &&
                               layout->bankedInstrumentTableAddress && layout->percussionInstrumentTableAddress;
   if (hasSynthLayout) {
-    if (const auto synth = addKonamiSnesSynth(result, *layout, displayName)) {
+    if (const auto synth = addKonamiSnesSynth(result, *layout, instruments, displayName)) {
       collection.soundBank(*synth);
     } else {
       result.warning("KonamiSnes sequence found, but no valid instruments or samples were discovered",
