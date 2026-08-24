@@ -22,6 +22,7 @@
 #include <future>
 #include <iterator>
 #include <map>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -60,19 +61,32 @@ void prepareDiagnostics(ScanResult& result, const SourceFile& source) {
   return !source.knownFormat || std::ranges::find(acceptedFormats, *source.knownFormat) != acceptedFormats.end();
 }
 
-template <class Function>
-void runConcurrently(size_t taskCount, Function&& function) {
-  if (taskCount == 0) {
+struct FormatScan {
+  const FormatModule* format = nullptr;
+  ScanResult result;
+  std::exception_ptr failure;
+};
+
+void runFormatScans(std::span<FormatScan> scans, const ScanInput& input) {
+  if (scans.empty()) {
     return;
   }
 
   const unsigned available = std::thread::hardware_concurrency();
   const size_t workerLimit = available == 0 ? 2 : available;
-  const size_t workerCount = std::min(taskCount, workerLimit);
-  if (workerCount == 1) {
-    for (size_t index = 0; index < taskCount; ++index) {
-      function(index);
+  const size_t workerCount = std::min(scans.size(), workerLimit);
+
+  const auto scanAt = [&](size_t index) noexcept {
+    auto& scan = scans[index];
+    try {
+      scan.result = scan.format->scan(input);
+    } catch (...) {
+      scan.failure = std::current_exception();
     }
+  };
+
+  if (workerCount == 1) {
+    scanAt(0);
     return;
   }
 
@@ -80,10 +94,10 @@ void runConcurrently(size_t taskCount, Function&& function) {
   const auto work = [&] {
     while (true) {
       const size_t index = nextTask.fetch_add(1, std::memory_order_relaxed);
-      if (index >= taskCount) {
+      if (index >= scans.size()) {
         return;
       }
-      function(index);
+      scanAt(index);
     }
   };
 
@@ -97,12 +111,6 @@ void runConcurrently(size_t taskCount, Function&& function) {
     worker.get();
   }
 }
-
-struct ModuleScan {
-  const FormatModule* module = nullptr;
-  ScanResult result;
-  std::exception_ptr failure;
-};
 
 }  // namespace
 
@@ -422,35 +430,28 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
     }
   }
 
-  std::vector<ModuleScan> scans;
+  std::vector<FormatScan> scans;
+  scans.reserve(formats_.modules().size());
   for (const auto& module : formats_.modules()) {
     if (!accepts(source, module.acceptedFormats)) {
       continue;
     }
     acceptsKnownFormat = true;
-    scans.push_back(ModuleScan{.module = &module});
+    scans.push_back(FormatScan{.format = &module});
   }
 
-  const ByteReader reader = sources_.reader(id);
-  const RetainedSource retained{id, sources_.sharedBytes(id)};
-  runConcurrently(scans.size(), [&](size_t index) {
-    auto& scan = scans[index];
-    try {
-      scan.result = scan.module->scan(ScanInput{
-          .source = source,
-          .reader = reader,
-          .ids = ids_,
-          .retained = retained,
-      });
-    } catch (...) {
-      scan.failure = std::current_exception();
-    }
-  });
+  const ScanInput input{
+      .source = source,
+      .reader = sources_.reader(id),
+      .ids = ids_,
+      .retained = RetainedSource{id, sources_.sharedBytes(id)},
+  };
+  runFormatScans(scans, input);
 
   // Admission stays serial and follows registry order. Scanner callbacks only
   // read the shared source bytes and build their private result values.
   for (auto& scan : scans) {
-    const FormatModule& module = *scan.module;
+    const FormatModule& module = *scan.format;
     if (scan.failure) {
       try {
         std::rethrow_exception(scan.failure);

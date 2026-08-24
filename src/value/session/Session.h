@@ -81,8 +81,9 @@ private:
   FormatRegistry formats_;
   ScanIdAllocator ids_;
   std::unordered_set<u32> scannedSources_;
-  // Session is single-thread-confined. This memoized immutable revision is
-  // populated on the first snapshot read after a mutation.
+  // The public Session API is single-thread-confined; format scans fan out
+  // internally. This immutable revision is populated on the first snapshot
+  // read after a mutation.
   mutable std::optional<SessionSnapshot> snapshotCache_;
 };
 
