@@ -98,6 +98,7 @@ private:
 struct FormatModule {
   // Function table registered by one format. Recognition belongs at the start
   // of scan(), which returns an empty result when the source does not match.
+  // Different modules may scan the same immutable input concurrently.
   using Scan = std::function<ScanResult(const ScanInput& input)>;
   using ResolveCollections = std::function<std::vector<DesiredCollection>(const CollectionDiscoveryContext& context)>;
 

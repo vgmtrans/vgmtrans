@@ -6,10 +6,6 @@
 
 #include "value/scan/ScanTypes.h"
 
-#include <algorithm>
-#include <cstddef>
-#include <utility>
-
 namespace vgmtrans::core {
 
 namespace {
