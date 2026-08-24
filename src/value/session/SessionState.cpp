@@ -105,9 +105,6 @@ void SessionState::appendScan(SourceId origin, ScanResult result) {
     }
   }
 
-  assetsById_.reserve(assetsById_.size() + result.assets.size());
-  annotationIds_.reserve(annotationIds_.size() + result.sourceMap.annotations().size());
-
   if (!result.assets.empty() || !result.sourceMap.empty()) {
     scanChunks_.push_back(ScanChunk{
         .assets = sharedVector(std::move(result.assets)),
