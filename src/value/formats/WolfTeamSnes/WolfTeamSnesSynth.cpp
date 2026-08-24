@@ -24,107 +24,57 @@ using namespace core;
 
 namespace {
 
-struct Patch {
-  u8 program = 0;
-  u8 srcn = 0;
-  u8 patchIndex = 0;
-  u8 pitch = 0;
-  u8 adsr1 = 0;
-  u8 adsr2 = 0;
-  u8 gain = 0;
-  u8 volume = 0;
-  u8 tuning = 0;
-  SourceRange patchSource;
-  SourceRange mapSource;
-  SourceRange volumeSource;
-};
-
-[[nodiscard]] s16 signedByte(u8 value) {
-  return value < 0x80 ? value : static_cast<s16>(value) - 0x100;
-}
-
 [[nodiscard]] double attenuation(double gain) {
   return gain <= 0.0 ? 100.0 : std::max(0.0, -20.0 * std::log10(gain));
 }
 
-[[nodiscard]] double lateUnityKey(const Patch& patch) {
-  const double fine = signedByte(static_cast<u8>(patch.tuning - 0x40)) / 64.0;
+[[nodiscard]] double lateUnityKey(const InstrumentInfo& patch) {
+  const double fine = signedDriverByte(static_cast<u8>(patch.tuning - 0x40)) / 64.0;
   const double pitchTableOffset = 12.0 * std::log2(4286.0 / 4096.0);
-  return 72.0 - (signedByte(patch.pitch) + fine + pitchTableOffset);
+  return 72.0 - (patch.driverPitch + fine + pitchTableOffset);
 }
 
-[[nodiscard]] double segmentedUnityKey(const Patch& patch, const Layout& layout) {
+[[nodiscard]] double segmentedUnityKey(const InstrumentInfo& patch, const Layout& layout) {
   if (layout.middleSegmented()) {
     return 60.0;
   }
-  const s16 coarse = signedByte(static_cast<u8>(patch.pitch + layout.instruments.globalPitchBase));
   const double tableBase = 12.0 * std::log2(0x10be / 4096.0);
-  return 60.0 - coarse - tableBase;
+  return 60.0 - patch.driverPitch - tableBase;
 }
 
-[[nodiscard]] std::vector<Patch> collectPatches(ByteReader reader, const Layout& layout) {
-  std::vector<Patch> result;
+[[nodiscard]] std::vector<InstrumentInfo> collectInstruments(ByteReader reader, const Layout& layout) {
+  std::vector<InstrumentInfo> result;
   result.reserve(layout.instruments.count);
   for (u32 program = 0; program < layout.instruments.count; ++program) {
-    u8 patchIndex = static_cast<u8>(program);
-    SourceRange mapSource;
-    if (layout.instruments.patchMapAddress) {
-      const u32 map = *layout.instruments.patchMapAddress + program;
-      if (!reader.has(map, 1)) {
-        continue;
-      }
-      patchIndex = reader.u8At(map);
-      mapSource = reader.range(map, 1);
-    }
-    const u32 patch = layout.instruments.patchTableAddress + patchIndex * layout.instruments.entrySize;
-    if (!reader.has(patch, layout.instruments.entrySize)) {
+    const auto info = readInstrumentInfo(reader, layout, static_cast<u8>(program));
+    if (!info || (layout.instruments.volumeTableAddress && !info->volumeSource.valid())) {
       continue;
     }
-    Patch info{
-        .program = static_cast<u8>(program),
-        .srcn = static_cast<u8>(program),
-        .patchIndex = patchIndex,
-        .pitch = reader.u8At(patch),
-        .adsr1 = reader.u8At(patch + 1),
-        .adsr2 = reader.u8At(patch + 2),
-        .gain = layout.segmented() ? reader.u8At(patch + 3) : u8{0xb8},
-        .tuning = layout.segmented() ? u8{0x40} : reader.u8At(patch + 3),
-        .patchSource = reader.range(patch, layout.instruments.entrySize),
-        .mapSource = mapSource,
-    };
-    if (layout.instruments.volumeTableAddress) {
-      const u32 volume = *layout.instruments.volumeTableAddress + program;
-      if (!reader.has(volume, 1)) {
-        continue;
-      }
-      info.volume = reader.u8At(volume);
-      info.volumeSource = reader.range(volume, 1);
-    }
-    result.push_back(info);
+    result.push_back(*info);
   }
   return result;
 }
 
-[[nodiscard]] std::vector<u8> referencedSrcns(const std::vector<Patch>& patches) {
+[[nodiscard]] std::vector<u8> referencedSrcns(const std::vector<InstrumentInfo>& patches) {
   std::vector<u8> result;
   result.reserve(patches.size());
-  for (const Patch& patch : patches) {
-    result.push_back(patch.srcn);
+  for (const InstrumentInfo& patch : patches) {
+    result.push_back(patch.program);
   }
   return result;
 }
 
-void addInstruments(InstrumentSetBuilder& instruments, const std::vector<Patch>& patches,
+void addInstruments(InstrumentSetBuilder& instruments, const std::vector<InstrumentInfo>& patches,
                     const SnesBrrSampleRefs& samples, const Layout& layout) {
-  for (const Patch& patch : patches) {
-    const auto sample = samples.findSrcn(patch.srcn);
+  for (const InstrumentInfo& patch : patches) {
+    const auto sample = samples.findSrcn(patch.program);
     if (!sample) {
       continue;
     }
     Instrument instrument{
         .explicitAddress = InstrumentAddress{.bank = 0, .program = patch.program},
         .identity = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = patch.program},
-        .name = fmt::format("Instrument {} (SRCN {})", patch.program, patch.srcn),
+        .name = fmt::format("Instrument {} (SRCN {})", patch.program, patch.program),
         .range = patch.mapSource.valid() ? patch.mapSource : patch.patchSource,
     };
     auto entry = instruments.append(std::move(instrument));
@@ -168,7 +118,7 @@ void addInstruments(InstrumentSetBuilder& instruments, const std::vector<Patch>&
                     .attenuationDb = attenuation(gain),
                 })
         .source("Region", patch.patchSource, "wolf-team-snes-region")
-        .description(fmt::format("SRCN {}", patch.srcn));
+        .description(fmt::format("SRCN {}", patch.program));
   }
 }
 
@@ -180,7 +130,7 @@ std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layou
     return std::nullopt;
   }
   const ByteReader reader = builder.reader();
-  const std::vector<Patch> patches = collectPatches(reader, layout);
+  const std::vector<InstrumentInfo> patches = collectInstruments(reader, layout);
   if (patches.empty()) {
     return std::nullopt;
   }

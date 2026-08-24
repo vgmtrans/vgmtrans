@@ -85,6 +85,24 @@ struct Layout {
   [[nodiscard]] bool middleSegmented() const noexcept { return isMiddleSegmentedVariant(variant); }
 };
 
+[[nodiscard]] constexpr s16 signedDriverByte(u8 value) noexcept {
+  return value < 0x80 ? value : static_cast<s16>(value) - 0x100;
+}
+
+struct InstrumentInfo {
+  u8 program = 0;
+  u8 patchIndex = 0;
+  s16 driverPitch = 0;
+  u8 adsr1 = 0;
+  u8 adsr2 = 0;
+  u8 gain = 0;
+  u8 volume = 0;
+  u8 tuning = 0;
+  core::SourceRange patchSource;
+  core::SourceRange mapSource;
+  core::SourceRange volumeSource;
+};
+
 struct SequenceParse {
   core::SequenceProgram program;
   core::SourceRange headerRange;
@@ -92,6 +110,8 @@ struct SequenceParse {
 
 [[nodiscard]] const char* variantName(Variant variant);
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);
+[[nodiscard]] std::optional<InstrumentInfo> readInstrumentInfo(core::ByteReader reader, const Layout& layout,
+                                                               u8 program);
 [[nodiscard]] core::TrackProgram decodeSourceTrack(core::ByteReader reader, const Layout& layout,
                                                    const ChannelLayout& channel,
                                                    std::vector<core::Diagnostic>* diagnostics = nullptr);

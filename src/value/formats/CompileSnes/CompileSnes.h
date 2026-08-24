@@ -57,23 +57,27 @@ struct Layout {
   }
 };
 
-struct ReferencedData {
-  std::set<u8> programs;
-  std::set<u8> volumeEnvelopes;
-  std::set<u8> vibratos;
-  std::set<u8> gainEnvelopes;
-  std::set<u8> panEnvelopes;
-  std::set<u8> echoPresets;
-  std::set<u8> percussionNotes;
+// The tuning row selects the source program's transpose and pitch table.
+// Sequence playback and synth construction both consume this same decoded fact.
+struct InstrumentInfo {
+  u8 program = 0;
+  s8 transpose = 0;
+  u8 pitchTable = 0;
+  u16 pitchTableAddress = 0;
+  core::SourceRange source;
 };
 
 struct SequenceParse {
   core::SequenceProgram program;
-  ReferencedData references;
+  std::set<u8> programs;
   core::SourceRange headerRange;
 };
 
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);
+[[nodiscard]] std::optional<InstrumentInfo> readInstrumentInfo(core::ByteReader reader, const Layout& layout,
+                                                               u8 program);
+[[nodiscard]] u16 instrumentPitch(core::ByteReader reader, const InstrumentInfo& instrument, u8 key);
+[[nodiscard]] double instrumentUnityKey(core::ByteReader reader, const InstrumentInfo& instrument);
 [[nodiscard]] core::TrackProgram decodeSourceTrack(core::ByteReader reader, const Layout& layout, u32 trackNumber,
                                                    u32 startAddress,
                                                    std::vector<core::Diagnostic>* diagnostics = nullptr);
@@ -83,7 +87,7 @@ struct SequenceParse {
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
 [[nodiscard]] core::Envelope driverEnvelope(u8 adsr1, u8 adsr2, u8 gain = 0);
 [[nodiscard]] std::optional<core::ScanSoundBankRef> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
-                                                             const ReferencedData& references,
+                                                             const std::set<u8>& programs,
                                                              std::string_view displayName);
 [[nodiscard]] core::FormatModule module();
 

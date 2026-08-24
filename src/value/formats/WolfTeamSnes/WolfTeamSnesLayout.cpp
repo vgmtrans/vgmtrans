@@ -613,4 +613,48 @@ std::optional<Layout> findLayout(ByteReader reader) {
   return makeSegmentedLayout(reader, Variant::Arcus, *arcus);
 }
 
+std::optional<InstrumentInfo> readInstrumentInfo(ByteReader reader, const Layout& layout, u8 program) {
+  if (layout.segmented() && !layout.instruments.confirmed) {
+    return std::nullopt;
+  }
+
+  u8 patchIndex = program;
+  SourceRange mapSource;
+  if (layout.instruments.patchMapAddress) {
+    const u32 map = *layout.instruments.patchMapAddress + program;
+    if (!reader.has(map, 1)) {
+      return std::nullopt;
+    }
+    patchIndex = reader.u8At(map);
+    mapSource = reader.range(map, 1);
+  }
+  const u32 patch = layout.instruments.patchTableAddress + patchIndex * layout.instruments.entrySize;
+  if (!reader.has(patch, layout.instruments.entrySize)) {
+    return std::nullopt;
+  }
+
+  const u8 driverPitch = layout.variant == Variant::Arcus
+                             ? static_cast<u8>(reader.u8At(patch) + layout.instruments.globalPitchBase)
+                             : reader.u8At(patch);
+  InstrumentInfo result{
+      .program = program,
+      .patchIndex = patchIndex,
+      .driverPitch = signedDriverByte(driverPitch),
+      .adsr1 = reader.u8At(patch + 1),
+      .adsr2 = reader.u8At(patch + 2),
+      .gain = layout.segmented() ? reader.u8At(patch + 3) : u8{0xb8},
+      .tuning = layout.segmented() ? u8{0x40} : reader.u8At(patch + 3),
+      .patchSource = reader.range(patch, layout.instruments.entrySize),
+      .mapSource = mapSource,
+  };
+  if (layout.instruments.volumeTableAddress) {
+    const u32 volume = *layout.instruments.volumeTableAddress + program;
+    if (reader.has(volume, 1)) {
+      result.volume = reader.u8At(volume);
+      result.volumeSource = reader.range(volume, 1);
+    }
+  }
+  return result;
+}
+
 }  // namespace vgmtrans::formats::wolf_team_snes

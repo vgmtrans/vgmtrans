@@ -45,12 +45,8 @@ constexpr u16 kMaxUnityPitch = 0x1200;
 // runtime phrase/segment index when two table entries share one source address.
 constexpr u8 kSourcePositionRepeatSlot = 2;
 
-[[nodiscard]] s16 signedByte(u8 value) {
-  return value < 0x80 ? value : static_cast<s16>(value) - 0x100;
-}
-
 [[nodiscard]] s16 centeredByte(u8 value) {
-  return signedByte(static_cast<u8>(value - 0x40));
+  return signedDriverByte(static_cast<u8>(value - 0x40));
 }
 
 [[nodiscard]] u8 compactMultiply(u8 lhs, u8 rhs) {
@@ -966,31 +962,13 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       .lateTraits = layout.lateTraits,
       .headerTempo = reader.u8At(layout.sequenceHeaderAddress + 0x22),
       .timerScale =
-          layout.middleSegmented() ? u8{0x40}
-                                   : (layout.variant == Variant::Arcus ? reader.u8At(0xe2) : u8{0x40}),
+          layout.middleSegmented() ? u8{0x40} : (layout.variant == Variant::Arcus ? reader.u8At(0xe2) : u8{0x40}),
   };
 
   for (u32 programNumber = 0; programNumber < kInstrumentCount; ++programNumber) {
-    s16 pitch = 0;
-    if (!layout.segmented()) {
-      const u32 patch = layout.instruments.patchTableAddress + programNumber * layout.instruments.entrySize;
-      if (reader.has(patch, 1)) {
-        pitch = signedByte(reader.u8At(patch));
-      }
-    } else if (layout.instruments.confirmed) {
-      u8 patchIndex = static_cast<u8>(programNumber);
-      if (layout.instruments.patchMapAddress && reader.has(*layout.instruments.patchMapAddress + programNumber, 1)) {
-        patchIndex = reader.u8At(*layout.instruments.patchMapAddress + programNumber);
-      }
-      const u32 patch = layout.instruments.patchTableAddress + patchIndex * layout.instruments.entrySize;
-      if (reader.has(patch, 1)) {
-        const u8 raw = layout.variant == Variant::Arcus
-                           ? static_cast<u8>(reader.u8At(patch) + layout.instruments.globalPitchBase)
-                           : reader.u8At(patch);
-        pitch = signedByte(raw);
-      }
+    if (const auto instrument = readInstrumentInfo(reader, layout, static_cast<u8>(programNumber))) {
+      config.instrumentPitch[programNumber] = instrument->driverPitch;
     }
-    config.instrumentPitch[programNumber] = pitch;
   }
 
   const u32 pitchTable = layout.segmented() ? kSegmentedPitchTable : findPitchTable(reader, layout.variant);

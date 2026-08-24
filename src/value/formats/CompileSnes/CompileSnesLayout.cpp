@@ -9,6 +9,8 @@
 #include "value/scan/BytePattern.h"
 
 #include <array>
+#include <cmath>
+#include <limits>
 #include <map>
 
 namespace vgmtrans::formats::compile_snes {
@@ -145,6 +147,55 @@ std::optional<Layout> findLayout(ByteReader reader) {
       .globalTranspose = static_cast<s8>(reader.u8At(engine + 0x0f)),
       .stereoEnabled = (reader.u8At(1) & 4) != 0,
   };
+}
+
+std::optional<InstrumentInfo> readInstrumentInfo(ByteReader reader, const Layout& layout, u8 program) {
+  if (program >= 64) {
+    return std::nullopt;
+  }
+  const u32 address = layout.tuningTableAddress + program * (layout.early() ? 1u : 2u);
+  if (!reader.has(address, layout.early() ? 1 : 2)) {
+    return std::nullopt;
+  }
+
+  const u8 pitchTable = layout.early() ? 0 : reader.u8At(address + 1);
+  u16 pitchTableAddress = layout.regularPitchTableAddress;
+  const u32 pointerAddress = layout.pitchTableListAddress + pitchTable * 2u;
+  if (!layout.early() && pitchTable != 0 && reader.has(pointerAddress, 2)) {
+    const u16 candidate = reader.le16(pointerAddress);
+    if (reader.has(candidate, 242)) {
+      pitchTableAddress = candidate;
+    }
+  }
+  return InstrumentInfo{
+      .program = program,
+      .transpose = static_cast<s8>(reader.u8At(address)),
+      .pitchTable = pitchTable,
+      .pitchTableAddress = pitchTableAddress,
+      .source = reader.range(address, layout.early() ? 1 : 2),
+  };
+}
+
+u16 instrumentPitch(ByteReader reader, const InstrumentInfo& instrument, u8 key) {
+  const u32 address = instrument.pitchTableAddress + key * 2u;
+  return key <= 120 && reader.has(address, 2) ? reader.le16(address) : u16{0};
+}
+
+double instrumentUnityKey(ByteReader reader, const InstrumentInfo& instrument) {
+  u8 nearest = 1;
+  u16 nearestPitch = 0;
+  unsigned distance = std::numeric_limits<unsigned>::max();
+  for (u8 key = 1; key <= 120; ++key) {
+    const u16 pitch = instrumentPitch(reader, instrument, key);
+    const unsigned candidate = static_cast<unsigned>(std::abs(static_cast<int>(pitch) - 0x1000));
+    if (candidate < distance) {
+      nearest = key;
+      nearestPitch = pitch;
+      distance = candidate;
+    }
+  }
+  const double correction = nearestPitch == 0 ? 0.0 : 12.0 * std::log2(nearestPitch / 4096.0);
+  return nearest - instrument.transpose - correction;
 }
 
 }  // namespace vgmtrans::formats::compile_snes
