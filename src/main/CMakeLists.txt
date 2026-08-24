@@ -10,6 +10,8 @@ endif()
 # mio is a header-only library
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/mio ${CMAKE_CURRENT_BINARY_DIR}/lib/mio EXCLUDE_FROM_ALL SYSTEM)
 
+find_package(Threads REQUIRED)
+
 # nlohmann-json is a header-only library,
 # but some distros provide it as a system package
 if(USE_SYSTEM_NLOHMANN)
@@ -224,7 +226,7 @@ target_include_directories(
   PUBLIC
     ${PROJECT_SOURCE_DIR}/src)
 target_compile_features(vgmtransvaluecore PUBLIC cxx_std_20)
-target_link_libraries(vgmtransvaluecore PRIVATE fmt::fmt)
+target_link_libraries(vgmtransvaluecore PRIVATE fmt::fmt Threads::Threads)
 
 add_library(vgmtransvalueformats STATIC)
 vgmtrans_enable_project_warnings(vgmtransvalueformats)
