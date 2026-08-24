@@ -146,6 +146,10 @@ void layoutAndModuleUseLiveSongState() {
   const SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.diagnostics().empty() && snapshot.collections().size() == 1 && snapshot.assets().size() == 2,
          "CompileSnes scanning should publish a sequence and self-contained sound bank");
+  const Collection& collection = snapshot.collections().front();
+  const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
+  expect(instruments != nullptr && std::abs(instruments->instruments.front().regions.front().unityKey - 96.0) < 0.001,
+         "CompileSnes playback and synth construction should share the decoded pitch table and tuning row");
 }
 
 void commandWidthsFollowEachDriverRevision() {

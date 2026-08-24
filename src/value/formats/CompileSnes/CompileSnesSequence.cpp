@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <limits>
 #include <string>
 #include <utility>
 
@@ -39,14 +38,6 @@ enum class Curve : u8 {
 [[nodiscard]] u16 pointer(ByteReader reader, u16 list, u8 index) {
   const u32 address = list + index * 2u;
   return reader.has(address, 2) ? reader.le16(address) : u16{0};
-}
-
-[[nodiscard]] u16 pitchAddress(ByteReader reader, const Layout& layout, u8 index) {
-  if (layout.early() || index == 0) {
-    return layout.regularPitchTableAddress;
-  }
-  const u16 address = pointer(reader, layout.pitchTableListAddress, index);
-  return reader.has(address, 242) ? address : layout.regularPitchTableAddress;
 }
 
 struct TrackHeader {
@@ -113,24 +104,18 @@ public:
     };
   }
 
-  [[nodiscard]] u32 patch(u8 srcn) const {
-    if (srcn >= 64) {
-      return 0;
-    }
+  [[nodiscard]] InstrumentInfo instrument(u8 program) const {
     const ByteReader reader = source_.reader();
-    const u32 address = layout_.tuningTableAddress + srcn * (early() ? 1u : 2u);
-    if (!reader.has(address, early() ? 1 : 2)) {
-      return 0;
-    }
-    const u8 pitchIndex = early() ? 0 : reader.u8At(address + 1);
-    return reader.u8At(address) | (static_cast<u32>(pitchIndex) << 8);
+    return readInstrumentInfo(reader, layout_, program)
+        .value_or(InstrumentInfo{.program = program, .pitchTableAddress = layout_.regularPitchTableAddress});
   }
 
-  [[nodiscard]] u16 pitch(u8 tableIndex, u8 key) const {
-    const ByteReader reader = source_.reader();
-    const u16 table = pitchAddress(reader, layout_, tableIndex);
-    const u32 address = table + key * 2u;
-    return key <= 120 && reader.has(address, 2) ? reader.le16(address) : u16{0};
+  [[nodiscard]] u16 pitch(const InstrumentInfo& instrument, u8 key) const {
+    return instrumentPitch(source_.reader(), instrument, key);
+  }
+
+  [[nodiscard]] double unityKey(const InstrumentInfo& instrument) const {
+    return instrumentUnityKey(source_.reader(), instrument);
   }
 
   [[nodiscard]] u16 adsr(u8 index) const {
@@ -216,10 +201,9 @@ namespace math {
   return kVolumeTable[std::min<u8>(logical, 31)] / 127.0;
 }
 
-[[nodiscard]] StereoBalance panGains(s8 pan, u8 phase = 0) {
-  const u8 raw = static_cast<u8>(pan);
-  double left = (raw ^ 0x80) / 256.0;
-  double right = (raw ^ 0x7f) / 256.0;
+[[nodiscard]] StereoBalance panGains(u8 pan, u8 phase = 0) {
+  double left = (pan ^ 0x80) / 256.0;
+  double right = (pan ^ 0x7f) / 256.0;
   if ((phase & 1) != 0) {
     left = -left;
   }
@@ -331,7 +315,7 @@ struct ProgramState {
     const auto preset = data.curve(Curve::Echo, 0);
     if (preset.size() >= 16) {
       echo.delayMilliseconds = (preset[1] & 0x0f) * 16.0;
-      const StereoBalance pan = math::panGains(static_cast<s8>(preset[3]), static_cast<u8>(preset[7]));
+      const StereoBalance pan = math::panGains(preset[3], preset[7]);
       echo.leftGain = preset[2] / 127.0 * pan.leftGain;
       echo.rightGain = preset[2] / 127.0 * pan.rightGain;
       echo.feedback = static_cast<s8>(preset[4]) / 128.0;
@@ -433,38 +417,17 @@ struct Playback {
     }
   }
 
-  [[nodiscard]] u32 patch(u8 srcn) const { return data().patch(srcn); }
-
   [[nodiscard]] u16 pitchForSequenceNote(u8 note) const {
-    const u32 patchData = patch(track.program);
-    const s8 patchTranspose = static_cast<s8>(patchData & 0xff);
-    const u8 pitchIndex = static_cast<u8>((patchData >> 8) & 0xff);
-    const u8 key = static_cast<u8>(note + patchTranspose);
-    return key > 0 && key < 0x79 ? data().pitch(pitchIndex, key) : 0;
+    const InstrumentInfo instrument = data().instrument(track.program);
+    const u8 key = static_cast<u8>(note + instrument.transpose);
+    return key > 0 && key < 0x79 ? data().pitch(instrument, key) : 0;
   }
 
   [[nodiscard]] u8 sequenceNote(u8 rawNote) const { return static_cast<u8>(rawNote + track.transpose); }
 
   [[nodiscard]] u16 basePitch(u8 rawNote) const { return pitchForSequenceNote(sequenceNote(rawNote)); }
 
-  [[nodiscard]] double patchUnity() const {
-    const u32 patchData = patch(track.program);
-    const s8 patchTranspose = static_cast<s8>(patchData & 0xff);
-    const u8 pitchIndex = static_cast<u8>((patchData >> 8) & 0xff);
-    u32 nearest = 1;
-    u16 pitch = 0;
-    unsigned distance = std::numeric_limits<unsigned>::max();
-    for (u8 key = 1; key <= 120; ++key) {
-      const u16 candidatePitch = data().pitch(pitchIndex, key);
-      const unsigned candidate = static_cast<unsigned>(std::abs(static_cast<int>(candidatePitch) - 0x1000));
-      if (candidate < distance) {
-        nearest = key;
-        pitch = candidatePitch;
-        distance = candidate;
-      }
-    }
-    return nearest - patchTranspose - (pitch == 0 ? 0.0 : 12.0 * std::log2(pitch / 4096.0));
-  }
+  [[nodiscard]] double patchUnity() const { return data().unityKey(data().instrument(track.program)); }
 
   [[nodiscard]] double keyForPitch(u16 pitch) const {
     return pitch == 0 ? 0.0 : patchUnity() + 12.0 * std::log2(pitch / 4096.0);
@@ -478,7 +441,7 @@ struct Playback {
   }
 
   void emitPan() const {
-    const StereoBalance gains = math::panGains(track.pan, track.stereoPhase);
+    const StereoBalance gains = math::panGains(static_cast<u8>(track.pan), track.stereoPhase);
     out.stereoBalance(gains.leftGain, gains.rightGain);
   }
 
@@ -741,7 +704,7 @@ struct Playback {
       return;
     }
     programState.echo.delayMilliseconds = (preset[1] & 0x0f) * 16.0;
-    const StereoBalance pan = math::panGains(static_cast<s8>(preset[3]), static_cast<u8>(preset[7]));
+    const StereoBalance pan = math::panGains(preset[3], preset[7]);
     programState.echo.leftGain = preset[2] / 127.0 * pan.leftGain;
     programState.echo.rightGain = preset[2] / 127.0 * pan.rightGain;
     programState.echo.feedback = static_cast<s8>(preset[4]) / 128.0;
@@ -941,7 +904,7 @@ struct DurationValue {
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, const Layout& layout,
                                                    std::vector<Diagnostic>* diagnostics,
-                                                   ReferencedData* references = nullptr) {
+                                                   std::set<u8>* programs = nullptr) {
   Cursor cursor(reader, begin, "compile-snes", diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
@@ -991,8 +954,8 @@ struct DurationValue {
       }
     }
     const DurationValue duration = parseDuration(event);
-    if (references != nullptr) {
-      references->percussionNotes.insert(index);
+    if (programs != nullptr && reader.has(row, 8)) {
+      programs->insert(reader.u8At(row));
     }
     return event.invoke<&Playback::percussion>(index, raw, duration.ticks, duration.gate, duration.present);
   }
@@ -1021,9 +984,6 @@ struct DurationValue {
     case 0x83: {
       auto event = cursor.command("Vibrato Curve", SequenceSemantic::Modulation);
       const u8 index = event.u8("curve");
-      if (references != nullptr) {
-        references->vibratos.insert(index);
-      }
       return event.invoke<&Playback::vibrato>(index);
     }
     case 0x84: {
@@ -1042,9 +1002,6 @@ struct DurationValue {
     case 0x88: {
       auto event = cursor.command("Volume Envelope / Tremolo", SequenceSemantic::Modulation);
       const u8 index = event.u8("curve");
-      if (references != nullptr) {
-        references->volumeEnvelopes.insert(index);
-      }
       return event.invoke<&Playback::volumeEnvelope>(index);
     }
     case 0x89: {
@@ -1140,16 +1097,13 @@ struct DurationValue {
     case 0x9f: {
       auto event = cursor.command("ADSR / Dynamic GAIN", SequenceSemantic::Envelope);
       const u8 index = event.u8("pattern");
-      if (references != nullptr && index > 0x80) {
-        references->gainEnvelopes.insert(index & 0x7f);
-      }
       return event.invoke<&Playback::setAdsr>(index);
     }
     case 0xa0: {
       auto event = cursor.command("Program Change", SequenceSemantic::Program);
       const u8 srcn = event.u8("srcn", SemanticOperandRole::InstrumentProgram);
-      if (references != nullptr) {
-        references->programs.insert(srcn);
+      if (programs != nullptr) {
+        programs->insert(srcn);
       }
       return event.invoke<&Playback::program>(srcn);
     }
@@ -1161,9 +1115,6 @@ struct DurationValue {
       auto event = cursor.command("Pan Envelope", SequenceSemantic::Pan);
       const u8 index = event.u8("curve");
       const s8 direct = index == 0 ? event.s8("pan", SemanticOperandRole::Pan) : 0;
-      if (references != nullptr) {
-        references->panEnvelopes.insert(index);
-      }
       return event.invoke<&Playback::panEnvelope>(index, direct);
     }
     case 0xa4:
@@ -1193,9 +1144,6 @@ struct DurationValue {
       if (layout.hasEchoCommands()) {
         auto event = cursor.command("Echo Preset", SequenceSemantic::State);
         const u8 index = event.u8("preset");
-        if (references != nullptr) {
-          references->echoPresets.insert(index);
-        }
         return event.invoke<&Playback::echoPreset>(index);
       }
       return cursor.sourceOnly("NOP", "nop");
@@ -1242,24 +1190,6 @@ struct DurationValue {
   }
 }
 
-void addPercussionReferences(ByteReader reader, const Layout& layout, ReferencedData& references) {
-  for (const u8 index : references.percussionNotes) {
-    const u32 row = layout.percussionTableAddress + index * 8u;
-    if (!reader.has(row, 8)) {
-      continue;
-    }
-    references.programs.insert(reader.u8At(row));
-    references.volumeEnvelopes.insert(reader.u8At(row + 2));
-    if ((reader.u8At(row + 4) & 0x80) == 0) {
-      references.vibratos.insert(reader.u8At(row + 3));
-    }
-    const u8 adsr = reader.u8At(row + 1);
-    if (adsr > 0x80) {
-      references.gainEnvelopes.insert(adsr & 0x7f);
-    }
-  }
-}
-
 }  // namespace
 
 const SequenceProgramConfig& sequenceConfig() {
@@ -1291,30 +1221,20 @@ SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetI
   const ByteReader reader = source.reader();
   const u8 count = reader.u8At(layout.songHeaderAddress);
   const SourceRange header = reader.range(layout.songHeaderAddress, 1 + count * 14u);
-  ReferencedData references;
+  std::set<u8> programs;
   SequenceDecodeSession sequence{reader, sequenceConfig(), sequenceId, header, sourceMap, kCommandLimit, kAramSize};
   for (u32 track = 0; track < count; ++track) {
     const u32 item = layout.songHeaderAddress + 1 + track * 14u;
     const u16 start = reader.le16(item + 8);
-    references.programs.insert(reader.u8At(item + 10));
-    references.volumeEnvelopes.insert(reader.u8At(item + 3));
-    references.vibratos.insert(reader.u8At(item + 4));
-    const u8 adsr = reader.u8At(item + 11);
-    if (adsr > 0x80) {
-      references.gainEnvelopes.insert(adsr & 0x7f);
-    }
+    programs.insert(reader.u8At(item + 10));
     sequence.addTrack(
         track, reader.range(item, 14), start,
-        [&](u32 offset) { return decodeCommand(reader, offset, layout, diagnostics, &references); }, start);
-  }
-  addPercussionReferences(reader, layout, references);
-  if (layout.hasEchoCommands()) {
-    references.echoPresets.insert(0);
+        [&](u32 offset) { return decodeCommand(reader, offset, layout, diagnostics, &programs); }, start);
   }
 
   SequenceProgram program =
       sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(DriverData{std::move(source), layout}));
-  return SequenceParse{.program = std::move(program), .references = std::move(references), .headerRange = header};
+  return SequenceParse{.program = std::move(program), .programs = std::move(programs), .headerRange = header};
 }
 
 }  // namespace vgmtrans::formats::compile_snes
