@@ -208,6 +208,23 @@ void sessionStatePreflightsSourceAnnotationIdCollisions() {
          "source annotation collision should not mutate existing session state");
 }
 
+void sessionStateReleasesAnnotationIdsWithRemovedSources() {
+  SessionState state;
+  const auto scan = [](SourceId source) {
+    return ScanResult{.sourceMap = SourceMap{{SourceAnnotation{
+                          .id = SourceAnnotationId{7},
+                          .range = SourceRange{.source = source, .offset = 0, .size = 1},
+                      }}}};
+  };
+
+  state.appendScan(SourceId{1}, scan(SourceId{1}));
+  const std::array removedSources{SourceId{1}};
+  state.removeSources(removedSources);
+  state.appendScan(SourceId{2}, scan(SourceId{2}));
+  expect(state.sourceMap().annotations().size() == 1,
+         "an annotation id should be reusable after its source has been removed");
+}
+
 void sessionStateScrubsCrossSourceObjectLinks() {
   SessionState state;
   const SourceId firstSource{1};
@@ -454,6 +471,7 @@ void runValueSourceMapTests() {
   sourceMapRejectsDuplicateAnnotationIds();
   sessionStateRejectsCrossScanAnnotationIdCollisions();
   sessionStatePreflightsSourceAnnotationIdCollisions();
+  sessionStateReleasesAnnotationIdsWithRemovedSources();
   sessionStateScrubsCrossSourceObjectLinks();
   scanValidationRejectsSourceAnnotationParentCycles();
   scanValidationRequiresAssetOwnedAnnotationGraphs();
