@@ -8,6 +8,7 @@
 
 #include "SessionSnapshotBuilder.h"
 
+#include "value/scan/BytePattern.h"
 #include "value/session/SessionState.h"
 #include "value/validation/ScanValidation.h"
 
@@ -18,6 +19,19 @@
 #include <thread>
 
 namespace {
+
+void bytePatternSearchHonorsMasksAndStartOffsets() {
+  const std::vector<u8> bytes{0x10, 0xaa, 0x20, 0xbb, 0x30, 0xaa, 0x40, 0xbb};
+  const ByteReader reader(SourceId{1}, bytes);
+  constexpr auto masked = makeMaskedBytePattern("\xaa\x00\xbb", "x?x");
+
+  expect(findBytePattern(reader, masked) == 1 && findBytePattern(reader, masked, 2) == 5,
+         "masked search should find anchored matches at or after its starting offset");
+  expect(findBytePattern(reader, makeMaskedBytePattern("\x00\x40", "?x")) == 5,
+         "masked search should handle leading wildcards");
+  expect(findBytePattern(reader, makeMaskedBytePattern("\x00\x00", "??"), 6) == 6,
+         "an all-wildcard pattern should match at the starting offset");
+}
 
 [[nodiscard]] std::string firstValidationMessage(ValidationReport report) {
   return report.empty() ? std::string{} : report.diagnostics().front().message;
@@ -1275,6 +1289,7 @@ void snapshotFindsTheFirstCollectionContainingAnAsset() {
 }  // namespace
 
 void runValueSessionTests() {
+  bytePatternSearchHonorsMasksAndStartOffsets();
   sessionScansValuesAndDerivedSources();
   sessionRoutesKnownFormatsAndConsumesExtractedParents();
   sessionDiagnosesUnsupportedKnownFormats();

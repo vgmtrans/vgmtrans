@@ -8,6 +8,7 @@
 
 #include "value/base/Source.h"
 
+#include <algorithm>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -54,6 +55,17 @@ struct MaskedBytePattern {
     return bytes.empty() ? static_cast<u8>(textBytes[index]) : bytes[index];
   }
   [[nodiscard]] bool valid() const noexcept { return size() != 0 && size() == mask.size(); }
+  [[nodiscard]] bool matches(std::span<const u8> candidate) const noexcept {
+    if (!valid() || candidate.size() < size()) {
+      return false;
+    }
+    for (size_t index = 0; index < size(); ++index) {
+      if (mask[index] == 'x' && candidate[index] != at(index)) {
+        return false;
+      }
+    }
+    return true;
+  }
 };
 
 template <size_t ByteCount, size_t MaskCount>
@@ -67,22 +79,29 @@ template <size_t ByteCount, size_t MaskCount>
   if (!pattern.valid() || !reader.has(offset, pattern.size())) {
     return false;
   }
-  for (size_t index = 0; index < pattern.size(); ++index) {
-    if (pattern.mask[index] == 'x' && reader.u8At(offset + index) != pattern.at(index)) {
-      return false;
-    }
-  }
-  return true;
+  return pattern.matches(reader.slice(offset, pattern.size()));
 }
 
 [[nodiscard]] inline std::optional<u32> findBytePattern(ByteReader reader, MaskedBytePattern pattern, u32 begin = 0) {
   if (!pattern.valid() || pattern.size() > reader.size() || begin > reader.size() - pattern.size()) {
     return std::nullopt;
   }
-  for (u64 offset = begin; offset <= reader.size() - pattern.size(); ++offset) {
-    if (matchesBytePattern(reader, offset, pattern)) {
+
+  const auto bytes = reader.slice(0, reader.size());
+  const size_t lastOffset = bytes.size() - pattern.size();
+  const size_t anchor = pattern.mask.find('x');
+  if (anchor == std::string_view::npos) {
+    return begin;
+  }
+
+  auto candidate = bytes.begin() + begin + anchor;
+  const auto end = bytes.begin() + lastOffset + anchor + 1;
+  while ((candidate = std::find(candidate, end, pattern.at(anchor))) != end) {
+    const size_t offset = static_cast<size_t>(candidate - bytes.begin()) - anchor;
+    if (pattern.matches(bytes.subspan(offset, pattern.size()))) {
       return static_cast<u32>(offset);
     }
+    ++candidate;
   }
   return std::nullopt;
 }
