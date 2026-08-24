@@ -81,6 +81,7 @@ private:
   std::vector<Diagnostic> diagnostics_;
 
   std::unordered_map<u32, const Asset*> assetsById_;
+  std::unordered_set<u32> annotationIds_;
 };
 
 }  // namespace vgmtrans::core

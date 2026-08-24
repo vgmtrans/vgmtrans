@@ -100,12 +100,13 @@ void SessionState::appendScan(SourceId origin, ScanResult result) {
   }
 
   for (const auto& annotation : result.sourceMap.annotations()) {
-    if (annotation.id.valid() && sourceMap_.find(annotation.id) != nullptr) {
+    if (annotation.id.valid() && annotationIds_.contains(annotation.id.value)) {
       throw std::invalid_argument("Source map reused existing annotation id " + std::to_string(annotation.id.value));
     }
   }
 
   assetsById_.reserve(assetsById_.size() + result.assets.size());
+  annotationIds_.reserve(annotationIds_.size() + result.sourceMap.annotations().size());
 
   if (!result.assets.empty() || !result.sourceMap.empty()) {
     scanChunks_.push_back(ScanChunk{
@@ -116,6 +117,11 @@ void SessionState::appendScan(SourceId origin, ScanResult result) {
 
     for (const auto& value : *chunk.assets) {
       assetsById_.emplace(metadata(value).id.value, &value);
+    }
+    for (const auto& annotation : chunk.sourceMap.annotations()) {
+      if (annotation.id.valid()) {
+        annotationIds_.insert(annotation.id.value);
+      }
     }
     rebuildViews();
   }
@@ -478,6 +484,14 @@ void SessionState::rebuildIndexes() {
     const AssetId id = metadata(asset).id;
     if (id.valid()) {
       assetsById_.emplace(id.value, &asset);
+    }
+  }
+
+  annotationIds_.clear();
+  annotationIds_.reserve(sourceMap_.annotations().size());
+  for (const auto& annotation : sourceMap_.annotations()) {
+    if (annotation.id.valid()) {
+      annotationIds_.insert(annotation.id.value);
     }
   }
 }
