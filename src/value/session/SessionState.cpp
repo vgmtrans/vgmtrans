@@ -303,8 +303,12 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
   std::unordered_set<u32> removedAnnotations;
   for (const auto& annotation : sourceMap_.annotations()) {
     const bool removedSource = annotation.range.valid() && sourceIds.contains(annotation.range.source.value);
+    if (removedSource) {
+      removedAnnotations.insert(annotation.id.value);
+      continue;
+    }
     const auto owner = sourceMap_.assetOwner(annotation.id);
-    if (removedSource || (owner && assetIds.contains(owner->value))) {
+    if (owner && assetIds.contains(owner->value)) {
       removedAnnotations.insert(annotation.id.value);
     }
   }
