@@ -15,14 +15,18 @@
 #include "value/validation/ScanValidation.h"
 
 #include <algorithm>
+#include <atomic>
 #include <array>
 #include <exception>
 #include <fstream>
+#include <future>
 #include <iterator>
 #include <map>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
+#include <vector>
 
 namespace vgmtrans::core {
 
@@ -55,6 +59,50 @@ void prepareDiagnostics(ScanResult& result, const SourceFile& source) {
 [[nodiscard]] bool accepts(const SourceFile& source, const std::vector<std::string>& acceptedFormats) {
   return !source.knownFormat || std::ranges::find(acceptedFormats, *source.knownFormat) != acceptedFormats.end();
 }
+
+template <class Function>
+void runConcurrently(size_t taskCount, Function&& function) {
+  if (taskCount == 0) {
+    return;
+  }
+
+  const unsigned available = std::thread::hardware_concurrency();
+  const size_t workerLimit = available == 0 ? 2 : available;
+  const size_t workerCount = std::min(taskCount, workerLimit);
+  if (workerCount == 1) {
+    for (size_t index = 0; index < taskCount; ++index) {
+      function(index);
+    }
+    return;
+  }
+
+  std::atomic_size_t nextTask{0};
+  const auto work = [&] {
+    while (true) {
+      const size_t index = nextTask.fetch_add(1, std::memory_order_relaxed);
+      if (index >= taskCount) {
+        return;
+      }
+      function(index);
+    }
+  };
+
+  std::vector<std::future<void>> workers;
+  workers.reserve(workerCount - 1);
+  for (size_t index = 1; index < workerCount; ++index) {
+    workers.push_back(std::async(std::launch::async, work));
+  }
+  work();
+  for (auto& worker : workers) {
+    worker.get();
+  }
+}
+
+struct ModuleScan {
+  const FormatModule* module = nullptr;
+  ScanResult result;
+  std::exception_ptr failure;
+};
 
 }  // namespace
 
@@ -374,41 +422,60 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
     }
   }
 
-  const auto scanModule = [&](const FormatModule& module) {
-    try {
-      ScanResult result = module.scan(ScanInput{
-          .source = source,
-          .reader = sources_.reader(id),
-          .ids = ids_,
-          .retained = RetainedSource{id, sources_.sharedBytes(id)},
-      });
-      for (auto& asset : result.assets) {
-        if (auto* bank = std::get_if<SoundBankAsset>(&asset)) {
-          bank->localSamples.preferredFilter = module.preferredSampleFilter;
-        } else if (auto* samples = std::get_if<SamplePoolAsset>(&asset)) {
-          samples->pool.preferredFilter = module.preferredSampleFilter;
-        }
-      }
-      normalizeScanResult(result, ids_);
-      prepareDiagnostics(result, source);
-      auto validation = validateScanResult(source.id, result, sources_, state_->assets());
-      if (!validation.empty()) {
-        addValidationFailure(module.name, "scan", std::move(validation));
-        return;
-      }
-      state_->appendScan(source.id, std::move(result));
-    } catch (const std::exception& ex) {
-      state_->addError(std::string(module.name) + " scan failed: " + ex.what(),
-                       SourceRange{.source = source.id, .offset = 0, .size = source.size});
-    }
-  };
-
+  std::vector<ModuleScan> scans;
   for (const auto& module : formats_.modules()) {
     if (!accepts(source, module.acceptedFormats)) {
       continue;
     }
     acceptsKnownFormat = true;
-    scanModule(module);
+    scans.push_back(ModuleScan{.module = &module});
+  }
+
+  const ByteReader reader = sources_.reader(id);
+  const RetainedSource retained{id, sources_.sharedBytes(id)};
+  runConcurrently(scans.size(), [&](size_t index) {
+    auto& scan = scans[index];
+    try {
+      scan.result = scan.module->scan(ScanInput{
+          .source = source,
+          .reader = reader,
+          .ids = ids_,
+          .retained = retained,
+      });
+    } catch (...) {
+      scan.failure = std::current_exception();
+    }
+  });
+
+  // Admission stays serial and follows registry order. Scanner callbacks only
+  // read the shared source bytes and build their private result values.
+  for (auto& scan : scans) {
+    const FormatModule& module = *scan.module;
+    if (scan.failure) {
+      try {
+        std::rethrow_exception(scan.failure);
+      } catch (const std::exception& ex) {
+        state_->addError(std::string(module.name) + " scan failed: " + ex.what(),
+                         SourceRange{.source = source.id, .offset = 0, .size = source.size});
+        continue;
+      }
+    }
+
+    for (auto& asset : scan.result.assets) {
+      if (auto* bank = std::get_if<SoundBankAsset>(&asset)) {
+        bank->localSamples.preferredFilter = module.preferredSampleFilter;
+      } else if (auto* samples = std::get_if<SamplePoolAsset>(&asset)) {
+        samples->pool.preferredFilter = module.preferredSampleFilter;
+      }
+    }
+    normalizeScanResult(scan.result, ids_);
+    prepareDiagnostics(scan.result, source);
+    auto validation = validateScanResult(source.id, scan.result, sources_, state_->assets());
+    if (!validation.empty()) {
+      addValidationFailure(module.name, "scan", std::move(validation));
+      continue;
+    }
+    state_->appendScan(source.id, std::move(scan.result));
   }
 
   if (source.knownFormat && !acceptsKnownFormat) {

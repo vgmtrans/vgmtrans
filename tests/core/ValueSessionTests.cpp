@@ -11,6 +11,12 @@
 #include "value/session/SessionState.h"
 #include "value/validation/ScanValidation.h"
 
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
+
 namespace {
 
 [[nodiscard]] std::string firstValidationMessage(ValidationReport report) {
@@ -159,6 +165,57 @@ void sessionDiagnosesUnsupportedKnownFormats() {
          "an unsupported known format should retain its source with a diagnostic");
   expect(snapshot.diagnostics().front().code == "scan.known-format.unsupported",
          "unsupported authoritative routing should preserve a structured diagnostic");
+}
+
+void sessionScansApplicableFormatsConcurrently() {
+  Session session;
+  const bool parallelExecutionAvailable = std::thread::hardware_concurrency() != 1;
+  std::mutex scannerMutex;
+  std::condition_variable scannerStarted;
+  u32 activeScanners = 0;
+  bool scannersOverlapped = false;
+  std::atomic<u32> completed{0};
+
+  const auto module = [&](std::string name, u8 payload) {
+    return FormatModule{
+        .name = name,
+        .scan = [&, name = std::move(name), payload](const ScanInput& input) {
+          if (parallelExecutionAvailable) {
+            std::unique_lock lock(scannerMutex);
+            ++activeScanners;
+            if (activeScanners > 1) {
+              scannersOverlapped = true;
+              scannerStarted.notify_all();
+            } else {
+              scannerStarted.wait_for(lock, std::chrono::seconds(1), [&] { return scannersOverlapped; });
+            }
+            --activeScanners;
+          }
+          ScanResultBuilder out(input, name);
+          const SourceRange range = input.reader.range(0, 1);
+          const auto asset = out.misc(name, range).payload({payload});
+          out.sourceMap().annotation(SourceRole::Payload, name, range).owner(ObjectRefs::misc(asset.id()));
+          completed.fetch_add(1, std::memory_order_relaxed);
+          return out.finish();
+        },
+    };
+  };
+
+  session.registerFormat(module("First", 1));
+  session.registerFormat(module("Second", 2));
+  session.addSource(SourceFile{.name = "parallel.bin"}, {0xaa});
+  session.scanPendingSources();
+
+  const SessionSnapshot snapshot = session.snapshot();
+  expect(completed.load(std::memory_order_relaxed) == 2,
+         "parallel scanning should execute every applicable format");
+  expect(!parallelExecutionAvailable || scannersOverlapped,
+         "applicable formats should scan concurrently when multiple workers are available");
+  expect(snapshot.assets().size() == 2, "parallel scanning should admit every applicable format result");
+  expect(metadata(snapshot.assets()[0]).format == "First" && metadata(snapshot.assets()[1]).format == "Second",
+         "parallel scan admission should preserve format registry order");
+  expect(metadata(snapshot.assets()[0]).id != metadata(snapshot.assets()[1]).id,
+         "parallel scanners should receive unique asset ids");
 }
 
 void sessionSharesOneImmutableSnapshotPerRevision() {
@@ -1221,6 +1278,7 @@ void runValueSessionTests() {
   sessionScansValuesAndDerivedSources();
   sessionRoutesKnownFormatsAndConsumesExtractedParents();
   sessionDiagnosesUnsupportedKnownFormats();
+  sessionScansApplicableFormatsConcurrently();
   sessionSharesOneImmutableSnapshotPerRevision();
   sessionReportsMissingSequenceRuntime();
   sessionScansIndividualSourcesWithoutDuplicating();

@@ -9,6 +9,7 @@
 #include "value/base/Source.h"
 #include "value/model/SessionSnapshot.h"
 
+#include <atomic>
 #include <cstddef>
 #include <string>
 #include <unordered_map>
@@ -21,6 +22,12 @@ namespace vgmtrans::core {
 // IDs that formats reserve for cross-references.
 class ScanIdAllocator {
 public:
+  ScanIdAllocator() = default;
+  ScanIdAllocator(ScanIdAllocator&& other) noexcept;
+  ScanIdAllocator& operator=(ScanIdAllocator&& other) noexcept;
+  ScanIdAllocator(const ScanIdAllocator&) = delete;
+  ScanIdAllocator& operator=(const ScanIdAllocator&) = delete;
+
   [[nodiscard]] AssetId nextAssetId() noexcept;
   [[nodiscard]] CollectionId nextCollectionId() noexcept;
   [[nodiscard]] SourceAnnotationId nextSourceAnnotationId() noexcept;
@@ -32,9 +39,9 @@ public:
 private:
   // Formats may assign IDs explicitly when they need cross-references. Generated
   // IDs always advance past any explicit IDs already seen.
-  u32 nextAssetId_ = 0;
-  u32 nextCollectionId_ = 0;
-  u32 nextSourceAnnotationId_ = 0;
+  std::atomic<u32> nextAssetId_{0};
+  std::atomic<u32> nextCollectionId_{0};
+  std::atomic<u32> nextSourceAnnotationId_{0};
 };
 
 struct ScanInput {
