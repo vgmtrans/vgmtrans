@@ -766,7 +766,8 @@ struct Playback {
       return;
     }
     const u16 destination = static_cast<u16>(curve[p + 6] | (curve[p + 7] << 8));
-    if (destination == 0 || destination < curve.address() || destination - curve.address() >= curve.size()) {
+    if (destination == 0 || destination < curve.address() ||
+        static_cast<size_t>(destination - curve.address()) >= curve.size()) {
       track.panEnvelopeActive = false;
       return;
     }

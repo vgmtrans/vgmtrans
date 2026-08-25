@@ -31,6 +31,7 @@ function(vgmtrans_enable_project_warnings target)
         $<$<COMPILE_LANGUAGE:CXX>:/wd4458>
         $<$<COMPILE_LANGUAGE:CXX>:/wd4701>
         $<$<COMPILE_LANGUAGE:CXX>:/wd4702>
+        $<$<COMPILE_LANG_AND_ID:CXX,Clang>:-Wno-missing-designated-field-initializers>
         $<$<COMPILE_LANG_AND_ID:CXX,Clang>:-Wno-unused-const-variable>
         $<$<COMPILE_LANG_AND_ID:CXX,Clang>:-Wno-unused-private-field>
         $<$<COMPILE_LANG_AND_ID:CXX,Clang>:-Wdeprecated-copy-with-dtor>

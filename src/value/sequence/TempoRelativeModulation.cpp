@@ -172,10 +172,9 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
           if (!rate || !rate->context.cyclesPerTick) {
             return;
           }
-          auto update = *rate;
+          auto& update = std::get<ModulationPerformanceEvent>(derived[trackIndex].emplace_back(*rate));
           update.header = derivedHeader(*tempo, track);
           resolveContext(update, secondsPerTick);
-          derived[trackIndex].emplace_back(std::move(update));
         };
         appendRate(trackState.vibratoRate);
         appendRate(trackState.tremoloRate);
