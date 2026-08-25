@@ -311,11 +311,6 @@ std::vector<SourceAnnotationId> SourceMap::withSequenceSemantic(SourceId source,
   });
 }
 
-std::vector<SourceLink> SourceMap::linksFrom(SourceAnnotationId id) const {
-  const auto* annotation = find(id);
-  return annotation != nullptr ? annotation->links : std::vector<SourceLink>{};
-}
-
 std::vector<SourceAnnotationId> SourceMap::linksTo(const SourceTarget& target) const {
   return idsFromAnnotations(annotations(), [&](const SourceAnnotation& annotation) {
     return std::ranges::any_of(annotation.links, [&](const SourceLink& link) { return link.target == target; });
@@ -368,8 +363,8 @@ AnnotationBuilder& AnnotationBuilder::range(SourceRange range) {
 AnnotationBuilder& AnnotationBuilder::label(std::string_view label) {
   if (auto* found = annotation()) {
     found->label = std::string(label);
-    if (found->localKind.empty()) {
-      found->localKind = sourceLocalKind(label);
+    if (found->kind.empty()) {
+      found->kind = sourceKindFromLabel(label);
     }
   }
   return *this;
@@ -382,16 +377,9 @@ AnnotationBuilder& AnnotationBuilder::description(std::string_view description) 
   return *this;
 }
 
-AnnotationBuilder& AnnotationBuilder::kind(std::string_view localKindOverride) {
+AnnotationBuilder& AnnotationBuilder::kind(std::string_view kind) {
   if (auto* found = annotation()) {
-    found->localKind = std::string(localKindOverride);
-  }
-  return *this;
-}
-
-AnnotationBuilder& AnnotationBuilder::detailKind(std::string_view detailKind) {
-  if (auto* found = annotation()) {
-    found->detailKind = std::string(detailKind);
+    found->kind = std::string(kind);
   }
   return *this;
 }
@@ -550,7 +538,7 @@ AnnotationBuilder SourceMapBuilder::add(SourceRole role, std::string_view label,
       .range = range,
       .role = role,
       .label = std::string(label),
-      .localKind = sourceLocalKind(label),
+      .kind = sourceKindFromLabel(label),
   });
   if (id.valid()) {
     annotationsById_.emplace(id.value, index);
@@ -567,7 +555,7 @@ SourceAnnotation* SourceMapBuilder::annotation(SourceAnnotationId id) {
   return annotation.id == id ? &annotation : nullptr;
 }
 
-std::string sourceLocalKind(std::string_view label) {
+std::string sourceKindFromLabel(std::string_view label) {
   std::string kind;
   bool pendingDash = false;
   for (const unsigned char ch : label) {

@@ -830,7 +830,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 const SequenceProgramConfig& sequenceConfig() {
   static const SequenceProgramConfig config = SequenceProgramConfig{
-      .commandDetailKindPrefix = "itikiti-snes",
+      .commandKindPrefix = "itikiti-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
           SequenceProgramBehavior{

@@ -765,7 +765,7 @@ using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
                                                         std::optional<StereoBalance> initialStereoBalance) {
   behavior.initialStereoBalance = initialStereoBalance;
   return SequenceProgramConfig{
-      .commandDetailKindPrefix = "probe",
+      .commandKindPrefix = "probe",
       .timebase = Timebase{.ppqn = 48},
       .behavior = behavior,
   };

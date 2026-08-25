@@ -23,8 +23,7 @@ namespace vgmtrans::core {
 // source annotations without teaching format execution about SourceMapBuilder.
 struct DecodedCommandPresentation {
   std::string label;
-  std::string localKind;
-  std::string detailKind;
+  std::string kind;
   SequenceSemantic semantic = SequenceSemantic::Unknown;
   CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback;
 };

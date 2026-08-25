@@ -752,7 +752,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 const SequenceProgramConfig& sequenceConfig() {
   static const SequenceProgramConfig config = SequenceProgramConfig{
-      .commandDetailKindPrefix = "heartbeat-snes",
+      .commandKindPrefix = "heartbeat-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
           SequenceProgramBehavior{

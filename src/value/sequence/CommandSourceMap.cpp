@@ -147,8 +147,7 @@ void projectOperand(AnnotationBuilder& annotation, const SemanticOperand& operan
 
   auto annotation =
       sourceMap->command(command.presentation.label, command.range, command.presentation.semantic)
-          .kind(command.presentation.localKind)
-          .detailKind(command.presentation.detailKind)
+          .kind(command.presentation.kind)
           .playbackStatus(command.presentation.playback)
           .field("opcode", SourceRange{.source = command.range.source, .offset = command.range.offset, .size = 1},
                  command.opcode, SourceValueDisplay::Hex);
@@ -241,7 +240,7 @@ SequenceDecodeSession::SequenceDecodeSession(ByteReader reader, const SequencePr
           .sequenceAsset = sequenceAsset,
           .sourceMap = sourceMap,
       },
-      program_(config.makeProgram()), sourceKindPrefix_(config.commandDetailKindPrefix) {
+      program_(config.makeProgram()), sourceKindPrefix_(config.commandKindPrefix) {
   if (tracks_.sourceMap == nullptr) {
     return;
   }

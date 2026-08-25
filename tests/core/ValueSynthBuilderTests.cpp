@@ -337,7 +337,7 @@ void scanResultBuilderRetainsSampleKeysAndExposesExistingRegions() {
   expect(scan.diagnostics.size() == 1 && scan.diagnostics[0].message == "Required sample 99 was not found",
          "a draft should report a format-authored warning through the shared diagnostic stream");
   const auto regionSources = scan.sourceMap.ownedBy(ObjectRefs::region(instrumentsAsset, 0, 0));
-  expect(regionSources.size() == 1 && scan.sourceMap.get(regionSources[0]).localKind == "probe-prebuilt-region",
+  expect(regionSources.size() == 1 && scan.sourceMap.get(regionSources[0]).category() == "probe-prebuilt-region",
          "a prebuilt region should accept an exact source record without being removed and added again");
 }
 

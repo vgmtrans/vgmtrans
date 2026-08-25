@@ -207,8 +207,15 @@ struct SourceAnnotation {
   std::string description;
   std::optional<SequenceSemantic> sequenceSemantic;
   std::optional<CommandPlaybackStatus> playbackStatus;
-  std::string localKind;
-  std::string detailKind;
+  // Qualified identity used by inspectors and format-specific behavior. The
+  // final segment remains the format-neutral category used for coloring and
+  // grouping (for example, "capcom-snes.note" -> "note").
+  std::string kind;
+  [[nodiscard]] std::string_view category() const noexcept {
+    const std::string_view qualified{kind};
+    const size_t separator = qualified.rfind('.');
+    return separator == std::string_view::npos ? qualified : qualified.substr(separator + 1);
+  }
   // Asset ownership is explicit at graph roots and inherited by structural
   // descendants. Scan validation rejects parents that cross asset boundaries.
   std::optional<ObjectRef> owner;
@@ -242,7 +249,6 @@ public:
   [[nodiscard]] std::vector<SourceAnnotationId> childrenOf(SourceAnnotationId parent) const;
   [[nodiscard]] std::vector<SourceAnnotationId> withRole(SourceId source, SourceRole role) const;
   [[nodiscard]] std::vector<SourceAnnotationId> withSequenceSemantic(SourceId source, SequenceSemantic semantic) const;
-  [[nodiscard]] std::vector<SourceLink> linksFrom(SourceAnnotationId id) const;
   [[nodiscard]] std::vector<SourceAnnotationId> linksTo(const SourceTarget& target) const;
 
 private:
@@ -290,8 +296,7 @@ public:
   AnnotationBuilder& range(SourceRange range);
   AnnotationBuilder& label(std::string_view label);
   AnnotationBuilder& description(std::string_view description);
-  AnnotationBuilder& kind(std::string_view localKindOverride);
-  AnnotationBuilder& detailKind(std::string_view detailKind);
+  AnnotationBuilder& kind(std::string_view kind);
   AnnotationBuilder& parent(SourceAnnotationId parent);
   AnnotationBuilder& owner(ObjectRef owner);
   AnnotationBuilder& outline(SourceOutlinePolicy policy);
@@ -363,6 +368,6 @@ private:
   std::unordered_map<u32, size_t> annotationsById_;
 };
 
-[[nodiscard]] std::string sourceLocalKind(std::string_view label);
+[[nodiscard]] std::string sourceKindFromLabel(std::string_view label);
 
 }  // namespace vgmtrans::core

@@ -776,7 +776,7 @@ struct DecodeContext {
 
 const SequenceProgramConfig& mp2kSequenceConfig() {
   static const SequenceProgramConfig config = SequenceProgramConfig{
-      .commandDetailKindPrefix = "mp2k",
+      .commandKindPrefix = "mp2k",
       .timebase = Timebase{.ppqn = 24},
       .behavior =
           SequenceProgramBehavior{

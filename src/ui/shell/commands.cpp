@@ -463,8 +463,7 @@ std::string valueAnnotationDescription(const vgmtrans::core::SourceAnnotation& a
 }
 
 std::string_view valueAnnotationKind(const vgmtrans::core::SourceAnnotation& annotation) {
-  return annotation.detailKind.empty() ? std::string_view{annotation.localKind}
-                                       : std::string_view{annotation.detailKind};
+  return annotation.kind;
 }
 
 std::string_view valuePlaybackStatusName(vgmtrans::core::CommandPlaybackStatus status) {

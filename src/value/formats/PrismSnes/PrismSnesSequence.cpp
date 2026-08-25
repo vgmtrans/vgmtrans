@@ -1579,7 +1579,7 @@ struct WalkState {
 
 const SequenceProgramConfig& sequenceConfig() {
   static const SequenceProgramConfig config = SequenceProgramConfig{
-      .commandDetailKindPrefix = "prism-snes",
+      .commandKindPrefix = "prism-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
           SequenceProgramBehavior{

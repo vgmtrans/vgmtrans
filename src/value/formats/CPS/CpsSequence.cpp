@@ -1003,7 +1003,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 [[nodiscard]] SequenceProgramConfig makeSequenceConfig(std::string_view prefix, u32 ppqn,
                                                        u8 initialPitchBendRange, double initialLevel = 1.0) {
   return SequenceProgramConfig{
-      .commandDetailKindPrefix = std::string(prefix),
+      .commandKindPrefix = std::string(prefix),
       .timebase = Timebase{.ppqn = ppqn},
       .behavior =
           SequenceProgramBehavior{

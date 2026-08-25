@@ -1376,7 +1376,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 const SequenceProgramConfig& sequenceConfig() {
   static const SequenceProgramConfig config = SequenceProgramConfig{
-      .commandDetailKindPrefix = "hudson-snes",
+      .commandKindPrefix = "hudson-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
           SequenceProgramBehavior{

@@ -311,7 +311,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 const SequenceProgramConfig& sonyPs1SequenceConfig() {
   static const SequenceProgramConfig config = SequenceProgramConfig{
-      .commandDetailKindPrefix = std::string(kSonyPs1CommandKindPrefix),
+      .commandKindPrefix = std::string(kSonyPs1CommandKindPrefix),
       .timebase = Timebase{.ppqn = 48},
       .behavior =
           SequenceProgramBehavior{

@@ -1572,7 +1572,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
 [[nodiscard]] SequenceProgramConfig makeSequenceConfig(KonamiSnesVersion version) {
   const PanGains initialBalance = panGains(version, version <= KONAMISNES_V2 ? 10 : 20);
   return SequenceProgramConfig{
-      .commandDetailKindPrefix = "konami-snes",
+      .commandKindPrefix = "konami-snes",
       .timebase = Timebase{.ppqn = kKonamiSnesPpqn},
       .behavior =
           SequenceProgramBehavior{

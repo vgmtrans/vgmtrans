@@ -661,7 +661,7 @@ void finalizeSegSatPerformance(PerformanceSequence& performance, std::span<const
 
 const SequenceProgramConfig& segSatSequenceConfig() {
   static const SequenceProgramConfig config = SequenceProgramConfig{
-      .commandDetailKindPrefix = "segsat",
+      .commandKindPrefix = "segsat",
       .timebase = Timebase{.ppqn = 48},
       .behavior =
           SequenceProgramBehavior{

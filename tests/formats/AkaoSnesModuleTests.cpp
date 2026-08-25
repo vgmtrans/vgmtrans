@@ -92,7 +92,7 @@ const SourceAnnotation* annotationWithKind(const SourceMap& sourceMap, SourceId 
                                            std::string_view kind) {
   const auto annotations = sourceMap.withRole(source, role);
   const auto found =
-      std::ranges::find_if(annotations, [&](SourceAnnotationId id) { return sourceMap.get(id).localKind == kind; });
+      std::ranges::find_if(annotations, [&](SourceAnnotationId id) { return sourceMap.get(id).category() == kind; });
   return found == annotations.end() ? nullptr : sourceMap.find(*found);
 }
 
@@ -254,7 +254,7 @@ void akaoSnesModuleDiscoversSequenceInstrumentsAndSamples() {
 
   const auto tuningEntries = project.sourceMap().withRole(source, SourceRole::Instrument);
   const auto tuning = std::ranges::find_if(tuningEntries, [&](SourceAnnotationId id) {
-    return project.sourceMap().get(id).localKind == "akao-snes-tuning-entry";
+    return project.sourceMap().get(id).category() == "akao-snes-tuning-entry";
   });
   expect(tuning != tuningEntries.end() &&
              project.sourceMap().get(*tuning).range == SourceRange{.source = source, .offset = 0x5200, .size = 1},

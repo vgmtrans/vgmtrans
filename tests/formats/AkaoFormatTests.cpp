@@ -58,11 +58,11 @@ bool hasLinkRole(const SourceAnnotation& annotation, SourceLinkRole role) {
 }
 
 const SourceAnnotation* annotationWithKind(const SourceMap& sourceMap, SourceId source, SourceRole role,
-                                           std::string_view localKind) {
+                                           std::string_view category) {
   const auto annotations = sourceMap.withRole(source, role);
   for (const SourceAnnotationId id : annotations) {
     const SourceAnnotation& annotation = sourceMap.get(id);
-    if (annotation.localKind == localKind) {
+    if (annotation.category() == category) {
       return &annotation;
     }
   }
@@ -814,7 +814,7 @@ void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView() {
   const auto sequenceHeaders = project.sourceMap().withRole(SourceId{0}, SourceRole::Header);
   const auto header = std::ranges::find_if(sequenceHeaders, [&](SourceAnnotationId id) {
     const SourceAnnotation& annotation = project.sourceMap().get(id);
-    return annotation.localKind == "akao-sequence-header";
+    return annotation.category() == "akao-sequence-header";
   });
   expect(header != sequenceHeaders.end(), "Akao source map should expose the sequence header annotation");
   const SourceAnnotation& sequenceHeader = project.sourceMap().get(*header);
