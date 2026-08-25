@@ -190,8 +190,8 @@ struct TrackState {
   std::array<s16, 2> loopAttenuation{};
   std::array<s16, 2> loopTranspose{};
   double nmiRateHertz = 0.0;
-  PerformanceBoundValue<SequenceAutomatedValue<double>> volume;
-  PerformanceBoundValue<SequenceAutomatedValue<double>> pan;
+  PerformanceBoundValue<SequenceLinearMotion<double>> volume;
+  PerformanceBoundValue<SequenceLinearMotion<double>> pan;
   double pitchBendSemitones = 0.0;
   std::optional<double> emittedPitchBend;
   std::optional<double> emittedTuningCents;
@@ -223,7 +223,7 @@ struct SequenceState {
 
   // EB owns one song-wide accumulator. EA on any channel cancels it, and
   // each update copies its tempo into every active channel.
-  PerformanceBoundValue<SequenceAutomatedValue<double>> tempo;
+  PerformanceBoundValue<SequenceLinearMotion<double>> tempo;
   std::array<double, kKonamiArcadeMaxTracks> channelTempos;
   std::optional<u64> tempoSlideLastTick;
   double nmiRateHertz = 0.0;
