@@ -485,12 +485,12 @@ void performanceMidiRendererCombinesExpressionWithPanGain() {
          "sequence-event MIDI lowering should multiply pan compensation by source expression");
 
   PerformanceSequence precisePerformance = performance;
-  std::get<ExpressionPerformanceEvent>(precisePerformance.tracks[0].events[0]).precisionHint =
-      LevelPrecisionHint::FourteenBit;
+  std::get<ExpressionPerformanceEvent>(precisePerformance.tracks[0].events[0]).sourceQuantization =
+      ValueQuantization{.levels = 256};
   const MidiSequence preciseMidi = renderMidiSequence(precisePerformance);
   expect(std::count_if(preciseMidi.tracks[0].events.begin(), preciseMidi.tracks[0].events.end(),
                        [](const MidiEvent& event) { return std::holds_alternative<Expression14>(event); }) == 4,
-         "pan compensation should preserve the source expression's precision");
+         "pan compensation should preserve the source expression's quantization");
 }
 
 void performanceMidiRendererLowersDeclaredPanLaws() {
@@ -602,12 +602,12 @@ void performanceMidiRendererHonorsMidiExportOptions() {
                                                   LevelPerformanceEvent{
                                                       .header = PerformanceEventHeader{.tick = 0},
                                                       .linearGain = 1.0,
-                                                      .precisionHint = LevelPrecisionHint::FourteenBit,
+                                                      .sourceQuantization = ValueQuantization{.levels = 256},
                                                   },
                                                   ExpressionPerformanceEvent{
                                                       .header = PerformanceEventHeader{.tick = 0},
                                                       .linearGain = 1.0,
-                                                      .precisionHint = LevelPrecisionHint::FourteenBit,
+                                                      .sourceQuantization = ValueQuantization{.levels = 256},
                                                   },
                                               },
                                       },
@@ -632,9 +632,9 @@ void performanceMidiRendererHonorsMidiExportOptions() {
              !std::get<BankSelect>(autoMidi.tracks[0].events[1]).writeLsb,
          "MIDI renderer should lower logical banks to MSB-only bank select by default");
   expect(std::holds_alternative<Volume14>(autoMidi.tracks[0].events[3]),
-         "MIDI renderer should honor 14-bit source volume hints by default");
+         "MIDI renderer should honor source volume quantization by default");
   expect(std::holds_alternative<Expression14>(autoMidi.tracks[0].events[4]),
-         "MIDI renderer should honor 14-bit source expression hints by default");
+         "MIDI renderer should honor source expression quantization by default");
   expect(std::get<NoteDuration>(autoMidi.tracks[9].events[1]).channel == 10,
          "MIDI renderer should skip channel 10 by default");
   expect(std::get<MidiPort>(autoMidi.tracks[15].events[0]).port == 1 &&
@@ -1379,7 +1379,7 @@ void performanceMidiRendererDoesNotRestartVibratoAtAHeldPitchSlideBoundary() {
       .amount = 0.5,
       .pitchDepthSemitones = 1.0,
   });
-  out.vibratoDelay(6, 0);
+  out.vibratoDelayTicks(6);
   const PerformanceNoteId first = out.note(60, 1.0, 4);
   const PerformanceNoteId second = out.at(4).note(64, 1.0, 4);
   out.at(4).pitchSlide(second, 60, 64, 4).continueFrom(first);

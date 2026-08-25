@@ -419,7 +419,7 @@ struct Playback {
 
   void emitLevel(PerformanceEmitter output) {
     output.level(math::channelGain(track.channelMaster, channelVolume(), track.alternateVolume),
-                 LevelPrecisionHint::FourteenBit);
+                 ValueQuantization{.levels = 256});
   }
 
   void emitLevel() { emitLevel(out); }

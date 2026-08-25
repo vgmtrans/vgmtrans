@@ -1183,7 +1183,7 @@ struct Playback {
       out.vibratoDelayTicks(track.vibrato.delay);
     } else {
       out.vibratoRate(0.0);
-      out.vibratoDelay(0, 0);
+      out.vibratoDelayTicks(0);
     }
   }
 

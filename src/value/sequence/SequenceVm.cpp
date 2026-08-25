@@ -223,7 +223,6 @@ void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavio
     track.events.emplace_back(LevelPerformanceEvent{
         .header = header,
         .linearGain = *behavior.initialLevel,
-        .precisionHint = LevelPrecisionHint::SevenBit,
     });
   }
   if (includeGlobalEvents && behavior.initialMasterLevel) {
@@ -236,7 +235,6 @@ void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavio
     track.events.emplace_back(ExpressionPerformanceEvent{
         .header = header,
         .linearGain = *behavior.initialExpression,
-        .precisionHint = LevelPrecisionHint::SevenBit,
     });
   }
   if (behavior.initialStereoBalance) {

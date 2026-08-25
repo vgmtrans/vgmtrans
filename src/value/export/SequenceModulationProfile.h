@@ -28,8 +28,8 @@ struct SequenceModulationProfile {
 [[nodiscard]] SequenceModulationProfile analyzeSequenceModulation(const PerformanceSequence& sequence);
 
 // Resolves a physical event into the normalized input used by MIDI synth
-// controls. Events without a physical representation retain their legacy
-// normalized amount.
+// controls. Events without a physical representation use their normalized
+// source control amount.
 [[nodiscard]] double modulationControllerAmount(const ModulationPerformanceEvent& event,
                                                 const SequenceModulationProfile* profile) noexcept;
 [[nodiscard]] u8 vibratoDelayControllerValue(const VibratoDelayPerformanceEvent& event,

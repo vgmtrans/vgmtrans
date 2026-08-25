@@ -113,10 +113,10 @@ public:
                        VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks);
   void level(LevelPerformanceEvent event);
   void level(double linearGain, ValueQuantization sourceQuantization);
-  void level(double linearGain, LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit);
+  void level(double linearGain);
   void expression(ExpressionPerformanceEvent event);
   void expression(double linearGain, ValueQuantization sourceQuantization);
-  void expression(double linearGain, LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit);
+  void expression(double linearGain);
   void pan(PanPerformanceEvent event);
   void pan(double stereoPosition);
   void pan(double stereoPosition, double linearGain);
@@ -135,11 +135,9 @@ public:
   void pitchBendRange(PitchBendRangePerformanceEvent event);
   void pitchBendRange(u8 semitones);
   void vibratoDelay(VibratoDelayPerformanceEvent event);
-  void vibratoDelay(u32 delayTicks, u8 midiValue);
   void vibratoDelayTicks(u32 delayTicks);
   void vibratoDelayPhysical(u32 delayTicks, double milliseconds);
   void tremoloDelay(TremoloDelayPerformanceEvent event);
-  void tremoloDelay(u32 delayTicks, u8 midiValue);
   void tremoloDelayTicks(u32 delayTicks);
   void tremoloDelayPhysical(u32 delayTicks, double milliseconds);
   void portamento(PortamentoPerformanceEvent event);
