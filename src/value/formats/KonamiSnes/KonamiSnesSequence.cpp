@@ -936,7 +936,7 @@ private:
     if (track.currentNoteVolume == 0 && track.version >= KONAMISNES_V3) {
       return;
     }
-    output.level(LevelScale::linearFromLinear(mixedLevel(trackVolume)), LevelPrecisionHint::FourteenBit);
+    output.level(LevelScale::linearFromLinear(mixedLevel(trackVolume)), ValueQuantization{.levels = 128});
   }
 
   void loadInstrument(const KonamiSnesInstrumentInfo* instrument) {
@@ -1129,7 +1129,7 @@ private:
     if (!vibratoActive()) {
       // Clear both the simulation delay and the synth controller when vibrato
       // is disabled by either a zero rate or zero depth.
-      out.vibratoDelay(0, 0);
+      out.vibratoDelayTicks(0);
       return;
     }
     if (vibrato::usesEarlyCounter(track.version)) {

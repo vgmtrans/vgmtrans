@@ -304,7 +304,7 @@ struct Playback {
       out.vibratoDelayTicks(static_cast<u32>(vibrato.delay) + 1);
     } else {
       out.vibratoRateCyclesPerTick(0.0, context);
-      out.vibratoDelay(0, 0);
+      out.vibratoDelayTicks(0);
     }
   }
 
@@ -319,7 +319,7 @@ struct Playback {
       out.tremoloDelayTicks(static_cast<u32>(delay) + 1);
     } else {
       out.tremoloRateCyclesPerTick(0.0, context);
-      out.tremoloDelay(0, 0);
+      out.tremoloDelayTicks(0);
     }
   }
 
@@ -617,7 +617,7 @@ struct Playback {
 
   void volume(u8 raw) {
     track.volume.setCurrentAt(vm.tick(), raw);
-    out.level(LevelScale::linearFromLinear(volumeGain(raw)), LevelPrecisionHint::FourteenBit);
+    out.level(LevelScale::linearFromLinear(volumeGain(raw)), ValueQuantization{.levels = 128});
   }
 
   void reverb(u8 firstNibble, u8 secondNibble) { out.reverb(reverbGain(firstNibble, secondNibble, isGx())); }
@@ -764,7 +764,7 @@ struct Playback {
     static_cast<void>(track.volume.tickChanged([&](double value) {
       track.volume.output(out).level(
           LevelScale::linearFromLinear(volumeGain(static_cast<u8>(std::clamp(value, 0.0, 255.0)))),
-          LevelPrecisionHint::FourteenBit);
+          ValueQuantization{.levels = 128});
     }));
     static_cast<void>(track.pan.tickChanged([&](double value) {
       const auto [left, right] = stereoGains(static_cast<u8>(std::clamp(value, 0.0, 255.0)) | 0x10);

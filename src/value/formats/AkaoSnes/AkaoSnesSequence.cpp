@@ -1092,8 +1092,10 @@ struct Playback {
 
   void emitVolume(PerformanceEmitter output, u8 volume) {
     const double envelope = context.version == AKAOSNES_V1 ? track.v1Envelope.level() : 1.0;
-    output.level(channelLevel(volume) * envelope,
-                 context.version == AKAOSNES_V1 ? LevelPrecisionHint::FourteenBit : LevelPrecisionHint::SevenBit);
+    // V1 additionally applies the DSP's 11-bit live envelope to its 7-bit
+    // channel level; later versions have only the channel-level quantization.
+    const ValueQuantization quantization{.levels = context.version == AKAOSNES_V1 ? 2'048u : 128u};
+    output.level(channelLevel(volume) * envelope, quantization);
   }
 
   void volume(u8 value) {
@@ -1375,10 +1377,10 @@ struct Playback {
   void clearLfoRateAndDelay(LfoTarget target) {
     if (target == LfoTarget::Vibrato) {
       out.vibratoRate(0.0);
-      out.vibratoDelay(0, 0);
+      out.vibratoDelayTicks(0);
     } else {
       out.tremoloRate(0.0);
-      out.tremoloDelay(0, 0);
+      out.tremoloDelayTicks(0);
     }
   }
 

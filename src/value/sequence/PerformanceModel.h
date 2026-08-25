@@ -121,13 +121,8 @@ struct EnvelopePerformanceEvent {
   PerformanceLaneId lane{0};
 };
 
-enum class LevelPrecisionHint {
-  SevenBit,
-  FourteenBit,
-};
-
 struct ValueQuantization {
-  // Number of distinct source-domain values, not a destination bit width.
+  // Number of levels in the source value's native scale, not a destination bit width.
   // Zero means the source is continuous or its quantization is unknown.
   u32 levels = 0;
 };
@@ -136,9 +131,6 @@ struct LevelPerformanceEvent {
   PerformanceEventHeader header;
   // Interpreted loudness as linear amplitude/gain, not a MIDI controller value.
   double linearGain = 1.0;
-  // Legacy destination-shaped hint for older cursor formats. Semantic formats use
-  // sourceQuantization, and export options may override either one.
-  LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit;
   std::optional<ValueQuantization> sourceQuantization;
 };
 
@@ -146,9 +138,6 @@ struct ExpressionPerformanceEvent {
   PerformanceEventHeader header;
   // Interpreted expression as linear amplitude/gain, not a MIDI controller value.
   double linearGain = 1.0;
-  // Legacy destination-shaped hint for older cursor formats. Semantic formats use
-  // sourceQuantization, and export options may override either one.
-  LevelPrecisionHint precisionHint = LevelPrecisionHint::SevenBit;
   std::optional<ValueQuantization> sourceQuantization;
 };
 
@@ -245,8 +234,6 @@ struct VibratoDelayPerformanceEvent {
   // Controls whether this delay affects the LFO already playing or only later
   // notes that restart it.
   LfoDelayUpdateMode updateMode = LfoDelayUpdateMode::CurrentAndFutureNotes;
-  // Legacy controller fallback for formats that do not provide milliseconds.
-  u8 midiValue = 0;
 };
 
 struct TremoloDelayPerformanceEvent {
@@ -257,7 +244,6 @@ struct TremoloDelayPerformanceEvent {
   // Controls whether this delay affects the LFO already playing or only later
   // notes that restart it.
   LfoDelayUpdateMode updateMode = LfoDelayUpdateMode::CurrentAndFutureNotes;
-  u8 midiValue = 0;
 };
 
 struct PortamentoPerformanceEvent {
@@ -405,7 +391,8 @@ struct LfoPerformanceContext {
 struct ModulationPerformanceEvent {
   PerformanceEventHeader header;
   ModulationPerformanceTarget target = ModulationPerformanceTarget::VibratoDepth;
-  // Legacy normalized fallback for formats that do not provide a physical value.
+  // Normalized source control value. Formats with physical modulation facts
+  // provide those below; lowering uses this value when no physical fact exists.
   double amount = 0.0;
   // The shared modulation planner derives both MIDI controls and synth
   // modulation from these physical values.

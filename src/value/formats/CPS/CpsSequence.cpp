@@ -351,17 +351,17 @@ struct Playback {
     if (track.synth == SynthKind::OkiM6295) {
       constexpr std::array<u8, 16> attenuation{32, 22, 16, 11, 8, 6, 4, 3, 2, 0, 0, 0, 0, 0, 0, 0};
       const u8 index = static_cast<u8>(8 - raw) & 0x0f;
-      out.level(attenuation[index] / 32.0, LevelPrecisionHint::SevenBit);
+      out.level(attenuation[index] / 32.0, ValueQuantization{.levels = 33});
     } else if (isCps1(track.version)) {
-      out.level(std::min<u8>(raw, 127) / 127.0, LevelPrecisionHint::SevenBit);
+      out.level(std::min<u8>(raw, 127) / 127.0, ValueQuantization{.levels = 128});
     } else {
-      out.level(tables::earlyVolume[raw & 0x7f] / 8191.0, LevelPrecisionHint::FourteenBit);
+      out.level(tables::earlyVolume[raw & 0x7f] / 8191.0, ValueQuantization{.levels = 8'192});
     }
   }
 
   void lateVolume(u8 raw) {
     const double level = isCps3(track.version) ? raw / 128.0 : tables::earlyVolume[raw & 0x7f] / 8191.0;
-    out.level(level, LevelPrecisionHint::FourteenBit);
+    out.level(level, ValueQuantization{.levels = isCps3(track.version) ? 256u : 8'192u});
   }
 
   void emitLateExpression() {
@@ -371,7 +371,7 @@ struct Playback {
     const s32 combinedAdjustment = track.lateVolumeBaseAdjustment + track.lateVolumeAdjustment;
     const double adjustment = isCps3(track.version) ? cpsVolumeAdjustmentGain(combinedAdjustment)
                                                     : (std::clamp<s32>(combinedAdjustment, -64, 63) + 64) / 64.0;
-    out.expression(expression * adjustment, LevelPrecisionHint::FourteenBit);
+    out.expression(expression * adjustment, ValueQuantization{.levels = isCps3(track.version) ? 256u : 513u});
   }
 
   void lateExpression(u8 raw) {

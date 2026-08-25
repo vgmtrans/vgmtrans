@@ -291,10 +291,9 @@ void PerformanceEmitter::level(double linearGain, ValueQuantization sourceQuanti
   });
 }
 
-void PerformanceEmitter::level(double linearGain, LevelPrecisionHint precisionHint) {
+void PerformanceEmitter::level(double linearGain) {
   level(LevelPerformanceEvent{
       .linearGain = linearGain,
-      .precisionHint = precisionHint,
   });
 }
 
@@ -309,10 +308,9 @@ void PerformanceEmitter::expression(double linearGain, ValueQuantization sourceQ
   });
 }
 
-void PerformanceEmitter::expression(double linearGain, LevelPrecisionHint precisionHint) {
+void PerformanceEmitter::expression(double linearGain) {
   expression(ExpressionPerformanceEvent{
       .linearGain = linearGain,
-      .precisionHint = precisionHint,
   });
 }
 
@@ -415,13 +413,6 @@ void PerformanceEmitter::vibratoDelay(VibratoDelayPerformanceEvent event) {
   append(std::move(event));
 }
 
-void PerformanceEmitter::vibratoDelay(u32 delayTicks, u8 midiValue) {
-  vibratoDelay(VibratoDelayPerformanceEvent{
-      .delayTicks = delayTicks,
-      .midiValue = midiValue,
-  });
-}
-
 void PerformanceEmitter::vibratoDelayTicks(u32 delayTicks) {
   vibratoDelay(VibratoDelayPerformanceEvent{
       .delayTicks = delayTicks,
@@ -438,13 +429,6 @@ void PerformanceEmitter::vibratoDelayPhysical(u32 delayTicks, double millisecond
 
 void PerformanceEmitter::tremoloDelay(TremoloDelayPerformanceEvent event) {
   append(std::move(event));
-}
-
-void PerformanceEmitter::tremoloDelay(u32 delayTicks, u8 midiValue) {
-  tremoloDelay(TremoloDelayPerformanceEvent{
-      .delayTicks = delayTicks,
-      .midiValue = midiValue,
-  });
 }
 
 void PerformanceEmitter::tremoloDelayTicks(u32 delayTicks) {

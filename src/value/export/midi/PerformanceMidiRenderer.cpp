@@ -158,7 +158,7 @@ struct LoweredStereoBalance {
   return static_cast<s16>(std::clamp<int>(static_cast<int>(std::lround(normalized * 8192.0)), -8192, 8191));
 }
 
-[[nodiscard]] MidiLevelResolution resolveLevelResolution(MidiLevelResolution requested, LevelPrecisionHint hint,
+[[nodiscard]] MidiLevelResolution resolveLevelResolution(MidiLevelResolution requested,
                                                          std::optional<ValueQuantization> quantization = std::nullopt) {
   if (requested != MidiLevelResolution::Auto) {
     return requested;
@@ -166,7 +166,7 @@ struct LoweredStereoBalance {
   if (quantization && quantization->levels > 128) {
     return MidiLevelResolution::FourteenBit;
   }
-  return hint == LevelPrecisionHint::FourteenBit ? MidiLevelResolution::FourteenBit : MidiLevelResolution::SevenBit;
+  return MidiLevelResolution::SevenBit;
 }
 
 [[nodiscard]] bool writeBankSelectLsb(const MidiExportOptions& options) {
@@ -182,10 +182,8 @@ struct MidiControllerState {
 };
 
 void addVolume(MidiTrack& track, MidiControllerState* state, u64 tick, u8 channel, double linearGain,
-               LevelPrecisionHint precisionHint, const MidiExportOptions& options,
-               std::optional<ValueQuantization> quantization = std::nullopt) {
-  if (resolveLevelResolution(options.volumeResolution, precisionHint, quantization) ==
-      MidiLevelResolution::FourteenBit) {
+               const MidiExportOptions& options, std::optional<ValueQuantization> quantization = std::nullopt) {
+  if (resolveLevelResolution(options.volumeResolution, quantization) == MidiLevelResolution::FourteenBit) {
     const u16 value = LevelScale::midi14FromLinear(linearGain);
     if (state != nullptr && state->volume14 && *state->volume14 == value) {
       return;
@@ -209,10 +207,8 @@ void addVolume(MidiTrack& track, MidiControllerState* state, u64 tick, u8 channe
 }
 
 void addExpression(MidiTrack& track, MidiControllerState* state, u64 tick, u8 channel, double linearGain,
-                   LevelPrecisionHint precisionHint, const MidiExportOptions& options,
-                   std::optional<ValueQuantization> quantization = std::nullopt) {
-  if (resolveLevelResolution(options.expressionResolution, precisionHint, quantization) ==
-      MidiLevelResolution::FourteenBit) {
+                   const MidiExportOptions& options, std::optional<ValueQuantization> quantization = std::nullopt) {
+  if (resolveLevelResolution(options.expressionResolution, quantization) == MidiLevelResolution::FourteenBit) {
     const u16 value = LevelScale::midi14FromLinear(linearGain);
     if (state != nullptr && state->expression14 && *state->expression14 == value) {
       return;
@@ -363,7 +359,6 @@ struct RenderTrackState {
   SimulatedLfoState vibrato;
   std::optional<s16> lastPitchBendValue;
   double sourceExpressionGain = 1.0;
-  LevelPrecisionHint sourceExpressionPrecisionHint = LevelPrecisionHint::SevenBit;
   std::optional<ValueQuantization> sourceExpressionQuantization;
   double panExpressionGain = 1.0;
   double simulatedTremoloGain = 1.0;
@@ -1033,8 +1028,7 @@ void addCombinedExpression(MidiTrack& track, RenderTrackState& state, u64 tick, 
                            MidiControllerState* automationState = nullptr) {
   const bool simulatingTremolo = modulationConversion == ModulationConversionPolicy::SequenceEventSimulation;
   addExpression(track, automationState, tick, channel,
-                state.sourceExpressionGain * state.panExpressionGain * state.simulatedTremoloGain,
-                simulatingTremolo ? LevelPrecisionHint::SevenBit : state.sourceExpressionPrecisionHint, options,
+                state.sourceExpressionGain * state.panExpressionGain * state.simulatedTremoloGain, options,
                 simulatingTremolo ? std::nullopt : state.sourceExpressionQuantization);
 }
 
@@ -1249,11 +1243,10 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           applyInstrumentSelection(track, state, typedEvent.header.tick, channel, selection, options,
                                    modulationConversion, true);
         } else if constexpr (std::is_same_v<TypedEvent, LevelPerformanceEvent>) {
-          addVolume(track, automationState, typedEvent.header.tick, channel, typedEvent.linearGain,
-                    typedEvent.precisionHint, options, typedEvent.sourceQuantization);
+          addVolume(track, automationState, typedEvent.header.tick, channel, typedEvent.linearGain, options,
+                    typedEvent.sourceQuantization);
         } else if constexpr (std::is_same_v<TypedEvent, ExpressionPerformanceEvent>) {
           state.sourceExpressionGain = typedEvent.linearGain;
-          state.sourceExpressionPrecisionHint = typedEvent.precisionHint;
           state.sourceExpressionQuantization = typedEvent.sourceQuantization;
           addCombinedExpression(track, state, typedEvent.header.tick, channel, options, modulationConversion,
                                 automationState);

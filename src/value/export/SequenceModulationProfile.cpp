@@ -257,7 +257,7 @@ u8 vibratoDelayControllerValue(const VibratoDelayPerformanceEvent& event,
                                const SequenceModulationProfile* profile) noexcept {
   if (profile == nullptr || !event.milliseconds || !profile->instruments.vibrato ||
       !profile->instruments.vibrato->delaySeconds) {
-    return event.midiValue;
+    return 0;
   }
   return midi7(normalizedSeconds(*event.milliseconds / 1000.0, *profile->instruments.vibrato->delaySeconds));
 }
@@ -266,7 +266,7 @@ u8 tremoloDelayControllerValue(const TremoloDelayPerformanceEvent& event,
                                const SequenceModulationProfile* profile) noexcept {
   if (profile == nullptr || !event.milliseconds || !profile->instruments.tremolo ||
       !profile->instruments.tremolo->delaySeconds) {
-    return event.midiValue;
+    return 0;
   }
   return midi7(normalizedSeconds(*event.milliseconds / 1000.0, *profile->instruments.tremolo->delaySeconds));
 }
