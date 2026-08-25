@@ -310,8 +310,8 @@ void addQSoundRegion(ScanSoundBankDraft& instruments, InstrumentSetBuilder::Entr
 
 }  // namespace
 
-Cps1SynthRefs addCps1Synth(ScanResultBuilder& builder, CpsLayout& layout) {
-  Cps1SynthRefs refs;
+Cps1SynthDrafts addCps1Synth(ScanResultBuilder& builder, CpsLayout& layout) {
+  Cps1SynthDrafts drafts;
   const ByteReader reader = builder.reader();
   const u32 patchSize = layout.version == CpsVersion::Cps1V200 || layout.version == CpsVersion::Cps1V500 ||
                                 layout.version == CpsVersion::Cps1V502
@@ -354,11 +354,11 @@ Cps1SynthRefs addCps1Synth(ScanResultBuilder& builder, CpsLayout& layout) {
           });
       instrument.source(name, range, "cps1-ym2151-patch").derived("transpose", transpose);
     }
-    refs.ym2151 = ym.ref();
+    drafts.ym2151 = ym;
   }
 
   if (!layout.sampleRom.valid() || layout.sampleRom.size < 0x400) {
-    return refs;
+    return drafts;
   }
 
   auto oki = builder.soundBank(layout.game + " OKI Sound Bank");
@@ -438,24 +438,23 @@ Cps1SynthRefs addCps1Synth(ScanResultBuilder& builder, CpsLayout& layout) {
           .source("Region", range, "cps1-oki-region");
     }
   }
-  refs.oki = oki.ref();
-  return refs;
+  drafts.oki = oki;
+  return drafts;
 }
 
-ScanSoundBankRef addCpsQSoundSynth(ScanResultBuilder& builder, const CpsLayout& layout) {
+ScanSoundBankDraft addCpsQSoundSynth(ScanResultBuilder& builder, const CpsLayout& layout) {
   const ByteReader reader = builder.reader();
   auto instruments = builder.soundBank(layout.game + " QSound Sound Bank");
   auto& samples = instruments.samples();
-  const ScanSoundBankRef ref = instruments.ref();
 
   const auto sampleInfos = qsoundSampleInfos(reader, layout);
   if (sampleInfos.empty()) {
     samples.warning("CPS QSound sample table contained no entries", layout.program);
-    return ref;
+    return instruments;
   }
   if (!layout.sampleRom.valid()) {
     samples.warning("CPS QSound sample ROM region is unavailable", layout.program);
-    return ref;
+    return instruments;
   }
 
   const u32 addressBase = sampleInfos.front().start & 0xff0000;
@@ -618,7 +617,7 @@ ScanSoundBankRef addCpsQSoundSynth(ScanResultBuilder& builder, const CpsLayout& 
   if (instruments.empty()) {
     instruments.warning("CPS QSound instrument table contained no usable instruments", layout.program);
   }
-  return ref;
+  return instruments;
 }
 
 }  // namespace vgmtrans::formats::cps

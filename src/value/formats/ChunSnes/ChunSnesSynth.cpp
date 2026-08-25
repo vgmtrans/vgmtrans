@@ -89,8 +89,8 @@ struct Patch {
 
 }  // namespace
 
-std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layout& layout,
-                                         std::string_view displayName) {
+std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
+                                           std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const std::vector<Patch> patches = collectPatches(reader, layout);
   if (patches.empty()) {
@@ -136,7 +136,7 @@ std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layou
   if (instruments.builder().empty()) {
     return std::nullopt;
   }
-  return instruments.ref();
+  return instruments;
 }
 
 }  // namespace vgmtrans::formats::chun_snes

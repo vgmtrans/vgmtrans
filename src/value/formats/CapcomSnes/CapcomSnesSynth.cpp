@@ -103,8 +103,8 @@ std::vector<CapcomSnesInstrumentInfo> parseCapcomSnesInstrumentInfos(ByteReader 
 
 // Builds Capcom's instruments and samples together, then links every instrument
 // region to its matching sample.
-std::optional<ScanSoundBankRef> addCapcomSnesSynth(ScanResultBuilder& builder, u32 instrumentTableAddress,
-                                                   u32 spcDirAddress, std::string_view displayName) {
+std::optional<ScanSoundBankDraft> addCapcomSnesSynth(ScanResultBuilder& builder, u32 instrumentTableAddress,
+                                                     u32 spcDirAddress, std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const auto instrumentInfos = parseCapcomSnesInstrumentInfos(reader, instrumentTableAddress, spcDirAddress);
   std::vector<u8> referencedSrcns;
@@ -169,7 +169,7 @@ std::optional<ScanSoundBankRef> addCapcomSnesSynth(ScanResultBuilder& builder, u
     }
   }
 
-  return instruments.ref();
+  return instruments;
 }
 
 }  // namespace vgmtrans::formats::capcom_snes

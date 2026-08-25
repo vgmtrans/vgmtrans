@@ -61,8 +61,9 @@ PatchTable parsePatches(ByteReader reader, const Layout& layout) {
   return result;
 }
 
-std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layout& layout, const std::set<u8>& programs,
-                                         const PatchTable& patchTable, std::string_view displayName) {
+std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
+                                           const std::set<u8>& programs, const PatchTable& patchTable,
+                                           std::string_view displayName) {
   const ByteReader reader = builder.reader();
   std::vector<Patch> patches;
   for (const u8 program : programs) {
@@ -112,7 +113,7 @@ std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layou
         .source("Region", patch.source, "falcom-snes-region")
         .description(fmt::format("SRCN {}, 8.8 pitch scale ${:04X}", *patch.srcn, patch.pitchScale));
   }
-  return instruments.ref();
+  return instruments;
 }
 
 }  // namespace vgmtrans::formats::falcom_snes

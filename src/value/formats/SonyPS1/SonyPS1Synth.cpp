@@ -71,7 +71,7 @@ struct PanGains {
 
 }  // namespace
 
-ScanSoundBankRef addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLayout& layout, u16 bank) {
+void addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLayout& layout, u16 bank) {
   const ByteReader reader = result.reader();
   const std::string name = fmt::format("Sony PS1 VAB {}", bank);
   auto instruments = result.soundBank(name);
@@ -218,15 +218,13 @@ ScanSoundBankRef addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLayo
           .parent(toneRoot);
     }
   }
-
-  return instruments.ref();
 }
 
-std::optional<ScanSamplePoolRef> addSonyPs1RawSampleBody(ScanResultBuilder& result) {
+bool addSonyPs1RawSampleBody(ScanResultBuilder& result) {
   const ByteReader reader = result.reader();
   const auto streams = inspectRawBody(reader);
   if (streams.empty()) {
-    return std::nullopt;
+    return false;
   }
 
   auto samples = result.samplePool(result.sourceDisplayName() + " VAG Samples");
@@ -248,7 +246,7 @@ std::optional<ScanSamplePoolRef> addSonyPs1RawSampleBody(ScanResultBuilder& resu
                                     });
     entry.source(fmt::format("VAG {}", index + 1), stream.encodedData, "sony-ps1-vag").parent(root);
   }
-  return samples.ref();
+  return true;
 }
 
 }  // namespace vgmtrans::formats::sony_ps1

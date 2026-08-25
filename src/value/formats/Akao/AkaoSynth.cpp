@@ -42,7 +42,7 @@ struct ParsedSample {
 };
 
 struct ParsedSamplePool {
-  ScanSamplePoolRef ref;
+  AssetId asset;
   std::vector<AkaoArticulation> articulations;
   std::vector<ParsedSample> samples;
   std::string name;
@@ -322,7 +322,7 @@ struct ParsedSamplePool {
 
 void emitSamplePool(const ScanInput& input, ScanResultBuilder& result, ParsedSamplePool& parsed) {
   auto samples = result.samplePool(parsed.name, parsed.range);
-  parsed.ref = samples.ref();
+  parsed.asset = samples.id();
   const SourceAnnotationId root =
       samples.source(SourceRole::SamplePool, parsed.name, parsed.range, "akao-sample-collection").id();
   for (auto& parsedSample : parsed.samples) {
@@ -359,7 +359,7 @@ void emitSamplePool(const ScanInput& input, ScanResultBuilder& result, ParsedSam
                           .derived("effective_adsr2", articulation.adsr2, SourceValueDisplay::Hex);
     if (articulation.sampleIndex < parsed.samples.size()) {
       annotation.link(SourceLinkRole::UsesSample,
-                      SourceTarget{ObjectRefs::sample(parsed.ref.id, articulation.sampleIndex)});
+                      SourceTarget{ObjectRefs::sample(parsed.asset, articulation.sampleIndex)});
     }
   }
   samples.data(AkaoSamplePoolData{

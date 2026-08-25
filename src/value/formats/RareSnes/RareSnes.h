@@ -81,9 +81,9 @@ struct SequenceParse {
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
 [[nodiscard]] core::SequenceRuntime sequenceRuntime(Profile profile, u8 initialTempo, u8 initialTimer,
                                                     bool monoOutput = false);
-[[nodiscard]] std::optional<core::ScanSoundBankRef> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
-                                                             const SequenceRecipes& recipes,
-                                                             std::string_view displayName);
+[[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
+                                                               const SequenceRecipes& recipes,
+                                                               std::string_view displayName);
 [[nodiscard]] core::FormatModule module();
 
 }  // namespace vgmtrans::formats::rare_snes

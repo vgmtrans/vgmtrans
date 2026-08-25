@@ -38,8 +38,8 @@ namespace {
 
 }  // namespace
 
-std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layout& layout,
-                                         const SequenceRecipes& recipes, std::string_view displayName) {
+std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
+                                           const SequenceRecipes& recipes, std::string_view displayName) {
   if (!layout.spcDirAddress || recipes.patches.empty()) {
     return std::nullopt;
   }
@@ -90,7 +90,7 @@ std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layou
   if (instrumentDraft.builder().empty()) {
     return std::nullopt;
   }
-  return instrumentDraft.ref();
+  return instrumentDraft;
 }
 
 }  // namespace vgmtrans::formats::rare_snes

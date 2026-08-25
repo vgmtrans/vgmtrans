@@ -107,9 +107,8 @@ struct SonyPs1SampleBodyLayout {
 [[nodiscard]] std::optional<u32> matchSonyPs1SampleBody(core::ByteReader reader, u32 preferredOffset,
                                                         const std::vector<u32>& sampleSizes, bool forceSingle = false);
 
-[[nodiscard]] core::ScanSoundBankRef addSonyPs1Bank(core::ScanResultBuilder& result, const SonyPs1BankLayout& layout,
-                                                    u16 bank);
-[[nodiscard]] std::optional<core::ScanSamplePoolRef> addSonyPs1RawSampleBody(core::ScanResultBuilder& result);
+void addSonyPs1Bank(core::ScanResultBuilder& result, const SonyPs1BankLayout& layout, u16 bank);
+[[nodiscard]] bool addSonyPs1RawSampleBody(core::ScanResultBuilder& result);
 [[nodiscard]] core::SequenceProgram parseSonyPs1Sequence(core::ByteReader reader, core::AssetId id,
                                                          const SonyPs1SequenceLayout& layout,
                                                          core::SourceMapBuilder* sourceMap = nullptr,

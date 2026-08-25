@@ -148,7 +148,7 @@ void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceEn
     }
     for (const auto& articulation : data->articulations) {
       articulations[articulation.articulationId] = AkaoArticulationBinding{
-          .collection = ScanSamplePoolRef{.id = samplePool->metadata.id},
+          .samplePool = samplePool->metadata.id,
           .sampleIndex = articulation.sampleIndex,
           .articulation = articulation,
       };

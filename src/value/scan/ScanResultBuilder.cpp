@@ -180,44 +180,24 @@ ScanMiscDraft& ScanMiscDraft::payload(std::vector<u8> payload) {
 ScanCollectionBuilder::ScanCollectionBuilder(ScanResultBuilder& out, size_t index) : out_(out), index_(index) {
 }
 
-ScanCollectionBuilder& ScanCollectionBuilder::sequence(ScanSequenceRef asset) {
-  out_.validateDraftReference(asset.id, ScanResultBuilder::DraftRole::Sequence);
-  out_.explicitCollection(index_).members.sequence = asset.id;
+ScanCollectionBuilder& ScanCollectionBuilder::sequence(AssetId asset) {
+  out_.explicitCollection(index_).members.sequence = asset;
   return *this;
 }
 
-ScanCollectionBuilder& ScanCollectionBuilder::sequence(const ScanSequenceDraft& asset) {
-  return sequence(asset.ref());
-}
-
-ScanCollectionBuilder& ScanCollectionBuilder::soundBank(ScanSoundBankRef asset) {
-  out_.validateDraftReference(asset.id, ScanResultBuilder::DraftRole::SoundBank);
-  out_.explicitCollection(index_).members.soundBanks.push_back(asset.id);
+ScanCollectionBuilder& ScanCollectionBuilder::soundBank(AssetId asset) {
+  out_.explicitCollection(index_).members.soundBanks.push_back(asset);
   return *this;
 }
 
-ScanCollectionBuilder& ScanCollectionBuilder::soundBank(const ScanSoundBankDraft& asset) {
-  return soundBank(asset.ref());
-}
-
-ScanCollectionBuilder& ScanCollectionBuilder::samplePool(ScanSamplePoolRef asset) {
-  out_.validateDraftReference(asset.id, ScanResultBuilder::DraftRole::SamplePool);
-  out_.explicitCollection(index_).members.samplePools.push_back(asset.id);
+ScanCollectionBuilder& ScanCollectionBuilder::samplePool(AssetId asset) {
+  out_.explicitCollection(index_).members.samplePools.push_back(asset);
   return *this;
 }
 
-ScanCollectionBuilder& ScanCollectionBuilder::samplePool(const ScanSamplePoolDraft& asset) {
-  return samplePool(asset.ref());
-}
-
-ScanCollectionBuilder& ScanCollectionBuilder::misc(ScanMiscAssetRef asset) {
-  out_.validateDraftReference(asset.id, ScanResultBuilder::DraftRole::Misc);
-  out_.explicitCollection(index_).members.miscAssets.push_back(asset.id);
+ScanCollectionBuilder& ScanCollectionBuilder::misc(AssetId asset) {
+  out_.explicitCollection(index_).members.miscAssets.push_back(asset);
   return *this;
-}
-
-ScanCollectionBuilder& ScanCollectionBuilder::misc(const ScanMiscDraft& asset) {
-  return misc(asset.ref());
 }
 
 ScanResultBuilder::ScanResultBuilder(ScanInput input, std::string format)
@@ -417,49 +397,6 @@ CollectionKey ScanResultBuilder::defaultCollectionKey(std::string_view name) con
 
 ExplicitCollection& ScanResultBuilder::explicitCollection(size_t index) {
   return result_.explicitCollections.at(index);
-}
-
-std::string ScanResultBuilder::roleName(DraftRole role) {
-  switch (role) {
-    case DraftRole::Sequence:
-      return "sequence";
-    case DraftRole::SoundBank:
-      return "sound-bank";
-    case DraftRole::SamplePool:
-      return "sample-pool";
-    case DraftRole::Misc:
-      return "misc";
-  }
-  return "unknown";
-}
-
-void ScanResultBuilder::validateDraftReference(AssetId id, DraftRole role) const {
-  for (const auto& slot : drafts_) {
-    const auto found = std::visit([&](const auto& pending) { return pending.id == id; }, slot->value);
-    if (!found) {
-      continue;
-    }
-    const DraftRole actual = std::visit(
-        [](const auto& pending) {
-          using Pending = std::decay_t<decltype(pending)>;
-          if constexpr (std::is_same_v<Pending, PendingSequence>) {
-            return DraftRole::Sequence;
-          } else if constexpr (std::is_same_v<Pending, PendingSoundBank>) {
-            return DraftRole::SoundBank;
-          } else if constexpr (std::is_same_v<Pending, PendingSamplePool>) {
-            return DraftRole::SamplePool;
-          } else {
-            return DraftRole::Misc;
-          }
-        },
-        slot->value);
-    if (actual != role) {
-      throw std::logic_error("ScanResultBuilder collection used " + roleName(actual) + " draft as a " + roleName(role));
-    }
-    return;
-  }
-  throw std::logic_error("ScanResultBuilder collection referenced an unknown " + roleName(role) + " asset id " +
-                         std::to_string(id.value));
 }
 
 void ScanResultBuilder::setSequenceProgram(size_t slot, SequenceProgram program) {

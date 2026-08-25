@@ -410,9 +410,9 @@ struct PanAndAttenuation {
 
 }  // namespace
 
-std::optional<ScanSoundBankRef> addSegSatBank(ScanResultBuilder& builder, const SegSatBankLayout& layout,
-                                              SegSatDriverVersion version, SegSatVolumeModel volumeModel,
-                                              u8 exportBank) {
+std::optional<ScanSoundBankDraft> addSegSatBank(ScanResultBuilder& builder, const SegSatBankLayout& layout,
+                                                SegSatDriverVersion version, SegSatVolumeModel volumeModel,
+                                                u8 exportBank) {
   const ByteReader reader = builder.reader();
   auto parsed = parseInstruments(reader, layout, version);
   if (parsed.empty()) {
@@ -495,7 +495,7 @@ std::optional<ScanSoundBankRef> addSegSatBank(ScanResultBuilder& builder, const 
     }
   }
   instruments.data(std::move(velocityBank));
-  return instruments.ref();
+  return instruments;
 }
 
 SegSatVelocityBank readSegSatVelocityBank(ByteReader reader, const SegSatBankLayout& layout, u8 sourceBank,

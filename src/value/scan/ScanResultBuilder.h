@@ -20,24 +20,6 @@
 
 namespace vgmtrans::core {
 
-// Drafts expose these small durable references when another asset needs to keep
-// the identity but not the draft's authoring surface.
-struct ScanSequenceRef {
-  AssetId id;
-};
-
-struct ScanSoundBankRef {
-  AssetId id;
-};
-
-struct ScanSamplePoolRef {
-  AssetId id;
-};
-
-struct ScanMiscAssetRef {
-  AssetId id;
-};
-
 class ScanResultBuilder;
 
 // Drafts are lightweight views into result-owned pending assets. Creating a
@@ -45,7 +27,6 @@ class ScanResultBuilder;
 // it even when a sound bank or sample pool remains empty.
 class ScanSequenceDraft {
 public:
-  [[nodiscard]] ScanSequenceRef ref() const noexcept { return ScanSequenceRef{.id = id_}; }
   [[nodiscard]] AssetId id() const noexcept { return id_; }
   ScanSequenceDraft& range(SourceRange range);
   ScanSequenceDraft& program(SequenceProgram program);
@@ -65,7 +46,6 @@ private:
 
 class ScanSoundBankDraft {
 public:
-  [[nodiscard]] ScanSoundBankRef ref() const noexcept { return ScanSoundBankRef{.id = id_}; }
   [[nodiscard]] AssetId id() const noexcept { return id_; }
 
   InstrumentSetBuilder::Entry append(Instrument instrument);
@@ -103,7 +83,6 @@ private:
 
 class ScanSamplePoolDraft {
 public:
-  [[nodiscard]] ScanSamplePoolRef ref() const noexcept { return ScanSamplePoolRef{.id = id_}; }
   [[nodiscard]] AssetId id() const noexcept { return id_; }
 
   SamplePoolBuilder::Entry add(u64 sourceKey, Sample sample);
@@ -136,7 +115,6 @@ private:
 
 class ScanMiscDraft {
 public:
-  [[nodiscard]] ScanMiscAssetRef ref() const noexcept { return ScanMiscAssetRef{.id = id_}; }
   [[nodiscard]] AssetId id() const noexcept { return id_; }
   ScanMiscDraft& payload(std::vector<u8> payload);
 
@@ -159,14 +137,14 @@ class ScanCollectionBuilder {
 public:
   ScanCollectionBuilder(ScanResultBuilder& out, size_t index);
 
-  ScanCollectionBuilder& sequence(ScanSequenceRef asset);
-  ScanCollectionBuilder& sequence(const ScanSequenceDraft& asset);
-  ScanCollectionBuilder& soundBank(ScanSoundBankRef asset);
-  ScanCollectionBuilder& soundBank(const ScanSoundBankDraft& asset);
-  ScanCollectionBuilder& samplePool(ScanSamplePoolRef asset);
-  ScanCollectionBuilder& samplePool(const ScanSamplePoolDraft& asset);
-  ScanCollectionBuilder& misc(ScanMiscAssetRef asset);
-  ScanCollectionBuilder& misc(const ScanMiscDraft& asset);
+  ScanCollectionBuilder& sequence(AssetId asset);
+  ScanCollectionBuilder& sequence(const ScanSequenceDraft& asset) { return sequence(asset.id()); }
+  ScanCollectionBuilder& soundBank(AssetId asset);
+  ScanCollectionBuilder& soundBank(const ScanSoundBankDraft& asset) { return soundBank(asset.id()); }
+  ScanCollectionBuilder& samplePool(AssetId asset);
+  ScanCollectionBuilder& samplePool(const ScanSamplePoolDraft& asset) { return samplePool(asset.id()); }
+  ScanCollectionBuilder& misc(AssetId asset);
+  ScanCollectionBuilder& misc(const ScanMiscDraft& asset) { return misc(asset.id()); }
 
 private:
   ScanResultBuilder& out_;
@@ -214,19 +192,10 @@ private:
   friend class ScanSamplePoolDraft;
   friend class ScanMiscDraft;
 
-  enum class DraftRole {
-    Sequence,
-    SoundBank,
-    SamplePool,
-    Misc,
-  };
-
   [[nodiscard]] AssetMetadata metadata(AssetId id, std::string name, SourceRange range) const;
   [[nodiscard]] CollectionKey defaultCollectionKey(std::string_view name) const;
   [[nodiscard]] ExplicitCollection& explicitCollection(size_t index);
-  [[nodiscard]] static std::string roleName(DraftRole role);
 
-  void validateDraftReference(AssetId id, DraftRole role) const;
   void setSequenceRange(size_t slot, SourceRange range);
   void setSequenceProgram(size_t slot, SequenceProgram program);
   void setPrivateData(size_t slot, AssetPrivateData data);

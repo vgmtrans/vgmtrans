@@ -623,13 +623,13 @@ void konamiSnesSynthBuilderGroupsPercussionAndPreservesSampleRules() {
              percussion.regions[2].sample.index() == 4,
          "percussion regions should retain their direct source sample references");
 
-  const auto sparseSources = scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->id, 1));
+  const auto sparseSources = scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->id(), 1));
   expect(sparseSources.size() == 1 && scan.sourceMap.get(sparseSources[0]).range.offset == 0x401c,
          "sparse source program 4 should use dense instrument owner 1");
-  expect(scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->id, 4)).empty(),
+  expect(scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->id(), 4)).empty(),
          "a sparse source program must not be mistaken for a dense annotation owner");
 
-  const auto percussionSources = scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->id, 3));
+  const auto percussionSources = scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->id(), 3));
   expect(percussionSources.size() == 3, "every percussion source entry should point back to the one durable drum kit");
   for (const SourceAnnotationId id : percussionSources) {
     const SourceAnnotation& annotation = scan.sourceMap.get(id);
@@ -639,7 +639,7 @@ void konamiSnesSynthBuilderGroupsPercussionAndPreservesSampleRules() {
            "each drum-kit source record should expose the kit's complete, deduplicated sample relationship");
   }
   for (u32 regionIndex = 0; regionIndex < percussion.regions.size(); ++regionIndex) {
-    expect(scan.sourceMap.ownedBy(ObjectRefs::region(synth->id, 3, regionIndex)).size() == 1,
+    expect(scan.sourceMap.ownedBy(ObjectRefs::region(synth->id(), 3, regionIndex)).size() == 1,
            "each grouped percussion region should retain its own stable source owner");
   }
 }

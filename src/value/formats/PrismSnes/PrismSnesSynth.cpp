@@ -82,8 +82,8 @@ struct Patch {
 
 }  // namespace
 
-std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layout& layout, const std::set<u8>& programs,
-                                         std::string_view displayName) {
+std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
+                                           const std::set<u8>& programs, std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const std::vector<Patch> patches = collectPatches(reader, layout, programs);
   if (patches.empty()) {
@@ -128,7 +128,7 @@ std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layou
         .parent(root)
         .description(fmt::format("SRCN {}, tuning {:.4f} semitones", patch.program, semitones));
   }
-  return instruments.ref();
+  return instruments;
 }
 
 }  // namespace vgmtrans::formats::prism_snes
