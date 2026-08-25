@@ -45,8 +45,8 @@ namespace {
 
 }  // namespace
 
-std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layout& layout, const std::set<u8>& programs,
-                                         std::string_view displayName) {
+std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
+                                           const std::set<u8>& programs, std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const std::vector<InstrumentInfo> instrumentInfo = collectInstruments(reader, layout, programs);
   if (instrumentInfo.empty()) {
@@ -89,7 +89,7 @@ std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layou
         .source("Region", info.source, "compile-snes-region")
         .description(fmt::format("SRCN {}, unity key {:.3f}", info.program, unityKey));
   }
-  return instruments.ref();
+  return instruments;
 }
 
 }  // namespace vgmtrans::formats::compile_snes

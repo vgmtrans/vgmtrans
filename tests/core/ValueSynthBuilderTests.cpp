@@ -260,8 +260,8 @@ void scanResultBuilderOwnsSynthDraftsUntilFinish() {
   ScanResultBuilder result(input, "SynthBuilderProbe");
   auto instruments = result.soundBank("Probe Instruments", input.reader.range(8, 8));
   auto samples = result.samplePool("Probe Samples", input.reader.range(0, 8));
-  const auto instrumentRef = instruments.ref();
-  const auto sampleRef = samples.ref();
+  const AssetId instrumentAssetId = instruments.id();
+  const AssetId sampleAssetId = samples.id();
 
   const auto concreteSample = samples
                                   .add(12,
@@ -283,13 +283,13 @@ void scanResultBuilderOwnsSynthDraftsUntilFinish() {
   expect(instrumentAsset != nullptr && sampleAsset != nullptr,
          "draft creation order should determine materialized asset order");
   expect(
-      instrumentAsset->metadata.id == instrumentRef.id && instrumentAsset->metadata.range == input.reader.range(8, 8),
+      instrumentAsset->metadata.id == instrumentAssetId && instrumentAsset->metadata.range == input.reader.range(8, 8),
       "instrument materialization should use the draft's stable id and accumulated range");
-  expect(sampleAsset->metadata.id == sampleRef.id && sampleAsset->metadata.range == input.reader.range(0, 8),
+  expect(sampleAsset->metadata.id == sampleAssetId && sampleAsset->metadata.range == input.reader.range(0, 8),
          "sample materialization should use the draft's stable id and included range");
-  expect(instrumentAsset->instruments[0].regions[0].sample.owner() == sampleRef.id,
+  expect(instrumentAsset->instruments[0].regions[0].sample.owner() == sampleAssetId,
          "concrete sample references should survive the finish boundary");
-  expect(!scan.sourceMap.ownedBy(ObjectRefs::region(instrumentRef.id, 0, 0)).empty(),
+  expect(!scan.sourceMap.ownedBy(ObjectRefs::region(instrumentAssetId, 0, 0)).empty(),
          "scan-time builders should publish stable region ownership into the finished source map");
 }
 
@@ -353,8 +353,8 @@ void entryValuesAreReadOnlyAndInitialRangesRemainAuthoritative() {
   ScanResultBuilder result(input, "SynthBuilderProbe");
   auto instruments = result.soundBank("Late Instruments");
   auto samples = result.samplePool("Late Samples");
-  const auto instrumentRef = instruments.ref();
-  const auto sampleRef = samples.ref();
+  const AssetId instrumentAssetId = instruments.id();
+  const AssetId sampleAssetId = samples.id();
 
   auto sample = samples.add(0, Sample{.name = "Sample", .encodedData = input.reader.range(32, 9)});
   auto instrument = instruments.add(0, Instrument{.name = "Instrument", .range = input.reader.range(8, 4)});
@@ -376,9 +376,9 @@ void entryValuesAreReadOnlyAndInitialRangesRemainAuthoritative() {
   expect(instrumentAsset->instruments[0].range == input.reader.range(8, 4) &&
              instrumentAsset->instruments[0].regions[0].range == input.reader.range(12, 4),
          "source records should not replace explicit durable ranges");
-  expect(!scan.sourceMap.ownedBy(ObjectRefs::instrument(instrumentRef.id, 0)).empty() &&
-             !scan.sourceMap.ownedBy(ObjectRefs::region(instrumentRef.id, 0, 0)).empty() &&
-             !scan.sourceMap.ownedBy(ObjectRefs::sample(sampleRef.id, 0)).empty(),
+  expect(!scan.sourceMap.ownedBy(ObjectRefs::instrument(instrumentAssetId, 0)).empty() &&
+             !scan.sourceMap.ownedBy(ObjectRefs::region(instrumentAssetId, 0, 0)).empty() &&
+             !scan.sourceMap.ownedBy(ObjectRefs::sample(sampleAssetId, 0)).empty(),
          "read-only entry views should retain durable source owners");
 }
 

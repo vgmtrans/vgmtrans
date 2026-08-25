@@ -164,10 +164,10 @@ struct SegSatRuntimeConfig {
 [[nodiscard]] std::vector<SegSatSequenceLayout> findSegSatSequences(core::ByteReader reader);
 [[nodiscard]] SegSatDriverVersion determineSegSatDriverVersion(core::ByteReader reader);
 [[nodiscard]] SegSatVolumeModel determineSegSatVolumeModel(core::ByteReader reader);
-[[nodiscard]] std::optional<core::ScanSoundBankRef> addSegSatBank(core::ScanResultBuilder& builder,
-                                                                  const SegSatBankLayout& layout,
-                                                                  SegSatDriverVersion version,
-                                                                  SegSatVolumeModel volumeModel, u8 exportBank);
+[[nodiscard]] std::optional<core::ScanSoundBankDraft> addSegSatBank(core::ScanResultBuilder& builder,
+                                                                    const SegSatBankLayout& layout,
+                                                                    SegSatDriverVersion version,
+                                                                    SegSatVolumeModel volumeModel, u8 exportBank);
 [[nodiscard]] SegSatVelocityBank readSegSatVelocityBank(core::ByteReader reader, const SegSatBankLayout& layout,
                                                         u8 sourceBank, SegSatVolumeModel volumeModel);
 void finalizeSegSatPerformance(core::PerformanceSequence& performance, std::span<const SegSatVelocityBank> banks,

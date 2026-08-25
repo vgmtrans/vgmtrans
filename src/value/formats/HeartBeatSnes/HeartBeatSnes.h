@@ -55,9 +55,9 @@ struct SequenceParse {
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
 [[nodiscard]] core::SequenceRuntime sequenceRuntime();
 [[nodiscard]] core::Envelope driverEnvelope(u8 adsr1, u8 adsr2);
-[[nodiscard]] std::optional<core::ScanSoundBankRef> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
-                                                             const std::set<u8>& programs,
-                                                             std::string_view displayName);
+[[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
+                                                               const std::set<u8>& programs,
+                                                               std::string_view displayName);
 [[nodiscard]] core::FormatModule module();
 
 }  // namespace vgmtrans::formats::heartbeat_snes

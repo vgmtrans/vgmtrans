@@ -93,8 +93,8 @@ struct Patch {
 
 }  // namespace
 
-std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layout& layout, const std::set<u8>& programs,
-                                         std::string_view displayName) {
+std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
+                                           const std::set<u8>& programs, std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const std::vector<Patch> patches = collectPatches(reader, layout, programs);
   if (patches.empty()) {
@@ -135,7 +135,7 @@ std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layou
         .source("Region", patch.source, "heartbeat-snes-region")
         .description(fmt::format("SRCN {}, scale ${:04X}", patch.srcn, patch.pitchScale));
   }
-  return instruments.ref();
+  return instruments;
 }
 
 }  // namespace vgmtrans::formats::heartbeat_snes

@@ -61,9 +61,9 @@ struct SequenceParse {
                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
 [[nodiscard]] PatchTable parsePatches(core::ByteReader reader, const Layout& layout);
-[[nodiscard]] std::optional<core::ScanSoundBankRef> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
-                                                             const std::set<u8>& programs, const PatchTable& patches,
-                                                             std::string_view displayName);
+[[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
+                                                               const std::set<u8>& programs, const PatchTable& patches,
+                                                               std::string_view displayName);
 [[nodiscard]] core::FormatModule module();
 
 }  // namespace vgmtrans::formats::falcom_snes

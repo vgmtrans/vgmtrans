@@ -69,7 +69,7 @@ namespace {
   for (u32 index = 0; index < bankLayouts.size(); ++index) {
     const auto& layout = bankLayouts[index];
     const u16 bank = numbers[index];
-    static_cast<void>(addSonyPs1Bank(result, layout, bank));
+    addSonyPs1Bank(result, layout, bank);
   }
 
   for (const auto& layout : sequenceLayouts) {

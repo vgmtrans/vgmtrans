@@ -309,8 +309,8 @@ void addAkaoSnesInstruments(InstrumentSetBuilder& instruments, ByteReader reader
 
 }  // namespace
 
-std::optional<ScanSoundBankRef> addAkaoSnesSynth(ScanResultBuilder& builder, const AkaoSnesLayout& layout,
-                                                 std::string_view displayName) {
+std::optional<ScanSoundBankDraft> addAkaoSnesSynth(ScanResultBuilder& builder, const AkaoSnesLayout& layout,
+                                                   std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const auto instrumentInfos = parseAkaoSnesInstrumentInfos(reader, layout, &builder.diagnostics());
   if (instrumentInfos.empty() || !layout.spcDirAddress) {
@@ -326,7 +326,7 @@ std::optional<ScanSoundBankRef> addAkaoSnesSynth(ScanResultBuilder& builder, con
 
   addAkaoSnesInstruments(instruments.builder(), reader, layout, instrumentInfos, sampleRefs);
 
-  return instruments.ref();
+  return instruments;
 }
 
 }  // namespace vgmtrans::formats::akao_snes

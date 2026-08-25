@@ -1020,12 +1020,12 @@ void capcomSnesInstrumentTableSkipsBlankSlotsLikeLegacy() {
          "CapcomSnes builder should retain both sparse instruments");
   expect(builtInstruments->instruments[1].identity && builtInstruments->instruments[1].identity->key == 2,
          "a sparse source identity should remain distinct from its dense model position");
-  const auto secondInstrumentSources = scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->id, 1));
+  const auto secondInstrumentSources = scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->id(), 1));
   expect(secondInstrumentSources.size() == 1 && scan.sourceMap.get(secondInstrumentSources[0]).range.offset == 0x400c,
          "CapcomSnes annotations should use dense instrument ownership while preserving sparse source ranges");
-  expect(scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->id, 2)).empty(),
+  expect(scan.sourceMap.ownedBy(ObjectRefs::instrument(synth->id(), 2)).empty(),
          "a sparse source program must not leak into the dense annotation owner");
-  expect(scan.sourceMap.ownedBy(ObjectRefs::region(synth->id, 1, 0)).size() == 1,
+  expect(scan.sourceMap.ownedBy(ObjectRefs::region(synth->id(), 1, 0)).size() == 1,
          "CapcomSnes sparse instruments should expose stable region ownership");
 
   std::vector<u8> fullTable(0x10000);

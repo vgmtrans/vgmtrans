@@ -282,24 +282,6 @@ void scanResultBuilderRejectsIncompleteSequenceDrafts() {
   expect(threw, "scan result builder should reject a sequence draft that was never given a program");
 }
 
-void scanResultBuilderRejectsWrongRoleHandleReuse() {
-  SourceStore sources;
-  const SourceId source = sources.add(SourceFile{.name = "builder-wrong-role.probe"}, {0xaa});
-  ScanIdAllocator ids;
-  ScanInput input{.source = sources.source(source), .reader = sources.reader(source), .ids = ids};
-
-  ScanResultBuilder out(input, "ProbeBuilder");
-  const auto sequence = out.sequence("Sequence").program(SequenceProgram{});
-
-  bool threw = false;
-  try {
-    out.collection("Broken").soundBank(ScanSoundBankRef{.id = sequence.id()});
-  } catch (const std::logic_error&) {
-    threw = true;
-  }
-  expect(threw, "scan result builder should reject using one handle id with the wrong role");
-}
-
 void scanResultBuilderPublishesEmptySynthDrafts() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "builder-sample-ref.probe"}, {0xaa});
@@ -356,7 +338,6 @@ void runValueRegistryTests() {
   scanResultBuilderCoversCommonScannerPlumbing();
   scanResultBuilderNamesSourceCollections();
   scanResultBuilderRejectsIncompleteSequenceDrafts();
-  scanResultBuilderRejectsWrongRoleHandleReuse();
   scanResultBuilderPublishesEmptySynthDrafts();
   scanResultBuilderCursorReportsMalformedFields();
   sessionStoresTheOwningFormatsPreferredSampleFilter();

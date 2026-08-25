@@ -104,13 +104,13 @@ struct CpsLayout {
                                                       core::SourceMapBuilder* sourceMap = nullptr,
                                                       std::vector<core::Diagnostic>* diagnostics = nullptr);
 
-struct Cps1SynthRefs {
-  std::optional<core::ScanSoundBankRef> ym2151;
-  std::optional<core::ScanSoundBankRef> oki;
+struct Cps1SynthDrafts {
+  std::optional<core::ScanSoundBankDraft> ym2151;
+  std::optional<core::ScanSoundBankDraft> oki;
 };
 
-[[nodiscard]] Cps1SynthRefs addCps1Synth(core::ScanResultBuilder& builder, CpsLayout& layout);
-[[nodiscard]] core::ScanSoundBankRef addCpsQSoundSynth(core::ScanResultBuilder& builder, const CpsLayout& layout);
+[[nodiscard]] Cps1SynthDrafts addCps1Synth(core::ScanResultBuilder& builder, CpsLayout& layout);
+[[nodiscard]] core::ScanSoundBankDraft addCpsQSoundSynth(core::ScanResultBuilder& builder, const CpsLayout& layout);
 
 [[nodiscard]] const core::SequenceProgramConfig& cps1V1SequenceConfig();
 [[nodiscard]] const core::SequenceProgramConfig& cpsEarlySequenceConfig();

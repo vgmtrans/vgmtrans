@@ -21,7 +21,7 @@ namespace {
 
 struct BankAssets {
   SegSatBankLayout layout;
-  ScanSoundBankRef bank;
+  ScanSoundBankDraft bank;
 };
 
 [[nodiscard]] CollectionKey collectionKey(SourceId source, const SegSatSequenceLayout& sequence) {

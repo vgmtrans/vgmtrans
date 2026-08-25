@@ -185,7 +185,7 @@ struct AkaoSamplePoolData {
 };
 
 struct AkaoArticulationBinding {
-  core::ScanSamplePoolRef collection;
+  core::AssetId samplePool;
   u32 sampleIndex = 0;
   AkaoArticulation articulation;
 };

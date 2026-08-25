@@ -26,7 +26,7 @@ namespace {
   }
 
   ScanResultBuilder result(input, std::string(kSuzukiPs1FormatName));
-  std::vector<ScanSoundBankRef> banks;
+  std::vector<ScanSoundBankDraft> banks;
   std::vector<SuzukiPs1Instrument> instruments;
   for (const auto& layout : bankLayouts) {
     if (auto bank = addSuzukiPs1Bank(result, layout)) {

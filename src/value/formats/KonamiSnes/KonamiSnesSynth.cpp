@@ -287,9 +287,9 @@ void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader read
 
 }  // namespace
 
-std::optional<ScanSoundBankRef> addKonamiSnesSynth(ScanResultBuilder& builder, const KonamiSnesLayout& layout,
-                                                   const std::vector<KonamiSnesInstrumentInfo>& instrumentInfos,
-                                                   std::string_view displayName) {
+std::optional<ScanSoundBankDraft> addKonamiSnesSynth(ScanResultBuilder& builder, const KonamiSnesLayout& layout,
+                                                     const std::vector<KonamiSnesInstrumentInfo>& instrumentInfos,
+                                                     std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const auto sampleCatalog = parseKonamiSnesSampleInfos(reader, *layout.spcDirAddress, instrumentInfos);
   // Do not publish half of a synth. A sound bank without sample data (or
@@ -303,7 +303,7 @@ std::optional<ScanSoundBankRef> addKonamiSnesSynth(ScanResultBuilder& builder, c
 
   addKonamiSnesInstruments(instruments.builder(), reader, instrumentInfos, sampleRefs);
 
-  return instruments.ref();
+  return instruments;
 }
 
 }  // namespace vgmtrans::formats::konami_snes

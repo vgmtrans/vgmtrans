@@ -362,8 +362,8 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
 
 }  // namespace
 
-std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layout& layout,
-                                         const SequenceRecipes& recipes, std::string_view displayName) {
+std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
+                                           const SequenceRecipes& recipes, std::string_view displayName) {
   if (!layout.instrumentTableAddress || !layout.spcDirAddress) {
     return std::nullopt;
   }
@@ -381,7 +381,7 @@ std::optional<ScanSoundBankRef> addSynth(ScanResultBuilder& builder, const Layou
   auto instrumentDraft = builder.soundBank(fmt::format("{} Instruments", displayName));
   const SnesBrrSampleRefs sampleRefs = addSnesBrrSamples(instrumentDraft.samples(), reader, catalog);
   addInstruments(instrumentDraft.builder(), reader, layout, recipes, instruments, sampleRefs);
-  return instrumentDraft.ref();
+  return instrumentDraft;
 }
 
 }  // namespace vgmtrans::formats::nin_snes

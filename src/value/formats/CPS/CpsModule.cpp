@@ -117,7 +117,7 @@ void annotateArticulationTable(SourceMapBuilder& sourceMap, ByteReader reader, c
     return result.finish();
   }
 
-  std::vector<ScanMiscAssetRef> miscAssets;
+  std::vector<AssetId> miscAssets;
   const auto addTable = [&](std::string name, std::string_view kind, u32 offset,
                             u32 size) -> std::optional<SourceAnnotationId> {
     if (size == 0 || !input.reader.has(offset, size)) {
@@ -128,7 +128,7 @@ void annotateArticulationTable(SourceMapBuilder& sourceMap, ByteReader reader, c
     const auto misc = result.misc(name, range).payload(std::vector<u8>(bytes.begin(), bytes.end()));
     const SourceAnnotationId table =
         result.sourceMap().table(name, range).owner(ObjectRefs::misc(misc.id())).kind(kind).id();
-    miscAssets.push_back(misc.ref());
+    miscAssets.push_back(misc.id());
     return table;
   };
 
@@ -149,8 +149,8 @@ void annotateArticulationTable(SourceMapBuilder& sourceMap, ByteReader reader, c
     }
   }
 
-  Cps1SynthRefs cps1Synth;
-  std::optional<ScanSoundBankRef> qsoundSynth;
+  Cps1SynthDrafts cps1Synth;
+  std::optional<ScanSoundBankDraft> qsoundSynth;
   if (isCps1(layout->version)) {
     cps1Synth = addCps1Synth(result, *layout);
   } else {

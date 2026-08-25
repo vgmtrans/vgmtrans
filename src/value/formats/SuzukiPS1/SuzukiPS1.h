@@ -68,7 +68,7 @@ struct SuzukiPs1Instrument {
 };
 
 struct SuzukiPs1ScannedBank {
-  core::ScanSoundBankRef bank;
+  core::ScanSoundBankDraft bank;
   std::vector<SuzukiPs1Instrument> instruments;
 };
 

@@ -189,7 +189,7 @@ std::optional<SuzukiPs1ScannedBank> addSuzukiPs1Bank(ScanResultBuilder& result, 
   }
 
   return SuzukiPs1ScannedBank{
-      .bank = instruments.ref(),
+      .bank = instruments,
       .instruments = std::move(parsed),
   };
 }
