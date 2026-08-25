@@ -301,15 +301,14 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
   }
 
   std::unordered_set<u32> removedAnnotations;
-  for (const auto& annotation : sourceMap_.annotations()) {
-    const bool removedSource = annotation.range.valid() && sourceIds.contains(annotation.range.source.value);
-    if (removedSource) {
-      removedAnnotations.insert(annotation.id.value);
-      continue;
+  for (const u32 source : sourceIds) {
+    for (const SourceAnnotationId annotation : sourceMap_.annotationsForSource(SourceId{source})) {
+      removedAnnotations.insert(annotation.value);
     }
-    const auto owner = sourceMap_.assetOwner(annotation.id);
-    if (owner && assetIds.contains(owner->value)) {
-      removedAnnotations.insert(annotation.id.value);
+  }
+  for (const u32 asset : assetIds) {
+    for (const SourceAnnotationId annotation : sourceMap_.annotationsForAsset(AssetId{asset})) {
+      removedAnnotations.insert(annotation.value);
     }
   }
 
