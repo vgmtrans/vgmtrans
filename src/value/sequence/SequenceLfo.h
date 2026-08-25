@@ -49,7 +49,7 @@ public:
   // depth value.
   void clearFade() {
     fadePlan_.reset();
-    fade_.clearMotion();
+    fade_.clear();
     fade_.clearAutomation();
   }
 
@@ -102,7 +102,7 @@ public:
 private:
   s32 targetDepth_ = 0;
   std::optional<SequenceMotionPlan<s32>> fadePlan_;
-  PerformanceBoundValue<SequenceAutomatedValue<s32>> fade_;
+  PerformanceBoundValue<SequenceLinearMotion<s32>> fade_;
   double lastPhysicalDepth_ = 0.0;
 };
 

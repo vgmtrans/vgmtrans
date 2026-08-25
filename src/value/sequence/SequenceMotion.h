@@ -135,6 +135,15 @@ public:
             false};
   }
 
+  template <typename Apply>
+  [[nodiscard]] SequenceMotionTick<ValueType> begin(const SequenceMotionPlan<ValueType>& plan, Apply&& apply) {
+    const auto motionTick = begin(plan);
+    if (motionTick.status == SequenceMotionStatus::Finished && motionTick.changed) {
+      std::forward<Apply>(apply)(motionTick.current);
+    }
+    return motionTick;
+  }
+
   [[nodiscard]] bool active() const {
     return delay_ != 0 ||
            (mode_ == SequenceMotionMode::TargetByStep ? step_ != ValueType{} : ticksRemaining_ != 0);
@@ -183,44 +192,6 @@ public:
     return {SequenceMotionStatus::Running, previous, current_, current_ != previous};
   }
 
-private:
-  ValueType current_ {};
-  ValueType target_ {};
-  ValueType step_ {};
-  u32 delay_ = 0;
-  u32 ticksRemaining_ = 0;
-  SequenceMotionMode mode_ = SequenceMotionMode::TargetOverTicks;
-};
-
-template <typename ValueType>
-class SequenceAutomatedValue {
-public:
-  void reset(ValueType current = {}) { motion_.reset(current); }
-  void setCurrent(ValueType current) { motion_.setCurrent(current); }
-  void setCurrentPreservingMotion(ValueType current) { motion_.setCurrentPreservingMotion(current); }
-  void clearMotion() { motion_.clear(); }
-
-  [[nodiscard]] bool active() const { return motion_.active(); }
-  [[nodiscard]] ValueType current() const { return motion_.current(); }
-  [[nodiscard]] ValueType target() const { return motion_.target(); }
-  [[nodiscard]] ValueType step() const { return motion_.step(); }
-  [[nodiscard]] bool usesTicks() const { return motion_.usesTicks(); }
-
-  [[nodiscard]] SequenceMotionTick<ValueType> begin(const SequenceMotionPlan<ValueType>& plan) {
-    return motion_.begin(plan);
-  }
-
-  template <typename Apply>
-  [[nodiscard]] SequenceMotionTick<ValueType> begin(const SequenceMotionPlan<ValueType>& plan, Apply&& apply) {
-    const auto tick = begin(plan);
-    if (tick.status == SequenceMotionStatus::Finished && tick.changed) {
-      std::forward<Apply>(apply)(tick.current);
-    }
-    return tick;
-  }
-
-  [[nodiscard]] SequenceMotionTick<ValueType> tick() { return motion_.tick(); }
-
   template <typename Apply>
   [[nodiscard]] SequenceMotionTick<ValueType> tickChanged(Apply&& apply, bool applyDelayedStep = false) {
     const auto motionTick = tick();
@@ -231,36 +202,29 @@ public:
   }
 
 private:
-  SequenceLinearMotion<ValueType> motion_;
+  ValueType current_{};
+  ValueType target_{};
+  ValueType step_{};
+  u32 delay_ = 0;
+  u32 ticksRemaining_ = 0;
+  SequenceMotionMode mode_ = SequenceMotionMode::TargetOverTicks;
 };
 
-template <typename ValueType, unsigned FractionBits = 8>
-struct SequenceFixedPointMotionPlan {
+template <typename ValueType = s32, unsigned FractionBits = 8>
+struct SequenceFixedPointMotion {
   ValueType targetRaw {};
   ValueType stepFixed {};
   u32 ticks = 0;
   u32 delay = 0;
   SequenceMotionMode mode = SequenceMotionMode::TargetOverTicks;
 
-  [[nodiscard]] static SequenceFixedPointMotionPlan targetRawOverTicks(ValueType targetValue, u32 tickCount,
-                                                                       u32 delayTicks = 0) {
+  [[nodiscard]] static SequenceFixedPointMotion toRawTarget(ValueType targetValue, u32 tickCount, u32 delayTicks = 0) {
     return {targetValue, {}, tickCount, delayTicks, SequenceMotionMode::TargetOverTicks};
   }
 
-  [[nodiscard]] static SequenceFixedPointMotionPlan targetRawOverTicksWithStepFixed(ValueType targetValue,
-                                                                                    ValueType stepValue,
-                                                                                    u32 tickCount,
-                                                                                    u32 delayTicks = 0) {
-    return {targetValue, stepValue, tickCount, delayTicks, SequenceMotionMode::TargetOverTicksWithStep};
-  }
-
-  [[nodiscard]] static SequenceFixedPointMotionPlan targetRawByStepFixed(ValueType targetValue, ValueType stepValue,
-                                                                         u32 delayTicks = 0) {
+  [[nodiscard]] static SequenceFixedPointMotion toRawTargetByFixedStep(ValueType targetValue, ValueType stepValue,
+                                                                       u32 delayTicks = 0) {
     return {targetValue, stepValue, 0, delayTicks, SequenceMotionMode::TargetByStep};
-  }
-
-  [[nodiscard]] bool usesTicks() const {
-    return mode != SequenceMotionMode::TargetByStep;
   }
 };
 
@@ -282,7 +246,6 @@ public:
   void reset(ValueType rawCurrent = {}) { value_.reset(toFixed(rawCurrent)); }
   void setCurrentRaw(ValueType rawCurrent) { value_.setCurrent(toFixed(rawCurrent)); }
   void setCurrentFixedPreservingMotion(ValueType fixedCurrent) { value_.setCurrentPreservingMotion(fixedCurrent); }
-  void clearMotion() { value_.clearMotion(); }
 
   [[nodiscard]] bool active() const { return value_.active(); }
   [[nodiscard]] ValueType currentFixed() const { return value_.current(); }
@@ -302,7 +265,7 @@ public:
   }
 
   [[nodiscard]] SequenceMotionTick<ValueType> begin(
-      const SequenceFixedPointMotionPlan<ValueType, FractionBits>& rawMotion) {
+      const SequenceFixedPointMotion<ValueType, FractionBits>& rawMotion) {
     value_.setCurrentPreservingMotion(toFixed(currentRaw()));
     SequenceMotionPlan<ValueType> fixedMotion{
         toFixed(rawMotion.targetRaw),
@@ -319,8 +282,8 @@ public:
   }
 
   template <typename ApplyRaw>
-  [[nodiscard]] SequenceMotionTick<ValueType> begin(
-      const SequenceFixedPointMotionPlan<ValueType, FractionBits>& rawMotion, ApplyRaw&& applyRaw) {
+  [[nodiscard]] SequenceMotionTick<ValueType> begin(const SequenceFixedPointMotion<ValueType, FractionBits>& rawMotion,
+                                                    ApplyRaw&& applyRaw) {
     const ValueType previousRaw = currentRaw();
     const auto motionTick = begin(rawMotion);
     const ValueType nextRaw = currentRaw();
@@ -361,21 +324,8 @@ private:
     return static_cast<ValueType>(-((static_cast<ValueType>(-fixedValue) + kScale - 1) / kScale));
   }
 
-  SequenceAutomatedValue<ValueType> value_;
+  SequenceLinearMotion<ValueType> value_;
   SequenceFixedPointRounding rounding_ = SequenceFixedPointRounding::Floor;
-};
-
-template <typename ValueType = s32, unsigned FractionBits = 8>
-struct SequenceFixedPointMotion {
-  using Plan = SequenceFixedPointMotionPlan<ValueType, FractionBits>;
-
-  [[nodiscard]] static Plan toRawTarget(ValueType targetRaw, u32 ticks, u32 delay = 0) {
-    return Plan::targetRawOverTicks(targetRaw, ticks, delay);
-  }
-
-  [[nodiscard]] static Plan toRawTargetByFixedStep(ValueType targetRaw, ValueType stepFixed, u32 delay = 0) {
-    return Plan::targetRawByStepFixed(targetRaw, stepFixed, delay);
-  }
 };
 
 }  // namespace vgmtrans::core

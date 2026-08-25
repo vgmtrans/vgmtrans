@@ -250,7 +250,7 @@ void performanceBoundValueOwnsReplacementLifecycle() {
   u32 nextNote = 0;
   u32 nextAutomation = 0;
   PerformanceEmitter out{track, CommandId{9}, SourceAnnotationId{11}, 0, nextSequence, nextNote, nextAutomation};
-  PerformanceBoundValue<SequenceAutomatedValue<double>> value;
+  PerformanceBoundValue<SequenceLinearMotion<double>> value;
   value.reset(0.0);
 
   static_cast<void>(value.begin(out.fade(PerformanceAutomationTarget::Level, 1.0, 8),

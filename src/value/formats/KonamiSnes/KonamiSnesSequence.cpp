@@ -747,7 +747,7 @@ struct Playback {
     const u8 clampedDestination = target == FadeTarget::Pan ? clampPan(track.version, destination) : destination;
     // Versions 1-4 provide a duration and let the driver calculate the step.
     // Versions 5-6 provide the signed step directly and stop at the target.
-    const SequenceFixedPointMotionPlan<s32> motion =
+    const SequenceFixedPointMotion<s32> motion =
         stepBased
             ? SequenceFixedPointMotion<s32>::toRawTargetByFixedStep(clampedDestination, static_cast<s32>(step) * 16)
             : SequenceFixedPointMotion<s32>::toRawTarget(clampedDestination, ticks);
