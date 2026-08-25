@@ -39,7 +39,7 @@ target_sources(vgmtrans-value-core-tests
     core/ValueSynthExportTests.cpp
     core/ValueCoreTests.cpp
 )
-target_link_libraries(vgmtrans-value-core-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
+target_link_libraries(vgmtrans-value-core-tests PRIVATE vgmtransvalueformats vgmtransvaluecore ZLIB::ZLIB)
 target_compile_features(vgmtrans-value-core-tests PRIVATE cxx_std_20)
 
 add_test(NAME vgmtrans-value-core-tests COMMAND vgmtrans-value-core-tests)
@@ -54,7 +54,7 @@ add_test(NAME vgmtrans-compile-snes-tests COMMAND vgmtrans-compile-snes-tests)
 add_executable(vgmtrans-mp2k-tests
   formats/Mp2kModuleTests.cpp
   formats/Mp2kTestMain.cpp)
-target_link_libraries(vgmtrans-mp2k-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
+target_link_libraries(vgmtrans-mp2k-tests PRIVATE vgmtransvalueformats vgmtransvaluecore ZLIB::ZLIB)
 target_compile_features(vgmtrans-mp2k-tests PRIVATE cxx_std_20)
 add_test(NAME vgmtrans-mp2k-tests COMMAND vgmtrans-mp2k-tests)
 
