@@ -124,11 +124,11 @@ struct QSoundSampleInfo {
 [[nodiscard]] u8 cps1VolumeAttenuation(u8 volume) {
   const u16 mixed = ((static_cast<u16>(volume) << 8) | (volume >> 4)) & 0x0f07;
   const u8 keyScaleAttenuation = static_cast<u8>(mixed >> 8);
-  const u8 rotated = 0xfe;
+  constexpr u8 rotated = 0xfe;
   u8 product = static_cast<u8>((((rotated << 1) | (rotated >> 7)) & 0xf0) >> 4);
   product = static_cast<u8>(product * ((static_cast<s8>(mixed) << 1) & 0x0f));
   product >>= 4;
-  if ((rotated & 0x80) != 0) {
+  if constexpr ((rotated & 0x80) != 0) {
     product = static_cast<u8>(-product);
   }
   return static_cast<u8>(std::min<int>(static_cast<s8>(product) + 0x10 + keyScaleAttenuation, 0x7f));

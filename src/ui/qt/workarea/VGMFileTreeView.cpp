@@ -294,8 +294,8 @@ VGMFileTreeView::VGMFileTreeView(std::shared_ptr<const vgmtrans::core::SourceIns
         item = new QTreeWidgetItem(group);
         item->setFlags(item->flags() & ~Qt::ItemIsSelectable);
       } else {
-        if (auto* parent = item->parent()) {
-          parent->removeChild(item);
+        if (auto* parentItem = item->parent()) {
+          parentItem->removeChild(item);
         } else {
           takeTopLevelItem(indexOfTopLevelItem(item));
         }
