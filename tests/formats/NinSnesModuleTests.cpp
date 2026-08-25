@@ -1309,7 +1309,7 @@ void ninSnesEarlierPercussionUsesSeparateSixByteTable() {
          "the percussion row's sixth byte should determine the exported drum pitch");
 
   const auto drumSource = std::ranges::find_if(scan.sourceMap.annotations(), [](const SourceAnnotation& annotation) {
-    return annotation.localKind == "nin-snes-drum-region";
+    return annotation.category() == "nin-snes-drum-region";
   });
   expect(drumSource != scan.sourceMap.annotations().end() && drumSource->fieldsAsChildren,
          "NinSnes drum records should opt their exact fields into TreeView child projection");

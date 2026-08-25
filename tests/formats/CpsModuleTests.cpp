@@ -511,7 +511,7 @@ const SourceAnnotation& miscRoot(const ScanResult& result, const MiscAsset& misc
   const auto roots = result.sourceMap.ownedBy(ObjectRefs::misc(misc.metadata.id));
   expect(roots.size() == 1, "misc asset should have exactly one explicitly owned annotation root");
   const auto& root = result.sourceMap.get(roots.front());
-  expect(root.role == SourceRole::Table && root.localKind == kind && root.range == misc.metadata.range,
+  expect(root.role == SourceRole::Table && root.category() == kind && root.range == misc.metadata.range,
          "misc asset annotation root should describe its complete typed table");
   return root;
 }
@@ -615,7 +615,7 @@ void cps1ModuleRetainsYm2151AndOkiDomains() {
   const auto& sequenceTable = miscAt(result, 0x106, 2);
   const auto& sequenceTableRoot = miscRoot(result, sequenceTable, "cps-sequence-pointer-table");
   const auto& sequencePointer = onlyChild(result, sequenceTableRoot);
-  expect(sequencePointer.role == SourceRole::Pointer && sequencePointer.localKind == "cps-sequence-pointer" &&
+  expect(sequencePointer.role == SourceRole::Pointer && sequencePointer.category() == "cps-sequence-pointer" &&
              sequencePointer.range.offset == 0x106 && sequencePointer.range.size == 2 &&
              fieldMatches(sequencePointer, "encoded_pointer", 0x106, 2, 0x500) && pointsTo(sequencePointer, 0x500),
          "CPS1 misc sequence table should annotate its big-endian pointer and resolved target");
@@ -687,7 +687,7 @@ void cps2EarlyModuleUsesPhysicalModulation() {
 
   const auto& sampleTable = miscAt(result, 0x200, 8);
   const auto& sampleInfo = onlyChild(result, miscRoot(result, sampleTable, "cps-qsound-sample-info-table"));
-  expect(sampleInfo.role == SourceRole::TableEntry && sampleInfo.localKind == "cps-qsound-sample-info" &&
+  expect(sampleInfo.role == SourceRole::TableEntry && sampleInfo.category() == "cps-qsound-sample-info" &&
              sampleInfo.fieldsAsChildren && fieldMatches(sampleInfo, "bank", 0x200, 1, 0) &&
              fieldMatches(sampleInfo, "start_offset", 0x201, 2, 0) &&
              fieldMatches(sampleInfo, "loop_offset", 0x203, 2, 0) &&
@@ -697,7 +697,7 @@ void cps2EarlyModuleUsesPhysicalModulation() {
 
   const auto& articulationTable = miscAt(result, 0x300, 0x800);
   const auto& articulation = onlyChild(result, miscRoot(result, articulationTable, "cps-qsound-articulation-table"));
-  expect(articulation.role == SourceRole::TableEntry && articulation.localKind == "cps-qsound-articulation" &&
+  expect(articulation.role == SourceRole::TableEntry && articulation.category() == "cps-qsound-articulation" &&
              articulation.fieldsAsChildren && fieldMatches(articulation, "attack_rate", 0x300, 1, 63) &&
              fieldMatches(articulation, "decay_rate", 0x301, 1, 63) &&
              fieldMatches(articulation, "sustain_level", 0x302, 1, 127) &&

@@ -408,8 +408,8 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
   const SourceAnnotation* programSource =
       programSources.empty() ? nullptr : combinedSources.find(programSources.front());
   const SourceAnnotation* toneSource = toneSources.empty() ? nullptr : combinedSources.find(toneSources.front());
-  expect(programSource != nullptr && programSource->localKind == "sony-ps1-program" &&
-             programSource->fieldsAsChildren && toneSource != nullptr && toneSource->localKind == "sony-ps1-tone" &&
+  expect(programSource != nullptr && programSource->category() == "sony-ps1-program" &&
+             programSource->fieldsAsChildren && toneSource != nullptr && toneSource->category() == "sony-ps1-tone" &&
              toneSource->fieldsAsChildren,
          "VAB program and tone attributes should appear as selectable virtual children");
 

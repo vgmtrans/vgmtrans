@@ -551,7 +551,7 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
 
 const SequenceProgramConfig& capcomSnesSequenceConfig() {
   static const SequenceProgramConfig config = SequenceProgramConfig{
-      .commandDetailKindPrefix = "capcom-snes",
+      .commandKindPrefix = "capcom-snes",
       .timebase = Timebase{.ppqn = kCapcomSnesPpqn},
       .behavior =
           SequenceProgramBehavior{

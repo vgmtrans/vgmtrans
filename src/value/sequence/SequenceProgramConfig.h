@@ -13,7 +13,7 @@
 namespace vgmtrans::core {
 
 struct SequenceProgramConfig {
-  std::string commandDetailKindPrefix;
+  std::string commandKindPrefix;
   Timebase timebase;
   SequenceProgramBehavior behavior;
 

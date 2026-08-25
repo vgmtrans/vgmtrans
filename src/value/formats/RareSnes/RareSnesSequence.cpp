@@ -1797,7 +1797,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 [[nodiscard]] SequenceProgramConfig makeSequenceConfig() {
   return SequenceProgramConfig{
-      .commandDetailKindPrefix = "rare-snes",
+      .commandKindPrefix = "rare-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
           SequenceProgramBehavior{

@@ -463,9 +463,9 @@ void scannerBuildsTunedSynthAndCollection() {
     });
   });
   const auto header = std::ranges::find_if(
-      headers, [&](SourceAnnotationId id) { return sourceMap.get(id).localKind == "wolf-team-snes-sequence-header"; });
+      headers, [&](SourceAnnotationId id) { return sourceMap.get(id).category() == "wolf-team-snes-sequence-header"; });
   const auto table = std::ranges::find_if(tables, [&](SourceAnnotationId id) {
-    return sourceMap.get(id).localKind == "wolf-team-snes-stream-pointer-table";
+    return sourceMap.get(id).category() == "wolf-team-snes-stream-pointer-table";
   });
   const auto note =
       std::ranges::find_if(commands, [&](SourceAnnotationId id) { return sourceMap.get(id).range.offset == 0x6000; });
@@ -474,10 +474,10 @@ void scannerBuildsTunedSynthAndCollection() {
              sourceMap.get(*table).range == SourceRange{.source = source, .offset = 0x5000, .size = 4} &&
              std::ranges::count_if(pointers,
                                    [&](SourceAnnotationId id) {
-                                     return sourceMap.get(id).localKind == "wolf-team-snes-stream-pointer";
+                                     return sourceMap.get(id).category() == "wolf-team-snes-stream-pointer";
                                    }) == 1 &&
              !commandHasStreamTargetFanout && note != commands.end() &&
-             sourceMap.get(*note).detailKind == "wolf-team-snes.note" &&
+             sourceMap.get(*note).kind == "wolf-team-snes.note" &&
              sourceMap.get(*note).range == SourceRange{.source = source, .offset = 0x6000, .size = 4},
          "sequence headers, stream tables, pointers, and exact command bytes should be connected in the source map");
 }

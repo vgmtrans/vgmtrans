@@ -47,11 +47,11 @@ void writeBytes(std::vector<u8>& bytes, size_t offset, const std::array<u8, Size
 }
 
 const SourceAnnotation* annotationWithKind(const SourceMap& sourceMap, SourceId source, SourceRole role,
-                                           std::string_view localKind) {
+                                           std::string_view category) {
   const auto annotations = sourceMap.withRole(source, role);
   for (const SourceAnnotationId id : annotations) {
     const SourceAnnotation& annotation = sourceMap.get(id);
-    if (annotation.localKind == localKind) {
+    if (annotation.category() == category) {
       return &annotation;
     }
   }
@@ -422,11 +422,11 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
 
   const TrackProgram& track = sequence->program.tracks.front();
   expect(track.commands.size() == 7, "KonamiSnes fixture should decode tempo, setup, note, and end commands");
-  constexpr std::array<std::string_view, 7> expectedCommandDetailKinds{
+  constexpr std::array<std::string_view, 7> expectedCommandKinds{
       "konami-snes.tempo",   "konami-snes.program", "konami-snes.volume", "konami-snes.pan",
       "konami-snes.vibrato", "konami-snes.note",    "konami-snes.end"};
-  for (size_t index = 0; index < expectedCommandDetailKinds.size(); ++index) {
-    expect(commandDetailKind(project.sourceMap(), track.commands[index]) == expectedCommandDetailKinds[index],
+  for (size_t index = 0; index < expectedCommandKinds.size(); ++index) {
+    expect(commandKind(project.sourceMap(), track.commands[index]) == expectedCommandKinds[index],
            "track should decode KonamiSnes command " + std::to_string(index));
   }
 

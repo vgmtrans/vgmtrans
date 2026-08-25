@@ -729,10 +729,9 @@ public:
     bool finished_ = false;
   };
 
-  CompilerCursor(ByteReader reader, u32 begin, u32 end, std::string_view detailKindPrefix,
+  CompilerCursor(ByteReader reader, u32 begin, u32 end, std::string_view kindPrefix,
                  std::vector<Diagnostic>* diagnostics = nullptr)
-      : record_(reader, begin, end, diagnostics, false), detailKindPrefix_(detailKindPrefix),
-        diagnostics_(diagnostics) {
+      : record_(reader, begin, end, diagnostics, false), kindPrefix_(kindPrefix), diagnostics_(diagnostics) {
     const auto opcode = record_.u8("opcode", SourceValueDisplay::Hex);
     if (opcode) {
       opcode_ = *opcode;
@@ -742,10 +741,10 @@ public:
 
   // Most extracted sequence sources use the complete byte buffer. Formats
   // with a meaningful subrange continue to pass an explicit end offset.
-  CompilerCursor(ByteReader reader, u32 begin, std::string_view detailKindPrefix,
+  CompilerCursor(ByteReader reader, u32 begin, std::string_view kindPrefix,
                  std::vector<Diagnostic>* diagnostics = nullptr)
       : CompilerCursor(reader, begin, static_cast<u32>(std::min<u64>(reader.size(), std::numeric_limits<u32>::max())),
-                       detailKindPrefix, diagnostics) {}
+                       kindPrefix, diagnostics) {}
 
   [[nodiscard]] bool hasOpcode() const noexcept { return opcodeRange_.size != 0; }
   [[nodiscard]] bool ok() const noexcept { return record_.ok(); }
@@ -753,34 +752,33 @@ public:
 
   [[nodiscard]] Event command(std::string_view label, SequenceSemantic semantic,
                               CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback,
-                              std::string_view localKind = {}) {
-    const std::string kind = localKind.empty() ? sourceLocalKind(label) : std::string(localKind);
+                              std::string_view category = {}) {
+    const std::string kind = category.empty() ? sourceKindFromLabel(label) : std::string(category);
     return Event{*this, DecodedCommandPresentation{
                             .label = std::string(label),
-                            .localKind = kind,
-                            .detailKind = detailKindPrefix_.empty() ? kind : detailKindPrefix_ + "." + kind,
+                            .kind = qualifiedKind(kind),
                             .semantic = semantic,
                             .playback = playback,
                         }};
   }
 
-  [[nodiscard]] Event sourceOnly(std::string_view label, std::string_view localKind = {}) {
-    return command(label, SequenceSemantic::Meta, CommandPlaybackStatus::SourceOnly, localKind);
+  [[nodiscard]] Event sourceOnly(std::string_view label, std::string_view category = {}) {
+    return command(label, SequenceSemantic::Meta, CommandPlaybackStatus::SourceOnly, category);
   }
 
-  [[nodiscard]] Event noOp(std::string_view label, std::string_view localKind = {}) {
-    return command(label, SequenceSemantic::Meta, CommandPlaybackStatus::NoOp, localKind);
+  [[nodiscard]] Event noOp(std::string_view label, std::string_view category = {}) {
+    return command(label, SequenceSemantic::Meta, CommandPlaybackStatus::NoOp, category);
   }
 
-  [[nodiscard]] Event unsupported(std::string_view label, std::string_view localKind = "unsupported") {
-    return command(label, SequenceSemantic::Unsupported, CommandPlaybackStatus::Unsupported, localKind);
+  [[nodiscard]] Event unsupported(std::string_view label, std::string_view category = "unsupported") {
+    return command(label, SequenceSemantic::Unsupported, CommandPlaybackStatus::Unsupported, category);
   }
 
   // Records the command and its raw operands for source inspection, but
   // compiles no playback behavior and continues to the next command.
   [[nodiscard]] DecodedBytecodeCommand ignored(std::string_view label, u32 operandBytes,
-                                               std::string_view localKind = {}) {
-    auto event = sourceOnly(label, localKind);
+                                               std::string_view category = {}) {
+    auto event = sourceOnly(label, category);
     static_cast<void>(event.rawBytes("bytes", operandBytes));
     return event;
   }
@@ -820,14 +818,16 @@ private:
   }
 
   [[nodiscard]] DecodedCommandPresentation truncatedPresentation() const {
-    const std::string kind = "truncated";
     return DecodedCommandPresentation{
         .label = "Truncated Command",
-        .localKind = kind,
-        .detailKind = detailKindPrefix_.empty() ? kind : detailKindPrefix_ + "." + kind,
+        .kind = qualifiedKind("truncated"),
         .semantic = SequenceSemantic::Unsupported,
         .playback = CommandPlaybackStatus::Unsupported,
     };
+  }
+
+  [[nodiscard]] std::string qualifiedKind(std::string_view category) const {
+    return kindPrefix_.empty() ? std::string(category) : kindPrefix_ + "." + std::string(category);
   }
 
   [[nodiscard]] DecodedBytecodeCommand finish(DecodedCommandPresentation presentation, CommandExecution execution,
@@ -853,7 +853,7 @@ private:
   }
 
   RecordReader record_;
-  std::string detailKindPrefix_;
+  std::string kindPrefix_;
   std::vector<Diagnostic>* diagnostics_ = nullptr;
   ::u8 opcode_ = 0;
   SourceRange opcodeRange_;

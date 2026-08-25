@@ -27,9 +27,9 @@ inline const vgmtrans::core::SourceAnnotation& commandAnnotation(const vgmtrans:
   return *annotation;
 }
 
-inline std::string_view commandDetailKind(const vgmtrans::core::SourceMap& sourceMap,
-                                          const vgmtrans::core::SourceCommand& command) {
-  return commandAnnotation(sourceMap, command).detailKind;
+inline std::string_view commandKind(const vgmtrans::core::SourceMap& sourceMap,
+                                    const vgmtrans::core::SourceCommand& command) {
+  return commandAnnotation(sourceMap, command).kind;
 }
 
 inline const vgmtrans::core::SourceField* fieldWithName(const vgmtrans::core::SourceAnnotation& annotation,
@@ -60,11 +60,11 @@ inline bool fieldEquals(const vgmtrans::core::SourceField* field, std::string_vi
 }
 
 inline bool hasCommandAnnotation(const vgmtrans::core::SourceMap& sourceMap, vgmtrans::core::SourceId source,
-                                 std::string_view detailKind, u32 offset) {
+                                 std::string_view kind, u32 offset) {
   const auto commandIds = sourceMap.withRole(source, vgmtrans::core::SourceRole::Command);
   return std::ranges::any_of(commandIds, [&](vgmtrans::core::SourceAnnotationId id) {
     const vgmtrans::core::SourceAnnotation& annotation = sourceMap.get(id);
-    return annotation.range.offset == offset && annotation.detailKind == detailKind;
+    return annotation.range.offset == offset && annotation.kind == kind;
   });
 }
 

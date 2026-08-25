@@ -144,11 +144,11 @@ std::string performanceTrackSnapshot(const PerformanceTrack& track) {
 }
 
 const SourceAnnotation* annotationWithKind(const SourceMap& sourceMap, SourceId source, SourceRole role,
-                                           std::string_view localKind) {
+                                           std::string_view category) {
   const auto annotations = sourceMap.withRole(source, role);
   for (const SourceAnnotationId id : annotations) {
     const SourceAnnotation& annotation = sourceMap.get(id);
-    if (annotation.localKind == localKind) {
+    if (annotation.category() == category) {
       return &annotation;
     }
   }
@@ -379,12 +379,12 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(sequence->program.runtime.valid(), "CapcomSnes should attach a compiled command runtime");
   const auto& firstTrack = sequence->program.tracks[0];
   expect(firstTrack.commands.size() == 8, "track should decode all fixture commands");
-  constexpr std::array<std::string_view, 8> expectedCommandDetailKinds{
+  constexpr std::array<std::string_view, 8> expectedCommandKinds{
       "capcom-snes.tempo", "capcom-snes.instrument", "capcom-snes.volume", "capcom-snes.pan",
       "capcom-snes.lfo",   "capcom-snes.lfo",        "capcom-snes.note",   "capcom-snes.end",
   };
-  for (size_t index = 0; index < expectedCommandDetailKinds.size(); ++index) {
-    expect(commandDetailKind(project.sourceMap(), firstTrack.commands[index]) == expectedCommandDetailKinds[index],
+  for (size_t index = 0; index < expectedCommandKinds.size(); ++index) {
+    expect(commandKind(project.sourceMap(), firstTrack.commands[index]) == expectedCommandKinds[index],
            "track should decode command " + std::to_string(index));
   }
   expect(firstTrack.commands[0].opcode == 0x05, "CapcomSnes tempo should be a compiled command with source metadata");
@@ -426,7 +426,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
 
   const auto firstTempoAnnotationId = std::ranges::find_if(commandAnnotations, [&](SourceAnnotationId id) {
     const SourceAnnotation& annotation = sourceMap.get(id);
-    return annotation.detailKind == "capcom-snes.tempo";
+    return annotation.kind == "capcom-snes.tempo";
   });
   expect(firstTempoAnnotationId != commandAnnotations.end(), "source map should expose typed command annotations");
   const SourceAnnotation& firstTempoAnnotation = sourceMap.get(*firstTempoAnnotationId);
@@ -439,7 +439,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(tempoAnnotations.size() == sequence->program.tracks.size(),
          "CapcomSnes scan should publish source annotations for decoded tempo commands");
   const SourceAnnotation& tempoAnnotation = project.sourceMap().get(tempoAnnotations.front());
-  expect(tempoAnnotation.label == "Tempo" && tempoAnnotation.localKind == "tempo",
+  expect(tempoAnnotation.label == "Tempo" && tempoAnnotation.category() == "tempo",
          "CapcomSnes tempo annotation should carry command display metadata");
   expect(tempoAnnotation.range.offset == 0x3000 && tempoAnnotation.range.size == 3,
          "CapcomSnes tempo annotation should use the exact decoded command range");
@@ -455,8 +455,9 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "sequence header annotation should point at the semantic sequence asset");
   const auto* trackPointer = annotationWithKind(sourceMap, source, SourceRole::Pointer, "capcom-snes-track-pointer");
   const auto trackPointers = sourceMap.withRole(source, SourceRole::Pointer);
-  const auto capcomTrackPointerCount = std::ranges::count_if(
-      trackPointers, [&](SourceAnnotationId id) { return sourceMap.get(id).localKind == "capcom-snes-track-pointer"; });
+  const auto capcomTrackPointerCount = std::ranges::count_if(trackPointers, [&](SourceAnnotationId id) {
+    return sourceMap.get(id).category() == "capcom-snes-track-pointer";
+  });
   expect(trackPointer != nullptr && trackPointer->range.size == 2 && capcomTrackPointerCount == 8,
          "CapcomSnes scan should annotate track pointer fields");
   expect(trackPointer->parent == sequenceHeader->id && !firstTrackAnnotation.parent,
@@ -677,7 +678,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const auto instrumentChildren = sourceMap.childrenOf(instrumentAnnotation.id);
   const auto regionAnnotationId = std::ranges::find_if(instrumentChildren, [&](SourceAnnotationId id) {
     const SourceAnnotation& annotation = sourceMap.get(id);
-    return annotation.role == SourceRole::Region && annotation.localKind == "capcom-snes-region";
+    return annotation.role == SourceRole::Region && annotation.category() == "capcom-snes-region";
   });
   expect(regionAnnotationId != instrumentChildren.end(), "instrument set source map should expose region annotations");
   const SourceAnnotation& regionAnnotation = sourceMap.get(*regionAnnotationId);
@@ -688,7 +689,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "region annotation should preserve the instrument header source range");
   const auto adsrAnnotationId = std::ranges::find_if(instrumentChildren, [&](SourceAnnotationId id) {
     const SourceAnnotation& annotation = sourceMap.get(id);
-    return annotation.role == SourceRole::DataBlock && annotation.localKind == "capcom-snes-adsr-gain";
+    return annotation.role == SourceRole::DataBlock && annotation.category() == "capcom-snes-adsr-gain";
   });
   expect(adsrAnnotationId != instrumentChildren.end(), "instrument source map should expose ADSR/Gain documentation");
   const SourceAnnotation& adsrAnnotation = sourceMap.get(*adsrAnnotationId);
@@ -1075,7 +1076,7 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
   const auto& commands = track.commands;
   expect(commands.size() == 4, "CapcomSnes note-state fixture should decode four commands");
 
-  expect(commandDetailKind(project.sourceMap(), commands[0]) == "capcom-snes.octave",
+  expect(commandKind(project.sourceMap(), commands[0]) == "capcom-snes.octave",
          "CapcomSnes octave opcode should decode as a local command");
   const SourceField* octaveField = fieldWithName(commandAnnotation(project.sourceMap(), commands[0]), "octave");
   expect(fieldEquals(octaveField, u64{4}),
@@ -1083,7 +1084,7 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
   expect(commands[0].range.offset == 0x3000 && commands[0].range.size == 2,
          "CapcomSnes octave command should preserve its source range");
 
-  expect(commandDetailKind(project.sourceMap(), commands[1]) == "capcom-snes.note-attributes",
+  expect(commandKind(project.sourceMap(), commands[1]) == "capcom-snes.note-attributes",
          "CapcomSnes attributes opcode should decode as a local command");
   const SourceField* attributeField = fieldWithName(commandAnnotation(project.sourceMap(), commands[1]), "attributes");
   expect(fieldEquals(attributeField, u64{0x48}),
@@ -1094,7 +1095,7 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
   const auto noteCommandAnnotations = project.sourceMap().withRole(commands[1].range.source, SourceRole::Command);
   const auto attributeAnnotationId = std::ranges::find_if(noteCommandAnnotations, [&](SourceAnnotationId id) {
     const SourceAnnotation& annotation = project.sourceMap().get(id);
-    return annotation.detailKind == "capcom-snes.note-attributes" && annotation.range.offset == 0x3002;
+    return annotation.kind == "capcom-snes.note-attributes" && annotation.range.offset == 0x3002;
   });
   expect(attributeAnnotationId != noteCommandAnnotations.end(),
          "CapcomSnes source map should expose typed note-attribute command annotations");
@@ -1293,7 +1294,7 @@ void capcomSnesSequenceEmitsSourceOnlyDriverSemantics() {
       "capcom-snes.note",          "capcom-snes.end",
   };
   for (size_t index = 0; index < expectedKinds.size(); ++index) {
-    expect(commandDetailKind(annotations, track.commands[index]) == expectedKinds[index],
+    expect(commandKind(annotations, track.commands[index]) == expectedKinds[index],
            "CapcomSnes source-only fixture should decode typed command " + std::to_string(index));
   }
 
@@ -1611,7 +1612,7 @@ void capcomSnesSequenceExecutesRepeatUntilCommand() {
   const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 3, "CapcomSnes repeat fixture should decode note, repeat, and end");
 
-  expect(commandDetailKind(annotations, track.commands[1]) == "capcom-snes.repeat-until",
+  expect(commandKind(annotations, track.commands[1]) == "capcom-snes.repeat-until",
          "CapcomSnes repeat opcode should decode as Repeat Until");
   const SourceAnnotation& repeatAnnotation = commandAnnotation(annotations, track.commands[1]);
   expect(fieldEquals(fieldWithName(repeatAnnotation, "slot"), u64{1}) &&
@@ -1664,7 +1665,7 @@ void capcomSnesSequenceAppliesRepeatBreakAttributesOnlyWhenBranchIsTaken() {
   const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 6, "CapcomSnes repeat-break fixture should decode both branch paths");
 
-  expect(commandDetailKind(annotations, track.commands[1]) == "capcom-snes.repeat-break",
+  expect(commandKind(annotations, track.commands[1]) == "capcom-snes.repeat-break",
          "CapcomSnes repeat-break opcode should decode as Repeat Break");
   const SourceAnnotation& repeatBreakAnnotation = commandAnnotation(annotations, track.commands[1]);
   expect(fieldEquals(fieldWithName(repeatBreakAnnotation, "slot"), u64{1}) &&
@@ -1715,11 +1716,11 @@ void capcomSnesSequenceDecodesRepeatBreakSideTargets() {
 
   expect(track.commands.size() == 4,
          "CapcomSnes linear decode should preserve repeat-break side target commands after fallthrough");
-  expect(commandDetailKind(annotations, track.commands[0]) == "capcom-snes.repeat-break",
+  expect(commandKind(annotations, track.commands[0]) == "capcom-snes.repeat-break",
          "CapcomSnes side-target fixture should start with repeat break");
-  expect(commandDetailKind(annotations, track.commands[1]) == "capcom-snes.end",
+  expect(commandKind(annotations, track.commands[1]) == "capcom-snes.end",
          "CapcomSnes side-target fixture should keep the fallthrough end command");
-  expect(commandDetailKind(annotations, track.commands[2]) == "capcom-snes.note",
+  expect(commandKind(annotations, track.commands[2]) == "capcom-snes.note",
          "CapcomSnes side-target fixture should decode the out-of-line repeat-break target");
   expect(diagnostics.empty(), "CapcomSnes side-target fixture should decode without diagnostics");
 
@@ -1751,9 +1752,9 @@ void capcomSnesV1SequencePreservesUnknownOneByteEvents() {
                                   CapcomSnesTrackDecodeOptions{.startOffset = 0x3000, .sourceMap = &sourceMap});
   const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 4, "CapcomSnes V1 unknown one-byte events should not truncate track decoding");
-  expect(commandDetailKind(annotations, track.commands[0]) == "capcom-snes.unknown-one-byte",
+  expect(commandKind(annotations, track.commands[0]) == "capcom-snes.unknown-one-byte",
          "CapcomSnes V1 opcode $1E should decode as a one-byte unknown event");
-  expect(commandDetailKind(annotations, track.commands[1]) == "capcom-snes.unknown-one-byte",
+  expect(commandKind(annotations, track.commands[1]) == "capcom-snes.unknown-one-byte",
          "CapcomSnes V1 opcode $1F should decode as a one-byte unknown event");
   expect(track.commands[0].range.offset == 0x3000 && track.commands[0].range.size == 2,
          "CapcomSnes V1 unknown one-byte event should preserve its source range");

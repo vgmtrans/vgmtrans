@@ -862,7 +862,7 @@ SequenceProgramConfig makeAkaoConfig(AkaoPs1Version version) {
   const std::string prefix = commandKindPrefix(version);
   const PanLaw panLaw = defaultPanLaw(version);
   return SequenceProgramConfig{
-      .commandDetailKindPrefix = prefix,
+      .commandKindPrefix = prefix,
       .timebase = Timebase{.ppqn = kAkaoPpqn},
       .behavior =
           SequenceProgramBehavior{

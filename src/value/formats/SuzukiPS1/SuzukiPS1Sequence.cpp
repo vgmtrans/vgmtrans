@@ -648,7 +648,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 const SequenceProgramConfig& suzukiPs1SequenceConfig() {
   static const SequenceProgramConfig config = SequenceProgramConfig{
-      .commandDetailKindPrefix = std::string(kSuzukiPs1CommandKindPrefix),
+      .commandKindPrefix = std::string(kSuzukiPs1CommandKindPrefix),
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
           SequenceProgramBehavior{

@@ -43,7 +43,8 @@ void sourceMapBuilderRecordsAnnotationsFieldsAndLinks() {
   const auto& headerAnnotation = sourceMap.get(header.id());
   expect(headerAnnotation.role == SourceRole::Header && headerAnnotation.range == headerRecord.range,
          "record annotation helper should preserve the requested role and covering range");
-  expect(headerAnnotation.localKind == "probe-header", "source map should slugify annotation labels");
+  expect(headerAnnotation.kind == "probe-header" && headerAnnotation.category() == "probe-header",
+         "source map should slugify annotation labels");
   expect(headerAnnotation.fields.size() == 2, "source map should preserve record and derived fields");
   expect(std::get<u64>(headerAnnotation.fields[0].value) == 0xaa, "source map should preserve field values");
   expect(std::get<std::string>(headerAnnotation.fields[1].value) == "yes",
@@ -60,7 +61,7 @@ void sourceMapBuilderRecordsAnnotationsFieldsAndLinks() {
   expect(sourceMap.get(table.id()).parent == header.id(), "source map should preserve source containment");
   expect(sourceMap.get(command.id()).sequenceSemantic == SequenceSemantic::Pitch,
          "command helper should preserve sequence semantic");
-  expect(sourceMap.get(command.id()).localKind == "pitch-bend-range",
+  expect(sourceMap.get(command.id()).category() == "pitch-bend-range",
          "command helper should slugify multi-word labels");
   expect(sourceMap.get(command.id()).fields.size() == 1 && sourceMap.get(command.id()).fields[0].name == "bend" &&
              std::get<s64>(sourceMap.get(command.id()).fields[0].value) == -2 &&

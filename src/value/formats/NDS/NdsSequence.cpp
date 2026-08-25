@@ -568,8 +568,7 @@ struct SequenceDecodeContext {
       .presentation =
           DecodedCommandPresentation{
               .label = "Recovery Stop",
-              .localKind = "recovery-stop",
-              .detailKind = "nds.recovery-stop",
+              .kind = "nds.recovery-stop",
               .semantic = SequenceSemantic::Unsupported,
               .playback = CommandPlaybackStatus::StopsPlayback,
           },
@@ -704,7 +703,7 @@ struct SequenceDecodeContext {
 
 const SequenceProgramConfig& ndsSequenceConfig() {
   static const SequenceProgramConfig config = SequenceProgramConfig{
-      .commandDetailKindPrefix = "nds",
+      .commandKindPrefix = "nds",
       .timebase = Timebase{.ppqn = 0x30},
       .behavior =
           SequenceProgramBehavior{

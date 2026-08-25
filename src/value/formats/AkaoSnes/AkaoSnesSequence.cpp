@@ -2080,7 +2080,7 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
 
 [[nodiscard]] const SequenceProgramConfig& sharedConfig() {
   static const SequenceProgramConfig config = SequenceProgramConfig{
-      .commandDetailKindPrefix = "akao-snes",
+      .commandKindPrefix = "akao-snes",
       .timebase = Timebase{.ppqn = kAkaoSnesPpqn},
       .behavior =
           SequenceProgramBehavior{

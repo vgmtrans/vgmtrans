@@ -1148,7 +1148,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
 
 [[nodiscard]] SequenceProgramConfig makeSequenceConfig() {
   return SequenceProgramConfig{
-      .commandDetailKindPrefix = "konami-arcade",
+      .commandKindPrefix = "konami-arcade",
       .timebase = Timebase{.ppqn = kKonamiArcadePpqn},
       .behavior =
           SequenceProgramBehavior{

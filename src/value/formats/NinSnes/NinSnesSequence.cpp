@@ -2193,7 +2193,7 @@ struct PlaylistDecode {
 
 [[nodiscard]] SequenceProgramConfig makeSequenceConfig() {
   return SequenceProgramConfig{
-      .commandDetailKindPrefix = "nin-snes",
+      .commandKindPrefix = "nin-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
           SequenceProgramBehavior{

@@ -37,11 +37,11 @@ void expect(bool condition, const std::string& message) {
 }
 
 const SourceAnnotation* annotationWithKind(const SourceMap& sourceMap, SourceId source, SourceRole role,
-                                           std::string_view localKind) {
+                                           std::string_view category) {
   const auto annotations = sourceMap.withRole(source, role);
   for (const SourceAnnotationId id : annotations) {
     const SourceAnnotation& annotation = sourceMap.get(id);
-    if (annotation.localKind == localKind) {
+    if (annotation.category() == category) {
       return &annotation;
     }
   }
@@ -410,9 +410,9 @@ void ndsSequenceDecodesAndRendersNoteWaitCommands() {
   expect(std::ranges::all_of(track.commands, [](const SourceCommand& command) { return command.range.size != 0; }),
          "NDS SSEQ should store every complete command as named semantic data");
   const SourceMap annotations = sourceMap.finish();
-  expect(commandDetailKind(annotations, track.commands[0]) == "nds.note-wait",
+  expect(commandKind(annotations, track.commands[0]) == "nds.note-wait",
          "NDS SSEQ decoder should decode note-wait as a local command");
-  expect(commandDetailKind(annotations, track.commands[1]) == "nds.note",
+  expect(commandKind(annotations, track.commands[1]) == "nds.note",
          "NDS SSEQ decoder should decode source note opcodes as local commands");
   const auto noteAnnotations = annotations.withSequenceSemantic(SourceId{4}, SequenceSemantic::Note);
   expect(noteAnnotations.size() == 1, "NDS SSEQ note command should publish a source annotation");
@@ -513,7 +513,7 @@ void ndsSequenceDecodesAndRendersNoteWaitCommands() {
                                                        trackStart, 0, false, &expressionSourceMap);
   const SourceMap expressionAnnotations = expressionSourceMap.finish();
   expect(expressionTrack.commands.size() == 2 &&
-             commandDetailKind(expressionAnnotations, expressionTrack.commands[0]) == "nds.expression",
+             commandKind(expressionAnnotations, expressionTrack.commands[0]) == "nds.expression",
          "NDS expression opcode should decode as a musical command");
   const SequenceProgram expressionProgram{
       .runtime = ndsSequenceRuntime(),
@@ -954,9 +954,8 @@ void ndsSequenceExecutesCallAndReturn() {
   const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 6, "NDS call fixture should decode call target and fallthrough blocks");
 
-  const auto call = std::ranges::find_if(track.commands, [&](const SourceCommand& command) {
-    return commandDetailKind(annotations, command) == "nds.call";
-  });
+  const auto call = std::ranges::find_if(
+      track.commands, [&](const SourceCommand& command) { return commandKind(annotations, command) == "nds.call"; });
   expect(call != track.commands.end(), "NDS call fixture should preserve the call command");
   expect(call->range.offset == trackStart + 2 && call->range.size == 4,
          "NDS call command should preserve its source range");
@@ -1015,7 +1014,7 @@ void ndsSequenceExecutesCallAndReturn() {
   expect(overlapTrack.commands[1].range.offset == trackStart + 4 && overlapTrack.commands[1].range.size == 1,
          "NDS linearized overlap fixture should stop before overlapping a queued call target");
   const SourceAnnotation& recovery = commandAnnotation(overlapAnnotations, overlapTrack.commands[1]);
-  expect(recovery.detailKind == "nds.recovery-stop" && recovery.sequenceSemantic == SequenceSemantic::Unsupported &&
+  expect(recovery.kind == "nds.recovery-stop" && recovery.sequenceSemantic == SequenceSemantic::Unsupported &&
              recovery.playbackStatus == CommandPlaybackStatus::StopsPlayback,
          "NDS linearized overlap fixture should annotate the synthetic recovery stop command");
   expect(recovery.parent && overlapAnnotations.get(*recovery.parent).role == SourceRole::SequenceTrack,
@@ -1064,7 +1063,7 @@ void ndsSequenceDiscoversSecondaryTrackAddresses() {
   const SourceMap annotations = sourceMap.finish();
   expect(secondary.sourceTrackNumber == 1 && secondary.commands.size() == 2,
          "NDS secondary track should decode independently from the primary bootstrap");
-  expect(commandDetailKind(annotations, secondary.commands[0]) == "nds.rest",
+  expect(commandKind(annotations, secondary.commands[0]) == "nds.rest",
          "NDS secondary track should preserve decoded source commands");
 }
 
@@ -1086,7 +1085,7 @@ void ndsSequenceTrackAddressDiscoveryKeepsMalformedBootstrapCommands() {
          "NDS track discovery should keep an unterminated bootstrap delay as the primary track");
   const TrackProgram& track = asset.program.tracks.front();
   const SourceMap annotations = sourceMap.finish();
-  expect(track.commands.size() == 1 && commandDetailKind(annotations, track.commands[0]) == "nds.truncated",
+  expect(track.commands.size() == 1 && commandKind(annotations, track.commands[0]) == "nds.truncated",
          "NDS malformed bootstrap command should be preserved as a truncated source command");
 }
 
@@ -1108,7 +1107,7 @@ void ndsSequenceAnnotatesModulationDelayOperands() {
          "NDS modulation-delay fixture should decode the modulation command and end command");
 
   const SourceCommand& command = track.commands[0];
-  expect(commandDetailKind(annotations, command) == "nds.modulation-delay",
+  expect(commandKind(annotations, command) == "nds.modulation-delay",
          "NDS modulation delay should stay annotated as its source-driver command");
   expect(command.range.size == 3 && command.execution.valid(),
          "NDS modulation delay should retain executable playback behavior");
@@ -1133,7 +1132,7 @@ void ndsSequenceAnnotatesPartialModulationDelayOperands() {
                                              trackStart, 0, false, &sourceMap, &diagnostics);
   const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 1, "NDS partial modulation-delay fixture should decode one truncated command");
-  expect(commandDetailKind(annotations, track.commands[0]) == "nds.truncated",
+  expect(commandKind(annotations, track.commands[0]) == "nds.truncated",
          "NDS partial modulation delay should use the truncated-command fallback");
   expect(track.commands[0].range.size == 2,
          "NDS partial modulation delay should preserve the opcode and available operand source range");
@@ -1165,7 +1164,7 @@ void ndsSequenceMarksUnterminatedVarLenAsTruncated() {
                                              trackStart, 0, false, &sourceMap);
   const SourceMap annotations = sourceMap.finish();
   expect(track.commands.size() == 1, "NDS unterminated variable-length command should decode as one command");
-  expect(commandDetailKind(annotations, track.commands[0]) == "nds.truncated",
+  expect(commandKind(annotations, track.commands[0]) == "nds.truncated",
          "NDS unterminated variable-length command should use the truncated-command fallback");
   expect(track.commands[0].range.size == 2, "NDS truncated command should preserve its available partial source range");
 }
@@ -1175,8 +1174,8 @@ void ndsSequenceDoesNotLinkInvalidControlTargets() {
   constexpr u32 trackStart = sequenceOffset + 0x1c;
   constexpr u32 invalidRelativeTarget = 0x80;
   constexpr u32 sequenceEnd = trackStart + 4;
-  const auto checkInvalidTarget = [&](u8 opcode, SequenceSemantic semantic, SourceLinkRole role,
-                                      std::string_view detailKind, std::string_view warning) {
+  const auto checkInvalidTarget = [&](u8 opcode, SequenceSemantic semantic, SourceLinkRole role, std::string_view kind,
+                                      std::string_view warning) {
     std::vector<u8> bytes(0x1c0);
     bytes[trackStart + 0] = opcode;
     bytes[trackStart + 1] = static_cast<u8>(invalidRelativeTarget & 0xff);
@@ -1190,7 +1189,7 @@ void ndsSequenceDoesNotLinkInvalidControlTargets() {
                                                0, false, &sourceMap, &diagnostics);
 
     const SourceMap annotations = sourceMap.finish();
-    expect(track.commands.size() == 1 && commandDetailKind(annotations, track.commands[0]) == detailKind,
+    expect(track.commands.size() == 1 && commandKind(annotations, track.commands[0]) == kind,
            "NDS invalid control target should preserve the source command");
     expect(diagnostics.size() == 1 && diagnostics[0].message == warning,
            "NDS invalid control target should report a decode warning");
@@ -1220,8 +1219,7 @@ void ndsSequenceDoesNotLinkInvalidControlTargets() {
   const TrackProgram truncated = decodeTestTrack(ByteReader(SourceId{14}, truncatedBytes), sequenceOffset,
                                                  trackStart + 2, trackStart, 0, false, &truncatedSourceMap);
   const SourceMap truncatedAnnotations = truncatedSourceMap.finish();
-  expect(truncated.commands.size() == 1 &&
-             commandDetailKind(truncatedAnnotations, truncated.commands[0]) == "nds.truncated",
+  expect(truncated.commands.size() == 1 && commandKind(truncatedAnnotations, truncated.commands[0]) == "nds.truncated",
          "NDS partial control target should remain a truncated source command");
   const SourceAnnotation& truncatedCommand = commandAnnotation(truncatedAnnotations, truncated.commands[0]);
   expect(std::ranges::none_of(truncatedCommand.links,
@@ -1262,9 +1260,8 @@ void ndsMalformedRecoveryKeepsExecutableJumps() {
   const TrackProgram track = decodeTestTrack(ByteReader(SourceId{9}, bytes), sequenceOffset, subroutineOffset + 7,
                                              trackStart, 0, true, &sourceMap);
   const SourceMap annotations = sourceMap.finish();
-  const auto jump = std::ranges::find_if(track.commands, [&](const SourceCommand& command) {
-    return commandDetailKind(annotations, command) == "nds.jump";
-  });
+  const auto jump = std::ranges::find_if(
+      track.commands, [&](const SourceCommand& command) { return commandKind(annotations, command) == "nds.jump"; });
   expect(jump != track.commands.end(), "NDS malformed recovery should preserve recovered jumps as jump commands");
 
   SequenceProgram program = config.makeProgram();

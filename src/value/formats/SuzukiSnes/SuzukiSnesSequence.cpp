@@ -955,7 +955,7 @@ struct ParsedHeader {
 
 const SequenceProgramConfig& sequenceConfig() {
   static const SequenceProgramConfig config{
-      .commandDetailKindPrefix = "suzuki-snes",
+      .commandKindPrefix = "suzuki-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior = SequenceProgramBehavior{
           .initialLevel = math::levelGain(0x3c),

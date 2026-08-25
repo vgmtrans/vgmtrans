@@ -707,7 +707,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 const SequenceProgramConfig& sequenceConfig() {
   static const SequenceProgramConfig config{
-      .commandDetailKindPrefix = "falcom-snes",
+      .commandKindPrefix = "falcom-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
           SequenceProgramBehavior{
