@@ -18,6 +18,7 @@
 #include <QMdiArea>
 #include <QMdiSubWindow>
 #include <QIcon>
+#include <QObject>
 #include <QPointer>
 
 class QEvent;
@@ -90,4 +91,6 @@ private:
   std::vector<vgmtrans::core::SourcePlaybackSpan> m_playbackSpans;
   std::unordered_map<u32, InspectorWindow> assetToWindowMap;
   std::unordered_map<QMdiSubWindow *, u32> windowToAssetMap;
+  // Declared last so it disconnects subwindow callbacks before the maps are destroyed.
+  QObject windowDestroyedContext;
 };

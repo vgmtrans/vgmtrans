@@ -295,7 +295,7 @@ void MdiArea::newView(vgmtrans::core::AssetId asset) {
   windowToAssetMap.emplace(window, asset.value);
   connect(inspector, &VGMFileView::statusChanged, this, &MdiArea::inspectorStatusChanged);
   connect(inspector, &VGMFileView::playbackSeekRequested, this, &MdiArea::playbackSeekRequested);
-  connect(window, &QObject::destroyed, this, [this, assetValue = asset.value, window]() {
+  connect(window, &QObject::destroyed, &windowDestroyedContext, [this, assetValue = asset.value, window]() {
     const auto found = assetToWindowMap.find(assetValue);
     if (found != assetToWindowMap.end() && (found->second.window.isNull() || found->second.window.data() == window)) {
       assetToWindowMap.erase(found);
