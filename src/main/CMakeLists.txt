@@ -48,6 +48,7 @@ endif()
 
 if(USE_SYSTEM_ZLIB)
   find_package(ZLIB REQUIRED)
+  set_property(TARGET ZLIB::ZLIB PROPERTY IMPORTED_GLOBAL TRUE)
 else()
   message(STATUS "Using vendored zlib library")
   set(ZLIB_BUILD_TESTING OFF CACHE BOOL "[zlib] Enable Zlib Examples as tests" FORCE)
