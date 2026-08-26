@@ -411,10 +411,10 @@ void soundFontExporterWritesSfbkRiffFile() {
   const std::array<const SoundBankAsset*, 1> soundBanks{&soundBank};
   const std::array<const SamplePoolAsset*, 1> samples{&samplePool};
   const MidiModulationUsage midiModulationUsage{
-      .vibratoDepth = ObservedValueRange{.observed = true, .min = 4, .max = 38},
-      .vibratoRate = ObservedValueRange{.observed = true, .min = 5, .max = 12},
-      .tremoloDepth = ObservedValueRange{.observed = true, .min = 2, .max = 24},
-      .tremoloRate = ObservedValueRange{.observed = true, .min = 5, .max = 12},
+      .vibratoDepth = MidiModulationMaximum{.controllerValue = 38},
+      .vibratoRate = MidiModulationMaximum{.controllerValue = 12},
+      .tremoloDepth = MidiModulationMaximum{.controllerValue = 24},
+      .tremoloRate = MidiModulationMaximum{.controllerValue = 12},
   };
   const auto result = buildSoundFont2(
       SynthExportInput{
@@ -582,10 +582,10 @@ void dlsExporterWritesDlsRiffFile() {
   const std::array<const SoundBankAsset*, 1> soundBanks{&soundBank};
   const std::array<const SamplePoolAsset*, 1> samples{&samplePool};
   const MidiModulationUsage midiModulationUsage{
-      .vibratoDepth = ObservedValueRange{.observed = true, .min = 4, .max = 38},
-      .vibratoRate = ObservedValueRange{.observed = true, .min = 5, .max = 12},
-      .tremoloDepth = ObservedValueRange{.observed = true, .min = 2, .max = 24},
-      .tremoloRate = ObservedValueRange{.observed = true, .min = 5, .max = 12},
+      .vibratoDepth = MidiModulationMaximum{.controllerValue = 38},
+      .vibratoRate = MidiModulationMaximum{.controllerValue = 12},
+      .tremoloDepth = MidiModulationMaximum{.controllerValue = 24},
+      .tremoloRate = MidiModulationMaximum{.controllerValue = 12},
   };
   const auto result = buildDls(
       SynthExportInput{

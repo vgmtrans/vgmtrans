@@ -71,7 +71,7 @@ struct LoweredSynthModulation {
 
 // Helpers used when the user wants vibrato/tremolo controls scaled to the values
 // observed in the sequence instead of the full possible 0-127 range.
-[[nodiscard]] u8 scaledMidiModulationControllerValue(u8 value, const ObservedValueRange* range,
+[[nodiscard]] u8 scaledMidiModulationControllerValue(u8 value, const MidiModulationMaximum* maximum,
                                                      ModulationScalingPolicy policy) noexcept;
 
 void applyMidiModulationScaling(MidiSequence& sequence, const MidiModulationUsage& usage,

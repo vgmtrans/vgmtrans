@@ -9,45 +9,27 @@
 #include "value/sequence/PerformanceModel.h"
 
 #include <optional>
-#include <vector>
 
 namespace vgmtrans::core {
 
 struct SequenceModulationProfile;
 
-struct ObservedValueRange {
-  // Min/max controller values that actually occur in the rendered sequence,
-  // plus the normalized source amounts that produced them. MIDI controller
-  // scaling uses the quantized values; synth modulator scaling uses the precise
-  // normalized max when performance data provides it.
-  bool observed = false;
-  u32 min = 0;
-  u32 max = 0;
-  double normalizedMin = 0.0;
-  double normalizedMax = 0.0;
-  std::optional<SourceRange> firstRange;
-};
-
-struct MidiTrackModulationUsage {
-  u32 trackIndex = 0;
-  ObservedValueRange vibratoDepth;
-  ObservedValueRange vibratoRate;
-  ObservedValueRange tremoloDepth;
-  ObservedValueRange tremoloRate;
+struct MidiModulationMaximum {
+  // MIDI scaling uses the quantized controller maximum; synth scaling uses
+  // the precise normalized amount that produced it.
+  u8 controllerValue = 0;
+  double normalized = 0.0;
 };
 
 struct MidiModulationUsage {
-  // Aggregate modulation usage for the whole sequence plus per-track detail.
-  // Prefer analyzing PerformanceSequence so source meaning is read before MIDI quantization.
-  ObservedValueRange vibratoDepth;
-  ObservedValueRange vibratoRate;
-  ObservedValueRange tremoloDepth;
-  ObservedValueRange tremoloRate;
-  std::vector<MidiTrackModulationUsage> tracks;
+  // Aggregate maxima for the whole sequence. Analyze PerformanceSequence so
+  // source meaning is read before MIDI quantization.
+  std::optional<MidiModulationMaximum> vibratoDepth;
+  std::optional<MidiModulationMaximum> vibratoRate;
+  std::optional<MidiModulationMaximum> tremoloDepth;
+  std::optional<MidiModulationMaximum> tremoloRate;
 };
 
-[[nodiscard]] bool hasObservedValue(const ObservedValueRange& range) noexcept;
-[[nodiscard]] bool hasMidiModulationUsage(const MidiTrackModulationUsage& usage) noexcept;
 [[nodiscard]] bool hasMidiModulationUsage(const MidiModulationUsage& usage) noexcept;
 [[nodiscard]] MidiModulationUsage analyzePerformanceModulationUsage(
     const PerformanceSequence& sequence, const SequenceModulationProfile* modulationProfile = nullptr);
