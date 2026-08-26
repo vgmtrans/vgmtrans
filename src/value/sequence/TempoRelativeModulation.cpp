@@ -115,11 +115,8 @@ void resolveContext(ModulationPerformanceEvent& event, double secondsPerTick) {
 }  // namespace
 
 void resolveTempoRelativeModulation(PerformanceSequence& performance) {
-  if (!std::ranges::any_of(performance.tracks, &PerformanceTrack::hasPhysicalModulation)) {
-    return;
-  }
   const bool hasTempoRelativeModulation = std::ranges::any_of(performance.tracks, [](const PerformanceTrack& track) {
-    return track.hasPhysicalModulation && std::ranges::any_of(track.events, isTempoRelative);
+    return std::ranges::any_of(track.events, isTempoRelative);
   });
   if (!hasTempoRelativeModulation) {
     return;

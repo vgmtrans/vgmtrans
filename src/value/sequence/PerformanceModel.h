@@ -568,8 +568,6 @@ struct PerformanceTrack {
   TrackId id;
   u32 sourceTrackNumber = 0;
   u64 endTick = 0;
-  // Lets physical modulation analysis return immediately for ordinary tracks.
-  bool hasPhysicalModulation = false;
   // Events are stored in chronological execution order.
   std::vector<PerformanceEvent> events;
   std::vector<PerformanceAutomation> automations;

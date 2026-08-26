@@ -2605,8 +2605,8 @@ void physicalModulationProfileDrivesMidiAndSynthFromOnePlan() {
   };
   const SequenceModulationProfile profile = analyzeSequenceModulation(performance);
 
-  expect(track.hasPhysicalModulation && profile.instruments.vibrato && profile.instruments.tremolo,
-         "physical LFO authoring should opt the track into one shared sequence plan");
+  expect(profile.instruments.vibrato && profile.instruments.tremolo,
+         "physical LFO authoring should produce one shared sequence plan");
   expect(profile.instruments.vibrato->maxDepthCents == 200.0 && profile.instruments.vibrato->rateHertz.minimum == 2.0 &&
              profile.instruments.vibrato->rateHertz.maximum == 8.0 &&
              profile.instruments.vibrato->waveform == LfoWaveform::SawtoothUp &&
@@ -2678,11 +2678,16 @@ void physicalModulationProfileDrivesMidiAndSynthFromOnePlan() {
   PerformanceTrack ordinaryTrack{
       .events = {ModulationPerformanceEvent{
           .target = ModulationPerformanceTarget::VibratoDepth,
-          .pitchDepthSemitones = 9.0,
+          .amount = 0.9,
+          .context = LfoPerformanceContext{.shape = LfoShape{.waveform = LfoWaveform::Square}},
       }},
   };
   expect(analyzeSequenceModulation(PerformanceSequence{.tracks = {ordinaryTrack}}).empty(),
-         "physical modulation analysis should return immediately for tracks that did not opt in");
+         "normalized-only modulation should not create a physical sequence plan");
+  const auto combinedProfile = analyzeSequenceModulation(PerformanceSequence{.tracks = {track, ordinaryTrack}});
+  expect(
+      combinedProfile.instruments.vibrato && combinedProfile.instruments.vibrato->waveform == LfoWaveform::SawtoothUp,
+      "normalized-only modulation should not alter a physical waveform profile");
 }
 
 void tempoRelativeModulationFollowsTheGlobalTempoTimeline() {
@@ -2695,7 +2700,6 @@ void tempoRelativeModulationFollowsTheGlobalTempoTimeline() {
                   .id = TrackId{0},
                   .sourceTrackNumber = 0,
                   .endTick = 40,
-                  .hasPhysicalModulation = true,
                   .events =
                       {
                           ModulationPerformanceEvent{
@@ -2769,7 +2773,6 @@ void tempoRelativeModulationFollowsTheGlobalTempoTimeline() {
                     .id = TrackId{0},
                     .sourceTrackNumber = 0,
                     .endTick = 8,
-                    .hasPhysicalModulation = true,
                     .events =
                         {
                             ModulationPerformanceEvent{

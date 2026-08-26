@@ -12,7 +12,6 @@
 #include <limits>
 #include <optional>
 #include <stdexcept>
-#include <type_traits>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -708,22 +707,6 @@ void PerformanceEmitter::append(PerformanceEvent event) {
     auto& automation = track_.automations[*automation_];
     automation.realization.endTick = std::max(automation.realization.endTick, tick_);
   }
-  const bool physicalModulation =
-      std::visit(
-          [](const auto& typedEvent) {
-            using T = std::decay_t<decltype(typedEvent)>;
-            if constexpr (std::is_same_v<T, ModulationPerformanceEvent>) {
-              return typedEvent.pitchDepthSemitones.has_value() || typedEvent.volumeDepthDecibels.has_value() ||
-                     typedEvent.volumeDepthLinearGain.has_value() || typedEvent.panDepth.has_value() ||
-                     typedEvent.context.frequencyHz.has_value() || typedEvent.context.cyclesPerTick.has_value();
-            } else if constexpr (std::is_same_v<T, VibratoDelayPerformanceEvent> ||
-                                 std::is_same_v<T, TremoloDelayPerformanceEvent>) {
-              return typedEvent.milliseconds.has_value() || typedEvent.tempoRelative;
-            }
-            return false;
-          },
-          event);
-  track_.hasPhysicalModulation |= physicalModulation;
   std::visit([&](auto& typedEvent) { typedEvent.header = header(); }, event);
   track_.events.emplace_back(std::move(event));
 }

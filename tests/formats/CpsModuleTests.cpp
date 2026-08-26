@@ -724,8 +724,7 @@ void cps2EarlyModuleUsesPhysicalModulation() {
     }
     markerWorkaround |= std::holds_alternative<MarkerPerformanceEvent>(event);
   }
-  expect(performance.tracks[0].hasPhysicalModulation && physicalVibrato && physicalTremolo && physicalPan &&
-             physicalCenter && !markerWorkaround,
+  expect(physicalVibrato && physicalTremolo && physicalPan && physicalCenter && !markerWorkaround,
          "early CPS2 modulation and balance should stay physical without legacy MIDI marker workarounds");
 }
 

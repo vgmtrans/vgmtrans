@@ -65,8 +65,7 @@ bool hasMidiModulationUsage(const MidiModulationUsage& usage) noexcept {
 MidiModulationUsage analyzePerformanceModulationUsage(const PerformanceSequence& sequence,
                                                       const SequenceModulationProfile* modulationProfile) {
   std::optional<SequenceModulationProfile> derivedModulationProfile;
-  if (modulationProfile == nullptr &&
-      std::ranges::any_of(sequence.tracks, &PerformanceTrack::hasPhysicalModulation)) {
+  if (modulationProfile == nullptr) {
     derivedModulationProfile = analyzeSequenceModulation(sequence);
     modulationProfile = &*derivedModulationProfile;
   }
