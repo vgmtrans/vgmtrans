@@ -298,12 +298,12 @@ std::optional<ScanSoundBankDraft> addKonamiSnesSynth(ScanResultBuilder& builder,
     return std::nullopt;
   }
 
-  auto instruments = builder.soundBank(fmt::format("{} Instruments", displayName));
-  const auto sampleRefs = addSnesBrrSamples(instruments.samples(), reader, sampleCatalog);
+  auto bank = builder.soundBank(fmt::format("{} Instruments", displayName));
+  const auto sampleRefs = addSnesBrrSamples(bank.localSamples(), reader, sampleCatalog);
 
-  addKonamiSnesInstruments(instruments.builder(), reader, instrumentInfos, sampleRefs);
+  addKonamiSnesInstruments(bank.instruments(), reader, instrumentInfos, sampleRefs);
 
-  return instruments;
+  return bank;
 }
 
 }  // namespace vgmtrans::formats::konami_snes

@@ -232,8 +232,8 @@ void soundBankOwnsNoncontiguousSamplesWithoutInventingOneSourceRange() {
   const SourceRange instrumentTable = input.reader.range(8, 8);
   const SourceRange sampleData = input.reader.range(192, 9);
   auto bank = result.soundBank("Noncontiguous Bank", instrumentTable);
-  const auto sample = bank.samples().add(4, Sample{.name = "Local Sample", .encodedData = sampleData});
-  bank.add(0, Instrument{.name = "Instrument"}).region(sample.ref(), Region{});
+  const auto sample = bank.localSamples().add(4, Sample{.name = "Local Sample", .encodedData = sampleData});
+  bank.instruments().add(0, Instrument{.name = "Instrument"}).region(sample.ref(), Region{});
 
   const ScanResult scan = result.finish();
   const auto* soundBank = std::get_if<SoundBankAsset>(&scan.assets.front());
@@ -258,10 +258,12 @@ void scanResultBuilderOwnsSynthDraftsUntilFinish() {
       .ids = ids,
   };
   ScanResultBuilder result(input, "SynthBuilderProbe");
-  auto instruments = result.soundBank("Probe Instruments", input.reader.range(8, 8));
-  auto samples = result.samplePool("Probe Samples", input.reader.range(0, 8));
-  const AssetId instrumentAssetId = instruments.id();
-  const AssetId sampleAssetId = samples.id();
+  auto bank = result.soundBank("Probe Instruments", input.reader.range(8, 8));
+  auto pool = result.samplePool("Probe Samples", input.reader.range(0, 8));
+  auto& instruments = bank.instruments();
+  auto& samples = pool.samples();
+  const AssetId instrumentAssetId = bank.id();
+  const AssetId sampleAssetId = pool.id();
 
   const auto concreteSample = samples
                                   .add(12,
@@ -304,8 +306,9 @@ void scanResultBuilderRetainsSampleKeysAndExposesExistingRegions() {
   };
   ScanResultBuilder result(input, "SynthBuilderProbe");
 
-  auto samples = result.samplePool("Sparse Samples");
-  const AssetId samplesAsset = samples.id();
+  auto pool = result.samplePool("Sparse Samples");
+  auto& samples = pool.samples();
+  const AssetId samplesAsset = pool.id();
   samples.add(12, Sample{.name = "Sparse Sample", .encodedData = input.reader.range(32, 4)});
   samples.alias(20, 12);
   const auto sample = samples.find(20);
@@ -315,8 +318,9 @@ void scanResultBuilderRetainsSampleKeysAndExposesExistingRegions() {
     samples.warning("Required sample 99 was not found", input.reader.range(4, 1));
   }
 
-  auto instruments = result.soundBank("Prebuilt Instruments");
-  const AssetId instrumentsAsset = instruments.id();
+  auto bank = result.soundBank("Prebuilt Instruments");
+  auto& instruments = bank.instruments();
+  const AssetId instrumentsAsset = bank.id();
   auto instrument = instruments.add(7, Instrument{
                                            .name = "Prebuilt Instrument",
                                            .range = input.reader.range(8, 8),
@@ -351,10 +355,12 @@ void entryValuesAreReadOnlyAndInitialRangesRemainAuthoritative() {
       .ids = ids,
   };
   ScanResultBuilder result(input, "SynthBuilderProbe");
-  auto instruments = result.soundBank("Late Instruments");
-  auto samples = result.samplePool("Late Samples");
-  const AssetId instrumentAssetId = instruments.id();
-  const AssetId sampleAssetId = samples.id();
+  auto bank = result.soundBank("Late Instruments");
+  auto pool = result.samplePool("Late Samples");
+  auto& instruments = bank.instruments();
+  auto& samples = pool.samples();
+  const AssetId instrumentAssetId = bank.id();
+  const AssetId sampleAssetId = pool.id();
 
   auto sample = samples.add(0, Sample{.name = "Sample", .encodedData = input.reader.range(32, 9)});
   auto instrument = instruments.add(0, Instrument{.name = "Instrument", .range = input.reader.range(8, 4)});
@@ -392,7 +398,8 @@ void scanResultBuilderDraftViewsRemainStableAsTheResultGrows() {
       .ids = ids,
   };
   ScanResultBuilder result(input, "SynthBuilderProbe");
-  auto samples = result.samplePool("Stable Samples");
+  auto pool = result.samplePool("Stable Samples");
+  auto& samples = pool.samples();
   auto sample = samples.add(7, Sample{.name = "Stable Sample", .encodedData = input.reader.range(32, 4)});
 
   // Growing the result must not invalidate a draft proxy or an entry returned
@@ -406,10 +413,10 @@ void scanResultBuilderDraftViewsRemainStableAsTheResultGrows() {
 
   const ScanResult scan = result.finish();
   const auto& sampleAsset = std::get<SamplePoolAsset>(scan.assets.front());
-  expect(sampleAsset.pool.samples.size() == 1 && samples.id() == sampleAsset.metadata.id && alias &&
-             alias->owner() == samples.id() && alias->index() == 0,
+  expect(sampleAsset.pool.samples.size() == 1 && pool.id() == sampleAsset.metadata.id && alias &&
+             alias->owner() == pool.id() && alias->index() == 0,
          "draft proxies and sparse lookups should survive growth of the result-owned draft list");
-  expect(scan.sourceMap.ownedBy(ObjectRefs::sample(samples.id(), 0)).size() == 1,
+  expect(scan.sourceMap.ownedBy(ObjectRefs::sample(pool.id(), 0)).size() == 1,
          "entries obtained before result growth should still publish their source annotations");
 }
 

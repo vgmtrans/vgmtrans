@@ -85,8 +85,9 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     return std::nullopt;
   }
 
-  auto instruments = builder.soundBank(fmt::format("{} Instruments", displayName));
-  const SnesBrrSampleRefs sampleRefs = addSnesBrrSamples(instruments.samples(), reader, catalog);
+  auto bank = builder.soundBank(fmt::format("{} Instruments", displayName));
+  auto& instruments = bank.instruments();
+  const SnesBrrSampleRefs sampleRefs = addSnesBrrSamples(bank.localSamples(), reader, catalog);
   for (const Patch& patch : patches) {
     const auto sample = sampleRefs.findSrcn(*patch.srcn);
     if (!sample) {
@@ -113,7 +114,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .source("Region", patch.source, "falcom-snes-region")
         .description(fmt::format("SRCN {}, 8.8 pitch scale ${:04X}", *patch.srcn, patch.pitchScale));
   }
-  return instruments;
+  return bank;
 }
 
 }  // namespace vgmtrans::formats::falcom_snes

@@ -48,7 +48,7 @@ struct SynthContext {
   u32 sampleRate = 0;
   u8 directSoundMasterVolume = 15;
   u8 dacBits = 8;
-  ScanSamplePoolDraft& psg;
+  SamplePoolBuilder& psg;
   SamplePoolBuilder& pcm;
 };
 
@@ -188,7 +188,7 @@ struct SynthContext {
   return entry.ref();
 }
 
-[[nodiscard]] std::optional<SampleRef> programmableWave(ScanResultBuilder& builder, ScanSamplePoolDraft& psg,
+[[nodiscard]] std::optional<SampleRef> programmableWave(ScanResultBuilder& builder, SamplePoolBuilder& psg,
                                                         u32 pointer) {
   const auto offset = romOffset(pointer, builder.reader(), 16);
   if (!offset) {
@@ -363,7 +363,8 @@ std::vector<Mp2kTone> parseMp2kTones(ByteReader reader, const Mp2kBank& bank, st
 }  // namespace
 
 ScanSamplePoolDraft addMp2kPsgSamples(ScanResultBuilder& builder, u32 sampleRate) {
-  auto samples = builder.samplePool("MP2k PSG samples");
+  auto pool = builder.samplePool("MP2k PSG samples");
+  auto& samples = pool.samples();
   constexpr std::array<std::string_view, 4> names{"12.5%", "25%", "50%", "75%"};
   for (u32 duty = 0; duty < names.size(); ++duty) {
     samples.add(duty, Sample{
@@ -390,20 +391,21 @@ ScanSamplePoolDraft addMp2kPsgSamples(ScanResultBuilder& builder, u32 sampleRate
                          .codecParameter = key,
                      });
   }
-  return samples;
+  return pool;
 }
 
 Mp2kScannedBank addMp2kInstrumentSet(ScanResultBuilder& builder, const Mp2kBank& bank, u32 sampleRate,
                                      u8 directSoundMasterVolume, u8 dacBits, ScanSamplePoolDraft& psg) {
   std::vector<Mp2kTone> tones = parseMp2kTones(builder.reader(), bank, &builder.diagnostics());
-  auto instruments = builder.soundBank(fmt::format("MP2k bank {:#x}", bank.offset));
+  auto bankDraft = builder.soundBank(fmt::format("MP2k bank {:#x}", bank.offset));
+  auto& instruments = bankDraft.instruments();
   SynthContext context{
       .builder = builder,
       .sampleRate = sampleRate,
       .directSoundMasterVolume = directSoundMasterVolume,
       .dacBits = dacBits,
-      .psg = psg,
-      .pcm = instruments.samples(),
+      .psg = psg.samples(),
+      .pcm = bankDraft.localSamples(),
   };
   instruments.include(builder.reader().range(bank.offset, static_cast<u64>(bank.instrumentCount) * 12));
   instruments.source(SourceRole::Table, "Voicegroup", instruments.range(), "mp2k-voicegroup")
@@ -429,7 +431,7 @@ Mp2kScannedBank addMp2kInstrumentSet(ScanResultBuilder& builder, const Mp2kBank&
         .range = tone.source.range,
         .modulation = mp2kModulation(),
     };
-    auto instrument = instruments.builder().append(std::move(value));
+    auto instrument = instruments.append(std::move(value));
     instrument.source("Tone", tone.source, "mp2k-tone");
 
     if (tone.split() && !tone.rhythm()) {
@@ -440,7 +442,7 @@ Mp2kScannedBank addMp2kInstrumentSet(ScanResultBuilder& builder, const Mp2kBank&
       addToneRegion(context, instrument, tone, {});
     }
   }
-  return Mp2kScannedBank{.instruments = instruments, .tones = std::move(tones)};
+  return Mp2kScannedBank{.instruments = bankDraft, .tones = std::move(tones)};
 }
 
 }  // namespace vgmtrans::formats::mp2k

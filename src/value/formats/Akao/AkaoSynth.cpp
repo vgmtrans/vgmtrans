@@ -321,8 +321,9 @@ struct ParsedSamplePool {
 }
 
 void emitSamplePool(const ScanInput& input, ScanResultBuilder& result, ParsedSamplePool& parsed) {
-  auto samples = result.samplePool(parsed.name, parsed.range);
-  parsed.asset = samples.id();
+  auto pool = result.samplePool(parsed.name, parsed.range);
+  auto& samples = pool.samples();
+  parsed.asset = pool.id();
   const SourceAnnotationId root =
       samples.source(SourceRole::SamplePool, parsed.name, parsed.range, "akao-sample-collection").id();
   for (auto& parsedSample : parsed.samples) {
@@ -362,7 +363,7 @@ void emitSamplePool(const ScanInput& input, ScanResultBuilder& result, ParsedSam
                       SourceTarget{ObjectRefs::sample(parsed.asset, articulation.sampleIndex)});
     }
   }
-  samples.data(AkaoSamplePoolData{
+  pool.data(AkaoSamplePoolData{
       .sampleSetId = parsed.table.sampleSetId,
       .firstArticulationId = parsed.table.firstArticulationId,
       .articulationCount = parsed.table.articulationCount,

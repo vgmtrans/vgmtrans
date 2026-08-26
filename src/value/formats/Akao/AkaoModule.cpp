@@ -60,8 +60,8 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
     const std::string sequenceName = fmt::format("Akao Seq {:02X}", layout->header.sequenceId);
     auto sequence = result.sequence(sequenceName, input.reader.range(offset, layout->header.length));
     auto parsed = parseAkaoSequence(input, sequence.id(), *layout, &result.sourceMap(), &result.diagnostics());
-    auto instruments = result.soundBank(akaoInstrumentSetName(parsed.analysis));
-    auto built = buildAkaoInstrumentSet(input, parsed.analysis, instruments.builder());
+    auto bank = result.soundBank(akaoInstrumentSetName(parsed.analysis));
+    auto built = buildAkaoInstrumentSet(input, parsed.analysis, bank.instruments());
     parsed.analysis.requiredArticulations = std::move(built.requiredArticulations);
     std::erase(parsed.analysis.requiredArticulations, 0);
     std::ranges::sort(parsed.analysis.requiredArticulations);
@@ -72,10 +72,10 @@ void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<
             .sequenceId = parsed.analysis.header.sequenceId,
             .sampleSetId = parsed.analysis.header.sampleSetId,
             .requiredArticulations = parsed.analysis.requiredArticulations,
-            .structuralInstrumentSet = instruments.id(),
+            .structuralInstrumentSet = bank.id(),
         })
         .program(std::move(parsed.program));
-    instruments.data(AkaoSoundBankData{.binding = std::move(built.binding)});
+    bank.data(AkaoSoundBankData{.binding = std::move(built.binding)});
   }
 }
 

@@ -120,8 +120,9 @@ std::optional<ScanSoundBankDraft> addCapcomSnesSynth(ScanResultBuilder& builder,
   const u32 rootOffset = static_cast<u32>(instrumentInfos.front().source.range.offset);
   const u32 rootSize = static_cast<u32>(instrumentInfos.back().source.range.endOffset() - rootOffset);
   const SourceRange instrumentTableRange = reader.range(rootOffset, rootSize);
-  auto instruments = builder.soundBank(fmt::format("{} Instruments", displayName));
-  const auto sampleRefs = addSnesBrrSamples(instruments.samples(), reader, sampleCatalog);
+  auto bank = builder.soundBank(fmt::format("{} Instruments", displayName));
+  auto& instruments = bank.instruments();
+  const auto sampleRefs = addSnesBrrSamples(bank.localSamples(), reader, sampleCatalog);
 
   instruments.include(instrumentTableRange);
   const SourceAnnotationId root =
@@ -169,7 +170,7 @@ std::optional<ScanSoundBankDraft> addCapcomSnesSynth(ScanResultBuilder& builder,
     }
   }
 
-  return instruments;
+  return bank;
 }
 
 }  // namespace vgmtrans::formats::capcom_snes

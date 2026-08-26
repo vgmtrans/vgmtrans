@@ -74,9 +74,10 @@ struct PanGains {
 void addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLayout& layout, u16 bank) {
   const ByteReader reader = result.reader();
   const std::string name = fmt::format("Sony PS1 VAB {}", bank);
-  auto instruments = result.soundBank(name);
-  instruments.data(SonyPs1SampleSize{.bytes = layout.expectedSampleBytes});
-  auto& samples = instruments.samples();
+  auto bankDraft = result.soundBank(name);
+  bankDraft.data(SonyPs1SampleSize{.bytes = layout.expectedSampleBytes});
+  auto& instruments = bankDraft.instruments();
+  auto& samples = bankDraft.localSamples();
 
   if (layout.hasSampleBody) {
     std::vector<std::pair<u32, PsxAdpcmStream>> streams;
@@ -227,8 +228,9 @@ bool addSonyPs1RawSampleBody(ScanResultBuilder& result) {
     return false;
   }
 
-  auto samples = result.samplePool(result.sourceDisplayName() + " VAG Samples");
-  samples.data(SonyPs1SampleSize{.bytes = static_cast<u32>(reader.size())});
+  auto pool = result.samplePool(result.sourceDisplayName() + " VAG Samples");
+  pool.data(SonyPs1SampleSize{.bytes = static_cast<u32>(reader.size())});
+  auto& samples = pool.samples();
   const SourceRange body = reader.range(0, reader.size());
   const SourceAnnotationId root =
       samples.source(SourceRole::SamplePool, "VAB Sample Body", body, "sony-ps1-vab-body").id();

@@ -101,8 +101,9 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     return std::nullopt;
   }
 
-  auto instruments = builder.soundBank(fmt::format("{} Instruments", displayName));
-  auto& samplePool = instruments.samples();
+  auto bank = builder.soundBank(fmt::format("{} Instruments", displayName));
+  auto& instruments = bank.instruments();
+  auto& samplePool = bank.localSamples();
   const SnesBrrSampleRefs samples = addSnesBrrSamples(samplePool, reader, catalog);
   for (const Patch& patch : patches) {
     const auto sample = samples.findSrcn(patch.srcn);
@@ -115,7 +116,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .name = fmt::format("Instrument {} (global {}, SRCN {})", patch.program, patch.global, patch.srcn),
         .range = patch.mappingSource,
     };
-    auto entry = instruments.builder().append(std::move(instrument));
+    auto entry = instruments.append(std::move(instrument));
     const SourceAnnotationId root =
         entry.source(fmt::format("Instrument {}", patch.program), patch.mappingSource, "chun-snes-instrument").id();
     entry.source("Sample parameters", patch.sampleInfoSource, "chun-snes-sample-info").parent(root);
@@ -133,10 +134,10 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .description(fmt::format("SRCN {}, pitch scale {:#06x}", patch.srcn, patch.pitchScale));
   }
 
-  if (instruments.builder().empty()) {
+  if (instruments.empty()) {
     return std::nullopt;
   }
-  return instruments;
+  return bank;
 }
 
 }  // namespace vgmtrans::formats::chun_snes

@@ -75,54 +75,11 @@ ScanSoundBankDraft::ScanSoundBankDraft(ScanResultBuilder& out, size_t slot, Asse
     : out_(&out), slot_(slot), id_(id) {
 }
 
-InstrumentSetBuilder::Entry ScanSoundBankDraft::append(Instrument instrument) {
-  return builder().append(std::move(instrument));
-}
-
-InstrumentSetBuilder::Entry ScanSoundBankDraft::add(u64 groupingKey, Instrument instrument) {
-  return builder().add(groupingKey, std::move(instrument));
-}
-
-InstrumentSetBuilder::Entry ScanSoundBankDraft::getOrAdd(u64 groupingKey, Instrument initialValue) {
-  return builder().getOrAdd(groupingKey, std::move(initialValue));
-}
-
-std::optional<InstrumentSetBuilder::Entry> ScanSoundBankDraft::find(u64 groupingKey) {
-  return builder().find(groupingKey);
-}
-
-AnnotationBuilder ScanSoundBankDraft::source(SourceRole role, std::string_view label, SourceRange range,
-                                             std::string_view kind) {
-  return builder().source(role, label, range, kind);
-}
-
-AnnotationBuilder ScanSoundBankDraft::source(SourceRole role, std::string_view label, const SourceRecord& record,
-                                             std::string_view kind) {
-  return builder().source(role, label, record, kind);
-}
-
-ScanSoundBankDraft& ScanSoundBankDraft::include(SourceRange range) {
-  builder().include(range);
-  return *this;
-}
-
-SourceRange ScanSoundBankDraft::range() const noexcept {
-  return out_->instrumentDraft(slot_).range();
-}
-
-bool ScanSoundBankDraft::empty() const noexcept {
-  return out_->instrumentDraft(slot_).empty();
-}
-
-void ScanSoundBankDraft::warning(std::string message, SourceRange range) {
-  builder().warning(std::move(message), range);
-}
-
-InstrumentSetBuilder& ScanSoundBankDraft::builder() {
+InstrumentSetBuilder& ScanSoundBankDraft::instruments() {
   return out_->instrumentDraft(slot_);
 }
 
-SamplePoolBuilder& ScanSoundBankDraft::samples() {
+SamplePoolBuilder& ScanSoundBankDraft::localSamples() {
   return out_->localSampleDraft(slot_);
 }
 
@@ -130,42 +87,11 @@ ScanSamplePoolDraft::ScanSamplePoolDraft(ScanResultBuilder& out, size_t slot, As
     : out_(&out), slot_(slot), id_(id) {
 }
 
-SamplePoolBuilder::Entry ScanSamplePoolDraft::add(u64 sourceKey, Sample sample) {
-  return builder().add(sourceKey, std::move(sample));
-}
-
-SamplePoolBuilder::Entry ScanSamplePoolDraft::alias(u64 aliasKey, u64 existingKey) {
-  return builder().alias(aliasKey, existingKey);
-}
-
-std::optional<SampleRef> ScanSamplePoolDraft::find(u64 sourceKey) const {
-  return builder().find(sourceKey);
-}
-
-AnnotationBuilder ScanSamplePoolDraft::source(SourceRole role, std::string_view label, SourceRange range,
-                                              std::string_view kind) {
-  return builder().source(role, label, range, kind);
-}
-
-AnnotationBuilder ScanSamplePoolDraft::source(SourceRole role, std::string_view label, const SourceRecord& record,
-                                              std::string_view kind) {
-  return builder().source(role, label, record, kind);
-}
-
-ScanSamplePoolDraft& ScanSamplePoolDraft::include(SourceRange range) {
-  builder().include(range);
-  return *this;
-}
-
-void ScanSamplePoolDraft::warning(std::string message, SourceRange range) {
-  builder().warning(std::move(message), range);
-}
-
-SamplePoolBuilder& ScanSamplePoolDraft::builder() {
+SamplePoolBuilder& ScanSamplePoolDraft::samples() {
   return out_->sampleDraft(slot_);
 }
 
-const SamplePoolBuilder& ScanSamplePoolDraft::builder() const {
+const SamplePoolBuilder& ScanSamplePoolDraft::samples() const {
   return out_->sampleDraft(slot_);
 }
 
@@ -241,11 +167,10 @@ ScanSoundBankDraft ScanResultBuilder::soundBank(std::string name, SourceRange ra
       .instruments = InstrumentSetBuilder{id, &sourceMap_, &result_.diagnostics},
       .samples = SamplePoolBuilder{id, &sourceMap_, &result_.diagnostics},
   }));
-  ScanSoundBankDraft draft(*this, slot, id);
   if (range.valid()) {
-    draft.include(range);
+    instrumentDraft(slot).include(range);
   }
-  return draft;
+  return ScanSoundBankDraft(*this, slot, id);
 }
 
 ScanSamplePoolDraft ScanResultBuilder::samplePool(std::string name, SourceRange range) {
@@ -256,11 +181,10 @@ ScanSamplePoolDraft ScanResultBuilder::samplePool(std::string name, SourceRange 
       .name = std::move(name),
       .samples = SamplePoolBuilder{id, &sourceMap_, &result_.diagnostics},
   }));
-  ScanSamplePoolDraft draft(*this, slot, id);
   if (range.valid()) {
-    draft.include(range);
+    sampleDraft(slot).include(range);
   }
-  return draft;
+  return ScanSamplePoolDraft(*this, slot, id);
 }
 
 ScanMiscDraft ScanResultBuilder::misc(std::string name, SourceRange range) {
@@ -423,19 +347,11 @@ InstrumentSetBuilder& ScanResultBuilder::instrumentDraft(size_t slot) {
   return std::get<PendingSoundBank>(drafts_.at(slot)->value).instruments;
 }
 
-const InstrumentSetBuilder& ScanResultBuilder::instrumentDraft(size_t slot) const {
-  return std::get<PendingSoundBank>(drafts_.at(slot)->value).instruments;
-}
-
 SamplePoolBuilder& ScanResultBuilder::localSampleDraft(size_t slot) {
   return std::get<PendingSoundBank>(drafts_.at(slot)->value).samples;
 }
 
 SamplePoolBuilder& ScanResultBuilder::sampleDraft(size_t slot) {
-  return std::get<PendingSamplePool>(drafts_.at(slot)->value).samples;
-}
-
-const SamplePoolBuilder& ScanResultBuilder::sampleDraft(size_t slot) const {
   return std::get<PendingSamplePool>(drafts_.at(slot)->value).samples;
 }
 

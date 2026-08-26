@@ -200,15 +200,16 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     return std::nullopt;
   }
 
-  auto instruments = builder.soundBank(fmt::format("{} Instruments", displayName));
-  auto& samplePool = instruments.samples();
+  auto bank = builder.soundBank(fmt::format("{} Instruments", displayName));
+  auto& instruments = bank.instruments();
+  auto& samplePool = bank.localSamples();
   const SnesBrrSampleRefs samples = addSnesBrrSamples(samplePool, reader, catalog);
-  addMelodicInstruments(instruments.builder(), patches, samples);
-  addDrumKit(instruments.builder(), recipes, patches, samples);
-  if (instruments.builder().empty()) {
+  addMelodicInstruments(instruments, patches, samples);
+  addDrumKit(instruments, recipes, patches, samples);
+  if (instruments.empty()) {
     return std::nullopt;
   }
-  return instruments;
+  return bank;
 }
 
 }  // namespace vgmtrans::formats::suzuki_snes

@@ -431,8 +431,9 @@ std::optional<ScanSoundBankDraft> addSegSatBank(ScanResultBuilder& builder, cons
   SegSatVelocityBank velocityBank =
       readSegSatVelocityBank(reader, layout, layout.sourceBank.value_or(exportBank), volumeModel);
 
-  auto instruments = builder.soundBank(fmt::format("SegSat Sound Bank {}", exportBank));
-  auto& samples = instruments.samples();
+  auto bank = builder.soundBank(fmt::format("SegSat Sound Bank {}", exportBank));
+  auto& instruments = bank.instruments();
+  auto& samples = bank.localSamples();
   for (const auto& [offset, parsedRegion] : uniqueSamples) {
     const std::string name = fmt::format("Sample 0x{:X}", offset);
     samples
@@ -494,8 +495,8 @@ std::optional<ScanSoundBankDraft> addSegSatBank(ScanResultBuilder& builder, cons
       entry.region(*sample, std::move(parsedRegion.region)).source("Region", parsedRegion.source, "segsat-region");
     }
   }
-  instruments.data(std::move(velocityBank));
-  return instruments;
+  bank.data(std::move(velocityBank));
+  return bank;
 }
 
 SegSatVelocityBank readSegSatVelocityBank(ByteReader reader, const SegSatBankLayout& layout, u8 sourceBank,

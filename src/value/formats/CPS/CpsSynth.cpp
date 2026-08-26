@@ -278,7 +278,7 @@ struct QSoundSampleInfo {
   return raw < sampleCount ? raw : 0;
 }
 
-void addQSoundRegion(ScanSoundBankDraft& instruments, InstrumentSetBuilder::Entry instrument,
+void addQSoundRegion(InstrumentSetBuilder& instruments, InstrumentSetBuilder::Entry instrument,
                      const SamplePoolBuilder& samples, const std::vector<QSoundSampleInfo>& sampleInfos,
                      CpsVersion version, SourceRange range, u32 rawSample, s8 fineTune, u8 attack, u8 decay,
                      u8 sustainLevel, u8 sustain, u8 release, KeyRange keys = {}, double pan = 0.5,
@@ -333,7 +333,8 @@ Cps1SynthDrafts addCps1Synth(ScanResultBuilder& builder, CpsLayout& layout) {
   }
 
   if (!patchOffsets.empty()) {
-    auto ym = builder.soundBank(layout.game + " YM2151 Instruments");
+    auto ymDraft = builder.soundBank(layout.game + " YM2151 Instruments");
+    auto& ym = ymDraft.instruments();
     ym.include(reader.range(layout.instrumentTableOffset, layout.instrumentTableLength));
     ym.source(SourceRole::Table, "YM2151 Patch Table",
               reader.range(layout.instrumentTableOffset, layout.instrumentTableLength), "cps1-ym2151-patch-table");
@@ -354,15 +355,16 @@ Cps1SynthDrafts addCps1Synth(ScanResultBuilder& builder, CpsLayout& layout) {
           });
       instrument.source(name, range, "cps1-ym2151-patch").derived("transpose", transpose);
     }
-    drafts.ym2151 = ym;
+    drafts.ym2151 = ymDraft;
   }
 
   if (!layout.sampleRom.valid() || layout.sampleRom.size < 0x400) {
     return drafts;
   }
 
-  auto oki = builder.soundBank(layout.game + " OKI Sound Bank");
-  auto& samples = oki.samples();
+  auto okiDraft = builder.soundBank(layout.game + " OKI Sound Bank");
+  auto& oki = okiDraft.instruments();
+  auto& samples = okiDraft.localSamples();
   const SourceRange directory =
       reader.range(layout.sampleRom.offset + 8, std::min<u64>(0x3f8, layout.sampleRom.size - 8));
   samples.source(SourceRole::Table, "OKI Sample Directory", directory, "cps1-oki-sample-directory");
@@ -438,23 +440,24 @@ Cps1SynthDrafts addCps1Synth(ScanResultBuilder& builder, CpsLayout& layout) {
           .source("Region", range, "cps1-oki-region");
     }
   }
-  drafts.oki = oki;
+  drafts.oki = okiDraft;
   return drafts;
 }
 
 ScanSoundBankDraft addCpsQSoundSynth(ScanResultBuilder& builder, const CpsLayout& layout) {
   const ByteReader reader = builder.reader();
-  auto instruments = builder.soundBank(layout.game + " QSound Sound Bank");
-  auto& samples = instruments.samples();
+  auto bank = builder.soundBank(layout.game + " QSound Sound Bank");
+  auto& instruments = bank.instruments();
+  auto& samples = bank.localSamples();
 
   const auto sampleInfos = qsoundSampleInfos(reader, layout);
   if (sampleInfos.empty()) {
     samples.warning("CPS QSound sample table contained no entries", layout.program);
-    return instruments;
+    return bank;
   }
   if (!layout.sampleRom.valid()) {
     samples.warning("CPS QSound sample ROM region is unavailable", layout.program);
-    return instruments;
+    return bank;
   }
 
   const u32 addressBase = sampleInfos.front().start & 0xff0000;
@@ -617,7 +620,7 @@ ScanSoundBankDraft addCpsQSoundSynth(ScanResultBuilder& builder, const CpsLayout
   if (instruments.empty()) {
     instruments.warning("CPS QSound instrument table contained no usable instruments", layout.program);
   }
-  return instruments;
+  return bank;
 }
 
 }  // namespace vgmtrans::formats::cps

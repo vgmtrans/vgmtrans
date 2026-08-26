@@ -48,25 +48,8 @@ class ScanSoundBankDraft {
 public:
   [[nodiscard]] AssetId id() const noexcept { return id_; }
 
-  InstrumentSetBuilder::Entry append(Instrument instrument);
-  InstrumentSetBuilder::Entry add(u64 groupingKey, Instrument instrument);
-  InstrumentSetBuilder::Entry getOrAdd(u64 groupingKey, Instrument initialValue);
-  [[nodiscard]] std::optional<InstrumentSetBuilder::Entry> find(u64 groupingKey);
-
-  AnnotationBuilder source(SourceRole role, std::string_view label, SourceRange range, std::string_view kind = {});
-  AnnotationBuilder source(SourceRole role, std::string_view label, const SourceRecord& record,
-                           std::string_view kind = {});
-
-  ScanSoundBankDraft& include(SourceRange range);
-  [[nodiscard]] SourceRange range() const noexcept;
-  [[nodiscard]] bool empty() const noexcept;
-
-  void warning(std::string message, SourceRange range = {});
-
-  // Existing reusable synth helpers may operate on the domain builder
-  // directly. The draft remains its owner and finish() remains scan-owned.
-  [[nodiscard]] InstrumentSetBuilder& builder();
-  [[nodiscard]] SamplePoolBuilder& samples();
+  [[nodiscard]] InstrumentSetBuilder& instruments();
+  [[nodiscard]] SamplePoolBuilder& localSamples();
 
   template <typename T>
   ScanSoundBankDraft& data(T value);
@@ -85,20 +68,8 @@ class ScanSamplePoolDraft {
 public:
   [[nodiscard]] AssetId id() const noexcept { return id_; }
 
-  SamplePoolBuilder::Entry add(u64 sourceKey, Sample sample);
-  SamplePoolBuilder::Entry alias(u64 aliasKey, u64 existingKey);
-  [[nodiscard]] std::optional<SampleRef> find(u64 sourceKey) const;
-
-  AnnotationBuilder source(SourceRole role, std::string_view label, SourceRange range, std::string_view kind = {});
-  AnnotationBuilder source(SourceRole role, std::string_view label, const SourceRecord& record,
-                           std::string_view kind = {});
-
-  ScanSamplePoolDraft& include(SourceRange range);
-
-  void warning(std::string message, SourceRange range = {});
-
-  [[nodiscard]] SamplePoolBuilder& builder();
-  [[nodiscard]] const SamplePoolBuilder& builder() const;
+  [[nodiscard]] SamplePoolBuilder& samples();
+  [[nodiscard]] const SamplePoolBuilder& samples() const;
 
   template <typename T>
   ScanSamplePoolDraft& data(T value);
@@ -201,10 +172,8 @@ private:
   void setPrivateData(size_t slot, AssetPrivateData data);
   void setMiscPayload(size_t slot, std::vector<u8> payload);
   [[nodiscard]] InstrumentSetBuilder& instrumentDraft(size_t slot);
-  [[nodiscard]] const InstrumentSetBuilder& instrumentDraft(size_t slot) const;
   [[nodiscard]] SamplePoolBuilder& localSampleDraft(size_t slot);
   [[nodiscard]] SamplePoolBuilder& sampleDraft(size_t slot);
-  [[nodiscard]] const SamplePoolBuilder& sampleDraft(size_t slot) const;
 
   ScanInput input_;
   std::string format_;

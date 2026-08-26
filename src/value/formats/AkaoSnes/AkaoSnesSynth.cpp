@@ -321,12 +321,12 @@ std::optional<ScanSoundBankDraft> addAkaoSnesSynth(ScanResultBuilder& builder, c
     return std::nullopt;
   }
 
-  auto instruments = builder.soundBank(fmt::format("{} Instruments", displayName));
-  const auto sampleRefs = addSnesBrrSamples(instruments.samples(), reader, sampleCatalog, "akao-snes-sample-dir-entry");
+  auto bank = builder.soundBank(fmt::format("{} Instruments", displayName));
+  const auto sampleRefs = addSnesBrrSamples(bank.localSamples(), reader, sampleCatalog, "akao-snes-sample-dir-entry");
 
-  addAkaoSnesInstruments(instruments.builder(), reader, layout, instrumentInfos, sampleRefs);
+  addAkaoSnesInstruments(bank.instruments(), reader, layout, instrumentInfos, sampleRefs);
 
-  return instruments;
+  return bank;
 }
 
 }  // namespace vgmtrans::formats::akao_snes
