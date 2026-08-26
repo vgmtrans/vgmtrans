@@ -445,17 +445,6 @@ void PerformanceEmitter::tremoloDelayPhysical(u32 delayTicks, double millisecond
   });
 }
 
-void PerformanceEmitter::portamento(PortamentoPerformanceEvent event) {
-  append(std::move(event));
-}
-
-void PerformanceEmitter::portamento(double timeMilliseconds, double previousKey) {
-  portamento(PortamentoPerformanceEvent{
-      .timeMilliseconds = timeMilliseconds,
-      .previousKey = previousKey,
-  });
-}
-
 void PerformanceEmitter::portamentoEnable(PortamentoEnablePerformanceEvent event) {
   append(std::move(event));
 }
@@ -463,26 +452,6 @@ void PerformanceEmitter::portamentoEnable(PortamentoEnablePerformanceEvent event
 void PerformanceEmitter::portamentoEnable(bool enabled) {
   portamentoEnable(PortamentoEnablePerformanceEvent{
       .enabled = enabled,
-  });
-}
-
-void PerformanceEmitter::portamentoTime(PortamentoTimePerformanceEvent event) {
-  append(std::move(event));
-}
-
-void PerformanceEmitter::portamentoTime(double timeMilliseconds) {
-  portamentoTime(PortamentoTimePerformanceEvent{
-      .timeMilliseconds = timeMilliseconds,
-  });
-}
-
-void PerformanceEmitter::portamentoControl(PortamentoControlPerformanceEvent event) {
-  append(std::move(event));
-}
-
-void PerformanceEmitter::portamentoControl(double previousKey) {
-  portamentoControl(PortamentoControlPerformanceEvent{
-      .previousKey = previousKey,
   });
 }
 
@@ -599,12 +568,6 @@ void PerformanceEmitter::marker(MarkerPerformanceEvent event) {
   append(std::move(event));
 }
 
-void PerformanceEmitter::appendEvents(std::vector<PerformanceEvent> events) {
-  for (auto& event : events) {
-    append(std::move(event));
-  }
-}
-
 PitchSlideBinding PerformanceEmitter::pitchSlide(PerformanceNoteId note, double startKey, double targetKey,
                                                  u32 durationTicks, PerformanceLaneId lane) {
   return pitchSlide(note, startKey, targetKey, PitchSlideTiming::fromTicks(durationTicks), lane);
@@ -711,12 +674,6 @@ PerformanceAutomationBinding PerformanceEmitter::fade(PerformanceAutomationTarge
                                                       u32 durationTicks, u32 delayTicks) {
   return beginAutomation(scalarAutomationIntent(target, PerformanceAutomationMotion::TargetOverTicks, targetValue,
                                                 durationTicks, delayTicks));
-}
-
-PerformanceAutomationBinding PerformanceEmitter::noteFade(PerformanceAutomationTarget target, double targetValue,
-                                                          u32 durationTicks, u32 delayTicks) {
-  return beginAutomation(scalarAutomationIntent(target, PerformanceAutomationMotion::TargetOverTicks, targetValue,
-                                                durationTicks, delayTicks, true));
 }
 
 PerformanceAutomationBinding PerformanceEmitter::step(PerformanceAutomationTarget target, double targetValue,
