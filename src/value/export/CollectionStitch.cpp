@@ -56,25 +56,24 @@ void fail(CollectionStitchResult& result, std::string message) {
   result.soundFont.diagnostics.push_back(diagnostic);
 }
 
-void mergeRange(ObservedValueRange& destination, const ObservedValueRange& source) {
-  if (!source.observed) {
+void mergeMaximum(std::optional<MidiModulationMaximum>& destination,
+                  const std::optional<MidiModulationMaximum>& source) {
+  if (!source) {
     return;
   }
-  if (!destination.observed) {
+  if (!destination) {
     destination = source;
     return;
   }
-  destination.min = std::min(destination.min, source.min);
-  destination.max = std::max(destination.max, source.max);
-  destination.normalizedMin = std::min(destination.normalizedMin, source.normalizedMin);
-  destination.normalizedMax = std::max(destination.normalizedMax, source.normalizedMax);
+  destination->controllerValue = std::max(destination->controllerValue, source->controllerValue);
+  destination->normalized = std::max(destination->normalized, source->normalized);
 }
 
 void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulationUsage& source) {
-  mergeRange(destination.vibratoDepth, source.vibratoDepth);
-  mergeRange(destination.vibratoRate, source.vibratoRate);
-  mergeRange(destination.tremoloDepth, source.tremoloDepth);
-  mergeRange(destination.tremoloRate, source.tremoloRate);
+  mergeMaximum(destination.vibratoDepth, source.vibratoDepth);
+  mergeMaximum(destination.vibratoRate, source.vibratoRate);
+  mergeMaximum(destination.tremoloDepth, source.tremoloDepth);
+  mergeMaximum(destination.tremoloRate, source.tremoloRate);
 }
 
 [[nodiscard]] bool preparePart(StitchPart& part, const SessionSnapshot& snapshot, const ExportRequest& request,

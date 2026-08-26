@@ -2562,24 +2562,17 @@ PerformanceSequence observedModulationPerformance() {
   return performance;
 }
 
-void modulationAnalysisReportsObservedPerformanceRanges() {
+void modulationAnalysisReportsObservedPerformanceMaxima() {
   const auto usage = analyzePerformanceModulationUsage(observedModulationPerformance());
   expect(hasMidiModulationUsage(usage), "performance modulation analysis should report observed driver modulation");
-  expect(usage.tracks.size() == 2, "performance modulation analysis should preserve track-level results");
-  expect(usage.vibratoDepth.observed && usage.vibratoDepth.min == 0 && usage.vibratoDepth.max == 82,
-         "performance modulation analysis should report global vibrato depth range");
-  expect(usage.vibratoRate.observed && usage.vibratoRate.min == 17 && usage.vibratoRate.max == 29,
-         "performance modulation analysis should report global vibrato rate range");
-  expect(usage.tremoloDepth.observed && usage.tremoloDepth.min == 40 && usage.tremoloDepth.max == 40,
-         "performance modulation analysis should report global tremolo depth range");
-  expect(usage.tremoloRate.observed && usage.tremoloRate.min == 5 && usage.tremoloRate.max == 9,
-         "performance modulation analysis should report global tremolo rate range");
-  expect(usage.tracks[0].trackIndex == 0 && usage.tracks[0].vibratoDepth.max == 82 &&
-             usage.tracks[0].vibratoRate.max == 17,
-         "performance modulation analysis should keep first track modulation ranges separate");
-  expect(usage.tracks[1].trackIndex == 1 && !usage.tracks[1].vibratoDepth.observed &&
-             usage.tracks[1].vibratoRate.max == 29,
-         "performance modulation analysis should keep second track modulation ranges separate");
+  expect(usage.vibratoDepth && usage.vibratoDepth->controllerValue == 82,
+         "performance modulation analysis should report global vibrato depth maximum");
+  expect(usage.vibratoRate && usage.vibratoRate->controllerValue == 29,
+         "performance modulation analysis should report global vibrato rate maximum");
+  expect(usage.tremoloDepth && usage.tremoloDepth->controllerValue == 40,
+         "performance modulation analysis should report global tremolo depth maximum");
+  expect(usage.tremoloRate && usage.tremoloRate->controllerValue == 9,
+         "performance modulation analysis should report global tremolo rate maximum");
 }
 
 void physicalModulationProfileDrivesMidiAndSynthFromOnePlan() {
@@ -2854,7 +2847,7 @@ void observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators()
   };
 
   const auto usage = analyzePerformanceModulationUsage(observedModulationPerformance());
-  expect(scaledMidiModulationControllerValue(41, &usage.vibratoDepth, ModulationScalingPolicy::FullFormatRange) == 41,
+  expect(scaledMidiModulationControllerValue(41, &*usage.vibratoDepth, ModulationScalingPolicy::FullFormatRange) == 41,
          "full-range modulation scaling should leave MIDI controller values unchanged");
 
   applyMidiModulationScaling(midiSequence, usage, ModulationScalingPolicy::ObservedSequenceRange);
@@ -2983,7 +2976,7 @@ void runValueMidiTests() {
   performanceMidiRendererHonorsNoBoostTremoloPhaseAndResetPolicy();
   exportRequestSequenceLoopsAffectMidiLowering();
   standaloneSequenceExportDoesNotRequireACollection();
-  modulationAnalysisReportsObservedPerformanceRanges();
+  modulationAnalysisReportsObservedPerformanceMaxima();
   physicalModulationProfileDrivesMidiAndSynthFromOnePlan();
   tempoRelativeModulationFollowsTheGlobalTempoTimeline();
   observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators();
