@@ -51,8 +51,9 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     return std::nullopt;
   }
 
-  auto instrumentDraft = builder.soundBank(fmt::format("{} Instruments", displayName));
-  const SnesBrrSampleRefs samples = addSnesBrrSamples(instrumentDraft.samples(), reader, catalog);
+  auto bank = builder.soundBank(fmt::format("{} Instruments", displayName));
+  auto& instruments = bank.instruments();
+  const SnesBrrSampleRefs samples = addSnesBrrSamples(bank.localSamples(), reader, catalog);
 
   for (const PatchRecipe& patch : recipes.patches) {
     const auto sample = samples.findSrcn(patch.srcn);
@@ -68,7 +69,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .name = fmt::format("Patch {} (Program {}, SRCN {})", patch.key, patch.sourceProgram, patch.srcn),
         .range = patch.source,
     };
-    auto entry = instrumentDraft.builder().append(std::move(instrument));
+    auto entry = instruments.append(std::move(instrument));
     if (patch.source.valid()) {
       entry.source(fmt::format("Patch {}", patch.key), patch.source, "rare-snes-instrument");
     }
@@ -87,10 +88,10 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     }
   }
 
-  if (instrumentDraft.builder().empty()) {
+  if (instruments.empty()) {
     return std::nullopt;
   }
-  return instrumentDraft;
+  return bank;
 }
 
 }  // namespace vgmtrans::formats::rare_snes

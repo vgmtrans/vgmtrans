@@ -86,7 +86,7 @@ struct ParsedNdsRegion {
   u8 effectiveRootKey = *rootKey;
   if (type == InstrumentType::Sample) {
     if (*collectionIndex < waveCollections.size() && waveCollections[*collectionIndex]) {
-      sample = waveCollections[*collectionIndex]->find(*sourceIndex);
+      sample = waveCollections[*collectionIndex]->samples().find(*sourceIndex);
     }
     if (!sample) {
       builder.warning(fmt::format("Sample {} in wave archive slot {} was not found", *sourceIndex, *collectionIndex),
@@ -96,7 +96,7 @@ struct ParsedNdsRegion {
     const bool pulse = type == InstrumentType::PsgWave;
     const u32 psgIndex = pulse ? (*sourceIndex & 0x07) : 8;
     const std::string description = pulse ? fmt::format("PSG duty sample {}", psgIndex) : "PSG noise sample";
-    sample = psgCollection.find(psgIndex);
+    sample = psgCollection.samples().find(psgIndex);
     if (!sample) {
       builder.warning(description + " was not found", range);
     }
@@ -212,7 +212,8 @@ void addNdsWave(ScanResultBuilder& builder, RecordReader& archive, SamplePoolBui
 // Creates the built-in pulse and noise sounds used by NDS instruments that do
 // not refer to a wave archive.
 ScanSamplePoolDraft addNdsPsgSamples(ScanResultBuilder& builder) {
-  auto samples = builder.samplePool("NDS PSG samples");
+  auto pool = builder.samplePool("NDS PSG samples");
+  auto& samples = pool.samples();
   for (u32 i = 0; i <= 8; ++i) {
     samples.add(i, Sample{
                        .name = fmt::format("PSG_duty_{}", i),
@@ -224,7 +225,7 @@ ScanSamplePoolDraft addNdsPsgSamples(ScanResultBuilder& builder) {
                    });
   }
 
-  return samples;
+  return pool;
 }
 
 // Reads every valid sample from one NDS wave archive and adds the resulting
@@ -236,12 +237,13 @@ std::optional<ScanSamplePoolDraft> addNdsWaveArchive(ScanResultBuilder& builder,
     return std::nullopt;
   }
 
-  auto samples = builder.samplePool(std::string(name));
+  auto pool = builder.samplePool(std::string(name));
+  auto& samples = pool.samples();
   samples.include(range);
 
   if (range.endOffset() > std::numeric_limits<u32>::max()) {
     samples.warning("NDS wave archive range is too large to parse", range);
-    return samples;
+    return pool;
   }
   RecordReader archive(reader, static_cast<u32>(range.offset), static_cast<u32>(range.endOffset()),
                        &builder.diagnostics(), false);
@@ -251,11 +253,11 @@ std::optional<ScanSamplePoolDraft> addNdsWaveArchive(ScanResultBuilder& builder,
 
   const auto sampleCount = archive.u32leAt(0x38, "SWAR sample count");
   if (!sampleCount) {
-    return samples;
+    return pool;
   }
   const auto sampleTableRange = archive.rangeAt(0x3c, static_cast<u64>(*sampleCount) * 4, "SWAR sample offset table");
   if (!sampleTableRange) {
-    return samples;
+    return pool;
   }
   const SourceAnnotationId sampleTable =
       samples.source(SourceRole::Table, "SWAR Sample Offset Table", *sampleTableRange, "swar-sample-offset-table")
@@ -279,10 +281,10 @@ std::optional<ScanSamplePoolDraft> addNdsWaveArchive(ScanResultBuilder& builder,
             .derived("sample_index", i)
             .parent(sampleTable)
             .id();
-    addNdsWave(builder, archive, samples.builder(), *sampleRelativeOffset, *sampleHeaderRange, i, samplePointer);
+    addNdsWave(builder, archive, samples, *sampleRelativeOffset, *sampleHeaderRange, i, samplePointer);
   }
 
-  return samples;
+  return pool;
 }
 
 // Reads the instruments in one NDS bank, including single-sample, pulse, noise,
@@ -306,7 +308,8 @@ std::optional<ScanSoundBankDraft> addNdsInstrumentSet(
     return std::nullopt;
   }
 
-  auto instruments = builder.soundBank(std::string(name));
+  auto bankDraft = builder.soundBank(std::string(name));
+  auto& instruments = bankDraft.instruments();
   instruments.include(range);
   auto pointerTable = instruments
                           .source(SourceRole::Table, "SBNK Instrument Pointer Table", *pointerTableRange,
@@ -441,7 +444,7 @@ std::optional<ScanSoundBankDraft> addNdsInstrumentSet(
     }
   }
 
-  return instruments;
+  return bankDraft;
 }
 
 }  // namespace vgmtrans::formats::nds

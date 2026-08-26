@@ -113,8 +113,9 @@ std::optional<SuzukiPs1ScannedBank> addSuzukiPs1Bank(ScanResultBuilder& result, 
   }
 
   const std::string bankName = fmt::format("SuzukiPS1 WDS {}", layout.bank);
-  auto instruments = result.soundBank(bankName);
-  auto& samples = instruments.samples();
+  auto bank = result.soundBank(bankName);
+  auto& instruments = bank.instruments();
+  auto& samples = bank.localSamples();
   const SourceRange bankRange = reader.range(layout.offset, layout.length);
   const SourceAnnotationId sampleRoot =
       samples
@@ -189,7 +190,7 @@ std::optional<SuzukiPs1ScannedBank> addSuzukiPs1Bank(ScanResultBuilder& result, 
   }
 
   return SuzukiPs1ScannedBank{
-      .bank = instruments,
+      .bank = bank,
       .instruments = std::move(parsed),
   };
 }

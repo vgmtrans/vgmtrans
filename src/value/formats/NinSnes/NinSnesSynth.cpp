@@ -378,10 +378,10 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     return std::nullopt;
   }
 
-  auto instrumentDraft = builder.soundBank(fmt::format("{} Instruments", displayName));
-  const SnesBrrSampleRefs sampleRefs = addSnesBrrSamples(instrumentDraft.samples(), reader, catalog);
-  addInstruments(instrumentDraft.builder(), reader, layout, recipes, instruments, sampleRefs);
-  return instrumentDraft;
+  auto bank = builder.soundBank(fmt::format("{} Instruments", displayName));
+  const SnesBrrSampleRefs sampleRefs = addSnesBrrSamples(bank.localSamples(), reader, catalog);
+  addInstruments(bank.instruments(), reader, layout, recipes, instruments, sampleRefs);
+  return bank;
 }
 
 }  // namespace vgmtrans::formats::nin_snes

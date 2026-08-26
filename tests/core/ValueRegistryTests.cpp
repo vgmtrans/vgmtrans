@@ -165,8 +165,9 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
   }
   expect(rejectedSecondData, "scan result builder should reject a second private data value for one asset");
   const auto bank = out.soundBank("Builder Bank", input.reader.range(0, 1)).data(BuilderPrivateData{.value = 22});
-  auto samples = out.samplePool("Builder Samples", input.reader.range(1, 2));
-  samples.data(BuilderPrivateData{.value = 33});
+  auto samplePool = out.samplePool("Builder Samples", input.reader.range(1, 2));
+  samplePool.data(BuilderPrivateData{.value = 33});
+  auto& samples = samplePool.samples();
   samples.add(0, Sample{
                      .name = "Builder Sample",
                      .codec = AudioCodec::PcmS8,
@@ -181,7 +182,7 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
   out.collection("Builder Song", CollectionKey{.resolver = "ProbeBuilder", .value = "song:1"})
       .sequence(sequence)
       .soundBank(bank)
-      .samplePool(samples)
+      .samplePool(samplePool)
       .misc(misc);
   out.warning("builder warning", input.reader.range(0, 1));
 
@@ -206,7 +207,7 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
          "scan result builder should preserve the collection sequence");
   expect(result.explicitCollections[0].members.soundBanks == std::vector<AssetId>{bank.id()},
          "scan result builder should preserve the collection instrument set");
-  expect(result.explicitCollections[0].members.samplePools == std::vector<AssetId>{samples.id()},
+  expect(result.explicitCollections[0].members.samplePools == std::vector<AssetId>{samplePool.id()},
          "scan result builder should preserve the collection sample collection");
   expect(result.explicitCollections[0].members.miscAssets == std::vector<AssetId>{misc.id()},
          "scan result builder should preserve the collection misc asset");
@@ -222,7 +223,8 @@ void sessionStoresTheOwningFormatsPreferredSampleFilter() {
       .scan =
           [](const ScanInput& input) {
             ScanResultBuilder out(input, "FilteredSamples");
-            auto samples = out.samplePool("Filtered Samples", input.reader.range(0, 1));
+            auto pool = out.samplePool("Filtered Samples", input.reader.range(0, 1));
+            auto& samples = pool.samples();
             samples.add(0, Sample{
                                .name = "Filtered Sample",
                                .codec = AudioCodec::PcmS8,

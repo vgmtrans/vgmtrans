@@ -83,8 +83,9 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     return std::nullopt;
   }
 
-  auto instruments = builder.soundBank(fmt::format("{} Instruments", displayName));
-  auto& samplePool = instruments.samples();
+  auto bank = builder.soundBank(fmt::format("{} Instruments", displayName));
+  auto& instruments = bank.instruments();
+  auto& samplePool = bank.localSamples();
   const SnesBrrSampleRefs samples = addSnesBrrSamples(samplePool, reader, catalog);
 
   for (const Patch& patch : patches) {
@@ -113,7 +114,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .source("Region", patch.adsrSource, "itikiti-snes-region")
         .description(fmt::format("SRCN {}, ADSR ${:02X}{:02X}", patch.program, patch.adsr1, patch.adsr2));
   }
-  return instruments;
+  return bank;
 }
 
 }  // namespace vgmtrans::formats::itikiti_snes

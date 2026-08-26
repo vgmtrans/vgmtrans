@@ -57,8 +57,9 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     return std::nullopt;
   }
 
-  auto instruments = builder.soundBank(fmt::format("{} Instruments", displayName));
-  auto& samplePool = instruments.samples();
+  auto bank = builder.soundBank(fmt::format("{} Instruments", displayName));
+  auto& instruments = bank.instruments();
+  auto& samplePool = bank.localSamples();
   const SnesBrrSampleRefs samples = addSnesBrrSamples(samplePool, reader, catalog);
   for (const InstrumentInfo& info : instrumentInfo) {
     const auto sample = samples.findSrcn(info.program);
@@ -89,7 +90,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .source("Region", info.source, "compile-snes-region")
         .description(fmt::format("SRCN {}, unity key {:.3f}", info.program, unityKey));
   }
-  return instruments;
+  return bank;
 }
 
 }  // namespace vgmtrans::formats::compile_snes

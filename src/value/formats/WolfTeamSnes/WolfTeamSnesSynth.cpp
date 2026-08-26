@@ -157,14 +157,15 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     return std::nullopt;
   }
 
-  auto instruments = builder.soundBank(fmt::format("{} Instruments", displayName));
-  auto& samplePool = instruments.samples();
+  auto bank = builder.soundBank(fmt::format("{} Instruments", displayName));
+  auto& instruments = bank.instruments();
+  auto& samplePool = bank.localSamples();
   const SnesBrrSampleRefs samples = addSnesBrrSamples(samplePool, reader, catalog, "wolf-team-snes-sample-dir-entry");
-  addInstruments(instruments.builder(), patches, samples, layout);
-  if (instruments.builder().empty()) {
+  addInstruments(instruments, patches, samples, layout);
+  if (instruments.empty()) {
     return std::nullopt;
   }
-  return instruments;
+  return bank;
 }
 
 }  // namespace vgmtrans::formats::wolf_team_snes
