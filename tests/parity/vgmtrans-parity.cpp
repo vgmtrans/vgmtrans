@@ -5064,13 +5064,13 @@ int selfTest() {
           .name = "Parity",
           .events =
               {
-                  Tempo{.tick = 0, .microsecondsPerQuarter = 500000},
-                  ProgramChange{.tick = 0, .channel = 2, .program = 12},
-                  Volume{.tick = 0, .channel = 2, .value = 80},
-                  Pan{.tick = 12, .channel = 2, .value = 32},
-                  NoteDuration{.tick = 24, .channel = 2, .key = 64, .velocity = 100, .duration = 36},
-                  EndOfTrack{.tick = 60},
+                  midi::meta(0, 0x51, {0x07, 0xa1, 0x20}),
+                  midi::programChange(0, 2, 12),
+                  midi::controller(0, 2, MidiController::ChannelVolume, 80),
+                  midi::controller(12, 2, MidiController::Pan, 32),
+                  midi::note(24, 2, 64, 100, 36),
               },
+          .endTick = 60,
       }},
   };
 
@@ -5096,9 +5096,8 @@ int selfTest() {
   expect(compareMidi(midi, midi, parityOutput), "self-test should compare identical MIDI");
 
   MidiSequence longerSequence = midiSequence;
-  longerSequence.tracks[0].events.insert(longerSequence.tracks[0].events.end() - 1,
-                                         ProgramChange{.tick = 60, .channel = 2, .program = 13});
-  std::get<EndOfTrack>(longerSequence.tracks[0].events.back()).tick = 72;
+  longerSequence.tracks[0].events.push_back(midi::programChange(60, 2, 13));
+  longerSequence.tracks[0].endTick = 72;
   const auto longerMidi = encodeMidiFile(longerSequence);
   std::ostringstream exactHorizonOutput;
   expect(!compareMidi(longerMidi, midi, exactHorizonOutput),

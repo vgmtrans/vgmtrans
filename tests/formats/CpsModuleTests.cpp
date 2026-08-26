@@ -5,6 +5,7 @@
  */
 
 #include "value/extractors/MameRomSetExtractor.h"
+#include "../MidiTestSupport.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/export/midi/PitchTransitionMidiLowering.h"
 #include "value/export/synth/SynthExportData.h"
@@ -801,11 +802,11 @@ void cps2EarlyZeroRateSlursRemainLinked() {
     bool hasPitchBend = false;
     bool hasPortamento = false;
     for (const auto& event : midi.tracks[0].events) {
-      if (const auto* note = std::get_if<NoteDuration>(&event)) {
+      if (const auto* note = std::get_if<NoteDuration>(&event.payload)) {
         attacks.push_back(note->key);
       } else {
-        hasPitchBend |= std::holds_alternative<PitchBend>(event);
-        hasPortamento |= std::holds_alternative<PortamentoControl>(event);
+        hasPitchBend |= isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+        hasPortamento |= isMidiController(event, MidiController::PortamentoControl);
       }
     }
     expect(attacks == std::vector<u8>{34, 64} && hasPitchBend && !hasPortamento,
@@ -818,9 +819,10 @@ void cps2EarlyZeroRateSlursRemainLinked() {
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
   expect(std::ranges::count_if(
              portamento.tracks[0].events,
-             [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) == 3 &&
-             std::ranges::none_of(portamento.tracks[0].events,
-                                  [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }),
+             [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }) == 3 &&
+             std::ranges::none_of(
+                 portamento.tracks[0].events,
+                 [](const MidiEvent& event) { return isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend); }),
          "native-portamento export should retain all three zero-rate target changes");
 
   const auto slowResult = scan(earlyCps2SlurFixture(1));
@@ -857,11 +859,12 @@ void cps2EarlyPortamentoStartsOnFirstTiedNote() {
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
   const MidiSequence pitchBend =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
-  expect(std::ranges::any_of(portamento.tracks[0].events,
-                             [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) &&
+  expect(std::ranges::any_of(
+             portamento.tracks[0].events,
+             [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }) &&
              std::ranges::any_of(pitchBend.tracks[0].events,
                                  [](const MidiEvent& event) {
-                                   const auto* bend = std::get_if<PitchBend>(&event);
+                                   const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
                                    return bend != nullptr && std::abs(static_cast<int>(bend->value)) > 4096;
                                  }),
          "both MIDI transition renderers should preserve the Dino-style portamento entry");
@@ -1017,25 +1020,29 @@ void cps3HeldNotesRetargetOneVoiceWithoutLosingPitch() {
   const MidiSequence midi = renderMidiSequence(performance, bendOptions);
   const MidiSequence previewMidi =
       renderMidiSequence(performance, bendOptions, ModulationConversionPolicy::SequenceEventSimulation);
-  std::vector<NoteDuration> attacks;
+  std::vector<std::pair<u64, NoteDuration>> attacks;
   for (const auto& event : midi.tracks[0].events) {
-    if (const auto* note = std::get_if<NoteDuration>(&event)) {
-      attacks.push_back(*note);
+    if (const auto* note = std::get_if<NoteDuration>(&event.payload)) {
+      attacks.emplace_back(event.tick, *note);
     }
   }
-  expect(attacks.size() == 3 && attacks[0].tick == 0 && attacks[0].key == 83 && attacks[0].duration == 12 &&
-             attacks[1].tick == 12 && attacks[1].key == 86 && attacks[1].duration == 18 && attacks[2].tick == 30 &&
-             attacks[2].key == 91 && attacks[2].duration == 378,
+  expect(attacks.size() == 3 && attacks[0].first == 0 && attacks[0].second.key == 83 &&
+             attacks[0].second.duration == 12 && attacks[1].first == 12 && attacks[1].second.key == 86 &&
+             attacks[1].second.duration == 18 && attacks[2].first == 30 && attacks[2].second.key == 91 &&
+             attacks[2].second.duration == 378,
          "MIDI lowering should retain three physical attacks while sustaining each held CPS3 voice");
 
   for (const auto* rendered : {&midi, &previewMidi}) {
     std::vector<std::pair<u64, u16>> midiRanges;
     std::vector<std::pair<u64, s16>> midiBends;
+    for (const auto& rpn : midiRpns(rendered->tracks[0].events)) {
+      if (rpn.parameterMsb == 0 && rpn.parameterLsb == 0) {
+        midiRanges.emplace_back(rpn.tick, static_cast<u16>((rpn.value >> 7) * 100 + (rpn.value & 0x7f)));
+      }
+    }
     for (const auto& event : rendered->tracks[0].events) {
-      if (const auto* range = std::get_if<PitchBendRange>(&event)) {
-        midiRanges.emplace_back(range->tick, range->cents);
-      } else if (const auto* bend = std::get_if<PitchBend>(&event)) {
-        midiBends.emplace_back(bend->tick, bend->value);
+      if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend)) {
+        midiBends.emplace_back(event.tick, bend->value);
       }
     }
     expect(midiRanges == std::vector<std::pair<u64, u16>>{{0, 1200}, {12, 400}},

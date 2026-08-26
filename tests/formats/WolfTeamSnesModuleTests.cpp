@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/WolfTeamSnes/WolfTeamSnes.h"
+#include "../MidiTestSupport.h"
 
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/platform/SnesSampleDirectory.h"
@@ -526,13 +527,13 @@ void sameKeyTimedNotesMoveThePendingNoteOff() {
       "Freeze's 0x47dc note must move the pending 0x4753 note-off without another attack");
 
   const MidiSequence midi = renderMidiSequence(performance);
-  std::vector<NoteDuration> midiNotes;
+  std::vector<std::pair<u64, NoteDuration>> midiNotes;
   for (const MidiEvent& event : midi.tracks.front().events) {
-    if (const auto* note = std::get_if<NoteDuration>(&event)) {
-      midiNotes.push_back(*note);
+    if (const auto* note = std::get_if<NoteDuration>(&event.payload)) {
+      midiNotes.emplace_back(event.tick, *note);
     }
   }
-  expect(midiNotes.size() == 1 && midiNotes.front().tick == 0 && midiNotes.front().duration == 192,
+  expect(midiNotes.size() == 1 && midiNotes.front().first == 0 && midiNotes.front().second.duration == 192,
          "Freeze MIDI lowering must keep one attack and move its note-off to the 0x47dc command's new end");
 
   std::vector<u8> segmented(kAramSize);

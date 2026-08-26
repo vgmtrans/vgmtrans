@@ -105,8 +105,7 @@ LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulati
       });
     }
     if (vibrato.delaySeconds) {
-      const s32 delayAmount =
-          synthAmountFromSecondsRange(vibrato.delaySeconds->minimum, vibrato.delaySeconds->maximum);
+      const s32 delayAmount = synthAmountFromSecondsRange(vibrato.delaySeconds->minimum, vibrato.delaySeconds->maximum);
       if (delayAmount != 0) {
         lowered.modulators.push_back(SynthModulator{
             .destination = SynthDestination::VibratoDelay,
@@ -137,8 +136,7 @@ LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulati
       });
     }
     if (tremolo.delaySeconds) {
-      const s32 delayAmount =
-          synthAmountFromSecondsRange(tremolo.delaySeconds->minimum, tremolo.delaySeconds->maximum);
+      const s32 delayAmount = synthAmountFromSecondsRange(tremolo.delaySeconds->minimum, tremolo.delaySeconds->maximum);
       if (delayAmount != 0) {
         lowered.modulators.push_back(SynthModulator{
             .destination = SynthDestination::TremoloDelay,
@@ -205,24 +203,29 @@ void applyMidiModulationScaling(MidiSequence& sequence, const MidiModulationUsag
                                 ModulationScalingPolicy policy) {
   for (auto& track : sequence.tracks) {
     for (auto& event : track.events) {
-      std::visit(
-          [&](auto& typedEvent) {
-            using TypedEvent = std::decay_t<decltype(typedEvent)>;
-            if constexpr (std::is_same_v<TypedEvent, VibratoDepth>) {
-              typedEvent.value = scaledMidiModulationControllerValue(typedEvent.value, typedEvent.normalizedAmount,
-                                                                     &usage.vibratoDepth, policy);
-            } else if constexpr (std::is_same_v<TypedEvent, VibratoFrequency>) {
-              typedEvent.value = scaledMidiModulationControllerValue(typedEvent.value, typedEvent.normalizedAmount,
-                                                                     &usage.vibratoRate, policy);
-            } else if constexpr (std::is_same_v<TypedEvent, TremoloDepth>) {
-              typedEvent.value = scaledMidiModulationControllerValue(typedEvent.value, typedEvent.normalizedAmount,
-                                                                     &usage.tremoloDepth, policy);
-            } else if constexpr (std::is_same_v<TypedEvent, TremoloFrequency>) {
-              typedEvent.value = scaledMidiModulationControllerValue(typedEvent.value, typedEvent.normalizedAmount,
-                                                                     &usage.tremoloRate, policy);
-            }
-          },
-          event);
+      auto* message = std::get_if<MidiChannelMessage>(&event.payload);
+      if (message == nullptr || message->kind != MidiChannelMessageKind::ControlChange) {
+        continue;
+      }
+      const ObservedValueRange* range = nullptr;
+      switch (static_cast<MidiController>(message->parameter)) {
+        case MidiController::Modulation:
+          range = &usage.vibratoDepth;
+          break;
+        case MidiController::VibratoRate:
+          range = &usage.vibratoRate;
+          break;
+        case MidiController::TremoloDepth:
+          range = &usage.tremoloDepth;
+          break;
+        case MidiController::TremoloRate:
+          range = &usage.tremoloRate;
+          break;
+        default:
+          continue;
+      }
+      message->value = scaledMidiModulationControllerValue(static_cast<u8>(message->value), message->normalizedAmount,
+                                                           range, policy);
     }
   }
 }

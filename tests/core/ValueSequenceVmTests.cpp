@@ -5,6 +5,7 @@
  */
 
 #include "ValueTestSupport.h"
+#include "../MidiTestSupport.h"
 
 namespace {
 
@@ -220,8 +221,8 @@ void sequenceVmPreservesDeclaredLoopAsPerformanceMarkers() {
   const std::array<u8, 3> loopBytes{0xfb, 0x00, 0x00};
   const CommandId noteCommand =
       addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  const CommandId loopCommand = addProbeCommand<ProbeDeclaredLoopCommand>(track, config, Address{3},
-                                                                          probeRange(3, loopBytes.size()), loopBytes);
+  const CommandId loopCommand =
+      addProbeCommand<ProbeDeclaredLoopCommand>(track, config, Address{3}, probeRange(3, loopBytes.size()), loopBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
@@ -321,8 +322,8 @@ void sequenceVmPreservesLoopCandidateAsPerformanceMarkers() {
   const std::array<u8, 3> jumpBytes{0xfc, 0x00, 0x00};
   const CommandId noteCommand =
       addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);
-  const CommandId jumpCommand = addProbeCommand<ProbeLoopCandidateCommand>(track, config, Address{3},
-                                                                           probeRange(3, jumpBytes.size()), jumpBytes);
+  const CommandId jumpCommand =
+      addProbeCommand<ProbeLoopCandidateCommand>(track, config, Address{3}, probeRange(3, jumpBytes.size()), jumpBytes);
 
   const SequenceProgram program{
       .runtime = probeSequenceRuntime(),
@@ -400,8 +401,10 @@ void sequenceVmPreservesLoopsAsPerformanceMarkers() {
   const MidiSequence midi = renderMidiSequence(performance);
   const auto countMidiMarkers = [&](std::string_view text, u64 tick) {
     return std::ranges::count_if(midi.tracks[0].events, [text, tick](const MidiEvent& event) {
-      const auto* marker = std::get_if<Marker>(&event);
-      return marker != nullptr && marker->text == text && marker->tick == tick;
+      const auto* marker = midiMeta(event, 6);
+      return marker != nullptr &&
+             std::string_view(reinterpret_cast<const char*>(marker->data.data()), marker->data.size()) == text &&
+             event.tick == tick;
     });
   };
   expect(countMidiMarkers("Loop Start", 0) == 1 && countMidiMarkers("Loop End", 12) == 1,
@@ -533,16 +536,16 @@ void sequenceVmEmitsProgramInitialChannelState() {
          "initial source instrument should preserve its identity without inventing a source command");
 
   const MidiSequence midi = renderMidiSequence(performance);
-  const auto* midiPort = std::get_if<MidiPort>(&midi.tracks[0].events[0]);
-  expect(midiPort != nullptr && midiPort->port == 0, "performance renderer should emit MIDI port metadata");
-  const auto* midiReverb = std::get_if<Reverb>(&midi.tracks[0].events[1]);
+  const auto renderedPort = ::midiPort(midi.tracks[0].events[0]);
+  expect(renderedPort && *renderedPort == 0, "performance renderer should emit MIDI port metadata");
+  const auto* midiReverb = midiController(midi.tracks[0].events[1], MidiController::Reverb);
   expect(midiReverb != nullptr && midiReverb->channel == 0 && midiReverb->value == 0,
          "performance renderer should lower initial reverb to MIDI CC91");
-  expect(std::holds_alternative<Volume>(midi.tracks[0].events[2]) &&
-             std::holds_alternative<Expression>(midi.tracks[0].events[3]),
+  expect(isMidiController(midi.tracks[0].events[2], MidiController::ChannelVolume) &&
+             isMidiController(midi.tracks[0].events[3], MidiController::Expression),
          "performance renderer should lower initial level and expression to their distinct MIDI controllers");
-  const auto* midiMono = std::get_if<MonoMode>(&midi.tracks[0].events[6]);
-  expect(midiMono != nullptr && midiMono->channel == 0 && midiMono->channels == 0,
+  const auto* midiMono = midiController(midi.tracks[0].events[6], MidiController::MonoMode);
+  expect(midiMono != nullptr && midiMono->channel == 0 && midiMono->value == 0,
          "performance renderer should lower initial mono mode to MIDI CC126");
 }
 
@@ -693,8 +696,7 @@ void sequenceVmRepeatReplayUsesCommandAddressesNotSourceOffsets() {
 
   addProbeCommand<ProbeJumpCommand>(track, config, Address{1000}, probeRange(100, jumpToOutsideBytes.size()),
                                     jumpToOutsideBytes);
-  addProbeCommand<ProbeRepeatCommand>(track, config, Address{1003}, probeRange(103, repeatBytes.size()),
-                                      repeatBytes);
+  addProbeCommand<ProbeRepeatCommand>(track, config, Address{1003}, probeRange(103, repeatBytes.size()), repeatBytes);
   addProbeCommand<ProbeJumpCommand>(track, config, Address{2000}, probeRange(200, jumpToSelfBytes.size()),
                                     jumpToSelfBytes);
 
@@ -1494,8 +1496,7 @@ void sequenceVmClosesActiveNotesAtLoopCutoff() {
   TrackProgram loopTrack{.startAddress = Address{0}};
   appendTestCommand(loopTrack, Address{0}, 0, {}, {}, CommandFlow::fallthroughTo(Address{1}), SourceAnnotationId{200});
   appendTestCommand(loopTrack, Address{1}, 0, {}, {},
-                          CommandFlow::jumpTo(Address{0}, Address{2}, JumpSemantics::LoopCandidate),
-                          SourceAnnotationId{201});
+                    CommandFlow::jumpTo(Address{0}, Address{2}, JumpSemantics::LoopCandidate), SourceAnnotationId{201});
 
   const PerformanceSequence performance = SequenceVm().render(SequenceProgram{
       .runtime = runtime,

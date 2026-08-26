@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/SuzukiSnes/SuzukiSnes.h"
+#include "../MidiTestSupport.h"
 
 #include "value/export/DynamicEnvelope.h"
 #include "value/export/SequenceModulationProfile.h"
@@ -338,8 +339,8 @@ void driverDefaultsAndPitchTransitionsAreVersioned() {
   const MidiSequence boosterMidi =
       renderMidiSequence(booster, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   const bool thirdNoteBendsUp = std::ranges::any_of(boosterMidi.tracks.front().events, [](const MidiEvent& event) {
-    const auto* bend = std::get_if<PitchBend>(&event);
-    return bend != nullptr && bend->tick > 96 && bend->value > 0;
+    const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+    return bend != nullptr && event.tick > 96 && bend->value > 0;
   });
   expect(boosterNotes.size() == 3 && firstBoosterSlide != nullptr && thirdBoosterSlide != nullptr &&
              firstBoosterSlide->note == boosterNotes.front()->note && firstBoosterSlide->startKey == 60.0 &&
@@ -397,7 +398,7 @@ void smrBowserPitchSlideContinuesAcrossTies() {
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   expect(std::ranges::any_of(midi.tracks.front().events,
                              [](const MidiEvent& event) {
-                               const auto* bend = std::get_if<PitchBend>(&event);
+                               const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
                                return bend != nullptr && bend->value != 0;
                              }),
          "SMR pitch slide should lower to audible MIDI pitch-bend events");
@@ -499,7 +500,8 @@ void modulationMathMatchesEachDriverRevision() {
   const MidiSequence boosterMidi = renderMidiSequence(booster, {}, ModulationConversionPolicy::SequenceEventSimulation);
   const auto boosterExpressionAt = [&](u64 tick) -> std::optional<u8> {
     for (const MidiEvent& event : boosterMidi.tracks.front().events) {
-      if (const auto* expression = std::get_if<Expression>(&event); expression != nullptr && expression->tick == tick) {
+      if (const auto* expression = midiController(event, MidiController::Expression);
+          expression != nullptr && event.tick == tick) {
         return expression->value;
       }
     }
@@ -515,7 +517,8 @@ void modulationMathMatchesEachDriverRevision() {
       renderMidiSequence(shortTremolo, {}, ModulationConversionPolicy::SequenceEventSimulation);
   const auto expressionAt = [&](u64 tick) -> std::optional<u8> {
     for (const MidiEvent& event : shortTremoloMidi.tracks.front().events) {
-      if (const auto* expression = std::get_if<Expression>(&event); expression != nullptr && expression->tick == tick) {
+      if (const auto* expression = midiController(event, MidiController::Expression);
+          expression != nullptr && event.tick == tick) {
         return expression->value;
       }
     }
@@ -531,8 +534,7 @@ void modulationMathMatchesEachDriverRevision() {
 
   const PerformanceSequence sd3Folded = render(Version::SeikenDensetsu3, {0xf4, 0x07, 0x36, 0xd0});
   const auto* sd3FoldedRate = modulationValue(sd3Folded, ModulationPerformanceTarget::TremoloRate);
-  expect(sd3FoldedRate &&
-             std::abs(sd3FoldedRate->context.cyclesPerTick.value_or(0.0) - (0x36 / 256.0)) < 0.000001,
+  expect(sd3FoldedRate && std::abs(sd3FoldedRate->context.cyclesPerTick.value_or(0.0) - (0x36 / 256.0)) < 0.000001,
          "SD3 folded tremolo should retain its eight-bit accumulator carrier");
 
   const PerformanceSequence restarted = render(Version::SeikenDensetsu3, {0xe9, 0x08, 0x04, 0xeb, 0xea, 0xd0});

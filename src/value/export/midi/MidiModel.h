@@ -15,232 +15,100 @@
 
 namespace vgmtrans::core {
 
-// MIDI event model used just before writing a Standard MIDI File. At this point
-// source playback has already run, loops have been handled, channels/ports have
-// been assigned, and levels have been converted to MIDI controller values.
+// Compact MIDI target used after performance rendering. Most payloads are
+// already MIDI messages; only duration notes and logical bank selection remain
+// structured because later export stages still operate on them.
 
-struct NoteOn {
-  u64 tick = 0;
-  u8 channel = 0;
-  u8 key = 0;
-  u8 velocity = 0;
+enum class MidiChannelMessageKind : u8 {
+  ControlChange,
+  ProgramChange,
+  PitchBend,
 };
 
-struct NoteOff {
-  u64 tick = 0;
+enum class MidiController : u8 {
+  BankSelectMsb = 0,
+  Modulation = 1,
+  PortamentoTime = 5,
+  RpnDataMsb = 6,
+  ChannelVolume = 7,
+  Pan = 10,
+  Expression = 11,
+  BankSelectLsb = 32,
+  PortamentoTimeLsb = 37,
+  RpnDataLsb = 38,
+  ChannelVolumeLsb = 39,
+  ExpressionLsb = 43,
+  Portamento = 65,
+  Legato = 68,
+  TremoloRate = 75,
+  VibratoRate = 76,
+  VibratoDelay = 78,
+  TremoloDelay = 79,
+  PortamentoControl = 84,
+  Reverb = 91,
+  TremoloDepth = 92,
+  RpnParameterLsb = 100,
+  RpnParameterMsb = 101,
+  AllSoundOff = 120,
+  MonoMode = 126,
+};
+
+enum class MidiValueUnit : u8 {
+  Data,
+  Ticks,
+};
+
+struct MidiChannelMessage {
+  MidiChannelMessageKind kind = MidiChannelMessageKind::ControlChange;
   u8 channel = 0;
-  u8 key = 0;
-  u8 velocity = 0;
+  s32 parameter = 0;
+  s32 value = 0;
+  int priority = 20;
+  // Delay controllers are represented in ticks until collection stitching has
+  // reconciled PPQN. All other values are already MIDI data.
+  MidiValueUnit valueUnit = MidiValueUnit::Data;
+  // Physical modulation scaling may revise four controller values after tracks
+  // have been combined. Other channel messages leave this empty.
+  std::optional<double> normalizedAmount;
 };
 
 struct NoteDuration {
-  u64 tick = 0;
   u8 channel = 0;
   u8 key = 0;
   u8 velocity = 0;
-  // The renderer keeps note duration as one event. encodeMidiFile expands it to
-  // note-on/note-off messages when writing the file.
   u32 duration = 0;
 };
 
-struct Tempo {
-  u64 tick = 0;
-  u32 microsecondsPerQuarter = 500000;
-};
-
-struct TimeSignature {
-  u64 tick = 0;
-  u8 numerator = 4;
-  u8 denominator = 4;
-  u8 clocksPerMetronomeClick = 24;
-};
-
-struct MidiPort {
-  u64 tick = 0;
-  u8 port = 0;
-};
-
-struct ProgramChange {
-  u64 tick = 0;
-  u8 channel = 0;
-  u8 program = 0;
-};
-
 struct BankSelect {
-  u64 tick = 0;
   u8 channel = 0;
   u16 bank = 0;
   bool writeLsb = true;
 };
 
-struct Volume {
-  u64 tick = 0;
-  u8 channel = 0;
-  u8 value = 0;
+struct MidiMetaMessage {
+  u8 type = 0;
+  std::vector<u8> data;
+  int priority = 0;
 };
 
-struct Volume14 {
-  u64 tick = 0;
-  u8 channel = 0;
-  // Some source drivers have finer resolution or nonlinear amplitude curves. Keep a
-  // 14-bit event here so exporters can write MSB/LSB controller pairs when useful.
-  u16 value = 0;
+struct MidiSysExMessage {
+  // Data excludes the leading F0 status byte and includes any terminating F7.
+  std::vector<u8> data;
+  int priority = 5;
 };
 
-struct Pan {
-  u64 tick = 0;
-  u8 channel = 0;
-  u8 value = 64;
-};
+using MidiEventPayload = std::variant<NoteDuration, BankSelect, MidiChannelMessage, MidiMetaMessage, MidiSysExMessage>;
 
-struct Expression {
+struct MidiEvent {
   u64 tick = 0;
-  u8 channel = 0;
-  u8 value = 127;
+  MidiEventPayload payload;
 };
-
-struct Expression14 {
-  u64 tick = 0;
-  u8 channel = 0;
-  u16 value = 16383;
-};
-
-struct MasterVolume {
-  u64 tick = 0;
-  u16 value = 0;
-};
-
-struct Reverb {
-  u64 tick = 0;
-  u8 channel = 0;
-  u8 value = 0;
-};
-
-struct FineTune {
-  u64 tick = 0;
-  u8 channel = 0;
-  double cents = 0.0;
-};
-
-struct CoarseTune {
-  u64 tick = 0;
-  u8 channel = 0;
-  s8 semitones = 0;
-};
-
-struct PitchBend {
-  u64 tick = 0;
-  u8 channel = 0;
-  s16 value = 0;
-};
-
-struct PitchBendRange {
-  u64 tick = 0;
-  u8 channel = 0;
-  u16 cents = 200;
-};
-
-struct VibratoDepth {
-  u64 tick = 0;
-  u8 channel = 0;
-  u8 value = 0;
-  std::optional<double> normalizedAmount;
-};
-
-struct VibratoFrequency {
-  u64 tick = 0;
-  u8 channel = 0;
-  u8 value = 0;
-  std::optional<double> normalizedAmount;
-};
-
-struct VibratoDelay {
-  u64 tick = 0;
-  u8 channel = 0;
-  u32 ticks = 0;
-};
-
-struct TremoloDepth {
-  u64 tick = 0;
-  u8 channel = 0;
-  u8 value = 0;
-  std::optional<double> normalizedAmount;
-};
-
-struct TremoloFrequency {
-  u64 tick = 0;
-  u8 channel = 0;
-  u8 value = 0;
-  std::optional<double> normalizedAmount;
-};
-
-struct TremoloDelay {
-  u64 tick = 0;
-  u8 channel = 0;
-  u32 ticks = 0;
-};
-
-struct PortamentoEnable {
-  u64 tick = 0;
-  u8 channel = 0;
-  bool enabled = false;
-};
-
-struct PortamentoTime {
-  u64 tick = 0;
-  u8 channel = 0;
-  u8 value = 0;
-};
-
-struct PortamentoTime14 {
-  u64 tick = 0;
-  u8 channel = 0;
-  u16 value = 0;
-};
-
-struct PortamentoControl {
-  u64 tick = 0;
-  u8 channel = 0;
-  u8 key = 0;
-};
-
-struct LegatoPedal {
-  u64 tick = 0;
-  u8 channel = 0;
-  bool enabled = false;
-};
-
-struct AllSoundOff {
-  u64 tick = 0;
-  u8 channel = 0;
-};
-
-struct MonoMode {
-  u64 tick = 0;
-  u8 channel = 0;
-  u8 channels = 1;
-};
-
-struct EndOfTrack {
-  u64 tick = 0;
-};
-
-struct Marker {
-  u64 tick = 0;
-  std::string text;
-};
-
-using MidiEvent = std::variant<NoteOn, NoteOff, NoteDuration, Tempo, TimeSignature, MidiPort, ProgramChange, BankSelect,
-                               Volume, Volume14, Pan, Expression, Expression14, MasterVolume, Reverb, FineTune,
-                               CoarseTune, PitchBend, PitchBendRange, VibratoDepth, VibratoFrequency, VibratoDelay,
-                               TremoloDepth, TremoloFrequency, TremoloDelay, PortamentoEnable, PortamentoTime,
-                               PortamentoTime14, PortamentoControl, LegatoPedal, AllSoundOff, MonoMode, EndOfTrack,
-                               Marker>;
 
 struct MidiTrack {
   // Empty names are valid; the exporter will omit track-name meta events.
   std::string name;
   std::vector<MidiEvent> events;
+  u64 endTick = 0;
 };
 
 struct MidiSequence {
@@ -249,5 +117,23 @@ struct MidiSequence {
   // Keep export warnings with the rendered MIDI data so callers can still receive a usable file.
   std::vector<Diagnostic> diagnostics;
 };
+
+namespace midi {
+
+[[nodiscard]] MidiEvent note(u64 tick, u8 channel, u8 key, u8 velocity, u32 duration);
+[[nodiscard]] MidiEvent bankSelect(u64 tick, u8 channel, u16 bank, bool writeLsb);
+[[nodiscard]] MidiEvent controller(u64 tick, u8 channel, MidiController controller, s32 value, int priority = 20,
+                                   MidiValueUnit unit = MidiValueUnit::Data,
+                                   std::optional<double> normalizedAmount = std::nullopt);
+[[nodiscard]] MidiEvent programChange(u64 tick, u8 channel, u8 program);
+[[nodiscard]] MidiEvent pitchBend(u64 tick, u8 channel, s16 value);
+[[nodiscard]] MidiEvent meta(u64 tick, u8 type, std::vector<u8> data, int priority = 0);
+[[nodiscard]] MidiEvent sysex(u64 tick, std::vector<u8> data, int priority = 5);
+
+void appendController14(MidiTrack& track, u64 tick, u8 channel, MidiController msb, MidiController lsb, u16 value,
+                        bool lsbFirst = false);
+void appendRpn(MidiTrack& track, u64 tick, u8 channel, u8 parameterMsb, u8 parameterLsb, u16 value, int priority = 18);
+
+}  // namespace midi
 
 }  // namespace vgmtrans::core

@@ -5,6 +5,7 @@
  */
 
 #include "ValueTestSupport.h"
+#include "../MidiTestSupport.h"
 
 #include "value/export/DynamicEnvelope.h"
 
@@ -320,8 +321,8 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero() {
       renderMidiSequence(materialized.performance, {}, ModulationConversionPolicy::SynthModulators, views);
   std::vector<std::pair<u64, u16>> banks;
   for (const auto& event : midi.tracks[0].events) {
-    if (const auto* bank = std::get_if<BankSelect>(&event)) {
-      banks.emplace_back(bank->tick, bank->bank);
+    if (const auto* bank = std::get_if<BankSelect>(&event.payload)) {
+      banks.emplace_back(event.tick, bank->bank);
     }
   }
   expect(std::ranges::find(banks, std::pair<u64, u16>{0, 128}) != banks.end(),
@@ -330,8 +331,8 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero() {
          "restoring the base envelope should explicitly return MIDI to bank zero");
   expect(std::ranges::any_of(midi.tracks[0].events,
                              [](const MidiEvent& event) {
-                               const auto* program = std::get_if<ProgramChange>(&event);
-                               return program != nullptr && program->tick == 10 && program->program == 0;
+                               const auto* program = midiChannelMessage(event, MidiChannelMessageKind::ProgramChange);
+                               return program != nullptr && event.tick == 10 && program->value == 0;
                              }),
          "a bank change should reselect the program even when its number is unchanged");
   expect(std::ranges::none_of(banks, [](const auto& bank) { return bank.first == 4; }),

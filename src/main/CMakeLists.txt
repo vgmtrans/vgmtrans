@@ -159,6 +159,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/export/SequenceModulationProfile.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiExporter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiExporter.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiModel.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiModel.h
     ${PROJECT_SOURCE_DIR}/src/value/export/synth/ModulationScaling.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/synth/ModulationScaling.h
