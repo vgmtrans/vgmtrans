@@ -47,7 +47,7 @@ struct Collection {
   CollectionMembers members;
   std::vector<CollectionIssue> issues;
 
-  [[nodiscard]] CollectionResolution resolution() const noexcept { return collectionResolution(issues); }
+  [[nodiscard]] CollectionIssueImpact issueImpact() const noexcept;
 };
 
 // Copyable read-only view of one Session revision. Copies share immutable

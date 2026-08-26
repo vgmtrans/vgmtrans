@@ -239,9 +239,13 @@ void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::stri
         const auto bytes = input.reader.slice(0, input.reader.size());
         return ExtractionResult{
             .sources = {ExtractedSource{
-                .file = SourceFile{.name = input.source.name + ".child", .knownFormat = "probe-sequence"},
+                .file =
+                    SourceFile{
+                        .name = input.source.name + ".child",
+                        .origin = input.reader.range(0, 1),
+                        .knownFormat = "probe-sequence",
+                    },
                 .bytes = std::vector<u8>(bytes.begin(), bytes.end()),
-                .origin = input.reader.range(0, 1),
             }},
         };
       },
@@ -500,9 +504,12 @@ struct ProbeBankData {
 
   return ExtractionResult{
       .sources = {ExtractedSource{
-          .file = SourceFile{.name = "bad-parent.child"},
+          .file =
+              SourceFile{
+                  .name = "bad-parent.child",
+                  .origin = SourceRange{.source = SourceId{99}, .offset = 0, .size = 1},
+              },
           .bytes = {0xbb},
-          .origin = SourceRange{.source = SourceId{99}, .offset = 0, .size = 1},
       }},
   };
 }

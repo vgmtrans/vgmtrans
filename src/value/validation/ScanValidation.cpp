@@ -346,18 +346,19 @@ ValidationReport validateExtractionResult(SourceId source, const ExtractionResul
   }
 
   for (const auto& extracted : result.sources) {
+    const auto& origin = extracted.file.origin;
     if (extracted.file.knownFormat && extracted.file.knownFormat->empty()) {
       report.error("scan.extracted-source.empty-known-format",
-                   "Extraction result contained a source with an empty known format", extracted.origin);
+                   "Extraction result contained a source with an empty known format", origin);
     }
-    if (extracted.origin && extracted.origin->source.valid() && !sources.contains(extracted.origin->source)) {
-      report.error("scan.extracted-source.missing-parent",
-                   "Extraction result contained a source with missing parent source " +
-                       std::to_string(extracted.origin->source.value),
-                   extracted.origin);
+    if (origin && origin->source.valid() && !sources.contains(origin->source)) {
+      report.error(
+          "scan.extracted-source.missing-parent",
+          "Extraction result contained a source with missing parent source " + std::to_string(origin->source.value),
+          origin);
     }
-    if (extracted.origin && sources.contains(extracted.origin->source)) {
-      validateRange(report, sources, *extracted.origin, "extracted source origin", "Extraction result");
+    if (origin && sources.contains(origin->source)) {
+      validateRange(report, sources, *origin, "extracted source origin", "Extraction result");
     }
   }
   return report;

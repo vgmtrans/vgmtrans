@@ -492,13 +492,7 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
 void Session::addExtractedSources(std::vector<ExtractedSource> extractedSources, SourceId defaultParent,
                                   std::vector<SourceId>& queue, std::set<u32>& queued) {
   for (auto& extracted : extractedSources) {
-    SourceId parent = defaultParent;
-    if (extracted.origin && extracted.origin->source.valid()) {
-      parent = extracted.origin->source;
-    }
-
-    const SourceId derived =
-        sources_.addDerived(std::move(extracted.file), std::move(extracted.bytes), parent, extracted.origin);
+    const SourceId derived = sources_.addDerived(std::move(extracted.file), std::move(extracted.bytes), defaultParent);
     if (queued.insert(derived.value).second) {
       queue.push_back(derived);
     }

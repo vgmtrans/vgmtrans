@@ -138,10 +138,10 @@ constexpr std::string_view kExtendedId666Signature = "xid6";
               .name = sourceName(input.source) + " - ram",
               .title = spcTitle(spcBytes),
               .path = input.source.path,
+              .origin = origin,
               .knownFormat = std::string(source_formats::kSnesAram),
           },
       .bytes = std::move(ram),
-      .origin = origin,
   });
   return result;
 }

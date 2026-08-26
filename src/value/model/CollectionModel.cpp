@@ -58,17 +58,4 @@ CollectionIssue ambiguousMatchIssue(std::string message, std::optional<AssetId> 
   };
 }
 
-CollectionResolution collectionResolution(std::span<const CollectionIssue> issues) noexcept {
-  CollectionResolution resolution = CollectionResolution::Resolved;
-  for (const auto& issue : issues) {
-    if (issue.impact == CollectionIssueImpact::Ambiguous) {
-      return CollectionResolution::Ambiguous;
-    }
-    if (issue.impact == CollectionIssueImpact::Incomplete) {
-      resolution = CollectionResolution::Incomplete;
-    }
-  }
-  return resolution;
-}
-
 }  // namespace vgmtrans::core

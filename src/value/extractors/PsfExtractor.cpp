@@ -403,6 +403,7 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
   SourceFile file{
       .name = sourceName(input.source),
       .path = input.source.path,
+      .origin = range,
       .knownFormat = std::string(extractedFormat(psf.version)),
   };
   if (auto title = psf.tags.find("title"); title != psf.tags.end() && !title->second.empty()) {
@@ -417,7 +418,6 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
   result.sources.push_back(ExtractedSource{
       .file = std::move(file),
       .bytes = std::move(image.data),
-      .origin = range,
   });
   return result;
 }

@@ -84,21 +84,8 @@ const Asset* SessionState::asset(AssetId id) const noexcept {
 }
 
 void SessionState::appendScan(SourceId origin, ScanResult result) {
-  std::unordered_set<u32> batchAssetIds;
-  batchAssetIds.reserve(result.assets.size());
-  for (const auto& value : result.assets) {
-    const AssetId id = metadata(value).id;
-    if (!id.valid()) {
-      throw std::invalid_argument("Scan result contained an asset without an id");
-    }
-    if (!batchAssetIds.insert(id.value).second) {
-      throw std::invalid_argument("Scan result contained duplicate asset id " + std::to_string(id.value));
-    }
-    if (assetsById_.contains(id.value)) {
-      throw std::invalid_argument("Scan result reused existing asset id " + std::to_string(id.value));
-    }
-  }
-
+  // validateScanResult() has already admitted asset IDs. Annotation IDs need a
+  // separate cross-scan check because validation does not see session annotations.
   for (const auto& annotation : result.sourceMap.annotations()) {
     if (annotation.id.valid() && annotationIds_.contains(annotation.id.value)) {
       throw std::invalid_argument("Source map reused existing annotation id " + std::to_string(annotation.id.value));
