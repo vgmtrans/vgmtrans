@@ -10,7 +10,6 @@
 
 #include <functional>
 #include <optional>
-#include <span>
 #include <string>
 #include <vector>
 
@@ -35,17 +34,12 @@ struct CollectionMembers {
   std::vector<AssetId> miscAssets;
 };
 
-enum class CollectionResolution {
-  Resolved,
-  Incomplete,
-  Ambiguous,
-};
-
 enum class CollectionOrigin {
   Discovered,
   UserCreated,
 };
 
+// Ordered by precedence so a collection's status is its greatest issue impact.
 enum class CollectionIssueImpact {
   None,
   Incomplete,
@@ -80,9 +74,5 @@ struct DesiredCollection {
 [[nodiscard]] CollectionIssue ambiguousMatchIssue(std::string message = "Collection has ambiguous matches",
                                                   std::optional<AssetId> asset = std::nullopt,
                                                   std::optional<SourceRange> range = std::nullopt);
-
-// Resolution summarizes the semantic effect of the issues. Ambiguity takes
-// precedence when a collection has more than one kind of problem.
-[[nodiscard]] CollectionResolution collectionResolution(std::span<const CollectionIssue> issues) noexcept;
 
 }  // namespace vgmtrans::core

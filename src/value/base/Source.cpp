@@ -125,15 +125,14 @@ SourceId SourceStore::add(SourceFile file, std::vector<u8> bytes) {
   return id;
 }
 
-SourceId SourceStore::addDerived(SourceFile file, std::vector<u8> bytes, SourceId parent,
-                                 std::optional<SourceRange> origin) {
+SourceId SourceStore::addDerived(SourceFile file, std::vector<u8> bytes, SourceId defaultParent) {
+  const SourceId parent = file.origin && file.origin->source.valid() ? file.origin->source : defaultParent;
   if (!contains(parent)) {
     throw std::invalid_argument("Derived source parent is not present");
   }
 
   file.kind = SourceKind::Derived;
   file.parent = parent;
-  file.origin = origin;
   return add(std::move(file), std::move(bytes));
 }
 

@@ -525,6 +525,7 @@ namespace {
       .name = set->name + " ROM regions",
       .title = set->name,
       .path = input.source.path,
+      .origin = archiveRange,
       .knownFormat = set->format,
       .attributes =
           {
@@ -560,7 +561,6 @@ namespace {
   result.sources.push_back(ExtractedSource{
       .file = std::move(assembledFile),
       .bytes = std::move(assembledBytes),
-      .origin = archiveRange,
   });
   return result;
 }

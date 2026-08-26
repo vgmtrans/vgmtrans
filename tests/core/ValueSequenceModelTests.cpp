@@ -108,14 +108,14 @@ void sequenceValidationProtectsPositionalCommandStorage() {
          "sequence validation should reject duplicate, out-of-order, and missing-start command storage");
 }
 
-void collectionIssuesDeriveResolution() {
+void collectionIssuesDeriveImpact() {
   const CollectionIssue missingSequence = missingSequenceIssue();
   expect(missingSequence.impact == CollectionIssueImpact::Incomplete && missingSequence.severity == Severity::Warning &&
              missingSequence.code == "missing-sequence",
          "missing sequence helper should create a warning issue");
   const std::vector<CollectionIssue> missingIssues{missingSequence};
-  expect(collectionResolution(missingIssues) == CollectionResolution::Incomplete,
-         "missing issues should make collection resolution incomplete");
+  expect(Collection{.issues = missingIssues}.issueImpact() == CollectionIssueImpact::Incomplete,
+         "missing issues should make a collection incomplete");
 
   const CollectionIssue missingInstrument = missingSoundBankIssue(AssetId{7});
   expect(missingInstrument.severity == Severity::Error && missingInstrument.asset == AssetId{7},
@@ -123,14 +123,14 @@ void collectionIssuesDeriveResolution() {
 
   const CollectionIssue ambiguous = ambiguousMatchIssue("multiple banks match");
   const std::vector<CollectionIssue> ambiguousIssues{ambiguous};
-  expect(collectionResolution(ambiguousIssues) == CollectionResolution::Ambiguous,
-         "ambiguous match issue should make collection resolution ambiguous");
-  expect(collectionResolution(std::vector{missingSequence, ambiguous}) == CollectionResolution::Ambiguous,
+  expect(Collection{.issues = ambiguousIssues}.issueImpact() == CollectionIssueImpact::Ambiguous,
+         "ambiguous match issue should make a collection ambiguous");
+  expect(Collection{.issues = {missingSequence, ambiguous}}.issueImpact() == CollectionIssueImpact::Ambiguous,
          "ambiguity should take precedence when a collection is also incomplete");
 
   const Collection incomplete{.issues = {missingSamplePoolIssue()}};
-  expect(incomplete.resolution() == CollectionResolution::Incomplete,
-         "collection resolution should be derived from its issues");
+  expect(incomplete.issueImpact() == CollectionIssueImpact::Incomplete,
+         "collection impact should be derived from its issues");
 }
 
 void performanceAutomationRetainsIntentAlongsideOneEventTimeline() {
@@ -420,7 +420,7 @@ void runValueSequenceModelTests() {
   sourceCommandsRetainOnlySemanticData();
   sequenceSourceRangeIncludesDecodedCommandsFromTheBaseSource();
   sequenceValidationProtectsPositionalCommandStorage();
-  collectionIssuesDeriveResolution();
+  collectionIssuesDeriveImpact();
   performanceAutomationRetainsIntentAlongsideOneEventTimeline();
   performanceEmitterBindsScalarAutomationWithoutExposingStorage();
   performanceBoundValueOwnsReplacementLifecycle();

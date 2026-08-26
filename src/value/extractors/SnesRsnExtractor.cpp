@@ -92,9 +92,8 @@ using ArchivePtr = std::unique_ptr<ar_archive, ArchiveCloser>;
     }
 
     result.sources.push_back(ExtractedSource{
-        .file = SourceFile{.name = rawName, .path = input.source.path},
+        .file = SourceFile{.name = rawName, .path = input.source.path, .origin = sourceRange},
         .bytes = std::move(entryBytes),
-        .origin = sourceRange,
     });
   }
 

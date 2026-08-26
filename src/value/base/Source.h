@@ -143,7 +143,6 @@ struct ExtractedSource {
   // so they can be inspected and processed like user-loaded files.
   SourceFile file;
   std::vector<u8> bytes;
-  std::optional<SourceRange> origin;
 };
 
 class SourceStore {
@@ -151,7 +150,7 @@ public:
   // SourceStore owns all bytes referenced by SourceRange. Assets copy SourceRange
   // values instead of copying source bytes.
   SourceId add(SourceFile file, std::vector<u8> bytes);
-  SourceId addDerived(SourceFile file, std::vector<u8> bytes, SourceId parent, std::optional<SourceRange> origin);
+  SourceId addDerived(SourceFile file, std::vector<u8> bytes, SourceId defaultParent);
   [[nodiscard]] std::vector<SourceId> removeFamily(SourceId id);
 
   [[nodiscard]] bool contains(SourceId id) const noexcept;

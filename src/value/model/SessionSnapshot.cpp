@@ -31,6 +31,16 @@ const AssetMetadata& metadata(const Asset& asset) {
   return std::visit([](const auto& typedAsset) -> const AssetMetadata& { return typedAsset.metadata; }, asset);
 }
 
+CollectionIssueImpact Collection::issueImpact() const noexcept {
+  CollectionIssueImpact impact = CollectionIssueImpact::None;
+  for (const auto& issue : issues) {
+    if (issue.impact > impact) {
+      impact = issue.impact;
+    }
+  }
+  return impact;
+}
+
 SessionSnapshot::Storage::Storage(std::vector<SourceFile> sourcesValue, SharedSequence<Asset> assetsValue,
                                   std::vector<Collection> collectionsValue, SourceMap sourceMapValue,
                                   std::vector<Diagnostic> diagnosticsValue)
