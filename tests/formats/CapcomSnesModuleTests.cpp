@@ -525,7 +525,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(isMidiChannelMessage(midiSequence.tracks[0].events[5], MidiChannelMessageKind::ProgramChange),
          "CapcomSnes source command should emit program changes");
   expect(isMidiController(midiSequence.tracks[0].events[6], MidiController::ChannelVolume) &&
-             isMidiController(midiSequence.tracks[0].events[7], MidiController::ChannelVolumeLsb),
+             isMidiControllerLsb(midiSequence.tracks[0].events[7], MidiController::ChannelVolume),
          "CapcomSnes source command should emit high-resolution target-quantized volume");
   expect(midiController(midiSequence.tracks[0].events[8], MidiController::Pan)->value == 64,
          "CapcomSnes center pan should map to MIDI center pan");
@@ -1566,7 +1566,7 @@ void capcomSnesSequenceEmitsStructuredPitchSlides() {
   expect(std::ranges::none_of(pitchBendMidi.tracks[0].events,
                               [](const MidiEvent& event) {
                                 return isMidiController(event, MidiController::PortamentoTime) ||
-                                       isMidiController(event, MidiController::PortamentoTimeLsb) ||
+                                       isMidiControllerLsb(event, MidiController::PortamentoTime) ||
                                        isMidiController(event, MidiController::PortamentoControl);
                               }) &&
              std::ranges::any_of(

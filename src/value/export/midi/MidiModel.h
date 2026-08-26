@@ -34,10 +34,7 @@ enum class MidiController : u8 {
   Pan = 10,
   Expression = 11,
   BankSelectLsb = 32,
-  PortamentoTimeLsb = 37,
   RpnDataLsb = 38,
-  ChannelVolumeLsb = 39,
-  ExpressionLsb = 43,
   Portamento = 65,
   Legato = 68,
   TremoloRate = 75,
@@ -53,20 +50,11 @@ enum class MidiController : u8 {
   MonoMode = 126,
 };
 
-enum class MidiValueUnit : u8 {
-  Data,
-  Ticks,
-};
-
 struct MidiChannelMessage {
   MidiChannelMessageKind kind = MidiChannelMessageKind::ControlChange;
   u8 channel = 0;
-  s32 parameter = 0;
+  u8 parameter = 0;
   s32 value = 0;
-  int priority = 20;
-  // Delay controllers are represented in ticks until collection stitching has
-  // reconciled PPQN. All other values are already MIDI data.
-  MidiValueUnit valueUnit = MidiValueUnit::Data;
   // Physical modulation scaling may revise four controller values after tracks
   // have been combined. Other channel messages leave this empty.
   std::optional<double> normalizedAmount;
@@ -81,6 +69,7 @@ struct NoteDuration {
 
 struct BankSelect {
   u8 channel = 0;
+  // Logical bank; the exporter applies the selected MSB-only or MSB/LSB encoding.
   u16 bank = 0;
   bool writeLsb = true;
 };
@@ -88,20 +77,17 @@ struct BankSelect {
 struct MidiMetaMessage {
   u8 type = 0;
   std::vector<u8> data;
-  int priority = 0;
 };
 
 struct MidiSysExMessage {
   // Data excludes the leading F0 status byte and includes any terminating F7.
   std::vector<u8> data;
-  int priority = 5;
 };
-
-using MidiEventPayload = std::variant<NoteDuration, BankSelect, MidiChannelMessage, MidiMetaMessage, MidiSysExMessage>;
 
 struct MidiEvent {
   u64 tick = 0;
-  MidiEventPayload payload;
+  int priority = 20;
+  std::variant<NoteDuration, BankSelect, MidiChannelMessage, MidiMetaMessage, MidiSysExMessage> payload;
 };
 
 struct MidiTrack {
@@ -123,15 +109,13 @@ namespace midi {
 [[nodiscard]] MidiEvent note(u64 tick, u8 channel, u8 key, u8 velocity, u32 duration);
 [[nodiscard]] MidiEvent bankSelect(u64 tick, u8 channel, u16 bank, bool writeLsb);
 [[nodiscard]] MidiEvent controller(u64 tick, u8 channel, MidiController controller, s32 value, int priority = 20,
-                                   MidiValueUnit unit = MidiValueUnit::Data,
                                    std::optional<double> normalizedAmount = std::nullopt);
 [[nodiscard]] MidiEvent programChange(u64 tick, u8 channel, u8 program);
 [[nodiscard]] MidiEvent pitchBend(u64 tick, u8 channel, s16 value);
 [[nodiscard]] MidiEvent meta(u64 tick, u8 type, std::vector<u8> data, int priority = 0);
 [[nodiscard]] MidiEvent sysex(u64 tick, std::vector<u8> data, int priority = 5);
 
-void appendController14(MidiTrack& track, u64 tick, u8 channel, MidiController msb, MidiController lsb, u16 value,
-                        bool lsbFirst = false);
+void appendController14(MidiTrack& track, u64 tick, u8 channel, MidiController msb, u16 value, bool lsbFirst = false);
 void appendRpn(MidiTrack& track, u64 tick, u8 channel, u8 parameterMsb, u8 parameterLsb, u16 value, int priority = 18);
 
 }  // namespace midi

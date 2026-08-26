@@ -33,6 +33,10 @@ inline bool isMidiController(const vgmtrans::core::MidiEvent& event, vgmtrans::c
   return midiController(event, controller) != nullptr;
 }
 
+inline bool isMidiControllerLsb(const vgmtrans::core::MidiEvent& event, vgmtrans::core::MidiController msbController) {
+  return isMidiController(event, static_cast<vgmtrans::core::MidiController>(static_cast<u8>(msbController) + 32));
+}
+
 inline const vgmtrans::core::MidiChannelMessage* midiChannelMessage(const vgmtrans::core::MidiEvent& event,
                                                                     vgmtrans::core::MidiChannelMessageKind kind) {
   const auto* message = std::get_if<vgmtrans::core::MidiChannelMessage>(&event.payload);
@@ -137,8 +141,8 @@ inline std::vector<std::pair<u64, u16>> midiPitchBendRanges(std::span<const vgmt
 }
 
 inline std::optional<u16> firstMidiController14(std::span<const vgmtrans::core::MidiEvent> events,
-                                                vgmtrans::core::MidiController msb,
-                                                vgmtrans::core::MidiController lsb) {
+                                                vgmtrans::core::MidiController msb) {
+  const auto lsb = static_cast<vgmtrans::core::MidiController>(static_cast<u8>(msb) + 32);
   for (size_t index = 0; index + 1 < events.size(); ++index) {
     const auto* firstMsb = midiController(events[index], msb);
     const auto* firstLsb = midiController(events[index + 1], lsb);

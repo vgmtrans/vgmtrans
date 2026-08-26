@@ -12,28 +12,25 @@ namespace vgmtrans::core::midi {
 
 namespace {
 
-MidiEvent channelMessage(u64 tick, MidiChannelMessageKind kind, u8 channel, s32 parameter, s32 value, int priority) {
-  return {tick, MidiChannelMessage{kind, channel, parameter, value, priority}};
+MidiEvent channelMessage(u64 tick, MidiChannelMessageKind kind, u8 channel, u8 parameter, s32 value, int priority,
+                         std::optional<double> normalizedAmount = std::nullopt) {
+  return {tick, priority, MidiChannelMessage{kind, channel, parameter, value, normalizedAmount}};
 }
 
 }  // namespace
 
 MidiEvent note(u64 tick, u8 channel, u8 key, u8 velocity, u32 duration) {
-  return {tick, NoteDuration{channel, key, velocity, duration}};
+  return {tick, 50, NoteDuration{channel, key, velocity, duration}};
 }
 
 MidiEvent bankSelect(u64 tick, u8 channel, u16 bank, bool writeLsb) {
-  return {tick, BankSelect{channel, bank, writeLsb}};
+  return {tick, 15, BankSelect{channel, bank, writeLsb}};
 }
 
-MidiEvent controller(u64 tick, u8 channel, MidiController controllerNumber, s32 value, int priority, MidiValueUnit unit,
+MidiEvent controller(u64 tick, u8 channel, MidiController controllerNumber, s32 value, int priority,
                      std::optional<double> normalizedAmount) {
-  MidiEvent event = channelMessage(tick, MidiChannelMessageKind::ControlChange, channel,
-                                   static_cast<u8>(controllerNumber), value, priority);
-  auto& message = std::get<MidiChannelMessage>(event.payload);
-  message.valueUnit = unit;
-  message.normalizedAmount = normalizedAmount;
-  return event;
+  return channelMessage(tick, MidiChannelMessageKind::ControlChange, channel, static_cast<u8>(controllerNumber), value,
+                        priority, normalizedAmount);
 }
 
 MidiEvent programChange(u64 tick, u8 channel, u8 program) {
@@ -45,15 +42,15 @@ MidiEvent pitchBend(u64 tick, u8 channel, s16 value) {
 }
 
 MidiEvent meta(u64 tick, u8 type, std::vector<u8> data, int priority) {
-  return {tick, MidiMetaMessage{type, std::move(data), priority}};
+  return {tick, priority, MidiMetaMessage{type, std::move(data)}};
 }
 
 MidiEvent sysex(u64 tick, std::vector<u8> data, int priority) {
-  return {tick, MidiSysExMessage{std::move(data), priority}};
+  return {tick, priority, MidiSysExMessage{std::move(data)}};
 }
 
-void appendController14(MidiTrack& track, u64 tick, u8 channel, MidiController msb, MidiController lsb, u16 value,
-                        bool lsbFirst) {
+void appendController14(MidiTrack& track, u64 tick, u8 channel, MidiController msb, u16 value, bool lsbFirst) {
+  const auto lsb = static_cast<MidiController>(static_cast<u8>(msb) + 32);
   const MidiEvent most = controller(tick, channel, msb, (value >> 7) & 0x7f);
   const MidiEvent least = controller(tick, channel, lsb, value & 0x7f);
   if (lsbFirst) {

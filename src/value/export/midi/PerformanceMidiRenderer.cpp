@@ -34,8 +34,8 @@ namespace {
 }
 
 void addController(MidiTrack& track, u64 tick, u8 channel, MidiController controller, s32 value, int priority = 20,
-                   MidiValueUnit unit = MidiValueUnit::Data, std::optional<double> normalizedAmount = std::nullopt) {
-  track.events.push_back(midi::controller(tick, channel, controller, value, priority, unit, normalizedAmount));
+                   std::optional<double> normalizedAmount = std::nullopt) {
+  track.events.push_back(midi::controller(tick, channel, controller, value, priority, normalizedAmount));
 }
 
 void addPitchBendRange(MidiTrack& track, u64 tick, u8 channel, u16 cents) {
@@ -229,8 +229,7 @@ void addVolume(MidiTrack& track, MidiControllerState* state, u64 tick, u8 channe
     if (state != nullptr && state->volume14 && *state->volume14 == value) {
       return;
     }
-    midi::appendController14(track, tick, channel, MidiController::ChannelVolume, MidiController::ChannelVolumeLsb,
-                             value);
+    midi::appendController14(track, tick, channel, MidiController::ChannelVolume, value);
     if (state != nullptr) {
       state->volume14 = value;
       state->volume7.reset();
@@ -255,7 +254,7 @@ void addExpression(MidiTrack& track, MidiControllerState* state, u64 tick, u8 ch
     if (state != nullptr && state->expression14 && *state->expression14 == value) {
       return;
     }
-    midi::appendController14(track, tick, channel, MidiController::Expression, MidiController::ExpressionLsb, value);
+    midi::appendController14(track, tick, channel, MidiController::Expression, value);
     if (state != nullptr) {
       state->expression14 = value;
       state->expression7.reset();
@@ -335,13 +334,6 @@ struct MidiInstrumentSelection {
       .address = resolveInstrumentAddress({}, event.sourceInstrument),
       .forceBankSelect = true,
   };
-}
-
-[[nodiscard]] u16 midiBank(const MidiInstrumentSelection& selection, const MidiExportOptions& options) {
-  if (options.bankSelectStyle == MidiBankSelectStyle::MsbOnly) {
-    return static_cast<u16>((selection.address.bank & 0x7f) << 7);
-  }
-  return static_cast<u16>(selection.address.bank & 0x3fff);
 }
 
 struct SimulatedLfoDelay {
@@ -700,11 +692,13 @@ void applyInstrumentPitchBendRange(MidiTrack& track, RenderTrackState& state, u6
 void applyInstrumentSelection(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
                               const MidiInstrumentSelection& selection, const MidiExportOptions& options,
                               ModulationConversionPolicy modulationConversion, bool forceProgramChange) {
-  const u16 bank = midiBank(selection, options);
-  const bool bankChanged = bank != state.midiBank;
+  const u16 bank = static_cast<u16>(selection.address.bank & 0x3fff);
+  const u16 emittedBank =
+      options.bankSelectStyle == MidiBankSelectStyle::MsbOnly ? static_cast<u16>(bank & 0x7f) : bank;
+  const bool bankChanged = emittedBank != state.midiBank;
   if (bankChanged || selection.forceBankSelect) {
     track.events.push_back(midi::bankSelect(tick, channel, bank, writeBankSelectLsb(options)));
-    state.midiBank = bank;
+    state.midiBank = emittedBank;
   }
   const u8 program = data7(selection.address.program);
   if (forceProgramChange || bankChanged || program != state.midiProgram) {
@@ -1329,7 +1323,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                       typedEvent.tempoRelative, typedEvent.updateMode);
           if (modulationConversion != ModulationConversionPolicy::SequenceEventSimulation) {
             addController(track, typedEvent.header.tick, channel, MidiController::VibratoDelay,
-                          vibratoDelayControllerValue(typedEvent, modulationProfile), 20, MidiValueUnit::Ticks);
+                          vibratoDelayControllerValue(typedEvent, modulationProfile));
           }
         } else if constexpr (std::is_same_v<TypedEvent, TremoloDelayPerformanceEvent>) {
           const auto fallback = typedEvent.milliseconds ? LfoInitialPhaseFallback::Zero
@@ -1338,11 +1332,11 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                       typedEvent.tempoRelative, typedEvent.updateMode, fallback);
           if (modulationConversion != ModulationConversionPolicy::SequenceEventSimulation) {
             addController(track, typedEvent.header.tick, channel, MidiController::TremoloDelay,
-                          tremoloDelayControllerValue(typedEvent, modulationProfile), 20, MidiValueUnit::Ticks);
+                          tremoloDelayControllerValue(typedEvent, modulationProfile));
           }
         } else if constexpr (std::is_same_v<TypedEvent, PortamentoPerformanceEvent>) {
           midi::appendController14(track, typedEvent.header.tick, channel, MidiController::PortamentoTime,
-                                   MidiController::PortamentoTimeLsb, data14(typedEvent.timeMilliseconds), true);
+                                   data14(typedEvent.timeMilliseconds), true);
           if (typedEvent.previousKey) {
             const double previousKey =
                 *typedEvent.previousKey + globalTransposeAt(globalTransposes, typedEvent.header.tick);
@@ -1430,19 +1424,19 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           switch (typedEvent.target) {
             case ModulationPerformanceTarget::VibratoDepth:
               addController(track, typedEvent.header.tick, channel, MidiController::Modulation, value, 20,
-                            MidiValueUnit::Data, normalizedAmount);
+                            normalizedAmount);
               break;
             case ModulationPerformanceTarget::VibratoRate:
               addController(track, typedEvent.header.tick, channel, MidiController::VibratoRate, value, 20,
-                            MidiValueUnit::Data, normalizedAmount);
+                            normalizedAmount);
               break;
             case ModulationPerformanceTarget::TremoloDepth:
               addController(track, typedEvent.header.tick, channel, MidiController::TremoloDepth, value, 20,
-                            MidiValueUnit::Data, normalizedAmount);
+                            normalizedAmount);
               break;
             case ModulationPerformanceTarget::TremoloRate:
               addController(track, typedEvent.header.tick, channel, MidiController::TremoloRate, value, 20,
-                            MidiValueUnit::Data, normalizedAmount);
+                            normalizedAmount);
               break;
             case ModulationPerformanceTarget::PanDepth:
             case ModulationPerformanceTarget::PanRate:

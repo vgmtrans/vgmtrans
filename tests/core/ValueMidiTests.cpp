@@ -42,7 +42,7 @@ void midiExporterWritesStandardMidiFile() {
 void midiExporterKeeps14BitControllerPairsAdjacent() {
   MidiSequence midiSequence{.timebase = Timebase{.ppqn = 48}};
   MidiTrack track;
-  midi::appendController14(track, 0, 0, MidiController::ChannelVolume, MidiController::ChannelVolumeLsb, 0x1234);
+  midi::appendController14(track, 0, 0, MidiController::ChannelVolume, 0x1234);
   track.events.push_back(midi::controller(0, 0, MidiController::Pan, 64));
   midiSequence.tracks.push_back(std::move(track));
 
@@ -72,8 +72,7 @@ void midiExporterWritesAllSoundOffImmediatelyBeforeNoteOn() {
 void midiExporterPreservesLegacyPortamentoTimeByteOrder() {
   MidiSequence midiSequence{.timebase = Timebase{.ppqn = 48}};
   MidiTrack track;
-  midi::appendController14(track, 0, 0, MidiController::PortamentoTime, MidiController::PortamentoTimeLsb, 0x01d3,
-                           true);
+  midi::appendController14(track, 0, 0, MidiController::PortamentoTime, 0x01d3, true);
   track.events.push_back(midi::controller(0, 0, MidiController::PortamentoControl, 60));
   midiSequence.tracks.push_back(std::move(track));
 
@@ -107,7 +106,7 @@ void midiExporterKeepsSameTickBankProgramPairsAdjacent() {
   MidiSequence midiSequence{.timebase = Timebase{.ppqn = 48}};
   MidiTrack track{.endTick = 24};
   track.events = {
-      midi::bankSelect(0, 0, 0, false), midi::programChange(0, 0, 13), midi::bankSelect(0, 0, 0x7f << 7, false),
+      midi::bankSelect(0, 0, 0, false), midi::programChange(0, 0, 13), midi::bankSelect(0, 0, 0x7f, false),
       midi::programChange(0, 0, 0),     midi::note(0, 0, 60, 100, 24),
   };
   midiSequence.tracks.push_back(std::move(track));
@@ -434,7 +433,9 @@ void performanceMidiRendererCombinesExpressionWithPanGain() {
   const MidiSequence preciseMidi = renderMidiSequence(precisePerformance);
   expect(
       std::count_if(preciseMidi.tracks[0].events.begin(), preciseMidi.tracks[0].events.end(),
-                    [](const MidiEvent& event) { return isMidiController(event, MidiController::ExpressionLsb); }) == 4,
+                    [](const MidiEvent& event) {
+                      return isMidiControllerLsb(event, MidiController::Expression);
+                    }) == 4,
          "pan compensation should preserve the source expression's quantization");
 }
 
@@ -577,14 +578,14 @@ void performanceMidiRendererHonorsMidiExportOptions() {
   const MidiSequence autoMidi = renderMidiSequence(performance);
   expect(*midiPort(autoMidi.tracks[0].events[0]) == 0,
          "MIDI renderer should emit port zero for the first channel group");
-  expect(midiBankSelect(autoMidi.tracks[0].events[1])->bank == (2 << 7) &&
+  expect(midiBankSelect(autoMidi.tracks[0].events[1])->bank == 130 &&
              !midiBankSelect(autoMidi.tracks[0].events[1])->writeLsb,
-         "MIDI renderer should lower logical banks to MSB-only bank select by default");
+         "MIDI renderer should retain logical banks for MSB-only bank select by default");
   expect(isMidiController(autoMidi.tracks[0].events[3], MidiController::ChannelVolume) &&
-             isMidiController(autoMidi.tracks[0].events[4], MidiController::ChannelVolumeLsb),
+             isMidiControllerLsb(autoMidi.tracks[0].events[4], MidiController::ChannelVolume),
          "MIDI renderer should honor source volume quantization by default");
   expect(isMidiController(autoMidi.tracks[0].events[5], MidiController::Expression) &&
-             isMidiController(autoMidi.tracks[0].events[6], MidiController::ExpressionLsb),
+             isMidiControllerLsb(autoMidi.tracks[0].events[6], MidiController::Expression),
          "MIDI renderer should honor source expression quantization by default");
   expect(midiNote(autoMidi.tracks[9].events[1])->channel == 10, "MIDI renderer should skip channel 10 by default");
   expect(*midiPort(autoMidi.tracks[15].events[0]) == 1 && midiNote(autoMidi.tracks[15].events[1])->channel == 0,
@@ -599,7 +600,7 @@ void performanceMidiRendererHonorsMidiExportOptions() {
                                       });
   expect(midiBankSelect(forcedMidi.tracks[0].events[1])->bank == 130 &&
              midiBankSelect(forcedMidi.tracks[0].events[1])->writeLsb,
-         "MIDI renderer should lower logical banks to combined MSB/LSB output when requested");
+         "MIDI renderer should retain logical banks for combined MSB/LSB output when requested");
   expect(isMidiController(forcedMidi.tracks[0].events[3], MidiController::ChannelVolume),
          "MIDI renderer should allow forced 7-bit volume output");
   expect(isMidiController(forcedMidi.tracks[0].events[4], MidiController::Expression),
@@ -895,13 +896,12 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
 
   const MidiSequence native = renderMidiSequence(
       performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PreserveFormat});
-  const auto portamentoTime =
-      firstMidiController14(native.tracks[0].events, MidiController::PortamentoTime, MidiController::PortamentoTimeLsb);
+  const auto portamentoTime = firstMidiController14(native.tracks[0].events, MidiController::PortamentoTime);
   expect(portamentoTime == 63 &&
              std::ranges::any_of(native.tracks[0].events,
                                  [](const MidiEvent& event) {
                                    const auto* bank = std::get_if<BankSelect>(&event.payload);
-                                   return bank != nullptr && bank->bank == (3 << 7);
+                                   return bank != nullptr && bank->bank == 3;
                                  }) &&
              std::ranges::any_of(
                  native.tracks[0].events,
@@ -910,12 +910,10 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
                  native.tracks[0].events,
                  [](const MidiEvent& event) { return isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend); }),
          "portamento lowering should derive physical duration from sequence ticks and tempo");
-  const auto rateTime =
-      firstMidiController14(native.tracks[1].events, MidiController::PortamentoTime, MidiController::PortamentoTimeLsb);
+  const auto rateTime = firstMidiController14(native.tracks[1].events, MidiController::PortamentoTime);
   expect(rateTime == 2000,
          "fixed-rate timing should derive portamento duration from pitch distance independently of tempo");
-  const auto fixedTime =
-      firstMidiController14(native.tracks[2].events, MidiController::PortamentoTime, MidiController::PortamentoTimeLsb);
+  const auto fixedTime = firstMidiController14(native.tracks[2].events, MidiController::PortamentoTime);
   expect(fixedTime == 125, "fixed-duration timing should preserve source physical time independently of tempo");
 
   const MidiSequence bent =
@@ -954,7 +952,7 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
           std::ranges::none_of(bent.tracks[0].events,
                                [](const MidiEvent& event) {
                                  return isMidiController(event, MidiController::PortamentoTime) ||
-                                        isMidiController(event, MidiController::PortamentoTimeLsb) ||
+                                        isMidiControllerLsb(event, MidiController::PortamentoTime) ||
                                         isMidiController(event, MidiController::PortamentoControl);
                                }),
       "one parsed transition should lower to pitch bend without leaking native-portamento settings");
@@ -1709,7 +1707,7 @@ void performanceMidiRendererResolvesSourceInstrumentIdentityAtExport() {
     return isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend);
   });
   const auto ranges = midiPitchBendRanges(midi.tracks[0].events);
-  expect(bank != midi.tracks[0].events.end() && midiBankSelect(*bank)->bank == (3 << 7) &&
+  expect(bank != midi.tracks[0].events.end() && midiBankSelect(*bank)->bank == 3 &&
              program != midi.tracks[0].events.end() &&
              midiChannelMessage(*program, MidiChannelMessageKind::ProgramChange)->value == 9 &&
              ranges == std::vector<std::pair<u64, u16>>{{0, 2400}} && bend != midi.tracks[0].events.end() &&
@@ -2915,8 +2913,8 @@ void observedModulationScalingUsesPreciseNormalizedAmounts() {
       .tracks = {MidiTrack{
           .events =
               {
-                  midi::controller(0, 0, MidiController::Modulation, 1, 20, MidiValueUnit::Data, 0.006862745098),
-                  midi::controller(12, 0, MidiController::Modulation, 2, 20, MidiValueUnit::Data, 0.015686274510),
+                  midi::controller(0, 0, MidiController::Modulation, 1, 20, 0.006862745098),
+                  midi::controller(12, 0, MidiController::Modulation, 2, 20, 0.015686274510),
               },
       }},
   };
