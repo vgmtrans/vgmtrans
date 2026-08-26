@@ -214,62 +214,50 @@ struct LoweredStereoBalance {
   return options.bankSelectStyle == MidiBankSelectStyle::MsbAndLsb;
 }
 
+struct MidiLevelState {
+  MidiLevelResolution resolution;
+  u16 value;
+
+  friend bool operator==(const MidiLevelState&, const MidiLevelState&) = default;
+};
+
 struct MidiControllerState {
-  std::optional<u8> volume7;
-  std::optional<u16> volume14;
-  std::optional<u8> expression7;
-  std::optional<u16> expression14;
+  std::optional<MidiLevelState> volume;
+  std::optional<MidiLevelState> expression;
   std::optional<u8> pan;
 };
 
+void addLevelController(MidiTrack& track, std::optional<MidiLevelState>* state, u64 tick, u8 channel,
+                        MidiController controller, double linearGain, MidiLevelResolution requestedResolution,
+                        std::optional<ValueQuantization> quantization = std::nullopt) {
+  const MidiLevelResolution resolution = resolveLevelResolution(requestedResolution, quantization);
+  const u16 value = resolution == MidiLevelResolution::FourteenBit ? LevelScale::midi14FromLinear(linearGain)
+                                                                   : LevelScale::midi7FromLinear(linearGain);
+  const MidiLevelState nextState{.resolution = resolution, .value = value};
+  if (state != nullptr && state->has_value() && **state == nextState) {
+    return;
+  }
+
+  if (resolution == MidiLevelResolution::FourteenBit) {
+    midi::appendController14(track, tick, channel, controller, value);
+  } else {
+    addController(track, tick, channel, controller, static_cast<u8>(value));
+  }
+  if (state != nullptr) {
+    *state = nextState;
+  }
+}
+
 void addVolume(MidiTrack& track, MidiControllerState* state, u64 tick, u8 channel, double linearGain,
                const MidiExportOptions& options, std::optional<ValueQuantization> quantization = std::nullopt) {
-  if (resolveLevelResolution(options.volumeResolution, quantization) == MidiLevelResolution::FourteenBit) {
-    const u16 value = LevelScale::midi14FromLinear(linearGain);
-    if (state != nullptr && state->volume14 && *state->volume14 == value) {
-      return;
-    }
-    midi::appendController14(track, tick, channel, MidiController::ChannelVolume, value);
-    if (state != nullptr) {
-      state->volume14 = value;
-      state->volume7.reset();
-    }
-  } else {
-    const u8 value = LevelScale::midi7FromLinear(linearGain);
-    if (state != nullptr && state->volume7 && *state->volume7 == value) {
-      return;
-    }
-    addController(track, tick, channel, MidiController::ChannelVolume, value);
-    if (state != nullptr) {
-      state->volume7 = value;
-      state->volume14.reset();
-    }
-  }
+  addLevelController(track, state != nullptr ? &state->volume : nullptr, tick, channel, MidiController::ChannelVolume,
+                     linearGain, options.volumeResolution, quantization);
 }
 
 void addExpression(MidiTrack& track, MidiControllerState* state, u64 tick, u8 channel, double linearGain,
                    const MidiExportOptions& options, std::optional<ValueQuantization> quantization = std::nullopt) {
-  if (resolveLevelResolution(options.expressionResolution, quantization) == MidiLevelResolution::FourteenBit) {
-    const u16 value = LevelScale::midi14FromLinear(linearGain);
-    if (state != nullptr && state->expression14 && *state->expression14 == value) {
-      return;
-    }
-    midi::appendController14(track, tick, channel, MidiController::Expression, value);
-    if (state != nullptr) {
-      state->expression14 = value;
-      state->expression7.reset();
-    }
-  } else {
-    const u8 value = LevelScale::midi7FromLinear(linearGain);
-    if (state != nullptr && state->expression7 && *state->expression7 == value) {
-      return;
-    }
-    addController(track, tick, channel, MidiController::Expression, value);
-    if (state != nullptr) {
-      state->expression7 = value;
-      state->expression14.reset();
-    }
-  }
+  addLevelController(track, state != nullptr ? &state->expression : nullptr, tick, channel, MidiController::Expression,
+                     linearGain, options.expressionResolution, quantization);
 }
 
 void addPan(MidiTrack& track, MidiControllerState* state, u64 tick, u8 channel, u8 value) {
