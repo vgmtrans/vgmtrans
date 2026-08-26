@@ -22,7 +22,6 @@ struct MidiMessage {
   // bank select should precede program changes, and end-of-track should be last.
   u64 tick = 0;
   int priority = 0;
-  size_t sequence = 0;
   std::vector<u8> bytes;
 };
 
@@ -54,7 +53,6 @@ void addMessage(std::vector<MidiMessage>& messages, u64 tick, int priority, std:
   messages.push_back(MidiMessage{
       .tick = tick,
       .priority = priority,
-      .sequence = messages.size(),
       .bytes = std::move(bytes),
   });
 }
@@ -148,14 +146,12 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
   }
   addMessage(messages, endTick, 1000, metaEvent(0x2f, std::span<const u8>()));
 
+  // Preserve insertion order for messages with the same tick and priority.
   std::ranges::stable_sort(messages, [](const MidiMessage& a, const MidiMessage& b) {
     if (a.tick != b.tick) {
       return a.tick < b.tick;
     }
-    if (a.priority != b.priority) {
-      return a.priority < b.priority;
-    }
-    return a.sequence < b.sequence;
+    return a.priority < b.priority;
   });
 
   std::vector<u8> trackData;
