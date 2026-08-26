@@ -189,7 +189,6 @@ CollectionId SessionState::createUserCollection(std::string name, CollectionMemb
   collections_.push_back(Collection{
       .id = id,
       .name = std::move(name),
-      .origin = CollectionOrigin::UserCreated,
       .binder = std::move(binder),
       .members = std::move(members),
   });
@@ -222,8 +221,8 @@ SourceMap SessionState::sourceMapForAsset(AssetId asset) const {
 std::map<std::string, std::vector<DesiredCollection>> SessionState::desiredCollectionsByResolver() const {
   std::map<std::string, std::vector<DesiredCollection>> grouped;
   for (const auto& collection : collections_) {
-    if (collection.origin == CollectionOrigin::Discovered && !collection.key.resolver.empty()) {
-      grouped.try_emplace(collection.key.resolver);
+    if (collection.key) {
+      grouped.try_emplace(collection.key->resolver);
     }
   }
   for (const auto& entry : explicitCollections_) {
@@ -267,7 +266,6 @@ void SessionState::reconcileCollections(std::string_view resolver, std::vector<D
     collections_.push_back(Collection{
         .id = nextCollectionId(ids),
         .name = std::move(candidate.name),
-        .origin = CollectionOrigin::Discovered,
         .key = std::move(key),
         .binder = std::move(candidateBinder),
         .members = std::move(candidate.members),
@@ -276,8 +274,7 @@ void SessionState::reconcileCollections(std::string_view resolver, std::vector<D
   }
 
   std::erase_if(collections_, [&](const Collection& collection) {
-    return collection.origin == CollectionOrigin::Discovered && collection.key.resolver == resolver &&
-           !seenKeys.contains(collection.key.value);
+    return collection.key && collection.key->resolver == resolver && !seenKeys.contains(collection.key->value);
   });
 }
 
@@ -371,7 +368,7 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
   std::erase_if(diagnostics_, removesDiagnostic);
 
   std::erase_if(collections_, [&](const Collection& collection) {
-    return collection.origin == CollectionOrigin::UserCreated && referencedAsset(collection.members, assetIds);
+    return !collection.isDiscovered() && referencedAsset(collection.members, assetIds);
   });
   rebuildViews();
   rebuildIndexes();

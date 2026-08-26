@@ -584,7 +584,6 @@ void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources() {
   const Collection collection{
       .id = CollectionId{0},
       .name = "Multi-source SegSat",
-      .origin = CollectionOrigin::UserCreated,
       .binder = bindSegSatCollection,
       .members =
           {

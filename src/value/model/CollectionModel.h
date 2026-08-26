@@ -34,11 +34,6 @@ struct CollectionMembers {
   std::vector<AssetId> miscAssets;
 };
 
-enum class CollectionOrigin {
-  Discovered,
-  UserCreated,
-};
-
 // Ordered by precedence so a collection's status is its greatest issue impact.
 enum class CollectionIssueImpact {
   None,

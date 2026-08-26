@@ -409,7 +409,7 @@ void sessionKeepsScannerKnownCollectionsWithoutResolver() {
   session.scanSource(source);
   SessionSnapshot project = session.snapshot();
   expect(project.collections().size() == 1, "explicit scanner-known collection should be published");
-  expect(project.collections()[0].key.resolver == "ProbeExplicit",
+  expect(project.collections()[0].key && project.collections()[0].key->resolver == "ProbeExplicit",
          "explicit scanner-known collection should use its scanner resolver key");
 
   session.removeSource(source);
@@ -448,7 +448,7 @@ void sessionCreatesUserCollectionsFromDetectedAssets() {
   expect(collection != nullptr, "created collection should be addressable by its stable id");
   expect(after.collections().size() == 2 && before.collections().size() == 1,
          "creating a collection should publish a new immutable snapshot revision");
-  expect(collection->name == "Hand-picked" && collection->origin == CollectionOrigin::UserCreated,
+  expect(collection->name == "Hand-picked" && !collection->isDiscovered(),
          "manual collection should preserve its name and user-created origin");
   expect(collection->members.sequence == members.sequence && collection->members.soundBanks == members.soundBanks,
          "manual collection should preserve the selected asset ids");
@@ -665,8 +665,9 @@ void sessionResolverFailureKeepsExplicitCollections() {
   SessionSnapshot project = session.snapshot();
   expect(project.collections().size() == 2,
          "initial scan should create scanner-supplied and resolver-supplied collections");
-  const auto originalExplicit = std::ranges::find_if(
-      project.collections(), [](const Collection& collection) { return collection.key.value.starts_with("source:"); });
+  const auto originalExplicit = std::ranges::find_if(project.collections(), [](const Collection& collection) {
+    return collection.key && collection.key->value.starts_with("source:");
+  });
   expect(originalExplicit != project.collections().end(), "initial scan should publish its explicit collection");
   const CollectionId originalExplicitId = originalExplicit->id;
 
@@ -678,7 +679,9 @@ void sessionResolverFailureKeepsExplicitCollections() {
   expect(std::ranges::find(project.collections(), originalExplicitId, &Collection::id) != project.collections().end(),
          "an existing scanner-supplied collection should keep its id");
   expect(std::ranges::none_of(project.collections(),
-                              [](const Collection& collection) { return collection.key.value == "dynamic"; }),
+                              [](const Collection& collection) {
+                                return collection.key && collection.key->value == "dynamic";
+                              }),
          "a resolver failure should remove its previous dynamic collection");
   static_cast<void>(diagnosticWithMessage(project.diagnostics(),
                                           "ProbeSequenceFragileResolver resolveCollections failed: resolver exploded"));
@@ -1076,7 +1079,7 @@ void sessionReportsDesiredCollectionWrongTypeReferences() {
   session.scanPendingSources();
   const SessionSnapshot project = session.snapshot();
   const auto found = std::ranges::find_if(project.collections(), [](const Collection& collection) {
-    return collection.key.resolver == "ProbeWrongTypeRefs";
+    return collection.key && collection.key->resolver == "ProbeWrongTypeRefs";
   });
   expect(found != project.collections().end(), "wrong-type resolver should publish a collection shell");
   expect(found->issueImpact() == CollectionIssueImpact::Incomplete,
