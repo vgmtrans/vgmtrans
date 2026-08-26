@@ -140,14 +140,8 @@ public:
   void tremoloDelay(TremoloDelayPerformanceEvent event);
   void tremoloDelayTicks(u32 delayTicks);
   void tremoloDelayPhysical(u32 delayTicks, double milliseconds);
-  void portamento(PortamentoPerformanceEvent event);
-  void portamento(double timeMilliseconds, double previousKey);
   void portamentoEnable(PortamentoEnablePerformanceEvent event);
   void portamentoEnable(bool enabled);
-  void portamentoTime(PortamentoTimePerformanceEvent event);
-  void portamentoTime(double timeMilliseconds);
-  void portamentoControl(PortamentoControlPerformanceEvent event);
-  void portamentoControl(double previousKey);
   void pitchTransitionSettings(PitchTransitionSettingsPerformanceEvent event);
   void pitchTransitionSettings(double timeMilliseconds);
   void legatoPedal(LegatoPedalPerformanceEvent event);
@@ -165,7 +159,6 @@ public:
   void panLfoRate(double hertz, LfoPerformanceContext context = {});
   void panLfoRateCyclesPerTick(double cycles, LfoPerformanceContext context = {});
   void marker(MarkerPerformanceEvent event);
-  void appendEvents(std::vector<PerformanceEvent> events);
 
   // Declares a note-anchored transition between absolute keys, where 60.0 is
   // middle C and 60.5 is halfway to C-sharp. Unlike fade(Pitch, ...), this
@@ -192,8 +185,6 @@ public:
 
   [[nodiscard]] PerformanceAutomationBinding fade(PerformanceAutomationTarget target, double targetValue,
                                                   u32 durationTicks, u32 delayTicks = 0);
-  [[nodiscard]] PerformanceAutomationBinding noteFade(PerformanceAutomationTarget target, double targetValue,
-                                                      u32 durationTicks, u32 delayTicks = 0);
   [[nodiscard]] PerformanceAutomationBinding step(PerformanceAutomationTarget target, double targetValue,
                                                   u32 durationTicks = 0, u32 delayTicks = 0);
   [[nodiscard]] PerformanceAutomationBinding noteEnvelope(PerformanceAutomationTarget target, double targetValue,

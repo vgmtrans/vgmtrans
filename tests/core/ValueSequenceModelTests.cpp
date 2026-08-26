@@ -210,7 +210,7 @@ void performanceEmitterBindsScalarAutomationWithoutExposingStorage() {
   u32 nextAutomation = 0;
   PerformanceEmitter out{track, CommandId{9}, SourceAnnotationId{11}, 0, nextSequence, nextNote, nextAutomation};
 
-  const auto fade = out.noteFade(PerformanceAutomationTarget::Pitch, 2.0, 2, 1);
+  const auto fade = out.fade(PerformanceAutomationTarget::Pitch, 2.0, 2, 1);
   fade.at(out, 1).pitchBend(1.0);
   fade.at(out, 2).pitchBend(2.0);
   out.note(60, 1.0, 3);
@@ -223,7 +223,7 @@ void performanceEmitterBindsScalarAutomationWithoutExposingStorage() {
   const auto& intent = std::get<ScalarPerformanceAutomationIntent>(track.automations[0].intent);
   expect(intent.target == PerformanceAutomationTarget::Pitch &&
              intent.motion == PerformanceAutomationMotion::TargetOverTicks && intent.targetValue == 2.0 &&
-             intent.durationTicks == 2 && intent.delayTicks == 1 && intent.restartsOnNote,
+             intent.durationTicks == 2 && intent.delayTicks == 1 && !intent.restartsOnNote,
          "emitter automation helpers should construct the declared source intent");
   expect(performanceEventHeader(track.events[0]).sourceCommand == CommandId{9} &&
              performanceEventHeader(track.events[0]).sourceAnnotation == SourceAnnotationId{11},
