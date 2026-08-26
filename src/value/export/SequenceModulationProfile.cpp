@@ -103,25 +103,26 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
                        LfoObservation& pan) {
   switch (event.target) {
     case ModulationPerformanceTarget::VibratoDepth:
-      vibrato.observeWaveform(standardWaveform(event));
       if (event.pitchDepthSemitones) {
+        vibrato.observeWaveform(standardWaveform(event));
         vibrato.maxDepth = std::max(vibrato.maxDepth, std::abs(*event.pitchDepthSemitones) * 100.0);
       }
       break;
     case ModulationPerformanceTarget::VibratoRate:
-      vibrato.observeWaveform(standardWaveform(event));
       if (event.context.frequencyHz) {
+        vibrato.observeWaveform(standardWaveform(event));
         vibrato.rate.observe(*event.context.frequencyHz);
       }
       break;
     case ModulationPerformanceTarget::TremoloDepth:
-      tremolo.observeWaveform(standardWaveform(event));
       if (event.volumeDepthDecibels) {
+        tremolo.observeWaveform(standardWaveform(event));
         tremolo.maxDepth = std::max(tremolo.maxDepth, std::abs(*event.volumeDepthDecibels));
         if (std::abs(*event.volumeDepthDecibels) > 0.0) {
           tremolo.gainMode = event.context.tremoloGainMode;
         }
       } else if (event.volumeDepthLinearGain) {
+        tremolo.observeWaveform(standardWaveform(event));
         const double depth = std::clamp(std::abs(*event.volumeDepthLinearGain), 0.0, 1.0 - 1e-9);
         tremolo.maxDepth = std::max(tremolo.maxDepth, -20.0 * std::log10(1.0 - depth));
         if (depth > 0.0) {
@@ -130,8 +131,8 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
       }
       break;
     case ModulationPerformanceTarget::TremoloRate:
-      tremolo.observeWaveform(standardWaveform(event));
       if (event.context.frequencyHz) {
+        tremolo.observeWaveform(standardWaveform(event));
         tremolo.rate.observe(*event.context.frequencyHz);
       }
       break;
@@ -173,9 +174,6 @@ SequenceModulationProfile analyzeSequenceModulation(const PerformanceSequence& s
   LfoObservation pan;
 
   for (const auto& track : sequence.tracks) {
-    if (!track.hasPhysicalModulation) {
-      continue;
-    }
     for (const auto& event : track.events) {
       if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
         observeModulation(*modulation, vibrato, tremolo, pan);

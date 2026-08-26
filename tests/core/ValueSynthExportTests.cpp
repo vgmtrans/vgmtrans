@@ -1058,7 +1058,6 @@ struct PreparedProbeProgramState {
       throw std::runtime_error("test finalizer failure");
     }
     for (auto& track : performance.tracks) {
-      track.hasPhysicalModulation = true;
       track.events.emplace_back(ModulationPerformanceEvent{
           .target = ModulationPerformanceTarget::VibratoDepth,
           .pitchDepthSemitones = 1.0,

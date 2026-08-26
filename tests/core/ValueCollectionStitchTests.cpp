@@ -30,7 +30,6 @@ struct StitchProgramState {
                                           .amount = leaveDirtyMidiState ? 0.25 : 0.5,
                                       });
       if (leaveDirtyMidiState) {
-        track.hasPhysicalModulation = true;
         track.events.push_back(ModulationPerformanceEvent{
             .header = PerformanceEventHeader{.tick = 1},
             .target = ModulationPerformanceTarget::VibratoDepth,

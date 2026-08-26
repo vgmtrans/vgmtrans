@@ -1457,8 +1457,7 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
                                 std::span<const SoundBankAsset* const> soundBanks,
                                 const SequenceModulationProfile* modulationProfile) {
   std::optional<SequenceModulationProfile> derivedModulationProfile;
-  if (modulationProfile == nullptr &&
-      std::ranges::any_of(performance.tracks, &PerformanceTrack::hasPhysicalModulation)) {
+  if (modulationProfile == nullptr) {
     derivedModulationProfile = analyzeSequenceModulation(performance);
     modulationProfile = &*derivedModulationProfile;
   }
