@@ -37,8 +37,9 @@ using Asset = std::variant<SequenceProgramAsset, SoundBankAsset, SamplePoolAsset
 struct Collection {
   CollectionId id;
   std::string name;
-  CollectionOrigin origin = CollectionOrigin::Discovered;
-  CollectionKey key;
+  // Present only for collections produced by discovery. This is also their
+  // stable identity across reconciliation; user-created collections have none.
+  std::optional<CollectionKey> key;
   // Chosen during session resolution so binding never has to recover format
   // behavior from a registry.
   CollectionBinder binder;
@@ -47,6 +48,7 @@ struct Collection {
   CollectionMembers members;
   std::vector<CollectionIssue> issues;
 
+  [[nodiscard]] bool isDiscovered() const noexcept { return key.has_value(); }
   [[nodiscard]] CollectionIssueImpact issueImpact() const noexcept;
 };
 

@@ -1151,12 +1151,12 @@ void collectionBindingAppliesToWholeExport() {
   builder.assets.emplace_back(failingSequence);
   auto failingCollection = builder.collections.front();
   failingCollection.id = CollectionId{1};
-  failingCollection.key.value = "failure";
+  failingCollection.key->value = "failure";
   failingCollection.members.sequence = failingSequence.metadata.id;
   builder.collections.push_back(std::move(failingCollection));
   auto mismatchedCollection = builder.collections.front();
   mismatchedCollection.id = CollectionId{2};
-  mismatchedCollection.key.value = "runtime-mismatch";
+  mismatchedCollection.key->value = "runtime-mismatch";
   mismatchedCollection.binder = [](CollectionBindingContext& context) {
     if (!context.replaceSequenceRuntime(makeCompiledRuntime<ForeignRuntimeCursor>())) {
       return;

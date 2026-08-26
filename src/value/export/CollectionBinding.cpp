@@ -134,9 +134,9 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
   }
 
   if (!failed && collection->binder) {
-    const std::string bindingName = !collection->key.resolver.empty() ? collection->key.resolver
-                                    : sequence != nullptr             ? sequence->metadata.format
-                                                                      : "Collection";
+    const std::string bindingName = collection->key       ? collection->key->resolver
+                                    : sequence != nullptr ? sequence->metadata.format
+                                                          : "Collection";
     try {
       CollectionBindingContext context{sequence, sequenceRuntime, soundBanks, samplePools, miscAssets, diagnostics};
       collection->binder(context);
