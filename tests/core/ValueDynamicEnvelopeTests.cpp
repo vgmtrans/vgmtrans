@@ -325,7 +325,7 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero() {
       banks.emplace_back(event.tick, bank->bank);
     }
   }
-  expect(std::ranges::find(banks, std::pair<u64, u16>{0, 128}) != banks.end(),
+  expect(std::ranges::find(banks, std::pair<u64, u16>{0, 1}) != banks.end(),
          "the first fresh note should select the generated logical bank");
   expect(std::ranges::find(banks, std::pair<u64, u16>{10, 0}) != banks.end(),
          "restoring the base envelope should explicitly return MIDI to bank zero");

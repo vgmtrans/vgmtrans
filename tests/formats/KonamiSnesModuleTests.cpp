@@ -897,7 +897,7 @@ void konamiSnesPercussionUsesPackedGsDrumBank() {
     return bank != nullptr && event.tick == 0;
   });
   expect(drumBank != events.end(), "KonamiSnes percussion should emit a drum bank select");
-  expect(std::get<BankSelect>(drumBank->payload).bank == (0x7f << 7),
+  expect(std::get<BankSelect>(drumBank->payload).bank == 0x7f,
          "KonamiSnes percussion should use the packed GS bank field so MIDI serializes bank MSB 127");
   const auto midiNote = std::ranges::find_if(events, [](const MidiEvent& event) {
     const auto* note = std::get_if<NoteDuration>(&event.payload);

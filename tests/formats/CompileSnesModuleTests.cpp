@@ -301,7 +301,7 @@ void portamentoUsesDriverRateAndRetriggersFirstNote() {
   const auto portamentoCount = std::ranges::count_if(midi.tracks.front().events, [](const MidiEvent& event) {
     return isMidiController(event, MidiController::Portamento) ||
            isMidiController(event, MidiController::PortamentoTime) ||
-           isMidiController(event, MidiController::PortamentoTimeLsb) ||
+           isMidiControllerLsb(event, MidiController::PortamentoTime) ||
            isMidiController(event, MidiController::PortamentoControl);
   });
   expect(slide != nullptr && slide->timing.timelineTicks == 1 && timing != nullptr && timing->milliseconds == 16.0 &&

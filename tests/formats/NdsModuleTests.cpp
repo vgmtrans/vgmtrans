@@ -867,7 +867,7 @@ void ndsSequencePreservesPortamentoTimingIntent() {
   expect(std::ranges::none_of(bent.tracks[0].events,
                               [](const MidiEvent& event) {
                                 return isMidiController(event, MidiController::PortamentoTime) ||
-                                       isMidiController(event, MidiController::PortamentoTimeLsb) ||
+                                       isMidiControllerLsb(event, MidiController::PortamentoTime) ||
                                        isMidiController(event, MidiController::PortamentoControl);
                               }) &&
              std::ranges::any_of(bent.tracks[0].events,

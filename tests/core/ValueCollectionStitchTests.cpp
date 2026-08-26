@@ -17,7 +17,7 @@ struct StitchProgramState {
   void finalizePerformance(PerformanceSequence& performance) const {
     for (auto& track : performance.tracks) {
       auto position = track.events.insert(track.events.begin(), InstrumentPerformanceEvent{
-                                                                    .bank = 127,
+                                                                    .bank = 255,
                                                                     .program = 0,
                                                                     .forceBankSelect = true,
                                                                 });
@@ -30,6 +30,31 @@ struct StitchProgramState {
                                           .amount = leaveDirtyMidiState ? 0.25 : 0.5,
                                       });
       if (leaveDirtyMidiState) {
+        track.hasPhysicalModulation = true;
+        track.events.push_back(ModulationPerformanceEvent{
+            .header = PerformanceEventHeader{.tick = 1},
+            .target = ModulationPerformanceTarget::VibratoDepth,
+            .amount = 1.0,
+            .pitchDepthSemitones = 1.0,
+        });
+        track.events.push_back(ModulationPerformanceEvent{
+            .header = PerformanceEventHeader{.tick = 1},
+            .target = ModulationPerformanceTarget::VibratoRate,
+            .amount = 1.0,
+            .context = LfoPerformanceContext{.frequencyHz = 5.0},
+        });
+        track.events.push_back(VibratoDelayPerformanceEvent{
+            .header = PerformanceEventHeader{.tick = 1},
+            .milliseconds = 100.0,
+        });
+        track.events.push_back(VibratoDelayPerformanceEvent{
+            .header = PerformanceEventHeader{.tick = 2},
+            .milliseconds = 150.0,
+        });
+        track.events.push_back(VibratoDelayPerformanceEvent{
+            .header = PerformanceEventHeader{.tick = 3},
+            .milliseconds = 200.0,
+        });
         track.events.push_back(TuningPerformanceEvent{
             .header = PerformanceEventHeader{.tick = 1},
             .cents = 25.0,
@@ -104,7 +129,7 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
                     .regions = {Region{.sample = SampleRef::resolved(samplesId, 1)}},
                 },
                 Instrument{
-                    .explicitAddress = InstrumentAddress{.bank = 127, .program = 0},
+                    .explicitAddress = InstrumentAddress{.bank = 255, .program = 0},
                     .name = "Drums " + std::to_string(index),
                     .regions = {Region{.sample = SampleRef::resolved(samplesId, 0)}},
                 },
@@ -163,9 +188,9 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
   expect(result.parts.size() == 2 && result.parts[0].startTick == 0 && result.parts[1].startTick == 8,
          "stitched parts should be rescaled to a common PPQN and placed sequentially");
   expect(result.parts[0].banks ==
-                 std::vector<CollectionStitchBank>({{.source = 0, .target = 0}, {.source = 127, .target = 1}}) &&
+                 std::vector<CollectionStitchBank>({{.source = 0, .target = 0}, {.source = 255, .target = 1}}) &&
              result.parts[1].banks ==
-                 std::vector<CollectionStitchBank>({{.source = 0, .target = 2}, {.source = 127, .target = 3}}),
+                 std::vector<CollectionStitchBank>({{.source = 0, .target = 2}, {.source = 255, .target = 3}}),
          "each collection's distinct source banks should receive dense, non-overlapping target banks");
 
   const std::vector<u8> secondPartBank{0xb0, 0x00, 0x02};
@@ -178,7 +203,12 @@ void stitchedExportCompactsBanksAndHonorsInstrumentPolicies() {
                      firstPartDrums.end()) != result.midi.bytes.end() &&
              std::search(result.midi.bytes.begin(), result.midi.bytes.end(), secondPartDrums.begin(),
                          secondPartDrums.end()) != result.midi.bytes.end(),
-         "source bank 127 selections should follow the same compact mapping as the SoundFont presets");
+         "source bank 255 selections should follow the same compact mapping as the SoundFont presets");
+  // The first part's 150 ms delay maps to 74 within its observed 100-200 ms range.
+  const std::vector<u8> unscaledVibratoDelay{0xb0, 0x4e, 74};
+  expect(std::search(result.midi.bytes.begin(), result.midi.bytes.end(), unscaledVibratoDelay.begin(),
+                     unscaledVibratoDelay.end()) != result.midi.bytes.end(),
+         "stitching should not PPQN-scale normalized MIDI delay-controller data");
   const std::vector<u8> scaledFirstPartVibrato{0xb0, 0x01, 0x40};
   const std::vector<u8> scaledSecondPartVibrato{0xb0, 0x01, 0x7f};
   expect(std::search(observed.midi.bytes.begin(), observed.midi.bytes.end(), scaledFirstPartVibrato.begin(),

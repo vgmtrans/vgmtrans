@@ -133,14 +133,6 @@ void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulation
   return true;
 }
 
-[[nodiscard]] u32 logicalBank(const BankSelect& event, MidiBankSelectStyle style) {
-  return style == MidiBankSelectStyle::MsbOnly ? event.bank >> 7 : event.bank;
-}
-
-[[nodiscard]] u16 midiBank(u32 bank, MidiBankSelectStyle style) {
-  return static_cast<u16>(style == MidiBankSelectStyle::MsbOnly ? bank << 7 : bank);
-}
-
 [[nodiscard]] std::optional<u8> eventChannel(const MidiEvent& event) {
   return std::visit(
       [](const auto& typed) -> std::optional<u8> {
@@ -159,11 +151,9 @@ void appendInitialChannelState(MidiTrack& track, u64 tick, u8 channel, u16 bank,
 
   track.events.push_back(midi::bankSelect(tick, channel, bank, writeBankLsb));
   track.events.push_back(midi::programChange(tick, channel, 0));
-  midi::appendController14(track, tick, channel, MidiController::ChannelVolume, MidiController::ChannelVolumeLsb,
-                           defaultVolume);
+  midi::appendController14(track, tick, channel, MidiController::ChannelVolume, defaultVolume);
   track.events.push_back(midi::controller(tick, channel, MidiController::Pan, 64));
-  midi::appendController14(track, tick, channel, MidiController::Expression, MidiController::ExpressionLsb,
-                           defaultExpression);
+  midi::appendController14(track, tick, channel, MidiController::Expression, defaultExpression);
   track.events.push_back(midi::controller(tick, channel, MidiController::Reverb, 0));
   midi::appendRpn(track, tick, channel, 0, 1, 8192, 8);
   midi::appendRpn(track, tick, channel, 0, 2, 8192, 8);
@@ -171,15 +161,12 @@ void appendInitialChannelState(MidiTrack& track, u64 tick, u8 channel, u16 bank,
   track.events.push_back(midi::pitchBend(tick, channel, 0));
   track.events.push_back(midi::controller(tick, channel, MidiController::Modulation, 0));
   track.events.push_back(midi::controller(tick, channel, MidiController::VibratoRate, defaultSoundController));
-  track.events.push_back(
-      midi::controller(tick, channel, MidiController::VibratoDelay, defaultSoundController, 20, MidiValueUnit::Ticks));
+  track.events.push_back(midi::controller(tick, channel, MidiController::VibratoDelay, defaultSoundController));
   track.events.push_back(midi::controller(tick, channel, MidiController::TremoloDepth, 0));
   track.events.push_back(midi::controller(tick, channel, MidiController::TremoloRate, defaultSoundController));
-  track.events.push_back(
-      midi::controller(tick, channel, MidiController::TremoloDelay, defaultSoundController, 20, MidiValueUnit::Ticks));
+  track.events.push_back(midi::controller(tick, channel, MidiController::TremoloDelay, defaultSoundController));
   track.events.push_back(midi::controller(tick, channel, MidiController::Portamento, 0));
-  midi::appendController14(track, tick, channel, MidiController::PortamentoTime, MidiController::PortamentoTimeLsb, 0,
-                           true);
+  midi::appendController14(track, tick, channel, MidiController::PortamentoTime, 0, true);
   track.events.push_back(midi::controller(tick, channel, MidiController::PortamentoControl, 0));
   track.events.push_back(midi::controller(tick, channel, MidiController::Legato, 0));
 }
@@ -189,7 +176,7 @@ void appendInitialChannelState(MidiTrack& track, u64 tick, u8 channel, u16 bank,
   return found == part.banks.end() ? std::nullopt : std::optional{found->target};
 }
 
-[[nodiscard]] bool planBanks(std::vector<StitchPart>& parts, MidiBankSelectStyle style) {
+[[nodiscard]] bool planBanks(std::vector<StitchPart>& parts) {
   u32 nextBank = 0;
   std::unordered_map<u32, std::vector<CollectionStitchBank>> planned;
   for (auto& part : parts) {
@@ -207,7 +194,7 @@ void appendInitialChannelState(MidiTrack& track, u64 tick, u8 channel, u16 bank,
     for (const auto& track : part.midi.tracks) {
       for (const auto& event : track.events) {
         if (const auto* bank = std::get_if<BankSelect>(&event.payload)) {
-          sourceBanks.insert(logicalBank(*bank, style));
+          sourceBanks.insert(bank->bank);
         }
       }
     }
@@ -222,7 +209,7 @@ void appendInitialChannelState(MidiTrack& track, u64 tick, u8 channel, u16 bank,
   return true;
 }
 
-void remapPart(StitchPart& part, MidiBankSelectStyle style) {
+void remapPart(StitchPart& part) {
   for (auto& set : part.instruments) {
     for (auto& instrument : set.instruments) {
       auto address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
@@ -234,7 +221,7 @@ void remapPart(StitchPart& part, MidiBankSelectStyle style) {
   for (auto& track : part.midi.tracks) {
     for (auto& event : track.events) {
       if (auto* bank = std::get_if<BankSelect>(&event.payload)) {
-        bank->bank = midiBank(*remappedBank(part, logicalBank(*bank, style)), style);
+        bank->bank = static_cast<u16>(*remappedBank(part, bank->bank));
       }
     }
   }
@@ -285,16 +272,6 @@ void remapPart(StitchPart& part, MidiBankSelectStyle style) {
       return false;
     }
     note->duration = static_cast<u32>(*end - *tick);
-  } else if (auto* message = std::get_if<MidiChannelMessage>(&event.payload);
-             message != nullptr && message->valueUnit == MidiValueUnit::Ticks) {
-    if (message->value < 0) {
-      return false;
-    }
-    const auto value = scaled(static_cast<u64>(message->value), sourcePpqn, targetPpqn);
-    if (!value || *value > std::numeric_limits<s32>::max()) {
-      return false;
-    }
-    message->value = static_cast<s32>(*value);
   }
   event.tick = *tick + start;
   return true;
@@ -330,7 +307,7 @@ void remapPart(StitchPart& part, MidiBankSelectStyle style) {
         }
         MidiTrack initialState;
         initialState.events.reserve(channels.size() * 32);
-        const u16 bank = midiBank(*remappedBank(part, 0), bankStyle);
+        const u16 bank = static_cast<u16>(*remappedBank(part, 0));
         for (const u8 channel : channels) {
           appendInitialChannelState(initialState, cursor, channel, bank, bankStyle == MidiBankSelectStyle::MsbAndLsb);
         }
@@ -392,12 +369,12 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
     }
   }
 
-  if (!planBanks(parts, request.sequence.midi.bankSelectStyle)) {
+  if (!planBanks(parts)) {
     fail(result, "Stitched collections require more than the 128 preset banks supported by SoundFont2");
     return result;
   }
   for (auto& part : parts) {
-    remapPart(part, request.sequence.midi.bankSelectStyle);
+    remapPart(part);
   }
 
   auto composition = composeMidi(parts, request.sequence.midi.bankSelectStyle);

@@ -78,20 +78,19 @@ void addMessage(std::vector<MidiMessage>& messages, u64 tick, int priority, std:
   return bytes;
 }
 
-void addChannelMessage(std::vector<MidiMessage>& messages, u64 tick, const MidiChannelMessage& message) {
+void addChannelMessage(std::vector<MidiMessage>& messages, u64 tick, int priority, const MidiChannelMessage& message) {
   const u8 channel = channel4(message.channel);
   switch (message.kind) {
     case MidiChannelMessageKind::ControlChange:
-      addMessage(messages, tick, message.priority,
-                 {static_cast<u8>(0xb0 | channel), data7(message.parameter), data7(message.value)});
+      addMessage(messages, tick, priority, {static_cast<u8>(0xb0 | channel), message.parameter, data7(message.value)});
       return;
     case MidiChannelMessageKind::ProgramChange:
-      addMessage(messages, tick, message.priority, {static_cast<u8>(0xc0 | channel), data7(message.value)});
+      addMessage(messages, tick, priority, {static_cast<u8>(0xc0 | channel), data7(message.value)});
       return;
     case MidiChannelMessageKind::PitchBend: {
       const s32 value = std::clamp<s32>(message.value + 0x2000, 0, 0x3fff);
       addMessage(
-          messages, tick, message.priority,
+          messages, tick, priority,
           {static_cast<u8>(0xe0 | channel), static_cast<u8>(value & 0x7f), static_cast<u8>((value >> 7) & 0x7f)});
       return;
     }
@@ -105,33 +104,32 @@ void addEventMessages(std::vector<MidiMessage>& messages, const MidiEvent& event
         if constexpr (std::is_same_v<Payload, NoteDuration>) {
           // Keep a zero-length note's on/off pair in source order. Sorting its
           // off before its on would leave the attack hanging until a later release.
-          const int noteOnPriority = payload.duration == 0 ? 40 : 50;
+          const int noteOnPriority = payload.duration == 0 ? 40 : event.priority;
           addMessage(messages, event.tick, noteOnPriority,
                      {static_cast<u8>(0x90 | channel4(payload.channel)), data7(payload.key), payload.velocity});
           addMessage(messages, event.tick + payload.duration, 40,
                      {static_cast<u8>(0x80 | channel4(payload.channel)), data7(payload.key), 64});
           endTick = std::max(endTick, event.tick + payload.duration);
         } else if constexpr (std::is_same_v<Payload, BankSelect>) {
-          addChannelMessage(messages, event.tick,
+          const s32 bankMsb = payload.writeLsb ? (payload.bank >> 7) & 0x7f : payload.bank & 0x7f;
+          addChannelMessage(messages, event.tick, event.priority,
                             MidiChannelMessage{.kind = MidiChannelMessageKind::ControlChange,
                                                .channel = payload.channel,
                                                .parameter = static_cast<u8>(MidiController::BankSelectMsb),
-                                               .value = (payload.bank >> 7) & 0x7f,
-                                               .priority = 15});
+                                               .value = bankMsb});
           if (payload.writeLsb) {
-            addChannelMessage(messages, event.tick,
+            addChannelMessage(messages, event.tick, event.priority,
                               MidiChannelMessage{.kind = MidiChannelMessageKind::ControlChange,
                                                  .channel = payload.channel,
                                                  .parameter = static_cast<u8>(MidiController::BankSelectLsb),
-                                                 .value = payload.bank & 0x7f,
-                                                 .priority = 15});
+                                                 .value = payload.bank & 0x7f});
           }
         } else if constexpr (std::is_same_v<Payload, MidiChannelMessage>) {
-          addChannelMessage(messages, event.tick, payload);
+          addChannelMessage(messages, event.tick, event.priority, payload);
         } else if constexpr (std::is_same_v<Payload, MidiMetaMessage>) {
-          addMessage(messages, event.tick, payload.priority, metaEvent(payload.type, payload.data));
+          addMessage(messages, event.tick, event.priority, metaEvent(payload.type, payload.data));
         } else if constexpr (std::is_same_v<Payload, MidiSysExMessage>) {
-          addMessage(messages, event.tick, payload.priority, sysexEvent(payload.data));
+          addMessage(messages, event.tick, event.priority, sysexEvent(payload.data));
         }
       },
       event.payload);

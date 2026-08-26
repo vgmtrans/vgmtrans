@@ -427,7 +427,7 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
   expect(std::ranges::any_of(midi.tracks[0].events,
                              [](const MidiEvent& event) {
                                const auto* bank = std::get_if<BankSelect>(&event.payload);
-                               return bank != nullptr && bank->bank == (2 << 7);
+                               return bank != nullptr && bank->bank == 2;
                              }),
          "KonamiArcade percussion should select SF2 bank 2 under MSB-only MIDI lowering");
   const auto tiedNote = std::ranges::find_if(midi.tracks[0].events, [](const MidiEvent& event) {
@@ -460,7 +460,7 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
   expect(std::ranges::none_of(pitchBendMidi.tracks[0].events,
                               [](const MidiEvent& event) {
                                 return isMidiController(event, MidiController::PortamentoTime) ||
-                                       isMidiController(event, MidiController::PortamentoTimeLsb) ||
+                                       isMidiControllerLsb(event, MidiController::PortamentoTime) ||
                                        isMidiController(event, MidiController::PortamentoControl);
                               }) &&
              std::ranges::any_of(pitchBendMidi.tracks[0].events,
