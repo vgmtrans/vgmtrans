@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/ChunSnes/ChunSnes.h"
+#include "../MidiTestSupport.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
 
@@ -108,8 +109,8 @@ void runChunSnesModuleTests() {
 
   const MidiSequence midi = renderMidiSequence(performance);
   const bool upwardSlide = std::ranges::any_of(midi.tracks.front().events, [](const MidiEvent& event) {
-    const auto* bend = std::get_if<PitchBend>(&event);
-    return bend != nullptr && bend->tick <= 6 && bend->value > 1024;
+    const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+    return bend != nullptr && event.tick <= 6 && bend->value > 1024;
   });
   expect(upwardSlide, "upward slides should lower to positive pitch bends");
 

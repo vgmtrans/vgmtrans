@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/Akao/Akao.h"
+#include "../MidiTestSupport.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/scan/CollectionDiscovery.h"
 #include "value/sequence/SequenceVm.h"
@@ -501,16 +502,17 @@ void akaoPitchSlideAppliesOnceToTheNextNote() {
          "Akao A4 should retain its upward semitone depth, tick duration, and pitch-bend intent");
 
   const MidiSequence midi = renderMidiSequence(performance);
-  expect(
-      std::ranges::count_if(midi.tracks[0].events,
-                            [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); }) == 2 &&
+  expect(std::ranges::count_if(
+             midi.tracks[0].events,
+             [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event.payload); }) == 2 &&
           std::ranges::any_of(midi.tracks[0].events,
                               [](const MidiEvent& event) {
-                                const auto* bend = std::get_if<PitchBend>(&event);
-                                return bend != nullptr && bend->tick <= 0x24 && bend->value > 0;
+                                   const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+                                   return bend != nullptr && event.tick <= 0x24 && bend->value > 0;
                               }) &&
-          std::ranges::none_of(midi.tracks[0].events,
-                               [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }),
+             std::ranges::none_of(
+                 midi.tracks[0].events,
+                 [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }),
       "Akao A4 should bend the original attack without creating a destination-note attack or portamento event");
 }
 
@@ -562,8 +564,8 @@ void akaoPortamentoRetainsPitchTransitionIntent() {
       performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PreserveFormat});
   expect(std::ranges::any_of(native.tracks[0].events,
                              [](const MidiEvent& event) {
-                               const auto* control = std::get_if<PortamentoControl>(&event);
-                               return control != nullptr && control->tick == 16 && control->key == 48;
+                               const auto* control = midiController(event, MidiController::PortamentoControl);
+                               return control != nullptr && event.tick == 16 && control->value == 48;
                              }),
          "preserve-format MIDI should lower Akao portamento with its explicit source key");
 
@@ -571,19 +573,19 @@ void akaoPortamentoRetainsPitchTransitionIntent() {
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   expect(std::ranges::none_of(pitchBend.tracks[0].events,
                               [](const MidiEvent& event) {
-                                return std::holds_alternative<PortamentoTime>(event) ||
-                                       std::holds_alternative<PortamentoTime14>(event) ||
-                                       std::holds_alternative<PortamentoControl>(event);
+                                return isMidiController(event, MidiController::PortamentoTime) ||
+                                       isMidiController(event, MidiController::PortamentoTimeLsb) ||
+                                       isMidiController(event, MidiController::PortamentoControl);
                               }) &&
              std::ranges::any_of(pitchBend.tracks[0].events,
                                  [](const MidiEvent& event) {
-                                   const auto* bend = std::get_if<PitchBend>(&event);
-                                   return bend != nullptr && bend->tick >= 16 && bend->value != 0;
+                                   const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+                                   return bend != nullptr && event.tick >= 16 && bend->value != 0;
                                  }) &&
              std::ranges::any_of(pitchBend.tracks[0].events,
                                  [](const MidiEvent& event) {
-                                   const auto* note = std::get_if<NoteDuration>(&event);
-                                   return note != nullptr && note->tick == 16 && note->key == 49;
+                                   const auto* note = std::get_if<NoteDuration>(&event.payload);
+                                   return note != nullptr && event.tick == 16 && note->key == 49;
                                  }),
          "pitch-bend lowering should preserve Akao's destination-note attack without native portamento events");
 }

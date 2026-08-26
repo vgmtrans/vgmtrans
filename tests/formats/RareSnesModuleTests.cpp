@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/RareSnes/RareSnes.h"
+#include "../MidiTestSupport.h"
 
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
@@ -351,8 +352,7 @@ void rareSnesPhysicalLfosAndPitchEnvelopesUseTimerClock() {
   expect(performance.diagnostics.empty() && vibratoDepth && vibratoRate && tremoloDepth && tremoloRate,
          "Rare vibrato and tremolo should retain physical triangle depth, rate, and delay");
   const auto activeRate = std::ranges::find_if(modulation, [](const ModulationPerformanceEvent* event) {
-    return event->target == ModulationPerformanceTarget::VibratoRate &&
-           event->context.frequencyHz.value_or(0.0) > 0.0;
+    return event->target == ModulationPerformanceTarget::VibratoRate && event->context.frequencyHz.value_or(0.0) > 0.0;
   });
   expect(activeRate != modulation.end() &&
              std::abs((*activeRate)->context.frequencyHz.value() - (1.0 / (8 * 2 * 2 * 0.0075))) < 0.000001,
@@ -371,8 +371,8 @@ void rareSnesPhysicalLfosAndPitchEnvelopesUseTimerClock() {
       renderMidiSequence(delayedNote, {}, ModulationConversionPolicy::SequenceEventSimulation);
   expect(std::ranges::none_of(simulated.tracks.front().events,
                               [](const MidiEvent& event) {
-                                const auto* bend = std::get_if<PitchBend>(&event);
-                                return bend != nullptr && bend->tick < 32 && bend->value != 0;
+                                const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+                                return bend != nullptr && event.tick < 32 && bend->value != 0;
                               }),
          "Rare vibrato configuration should not generate pitch bends during rests before the first note");
 }
@@ -395,7 +395,7 @@ void rareSnesPitchEnvelopeInvertsOnlyItsInitialSteps() {
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   expect(std::ranges::count_if(pitchBend.tracks.front().events,
                                [](const MidiEvent& event) {
-                                 const auto* bend = std::get_if<PitchBend>(&event);
+                                 const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
                                  return bend != nullptr && bend->value > 0;
                                }) > 3,
          "pitch-bend rendering should step upward instead of popping to Gang-Plank Galleon's target");
@@ -404,7 +404,7 @@ void rareSnesPitchEnvelopeInvertsOnlyItsInitialSteps() {
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
   expect(std::ranges::any_of(portamento.tracks.front().events,
                              [](const MidiEvent& event) {
-                               const auto* note = std::get_if<NoteDuration>(&event);
+                               const auto* note = std::get_if<NoteDuration>(&event.payload);
                                return note != nullptr && note->key > 70;
                              }),
          "portamento rendering should glide Gang-Plank Galleon's A3 event upward");

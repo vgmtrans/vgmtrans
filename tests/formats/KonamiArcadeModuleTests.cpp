@@ -5,6 +5,7 @@
  */
 
 #include "value/extractors/MameRomSetExtractor.h"
+#include "../MidiTestSupport.h"
 #include "value/export/DynamicEnvelope.h"
 #include "value/export/SequenceModulationProfile.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
@@ -415,39 +416,41 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
       ModulationConversionPolicy::SynthModulators, soundBanks, &modulationProfile);
   expect(
       std::ranges::any_of(midi.tracks[0].events,
-                          [](const MidiEvent& event) { return std::holds_alternative<VibratoDepth>(event); }) &&
-          std::ranges::any_of(midi.tracks[0].events,
-                              [](const MidiEvent& event) { return std::holds_alternative<VibratoFrequency>(event); }) &&
-          std::ranges::any_of(midi.tracks[0].events,
-                              [](const MidiEvent& event) { return std::holds_alternative<VibratoDelay>(event); }),
+                          [](const MidiEvent& event) { return isMidiController(event, MidiController::Modulation); }) &&
+          std::ranges::any_of(
+              midi.tracks[0].events,
+              [](const MidiEvent& event) { return isMidiController(event, MidiController::VibratoRate); }) &&
+          std::ranges::any_of(
+              midi.tracks[0].events,
+              [](const MidiEvent& event) { return isMidiController(event, MidiController::VibratoDelay); }),
       "KonamiArcade synth-modulator lowering should retain vibrato depth, rate, and delay controls");
   expect(std::ranges::any_of(midi.tracks[0].events,
                              [](const MidiEvent& event) {
-                               const auto* bank = std::get_if<BankSelect>(&event);
+                               const auto* bank = std::get_if<BankSelect>(&event.payload);
                                return bank != nullptr && bank->bank == (2 << 7);
                              }),
          "KonamiArcade percussion should select SF2 bank 2 under MSB-only MIDI lowering");
   const auto tiedNote = std::ranges::find_if(midi.tracks[0].events, [](const MidiEvent& event) {
-    const auto* note = std::get_if<NoteDuration>(&event);
-    return note != nullptr && note->tick == 6 && note->key == 64;
+    const auto* note = std::get_if<NoteDuration>(&event.payload);
+    return note != nullptr && event.tick == 6 && note->key == 64;
   });
-  expect(tiedNote != midi.tracks[0].events.end() && std::get<NoteDuration>(*tiedNote).duration == 8,
+  expect(tiedNote != midi.tracks[0].events.end() && std::get<NoteDuration>(tiedNote->payload).duration == 8,
          "MIDI lowering should hold the zero-release tied voice until its next activation");
   expect(std::ranges::any_of(midi.tracks[0].events,
                              [](const MidiEvent& event) {
-                               const auto* control = std::get_if<PortamentoControl>(&event);
-                               return control != nullptr && control->tick == 15 && control->key == 64;
+                               const auto* control = midiController(event, MidiController::PortamentoControl);
+                               return control != nullptr && event.tick == 15 && control->value == 64;
                              }),
          "MIDI lowering should retain the delayed portamento source key after the release gap");
   expect(std::ranges::any_of(midi.tracks[0].events,
                              [](const MidiEvent& event) {
-                               const auto* note = std::get_if<NoteDuration>(&event);
-                               return note != nullptr && note->tick == 22 && note->key == 70 && note->duration == 3;
+                               const auto* note = std::get_if<NoteDuration>(&event.payload);
+                               return note != nullptr && event.tick == 22 && note->key == 70 && note->duration == 3;
                              }) &&
              std::ranges::any_of(midi.tracks[0].events,
                                  [](const MidiEvent& event) {
-                                   const auto* note = std::get_if<NoteDuration>(&event);
-                                   return note != nullptr && note->tick == 24 && note->key == 72 && note->duration == 8;
+                                   const auto* note = std::get_if<NoteDuration>(&event.payload);
+                                   return note != nullptr && event.tick == 24 && note->key == 72 && note->duration == 8;
                                  }),
          "MysticWarrior F3 timing should overlap the fully transposed source and target notes by one tick");
 
@@ -456,26 +459,26 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
                          ModulationConversionPolicy::SynthModulators, soundBanks);
   expect(std::ranges::none_of(pitchBendMidi.tracks[0].events,
                               [](const MidiEvent& event) {
-                                return std::holds_alternative<PortamentoTime>(event) ||
-                                       std::holds_alternative<PortamentoTime14>(event) ||
-                                       std::holds_alternative<PortamentoControl>(event);
+                                return isMidiController(event, MidiController::PortamentoTime) ||
+                                       isMidiController(event, MidiController::PortamentoTimeLsb) ||
+                                       isMidiController(event, MidiController::PortamentoControl);
                               }) &&
              std::ranges::any_of(pitchBendMidi.tracks[0].events,
                                  [](const MidiEvent& event) {
-                                   const auto* bend = std::get_if<PitchBend>(&event);
-                                   return bend != nullptr && bend->tick >= 14 && bend->value != 0;
+                                   const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+                                   return bend != nullptr && event.tick >= 14 && bend->value != 0;
                                  }),
          "the export request should be able to render KonamiArcade transitions as pitch bend");
   expect(std::ranges::any_of(pitchBendMidi.tracks[0].events,
                              [](const MidiEvent& event) {
-                               const auto* note = std::get_if<NoteDuration>(&event);
-                               return note != nullptr && note->tick == 14 && note->key == 66 && note->duration == 8;
+                               const auto* note = std::get_if<NoteDuration>(&event.payload);
+                               return note != nullptr && event.tick == 14 && note->key == 66 && note->duration == 8;
                              }),
          "pitch-bend lowering should retain the fresh attack after the preceding release gap");
   expect(std::ranges::any_of(pitchBendMidi.tracks[0].events,
                              [](const MidiEvent& event) {
-                               const auto* note = std::get_if<NoteDuration>(&event);
-                               return note != nullptr && note->tick == 22 && note->key == 70 && note->duration == 10;
+                               const auto* note = std::get_if<NoteDuration>(&event.payload);
+                               return note != nullptr && event.tick == 22 && note->key == 70 && note->duration == 10;
                              }),
          "pitch-bend lowering should retain the delayed slide's one nominal source note");
 }
@@ -938,7 +941,7 @@ void konamiArcadeMysticDrumPitchSlidesUseTablePitch() {
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   expect(std::ranges::any_of(midi.tracks[0].events,
                              [](const MidiEvent& event) {
-                               const auto* bend = std::get_if<PitchBend>(&event);
+                               const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
                                return bend != nullptr && bend->value < 0;
                              }),
          "MIDI lowering should preserve the drum slide's downward direction");

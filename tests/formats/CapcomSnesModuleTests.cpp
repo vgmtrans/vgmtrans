@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/CapcomSnes/CapcomSnes.h"
+#include "../MidiTestSupport.h"
 
 #include "value/export/DynamicEnvelope.h"
 #include "value/export/Export.h"
@@ -510,34 +511,35 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(midiSequence.tracks.size() == 8, "builder should preserve track count");
   expect(midiSequence.tracks[0].events.size() == 14,
          "built track should include port, initial, command, and end events");
-  expect(std::get<MidiPort>(midiSequence.tracks[0].events[0]).port == 0,
+  expect(midiMeta(midiSequence.tracks[0].events[0], 0x21)->data[0] == 0,
          "CapcomSnes should emit the legacy MIDI port metadata");
-  expect(std::get<Reverb>(midiSequence.tracks[0].events[1]).value == 0,
+  expect(midiController(midiSequence.tracks[0].events[1], MidiController::Reverb)->value == 0,
          "CapcomSnes should emit the legacy initial reverb controller");
-  expect(std::get<MonoMode>(midiSequence.tracks[0].events[2]).channels == 0,
+  expect(midiController(midiSequence.tracks[0].events[2], MidiController::MonoMode)->value == 0,
          "CapcomSnes should emit the legacy initial mono-mode controller");
-  expect(std::get<Tempo>(midiSequence.tracks[0].events[3]).microsecondsPerQuarter == 42191,
+  const auto& tempoData = midiMeta(midiSequence.tracks[0].events[3], 0x51)->data;
+  expect(((tempoData[0] << 16) | (tempoData[1] << 8) | tempoData[2]) == 42191,
          "CapcomSnes source command should interpret tempo with driver timing math");
-  expect(std::holds_alternative<BankSelect>(midiSequence.tracks[0].events[4]),
+  expect(midiBankSelect(midiSequence.tracks[0].events[4]) != nullptr,
          "CapcomSnes source command should force bank select like the legacy converter");
-  expect(std::holds_alternative<ProgramChange>(midiSequence.tracks[0].events[5]),
+  expect(isMidiChannelMessage(midiSequence.tracks[0].events[5], MidiChannelMessageKind::ProgramChange),
          "CapcomSnes source command should emit program changes");
-  expect(std::holds_alternative<Volume14>(midiSequence.tracks[0].events[6]),
+  expect(isMidiController(midiSequence.tracks[0].events[6], MidiController::ChannelVolume) &&
+             isMidiController(midiSequence.tracks[0].events[7], MidiController::ChannelVolumeLsb),
          "CapcomSnes source command should emit high-resolution target-quantized volume");
-  expect(std::get<Pan>(midiSequence.tracks[0].events[7]).value == 64,
+  expect(midiController(midiSequence.tracks[0].events[8], MidiController::Pan)->value == 64,
          "CapcomSnes center pan should map to MIDI center pan");
-  expect(std::holds_alternative<Expression>(midiSequence.tracks[0].events[8]),
+  expect(isMidiController(midiSequence.tracks[0].events[9], MidiController::Expression),
          "CapcomSnes pan should emit expression compensation for the source pan law");
-  expect(std::get<VibratoDepth>(midiSequence.tracks[0].events[9]).value == 127,
+  expect(midiController(midiSequence.tracks[0].events[10], MidiController::Modulation)->value == 127,
          "CapcomSnes vibrato depth should be independent of whether the oscillator is advancing");
-  expect(std::holds_alternative<VibratoFrequency>(midiSequence.tracks[0].events[10]),
+  expect(isMidiController(midiSequence.tracks[0].events[11], MidiController::VibratoRate),
          "CapcomSnes LFO rate should emit vibrato frequency");
-  expect(std::holds_alternative<TremoloFrequency>(midiSequence.tracks[0].events[11]),
+  expect(isMidiController(midiSequence.tracks[0].events[12], MidiController::TremoloRate),
          "CapcomSnes LFO rate should emit tremolo frequency");
-  expect(std::get<NoteDuration>(midiSequence.tracks[0].events[12]).duration == 6,
+  expect(midiNote(midiSequence.tracks[0].events[13])->duration == 6,
          "CapcomSnes note length index should map to ticks");
-  expect(std::get<EndOfTrack>(midiSequence.tracks[0].events[13]).tick == 6,
-         "builder should advance time before end of track");
+  expect(midiSequence.tracks[0].endTick == 6, "builder should advance time before end of track");
 
   const auto vibratoDepth = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
@@ -559,7 +561,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
       renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
   expect(std::ranges::any_of(simulatedMidi.tracks[0].events,
                              [](const MidiEvent& event) {
-                               const auto* bend = std::get_if<PitchBend>(&event);
+                               const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
                                return bend != nullptr && bend->value != 0;
                              }),
          "CapcomSnes sequence-event modulation should render vibrato as nonzero pitch bends");
@@ -1109,15 +1111,15 @@ void capcomSnesNoteStateCommandsAreTypedAndInterpreted() {
 
   const auto& events = midiSequence.tracks[0].events;
   const auto note = std::ranges::find_if(events, [](const MidiEvent& event) {
-    const auto* typed = std::get_if<NoteDuration>(&event);
-    return typed != nullptr && typed->tick == 0;
+    const auto* typed = std::get_if<NoteDuration>(&event.payload);
+    return typed != nullptr && event.tick == 0;
   });
   expect(note != events.end(), "CapcomSnes note-state fixture should emit a note");
-  expect(std::get<NoteDuration>(*note).key == 72,
+  expect(std::get<NoteDuration>(note->payload).key == 72,
          "CapcomSnes note-state emission should apply octave and 2-octave-up attributes");
-  expect(std::get<NoteDuration>(*note).duration == 7,
+  expect(std::get<NoteDuration>(note->payload).duration == 7,
          "CapcomSnes slurred note-state emission should preserve legacy note extension");
-  expect(std::get<EndOfTrack>(events.back()).tick == 6,
+  expect(midiSequence.tracks[0].endTick == 6,
          "CapcomSnes note-state emission should still advance by the decoded note length");
 }
 
@@ -1249,11 +1251,11 @@ void capcomSnesPanPerformanceCarriesGainCompensation() {
          "CapcomSnes pan performance should retain the source engine's stereo balance");
 
   const MidiSequence midi = renderMidiSequence(performance);
-  expect(midi.tracks[0].events.size() == 6,
-         "CapcomSnes compensated pan should render port, initial defaults, pan, expression, and end");
-  expect(std::get<Pan>(midi.tracks[0].events[3]).value == 113,
+  expect(midi.tracks[0].events.size() == 5 && midi.tracks[0].endTick == performance.tracks[0].endTick,
+         "CapcomSnes compensated pan should render port, initial defaults, pan, and expression");
+  expect(midiController(midi.tracks[0].events[3], MidiController::Pan)->value == 113,
          "CapcomSnes pan renderer should emit the driver-computed MIDI pan");
-  expect(std::get<Expression>(midi.tracks[0].events[4]).value == 123,
+  expect(midiController(midi.tracks[0].events[4], MidiController::Expression)->value == 123,
          "CapcomSnes pan renderer should quantize the source gain compensation as expression");
 }
 
@@ -1336,11 +1338,18 @@ void capcomSnesSequenceEmitsSourceOnlyDriverSemantics() {
   expect(performance.tracks[0].endTick == 6, "CapcomSnes source-only fixture should advance through the later note");
 
   const MidiSequence midi = renderMidiSequence(performance);
-  expect(std::holds_alternative<FineTune>(midi.tracks[0].events[3]),
+  const auto rpns = midiRpns(midi.tracks[0].events);
+  expect(
+      std::ranges::any_of(rpns, [](const MidiRpnView& rpn) { return rpn.parameterMsb == 0 && rpn.parameterLsb == 1; }),
          "CapcomSnes tuning performance should render as MIDI fine tuning");
-  expect(std::holds_alternative<MasterVolume>(midi.tracks[0].events[4]),
+  expect(std::ranges::any_of(midi.tracks[0].events,
+                             [](const MidiEvent& event) { return midiMasterVolume(event).has_value(); }),
          "CapcomSnes master level performance should render as MIDI master volume");
-  expect(std::get<Reverb>(midi.tracks[0].events[5]).value == 40,
+  expect(std::ranges::any_of(midi.tracks[0].events,
+                             [](const MidiEvent& event) {
+                               const auto* reverb = midiController(event, MidiController::Reverb);
+                               return reverb != nullptr && reverb->value == 40;
+                             }),
          "CapcomSnes reverb performance should preserve the legacy echo send");
 }
 
@@ -1518,55 +1527,58 @@ void capcomSnesSequenceEmitsStructuredPitchSlides() {
       performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PreserveFormat});
   expect(std::ranges::any_of(midi.tracks[0].events,
                              [](const MidiEvent& event) {
-                               const auto* note = std::get_if<NoteDuration>(&event);
-                               return note != nullptr && note->tick == 0 && note->key == 0 && note->duration == 7;
+                               const auto* note = std::get_if<NoteDuration>(&event.payload);
+                               return note != nullptr && event.tick == 0 && note->key == 0 && note->duration == 7;
                              }) &&
              std::ranges::any_of(midi.tracks[0].events,
                                  [](const MidiEvent& event) {
-                                   const auto* note = std::get_if<NoteDuration>(&event);
-                                   return note != nullptr && note->tick == 6 && note->key == 5 && note->duration == 7;
+                                   const auto* note = std::get_if<NoteDuration>(&event.payload);
+                                   return note != nullptr && event.tick == 6 && note->key == 5 && note->duration == 7;
                                  }) &&
              std::ranges::any_of(midi.tracks[0].events,
                                  [](const MidiEvent& event) {
-                                   const auto* note = std::get_if<NoteDuration>(&event);
-                                   return note != nullptr && note->tick == 12 && note->key == 6 && note->duration == 12;
+                                   const auto* note = std::get_if<NoteDuration>(&event.payload);
+                                   return note != nullptr && event.tick == 12 && note->key == 6 && note->duration == 12;
                                  }),
          "native CapcomSnes portamento should retain the slurred notes' one-tick overlap");
   expect(std::ranges::any_of(midi.tracks[0].events,
                              [](const MidiEvent& event) {
-                               const auto* time = std::get_if<PortamentoTime14>(&event);
-                               return time != nullptr && time->tick == 6 && time->value == 160;
+                               const auto* time = midiController(event, MidiController::PortamentoTime);
+                               return time != nullptr && event.tick == 6 && time->value == 1;
                              }) &&
              std::ranges::any_of(midi.tracks[0].events,
                                  [](const MidiEvent& event) {
-                                   const auto* control = std::get_if<PortamentoControl>(&event);
-                                   return control != nullptr && control->tick == 6 && control->key == 0;
+                                   const auto* control = midiController(event, MidiController::PortamentoControl);
+                                   return control != nullptr && event.tick == 6 && control->value == 0;
                                  }),
          "native CapcomSnes portamento should lower to its physical time and CC 84 source key");
   expect(std::ranges::count_if(
              midi.tracks[0].events,
-             [](const MidiEvent& event) { return std::holds_alternative<PortamentoTime14>(event); }) == 2 &&
-             std::ranges::count_if(
-                 midi.tracks[0].events,
-                 [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) == 2,
+             [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoTime); }) == 2 &&
+             std::ranges::count_if(midi.tracks[0].events,
+                                   [](const MidiEvent& event) {
+                                     return isMidiController(event, MidiController::PortamentoControl);
+                                   }) == 2,
          "native CapcomSnes lowering should emit one controller pair for each actual glide");
 
   const MidiSequence pitchBendMidi =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   expect(std::ranges::none_of(pitchBendMidi.tracks[0].events,
                               [](const MidiEvent& event) {
-                                return std::holds_alternative<PortamentoTime14>(event) ||
-                                       std::holds_alternative<PortamentoControl>(event);
+                                return isMidiController(event, MidiController::PortamentoTime) ||
+                                       isMidiController(event, MidiController::PortamentoTimeLsb) ||
+                                       isMidiController(event, MidiController::PortamentoControl);
                               }) &&
-             std::ranges::any_of(pitchBendMidi.tracks[0].events,
-                                 [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }),
+             std::ranges::any_of(
+                 pitchBendMidi.tracks[0].events,
+                 [](const MidiEvent& event) { return isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend); }),
          "CapcomSnes pitch intent should support pitch-bend export without portamento controllers");
   const auto pitchBendNotes = std::ranges::count_if(pitchBendMidi.tracks[0].events, [](const MidiEvent& event) {
-    return std::holds_alternative<NoteDuration>(event);
+    return std::holds_alternative<NoteDuration>(event.payload);
   });
   const auto heldNote = std::ranges::find_if(pitchBendMidi.tracks[0].events, [](const MidiEvent& event) {
-    const auto* note = std::get_if<NoteDuration>(&event);
-    return note != nullptr && note->tick == 0 && note->key == 0 && note->duration == 24;
+    const auto* note = std::get_if<NoteDuration>(&event.payload);
+    return note != nullptr && event.tick == 0 && note->key == 0 && note->duration == 24;
   });
   expect(pitchBendNotes == 1 && heldNote != pitchBendMidi.tracks[0].events.end(),
          "CapcomSnes pitch-bend export should carry one attack across the complete slurred note chain");
@@ -1577,8 +1589,8 @@ void capcomSnesSequenceEmitsStructuredPitchSlides() {
   const auto lastPitchBendAt = [](const MidiSequence& sequence, u64 tick) -> std::optional<s16> {
     std::optional<s16> result;
     for (const auto& event : sequence.tracks[0].events) {
-      const auto* bend = std::get_if<PitchBend>(&event);
-      if (bend != nullptr && bend->tick == tick) {
+      const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+      if (bend != nullptr && event.tick == tick) {
         result = bend->value;
       }
     }

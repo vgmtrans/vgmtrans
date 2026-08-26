@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/KonamiSnes/KonamiSnes.h"
+#include "../MidiTestSupport.h"
 
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/formats/ValueFormats.h"
@@ -59,11 +60,6 @@ const SourceAnnotation* annotationWithKind(const SourceMap& sourceMap, SourceId 
 }
 
 template <class Event>
-bool hasMidiEvent(const MidiTrack& track) {
-  return std::ranges::any_of(track.events, [](const MidiEvent& event) { return std::holds_alternative<Event>(event); });
-}
-
-template <class Event>
 std::vector<const Event*> performanceEvents(const PerformanceTrack& track) {
   std::vector<const Event*> result;
   for (const PerformanceEvent& event : track.events) {
@@ -76,15 +72,15 @@ std::vector<const Event*> performanceEvents(const PerformanceTrack& track) {
 
 bool hasNonZeroPitchBendBefore(const MidiTrack& track, u64 tick) {
   return std::ranges::any_of(track.events, [tick](const MidiEvent& event) {
-    const auto* pitchBend = std::get_if<PitchBend>(&event);
-    return pitchBend != nullptr && pitchBend->tick < tick && pitchBend->value != 0;
+    const auto* pitchBend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+    return pitchBend != nullptr && event.tick < tick && pitchBend->value != 0;
   });
 }
 
 bool hasNonZeroPitchBendAtOrAfter(const MidiTrack& track, u64 tick) {
   return std::ranges::any_of(track.events, [tick](const MidiEvent& event) {
-    const auto* pitchBend = std::get_if<PitchBend>(&event);
-    return pitchBend != nullptr && pitchBend->tick >= tick && pitchBend->value != 0;
+    const auto* pitchBend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+    return pitchBend != nullptr && event.tick >= tick && pitchBend->value != 0;
   });
 }
 
@@ -460,16 +456,25 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const SequenceModulationProfile modulationProfile = analyzeSequenceModulation(performance);
   const MidiSequence synthModulationMidi =
       renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, {}, &modulationProfile);
-  expect(hasMidiEvent<VibratoDepth>(synthModulationMidi.tracks[0]) &&
-             hasMidiEvent<VibratoFrequency>(synthModulationMidi.tracks[0]) &&
-             hasMidiEvent<VibratoDelay>(synthModulationMidi.tracks[0]),
+  expect(
+      std::ranges::any_of(synthModulationMidi.tracks[0].events,
+                          [](const MidiEvent& event) { return isMidiController(event, MidiController::Modulation); }) &&
+          std::ranges::any_of(
+              synthModulationMidi.tracks[0].events,
+              [](const MidiEvent& event) { return isMidiController(event, MidiController::VibratoRate); }) &&
+          std::ranges::any_of(
+              synthModulationMidi.tracks[0].events,
+              [](const MidiEvent& event) { return isMidiController(event, MidiController::VibratoDelay); }),
          "default KonamiSnes MIDI rendering should preserve synth modulation controllers");
 
   const MidiSequence simulatedMidi =
       renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
-  expect(!hasMidiEvent<VibratoDepth>(simulatedMidi.tracks[0]) &&
-             !hasMidiEvent<VibratoFrequency>(simulatedMidi.tracks[0]) &&
-             !hasMidiEvent<VibratoDelay>(simulatedMidi.tracks[0]),
+  expect(std::ranges::none_of(simulatedMidi.tracks[0].events,
+                              [](const MidiEvent& event) {
+                                return isMidiController(event, MidiController::Modulation) ||
+                                       isMidiController(event, MidiController::VibratoRate) ||
+                                       isMidiController(event, MidiController::VibratoDelay);
+                              }),
          "sequence-event modulation policy should suppress synth modulation controllers");
   expect(!hasNonZeroPitchBendBefore(simulatedMidi.tracks[0], 2),
          "sequence-event modulation policy should keep simulated vibrato silent before delay");
@@ -658,16 +663,20 @@ void konamiSnesProgramChangeReemitsCurrentFineTune() {
   const auto& events = midi.tracks[0].events;
 
   const auto programChange = std::ranges::find_if(events, [](const MidiEvent& event) {
-    const auto* program = std::get_if<ProgramChange>(&event);
-    return program != nullptr && program->tick == 5 && program->program == 9;
+    const auto* program = midiChannelMessage(event, MidiChannelMessageKind::ProgramChange);
+    return program != nullptr && event.tick == 5 && program->value == 9;
   });
   expect(programChange != events.end(), "KonamiSnes program change should render at the expected tick");
 
   const auto sameTickFineTune = std::ranges::find_if(events, [](const MidiEvent& event) {
-    const auto* fineTune = std::get_if<FineTune>(&event);
-    return fineTune != nullptr && fineTune->tick == 5 && std::abs(fineTune->cents + 18.75) < 0.001;
+    return event.tick == 5 && isMidiController(event, MidiController::RpnParameterMsb);
   });
-  expect(sameTickFineTune != events.end(),
+  const auto rpns = midiRpns(events);
+  expect(sameTickFineTune != events.end() && std::ranges::any_of(rpns,
+                                                                 [](const MidiRpnView& rpn) {
+                                                                   return rpn.tick == 5 && rpn.parameterMsb == 0 &&
+                                                                          rpn.parameterLsb == 1 && rpn.value == 6656;
+                                                                 }),
          "KonamiSnes should re-emit the active fine tune before same-tick program/note playback");
   expect(std::distance(events.begin(), sameTickFineTune) < std::distance(events.begin(), programChange),
          "KonamiSnes fine tune should be ordered before the same-tick program change");
@@ -852,7 +861,12 @@ void konamiSnesProportionalPortamentoMatchesDriverCurve() {
       renderMidiSequence(proportional, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   const MidiSequence portamento =
       renderMidiSequence(proportional, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
-  expect(hasMidiEvent<PitchBend>(pitchBend.tracks[0]) && hasMidiEvent<PortamentoControl>(portamento.tracks[0]),
+  expect(std::ranges::any_of(
+             pitchBend.tracks[0].events,
+             [](const MidiEvent& event) { return isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend); }) &&
+             std::ranges::any_of(
+                 portamento.tracks[0].events,
+                 [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }),
          "V3 proportional portamento should render in both MIDI transition modes");
 
   const PerformanceSequence interrupted = renderKonamiSnesProgram(
@@ -879,17 +893,17 @@ void konamiSnesPercussionUsesPackedGsDrumBank() {
   const auto& events = midi.tracks[0].events;
 
   const auto drumBank = std::ranges::find_if(events, [](const MidiEvent& event) {
-    const auto* bank = std::get_if<BankSelect>(&event);
-    return bank != nullptr && bank->tick == 0;
+    const auto* bank = std::get_if<BankSelect>(&event.payload);
+    return bank != nullptr && event.tick == 0;
   });
   expect(drumBank != events.end(), "KonamiSnes percussion should emit a drum bank select");
-  expect(std::get<BankSelect>(*drumBank).bank == (0x7f << 7),
+  expect(std::get<BankSelect>(drumBank->payload).bank == (0x7f << 7),
          "KonamiSnes percussion should use the packed GS bank field so MIDI serializes bank MSB 127");
   const auto midiNote = std::ranges::find_if(events, [](const MidiEvent& event) {
-    const auto* note = std::get_if<NoteDuration>(&event);
+    const auto* note = std::get_if<NoteDuration>(&event.payload);
     return note != nullptr && note->key == 4;
   });
-  expect(midiNote != events.end() && std::get<NoteDuration>(*midiNote).duration == 29,
+  expect(midiNote != events.end() && std::get<NoteDuration>(midiNote->payload).duration == 29,
          "percussion off should not prevent a tie from extending the preceding drum note");
 }
 
@@ -1232,7 +1246,7 @@ void konamiSnesSequenceSimulationPreservesDriverVibratoDepth() {
       renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
   s16 maximumBend = 0;
   for (const MidiEvent& event : midi.tracks[0].events) {
-    if (const auto* bend = std::get_if<PitchBend>(&event)) {
+    if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend)) {
       maximumBend = std::max<s16>(maximumBend, static_cast<s16>(std::abs(bend->value)));
     }
   }
@@ -1318,17 +1332,19 @@ void konamiSnesCompiledPlaybackHandlesCallsLoopsTiesAndSlides() {
   const MidiSequence exactPitchMidi = renderMidiSequence(tied);
   expect(std::ranges::any_of(exactPitchMidi.tracks[0].events,
                              [](const MidiEvent& event) {
-                               const auto* bend = std::get_if<PitchBend>(&event);
+                               const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
                                return bend != nullptr && bend->value != 0;
                              }),
          "KonamiSnes should preserve its exact sampled curve as pitch bend by default");
 
   const MidiSequence nativePitchMidi =
       renderMidiSequence(tied, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
-  expect(std::ranges::any_of(nativePitchMidi.tracks[0].events,
-                             [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) &&
-             std::ranges::none_of(nativePitchMidi.tracks[0].events,
-                                  [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }),
+  expect(std::ranges::any_of(
+             nativePitchMidi.tracks[0].events,
+             [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }) &&
+             std::ranges::none_of(
+                 nativePitchMidi.tracks[0].events,
+                 [](const MidiEvent& event) { return isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend); }),
          "the shared linear transition should support native portamento");
 }
 
@@ -1354,8 +1370,8 @@ void konamiSnesHeldNoteUsesRealizedInlineSlidePitch() {
   const MidiSequence pitchBend = renderMidiSequence(performance);
   expect(std::ranges::none_of(pitchBend.tracks[0].events,
                               [](const MidiEvent& event) {
-                                const auto* bend = std::get_if<PitchBend>(&event);
-                                return bend != nullptr && bend->tick == 0x60;
+                                const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+                                return bend != nullptr && event.tick == 0x60;
                               }),
          "the retained inline-slide bend should not be doubled at tick 96");
 
@@ -1363,11 +1379,11 @@ void konamiSnesHeldNoteUsesRealizedInlineSlidePitch() {
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
   expect(std::ranges::count_if(
              portamento.tracks[0].events,
-             [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) == 1 &&
+             [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }) == 1 &&
              std::ranges::none_of(portamento.tracks[0].events,
                                   [](const MidiEvent& event) {
-                                    const auto* note = std::get_if<NoteDuration>(&event);
-                                    return note != nullptr && note->tick == 0x60;
+                                    const auto* note = std::get_if<NoteDuration>(&event.payload);
+                                    return note != nullptr && event.tick == 0x60;
                                   }),
          "native portamento should not retrigger and immediately silence the slide target at tick 96");
 }
@@ -1393,8 +1409,8 @@ void konamiSnesHeldNoteRestartsPitchEnvelopeWithoutRetrigger() {
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   expect(std::ranges::none_of(midi.tracks[0].events,
                               [](const MidiEvent& event) {
-                                const auto* note = std::get_if<NoteDuration>(&event);
-                                return note != nullptr && note->tick == 42;
+                                const auto* note = std::get_if<NoteDuration>(&event.payload);
+                                return note != nullptr && event.tick == 42;
                               }),
          "restarting a held pitch envelope should not retrigger its MIDI note");
 }
@@ -1456,7 +1472,8 @@ void konamiSnesPlayOnceCoordinatesGlobalLoopCompletion() {
                                    }) == 2,
          "requested Konami sequence loops should replay the declared loop through shared loop policy");
   const MidiSequence repeatedMidi = renderMidiSequence(repeated);
-  expect(std::ranges::count_if(repeatedMidi.tracks[0].events,
-                               [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); }) == 2,
+  expect(std::ranges::count_if(
+             repeatedMidi.tracks[0].events,
+             [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event.payload); }) == 2,
          "requested Konami loop playback should remain visible in default MIDI output");
 }

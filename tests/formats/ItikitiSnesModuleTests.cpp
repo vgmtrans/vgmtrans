@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/ItikitiSnes/ItikitiSnes.h"
+#include "../MidiTestSupport.h"
 
 #include "value/base/LevelScale.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
@@ -166,8 +167,7 @@ void physicalLfosAndMixerStateArePreserved() {
              std::abs(*vibratoRate.front()->context.frequencyHz - 8000.0 / (39.0 * 32.0 * 4.0)) < 0.000001 &&
              vibrato.front()->context.shape && vibrato.front()->context.shape->waveform == LfoWaveform::Sine &&
              vibrato.front()->context.polarity == LfoPolarity::Bipolar &&
-             vibrato.front()->context.shape->samples.size() == 32 &&
-             vibrato.front()->context.sampleImmediatelyOnNote &&
+             vibrato.front()->context.shape->samples.size() == 32 && vibrato.front()->context.sampleImmediatelyOnNote &&
              vibrato.front()->context.restartMode == LfoRestartMode::PhaseAndDelay &&
              vibratoRate.front()->context.restartMode == LfoRestartMode::None,
          "vibrato should preserve the timer-0 oscillator and asymmetric driver pitch ratios");
@@ -205,8 +205,8 @@ void lfoModesFollowTheDriverStateMachine() {
       renderMidiSequence(portamento, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
   const auto hasNonzeroBendAt = [&](u64 tick) {
     return std::ranges::any_of(portamentoMidi.tracks.front().events, [=](const MidiEvent& event) {
-      const auto* bend = std::get_if<PitchBend>(&event);
-      return bend != nullptr && bend->tick == tick && bend->value != 0;
+      const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+      return bend != nullptr && event.tick == tick && bend->value != 0;
     });
   };
   const double minimum = 12.0 * std::log2(1.0 - 32.0 / 256.0);
@@ -219,9 +219,8 @@ void lfoModesFollowTheDriverStateMachine() {
              depth[0]->context.pitchRangeSemitones && depth[0]->context.pitchRangeSemitones->minimum == 0.0 &&
              std::abs(depth[0]->context.pitchRangeSemitones->maximum - maximum) < 0.000001 &&
              rate[0]->context.frequencyHz &&
-             std::abs(*rate[0]->context.frequencyHz - 8000.0 / (39.0 * 16.0)) < 0.000001 &&
-             depth[0]->context.shape && depth[0]->context.shape->samples.size() == 16 &&
-             depth[0]->context.shape->samples.at(8) == 1.0,
+             std::abs(*rate[0]->context.frequencyHz - 8000.0 / (39.0 * 16.0)) < 0.000001 && depth[0]->context.shape &&
+             depth[0]->context.shape->samples.size() == 16 && depth[0]->context.shape->samples.at(8) == 1.0,
          "the positive-lobe mode should repeat after sixteen timer-0 steps");
   expect(depth[1]->context.polarity == LfoPolarity::Negative && depth[1]->context.initialPhaseCycles == 0.0 &&
              depth[1]->context.pitchRangeSemitones &&
@@ -229,12 +228,12 @@ void lfoModesFollowTheDriverStateMachine() {
              depth[1]->context.pitchRangeSemitones->maximum == 0.0 && rate[1]->context.frequencyHz &&
              std::abs(*rate[1]->context.frequencyHz - 8000.0 / (39.0 * 16.0 * 2.0)) < 0.000001,
          "the negative-lobe mode should retain its signed phase and pitch range");
-  expect(depth[2]->context.polarity == LfoPolarity::Bipolar && depth[2]->context.initialPhaseCycles == 0.0 &&
+  expect(
+      depth[2]->context.polarity == LfoPolarity::Bipolar && depth[2]->context.initialPhaseCycles == 0.0 &&
              depth[2]->context.pitchRangeSemitones &&
              std::abs(depth[2]->context.pitchRangeSemitones->minimum - minimum) < 0.000001 &&
              std::abs(depth[2]->context.pitchRangeSemitones->maximum - maximum) < 0.000001 &&
-             rate[2]->context.frequencyHz &&
-             std::abs(*rate[2]->context.frequencyHz - 8000.0 / (39.0 * 32.0)) < 0.000001 &&
+          rate[2]->context.frequencyHz && std::abs(*rate[2]->context.frequencyHz - 8000.0 / (39.0 * 32.0)) < 0.000001 &&
              depth[3]->context.polarity == LfoPolarity::Bipolar && depth[3]->context.initialPhaseCycles == 0.0 &&
              depth[4]->pitchDepthSemitones == 0.0 && depth[4]->context.polarity == LfoPolarity::Bipolar &&
              depth[4]->context.zeroDepthBehavior == LfoZeroDepthBehavior::HoldOutputUntilNextNote &&
@@ -242,11 +241,9 @@ void lfoModesFollowTheDriverStateMachine() {
              continuousDepth.front()->context.initialPhaseCycles == 0.5 &&
              continuousDepth.front()->context.restartMode == LfoRestartMode::Phase &&
              continuousDepth.front()->context.noteRestartInitialPhaseCycles == 0.0 && continuousDelay.size() == 1 &&
-             continuousDelay.front()->updateMode == LfoDelayUpdateMode::FutureNotesOnly &&
-             portamentoDepth.size() == 1 && portamentoDepth.front()->context.shape &&
-             portamentoDepth.front()->context.shape->samples.at(2) == 0.0 &&
-             portamentoDepth.front()->context.shape->samples.at(3) > 0.0 && !hasNonzeroBendAt(1) &&
-             hasNonzeroBendAt(2) &&
+          continuousDelay.front()->updateMode == LfoDelayUpdateMode::FutureNotesOnly && portamentoDepth.size() == 1 &&
+          portamentoDepth.front()->context.shape && portamentoDepth.front()->context.shape->samples.at(2) == 0.0 &&
+          portamentoDepth.front()->context.shape->samples.at(3) > 0.0 && !hasNonzeroBendAt(1) && hasNonzeroBendAt(2) &&
              portamentoNotes.size() == 2 && !portamentoNotes.back()->restartsEnvelope &&
              portamentoNotes.back()->restartsVibratoLfoPhase == true && !portamentoNotes.back()->restartsLfoPhase &&
              tremoloDepth.size() == 2 && tremoloDepth.back()->volumeDepthLinearGain == 0.0 &&
@@ -272,16 +269,15 @@ void trackAndMasterVolumeRetainIndependentResolution() {
          "master volume should be an absolute gain instead of a clipped boost over the $18 startup value");
 
   const MidiSequence midi = renderMidiSequence(performance);
-  const auto volume = std::ranges::find_if(
-      midi.tracks.front().events, [](const MidiEvent& event) { return std::holds_alternative<Volume14>(event); });
-  const auto master =
-      std::ranges::find_if(midi.tracks.front().events.rbegin(), midi.tracks.front().events.rend(),
-                           [](const MidiEvent& event) { return std::holds_alternative<MasterVolume>(event); });
+  const auto volume = std::ranges::find_if(midi.tracks.front().events, [](const MidiEvent& event) {
+    return isMidiController(event, MidiController::ChannelVolume);
+  });
+  const auto master = std::ranges::find_if(midi.tracks.front().events.rbegin(), midi.tracks.front().events.rend(),
+                                           [](const MidiEvent& event) { return midiMasterVolume(event).has_value(); });
   expect(volume != midi.tracks.front().events.end(),
          "eight-bit source volume should automatically use a 14-bit MIDI controller");
   expect(master != midi.tracks.front().events.rend() &&
-             std::get<MasterVolume>(*master).value == LevelScale::midi14FromLinear(half) &&
-             std::get<MasterVolume>(*master).value < 0x3fff,
+             *midiMasterVolume(*master) == LevelScale::midi14FromLinear(half) && *midiMasterVolume(*master) < 0x3fff,
          "master volume should retain its level rather than saturating the 14-bit MIDI master controller");
 }
 

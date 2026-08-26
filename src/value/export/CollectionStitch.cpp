@@ -149,34 +149,39 @@ void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulation
         }
         return std::nullopt;
       },
-      event);
+      event.payload);
 }
 
-void appendInitialChannelState(std::vector<MidiEvent>& events, u64 tick, u8 channel, u16 bank, bool writeBankLsb) {
+void appendInitialChannelState(MidiTrack& track, u64 tick, u8 channel, u16 bank, bool writeBankLsb) {
   constexpr u16 defaultVolume = 100u << 7;
   constexpr u16 defaultExpression = 127u << 7;
   constexpr u8 defaultSoundController = 64;
 
-  events.emplace_back(BankSelect{.tick = tick, .channel = channel, .bank = bank, .writeLsb = writeBankLsb});
-  events.emplace_back(ProgramChange{.tick = tick, .channel = channel});
-  events.emplace_back(Volume14{.tick = tick, .channel = channel, .value = defaultVolume});
-  events.emplace_back(Pan{.tick = tick, .channel = channel});
-  events.emplace_back(Expression14{.tick = tick, .channel = channel, .value = defaultExpression});
-  events.emplace_back(Reverb{.tick = tick, .channel = channel});
-  events.emplace_back(FineTune{.tick = tick, .channel = channel});
-  events.emplace_back(CoarseTune{.tick = tick, .channel = channel});
-  events.emplace_back(PitchBendRange{.tick = tick, .channel = channel});
-  events.emplace_back(PitchBend{.tick = tick, .channel = channel});
-  events.emplace_back(VibratoDepth{.tick = tick, .channel = channel});
-  events.emplace_back(VibratoFrequency{.tick = tick, .channel = channel, .value = defaultSoundController});
-  events.emplace_back(VibratoDelay{.tick = tick, .channel = channel, .ticks = defaultSoundController});
-  events.emplace_back(TremoloDepth{.tick = tick, .channel = channel});
-  events.emplace_back(TremoloFrequency{.tick = tick, .channel = channel, .value = defaultSoundController});
-  events.emplace_back(TremoloDelay{.tick = tick, .channel = channel, .ticks = defaultSoundController});
-  events.emplace_back(PortamentoEnable{.tick = tick, .channel = channel});
-  events.emplace_back(PortamentoTime14{.tick = tick, .channel = channel});
-  events.emplace_back(PortamentoControl{.tick = tick, .channel = channel});
-  events.emplace_back(LegatoPedal{.tick = tick, .channel = channel});
+  track.events.push_back(midi::bankSelect(tick, channel, bank, writeBankLsb));
+  track.events.push_back(midi::programChange(tick, channel, 0));
+  midi::appendController14(track, tick, channel, MidiController::ChannelVolume, MidiController::ChannelVolumeLsb,
+                           defaultVolume);
+  track.events.push_back(midi::controller(tick, channel, MidiController::Pan, 64));
+  midi::appendController14(track, tick, channel, MidiController::Expression, MidiController::ExpressionLsb,
+                           defaultExpression);
+  track.events.push_back(midi::controller(tick, channel, MidiController::Reverb, 0));
+  midi::appendRpn(track, tick, channel, 0, 1, 8192, 8);
+  midi::appendRpn(track, tick, channel, 0, 2, 8192, 8);
+  midi::appendRpn(track, tick, channel, 0, 0, 2u << 7);
+  track.events.push_back(midi::pitchBend(tick, channel, 0));
+  track.events.push_back(midi::controller(tick, channel, MidiController::Modulation, 0));
+  track.events.push_back(midi::controller(tick, channel, MidiController::VibratoRate, defaultSoundController));
+  track.events.push_back(
+      midi::controller(tick, channel, MidiController::VibratoDelay, defaultSoundController, 20, MidiValueUnit::Ticks));
+  track.events.push_back(midi::controller(tick, channel, MidiController::TremoloDepth, 0));
+  track.events.push_back(midi::controller(tick, channel, MidiController::TremoloRate, defaultSoundController));
+  track.events.push_back(
+      midi::controller(tick, channel, MidiController::TremoloDelay, defaultSoundController, 20, MidiValueUnit::Ticks));
+  track.events.push_back(midi::controller(tick, channel, MidiController::Portamento, 0));
+  midi::appendController14(track, tick, channel, MidiController::PortamentoTime, MidiController::PortamentoTimeLsb, 0,
+                           true);
+  track.events.push_back(midi::controller(tick, channel, MidiController::PortamentoControl, 0));
+  track.events.push_back(midi::controller(tick, channel, MidiController::Legato, 0));
 }
 
 [[nodiscard]] std::optional<u32> remappedBank(const StitchPart& part, u32 source) {
@@ -201,7 +206,7 @@ void appendInitialChannelState(std::vector<MidiEvent>& events, u64 tick, u8 chan
     }
     for (const auto& track : part.midi.tracks) {
       for (const auto& event : track.events) {
-        if (const auto* bank = std::get_if<BankSelect>(&event)) {
+        if (const auto* bank = std::get_if<BankSelect>(&event.payload)) {
           sourceBanks.insert(logicalBank(*bank, style));
         }
       }
@@ -228,7 +233,7 @@ void remapPart(StitchPart& part, MidiBankSelectStyle style) {
 
   for (auto& track : part.midi.tracks) {
     for (auto& event : track.events) {
-      if (auto* bank = std::get_if<BankSelect>(&event)) {
+      if (auto* bank = std::get_if<BankSelect>(&event.payload)) {
         bank->bank = midiBank(*remappedBank(part, logicalBank(*bank, style)), style);
       }
     }
@@ -263,43 +268,36 @@ void remapPart(StitchPart& part, MidiBankSelectStyle style) {
 }
 
 [[nodiscard]] u64 eventEnd(const MidiEvent& event) {
-  return std::visit(
-      [](const auto& typed) {
-        using Event = std::decay_t<decltype(typed)>;
-        if constexpr (std::is_same_v<Event, NoteDuration>) {
-          return typed.tick > std::numeric_limits<u64>::max() - typed.duration ? std::numeric_limits<u64>::max()
-                                                                               : typed.tick + typed.duration;
-        }
-        return typed.tick;
-      },
-      event);
+  const auto* note = std::get_if<NoteDuration>(&event.payload);
+  return note != nullptr && event.tick > std::numeric_limits<u64>::max() - note->duration
+             ? std::numeric_limits<u64>::max()
+             : event.tick + (note != nullptr ? note->duration : 0);
 }
 
 [[nodiscard]] bool retime(MidiEvent& event, u32 sourcePpqn, u32 targetPpqn, u64 start) {
-  return std::visit(
-      [&](auto& typed) {
-        const auto tick = scaled(typed.tick, sourcePpqn, targetPpqn);
-        if (!tick || *tick > std::numeric_limits<u64>::max() - start) {
-          return false;
-        }
-        if constexpr (std::is_same_v<std::decay_t<decltype(typed)>, NoteDuration>) {
-          const auto end = scaled(eventEnd(event), sourcePpqn, targetPpqn);
-          if (!end || *end < *tick || *end - *tick > std::numeric_limits<u32>::max()) {
-            return false;
-          }
-          typed.duration = static_cast<u32>(*end - *tick);
-        } else if constexpr (std::is_same_v<std::decay_t<decltype(typed)>, VibratoDelay> ||
-                             std::is_same_v<std::decay_t<decltype(typed)>, TremoloDelay>) {
-          const auto delay = scaled(typed.ticks, sourcePpqn, targetPpqn);
-          if (!delay || *delay > std::numeric_limits<u32>::max()) {
-            return false;
-          }
-          typed.ticks = static_cast<u32>(*delay);
-        }
-        typed.tick = *tick + start;
-        return true;
-      },
-      event);
+  const auto tick = scaled(event.tick, sourcePpqn, targetPpqn);
+  if (!tick || *tick > std::numeric_limits<u64>::max() - start) {
+    return false;
+  }
+  if (auto* note = std::get_if<NoteDuration>(&event.payload)) {
+    const auto end = scaled(eventEnd(event), sourcePpqn, targetPpqn);
+    if (!end || *end < *tick || *end - *tick > std::numeric_limits<u32>::max()) {
+      return false;
+    }
+    note->duration = static_cast<u32>(*end - *tick);
+  } else if (auto* message = std::get_if<MidiChannelMessage>(&event.payload);
+             message != nullptr && message->valueUnit == MidiValueUnit::Ticks) {
+    if (message->value < 0) {
+      return false;
+    }
+    const auto value = scaled(static_cast<u64>(message->value), sourcePpqn, targetPpqn);
+    if (!value || *value > std::numeric_limits<s32>::max()) {
+      return false;
+    }
+    message->value = static_cast<s32>(*value);
+  }
+  event.tick = *tick + start;
+  return true;
 }
 
 [[nodiscard]] std::optional<ComposedMidi> composeMidi(const std::vector<StitchPart>& parts,
@@ -314,6 +312,7 @@ void remapPart(StitchPart& part, MidiBankSelectStyle style) {
     u64 end = 0;
     for (const auto& sourceTrack : part.midi.tracks) {
       auto track = sourceTrack;
+      end = std::max(end, sourceTrack.endTick);
       for (auto& event : track.events) {
         end = std::max(end, eventEnd(event));
         if (!retime(event, sourcePpqn, composition.midi.timebase.ppqn, cursor)) {
@@ -329,14 +328,19 @@ void remapPart(StitchPart& part, MidiBankSelectStyle style) {
             channels.insert(*channel);
           }
         }
-        std::vector<MidiEvent> initialState;
-        initialState.reserve(channels.size() * 20);
+        MidiTrack initialState;
+        initialState.events.reserve(channels.size() * 32);
         const u16 bank = midiBank(*remappedBank(part, 0), bankStyle);
         for (const u8 channel : channels) {
           appendInitialChannelState(initialState, cursor, channel, bank, bankStyle == MidiBankSelectStyle::MsbAndLsb);
         }
-        track.events.insert(track.events.begin(), initialState.begin(), initialState.end());
+        track.events.insert(track.events.begin(), initialState.events.begin(), initialState.events.end());
       }
+      const auto trackEnd = scaled(sourceTrack.endTick, sourcePpqn, composition.midi.timebase.ppqn);
+      if (!trackEnd || *trackEnd > std::numeric_limits<u64>::max() - cursor) {
+        return std::nullopt;
+      }
+      track.endTick = *trackEnd + cursor;
       composition.midi.tracks.push_back(std::move(track));
     }
     append(composition.midi.diagnostics, part.midi.diagnostics);

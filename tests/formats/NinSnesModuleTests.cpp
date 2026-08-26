@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/NinSnes/NinSnes.h"
+#include "../MidiTestSupport.h"
 
 #include "value/formats/NinSnes/NinSnesPatterns.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
@@ -346,16 +347,17 @@ void ninSnesProfilesShareSquaredLevelCurve() {
     }
 
     const MidiSequence midi = renderMidiSequence(performance);
-    const auto volume = std::ranges::find_if(
-        midi.tracks[0].events, [](const MidiEvent& event) { return std::holds_alternative<Volume14>(event); });
+    const auto volume = std::ranges::find_if(midi.tracks[0].events, [](const MidiEvent& event) {
+      return isMidiController(event, MidiController::ChannelVolume);
+    });
     const auto masterVolume = std::ranges::find_if(
-        midi.tracks[0].events, [](const MidiEvent& event) { return std::holds_alternative<MasterVolume>(event); });
+        midi.tracks[0].events, [](const MidiEvent& event) { return midiMasterVolume(event).has_value(); });
     expect(volume != midi.tracks[0].events.end() &&
-               (std::get<Volume14>(*volume).value >> 7) == static_cast<u16>(kChannelLevel / 2),
+               midiController(*volume, MidiController::ChannelVolume)->value == static_cast<u16>(kChannelLevel / 2),
            label + " should retain the legacy channel-controller MSB");
     if (opcodes.master != 0) {
       expect(masterVolume != midi.tracks[0].events.end() &&
-                 (std::get<MasterVolume>(*masterVolume).value >> 7) == static_cast<u16>(kMasterLevel / 2),
+                 (*midiMasterVolume(*masterVolume) >> 7) == static_cast<u16>(kMasterLevel / 2),
              label + " should retain the legacy master-volume MSB");
     }
   }
@@ -477,8 +479,7 @@ void ninSnesProfilesEmitSubtractiveTremolo() {
     expect(depths[1]->volumeDepthDecibels == 0.0, label + " should disable tremolo by clearing its depth");
     expect(rate != nullptr && rate->context.cyclesPerTick && rate->context.frequencyHz &&
                std::abs(*rate->context.cyclesPerTick - 0.125) < 0.0001 &&
-               std::abs(*rate->context.frequencyHz - 7.8125) < 0.0001 &&
-               rate->context.initialPhaseCycles == 0.25,
+               std::abs(*rate->context.frequencyHz - 7.8125) < 0.0001 && rate->context.initialPhaseCycles == 0.25,
            label + " should use the sequence-clocked N-SPC tremolo rate");
     expect(delay != nullptr && delay->delayTicks == kDelay && delay->milliseconds &&
                std::abs(*delay->milliseconds - 48.0) < 0.0001 && delay->tempoRelative,
@@ -521,12 +522,12 @@ void ninSnesStandardEchoUsesMaskLevelAndDisable() {
   expect(performance.tracks.size() == 8, "standard echo fixture should retain all eight DSP voices");
   for (size_t index = 0; index < midi.tracks.size(); ++index) {
     const bool enabled = std::ranges::any_of(midi.tracks[index].events, [](const MidiEvent& event) {
-      const auto* reverb = std::get_if<Reverb>(&event);
-      return reverb != nullptr && reverb->tick == 0 && reverb->value != 0;
+      const auto* reverb = midiController(event, MidiController::Reverb);
+      return reverb != nullptr && event.tick == 0 && reverb->value != 0;
     });
     const bool disabled = std::ranges::any_of(midi.tracks[index].events, [](const MidiEvent& event) {
-      const auto* reverb = std::get_if<Reverb>(&event);
-      return reverb != nullptr && reverb->tick == 4 && reverb->value == 0;
+      const auto* reverb = midiController(event, MidiController::Reverb);
+      return reverb != nullptr && event.tick == 4 && reverb->value == 0;
     });
     expect(enabled == (index < 2) && (index >= 2 || disabled),
            "standard echo should apply EON globally and honor echo-off on track " + std::to_string(index));
@@ -674,7 +675,7 @@ void ninSnesNoteVelocityPreservesLegacyCurve() {
   const MidiSequence midi = renderMidiSequence(performance);
   std::vector<u8> velocities;
   for (const MidiEvent& event : midi.tracks[0].events) {
-    if (const auto* note = std::get_if<NoteDuration>(&event)) {
+    if (const auto* note = std::get_if<NoteDuration>(&event.payload)) {
       velocities.push_back(note->velocity);
     }
   }
@@ -868,10 +869,10 @@ void ninSnesPlaylistCarriesTiesAcrossSectionParserResets() {
   const PerformanceSequence performance = render(std::move(bytes));
   expect(performance.diagnostics.empty(), "cross-section tie fixture should render without diagnostics");
   const MidiSequence midi = renderMidiSequence(performance);
-  const auto note = std::ranges::find_if(
-      midi.tracks[0].events, [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); });
-  expect(note != midi.tracks[0].events.end() && std::get<NoteDuration>(*note).tick == 0 &&
-             std::get<NoteDuration>(*note).duration == 34,
+  const auto note = std::ranges::find_if(midi.tracks[0].events, [](const MidiEvent& event) {
+    return std::holds_alternative<NoteDuration>(event.payload);
+  });
+  expect(note != midi.tracks[0].events.end() && note->tick == 0 && std::get<NoteDuration>(note->payload).duration == 34,
          "a leading tie in the next section should extend the previous duration note");
   expect(std::ranges::any_of(performance.tracks[0].events,
                              [](const PerformanceEvent& event) {
@@ -937,14 +938,15 @@ void ninSnesKonamiZeroDurationRateContinuesHeldVoice() {
          "CC68 intent should bracket the exact zero-rate held-note run");
 
   const MidiSequence midi = renderMidiSequence(performance);
-  std::vector<NoteDuration> attacks;
+  std::vector<std::pair<u64, NoteDuration>> attacks;
   for (const MidiEvent& event : midi.tracks[0].events) {
-    if (const auto* note = std::get_if<NoteDuration>(&event)) {
-      attacks.push_back(*note);
+    if (const auto* note = std::get_if<NoteDuration>(&event.payload)) {
+      attacks.emplace_back(event.tick, *note);
     }
   }
-  expect(attacks.size() == 2 && attacks[0].tick == 0 && attacks[0].key == 24 && attacks[0].duration == 2 &&
-             attacks[1].tick == 4 && attacks[1].key == 28 && attacks[1].duration == 14,
+  expect(attacks.size() == 2 && attacks[0].first == 0 && attacks[0].second.key == 24 &&
+             attacks[0].second.duration == 2 && attacks[1].first == 4 && attacks[1].second.key == 28 &&
+             attacks[1].second.duration == 14,
          "pitch-bend lowering should render the zero-rate run as one sustained physical attack");
 
   Layout standard = standardLayout();
@@ -1007,22 +1009,24 @@ void ninSnesF9UsesSharedPitchTransitions() {
          "F9 format playback should not choose a MIDI pitch representation");
 
   const MidiSequence pitchBend = renderMidiSequence(performance);
-  expect(
-      std::ranges::any_of(pitchBend.tracks[0].events,
+  expect(std::ranges::any_of(pitchBend.tracks[0].events,
                           [](const MidiEvent& event) {
-                            const auto* bend = std::get_if<PitchBend>(&event);
+                               const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
                             return bend != nullptr && bend->value != 0;
                           }) &&
-          std::ranges::none_of(pitchBend.tracks[0].events,
-                               [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }),
+             std::ranges::none_of(
+                 pitchBend.tracks[0].events,
+                 [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }),
       "NinSnes should retain exact F9 pitch bends by default");
 
   const MidiSequence portamento =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
-  expect(std::ranges::any_of(portamento.tracks[0].events,
-                             [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) &&
-             std::ranges::none_of(portamento.tracks[0].events,
-                                  [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }),
+  expect(std::ranges::any_of(
+             portamento.tracks[0].events,
+             [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }) &&
+             std::ranges::none_of(
+                 portamento.tracks[0].events,
+                 [](const MidiEvent& event) { return isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend); }),
          "an explicit portamento export should lower F9 as native portamento");
 
   // A note pitch envelope owns the same driver motion first. F9 begins only
@@ -1039,13 +1043,13 @@ void ninSnesF9UsesSharedPitchTransitions() {
   const MidiSequence envelopePitchBend = renderMidiSequence(afterEnvelope);
   expect(std::ranges::none_of(envelopePitchBend.tracks[0].events,
                               [](const MidiEvent& event) {
-                                const auto* bend = std::get_if<PitchBend>(&event);
-                                return bend != nullptr && bend->tick == 0 && bend->value != 0;
+                                const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+                                return bend != nullptr && event.tick == 0 && bend->value != 0;
                               }) &&
              std::ranges::any_of(envelopePitchBend.tracks[0].events,
                                  [](const MidiEvent& event) {
-                                   const auto* bend = std::get_if<PitchBend>(&event);
-                                   return bend != nullptr && bend->tick == 1 && bend->value != 0;
+                                   const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+                                   return bend != nullptr && event.tick == 1 && bend->value != 0;
                                  }),
          "pitch-bend lowering should not apply F9's post-envelope starting pitch at note attack");
 
@@ -1053,13 +1057,13 @@ void ninSnesF9UsesSharedPitchTransitions() {
       afterEnvelope, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
   expect(std::ranges::any_of(envelopePortamento.tracks[0].events,
                              [](const MidiEvent& event) {
-                               const auto* note = std::get_if<NoteDuration>(&event);
-                               return note != nullptr && note->tick == 0 && note->key == 24;
+                               const auto* note = std::get_if<NoteDuration>(&event.payload);
+                               return note != nullptr && event.tick == 0 && note->key == 24;
                              }) &&
              std::ranges::any_of(envelopePortamento.tracks[0].events,
                                  [](const MidiEvent& event) {
-                                   const auto* bend = std::get_if<PitchBend>(&event);
-                                   return bend != nullptr && bend->tick == 3 && bend->value == 0;
+                                   const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+                                   return bend != nullptr && event.tick == 3 && bend->value == 0;
                                  }),
          "native portamento should preserve the preceding envelope and center its bend at the F9 handoff");
 
@@ -1068,8 +1072,8 @@ void ninSnesF9UsesSharedPitchTransitions() {
   const MidiSequence consecutivePitchBend = renderMidiSequence(consecutive);
   expect(std::ranges::none_of(consecutivePitchBend.tracks[0].events,
                               [](const MidiEvent& event) {
-                                const auto* bend = std::get_if<PitchBend>(&event);
-                                return bend != nullptr && bend->tick == 0 && bend->value != 0;
+                                const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+                                return bend != nullptr && event.tick == 0 && bend->value != 0;
                               }),
          "a later F9 should inherit the preceding transition instead of pre-bending the note attack");
 
@@ -1086,7 +1090,7 @@ void ninSnesF9UsesSharedPitchTransitions() {
       renderMidiSequence(queued, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
   expect(std::ranges::count_if(
              queuedPortamento.tracks[0].events,
-             [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) == 1,
+             [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }) == 1,
          "a canceled delayed F9 should not leave a zero-length portamento behind");
 
   for (const ProfileId id : kProfileIds) {

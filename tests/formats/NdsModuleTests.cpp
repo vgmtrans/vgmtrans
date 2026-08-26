@@ -5,6 +5,7 @@
  */
 
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "../MidiTestSupport.h"
 #include "value/export/synth/ModulationScaling.h"
 #include "value/formats/NDS/Nds.h"
 #include "value/formats/NDS/NdsEnvelope.h"
@@ -444,21 +445,17 @@ void ndsSequenceDecodesAndRendersNoteWaitCommands() {
   const MidiSequence midi = renderMidiSequence(performance);
   expect(midi.tracks.size() == 1, "NDS SSEQ MIDI rendering should preserve one track");
   const auto& events = midi.tracks[0].events;
-  const auto port =
-      std::ranges::find_if(events, [](const MidiEvent& event) { return std::holds_alternative<MidiPort>(event); });
-  const auto note =
-      std::ranges::find_if(events, [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); });
+  const auto port = std::ranges::find_if(events, [](const MidiEvent& event) { return midiMeta(event, 33) != nullptr; });
+  const auto note = std::ranges::find_if(
+      events, [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event.payload); });
   const auto tempo =
-      std::ranges::find_if(events, [](const MidiEvent& event) { return std::holds_alternative<Tempo>(event); });
-  expect(port != events.end() && std::get<MidiPort>(*port).port == 0,
-         "NDS SSEQ MIDI rendering should emit MIDI port metadata");
-  expect(
-      note != events.end() && std::get<NoteDuration>(*note).tick == 0 && std::get<NoteDuration>(*note).duration == 24,
+      std::ranges::find_if(events, [](const MidiEvent& event) { return midiMeta(event, 81) != nullptr; });
+  expect(port != events.end() && *midiPort(*port) == 0, "NDS SSEQ MIDI rendering should emit MIDI port metadata");
+  expect(note != events.end() && note->tick == 0 && std::get<NoteDuration>(note->payload).duration == 24,
       "NDS SSEQ note should render at the current tick with its source duration");
-  expect(tempo != events.end() && std::get<Tempo>(*tempo).tick == 24 &&
-             std::get<Tempo>(*tempo).microsecondsPerQuarter == 500000,
+  expect(tempo != events.end() && tempo->tick == 24 && *midiTempo(*tempo) == 500000,
          "NDS SSEQ tempo should convert BPM to microseconds per quarter");
-  expect(std::get<EndOfTrack>(events.back()).tick == 30, "NDS SSEQ MIDI rendering should preserve VM end tick");
+  expect(midi.tracks[0].endTick == 30, "NDS SSEQ MIDI rendering should preserve VM end tick");
 
   bytes[trackStart + 0] = 0x81;
   bytes[trackStart + 1] = 0x81;
@@ -522,7 +519,7 @@ void ndsSequenceDecodesAndRendersNoteWaitCommands() {
       .tracks = {expressionTrack},
   };
   const MidiSequence expressionMidi = renderMidiSequence(SequenceVm(LoopPolicy::PlayOnce).render(expressionProgram));
-  expect(std::holds_alternative<Expression>(expressionMidi.tracks[0].events[1]),
+  expect(isMidiController(expressionMidi.tracks[0].events[1], MidiController::Expression),
          "NDS expression opcode should render as MIDI expression");
 }
 
@@ -713,14 +710,14 @@ void ndsSynthModulatorsUseSequenceLfoRanges() {
   u8 maxVibratoFrequency = 0;
   u32 maxVibratoDelay = 0;
   for (const MidiEvent& event : midi.tracks[0].events) {
-    if (const auto* depth = std::get_if<VibratoDepth>(&event)) {
-      maxVibratoDepth = std::max(maxVibratoDepth, depth->value);
-    } else if (const auto* depth = std::get_if<TremoloDepth>(&event)) {
-      maxTremoloDepth = std::max(maxTremoloDepth, depth->value);
-    } else if (const auto* rate = std::get_if<VibratoFrequency>(&event)) {
-      maxVibratoFrequency = std::max(maxVibratoFrequency, rate->value);
-    } else if (const auto* delay = std::get_if<VibratoDelay>(&event)) {
-      maxVibratoDelay = std::max(maxVibratoDelay, delay->ticks);
+    if (const auto* depth = midiController(event, MidiController::Modulation)) {
+      maxVibratoDepth = std::max(maxVibratoDepth, static_cast<u8>(depth->value));
+    } else if (const auto* depth = midiController(event, MidiController::TremoloDepth)) {
+      maxTremoloDepth = std::max(maxTremoloDepth, static_cast<u8>(depth->value));
+    } else if (const auto* rate = midiController(event, MidiController::VibratoRate)) {
+      maxVibratoFrequency = std::max(maxVibratoFrequency, static_cast<u8>(rate->value));
+    } else if (const auto* delay = midiController(event, MidiController::VibratoDelay)) {
+      maxVibratoDelay = std::max(maxVibratoDelay, static_cast<u32>(delay->value));
     }
   }
   expect(maxVibratoDepth == 127 && maxTremoloDepth == 127 && maxVibratoFrequency == 127 && maxVibratoDelay == 127,
@@ -806,10 +803,11 @@ void ndsSequenceRevealsRunningSineLfoAtDepthChange() {
       renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
 
   const auto bend = std::ranges::find_if(midi.tracks[0].events, [](const MidiEvent& event) {
-    const auto* pitch = std::get_if<PitchBend>(&event);
-    return pitch != nullptr && pitch->tick == 5;
+    const auto* pitch = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+    return pitch != nullptr && event.tick == 5;
   });
-  expect(bend != midi.tracks[0].events.end() && std::get<PitchBend>(*bend).value == 1524,
+  expect(bend != midi.tracks[0].events.end() &&
+             midiChannelMessage(*bend, MidiChannelMessageKind::PitchBend)->value == 1524,
          "NDS CA should reveal the already-running default 6 Hz sine LFO instead of restarting it");
 }
 
@@ -861,20 +859,20 @@ void ndsSequencePreservesPortamentoTimingIntent() {
   const MidiSequence native = renderMidiSequence(performance);
   expect(std::ranges::count_if(
              native.tracks[0].events,
-             [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) == 2,
+             [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }) == 2,
          "preserve-format MIDI should lower both NDS source portamento transitions natively");
 
   const MidiSequence bent =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
   expect(std::ranges::none_of(bent.tracks[0].events,
                               [](const MidiEvent& event) {
-                                return std::holds_alternative<PortamentoTime>(event) ||
-                                       std::holds_alternative<PortamentoTime14>(event) ||
-                                       std::holds_alternative<PortamentoControl>(event);
+                                return isMidiController(event, MidiController::PortamentoTime) ||
+                                       isMidiController(event, MidiController::PortamentoTimeLsb) ||
+                                       isMidiController(event, MidiController::PortamentoControl);
                               }) &&
              std::ranges::any_of(bent.tracks[0].events,
                                  [](const MidiEvent& event) {
-                                   const auto* bend = std::get_if<PitchBend>(&event);
+                                   const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
                                    return bend != nullptr && bend->value != 0;
                                  }),
          "pitch-bend lowering should reproduce NDS portamento without native portamento events");
@@ -916,12 +914,14 @@ void ndsSequencePreservesTiedSweepVoices() {
          "a tied NDS note without a sweep should preserve its immediate attack-free pitch change");
 
   const MidiSequence midi = renderMidiSequence(performance);
-  const auto noteCount = std::ranges::count_if(
-      midi.tracks[0].events, [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); });
-  const auto note = std::ranges::find_if(
-      midi.tracks[0].events, [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); });
-  expect(noteCount == 1 && note != midi.tracks[0].events.end() && std::get<NoteDuration>(*note).tick == 0 &&
-             std::get<NoteDuration>(*note).duration == 12,
+  const auto noteCount = std::ranges::count_if(midi.tracks[0].events, [](const MidiEvent& event) {
+    return std::holds_alternative<NoteDuration>(event.payload);
+  });
+  const auto note = std::ranges::find_if(midi.tracks[0].events, [](const MidiEvent& event) {
+    return std::holds_alternative<NoteDuration>(event.payload);
+  });
+  expect(noteCount == 1 && note != midi.tracks[0].events.end() && note->tick == 0 &&
+             std::get<NoteDuration>(note->payload).duration == 12,
          "pitch-bend lowering should keep tied NDS key changes on one MIDI attack");
 }
 

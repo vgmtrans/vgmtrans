@@ -33,6 +33,47 @@ namespace {
   return static_cast<u16>(std::clamp<int>(static_cast<int>(std::lround(value)), 0, 16383));
 }
 
+void addController(MidiTrack& track, u64 tick, u8 channel, MidiController controller, s32 value, int priority = 20,
+                   MidiValueUnit unit = MidiValueUnit::Data, std::optional<double> normalizedAmount = std::nullopt) {
+  track.events.push_back(midi::controller(tick, channel, controller, value, priority, unit, normalizedAmount));
+}
+
+void addPitchBendRange(MidiTrack& track, u64 tick, u8 channel, u16 cents) {
+  const u8 semitones = static_cast<u8>(std::min<u16>(cents / 100, 127));
+  const u8 fineCents = static_cast<u8>(std::min<u16>(cents % 100, 127));
+  midi::appendRpn(track, tick, channel, 0, 0, static_cast<u16>((semitones << 7) | fineCents));
+}
+
+void addFineTune(MidiTrack& track, u64 tick, u8 channel, double cents) {
+  const double semitones = std::clamp(cents / 100.0, -1.0, 1.0);
+  const s32 value = std::min(static_cast<int>(std::lround(8192 * semitones)), 8191) + 8192;
+  midi::appendRpn(track, tick, channel, 0, 1, static_cast<u16>(value), 8);
+}
+
+void addCoarseTune(MidiTrack& track, u64 tick, u8 channel, s8 semitones) {
+  const s32 value = std::clamp<s32>((semitones + 64) << 7, 0, 16383);
+  midi::appendRpn(track, tick, channel, 0, 2, static_cast<u16>(value), 8);
+}
+
+[[nodiscard]] u8 denominatorPower(u8 denominator) {
+  if (denominator == 0) {
+    return 0;
+  }
+  constexpr double ln2 = 0.69314718055994530942;
+  return static_cast<u8>(std::log(static_cast<double>(denominator)) / ln2);
+}
+
+[[nodiscard]] MidiEvent tempoEvent(u64 tick, u32 microsecondsPerQuarter) {
+  return midi::meta(
+      tick, 0x51,
+      {static_cast<u8>((microsecondsPerQuarter >> 16) & 0xff), static_cast<u8>((microsecondsPerQuarter >> 8) & 0xff),
+       static_cast<u8>(microsecondsPerQuarter & 0xff)});
+}
+
+[[nodiscard]] MidiEvent timeSignatureEvent(u64 tick, u8 numerator, u8 denominator, u8 clocksPerMetronomeClick) {
+  return midi::meta(tick, 0x58, {numerator, denominatorPower(denominator), clocksPerMetronomeClick, 8});
+}
+
 [[nodiscard]] u8 midiKey(double key) {
   return data7(key);
 }
@@ -188,7 +229,8 @@ void addVolume(MidiTrack& track, MidiControllerState* state, u64 tick, u8 channe
     if (state != nullptr && state->volume14 && *state->volume14 == value) {
       return;
     }
-    track.events.push_back(Volume14{.tick = tick, .channel = channel, .value = value});
+    midi::appendController14(track, tick, channel, MidiController::ChannelVolume, MidiController::ChannelVolumeLsb,
+                             value);
     if (state != nullptr) {
       state->volume14 = value;
       state->volume7.reset();
@@ -198,7 +240,7 @@ void addVolume(MidiTrack& track, MidiControllerState* state, u64 tick, u8 channe
     if (state != nullptr && state->volume7 && *state->volume7 == value) {
       return;
     }
-    track.events.push_back(Volume{.tick = tick, .channel = channel, .value = value});
+    addController(track, tick, channel, MidiController::ChannelVolume, value);
     if (state != nullptr) {
       state->volume7 = value;
       state->volume14.reset();
@@ -213,7 +255,7 @@ void addExpression(MidiTrack& track, MidiControllerState* state, u64 tick, u8 ch
     if (state != nullptr && state->expression14 && *state->expression14 == value) {
       return;
     }
-    track.events.push_back(Expression14{.tick = tick, .channel = channel, .value = value});
+    midi::appendController14(track, tick, channel, MidiController::Expression, MidiController::ExpressionLsb, value);
     if (state != nullptr) {
       state->expression14 = value;
       state->expression7.reset();
@@ -223,7 +265,7 @@ void addExpression(MidiTrack& track, MidiControllerState* state, u64 tick, u8 ch
     if (state != nullptr && state->expression7 && *state->expression7 == value) {
       return;
     }
-    track.events.push_back(Expression{.tick = tick, .channel = channel, .value = value});
+    addController(track, tick, channel, MidiController::Expression, value);
     if (state != nullptr) {
       state->expression7 = value;
       state->expression14.reset();
@@ -235,7 +277,7 @@ void addPan(MidiTrack& track, MidiControllerState* state, u64 tick, u8 channel, 
   if (state != nullptr && state->pan && *state->pan == value) {
     return;
   }
-  track.events.push_back(Pan{.tick = tick, .channel = channel, .value = value});
+  addController(track, tick, channel, MidiController::Pan, value);
   if (state != nullptr) {
     state->pan = value;
   }
@@ -541,24 +583,20 @@ struct VoicePitchBendRangeChange {
   return semitones;
 }
 
-[[nodiscard]] std::vector<TimeSignature> collectGlobalTimeSignatures(const PerformanceTimelines& timelines) {
-  std::vector<TimeSignature> timeSignatures;
+[[nodiscard]] std::vector<MidiEvent> collectGlobalTimeSignatures(const PerformanceTimelines& timelines) {
+  std::vector<MidiEvent> timeSignatures;
   for (const auto& timeline : timelines) {
     for (const auto* event : timeline) {
       const auto* timeSignature = std::get_if<TimeSignaturePerformanceEvent>(event);
       if (timeSignature == nullptr) {
         continue;
       }
-      timeSignatures.push_back(TimeSignature{
-          .tick = timeSignature->header.tick,
-          .numerator = timeSignature->numerator,
-          .denominator = timeSignature->denominator,
-          .clocksPerMetronomeClick = timeSignature->clocksPerMetronomeClick,
-      });
+      timeSignatures.push_back(timeSignatureEvent(timeSignature->header.tick, timeSignature->numerator,
+                                                  timeSignature->denominator, timeSignature->clocksPerMetronomeClick));
     }
   }
   std::ranges::stable_sort(timeSignatures,
-                           [](const TimeSignature& lhs, const TimeSignature& rhs) { return lhs.tick < rhs.tick; });
+                           [](const MidiEvent& lhs, const MidiEvent& rhs) { return lhs.tick < rhs.tick; });
   return timeSignatures;
 }
 
@@ -567,15 +605,16 @@ bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePer
     return false;
   }
 
-  auto* previous = std::get_if<NoteDuration>(&track.events[*state.lastNoteIndex]);
+  MidiEvent& previousEvent = track.events[*state.lastNoteIndex];
+  auto* previous = std::get_if<NoteDuration>(&previousEvent.payload);
   if (previous == nullptr || previous->channel != channel) {
     return false;
   }
 
-  const u64 previousEnd = previous->tick + previous->duration;
+  const u64 previousEnd = previousEvent.tick + previous->duration;
   const u64 extensionEnd = note.header.tick + note.durationTicks;
   if (extensionEnd > previousEnd) {
-    previous->duration = static_cast<u32>(extensionEnd - previous->tick);
+    previous->duration = static_cast<u32>(extensionEnd - previousEvent.tick);
   }
   return true;
 }
@@ -617,11 +656,7 @@ void ensurePitchBendRange(MidiTrack& track, RenderTrackState& state, u64 tick, u
     state.pitchBendRangeCents = range;
     return;
   }
-  track.events.push_back(PitchBendRange{
-      .tick = tick,
-      .channel = channel,
-      .cents = range,
-  });
+  addPitchBendRange(track, tick, channel, range);
   state.pitchBendRangeCents = range;
   state.lastPitchBendRangeCents = range;
 }
@@ -630,11 +665,7 @@ void addPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channe
   if (!force && state.lastPitchBendValue && *state.lastPitchBendValue == value) {
     return;
   }
-  track.events.push_back(PitchBend{
-      .tick = tick,
-      .channel = channel,
-      .value = value,
-  });
+  track.events.push_back(midi::pitchBend(tick, channel, value));
   state.lastPitchBendValue = value;
 }
 
@@ -672,22 +703,13 @@ void applyInstrumentSelection(MidiTrack& track, RenderTrackState& state, u64 tic
   const u16 bank = midiBank(selection, options);
   const bool bankChanged = bank != state.midiBank;
   if (bankChanged || selection.forceBankSelect) {
-    track.events.push_back(BankSelect{
-        .tick = tick,
-        .channel = channel,
-        .bank = bank,
-        .writeLsb = writeBankSelectLsb(options),
-    });
+    track.events.push_back(midi::bankSelect(tick, channel, bank, writeBankSelectLsb(options)));
     state.midiBank = bank;
   }
   const u8 program = data7(selection.address.program);
   if (forceProgramChange || bankChanged || program != state.midiProgram) {
     state.midiProgram = program;
-    track.events.push_back(ProgramChange{
-        .tick = tick,
-        .channel = channel,
-        .program = program,
-    });
+    track.events.push_back(midi::programChange(tick, channel, program));
   }
   applyInstrumentPitchBendRange(track, state, tick, channel, selection.pitchBendRangeCents, modulationConversion);
 }
@@ -833,8 +855,8 @@ void configureLfo(SimulatedLfoState& lfo, u64 tick, const ModulationPerformanceE
   if (context.delayTicks || context.delayMilliseconds) {
     SimulatedLfoDelay delay{
         .ticks = context.delayTicks.value_or(0),
-        .milliseconds = context.delayMilliseconds ? std::optional{std::max(0.0, *context.delayMilliseconds)}
-                                                  : std::nullopt,
+        .milliseconds =
+            context.delayMilliseconds ? std::optional{std::max(0.0, *context.delayMilliseconds)} : std::nullopt,
         .tempoRelative = context.delayIsTempoRelative,
     };
     applyLfoDelayUpdate(lfo, std::move(delay), context.delayUpdateMode);
@@ -1214,10 +1236,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             return;
           }
           if (options.terminatePreviousVoice && typedEvent.restartsEnvelope && state.lastNoteIndex) {
-            track.events.push_back(AllSoundOff{
-                .tick = typedEvent.header.tick,
-                .channel = channel,
-            });
+            addController(track, typedEvent.header.tick, channel, MidiController::AllSoundOff, 0, 45);
           }
           state.lastNoteIndex = track.events.size();
           u32 duration = typedEvent.durationTicks;
@@ -1225,13 +1244,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             duration = std::min(duration, globalTempos.durationTicksForMilliseconds(
                                               typedEvent.header.tick, *typedEvent.maximumDurationMilliseconds));
           }
-          track.events.push_back(NoteDuration{
-              .tick = typedEvent.header.tick,
-              .channel = channel,
-              .key = key,
-              .velocity = midiVelocity(typedEvent.linearVelocity),
-              .duration = duration,
-          });
+          track.events.push_back(
+              midi::note(typedEvent.header.tick, channel, key, midiVelocity(typedEvent.linearVelocity), duration));
         } else if constexpr (std::is_same_v<TypedEvent, TempoPerformanceEvent>) {
           // Tempo is song-wide. Effective changes are written once on the
           // first MIDI track after all source tracks have been lowered.
@@ -1270,43 +1284,25 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           addCombinedExpression(track, state, typedEvent.header.tick, channel, options, modulationConversion,
                                 automationState);
         } else if constexpr (std::is_same_v<TypedEvent, MasterLevelPerformanceEvent>) {
-          track.events.push_back(MasterVolume{
-              .tick = typedEvent.header.tick,
-              .value = LevelScale::midi14FromLinear(typedEvent.linearGain),
-          });
+          const u16 value = LevelScale::midi14FromLinear(typedEvent.linearGain);
+          track.events.push_back(midi::sysex(
+              typedEvent.header.tick,
+              {0x7f, 0x7f, 0x04, 0x01, static_cast<u8>(value & 0x7f), static_cast<u8>((value >> 7) & 0x7f), 0xf7}));
         } else if constexpr (std::is_same_v<TypedEvent, ReverbPerformanceEvent>) {
           const bool enabled = !typedEvent.voiceMask ||
                                (sourceTrackNumber < 8 && (*typedEvent.voiceMask & (1u << sourceTrackNumber)) != 0);
-          track.events.push_back(Reverb{
-              .tick = typedEvent.header.tick,
-              .channel = channel,
-              .value = midiNormalized7(enabled ? typedEvent.send : 0.0),
-          });
+          addController(track, typedEvent.header.tick, channel, MidiController::Reverb,
+                        midiNormalized7(enabled ? typedEvent.send : 0.0));
         } else if constexpr (std::is_same_v<TypedEvent, MonoModePerformanceEvent>) {
-          track.events.push_back(MonoMode{
-              .tick = typedEvent.header.tick,
-              .channel = channel,
-              .channels = typedEvent.channels,
-          });
+          addController(track, typedEvent.header.tick, channel, MidiController::MonoMode, typedEvent.channels);
         } else if constexpr (std::is_same_v<TypedEvent, TuningPerformanceEvent>) {
           if (options.wideTuning == MidiWideTuningRendering::CoarseTune) {
             const s32 coarseSemitones = std::clamp<s32>(static_cast<s32>(typedEvent.cents / 100.0), -64, 63);
-            track.events.push_back(CoarseTune{
-                .tick = typedEvent.header.tick,
-                .channel = channel,
-                .semitones = static_cast<s8>(coarseSemitones),
-            });
-            track.events.push_back(FineTune{
-                .tick = typedEvent.header.tick,
-                .channel = channel,
-                .cents = typedEvent.cents - static_cast<double>(coarseSemitones) * 100.0,
-            });
+            addCoarseTune(track, typedEvent.header.tick, channel, static_cast<s8>(coarseSemitones));
+            addFineTune(track, typedEvent.header.tick, channel,
+                        typedEvent.cents - static_cast<double>(coarseSemitones) * 100.0);
           } else {
-            track.events.push_back(FineTune{
-                .tick = typedEvent.header.tick,
-                .channel = channel,
-                .cents = std::clamp(typedEvent.cents, -100.0, 100.0),
-            });
+            addFineTune(track, typedEvent.header.tick, channel, std::clamp(typedEvent.cents, -100.0, 100.0));
             const double bend = tuningBendSemitones(typedEvent.cents, options.wideTuning);
             if (bend != state.tuningBendSemitones) {
               state.tuningBendSemitones = bend;
@@ -1332,11 +1328,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           setLfoDelay(state.vibrato, typedEvent.header.tick, typedEvent.delayTicks, typedEvent.milliseconds,
                       typedEvent.tempoRelative, typedEvent.updateMode);
           if (modulationConversion != ModulationConversionPolicy::SequenceEventSimulation) {
-            track.events.push_back(VibratoDelay{
-                .tick = typedEvent.header.tick,
-                .channel = channel,
-                .ticks = vibratoDelayControllerValue(typedEvent, modulationProfile),
-            });
+            addController(track, typedEvent.header.tick, channel, MidiController::VibratoDelay,
+                          vibratoDelayControllerValue(typedEvent, modulationProfile), 20, MidiValueUnit::Ticks);
           }
         } else if constexpr (std::is_same_v<TypedEvent, TremoloDelayPerformanceEvent>) {
           const auto fallback = typedEvent.milliseconds ? LfoInitialPhaseFallback::Zero
@@ -1344,53 +1337,31 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           setLfoDelay(state.tremolo, typedEvent.header.tick, typedEvent.delayTicks, typedEvent.milliseconds,
                       typedEvent.tempoRelative, typedEvent.updateMode, fallback);
           if (modulationConversion != ModulationConversionPolicy::SequenceEventSimulation) {
-            track.events.push_back(TremoloDelay{
-                .tick = typedEvent.header.tick,
-                .channel = channel,
-                .ticks = tremoloDelayControllerValue(typedEvent, modulationProfile),
-            });
+            addController(track, typedEvent.header.tick, channel, MidiController::TremoloDelay,
+                          tremoloDelayControllerValue(typedEvent, modulationProfile), 20, MidiValueUnit::Ticks);
           }
         } else if constexpr (std::is_same_v<TypedEvent, PortamentoPerformanceEvent>) {
-          track.events.push_back(PortamentoTime14{
-              .tick = typedEvent.header.tick,
-              .channel = channel,
-              .value = data14(typedEvent.timeMilliseconds),
-          });
+          midi::appendController14(track, typedEvent.header.tick, channel, MidiController::PortamentoTime,
+                                   MidiController::PortamentoTimeLsb, data14(typedEvent.timeMilliseconds), true);
           if (typedEvent.previousKey) {
             const double previousKey =
                 *typedEvent.previousKey + globalTransposeAt(globalTransposes, typedEvent.header.tick);
-            track.events.push_back(PortamentoControl{
-                .tick = typedEvent.header.tick,
-                .channel = channel,
-                .key = midiKey(previousKey),
-            });
+            addController(track, typedEvent.header.tick, channel, MidiController::PortamentoControl,
+                          midiKey(previousKey));
           }
         } else if constexpr (std::is_same_v<TypedEvent, PortamentoEnablePerformanceEvent>) {
-          track.events.push_back(PortamentoEnable{
-              .tick = typedEvent.header.tick,
-              .channel = channel,
-              .enabled = typedEvent.enabled,
-          });
+          addController(track, typedEvent.header.tick, channel, MidiController::Portamento,
+                        typedEvent.enabled ? 127 : 0);
         } else if constexpr (std::is_same_v<TypedEvent, PortamentoTimePerformanceEvent>) {
-          track.events.push_back(PortamentoTime{
-              .tick = typedEvent.header.tick,
-              .channel = channel,
-              .value = data7(typedEvent.timeMilliseconds),
-          });
+          addController(track, typedEvent.header.tick, channel, MidiController::PortamentoTime,
+                        data7(typedEvent.timeMilliseconds));
         } else if constexpr (std::is_same_v<TypedEvent, PortamentoControlPerformanceEvent>) {
           const double previousKey =
               typedEvent.previousKey + globalTransposeAt(globalTransposes, typedEvent.header.tick);
-          track.events.push_back(PortamentoControl{
-              .tick = typedEvent.header.tick,
-              .channel = channel,
-              .key = midiKey(previousKey),
-          });
+          addController(track, typedEvent.header.tick, channel, MidiController::PortamentoControl,
+                        midiKey(previousKey));
         } else if constexpr (std::is_same_v<TypedEvent, LegatoPedalPerformanceEvent>) {
-          track.events.push_back(LegatoPedal{
-              .tick = typedEvent.header.tick,
-              .channel = channel,
-              .enabled = typedEvent.enabled,
-          });
+          addController(track, typedEvent.header.tick, channel, MidiController::Legato, typedEvent.enabled ? 127 : 0);
         } else if constexpr (std::is_same_v<TypedEvent, ModulationPerformanceEvent>) {
           const double normalizedAmount = modulationControllerAmount(typedEvent, modulationProfile);
           const u8 value = midiNormalized7(normalizedAmount);
@@ -1416,13 +1387,13 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                                       ? RenderTrackState::TremoloDepthUnit::Decibels
                                       : (physicalLinearGain ? RenderTrackState::TremoloDepthUnit::LinearGain
                                                             : RenderTrackState::TremoloDepthUnit::LegacyUnipolar);
-                setSimulatedTremoloDepth(
-                    track, state, typedEvent.header.tick, channel,
-                    physicalDecibels ? *typedEvent.volumeDepthDecibels
-                                     : (physicalLinearGain ? *typedEvent.volumeDepthLinearGain
-                                                           : std::clamp(typedEvent.amount, 0.0, 1.0) * 0.5),
-                    unit, typedEvent.context.tremoloGainMode, typedEvent.context.zeroDepthBehavior, options,
-                    modulationConversion);
+                setSimulatedTremoloDepth(track, state, typedEvent.header.tick, channel,
+                                         physicalDecibels
+                                             ? *typedEvent.volumeDepthDecibels
+                                             : (physicalLinearGain ? *typedEvent.volumeDepthLinearGain
+                                                                   : std::clamp(typedEvent.amount, 0.0, 1.0) * 0.5),
+                                         unit, typedEvent.context.tremoloGainMode, typedEvent.context.zeroDepthBehavior,
+                                         options, modulationConversion);
                 break;
               }
               case ModulationPerformanceTarget::VibratoRate:
@@ -1458,46 +1429,28 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           }
           switch (typedEvent.target) {
             case ModulationPerformanceTarget::VibratoDepth:
-              track.events.push_back(VibratoDepth{
-                  .tick = typedEvent.header.tick,
-                  .channel = channel,
-                  .value = value,
-                  .normalizedAmount = normalizedAmount,
-              });
+              addController(track, typedEvent.header.tick, channel, MidiController::Modulation, value, 20,
+                            MidiValueUnit::Data, normalizedAmount);
               break;
             case ModulationPerformanceTarget::VibratoRate:
-              track.events.push_back(VibratoFrequency{
-                  .tick = typedEvent.header.tick,
-                  .channel = channel,
-                  .value = value,
-                  .normalizedAmount = normalizedAmount,
-              });
+              addController(track, typedEvent.header.tick, channel, MidiController::VibratoRate, value, 20,
+                            MidiValueUnit::Data, normalizedAmount);
               break;
             case ModulationPerformanceTarget::TremoloDepth:
-              track.events.push_back(TremoloDepth{
-                  .tick = typedEvent.header.tick,
-                  .channel = channel,
-                  .value = value,
-                  .normalizedAmount = normalizedAmount,
-              });
+              addController(track, typedEvent.header.tick, channel, MidiController::TremoloDepth, value, 20,
+                            MidiValueUnit::Data, normalizedAmount);
               break;
             case ModulationPerformanceTarget::TremoloRate:
-              track.events.push_back(TremoloFrequency{
-                  .tick = typedEvent.header.tick,
-                  .channel = channel,
-                  .value = value,
-                  .normalizedAmount = normalizedAmount,
-              });
+              addController(track, typedEvent.header.tick, channel, MidiController::TremoloRate, value, 20,
+                            MidiValueUnit::Data, normalizedAmount);
               break;
             case ModulationPerformanceTarget::PanDepth:
             case ModulationPerformanceTarget::PanRate:
               break;
           }
         } else if constexpr (std::is_same_v<TypedEvent, MarkerPerformanceEvent>) {
-          track.events.push_back(Marker{
-              .tick = typedEvent.header.tick,
-              .text = typedEvent.text,
-          });
+          track.events.push_back(midi::meta(typedEvent.header.tick, 0x06,
+                                            std::vector<u8>(typedEvent.text.begin(), typedEvent.text.end()), 90));
         }
       },
       event);
@@ -1527,7 +1480,7 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
   sequence.tracks.reserve(loweredPerformance.tracks.size());
   const PerformanceTimelines timelines = buildPerformanceTimelines(loweredPerformance);
   const std::vector<GlobalTransposeChange> globalTransposes = collectGlobalTransposeChanges(timelines);
-  const std::vector<TimeSignature> globalTimeSignatures = collectGlobalTimeSignatures(timelines);
+  const std::vector<MidiEvent> globalTimeSignatures = collectGlobalTimeSignatures(timelines);
 
   for (size_t trackIndex = 0; trackIndex < loweredPerformance.tracks.size(); ++trackIndex) {
     const auto& performanceTrack = loweredPerformance.tracks[trackIndex];
@@ -1546,10 +1499,7 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
       });
     }
     if (options.writePortMetaEvents) {
-      midiTrack.events.push_back(MidiPort{
-          .tick = 0,
-          .port = midiPortByte(assignment.port),
-      });
+      midiTrack.events.push_back(midi::meta(0, 0x21, {midiPortByte(assignment.port)}, -5));
     }
     applyInstrumentPitchBendRange(midiTrack, renderState, 0, assignment.channel,
                                   instrumentSelection(InstrumentPerformanceEvent{}, soundBanks).pitchBendRangeCents,
@@ -1586,10 +1536,7 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
       if (trackIndex == 0) {
         if (const auto* tempo = std::get_if<TempoPerformanceEvent>(event);
             tempo != nullptr && globalTempos.contains(*tempo)) {
-          midiTrack.events.push_back(Tempo{
-              .tick = tempo->header.tick,
-              .microsecondsPerQuarter = tempo->microsecondsPerQuarter,
-          });
+          midiTrack.events.push_back(tempoEvent(tempo->header.tick, tempo->microsecondsPerQuarter));
           for (size_t index = 0; index < globalTempoPoints.size(); ++index) {
             if (!renderedTempoPoints[index] && globalTempoPoints[index].tick == tempo->header.tick &&
                 globalTempoPoints[index].microsecondsPerQuarter == tempo->microsecondsPerQuarter) {
@@ -1619,10 +1566,7 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
           continue;
         }
         const auto& tempo = globalTempoPoints[index];
-        midiTrack.events.push_back(Tempo{
-            .tick = tempo.tick,
-            .microsecondsPerQuarter = tempo.microsecondsPerQuarter,
-        });
+        midiTrack.events.push_back(tempoEvent(tempo.tick, tempo.microsecondsPerQuarter));
         endTick = std::max(endTick, tempo.tick);
       }
       midiTrack.events.insert(midiTrack.events.end(), globalTimeSignatures.begin(), globalTimeSignatures.end());
@@ -1630,9 +1574,7 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
         endTick = std::max(endTick, timeSignature.tick);
       }
     }
-    midiTrack.events.push_back(EndOfTrack{
-        .tick = endTick,
-    });
+    midiTrack.endTick = endTick;
     sequence.tracks.push_back(std::move(midiTrack));
   }
 

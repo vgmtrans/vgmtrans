@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/AkaoSnes/AkaoSnes.h"
+#include "../MidiTestSupport.h"
 #include "value/formats/AkaoSnes/AkaoSnesV4Lfo.h"
 #include "value/formats/ValueFormats.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
@@ -655,10 +656,10 @@ void akaoSnesV3VibratoPreservesSquareWaveModesAndSteppedAttack() {
     return nullptr;
   };
   const auto bendValues = [](const MidiSequence& midi) {
-    std::vector<const PitchBend*> bends;
+    std::vector<std::pair<u64, s32>> bends;
     for (const MidiEvent& event : midi.tracks.front().events) {
-      if (const auto* bend = std::get_if<PitchBend>(&event)) {
-        bends.push_back(bend);
+      if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend)) {
+        bends.emplace_back(event.tick, bend->value);
       }
     }
     return bends;
@@ -684,13 +685,12 @@ void akaoSnesV3VibratoPreservesSquareWaveModesAndSteppedAttack() {
                depth->context.initialPhaseCycles == mode.initialPhase && depth->context.pitchRangeSemitones &&
                depth->context.steppedDepthAttackSteps == 0,
            "AkaoSnes V3 vibrato should retain its square waveform, phase, and packed direction mode");
-    expect(
-        (depth->context.pitchRangeSemitones->minimum < 0.0) == mode.hasDownwardExcursion &&
+    expect((depth->context.pitchRangeSemitones->minimum < 0.0) == mode.hasDownwardExcursion &&
             (depth->context.pitchRangeSemitones->maximum > 0.0) == mode.hasUpwardExcursion &&
             depth->pitchDepthSemitones &&
-            std::abs(*depth->pitchDepthSemitones -
-                     std::max(std::abs(depth->context.pitchRangeSemitones->minimum),
-                              std::abs(depth->context.pitchRangeSemitones->maximum))) < 0.000001,
+               std::abs(*depth->pitchDepthSemitones - std::max(std::abs(depth->context.pitchRangeSemitones->minimum),
+                                                               std::abs(depth->context.pitchRangeSemitones->maximum))) <
+                   0.000001,
         "AkaoSnes V3 packed depth modes should retain their full asymmetric pitch endpoints");
 
     const auto rates = eventsOfType<ModulationPerformanceEvent>(performance.tracks.front());
@@ -705,14 +705,14 @@ void akaoSnesV3VibratoPreservesSquareWaveModesAndSteppedAttack() {
     const MidiSequence midi =
         renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
     const auto bends = bendValues(midi);
-    const bool hasNegative = std::ranges::any_of(bends, [](const PitchBend* bend) { return bend->value < -3000; });
-    const bool hasPositive = std::ranges::any_of(bends, [](const PitchBend* bend) { return bend->value > 3000; });
+    const bool hasNegative = std::ranges::any_of(bends, [](const auto& bend) { return bend.second < -3000; });
+    const bool hasPositive = std::ranges::any_of(bends, [](const auto& bend) { return bend.second > 3000; });
     expect(hasNegative == mode.hasDownwardExcursion && hasPositive == mode.hasUpwardExcursion,
            "AkaoSnes V3 sequence-event simulation should preserve downward, upward, and bipolar square modes");
     expect(std::ranges::any_of(bends,
-                               [&](const PitchBend* bend) {
-                                 return bend->tick == 0 &&
-                                        (mode.hasUpwardExcursion ? bend->value > 3000 : bend->value < -3000);
+                               [&](const auto& bend) {
+                                 return bend.first == 0 &&
+                                        (mode.hasUpwardExcursion ? bend.second > 3000 : bend.second < -3000);
                                }),
            "AkaoSnes V3 zero-delay vibrato should calculate its first held sample on the note-on tick");
   }
@@ -732,11 +732,11 @@ void akaoSnesV3VibratoPreservesSquareWaveModesAndSteppedAttack() {
   const MidiSequence delayedMidi =
       renderMidiSequence(delayed, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
   const auto delayedBends = bendValues(delayedMidi);
-  const auto firstExcursion = std::ranges::find_if(delayedBends, [](const PitchBend* bend) { return bend->value > 0; });
-  expect(firstExcursion != delayedBends.end() && (*firstExcursion)->tick == 1 && (*firstExcursion)->value > 800 &&
-             (*firstExcursion)->value < 1200 &&
+  const auto firstExcursion = std::ranges::find_if(delayedBends, [](const auto& bend) { return bend.second > 0; });
+  expect(firstExcursion != delayedBends.end() && firstExcursion->first == 1 && firstExcursion->second > 800 &&
+             firstExcursion->second < 1200 &&
              std::ranges::any_of(
-                 delayedBends, [](const PitchBend* bend) { return bend->value > 3500; }),
+                 delayedBends, [](const auto& bend) { return bend.second > 3500; }),
          "AkaoSnes V3 delayed vibrato should begin one tick later at quarter depth and reach full depth by stages");
 }
 
@@ -845,11 +845,11 @@ void akaoSnesV4LfosPreserveDriverFamiliesAndPackedModes() {
     const MidiSequence midi =
         renderMidiSequence(performance, MidiExportOptions{}, ModulationConversionPolicy::SequenceEventSimulation);
     const bool bendsDown = std::ranges::any_of(midi.tracks.front().events, [](const MidiEvent& event) {
-      const auto* bend = std::get_if<PitchBend>(&event);
+      const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
       return bend != nullptr && bend->value < 0;
     });
     const bool bendsUp = std::ranges::any_of(midi.tracks.front().events, [](const MidiEvent& event) {
-      const auto* bend = std::get_if<PitchBend>(&event);
+      const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
       return bend != nullptr && bend->value > 0;
     });
     expect(bendsDown == (test.polarity != LfoPolarity::Positive) && bendsUp == (test.polarity != LfoPolarity::Negative),
@@ -1064,16 +1064,20 @@ void akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo() {
 
   const MidiSequence bendSlide = renderMidiSequence(slide);
   expect(std::ranges::count_if(bendSlide.tracks.front().events,
-                               [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }) >= 3,
+                               [](const MidiEvent& event) {
+                                 return isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+                               }) >= 3,
          "preserve-format MIDI should lower an AkaoSnes pitch slide through its sampled pitch-bend curve");
 
   MidiExportOptions portamentoOptions;
   portamentoOptions.pitchTransitions = MidiPitchTransitionRendering::Portamento;
   const MidiSequence portamentoSlide = renderMidiSequence(slide, portamentoOptions);
-  expect(std::ranges::any_of(portamentoSlide.tracks.front().events,
-                             [](const MidiEvent& event) { return std::holds_alternative<PortamentoControl>(event); }) &&
-             std::ranges::none_of(portamentoSlide.tracks.front().events,
-                                  [](const MidiEvent& event) { return std::holds_alternative<PitchBend>(event); }),
+  expect(std::ranges::any_of(
+             portamentoSlide.tracks.front().events,
+             [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }) &&
+             std::ranges::none_of(
+                 portamentoSlide.tracks.front().events,
+                 [](const MidiEvent& event) { return isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend); }),
          "explicit portamento MIDI should lower the same AkaoSnes pitch-slide intent natively");
 
   slideBytes[start + 1] = 0;
@@ -1190,9 +1194,10 @@ void akaoSnesV4TieExtendsShortenedPreviousNote() {
   expect(performance.diagnostics.empty(), "AkaoSnes V4 tie fixture should render without diagnostics");
 
   const MidiSequence midi = renderMidiSequence(performance);
-  const auto note = std::ranges::find_if(
-      midi.tracks[0].events, [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); });
+  const auto note = std::ranges::find_if(midi.tracks[0].events, [](const MidiEvent& event) {
+    return std::holds_alternative<NoteDuration>(event.payload);
+  });
   expect(note != midi.tracks[0].events.end(), "AkaoSnes V4 tie fixture should render a MIDI note");
-  expect(std::get<NoteDuration>(*note).duration == 142,
+  expect(std::get<NoteDuration>(note->payload).duration == 142,
          "AkaoSnes V4 tie should extend the previous shortened note instead of leaving it at 94 ticks");
 }

@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/CompileSnes/CompileSnes.h"
+#include "../MidiTestSupport.h"
 
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
@@ -271,8 +272,8 @@ void pitchSweepAdvancesThroughThePitchTable() {
   const MidiSequence midi = renderMidiSequence(downward);
   const auto hasBendAt = [&](u64 tick) {
     return std::ranges::any_of(midi.tracks.front().events, [tick](const MidiEvent& event) {
-      const auto* bend = std::get_if<PitchBend>(&event);
-      return bend != nullptr && bend->tick == tick;
+      const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+      return bend != nullptr && event.tick == tick;
     });
   };
   expect(midi.timebase.ppqn == 12 && hasBendAt(1) && hasBendAt(2) && hasBendAt(3),
@@ -294,11 +295,14 @@ void portamentoUsesDriverRateAndRetriggersFirstNote() {
   const auto* timing = slide == nullptr ? nullptr : std::get_if<FixedDurationPitchSlideTiming>(&slide->timing.physical);
   const MidiSequence midi =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
-  const auto noteCount = std::ranges::count_if(
-      midi.tracks.front().events, [](const MidiEvent& event) { return std::holds_alternative<NoteDuration>(event); });
+  const auto noteCount = std::ranges::count_if(midi.tracks.front().events, [](const MidiEvent& event) {
+    return std::holds_alternative<NoteDuration>(event.payload);
+  });
   const auto portamentoCount = std::ranges::count_if(midi.tracks.front().events, [](const MidiEvent& event) {
-    return std::holds_alternative<PortamentoEnable>(event) || std::holds_alternative<PortamentoTime>(event) ||
-           std::holds_alternative<PortamentoTime14>(event) || std::holds_alternative<PortamentoControl>(event);
+    return isMidiController(event, MidiController::Portamento) ||
+           isMidiController(event, MidiController::PortamentoTime) ||
+           isMidiController(event, MidiController::PortamentoTimeLsb) ||
+           isMidiController(event, MidiController::PortamentoControl);
   });
   expect(slide != nullptr && slide->timing.timelineTicks == 1 && timing != nullptr && timing->milliseconds == 16.0 &&
              noteCount == 2 && portamentoCount == 0,
