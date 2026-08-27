@@ -619,7 +619,7 @@ struct Playback {
           std::ceil(std::abs(track.targetPitch - track.currentPitch) / track.portamentoStep));
       auto slide = out.pitchSlide(track.lastNote, startKey, targetKey, slideTicks).preferPitchBend();
       if (continues) {
-        slide.continueFrom(previousNote).continueAcrossNotes();
+        slide.continueFrom(previousNote);
       }
     } else {
       track.currentPitch = track.targetPitch;

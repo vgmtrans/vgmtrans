@@ -232,6 +232,18 @@ void pitchEffectsRetainPhysicalTiming() {
              }),
          "raw-pitch portamento should retain the driver's fixed step rate as a physical pitch transition");
 
+  const PerformanceSequence retriggered =
+      render({0x3b, 1, 0x90, 16, 0x9f, 0x3d, 29, 0x90, 8, 0x84, 2, 0x3d, 10, 0x3e, 5, 0x85, 0x9e, 0x90, 0,
+              0x3b, 30, 0x80});
+  expect(retriggered.diagnostics.empty() &&
+             std::ranges::any_of(retriggered.tracks.front().automations, [](const auto& automation) {
+               const auto* slide = std::get_if<PitchTransitionIntent>(&automation.intent);
+               return slide != nullptr && automation.header.tick == 55 && automation.realization.endTick == 60 &&
+                      automation.realization.endReason == PerformanceAutomationEndReason::Interrupted &&
+                      !slide->continuesAcrossNotes;
+             }),
+         "a new attack should cancel the preceding legato portamento instead of bending the fresh note");
+
   const PerformanceSequence trill = render({0x86, 8, 0x96, 12, 2, 3, 0x32, 0x80});
   const auto bends = events<PitchBendPerformanceEvent>(trill.tracks.front());
   expect(trill.diagnostics.empty() && std::ranges::any_of(bends, [](const auto* event) {
