@@ -6,6 +6,7 @@
 
 #include "value/formats/SoftCreat/SoftCreat.h"
 
+#include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
@@ -198,6 +199,30 @@ void gainHoldContinuesTheCurrentEnvelope() {
   expect(modulation.empty(), "legato notes without vibrato should not emit redundant modulation resets");
 }
 
+void restsPreserveTheKeyedVoice() {
+  const PerformanceSequence performance =
+      render({0xa2, 1, 120, 1, 120, 1, 120, 14, 0x93, 5, 0x84, 2, 0x18, 20, 0x9f, 0x18, 10, 0x18, 10,
+              0x93, 0, 0x18, 40, 0, 160, 0, 80, 0x85, 0x9e, 0x19, 1, 0x80});
+  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const MidiSequence midi = renderMidiSequence(performance);
+  const auto heldNote = std::ranges::find_if(midi.tracks.front().events, [](const MidiEvent& event) {
+    const auto* note = std::get_if<NoteDuration>(&event.payload);
+    return note != nullptr && event.tick == 0 && note->duration == 640;
+  });
+  expect(performance.diagnostics.empty() && notes.size() == 13 && notes[4]->header.tick == 80 &&
+             notes[4]->extendsPrevious && notes[5]->header.tick == 240 && notes[5]->extendsPrevious &&
+             notes[6]->header.tick == 320 && notes[6]->extendsPrevious && notes[6]->note == notes[0]->note &&
+             notes[12]->header.tick == 640 && !notes[12]->extendsPrevious && notes[12]->note != notes[0]->note &&
+             heldNote != midi.tracks.front().events.end(),
+         "rests should extend a keyed voice until a retriggering note sends KOFF/KON");
+
+  const PerformanceSequence releasedRest =
+      render({0xa2, 1, 120, 1, 120, 1, 120, 14, 0x93, 0, 0x18, 20, 0x93, 5, 0, 20, 0x80});
+  const auto expression = events<ExpressionPerformanceEvent>(releasedRest.tracks.front());
+  expect(std::ranges::any_of(expression, [](const auto* event) { return event->header.tick == 35; }),
+         "rest durations should schedule software release just like note durations");
+}
+
 void durationModesLegatoAndRepeatsAreStateful() {
   const PerformanceSequence repeated = render({0x86, 4, 0x84, 2, 1, 0x85, 0x9f, 2, 0x80});
   const auto notes = events<NotePerformanceEvent>(repeated.tracks.front());
@@ -218,8 +243,9 @@ void durationModesLegatoAndRepeatsAreStateful() {
 
   const PerformanceSequence polymorphicTail =
       render({0x84, 2, 0, 1, 0xbf, 0x86, 1, 1, 0x40, 0x86, 0, 0x85, 0x80}, Version::LateEcho);
+  const auto polymorphicNotes = events<NotePerformanceEvent>(polymorphicTail.tracks.front());
   expect(polymorphicTail.diagnostics.empty() &&
-             events<NotePerformanceEvent>(polymorphicTail.tracks.front()).size() == 2,
+             std::ranges::count_if(polymorphicNotes, [](const auto* note) { return !note->extendsPrevious; }) == 2,
          "a byte that becomes a per-note suffix on a later pass should retain both control-flow interpretations");
 }
 
@@ -259,6 +285,7 @@ void runSoftCreatModuleTests() {
   versionedOpcodesRetainTheirRealOperandLengths();
   physicalEffectsAndSoftwareGainRender();
   gainHoldContinuesTheCurrentEnvelope();
+  restsPreserveTheKeyedVoice();
   durationModesLegatoAndRepeatsAreStateful();
   pitchEffectsRetainPhysicalTiming();
 }
