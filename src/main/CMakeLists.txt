@@ -323,6 +323,10 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1Samples.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1Sequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1Synth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SoftCreat/SoftCreatLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SoftCreat/SoftCreatModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SoftCreat/SoftCreatSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SoftCreat/SoftCreatSynth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SquarePS2/SquarePS2Layout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SquarePS2/SquarePS2Module.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SquarePS2/SquarePS2Resolver.cpp
@@ -368,6 +372,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/Nds.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SegSat/SegSat.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/SoftCreat/SoftCreat.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SquarePS2/SquarePS2.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnes.h
