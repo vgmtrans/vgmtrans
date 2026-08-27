@@ -263,6 +263,8 @@ public:
   PitchSlideBinding& continueAcrossNotes(bool enabled = true);
   PitchSlideBinding& preferPortamento();
   PitchSlideBinding& preferPitchBend();
+  // Protects per-voice slides which channel-wide pitch bend cannot preserve.
+  PitchSlideBinding& requirePortamento();
 
   // Retains portamento time already established by an earlier driver command.
   PitchSlideBinding& useCurrentPortamentoTiming();
