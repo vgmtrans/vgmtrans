@@ -11,6 +11,7 @@ target_sources(vgmtrans-value-core-tests
     formats/KonamiArcadeModuleTests.cpp
     formats/KonamiSnesModuleTests.cpp
     formats/Mp2kModuleTests.cpp
+    formats/NeverlandSnesModuleTests.cpp
     formats/NinSnesModuleTests.cpp
     formats/PrismSnesModuleTests.cpp
     formats/RareSnesModuleTests.cpp

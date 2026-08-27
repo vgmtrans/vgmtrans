@@ -113,22 +113,25 @@ void Settings::ConversionSettings::setPitchTransitionRendering(
   emit owner->conversionOptionsChanged();
 }
 
-vgmtrans::core::MidiWideTuningRendering Settings::ConversionSettings::wideTuningRendering() const {
+vgmtrans::core::MidiTuningRendering Settings::ConversionSettings::tuningRendering() const {
   settings.beginGroup(QStringLiteral("ConversionOptions"));
-  const int value =
+  const int legacyDefault =
       settings.value(QStringLiteral("wideTuningRendering"),
-                     static_cast<int>(vgmtrans::core::MidiWideTuningRendering::PitchBend))
+                     static_cast<int>(vgmtrans::core::MidiTuningRendering::PitchBend))
           .toInt();
+  const int value = settings.value(QStringLiteral("tuningRendering"), legacyDefault).toInt();
   settings.endGroup();
-  return value == static_cast<int>(vgmtrans::core::MidiWideTuningRendering::CoarseTune)
-             ? vgmtrans::core::MidiWideTuningRendering::CoarseTune
-             : vgmtrans::core::MidiWideTuningRendering::PitchBend;
+  switch (static_cast<vgmtrans::core::MidiTuningRendering>(value)) {
+    case vgmtrans::core::MidiTuningRendering::PitchBend:
+    case vgmtrans::core::MidiTuningRendering::CoarseAndFineTune:
+      return static_cast<vgmtrans::core::MidiTuningRendering>(value);
+  }
+  return vgmtrans::core::MidiTuningRendering::PitchBend;
 }
 
-void Settings::ConversionSettings::setWideTuningRendering(
-    vgmtrans::core::MidiWideTuningRendering rendering) const {
+void Settings::ConversionSettings::setTuningRendering(vgmtrans::core::MidiTuningRendering rendering) const {
   settings.beginGroup(QStringLiteral("ConversionOptions"));
-  settings.setValue(QStringLiteral("wideTuningRendering"), static_cast<int>(rendering));
+  settings.setValue(QStringLiteral("tuningRendering"), static_cast<int>(rendering));
   settings.endGroup();
   emit owner->conversionOptionsChanged();
 }

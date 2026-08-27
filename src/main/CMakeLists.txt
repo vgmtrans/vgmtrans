@@ -294,6 +294,10 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2kModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2kSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2kSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NeverlandSnes/NeverlandSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NeverlandSnes/NeverlandSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NeverlandSnes/NeverlandSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NeverlandSnes/NeverlandSnesSynth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesPatterns.cpp
@@ -366,6 +370,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcade.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2k.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NeverlandSnes/NeverlandSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/PrismSnes/PrismSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/RareSnes/RareSnes.h

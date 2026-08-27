@@ -145,14 +145,14 @@ void MenuBar::appendOptionsMenu() {
                       Settings::the()->conversion.setPitchTransitionRendering(rendering);
                     });
 
-  using vgmtrans::core::MidiWideTuningRendering;
+  using vgmtrans::core::MidiTuningRendering;
   appendEnumOptions(
-      m_optionsMenu, tr("Wide Tuning Rendering"), Settings::the()->conversion.wideTuningRendering(),
+      m_optionsMenu, tr("Tuning Rendering"), Settings::the()->conversion.tuningRendering(),
       std::array{
-          std::pair{tr("Pitch Bend (Compatible, Default)"), MidiWideTuningRendering::PitchBend},
-          std::pair{tr("Coarse Tune RPN"), MidiWideTuningRendering::CoarseTune},
+          std::pair{tr("Use Pitch Bend"), MidiTuningRendering::PitchBend},
+          std::pair{tr("Use Coarse/Fine Tune RPN"), MidiTuningRendering::CoarseAndFineTune},
       },
-      [](MidiWideTuningRendering rendering) { Settings::the()->conversion.setWideTuningRendering(rendering); });
+      [](MidiTuningRendering rendering) { Settings::the()->conversion.setTuningRendering(rendering); });
 
   using vgmtrans::core::ModulationConversionPolicy;
   appendEnumOptions(

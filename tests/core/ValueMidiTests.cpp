@@ -225,7 +225,7 @@ void performanceMidiRendererTrustsSourceNoteExtensions() {
   expect(midiSequence.tracks[0].endTick == 30, "performance renderer should preserve track end ticks");
 }
 
-void performanceMidiRendererSelectsWideTuningRepresentation() {
+void performanceMidiRendererSelectsTuningRepresentation() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {PerformanceTrack{
@@ -233,6 +233,10 @@ void performanceMidiRendererSelectsWideTuningRepresentation() {
           .events =
               {
                   TuningPerformanceEvent{.header = PerformanceEventHeader{.tick = 0}, .cents = 100.0},
+                  NotePerformanceEvent{.header = PerformanceEventHeader{.tick = 0},
+                                       .key = 60.0,
+                                       .linearVelocity = 1.0,
+                                       .durationTicks = 18},
                   PitchBendPerformanceEvent{.header = PerformanceEventHeader{.tick = 6}, .semitones = 0.5},
                   TuningPerformanceEvent{.header = PerformanceEventHeader{.tick = 12}, .cents = 214.0625},
                   TuningPerformanceEvent{.header = PerformanceEventHeader{.tick = 18}, .cents = 14.0625},
@@ -240,29 +244,25 @@ void performanceMidiRendererSelectsWideTuningRepresentation() {
       }},
   };
 
-  const MidiSequence compatible = renderMidiSequence(performance);
-  std::vector<u16> compatibleFine;
-  std::vector<std::pair<u64, s32>> compatibleBends;
-  size_t compatibleCoarseCount = 0;
-  for (const auto& rpn : midiRpns(compatible.tracks.front().events)) {
-    if (rpn.parameterMsb == 0 && rpn.parameterLsb == 1) {
-      compatibleFine.push_back(rpn.value);
-    } else if (rpn.parameterMsb == 0 && rpn.parameterLsb == 2) {
-      ++compatibleCoarseCount;
-    }
+  const MidiSequence pitchBend = renderMidiSequence(performance);
+  std::vector<std::pair<u64, s32>> tuningBends;
+  size_t tuningRpnCount = 0;
+  for (const auto& rpn : midiRpns(pitchBend.tracks.front().events)) {
+    tuningRpnCount += rpn.parameterMsb == 0 && (rpn.parameterLsb == 1 || rpn.parameterLsb == 2);
   }
-  for (const auto& event : compatible.tracks.front().events) {
+  for (const auto& event : pitchBend.tracks.front().events) {
     if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend)) {
-      compatibleBends.emplace_back(event.tick, bend->value);
+      tuningBends.emplace_back(event.tick, bend->value);
     }
   }
-  expect(compatibleCoarseCount == 0 && compatibleFine == std::vector<u16>{16383, 16383, 9344},
-         "compatible tuning should keep the fine-tuning range out of coarse RPN");
-  expect(compatibleBends == std::vector<std::pair<u64, s32>>{{6, 2048}, {12, 6720}, {18, 2048}},
-         "compatible wide tuning should add its excess to source pitch bend and remove it when tuning narrows");
+  expect(tuningRpnCount == 0 && midiPitchBendRanges(pitchBend.tracks.front().events) ==
+                                    std::vector<std::pair<u64, u16>>{{0, 300}},
+         "default tuning should reserve one stable pitch-bend range without tuning RPNs");
+  expect(tuningBends == std::vector<std::pair<u64, s32>>{{0, 2731}, {6, 4096}, {12, 7211}, {18, 1749}},
+         "default tuning should place the complete tuning and source bend on the wheel");
 
   MidiExportOptions coarseOptions;
-  coarseOptions.wideTuning = MidiWideTuningRendering::CoarseTune;
+  coarseOptions.tuning = MidiTuningRendering::CoarseAndFineTune;
   const MidiSequence coarse = renderMidiSequence(performance, coarseOptions);
   std::vector<u16> coarseTuning;
   std::vector<u16> coarseFine;
@@ -2409,8 +2409,8 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
          "sample filtering should use each format's recommendation by default");
   expect(!ExportRequest{}.sequence.midi.terminatePreviousVoice,
          "previous-voice termination should remain explicitly opt-in");
-  expect(ExportRequest{}.sequence.midi.wideTuning == MidiWideTuningRendering::PitchBend,
-         "wide tuning should default to compatible pitch-bend rendering");
+  expect(ExportRequest{}.sequence.midi.tuning == MidiTuningRendering::PitchBend,
+         "tuning should default to pitch-bend rendering");
 
   const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
@@ -2950,7 +2950,7 @@ void runValueMidiTests() {
   midiExporterOrdersGeneratedNoteOffBeforeSameTickNoteOn();
   midiExporterKeepsZeroDurationNotePairedAtSameTick();
   performanceMidiRendererTrustsSourceNoteExtensions();
-  performanceMidiRendererSelectsWideTuningRepresentation();
+  performanceMidiRendererSelectsTuningRepresentation();
   performanceMidiRendererWritesTimeSignaturesToFirstTrack();
   performanceMidiRendererWritesPanGainResetWhenRequested();
   performanceMidiRendererCombinesExpressionWithPanGain();

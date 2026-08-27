@@ -38,6 +38,7 @@ void runSoftCreatSnesModuleTests();
 void runCompileSnesModuleTests();
 void runWolfTeamSnesModuleTests();
 void runMp2kModuleTests();
+void runNeverlandSnesModuleTests();
 
 void capcomSnesLayoutSelectsSongListAndFixedHeaders();
 void capcomSnesLayoutFallsBackToV2SongList();
@@ -233,6 +234,7 @@ int main() {
     runHudsonSnesModuleTests();
     runItikitiSnesModuleTests();
     runSoftCreatSnesModuleTests();
+    runNeverlandSnesModuleTests();
     runCompileSnesModuleTests();
     runPrismSnesModuleTests();
 

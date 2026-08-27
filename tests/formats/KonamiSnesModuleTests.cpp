@@ -659,7 +659,8 @@ void konamiSnesProgramChangeReemitsCurrentFineTune() {
   };
 
   const PerformanceSequence performance = renderKonamiSnesTrack(bytes);
-  const MidiSequence midi = renderMidiSequence(performance);
+  const MidiSequence midi =
+      renderMidiSequence(performance, MidiExportOptions{.tuning = MidiTuningRendering::CoarseAndFineTune});
   const auto& events = midi.tracks[0].events;
 
   const auto programChange = std::ranges::find_if(events, [](const MidiEvent& event) {
@@ -1338,7 +1339,10 @@ void konamiSnesCompiledPlaybackHandlesCallsLoopsTiesAndSlides() {
          "KonamiSnes should preserve its exact sampled curve as pitch bend by default");
 
   const MidiSequence nativePitchMidi =
-      renderMidiSequence(tied, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
+      renderMidiSequence(tied, MidiExportOptions{
+                                   .pitchTransitions = MidiPitchTransitionRendering::Portamento,
+                                   .tuning = MidiTuningRendering::CoarseAndFineTune,
+                               });
   expect(std::ranges::any_of(
              nativePitchMidi.tracks[0].events,
              [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }) &&
