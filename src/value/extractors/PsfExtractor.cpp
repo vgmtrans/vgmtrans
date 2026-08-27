@@ -33,6 +33,7 @@ constexpr u8 kNds2sfVersion = 0x24;
 constexpr u8 kNcsfVersion = 0x25;
 constexpr u8 kGsfVersion = 0x22;
 constexpr u8 kPsf1Version = 0x01;
+constexpr u8 kPsf2Version = 0x02;
 constexpr u8 kSsfVersion = 0x11;
 constexpr u32 kGbaRomBase = 0x08000000;
 constexpr size_t kPsf1DataOffset = 0x800;
@@ -54,8 +55,8 @@ struct Image {
 };
 
 [[nodiscard]] bool supportedVersion(u8 version) {
-  return version == kPsf1Version || version == kSsfVersion || version == kGsfVersion || version == kNds2sfVersion ||
-         version == kNcsfVersion;
+  return version == kPsf1Version || version == kPsf2Version || version == kSsfVersion || version == kGsfVersion ||
+         version == kNds2sfVersion || version == kNcsfVersion;
 }
 
 [[nodiscard]] std::optional<size_t> dataOffsetForVersion(u8 version) {
@@ -117,6 +118,84 @@ struct Image {
     throw std::runtime_error("PSF executable zlib stream could not be decompressed");
   }
   return output;
+}
+
+struct Psf2Member {
+  std::string path;
+  std::vector<u8> bytes;
+};
+
+[[nodiscard]] std::string psf2Name(std::span<const u8> bytes, size_t offset) {
+  if (offset > bytes.size() || bytes.size() - offset < 36) {
+    throw std::runtime_error("PSF2 directory entry is truncated");
+  }
+  const auto end = std::find(bytes.begin() + static_cast<std::ptrdiff_t>(offset),
+                             bytes.begin() + static_cast<std::ptrdiff_t>(offset + 36), u8{0});
+  if (end == bytes.begin() + static_cast<std::ptrdiff_t>(offset)) {
+    throw std::runtime_error("PSF2 directory entry has an empty name");
+  }
+  return {reinterpret_cast<const char*>(bytes.data() + offset),
+          static_cast<size_t>(end - bytes.begin()) - offset};
+}
+
+void unpackPsf2Directory(std::span<const u8> bytes, size_t tableOffset, u32 count, std::string_view prefix,
+                         std::vector<Psf2Member>& members, int depth = 0) {
+  constexpr size_t kEntrySize = 48;
+  constexpr u32 kMaxEntries = 65536;
+  if (depth >= kMaxRecursion || count > kMaxEntries || tableOffset > bytes.size() ||
+      static_cast<u64>(count) * kEntrySize > bytes.size() - tableOffset) {
+    throw std::runtime_error("PSF2 directory table is invalid");
+  }
+
+  for (u32 i = 0; i < count; ++i) {
+    const size_t entry = tableOffset + static_cast<size_t>(i) * kEntrySize;
+    const std::string name = psf2Name(bytes, entry);
+    const u32 offset = le32(bytes, entry + 36);
+    const u32 fileSize = le32(bytes, entry + 40);
+    const u32 blockSize = le32(bytes, entry + 44);
+    const std::string path = prefix.empty() ? name : std::string(prefix) + "/" + name;
+
+    if (fileSize == 0 && blockSize == 0) {
+      const u32 childCount = le32(bytes, static_cast<size_t>(offset) + 16);
+      unpackPsf2Directory(bytes, static_cast<size_t>(offset) + 20, childCount, path, members, depth + 1);
+      continue;
+    }
+    if (blockSize == 0) {
+      throw std::runtime_error("PSF2 file has a zero block size");
+    }
+
+    const u32 blockCount = fileSize == 0 ? 0 : 1 + (fileSize - 1) / blockSize;
+    const size_t sizeTable = static_cast<size_t>(offset) + 16;
+    if (sizeTable > bytes.size() || static_cast<u64>(blockCount) * 4 > bytes.size() - sizeTable) {
+      throw std::runtime_error("PSF2 block table is truncated");
+    }
+
+    size_t compressedOffset = sizeTable + static_cast<size_t>(blockCount) * 4;
+    std::vector<u8> output;
+    output.reserve(fileSize);
+    for (u32 block = 0; block < blockCount; ++block) {
+      const u32 compressedSize = le32(bytes, sizeTable + static_cast<size_t>(block) * 4);
+      if (compressedOffset > bytes.size() || compressedSize > bytes.size() - compressedOffset) {
+        throw std::runtime_error("PSF2 compressed block is truncated");
+      }
+      uLongf decodedSize = std::min<u32>(blockSize, fileSize - static_cast<u32>(output.size()));
+      std::vector<u8> decoded(decodedSize);
+      const int status = uncompress(reinterpret_cast<Bytef*>(decoded.data()), &decodedSize,
+                                    reinterpret_cast<const Bytef*>(bytes.data() + compressedOffset), compressedSize);
+      if (status != Z_OK || decodedSize != decoded.size()) {
+        throw std::runtime_error("PSF2 compressed block could not be decompressed");
+      }
+      output.insert(output.end(), decoded.begin(), decoded.end());
+      compressedOffset += compressedSize;
+    }
+    members.push_back(Psf2Member{.path = path, .bytes = std::move(output)});
+  }
+}
+
+[[nodiscard]] std::vector<Psf2Member> unpackPsf2(std::span<const u8> bytes) {
+  std::vector<Psf2Member> members;
+  unpackPsf2Directory(bytes, 20, le32(bytes, 16), {}, members);
+  return members;
 }
 
 void parseTags(PsfData& psf, std::span<const u8> bytes, size_t offset) {
@@ -390,6 +469,28 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
   ExtractionResult result;
   const auto range = input.reader.range(0, input.reader.size());
   const auto psf = parsePsf(bytes);
+
+  if (psf.version == kPsf2Version) {
+    const auto members = unpackPsf2(bytes.first(16 + le32(bytes, 4)));
+    result.sources.reserve(members.size());
+    for (auto member : members) {
+      SourceFile file{
+          .name = std::filesystem::path(member.path).filename().string(),
+          .path = input.source.path,
+          .origin = range,
+      };
+      file.attributes.emplace("container-format", "PSF2");
+      file.attributes.emplace("container-member", member.path);
+      result.sources.push_back(ExtractedSource{
+          .file = std::move(file),
+          .bytes = std::move(member.bytes),
+      });
+    }
+    if (result.sources.empty()) {
+      result.diagnostics.push_back(warning("PSF2 filesystem did not contain any files", range));
+    }
+    return result;
+  }
 
   Image image;
   const std::filesystem::path basePath =
