@@ -205,6 +205,20 @@ void repeatFramesCanSpanSections() {
          "loop frames should restore the voice address and playlist cursor across section boundaries");
 }
 
+void reusedSectionsDoNotImplyLoops() {
+  std::vector<u8> bytes(0x80);
+  writeBytes(bytes, 0, {0x00, 0x10, 0x00, 0x20, 0x00, 0x20, 0x00, 0x30, 0xff});
+  writeBytes(bytes, 0x10, {0xfb, 0x3c, 1, 1, 0x7f, 0xfd});
+  writeBytes(bytes, 0x20, {0x3d, 1, 1, 0x7f, 0xfd});
+  writeBytes(bytes, 0x30, {0x3e, 1, 1, 0x7f, 0xfc, 0});
+
+  const PerformanceSequence performance = render(std::move(bytes));
+  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  expect(performance.diagnostics.empty() && performance.tracks.front().endTick == 4 && notes.size() == 4 &&
+             notes[0]->key == 84.0 && notes[1]->key == 85.0 && notes[2]->key == 85.0 && notes[3]->key == 86.0,
+         "reusing a section should not stop playback before the driver's explicit loop command");
+}
+
 void modernEffectsRetainPhysicalDriverState() {
   std::vector<u8> bytes(0x100);
   writeBytes(bytes, 0, {0x00, 0x10, 0xff});
@@ -278,6 +292,7 @@ void runNeverlandSnesModuleTests() {
   playlistsCallSectionsAndRespectDialectTranspose();
   playlistTransposeDoesNotLeakIntoLaterSections();
   repeatFramesCanSpanSections();
+  reusedSectionsDoNotImplyLoops();
   modernEffectsRetainPhysicalDriverState();
   originalAdsrSiblingResetAndEnergyDriftAreAudited();
 }
