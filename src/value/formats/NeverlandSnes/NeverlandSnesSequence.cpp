@@ -965,6 +965,7 @@ const SequenceProgramConfig& sequenceConfig(Version version) {
       .behavior =
           SequenceProgramBehavior{
               .commandLimit = kCommandLimit,
+              .inferLoopsFromRepeatedState = false,
               .initialSourceInstrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0},
               .initialLevel = math::gain(0x60),
               .initialMasterLevel = 1.0,
@@ -980,6 +981,7 @@ const SequenceProgramConfig& sequenceConfig(Version version) {
       .behavior =
           SequenceProgramBehavior{
               .commandLimit = kCommandLimit,
+              .inferLoopsFromRepeatedState = false,
               .initialSourceInstrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0},
               .initialLevel = math::gain(0x70),
               .initialMasterLevel = math::signedDspGain(0x70),
