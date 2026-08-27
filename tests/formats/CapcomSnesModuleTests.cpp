@@ -1338,10 +1338,12 @@ void capcomSnesSequenceEmitsSourceOnlyDriverSemantics() {
   expect(performance.tracks[0].endTick == 6, "CapcomSnes source-only fixture should advance through the later note");
 
   const MidiSequence midi = renderMidiSequence(performance);
-  const auto rpns = midiRpns(midi.tracks[0].events);
-  expect(
-      std::ranges::any_of(rpns, [](const MidiRpnView& rpn) { return rpn.parameterMsb == 0 && rpn.parameterLsb == 1; }),
-         "CapcomSnes tuning performance should render as MIDI fine tuning");
+  expect(std::ranges::any_of(midi.tracks[0].events,
+                             [](const MidiEvent& event) {
+                               const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+                               return bend != nullptr && bend->value != 0;
+                             }),
+         "CapcomSnes tuning performance should render as MIDI pitch bend by default");
   expect(std::ranges::any_of(midi.tracks[0].events,
                              [](const MidiEvent& event) { return midiMasterVolume(event).has_value(); }),
          "CapcomSnes master level performance should render as MIDI master volume");

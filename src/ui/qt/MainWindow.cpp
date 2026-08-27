@@ -306,7 +306,7 @@ void applySequenceRenderSettings(vgmtrans::core::SequenceRenderOptions& options)
   options.midi.bankSelectStyle = Settings::the()->conversion.bankSelectStyle() == BankSelectStyle::MMA
                                      ? vgmtrans::core::MidiBankSelectStyle::MsbAndLsb
                                      : vgmtrans::core::MidiBankSelectStyle::MsbOnly;
-  options.midi.wideTuning = Settings::the()->conversion.wideTuningRendering();
+  options.midi.tuning = Settings::the()->conversion.tuningRendering();
 }
 
 void applyMidiExportSettings(vgmtrans::core::SequenceRenderOptions& options) {

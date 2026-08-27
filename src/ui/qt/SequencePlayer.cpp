@@ -94,6 +94,7 @@ SequencePlayer::~SequencePlayer() {
 vgmtrans::core::PlaybackRequest SequencePlayer::playbackRequest(
     vgmtrans::core::SequenceRenderOptions options) const {
   options.midi.pitchTransitions = vgmtrans::core::MidiPitchTransitionRendering::PitchBend;
+  options.midi.tuning = vgmtrans::core::MidiTuningRendering::PitchBend;
   return vgmtrans::core::PlaybackRequest{
       .sequence = std::move(options),
       .modulationConversion = vgmtrans::core::ModulationConversionPolicy::SequenceEventSimulation,

@@ -23,6 +23,7 @@
 #include "value/formats/KonamiArcade/KonamiArcade.h"
 #include "value/formats/KonamiSnes/KonamiSnes.h"
 #include "value/formats/MP2k/MP2k.h"
+#include "value/formats/NeverlandSnes/NeverlandSnes.h"
 #include "value/formats/NinSnes/NinSnes.h"
 #include "value/formats/PrismSnes/PrismSnes.h"
 #include "value/formats/RareSnes/RareSnes.h"
@@ -107,6 +108,7 @@ void registerValueFormats(core::Session& session, const ValueFormatOptions& opti
   session.registerFormat(konami_arcade::konamiArcadeModule());
   session.registerFormat(konami_snes::konamiSnesModule());
   session.registerFormat(mp2k::mp2kModule());
+  session.registerFormat(neverland_snes::module());
   session.registerFormat(nin_snes::module());
   session.registerFormat(prism_snes::module());
   session.registerFormat(rare_snes::module());

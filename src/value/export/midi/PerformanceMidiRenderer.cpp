@@ -416,11 +416,14 @@ struct VoicePitchBendRangeChange {
   std::optional<u16> voiceCents;
 };
 
-[[nodiscard]] double tuningBendSemitones(double cents, MidiWideTuningRendering rendering) {
-  if (rendering == MidiWideTuningRendering::CoarseTune) {
-    return 0.0;
+[[nodiscard]] double tuningBendSemitones(double cents, MidiTuningRendering rendering) {
+  switch (rendering) {
+    case MidiTuningRendering::PitchBend:
+      return cents / 100.0;
+    case MidiTuningRendering::CoarseAndFineTune:
+      return 0.0;
   }
-  return (cents - std::clamp(cents, -100.0, 100.0)) / 100.0;
+  throw std::logic_error("Unknown MIDI tuning rendering");
 }
 
 [[nodiscard]] PerformanceTimelines buildPerformanceTimelines(const PerformanceSequence& performance) {
@@ -453,13 +456,14 @@ struct VoicePitchBendRangeChange {
 // Pitch-bend sensitivity is channel state. Reserve one stable range from each
 // physical attack through every linked note in that sounding voice.
 [[nodiscard]] std::vector<VoicePitchBendRangeChange> planVoicePitchBendRanges(const PerformanceTimeline& timeline,
-                                                                              MidiWideTuningRendering tuningRendering) {
+                                                                              MidiTuningRendering tuningRendering) {
   struct Voice {
     u64 startTick = 0;
     u64 startSequence = 0;
     u16 sourceCents = 200;
     double bendExtent = 0.0;
     bool hasAutomatedBend = false;
+    bool hasTuningBend = false;
   };
 
   std::vector<Voice> voices;
@@ -483,8 +487,8 @@ struct VoicePitchBendRangeChange {
       activeVoice = nextVoice++;
       voices[activeVoice].sourceCents = sourceCents;
       voices[activeVoice].bendExtent = std::abs(activeTuningBend + activeBend);
+      voices[activeVoice].hasTuningBend = activeTuningBend != 0.0;
     }
-
     if (const auto* range = std::get_if<PitchBendRangePerformanceEvent>(event)) {
       sourceCents = std::max<u16>(200, range->cents);
     } else if (const auto* tuning = std::get_if<TuningPerformanceEvent>(event)) {
@@ -494,6 +498,7 @@ struct VoicePitchBendRangeChange {
       }
       auto& voice = voices[activeVoice];
       voice.bendExtent = std::max(voice.bendExtent, std::abs(activeTuningBend + activeBend));
+      voice.hasTuningBend |= activeTuningBend != 0.0;
     } else if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(event)) {
       activeBend = bend->semitones;
       if (activeVoice != voices.size()) {
@@ -507,10 +512,11 @@ struct VoicePitchBendRangeChange {
   std::vector<VoicePitchBendRangeChange> changes;
   std::optional<u16> activeRange;
   for (const auto& voice : voices) {
+    const u16 requiredCents = static_cast<u16>(
+        std::clamp(std::ceil(voice.bendExtent * 100.0), 0.0, 12'700.0));
     const std::optional<u16> range =
-        voice.hasAutomatedBend
-            ? std::optional{std::max<u16>(
-                  200, static_cast<u16>(std::clamp(std::ceil(voice.bendExtent * 100.0), 0.0, 12'700.0)))}
+        voice.hasAutomatedBend || (voice.hasTuningBend && requiredCents > voice.sourceCents)
+            ? std::optional{std::max<u16>(200, requiredCents)}
             : std::nullopt;
     if (range != activeRange) {
       changes.push_back(VoicePitchBendRangeChange{
@@ -1272,18 +1278,15 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
         } else if constexpr (std::is_same_v<TypedEvent, MonoModePerformanceEvent>) {
           addController(track, typedEvent.header.tick, channel, MidiController::MonoMode, typedEvent.channels);
         } else if constexpr (std::is_same_v<TypedEvent, TuningPerformanceEvent>) {
-          if (options.wideTuning == MidiWideTuningRendering::CoarseTune) {
-            const s32 coarseSemitones = std::clamp<s32>(static_cast<s32>(typedEvent.cents / 100.0), -64, 63);
-            addCoarseTune(track, typedEvent.header.tick, channel, static_cast<s8>(coarseSemitones));
-            addFineTune(track, typedEvent.header.tick, channel,
-                        typedEvent.cents - static_cast<double>(coarseSemitones) * 100.0);
-          } else {
-            addFineTune(track, typedEvent.header.tick, channel, std::clamp(typedEvent.cents, -100.0, 100.0));
-            const double bend = tuningBendSemitones(typedEvent.cents, options.wideTuning);
-            if (bend != state.tuningBendSemitones) {
-              state.tuningBendSemitones = bend;
-              addCurrentPitchBend(track, state, typedEvent.header.tick, channel, modulationConversion, false);
-            }
+          if (options.tuning == MidiTuningRendering::CoarseAndFineTune) {
+            const s32 coarse = std::clamp<s32>(static_cast<s32>(typedEvent.cents / 100.0), -64, 63);
+            addCoarseTune(track, typedEvent.header.tick, channel, static_cast<s8>(coarse));
+            addFineTune(track, typedEvent.header.tick, channel, typedEvent.cents - coarse * 100.0);
+          }
+          const double bend = tuningBendSemitones(typedEvent.cents, options.tuning);
+          if (bend != state.tuningBendSemitones) {
+            state.tuningBendSemitones = bend;
+            addCurrentPitchBend(track, state, typedEvent.header.tick, channel, modulationConversion, false);
           }
         } else if constexpr (std::is_same_v<TypedEvent, GlobalTransposePerformanceEvent>) {
           // Global transpose changes how later notes and portamento controls are written. It does not
@@ -1464,7 +1467,7 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
     };
     RenderTrackState renderState;
     std::unordered_map<PerformanceAutomationId, MidiControllerState> automationControllerStates;
-    const auto pitchBendRangeChanges = planVoicePitchBendRanges(timelines[trackIndex], options.wideTuning);
+    const auto pitchBendRangeChanges = planVoicePitchBendRanges(timelines[trackIndex], options.tuning);
     size_t nextPitchBendRangeChange = 0;
     const auto assignment = midiChannelAssignment(trackIndex, options);
     if (assignment.port > 255) {
