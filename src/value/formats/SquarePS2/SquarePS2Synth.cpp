@@ -176,7 +176,8 @@ std::optional<ScanSoundBankDraft> addWd(ScanResultBuilder& result, const WdLayou
     }
     const u32 programOffset = programs[program].front().source.range.offset;
     auto instrument = instruments.append(Instrument{
-        .explicitAddress = InstrumentAddress{.bank = layout.bankId, .program = program},
+        // The WD ID selects a loaded driver bank; it is not a MIDI/SF2 bank number.
+        .explicitAddress = InstrumentAddress{.bank = 0, .program = program},
         .identity = instrumentIdentity(layout.bankId, static_cast<u8>(program)),
         .reverb = std::ranges::any_of(programs[program], [](const ParsedRegion& region) { return region.routing != 0; })
                       ? 1.0

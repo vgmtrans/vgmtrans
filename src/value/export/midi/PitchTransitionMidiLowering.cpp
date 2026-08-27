@@ -611,6 +611,9 @@ void appendSourceEvents(std::vector<PerformanceEvent>& events, const Performance
 [[nodiscard]] PitchTransitionRenderingHint effectiveRendering(const PerformanceSequence& performance,
                                                               const MidiExportOptions& options,
                                                               const PitchTransitionIntent& transition) {
+  if (transition.nativePortamento.required) {
+    return PitchTransitionRenderingHint::Portamento;
+  }
   if (options.pitchTransitions == MidiPitchTransitionRendering::Portamento) {
     return PitchTransitionRenderingHint::Portamento;
   }
@@ -668,10 +671,9 @@ PerformanceSequence lowerMidiPerformanceAutomation(const PerformanceSequence& pe
     lowerPortamento(lowered, events, track.events, notes, portamentoTransitions, tempos, nextSequence);
     linkPitchBendVoices(notes, pitchBendTransitions);
     const bool renderPortamentoSettings =
-        options.pitchTransitions == MidiPitchTransitionRendering::Portamento ||
+        !portamentoTransitions.empty() || options.pitchTransitions == MidiPitchTransitionRendering::Portamento ||
         (options.pitchTransitions == MidiPitchTransitionRendering::PreserveFormat &&
-         (performance.preferredPitchTransitionRendering == PitchTransitionRenderingHint::Portamento ||
-          !portamentoTransitions.empty()));
+         performance.preferredPitchTransitionRendering == PitchTransitionRenderingHint::Portamento);
     appendSourceEvents(events, track, notes, renderPortamentoSettings, nextSequence);
     lowerPitchBends(lowered, events, notes, pitchBendTransitions);
     std::ranges::stable_sort(events, [](const PerformanceEvent& lhs, const PerformanceEvent& rhs) {

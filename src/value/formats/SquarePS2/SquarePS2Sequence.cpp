@@ -333,6 +333,7 @@ struct TrackState {
   u16 bank = 0;
   u8 program = 0;
   u8 previousKey = 60;
+  u8 previousPitchKey = 60;
   u8 previousVelocity = 127;
   s8 pitchBendRange = 2;
   s16 coarseTuning = 0;
@@ -390,15 +391,17 @@ struct Playback {
   }
 
   Effects noteOn(u8 key, u8 velocity, u32 delta) {
-    const u8 previousKey = track.previousKey;
-    const bool glides = track.portamento && track.hasPreviousNote && track.portamentoTicks != 0 && previousKey != key;
+    const u8 previousPitchKey = track.previousPitchKey;
+    const bool glides =
+        track.portamento && track.hasPreviousNote && track.portamentoTicks != 0 && previousPitchKey != key;
     track.previousKey = key;
+    track.previousPitchKey = key;
     track.previousVelocity = velocity;
     track.hasPreviousNote = true;
     auto emitter = delayed(delta);
     const PerformanceNoteId note = emitter.noteOn(key, controller(static_cast<s8>(std::min<u8>(velocity, 127))));
     if (glides) {
-      emitter.pitchSlide(note, previousKey, key, track.portamentoTicks).preferPortamento();
+      emitter.pitchSlide(note, previousPitchKey, key, track.portamentoTicks).requirePortamento();
     }
     return after(delta);
   }

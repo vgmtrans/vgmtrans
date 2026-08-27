@@ -846,6 +846,14 @@ PitchSlideBinding& PitchSlideBinding::preferPitchBend() {
   return *this;
 }
 
+PitchSlideBinding& PitchSlideBinding::requirePortamento() {
+  if (auto* transition = intent()) {
+    transition->preferredRendering = PitchTransitionRenderingHint::Portamento;
+    transition->nativePortamento.required = true;
+  }
+  return *this;
+}
+
 PitchSlideBinding& PitchSlideBinding::useCurrentPortamentoTiming() {
   if (auto* transition = intent()) {
     transition->nativePortamento.useCurrentTiming = true;

@@ -513,6 +513,9 @@ struct PitchSlideTiming {
 // MIDI controller events.
 struct NativePortamentoHint {
   bool useCurrentTiming = false;
+  // The source transition relies on independently pitched overlapping voices
+  // and cannot be represented safely by channel-wide MIDI pitch bend.
+  bool required = false;
   u32 overlapTicks = 1;
   std::optional<double> restoreTimeMilliseconds;
 };

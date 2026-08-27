@@ -48,7 +48,7 @@ void le32(std::vector<u8>& bytes, size_t offset, u32 value) {
 
 std::vector<u8> bgmFixture() {
   const std::vector<u8> events{
-      0x00, 0x21, 0x07, 0x00,        // bank 7, program 0
+      0x00, 0x21, 0x80, 0x00,        // WD 128, program 0
       0x00, 0x08, 0x78,              // tempo 120
       0x00, 0x11, 0x3c, 0x64,        // note on
       0x00, 0x40, 0x20, 0x04, 0x00,  // vibrato
@@ -57,10 +57,12 @@ std::vector<u8> bgmFixture() {
       0x00, 0x30,                    // ADSR reset
       0x00, 0x31, 0x60,              // dynamic attack rate
       0x00, 0x60,                    // wet routing on
-      0x0a, 0x18,                    // previous-key note off after 10 ticks
       0x00, 0x28, 0x04,              // four-tick portamento
-      0x00, 0x11, 0x3e, 0x60,        // second note glides from the previous key
-      0x0a, 0x18,                    // previous-key note off after 10 ticks
+      0x08, 0x11, 0x3e, 0x60,        // overlapping second note glides from key 60
+      0x04, 0x1a, 0x3c,              // release key 60 at the end of its glide
+      0x04, 0x12, 0x40,              // third note must still glide from key 62
+      0x04, 0x1a, 0x3e,              // release key 62 at the end of its glide
+      0x04, 0x1a, 0x40,              // release key 64
       0x00, 0x29,                    // portamento off
       0x00, 0x00,                    // end
   };
@@ -71,7 +73,7 @@ std::vector<u8> bgmFixture() {
   bytes[2] = 'M';
   bytes[3] = ' ';
   le16(bytes, 4, 12);
-  le16(bytes, 6, 7);
+  le16(bytes, 6, 128);
   bytes[8] = 1;
   le16(bytes, 0x0a, 120);
   bytes[0x0c] = 127;
@@ -87,7 +89,7 @@ std::vector<u8> wdFixture() {
   std::vector<u8> bytes(sampleOffset + 0x60, 0);
   bytes[0] = 'W';
   bytes[1] = 'D';
-  le16(bytes, 2, 7);
+  le16(bytes, 2, 128);
   le32(bytes, 4, 0x60);
   le32(bytes, 8, 2);
   le32(bytes, 0x0c, 3);
@@ -231,6 +233,9 @@ void syntheticArchiveCoversDriverFeatures() {
          "a first-region stereo pair should stop at the next WD instrument pointer");
   expect(bank.instruments[0].regions[0].pan == 0.0 && bank.instruments[0].regions[1].pan == 1.0,
          "WD stereo partners should use the driver's hard-left and hard-right routing");
+  expect(bank.instruments[0].explicitAddress && bank.instruments[0].explicitAddress->bank == 0 &&
+             bank.instruments[0].explicitAddress->program == 0,
+         "WD IDs should resolve instruments without becoming MIDI or SoundFont bank numbers");
   expect(std::abs(bank.instruments.front().regions.front().unityKey - 59.0) < 0.0001,
          "WD signed 8.8 pitch correction should determine the unity key");
   const auto& relativeLoop = bank.instruments[1].regions.front().loop;
@@ -242,16 +247,19 @@ void syntheticArchiveCoversDriverFeatures() {
                                          SequenceRenderOptions{.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = 0});
   expect(rendered.performance.has_value(), "SquarePS2 collection should render");
   const auto& performance = *rendered.performance;
-  expect(countEvents<NotePerformanceEvent>(performance) == 2, "split note-on/off commands should form two notes");
+  expect(countEvents<NotePerformanceEvent>(performance) == 3, "split note-on/off commands should form three notes");
   expect(countEvents<EnvelopePerformanceEvent>(performance) >= 2,
          "ADSR reset and live attack-rate writes should emit dynamic envelope events");
   expect(countEvents<ModulationPerformanceEvent>(performance) >= 6,
          "vibrato, tremolo, and pan LFO should each retain physical depth and rate events");
-  const bool hasPortamento = std::ranges::any_of(performance.tracks, [](const PerformanceTrack& track) {
-    return std::ranges::any_of(
-        track.automations, [](const PerformanceAutomation& automation) { return pitchTransitionIntent(automation); });
-  });
-  expect(hasPortamento, "portamento time should create a pitch transition between successive notes");
+  const auto& automations = performance.tracks.front().automations;
+  const auto* firstSlide = automations.empty() ? nullptr : pitchTransitionIntent(automations.front());
+  const auto* secondSlide = automations.size() < 2 ? nullptr : pitchTransitionIntent(automations[1]);
+  expect(automations.size() == 2 && firstSlide && secondSlide && firstSlide->startKey == 60.0 &&
+             firstSlide->targetKey == 62.0 && firstSlide->nativePortamento.required &&
+             secondSlide->startKey == 62.0 && secondSlide->targetKey == 64.0 &&
+             secondSlide->nativePortamento.required,
+         "overlapping SquarePS2 portamento should retain its independent attack and persistent driver pitch");
   const size_t reverbEvents = countEvents<ReverbPerformanceEvent>(performance);
   const bool wetRouting = std::ranges::any_of(performance.tracks, [](const PerformanceTrack& track) {
     return std::ranges::any_of(track.events, [](const PerformanceEvent& event) {
