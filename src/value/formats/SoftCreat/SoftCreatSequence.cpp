@@ -549,12 +549,26 @@ struct Playback {
     return effects;
   }
 
+  void beginDuration(u8 encodedDuration) {
+    track.remaining = math::ticks(encodedDuration);
+    track.gateRemaining = track.directGate != 0 ? static_cast<u8>(encodedDuration - track.directGate)
+                                               : track.releaseRemaining;
+  }
+
   [[nodiscard]] Effects rest(u8 encodedDuration, std::optional<u8> volume, Address continuation) {
     const std::optional<Address> runtimeContinuation = resolveVolumeSuffix(volume, continuation);
     noteVolume(volume);
-    track.lastNote = {};
-    track.lastKey.reset();
-    track.remaining = math::ticks(encodedDuration);
+    beginDuration(encodedDuration);
+    if (track.lastNote.valid() && track.lastKey) {
+      track.lastNote = out.note(NotePerformanceEvent{
+          .key = *track.lastKey,
+          .linearVelocity = 1.0,
+          .durationTicks = track.remaining,
+          .extendsPrevious = true,
+          .restartsEnvelope = false,
+          .restartsLfoPhase = false,
+      });
+    }
     return wait(track.remaining, runtimeContinuation);
   }
 
@@ -632,9 +646,7 @@ struct Playback {
     }
     emitVibrato();
 
-    track.remaining = length;
-    track.gateRemaining = track.directGate != 0 ? static_cast<u8>(encodedDuration - track.directGate)
-                                               : track.releaseRemaining;
+    beginDuration(encodedDuration);
     return wait(length, runtimeContinuation);
   }
 
