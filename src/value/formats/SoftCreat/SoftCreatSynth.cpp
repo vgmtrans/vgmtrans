@@ -9,7 +9,6 @@
 #include "value/platform/SnesSampleDirectory.h"
 
 #include <cmath>
-#include <limits>
 #include <string>
 #include <vector>
 
@@ -20,16 +19,6 @@ namespace vgmtrans::formats::softcreat {
 using namespace core;
 
 namespace {
-
-[[nodiscard]] Envelope neutralEnvelope() {
-  return Envelope{
-      .attackSeconds = 0.0,
-      .holdSeconds = 0.0,
-      .decaySeconds = std::numeric_limits<double>::infinity(),
-      .releaseSeconds = 0.0,
-      .sustainAmplitude = 1.0,
-  };
-}
 
 [[nodiscard]] double tuningSemitones(u8 coarse, u8 fine) {
   return static_cast<s8>(coarse) + 12.0 * std::log2(1.0 + fine / 256.0);
@@ -76,7 +65,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
                      // The pitch table reaches $1000 at internal note 62.
                      // Source note zero is exported as MIDI key 24.
                      .unityKey = 86.0 - tuningSemitones(reader.u8At(coarseAddress), reader.u8At(fineAddress)),
-                     .envelope = neutralEnvelope(),
+                     .envelope = neutralGainEnvelope(),
                  })
         .source(fmt::format("Instrument {} Region", srcn), coarseSource, "softcreat-region");
   }

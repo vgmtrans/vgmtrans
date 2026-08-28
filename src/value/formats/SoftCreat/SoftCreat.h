@@ -12,6 +12,7 @@
 #include "value/sequence/SequenceProgramConfig.h"
 
 #include <array>
+#include <limits>
 #include <optional>
 #include <set>
 #include <string_view>
@@ -23,6 +24,16 @@ inline constexpr u32 kAramSize = 0x10000;
 inline constexpr u32 kTrackCount = 8;
 inline constexpr u16 kPpqn = 48;
 inline constexpr std::string_view kInstrumentDomain = "softcreat.instrument";
+
+[[nodiscard]] inline core::Envelope neutralGainEnvelope() {
+  return core::Envelope{
+      .attackSeconds = 0.0,
+      .holdSeconds = 0.0,
+      .decaySeconds = std::numeric_limits<double>::infinity(),
+      .releaseSeconds = 0.0,
+      .sustainAmplitude = 1.0,
+  };
+}
 
 // The command cutoff identifies five materially different sequence languages.
 enum class Version : u8 {
@@ -72,7 +83,6 @@ struct EchoState {
 struct Layout {
   Version version = Version::Early;
   u8 songIndex = 0;
-  u8 songCount = 0;
   u8 initialTimer = 0x85;
   u8 musicVolume = 0x80;
   u16 pitchLowTableAddress = 0;

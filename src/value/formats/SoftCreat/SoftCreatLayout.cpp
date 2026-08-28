@@ -10,14 +10,11 @@
 
 #include <algorithm>
 #include <array>
-#include <bit>
 #include <optional>
-#include <string_view>
 
 namespace vgmtrans::formats::softcreat {
 
 using namespace core;
-using namespace std::string_view_literals;
 
 namespace {
 
@@ -219,7 +216,6 @@ std::optional<Layout> findLayout(ByteReader reader) {
   return Layout{
       .version = *version,
       .songIndex = song,
-      .songCount = songs,
       .initialTimer = timer,
       .musicVolume = reader.u8At(0xe8),
       .pitchLowTableAddress = pitchLow,
