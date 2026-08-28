@@ -80,11 +80,6 @@ enum class GainPhase : u8 {
   End,
 };
 
-struct RepeatFrame {
-  Address start;
-  u16 remaining = 0;
-};
-
 struct RuntimeConfig {
   RetainedSource source;
   Layout layout;
@@ -137,7 +132,7 @@ struct TrackState {
   bool bypassTranspose = false;
   bool perNoteVolume = false;
   std::optional<u16> drumTable;
-  std::array<RepeatFrame, 8> repeats{};
+  std::array<Address, 8> repeatStarts{};
   u8 repeatDepth = 0;
 
   PerformanceNoteId lastNote;
@@ -728,22 +723,25 @@ struct Playback {
     emitReverb();
   }
   [[nodiscard]] Effects repeatStart(u8 count, Address start) {
-    if (track.repeatDepth >= track.repeats.size()) {
+    if (track.repeatDepth >= track.repeatStarts.size()) {
       return vm.end();
     }
-    track.repeats[track.repeatDepth++] =
-        RepeatFrame{.start = start, .remaining = static_cast<u16>(math::ticks(count))};
+    const u8 slot = track.repeatDepth++;
+    track.repeatStarts[slot] = start;
+    vm.repeatCounter(slot).start(math::ticks(count));
     return {};
   }
   [[nodiscard]] Effects repeatEnd() {
     if (track.repeatDepth == 0) {
       return vm.end();
     }
-    RepeatFrame& frame = track.repeats[track.repeatDepth - 1];
-    if (--frame.remaining != 0) {
-      return vm.finiteBranch(frame.start);
+    const u8 slot = static_cast<u8>(track.repeatDepth - 1);
+    RepeatCounter repeat = vm.repeatCounter(slot);
+    if (repeat.consumeReplay()) {
+      return vm.finiteBranch(track.repeatStarts[slot]);
     }
-    --track.repeatDepth;
+    repeat.finish();
+    track.repeatDepth = slot;
     return {};
   }
   [[nodiscard]] Effects return_() { return vm.inSubroutine() ? vm.return_() : vm.end(); }
