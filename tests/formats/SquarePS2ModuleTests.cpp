@@ -58,11 +58,13 @@ std::vector<u8> bgmFixture() {
       0x00, 0x31, 0x60,              // dynamic attack rate
       0x00, 0x60,                    // wet routing on
       0x00, 0x28, 0x04,              // four-tick portamento
-      0x08, 0x11, 0x3e, 0x60,        // overlapping second note glides from key 60
+      0x08, 0x11, 0x3e, 0x60,        // fresh second note glides from key 60
       0x04, 0x1a, 0x3c,              // release key 60 at the end of its glide
-      0x04, 0x12, 0x40,              // third note must still glide from key 62
+      0x04, 0x2a,                    // legato on
+      0x00, 0x12, 0x40,              // overlapping third note glides from key 62
       0x04, 0x1a, 0x3e,              // release key 62 at the end of its glide
       0x04, 0x1a, 0x40,              // release key 64
+      0x00, 0x2b,                    // legato off
       0x00, 0x29,                    // portamento off
       0x00, 0x00,                    // end
   };
@@ -248,6 +250,15 @@ void syntheticArchiveCoversDriverFeatures() {
   expect(rendered.performance.has_value(), "SquarePS2 collection should render");
   const auto& performance = *rendered.performance;
   expect(countEvents<NotePerformanceEvent>(performance) == 3, "split note-on/off commands should form three notes");
+  std::vector<const NotePerformanceEvent*> notes;
+  for (const auto& event : performance.tracks.front().events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(note);
+    }
+  }
+  expect(notes.size() == 3 && notes[0]->durationTicks == 8 && notes[1]->header.tick == 8 &&
+             notes[1]->durationTicks == 12 && notes[2]->header.tick == 16,
+         "non-legato portamento should end its source note while explicit legato preserves overlap");
   expect(countEvents<EnvelopePerformanceEvent>(performance) >= 2,
          "ADSR reset and live attack-rate writes should emit dynamic envelope events");
   expect(countEvents<ModulationPerformanceEvent>(performance) >= 6,
@@ -255,11 +266,12 @@ void syntheticArchiveCoversDriverFeatures() {
   const auto& automations = performance.tracks.front().automations;
   const auto* firstSlide = automations.empty() ? nullptr : pitchTransitionIntent(automations.front());
   const auto* secondSlide = automations.size() < 2 ? nullptr : pitchTransitionIntent(automations[1]);
-  expect(automations.size() == 2 && firstSlide && secondSlide && firstSlide->startKey == 60.0 &&
-             firstSlide->targetKey == 62.0 && firstSlide->nativePortamento.required &&
-             secondSlide->startKey == 62.0 && secondSlide->targetKey == 64.0 &&
-             secondSlide->nativePortamento.required,
-         "overlapping SquarePS2 portamento should retain its independent attack and persistent driver pitch");
+  const auto driverSlide = [](const PitchTransitionIntent* slide, double startKey, double targetKey) {
+    return slide && slide->startKey == startKey && slide->targetKey == targetKey &&
+           slide->portamentoRendering.required;
+  };
+  expect(automations.size() == 2 && driverSlide(firstSlide, 60.0, 62.0) && driverSlide(secondSlide, 62.0, 64.0),
+         "SquarePS2 slides should retain their persistent driver pitch and MIDI portamento requirement");
   const size_t reverbEvents = countEvents<ReverbPerformanceEvent>(performance);
   const bool wetRouting = std::ranges::any_of(performance.tracks, [](const PerformanceTrack& track) {
     return std::ranges::any_of(track.events, [](const PerformanceEvent& event) {

@@ -1006,7 +1006,7 @@ void performanceMidiRendererAllowsMixedPitchTransitionRendering() {
   expect(countPortamento(preserved) == 1 && countPitchBends(preserved) != 0,
          "PreserveFormat should allow portamento and pitch bend transitions in one track");
   expect(noteDuration(preserved, 0) == 5 && noteDuration(preserved, 4) == 8 && !noteDuration(preserved, 8),
-         "pitch-bend continuation should retain the voice started by native portamento");
+         "pitch-bend continuation should retain the voice started by MIDI portamento");
 
   const MidiSequence allPortamento =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
@@ -1081,7 +1081,7 @@ void performanceMidiRendererRetainsHeldVoiceAcrossChainedPitchBends() {
          "a chained bend should remain relative to the MIDI key that began the held voice");
 }
 
-void performanceMidiRendererRetriggersUnlinkedPitchBendDestinations() {
+void performanceMidiRendererHonorsRequiredPortamento() {
   PerformanceTrack track{
       .id = TrackId{0},
       .sourceTrackNumber = 0,
@@ -1092,9 +1092,9 @@ void performanceMidiRendererRetriggersUnlinkedPitchBendDestinations() {
   u32 nextAutomation = 0;
   PerformanceEmitter out{track, CommandId{3}, SourceAnnotationId{4}, 0, nextSequence, nextNote, nextAutomation};
   out.portamentoEnable(true);
-  out.note(60, 1.0, 4);
+  out.note(60, 1.0, 8);
   const PerformanceNoteId destination = out.at(4).note(64, 1.0, 4);
-  out.at(4).pitchSlide(destination, 60, 64, 4);
+  out.at(4).pitchSlide(destination, 60, 64, 4).requirePortamento();
 
   const MidiSequence midi = renderMidiSequence(
       PerformanceSequence{
@@ -1102,10 +1102,17 @@ void performanceMidiRendererRetriggersUnlinkedPitchBendDestinations() {
           .tracks = {track},
       },
       MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
-  const auto noteCount = std::ranges::count_if(midi.tracks[0].events, [](const MidiEvent& event) {
-    return std::holds_alternative<NoteDuration>(event.payload);
-  });
-  expect(noteCount == 2, "a boundary pitch slide without continueFrom should retain the destination note's attack");
+  const auto& events = midi.tracks.front().events;
+  const auto notes = midiNotes(events);
+  expect(notes.size() == 2 && notes[0].tick == 0 && notes[0].key == 60 && notes[1].tick == 4 && notes[1].key == 64,
+         "required portamento should retain both source attacks");
+  expect(std::ranges::any_of(events, [](const MidiEvent& event) {
+           return isMidiController(event, MidiController::PortamentoControl);
+         }) &&
+             std::ranges::none_of(events, [](const MidiEvent& event) {
+               return isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+             }),
+         "required portamento should reject a channel-wide pitch-bend override");
 
   const MidiSequence terminatingPortamento = renderMidiSequence(
       PerformanceSequence{.timebase = Timebase{.ppqn = 48}, .tracks = {track}},
@@ -1114,26 +1121,9 @@ void performanceMidiRendererRetriggersUnlinkedPitchBendDestinations() {
              terminatingPortamento.tracks[0].events,
              [](const MidiEvent& event) { return isMidiController(event, MidiController::AllSoundOff); }) == 1,
          "new-attack termination should still cut off an unlinked portamento destination");
-
-  auto requiredTrack = track;
-  pitchTransitionIntent(requiredTrack.automations.front())->nativePortamento.required = true;
-  const MidiSequence required = renderMidiSequence(
-      PerformanceSequence{.timebase = Timebase{.ppqn = 48}, .tracks = {requiredTrack}},
-      MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
-  expect(std::ranges::any_of(required.tracks[0].events, [](const MidiEvent& event) {
-           return isMidiController(event, MidiController::PortamentoControl);
-         }) &&
-             std::ranges::any_of(required.tracks[0].events, [](const MidiEvent& event) {
-               const auto* control = midiController(event, MidiController::Portamento);
-               return control != nullptr && control->value == 127;
-             }) &&
-             std::ranges::none_of(required.tracks[0].events, [](const MidiEvent& event) {
-               return isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend);
-             }),
-         "required per-voice portamento should reject a channel-wide pitch-bend override");
 }
 
-void performanceMidiRendererStartsANewVoiceAfterPitchBendContinuationWhenNativePortamentoTakesOver() {
+void performanceMidiRendererStartsANewVoiceAfterPitchBendContinuationWhenMidiPortamentoTakesOver() {
   PerformanceTrack track{
       .id = TrackId{0},
       .sourceTrackNumber = 0,
@@ -1145,7 +1135,7 @@ void performanceMidiRendererStartsANewVoiceAfterPitchBendContinuationWhenNativeP
   PerformanceEmitter out{track, CommandId{5}, SourceAnnotationId{6}, 0, nextSequence, nextNote, nextAutomation};
   const PerformanceNoteId first = out.note(60, 1.0, 4);
   const PerformanceNoteId second = out.at(4).note(64, 1.0, 4);
-  out.at(4).pitchSlide(second, 60, 64, 4).continueFrom(first).preferPitchBend();
+  out.at(4).pitchSlide(second, 60, 64, 3).continueFrom(first).preferPitchBend();
   const PerformanceNoteId third = out.at(8).note(67, 1.0, 4);
   out.at(8).pitchSlide(third, 64, 67, 4).continueFrom(second).preferPortamento();
 
@@ -1157,11 +1147,15 @@ void performanceMidiRendererStartsANewVoiceAfterPitchBendContinuationWhenNativeP
       MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PreserveFormat});
   const auto notes = midiNotes(midi.tracks[0].events);
   expect(notes.size() == 2 && notes[0].tick == 0 && notes[0].key == 60 && notes[0].duration == 9 &&
-             notes[1].tick == 8 && notes[1].key == 67,
-         "native portamento after a held bend should overlap the actual held voice and then start its destination");
+             notes[1].tick == 8 && notes[1].key == 67 &&
+             std::ranges::none_of(midi.tracks[0].events, [](const MidiEvent& event) {
+               const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+               return event.tick == 8 && bend != nullptr && std::abs(bend->value) > 1024;
+             }),
+         "MIDI portamento should start its new voice without exposing the held bend under its smaller range");
 }
 
-void performanceMidiRendererResetsHeldPitchBeforeNativePortamentoTakesOver() {
+void performanceMidiRendererResetsHeldPitchBeforeMidiPortamentoTakesOver() {
   PerformanceTrack track{
       .id = TrackId{0},
       .sourceTrackNumber = 0,
@@ -1190,7 +1184,7 @@ void performanceMidiRendererResetsHeldPitchBeforeNativePortamentoTakesOver() {
     }
   }
   expect(finalBendAtTakeover == 0,
-         "native portamento replacing a held pitch bend should receive an untransposed destination note");
+         "MIDI portamento replacing a held pitch bend should receive an untransposed destination note");
 }
 
 void performanceMidiRendererCombinesPitchSlidesWithSimulatedVibrato() {
@@ -2969,9 +2963,9 @@ void runValueMidiTests() {
   performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering();
   performanceMidiRendererAllowsMixedPitchTransitionRendering();
   performanceMidiRendererRetainsHeldVoiceAcrossChainedPitchBends();
-  performanceMidiRendererRetriggersUnlinkedPitchBendDestinations();
-  performanceMidiRendererStartsANewVoiceAfterPitchBendContinuationWhenNativePortamentoTakesOver();
-  performanceMidiRendererResetsHeldPitchBeforeNativePortamentoTakesOver();
+  performanceMidiRendererHonorsRequiredPortamento();
+  performanceMidiRendererStartsANewVoiceAfterPitchBendContinuationWhenMidiPortamentoTakesOver();
+  performanceMidiRendererResetsHeldPitchBeforeMidiPortamentoTakesOver();
   performanceMidiRendererCombinesPitchSlidesWithSimulatedVibrato();
   performanceMidiRendererUsesOnlyFrozenVibratoOffsetForPitchRange();
   performanceMidiRendererUsesWholeSemitonePitchBendRanges();

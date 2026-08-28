@@ -411,6 +411,7 @@ using PerformanceTimelines = std::vector<PerformanceTimeline>;
 
 struct VoicePitchBendRangeChange {
   u64 tick = 0;
+  u64 sequence = 0;
   u16 sourceCents = 200;
   std::optional<u16> voiceCents;
 };
@@ -455,6 +456,7 @@ struct VoicePitchBendRangeChange {
                                                                               MidiWideTuningRendering tuningRendering) {
   struct Voice {
     u64 startTick = 0;
+    u64 startSequence = 0;
     u16 sourceCents = 200;
     double bendExtent = 0.0;
     bool hasAutomatedBend = false;
@@ -464,7 +466,7 @@ struct VoicePitchBendRangeChange {
   for (const auto* event : timeline) {
     const auto* note = std::get_if<NotePerformanceEvent>(event);
     if (note != nullptr && !note->extendsPrevious && (voices.empty() || voices.back().startTick != note->header.tick)) {
-      voices.push_back(Voice{.startTick = note->header.tick});
+      voices.push_back(Voice{.startTick = note->header.tick, .startSequence = note->header.sequence});
     }
   }
 
@@ -473,42 +475,33 @@ struct VoicePitchBendRangeChange {
   u16 sourceCents = 200;
   double activeBend = 0.0;
   double activeTuningBend = 0.0;
-  for (size_t begin = 0; begin < timeline.size();) {
-    const u64 tick = performanceEventHeader(*timeline[begin]).tick;
-    size_t end = begin;
-    while (end < timeline.size() && performanceEventHeader(*timeline[end]).tick == tick) {
-      if (const auto* range = std::get_if<PitchBendRangePerformanceEvent>(timeline[end])) {
-        sourceCents = std::max<u16>(200, range->cents);
-      }
-      ++end;
-    }
-    while (nextVoice < voices.size() && voices[nextVoice].startTick <= tick) {
+  for (const auto* event : timeline) {
+    const auto& header = performanceEventHeader(*event);
+    while (nextVoice < voices.size() &&
+           std::tie(voices[nextVoice].startTick, voices[nextVoice].startSequence) <=
+               std::tie(header.tick, header.sequence)) {
       activeVoice = nextVoice++;
       voices[activeVoice].sourceCents = sourceCents;
       voices[activeVoice].bendExtent = std::abs(activeTuningBend + activeBend);
     }
-    for (size_t index = begin; index < end; ++index) {
-      if (const auto* tuning = std::get_if<TuningPerformanceEvent>(timeline[index])) {
-        activeTuningBend = tuningBendSemitones(tuning->cents, tuningRendering);
-        if (activeVoice != voices.size()) {
-          voices[activeVoice].bendExtent =
-              std::max(voices[activeVoice].bendExtent, std::abs(activeTuningBend + activeBend));
-        }
-        continue;
-      }
-      const auto* bend = std::get_if<PitchBendPerformanceEvent>(timeline[index]);
-      if (bend == nullptr) {
-        continue;
-      }
-      activeBend = bend->semitones;
+
+    if (const auto* range = std::get_if<PitchBendRangePerformanceEvent>(event)) {
+      sourceCents = std::max<u16>(200, range->cents);
+    } else if (const auto* tuning = std::get_if<TuningPerformanceEvent>(event)) {
+      activeTuningBend = tuningBendSemitones(tuning->cents, tuningRendering);
       if (activeVoice == voices.size()) {
         continue;
       }
       auto& voice = voices[activeVoice];
       voice.bendExtent = std::max(voice.bendExtent, std::abs(activeTuningBend + activeBend));
-      voice.hasAutomatedBend |= bend->header.automation.has_value();
+    } else if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(event)) {
+      activeBend = bend->semitones;
+      if (activeVoice != voices.size()) {
+        auto& voice = voices[activeVoice];
+        voice.bendExtent = std::max(voice.bendExtent, std::abs(activeTuningBend + activeBend));
+        voice.hasAutomatedBend |= bend->header.automation.has_value();
+      }
     }
-    begin = end;
   }
 
   std::vector<VoicePitchBendRangeChange> changes;
@@ -522,6 +515,7 @@ struct VoicePitchBendRangeChange {
     if (range != activeRange) {
       changes.push_back(VoicePitchBendRangeChange{
           .tick = voice.startTick,
+          .sequence = voice.startSequence,
           .sourceCents = voice.sourceCents,
           .voiceCents = range,
       });
@@ -1488,7 +1482,9 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
     for (const auto* event : timelines[trackIndex]) {
       const auto& header = performanceEventHeader(*event);
       while (nextPitchBendRangeChange < pitchBendRangeChanges.size() &&
-             pitchBendRangeChanges[nextPitchBendRangeChange].tick <= header.tick) {
+             std::tie(pitchBendRangeChanges[nextPitchBendRangeChange].tick,
+                      pitchBendRangeChanges[nextPitchBendRangeChange].sequence) <=
+                 std::tie(header.tick, header.sequence)) {
         const auto& change = pitchBendRangeChanges[nextPitchBendRangeChange++];
         if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation && change.tick != 0) {
           // Finish the previous voice before changing the channel sensitivity.

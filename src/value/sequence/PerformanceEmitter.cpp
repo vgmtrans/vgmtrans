@@ -849,28 +849,28 @@ PitchSlideBinding& PitchSlideBinding::preferPitchBend() {
 PitchSlideBinding& PitchSlideBinding::requirePortamento() {
   if (auto* transition = intent()) {
     transition->preferredRendering = PitchTransitionRenderingHint::Portamento;
-    transition->nativePortamento.required = true;
+    transition->portamentoRendering.required = true;
   }
   return *this;
 }
 
 PitchSlideBinding& PitchSlideBinding::useCurrentPortamentoTiming() {
   if (auto* transition = intent()) {
-    transition->nativePortamento.useCurrentTiming = true;
+    transition->portamentoRendering.useCurrentTiming = true;
   }
   return *this;
 }
 
 PitchSlideBinding& PitchSlideBinding::restorePortamentoTiming(double timeMilliseconds) {
   if (auto* transition = intent()) {
-    transition->nativePortamento.restoreTimeMilliseconds = timeMilliseconds;
+    transition->portamentoRendering.restoreTimeMilliseconds = timeMilliseconds;
   }
   return *this;
 }
 
 PitchSlideBinding& PitchSlideBinding::portamentoOverlap(u32 ticks) {
   if (auto* transition = intent()) {
-    transition->nativePortamento.overlapTicks = ticks;
+    transition->portamentoRendering.overlapTicks = ticks;
   }
   return *this;
 }

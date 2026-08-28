@@ -363,8 +363,8 @@ void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
              configuredIntent.preferredRendering == PitchTransitionRenderingHint::PitchBend &&
              configuredIntent.timing.timelineTicks == 4 &&
              std::get<FixedDurationPitchSlideTiming>(configuredIntent.timing.physical).milliseconds == 125.0 &&
-             configuredIntent.nativePortamento.restoreTimeMilliseconds == 250.0 &&
-             configuredIntent.nativePortamento.overlapTicks == 2,
+             configuredIntent.portamentoRendering.restoreTimeMilliseconds == 250.0 &&
+             configuredIntent.portamentoRendering.overlapTicks == 2,
          "the pitch-slide handle should attach uncommon source behavior without exposing IR construction");
 }
 

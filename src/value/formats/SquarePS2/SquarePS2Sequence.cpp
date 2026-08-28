@@ -333,7 +333,7 @@ struct TrackState {
   u16 bank = 0;
   u8 program = 0;
   u8 previousKey = 60;
-  u8 previousPitchKey = 60;
+  std::optional<u8> previousPitchKey;
   u8 previousVelocity = 127;
   s8 pitchBendRange = 2;
   s16 coarseTuning = 0;
@@ -341,7 +341,7 @@ struct TrackState {
   bool initialized = false;
   bool hasEnvelope = false;
   bool portamento = false;
-  bool hasPreviousNote = false;
+  bool legato = false;
   u16 adsr1 = 0;
   u16 adsr2 = 0;
   std::array<LfoState, 4> lfos{};
@@ -391,18 +391,22 @@ struct Playback {
   }
 
   Effects noteOn(u8 key, u8 velocity, u32 delta) {
-    const u8 previousPitchKey = track.previousPitchKey;
+    auto emitter = delayed(delta);
     const bool glides =
-        track.portamento && track.hasPreviousNote && track.portamentoTicks != 0 && previousPitchKey != key;
+        track.portamento && track.previousPitchKey && track.portamentoTicks != 0 && *track.previousPitchKey != key;
+    if (glides && !track.legato) {
+      // Only Legato On prevents the driver from activating a new destination
+      // voice. Otherwise, end the overlap so MIDI portamento also activates one.
+      emitter.noteOff(*track.previousPitchKey);
+    }
+    const PerformanceNoteId note = emitter.noteOn(key, controller(static_cast<s8>(std::min<u8>(velocity, 127))));
+    if (glides) {
+      // Pitch bend would also retune unrelated and releasing voices.
+      emitter.pitchSlide(note, *track.previousPitchKey, key, track.portamentoTicks).requirePortamento();
+    }
     track.previousKey = key;
     track.previousPitchKey = key;
     track.previousVelocity = velocity;
-    track.hasPreviousNote = true;
-    auto emitter = delayed(delta);
-    const PerformanceNoteId note = emitter.noteOn(key, controller(static_cast<s8>(std::min<u8>(velocity, 127))));
-    if (glides) {
-      emitter.pitchSlide(note, previousPitchKey, key, track.portamentoTicks).requirePortamento();
-    }
     return after(delta);
   }
 
@@ -693,7 +697,14 @@ struct Playback {
 
   Effects portamentoOff(u32 delta) {
     track.portamento = false;
+    track.previousPitchKey.reset();
     delayed(delta).portamentoEnable(false);
+    return after(delta);
+  }
+
+  Effects legato(bool enabled, u32 delta) {
+    track.legato = enabled;
+    delayed(delta).legatoPedal(enabled);
     return after(delta);
   }
 
@@ -970,16 +981,10 @@ using Cursor = CompilerCursor<TrackState, Playback>;
           .invoke<&Playback::portamentoOff>(source->delta);
     case 0x2a:
       return beginEvent(cursor, *source, "Legato On", SequenceSemantic::State)
-          .invoke([delta = source->delta](Playback& playback) {
-            playback.delayed(delta).legatoPedal(true);
-            return playback.after(delta);
-          });
+          .invoke<&Playback::legato>(true, source->delta);
     case 0x2b:
       return beginEvent(cursor, *source, "Legato Off", SequenceSemantic::State)
-          .invoke([delta = source->delta](Playback& playback) {
-            playback.delayed(delta).legatoPedal(false);
-            return playback.after(delta);
-          });
+          .invoke<&Playback::legato>(false, source->delta);
     case 0x2c: {
       auto event = beginEvent(cursor, *source, "Pitch Slide", SequenceSemantic::Pitch);
       const u32 duration = event.varLen("duration", SemanticOperandRole::Duration);
