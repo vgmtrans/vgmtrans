@@ -49,142 +49,21 @@ struct Vlq {
   return std::nullopt;
 }
 
-struct EventLayout {
-  u32 begin = 0;
-  u32 end = 0;
+struct EventPrefix {
   u32 delta = 0;
   u32 deltaSize = 0;
   u8 status = 0;
 };
 
-[[nodiscard]] std::optional<EventLayout> eventLayout(ByteReader reader, u32 begin, u32 end) {
+[[nodiscard]] std::optional<EventPrefix> readEventPrefix(ByteReader reader, u32 begin, u32 end) {
   const auto delta = readVlq(reader, begin, end);
   if (!delta || begin + delta->size >= end) {
     return std::nullopt;
   }
-  const u8 status = reader.u8At(begin + delta->size);
-  u32 position = begin + delta->size + 1;
-  const auto bytes = [&](u32 count) -> bool {
-    if (count > end - position) {
-      return false;
-    }
-    position += count;
-    return true;
-  };
-  const auto variable = [&](u32 suffix) -> bool {
-    const auto value = readVlq(reader, position, end);
-    if (!value || value->size + suffix > end - position) {
-      return false;
-    }
-    position += value->size + suffix;
-    return true;
-  };
-
-  bool valid = true;
-  switch (status) {
-    case 0x05:
-    case 0x07:
-    case 0x08:
-    case 0x0a:
-    case 0x0d:
-    case 0x0e:
-    case 0x12:
-    case 0x13:
-    case 0x1a:
-    case 0x1b:
-    case 0x20:
-    case 0x22:
-    case 0x24:
-    case 0x26:
-    case 0x2d:
-    case 0x31:
-    case 0x32:
-    case 0x33:
-    case 0x34:
-    case 0x35:
-    case 0x36:
-    case 0x37:
-    case 0x38:
-    case 0x3c:
-    case 0x3d:
-    case 0x3e:
-    case 0x3f:
-    case 0x42:
-    case 0x44:
-    case 0x46:
-    case 0x4a:
-    case 0x4c:
-    case 0x4e:
-    case 0x52:
-    case 0x54:
-    case 0x56:
-    case 0x58:
-    case 0x59:
-    case 0x5a:
-    case 0x5b:
-    case 0x5d:
-    case 0x6c:
-    case 0x70:
-    case 0x71:
-    case 0x72:
-    case 0x79:
-    case 0x7c:
-    case 0x7d:
-      valid = bytes(1);
-      break;
-    case 0x09:
-    case 0x0b:
-    case 0x0c:
-    case 0x11:
-    case 0x19:
-    case 0x21:
-    case 0x39:
-    case 0x47:
-    case 0x4f:
-    case 0x5c:
-    case 0x62:
-    case 0x78:
-      valid = bytes(2);
-      break;
-    case 0x40:
-    case 0x48:
-    case 0x50:
-    case 0x73:
-    case 0x74:
-    case 0x75:
-      valid = bytes(3);
-      break;
-    case 0x23:
-    case 0x25:
-    case 0x27:
-    case 0x2c:
-    case 0x43:
-    case 0x45:
-    case 0x4b:
-    case 0x4d:
-    case 0x53:
-    case 0x55:
-      valid = variable(1);
-      break;
-    case 0x28:
-      valid = variable(0);
-      break;
-    case 0x76:
-    case 0x77:
-      valid = bytes(1) && variable(1);
-      break;
-    default:
-      break;
-  }
-  if (!valid) {
-    return std::nullopt;
-  }
-  return EventLayout{
-      .begin = begin,
-      .end = position,
+  return EventPrefix{
       .delta = delta->value,
       .deltaSize = delta->size,
-      .status = status,
+      .status = reader.u8At(begin + delta->size),
   };
 }
 
@@ -194,27 +73,30 @@ struct RepeatInfo {
 };
 
 struct TrackLayout {
-  std::map<u32, RepeatInfo> repeatEnds;
-  std::map<u32, RepeatInfo> repeatLoops;
+  std::map<u32, RepeatInfo> repeatTargets;
   std::map<u32, Address> sequenceLoops;
 };
 
+[[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end, const TrackLayout& layout,
+                                                   std::vector<Diagnostic>* diagnostics);
+
 [[nodiscard]] TrackLayout analyzeTrack(ByteReader reader, u32 begin, u32 end) {
-  struct OpenRepeat {
-    Address start;
-    u8 slot = 0;
-  };
   TrackLayout result;
-  std::vector<OpenRepeat> repeats;
+  std::vector<RepeatInfo> repeats;
   std::optional<Address> sequenceLoop;
   for (u32 offset = begin; offset < end;) {
-    const auto event = eventLayout(reader, offset, end);
-    if (!event || event->end <= offset) {
+    const auto event = readEventPrefix(reader, offset, end);
+    if (!event) {
+      break;
+    }
+    const auto command = decodeCommand(reader, offset, end, {}, nullptr);
+    const u32 next = offset + command.range.size;
+    if (next <= offset || next > end) {
       break;
     }
     switch (event->status) {
       case 0x02:
-        sequenceLoop = Address{event->end};
+        sequenceLoop = Address{next};
         break;
       case 0x03:
         if (sequenceLoop) {
@@ -222,26 +104,26 @@ struct TrackLayout {
         }
         break;
       case 0x04:
-        repeats.push_back(OpenRepeat{
-            .start = Address{event->end},
+        repeats.push_back(RepeatInfo{
+            .start = Address{next},
             .slot = static_cast<u8>(std::min<std::size_t>(repeats.size(), 3)),
         });
         break;
       case 0x05:
         if (!repeats.empty()) {
-          result.repeatEnds.emplace(offset, RepeatInfo{.start = repeats.back().start, .slot = repeats.back().slot});
+          result.repeatTargets.emplace(offset, repeats.back());
           repeats.pop_back();
         }
         break;
       case 0x06:
         if (!repeats.empty()) {
-          result.repeatLoops.emplace(offset, RepeatInfo{.start = repeats.back().start, .slot = repeats.back().slot});
+          result.repeatTargets.emplace(offset, repeats.back());
         }
         break;
       default:
         break;
     }
-    offset = event->end;
+    offset = next;
     if (event->status == 0x00 || (event->status >= 0x7a && event->status <= 0x7b)) {
       break;
     }
@@ -761,7 +643,7 @@ struct Playback {
 
 using Cursor = CompilerCursor<TrackState, Playback>;
 
-[[nodiscard]] Cursor::Event beginEvent(Cursor& cursor, const EventLayout& source, std::string_view label,
+[[nodiscard]] Cursor::Event beginEvent(Cursor& cursor, const EventPrefix& source, std::string_view label,
                                        SequenceSemantic semantic,
                                        CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback) {
   auto event = cursor.command(label, semantic, playback);
@@ -774,7 +656,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   return event;
 }
 
-[[nodiscard]] DecodedBytecodeCommand sourceOnly(Cursor& cursor, const EventLayout& source, std::string_view label,
+[[nodiscard]] DecodedBytecodeCommand sourceOnly(Cursor& cursor, const EventPrefix& source, std::string_view label,
                                                 SequenceSemantic semantic, u32 parameters) {
   auto event = beginEvent(cursor, source, label, semantic, CommandPlaybackStatus::SourceOnly);
   if (parameters != 0) {
@@ -783,15 +665,69 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   return event.wait(source.delta);
 }
 
+[[nodiscard]] DecodedBytecodeCommand decodeLfoCommand(Cursor& cursor, const EventPrefix& source) {
+  const u8 slot = static_cast<u8>((source.status - 0x40) / 8);
+  switch (source.status & 7) {
+    case 0: {
+      static constexpr std::array names{"Vibrato", "Tremolo", "Pan LFO"};
+      auto event = beginEvent(cursor, source, names[slot], SequenceSemantic::Modulation);
+      const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
+      const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
+      const u8 wave = event.u8("wave", SemanticOperandRole::Modulation);
+      return event.invoke<&Playback::lfoInitialize>(slot, static_cast<s8>(slot), depth, rate, wave, source.delta);
+    }
+    case 1:
+      return beginEvent(cursor, source, "LFO Off", SequenceSemantic::Modulation)
+          .invoke<&Playback::lfoOff>(slot, source.delta);
+    case 2: {
+      auto event = beginEvent(cursor, source, "LFO Depth", SequenceSemantic::Modulation);
+      return event.invoke<&Playback::lfoDepthValue>(slot, event.u8("depth", SemanticOperandRole::Modulation),
+                                                    source.delta);
+    }
+    case 3: {
+      auto event = beginEvent(cursor, source, "LFO Depth Fade", SequenceSemantic::Modulation);
+      const u32 duration = event.varLen("duration", SemanticOperandRole::Duration);
+      const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
+      return event.invoke<&Playback::lfoDepthFade>(slot, duration, depth, source.delta);
+    }
+    case 4: {
+      auto event = beginEvent(cursor, source, "LFO Rate", SequenceSemantic::Modulation);
+      return event.invoke<&Playback::lfoRateValue>(slot, event.u8("rate", SemanticOperandRole::Modulation),
+                                                   source.delta);
+    }
+    case 5: {
+      auto event = beginEvent(cursor, source, "LFO Rate Fade", SequenceSemantic::Modulation);
+      const u32 duration = event.varLen("duration", SemanticOperandRole::Duration);
+      const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
+      return event.invoke<&Playback::lfoRateFade>(slot, duration, rate, source.delta);
+    }
+    case 6: {
+      auto event = beginEvent(cursor, source, "LFO Waveform", SequenceSemantic::Modulation);
+      return event.invoke<&Playback::lfoWave>(slot, event.u8("wave", SemanticOperandRole::Modulation), source.delta);
+    }
+    case 7: {
+      auto event = beginEvent(cursor, source, "LFO Delay and Fade", SequenceSemantic::Modulation);
+      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
+      const u8 fade = event.u8("fade", SemanticOperandRole::Duration);
+      return event.invoke<&Playback::lfoDelay>(slot, delay, fade, source.delta);
+    }
+    default:
+      return cursor.unsupported("Undefined LFO Event").stop();
+  }
+}
+
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end, const TrackLayout& layout,
                                                    std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, begin, end, kSquarePs2CommandKindPrefix, diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
   }
-  const auto source = eventLayout(reader, begin, end);
+  const auto source = readEventPrefix(reader, begin, end);
   if (!source) {
     return cursor.unsupported("Truncated SquarePS2 Event").stop();
+  }
+  if (source->status >= 0x40 && source->status <= 0x56) {
+    return decodeLfoCommand(cursor, *source);
   }
 
   switch (source->status) {
@@ -818,8 +754,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x05: {
       auto event = beginEvent(cursor, *source, "Repeat End", SequenceSemantic::Repeat);
       const u8 count = event.u8("count", SemanticOperandRole::Count);
-      const auto found = layout.repeatEnds.find(begin);
-      if (found == layout.repeatEnds.end()) {
+      const auto found = layout.repeatTargets.find(begin);
+      if (found == layout.repeatTargets.end()) {
         return event.wait(source->delta);
       }
       event.derived("total_plays", totalPlays(count), SemanticOperandRole::Count);
@@ -830,8 +766,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0x06: {
       auto event = beginEvent(cursor, *source, "Repeat Forever", SequenceSemantic::Loop);
-      const auto found = layout.repeatLoops.find(begin);
-      if (found == layout.repeatLoops.end()) {
+      const auto found = layout.repeatTargets.find(begin);
+      if (found == layout.repeatTargets.end()) {
         return event.wait(source->delta).end();
       }
       event.derived("destination", found->second.start, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
@@ -1035,8 +971,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0x3c: {
       auto event = beginEvent(cursor, *source, "Sustain Pedal", SequenceSemantic::State);
-      const bool enabled =
-          event.u8("enabled", SourceValueDisplay::Boolean, SemanticOperandRole::State) != 0;
+      const bool enabled = event.u8("enabled", SourceValueDisplay::Boolean, SemanticOperandRole::State) != 0;
       return event.invoke<&Playback::sustainPedal>(enabled, source->delta);
     }
     case 0x3d:
@@ -1045,77 +980,6 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return sourceOnly(cursor, *source, "Track Flag 0x20", SequenceSemantic::State, 1);
     case 0x3f:
       return sourceOnly(cursor, *source, "Track Flag 0x10", SequenceSemantic::State, 1);
-    case 0x40:
-    case 0x48:
-    case 0x50: {
-      const u8 slot = static_cast<u8>((source->status - 0x40) / 8);
-      const s8 mode = static_cast<s8>(slot);
-      auto event = beginEvent(cursor, *source,
-                              slot == 0   ? "Vibrato"
-                              : slot == 1 ? "Tremolo"
-                                          : "Pan LFO",
-                              SequenceSemantic::Modulation);
-      const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
-      const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
-      const u8 wave = event.u8("wave", SemanticOperandRole::Modulation);
-      return event.invoke<&Playback::lfoInitialize>(slot, mode, depth, rate, wave, source->delta);
-    }
-    case 0x41:
-    case 0x49:
-    case 0x51: {
-      const u8 slot = static_cast<u8>((source->status - 0x41) / 8);
-      return beginEvent(cursor, *source, "LFO Off", SequenceSemantic::Modulation)
-          .invoke<&Playback::lfoOff>(slot, source->delta);
-    }
-    case 0x42:
-    case 0x4a:
-    case 0x52: {
-      const u8 slot = static_cast<u8>((source->status - 0x42) / 8);
-      auto event = beginEvent(cursor, *source, "LFO Depth", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::lfoDepthValue>(slot, event.u8("depth", SemanticOperandRole::Modulation),
-                                                    source->delta);
-    }
-    case 0x43:
-    case 0x4b:
-    case 0x53: {
-      const u8 slot = static_cast<u8>((source->status - 0x43) / 8);
-      auto event = beginEvent(cursor, *source, "LFO Depth Fade", SequenceSemantic::Modulation);
-      const u32 duration = event.varLen("duration", SemanticOperandRole::Duration);
-      const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
-      return event.invoke<&Playback::lfoDepthFade>(slot, duration, depth, source->delta);
-    }
-    case 0x44:
-    case 0x4c:
-    case 0x54: {
-      const u8 slot = static_cast<u8>((source->status - 0x44) / 8);
-      auto event = beginEvent(cursor, *source, "LFO Rate", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::lfoRateValue>(slot, event.u8("rate", SemanticOperandRole::Modulation),
-                                                   source->delta);
-    }
-    case 0x45:
-    case 0x4d:
-    case 0x55: {
-      const u8 slot = static_cast<u8>((source->status - 0x45) / 8);
-      auto event = beginEvent(cursor, *source, "LFO Rate Fade", SequenceSemantic::Modulation);
-      const u32 duration = event.varLen("duration", SemanticOperandRole::Duration);
-      const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
-      return event.invoke<&Playback::lfoRateFade>(slot, duration, rate, source->delta);
-    }
-    case 0x46:
-    case 0x4e:
-    case 0x56: {
-      const u8 slot = static_cast<u8>((source->status - 0x46) / 8);
-      auto event = beginEvent(cursor, *source, "LFO Waveform", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::lfoWave>(slot, event.u8("wave", SemanticOperandRole::Modulation), source->delta);
-    }
-    case 0x47:
-    case 0x4f: {
-      const u8 slot = static_cast<u8>((source->status - 0x47) / 8);
-      auto event = beginEvent(cursor, *source, "LFO Delay and Fade", SequenceSemantic::Modulation);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      const u8 fade = event.u8("fade", SemanticOperandRole::Duration);
-      return event.invoke<&Playback::lfoDelay>(slot, delay, fade, source->delta);
-    }
     case 0x58:
       return sourceOnly(cursor, *source, "Track Pitch Scale", SequenceSemantic::Pitch, 1);
     case 0x59: {

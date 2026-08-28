@@ -11,7 +11,6 @@
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/SequenceProgramConfig.h"
 
-#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
