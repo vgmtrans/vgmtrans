@@ -397,8 +397,10 @@ private:
   u32 loopRepeats_ = 0;
 };
 
+// Some drivers implement a song loop as one global checkpoint rather than an
+// independent jump in each track. Only source position and unconsumed time are
+// restored; notes, controllers, and other musical state continue across it.
 struct SynchronizedLoopTrackSnapshot {
-  // Song loops restore source control and timing; musical state continues.
   std::optional<u32> current;
   u32 pendingTicks = 0;
   u32 pendingTickCommand = 0;
@@ -511,6 +513,8 @@ public:
   }
 
   [[nodiscard]] SynchronizedLoopTrackSnapshot synchronizedLoopSnapshot(u64 boundary) const {
+    // Another track's current delay may span the loop boundary, so save only
+    // the portion that remains after it.
     u32 remainingTicks = pendingTicks_;
     if (active()) {
       if (runtime_.tick > boundary || boundary - runtime_.tick > remainingTicks) {
@@ -522,6 +526,7 @@ public:
   }
 
   void restoreSynchronizedLoop(const SynchronizedLoopTrackSnapshot& snapshot, u64 tick) {
+    // Continue from the loop-end tick so each repetition follows the previous one.
     runtime_.tick = tick;
     current_ = snapshot.current;
     pendingTicks_ = snapshot.pendingTicks;
