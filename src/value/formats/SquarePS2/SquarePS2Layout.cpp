@@ -21,10 +21,6 @@ constexpr u32 kBgmHeaderSize = 0x20;
 constexpr u32 kWdHeaderSize = 0x20;
 constexpr u32 kRegionSize = 0x20;
 
-[[nodiscard]] bool validRange(ByteReader reader, u64 offset, u64 size) {
-  return offset <= reader.size() && size <= reader.size() - offset;
-}
-
 [[nodiscard]] u32 align4(u32 value) {
   return (value + 3) & ~u32{3};
 }
@@ -32,7 +28,7 @@ constexpr u32 kRegionSize = 0x20;
 }  // namespace
 
 std::optional<BgmLayout> readBgmLayout(ByteReader reader, u32 offset) {
-  if (!validRange(reader, offset, kBgmHeaderSize) || reader.le32(offset) != kBgmSignature) {
+  if (!reader.has(offset, kBgmHeaderSize) || reader.le32(offset) != kBgmSignature) {
     return std::nullopt;
   }
   BgmLayout layout{
@@ -98,7 +94,7 @@ std::vector<BgmLayout> findBgmLayouts(ByteReader reader) {
 }
 
 std::optional<WdLayout> readWdLayout(ByteReader reader, u32 offset) {
-  if (!validRange(reader, offset, kWdHeaderSize) || reader.le16(offset) != kWdSignature) {
+  if (!reader.has(offset, kWdHeaderSize) || reader.le16(offset) != kWdSignature) {
     return std::nullopt;
   }
   WdLayout layout{
@@ -118,7 +114,7 @@ std::optional<WdLayout> readWdLayout(ByteReader reader, u32 offset) {
       static_cast<u64>(layout.regionTableOffset) + static_cast<u64>(layout.regionCount) * kRegionSize;
   const u64 length = sampleOffset - offset + layout.sampleSize;
   if (sampleOffset > std::numeric_limits<u32>::max() || length > std::numeric_limits<u32>::max() ||
-      !validRange(reader, offset, length)) {
+      !reader.has(offset, length)) {
     return std::nullopt;
   }
   layout.sampleOffset = static_cast<u32>(sampleOffset);

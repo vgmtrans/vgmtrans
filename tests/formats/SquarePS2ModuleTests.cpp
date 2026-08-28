@@ -56,7 +56,7 @@ std::vector<u8> bgmFixture() {
       0x00, 0x50, 0x40, 0x08, 0x02,  // pan LFO
       0x00, 0x30,                    // ADSR reset
       0x00, 0x31, 0x60,              // dynamic attack rate
-      0x00, 0x60,                    // wet routing on
+      0x00, 0x60,                    // reverb on
       0x00, 0x28, 0x04,              // four-tick portamento
       0x08, 0x11, 0x3e, 0x60,        // fresh second note glides from key 60
       0x04, 0x1a, 0x3c,              // release key 60 at the end of its glide
@@ -267,8 +267,7 @@ void syntheticArchiveCoversDriverFeatures() {
   const auto* firstSlide = automations.empty() ? nullptr : pitchTransitionIntent(automations.front());
   const auto* secondSlide = automations.size() < 2 ? nullptr : pitchTransitionIntent(automations[1]);
   const auto driverSlide = [](const PitchTransitionIntent* slide, double startKey, double targetKey) {
-    return slide && slide->startKey == startKey && slide->targetKey == targetKey &&
-           slide->portamentoRendering.required;
+    return slide && slide->startKey == startKey && slide->targetKey == targetKey && slide->portamentoRendering.required;
   };
   expect(automations.size() == 2 && driverSlide(firstSlide, 60.0, 62.0) && driverSlide(secondSlide, 62.0, 64.0),
          "SquarePS2 slides should retain their persistent driver pitch and MIDI portamento requirement");
