@@ -109,9 +109,8 @@ std::optional<WdLayout> readWdLayout(ByteReader reader, u32 offset) {
       layout.regionCount == 0 || layout.regionCount > 65536) {
     return std::nullopt;
   }
-  layout.regionTableOffset = layout.instrumentTableOffset + align4(layout.instrumentCount) * 4;
-  const u64 sampleOffset =
-      static_cast<u64>(layout.regionTableOffset) + static_cast<u64>(layout.regionCount) * kRegionSize;
+  const u32 regionTableOffset = layout.instrumentTableOffset + align4(layout.instrumentCount) * 4;
+  const u64 sampleOffset = static_cast<u64>(regionTableOffset) + static_cast<u64>(layout.regionCount) * kRegionSize;
   const u64 length = sampleOffset - offset + layout.sampleSize;
   if (sampleOffset > std::numeric_limits<u32>::max() || length > std::numeric_limits<u32>::max() ||
       !reader.has(offset, length)) {
@@ -121,8 +120,8 @@ std::optional<WdLayout> readWdLayout(ByteReader reader, u32 offset) {
   layout.length = static_cast<u32>(length);
   for (u32 i = 0; i < layout.instrumentCount; ++i) {
     const u32 relative = reader.le32(layout.instrumentTableOffset + i * 4);
-    if (relative != 0 && (relative < layout.regionTableOffset - offset || relative >= layout.sampleOffset - offset ||
-                          (relative - (layout.regionTableOffset - offset)) % kRegionSize != 0)) {
+    if (relative != 0 && (relative < regionTableOffset - offset || relative >= layout.sampleOffset - offset ||
+                          (relative - (regionTableOffset - offset)) % kRegionSize != 0)) {
       return std::nullopt;
     }
   }
