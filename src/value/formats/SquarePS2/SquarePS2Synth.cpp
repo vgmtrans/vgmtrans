@@ -143,15 +143,11 @@ std::optional<ScanSoundBankDraft> addWd(ScanResultBuilder& result, const WdLayou
   instruments.include(bankRange);
   samples.include(bankRange);
   instruments.source(SourceRole::Header, "WD Header", reader.range(layout.offset, 0x20), "square-ps2-wd-header")
+      .fieldsAsChildren()
       .field("bank_id", reader.range(layout.offset + 2, 2), layout.bankId)
       .field("sample_size", reader.range(layout.offset + 4, 4), layout.sampleSize)
       .field("instrument_count", reader.range(layout.offset + 8, 4), layout.instrumentCount)
       .field("region_count", reader.range(layout.offset + 0x0c, 4), layout.regionCount);
-  const SourceAnnotationId sampleRoot =
-      samples
-          .source(SourceRole::SamplePool, "WD Sample Data", reader.range(layout.sampleOffset, layout.sampleSize),
-                  "square-ps2-sample-data")
-          .id();
 
   std::map<u32, SampleRef> refs;
   for (const auto& [offset, stream] : streams) {
@@ -165,7 +161,7 @@ std::optional<ScanSoundBankDraft> addWd(ScanResultBuilder& result, const WdLayou
                                          .bitsPerSample = 16,
                                          .loop = stream.loop,
                                      });
-    entry.source(fmt::format("Sample {}", index), stream.encodedData, "psx-adpcm-sample").parent(sampleRoot);
+    entry.source(fmt::format("Sample {}", index), stream.encodedData, "psx-adpcm-sample");
     refs.emplace(offset, entry.ref());
   }
 
@@ -185,6 +181,7 @@ std::optional<ScanSoundBankDraft> addWd(ScanResultBuilder& result, const WdLayou
         .name = fmt::format("Instrument {}", program),
         .range = reader.range(programOffset, static_cast<u32>(programs[program].size()) * kRegionSize),
     });
+    instrument.source(instrument.value().name, instrument.value().range, "square-ps2-instrument");
     data.envelopes.push_back(EnvelopeDefaults{
         .bank = layout.bankId,
         .program = static_cast<u8>(program),

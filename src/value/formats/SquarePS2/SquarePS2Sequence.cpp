@@ -973,6 +973,7 @@ SequenceProgram parseBgm(ByteReader reader, AssetId id, const BgmLayout& layout,
     sourceMap->header("SquarePS2 BGM Header", reader.range(layout.offset, 0x20))
         .kind("square-ps2-bgm-header")
         .owner(ObjectRefs::sequence(id))
+        .fieldsAsChildren()
         .field("sequence_id", reader.range(layout.offset + 4, 2), layout.sequenceId)
         .field("wave_bank_id", reader.range(layout.offset + 6, 2), layout.waveBankId)
         .field("track_count", reader.range(layout.offset + 8, 1), layout.trackCount)
