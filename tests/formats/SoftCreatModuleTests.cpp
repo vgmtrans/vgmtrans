@@ -232,6 +232,14 @@ void durationModesLegatoAndRepeatsAreStateful() {
          "a byte that becomes a per-note suffix on a later pass should retain both control-flow interpretations");
 }
 
+void finiteRepeatsAreNotSongLoops() {
+  const PerformanceSequence performance = render(
+      {0x86, 1, 0x84, 4, 0x82, 0x0d, 0x10, 0x85, 2, 0x81, 0x08, 0x10, 0x80, 1, 0x83});
+  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  expect(performance.diagnostics.empty() && performance.tracks.front().endTick == 5 && notes.size() == 5,
+         "finite SoftCreat repeats should remain distinct from the following infinite song loop");
+}
+
 void perNoteVolumePrecedesLiteralDuration() {
   const PerformanceSequence performance =
       render({0xb9, 0x19, 100, 12, 0x80}, Version::MaximumCarnage);
@@ -280,6 +288,7 @@ void runSoftCreatModuleTests() {
   gainHoldContinuesTheCurrentEnvelope();
   restsPreserveTheKeyedVoice();
   durationModesLegatoAndRepeatsAreStateful();
+  finiteRepeatsAreNotSongLoops();
   perNoteVolumePrecedesLiteralDuration();
   pitchEffectsRetainPhysicalTiming();
 }
