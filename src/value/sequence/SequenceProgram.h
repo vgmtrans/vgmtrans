@@ -153,6 +153,13 @@ struct CommandFlow {
 using CommandBody = std::function<Effects(void* playback)>;
 using CommandPredicate = std::function<bool(void* playback)>;
 
+enum class SequenceCoordinatorSignal : u8 {
+  None,
+  SectionEnd,
+  SynchronizedLoopStart,
+  SynchronizedLoopEnd,
+};
+
 struct CommandExecution {
   // Cursor helpers compose their operations while decoding. The durable source
   // command retains only the resulting body, not an inspectable micro-program.
@@ -160,6 +167,11 @@ struct CommandExecution {
   // Some drivers poll the next command while the current wait is still active.
   // The predicate is format-owned; SequenceVm only provides the polling timing.
   CommandPredicate duringWait;
+  // Some bytecodes encode time before an event rather than after it. Delay the
+  // body and its control-flow transition until that event time is reached.
+  u32 delayTicks = 0;
+  // Notify the sequence coordinator without changing this track's control flow.
+  SequenceCoordinatorSignal coordinatorSignal = SequenceCoordinatorSignal::None;
 
   [[nodiscard]] bool valid() const noexcept { return static_cast<bool>(body); }
 };
