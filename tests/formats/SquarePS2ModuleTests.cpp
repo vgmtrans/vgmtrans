@@ -68,7 +68,15 @@ std::vector<u8> bgmFixture() {
       0x00, 0x29,                    // portamento off
       0x00, 0x00,                    // end
   };
-  const u32 length = 0x20 + 4 + static_cast<u32>(events.size());
+  const std::vector<std::vector<u8>> tracks{
+      {0x18, 0x00},              // timing track: end at tick 24
+      {0x08, 0x02, 0x10, 0x03},  // song loop: ticks 8 through 24
+      events,
+  };
+  u32 length = 0x20;
+  for (const auto& track : tracks) {
+    length += 4 + static_cast<u32>(track.size());
+  }
   std::vector<u8> bytes(length, 0);
   bytes[0] = 'B';
   bytes[1] = 'G';
@@ -76,13 +84,17 @@ std::vector<u8> bgmFixture() {
   bytes[3] = ' ';
   le16(bytes, 4, 12);
   le16(bytes, 6, 128);
-  bytes[8] = 1;
+  bytes[8] = static_cast<u8>(tracks.size());
   le16(bytes, 0x0a, 120);
   bytes[0x0c] = 127;
   le16(bytes, 0x0e, 48);
   le32(bytes, 0x10, length);
-  le32(bytes, 0x20, static_cast<u32>(events.size()));
-  std::ranges::copy(events, bytes.begin() + 0x24);
+  u32 offset = 0x20;
+  for (const auto& track : tracks) {
+    le32(bytes, offset, static_cast<u32>(track.size()));
+    std::ranges::copy(track, bytes.begin() + offset + 4);
+    offset += 4 + static_cast<u32>(track.size());
+  }
   return bytes;
 }
 
@@ -251,7 +263,7 @@ void syntheticArchiveCoversDriverFeatures() {
   const auto& performance = *rendered.performance;
   expect(countEvents<NotePerformanceEvent>(performance) == 3, "split note-on/off commands should form three notes");
   std::vector<const NotePerformanceEvent*> notes;
-  for (const auto& event : performance.tracks.front().events) {
+  for (const auto& event : performance.tracks[2].events) {
     if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
       notes.push_back(note);
     }
@@ -263,7 +275,7 @@ void syntheticArchiveCoversDriverFeatures() {
          "ADSR reset and live attack-rate writes should emit dynamic envelope events");
   expect(countEvents<ModulationPerformanceEvent>(performance) >= 6,
          "vibrato, tremolo, and pan LFO should each retain physical depth and rate events");
-  const auto& automations = performance.tracks.front().automations;
+  const auto& automations = performance.tracks[2].automations;
   const auto* firstSlide = automations.empty() ? nullptr : pitchTransitionIntent(automations.front());
   const auto* secondSlide = automations.size() < 2 ? nullptr : pitchTransitionIntent(automations[1]);
   const auto driverSlide = [](const PitchTransitionIntent* slide, double startKey, double targetKey) {
@@ -279,6 +291,12 @@ void syntheticArchiveCoversDriverFeatures() {
     });
   });
   expect(reverbEvents >= 1 && wetRouting, "SPU2 effect routing should emit a full wet-send event");
+  const auto repeated = renderCollection(*binding.collection,
+                                         SequenceRenderOptions{.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = 1});
+  expect(repeated.performance && countEvents<NotePerformanceEvent>(*repeated.performance) == 5 &&
+             std::ranges::all_of(repeated.performance->tracks,
+                                 [](const PerformanceTrack& track) { return track.endTick == 40; }),
+         "the source-track-1 loop should replay every track from its shared tick-8 snapshot");
   const auto playback = session.preparePlayback(
       collection->id, PlaybackRequest{.sequence = {.loopPolicy = LoopPolicy::PlayOnce, .sequenceLoops = 0}});
   expect(playback.playable(), "SquarePS2 playback preparation should produce both MIDI and SoundFont data");

@@ -29,13 +29,13 @@ namespace {
 
 constexpr u32 kMaxCommands = 1'048'576;
 
-struct Vlq {
+struct VarLen {
   u32 value = 0;
   u32 size = 0;
 };
 
-[[nodiscard]] std::optional<Vlq> readVlq(ByteReader reader, u32 offset, u32 end) {
-  Vlq result;
+[[nodiscard]] std::optional<VarLen> readVarLen(ByteReader reader, u32 offset, u32 end) {
+  VarLen result;
   while (offset + result.size < end && result.size < 5) {
     const u8 byte = reader.u8At(offset + result.size++);
     if (result.value > (std::numeric_limits<u32>::max() >> 7)) {
@@ -56,7 +56,7 @@ struct EventPrefix {
 };
 
 [[nodiscard]] std::optional<EventPrefix> readEventPrefix(ByteReader reader, u32 begin, u32 end) {
-  const auto delta = readVlq(reader, begin, end);
+  const auto delta = readVarLen(reader, begin, end);
   if (!delta || begin + delta->size >= end) {
     return std::nullopt;
   }
@@ -74,35 +74,25 @@ struct RepeatInfo {
 
 struct TrackLayout {
   std::map<u32, RepeatInfo> repeatTargets;
-  std::map<u32, Address> sequenceLoops;
 };
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end, const TrackLayout& layout,
-                                                   std::vector<Diagnostic>* diagnostics);
+                                                   u32 trackIndex, std::vector<Diagnostic>* diagnostics);
 
 [[nodiscard]] TrackLayout analyzeTrack(ByteReader reader, u32 begin, u32 end) {
   TrackLayout result;
   std::vector<RepeatInfo> repeats;
-  std::optional<Address> sequenceLoop;
   for (u32 offset = begin; offset < end;) {
     const auto event = readEventPrefix(reader, offset, end);
     if (!event) {
       break;
     }
-    const auto command = decodeCommand(reader, offset, end, {}, nullptr);
+    const auto command = decodeCommand(reader, offset, end, {}, 0, nullptr);
     const u32 next = offset + command.range.size;
     if (next <= offset || next > end) {
       break;
     }
     switch (event->status) {
-      case 0x02:
-        sequenceLoop = Address{next};
-        break;
-      case 0x03:
-        if (sequenceLoop) {
-          result.sequenceLoops.emplace(offset, *sequenceLoop);
-        }
-        break;
       case 0x04:
         repeats.push_back(RepeatInfo{
             .start = Address{next},
@@ -217,7 +207,6 @@ struct TrackState {
   u8 previousVelocity = 127;
   s8 pitchBendRange = 2;
   s16 coarseTuning = 0;
-  u32 eventDelta = 0;
   u32 portamentoTicks = 0;
   bool hasEnvelope = false;
   bool portamento = false;
@@ -251,12 +240,9 @@ struct Playback {
   PerformanceEmitter& out;
   VmApi& vm;
 
-  [[nodiscard]] u64 eventTick() const {
-    return track.eventDelta > std::numeric_limits<u64>::max() - vm.tick() ? std::numeric_limits<u64>::max()
-                                                                          : vm.tick() + track.eventDelta;
-  }
+  [[nodiscard]] u64 eventTick() const { return vm.tick(); }
 
-  [[nodiscard]] PerformanceEmitter atEvent() const { return out.at(eventTick()); }
+  [[nodiscard]] PerformanceEmitter atEvent() const { return out; }
 
   void publishEnvelope(PerformanceEmitter& emitter) {
     if (track.hasEnvelope) {
@@ -283,8 +269,6 @@ struct Playback {
     track.previousPitchKey = key;
     track.previousVelocity = velocity;
   }
-
-  void noteOnPrevious() { noteOn(track.previousKey, track.previousVelocity); }
 
   void noteOff(u8 key) {
     track.previousKey = key;
@@ -370,17 +354,6 @@ struct Playback {
     }
   }
 
-  void lfoInitialize(u8 slot, u8 depth, u8 rate, u8 wave) {
-    auto& lfo = track.lfos[slot & 3];
-    lfo.mode = static_cast<s8>(slot);
-    lfo.depth = depth;
-    lfo.rate = rate;
-    lfo.wave = wave & 0x0f;
-    auto emitter = atEvent();
-    emitLfoDepth(emitter, lfo, true);
-    emitLfoRate(emitter, lfo);
-  }
-
   void lfoOff(u8 slot) {
     auto& lfo = track.lfos[slot & 3];
     auto emitter = atEvent();
@@ -420,23 +393,11 @@ struct Playback {
     emitLfoRate(emitter, lfo);
   }
 
-  void lfoDepthAndRate(u8 slot, u8 depth, u8 rate) {
-    lfoDepthValue(slot, depth);
-    lfoRateValue(slot, rate);
-  }
-
   void lfoRateFade(u8 slot, u32 duration, u8 rate) {
     auto& lfo = track.lfos[slot & 3];
     lfo.rate = rate;
     auto emitter = out.at(eventTick() + duration);
     emitLfoRate(emitter, lfo);
-  }
-
-  void lfoWave(u8 slot, u8 wave) {
-    auto& lfo = track.lfos[slot & 3];
-    lfo.wave = wave & 0x0f;
-    auto emitter = atEvent();
-    emitLfoDepth(emitter, lfo, true);
   }
 
   void lfoDelay(u8 slot, u8 delay, u8 fade) {
@@ -446,41 +407,6 @@ struct Playback {
     auto emitter = atEvent();
     emitLfoDepth(emitter, lfo, true);
   }
-
-  void lfoModeWave(u8 slot, u8 mode, u8 wave) {
-    auto& lfo = track.lfos[slot & 3];
-    lfo.mode = static_cast<s8>(mode % 3);
-    lfo.wave = wave & 0x0f;
-    auto emitter = atEvent();
-    emitLfoDepth(emitter, lfo, true);
-    emitLfoRate(emitter, lfo);
-  }
-
-  void tempo(u8 raw) {
-    if (const u32 micros = tempoMicros(raw); micros != 0) {
-      atEvent().tempo(micros);
-    }
-  }
-
-  void tempoFade(u8 duration, u8 raw) {
-    if (const u32 micros = tempoMicros(raw); micros != 0) {
-      const u64 tick = eventTick();
-      auto emitter = out.at(tick);
-      emitter.fade(PerformanceAutomationTarget::Tempo, micros, duration).at(emitter, tick + duration).tempo(micros);
-    }
-  }
-
-  void timeSignature(u8 numerator, u8 denominator) {
-    if (numerator != 0 && denominator != 0) {
-      atEvent().timeSignature(numerator, denominator, 48);
-    }
-  }
-
-  void level(s8 raw) { atEvent().level(controller(raw), ValueQuantization{.levels = 128}); }
-
-  void masterLevel(s8 raw) { atEvent().masterLevel(controller(raw)); }
-
-  void expression(s8 raw) { atEvent().expression(controller(raw), ValueQuantization{.levels = 128}); }
 
   void controllerFade(u8 kind, u32 duration, s8 raw) {
     const u64 tick = eventTick();
@@ -500,66 +426,9 @@ struct Playback {
     }
   }
 
-  void pan(u8 raw) { atEvent().pan(panPosition(raw)); }
-
-  void panFade(u32 duration, u8 raw) {
-    const u64 tick = eventTick();
-    auto emitter = out.at(tick);
-    const double value = panPosition(raw);
-    emitter.fade(PerformanceAutomationTarget::Pan, value, duration).at(emitter, tick + duration).pan(value);
-  }
-
-  void sustainPedal(bool down) { atEvent().sustainPedal(down); }
-
-  void portamentoTime(u32 duration) {
-    track.portamentoTicks = duration;
-    track.portamento = true;
-    atEvent().portamentoEnable(true);
-  }
-
-  void portamentoOff() {
-    track.portamento = false;
-    track.previousPitchKey.reset();
-    atEvent().portamentoEnable(false);
-  }
-
-  void legato(bool enabled) {
-    track.legato = enabled;
-    atEvent().legatoPedal(enabled);
-  }
-
-  void pitchBend(u8 lsb, u8 msb) {
-    const s32 wheel = static_cast<s32>(lsb) + static_cast<s32>(msb) * 128 - 8192;
-    const double normalized = std::clamp(wheel / 8192.0, -1.0, 1.0);
-    atEvent().pitchBend(PitchBendPerformanceEvent{
-        .semitones = normalized * track.pitchBendRange,
-        .normalizedWheelPosition = normalized,
-    });
-  }
-
-  void bendRange(s8 range) {
-    track.pitchBendRange = range;
-    atEvent().pitchBendRange(static_cast<u8>(std::abs(static_cast<int>(range))));
-  }
-
   void tuning(s16 semitones256) {
     track.coarseTuning = semitones256;
     atEvent().tuning(semitones256 * (100.0 / 256.0));
-  }
-
-  void relativeTuning(s8 semitones) { tuning(static_cast<s16>(track.coarseTuning + semitones * 256)); }
-
-  void pitchSlide(u32 ticks, s8 semitones) {
-    const u64 tick = eventTick();
-    auto emitter = out.at(tick);
-    emitter.fade(PerformanceAutomationTarget::Pitch, semitones, ticks).at(emitter, tick + ticks).pitchBend(semitones);
-  }
-
-  void reverb(double send) { atEvent().reverb(send); }
-
-  void routing(u8 left, u8 right) {
-    const double wet = ((left == 1 || left == 2 ? 1.0 : 0.0) + (right == 1 || right == 2 ? 1.0 : 0.0)) / 2.0;
-    atEvent().reverb(wet);
   }
 };
 
@@ -575,7 +444,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   }
   event.derived("delta", source.delta, SemanticOperandRole::Duration);
   event.u8("status", SourceValueDisplay::Hex);
-  return event.set<&TrackState::eventDelta>(source.delta).wait(source.delta);
+  return event.delay(source.delta);
 }
 
 [[nodiscard]] DecodedBytecodeCommand sourceOnly(Cursor& cursor, const EventPrefix& source, std::string_view label,
@@ -597,7 +466,16 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
       const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
       const u8 wave = event.u8("wave", SemanticOperandRole::Modulation);
-      return event.invoke<&Playback::lfoInitialize>(slot, depth, rate, wave);
+      return event.invoke([slot, depth, rate, wave](Playback& playback) {
+        auto& lfo = playback.track.lfos[slot & 3];
+        lfo.mode = static_cast<s8>(slot);
+        lfo.depth = depth;
+        lfo.rate = rate;
+        lfo.wave = wave & 0x0f;
+        auto emitter = playback.atEvent();
+        playback.emitLfoDepth(emitter, lfo, true);
+        playback.emitLfoRate(emitter, lfo);
+      });
     }
     case 1:
       return beginEvent(cursor, source, "LFO Off", SequenceSemantic::Modulation).invoke<&Playback::lfoOff>(slot);
@@ -623,7 +501,13 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 6: {
       auto event = beginEvent(cursor, source, "LFO Waveform", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::lfoWave>(slot, event.u8("wave", SemanticOperandRole::Modulation));
+      const u8 wave = event.u8("wave", SemanticOperandRole::Modulation);
+      return event.invoke([slot, wave](Playback& playback) {
+        auto& lfo = playback.track.lfos[slot & 3];
+        lfo.wave = wave & 0x0f;
+        auto emitter = playback.atEvent();
+        playback.emitLfoDepth(emitter, lfo, true);
+      });
     }
     case 7: {
       auto event = beginEvent(cursor, source, "LFO Delay and Fade", SequenceSemantic::Modulation);
@@ -637,7 +521,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end, const TrackLayout& layout,
-                                                   std::vector<Diagnostic>* diagnostics) {
+                                                   u32 trackIndex, std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, begin, end, kSquarePs2CommandKindPrefix, diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
@@ -656,17 +540,16 @@ using Cursor = CompilerCursor<TrackState, Playback>;
           .end();
     case 0x01:
       return beginEvent(cursor, *source, "Section Marker", SequenceSemantic::Meta);
-    case 0x02:
-      return beginEvent(cursor, *source, "Sequence Loop Point", SequenceSemantic::Loop);
-    case 0x03: {
-      auto event = beginEvent(cursor, *source, "Sequence Loop", SequenceSemantic::Loop);
-      const auto found = layout.sequenceLoops.find(begin);
-      if (found == layout.sequenceLoops.end()) {
-        return event.end();
+    case 0x02: {
+      auto event = beginEvent(cursor, *source, "Sequence Loop Point", SequenceSemantic::Loop);
+      // The driver takes the song-wide snapshot only from source track 1.
+      if (trackIndex == 1) {
+        return event.synchronizedLoopStart();
       }
-      event.derived("destination", found->second, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
-      return event.declaredLoop(found->second);
+      return event;
     }
+    case 0x03:
+      return beginEvent(cursor, *source, "Sequence Loop", SequenceSemantic::Loop).synchronizedLoopEnd();
     case 0x04:
       return beginEvent(cursor, *source, "Repeat Begin", SequenceSemantic::Repeat);
     case 0x05: {
@@ -695,18 +578,29 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       auto event = beginEvent(cursor, *source, "Tempo", SequenceSemantic::Tempo);
       const u8 raw = event.u8("tempo");
       event.derived("beats_per_minute", static_cast<double>(raw), SourceValueDisplay::BeatsPerMinute);
-      return event.invoke<&Playback::tempo>(raw);
+      return event.invoke([raw](Playback& playback) {
+        if (const u32 micros = tempoMicros(raw); micros != 0) {
+          playback.atEvent().tempo(micros);
+        }
+      });
     }
     case 0x09: {
       auto event = beginEvent(cursor, *source, "Tempo Fade", SequenceSemantic::Tempo);
       const u8 duration = event.u8("duration", SemanticOperandRole::Duration);
       const u8 target = event.u8("target");
       event.derived("target_beats_per_minute", static_cast<double>(target), SourceValueDisplay::BeatsPerMinute);
-      return event.invoke<&Playback::tempoFade>(duration, target);
+      return event.invoke([duration, target](Playback& playback) {
+        if (const u32 micros = tempoMicros(target); micros != 0) {
+          const u64 tick = playback.eventTick();
+          auto emitter = playback.out.at(tick);
+          emitter.fade(PerformanceAutomationTarget::Tempo, micros, duration).at(emitter, tick + duration).tempo(micros);
+        }
+      });
     }
     case 0x0a: {
       auto event = beginEvent(cursor, *source, "Master Level", SequenceSemantic::Level);
-      return event.invoke<&Playback::masterLevel>(event.s8("level", SemanticOperandRole::Level));
+      const s8 level = event.s8("level", SemanticOperandRole::Level);
+      return event.invoke([level](Playback& playback) { playback.atEvent().masterLevel(controller(level)); });
     }
     case 0x0b: {
       auto event = beginEvent(cursor, *source, "Master Level Fade", SequenceSemantic::Level);
@@ -718,7 +612,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       auto event = beginEvent(cursor, *source, "Time Signature", SequenceSemantic::Meta);
       const u8 numerator = event.u8("numerator");
       const u8 denominator = event.u8("denominator");
-      return event.invoke<&Playback::timeSignature>(numerator, denominator);
+      return event.invoke([numerator, denominator](Playback& playback) {
+        if (numerator != 0 && denominator != 0) {
+          playback.atEvent().timeSignature(numerator, denominator, 48);
+        }
+      });
     }
     case 0x0d:
       return sourceOnly(cursor, *source, "Driver Mix Preset", 1);
@@ -726,7 +624,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return sourceOnly(cursor, *source, "Reserved Parameter", 1);
     case 0x10:
       return beginEvent(cursor, *source, "Note On (Previous Key and Velocity)", SequenceSemantic::Note)
-          .invoke<&Playback::noteOnPrevious>();
+          .invoke(
+              [](Playback& playback) { playback.noteOn(playback.track.previousKey, playback.track.previousVelocity); });
     case 0x11: {
       auto event = beginEvent(cursor, *source, "Note On", SequenceSemantic::Note);
       const u8 key = event.u8("key", SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
@@ -775,7 +674,10 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0x22: {
       auto event = beginEvent(cursor, *source, "Level", SequenceSemantic::Level);
-      return event.invoke<&Playback::level>(event.s8("level", SemanticOperandRole::Level));
+      const s8 level = event.s8("level", SemanticOperandRole::Level);
+      return event.invoke([level](Playback& playback) {
+        playback.atEvent().level(controller(level), ValueQuantization{.levels = 128});
+      });
     }
     case 0x23: {
       auto event = beginEvent(cursor, *source, "Level Fade", SequenceSemantic::Level);
@@ -785,7 +687,10 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0x24: {
       auto event = beginEvent(cursor, *source, "Expression", SequenceSemantic::Level);
-      return event.invoke<&Playback::expression>(event.s8("expression", SemanticOperandRole::Level));
+      const s8 expression = event.s8("expression", SemanticOperandRole::Level);
+      return event.invoke([expression](Playback& playback) {
+        playback.atEvent().expression(controller(expression), ValueQuantization{.levels = 128});
+      });
     }
     case 0x25: {
       auto event = beginEvent(cursor, *source, "Expression Fade", SequenceSemantic::Level);
@@ -795,30 +700,55 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0x26: {
       auto event = beginEvent(cursor, *source, "Pan", SequenceSemantic::Pan);
-      return event.invoke<&Playback::pan>(event.u8("pan", SemanticOperandRole::Pan));
+      const u8 pan = event.u8("pan", SemanticOperandRole::Pan);
+      return event.invoke([pan](Playback& playback) { playback.atEvent().pan(panPosition(pan)); });
     }
     case 0x27: {
       auto event = beginEvent(cursor, *source, "Pan Fade", SequenceSemantic::Pan);
       const u32 duration = event.varLen("duration", SemanticOperandRole::Duration);
       const u8 target = event.u8("target", SemanticOperandRole::Pan);
-      return event.invoke<&Playback::panFade>(duration, target);
+      return event.invoke([duration, target](Playback& playback) {
+        const u64 tick = playback.eventTick();
+        auto emitter = playback.out.at(tick);
+        const double pan = panPosition(target);
+        emitter.fade(PerformanceAutomationTarget::Pan, pan, duration).at(emitter, tick + duration).pan(pan);
+      });
     }
     case 0x28: {
       auto event = beginEvent(cursor, *source, "Portamento Time", SequenceSemantic::Portamento);
-      return event.invoke<&Playback::portamentoTime>(event.varLen("duration", SemanticOperandRole::Duration));
+      const u32 duration = event.varLen("duration", SemanticOperandRole::Duration);
+      return event.invoke([duration](Playback& playback) {
+        playback.track.portamentoTicks = duration;
+        playback.track.portamento = true;
+        playback.atEvent().portamentoEnable(true);
+      });
     }
     case 0x29:
-      return beginEvent(cursor, *source, "Portamento Off", SequenceSemantic::Portamento)
-          .invoke<&Playback::portamentoOff>();
+      return beginEvent(cursor, *source, "Portamento Off", SequenceSemantic::Portamento).invoke([](Playback& playback) {
+        playback.track.portamento = false;
+        playback.track.previousPitchKey.reset();
+        playback.atEvent().portamentoEnable(false);
+      });
     case 0x2a:
-    case 0x2b:
-      return beginEvent(cursor, *source, source->status == 0x2a ? "Legato On" : "Legato Off", SequenceSemantic::State)
-          .invoke<&Playback::legato>(source->status == 0x2a);
+    case 0x2b: {
+      const bool enabled = source->status == 0x2a;
+      return beginEvent(cursor, *source, enabled ? "Legato On" : "Legato Off", SequenceSemantic::State)
+          .invoke([enabled](Playback& playback) {
+            playback.track.legato = enabled;
+            playback.atEvent().legatoPedal(enabled);
+          });
+    }
     case 0x2c: {
       auto event = beginEvent(cursor, *source, "Pitch Slide", SequenceSemantic::Pitch);
       const u32 duration = event.varLen("duration", SemanticOperandRole::Duration);
       const s8 semitones = event.s8("semitones", SemanticOperandRole::Pitch);
-      return event.invoke<&Playback::pitchSlide>(duration, semitones);
+      return event.invoke([duration, semitones](Playback& playback) {
+        const u64 tick = playback.eventTick();
+        auto emitter = playback.out.at(tick);
+        emitter.fade(PerformanceAutomationTarget::Pitch, semitones, duration)
+            .at(emitter, tick + duration)
+            .pitchBend(semitones);
+      });
     }
     case 0x2d:
       return sourceOnly(cursor, *source, "Voice Flag", 1);
@@ -849,7 +779,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x3c: {
       auto event = beginEvent(cursor, *source, "Sustain Pedal", SequenceSemantic::State);
       const bool enabled = event.u8("enabled", SourceValueDisplay::Boolean, SemanticOperandRole::State) != 0;
-      return event.invoke<&Playback::sustainPedal>(enabled);
+      return event.invoke([enabled](Playback& playback) { playback.atEvent().sustainPedal(enabled); });
     }
     case 0x3d:
       return sourceOnly(cursor, *source, "Sequence Parameter", 1);
@@ -872,27 +802,45 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x5b: {
       auto event = beginEvent(cursor, *source, "Relative Coarse Tuning", SequenceSemantic::Pitch);
       const s8 amount = event.s8("semitones", SemanticOperandRole::Pitch);
-      return event.invoke<&Playback::relativeTuning>(amount);
+      return event.invoke([amount](Playback& playback) {
+        playback.tuning(static_cast<s16>(playback.track.coarseTuning + amount * 256));
+      });
     }
     case 0x5c: {
       auto event = beginEvent(cursor, *source, "Pitch Bend", SequenceSemantic::Pitch);
       const u8 lsb = event.u8("lsb", SemanticOperandRole::Pitch);
       const u8 msb = event.u8("msb", SemanticOperandRole::Pitch);
-      return event.invoke<&Playback::pitchBend>(lsb, msb);
+      return event.invoke([lsb, msb](Playback& playback) {
+        const s32 wheel = static_cast<s32>(lsb) + static_cast<s32>(msb) * 128 - 8192;
+        const double normalized = std::clamp(wheel / 8192.0, -1.0, 1.0);
+        playback.atEvent().pitchBend(PitchBendPerformanceEvent{
+            .semitones = normalized * playback.track.pitchBendRange,
+            .normalizedWheelPosition = normalized,
+        });
+      });
     }
     case 0x5d: {
       auto event = beginEvent(cursor, *source, "Pitch Bend Range", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::bendRange>(event.s8("semitones", SemanticOperandRole::Pitch));
+      const s8 range = event.s8("semitones", SemanticOperandRole::Pitch);
+      return event.invoke([range](Playback& playback) {
+        playback.track.pitchBendRange = range;
+        playback.atEvent().pitchBendRange(static_cast<u8>(std::abs(static_cast<int>(range))));
+      });
     }
     case 0x60:
-    case 0x61:
-      return beginEvent(cursor, *source, source->status == 0x60 ? "Reverb On" : "Reverb Off", SequenceSemantic::State)
-          .invoke<&Playback::reverb>(source->status == 0x60 ? 1.0 : 0.0);
+    case 0x61: {
+      const bool enabled = source->status == 0x60;
+      return beginEvent(cursor, *source, enabled ? "Reverb On" : "Reverb Off", SequenceSemantic::State)
+          .invoke([enabled](Playback& playback) { playback.atEvent().reverb(enabled ? 1.0 : 0.0); });
+    }
     case 0x62: {
       auto event = beginEvent(cursor, *source, "Output Routing", SequenceSemantic::State);
       const u8 left = event.u8("left", SemanticOperandRole::State);
       const u8 right = event.u8("right", SemanticOperandRole::State);
-      return event.invoke<&Playback::routing>(left, right);
+      return event.invoke([left, right](Playback& playback) {
+        const double wet = ((left == 1 || left == 2 ? 1.0 : 0.0) + (right == 1 || right == 2 ? 1.0 : 0.0)) / 2.0;
+        playback.atEvent().reverb(wet);
+      });
     }
     case 0x64:
     case 0x65:
@@ -920,14 +868,24 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 slot = event.u8("slot");
       const u8 mode = event.u8("mode", SemanticOperandRole::Modulation);
       const u8 wave = event.u8("wave", SemanticOperandRole::Modulation);
-      return event.invoke<&Playback::lfoModeWave>(slot, mode, wave);
+      return event.invoke([slot, mode, wave](Playback& playback) {
+        auto& lfo = playback.track.lfos[slot & 3];
+        lfo.mode = static_cast<s8>(mode % 3);
+        lfo.wave = wave & 0x0f;
+        auto emitter = playback.atEvent();
+        playback.emitLfoDepth(emitter, lfo, true);
+        playback.emitLfoRate(emitter, lfo);
+      });
     }
     case 0x75: {
       auto event = beginEvent(cursor, *source, "LFO Slot Depth and Rate", SequenceSemantic::Modulation);
       const u8 slot = event.u8("slot");
       const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
       const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
-      return event.invoke<&Playback::lfoDepthAndRate>(slot, depth, rate);
+      return event.invoke([slot, depth, rate](Playback& playback) {
+        playback.lfoDepthValue(slot, depth);
+        playback.lfoRateValue(slot, rate);
+      });
     }
     case 0x76:
     case 0x77: {
@@ -969,7 +927,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       .sourceMap = sourceMap,
   };
   return tracks.decode(trackIndex, source.dataOffset,
-                       [&](u32 offset) { return decodeCommand(reader, offset, end, layout, diagnostics); });
+                       [&](u32 offset) { return decodeCommand(reader, offset, end, layout, trackIndex, diagnostics); });
 }
 
 }  // namespace

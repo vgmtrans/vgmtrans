@@ -455,6 +455,23 @@ public:
 
     Event& wait(auto ticks) { return append<&detail::wait<Playback>>(std::move(ticks)); }
 
+    Event& delay(u32 ticks) {
+      execution_.delayTicks = ticks;
+      return *this;
+    }
+
+    Event& synchronizedLoopStart() {
+      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
+      execution_.coordinatorSignal = SequenceCoordinatorSignal::SynchronizedLoopStart;
+      return *this;
+    }
+
+    Event& synchronizedLoopEnd() {
+      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
+      execution_.coordinatorSignal = SequenceCoordinatorSignal::SynchronizedLoopEnd;
+      return *this;
+    }
+
     template <auto Member>
     Event& wait() {
       return appendCallable([](Playback& playback) {

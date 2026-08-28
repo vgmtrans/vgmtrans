@@ -397,6 +397,14 @@ private:
   u32 loopRepeats_ = 0;
 };
 
+struct SynchronizedLoopTrackSnapshot {
+  // Song loops restore source control and timing; musical state continues.
+  std::optional<u32> current;
+  u32 pendingTicks = 0;
+  u32 pendingTickCommand = 0;
+  bool delayedCommand = false;
+};
+
 // VmTrackExecutor owns the mutable playback state for one track. SequenceVm keeps
 // whole-sequence coordination, such as synchronized stopping across tracks.
 class VmTrackExecutor {
@@ -434,21 +442,21 @@ public:
   }
   [[nodiscard]] std::optional<u64> loopStopTick() const noexcept { return loopStopTick_; }
 
-  [[nodiscard]] bool executeNext() {
+  [[nodiscard]] SequenceCoordinatorSignal executeNext() {
     if (!current_ && pendingTicks_ == 0) {
-      return false;
+      return SequenceCoordinatorSignal::None;
     }
     if (pendingTicks_ != 0) {
       if (runtime_.tick != std::numeric_limits<u64>::max()) {
         ++runtime_.tick;
       }
       tickRuntime(pendingTickCommand_);
-      if (pendingTicks_ > 1) {
+      if (pendingTicks_ > 1 && !pendingDelayedCommand_) {
         executeReadyCommandDuringWait();
       }
       --pendingTicks_;
       if (pendingTicks_ != 0) {
-        return false;
+        return SequenceCoordinatorSignal::None;
       }
     }
 
@@ -456,20 +464,28 @@ public:
     // wait. Keep consuming zero-time commands here; yielding between them
     // would let a later channel run too early at the same tick.
     while (current_ && pendingTicks_ == 0) {
+      const SourceCommand& command = track_.commands.at(*current_);
+      if (!pendingDelayedCommand_ && command.execution.delayTicks != 0) {
+        pendingDelayedCommand_ = true;
+        scheduleTicks(*current_, command.execution.delayTicks);
+        return SequenceCoordinatorSignal::None;
+      }
       const bool hadLoopStop = loopStopTick_.has_value();
-      if (executeCommand()) {
-        return true;
+      const SequenceCoordinatorSignal signal = executeCommand();
+      pendingDelayedCommand_ = false;
+      if (signal != SequenceCoordinatorSignal::None) {
+        return signal;
       }
       if (!hadLoopStop && loopStopTick_) {
         // Let the sequence coordinator observe the newly discovered common
         // loop boundary before this zero-time loop can execute again.
-        return false;
+        return SequenceCoordinatorSignal::None;
       }
       if (pendingTicks_ != 0) {
         executeReadyCommandDuringWait();
       }
     }
-    return false;
+    return SequenceCoordinatorSignal::None;
   }
 
   // A section switch preserves the format's typed channel state, but resets
@@ -480,6 +496,7 @@ public:
     runtime_.repeat.clear();
     runtime_.lastCommand = {};
     pendingTicks_ = 0;
+    pendingDelayedCommand_ = false;
     current_ = start ? track_.commandIndex(*start) : std::optional<u32>{};
     arrivedByControlFlow_ = true;
     loopDetector_.clear();
@@ -493,6 +510,28 @@ public:
     }
   }
 
+  [[nodiscard]] SynchronizedLoopTrackSnapshot synchronizedLoopSnapshot(u64 boundary) const {
+    u32 remainingTicks = pendingTicks_;
+    if (active()) {
+      if (runtime_.tick > boundary || boundary - runtime_.tick > remainingTicks) {
+        throw std::logic_error("Synchronized loop point was not reached in global track order");
+      }
+      remainingTicks -= static_cast<u32>(boundary - runtime_.tick);
+    }
+    return {current_, remainingTicks, pendingTickCommand_, pendingDelayedCommand_};
+  }
+
+  void restoreSynchronizedLoop(const SynchronizedLoopTrackSnapshot& snapshot, u64 tick) {
+    runtime_.tick = tick;
+    current_ = snapshot.current;
+    pendingTicks_ = snapshot.pendingTicks;
+    pendingTickCommand_ = snapshot.pendingTickCommand;
+    pendingDelayedCommand_ = snapshot.delayedCommand;
+    arrivedByControlFlow_ = true;
+    loopDetector_.clear();
+    loopStopTick_.reset();
+  }
+
   void trimAt(u64 tick, bool retainBoundaryEvents) {
     closeActiveNotesAt(tick);
     endTrackAt(performanceTrack_, tick, retainBoundaryEvents);
@@ -500,7 +539,7 @@ public:
 
   void closeActiveNotesAt(u64 tick) { outputAt(tick, runtime_.lastCommand).allNotesOff(); }
 
-  void preservePlaylistLoop(u64 startTick, u64 endTick) {
+  void preserveLoop(u64 startTick, u64 endTick) {
     addLoopMarker(performanceTrack_, {}, startTick, outputSequence_, "Loop Start");
     addLoopMarker(performanceTrack_, runtime_.lastCommand, endTick, outputSequence_, "Loop End");
   }
@@ -543,7 +582,7 @@ private:
   }
 
   void executeReadyCommandDuringWait() {
-    if (pendingTicks_ == 0 || !current_ || sequenceRuntime_.readyDuringWait == nullptr) {
+    if (pendingTicks_ == 0 || pendingDelayedCommand_ || !current_ || sequenceRuntime_.readyDuringWait == nullptr) {
       return;
     }
     const u32 commandIndex = *current_;
@@ -559,7 +598,7 @@ private:
     static_cast<void>(executeCommand(true));
   }
 
-  [[nodiscard]] bool executeCommand(bool duringWait = false) {
+  [[nodiscard]] SequenceCoordinatorSignal executeCommand(bool duringWait = false) {
     if (executedCommands_ >= behavior_.commandLimit) {
       const SourceCommand& command = track_.commands.at(*current_);
       warn(fmt::format("Sequence VM command limit reached: track={}, address=${:04X}, tick={}, executed={}, limit={}",
@@ -567,7 +606,7 @@ private:
                        behavior_.commandLimit),
            command.range);
       current_ = std::nullopt;
-      return false;
+      return SequenceCoordinatorSignal::None;
     }
     const u32 commandIndex = *current_;
     const CommandId commandId{commandIndex};
@@ -576,7 +615,7 @@ private:
     const auto loop = loopDetector_.observe(visitState, runtime_, arrivedByControlFlow_);
     if (behavior_.inferLoopsFromRepeatedState && loop) {
       if (handleLoop(*loop, commandIndex, visitState).kind == LoopActionKind::StopTrack) {
-        return false;
+        return SequenceCoordinatorSignal::None;
       }
     }
 
@@ -623,11 +662,13 @@ private:
       }
     }
     runtime_.lastCommand = commandId;
-    const bool endedSection = effectiveTransition.kind == CommandTransitionKind::EndSection;
+    const SequenceCoordinatorSignal signal = effectiveTransition.kind == CommandTransitionKind::EndSection
+                                                 ? SequenceCoordinatorSignal::SectionEnd
+                                                 : command.execution.coordinatorSignal;
     applyTransition(commandId, command, effectiveTransition);
 
     ++executedCommands_;
-    return endedSection;
+    return signal;
   }
 
   [[nodiscard]] LoopAction handleLoop(const LoopPoint& loop, u32 replayIndex,
@@ -687,10 +728,6 @@ private:
         break;
 
       case CommandTransitionKind::End:
-        current_ = std::nullopt;
-        arrivedByControlFlow_ = false;
-        break;
-
       case CommandTransitionKind::EndSection:
         current_ = std::nullopt;
         arrivedByControlFlow_ = false;
@@ -834,6 +871,7 @@ private:
   std::optional<u32> current_;
   u32 pendingTicks_ = 0;
   u32 pendingTickCommand_ = 0;
+  bool pendingDelayedCommand_ = false;
   u32 executedCommands_ = 0;
   std::optional<u64> loopStopTick_;
   u32 loopRepeats_ = 0;
@@ -1026,6 +1064,9 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
       // tie-break. A channel keeps control at the same tick while it consumes
       // zero-time commands, matching how these drivers run until their next wait.
       std::optional<u64> sequenceEndTick;
+      std::optional<u64> synchronizedLoopStartTick;
+      std::vector<SynchronizedLoopTrackSnapshot> synchronizedLoopSnapshot;
+      u32 synchronizedLoopRepeats = 0;
       while (true) {
         size_t selected = executors.size();
         for (size_t i = 0; i < executors.size(); ++i) {
@@ -1040,12 +1081,45 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
           break;
         }
 
-        const bool endedSection = executors[selected]->executeNext();
-        if (endedSection && playlist) {
+        const SequenceCoordinatorSignal signal = executors[selected]->executeNext();
+        if (signal == SequenceCoordinatorSignal::SynchronizedLoopStart && !playlist) {
           const u64 boundary = executors[selected]->tick();
+          synchronizedLoopSnapshot.clear();
+          synchronizedLoopSnapshot.reserve(executors.size());
+          for (const auto& executor : executors) {
+            synchronizedLoopSnapshot.push_back(executor->synchronizedLoopSnapshot(boundary));
+          }
+          synchronizedLoopStartTick = boundary;
+          synchronizedLoopRepeats = 0;
+          continue;
+        }
+
+        if (signal == SequenceCoordinatorSignal::SynchronizedLoopEnd && !playlist) {
+          const u64 boundary = executors[selected]->tick();
+          if (!synchronizedLoopSnapshot.empty()) {
+            if (loopPolicy == LoopPolicy::PlayOnce && synchronizedLoopRepeats < options_.sequenceLoops) {
+              ++synchronizedLoopRepeats;
+              for (size_t i = 0; i < executors.size(); ++i) {
+                executors[i]->restoreSynchronizedLoop(synchronizedLoopSnapshot[i], boundary);
+              }
+              continue;
+            }
+
+            if (loopPolicy == LoopPolicy::Preserve && synchronizedLoopStartTick) {
+              for (auto& executor : executors) {
+                executor->preserveLoop(*synchronizedLoopStartTick, boundary);
+              }
+            }
+            sequenceEndTick = boundary;
+            break;
+          }
+        }
+
+        if (signal == SequenceCoordinatorSignal::SectionEnd && playlist) {
+          const u64 boundary = executors[selected]->tick();
+          // Tracks are visited in stable source order, so keep same-tick work
+          // from tracks processed before the boundary command.
           for (size_t i = 0; i < executors.size(); ++i) {
-            // Tracks are ordered exactly as the driver visits them. Retain
-            // same-tick work from channels already processed before End.
             executors[i]->trimAt(boundary, i <= selected);
           }
           endSourceSpansAt(target.sourceSpans, boundary);
@@ -1053,7 +1127,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
           const PlaylistAdvance next = playlist->advance(boundary);
           if (next.preservedLoopStart) {
             for (auto& executor : executors) {
-              executor->preservePlaylistLoop(*next.preservedLoopStart, boundary);
+              executor->preserveLoop(*next.preservedLoopStart, boundary);
             }
           }
           if (next.trackStarts == nullptr) {
