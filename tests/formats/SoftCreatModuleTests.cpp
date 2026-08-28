@@ -232,6 +232,16 @@ void durationModesLegatoAndRepeatsAreStateful() {
          "a byte that becomes a per-note suffix on a later pass should retain both control-flow interpretations");
 }
 
+void perNoteVolumePrecedesLiteralDuration() {
+  const PerformanceSequence performance =
+      render({0xb9, 0x19, 100, 12, 0x80}, Version::MaximumCarnage);
+  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto balance = events<StereoBalancePerformanceEvent>(performance.tracks.front());
+  expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->durationTicks == 12 &&
+             balance.size() == 1 && std::abs(balance.front()->rightGain - 100.0 / 256.0) < 0.000001,
+         "per-note mode should read volume before a literal duration, matching the SPC700 driver");
+}
+
 void pitchEffectsRetainPhysicalTiming() {
   const PerformanceSequence portamento = render({0x86, 4, 0x32, 0x90, 0x40, 0x3e, 0x80});
   expect(portamento.diagnostics.empty() &&
@@ -270,5 +280,6 @@ void runSoftCreatModuleTests() {
   gainHoldContinuesTheCurrentEnvelope();
   restsPreserveTheKeyedVoice();
   durationModesLegatoAndRepeatsAreStateful();
+  perNoteVolumePrecedesLiteralDuration();
   pitchEffectsRetainPhysicalTiming();
 }
