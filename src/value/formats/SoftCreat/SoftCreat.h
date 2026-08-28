@@ -33,6 +33,27 @@ enum class Version : u8 {
   LateNoEcho,       // Tin Star; Foreman For Real
 };
 
+struct Dialect {
+  u8 commandCutoff = 0;
+  std::optional<u8> noteAliasOpcode;
+};
+
+[[nodiscard]] constexpr Dialect dialect(Version version) noexcept {
+  switch (version) {
+    case Version::Early:
+      return {.commandCutoff = 0xb8};
+    case Version::Plok:
+      return {.commandCutoff = 0xba, .noteAliasOpcode = 0xb8};
+    case Version::MaximumCarnage:
+      return {.commandCutoff = 0xbd, .noteAliasOpcode = 0xb3};
+    case Version::LateEcho:
+      return {.commandCutoff = 0xc7, .noteAliasOpcode = 0xb9};
+    case Version::LateNoEcho:
+      return {.commandCutoff = 0xc3, .noteAliasOpcode = 0xb9};
+  }
+  return {};
+}
+
 struct TrackPointer {
   u16 address = 0;
   core::SourceRange lowSource;
@@ -50,14 +71,10 @@ struct EchoState {
 
 struct Layout {
   Version version = Version::Early;
-  u8 commandCutoff = 0;
   u8 songIndex = 0;
   u8 songCount = 0;
   u8 initialTimer = 0x85;
   u8 musicVolume = 0x80;
-  u16 songListAddress = 0;
-  u16 sequenceHeaderAddress = 0;
-  u16 dispatchTableAddress = 0;
   u16 pitchLowTableAddress = 0;
   u16 pitchHighTableAddress = 0;
   u16 coarseTableAddress = 0;
@@ -79,7 +96,6 @@ struct SequenceParse {
   SequenceReferences references;
 };
 
-[[nodiscard]] const char* versionName(Version version);
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);
 [[nodiscard]] core::TrackProgram decodeSourceTrack(core::ByteReader reader, const Layout& layout, u32 trackNumber,
                                                    u32 startAddress,

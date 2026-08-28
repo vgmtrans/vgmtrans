@@ -83,6 +83,14 @@ enum class GainMode : u8 {
   Stream,
 };
 
+enum class GainPhase : u8 {
+  Attack,
+  Decay,
+  Sustain,
+  Release,
+  End,
+};
+
 struct RepeatFrame {
   Address start;
   u16 remaining = 0;
@@ -94,11 +102,8 @@ struct RuntimeConfig {
 };
 
 struct ProgramState {
-  ProgramState(const RuntimeConfig& config)
-      : data(config.source.reader()), layout(config.layout), echo(config.layout.echo) {}
+  explicit ProgramState(const RuntimeConfig& config) : echo(config.layout.echo) {}
 
-  ByteReader data;
-  Layout layout;
   EchoState echo;
   std::array<u8, 32> flags{};
   bool echoDisabled = false;
@@ -166,7 +171,7 @@ struct TrackState {
   GainMode gainMode = GainMode::Preset;
   bool gainRetriggers = true;
   GainRow gain;
-  u8 gainPhase = 0;
+  GainPhase gainPhase = GainPhase::Attack;
   u16 gainStep = 0;
   u16 gainCounter = 0;
   u8 gainLevel = 0x7f;
@@ -320,7 +325,7 @@ struct Playback {
   }
 
   void startPresetGain() {
-    track.gainPhase = 0;
+    track.gainPhase = GainPhase::Attack;
     track.gainStep = 0;
     track.gainCounter = 1;
   }
@@ -351,7 +356,7 @@ struct Playback {
   void releaseGain() {
     if (track.gainMode == GainMode::Preset) {
       track.releaseStart = track.gainLevel;
-      track.gainPhase = 3;
+      track.gainPhase = GainPhase::Release;
       track.gainStep = 0;
     } else if (track.streamReleaseOffset == 0) {
       u16 offset = 0;
@@ -370,7 +375,7 @@ struct Playback {
     }
     track.gainCounter = math::ticks(track.gain.interval);
     switch (track.gainPhase) {
-      case 0:
+      case GainPhase::Attack:
         if (track.gain.attackSteps == 0) {
           return;
         }
@@ -380,18 +385,18 @@ struct Playback {
                                                 (track.gain.attackPeak - track.gain.attackStart) * track.gainStep /
                                                     (track.gain.attackSteps - 1u));
         if (++track.gainStep == track.gain.attackSteps) {
-          track.gainPhase = 1;
+          track.gainPhase = GainPhase::Decay;
           track.gainStep = 0;
         }
         break;
-      case 1: {
+      case GainPhase::Decay: {
         if (track.gain.decaySteps == 0) {
           return;
         }
         const u16 remaining = static_cast<u16>(track.gain.decaySteps - track.gainStep - 1u);
         if (remaining == 0) {
           track.gainLevel = track.gain.sustain;
-          track.gainPhase = 2;
+          track.gainPhase = GainPhase::Sustain;
           track.gainStep = 0;
         } else {
           track.gainLevel = static_cast<u8>(
@@ -401,23 +406,23 @@ struct Playback {
         }
         break;
       }
-      case 2:
+      case GainPhase::Sustain:
         return;
-      case 3: {
+      case GainPhase::Release: {
         if (track.gain.releaseSteps == 0) {
           return;
         }
         const u16 remaining = static_cast<u16>(track.gain.releaseSteps - track.gainStep - 1u);
         if (remaining == 0) {
           track.gainLevel = 0;
-          track.gainPhase = 4;
+          track.gainPhase = GainPhase::End;
         } else {
           track.gainLevel = static_cast<u8>(track.releaseStart * remaining / track.gain.releaseSteps);
           ++track.gainStep;
         }
         break;
       }
-      default:
+      case GainPhase::End:
         return;
     }
     emitGain();
@@ -664,8 +669,7 @@ struct Playback {
   void streamGain(u8 interval, u16 address) {
     track.streamInterval = interval;
     track.streamAddress = address;
-    track.gainMode = GainMode::Stream;
-    track.gainRetriggers = true;
+    setGainMode(GainMode::Stream);
     track.streamOffset = 1;
     track.streamReleaseOffset = 0;
     track.gainCounter = 1;
@@ -709,15 +713,10 @@ struct Playback {
   }
   void setEnvelope(GainRow row) {
     track.gain = row;
-    track.gainMode = GainMode::Preset;
-    track.gainRetriggers = true;
+    setGainMode(GainMode::Preset);
   }
-  void presetGain() {
-    track.gainMode = GainMode::Preset;
-    track.gainRetriggers = true;
-  }
-  void streamGainMode() {
-    track.gainMode = GainMode::Stream;
+  void setGainMode(GainMode mode) {
+    track.gainMode = mode;
     track.gainRetriggers = true;
   }
   void keepGainEnvelope() { track.gainRetriggers = false; }
@@ -829,49 +828,8 @@ struct DecodeState {
     if (opcode >= 0x8c && opcode <= 0xa8) {
       return static_cast<u8>(opcode + 1);
     }
-    switch (opcode) {
-      case 0xa9:
-        return 0xaf;
-      case 0xaa:
-        return 0xb0;
-      case 0xab:
-        return 0xb1;
-      case 0xac:
-        return 0xb2;
-      case 0xad:
-        return 0xb3;
-      case 0xae:
-        return 0xb4;
-      case 0xaf:
-        return 0xb5;
-      case 0xb0:
-        return 0xb6;
-      case 0xb1:
-        return 0xb7;
-      case 0xb2:
-        return 0xb8;
-      case 0xb3:
-        return 0xb9;
-      case 0xb4:
-        return 0xba;
-      case 0xb5:
-        return 0xbb;
-      case 0xb6:
-        return 0xbc;
-      case 0xb7:
-        return 0xbd;
-      case 0xb8:
-        return 0xbe;
-      case 0xb9:
-        return 0xbf;
-      case 0xba:
-        return 0xc0;
-      case 0xbb:
-        return 0xc1;
-      case 0xbc:
-        return 0xc2;
-      default:
-        return opcode;
+    if (opcode >= 0xa9 && opcode <= 0xbc) {
+      return static_cast<u8>(opcode + 6);
     }
   }
   if (version == Version::LateNoEcho && opcode >= 0xaa && opcode <= 0xb0) {
@@ -881,9 +839,8 @@ struct DecodeState {
 }
 
 [[nodiscard]] bool isAlias(Version version, u8 opcode) {
-  return (version == Version::Plok && opcode == 0xb8) ||
-         (version == Version::MaximumCarnage && opcode == 0xb3) ||
-         ((version == Version::LateEcho || version == Version::LateNoEcho) && opcode == 0xb9);
+  const auto alias = dialect(version).noteAliasOpcode;
+  return alias && *alias == opcode;
 }
 
 [[nodiscard]] GainRow readGainRow(Cursor::Event& event) {
@@ -938,7 +895,7 @@ struct DecodeState {
     return note == 0 ? event.invoke<&Playback::rest>(duration, volume, continuation)
                      : event.invoke<&Playback::note>(note, duration, volume, continuation);
   }
-  if (opcode >= layout.commandCutoff || opcode == 0x80) {
+  if (opcode >= dialect(layout.version).commandCutoff || opcode == 0x80) {
     return cursor.command("End", SequenceSemantic::End).end();
   }
   if (layout.version == Version::Plok && opcode == 0xb9) {
@@ -1055,13 +1012,13 @@ struct DecodeState {
     }
     case 0x9b:
       return cursor.command("Software GAIN Envelope", SequenceSemantic::Envelope)
-          .invoke<&Playback::presetGain>();
+          .invoke<&Playback::setGainMode>(GainMode::Preset);
     case 0x9c:
       return cursor.command("Keep GAIN Envelope", SequenceSemantic::Envelope)
           .invoke<&Playback::keepGainEnvelope>();
     case 0x9d:
       return cursor.command("Streamed GAIN Mode", SequenceSemantic::Envelope)
-          .invoke<&Playback::streamGainMode>();
+          .invoke<&Playback::setGainMode>(GainMode::Stream);
     case 0x9e:
     case 0x9f:
       return cursor.command(command == 0x9e ? "Retrigger On" : "Legato / Retrigger Off", SequenceSemantic::State)
@@ -1243,10 +1200,9 @@ struct DiscoveryPoint {
   std::map<u32, DecodeState> commandStates;
   std::map<u32, u32> stateVisits;
 
-  const auto queue = [&](std::vector<DiscoveryPoint>& points, Address address, DecodeState state,
-                         std::vector<u32> returns, std::vector<u32> repeats) {
+  const auto queue = [&](Address address, DecodeState state, std::vector<u32> returns, std::vector<u32> repeats) {
     if (address.value < kAramSize && reader.has(address.value, 1)) {
-      points.push_back(DiscoveryPoint{static_cast<u32>(address.value), state, std::move(returns), std::move(repeats)});
+      pending.push_back(DiscoveryPoint{static_cast<u32>(address.value), state, std::move(returns), std::move(repeats)});
     }
   };
 
@@ -1283,48 +1239,56 @@ struct DiscoveryPoint {
       }
     }
 
-    const u8 opcode = decoded.opcode;
-    const u8 command = canonicalOpcode(layout.version, opcode);
+    const u8 command = canonicalOpcode(layout.version, decoded.opcode);
     const Address continuation = decoded.flow.continuation;
-    if (opcode < 0x80 || isAlias(layout.version, opcode)) {
-      queue(pending, continuation, nextState, std::move(point.returns), std::move(point.repeats));
-    } else if (opcode >= layout.commandCutoff || opcode == 0x80 || command == 0xa1 || command == 0xb8) {
-      continue;
-    } else if (command == 0x81 || command == 0xa3) {
-      for (const Address target : decoded.discoveryTargets) {
-        queue(pending, target, nextState, point.returns, point.repeats);
-      }
-      if (const auto target = decoded.flow.defaultDestination()) {
-        queue(pending, *target, nextState, std::move(point.returns), std::move(point.repeats));
-      }
-    } else if (command == 0x82 || command == 0xa4) {
-      point.returns.push_back(static_cast<u32>(continuation.value));
-      for (const Address target : decoded.discoveryTargets) {
-        queue(pending, target, nextState, point.returns, point.repeats);
-      }
-      if (const auto target = decoded.flow.defaultDestination()) {
-        queue(pending, *target, nextState, std::move(point.returns), std::move(point.repeats));
-      }
-    } else if (command == 0x83) {
-      if (!point.returns.empty()) {
-        const Address target{point.returns.back()};
-        point.returns.pop_back();
-        queue(pending, target, nextState, std::move(point.returns), std::move(point.repeats));
-      }
-    } else if (command == 0x84) {
+    if (command == 0x84) {
       point.repeats.push_back(static_cast<u32>(continuation.value));
-      queue(pending, continuation, nextState, std::move(point.returns), std::move(point.repeats));
-    } else if (command == 0x85 && !point.repeats.empty()) {
-      queue(pending, Address{point.repeats.back()}, nextState, point.returns, point.repeats);
-      point.repeats.pop_back();
-      queue(pending, continuation, nextState, std::move(point.returns), std::move(point.repeats));
-    } else if (command == 0x85) {
+      queue(continuation, nextState, std::move(point.returns), std::move(point.repeats));
       continue;
-    } else {
-      for (const Address target : decoded.discoveryTargets) {
-        queue(pending, target, nextState, point.returns, point.repeats);
+    }
+    if (command == 0x85) {
+      if (point.repeats.empty()) {
+        continue;
       }
-      queue(pending, continuation, nextState, std::move(point.returns), std::move(point.repeats));
+      queue(Address{point.repeats.back()}, nextState, point.returns, point.repeats);
+      point.repeats.pop_back();
+      queue(continuation, nextState, std::move(point.returns), std::move(point.repeats));
+      continue;
+    }
+
+    const auto queueAlternatives = [&] {
+      for (const Address target : decoded.discoveryTargets) {
+        queue(target, nextState, point.returns, point.repeats);
+      }
+    };
+    switch (decoded.flow.defaultTransition.kind) {
+      case CommandTransitionKind::Fallthrough:
+        queueAlternatives();
+        queue(continuation, nextState, std::move(point.returns), std::move(point.repeats));
+        break;
+      case CommandTransitionKind::Jump:
+        queueAlternatives();
+        if (const auto target = decoded.flow.defaultDestination()) {
+          queue(*target, nextState, std::move(point.returns), std::move(point.repeats));
+        }
+        break;
+      case CommandTransitionKind::Call:
+        point.returns.push_back(static_cast<u32>(continuation.value));
+        queueAlternatives();
+        if (const auto target = decoded.flow.defaultDestination()) {
+          queue(*target, nextState, std::move(point.returns), std::move(point.repeats));
+        }
+        break;
+      case CommandTransitionKind::Return:
+        if (!point.returns.empty()) {
+          const Address target{point.returns.back()};
+          point.returns.pop_back();
+          queue(target, nextState, std::move(point.returns), std::move(point.repeats));
+        }
+        break;
+      case CommandTransitionKind::End:
+      case CommandTransitionKind::EndSection:
+        break;
     }
   }
 

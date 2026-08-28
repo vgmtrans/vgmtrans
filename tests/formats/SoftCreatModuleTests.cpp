@@ -48,22 +48,6 @@ std::vector<const Event*> events(const PerformanceTrack& track) {
   return result;
 }
 
-u8 cutoff(Version version) {
-  switch (version) {
-    case Version::Early:
-      return 0xb8;
-    case Version::Plok:
-      return 0xba;
-    case Version::MaximumCarnage:
-      return 0xbd;
-    case Version::LateEcho:
-      return 0xc7;
-    case Version::LateNoEcho:
-      return 0xc3;
-  }
-  return 0x80;
-}
-
 PerformanceSequence render(std::initializer_list<u8> commands, Version version = Version::Early) {
   std::vector<u8> bytes(kAramSize);
   constexpr u16 start = 0x1000;
@@ -76,7 +60,6 @@ PerformanceSequence render(std::initializer_list<u8> commands, Version version =
   }
   Layout layout{
       .version = version,
-      .commandCutoff = cutoff(version),
       .initialTimer = 0x84,
       .musicVolume = 0x80,
       .pitchLowTableAddress = 0x0200,
@@ -138,14 +121,14 @@ void layoutUsesLiveSongAndAuditedTables() {
 void versionedOpcodesRetainTheirRealOperandLengths() {
   std::vector<u8> bytes(kAramSize);
   writeBytes(bytes, 0x1000, {0xa1, 1, 2, 3, 4, 5, 6, 7, 0x80});
-  Layout maximum{.version = Version::MaximumCarnage, .commandCutoff = 0xbd};
+  Layout maximum{.version = Version::MaximumCarnage};
   const TrackProgram maxTrack = decodeSourceTrack(ByteReader(SourceId{303}, bytes), maximum, 0, 0x1000);
   expect(maxTrack.commands.size() == 2 && maxTrack.commands.front().range.size == 8 &&
              maxTrack.commands.front().semantic == SequenceSemantic::Envelope,
          "Maximum Carnage A1 should be the seven-byte inline software envelope");
 
   writeBytes(bytes, 0x1000, {0xaa, 0x40, 0x80});
-  Layout late{.version = Version::LateNoEcho, .commandCutoff = 0xc3};
+  Layout late{.version = Version::LateNoEcho};
   const TrackProgram lateTrack = decodeSourceTrack(ByteReader(SourceId{304}, bytes), late, 0, 0x1000);
   expect(lateTrack.commands.size() == 2 && lateTrack.commands.front().range.size == 2 &&
              lateTrack.commands.front().semantic == SequenceSemantic::Level,
