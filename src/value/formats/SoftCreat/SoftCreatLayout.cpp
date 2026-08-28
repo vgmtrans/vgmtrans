@@ -50,21 +50,19 @@ constexpr std::array<u8, 27> kDspRegisters{
     0x4f, 0x5f, 0x6f, 0x7f, 0x05, 0x15, 0x25, 0x35, 0x45, 0x55, 0x65, 0x75, 0xff,
 };
 
+constexpr std::array kVersions{
+    Version::Early,
+    Version::Plok,
+    Version::MaximumCarnage,
+    Version::LateEcho,
+    Version::LateNoEcho,
+};
+
 [[nodiscard]] std::optional<Version> versionForCutoff(u8 cutoff) {
-  switch (cutoff) {
-    case 0xb8:
-      return Version::Early;
-    case 0xba:
-      return Version::Plok;
-    case 0xbd:
-      return Version::MaximumCarnage;
-    case 0xc7:
-      return Version::LateEcho;
-    case 0xc3:
-      return Version::LateNoEcho;
-    default:
-      return std::nullopt;
-  }
+  const auto found = std::ranges::find_if(kVersions, [cutoff](Version version) {
+    return dialect(version).commandCutoff == cutoff;
+  });
+  return found == kVersions.end() ? std::nullopt : std::optional<Version>{*found};
 }
 
 [[nodiscard]] std::optional<u32> findBytes(ByteReader reader, std::span<const u8> bytes) {
@@ -112,14 +110,11 @@ constexpr std::array<u8, 27> kDspRegisters{
 }
 
 [[nodiscard]] std::optional<u16> aliasTable(ByteReader reader, Version version, u16 dispatch) {
-  const u8 opcode = version == Version::Plok              ? 0xb8
-                    : version == Version::MaximumCarnage ? 0xb3
-                    : version == Version::LateEcho || version == Version::LateNoEcho ? 0xb9
-                                                                                       : 0;
-  if (opcode == 0) {
+  const auto opcode = dialect(version).noteAliasOpcode;
+  if (!opcode) {
     return std::nullopt;
   }
-  const u32 entry = dispatch + (opcode - 0x80u) * 2u;
+  const u32 entry = dispatch + (*opcode - 0x80u) * 2u;
   if (!reader.has(entry, 2)) {
     return std::nullopt;
   }
@@ -134,22 +129,6 @@ constexpr std::array<u8, 27> kDspRegisters{
 }
 
 }  // namespace
-
-const char* versionName(Version version) {
-  switch (version) {
-    case Version::Early:
-      return "Early";
-    case Version::Plok:
-      return "Plok";
-    case Version::MaximumCarnage:
-      return "Maximum Carnage";
-    case Version::LateEcho:
-      return "Late (echo)";
-    case Version::LateNoEcho:
-      return "Late (no sequence echo)";
-  }
-  return "Unknown";
-}
 
 std::optional<Layout> findLayout(ByteReader reader) {
   if (reader.size() != kAramSize) {
@@ -239,14 +218,10 @@ std::optional<Layout> findLayout(ByteReader reader) {
   }
   return Layout{
       .version = *version,
-      .commandCutoff = cutoff,
       .songIndex = song,
       .songCount = songs,
       .initialTimer = timer,
       .musicVolume = reader.u8At(0xe8),
-      .songListAddress = list,
-      .sequenceHeaderAddress = static_cast<u16>(list + song),
-      .dispatchTableAddress = dispatch,
       .pitchLowTableAddress = pitchLow,
       .pitchHighTableAddress = pitchHigh,
       .coarseTableAddress = coarse,
