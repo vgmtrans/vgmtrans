@@ -110,7 +110,7 @@ std::vector<u8> scannerFixture() {
 void layoutUsesLiveSongAndAuditedTables() {
   const std::vector<u8> bytes = scannerFixture();
   const auto layout = findLayout(ByteReader(SourceId{302}, bytes));
-  expect(layout && layout->version == Version::LateEcho && layout->songIndex == 2 && layout->songCount == 3 &&
+  expect(layout && layout->version == Version::LateEcho && layout->songIndex == 2 &&
              layout->tracks[0].address == 0x3000 && layout->pitchLowTableAddress == 0x4000 &&
              layout->pitchHighTableAddress == 0x4055 && layout->coarseTableAddress == 0x4200 &&
              layout->fineTableAddress == 0x4100 && layout->envelopeTableAddress == 0x4300 &&

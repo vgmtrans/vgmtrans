@@ -12,7 +12,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <limits>
 #include <map>
 #include <optional>
 #include <set>
@@ -54,16 +53,6 @@ namespace math {
   const auto found = std::ranges::find(kFirPresets, coefficients);
   return found == kFirPresets.end() ? std::nullopt
                                     : std::optional<u8>{static_cast<u8>(found - kFirPresets.begin())};
-}
-
-[[nodiscard]] Envelope neutralEnvelope() {
-  return Envelope{
-      .attackSeconds = 0.0,
-      .holdSeconds = 0.0,
-      .decaySeconds = std::numeric_limits<double>::infinity(),
-      .releaseSeconds = 0.0,
-      .sustainAmplitude = 1.0,
-  };
 }
 
 }  // namespace math
@@ -146,7 +135,6 @@ struct TrackState {
   bool trillHigh = false;
   bool retrigger = true;
   bool bypassTranspose = false;
-  bool noise = false;
   bool perNoteVolume = false;
   std::optional<u16> drumTable;
   std::array<RepeatFrame, 8> repeats{};
@@ -339,7 +327,7 @@ struct Playback {
   void attachGain(u32 length) {
     track.gainAutomation = out.noteEnvelope(PerformanceAutomationTarget::Expression, 1.0, length);
     track.lastEmittedGain.reset();
-    out.replaceEnvelope(math::neutralEnvelope(), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    out.replaceEnvelope(neutralGainEnvelope(), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
 
   void restartGain() {
@@ -655,7 +643,6 @@ struct Playback {
     return wait(length, runtimeContinuation);
   }
 
-  void transpose(s8 value) { track.transpose = value; }
   void directLeft(s8 value) {
     track.left = static_cast<u8>(value);
     track.volume = 0;
@@ -719,7 +706,6 @@ struct Playback {
     track.gainMode = mode;
     track.gainRetriggers = true;
   }
-  void keepGainEnvelope() { track.gainRetriggers = false; }
   void noiseClock(u8) {
     program.echoDisabled = true;
     emitReverb();
@@ -811,7 +797,6 @@ struct Playback {
     out.panLfoRateCyclesPerTick(cycles, context);
   }
   void timer(u8 value) { out.tempo(math::tempoMicrosecondsPerQuarter(value)); }
-  void drum(u16 table) { track.drumTable = table; }
 };
 
 using Cursor = CompilerCursor<TrackState, Playback>;
@@ -931,7 +916,7 @@ struct DecodeState {
       return cursor.command("Explicit Next Duration", SequenceSemantic::State);
     case 0x88: {
       auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::transpose>(event.s8("semitones", SemanticOperandRole::Pitch));
+      return event.set<&TrackState::transpose>(event.s8("semitones", SemanticOperandRole::Pitch));
     }
     case 0x89: {
       auto event = cursor.command("Instrument", SequenceSemantic::Program);
@@ -1004,8 +989,7 @@ struct DecodeState {
     }
     case 0x98:
     case 0x99:
-      return cursor.command(command == 0x98 ? "Noise On" : "Noise Off", SequenceSemantic::State)
-          .set<&TrackState::noise>(command == 0x98);
+      return cursor.command(command == 0x98 ? "Noise On" : "Noise Off", SequenceSemantic::State);
     case 0x9a: {
       auto event = cursor.command("Noise Clock / Echo Disable", SequenceSemantic::State);
       return event.invoke<&Playback::noiseClock>(event.u8("clock", SourceValueDisplay::Hex));
@@ -1015,7 +999,7 @@ struct DecodeState {
           .invoke<&Playback::setGainMode>(GainMode::Preset);
     case 0x9c:
       return cursor.command("Keep GAIN Envelope", SequenceSemantic::Envelope)
-          .invoke<&Playback::keepGainEnvelope>();
+          .set<&TrackState::gainRetriggers>(false);
     case 0x9d:
       return cursor.command("Streamed GAIN Mode", SequenceSemantic::Envelope)
           .invoke<&Playback::setGainMode>(GainMode::Stream);
@@ -1145,7 +1129,7 @@ struct DecodeState {
       auto event = cursor.command("Drum Table On", SequenceSemantic::Instrument);
       const u16 table = event.u16le("table", SourceValueDisplay::Address, SemanticOperandRole::InstrumentTablePointer);
       state.drumTable = table;
-      return event.invoke<&Playback::drum>(table);
+      return event.set<&TrackState::drumTable>(std::optional<u16>{table});
     }
     case 0xc2:
       state.drumTable.reset();
