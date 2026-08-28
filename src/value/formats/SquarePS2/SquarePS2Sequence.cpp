@@ -955,19 +955,16 @@ SequenceRuntime sequenceRuntime(RuntimeConfig config) {
   return makeCompiledRuntime<Cursor>(std::move(config));
 }
 
-SequenceProgram parseBgm(ByteReader reader, AssetId id, const BgmLayout& layout, RuntimeConfig config,
-                         SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+SequenceProgram parseBgm(ByteReader reader, AssetId id, const BgmLayout& layout, SourceMapBuilder* sourceMap,
+                         std::vector<Diagnostic>* diagnostics) {
   SequenceProgram program = sequenceConfig().makeProgram();
   program.timebase.ppqn = layout.ppqn;
   if (const u32 initialTempo = tempoMicros(layout.initialTempo); initialTempo != 0) {
     program.behavior.initialTempoMicrosecondsPerQuarter = initialTempo;
   }
   program.behavior.initialMasterLevel = controller(static_cast<s8>(layout.initialMasterLevel));
-  if (config.defaultBank == 0) {
-    config.defaultBank = layout.waveBankId;
-  }
-  program.behavior.initialSourceInstrument = instrumentIdentity(config.defaultBank, 0);
-  program.runtime = sequenceRuntime(std::move(config));
+  program.behavior.initialSourceInstrument = instrumentIdentity(layout.waveBankId, 0);
+  program.runtime = sequenceRuntime(RuntimeConfig{.defaultBank = layout.waveBankId});
 
   if (sourceMap != nullptr) {
     sourceMap->header("SquarePS2 BGM Header", reader.range(layout.offset, 0x20))
@@ -991,7 +988,6 @@ SequenceProgram parseBgm(ByteReader reader, AssetId id, const BgmLayout& layout,
       AnnotationBuilder{*sourceMap, trackProgram.annotation}.range(reader.range(track.blockOffset, 4 + track.length));
       sourceMap->field("Track Length", reader.range(track.blockOffset, 4), track.length).parent(trackProgram.annotation);
     }
-    trackProgram.sourceTrackNumber = index;
     program.tracks.push_back(std::move(trackProgram));
   }
   return program;

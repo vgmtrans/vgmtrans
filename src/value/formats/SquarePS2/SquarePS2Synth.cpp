@@ -167,33 +167,33 @@ std::optional<ScanSoundBankDraft> addWd(ScanResultBuilder& result, const WdLayou
 
   SoundBankData data{.bankId = layout.bankId};
   for (u32 program = 0; program < programs.size(); ++program) {
-    if (programs[program].empty()) {
+    const auto& regions = programs[program];
+    if (regions.empty()) {
       continue;
     }
-    const u32 programOffset = programs[program].front().source.range.offset;
+    const u32 programOffset = regions.front().source.range.offset;
     auto instrument = instruments.append(Instrument{
         // The WD ID selects a loaded driver bank; it is not a MIDI/SF2 bank number.
         .explicitAddress = InstrumentAddress{.bank = 0, .program = program},
         .identity = instrumentIdentity(layout.bankId, static_cast<u8>(program)),
-        .reverb = std::ranges::any_of(programs[program], [](const ParsedRegion& region) { return region.routing != 0; })
-                      ? 1.0
-                      : 0.0,
+        .reverb =
+            std::ranges::any_of(regions, [](const ParsedRegion& region) { return region.routing != 0; }) ? 1.0 : 0.0,
         .name = fmt::format("Instrument {}", program),
-        .range = reader.range(programOffset, static_cast<u32>(programs[program].size()) * kRegionSize),
+        .range = reader.range(programOffset, static_cast<u32>(regions.size()) * kRegionSize),
     });
     instrument.source(instrument.value().name, instrument.value().range, "square-ps2-instrument");
     data.envelopes.push_back(EnvelopeDefaults{
         .bank = layout.bankId,
         .program = static_cast<u8>(program),
-        .adsr1 = programs[program].front().adsr1,
-        .adsr2 = programs[program].front().adsr2,
+        .adsr1 = regions.front().adsr1,
+        .adsr2 = regions.front().adsr2,
     });
 
     u8 keyLow = 0;
     u8 velocityLow = 0;
     u8 previousKeyHigh = 0xff;
-    for (size_t index = 0; index < programs[program].size();) {
-      const auto& primary = programs[program][index];
+    for (size_t index = 0; index < regions.size();) {
+      const auto& primary = regions[index];
       if (previousKeyHigh != primary.keyHigh) {
         keyLow = previousKeyHigh == 0xff ? 0 : static_cast<u8>(std::min<unsigned>(previousKeyHigh + 1, 127));
         velocityLow = 0;
@@ -201,33 +201,33 @@ std::optional<ScanSoundBankDraft> addWd(ScanResultBuilder& result, const WdLayou
       }
       const KeyRange keys{.low = keyLow, .high = std::min<u8>(primary.keyHigh, 127)};
       const VelocityRange velocities{.low = velocityLow, .high = std::min<u8>(primary.velocityHigh, 127)};
-      const size_t layers = (primary.flags & 1) != 0 && index + 1 < programs[program].size() ? 2 : 1;
+      const size_t layers = (primary.flags & 1) != 0 && index + 1 < regions.size() ? 2 : 1;
       for (size_t layer = 0; layer < layers; ++layer) {
-        const auto& source = programs[program][index + layer];
-        const auto sample = refs.find(source.sampleOffset);
+        const auto& parsedRegion = regions[index + layer];
+        const auto sample = refs.find(parsedRegion.sampleOffset);
         if (sample == refs.end()) {
           continue;
         }
         Region region{
             .keyRange = keys,
             .velocityRange = velocities,
-            .range = source.source.range,
-            .unityKey = 60.0 - source.tuning / 256.0,
-            .envelope = psxSpuEnvelope(source.adsr1, source.adsr2, PsxSpuGeneration::Ps2),
-            .pan = layers == 2 ? static_cast<double>(layer) : regionPan(source.pan),
-            .attenuationDb = attenuation(source.level),
+            .range = parsedRegion.source.range,
+            .unityKey = 60.0 - parsedRegion.tuning / 256.0,
+            .envelope = psxSpuEnvelope(parsedRegion.adsr1, parsedRegion.adsr2, PsxSpuGeneration::Ps2),
+            .pan = layers == 2 ? static_cast<double>(layer) : regionPan(parsedRegion.pan),
+            .attenuationDb = attenuation(parsedRegion.level),
         };
         // The driver adds this WD field to the sample address; it is not pool-relative.
-        if (const auto stream = streams.find(source.sampleOffset);
+        if (const auto stream = streams.find(parsedRegion.sampleOffset);
             stream != streams.end() && stream->second.loop.enabled &&
-            source.loopOffset < stream->second.encodedData.size) {
+            parsedRegion.loopOffset < stream->second.encodedData.size) {
           const u32 frames = psxAdpcmDecodedFrames(static_cast<u32>(stream->second.encodedData.size));
-          const u32 loopStart = psxAdpcmDecodedOffset(source.loopOffset);
+          const u32 loopStart = psxAdpcmDecodedOffset(parsedRegion.loopOffset);
           if (loopStart < frames) {
             region.loop = Loop{.enabled = true, .start = loopStart, .length = frames - loopStart};
           }
         }
-        instrument.region(sample->second, std::move(region)).source("Region", source.source, "square-ps2-region");
+        instrument.region(sample->second, std::move(region)).source("Region", parsedRegion.source, "square-ps2-region");
       }
       velocityLow = primary.velocityHigh >= 127 ? 0 : static_cast<u8>(primary.velocityHigh + 1);
       index += layers;

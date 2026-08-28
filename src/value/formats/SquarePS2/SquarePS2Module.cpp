@@ -34,13 +34,8 @@ namespace {
   for (const auto& bgm : bgms) {
     const std::string name = fmt::format("{} BGM {}", result.sourceDisplayName(), bgm.sequenceId);
     auto sequence = result.sequence(name, input.reader.range(bgm.offset, bgm.length));
-    sequence
-        .data(SequenceData{
-            .sequenceId = bgm.sequenceId,
-            .waveBankId = bgm.waveBankId,
-        })
-        .program(parseBgm(input.reader, sequence.id(), bgm, RuntimeConfig{.defaultBank = bgm.waveBankId},
-                          &result.sourceMap(), &result.diagnostics()));
+    sequence.data(SequenceData{.waveBankId = bgm.waveBankId})
+        .program(parseBgm(input.reader, sequence.id(), bgm, &result.sourceMap(), &result.diagnostics()));
   }
   return result.finish();
 }

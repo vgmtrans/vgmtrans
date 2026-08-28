@@ -57,7 +57,6 @@ struct WdLayout {
   u32 instrumentCount = 0;
   u32 regionCount = 0;
   u32 instrumentTableOffset = 0;
-  u32 regionTableOffset = 0;
   u32 sampleOffset = 0;
 };
 
@@ -69,7 +68,6 @@ struct EnvelopeDefaults {
 };
 
 struct SequenceData {
-  u16 sequenceId = 0;
   u16 waveBankId = 0;
 };
 
@@ -89,7 +87,7 @@ struct RuntimeConfig {
 [[nodiscard]] std::vector<WdLayout> findWdLayouts(core::ByteReader reader);
 
 [[nodiscard]] core::SequenceProgram parseBgm(core::ByteReader reader, core::AssetId id, const BgmLayout& layout,
-                                             RuntimeConfig config = {}, core::SourceMapBuilder* sourceMap = nullptr,
+                                             core::SourceMapBuilder* sourceMap = nullptr,
                                              std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] core::SequenceRuntime sequenceRuntime(RuntimeConfig config);
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
