@@ -984,15 +984,14 @@ SequenceProgram parseBgm(ByteReader reader, AssetId id, const BgmLayout& layout,
   }
 
   for (u32 index = 0; index < layout.tracks.size(); ++index) {
-    if (sourceMap != nullptr) {
-      sourceMap->table("Track Block", reader.range(layout.tracks[index].blockOffset, 4))
-          .kind("square-ps2-track-block")
-          .owner(ObjectRefs::sequence(id))
-          .field("length", reader.range(layout.tracks[index].blockOffset, 4), layout.tracks[index].length);
+    const auto& track = layout.tracks[index];
+    auto trackProgram = decodeTrack(reader, id, index, track, sourceMap, diagnostics);
+    if (sourceMap != nullptr && trackProgram.annotation.valid()) {
+      AnnotationBuilder{*sourceMap, trackProgram.annotation}.range(reader.range(track.blockOffset, 4 + track.length));
+      sourceMap->field("Track Length", reader.range(track.blockOffset, 4), track.length).parent(trackProgram.annotation);
     }
-    auto track = decodeTrack(reader, id, index, layout.tracks[index], sourceMap, diagnostics);
-    track.sourceTrackNumber = index;
-    program.tracks.push_back(std::move(track));
+    trackProgram.sourceTrackNumber = index;
+    program.tracks.push_back(std::move(trackProgram));
   }
   return program;
 }

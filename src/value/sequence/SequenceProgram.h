@@ -193,6 +193,7 @@ struct SourceCommand {
 struct TrackProgram {
   u32 sourceTrackNumber = 0;
   Address startAddress;
+  SourceAnnotationId annotation;
   // Commands are stored in strictly increasing source-address order, allowing
   // address lookup without a parallel index. CommandId is stable positional identity.
   std::vector<SourceCommand> commands;

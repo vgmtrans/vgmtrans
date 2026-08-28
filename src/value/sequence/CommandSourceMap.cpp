@@ -209,6 +209,7 @@ TrackProgram TrackDecodeSession::finish() {
   TrackProgram track{
       .sourceTrackNumber = trackIndex_,
       .startAddress = Address{startOffset_},
+      .annotation = annotation_.value_or(SourceAnnotationId{}),
   };
   for (auto& [offset, decoded] : commands_) {
     const SourceAnnotationId annotation = projectDecodedCommand(sourceMap_, decoded, commandParent_);
