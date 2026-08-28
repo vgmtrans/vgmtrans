@@ -688,6 +688,11 @@ struct Playback {
     return after(delta);
   }
 
+  Effects sustainPedal(bool down, u32 delta) {
+    delayed(delta).sustainPedal(down);
+    return after(delta);
+  }
+
   Effects portamentoTime(u32 duration, u32 delta) {
     track.portamentoTicks = duration;
     track.portamento = true;
@@ -1028,8 +1033,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 sustain = event.u8("sustain_level");
       return event.invoke<&Playback::envelopeParameter>(9, decay, sustain, source->delta);
     }
-    case 0x3c:
-      return sourceOnly(cursor, *source, "Track Voice Flag", SequenceSemantic::State, 1);
+    case 0x3c: {
+      auto event = beginEvent(cursor, *source, "Sustain Pedal", SequenceSemantic::State);
+      const bool enabled =
+          event.u8("enabled", SourceValueDisplay::Boolean, SemanticOperandRole::State) != 0;
+      return event.invoke<&Playback::sustainPedal>(enabled, source->delta);
+    }
     case 0x3d:
       return sourceOnly(cursor, *source, "Sequence Parameter", SequenceSemantic::State, 1);
     case 0x3e:
@@ -1140,10 +1149,10 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return event.invoke<&Playback::bendRange>(event.s8("semitones", SemanticOperandRole::Pitch), source->delta);
     }
     case 0x60:
-      return beginEvent(cursor, *source, "Wet Routing On", SequenceSemantic::State)
+      return beginEvent(cursor, *source, "Reverb On", SequenceSemantic::State)
           .invoke<&Playback::reverb>(1.0, source->delta);
     case 0x61:
-      return beginEvent(cursor, *source, "Wet Routing Off", SequenceSemantic::State)
+      return beginEvent(cursor, *source, "Reverb Off", SequenceSemantic::State)
           .invoke<&Playback::reverb>(0.0, source->delta);
     case 0x62: {
       auto event = beginEvent(cursor, *source, "Output Routing", SequenceSemantic::State);
