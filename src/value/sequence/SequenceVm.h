@@ -261,14 +261,15 @@ public:
 
   PitchSlideBinding& continueFrom(PerformanceNoteId previousNote);
   PitchSlideBinding& continueAcrossNotes(bool enabled = true);
+  // Export preferences; neither changes the source transition's semantics.
   PitchSlideBinding& preferPortamento();
   PitchSlideBinding& preferPitchBend();
-  // Protects per-voice slides which channel-wide pitch bend cannot preserve.
+  // Rejects channel pitch bend when it cannot preserve the source behavior.
   PitchSlideBinding& requirePortamento();
 
   // Retains portamento time already established by an earlier driver command.
   PitchSlideBinding& useCurrentPortamentoTiming();
-  // Reinstates a persistent driver setting after a temporary native slide.
+  // Reinstates a persistent driver setting after temporary portamento.
   PitchSlideBinding& restorePortamentoTiming(double timeMilliseconds);
   PitchSlideBinding& portamentoOverlap(u32 ticks);
 

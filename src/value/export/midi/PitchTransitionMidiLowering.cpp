@@ -41,7 +41,7 @@ struct NoteSpan {
   // stable pitch-bend range.
   PerformanceNoteId pitchBendVoice;
   double bendBaseKey = 0.0;
-  // Empty unless native portamento must replace this source note.
+  // Empty unless MIDI portamento must replace this source note.
   std::vector<PortamentoSegment> portamentoSegments;
 };
 
@@ -429,7 +429,7 @@ void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
       continue;
     }
     if (segment.endTick > clampedStart) {
-      const u32 overlap = transition.nativePortamento.overlapTicks;
+      const u32 overlap = transition.portamentoRendering.overlapTicks;
       segment.endTick = std::min(note.endTick, clampedStart > std::numeric_limits<u64>::max() - overlap
                                                    ? std::numeric_limits<u64>::max()
                                                    : clampedStart + overlap);
@@ -510,7 +510,7 @@ void lowerPortamento(PerformanceSequence& performance, std::vector<PerformanceEv
       if (auto* previous = findNote(notes, *transition.previousNote)) {
         beginPortamentoRewrite(*previous);
         auto& segment = previous->portamentoSegments.back();
-        const u32 overlap = transition.nativePortamento.overlapTicks;
+        const u32 overlap = transition.portamentoRendering.overlapTicks;
         const u64 overlapEnd = startTick > std::numeric_limits<u64>::max() - overlap ? std::numeric_limits<u64>::max()
                                                                                      : startTick + overlap;
         segment.endTick = std::max(segment.endTick, overlapEnd);
@@ -525,7 +525,7 @@ void lowerPortamento(PerformanceSequence& performance, std::vector<PerformanceEv
       });
     }
 
-    if (transition.nativePortamento.useCurrentTiming) {
+    if (transition.portamentoRendering.useCurrentTiming) {
       events.emplace_back(PortamentoControlPerformanceEvent{
           .header = atTick(automation->header, startTick, nextSequence),
           .previousKey = transition.startKey,
@@ -537,10 +537,10 @@ void lowerPortamento(PerformanceSequence& performance, std::vector<PerformanceEv
           .previousKey = transition.startKey,
       });
     }
-    if (transition.nativePortamento.restoreTimeMilliseconds) {
+    if (transition.portamentoRendering.restoreTimeMilliseconds) {
       events.emplace_back(PortamentoPerformanceEvent{
           .header = atTick(automation->header, note->endTick, nextSequence),
-          .timeMilliseconds = *transition.nativePortamento.restoreTimeMilliseconds,
+          .timeMilliseconds = *transition.portamentoRendering.restoreTimeMilliseconds,
       });
     }
   }
@@ -561,12 +561,12 @@ void appendSourceEvents(std::vector<PerformanceEvent>& events, const Performance
         continue;
       }
     }
-    const bool nativePortamentoEvent =
+    const bool midiPortamentoEvent =
         std::holds_alternative<PortamentoPerformanceEvent>(event) ||
         std::holds_alternative<PortamentoEnablePerformanceEvent>(event) ||
         std::holds_alternative<PortamentoTimePerformanceEvent>(event) ||
         std::holds_alternative<PortamentoControlPerformanceEvent>(event);
-    if (nativePortamentoEvent && !renderPortamentoSettings) {
+    if (midiPortamentoEvent && !renderPortamentoSettings) {
       continue;
     }
     if (const auto* settings = std::get_if<PitchTransitionSettingsPerformanceEvent>(&event)) {
@@ -611,7 +611,7 @@ void appendSourceEvents(std::vector<PerformanceEvent>& events, const Performance
 [[nodiscard]] PitchTransitionRenderingHint effectiveRendering(const PerformanceSequence& performance,
                                                               const MidiExportOptions& options,
                                                               const PitchTransitionIntent& transition) {
-  if (transition.nativePortamento.required) {
+  if (transition.portamentoRendering.required) {
     return PitchTransitionRenderingHint::Portamento;
   }
   if (options.pitchTransitions == MidiPitchTransitionRendering::Portamento) {

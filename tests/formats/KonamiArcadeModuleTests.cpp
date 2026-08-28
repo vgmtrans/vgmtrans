@@ -399,7 +399,7 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
     }
   }
   expect(transitions.size() == 2 && transitions[0]->startKey == 64.0 && transitions[0]->targetKey == 66.0 &&
-             !transitions[0]->previousNote && transitions[0]->nativePortamento.useCurrentTiming &&
+             !transitions[0]->previousNote && transitions[0]->portamentoRendering.useCurrentTiming &&
              transitions[1]->startKey == 70.0 && transitions[1]->targetKey == 72.0 &&
              std::holds_alternative<FixedDurationPitchSlideTiming>(transitions[1]->timing.physical),
          "continuous and delayed slides should retain typed intent without linking across a release gap");

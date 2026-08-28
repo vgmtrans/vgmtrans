@@ -507,14 +507,12 @@ struct PitchSlideTiming {
   }
 };
 
-// Native portamento cannot reproduce an arbitrary pitch curve, but it is often
-// the most compatible rendering of a source driver's glide. These physical
-// timing hints preserve that option without turning the transition itself into
-// MIDI controller events.
-struct NativePortamentoHint {
+// MIDI portamento cannot reproduce an arbitrary pitch curve, but it is often
+// the most compatible export of a source driver's glide. These physical timing
+// hints preserve that option without defining the source transition in terms
+// of MIDI controller events.
+struct PortamentoRenderingHints {
   bool useCurrentTiming = false;
-  // The source transition relies on independently pitched overlapping voices
-  // and cannot be represented safely by channel-wide MIDI pitch bend.
   bool required = false;
   u32 overlapTicks = 1;
   std::optional<double> restoreTimeMilliseconds;
@@ -523,8 +521,8 @@ struct NativePortamentoHint {
 struct PitchTransitionIntent {
   PerformanceNoteId note;
   // This transition continues the preceding voice without a new attack.
-  // Native portamento realizes that as overlapping notes; pitch bend retains
-  // the already-sounding MIDI note.
+  // Portamento lowering may express that with overlapping MIDI notes; pitch
+  // bend retains the already-sounding MIDI note.
   std::optional<PerformanceNoteId> previousNote;
   PerformanceLaneId lane{0};
   double startKey = 0.0;
@@ -537,7 +535,7 @@ struct PitchTransitionIntent {
   // Source playback normally replaces a slide at a new note. Formats whose
   // driver carries one live motion across note boundaries opt in explicitly.
   bool continuesAcrossNotes = false;
-  NativePortamentoHint nativePortamento;
+  PortamentoRenderingHints portamentoRendering;
 };
 
 using PerformanceAutomationIntent = std::variant<ScalarPerformanceAutomationIntent, PitchTransitionIntent>;

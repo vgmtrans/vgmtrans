@@ -1511,7 +1511,7 @@ void capcomSnesSequenceEmitsStructuredPitchSlides() {
   expect(retargeted != nullptr && retargeted->startKey == 5.0 && retargeted->targetKey == 6.0 &&
              retargeted->previousNote == notes[1]->note && retargeted->timing.timelineTicks == 12 &&
              std::get<FixedDurationPitchSlideTiming>(retargeted->timing.physical).milliseconds == 64.0 &&
-             !retargeted->nativePortamento.useCurrentTiming,
+             !retargeted->portamentoRendering.useCurrentTiming,
          "a new CapcomSnes glide should begin at the preceding note target with its newly selected rate");
   expect(notes[3]->note == notes[2]->note && notes[3]->extendsPrevious,
          "a repeated CapcomSnes target should extend the active glide without creating a snap transition");
