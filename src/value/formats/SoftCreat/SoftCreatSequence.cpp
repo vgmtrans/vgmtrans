@@ -520,17 +520,30 @@ struct Playback {
     }
   }
 
-  [[nodiscard]] std::optional<Address> resolveVolumeSuffix(std::optional<u8>& value, Address continuation) {
-    // A loop may first expose a byte as a command, then consume that same byte
-    // as a volume suffix after BF enables the late driver's per-note mode.
-    if (value.has_value() == track.perNoteVolume) {
+  [[nodiscard]] std::optional<Address> resolveNoteOperands(u8& duration, std::optional<u8>& volume,
+                                                           bool literalDuration, Address continuation) {
+    // A loop may reach the same note before and after BF enables per-note
+    // volume. Reinterpret the compiled operands in the runtime state.
+    if (volume.has_value() == track.perNoteVolume) {
       return std::nullopt;
     }
-    if (track.perNoteVolume && track.data.has(continuation.value, 1)) {
-      value = track.data.u8At(continuation.value);
+    if (track.perNoteVolume) {
+      if (!track.data.has(continuation.value, 1)) {
+        volume.reset();
+        return std::nullopt;
+      }
+      if (literalDuration) {
+        volume = duration;
+        duration = track.data.u8At(continuation.value);
+      } else {
+        volume = track.data.u8At(continuation.value);
+      }
       return Address{continuation.value + 1};
     }
-    value.reset();
+    if (literalDuration) {
+      duration = *volume;
+    }
+    volume.reset();
     return continuation.value == 0 ? std::nullopt : std::optional<Address>{Address{continuation.value - 1}};
   }
 
@@ -548,8 +561,10 @@ struct Playback {
                                                : track.releaseRemaining;
   }
 
-  [[nodiscard]] Effects rest(u8 encodedDuration, std::optional<u8> volume, Address continuation) {
-    const std::optional<Address> runtimeContinuation = resolveVolumeSuffix(volume, continuation);
+  [[nodiscard]] Effects rest(u8 encodedDuration, std::optional<u8> volume, bool literalDuration,
+                             Address continuation) {
+    const std::optional<Address> runtimeContinuation =
+        resolveNoteOperands(encodedDuration, volume, literalDuration, continuation);
     noteVolume(volume);
     beginDuration(encodedDuration);
     if (track.lastNote.valid() && track.lastKey) {
@@ -565,8 +580,10 @@ struct Playback {
     return wait(track.remaining, runtimeContinuation);
   }
 
-  [[nodiscard]] Effects note(u8 rawNote, u8 encodedDuration, std::optional<u8> noteVolume, Address continuation) {
-    const std::optional<Address> runtimeContinuation = resolveVolumeSuffix(noteVolume, continuation);
+  [[nodiscard]] Effects note(u8 rawNote, u8 encodedDuration, std::optional<u8> noteVolume, bool literalDuration,
+                             Address continuation) {
+    const std::optional<Address> runtimeContinuation =
+        resolveNoteOperands(encodedDuration, noteVolume, literalDuration, continuation);
     this->noteVolume(noteVolume);
     if (track.drumTable && rawNote >= 0x12) {
       const u16 entry = static_cast<u16>(*track.drumTable + (rawNote - 0x12u) * 4u);
@@ -861,15 +878,16 @@ struct DecodeState {
       event.opcodeValue("note", static_cast<u8>(opcode + 24), SourceValueDisplay::MidiNote,
                         SemanticOperandRole::NoteKey);
     }
-    const bool literal = state.defaultDuration == 0 || state.explicitDuration;
-    const u8 duration = literal ? event.u8("duration", SemanticOperandRole::Duration) : state.defaultDuration;
-    state.explicitDuration = false;
     std::optional<u8> volume;
-    // The late driver fetches this suffix after its rest branch rejoins the
-    // note path, so rests carry (and apply) per-note volume too.
+    // The driver fetches per-note volume before duration. Its rest branch
+    // rejoins this path, so rests carry and apply the value too.
     if (state.perNoteVolume) {
       volume = event.u8("volume", SemanticOperandRole::Level);
     }
+    const bool literalDuration = state.defaultDuration == 0 || state.explicitDuration;
+    const u8 duration =
+        literalDuration ? event.u8("duration", SemanticOperandRole::Duration) : state.defaultDuration;
+    state.explicitDuration = false;
     if (references != nullptr && note != 0 && state.drumTable && note >= 0x12) {
       const u16 entry = static_cast<u16>(*state.drumTable + (note - 0x12u) * 4u);
       if (reader.has(entry, 4)) {
@@ -877,8 +895,8 @@ struct DecodeState {
       }
     }
     const Address continuation = event.nextAddress();
-    return note == 0 ? event.invoke<&Playback::rest>(duration, volume, continuation)
-                     : event.invoke<&Playback::note>(note, duration, volume, continuation);
+    return note == 0 ? event.invoke<&Playback::rest>(duration, volume, literalDuration, continuation)
+                     : event.invoke<&Playback::note>(note, duration, volume, literalDuration, continuation);
   }
   if (opcode >= dialect(layout.version).commandCutoff || opcode == 0x80) {
     return cursor.command("End", SequenceSemantic::End).end();
