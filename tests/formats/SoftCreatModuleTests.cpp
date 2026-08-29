@@ -8,6 +8,7 @@
 
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
+#include "value/session/Session.h"
 
 #include <algorithm>
 #include <array>
@@ -116,6 +117,52 @@ void layoutUsesLiveSongAndAuditedTables() {
              layout->fineTableAddress == 0x4100 && layout->envelopeTableAddress == 0x4300 &&
              layout->spcDirAddress == 0x4400 && layout->initialTimer == 0x92 && layout->musicVolume == 0x70,
          "SoftCreat layout should use the live song and recover every relocated driver table");
+}
+
+void instrumentAnnotationsReflectTheSynthModel() {
+  Session session;
+  session.registerFormat(module());
+  const SourceId source =
+      session.addSource(SourceFile{.name = "SoftCreat fixture.aram"}, scannerFixture());
+  session.scanPendingSources();
+  const SessionSnapshot snapshot = session.snapshot();
+  const auto* bank = snapshot.collections().empty() || snapshot.collections().front().members.soundBanks.empty()
+                         ? nullptr
+                         : snapshot.asset<SoundBankAsset>(snapshot.collections().front().members.soundBanks.front());
+  expect(bank != nullptr && bank->instruments.size() == 1,
+         "SoftCreat scanning should publish its referenced instrument");
+
+  const auto instrumentSources = snapshot.sourceMap().ownedBy(ObjectRefs::instrument(bank->metadata.id, 0));
+  const auto root = std::ranges::find_if(instrumentSources, [&](SourceAnnotationId id) {
+    return snapshot.sourceMap().get(id).category() == "softcreat-instrument";
+  });
+  expect(root != instrumentSources.end(), "SoftCreat instruments should expose a source annotation");
+  const auto tables = snapshot.sourceMap().annotationsForAsset(bank->metadata.id);
+  const auto table = [&](std::string_view kind) -> const SourceAnnotation* {
+    const auto found = std::ranges::find_if(tables, [&](SourceAnnotationId id) {
+      return snapshot.sourceMap().get(id).category() == kind;
+    });
+    return found == tables.end() ? nullptr : &snapshot.sourceMap().get(*found);
+  };
+  const SourceAnnotation* coarseTable = table("softcreat-coarse-tuning-table");
+  const SourceAnnotation* fineTable = table("softcreat-fine-tuning-table");
+  expect(coarseTable != nullptr && coarseTable->range.offset == 0x4200 && coarseTable->range.size == 0x100 &&
+             coarseTable->fields.size() == 0x100 && fineTable != nullptr && fineTable->range.offset == 0x4100 &&
+             fineTable->range.size == 0x100 && fineTable->fields.size() == 0x100,
+         "SoftCreat should annotate every entry in both complete tuning tables");
+  const SourceAnnotation& instrument = snapshot.sourceMap().get(*root);
+  expect(instrument.parent == coarseTable->id,
+         "referenced instruments should be rooted in the source table that defines their coarse tuning");
+  expect(instrument.fieldsAsChildren &&
+             std::ranges::count_if(instrument.fields, [](const SourceField& field) { return field.range.valid(); }) == 2,
+         "SoftCreat instruments should expose their two source-backed tuning fields");
+  expect(bank->instruments.front().regions.size() == 1 && !bank->instruments.front().regions.front().range.valid() &&
+             snapshot.sourceMap().ownedBy(ObjectRefs::region(bank->metadata.id, 0, 0)).empty(),
+         "SoftCreat's derived playable region should remain in the synth model without claiming source bytes");
+  expect(std::ranges::all_of(instrument.fields, [&](const SourceField& field) {
+           return !field.range.valid() || field.range.source == source;
+         }),
+         "SoftCreat instrument fields should retain their source identity");
 }
 
 void versionedOpcodesRetainTheirRealOperandLengths() {
@@ -283,6 +330,7 @@ void pitchEffectsRetainPhysicalTiming() {
 
 void runSoftCreatModuleTests() {
   layoutUsesLiveSongAndAuditedTables();
+  instrumentAnnotationsReflectTheSynthModel();
   versionedOpcodesRetainTheirRealOperandLengths();
   physicalEffectsAndSoftwareGainRender();
   gainHoldContinuesTheCurrentEnvelope();
