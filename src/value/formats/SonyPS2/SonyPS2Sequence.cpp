@@ -568,10 +568,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   std::vector<MidiEvent> events;
   std::array<std::optional<u32>, 8> loopStarts;
   std::array<u8, 16> nrpnMsb{};
-  std::array<u8, 16> nrpnLsb{};
-  nrpnMsb.fill(127);
-  nrpnLsb.fill(127);
+  nrpnMsb.fill(0xff);
   std::array<u8, 16> loopId{};
+  loopId.fill(0xff);
   u32 cursor = layout.dataOffset;
   u8 runningStatus = 0;
   bool omitDelta = false;
@@ -700,18 +699,17 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 channel = event.channel;
       if (event.data1 == 99) {
         nrpnMsb[channel] = event.data2;
-      } else if (event.data1 == 98) {
-        nrpnLsb[channel] = event.data2;
+        loopId[channel] = 0xff;
       } else if (event.data1 == 6 && nrpnMsb[channel] == 0 && event.data2 < 8) {
         loopStarts[event.data2] = event.end;
       } else if (event.data1 == 6 && nrpnMsb[channel] == 1 && event.data2 < 8) {
         loopId[channel] = event.data2;
-      } else if (event.data1 == 38 && nrpnMsb[channel] == 1 && loopStarts[loopId[channel]]) {
+      } else if (event.data1 == 38 && nrpnMsb[channel] == 1 && loopId[channel] < loopStarts.size() &&
+                 loopStarts[loopId[channel]]) {
         event.loopId = loopId[channel];
         event.loopCount = event.data2;
         event.loopDestination = loopStarts[event.loopId];
       }
-      (void)nrpnLsb;
     }
     events.push_back(std::move(event));
     if (events.back().endEvent || events.back().malformed) {
@@ -1184,7 +1182,8 @@ std::optional<SequenceProgram> parseSongSequence(ByteReader reader, AssetId id, 
       songTempo = static_cast<u8>(std::clamp(updated, 10, 255));
       continue;
     }
-    if (family == 0xa0 && operation == 0 && value < layout.midiBlocks.size()) {
+    const auto midi = std::ranges::find(layout.midiBlocks, value, &MidiBlockLayout::index);
+    if (family == 0xa0 && operation == 0 && midi != layout.midiBlocks.end()) {
       hasPlaybackCommand = true;
       if (playlist.commands.empty()) {
         playlist.startAddress = Address{commandOffset};
@@ -1194,8 +1193,8 @@ std::optional<SequenceProgram> parseSongSequence(ByteReader reader, AssetId id, 
           .fallthrough = Address{cursor},
           .range = reader.range(commandOffset, 3),
           .kind = PlaylistCommandKind::PlaySection,
-          .target = Address{layout.midiBlocks[value].dataOffset},
-          .trackStarts = std::vector<std::optional<Address>>(16, Address{layout.midiBlocks[value].dataOffset}),
+          .target = Address{midi->dataOffset},
+          .trackStarts = std::vector<std::optional<Address>>(16, Address{midi->dataOffset}),
       };
       playlist.commands.push_back(std::move(command));
       continue;
