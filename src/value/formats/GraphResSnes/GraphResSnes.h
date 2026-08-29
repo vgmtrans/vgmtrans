@@ -24,6 +24,9 @@ inline constexpr u32 kTrackCount = 8;
 inline constexpr u16 kPpqn = 48;
 inline constexpr u32 kCommandLimit = 131072;
 inline constexpr std::string_view kInstrumentDomain = "graph-res-snes.instrument";
+inline constexpr u8 kDefaultAdsr1 = 0x8f;
+inline constexpr u8 kDefaultAdsr2 = 0xe0;
+inline constexpr double kUnityKey = 57.0;
 
 struct DspState {
   u8 masterVolume = 0x7f;
@@ -67,7 +70,6 @@ struct SequenceParse {
 [[nodiscard]] SequenceParse decodeSequence(core::RetainedSource source, const Layout& layout,
                                            core::AssetId sequenceId, core::SourceMapBuilder* sourceMap = nullptr,
                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
-[[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
 [[nodiscard]] core::Envelope driverEnvelope(u8 adsr1, u8 adsr2);
 [[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
                                                                const std::set<u8>& programs,

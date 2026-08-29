@@ -78,8 +78,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .region(*sample,
                 Region{
                     .range = source,
-                    .unityKey = 57.0,
-                    .envelope = driverEnvelope(0x8f, 0xe0),
+                    .unityKey = kUnityKey,
+                    .envelope = driverEnvelope(kDefaultAdsr1, kDefaultAdsr2),
                 })
         .source("Region", source, "graph-res-snes-region")
         .parent(root)
