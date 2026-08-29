@@ -62,18 +62,6 @@ constexpr std::array kVersions{
   return found == kVersions.end() ? std::nullopt : std::optional<Version>{*found};
 }
 
-[[nodiscard]] std::optional<u32> findBytes(ByteReader reader, std::span<const u8> bytes) {
-  if (bytes.empty() || bytes.size() > reader.size()) {
-    return std::nullopt;
-  }
-  for (u32 offset = 0; offset <= reader.size() - bytes.size(); ++offset) {
-    if (matchesBytes(reader, offset, bytes)) {
-      return offset;
-    }
-  }
-  return std::nullopt;
-}
-
 [[nodiscard]] bool validTrackPointer(ByteReader reader, u16 address) {
   return address >= 0x0200 && reader.has(address, 1);
 }
@@ -158,7 +146,6 @@ std::optional<Layout> findLayout(ByteReader reader) {
   const u8 song = bestSong(reader, list, songs, reader.u8At(0xe4));
   std::array<TrackPointer, kTrackCount> tracks{};
   unsigned active = 0;
-  u16 firstTrack = 0xffff;
   for (u32 track = 0; track < kTrackCount; ++track) {
     const u32 low = list + track * songs * 2u + song;
     const u32 high = low + songs;
@@ -170,7 +157,6 @@ std::optional<Layout> findLayout(ByteReader reader) {
     };
     if (validTrackPointer(reader, address)) {
       ++active;
-      firstTrack = std::min(firstTrack, address);
     } else if (address != 0) {
       return std::nullopt;
     }
