@@ -509,7 +509,7 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
       renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, {}, &modulationProfile);
   expect(midiSequence.diagnostics.empty(), "CapcomSnes MIDI sequence build should not warn for linear fixture");
   expect(midiSequence.tracks.size() == 8, "builder should preserve track count");
-  expect(midiSequence.tracks[0].events.size() == 14,
+  expect(midiSequence.tracks[0].events.size() == 15,
          "built track should include port, initial, command, and end events");
   expect(midiMeta(midiSequence.tracks[0].events[0], 0x21)->data[0] == 0,
          "CapcomSnes should emit the legacy MIDI port metadata");
@@ -529,15 +529,16 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "CapcomSnes source command should emit high-resolution target-quantized volume");
   expect(midiController(midiSequence.tracks[0].events[8], MidiController::Pan)->value == 64,
          "CapcomSnes center pan should map to MIDI center pan");
-  expect(isMidiController(midiSequence.tracks[0].events[9], MidiController::Expression),
-         "CapcomSnes pan should emit expression compensation for the source pan law");
-  expect(midiController(midiSequence.tracks[0].events[10], MidiController::Modulation)->value == 127,
+  expect(isMidiController(midiSequence.tracks[0].events[9], MidiController::ChannelVolume) &&
+             isMidiControllerLsb(midiSequence.tracks[0].events[10], MidiController::ChannelVolume),
+         "CapcomSnes pan should compose its gain with high-resolution channel volume");
+  expect(midiController(midiSequence.tracks[0].events[11], MidiController::Modulation)->value == 127,
          "CapcomSnes vibrato depth should be independent of whether the oscillator is advancing");
-  expect(isMidiController(midiSequence.tracks[0].events[11], MidiController::VibratoRate),
+  expect(isMidiController(midiSequence.tracks[0].events[12], MidiController::VibratoRate),
          "CapcomSnes LFO rate should emit vibrato frequency");
-  expect(isMidiController(midiSequence.tracks[0].events[12], MidiController::TremoloRate),
+  expect(isMidiController(midiSequence.tracks[0].events[13], MidiController::TremoloRate),
          "CapcomSnes LFO rate should emit tremolo frequency");
-  expect(midiNote(midiSequence.tracks[0].events[13])->duration == 6,
+  expect(midiNote(midiSequence.tracks[0].events[14])->duration == 6,
          "CapcomSnes note length index should map to ticks");
   expect(midiSequence.tracks[0].endTick == 6, "builder should advance time before end of track");
 
@@ -1252,11 +1253,11 @@ void capcomSnesPanPerformanceCarriesGainCompensation() {
 
   const MidiSequence midi = renderMidiSequence(performance);
   expect(midi.tracks[0].events.size() == 5 && midi.tracks[0].endTick == performance.tracks[0].endTick,
-         "CapcomSnes compensated pan should render port, initial defaults, pan, and expression");
+         "CapcomSnes compensated pan should render port, initial defaults, pan, and channel volume");
   expect(midiController(midi.tracks[0].events[3], MidiController::Pan)->value == 113,
          "CapcomSnes pan renderer should emit the driver-computed MIDI pan");
-  expect(midiController(midi.tracks[0].events[4], MidiController::Expression)->value == 123,
-         "CapcomSnes pan renderer should quantize the source gain compensation as expression");
+  expect(midiController(midi.tracks[0].events[4], MidiController::ChannelVolume)->value == 123,
+         "CapcomSnes pan renderer should quantize the source gain compensation as channel volume");
 }
 
 void capcomSnesSequenceEmitsSourceOnlyDriverSemantics() {

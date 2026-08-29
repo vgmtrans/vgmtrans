@@ -237,6 +237,13 @@ void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavio
         .linearGain = *behavior.initialExpression,
     });
   }
+  if (behavior.initialChannelPan) {
+    track.events.emplace_back(ChannelPanPerformanceEvent{
+        .header = header,
+        .position = behavior.initialChannelPan->position,
+        .voicePanLaw = behavior.initialChannelPan->voicePanLaw,
+    });
+  }
   if (behavior.initialStereoBalance) {
     track.events.emplace_back(StereoBalancePerformanceEvent{
         .header = header,

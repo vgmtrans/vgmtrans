@@ -238,7 +238,15 @@ struct SectionPlaylist {
 enum class PanLaw {
   Unspecified,
   ConstantSum,
+  ConstantMaximum,
   EqualPower,
+};
+
+struct ChannelPan {
+  // A channel-pan controller is additive to each voice's intrinsic pan. This
+  // differs from both an absolute spatial position and final left/right gain.
+  double position = 0.5;
+  PanLaw voicePanLaw = PanLaw::Unspecified;
 };
 
 struct StereoBalance {
@@ -267,6 +275,7 @@ struct SequenceProgramBehavior {
   std::optional<double> initialMasterLevel;
   std::optional<double> initialExpression;
   std::optional<double> initialReverbSend;
+  std::optional<ChannelPan> initialChannelPan;
   std::optional<StereoBalance> initialStereoBalance;
   std::optional<u8> initialMonoModeChannels;
   std::optional<u8> initialPitchBendRangeSemitones;

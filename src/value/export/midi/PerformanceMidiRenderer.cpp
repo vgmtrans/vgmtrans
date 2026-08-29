@@ -116,7 +116,7 @@ struct MidiChannelAssignment {
 
 struct LoweredStereoBalance {
   u8 pan = 64;
-  double expressionGain = 1.0;
+  double gain = 1.0;
 };
 
 [[nodiscard]] LoweredStereoBalance lowerStereoBalance(double sourceLeft, double sourceRight) {
@@ -128,7 +128,7 @@ struct LoweredStereoBalance {
 
   // MIDI pan has only one position value, while source engines may specify two
   // independent channel gains. Pick the closest equal-power MIDI position,
-  // then use expression to retain the source engine's combined loudness.
+  // then retain the scalar needed to reproduce the source gain vector.
   u8 pan = 64;
   if (sourceLeft == 0.0 && sourceRight == 0.0) {
     pan = 64;
@@ -164,7 +164,7 @@ struct LoweredStereoBalance {
   const double midiGain = midiLeft + midiRight;
   return LoweredStereoBalance{
       .pan = pan,
-      .expressionGain = midiGain == 0.0 ? 0.0 : (sourceLeft + sourceRight) / midiGain,
+      .gain = midiGain == 0.0 ? 0.0 : (sourceLeft + sourceRight) / midiGain,
   };
 }
 
@@ -175,10 +175,12 @@ struct LoweredStereoBalance {
       const double rightGain = (position + 1.0) / 2.0;
       return lowerStereoBalance(1.0 - rightGain, rightGain);
     }
+    case PanLaw::ConstantMaximum:
+      return position < 0.0 ? lowerStereoBalance(1.0, position + 1.0) : lowerStereoBalance(1.0 - position, 1.0);
     case PanLaw::EqualPower:
       return LoweredStereoBalance{
           .pan = midiPan(position),
-          .expressionGain = 1.0,
+          .gain = 1.0,
       };
     case PanLaw::Unspecified:
       throw std::logic_error("Cannot render positional pan without a declared pan law");
@@ -380,9 +382,13 @@ struct RenderTrackState {
   double simulatedVibratoSemitones = 0.0;
   SimulatedLfoState vibrato;
   std::optional<s16> lastPitchBendValue;
+  double sourceLevelGain = 1.0;
+  std::optional<ValueQuantization> sourceLevelQuantization;
+  double panLevelGain = 1.0;
+  double levelHeadroom = 1.0;
+  bool levelEmitted = false;
   double sourceExpressionGain = 1.0;
   std::optional<ValueQuantization> sourceExpressionQuantization;
-  double panExpressionGain = 1.0;
   double simulatedTremoloGain = 1.0;
   enum class TremoloDepthUnit {
     LegacyUnipolar,
@@ -453,6 +459,62 @@ struct VoicePitchBendRangeChange {
   return timelines;
 }
 
+[[nodiscard]] double maximumPanLawGain(PanLaw law) {
+  switch (law) {
+    case PanLaw::ConstantMaximum:
+      return std::sqrt(2.0);
+    case PanLaw::ConstantSum:
+    case PanLaw::EqualPower:
+    case PanLaw::Unspecified:
+      return 1.0;
+  }
+  throw std::logic_error("Unknown pan law");
+}
+
+// MIDI CC7/CC11 cannot encode gain above unity. Reserve the minimum uniform
+// sequence-wide headroom needed by source pan laws so every track keeps its
+// relative level and source expression remains unclipped.
+[[nodiscard]] double panLevelHeadroom(const PerformanceTimelines& timelines) {
+  double maximumGain = 1.0;
+  const auto observe = [&](double gain) {
+    if (std::isfinite(gain)) {
+      maximumGain = std::max(maximumGain, std::max(0.0, gain));
+    }
+  };
+
+  for (const auto& timeline : timelines) {
+    double sourcePanLinearGain = 1.0;
+    PanLaw sourcePanLaw = PanLaw::Unspecified;
+    PanLaw lfoPanLaw = PanLaw::Unspecified;
+    for (const PerformanceEvent* event : timeline) {
+      if (const auto* pan = std::get_if<PanPerformanceEvent>(event)) {
+        sourcePanLinearGain = pan->hasLinearGain ? pan->linearGain : 1.0;
+        sourcePanLaw = pan->law;
+        observe(lowerPositionalPan(pan->law, pan->stereoPosition).gain * sourcePanLinearGain);
+      } else if (const auto* balance = std::get_if<StereoBalancePerformanceEvent>(event)) {
+        const double left = std::abs(balance->leftGain);
+        const double right = std::abs(balance->rightGain);
+        sourcePanLinearGain = left + right;
+        sourcePanLaw = PanLaw::Unspecified;
+        observe(lowerStereoBalance(left, right).gain);
+      } else if (std::holds_alternative<ChannelPanPerformanceEvent>(*event)) {
+        sourcePanLinearGain = 1.0;
+        sourcePanLaw = PanLaw::Unspecified;
+        lfoPanLaw = PanLaw::Unspecified;
+      } else if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(event);
+                 modulation != nullptr && (modulation->target == ModulationPerformanceTarget::PanDepth ||
+                                           modulation->target == ModulationPerformanceTarget::PanRate)) {
+        if (modulation->context.panLaw != PanLaw::Unspecified) {
+          lfoPanLaw = modulation->context.panLaw;
+        }
+        const PanLaw law = lfoPanLaw != PanLaw::Unspecified ? lfoPanLaw : sourcePanLaw;
+        observe(maximumPanLawGain(law) * sourcePanLinearGain);
+      }
+    }
+  }
+  return 1.0 / maximumGain;
+}
+
 // Pitch-bend sensitivity is channel state. Reserve one stable range from each
 // physical attack through every linked note in that sounding voice.
 [[nodiscard]] std::vector<VoicePitchBendRangeChange> planVoicePitchBendRanges(const PerformanceTimeline& timeline,
@@ -481,9 +543,8 @@ struct VoicePitchBendRangeChange {
   double activeTuningBend = 0.0;
   for (const auto* event : timeline) {
     const auto& header = performanceEventHeader(*event);
-    while (nextVoice < voices.size() &&
-           std::tie(voices[nextVoice].startTick, voices[nextVoice].startSequence) <=
-               std::tie(header.tick, header.sequence)) {
+    while (nextVoice < voices.size() && std::tie(voices[nextVoice].startTick, voices[nextVoice].startSequence) <=
+                                            std::tie(header.tick, header.sequence)) {
       activeVoice = nextVoice++;
       voices[activeVoice].sourceCents = sourceCents;
       voices[activeVoice].bendExtent = std::abs(activeTuningBend + activeBend);
@@ -512,8 +573,7 @@ struct VoicePitchBendRangeChange {
   std::vector<VoicePitchBendRangeChange> changes;
   std::optional<u16> activeRange;
   for (const auto& voice : voices) {
-    const u16 requiredCents = static_cast<u16>(
-        std::clamp(std::ceil(voice.bendExtent * 100.0), 0.0, 12'700.0));
+    const u16 requiredCents = static_cast<u16>(std::clamp(std::ceil(voice.bendExtent * 100.0), 0.0, 12'700.0));
     const std::optional<u16> range =
         voice.hasAutomatedBend || (voice.hasTuningBend && requiredCents > voice.sourceCents)
             ? std::optional{std::max<u16>(200, requiredCents)}
@@ -1025,14 +1085,23 @@ bool shouldRestartSimulatedVibratoForNote(const NotePerformanceEvent& note, cons
   return wasHeld;
 }
 
-// Source expression, pan-law compensation, and simulated tremolo all use MIDI
-// expression. Write their product so changing one cannot erase the others.
+// Pan-law conversion can require gain above unity. A sequence-wide headroom
+// factor bounds that gain without changing the mix between tracks. Keep it on
+// channel volume so source expression remains an independent control flow.
+void addCombinedLevel(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, const MidiExportOptions& options,
+                      MidiControllerState* automationState = nullptr) {
+  addVolume(track, automationState, tick, channel, state.sourceLevelGain * state.panLevelGain * state.levelHeadroom,
+            options, state.sourceLevelQuantization);
+  state.levelEmitted = true;
+}
+
+// Source expression and simulated tremolo share the remaining MIDI expression
+// controller. Pan conversion deliberately does not participate in this product.
 void addCombinedExpression(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
                            const MidiExportOptions& options, ModulationConversionPolicy modulationConversion,
                            MidiControllerState* automationState = nullptr) {
   const bool simulatingTremolo = modulationConversion == ModulationConversionPolicy::SequenceEventSimulation;
-  addExpression(track, automationState, tick, channel,
-                state.sourceExpressionGain * state.panExpressionGain * state.simulatedTremoloGain, options,
+  addExpression(track, automationState, tick, channel, state.sourceExpressionGain * state.simulatedTremoloGain, options,
                 simulatingTremolo ? std::nullopt : state.sourceExpressionQuantization);
 }
 
@@ -1119,58 +1188,56 @@ bool shouldRestartSimulatedTremoloForNote(const NotePerformanceEvent& note, cons
 }
 
 void addCombinedPan(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, const MidiExportOptions& options,
-                    ModulationConversionPolicy modulationConversion, MidiControllerState* automationState = nullptr,
-                    bool force = false) {
+                    MidiControllerState* automationState = nullptr, bool force = false) {
   const double position = std::clamp(state.sourcePanPosition + state.simulatedPanOffset, -1.0, 1.0);
   const PanLaw law = state.panLfo.panLaw != PanLaw::Unspecified ? state.panLfo.panLaw : state.sourcePanLaw;
   u8 value = midiPan(position);
-  double expressionGain = state.panExpressionGain;
+  double levelGain = state.panLevelGain;
   if (law != PanLaw::Unspecified) {
     const LoweredStereoBalance lowered = lowerPositionalPan(law, position);
     value = lowered.pan;
-    expressionGain = lowered.expressionGain * state.sourcePanLinearGain;
+    levelGain = lowered.gain * state.sourcePanLinearGain;
   }
   if (automationState == nullptr && !force && state.lastPanValue && *state.lastPanValue == value) {
-    if (expressionGain == state.panExpressionGain) {
+    if (levelGain == state.panLevelGain) {
       return;
     }
   } else {
     addPan(track, automationState, tick, channel, value);
     state.lastPanValue = value;
   }
-  if (expressionGain != state.panExpressionGain) {
-    state.panExpressionGain = expressionGain;
-    addCombinedExpression(track, state, tick, channel, options, modulationConversion, automationState);
+  if (levelGain != state.panLevelGain) {
+    state.panLevelGain = levelGain;
+    addCombinedLevel(track, state, tick, channel, options, automationState);
   }
 }
 
 void flushSimulatedPan(MidiTrack& track, RenderTrackState& state, u64 upToTick, u8 channel,
-                       const PerformanceTempoMap& tempos, const MidiExportOptions& options,
-                       ModulationConversionPolicy modulationConversion) {
+                       const PerformanceTempoMap& tempos, const MidiExportOptions& options) {
   flushLfo(state.panLfo, upToTick, tempos, [&](u64 tick, double value) {
     state.simulatedPanOffset = state.panLfo.depth * value;
-    addCombinedPan(track, state, tick, channel, options, modulationConversion);
+    addCombinedPan(track, state, tick, channel, options);
   });
 }
 
 void setSimulatedPanDepth(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, double depth,
-                          const MidiExportOptions& options, ModulationConversionPolicy modulationConversion) {
+                          const MidiExportOptions& options) {
   state.panLfo.depth = std::max(0.0, depth);
   if (state.panLfo.depth <= 0.0 && state.simulatedPanOffset != 0.0) {
     state.simulatedPanOffset = 0.0;
-    addCombinedPan(track, state, tick, channel, options, modulationConversion);
+    addCombinedPan(track, state, tick, channel, options);
   }
 }
 
 void restartSimulatedPanForNote(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
-                                const MidiExportOptions& options, ModulationConversionPolicy modulationConversion) {
+                                const MidiExportOptions& options) {
   if (!state.panLfo.configured) {
     return;
   }
   restartNoteLfo(state.panLfo, tick);
   if (state.simulatedPanOffset != 0.0) {
     state.simulatedPanOffset = 0.0;
-    addCombinedPan(track, state, tick, channel, options, modulationConversion);
+    addCombinedPan(track, state, tick, channel, options);
   }
 }
 
@@ -1212,13 +1279,17 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             }
           }
           if (shouldRestartSimulatedPanForNote(typedEvent, state)) {
-            restartSimulatedPanForNote(track, state, typedEvent.header.tick, channel, options, modulationConversion);
+            restartSimulatedPanForNote(track, state, typedEvent.header.tick, channel, options);
           }
           if (extendPreviousNote(track, state, typedEvent, channel)) {
             return;
           }
           if (options.terminatePreviousVoice && typedEvent.restartsEnvelope && state.lastNoteIndex) {
             addController(track, typedEvent.header.tick, channel, MidiController::AllSoundOff, 0, 45);
+          }
+          if (!state.levelEmitted &&
+              (state.levelHeadroom != 1.0 || state.sourceLevelGain != 1.0 || state.panLevelGain != 1.0)) {
+            addCombinedLevel(track, state, typedEvent.header.tick, channel, options);
           }
           state.lastNoteIndex = track.events.size();
           u32 duration = typedEvent.durationTicks;
@@ -1239,8 +1310,9 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           applyInstrumentSelection(track, state, typedEvent.header.tick, channel, selection, options,
                                    modulationConversion, true);
         } else if constexpr (std::is_same_v<TypedEvent, LevelPerformanceEvent>) {
-          addVolume(track, automationState, typedEvent.header.tick, channel, typedEvent.linearGain, options,
-                    typedEvent.sourceQuantization);
+          state.sourceLevelGain = typedEvent.linearGain;
+          state.sourceLevelQuantization = typedEvent.sourceQuantization;
+          addCombinedLevel(track, state, typedEvent.header.tick, channel, options, automationState);
         } else if constexpr (std::is_same_v<TypedEvent, ExpressionPerformanceEvent>) {
           state.sourceExpressionGain = typedEvent.linearGain;
           state.sourceExpressionQuantization = typedEvent.sourceQuantization;
@@ -1250,8 +1322,23 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           state.sourcePanPosition = typedEvent.stereoPosition;
           state.sourcePanLinearGain = typedEvent.hasLinearGain ? typedEvent.linearGain : 1.0;
           state.sourcePanLaw = typedEvent.law;
-          addCombinedPan(track, state, typedEvent.header.tick, channel, options, modulationConversion, automationState,
+          addCombinedPan(track, state, typedEvent.header.tick, channel, options, automationState,
                          automationState == nullptr);
+        } else if constexpr (std::is_same_v<TypedEvent, ChannelPanPerformanceEvent>) {
+          // MIDI/SF2 already applies CC10 to each voice's intrinsic region pan.
+          // Preserve that native composition without aggregate-pan gain repair.
+          state.sourcePanPosition = 0.0;
+          state.sourcePanLinearGain = 1.0;
+          state.sourcePanLaw = PanLaw::Unspecified;
+          state.simulatedPanOffset = 0.0;
+          state.panLfo = {};
+          const u8 value = data7(std::clamp(typedEvent.position, 0.0, 1.0) * 127.0);
+          addPan(track, automationState, typedEvent.header.tick, channel, value);
+          state.lastPanValue = value;
+          if (state.panLevelGain != 1.0) {
+            state.panLevelGain = 1.0;
+            addCombinedLevel(track, state, typedEvent.header.tick, channel, options, automationState);
+          }
         } else if constexpr (std::is_same_v<TypedEvent, StereoBalancePerformanceEvent>) {
           const LoweredStereoBalance lowered = lowerStereoBalance(typedEvent.leftGain, typedEvent.rightGain);
           const double left = std::abs(typedEvent.leftGain);
@@ -1262,9 +1349,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           state.sourcePanLaw = PanLaw::Unspecified;
           addPan(track, automationState, typedEvent.header.tick, channel, lowered.pan);
           state.lastPanValue = lowered.pan;
-          state.panExpressionGain = lowered.expressionGain;
-          addCombinedExpression(track, state, typedEvent.header.tick, channel, options, modulationConversion,
-                                automationState);
+          state.panLevelGain = lowered.gain;
+          addCombinedLevel(track, state, typedEvent.header.tick, channel, options, automationState);
         } else if constexpr (std::is_same_v<TypedEvent, MasterLevelPerformanceEvent>) {
           const u16 value = LevelScale::midi14FromLinear(typedEvent.linearGain);
           track.events.push_back(midi::sysex(
@@ -1389,7 +1475,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               case ModulationPerformanceTarget::PanDepth:
                 configureLfo(state.panLfo, typedEvent.header.tick, typedEvent);
                 setSimulatedPanDepth(track, state, typedEvent.header.tick, channel,
-                                     typedEvent.panDepth.value_or(normalizedAmount), options, modulationConversion);
+                                     typedEvent.panDepth.value_or(normalizedAmount), options);
                 break;
               case ModulationPerformanceTarget::PanRate:
                 configureLfo(state.panLfo, typedEvent.header.tick, typedEvent);
@@ -1402,7 +1488,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             configureLfo(state.panLfo, typedEvent.header.tick, typedEvent);
             if (typedEvent.target == ModulationPerformanceTarget::PanDepth) {
               setSimulatedPanDepth(track, state, typedEvent.header.tick, channel,
-                                   typedEvent.panDepth.value_or(normalizedAmount), options, modulationConversion);
+                                   typedEvent.panDepth.value_or(normalizedAmount), options);
             }
             return;
           }
@@ -1459,6 +1545,7 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
   const PerformanceTimelines timelines = buildPerformanceTimelines(loweredPerformance);
   const std::vector<GlobalTransposeChange> globalTransposes = collectGlobalTransposeChanges(timelines);
   const std::vector<MidiEvent> globalTimeSignatures = collectGlobalTimeSignatures(timelines);
+  const double levelHeadroom = panLevelHeadroom(timelines);
 
   for (size_t trackIndex = 0; trackIndex < loweredPerformance.tracks.size(); ++trackIndex) {
     const auto& performanceTrack = loweredPerformance.tracks[trackIndex];
@@ -1466,6 +1553,7 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
         .name = "Track " + std::to_string(performanceTrack.sourceTrackNumber),
     };
     RenderTrackState renderState;
+    renderState.levelHeadroom = levelHeadroom;
     std::unordered_map<PerformanceAutomationId, MidiControllerState> automationControllerStates;
     const auto pitchBendRangeChanges = planVoicePitchBendRanges(timelines[trackIndex], options.tuning);
     size_t nextPitchBendRangeChange = 0;
@@ -1511,8 +1599,7 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
         flushSimulatedTremolo(midiTrack, renderState, flushTick, assignment.channel, globalTempos, options,
                               modulationConversion);
       }
-      flushSimulatedPan(midiTrack, renderState, flushTick, assignment.channel, globalTempos, options,
-                        modulationConversion);
+      flushSimulatedPan(midiTrack, renderState, flushTick, assignment.channel, globalTempos, options);
       if (trackIndex == 0) {
         if (const auto* tempo = std::get_if<TempoPerformanceEvent>(event);
             tempo != nullptr && globalTempos.contains(*tempo)) {
@@ -1539,7 +1626,7 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
       flushSimulatedTremolo(midiTrack, renderState, endTick, assignment.channel, globalTempos, options,
                             modulationConversion);
     }
-    flushSimulatedPan(midiTrack, renderState, endTick, assignment.channel, globalTempos, options, modulationConversion);
+    flushSimulatedPan(midiTrack, renderState, endTick, assignment.channel, globalTempos, options);
     if (trackIndex == 0) {
       for (size_t index = 0; index < globalTempoPoints.size(); ++index) {
         if (renderedTempoPoints[index]) {
