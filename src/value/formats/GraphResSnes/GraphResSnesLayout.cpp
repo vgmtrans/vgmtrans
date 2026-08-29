@@ -30,6 +30,8 @@ constexpr auto kTableInitialization = makeMaskedBytePattern(
 constexpr auto kTimerInitialization =
     makeMaskedBytePattern("\xe8\x00\xc4\xf1\xe8\x00\xc4\xfa\xe8\x01\xc4\xf1", "xxxxx?xxxxxx");
 
+// The game stores its starting sound settings as number/value pairs. Read them
+// into a table until the $FF end marker is reached.
 [[nodiscard]] std::optional<std::array<u8, 128>> readDspRegisters(ByteReader reader, u16 address) {
   std::array<u8, 128> registers{};
   for (u32 item = 0; item < 128 && reader.has(address, 1); ++item) {
@@ -45,7 +47,9 @@ constexpr auto kTimerInitialization =
   return std::nullopt;
 }
 
-[[nodiscard]] u8 pitchEnvelopeCount(ByteReader reader, u16 list) {
+// The game does not store the number of pitch patterns. The first pattern
+// begins immediately after the pointer list, so its address reveals the count.
+[[nodiscard]] u8 readPitchEnvelopeCount(ByteReader reader, u16 list) {
   if (!reader.has(list, 2)) {
     return 0;
   }
@@ -67,6 +71,8 @@ constexpr auto kTimerInitialization =
 
 }  // namespace
 
+// Find several recognizable pieces of the sound driver, then read the table
+// addresses embedded in them. This works even when a game moves the driver.
 std::optional<Layout> findLayout(ByteReader reader) {
   if (reader.size() != kAramSize) {
     return std::nullopt;
@@ -98,10 +104,9 @@ std::optional<Layout> findLayout(ByteReader reader) {
       .pitchEnvelopeListAddress = reader.le16(tablePointers + 6),
       .spcDirAddress = static_cast<u16>((*dspRegisters)[0x5d] << 8),
       .timerTarget = reader.u8At(*initializeTimer + 5),
-      // The reset list clears MVOL; the sequencer's separate shadows start at $7F.
+      // The chip reset sets master volume to zero, but the sequence player
+      // keeps its own starting master volume of $7F.
       .dsp = DspState{
-          .echoLeft = (*dspRegisters)[0x2c],
-          .echoRight = (*dspRegisters)[0x3c],
           .echoFeedback = static_cast<s8>((*dspRegisters)[0x0d]),
           .echoVoices = (*dspRegisters)[0x4d],
           .echoDelay = static_cast<u8>((*dspRegisters)[0x7d] & 0x0f),
@@ -111,7 +116,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
   for (u8 coefficient = 0; coefficient < layout.dsp.fir.size(); ++coefficient) {
     layout.dsp.fir[coefficient] = static_cast<s8>((*dspRegisters)[coefficient * 0x10u + 0x0f]);
   }
-  layout.pitchEnvelopeCount = pitchEnvelopeCount(reader, layout.pitchEnvelopeListAddress);
+  layout.pitchEnvelopeCount = readPitchEnvelopeCount(reader, layout.pitchEnvelopeListAddress);
   if (layout.timerTarget == 0 || layout.pitchEnvelopeCount == 0 || !reader.has(layout.volumeTableAddress, 16) ||
       !reader.has(layout.panTableAddress, 32) || !reader.has(layout.pitchTableAddress, 48 * 2u) ||
       layout.spcDirAddress == 0 || !reader.has(layout.spcDirAddress, 4)) {
