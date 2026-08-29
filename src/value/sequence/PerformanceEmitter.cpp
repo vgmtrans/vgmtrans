@@ -410,9 +410,10 @@ void PerformanceEmitter::pitchBend(PitchBendPerformanceEvent event) {
   append(std::move(event));
 }
 
-void PerformanceEmitter::pitchBend(double semitones) {
+void PerformanceEmitter::pitchBend(double semitones, PitchBendLayerId layer) {
   pitchBend(PitchBendPerformanceEvent{
       .semitones = semitones,
+      .layer = layer,
   });
 }
 

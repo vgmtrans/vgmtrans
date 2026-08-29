@@ -168,9 +168,13 @@ void interleavedRuntimePreservesDynamicDriverFeatures() {
              std::abs(*envelopes.front()->update.values->releaseSeconds -
                       snesDspGainEnvelopeSeconds(0xaa, 0x7ff, 0)) < 0.000001,
          "sequence-selected ADSR should retain its separate GAIN release rate");
-  expect(!events<PitchBendPerformanceEvent>(performance.tracks[0]).empty() &&
+  const auto pitchTable = events<PitchBendPerformanceEvent>(performance.tracks[0]);
+  expect(!pitchTable.empty() &&
+             std::ranges::all_of(pitchTable, [](const PitchBendPerformanceEvent* event) {
+               return event->layer != kPrimaryPitchBendLayer;
+             }) &&
              !performance.tracks[0].automations.empty(),
-         "arbitrary pitch tables and portamento should produce exact pitch motion and a musical slide");
+         "pitch tables should remain independent of the track's musical slides");
 
   const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks[0]);
   expect(std::ranges::any_of(instruments, [](const InstrumentPerformanceEvent* event) {

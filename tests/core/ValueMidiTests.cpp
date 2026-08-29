@@ -630,8 +630,12 @@ void performanceMidiRendererCanTerminatePreviousVoices() {
                       .key = 62.0,
                       .durationTicks = 4,
                   },
+                  PitchBendPerformanceEvent{
+                      .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 8, .sequence = 2},
+                      .semitones = -1.0,
+                  },
                   NotePerformanceEvent{
-                      .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 10, .sequence = 2},
+                      .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 10, .sequence = 3},
                       .key = 62.0,
                       .durationTicks = 4,
                       .extendsPrevious = true,
@@ -651,9 +655,13 @@ void performanceMidiRendererCanTerminatePreviousVoices() {
   const MidiSequence terminated = renderMidiSequence(performance, options);
   const auto isSoundOff = [](const MidiEvent& event) { return isMidiController(event, MidiController::AllSoundOff); };
   const auto soundOff = std::ranges::find_if(terminated.tracks[0].events, isSoundOff);
+  const auto attackBend = std::ranges::find_if(terminated.tracks[0].events, [](const MidiEvent& event) {
+    return event.tick == 8 && isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+  });
   expect(std::ranges::count_if(terminated.tracks[0].events, isSoundOff) == 1 &&
-             soundOff != terminated.tracks[0].events.end() && soundOff->tick == 8,
-         "the renderer should terminate a previous voice before a fresh attack, but not before an extension");
+             soundOff != terminated.tracks[0].events.end() && soundOff->tick == 8 &&
+             attackBend != terminated.tracks[0].events.end() && soundOff->priority < attackBend->priority,
+         "the renderer should terminate a previous voice before configuring a fresh attack, but not before an extension");
 }
 
 void performanceMidiRendererLowersStructuredScalarAutomationPoints() {
@@ -1055,7 +1063,6 @@ void performanceMidiRendererRetainsHeldVoiceAcrossChainedPitchBends() {
       .tracks = {track},
   };
   const MidiExportOptions bendOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend};
-  const PerformanceSequence lowered = lowerMidiPerformanceAutomation(performance, bendOptions);
   const MidiSequence midi = renderMidiSequence(performance, bendOptions);
 
   const auto notes = midiNotes(midi.tracks[0].events);
@@ -1073,13 +1080,6 @@ void performanceMidiRendererRetainsHeldVoiceAcrossChainedPitchBends() {
   };
   expect(hasMidiBend(8, 2341) && hasMidiBend(12, 4681) && hasMidiBend(16, 8191),
          "chained transitions should honor each absolute start key without retuning the held voice's bend range");
-
-  const auto chainedStart = std::ranges::find_if(lowered.tracks[0].events, [](const PerformanceEvent& event) {
-    const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
-    return bend != nullptr && bend->header.tick == 12 && std::abs(bend->semitones - 4.0) < 0.000001;
-  });
-  expect(chainedStart != lowered.tracks[0].events.end(),
-         "a chained bend should remain relative to the MIDI key that began the held voice");
 }
 
 void performanceMidiRendererHonorsRequiredPortamento() {
@@ -1561,19 +1561,18 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
       .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
       .tracks = {track},
   };
-  const PerformanceSequence lowered = lowerMidiPerformanceAutomation(performance, {});
   const MidiSequence midi = renderMidiSequence(performance);
-  const auto hasBend = [&](u64 tick, double semitones) {
-    return std::ranges::any_of(lowered.tracks[0].events, [&](const PerformanceEvent& event) {
-      const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
-      return bend != nullptr && bend->header.tick == tick && bend->semitones == semitones;
-    });
-  };
   const auto ranges = midiPitchBendRanges(midi.tracks[0].events);
   const auto hasRange = [&](u64 tick, u16 cents) {
     return std::ranges::find(ranges, std::pair{tick, cents}) != ranges.end();
   };
-  expect(hasBend(4, 4.25) && hasBend(6, 3.75) && hasBend(8, -0.25) && hasRange(0, 500) && !hasRange(6, 800) &&
+  const auto hasBend = [&](u64 tick, s16 value) {
+    return std::ranges::any_of(midi.tracks[0].events, [&](const MidiEvent& event) {
+      const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+      return bend != nullptr && event.tick == tick && bend->value == value;
+    });
+  };
+  expect(hasBend(4, 6963) && hasBend(6, 6144) && hasBend(8, -341) && hasRange(0, 500) && !hasRange(6, 800) &&
              hasRange(8, 600),
          "a held transition should mask source range changes until the next physical attack");
 
@@ -1586,9 +1585,11 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
                                           nextSequence,           nextNote,      nextAutomation};
   delayedTransitionOut.pitchBendRange(2);
   delayedTransitionOut.note(60, 1.0, 4);
-  delayedTransitionOut.at(2).pitchBend(0.25);
+  constexpr PitchBendLayerId modulationLayer{1};
+  delayedTransitionOut.at(2).pitchBend(0.25, modulationLayer);
   const PerformanceNoteId delayedTransitionNote = delayedTransitionOut.at(4).note(62, 1.0, 8);
   delayedTransitionOut.at(6).pitchSlide(delayedTransitionNote, 62, 72, 2);
+  delayedTransitionOut.at(7).pitchBend(0.5, modulationLayer);
   const PerformanceSequence delayedTransitionPerformance{
       .timebase = Timebase{.ppqn = 48},
       .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
@@ -1599,12 +1600,21 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
     const MidiSequence delayedTransitionMidi = renderMidiSequence(delayedTransitionPerformance, {}, policy);
     const auto preservedBend = std::ranges::find_if(delayedTransitionMidi.tracks[0].events, [](const MidiEvent& event) {
       const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
-      return bend != nullptr && event.tick == 4 && bend->value == 205;
+      return bend != nullptr && event.tick == 4 && bend->value == 186;
     });
+    const auto combinedBend = std::ranges::find_if(delayedTransitionMidi.tracks[0].events, [](const MidiEvent& event) {
+      const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+      return bend != nullptr && event.tick == 7 && bend->value == 4096;
+    });
+    const auto bendsAtTransitionTick =
+         std::ranges::count_if(delayedTransitionMidi.tracks[0].events, [](const MidiEvent& event) {
+           return event.tick == 7 && isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+         });
     const auto delayedTransitionRanges = midiPitchBendRanges(delayedTransitionMidi.tracks[0].events);
-    expect(std::ranges::find(delayedTransitionRanges, std::pair<u64, u16>{4, 1000}) != delayedTransitionRanges.end() &&
-               preservedBend != delayedTransitionMidi.tracks[0].events.end(),
-           "changing sensitivity for a later transition should re-encode an active bend at the new voice attack");
+    expect(std::ranges::find(delayedTransitionRanges, std::pair<u64, u16>{4, 1100}) != delayedTransitionRanges.end() &&
+               preservedBend != delayedTransitionMidi.tracks[0].events.end() &&
+               combinedBend != delayedTransitionMidi.tracks[0].events.end() && bendsAtTransitionTick == 1,
+           "independent modulation should combine with a slide and its new voice range");
   }
 
   PerformanceTrack sameVoiceTrack{
