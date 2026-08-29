@@ -341,6 +341,7 @@ struct Playback {
       return;
     }
     if (!continues) {
+      closeVoice(vm.tick());
       if (percussionIndex) {
         out.instrument(127, 0, InstrumentEnvelopeMode::PreserveDynamicOverride);
       } else {
@@ -377,6 +378,7 @@ struct Playback {
       return;
     }
     if (!continues) {
+      closeVoice(vm.tick());
       track.voiceControls = track.controls;
       out.instrument(0, 126, InstrumentEnvelopeMode::PreserveDynamicOverride);
       out.replaceEnvelope(driverEnvelope(reader(), layout(), track.voiceControls[kEnvelope]),
