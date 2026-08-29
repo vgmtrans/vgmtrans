@@ -35,7 +35,6 @@ struct Layout {
   u16 sequenceAddress;
   u16 sequenceReferenceAddress;
   u8 sequenceReferenceSize;
-  u8 songIndex;
   u16 dataPointerBlockAddress;
   u16 tuningTableAddress;
   u16 spcDirAddress;
@@ -49,9 +48,6 @@ struct Layout {
   }
   [[nodiscard]] u16 percussionTable(core::ByteReader reader) const {
     return reader.le16(dataPointerBlockAddress + 4);
-  }
-  [[nodiscard]] u16 firTable(core::ByteReader reader) const {
-    return reader.le16(dataPointerBlockAddress + 6);
   }
 };
 

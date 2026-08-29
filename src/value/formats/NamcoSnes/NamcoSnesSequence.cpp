@@ -77,16 +77,36 @@ enum Parameter : u8 {
   kParameterCount,
 };
 
+struct ParameterCommand {
+  std::string_view name;
+  SequenceSemantic semantic;
+  SemanticOperandRole role;
+};
+
+constexpr std::array<ParameterCommand, kParameterCount> kParameterCommands{{
+    {"Instrument", SequenceSemantic::Program, SemanticOperandRole::Instrument},
+    {"Voice Volume", SequenceSemantic::Level, SemanticOperandRole::Level},
+    {"Stereo Balance", SequenceSemantic::Pan, SemanticOperandRole::Pan},
+    {"Gate Time", SequenceSemantic::State, SemanticOperandRole::Duration},
+    {"Pitch Modulation Table", SequenceSemantic::Modulation, SemanticOperandRole::Modulation},
+    {"Transpose", SequenceSemantic::Pitch, SemanticOperandRole::Pitch},
+    {"Fine Tuning", SequenceSemantic::Pitch, SemanticOperandRole::Pitch},
+    {"Portamento Speed", SequenceSemantic::Portamento, SemanticOperandRole::Duration},
+    {"Pitch Table Rate", SequenceSemantic::Modulation, SemanticOperandRole::Modulation},
+    {"Pitch Table Depth", SequenceSemantic::Modulation, SemanticOperandRole::Modulation},
+    {"Envelope Preset", SequenceSemantic::Envelope, SemanticOperandRole::Value},
+}};
+
 struct DriverData {
   RetainedSource source;
   Layout layout;
 };
 
 struct ProgramState {
-  explicit ProgramState(const DriverData& data) : data(data) { echo.voiceMask = 0; }
+  explicit ProgramState(const DriverData& data) : data(data) {}
 
   DriverData data;
-  ReverbPerformanceEvent echo;
+  ReverbPerformanceEvent echo{.voiceMask = 0};
   bool echoEnabled = false;
 };
 
@@ -303,6 +323,15 @@ struct Playback {
     emitPitchBend(modulationValue());
   }
 
+  void beginAttack(VoiceInstrument instrument) {
+    closeVoice(vm.tick());
+    selectInstrument(instrument);
+    out.replaceEnvelope(driverEnvelope(reader(), layout(), track.voiceControls[kEnvelope]),
+                        VoiceEnvelopeScope::FutureAttacks);
+    emitMix(track.voiceControls[kVolume], track.voiceControls[kBalance]);
+    beginPitchModulation();
+  }
+
   [[nodiscard]] double targetPitch(u8 sourceNote) const {
     const u8 coarse = static_cast<u8>(sourceNote + static_cast<s8>(track.voiceControls[kTranspose]));
     return coarse + track.voiceControls[kFineTuning] / 256.0;
@@ -353,9 +382,6 @@ struct Playback {
       }
     }
     const u8 srcn = track.voiceControls[kSrcn];
-    const u8 envelope = track.voiceControls[kEnvelope];
-    const u8 volume = track.voiceControls[kVolume];
-    const u8 balance = track.voiceControls[kBalance];
     const s8 transpose = static_cast<s8>(track.voiceControls[kTranspose]);
     const u8 coarse = static_cast<u8>(sourceNote + transpose);
     const double fine = math::tuningCents(track.voiceControls[kFineTuning]);
@@ -374,12 +400,8 @@ struct Playback {
       return;
     }
     if (!continues) {
-      closeVoice(vm.tick());
-      selectInstrument(percussionIndex ? VoiceInstrument{.source = VoiceSource::Percussion}
-                                       : VoiceInstrument{.source = VoiceSource::Melodic, .srcn = srcn});
-      out.replaceEnvelope(driverEnvelope(reader(), layout(), envelope), VoiceEnvelopeScope::FutureAttacks);
-      emitMix(volume, balance);
-      beginPitchModulation();
+      beginAttack(percussionIndex ? VoiceInstrument{.source = VoiceSource::Percussion}
+                                  : VoiceInstrument{.source = VoiceSource::Melodic, .srcn = srcn});
     }
     out.tuning(tuning);
 
@@ -390,11 +412,7 @@ struct Playback {
         .restartsEnvelope = !continues,
         .restartsLfoPhase = !continues,
     };
-    if (continues) {
-      track.lastNote = out.continueVoice(previous, std::move(event));
-    } else {
-      track.lastNote = out.note(std::move(event));
-    }
+    track.lastNote = continues ? out.continueVoice(previous, std::move(event)) : out.note(std::move(event));
     beginPortamento(target, outputKey, previous, continues);
     track.lastSourceNote = sourceNote;
     track.gateTicks = 0;
@@ -407,13 +425,8 @@ struct Playback {
       return;
     }
     if (!continues) {
-      closeVoice(vm.tick());
       track.voiceControls = track.controls;
-      selectInstrument(VoiceInstrument{.source = VoiceSource::Noise});
-      out.replaceEnvelope(driverEnvelope(reader(), layout(), track.voiceControls[kEnvelope]),
-                          VoiceEnvelopeScope::FutureAttacks);
-      emitMix(track.voiceControls[kVolume], track.voiceControls[kBalance]);
-      beginPitchModulation();
+      beginAttack(VoiceInstrument{.source = VoiceSource::Noise});
     }
     out.tuning(0.0);
     const double key = std::min<int>(35 + (raw & 0x1f), 127);
@@ -705,28 +718,12 @@ template <class Event>
       break;
   }
 
-  if (opcode >= 0x20 && opcode <= 0x2a) {
-    static constexpr std::array<std::string_view, 11> names{
-        "Instrument",       "Voice Volume",  "Stereo Balance", "Gate Time",      "Pitch Modulation Table",
-        "Transpose",        "Fine Tuning",   "Portamento Speed", "Pitch Table Rate", "Pitch Table Depth",
-        "Envelope Preset",
-    };
-    static constexpr std::array<SequenceSemantic, 11> semantics{
-        SequenceSemantic::Program,    SequenceSemantic::Level,      SequenceSemantic::Pan,
-        SequenceSemantic::State,      SequenceSemantic::Modulation, SequenceSemantic::Pitch,
-        SequenceSemantic::Pitch,      SequenceSemantic::Portamento, SequenceSemantic::Modulation,
-        SequenceSemantic::Modulation, SequenceSemantic::Envelope,
-    };
-    static constexpr std::array<SemanticOperandRole, 11> roles{
-        SemanticOperandRole::Instrument, SemanticOperandRole::Level,      SemanticOperandRole::Pan,
-        SemanticOperandRole::Duration,   SemanticOperandRole::Modulation, SemanticOperandRole::Pitch,
-        SemanticOperandRole::Pitch,      SemanticOperandRole::Duration,   SemanticOperandRole::Modulation,
-        SemanticOperandRole::Modulation, SemanticOperandRole::Value,
-    };
+  if (opcode >= 0x20 && opcode - 0x20 < kParameterCommands.size()) {
     const u8 index = opcode - 0x20;
-    auto event = cursor.command(names[index], semantics[index]);
-    const MaskedValues values = maskedValues(event, "value", roles[index]);
-    if (index == 0 && srcns != nullptr) {
+    const ParameterCommand& command = kParameterCommands[index];
+    auto event = cursor.command(command.name, command.semantic);
+    const MaskedValues values = maskedValues(event, "value", command.role);
+    if (index == kSrcn && srcns != nullptr) {
       for (u32 voice = 0; voice < kTrackCount; ++voice) {
         if ((values.mask & math::voiceBit(voice)) != 0) {
           srcns->insert(values.values[voice]);
