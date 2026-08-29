@@ -189,6 +189,7 @@ std::vector<u8> hdFixture() {
   bytes[smpl + 20 + 23] = 60;
   le16(bytes, smpl + 20 + 32, 25);
   le16(bytes, smpl + 20 + 36, 40);
+  bytes[smpl + 20 + 40] = 0x11;
   bytes[smpl + 20 + 41] = 0x0c;
 
   const u32 sset = addSparseChunk(bytes, "IECStesS", 6);
@@ -210,9 +211,9 @@ std::vector<u8> hdFixture() {
   bytes[program + 15] = 3;
   le16(bytes, program + 20, 500);
   le16(bytes, program + 22, 1000);
-  le16(bytes, program + 24, 128);
-  le16(bytes, program + 26, static_cast<u16>(-128));
-  le16(bytes, program + 28, 0);
+  le16(bytes, program + 24, 0);
+  le16(bytes, program + 26, 0);
+  le16(bytes, program + 28, 128);
   le16(bytes, program + 30, static_cast<u16>(-256));
   bytes[program + 32] = 64;
   bytes[program + 33] = static_cast<u8>(-64);
@@ -361,6 +362,10 @@ void syntheticFeatures() {
          "Vagi rate and all three tuning layers should determine unity key");
   expect(region.modulation.vibrato && region.modulation.tremolo,
          "program pitch and amplitude LFOs should survive as physical modulation");
+  expect(region.modulation.vibrato->depthMode == ModulationDepthMode::Controller &&
+             near(region.modulation.vibrato->maxDepthCents, 200.0) &&
+             region.modulation.tremolo->depthMode == ModulationDepthMode::Fixed,
+         "controller-only vibrato and fixed tremolo should retain their distinct SonyPS2 depth flows");
   expect(bank.instruments[0].pitchBendRangeCents == 600,
          "the instrument channel should accommodate its largest split bend range");
   expect(bank.instruments[0].reverb == 1.0 && bank.instruments[1].reverb == 1.0,
@@ -370,6 +375,8 @@ void syntheticFeatures() {
   expect(bank.instruments[1].identity && bank.instruments[1].identity->domain == kSetbInstrumentDomain &&
              bank.instruments[1].regions.size() == 117 && near(bank.instruments[1].regions.front().unityKey, 73.5),
          "Setb note-addressed timbres should retain velocity curves, tuning, and their distinct identity domain");
+  expect(!bank.instruments[1].regions.front().modulation.vibrato,
+         "a Setb note without a key-on LFO trigger should not apply its configured waveform and depth");
 
   const auto rendered = renderCollection(*bound.collection, SequenceRenderOptions{});
   expect(rendered.performance && countEvents<NotePerformanceEvent>(*rendered.performance) == 2,
@@ -420,15 +427,17 @@ void syntheticFeatures() {
   };
   expect(hasController(MidiController::Pan, 64) && hasController(MidiController::Expression, 110),
          "SonyPS2 MIDI should lower CC10 directly without clipping the independent CC11 flow");
-  expect(countEvents<PortamentoControlPerformanceEvent>(*rendered.performance) == 1,
-         "CC84 should retain the driver's portamento source key");
+  const auto* portamentoSource = findEvent<PortamentoControlPerformanceEvent>(*rendered.performance);
+  expect(portamentoSource != nullptr && near(portamentoSource->previousKey, 60.0),
+         "note-off should provide the next SonyPS2 portamento source; CC84 is inert in the shipped driver");
   const auto* marker = findEvent<MarkerPerformanceEvent>(*rendered.performance);
   expect(marker != nullptr && marker->text == "SonyPS2 mark callback 2356",
          "14-bit mark callbacks should combine CC6 and CC38 before emitting a marker");
 
   const std::vector<u8> seBytes{
-      0,   0xa2, 3,  61,   100,       // note on
-      0,   0xb2, 3,  61,   0x0e, 10,  // raise pitch 100 cents over 10 ms
+      0,   0xa2, 3,  61,   100,          // note on
+      0,   0xb2, 3,  61,   0x20, 64, 0,  // two-byte amp-LFO depth used by the driver
+      0,   0xb2, 3,  61,   0x0e, 10,     // raise pitch 100 cents over 10 ms
       100, 0,    10, 0xa2, 3,    61, 0, 0, 0xff,
   };
   const ByteReader seReader(SourceId{1}, seBytes);

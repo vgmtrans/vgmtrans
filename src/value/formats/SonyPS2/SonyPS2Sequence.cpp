@@ -86,6 +86,7 @@ struct TrackState {
   };
   std::vector<ActiveNote> activeNotes;
   bool sustain = false;
+  bool portamentoEnabled = false;
   u16 pitchBendValue = 8192;
   double emittedPitchBendSemitones = 0.0;
   PerformanceNoteId seNote;
@@ -118,6 +119,30 @@ struct ProgramState {
   // is signed division truncated toward zero, including values just below a
   // multiple of 128.
   return product < 0 ? -((-product) / 128) : product / 128;
+}
+
+[[nodiscard]] bool controllerAffectsPlayback(u8 controller) {
+  switch (controller) {
+    case 0:
+    case 1:
+    case 2:
+    case 5:
+    case 6:
+    case 7:
+    case 10:
+    case 11:
+    case 38:
+    case 64:
+    case 65:
+    case 98:
+    case 99:
+    case 120:
+    case 121:
+    case 123:
+      return true;
+    default:
+      return false;
+  }
 }
 
 struct Playback {
@@ -195,6 +220,14 @@ struct Playback {
     }
   }
 
+  void capturePortamentoSource(PerformanceEmitter& delayed, u8 key) {
+    if (track.portamentoEnabled) {
+      // modhsyn derives the next glide's source from the most recent note-off.
+      // Its CC84 setter writes a separate field that the glide path never reads.
+      delayed.portamentoControl(key);
+    }
+  }
+
   void releaseAllKeyDownNotes() {
     for (auto& note : track.activeNotes) {
       if (note.keyDown) {
@@ -240,6 +273,7 @@ struct Playback {
       if (velocity == 0) {
         delayed.noteOff(key);
         releaseNotes(key);
+        capturePortamentoSource(delayed, key);
       } else {
         const auto note = bendRangeForKey(key);
         emitCurrentPitchBend(delayed, note);
@@ -255,6 +289,7 @@ struct Playback {
       auto delayed = out.at(delayedTick(vm, delta));
       delayed.noteOff(key);
       releaseNotes(key);
+      capturePortamentoSource(delayed, key);
     }
     return after(delta);
   }
@@ -374,10 +409,11 @@ struct Playback {
         break;
       }
       case 65:
-        delayed.portamentoEnable(value != 0);
+        track.portamentoEnabled = value != 0;
+        delayed.portamentoEnable(track.portamentoEnabled);
         break;
       case 84:
-        delayed.portamentoControl(value);
+        // Retained in the source map, but unused by this driver revision.
         break;
       case 98:
         track.nrpnLsb = value;
@@ -427,6 +463,7 @@ struct Playback {
         track.sustain = false;
         releaseSustainedNotes();
         delayed.portamentoEnable(false);
+        track.portamentoEnabled = false;
         delayed.vibratoDepth(0.0);
         delayed.tremoloLinearGainDepth(0.0);
         delayed.level(1.0);
@@ -666,9 +703,22 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     label = "Polyphonic Key Pressure";
     semantic = SequenceSemantic::State;
     playback = CommandPlaybackStatus::SourceOnly;
+  } else if (source.loopDestination) {
+    label = "Loop End";
+    semantic = SequenceSemantic::Loop;
+    playback = CommandPlaybackStatus::AffectsControlFlow;
+  } else if (family == 0xb0) {
+    label = "Control Change";
+    semantic = SequenceSemantic::State;
+    playback = controllerAffectsPlayback(source.data1) ? CommandPlaybackStatus::AffectsPlayback
+                                                       : CommandPlaybackStatus::SourceOnly;
   } else if (family == 0xc0) {
     label = "Program Change";
     semantic = SequenceSemantic::Program;
+  } else if (family == 0xd0) {
+    label = "Channel Pressure";
+    semantic = SequenceSemantic::State;
+    playback = CommandPlaybackStatus::SourceOnly;
   } else if (family == 0xe0) {
     label = "Pitch Bend";
     semantic = SequenceSemantic::Pitch;
@@ -683,10 +733,6 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     label = source.status == 0xff ? "Meta Event" : "System Exclusive";
     semantic = SequenceSemantic::Meta;
     playback = CommandPlaybackStatus::SourceOnly;
-  } else if (source.loopDestination) {
-    label = "Loop End";
-    semantic = SequenceSemantic::Loop;
-    playback = CommandPlaybackStatus::AffectsControlFlow;
   }
   auto event = cursor.command(label, semantic, playback);
   if (source.end > source.offset + 1) {
@@ -828,6 +874,8 @@ struct SeEvent {
             break;
           case 0x10:
           case 0x11:
+          case 0x20:
+          case 0x21:
             event.malformed = cursor + 2 > layout.dataEnd;
             if (!event.malformed) {
               event.value = reader.le16(cursor);
@@ -835,8 +883,6 @@ struct SeEvent {
             }
             break;
           case 0x12:
-          case 0x20:
-          case 0x21:
           case 0x22:
             event.malformed = !readValue(event.value);
             break;
