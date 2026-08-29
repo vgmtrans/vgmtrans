@@ -90,6 +90,19 @@ struct ProgramState {
   bool echoEnabled = false;
 };
 
+enum class VoiceSource : u8 {
+  Melodic,
+  Percussion,
+  Noise,
+};
+
+struct VoiceInstrument {
+  VoiceSource source = VoiceSource::Melodic;
+  u8 srcn = 0;
+
+  friend bool operator==(const VoiceInstrument&, const VoiceInstrument&) noexcept = default;
+};
+
 struct TrackState {
   explicit TrackState(const TrackProgram& source) : number(source.sourceTrackNumber) { resetVoice(); }
 
@@ -130,6 +143,7 @@ struct TrackState {
   u16 gateTicks = 0;
   PerformanceNoteId lastNote;
   u8 lastSourceNote = kRest;
+  VoiceInstrument emittedInstrument;
 
   bool haveDriverPitch = false;
   double driverPitch = 0.0;
@@ -158,6 +172,25 @@ struct Playback {
       static_cast<void>(out.setNoteEnd(track.lastNote, tick));
     }
     track.lastNote = {};
+  }
+
+  void selectInstrument(VoiceInstrument instrument) {
+    if (track.emittedInstrument == instrument) {
+      return;
+    }
+    track.emittedInstrument = instrument;
+    switch (instrument.source) {
+      case VoiceSource::Melodic:
+        out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = instrument.srcn},
+                       InstrumentEnvelopeMode::PreserveDynamicOverride);
+        break;
+      case VoiceSource::Percussion:
+        out.instrument(127, 0, InstrumentEnvelopeMode::PreserveDynamicOverride);
+        break;
+      case VoiceSource::Noise:
+        out.instrument(0, 126, InstrumentEnvelopeMode::PreserveDynamicOverride);
+        break;
+    }
   }
 
   void delta(u8 value) { track.delta = value; }
@@ -342,12 +375,8 @@ struct Playback {
     }
     if (!continues) {
       closeVoice(vm.tick());
-      if (percussionIndex) {
-        out.instrument(127, 0, InstrumentEnvelopeMode::PreserveDynamicOverride);
-      } else {
-        out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = srcn},
-                       InstrumentEnvelopeMode::PreserveDynamicOverride);
-      }
+      selectInstrument(percussionIndex ? VoiceInstrument{.source = VoiceSource::Percussion}
+                                       : VoiceInstrument{.source = VoiceSource::Melodic, .srcn = srcn});
       out.replaceEnvelope(driverEnvelope(reader(), layout(), envelope), VoiceEnvelopeScope::FutureAttacks);
       emitMix(volume, balance);
       beginPitchModulation();
@@ -380,7 +409,7 @@ struct Playback {
     if (!continues) {
       closeVoice(vm.tick());
       track.voiceControls = track.controls;
-      out.instrument(0, 126, InstrumentEnvelopeMode::PreserveDynamicOverride);
+      selectInstrument(VoiceInstrument{.source = VoiceSource::Noise});
       out.replaceEnvelope(driverEnvelope(reader(), layout(), track.voiceControls[kEnvelope]),
                           VoiceEnvelopeScope::FutureAttacks);
       emitMix(track.voiceControls[kVolume], track.voiceControls[kBalance]);

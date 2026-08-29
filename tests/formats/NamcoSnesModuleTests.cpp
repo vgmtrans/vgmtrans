@@ -210,11 +210,13 @@ void attacksFollowThePhysicalVoiceLifecycle() {
                     0x09, 0x80, 0x54, 0x03});
   const PerformanceSequence performance = render(fixture);
   const auto notes = events<NotePerformanceEvent>(performance.tracks[0]);
+  const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks[0]);
 
-  expect(performance.diagnostics.empty() && notes.size() == 3 && notes[0]->header.tick == 2 &&
+  expect(performance.diagnostics.empty() && instruments.size() == 1 && notes.size() == 3 &&
+             notes[0]->header.tick == 2 &&
              notes[0]->durationTicks == 4 && notes[1]->header.tick == 6 && notes[1]->durationTicks == 8 &&
              notes[2]->header.tick == 10 && notes[2]->extendsPrevious && notes[2]->note == notes[1]->note,
-         "fresh attacks should replace the physical voice at trigger time while legato retains it");
+         "attacks should manage voice lifetime without redundantly reselecting an unchanged instrument");
 }
 
 void bothRepeatCountersFollowTheSharedIncrementRules() {
