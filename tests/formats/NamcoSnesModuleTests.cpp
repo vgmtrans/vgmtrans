@@ -203,6 +203,20 @@ void percussionPitchMappingIsAppliedExactlyOnce() {
          "percussion regions should own table key mapping while the sequence applies only transpose and fine tuning");
 }
 
+void attacksFollowThePhysicalVoiceLifecycle() {
+  DriverFixture fixture(Version::WagyanParadise);
+  fixture.sequence({0x00, 4, 0x01, 0x80, 0x0b, 0x80, 2,    0x09, 0x80, 0x30,
+                    0x09, 0x80, 0x31, 0x0c, 0x80, 0x09, 0x80, 0x31, 0x0c, 0x00,
+                    0x09, 0x80, 0x54, 0x03});
+  const PerformanceSequence performance = render(fixture);
+  const auto notes = events<NotePerformanceEvent>(performance.tracks[0]);
+
+  expect(performance.diagnostics.empty() && notes.size() == 3 && notes[0]->header.tick == 2 &&
+             notes[0]->durationTicks == 4 && notes[1]->header.tick == 6 && notes[1]->durationTicks == 8 &&
+             notes[2]->header.tick == 10 && notes[2]->extendsPrevious && notes[2]->note == notes[1]->note,
+         "fresh attacks should replace the physical voice at trigger time while legato retains it");
+}
+
 void bothRepeatCountersFollowTheSharedIncrementRules() {
   DriverFixture fixture(Version::WagyanParadise);
   fixture.sequence({0x00, 1,    0x04, 1,    0x01, 0x80, 0x09, 0x80, 0x30, 0x06, 3,    0x06,
@@ -224,5 +238,6 @@ void runNamcoSnesModuleTests() {
   layoutsCoverAllAuditedDriverRelocations();
   interleavedRuntimePreservesDynamicDriverFeatures();
   percussionPitchMappingIsAppliedExactlyOnce();
+  attacksFollowThePhysicalVoiceLifecycle();
   bothRepeatCountersFollowTheSharedIncrementRules();
 }
