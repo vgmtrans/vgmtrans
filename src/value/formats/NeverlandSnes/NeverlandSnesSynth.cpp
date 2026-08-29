@@ -11,18 +11,17 @@
 
 #include <fmt/format.h>
 
-#include <cmath>
 #include <vector>
 
 namespace vgmtrans::formats::neverland_snes {
 
 using namespace core;
 
-Envelope driverEnvelope(u8 adsr1, u8 adsr2) {
+namespace {
+
+[[nodiscard]] Envelope driverEnvelope(u8 adsr1, u8 adsr2) {
   return snesDspEnvelope(static_cast<u8>(adsr1 | 0x80), adsr2, 0);
 }
-
-namespace {
 
 struct Patch {
   u8 program;
@@ -32,16 +31,10 @@ struct Patch {
   SourceRange source;
 };
 
-[[nodiscard]] double unityKey(u16 tuning) {
-  // The driver's pitch table places C8 at DSP pitch $217D.
-  constexpr double pitchTableC8 = 0x217d;
-  return 120.0 - 12.0 * std::log2((pitchTableC8 / 4096.0) * instrumentPitchScale(tuning));
-}
-
 [[nodiscard]] std::vector<Patch> collectPatches(ByteReader reader, const Layout& layout,
                                                 const ReferencedPrograms& references) {
   std::vector<Patch> result;
-  for (const u8 program : references.programs) {
+  for (const u8 program : references) {
     const u32 address = layout.instrumentTableAddress + program * 4u;
     if (!reader.has(address, 4) || !readSnesSampleDirectoryEntry(reader, layout.spcDirAddress + program * 4u, true)) {
       continue;
@@ -109,7 +102,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .region(*sample,
                 Region{
                     .range = patch.source,
-                    .unityKey = unityKey(patch.tuning),
+                    .unityKey = instrumentUnityKey(patch.tuning),
                     .envelope = driverEnvelope(patch.adsr1, patch.adsr2),
                 })
         .source("Region", patch.source, "neverland-snes-region")

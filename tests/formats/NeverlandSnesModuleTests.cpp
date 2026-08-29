@@ -6,6 +6,8 @@
 
 #include "value/formats/NeverlandSnes/NeverlandSnes.h"
 
+#include "ValueFormatTestSupport.h"
+
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 
@@ -61,6 +63,7 @@ Layout runtimeLayout(Version version = Version::Modern) {
       .instrumentTableAddress = 0x300,
       .spcDirAddress = 0x400,
       .initialTempo = 0x40,
+      .initialMasterVolume = version == Version::Original ? u8{0x7f} : u8{0x70},
       .initialEchoDelay = version == Version::Modern ? u8{2} : u8{4},
   };
   layout.tracks[0] = TrackLayout{.active = true, .playlistAddress = 0};
@@ -71,7 +74,7 @@ PerformanceSequence render(std::vector<u8> bytes, Layout layout = runtimeLayout(
   bytes.resize(std::max<size_t>(bytes.size(), 0x500));
   writeBytes(bytes, layout.instrumentTableAddress, {0x8f, 0xe0, 0x00, 0x10});
   const ByteReader reader{SourceId{301}, bytes};
-  const SequenceProgramConfig& config = sequenceConfig(layout.version);
+  const SequenceProgramConfig config = sequenceConfig(layout);
   SequenceProgram program{
       .runtime = sequenceRuntime(reader, layout),
       .timebase = config.timebase,
@@ -219,6 +222,42 @@ void reusedSectionsDoNotImplyLoops() {
          "reusing a section should not stop playback before the driver's explicit loop command");
 }
 
+void excessRepeatStartsAreIgnored() {
+  std::vector<u8> bytes(0x40);
+  writeBytes(bytes, 0, {0x00, 0x10, 0xff});
+  writeBytes(bytes, 0x10, {0xfb, 0xfb, 0xfb, 0x3c, 1, 1, 0x7f, 0xfc, 1, 0xfc, 1, 0xfd});
+
+  const PerformanceSequence performance = render(std::move(bytes));
+  const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  expect(performance.diagnostics.empty() && performance.tracks.front().endTick == 1 && notes.size() == 1,
+         "a third nested repeat start should be ignored, matching the driver's two-slot repeat stack");
+}
+
+SourceAnnotation extendedCommandAnnotation(Version version, bool pitchDrift, u8 command) {
+  std::vector<u8> bytes(0x100);
+  writeBytes(bytes, 0, {0x00, 0x60, 0xff});
+  writeBytes(bytes, 0x60, {0xff, command, 0, 0xfd});
+  Layout layout = runtimeLayout(version);
+  layout.hasPitchDrift = pitchDrift;
+  const ByteReader reader{SourceId{304}, bytes};
+  SourceMapBuilder sourceMap;
+  static_cast<void>(decodeSequence(reader, layout, AssetId{304}, &sourceMap));
+  const SourceMap annotations = sourceMap.finish();
+  return commandAnnotationAt(annotations, reader.source(), 0x60);
+}
+
+void extendedCommandsRetainSourceMetadata() {
+  const SourceAnnotation noise = extendedCommandAnnotation(Version::Original, false, 0x11);
+  const SourceAnnotation reserved = extendedCommandAnnotation(Version::Modern, false, 0x05);
+  const SourceAnnotation drift = extendedCommandAnnotation(Version::Modern, true, 0x05);
+  expect(noise.label == "DSP Noise On" && noise.playbackStatus == CommandPlaybackStatus::SourceOnly &&
+             noise.category() == "noise" && reserved.label == "Reserved Extended Command" &&
+             reserved.sequenceSemantic == SequenceSemantic::Meta && reserved.category() == "reserved" &&
+             drift.label == "Pitch Drift Up" && drift.sequenceSemantic == SequenceSemantic::Pitch &&
+             drift.playbackStatus == CommandPlaybackStatus::AffectsPlayback,
+         "extended commands should retain source-only, reserved, and playback metadata");
+}
+
 void modernEffectsRetainPhysicalDriverState() {
   std::vector<u8> bytes(0x100);
   writeBytes(bytes, 0, {0x00, 0x10, 0xff});
@@ -293,6 +332,8 @@ void runNeverlandSnesModuleTests() {
   playlistTransposeDoesNotLeakIntoLaterSections();
   repeatFramesCanSpanSections();
   reusedSectionsDoNotImplyLoops();
+  excessRepeatStartsAreIgnored();
+  extendedCommandsRetainSourceMetadata();
   modernEffectsRetainPhysicalDriverState();
   originalAdsrSiblingResetAndEnergyDriftAreAudited();
 }

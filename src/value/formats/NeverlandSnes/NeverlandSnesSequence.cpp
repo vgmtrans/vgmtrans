@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <optional>
 #include <set>
 #include <string>
 #include <utility>
@@ -36,7 +35,7 @@ constexpr std::array<u8, 128> kSineMagnitude{
     0x2e, 0x2b, 0x28, 0x25, 0x22, 0x1f, 0x1c, 0x19, 0x16, 0x13, 0x10, 0x0d, 0x09, 0x06, 0x03, 0x00,
 };
 constexpr std::array<u16, 12> kPitchTable{
-    0x217d, 0x237b, 0x2597, 0x27d3, 0x2a31, 0x2cb3, 0x2f5c, 0x322d, 0x3529, 0x3852, 0x3bab, 0x3f38,
+    kPitchTableC8, 0x237b, 0x2597, 0x27d3, 0x2a31, 0x2cb3, 0x2f5c, 0x322d, 0x3529, 0x3852, 0x3bab, 0x3f38,
 };
 
 namespace math {
@@ -61,7 +60,10 @@ namespace math {
 
 [[nodiscard]] double signedDspGain(s8 raw) { return raw / 128.0; }
 
-[[nodiscard]] double modernEchoGain(u8 raw, u8 master) {
+[[nodiscard]] double echoGain(Version version, u8 raw, u8 master) {
+  if (version == Version::Original) {
+    return signedDspGain(static_cast<s8>(raw));
+  }
   const u8 dspValue = static_cast<u8>((static_cast<u16>(raw) * master) / 128u);
   return signedDspGain(static_cast<s8>(dspValue));
 }
@@ -79,14 +81,14 @@ namespace math {
 
 [[nodiscard]] double melodicKey(u8 raw) { return normalizedNote(raw) + 24.0; }
 
-[[nodiscard]] double instrumentUnityKey(ByteReader reader, u16 table, u8 program) {
+[[nodiscard]] double programUnityKey(ByteReader reader, u16 table, u8 program) {
   const u32 address = table + program * 4u;
   const u16 tuning = reader.has(address, 4) ? reader.be16(address + 2) : u16{0x0100};
-  return 120.0 - 12.0 * std::log2((kPitchTable[0] / 4096.0) * instrumentPitchScale(tuning));
+  return instrumentUnityKey(tuning);
 }
 
 [[nodiscard]] double percussionKey(ByteReader reader, u16 table, const PercussionPatch& patch) {
-  return instrumentUnityKey(reader, table, patch.program) +
+  return programUnityKey(reader, table, patch.program) +
          12.0 * std::log2(std::max<u16>(patch.pitch, 1) / 4096.0);
 }
 
@@ -113,14 +115,10 @@ namespace math {
 }
 
 [[nodiscard]] ModulationRange vibratoRange(u8 depth, u8 strength) {
-  double minimum = 0.0;
-  double maximum = 0.0;
-  for (u32 phase = 0; phase < 256; ++phase) {
-    const double semitones = 12.0 * std::log2(vibratoRatio(static_cast<u8>(phase), depth, strength));
-    minimum = std::min(minimum, semitones);
-    maximum = std::max(maximum, semitones);
-  }
-  return {.minimum = minimum, .maximum = maximum};
+  return {
+      .minimum = 12.0 * std::log2(vibratoRatio(0xc0, depth, strength)),
+      .maximum = 12.0 * std::log2(vibratoRatio(0x40, depth, strength)),
+  };
 }
 
 [[nodiscard]] std::vector<double> vibratoSamples(u8 depth, u8 strength, double normalization) {
@@ -176,24 +174,15 @@ struct EchoState {
 };
 
 struct ProgramState {
-  ProgramState(const SequenceProgram&, const RuntimeConfig& config)
-      : version(config.layout.version),
-        tempoTarget(config.layout.initialTempo),
-        masterVolume(config.layout.initialMasterVolume) {
+  ProgramState(const SequenceProgram&, const RuntimeConfig& config) : tempoTarget(config.layout.initialTempo) {
     echo.delay = config.layout.initialEchoDelay;
-    if (version == Version::Original) {
-      echo.left = echo.right = math::signedDspGain(static_cast<s8>(config.layout.initialEchoVolume));
-    } else {
-      echo.left = echo.right =
-          math::modernEchoGain(config.layout.initialEchoVolume, config.layout.initialMasterVolume);
-    }
+    echo.left = echo.right = math::echoGain(config.layout.version, config.layout.initialEchoVolume,
+                                            config.layout.initialMasterVolume);
     echo.feedback = static_cast<s8>(config.layout.initialEchoFeedback);
     echo.filter = config.layout.initialEchoFilter;
   }
 
-  Version version;
   u8 tempoTarget;
-  u8 masterVolume;
   EchoState echo;
 };
 
@@ -201,19 +190,15 @@ struct TrackState {
   TrackState(const TrackProgram& source, const RuntimeConfig& config)
       : reader(config.reader),
         layout(config.layout),
-        trackNumber(source.sourceTrackNumber),
         percussion(config.layout.tracks[std::min<u32>(source.sourceTrackNumber, kTrackCount - 1)].percussion),
-        voiceBit(static_cast<u8>(1u << std::min<u32>(source.sourceTrackNumber, 7))),
-        volume(config.layout.version == Version::Original ? 0x60 : (config.layout.hasPitchDrift ? 0x7f : 0x70)) {}
+        voiceBit(static_cast<u8>(1u << std::min<u32>(source.sourceTrackNumber, 7))) {}
 
   ByteReader reader;
   Layout layout;
-  u32 trackNumber = 0;
   bool percussion = false;
   u8 voiceBit = 1;
   u16 playlistAddress = 0;
   u8 transpose = 0;
-  u8 volume = 0x70;
   u8 pan = 0x40;
   bool invertLeft = false;
   bool invertRight = false;
@@ -224,7 +209,7 @@ struct TrackState {
   u8 savedDuration = 0;
   u8 savedVelocity = 0;
   PerformanceNoteId lastNote;
-  std::optional<double> lastKey;
+  double lastKey = 0.0;
   u64 gateEnd = 0;
   double baseDspPitch = 0.0;
 
@@ -345,7 +330,7 @@ struct Playback {
 
     const u8 effective = static_cast<u8>(rawKey + track.transpose);
     double key = math::melodicKey(effective);
-    if (duration == 0 && (!track.percussion || program.version == Version::Original)) {
+    if (duration == 0 && (!track.percussion || track.layout.version == Version::Original)) {
       if (track.lastNote.valid()) {
         static_cast<void>(out.setNoteEnd(track.lastNote, vm.tick() + wait));
       }
@@ -359,7 +344,7 @@ struct Playback {
       if (patch == nullptr) {
         // The early driver has already installed the delta-time before its
         // percussion search; the later driver installs it only on a match.
-        return program.version == Version::Original ? Effects::wait(wait) : Effects{};
+        return track.layout.version == Version::Original ? Effects::wait(wait) : Effects{};
       }
       selectProgram(patch->program);
       track.pan = patch->pan;
@@ -372,7 +357,7 @@ struct Playback {
     }
     emitDrift();
 
-    const bool extend = track.lastNote.valid() && track.lastKey && std::abs(*track.lastKey - key) < 0.000001 &&
+    const bool extend = track.lastNote.valid() && std::abs(track.lastKey - key) < 0.000001 &&
                         vm.tick() < track.gateEnd;
     NotePerformanceEvent event{
         .key = key,
@@ -391,7 +376,6 @@ struct Playback {
   }
 
   [[nodiscard]] Effects volume(u8 wait, u8 value) {
-    track.volume = value;
     out.level(math::gain(value), ValueQuantization{.levels = 128});
     return Effects::wait(wait);
   }
@@ -431,15 +415,19 @@ struct Playback {
   }
 
   [[nodiscard]] Effects repeatStart(Address start) {
-    if (track.repeatDepth >= track.repeats.size()) {
-      return vm.end();
+    if (track.repeatDepth < track.repeats.size()) {
+      track.repeats[track.repeatDepth++] = RepeatFrame{
+          .start = start,
+          .playlistAddress = track.playlistAddress,
+          .transpose = track.transpose,
+      };
     }
-    track.repeats[track.repeatDepth++] = RepeatFrame{
-        .start = start,
-        .playlistAddress = track.playlistAddress,
-        .transpose = track.transpose,
-    };
     return {};
+  }
+
+  void restoreRepeat(const RepeatFrame& repeat) {
+    track.playlistAddress = repeat.playlistAddress;
+    track.transpose = repeat.transpose;
   }
 
   [[nodiscard]] Effects repeatEnd(u8 count) {
@@ -448,8 +436,7 @@ struct Playback {
     }
     RepeatFrame& repeat = track.repeats[track.repeatDepth - 1];
     if (count == 0) {
-      track.playlistAddress = repeat.playlistAddress;
-      track.transpose = repeat.transpose;
+      restoreRepeat(repeat);
       return vm.declaredLoop(repeat.start);
     }
     if (count == 1) {
@@ -461,8 +448,7 @@ struct Playback {
       counter.start(count);
     }
     if (counter.consumeReplay()) {
-      track.playlistAddress = repeat.playlistAddress;
-      track.transpose = repeat.transpose;
+      restoreRepeat(repeat);
       return vm.finiteBranch(repeat.start);
     }
     counter.finish();
@@ -492,8 +478,7 @@ struct Playback {
   }
 
   void echoVolume(u8 value, u8 channel) {
-    const double gain = program.version == Version::Original ? math::signedDspGain(static_cast<s8>(value))
-                                                              : math::modernEchoGain(value, program.masterVolume);
+    const double gain = math::echoGain(track.layout.version, value, track.layout.initialMasterVolume);
     if (channel != 1) {
       program.echo.left = gain;
     }
@@ -525,40 +510,32 @@ struct Playback {
     emitBalance();
   }
 
-  void attack(u8 raw) {
-    if (program.version == Version::Original) {
-      out.restoreEnvelope(EnvelopeFields::Decay, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+  void updateEnvelope(Envelope envelope, EnvelopeFields field, EnvelopeFields originalSibling) {
+    constexpr VoiceEnvelopeScope scope = VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks;
+    if (track.layout.version == Version::Original) {
+      out.restoreEnvelope(originalSibling, scope);
     }
-    out.updateEnvelope(EnvelopeUpdate::set(Envelope{.attackSeconds = snesDspAdsrAttackSeconds(raw & 0x0f)},
-                                           EnvelopeFields::Attack),
-                       VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    out.updateEnvelope(EnvelopeUpdate::set(std::move(envelope), field), scope);
+  }
+
+  void attack(u8 raw) {
+    updateEnvelope(Envelope{.attackSeconds = snesDspAdsrAttackSeconds(raw & 0x0f)}, EnvelopeFields::Attack,
+                   EnvelopeFields::Decay);
   }
 
   void decay(u8 raw) {
-    if (program.version == Version::Original) {
-      out.restoreEnvelope(EnvelopeFields::Attack, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
-    }
-    out.updateEnvelope(EnvelopeUpdate::set(Envelope{.decaySeconds = snesDspAdsrDecaySeconds(raw & 7)},
-                                           EnvelopeFields::Decay),
-                       VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    updateEnvelope(Envelope{.decaySeconds = snesDspAdsrDecaySeconds(raw & 7)}, EnvelopeFields::Decay,
+                   EnvelopeFields::Attack);
   }
 
   void sustain(u8 raw) {
-    if (program.version == Version::Original) {
-      out.restoreEnvelope(EnvelopeFields::SecondDecay, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
-    }
-    out.updateEnvelope(EnvelopeUpdate::set(Envelope{.sustainAmplitude = ((raw & 7) + 1) / 8.0},
-                                           EnvelopeFields::Sustain),
-                       VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    updateEnvelope(Envelope{.sustainAmplitude = ((raw & 7) + 1) / 8.0}, EnvelopeFields::Sustain,
+                   EnvelopeFields::SecondDecay);
   }
 
   void sustainRate(u8 raw) {
-    if (program.version == Version::Original) {
-      out.restoreEnvelope(EnvelopeFields::Sustain, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
-    }
-    out.updateEnvelope(EnvelopeUpdate::set(Envelope{.secondDecaySeconds = snesDspAdsrSustainSeconds(raw & 0x1f)},
-                                           EnvelopeFields::SecondDecay),
-                       VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    updateEnvelope(Envelope{.secondDecaySeconds = snesDspAdsrSustainSeconds(raw & 0x1f)},
+                   EnvelopeFields::SecondDecay, EnvelopeFields::Sustain);
   }
 
   void setVibratoDepth(u8 value) {
@@ -654,196 +631,127 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       .discoverTarget(Address{static_cast<u16>(begin + 2)});
 }
 
-[[nodiscard]] DecodedBytecodeCommand decodeSubcommand(Cursor& cursor, Version version, bool pitchDrift,
-                                                      u8 encodedCommand) {
-  std::string_view label = "Reserved Extended Command";
-  SequenceSemantic semantic = SequenceSemantic::Meta;
-  CommandPlaybackStatus status = CommandPlaybackStatus::SourceOnly;
-  std::string_view category = "reserved";
-  const auto describe = [&](std::string_view newLabel, SequenceSemantic newSemantic,
-                            CommandPlaybackStatus newStatus = CommandPlaybackStatus::AffectsPlayback,
-                            std::string_view newCategory = {}) {
-    label = newLabel;
-    semantic = newSemantic;
-    status = newStatus;
-    category = newCategory;
-  };
+template <auto Handler, class... Args>
+[[nodiscard]] DecodedBytecodeCommand valueSubcommand(Cursor& cursor, std::string_view label,
+                                                     SequenceSemantic semantic, Args... args) {
+  auto event = cursor.command(label, semantic);
+  static_cast<void>(event.u8("command", SourceValueDisplay::Hex));
+  return event.invoke<Handler>(event.u8("value", SourceValueDisplay::Hex), args...);
+}
+
+template <auto Handler, class... Args>
+[[nodiscard]] DecodedBytecodeCommand fixedSubcommand(Cursor& cursor, std::string_view label,
+                                                     SequenceSemantic semantic, Args... args) {
+  auto event = cursor.command(label, semantic);
+  static_cast<void>(event.u8("command", SourceValueDisplay::Hex));
+  static_cast<void>(event.u8("value", SourceValueDisplay::Hex));
+  return event.invoke<Handler>(args...);
+}
+
+[[nodiscard]] DecodedBytecodeCommand sourceSubcommand(Cursor& cursor, std::string_view label,
+                                                      SequenceSemantic semantic, std::string_view category) {
+  auto event = cursor.command(label, semantic, CommandPlaybackStatus::SourceOnly, category);
+  static_cast<void>(event.u8("command", SourceValueDisplay::Hex));
+  static_cast<void>(event.u8("value", SourceValueDisplay::Hex));
+  return event;
+}
+
+[[nodiscard]] DecodedBytecodeCommand decodeSubcommand(Cursor& cursor, Version version, bool pitchDrift, u8 command) {
+  switch (command) {
+    case 0x00: return valueSubcommand<&Playback::echoDelay>(cursor, "Echo Delay", SequenceSemantic::State);
+    case 0x01: return valueSubcommand<&Playback::echoFeedback>(cursor, "Echo Feedback", SequenceSemantic::State);
+    case 0x02: return valueSubcommand<&Playback::echoFilter>(cursor, "Echo Filter", SequenceSemantic::State);
+    case 0x03: return fixedSubcommand<&Playback::echoEnabled>(cursor, "Echo On", SequenceSemantic::State, true);
+    case 0x04: return fixedSubcommand<&Playback::echoEnabled>(cursor, "Echo Off", SequenceSemantic::State, false);
+    default: break;
+  }
+
   if (version == Version::Original) {
-    switch (encodedCommand) {
-      case 0x00: describe("Echo Delay", SequenceSemantic::State); break;
-      case 0x01: describe("Echo Feedback", SequenceSemantic::State); break;
-      case 0x02: describe("Echo Filter", SequenceSemantic::State); break;
-      case 0x03: describe("Echo On", SequenceSemantic::State); break;
-      case 0x04: describe("Echo Off", SequenceSemantic::State); break;
-      case 0x0b: describe("Attack Rate", SequenceSemantic::Envelope); break;
-      case 0x0c: describe("Decay Rate", SequenceSemantic::Envelope); break;
-      case 0x0d: describe("Sustain Level", SequenceSemantic::Envelope); break;
-      case 0x0e: describe("Sustain Rate", SequenceSemantic::Envelope); break;
-      case 0x0f: describe("Echo Volume Right", SequenceSemantic::State); break;
-      case 0x10: describe("Echo Volume Left", SequenceSemantic::State); break;
-      case 0x11: describe("DSP Noise On", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly, "noise"); break;
+    switch (command) {
+      case 0x0b: return valueSubcommand<&Playback::attack>(cursor, "Attack Rate", SequenceSemantic::Envelope);
+      case 0x0c: return valueSubcommand<&Playback::decay>(cursor, "Decay Rate", SequenceSemantic::Envelope);
+      case 0x0d: return valueSubcommand<&Playback::sustain>(cursor, "Sustain Level", SequenceSemantic::Envelope);
+      case 0x0e: return valueSubcommand<&Playback::sustainRate>(cursor, "Sustain Rate", SequenceSemantic::Envelope);
+      case 0x0f:
+        return valueSubcommand<&Playback::echoVolume>(cursor, "Echo Volume Right", SequenceSemantic::State, u8{1});
+      case 0x10:
+        return valueSubcommand<&Playback::echoVolume>(cursor, "Echo Volume Left", SequenceSemantic::State, u8{0});
+      case 0x11: return sourceSubcommand(cursor, "DSP Noise On", SequenceSemantic::State, "noise");
       case 0x13:
-        describe("DSP Pitch Modulation On", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly,
-                 "pitch-modulation");
-        break;
+        return sourceSubcommand(cursor, "DSP Pitch Modulation On", SequenceSemantic::State, "pitch-modulation");
       case 0x14:
-        describe("DSP Noise Frequency", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly,
-                 "noise-frequency");
-        break;
-      case 0x15: describe("DSP Noise Off", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly, "noise"); break;
-      case 0x16: describe("Echo Volume", SequenceSemantic::State); break;
+        return sourceSubcommand(cursor, "DSP Noise Frequency", SequenceSemantic::State, "noise-frequency");
+      case 0x15: return sourceSubcommand(cursor, "DSP Noise Off", SequenceSemantic::State, "noise");
+      case 0x16:
+        return valueSubcommand<&Playback::echoVolume>(cursor, "Echo Volume", SequenceSemantic::State, u8{2});
       case 0x17:
-        describe("DSP Pitch Modulation Off", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly,
-                 "pitch-modulation");
-        break;
+        return sourceSubcommand(cursor, "DSP Pitch Modulation Off", SequenceSemantic::State, "pitch-modulation");
       default: break;
     }
   } else {
-    switch (encodedCommand) {
-      case 0x00: describe("Echo Delay", SequenceSemantic::State); break;
-      case 0x01: describe("Echo Feedback", SequenceSemantic::State); break;
-      case 0x02: describe("Echo Filter", SequenceSemantic::State); break;
-      case 0x03: describe("Echo On", SequenceSemantic::State); break;
-      case 0x04: describe("Echo Off", SequenceSemantic::State); break;
+    switch (command) {
       case 0x05:
       case 0x06:
         if (pitchDrift) {
-          describe(encodedCommand == 5 ? "Pitch Drift Up" : "Pitch Drift Down", SequenceSemantic::Pitch);
+          return valueSubcommand<&Playback::pitchDrift>(cursor, command == 5 ? "Pitch Drift Up" : "Pitch Drift Down",
+                                                       SequenceSemantic::Pitch, command == 6);
         }
         break;
       case 0x07:
         if (pitchDrift) {
-          describe("Pitch Drift Off", SequenceSemantic::Pitch);
+          return fixedSubcommand<&Playback::pitchDriftOff>(cursor, "Pitch Drift Off", SequenceSemantic::Pitch);
         }
         break;
-      case 0x08: describe("Attack Rate", SequenceSemantic::Envelope); break;
-      case 0x09: describe("Decay Rate", SequenceSemantic::Envelope); break;
-      case 0x0a: describe("Sustain Level", SequenceSemantic::Envelope); break;
-      case 0x0b: describe("Sustain Rate", SequenceSemantic::Envelope); break;
+      case 0x08: return valueSubcommand<&Playback::attack>(cursor, "Attack Rate", SequenceSemantic::Envelope);
+      case 0x09: return valueSubcommand<&Playback::decay>(cursor, "Decay Rate", SequenceSemantic::Envelope);
+      case 0x0a: return valueSubcommand<&Playback::sustain>(cursor, "Sustain Level", SequenceSemantic::Envelope);
+      case 0x0b: return valueSubcommand<&Playback::sustainRate>(cursor, "Sustain Rate", SequenceSemantic::Envelope);
       case 0x0c:
-        describe("Unused Envelope Rate", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly,
-                 "unused-envelope-rate");
-        break;
-      case 0x0d: describe("Echo Volume", SequenceSemantic::State); break;
-      case 0x0e: describe("Echo Volume Right", SequenceSemantic::State); break;
-      case 0x0f: describe("Echo Volume Left", SequenceSemantic::State); break;
+        return sourceSubcommand(cursor, "Unused Envelope Rate", SequenceSemantic::State, "unused-envelope-rate");
+      case 0x0d:
+        return valueSubcommand<&Playback::echoVolume>(cursor, "Echo Volume", SequenceSemantic::State, u8{2});
+      case 0x0e:
+        return valueSubcommand<&Playback::echoVolume>(cursor, "Echo Volume Right", SequenceSemantic::State, u8{1});
+      case 0x0f:
+        return valueSubcommand<&Playback::echoVolume>(cursor, "Echo Volume Left", SequenceSemantic::State, u8{0});
       case 0x10:
-        describe("DSP Noise Frequency", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly,
-                 "noise-frequency");
-        break;
-      case 0x11: describe("DSP Noise On", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly, "noise"); break;
-      case 0x12: describe("DSP Noise Off", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly, "noise"); break;
+        return sourceSubcommand(cursor, "DSP Noise Frequency", SequenceSemantic::State, "noise-frequency");
+      case 0x11: return sourceSubcommand(cursor, "DSP Noise On", SequenceSemantic::State, "noise");
+      case 0x12: return sourceSubcommand(cursor, "DSP Noise Off", SequenceSemantic::State, "noise");
       case 0x13:
-        describe("DSP Pitch Modulation On", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly,
-                 "pitch-modulation");
-        break;
+        return sourceSubcommand(cursor, "DSP Pitch Modulation On", SequenceSemantic::State, "pitch-modulation");
       case 0x14:
-        describe("DSP Pitch Modulation Off", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly,
-                 "pitch-modulation");
-        break;
-      case 0x15: describe("Tremolo Depth", SequenceSemantic::Modulation); break;
-      case 0x16: describe("Vibrato Depth", SequenceSemantic::Modulation); break;
-      case 0x17: describe("Tremolo Rate", SequenceSemantic::Modulation); break;
-      case 0x18: describe("Vibrato Rate", SequenceSemantic::Modulation); break;
-      case 0x19: describe("Invert Left Dry Phase", SequenceSemantic::Pan); break;
-      case 0x1a: describe("Invert Right Dry Phase", SequenceSemantic::Pan); break;
-      case 0x1b: describe("Normal Dry Phase", SequenceSemantic::Pan); break;
-      case 0x1c: describe("Invert Left Echo Phase", SequenceSemantic::State); break;
-      case 0x1d: describe("Invert Right Echo Phase", SequenceSemantic::State); break;
-      case 0x1e: describe("Normal Echo Phase", SequenceSemantic::State); break;
+        return sourceSubcommand(cursor, "DSP Pitch Modulation Off", SequenceSemantic::State, "pitch-modulation");
+      case 0x15:
+        return valueSubcommand<&Playback::setTremoloDepth>(cursor, "Tremolo Depth", SequenceSemantic::Modulation);
+      case 0x16:
+        return valueSubcommand<&Playback::setVibratoDepth>(cursor, "Vibrato Depth", SequenceSemantic::Modulation);
+      case 0x17:
+        return valueSubcommand<&Playback::setTremoloRate>(cursor, "Tremolo Rate", SequenceSemantic::Modulation);
+      case 0x18:
+        return valueSubcommand<&Playback::setVibratoRate>(cursor, "Vibrato Rate", SequenceSemantic::Modulation);
+      case 0x19:
+        return fixedSubcommand<&Playback::dryPhase>(cursor, "Invert Left Dry Phase", SequenceSemantic::Pan, u8{0});
+      case 0x1a:
+        return fixedSubcommand<&Playback::dryPhase>(cursor, "Invert Right Dry Phase", SequenceSemantic::Pan, u8{1});
+      case 0x1b:
+        return fixedSubcommand<&Playback::dryPhase>(cursor, "Normal Dry Phase", SequenceSemantic::Pan, u8{2});
+      case 0x1c:
+        return fixedSubcommand<&Playback::echoReverse>(cursor, "Invert Left Echo Phase", SequenceSemantic::State,
+                                                      u8{0});
+      case 0x1d:
+        return fixedSubcommand<&Playback::echoReverse>(cursor, "Invert Right Echo Phase", SequenceSemantic::State,
+                                                      u8{1});
+      case 0x1e:
+        return fixedSubcommand<&Playback::echoReverse>(cursor, "Normal Echo Phase", SequenceSemantic::State, u8{2});
       default: break;
     }
   }
-
-  auto event = cursor.command(label, semantic, status, category);
-  const u8 command = event.u8("command", SourceValueDisplay::Hex);
-  const u8 value = event.u8("value", SourceValueDisplay::Hex);
-  if (version == Version::Original) {
-    switch (command) {
-      case 0x00:
-        return event.invoke<&Playback::echoDelay>(value);
-      case 0x01:
-        return event.invoke<&Playback::echoFeedback>(value);
-      case 0x02:
-        return event.invoke<&Playback::echoFilter>(value);
-      case 0x03:
-      case 0x04:
-        return event.invoke<&Playback::echoEnabled>(command == 3);
-      case 0x0b:
-        return event.invoke<&Playback::attack>(value);
-      case 0x0c:
-        return event.invoke<&Playback::decay>(value);
-      case 0x0d:
-        return event.invoke<&Playback::sustain>(value);
-      case 0x0e:
-        return event.invoke<&Playback::sustainRate>(value);
-      case 0x0f:
-      case 0x10:
-      case 0x16:
-        return event.invoke<&Playback::echoVolume>(
-            value, command == 0x0f ? u8{1} : (command == 0x10 ? u8{0} : u8{2}));
-      default:
-        return event;
-    }
-  }
-
-  switch (command) {
-    case 0x00:
-      return event.invoke<&Playback::echoDelay>(value);
-    case 0x01:
-      return event.invoke<&Playback::echoFeedback>(value);
-    case 0x02:
-      return event.invoke<&Playback::echoFilter>(value);
-    case 0x03:
-    case 0x04:
-      return event.invoke<&Playback::echoEnabled>(command == 3);
-    case 0x05:
-    case 0x06:
-      if (pitchDrift) {
-        return event.invoke<&Playback::pitchDrift>(value, command == 6);
-      }
-      return event;
-    case 0x07:
-      if (pitchDrift) {
-        return event.invoke<&Playback::pitchDriftOff>();
-      }
-      return event;
-    case 0x08:
-      return event.invoke<&Playback::attack>(value);
-    case 0x09:
-      return event.invoke<&Playback::decay>(value);
-    case 0x0a:
-      return event.invoke<&Playback::sustain>(value);
-    case 0x0b:
-      return event.invoke<&Playback::sustainRate>(value);
-    case 0x0d:
-    case 0x0e:
-    case 0x0f:
-      return event.invoke<&Playback::echoVolume>(
-          value, command == 0x0e ? u8{1} : (command == 0x0f ? u8{0} : u8{2}));
-    case 0x15:
-      return event.invoke<&Playback::setTremoloDepth>(value);
-    case 0x16:
-      return event.invoke<&Playback::setVibratoDepth>(value);
-    case 0x17:
-      return event.invoke<&Playback::setTremoloRate>(value);
-    case 0x18:
-      return event.invoke<&Playback::setVibratoRate>(value);
-    case 0x19:
-    case 0x1a:
-    case 0x1b:
-      return event.invoke<&Playback::dryPhase>(command == 0x19 ? u8{0} : (command == 0x1a ? u8{1} : u8{2}));
-    case 0x1c:
-    case 0x1d:
-    case 0x1e:
-      return event.invoke<&Playback::echoReverse>(command == 0x1c ? u8{0} : (command == 0x1d ? u8{1} : u8{2}));
-    default:
-      return event;
-  }
+  return sourceSubcommand(cursor, "Reserved Extended Command", SequenceSemantic::Meta, "reserved");
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, const Layout& layout,
-                                                   bool percussion, std::vector<Diagnostic>* diagnostics,
+                                                   std::vector<Diagnostic>* diagnostics,
                                                    ReferencedPrograms* references = nullptr) {
   Cursor cursor(reader, begin, "neverland-snes", diagnostics);
   if (!cursor.hasOpcode()) {
@@ -858,11 +766,6 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     const u8 wait = save ? event.u8("wait", SemanticOperandRole::Duration) : 0;
     const u8 duration = save ? event.u8("duration", SemanticOperandRole::Duration) : 0;
     const u8 velocity = save ? event.u8("volume", SemanticOperandRole::Level) : 0;
-    if (references != nullptr && percussion) {
-      for (const PercussionPatch& patch : layout.percussion) {
-        references->programs.insert(patch.program);
-      }
-    }
     return event.invokeFlow<&Playback::note>(key, wait, duration, velocity, save);
   }
 
@@ -920,7 +823,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 wait = event.u8("wait", SemanticOperandRole::Duration);
       const u8 program = event.u8("program", SemanticOperandRole::InstrumentProgram);
       if (references != nullptr) {
-        references->programs.insert(program);
+        references->insert(program);
       }
       return event.invokeFlow<&Playback::programChange>(wait, program);
     }
@@ -949,17 +852,17 @@ using Cursor = CompilerCursor<TrackState, Playback>;
                                        u32 trackNumber, u32 playlistAddress, std::vector<Diagnostic>* diagnostics,
                                        ReferencedPrograms* references) {
   const std::set<u32> playlist = playlistOffsets(reader, static_cast<u16>(playlistAddress));
-  const bool percussion = layout.tracks[std::min<u32>(trackNumber, kTrackCount - 1)].percussion;
   return scope.decode(trackNumber, playlistAddress, [&](u32 offset) {
     return playlist.contains(offset) ? decodePlaylist(reader, offset, layout, diagnostics)
-                                     : decodeCommand(reader, offset, layout, percussion, diagnostics, references);
+                                     : decodeCommand(reader, offset, layout, diagnostics, references);
   });
 }
 
 }  // namespace
 
-const SequenceProgramConfig& sequenceConfig(Version version) {
-  static const SequenceProgramConfig original = SequenceProgramConfig{
+SequenceProgramConfig sequenceConfig(const Layout& layout) {
+  const bool original = layout.version == Version::Original;
+  return SequenceProgramConfig{
       .commandKindPrefix = "neverland-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
@@ -967,31 +870,14 @@ const SequenceProgramConfig& sequenceConfig(Version version) {
               .commandLimit = kCommandLimit,
               .inferLoopsFromRepeatedState = false,
               .initialSourceInstrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0},
-              .initialLevel = math::gain(0x60),
-              .initialMasterLevel = 1.0,
+              .initialLevel = math::gain(original ? 0x60 : (layout.hasPitchDrift ? 0x7f : 0x70)),
+              .initialMasterLevel = math::signedDspGain(static_cast<s8>(layout.initialMasterVolume)),
               .initialReverbSend = 0.0,
               .initialStereoBalance = math::balance(0x40),
               .initialMonoModeChannels = 0,
-              .initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(0x40),
+              .initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(layout.initialTempo),
           },
   };
-  static const SequenceProgramConfig modern = SequenceProgramConfig{
-      .commandKindPrefix = "neverland-snes",
-      .timebase = Timebase{.ppqn = kPpqn},
-      .behavior =
-          SequenceProgramBehavior{
-              .commandLimit = kCommandLimit,
-              .inferLoopsFromRepeatedState = false,
-              .initialSourceInstrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0},
-              .initialLevel = math::gain(0x70),
-              .initialMasterLevel = math::signedDspGain(0x70),
-              .initialReverbSend = 0.0,
-              .initialStereoBalance = math::balance(0x40),
-              .initialMonoModeChannels = 0,
-              .initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(0x40),
-          },
-  };
-  return version == Version::Original ? original : modern;
 }
 
 SequenceRuntime sequenceRuntime(ByteReader reader, const Layout& layout) {
@@ -1008,12 +894,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
                              std::vector<Diagnostic>* diagnostics) {
   const u32 headerSize = layout.version == Version::Modern ? 0x50 : 0x40;
   const SourceRange header = reader.range(layout.sequenceBaseAddress, headerSize);
-  SequenceProgramConfig config = sequenceConfig(layout.version);
-  config.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(layout.initialTempo);
-  config.behavior.initialMasterLevel = math::signedDspGain(static_cast<s8>(layout.initialMasterVolume));
-  if (layout.hasPitchDrift) {
-    config.behavior.initialLevel = math::gain(0x7f);
-  }
+  const SequenceProgramConfig config = sequenceConfig(layout);
   SequenceDecodeSession sequence{reader, config, sequenceId, header, sourceMap, kCommandLimit, kAramSize};
   ReferencedPrograms references;
   for (u32 track = 0; track < kTrackCount; ++track) {
@@ -1021,8 +902,12 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     if (!source.active) {
       continue;
     }
-    if (!source.percussion) {
-      references.programs.insert(0);
+    if (source.percussion) {
+      for (const PercussionPatch& patch : layout.percussion) {
+        references.insert(patch.program);
+      }
+    } else {
+      references.insert(0);
     }
     const std::set<u32> playlist = playlistOffsets(reader, source.playlistAddress);
     sequence.addTrack(
@@ -1030,7 +915,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         [&](u32 offset) {
           return playlist.contains(offset)
                      ? decodePlaylist(reader, offset, layout, diagnostics)
-                     : decodeCommand(reader, offset, layout, source.percussion, diagnostics, &references);
+                     : decodeCommand(reader, offset, layout, diagnostics, &references);
         },
         layout.version == Version::Modern ? static_cast<u16>(source.playlistAddress - layout.sequenceBaseAddress)
                                           : source.playlistAddress);

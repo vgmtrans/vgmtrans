@@ -12,6 +12,7 @@
 #include "value/sequence/SequenceProgramConfig.h"
 
 #include <array>
+#include <cmath>
 #include <optional>
 #include <set>
 #include <string_view>
@@ -24,6 +25,7 @@ inline constexpr u32 kTrackCount = 8;
 inline constexpr u32 kCommandLimit = 131072;
 inline constexpr u16 kPpqn = 48;
 inline constexpr std::string_view kInstrumentDomain = "neverland-snes.instrument";
+inline constexpr u16 kPitchTableC8 = 0x217d;
 
 enum class Version : u8 {
   Original,
@@ -60,13 +62,16 @@ struct Layout {
   std::vector<PercussionPatch> percussion;
 };
 
-struct ReferencedPrograms {
-  std::set<u8> programs;
-};
+using ReferencedPrograms = std::set<u8>;
 
 // Instrument bytes +2/+3 are an unsigned 8.8 multiplier in source order.
 [[nodiscard]] constexpr double instrumentPitchScale(u16 tuning) {
   return static_cast<double>(tuning == 0 ? 1 : tuning) / 256.0;
+}
+
+// The driver's pitch table places C8 at DSP pitch $217D.
+[[nodiscard]] inline double instrumentUnityKey(u16 tuning) {
+  return 120.0 - 12.0 * std::log2((kPitchTableC8 / 4096.0) * instrumentPitchScale(tuning));
 }
 
 struct SequenceParse {
@@ -82,9 +87,8 @@ struct SequenceParse {
 [[nodiscard]] SequenceParse decodeSequence(core::ByteReader reader, const Layout& layout, core::AssetId sequenceId,
                                            core::SourceMapBuilder* sourceMap = nullptr,
                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
-[[nodiscard]] const core::SequenceProgramConfig& sequenceConfig(Version version);
+[[nodiscard]] core::SequenceProgramConfig sequenceConfig(const Layout& layout);
 [[nodiscard]] core::SequenceRuntime sequenceRuntime(core::ByteReader reader, const Layout& layout);
-[[nodiscard]] core::Envelope driverEnvelope(u8 adsr1, u8 adsr2);
 [[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
                                                                const ReferencedPrograms& references,
                                                                std::string_view displayName);
