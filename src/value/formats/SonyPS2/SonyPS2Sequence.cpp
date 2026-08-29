@@ -6,7 +6,6 @@
 
 #include "value/formats/SonyPS2/SonyPS2.h"
 
-#include "value/base/LevelScale.h"
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompiledCommandRuntime.h"
 #include "value/sequence/SequenceVm.h"
@@ -29,6 +28,15 @@ using namespace core;
 namespace {
 
 constexpr u32 kMaxCommands = 1048576;
+constexpr u32 kSeTrackFlag = 1u << 24;
+
+[[nodiscard]] constexpr bool isSeTrack(u32 sourceTrackNumber) noexcept {
+  return (sourceTrackNumber & kSeTrackFlag) != 0;
+}
+
+[[nodiscard]] constexpr u32 seTrackNumber(u8 set, u8 timbre, u8 key) noexcept {
+  return kSeTrackFlag | (static_cast<u32>(set) << 16) | (static_cast<u32>(timbre) << 8) | key;
+}
 
 struct MidiEvent {
   u32 offset = 0;
@@ -50,14 +58,17 @@ struct MidiEvent {
 
 struct TrackState {
   explicit TrackState(const TrackProgram& source)
-      : channel(static_cast<u8>(source.sourceTrackNumber)), seSequence((source.sourceTrackNumber & 0x10000) != 0),
-        seSet(static_cast<u8>((source.sourceTrackNumber >> 8) & 0x0f)),
-        seTimbre(static_cast<u8>(source.sourceTrackNumber & 0x7f)) {}
+      : channel(isSeTrack(source.sourceTrackNumber) ? 0 : static_cast<u8>(source.sourceTrackNumber)),
+        seSequence(isSeTrack(source.sourceTrackNumber)),
+        seSet(static_cast<u8>((source.sourceTrackNumber >> 16) & 0x0f)),
+        seTimbre(static_cast<u8>((source.sourceTrackNumber >> 8) & 0x7f)),
+        seKey(static_cast<u8>(source.sourceTrackNumber & 0x7f)) {}
 
   u8 channel = 0;
   bool seSequence = false;
   u8 seSet = 0;
   u8 seTimbre = 0;
+  u8 seKey = 0;
   u8 bank = 0;
   u8 program = 0;
   u8 nrpnMsb = 127;
@@ -77,6 +88,8 @@ struct TrackState {
   bool sustain = false;
   u16 pitchBendValue = 8192;
   double emittedPitchBendSemitones = 0.0;
+  PerformanceNoteId seNote;
+  double seTerminalKey = 0.0;
   bool initialized = false;
 };
 
@@ -230,7 +243,7 @@ struct Playback {
       } else {
         const auto note = bendRangeForKey(key);
         emitCurrentPitchBend(delayed, note);
-        delayed.noteOn(key, LevelScale::linearFromMidi7(std::min<u8>(velocity, 127)));
+        delayed.noteOn(key, velocityGain(velocity));
         track.activeNotes.push_back(note);
       }
     }
@@ -247,17 +260,32 @@ struct Playback {
   }
 
   Effects seNote(u8 set, u8 timbre, u8 key, u8 velocity, bool noteOnOnly, u32 delta) {
-    if (track.seSequence && set == track.seSet && timbre == track.seTimbre) {
+    if (track.seSequence && set == track.seSet && timbre == track.seTimbre && key == track.seKey) {
       auto delayed = out.at(delayedTick(vm, delta));
       if (velocity == 0) {
         delayed.noteOff(key);
+        track.seNote = {};
       } else {
         // The 0x9n variant asks the driver not to replace an already sounding
         // equal-key voice. ActiveNoteState is key-addressed, so this currently
         // shares ordinary note-on behavior when equal keys overlap.
         (void)noteOnOnly;
-        delayed.noteOn(key, LevelScale::linearFromMidi7(std::min<u8>(velocity, 127)));
+        track.seNote = delayed.noteOn(key, velocityGain(velocity));
+        track.seTerminalKey = key;
       }
+    }
+    return after(delta);
+  }
+
+  Effects sePitch(u8 set, u8 timbre, u8 key, u16 cents, bool negative, u32 time, u32 delta) {
+    if (track.seSequence && set == track.seSet && timbre == track.seTimbre && key == track.seKey &&
+        track.seNote.valid()) {
+      auto delayed = out.at(delayedTick(vm, delta));
+      const double start = delayed.currentPitchTransitionKey(track.seNote).value_or(track.seTerminalKey);
+      const double target = start + (negative ? -cents : cents) / 100.0;
+      const u32 duration = std::max<u32>(time, 1);
+      delayed.pitchSlide(track.seNote, start, target, PitchSlideTiming::fixedDuration(duration, duration));
+      track.seTerminalKey = target;
     }
     return after(delta);
   }
@@ -726,6 +754,8 @@ struct SeEvent {
   u8 key = 0;
   u8 velocity = 0;
   u8 operation = 0;
+  u32 time = 0;
+  u32 value = 0;
   u8 loopId = 0;
   u8 loopCount = 0;
   std::optional<u32> loopDestination;
@@ -767,36 +797,49 @@ struct SeEvent {
         event.timbre = reader.u8At(cursor++);
         event.key = reader.u8At(cursor++);
         event.operation = reader.u8At(cursor++);
-        const auto readTime = [&]() { return readVlq(reader, cursor, layout.dataEnd).has_value(); };
+        const auto readValue = [&](u32& value) {
+          const auto decoded = readVlq(reader, cursor, layout.dataEnd);
+          if (!decoded) {
+            return false;
+          }
+          value = decoded->first;
+          return true;
+        };
         switch (event.operation) {
           case 0x07:
-          case 0x0a:
-          case 0x0b:
           case 0x0c:
           case 0x0d:
-            event.malformed = !readTime() || cursor >= layout.dataEnd;
+            event.malformed = !readValue(event.time) || cursor >= layout.dataEnd;
             if (!event.malformed) {
-              ++cursor;
+              event.value = reader.u8At(cursor++);
             }
+            break;
+          case 0x0a:
+          case 0x0b:
+            event.malformed = !readValue(event.time) || !readValue(event.value);
             break;
           case 0x0e:
           case 0x0f:
-            event.malformed = !readTime() || cursor + 2 > layout.dataEnd;
-            cursor = event.malformed ? cursor : cursor + 2;
+            event.malformed = !readValue(event.time) || cursor + 2 > layout.dataEnd;
+            if (!event.malformed) {
+              event.value = reader.le16(cursor);
+              cursor += 2;
+            }
             break;
           case 0x10:
           case 0x11:
             event.malformed = cursor + 2 > layout.dataEnd;
-            cursor = event.malformed ? cursor : cursor + 2;
+            if (!event.malformed) {
+              event.value = reader.le16(cursor);
+              cursor += 2;
+            }
             break;
           case 0x12:
           case 0x20:
           case 0x21:
-          case 0x22: {
-            const auto value = readVlq(reader, cursor, layout.dataEnd);
-            event.malformed = !value;
+          case 0x22:
+            event.malformed = !readValue(event.value);
             break;
-          }
           default:
             event.malformed = true;
             break;
@@ -853,6 +896,7 @@ struct SeEvent {
   }
   const u8 family = source.opcode & 0xf0;
   const bool note = family == 0x90 || family == 0xa0;
+  const bool pitchSlide = family == 0xb0 && (source.operation == 0x0e || source.operation == 0x0f);
   auto event = cursor.command(source.malformed         ? "Malformed SeSeq Command"
                               : note                   ? (source.velocity == 0 ? "SE Note Off" : "SE Note On")
                               : source.loopDestination ? "SE Jump"
@@ -863,10 +907,10 @@ struct SeEvent {
                               : source.loopDestination ? SequenceSemantic::Loop
                               : source.endEvent        ? SequenceSemantic::End
                                                        : SequenceSemantic::State,
-                              source.malformed  ? CommandPlaybackStatus::Unsupported
-                              : source.endEvent ? CommandPlaybackStatus::StopsPlayback
-                              : family == 0xb0  ? CommandPlaybackStatus::SourceOnly
-                                                : CommandPlaybackStatus::AffectsPlayback);
+                              source.malformed                ? CommandPlaybackStatus::Unsupported
+                              : source.endEvent               ? CommandPlaybackStatus::StopsPlayback
+                              : family == 0xb0 && !pitchSlide ? CommandPlaybackStatus::SourceOnly
+                                                              : CommandPlaybackStatus::AffectsPlayback);
   if (source.end > source.offset + 1) {
     static_cast<void>(event.rawBytes("encoded_bytes", source.end - source.offset - 1));
   }
@@ -893,9 +937,21 @@ struct SeEvent {
   if (source.endEvent) {
     return event.wait(source.delta).end();
   }
+  event.derived("set", source.set, SemanticOperandRole::InstrumentBank);
+  event.derived("timbre", source.timbre, SemanticOperandRole::InstrumentProgram);
+  event.derived("key", source.key, SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
+  event.derived("operation", source.operation);
+  if (source.time != 0 || pitchSlide) {
+    event.derived("time_ms", source.time, SemanticOperandRole::Duration);
+  }
+  event.derived("value", source.value);
+  if (pitchSlide) {
+    return event.invoke<&Playback::sePitch>(source.set, source.timbre, source.key, static_cast<u16>(source.value),
+                                            source.operation == 0x0f, source.time, source.delta);
+  }
   // These commands target one active (set,timbre,note) voice. Emitting a
-  // track-wide fade or LFO update would change sibling notes, so retain their
-  // source semantics and timing without a knowingly incorrect automation.
+  // generic MIDI fade or LFO update would still lose driver-specific curve,
+  // phase, and retargeting semantics, so retain those commands as source data.
   return event.wait(source.delta);
 }
 
@@ -1132,7 +1188,7 @@ std::optional<SequenceProgram> parseSeSequence(ByteReader reader, AssetId id, co
     if ((event.opcode & 0xf0) != 0x90 && (event.opcode & 0xf0) != 0xa0) {
       continue;
     }
-    const u32 voice = 0x10000 | (static_cast<u32>(event.set) << 8) | event.timbre;
+    const u32 voice = seTrackNumber(event.set, event.timbre, event.key);
     if (std::ranges::find(voices, voice) == voices.end()) {
       voices.push_back(voice);
     }

@@ -157,7 +157,7 @@ namespace {
         auto program = parseSeSequence(input.reader, sequence.id(), block, &result.sourceMap(), &result.diagnostics());
         sequence.data(SequenceData{}).program(std::move(*program));
       }
-      result.warning("SonyPS2 SeSeq notes and jumps are playable; per-active-voice fades, pitch, pan, and LFO "
+      result.warning("SonyPS2 SeSeq notes, jumps, and per-voice pitch slides are playable; volume, pan, and LFO "
                      "automation remain source-only",
                      input.reader.range(layout.seSequences->offset, layout.seSequences->size));
     }

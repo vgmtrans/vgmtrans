@@ -6,10 +6,13 @@
 
 #pragma once
 
+#include "value/base/LevelScale.h"
 #include "value/scan/FormatModule.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceProgramConfig.h"
 
+#include <algorithm>
+#include <cmath>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -22,6 +25,25 @@ inline constexpr std::string_view kCollectionResolver = "sony-ps2";
 inline constexpr std::string_view kInstrumentDomain = "sony-ps2.instrument";
 inline constexpr std::string_view kSetbInstrumentDomain = "sony-ps2.setb-instrument";
 inline constexpr std::string_view kCommandKindPrefix = "sony-ps2:sequence";
+
+// modhsyn multiplies the 1..127 note velocity directly into SPU2 voice gain.
+// MIDI targets conventionally square velocity, so sequence notes and synth
+// velocity zones must share this conversion to stay in the same domain.
+[[nodiscard]] constexpr double velocityGain(u8 velocity) noexcept {
+  return static_cast<double>(std::min<u8>(velocity, 127)) / 128.0;
+}
+
+[[nodiscard]] inline u8 midiVelocity(u8 velocity) {
+  return core::LevelScale::midi7FromLinear(velocityGain(velocity));
+}
+
+[[nodiscard]] inline u8 rawVelocityFromMidi(u8 velocity) {
+  if (velocity == 0) {
+    return 0;
+  }
+  return static_cast<u8>(
+      std::clamp<int>(static_cast<int>(std::lround(core::LevelScale::linearFromMidi7(velocity) * 128.0)), 1, 127));
+}
 
 [[nodiscard]] inline core::InstrumentIdentity instrumentIdentity(u16 bank, u8 program) {
   return core::InstrumentIdentity{
