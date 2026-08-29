@@ -70,9 +70,19 @@ struct SampleBinding {
   return left->id == right->id ? 1 : 0;
 }
 
-[[nodiscard]] bool compatible(const SoundBankData& bank, const SampleBodyData& body) {
-  return std::ranges::all_of(bank.vags, [&](const std::optional<VagInfo>& vag) {
-    return !vag || (body.source && vag->bodyOffset < body.bytes && (vag->bodyOffset & 0xf) == 0);
+[[nodiscard]] bool compatible(const BankEntry& bank, const SampleBodyData& body) {
+  if (!body.source) {
+    return false;
+  }
+  return std::ranges::all_of(bank.asset->instruments, [&](const Instrument& instrument) {
+    return std::ranges::all_of(instrument.regions, [&](const Region& region) {
+      if (!region.sample.needsBinding()) {
+        return true;
+      }
+      const u32 index = region.sample.index();
+      return index < bank.data->vags.size() && bank.data->vags[index] &&
+             bank.data->vags[index]->bodyOffset < body.bytes && (bank.data->vags[index]->bodyOffset & 0xf) == 0;
+    });
   });
 }
 
@@ -80,7 +90,7 @@ struct SampleBinding {
   std::vector<const BodyEntry*> selected;
   int best = -1;
   for (const auto& body : bodies) {
-    if (!compatible(*bank.data, *body.data)) {
+    if (!compatible(bank, *body.data)) {
       continue;
     }
     const int score = affinity(bank.source, body.source);
@@ -93,6 +103,16 @@ struct SampleBinding {
     }
   }
   return selected;
+}
+
+[[nodiscard]] u32 sampleBoundary(const SoundBankData& bank, u32 bodyOffset, u32 bodyBytes) {
+  u32 boundary = bodyBytes;
+  for (const auto& vag : bank.vags) {
+    if (vag && vag->bodyOffset > bodyOffset) {
+      boundary = std::min(boundary, vag->bodyOffset);
+    }
+  }
+  return boundary;
 }
 
 [[nodiscard]] std::vector<const BankEntry*> chooseBanks(const SequenceEntry& sequence,
@@ -204,10 +224,28 @@ void applyBindings(CollectionBindingContext& context, const std::vector<SampleBi
         } else {
           auto [sample, inserted] = localSamples.try_emplace(bodyOffset, 0);
           if (inserted) {
-            const auto stream = inspectPsxAdpcmStream(bodyData->source.reader(), bodyOffset, bodyData->bytes);
-            if (!stream) {
-              context.fail("SonyPS2 Vagi entry does not address a complete BD sample block", region.range);
+            const ByteReader reader = bodyData->source.reader();
+            const u32 boundary = sampleBoundary(*bankData, bodyOffset, bodyData->bytes);
+            const auto stream = inspectPsxAdpcmStream(reader, bodyOffset, boundary);
+            const bool completeEndpoint = stream && stream->encodedData.size >= kPsxAdpcmBlockBytes &&
+                                          (reader.u8At(bodyOffset + stream->encodedData.size -
+                                                       kPsxAdpcmBlockBytes + 1) &
+                                           1) != 0;
+            const u32 partialBlock = boundary & ~(kPsxAdpcmBlockBytes - 1);
+            const bool truncatedEndpoint = stream && boundary == bodyData->bytes && boundary - partialBlock >= 2 &&
+                                           partialBlock >= bodyOffset && (reader.u8At(partialBlock + 1) & 1) != 0;
+            if (!completeEndpoint && !truncatedEndpoint) {
+              context.fail(fmt::format("SonyPS2 Vagi entry at {:#x} has no ADPCM endpoint before the next BD "
+                                       "waveform",
+                                       bodyOffset),
+                           region.range);
               return;
+            }
+            Loop loop = stream->loop;
+            if (truncatedEndpoint) {
+              loop.enabled = (reader.u8At(partialBlock + 1) & 2) != 0;
+              context.warning("SonyPS2 BD ends inside its final ADPCM block; the incomplete block was omitted",
+                              stream->encodedData);
             }
             sample->second = static_cast<u32>(bank->localSamples.samples.size());
             bank->localSamples.samples.push_back(Sample{
@@ -217,7 +255,7 @@ void applyBindings(CollectionBindingContext& context, const std::vector<SampleBi
                 .sampleRate = kPs2SpuSampleRate,
                 .channels = 1,
                 .bitsPerSample = 16,
-                .loop = stream->loop,
+                .loop = loop,
             });
           }
           region.sample = SampleRef::resolved(bank->metadata.id, sample->second);

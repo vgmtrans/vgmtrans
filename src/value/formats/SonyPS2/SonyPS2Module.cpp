@@ -195,14 +195,19 @@ struct Psf2Selection {
   }
   const bool bodyCandidate = extension == ".bd";
   std::vector<SequenceLayout> sequences;
+  std::vector<std::pair<u32, SoundBankData>> banks;
   if (extension == ".sq") {
     if (auto layout = readSequenceLayout(input.reader, 0)) {
       sequences.push_back(std::move(*layout));
     }
-  } else {
+  } else if (extension == ".hd") {
+    if (auto layout = readSoundBankLayout(input.reader, 0)) {
+      banks.emplace_back(0, std::move(*layout));
+    }
+  } else if (!bodyCandidate) {
     sequences = findSequenceLayouts(input.reader);
+    banks = findBanks(input.reader);
   }
-  auto banks = findBanks(input.reader);
   if (sequences.empty() && banks.empty() && !bodyCandidate) {
     return {};
   }

@@ -624,6 +624,11 @@ void realArchive(const std::filesystem::path& path) {
            "the Namco X Capcom archive should expose only its selected g01 MIDI sequence");
   }
   const auto bound = bindCollection(snapshot, sonyCollections.front()->id);
+  if (!bound.collection) {
+    for (const auto& diagnostic : bound.diagnostics) {
+      std::cerr << "bind: " << diagnostic.message << '\n';
+    }
+  }
   expect(bound.collection && bound.collection->soundBanks().size() == 1 && bound.collection->samplePools().size() == 1,
          "the g01 SQ, HD, and BD members should resolve into one complete collection");
   const auto rendered = renderCollection(*bound.collection,
