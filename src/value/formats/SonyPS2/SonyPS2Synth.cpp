@@ -7,6 +7,7 @@
 #include "value/formats/SonyPS2/SonyPS2.h"
 
 #include "value/synth/PsxSpu.h"
+#include "value/synth/SynthMath.h"
 
 #include <fmt/format.h>
 
@@ -672,7 +673,7 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
                             (program.detune + split.detune + sample.detune) / 128.0 +
                             12.0 * std::log2(48000.0 / vag.sampleRate),
                 .envelope = keyFollowEnvelope(sample, representedKey),
-                .pan = rawPan / 127.0,
+                .pan = panPositionFrom7Bit(static_cast<u8>(rawPan)),
                 .attenuationDb = attenuation(gain),
                 .modulation = modulation(program, split, sample, representedKey, representedVelocity),
             };
@@ -845,7 +846,7 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
                 .range = reader.range(noteOffset, noteBytes),
                 .unityKey = note - lfo.transpose - lfo.detune / 128.0 + 12.0 * std::log2(48000.0 / vag.sampleRate),
                 .envelope = psxSpuEnvelope(lfoSample.adsr1, lfoSample.adsr2, PsxSpuGeneration::Ps2),
-                .pan = panMagnitude(lfo.pan) / 127.0,
+                .pan = panPositionFrom7Bit(static_cast<u8>(panMagnitude(lfo.pan))),
                 .attenuationDb = attenuation(gain),
                 .modulation = modulation(lfo, neutralSplit, lfoSample, note, representedVelocity),
             };

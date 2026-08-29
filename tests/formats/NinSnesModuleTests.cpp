@@ -347,14 +347,16 @@ void ninSnesProfilesShareSquaredLevelCurve() {
     }
 
     const MidiSequence midi = renderMidiSequence(performance);
-    const auto volume = std::ranges::find_if(midi.tracks[0].events, [](const MidiEvent& event) {
-      return isMidiController(event, MidiController::ChannelVolume);
-    });
+    const MidiChannelMessage* volume = nullptr;
+    for (const MidiEvent& event : midi.tracks[0].events) {
+      if (const auto* candidate = midiController(event, MidiController::ChannelVolume)) {
+        volume = candidate;
+      }
+    }
     const auto masterVolume = std::ranges::find_if(
         midi.tracks[0].events, [](const MidiEvent& event) { return midiMasterVolume(event).has_value(); });
-    expect(volume != midi.tracks[0].events.end() &&
-               midiController(*volume, MidiController::ChannelVolume)->value == static_cast<u16>(kChannelLevel / 2),
-           label + " should retain the legacy channel-controller MSB");
+    expect(volume != nullptr && volume->value <= static_cast<u16>(kChannelLevel / 2),
+           label + " should combine its pan gain without increasing the source channel level");
     if (opcodes.master != 0) {
       expect(masterVolume != midi.tracks[0].events.end() &&
                  (*midiMasterVolume(*masterVolume) >> 7) == static_cast<u16>(kMasterLevel / 2),
@@ -1010,14 +1012,14 @@ void ninSnesF9UsesSharedPitchTransitions() {
 
   const MidiSequence pitchBend = renderMidiSequence(performance);
   expect(std::ranges::any_of(pitchBend.tracks[0].events,
-                          [](const MidiEvent& event) {
+                             [](const MidiEvent& event) {
                                const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
-                            return bend != nullptr && bend->value != 0;
-                          }) &&
+                               return bend != nullptr && bend->value != 0;
+                             }) &&
              std::ranges::none_of(
                  pitchBend.tracks[0].events,
                  [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }),
-      "NinSnes should retain exact F9 pitch bends by default");
+         "NinSnes should retain exact F9 pitch bends by default");
 
   const MidiSequence portamento =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});

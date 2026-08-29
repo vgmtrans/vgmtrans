@@ -199,8 +199,7 @@ PerformanceNoteId PerformanceEmitter::continueVoice(PerformanceNoteId previousNo
 
   const PerformanceLaneId lane = previousEvent->lane;
   event.lane = lane;
-  const double startKey =
-      currentPitchTransitionKey(previousNote, lane).value_or(previousEvent->key);
+  const double startKey = currentPitchTransitionKey(previousNote, lane).value_or(previousEvent->key);
   if (std::abs(startKey - event.key) < 0.000001) {
     event.note = previousNote;
     event.extendsPrevious = true;
@@ -211,8 +210,7 @@ PerformanceNoteId PerformanceEmitter::continueVoice(PerformanceNoteId previousNo
   event.extendsPrevious = false;
   const double targetKey = event.key;
   const PerformanceNoteId continuedNote = note(std::move(event));
-  pitchSlide(continuedNote, startKey, targetKey, PitchSlideTiming::fromTicks(0), lane)
-      .continueFrom(previousNote);
+  pitchSlide(continuedNote, startKey, targetKey, PitchSlideTiming::fromTicks(0), lane).continueFrom(previousNote);
   return continuedNote;
 }
 
@@ -261,8 +259,7 @@ void PerformanceEmitter::instrument(u32 bank, u32 program, InstrumentEnvelopeMod
   instrument(bank, program, false, envelopeMode);
 }
 
-void PerformanceEmitter::instrument(u32 bank, u32 program, bool forceBankSelect,
-                                    InstrumentEnvelopeMode envelopeMode) {
+void PerformanceEmitter::instrument(u32 bank, u32 program, bool forceBankSelect, InstrumentEnvelopeMode envelopeMode) {
   instrument(InstrumentPerformanceEvent{
       .bank = bank,
       .program = program,
@@ -345,6 +342,20 @@ void PerformanceEmitter::pan(double stereoPosition, double linearGain) {
       .stereoPosition = stereoPosition,
       .linearGain = linearGain,
       .hasLinearGain = true,
+  });
+}
+
+void PerformanceEmitter::channelPan(ChannelPanPerformanceEvent event) {
+  if (event.voicePanLaw == PanLaw::Unspecified) {
+    throw std::logic_error("Channel pan requires the voice pan law it offsets");
+  }
+  append(std::move(event));
+}
+
+void PerformanceEmitter::channelPan(double position, PanLaw voicePanLaw) {
+  channelPan(ChannelPanPerformanceEvent{
+      .position = position,
+      .voicePanLaw = voicePanLaw,
   });
 }
 
@@ -642,8 +653,7 @@ PitchSlideBinding PerformanceEmitter::pitchSlide(PerformanceNoteId note, double 
 }
 
 PitchSlideBinding PerformanceEmitter::retargetPitchSlide(PerformanceNoteId note, double fallbackStartKey,
-                                                         double targetKey, u32 durationTicks,
-                                                         PerformanceLaneId lane) {
+                                                         double targetKey, u32 durationTicks, PerformanceLaneId lane) {
   return retargetPitchSlide(note, fallbackStartKey, targetKey, PitchSlideTiming::fromTicks(durationTicks), lane);
 }
 
@@ -664,8 +674,8 @@ std::optional<double> PerformanceEmitter::currentPitchTransitionKey(PerformanceN
     }
     const u64 realizedTick = std::min(tick_, previous->realization.endTick);
     const u64 elapsed = realizedTick - previous->realization.startTick;
-    return pitchTransitionValueAt(
-        *transition, static_cast<u32>(std::min<u64>(elapsed, std::numeric_limits<u32>::max())));
+    return pitchTransitionValueAt(*transition,
+                                  static_cast<u32>(std::min<u64>(elapsed, std::numeric_limits<u32>::max())));
   }
   return std::nullopt;
 }

@@ -60,6 +60,7 @@ std::vector<u8> sqFixture(bool includeSong = true, bool repeatSong = false, u8 s
       0,    0xb0, 1,    64,    // program-scaled pitch modulation
       0,    0xb0, 2,    64,    // program-scaled amplitude modulation
       0,    0xb0, 7,    64,    // driver's linear channel volume
+      0,    0xb0, 10,   64,    // additive channel pan, neutral at center
       0,    0xb0, 11,   96,    // driver's linear expression
       0,    0xb0, 5,    25,    // portamento time: 500 ms
       0,    0xb0, 84,   48,    // portamento source key
@@ -401,6 +402,19 @@ void syntheticFeatures() {
   const auto* expression = findEvent<ExpressionPerformanceEvent>(
       *rendered.performance, [](const auto& event) { return near(event.linearGain, 96.0 / 127.0); });
   expect(expression != nullptr, "CC11 should retain the driver's linear expression gain");
+  const auto* pan = findEvent<ChannelPanPerformanceEvent>(*rendered.performance);
+  expect(pan != nullptr && near(pan->position, 0.5) && pan->voicePanLaw == PanLaw::ConstantMaximum,
+         "CC10 should remain an additive constant-maximum voice-pan controller");
+  const MidiSequence midi = renderMidiSequence(*rendered.performance);
+  const auto hasController = [&](MidiController controller, u16 value) {
+    return std::ranges::any_of(midi.tracks.front().events, [&](const MidiEvent& event) {
+      const auto* message = std::get_if<MidiChannelMessage>(&event.payload);
+      return message != nullptr && message->kind == MidiChannelMessageKind::ControlChange &&
+             message->parameter == static_cast<u8>(controller) && message->value == value;
+    });
+  };
+  expect(hasController(MidiController::Pan, 64) && hasController(MidiController::Expression, 110),
+         "SonyPS2 MIDI should lower CC10 directly without clipping the independent CC11 flow");
   expect(countEvents<PortamentoControlPerformanceEvent>(*rendered.performance) == 1,
          "CC84 should retain the driver's portamento source key");
   const auto* marker = findEvent<MarkerPerformanceEvent>(*rendered.performance);
@@ -544,6 +558,7 @@ void realArchive(const std::filesystem::path& path) {
   }
   expect(sonyCollections.size() == 1, "a SonyPS2 archive should expose one selected Song or MIDI sequence");
   const bool g01Opening = path.filename() == "11 Tekken Tag Tournament - OPENING MOVIE.psf2";
+  const bool striderFalloff = path.filename() == "19 Strider Hiryuu Bouei-ken ~ Fumikomu! (1 Stage BGM1).psf2";
   if (g01Opening) {
     expect(sonyCollections.front()->name == "g01 MIDI 0",
            "the Namco X Capcom archive should expose only its selected g01 MIDI sequence");
@@ -579,6 +594,20 @@ void realArchive(const std::filesystem::path& path) {
     };
     expect(midiBendAt(8760, 4093) && midiBendAt(9840, -4096) && midiBendAt(77880, 8189),
            "g01 channel 2 should lower its physical bends through the 24-semitone MIDI channel range");
+  }
+  if (striderFalloff) {
+    const std::array<const SoundBankAsset*, 1> soundBanks{&bound.collection->soundBanks().front()};
+    const MidiSequence midi =
+        renderMidiSequence(*rendered.performance, {}, ModulationConversionPolicy::SynthModulators, soundBanks);
+    const auto expressionAt = [&](u64 tick, u16 value) {
+      return std::ranges::any_of(midi.tracks[1].events, [&](const MidiEvent& event) {
+        const auto* message = std::get_if<MidiChannelMessage>(&event.payload);
+        return event.tick == tick && message != nullptr && message->kind == MidiChannelMessageKind::ControlChange &&
+               message->parameter == static_cast<u8>(MidiController::Expression) && message->value == value;
+      });
+    };
+    expect(expressionAt(29580, 126) && expressionAt(29775, 106),
+           "Strider channel 1 should retain the unclipped expression fade after the note at SQ offset 0x15f3");
   }
   const auto playback =
       session.preparePlayback(sonyCollections.front()->id,

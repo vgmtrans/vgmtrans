@@ -255,8 +255,8 @@ void performanceMidiRendererSelectsTuningRepresentation() {
       tuningBends.emplace_back(event.tick, bend->value);
     }
   }
-  expect(tuningRpnCount == 0 && midiPitchBendRanges(pitchBend.tracks.front().events) ==
-                                    std::vector<std::pair<u64, u16>>{{0, 300}},
+  expect(tuningRpnCount == 0 &&
+             midiPitchBendRanges(pitchBend.tracks.front().events) == std::vector<std::pair<u64, u16>>{{0, 300}},
          "default tuning should reserve one stable pitch-bend range without tuning RPNs");
   expect(tuningBends == std::vector<std::pair<u64, s32>>{{0, 2731}, {6, 4096}, {12, 7211}, {18, 1749}},
          "default tuning should place the complete tuning and source bend on the wheel");
@@ -351,8 +351,8 @@ void performanceMidiRendererWritesPanGainResetWhenRequested() {
                   },
                   StereoBalancePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 12},
-                      .leftGain = 0.7071067811865476,
-                      .rightGain = 0.7071067811865476,
+                      .leftGain = 1.0,
+                      .rightGain = 1.0,
                   },
                   StereoBalancePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 24},
@@ -366,17 +366,17 @@ void performanceMidiRendererWritesPanGainResetWhenRequested() {
   const MidiSequence midiSequence = renderMidiSequence(performance);
   const auto& events = midiSequence.tracks[0].events;
   expect(midiController(events[1], MidiController::Pan)->value == 0 &&
-             isMidiController(events[2], MidiController::Expression),
-         "pan gain compensation should emit expression with the pan event");
+             midiController(events[2], MidiController::ChannelVolume)->value == 76,
+         "pan gain compensation should use bounded channel-volume headroom");
   expect(midiController(events[3], MidiController::Pan)->value == 64 &&
-             midiController(events[4], MidiController::Expression)->value == 127,
-         "full-gain compensated pan should reset expression to full scale");
+             midiController(events[4], MidiController::ChannelVolume)->value == 127,
+         "maximum pan compensation should fit exactly within reserved headroom");
   expect(midiController(events[5], MidiController::Pan)->value == 64 &&
-             midiController(events[6], MidiController::Expression)->value == 107,
+             midiController(events[6], MidiController::ChannelVolume)->value == 90,
          "MIDI pan lowering should preserve a phase-inverted channel's magnitude");
 }
 
-void performanceMidiRendererCombinesExpressionWithPanGain() {
+void performanceMidiRendererKeepsPanGainOutOfExpression() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
       .tracks = {PerformanceTrack{
@@ -410,22 +410,25 @@ void performanceMidiRendererCombinesExpressionWithPanGain() {
       }},
   };
 
-  const auto expressionValues = [&](ModulationConversionPolicy policy) {
+  const auto controllerValues = [&](ModulationConversionPolicy policy, MidiController controller) {
     const MidiSequence midi = renderMidiSequence(performance, MidiExportOptions{}, policy);
     std::vector<u8> values;
     for (const MidiEvent& event : midi.tracks[0].events) {
-      if (const auto* expression = midiController(event, MidiController::Expression)) {
-        values.push_back(expression->value);
+      if (const auto* message = midiController(event, controller)) {
+        values.push_back(message->value);
       }
     }
     return values;
   };
 
-  const std::vector<u8> expected{64, 45, 64, 32};
-  expect(expressionValues(ModulationConversionPolicy::SynthModulators) == expected,
-         "synth-modulator MIDI lowering should multiply pan compensation by source expression");
-  expect(expressionValues(ModulationConversionPolicy::SequenceEventSimulation) == expected,
-         "sequence-event MIDI lowering should multiply pan compensation by source expression");
+  const std::vector<u8> expectedVolume{90, 127, 64};
+  for (const auto policy :
+       {ModulationConversionPolicy::SynthModulators, ModulationConversionPolicy::SequenceEventSimulation}) {
+    expect(controllerValues(policy, MidiController::Expression) == std::vector<u8>{64},
+           "pan compensation should not rewrite source expression");
+    expect(controllerValues(policy, MidiController::ChannelVolume) == expectedVolume,
+           "pan compensation should compose with channel volume");
+  }
 
   PerformanceSequence precisePerformance = performance;
   std::get<ExpressionPerformanceEvent>(precisePerformance.tracks[0].events[0]).sourceQuantization =
@@ -433,10 +436,8 @@ void performanceMidiRendererCombinesExpressionWithPanGain() {
   const MidiSequence preciseMidi = renderMidiSequence(precisePerformance);
   expect(
       std::count_if(preciseMidi.tracks[0].events.begin(), preciseMidi.tracks[0].events.end(),
-                    [](const MidiEvent& event) {
-                      return isMidiControllerLsb(event, MidiController::Expression);
-                    }) == 4,
-         "pan compensation should preserve the source expression's quantization");
+                    [](const MidiEvent& event) { return isMidiControllerLsb(event, MidiController::Expression); }) == 1,
+      "only source expression should retain source expression quantization");
 }
 
 void performanceMidiRendererLowersDeclaredPanLaws() {
@@ -472,12 +473,12 @@ void performanceMidiRendererLowersDeclaredPanLaws() {
       std::ranges::none_of(midi.tracks[0].events,
                            [](const MidiEvent& event) { return isMidiController(event, MidiController::Expression); }),
       "equal-power positional pan should not add loudness compensation");
-  const auto constantSumExpression = std::ranges::find_if(midi.tracks[1].events, [](const MidiEvent& event) {
-    return isMidiController(event, MidiController::Expression);
+  const auto constantSumVolume = std::ranges::find_if(midi.tracks[1].events, [](const MidiEvent& event) {
+    return isMidiController(event, MidiController::ChannelVolume);
   });
-  expect(constantSumExpression != midi.tracks[1].events.end() &&
-             midiController(*constantSumExpression, MidiController::Expression)->value == 107,
-      "constant-sum center pan should retain its lower combined gain when lowered to MIDI equal-power pan");
+  expect(constantSumVolume != midi.tracks[1].events.end() &&
+             midiController(*constantSumVolume, MidiController::ChannelVolume)->value == 107,
+         "constant-sum center pan should retain its lower combined gain when lowered to MIDI equal-power pan");
 }
 
 void performanceMidiRendererRetainsPanLawDuringLfoSimulation() {
@@ -500,10 +501,10 @@ void performanceMidiRendererRetainsPanLawDuringLfoSimulation() {
                       .target = ModulationPerformanceTarget::PanRate,
                       .context =
                           LfoPerformanceContext{
-                          .cyclesPerTick = 0.25,
-                          .shape = LfoShape{.waveform = LfoWaveform::Triangle},
-                          .panLaw = PanLaw::ConstantSum,
-                      },
+                              .cyclesPerTick = 0.25,
+                              .shape = LfoShape{.waveform = LfoWaveform::Triangle},
+                              .panLaw = PanLaw::ConstantSum,
+                          },
                   },
                   ModulationPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0, .sequence = 2},
@@ -511,10 +512,10 @@ void performanceMidiRendererRetainsPanLawDuringLfoSimulation() {
                       .panDepth = 1.0,
                       .context =
                           LfoPerformanceContext{
-                          .cyclesPerTick = 0.25,
-                          .shape = LfoShape{.waveform = LfoWaveform::Triangle},
-                          .panLaw = PanLaw::ConstantSum,
-                      },
+                              .cyclesPerTick = 0.25,
+                              .shape = LfoShape{.waveform = LfoWaveform::Triangle},
+                              .panLaw = PanLaw::ConstantSum,
+                          },
                   },
               },
       }},
@@ -530,8 +531,8 @@ void performanceMidiRendererRetainsPanLawDuringLfoSimulation() {
                              }) &&
              std::ranges::any_of(events,
                                  [](const MidiEvent& event) {
-                                   const auto* expression = midiController(event, MidiController::Expression);
-                                   return expression && event.tick == 2 && expression->value == 127;
+                                   const auto* volume = midiController(event, MidiController::ChannelVolume);
+                                   return volume && event.tick == 2 && volume->value == 127;
                                  }),
          "constant-sum pan LFO simulation should restore full aggregate gain at a hard-pan peak");
 }
@@ -643,7 +644,7 @@ void performanceMidiRendererCanTerminatePreviousVoices() {
   expect(
       std::ranges::none_of(plain.tracks[0].events,
                            [](const MidiEvent& event) { return isMidiController(event, MidiController::AllSoundOff); }),
-         "previous-voice termination should remain opt-in");
+      "previous-voice termination should remain opt-in");
 
   MidiExportOptions options;
   options.terminatePreviousVoice = true;
@@ -1021,7 +1022,7 @@ void performanceMidiRendererAllowsMixedPitchTransitionRendering() {
   expect(
       std::ranges::none_of(terminatingPortamento.tracks[0].events,
                            [](const MidiEvent& event) { return isMidiController(event, MidiController::AllSoundOff); }),
-         "new-attack termination should not cut off linked native-portamento continuations");
+      "new-attack termination should not cut off linked native-portamento continuations");
 
   const MidiSequence allPitchBend =
       renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
@@ -1106,13 +1107,13 @@ void performanceMidiRendererHonorsRequiredPortamento() {
   const auto notes = midiNotes(events);
   expect(notes.size() == 2 && notes[0].tick == 0 && notes[0].key == 60 && notes[1].tick == 4 && notes[1].key == 64,
          "required portamento should retain both source attacks");
-  expect(std::ranges::any_of(events, [](const MidiEvent& event) {
-           return isMidiController(event, MidiController::PortamentoControl);
-         }) &&
-             std::ranges::none_of(events, [](const MidiEvent& event) {
-               return isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend);
-             }),
-         "required portamento should reject a channel-wide pitch-bend override");
+  expect(
+      std::ranges::any_of(
+          events, [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }) &&
+          std::ranges::none_of(
+              events,
+              [](const MidiEvent& event) { return isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend); }),
+      "required portamento should reject a channel-wide pitch-bend override");
 
   const MidiSequence terminatingPortamento = renderMidiSequence(
       PerformanceSequence{.timebase = Timebase{.ppqn = 48}, .tracks = {track}},
@@ -1148,10 +1149,11 @@ void performanceMidiRendererStartsANewVoiceAfterPitchBendContinuationWhenMidiPor
   const auto notes = midiNotes(midi.tracks[0].events);
   expect(notes.size() == 2 && notes[0].tick == 0 && notes[0].key == 60 && notes[0].duration == 9 &&
              notes[1].tick == 8 && notes[1].key == 67 &&
-             std::ranges::none_of(midi.tracks[0].events, [](const MidiEvent& event) {
-               const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
-               return event.tick == 8 && bend != nullptr && std::abs(bend->value) > 1024;
-             }),
+             std::ranges::none_of(midi.tracks[0].events,
+                                  [](const MidiEvent& event) {
+                                    const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+                                    return event.tick == 8 && bend != nullptr && std::abs(bend->value) > 1024;
+                                  }),
          "MIDI portamento should start its new voice without exposing the held bend under its smaller range");
 }
 
@@ -1598,7 +1600,7 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
     const auto preservedBend = std::ranges::find_if(delayedTransitionMidi.tracks[0].events, [](const MidiEvent& event) {
       const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
       return bend != nullptr && event.tick == 4 && bend->value == 205;
-        });
+    });
     const auto delayedTransitionRanges = midiPitchBendRanges(delayedTransitionMidi.tracks[0].events);
     expect(std::ranges::find(delayedTransitionRanges, std::pair<u64, u16>{4, 1000}) != delayedTransitionRanges.end() &&
                preservedBend != delayedTransitionMidi.tracks[0].events.end(),
@@ -1929,9 +1931,9 @@ void performanceMidiRendererHonorsSpecifiedLfoWaveform() {
           .amount = 1.0,
           .context =
               LfoPerformanceContext{
-              .frequencyHz = 12.5,
-              .shape = LfoShape{.waveform = LfoWaveform::Sine},
-          },
+                  .frequencyHz = 12.5,
+                  .shape = LfoShape{.waveform = LfoWaveform::Sine},
+              },
       },
       ModulationPerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
@@ -1965,10 +1967,10 @@ void performanceMidiRendererHonorsSteppedLfoSamplesAndHeldDisableValue() {
           .target = ModulationPerformanceTarget::VibratoRate,
           .context =
               LfoPerformanceContext{
-              .frequencyHz = 25.0,
-              .shape = shape,
-              .sampleImmediatelyOnNote = true,
-          },
+                  .frequencyHz = 25.0,
+                  .shape = shape,
+                  .sampleImmediatelyOnNote = true,
+              },
       },
       ModulationPerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
@@ -1976,9 +1978,9 @@ void performanceMidiRendererHonorsSteppedLfoSamplesAndHeldDisableValue() {
           .pitchDepthSemitones = 1.0,
           .context =
               LfoPerformanceContext{
-              .shape = shape,
-              .sampleImmediatelyOnNote = true,
-          },
+                  .shape = shape,
+                  .sampleImmediatelyOnNote = true,
+              },
       },
       NotePerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
@@ -1991,9 +1993,9 @@ void performanceMidiRendererHonorsSteppedLfoSamplesAndHeldDisableValue() {
           .pitchDepthSemitones = 0.0,
           .context =
               LfoPerformanceContext{
-              .shape = shape,
-              .zeroDepthBehavior = LfoZeroDepthBehavior::HoldOutputUntilNextNote,
-          },
+                  .shape = shape,
+                  .zeroDepthBehavior = LfoZeroDepthBehavior::HoldOutputUntilNextNote,
+              },
       },
       NotePerformanceEvent{
           .header = PerformanceEventHeader{.tick = 3},
@@ -2023,10 +2025,10 @@ void performanceMidiRendererReplacesSampledLfoWithNamedWaveform() {
           .target = ModulationPerformanceTarget::VibratoRate,
           .context =
               LfoPerformanceContext{
-              .frequencyHz = 25.0,
-              .shape = sampledShape,
-              .sampleImmediatelyOnNote = true,
-          },
+                  .frequencyHz = 25.0,
+                  .shape = sampledShape,
+                  .sampleImmediatelyOnNote = true,
+              },
       },
       ModulationPerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
@@ -2034,9 +2036,9 @@ void performanceMidiRendererReplacesSampledLfoWithNamedWaveform() {
           .pitchDepthSemitones = 1.0,
           .context =
               LfoPerformanceContext{
-              .shape = sampledShape,
-              .sampleImmediatelyOnNote = true,
-          },
+                  .shape = sampledShape,
+                  .sampleImmediatelyOnNote = true,
+              },
       },
       NotePerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
@@ -2048,10 +2050,10 @@ void performanceMidiRendererReplacesSampledLfoWithNamedWaveform() {
           .target = ModulationPerformanceTarget::VibratoRate,
           .context =
               LfoPerformanceContext{
-              .frequencyHz = 25.0,
-              .shape = LfoShape{.waveform = LfoWaveform::Sine},
-              .sampleImmediatelyOnNote = true,
-          },
+                  .frequencyHz = 25.0,
+                  .shape = LfoShape{.waveform = LfoWaveform::Sine},
+                  .sampleImmediatelyOnNote = true,
+              },
       },
   };
   const MidiSequence midi = renderSimulatedModulation(2, std::move(events));
@@ -2200,10 +2202,10 @@ void performanceMidiRendererReplacesSavedNoteDelay() {
           .target = ModulationPerformanceTarget::VibratoRate,
           .context =
               LfoPerformanceContext{
-              .frequencyHz = 25.0,
-              .shape = shape,
-              .sampleImmediatelyOnNote = true,
-          },
+                  .frequencyHz = 25.0,
+                  .shape = shape,
+                  .sampleImmediatelyOnNote = true,
+              },
       },
       ModulationPerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
@@ -2211,9 +2213,9 @@ void performanceMidiRendererReplacesSavedNoteDelay() {
           .pitchDepthSemitones = 1.0,
           .context =
               LfoPerformanceContext{
-              .shape = shape,
-              .sampleImmediatelyOnNote = true,
-          },
+                  .shape = shape,
+                  .sampleImmediatelyOnNote = true,
+              },
       },
       NotePerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
@@ -2328,10 +2330,10 @@ void performanceMidiRendererHonorsNoBoostTremoloPhaseAndResetPolicy() {
                       .target = ModulationPerformanceTarget::TremoloRate,
                       .context =
                           LfoPerformanceContext{
-                          .frequencyHz = 25.0,
-                          .shape = LfoShape{.waveform = LfoWaveform::Triangle},
-                          .initialPhaseCycles = 0.75,
-                      },
+                              .frequencyHz = 25.0,
+                              .shape = LfoShape{.waveform = LfoWaveform::Triangle},
+                              .initialPhaseCycles = 0.75,
+                          },
                   },
                   ModulationPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
@@ -2339,10 +2341,10 @@ void performanceMidiRendererHonorsNoBoostTremoloPhaseAndResetPolicy() {
                       .volumeDepthDecibels = 3.0,
                       .context =
                           LfoPerformanceContext{
-                          .shape = LfoShape{.waveform = LfoWaveform::Triangle},
-                          .initialPhaseCycles = 0.75,
-                          .tremoloGainMode = TremoloGainMode::NoBoost,
-                      },
+                              .shape = LfoShape{.waveform = LfoWaveform::Triangle},
+                              .initialPhaseCycles = 0.75,
+                              .tremoloGainMode = TremoloGainMode::NoBoost,
+                          },
                   },
                   NotePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
@@ -2880,7 +2882,7 @@ void observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators()
          "observed modulation scaling should expand tremolo depth controllers");
   expect(midiController(leadEvents[5], MidiController::TremoloRate)->value == 71 &&
              midiController(leadEvents[6], MidiController::TremoloRate)->value == 127,
-      "observed modulation scaling should expand tremolo rate controllers");
+         "observed modulation scaling should expand tremolo rate controllers");
 
   const SynthModulator defaultTremoloRate{
       .destination = SynthDestination::TremoloRate,
@@ -2953,7 +2955,7 @@ void runValueMidiTests() {
   performanceMidiRendererSelectsTuningRepresentation();
   performanceMidiRendererWritesTimeSignaturesToFirstTrack();
   performanceMidiRendererWritesPanGainResetWhenRequested();
-  performanceMidiRendererCombinesExpressionWithPanGain();
+  performanceMidiRendererKeepsPanGainOutOfExpression();
   performanceMidiRendererLowersDeclaredPanLaws();
   performanceMidiRendererRetainsPanLawDuringLfoSimulation();
   performanceMidiRendererHonorsMidiExportOptions();

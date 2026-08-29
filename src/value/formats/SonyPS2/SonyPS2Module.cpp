@@ -41,7 +41,7 @@ namespace {
 [[nodiscard]] std::optional<u32> trivialSongMidi(const SequenceProgram& program, const SequenceLayout& layout) {
   if (!program.sectionPlaylist || program.sectionPlaylist->commands.size() != 2 ||
       program.behavior.initialMasterLevel.has_value() ||
-      program.behavior.initialTempoMicrosecondsPerQuarter != 500000 ||
+      program.behavior.initialTempoMicrosecondsPerQuarter != 500000 || program.behavior.initialChannelPan.has_value() ||
       (program.behavior.initialStereoBalance && (program.behavior.initialStereoBalance->leftGain != 1.0 ||
                                                  program.behavior.initialStereoBalance->rightGain != 1.0))) {
     return std::nullopt;

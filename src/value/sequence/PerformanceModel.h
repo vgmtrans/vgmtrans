@@ -148,12 +148,23 @@ struct PanPerformanceEvent {
   // Resolved from the source program's driver behavior when emitted. Keeping
   // it on the event makes the performance IR self-contained.
   PanLaw law = PanLaw::Unspecified;
-  // Some source pan laws also change loudness. Keep that as neutral gain here;
-  // MIDI-specific expression compensation belongs to the renderer.
+  // Some source pan laws also change loudness. Keep that scalar on the event;
+  // destination-specific gain compensation belongs to the renderer.
   double linearGain = 1.0;
   // True means the source pan law intentionally supplied linearGain, even when it
-  // is 1.0 and should reset a previous expression compensation.
+  // is 1.0 and should reset previous pan gain compensation.
   bool hasLinearGain = false;
+};
+
+struct ChannelPanPerformanceEvent {
+  PerformanceEventHeader header;
+  // Unipolar controller position: 0.0 is hard left, 0.5 is neutral, and 1.0
+  // is hard right. The controller is applied additively to every voice's
+  // intrinsic pan rather than describing the final mixed stereo position.
+  double position = 0.5;
+  // The voice-side law is metadata for targets that combine the controller
+  // with instrument pan; the controller itself must not change channel gain.
+  PanLaw voicePanLaw = PanLaw::Unspecified;
 };
 
 struct StereoBalancePerformanceEvent {
@@ -414,12 +425,13 @@ struct MarkerPerformanceEvent {
 using PerformanceEvent =
     std::variant<NotePerformanceEvent, TempoPerformanceEvent, TimeSignaturePerformanceEvent, InstrumentPerformanceEvent,
                  EnvelopePerformanceEvent, LevelPerformanceEvent, ExpressionPerformanceEvent, PanPerformanceEvent,
-                 StereoBalancePerformanceEvent, MasterLevelPerformanceEvent, ReverbPerformanceEvent,
-                 MonoModePerformanceEvent, TuningPerformanceEvent, GlobalTransposePerformanceEvent,
-                 PortamentoPerformanceEvent, PortamentoEnablePerformanceEvent, PortamentoTimePerformanceEvent,
-                 PortamentoControlPerformanceEvent, PitchBendPerformanceEvent, PitchBendRangePerformanceEvent,
-                 VibratoDelayPerformanceEvent, TremoloDelayPerformanceEvent, PitchTransitionSettingsPerformanceEvent,
-                 LegatoPedalPerformanceEvent, ModulationPerformanceEvent, MarkerPerformanceEvent>;
+                 ChannelPanPerformanceEvent, StereoBalancePerformanceEvent, MasterLevelPerformanceEvent,
+                 ReverbPerformanceEvent, MonoModePerformanceEvent, TuningPerformanceEvent,
+                 GlobalTransposePerformanceEvent, PortamentoPerformanceEvent, PortamentoEnablePerformanceEvent,
+                 PortamentoTimePerformanceEvent, PortamentoControlPerformanceEvent, PitchBendPerformanceEvent,
+                 PitchBendRangePerformanceEvent, VibratoDelayPerformanceEvent, TremoloDelayPerformanceEvent,
+                 PitchTransitionSettingsPerformanceEvent, LegatoPedalPerformanceEvent, ModulationPerformanceEvent,
+                 MarkerPerformanceEvent>;
 
 enum class PerformanceAutomationTarget {
   Tempo,

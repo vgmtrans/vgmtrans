@@ -10,6 +10,7 @@
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompiledCommandRuntime.h"
 #include "value/sequence/SequenceVm.h"
+#include "value/synth/SynthMath.h"
 
 #include <algorithm>
 #include <array>
@@ -86,17 +87,6 @@ struct ProgramState {
 
 [[nodiscard]] u64 delayedTick(const VmApi& vm, u32 delta) {
   return vm.tick() > std::numeric_limits<u64>::max() - delta ? std::numeric_limits<u64>::max() : vm.tick() + delta;
-}
-
-[[nodiscard]] std::pair<double, double> panGains(u8 value) {
-  value = std::min<u8>(value, 127);
-  if (value == 0) {
-    return {1.0, 0.0};
-  }
-  if (value < 64) {
-    return {1.0, (value - 1) / 63.0};
-  }
-  return {(127 - value) / 63.0, 1.0};
 }
 
 [[nodiscard]] double linearMidi7(u8 value) {
@@ -338,11 +328,11 @@ struct Playback {
       case 7:
         delayed.level(linearMidi7(value));
         break;
-      case 10: {
-        const auto [left, right] = panGains(value);
-        delayed.stereoBalance(left, right);
+      case 10:
+        // modhsyn stores CC10 as a signed offset from center, then applies it
+        // independently to every voice's Program/Split/Sample pan.
+        delayed.channelPan(panPositionFrom7Bit(std::min<u8>(value, 127)), PanLaw::ConstantMaximum);
         break;
-      }
       case 11:
         delayed.expression(linearMidi7(value));
         break;
@@ -413,7 +403,7 @@ struct Playback {
         delayed.tremoloLinearGainDepth(0.0);
         delayed.level(1.0);
         delayed.expression(1.0);
-        delayed.stereoBalance(1.0, 1.0);
+        delayed.channelPan(0.5, PanLaw::ConstantMaximum);
         delayed.pitchBend(0.0);
         break;
       default:
@@ -920,7 +910,6 @@ const SequenceProgramConfig& sequenceConfig() {
               .commandLimit = kMaxCommands,
               .initialLevel = 1.0,
               .initialExpression = 1.0,
-              .initialStereoBalance = StereoBalance{1.0, 1.0},
               .initialPitchBendRangeSemitones = 2,
               .initialTempoMicrosecondsPerQuarter = 500000,
           },
@@ -1117,8 +1106,10 @@ std::optional<SequenceProgram> parseSongSequence(ByteReader reader, AssetId id, 
       program.behavior.initialMasterLevel = songVolume / 128.0;
     }
     if (songPan != 64) {
-      const auto [left, right] = panGains(songPan);
-      program.behavior.initialStereoBalance = StereoBalance{left, right};
+      program.behavior.initialChannelPan = ChannelPan{
+          .position = panPositionFrom7Bit(songPan),
+          .voicePanLaw = PanLaw::ConstantMaximum,
+      };
     }
     if (songTempo != 120) {
       program.behavior.initialTempoMicrosecondsPerQuarter = static_cast<u32>(std::llround(60000000.0 / songTempo));
@@ -1153,8 +1144,10 @@ std::optional<SequenceProgram> parseSeSequence(ByteReader reader, AssetId id, co
   program.timebase.ppqn = layout.ppqn;
   program.behavior.initialTempoMicrosecondsPerQuarter = 1000000;
   program.behavior.initialLevel = std::min<u8>(layout.volume, 128) / 128.0;
-  const auto [left, right] = panGains(static_cast<u8>(std::clamp<int>(std::abs(layout.pan), 0, 127)));
-  program.behavior.initialStereoBalance = StereoBalance{left, right};
+  program.behavior.initialChannelPan = ChannelPan{
+      .position = panPositionFrom7Bit(static_cast<u8>(std::clamp<int>(std::abs(layout.pan), 0, 127))),
+      .voicePanLaw = PanLaw::ConstantMaximum,
+  };
   program.runtime = sequenceRuntime();
   std::map<u32, const SeEvent*> byOffset;
   for (const auto& event : events) {
