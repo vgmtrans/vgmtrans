@@ -12,6 +12,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <limits>
 #include <optional>
@@ -301,47 +302,114 @@ struct SampleParam {
   return targetGain == 0.0 ? 1.0 : velocityGain(static_cast<u8>(velocityCurve(curve, rawVelocity))) / targetGain;
 }
 
+[[nodiscard]] int wrappedFixedSquare(int value) {
+  // The driver reads the low 32 bits of the MIPS multiply before dividing the
+  // signed 18.14 result. Preserve that wrap, including its type 4/5 curve.
+  const auto product = static_cast<u32>(static_cast<s64>(value) * value);
+  return std::bit_cast<s32>(product) / 0x4000;
+}
+
+[[nodiscard]] int endpointDenominator(int velocity, int center) {
+  return velocity > center ? 127 - center : center - 1;
+}
+
 [[nodiscard]] double bipolarVelocityCurve(u8 type, int velocity, int center) {
-  const double normalized = (std::clamp(velocity, 1, 127) - 1) / 126.0;
-  const double normalizedCenter = (std::clamp(center, 1, 127) - 1) / 126.0;
-  const double linear = normalized - normalizedCenter;
+  velocity = std::clamp(velocity, 1, 127);
+  center = std::clamp(center, 0, 127);
+  const int difference = velocity - center;
+  const auto linear = [&] { return difference * 0x10000 / 126; };
+  const auto convex = [](int value) {
+    return wrappedFixedSquare((value - 1) * 0x8000 / 126);
+  };
+  const auto concave = [&](int value) {
+    return 0x10000 - wrappedFixedSquare(0x10000 - (value - 1) * 0x8000 / 126);
+  };
+  const auto endpoint = [&] {
+    const int denominator = endpointDenominator(velocity, center);
+    return difference == 0 || denominator == 0 ? 0 : difference * 0x10000 / denominator;
+  };
+  const auto endpointConvex = [&] {
+    const int denominator = endpointDenominator(velocity, center);
+    if (difference == 0 || denominator == 0) {
+      return 0;
+    }
+    const int amount = wrappedFixedSquare(difference * 0x8000 / denominator);
+    return difference < 0 ? -amount : amount;
+  };
+  const auto endpointConcave = [&] {
+    const int denominator = endpointDenominator(velocity, center);
+    if (difference == 0 || denominator == 0) {
+      return 0;
+    }
+    const int scaled = difference * 0x8000 / denominator;
+    return difference > 0 ? 0x10000 - wrappedFixedSquare(0x8000 - scaled)
+                          : wrappedFixedSquare(0x8000 + scaled) - 0x10000;
+  };
+  int fixed = 0;
   switch (type & 0x0f) {
     case 0:
-      return linear;
+      fixed = linear();
+      break;
     case 1:
-      return -linear;
+      fixed = -linear();
+      break;
     case 2:
-      return normalized * normalized - normalizedCenter * normalizedCenter;
+      fixed = convex(velocity) - convex(center);
+      break;
     case 3:
-      return normalizedCenter * normalizedCenter - normalized * normalized;
+      fixed = convex(center) - convex(velocity);
+      break;
     case 4:
-      return (4.0 * normalized - normalized * normalized) -
-             (4.0 * normalizedCenter - normalizedCenter * normalizedCenter);
+      fixed = concave(velocity) - concave(center);
+      break;
     case 5:
-      return (4.0 * normalizedCenter - normalizedCenter * normalizedCenter) -
-             (4.0 * normalized - normalized * normalized);
+      fixed = concave(center) - concave(velocity);
+      break;
     case 6:
+      fixed = endpoint();
+      break;
     case 7:
+      fixed = -endpoint();
+      break;
     case 8:
-    case 9: {
-      const int difference = velocity - center;
-      if (difference == 0) {
-        return 0.0;
-      }
-      const double denominator = difference > 0 ? std::max(127 - center, 1) : std::max(center - 1, 1);
-      const double magnitude = std::abs(difference) / denominator;
-      double shaped = magnitude;
-      if (type == 8) {
-        shaped *= shaped;
-      } else if (type == 9) {
-        shaped = 1.0 - (1.0 - shaped) * (1.0 - shaped);
-      }
-      const double signedValue = std::copysign(shaped, static_cast<double>(difference));
-      return type == 7 ? -signedValue : signedValue;
-    }
+      fixed = endpointConvex();
+      break;
+    case 9:
+      fixed = endpointConcave();
+      break;
+    case 10:
+      // The shipped dispatch table points this undocumented value at the
+      // ordinary byte-valued velocity helper.
+      fixed = velocity;
+      break;
     default:
-      return linear;
+      fixed = linear();
+      break;
   }
+  return fixed / 65536.0;
+}
+
+[[nodiscard]] int panMagnitude(s8 value) {
+  return std::min(std::abs(static_cast<int>(value)), 127);
+}
+
+[[nodiscard]] int regionPan(const ProgramParam& program, const SplitParam& split, const SampleParam& sample,
+                            int key) {
+  const int follow = ((key - static_cast<int>(program.keyFollowPanCenter)) * program.keyFollowPan +
+                      (key - static_cast<int>(split.keyFollowPanCenter)) * split.keyFollowPan) /
+                     12;
+  if ((program.attributes & 1) == 0) {
+    return std::clamp(panMagnitude(program.pan) + panMagnitude(split.pan) + panMagnitude(sample.pan) - 128 + follow,
+                      0, 127);
+  }
+  int pan = program.pan + split.pan + sample.pan - 128 + follow;
+  while (pan > 127) {
+    pan -= 255;
+  }
+  while (pan < -128) {
+    pan += 255;
+  }
+  return std::min(std::abs(pan), 127);
 }
 
 [[nodiscard]] double crossfade(u8 rawLow, u8 cross, u8 rawHigh, int value) {
@@ -362,10 +430,6 @@ struct SampleParam {
 
 [[nodiscard]] double gainFromRaw(int value) {
   return std::clamp(value, 0, 128) / 128.0;
-}
-
-[[nodiscard]] int panMagnitude(s8 value) {
-  return std::min(std::abs(static_cast<int>(value)), 127);
 }
 
 [[nodiscard]] double attenuation(double gain) {
@@ -733,12 +797,7 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
                                                                         static_cast<u8>(representedTargetVelocity));
               const double gain = gainFromRaw(program.volume) * gainFromRaw(split.volume) * gainFromRaw(sample.volume) *
                                   keyGain * velocityFade * velocityCorrection;
-              const double panFollow =
-                  (representedKey - static_cast<int>(program.keyFollowPanCenter)) * program.keyFollowPan / 12.0 +
-                  (representedKey - static_cast<int>(split.keyFollowPanCenter)) * split.keyFollowPan / 12.0;
-              const int rawPan = std::clamp<int>(panMagnitude(program.pan) + panMagnitude(split.pan) +
-                                                     panMagnitude(sample.pan) - 128 + static_cast<int>(panFollow),
-                                                 0, 127);
+              const int rawPan = regionPan(program, split, sample, representedKey);
               Region region{
                   .keyRange = KeyRange{static_cast<u8>(key), static_cast<u8>(emittedKeyHigh)},
                   .velocityRange = VelocityRange{static_cast<u8>(targetVelocity), static_cast<u8>(emittedVelocityHigh)},
@@ -955,7 +1014,9 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
                 .source("SE timbre note", reader.range(noteOffset, noteBytes), "sony-ps2-setb-note");
             targetVelocity = emittedHigh + 1;
           }
-          if ((reader.u8At(noteOffset + 8) != 0 || reader.u8At(noteOffset + 9) != 0) && !warnedSetbVoicePolicy) {
+          if ((reader.u8At(noteOffset + 7) != 0 || reader.u8At(noteOffset + 8) != 0 ||
+               reader.u8At(noteOffset + 9) != 0) &&
+              !warnedSetbVoicePolicy) {
             // Group limits and priorities affect voice stealing rather than
             // the static sound of an exported region.
             instruments.warning("SonyPS2 Setb group limits and voice priorities have no synth-model equivalent",

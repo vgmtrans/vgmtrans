@@ -66,6 +66,7 @@ struct SparseChunkLayout {
 };
 
 struct MidiBlockLayout {
+  u32 index = 0;
   u32 offset = 0;
   u32 dataOffset = 0;
   u32 dataEnd = 0;

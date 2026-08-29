@@ -91,7 +91,7 @@ std::vector<u8> sqFixture(bool includeSong = true, bool repeatSong = false, u8 s
       0,  0xff, 0x2f, 0,
   };
   constexpr u32 midiOffset = 0x30;
-  constexpr u32 tableBytes = 8;
+  constexpr u32 tableBytes = 12;
   const u32 firstBlock = 16 + tableBytes;
   const u32 secondBlock = firstBlock + 6 + static_cast<u32>(plain.size());
   const u32 midiSize = secondBlock + 12 + static_cast<u32>(compressed.size());
@@ -104,9 +104,10 @@ std::vector<u8> sqFixture(bool includeSong = true, bool repeatSong = false, u8 s
   le32(bytes, 0x24, midiOffset);
   text(bytes, midiOffset, "IECSidiM");
   le32(bytes, midiOffset + 8, midiSize);
-  le32(bytes, midiOffset + 12, 1);
+  le32(bytes, midiOffset + 12, 2);
   le32(bytes, midiOffset + 16, firstBlock);
-  le32(bytes, midiOffset + 20, secondBlock);
+  le32(bytes, midiOffset + 20, 0xffffffff);
+  le32(bytes, midiOffset + 24, secondBlock);
   le32(bytes, midiOffset + firstBlock, 6);
   le16(bytes, midiOffset + firstBlock + 4, 480);
   std::ranges::copy(plain, bytes.begin() + midiOffset + firstBlock + 6);
@@ -135,7 +136,7 @@ std::vector<u8> sqFixture(bool includeSong = true, bool repeatSong = false, u8 s
   }
   bytes[songCursor++] = 0xa0;
   bytes[songCursor++] = 0;
-  bytes[songCursor++] = 1;
+  bytes[songCursor++] = 2;
   if (repeatSong) {
     bytes[songCursor++] = 0xa0;
     bytes[songCursor++] = 0x11;
@@ -470,8 +471,8 @@ void syntheticFeatures() {
 
 void trivialSongCollapsesToSelectedMidi() {
   const auto snapshot = scanFixture(sqFixture());
-  expect(snapshot.collections().size() == 1 && snapshot.collections().front().name == "music MIDI 1",
-         "a play-one-MIDI-and-end Song table should select its MIDI instead of publishing a duplicate sequence");
+  expect(snapshot.collections().size() == 1 && snapshot.collections().front().name == "music MIDI 2",
+         "a Song should select its sparse MIDI block number instead of publishing a duplicate sequence");
   const auto bound = bindCollection(snapshot, snapshot.collections().front().id);
   expect(bound.collection && bound.collection->samplePools().size() == 1,
          "a PSF2 BD member should bind even though its host path ends in .psf2");

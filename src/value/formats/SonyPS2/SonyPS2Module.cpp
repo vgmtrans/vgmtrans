@@ -136,7 +136,7 @@ namespace {
         continue;
       }
       const auto& block = layout.midiBlocks[midi];
-      auto sequence = result.sequence(fmt::format("{} MIDI {}", result.sourceDisplayName(), midi),
+      auto sequence = result.sequence(fmt::format("{} MIDI {}", result.sourceDisplayName(), block.index),
                                       input.reader.range(block.offset, block.dataEnd - block.offset));
       sequence.data(SequenceData{})
           .program(parseMidiSequence(input.reader, sequence.id(), block, &result.sourceMap(), &result.diagnostics()));

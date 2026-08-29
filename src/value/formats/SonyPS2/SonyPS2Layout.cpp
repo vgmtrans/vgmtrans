@@ -122,7 +122,8 @@ std::optional<SequenceLayout> readSequenceLayout(ByteReader reader, u32 offset) 
   }
 
   if (layout.midi) {
-    for (const auto entry : layout.midi->entries) {
+    for (u32 index = 0; index < layout.midi->entries.size(); ++index) {
+      const auto entry = layout.midi->entries[index];
       if (!entry || !reader.has(*entry, 6)) {
         continue;
       }
@@ -131,6 +132,7 @@ std::optional<SequenceLayout> readSequenceLayout(ByteReader reader, u32 offset) 
         continue;
       }
       MidiBlockLayout block{
+          .index = index,
           .offset = *entry,
           .dataOffset = *entry + relativeData,
           .dataEnd = entryEnd(*layout.midi, *entry),
