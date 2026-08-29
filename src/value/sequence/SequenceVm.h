@@ -136,7 +136,7 @@ public:
   void globalTranspose(GlobalTransposePerformanceEvent event);
   void globalTranspose(s32 semitones);
   void pitchBend(PitchBendPerformanceEvent event);
-  void pitchBend(double semitones);
+  void pitchBend(double semitones, PitchBendLayerId layer = kPrimaryPitchBendLayer);
   void pitchBendRange(PitchBendRangePerformanceEvent event);
   void pitchBendRange(u8 semitones);
   void vibratoDelay(VibratoDelayPerformanceEvent event);

@@ -31,6 +31,10 @@ using PerformanceAutomationId = Id<PerformanceAutomationIdTag>;
 struct PerformanceLaneIdTag;
 using PerformanceLaneId = Id<PerformanceLaneIdTag>;
 
+struct PitchBendLayerIdTag;
+using PitchBendLayerId = Id<PitchBendLayerIdTag>;
+inline constexpr PitchBendLayerId kPrimaryPitchBendLayer{0};
+
 struct PerformanceEventHeader {
   CommandId sourceCommand;
   SourceAnnotationId sourceAnnotation;
@@ -213,6 +217,10 @@ struct PitchBendPerformanceEvent {
   // A source pitch wheel may rely on the selected instrument for its range.
   // Collection-aware lowerers use this position instead of the fallback above.
   std::optional<double> normalizedWheelPosition;
+  // Each event replaces one persistent layer; renderers add the active layers.
+  // Layer zero retains ordinary bend/transition replacement semantics. An
+  // independent pitch LFO or envelope uses another layer so neither is erased.
+  PitchBendLayerId layer = kPrimaryPitchBendLayer;
 };
 
 struct PitchBendRangePerformanceEvent {

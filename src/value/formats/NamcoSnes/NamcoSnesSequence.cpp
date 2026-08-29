@@ -26,6 +26,7 @@ namespace {
 
 constexpr std::string_view kFormatId = "namco-snes";
 constexpr u8 kRest = 0x54;
+constexpr PitchBendLayerId kPitchTableBendLayer{1};
 namespace math {
 
 [[nodiscard]] constexpr u8 voiceBit(u32 track) { return static_cast<u8>(0x80u >> track); }
@@ -267,7 +268,7 @@ struct Playback {
       out.pitchBendRange(requiredRange);
     }
     if (!track.pitchBend || std::abs(*track.pitchBend - semitones) > 0.0001) {
-      out.pitchBend(semitones);
+      out.pitchBend(semitones, kPitchTableBendLayer);
       track.pitchBend = semitones;
     }
   }

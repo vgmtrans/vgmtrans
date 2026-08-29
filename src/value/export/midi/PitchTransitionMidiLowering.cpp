@@ -10,8 +10,10 @@
 #include <cmath>
 #include <limits>
 #include <optional>
+#include <stdexcept>
 #include <tuple>
 #include <type_traits>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -119,12 +121,13 @@ struct PitchBendLayer {
   return key;
 }
 
-[[nodiscard]] std::optional<double> pitchBendAt(const std::vector<PerformanceEvent>& events, u64 beginTick,
-                                                u64 endTick) {
+[[nodiscard]] std::optional<double> primaryPitchBendAt(const std::vector<PerformanceEvent>& events, u64 beginTick,
+                                                       u64 endTick) {
   const PitchBendPerformanceEvent* latest = nullptr;
   for (const auto& event : events) {
     const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
-    if (bend == nullptr || bend->header.tick < beginTick || bend->header.tick > endTick) {
+    if (bend == nullptr || bend->layer != kPrimaryPitchBendLayer || bend->header.tick < beginTick ||
+        bend->header.tick > endTick) {
       continue;
     }
     if (latest == nullptr ||
@@ -138,7 +141,7 @@ struct PitchBendLayer {
 [[nodiscard]] std::optional<double> establishedPitchBend(const std::vector<PerformanceEvent>& events,
                                                          const NoteSpan& note, const PitchTransitionIntent& transition,
                                                          u64 startTick) {
-  const auto bend = pitchBendAt(events, note.source.header.tick, startTick);
+  const auto bend = primaryPitchBendAt(events, note.source.header.tick, startTick);
   // Pitch bends may already have passed through the source's finite bend
   // register, so allow a small quantization difference from the exact key.
   if (!bend || std::abs(bendBaseKeyAt(note, startTick) + *bend - transition.startKey) >= 0.02) {
@@ -218,40 +221,60 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
   };
 }
 
-[[nodiscard]] std::vector<PitchBendPerformanceEvent> resolvePitchBends(std::vector<PitchBendWrite> writes) {
+[[nodiscard]] std::vector<PitchBendPerformanceEvent> resolvePitchBends(std::vector<PitchBendWrite> writes,
+                                                                       PitchBendLayerId heldTransitionLayer) {
   std::ranges::stable_sort(writes, [](const PitchBendWrite& lhs, const PitchBendWrite& rhs) {
     return std::tie(lhs.bend.header.tick, lhs.bend.header.sequence) <
            std::tie(rhs.bend.header.tick, rhs.bend.header.sequence);
   });
 
-  PitchBendLayer pitch;
+  PitchBendLayer primary;
   PitchBendLayer heldVoice;
   std::vector<PitchBendPerformanceEvent> resolved;
-  resolved.reserve(writes.size());
+  resolved.reserve(writes.size() * 2);
   for (const auto& write : writes) {
-    auto& layer = write.kind == PitchBendWriteKind::HeldTransition ? heldVoice : pitch;
+    if (write.kind == PitchBendWriteKind::Source) {
+      if (write.bend.layer == kPrimaryPitchBendLayer) {
+        primary.semitones = write.bend.semitones;
+        primary.owner.reset();
+      }
+      resolved.push_back(write.bend);
+      continue;
+    }
+
+    const bool held = write.kind == PitchBendWriteKind::HeldTransition;
+    auto& layer = held ? heldVoice : primary;
     if (write.reset) {
       if (layer.owner != write.owner) {
         continue;
       }
       layer = {};
     } else {
-      if (write.kind == PitchBendWriteKind::AbsoluteTransition) {
+      if (!held) {
+        if (heldVoice.semitones != 0.0) {
+          auto reset = write.bend;
+          reset.semitones = 0.0;
+          reset.normalizedWheelPosition.reset();
+          reset.layer = heldTransitionLayer;
+          reset.header.automation.reset();
+          resolved.push_back(std::move(reset));
+        }
         heldVoice = {};
       }
-      const bool relative = write.kind == PitchBendWriteKind::HeldTransition;
-      if (relative && layer.owner != write.owner) {
+      if (held && layer.owner != write.owner) {
         // Cancel an interrupted absolute transition, but retain ownerless
         // source bend beneath the held transition.
         layer.ownerBaseSemitones =
-            write.establishesHeldPitch ? (pitch.owner ? -pitch.semitones : 0.0) : layer.semitones;
+            write.establishesHeldPitch ? (primary.owner ? -primary.semitones : 0.0) : layer.semitones;
       }
-      layer.semitones = (relative ? layer.ownerBaseSemitones : 0.0) + write.bend.semitones;
+      layer.semitones = (held ? layer.ownerBaseSemitones : 0.0) + write.bend.semitones;
       layer.owner = write.owner;
     }
 
     auto bend = write.bend;
-    bend.semitones = pitch.semitones + heldVoice.semitones;
+    bend.semitones = layer.semitones;
+    bend.normalizedWheelPosition.reset();
+    bend.layer = held ? heldTransitionLayer : kPrimaryPitchBendLayer;
     if (write.reset) {
       // The reset occurs at the next attack, but it is not part of that voice's
       // transition path.
@@ -262,16 +285,28 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
   return resolved;
 }
 
-[[nodiscard]] std::optional<double> establishedPitchBend(const std::vector<PitchBendWrite>& bends, const NoteSpan& note,
-                                                         const PitchTransitionIntent& transition, u64 startTick) {
-  const auto resolved = resolvePitchBends(bends);
-  std::optional<double> bendAtStart;
+[[nodiscard]] std::optional<double> establishedPitchBend(const std::vector<PitchBendWrite>& bends,
+                                                         const NoteSpan& note, const PitchTransitionIntent& transition,
+                                                         u64 startTick,
+                                                         PitchBendLayerId heldTransitionLayer) {
+  const auto resolved = resolvePitchBends(bends, heldTransitionLayer);
+  double primary = 0.0;
+  double held = 0.0;
+  bool established = false;
   for (const auto& bend : resolved) {
-    if (bend.header.tick <= startTick) {
-      bendAtStart = bend.semitones;
+    if (bend.header.tick > startTick) {
+      continue;
+    }
+    if (bend.layer == kPrimaryPitchBendLayer) {
+      primary = bend.semitones;
+      established = true;
+    } else if (bend.layer == heldTransitionLayer) {
+      held = bend.semitones;
+      established = true;
     }
   }
-  if (!bendAtStart || std::abs(bendBaseKeyAt(note, startTick) + *bendAtStart - transition.startKey) >= 0.02) {
+  const double bendAtStart = primary + held;
+  if (!established || std::abs(bendBaseKeyAt(note, startTick) + bendAtStart - transition.startKey) >= 0.02) {
     return std::nullopt;
   }
   return bendAtStart;
@@ -279,7 +314,7 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
 
 [[nodiscard]] bool appendPitchBends(std::vector<PitchBendWrite>& bends, const PerformanceAutomation& automation,
                                     const PitchTransitionIntent& transition, const NoteSpan& note,
-                                    bool retainReleaseTail) {
+                                    bool retainReleaseTail, PitchBendLayerId heldTransitionLayer) {
   const u64 startTick = std::max(note.source.header.tick, automation.realization.startTick);
   const u64 endTick =
       retainReleaseTail ? automation.realization.endTick : std::min(note.endTick, automation.realization.endTick);
@@ -289,7 +324,8 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
 
   // A delayed slide may begin away from the note's nominal key.
   const double noteBaseKey = bendBaseKeyAt(note, note.source.header.tick);
-  const bool startPitchEstablished = establishedPitchBend(bends, note, transition, startTick).has_value();
+  const bool startPitchEstablished =
+      establishedPitchBend(bends, note, transition, startTick, heldTransitionLayer).has_value();
   // A held source voice may either continue from its live bend or explicitly
   // reload the transition's declared start key at the note boundary.
   const bool establishesHeldPitch = transition.previousNote && !startPitchEstablished;
@@ -357,9 +393,25 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
   return bends;
 }
 
+[[nodiscard]] PitchBendLayerId unusedPitchBendLayer(const std::vector<PitchBendWrite>& bends) {
+  std::unordered_set<u32> used;
+  for (const auto& bend : bends) {
+    if (bend.bend.layer.valid()) {
+      used.insert(bend.bend.layer.value);
+    }
+  }
+  for (u32 candidate = 1; candidate != invalidIdValue; ++candidate) {
+    if (!used.contains(candidate)) {
+      return PitchBendLayerId{candidate};
+    }
+  }
+  throw std::overflow_error("Pitch bend layer space exhausted");
+}
+
 void lowerPitchBends(PerformanceSequence& performance, std::vector<PerformanceEvent>& events,
                      const std::vector<NoteSpan>& notes, const std::vector<const PerformanceAutomation*>& transitions) {
   auto bends = takeSourcePitchBends(events);
+  const PitchBendLayerId heldTransitionLayer = unusedPitchBendLayer(bends);
   for (const auto* automation : transitions) {
     const auto& transition = *pitchTransitionIntent(*automation);
     const auto* anchor = findNote(notes, transition.note);
@@ -376,7 +428,8 @@ void lowerPitchBends(PerformanceSequence& performance, std::vector<PerformanceEv
     }
     bool rendered = false;
     for (const auto* note : affectedNotes) {
-      rendered |= appendPitchBends(bends, *automation, transition, *note, note == affectedNotes.back());
+      rendered |= appendPitchBends(bends, *automation, transition, *note, note == affectedNotes.back(),
+                                   heldTransitionLayer);
     }
     if (rendered) {
       // Retain the terminal bend through note-off and the synth's release
@@ -388,7 +441,7 @@ void lowerPitchBends(PerformanceSequence& performance, std::vector<PerformanceEv
     }
   }
 
-  auto resolved = resolvePitchBends(std::move(bends));
+  auto resolved = resolvePitchBends(std::move(bends), heldTransitionLayer);
   for (auto& bend : resolved) {
     events.emplace_back(std::move(bend));
   }
