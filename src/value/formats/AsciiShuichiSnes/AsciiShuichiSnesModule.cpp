@@ -22,7 +22,7 @@ namespace {
     return {};
   }
 
-  ScanResultBuilder result(input, "AsciiShuichiSnes");
+  ScanResultBuilder result(input, kFormatName);
   const std::string displayName =
       fmt::format("{} (Shuichi Ukai, {})", result.sourceDisplayName(), versionName(layout->version));
   auto sequence = result.sequence(displayName);
@@ -45,7 +45,7 @@ namespace {
 
 FormatModule module() {
   return FormatModule{
-      .name = "AsciiShuichiSnes",
+      .name = kFormatName,
       .preferredSampleFilter = SampleFilter::SnesDspLowPass,
       .acceptedFormats = {source_formats::kSnesAram},
       .scan = scan,

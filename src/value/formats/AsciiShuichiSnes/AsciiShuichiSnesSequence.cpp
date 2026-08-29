@@ -8,15 +8,13 @@
 
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompiledCommandRuntime.h"
-#include "value/synth/SnesDsp.h"
+#include "value/sequence/SequenceProgramConfig.h"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <limits>
 #include <optional>
 #include <set>
-#include <string>
 #include <utility>
 
 namespace vgmtrans::formats::ascii_shuichi_snes {
@@ -56,24 +54,14 @@ namespace math {
   };
 }
 
-[[nodiscard]] double tuningCents(s8 tuning) { return 1200.0 * std::log2(1.0 + tuning / 4096.0); }
-
 [[nodiscard]] double vibratoSemitones(double key, s8 tuning, s8 step, u8 width) {
-  const double tunedKey = key + tuningCents(tuning) / 100.0;
+  const double tunedKey = key + driverTuningCents(tuning) / 100.0;
   const double pitch = 4096.0 * std::exp2((tunedKey - 81.0) / 12.0);
   // A fresh note loads width >> 1 into a DBNZ counter. Width 0 or 1 therefore
   // means 256 initial steps rather than zero.
   const double excursion =
       std::abs(static_cast<double>(step)) * counter(static_cast<u8>(width >> 1));
   return pitch > excursion ? 12.0 * std::log2((pitch + excursion) / pitch) : 0.0;
-}
-
-[[nodiscard]] double releaseSeconds(u8 adsr2, u8 gain) {
-  if ((gain > 0 && gain < 0x80) || gain >= 0xc0) {
-    return std::numeric_limits<double>::infinity();
-  }
-  const s16 start = static_cast<s16>(((adsr2 >> 5) << 8) | 0xff);
-  return snesDspGainEnvelopeSeconds(gain, start, 0);
 }
 
 }  // namespace math
@@ -84,13 +72,13 @@ struct RuntimePatch {
 };
 
 struct RuntimeConfig {
-  std::array<RuntimePatch, 256> patches{};
+  std::array<RuntimePatch, kPhysicalPatchCount> patches{};
 };
 
 [[nodiscard]] RuntimeConfig runtimeConfig(ByteReader reader, const Layout& layout) {
   RuntimeConfig config;
   for (u32 program = 0; program < config.patches.size(); ++program) {
-    const u32 row = layout.instrumentTableAddress + static_cast<u8>(program * 4u);
+    const u32 row = instrumentRowAddress(layout, static_cast<u8>(program));
     if (!reader.has(row, 4)) {
       break;
     }
@@ -146,8 +134,6 @@ struct RepeatFrame {
 };
 
 struct TrackState {
-  explicit TrackState(const RuntimeConfig&) {}
-
   u8 rawLength = 0;
   u8 duration = 0;
   u8 durationRate = 0;
@@ -163,7 +149,7 @@ struct TrackState {
   u64 noteStartTick = 0;
   u32 noteWaitTicks = 0;
   PerformanceNoteId lastNote;
-  std::optional<double> lastKey;
+  double lastKey = kOutputKeyOffset;
   Address loopPoint;
   std::array<RepeatFrame, 3> repeats{};
   u8 repeatDepth = 0;
@@ -178,7 +164,9 @@ struct Playback {
   VmApi& vm;
   ProgramState& program;
 
-  [[nodiscard]] const RuntimePatch& patch() const { return program.config->patches[track.program]; }
+  [[nodiscard]] const RuntimePatch& patch() const {
+    return program.config->patches[track.program & (kPhysicalPatchCount - 1)];
+  }
 
   void beforeCommand() {
     if (track.temporaryVolumeTick && vm.tick() > *track.temporaryVolumeTick) {
@@ -217,7 +205,7 @@ struct Playback {
   [[nodiscard]] LfoPerformanceContext vibratoContext() const {
     const double period = 2.0 * math::counter(track.vibrato.width) * math::counter(track.vibrato.rate);
     return LfoPerformanceContext{
-        .cyclesPerTick = period == 0.0 ? 0.0 : 1.0 / period,
+        .cyclesPerTick = 1.0 / period,
         // Both additions and counters are eight-bit in the driver. Zero is a
         // complete 256-tick DBNZ cycle, not an immediate update.
         .delayTicks = math::counter(static_cast<u8>(track.vibrato.delay + track.vibrato.rate)),
@@ -241,9 +229,9 @@ struct Playback {
     output.vibratoDelayTicks(context.delayTicks.value_or(0));
   }
 
-  [[nodiscard]] Effects note(u8 sourceKey, bool hasLength, u8 length, bool followedByRest) {
-    if (hasLength) {
-      track.rawLength = length;
+  [[nodiscard]] Effects note(u8 sourceKey, std::optional<u8> length, bool followedByRest) {
+    if (length) {
+      track.rawLength = *length;
     }
     const double key = static_cast<double>(sourceKey + track.transpose);
     NotePerformanceEvent event{
@@ -257,7 +245,7 @@ struct Playback {
         .restartsLfoPhase = true,
     };
     if (track.slurNext && track.lastNote.valid()) {
-      if (track.lastKey && std::abs(*track.lastKey - key) < 0.000001) {
+      if (std::abs(track.lastKey - key) < 0.000001) {
         event.extendsPrevious = true;
         track.lastNote = out.note(std::move(event));
       } else {
@@ -286,33 +274,22 @@ struct Playback {
     track.slurNext = true;
   }
 
-  [[nodiscard]] Effects rest(bool hasLength, u8 length) {
-    if (hasLength) {
-      track.rawLength = length;
+  [[nodiscard]] Effects rest(std::optional<u8> length) {
+    if (length) {
+      track.rawLength = *length;
     }
     track.lastNote = {};
-    track.lastKey.reset();
+    track.lastKey = kOutputKeyOffset;
     track.slurNext = false;
     return Effects::wait(waitTicks());
   }
 
-  void instrument(u8 value) {
-    track.program = value;
-    out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = value},
-                   InstrumentEnvelopeMode::UseInstrumentEnvelope);
-    out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
-    emitTrackTuning();
-  }
-
   void releaseGain(u8 gain) {
     Envelope envelope;
-    envelope.releaseSeconds = math::releaseSeconds(patch().adsr2, gain);
+    envelope.releaseSeconds = driverReleaseSeconds(patch().adsr2, gain);
     out.updateEnvelope(std::move(envelope), EnvelopeFields::Release,
                        VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
-
-  void transposeAbsolute(s8 value) { track.transpose = value; }
-  void transposeRelative(s8 value) { track.transpose = static_cast<s8>(track.transpose + value); }
 
   void fineTuning(s8 value) {
     track.tuning = value;
@@ -321,28 +298,18 @@ struct Playback {
 
   void emitTrackTuning() {
     const s8 combined = static_cast<s8>(patch().tuning + track.tuning);
-    out.tuning(math::tuningCents(combined) - math::tuningCents(patch().tuning));
+    out.tuning(driverTuningCents(combined) - driverTuningCents(patch().tuning));
   }
 
   void pitchSlide(u8 delay, u8 duration, u8 sourceTarget) {
-    if (!track.lastNote.valid() || !track.lastKey) {
+    if (!track.lastNote.valid()) {
       return;
     }
     const double target = sourceTarget + track.transpose;
     PerformanceEmitter delayed = out.at(vm.tick() + delay);
-    const double start = delayed.currentPitchTransitionKey(track.lastNote).value_or(*track.lastKey);
+    const double start = delayed.currentPitchTransitionKey(track.lastNote).value_or(track.lastKey);
     delayed.retargetPitchSlide(track.lastNote, start, target, math::counter(duration)).preferPitchBend();
     track.lastKey = target;
-  }
-
-  void durationRate(u8 rate) {
-    track.durationUsesRate = true;
-    track.durationRate = rate;
-  }
-
-  void durationTicks(u8 ticks) {
-    track.durationUsesRate = false;
-    track.duration = ticks;
   }
 
   void stopVolumeFade() { track.volumeFade.active = false; }
@@ -368,11 +335,6 @@ struct Playback {
     emitPan(out);
   }
 
-  void volumeAndPan(u8 newVolume, u8 newPan) {
-    volume(newVolume);
-    pan(newPan);
-  }
-
   void panFade(u8 intervalMinusOne, u8 delay, u8 endpoint) {
     const u8 target = std::min<u8>(endpoint >> 1, 30);
     const u8 rawInterval = static_cast<u8>(intervalMinusOne + 1);
@@ -396,12 +358,10 @@ struct Playback {
     };
   }
 
-  void masterVolume(u8 value) { out.masterLevel(std::abs(static_cast<s8>(value)) / 127.0); }
-
   void echoVolume(s8 left, s8 right) {
     program.echo.leftGain = std::clamp(left / 127.0, -1.0, 1.0);
     program.echo.rightGain = std::clamp(right / 127.0, -1.0, 1.0);
-    program.echo.send = std::min(1.0, std::max(std::abs(*program.echo.leftGain), std::abs(*program.echo.rightGain)));
+    program.echo.send = std::max(std::abs(*program.echo.leftGain), std::abs(*program.echo.rightGain));
     out.reverb(program.echo);
   }
 
@@ -428,23 +388,11 @@ struct Playback {
     out.reverb(program.echo);
   }
 
-  void vibrato(u8 delay, u8 rate, s8 step, u8 width) {
-    track.vibrato = {.delay = delay, .rate = rate, .step = step, .width = width};
-    emitVibrato(track.lastKey.value_or(kOutputKeyOffset), out);
+  void vibrato(Vibrato value) {
+    track.vibrato = value;
+    emitVibrato(track.lastKey, out);
   }
 
-  void vibratoOff() {
-    track.vibrato = {};
-    emitVibrato(track.lastKey.value_or(kOutputKeyOffset), out);
-  }
-
-  void combined(u8 newProgram, u8 newVolume, u8 newPan, s8 newTranspose) {
-    instrument(newProgram);
-    volumeAndPan(newVolume, newPan);
-    transposeAbsolute(newTranspose);
-  }
-
-  void loopStart(Address address) { track.loopPoint = address; }
   [[nodiscard]] Effects loopForever() { return vm.declaredLoop(track.loopPoint); }
 
   void repeatStart(Address address) {
@@ -512,10 +460,72 @@ struct Playback {
 
 using Cursor = CompilerCursor<TrackState, Playback>;
 
-[[nodiscard]] bool optionalLength(Cursor::Event& event, u8& length) {
-  const bool present = event.peekU8().value_or(0xff) < 0x80;
-  length = present ? event.u8("length", SemanticOperandRole::Duration) : 0;
-  return present;
+enum class Command : u8 {
+  Program = 0x89,
+  ReleaseGain = 0x8a,
+  Tempo = 0x8b,
+  Transpose = 0x8c,
+  RelativeTranspose = 0x8d,
+  FineTuning = 0x8e,
+  PitchSlide = 0x8f,
+  DurationRate = 0x90,
+  VolumeAndPan = 0x92,
+  Volume = 0x93,
+  RelativeVolume = 0x94,
+  TemporaryVolume = 0x95,
+  Pan = 0x96,
+  AutomaticPan = 0x98,
+  VolumeFade = 0x99,
+  EchoVolume = 0x9a,
+  EchoParameters = 0x9b,
+  EchoMask = 0x9c,
+  Vibrato = 0x9d,
+  VibratoOff = 0x9e,
+  Rest = 0x9f,
+  NoiseOn = 0xa0,
+  NoiseOff = 0xa1,
+  EchoFir = 0xa2,
+  MuteVoiceMask = 0xa3,
+  Combined = 0xa4,
+  DurationTicks = 0xa5,
+  WriteCpuPort = 0xa6,
+  EndVoice = 0xab,
+  MasterVolume = 0xac,
+};
+
+constexpr std::array<Command, 23> kEarlyCommands{
+    Command::Program,       Command::Tempo,          Command::Transpose,    Command::TemporaryVolume,
+    Command::FineTuning,    Command::DurationRate,   Command::MasterVolume, Command::VolumeAndPan,
+    Command::Volume,        Command::Pan,            Command::AutomaticPan, Command::VolumeFade,
+    Command::EchoVolume,    Command::EchoParameters, Command::EchoMask,     Command::Vibrato,
+    Command::VibratoOff,    Command::PitchSlide,     Command::Rest,         Command::NoiseOn,
+    Command::NoiseOff,      Command::EchoFir,        Command::EndVoice,
+};
+
+[[nodiscard]] Command semanticCommand(Version version, u8 opcode) {
+  return version == Version::Early ? kEarlyCommands[opcode - 0x89] : static_cast<Command>(opcode);
+}
+
+[[nodiscard]] std::optional<u8> optionalLength(Cursor::Event& event) {
+  if (event.peekU8().value_or(0xff) >= 0x80) {
+    return std::nullopt;
+  }
+  return event.u8("length", SemanticOperandRole::Duration);
+}
+
+[[nodiscard]] u8 programOperand(Cursor::Event& event, std::set<u8>* programs) {
+  const u8 program = event.u8("program", SemanticOperandRole::InstrumentProgram);
+  if (programs) {
+    programs->insert(program);
+  }
+  return program;
+}
+
+Cursor::Event& selectInstrument(Cursor::Event& event, u8 program) {
+  return event.set<&TrackState::program>(program)
+      .emitInstrument(std::string_view{kInstrumentDomain}, program, InstrumentEnvelopeMode::UseInstrumentEnvelope)
+      .restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks)
+      .invoke<&Playback::emitTrackTuning>();
 }
 
 [[nodiscard]] u8 targetNote(Cursor::Event& event, u8 noteBase) {
@@ -538,29 +548,30 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   return event.invoke<&Playback::echoFir>(c0, c1, c2, c3, c4, c5, c6, event.s8("coefficient_7"));
 }
 
-[[nodiscard]] DecodedBytecodeCommand decodeCommonFlow(Cursor& cursor, u8 opcode, u32 begin) {
+[[nodiscard]] DecodedBytecodeCommand decodeCommonFlow(Cursor& cursor, u8 opcode) {
   switch (opcode) {
     case 0x80:
       return cursor.command("End", SequenceSemantic::End).end();
-    case 0x81:
-      return cursor.command("Infinite Loop Point", SequenceSemantic::Repeat)
-          .invoke<&Playback::loopStart>(Address{begin + 1});
+    case 0x81: {
+      auto event = cursor.command("Infinite Loop Point", SequenceSemantic::Repeat);
+      return event.set<&TrackState::loopPoint>(event.nextAddress());
+    }
     case 0x82:
       return cursor.command("Infinite Loop", SequenceSemantic::Jump).invokeFlow<&Playback::loopForever>();
-    case 0x83:
-      return cursor.command("Repeat Start", SequenceSemantic::Repeat)
-          .invoke<&Playback::repeatStart>(Address{begin + 1});
+    case 0x83: {
+      auto event = cursor.command("Repeat Start", SequenceSemantic::Repeat);
+      return event.invoke<&Playback::repeatStart>(event.nextAddress());
+    }
     case 0x84: {
       auto event = cursor.command("Repeat End", SequenceSemantic::Repeat);
       const u8 count = event.u8("count", SemanticOperandRole::Count);
-      return event.invokeFlow<&Playback::repeatEnd>(count, Address{begin + 2});
+      return event.invokeFlow<&Playback::repeatEnd>(count, event.nextAddress());
     }
     case 0x85:
       return cursor.command("Repeat Break", SequenceSemantic::RepeatBreak).invokeFlow<&Playback::repeatBreak>();
     case 0x86: {
       auto event = cursor.command("Call", SequenceSemantic::Call);
-      return event.call(
-          Address{event.u16le("destination", SourceValueDisplay::Address, SemanticOperandRole::CallTarget)});
+      return event.call(event.addressLe("destination", SemanticOperandRole::CallTarget));
     }
     case 0x87:
       return cursor.command("Return", SequenceSemantic::Return).return_();
@@ -571,200 +582,75 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   }
 }
 
-[[nodiscard]] DecodedBytecodeCommand decodeEarly(Cursor& cursor, u8 opcode, u32 begin,
-                                                 std::set<u8>* programs) {
-  if (opcode <= 0x88) {
-    return decodeCommonFlow(cursor, opcode, begin);
-  }
-  switch (opcode) {
-    case 0x89: {
+[[nodiscard]] DecodedBytecodeCommand decodeSemantic(Cursor& cursor, Command command, const Layout& layout,
+                                                    std::set<u8>* programs) {
+  switch (command) {
+    case Command::Program: {
       auto event = cursor.command("Program Change", SequenceSemantic::Program);
-      const u8 program = event.u8("program", SemanticOperandRole::InstrumentProgram);
-      if (programs) {
-        programs->insert(program);
-      }
-      return event.invoke<&Playback::instrument>(program);
+      return selectInstrument(event, programOperand(event, programs));
     }
-    case 0x8a: {
-      auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-      return event.emitTempo(event.resolved("microseconds_per_quarter", event.rawU8("tempo"),
-                                            math::tempoMicrosecondsPerQuarter));
-    }
-    case 0x8b: {
-      auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::transposeAbsolute>(event.s8("semitones", SemanticOperandRole::Pitch));
-    }
-    case 0x8c: {
-      auto event = cursor.command("Temporary Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::temporaryVolume>(event.s8("delta", SemanticOperandRole::Level));
-    }
-    case 0x8d: {
-      auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::fineTuning>(event.s8("fraction", SemanticOperandRole::Pitch));
-    }
-    case 0x8e: {
-      auto event = cursor.command("Duration Rate", SequenceSemantic::State);
-      return event.invoke<&Playback::durationRate>(event.u8("rate", SemanticOperandRole::Duration));
-    }
-    case 0x8f: {
-      auto event = cursor.command("Master Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::masterVolume>(event.u8("volume", SemanticOperandRole::Level));
-    }
-    case 0x90: {
-      auto event = cursor.command("Volume and Pan", SequenceSemantic::Level);
-      const u8 volume = event.u8("volume", SemanticOperandRole::Level);
-      return event.invoke<&Playback::volumeAndPan>(volume, event.u8("pan", SemanticOperandRole::Pan));
-    }
-    case 0x91: {
-      auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(event.u8("volume", SemanticOperandRole::Level));
-    }
-    case 0x92: {
-      auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      return event.invoke<&Playback::pan>(event.u8("pan", SemanticOperandRole::Pan));
-    }
-    case 0x93: {
-      auto event = cursor.command("Automatic Pan", SequenceSemantic::Pan);
-      const u8 interval = event.u8("interval_minus_one", SemanticOperandRole::Duration);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      return event.invoke<&Playback::panFade>(interval, delay, event.u8("endpoint_and_mode", SemanticOperandRole::Pan));
-    }
-    case 0x94: {
-      auto event = cursor.command("Volume Fade", SequenceSemantic::Level);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      const u8 interval = event.u8("interval", SemanticOperandRole::Duration);
-      const s8 step = event.s8("step", SemanticOperandRole::Level);
-      return event.invoke<&Playback::volumeFade>(delay, interval, step,
-                                                 event.u8("step_count", SemanticOperandRole::Count));
-    }
-    case 0x95: {
-      auto event = cursor.command("Echo Volume", SequenceSemantic::State);
-      const s8 left = event.s8("left", SemanticOperandRole::Level);
-      return event.invoke<&Playback::echoVolume>(left, event.s8("right", SemanticOperandRole::Level));
-    }
-    case 0x96: {
-      auto event = cursor.command("Echo Parameters", SequenceSemantic::State);
-      const u8 delay = event.u8("delay");
-      const s8 feedback = event.s8("feedback");
-      return event.invoke<&Playback::echoParameters>(delay, feedback, event.u8("reserved"));
-    }
-    case 0x97: {
-      auto event = cursor.command("Echo Voice Mask", SequenceSemantic::State);
-      return event.invoke<&Playback::echoMask>(event.u8("mask", SourceValueDisplay::Hex));
-    }
-    case 0x98: {
-      auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      const u8 rate = event.u8("step_interval", SemanticOperandRole::Modulation);
-      const s8 step = event.s8("pitch_step", SemanticOperandRole::Modulation);
-      return event.invoke<&Playback::vibrato>(delay, rate, step,
-                                              event.u8("direction_width", SemanticOperandRole::Duration));
-    }
-    case 0x99:
-      return cursor.command("Vibrato Off", SequenceSemantic::Modulation).invoke<&Playback::vibratoOff>();
-    case 0x9a: {
-      auto event = cursor.command("Pitch Slide to Note", SequenceSemantic::Pitch);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      const u8 duration = event.u8("duration", SemanticOperandRole::Duration);
-      event.invoke<&Playback::pitchSlide>(delay, duration, targetNote(event, 0xa0));
-      return event.duringWaitWhen<&Playback::canInlineNoteControl>();
-    }
-    case 0x9b: {
-      auto event = cursor.command("Rest", SequenceSemantic::Rest);
-      u8 length = 0;
-      const bool hasLength = optionalLength(event, length);
-      return event.invoke<&Playback::rest>(hasLength, length);
-    }
-    case 0x9c:
-      return cursor.sourceOnly("DSP Noise On", "noise-on");
-    case 0x9d:
-      return cursor.sourceOnly("DSP Noise Off", "noise-off");
-    case 0x9e:
-      return decodeFir(cursor);
-    case 0x9f:
-      return cursor.command("End Voice", SequenceSemantic::End).end();
-    default:
-      return cursor.unsupported("Invalid Command").stop();
-  }
-}
-
-[[nodiscard]] DecodedBytecodeCommand decodeLater(Cursor& cursor, u8 opcode, u32 begin,
-                                                 bool hasFirCommand, std::set<u8>* programs) {
-  if (opcode <= 0x88) {
-    return decodeCommonFlow(cursor, opcode, begin);
-  }
-  switch (opcode) {
-    case 0x89: {
-      auto event = cursor.command("Program Change", SequenceSemantic::Program);
-      const u8 program = event.u8("program", SemanticOperandRole::InstrumentProgram);
-      if (programs) {
-        programs->insert(program);
-      }
-      return event.invoke<&Playback::instrument>(program);
-    }
-    case 0x8a: {
+    case Command::ReleaseGain: {
       auto event = cursor.command("Release GAIN", SequenceSemantic::Envelope);
       return event.invoke<&Playback::releaseGain>(event.u8("gain", SourceValueDisplay::Hex));
     }
-    case 0x8b: {
+    case Command::Tempo: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
       return event.emitTempo(event.resolved("microseconds_per_quarter", event.rawU8("tempo"),
                                             math::tempoMicrosecondsPerQuarter));
     }
-    case 0x8c: {
+    case Command::Transpose: {
       auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::transposeAbsolute>(event.s8("semitones", SemanticOperandRole::Pitch));
+      return event.set<&TrackState::transpose>(event.s8("semitones", SemanticOperandRole::Pitch));
     }
-    case 0x8d: {
+    case Command::RelativeTranspose: {
       auto event = cursor.command("Relative Transpose", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::transposeRelative>(event.s8("semitones", SemanticOperandRole::Pitch));
+      return event.add<&TrackState::transpose>(event.s8("semitones", SemanticOperandRole::Pitch));
     }
-    case 0x8e: {
+    case Command::FineTuning: {
       auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
       return event.invoke<&Playback::fineTuning>(event.s8("fraction", SemanticOperandRole::Pitch));
     }
-    case 0x8f: {
+    case Command::PitchSlide: {
       auto event = cursor.command("Pitch Slide to Note", SequenceSemantic::Pitch);
       const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
       const u8 duration = event.u8("duration", SemanticOperandRole::Duration);
-      event.invoke<&Playback::pitchSlide>(delay, duration, targetNote(event, 0xac));
+      event.invoke<&Playback::pitchSlide>(delay, duration, targetNote(event, layout.noteBase()));
       return event.duringWaitWhen<&Playback::canInlineNoteControl>();
     }
-    case 0x90: {
+    case Command::DurationRate: {
       auto event = cursor.command("Duration Rate", SequenceSemantic::State);
-      return event.invoke<&Playback::durationRate>(event.u8("rate", SemanticOperandRole::Duration));
+      const u8 rate = event.u8("rate", SemanticOperandRole::Duration);
+      return event.set<&TrackState::durationUsesRate>(true).set<&TrackState::durationRate>(rate);
     }
-    case 0x91:
-    case 0x97:
-      return cursor.unsupported("Invalid Command").stop();
-    case 0x92: {
+    case Command::VolumeAndPan: {
       auto event = cursor.command("Volume and Pan", SequenceSemantic::Level);
       const u8 volume = event.u8("volume", SemanticOperandRole::Level);
-      return event.invoke<&Playback::volumeAndPan>(volume, event.u8("pan", SemanticOperandRole::Pan));
+      const u8 pan = event.u8("pan", SemanticOperandRole::Pan);
+      return event.invoke<&Playback::volume>(volume).invoke<&Playback::pan>(pan);
     }
-    case 0x93: {
+    case Command::Volume: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
       return event.invoke<&Playback::volume>(event.u8("volume", SemanticOperandRole::Level));
     }
-    case 0x94: {
+    case Command::RelativeVolume: {
       auto event = cursor.command("Relative Volume", SequenceSemantic::Level);
       return event.invoke<&Playback::relativeVolume>(event.s8("delta", SemanticOperandRole::Level));
     }
-    case 0x95: {
+    case Command::TemporaryVolume: {
       auto event = cursor.command("Temporary Volume", SequenceSemantic::Level);
       return event.invoke<&Playback::temporaryVolume>(event.s8("delta", SemanticOperandRole::Level));
     }
-    case 0x96: {
+    case Command::Pan: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
       return event.invoke<&Playback::pan>(event.u8("pan", SemanticOperandRole::Pan));
     }
-    case 0x98: {
+    case Command::AutomaticPan: {
       auto event = cursor.command("Automatic Pan", SequenceSemantic::Pan);
       const u8 interval = event.u8("interval_minus_one", SemanticOperandRole::Duration);
       const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
       return event.invoke<&Playback::panFade>(interval, delay, event.u8("endpoint_and_mode", SemanticOperandRole::Pan));
     }
-    case 0x99: {
+    case Command::VolumeFade: {
       auto event = cursor.command("Volume Fade", SequenceSemantic::Level);
       const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
       const u8 interval = event.u8("interval", SemanticOperandRole::Duration);
@@ -772,70 +658,76 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return event.invoke<&Playback::volumeFade>(delay, interval, step,
                                                  event.u8("step_count", SemanticOperandRole::Count));
     }
-    case 0x9a: {
+    case Command::EchoVolume: {
       auto event = cursor.command("Echo Volume", SequenceSemantic::State);
       const s8 left = event.s8("left", SemanticOperandRole::Level);
       return event.invoke<&Playback::echoVolume>(left, event.s8("right", SemanticOperandRole::Level));
     }
-    case 0x9b: {
+    case Command::EchoParameters: {
       auto event = cursor.command("Echo Parameters", SequenceSemantic::State);
       const u8 delay = event.u8("delay");
       const s8 feedback = event.s8("feedback");
       return event.invoke<&Playback::echoParameters>(delay, feedback, event.u8("reserved"));
     }
-    case 0x9c: {
+    case Command::EchoMask: {
       auto event = cursor.command("Echo Voice Mask", SequenceSemantic::State);
       return event.invoke<&Playback::echoMask>(event.u8("mask", SourceValueDisplay::Hex));
     }
-    case 0x9d: {
+    case Command::Vibrato: {
       auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
       const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
       const u8 rate = event.u8("step_interval", SemanticOperandRole::Modulation);
       const s8 step = event.s8("pitch_step", SemanticOperandRole::Modulation);
-      return event.invoke<&Playback::vibrato>(delay, rate, step,
-                                              event.u8("direction_width", SemanticOperandRole::Duration));
+      const u8 width = event.u8("direction_width", SemanticOperandRole::Duration);
+      return event.invoke<&Playback::vibrato>(Vibrato{.delay = delay, .rate = rate, .step = step, .width = width});
     }
-    case 0x9e:
-      return cursor.command("Vibrato Off", SequenceSemantic::Modulation).invoke<&Playback::vibratoOff>();
-    case 0x9f: {
+    case Command::VibratoOff:
+      return cursor.command("Vibrato Off", SequenceSemantic::Modulation).invoke<&Playback::vibrato>(Vibrato{});
+    case Command::Rest: {
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
-      u8 length = 0;
-      const bool hasLength = optionalLength(event, length);
-      return event.invoke<&Playback::rest>(hasLength, length);
+      return event.invoke<&Playback::rest>(optionalLength(event));
     }
-    case 0xa0:
+    case Command::NoiseOn:
       return cursor.sourceOnly("DSP Noise On", "noise-on");
-    case 0xa1:
+    case Command::NoiseOff:
       return cursor.sourceOnly("DSP Noise Off", "noise-off");
-    case 0xa2:
-      return hasFirCommand ? decodeFir(cursor) : cursor.unsupported("Invalid Command").stop();
-    case 0xa3: {
+    case Command::EchoFir:
+      return layout.version == Version::Early || layout.hasEchoFirCommand
+                 ? decodeFir(cursor)
+                 : cursor.unsupported("Invalid Command").stop();
+    case Command::MuteVoiceMask: {
       auto event = cursor.sourceOnly("Mute Voice Mask", "mute-voice-mask");
       static_cast<void>(event.u8("mask", SourceValueDisplay::Hex));
       return event;
     }
-    case 0xa4: {
+    case Command::Combined: {
       auto event = cursor.command("Program, Volume, Pan and Transpose", SequenceSemantic::State);
-      const u8 program = event.u8("program", SemanticOperandRole::InstrumentProgram);
+      const u8 program = programOperand(event, programs);
       const u8 volume = event.u8("volume", SemanticOperandRole::Level);
       const u8 pan = event.u8("pan", SemanticOperandRole::Pan);
       const s8 transpose = event.s8("transpose", SemanticOperandRole::Pitch);
-      if (programs) {
-        programs->insert(program);
-      }
-      return event.invoke<&Playback::combined>(program, volume, pan, transpose);
+      selectInstrument(event, program);
+      return event.invoke<&Playback::volume>(volume)
+          .invoke<&Playback::pan>(pan)
+          .set<&TrackState::transpose>(transpose);
     }
-    case 0xa5: {
+    case Command::DurationTicks: {
       auto event = cursor.command("Duration Ticks", SequenceSemantic::State);
-      return event.invoke<&Playback::durationTicks>(event.u8("ticks", SemanticOperandRole::Duration));
+      const u8 ticks = event.u8("ticks", SemanticOperandRole::Duration);
+      return event.set<&TrackState::durationUsesRate>(false).set<&TrackState::duration>(ticks);
     }
-    case 0xa6: {
+    case Command::WriteCpuPort: {
       auto event = cursor.sourceOnly("Write CPU Port", "cpu-port");
       static_cast<void>(event.u8("value", SourceValueDisplay::Hex));
       return event;
     }
-    case 0xab:
+    case Command::EndVoice:
       return cursor.command("End Voice", SequenceSemantic::End).end();
+    case Command::MasterVolume: {
+      auto event = cursor.command("Master Volume", SequenceSemantic::Level);
+      const u8 volume = event.u8("volume", SemanticOperandRole::Level);
+      return event.emitMasterLevel(std::abs(static_cast<s8>(volume)) / 127.0);
+    }
     default:
       return cursor.unsupported("Invalid Command").stop();
   }
@@ -844,7 +736,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, const Layout& layout, u32 begin,
                                                    std::vector<Diagnostic>* diagnostics,
                                                    std::set<u8>* programs = nullptr) {
-  Cursor cursor(reader, begin, "ascii-shuichi-snes", diagnostics);
+  Cursor cursor(reader, begin, kFormatId, diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
   }
@@ -854,28 +746,27 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     event.invoke<&Playback::tie>();
     return event.duringWaitWhen<&Playback::canInlineNoteControl>();
   }
-  if (opcode >= layout.noteBase) {
+  if (opcode >= layout.noteBase()) {
     auto event = cursor.command("Note", SequenceSemantic::Note);
-    const u8 key = event.opcodeValue("key", static_cast<u8>(opcode - layout.noteBase + kOutputKeyOffset),
+    const u8 key = event.opcodeValue("key", static_cast<u8>(opcode - layout.noteBase() + kOutputKeyOffset),
                                      SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
-    u8 length = 0;
-    const bool hasLength = optionalLength(event, length);
+    const std::optional<u8> length = optionalLength(event);
     const bool followedByRest = event.peekU8() == (layout.version == Version::Early ? 0x9b : 0x9f);
-    return event.invoke<&Playback::note>(key, hasLength, length, followedByRest);
+    return event.invoke<&Playback::note>(key, length, followedByRest);
   }
-  return layout.version == Version::Early ? decodeEarly(cursor, opcode, begin, programs)
-                                           : decodeLater(cursor, opcode, begin, layout.hasEchoFirCommand, programs);
+  if (opcode <= 0x88) {
+    return decodeCommonFlow(cursor, opcode);
+  }
+  return decodeSemantic(cursor, semanticCommand(layout.version, opcode), layout, programs);
 }
-
-}  // namespace
 
 const SequenceProgramConfig& sequenceConfig() {
   static const SequenceProgramConfig config{
-      .commandKindPrefix = "ascii-shuichi-snes",
+      .commandKindPrefix = kFormatId,
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior = SequenceProgramBehavior{
           .commandLimit = kCommandLimit,
-          .initialSourceInstrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0},
+          .initialSourceInstrument = InstrumentIdentity{.domain = kInstrumentDomain, .key = 0},
           .initialLevel = 0.0,
           .initialMasterLevel = 1.0,
           .initialReverbSend = 0.0,
@@ -887,12 +778,7 @@ const SequenceProgramConfig& sequenceConfig() {
   return config;
 }
 
-TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, u32 trackNumber, u32 startAddress,
-                               std::vector<Diagnostic>* diagnostics) {
-  const TrackDecodeScope tracks{.reader = reader, .maxCommands = kCommandLimit};
-  return tracks.decode(trackNumber, startAddress,
-                       [&](u32 offset) { return decodeCommand(reader, layout, offset, diagnostics); });
-}
+}  // namespace
 
 SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
                              std::vector<Diagnostic>* diagnostics) {
