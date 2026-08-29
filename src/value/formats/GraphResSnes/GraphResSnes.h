@@ -26,10 +26,8 @@ inline constexpr u32 kCommandLimit = 131072;
 inline constexpr std::string_view kInstrumentDomain = "graph-res-snes.instrument";
 
 struct DspState {
-  u8 masterLeft = 0x7f;
-  u8 masterRight = 0x7f;
-  u8 echoLeft = 0;
-  u8 echoRight = 0;
+  u8 masterVolume = 0x7f;
+  u8 echoVolume = 0;
   s8 echoFeedback = 0;
   u8 echoVoices = 0;
   u8 echoDelay = 0;

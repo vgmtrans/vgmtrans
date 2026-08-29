@@ -125,7 +125,7 @@ void layoutAndModuleBuildASequenceAndSynth() {
              layout->panTableAddress == 0x1a20 && layout->pitchTableAddress == 0x1b00 &&
              layout->pitchEnvelopeListAddress == 0x1c00 && layout->pitchEnvelopeCount == 2 &&
              layout->spcDirAddress == 0x4000 && layout->timerTarget == 0x85 &&
-             layout->dsp.masterLeft == 0x7f && layout->dsp.masterRight == 0x7f,
+             layout->dsp.masterVolume == 0x7f,
          "GraphResSnes should recover its relocated score, driver tables, DIR, and fixed timer");
 
   Session session;

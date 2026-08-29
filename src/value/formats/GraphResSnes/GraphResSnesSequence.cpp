@@ -37,13 +37,17 @@ constexpr std::array<std::array<s8, 8>, 4> kFirPresets{{
 
 namespace math {
 
+// Note lengths use one byte, where zero means 256 rather than no time at all.
 [[nodiscard]] constexpr u32 ticks(u8 encoded) { return encoded == 0 ? 256 : encoded; }
 
+// Timer 0 advances at 8 kHz, and each timer overflow advances the sequence by
+// one tick.
 [[nodiscard]] constexpr u32 tempoMicrosecondsPerQuarter(u8 timerTarget) {
-  // Timer 0 advances at 8 kHz. One sequence tick is one timer overflow.
   return kPpqn * 125u * (timerTarget == 0 ? 256u : timerTarget);
 }
 
+// Reproduce the driver's 8-bit duration and key-off counters. Ties suppress
+// key-off entirely; untied notes test the threshold after each decrement.
 [[nodiscard]] u32 soundingTicks(u32 length, u8 rate, bool tiesNext) {
   if (tiesNext) {
     return length;
@@ -66,6 +70,10 @@ namespace math {
 
 [[nodiscard]] constexpr double signedGain(s8 value) { return value / 128.0; }
 
+[[nodiscard]] constexpr double gain(u8 value) { return value / 128.0; }
+
+// If all eight echo-filter values match one of the driver's four built-in
+// filters, return its number. Custom filter values have no preset number.
 [[nodiscard]] std::optional<u8> firPreset(const std::array<s8, 8>& coefficients) {
   const auto found = std::ranges::find(kFirPresets, coefficients);
   return found == kFirPresets.end() ? std::nullopt
@@ -83,9 +91,9 @@ struct ProgramState {
   explicit ProgramState(const RuntimeConfig& config) : dsp(config.layout.dsp) {}
 
   DspState dsp;
-  u16 fade = 0;
+  u16 fadeAccumulator = 0;
   u8 fadeRate = 0;
-  bool initialized = false;
+  bool emittedInitialEcho = false;
   std::optional<u64> lastGlobalTick;
 };
 
@@ -112,7 +120,6 @@ struct TrackState {
   s8 pan = 0;
   u8 octave = 4;
   u8 transpose = 0;
-  u8 program = 0;
   u8 defaultLength = 0;
   u8 durationRate = 8;
   u8 adsr1 = 0x8f;
@@ -127,7 +134,7 @@ struct TrackState {
   u64 activeUntil = 0;
   PitchEnvelopeState pitchEnvelope;
   std::array<RepeatFrame, 4> repeats{};
-  u8 repeatDepth = 4;
+  u8 repeatDepth = static_cast<u8>(repeats.size());
   RepeatFrame unstackedRepeat;
   PerformanceNoteId lastNote;
   std::optional<double> lastKey;
@@ -140,37 +147,42 @@ struct Playback {
   VmApi& vm;
   ProgramState& program;
 
+  // The fade keeps fractional progress in its low byte. Subtract its whole
+  // part from a volume, and mute once the result leaves the valid 0-127 range.
   [[nodiscard]] u8 faded(u8 value) const {
-    const int result = static_cast<int>(value) - static_cast<int>(program.fade >> 8);
+    const int result = static_cast<int>(value) - static_cast<int>(program.fadeAccumulator >> 8);
     return result >= 0 && result < 0x80 ? static_cast<u8>(result) : 0;
   }
 
-  void emitMaster() {
-    out.masterLevel(std::max(faded(program.dsp.masterLeft), faded(program.dsp.masterRight)) / 128.0);
-  }
+  void emitMaster() { out.masterLevel(math::gain(faded(program.dsp.masterVolume))); }
 
+  // Echo is heard only when it is enabled and at least one voice uses it. Keep
+  // the saved echo settings even while the audible echo amount is zero.
   void emitEcho() {
-    const u8 left = faded(program.dsp.echoLeft);
-    const u8 right = faded(program.dsp.echoRight);
+    const double gain = math::gain(faded(program.dsp.echoVolume));
     const bool enabled = (program.dsp.flags & 0x20) == 0 && program.dsp.echoVoices != 0;
     out.reverb(ReverbPerformanceEvent{
         .voiceMask = program.dsp.echoVoices,
-        .send = enabled ? std::max(left, right) / 128.0 : 0.0,
-        .leftGain = left / 128.0,
-        .rightGain = right / 128.0,
+        .send = enabled ? gain : 0.0,
+        .leftGain = gain,
+        .rightGain = gain,
         .delayMilliseconds = program.dsp.echoDelay * 16.0,
         .feedback = math::signedGain(program.dsp.echoFeedback),
         .filterIndex = math::firPreset(program.dsp.fir),
     });
   }
 
+  // Some echo settings come from the driver's starting state rather than a
+  // sequence command. Report them once before the first command runs.
   void beforeCommand() {
-    if (!program.initialized) {
-      program.initialized = true;
+    if (!program.emittedInitialEcho) {
+      program.emittedInitialEcho = true;
       emitEcho();
     }
   }
 
+  // The pan table contains a left/right pair for each distance from center. A
+  // negative pan index uses the same pair with left and right swapped.
   [[nodiscard]] std::pair<double, double> channelGains() const {
     const int signedPan = track.pan;
     const u8 offset = static_cast<u8>(std::abs(signedPan) * 2);
@@ -185,6 +197,8 @@ struct Playback {
     return signedPan < 0 ? std::pair{second, first} : std::pair{first, second};
   }
 
+  // Our output stores volume and pan separately. Use the louder side as the
+  // volume, then express both sides relative to it to preserve their balance.
   void emitMix() {
     const auto [left, right] = channelGains();
     const double level = std::max(std::abs(left), std::abs(right));
@@ -199,13 +213,15 @@ struct Playback {
     return track.data.le16(track.layout.pitchEnvelopeListAddress + track.pitchEnvelope.index * 2u);
   }
 
-  [[nodiscard]] s16 pitchEnvelopeDelta(bool advance) {
+  // A pitch-change pattern is made of four-byte steps. When one step expires,
+  // move to the next; a step beginning with $FE jumps to another step instead.
+  void advancePitchEnvelope() {
     const auto table = pitchEnvelopeAddress();
     if (!table) {
-      return 0;
+      return;
     }
     auto& envelope = track.pitchEnvelope;
-    if (advance && envelope.counter == 0) {
+    if (envelope.counter == 0) {
       envelope.offset = static_cast<u8>(envelope.offset + 4);
       for (u32 redirects = 0; redirects < 64; ++redirects) {
         const u16 record = static_cast<u16>(*table + envelope.offset);
@@ -216,14 +232,26 @@ struct Playback {
         envelope.offset = static_cast<u8>(envelope.offset + track.data.u8At(static_cast<u16>(record + 2)));
       }
     }
-    if (advance && envelope.counter != 0xff && envelope.counter != 0) {
+    if (envelope.counter != 0xff && envelope.counter != 0) {
       --envelope.counter;
     }
+  }
+
+  // Bytes 2-3 of the current step are a signed 16-bit amount added directly to
+  // the DSP pitch before octave scaling; positive raises it and negative lowers it.
+  [[nodiscard]] s16 pitchEnvelopeDelta() const {
+    const auto table = pitchEnvelopeAddress();
+    if (!table) {
+      return 0;
+    }
+    const auto& envelope = track.pitchEnvelope;
     const u16 record = static_cast<u16>(*table + envelope.offset);
     return static_cast<s16>(track.data.u8At(static_cast<u16>(record + 2)) |
                             (track.data.u8At(static_cast<u16>(record + 3)) << 8));
   }
 
+  // Starting a new note returns the pitch-change pattern to its first step.
+  // A tied note keeps the pattern at its current position.
   void resetPitchEnvelope() {
     track.pitchEnvelope.offset = 0;
     const auto table = pitchEnvelopeAddress();
@@ -235,11 +263,13 @@ struct Playback {
     double bend = 0.0;
   };
 
-  [[nodiscard]] Pitch tonalPitch(bool advanceEnvelope) {
+  // The tuning table chooses the note. The pitch-change pattern and pitch-offset
+  // command then move it up or down, which we report as pitch bend.
+  [[nodiscard]] Pitch tonalPitch() const {
     const u8 noteNumber = static_cast<u8>(kNoteNumbers[track.rawNote] + track.transpose);
     const u16 tableAddress = static_cast<u16>(track.layout.pitchTableAddress + static_cast<u8>(noteNumber * 2u));
     const u16 base = track.data.le16(tableAddress);
-    const u16 shifted = static_cast<u16>(base + pitchEnvelopeDelta(advanceEnvelope) + track.pitchOffset);
+    const u16 shifted = static_cast<u16>(base + pitchEnvelopeDelta() + track.pitchOffset);
     const u8 shift = track.octave < 5 ? static_cast<u8>(5 - track.octave) : 0;
     const u16 reference = static_cast<u16>(base >> shift);
     const u16 physical = static_cast<u16>(shifted >> shift);
@@ -252,11 +282,13 @@ struct Playback {
     };
   }
 
-  void emitPitch(bool advanceEnvelope) {
+  // The game writes pitch every tick. Our output needs a new event only when
+  // the audible pitch bend has actually changed.
+  void emitPitch() {
     if (track.noise || track.rawNote == 7 || track.rawNote == 15) {
       return;
     }
-    const Pitch pitch = tonalPitch(advanceEnvelope);
+    const Pitch pitch = tonalPitch();
     if (pitch.key == 0.0) {
       return;
     }
@@ -266,44 +298,58 @@ struct Playback {
     }
   }
 
+  // Fade progress is shared by the whole song, but this function is reached
+  // once per track. Update the fade only once for each moment in the song.
   void tickGlobal() {
     if (program.lastGlobalTick && *program.lastGlobalTick == vm.tick()) {
       return;
     }
     program.lastGlobalTick = vm.tick();
-    const u16 next = static_cast<u16>(program.fade + (program.fadeRate << 4));
-    if ((next & 0x8000) == 0 && next != program.fade) {
-      const u8 oldInteger = static_cast<u8>(program.fade >> 8);
-      program.fade = next;
-      if (oldInteger != static_cast<u8>(program.fade >> 8)) {
+    const u16 next = static_cast<u16>(program.fadeAccumulator + (program.fadeRate << 4));
+    if ((next & 0x8000) == 0 && next != program.fadeAccumulator) {
+      const u8 oldInteger = static_cast<u8>(program.fadeAccumulator >> 8);
+      program.fadeAccumulator = next;
+      if (oldInteger != static_cast<u8>(program.fadeAccumulator >> 8)) {
         emitMaster();
         emitEcho();
       }
     }
   }
 
+  // While a normal note is still sounding, move its pitch-change pattern
+  // forward and report any new bend. Rests and noise do not use this pattern.
   void tick() {
     tickGlobal();
     if (track.remaining == 0 || --track.remaining == 0 || track.noise || track.rawNote == 7 || track.rawNote == 15) {
       return;
     }
-    static_cast<void>(pitchEnvelopeDelta(true));
+    advancePitchEnvelope();
     if (track.lastNote.valid() && vm.tick() < track.activeUntil) {
-      emitPitch(false);
+      emitPitch();
     }
   }
 
+  // F7 saves a new volume shape but does not apply it right away. When the next
+  // note is read, apply it to sounds already playing and to notes started later.
+  void applyPendingEnvelope() {
+    if (track.appliedAdsr1 == track.adsr1 && track.appliedAdsr2 == track.adsr2) {
+      return;
+    }
+    track.appliedAdsr1 = track.adsr1;
+    track.appliedAdsr2 = track.adsr2;
+    out.replaceEnvelope(driverEnvelope(track.appliedAdsr1, track.appliedAdsr2),
+                        VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+  }
+
+  // A tie keeps the same sound playing instead of starting it again. Noise uses
+  // a noise frequency in place of a note, and a new normal note restarts its
+  // pitch-change pattern after calculating the note's starting pitch.
   [[nodiscard]] Effects note(u8 key, u8 encodedLength, bool hasLength, bool tiesNext) {
     const u32 length = math::ticks(hasLength ? encodedLength : track.defaultLength);
     const bool continues = track.continuesPrevious && track.lastNote.valid();
     track.rawNote = key;
 
-    if (track.appliedAdsr1 != track.adsr1 || track.appliedAdsr2 != track.adsr2) {
-      track.appliedAdsr1 = track.adsr1;
-      track.appliedAdsr2 = track.adsr2;
-      out.replaceEnvelope(driverEnvelope(track.appliedAdsr1, track.appliedAdsr2),
-                          VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
-    }
+    applyPendingEnvelope();
 
     if (key == 7 || key == 15) {
       track.lastNote = {};
@@ -317,7 +363,8 @@ struct Playback {
         program.dsp.flags = static_cast<u8>(noteKey) | 0x20;
         emitEcho();
       } else {
-        const Pitch pitch = tonalPitch(true);
+        advancePitchEnvelope();
+        const Pitch pitch = tonalPitch();
         noteKey = pitch.key;
         bend = pitch.bend;
       }
@@ -370,14 +417,12 @@ struct Playback {
   }
 
   void masterVolume(u8 value) {
-    program.dsp.masterLeft = value;
-    program.dsp.masterRight = value;
+    program.dsp.masterVolume = value;
     emitMaster();
   }
 
   void echoVolume(u8 value) {
-    program.dsp.echoLeft = value;
-    program.dsp.echoRight = value;
+    program.dsp.echoVolume = value;
     emitEcho();
   }
 
@@ -390,18 +435,20 @@ struct Playback {
   }
 
   void instrument(u8 value) {
-    track.program = value;
     out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = value},
                    InstrumentEnvelopeMode::PreserveDynamicOverride);
   }
 
   void pitchOffset(s16 value) {
     track.pitchOffset = value;
-    emitPitch(false);
+    emitPitch();
   }
 
   void pitchEnvelope(u8 index) { track.pitchEnvelope.index = index; }
 
+  // ED writes directly to the sound chip instead of saving a setting for the
+  // next note. Some registers change the song's echo; others change the sound
+  // already playing on this track.
   void dspWrite(u8 reg, u8 value) {
     bool echoChanged = false;
     switch (reg) {
@@ -435,19 +482,27 @@ struct Playback {
     if ((reg >> 4) != track.trackNumber) {
       return;
     }
-    if ((reg & 0x0f) == 5) {
-      track.appliedAdsr1 = value;
-      out.replaceEnvelope(driverEnvelope(value, track.appliedAdsr2), VoiceEnvelopeScope::ActiveVoices);
-    } else if ((reg & 0x0f) == 6) {
-      track.appliedAdsr2 = value;
-      out.replaceEnvelope(driverEnvelope(track.appliedAdsr1, value), VoiceEnvelopeScope::ActiveVoices);
-    } else if ((reg & 0x0f) == 7) {
-      track.appliedAdsr1 = 0;
-      track.appliedAdsr2 = 0;
-      out.replaceEnvelope(snesDspEnvelope(0, 0, value), VoiceEnvelopeScope::ActiveVoices);
+    switch (reg & 0x0f) {
+      case 5:
+        track.appliedAdsr1 = value;
+        out.replaceEnvelope(driverEnvelope(value, track.appliedAdsr2), VoiceEnvelopeScope::ActiveVoices);
+        break;
+      case 6:
+        track.appliedAdsr2 = value;
+        out.replaceEnvelope(driverEnvelope(track.appliedAdsr1, value), VoiceEnvelopeScope::ActiveVoices);
+        break;
+      case 7:
+        track.appliedAdsr1 = 0;
+        track.appliedAdsr2 = 0;
+        out.replaceEnvelope(snesDspEnvelope(0, 0, value), VoiceEnvelopeScope::ActiveVoices);
+        break;
+      default:
+        break;
     }
   }
 
+  // Up to four loops may be nested. EA opens a loop, and EB closes it and makes
+  // that nesting slot available again.
   void loopStart() {
     if (track.repeatDepth == 0) {
       return;
@@ -456,6 +511,8 @@ struct Playback {
     track.repeats[track.repeatDepth] = {};
   }
 
+  // EB and EE count repeats the same way. A count of zero means repeat forever;
+  // other counts are remembered when the loop is first reached.
   [[nodiscard]] Effects repeat(RepeatFrame& frame, u8 count, Address destination, Address exit) {
     if (!frame.initialized) {
       frame = RepeatFrame{.remaining = count, .exit = exit, .initialized = true};
@@ -481,6 +538,8 @@ struct Playback {
     return effects;
   }
 
+  // E9 leaves the loop only on its final pass. Leaving also frees the current
+  // nesting slot, just as reaching the normal loop end would.
   [[nodiscard]] Effects loopBreak() {
     if (track.repeatDepth >= track.repeats.size()) {
       return vm.fallthrough();
@@ -502,10 +561,20 @@ struct Playback {
 
 using Cursor = CompilerCursor<TrackState, Playback>;
 
+// Jump commands store a signed distance from the command itself, not a full
+// address. Addresses wrap around at the end of the sound processor's memory.
 [[nodiscard]] Address relativeAddress(u32 begin, u16 offset) {
   return Address{static_cast<u16>(begin + offset)};
 }
 
+[[nodiscard]] Address relativeTarget(Cursor::Event& event, u32 begin, SemanticOperandRole role) {
+  const auto encoded = event.rawU16le("relative_destination", SourceValueDisplay::SignedDecimal);
+  return event.resolved("destination", encoded, [begin](u16 value) { return relativeAddress(begin, value); },
+                        SourceValueDisplay::Address, role);
+}
+
+// Read one command and describe what it does. FE appears after a note, but it
+// changes that note into a tie, so note decoding also looks one byte ahead.
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, const Layout& layout,
                                                    std::vector<Diagnostic>* diagnostics,
                                                    std::set<u8>* programs) {
@@ -564,10 +633,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xeb: {
       auto event = cursor.command("Loop End", SequenceSemantic::Repeat);
       const u8 count = event.u8("count", SemanticOperandRole::Count);
-      const auto encoded = event.rawU16le("relative_destination", SourceValueDisplay::SignedDecimal);
-      const Address destination = event.resolved(
-          "destination", encoded, [begin](u16 value) { return relativeAddress(begin, value); },
-          SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
+      const Address destination = relativeTarget(event, begin, SemanticOperandRole::RepeatTarget);
       const Address exit{static_cast<u16>(begin + 4)};
       return event.invokeFlow<&Playback::loopEnd>(count, destination, exit).mayBranchTo(destination);
     }
@@ -583,10 +649,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xee: {
       auto event = cursor.command("Unstacked Loop", SequenceSemantic::Repeat);
       const u8 count = event.u8("count", SemanticOperandRole::Count);
-      const auto encoded = event.rawU16le("relative_destination", SourceValueDisplay::SignedDecimal);
-      const Address destination = event.resolved(
-          "destination", encoded, [begin](u16 value) { return relativeAddress(begin, value); },
-          SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
+      const Address destination = relativeTarget(event, begin, SemanticOperandRole::RepeatTarget);
       const Address exit{static_cast<u16>(begin + 4)};
       return event.invokeFlow<&Playback::unstackedLoop>(count, destination, exit).mayBranchTo(destination);
     }
@@ -618,18 +681,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return cursor.command("Return", SequenceSemantic::Return).return_();
     case 0xf9: {
       auto event = cursor.command("Call", SequenceSemantic::Call);
-      const auto encoded = event.rawU16le("relative_destination", SourceValueDisplay::SignedDecimal);
-      const Address destination = event.resolved(
-          "destination", encoded, [begin](u16 value) { return relativeAddress(begin, value); },
-          SourceValueDisplay::Address, SemanticOperandRole::CallTarget);
+      const Address destination = relativeTarget(event, begin, SemanticOperandRole::CallTarget);
       return event.call(destination);
     }
     case 0xfa: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
-      const auto encoded = event.rawU16le("relative_destination", SourceValueDisplay::SignedDecimal);
-      const Address destination = event.resolved(
-          "destination", encoded, [begin](u16 value) { return relativeAddress(begin, value); },
-          SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
+      const Address destination = relativeTarget(event, begin, SemanticOperandRole::JumpTarget);
       return event.loopCandidate(destination);
     }
     case 0xfb: {
@@ -670,8 +727,8 @@ const SequenceProgramConfig& sequenceConfig() {
       .behavior = SequenceProgramBehavior{
           .commandLimit = kCommandLimit,
           .initialSourceInstrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0},
-          .initialLevel = 15.0 / 128.0,
-          .initialMasterLevel = 127.0 / 128.0,
+          .initialLevel = math::gain(15),
+          .initialMasterLevel = math::gain(127),
           .initialStereoBalance = StereoBalance{.leftGain = 1.0, .rightGain = 1.0},
           .initialPitchBendRangeSemitones = 12,
           .initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(0x85),
@@ -687,6 +744,8 @@ TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, u32 trac
                        [&](u32 offset) { return decodeCommand(reader, offset, layout, diagnostics, programs); });
 }
 
+// Collect the sample numbers used by the sequence while reading its commands.
+// Keep the original sound memory because playback still needs its lookup tables.
 SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetId sequenceId,
                              SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const ByteReader reader = source.reader();
