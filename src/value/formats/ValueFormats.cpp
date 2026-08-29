@@ -12,6 +12,7 @@
 #include "value/extractors/SnesSpcExtractor.h"
 #include "value/formats/Akao/Akao.h"
 #include "value/formats/AkaoSnes/AkaoSnes.h"
+#include "value/formats/AsciiShuichiSnes/AsciiShuichiSnes.h"
 #include "value/formats/CapcomSnes/CapcomSnes.h"
 #include "value/formats/ChunSnes/ChunSnes.h"
 #include "value/formats/CompileSnes/CompileSnes.h"
@@ -94,6 +95,7 @@ void registerValueFormats(core::Session& session, const ValueFormatOptions& opti
   session.registerExtractor(snes_rsn::snesRsnExtractor());
   session.registerExtractor(snes_spc::snesSpcExtractor());
   session.registerExtractor(psf::psfExtractor());
+  session.registerFormat(ascii_shuichi_snes::module());
   session.registerFormat(capcom_snes::capcomSnesModule());
   session.registerFormat(chun_snes::module());
   session.registerFormat(compile_snes::module());

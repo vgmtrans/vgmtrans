@@ -1,6 +1,7 @@
 add_executable(vgmtrans-value-core-tests)
 target_sources(vgmtrans-value-core-tests
   PRIVATE
+    formats/AsciiShuichiSnesModuleTests.cpp
     formats/CapcomSnesModuleTests.cpp
     formats/CompileSnesModuleTests.cpp
     formats/FalcomSnesModuleTests.cpp
@@ -80,6 +81,14 @@ add_executable(vgmtrans-heartbeat-snes-tests
 target_link_libraries(vgmtrans-heartbeat-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
 target_compile_features(vgmtrans-heartbeat-snes-tests PRIVATE cxx_std_20)
 add_test(NAME vgmtrans-heartbeat-snes-tests COMMAND vgmtrans-heartbeat-snes-tests)
+
+add_executable(vgmtrans-ascii-shuichi-snes-tests
+  formats/AsciiShuichiSnesModuleTests.cpp
+  formats/AsciiShuichiSnesTestMain.cpp
+)
+target_link_libraries(vgmtrans-ascii-shuichi-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
+target_compile_features(vgmtrans-ascii-shuichi-snes-tests PRIVATE cxx_std_20)
+add_test(NAME vgmtrans-ascii-shuichi-snes-tests COMMAND vgmtrans-ascii-shuichi-snes-tests)
 
 add_executable(vgmtrans-prism-snes-tests
   formats/PrismSnesModuleTests.cpp
