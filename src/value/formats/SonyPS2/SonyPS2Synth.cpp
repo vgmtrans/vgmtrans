@@ -391,6 +391,10 @@ struct SampleParam {
   }
 }
 
+[[nodiscard]] bool unsupportedLfoWaveform(u8 value) {
+  return value != 0 && !waveform(value).has_value();
+}
+
 [[nodiscard]] bool pitchLfoStartsAtKeyOn(u8 attributes) {
   return (attributes & 0x05) != 0;
 }
@@ -419,12 +423,12 @@ struct SampleParam {
   const int controlledPitchUnits = std::max(std::abs(static_cast<int>(program.midiPitchPositive)),
                                             std::abs(static_cast<int>(program.midiPitchNegative)));
   const int pitchUnits = fixedPitchUnits != 0 ? fixedPitchUnits : controlledPitchUnits;
-  if (pitchLfoStartsAtKeyOn(sample.lfoAttributes) && program.pitchWave != 0 && program.pitchCycle != 0 &&
-      pitchUnits != 0) {
+  const auto pitchWaveform = waveform(program.pitchWave);
+  if (pitchLfoStartsAtKeyOn(sample.lfoAttributes) && pitchWaveform && program.pitchCycle != 0 && pitchUnits != 0) {
     result.vibrato = VibratoSpec{
         .maxDepthCents = pitchUnits * 100.0 / 128.0,
         .rateHertz = ModulationRange{1000.0 / program.pitchCycle, 1000.0 / program.pitchCycle},
-        .waveform = waveform(program.pitchWave),
+        .waveform = pitchWaveform,
         .delaySeconds = ModulationRange{sample.pitchDelay / 1000.0, sample.pitchDelay / 1000.0},
         .depthMode = fixedPitchUnits != 0 ? ModulationDepthMode::Fixed : ModulationDepthMode::Controller,
     };
@@ -438,11 +442,12 @@ struct SampleParam {
                                           std::abs(static_cast<int>(program.midiAmpNegative)));
   const int ampUnits = fixedAmpUnits != 0 ? fixedAmpUnits : controlledAmpUnits;
   const double ampDepth = std::clamp(ampUnits / 128.0, 0.0, 0.999);
-  if (ampLfoStartsAtKeyOn(sample.lfoAttributes) && program.ampWave != 0 && program.ampCycle != 0 && ampDepth != 0.0) {
+  const auto ampWaveform = waveform(program.ampWave);
+  if (ampLfoStartsAtKeyOn(sample.lfoAttributes) && ampWaveform && program.ampCycle != 0 && ampDepth != 0.0) {
     result.tremolo = TremoloSpec{
         .maxDepthDb = -20.0 * std::log10(1.0 - ampDepth),
         .rateHertz = ModulationRange{1000.0 / program.ampCycle, 1000.0 / program.ampCycle},
-        .waveform = waveform(program.ampWave),
+        .waveform = ampWaveform,
         .gainMode = TremoloGainMode::BipolarAroundNominal,
         .delaySeconds = ModulationRange{sample.ampDelay / 1000.0, sample.ampDelay / 1000.0},
         .depthMode = fixedAmpUnits != 0 ? ModulationDepthMode::Fixed : ModulationDepthMode::Controller,
@@ -753,8 +758,9 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
             }
             key = emittedKeyHigh + 1;
           }
-          if ((program.pitchWave == 0x80 || program.ampWave == 0x80) && !warnedLfoShape) {
-            instruments.warning("SonyPS2 user-defined LFO wave tables have no value-core waveform model",
+          if ((unsupportedLfoWaveform(program.pitchWave) || unsupportedLfoWaveform(program.ampWave)) &&
+              !warnedLfoShape) {
+            instruments.warning("SonyPS2 custom or unknown LFO waveform is unavailable; the LFO is disabled",
                                 reader.range(program.offset, kProgramBytes));
             warnedLfoShape = true;
           }
@@ -832,7 +838,15 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
         for (u32 note = noteLow; note <= noteHigh; ++note) {
           const u32 noteOffset = noteBlockOffset + (note - noteLow) * noteBytes;
           const u16 vagIndex = reader.le16(noteOffset);
-          if (vagIndex == 0xffff || vagIndex >= layout.vags.size() || !layout.vags[vagIndex]) {
+          if (vagIndex == 0xffff) {
+            if (!warnedNoise) {
+              instruments.warning("SonyPS2 noise-generator regions cannot be represented as sampled regions",
+                                  reader.range(noteOffset, noteBytes));
+              warnedNoise = true;
+            }
+            continue;
+          }
+          if (vagIndex >= layout.vags.size() || !layout.vags[vagIndex]) {
             continue;
           }
           const VagInfo& vag = *layout.vags[vagIndex];
@@ -894,8 +908,8 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
               .ampFade = reader.le16(noteOffset + 40),
               .lfoAttributes = reader.u8At(noteOffset + 49),
           };
-          if ((lfo.pitchWave == 0x80 || lfo.ampWave == 0x80) && !warnedLfoShape) {
-            instruments.warning("SonyPS2 user-defined LFO wave tables have no value-core waveform model",
+          if ((unsupportedLfoWaveform(lfo.pitchWave) || unsupportedLfoWaveform(lfo.ampWave)) && !warnedLfoShape) {
+            instruments.warning("SonyPS2 custom or unknown LFO waveform is unavailable; the LFO is disabled",
                                 reader.range(noteOffset, noteBytes));
             warnedLfoShape = true;
           }

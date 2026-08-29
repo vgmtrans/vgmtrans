@@ -57,6 +57,7 @@ std::vector<u8> sqFixture(bool includeSong = true, bool repeatSong = false, u8 s
   const std::vector<u8> plain{
       0,    0xb0, 0,    0,     // bank 0
       0,    0xc0, 0,           // program 0
+      0,    0xb0, 0,    1,     // pending bank only; no change until another program change
       0,    0xb0, 1,    64,    // program-scaled pitch modulation
       0,    0xb0, 2,    64,    // program-scaled amplitude modulation
       0,    0xb0, 7,    64,    // driver's linear channel volume
@@ -69,6 +70,8 @@ std::vector<u8> sqFixture(bool includeSong = true, bool repeatSong = false, u8 s
       0,    0xb0, 98,   1,     // 14-bit mark callback
       0,    0xb0, 6,    0x12,  // mark data MSB
       0,    0xb0, 38,   0x34,  // mark data LSB
+      0,    0xb0, 6,    1,     // inert after the driver consumes the NRPN selector
+      0,    0xb0, 38,   2,
       0,    0xa0, 60,   70,    // ordinary (uncompressed) polyphonic pressure
       0,    0x90, 60,   0xe4,  // velocity 100 and omitted next zero delta
       0xe0, 0x7f, 0x7f,        // maximum positive pitch wheel
@@ -83,6 +86,8 @@ std::vector<u8> sqFixture(bool includeSong = true, bool repeatSong = false, u8 s
   const std::vector<u8> compressed{
       0,  0xa0, 0x0c,  // table 0, reconstructed velocity 103
       10, 0x80, 60,    // note off
+      0,  0xb0, 10,   127,                    // pan changed at the end of this section
+      0,  0xff, 0x51, 3, 0x0f, 0x42, 0x40,  // one-second tempo
       0,  0xff, 0x2f, 0,
   };
   constexpr u32 midiOffset = 0x30;
@@ -255,11 +260,12 @@ std::vector<u8> hdFixture() {
   bytes[note + 13] = 0x0c;
   le16(bytes, note + 14, 0x8f7f);
   le16(bytes, note + 16, 0x1fcf);
-  bytes[note + 18] = 6;
+  bytes[note + 18] = 0x80;
   le16(bytes, note + 24, 250);
   le16(bytes, note + 28, 64);
   le16(bytes, note + 30, static_cast<u16>(-64));
   le16(bytes, note + 34, 10);
+  bytes[note + 49] = 0x01;
 
   le32(bytes, 0x1c, static_cast<u32>(bytes.size()));
   le32(bytes, 0x24, prog);
@@ -376,7 +382,7 @@ void syntheticFeatures() {
              bank.instruments[1].regions.size() == 117 && near(bank.instruments[1].regions.front().unityKey, 73.5),
          "Setb note-addressed timbres should retain velocity curves, tuning, and their distinct identity domain");
   expect(!bank.instruments[1].regions.front().modulation.vibrato,
-         "a Setb note without a key-on LFO trigger should not apply its configured waveform and depth");
+         "a Setb note must not invent a default waveform when its custom LFO table is unavailable");
 
   const auto rendered = renderCollection(*bound.collection, SequenceRenderOptions{});
   expect(rendered.performance && countEvents<NotePerformanceEvent>(*rendered.performance) == 2,
@@ -431,8 +437,9 @@ void syntheticFeatures() {
   expect(portamentoSource != nullptr && near(portamentoSource->previousKey, 60.0),
          "note-off should provide the next SonyPS2 portamento source; CC84 is inert in the shipped driver");
   const auto* marker = findEvent<MarkerPerformanceEvent>(*rendered.performance);
-  expect(marker != nullptr && marker->text == "SonyPS2 mark callback 2356",
-         "14-bit mark callbacks should combine CC6 and CC38 before emitting a marker");
+  expect(marker != nullptr && marker->text == "SonyPS2 mark callback 2356" &&
+             countEvents<MarkerPerformanceEvent>(*rendered.performance) == 1,
+         "14-bit mark callbacks should combine CC6 and CC38 once, then consume the NRPN selector");
 
   const std::vector<u8> seBytes{
       0,   0xa2, 3,  61,   100,          // note on
@@ -493,6 +500,14 @@ void trivialSongCollapsesToSelectedMidi() {
   const auto* masterLevel = findEvent<MasterLevelPerformanceEvent>(*statefulRender.performance);
   expect(masterLevel != nullptr && near(masterLevel->linearGain, 98.0 / 128.0),
          "Song Volume - should use the driver's 0..128 linear master scale");
+
+  auto unsupportedSong = sqFixture();
+  const u32 songOffset = unsupportedSong[0x20] | (static_cast<u32>(unsupportedSong[0x21]) << 8) |
+                         (static_cast<u32>(unsupportedSong[0x22]) << 16) |
+                         (static_cast<u32>(unsupportedSong[0x23]) << 24);
+  unsupportedSong[songOffset + 21] = 7;
+  expect(scanFixture(std::move(unsupportedSong)).collections().size() == 2,
+         "an unsupported Song table should remain annotated misc data without invalidating its MIDI blocks");
 }
 
 void repeatingSongRemainsPlaylist() {
@@ -504,6 +519,14 @@ void repeatingSongRemainsPlaylist() {
   const auto rendered = renderCollection(*bound.collection, SequenceRenderOptions{});
   expect(rendered.performance && countEvents<NotePerformanceEvent>(*rendered.performance) == 2,
          "a finite Song repeat should replay its selected MIDI section");
+  const auto* panReset = findEvent<ChannelPanPerformanceEvent>(*rendered.performance, [](const auto& event) {
+    return event.header.tick == 10 && near(event.position, 0.5);
+  });
+  const auto* tempoReset = findEvent<TempoPerformanceEvent>(*rendered.performance, [](const auto& event) {
+    return event.header.tick == 10 && event.microsecondsPerQuarter == 500000;
+  });
+  expect(panReset != nullptr && tempoReset != nullptr,
+         "each Song section should restore Song pan and tempo before the next MIDI block starts");
 }
 
 std::vector<u8> readFile(const std::filesystem::path& path) {
