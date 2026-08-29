@@ -39,6 +39,13 @@ constexpr auto kOriginalInstrument =
 constexpr auto kDirectory =
     makeMaskedBytePattern("\x5d\x00\x4d\x00\x0d\x00\x3c\x00\x2c\x00", "x?xxxxxxxx");
 
+// The three modern drivers use the same DSP reset routine with different
+// mixer values and relocated stores/calls.
+constexpr auto kModernDefaults = makeMaskedBytePattern(
+    "\x8f\x6c\xf2\xe8\x20\xc4\xf3\xc5\x00\x00\xe8\x00\xc5\x00\x00\x3f"
+    "\x00\x00\xe8\x00\x3f\x00\x00\xe8\x00\xc5\x00\x00\xe8\x00\xc5",
+    "xxxxxxxx??x?x??x??x?x??x?x??x?x");
+
 // Energy Breaker assigns FF 05-07 to a signed fixed-clock pitch accumulator.
 constexpr auto kPitchDrift = makeMaskedBytePattern(
     "\xce\xf7\x18\x2f\x12\xce\xf7\x18\x08\x80\x2f\x0b\xce\xe8\x00", "xxxxxxxxxxxxxxx");
@@ -49,11 +56,6 @@ constexpr auto kPercussion = makeMaskedBytePattern(
     "\x8d\x00\xf6\x00\x00\xf0\x00\x75\x00\x00\xf0\x03\xfc\x2f\xf3"
     "\xf6\x00\x00\xd4\x4d\xf6\x00\x00\xd4\x5d\xf6\x00\x00\xd5\x00\x00\xf6\x00\x00\x3f",
     "xxx??x?x??xxxxxx??xxx??xxx??x??x??x");
-
-[[nodiscard]] bool signature(ByteReader reader, u16 base, std::string_view text) {
-  return reader.has(base, text.size()) &&
-         std::equal(text.begin(), text.end(), reader.slice(base, text.size()).begin());
-}
 
 [[nodiscard]] std::optional<u16> instrumentTable(ByteReader reader, Version version) {
   if (version == Version::Modern) {
@@ -157,26 +159,16 @@ struct ModernDefaults {
 };
 
 [[nodiscard]] ModernDefaults modernDefaults(ByteReader reader) {
-  // The three games use different mixer defaults, but the DSP reset routine
-  // applies them through the same instruction skeleton.
-  for (u32 offset = 0; offset + 32 <= reader.size(); ++offset) {
-    if (reader.u8At(offset) == 0x8f && reader.u8At(offset + 1) == 0x6c && reader.u8At(offset + 2) == 0xf2 &&
-        reader.u8At(offset + 3) == 0xe8 && reader.u8At(offset + 4) == 0x20 &&
-        reader.u8At(offset + 5) == 0xc4 && reader.u8At(offset + 6) == 0xf3 &&
-        reader.u8At(offset + 7) == 0xc5 && reader.u8At(offset + 10) == 0xe8 &&
-        reader.u8At(offset + 12) == 0xc5 && reader.u8At(offset + 15) == 0x3f &&
-        reader.u8At(offset + 18) == 0xe8 && reader.u8At(offset + 20) == 0x3f &&
-        reader.u8At(offset + 23) == 0xe8 && reader.u8At(offset + 25) == 0xc5 &&
-        reader.u8At(offset + 28) == 0xe8 && reader.u8At(offset + 30) == 0xc5) {
-      return ModernDefaults{
-          .master = reader.u8At(offset + 11),
-          .echoVolume = reader.u8At(offset + 19),
-          .feedback = reader.u8At(offset + 24),
-          .filter = reader.u8At(offset + 29),
-      };
-    }
+  const auto code = findBytePattern(reader, kModernDefaults);
+  if (!code) {
+    return {};
   }
-  return {};
+  return ModernDefaults{
+      .master = reader.u8At(*code + 11),
+      .echoVolume = reader.u8At(*code + 19),
+      .feedback = reader.u8At(*code + 24),
+      .filter = reader.u8At(*code + 29),
+  };
 }
 
 }  // namespace
@@ -191,13 +183,13 @@ std::optional<Layout> findLayout(ByteReader reader) {
   if (const auto loader = findBytePattern(reader, kModernLoader)) {
     version = Version::Modern;
     base = static_cast<u16>(reader.u8At(*loader + 4) << 8);
-    if (!signature(reader, base, "S2C")) {
+    if (!matchesBytes(reader, base, "S2C")) {
       return std::nullopt;
     }
   } else if (const auto originalLoader = findBytePattern(reader, kOriginalLoader)) {
     version = Version::Original;
     base = static_cast<u16>(reader.u8At(*originalLoader + 4) << 8);
-    if (!signature(reader, base, "SFC")) {
+    if (!matchesBytes(reader, base, "SFC")) {
       return std::nullopt;
     }
   } else {
