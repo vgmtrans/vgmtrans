@@ -31,6 +31,7 @@ void suzukiPs1ModuleBuildsFractionallyTunedWdsSynth();
 void runSuzukiSnesModuleTests();
 void runFalcomSnesModuleTests();
 void runHeartBeatSnesModuleTests();
+void runAsciiShuichiSnesModuleTests();
 void runPrismSnesModuleTests();
 void runHudsonSnesModuleTests();
 void runItikitiSnesModuleTests();
@@ -231,6 +232,7 @@ int main() {
     runSuzukiSnesModuleTests();
     runFalcomSnesModuleTests();
     runHeartBeatSnesModuleTests();
+    runAsciiShuichiSnesModuleTests();
     runHudsonSnesModuleTests();
     runItikitiSnesModuleTests();
     runSoftCreatSnesModuleTests();
