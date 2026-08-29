@@ -5,6 +5,7 @@ target_sources(vgmtrans-value-core-tests
     formats/CapcomSnesModuleTests.cpp
     formats/CompileSnesModuleTests.cpp
     formats/FalcomSnesModuleTests.cpp
+    formats/GraphResSnesModuleTests.cpp
     formats/HeartBeatPS1ModuleTests.cpp
     formats/HeartBeatSnesModuleTests.cpp
     formats/HudsonSnesModuleTests.cpp

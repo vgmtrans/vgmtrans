@@ -37,6 +37,7 @@ void hosaSequenceLoopRestoresEveryTrack();
 void hosaModuleBuildsDriverAccurateRegions();
 void runSuzukiSnesModuleTests();
 void runFalcomSnesModuleTests();
+void runGraphResSnesModuleTests();
 void runHeartBeatSnesModuleTests();
 void runHeartBeatPs1ModuleTests();
 void runAsciiShuichiSnesModuleTests();
@@ -248,6 +249,7 @@ int main() {
     runSonyPs1CollectionBindingTests();
     runSuzukiSnesModuleTests();
     runFalcomSnesModuleTests();
+    runGraphResSnesModuleTests();
     runHeartBeatSnesModuleTests();
     runAsciiShuichiSnesModuleTests();
     runHudsonSnesModuleTests();
