@@ -47,6 +47,7 @@ void runSoftCreatSnesModuleTests();
 void runCompileSnesModuleTests();
 void runWolfTeamSnesModuleTests();
 void runMp2kModuleTests();
+void runNamcoSnesModuleTests();
 void runNeverlandSnesModuleTests();
 void runPandoraBoxSnesModuleTests();
 
@@ -397,6 +398,7 @@ int main() {
     akaoCollectionPrefersCompleteSamplesFromSequenceSource();
     akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView();
     runMp2kModuleTests();
+    runNamcoSnesModuleTests();
     ndsLayoutResolvesNamesFilesAndDependencies();
     ndsLayoutBoundsMalformedTablesAndPointers();
     ndsSequenceFatRangesHandleNormalEmptyAndRecoveredFiles();
