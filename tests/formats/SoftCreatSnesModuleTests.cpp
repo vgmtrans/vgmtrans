@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/SoftCreat/SoftCreat.h"
+#include "value/formats/SoftCreatSnes/SoftCreatSnes.h"
 
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
@@ -19,7 +19,7 @@
 #include <vector>
 
 using namespace vgmtrans::core;
-using namespace vgmtrans::formats::softcreat;
+using namespace vgmtrans::formats::softcreat_snes;
 
 namespace {
 
@@ -109,6 +109,7 @@ std::vector<u8> scannerFixture() {
 }
 
 void layoutUsesLiveSongAndAuditedTables() {
+  expect(module().name == "SoftCreatSnes", "the value format should expose its complete driver name");
   const std::vector<u8> bytes = scannerFixture();
   const auto layout = findLayout(ByteReader(SourceId{302}, bytes));
   expect(layout && layout->version == Version::LateEcho && layout->songIndex == 2 &&
@@ -116,27 +117,27 @@ void layoutUsesLiveSongAndAuditedTables() {
              layout->pitchHighTableAddress == 0x4055 && layout->coarseTableAddress == 0x4200 &&
              layout->fineTableAddress == 0x4100 && layout->envelopeTableAddress == 0x4300 &&
              layout->spcDirAddress == 0x4400 && layout->initialTimer == 0x92 && layout->musicVolume == 0x70,
-         "SoftCreat layout should use the live song and recover every relocated driver table");
+         "SoftCreatSnes layout should use the live song and recover every relocated driver table");
 }
 
 void instrumentAnnotationsReflectTheSynthModel() {
   Session session;
   session.registerFormat(module());
   const SourceId source =
-      session.addSource(SourceFile{.name = "SoftCreat fixture.aram"}, scannerFixture());
+      session.addSource(SourceFile{.name = "SoftCreatSnes fixture.aram"}, scannerFixture());
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
   const auto* bank = snapshot.collections().empty() || snapshot.collections().front().members.soundBanks.empty()
                          ? nullptr
                          : snapshot.asset<SoundBankAsset>(snapshot.collections().front().members.soundBanks.front());
   expect(bank != nullptr && bank->instruments.size() == 1,
-         "SoftCreat scanning should publish its referenced instrument");
+         "SoftCreatSnes scanning should publish its referenced instrument");
 
   const auto instrumentSources = snapshot.sourceMap().ownedBy(ObjectRefs::instrument(bank->metadata.id, 0));
   const auto root = std::ranges::find_if(instrumentSources, [&](SourceAnnotationId id) {
-    return snapshot.sourceMap().get(id).category() == "softcreat-instrument";
+    return snapshot.sourceMap().get(id).category() == "softcreat-snes-instrument";
   });
-  expect(root != instrumentSources.end(), "SoftCreat instruments should expose a source annotation");
+  expect(root != instrumentSources.end(), "SoftCreatSnes instruments should expose a source annotation");
   const auto tables = snapshot.sourceMap().annotationsForAsset(bank->metadata.id);
   const auto table = [&](std::string_view kind) -> const SourceAnnotation* {
     const auto found = std::ranges::find_if(tables, [&](SourceAnnotationId id) {
@@ -144,25 +145,25 @@ void instrumentAnnotationsReflectTheSynthModel() {
     });
     return found == tables.end() ? nullptr : &snapshot.sourceMap().get(*found);
   };
-  const SourceAnnotation* coarseTable = table("softcreat-coarse-tuning-table");
-  const SourceAnnotation* fineTable = table("softcreat-fine-tuning-table");
+  const SourceAnnotation* coarseTable = table("softcreat-snes-coarse-tuning-table");
+  const SourceAnnotation* fineTable = table("softcreat-snes-fine-tuning-table");
   expect(coarseTable != nullptr && coarseTable->range.offset == 0x4200 && coarseTable->range.size == 0x100 &&
              coarseTable->fields.size() == 0x100 && fineTable != nullptr && fineTable->range.offset == 0x4100 &&
              fineTable->range.size == 0x100 && fineTable->fields.size() == 0x100,
-         "SoftCreat should annotate every entry in both complete tuning tables");
+         "SoftCreatSnes should annotate every entry in both complete tuning tables");
   const SourceAnnotation& instrument = snapshot.sourceMap().get(*root);
   expect(instrument.parent == coarseTable->id,
          "referenced instruments should be rooted in the source table that defines their coarse tuning");
   expect(instrument.fieldsAsChildren &&
              std::ranges::count_if(instrument.fields, [](const SourceField& field) { return field.range.valid(); }) == 2,
-         "SoftCreat instruments should expose their two source-backed tuning fields");
+         "SoftCreatSnes instruments should expose their two source-backed tuning fields");
   expect(bank->instruments.front().regions.size() == 1 && !bank->instruments.front().regions.front().range.valid() &&
              snapshot.sourceMap().ownedBy(ObjectRefs::region(bank->metadata.id, 0, 0)).empty(),
-         "SoftCreat's derived playable region should remain in the synth model without claiming source bytes");
+         "SoftCreatSnes's derived playable region should remain in the synth model without claiming source bytes");
   expect(std::ranges::all_of(instrument.fields, [&](const SourceField& field) {
            return !field.range.valid() || field.range.source == source;
          }),
-         "SoftCreat instrument fields should retain their source identity");
+         "SoftCreatSnes instrument fields should retain their source identity");
 }
 
 void versionedOpcodesRetainTheirRealOperandLengths() {
@@ -284,7 +285,7 @@ void finiteRepeatsAreNotSongLoops() {
       {0x86, 1, 0x84, 4, 0x82, 0x0d, 0x10, 0x85, 2, 0x81, 0x08, 0x10, 0x80, 1, 0x83});
   const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && performance.tracks.front().endTick == 5 && notes.size() == 5,
-         "finite SoftCreat repeats should remain distinct from the following infinite song loop");
+         "finite SoftCreatSnes repeats should remain distinct from the following infinite song loop");
 }
 
 void perNoteVolumePrecedesLiteralDuration() {
@@ -328,7 +329,7 @@ void pitchEffectsRetainPhysicalTiming() {
 
 }  // namespace
 
-void runSoftCreatModuleTests() {
+void runSoftCreatSnesModuleTests() {
   layoutUsesLiveSongAndAuditedTables();
   instrumentAnnotationsReflectTheSynthModel();
   versionedOpcodesRetainTheirRealOperandLengths();

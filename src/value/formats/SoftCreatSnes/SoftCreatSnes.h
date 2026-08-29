@@ -18,12 +18,12 @@
 #include <string_view>
 #include <vector>
 
-namespace vgmtrans::formats::softcreat {
+namespace vgmtrans::formats::softcreat_snes {
 
 inline constexpr u32 kAramSize = 0x10000;
 inline constexpr u32 kTrackCount = 8;
 inline constexpr u16 kPpqn = 48;
-inline constexpr std::string_view kInstrumentDomain = "softcreat.instrument";
+inline constexpr std::string_view kInstrumentDomain = "softcreat-snes.instrument";
 
 inline constexpr core::Envelope kNeutralGainEnvelope{
     .attackSeconds = 0.0,
@@ -118,4 +118,4 @@ struct SequenceParse {
                                                                std::string_view displayName);
 [[nodiscard]] core::FormatModule module();
 
-}  // namespace vgmtrans::formats::softcreat
+}  // namespace vgmtrans::formats::softcreat_snes

@@ -29,7 +29,7 @@
 #include "value/formats/NDS/Nds.h"
 #include "value/formats/SegSat/SegSat.h"
 #include "value/formats/SonyPS1/SonyPS1.h"
-#include "value/formats/SoftCreat/SoftCreat.h"
+#include "value/formats/SoftCreatSnes/SoftCreatSnes.h"
 #include "value/formats/SquarePS2/SquarePS2.h"
 #include "value/formats/SuzukiPS1/SuzukiPS1.h"
 #include "value/formats/SuzukiSnes/SuzukiSnes.h"
@@ -112,7 +112,7 @@ void registerValueFormats(core::Session& session, const ValueFormatOptions& opti
   session.registerFormat(rare_snes::module());
   session.registerFormat(segsat::segSatModule());
   session.registerFormat(sony_ps1::sonyPs1Module());
-  session.registerFormat(softcreat::module());
+  session.registerFormat(softcreat_snes::module());
   session.registerFormat(square_ps2::module());
   session.registerFormat(suzuki_ps1::suzukiPs1Module());
   session.registerFormat(suzuki_snes::module());

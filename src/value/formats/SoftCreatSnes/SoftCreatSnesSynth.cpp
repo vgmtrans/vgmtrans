@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/SoftCreat/SoftCreat.h"
+#include "value/formats/SoftCreatSnes/SoftCreatSnes.h"
 
 #include "value/platform/SnesSampleDirectory.h"
 
@@ -14,7 +14,7 @@
 
 #include <fmt/format.h>
 
-namespace vgmtrans::formats::softcreat {
+namespace vgmtrans::formats::softcreat_snes {
 
 using namespace core;
 
@@ -51,12 +51,12 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   auto coarseTable = instruments
                          .source(SourceRole::Table, "Coarse Tuning Table",
                                  reader.range(layout.coarseTableAddress, tableSize),
-                                 "softcreat-coarse-tuning-table")
+                                 "softcreat-snes-coarse-tuning-table")
                          .fieldsAsChildren()
                          .description(fmt::format("{} signed semitone entries indexed by SRCN", tableSize));
   auto fineTable = instruments
                        .source(SourceRole::Table, "Fine Tuning Table", reader.range(layout.fineTableAddress, tableSize),
-                               "softcreat-fine-tuning-table")
+                               "softcreat-snes-fine-tuning-table")
                        .fieldsAsChildren()
                        .description(fmt::format("{} fractional tuning entries indexed by SRCN", tableSize));
   for (u32 srcn = 0; srcn < tableSize; ++srcn) {
@@ -87,7 +87,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .name = fmt::format("Instrument {}", srcn),
         .range = coarseSource,
     });
-    entry.source(fmt::format("Instrument {}", srcn), coarseSource, "softcreat-instrument")
+    entry.source(fmt::format("Instrument {}", srcn), coarseSource, "softcreat-snes-instrument")
         .parent(coarseTable.id())
         .fieldsAsChildren()
         .field("coarse_tuning", coarseSource, coarse, SourceValueDisplay::SignedDecimal)
@@ -104,4 +104,4 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   return instruments.empty() ? std::nullopt : std::optional<ScanSoundBankDraft>{std::move(bank)};
 }
 
-}  // namespace vgmtrans::formats::softcreat
+}  // namespace vgmtrans::formats::softcreat_snes
