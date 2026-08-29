@@ -52,6 +52,11 @@ target_link_libraries(vgmtrans-square-ps2-tests PRIVATE vgmtransvalueformats vgm
 target_compile_features(vgmtrans-square-ps2-tests PRIVATE cxx_std_20)
 add_test(NAME vgmtrans-square-ps2-tests COMMAND vgmtrans-square-ps2-tests)
 
+add_executable(vgmtrans-sony-ps2-tests formats/SonyPS2ModuleTests.cpp)
+target_link_libraries(vgmtrans-sony-ps2-tests PRIVATE vgmtransvalueformats vgmtransvaluecore ZLIB::ZLIB)
+target_compile_features(vgmtrans-sony-ps2-tests PRIVATE cxx_std_20)
+add_test(NAME vgmtrans-sony-ps2-tests COMMAND vgmtrans-sony-ps2-tests)
+
 add_executable(vgmtrans-compile-snes-tests
   formats/CompileSnesModuleTests.cpp
   formats/CompileSnesTestMain.cpp)
