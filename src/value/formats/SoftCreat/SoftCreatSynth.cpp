@@ -24,10 +24,6 @@ namespace {
   return 1200.0 * std::log2(1.0 + fine / 256.0);
 }
 
-[[nodiscard]] double tuningSemitones(s8 coarse, u8 fine) {
-  return coarse + fineTuningCents(fine) / 100.0;
-}
-
 [[nodiscard]] u32 tuningTableSize(const Layout& layout) {
   // Every driver places the equal-length parallel arrays back-to-back.
   const int distance = static_cast<int>(layout.coarseTableAddress) - static_cast<int>(layout.fineTableAddress);
@@ -81,9 +77,9 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     }
     const SourceRange coarseSource = reader.range(coarseAddress, 1);
     const SourceRange fineSource = reader.range(fineAddress, 1);
-    const s8 coarse = static_cast<s8>(reader.u8At(coarseAddress));
+    const s8 coarse = reader.s8At(coarseAddress);
     const u8 fine = reader.u8At(fineAddress);
-    const double tuning = tuningSemitones(coarse, fine);
+    const double tuning = coarse + fineTuningCents(fine) / 100.0;
     auto entry = instruments.append(Instrument{
         .explicitAddress = InstrumentAddress{.bank = static_cast<u32>(srcn >> 7),
                                              .program = static_cast<u32>(srcn & 0x7f)},
@@ -102,7 +98,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
                      // The pitch table reaches $1000 at internal note 62.
                      // Source note zero is exported as MIDI key 24.
                      .unityKey = 86.0 - tuning,
-                     .envelope = neutralGainEnvelope(),
+                     .envelope = kNeutralGainEnvelope,
                  });
   }
   return instruments.empty() ? std::nullopt : std::optional<ScanSoundBankDraft>{std::move(bank)};

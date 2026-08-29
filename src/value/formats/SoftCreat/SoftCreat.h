@@ -25,15 +25,13 @@ inline constexpr u32 kTrackCount = 8;
 inline constexpr u16 kPpqn = 48;
 inline constexpr std::string_view kInstrumentDomain = "softcreat.instrument";
 
-[[nodiscard]] inline core::Envelope neutralGainEnvelope() {
-  return core::Envelope{
-      .attackSeconds = 0.0,
-      .holdSeconds = 0.0,
-      .decaySeconds = std::numeric_limits<double>::infinity(),
-      .releaseSeconds = 0.0,
-      .sustainAmplitude = 1.0,
-  };
-}
+inline constexpr core::Envelope kNeutralGainEnvelope{
+    .attackSeconds = 0.0,
+    .holdSeconds = 0.0,
+    .decaySeconds = std::numeric_limits<double>::infinity(),
+    .releaseSeconds = 0.0,
+    .sustainAmplitude = 1.0,
+};
 
 // The command cutoff identifies five materially different sequence languages.
 enum class Version : u8 {

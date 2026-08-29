@@ -11,12 +11,13 @@
 
 #include <algorithm>
 #include <array>
+#include <bitset>
 #include <cmath>
+#include <compare>
 #include <map>
 #include <optional>
 #include <set>
 #include <string>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -80,6 +81,8 @@ enum class GainPhase : u8 {
   End,
 };
 
+enum class StereoSide : u8 { Left, Right };
+
 struct RuntimeConfig {
   RetainedSource source;
   Layout layout;
@@ -89,7 +92,7 @@ struct ProgramState {
   explicit ProgramState(const RuntimeConfig& config) : echo(config.layout.echo) {}
 
   EchoState echo;
-  std::array<u8, 32> flags{};
+  std::bitset<256> flags;
   bool echoDisabled = false;
   bool initialized = false;
 };
@@ -201,12 +204,8 @@ struct Playback {
   }
 
   void emitReverb() {
-    const double send = program.echoDisabled || program.echo.voiceMask == 0
-                            ? 0.0
-                            : std::min(std::max(std::abs(static_cast<int>(program.echo.left)),
-                                                std::abs(static_cast<int>(program.echo.right))) /
-                                           128.0,
-                                       1.0);
+    const int peak = std::max(std::abs(program.echo.left), std::abs(program.echo.right));
+    const double send = program.echoDisabled || program.echo.voiceMask == 0 ? 0.0 : peak / 128.0;
     out.reverb(ReverbPerformanceEvent{
         .voiceMask = program.echo.voiceMask,
         .send = send,
@@ -307,30 +306,22 @@ struct Playback {
     }
   }
 
-  void startPresetGain() {
-    track.gainPhase = GainPhase::Attack;
-    track.gainStep = 0;
-    track.gainCounter = 1;
-  }
-
-  void startStreamGain() {
-    track.streamOffset = 0;
-    track.streamReleaseOffset = 0;
-    track.gainCounter = math::ticks(track.streamInterval);
-  }
-
   void attachGain(u32 length) {
     track.gainAutomation = out.noteEnvelope(PerformanceAutomationTarget::Expression, 1.0, length);
     track.lastEmittedGain.reset();
-    out.replaceEnvelope(neutralGainEnvelope(), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    out.replaceEnvelope(kNeutralGainEnvelope, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
 
   void restartGain() {
     if (track.gainMode == GainMode::Preset) {
-      startPresetGain();
+      track.gainPhase = GainPhase::Attack;
+      track.gainStep = 0;
+      track.gainCounter = 1;
       tickPresetGain();
     } else {
-      startStreamGain();
+      track.streamOffset = 0;
+      track.streamReleaseOffset = 0;
+      track.gainCounter = math::ticks(track.streamInterval);
       emitGain();
       tickStreamGain();
     }
@@ -446,14 +437,10 @@ struct Playback {
     if (track.glissandoInterval != 0) {
       if (track.glissandoCounter != 0 && --track.glissandoCounter == 0) {
         track.glissandoCounter = math::ticks(track.glissandoInterval);
-        const u8 step = std::max<u8>(track.glissandoStep, 1);
-        if (track.currentInternalNote < wanted) {
-          track.currentInternalNote = static_cast<u8>(
-              std::min<unsigned>(static_cast<unsigned>(track.currentInternalNote) + step, wanted));
-        } else if (track.currentInternalNote > wanted) {
-          track.currentInternalNote = static_cast<u8>(
-              std::max<int>(static_cast<int>(track.currentInternalNote) - step, wanted));
-        }
+        const int distance = static_cast<int>(wanted) - track.currentInternalNote;
+        const int step = std::max<int>(track.glissandoStep, 1);
+        track.currentInternalNote =
+            static_cast<u8>(track.currentInternalNote + std::clamp(distance, -step, step));
       }
       track.targetPitch = tunedPitch(track.currentInternalNote, track.srcn);
     } else {
@@ -463,10 +450,11 @@ struct Playback {
 
     if (track.portamentoStep == 0) {
       track.currentPitch = track.targetPitch;
-    } else if (track.currentPitch < track.targetPitch) {
-      track.currentPitch = std::min(track.currentPitch + track.portamentoStep, track.targetPitch);
-    } else if (track.currentPitch > track.targetPitch) {
-      track.currentPitch = std::max(track.currentPitch - track.portamentoStep, track.targetPitch);
+    } else {
+      const double step = track.portamentoStep;
+      const double distance = track.targetPitch - track.currentPitch;
+      track.currentPitch = std::abs(distance) <= step ? track.targetPitch
+                                                      : track.currentPitch + std::copysign(step, distance);
     }
   }
 
@@ -491,10 +479,8 @@ struct Playback {
       const int next = track.pan + track.autoPan;
       if (next < 0 || next > 255) {
         track.autoPan = static_cast<s8>(-track.autoPan);
-        track.pan = static_cast<u8>(std::clamp(next, 0, 255));
-      } else {
-        track.pan = static_cast<u8>(next);
       }
+      track.pan = static_cast<u8>(std::clamp(next, 0, 255));
     }
     if (++track.fadeCounter == 16) {
       track.fadeCounter = 0;
@@ -655,13 +641,8 @@ struct Playback {
     return wait(length, runtimeContinuation);
   }
 
-  void directLeft(s8 value) {
-    track.left = static_cast<u8>(value);
-    track.volume = 0;
-    emitBalance();
-  }
-  void directRight(s8 value) {
-    track.right = static_cast<u8>(value);
+  void directVolume(StereoSide side, s8 value) {
+    (side == StereoSide::Right ? track.right : track.left) = static_cast<u8>(value);
     track.volume = 0;
     emitBalance();
   }
@@ -681,11 +662,7 @@ struct Playback {
     }
   }
   void vibrato(bool negative, u8 delay, u8 step, u8 interval) {
-    track.vibrato.enabled = true;
-    track.vibrato.startsNegative = negative;
-    track.vibrato.delay = delay;
-    track.vibrato.step = step;
-    track.vibrato.interval = interval;
+    track.vibrato = {.enabled = true, .startsNegative = negative, .delay = delay, .step = step, .interval = interval};
   }
   void vibratoOff() {
     track.vibrato.enabled = false;
@@ -745,15 +722,8 @@ struct Playback {
     return {};
   }
   [[nodiscard]] Effects return_() { return vm.inSubroutine() ? vm.return_() : vm.end(); }
-  void setFlag(u8 value, bool enabled) {
-    const u8 byte = value >> 3;
-    const u8 mask = static_cast<u8>(1u << (value & 7));
-    program.flags[byte] = enabled ? static_cast<u8>(program.flags[byte] | mask)
-                                  : static_cast<u8>(program.flags[byte] & ~mask);
-  }
-  [[nodiscard]] bool flag(u8 value) const {
-    return (program.flags[value >> 3] & (1u << (value & 7))) != 0;
-  }
+  void setFlag(u8 value, bool enabled) { program.flags.set(value, enabled); }
+  [[nodiscard]] bool flag(u8 value) const { return program.flags.test(value); }
   [[nodiscard]] Effects flagJump(u8 value, bool expected, Address destination) {
     return flag(value) == expected ? vm.finiteBranch(destination) : Effects{};
   }
@@ -770,12 +740,8 @@ struct Playback {
                                      : static_cast<u8>(program.echo.voiceMask & ~voiceBit());
     emitReverb();
   }
-  void echoLeft(s8 value) {
-    program.echo.left = value;
-    emitReverb();
-  }
-  void echoRight(s8 value) {
-    program.echo.right = value;
+  void echoVolume(StereoSide side, s8 value) {
+    (side == StereoSide::Right ? program.echo.right : program.echo.left) = value;
     emitReverb();
   }
   void echoFeedback(s8 value) {
@@ -801,7 +767,7 @@ struct Playback {
   }
   void autoPan(s8 step) {
     track.autoPan = step;
-    const double cycles = step == 0 ? 0.0 : std::abs(static_cast<int>(step)) / 510.0;
+    const double cycles = step == 0 ? 0.0 : std::abs(step) / 510.0;
     const LfoPerformanceContext context{
         .cyclesPerTick = cycles,
         .shape = LfoShape{.waveform = LfoWaveform::Triangle},
@@ -811,7 +777,6 @@ struct Playback {
     out.panLfoDepth(step == 0 ? 0.0 : 1.0, context);
     out.panLfoRateCyclesPerTick(cycles, context);
   }
-  void timer(u8 value) { out.tempo(math::tempoMicrosecondsPerQuarter(value)); }
 };
 
 using Cursor = CompilerCursor<TrackState, Playback>;
@@ -821,6 +786,8 @@ struct DecodeState {
   bool explicitDuration = false;
   bool perNoteVolume = false;
   std::optional<u16> drumTable;
+
+  friend auto operator<=>(const DecodeState&, const DecodeState&) = default;
 };
 
 [[nodiscard]] u8 canonicalOpcode(Version version, u8 opcode) {
@@ -839,19 +806,19 @@ struct DecodeState {
 }
 
 [[nodiscard]] bool isAlias(Version version, u8 opcode) {
-  const auto alias = dialect(version).noteAliasOpcode;
-  return alias && *alias == opcode;
+  return dialect(version).noteAliasOpcode == opcode;
 }
 
 [[nodiscard]] GainRow readGainRow(Cursor::Event& event) {
-  const u8 interval = event.u8("interval", SemanticOperandRole::Duration);
-  const u8 attackStart = event.u8("attack_start", SemanticOperandRole::Level);
-  const u8 attackSteps = event.u8("attack_steps", SemanticOperandRole::Count);
-  const u8 attackPeak = event.u8("attack_peak", SemanticOperandRole::Level);
-  const u8 decaySteps = event.u8("decay_steps", SemanticOperandRole::Count);
-  const u8 sustain = event.u8("sustain", SemanticOperandRole::Level);
-  const u8 releaseSteps = event.u8("release_steps", SemanticOperandRole::Count);
-  return {interval, attackStart, attackSteps, attackPeak, decaySteps, sustain, releaseSteps};
+  return {
+      event.u8("interval", SemanticOperandRole::Duration),
+      event.u8("attack_start", SemanticOperandRole::Level),
+      event.u8("attack_steps", SemanticOperandRole::Count),
+      event.u8("attack_peak", SemanticOperandRole::Level),
+      event.u8("decay_steps", SemanticOperandRole::Count),
+      event.u8("sustain", SemanticOperandRole::Level),
+      event.u8("release_steps", SemanticOperandRole::Count),
+  };
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, const Layout& layout, u32 begin,
@@ -942,13 +909,12 @@ struct DecodeState {
       }
       return event.invoke<&Playback::instrument>(srcn);
     }
-    case 0x8a: {
-      auto event = cursor.command("Direct Left Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::directLeft>(event.s8("volume", SemanticOperandRole::Level));
-    }
+    case 0x8a:
     case 0x8b: {
-      auto event = cursor.command("Direct Right Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::directRight>(event.s8("volume", SemanticOperandRole::Level));
+      auto event = cursor.command(command == 0x8a ? "Direct Left Volume" : "Direct Right Volume",
+                                  SequenceSemantic::Level);
+      const StereoSide side = command == 0x8a ? StereoSide::Left : StereoSide::Right;
+      return event.invoke<&Playback::directVolume>(side, event.s8("volume", SemanticOperandRole::Level));
     }
     case 0x8c: {
       auto event = cursor.command("Streamed GAIN Envelope", SequenceSemantic::Envelope);
@@ -1076,13 +1042,12 @@ struct DecodeState {
     case 0xab:
       return cursor.command(command == 0xaa ? "Echo Voice On" : "Echo Voice Off", SequenceSemantic::State)
           .invoke<&Playback::echoVoice>(command == 0xaa);
-    case 0xac: {
-      auto event = cursor.command("Echo Left Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::echoLeft>(event.s8("volume", SemanticOperandRole::Level));
-    }
+    case 0xac:
     case 0xad: {
-      auto event = cursor.command("Echo Right Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::echoRight>(event.s8("volume", SemanticOperandRole::Level));
+      auto event = cursor.command(command == 0xac ? "Echo Left Volume" : "Echo Right Volume",
+                                  SequenceSemantic::Level);
+      const StereoSide side = command == 0xac ? StereoSide::Left : StereoSide::Right;
+      return event.invoke<&Playback::echoVolume>(side, event.s8("volume", SemanticOperandRole::Level));
     }
     case 0xae: {
       auto event = cursor.command("Echo Feedback", SequenceSemantic::State);
@@ -1119,7 +1084,8 @@ struct DecodeState {
     }
     case 0xb6: {
       auto event = cursor.command("Timer / Tempo", SequenceSemantic::Tempo);
-      return event.invoke<&Playback::timer>(event.u8("timer", SemanticOperandRole::Duration));
+      return event.emitTempo(
+          math::tempoMicrosecondsPerQuarter(event.u8("timer", SemanticOperandRole::Duration)));
     }
     case 0xb7:
       return cursor.sourceOnly("Live Volume/Pan Mode", "live-mixer");
@@ -1173,12 +1139,12 @@ struct DiscoveryPoint {
   std::vector<u32> returns;
   std::vector<u32> repeats;
 
-  bool operator<(const DiscoveryPoint& rhs) const {
-    return std::tie(offset, state.defaultDuration, state.explicitDuration, state.perNoteVolume, state.drumTable,
-                    returns, repeats) <
-           std::tie(rhs.offset, rhs.state.defaultDuration, rhs.state.explicitDuration, rhs.state.perNoteVolume,
-                    rhs.state.drumTable, rhs.returns, rhs.repeats);
-  }
+  friend auto operator<=>(const DiscoveryPoint&, const DiscoveryPoint&) = default;
+};
+
+struct DiscoveredCommand {
+  DecodedBytecodeCommand command;
+  DecodeState initialState;
 };
 
 [[nodiscard]] TrackProgram decodeTrack(ByteReader reader, const Layout& layout, u32 trackNumber, u32 startAddress,
@@ -1196,13 +1162,13 @@ struct DiscoveryPoint {
   auto session = scope.begin(trackNumber, startAddress);
   std::vector<DiscoveryPoint> pending{{.offset = startAddress}};
   std::set<DiscoveryPoint> visited;
-  std::map<u32, DecodedBytecodeCommand> commands;
-  std::map<u32, DecodeState> commandStates;
+  std::map<u32, DiscoveredCommand> commands;
   std::map<u32, u32> stateVisits;
 
-  const auto queue = [&](Address address, DecodeState state, std::vector<u32> returns, std::vector<u32> repeats) {
+  const auto queue = [&](Address address, DiscoveryPoint point) {
     if (address.value < kAramSize && reader.has(address.value, 1)) {
-      pending.push_back(DiscoveryPoint{static_cast<u32>(address.value), state, std::move(returns), std::move(repeats)});
+      point.offset = static_cast<u32>(address.value);
+      pending.push_back(std::move(point));
     }
   };
 
@@ -1217,73 +1183,72 @@ struct DiscoveryPoint {
     DecodeState nextState = point.state;
     DecodedBytecodeCommand decoded =
         decodeCommand(reader, layout, point.offset, nextState, diagnostics, references);
-    const auto [existing, inserted] = commands.try_emplace(point.offset, decoded);
-    if (inserted) {
-      commandStates.emplace(point.offset, point.state);
-    }
-    if (!inserted && existing->second.range.size != decoded.range.size) {
-      const DecodeState& original = commandStates.at(point.offset);
+    const auto [existing, inserted] = commands.try_emplace(
+        point.offset, DiscoveredCommand{.command = decoded, .initialState = point.state});
+    if (!inserted && existing->second.command.range.size != decoded.range.size) {
+      const DecodeState& original = existing->second.initialState;
+      DecodeState withoutVolumeDifference = point.state;
+      withoutVolumeDifference.perNoteVolume = original.perNoteVolume;
       const bool volumeSuffixOnly = (decoded.opcode < 0x80 || isAlias(layout.version, decoded.opcode)) &&
-                                    original.defaultDuration == point.state.defaultDuration &&
-                                    original.explicitDuration == point.state.explicitDuration &&
-                                    original.drumTable == point.state.drumTable &&
+                                    original == withoutVolumeDifference &&
                                     original.perNoteVolume != point.state.perNoteVolume;
-      if (!volumeSuffixOnly && diagnostics != nullptr) {
-        diagnostics->push_back(Diagnostic{.severity = Severity::Warning,
-                                          .message = fmt::format("SoftCreat command ${:04X} has incompatible state",
-                                                                point.offset),
-                                          .range = decoded.range});
-      }
       if (!volumeSuffixOnly) {
+        if (diagnostics != nullptr) {
+          diagnostics->push_back(Diagnostic{.severity = Severity::Warning,
+                                            .message = fmt::format("SoftCreat command ${:04X} has incompatible state",
+                                                                  point.offset),
+                                            .range = decoded.range});
+        }
         continue;
       }
     }
+    point.state = nextState;
 
     const u8 command = canonicalOpcode(layout.version, decoded.opcode);
     const Address continuation = decoded.flow.continuation;
     if (command == 0x84) {
       point.repeats.push_back(static_cast<u32>(continuation.value));
-      queue(continuation, nextState, std::move(point.returns), std::move(point.repeats));
+      queue(continuation, std::move(point));
       continue;
     }
     if (command == 0x85) {
       if (point.repeats.empty()) {
         continue;
       }
-      queue(Address{point.repeats.back()}, nextState, point.returns, point.repeats);
+      queue(Address{point.repeats.back()}, point);
       point.repeats.pop_back();
-      queue(continuation, nextState, std::move(point.returns), std::move(point.repeats));
+      queue(continuation, std::move(point));
       continue;
     }
 
     const auto queueAlternatives = [&] {
       for (const Address target : decoded.discoveryTargets) {
-        queue(target, nextState, point.returns, point.repeats);
+        queue(target, point);
       }
     };
     switch (decoded.flow.defaultTransition.kind) {
       case CommandTransitionKind::Fallthrough:
         queueAlternatives();
-        queue(continuation, nextState, std::move(point.returns), std::move(point.repeats));
+        queue(continuation, std::move(point));
         break;
       case CommandTransitionKind::Jump:
         queueAlternatives();
         if (const auto target = decoded.flow.defaultDestination()) {
-          queue(*target, nextState, std::move(point.returns), std::move(point.repeats));
+          queue(*target, std::move(point));
         }
         break;
       case CommandTransitionKind::Call:
         point.returns.push_back(static_cast<u32>(continuation.value));
         queueAlternatives();
         if (const auto target = decoded.flow.defaultDestination()) {
-          queue(*target, nextState, std::move(point.returns), std::move(point.repeats));
+          queue(*target, std::move(point));
         }
         break;
       case CommandTransitionKind::Return:
         if (!point.returns.empty()) {
           const Address target{point.returns.back()};
           point.returns.pop_back();
-          queue(target, nextState, std::move(point.returns), std::move(point.repeats));
+          queue(target, std::move(point));
         }
         break;
       case CommandTransitionKind::End:
@@ -1292,14 +1257,16 @@ struct DiscoveryPoint {
     }
   }
 
-  for (auto& [offset, command] : commands) {
-    session.findOrAppend(std::move(command), offset);
+  for (auto& [offset, discovered] : commands) {
+    session.findOrAppend(std::move(discovered.command), offset);
   }
   return session.finish();
 }
 
-[[nodiscard]] SequenceProgramConfig makeSequenceConfig() {
-  return SequenceProgramConfig{
+}  // namespace
+
+const SequenceProgramConfig& sequenceConfig() {
+  static const SequenceProgramConfig config{
       .commandKindPrefix = "softcreat",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
@@ -1312,12 +1279,6 @@ struct DiscoveryPoint {
               .initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(0x85),
           },
   };
-}
-
-}  // namespace
-
-const SequenceProgramConfig& sequenceConfig() {
-  static const SequenceProgramConfig config = makeSequenceConfig();
   return config;
 }
 

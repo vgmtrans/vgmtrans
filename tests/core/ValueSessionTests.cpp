@@ -31,6 +31,8 @@ void bytePatternSearchHonorsMasksAndStartOffsets() {
          "masked search should handle leading wildcards");
   expect(findBytePattern(reader, makeMaskedBytePattern("\x00\x00", "??"), 6) == 6,
          "an all-wildcard pattern should match at the starting offset");
+  expect(findBytes(reader, std::array<u8, 2>{0xaa, 0x40}) == 5,
+         "exact byte search should share the pattern scanner's offset result");
 }
 
 [[nodiscard]] std::string firstValidationMessage(ValidationReport report) {
