@@ -66,9 +66,9 @@ bool addSampleBody(ScanResultBuilder& result) {
   if (reader.size() < kPsxAdpcmBlockBytes || reader.size() > std::numeric_limits<u32>::max()) {
     return false;
   }
-  const u32 end = static_cast<u32>(reader.size());
+  const u32 physicalEnd = static_cast<u32>(reader.size());
+  const u32 end = physicalEnd & ~(kPsxAdpcmBlockBytes - 1);
   u32 cursor = 0;
-  u32 logicalEnd = end;
   struct Parsed {
     u32 offset;
     std::optional<u32> zeroPrefix;
@@ -80,7 +80,6 @@ bool addSampleBody(ScanResultBuilder& result) {
       cursor += kPsxAdpcmBlockBytes;
     }
     if (!parsed.empty() && allZero(reader, cursor, end)) {
-      logicalEnd = cursor;
       cursor = end;
       break;
     }
@@ -104,23 +103,20 @@ bool addSampleBody(ScanResultBuilder& result) {
       }
     }
     if (!foundEnd) {
-      return false;
+      break;
     }
     const auto stream = inspectPsxAdpcmStream(reader, sampleOffset, cursor);
     if (!stream || stream->encodedData.size != cursor - sampleOffset) {
-      return false;
+      break;
     }
     parsed.push_back(Parsed{sampleOffset, zeroPrefix, *stream});
   }
-  if (parsed.empty() || cursor != end) {
-    return false;
-  }
 
-  auto pool = result.samplePool(fmt::format("{} BD", result.sourceDisplayName()), reader.range(0, end));
+  auto pool = result.samplePool(fmt::format("{} BD", result.sourceDisplayName()), reader.range(0, physicalEnd));
   auto& samples = pool.samples();
-  samples.include(reader.range(0, end));
+  samples.include(reader.range(0, physicalEnd));
   SampleBodyData retained{
-      .bytes = logicalEnd,
+      .bytes = physicalEnd,
       .source = RetainedSource::copyOf(reader),
   };
   for (const auto& item : parsed) {
