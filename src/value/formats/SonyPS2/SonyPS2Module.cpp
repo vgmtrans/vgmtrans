@@ -120,9 +120,11 @@ namespace {
             publishSongs.push_back(SongEntry{.index = song, .offset = *entry, .end = entryEnd});
           }
         } else {
-          auto misc = result.misc(fmt::format("{} Song {} table", result.sourceDisplayName(), song),
-                                  input.reader.range(*entry, entryEnd - *entry));
+          const auto name = fmt::format("{} Song {} table", result.sourceDisplayName(), song);
+          const auto range = input.reader.range(*entry, entryEnd - *entry);
+          auto misc = result.misc(name, range);
           misc.payload({});
+          result.sourceMap().table(name, range).kind("sony-ps2-song-table").owner(ObjectRefs::misc(misc.id()));
         }
       }
     }
@@ -162,11 +164,13 @@ namespace {
                      input.reader.range(layout.seSequences->offset, layout.seSequences->size));
     }
     if (layout.seSongs) {
-      auto misc = result.misc(fmt::format("{} SeSong tables", result.sourceDisplayName()),
-                              input.reader.range(layout.seSongs->offset, layout.seSongs->size));
+      const auto name = fmt::format("{} SeSong tables", result.sourceDisplayName());
+      const auto range = input.reader.range(layout.seSongs->offset, layout.seSongs->size);
+      auto misc = result.misc(name, range);
       misc.payload({});
+      result.sourceMap().table(name, range).kind("sony-ps2-sesong-tables").owner(ObjectRefs::misc(misc.id()));
       result.warning("SonyPS2 SeSong playback tables remain source-only",
-                     input.reader.range(layout.seSongs->offset, layout.seSongs->size));
+                     range);
     }
   }
   return result.finish();

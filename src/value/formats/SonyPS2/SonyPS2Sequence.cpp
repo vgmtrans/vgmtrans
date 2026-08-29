@@ -57,12 +57,25 @@ struct MidiEvent {
 };
 
 struct TrackState {
-  explicit TrackState(const TrackProgram& source)
+  TrackState(const SequenceProgram& sequence, const TrackProgram& source)
       : channel(isSeTrack(source.sourceTrackNumber) ? 0 : static_cast<u8>(source.sourceTrackNumber)),
         seSequence(isSeTrack(source.sourceTrackNumber)),
         seSet(static_cast<u8>((source.sourceTrackNumber >> 16) & 0x0f)),
         seTimbre(static_cast<u8>((source.sourceTrackNumber >> 8) & 0x7f)),
-        seKey(static_cast<u8>(source.sourceTrackNumber & 0x7f)) {}
+        seKey(static_cast<u8>(source.sourceTrackNumber & 0x7f)) {
+    if (sequence.sectionPlaylist) {
+      sectionPan = sequence.behavior.initialChannelPan.value_or(ChannelPan{
+          .position = 0.5,
+          .voicePanLaw = PanLaw::ConstantMaximum,
+      });
+      sectionTempo = sequence.behavior.initialTempoMicrosecondsPerQuarter;
+    }
+  }
+
+  void beginSection() {
+    resetSectionState = sectionStarted;
+    sectionStarted = true;
+  }
 
   u8 channel = 0;
   bool seSequence = false;
@@ -70,10 +83,12 @@ struct TrackState {
   u8 seTimbre = 0;
   u8 seKey = 0;
   u8 bank = 0;
+  u8 pendingBank = 0;
   u8 program = 0;
-  u8 nrpnMsb = 127;
-  u8 nrpnLsb = 127;
+  u8 nrpnMsb = 0xff;
+  u8 nrpnLsb = 0xff;
   u8 dataEntryMsb = 0;
+  std::optional<std::pair<u8, u8>> dataEntryNrpn;
   u16 pitchBendPositive = 256;
   u16 pitchBendNegative = 256;
   std::vector<PitchBendZone> pitchBendZones;
@@ -87,6 +102,10 @@ struct TrackState {
   std::vector<ActiveNote> activeNotes;
   bool sustain = false;
   bool portamentoEnabled = false;
+  bool sectionStarted = false;
+  bool resetSectionState = false;
+  std::optional<ChannelPan> sectionPan;
+  u32 sectionTempo = 500000;
   u16 pitchBendValue = 8192;
   double emittedPitchBendSemitones = 0.0;
   PerformanceNoteId seNote;
@@ -253,6 +272,13 @@ struct Playback {
   }
 
   void beforeCommand() {
+    if (track.resetSectionState) {
+      track.resetSectionState = false;
+      if (track.channel == 0) {
+        out.tempo(track.sectionTempo);
+      }
+      out.channelPan(track.sectionPan->position, track.sectionPan->voicePanLaw);
+    }
     if (track.initialized) {
       return;
     }
@@ -327,6 +353,7 @@ struct Playback {
 
   Effects programChange(u8 channel, u8 value, u32 delta) {
     if (channel == track.channel) {
+      track.bank = track.pendingBank;
       track.program = value;
       auto delayed = out.at(delayedTick(vm, delta));
       delayed.instrument(instrumentIdentity(track.bank, track.program));
@@ -342,9 +369,9 @@ struct Playback {
     auto delayed = out.at(delayedTick(vm, delta));
     switch (controller) {
       case 0:
-        track.bank = value;
-        delayed.instrument(instrumentIdentity(track.bank, track.program));
-        updateProgramSettings(delayed);
+        // Like the driver, Bank Select only stages the bank used by the next
+        // Program Change; it does not retarget voices or the active program.
+        track.pendingBank = value;
         break;
       case 1:
         if (const auto* program = selectedProgram()) {
@@ -417,13 +444,20 @@ struct Playback {
         break;
       case 98:
         track.nrpnLsb = value;
+        track.dataEntryNrpn.reset();
         break;
       case 99:
         track.nrpnMsb = value;
+        track.nrpnLsb = 0xff;
+        track.dataEntryNrpn.reset();
         break;
       case 6:
         track.dataEntryMsb = value;
+        track.dataEntryNrpn = std::pair{track.nrpnMsb, track.nrpnLsb};
         if (track.nrpnMsb == 3 && (track.nrpnLsb & 0x0f) == 0) {
+          // SPU2 applies this as a core-global signed effect-return depth.
+          // Track-local MIDI reverb send is the nearest portable projection;
+          // it cannot retain core selection or wet-only voice routing.
           delayed.reverb(value / 127.0);
         } else if (track.nrpnMsb == 0x10 && track.nrpnLsb == 0) {
           delayed.marker(MarkerPerformanceEvent{.text = "SonyPS2 mark callback " + std::to_string(value)});
@@ -433,17 +467,22 @@ struct Playback {
         // The remaining reverb NRPNs configure negative-phase sends, the
         // algorithm, delay, and feedback. They remain visible in the source
         // command stream until value-core has a physical reverb model.
+        // modhsyn consumes the selection after every Data Entry MSB. Retain a
+        // separate snapshot only so a following LSB can complete a 14-bit mark.
+        track.nrpnMsb = 0xff;
+        track.nrpnLsb = 0xff;
         break;
       case 38:
-        if (track.nrpnMsb == 0x10 && track.nrpnLsb == 1) {
+        if (track.dataEntryNrpn == std::pair<u8, u8>{0x10, 1}) {
           delayed.marker(MarkerPerformanceEvent{
               .text = "SonyPS2 mark callback " + std::to_string((track.dataEntryMsb << 7) | value),
           });
-        } else if (track.nrpnMsb == 0x12) {
+        } else if (track.dataEntryNrpn && track.dataEntryNrpn->first == 0x12) {
           delayed.marker(MarkerPerformanceEvent{
               .text = "SonyPS2 mark MSB callback " + std::to_string((track.dataEntryMsb << 7) | value),
           });
         }
+        track.dataEntryNrpn.reset();
         break;
       case 120:
         // The driver frees hardware voices immediately. Value-core can end
