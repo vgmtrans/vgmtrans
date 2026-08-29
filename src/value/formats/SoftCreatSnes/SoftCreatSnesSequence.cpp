@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/SoftCreat/SoftCreat.h"
+#include "value/formats/SoftCreatSnes/SoftCreatSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompiledCommandRuntime.h"
@@ -23,7 +23,7 @@
 
 #include <fmt/format.h>
 
-namespace vgmtrans::formats::softcreat {
+namespace vgmtrans::formats::softcreat_snes {
 
 using namespace core;
 
@@ -824,7 +824,7 @@ struct DecodeState {
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, const Layout& layout, u32 begin,
                                                    DecodeState& state, std::vector<Diagnostic>* diagnostics,
                                                    SequenceReferences* references) {
-  Cursor cursor(reader, begin, "softcreat", diagnostics);
+  Cursor cursor(reader, begin, "softcreat-snes", diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
   }
@@ -1195,7 +1195,7 @@ struct DiscoveredCommand {
       if (!volumeSuffixOnly) {
         if (diagnostics != nullptr) {
           diagnostics->push_back(Diagnostic{.severity = Severity::Warning,
-                                            .message = fmt::format("SoftCreat command ${:04X} has incompatible state",
+                                            .message = fmt::format("SoftCreatSnes command ${:04X} has incompatible state",
                                                                   point.offset),
                                             .range = decoded.range});
         }
@@ -1267,7 +1267,7 @@ struct DiscoveredCommand {
 
 const SequenceProgramConfig& sequenceConfig() {
   static const SequenceProgramConfig config{
-      .commandKindPrefix = "softcreat",
+      .commandKindPrefix = "softcreat-snes",
       .timebase = Timebase{.ppqn = kPpqn},
       .behavior =
           SequenceProgramBehavior{
@@ -1300,12 +1300,12 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
 
   std::optional<SourceAnnotationId> headerParent;
   if (sourceMap != nullptr) {
-    auto header = sourceMap->header("SoftCreat Sequence Header", layout.sequenceHeaderRange)
-                      .kind("softcreat-sequence-header")
+    auto header = sourceMap->header("SoftCreatSnes Sequence Header", layout.sequenceHeaderRange)
+                      .kind("softcreat-snes-sequence-header")
                       .owner(ObjectRefs::asset(sequenceId));
     headerParent = header.id();
     sourceMap->field("Selected Song", reader.range(0xe4, 1), layout.songIndex)
-        .kind("softcreat-song-index")
+        .kind("softcreat-snes-song-index")
         .owner(ObjectRefs::asset(sequenceId))
         .parent(*headerParent);
   }
@@ -1318,7 +1318,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     if (sourceMap != nullptr && headerParent) {
       sourceMap->pointer(fmt::format("Track {} Pointer", track), pointer.lowSource,
                          SourceTarget{reader.range(pointer.address, 1)})
-          .kind("softcreat-track-pointer")
+          .kind("softcreat-snes-track-pointer")
           .field("low", pointer.lowSource, pointer.address & 0xff, SourceValueDisplay::Address)
           .field("high", pointer.highSource, pointer.address >> 8, SourceValueDisplay::Address)
           .owner(ObjectRefs::sequenceTrack(sequenceId, track))
@@ -1331,4 +1331,4 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   return SequenceParse{.program = std::move(program), .references = std::move(references)};
 }
 
-}  // namespace vgmtrans::formats::softcreat
+}  // namespace vgmtrans::formats::softcreat_snes

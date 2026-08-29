@@ -4,11 +4,11 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/SoftCreat/SoftCreat.h"
+#include "value/formats/SoftCreatSnes/SoftCreatSnes.h"
 
 #include <string>
 
-namespace vgmtrans::formats::softcreat {
+namespace vgmtrans::formats::softcreat_snes {
 
 using namespace core;
 
@@ -20,7 +20,7 @@ namespace {
     return {};
   }
 
-  ScanResultBuilder result(input, "SoftCreat");
+  ScanResultBuilder result(input, "SoftCreatSnes");
   const std::string displayName = result.sourceDisplayName();
   auto sequence = result.sequence(displayName);
   SequenceParse parsed =
@@ -32,7 +32,7 @@ namespace {
   if (const auto synth = addSynth(result, *layout, parsed.references, displayName)) {
     collection.soundBank(*synth);
   } else {
-    result.warning("SoftCreat sequence found, but no valid referenced BRR instruments were discovered",
+    result.warning("SoftCreatSnes sequence found, but no valid referenced BRR instruments were discovered",
                    layout->sequenceHeaderRange);
   }
   return result.finish();
@@ -42,11 +42,11 @@ namespace {
 
 FormatModule module() {
   return FormatModule{
-      .name = "SoftCreat",
+      .name = "SoftCreatSnes",
       .preferredSampleFilter = SampleFilter::SnesDspLowPass,
       .acceptedFormats = {source_formats::kSnesAram},
       .scan = scan,
   };
 }
 
-}  // namespace vgmtrans::formats::softcreat
+}  // namespace vgmtrans::formats::softcreat_snes

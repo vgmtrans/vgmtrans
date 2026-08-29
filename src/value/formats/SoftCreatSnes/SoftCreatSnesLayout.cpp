@@ -4,7 +4,7 @@
  * refer to the included LICENSE.txt file
  */
 
-#include "value/formats/SoftCreat/SoftCreat.h"
+#include "value/formats/SoftCreatSnes/SoftCreatSnes.h"
 
 #include "value/scan/BytePattern.h"
 
@@ -12,7 +12,7 @@
 #include <array>
 #include <optional>
 
-namespace vgmtrans::formats::softcreat {
+namespace vgmtrans::formats::softcreat_snes {
 
 using namespace core;
 
@@ -217,4 +217,4 @@ std::optional<Layout> findLayout(ByteReader reader) {
   };
 }
 
-}  // namespace vgmtrans::formats::softcreat
+}  // namespace vgmtrans::formats::softcreat_snes

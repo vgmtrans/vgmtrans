@@ -34,7 +34,7 @@ void runHeartBeatSnesModuleTests();
 void runPrismSnesModuleTests();
 void runHudsonSnesModuleTests();
 void runItikitiSnesModuleTests();
-void runSoftCreatModuleTests();
+void runSoftCreatSnesModuleTests();
 void runCompileSnesModuleTests();
 void runWolfTeamSnesModuleTests();
 void runMp2kModuleTests();
@@ -232,7 +232,7 @@ int main() {
     runHeartBeatSnesModuleTests();
     runHudsonSnesModuleTests();
     runItikitiSnesModuleTests();
-    runSoftCreatModuleTests();
+    runSoftCreatSnesModuleTests();
     runCompileSnesModuleTests();
     runPrismSnesModuleTests();
 
