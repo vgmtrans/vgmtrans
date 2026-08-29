@@ -28,7 +28,10 @@ namespace {
 constexpr u32 kProgramBytes = 36;
 constexpr u32 kSplitBytes = 20;
 constexpr u32 kSampleBytes = 42;
-constexpr u32 kMaxDerivedRegions = 32768;
+// A region needs at least fourteen SoundFont generators, plus any LFO
+// generators. Staying below this bank-wide count leaves room in SF2's 16-bit
+// generator and modulator indices without changing ordinary banks.
+constexpr u32 kMaxSynthRegions = 3000;
 
 struct Chunk {
   u32 offset = 0;
@@ -532,6 +535,130 @@ struct SampleParam {
          sample.velocityAmp != 0 || sample.velocityAmpCurve != 0;
 }
 
+struct RegionShape {
+  u16 keys = 1;
+  u16 velocities = 1;
+};
+
+struct RegionResolution {
+  u32 step = 1;
+  u64 exactRegions = 0;
+  u64 emittedRegions = 0;
+};
+
+[[nodiscard]] RegionResolution regionResolution(ByteReader reader, const std::optional<Chunk>& programs,
+                                                const std::optional<Chunk>& sampleSets,
+                                                const std::optional<Chunk>& samples,
+                                                const std::optional<Chunk>& setb, const SoundBankData& layout) {
+  std::vector<RegionShape> shapes;
+  if (programs && sampleSets && samples) {
+    for (const auto programOffset : programs->entries) {
+      if (!programOffset || !reader.has(*programOffset, kProgramBytes)) {
+        continue;
+      }
+      const ProgramParam program = readProgram(reader, *programOffset);
+      if (program.splitCount == 0 || reader.u8At(*programOffset + 5) != kSplitBytes ||
+          !reader.has(program.splitOffset, static_cast<u64>(program.splitCount) * kSplitBytes)) {
+        continue;
+      }
+      for (u32 splitIndex = 0; splitIndex < program.splitCount; ++splitIndex) {
+        const SplitParam split = readSplit(reader, program.splitOffset + splitIndex * kSplitBytes);
+        if (split.sampleSet >= sampleSets->entries.size() || !sampleSets->entries[split.sampleSet]) {
+          continue;
+        }
+        const u32 sampleSetOffset = *sampleSets->entries[split.sampleSet];
+        if (!reader.has(sampleSetOffset, 4)) {
+          continue;
+        }
+        const u8 curve = reader.u8At(sampleSetOffset);
+        const int setLow = std::clamp<int>(reader.u8At(sampleSetOffset + 1) & 0x7f, 1, 127);
+        const int setHigh = std::clamp<int>(reader.u8At(sampleSetOffset + 2) & 0x7f, 1, 127);
+        const u8 sampleCount = reader.u8At(sampleSetOffset + 3);
+        if (!reader.has(sampleSetOffset + 4, static_cast<u64>(sampleCount) * 2)) {
+          continue;
+        }
+        for (u32 number = 0; number < sampleCount; ++number) {
+          const u16 sampleIndex = reader.le16(sampleSetOffset + 4 + number * 2);
+          if (sampleIndex >= samples->entries.size() || !samples->entries[sampleIndex] ||
+              !reader.has(*samples->entries[sampleIndex], kSampleBytes)) {
+            continue;
+          }
+          const SampleParam sample = readSample(reader, *samples->entries[sampleIndex]);
+          if (sample.vag == 0xffff || sample.vag >= layout.vags.size() || !layout.vags[sample.vag]) {
+            continue;
+          }
+          const int keyLow = split.low & 0x7f;
+          const int keyHigh = split.high & 0x7f;
+          const int rawVelocityLow = std::max(setLow, static_cast<int>(sample.low & 0x7f));
+          const int rawVelocityHigh = std::min(setHigh, static_cast<int>(sample.high & 0x7f));
+          if (keyLow > keyHigh || rawVelocityLow > rawVelocityHigh) {
+            continue;
+          }
+          shapes.push_back(RegionShape{
+              .keys = static_cast<u16>(keyDependent(program, split, sample) ? keyHigh - keyLow + 1 : 1),
+              .velocities = static_cast<u16>(velocityDependent(sample) || curve != 0
+                                                 ? midiVelocity(static_cast<u8>(rawVelocityHigh)) -
+                                                       midiVelocity(static_cast<u8>(rawVelocityLow)) + 1
+                                                 : 1),
+          });
+        }
+      }
+    }
+  }
+  if (setb) {
+    for (const auto setOffset : setb->entries) {
+      if (!setOffset || !reader.has(*setOffset, 4)) {
+        continue;
+      }
+      const u32 maximumTimbre = reader.le32(*setOffset);
+      if (maximumTimbre >= 128 || !reader.has(*setOffset + 4, static_cast<u64>(maximumTimbre + 1) * 4)) {
+        continue;
+      }
+      for (u32 timbre = 0; timbre <= maximumTimbre; ++timbre) {
+        const u32 relative = reader.le32(*setOffset + 4 + timbre * 4);
+        const u32 timbreOffset = setb->offset + relative;
+        if (relative == 0xffffffff || relative >= setb->size || !reader.has(timbreOffset, 8)) {
+          continue;
+        }
+        const u32 noteBlockOffset = timbreOffset + reader.le32(timbreOffset);
+        const u8 noteBytes = reader.u8At(timbreOffset + 4);
+        const u8 noteLow = reader.u8At(timbreOffset + 5);
+        const u8 noteHigh = reader.u8At(timbreOffset + 6);
+        if (noteBytes < 50 || noteLow > noteHigh ||
+            !reader.has(noteBlockOffset, static_cast<u64>(noteHigh - noteLow + 1) * noteBytes)) {
+          continue;
+        }
+        for (u32 note = noteLow; note <= noteHigh; ++note) {
+          const u32 noteOffset = noteBlockOffset + (note - noteLow) * noteBytes;
+          const u16 vag = reader.le16(noteOffset);
+          if (vag == 0xffff || vag >= layout.vags.size() || !layout.vags[vag]) {
+            continue;
+          }
+          const bool velocityZones = reader.u8At(noteOffset + 2) != 0 || reader.u8At(noteOffset + 42) != 0 ||
+                                     reader.u8At(noteOffset + 43) != 0;
+          shapes.push_back(RegionShape{
+              .velocities = static_cast<u16>(velocityZones ? 128 - midiVelocity(1) : 1),
+          });
+        }
+      }
+    }
+  }
+
+  const auto countAt = [&](u32 step) {
+    u64 count = 0;
+    for (const auto& shape : shapes) {
+      count += ((shape.keys + step - 1) / step) * ((shape.velocities + step - 1) / step);
+    }
+    return count;
+  };
+  RegionResolution resolution{.exactRegions = countAt(1)};
+  while (resolution.step < 128 && countAt(resolution.step) > kMaxSynthRegions) {
+    ++resolution.step;
+  }
+  resolution.emittedRegions = countAt(resolution.step);
+  return resolution;
+}
+
 }  // namespace
 
 void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
@@ -564,6 +691,14 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
       .field("vag_info_chunk", reader.range(offset + 0x30, 4), reader.le32(offset + 0x30), SourceValueDisplay::Address)
       .field("setb_chunk", reader.range(offset + 0x34, 4), reader.le32(offset + 0x34), SourceValueDisplay::Address);
 
+  const RegionResolution resolution = regionResolution(reader, programs, sampleSets, samples, setb, layout);
+  if (resolution.step != 1) {
+    instruments.warning(fmt::format("SonyPS2 key/velocity modulation requires {} exact regions; using {}-step "
+                                    "zones ({} regions) to fit 16-bit synth tables",
+                                    resolution.exactRegions, resolution.step, resolution.emittedRegions),
+                        reader.range(offset, headerBytes));
+  }
+
   bool warnedLfoShape = false;
   bool warnedLfoPhase = false;
   bool warnedLfoKeyOff = false;
@@ -573,7 +708,6 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
   bool warnedBendRange = false;
   bool warnedPanPhase = false;
   bool warnedNoise = false;
-  bool warnedRegionLimit = false;
   bool warnedVoicePolicy = false;
   bool warnedRouting = false;
   if (hasProgramTables) {
@@ -671,7 +805,6 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
       });
       instrument.source(instrument.value().name, reader.range(*programOffset, kProgramBytes), "sony-ps2-program");
 
-      u32 derivedRegions = 0;
       for (const auto& split : splits) {
         if (split.sampleSet >= sampleSets->entries.size() || !sampleSets->entries[split.sampleSet]) {
           continue;
@@ -764,31 +897,24 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
           const int targetVelocityHigh = midiVelocity(static_cast<u8>(rawVelocityHigh));
           const bool splitKeys = keyDependent(program, split, sample);
           const bool splitVelocities = velocityDependent(sample) || velocityCurveType != 0;
-          const u32 keyZones = splitKeys ? std::max(0, keyHigh - keyLow + 1) : 1;
-          u32 velocityStep = 1;
-          const u32 velocityZones = splitVelocities ? std::max(0, targetVelocityHigh - targetVelocityLow + 1) : 1;
-          if (keyZones != 0 && derivedRegions + keyZones * velocityZones > kMaxDerivedRegions) {
-            velocityStep = 4;
-            if (!warnedRegionLimit) {
-              instruments.warning("SonyPS2 key/velocity modulation required more than 32768 exact zones; velocity was "
-                                  "quantized to four-step zones",
-                                  reader.range(sample.offset, kSampleBytes));
-              warnedRegionLimit = true;
-            }
-          }
           for (int key = keyLow; key <= keyHigh;) {
-            const int representedKey = splitKeys ? key : std::clamp<int>(split.keyFollowPitchCenter, keyLow, keyHigh);
-            const int emittedKeyHigh = splitKeys ? key : keyHigh;
+            const int emittedKeyHigh =
+                splitKeys ? std::min(key + static_cast<int>(resolution.step) - 1, keyHigh) : keyHigh;
+            const int representedKey = splitKeys ? key + (emittedKeyHigh - key) / 2
+                                                 : std::clamp<int>(split.keyFollowPitchCenter, keyLow, keyHigh);
             for (int targetVelocity = targetVelocityLow; targetVelocity <= targetVelocityHigh;) {
+              const int emittedVelocityHigh = splitVelocities
+                                                  ? std::min(targetVelocity + static_cast<int>(resolution.step) - 1,
+                                                             targetVelocityHigh)
+                                                  : targetVelocityHigh;
+              const int representedTargetVelocity =
+                  splitVelocities ? targetVelocity + (emittedVelocityHigh - targetVelocity) / 2
+                                  : midiVelocity(static_cast<u8>(std::clamp<int>(sample.velocityAmpCenter,
+                                                                                rawVelocityLow, rawVelocityHigh)));
               const int representedRawVelocity =
-                  splitVelocities ? std::clamp<int>(rawVelocityFromMidi(static_cast<u8>(targetVelocity)),
+                  splitVelocities ? std::clamp<int>(rawVelocityFromMidi(static_cast<u8>(representedTargetVelocity)),
                                                     rawVelocityLow, rawVelocityHigh)
                                   : std::clamp<int>(sample.velocityAmpCenter, rawVelocityLow, rawVelocityHigh);
-              const int representedTargetVelocity =
-                  splitVelocities ? targetVelocity : midiVelocity(static_cast<u8>(representedRawVelocity));
-              const int emittedVelocityHigh =
-                  splitVelocities ? std::min(targetVelocity + static_cast<int>(velocityStep) - 1, targetVelocityHigh)
-                                  : targetVelocityHigh;
               const double keyGain = crossfade(split.low, split.cross, split.high, representedKey);
               const double velocityFade = crossfade(sample.low, sample.cross, sample.high, representedRawVelocity);
               // Region ranges are selected by target MIDI velocity, while all
@@ -812,7 +938,6 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
               };
               instrument.region(SampleRef::unbound(sample.vag), std::move(region))
                   .source("Sample region", reader.range(sample.offset, kSampleBytes), "sony-ps2-sample-param");
-              ++derivedRegions;
               targetVelocity = emittedVelocityHigh + 1;
             }
             key = emittedKeyHigh + 1;
@@ -993,10 +1118,13 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
           const bool velocityZones = curve != 0 || velocityPitch != 0 || velocityAmp != 0;
           const int targetVelocityLow = midiVelocity(1);
           for (int targetVelocity = targetVelocityLow; targetVelocity <= 127;) {
+            const int emittedHigh = velocityZones
+                                        ? std::min(targetVelocity + static_cast<int>(resolution.step) - 1, 127)
+                                        : 127;
+            const int representedTargetVelocity =
+                velocityZones ? targetVelocity + (emittedHigh - targetVelocity) / 2 : 127;
             const int representedRawVelocity =
-                velocityZones ? rawVelocityFromMidi(static_cast<u8>(targetVelocity)) : 127;
-            const int representedTargetVelocity = velocityZones ? targetVelocity : 127;
-            const int emittedHigh = velocityZones ? targetVelocity : 127;
+                velocityZones ? rawVelocityFromMidi(static_cast<u8>(representedTargetVelocity)) : 127;
             const double curveCorrection =
                 velocityCurveCorrection(curve, representedRawVelocity, static_cast<u8>(representedTargetVelocity));
             const double gain = gainFromRaw(lfo.volume) * curveCorrection;

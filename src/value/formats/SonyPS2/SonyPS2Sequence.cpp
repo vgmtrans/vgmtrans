@@ -224,6 +224,12 @@ struct Playback {
     delayed.pitchBend(PitchBendPerformanceEvent{.semitones = semitones});
   }
 
+  void pruneReleasedNotes() {
+    std::erase_if(track.activeNotes, [](const TrackState::ActiveNote& note) {
+      return !note.keyDown && !note.sustained;
+    });
+  }
+
   void releaseNotes(u8 key) {
     for (auto& note : track.activeNotes) {
       if (note.key == key && note.keyDown) {
@@ -231,12 +237,14 @@ struct Playback {
         note.sustained = track.sustain;
       }
     }
+    pruneReleasedNotes();
   }
 
   void releaseSustainedNotes() {
     for (auto& note : track.activeNotes) {
       note.sustained = false;
     }
+    pruneReleasedNotes();
   }
 
   void capturePortamentoSource(PerformanceEmitter& delayed, u8 key) {
@@ -254,6 +262,7 @@ struct Playback {
         note.sustained = false;
       }
     }
+    pruneReleasedNotes();
   }
 
   void updateProgramSettings(PerformanceEmitter& delayed) {
@@ -1145,6 +1154,8 @@ std::optional<SequenceProgram> parseSongSequence(ByteReader reader, AssetId id, 
   bool hasPlaybackCommand = false;
   bool hasRepeat = false;
   bool unsupported = false;
+  bool mixedTimebase = false;
+  std::optional<u16> selectedPpqn;
   u32 cursor = songOffset;
   while (cursor + 3 <= songEnd && playlist.commands.size() < 4096) {
     const u32 commandOffset = cursor;
@@ -1185,6 +1196,11 @@ std::optional<SequenceProgram> parseSongSequence(ByteReader reader, AssetId id, 
     const auto midi = std::ranges::find(layout.midiBlocks, value, &MidiBlockLayout::index);
     if (family == 0xa0 && operation == 0 && midi != layout.midiBlocks.end()) {
       hasPlaybackCommand = true;
+      if (selectedPpqn && *selectedPpqn != midi->ppqn) {
+        mixedTimebase = true;
+      } else {
+        selectedPpqn = midi->ppqn;
+      }
       if (playlist.commands.empty()) {
         playlist.startAddress = Address{commandOffset};
       }
@@ -1229,13 +1245,16 @@ std::optional<SequenceProgram> parseSongSequence(ByteReader reader, AssetId id, 
     unsupported = true;
     break;
   }
-  if (playlist.commands.empty() || unsupported || (hasPrefixState && hasRepeat) ||
+  if (playlist.commands.empty() || unsupported || mixedTimebase || (hasPrefixState && hasRepeat) ||
       playlist.commands.back().kind != PlaylistCommandKind::End) {
     if (diagnostics != nullptr) {
       diagnostics->push_back(Diagnostic{
           .severity = Severity::Warning,
-          .message = "SonyPS2 Song uses fades, clears, state changes between MIDI sections, or malformed commands "
-                     "not representable by SectionPlaylist",
+          .message = mixedTimebase
+                         ? "SonyPS2 Song selects MIDI blocks with different divisions; mixed timebases remain "
+                           "source-only"
+                         : "SonyPS2 Song uses fades, clears, state changes between MIDI sections, or malformed "
+                           "commands not representable by SectionPlaylist",
           .range = reader.range(songOffset, songEnd - songOffset),
       });
     }
@@ -1260,6 +1279,7 @@ std::optional<SequenceProgram> parseSongSequence(ByteReader reader, AssetId id, 
         .kind("sony-ps2-song-table")
         .owner(ObjectRefs::sequence(id));
   }
+  program.timebase.ppqn = selectedPpqn.value_or(program.timebase.ppqn);
   program.sectionPlaylist = std::move(playlist);
   return program;
 }

@@ -10,6 +10,8 @@
 
 namespace vgmtrans::formats::psf {
 
+inline constexpr char kPsf2IniAttribute[] = "psf2.ini";
+
 [[nodiscard]] core::SourceExtractor psfExtractor();
 
 }  // namespace vgmtrans::formats::psf

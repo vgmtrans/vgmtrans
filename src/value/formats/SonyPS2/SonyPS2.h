@@ -108,6 +108,7 @@ struct VagInfo {
 
 struct SampleBodyData {
   u32 bytes = 0;
+  core::RetainedSource source;
   struct Entry {
     u32 bodyOffset = 0;
     u32 sampleIndex = 0;

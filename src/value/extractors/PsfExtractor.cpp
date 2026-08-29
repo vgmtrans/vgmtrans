@@ -472,6 +472,17 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
 
   if (psf.version == kPsf2Version) {
     const auto members = unpackPsf2(bytes.first(16 + le32(bytes, 4)));
+    std::optional<std::string> ini;
+    const auto iniMember = std::ranges::find_if(members, [](const Psf2Member& member) {
+      std::string path = member.path;
+      std::ranges::transform(path, path.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+      return path == "psf2.ini";
+    });
+    if (iniMember != members.end() && iniMember->bytes.size() <= 65536) {
+      ini = iniMember->bytes.empty()
+                ? std::string{}
+                : std::string(reinterpret_cast<const char*>(iniMember->bytes.data()), iniMember->bytes.size());
+    }
     result.sources.reserve(members.size());
     for (auto member : members) {
       SourceFile file{
@@ -481,6 +492,9 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
       };
       file.attributes.emplace("container-format", "PSF2");
       file.attributes.emplace("container-member", member.path);
+      if (ini) {
+        file.attributes.emplace(kPsf2IniAttribute, *ini);
+      }
       result.sources.push_back(ExtractedSource{
           .file = std::move(file),
           .bytes = std::move(member.bytes),
