@@ -353,8 +353,8 @@ void syntheticFeatures() {
   const auto& bank = bound.collection->soundBanks().front();
   expect(bank.instruments.size() == 2 && bank.localSamples.samples.empty(),
          "HD should retain both Prog and Setb instruments with external samples");
-  expect(bank.instruments[0].regions.size() == 182,
-         "sample-set limits and both split layers should retain their exact velocity zones; got " +
+  expect(bank.instruments[0].regions.size() == 156,
+         "sample-set limits and both split layers should retain their mapped velocity zones; got " +
              std::to_string(bank.instruments[0].regions.size()));
   const auto& region = bank.instruments[0].regions.front();
   expect(region.sample.valid() && near(region.unityKey, 69.0),
@@ -368,15 +368,15 @@ void syntheticFeatures() {
   expect(bound.collection->samplePools().front()->pool.samples.front().loop.enabled,
          "PSX ADPCM loop flags should survive HD/BD binding");
   expect(bank.instruments[1].identity && bank.instruments[1].identity->domain == kSetbInstrumentDomain &&
-             bank.instruments[1].regions.size() == 127 && near(bank.instruments[1].regions.front().unityKey, 73.5),
+             bank.instruments[1].regions.size() == 117 && near(bank.instruments[1].regions.front().unityKey, 73.5),
          "Setb note-addressed timbres should retain velocity curves, tuning, and their distinct identity domain");
 
   const auto rendered = renderCollection(*bound.collection, SequenceRenderOptions{});
   expect(rendered.performance && countEvents<NotePerformanceEvent>(*rendered.performance) == 2,
          "compact zero-delta note-on/off should render both plain MIDI notes");
   const auto* note = findEvent<NotePerformanceEvent>(*rendered.performance);
-  expect(note != nullptr && near(note->linearVelocity, (100.0 / 127.0) * (100.0 / 127.0)),
-         "note velocity should preserve the source MIDI value used to select velocity regions");
+  expect(note != nullptr && near(note->linearVelocity, 100.0 / 128.0),
+         "note velocity should retain the driver's linear voice gain");
   const auto hasPhysicalBend = [&](double semitones) {
     return findEvent<PitchBendPerformanceEvent>(*rendered.performance, [&](const auto& event) {
              return near(event.semitones, semitones) && !event.normalizedWheelPosition;
@@ -406,6 +406,11 @@ void syntheticFeatures() {
   expect(pan != nullptr && near(pan->position, 0.5) && pan->voicePanLaw == PanLaw::ConstantMaximum,
          "CC10 should remain an additive constant-maximum voice-pan controller");
   const MidiSequence midi = renderMidiSequence(*rendered.performance);
+  const auto midiNote = std::ranges::find_if(midi.tracks.front().events, [](const MidiEvent& event) {
+    return std::holds_alternative<NoteDuration>(event.payload);
+  });
+  expect(midiNote != midi.tracks.front().events.end() && std::get<NoteDuration>(midiNote->payload).velocity == 112,
+         "Sony velocity 100 should lower to an equivalent MIDI amplitude");
   const auto hasController = [&](MidiController controller, u16 value) {
     return std::ranges::any_of(midi.tracks.front().events, [&](const MidiEvent& event) {
       const auto* message = std::get_if<MidiChannelMessage>(&event.payload);
@@ -422,7 +427,9 @@ void syntheticFeatures() {
          "14-bit mark callbacks should combine CC6 and CC38 before emitting a marker");
 
   const std::vector<u8> seBytes{
-      0, 0xa2, 3, 61, 100, 10, 0xa2, 3, 61, 0, 0, 0xff,
+      0,   0xa2, 3,  61,   100,       // note on
+      0,   0xb2, 3,  61,   0x0e, 10,  // raise pitch 100 cents over 10 ms
+      100, 0,    10, 0xa2, 3,    61, 0, 0, 0xff,
   };
   const ByteReader seReader(SourceId{1}, seBytes);
   const auto se = parseSeSequence(seReader, AssetId{1},
@@ -436,6 +443,13 @@ void syntheticFeatures() {
   const PerformanceSequence sePerformance = SequenceVm().render(*se);
   expect(countEvents<NotePerformanceEvent>(sePerformance) == 1,
          "SeSeq set/timbre note-on and note-off commands should render on their dedicated voice track");
+  expect(sePerformance.tracks.size() == 1 && sePerformance.tracks.front().automations.size() == 1,
+         "SeSeq pitch automation should remain isolated to its addressed set/timbre/note voice");
+  const auto* pitch = std::get_if<PitchTransitionIntent>(&sePerformance.tracks.front().automations.front().intent);
+  expect(pitch != nullptr && near(pitch->startKey, 61.0) && near(pitch->targetKey, 62.0) &&
+             pitch->timing.timelineTicks == 10 &&
+             near(std::get<FixedDurationPitchSlideTiming>(pitch->timing.physical).milliseconds, 10.0),
+         "SeSeq Time-Pitch+ should preserve its relative cents and physical millisecond duration");
 }
 
 void trivialSongCollapsesToSelectedMidi() {
@@ -559,6 +573,7 @@ void realArchive(const std::filesystem::path& path) {
   expect(sonyCollections.size() == 1, "a SonyPS2 archive should expose one selected Song or MIDI sequence");
   const bool g01Opening = path.filename() == "11 Tekken Tag Tournament - OPENING MOVIE.psf2";
   const bool striderFalloff = path.filename() == "19 Strider Hiryuu Bouei-ken ~ Fumikomu! (1 Stage BGM1).psf2";
+  const bool streetFighterVelocity = path.filename() == "20 Street Fighter II - Stage Japan Ryu.psf2";
   if (g01Opening) {
     expect(sonyCollections.front()->name == "g01 MIDI 0",
            "the Namco X Capcom archive should expose only its selected g01 MIDI sequence");
@@ -608,6 +623,18 @@ void realArchive(const std::filesystem::path& path) {
     };
     expect(expressionAt(29580, 126) && expressionAt(29775, 106),
            "Strider channel 1 should retain the unclipped expression fade after the note at SQ offset 0x15f3");
+  }
+  if (streetFighterVelocity) {
+    const MidiSequence midi = renderMidiSequence(*rendered.performance);
+    const auto noteAt = [&](size_t track, u64 tick, u8 key, u8 velocity) {
+      return std::ranges::any_of(midi.tracks[track].events, [&](const MidiEvent& event) {
+        const auto* note = std::get_if<NoteDuration>(&event.payload);
+        return event.tick == tick && note != nullptr && note->key == key && note->velocity == velocity;
+      });
+    };
+    expect(midi.tracks.size() > 9 && noteAt(7, 7920, 70, 117) && noteAt(7, 8040, 73, 110) && noteAt(7, 8160, 75, 87) &&
+               noteAt(8, 8160, 75, 87) && noteAt(9, 8190, 75, 87),
+           "Street Fighter channels 7-9 should retain the driver's linear velocity ratios");
   }
   const auto playback =
       session.preparePlayback(sonyCollections.front()->id,

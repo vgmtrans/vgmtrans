@@ -292,6 +292,11 @@ struct SampleParam {
   }
 }
 
+[[nodiscard]] double velocityCurveCorrection(u8 curve, int rawVelocity, u8 targetVelocity) {
+  const double targetGain = LevelScale::linearFromMidi7(targetVelocity);
+  return targetGain == 0.0 ? 1.0 : velocityGain(static_cast<u8>(velocityCurve(curve, rawVelocity))) / targetGain;
+}
+
 [[nodiscard]] double bipolarVelocityCurve(u8 type, int velocity, int center) {
   const double normalized = (std::clamp(velocity, 1, 127) - 1) / 126.0;
   const double normalizedCenter = (std::clamp(center, 1, 127) - 1) / 126.0;
@@ -622,16 +627,18 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
         const VagInfo& vag = *layout.vags[sample.vag];
         const int keyLow = std::min<int>(split.low & 0x7f, 127);
         const int keyHigh = std::min<int>(split.high & 0x7f, 127);
-        const int velocityLow = std::max<int>(sampleSetVelocityLow, sample.low & 0x7f);
-        const int velocityHigh = std::min<int>(sampleSetVelocityHigh, sample.high & 0x7f);
-        if (velocityLow > velocityHigh) {
+        const int rawVelocityLow = std::max<int>(sampleSetVelocityLow, sample.low & 0x7f);
+        const int rawVelocityHigh = std::min<int>(sampleSetVelocityHigh, sample.high & 0x7f);
+        if (rawVelocityLow > rawVelocityHigh) {
           continue;
         }
+        const int targetVelocityLow = midiVelocity(static_cast<u8>(rawVelocityLow));
+        const int targetVelocityHigh = midiVelocity(static_cast<u8>(rawVelocityHigh));
         const bool splitKeys = keyDependent(program, split, sample);
         const bool splitVelocities = velocityDependent(sample) || velocityCurveType != 0;
         const u32 keyZones = splitKeys ? std::max(0, keyHigh - keyLow + 1) : 1;
         u32 velocityStep = 1;
-        const u32 velocityZones = splitVelocities ? std::max(0, velocityHigh - velocityLow + 1) : 1;
+        const u32 velocityZones = splitVelocities ? std::max(0, targetVelocityHigh - targetVelocityLow + 1) : 1;
         if (keyZones != 0 && derivedRegions + keyZones * velocityZones > kMaxDerivedRegions) {
           velocityStep = 4;
           if (!warnedRegionLimit) {
@@ -644,19 +651,22 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
         for (int key = keyLow; key <= keyHigh;) {
           const int representedKey = splitKeys ? key : std::clamp<int>(split.keyFollowPitchCenter, keyLow, keyHigh);
           const int emittedKeyHigh = splitKeys ? key : keyHigh;
-          for (int velocity = velocityLow; velocity <= velocityHigh;) {
-            const int representedVelocity =
-                splitVelocities ? velocity : std::clamp<int>(sample.velocityAmpCenter, velocityLow, velocityHigh);
+          for (int targetVelocity = targetVelocityLow; targetVelocity <= targetVelocityHigh;) {
+            const int representedRawVelocity =
+                splitVelocities ? std::clamp<int>(rawVelocityFromMidi(static_cast<u8>(targetVelocity)), rawVelocityLow,
+                                                  rawVelocityHigh)
+                                : std::clamp<int>(sample.velocityAmpCenter, rawVelocityLow, rawVelocityHigh);
+            const int representedTargetVelocity =
+                splitVelocities ? targetVelocity : midiVelocity(static_cast<u8>(representedRawVelocity));
             const int emittedVelocityHigh =
-                splitVelocities ? std::min(velocity + static_cast<int>(velocityStep) - 1, velocityHigh) : velocityHigh;
+                splitVelocities ? std::min(targetVelocity + static_cast<int>(velocityStep) - 1, targetVelocityHigh)
+                                : targetVelocityHigh;
             const double keyGain = crossfade(split.low, split.cross, split.high, representedKey);
-            const double velocityFade = crossfade(sample.low, sample.cross, sample.high, representedVelocity);
-            const int curvedVelocity = velocityCurve(velocityCurveType, representedVelocity);
-            // MIDI velocity must remain on its source 1..127 scale so these
-            // exact velocity regions remain selectable. Relative to that
-            // scale the driver applies curvedVelocity/128.
-            const double velocityCorrection =
-                static_cast<double>(curvedVelocity) * 127.0 / (representedVelocity * 128.0);
+            const double velocityFade = crossfade(sample.low, sample.cross, sample.high, representedRawVelocity);
+            // Region ranges are selected by target MIDI velocity, while all
+            // driver curves are evaluated in Sony's linear source domain.
+            const double velocityCorrection = velocityCurveCorrection(velocityCurveType, representedRawVelocity,
+                                                                      static_cast<u8>(representedTargetVelocity));
             const double gain = gainFromRaw(program.volume) * gainFromRaw(split.volume) * gainFromRaw(sample.volume) *
                                 keyGain * velocityFade * velocityCorrection;
             const double panFollow =
@@ -667,7 +677,7 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
                                                0, 127);
             Region region{
                 .keyRange = KeyRange{static_cast<u8>(key), static_cast<u8>(emittedKeyHigh)},
-                .velocityRange = VelocityRange{static_cast<u8>(velocity), static_cast<u8>(emittedVelocityHigh)},
+                .velocityRange = VelocityRange{static_cast<u8>(targetVelocity), static_cast<u8>(emittedVelocityHigh)},
                 .range = reader.range(sample.offset, kSampleBytes),
                 .unityKey = sample.baseNote - program.transpose - split.transpose -
                             (program.detune + split.detune + sample.detune) / 128.0 +
@@ -675,12 +685,12 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
                 .envelope = keyFollowEnvelope(sample, representedKey),
                 .pan = panPositionFrom7Bit(static_cast<u8>(rawPan)),
                 .attenuationDb = attenuation(gain),
-                .modulation = modulation(program, split, sample, representedKey, representedVelocity),
+                .modulation = modulation(program, split, sample, representedKey, representedRawVelocity),
             };
             instrument.region(SampleRef::unbound(sample.vag), std::move(region))
                 .source("Sample region", reader.range(sample.offset, kSampleBytes), "sony-ps2-sample-param");
             ++derivedRegions;
-            velocity = emittedVelocityHigh + 1;
+            targetVelocity = emittedVelocityHigh + 1;
           }
           key = emittedKeyHigh + 1;
         }
@@ -834,25 +844,28 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
             warnedLfoAsymmetry = true;
           }
           const bool velocityZones = curve != 0 || velocityPitch != 0 || velocityAmp != 0;
-          for (int velocity = 1; velocity <= 127;) {
-            const int representedVelocity = velocityZones ? velocity : 127;
-            const int emittedHigh = velocityZones ? velocity : 127;
+          const int targetVelocityLow = midiVelocity(1);
+          for (int targetVelocity = targetVelocityLow; targetVelocity <= 127;) {
+            const int representedRawVelocity =
+                velocityZones ? rawVelocityFromMidi(static_cast<u8>(targetVelocity)) : 127;
+            const int representedTargetVelocity = velocityZones ? targetVelocity : 127;
+            const int emittedHigh = velocityZones ? targetVelocity : 127;
             const double curveCorrection =
-                static_cast<double>(velocityCurve(curve, representedVelocity)) * 127.0 / (representedVelocity * 128.0);
+                velocityCurveCorrection(curve, representedRawVelocity, static_cast<u8>(representedTargetVelocity));
             const double gain = gainFromRaw(lfo.volume) * curveCorrection;
             Region region{
                 .keyRange = KeyRange{static_cast<u8>(note), static_cast<u8>(note)},
-                .velocityRange = VelocityRange{static_cast<u8>(velocity), static_cast<u8>(emittedHigh)},
+                .velocityRange = VelocityRange{static_cast<u8>(targetVelocity), static_cast<u8>(emittedHigh)},
                 .range = reader.range(noteOffset, noteBytes),
                 .unityKey = note - lfo.transpose - lfo.detune / 128.0 + 12.0 * std::log2(48000.0 / vag.sampleRate),
                 .envelope = psxSpuEnvelope(lfoSample.adsr1, lfoSample.adsr2, PsxSpuGeneration::Ps2),
                 .pan = panPositionFrom7Bit(static_cast<u8>(panMagnitude(lfo.pan))),
                 .attenuationDb = attenuation(gain),
-                .modulation = modulation(lfo, neutralSplit, lfoSample, note, representedVelocity),
+                .modulation = modulation(lfo, neutralSplit, lfoSample, note, representedRawVelocity),
             };
             instrument.region(SampleRef::unbound(vagIndex), std::move(region))
                 .source("SE timbre note", reader.range(noteOffset, noteBytes), "sony-ps2-setb-note");
-            velocity = emittedHigh + 1;
+            targetVelocity = emittedHigh + 1;
           }
           if ((reader.u8At(noteOffset + 8) != 0 || reader.u8At(noteOffset + 9) != 0) && !warnedSetbVoicePolicy) {
             // Group limits and priorities affect voice stealing rather than
