@@ -53,7 +53,8 @@ void text(std::vector<u8>& bytes, size_t offset, std::string_view value) {
   std::ranges::copy(value, bytes.begin() + offset);
 }
 
-std::vector<u8> sqFixture(bool includeSong = true, bool repeatSong = false, u8 songVolumeReduction = 0) {
+std::vector<u8> sqFixture(bool includeSong = true, bool repeatSong = false, u8 songVolumeReduction = 0,
+                          u16 firstPpqn = 480, u16 secondPpqn = 480) {
   const std::vector<u8> plain{
       0,    0xb0, 0,    0,     // bank 0
       0,    0xc0, 0,           // program 0
@@ -109,10 +110,10 @@ std::vector<u8> sqFixture(bool includeSong = true, bool repeatSong = false, u8 s
   le32(bytes, midiOffset + 20, 0xffffffff);
   le32(bytes, midiOffset + 24, secondBlock);
   le32(bytes, midiOffset + firstBlock, 6);
-  le16(bytes, midiOffset + firstBlock + 4, 480);
+  le16(bytes, midiOffset + firstBlock + 4, firstPpqn);
   std::ranges::copy(plain, bytes.begin() + midiOffset + firstBlock + 6);
   le32(bytes, midiOffset + secondBlock, 12);
-  le16(bytes, midiOffset + secondBlock + 4, 480);
+  le16(bytes, midiOffset + secondBlock + 4, secondPpqn);
   le16(bytes, midiOffset + secondBlock + 6, 1);
   le16(bytes, midiOffset + secondBlock + 8, 2);
   bytes[midiOffset + secondBlock + 10] = 0x90;
@@ -321,19 +322,22 @@ const Collection* firstCollection(const SessionSnapshot& snapshot) {
   return found == snapshot.collections().end() ? nullptr : &*found;
 }
 
-SourceFile archiveMember(std::string name) {
+SourceFile archiveMember(std::string name, std::string_view ini = {}) {
   SourceFile source{.name = name, .path = "/fixture/music.psf2"};
   source.attributes.emplace("container-format", "PSF2");
   source.attributes.emplace("container-member", std::move(name));
+  if (!ini.empty()) {
+    source.attributes.emplace(vgmtrans::formats::psf::kPsf2IniAttribute, ini);
+  }
   return source;
 }
 
-SessionSnapshot scanFixture(std::vector<u8> sq) {
+SessionSnapshot scanFixture(std::vector<u8> sq, std::string_view ini = {}) {
   Session session;
   session.registerFormat(module());
-  session.addSource(archiveMember("music.sq"), std::move(sq));
-  session.addSource(archiveMember("music.hd"), hdFixture());
-  session.addSource(archiveMember("music.bd"), bdFixture());
+  session.addSource(archiveMember("music.sq", ini), std::move(sq));
+  session.addSource(archiveMember("music.hd", ini), hdFixture());
+  session.addSource(archiveMember("music.bd", ini), bdFixture());
   session.scanPendingSources();
   return session.snapshot();
 }
@@ -470,15 +474,23 @@ void syntheticFeatures() {
 }
 
 void trivialSongCollapsesToSelectedMidi() {
-  const auto snapshot = scanFixture(sqFixture());
+  const auto snapshot = scanFixture(sqFixture(true, false, 0, 240, 480));
   expect(snapshot.collections().size() == 1 && snapshot.collections().front().name == "music MIDI 2",
          "a Song should select its sparse MIDI block number instead of publishing a duplicate sequence");
+  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*snapshot.collections().front().members.sequence);
+  expect(sequence != nullptr && sequence->program.timebase.ppqn == 480,
+         "a Song should inherit the division of the MIDI block it selects");
   const auto bound = bindCollection(snapshot, snapshot.collections().front().id);
   expect(bound.collection && bound.collection->samplePools().size() == 1,
          "a PSF2 BD member should bind even though its host path ends in .psf2");
   const auto rendered = renderCollection(*bound.collection, SequenceRenderOptions{});
   expect(rendered.performance && countEvents<NotePerformanceEvent>(*rendered.performance) == 1,
          "the MIDI selected by a trivial Song wrapper should remain playable");
+
+  const auto iniSnapshot = scanFixture(sqFixture(false),
+                                       "sq.irx -s=music.sq -h=music.hd -b=music.bd -n=2");
+  expect(iniSnapshot.collections().size() == 1 && iniSnapshot.collections().front().name == "music MIDI 2",
+         "PSF2 sq.irx metadata should publish only the MIDI block the original player selects");
 
   auto staleSizes = sqFixture();
   constexpr u32 staleBytes = 0x400;

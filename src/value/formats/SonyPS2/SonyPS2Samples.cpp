@@ -55,6 +55,10 @@ namespace {
   return (filterShift >> 4) <= 4 && (filterShift & 0x0f) <= 12 && (reader.u8At(offset + 1) & 0xf8) == 0;
 }
 
+[[nodiscard]] bool allZero(ByteReader reader, u32 offset, u32 end) {
+  return std::ranges::all_of(reader.slice(offset, end - offset), [](u8 byte) { return byte == 0; });
+}
+
 }  // namespace
 
 bool addSampleBody(ScanResultBuilder& result) {
@@ -64,7 +68,7 @@ bool addSampleBody(ScanResultBuilder& result) {
   }
   const u32 end = static_cast<u32>(reader.size());
   u32 cursor = 0;
-  SampleBodyData retained{.bytes = end};
+  u32 logicalEnd = end;
   struct Parsed {
     u32 offset;
     std::optional<u32> zeroPrefix;
@@ -74,6 +78,11 @@ bool addSampleBody(ScanResultBuilder& result) {
   while (cursor + kPsxAdpcmBlockBytes <= end) {
     while (cursor + kPsxAdpcmBlockBytes <= end && explicitPaddingBlock(reader, cursor)) {
       cursor += kPsxAdpcmBlockBytes;
+    }
+    if (!parsed.empty() && allZero(reader, cursor, end)) {
+      logicalEnd = cursor;
+      cursor = end;
+      break;
     }
     std::optional<u32> zeroPrefix;
     if (cursor + kPsxAdpcmBlockBytes * 2 <= end && zeroBlock(reader, cursor) &&
@@ -110,6 +119,10 @@ bool addSampleBody(ScanResultBuilder& result) {
   auto pool = result.samplePool(fmt::format("{} BD", result.sourceDisplayName()), reader.range(0, end));
   auto& samples = pool.samples();
   samples.include(reader.range(0, end));
+  SampleBodyData retained{
+      .bytes = logicalEnd,
+      .source = RetainedSource::copyOf(reader),
+  };
   for (const auto& item : parsed) {
     const u32 denseIndex = static_cast<u32>(samples.size());
     auto entry = samples.add(item.offset, Sample{

@@ -7,6 +7,10 @@
 #include "value/formats/SonyPS2/SonyPS2.h"
 
 #include "value/scan/CollectionDiscovery.h"
+#include "value/synth/PsxAdpcm.h"
+#include "value/synth/PsxSpu.h"
+
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <cmath>
@@ -67,15 +71,8 @@ struct SampleBinding {
 }
 
 [[nodiscard]] bool compatible(const SoundBankData& bank, const SampleBodyData& body) {
-  const u32 difference =
-      bank.expectedBodyBytes > body.bytes ? bank.expectedBodyBytes - body.bytes : body.bytes - bank.expectedBodyBytes;
-  if (difference > 32) {
-    return false;
-  }
   return std::ranges::all_of(bank.vags, [&](const std::optional<VagInfo>& vag) {
-    return !vag || std::ranges::any_of(body.entries, [&](const SampleBodyData::Entry& entry) {
-      return entry.bodyOffset == vag->bodyOffset;
-    });
+    return !vag || (body.source && vag->bodyOffset < body.bytes && (vag->bodyOffset & 0xf) == 0);
   });
 }
 
@@ -177,6 +174,17 @@ void applyBindings(CollectionBindingContext& context, const std::vector<SampleBi
       context.fail("SonyPS2 HD/BD binding metadata is missing", bank->metadata.range);
       return;
     }
+    const u32 sizeDifference = bankData->expectedBodyBytes > bodyData->bytes
+                                   ? bankData->expectedBodyBytes - bodyData->bytes
+                                   : bodyData->bytes - bankData->expectedBodyBytes;
+    if (sizeDifference > 32) {
+      // The manual describes bodySize as the complete BD length, but shipped
+      // banks can retain an unrelated allocation size. sceHSyn_Load receives
+      // only the uploaded body base and resolves samples through Vagi offsets.
+      context.warning("SonyPS2 HD bodySize differs from the selected BD; VAG offsets were used for binding",
+                      bank->metadata.range);
+    }
+    std::unordered_map<u32, u32> localSamples;
     for (auto& instrument : bank->instruments) {
       for (auto& region : instrument.regions) {
         if (!region.sample.needsBinding()) {
@@ -189,12 +197,33 @@ void applyBindings(CollectionBindingContext& context, const std::vector<SampleBi
         }
         const u32 bodyOffset = bankData->vags[vagIndex]->bodyOffset;
         const auto entry = std::ranges::find(bodyData->entries, bodyOffset, &SampleBodyData::Entry::bodyOffset);
-        if (entry == bodyData->entries.end()) {
-          context.fail("SonyPS2 Vagi entry has no sample at its BD body offset", region.range);
-          return;
+        bool loops = false;
+        if (entry != bodyData->entries.end()) {
+          region.sample = SampleRef::resolved(body->metadata.id, entry->sampleIndex);
+          loops = body->pool.samples[entry->sampleIndex].loop.enabled;
+        } else {
+          auto [sample, inserted] = localSamples.try_emplace(bodyOffset, 0);
+          if (inserted) {
+            const auto stream = inspectPsxAdpcmStream(bodyData->source.reader(), bodyOffset, bodyData->bytes);
+            if (!stream) {
+              context.fail("SonyPS2 Vagi entry does not address a complete BD sample block", region.range);
+              return;
+            }
+            sample->second = static_cast<u32>(bank->localSamples.samples.size());
+            bank->localSamples.samples.push_back(Sample{
+                .name = fmt::format("VAG at {:#x}", bodyOffset),
+                .codec = AudioCodec::PsxAdpcm,
+                .encodedData = stream->encodedData,
+                .sampleRate = kPs2SpuSampleRate,
+                .channels = 1,
+                .bitsPerSample = 16,
+                .loop = stream->loop,
+            });
+          }
+          region.sample = SampleRef::resolved(bank->metadata.id, sample->second);
+          loops = bank->localSamples.samples[sample->second].loop.enabled;
         }
-        region.sample = SampleRef::resolved(body->metadata.id, entry->sampleIndex);
-        if (bankData->vags[vagIndex]->loops != body->pool.samples[entry->sampleIndex].loop.enabled) {
+        if (bankData->vags[vagIndex]->loops != loops) {
           context.warning("SonyPS2 Vagi loop attribute disagrees with the ADPCM end flags", region.range);
         }
       }
