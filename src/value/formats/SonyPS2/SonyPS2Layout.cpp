@@ -29,8 +29,9 @@ constexpr std::array<u8, 8> kSeSongTag{'I', 'E', 'C', 'S', 'g', 'n', 'S', 'S'};
 }
 
 [[nodiscard]] std::optional<SparseChunkLayout> readSparseChunk(ByteReader reader, u32 fileOffset, u32 fileEnd,
-                                                               u32 relativeOffset, const std::array<u8, 8>& tag) {
-  if (relativeOffset == 0xffffffff || relativeOffset > fileEnd - fileOffset) {
+                                                               u32 declaredFileSize, u32 relativeOffset,
+                                                               const std::array<u8, 8>& tag) {
+  if (relativeOffset == 0xffffffff || relativeOffset > declaredFileSize || relativeOffset > fileEnd - fileOffset) {
     return std::nullopt;
   }
   const u32 offset = fileOffset + relativeOffset;
@@ -38,20 +39,24 @@ constexpr std::array<u8, 8> kSeSongTag{'I', 'E', 'C', 'S', 'g', 'n', 'S', 'S'};
     return std::nullopt;
   }
   const u32 declaredSize = reader.le32(offset + 8);
-  if (declaredSize < 16 || declaredSize > fileEnd - offset) {
+  if (declaredSize < 16 || declaredSize > declaredFileSize - relativeOffset) {
     return std::nullopt;
   }
+  // The Sony driver validates tags and offset tables but never consults these
+  // size fields. Shipped SQs can retain an oversized file/chunk length after a
+  // MIDI payload was shortened, so parse the physically available prefix.
+  const u32 availableSize = std::min(declaredSize, fileEnd - offset);
   const u32 maximumIndex = reader.le32(offset + 12);
-  if (maximumIndex > 65535 || static_cast<u64>(maximumIndex + 1) * 4 > declaredSize - 16) {
+  if (maximumIndex > 65535 || static_cast<u64>(maximumIndex + 1) * 4 > availableSize - 16) {
     return std::nullopt;
   }
-  SparseChunkLayout chunk{.offset = offset, .size = declaredSize};
+  SparseChunkLayout chunk{.offset = offset, .size = availableSize};
   chunk.entries.reserve(maximumIndex + 1);
   for (u32 index = 0; index <= maximumIndex; ++index) {
     const u32 relative = reader.le32(offset + 16 + index * 4);
     if (relative == 0xffffffff) {
       chunk.entries.push_back(std::nullopt);
-    } else if (relative < declaredSize) {
+    } else if (relative < availableSize) {
       chunk.entries.push_back(offset + relative);
     } else {
       return std::nullopt;
@@ -79,19 +84,19 @@ std::optional<SequenceLayout> readSequenceLayout(ByteReader reader, u32 offset) 
   }
   const u32 headerSize = reader.le32(offset + 24);
   const u32 fileSize = reader.le32(offset + 0x1c);
-  if (headerSize < 0x20 || fileSize < 0x30 || fileSize > std::numeric_limits<u32>::max() - offset ||
-      !reader.has(offset, fileSize)) {
+  if (headerSize < 0x20 || fileSize < 0x30 || fileSize > std::numeric_limits<u32>::max() - offset) {
     return std::nullopt;
   }
-  const u32 fileEnd = offset + fileSize;
+  const u32 availableFileSize = static_cast<u32>(std::min<u64>(fileSize, reader.size() - offset));
+  const u32 fileEnd = offset + availableFileSize;
   SequenceLayout layout{
       .offset = offset,
-      .length = fileSize,
+      .length = availableFileSize,
       .majorVersion = reader.u8At(offset + 14),
       .minorVersion = reader.u8At(offset + 15),
   };
-  layout.songs = readSparseChunk(reader, offset, fileEnd, reader.le32(offset + 0x20), kSongTag);
-  layout.midi = readSparseChunk(reader, offset, fileEnd, reader.le32(offset + 0x24), kMidiTag);
+  layout.songs = readSparseChunk(reader, offset, fileEnd, fileSize, reader.le32(offset + 0x20), kSongTag);
+  layout.midi = readSparseChunk(reader, offset, fileEnd, fileSize, reader.le32(offset + 0x24), kMidiTag);
   const u32 seRelative = reader.le32(offset + 0x28);
   if (seRelative != 0xffffffff && seRelative <= fileEnd - offset) {
     const u32 seOffset = offset + seRelative;
@@ -111,7 +116,7 @@ std::optional<SequenceLayout> readSequenceLayout(ByteReader reader, u32 offset) 
       }
     }
   }
-  layout.seSongs = readSparseChunk(reader, offset, fileEnd, reader.le32(offset + 0x2c), kSeSongTag);
+  layout.seSongs = readSparseChunk(reader, offset, fileEnd, fileSize, reader.le32(offset + 0x2c), kSeSongTag);
   if (!layout.midi && !layout.songs && !layout.seSequences && !layout.seSongs) {
     return std::nullopt;
   }
@@ -235,7 +240,7 @@ std::optional<SoundBankData> readSoundBankLayout(ByteReader reader, u32 offset) 
     return std::nullopt;
   }
   const u32 end = offset + headerBytes;
-  const auto vagi = readSparseChunk(reader, offset, end, reader.le32(offset + 0x30),
+  const auto vagi = readSparseChunk(reader, offset, end, headerBytes, reader.le32(offset + 0x30),
                                     std::array<u8, 8>{'I', 'E', 'C', 'S', 'i', 'g', 'a', 'V'});
   if (!vagi) {
     return std::nullopt;
