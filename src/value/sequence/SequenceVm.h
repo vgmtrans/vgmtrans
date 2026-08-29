@@ -83,6 +83,9 @@ public:
   void sustainPedal(bool down);
   // Immediately closes every active note, independent of the pedal state.
   void allNotesOff();
+  // Closes notes whose keys are still down while retaining notes already held
+  // by the sustain pedal. This is MIDI All Notes Off rather than All Sound Off.
+  void releaseAllNotes();
   // Emits event on an already-sounding source voice and returns the note
   // identity that later automation should address. If event.key is the pitch
   // currently sounding, the existing note is extended. Otherwise a new note
@@ -142,6 +145,8 @@ public:
   void tremoloDelayPhysical(u32 delayTicks, double milliseconds);
   void portamentoEnable(PortamentoEnablePerformanceEvent event);
   void portamentoEnable(bool enabled);
+  void portamentoControl(PortamentoControlPerformanceEvent event);
+  void portamentoControl(double previousKey);
   void pitchTransitionSettings(PitchTransitionSettingsPerformanceEvent event);
   void pitchTransitionSettings(double timeMilliseconds);
   void legatoPedal(LegatoPedalPerformanceEvent event);

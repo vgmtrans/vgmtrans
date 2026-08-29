@@ -156,6 +156,17 @@ void PerformanceEmitter::allNotesOff() {
   state.notes.clear();
 }
 
+void PerformanceEmitter::releaseAllNotes() {
+  auto& state = activeNotes();
+  std::erase_if(state.notes, [&](const auto& active) {
+    if (active.second.released) {
+      return false;
+    }
+    finishActiveNote(active.second, tick_);
+    return true;
+  });
+}
+
 detail::ActiveNoteState& PerformanceEmitter::activeNotes() const {
   if (activeNotes_ == nullptr) {
     throw std::logic_error("Active-note operations require VM-managed state");
@@ -451,6 +462,16 @@ void PerformanceEmitter::portamentoEnable(PortamentoEnablePerformanceEvent event
 void PerformanceEmitter::portamentoEnable(bool enabled) {
   portamentoEnable(PortamentoEnablePerformanceEvent{
       .enabled = enabled,
+  });
+}
+
+void PerformanceEmitter::portamentoControl(PortamentoControlPerformanceEvent event) {
+  append(std::move(event));
+}
+
+void PerformanceEmitter::portamentoControl(double previousKey) {
+  portamentoControl(PortamentoControlPerformanceEvent{
+      .previousKey = previousKey,
   });
 }
 

@@ -331,6 +331,12 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1Samples.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1Sequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1Synth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS2/SonyPS2Layout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS2/SonyPS2Module.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS2/SonyPS2Resolver.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS2/SonyPS2Samples.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS2/SonyPS2Sequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS2/SonyPS2Synth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SoftCreatSnes/SoftCreatSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SoftCreatSnes/SoftCreatSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SoftCreatSnes/SoftCreatSnesSequence.cpp
@@ -382,6 +388,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/Nds.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SegSat/SegSat.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS2/SonyPS2.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SoftCreatSnes/SoftCreatSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SquarePS2/SquarePS2.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1.h
