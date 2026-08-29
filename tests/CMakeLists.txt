@@ -14,6 +14,7 @@ target_sources(vgmtrans-value-core-tests
     formats/KonamiTMNT2ModuleTests.cpp
     formats/KonamiSnesModuleTests.cpp
     formats/Mp2kModuleTests.cpp
+    formats/NamcoSnesModuleTests.cpp
     formats/NeverlandSnesModuleTests.cpp
     formats/NinSnesModuleTests.cpp
     formats/HOSAModuleTests.cpp
@@ -58,6 +59,13 @@ add_executable(vgmtrans-hosa-tests
 target_link_libraries(vgmtrans-hosa-tests PRIVATE vgmtransvalueformats vgmtransvaluecore ZLIB::ZLIB)
 target_compile_features(vgmtrans-hosa-tests PRIVATE cxx_std_20)
 add_test(NAME vgmtrans-hosa-tests COMMAND vgmtrans-hosa-tests)
+
+add_executable(vgmtrans-namco-snes-tests
+  formats/NamcoSnesModuleTests.cpp
+  formats/NamcoSnesTestMain.cpp)
+target_link_libraries(vgmtrans-namco-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore)
+target_compile_features(vgmtrans-namco-snes-tests PRIVATE cxx_std_20)
+add_test(NAME vgmtrans-namco-snes-tests COMMAND vgmtrans-namco-snes-tests)
 
 add_executable(vgmtrans-square-ps2-tests formats/SquarePS2ModuleTests.cpp)
 target_link_libraries(vgmtrans-square-ps2-tests PRIVATE vgmtransvalueformats vgmtransvaluecore ZLIB::ZLIB)

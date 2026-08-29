@@ -26,6 +26,7 @@
 #include "value/formats/KonamiTMNT2/KonamiTMNT2.h"
 #include "value/formats/KonamiSnes/KonamiSnes.h"
 #include "value/formats/MP2k/MP2k.h"
+#include "value/formats/NamcoSnes/NamcoSnes.h"
 #include "value/formats/NeverlandSnes/NeverlandSnes.h"
 #include "value/formats/NinSnes/NinSnes.h"
 #include "value/formats/HOSA/HOSA.h"
@@ -119,6 +120,7 @@ void registerValueFormats(core::Session& session, const ValueFormatOptions& opti
   session.registerFormat(konami_tmnt2::module());
   session.registerFormat(konami_snes::konamiSnesModule());
   session.registerFormat(mp2k::mp2kModule());
+  session.registerFormat(namco_snes::module());
   session.registerFormat(neverland_snes::module());
   session.registerFormat(nin_snes::module());
   session.registerFormat(hosa::module());
