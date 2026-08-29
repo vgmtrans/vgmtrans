@@ -38,7 +38,6 @@ struct SequenceLocation {
   u16 address;
   u16 reference;
   u8 referenceSize;
-  u8 songIndex;
 };
 
 [[nodiscard]] std::optional<SequenceLocation> inlineSong(ByteReader reader, u16 list, u8 group, u8 state) {
@@ -53,8 +52,7 @@ struct SequenceLocation {
   }
   return SequenceLocation{.address = start,
                           .reference = static_cast<u16>(row),
-                          .referenceSize = 3,
-                          .songIndex = song};
+                          .referenceSize = 3};
 }
 
 [[nodiscard]] std::optional<SequenceLocation> indirectSong(ByteReader reader, u16 block, u8 group, u8 state) {
@@ -74,8 +72,7 @@ struct SequenceLocation {
   }
   return SequenceLocation{.address = start,
                           .reference = static_cast<u16>(row),
-                          .referenceSize = 2,
-                          .songIndex = song};
+                          .referenceSize = 2};
 }
 
 [[nodiscard]] std::optional<SequenceLocation> selectSequence(ByteReader reader, Version version, u16 block) {
@@ -117,8 +114,7 @@ struct SequenceLocation {
       if (plausibleSequence(reader, start)) {
         return SequenceLocation{.address = start,
                                 .reference = static_cast<u16>(row),
-                                .referenceSize = 3,
-                                .songIndex = song};
+                                .referenceSize = 3};
       }
     }
   }
@@ -174,7 +170,6 @@ std::optional<Layout> findLayout(ByteReader reader) {
       .sequenceAddress = sequence->address,
       .sequenceReferenceAddress = sequence->reference,
       .sequenceReferenceSize = sequence->referenceSize,
-      .songIndex = sequence->songIndex,
       .dataPointerBlockAddress = block,
       .tuningTableAddress = tuning,
       .spcDirAddress = directory,

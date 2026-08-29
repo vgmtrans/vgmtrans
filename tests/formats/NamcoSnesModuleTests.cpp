@@ -68,7 +68,6 @@ public:
   }
 
   DriverFixture& sequence(std::initializer_list<u8> bytes, u16 address = 0x2000) {
-    sequenceAddress_ = address;
     write(address, bytes);
     selectSong(1, 3, address);
     return *this;
@@ -109,7 +108,6 @@ private:
   std::vector<u8> data_;
   Version version_;
   u16 block_ = 0;
-  u16 sequenceAddress_ = 0x2000;
 };
 
 Layout manualLayout(const DriverFixture& fixture) {
@@ -118,7 +116,6 @@ Layout manualLayout(const DriverFixture& fixture) {
       .sequenceAddress = 0x2000,
       .sequenceReferenceAddress = static_cast<u16>(fixture.block() + 11),
       .sequenceReferenceSize = 3,
-      .songIndex = 1,
       .dataPointerBlockAddress = fixture.block(),
       .tuningTableAddress = 0x11e0,
       .spcDirAddress = 0x1100,
@@ -140,7 +137,7 @@ void layoutsCoverAllAuditedDriverRelocations() {
     const auto layout = findLayout(ByteReader(SourceId{222}, fixture.data()));
     expect(layout && layout->version == version && layout->sequenceAddress == 0x2000 &&
                layout->dataPointerBlockAddress == fixture.block() && layout->tuningTableAddress == 0x11e0 &&
-               layout->spcDirAddress == 0x1100 && layout->songIndex == 1,
+               layout->spcDirAddress == 0x1100,
            "NamcoSnes layout detection should follow every audited relocation and live song slot");
   }
 }
