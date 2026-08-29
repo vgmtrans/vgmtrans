@@ -20,38 +20,51 @@ namespace vgmtrans::formats::ascii_shuichi_snes {
 
 using namespace core;
 
+double driverReleaseSeconds(u8 adsr2, u8 gain) {
+  const s16 releaseStart = static_cast<s16>(((adsr2 >> 5) << 8) | 0xff);
+  if ((gain > 0 && gain < 0x80) || gain >= 0xc0) {
+    // Direct nonzero and increasing GAIN modes never decay to silence.
+    return std::numeric_limits<double>::infinity();
+  }
+  return snesDspGainEnvelopeSeconds(gain, releaseStart, 0);
+}
+
+double driverTuningCents(s8 tuning) { return 1200.0 * std::log2(1.0 + tuning / 4096.0); }
+
+namespace {
+
 Envelope driverEnvelope(u8 adsr1, u8 adsr2, u8 gain) {
   Envelope envelope = snesDspEnvelope(adsr1, adsr2, gain);
   // Note expiry uses the patch's GAIN byte instead of KOF. The driver first
   // writes GAIN and then clears ADSR1's enable bit.
-  const s16 releaseStart = static_cast<s16>(((adsr2 >> 5) << 8) | 0xff);
-  if ((gain > 0 && gain < 0x80) || gain >= 0xc0) {
-    // Direct nonzero and increasing GAIN modes never decay to silence.
-    envelope.releaseSeconds = std::numeric_limits<double>::infinity();
-  } else {
-    envelope.releaseSeconds = snesDspGainEnvelopeSeconds(gain, releaseStart, 0);
-  }
+  envelope.releaseSeconds = driverReleaseSeconds(adsr2, gain);
   return envelope;
 }
 
-namespace {
+struct Patch {
+  u8 program;
+  u8 srcn;
+  u8 adsr1;
+  u8 adsr2;
+  u8 gain;
+  s8 tuning;
+  SourceRange source;
+  SourceRange tuningSource;
+};
 
 [[nodiscard]] std::vector<Patch> collectPatches(ByteReader reader, const Layout& layout,
                                                 const std::set<u8>& programs) {
   std::vector<Patch> patches;
-  const SnesSampleDirectory directory(reader, layout.spcDirAddress);
   for (const u8 program : programs) {
     // The loader performs two 8-bit ASLs, so programs 64..255 alias the same
     // 64 physical rows exactly as they do on the SPC700.
-    const u32 row = layout.instrumentTableAddress + static_cast<u8>(program * 4u);
+    const u32 row = instrumentRowAddress(layout, program);
     if (!reader.has(row, 4)) {
       continue;
     }
     const u8 srcn = reader.u8At(row);
-    const auto sample = directory.entry(srcn);
     const u32 tuning = layout.tuningTableAddress + srcn;
-    if (!sample || !sample->stream || (sample->stream->loops && !sample->loopAddressIsBlockAligned()) ||
-        !reader.has(tuning, 1)) {
+    if (!reader.has(tuning, 1)) {
       continue;
     }
     patches.push_back(Patch{
@@ -69,17 +82,9 @@ namespace {
 }
 
 [[nodiscard]] std::vector<u8> referencedSrcns(const std::vector<Patch>& patches) {
-  std::vector<u8> srcns;
-  srcns.reserve(patches.size());
-  for (const Patch& patch : patches) {
-    srcns.push_back(patch.srcn);
-  }
+  std::vector<u8> srcns(patches.size());
+  std::ranges::transform(patches, srcns.begin(), &Patch::srcn);
   return srcns;
-}
-
-[[nodiscard]] double unityKey(s8 tuning) {
-  const double ratio = 1.0 + tuning / 4096.0;
-  return 81.0 - 12.0 * std::log2(ratio);
 }
 
 }  // namespace
@@ -97,18 +102,16 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   }
 
   auto bank = builder.soundBank(fmt::format("{} Instruments", displayName));
-  auto& instruments = bank.instruments();
-  auto& samplePool = bank.localSamples();
-  const SnesBrrSampleRefs samples = addSnesBrrSamples(samplePool, reader, catalog);
+  const SnesBrrSampleRefs samples = addSnesBrrSamples(bank.localSamples(), reader, catalog);
 
   for (const Patch& patch : patches) {
     const auto sample = samples.findSrcn(patch.srcn);
     if (!sample) {
       continue;
     }
-    auto entry = instruments.append(Instrument{
+    auto entry = bank.instruments().append(Instrument{
         .explicitAddress = InstrumentAddress{.bank = 0, .program = patch.program},
-        .identity = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = patch.program},
+        .identity = InstrumentIdentity{.domain = kInstrumentDomain, .key = patch.program},
         .name = fmt::format("Instrument {} (SRCN {})", patch.program, patch.srcn),
         .range = patch.source,
     });
@@ -121,7 +124,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .region(*sample,
                 Region{
                     .range = patch.source,
-                    .unityKey = unityKey(patch.tuning),
+                    .unityKey = 81.0 - driverTuningCents(patch.tuning) / 100.0,
                     .envelope = driverEnvelope(patch.adsr1, patch.adsr2, patch.gain),
                 })
         .source("Region", patch.source, "ascii-shuichi-snes-region")

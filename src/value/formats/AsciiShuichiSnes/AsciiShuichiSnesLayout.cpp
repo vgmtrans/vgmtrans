@@ -90,12 +90,10 @@ std::optional<Layout> findLayout(ByteReader reader) {
   const u32 firIndex = version == Version::Early ? 0x1e : 0x22;
   return Layout{
       .version = version,
-      .noteBase = noteBase,
       .sequenceHeaderAddress = header,
       .instrumentTableAddress = instrumentTable,
       .tuningTableAddress = tuningTable,
       .spcDirAddress = spcDir,
-      .commandTableAddress = commandTable,
       .hasEchoFirCommand = reader.le16(commandTable + firIndex * 2u) != 0,
       .trackAddresses = *tracks,
   };
