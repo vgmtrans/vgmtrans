@@ -34,6 +34,11 @@ constexpr std::array<std::array<s8, 8>, 4> kFirPresets{{
     {{0x0c, 0x21, 0x2b, 0x2b, 0x13, -2, -0x0d, -7}},
     {{0x34, 0x33, 0, -0x27, -0x1b, 1, -4, -0x15}},
 }};
+constexpr u8 kRestKey = 7;
+constexpr u8 kInvalidNoteKey = 15;
+constexpr double kPitchComparisonTolerance = 0.000001;
+
+[[nodiscard]] constexpr bool isSilentKey(u8 key) { return key == kRestKey || key == kInvalidNoteKey; }
 
 namespace math {
 
@@ -82,6 +87,22 @@ namespace math {
 
 }  // namespace math
 
+[[nodiscard]] SequenceProgramConfig sequenceConfig(u8 timerTarget) {
+  return SequenceProgramConfig{
+      .commandKindPrefix = "graph-res-snes",
+      .timebase = Timebase{.ppqn = kPpqn},
+      .behavior = SequenceProgramBehavior{
+          .commandLimit = kCommandLimit,
+          .initialSourceInstrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0},
+          .initialLevel = math::gain(15),
+          .initialMasterLevel = math::gain(127),
+          .initialStereoBalance = StereoBalance{.leftGain = 1.0, .rightGain = 1.0},
+          .initialPitchBendRangeSemitones = 12,
+          .initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(timerTarget),
+      },
+  };
+}
+
 struct RuntimeConfig {
   RetainedSource source;
   Layout layout;
@@ -103,6 +124,13 @@ struct PitchEnvelopeState {
   u8 counter = 0;
 };
 
+struct EnvelopeSettings {
+  u8 adsr1 = kDefaultAdsr1;
+  u8 adsr2 = kDefaultAdsr2;
+
+  friend bool operator==(const EnvelopeSettings&, const EnvelopeSettings&) = default;
+};
+
 struct RepeatFrame {
   u8 remaining = 0;
   Address exit;
@@ -122,14 +150,12 @@ struct TrackState {
   u8 transpose = 0;
   u8 defaultLength = 0;
   u8 durationRate = 8;
-  u8 adsr1 = 0x8f;
-  u8 adsr2 = 0xe0;
-  u8 appliedAdsr1 = 0x8f;
-  u8 appliedAdsr2 = 0xe0;
+  EnvelopeSettings pendingEnvelope;
+  EnvelopeSettings appliedEnvelope;
   s16 pitchOffset = 0;
   bool noise = false;
   bool continuesPrevious = false;
-  u8 rawNote = 7;
+  u8 rawNote = kRestKey;
   u32 remaining = 0;
   u64 activeUntil = 0;
   PitchEnvelopeState pitchEnvelope;
@@ -277,7 +303,7 @@ struct Playback {
       return {};
     }
     return Pitch{
-        .key = 57.0 + 12.0 * std::log2(reference / 4096.0),
+        .key = kUnityKey + 12.0 * std::log2(reference / 4096.0),
         .bend = 12.0 * std::log2(physical / static_cast<double>(reference)),
     };
   }
@@ -285,14 +311,15 @@ struct Playback {
   // The game writes pitch every tick. Our output needs a new event only when
   // the audible pitch bend has actually changed.
   void emitPitch() {
-    if (track.noise || track.rawNote == 7 || track.rawNote == 15) {
+    if (track.noise || isSilentKey(track.rawNote)) {
       return;
     }
     const Pitch pitch = tonalPitch();
     if (pitch.key == 0.0) {
       return;
     }
-    if (!track.lastPitchBend || std::abs(*track.lastPitchBend - pitch.bend) > 0.000001) {
+    if (!track.lastPitchBend ||
+        std::abs(*track.lastPitchBend - pitch.bend) > kPitchComparisonTolerance) {
       out.pitchBend(pitch.bend);
       track.lastPitchBend = pitch.bend;
     }
@@ -301,10 +328,11 @@ struct Playback {
   // Fade progress is shared by the whole song, but this function is reached
   // once per track. Update the fade only once for each moment in the song.
   void tickGlobal() {
-    if (program.lastGlobalTick && *program.lastGlobalTick == vm.tick()) {
+    const u64 currentTick = vm.tick();
+    if (program.lastGlobalTick && *program.lastGlobalTick == currentTick) {
       return;
     }
-    program.lastGlobalTick = vm.tick();
+    program.lastGlobalTick = currentTick;
     const u16 next = static_cast<u16>(program.fadeAccumulator + (program.fadeRate << 4));
     if ((next & 0x8000) == 0 && next != program.fadeAccumulator) {
       const u8 oldInteger = static_cast<u8>(program.fadeAccumulator >> 8);
@@ -320,7 +348,7 @@ struct Playback {
   // forward and report any new bend. Rests and noise do not use this pattern.
   void tick() {
     tickGlobal();
-    if (track.remaining == 0 || --track.remaining == 0 || track.noise || track.rawNote == 7 || track.rawNote == 15) {
+    if (track.remaining == 0 || --track.remaining == 0 || track.noise || isSilentKey(track.rawNote)) {
       return;
     }
     advancePitchEnvelope();
@@ -332,12 +360,11 @@ struct Playback {
   // F7 saves a new volume shape but does not apply it right away. When the next
   // note is read, apply it to sounds already playing and to notes started later.
   void applyPendingEnvelope() {
-    if (track.appliedAdsr1 == track.adsr1 && track.appliedAdsr2 == track.adsr2) {
+    if (track.appliedEnvelope == track.pendingEnvelope) {
       return;
     }
-    track.appliedAdsr1 = track.adsr1;
-    track.appliedAdsr2 = track.adsr2;
-    out.replaceEnvelope(driverEnvelope(track.appliedAdsr1, track.appliedAdsr2),
+    track.appliedEnvelope = track.pendingEnvelope;
+    out.replaceEnvelope(driverEnvelope(track.appliedEnvelope.adsr1, track.appliedEnvelope.adsr2),
                         VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
 
@@ -351,7 +378,7 @@ struct Playback {
 
     applyPendingEnvelope();
 
-    if (key == 7 || key == 15) {
+    if (isSilentKey(key)) {
       track.lastNote = {};
       track.lastKey.reset();
       track.lastPitchBend.reset();
@@ -377,7 +404,8 @@ struct Playback {
           .restartsEnvelope = !continues,
           .restartsLfoPhase = !continues,
       };
-      if (continues && track.lastKey && std::abs(*track.lastKey - noteKey) < 0.000001) {
+      if (continues && track.lastKey &&
+          std::abs(*track.lastKey - noteKey) < kPitchComparisonTolerance) {
         event.extendsPrevious = true;
         track.lastNote = out.note(std::move(event));
       } else if (continues) {
@@ -430,8 +458,7 @@ struct Playback {
   void noiseToggle() { track.noise = !track.noise; }
 
   void adsr(u8 adsr2, u8 adsr1) {
-    track.adsr1 = adsr1;
-    track.adsr2 = adsr2;
+    track.pendingEnvelope = EnvelopeSettings{.adsr1 = adsr1, .adsr2 = adsr2};
   }
 
   void instrument(u8 value) {
@@ -484,16 +511,15 @@ struct Playback {
     }
     switch (reg & 0x0f) {
       case 5:
-        track.appliedAdsr1 = value;
-        out.replaceEnvelope(driverEnvelope(value, track.appliedAdsr2), VoiceEnvelopeScope::ActiveVoices);
+        track.appliedEnvelope.adsr1 = value;
+        out.replaceEnvelope(driverEnvelope(value, track.appliedEnvelope.adsr2), VoiceEnvelopeScope::ActiveVoices);
         break;
       case 6:
-        track.appliedAdsr2 = value;
-        out.replaceEnvelope(driverEnvelope(track.appliedAdsr1, value), VoiceEnvelopeScope::ActiveVoices);
+        track.appliedEnvelope.adsr2 = value;
+        out.replaceEnvelope(driverEnvelope(track.appliedEnvelope.adsr1, value), VoiceEnvelopeScope::ActiveVoices);
         break;
       case 7:
-        track.appliedAdsr1 = 0;
-        track.appliedAdsr2 = 0;
+        track.appliedEnvelope = EnvelopeSettings{.adsr1 = 0, .adsr2 = 0};
         out.replaceEnvelope(snesDspEnvelope(0, 0, value), VoiceEnvelopeScope::ActiveVoices);
         break;
       default:
@@ -563,14 +589,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 // Jump commands store a signed distance from the command itself, not a full
 // address. Addresses wrap around at the end of the sound processor's memory.
-[[nodiscard]] Address relativeAddress(u32 begin, u16 offset) {
-  return Address{static_cast<u16>(begin + offset)};
-}
-
 [[nodiscard]] Address relativeTarget(Cursor::Event& event, u32 begin, SemanticOperandRole role) {
   const auto encoded = event.rawU16le("relative_destination", SourceValueDisplay::SignedDecimal);
-  return event.resolved("destination", encoded, [begin](u16 value) { return relativeAddress(begin, value); },
-                        SourceValueDisplay::Address, role);
+  return event.resolved(
+      "destination", encoded,
+      [begin](u16 offset) { return Address{static_cast<u16>(begin + offset)}; }, SourceValueDisplay::Address, role);
 }
 
 // Read one command and describe what it does. FE appears after a note, but it
@@ -585,8 +608,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   const u8 opcode = cursor.opcode();
   if (opcode < 0x80) {
     const u8 key = opcode & 0x0f;
-    auto event = cursor.command(key == 7 ? "Rest" : (key == 15 ? "Invalid Note" : "Note"),
-                                key == 7 ? SequenceSemantic::Rest : SequenceSemantic::Note);
+    auto event = cursor.command(key == kRestKey ? "Rest" : (key == kInvalidNoteKey ? "Invalid Note" : "Note"),
+                                key == kRestKey ? SequenceSemantic::Rest : SequenceSemantic::Note);
     event.opcodeValue("key", key, SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
     const bool hasLength = (opcode & 0x10) != 0;
     const u8 length = hasLength ? event.u8("length", SemanticOperandRole::Duration) : 0;
@@ -720,23 +743,6 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
 }  // namespace
 
-const SequenceProgramConfig& sequenceConfig() {
-  static const SequenceProgramConfig config{
-      .commandKindPrefix = "graph-res-snes",
-      .timebase = Timebase{.ppqn = kPpqn},
-      .behavior = SequenceProgramBehavior{
-          .commandLimit = kCommandLimit,
-          .initialSourceInstrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0},
-          .initialLevel = math::gain(15),
-          .initialMasterLevel = math::gain(127),
-          .initialStereoBalance = StereoBalance{.leftGain = 1.0, .rightGain = 1.0},
-          .initialPitchBendRangeSemitones = 12,
-          .initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(0x85),
-      },
-  };
-  return config;
-}
-
 TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, u32 trackNumber, u32 startAddress,
                                std::set<u8>* programs, std::vector<Diagnostic>* diagnostics) {
   const TrackDecodeScope tracks{.reader = reader, .maxCommands = kCommandLimit};
@@ -751,8 +757,7 @@ SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetI
   const ByteReader reader = source.reader();
   const SourceRange header = reader.range(layout.sequenceHeaderAddress, kTrackCount * 3u);
   std::set<u8> programs{0};
-  SequenceProgramConfig config = sequenceConfig();
-  config.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(layout.timerTarget);
+  const SequenceProgramConfig config = sequenceConfig(layout.timerTarget);
   SequenceDecodeSession sequence{reader, config, sequenceId, header, sourceMap, kCommandLimit, kAramSize};
   for (const TrackHeader& track : layout.tracks) {
     sequence.addTrack(
