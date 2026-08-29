@@ -33,6 +33,10 @@ void expect(bool condition, const std::string& message) {
   }
 }
 
+bool near(double actual, double expected) {
+  return std::abs(actual - expected) < 0.000001;
+}
+
 void le16(std::vector<u8>& bytes, size_t offset, u16 value) {
   bytes[offset] = static_cast<u8>(value);
   bytes[offset + 1] = static_cast<u8>(value >> 8);
@@ -68,6 +72,11 @@ std::vector<u8> sqFixture(bool includeSong = true, bool repeatSong = false, u8 s
       0,    0x90, 60,   0xe4,  // velocity 100 and omitted next zero delta
       0xe0, 0x7f, 0x7f,        // maximum positive pitch wheel
       10,   0x80, 60,          // note off
+      0,    0xe0, 0,    64,    // center pitch wheel
+      0,    0x90, 84,   100,   // note in the upper bend-range split
+      0,    0xe0, 0x7f, 0x7f,  // maximum positive pitch wheel
+      0,    0xe0, 0,    0,     // maximum negative pitch wheel
+      10,   0x80, 84,          // note off
       0,    0xff, 0x2f, 0,     // end
   };
   const std::vector<u8> compressed{
@@ -278,6 +287,23 @@ size_t countEvents(const PerformanceSequence& performance) {
   return result;
 }
 
+template <class Event, class Predicate>
+const Event* findEvent(const PerformanceSequence& performance, Predicate predicate) {
+  for (const auto& track : performance.tracks) {
+    for (const auto& event : track.events) {
+      if (const auto* typed = std::get_if<Event>(&event); typed != nullptr && predicate(*typed)) {
+        return typed;
+      }
+    }
+  }
+  return nullptr;
+}
+
+template <class Event>
+const Event* findEvent(const PerformanceSequence& performance) {
+  return findEvent<Event>(performance, [](const Event&) { return true; });
+}
+
 const Collection* firstCollection(const SessionSnapshot& snapshot) {
   const auto found = std::ranges::find_if(snapshot.collections(), [](const Collection& collection) {
     return collection.members.sequence && !collection.members.soundBanks.empty() &&
@@ -293,14 +319,18 @@ SourceFile archiveMember(std::string name) {
   return source;
 }
 
-void syntheticFeatures() {
+SessionSnapshot scanFixture(std::vector<u8> sq) {
   Session session;
   session.registerFormat(module());
-  session.addSource(archiveMember("music.sq"), sqFixture(false));
+  session.addSource(archiveMember("music.sq"), std::move(sq));
   session.addSource(archiveMember("music.hd"), hdFixture());
   session.addSource(archiveMember("music.bd"), bdFixture());
   session.scanPendingSources();
-  const auto snapshot = session.snapshot();
+  return session.snapshot();
+}
+
+void syntheticFeatures() {
+  const auto snapshot = scanFixture(sqFixture(false));
   expect(std::ranges::none_of(snapshot.diagnostics(),
                               [](const Diagnostic& diagnostic) { return diagnostic.severity == Severity::Error; }),
          "synthetic SonyPS2 scan should not report errors");
@@ -313,8 +343,8 @@ void syntheticFeatures() {
     expect(candidateRender.performance.has_value(), "every synthetic SonyPS2 sequence should render");
     allSequenceNotes += countEvents<NotePerformanceEvent>(*candidateRender.performance);
   }
-  expect(allSequenceNotes == 2,
-         "plain and compressed MIDI should each render one note; got " + std::to_string(allSequenceNotes));
+  expect(allSequenceNotes == 3,
+         "plain and compressed MIDI should render all three notes; got " + std::to_string(allSequenceNotes));
   const Collection* collection = firstCollection(snapshot);
   expect(collection != nullptr, "same-stem SQ/HD/BD should resolve into a collection");
   const auto bound = bindCollection(snapshot, collection->id);
@@ -326,7 +356,7 @@ void syntheticFeatures() {
          "sample-set limits and both split layers should retain their exact velocity zones; got " +
              std::to_string(bank.instruments[0].regions.size()));
   const auto& region = bank.instruments[0].regions.front();
-  expect(region.sample.valid() && std::abs(region.unityKey - 69.0) < 0.001,
+  expect(region.sample.valid() && near(region.unityKey, 69.0),
          "Vagi rate and all three tuning layers should determine unity key");
   expect(region.modulation.vibrato && region.modulation.tremolo,
          "program pitch and amplitude LFOs should survive as physical modulation");
@@ -337,83 +367,44 @@ void syntheticFeatures() {
   expect(bound.collection->samplePools().front()->pool.samples.front().loop.enabled,
          "PSX ADPCM loop flags should survive HD/BD binding");
   expect(bank.instruments[1].identity && bank.instruments[1].identity->domain == kSetbInstrumentDomain &&
-             bank.instruments[1].regions.size() == 127 &&
-             std::abs(bank.instruments[1].regions.front().unityKey - 73.5) < 0.001,
+             bank.instruments[1].regions.size() == 127 && near(bank.instruments[1].regions.front().unityKey, 73.5),
          "Setb note-addressed timbres should retain velocity curves, tuning, and their distinct identity domain");
 
   const auto rendered = renderCollection(*bound.collection, SequenceRenderOptions{});
-  expect(rendered.performance && countEvents<NotePerformanceEvent>(*rendered.performance) == 1,
-         "compact zero-delta note-on/off should render one note");
-  expect(std::ranges::any_of(rendered.performance->tracks,
-                             [](const PerformanceTrack& track) {
-                               return std::ranges::any_of(track.events, [](const PerformanceEvent& event) {
-                                 const auto* note = std::get_if<NotePerformanceEvent>(&event);
-                                 return note != nullptr &&
-                                        std::abs(note->linearVelocity - (100.0 / 127.0) * (100.0 / 127.0)) < 0.000001;
-                               });
-                             }),
+  expect(rendered.performance && countEvents<NotePerformanceEvent>(*rendered.performance) == 2,
+         "compact zero-delta note-on/off should render both plain MIDI notes");
+  const auto* note = findEvent<NotePerformanceEvent>(*rendered.performance);
+  expect(note != nullptr && near(note->linearVelocity, (100.0 / 127.0) * (100.0 / 127.0)),
          "note velocity should preserve the source MIDI value used to select velocity regions");
-  expect(std::ranges::any_of(rendered.performance->tracks,
-                             [](const PerformanceTrack& track) {
-                               return std::ranges::any_of(track.events, [](const PerformanceEvent& event) {
-                                 const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
-                                 return bend != nullptr && std::abs(bend->semitones - 383.0 / 128.0) < 0.000001 &&
-                                        !bend->normalizedWheelPosition;
-                               });
-                             }),
-         "pitch wheel should use the active split's driver-quantized range, not the program maximum");
-  expect(countEvents<ModulationPerformanceEvent>(*rendered.performance) >= 2,
-         "CC1 and CC2 should emit bank-aware physical modulation");
-  expect(std::ranges::any_of(rendered.performance->tracks,
-                             [](const PerformanceTrack& track) {
-                               return std::ranges::any_of(track.events, [](const PerformanceEvent& event) {
-                                 const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
-                                 return modulation != nullptr &&
-                                        modulation->target == ModulationPerformanceTarget::VibratoDepth &&
-                                        std::abs(modulation->amount - 64.0 / 127.0) < 0.000001 &&
-                                        modulation->pitchDepthSemitones &&
-                                        std::abs(*modulation->pitchDepthSemitones - 1.0) < 0.000001;
-                               });
-                             }),
+  const auto hasPhysicalBend = [&](double semitones) {
+    return findEvent<PitchBendPerformanceEvent>(*rendered.performance, [&](const auto& event) {
+             return near(event.semitones, semitones) && !event.normalizedWheelPosition;
+           }) != nullptr;
+  };
+  expect(hasPhysicalBend(383.0 / 128.0) && hasPhysicalBend(767.0 / 128.0) && hasPhysicalBend(-6.0),
+         "pitch wheel should switch between each active split's signed, driver-quantized range");
+  const auto* vibrato = findEvent<ModulationPerformanceEvent>(*rendered.performance, [](const auto& event) {
+    return event.target == ModulationPerformanceTarget::VibratoDepth;
+  });
+  expect(vibrato != nullptr && near(vibrato->amount, 64.0 / 127.0) && vibrato->pitchDepthSemitones &&
+             near(*vibrato->pitchDepthSemitones, 1.0),
          "CC1 should retain both its raw controller amount and modhsyn's 0..128-scaled physical depth");
-  expect(std::ranges::any_of(rendered.performance->tracks,
-                             [](const PerformanceTrack& track) {
-                               return std::ranges::any_of(track.events, [](const PerformanceEvent& event) {
-                                 const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
-                                 return modulation != nullptr &&
-                                        modulation->target == ModulationPerformanceTarget::TremoloDepth &&
-                                        std::abs(modulation->amount - 64.0 / 127.0) < 0.000001 &&
-                                        modulation->volumeDepthLinearGain &&
-                                        std::abs(*modulation->volumeDepthLinearGain - 0.25) < 0.000001;
-                               });
-                             }),
+  const auto* tremolo = findEvent<ModulationPerformanceEvent>(*rendered.performance, [](const auto& event) {
+    return event.target == ModulationPerformanceTarget::TremoloDepth;
+  });
+  expect(tremolo != nullptr && near(tremolo->amount, 64.0 / 127.0) && tremolo->volumeDepthLinearGain &&
+             near(*tremolo->volumeDepthLinearGain, 0.25),
          "CC2 should retain both its raw controller amount and modhsyn's 0..128-scaled physical depth");
-  expect(std::ranges::any_of(rendered.performance->tracks,
-                             [](const PerformanceTrack& track) {
-                               return std::ranges::any_of(track.events, [](const PerformanceEvent& event) {
-                                 const auto* level = std::get_if<LevelPerformanceEvent>(&event);
-                                 return level != nullptr && std::abs(level->linearGain - 64.0 / 127.0) < 0.000001;
-                               });
-                             }),
-         "CC7 should retain the driver's linear channel-volume gain");
-  expect(std::ranges::any_of(rendered.performance->tracks,
-                             [](const PerformanceTrack& track) {
-                               return std::ranges::any_of(track.events, [](const PerformanceEvent& event) {
-                                 const auto* expression = std::get_if<ExpressionPerformanceEvent>(&event);
-                                 return expression != nullptr &&
-                                        std::abs(expression->linearGain - 96.0 / 127.0) < 0.000001;
-                               });
-                             }),
-         "CC11 should retain the driver's linear expression gain");
+  const auto* level = findEvent<LevelPerformanceEvent>(
+      *rendered.performance, [](const auto& event) { return near(event.linearGain, 64.0 / 127.0); });
+  expect(level != nullptr, "CC7 should retain the driver's linear channel-volume gain");
+  const auto* expression = findEvent<ExpressionPerformanceEvent>(
+      *rendered.performance, [](const auto& event) { return near(event.linearGain, 96.0 / 127.0); });
+  expect(expression != nullptr, "CC11 should retain the driver's linear expression gain");
   expect(countEvents<PortamentoControlPerformanceEvent>(*rendered.performance) == 1,
          "CC84 should retain the driver's portamento source key");
-  expect(std::ranges::any_of(rendered.performance->tracks,
-                             [](const PerformanceTrack& track) {
-                               return std::ranges::any_of(track.events, [](const PerformanceEvent& event) {
-                                 const auto* marker = std::get_if<MarkerPerformanceEvent>(&event);
-                                 return marker != nullptr && marker->text == "SonyPS2 mark callback 2356";
-                               });
-                             }),
+  const auto* marker = findEvent<MarkerPerformanceEvent>(*rendered.performance);
+  expect(marker != nullptr && marker->text == "SonyPS2 mark callback 2356",
          "14-bit mark callbacks should combine CC6 and CC38 before emitting a marker");
 
   const std::vector<u8> seBytes{
@@ -434,13 +425,7 @@ void syntheticFeatures() {
 }
 
 void trivialSongCollapsesToSelectedMidi() {
-  Session session;
-  session.registerFormat(module());
-  session.addSource(archiveMember("music.sq"), sqFixture());
-  session.addSource(archiveMember("music.hd"), hdFixture());
-  session.addSource(archiveMember("music.bd"), bdFixture());
-  session.scanPendingSources();
-  const auto snapshot = session.snapshot();
+  const auto snapshot = scanFixture(sqFixture());
   expect(snapshot.collections().size() == 1 && snapshot.collections().front().name == "music MIDI 1",
          "a play-one-MIDI-and-end Song table should select its MIDI instead of publishing a duplicate sequence");
   const auto bound = bindCollection(snapshot, snapshot.collections().front().id);
@@ -450,13 +435,16 @@ void trivialSongCollapsesToSelectedMidi() {
   expect(rendered.performance && countEvents<NotePerformanceEvent>(*rendered.performance) == 1,
          "the MIDI selected by a trivial Song wrapper should remain playable");
 
-  Session stateful;
-  stateful.registerFormat(module());
-  stateful.addSource(archiveMember("music.sq"), sqFixture(true, false, 30));
-  stateful.addSource(archiveMember("music.hd"), hdFixture());
-  stateful.addSource(archiveMember("music.bd"), bdFixture());
-  stateful.scanPendingSources();
-  const auto statefulSnapshot = stateful.snapshot();
+  auto staleSizes = sqFixture();
+  constexpr u32 staleBytes = 0x400;
+  le32(staleSizes, 0x1c, static_cast<u32>(staleSizes.size()) + staleBytes);
+  le32(staleSizes, 0x20, static_cast<u32>(staleSizes.size()) - 32 + staleBytes);
+  le32(staleSizes, 0x38, static_cast<u32>(staleSizes.size()) - 32 - 0x30 + staleBytes);
+  const auto staleSnapshot = scanFixture(std::move(staleSizes));
+  expect(staleSnapshot.collections().size() == 2,
+         "a shipped SQ with stale oversized length fields should retain its playable MIDI blocks");
+
+  const auto statefulSnapshot = scanFixture(sqFixture(true, false, 30));
   expect(statefulSnapshot.collections().size() == 1 && statefulSnapshot.collections().front().name == "music Song 0",
          "a Song volume prefix should retain its wrapper while suppressing the private MIDI section");
   const auto statefulBinding = bindCollection(statefulSnapshot, statefulSnapshot.collections().front().id);
@@ -465,24 +453,13 @@ void trivialSongCollapsesToSelectedMidi() {
   expect(statefulRender.performance && countEvents<NotePerformanceEvent>(*statefulRender.performance) == 1 &&
              countEvents<MasterLevelPerformanceEvent>(*statefulRender.performance) == 1,
          "a Song volume prefix should remain playable as song-wide gain");
-  expect(std::ranges::any_of(statefulRender.performance->tracks,
-                             [](const PerformanceTrack& track) {
-                               return std::ranges::any_of(track.events, [](const PerformanceEvent& event) {
-                                 const auto* level = std::get_if<MasterLevelPerformanceEvent>(&event);
-                                 return level != nullptr && std::abs(level->linearGain - 98.0 / 128.0) < 0.000001;
-                               });
-                             }),
+  const auto* masterLevel = findEvent<MasterLevelPerformanceEvent>(*statefulRender.performance);
+  expect(masterLevel != nullptr && near(masterLevel->linearGain, 98.0 / 128.0),
          "Song Volume - should use the driver's 0..128 linear master scale");
 }
 
 void repeatingSongRemainsPlaylist() {
-  Session session;
-  session.registerFormat(module());
-  session.addSource(archiveMember("music.sq"), sqFixture(true, true));
-  session.addSource(archiveMember("music.hd"), hdFixture());
-  session.addSource(archiveMember("music.bd"), bdFixture());
-  session.scanPendingSources();
-  const auto snapshot = session.snapshot();
+  const auto snapshot = scanFixture(sqFixture(true, true));
   expect(snapshot.collections().size() == 1 && snapshot.collections().front().name == "music Song 0",
          "a repeating Song table should remain the sole public sequence instead of exposing its MIDI sections");
   const auto bound = bindCollection(snapshot, snapshot.collections().front().id);
@@ -555,6 +532,16 @@ void realArchive(const std::filesystem::path& path) {
       sonyCollections.push_back(&collection);
     }
   }
+  if (sonyCollections.size() != 1) {
+    std::cerr << "archive diagnostic: " << snapshot.sources().size() << " sources, " << snapshot.assets().size()
+              << " assets, " << snapshot.collections().size() << " collections\n";
+    for (const auto& source : snapshot.sources()) {
+      std::cerr << "source: " << source.name << '\n';
+    }
+    for (const auto& diagnostic : snapshot.diagnostics()) {
+      std::cerr << "scan: " << diagnostic.message << '\n';
+    }
+  }
   expect(sonyCollections.size() == 1, "a SonyPS2 archive should expose one selected Song or MIDI sequence");
   const bool g01Opening = path.filename() == "11 Tekken Tag Tournament - OPENING MOVIE.psf2";
   if (g01Opening) {
@@ -574,7 +561,7 @@ void realArchive(const std::filesystem::path& path) {
     const auto bendAt = [&](u64 tick, double semitones) {
       return std::ranges::any_of(track2->events, [&](const PerformanceEvent& event) {
         const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
-        return bend != nullptr && bend->header.tick == tick && std::abs(bend->semitones - semitones) < 0.000001 &&
+        return bend != nullptr && bend->header.tick == tick && near(bend->semitones, semitones) &&
                !bend->normalizedWheelPosition;
       });
     };
