@@ -139,16 +139,35 @@ u32 PerformanceTempoMap::durationTicksForMilliseconds(u64 startTick, double mill
   if (!(milliseconds > 0.0) || !std::isfinite(milliseconds)) {
     return 0;
   }
-  const double targetSeconds = milliseconds / 1000.0;
-  double elapsedSeconds = 0.0;
-  for (u32 ticks = 0; ticks < std::numeric_limits<u32>::max(); ++ticks) {
-    const double nextSeconds = elapsedSeconds + tickSeconds(startTick + ticks);
-    if (nextSeconds >= targetSeconds) {
-      return targetSeconds - elapsedSeconds <= nextSeconds - targetSeconds ? ticks : ticks + 1;
+  const double ppqn = std::max<u16>(timebase_.ppqn, 1);
+  double remainingMicroseconds = milliseconds * 1000.0;
+  u32 tempo = initialTempoMicrosecondsPerQuarter_;
+  u64 cursor = startTick;
+  u64 elapsedTicks = 0;
+
+  for (const auto& change : changes_) {
+    if (change.tick <= startTick) {
+      tempo = change.microsecondsPerQuarter;
+      continue;
     }
-    elapsedSeconds = nextSeconds;
+    const u64 segmentTicks = change.tick - cursor;
+    const double segmentMicroseconds = static_cast<double>(segmentTicks) * tempo / ppqn;
+    if (remainingMicroseconds <= segmentMicroseconds) {
+      break;
+    }
+    remainingMicroseconds -= segmentMicroseconds;
+    elapsedTicks += segmentTicks;
+    if (elapsedTicks >= std::numeric_limits<u32>::max()) {
+      return std::numeric_limits<u32>::max();
+    }
+    cursor = change.tick;
+    tempo = change.microsecondsPerQuarter;
   }
-  return std::numeric_limits<u32>::max();
+
+  const double exactTailTicks = remainingMicroseconds * ppqn / std::max<u32>(tempo, 1);
+  const auto wholeTailTicks = static_cast<u64>(exactTailTicks);
+  elapsedTicks += wholeTailTicks + (exactTailTicks - wholeTailTicks > 0.5 ? 1 : 0);
+  return static_cast<u32>(std::min<u64>(elapsedTicks, std::numeric_limits<u32>::max()));
 }
 
 bool PerformanceTempoMap::contains(const TempoPerformanceEvent& event) const {

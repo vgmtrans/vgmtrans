@@ -309,6 +309,10 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2kModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2kSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2kSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/MoriSnes/MoriSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/MoriSnes/MoriSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/MoriSnes/MoriSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/MoriSnes/MoriSnesSynth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NamcoSnes/NamcoSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NamcoSnes/NamcoSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NamcoSnes/NamcoSnesSequence.cpp
@@ -413,6 +417,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcade.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2k.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/MoriSnes/MoriSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NamcoSnes/NamcoSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NeverlandSnes/NeverlandSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnes.h
