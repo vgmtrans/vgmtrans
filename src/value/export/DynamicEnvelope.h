@@ -6,24 +6,16 @@
 
 #pragma once
 
-#include "value/sequence/PerformanceModel.h"
-#include "value/synth/SynthModel.h"
-
-#include <span>
-#include <vector>
+#include "value/export/InstrumentVariants.h"
 
 namespace vgmtrans::core {
 
-struct DynamicEnvelopeMaterialization {
-  // Export-only performance whose fresh attacks select the generated variants
-  // they need.
-  PerformanceSequence performance;
-  std::vector<Diagnostic> diagnostics;
-};
+using DynamicEnvelopeMaterialization = InstrumentVariantMaterialization;
 
-// Appends only the instrument variants used by fresh note attacks. The returned
-// performance is export-only; the input performance remains unchanged.
-[[nodiscard]] DynamicEnvelopeMaterialization materializeDynamicEnvelopes(const PerformanceSequence& performance,
-                                                                         std::span<SoundBankAsset> soundBanks);
+// Compatibility entry point for callers that only materialize dynamic ADSR.
+[[nodiscard]] inline DynamicEnvelopeMaterialization materializeDynamicEnvelopes(const PerformanceSequence& performance,
+                                                                                std::span<SoundBankAsset> soundBanks) {
+  return materializeInstrumentVariants(performance, soundBanks, InstrumentVariantOptions{.dynamicEnvelopes = true});
+}
 
 }  // namespace vgmtrans::core

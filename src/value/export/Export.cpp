@@ -415,7 +415,7 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
       .dynamicEnvelopes = request.dynamicEnvelopes,
       .sampleFiltering = request.sampleFiltering,
   };
-  workspace.render(exportRequest.sequence, exportRequest.dynamicEnvelopes);
+  workspace.render(exportRequest.sequence, exportRequest.dynamicEnvelopes, /*materializeSignedStereo=*/true);
   const auto instruments = workspace.soundBankView();
   auto loweredMidi = renderMidi(workspace.rendering, instruments, exportRequest.sequence.midi,
                                 exportRequest.modulationConversion, workspace.performance());
@@ -463,7 +463,8 @@ std::vector<Artifact> exportCollectionImpl(const SessionSnapshot& snapshot, cons
   const bool needsRendering = exportsMidi || (exportsSynth && (bound.hasSequence() || synthRequiresPerformance));
 
   if (needsRendering) {
-    workspace.render(request.sequence, request.dynamicEnvelopes);
+    workspace.render(request.sequence, request.dynamicEnvelopes,
+                     /*materializeSignedStereo=*/exportsMidi && exportsSynth);
   }
   const auto& rendering = workspace.rendering;
   const PerformanceSequence* preparedPerformance = workspace.performance();

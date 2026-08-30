@@ -8,6 +8,7 @@
 #include "../MidiTestSupport.h"
 
 #include "value/export/DynamicEnvelope.h"
+#include "value/export/InstrumentVariants.h"
 
 namespace {
 
@@ -48,17 +49,17 @@ InstrumentAddress selectedAddressForNote(const PerformanceSequence& performance,
       return *noteEvent->instrumentAddress;
     }
   }
-  throw std::runtime_error("Dynamic-envelope test note instrument was not found");
+  throw std::runtime_error("Test note instrument was not found");
 }
 
-size_t selectedInstrumentForNote(const DynamicEnvelopeMaterialization& materialized, PerformanceNoteId note,
+size_t selectedInstrumentForNote(const InstrumentVariantMaterialization& materialized, PerformanceNoteId note,
                                  const SoundBankAsset& soundBank) {
   const InstrumentAddress address = selectedAddressForNote(materialized.performance, note);
   const auto instrument = std::ranges::find_if(soundBank.instruments, [&](const Instrument& candidate) {
     return resolveInstrumentAddress(candidate.explicitAddress, candidate.identity) == address;
   });
   if (instrument == soundBank.instruments.end()) {
-    throw std::runtime_error("Dynamic-envelope test instrument was not found");
+    throw std::runtime_error("Test instrument was not found");
   }
   return static_cast<size_t>(std::distance(soundBank.instruments.begin(), instrument));
 }
@@ -384,12 +385,120 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments() {
          "used-only synth export should retain the exact generated variant selected by the lowered performance");
 }
 
+void signedStereoMaterializationUsesAttackTimeVariants() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "signed-stereo.pcm"}, std::vector<u8>{0x00, 0x80, 0xe8, 0x03});
+  Instrument instrument = testInstrument(0, {});
+  instrument.regions[0].sample = SampleRef::resolved(AssetId{10}, 0);
+  std::vector<SoundBankAsset> sets{SoundBankAsset{
+      .metadata = AssetMetadata{.id = AssetId{10}},
+      .instruments = {std::move(instrument)},
+      .localSamples = SamplePool{.samples = {Sample{
+                                     .codec = AudioCodec::PcmS16,
+                                     .encodedData = SourceRange{.source = source, .size = 4},
+                                     .sampleRate = 32000,
+                                 }}},
+  }};
+  auto performance = sequenceWithEvents({
+      StereoBalancePerformanceEvent{
+          .header = eventHeader(0, 0),
+          .leftGain = -1.0,
+          .rightGain = 1.0,
+      },
+      ChannelPanPerformanceEvent{
+          .header = eventHeader(0, 1),
+          .position = 0.25,
+      },
+      EnvelopePerformanceEvent{
+          .header = eventHeader(0, 2),
+          .update = EnvelopeUpdate::set(Envelope{.attackSeconds = 0.25}, EnvelopeFields::Attack),
+      },
+      NotePerformanceEvent{
+          .header = eventHeader(0, 3),
+          .key = 60,
+          .durationTicks = 10,
+          .note = PerformanceNoteId{1},
+      },
+      ChannelPanPerformanceEvent{
+          .header = eventHeader(4, 4),
+          .position = 0.75,
+      },
+      StereoBalancePerformanceEvent{
+          .header = eventHeader(5, 5),
+          .leftGain = 1.0,
+          .rightGain = 1.0,
+      },
+  });
+
+  const auto materialized = materializeInstrumentVariants(
+      performance, sets, InstrumentVariantOptions{.dynamicEnvelopes = true, .signedStereo = true});
+  expect(sets[0].instruments.size() == 2, "attack-time state should create one combined instrument variant");
+  expect(std::ranges::none_of(materialized.performance.tracks[0].events,
+                              [](const PerformanceEvent& event) {
+                                return std::holds_alternative<StereoBalancePerformanceEvent>(event) ||
+                                       std::holds_alternative<ChannelPanPerformanceEvent>(event);
+                              }),
+         "materialized stereo state should not also be emitted as channel-wide MIDI pan");
+  expect(std::ranges::count_if(
+             materialized.diagnostics,
+             [](const Diagnostic& diagnostic) { return diagnostic.code == "signed-stereo-active-voice"; }) == 2,
+         "phase and pan changes during a sounding note should each report the attack-time limitation");
+
+  const size_t inverted = selectedInstrumentForNote(materialized, PerformanceNoteId{1}, sets[0]);
+  const auto& invertedRegions = sets[0].instruments[inverted].regions;
+  expect(invertedRegions.size() == 2 && invertedRegions[0].pan == 0.0 && invertedRegions[1].pan == 1.0 &&
+             invertedRegions[0].invertSamplePhase && !invertedRegions[1].invertSamplePhase &&
+             invertedRegions[0].envelope.attackSeconds == 0.25 &&
+             invertedRegions[0].attenuationDb < invertedRegions[1].attenuationDb,
+         "the combined variant should retain its envelope and bake signed pan into two hard-panned layers");
+
+  std::vector<const SoundBankAsset*> views{&sets[0]};
+  const auto prepared = prepareSynthData(
+      SynthExportInput{
+          .soundBanks = views,
+          .sequenceUsage = &materialized.performance,
+      },
+      sources);
+  const auto phaseInverted = std::ranges::find_if(
+      prepared.samples, [](const DecodedSynthSample& sample) { return sample.name.ends_with(" [inverted]"); });
+  expect(prepared.samples.size() == 2 && phaseInverted != prepared.samples.end() &&
+             phaseInverted->decoded.pcm == std::vector<s16>{32767, -1000},
+         "shared synth preparation should create one saturated phase-inverted PCM copy");
+}
+
+void signedStereoMaterializationLeavesOrdinaryTracksAlone() {
+  std::vector<SoundBankAsset> sets{SoundBankAsset{
+      .instruments = {testInstrument(0, {})},
+  }};
+  const auto performance = sequenceWithEvents({
+      ChannelPanPerformanceEvent{
+          .header = eventHeader(0, 0),
+          .position = 0.25,
+      },
+      NotePerformanceEvent{
+          .header = eventHeader(0, 1),
+          .key = 60,
+          .durationTicks = 4,
+          .note = PerformanceNoteId{1},
+      },
+  });
+
+  const auto materialized =
+      materializeInstrumentVariants(performance, sets, InstrumentVariantOptions{.signedStereo = true});
+  expect(sets[0].instruments.size() == 1 &&
+             std::holds_alternative<ChannelPanPerformanceEvent>(materialized.performance.tracks[0].events[0]) &&
+             !std::get<NotePerformanceEvent>(materialized.performance.tracks[0].events[1]).instrumentAddress,
+         "ordinary panned tracks should not create variants or alter their MIDI events");
+}
+
 }  // namespace
 
-void runValueDynamicEnvelopeTests() {
+void runValueInstrumentVariantTests() {
   dynamicEnvelopeMaterializationIsIncrementalAndDeduplicated();
   dynamicEnvelopeInstrumentSelectionControlsOverrideCarry();
   dynamicEnvelopeActiveVoiceLimitationIsExplicit();
   dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero();
   dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments();
+  signedStereoMaterializationUsesAttackTimeVariants();
+  signedStereoMaterializationLeavesOrdinaryTracksAlone();
 }
