@@ -34,9 +34,6 @@ inline constexpr std::string_view kTriAcePs1CommandKindPrefix = "triace-ps1:sequ
 
 struct TriAcePs1TrackLayout {
   u8 slot = 0;
-  u32 recordOffset = 0;
-  u16 unknown1 = 0;
-  u16 unknown2 = 0;
   u32 playlistOffset = 0;
   u32 playlistLength = 0;
   std::vector<u32> patternAddresses;

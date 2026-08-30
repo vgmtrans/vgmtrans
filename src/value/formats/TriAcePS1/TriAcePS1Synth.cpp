@@ -108,16 +108,14 @@ std::optional<ScanSoundBankDraft> addTriAcePs1Bank(ScanResultBuilder& result, co
   const ByteReader reader = result.reader();
   auto parsed = readInstruments(reader, layout, &result.diagnostics());
   std::set<u32> offsets;
-  u8 maximumLevel = 0;
   for (const auto& instrument : parsed) {
     for (const auto& region : instrument.regions) {
       if (region.sampleOffset < layout.sampleSectionSize) {
         offsets.insert(region.sampleOffset);
       }
-      maximumLevel = std::max(maximumLevel, region.level);
     }
   }
-  if (offsets.empty() || maximumLevel == 0) {
+  if (offsets.empty()) {
     return std::nullopt;
   }
 
@@ -131,6 +129,18 @@ std::optional<ScanSoundBankDraft> addTriAcePs1Bank(ScanResultBuilder& result, co
     }
   }
   if (streams.empty()) {
+    return std::nullopt;
+  }
+
+  u8 maximumLevel = 0;
+  for (const auto& instrument : parsed) {
+    for (const auto& region : instrument.regions) {
+      if (streams.contains(region.sampleOffset)) {
+        maximumLevel = std::max(maximumLevel, region.level);
+      }
+    }
+  }
+  if (maximumLevel == 0) {
     return std::nullopt;
   }
 
