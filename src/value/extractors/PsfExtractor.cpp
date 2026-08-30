@@ -126,6 +126,15 @@ struct Psf2Member {
   std::vector<u8> bytes;
 };
 
+using Psf2Filesystem = std::map<std::string, Psf2Member>;
+
+[[nodiscard]] std::string psf2PathKey(std::string path) {
+  std::ranges::transform(path, path.begin(), [](unsigned char ch) {
+    return ch == '\\' ? '/' : static_cast<char>(std::tolower(ch));
+  });
+  return path;
+}
+
 [[nodiscard]] std::string psf2Name(std::span<const u8> bytes, size_t offset) {
   if (offset > bytes.size() || bytes.size() - offset < 36) {
     throw std::runtime_error("PSF2 directory entry is truncated");
@@ -140,7 +149,7 @@ struct Psf2Member {
 }
 
 void unpackPsf2Directory(std::span<const u8> bytes, size_t tableOffset, u32 count, std::string_view prefix,
-                         std::vector<Psf2Member>& members, int depth = 0) {
+                         Psf2Filesystem& filesystem, int depth = 0) {
   constexpr size_t kEntrySize = 48;
   constexpr u32 kMaxEntries = 65536;
   if (depth >= kMaxRecursion || count > kMaxEntries || tableOffset > bytes.size() ||
@@ -158,11 +167,11 @@ void unpackPsf2Directory(std::span<const u8> bytes, size_t tableOffset, u32 coun
 
     if (fileSize == 0 && blockSize == 0) {
       if (offset == 0) {
-        members.push_back(Psf2Member{.path = path});
+        filesystem.insert_or_assign(psf2PathKey(path), Psf2Member{.path = path});
         continue;
       }
       const u32 childCount = le32(bytes, offset);
-      unpackPsf2Directory(bytes, static_cast<size_t>(offset) + 4, childCount, path, members, depth + 1);
+      unpackPsf2Directory(bytes, static_cast<size_t>(offset) + 4, childCount, path, filesystem, depth + 1);
       continue;
     }
     if (blockSize == 0) {
@@ -193,34 +202,19 @@ void unpackPsf2Directory(std::span<const u8> bytes, size_t tableOffset, u32 coun
       output.insert(output.end(), decoded.begin(), decoded.end());
       compressedOffset += compressedSize;
     }
-    members.push_back(Psf2Member{.path = path, .bytes = std::move(output)});
+    filesystem.insert_or_assign(psf2PathKey(path), Psf2Member{.path = path, .bytes = std::move(output)});
   }
 }
 
-[[nodiscard]] std::vector<Psf2Member> unpackPsf2(std::span<const u8> bytes) {
-  std::vector<Psf2Member> members;
-  unpackPsf2Directory(bytes, 4, le32(bytes, 0), {}, members);
-  return members;
+[[nodiscard]] Psf2Filesystem unpackPsf2(std::span<const u8> bytes) {
+  Psf2Filesystem filesystem;
+  unpackPsf2Directory(bytes, 4, le32(bytes, 0), {}, filesystem);
+  return filesystem;
 }
 
-[[nodiscard]] std::string psf2PathKey(std::string path) {
-  std::ranges::transform(path, path.begin(), [](unsigned char ch) {
-    return ch == '\\' ? '/' : static_cast<char>(std::tolower(ch));
-  });
-  return path;
-}
-
-void overlayPsf2(std::vector<Psf2Member>& filesystem, std::vector<Psf2Member> overlay) {
-  for (auto& member : overlay) {
-    const std::string key = psf2PathKey(member.path);
-    const auto existing = std::ranges::find_if(filesystem, [&](const Psf2Member& candidate) {
-      return psf2PathKey(candidate.path) == key;
-    });
-    if (existing == filesystem.end()) {
-      filesystem.push_back(std::move(member));
-    } else {
-      *existing = std::move(member);
-    }
+void overlayPsf2(Psf2Filesystem& filesystem, Psf2Filesystem overlay) {
+  for (auto& [path, member] : overlay) {
+    filesystem.insert_or_assign(path, std::move(member));
   }
 }
 
@@ -398,7 +392,7 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
                   std::vector<Diagnostic>& diagnostics, SourceRange range, int depth = 0);
 
 void loadPsf2WithLibs(const PsfData& psf, const std::filesystem::path& basePath,
-                      std::vector<Psf2Member>& filesystem, std::vector<Diagnostic>& diagnostics, SourceRange range,
+                      Psf2Filesystem& filesystem, std::vector<Diagnostic>& diagnostics, SourceRange range,
                       int depth = 0);
 
 template <class Load>
@@ -432,7 +426,7 @@ void loadNumberedLibraries(const PsfData& psf, Load&& load) {
 }
 
 void loadPsf2WithLibs(const PsfData& psf, const std::filesystem::path& basePath,
-                      std::vector<Psf2Member>& filesystem, std::vector<Diagnostic>& diagnostics, SourceRange range,
+                      Psf2Filesystem& filesystem, std::vector<Diagnostic>& diagnostics, SourceRange range,
                       int depth) {
   if (depth >= kMaxRecursion) {
     diagnostics.push_back(warning("PSF2 library recursion limit was reached", range));
@@ -540,23 +534,18 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
   const auto psf = parsePsf(bytes);
 
   if (psf.version == kPsf2Version) {
-    std::vector<Psf2Member> members;
+    Psf2Filesystem filesystem;
     const std::filesystem::path basePath =
         input.source.path.empty() ? std::filesystem::path{} : input.source.path.parent_path();
-    loadPsf2WithLibs(psf, basePath, members, result.diagnostics, range);
+    loadPsf2WithLibs(psf, basePath, filesystem, result.diagnostics, range);
     std::optional<std::string> ini;
-    const auto iniMember = std::ranges::find_if(members, [](const Psf2Member& member) {
-      std::string path = member.path;
-      std::ranges::transform(path, path.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
-      return path == "psf2.ini";
-    });
-    if (iniMember != members.end() && iniMember->bytes.size() <= 65536) {
-      ini = iniMember->bytes.empty()
-                ? std::string{}
-                : std::string(reinterpret_cast<const char*>(iniMember->bytes.data()), iniMember->bytes.size());
+    const auto iniMember = filesystem.find("psf2.ini");
+    if (iniMember != filesystem.end() && iniMember->second.bytes.size() <= 65536) {
+      const auto& iniBytes = iniMember->second.bytes;
+      ini.emplace(iniBytes.begin(), iniBytes.end());
     }
-    result.sources.reserve(members.size());
-    for (auto member : members) {
+    result.sources.reserve(filesystem.size());
+    for (auto& [_, member] : filesystem) {
       SourceFile file{
           .name = std::filesystem::path(member.path).filename().string(),
           .path = input.source.path,
