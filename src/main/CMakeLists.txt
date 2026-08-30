@@ -317,6 +317,7 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesProfile.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/OhoriAkaPS1/OhoriAkaPS1Bytecode.h
     ${PROJECT_SOURCE_DIR}/src/value/formats/OhoriAkaPS1/OhoriAkaPS1Layout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/OhoriAkaPS1/OhoriAkaPS1Module.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/OhoriAkaPS1/OhoriAkaPS1Sequence.cpp
