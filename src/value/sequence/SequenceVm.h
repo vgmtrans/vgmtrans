@@ -147,8 +147,6 @@ public:
   void tremoloDelayPhysical(u32 delayTicks, double milliseconds);
   void portamentoEnable(PortamentoEnablePerformanceEvent event);
   void portamentoEnable(bool enabled);
-  void portamentoControl(PortamentoControlPerformanceEvent event);
-  void portamentoControl(double previousKey);
   void pitchTransitionSettings(PitchTransitionSettingsPerformanceEvent event);
   void pitchTransitionSettings(double timeMilliseconds);
   void legatoPedal(LegatoPedalPerformanceEvent event);

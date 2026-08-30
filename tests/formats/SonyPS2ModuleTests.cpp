@@ -476,24 +476,35 @@ void syntheticFeatures() {
   expect(expression != nullptr, "CC11 should retain the driver's linear expression gain");
   const auto* pan = findEvent<ChannelPanPerformanceEvent>(*rendered.performance);
   expect(pan != nullptr && near(pan->position, 0.5), "CC10 should remain additive to each voice's intrinsic pan");
+  const auto& automations = rendered.performance->tracks.front().automations;
+  const auto* portamento =
+      automations.size() == 1 ? std::get_if<PitchTransitionIntent>(&automations.front().intent) : nullptr;
+  expect(portamento != nullptr && near(portamento->startKey, 60.0) && near(portamento->targetKey, 84.0) &&
+             portamento->timing.timelineTicks == 480 &&
+             near(std::get<FixedDurationPitchSlideTiming>(portamento->timing.physical).milliseconds, 500.0) &&
+             portamento->portamentoRendering.useCurrentTiming,
+         "SonyPS2 note-off should define the next note's physical portamento transition; CC84 is inert");
   const MidiSequence midi = renderMidiSequence(*rendered.performance);
   const auto midiNote = std::ranges::find_if(midi.tracks.front().events, [](const MidiEvent& event) {
     return std::holds_alternative<NoteDuration>(event.payload);
   });
   expect(midiNote != midi.tracks.front().events.end() && std::get<NoteDuration>(midiNote->payload).velocity == 112,
          "Sony velocity 100 should lower to an equivalent MIDI amplitude");
-  const auto hasController = [&](MidiController controller, u16 value) {
-    return std::ranges::any_of(midi.tracks.front().events, [&](const MidiEvent& event) {
+  const auto hasController = [&](const MidiSequence& sequence, MidiController controller, u16 value) {
+    return std::ranges::any_of(sequence.tracks.front().events, [&](const MidiEvent& event) {
       const auto* message = std::get_if<MidiChannelMessage>(&event.payload);
       return message != nullptr && message->kind == MidiChannelMessageKind::ControlChange &&
              message->parameter == static_cast<u8>(controller) && message->value == value;
     });
   };
-  expect(hasController(MidiController::Pan, 64) && hasController(MidiController::Expression, 110),
+  expect(hasController(midi, MidiController::Pan, 64) && hasController(midi, MidiController::Expression, 110),
          "SonyPS2 MIDI should lower CC10 directly without clipping the independent CC11 flow");
-  const auto* portamentoSource = findEvent<PortamentoControlPerformanceEvent>(*rendered.performance);
-  expect(portamentoSource != nullptr && near(portamentoSource->previousKey, 60.0),
-         "note-off should provide the next SonyPS2 portamento source; CC84 is inert in the shipped driver");
+  expect(hasController(midi, MidiController::PortamentoControl, 60),
+         "native MIDI lowering should retain SonyPS2's derived portamento source key");
+  const MidiSequence bendMidi = renderMidiSequence(
+      *rendered.performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::PitchBend});
+  expect(!hasController(bendMidi, MidiController::PortamentoControl, 60),
+         "pitch-bend lowering should not leak MIDI portamento controls from SonyPS2 interpretation");
   const auto* marker = findEvent<MarkerPerformanceEvent>(*rendered.performance);
   expect(marker != nullptr && marker->text == "SonyPS2 mark callback 2356" &&
              countEvents<MarkerPerformanceEvent>(*rendered.performance) == 1,
