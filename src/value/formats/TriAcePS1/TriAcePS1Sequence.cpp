@@ -71,21 +71,27 @@ struct NoteEncoding {
   bool velocityImplied = false;
 };
 
+struct RepeatTarget {
+  Address command;
+  u32 patternIndex = 0;
+};
+
 struct TrackAnalysis {
   std::map<u32, NoteEncoding> notes;
-  std::map<u32, Address> repeatEnds;
+  std::map<u32, RepeatTarget> repeatEnds;
 };
 
 [[nodiscard]] TrackAnalysis analyzeTrack(ByteReader reader, const TriAcePs1SequenceLayout& sequence,
                                          const TriAcePs1TrackLayout& track) {
   TrackAnalysis analysis;
   const u32 end = sequence.offset + sequence.length;
-  for (const u32 pattern : track.patternAddresses) {
+  std::optional<RepeatTarget> repeatStart;
+  for (u32 patternIndex = 0; patternIndex < track.patternAddresses.size(); ++patternIndex) {
+    const u32 pattern = track.patternAddresses[patternIndex];
     // Pattern end writes mode 4 in both retail drivers, making duration and
     // velocity explicit again before the next playlist entry is selected.
     u8 impliedDuration = 0;
     u8 impliedVelocity = 0;
-    std::optional<Address> repeatStart;
     for (u32 offset = pattern; offset < end;) {
       const u8 opcode = reader.u8At(offset);
       if (opcode < 0x80) {
@@ -118,7 +124,7 @@ struct TrackAnalysis {
         break;
       }
       if (opcode == 0x8d) {
-        repeatStart = Address{offset + size};
+        repeatStart = RepeatTarget{.command = Address{offset + size}, .patternIndex = patternIndex};
       } else if (opcode == 0x8e && repeatStart) {
         analysis.repeatEnds.try_emplace(offset, *repeatStart);
       } else if (opcode == 0x9e) {
@@ -339,7 +345,16 @@ struct Playback {
     return vm.end();
   }
 
-  Effects repeatEnd(u8 count, Address destination) { return vm.countedRepeatUntil(0, totalPlays(count), destination); }
+  Effects repeatEnd(u8 count, Address destination, u32 patternIndex) {
+    // The byte counter produces 256 hardware plays for zero; both games use
+    // that as a practical song loop, so leave its duration to VM loop policy.
+    Effects effects = count == 0 ? vm.declaredLoop(destination) : vm.countedRepeatUntil(0, count, destination);
+
+    if (effects.flowOverride) {
+      track.patternIndex = patternIndex;
+    }
+    return effects;
+  }
 
   void tempoModifier(s8 modifier) {
     const double scale = modifier < 0 ? 1.0 + modifier / 128.0 : 1.0 + modifier / 64.0;
@@ -552,9 +567,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         return event.ignore();
       }
       event.derived("decoded_total_plays", totalPlays(count));
-      event.derived("destination", found->second, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-      event.mayBranchTo(found->second);
-      return event.invokeFlow<&Playback::repeatEnd>(count, found->second);
+      event.derived("destination", found->second.command, SourceValueDisplay::Address,
+                    SemanticOperandRole::RepeatTarget);
+      event.derived("playlist_index", found->second.patternIndex);
+      event.mayBranchTo(found->second.command);
+      return event.invokeFlow<&Playback::repeatEnd>(count, found->second.command, found->second.patternIndex);
     }
     case 0x8f: {
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
