@@ -23,20 +23,16 @@ constexpr u32 kBankHeaderSize = 12;
 constexpr u32 kInstrumentHeaderSize = 8;
 constexpr u32 kRegionSize = 20;
 
-[[nodiscard]] bool rangeValid(ByteReader reader, u64 offset, u64 size) {
-  return offset <= reader.size() && size <= reader.size() - offset;
-}
-
 }  // namespace
 
 std::optional<TriAcePs1SequenceLayout> readTriAcePs1SequenceLayout(ByteReader reader, u32 offset) {
-  if (!rangeValid(reader, offset, kSequenceHeaderSize) || reader.le16(offset) != 0xffff) {
+  if (!reader.has(offset, kSequenceHeaderSize) || reader.le16(offset) != 0xffff) {
     return std::nullopt;
   }
 
   const u32 length = static_cast<u32>(reader.le16(offset + 2)) + 2;
   const u8 tempo = reader.u8At(offset + 0x0f);
-  if (length < kSequenceHeaderSize || !rangeValid(reader, offset, length) || tempo == 0 || tempo > 240) {
+  if (length < kSequenceHeaderSize || !reader.has(offset, length) || tempo == 0 || tempo > 240) {
     return std::nullopt;
   }
 
@@ -103,13 +99,13 @@ std::vector<TriAcePs1SequenceLayout> findTriAcePs1Sequences(ByteReader reader) {
 }
 
 std::optional<TriAcePs1BankLayout> readTriAcePs1BankLayout(ByteReader reader, u32 offset) {
-  if (!rangeValid(reader, offset, kBankHeaderSize)) {
+  if (!reader.has(offset, kBankHeaderSize)) {
     return std::nullopt;
   }
   const u32 length = reader.le32(offset);
   const u16 instrumentSize = reader.le16(offset + 4);
-  if (instrumentSize < kBankHeaderSize + 4 || instrumentSize >= length || !rangeValid(reader, offset, length) ||
-      !rangeValid(reader, offset + instrumentSize, 16)) {
+  if (instrumentSize < kBankHeaderSize + 4 || instrumentSize >= length || !reader.has(offset, length) ||
+      !reader.has(offset + instrumentSize, 16)) {
     return std::nullopt;
   }
   for (u32 i = 0; i < 16; ++i) {
@@ -125,7 +121,7 @@ std::optional<TriAcePs1BankLayout> readTriAcePs1BankLayout(ByteReader reader, u3
   const u32 terminator = offset + instrumentSize - 4;
   u32 instruments = 0;
   while (cursor < terminator) {
-    if (!rangeValid(reader, cursor, kInstrumentHeaderSize)) {
+    if (!reader.has(cursor, kInstrumentHeaderSize)) {
       return std::nullopt;
     }
     const u8 regions = reader.u8At(cursor + 7);

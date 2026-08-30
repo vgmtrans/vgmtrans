@@ -44,7 +44,10 @@ struct ParsedRegion {
 };
 
 struct ParsedInstrument {
-  TriAcePs1Instrument identity;
+  u8 program = 0;
+  u8 bank = 0;
+  u16 adsr1 = 0;
+  u16 adsr2 = 0;
   SourceRecord source;
   std::vector<ParsedRegion> regions;
 };
@@ -58,13 +61,10 @@ struct ParsedInstrument {
     const u32 recordSize = kInstrumentHeaderSize + static_cast<u32>(count) * kRegionSize;
     RecordReader header(reader, cursor, cursor + kInstrumentHeaderSize, diagnostics);
     ParsedInstrument instrument{
-        .identity =
-            TriAcePs1Instrument{
-                .program = *header.u8At(0, "program", SourceValueDisplay::Hex),
-                .bank = *header.u8At(1, "bank", SourceValueDisplay::Hex),
-                .adsr1 = *header.u16leAt(2, "adsr1", SourceValueDisplay::Hex),
-                .adsr2 = *header.u16leAt(4, "adsr2", SourceValueDisplay::Hex),
-            },
+        .program = *header.u8At(0, "program", SourceValueDisplay::Hex),
+        .bank = *header.u8At(1, "bank", SourceValueDisplay::Hex),
+        .adsr1 = *header.u16leAt(2, "adsr1", SourceValueDisplay::Hex),
+        .adsr2 = *header.u16leAt(4, "adsr2", SourceValueDisplay::Hex),
     };
     static_cast<void>(header.u8At(6, "unknown_06", SourceValueDisplay::Hex));
     static_cast<void>(header.u8At(7, "region_count"));
@@ -104,7 +104,7 @@ struct ParsedInstrument {
 
 }  // namespace
 
-std::optional<TriAcePs1ScannedBank> addTriAcePs1Bank(ScanResultBuilder& result, const TriAcePs1BankLayout& layout) {
+std::optional<ScanSoundBankDraft> addTriAcePs1Bank(ScanResultBuilder& result, const TriAcePs1BankLayout& layout) {
   const ByteReader reader = result.reader();
   auto parsed = readInstruments(reader, layout, &result.diagnostics());
   std::set<u32> offsets;
@@ -178,16 +178,16 @@ std::optional<TriAcePs1ScannedBank> addTriAcePs1Bank(ScanResultBuilder& result, 
     sampleRefs.emplace(offset, entry.ref());
   }
 
-  for (auto& source : parsed) {
-    const u16 encoded = static_cast<u16>((source.identity.bank << 8) | source.identity.program);
+  for (const auto& source : parsed) {
+    const u16 encoded = static_cast<u16>((source.bank << 8) | source.program);
     auto instrument = instruments.append(Instrument{
         .explicitAddress =
             InstrumentAddress{
                 .bank = static_cast<u32>(encoded >> 7),
                 .program = static_cast<u32>(encoded & 0x7f),
             },
-        .identity = triAcePs1InstrumentIdentity(source.identity.bank, source.identity.program),
-        .name = fmt::format("Instrument {:02X}:{:02X}", source.identity.bank, source.identity.program),
+        .identity = triAcePs1InstrumentIdentity(source.bank, source.program),
+        .name = fmt::format("Instrument {:02X}:{:02X}", source.bank, source.program),
         .range = reader.range(source.source.range.offset,
                               kInstrumentHeaderSize + static_cast<u32>(source.regions.size()) * kRegionSize),
     });
@@ -203,7 +203,7 @@ std::optional<TriAcePs1ScannedBank> addTriAcePs1Bank(ScanResultBuilder& result, 
           .velocityRange = sourceRegion.velocities,
           .range = sourceRegion.source.range,
           .unityKey = kDriverUnityKey - sourceRegion.semitone - sourceRegion.fine / 64.0,
-          .envelope = psxSpuEnvelope(source.identity.adsr1, source.identity.adsr2),
+          .envelope = psxSpuEnvelope(source.adsr1, source.adsr2),
           // The driver multiplies this byte directly. Normalize the loudest
           // region in a bank so values above 0x7f retain their intended boost.
           .attenuationDb = linearAmplitudeToAttenuationDb(sourceRegion.level / static_cast<double>(maximumLevel)),
@@ -225,7 +225,7 @@ std::optional<TriAcePs1ScannedBank> addTriAcePs1Bank(ScanResultBuilder& result, 
     }
   }
 
-  return TriAcePs1ScannedBank{.bank = bank};
+  return bank;
 }
 
 }  // namespace vgmtrans::formats::triace_ps1

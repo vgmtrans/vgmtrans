@@ -72,7 +72,7 @@ struct NoteEncoding {
 };
 
 struct RepeatTarget {
-  Address command;
+  Address destination;
   u32 patternIndex = 0;
 };
 
@@ -124,7 +124,7 @@ struct TrackAnalysis {
         break;
       }
       if (opcode == 0x8d) {
-        repeatStart = RepeatTarget{.command = Address{offset + size}, .patternIndex = patternIndex};
+        repeatStart = RepeatTarget{.destination = Address{offset + size}, .patternIndex = patternIndex};
       } else if (opcode == 0x8e && repeatStart) {
         analysis.repeatEnds.try_emplace(offset, *repeatStart);
       } else if (opcode == 0x9e) {
@@ -202,8 +202,6 @@ struct TrackState {
   u8 vibratoRate = 0;
   bool automaticVibrato = false;
   bool randomPitch = false;
-  bool invertLeft = false;
-  bool invertRight = false;
   bool sustainDown = false;
   Harmony harmony;
   std::vector<ActiveVoice> activeVoices;
@@ -322,7 +320,7 @@ struct Playback {
     if (track.harmony.enabled) {
       const s8 harmonyRandom = track.randomPitch ? program.randomFineTune() : 0;
       const double harmonyKey = key + track.harmony.transpose + (track.harmony.fine + harmonyRandom) / 64.0;
-      out.at(vm.tick() + track.harmony.delay)
+      out.at(tick + track.harmony.delay)
           .note(NotePerformanceEvent{
               .key = harmonyKey,
               .linearVelocity = linearController(velocity) * linearController(track.harmony.volume),
@@ -333,8 +331,6 @@ struct Playback {
     }
     return Effects::wait(delta);
   }
-
-  Effects rest(u8 delta) { return Effects::wait(delta); }
 
   Effects patternEnd() {
     ++track.patternIndex;
@@ -418,9 +414,9 @@ struct Playback {
   }
 
   void voicePhase(u8 mode) {
-    track.invertLeft = mode == 1 || mode == 3;
-    track.invertRight = mode == 2 || mode == 3;
-    out.stereoBalance(track.invertLeft ? -1.0 : 1.0, track.invertRight ? -1.0 : 1.0);
+    const bool invertLeft = mode == 1 || mode == 3;
+    const bool invertRight = mode == 2 || mode == 3;
+    out.stereoBalance(invertLeft ? -1.0 : 1.0, invertRight ? -1.0 : 1.0);
   }
 
   void automaticVibratoEnabled(bool enabled) {
@@ -567,15 +563,15 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         return event.ignore();
       }
       event.derived("decoded_total_plays", totalPlays(count));
-      event.derived("destination", found->second.command, SourceValueDisplay::Address,
+      event.derived("destination", found->second.destination, SourceValueDisplay::Address,
                     SemanticOperandRole::RepeatTarget);
       event.derived("playlist_index", found->second.patternIndex);
-      event.mayBranchTo(found->second.command);
-      return event.invokeFlow<&Playback::repeatEnd>(count, found->second.command, found->second.patternIndex);
+      event.mayBranchTo(found->second.destination);
+      return event.invokeFlow<&Playback::repeatEnd>(count, found->second.destination, found->second.patternIndex);
     }
     case 0x8f: {
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
-      return event.invoke<&Playback::rest>(event.u8("delta", SemanticOperandRole::Duration));
+      return event.wait(event.u8("delta", SemanticOperandRole::Duration));
     }
     case 0x90: {
       auto event = cursor.command("Reverb Send", SequenceSemantic::State);

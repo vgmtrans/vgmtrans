@@ -62,25 +62,14 @@ struct TriAcePs1BankLayout {
   u32 sampleSectionSize = 0;
 };
 
-struct TriAcePs1Instrument {
-  u8 bank = 0;
-  u8 program = 0;
-  u16 adsr1 = 0;
-  u16 adsr2 = 0;
-};
-
-struct TriAcePs1ScannedBank {
-  core::ScanSoundBankDraft bank;
-};
-
 [[nodiscard]] std::optional<TriAcePs1SequenceLayout> readTriAcePs1SequenceLayout(core::ByteReader reader, u32 offset);
 [[nodiscard]] std::vector<TriAcePs1SequenceLayout> findTriAcePs1Sequences(core::ByteReader reader);
 [[nodiscard]] std::optional<TriAcePs1BankLayout> readTriAcePs1BankLayout(core::ByteReader reader, u32 offset);
 [[nodiscard]] std::vector<TriAcePs1BankLayout> findTriAcePs1Banks(core::ByteReader reader, u32 begin = 0,
                                                                   std::optional<u32> length = std::nullopt);
 
-[[nodiscard]] std::optional<TriAcePs1ScannedBank> addTriAcePs1Bank(core::ScanResultBuilder& result,
-                                                                   const TriAcePs1BankLayout& layout);
+[[nodiscard]] std::optional<core::ScanSoundBankDraft> addTriAcePs1Bank(core::ScanResultBuilder& result,
+                                                                       const TriAcePs1BankLayout& layout);
 [[nodiscard]] core::SequenceProgram parseTriAcePs1Sequence(core::ByteReader reader, core::AssetId id,
                                                            const TriAcePs1SequenceLayout& layout,
                                                            core::SourceMapBuilder* sourceMap = nullptr,
