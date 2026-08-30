@@ -38,9 +38,7 @@ struct Psf2Selection {
 
 [[nodiscard]] std::string normalizedPath(std::string_view value) {
   std::string result(value);
-  std::ranges::transform(result, result.begin(), [](unsigned char ch) {
-    return static_cast<char>(std::tolower(ch));
-  });
+  std::ranges::transform(result, result.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
   std::ranges::replace(result, '\\', '/');
   if (const auto device = result.find(':'); device != std::string::npos) {
     result.erase(0, device + 1);
@@ -66,7 +64,8 @@ struct Psf2Selection {
   }
   const std::string actualPath = normalizedPath(*member);
   const std::string selectedPath = normalizedPath(selected);
-  return selectedPath.find('/') == std::string::npos ? baseName(actualPath) == selectedPath : actualPath == selectedPath;
+  return selectedPath.find('/') == std::string::npos ? baseName(actualPath) == selectedPath
+                                                     : actualPath == selectedPath;
 }
 
 [[nodiscard]] std::vector<std::string> commandWords(std::string_view line) {
@@ -80,8 +79,8 @@ struct Psf2Selection {
     }
     const char quote = line[cursor] == '\'' || line[cursor] == '"' ? line[cursor++] : '\0';
     const size_t begin = cursor;
-    while (cursor < line.size() && (quote != '\0' ? line[cursor] != quote
-                                                   : !std::isspace(static_cast<unsigned char>(line[cursor])))) {
+    while (cursor < line.size() &&
+           (quote != '\0' ? line[cursor] != quote : !std::isspace(static_cast<unsigned char>(line[cursor])))) {
       ++cursor;
     }
     words.emplace_back(line.substr(begin, cursor - begin));
@@ -90,6 +89,49 @@ struct Psf2Selection {
     }
   }
   return words;
+}
+
+void applySqOption(Psf2Selection& selection, std::string_view word) {
+  if (word.size() < 4 || word.front() != '-' || word[2] != '=') {
+    return;
+  }
+  const char option = static_cast<char>(std::tolower(static_cast<unsigned char>(word[1])));
+  const std::string_view value = word.substr(3);
+  switch (option) {
+    case 's':
+      selection.sequence = value;
+      return;
+    case 'h':
+      selection.header = value;
+      return;
+    case 'b':
+      selection.body = value;
+      return;
+    default:
+      break;
+  }
+
+  u32 number = 0;
+  const auto [position, error] = std::from_chars(value.data(), value.data() + value.size(), number);
+  if (error != std::errc{} || position != value.data() + value.size()) {
+    return;
+  }
+  switch (option) {
+    case 'd':
+      selection.reverbDepth = number;
+      break;
+    case 'n':
+      selection.midi = number;
+      break;
+    case 'r':
+      selection.reverbType = number;
+      break;
+    case 'v':
+      selection.volume = number;
+      break;
+    default:
+      break;
+  }
 }
 
 [[nodiscard]] std::optional<Psf2Selection> psf2Selection(const SourceFile& source) {
@@ -103,32 +145,7 @@ struct Psf2Selection {
     if (!words.empty() && baseName(normalizedPath(words.front())) == "sq.irx") {
       Psf2Selection selection;
       for (const auto& word : words | std::views::drop(1)) {
-        if (word.size() < 4 || word.front() != '-' || word[2] != '=') {
-          continue;
-        }
-        const char option = static_cast<char>(std::tolower(static_cast<unsigned char>(word[1])));
-        const std::string_view value(word.data() + 3, word.size() - 3);
-        if (option == 's') {
-          selection.sequence = value;
-        } else if (option == 'h') {
-          selection.header = value;
-        } else if (option == 'b') {
-          selection.body = value;
-        } else if (option == 'd' || option == 'n' || option == 'r' || option == 'v') {
-          u32 number = 0;
-          const auto [position, error] = std::from_chars(value.data(), value.data() + value.size(), number);
-          if (error == std::errc{} && position == value.data() + value.size()) {
-            if (option == 'd') {
-              selection.reverbDepth = number;
-            } else if (option == 'n') {
-              selection.midi = number;
-            } else if (option == 'r') {
-              selection.reverbType = number;
-            } else {
-              selection.volume = number;
-            }
-          }
-        }
+        applySqOption(selection, word);
       }
       return selection;
     }
@@ -196,6 +213,126 @@ struct Psf2Selection {
   return banks;
 }
 
+void publishMidiBlock(ScanResultBuilder& result, const MidiBlockLayout& block, u32 initialVolume = 128) {
+  const ByteReader reader = result.reader();
+  auto sequence = result.sequence(fmt::format("{} MIDI {}", result.sourceDisplayName(), block.index),
+                                  reader.range(block.offset, block.dataEnd - block.offset));
+  auto program = parseMidiSequence(reader, sequence.id(), block, &result.sourceMap(), &result.diagnostics());
+  if (initialVolume != 128) {
+    program.behavior.initialMasterLevel = std::min(initialVolume, 128u) / 128.0;
+  }
+  sequence.data(SequenceData{}).program(std::move(program));
+}
+
+[[nodiscard]] u32 songEntryEnd(const SparseChunkLayout& songs, u32 offset) {
+  u32 end = songs.offset + songs.size;
+  for (const auto candidate : songs.entries) {
+    if (candidate && *candidate > offset) {
+      end = std::min(end, *candidate);
+    }
+  }
+  return end;
+}
+
+void publishSongs(ScanResultBuilder& result, const SequenceLayout& layout, const SparseChunkLayout& songs) {
+  struct PlayableSong {
+    u32 index;
+    u32 offset;
+    u32 end;
+  };
+
+  std::vector<bool> publishMidi(layout.midiBlocks.size(), false);
+  std::vector<PlayableSong> playableSongs;
+  bool foundPlayableSong = false;
+  const ByteReader reader = result.reader();
+  for (u32 song = 0; song < songs.entries.size(); ++song) {
+    const auto entry = songs.entries[song];
+    if (!entry) {
+      continue;
+    }
+    const u32 end = songEntryEnd(songs, *entry);
+    if (auto program = parseSongSequence(reader, AssetId{}, layout, *entry, end, nullptr, nullptr)) {
+      foundPlayableSong = true;
+      if (const auto midi = trivialSongMidi(*program, layout)) {
+        publishMidi[*midi] = true;
+      } else {
+        playableSongs.push_back(PlayableSong{.index = song, .offset = *entry, .end = end});
+      }
+      continue;
+    }
+
+    const auto name = fmt::format("{} Song {} table", result.sourceDisplayName(), song);
+    const auto range = reader.range(*entry, end - *entry);
+    auto misc = result.misc(name, range);
+    misc.payload({});
+    result.sourceMap().table(name, range).kind("sony-ps2-song-table").owner(ObjectRefs::misc(misc.id()));
+  }
+  if (!foundPlayableSong) {
+    std::fill(publishMidi.begin(), publishMidi.end(), true);
+  }
+  for (u32 midi = 0; midi < publishMidi.size(); ++midi) {
+    if (publishMidi[midi]) {
+      publishMidiBlock(result, layout.midiBlocks[midi]);
+    }
+  }
+  for (const auto& song : playableSongs) {
+    auto sequence = result.sequence(fmt::format("{} Song {}", result.sourceDisplayName(), song.index),
+                                    reader.range(song.offset, song.end - song.offset));
+    auto program = parseSongSequence(reader, sequence.id(), layout, song.offset, song.end, &result.sourceMap(),
+                                     &result.diagnostics());
+    sequence.data(SequenceData{}).program(std::move(*program));
+  }
+}
+
+void publishSeSequences(ScanResultBuilder& result, const SequenceLayout& layout) {
+  const ByteReader reader = result.reader();
+  if (layout.seSequences) {
+    for (const auto& block : layout.seSequenceBlocks) {
+      if (!parseSeSequence(reader, AssetId{}, block, nullptr, nullptr)) {
+        continue;
+      }
+      auto sequence =
+          result.sequence(fmt::format("{} SeSeq {}:{}", result.sourceDisplayName(), block.set, block.sequence),
+                          reader.range(block.offset, block.dataEnd - block.offset));
+      auto program = parseSeSequence(reader, sequence.id(), block, &result.sourceMap(), &result.diagnostics());
+      sequence.data(SequenceData{}).program(std::move(*program));
+    }
+    result.warning("SonyPS2 SeSeq notes, jumps, and per-voice pitch slides are playable; volume, pan, and LFO "
+                   "automation remain source-only",
+                   reader.range(layout.seSequences->offset, layout.seSequences->size));
+  }
+  if (layout.seSongs) {
+    const auto name = fmt::format("{} SeSong tables", result.sourceDisplayName());
+    const auto range = reader.range(layout.seSongs->offset, layout.seSongs->size);
+    auto misc = result.misc(name, range);
+    misc.payload({});
+    result.sourceMap().table(name, range).kind("sony-ps2-sesong-tables").owner(ObjectRefs::misc(misc.id()));
+    result.warning("SonyPS2 SeSong playback tables remain source-only", range);
+  }
+}
+
+void publishSequenceLayout(ScanResultBuilder& result, const SequenceLayout& layout, const Psf2Selection* selection) {
+  if (selection != nullptr) {
+    const auto midi = std::ranges::find(layout.midiBlocks, selection->midi, &MidiBlockLayout::index);
+    if (midi != layout.midiBlocks.end()) {
+      publishMidiBlock(result, *midi, selection->volume);
+    } else {
+      result.warning(fmt::format("PSF2 sq.irx selects missing SonyPS2 MIDI block {}", selection->midi),
+                     result.reader().range(layout.offset, layout.length));
+    }
+    return;
+  }
+
+  if (!layout.songs) {
+    for (const auto& midi : layout.midiBlocks) {
+      publishMidiBlock(result, midi);
+    }
+  } else {
+    publishSongs(result, layout, *layout.songs);
+  }
+  publishSeSequences(result, layout);
+}
+
 [[nodiscard]] ScanResult scan(const ScanInput& input) {
   const std::string extension = lowerExtension(input.source);
   const auto selection = psf2Selection(input.source);
@@ -233,103 +370,9 @@ struct Psf2Selection {
     }
     addSoundBank(result, offset, std::move(bank));
   }
-  for (u32 fileIndex = 0; fileIndex < sequences.size(); ++fileIndex) {
-    const auto& layout = sequences[fileIndex];
-    const auto publishMidiBlock = [&](const MidiBlockLayout& block, u32 initialVolume) {
-      auto sequence = result.sequence(fmt::format("{} MIDI {}", result.sourceDisplayName(), block.index),
-                                      input.reader.range(block.offset, block.dataEnd - block.offset));
-      auto program = parseMidiSequence(input.reader, sequence.id(), block, &result.sourceMap(), &result.diagnostics());
-      if (initialVolume != 128) {
-        program.behavior.initialMasterLevel = std::min(initialVolume, 128u) / 128.0;
-      }
-      sequence.data(SequenceData{}).program(std::move(program));
-    };
-    if (selection && extension == ".sq") {
-      const auto midi = std::ranges::find(layout.midiBlocks, selection->midi, &MidiBlockLayout::index);
-      if (midi != layout.midiBlocks.end()) {
-        publishMidiBlock(*midi, selection->volume);
-      } else {
-        result.warning(fmt::format("PSF2 sq.irx selects missing SonyPS2 MIDI block {}", selection->midi),
-                       input.reader.range(layout.offset, layout.length));
-      }
-      continue;
-    }
-    struct SongEntry {
-      u32 index;
-      u32 offset;
-      u32 end;
-    };
-    std::vector<bool> publishMidi(layout.midiBlocks.size(), !layout.songs.has_value());
-    std::vector<SongEntry> publishSongs;
-    bool foundPlayableSong = false;
-    if (layout.songs) {
-      for (u32 song = 0; song < layout.songs->entries.size(); ++song) {
-        const auto entry = layout.songs->entries[song];
-        if (!entry) {
-          continue;
-        }
-        u32 entryEnd = layout.songs->offset + layout.songs->size;
-        for (const auto candidate : layout.songs->entries) {
-          if (candidate && *candidate > *entry) {
-            entryEnd = std::min(entryEnd, *candidate);
-          }
-        }
-        if (auto program = parseSongSequence(input.reader, AssetId{}, layout, *entry, entryEnd, nullptr, nullptr)) {
-          foundPlayableSong = true;
-          if (const auto midi = trivialSongMidi(*program, layout)) {
-            publishMidi[*midi] = true;
-          } else {
-            publishSongs.push_back(SongEntry{.index = song, .offset = *entry, .end = entryEnd});
-          }
-        } else {
-          const auto name = fmt::format("{} Song {} table", result.sourceDisplayName(), song);
-          const auto range = input.reader.range(*entry, entryEnd - *entry);
-          auto misc = result.misc(name, range);
-          misc.payload({});
-          result.sourceMap().table(name, range).kind("sony-ps2-song-table").owner(ObjectRefs::misc(misc.id()));
-        }
-      }
-    }
-    if (!foundPlayableSong) {
-      std::fill(publishMidi.begin(), publishMidi.end(), true);
-    }
-    for (u32 midi = 0; midi < layout.midiBlocks.size(); ++midi) {
-      if (!publishMidi[midi]) {
-        continue;
-      }
-      publishMidiBlock(layout.midiBlocks[midi], 128);
-    }
-    for (const auto& song : publishSongs) {
-      auto sequence = result.sequence(fmt::format("{} Song {}", result.sourceDisplayName(), song.index),
-                                      input.reader.range(song.offset, song.end - song.offset));
-      auto program = parseSongSequence(input.reader, sequence.id(), layout, song.offset, song.end, &result.sourceMap(),
-                                       &result.diagnostics());
-      sequence.data(SequenceData{}).program(std::move(*program));
-    }
-    if (layout.seSequences) {
-      for (const auto& block : layout.seSequenceBlocks) {
-        if (!parseSeSequence(input.reader, AssetId{}, block, nullptr, nullptr)) {
-          continue;
-        }
-        auto sequence =
-            result.sequence(fmt::format("{} SeSeq {}:{}", result.sourceDisplayName(), block.set, block.sequence),
-                            input.reader.range(block.offset, block.dataEnd - block.offset));
-        auto program = parseSeSequence(input.reader, sequence.id(), block, &result.sourceMap(), &result.diagnostics());
-        sequence.data(SequenceData{}).program(std::move(*program));
-      }
-      result.warning("SonyPS2 SeSeq notes, jumps, and per-voice pitch slides are playable; volume, pan, and LFO "
-                     "automation remain source-only",
-                     input.reader.range(layout.seSequences->offset, layout.seSequences->size));
-    }
-    if (layout.seSongs) {
-      const auto name = fmt::format("{} SeSong tables", result.sourceDisplayName());
-      const auto range = input.reader.range(layout.seSongs->offset, layout.seSongs->size);
-      auto misc = result.misc(name, range);
-      misc.payload({});
-      result.sourceMap().table(name, range).kind("sony-ps2-sesong-tables").owner(ObjectRefs::misc(misc.id()));
-      result.warning("SonyPS2 SeSong playback tables remain source-only",
-                     range);
-    }
+  const Psf2Selection* selectedSq = selection && extension == ".sq" ? &*selection : nullptr;
+  for (const auto& layout : sequences) {
+    publishSequenceLayout(result, layout, selectedSq);
   }
   return result.finish();
 }

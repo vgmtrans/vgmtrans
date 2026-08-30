@@ -126,6 +126,48 @@ struct SampleParam {
   u8 routing = 0;
 };
 
+struct SampleSetParam {
+  u32 offset = 0;
+  u8 velocityCurve = 0;
+  int velocityLow = 1;
+  int velocityHigh = 127;
+  std::vector<SampleParam> samples;
+};
+
+struct ProgramDefinition {
+  u32 index = 0;
+  ProgramParam program;
+  std::vector<SplitParam> splits;
+};
+
+struct SetbNoteParam {
+  u32 offset = 0;
+  u8 size = 0;
+  u8 key = 0;
+  u8 velocityCurve = 0;
+  u8 groupLimit = 0;
+  u8 group = 0;
+  u8 priority = 0;
+  u8 attributes = 0;
+  u8 routing = 0;
+  ProgramParam program;
+  SplitParam split;
+  SampleParam sample;
+};
+
+struct SetbTimbreDefinition {
+  u32 set = 0;
+  u32 timbre = 0;
+  u32 offset = 0;
+  std::vector<SetbNoteParam> notes;
+};
+
+struct BankDefinition {
+  std::vector<std::optional<SampleSetParam>> sampleSets;
+  std::vector<ProgramDefinition> programs;
+  std::vector<SetbTimbreDefinition> setbTimbres;
+};
+
 [[nodiscard]] bool textAt(ByteReader reader, u32 offset, std::string_view text) {
   return reader.has(offset, text.size()) && std::ranges::equal(text, reader.slice(offset, text.size()));
 }
@@ -252,6 +294,181 @@ struct SampleParam {
   };
 }
 
+[[nodiscard]] SetbNoteParam readSetbNote(ByteReader reader, u32 offset, u8 size, u8 key) {
+  const u16 vag = reader.le16(offset);
+  const u8 velocityPitchCenter = reader.u8At(offset + 44);
+  const u8 velocityAmpCenter = reader.u8At(offset + 45);
+  return SetbNoteParam{
+      .offset = offset,
+      .size = size,
+      .key = key,
+      .velocityCurve = reader.u8At(offset + 2),
+      .groupLimit = reader.u8At(offset + 7),
+      .group = reader.u8At(offset + 8),
+      .priority = reader.u8At(offset + 9),
+      .attributes = reader.u8At(offset + 12),
+      .routing = reader.u8At(offset + 13),
+      .program =
+          ProgramParam{
+              .offset = offset,
+              .volume = reader.u8At(offset + 3),
+              .pan = static_cast<s8>(reader.u8At(offset + 4)),
+              .transpose = static_cast<s8>(reader.u8At(offset + 5)),
+              .detune = static_cast<s8>(reader.u8At(offset + 6)),
+              .pitchWave = reader.u8At(offset + 18),
+              .ampWave = reader.u8At(offset + 19),
+              .pitchPhase = reader.u8At(offset + 20),
+              .ampPhase = reader.u8At(offset + 21),
+              .pitchRandomPhase = reader.u8At(offset + 22),
+              .ampRandomPhase = reader.u8At(offset + 23),
+              .pitchCycle = reader.le16(offset + 24),
+              .ampCycle = reader.le16(offset + 26),
+              .pitchPositive = static_cast<s16>(reader.le16(offset + 28)),
+              .pitchNegative = static_cast<s16>(reader.le16(offset + 30)),
+              .ampPositive = static_cast<s8>(reader.u8At(offset + 32)),
+              .ampNegative = static_cast<s8>(reader.u8At(offset + 33)),
+          },
+      .split =
+          SplitParam{
+              .low = key,
+              .cross = key,
+              .high = key,
+              .volume = 128,
+              .pan = 64,
+          },
+      .sample =
+          SampleParam{
+              .offset = offset,
+              .vag = vag,
+              .velocityPitch = static_cast<s8>(reader.u8At(offset + 42)),
+              .velocityPitchCenter = velocityPitchCenter,
+              .velocityPitchCurve = reader.u8At(offset + 46),
+              .velocityAmp = static_cast<s8>(reader.u8At(offset + 43)),
+              .velocityAmpCenter = velocityAmpCenter,
+              .velocityAmpCurve = reader.u8At(offset + 47),
+              .baseNote = key,
+              .adsr1 = reader.le16(offset + 14),
+              .adsr2 = reader.le16(offset + 16),
+              .pitchDelay = reader.le16(offset + 34),
+              .pitchFade = reader.le16(offset + 38),
+              .ampDelay = reader.le16(offset + 36),
+              .ampFade = reader.le16(offset + 40),
+              .lfoAttributes = reader.u8At(offset + 49),
+              .routing = reader.u8At(offset + 13),
+          },
+  };
+}
+
+[[nodiscard]] std::vector<std::optional<SampleSetParam>> readSampleSets(ByteReader reader, const Chunk& sampleSets,
+                                                                        const Chunk& samples) {
+  std::vector<std::optional<SampleSetParam>> result(sampleSets.entries.size());
+  for (u32 index = 0; index < sampleSets.entries.size(); ++index) {
+    const auto offset = sampleSets.entries[index];
+    if (!offset || !reader.has(*offset, 4)) {
+      continue;
+    }
+    const u8 count = reader.u8At(*offset + 3);
+    if (!reader.has(*offset + 4, static_cast<u64>(count) * 2)) {
+      continue;
+    }
+    SampleSetParam set{
+        .offset = *offset,
+        .velocityCurve = reader.u8At(*offset),
+        .velocityLow = std::clamp<int>(reader.u8At(*offset + 1) & 0x7f, 1, 127),
+        .velocityHigh = std::clamp<int>(reader.u8At(*offset + 2) & 0x7f, 1, 127),
+    };
+    for (u32 number = 0; number < count; ++number) {
+      const u16 sampleIndex = reader.le16(*offset + 4 + number * 2);
+      if (sampleIndex < samples.entries.size() && samples.entries[sampleIndex] &&
+          reader.has(*samples.entries[sampleIndex], kSampleBytes)) {
+        set.samples.push_back(readSample(reader, *samples.entries[sampleIndex]));
+      }
+    }
+    result[index] = std::move(set);
+  }
+  return result;
+}
+
+[[nodiscard]] std::vector<ProgramDefinition> readPrograms(ByteReader reader, const Chunk& programs) {
+  std::vector<ProgramDefinition> result;
+  for (u32 index = 0; index < programs.entries.size(); ++index) {
+    const auto offset = programs.entries[index];
+    if (!offset || !reader.has(*offset, kProgramBytes)) {
+      continue;
+    }
+    const ProgramParam program = readProgram(reader, *offset);
+    if (program.splitCount == 0 || reader.u8At(*offset + 5) != kSplitBytes ||
+        !reader.has(program.splitOffset, static_cast<u64>(program.splitCount) * kSplitBytes)) {
+      continue;
+    }
+    ProgramDefinition definition{.index = index, .program = program};
+    definition.splits.reserve(program.splitCount);
+    for (u32 split = 0; split < program.splitCount; ++split) {
+      definition.splits.push_back(readSplit(reader, program.splitOffset + split * kSplitBytes));
+    }
+    result.push_back(std::move(definition));
+  }
+  return result;
+}
+
+[[nodiscard]] std::vector<SetbTimbreDefinition> readSetbTimbres(ByteReader reader, const Chunk& setb) {
+  std::vector<SetbTimbreDefinition> result;
+  for (u32 setIndex = 0; setIndex < setb.entries.size(); ++setIndex) {
+    const auto setOffset = setb.entries[setIndex];
+    if (!setOffset || !reader.has(*setOffset, 4)) {
+      continue;
+    }
+    const u32 maximumTimbre = reader.le32(*setOffset);
+    if (maximumTimbre >= 128 || !reader.has(*setOffset + 4, static_cast<u64>(maximumTimbre + 1) * 4)) {
+      continue;
+    }
+    for (u32 timbre = 0; timbre <= maximumTimbre; ++timbre) {
+      const u32 relative = reader.le32(*setOffset + 4 + timbre * 4);
+      if (relative == 0xffffffff || relative >= setb.size) {
+        continue;
+      }
+      const u32 timbreOffset = setb.offset + relative;
+      if (!reader.has(timbreOffset, 8)) {
+        continue;
+      }
+      const u32 noteBlockOffset = timbreOffset + reader.le32(timbreOffset);
+      const u8 noteBytes = reader.u8At(timbreOffset + 4);
+      const u8 noteLow = reader.u8At(timbreOffset + 5);
+      const u8 noteHigh = reader.u8At(timbreOffset + 6);
+      if (noteBytes < 50 || noteLow > noteHigh ||
+          !reader.has(noteBlockOffset, static_cast<u64>(noteHigh - noteLow + 1) * noteBytes)) {
+        continue;
+      }
+      SetbTimbreDefinition definition{
+          .set = setIndex,
+          .timbre = timbre,
+          .offset = timbreOffset,
+      };
+      definition.notes.reserve(noteHigh - noteLow + 1);
+      for (u32 note = noteLow; note <= noteHigh; ++note) {
+        definition.notes.push_back(
+            readSetbNote(reader, noteBlockOffset + (note - noteLow) * noteBytes, noteBytes, static_cast<u8>(note)));
+      }
+      result.push_back(std::move(definition));
+    }
+  }
+  return result;
+}
+
+[[nodiscard]] BankDefinition readBankDefinition(ByteReader reader, const std::optional<Chunk>& programs,
+                                                const std::optional<Chunk>& sampleSets,
+                                                const std::optional<Chunk>& samples, const std::optional<Chunk>& setb) {
+  BankDefinition result;
+  if (programs && sampleSets && samples) {
+    result.sampleSets = readSampleSets(reader, *sampleSets, *samples);
+    result.programs = readPrograms(reader, *programs);
+  }
+  if (setb) {
+    result.setbTimbres = readSetbTimbres(reader, *setb);
+  }
+  return result;
+}
+
 [[nodiscard]] int adjustedField(int original, int key, s8 follow, u8 center, int maximum) {
   return std::clamp(original + ((key - static_cast<int>(center)) * static_cast<int>(follow)) / 12, 0, maximum);
 }
@@ -321,12 +538,8 @@ struct SampleParam {
   center = std::clamp(center, 0, 127);
   const int difference = velocity - center;
   const auto linear = [&] { return difference * 0x10000 / 126; };
-  const auto convex = [](int value) {
-    return wrappedFixedSquare((value - 1) * 0x8000 / 126);
-  };
-  const auto concave = [&](int value) {
-    return 0x10000 - wrappedFixedSquare(0x10000 - (value - 1) * 0x8000 / 126);
-  };
+  const auto convex = [](int value) { return wrappedFixedSquare((value - 1) * 0x8000 / 126); };
+  const auto concave = [&](int value) { return 0x10000 - wrappedFixedSquare(0x10000 - (value - 1) * 0x8000 / 126); };
   const auto endpoint = [&] {
     const int denominator = endpointDenominator(velocity, center);
     return difference == 0 || denominator == 0 ? 0 : difference * 0x10000 / denominator;
@@ -396,14 +609,13 @@ struct SampleParam {
   return std::min(std::abs(static_cast<int>(value)), 127);
 }
 
-[[nodiscard]] int regionPan(const ProgramParam& program, const SplitParam& split, const SampleParam& sample,
-                            int key) {
+[[nodiscard]] int regionPan(const ProgramParam& program, const SplitParam& split, const SampleParam& sample, int key) {
   const int follow = ((key - static_cast<int>(program.keyFollowPanCenter)) * program.keyFollowPan +
                       (key - static_cast<int>(split.keyFollowPanCenter)) * split.keyFollowPan) /
                      12;
   if ((program.attributes & 1) == 0) {
-    return std::clamp(panMagnitude(program.pan) + panMagnitude(split.pan) + panMagnitude(sample.pan) - 128 + follow,
-                      0, 127);
+    return std::clamp(panMagnitude(program.pan) + panMagnitude(split.pan) + panMagnitude(sample.pan) - 128 + follow, 0,
+                      127);
   }
   int pan = program.pan + split.pan + sample.pan - 128 + follow;
   while (pan > 127) {
@@ -550,106 +762,125 @@ struct RegionResolution {
   u64 emittedRegions = 0;
 };
 
-[[nodiscard]] RegionResolution regionResolution(ByteReader reader, const std::optional<Chunk>& programs,
-                                                const std::optional<Chunk>& sampleSets,
-                                                const std::optional<Chunk>& samples,
-                                                const std::optional<Chunk>& setb, const SoundBankData& layout) {
+struct SynthWarnings {
+  bool lfoShape = false;
+  bool lfoPhase = false;
+  bool lfoKeyOff = false;
+  bool lfoAsymmetry = false;
+  bool lfoCombination = false;
+  bool customVelocityCurve = false;
+  bool bendRange = false;
+  bool panPhase = false;
+  bool noise = false;
+  bool voicePolicy = false;
+  bool routing = false;
+  bool setbVoicePolicy = false;
+};
+
+void warnCustomVelocityCurve(InstrumentSetBuilder& instruments, u8 curves, SourceRange range, SynthWarnings& warnings) {
+  if ((curves & 0xf0) == 0 || warnings.customVelocityCurve) {
+    return;
+  }
+  instruments.warning("SonyPS2 application-supplied velocity remap tables are unavailable; using the selected "
+                      "built-in curve",
+                      range);
+  warnings.customVelocityCurve = true;
+}
+
+void warnRouting(InstrumentSetBuilder& instruments, u8 routing, SourceRange range, SynthWarnings& warnings) {
+  if (routing == 0 || warnings.routing) {
+    return;
+  }
+  instruments.warning("SonyPS2 reverb algorithm, SPU2 core, and dry/wet routing are reduced to a generic instrument "
+                      "reverb send",
+                      range);
+  warnings.routing = true;
+}
+
+void warnLfoLimitations(InstrumentSetBuilder& instruments, const ProgramParam& program, const SampleParam& sample,
+                        SourceRange programRange, SourceRange sampleRange, bool checkAsymmetry,
+                        SynthWarnings& warnings) {
+  if ((unsupportedLfoWaveform(program.pitchWave) || unsupportedLfoWaveform(program.ampWave)) && !warnings.lfoShape) {
+    instruments.warning("SonyPS2 custom or unknown LFO waveform is unavailable; the LFO is disabled", programRange);
+    warnings.lfoShape = true;
+  }
+  if ((program.pitchPhase != 0 || program.ampPhase != 0 || program.pitchRandomPhase != 0 ||
+       program.ampRandomPhase != 0 || sample.pitchFade != 0 || sample.ampFade != 0) &&
+      !warnings.lfoPhase) {
+    instruments.warning("SonyPS2 LFO phase, random phase, or fade behavior is not representable", sampleRange);
+    warnings.lfoPhase = true;
+  }
+  if (hasKeyOffLfoTrigger(sample.lfoAttributes) && !warnings.lfoKeyOff) {
+    instruments.warning("SonyPS2 key-off LFO triggering has no synth-model equivalent", sampleRange);
+    warnings.lfoKeyOff = true;
+  }
+  if (checkAsymmetry && !warnings.lfoAsymmetry &&
+      (unsupportedLfoDepthPair(program.pitchPositive, program.pitchNegative) ||
+       unsupportedLfoDepthPair(program.ampPositive, program.ampNegative))) {
+    instruments.warning("SonyPS2 signed or asymmetric LFO half-cycle depths are reduced to a symmetric maximum",
+                        sampleRange);
+    warnings.lfoAsymmetry = true;
+  }
+}
+
+[[nodiscard]] std::optional<RegionShape> programRegionShape(const ProgramParam& program, const SplitParam& split,
+                                                            const SampleParam& sample, const SampleSetParam& sampleSet,
+                                                            const SoundBankData& layout) {
+  if (sample.vag == 0xffff || sample.vag >= layout.vags.size() || !layout.vags[sample.vag]) {
+    return std::nullopt;
+  }
+  const int keyLow = split.low & 0x7f;
+  const int keyHigh = split.high & 0x7f;
+  const int velocityLow = std::max(sampleSet.velocityLow, static_cast<int>(sample.low & 0x7f));
+  const int velocityHigh = std::min(sampleSet.velocityHigh, static_cast<int>(sample.high & 0x7f));
+  if (keyLow > keyHigh || velocityLow > velocityHigh) {
+    return std::nullopt;
+  }
+  return RegionShape{
+      .keys = static_cast<u16>(keyDependent(program, split, sample) ? keyHigh - keyLow + 1 : 1),
+      .velocities = static_cast<u16>(velocityDependent(sample) || sampleSet.velocityCurve != 0
+                                         ? midiVelocity(static_cast<u8>(velocityHigh)) -
+                                               midiVelocity(static_cast<u8>(velocityLow)) + 1
+                                         : 1),
+  };
+}
+
+void appendProgramRegionShapes(std::vector<RegionShape>& shapes, const BankDefinition& definition,
+                               const SoundBankData& layout) {
+  for (const auto& program : definition.programs) {
+    for (const auto& split : program.splits) {
+      if (split.sampleSet >= definition.sampleSets.size() || !definition.sampleSets[split.sampleSet]) {
+        continue;
+      }
+      const auto& sampleSet = *definition.sampleSets[split.sampleSet];
+      for (const auto& sample : sampleSet.samples) {
+        if (auto shape = programRegionShape(program.program, split, sample, sampleSet, layout)) {
+          shapes.push_back(*shape);
+        }
+      }
+    }
+  }
+}
+
+void appendSetbRegionShapes(std::vector<RegionShape>& shapes, const BankDefinition& definition,
+                            const SoundBankData& layout) {
+  for (const auto& timbre : definition.setbTimbres) {
+    for (const auto& note : timbre.notes) {
+      if (note.sample.vag != 0xffff && note.sample.vag < layout.vags.size() && layout.vags[note.sample.vag]) {
+        const bool velocityZones =
+            note.velocityCurve != 0 || note.sample.velocityPitch != 0 || note.sample.velocityAmp != 0;
+        shapes.push_back(RegionShape{
+            .velocities = static_cast<u16>(velocityZones ? 128 - midiVelocity(1) : 1),
+        });
+      }
+    }
+  }
+}
+
+[[nodiscard]] RegionResolution regionResolution(const BankDefinition& definition, const SoundBankData& layout) {
   std::vector<RegionShape> shapes;
-  if (programs && sampleSets && samples) {
-    for (const auto programOffset : programs->entries) {
-      if (!programOffset || !reader.has(*programOffset, kProgramBytes)) {
-        continue;
-      }
-      const ProgramParam program = readProgram(reader, *programOffset);
-      if (program.splitCount == 0 || reader.u8At(*programOffset + 5) != kSplitBytes ||
-          !reader.has(program.splitOffset, static_cast<u64>(program.splitCount) * kSplitBytes)) {
-        continue;
-      }
-      for (u32 splitIndex = 0; splitIndex < program.splitCount; ++splitIndex) {
-        const SplitParam split = readSplit(reader, program.splitOffset + splitIndex * kSplitBytes);
-        if (split.sampleSet >= sampleSets->entries.size() || !sampleSets->entries[split.sampleSet]) {
-          continue;
-        }
-        const u32 sampleSetOffset = *sampleSets->entries[split.sampleSet];
-        if (!reader.has(sampleSetOffset, 4)) {
-          continue;
-        }
-        const u8 curve = reader.u8At(sampleSetOffset);
-        const int setLow = std::clamp<int>(reader.u8At(sampleSetOffset + 1) & 0x7f, 1, 127);
-        const int setHigh = std::clamp<int>(reader.u8At(sampleSetOffset + 2) & 0x7f, 1, 127);
-        const u8 sampleCount = reader.u8At(sampleSetOffset + 3);
-        if (!reader.has(sampleSetOffset + 4, static_cast<u64>(sampleCount) * 2)) {
-          continue;
-        }
-        for (u32 number = 0; number < sampleCount; ++number) {
-          const u16 sampleIndex = reader.le16(sampleSetOffset + 4 + number * 2);
-          if (sampleIndex >= samples->entries.size() || !samples->entries[sampleIndex] ||
-              !reader.has(*samples->entries[sampleIndex], kSampleBytes)) {
-            continue;
-          }
-          const SampleParam sample = readSample(reader, *samples->entries[sampleIndex]);
-          if (sample.vag == 0xffff || sample.vag >= layout.vags.size() || !layout.vags[sample.vag]) {
-            continue;
-          }
-          const int keyLow = split.low & 0x7f;
-          const int keyHigh = split.high & 0x7f;
-          const int rawVelocityLow = std::max(setLow, static_cast<int>(sample.low & 0x7f));
-          const int rawVelocityHigh = std::min(setHigh, static_cast<int>(sample.high & 0x7f));
-          if (keyLow > keyHigh || rawVelocityLow > rawVelocityHigh) {
-            continue;
-          }
-          shapes.push_back(RegionShape{
-              .keys = static_cast<u16>(keyDependent(program, split, sample) ? keyHigh - keyLow + 1 : 1),
-              .velocities = static_cast<u16>(velocityDependent(sample) || curve != 0
-                                                 ? midiVelocity(static_cast<u8>(rawVelocityHigh)) -
-                                                       midiVelocity(static_cast<u8>(rawVelocityLow)) + 1
-                                                 : 1),
-          });
-        }
-      }
-    }
-  }
-  if (setb) {
-    for (const auto setOffset : setb->entries) {
-      if (!setOffset || !reader.has(*setOffset, 4)) {
-        continue;
-      }
-      const u32 maximumTimbre = reader.le32(*setOffset);
-      if (maximumTimbre >= 128 || !reader.has(*setOffset + 4, static_cast<u64>(maximumTimbre + 1) * 4)) {
-        continue;
-      }
-      for (u32 timbre = 0; timbre <= maximumTimbre; ++timbre) {
-        const u32 relative = reader.le32(*setOffset + 4 + timbre * 4);
-        if (relative == 0xffffffff || relative >= setb->size) {
-          continue;
-        }
-        const u32 timbreOffset = setb->offset + relative;
-        if (!reader.has(timbreOffset, 8)) {
-          continue;
-        }
-        const u32 noteBlockOffset = timbreOffset + reader.le32(timbreOffset);
-        const u8 noteBytes = reader.u8At(timbreOffset + 4);
-        const u8 noteLow = reader.u8At(timbreOffset + 5);
-        const u8 noteHigh = reader.u8At(timbreOffset + 6);
-        if (noteBytes < 50 || noteLow > noteHigh ||
-            !reader.has(noteBlockOffset, static_cast<u64>(noteHigh - noteLow + 1) * noteBytes)) {
-          continue;
-        }
-        for (u32 note = noteLow; note <= noteHigh; ++note) {
-          const u32 noteOffset = noteBlockOffset + (note - noteLow) * noteBytes;
-          const u16 vag = reader.le16(noteOffset);
-          if (vag == 0xffff || vag >= layout.vags.size() || !layout.vags[vag]) {
-            continue;
-          }
-          const bool velocityZones = reader.u8At(noteOffset + 2) != 0 || reader.u8At(noteOffset + 42) != 0 ||
-                                     reader.u8At(noteOffset + 43) != 0;
-          shapes.push_back(RegionShape{
-              .velocities = static_cast<u16>(velocityZones ? 128 - midiVelocity(1) : 1),
-          });
-        }
-      }
-    }
-  }
+  appendProgramRegionShapes(shapes, definition, layout);
+  appendSetbRegionShapes(shapes, definition, layout);
 
   const auto countAt = [&](u32 step) {
     u64 count = 0;
@@ -664,6 +895,290 @@ struct RegionResolution {
   }
   resolution.emittedRegions = countAt(resolution.step);
   return resolution;
+}
+
+void emitProgramSampleRegions(const InstrumentSetBuilder::Entry& instrument, ByteReader reader,
+                              const ProgramParam& program, const SplitParam& split, const SampleSetParam& sampleSet,
+                              const SampleParam& sample, const VagInfo& vag, RegionResolution resolution) {
+  const int keyLow = std::min<int>(split.low & 0x7f, 127);
+  const int keyHigh = std::min<int>(split.high & 0x7f, 127);
+  const int rawVelocityLow = std::max<int>(sampleSet.velocityLow, sample.low & 0x7f);
+  const int rawVelocityHigh = std::min<int>(sampleSet.velocityHigh, sample.high & 0x7f);
+  if (rawVelocityLow > rawVelocityHigh) {
+    return;
+  }
+  const int targetVelocityLow = midiVelocity(static_cast<u8>(rawVelocityLow));
+  const int targetVelocityHigh = midiVelocity(static_cast<u8>(rawVelocityHigh));
+  const bool splitKeys = keyDependent(program, split, sample);
+  const bool splitVelocities = velocityDependent(sample) || sampleSet.velocityCurve != 0;
+  for (int key = keyLow; key <= keyHigh;) {
+    const int keyHighOut = splitKeys ? std::min(key + static_cast<int>(resolution.step) - 1, keyHigh) : keyHigh;
+    const int representedKey =
+        splitKeys ? key + (keyHighOut - key) / 2 : std::clamp<int>(split.keyFollowPitchCenter, keyLow, keyHigh);
+    for (int velocity = targetVelocityLow; velocity <= targetVelocityHigh;) {
+      const int velocityHighOut = splitVelocities
+                                      ? std::min(velocity + static_cast<int>(resolution.step) - 1, targetVelocityHigh)
+                                      : targetVelocityHigh;
+      const int representedVelocity = splitVelocities
+                                          ? velocity + (velocityHighOut - velocity) / 2
+                                          : midiVelocity(static_cast<u8>(std::clamp<int>(
+                                                sample.velocityAmpCenter, rawVelocityLow, rawVelocityHigh)));
+      const int rawVelocity = splitVelocities
+                                  ? std::clamp<int>(rawVelocityFromMidi(static_cast<u8>(representedVelocity)),
+                                                    rawVelocityLow, rawVelocityHigh)
+                                  : std::clamp<int>(sample.velocityAmpCenter, rawVelocityLow, rawVelocityHigh);
+      // Region ranges use MIDI velocity, while driver curves are evaluated in
+      // Sony's linear source domain.
+      const double gain =
+          gainFromRaw(program.volume) * gainFromRaw(split.volume) * gainFromRaw(sample.volume) *
+          crossfade(split.low, split.cross, split.high, representedKey) *
+          crossfade(sample.low, sample.cross, sample.high, rawVelocity) *
+          velocityCurveCorrection(sampleSet.velocityCurve, rawVelocity, static_cast<u8>(representedVelocity));
+      Region region{
+          .keyRange = KeyRange{static_cast<u8>(key), static_cast<u8>(keyHighOut)},
+          .velocityRange = VelocityRange{static_cast<u8>(velocity), static_cast<u8>(velocityHighOut)},
+          .range = reader.range(sample.offset, kSampleBytes),
+          .unityKey = sample.baseNote - program.transpose - split.transpose -
+                      (program.detune + split.detune + sample.detune) / 128.0 +
+                      12.0 * std::log2(48000.0 / vag.sampleRate),
+          .envelope = keyFollowEnvelope(sample, representedKey),
+          .pan = panPositionFrom7Bit(static_cast<u8>(regionPan(program, split, sample, representedKey))),
+          .attenuationDb = attenuation(gain),
+          .modulation = modulation(program, split, sample, representedKey, rawVelocity),
+      };
+      instrument.region(SampleRef::unbound(sample.vag), std::move(region))
+          .source("Sample region", reader.range(sample.offset, kSampleBytes), "sony-ps2-sample-param");
+      velocity = velocityHighOut + 1;
+    }
+    key = keyHighOut + 1;
+  }
+}
+
+void addProgramSample(InstrumentSetBuilder& instruments, const InstrumentSetBuilder::Entry& instrument,
+                      ByteReader reader, const SoundBankData& layout, const ProgramParam& program,
+                      const SplitParam& split, const SampleSetParam& sampleSet, const SampleParam& sample,
+                      RegionResolution resolution, SynthWarnings& warnings) {
+  const SourceRange sampleRange = reader.range(sample.offset, kSampleBytes);
+  warnCustomVelocityCurve(instruments, sample.velocityPitchCurve | sample.velocityAmpCurve, sampleRange, warnings);
+  const bool mixedPitchDepth = pitchLfoStartsAtKeyOn(sample.lfoAttributes) && program.pitchWave != 0 &&
+                               program.pitchCycle != 0 &&
+                               (program.midiPitchPositive != 0 || program.midiPitchNegative != 0) &&
+                               (program.pitchPositive != 0 || program.pitchNegative != 0 || split.keyFollowPitch != 0 ||
+                                sample.velocityPitch != 0);
+  const bool mixedAmpDepth =
+      ampLfoStartsAtKeyOn(sample.lfoAttributes) && program.ampWave != 0 && program.ampCycle != 0 &&
+      (program.midiAmpPositive != 0 || program.midiAmpNegative != 0) &&
+      (program.ampPositive != 0 || program.ampNegative != 0 || split.keyFollowAmp != 0 || sample.velocityAmp != 0);
+  if (!warnings.lfoCombination && (mixedPitchDepth || mixedAmpDepth)) {
+    instruments.warning("SonyPS2 additive fixed and controller LFO depths share one synth modulation mode; the "
+                        "fixed component is retained",
+                        reader.range(sample.offset, kSampleBytes));
+    warnings.lfoCombination = true;
+  }
+  if ((sample.group != 0 || sample.priority != 0) && !warnings.voicePolicy) {
+    // These fields control admission and stealing of live SPU2 voices; they do
+    // not alter a region's static synthesis parameters.
+    instruments.warning("SonyPS2 voice groups and priorities have no synth-model equivalent",
+                        reader.range(sample.offset, kSampleBytes));
+    warnings.voicePolicy = true;
+  }
+  // Preserve effect-send capability as Instrument::reverb. The exact dry/wet
+  // matrix and SPU2 core selection need a routing model.
+  warnRouting(instruments, sample.routing, sampleRange, warnings);
+  if (sample.pan < 0 && !warnings.panPhase) {
+    instruments.warning("SonyPS2 negative-phase pan is reduced to ordinary stereo position",
+                        reader.range(sample.offset, kSampleBytes));
+    warnings.panPhase = true;
+  }
+  if (sample.vag == 0xffff) {
+    if (!warnings.noise) {
+      instruments.warning("SonyPS2 noise-generator regions cannot be represented as sampled regions",
+                          reader.range(sample.offset, kSampleBytes));
+      warnings.noise = true;
+    }
+    return;
+  }
+  if (sample.vag >= layout.vags.size() || !layout.vags[sample.vag]) {
+    return;
+  }
+
+  emitProgramSampleRegions(instrument, reader, program, split, sampleSet, sample, *layout.vags[sample.vag], resolution);
+
+  // Physical depth/rate/delay are retained; unsupported phase and trigger
+  // behavior remains an explicit diagnostic.
+  warnLfoLimitations(instruments, program, sample, reader.range(program.offset, kProgramBytes), sampleRange, false,
+                     warnings);
+}
+
+void addProgramDefinition(InstrumentSetBuilder& instruments, ByteReader reader, SoundBankData& layout,
+                          const BankDefinition& definition, const ProgramDefinition& source,
+                          RegionResolution resolution, SynthWarnings& warnings) {
+  const ProgramParam& program = source.program;
+  ProgramRuntimeInfo runtime{
+      .program = static_cast<u8>(source.index),
+      .pitchDepthPositive = program.pitchPositive,
+      .pitchDepthNegative = program.pitchNegative,
+      .midiPitchDepthPositive = program.midiPitchPositive,
+      .midiPitchDepthNegative = program.midiPitchNegative,
+      .pitchBendPositive = 0,
+      .pitchBendNegative = 0,
+      .ampDepthPositive = program.ampPositive,
+      .ampDepthNegative = program.ampNegative,
+      .midiAmpDepthPositive = program.midiAmpPositive,
+      .midiAmpDepthNegative = program.midiAmpNegative,
+  };
+  for (const auto& split : source.splits) {
+    runtime.pitchBendNegative = std::max(runtime.pitchBendNegative, split.bendLow);
+    runtime.pitchBendPositive = std::max(runtime.pitchBendPositive, split.bendHigh);
+    runtime.pitchBendZones.push_back(PitchBendZone{
+        .keyLow = static_cast<u8>(split.low & 0x7f),
+        .keyHigh = static_cast<u8>(split.high & 0x7f),
+        .negative = split.bendLow,
+        .positive = split.bendHigh,
+    });
+  }
+  if (!warnings.bendRange &&
+      (std::ranges::any_of(source.splits, [](const SplitParam& split) { return split.bendLow != split.bendHigh; }) ||
+       std::ranges::any_of(source.splits, [&](const SplitParam& split) {
+         return split.bendLow != source.splits.front().bendLow || split.bendHigh != source.splits.front().bendHigh;
+       }))) {
+    // Sequence playback retains the driver's physical, direction-specific
+    // result for each active split. The static Instrument range is only the
+    // symmetric channel capacity used for MIDI and live input; simultaneous
+    // voices with different ranges cannot be expressed on one MIDI channel.
+    instruments.warning("SonyPS2 split- or direction-specific pitch bends use one live-input channel range",
+                        reader.range(program.offset, kProgramBytes));
+    warnings.bendRange = true;
+  }
+  if (!warnings.lfoAsymmetry && (unsupportedLfoDepthPair(program.pitchPositive, program.pitchNegative) ||
+                                 unsupportedLfoDepthPair(program.midiPitchPositive, program.midiPitchNegative) ||
+                                 unsupportedLfoDepthPair(program.ampPositive, program.ampNegative) ||
+                                 unsupportedLfoDepthPair(program.midiAmpPositive, program.midiAmpNegative))) {
+    // The driver selects independently signed depths for each waveform half.
+    // The synth model can retain only one symmetric magnitude.
+    instruments.warning("SonyPS2 signed or asymmetric LFO half-cycle depths are reduced to a symmetric maximum",
+                        reader.range(program.offset, kProgramBytes));
+    warnings.lfoAsymmetry = true;
+  }
+
+  const bool wet = std::ranges::any_of(source.splits, [&](const SplitParam& split) {
+    return split.sampleSet < definition.sampleSets.size() && definition.sampleSets[split.sampleSet] &&
+           std::ranges::any_of(
+               definition.sampleSets[split.sampleSet]->samples,
+               [](const SampleParam& sample) { return (sample.routing & 0x0c) != 0; });
+  });
+  layout.runtimePrograms.push_back(runtime);
+  auto instrument = instruments.append(Instrument{
+      .explicitAddress = InstrumentAddress{.bank = 0, .program = source.index},
+      .identity = instrumentIdentity(0, static_cast<u8>(source.index)),
+      .pitchBendRangeCents = static_cast<u16>(
+          std::min<u32>(65535, (std::max(runtime.pitchBendPositive, runtime.pitchBendNegative) * 100u + 127u) / 128u)),
+      .reverb = wet ? reverbSend(layout) : 0.0,
+      .name = fmt::format("Program {}", source.index),
+      .range = reader.range(program.offset, kProgramBytes),
+  });
+  instrument.source(instrument.value().name, reader.range(program.offset, kProgramBytes), "sony-ps2-program");
+
+  for (const auto& split : source.splits) {
+    if (split.sampleSet >= definition.sampleSets.size() || !definition.sampleSets[split.sampleSet]) {
+      continue;
+    }
+    const auto& sampleSet = *definition.sampleSets[split.sampleSet];
+    warnCustomVelocityCurve(instruments, sampleSet.velocityCurve, reader.range(sampleSet.offset, 1), warnings);
+    for (const auto& sample : sampleSet.samples) {
+      addProgramSample(instruments, instrument, reader, layout, program, split, sampleSet, sample, resolution,
+                       warnings);
+    }
+  }
+
+  if (((program.attributes & 1) != 0 || program.pan < 0 ||
+       std::ranges::any_of(
+           source.splits, [](const SplitParam& split) { return split.pan < 0; })) &&
+      !warnings.panPhase) {
+    // ROUND_PAN and the driver's negative pan values can invert SPU output
+    // phase. Region::pan can preserve position but not that phase inversion.
+    instruments.warning("SonyPS2 round-pan phase inversion is reduced to ordinary stereo position",
+                        reader.range(program.offset, kProgramBytes));
+    warnings.panPhase = true;
+  }
+}
+
+void addSetbNote(InstrumentSetBuilder& instruments, const InstrumentSetBuilder::Entry& instrument, ByteReader reader,
+                 const SoundBankData& layout, const SetbNoteParam& note, RegionResolution resolution,
+                 SynthWarnings& warnings) {
+  const u16 vagIndex = note.sample.vag;
+  if (vagIndex == 0xffff) {
+    if (!warnings.noise) {
+      instruments.warning("SonyPS2 noise-generator regions cannot be represented as sampled regions",
+                          reader.range(note.offset, note.size));
+      warnings.noise = true;
+    }
+    return;
+  }
+  if (vagIndex >= layout.vags.size() || !layout.vags[vagIndex]) {
+    return;
+  }
+  const SourceRange noteRange = reader.range(note.offset, note.size);
+  warnRouting(instruments, note.routing, noteRange, warnings);
+  const ProgramParam& lfo = note.program;
+  const SampleParam& lfoSample = note.sample;
+  warnCustomVelocityCurve(instruments, note.velocityCurve | lfoSample.velocityPitchCurve | lfoSample.velocityAmpCurve,
+                          noteRange, warnings);
+  warnLfoLimitations(instruments, lfo, lfoSample, noteRange, noteRange, true, warnings);
+
+  const VagInfo& vag = *layout.vags[vagIndex];
+  const bool velocityZones = note.velocityCurve != 0 || lfoSample.velocityPitch != 0 || lfoSample.velocityAmp != 0;
+  for (int velocity = midiVelocity(1); velocity <= 127;) {
+    const int high = velocityZones ? std::min(velocity + static_cast<int>(resolution.step) - 1, 127) : 127;
+    const int representedVelocity = velocityZones ? velocity + (high - velocity) / 2 : 127;
+    const int rawVelocity = velocityZones ? rawVelocityFromMidi(static_cast<u8>(representedVelocity)) : 127;
+    const double gain = gainFromRaw(lfo.volume) *
+                        velocityCurveCorrection(note.velocityCurve, rawVelocity, static_cast<u8>(representedVelocity));
+    Region region{
+        .keyRange = KeyRange{note.key, note.key},
+        .velocityRange = VelocityRange{static_cast<u8>(velocity), static_cast<u8>(high)},
+        .range = reader.range(note.offset, note.size),
+        .unityKey = note.key - lfo.transpose - lfo.detune / 128.0 + 12.0 * std::log2(48000.0 / vag.sampleRate),
+        .envelope = psxSpuEnvelope(lfoSample.adsr1, lfoSample.adsr2, PsxSpuGeneration::Ps2),
+        .pan = panPositionFrom7Bit(static_cast<u8>(panMagnitude(lfo.pan))),
+        .attenuationDb = attenuation(gain),
+        .modulation = modulation(lfo, note.split, lfoSample, note.key, rawVelocity),
+    };
+    instrument.region(SampleRef::unbound(vagIndex), std::move(region))
+        .source("SE timbre note", reader.range(note.offset, note.size), "sony-ps2-setb-note");
+    velocity = high + 1;
+  }
+  if ((note.groupLimit != 0 || note.group != 0 || note.priority != 0) && !warnings.setbVoicePolicy) {
+    // Group limits and priorities affect voice stealing rather than the static
+    // sound of an exported region.
+    instruments.warning("SonyPS2 Setb group limits and voice priorities have no synth-model equivalent",
+                        reader.range(note.offset, note.size));
+    warnings.setbVoicePolicy = true;
+  }
+  if (((note.attributes & 1) != 0 || lfo.pan < 0) && !warnings.panPhase) {
+    instruments.warning("SonyPS2 round- or negative-phase pan is reduced to ordinary stereo position",
+                        reader.range(note.offset, note.size));
+    warnings.panPhase = true;
+  }
+}
+
+void addSetbDefinitions(InstrumentSetBuilder& instruments, ByteReader reader, const SoundBankData& layout,
+                        const BankDefinition& definition, RegionResolution resolution, SynthWarnings& warnings) {
+  for (const auto& timbre : definition.setbTimbres) {
+    const bool wet =
+        std::ranges::any_of(timbre.notes, [](const SetbNoteParam& note) { return (note.routing & 0x0c) != 0; });
+    auto instrument = instruments.append(Instrument{
+        .explicitAddress = InstrumentAddress{.bank = 128 + timbre.set, .program = timbre.timbre},
+        .identity = setbInstrumentIdentity(static_cast<u8>(timbre.set), static_cast<u8>(timbre.timbre)),
+        .reverb = wet ? reverbSend(layout) : 0.0,
+        .name = fmt::format("SE Set {} Timbre {}", timbre.set, timbre.timbre),
+        .range = reader.range(timbre.offset, 8),
+    });
+    instrument.source(instrument.value().name, reader.range(timbre.offset, 8), "sony-ps2-setb-timbre");
+    for (const auto& note : timbre.notes) {
+      addSetbNote(instruments, instrument, reader, layout, note, resolution, warnings);
+    }
+  }
 }
 
 }  // namespace
@@ -683,6 +1198,7 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
       return;
     }
   }
+  const BankDefinition definition = readBankDefinition(reader, programs, sampleSets, samples, setb);
 
   auto bank = result.soundBank(fmt::format("{} HD", result.sourceDisplayName()), reader.range(offset, headerBytes));
   auto& instruments = bank.instruments();
@@ -698,7 +1214,7 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
       .field("vag_info_chunk", reader.range(offset + 0x30, 4), reader.le32(offset + 0x30), SourceValueDisplay::Address)
       .field("setb_chunk", reader.range(offset + 0x34, 4), reader.le32(offset + 0x34), SourceValueDisplay::Address);
 
-  const RegionResolution resolution = regionResolution(reader, programs, sampleSets, samples, setb, layout);
+  const RegionResolution resolution = regionResolution(definition, layout);
   if (resolution.step != 1) {
     const std::string consequence =
         resolution.emittedRegions <= kMaxSynthRegions
@@ -710,468 +1226,16 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
                         reader.range(offset, headerBytes));
   }
 
-  bool warnedLfoShape = false;
-  bool warnedLfoPhase = false;
-  bool warnedLfoKeyOff = false;
-  bool warnedLfoAsymmetry = false;
-  bool warnedLfoCombination = false;
-  bool warnedCustomVelocityCurve = false;
-  bool warnedBendRange = false;
-  bool warnedPanPhase = false;
-  bool warnedNoise = false;
-  bool warnedVoicePolicy = false;
-  bool warnedRouting = false;
+  SynthWarnings warnings;
   if (hasProgramTables) {
-    for (u32 programIndex = 0; programIndex < programs->entries.size(); ++programIndex) {
-      const auto programOffset = programs->entries[programIndex];
-      if (!programOffset || !reader.has(*programOffset, kProgramBytes)) {
-        continue;
-      }
-      const ProgramParam program = readProgram(reader, *programOffset);
-      if (program.splitCount == 0 || reader.u8At(*programOffset + 5) != kSplitBytes ||
-          !reader.has(program.splitOffset, static_cast<u64>(program.splitCount) * kSplitBytes)) {
-        continue;
-      }
-      ProgramRuntimeInfo runtime{
-          .program = static_cast<u8>(programIndex),
-          .pitchDepthPositive = program.pitchPositive,
-          .pitchDepthNegative = program.pitchNegative,
-          .midiPitchDepthPositive = program.midiPitchPositive,
-          .midiPitchDepthNegative = program.midiPitchNegative,
-          .pitchBendPositive = 0,
-          .pitchBendNegative = 0,
-          .ampDepthPositive = program.ampPositive,
-          .ampDepthNegative = program.ampNegative,
-          .midiAmpDepthPositive = program.midiAmpPositive,
-          .midiAmpDepthNegative = program.midiAmpNegative,
-      };
-      std::vector<SplitParam> splits;
-      splits.reserve(program.splitCount);
-      for (u32 index = 0; index < program.splitCount; ++index) {
-        const SplitParam split = readSplit(reader, program.splitOffset + index * kSplitBytes);
-        runtime.pitchBendNegative = std::max(runtime.pitchBendNegative, split.bendLow);
-        runtime.pitchBendPositive = std::max(runtime.pitchBendPositive, split.bendHigh);
-        runtime.pitchBendZones.push_back(PitchBendZone{
-            .keyLow = static_cast<u8>(split.low & 0x7f),
-            .keyHigh = static_cast<u8>(split.high & 0x7f),
-            .negative = split.bendLow,
-            .positive = split.bendHigh,
-        });
-        splits.push_back(split);
-      }
-      if (!warnedBendRange &&
-          (std::ranges::any_of(splits, [](const SplitParam& split) { return split.bendLow != split.bendHigh; }) ||
-           std::ranges::any_of(splits, [&](const SplitParam& split) {
-             return split.bendLow != splits.front().bendLow || split.bendHigh != splits.front().bendHigh;
-           }))) {
-        // Sequence playback retains the driver's physical, direction-specific
-        // result for each active split. The static Instrument range is only the
-        // symmetric channel capacity used for MIDI and live input; simultaneous
-        // voices with different ranges cannot be expressed on one MIDI channel.
-        instruments.warning("SonyPS2 split- or direction-specific pitch bends use one live-input channel range",
-                            reader.range(program.offset, kProgramBytes));
-        warnedBendRange = true;
-      }
-      if (!warnedLfoAsymmetry && (unsupportedLfoDepthPair(program.pitchPositive, program.pitchNegative) ||
-                                  unsupportedLfoDepthPair(program.midiPitchPositive, program.midiPitchNegative) ||
-                                  unsupportedLfoDepthPair(program.ampPositive, program.ampNegative) ||
-                                  unsupportedLfoDepthPair(program.midiAmpPositive, program.midiAmpNegative))) {
-        // The driver selects independently signed depths for each waveform
-        // half. The synth model can retain only one symmetric magnitude.
-        instruments.warning("SonyPS2 signed or asymmetric LFO half-cycle depths are reduced to a symmetric maximum",
-                            reader.range(program.offset, kProgramBytes));
-        warnedLfoAsymmetry = true;
-      }
-      const bool programWet = std::ranges::any_of(splits, [&](const SplitParam& split) {
-        if (split.sampleSet >= sampleSets->entries.size() || !sampleSets->entries[split.sampleSet]) {
-          return false;
-        }
-        const u32 sampleSetOffset = *sampleSets->entries[split.sampleSet];
-        if (!reader.has(sampleSetOffset, 4)) {
-          return false;
-        }
-        const u8 count = reader.u8At(sampleSetOffset + 3);
-        if (!reader.has(sampleSetOffset + 4, static_cast<u64>(count) * 2)) {
-          return false;
-        }
-        for (u32 number = 0; number < count; ++number) {
-          const u16 index = reader.le16(sampleSetOffset + 4 + number * 2);
-          if (index < samples->entries.size() && samples->entries[index] &&
-              reader.has(*samples->entries[index], kSampleBytes) &&
-              (reader.u8At(*samples->entries[index] + 41) & 0x0c) != 0) {
-            return true;
-          }
-        }
-        return false;
-      });
-      layout.runtimePrograms.push_back(runtime);
-      auto instrument = instruments.append(Instrument{
-          .explicitAddress = InstrumentAddress{.bank = 0, .program = programIndex},
-          .identity = instrumentIdentity(0, static_cast<u8>(programIndex)),
-          .pitchBendRangeCents = static_cast<u16>(std::min<u32>(
-              65535, (std::max(runtime.pitchBendPositive, runtime.pitchBendNegative) * 100u + 127u) / 128u)),
-          .reverb = programWet ? reverbSend(layout) : 0.0,
-          .name = fmt::format("Program {}", programIndex),
-          .range = reader.range(*programOffset, kProgramBytes),
-      });
-      instrument.source(instrument.value().name, reader.range(*programOffset, kProgramBytes), "sony-ps2-program");
-
-      for (const auto& split : splits) {
-        if (split.sampleSet >= sampleSets->entries.size() || !sampleSets->entries[split.sampleSet]) {
-          continue;
-        }
-        const u32 sampleSetOffset = *sampleSets->entries[split.sampleSet];
-        if (!reader.has(sampleSetOffset, 4)) {
-          continue;
-        }
-        const u8 velocityCurveType = reader.u8At(sampleSetOffset);
-        if ((velocityCurveType & 0xf0) != 0 && !warnedCustomVelocityCurve) {
-          instruments.warning("SonyPS2 application-supplied velocity remap tables are unavailable; using the "
-                              "selected built-in curve",
-                              reader.range(sampleSetOffset, 1));
-          warnedCustomVelocityCurve = true;
-        }
-        const int sampleSetVelocityLow = std::clamp<int>(reader.u8At(sampleSetOffset + 1) & 0x7f, 1, 127);
-        const int sampleSetVelocityHigh = std::clamp<int>(reader.u8At(sampleSetOffset + 2) & 0x7f, 1, 127);
-        const u8 sampleCount = reader.u8At(sampleSetOffset + 3);
-        if (!reader.has(sampleSetOffset + 4, static_cast<u64>(sampleCount) * 2)) {
-          continue;
-        }
-        for (u32 sampleNumber = 0; sampleNumber < sampleCount; ++sampleNumber) {
-          const u16 sampleIndex = reader.le16(sampleSetOffset + 4 + sampleNumber * 2);
-          if (sampleIndex >= samples->entries.size() || !samples->entries[sampleIndex] ||
-              !reader.has(*samples->entries[sampleIndex], kSampleBytes)) {
-            continue;
-          }
-          const SampleParam sample = readSample(reader, *samples->entries[sampleIndex]);
-          if (((sample.velocityPitchCurve | sample.velocityAmpCurve) & 0xf0) != 0 && !warnedCustomVelocityCurve) {
-            instruments.warning("SonyPS2 application-supplied velocity remap tables are unavailable; using the "
-                                "selected built-in curve",
-                                reader.range(sample.offset, kSampleBytes));
-            warnedCustomVelocityCurve = true;
-          }
-          const bool mixedPitchDepth = pitchLfoStartsAtKeyOn(sample.lfoAttributes) && program.pitchWave != 0 &&
-                                       program.pitchCycle != 0 &&
-                                       (program.midiPitchPositive != 0 || program.midiPitchNegative != 0) &&
-                                       (program.pitchPositive != 0 || program.pitchNegative != 0 ||
-                                        split.keyFollowPitch != 0 || sample.velocityPitch != 0);
-          const bool mixedAmpDepth = ampLfoStartsAtKeyOn(sample.lfoAttributes) && program.ampWave != 0 &&
-                                     program.ampCycle != 0 &&
-                                     (program.midiAmpPositive != 0 || program.midiAmpNegative != 0) &&
-                                     (program.ampPositive != 0 || program.ampNegative != 0 || split.keyFollowAmp != 0 ||
-                                      sample.velocityAmp != 0);
-          if (!warnedLfoCombination && (mixedPitchDepth || mixedAmpDepth)) {
-            instruments.warning("SonyPS2 additive fixed and controller LFO depths share one synth modulation mode; "
-                                "the fixed component is retained",
-                                reader.range(sample.offset, kSampleBytes));
-            warnedLfoCombination = true;
-          }
-          if ((sample.group != 0 || sample.priority != 0) && !warnedVoicePolicy) {
-            // These fields control admission and stealing of live SPU2 voices;
-            // they do not alter a region's static synthesis parameters.
-            instruments.warning("SonyPS2 voice groups and priorities have no synth-model equivalent",
-                                reader.range(sample.offset, kSampleBytes));
-            warnedVoicePolicy = true;
-          }
-          if (sample.routing != 0 && !warnedRouting) {
-            // Preserve effect-send capability as Instrument::reverb. The exact
-            // dry/wet left/right matrix and SPU2 core selection need a routing model.
-            instruments.warning("SonyPS2 reverb algorithm, SPU2 core, and dry/wet routing are reduced to a generic "
-                                "instrument reverb send",
-                                reader.range(sample.offset, kSampleBytes));
-            warnedRouting = true;
-          }
-          if (sample.pan < 0 && !warnedPanPhase) {
-            instruments.warning("SonyPS2 negative-phase pan is reduced to ordinary stereo position",
-                                reader.range(sample.offset, kSampleBytes));
-            warnedPanPhase = true;
-          }
-          if (sample.vag == 0xffff) {
-            if (!warnedNoise) {
-              instruments.warning("SonyPS2 noise-generator regions cannot be represented as sampled regions",
-                                  reader.range(sample.offset, kSampleBytes));
-              warnedNoise = true;
-            }
-            continue;
-          }
-          if (sample.vag >= layout.vags.size() || !layout.vags[sample.vag]) {
-            continue;
-          }
-          const VagInfo& vag = *layout.vags[sample.vag];
-          const int keyLow = std::min<int>(split.low & 0x7f, 127);
-          const int keyHigh = std::min<int>(split.high & 0x7f, 127);
-          const int rawVelocityLow = std::max<int>(sampleSetVelocityLow, sample.low & 0x7f);
-          const int rawVelocityHigh = std::min<int>(sampleSetVelocityHigh, sample.high & 0x7f);
-          if (rawVelocityLow > rawVelocityHigh) {
-            continue;
-          }
-          const int targetVelocityLow = midiVelocity(static_cast<u8>(rawVelocityLow));
-          const int targetVelocityHigh = midiVelocity(static_cast<u8>(rawVelocityHigh));
-          const bool splitKeys = keyDependent(program, split, sample);
-          const bool splitVelocities = velocityDependent(sample) || velocityCurveType != 0;
-          for (int key = keyLow; key <= keyHigh;) {
-            const int emittedKeyHigh =
-                splitKeys ? std::min(key + static_cast<int>(resolution.step) - 1, keyHigh) : keyHigh;
-            const int representedKey = splitKeys ? key + (emittedKeyHigh - key) / 2
-                                                 : std::clamp<int>(split.keyFollowPitchCenter, keyLow, keyHigh);
-            for (int targetVelocity = targetVelocityLow; targetVelocity <= targetVelocityHigh;) {
-              const int emittedVelocityHigh = splitVelocities
-                                                  ? std::min(targetVelocity + static_cast<int>(resolution.step) - 1,
-                                                             targetVelocityHigh)
-                                                  : targetVelocityHigh;
-              const int representedTargetVelocity =
-                  splitVelocities ? targetVelocity + (emittedVelocityHigh - targetVelocity) / 2
-                                  : midiVelocity(static_cast<u8>(std::clamp<int>(sample.velocityAmpCenter,
-                                                                                rawVelocityLow, rawVelocityHigh)));
-              const int representedRawVelocity =
-                  splitVelocities ? std::clamp<int>(rawVelocityFromMidi(static_cast<u8>(representedTargetVelocity)),
-                                                    rawVelocityLow, rawVelocityHigh)
-                                  : std::clamp<int>(sample.velocityAmpCenter, rawVelocityLow, rawVelocityHigh);
-              const double keyGain = crossfade(split.low, split.cross, split.high, representedKey);
-              const double velocityFade = crossfade(sample.low, sample.cross, sample.high, representedRawVelocity);
-              // Region ranges are selected by target MIDI velocity, while all
-              // driver curves are evaluated in Sony's linear source domain.
-              const double velocityCorrection = velocityCurveCorrection(velocityCurveType, representedRawVelocity,
-                                                                        static_cast<u8>(representedTargetVelocity));
-              const double gain = gainFromRaw(program.volume) * gainFromRaw(split.volume) * gainFromRaw(sample.volume) *
-                                  keyGain * velocityFade * velocityCorrection;
-              const int rawPan = regionPan(program, split, sample, representedKey);
-              Region region{
-                  .keyRange = KeyRange{static_cast<u8>(key), static_cast<u8>(emittedKeyHigh)},
-                  .velocityRange = VelocityRange{static_cast<u8>(targetVelocity), static_cast<u8>(emittedVelocityHigh)},
-                  .range = reader.range(sample.offset, kSampleBytes),
-                  .unityKey = sample.baseNote - program.transpose - split.transpose -
-                              (program.detune + split.detune + sample.detune) / 128.0 +
-                              12.0 * std::log2(48000.0 / vag.sampleRate),
-                  .envelope = keyFollowEnvelope(sample, representedKey),
-                  .pan = panPositionFrom7Bit(static_cast<u8>(rawPan)),
-                  .attenuationDb = attenuation(gain),
-                  .modulation = modulation(program, split, sample, representedKey, representedRawVelocity),
-              };
-              instrument.region(SampleRef::unbound(sample.vag), std::move(region))
-                  .source("Sample region", reader.range(sample.offset, kSampleBytes), "sony-ps2-sample-param");
-              targetVelocity = emittedVelocityHigh + 1;
-            }
-            key = emittedKeyHigh + 1;
-          }
-          if ((unsupportedLfoWaveform(program.pitchWave) || unsupportedLfoWaveform(program.ampWave)) &&
-              !warnedLfoShape) {
-            instruments.warning("SonyPS2 custom or unknown LFO waveform is unavailable; the LFO is disabled",
-                                reader.range(program.offset, kProgramBytes));
-            warnedLfoShape = true;
-          }
-          if ((program.pitchPhase != 0 || program.ampPhase != 0 || program.pitchRandomPhase != 0 ||
-               program.ampRandomPhase != 0 || sample.pitchFade != 0 || sample.ampFade != 0) &&
-              !warnedLfoPhase) {
-            // The model deliberately retains physical depth/rate/delay while
-            // phase, random phase, and fade-in await a richer LFO type.
-            instruments.warning("SonyPS2 LFO phase, random phase, or fade behavior is not representable",
-                                reader.range(sample.offset, kSampleBytes));
-            warnedLfoPhase = true;
-          }
-          if (hasKeyOffLfoTrigger(sample.lfoAttributes) && !warnedLfoKeyOff) {
-            instruments.warning("SonyPS2 key-off LFO triggering has no synth-model equivalent",
-                                reader.range(sample.offset, kSampleBytes));
-            warnedLfoKeyOff = true;
-          }
-        }
-      }
-      if (((program.attributes & 1) != 0 || program.pan < 0 ||
-           std::ranges::any_of(
-               splits, [](const SplitParam& split) { return split.pan < 0; })) &&
-          !warnedPanPhase) {
-        // ROUND_PAN and the driver's negative pan values can invert SPU output
-        // phase. Region::pan can preserve position but not that phase inversion.
-        instruments.warning("SonyPS2 round-pan phase inversion is reduced to ordinary stereo position",
-                            reader.range(program.offset, kProgramBytes));
-        warnedPanPhase = true;
-      }
+    for (const auto& program : definition.programs) {
+      addProgramDefinition(instruments, reader, layout, definition, program, resolution, warnings);
     }
   }
-
   if (setb) {
     instruments.source(SourceRole::Table, "SonyPS2 Setb chunk", reader.range(setb->offset, setb->size),
                        "sony-ps2-setb");
-    bool warnedSetbVoicePolicy = false;
-    for (u32 setIndex = 0; setIndex < setb->entries.size(); ++setIndex) {
-      const auto setOffset = setb->entries[setIndex];
-      if (!setOffset || !reader.has(*setOffset, 4)) {
-        continue;
-      }
-      const u32 maximumTimbre = reader.le32(*setOffset);
-      if (maximumTimbre >= 128 || !reader.has(*setOffset + 4, static_cast<u64>(maximumTimbre + 1) * 4)) {
-        continue;
-      }
-      for (u32 timbreIndex = 0; timbreIndex <= maximumTimbre; ++timbreIndex) {
-        const u32 timbreRelative = reader.le32(*setOffset + 4 + timbreIndex * 4);
-        if (timbreRelative == 0xffffffff || timbreRelative >= setb->size) {
-          continue;
-        }
-        const u32 timbreOffset = setb->offset + timbreRelative;
-        if (!reader.has(timbreOffset, 8)) {
-          continue;
-        }
-        const u32 noteBlockOffset = timbreOffset + reader.le32(timbreOffset);
-        const u8 noteBytes = reader.u8At(timbreOffset + 4);
-        const u8 noteLow = reader.u8At(timbreOffset + 5);
-        const u8 noteHigh = reader.u8At(timbreOffset + 6);
-        if (noteBytes < 50 || noteLow > noteHigh ||
-            !reader.has(noteBlockOffset, static_cast<u64>(noteHigh - noteLow + 1) * noteBytes)) {
-          continue;
-        }
-        bool wet = false;
-        for (u32 note = noteLow; note <= noteHigh; ++note) {
-          wet |= (reader.u8At(noteBlockOffset + (note - noteLow) * noteBytes + 13) & 0x0c) != 0;
-        }
-        auto instrument = instruments.append(Instrument{
-            .explicitAddress = InstrumentAddress{.bank = 128 + setIndex, .program = timbreIndex},
-            .identity = setbInstrumentIdentity(static_cast<u8>(setIndex), static_cast<u8>(timbreIndex)),
-            .reverb = wet ? reverbSend(layout) : 0.0,
-            .name = fmt::format("SE Set {} Timbre {}", setIndex, timbreIndex),
-            .range = reader.range(timbreOffset, 8),
-        });
-        instrument.source(instrument.value().name, reader.range(timbreOffset, 8), "sony-ps2-setb-timbre");
-        for (u32 note = noteLow; note <= noteHigh; ++note) {
-          const u32 noteOffset = noteBlockOffset + (note - noteLow) * noteBytes;
-          const u16 vagIndex = reader.le16(noteOffset);
-          if (vagIndex == 0xffff) {
-            if (!warnedNoise) {
-              instruments.warning("SonyPS2 noise-generator regions cannot be represented as sampled regions",
-                                  reader.range(noteOffset, noteBytes));
-              warnedNoise = true;
-            }
-            continue;
-          }
-          if (vagIndex >= layout.vags.size() || !layout.vags[vagIndex]) {
-            continue;
-          }
-          const VagInfo& vag = *layout.vags[vagIndex];
-          const u8 routing = reader.u8At(noteOffset + 13);
-          if (routing != 0 && !warnedRouting) {
-            instruments.warning("SonyPS2 reverb algorithm, SPU2 core, and dry/wet routing are reduced to a generic "
-                                "instrument reverb send",
-                                reader.range(noteOffset, noteBytes));
-            warnedRouting = true;
-          }
-          const u8 curve = reader.u8At(noteOffset + 2);
-          const s8 velocityPitch = static_cast<s8>(reader.u8At(noteOffset + 42));
-          const s8 velocityAmp = static_cast<s8>(reader.u8At(noteOffset + 43));
-          const u8 velocityPitchCenter = reader.u8At(noteOffset + 44);
-          const u8 velocityAmpCenter = reader.u8At(noteOffset + 45);
-          const u8 velocityPitchCurve = reader.u8At(noteOffset + 46);
-          const u8 velocityAmpCurve = reader.u8At(noteOffset + 47);
-          if (((curve | velocityPitchCurve | velocityAmpCurve) & 0xf0) != 0 && !warnedCustomVelocityCurve) {
-            instruments.warning("SonyPS2 application-supplied velocity remap tables are unavailable; using the "
-                                "selected built-in curve",
-                                reader.range(noteOffset, noteBytes));
-            warnedCustomVelocityCurve = true;
-          }
-          ProgramParam lfo{
-              .volume = reader.u8At(noteOffset + 3),
-              .pan = static_cast<s8>(reader.u8At(noteOffset + 4)),
-              .transpose = static_cast<s8>(reader.u8At(noteOffset + 5)),
-              .detune = static_cast<s8>(reader.u8At(noteOffset + 6)),
-              .pitchWave = reader.u8At(noteOffset + 18),
-              .ampWave = reader.u8At(noteOffset + 19),
-              .pitchPhase = reader.u8At(noteOffset + 20),
-              .ampPhase = reader.u8At(noteOffset + 21),
-              .pitchRandomPhase = reader.u8At(noteOffset + 22),
-              .ampRandomPhase = reader.u8At(noteOffset + 23),
-              .pitchCycle = reader.le16(noteOffset + 24),
-              .ampCycle = reader.le16(noteOffset + 26),
-              .pitchPositive = static_cast<s16>(reader.le16(noteOffset + 28)),
-              .pitchNegative = static_cast<s16>(reader.le16(noteOffset + 30)),
-              .ampPositive = static_cast<s8>(reader.u8At(noteOffset + 32)),
-              .ampNegative = static_cast<s8>(reader.u8At(noteOffset + 33)),
-          };
-          SplitParam neutralSplit{.low = static_cast<u8>(note),
-                                  .cross = static_cast<u8>(note),
-                                  .high = static_cast<u8>(note),
-                                  .volume = 128,
-                                  .pan = 64};
-          SampleParam lfoSample{
-              .velocityPitch = velocityPitch,
-              .velocityPitchCenter = velocityPitchCenter,
-              .velocityPitchCurve = velocityPitchCurve,
-              .velocityAmp = velocityAmp,
-              .velocityAmpCenter = velocityAmpCenter,
-              .velocityAmpCurve = velocityAmpCurve,
-              .baseNote = static_cast<u8>(note),
-              .adsr1 = reader.le16(noteOffset + 14),
-              .adsr2 = reader.le16(noteOffset + 16),
-              .pitchDelay = reader.le16(noteOffset + 34),
-              .pitchFade = reader.le16(noteOffset + 38),
-              .ampDelay = reader.le16(noteOffset + 36),
-              .ampFade = reader.le16(noteOffset + 40),
-              .lfoAttributes = reader.u8At(noteOffset + 49),
-          };
-          if ((unsupportedLfoWaveform(lfo.pitchWave) || unsupportedLfoWaveform(lfo.ampWave)) && !warnedLfoShape) {
-            instruments.warning("SonyPS2 custom or unknown LFO waveform is unavailable; the LFO is disabled",
-                                reader.range(noteOffset, noteBytes));
-            warnedLfoShape = true;
-          }
-          if ((lfo.pitchPhase != 0 || lfo.ampPhase != 0 || lfo.pitchRandomPhase != 0 || lfo.ampRandomPhase != 0 ||
-               lfoSample.pitchFade != 0 || lfoSample.ampFade != 0) &&
-              !warnedLfoPhase) {
-            instruments.warning("SonyPS2 LFO phase, random phase, or fade behavior is not representable",
-                                reader.range(noteOffset, noteBytes));
-            warnedLfoPhase = true;
-          }
-          if (hasKeyOffLfoTrigger(lfoSample.lfoAttributes) && !warnedLfoKeyOff) {
-            instruments.warning("SonyPS2 key-off LFO triggering has no synth-model equivalent",
-                                reader.range(noteOffset, noteBytes));
-            warnedLfoKeyOff = true;
-          }
-          if (!warnedLfoAsymmetry && (unsupportedLfoDepthPair(lfo.pitchPositive, lfo.pitchNegative) ||
-                                      unsupportedLfoDepthPair(lfo.ampPositive, lfo.ampNegative))) {
-            instruments.warning("SonyPS2 signed or asymmetric LFO half-cycle depths are reduced to a symmetric maximum",
-                                reader.range(noteOffset, noteBytes));
-            warnedLfoAsymmetry = true;
-          }
-          const bool velocityZones = curve != 0 || velocityPitch != 0 || velocityAmp != 0;
-          const int targetVelocityLow = midiVelocity(1);
-          for (int targetVelocity = targetVelocityLow; targetVelocity <= 127;) {
-            const int emittedHigh = velocityZones
-                                        ? std::min(targetVelocity + static_cast<int>(resolution.step) - 1, 127)
-                                        : 127;
-            const int representedTargetVelocity =
-                velocityZones ? targetVelocity + (emittedHigh - targetVelocity) / 2 : 127;
-            const int representedRawVelocity =
-                velocityZones ? rawVelocityFromMidi(static_cast<u8>(representedTargetVelocity)) : 127;
-            const double curveCorrection =
-                velocityCurveCorrection(curve, representedRawVelocity, static_cast<u8>(representedTargetVelocity));
-            const double gain = gainFromRaw(lfo.volume) * curveCorrection;
-            Region region{
-                .keyRange = KeyRange{static_cast<u8>(note), static_cast<u8>(note)},
-                .velocityRange = VelocityRange{static_cast<u8>(targetVelocity), static_cast<u8>(emittedHigh)},
-                .range = reader.range(noteOffset, noteBytes),
-                .unityKey = note - lfo.transpose - lfo.detune / 128.0 + 12.0 * std::log2(48000.0 / vag.sampleRate),
-                .envelope = psxSpuEnvelope(lfoSample.adsr1, lfoSample.adsr2, PsxSpuGeneration::Ps2),
-                .pan = panPositionFrom7Bit(static_cast<u8>(panMagnitude(lfo.pan))),
-                .attenuationDb = attenuation(gain),
-                .modulation = modulation(lfo, neutralSplit, lfoSample, note, representedRawVelocity),
-            };
-            instrument.region(SampleRef::unbound(vagIndex), std::move(region))
-                .source("SE timbre note", reader.range(noteOffset, noteBytes), "sony-ps2-setb-note");
-            targetVelocity = emittedHigh + 1;
-          }
-          if ((reader.u8At(noteOffset + 7) != 0 || reader.u8At(noteOffset + 8) != 0 ||
-               reader.u8At(noteOffset + 9) != 0) &&
-              !warnedSetbVoicePolicy) {
-            // Group limits and priorities affect voice stealing rather than
-            // the static sound of an exported region.
-            instruments.warning("SonyPS2 Setb group limits and voice priorities have no synth-model equivalent",
-                                reader.range(noteOffset, noteBytes));
-            warnedSetbVoicePolicy = true;
-          }
-          if (((reader.u8At(noteOffset + 12) & 1) != 0 || lfo.pan < 0) && !warnedPanPhase) {
-            instruments.warning("SonyPS2 round- or negative-phase pan is reduced to ordinary stereo position",
-                                reader.range(noteOffset, noteBytes));
-            warnedPanPhase = true;
-          }
-        }
-      }
-    }
+    addSetbDefinitions(instruments, reader, layout, definition, resolution, warnings);
   }
   bank.data(std::move(layout));
 }

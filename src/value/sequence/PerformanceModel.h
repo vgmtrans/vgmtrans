@@ -162,9 +162,6 @@ struct ChannelPanPerformanceEvent {
   // is hard right. The controller is applied additively to every voice's
   // intrinsic pan rather than describing the final mixed stereo position.
   double position = 0.5;
-  // The voice-side law is metadata for targets that combine the controller
-  // with instrument pan; the controller itself must not change channel gain.
-  PanLaw voicePanLaw = PanLaw::Unspecified;
 };
 
 struct StereoBalancePerformanceEvent {
