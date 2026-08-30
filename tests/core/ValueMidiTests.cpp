@@ -1658,6 +1658,47 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
          "a same-voice transition should replace its starting bend and yield to a later source bend");
 }
 
+void performanceMidiRendererExpandsRangeForComposedPitchLayers() {
+  PerformanceTrack track{.id = TrackId{0}, .endTick = 16};
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track, CommandId{15}, SourceAnnotationId{16}, 0, nextSequence, nextNote, nextAutomation};
+  constexpr PitchBendLayerId secondLayer{1};
+
+  out.note(60, 1.0, 8);
+  out.at(1).pitchBend(2.0);
+  out.at(2).pitchBend(2.0, secondLayer);
+  out.at(8).pitchBend(0.0);
+  out.at(8).pitchBend(0.0, secondLayer);
+  out.at(8).instrument(0, 1);
+  out.at(9).note(60, 1.0, 7);
+  PitchBendPerformanceEvent normalizedBend{.semitones = 1.5, .normalizedWheelPosition = 0.75};
+  out.at(10).pitchBend(normalizedBend);
+  normalizedBend.layer = secondLayer;
+  out.at(11).pitchBend(normalizedBend);
+  out.at(12).instrument(0, 2);
+
+  const PerformanceSequence performance{.timebase = Timebase{.ppqn = 48}, .tracks = {track}};
+  const SoundBankAsset soundBank{.instruments = {
+                                     Instrument{.explicitAddress = InstrumentAddress{.bank = 0, .program = 1},
+                                                .pitchBendRangeCents = 400},
+                                     Instrument{.explicitAddress = InstrumentAddress{.bank = 0, .program = 2},
+                                                .pitchBendRangeCents = 200},
+                                 }};
+  const std::array<const SoundBankAsset*, 1> soundBanks{&soundBank};
+  const MidiSequence midi =
+      renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, soundBanks);
+  const auto& events = midi.tracks[0].events;
+  const auto updatedBend = std::ranges::find_if(events, [](const MidiEvent& event) {
+    const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+    return bend != nullptr && event.tick == 12 && bend->value == 4096;
+  });
+  expect(midiPitchBendRanges(events) == std::vector<std::pair<u64, u16>>{{0, 400}, {9, 600}} &&
+             updatedBend != events.end(),
+         "composed layers should expand the voice range and follow normalized-wheel range changes");
+}
+
 void performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes() {
   PerformanceTrack track{
       .id = TrackId{0},
@@ -2988,6 +3029,7 @@ void runValueMidiTests() {
   performanceMidiLoweringAppliesPitchResetsBeforeLaterTransitions();
   performanceMidiRendererLeavesTerminalPitchBentWithoutAnotherAttack();
   performanceMidiRendererCombinesSourceBendWithPitchTransitions();
+  performanceMidiRendererExpandsRangeForComposedPitchLayers();
   performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes();
   performanceMidiRendererResolvesSourceInstrumentIdentityAtExport();
   performanceMidiRendererQuantizesPitchBendAndPortamento();
