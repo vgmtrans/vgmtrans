@@ -365,9 +365,49 @@ struct SimulatedLfoState {
   bool producedSample = false;
 };
 
-struct PitchBendLayerState {
-  double semitones = 0.0;
-  std::optional<double> normalizedWheelPosition;
+[[nodiscard]] u16 wholeSemitonePitchBendRangeCents(u16 cents) {
+  constexpr u32 kMinimumRangeCents = 200;
+  constexpr u32 kMaximumWholeSemitoneRangeCents = 12'700;
+  const u32 clamped = std::clamp<u32>(cents, kMinimumRangeCents, kMaximumWholeSemitoneRangeCents);
+  return static_cast<u16>(((clamped + 99) / 100) * 100);
+}
+
+// Pitch layers are persistent and additive. Keep their replacement semantics
+// and source-wheel conversion in one place so range planning and rendering
+// cannot disagree about the resulting pitch.
+class PitchBendLayers {
+ public:
+  void apply(const PitchBendPerformanceEvent& bend) {
+    const double normalized = std::clamp(bend.normalizedWheelPosition.value_or(0.0), -1.0, 1.0);
+    if (bend.semitones == 0.0 && normalized == 0.0) {
+      layers.erase(bend.layer);
+      return;
+    }
+    layers.insert_or_assign(
+        bend.layer,
+        Layer{
+            .semitones = bend.semitones,
+            .normalizedWheelPosition = bend.normalizedWheelPosition ? std::optional{normalized} : std::nullopt,
+        });
+  }
+
+  [[nodiscard]] double semitones(u16 sourceRangeCents, std::optional<u16> instrumentRangeCents) const {
+    const double wheelRange = instrumentRangeCents.value_or(sourceRangeCents) / 100.0;
+    double total = 0.0;
+    for (const auto& entry : layers) {
+      const auto& layer = entry.second;
+      total += layer.normalizedWheelPosition ? *layer.normalizedWheelPosition * wheelRange : layer.semitones;
+    }
+    return total;
+  }
+
+ private:
+  struct Layer {
+    double semitones = 0.0;
+    std::optional<double> normalizedWheelPosition;
+  };
+
+  std::unordered_map<PitchBendLayerId, Layer> layers;
 };
 
 struct RenderTrackState {
@@ -384,7 +424,7 @@ struct RenderTrackState {
   std::optional<u16> instrumentPitchBendRangeCents;
   std::optional<u16> voicePitchBendRangeCents;
   double tuningBendSemitones = 0.0;
-  std::unordered_map<PitchBendLayerId, PitchBendLayerState> pitchBendLayers;
+  PitchBendLayers pitchBendLayers;
   double simulatedVibratoSemitones = 0.0;
   SimulatedLfoState vibrato;
   std::optional<s16> lastPitchBendValue;
@@ -503,14 +543,16 @@ struct VoicePitchBendRangeChange {
 // Pitch-bend sensitivity is channel state. Reserve one stable range from each
 // physical attack through every linked note in that sounding voice.
 [[nodiscard]] std::vector<VoicePitchBendRangeChange> planVoicePitchBendRanges(const PerformanceTimeline& timeline,
-                                                                              MidiTuningRendering tuningRendering) {
+                                                                              MidiTuningRendering tuningRendering,
+                                                                              std::span<const SoundBankAsset* const>
+                                                                                  soundBanks) {
   struct Voice {
     u64 startTick = 0;
     u64 startSequence = 0;
     u16 sourceCents = 200;
     double bendExtent = 0.0;
     bool hasAutomatedBend = false;
-    bool hasTuningBend = false;
+    bool exceedsAvailableRange = false;
   };
 
   std::vector<Voice> voices;
@@ -524,50 +566,55 @@ struct VoicePitchBendRangeChange {
   size_t nextVoice = 0;
   size_t activeVoice = voices.size();
   u16 sourceCents = 200;
-  std::unordered_map<PitchBendLayerId, double> activeBendLayers;
-  double activeBend = 0.0;
+  std::optional<u16> instrumentCents =
+      instrumentSelection(InstrumentPerformanceEvent{}, soundBanks).pitchBendRangeCents;
+  PitchBendLayers activeBendLayers;
   double activeTuningBend = 0.0;
+  const auto observePitch = [&] {
+    if (activeVoice == voices.size()) {
+      return;
+    }
+    auto& voice = voices[activeVoice];
+    const double bend = activeTuningBend + activeBendLayers.semitones(sourceCents, instrumentCents);
+    voice.bendExtent = std::max(voice.bendExtent, std::abs(bend));
+    const u16 availableCents = wholeSemitonePitchBendRangeCents(
+        std::max(sourceCents, instrumentCents.value_or(static_cast<u16>(0))));
+    voice.exceedsAvailableRange |= std::abs(bend) * 100.0 > availableCents;
+  };
   for (const auto* event : timeline) {
     const auto& header = performanceEventHeader(*event);
     while (nextVoice < voices.size() && std::tie(voices[nextVoice].startTick, voices[nextVoice].startSequence) <=
                                             std::tie(header.tick, header.sequence)) {
       activeVoice = nextVoice++;
       voices[activeVoice].sourceCents = sourceCents;
-      voices[activeVoice].bendExtent = std::abs(activeTuningBend + activeBend);
-      voices[activeVoice].hasTuningBend = activeTuningBend != 0.0;
+      observePitch();
     }
     if (const auto* range = std::get_if<PitchBendRangePerformanceEvent>(event)) {
-      sourceCents = std::max<u16>(200, range->cents);
+      sourceCents = range->cents;
+      observePitch();
+    } else if (const auto* instrument = std::get_if<InstrumentPerformanceEvent>(event)) {
+      instrumentCents = instrumentSelection(*instrument, soundBanks).pitchBendRangeCents;
+      observePitch();
     } else if (const auto* tuning = std::get_if<TuningPerformanceEvent>(event)) {
       activeTuningBend = tuningBendSemitones(tuning->cents, tuningRendering);
-      if (activeVoice == voices.size()) {
-        continue;
-      }
-      auto& voice = voices[activeVoice];
-      voice.bendExtent = std::max(voice.bendExtent, std::abs(activeTuningBend + activeBend));
-      voice.hasTuningBend |= activeTuningBend != 0.0;
+      observePitch();
     } else if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(event)) {
-      activeBendLayers[bend->layer] = bend->semitones;
-      activeBend = 0.0;
-      for (const auto& entry : activeBendLayers) {
-        activeBend += entry.second;
-      }
+      activeBendLayers.apply(*bend);
       if (activeVoice != voices.size()) {
-        auto& voice = voices[activeVoice];
-        voice.bendExtent = std::max(voice.bendExtent, std::abs(activeTuningBend + activeBend));
-        voice.hasAutomatedBend |= bend->header.automation.has_value();
+        voices[activeVoice].hasAutomatedBend |= bend->header.automation.has_value();
       }
+      observePitch();
     }
   }
 
   std::vector<VoicePitchBendRangeChange> changes;
   std::optional<u16> activeRange;
   for (const auto& voice : voices) {
-    const u16 requiredCents = static_cast<u16>(std::clamp(std::ceil(voice.bendExtent * 100.0), 0.0, 12'700.0));
-    const std::optional<u16> range =
-        voice.hasAutomatedBend || (voice.hasTuningBend && requiredCents > voice.sourceCents)
-            ? std::optional{std::max<u16>(200, requiredCents)}
-            : std::nullopt;
+    const u16 requiredCents = static_cast<u16>(
+        std::clamp(std::ceil(voice.bendExtent * 100.0), 0.0, 12'700.0));
+    const std::optional<u16> range = voice.hasAutomatedBend || voice.exceedsAvailableRange
+                                         ? std::optional{std::max<u16>(200, requiredCents)}
+                                         : std::nullopt;
     if (range != activeRange) {
       changes.push_back(VoicePitchBendRangeChange{
           .tick = voice.startTick,
@@ -650,13 +697,7 @@ bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePer
 }
 
 [[nodiscard]] double layeredPitchBendSemitones(const RenderTrackState& state) {
-  const double wheelRange = state.instrumentPitchBendRangeCents.value_or(state.sourcePitchBendRangeCents) / 100.0;
-  double total = 0.0;
-  for (const auto& entry : state.pitchBendLayers) {
-    const auto& bend = entry.second;
-    total += bend.normalizedWheelPosition ? *bend.normalizedWheelPosition * wheelRange : bend.semitones;
-  }
-  return total;
+  return state.pitchBendLayers.semitones(state.sourcePitchBendRangeCents, state.instrumentPitchBendRangeCents);
 }
 
 [[nodiscard]] u16 requiredPitchBendRangeCents(const RenderTrackState& state) {
@@ -681,13 +722,6 @@ bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePer
   return modulationConversion == ModulationConversionPolicy::SequenceEventSimulation
              ? std::max(range, requiredPitchBendRangeCents(state))
              : range;
-}
-
-[[nodiscard]] u16 wholeSemitonePitchBendRangeCents(u16 cents) {
-  constexpr u32 kMinimumRangeCents = 200;
-  constexpr u32 kMaximumWholeSemitoneRangeCents = 12'700;
-  const u32 clamped = std::clamp<u32>(cents, kMinimumRangeCents, kMaximumWholeSemitoneRangeCents);
-  return static_cast<u16>(((clamped + 99) / 100) * 100);
 }
 
 void ensurePitchBendRange(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, u16 cents) {
@@ -727,11 +761,12 @@ void addPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channe
                                                                                       : 0.0);
 }
 
-void ensurePitchBendRangePreservingPitch(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, u16 cents,
-                                         ModulationConversionPolicy modulationConversion) {
-  const u16 previousRange = state.pitchBendRangeCents;
+void refreshPitchBendRange(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, u16 cents,
+                           ModulationConversionPolicy modulationConversion) {
   ensurePitchBendRange(track, state, tick, channel, cents);
-  if (state.pitchBendRangeCents != previousRange && state.lastPitchBendValue) {
+  if (state.lastPitchBendValue) {
+    // A source or instrument range can reinterpret a normalized layer even
+    // when whole-semitone MIDI sensitivity remains unchanged.
     addPitchBend(track, state, tick, channel,
                  midiPitchBend(currentPitchBendSemitones(state, modulationConversion), state.pitchBendRangeCents));
   }
@@ -742,10 +777,11 @@ void applyInstrumentPitchBendRange(MidiTrack& track, RenderTrackState& state, u6
   const u16 previousRange = effectivePitchBendRangeCents(state, modulationConversion);
   state.instrumentPitchBendRangeCents = cents;
   const u16 range = effectivePitchBendRangeCents(state, modulationConversion);
-  if (wholeSemitonePitchBendRangeCents(range) == wholeSemitonePitchBendRangeCents(previousRange)) {
+  if (!state.lastPitchBendValue &&
+      wholeSemitonePitchBendRangeCents(range) == wholeSemitonePitchBendRangeCents(previousRange)) {
     return;
   }
-  ensurePitchBendRangePreservingPitch(track, state, tick, channel, range, modulationConversion);
+  refreshPitchBendRange(track, state, tick, channel, range, modulationConversion);
 }
 
 void applyInstrumentSelection(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
@@ -771,8 +807,8 @@ void applyVoicePitchBendRangeChange(MidiTrack& track, RenderTrackState& state, c
                                     u8 channel, ModulationConversionPolicy modulationConversion) {
   state.sourcePitchBendRangeCents = change.sourceCents;
   state.voicePitchBendRangeCents = change.voiceCents;
-  ensurePitchBendRangePreservingPitch(track, state, change.tick, channel,
-                                      effectivePitchBendRangeCents(state, modulationConversion), modulationConversion);
+  refreshPitchBendRange(track, state, change.tick, channel, effectivePitchBendRangeCents(state, modulationConversion),
+                        modulationConversion);
 }
 
 void addCurrentPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
@@ -1392,24 +1428,12 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           // Global transpose changes how later notes and portamento controls are written. It does not
           // become a MIDI event itself.
         } else if constexpr (std::is_same_v<TypedEvent, PitchBendPerformanceEvent>) {
-          const double normalized = std::clamp(typedEvent.normalizedWheelPosition.value_or(0.0), -1.0, 1.0);
-          if (typedEvent.semitones == 0.0 && normalized == 0.0) {
-            state.pitchBendLayers.erase(typedEvent.layer);
-          } else {
-            state.pitchBendLayers.insert_or_assign(
-                typedEvent.layer,
-                PitchBendLayerState{
-                    .semitones = typedEvent.semitones,
-                    .normalizedWheelPosition =
-                        typedEvent.normalizedWheelPosition ? std::optional{normalized} : std::nullopt,
-                });
-          }
+          state.pitchBendLayers.apply(typedEvent);
           addCurrentPitchBend(track, state, typedEvent.header.tick, channel, modulationConversion, false);
         } else if constexpr (std::is_same_v<TypedEvent, PitchBendRangePerformanceEvent>) {
           state.sourcePitchBendRangeCents = typedEvent.cents;
-          ensurePitchBendRangePreservingPitch(track, state, typedEvent.header.tick, channel,
-                                              effectivePitchBendRangeCents(state, modulationConversion),
-                                              modulationConversion);
+          refreshPitchBendRange(track, state, typedEvent.header.tick, channel,
+                                effectivePitchBendRangeCents(state, modulationConversion), modulationConversion);
         } else if constexpr (std::is_same_v<TypedEvent, VibratoDelayPerformanceEvent>) {
           setLfoDelay(state.vibrato, typedEvent.header.tick, typedEvent.delayTicks, typedEvent.milliseconds,
                       typedEvent.tempoRelative, typedEvent.updateMode);
@@ -1577,7 +1601,7 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
     RenderTrackState renderState;
     renderState.levelHeadroom = levelHeadroom;
     std::unordered_map<PerformanceAutomationId, MidiControllerState> automationControllerStates;
-    const auto pitchBendRangeChanges = planVoicePitchBendRanges(timelines[trackIndex], options.tuning);
+    const auto pitchBendRangeChanges = planVoicePitchBendRanges(timelines[trackIndex], options.tuning, soundBanks);
     size_t nextPitchBendRangeChange = 0;
     const auto assignment = midiChannelAssignment(trackIndex, options);
     if (assignment.port > 255) {
