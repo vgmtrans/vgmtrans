@@ -354,6 +354,11 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnesSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TriAcePS1/TriAcePS1Extractor.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TriAcePS1/TriAcePS1Layout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TriAcePS1/TriAcePS1Module.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TriAcePS1/TriAcePS1Sequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TriAcePS1/TriAcePS1Synth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/WolfTeamSnes/WolfTeamSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/WolfTeamSnes/WolfTeamSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/WolfTeamSnes/WolfTeamSnesSequence.cpp

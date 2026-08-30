@@ -36,6 +36,7 @@
 #include "value/formats/SquarePS2/SquarePS2.h"
 #include "value/formats/SuzukiPS1/SuzukiPS1.h"
 #include "value/formats/SuzukiSnes/SuzukiSnes.h"
+#include "value/formats/TriAcePS1/TriAcePS1.h"
 #include "value/formats/WolfTeamSnes/WolfTeamSnes.h"
 #include "value/session/Session.h"
 
@@ -96,6 +97,7 @@ void registerValueFormats(core::Session& session, const ValueFormatOptions& opti
   session.registerExtractor(snes_rsn::snesRsnExtractor());
   session.registerExtractor(snes_spc::snesSpcExtractor());
   session.registerExtractor(psf::psfExtractor());
+  session.registerExtractor(triace_ps1::triAcePs1Extractor());
   session.registerFormat(ascii_shuichi_snes::module());
   session.registerFormat(capcom_snes::capcomSnesModule());
   session.registerFormat(chun_snes::module());
@@ -122,6 +124,7 @@ void registerValueFormats(core::Session& session, const ValueFormatOptions& opti
   session.registerFormat(square_ps2::module());
   session.registerFormat(suzuki_ps1::suzukiPs1Module());
   session.registerFormat(suzuki_snes::module());
+  session.registerFormat(triace_ps1::triAcePs1Module());
   session.registerFormat(wolf_team_snes::module());
 }
 
