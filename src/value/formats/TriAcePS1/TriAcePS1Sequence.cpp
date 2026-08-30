@@ -145,12 +145,10 @@ struct TrackAnalysis {
   return analysis;
 }
 
-struct RuntimeConfig {
-  TriAcePs1SequenceLayout layout;
-};
-
 struct ProgramState {
-  explicit ProgramState(const RuntimeConfig& config) : baseTempo(config.layout.tempo) {}
+  explicit ProgramState(const TriAcePs1SequenceLayout& layout)
+      : baseTempo(layout.tempo), timeSignatureNumerator(layout.timeSignatureNumerator),
+        timeSignatureDenominator(layout.timeSignatureDenominator) {}
 
   void finalizePerformance(PerformanceSequence& performance) {
     const auto belongsToHarmony = [](const PerformanceEvent& event) {
@@ -210,6 +208,8 @@ struct ProgramState {
   }
 
   u8 baseTempo = 120;
+  u8 timeSignatureNumerator = 4;
+  u8 timeSignatureDenominator = 4;
   s16 reverbDepth = 0x3fff;
   bool invertReverbLeft = false;
   bool invertReverbRight = false;
@@ -239,24 +239,20 @@ struct ActiveVoice {
 };
 
 struct TrackState {
-  TrackState(const TrackProgram& program, const RuntimeConfig& config) : slot(program.sourceTrackNumber) {
-    const auto found = std::ranges::find_if(config.layout.tracks,
-                                            [&](const TriAcePs1TrackLayout& track) { return track.slot == slot; });
-    if (found != config.layout.tracks.end()) {
+  TrackState(const TrackProgram& program, const TriAcePs1SequenceLayout& layout) : slot(program.sourceTrackNumber) {
+    const auto found =
+        std::ranges::find_if(layout.tracks, [&](const TriAcePs1TrackLayout& track) { return track.slot == slot; });
+    if (found != layout.tracks.end()) {
       for (const u32 address : found->patternAddresses) {
         patterns.push_back(Address{address});
       }
     }
-    numerator = config.layout.timeSignatureNumerator;
-    denominator = config.layout.timeSignatureDenominator;
   }
 
   u32 slot = 0;
   std::vector<Address> patterns;
   u32 patternIndex = 0;
   bool initialized = false;
-  u8 numerator = 4;
-  u8 denominator = 4;
   u8 bank = 0;
   u8 program = 0;
   u8 bendRange = 12;
@@ -284,8 +280,9 @@ struct Playback {
     }
     track.initialized = true;
     selectInstrument(track.program, track.bank, false);
-    if (track.slot == 0 && track.numerator != 0 && track.denominator != 0) {
-      out.timeSignature(track.numerator, track.denominator, kPpqn);
+    if (track.slot == 0 && program.timeSignatureNumerator != 0 &&
+        program.timeSignatureDenominator != 0) {
+      out.timeSignature(program.timeSignatureNumerator, program.timeSignatureDenominator, kPpqn);
     }
   }
 
@@ -784,7 +781,7 @@ SequenceProgram parseTriAcePs1Sequence(ByteReader reader, AssetId id, const TriA
                                        SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   SequenceProgram program = triAcePs1SequenceConfig().makeProgram();
   program.behavior.initialTempoMicrosecondsPerQuarter = tempoMicros(layout.tempo);
-  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{.layout = layout});
+  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(layout);
 
   if (sourceMap != nullptr) {
     sourceMap->header("TriAcePS1 Sequence Header", reader.range(layout.offset, kSequenceHeaderSize))

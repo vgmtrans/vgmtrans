@@ -57,9 +57,6 @@ std::optional<TriAcePs1SequenceLayout> readTriAcePs1SequenceLayout(ByteReader re
 
     TriAcePs1TrackLayout track{
         .slot = static_cast<u8>(slot),
-        .recordOffset = record,
-        .unknown1 = reader.le16(record),
-        .unknown2 = reader.le16(record + 2),
         .playlistOffset = playlist,
     };
     u32 cursor = playlist;

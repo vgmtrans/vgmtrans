@@ -102,7 +102,7 @@ std::vector<u8> scannerFixture() {
       0x80,
   }}));
   constexpr u32 bankOffset = 0x1000;
-  constexpr u32 instrumentSectionSize = 44;
+  constexpr u32 instrumentSectionSize = 64;
   constexpr u32 sampleSize = 0x100;
   std::vector<u8> bytes(bankOffset + instrumentSectionSize + sampleSize, 0);
   std::ranges::copy(slz, bytes.begin());
@@ -114,12 +114,19 @@ std::vector<u8> scannerFixture() {
   bytes[instrument + 1] = 3;
   le16(bytes, instrument + 2, 0x8f3f);
   le16(bytes, instrument + 4, 0x5fc8);
-  bytes[instrument + 7] = 1;
+  bytes[instrument + 7] = 2;
   const u32 region = instrument + 8;
   bytes[region + 1] = 127;
   bytes[region + 3] = 127;
   bytes[region + 12] = 127;
   le32(bytes, region + 16, 0x4000);
+  // A louder missing region must not affect the playable region's normalization.
+  const u32 missingRegion = region + 20;
+  bytes[missingRegion + 1] = 127;
+  bytes[missingRegion + 3] = 127;
+  le32(bytes, missingRegion + 4, sampleSize);
+  bytes[missingRegion + 12] = 255;
+  le32(bytes, missingRegion + 16, 0x4000);
   le32(bytes, bankOffset + instrumentSectionSize - 4, 0xffffffff);
   bytes[bankOffset + instrumentSectionSize + 16 + 1] = 1;
   return bytes;
@@ -136,8 +143,6 @@ std::vector<const Event*> eventsOfType(const PerformanceTrack& track) {
   return events;
 }
 
-}  // namespace
-
 void triAcePs1SequenceExecutesAuditedDriverFeatures() {
   const auto bytes = sequenceFixture({
       {
@@ -147,6 +152,7 @@ void triAcePs1SequenceExecutesAuditedDriverFeatures() {
           0x90, 0, 1,                       // per-track reverb send
           0x8a, 0, 0x40,                    // global reverb depth
           0x91, 0, 1,                       // invert reverb left
+          0x92, 0, 1,                       // invert dry voice left
           0x97, 0, 0x34, 0x12, 0x78, 0x56,  // dynamic native ADSR
           0x96, 0, 4,                       // bend range
           0x84, 0, 32,                      // +2 semitones
@@ -223,7 +229,14 @@ void triAcePs1SequenceExecutesAuditedDriverFeatures() {
   });
   expect(reverbs.size() >= 3 && invertedReverb != reverbs.end(),
          "track send, global depth, and signed reverb phase should all be preserved");
+  const auto balances = eventsOfType<StereoBalancePerformanceEvent>(track);
+  const auto invertedVoice = std::ranges::find_if(balances, [](const StereoBalancePerformanceEvent* event) {
+    return event->leftGain < 0.0 && event->rightGain > 0.0;
+  });
+  expect(invertedVoice != balances.end(), "voice phase should preserve signed dry-channel gain");
+}
 
+void triAcePs1SequenceRendersHarmonyCompanionTrack() {
   const auto harmonyBytes = sequenceFixture({{
       0x87, 0, 55,                      // source pan from A Crisp Morning
       0x9b, 0, 3,  12,  0,    127, 40,  // delayed octave harmony with left intrinsic pan
@@ -251,7 +264,9 @@ void triAcePs1SequenceExecutesAuditedDriverFeatures() {
              std::abs(harmonyPans[0]->position - 35.0 / 127.0) < 0.000001 && harmonyPans[0]->header.tick == 3 &&
              std::abs(harmonyPans[1]->position - 40.0 / 127.0) < 0.000001 && harmonyPans[1]->header.tick == 5,
          "the companion should combine its intrinsic pan with each delayed source-pan change");
+}
 
+void triAcePs1SequenceTreatsZeroRepeatAsPracticalLoop() {
   const auto loopingBytes = sequenceFixture({
       {
           0x8d,
@@ -310,4 +325,15 @@ void triAcePs1ExtractorAndModuleBuildSelfContainedCollection() {
          "instrument identity should preserve the driver's full bank/program word");
   expect(std::abs(instrument.regions.front().unityKey - 59.216912152) < 0.000001,
          "instrument pitch should use the audited fractional driver-table root");
+  expect(std::abs(instrument.regions.front().attenuationDb) < 0.000001,
+         "unplayable regions should not reduce the level of playable regions");
+}
+
+}  // namespace
+
+void runTriAcePs1ModuleTests() {
+  triAcePs1SequenceExecutesAuditedDriverFeatures();
+  triAcePs1SequenceRendersHarmonyCompanionTrack();
+  triAcePs1SequenceTreatsZeroRepeatAsPracticalLoop();
+  triAcePs1ExtractorAndModuleBuildSelfContainedCollection();
 }
