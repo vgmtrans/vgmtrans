@@ -259,9 +259,14 @@ void releaseTailsRetainDriverPitch() {
   const auto* slide = performance.tracks[0].automations.empty()
                           ? nullptr
                           : pitchTransitionIntent(performance.tracks[0].automations.front());
+  const auto* curve = slide == nullptr ? nullptr : std::get_if<SampledAutomationCurve>(&slide->curve);
 
-  expect(slide != nullptr && slide->startKey == 0x30 && slide->targetKey == 0x3c,
-         "a rest should end the exported note without discarding the SPC voice's retained pitch");
+  expect(slide != nullptr && slide->preferredRendering == PitchTransitionRenderingHint::PitchBend &&
+             slide->timing.timelineTicks == 10 && slide->startKey == 51.25 && slide->targetKey == 60.0 &&
+             curve != nullptr && curve->samples.size() == 11 &&
+             curve->samples[1] == AutomationSample{.tickOffset = 1, .value = 53.5} &&
+             curve->samples[4] == AutomationSample{.tickOffset = 4, .value = 57.5},
+         "release tails should retain the driver's immediate, distance-scaled fixed-point portamento curve");
 }
 
 void bothRepeatCountersFollowTheSharedIncrementRules() {

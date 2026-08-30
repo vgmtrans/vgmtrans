@@ -17,6 +17,7 @@
 #include <set>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace vgmtrans::formats::namco_snes {
 
@@ -54,6 +55,37 @@ namespace math {
     return 1.0;
   }
   return depth / 256.0;
+}
+
+[[nodiscard]] u16 nextPortamentoPitch(u16 current, u16 target, u8 speed) {
+  // The driver subtracts the 8.8 pitches, retains the signed coarse byte,
+  // then moves (|coarse distance| + 1) * speed / 2 fractional units.
+  const bool borrow = static_cast<u8>(target) < static_cast<u8>(current);
+  const int coarseDistance =
+      static_cast<s8>(static_cast<u8>((target >> 8) - (current >> 8) - (borrow ? 1 : 0)));
+  const u16 step = static_cast<u16>((std::abs(coarseDistance) + 1) * speed) >> 1;
+  if (coarseDistance < 0) {
+    const u16 next = static_cast<u16>(current - step);
+    return next < target ? target : next;
+  }
+  const u16 next = static_cast<u16>(current + step);
+  return next >= target ? target : next;
+}
+
+[[nodiscard]] std::vector<u16> portamentoCurve(u16 current, u16 target, u8 speed) {
+  // Performance transitions need their duration up front, so predict it with
+  // the same one-tick operation used by live playback.
+  std::vector<u16> curve{current};
+  for (u32 tick = 0; current != target && tick < std::numeric_limits<u16>::max(); ++tick) {
+    const u16 next = nextPortamentoPitch(current, target, speed);
+    // Speed $01 can genuinely stall within the final semitone.
+    if (next == current) {
+      break;
+    }
+    curve.push_back(next);
+    current = next;
+  }
+  return curve;
 }
 
 }  // namespace math
@@ -148,7 +180,7 @@ struct TrackState {
     pitchPosition = 0;
     pitchPhase = 0;
     pitchBend.reset();
-    portamentoActive = false;
+    portamentoTarget.reset();
   }
 
   void activate() {
@@ -178,13 +210,12 @@ struct TrackState {
   std::optional<u8> pendingNote;
   u16 triggerTicks = 0;
   u16 gateTicks = 0;
-  // An exported note can end while the SPC voice retains pitch and modulation
-  // state for release tails and the next attack.
+  // Driver pitch is an 8.8 note value. It survives exported note-off events so
+  // release tails and later attacks resume from the pitch the SPC voice retained.
   PerformanceNoteId activeNote;
-  std::optional<double> driverPitch;
-  bool portamentoActive = false;
-  double portamentoTarget = 0.0;
-  double portamentoStep = 0.0;
+  std::optional<u16> driverPitch;
+  // A target exists only while the per-tick driver slide is still active.
+  std::optional<u16> portamentoTarget;
 
   u16 pitchTable = 0;
   u8 pitchPosition = 0;
@@ -377,36 +408,56 @@ struct Playback {
                         VoiceEnvelopeScope::FutureAttacks);
   }
 
-  [[nodiscard]] double targetPitch(u8 sourceNote) const {
+  [[nodiscard]] u16 targetPitch(u8 sourceNote) const {
     const u8 coarse = static_cast<u8>(sourceNote + static_cast<s8>(track.liveControls[kTranspose]));
-    return coarse + track.liveControls[kFineTuning] / 256.0;
+    // $0120+x is the coarse note and $0100+x is its fractional byte.
+    return static_cast<u16>((coarse << 8) | track.liveControls[kFineTuning]);
   }
 
-  void beginPortamento(double target, double outputKey, PerformanceNoteId previous, bool continues) {
-    const u8 speed = track.liveControls[kPortamento];
-    if (speed == 0 || !track.driverPitch) {
-      track.driverPitch = target;
-      track.portamentoActive = false;
+  void advancePortamento() {
+    if (!track.driverPitch || !track.portamentoTarget || track.liveControls[kPortamento] == 0) {
       return;
     }
-    const double distance = std::abs(target - *track.driverPitch);
-    const double step = (std::floor(distance) + 1.0) * speed / 512.0;
-    if (step <= 0.0 || distance <= 0.0) {
+    *track.driverPitch = math::nextPortamentoPitch(*track.driverPitch, *track.portamentoTarget,
+                                                   track.liveControls[kPortamento]);
+    if (*track.driverPitch == *track.portamentoTarget) {
+      track.portamentoTarget.reset();
+    }
+  }
+
+  void emitPortamentoCurve(u16 target, double outputKey, PerformanceNoteId previous, bool continues) {
+    const std::vector curve =
+        math::portamentoCurve(*track.driverPitch, target, track.liveControls[kPortamento]);
+    const auto key = [&](u16 pitch) {
+      return outputKey + (static_cast<s32>(pitch) - static_cast<s32>(target)) / 256.0;
+    };
+    auto slide = out.pitchSlide(track.activeNote, key(curve.front()), key(curve.back()),
+                                static_cast<u32>(curve.size() - 1));
+    if (continues) {
+      slide.continueFrom(previous);
+    }
+    for (u32 tick = 0; tick < static_cast<u32>(curve.size()); ++tick) {
+      slide.sample(out.at(vm.tick() + tick), key(curve[tick]));
+    }
+    // Native MIDI portamento can match total time but not this stepped curve.
+    // An explicit export override remains available when compatibility matters more.
+    slide.preferPitchBend();
+  }
+
+  void beginPortamento(u16 target, double outputKey, PerformanceNoteId previous, bool continues) {
+    if (track.liveControls[kPortamento] == 0 || !track.driverPitch) {
       track.driverPitch = target;
-      track.portamentoActive = false;
+      track.portamentoTarget.reset();
       return;
     }
-    const u32 duration = static_cast<u32>(std::ceil(distance / step));
-    if (track.activeNote.valid()) {
-      auto slide = out.pitchSlide(track.activeNote, outputKey + *track.driverPitch - target, outputKey, duration);
-      if (continues) {
-        slide.continueFrom(previous);
-      }
-      slide.preferPortamento();
-    }
+
     track.portamentoTarget = target;
-    track.portamentoStep = step;
-    track.portamentoActive = true;
+    // Note dispatch advances once before writing pitch, so the pre-step value
+    // is not part of the new note's audible curve.
+    advancePortamento();
+    if (track.activeNote.valid() && *track.driverPitch != target) {
+      emitPortamentoCurve(target, outputKey, previous, continues);
+    }
   }
 
   void startNote(u8 sourceNote, std::optional<PercussionTrigger> percussion = {}) {
@@ -424,7 +475,7 @@ struct Playback {
     // The drum region maps its sequence key to the table's source note. Only
     // live pitch controls remain to be applied by the sequence.
     const double tuning = percussion ? transpose * 100.0 + fine : fine;
-    const double target = targetPitch(sourceNote);
+    const u16 target = targetPitch(sourceNote);
 
     const PerformanceNoteId previous = track.activeNote;
     const bool continues = track.slur && previous.valid();
@@ -463,8 +514,8 @@ struct Playback {
     }
     emitMix();
     if (track.slur && !previous.valid()) {
-      track.driverPitch = raw & 0x1f;
-      track.portamentoActive = false;
+      track.driverPitch = static_cast<u16>((raw & 0x1f) << 8);
+      track.portamentoTarget.reset();
       return;
     }
     out.tuning(0.0);
@@ -475,8 +526,8 @@ struct Playback {
                                .restartsEnvelope = !continues,
                                .restartsLfoPhase = !continues};
     track.activeNote = continues ? out.continueVoice(previous, std::move(event)) : out.note(std::move(event));
-    track.driverPitch = raw & 0x1f;
-    track.portamentoActive = false;
+    track.driverPitch = static_cast<u16>((raw & 0x1f) << 8);
+    track.portamentoTarget.reset();
   }
 
   void trigger(u8 raw) {
@@ -611,15 +662,7 @@ struct Playback {
     }
 
     if (!triggered && track.driverPitch) {
-      if (track.portamentoActive) {
-        const double distance = track.portamentoTarget - *track.driverPitch;
-        if (std::abs(distance) <= track.portamentoStep) {
-          track.driverPitch = track.portamentoTarget;
-          track.portamentoActive = false;
-        } else {
-          *track.driverPitch += std::copysign(track.portamentoStep, distance);
-        }
-      }
+      advancePortamento();
       advancePitchModulation();
     }
     if (track.activeNote.valid() && track.liveControls[kGate] != 0 && ++track.gateTicks > track.liveControls[kGate]) {
