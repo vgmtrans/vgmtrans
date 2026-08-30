@@ -123,12 +123,12 @@ struct InspectedEvent {
   return position * (rawRange / 1024.0);
 }
 
-[[nodiscard]] std::pair<s8, u8> addFinePitch(s8 high, u8 low, s8 delta) {
+[[nodiscard]] std::pair<s8, u8> addFinePitch(s8 high, u8 low, s8 delta, bool absolutePitch) {
   const u16 initial = static_cast<u16>((static_cast<u16>(static_cast<u8>(high)) << 8) | low);
   u16 result = static_cast<u16>(initial + delta);
-  // The driver's negative path clamps after borrowing into a signed-negative
-  // high byte. Its positive path intentionally retains eight-bit wrapping.
-  if (delta < 0 && (result & 0x8000) != 0) {
+  // The driver clamps against the complete voice pitch. Before D7/E2 replaces
+  // the inherited note, a negative result here is only a relative offset.
+  if (absolutePitch && delta < 0 && (result & 0x8000) != 0) {
     result = 0;
   }
   return {static_cast<s8>(result >> 8), static_cast<u8>(result)};
@@ -192,16 +192,17 @@ struct VoiceScriptState {
   std::vector<VoiceScriptFrame> stack;
   s32 pitch256 = 0;
   bool fineExplicit = false;
+  bool absolutePitch = false;
   u8 volume = 0xff;
   u8 pan = kInitialPan;
   bool panExplicit = false;
   bool keyOn = false;
 
   friend bool operator<(const VoiceScriptState& left, const VoiceScriptState& right) {
-    return std::tie(left.address, left.stack, left.pitch256, left.fineExplicit, left.volume, left.pan,
-                    left.panExplicit, left.keyOn) <
-           std::tie(right.address, right.stack, right.pitch256, right.fineExplicit, right.volume, right.pan,
-                    right.panExplicit, right.keyOn);
+    return std::tie(left.address, left.stack, left.pitch256, left.fineExplicit, left.absolutePitch, left.volume,
+                    left.pan, left.panExplicit, left.keyOn) <
+           std::tie(right.address, right.stack, right.pitch256, right.fineExplicit, right.absolutePitch,
+                    right.volume, right.pan, right.panExplicit, right.keyOn);
   }
 };
 
@@ -226,6 +227,7 @@ struct VoiceScriptState {
   bool panExplicit = false;
   s32 pitch256 = 0;
   bool fineExplicit = false;
+  bool absolutePitch = false;
   u8 volume = 0xff;
   bool keyOn = false;
   u32 tick = 0;
@@ -252,6 +254,7 @@ struct VoiceScriptState {
         .stack = stack,
         .pitch256 = pitch256,
         .fineExplicit = fineExplicit,
+        .absolutePitch = absolutePitch,
         .volume = volume,
         .pan = pan,
         .panExplicit = panExplicit,
@@ -391,6 +394,7 @@ struct VoiceScriptState {
         break;
       case 0xd7:
         pitch256 = static_cast<s8>(reader.u8At(pc)) * 256 + static_cast<u8>(pitch256);
+        absolutePitch = true;
         point();
         break;
       case 0xd8:
@@ -400,7 +404,7 @@ struct VoiceScriptState {
         break;
       case 0xd9: {
         const auto [high, low] = addFinePitch(static_cast<s8>(pitch256 >> 8), static_cast<u8>(pitch256),
-                                              static_cast<s8>(reader.u8At(pc)));
+                                              static_cast<s8>(reader.u8At(pc)), absolutePitch);
         pitch256 = high * 256 + low;
         point();
         break;
@@ -427,6 +431,7 @@ struct VoiceScriptState {
           pitch256 = static_cast<s8>(reader.u8At(presetTable + 4u + index)) * 256 +
                      reader.u8At(presetTable + index);
           fineExplicit = true;
+          absolutePitch = true;
           point();
         }
         break;
@@ -1096,7 +1101,7 @@ struct Playback {
 
   [[nodiscard]] Effects fineTuningAdd(const EventTiming& timing, s8 value) {
     const u32 delay = beginEvent(timing);
-    std::tie(track.transpose, track.fineTuning) = addFinePitch(track.transpose, track.fineTuning, value);
+    std::tie(track.transpose, track.fineTuning) = addFinePitch(track.transpose, track.fineTuning, value, true);
     return Effects::wait(delay);
   }
 
