@@ -27,6 +27,8 @@ using namespace core;
 
 namespace {
 
+constexpr int kNoAffinity = -2;
+
 using SequenceEntry = AssetWithData<SequenceProgramAsset, SequenceData>;
 using BankEntry = AssetWithData<SoundBankAsset, SoundBankData>;
 using BodyEntry = AssetWithData<SamplePoolAsset, SampleBodyData>;
@@ -59,6 +61,9 @@ struct BodyAddressing {
 }
 
 [[nodiscard]] int affinity(const SourceFile* left, const SourceFile* right) {
+  if (left != nullptr && right != nullptr && left->parent != right->parent) {
+    return kNoAffinity;
+  }
   const auto a = path(left);
   const auto b = path(right);
   if (a.empty() || b.empty()) {

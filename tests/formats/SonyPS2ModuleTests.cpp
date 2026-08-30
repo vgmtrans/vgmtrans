@@ -332,6 +332,28 @@ SourceFile archiveMember(std::string name, std::string_view ini = {}) {
   return source;
 }
 
+SourceExtractor archiveFixtureExtractor() {
+  return SourceExtractor{
+      .name = "SonyPS2 archive fixture",
+      .extract = [](const ExtractionInput& input) {
+        if (input.source.derived()) {
+          return ExtractionResult{};
+        }
+        ExtractionResult result;
+        const auto add = [&](std::string name, std::vector<u8> bytes) {
+          SourceFile source = archiveMember(std::move(name));
+          source.path = input.source.path;
+          source.origin = input.reader.range(0, input.reader.size());
+          result.sources.push_back(ExtractedSource{.file = std::move(source), .bytes = std::move(bytes)});
+        };
+        add("default.sq", sqFixture());
+        add("default.hd", hdFixture());
+        add("default.bd", bdFixture());
+        return result;
+      },
+  };
+}
+
 SessionSnapshot scanFixture(std::vector<u8> sq, std::string_view ini = {}, std::vector<u8> hd = hdFixture()) {
   Session session;
   session.registerFormat(module());
@@ -340,6 +362,31 @@ SessionSnapshot scanFixture(std::vector<u8> sq, std::string_view ini = {}, std::
   session.addSource(archiveMember("music.bd", ini), bdFixture());
   session.scanPendingSources();
   return session.snapshot();
+}
+
+void psf2ArchivesRemainSeparate() {
+  Session session;
+  session.registerExtractor(archiveFixtureExtractor());
+  session.registerFormat(module());
+  const auto load = [&](std::string name) {
+    const SourceId source = session.addSource(
+        SourceFile{.name = name, .path = std::filesystem::path("/fixture") / name}, {0});
+    session.scanSource(source);
+  };
+
+  load("first.psf2");
+  const SessionSnapshot first = session.snapshot();
+  expect(first.collections().size() == 1, "the first PSF2 should publish one collection");
+  const CollectionId initial = first.collections().front().id;
+  const CollectionMembers initialMembers = first.collections().front().members;
+
+  load("second.psf2");
+  const SessionSnapshot second = session.snapshot();
+  const Collection* retained = second.collection(initial);
+  expect(second.collections().size() == 2 && retained && retained->members.sequence == initialMembers.sequence &&
+             retained->members.soundBanks == initialMembers.soundBanks &&
+             retained->members.samplePools == initialMembers.samplePools,
+         "loading another PSF2 should add an independent collection without replacing the first");
 }
 
 void syntheticFeatures() {
@@ -712,6 +759,7 @@ void realArchive(const std::filesystem::path& path) {
 
 int main(int argc, char** argv) {
   try {
+    psf2ArchivesRemainSeparate();
     syntheticFeatures();
     trivialSongCollapsesToSelectedMidi();
     repeatingSongRemainsPlaylist();
