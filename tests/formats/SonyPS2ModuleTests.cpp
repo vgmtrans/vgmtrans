@@ -354,14 +354,18 @@ SourceExtractor archiveFixtureExtractor() {
   };
 }
 
-SessionSnapshot scanFixture(std::vector<u8> sq, std::string_view ini = {}, std::vector<u8> hd = hdFixture()) {
+Session fixtureSession(std::vector<u8> sq, std::string_view ini = {}, std::vector<u8> hd = hdFixture()) {
   Session session;
   session.registerFormat(module());
   session.addSource(archiveMember("music.sq", ini), std::move(sq));
   session.addSource(archiveMember("music.hd", ini), std::move(hd));
   session.addSource(archiveMember("music.bd", ini), bdFixture());
   session.scanPendingSources();
-  return session.snapshot();
+  return session;
+}
+
+SessionSnapshot scanFixture(std::vector<u8> sq, std::string_view ini = {}, std::vector<u8> hd = hdFixture()) {
+  return fixtureSession(std::move(sq), ini, std::move(hd)).snapshot();
 }
 
 void psf2ArchivesRemainSeparate() {
@@ -390,7 +394,8 @@ void psf2ArchivesRemainSeparate() {
 }
 
 void syntheticFeatures() {
-  const auto snapshot = scanFixture(sqFixture(false));
+  Session session = fixtureSession(sqFixture(false));
+  const auto snapshot = session.snapshot();
   expect(std::ranges::none_of(snapshot.diagnostics(),
                               [](const Diagnostic& diagnostic) { return diagnostic.severity == Severity::Error; }),
          "synthetic SonyPS2 scan should not report errors");
@@ -409,6 +414,9 @@ void syntheticFeatures() {
   expect(collection != nullptr, "same-stem SQ/HD/BD should resolve into a collection");
   const auto bound = bindCollection(snapshot, collection->id);
   expect(bound.collection.has_value(), "SonyPS2 collection should bind");
+  const CollectionId manual = session.createUserCollection("Manual SonyPS2 collection", collection->members);
+  expect(bindCollection(session.snapshot(), manual).collection.has_value(),
+         "a user-created SonyPS2 collection should infer its unique HD/BD binding");
   const auto& bank = bound.collection->soundBanks().front();
   expect(bank.instruments.size() == 2 && bank.localSamples.samples.empty(),
          "HD should retain both Prog and Setb instruments with external samples");

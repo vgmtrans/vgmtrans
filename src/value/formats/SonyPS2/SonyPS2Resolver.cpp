@@ -95,21 +95,22 @@ struct BodyAddressing {
   return {.omittedLeadingBlock = !startsWithSilence};
 }
 
-[[nodiscard]] bool compatible(const BankEntry& bank, const SampleBodyData& body) {
+[[nodiscard]] bool compatible(const SoundBankAsset& bank, const SoundBankData& bankData,
+                              const SampleBodyData& body) {
   if (!body.source) {
     return false;
   }
-  const BodyAddressing addressing = bodyAddressing(*bank.data, body);
-  return std::ranges::all_of(bank.asset->instruments, [&](const Instrument& instrument) {
+  const BodyAddressing addressing = bodyAddressing(bankData, body);
+  return std::ranges::all_of(bank.instruments, [&](const Instrument& instrument) {
     return std::ranges::all_of(instrument.regions, [&](const Region& region) {
       if (!region.sample.needsBinding()) {
         return true;
       }
       const u32 index = region.sample.index();
-      if (index >= bank.data->vags.size() || !bank.data->vags[index]) {
+      if (index >= bankData.vags.size() || !bankData.vags[index]) {
         return false;
       }
-      const u32 logicalOffset = bank.data->vags[index]->bodyOffset;
+      const u32 logicalOffset = bankData.vags[index]->bodyOffset;
       return (logicalOffset & (kPsxAdpcmBlockBytes - 1)) == 0 && addressing.physicalOffset(logicalOffset) < body.bytes;
     });
   });
@@ -119,7 +120,7 @@ struct BodyAddressing {
   std::vector<const BodyEntry*> selected;
   int best = -1;
   for (const auto& body : bodies) {
-    if (!compatible(bank, *body.data)) {
+    if (!compatible(*bank.asset, *bank.data, *body.data)) {
       continue;
     }
     const int score = affinity(bank.source, body.source);
@@ -423,7 +424,35 @@ std::vector<DesiredCollection> resolveCollections(const CollectionDiscoveryConte
 }
 
 void bindCollection(CollectionBindingContext& context) {
-  applyBindings(context, {});
+  std::vector<SampleBinding> bindings;
+  for (const auto& bank : context.soundBanks) {
+    if (bank.metadata.format != kFormatName) {
+      continue;
+    }
+    const auto* bankData = bank.privateData.get<SoundBankData>();
+    if (bankData == nullptr) {
+      context.fail("SonyPS2 HD is missing retained Vagi binding data", bank.metadata.range);
+      return;
+    }
+    const SamplePoolAsset* selected = nullptr;
+    for (const auto* body : context.samplePools) {
+      const auto* bodyData = body->privateData.get<SampleBodyData>();
+      if (body->metadata.format != kFormatName || bodyData == nullptr || !compatible(bank, *bankData, *bodyData)) {
+        continue;
+      }
+      if (selected != nullptr) {
+        context.fail("SonyPS2 HD matches multiple compatible BD sample bodies", bank.metadata.range);
+        return;
+      }
+      selected = body;
+    }
+    if (selected == nullptr) {
+      context.fail("SonyPS2 HD has no compatible BD sample body", bank.metadata.range);
+      return;
+    }
+    bindings.push_back(SampleBinding{.bank = bank.metadata.id, .body = selected->metadata.id});
+  }
+  applyBindings(context, bindings);
 }
 
 }  // namespace vgmtrans::formats::sony_ps2
