@@ -233,7 +233,8 @@ struct Harmony {
 
 struct ActiveVoice {
   PerformanceNoteId note;
-  double key = 0.0;
+  u8 sourceKey = 0;
+  double outputKey = 0.0;
   u64 endTick = 0;
   bool sustained = false;
 };
@@ -348,27 +349,29 @@ struct Playback {
   }
 
   Effects note(u8 key, u8 delta, u8 duration, u8 velocity) {
-    const s8 random = track.randomPitch ? program.randomFineTune() : 0;
-    const double outputKey = key + random / 64.0;
-    if (track.automaticVibrato) {
-      beginAutomaticVibrato();
-    }
     const u64 tick = vm.tick();
     std::erase_if(track.activeVoices,
                   [tick](const ActiveVoice& voice) { return !voice.sustained && voice.endTick <= tick; });
+    const auto continued = std::ranges::find_if(track.activeVoices,
+                                                [key](const ActiveVoice& voice) { return voice.sourceKey == key; });
+    const bool freshAttack = continued == track.activeVoices.end();
+    if (freshAttack && track.automaticVibrato) {
+      beginAutomaticVibrato();
+    }
+    const s8 random = freshAttack && track.randomPitch ? program.randomFineTune() : 0;
+    const double outputKey = freshAttack ? key + random / 64.0 : continued->outputKey;
     NotePerformanceEvent event{
         .key = outputKey,
         .linearVelocity = linearController(velocity),
         .durationTicks = duration,
-        .restartsVibratoLfoPhase = track.automaticVibrato,
+        .restartsVibratoLfoPhase = freshAttack && track.automaticVibrato,
     };
-    const auto continued = std::ranges::find_if(
-        track.activeVoices, [&](const ActiveVoice& voice) { return std::abs(voice.key - outputKey) < 0.000001; });
-    if (continued == track.activeVoices.end()) {
+    if (freshAttack) {
       const PerformanceNoteId note = out.note(std::move(event));
       track.activeVoices.push_back(ActiveVoice{
           .note = note,
-          .key = outputKey,
+          .sourceKey = key,
+          .outputKey = outputKey,
           .endTick = tick + duration,
           .sustained = track.sustainDown,
       });
