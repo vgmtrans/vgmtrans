@@ -6,6 +6,7 @@
 
 #include "value/formats/TriAcePS1/TriAcePS1.h"
 
+#include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/session/Session.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/PsxSpu.h"
@@ -156,6 +157,7 @@ void triAcePs1SequenceExecutesAuditedDriverFeatures() {
           0x97, 0, 0x34, 0x12, 0x78, 0x56,  // dynamic native ADSR
           0x96, 0, 4,                       // bend range
           0x84, 0, 32,                      // +2 semitones
+          0x99, 0, 1,                       // random fine pitch
           0x9e, 2, 100,                     // both note fields implied
           0x8d,                             // repeat begin
           0x80,
@@ -191,11 +193,23 @@ void triAcePs1SequenceExecutesAuditedDriverFeatures() {
   expect(performance.diagnostics.empty(), "audited TriAcePS1 fixture should render without diagnostics");
   const PerformanceTrack& track = performance.tracks.front();
   const auto notes = eventsOfType<NotePerformanceEvent>(track);
-  expect(notes.size() == 3 && notes[0]->key == 60.0 && notes[1]->key == 60.0 && notes[2]->key == 61.0,
+  expect(notes.size() == 3 && std::abs(notes[0]->key - 60.046875) < 0.000001 &&
+             notes[1]->key == notes[0]->key && std::abs(notes[2]->key - 61.03125) < 0.000001,
          "repeat flow and the pattern playlist should render all three notes (notes=" + std::to_string(notes.size()) +
              ")");
-  expect(notes[1]->extendsPrevious && notes[2]->durationTicks == 4,
-         "active same-key notes should extend without another attack, and sustain should defer their release");
+  expect(notes[1]->extendsPrevious && notes[1]->note == notes[0]->note && notes[2]->durationTicks == 4,
+         "raw-key continuations should retain their voice without consuming random pitch, and sustain should defer "
+         "release");
+  const MidiSequence midi = renderMidiSequence(performance);
+  const auto midiNotes = std::ranges::count_if(midi.tracks.front().events, [](const MidiEvent& event) {
+    return std::holds_alternative<NoteDuration>(event.payload);
+  });
+  const auto firstMidiNote = std::ranges::find_if(midi.tracks.front().events, [](const MidiEvent& event) {
+    return std::holds_alternative<NoteDuration>(event.payload);
+  });
+  expect(midiNotes == 2 && firstMidiNote != midi.tracks.front().events.end() &&
+             std::get<NoteDuration>(firstMidiNote->payload).duration == 3,
+         "MIDI lowering should extend the existing same-key note instead of emitting a colliding note-off");
 
   const auto modulation = eventsOfType<ModulationPerformanceEvent>(track);
   const auto depth = std::ranges::find_if(modulation, [](const ModulationPerformanceEvent* event) {
@@ -211,10 +225,15 @@ void triAcePs1SequenceExecutesAuditedDriverFeatures() {
   });
   const auto* rampIntent =
       ramp == track.automations.end() ? nullptr : std::get_if<ScalarPerformanceAutomationIntent>(&ramp->intent);
+  const auto rampCount = std::ranges::count_if(track.automations, [](const PerformanceAutomation& automation) {
+    const auto* intent = std::get_if<ScalarPerformanceAutomationIntent>(&automation.intent);
+    return intent != nullptr && intent->target == PerformanceAutomationTarget::VibratoDepth;
+  });
   expect(rampIntent != nullptr && rampIntent->motion == PerformanceAutomationMotion::Envelope &&
              rampIntent->targetValue == 4.0 && rampIntent->durationTicks == 4 && rampIntent->delayTicks == 2 &&
-             rampIntent->restartsOnNote,
-         "automatic vibrato depth should ramp once per music tick after the note delay");
+             rampIntent->restartsOnNote && rampCount == 2,
+         "automatic vibrato depth should ramp once per music tick after the note delay, restarting only for fresh "
+         "attacks");
 
   const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(track);
   expect(envelopes.size() >= 2 && envelopes.back()->update.values == psxSpuEnvelope(0x1234, 0x5678) &&
