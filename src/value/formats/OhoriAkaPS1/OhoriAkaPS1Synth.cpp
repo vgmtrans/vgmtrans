@@ -41,7 +41,7 @@ constexpr u32 kRegionSize = 0x10;
   return mode == 1 || mode == 5 ? 0 : 1;
 }
 
-[[nodiscard]] OhoriAkaPs1Region readRegion(ByteReader reader, u32 offset, u8 keyLow) {
+[[nodiscard]] OhoriAkaPs1Region readRegion(ByteReader reader, u32 offset) {
   RecordReader record(reader, offset, offset + kRegionSize);
   const u32 sampleOffset = *record.u32leAt(0, "sample_offset", SourceValueDisplay::Address);
   const u8 volume = *record.u8At(4, "volume");
@@ -69,7 +69,7 @@ constexpr u32 kRegionSize = 0x10;
       .offset = offset,
       .sampleOffset = sampleOffset,
       .volume = volume,
-      .keyLow = keyLow,
+      .keyLow = 0,
       .keyHigh = keyHigh,
       .unityKey = unityKey(semitone, fine),
       .panOverride = (rawPan & 0x80) != 0 ? std::optional<u8>(rawPan & 0x7f) : std::nullopt,
@@ -78,6 +78,20 @@ constexpr u32 kRegionSize = 0x10;
       .adsr2 = adsr2,
       .source = std::move(record).finish(),
   };
+}
+
+[[nodiscard]] std::vector<OhoriAkaPs1Region> effectiveRegions(const std::vector<OhoriAkaPs1Region>& raw) {
+  std::vector<OhoriAkaPs1Region> regions;
+  for (u16 key = 0; key < 128 && !raw.empty(); ++key) {
+    auto selected = std::ranges::find_if(raw, [key](const auto& region) { return key <= region.keyHigh; });
+    if (selected == raw.end()) selected = raw.begin();
+    if (regions.empty() || regions.back().offset != selected->offset) {
+      regions.push_back(*selected);
+      regions.back().keyLow = static_cast<u8>(key);
+    }
+    regions.back().keyHigh = static_cast<u8>(key);
+  }
+  return regions;
 }
 
 [[nodiscard]] std::vector<OhoriAkaPs1Instrument> readInstruments(ByteReader reader,
@@ -93,12 +107,12 @@ constexpr u32 kRegionSize = 0x10;
         .program = static_cast<u8>(program),
         .source = std::move(record).finish(),
     };
-    u8 keyLow = 0;
-    instrument.regions.reserve(count);
+    std::vector<OhoriAkaPs1Region> raw;
+    raw.reserve(count);
     for (u32 region = 0; region < count; ++region) {
-      instrument.regions.push_back(readRegion(reader, offset + 4 + region * kRegionSize, keyLow));
-      keyLow = instrument.regions.back().keyHigh == 0xff ? 0xff : instrument.regions.back().keyHigh + 1;
+      raw.push_back(readRegion(reader, offset + 4 + region * kRegionSize));
     }
+    instrument.regions = effectiveRegions(raw);
     instruments.push_back(std::move(instrument));
   }
   return instruments;

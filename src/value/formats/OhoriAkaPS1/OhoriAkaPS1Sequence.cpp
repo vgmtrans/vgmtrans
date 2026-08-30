@@ -433,8 +433,16 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       .sequenceAsset = sequence,
       .sourceMap = sourceMap,
   };
-  return tracks.decode(trackIndex, start,
-                       [&](u32 offset) { return decodeCommand(reader, offset, end, config, layout, diagnostics); });
+  TrackProgram track = tracks.decode(
+      trackIndex, start, [&](u32 offset) { return decodeCommand(reader, offset, end, config, layout, diagnostics); });
+  if (!track.commands.empty()) {
+    auto& last = track.commands.back();
+    if (last.flow.defaultTransition.kind == CommandTransitionKind::Fallthrough &&
+        last.flow.continuation.value == end) {
+      last.flow = CommandFlow::end(Address{end});
+    }
+  }
+  return track;
 }
 
 }  // namespace
