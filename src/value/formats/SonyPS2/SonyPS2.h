@@ -141,6 +141,8 @@ struct ProgramRuntimeInfo {
 
 struct SoundBankData {
   u32 expectedBodyBytes = 0;
+  u32 reverbType = 5;
+  u32 reverbDepth = 0x3fff;
   std::vector<std::optional<VagInfo>> vags;
   std::vector<ProgramRuntimeInfo> runtimePrograms;
 };

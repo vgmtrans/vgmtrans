@@ -36,6 +36,15 @@ struct SampleBinding {
   AssetId body;
 };
 
+struct BodyAddressing {
+  bool omittedLeadingBlock = false;
+
+  [[nodiscard]] u32 physicalOffset(u32 logicalOffset) const {
+    return omittedLeadingBlock && logicalOffset >= kPsxAdpcmBlockBytes ? logicalOffset - kPsxAdpcmBlockBytes
+                                                                       : logicalOffset;
+  }
+};
+
 [[nodiscard]] std::filesystem::path path(const SourceFile* source) {
   if (source == nullptr) {
     return {};
@@ -70,18 +79,33 @@ struct SampleBinding {
   return left->id == right->id ? 1 : 0;
 }
 
+[[nodiscard]] BodyAddressing bodyAddressing(const SoundBankData& bank, const SampleBodyData& body) {
+  if (!body.source || body.bytes < kPsxAdpcmBlockBytes || bank.expectedBodyBytes <= body.bytes ||
+      bank.expectedBodyBytes - body.bytes != kPsxAdpcmBlockBytes) {
+    return {};
+  }
+  const ByteReader reader = body.source.reader();
+  const bool startsWithSilence =
+      std::ranges::all_of(reader.slice(0, kPsxAdpcmBlockBytes), [](u8 byte) { return byte == 0; });
+  return {.omittedLeadingBlock = !startsWithSilence};
+}
+
 [[nodiscard]] bool compatible(const BankEntry& bank, const SampleBodyData& body) {
   if (!body.source) {
     return false;
   }
+  const BodyAddressing addressing = bodyAddressing(*bank.data, body);
   return std::ranges::all_of(bank.asset->instruments, [&](const Instrument& instrument) {
     return std::ranges::all_of(instrument.regions, [&](const Region& region) {
       if (!region.sample.needsBinding()) {
         return true;
       }
       const u32 index = region.sample.index();
-      return index < bank.data->vags.size() && bank.data->vags[index] &&
-             bank.data->vags[index]->bodyOffset < body.bytes && (bank.data->vags[index]->bodyOffset & 0xf) == 0;
+      if (index >= bank.data->vags.size() || !bank.data->vags[index]) {
+        return false;
+      }
+      const u32 logicalOffset = bank.data->vags[index]->bodyOffset;
+      return (logicalOffset & (kPsxAdpcmBlockBytes - 1)) == 0 && addressing.physicalOffset(logicalOffset) < body.bytes;
     });
   });
 }
@@ -105,11 +129,14 @@ struct SampleBinding {
   return selected;
 }
 
-[[nodiscard]] u32 sampleBoundary(const SoundBankData& bank, u32 bodyOffset, u32 bodyBytes) {
+[[nodiscard]] u32 sampleBoundary(const SoundBankData& bank, BodyAddressing addressing, u32 bodyOffset, u32 bodyBytes) {
   u32 boundary = bodyBytes;
   for (const auto& vag : bank.vags) {
-    if (vag && vag->bodyOffset > bodyOffset) {
-      boundary = std::min(boundary, vag->bodyOffset);
+    if (vag) {
+      const u32 candidate = addressing.physicalOffset(vag->bodyOffset);
+      if (candidate > bodyOffset) {
+        boundary = std::min(boundary, candidate);
+      }
     }
   }
   return boundary;
@@ -194,6 +221,14 @@ void applyBindings(CollectionBindingContext& context, const std::vector<SampleBi
       context.fail("SonyPS2 HD/BD binding metadata is missing", bank->metadata.range);
       return;
     }
+    const BodyAddressing addressing = bodyAddressing(*bankData, *bodyData);
+    if (addressing.omittedLeadingBlock) {
+      // Some PSF2 rips discarded the mandatory initial silent block but kept
+      // the original Vagi addresses. Keep source ranges physical and translate
+      // those logical addresses instead of manufacturing a padded source.
+      context.warning("SonyPS2 BD omits its initial silent ADPCM block; Vagi offsets were shifted by 16 bytes",
+                      body->metadata.range);
+    }
     const u32 sizeDifference = bankData->expectedBodyBytes > bodyData->bytes
                                    ? bankData->expectedBodyBytes - bodyData->bytes
                                    : bodyData->bytes - bankData->expectedBodyBytes;
@@ -215,7 +250,8 @@ void applyBindings(CollectionBindingContext& context, const std::vector<SampleBi
           context.fail("SonyPS2 region refers outside the sparse Vagi table", region.range);
           return;
         }
-        const u32 bodyOffset = bankData->vags[vagIndex]->bodyOffset;
+        const u32 logicalOffset = bankData->vags[vagIndex]->bodyOffset;
+        const u32 bodyOffset = addressing.physicalOffset(logicalOffset);
         const auto entry = std::ranges::find(bodyData->entries, bodyOffset, &SampleBodyData::Entry::bodyOffset);
         bool loops = false;
         if (entry != bodyData->entries.end()) {
@@ -225,7 +261,7 @@ void applyBindings(CollectionBindingContext& context, const std::vector<SampleBi
           auto [sample, inserted] = localSamples.try_emplace(bodyOffset, 0);
           if (inserted) {
             const ByteReader reader = bodyData->source.reader();
-            const u32 boundary = sampleBoundary(*bankData, bodyOffset, bodyData->bytes);
+            const u32 boundary = sampleBoundary(*bankData, addressing, bodyOffset, bodyData->bytes);
             const auto stream = inspectPsxAdpcmStream(reader, bodyOffset, boundary);
             const bool completeEndpoint = stream && stream->encodedData.size >= kPsxAdpcmBlockBytes &&
                                           (reader.u8At(bodyOffset + stream->encodedData.size -
@@ -237,7 +273,7 @@ void applyBindings(CollectionBindingContext& context, const std::vector<SampleBi
             if (!completeEndpoint && !truncatedEndpoint) {
               context.fail(fmt::format("SonyPS2 Vagi entry at {:#x} has no ADPCM endpoint before the next BD "
                                        "waveform",
-                                       bodyOffset),
+                                       logicalOffset),
                            region.range);
               return;
             }

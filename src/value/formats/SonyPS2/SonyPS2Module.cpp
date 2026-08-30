@@ -31,6 +31,9 @@ struct Psf2Selection {
   std::string header = "default.hd";
   std::string body = "default.bd";
   u32 midi = 0;
+  u32 volume = 128;
+  u32 reverbType = 5;
+  u32 reverbDepth = 0x3fff;
 };
 
 [[nodiscard]] std::string normalizedPath(std::string_view value) {
@@ -111,11 +114,19 @@ struct Psf2Selection {
           selection.header = value;
         } else if (option == 'b') {
           selection.body = value;
-        } else if (option == 'n') {
-          u32 midi = 0;
-          const auto [position, error] = std::from_chars(value.data(), value.data() + value.size(), midi);
+        } else if (option == 'd' || option == 'n' || option == 'r' || option == 'v') {
+          u32 number = 0;
+          const auto [position, error] = std::from_chars(value.data(), value.data() + value.size(), number);
           if (error == std::errc{} && position == value.data() + value.size()) {
-            selection.midi = midi;
+            if (option == 'd') {
+              selection.reverbDepth = number;
+            } else if (option == 'n') {
+              selection.midi = number;
+            } else if (option == 'r') {
+              selection.reverbType = number;
+            } else {
+              selection.volume = number;
+            }
           }
         }
       }
@@ -216,20 +227,27 @@ struct Psf2Selection {
     return {};
   }
   for (auto& [offset, bank] : banks) {
+    if (selection && extension == ".hd") {
+      bank.reverbType = selection->reverbType;
+      bank.reverbDepth = selection->reverbDepth;
+    }
     addSoundBank(result, offset, std::move(bank));
   }
   for (u32 fileIndex = 0; fileIndex < sequences.size(); ++fileIndex) {
     const auto& layout = sequences[fileIndex];
-    const auto publishMidiBlock = [&](const MidiBlockLayout& block) {
+    const auto publishMidiBlock = [&](const MidiBlockLayout& block, u32 initialVolume) {
       auto sequence = result.sequence(fmt::format("{} MIDI {}", result.sourceDisplayName(), block.index),
                                       input.reader.range(block.offset, block.dataEnd - block.offset));
-      sequence.data(SequenceData{})
-          .program(parseMidiSequence(input.reader, sequence.id(), block, &result.sourceMap(), &result.diagnostics()));
+      auto program = parseMidiSequence(input.reader, sequence.id(), block, &result.sourceMap(), &result.diagnostics());
+      if (initialVolume != 128) {
+        program.behavior.initialMasterLevel = std::min(initialVolume, 128u) / 128.0;
+      }
+      sequence.data(SequenceData{}).program(std::move(program));
     };
     if (selection && extension == ".sq") {
       const auto midi = std::ranges::find(layout.midiBlocks, selection->midi, &MidiBlockLayout::index);
       if (midi != layout.midiBlocks.end()) {
-        publishMidiBlock(*midi);
+        publishMidiBlock(*midi, selection->volume);
       } else {
         result.warning(fmt::format("PSF2 sq.irx selects missing SonyPS2 MIDI block {}", selection->midi),
                        input.reader.range(layout.offset, layout.length));
@@ -279,7 +297,7 @@ struct Psf2Selection {
       if (!publishMidi[midi]) {
         continue;
       }
-      publishMidiBlock(layout.midiBlocks[midi]);
+      publishMidiBlock(layout.midiBlocks[midi], 128);
     }
     for (const auto& song : publishSongs) {
       auto sequence = result.sequence(fmt::format("{} Song {}", result.sourceDisplayName(), song.index),

@@ -164,17 +164,17 @@ u32 addSparseChunk(std::vector<u8>& bytes, std::string_view tag, u32 entryBytes)
   return offset;
 }
 
-std::vector<u8> hdFixture() {
+std::vector<u8> hdFixture(u32 vagOffset = 0, u32 bodySize = 0x30) {
   std::vector<u8> bytes(0x40, 0xff);
   text(bytes, 0, "IECSsreV");
   le32(bytes, 8, 16);
   bytes[14] = 2;
   text(bytes, 16, "IECSdaeH");
   le32(bytes, 24, 0x40);
-  le32(bytes, 0x20, 0x30);
+  le32(bytes, 0x20, bodySize);
 
   const u32 vagi = addSparseChunk(bytes, "IECSigaV", 8);
-  le32(bytes, vagi + 20, 0);
+  le32(bytes, vagi + 20, vagOffset);
   le16(bytes, vagi + 24, 24000);
   bytes[vagi + 26] = 1;
 
@@ -332,11 +332,11 @@ SourceFile archiveMember(std::string name, std::string_view ini = {}) {
   return source;
 }
 
-SessionSnapshot scanFixture(std::vector<u8> sq, std::string_view ini = {}) {
+SessionSnapshot scanFixture(std::vector<u8> sq, std::string_view ini = {}, std::vector<u8> hd = hdFixture()) {
   Session session;
   session.registerFormat(module());
   session.addSource(archiveMember("music.sq", ini), std::move(sq));
-  session.addSource(archiveMember("music.hd", ini), hdFixture());
+  session.addSource(archiveMember("music.hd", ini), std::move(hd));
   session.addSource(archiveMember("music.bd", ini), bdFixture());
   session.scanPendingSources();
   return session.snapshot();
@@ -365,6 +365,13 @@ void syntheticFeatures() {
   const auto& bank = bound.collection->soundBanks().front();
   expect(bank.instruments.size() == 2 && bank.localSamples.samples.empty(),
          "HD should retain both Prog and Setb instruments with external samples");
+
+  const auto omittedBlock = scanFixture(sqFixture(false), {}, hdFixture(0x10, 0x40));
+  const Collection* omittedCollection = firstCollection(omittedBlock);
+  expect(omittedCollection != nullptr, "a BD missing its initial silent block should still resolve");
+  const auto omittedBinding = bindCollection(omittedBlock, omittedCollection->id);
+  expect(omittedBinding.collection && omittedBinding.collection->soundBanks().front().localSamples.samples.empty(),
+         "a BD missing its initial silent block should translate logical Vagi offsets onto physical samples");
   expect(bank.instruments[0].regions.size() == 156,
          "sample-set limits and both split layers should retain their mapped velocity zones; got " +
              std::to_string(bank.instruments[0].regions.size()));
@@ -488,9 +495,16 @@ void trivialSongCollapsesToSelectedMidi() {
          "the MIDI selected by a trivial Song wrapper should remain playable");
 
   const auto iniSnapshot = scanFixture(sqFixture(false),
-                                       "sq.irx -s=music.sq -h=music.hd -b=music.bd -n=2");
+                                       "sq.irx -s=music.sq -h=music.hd -b=music.bd -n=2 -v=64 -r=3 -d=4096");
   expect(iniSnapshot.collections().size() == 1 && iniSnapshot.collections().front().name == "music MIDI 2",
          "PSF2 sq.irx metadata should publish only the MIDI block the original player selects");
+  const auto iniBound = bindCollection(iniSnapshot, iniSnapshot.collections().front().id);
+  const auto iniRender = renderCollection(*iniBound.collection, SequenceRenderOptions{});
+  const auto* iniLevel = findEvent<MasterLevelPerformanceEvent>(*iniRender.performance);
+  expect(iniLevel != nullptr && near(iniLevel->linearGain, 0.5),
+         "PSF2 sq.irx -v should set the driver's initial sequence-wide MIDI volume");
+  expect(near(iniBound.collection->soundBanks().front().instruments.front().reverb, 4096.0 / 16383.0),
+         "PSF2 sq.irx -r/-d should retain the closest generic projection of the SPU2 reverb return");
 
   auto staleSizes = sqFixture();
   constexpr u32 staleBytes = 0x400;
