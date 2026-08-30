@@ -121,6 +121,31 @@ PerformanceSequence render(std::vector<u8> bytes) {
   return SequenceVm(LoopPolicy::PlayOnce).render(program);
 }
 
+SessionSnapshot scan(std::vector<u8> bytes) {
+  Session session;
+  session.registerFormat(module());
+  session.addSource(SourceFile{.name = "MoriSnes fixture.aram"}, std::move(bytes));
+  session.scanPendingSources();
+  return session.snapshot();
+}
+
+const Collection* firstCollection(const SessionSnapshot& snapshot) {
+  return snapshot.collections().empty() ? nullptr : &snapshot.collections().front();
+}
+
+const SoundBankAsset* firstSoundBank(const SessionSnapshot& snapshot) {
+  const Collection* collection = firstCollection(snapshot);
+  return collection == nullptr || collection->members.soundBanks.empty()
+             ? nullptr
+             : snapshot.asset<SoundBankAsset>(collection->members.soundBanks.front());
+}
+
+const Region* firstRegion(const SoundBankAsset* bank) {
+  return bank == nullptr || bank->instruments.empty() || bank->instruments.front().regions.empty()
+             ? nullptr
+             : &bank->instruments.front().regions.front();
+}
+
 void eventTimingAndAuditedCommandsRenderPhysically() {
   std::vector<u8> bytes{
       0x04, 0x03, 0x40, 0xc3, 0x80,  // prefix establishes delta/duration/velocity
@@ -261,17 +286,11 @@ void scannerBuildsScriptedSynthModulation() {
              layout->tracks.front().startAddress == 0x1400,
          "MoriSnes signatures should recover the live song, relative tracks, presets, pan law, and DIR");
 
-  Session session;
-  session.registerFormat(module());
-  session.addSource(SourceFile{.name = "MoriSnes fixture.aram"}, fixture.data());
-  session.scanPendingSources();
-  const SessionSnapshot snapshot = session.snapshot();
-  const Collection* collection = snapshot.collections().empty() ? nullptr : &snapshot.collections().front();
-  const auto* bank = collection == nullptr || collection->members.soundBanks.empty()
-                         ? nullptr
-                         : snapshot.asset<SoundBankAsset>(collection->members.soundBanks.front());
+  const SessionSnapshot snapshot = scan(fixture.data());
+  const Collection* collection = firstCollection(snapshot);
+  const auto* bank = firstSoundBank(snapshot);
   const Instrument* instrument = bank == nullptr || bank->instruments.empty() ? nullptr : &bank->instruments.front();
-  const Region* region = instrument == nullptr || instrument->regions.empty() ? nullptr : &instrument->regions.front();
+  const Region* region = firstRegion(bank);
 
   expect(snapshot.diagnostics().empty() && collection != nullptr && collection->members.sequence && bank != nullptr &&
              instrument != nullptr && instrument->identity && instrument->identity->key == 0x1500 && region != nullptr,
@@ -310,25 +329,17 @@ void loopingVoicePreludeRemainsSeparateFromItsVibratoCycle() {
   };
   std::ranges::copy(script, bytes.begin() + 0x1501);
 
-  Session session;
-  session.registerFormat(module());
-  session.addSource(SourceFile{.name = "MoriSnes prelude fixture.aram"}, bytes);
-  session.scanPendingSources();
-  const SessionSnapshot snapshot = session.snapshot();
-  const Collection* collection = snapshot.collections().empty() ? nullptr : &snapshot.collections().front();
-  const auto* bank = collection == nullptr || collection->members.soundBanks.empty()
-                         ? nullptr
-                         : snapshot.asset<SoundBankAsset>(collection->members.soundBanks.front());
+  const SessionSnapshot snapshot = scan(std::move(bytes));
+  const Collection* collection = firstCollection(snapshot);
+  const auto* bank = firstSoundBank(snapshot);
   const auto* sequence = collection == nullptr || !collection->members.sequence
                              ? nullptr
                              : snapshot.asset<SequenceProgramAsset>(*collection->members.sequence);
-  const Region* region = bank == nullptr || bank->instruments.empty() || bank->instruments.front().regions.empty()
-                             ? nullptr
-                             : &bank->instruments.front().regions.front();
+  const Region* region = firstRegion(bank);
   expect(snapshot.diagnostics().empty() && sequence != nullptr && region != nullptr &&
              region->modulation.vibrato && region->modulation.vibrato->delaySeconds &&
              std::abs(region->modulation.vibrato->maxDepthCents - 54 * (100.0 / 256.0)) < 0.000001 &&
-             std::abs(region->modulation.vibrato->delaySeconds->minimum - 31 * 0.009875) < 0.000001 &&
+             std::abs(region->modulation.vibrato->delaySeconds->minimum - 26 * 0.009875) < 0.000001 &&
              std::abs(region->modulation.vibrato->rateHertz.minimum - 1.0 / (24 * 0.009875)) < 0.000001,
          "a looping script's vibrato should use only its steady cycle, not its one-shot attack ramp" +
              (region && region->modulation.vibrato
@@ -351,11 +362,41 @@ void loopingVoicePreludeRemainsSeparateFromItsVibratoCycle() {
     return expression->header.tick == 15 * 0x20;
   });
   expect(performance.diagnostics.empty() && !notes.empty() && pitch != nullptr &&
-             pitch->timing.timelineTicks == 31 * 0x20 &&
+             pitch->timing.timelineTicks == 5 * 0x20 &&
              std::holds_alternative<FixedDurationPitchSlideTiming>(pitch->timing.physical) &&
-             std::abs(pitch->targetKey - pitch->startKey - 566.0 / 256.0) < 0.000001 &&
+             std::abs(pitch->targetKey - pitch->startKey - 515.0 / 256.0) < 0.000001 &&
              faded != expressions.end() && std::abs((*faded)->linearGain - 140.0 / 210.0) < 0.000001,
-         "the pre-cycle pitch rise and volume fade should remain per-note fixed-clock automation");
+         "the pre-cycle pitch rise and volume fade should remain per-note fixed-clock automation" +
+             (pitch ? " (ticks=" + std::to_string(pitch->timing.timelineTicks) +
+                          ", delta=" + std::to_string(pitch->targetKey - pitch->startKey) + ")"
+                    : std::string{" (missing pitch)"}));
+}
+
+void preAttackFinePitchRemainsRelativeToTheSourceNote() {
+  DriverFixture fixture;
+  std::vector<u8> bytes = fixture.data();
+
+  // Shopping District instrument $1400 applies D9 $88 before KON. The
+  // hardware borrows into the inherited source note rather than clamping the
+  // isolated script offset to zero.
+  const std::vector<u8> script{
+      0xde, 0xfc, 0x00,  // DSP row $1600
+      0xd9, 0x88,        // -120/256 semitone, relative to the source note
+      0xda,
+      0xd0,
+  };
+  std::ranges::copy(script, bytes.begin() + 0x1501);
+  bytes[0x1605] = 14;
+
+  const SessionSnapshot snapshot = scan(std::move(bytes));
+  const Region* region = firstRegion(firstSoundBank(snapshot));
+  const double pitchTableCorrection = 12.0 * std::log2(4286.0 / 4096.0);
+  const double expectedUnityKey = 72.0 - (14.0 - 120.0 / 256.0 + pitchTableCorrection);
+
+  expect(snapshot.diagnostics().empty() && region != nullptr &&
+             std::abs(region->unityKey - expectedUnityKey) < 0.000001,
+         "pre-attack fine pitch should borrow into the inherited source note instead of tuning the region sharp" +
+             (region ? " (unity=" + std::to_string(region->unityKey) + ")" : std::string{" (missing region)"}));
 }
 
 void physicalVoiceScriptsCanBoundNotes() {
@@ -520,6 +561,7 @@ void runMoriSnesModuleTests() {
   sourceVoiceScriptChangesFutureReleaseBehavior();
   scannerBuildsScriptedSynthModulation();
   loopingVoicePreludeRemainsSeparateFromItsVibratoCycle();
+  preAttackFinePitchRemainsRelativeToTheSourceNote();
   physicalVoiceScriptsCanBoundNotes();
   physicalVoiceScriptsCanRetriggerNotes();
   liveSongSelectionAndHardwareSoundEffectsAreRecovered();

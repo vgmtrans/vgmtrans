@@ -38,12 +38,14 @@ constexpr u32 kScriptCommandLimit = 131072;
   return static_cast<u16>(continuation + relative);
 }
 
-[[nodiscard]] s32 addFinePitch(s32 pitch256, s8 delta) {
+[[nodiscard]] s32 addFinePitch(s32 pitch256, s8 delta, bool absolutePitch) {
   const s8 high = static_cast<s8>(pitch256 >> 8);
   const u8 low = static_cast<u8>(pitch256);
   const u16 initial = static_cast<u16>((static_cast<u16>(static_cast<u8>(high)) << 8) | low);
   u16 result = static_cast<u16>(initial + delta);
-  if (delta < 0 && (result & 0x8000) != 0) {
+  // The driver clamps against the complete voice pitch. Before D7/E2 replaces
+  // the inherited note, a negative result here is only a relative offset.
+  if (absolutePitch && delta < 0 && (result & 0x8000) != 0) {
     result = 0;
   }
   return static_cast<s8>(result >> 8) * 256 + static_cast<u8>(result);
@@ -238,7 +240,8 @@ void includeRange(u32 begin, u32 size, u32& minimum, u32& maximum) {
                          static_cast<u8>(state.pitch256);
         break;
       case 0xd9:
-        state.pitch256 = addFinePitch(state.pitch256, static_cast<s8>(reader.u8At(operands)));
+        state.pitch256 =
+            addFinePitch(state.pitch256, static_cast<s8>(reader.u8At(operands)), state.absolutePitch);
         break;
       case 0xda:
         state.keyOn = true;
