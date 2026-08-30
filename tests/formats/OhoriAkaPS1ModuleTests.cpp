@@ -63,15 +63,16 @@ std::vector<const Event*> eventsOfType(const PerformanceTrack& track) {
 
 std::vector<u8> scannerFixture() {
   constexpr u32 sequence = 0x100;
-  constexpr u32 samples = 0x200;
+  constexpr u32 decoySamples = 0x180;
+  constexpr u32 samples = 0x300;
   auto bytes = sequenceFixture({0x83, 0x00, 0x21, 0xbc, 100, 0x80}, sequence);
-  bytes.resize(samples + 0x20);
+  bytes.resize(samples + 0x80);
 
   // Container back-pointer and its one-instrument bank at +0x10.
   le32(bytes, 8, sequence);
   le32(bytes, 0x18, 1);
   le32(bytes, 0x1c, 0x10);
-  le32(bytes, 0x20, 2);
+  le32(bytes, 0x20, 4);
   const u32 first = 0x24;
   le32(bytes, first, 0);
   bytes[first + 4] = 63;
@@ -83,17 +84,25 @@ std::vector<u8> scannerFixture() {
   bytes[first + 10] = 1;
   bytes[first + 11] = 0x80 | 32;
   le32(bytes, first + 12, (0x70u << 20) | (8u << 16) | (0x40u << 9) | (0x10u << 4) | 8u);
-  const u32 second = first + 0x10;
-  le32(bytes, second, 0x10);
+  // The driver ignores these zero-threshold placeholders: region selection is
+  // the first high threshold that contains the key, falling back to region 0.
+  le32(bytes, first + 0x10, 0x20);
+  le32(bytes, first + 0x20, 0x40);
+  const u32 second = first + 0x30;
+  le32(bytes, second, 0x60);
   bytes[second + 4] = 110;
   bytes[second + 5] = 127;
   bytes[second + 6] = 251;
   le32(bytes, second + 12, (0x60u << 20) | (6u << 16) | (0x30u << 9) | (8u << 4) | 7u);
 
-  // Two one-block terminated PSX ADPCM streams make the sample-pool base
-  // independently discoverable from the region offsets.
-  bytes[samples + 1] = 1;
+  // A real but incomplete pool appears first. The bank's actual pool matches
+  // every region offset, and each stream has the standard silent prefix.
+  bytes[decoySamples + 0x11] = 1;
+  bytes[decoySamples + 0x31] = 1;
   bytes[samples + 0x11] = 1;
+  bytes[samples + 0x31] = 1;
+  bytes[samples + 0x51] = 1;
+  bytes[samples + 0x71] = 1;
   return bytes;
 }
 
@@ -158,6 +167,30 @@ void ohoriAkaPs1SequencePreservesAuditedGrammarAndMixer() {
          "auto-pan, fixed-table vibrato, and timed native portamento should survive as physical playback intent");
 }
 
+void ohoriAkaPs1UnterminatedFinalTrackStopsAtZeroPadding() {
+  constexpr u32 track = 0x52;
+  auto bytes = sequenceFixture({
+      0x21, 0xbc, 127,  // ordinary note with explicit velocity
+      0x21, 0x00,       // an isolated key-zero note remains valid
+  });
+  bytes.resize(track + 5 + 64, 0);
+  bytes.back() = 0x80;  // unrelated data must not become the track terminator
+
+  const ByteReader reader(SourceId{82}, bytes);
+  const auto layout = readOhoriAkaPs1SequenceLayout(reader, 0);
+  expect(layout.has_value() && layout->trackEnds.size() == 1 && layout->trackEnds[0] == track + 5 &&
+             layout->length == track + 5,
+         "an unterminated final track should stop at zero padding instead of scanning unrelated memory");
+
+  const SequenceProgram program = parseOhoriAkaPs1Sequence(reader, AssetId{82}, *layout);
+  expect(program.tracks.size() == 1 && program.tracks[0].commands.size() == 2,
+         "zero padding should not produce phantom sequence commands");
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks[0]);
+  expect(performance.diagnostics.empty() && notes.size() == 2 && notes[0]->key == 60 && notes[1]->key == 0,
+         "padding detection should not reject an isolated key-zero note");
+}
+
 void ohoriAkaPs1ModuleBuildsDriverAccurateRegions() {
   Session session;
   session.registerFormat(ohoriAkaPs1Module());
@@ -171,7 +204,9 @@ void ohoriAkaPs1ModuleBuildsDriverAccurateRegions() {
   const auto* bank = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
   expect(bank != nullptr && bank->instruments.size() == 1 && bank->instruments[0].regions.size() == 2 &&
              bank->localSamples.samples.size() == 2,
-         "bank pointers and region sample offsets should resolve the complete local synth");
+         "bank pointers, driver region thresholds, and sample offsets should resolve the complete local synth");
+  expect(bank->localSamples.samples[0].encodedData.offset == 0x300,
+         "sample discovery should select the pool matching every bank offset rather than the first valid pool");
   const Region& region = bank->instruments[0].regions[0];
   expect(region.keyRange.low == 0 && region.keyRange.high == 60 && std::abs(region.unityKey - 59.5) < 1e-12 &&
              std::abs(region.attenuationDb - 6.089263430) < 0.000001,

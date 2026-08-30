@@ -25,6 +25,7 @@ constexpr u32 kRegionSize = 0x10;
 constexpr u32 kMaximumTracks = 24;
 constexpr u32 kMaximumInstruments = 256;
 constexpr u32 kMaximumSequenceSize = 0x100000;
+constexpr u32 kPaddingProbeSize = 16;
 constexpr std::array<u8, 32> kControlParameters{
     0, 1, 1, 1, 1, 1, 1, 2, 4, 1, 2, 0, 0, 1, 1, 0,
     1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -85,9 +86,21 @@ constexpr std::array<u8, 32> kControlParameters{
   return cursor <= end ? std::optional(cursor) : std::nullopt;
 }
 
-[[nodiscard]] std::optional<u32> trackEnd(ByteReader reader, u32 start, u32 limit) {
+[[nodiscard]] bool beginsZeroPadding(ByteReader reader, u32 offset, u32 limit) {
+  return offset <= limit && limit - offset >= kPaddingProbeSize && reader.has(offset, kPaddingProbeSize) &&
+         std::ranges::all_of(reader.slice(offset, kPaddingProbeSize), [](u8 byte) { return byte == 0; });
+}
+
+[[nodiscard]] std::optional<u32> trackEnd(ByteReader reader, u32 start, u32 limit, bool finalTrack) {
   u32 cursor = start;
   for (u32 commands = 0; commands < 262144 && cursor < limit;) {
+    // Some HOSAV streams omit the final 0x80 and end directly at the
+    // container's zero-filled tail. A single 00 00 remains a valid key-zero
+    // note; only a sustained run at an event boundary terminates the last
+    // track.
+    if (finalTrack && beginsZeroPadding(reader, cursor, limit)) {
+      return cursor;
+    }
     const u8 status = reader.u8At(cursor);
     const bool end = status >= 0x80 && (status & 0x60) != 0x20 && (status & 0x1f) == 0;
     const auto next = eventEnd(reader, cursor, limit);
@@ -153,6 +166,15 @@ constexpr std::array<u8, 32> kControlParameters{
   return ended;
 }
 
+[[nodiscard]] bool samplePoolStart(ByteReader reader, u32 offset) {
+  if (!reader.has(offset, kPsxAdpcmBlockBytes * 2)) return false;
+  const auto silent = reader.slice(offset, kPsxAdpcmBlockBytes);
+  const auto first = reader.slice(offset + kPsxAdpcmBlockBytes, kPsxAdpcmBlockBytes);
+  return std::ranges::all_of(silent, [](u8 byte) { return byte == 0; }) &&
+         reader.le16(offset + kPsxAdpcmBlockBytes) != 0 && (first[0] >> 4) <= 4 && (first[0] & 0x0f) <= 12 &&
+         (first[1] & ~u8{7}) == 0;
+}
+
 void locateSamples(ByteReader reader, OhoriAkaPs1BankLayout& layout) {
   std::set<u32> offsets;
   for (const u32 instrument : layout.instrumentAddresses) {
@@ -166,30 +188,30 @@ void locateSamples(ByteReader reader, OhoriAkaPs1BankLayout& layout) {
   }
   const std::vector<u32> samples(offsets.begin(), offsets.end());
   const u32 maximum = samples.back();
+  u32 bestBase = 0;
+  u32 bestMatches = 0;
   // The PSF-derived RAM source need not begin at a 16-byte address, so native
   // ADPCM alignment can appear at any four-byte residue in the ByteReader.
   for (u64 base = 0; base + maximum + kPsxAdpcmBlockBytes <= reader.size(); base += 4) {
-    const auto firstBlock = reader.slice(base + samples.front(), kPsxAdpcmBlockBytes);
-    if (std::ranges::all_of(firstBlock, [](u8 byte) { return byte == 0; }) ||
-        !plausibleAdpcm(reader, static_cast<u32>(base + samples[0]), static_cast<u32>(base + samples[1]))) {
-      continue;
-    }
-    u32 matches = 1;
-    for (std::size_t i = 1; i + 1 < samples.size() && matches < 6; ++i) {
+    if (!samplePoolStart(reader, static_cast<u32>(base))) continue;
+    u32 matches = 0;
+    for (std::size_t i = 0; i + 1 < samples.size(); ++i) {
       if (plausibleAdpcm(reader, static_cast<u32>(base + samples[i]), static_cast<u32>(base + samples[i + 1]))) {
         ++matches;
       } else {
         break;
       }
     }
-    if (matches >= std::min<std::size_t>(4, samples.size() - 1)) {
-      layout.sampleDataOffset = static_cast<u32>(base);
-      // The last stream supplies its own terminator, so the remaining source
-      // is only an upper bound and does not become part of the sample.
-      layout.sampleDataLength = static_cast<u32>(reader.size() - base);
-      return;
+    if (matches > bestMatches) {
+      bestBase = static_cast<u32>(base);
+      bestMatches = matches;
     }
   }
+  if (bestMatches < std::min<std::size_t>(4, samples.size() - 1)) return;
+  layout.sampleDataOffset = bestBase;
+  // The last stream supplies its own terminator, so the remaining source is
+  // only an upper bound and does not become part of the sample.
+  layout.sampleDataLength = static_cast<u32>(reader.size() - bestBase);
 }
 
 }  // namespace
@@ -233,7 +255,7 @@ std::optional<OhoriAkaPs1SequenceLayout> readOhoriAkaPs1SequenceLayout(ByteReade
     const u32 limit = i + 1 < layout.trackCount
                           ? layout.trackAddresses[i + 1]
                           : static_cast<u32>(std::min<u64>(reader.size(), offset + kMaximumSequenceSize));
-    const auto end = trackEnd(reader, layout.trackAddresses[i], limit);
+    const auto end = trackEnd(reader, layout.trackAddresses[i], limit, i + 1 == layout.trackCount);
     if (!end) {
       return std::nullopt;
     }
