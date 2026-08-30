@@ -472,16 +472,6 @@ void PerformanceEmitter::portamentoEnable(bool enabled) {
   });
 }
 
-void PerformanceEmitter::portamentoControl(PortamentoControlPerformanceEvent event) {
-  append(std::move(event));
-}
-
-void PerformanceEmitter::portamentoControl(double previousKey) {
-  portamentoControl(PortamentoControlPerformanceEvent{
-      .previousKey = previousKey,
-  });
-}
-
 void PerformanceEmitter::pitchTransitionSettings(PitchTransitionSettingsPerformanceEvent event) {
   append(std::move(event));
 }

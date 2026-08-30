@@ -276,6 +276,7 @@ struct PortamentoTimePerformanceEvent {
 
 struct PortamentoControlPerformanceEvent {
   PerformanceEventHeader header;
+  // MIDI-lowering artifact. Format interpreters should emit PitchTransitionIntent instead.
   double previousKey = 0.0;
 };
 

@@ -63,9 +63,11 @@ struct TrackState {
         seSet(static_cast<u8>((source.sourceTrackNumber >> 16) & 0x0f)),
         seTimbre(static_cast<u8>((source.sourceTrackNumber >> 8) & 0x7f)),
         seKey(static_cast<u8>(source.sourceTrackNumber & 0x7f)) {
+    currentTempo = sequence.behavior.initialTempoMicrosecondsPerQuarter;
+    ppqn = std::max<u16>(sequence.timebase.ppqn, 1);
     if (sequence.sectionPlaylist) {
       sectionPan = sequence.behavior.initialChannelPan.value_or(0.5);
-      sectionTempo = sequence.behavior.initialTempoMicrosecondsPerQuarter;
+      sectionTempo = currentTempo;
     }
   }
 
@@ -99,10 +101,14 @@ struct TrackState {
   std::vector<ActiveNote> activeNotes;
   bool sustain = false;
   bool portamentoEnabled = false;
+  std::optional<u8> portamentoSource;
+  u32 portamentoMilliseconds = 0;
   bool sectionStarted = false;
   bool resetSectionState = false;
   std::optional<double> sectionPan;
   u32 sectionTempo = 500000;
+  u32 currentTempo = 500000;
+  u16 ppqn = 480;
   u16 pitchBendValue = 8192;
   double emittedPitchBendSemitones = 0.0;
   PerformanceNoteId seNote;
@@ -243,12 +249,27 @@ struct Playback {
     pruneReleasedNotes();
   }
 
-  void capturePortamentoSource(PerformanceEmitter& delayed, u8 key) {
+  void capturePortamentoSource(u8 key) {
     if (track.portamentoEnabled) {
-      // modhsyn derives the next glide's source from the most recent note-off.
-      // Its CC84 setter writes a separate field that the glide path never reads.
-      delayed.portamentoControl(key);
+      track.portamentoSource = key;
     }
+  }
+
+  [[nodiscard]] u32 portamentoTicks() const {
+    const double ticks = track.portamentoMilliseconds * 1000.0 * track.ppqn / std::max<u32>(track.currentTempo, 1);
+    return static_cast<u32>(std::clamp(std::round(ticks), 1.0, static_cast<double>(std::numeric_limits<u32>::max())));
+  }
+
+  void applyPortamento(PerformanceEmitter& delayed, PerformanceNoteId note, u8 key) const {
+    if (!track.portamentoEnabled || !track.portamentoSource || track.portamentoMilliseconds == 0 ||
+        *track.portamentoSource == key) {
+      return;
+    }
+    delayed
+        .pitchSlide(note, *track.portamentoSource, key,
+                    PitchSlideTiming::fixedDuration(portamentoTicks(), track.portamentoMilliseconds))
+        .preferPortamento()
+        .useCurrentPortamentoTiming();
   }
 
   void releaseAllKeyDownNotes() {
@@ -279,6 +300,7 @@ struct Playback {
   void beforeCommand() {
     if (track.resetSectionState) {
       track.resetSectionState = false;
+      track.currentTempo = track.sectionTempo;
       if (track.channel == 0) {
         out.tempo(track.sectionTempo);
       }
@@ -304,11 +326,12 @@ struct Playback {
       if (velocity == 0) {
         delayed.noteOff(key);
         releaseNotes(key);
-        capturePortamentoSource(delayed, key);
+        capturePortamentoSource(key);
       } else {
         const auto note = bendRangeForKey(key);
         emitCurrentPitchBend(delayed, note);
-        delayed.noteOn(key, velocityGain(velocity));
+        const PerformanceNoteId played = delayed.noteOn(key, velocityGain(velocity));
+        applyPortamento(delayed, played, key);
         track.activeNotes.push_back(note);
       }
     }
@@ -320,7 +343,7 @@ struct Playback {
       auto delayed = out.at(delayedTick(vm, delta));
       delayed.noteOff(key);
       releaseNotes(key);
-      capturePortamentoSource(delayed, key);
+      capturePortamentoSource(key);
     }
     return after(delta);
   }
@@ -418,7 +441,8 @@ struct Playback {
         }
         break;
       case 5:
-        delayed.pitchTransitionSettings(value * 20.0);
+        track.portamentoMilliseconds = value * 20u;
+        delayed.pitchTransitionSettings(track.portamentoMilliseconds);
         break;
       case 7:
         delayed.level(linearMidi7(value));
@@ -440,10 +464,15 @@ struct Playback {
         track.sustain = sustain;
         break;
       }
-      case 65:
-        track.portamentoEnabled = value != 0;
+      case 65: {
+        const bool enabled = value != 0;
+        if (!enabled || !track.portamentoEnabled) {
+          track.portamentoSource.reset();
+        }
+        track.portamentoEnabled = enabled;
         delayed.portamentoEnable(track.portamentoEnabled);
         break;
+      }
       case 84:
         // Retained in the source map, but unused by this driver revision.
         break;
@@ -508,6 +537,7 @@ struct Playback {
         releaseSustainedNotes();
         delayed.portamentoEnable(false);
         track.portamentoEnabled = false;
+        track.portamentoSource.reset();
         delayed.vibratoDepth(0.0);
         delayed.tremoloLinearGainDepth(0.0);
         delayed.level(1.0);
@@ -537,8 +567,11 @@ struct Playback {
   }
 
   Effects tempo(u32 microseconds, u32 delta) {
-    if (track.channel == 0 && microseconds != 0) {
-      out.at(delayedTick(vm, delta)).tempo(microseconds);
+    if (microseconds != 0) {
+      track.currentTempo = microseconds;
+      if (track.channel == 0) {
+        out.at(delayedTick(vm, delta)).tempo(microseconds);
+      }
     }
     return after(delta);
   }
