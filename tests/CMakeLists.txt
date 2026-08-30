@@ -24,6 +24,7 @@ target_sources(vgmtrans-value-core-tests
     formats/SoftCreatSnesModuleTests.cpp
     formats/SuzukiPS1ModuleTests.cpp
     formats/SuzukiSnesModuleTests.cpp
+    formats/TriAcePS1ModuleTests.cpp
     formats/WolfTeamSnesModuleTests.cpp
     core/SessionSnapshotBuilder.h
     core/ValueCollectionDiscoveryTests.cpp
