@@ -114,7 +114,10 @@ bool addSampleBody(ScanResultBuilder& result) {
 
   auto pool = result.samplePool(fmt::format("{} BD", result.sourceDisplayName()), reader.range(0, physicalEnd));
   auto& samples = pool.samples();
-  samples.include(reader.range(0, physicalEnd));
+  const SourceRange bodyRange = reader.range(0, physicalEnd);
+  const SourceAnnotationId bodySource =
+      samples.source(SourceRole::SamplePool, "SonyPS2 BD body", bodyRange, "sony-ps2-bd-body").id();
+  samples.include(bodyRange);
   SampleBodyData retained{
       .bytes = physicalEnd,
       .source = RetainedSource::copyOf(reader),
@@ -130,7 +133,7 @@ bool addSampleBody(ScanResultBuilder& result) {
                                               .bitsPerSample = 16,
                                               .loop = item.stream.loop,
                                           });
-    entry.source(entry.value().name, item.stream.encodedData, "sony-ps2-vag-stream");
+    entry.source(entry.value().name, item.stream.encodedData, "sony-ps2-vag-stream").parent(bodySource);
     retained.entries.push_back(SampleBodyData::Entry{.bodyOffset = item.offset, .sampleIndex = denseIndex});
     if (item.zeroPrefix) {
       retained.entries.push_back(SampleBodyData::Entry{.bodyOffset = *item.zeroPrefix, .sampleIndex = denseIndex});

@@ -439,6 +439,10 @@ struct SampleParam {
   return gain <= 0.0 ? 96.0 : -20.0 * std::log10(gain);
 }
 
+[[nodiscard]] double reverbSend(const SoundBankData& bank) {
+  return bank.reverbType == 0 ? 0.0 : std::min(bank.reverbDepth, 0x3fffu) / static_cast<double>(0x3fff);
+}
+
 [[nodiscard]] std::optional<LfoWaveform> waveform(u8 value) {
   switch (value) {
     case 1:
@@ -616,8 +620,11 @@ struct RegionResolution {
       }
       for (u32 timbre = 0; timbre <= maximumTimbre; ++timbre) {
         const u32 relative = reader.le32(*setOffset + 4 + timbre * 4);
+        if (relative == 0xffffffff || relative >= setb->size) {
+          continue;
+        }
         const u32 timbreOffset = setb->offset + relative;
-        if (relative == 0xffffffff || relative >= setb->size || !reader.has(timbreOffset, 8)) {
+        if (!reader.has(timbreOffset, 8)) {
           continue;
         }
         const u32 noteBlockOffset = timbreOffset + reader.le32(timbreOffset);
@@ -693,9 +700,13 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
 
   const RegionResolution resolution = regionResolution(reader, programs, sampleSets, samples, setb, layout);
   if (resolution.step != 1) {
+    const std::string consequence =
+        resolution.emittedRegions <= kMaxSynthRegions
+            ? "to fit 16-bit synth tables"
+            : "but the coarsest zones still exceed the conservative 16-bit synth-table budget";
     instruments.warning(fmt::format("SonyPS2 key/velocity modulation requires {} exact regions; using {}-step "
-                                    "zones ({} regions) to fit 16-bit synth tables",
-                                    resolution.exactRegions, resolution.step, resolution.emittedRegions),
+                                    "zones ({} regions), {}",
+                                    resolution.exactRegions, resolution.step, resolution.emittedRegions, consequence),
                         reader.range(offset, headerBytes));
   }
 
@@ -799,7 +810,7 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
           .identity = instrumentIdentity(0, static_cast<u8>(programIndex)),
           .pitchBendRangeCents = static_cast<u16>(std::min<u32>(
               65535, (std::max(runtime.pitchBendPositive, runtime.pitchBendNegative) * 100u + 127u) / 128u)),
-          .reverb = programWet ? 1.0 : 0.0,
+          .reverb = programWet ? reverbSend(layout) : 0.0,
           .name = fmt::format("Program {}", programIndex),
           .range = reader.range(*programOffset, kProgramBytes),
       });
@@ -865,7 +876,8 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
           if (sample.routing != 0 && !warnedRouting) {
             // Preserve effect-send capability as Instrument::reverb. The exact
             // dry/wet left/right matrix and SPU2 core selection need a routing model.
-            instruments.warning("SonyPS2 SPU2 core and dry/wet routing is reduced to generic reverb capability",
+            instruments.warning("SonyPS2 reverb algorithm, SPU2 core, and dry/wet routing are reduced to a generic "
+                                "instrument reverb send",
                                 reader.range(sample.offset, kSampleBytes));
             warnedRouting = true;
           }
@@ -1014,7 +1026,7 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
         auto instrument = instruments.append(Instrument{
             .explicitAddress = InstrumentAddress{.bank = 128 + setIndex, .program = timbreIndex},
             .identity = setbInstrumentIdentity(static_cast<u8>(setIndex), static_cast<u8>(timbreIndex)),
-            .reverb = wet ? 1.0 : 0.0,
+            .reverb = wet ? reverbSend(layout) : 0.0,
             .name = fmt::format("SE Set {} Timbre {}", setIndex, timbreIndex),
             .range = reader.range(timbreOffset, 8),
         });
@@ -1036,7 +1048,8 @@ void addSoundBank(ScanResultBuilder& result, u32 offset, SoundBankData layout) {
           const VagInfo& vag = *layout.vags[vagIndex];
           const u8 routing = reader.u8At(noteOffset + 13);
           if (routing != 0 && !warnedRouting) {
-            instruments.warning("SonyPS2 SPU2 core and dry/wet routing is reduced to generic reverb capability",
+            instruments.warning("SonyPS2 reverb algorithm, SPU2 core, and dry/wet routing are reduced to a generic "
+                                "instrument reverb send",
                                 reader.range(noteOffset, noteBytes));
             warnedRouting = true;
           }
