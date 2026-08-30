@@ -81,8 +81,9 @@ constexpr u32 kRegionSize = 0x10;
 }
 
 [[nodiscard]] std::vector<OhoriAkaPs1Region> effectiveRegions(const std::vector<OhoriAkaPs1Region>& raw) {
+  if (raw.empty()) return {};
   std::vector<OhoriAkaPs1Region> regions;
-  for (u16 key = 0; key < 128 && !raw.empty(); ++key) {
+  for (u16 key = 0; key < 128; ++key) {
     auto selected = std::ranges::find_if(raw, [key](const auto& region) { return key <= region.keyHigh; });
     if (selected == raw.end()) selected = raw.begin();
     if (regions.empty() || regions.back().offset != selected->offset) {
@@ -97,16 +98,12 @@ constexpr u32 kRegionSize = 0x10;
 [[nodiscard]] std::vector<OhoriAkaPs1Instrument> readInstruments(ByteReader reader,
                                                                  const OhoriAkaPs1BankLayout& layout) {
   std::vector<OhoriAkaPs1Instrument> instruments;
-  instruments.reserve(layout.instrumentCount);
-  for (u32 program = 0; program < layout.instrumentCount; ++program) {
-    const u32 offset = layout.instrumentAddresses[program];
+  instruments.reserve(layout.instrumentAddresses.size());
+  for (const u32 offset : layout.instrumentAddresses) {
     const u32 count = reader.le32(offset);
     RecordReader record(reader, offset, offset + 4 + count * kRegionSize);
     (void)record.u32leAt(0, "region_count");
-    OhoriAkaPs1Instrument instrument{
-        .program = static_cast<u8>(program),
-        .source = std::move(record).finish(),
-    };
+    OhoriAkaPs1Instrument instrument{.source = std::move(record).finish()};
     std::vector<OhoriAkaPs1Region> raw;
     raw.reserve(count);
     for (u32 region = 0; region < count; ++region) {
@@ -122,11 +119,10 @@ constexpr u32 kRegionSize = 0x10;
 
 std::optional<OhoriAkaPs1ScannedBank> addOhoriAkaPs1Bank(ScanResultBuilder& result,
                                                          const OhoriAkaPs1BankLayout& layout) {
+  if (!layout.sampleDataOffset) return std::nullopt;
   const ByteReader reader = result.reader();
+  const u32 sampleBase = *layout.sampleDataOffset;
   auto parsed = readInstruments(reader, layout);
-  if (layout.sampleDataLength == 0) {
-    return std::nullopt;
-  }
   std::set<u32> offsets;
   for (const auto& instrument : parsed) {
     for (const auto& region : instrument.regions) {
@@ -135,10 +131,9 @@ std::optional<OhoriAkaPs1ScannedBank> addOhoriAkaPs1Bank(ScanResultBuilder& resu
   }
   std::map<u32, PsxAdpcmStream> streams;
   for (auto current = offsets.begin(); current != offsets.end(); ++current) {
-    const u32 start = layout.sampleDataOffset + *current;
-    const u32 boundary = std::next(current) == offsets.end()
-                             ? static_cast<u32>(std::min<u64>(reader.size(), layout.sampleDataOffset + layout.sampleDataLength))
-                             : layout.sampleDataOffset + *std::next(current);
+    const u32 start = sampleBase + *current;
+    const u32 boundary =
+        std::next(current) == offsets.end() ? static_cast<u32>(reader.size()) : sampleBase + *std::next(current);
     if (auto stream = inspectPsxAdpcmStream(reader, start, boundary)) {
       streams.emplace(*current, *stream);
     }
@@ -151,16 +146,15 @@ std::optional<OhoriAkaPs1ScannedBank> addOhoriAkaPs1Bank(ScanResultBuilder& resu
   auto& instruments = bank.instruments();
   auto& samples = bank.localSamples();
   instruments.include(reader.range(layout.offset, layout.length));
-  u32 sampleDataEnd = layout.sampleDataOffset;
+  u32 sampleDataEnd = sampleBase;
   for (const auto& [offset, stream] : streams) {
     sampleDataEnd = static_cast<u32>(std::max<u64>(sampleDataEnd, stream.encodedData.endOffset()));
   }
-  const u32 usedSampleDataLength = sampleDataEnd - layout.sampleDataOffset;
-  samples.include(reader.range(layout.sampleDataOffset, usedSampleDataLength));
+  const u32 usedSampleDataLength = sampleDataEnd - sampleBase;
+  samples.include(reader.range(sampleBase, usedSampleDataLength));
   const auto sampleRoot = samples
                               .source(SourceRole::SamplePool, "PS1 ADPCM Sample Data",
-                                      reader.range(layout.sampleDataOffset, usedSampleDataLength),
-                                      "ohori-aka-ps1-sample-data")
+                                      reader.range(sampleBase, usedSampleDataLength), "ohori-aka-ps1-sample-data")
                               .id();
   std::map<u32, SampleRef> sampleRefs;
   for (const auto& [offset, stream] : streams) {
@@ -182,14 +176,15 @@ std::optional<OhoriAkaPs1ScannedBank> addOhoriAkaPs1Bank(ScanResultBuilder& resu
                                   .source(SourceRole::Table, "Instrument Bank", reader.range(layout.offset, layout.length),
                                           "ohori-aka-ps1-instrument-bank")
                                   .id();
-  for (const auto& source : parsed) {
+  for (u32 program = 0; program < parsed.size(); ++program) {
+    const auto& source = parsed[program];
     auto instrument = instruments.append(Instrument{
-        .explicitAddress = InstrumentAddress{.bank = 0, .program = source.program},
-        .identity = ohoriAkaPs1InstrumentIdentity(source.program),
-        .name = fmt::format("Instrument {}", source.program),
+        .explicitAddress = InstrumentAddress{.bank = 0, .program = static_cast<u8>(program)},
+        .identity = ohoriAkaPs1InstrumentIdentity(static_cast<u8>(program)),
+        .name = fmt::format("Instrument {}", program),
         .range = source.source.range,
     });
-    instrument.source(fmt::format("Instrument {}", source.program), source.source, "ohori-aka-ps1-instrument")
+    instrument.source(fmt::format("Instrument {}", program), source.source, "ohori-aka-ps1-instrument")
         .parent(instrumentRoot);
     for (const auto& regionSource : source.regions) {
       const auto sample = sampleRefs.find(regionSource.sampleOffset);

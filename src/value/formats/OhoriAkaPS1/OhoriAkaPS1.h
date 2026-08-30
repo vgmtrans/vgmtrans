@@ -11,6 +11,7 @@
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceProgramConfig.h"
 
+#include <array>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -26,6 +27,11 @@ inline constexpr std::string_view kOhoriAkaPs1CommandKindPrefix = "ohori-aka-ps1
   return core::InstrumentIdentity{.domain = std::string(kOhoriAkaPs1InstrumentDomain), .key = program};
 }
 
+struct OhoriAkaPs1TrackLayout {
+  u32 offset = 0;
+  u32 end = 0;
+};
+
 struct OhoriAkaPs1SequenceLayout {
   u32 offset = 0;
   u32 length = 0;
@@ -37,9 +43,8 @@ struct OhoriAkaPs1SequenceLayout {
   u8 reverbFeedback = 0;
   u16 leftGain = 0;
   u16 rightGain = 0;
-  std::vector<u16> durations;
-  std::vector<u32> trackAddresses;
-  std::vector<u32> trackEnds;
+  std::array<u16, 32> durations{};
+  std::vector<OhoriAkaPs1TrackLayout> tracks;
 };
 
 struct OhoriAkaPs1Region {
@@ -57,7 +62,6 @@ struct OhoriAkaPs1Region {
 };
 
 struct OhoriAkaPs1Instrument {
-  u8 program = 0;
   std::vector<OhoriAkaPs1Region> regions;
   core::SourceRecord source;
 };
@@ -65,10 +69,7 @@ struct OhoriAkaPs1Instrument {
 struct OhoriAkaPs1BankLayout {
   u32 offset = 0;
   u32 length = 0;
-  u32 containerOffset = 0;
-  u32 sampleDataOffset = 0;
-  u32 sampleDataLength = 0;
-  u32 instrumentCount = 0;
+  std::optional<u32> sampleDataOffset;
   std::vector<u32> instrumentAddresses;
 };
 

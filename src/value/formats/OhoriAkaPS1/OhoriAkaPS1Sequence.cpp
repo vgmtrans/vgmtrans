@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/OhoriAkaPS1/OhoriAkaPS1.h"
+#include "value/formats/OhoriAkaPS1/OhoriAkaPS1Bytecode.h"
 
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompiledCommandRuntime.h"
@@ -28,8 +29,9 @@ using namespace core;
 namespace {
 
 constexpr u32 kPpqn = 48;
-constexpr u32 kMaxCommands = 262144;
 constexpr double kSpuFullScale = 16383.0;
+constexpr u16 kReuseTiming = 0xffff;
+constexpr u8 kReuseVelocity = 0xff;
 constexpr std::array<u16, 16> kVibratoWaveLength{8, 2, 7, 3, 7, 3, 156, 39, 64, 16, 80, 20, 256, 256, 40, 8};
 constexpr std::array<u16, 16> kVibratoWavePeak{32767, 32767, 32767, 32767, 32767, 32767, 32768, 32768,
                                               32767, 32767, 32768, 32768, 32767, 32623, 31190, 31173};
@@ -39,72 +41,25 @@ constexpr std::array<LfoWaveform, 16> kVibratoWaveform{
     LfoWaveform::Triangle, LfoWaveform::Triangle, LfoWaveform::Sine, LfoWaveform::Sine,
     LfoWaveform::Noise, LfoWaveform::Noise, LfoWaveform::Sine, LfoWaveform::Sine,
 };
-constexpr std::array<u8, 32> kControlParameters{
-    0, 1, 1, 1, 1, 1, 1, 2, 4, 1, 2, 0, 0, 1, 1, 0,
-    1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-};
 
-struct TrackLayout {
-  std::optional<Address> loopPoint;
+[[nodiscard]] std::map<u32, Address> findLoops(ByteReader reader, u32 start, u32 end) {
   std::map<u32, Address> loops;
-};
-
-[[nodiscard]] std::optional<u32> skipVariable(ByteReader reader, u32 cursor, u32 end) {
-  if (cursor >= end || !reader.has(cursor, 1)) return std::nullopt;
-  if ((reader.u8At(cursor) & 0x80) == 0) return cursor + 1;
-  return cursor + 1 < end ? std::optional<u32>{cursor + 2} : std::nullopt;
-}
-
-[[nodiscard]] std::optional<u32> encodedEnd(ByteReader reader, u32 cursor, u32 end) {
-  if (cursor >= end || !reader.has(cursor, 1)) return std::nullopt;
-  const u8 status = reader.u8At(cursor++);
-  if (status < 0x80) {
-    if (cursor >= end) return std::nullopt;
-    const u8 note = reader.u8At(cursor++);
-    if ((status & 0x60) == 0x40) {
-      const auto next = skipVariable(reader, cursor, end);
-      if (!next) return std::nullopt;
-      cursor = *next;
-    } else if ((status & 0x60) == 0x60) {
-      ++cursor;
-    }
-    if ((status & 0x1f) == 0x1f) {
-      const auto next = skipVariable(reader, cursor, end);
-      if (!next) return std::nullopt;
-      cursor = *next;
-    }
-    if ((note & 0x80) != 0) ++cursor;
-    return cursor <= end ? std::optional<u32>{cursor} : std::nullopt;
-  }
-  if ((status & 0x60) == 0x20) return cursor;  // relative note
-  cursor += kControlParameters[status & 0x1f];
-  if ((status & 0x60) == 0x40) {
-    const auto next = skipVariable(reader, cursor, end);
-    if (!next) return std::nullopt;
-    cursor = *next;
-  } else if ((status & 0x60) == 0x60) {
-    ++cursor;
-  }
-  return cursor <= end ? std::optional<u32>{cursor} : std::nullopt;
-}
-
-[[nodiscard]] TrackLayout analyzeTrack(ByteReader reader, u32 start, u32 end) {
-  TrackLayout layout;
+  std::optional<Address> loopPoint;
   for (u32 offset = start; offset < end;) {
-    const auto next = encodedEnd(reader, offset, end);
+    const auto next = bytecode::commandEnd(reader, offset, end);
     if (!next || *next <= offset) break;
     const u8 status = reader.u8At(offset);
-    if (status >= 0x80 && (status & 0x60) != 0x20 && (status & 0x1f) == 9) {
+    if (bytecode::isControl(status, 9)) {
       if (reader.u8At(offset + 1) == 0) {
-        layout.loopPoint = Address{*next};
-      } else if (layout.loopPoint) {
-        layout.loops.emplace(offset, *layout.loopPoint);
+        loopPoint = Address{*next};
+      } else if (loopPoint) {
+        loops.emplace(offset, *loopPoint);
       }
     }
     offset = *next;
-    if (status >= 0x80 && (status & 0x60) != 0x20 && (status & 0x1f) == 0) break;
+    if (bytecode::isControl(status, 0)) break;
   }
-  return layout;
+  return loops;
 }
 
 struct RuntimeConfig {
@@ -118,12 +73,12 @@ struct ProgramState {
   explicit ProgramState(const RuntimeConfig& config) : instruments(config.instruments) {}
 
   [[nodiscard]] const OhoriAkaPs1Region* region(u8 program, u8 key) const {
-    const auto instrument = std::ranges::find_if(instruments, [&](const auto& item) { return item.program == program; });
-    if (instrument == instruments.end()) return nullptr;
-    const auto region = std::ranges::find_if(instrument->regions, [&](const auto& item) {
+    if (program >= instruments.size()) return nullptr;
+    const auto& regions = instruments[program].regions;
+    const auto region = std::ranges::find_if(regions, [&](const auto& item) {
       return key >= item.keyLow && key <= item.keyHigh;
     });
-    return region == instrument->regions.end() ? nullptr : &*region;
+    return region == regions.end() ? nullptr : &*region;
   }
 
   std::span<const OhoriAkaPs1Instrument> instruments;
@@ -172,8 +127,8 @@ struct Playback {
 
   void emitBalance() {
     const u8 pan = track.region != nullptr && track.region->panOverride ? *track.region->panOverride : track.pan;
-    out.stereoBalance((track.leftGain / kSpuFullScale) * ((127 - std::min<u8>(pan, 127)) / 127.0),
-                      (track.rightGain / kSpuFullScale) * (std::min<u8>(pan, 127) / 127.0));
+    const double right = pan / 127.0;
+    out.stereoBalance((track.leftGain / kSpuFullScale) * (1.0 - right), (track.rightGain / kSpuFullScale) * right);
   }
 
   void loadRegion(u8 key) {
@@ -191,27 +146,7 @@ struct Playback {
     emitBalance();
   }
 
-  Effects note(u8 key, u16 duration, u16 deltaUpdate, bool deltaEqualsDuration, u8 velocityUpdate) {
-    const u8 previousKey = track.note;
-    track.note = key & 0x7f;
-    track.duration = duration;
-    if (deltaEqualsDuration) track.delta = duration;
-    if (deltaUpdate != 0xffff) track.delta = deltaUpdate;
-    track.noteDelta = track.delta;
-    if (velocityUpdate != 0xff) track.velocity = velocityUpdate;
-    loadRegion(track.note);
-    const PerformanceNoteId note = out.note(track.note, track.velocity / 127.0, duration);
-    if (track.portamento && track.hasPreviousNote && track.portamentoTime != 0 && previousKey != track.note) {
-      out.pitchSlide(note, previousKey, track.note, track.portamentoTime).requirePortamento();
-    }
-    track.hasPreviousNote = true;
-    return Effects::wait(track.delta);
-  }
-
-  Effects relativeNote(bool ascending, u8 distance) {
-    const u8 previousKey = track.note;
-    track.note = static_cast<u8>(ascending ? track.note + distance : track.note - distance);
-    track.delta = track.noteDelta;
+  Effects playNote(u8 previousKey) {
     loadRegion(track.note);
     const PerformanceNoteId note = out.note(track.note, track.velocity / 127.0, track.duration);
     if (track.portamento && track.hasPreviousNote && track.portamentoTime != 0 && previousKey != track.note) {
@@ -221,15 +156,35 @@ struct Playback {
     return Effects::wait(track.delta);
   }
 
+  Effects note(u8 key, u16 duration, u16 deltaUpdate, bool deltaEqualsDuration, u8 velocityUpdate) {
+    const u8 previousKey = track.note;
+    track.note = key & 0x7f;
+    track.duration = duration;
+    if (deltaEqualsDuration) track.delta = duration;
+    if (deltaUpdate != kReuseTiming) track.delta = deltaUpdate;
+    track.noteDelta = track.delta;
+    if (velocityUpdate != kReuseVelocity) track.velocity = velocityUpdate;
+    return playNote(previousKey);
+  }
+
+  Effects relativeNote(bool ascending, u8 distance) {
+    const u8 previousKey = track.note;
+    track.note = static_cast<u8>(ascending ? track.note + distance : track.note - distance);
+    track.delta = track.noteDelta;
+    return playNote(previousKey);
+  }
+
   Effects controlWait(u16 update) {
-    if (update != 0xffff) track.delta = update;
+    if (update != kReuseTiming) track.delta = update;
     return Effects::wait(track.delta);
   }
 
   void tempo(u8 value) {
     if (value != 0) out.tempo(static_cast<u32>(std::lround(60000000.0 / value)));
   }
-  void timeSignature(u8 value) { out.timeSignature(static_cast<u8>((value >> 4) + 1), static_cast<u8>((value & 15) + 1), kPpqn); }
+  void timeSignature(u8 value) {
+    out.timeSignature(static_cast<u8>((value >> 4) + 1), static_cast<u8>((value & 15) + 1), kPpqn);
+  }
   void programChange(u8 value) {
     track.program = value;
     track.adsrOverrides.fill(std::nullopt);
@@ -264,8 +219,14 @@ struct Playback {
     out.vibratoDepth(semitones, context);
     out.vibratoRateCyclesPerTick(cycles, std::move(context));
   }
-  void pitchBend(u8 low, u8 high) { out.pitchBend((static_cast<int>(low) + static_cast<int>(high) * 128 - 0x2000) / 682.0); }
-  void portamentoOn(u8 duration) { track.portamento = true; track.portamentoTime = duration; out.portamentoEnable(true); }
+  void pitchBend(u8 low, u8 high) {
+    out.pitchBend((static_cast<int>(low) + static_cast<int>(high) * 128 - 0x2000) / 682.0);
+  }
+  void portamentoOn(u8 duration) {
+    track.portamento = true;
+    track.portamentoTime = duration;
+    out.portamentoEnable(true);
+  }
   void portamentoOff() { track.portamento = false; out.portamentoEnable(false); }
   void adsr(u8 field, u8 value) {
     track.adsrOverrides[field] = value;
@@ -281,7 +242,7 @@ struct Playback {
 using Cursor = CompilerCursor<TrackState, Playback>;
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end,
-                                                   const RuntimeConfig& config, const TrackLayout& layout,
+                                                   const RuntimeConfig& config, const std::map<u32, Address>& loops,
                                                    std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, begin, end, kOhoriAkaPs1CommandKindPrefix, diagnostics);
   if (!cursor.hasOpcode()) return cursor.truncated();
@@ -299,7 +260,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 index = event.u8("delta_index", SourceValueDisplay::Hex, SemanticOperandRole::Duration) & 0x1f;
       return config.durations[index];
     }
-    return 0xffff;
+    return kReuseTiming;
   };
 
   if (status < 0x80) {
@@ -312,7 +273,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
                                                : config.durations[durationIndex];
     const u8 velocity = (encodedNote & 0x80) != 0
                             ? event.u8("velocity", SemanticOperandRole::Level)
-                            : 0xff;
+                            : kReuseVelocity;
     return event.invoke<&Playback::note>(note, duration, delta, (status & 0x60) == 0x20, velocity);
   }
   if ((status & 0x60) == 0x20) {
@@ -378,8 +339,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 mode = event.u8("mode");
       const u16 wait = readTiming(event);
       if (mode == 0) return event.invoke<&Playback::loopMarker>().invoke<&Playback::controlWait>(wait);
-      const auto found = layout.loops.find(begin);
-      if (found == layout.loops.end()) return event.invoke<&Playback::controlWait>(wait);
+      const auto found = loops.find(begin);
+      if (found == loops.end()) return event.invoke<&Playback::controlWait>(wait);
       event.derived("destination", found->second, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
       return event.invoke<&Playback::restoreLoop>().loopCandidate(found->second);
     }
@@ -416,7 +377,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     default: {
       auto event = cursor.command(command == 13 ? "Driver Parameter" : "Driver No-op", SequenceSemantic::Meta,
                                   CommandPlaybackStatus::NoOp);
-      for (u8 i = 0; i < kControlParameters[command]; ++i) event.u8("parameter", SourceValueDisplay::Hex);
+      for (u8 i = 0; i < bytecode::kControlParameterBytes[command]; ++i) {
+        event.u8("parameter", SourceValueDisplay::Hex);
+      }
       return event.invoke<&Playback::controlWait>(readTiming(event));
     }
   }
@@ -425,16 +388,16 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 [[nodiscard]] TrackProgram decodeTrack(ByteReader reader, AssetId sequence, u32 trackIndex, u32 start, u32 end,
                                        const RuntimeConfig& config, SourceMapBuilder* sourceMap,
                                        std::vector<Diagnostic>* diagnostics) {
-  const TrackLayout layout = analyzeTrack(reader, start, end);
+  const auto loops = findLoops(reader, start, end);
   const TrackDecodeScope tracks{
       .reader = reader,
       .bytecodeEnd = end,
-      .maxCommands = kMaxCommands,
+      .maxCommands = bytecode::kMaximumCommands,
       .sequenceAsset = sequence,
       .sourceMap = sourceMap,
   };
   TrackProgram track = tracks.decode(
-      trackIndex, start, [&](u32 offset) { return decodeCommand(reader, offset, end, config, layout, diagnostics); });
+      trackIndex, start, [&](u32 offset) { return decodeCommand(reader, offset, end, config, loops, diagnostics); });
   if (!track.commands.empty()) {
     auto& last = track.commands.back();
     if (last.flow.defaultTransition.kind == CommandTransitionKind::Fallthrough &&
@@ -451,7 +414,11 @@ const SequenceProgramConfig& ohoriAkaPs1SequenceConfig() {
   static const SequenceProgramConfig config{
       .commandKindPrefix = std::string(kOhoriAkaPs1CommandKindPrefix),
       .timebase = Timebase{.ppqn = kPpqn},
-      .behavior = SequenceProgramBehavior{.commandLimit = kMaxCommands, .panLaw = PanLaw::ConstantSum, .initialLevel = 1.0},
+      .behavior = SequenceProgramBehavior{
+          .commandLimit = bytecode::kMaximumCommands,
+          .panLaw = PanLaw::ConstantSum,
+          .initialLevel = 1.0,
+      },
   };
   return config;
 }
@@ -460,8 +427,12 @@ SequenceProgram parseOhoriAkaPs1Sequence(ByteReader reader, AssetId id, const Oh
                                          const std::vector<OhoriAkaPs1Instrument>& instruments,
                                          SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   SequenceProgram sequence = ohoriAkaPs1SequenceConfig().makeProgram();
-  RuntimeConfig runtime{.leftGain = layout.leftGain, .rightGain = layout.rightGain, .instruments = instruments};
-  std::ranges::copy(layout.durations, runtime.durations.begin());
+  RuntimeConfig runtime{
+      .durations = layout.durations,
+      .leftGain = layout.leftGain,
+      .rightGain = layout.rightGain,
+      .instruments = instruments,
+  };
   sequence.runtime = makeCompiledRuntime<Cursor, ProgramState>(runtime);
 
   if (sourceMap != nullptr) {
@@ -485,8 +456,9 @@ SequenceProgram parseOhoriAkaPs1Sequence(ByteReader reader, AssetId id, const Oh
         .owner(ObjectRefs::sequence(id));
   }
 
-  for (u32 i = 0; i < layout.trackAddresses.size(); ++i) {
-    auto track = decodeTrack(reader, id, i, layout.trackAddresses[i], layout.trackEnds[i], runtime, sourceMap, diagnostics);
+  for (u32 i = 0; i < layout.tracks.size(); ++i) {
+    auto track =
+        decodeTrack(reader, id, i, layout.tracks[i].offset, layout.tracks[i].end, runtime, sourceMap, diagnostics);
     track.sourceTrackNumber = i;
     sequence.tracks.push_back(std::move(track));
   }

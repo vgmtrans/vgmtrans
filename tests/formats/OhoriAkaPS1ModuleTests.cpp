@@ -136,7 +136,7 @@ void ohoriAkaPs1SequencePreservesAuditedGrammarAndMixer() {
       .adsr2 = composePsxAdsr2(false, 1, 0x30, false, 8),
   };
   const SequenceProgram program = parseOhoriAkaPs1Sequence(
-      reader, AssetId{81}, *layout, {OhoriAkaPs1Instrument{.program = 0, .regions = {region}}});
+      reader, AssetId{81}, *layout, {OhoriAkaPs1Instrument{.regions = {region}}});
   const auto variableNote = std::ranges::find_if(program.tracks[0].commands,
                                                   [](const SourceCommand& command) { return command.opcode == 0x5f; });
   expect(variableNote != program.tracks[0].commands.end() && variableNote->range.size == 5,
@@ -178,7 +178,7 @@ void ohoriAkaPs1UnterminatedFinalTrackStopsAtZeroPadding() {
 
   const ByteReader reader(SourceId{82}, bytes);
   const auto layout = readOhoriAkaPs1SequenceLayout(reader, 0);
-  expect(layout.has_value() && layout->trackEnds.size() == 1 && layout->trackEnds[0] == track + 5 &&
+  expect(layout.has_value() && layout->tracks.size() == 1 && layout->tracks[0].end == track + 5 &&
              layout->length == track + 5,
          "an unterminated final track should stop at zero padding instead of scanning unrelated memory");
 
