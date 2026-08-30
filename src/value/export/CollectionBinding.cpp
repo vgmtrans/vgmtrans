@@ -6,8 +6,8 @@
 
 #include "value/export/CollectionBinding.h"
 
-#include "value/export/DynamicEnvelope.h"
 #include "value/export/ExportDiagnostics.h"
+#include "value/export/InstrumentVariants.h"
 #include "value/scan/FormatModule.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/validation/SynthValidation.h"
@@ -195,13 +195,20 @@ CollectionWorkspace::CollectionWorkspace(BoundCollection collection, std::vector
     : collection(std::move(collection)), diagnostics(std::move(diagnostics)) {
 }
 
-void CollectionWorkspace::render(const SequenceRenderOptions& options, DynamicEnvelopePolicy dynamicEnvelopes) {
+void CollectionWorkspace::render(const SequenceRenderOptions& options, DynamicEnvelopePolicy dynamicEnvelopes,
+                                 bool materializeSignedStereo) {
   rendering = renderCollection(collection, options);
-  if (dynamicEnvelopes != DynamicEnvelopePolicy::InstrumentVariants || !rendering.performance) {
+  if (!rendering.performance ||
+      (dynamicEnvelopes != DynamicEnvelopePolicy::InstrumentVariants && !materializeSignedStereo)) {
     return;
   }
 
-  auto materialized = materializeDynamicEnvelopes(*rendering.performance, collection.soundBanks_);
+  auto materialized = materializeInstrumentVariants(
+      *rendering.performance, collection.soundBanks_,
+      InstrumentVariantOptions{
+          .dynamicEnvelopes = dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants,
+          .signedStereo = materializeSignedStereo,
+      });
   exportPerformance = std::move(materialized.performance);
   diagnostics.insert(diagnostics.end(), std::make_move_iterator(materialized.diagnostics.begin()),
                      std::make_move_iterator(materialized.diagnostics.end()));

@@ -30,7 +30,7 @@ target_sources(vgmtrans-value-core-tests
     core/ValueCollectionDiscoveryTests.cpp
     core/ValueCollectionStitchTests.cpp
     core/ValueCompilerCursorTests.cpp
-    core/ValueDynamicEnvelopeTests.cpp
+    core/ValueInstrumentVariantTests.cpp
     core/ValueMidiTests.cpp
     core/ValuePsxTests.cpp
     core/ValueRegistryTests.cpp

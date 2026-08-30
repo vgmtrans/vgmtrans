@@ -99,6 +99,9 @@ struct Region {
   // Synth region pan is unipolar: 0.0 left, 0.5 center, 1.0 right.
   double pan = 0.5;
   double attenuationDb = 0.0;
+  // Invert the decoded waveform before synth export. This permits layered
+  // regions to retain signed hardware stereo gains.
+  bool invertSamplePhase = false;
   // Layered hardware voices may give each zone an independent LFO. Keeping
   // that modulation on the region avoids applying one layer's curve to every
   // sample in the instrument.

@@ -79,7 +79,8 @@ public:
   CollectionWorkspace(const CollectionWorkspace&) = delete;
   CollectionWorkspace(CollectionWorkspace&&) noexcept = default;
 
-  void render(const SequenceRenderOptions& options, DynamicEnvelopePolicy dynamicEnvelopes);
+  void render(const SequenceRenderOptions& options, DynamicEnvelopePolicy dynamicEnvelopes,
+              bool materializeSignedStereo = false);
   void prepareSynth(ModulationConversionPolicy conversion, ModulationScalingPolicy scaling);
 
   [[nodiscard]] const PerformanceSequence* performance() const noexcept;

@@ -96,7 +96,7 @@ void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulation
     return false;
   }
 
-  workspace.render(request.sequence, request.dynamicEnvelopes);
+  workspace.render(request.sequence, request.dynamicEnvelopes, /*materializeSignedStereo=*/true);
   if (!workspace.performance()) {
     append(diagnostics, workspace.diagnostics);
     append(diagnostics, workspace.rendering.diagnostics);

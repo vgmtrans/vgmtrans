@@ -11,6 +11,7 @@
 #include "value/synth/SampleDecoder.h"
 
 #include <algorithm>
+#include <compare>
 #include <cmath>
 #include <limits>
 #include <map>
@@ -21,7 +22,14 @@ namespace vgmtrans::core {
 
 namespace {
 
-using SynthSampleIndexKey = std::pair<u32, u32>;
+struct SynthSampleIndexKey {
+  u32 owner = invalidIdValue;
+  u32 index = invalidIdValue;
+  bool phaseInverted = false;
+
+  friend auto operator<=>(const SynthSampleIndexKey&, const SynthSampleIndexKey&) = default;
+};
+
 using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
 using SynthSampleIndexList = std::vector<SynthSampleIndexKey>;
 using SynthInstrumentList = std::vector<const Instrument*>;
@@ -130,8 +138,9 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
     const SampleFilter selectedFilter = resolveSampleFilter(filtering, view.pool->preferredFilter);
 
     for (u32 sampleIndex = 0; sampleIndex < view.pool->samples.size(); ++sampleIndex) {
-      const SynthSampleIndexKey sampleKey{view.owner.value, sampleIndex};
-      if (sampleFilter != nullptr && std::ranges::find(*sampleFilter, sampleKey) == sampleFilter->end()) {
+      if (sampleFilter != nullptr && std::ranges::none_of(*sampleFilter, [&](const SynthSampleIndexKey& key) {
+            return key.owner == view.owner.value && key.index == sampleIndex;
+          })) {
         continue;
       }
       const auto& sample = view.pool->samples[sampleIndex];
@@ -169,21 +178,15 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
   return samples;
 }
 
-[[nodiscard]] SynthSampleIndexMap synthSampleIndexMap(std::span<const DecodedSynthSample> samples) {
-  // Region references use collection-local sample indexes. Export containers need a flat
-  // sample table, so keep a map from original reference identity to flat index.
-  SynthSampleIndexMap indexes;
-  for (u32 i = 0; i < samples.size(); ++i) {
-    indexes[{samples[i].owner.value, samples[i].localIndex}] = clampU16(i);
-  }
-  return indexes;
-}
-
 [[nodiscard]] SynthSampleIndexList referencedSamples(std::span<const Instrument* const> instruments) {
   SynthSampleIndexList samples;
   for (const auto* instrument : instruments) {
     for (const auto& region : instrument->regions) {
-      const SynthSampleIndexKey sample{region.sample.owner().value, region.sample.index()};
+      const SynthSampleIndexKey sample{
+          region.sample.owner().value,
+          region.sample.index(),
+          region.invertSamplePhase,
+      };
       if (std::ranges::find(samples, sample) == samples.end()) {
         samples.push_back(sample);
       }
@@ -194,13 +197,49 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
 
 [[nodiscard]] std::optional<u16> resolveRegionSampleIndex(const Region& region, const SynthSampleIndexMap& samples,
                                                           std::vector<Diagnostic>& diagnostics) {
-  const auto found = samples.find({region.sample.owner().value, region.sample.index()});
+  const auto found = samples.find({region.sample.owner().value, region.sample.index(), region.invertSamplePhase});
   if (found == samples.end()) {
     diagnostics.push_back(exportError("Region sample reference was not found", validDiagnosticRange(region.range)));
     return std::nullopt;
   }
 
   return found->second;
+}
+
+[[nodiscard]] SynthSampleIndexMap materializePhaseInvertedSamples(std::vector<DecodedSynthSample>& samples,
+                                                                  const SynthSampleIndexList& references,
+                                                                  bool discardUnreferenced) {
+  SynthSampleIndexMap indexes;
+  if (std::ranges::none_of(references, &SynthSampleIndexKey::phaseInverted)) {
+    for (u32 i = 0; i < samples.size(); ++i) {
+      indexes[{samples[i].owner.value, samples[i].localIndex, false}] = clampU16(i);
+    }
+    return indexes;
+  }
+
+  std::vector<DecodedSynthSample> materialized;
+  materialized.reserve(samples.size() * 2);
+  for (auto& sample : samples) {
+    const auto referenced = [&](bool inverted) {
+      return std::ranges::find(references, SynthSampleIndexKey{sample.owner.value, sample.localIndex, inverted}) !=
+             references.end();
+    };
+    if (referenced(true)) {
+      DecodedSynthSample inverted = sample;
+      inverted.name += " [inverted]";
+      for (s16& value : inverted.decoded.pcm) {
+        value = value == std::numeric_limits<s16>::min() ? std::numeric_limits<s16>::max() : static_cast<s16>(-value);
+      }
+      indexes[{sample.owner.value, sample.localIndex, true}] = clampU16(static_cast<u32>(materialized.size()));
+      materialized.push_back(std::move(inverted));
+    }
+    if (!discardUnreferenced || referenced(false)) {
+      indexes[{sample.owner.value, sample.localIndex, false}] = clampU16(static_cast<u32>(materialized.size()));
+      materialized.push_back(std::move(sample));
+    }
+  }
+  samples = std::move(materialized);
+  return indexes;
 }
 
 [[nodiscard]] std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
@@ -386,13 +425,12 @@ PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceSt
       samplePools.push_back(SamplePoolView{.owner = pool->metadata.id, .pool = &pool->pool});
     }
   }
-  std::optional<SynthSampleIndexList> sampleFilter;
-  if (input.sequenceUsage != nullptr || input.filterSamplesToReferencedInstruments) {
-    sampleFilter = referencedSamples(instruments);
-  }
+  const SynthSampleIndexList sampleReferences = referencedSamples(instruments);
+  const bool filterSamples = input.sequenceUsage != nullptr || input.filterSamplesToReferencedInstruments;
   prepared.samples = decodeSynthSamples(samplePools, sources, prepared.diagnostics, options,
-                                        sampleFilter ? &*sampleFilter : nullptr, input.sampleFiltering);
-  const auto samplesByReference = synthSampleIndexMap(prepared.samples);
+                                        filterSamples ? &sampleReferences : nullptr, input.sampleFiltering);
+  const auto samplesByReference =
+      materializePhaseInvertedSamples(prepared.samples, sampleReferences, filterSamples);
   prepared.instruments = resolveSynthInstruments(instruments, samplesByReference, prepared.diagnostics);
   return prepared;
 }
