@@ -224,6 +224,34 @@ void triAcePs1SequenceExecutesAuditedDriverFeatures() {
   expect(reverbs.size() >= 3 && invertedReverb != reverbs.end(),
          "track send, global depth, and signed reverb phase should all be preserved");
 
+  const auto harmonyBytes = sequenceFixture({{
+      0x87, 0, 55,                      // source pan from A Crisp Morning
+      0x9b, 0, 3,  12,  0,    127, 40,  // delayed octave harmony with left intrinsic pan
+      0x9a, 0, 1,                        // harmony on
+      60,   2, 4,  100,
+      0x9b, 0, 1,  0xf4, 0,   127, 100,  // configure the next clone without changing the active copy
+      0x87, 0, 64,                       // center source pan leaves the clone at its intrinsic pan
+      62,   2, 4,  100, 0x9a, 0,   0,    // harmony off
+      64,   2, 4,  100, 0x80,
+  }});
+  const ByteReader harmonyReader(SourceId{93}, harmonyBytes);
+  const auto harmonyLayout = readTriAcePs1SequenceLayout(harmonyReader, 0);
+  expect(harmonyLayout.has_value(), "TriAcePS1 harmony fixture should have a valid layout");
+  const PerformanceSequence harmony =
+      SequenceVm(LoopPolicy::PlayOnce).render(parseTriAcePs1Sequence(harmonyReader, AssetId{93}, *harmonyLayout));
+  expect(harmony.tracks.size() == 2, "harmony should render on one companion performance track");
+  const auto sourceNotes = eventsOfType<NotePerformanceEvent>(harmony.tracks[0]);
+  const auto harmonyNotes = eventsOfType<NotePerformanceEvent>(harmony.tracks[1]);
+  expect(sourceNotes.size() == 3 && harmonyNotes.size() == 2 && harmonyNotes[0]->key == 72.0 &&
+             harmonyNotes[0]->header.tick == 3 && harmonyNotes[1]->key == 74.0 && harmonyNotes[1]->header.tick == 5,
+         "the companion should retain its enabled parameter snapshot until it stops");
+  const auto sourcePans = eventsOfType<ChannelPanPerformanceEvent>(harmony.tracks[0]);
+  const auto harmonyPans = eventsOfType<ChannelPanPerformanceEvent>(harmony.tracks[1]);
+  expect(sourcePans.size() == 3 && harmonyPans.size() == 2 &&
+             std::abs(harmonyPans[0]->position - 35.0 / 127.0) < 0.000001 && harmonyPans[0]->header.tick == 3 &&
+             std::abs(harmonyPans[1]->position - 40.0 / 127.0) < 0.000001 && harmonyPans[1]->header.tick == 5,
+         "the companion should combine its intrinsic pan with each delayed source-pan change");
+
   const auto loopingBytes = sequenceFixture({
       {
           0x8d,
