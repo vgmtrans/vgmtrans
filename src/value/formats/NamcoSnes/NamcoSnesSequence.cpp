@@ -84,6 +84,9 @@ struct ParameterCommand {
   SemanticOperandRole role;
 };
 
+using ControlValues = std::array<u8, kParameterCount>;
+constexpr ControlValues kDefaultControls{0, 0x88, 0x88, 0, 0, 0, 0, 0, 0, 0, 0};
+
 constexpr std::array<ParameterCommand, kParameterCount> kParameterCommands{{
     {"Instrument", SequenceSemantic::Program, SemanticOperandRole::Instrument},
     {"Voice Volume", SequenceSemantic::Level, SemanticOperandRole::Level},
@@ -124,25 +127,38 @@ struct VoiceInstrument {
   friend bool operator==(const VoiceInstrument&, const VoiceInstrument&) noexcept = default;
 };
 
-struct TrackState {
-  explicit TrackState(const TrackProgram& source) : number(source.sourceTrackNumber) { resetVoice(); }
+struct PercussionTrigger {
+  u8 key;
+  u8 srcn;
+  u8 envelope;
+  u8 volume;
+  u8 balance;
+};
 
-  void resetVoice() {
-    controls = {0, 0x88, 0x88, 0, 0, 0, 0, 0, 0, 0, 0};
-    voiceControls = controls;
+struct TrackState {
+  explicit TrackState(const TrackProgram& source) : number(source.sourceTrackNumber) {}
+
+  void resetPhysicalVoice() {
     triggerDelay = 0;
     pendingNote.reset();
     triggerTicks = 0;
     gateTicks = 0;
-    lastNote = {};
-    lastSourceNote = kRest;
-    haveDriverPitch = false;
-    driverPitch = 0.0;
+    driverPitch.reset();
     pitchTable = 0;
     pitchPosition = 0;
     pitchPhase = 0;
     pitchBend.reset();
     portamentoActive = false;
+  }
+
+  void activate() {
+    commandControls[kVolume] = 0x88;
+    commandControls[kBalance] = 0x88;
+    for (const Parameter parameter :
+         {kGate, kPitchTable, kTranspose, kFineTuning, kPortamento, kEnvelope}) {
+      commandControls[parameter] = 0;
+    }
+    resetPhysicalVoice();
   }
 
   [[nodiscard]] bool selected(u8 mask) const { return (mask & math::voiceBit(number)) != 0; }
@@ -152,22 +168,20 @@ struct TrackState {
   u8 delta = 1;
   u8 multiplier = 1;
   u8 activeMask = 0;
-  // $0360 is command-facing state; $0200 is copied from it only on a fresh
-  // attack. Keeping both prevents a mid-note command from changing live DSP state.
-  std::array<u8, kParameterCount> controls{};
-  std::array<u8, kParameterCount> voiceControls{};
+  // The driver copies its command bank ($0360) to the live voice bank ($0200)
+  // on every trigger. Commands alone do not alter a sounding voice.
+  ControlValues commandControls = kDefaultControls;
+  ControlValues liveControls = kDefaultControls;
   u8 triggerDelay = 0;
   bool slur = false;
 
   std::optional<u8> pendingNote;
   u16 triggerTicks = 0;
   u16 gateTicks = 0;
-  PerformanceNoteId lastNote;
-  u8 lastSourceNote = kRest;
-  VoiceInstrument emittedInstrument;
-
-  bool haveDriverPitch = false;
-  double driverPitch = 0.0;
+  // An exported note can end while the SPC voice retains pitch and modulation
+  // state for release tails and the next attack.
+  PerformanceNoteId activeNote;
+  std::optional<double> driverPitch;
   bool portamentoActive = false;
   double portamentoTarget = 0.0;
   double portamentoStep = 0.0;
@@ -175,6 +189,9 @@ struct TrackState {
   u16 pitchTable = 0;
   u8 pitchPosition = 0;
   u8 pitchPhase = 0;
+
+  VoiceInstrument emittedInstrument;
+  std::optional<std::pair<u8, u8>> emittedMix;
   std::optional<double> pitchBend;
   u8 pitchBendRange = 48;
 };
@@ -188,11 +205,11 @@ struct Playback {
   [[nodiscard]] ByteReader reader() const { return program.data.source.reader(); }
   [[nodiscard]] const Layout& layout() const { return program.data.layout; }
 
-  void closeVoice(u64 tick) {
-    if (track.lastNote.valid()) {
-      static_cast<void>(out.setNoteEnd(track.lastNote, tick));
+  void endNote(u64 tick) {
+    if (track.activeNote.valid()) {
+      static_cast<void>(out.setNoteEnd(track.activeNote, tick));
     }
-    track.lastNote = {};
+    track.activeNote = {};
   }
 
   void selectInstrument(VoiceInstrument instrument) {
@@ -219,15 +236,14 @@ struct Playback {
 
   void activeVoices(u8 mask) {
     const bool wasActive = track.active();
-    track.activeMask = mask;
-    const bool isActive = track.active();
+    const bool isActive = track.selected(mask);
     if (wasActive && !isActive) {
-      closeVoice(vm.tick());
-      track.pendingNote.reset();
+      endNote(vm.tick());
+      track.resetPhysicalVoice();
     } else if (!wasActive && isActive) {
-      track.resetVoice();
-      track.activeMask = mask;
+      track.activate();
     }
+    track.activeMask = mask;
     if (track.number == 0 && program.echoEnabled) {
       program.echo.voiceMask = math::dspVoiceMask(mask);
       out.reverb(program.echo);
@@ -235,8 +251,8 @@ struct Playback {
   }
 
   void control(u8 index, MaskedValues values) {
-    if (index < track.controls.size() && track.selected(values.mask)) {
-      track.controls[index] = values.values[track.number];
+    if (index < track.commandControls.size() && track.selected(values.mask)) {
+      track.commandControls[index] = values.values[track.number];
     }
   }
 
@@ -248,7 +264,14 @@ struct Playback {
 
   void slur(u8 mask) { track.slur = track.selected(mask); }
 
-  void emitMix(u8 volume, u8 balance) {
+  void emitMix() {
+    const u8 volume = track.liveControls[kVolume];
+    const u8 balance = track.liveControls[kBalance];
+    const std::pair mix{volume, balance};
+    if (track.emittedMix == mix) {
+      return;
+    }
+    track.emittedMix = mix;
     out.level(volume / 256.0, ValueQuantization{.levels = 256});
     const double left = (balance >> 4) / 16.0;
     const double right = (balance & 0x0f) / 16.0;
@@ -301,53 +324,72 @@ struct Playback {
     const double current = static_cast<int>(reader().u8At(track.pitchTable + track.pitchPosition)) - 0x64;
     const double next = static_cast<int>(reader().u8At(track.pitchTable + nextPosition)) - 0x64;
     const double interpolated = current + (next - current) * (track.pitchPhase / 256.0);
-    return interpolated * math::modulationScale(layout().version, track.voiceControls[kPitchDepth]);
+    return interpolated * math::modulationScale(layout().version, track.liveControls[kPitchDepth]);
   }
 
-  void beginPitchModulation() {
-    const u8 index = track.voiceControls[kPitchTable];
+  [[nodiscard]] bool selectPitchTable(bool restart) {
+    const u8 index = track.liveControls[kPitchTable];
     if (index == 0) {
       track.pitchTable = 0;
-      emitPitchBend(0.0);
-      return;
+      return false;
     }
     const u16 pointers = layout().pitchPointerTable(reader());
     // The driver doubles the index with ASL A, discarding its high bit.
     const u32 entry = pointers + static_cast<u8>(index << 1);
     if (!reader().has(entry, 2) || !reader().has(reader().le16(entry), 1)) {
       track.pitchTable = 0;
+      return false;
+    }
+    track.pitchTable = reader().le16(entry);
+    if (restart) {
+      track.pitchPosition = resolvePitchPosition(track.pitchTable, 0, 0);
+      track.pitchPhase = 0;
+    } else if (!reader().has(track.pitchTable + track.pitchPosition, 1)) {
+      track.pitchPosition = resolvePitchPosition(track.pitchTable, 0, 0);
+    }
+    return true;
+  }
+
+  void beginPitchModulation() {
+    emitPitchBend(selectPitchTable(true) ? modulationValue() : 0.0);
+  }
+
+  void advancePitchModulation() {
+    if (!selectPitchTable(false)) {
       emitPitchBend(0.0);
       return;
     }
-    track.pitchTable = reader().le16(entry);
-    track.pitchPosition = resolvePitchPosition(track.pitchTable, 0, 0);
-    track.pitchPhase = 0;
+    const u16 phase = static_cast<u16>(track.pitchPhase) + track.liveControls[kPitchRate];
+    if (phase > 0xff) {
+      track.pitchPhase = track.liveControls[kPitchRate];
+      track.pitchPosition = resolvePitchPosition(track.pitchTable, static_cast<u8>(track.pitchPosition + 1),
+                                                 track.pitchPosition);
+    } else {
+      track.pitchPhase = static_cast<u8>(phase);
+    }
     emitPitchBend(modulationValue());
   }
 
   void beginAttack(VoiceInstrument instrument) {
-    closeVoice(vm.tick());
+    endNote(vm.tick());
     selectInstrument(instrument);
-    out.replaceEnvelope(driverEnvelope(reader(), layout(), track.voiceControls[kEnvelope]),
+    out.replaceEnvelope(driverEnvelope(reader(), layout(), track.liveControls[kEnvelope]),
                         VoiceEnvelopeScope::FutureAttacks);
-    emitMix(track.voiceControls[kVolume], track.voiceControls[kBalance]);
-    beginPitchModulation();
   }
 
   [[nodiscard]] double targetPitch(u8 sourceNote) const {
-    const u8 coarse = static_cast<u8>(sourceNote + static_cast<s8>(track.voiceControls[kTranspose]));
-    return coarse + track.voiceControls[kFineTuning] / 256.0;
+    const u8 coarse = static_cast<u8>(sourceNote + static_cast<s8>(track.liveControls[kTranspose]));
+    return coarse + track.liveControls[kFineTuning] / 256.0;
   }
 
   void beginPortamento(double target, double outputKey, PerformanceNoteId previous, bool continues) {
-    const u8 speed = track.voiceControls[kPortamento];
-    if (speed == 0 || track.lastSourceNote == kRest || !track.haveDriverPitch) {
+    const u8 speed = track.liveControls[kPortamento];
+    if (speed == 0 || !track.driverPitch) {
       track.driverPitch = target;
-      track.haveDriverPitch = true;
       track.portamentoActive = false;
       return;
     }
-    const double distance = std::abs(target - track.driverPitch);
+    const double distance = std::abs(target - *track.driverPitch);
     const double step = (std::floor(distance) + 1.0) * speed / 512.0;
     if (step <= 0.0 || distance <= 0.0) {
       track.driverPitch = target;
@@ -355,55 +397,47 @@ struct Playback {
       return;
     }
     const u32 duration = static_cast<u32>(std::ceil(distance / step));
-    auto slide = out.pitchSlide(track.lastNote, outputKey + track.driverPitch - target, outputKey, duration);
-    if (continues) {
-      slide.continueFrom(previous);
+    if (track.activeNote.valid()) {
+      auto slide = out.pitchSlide(track.activeNote, outputKey + *track.driverPitch - target, outputKey, duration);
+      if (continues) {
+        slide.continueFrom(previous);
+      }
+      slide.preferPortamento();
     }
-    slide.preferPortamento();
     track.portamentoTarget = target;
     track.portamentoStep = step;
     track.portamentoActive = true;
   }
 
-  void startNote(u8 sourceNote, std::optional<u8> percussionIndex = std::nullopt, std::optional<u8> srcnOverride = {},
-                 std::optional<u8> envelopeOverride = {}, std::optional<u8> volumeOverride = {},
-                 std::optional<u8> balanceOverride = {}) {
-    if (!track.slur) {
-      track.voiceControls = track.controls;
-      if (srcnOverride) {
-        track.voiceControls[kSrcn] = *srcnOverride;
-      }
-      if (envelopeOverride) {
-        track.voiceControls[kEnvelope] = *envelopeOverride;
-      }
-      if (volumeOverride) {
-        track.voiceControls[kVolume] = *volumeOverride;
-      }
-      if (balanceOverride) {
-        track.voiceControls[kBalance] = *balanceOverride;
-      }
+  void startNote(u8 sourceNote, std::optional<PercussionTrigger> percussion = {}) {
+    if (percussion) {
+      track.liveControls[kSrcn] = percussion->srcn;
+      track.liveControls[kEnvelope] = percussion->envelope;
+      track.liveControls[kVolume] = percussion->volume;
+      track.liveControls[kBalance] = percussion->balance;
     }
-    const u8 srcn = track.voiceControls[kSrcn];
-    const s8 transpose = static_cast<s8>(track.voiceControls[kTranspose]);
+    const u8 srcn = track.liveControls[kSrcn];
+    const s8 transpose = static_cast<s8>(track.liveControls[kTranspose]);
     const u8 coarse = static_cast<u8>(sourceNote + transpose);
-    const double fine = math::tuningCents(track.voiceControls[kFineTuning]);
-    const double outputKey = percussionIndex ? *percussionIndex : std::min<u8>(coarse, 127);
+    const double fine = math::tuningCents(track.liveControls[kFineTuning]);
+    const double outputKey = percussion ? percussion->key : std::min<u8>(coarse, 127);
     // The drum region maps its sequence key to the table's source note. Only
     // live pitch controls remain to be applied by the sequence.
-    const double tuning = percussionIndex ? transpose * 100.0 + fine : fine;
+    const double tuning = percussion ? transpose * 100.0 + fine : fine;
     const double target = targetPitch(sourceNote);
 
-    const PerformanceNoteId previous = track.lastNote;
+    const PerformanceNoteId previous = track.activeNote;
     const bool continues = track.slur && previous.valid();
-    if (track.slur && !previous.valid()) {
-      track.driverPitch = target;
-      track.haveDriverPitch = true;
-      track.lastSourceNote = sourceNote;
-      return;
+    if (!track.slur) {
+      beginAttack(percussion ? VoiceInstrument{.source = VoiceSource::Percussion}
+                             : VoiceInstrument{.source = VoiceSource::Melodic, .srcn = srcn});
+      beginPitchModulation();
     }
-    if (!continues) {
-      beginAttack(percussionIndex ? VoiceInstrument{.source = VoiceSource::Percussion}
-                                  : VoiceInstrument{.source = VoiceSource::Melodic, .srcn = srcn});
+    emitMix();
+    if (track.slur && !previous.valid()) {
+      beginPortamento(target, outputKey, previous, false);
+      advancePitchModulation();
+      return;
     }
     out.tuning(tuning);
 
@@ -414,21 +448,24 @@ struct Playback {
         .restartsEnvelope = !continues,
         .restartsLfoPhase = !continues,
     };
-    track.lastNote = continues ? out.continueVoice(previous, std::move(event)) : out.note(std::move(event));
+    track.activeNote = continues ? out.continueVoice(previous, std::move(event)) : out.note(std::move(event));
     beginPortamento(target, outputKey, previous, continues);
-    track.lastSourceNote = sourceNote;
-    track.gateTicks = 0;
+    if (continues) {
+      advancePitchModulation();
+    }
   }
 
   void startNoise(u8 raw) {
-    const PerformanceNoteId previous = track.lastNote;
+    const PerformanceNoteId previous = track.activeNote;
     const bool continues = track.slur && previous.valid();
-    if (track.slur && !previous.valid()) {
-      return;
-    }
-    if (!continues) {
-      track.voiceControls = track.controls;
+    if (!track.slur) {
       beginAttack(VoiceInstrument{.source = VoiceSource::Noise});
+    }
+    emitMix();
+    if (track.slur && !previous.valid()) {
+      track.driverPitch = raw & 0x1f;
+      track.portamentoActive = false;
+      return;
     }
     out.tuning(0.0);
     const double key = std::min<int>(35 + (raw & 0x1f), 127);
@@ -437,11 +474,9 @@ struct Playback {
                                .durationTicks = std::numeric_limits<u32>::max(),
                                .restartsEnvelope = !continues,
                                .restartsLfoPhase = !continues};
-    track.lastNote = continues ? out.continueVoice(previous, std::move(event)) : out.note(std::move(event));
-    track.lastSourceNote = raw;
-    track.haveDriverPitch = false;
+    track.activeNote = continues ? out.continueVoice(previous, std::move(event)) : out.note(std::move(event));
+    track.driverPitch = raw & 0x1f;
     track.portamentoActive = false;
-    track.gateTicks = 0;
   }
 
   void trigger(u8 raw) {
@@ -450,10 +485,14 @@ struct Playback {
     if (!track.active()) {
       return;
     }
+    track.liveControls = track.commandControls;
+    track.gateTicks = 0;
     if (raw == kRest) {
-      closeVoice(vm.tick());
-      track.lastSourceNote = raw;
-      track.portamentoActive = false;
+      emitMix();
+      if (track.driverPitch) {
+        advancePitchModulation();
+      }
+      endNote(vm.tick());
       return;
     }
     if (raw < kRest) {
@@ -474,8 +513,11 @@ struct Playback {
     if (note >= kRest) {
       return;
     }
-    startNote(note, index, reader().u8At(row), reader().u8At(row + 1), reader().u8At(row + 2),
-              reader().u8At(row + 3));
+    startNote(note, PercussionTrigger{.key = index,
+                                      .srcn = reader().u8At(row),
+                                      .envelope = reader().u8At(row + 1),
+                                      .volume = reader().u8At(row + 2),
+                                      .balance = reader().u8At(row + 3)});
   }
 
   [[nodiscard]] Effects note(MaskedValues notes) {
@@ -557,41 +599,32 @@ struct Playback {
     if (vm.inSubroutine()) {
       return vm.return_();
     }
-    closeVoice(vm.tick());
+    endNote(vm.tick());
     return vm.end();
   }
 
   void tick() {
+    bool triggered = false;
     if (track.pendingNote && ++track.triggerTicks == track.triggerDelay) {
       trigger(*track.pendingNote);
+      triggered = true;
     }
 
-    if (track.lastNote.valid() && track.voiceControls[kGate] != 0 && ++track.gateTicks > track.voiceControls[kGate]) {
-      closeVoice(vm.tick());
-    }
-
-    if (track.portamentoActive) {
-      const double distance = track.portamentoTarget - track.driverPitch;
-      if (std::abs(distance) <= track.portamentoStep) {
-        track.driverPitch = track.portamentoTarget;
-        track.portamentoActive = false;
-      } else {
-        track.driverPitch += std::copysign(track.portamentoStep, distance);
+    if (!triggered && track.driverPitch) {
+      if (track.portamentoActive) {
+        const double distance = track.portamentoTarget - *track.driverPitch;
+        if (std::abs(distance) <= track.portamentoStep) {
+          track.driverPitch = track.portamentoTarget;
+          track.portamentoActive = false;
+        } else {
+          *track.driverPitch += std::copysign(track.portamentoStep, distance);
+        }
       }
+      advancePitchModulation();
     }
-
-    if (track.pitchTable == 0 || !track.lastNote.valid()) {
-      return;
+    if (track.activeNote.valid() && track.liveControls[kGate] != 0 && ++track.gateTicks > track.liveControls[kGate]) {
+      endNote(vm.tick());
     }
-    const u16 phase = static_cast<u16>(track.pitchPhase) + track.voiceControls[kPitchRate];
-    if (phase > 0xff) {
-      track.pitchPhase = track.voiceControls[kPitchRate];
-      track.pitchPosition = resolvePitchPosition(track.pitchTable, static_cast<u8>(track.pitchPosition + 1),
-                                                 track.pitchPosition);
-    } else {
-      track.pitchPhase = static_cast<u8>(phase);
-    }
-    emitPitchBend(modulationValue());
   }
 };
 

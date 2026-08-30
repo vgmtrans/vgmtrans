@@ -231,6 +231,39 @@ void attacksFollowThePhysicalVoiceLifecycle() {
          "attacks should manage voice lifetime without redundantly reselecting an unchanged instrument");
 }
 
+void everyTriggerLatchesLiveVoiceControls() {
+  DriverFixture fixture(Version::WagyanParadise);
+  fixture.sequence({0x00, 4,    0x20, 0x80, 4,    0x01, 0x80, 0x09, 0x80, 0x30, 0x25, 0x80, 12,
+                    0x21, 0x80, 0x40, 0x23, 0x80, 2,    0x0c, 0x80, 0x09, 0x80, 0x31,
+                    0x21, 0x80, 0xa0, 0x09, 0x80, 0x54, 0x03});
+  const PerformanceSequence performance = render(fixture);
+  const auto notes = events<NotePerformanceEvent>(performance.tracks[0]);
+  const auto levels = events<LevelPerformanceEvent>(performance.tracks[0]);
+  const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks[0]);
+
+  expect(performance.diagnostics.empty() && notes.size() == 2 && notes[1]->key == 0x31 + 12,
+         "a slur trigger should latch pitch controls");
+  expect(notes[1]->durationTicks == 3, "a slur trigger should latch gate controls");
+  expect(levels.back()->header.tick == 8 && std::abs(levels.back()->linearGain - 0xa0 / 256.0) < 0.000001,
+         "a rest trigger should latch mix controls");
+  expect(instruments.size() == 2 && instruments.back()->sourceInstrument &&
+             instruments.back()->sourceInstrument->key == 4,
+         "voice activation should preserve the driver's persistent SRCN control");
+}
+
+void releaseTailsRetainDriverPitch() {
+  DriverFixture fixture(Version::WagyanParadise);
+  fixture.sequence({0x00, 4,    0x01, 0x80, 0x27, 0x80, 0x80, 0x09, 0x80, 0x30,
+                    0x09, 0x80, 0x54, 0x09, 0x80, 0x3c, 0x03});
+  const PerformanceSequence performance = render(fixture);
+  const auto* slide = performance.tracks[0].automations.empty()
+                          ? nullptr
+                          : pitchTransitionIntent(performance.tracks[0].automations.front());
+
+  expect(slide != nullptr && slide->startKey == 0x30 && slide->targetKey == 0x3c,
+         "a rest should end the exported note without discarding the SPC voice's retained pitch");
+}
+
 void bothRepeatCountersFollowTheSharedIncrementRules() {
   DriverFixture fixture(Version::WagyanParadise);
   fixture.sequence({0x00, 1,    0x04, 1,    0x01, 0x80, 0x09, 0x80, 0x30, 0x06, 3,    0x06,
@@ -254,5 +287,7 @@ void runNamcoSnesModuleTests() {
   percussionPitchMappingIsAppliedExactlyOnce();
   pitchTableIndexUsesSpcAccumulatorWrapping();
   attacksFollowThePhysicalVoiceLifecycle();
+  everyTriggerLatchesLiveVoiceControls();
+  releaseTailsRetainDriverPitch();
   bothRepeatCountersFollowTheSharedIncrementRules();
 }
