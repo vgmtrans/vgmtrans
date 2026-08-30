@@ -223,7 +223,7 @@ void applyBindings(CollectionBindingContext& context, const std::vector<SampleBi
     }
     const BodyAddressing addressing = bodyAddressing(*bankData, *bodyData);
     if (addressing.omittedLeadingBlock) {
-      // Some PSF2 rips discarded the mandatory initial silent block but kept
+      // Some PSF2 rips discarded the bank's initial silent block but kept
       // the original Vagi addresses. Keep source ranges physical and translate
       // those logical addresses instead of manufacturing a padded source.
       context.warning("SonyPS2 BD omits its initial silent ADPCM block; Vagi offsets were shifted by 16 bytes",

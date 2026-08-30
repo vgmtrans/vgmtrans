@@ -13,6 +13,7 @@
 #include <zlib.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -183,7 +184,7 @@ std::vector<u8> psf2Fixture() {
     const auto compressed = compress(members[index].bytes);
     const u32 entry = 20 + index * 48;
     std::ranges::copy(members[index].name, psf.begin() + entry);
-    const u32 node = static_cast<u32>(psf.size());
+    const u32 node = static_cast<u32>(psf.size() - 16);
     le32(psf, entry + 36, node);
     le32(psf, entry + 40, static_cast<u32>(members[index].bytes.size()));
     le32(psf, entry + 44, static_cast<u32>(members[index].bytes.size()));
@@ -192,6 +193,16 @@ std::vector<u8> psf2Fixture() {
     std::ranges::copy(compressed, psf.begin() + node + 20);
   }
   le32(psf, 4, static_cast<u32>(psf.size() - 16));
+  return psf;
+}
+
+std::vector<u8> miniPsf2(std::string_view library) {
+  std::vector<u8> psf(20);
+  std::ranges::copy(std::string_view("PSF"), psf.begin());
+  psf[3] = 2;
+  le32(psf, 4, 4);
+  const std::string tags = "[TAG]\n_lib=" + std::string(library) + "\n";
+  psf.insert(psf.end(), tags.begin(), tags.end());
   return psf;
 }
 
@@ -302,6 +313,24 @@ void syntheticArchiveCoversDriverFeatures() {
   expect(playback.playable(), "SquarePS2 playback preparation should produce both MIDI and SoundFont data");
 }
 
+void miniArchiveLoadsLibraryFilesystem() {
+  const auto unique = std::chrono::steady_clock::now().time_since_epoch().count();
+  const auto directory = std::filesystem::temp_directory_path() / ("vgmtrans-psf2-" + std::to_string(unique));
+  std::filesystem::create_directories(directory);
+  const auto libraryPath = directory / "fixture.psf2lib";
+  const auto library = psf2Fixture();
+  {
+    std::ofstream stream(libraryPath, std::ios::binary);
+    stream.write(reinterpret_cast<const char*>(library.data()), static_cast<std::streamsize>(library.size()));
+  }
+
+  const SessionSnapshot snapshot =
+      scan("selected.minipsf2", directory / "selected.minipsf2", miniPsf2(libraryPath.filename().string())).snapshot();
+  std::filesystem::remove_all(directory);
+  expect(snapshot.sources().size() == 3 && squareCollection(snapshot) != nullptr,
+         "MiniPSF2 should expose the recursively imported library filesystem");
+}
+
 std::vector<u8> readFile(const std::filesystem::path& path) {
   std::ifstream stream(path, std::ios::binary | std::ios::ate);
   expect(static_cast<bool>(stream), "real PSF2 archive should be readable");
@@ -372,6 +401,7 @@ void scanRealArchive(const std::filesystem::path& path) {
 int main(int argc, char** argv) {
   try {
     syntheticArchiveCoversDriverFeatures();
+    miniArchiveLoadsLibraryFilesystem();
     if (argc > 1) {
       scanRealArchive(argv[1]);
     }

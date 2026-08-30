@@ -42,6 +42,7 @@ constexpr int kMaxRecursion = 10;
 
 struct PsfData {
   u8 version = 0;
+  std::vector<u8> reserved;
   std::vector<u8> exe;
   std::map<std::string, std::string> tags;
 };
@@ -156,8 +157,12 @@ void unpackPsf2Directory(std::span<const u8> bytes, size_t tableOffset, u32 coun
     const std::string path = prefix.empty() ? name : std::string(prefix) + "/" + name;
 
     if (fileSize == 0 && blockSize == 0) {
-      const u32 childCount = le32(bytes, static_cast<size_t>(offset) + 16);
-      unpackPsf2Directory(bytes, static_cast<size_t>(offset) + 20, childCount, path, members, depth + 1);
+      if (offset == 0) {
+        members.push_back(Psf2Member{.path = path});
+        continue;
+      }
+      const u32 childCount = le32(bytes, offset);
+      unpackPsf2Directory(bytes, static_cast<size_t>(offset) + 4, childCount, path, members, depth + 1);
       continue;
     }
     if (blockSize == 0) {
@@ -165,7 +170,7 @@ void unpackPsf2Directory(std::span<const u8> bytes, size_t tableOffset, u32 coun
     }
 
     const u32 blockCount = fileSize == 0 ? 0 : 1 + (fileSize - 1) / blockSize;
-    const size_t sizeTable = static_cast<size_t>(offset) + 16;
+    const size_t sizeTable = offset;
     if (sizeTable > bytes.size() || static_cast<u64>(blockCount) * 4 > bytes.size() - sizeTable) {
       throw std::runtime_error("PSF2 block table is truncated");
     }
@@ -194,8 +199,29 @@ void unpackPsf2Directory(std::span<const u8> bytes, size_t tableOffset, u32 coun
 
 [[nodiscard]] std::vector<Psf2Member> unpackPsf2(std::span<const u8> bytes) {
   std::vector<Psf2Member> members;
-  unpackPsf2Directory(bytes, 20, le32(bytes, 16), {}, members);
+  unpackPsf2Directory(bytes, 4, le32(bytes, 0), {}, members);
   return members;
+}
+
+[[nodiscard]] std::string psf2PathKey(std::string path) {
+  std::ranges::transform(path, path.begin(), [](unsigned char ch) {
+    return ch == '\\' ? '/' : static_cast<char>(std::tolower(ch));
+  });
+  return path;
+}
+
+void overlayPsf2(std::vector<Psf2Member>& filesystem, std::vector<Psf2Member> overlay) {
+  for (auto& member : overlay) {
+    const std::string key = psf2PathKey(member.path);
+    const auto existing = std::ranges::find_if(filesystem, [&](const Psf2Member& candidate) {
+      return psf2PathKey(candidate.path) == key;
+    });
+    if (existing == filesystem.end()) {
+      filesystem.push_back(std::move(member));
+    } else {
+      *existing = std::move(member);
+    }
+  }
 }
 
 void parseTags(PsfData& psf, std::span<const u8> bytes, size_t offset) {
@@ -260,7 +286,8 @@ void parseTags(PsfData& psf, std::span<const u8> bytes, size_t offset) {
   }
 
   const size_t exeOffset = 16 + reservedSize;
-  PsfData psf{.version = version};
+  PsfData psf{.version = version,
+              .reserved = std::vector<u8>(bytes.begin() + 16, bytes.begin() + 16 + reservedSize)};
   if (exeSize != 0) {
     const auto compressed = bytes.subspan(exeOffset, exeSize);
     const uLong actualCrc = crc32(crc32(0L, nullptr, 0), reinterpret_cast<const Bytef*>(compressed.data()), exeSize);
@@ -370,6 +397,57 @@ void overlayPsfExe(const PsfData& psf, Image& image) {
 void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Image& image,
                   std::vector<Diagnostic>& diagnostics, SourceRange range, int depth = 0);
 
+void loadPsf2WithLibs(const PsfData& psf, const std::filesystem::path& basePath,
+                      std::vector<Psf2Member>& filesystem, std::vector<Diagnostic>& diagnostics, SourceRange range,
+                      int depth = 0);
+
+void tryOpenPsf2Lib(const std::filesystem::path& basePath, const std::string& libName,
+                    std::vector<Psf2Member>& filesystem, std::vector<Diagnostic>& diagnostics, SourceRange range,
+                    int depth) {
+  if (basePath.empty()) {
+    diagnostics.push_back(warning("PSF2 library could not be resolved without a source path: " + libName, range));
+    return;
+  }
+
+  std::string normalizedName = libName;
+  std::ranges::replace(normalizedName, '\\', '/');
+  const auto libPath = basePath / normalizedName;
+  try {
+    const auto bytes = readFile(libPath);
+    const auto library = parsePsf(bytes);
+    if (library.version != kPsf2Version) {
+      throw std::runtime_error("referenced file is not a PSF2 library");
+    }
+    loadPsf2WithLibs(library, libPath.parent_path(), filesystem, diagnostics, range, depth + 1);
+  } catch (const std::exception& ex) {
+    diagnostics.push_back(warning("PSF2 library could not be loaded: " + libPath.string() + ": " + ex.what(), range));
+  }
+}
+
+void loadPsf2WithLibs(const PsfData& psf, const std::filesystem::path& basePath,
+                      std::vector<Psf2Member>& filesystem, std::vector<Diagnostic>& diagnostics, SourceRange range,
+                      int depth) {
+  if (depth >= kMaxRecursion) {
+    diagnostics.push_back(warning("PSF2 library recursion limit was reached", range));
+    return;
+  }
+
+  if (const auto lib = primaryLibName(psf)) {
+    tryOpenPsf2Lib(basePath, *lib, filesystem, diagnostics, range, depth);
+  }
+  for (int i = 2;; ++i) {
+    const auto found = psf.tags.find("_lib" + std::to_string(i));
+    if (found == psf.tags.end()) {
+      break;
+    }
+    tryOpenPsf2Lib(basePath, found->second, filesystem, diagnostics, range, depth);
+  }
+
+  // PSF2 libraries form a case-insensitive filesystem overlay: every library
+  // is loaded first, then the referring mini replaces conflicting members.
+  overlayPsf2(filesystem, unpackPsf2(psf.reserved));
+}
+
 void tryOpenLib(const std::filesystem::path& basePath, const std::string& libName, Image& image,
                 std::vector<Diagnostic>& diagnostics, SourceRange range, int depth) {
   if (basePath.empty()) {
@@ -471,7 +549,10 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
   const auto psf = parsePsf(bytes);
 
   if (psf.version == kPsf2Version) {
-    const auto members = unpackPsf2(bytes.first(16 + le32(bytes, 4)));
+    std::vector<Psf2Member> members;
+    const std::filesystem::path basePath =
+        input.source.path.empty() ? std::filesystem::path{} : input.source.path.parent_path();
+    loadPsf2WithLibs(psf, basePath, members, result.diagnostics, range);
     std::optional<std::string> ini;
     const auto iniMember = std::ranges::find_if(members, [](const Psf2Member& member) {
       std::string path = member.path;
