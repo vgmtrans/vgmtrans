@@ -16,7 +16,7 @@ target_sources(vgmtrans-value-core-tests
     formats/Mp2kModuleTests.cpp
     formats/NeverlandSnesModuleTests.cpp
     formats/NinSnesModuleTests.cpp
-    formats/OhoriAkaPS1ModuleTests.cpp
+    formats/HOSAModuleTests.cpp
     formats/PrismSnesModuleTests.cpp
     formats/RareSnesModuleTests.cpp
     formats/AkaoSnesModuleTests.cpp
@@ -50,6 +50,13 @@ target_link_libraries(vgmtrans-value-core-tests PRIVATE vgmtransvalueformats vgm
 target_compile_features(vgmtrans-value-core-tests PRIVATE cxx_std_20)
 
 add_test(NAME vgmtrans-value-core-tests COMMAND vgmtrans-value-core-tests)
+
+add_executable(vgmtrans-hosa-tests
+  formats/HOSAModuleTests.cpp
+  formats/HOSATestMain.cpp)
+target_link_libraries(vgmtrans-hosa-tests PRIVATE vgmtransvalueformats vgmtransvaluecore ZLIB::ZLIB)
+target_compile_features(vgmtrans-hosa-tests PRIVATE cxx_std_20)
+add_test(NAME vgmtrans-hosa-tests COMMAND vgmtrans-hosa-tests)
 
 add_executable(vgmtrans-square-ps2-tests formats/SquarePS2ModuleTests.cpp)
 target_link_libraries(vgmtrans-square-ps2-tests PRIVATE vgmtransvalueformats vgmtransvaluecore ZLIB::ZLIB)

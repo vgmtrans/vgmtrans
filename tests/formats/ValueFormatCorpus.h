@@ -35,7 +35,11 @@ inline int scanValueFormatArchive(const std::filesystem::path& path, const Value
   session.scanSource(session.addSourceFromPath(path));
   const SessionSnapshot snapshot = session.snapshot();
 
-  const auto isRam = [](const SourceFile& source) { return source.derived() && source.name.ends_with(" - ram"); };
+  const auto isRam = [](const SourceFile& source) {
+    return source.derived() &&
+           ((source.knownFormat && *source.knownFormat == source_formats::kPlayStationRam) ||
+            source.name.ends_with(" - ram"));
+  };
   const auto ramSources = static_cast<unsigned>(std::ranges::count_if(snapshot.sources(), isRam));
   std::vector<AssetId> sequences;
   unsigned renderFailures = 0;
