@@ -56,7 +56,7 @@ namespace {
   std::vector<ScanSoundBankDraft> bankDrafts;
   for (const auto& layout : banks) {
     if (auto bank = addTriAcePs1Bank(result, layout)) {
-      bankDrafts.push_back(bank->bank);
+      bankDrafts.push_back(*bank);
     } else {
       result.warning("TriAcePS1 bank was recognized, but no playable SPU samples were found",
                      input.reader.range(layout.offset, layout.length));

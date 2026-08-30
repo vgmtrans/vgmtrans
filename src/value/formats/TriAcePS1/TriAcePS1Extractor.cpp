@@ -200,8 +200,7 @@ constexpr u32 kMaximumImplicitTail = 16;
         .offset = offset,
         .size = sequences[index].size(),
     });
-    bytes.insert(bytes.end(), std::make_move_iterator(sequences[index].begin()),
-                 std::make_move_iterator(sequences[index].end()));
+    bytes.insert(bytes.end(), sequences[index].begin(), sequences[index].end());
   }
 
   ExtractionResult result;
