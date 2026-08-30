@@ -28,6 +28,7 @@
 #include "value/formats/MP2k/MP2k.h"
 #include "value/formats/NeverlandSnes/NeverlandSnes.h"
 #include "value/formats/NinSnes/NinSnes.h"
+#include "value/formats/OhoriAkaPS1/OhoriAkaPS1.h"
 #include "value/formats/PrismSnes/PrismSnes.h"
 #include "value/formats/RareSnes/RareSnes.h"
 #include "value/formats/NDS/Nds.h"
@@ -119,6 +120,7 @@ void registerValueFormats(core::Session& session, const ValueFormatOptions& opti
   session.registerFormat(mp2k::mp2kModule());
   session.registerFormat(neverland_snes::module());
   session.registerFormat(nin_snes::module());
+  session.registerFormat(ohori_aka_ps1::ohoriAkaPs1Module());
   session.registerFormat(prism_snes::module());
   session.registerFormat(rare_snes::module());
   session.registerFormat(segsat::segSatModule());
