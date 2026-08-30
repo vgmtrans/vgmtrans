@@ -346,9 +346,9 @@ SourceExtractor archiveFixtureExtractor() {
           source.origin = input.reader.range(0, input.reader.size());
           result.sources.push_back(ExtractedSource{.file = std::move(source), .bytes = std::move(bytes)});
         };
-        add("default.sq", sqFixture());
-        add("default.hd", hdFixture());
-        add("default.bd", bdFixture());
+        add("sequence/music.sq", sqFixture());
+        add("synth/sound.hd", hdFixture());
+        add("synth/sound.bd", bdFixture());
         return result;
       },
   };
@@ -475,8 +475,7 @@ void syntheticFeatures() {
       *rendered.performance, [](const auto& event) { return near(event.linearGain, 96.0 / 127.0); });
   expect(expression != nullptr, "CC11 should retain the driver's linear expression gain");
   const auto* pan = findEvent<ChannelPanPerformanceEvent>(*rendered.performance);
-  expect(pan != nullptr && near(pan->position, 0.5) && pan->voicePanLaw == PanLaw::ConstantMaximum,
-         "CC10 should remain an additive constant-maximum voice-pan controller");
+  expect(pan != nullptr && near(pan->position, 0.5), "CC10 should remain additive to each voice's intrinsic pan");
   const MidiSequence midi = renderMidiSequence(*rendered.performance);
   const auto midiNote = std::ranges::find_if(midi.tracks.front().events, [](const MidiEvent& event) {
     return std::holds_alternative<NoteDuration>(event.payload);

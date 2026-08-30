@@ -124,7 +124,7 @@ public:
   void pan(double stereoPosition);
   void pan(double stereoPosition, double linearGain);
   void channelPan(ChannelPanPerformanceEvent event);
-  void channelPan(double position, PanLaw voicePanLaw);
+  void channelPan(double position);
   void stereoBalance(StereoBalancePerformanceEvent event);
   void stereoBalance(double leftGain, double rightGain);
   void masterLevel(MasterLevelPerformanceEvent event);

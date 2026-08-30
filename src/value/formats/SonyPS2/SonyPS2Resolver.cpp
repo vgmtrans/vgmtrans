@@ -161,7 +161,7 @@ struct BodyAddressing {
       selected.push_back(&bank);
     }
   }
-  if (best < 4 && banks.size() != 1) {
+  if (best < 4 && selected.size() != 1) {
     selected.clear();
   }
   return selected;
@@ -186,8 +186,150 @@ void attachBank(CollectionAssembly& collection, const BankEntry& bank, const std
   }
 }
 
-void applyBindings(CollectionBindingContext& context, const std::vector<SampleBinding>& bindings) {
-  std::vector<ProgramRuntimeInfo> runtimePrograms;
+struct BoundSample {
+  SampleRef reference;
+  bool loops = false;
+};
+
+class BodyBinder {
+public:
+  BodyBinder(CollectionBindingContext& context, SoundBankAsset& bank, const SamplePoolAsset& body,
+             const SoundBankData& bankData, const SampleBodyData& bodyData, BodyAddressing addressing)
+      : context_(context), bank_(bank), body_(body), bankData_(bankData), bodyData_(bodyData), addressing_(addressing) {
+  }
+
+  [[nodiscard]] bool bind(Region& region) {
+    if (!region.sample.needsBinding()) {
+      return true;
+    }
+    const u32 vagIndex = region.sample.index();
+    if (vagIndex >= bankData_.vags.size() || !bankData_.vags[vagIndex]) {
+      context_.fail("SonyPS2 region refers outside the sparse Vagi table", region.range);
+      return false;
+    }
+    const VagInfo& vag = *bankData_.vags[vagIndex];
+    const auto sample = resolve(addressing_.physicalOffset(vag.bodyOffset), vag.bodyOffset, region.range);
+    if (!sample) {
+      return false;
+    }
+    region.sample = sample->reference;
+    if (vag.loops != sample->loops) {
+      context_.warning("SonyPS2 Vagi loop attribute disagrees with the ADPCM end flags", region.range);
+    }
+    return true;
+  }
+
+private:
+  [[nodiscard]] std::optional<BoundSample> resolve(u32 bodyOffset, u32 logicalOffset, SourceRange range) {
+    const auto entry = std::ranges::find(bodyData_.entries, bodyOffset, &SampleBodyData::Entry::bodyOffset);
+    if (entry != bodyData_.entries.end()) {
+      const auto& sample = body_.pool.samples[entry->sampleIndex];
+      return BoundSample{
+          .reference = SampleRef::resolved(body_.metadata.id, entry->sampleIndex),
+          .loops = sample.loop.enabled,
+      };
+    }
+
+    auto [sample, inserted] = localSamples_.try_emplace(bodyOffset, 0);
+    if (inserted && !addLocalSample(sample->second, bodyOffset, logicalOffset, range)) {
+      localSamples_.erase(sample);
+      return std::nullopt;
+    }
+    const auto& local = bank_.localSamples.samples[sample->second];
+    return BoundSample{
+        .reference = SampleRef::resolved(bank_.metadata.id, sample->second),
+        .loops = local.loop.enabled,
+    };
+  }
+
+  [[nodiscard]] bool addLocalSample(u32& index, u32 bodyOffset, u32 logicalOffset, SourceRange range) {
+    const ByteReader reader = bodyData_.source.reader();
+    const u32 boundary = sampleBoundary(bankData_, addressing_, bodyOffset, bodyData_.bytes);
+    const auto stream = inspectPsxAdpcmStream(reader, bodyOffset, boundary);
+    const bool completeEndpoint =
+        stream && stream->encodedData.size >= kPsxAdpcmBlockBytes &&
+        (reader.u8At(bodyOffset + stream->encodedData.size - kPsxAdpcmBlockBytes + 1) & 1) != 0;
+    const u32 partialBlock = boundary & ~(kPsxAdpcmBlockBytes - 1);
+    const bool truncatedEndpoint = stream && boundary == bodyData_.bytes && boundary - partialBlock >= 2 &&
+                                   partialBlock >= bodyOffset && (reader.u8At(partialBlock + 1) & 1) != 0;
+    if (!completeEndpoint && !truncatedEndpoint) {
+      context_.fail(
+          fmt::format("SonyPS2 Vagi entry at {:#x} has no ADPCM endpoint before the next BD waveform", logicalOffset),
+          range);
+      return false;
+    }
+    Loop loop = stream->loop;
+    if (truncatedEndpoint) {
+      loop.enabled = (reader.u8At(partialBlock + 1) & 2) != 0;
+      context_.warning("SonyPS2 BD ends inside its final ADPCM block; the incomplete block was omitted",
+                       stream->encodedData);
+    }
+    index = static_cast<u32>(bank_.localSamples.samples.size());
+    bank_.localSamples.samples.push_back(Sample{
+        .name = fmt::format("VAG at {:#x}", bodyOffset),
+        .codec = AudioCodec::PsxAdpcm,
+        .encodedData = stream->encodedData,
+        .sampleRate = kPs2SpuSampleRate,
+        .channels = 1,
+        .bitsPerSample = 16,
+        .loop = loop,
+    });
+    return true;
+  }
+
+  CollectionBindingContext& context_;
+  SoundBankAsset& bank_;
+  const SamplePoolAsset& body_;
+  const SoundBankData& bankData_;
+  const SampleBodyData& bodyData_;
+  BodyAddressing addressing_;
+  std::unordered_map<u32, u32> localSamples_;
+};
+
+[[nodiscard]] bool bindBody(CollectionBindingContext& context, const SampleBinding& binding) {
+  auto* bank = context.soundBank(binding.bank);
+  const auto* body = context.samplePool(binding.body);
+  if (bank == nullptr || body == nullptr) {
+    context.fail("SonyPS2 collection contains an invalid HD/BD binding");
+    return false;
+  }
+  const auto* bankData = bank->privateData.get<SoundBankData>();
+  const auto* bodyData = body->privateData.get<SampleBodyData>();
+  if (bankData == nullptr || bodyData == nullptr) {
+    context.fail("SonyPS2 HD/BD binding metadata is missing", bank->metadata.range);
+    return false;
+  }
+  const BodyAddressing addressing = bodyAddressing(*bankData, *bodyData);
+  if (addressing.omittedLeadingBlock) {
+    // Some PSF2 rips discarded the bank's initial silent block but kept the
+    // original Vagi addresses. Translate those logical addresses rather than
+    // manufacturing a padded source.
+    context.warning("SonyPS2 BD omits its initial silent ADPCM block; Vagi offsets were shifted by 16 bytes",
+                    body->metadata.range);
+  }
+  const u32 sizeDifference = bankData->expectedBodyBytes > bodyData->bytes
+                                 ? bankData->expectedBodyBytes - bodyData->bytes
+                                 : bodyData->bytes - bankData->expectedBodyBytes;
+  if (sizeDifference > 32) {
+    // Shipped banks can retain an unrelated allocation size. sceHSyn_Load
+    // receives the uploaded body base and resolves samples through Vagi offsets.
+    context.warning("SonyPS2 HD bodySize differs from the selected BD; VAG offsets were used for binding",
+                    bank->metadata.range);
+  }
+
+  BodyBinder binder(context, *bank, *body, *bankData, *bodyData, addressing);
+  for (auto& instrument : bank->instruments) {
+    for (auto& region : instrument.regions) {
+      if (!binder.bind(region)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+[[nodiscard]] bool assignProgramAddresses(CollectionBindingContext& context,
+                                          std::vector<ProgramRuntimeInfo>& runtimePrograms) {
   u16 bankNumber = 0;
   for (auto& bank : context.soundBanks) {
     if (bank.metadata.format != kFormatName) {
@@ -196,7 +338,7 @@ void applyBindings(CollectionBindingContext& context, const std::vector<SampleBi
     const auto* data = bank.privateData.get<SoundBankData>();
     if (data == nullptr) {
       context.fail("SonyPS2 HD is missing retained Vagi binding data", bank.metadata.range);
-      return;
+      return false;
     }
     for (auto& instrument : bank.instruments) {
       if (!instrument.identity || instrument.identity->domain != kInstrumentDomain) {
@@ -212,100 +354,18 @@ void applyBindings(CollectionBindingContext& context, const std::vector<SampleBi
     }
     ++bankNumber;
   }
+  return true;
+}
+
+void applyBindings(CollectionBindingContext& context, const std::vector<SampleBinding>& bindings) {
+  std::vector<ProgramRuntimeInfo> runtimePrograms;
+  if (!assignProgramAddresses(context, runtimePrograms)) {
+    return;
+  }
 
   for (const auto& binding : bindings) {
-    auto* bank = context.soundBank(binding.bank);
-    const auto* body = context.samplePool(binding.body);
-    if (bank == nullptr || body == nullptr) {
-      context.fail("SonyPS2 collection contains an invalid HD/BD binding");
+    if (!bindBody(context, binding)) {
       return;
-    }
-    const auto* bankData = bank->privateData.get<SoundBankData>();
-    const auto* bodyData = body->privateData.get<SampleBodyData>();
-    if (bankData == nullptr || bodyData == nullptr) {
-      context.fail("SonyPS2 HD/BD binding metadata is missing", bank->metadata.range);
-      return;
-    }
-    const BodyAddressing addressing = bodyAddressing(*bankData, *bodyData);
-    if (addressing.omittedLeadingBlock) {
-      // Some PSF2 rips discarded the bank's initial silent block but kept
-      // the original Vagi addresses. Keep source ranges physical and translate
-      // those logical addresses instead of manufacturing a padded source.
-      context.warning("SonyPS2 BD omits its initial silent ADPCM block; Vagi offsets were shifted by 16 bytes",
-                      body->metadata.range);
-    }
-    const u32 sizeDifference = bankData->expectedBodyBytes > bodyData->bytes
-                                   ? bankData->expectedBodyBytes - bodyData->bytes
-                                   : bodyData->bytes - bankData->expectedBodyBytes;
-    if (sizeDifference > 32) {
-      // The manual describes bodySize as the complete BD length, but shipped
-      // banks can retain an unrelated allocation size. sceHSyn_Load receives
-      // only the uploaded body base and resolves samples through Vagi offsets.
-      context.warning("SonyPS2 HD bodySize differs from the selected BD; VAG offsets were used for binding",
-                      bank->metadata.range);
-    }
-    std::unordered_map<u32, u32> localSamples;
-    for (auto& instrument : bank->instruments) {
-      for (auto& region : instrument.regions) {
-        if (!region.sample.needsBinding()) {
-          continue;
-        }
-        const u32 vagIndex = region.sample.index();
-        if (vagIndex >= bankData->vags.size() || !bankData->vags[vagIndex]) {
-          context.fail("SonyPS2 region refers outside the sparse Vagi table", region.range);
-          return;
-        }
-        const u32 logicalOffset = bankData->vags[vagIndex]->bodyOffset;
-        const u32 bodyOffset = addressing.physicalOffset(logicalOffset);
-        const auto entry = std::ranges::find(bodyData->entries, bodyOffset, &SampleBodyData::Entry::bodyOffset);
-        bool loops = false;
-        if (entry != bodyData->entries.end()) {
-          region.sample = SampleRef::resolved(body->metadata.id, entry->sampleIndex);
-          loops = body->pool.samples[entry->sampleIndex].loop.enabled;
-        } else {
-          auto [sample, inserted] = localSamples.try_emplace(bodyOffset, 0);
-          if (inserted) {
-            const ByteReader reader = bodyData->source.reader();
-            const u32 boundary = sampleBoundary(*bankData, addressing, bodyOffset, bodyData->bytes);
-            const auto stream = inspectPsxAdpcmStream(reader, bodyOffset, boundary);
-            const bool completeEndpoint = stream && stream->encodedData.size >= kPsxAdpcmBlockBytes &&
-                                          (reader.u8At(bodyOffset + stream->encodedData.size -
-                                                       kPsxAdpcmBlockBytes + 1) &
-                                           1) != 0;
-            const u32 partialBlock = boundary & ~(kPsxAdpcmBlockBytes - 1);
-            const bool truncatedEndpoint = stream && boundary == bodyData->bytes && boundary - partialBlock >= 2 &&
-                                           partialBlock >= bodyOffset && (reader.u8At(partialBlock + 1) & 1) != 0;
-            if (!completeEndpoint && !truncatedEndpoint) {
-              context.fail(fmt::format("SonyPS2 Vagi entry at {:#x} has no ADPCM endpoint before the next BD "
-                                       "waveform",
-                                       logicalOffset),
-                           region.range);
-              return;
-            }
-            Loop loop = stream->loop;
-            if (truncatedEndpoint) {
-              loop.enabled = (reader.u8At(partialBlock + 1) & 2) != 0;
-              context.warning("SonyPS2 BD ends inside its final ADPCM block; the incomplete block was omitted",
-                              stream->encodedData);
-            }
-            sample->second = static_cast<u32>(bank->localSamples.samples.size());
-            bank->localSamples.samples.push_back(Sample{
-                .name = fmt::format("VAG at {:#x}", bodyOffset),
-                .codec = AudioCodec::PsxAdpcm,
-                .encodedData = stream->encodedData,
-                .sampleRate = kPs2SpuSampleRate,
-                .channels = 1,
-                .bitsPerSample = 16,
-                .loop = loop,
-            });
-          }
-          region.sample = SampleRef::resolved(bank->metadata.id, sample->second);
-          loops = bank->localSamples.samples[sample->second].loop.enabled;
-        }
-        if (bankData->vags[vagIndex]->loops != loops) {
-          context.warning("SonyPS2 Vagi loop attribute disagrees with the ADPCM end flags", region.range);
-        }
-      }
     }
   }
 

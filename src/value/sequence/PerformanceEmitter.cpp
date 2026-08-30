@@ -346,16 +346,12 @@ void PerformanceEmitter::pan(double stereoPosition, double linearGain) {
 }
 
 void PerformanceEmitter::channelPan(ChannelPanPerformanceEvent event) {
-  if (event.voicePanLaw == PanLaw::Unspecified) {
-    throw std::logic_error("Channel pan requires the voice pan law it offsets");
-  }
   append(std::move(event));
 }
 
-void PerformanceEmitter::channelPan(double position, PanLaw voicePanLaw) {
+void PerformanceEmitter::channelPan(double position) {
   channelPan(ChannelPanPerformanceEvent{
       .position = position,
-      .voicePanLaw = voicePanLaw,
   });
 }
 

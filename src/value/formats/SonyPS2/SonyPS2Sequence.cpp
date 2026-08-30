@@ -64,10 +64,7 @@ struct TrackState {
         seTimbre(static_cast<u8>((source.sourceTrackNumber >> 8) & 0x7f)),
         seKey(static_cast<u8>(source.sourceTrackNumber & 0x7f)) {
     if (sequence.sectionPlaylist) {
-      sectionPan = sequence.behavior.initialChannelPan.value_or(ChannelPan{
-          .position = 0.5,
-          .voicePanLaw = PanLaw::ConstantMaximum,
-      });
+      sectionPan = sequence.behavior.initialChannelPan.value_or(0.5);
       sectionTempo = sequence.behavior.initialTempoMicrosecondsPerQuarter;
     }
   }
@@ -104,7 +101,7 @@ struct TrackState {
   bool portamentoEnabled = false;
   bool sectionStarted = false;
   bool resetSectionState = false;
-  std::optional<ChannelPan> sectionPan;
+  std::optional<double> sectionPan;
   u32 sectionTempo = 500000;
   u16 pitchBendValue = 8192;
   double emittedPitchBendSemitones = 0.0;
@@ -225,9 +222,8 @@ struct Playback {
   }
 
   void pruneReleasedNotes() {
-    std::erase_if(track.activeNotes, [](const TrackState::ActiveNote& note) {
-      return !note.keyDown && !note.sustained;
-    });
+    std::erase_if(track.activeNotes,
+                  [](const TrackState::ActiveNote& note) { return !note.keyDown && !note.sustained; });
   }
 
   void releaseNotes(u8 key) {
@@ -286,7 +282,7 @@ struct Playback {
       if (track.channel == 0) {
         out.tempo(track.sectionTempo);
       }
-      out.channelPan(track.sectionPan->position, track.sectionPan->voicePanLaw);
+      out.channelPan(*track.sectionPan);
     }
     if (track.initialized) {
       return;
@@ -430,7 +426,7 @@ struct Playback {
       case 10:
         // modhsyn stores CC10 as a signed offset from center, then applies it
         // independently to every voice's Program/Split/Sample pan.
-        delayed.channelPan(panPositionFrom7Bit(std::min<u8>(value, 127)), PanLaw::ConstantMaximum);
+        delayed.channelPan(panPositionFrom7Bit(std::min<u8>(value, 127)));
         break;
       case 11:
         delayed.expression(linearMidi7(value));
@@ -516,7 +512,7 @@ struct Playback {
         delayed.tremoloLinearGainDepth(0.0);
         delayed.level(1.0);
         delayed.expression(1.0);
-        delayed.channelPan(0.5, PanLaw::ConstantMaximum);
+        delayed.channelPan(0.5);
         delayed.pitchBend(0.0);
         break;
       default:
@@ -1114,12 +1110,119 @@ SequenceProgram parseMidiSequence(ByteReader reader, AssetId id, const MidiBlock
   return program;
 }
 
-std::optional<SequenceProgram> parseSongSequence(ByteReader reader, AssetId id, const SequenceLayout& layout,
-                                                 u32 songOffset, u32 songEnd, SourceMapBuilder* sourceMap,
-                                                 std::vector<Diagnostic>* diagnostics) {
-  if (layout.midiBlocks.empty() || songOffset >= songEnd) {
-    return std::nullopt;
+namespace {
+
+struct ParsedSongTable {
+  SectionPlaylist playlist;
+  u8 volume = 128;
+  u8 pan = 64;
+  u8 tempo = 120;
+  bool hasPrefixState = false;
+  bool hasPlaybackCommand = false;
+  bool hasRepeat = false;
+  bool unsupported = false;
+  bool mixedTimebase = false;
+  std::optional<u16> ppqn;
+};
+
+[[nodiscard]] ParsedSongTable readSongTable(ByteReader reader, const SequenceLayout& layout, u32 songOffset,
+                                            u32 songEnd) {
+  ParsedSongTable song;
+  u32 cursor = songOffset;
+  while (cursor + 3 <= songEnd && song.playlist.commands.size() < 4096) {
+    const u32 commandOffset = cursor;
+    const u8 family = reader.u8At(cursor++);
+    const u8 operation = reader.u8At(cursor++);
+    const u8 value = reader.u8At(cursor++);
+
+    if (family != 0xa0) {
+      song.unsupported = true;
+      return song;
+    }
+
+    if ((operation >= 1 && operation <= 6) || (operation >= 0x21 && operation <= 0x23)) {
+      if (song.hasPlaybackCommand) {
+        song.unsupported = true;
+        return song;
+      }
+      song.hasPrefixState = true;
+      if (operation <= 3) {
+        const int updated = operation == 1   ? value
+                            : operation == 2 ? static_cast<int>(song.volume) + value
+                                             : static_cast<int>(song.volume) - value;
+        song.volume = static_cast<u8>(std::clamp(updated, 0, 128));
+      } else if (operation <= 6) {
+        const int updated = operation == 4   ? value
+                            : operation == 5 ? static_cast<int>(song.pan) + value
+                                             : static_cast<int>(song.pan) - value;
+        song.pan = static_cast<u8>(std::clamp(updated, 0, 127));
+      } else {
+        const int updated = operation == 0x21   ? value
+                            : operation == 0x22 ? static_cast<int>(song.tempo) + value
+                                                : static_cast<int>(song.tempo) - value;
+        song.tempo = static_cast<u8>(std::clamp(updated, 10, 255));
+      }
+      continue;
+    }
+
+    if (operation == 0) {
+      const auto midi = std::ranges::find(layout.midiBlocks, value, &MidiBlockLayout::index);
+      if (midi == layout.midiBlocks.end()) {
+        song.unsupported = true;
+        return song;
+      }
+      song.hasPlaybackCommand = true;
+      song.mixedTimebase |= song.ppqn && *song.ppqn != midi->ppqn;
+      song.ppqn = midi->ppqn;
+      if (song.playlist.commands.empty()) {
+        song.playlist.startAddress = Address{commandOffset};
+      }
+      song.playlist.commands.push_back(PlaylistCommand{
+          .address = Address{commandOffset},
+          .fallthrough = Address{cursor},
+          .range = reader.range(commandOffset, 3),
+          .kind = PlaylistCommandKind::PlaySection,
+          .target = Address{midi->dataOffset},
+          .trackStarts = std::vector<std::optional<Address>>(16, Address{midi->dataOffset}),
+      });
+      continue;
+    }
+
+    if (operation == 0x11 && cursor + 3 <= songEnd && reader.u8At(cursor) == 0xa1) {
+      song.hasPlaybackCommand = true;
+      song.hasRepeat = true;
+      const u16 relative = static_cast<u16>((reader.u8At(cursor + 1) << 8) | reader.u8At(cursor + 2));
+      cursor += 3;
+      song.playlist.commands.push_back(PlaylistCommand{
+          .address = Address{commandOffset},
+          .fallthrough = Address{cursor},
+          .range = reader.range(commandOffset, 6),
+          .kind = PlaylistCommandKind::Repeat,
+          .target = Address{songOffset + relative},
+          .additionalPlays = value,
+      });
+      continue;
+    }
+
+    if (operation == 0x7f && value == 0x7f) {
+      song.hasPlaybackCommand = true;
+      song.playlist.commands.push_back(PlaylistCommand{
+          .address = Address{commandOffset},
+          .fallthrough = Address{cursor},
+          .range = reader.range(commandOffset, 3),
+          .kind = PlaylistCommandKind::End,
+      });
+      return song;
+    }
+
+    song.unsupported = true;
+    return song;
   }
+  return song;
+}
+
+[[nodiscard]] SequenceProgram makeSongProgram(ByteReader reader, AssetId id, const SequenceLayout& layout,
+                                              std::vector<Diagnostic>* diagnostics) {
   SequenceProgram program = sequenceConfig().makeProgram();
   program.timebase.ppqn = layout.midiBlocks.front().ppqn;
   program.runtime = sequenceRuntime();
@@ -1145,112 +1248,27 @@ std::optional<SequenceProgram> parseSongSequence(ByteReader reader, AssetId id, 
       return left.address.value < right.address.value;
     });
   }
+  return program;
+}
 
-  SectionPlaylist playlist;
-  u8 songVolume = 128;
-  u8 songPan = 64;
-  u8 songTempo = 120;
-  bool hasPrefixState = false;
-  bool hasPlaybackCommand = false;
-  bool hasRepeat = false;
-  bool unsupported = false;
-  bool mixedTimebase = false;
-  std::optional<u16> selectedPpqn;
-  u32 cursor = songOffset;
-  while (cursor + 3 <= songEnd && playlist.commands.size() < 4096) {
-    const u32 commandOffset = cursor;
-    const u8 family = reader.u8At(cursor++);
-    const u8 operation = reader.u8At(cursor++);
-    const u8 value = reader.u8At(cursor++);
-    if (family == 0xa0 && operation >= 1 && operation <= 6) {
-      if (hasPlaybackCommand) {
-        unsupported = true;
-        break;
-      }
-      hasPrefixState = true;
-      if (operation <= 3) {
-        const int updated = operation == 1   ? value
-                            : operation == 2 ? static_cast<int>(songVolume) + value
-                                             : static_cast<int>(songVolume) - value;
-        songVolume = static_cast<u8>(std::clamp(updated, 0, 128));
-      } else {
-        const int updated = operation == 4   ? value
-                            : operation == 5 ? static_cast<int>(songPan) + value
-                                             : static_cast<int>(songPan) - value;
-        songPan = static_cast<u8>(std::clamp(updated, 0, 127));
-      }
-      continue;
-    }
-    if (family == 0xa0 && operation >= 0x21 && operation <= 0x23) {
-      if (hasPlaybackCommand) {
-        unsupported = true;
-        break;
-      }
-      hasPrefixState = true;
-      const int updated = operation == 0x21   ? value
-                          : operation == 0x22 ? static_cast<int>(songTempo) + value
-                                              : static_cast<int>(songTempo) - value;
-      songTempo = static_cast<u8>(std::clamp(updated, 10, 255));
-      continue;
-    }
-    const auto midi = std::ranges::find(layout.midiBlocks, value, &MidiBlockLayout::index);
-    if (family == 0xa0 && operation == 0 && midi != layout.midiBlocks.end()) {
-      hasPlaybackCommand = true;
-      if (selectedPpqn && *selectedPpqn != midi->ppqn) {
-        mixedTimebase = true;
-      } else {
-        selectedPpqn = midi->ppqn;
-      }
-      if (playlist.commands.empty()) {
-        playlist.startAddress = Address{commandOffset};
-      }
-      PlaylistCommand command{
-          .address = Address{commandOffset},
-          .fallthrough = Address{cursor},
-          .range = reader.range(commandOffset, 3),
-          .kind = PlaylistCommandKind::PlaySection,
-          .target = Address{midi->dataOffset},
-          .trackStarts = std::vector<std::optional<Address>>(16, Address{midi->dataOffset}),
-      };
-      playlist.commands.push_back(std::move(command));
-      continue;
-    }
-    if (family == 0xa0 && operation == 0x11 && cursor + 3 <= songEnd && reader.u8At(cursor) == 0xa1) {
-      hasPlaybackCommand = true;
-      hasRepeat = true;
-      const u32 suffix = cursor;
-      const u16 relative = static_cast<u16>((reader.u8At(cursor + 1) << 8) | reader.u8At(cursor + 2));
-      cursor += 3;
-      playlist.commands.push_back(PlaylistCommand{
-          .address = Address{commandOffset},
-          .fallthrough = Address{cursor},
-          .range = reader.range(commandOffset, 6),
-          .kind = PlaylistCommandKind::Repeat,
-          .target = Address{songOffset + relative},
-          .additionalPlays = value,
-      });
-      (void)suffix;
-      continue;
-    }
-    if (family == 0xa0 && operation == 0x7f && value == 0x7f) {
-      hasPlaybackCommand = true;
-      playlist.commands.push_back(PlaylistCommand{
-          .address = Address{commandOffset},
-          .fallthrough = Address{cursor},
-          .range = reader.range(commandOffset, 3),
-          .kind = PlaylistCommandKind::End,
-      });
-      break;
-    }
-    unsupported = true;
-    break;
+}  // namespace
+
+std::optional<SequenceProgram> parseSongSequence(ByteReader reader, AssetId id, const SequenceLayout& layout,
+                                                 u32 songOffset, u32 songEnd, SourceMapBuilder* sourceMap,
+                                                 std::vector<Diagnostic>* diagnostics) {
+  if (layout.midiBlocks.empty() || songOffset >= songEnd) {
+    return std::nullopt;
   }
-  if (playlist.commands.empty() || unsupported || mixedTimebase || (hasPrefixState && hasRepeat) ||
-      playlist.commands.back().kind != PlaylistCommandKind::End) {
+
+  ParsedSongTable song = readSongTable(reader, layout, songOffset, songEnd);
+  const bool valid = !song.playlist.commands.empty() && !song.unsupported && !song.mixedTimebase &&
+                     !(song.hasPrefixState && song.hasRepeat) &&
+                     song.playlist.commands.back().kind == PlaylistCommandKind::End;
+  if (!valid) {
     if (diagnostics != nullptr) {
       diagnostics->push_back(Diagnostic{
           .severity = Severity::Warning,
-          .message = mixedTimebase
+          .message = song.mixedTimebase
                          ? "SonyPS2 Song selects MIDI blocks with different divisions; mixed timebases remain "
                            "source-only"
                          : "SonyPS2 Song uses fades, clears, state changes between MIDI sections, or malformed "
@@ -1260,18 +1278,17 @@ std::optional<SequenceProgram> parseSongSequence(ByteReader reader, AssetId id, 
     }
     return std::nullopt;
   }
-  if (hasPrefixState) {
-    if (songVolume != 128) {
-      program.behavior.initialMasterLevel = songVolume / 128.0;
+
+  SequenceProgram program = makeSongProgram(reader, id, layout, diagnostics);
+  if (song.hasPrefixState) {
+    if (song.volume != 128) {
+      program.behavior.initialMasterLevel = song.volume / 128.0;
     }
-    if (songPan != 64) {
-      program.behavior.initialChannelPan = ChannelPan{
-          .position = panPositionFrom7Bit(songPan),
-          .voicePanLaw = PanLaw::ConstantMaximum,
-      };
+    if (song.pan != 64) {
+      program.behavior.initialChannelPan = panPositionFrom7Bit(song.pan);
     }
-    if (songTempo != 120) {
-      program.behavior.initialTempoMicrosecondsPerQuarter = static_cast<u32>(std::llround(60000000.0 / songTempo));
+    if (song.tempo != 120) {
+      program.behavior.initialTempoMicrosecondsPerQuarter = static_cast<u32>(std::llround(60000000.0 / song.tempo));
     }
   }
   if (sourceMap != nullptr) {
@@ -1279,8 +1296,8 @@ std::optional<SequenceProgram> parseSongSequence(ByteReader reader, AssetId id, 
         .kind("sony-ps2-song-table")
         .owner(ObjectRefs::sequence(id));
   }
-  program.timebase.ppqn = selectedPpqn.value_or(program.timebase.ppqn);
-  program.sectionPlaylist = std::move(playlist);
+  program.timebase.ppqn = song.ppqn.value_or(program.timebase.ppqn);
+  program.sectionPlaylist = std::move(song.playlist);
   return program;
 }
 
@@ -1304,10 +1321,8 @@ std::optional<SequenceProgram> parseSeSequence(ByteReader reader, AssetId id, co
   program.timebase.ppqn = layout.ppqn;
   program.behavior.initialTempoMicrosecondsPerQuarter = 1000000;
   program.behavior.initialLevel = std::min<u8>(layout.volume, 128) / 128.0;
-  program.behavior.initialChannelPan = ChannelPan{
-      .position = panPositionFrom7Bit(static_cast<u8>(std::clamp<int>(std::abs(layout.pan), 0, 127))),
-      .voicePanLaw = PanLaw::ConstantMaximum,
-  };
+  program.behavior.initialChannelPan =
+      panPositionFrom7Bit(static_cast<u8>(std::clamp<int>(std::abs(layout.pan), 0, 127)));
   program.runtime = sequenceRuntime();
   std::map<u32, const SeEvent*> byOffset;
   for (const auto& event : events) {

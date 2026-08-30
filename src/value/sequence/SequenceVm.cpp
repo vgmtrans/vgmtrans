@@ -240,8 +240,7 @@ void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavio
   if (behavior.initialChannelPan) {
     track.events.emplace_back(ChannelPanPerformanceEvent{
         .header = header,
-        .position = behavior.initialChannelPan->position,
-        .voicePanLaw = behavior.initialChannelPan->voicePanLaw,
+        .position = *behavior.initialChannelPan,
     });
   }
   if (behavior.initialStereoBalance) {

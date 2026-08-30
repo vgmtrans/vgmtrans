@@ -175,8 +175,6 @@ struct LoweredStereoBalance {
       const double rightGain = (position + 1.0) / 2.0;
       return lowerStereoBalance(1.0 - rightGain, rightGain);
     }
-    case PanLaw::ConstantMaximum:
-      return position < 0.0 ? lowerStereoBalance(1.0, position + 1.0) : lowerStereoBalance(1.0 - position, 1.0);
     case PanLaw::EqualPower:
       return LoweredStereoBalance{
           .pan = midiPan(position),
@@ -459,18 +457,6 @@ struct VoicePitchBendRangeChange {
   return timelines;
 }
 
-[[nodiscard]] double maximumPanLawGain(PanLaw law) {
-  switch (law) {
-    case PanLaw::ConstantMaximum:
-      return std::sqrt(2.0);
-    case PanLaw::ConstantSum:
-    case PanLaw::EqualPower:
-    case PanLaw::Unspecified:
-      return 1.0;
-  }
-  throw std::logic_error("Unknown pan law");
-}
-
 // MIDI CC7/CC11 cannot encode gain above unity. Reserve the minimum uniform
 // sequence-wide headroom needed by source pan laws so every track keeps its
 // relative level and source expression remains unclipped.
@@ -484,31 +470,21 @@ struct VoicePitchBendRangeChange {
 
   for (const auto& timeline : timelines) {
     double sourcePanLinearGain = 1.0;
-    PanLaw sourcePanLaw = PanLaw::Unspecified;
-    PanLaw lfoPanLaw = PanLaw::Unspecified;
     for (const PerformanceEvent* event : timeline) {
       if (const auto* pan = std::get_if<PanPerformanceEvent>(event)) {
         sourcePanLinearGain = pan->hasLinearGain ? pan->linearGain : 1.0;
-        sourcePanLaw = pan->law;
         observe(lowerPositionalPan(pan->law, pan->stereoPosition).gain * sourcePanLinearGain);
       } else if (const auto* balance = std::get_if<StereoBalancePerformanceEvent>(event)) {
         const double left = std::abs(balance->leftGain);
         const double right = std::abs(balance->rightGain);
         sourcePanLinearGain = left + right;
-        sourcePanLaw = PanLaw::Unspecified;
         observe(lowerStereoBalance(left, right).gain);
       } else if (std::holds_alternative<ChannelPanPerformanceEvent>(*event)) {
         sourcePanLinearGain = 1.0;
-        sourcePanLaw = PanLaw::Unspecified;
-        lfoPanLaw = PanLaw::Unspecified;
       } else if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(event);
                  modulation != nullptr && (modulation->target == ModulationPerformanceTarget::PanDepth ||
                                            modulation->target == ModulationPerformanceTarget::PanRate)) {
-        if (modulation->context.panLaw != PanLaw::Unspecified) {
-          lfoPanLaw = modulation->context.panLaw;
-        }
-        const PanLaw law = lfoPanLaw != PanLaw::Unspecified ? lfoPanLaw : sourcePanLaw;
-        observe(maximumPanLawGain(law) * sourcePanLinearGain);
+        observe(sourcePanLinearGain);
       }
     }
   }

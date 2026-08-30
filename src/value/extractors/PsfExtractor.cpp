@@ -401,26 +401,33 @@ void loadPsf2WithLibs(const PsfData& psf, const std::filesystem::path& basePath,
                       std::vector<Psf2Member>& filesystem, std::vector<Diagnostic>& diagnostics, SourceRange range,
                       int depth = 0);
 
-void tryOpenPsf2Lib(const std::filesystem::path& basePath, const std::string& libName,
-                    std::vector<Psf2Member>& filesystem, std::vector<Diagnostic>& diagnostics, SourceRange range,
-                    int depth) {
+template <class Load>
+void tryOpenLibrary(const std::filesystem::path& basePath, std::string libName, std::string_view kind,
+                    std::vector<Diagnostic>& diagnostics, SourceRange range, Load&& load) {
   if (basePath.empty()) {
-    diagnostics.push_back(warning("PSF2 library could not be resolved without a source path: " + libName, range));
+    diagnostics.push_back(
+        warning(std::string(kind) + " library could not be resolved without a source path: " + libName, range));
     return;
   }
 
-  std::string normalizedName = libName;
-  std::ranges::replace(normalizedName, '\\', '/');
-  const auto libPath = basePath / normalizedName;
+  std::ranges::replace(libName, '\\', '/');
+  const auto libPath = basePath / libName;
   try {
-    const auto bytes = readFile(libPath);
-    const auto library = parsePsf(bytes);
-    if (library.version != kPsf2Version) {
-      throw std::runtime_error("referenced file is not a PSF2 library");
-    }
-    loadPsf2WithLibs(library, libPath.parent_path(), filesystem, diagnostics, range, depth + 1);
+    load(parsePsf(readFile(libPath)), libPath.parent_path());
   } catch (const std::exception& ex) {
-    diagnostics.push_back(warning("PSF2 library could not be loaded: " + libPath.string() + ": " + ex.what(), range));
+    diagnostics.push_back(
+        warning(std::string(kind) + " library could not be loaded: " + libPath.string() + ": " + ex.what(), range));
+  }
+}
+
+template <class Load>
+void loadNumberedLibraries(const PsfData& psf, Load&& load) {
+  for (int i = 2;; ++i) {
+    const auto found = psf.tags.find("_lib" + std::to_string(i));
+    if (found == psf.tags.end()) {
+      return;
+    }
+    load(found->second);
   }
 }
 
@@ -432,37 +439,23 @@ void loadPsf2WithLibs(const PsfData& psf, const std::filesystem::path& basePath,
     return;
   }
 
+  const auto loadLibrary = [&](const std::string& name) {
+    tryOpenLibrary(basePath, name, "PSF2", diagnostics, range,
+                   [&](const PsfData& library, const std::filesystem::path& libraryBase) {
+                     if (library.version != kPsf2Version) {
+                       throw std::runtime_error("referenced file is not a PSF2 library");
+                     }
+                     loadPsf2WithLibs(library, libraryBase, filesystem, diagnostics, range, depth + 1);
+                   });
+  };
   if (const auto lib = primaryLibName(psf)) {
-    tryOpenPsf2Lib(basePath, *lib, filesystem, diagnostics, range, depth);
+    loadLibrary(*lib);
   }
-  for (int i = 2;; ++i) {
-    const auto found = psf.tags.find("_lib" + std::to_string(i));
-    if (found == psf.tags.end()) {
-      break;
-    }
-    tryOpenPsf2Lib(basePath, found->second, filesystem, diagnostics, range, depth);
-  }
+  loadNumberedLibraries(psf, loadLibrary);
 
   // PSF2 libraries form a case-insensitive filesystem overlay: every library
   // is loaded first, then the referring mini replaces conflicting members.
   overlayPsf2(filesystem, unpackPsf2(psf.reserved));
-}
-
-void tryOpenLib(const std::filesystem::path& basePath, const std::string& libName, Image& image,
-                std::vector<Diagnostic>& diagnostics, SourceRange range, int depth) {
-  if (basePath.empty()) {
-    diagnostics.push_back(warning("PSF library could not be resolved without a source path: " + libName, range));
-    return;
-  }
-
-  const auto libPath = basePath / libName;
-  try {
-    const auto bytes = readFile(libPath);
-    const auto libPsf = parsePsf(bytes);
-    loadWithLibs(libPsf, libPath.parent_path(), image, diagnostics, range, depth + 1);
-  } catch (const std::exception& ex) {
-    diagnostics.push_back(warning("PSF library could not be loaded: " + libPath.string() + ": " + ex.what(), range));
-  }
 }
 
 void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Image& image,
@@ -474,20 +467,18 @@ void loadWithLibs(const PsfData& psf, const std::filesystem::path& basePath, Ima
     return;
   }
 
+  const auto loadLibrary = [&](const std::string& name) {
+    tryOpenLibrary(basePath, name, "PSF", diagnostics, range,
+                   [&](const PsfData& library, const std::filesystem::path& libraryBase) {
+                     loadWithLibs(library, libraryBase, image, diagnostics, range, depth + 1);
+                   });
+  };
   if (const auto lib = primaryLibName(psf)) {
-    tryOpenLib(basePath, *lib, image, diagnostics, range, depth);
+    loadLibrary(*lib);
   }
 
   overlayPsfExe(psf, image);
-
-  for (int i = 2;; ++i) {
-    const auto key = "_lib" + std::to_string(i);
-    const auto found = psf.tags.find(key);
-    if (found == psf.tags.end()) {
-      break;
-    }
-    tryOpenLib(basePath, found->second, image, diagnostics, range, depth);
-  }
+  loadNumberedLibraries(psf, loadLibrary);
 }
 
 [[nodiscard]] std::string sourceName(const SourceFile& source) {
