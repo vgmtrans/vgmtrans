@@ -312,7 +312,8 @@ struct Playback {
       return;
     }
     const u16 pointers = layout().pitchPointerTable(reader());
-    const u32 entry = pointers + index * 2u;
+    // The driver doubles the index with ASL A, discarding its high bit.
+    const u32 entry = pointers + static_cast<u8>(index << 1);
     if (!reader().has(entry, 2) || !reader().has(reader().le16(entry), 1)) {
       track.pitchTable = 0;
       emitPitchBend(0.0);

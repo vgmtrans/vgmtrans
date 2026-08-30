@@ -59,8 +59,10 @@ public:
     word(0xdd00, 0xdd20);
     word(0xdd02, 0xdd23);
     write(0xdd20, {0xff, 0xe0, 0x1f, 0xf2, 0xe0, 0x0a});
+    word(0xde00, 0xde40);
     word(0xde02, 0xde20);
     write(0xde20, {0x64, 0x68, 0x64, 0x60, 0xf4, 0x00});
+    write(0xde40, {0x64, 0xf0});
     write(0xdf00, {4, 1, 0xc0, 0x88, 0x30});
     bigWord(0x11e0 + 3 * 2, 0x0700);
     bigWord(0x11e0 + 4 * 2, 0x0700);
@@ -204,6 +206,15 @@ void percussionPitchMappingIsAppliedExactlyOnce() {
          "percussion regions should own table key mapping while the sequence applies only transpose and fine tuning");
 }
 
+void pitchTableIndexUsesSpcAccumulatorWrapping() {
+  DriverFixture fixture(Version::WagyanParadise);
+  fixture.sequence({0x00, 1, 0x01, 0x80, 0x24, 0x80, 0x80, 0x09, 0x80, 0x30, 0x03});
+  const auto bends = events<PitchBendPerformanceEvent>(render(fixture).tracks[0]);
+
+  expect(bends.size() == 1 && bends.front()->semitones == 0.0,
+         "pitch table index $80 should alias index zero like the driver's eight-bit ASL A");
+}
+
 void attacksFollowThePhysicalVoiceLifecycle() {
   DriverFixture fixture(Version::WagyanParadise);
   fixture.sequence({0x00, 4, 0x01, 0x80, 0x0b, 0x80, 2,    0x09, 0x80, 0x30,
@@ -241,6 +252,7 @@ void runNamcoSnesModuleTests() {
   layoutsCoverAllAuditedDriverRelocations();
   interleavedRuntimePreservesDynamicDriverFeatures();
   percussionPitchMappingIsAppliedExactlyOnce();
+  pitchTableIndexUsesSpcAccumulatorWrapping();
   attacksFollowThePhysicalVoiceLifecycle();
   bothRepeatCountersFollowTheSharedIncrementRules();
 }
