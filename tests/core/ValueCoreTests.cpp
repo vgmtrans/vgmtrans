@@ -43,6 +43,7 @@ void runAsciiShuichiSnesModuleTests();
 void runPrismSnesModuleTests();
 void runHudsonSnesModuleTests();
 void runItikitiSnesModuleTests();
+void runMoriSnesModuleTests();
 void runSoftCreatSnesModuleTests();
 void runCompileSnesModuleTests();
 void runWolfTeamSnesModuleTests();
@@ -251,6 +252,7 @@ int main() {
     runAsciiShuichiSnesModuleTests();
     runHudsonSnesModuleTests();
     runItikitiSnesModuleTests();
+    runMoriSnesModuleTests();
     runSoftCreatSnesModuleTests();
     runNeverlandSnesModuleTests();
     runPandoraBoxSnesModuleTests();

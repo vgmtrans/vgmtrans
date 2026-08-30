@@ -9,6 +9,7 @@ target_sources(vgmtrans-value-core-tests
     formats/HeartBeatSnesModuleTests.cpp
     formats/HudsonSnesModuleTests.cpp
     formats/ItikitiSnesModuleTests.cpp
+    formats/MoriSnesModuleTests.cpp
     formats/CpsModuleTests.cpp
     formats/KonamiArcadeModuleTests.cpp
     formats/KonamiTMNT2ModuleTests.cpp
