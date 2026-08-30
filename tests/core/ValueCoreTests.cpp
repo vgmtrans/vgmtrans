@@ -32,6 +32,8 @@ void runTriAcePs1ModuleTests();
 void runSuzukiSnesModuleTests();
 void runFalcomSnesModuleTests();
 void runHeartBeatSnesModuleTests();
+void heartBeatPs1SequenceModelsAuditedDriverFeatures();
+void heartBeatPs1ModuleBuildsEmbeddedWaveBank();
 void runAsciiShuichiSnesModuleTests();
 void runPrismSnesModuleTests();
 void runHudsonSnesModuleTests();
@@ -422,6 +424,8 @@ int main() {
     segSatSsfExtractorUsesFourByteMiniHeader();
     suzukiPs1DynamicAdsrUsesAuditedDriverCommands();
     suzukiPs1ModuleBuildsFractionallyTunedWdsSynth();
+    heartBeatPs1SequenceModelsAuditedDriverFeatures();
+    heartBeatPs1ModuleBuildsEmbeddedWaveBank();
     runTriAcePs1ModuleTests();
     runWolfTeamSnesModuleTests();
   } catch (const std::exception& ex) {
