@@ -29,6 +29,7 @@ namespace {
 constexpr u32 kPpqn = 48;
 constexpr u32 kMaxCommands = 262144;
 constexpr u32 kSequenceHeaderSize = 0xd6;
+constexpr PerformanceLaneId kHarmonyLane{1};
 constexpr std::array<u8, 0x1f> kCommandSize{
     1, 3, 3, 4, 3, 3, 3, 3, 3, 3, 3, 0, 0, 1, 2, 2, 3, 3, 3, 3, 5, 3, 3, 6, 0, 3, 3, 7, 0, 0, 3,
 };
@@ -43,6 +44,13 @@ constexpr std::array<u8, 0x1f> kCommandSize{
 
 [[nodiscard]] double panController(u8 value) {
   return std::min<u8>(value, 127) / 127.0;
+}
+
+[[nodiscard]] u8 combinedVoicePan(u8 channelPan, u8 intrinsicPan) {
+  const int channel = std::min<u8>(channelPan, 127);
+  const int intrinsic = std::min<u8>(intrinsicPan, 127);
+  const int influence = std::min(channel, 128 - channel);
+  return static_cast<u8>(channel + (intrinsic - 64) * influence / 64);
 }
 
 [[nodiscard]] u32 tempoMicros(double bpm) {
@@ -144,6 +152,56 @@ struct RuntimeConfig {
 struct ProgramState {
   explicit ProgramState(const RuntimeConfig& config) : baseTempo(config.layout.tempo) {}
 
+  void finalizePerformance(PerformanceSequence& performance) {
+    const auto belongsToHarmony = [](const PerformanceEvent& event) {
+      if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+        return note->lane == kHarmonyLane;
+      }
+      if (const auto* pan = std::get_if<ChannelPanPerformanceEvent>(&event)) {
+        return pan->lane == kHarmonyLane;
+      }
+      return false;
+    };
+    std::vector<PerformanceTrack> harmonyTracks;
+    for (auto& source : performance.tracks) {
+      const bool hasHarmony = std::ranges::any_of(source.events, [](const PerformanceEvent& event) {
+        const auto* note = std::get_if<NotePerformanceEvent>(&event);
+        return note != nullptr && note->lane == kHarmonyLane;
+      });
+      if (!hasHarmony) {
+        std::erase_if(source.events, belongsToHarmony);
+        continue;
+      }
+
+      PerformanceTrack harmony = source;
+      std::erase_if(source.events, belongsToHarmony);
+      std::erase_if(harmony.events, [&](const PerformanceEvent& event) {
+        return (std::holds_alternative<NotePerformanceEvent>(event) ||
+                std::holds_alternative<ChannelPanPerformanceEvent>(event)) &&
+               !belongsToHarmony(event);
+      });
+      for (auto& event : harmony.events) {
+        if (auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+          note->lane = PerformanceLaneId{0};
+        } else if (auto* pan = std::get_if<ChannelPanPerformanceEvent>(&event)) {
+          pan->lane = PerformanceLaneId{0};
+        }
+      }
+      harmonyTracks.push_back(std::move(harmony));
+    }
+
+    for (auto& harmony : harmonyTracks) {
+      harmony.id = TrackId{static_cast<u32>(performance.tracks.size())};
+      for (auto& event : harmony.events) {
+        std::visit([&](auto& typed) { typed.header.track = harmony.id; }, event);
+      }
+      for (auto& automation : harmony.automations) {
+        automation.header.track = harmony.id;
+      }
+      performance.tracks.push_back(std::move(harmony));
+    }
+  }
+
   [[nodiscard]] s8 randomFineTune() {
     const u16 old = randomCurrent;
     randomCurrent = static_cast<u16>(randomPrevious + old + 0x3711);
@@ -159,12 +217,18 @@ struct ProgramState {
   u16 randomCurrent = 0;
 };
 
-struct Harmony {
-  bool enabled = false;
+struct HarmonyParameters {
   u8 delay = 0;
   s8 transpose = 0;
   s8 fine = 0;
   u8 volume = 127;
+  u8 pan = 64;
+};
+
+struct Harmony {
+  bool enabled = false;
+  HarmonyParameters parameters;
+  HarmonyParameters active;
 };
 
 struct ActiveVoice {
@@ -203,6 +267,7 @@ struct TrackState {
   bool automaticVibrato = false;
   bool randomPitch = false;
   bool sustainDown = false;
+  u8 channelPan = 64;
   Harmony harmony;
   std::vector<ActiveVoice> activeVoices;
 };
@@ -318,15 +383,16 @@ struct Playback {
       continued->sustained = track.sustainDown;
     }
     if (track.harmony.enabled) {
+      const HarmonyParameters& harmony = track.harmony.active;
       const s8 harmonyRandom = track.randomPitch ? program.randomFineTune() : 0;
-      const double harmonyKey = key + track.harmony.transpose + (track.harmony.fine + harmonyRandom) / 64.0;
-      out.at(tick + track.harmony.delay)
+      const double harmonyKey = key + harmony.transpose + (harmony.fine + harmonyRandom) / 64.0;
+      out.at(tick + harmony.delay)
           .note(NotePerformanceEvent{
               .key = harmonyKey,
-              .linearVelocity = linearController(velocity) * linearController(track.harmony.volume),
+              .linearVelocity = linearController(velocity) * linearController(harmony.volume),
               .durationTicks = duration,
               .restartsVibratoLfoPhase = track.automaticVibrato,
-              .lane = PerformanceLaneId{1},
+              .lane = kHarmonyLane,
           });
     }
     return Effects::wait(delta);
@@ -436,6 +502,19 @@ struct Playback {
 
   void fineTune(s8 value) { out.tuning(value * (100.0 / 64.0)); }
 
+  void channelPan(u8 value) {
+    track.channelPan = value;
+    out.channelPan(panController(value));
+    if (track.harmony.enabled) {
+      const HarmonyParameters& harmony = track.harmony.active;
+      out.at(vm.tick() + harmony.delay)
+          .channelPan(ChannelPanPerformanceEvent{
+              .position = panController(combinedVoicePan(value, harmony.pan)),
+              .lane = kHarmonyLane,
+          });
+    }
+  }
+
   void bendRange(u8 semitones) {
     track.bendRange = semitones;
     out.pitchBendRange(semitones);
@@ -447,13 +526,27 @@ struct Playback {
 
   void randomPitch(bool enabled) { track.randomPitch = enabled; }
 
-  void harmonyEnabled(bool enabled) { track.harmony.enabled = enabled; }
+  void harmonyEnabled(bool enabled) {
+    if (enabled && !track.harmony.enabled) {
+      track.harmony.active = track.harmony.parameters;
+      const HarmonyParameters& harmony = track.harmony.active;
+      out.at(vm.tick() + harmony.delay)
+          .channelPan(ChannelPanPerformanceEvent{
+              .position = panController(combinedVoicePan(track.channelPan, harmony.pan)),
+              .lane = kHarmonyLane,
+          });
+    }
+    track.harmony.enabled = enabled;
+  }
 
-  void harmonyParameters(u8 delay, s8 transpose, s8 fine, u8 volume, u8) {
-    track.harmony.delay = delay;
-    track.harmony.transpose = transpose;
-    track.harmony.fine = fine;
-    track.harmony.volume = volume;
+  void harmonyParameters(u8 delay, s8 transpose, s8 fine, u8 volume, u8 pan) {
+    track.harmony.parameters = HarmonyParameters{
+        .delay = delay,
+        .transpose = transpose,
+        .fine = fine,
+        .volume = volume,
+        .pan = pan,
+    };
   }
 };
 
@@ -535,8 +628,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
       const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
       const u8 value = event.u8("pan", SemanticOperandRole::Pan);
-      return event.invoke([position = panController(value)](Playback& playback) { playback.out.channelPan(position); })
-          .wait(delta);
+      return event.invoke<&Playback::channelPan>(value).wait(delta);
     }
     case 0x88: {
       auto event = cursor.command("Manual Vibrato Depth", SequenceSemantic::Modulation);
