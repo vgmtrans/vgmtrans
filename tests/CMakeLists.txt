@@ -16,6 +16,7 @@ target_sources(vgmtrans-value-core-tests
     formats/Mp2kModuleTests.cpp
     formats/NeverlandSnesModuleTests.cpp
     formats/NinSnesModuleTests.cpp
+    formats/OhoriAkaPS1ModuleTests.cpp
     formats/PrismSnesModuleTests.cpp
     formats/RareSnesModuleTests.cpp
     formats/AkaoSnesModuleTests.cpp

@@ -317,6 +317,10 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesProfile.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/OhoriAkaPS1/OhoriAkaPS1Layout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/OhoriAkaPS1/OhoriAkaPS1Module.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/OhoriAkaPS1/OhoriAkaPS1Sequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/OhoriAkaPS1/OhoriAkaPS1Synth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/PrismSnes/PrismSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/PrismSnes/PrismSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/PrismSnes/PrismSnesSequence.cpp
@@ -398,6 +402,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2k.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NeverlandSnes/NeverlandSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/OhoriAkaPS1/OhoriAkaPS1.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/PrismSnes/PrismSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/RareSnes/RareSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/Nds.h
