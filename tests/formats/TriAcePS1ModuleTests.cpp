@@ -71,31 +71,25 @@ std::vector<u8> slzWithImplicitTail(std::vector<u8> decoded) {
   return slz;
 }
 
-std::vector<u8> sequenceFixture(const std::vector<u8>& first, const std::vector<u8>& second = {}) {
+std::vector<u8> sequenceFixture(const std::vector<std::vector<u8>>& patterns) {
   constexpr u16 playlist = 0xd6;
-  constexpr u16 firstPattern = 0xdc;
-  const u16 secondPattern = static_cast<u16>(firstPattern + first.size());
-  std::vector<u8> bytes(secondPattern + second.size(), 0);
+  std::vector<u8> bytes(playlist + (patterns.size() + 1) * 2, 0);
   le16(bytes, 0, 0xffff);
-  le16(bytes, 2, static_cast<u16>(bytes.size() - 2));
   bytes[0x0f] = 80;
   bytes[0x10] = 4;
   bytes[0x11] = 4;
   le16(bytes, 0x16 + 4, playlist);
-  le16(bytes, playlist, firstPattern);
-  if (second.empty()) {
-    le16(bytes, playlist + 2, 0xffff);
-  } else {
-    le16(bytes, playlist + 2, secondPattern);
-    le16(bytes, playlist + 4, 0xffff);
+  for (size_t index = 0; index < patterns.size(); ++index) {
+    le16(bytes, playlist + index * 2, static_cast<u16>(bytes.size()));
+    bytes.insert(bytes.end(), patterns[index].begin(), patterns[index].end());
   }
-  std::ranges::copy(first, bytes.begin() + firstPattern);
-  std::ranges::copy(second, bytes.begin() + secondPattern);
+  le16(bytes, playlist + patterns.size() * 2, 0xffff);
+  le16(bytes, 2, static_cast<u16>(bytes.size() - 2));
   return bytes;
 }
 
 std::vector<u8> scannerFixture() {
-  const auto slz = slzWithImplicitTail(sequenceFixture({
+  const auto slz = slzWithImplicitTail(sequenceFixture({{
       0x83,
       0,
       0x12,
@@ -106,7 +100,7 @@ std::vector<u8> scannerFixture() {
       60,
       4,
       0x80,
-  }));
+  }}));
   constexpr u32 bankOffset = 0x1000;
   constexpr u32 instrumentSectionSize = 44;
   constexpr u32 sampleSize = 0x100;
@@ -145,7 +139,7 @@ std::vector<const Event*> eventsOfType(const PerformanceTrack& track) {
 }  // namespace
 
 void triAcePs1SequenceExecutesAuditedDriverFeatures() {
-  const auto bytes = sequenceFixture(
+  const auto bytes = sequenceFixture({
       {
           0x83, 0, 0x12, 3,                 // native instrument and ADSR
           0x94, 0, 2,    4,    8,           // automatic vibrato parameters
@@ -158,11 +152,18 @@ void triAcePs1SequenceExecutesAuditedDriverFeatures() {
           0x84, 0, 32,                      // +2 semitones
           0x9e, 2, 100,                     // both note fields implied
           0x8d,                             // repeat begin
-          60,   1,                          // repeated note
-          0x8e, 2,                          // two total plays
           0x80,
       },
       {
+          60,
+          1,
+          2,
+          100,  // repeated note; each pattern restores explicit note fields
+          0x80,
+      },
+      {
+          0x8e,
+          2,  // repeat end is deliberately in another playlist pattern
           61,
           1,
           2,
@@ -174,7 +175,8 @@ void triAcePs1SequenceExecutesAuditedDriverFeatures() {
           0,
           0,
           0x80,
-      });
+      },
+  });
   const ByteReader reader(SourceId{91}, bytes);
   const auto layout = readTriAcePs1SequenceLayout(reader, 0);
   expect(layout.has_value(), "TriAcePS1 sequence fixture should have a valid layout");
@@ -184,7 +186,8 @@ void triAcePs1SequenceExecutesAuditedDriverFeatures() {
   const PerformanceTrack& track = performance.tracks.front();
   const auto notes = eventsOfType<NotePerformanceEvent>(track);
   expect(notes.size() == 3 && notes[0]->key == 60.0 && notes[1]->key == 60.0 && notes[2]->key == 61.0,
-         "repeat flow and the pattern playlist should render all three notes");
+         "repeat flow and the pattern playlist should render all three notes (notes=" + std::to_string(notes.size()) +
+             ")");
   expect(notes[1]->extendsPrevious && notes[2]->durationTicks == 4,
          "active same-key notes should extend without another attack, and sustain should defer their release");
 
@@ -220,6 +223,34 @@ void triAcePs1SequenceExecutesAuditedDriverFeatures() {
   });
   expect(reverbs.size() >= 3 && invertedReverb != reverbs.end(),
          "track send, global depth, and signed reverb phase should all be preserved");
+
+  const auto loopingBytes = sequenceFixture({
+      {
+          0x8d,
+          60,
+          1,
+          1,
+          100,
+          0x80,
+      },
+      {
+          0x8e,
+          0,  // 256 hardware plays form a practical song loop
+          0x80,
+      },
+  });
+  const ByteReader loopingReader(SourceId{92}, loopingBytes);
+  const auto loopingLayout = readTriAcePs1SequenceLayout(loopingReader, 0);
+  expect(loopingLayout.has_value(), "TriAcePS1 loop fixture should have a valid layout");
+  const SequenceProgram loopingProgram = parseTriAcePs1Sequence(loopingReader, AssetId{92}, *loopingLayout);
+  const PerformanceSequence looped = SequenceVm(SequenceVmOptions{
+                                                    .loopPolicy = LoopPolicy::PlayOnce,
+                                                    .sequenceLoops = 1,
+                                                })
+                                         .render(loopingProgram);
+  expect(looped.diagnostics.empty(), "TriAcePS1 practical loop should render without diagnostics");
+  expect(eventsOfType<NotePerformanceEvent>(looped.tracks.front()).size() == 2,
+         "a zero repeat count should follow the requested sequence loop policy");
 }
 
 void triAcePs1ExtractorAndModuleBuildSelfContainedCollection() {
