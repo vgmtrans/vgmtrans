@@ -1405,6 +1405,35 @@ void performanceMidiRendererPreservesExactSamplesAndChainedPitchContinuity() {
          "queued pitch transitions should remain continuous at their shared boundary");
 }
 
+void performanceMidiRendererKeepsSampledPitchCurvesSparse() {
+  PerformanceTrack track{
+      .id = TrackId{0},
+      .sourceTrackNumber = 0,
+      .endTick = 8,
+  };
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track, CommandId{4}, SourceAnnotationId{5}, 0, nextSequence, nextNote, nextAutomation};
+  const PerformanceNoteId note = out.note(60, 1.0, 8);
+  out.pitchSlide(note, 60, 62, 6).sample(out.at(4), 61);
+
+  const MidiSequence midi = renderMidiSequence(PerformanceSequence{
+      .timebase = Timebase{.ppqn = 48},
+      .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
+      .tracks = {track},
+  });
+  std::vector<u64> bendTicks;
+  for (const MidiEvent& event : midi.tracks.front().events) {
+    if (midiChannelMessage(event, MidiChannelMessageKind::PitchBend) != nullptr) {
+      bendTicks.push_back(event.tick);
+    }
+  }
+  expect(std::ranges::find(bendTicks, 4) != bendTicks.end() && std::ranges::find(bendTicks, 6) != bendTicks.end() &&
+             std::ranges::none_of(bendTicks, [](u64 tick) { return tick == 1 || tick == 2 || tick == 3 || tick == 5; }),
+         "sampled pitch curves should emit their actual changes without redundant per-tick bend writes");
+}
+
 void performanceMidiRendererResetsInterruptedPitchBeforeTheNewNote() {
   PerformanceTrack track{
       .id = TrackId{0},
@@ -3074,6 +3103,7 @@ void runValueMidiTests() {
   performanceMidiRendererUsesWholeSemitonePitchBendRanges();
   performanceMidiRendererDoesNotRestartVibratoAtAHeldPitchSlideBoundary();
   performanceMidiRendererPreservesExactSamplesAndChainedPitchContinuity();
+  performanceMidiRendererKeepsSampledPitchCurvesSparse();
   performanceMidiRendererResetsInterruptedPitchBeforeTheNewNote();
   performanceMidiRendererDefersPitchResetUntilTheNextAttack();
   performanceMidiLoweringAppliesPitchResetsBeforeLaterTransitions();

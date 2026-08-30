@@ -362,14 +362,13 @@ void includeRange(u32 begin, u32 size, u32& minimum, u32& maximum) {
   std::transform(first, last, std::back_inserter(pitch), [](const VoiceSample& sample) { return sample.pitch256; });
   const auto [minimumPitch, maximumPitch] = std::minmax_element(pitch.begin(), pitch.end());
   if (*minimumPitch != *maximumPitch) {
-    const s32 excursion = std::max(std::abs(*minimumPitch - script.attackPitch256),
-                                   std::abs(*maximumPitch - script.attackPitch256));
-    const auto changed = std::ranges::find_if(script.samples, [&](const VoiceSample& sample) {
-      return sample.pitch256 != script.attackPitch256;
+    const double center = (*minimumPitch + *maximumPitch) / 2.0;
+    const auto changed = std::find_if(first, last, [&](const VoiceSample& sample) {
+      return sample.pitch256 != center;
     });
-    const double delay = std::distance(script.samples.begin(), changed) * kTimerSeconds;
+    const double delay = (*script.cycleStart + std::distance(first, changed)) * kTimerSeconds;
     result.vibrato = VibratoSpec{
-        .maxDepthCents = excursion * (100.0 / 256.0),
+        .maxDepthCents = (*maximumPitch - *minimumPitch) * (50.0 / 256.0),
         .rateHertz = ModulationRange{.minimum = rate, .maximum = rate},
         .waveform = inferWaveform(pitch),
         .delaySeconds = ModulationRange{.minimum = delay, .maximum = delay},
@@ -387,10 +386,12 @@ void includeRange(u32 begin, u32 size, u32& minimum, u32& maximum) {
     };
     const double low = decibels(static_cast<u8>(*minimumVolume));
     const double high = decibels(static_cast<u8>(*maximumVolume));
-    const auto changed = std::ranges::find_if(script.samples, [&](const VoiceSample& sample) {
-      return sample.volume != script.attackVolume;
+    const u8 cycleBaseline = *script.cycleStart == 0 ? script.attackVolume
+                                                     : script.samples[*script.cycleStart - 1].volume;
+    const auto changed = std::find_if(first, last, [&](const VoiceSample& sample) {
+      return sample.volume != cycleBaseline;
     });
-    const double delay = std::distance(script.samples.begin(), changed) * kTimerSeconds;
+    const double delay = (*script.cycleStart + std::distance(first, changed)) * kTimerSeconds;
     result.tremolo = TremoloSpec{
         .maxDepthDb = std::max(std::abs(low), std::abs(high)),
         .rateHertz = ModulationRange{.minimum = rate, .maximum = rate},

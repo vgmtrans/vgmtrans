@@ -401,7 +401,7 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
                                         transition.previousNote ? 0.0 : transition.startKey - noteBaseKey));
   }
 
-  for (u64 tick = startTick;; ++tick) {
+  const auto appendAt = [&](u64 tick) {
     const u64 elapsed = tick - automation.realization.startTick;
     const double transitionBaseKey = transition.previousNote && !establishesHeldPitch
                                          ? transition.startKey
@@ -411,6 +411,35 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
         pitchTransitionValueAt(transition, static_cast<u32>(std::min<u64>(elapsed, std::numeric_limits<u32>::max()))) -
             transitionBaseKey,
         false, establishesHeldPitch));
+  };
+
+  if (const auto* sampled = std::get_if<SampledAutomationCurve>(&transition.curve)) {
+    std::vector<u64> sampleTicks{startTick, endTick};
+    sampleTicks.reserve(sampled->samples.size() + note.portamentoSegments.size() + 2);
+    for (const AutomationSample& sample : sampled->samples) {
+      const u64 tick = automation.realization.startTick > std::numeric_limits<u64>::max() - sample.tickOffset
+                           ? std::numeric_limits<u64>::max()
+                           : automation.realization.startTick + sample.tickOffset;
+      if (tick >= startTick && tick <= endTick) {
+        sampleTicks.push_back(tick);
+      }
+    }
+    for (const PortamentoSegment& segment : note.portamentoSegments) {
+      if (segment.startTick >= startTick && segment.startTick <= endTick) {
+        sampleTicks.push_back(segment.startTick);
+      }
+    }
+    std::ranges::sort(sampleTicks);
+    const auto uniqueEnd = std::ranges::unique(sampleTicks).begin();
+    sampleTicks.erase(uniqueEnd, sampleTicks.end());
+    for (const u64 tick : sampleTicks) {
+      appendAt(tick);
+    }
+    return true;
+  }
+
+  for (u64 tick = startTick;; ++tick) {
+    appendAt(tick);
     if (tick == endTick) {
       break;
     }

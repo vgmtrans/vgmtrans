@@ -168,6 +168,10 @@ struct VoiceLimits {
   u8 attackPan = kInitialPan;
   bool attackPanExplicit = false;
   bool looping = false;
+  std::optional<u32> cycleStart;
+  std::optional<double> cyclePitchCenter256;
+  bool cycleFineExplicit = false;
+  std::optional<u8> cycleVolume;
   std::vector<Point> points;
   std::vector<Attack> attacks;
 };
@@ -180,6 +184,24 @@ struct VoiceScriptFrame {
   friend bool operator<(const VoiceScriptFrame& left, const VoiceScriptFrame& right) {
     return std::tie(left.repeat, left.address, left.remaining) <
            std::tie(right.repeat, right.address, right.remaining);
+  }
+};
+
+struct VoiceScriptState {
+  u16 address = 0;
+  std::vector<VoiceScriptFrame> stack;
+  s32 pitch256 = 0;
+  bool fineExplicit = false;
+  u8 volume = 0xff;
+  u8 pan = kInitialPan;
+  bool panExplicit = false;
+  bool keyOn = false;
+
+  friend bool operator<(const VoiceScriptState& left, const VoiceScriptState& right) {
+    return std::tie(left.address, left.stack, left.pitch256, left.fineExplicit, left.volume, left.pan,
+                    left.panExplicit, left.keyOn) <
+           std::tie(right.address, right.stack, right.pitch256, right.fineExplicit, right.volume, right.pan,
+                    right.panExplicit, right.keyOn);
   }
 };
 
@@ -197,7 +219,7 @@ struct VoiceScriptFrame {
 
   VoiceLimits result;
   std::vector<VoiceScriptFrame> stack;
-  std::set<std::pair<u16, std::vector<VoiceScriptFrame>>> visited;
+  std::map<VoiceScriptState, u32> visited;
   std::optional<u32> keyOnTick;
   std::optional<size_t> activeAttack;
   u8 pan = kInitialPan;
@@ -225,8 +247,35 @@ struct VoiceScriptFrame {
     }
   };
   for (u32 commands = 0; commands < 4096; ++commands) {
-    if (!visited.emplace(pc, stack).second) {
+    const VoiceScriptState state{
+        .address = pc,
+        .stack = stack,
+        .pitch256 = pitch256,
+        .fineExplicit = fineExplicit,
+        .volume = volume,
+        .pan = pan,
+        .panExplicit = panExplicit,
+        .keyOn = keyOn,
+    };
+    const auto [prior, inserted] = visited.emplace(state, tick);
+    if (!inserted) {
       result.looping = true;
+      if (keyOn && keyOnTick && prior->second >= *keyOnTick && tick > prior->second) {
+        const u32 cycleBegin = prior->second - *keyOnTick;
+        const u32 cycleEnd = tick - *keyOnTick;
+        s32 minimumPitch = pitch256;
+        s32 maximumPitch = pitch256;
+        for (const VoiceLimits::Point& value : result.points) {
+          if (value.tick >= cycleBegin && value.tick < cycleEnd) {
+            minimumPitch = std::min(minimumPitch, value.pitch256);
+            maximumPitch = std::max(maximumPitch, value.pitch256);
+          }
+        }
+        result.cycleStart = cycleBegin;
+        result.cyclePitchCenter256 = (minimumPitch + maximumPitch) / 2.0;
+        result.cycleFineExplicit = fineExplicit;
+        result.cycleVolume = volume;
+      }
       break;
     }
     if (!reader.has(pc, 1)) {
@@ -398,24 +447,39 @@ struct VoiceScriptFrame {
   return result;
 }
 
-void emitFinitePitchScript(const VoiceLimits& script, PerformanceEmitter& out, PerformanceNoteId note,
+void emitVoicePitchChanges(const VoiceLimits& script, PerformanceEmitter& out, PerformanceNoteId note,
                            double key, double inheritedFine, u64 attackTick, u8 tempo) {
-  if (script.looping || script.attacks.size() != 1 || script.points.size() < 2) {
+  if (script.attacks.size() != 1) {
     return;
   }
 
-  const auto pointKey = [&](const VoiceLimits::Point& point) {
-    const double replacedFine = point.fineExplicit && !script.attackFineExplicit ? inheritedFine : 0.0;
-    return key + (point.pitch256 - script.attackPitch256) / 256.0 - replacedFine;
+  struct Change {
+    u32 tick = 0;
+    double key = 0.0;
   };
-  std::vector<const VoiceLimits::Point*> changes;
+
+  const auto pointKey = [&](double pitch256, bool fineExplicit) {
+    const double replacedFine = fineExplicit && !script.attackFineExplicit ? inheritedFine : 0.0;
+    return key + (pitch256 - script.attackPitch256) / 256.0 - replacedFine;
+  };
+  std::vector<Change> changes;
   s32 previous = script.attackPitch256;
   bool previousFineExplicit = script.attackFineExplicit;
   for (const VoiceLimits::Point& point : script.points) {
+    if (script.cycleStart && point.tick >= *script.cycleStart) {
+      break;
+    }
     if (point.pitch256 != previous || point.fineExplicit != previousFineExplicit) {
-      changes.push_back(&point);
+      changes.push_back(Change{.tick = point.tick, .key = pointKey(point.pitch256, point.fineExplicit)});
       previous = point.pitch256;
       previousFineExplicit = point.fineExplicit;
+    }
+  }
+  if (script.cycleStart && script.cyclePitchCenter256) {
+    const double centerKey = pointKey(*script.cyclePitchCenter256, script.cycleFineExplicit);
+    const double currentKey = changes.empty() ? key : changes.back().key;
+    if (currentKey != centerKey) {
+      changes.push_back(Change{.tick = *script.cycleStart, .key = centerKey});
     }
   }
   if (changes.empty()) {
@@ -423,52 +487,58 @@ void emitFinitePitchScript(const VoiceLimits& script, PerformanceEmitter& out, P
   }
 
   const u32 scale = std::max<u8>(tempo, 1);
-  const VoiceLimits::Point& last = *changes.back();
-  const u32 duration = last.tick * scale;
-  auto slide = out.pitchSlide(
-      note, key, pointKey(last),
-      PitchSlideTiming::fixedDuration(duration, last.tick * kTimerMilliseconds));
+  const Change& last = changes.back();
+  auto slide = out.pitchSlide(note, key, last.key,
+                              PitchSlideTiming::fixedDuration(last.tick * scale,
+                                                              last.tick * kTimerMilliseconds));
 
-  previous = script.attackPitch256;
-  previousFineExplicit = script.attackFineExplicit;
-  for (const VoiceLimits::Point* point : changes) {
-    const u32 tick = point->tick * scale;
+  double previousKey = key;
+  for (const Change& change : changes) {
+    const u32 tick = change.tick * scale;
     // Voice-script pitch writes are instantaneous. Preserve the staircase by
     // holding the previous value until the final fine timeline tick.
     if (tick != 0) {
-      const double replacedFine = previousFineExplicit && !script.attackFineExplicit ? inheritedFine : 0.0;
-      slide.sample(out.at(attackTick + tick - 1),
-                   key + (previous - script.attackPitch256) / 256.0 - replacedFine);
+      slide.sample(out.at(attackTick + tick - 1), previousKey);
     }
-    slide.sample(out.at(attackTick + tick), pointKey(*point));
-    previous = point->pitch256;
-    previousFineExplicit = point->fineExplicit;
+    slide.sample(out.at(attackTick + tick), change.key);
+    previousKey = change.key;
   }
   slide.preferPitchBend();
 }
 
-void emitFiniteVolumeScript(const VoiceLimits& script, PerformanceEmitter& out, u64 attackTick, u8 tempo,
+void emitVoiceVolumeChanges(const VoiceLimits& script, PerformanceEmitter& out, u64 attackTick, u8 tempo,
                             std::optional<u64> endTick = std::nullopt) {
-  if (script.looping || script.attacks.size() != 1 || script.attackVolume == 0 || script.points.size() < 2) {
+  if (script.attacks.size() != 1 || script.attackVolume == 0) {
     return;
   }
 
   u8 previous = script.attackVolume;
   bool emitted = false;
-  for (const VoiceLimits::Point& point : script.points) {
-    if (point.volume == previous) {
-      continue;
-    }
-    const u64 tick = attackTick + point.tick * std::max<u8>(tempo, 1);
+  const auto emit = [&](u32 scriptTick, u8 volume) {
+    const u64 tick = attackTick + scriptTick * std::max<u8>(tempo, 1);
     if (endTick && tick >= *endTick) {
-      break;
+      return false;
     }
-    if (!emitted) {
+    if (volume != previous && !emitted) {
       out.expression(1.0);
       emitted = true;
     }
-    out.at(tick).expression(point.volume / static_cast<double>(script.attackVolume));
-    previous = point.volume;
+    if (volume != previous) {
+      out.at(tick).expression(volume / static_cast<double>(script.attackVolume));
+      previous = volume;
+    }
+    return true;
+  };
+  for (const VoiceLimits::Point& point : script.points) {
+    if (script.cycleStart && point.tick >= *script.cycleStart) {
+      break;
+    }
+    if (!emit(point.tick, point.volume)) {
+      return;
+    }
+  }
+  if (script.cycleStart && script.cycleVolume) {
+    static_cast<void>(emit(*script.cycleStart, *script.cycleVolume));
   }
 }
 
@@ -817,8 +887,8 @@ struct Playback {
       event.maximumDurationMilliseconds = std::max(0.0, *audioEndMilliseconds - now);
     }
     const PerformanceNoteId emitted = out.note(std::move(event));
-    emitFinitePitchScript(limits, out, emitted, key, track.fineTuning / 256.0, nowTick, program.tempo);
-    emitFiniteVolumeScript(limits, out, nowTick, program.tempo, autoEndTick);
+    emitVoicePitchChanges(limits, out, emitted, key, track.fineTuning / 256.0, nowTick, program.tempo);
+    emitVoiceVolumeChanges(limits, out, nowTick, program.tempo, autoEndTick);
 
     if (limits.attacks.size() > 1) {
       const VoiceLimits::Attack& first = limits.attacks.front();
@@ -1162,8 +1232,8 @@ struct SfxPlayback {
     }
     const u64 attackTick = vm.tick();
     const PerformanceNoteId emitted = out.note(std::move(note));
-    emitFinitePitchScript(limits, out, emitted, 60.0, 0.0, attackTick, kInitialTempo);
-    emitFiniteVolumeScript(limits, out, attackTick, kInitialTempo);
+    emitVoicePitchChanges(limits, out, emitted, 60.0, 0.0, attackTick, kInitialTempo);
+    emitVoiceVolumeChanges(limits, out, attackTick, kInitialTempo);
 
     if (limits.attacks.size() > 1) {
       const VoiceLimits::Attack& first = limits.attacks.front();

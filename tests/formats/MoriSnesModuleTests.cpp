@@ -280,7 +280,7 @@ void scannerBuildsScriptedSynthModulation() {
              region->modulation.vibrato->depthMode == ModulationDepthMode::Fixed &&
              region->modulation.tremolo->depthMode == ModulationDepthMode::Fixed &&
              region->modulation.vibrato->delaySeconds &&
-             std::abs(region->modulation.vibrato->delaySeconds->minimum - 5 * 0.009875) < 0.000001 &&
+             std::abs(region->modulation.vibrato->delaySeconds->minimum - 4 * 0.009875) < 0.000001 &&
              std::abs(region->modulation.vibrato->rateHertz.minimum - 1.0 / (2 * 0.009875)) < 0.000001,
          "instrument mini-scripts should become fixed-clock vibrato and tremolo with their physical delay and rate "
          "(v=" +
@@ -291,6 +291,71 @@ void scannerBuildsScriptedSynthModulation() {
                         ", rate=" + std::to_string(region->modulation.vibrato->rateHertz.minimum)
                   : std::string{}) +
              ")");
+}
+
+void loopingVoicePreludeRemainsSeparateFromItsVibratoCycle() {
+  DriverFixture fixture;
+  std::vector<u8> bytes = fixture.data();
+  const std::vector<u8> script{
+      0xde, 0xfc, 0x00,              // DSP row $1600
+      0xc5, 0xd2, 0xd8, 0xfe, 0xda,  // attack at -2 semitones
+      0x01,
+      0xce, 0x05, 0xd9, 0x67, 0x01, 0xdc, 0xfe, 0xcf,  // five-step rise to +3/256
+      0xce, 0x0a, 0xdc, 0xfa, 0x01, 0xcf,              // one-shot volume fade
+      0x0a,
+      0xce, 0x06, 0xd9, 0xf7, 0x01, 0xcf,
+      0xce, 0x0c, 0xd9, 0x09, 0x01, 0xcf,
+      0xce, 0x06, 0xd9, 0xf7, 0x01, 0xcf,
+      0xcb, 0xeb, 0xff,  // repeat the 24-tick +/-54/256 cycle
+  };
+  std::ranges::copy(script, bytes.begin() + 0x1501);
+
+  Session session;
+  session.registerFormat(module());
+  session.addSource(SourceFile{.name = "MoriSnes prelude fixture.aram"}, bytes);
+  session.scanPendingSources();
+  const SessionSnapshot snapshot = session.snapshot();
+  const Collection* collection = snapshot.collections().empty() ? nullptr : &snapshot.collections().front();
+  const auto* bank = collection == nullptr || collection->members.soundBanks.empty()
+                         ? nullptr
+                         : snapshot.asset<SoundBankAsset>(collection->members.soundBanks.front());
+  const auto* sequence = collection == nullptr || !collection->members.sequence
+                             ? nullptr
+                             : snapshot.asset<SequenceProgramAsset>(*collection->members.sequence);
+  const Region* region = bank == nullptr || bank->instruments.empty() || bank->instruments.front().regions.empty()
+                             ? nullptr
+                             : &bank->instruments.front().regions.front();
+  expect(snapshot.diagnostics().empty() && sequence != nullptr && region != nullptr &&
+             region->modulation.vibrato && region->modulation.vibrato->delaySeconds &&
+             std::abs(region->modulation.vibrato->maxDepthCents - 54 * (100.0 / 256.0)) < 0.000001 &&
+             std::abs(region->modulation.vibrato->delaySeconds->minimum - 31 * 0.009875) < 0.000001 &&
+             std::abs(region->modulation.vibrato->rateHertz.minimum - 1.0 / (24 * 0.009875)) < 0.000001,
+         "a looping script's vibrato should use only its steady cycle, not its one-shot attack ramp" +
+             (region && region->modulation.vibrato
+                  ? " (depth=" + std::to_string(region->modulation.vibrato->maxDepthCents) +
+                        ", delay=" +
+                        std::to_string(region->modulation.vibrato->delaySeconds
+                                           ? region->modulation.vibrato->delaySeconds->minimum
+                                           : -1.0) +
+                        ", rate=" + std::to_string(region->modulation.vibrato->rateHertz.minimum) + ")"
+                  : std::string{" (missing vibrato)"}));
+
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program);
+  const PerformanceTrack& track = performance.tracks.front();
+  const auto notes = events<NotePerformanceEvent>(track);
+  const auto expressions = events<ExpressionPerformanceEvent>(track);
+  const auto* pitch = track.automations.empty()
+                          ? nullptr
+                          : std::get_if<PitchTransitionIntent>(&track.automations.front().intent);
+  const auto faded = std::ranges::find_if(expressions, [](const ExpressionPerformanceEvent* expression) {
+    return expression->header.tick == 15 * 0x20;
+  });
+  expect(performance.diagnostics.empty() && !notes.empty() && pitch != nullptr &&
+             pitch->timing.timelineTicks == 31 * 0x20 &&
+             std::holds_alternative<FixedDurationPitchSlideTiming>(pitch->timing.physical) &&
+             std::abs(pitch->targetKey - pitch->startKey - 566.0 / 256.0) < 0.000001 &&
+             faded != expressions.end() && std::abs((*faded)->linearGain - 140.0 / 210.0) < 0.000001,
+         "the pre-cycle pitch rise and volume fade should remain per-note fixed-clock automation");
 }
 
 void physicalVoiceScriptsCanBoundNotes() {
@@ -454,6 +519,7 @@ void runMoriSnesModuleTests() {
   fixedClockModeUsesTimerDurations();
   sourceVoiceScriptChangesFutureReleaseBehavior();
   scannerBuildsScriptedSynthModulation();
+  loopingVoicePreludeRemainsSeparateFromItsVibratoCycle();
   physicalVoiceScriptsCanBoundNotes();
   physicalVoiceScriptsCanRetriggerNotes();
   liveSongSelectionAndHardwareSoundEffectsAreRecovered();
