@@ -12,7 +12,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
-#include <string>
+#include <utility>
 #include <vector>
 
 namespace vgmtrans::formats::pandora_box_snes {
@@ -29,21 +29,15 @@ struct Patch {
 };
 
 [[nodiscard]] std::vector<Patch> collectPatches(ByteReader reader, const Layout& layout,
-                                                const SequenceReferences& references) {
+                                                const std::set<u8>& programs) {
   std::vector<Patch> patches;
-  patches.reserve(references.programs.size());
-  for (const u8 program : references.programs) {
-    const u8 localOffset = static_cast<u8>(layout.localInstrumentTableAddress - layout.sequenceHeaderAddress);
-    const u16 address =
-        static_cast<u16>(layout.sequenceHeaderAddress + static_cast<u8>(localOffset + program));
-    const auto srcn = programSrcn(reader, layout, program);
-    if (!srcn || !reader.has(address, 1)) {
-      continue;
-    }
+  patches.reserve(programs.size());
+  for (const u8 program : programs) {
+    const u16 address = localInstrumentAddress(layout, program);
     patches.push_back(Patch{
         .program = program,
         .globalInstrument = reader.u8At(address),
-        .srcn = *srcn,
+        .srcn = programSrcn(reader, layout, program),
         .source = reader.range(address, 1),
     });
   }
@@ -64,9 +58,9 @@ struct Patch {
 }  // namespace
 
 std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
-                                           const SequenceReferences& references, std::string_view displayName) {
+                                           const std::set<u8>& programs, std::string_view displayName) {
   const ByteReader reader = builder.reader();
-  const std::vector<Patch> patches = collectPatches(reader, layout, references);
+  const std::vector<Patch> patches = collectPatches(reader, layout, programs);
   if (patches.empty()) {
     return std::nullopt;
   }
@@ -97,7 +91,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     }
     auto entry = instruments.append(Instrument{
         .explicitAddress = InstrumentAddress{.bank = 0, .program = patch.program},
-        .identity = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = patch.program},
+        .identity = InstrumentIdentity{.domain = kInstrumentDomain, .key = patch.program},
         .name = fmt::format("Instrument {} (SRCN {})", patch.program, patch.srcn),
         .range = patch.source,
     });

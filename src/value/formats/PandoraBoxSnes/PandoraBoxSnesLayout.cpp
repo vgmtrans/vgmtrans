@@ -8,8 +8,6 @@
 
 #include "value/scan/BytePattern.h"
 
-#include <algorithm>
-
 namespace vgmtrans::formats::pandora_box_snes {
 
 using namespace core;
@@ -44,7 +42,7 @@ constexpr auto kLoadSrcn = makeMaskedBytePattern(
 }
 
 [[nodiscard]] bool plausibleHeader(ByteReader reader, u16 address) {
-  if (address < 0x0200 || !reader.has(address, 0x2c)) {
+  if (address < 0x0200 || !reader.has(address, kSequenceHeaderSize)) {
     return false;
   }
   const u8 tempo = reader.u8At(address + 6);
@@ -124,7 +122,8 @@ std::optional<Layout> findLayout(ByteReader reader) {
   const u16 globalTable = static_cast<u16>(compareBase + 1);
   const u8 globalCount = reader.has(countAddress, 1) ? reader.u8At(countAddress) : 0;
   const u16 directory = static_cast<u16>(reader.u8At(*dirCode + 1) << 8);
-  const u16 localTable = static_cast<u16>(*header + reader.u8At(*header + 0x0c));
+  const u8 localTableOffset = reader.u8At(*header + 0x0c);
+  const u16 localTable = static_cast<u16>(*header + localTableOffset);
   if (globalCount == 0 || globalCount > 0x40 || !reader.has(globalTable, globalCount) ||
       !reader.has(localTable, 1) || !reader.has(directory, 4)) {
     return std::nullopt;
@@ -133,8 +132,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
   Layout layout{
       .version = version,
       .sequenceHeaderAddress = *header,
-      .sequenceHeaderRange = reader.range(*header, 0x2c),
-      .localInstrumentTableAddress = localTable,
+      .localInstrumentTableOffset = localTableOffset,
       .globalInstrumentTableAddress = globalTable,
       .globalInstrumentCount = globalCount,
       .spcDirAddress = directory,
@@ -150,20 +148,14 @@ std::optional<Layout> findLayout(ByteReader reader) {
     }
     const u16 address = static_cast<u16>(*header + relative);
     if (reader.has(address, 1)) {
-      layout.tracks[track] = TrackPointer{.address = address, .source = reader.range(pointer, 2)};
+      layout.tracks[track] = address;
     }
   }
   return layout;
 }
 
-std::optional<u8> programSrcn(ByteReader reader, const Layout& layout, u8 program) {
-  // The SPC700 adds program to the one-byte relative offset before using it
-  // as Y, so the song-relative index wraps at $100.
-  const u8 localOffset = static_cast<u8>(layout.localInstrumentTableAddress - layout.sequenceHeaderAddress);
-  const u16 local = static_cast<u16>(layout.sequenceHeaderAddress + static_cast<u8>(localOffset + program));
-  if (!reader.has(local, 1)) {
-    return std::nullopt;
-  }
+u8 programSrcn(ByteReader reader, const Layout& layout, u8 program) {
+  const u16 local = localInstrumentAddress(layout, program);
   const u8 global = reader.u8At(local);
   for (u32 index = layout.globalInstrumentCount; index != 0; --index) {
     if (reader.u8At(layout.globalInstrumentTableAddress + index - 1) == global) {
