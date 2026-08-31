@@ -5,10 +5,10 @@
  */
 
 #include "value/formats/MoriSnes/MoriSnes.h"
+#include "value/formats/MoriSnes/MoriSnesVoiceScript.h"
 
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompiledCommandRuntime.h"
-#include "value/synth/SnesDsp.h"
 
 #include <fmt/format.h>
 
@@ -18,7 +18,6 @@
 #include <limits>
 #include <map>
 #include <optional>
-#include <set>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -138,14 +137,6 @@ struct InspectedEvent {
   return {static_cast<s8>(result >> 8), static_cast<u8>(result)};
 }
 
-struct DriverConfig {
-  ByteReader data;
-  DriverTraits traits;
-  u16 presetTable = 0;
-  u16 presetPitchHigh = 0;
-  u16 panTable = 0;
-};
-
 [[nodiscard]] StereoBalance driverPanGains(const DriverConfig& driver, u8 raw) {
   const u8 pan = (raw & 0x80) != 0 ? driver.traits.initialPan : std::min(raw, driver.traits.maximumPan);
   if (driver.data.has(driver.panTable + pan, 1) &&
@@ -161,332 +152,8 @@ struct DriverConfig {
   };
 }
 
-struct VoiceLimits {
-  struct Point {
-    u32 tick = 0;
-    s32 pitch256 = 0;
-    bool fineExplicit = false;
-    u8 volume = 0xff;
-  };
-
-  struct Attack {
-    u32 tick = 0;
-    s32 pitch256 = 0;
-    bool fineExplicit = false;
-    u8 volume = 0xff;
-    u8 pan = 0;
-    bool panExplicit = false;
-    std::optional<u32> keyOff;
-  };
-
-  std::optional<u8> releaseDelay;
-  std::optional<u32> scriptEnd;
-  s32 attackPitch256 = 0;
-  bool attackFineExplicit = false;
-  u8 attackVolume = 0xff;
-  u8 attackPan = 0;
-  bool attackPanExplicit = false;
-  bool looping = false;
-  std::optional<u32> cycleStart;
-  std::optional<double> cyclePitchCenter256;
-  bool cycleFineExplicit = false;
-  std::optional<u8> cycleVolume;
-  std::vector<Point> points;
-  std::vector<Attack> attacks;
-};
-
-struct VoiceScriptFrame {
-  bool repeat = false;
-  u16 address = 0;
-  u16 remaining = 0;
-
-  friend bool operator<(const VoiceScriptFrame& left, const VoiceScriptFrame& right) {
-    return std::tie(left.repeat, left.address, left.remaining) <
-           std::tie(right.repeat, right.address, right.remaining);
-  }
-};
-
-struct VoiceScriptState {
-  u16 address = 0;
-  std::vector<VoiceScriptFrame> stack;
-  s32 pitch256 = 0;
-  bool fineExplicit = false;
-  bool absolutePitch = false;
-  u8 volume = 0xff;
-  u8 pan = 0;
-  bool panExplicit = false;
-  bool keyOn = false;
-
-  friend bool operator<(const VoiceScriptState& left, const VoiceScriptState& right) {
-    return std::tie(left.address, left.stack, left.pitch256, left.fineExplicit, left.absolutePitch, left.volume,
-                    left.pan, left.panExplicit, left.keyOn) <
-           std::tie(right.address, right.stack, right.pitch256, right.fineExplicit, right.absolutePitch,
-                    right.volume, right.pan, right.panExplicit, right.keyOn);
-  }
-};
-
-[[nodiscard]] VoiceLimits inspectVoice(const DriverConfig& driver, u16 script, bool percussion, u8 rawNote) {
-  const ByteReader reader = driver.data;
-  if (script == 0 || !reader.has(script, 1)) {
-    return {};
-  }
-  const DriverTraits traits = driver.traits;
-  if (percussion) {
-    const u16 entry = static_cast<u16>(script + (rawNote & 0x1f) * 2u);
-    if (!reader.has(entry, 2)) {
-      return {};
-    }
-    script = traits.absolutePercussionPointers
-                 ? reader.le16(entry)
-                 : relativeTarget(static_cast<u16>(entry + 2), static_cast<s16>(reader.le16(entry)));
-  }
-
-  VoiceLimits result;
-  result.attackPan = traits.initialPan;
-  std::vector<VoiceScriptFrame> stack;
-  std::map<VoiceScriptState, u32> visited;
-  std::optional<u32> keyOnTick;
-  std::optional<size_t> activeAttack;
-  u8 pan = traits.initialPan;
-  bool panExplicit = false;
-  s32 pitch256 = 0;
-  bool fineExplicit = false;
-  bool absolutePitch = false;
-  u8 volume = 0xff;
-  bool keyOn = false;
-  u32 tick = 0;
-  u16 pc = script;
-  const auto point = [&]() {
-    if (!keyOn || !keyOnTick) {
-      return;
-    }
-    VoiceLimits::Point value{
-        .tick = tick - *keyOnTick,
-        .pitch256 = pitch256,
-        .fineExplicit = fineExplicit,
-        .volume = volume,
-    };
-    if (!result.points.empty() && result.points.back().tick == value.tick) {
-      result.points.back() = value;
-    } else {
-      result.points.push_back(value);
-    }
-  };
-  for (u32 commands = 0; commands < 4096; ++commands) {
-    const VoiceScriptState state{
-        .address = pc,
-        .stack = stack,
-        .pitch256 = pitch256,
-        .fineExplicit = fineExplicit,
-        .absolutePitch = absolutePitch,
-        .volume = volume,
-        .pan = pan,
-        .panExplicit = panExplicit,
-        .keyOn = keyOn,
-    };
-    const auto [prior, inserted] = visited.emplace(state, tick);
-    if (!inserted) {
-      result.looping = true;
-      if (keyOn && keyOnTick && prior->second >= *keyOnTick && tick > prior->second) {
-        const u32 cycleBegin = prior->second - *keyOnTick;
-        const u32 cycleEnd = tick - *keyOnTick;
-        s32 minimumPitch = pitch256;
-        s32 maximumPitch = pitch256;
-        for (const VoiceLimits::Point& value : result.points) {
-          if (value.tick >= cycleBegin && value.tick < cycleEnd) {
-            minimumPitch = std::min(minimumPitch, value.pitch256);
-            maximumPitch = std::max(maximumPitch, value.pitch256);
-          }
-        }
-        result.cycleStart = cycleBegin;
-        result.cyclePitchCenter256 = (minimumPitch + maximumPitch) / 2.0;
-        result.cycleFineExplicit = fineExplicit;
-        result.cycleVolume = volume;
-      }
-      break;
-    }
-    if (!reader.has(pc, 1)) {
-      break;
-    }
-    const u8 status = reader.u8At(pc++);
-    if (status < 0x80) {
-      tick += status == 0 ? 256 : status;
-      continue;
-    }
-    if (!isCommand(traits.version, status)) {
-      break;
-    }
-    const u8 size = commandSize(traits.version, status);
-    if (!reader.has(pc, size)) {
-      break;
-    }
-    const u16 continuation = static_cast<u16>(pc + size);
-    const std::optional<u8> command = canonicalCommand(traits.version, status);
-    if (!command) {
-      pc = continuation;
-      continue;
-    }
-    switch (*command) {
-      case 0xc1:
-        pan = (reader.u8At(pc) & 0x80) != 0 ? traits.initialPan
-                                           : std::min(reader.u8At(pc), traits.maximumPan);
-        panExplicit = true;
-        break;
-      case 0xc5:
-        volume = reader.u8At(pc);
-        point();
-        break;
-      case 0xc7:
-        pitch256 = (pitch256 & ~0xff) | reader.u8At(pc);
-        fineExplicit = true;
-        point();
-        break;
-      case 0xe4: {
-        const u8 index = reader.u8At(pc);
-        const u8 raw = reader.has(driver.presetTable + index, 1) ? reader.u8At(driver.presetTable + index)
-                                                                 : traits.initialPan;
-        pan = (raw & 0x80) != 0 ? traits.initialPan : std::min(raw, traits.maximumPan);
-        panExplicit = true;
-        break;
-      }
-      case 0xcb:
-        pc = relativeTarget(continuation, static_cast<s16>(reader.le16(pc)));
-        continue;
-      case 0xcc:
-        if (stack.size() >= 10) {
-          return result;
-        }
-        stack.push_back(VoiceScriptFrame{.address = continuation});
-        pc = relativeTarget(continuation, static_cast<s16>(reader.le16(pc)));
-        continue;
-      case 0xcd:
-        if (stack.empty() || stack.back().repeat) {
-          return result;
-        }
-        pc = stack.back().address;
-        stack.pop_back();
-        continue;
-      case 0xce: {
-        if (stack.size() >= 10) {
-          return result;
-        }
-        const u8 count = reader.u8At(pc);
-        stack.push_back(VoiceScriptFrame{
-            .repeat = true,
-            .address = continuation,
-            .remaining = static_cast<u16>(count == 0 ? 256 : count),
-        });
-        break;
-      }
-      case 0xcf:
-        if (stack.empty() || !stack.back().repeat) {
-          return result;
-        }
-        if (--stack.back().remaining != 0) {
-          pc = stack.back().address;
-          continue;
-        }
-        stack.pop_back();
-        break;
-      case 0xd0:
-        result.scriptEnd = keyOnTick ? tick - *keyOnTick : tick;
-        return result;
-      case 0xda:
-        if (!keyOnTick) {
-          keyOnTick = tick;
-          result.attackPitch256 = pitch256;
-          result.attackFineExplicit = fineExplicit;
-          result.attackVolume = volume;
-          result.attackPan = pan;
-          result.attackPanExplicit = panExplicit;
-        }
-        if (keyOn && activeAttack && !result.attacks[*activeAttack].keyOff) {
-          result.attacks[*activeAttack].keyOff = tick - *keyOnTick - result.attacks[*activeAttack].tick;
-        }
-        keyOn = true;
-        result.attacks.push_back(VoiceLimits::Attack{
-            .tick = tick - *keyOnTick,
-            .pitch256 = pitch256,
-            .fineExplicit = fineExplicit,
-            .volume = volume,
-            .pan = pan,
-            .panExplicit = panExplicit,
-        });
-        activeAttack = result.attacks.size() - 1;
-        point();
-        break;
-      case 0xdb:
-        if (keyOnTick && keyOn && activeAttack) {
-          const u32 duration = tick - *keyOnTick - result.attacks[*activeAttack].tick;
-          result.attacks[*activeAttack].keyOff = duration;
-        }
-        keyOn = false;
-        activeAttack.reset();
-        break;
-      case 0xd7:
-        pitch256 = static_cast<s8>(reader.u8At(pc)) * 256 + static_cast<u8>(pitch256);
-        absolutePitch = true;
-        point();
-        break;
-      case 0xd8:
-        pitch256 = static_cast<s8>(static_cast<u8>((pitch256 >> 8) + static_cast<s8>(reader.u8At(pc)))) * 256 +
-                   static_cast<u8>(pitch256);
-        point();
-        break;
-      case 0xd9: {
-        const auto [high, low] = addFinePitch(static_cast<s8>(pitch256 >> 8), static_cast<u8>(pitch256),
-                                              static_cast<s8>(reader.u8At(pc)), absolutePitch);
-        pitch256 = high * 256 + low;
-        point();
-        break;
-      }
-      case 0xdc:
-        volume = static_cast<u8>(volume + static_cast<s8>(reader.u8At(pc)));
-        point();
-        break;
-      case 0xde: {
-        const u16 row = relativeTarget(continuation, static_cast<s16>(reader.le16(pc)));
-        if (!keyOnTick && reader.has(row, 7)) {
-          result.releaseDelay = reader.u8At(row + 4);
-        }
-        break;
-      }
-      case 0xe5: {
-        u8 wait = reader.has(driver.presetTable + reader.u8At(pc), 1)
-                      ? reader.u8At(driver.presetTable + reader.u8At(pc))
-                      : 1;
-        tick += std::max<u8>(wait, 1);
-        break;
-      }
-      case 0xe2: {
-        const u8 index = reader.u8At(pc);
-        if (reader.has(driver.presetTable + index, 1) && reader.has(driver.presetPitchHigh + index, 1)) {
-          pitch256 = static_cast<s8>(reader.u8At(driver.presetPitchHigh + index)) * 256 +
-                     reader.u8At(driver.presetTable + index);
-          fineExplicit = true;
-          absolutePitch = true;
-          point();
-        }
-        break;
-      }
-      case 0xe3: {
-        const u8 index = reader.u8At(pc);
-        if (reader.has(driver.presetTable + index, 1)) {
-          volume = reader.u8At(driver.presetTable + index);
-          point();
-        }
-        break;
-      }
-      default:
-        break;
-    }
-    pc = continuation;
-  }
-  return result;
-}
-
-void emitVoicePitchChanges(const VoiceLimits& script, PerformanceEmitter& out, double inheritedFine, u64 attackTick,
-                           u8 tempo) {
+void emitVoicePitchChanges(const VoiceScriptAnalysis& script, PerformanceEmitter& out, double inheritedFine,
+                           u64 attackTick, u8 tempo) {
   // The DSP voice offset is independent of the track's pitch wheel and remains
   // live through release. A new physical attack starts with a fresh offset.
   out.pitchBend(0.0, kVoiceScriptPitchLayer);
@@ -507,7 +174,7 @@ void emitVoicePitchChanges(const VoiceLimits& script, PerformanceEmitter& out, d
     }
   };
 
-  for (const VoiceLimits::Point& point : script.points) {
+  for (const VoiceScriptAnalysis::Point& point : script.points) {
     if (script.cycleStart && point.tick >= *script.cycleStart) {
       break;
     }
@@ -518,7 +185,7 @@ void emitVoicePitchChanges(const VoiceLimits& script, PerformanceEmitter& out, d
   }
 }
 
-void emitVoiceVolumeChanges(const VoiceLimits& script, PerformanceEmitter& out, u64 attackTick, u8 tempo,
+void emitVoiceVolumeChanges(const VoiceScriptAnalysis& script, PerformanceEmitter& out, u64 attackTick, u8 tempo,
                             std::optional<u64> endTick = std::nullopt) {
   if (script.attacks.size() != 1 || script.attackVolume == 0) {
     return;
@@ -541,7 +208,7 @@ void emitVoiceVolumeChanges(const VoiceLimits& script, PerformanceEmitter& out, 
     }
     return true;
   };
-  for (const VoiceLimits::Point& point : script.points) {
+  for (const VoiceScriptAnalysis::Point& point : script.points) {
     if (script.cycleStart && point.tick >= *script.cycleStart) {
       break;
     }
@@ -595,13 +262,14 @@ struct ProgramState : DriverConfig {
     tempo = value;
   }
 
-  [[nodiscard]] const VoiceLimits& voice(u16 script, bool percussion, u8 rawNote) {
+  [[nodiscard]] const VoiceScriptAnalysis& voice(u16 script, bool percussion, u8 rawNote) {
     const auto key = std::tuple{script, percussion, static_cast<u8>(rawNote & 0x1f)};
     const auto found = voiceCache.find(key);
     if (found != voiceCache.end()) {
       return found->second;
     }
-    return voiceCache.emplace(key, inspectVoice(*this, script, percussion, rawNote)).first->second;
+    const std::optional<u8> percussionNote = percussion ? std::optional{rawNote} : std::nullopt;
+    return voiceCache.emplace(key, analyzeVoiceScript(*this, script, percussionNote)).first->second;
   }
 
   void limitNoteTicks(const HardwareVoice& voice, u64 endTick) {
@@ -712,9 +380,10 @@ struct ProgramState : DriverConfig {
   u64 clockTick = 0;
   double clockMilliseconds = 0.0;
   std::array<HardwareVoice, 8> voices{};
-  std::map<std::tuple<u16, bool, u8>, VoiceLimits> voiceCache;
+  std::map<std::tuple<u16, bool, u8>, VoiceScriptAnalysis> voiceCache;
   std::map<u32, u32> outputTracks;
   std::map<std::pair<u32, u32>, NoteLimit> noteLimits;
+  ReferencedInstruments references;
 };
 
 struct RepeatFrame {
@@ -807,9 +476,19 @@ struct Playback {
 
     const u8 note = rawNote & 0x1f;
     const u8 sourceKey = static_cast<u8>(track.noteBase + note + track.transpose) & 0x7f;
+    if (track.descriptor != 0 && track.data.has(track.descriptor, 1)) {
+      if (!track.percussion && track.scriptAddress != static_cast<u16>(track.descriptor + 1)) {
+        program.references.directScriptKeys[track.scriptAddress].insert(sourceKey);
+      } else {
+        program.references.noteKeys[track.descriptor].insert(sourceKey);
+      }
+      if (track.percussion) {
+        program.references.percussionKeys[track.descriptor][note].insert(sourceKey);
+      }
+    }
     const u64 nowTick = vm.tick();
     const double now = program.millisecondsAt(nowTick);
-    const VoiceLimits& limits = program.voice(track.scriptAddress, track.percussion, note);
+    const VoiceScriptAnalysis& limits = program.voice(track.scriptAddress, track.percussion, note);
     const u8 physicalDuration = program.fast ? track.duration >> 1 : track.duration;
     const u32 gateClocks = physicalDuration + limits.releaseDelay.value_or(0);
     const bool fixedClock = (track.mode & 0x04) != 0;
@@ -878,7 +557,7 @@ struct Playback {
     emitVoiceVolumeChanges(limits, out, nowTick, program.tempo, autoEndTick);
 
     if (limits.attacks.size() > 1) {
-      const VoiceLimits::Attack& first = limits.attacks.front();
+      const VoiceScriptAnalysis::Attack& first = limits.attacks.front();
       for (auto attack = std::next(limits.attacks.begin()); attack != limits.attacks.end(); ++attack) {
         const u64 attackTick = nowTick + attack->tick * std::max<u8>(program.tempo, 1);
         const double attackMilliseconds = now + attack->tick * program.traits.timerMilliseconds();
@@ -942,6 +621,7 @@ struct Playback {
   [[nodiscard]] Effects instrument(const EventTiming& timing, Address descriptor) {
     const u32 delay = beginEvent(timing);
     track.descriptor = static_cast<u16>(descriptor.value);
+    program.references.descriptors.insert(track.descriptor);
     if (track.data.has(track.descriptor, 1)) {
       track.percussion = (track.data.u8At(track.descriptor) & 1) != 0;
       track.mode = static_cast<u8>((track.mode & ~u8{1}) | static_cast<u8>(track.percussion));
@@ -1110,6 +790,7 @@ struct Playback {
     const u32 delay = beginEvent(timing);
     track.scriptAddress = static_cast<u16>(address.value);
     if (!track.percussion) {
+      program.references.directScriptKeys.try_emplace(track.scriptAddress);
       out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain),
                                         .key = kDirectInstrumentFlag | track.scriptAddress},
                      InstrumentEnvelopeMode::UseInstrumentEnvelope);
@@ -1186,7 +867,7 @@ struct SfxPlayback {
   VmApi& vm;
 
   [[nodiscard]] Effects play() {
-    const VoiceLimits limits = inspectVoice(track, track.script, false, 0);
+    const VoiceScriptAnalysis limits = analyzeVoiceScript(track, track.script);
     const auto emitPan = [&](PerformanceEmitter output, u8 value, bool explicitPan) {
       const u8 raw = explicitPan && value < 0x80 ? value : track.data.u8At(0x3b);
       const StereoBalance balance = driverPanGains(track, raw);
@@ -1213,7 +894,7 @@ struct SfxPlayback {
     emitVoiceVolumeChanges(limits, out, attackTick, kInitialTempo);
 
     if (limits.attacks.size() > 1) {
-      const VoiceLimits::Attack& first = limits.attacks.front();
+      const VoiceScriptAnalysis::Attack& first = limits.attacks.front();
       const double sourceVelocity = sourceVelocityGain(track.data.u8At(0x3a));
       for (auto attack = std::next(limits.attacks.begin()); attack != limits.attacks.end(); ++attack) {
         auto output = out.at(attackTick + attack->tick * kInitialTempo);
@@ -1325,8 +1006,7 @@ void consumeTiming(Cursor::Event& event, u8 first, const InspectedEvent& inspect
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, const Layout& layout, u32 begin,
-                                                   std::vector<Diagnostic>* diagnostics,
-                                                   ReferencedInstruments* references = nullptr) {
+                                                   std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, begin, "mori-snes", diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
@@ -1366,9 +1046,6 @@ void consumeTiming(Cursor::Event& event, u8 first, const InspectedEvent& inspect
                                       SemanticOperandRole::InstrumentTablePointer);
       const Address descriptor{relativeTarget(static_cast<u16>(event.nextAddress().value), relative)};
       event.derived("descriptor", descriptor, SourceValueDisplay::Address, SemanticOperandRole::Instrument);
-      if (references != nullptr) {
-        references->descriptors.insert(static_cast<u16>(descriptor.value));
-      }
       return event.invoke<&Playback::instrument>(inspected.timing, descriptor);
     }
     case 0xc1:
@@ -1481,155 +1158,6 @@ void consumeTiming(Cursor::Event& event, u8 first, const InspectedEvent& inspect
       return event.invoke<&Playback::timebase>(inspected.timing, event.u8("flags", SourceValueDisplay::Hex));
     default:
       return event.stop();
-  }
-}
-
-struct ReferenceRepeat {
-  u16 start = 0;
-  u16 remaining = 0;
-
-  friend bool operator<(const ReferenceRepeat& left, const ReferenceRepeat& right) {
-    return std::tie(left.start, left.remaining) < std::tie(right.start, right.remaining);
-  }
-};
-
-struct ReferenceState {
-  u16 pc = 0;
-  std::vector<u16> calls;
-  std::vector<ReferenceRepeat> repeats;
-  u8 noteBase = 0;
-  s8 transpose = 0;
-  u16 descriptor = 0;
-  u16 script = 0;
-  bool percussion = false;
-
-  friend bool operator<(const ReferenceState& left, const ReferenceState& right) {
-    return std::tie(left.pc, left.calls, left.repeats, left.noteBase, left.transpose, left.descriptor, left.script,
-                    left.percussion) <
-           std::tie(right.pc, right.calls, right.repeats, right.noteBase, right.transpose, right.descriptor,
-                    right.script, right.percussion);
-  }
-};
-
-void collectTrackReferences(ByteReader reader, const Layout& layout, u16 start, ReferencedInstruments& references) {
-  ReferenceState state{.pc = start};
-  std::set<ReferenceState> visited;
-  for (u32 commands = 0; commands < kCommandLimit && visited.insert(state).second; ++commands) {
-    const InspectedEvent event = inspectEvent(reader, state.pc);
-    if (!event.valid) {
-      break;
-    }
-    const u8 status = event.status;
-    const u8 size = status >= 0xa0 && status < 0xc0 ? 1 : commandSize(layout.version, status);
-    if (!reader.has(event.operandAddress, size)) {
-      break;
-    }
-    const u16 continuation = static_cast<u16>(event.operandAddress + size);
-    if (status < 0xc0) {
-      if (state.descriptor != 0 && reader.has(state.descriptor, 1)) {
-        const u8 raw = status & 0x1f;
-        const u8 key = static_cast<u8>(state.noteBase + raw + state.transpose) & 0x7f;
-        if (!state.percussion && state.script != static_cast<u16>(state.descriptor + 1)) {
-          references.directScriptKeys[state.script].insert(key);
-        } else {
-          references.noteKeys[state.descriptor].insert(key);
-        }
-        if (state.percussion) {
-          references.percussionKeys[state.descriptor][raw].insert(key);
-        }
-      }
-      state.pc = continuation;
-      continue;
-    }
-
-    if (!isCommand(layout.version, status)) {
-      return;
-    }
-    const std::optional<u8> command = canonicalCommand(layout.version, status);
-    if (!command) {
-      state.pc = continuation;
-      continue;
-    }
-    switch (*command) {
-      case 0xc0:
-        state.descriptor = relativeTarget(continuation, static_cast<s16>(reader.le16(event.operandAddress)));
-        state.script = static_cast<u16>(state.descriptor + 1);
-        state.percussion = reader.has(state.descriptor, 1) && (reader.u8At(state.descriptor) & 1) != 0;
-        references.descriptors.insert(state.descriptor);
-        break;
-      case 0xc4:
-      case 0xd7:
-        state.transpose = static_cast<s8>(reader.u8At(event.operandAddress));
-        break;
-      case 0xcb:
-        state.pc = relativeTarget(continuation, static_cast<s16>(reader.le16(event.operandAddress)));
-        continue;
-      case 0xcc:
-        if (state.calls.size() >= 10) {
-          return;
-        }
-        state.calls.push_back(continuation);
-        state.pc = relativeTarget(continuation, static_cast<s16>(reader.le16(event.operandAddress)));
-        continue;
-      case 0xcd:
-        if (state.calls.empty()) {
-          return;
-        }
-        state.pc = state.calls.back();
-        state.calls.pop_back();
-        continue;
-      case 0xce:
-        if (state.repeats.size() >= 4) {
-          return;
-        }
-        state.repeats.push_back(ReferenceRepeat{
-            .start = continuation,
-            .remaining = static_cast<u16>(reader.u8At(event.operandAddress) == 0
-                                              ? 256
-                                              : reader.u8At(event.operandAddress)),
-        });
-        break;
-      case 0xcf:
-        if (state.repeats.empty()) {
-          return;
-        }
-        if (--state.repeats.back().remaining != 0) {
-          state.pc = state.repeats.back().start;
-          continue;
-        }
-        state.repeats.pop_back();
-        break;
-      case 0xd0:
-        return;
-      case 0xd1:
-        state.noteBase = reader.u8At(event.operandAddress);
-        break;
-      case 0xd2:
-        state.noteBase = static_cast<u8>(state.noteBase + 12);
-        break;
-      case 0xd3:
-        state.noteBase = static_cast<u8>(state.noteBase - 12);
-        break;
-      case 0xd8:
-        state.transpose = static_cast<s8>(state.transpose + static_cast<s8>(reader.u8At(event.operandAddress)));
-        break;
-      case 0xde:
-        state.script = relativeTarget(continuation, static_cast<s16>(reader.le16(event.operandAddress)));
-        if (!state.percussion) {
-          references.directScriptKeys.try_emplace(state.script);
-        }
-        break;
-      case 0xe2: {
-        const u8 index = reader.u8At(event.operandAddress);
-        if (reader.has(layout.presetPitchHighAddress + index, 1)) {
-          state.transpose = static_cast<s8>(reader.u8At(layout.presetPitchHighAddress + index));
-        }
-        break;
-      }
-      default:
-        break;
-    }
-    state.pc = continuation;
   }
 }
 
@@ -1748,15 +1276,12 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
 
   const u32 headerSize = layout.tracks.size() * 3u + 1u;
   const SourceRange header = reader.range(layout.songHeaderAddress, headerSize);
-  ReferencedInstruments references;
   SequenceDecodeSession sequence{reader, sequenceConfig(layout.version), sequenceId, header, sourceMap, kCommandLimit,
                                  kAramSize};
   for (const TrackHeader& track : layout.tracks) {
     const u16 encoded = reader.le16(track.range.offset + 1);
-    sequence.addTrack(
-        track.channel, reader.range(track.range.offset + 1, 2), track.startAddress,
-        [&](u32 offset) { return decodeCommand(reader, layout, offset, diagnostics, &references); }, encoded);
-    collectTrackReferences(reader, layout, track.startAddress, references);
+    sequence.addTrack(track.channel, reader.range(track.range.offset + 1, 2), track.startAddress,
+                      [&](u32 offset) { return decodeCommand(reader, layout, offset, diagnostics); }, encoded);
   }
   SequenceProgram program = sequence.finish(sequenceRuntime(reader, layout));
   const DriverTraits traits = driverTraits(layout.version);
@@ -1764,6 +1289,8 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     const double center = reader.u8At(layout.panTableAddress + traits.initialPan) / 128.0;
     program.behavior.initialStereoBalance = StereoBalance{.leftGain = center, .rightGain = center};
   }
+  ReferencedInstruments references = analyzeCompiledProgram<ProgramState>(
+      program, &ProgramState::references, diagnostics, SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce});
   return SequenceParse{.program = std::move(program), .references = std::move(references), .headerRange = header};
 }
 

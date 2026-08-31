@@ -317,6 +317,7 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/MoriSnes/MoriSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/MoriSnes/MoriSnesSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/MoriSnes/MoriSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/MoriSnes/MoriSnesVoiceScript.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NamcoSnes/NamcoSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NamcoSnes/NamcoSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NamcoSnes/NamcoSnesSequence.cpp
