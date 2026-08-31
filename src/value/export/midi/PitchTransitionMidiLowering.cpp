@@ -6,7 +6,7 @@
 
 #include "value/export/midi/PitchTransitionMidiLowering.h"
 
-#include "value/export/PerformanceInstrumentSelection.h"
+#include "value/export/PerformancePitchBendContext.h"
 
 #include <algorithm>
 #include <cmath>
@@ -50,23 +50,14 @@ struct NoteSpan {
   std::vector<PortamentoSegment> portamentoSegments;
 };
 
-struct PitchBendRangeContext {
-  u16 sourceCents = 200;
-  std::optional<u16> instrumentCents;
-
-  friend bool operator==(const PitchBendRangeContext&, const PitchBendRangeContext&) noexcept = default;
-};
-
 // A persistent normalized wheel is interpreted using the source and instrument
 // ranges active at the moment its pitch is queried.
 class PitchBendRangeTimeline {
  public:
   PitchBendRangeTimeline(const std::vector<PerformanceEvent>& events,
-                         std::span<const SoundBankAsset* const> soundBanks) {
-    if (const auto* instrument = findPerformanceInstrument({}, soundBanks)) {
-      initial_.instrumentCents = instrument->pitchBendRangeCents;
-    }
-    PitchBendRangeContext context = initial_;
+                         std::span<const SoundBankAsset* const> soundBanks)
+      : initial_(soundBanks) {
+    PerformancePitchBendContext context = initial_;
 
     std::vector<const PerformanceEvent*> timeline;
     timeline.reserve(events.size());
@@ -80,21 +71,7 @@ class PitchBendRangeTimeline {
     });
 
     for (const auto* event : timeline) {
-      PitchBendRangeContext next = context;
-      if (const auto* range = std::get_if<PitchBendRangePerformanceEvent>(event)) {
-        next.sourceCents = range->cents;
-      } else if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(event)) {
-        const auto* instrument = findPerformanceInstrument(*selection, soundBanks);
-        next.instrumentCents = instrument == nullptr ? std::nullopt : instrument->pitchBendRangeCents;
-      } else if (const auto* note = std::get_if<NotePerformanceEvent>(event);
-                 note != nullptr && !note->extendsPrevious && note->instrumentAddress) {
-        const auto address = *note->instrumentAddress;
-        const auto* instrument = findPerformanceInstrument(
-            InstrumentPerformanceEvent{.bank = address.bank, .program = address.program}, soundBanks);
-        next.instrumentCents = instrument == nullptr ? std::nullopt : instrument->pitchBendRangeCents;
-      }
-      if (next != context) {
-        context = next;
+      if (context.apply(*event, soundBanks)) {
         points_.push_back(Point{.header = performanceEventHeader(*event), .context = context});
       }
     }
@@ -107,16 +84,16 @@ class PitchBendRangeTimeline {
       return value < std::pair{point.header.tick, point.header.sequence};
     });
     const auto& context = found == points_.begin() ? initial_ : std::prev(found)->context;
-    return effectivePitchBendSemitones(bend, context.sourceCents, context.instrumentCents);
+    return context.semitones(bend);
   }
 
  private:
   struct Point {
     PerformanceEventHeader header;
-    PitchBendRangeContext context;
+    PerformancePitchBendContext context;
   };
 
-  PitchBendRangeContext initial_;
+  PerformancePitchBendContext initial_;
   std::vector<Point> points_;
 };
 
