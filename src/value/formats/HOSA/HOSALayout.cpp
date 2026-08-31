@@ -62,12 +62,16 @@ constexpr u32 kMaximumSequenceSize = 0x100000;
   u32 parsedEnd = tableEnd;
   for (u32 i = 0; i < count; ++i) {
     const u32 relative = reader.le32(bank + 12 + i * 4);
+    if (relative == 0) {
+      layout.instrumentAddresses.push_back(std::nullopt);
+      continue;
+    }
     if (relative < tableEnd || relative >= bankEnd - bank || !reader.has(bank + relative, 4)) {
       return std::nullopt;
     }
     const u32 regions = reader.u8At(bank + relative);
     const u64 end = static_cast<u64>(relative) + 4 + static_cast<u64>(regions) * kRegionSize;
-    if (regions == 0 || end > bankEnd - bank) return std::nullopt;
+    if (end > bankEnd - bank) return std::nullopt;
     layout.instrumentAddresses.push_back(bank + relative);
     parsedEnd = std::max(parsedEnd, static_cast<u32>(end));
   }
@@ -124,12 +128,14 @@ constexpr u32 kMaximumSequenceSize = 0x100000;
   return matches;
 }
 
-[[nodiscard]] std::optional<u32> locateSamples(ByteReader reader, const std::vector<u32>& instruments) {
+[[nodiscard]] std::optional<u32> locateSamples(ByteReader reader,
+                                               const std::vector<std::optional<u32>>& instruments) {
   std::vector<u32> samples;
-  for (const u32 instrument : instruments) {
-    const u32 count = reader.u8At(instrument);
+  for (const auto instrument : instruments) {
+    if (!instrument) continue;
+    const u32 count = reader.u8At(*instrument);
     for (u32 region = 0; region < count; ++region) {
-      samples.push_back(reader.le32(instrument + 4 + region * kRegionSize));
+      samples.push_back(reader.le32(*instrument + 4 + region * kRegionSize));
     }
   }
   std::ranges::sort(samples);

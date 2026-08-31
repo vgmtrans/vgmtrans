@@ -90,15 +90,19 @@ constexpr u32 kRegionSize = 0x10;
 [[nodiscard]] std::vector<Instrument> readInstruments(ByteReader reader, const BankLayout& layout) {
   std::vector<Instrument> instruments;
   instruments.reserve(layout.instrumentAddresses.size());
-  for (const u32 offset : layout.instrumentAddresses) {
-    const u32 count = reader.u8At(offset);
-    RecordReader record(reader, offset, offset + 4 + count * kRegionSize);
+  for (const auto offset : layout.instrumentAddresses) {
+    if (!offset) {
+      instruments.emplace_back();
+      continue;
+    }
+    const u32 count = reader.u8At(*offset);
+    RecordReader record(reader, *offset, *offset + 4 + count * kRegionSize);
     (void)record.u8At(0, "region_count");
     Instrument instrument{.source = std::move(record).finish()};
     std::vector<Region> raw;
     raw.reserve(count);
     for (u32 region = 0; region < count; ++region) {
-      raw.push_back(readRegion(reader, offset + 4 + region * kRegionSize));
+      raw.push_back(readRegion(reader, *offset + 4 + region * kRegionSize));
     }
     instrument.regions = effectiveRegions(raw);
     instruments.push_back(std::move(instrument));
@@ -166,6 +170,7 @@ std::optional<ScannedBank> addBank(ScanResultBuilder& result, const BankLayout& 
           .id();
   for (u32 program = 0; program < parsed.size(); ++program) {
     const auto& source = parsed[program];
+    if (source.regions.empty()) continue;
     auto instrument = bankInstruments.append(core::Instrument{
         .explicitAddress = InstrumentAddress{.bank = 0, .program = static_cast<u8>(program)},
         .identity = instrumentIdentity(static_cast<u8>(program)),

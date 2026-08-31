@@ -25,6 +25,7 @@ struct ValueFormatCorpus {
   std::string_view format;
   std::optional<core::ExportRequest> exports;
   std::optional<std::filesystem::path> outputDirectory;
+  bool requireSoundBank = false;
 };
 
 inline int scanValueFormatArchive(const std::filesystem::path& path, const ValueFormatCorpus& corpus) {
@@ -76,14 +77,22 @@ inline int scanValueFormatArchive(const std::filesystem::path& path, const Value
       }
     }
   }
+  const auto missingSoundBanks = std::ranges::count_if(snapshot.collections(), [&](const Collection& collection) {
+    return corpus.requireSoundBank && collection.members.sequence && collection.members.soundBanks.empty() &&
+           std::ranges::find(sequences, *collection.members.sequence) != sequences.end();
+  });
 
   std::cout << "sources " << snapshot.sources().size() << ", assets " << snapshot.assets().size() << ", collections "
             << snapshot.collections().size() << ", " << corpus.format << " sequences " << sequences.size() << '/'
-            << ramSources << ", render failures " << renderFailures << ", export failures " << exportFailures << '\n';
+            << ramSources << ", missing soundbanks " << missingSoundBanks << ", render failures " << renderFailures
+            << ", export failures " << exportFailures << '\n';
   for (const Diagnostic& diagnostic : snapshot.diagnostics()) {
     std::cerr << "diagnostic: " << diagnostic.message << '\n';
   }
-  return sequences.size() == ramSources && ramSources != 0 && renderFailures == 0 && exportFailures == 0 ? 0 : 2;
+  return sequences.size() == ramSources && ramSources != 0 && missingSoundBanks == 0 && renderFailures == 0 &&
+                 exportFailures == 0
+             ? 0
+             : 2;
 }
 
 }  // namespace vgmtrans::tests

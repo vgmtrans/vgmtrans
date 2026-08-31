@@ -91,15 +91,16 @@ std::vector<u8> scannerFixture() {
   auto bytes = sequenceFixture({0x83, 0x00, 0x21, 0xbc, 100, 0x80}, sequence);
   bytes.resize(samples + 0x80);
 
-  // Container back-pointer and its one-instrument bank at +0x10.
+  // Container back-pointer and a sparse four-slot bank at +0x10.
   le32(bytes, 8, sequence);
-  le32(bytes, 0x18, 1);
-  le32(bytes, 0x1c, 0x10);
-  le32(bytes, 0x20, 4);
-  bytes[0x21] = 0xaa;
-  bytes[0x22] = 0xbb;
-  bytes[0x23] = 0xcc;
-  const u32 first = 0x24;
+  le32(bytes, 0x18, 4);
+  le32(bytes, 0x1c, 0x20);
+  le32(bytes, 0x20, 0x64);
+  le32(bytes, 0x30, 4);
+  bytes[0x31] = 0xaa;
+  bytes[0x32] = 0xbb;
+  bytes[0x33] = 0xcc;
+  const u32 first = 0x34;
   le32(bytes, first, 0);
   bytes[first + 4] = 63;
   bytes[first + 5] = 60;

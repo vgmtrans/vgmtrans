@@ -74,7 +74,7 @@ struct BankLayout {
   u32 offset = 0;
   u32 length = 0;
   std::optional<u32> sampleDataOffset;
-  std::vector<u32> instrumentAddresses;
+  std::vector<std::optional<u32>> instrumentAddresses;
 };
 
 struct ScannedBank {
