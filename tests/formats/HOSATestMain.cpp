@@ -20,7 +20,7 @@ void hosaModuleBuildsDriverAccurateRegions();
 int main(int argc, char** argv) {
   try {
     if (argc == 2 || (argc == 3 && std::string_view(argv[2]) == "--render-only")) {
-      vgmtrans::tests::ValueFormatCorpus corpus{.format = "HOSA"};
+      vgmtrans::tests::ValueFormatCorpus corpus{.format = "HOSA", .requireSoundBank = true};
       if (argc == 2) {
         corpus.exports = vgmtrans::core::ExportRequest{
             .kinds = {vgmtrans::core::ExportKind::Midi, vgmtrans::core::ExportKind::SoundFont2},
