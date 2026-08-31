@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/MoriSnes/MoriSnes.h"
+#include "value/formats/MoriSnes/MoriSnesVoiceScript.h"
 
 #include "value/platform/SnesSampleDirectory.h"
 #include "value/synth/SnesDsp.h"
@@ -13,11 +14,8 @@
 
 #include <algorithm>
 #include <cmath>
-#include <limits>
-#include <map>
 #include <optional>
 #include <set>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -30,304 +28,45 @@ Envelope driverEnvelope(u8 adsr1, u8 adsr2, u8 gain) { return snesDspEnvelope(ad
 namespace {
 
 const double kPitchTableCorrection = 12.0 * std::log2(4286.0 / 4096.0);
-constexpr u32 kScriptCommandLimit = 131072;
 
 [[nodiscard]] u16 relativeTarget(u16 continuation, s16 relative) {
   return static_cast<u16>(continuation + relative);
 }
 
-[[nodiscard]] s32 addFinePitch(s32 pitch256, s8 delta, bool absolutePitch) {
-  const s8 high = static_cast<s8>(pitch256 >> 8);
-  const u8 low = static_cast<u8>(pitch256);
-  const u16 initial = static_cast<u16>((static_cast<u16>(static_cast<u8>(high)) << 8) | low);
-  u16 result = static_cast<u16>(initial + delta);
-  // The driver clamps against the complete voice pitch. Before D7/E2 replaces
-  // the inherited note, a negative result here is only a relative offset.
-  if (absolutePitch && delta < 0 && (result & 0x8000) != 0) {
-    result = 0;
-  }
-  return static_cast<s8>(result >> 8) * 256 + static_cast<u8>(result);
-}
+struct CycleSamples {
+  std::vector<s32> pitch;
+  std::vector<s32> volume;
+  u8 precedingVolume = 0xff;
+};
 
-struct ScriptFrame {
-  enum class Kind : u8 {
-    Call,
-    Repeat,
+[[nodiscard]] CycleSamples sampleCycle(const VoiceScriptAnalysis& script) {
+  CycleSamples samples;
+  if (!script.cycleStart || !script.cycleLength) {
+    return samples;
+  }
+
+  size_t nextPoint = 0;
+  s32 pitch = script.attackPitch256;
+  u8 volume = script.attackVolume;
+  const auto applyThrough = [&](u32 tick) {
+    while (nextPoint < script.points.size() && script.points[nextPoint].tick <= tick) {
+      pitch = script.points[nextPoint].pitch256;
+      volume = script.points[nextPoint].volume;
+      ++nextPoint;
+    }
   };
-
-  Kind kind = Kind::Call;
-  u16 address = 0;
-  u16 remaining = 0;
-
-  friend bool operator<(const ScriptFrame& left, const ScriptFrame& right) {
-    return std::tie(left.kind, left.address, left.remaining) < std::tie(right.kind, right.address, right.remaining);
+  if (*script.cycleStart != 0) {
+    applyThrough(*script.cycleStart - 1);
   }
-};
-
-struct ScriptState {
-  u16 pc = 0;
-  std::vector<ScriptFrame> stack;
-  s32 pitch256 = 0;
-  bool fineExplicit = false;
-  u8 volume = 0xff;
-  u8 pan = 0;
-  u16 rowAddress = 0;
-  bool absolutePitch = false;
-  bool panExplicit = false;
-  bool keyOn = false;
-
-  friend bool operator<(const ScriptState& left, const ScriptState& right) {
-    return std::tie(left.pc, left.stack, left.pitch256, left.fineExplicit, left.volume, left.pan, left.rowAddress,
-                    left.absolutePitch, left.panExplicit, left.keyOn) <
-           std::tie(right.pc, right.stack, right.pitch256, right.fineExplicit, right.volume, right.pan,
-                    right.rowAddress, right.absolutePitch, right.panExplicit, right.keyOn);
+  samples.precedingVolume = volume;
+  samples.pitch.reserve(*script.cycleLength);
+  samples.volume.reserve(*script.cycleLength);
+  for (u32 offset = 0; offset < *script.cycleLength; ++offset) {
+    applyThrough(*script.cycleStart + offset);
+    samples.pitch.push_back(pitch);
+    samples.volume.push_back(volume);
   }
-};
-
-struct VoiceSample {
-  s32 pitch256 = 0;
-  u8 volume = 0xff;
-};
-
-struct ScriptAnalysis {
-  u16 scriptAddress = 0;
-  u16 rowAddress = 0;
-  SourceRange scriptRange;
-  s32 attackPitch256 = 0;
-  u8 attackVolume = 0xff;
-  u8 attackPan = 0;
-  bool absolutePitch = false;
-  bool panExplicit = false;
-  std::vector<VoiceSample> samples;
-  std::optional<u32> cycleStart;
-  std::optional<u32> cycleLength;
-};
-
-void includeRange(u32 begin, u32 size, u32& minimum, u32& maximum) {
-  minimum = std::min(minimum, begin);
-  maximum = std::max(maximum, begin + size);
-}
-
-[[nodiscard]] std::optional<ScriptAnalysis> analyzeScript(ByteReader reader, const Layout& layout, u16 start) {
-  if (!reader.has(start, 1)) {
-    return std::nullopt;
-  }
-
-  const DriverTraits traits = driverTraits(layout.version);
-  ScriptState state{.pc = start};
-  state.pan = traits.initialPan;
-  std::map<ScriptState, u32> visited;
-  std::vector<VoiceSample> samples;
-  std::optional<u32> keyOnTick;
-  std::optional<u32> cycleStart;
-  std::optional<u32> cycleLength;
-  s32 attackPitch = 0;
-  u8 attackVolume = 0xff;
-  u8 attackPan = traits.initialPan;
-  bool attackAbsolute = false;
-  bool attackPanExplicit = false;
-  u16 firstRow = 0;
-  u32 tick = 0;
-  u32 minimum = start;
-  u32 maximum = start;
-
-  for (u32 commands = 0; commands < kScriptCommandLimit; ++commands) {
-    if (!reader.has(state.pc, 1)) {
-      break;
-    }
-    if (const auto found = visited.find(state); found != visited.end()) {
-      if (state.keyOn && keyOnTick && tick > found->second && found->second >= *keyOnTick) {
-        cycleStart = found->second - *keyOnTick;
-        cycleLength = tick - found->second;
-      }
-      break;
-    }
-    visited.emplace(state, tick);
-
-    const u16 command = state.pc;
-    const u8 status = reader.u8At(command);
-    includeRange(command, 1, minimum, maximum);
-    if (status < 0x80) {
-      const u32 wait = status == 0 ? 256 : status;
-      if (state.keyOn) {
-        samples.insert(samples.end(), wait, VoiceSample{.pitch256 = state.pitch256, .volume = state.volume});
-      }
-      tick += wait;
-      state.pc = static_cast<u16>(command + 1);
-      continue;
-    }
-    if (!isCommand(layout.version, status)) {
-      break;
-    }
-
-    const u8 size = commandSize(layout.version, status);
-    const u16 operands = static_cast<u16>(command + 1);
-    if (!reader.has(operands, size)) {
-      break;
-    }
-    includeRange(operands, size, minimum, maximum);
-    const u16 continuation = static_cast<u16>(operands + size);
-    const std::optional<u8> canonical = canonicalCommand(layout.version, status);
-    if (!canonical) {
-      state.pc = continuation;
-      continue;
-    }
-    switch (*canonical) {
-      case 0xc1:
-        state.pan = (reader.u8At(operands) & 0x80) != 0
-                        ? traits.initialPan
-                        : std::min(reader.u8At(operands), traits.maximumPan);
-        state.panExplicit = true;
-        break;
-      case 0xc5:
-        state.volume = reader.u8At(operands);
-        break;
-      case 0xc7:
-        state.pitch256 = (state.pitch256 & ~0xff) | reader.u8At(operands);
-        state.fineExplicit = true;
-        break;
-      case 0xcb:
-        state.pc = relativeTarget(continuation, static_cast<s16>(reader.le16(operands)));
-        continue;
-      case 0xcc:
-        if (state.stack.size() >= 10) {
-          return std::nullopt;
-        }
-        state.stack.push_back(ScriptFrame{.kind = ScriptFrame::Kind::Call, .address = continuation});
-        state.pc = relativeTarget(continuation, static_cast<s16>(reader.le16(operands)));
-        continue;
-      case 0xcd:
-        if (state.stack.empty() || state.stack.back().kind != ScriptFrame::Kind::Call) {
-          return std::nullopt;
-        }
-        state.pc = state.stack.back().address;
-        state.stack.pop_back();
-        continue;
-      case 0xce: {
-        if (state.stack.size() >= 10) {
-          return std::nullopt;
-        }
-        const u8 count = reader.u8At(operands);
-        state.stack.push_back(ScriptFrame{
-            .kind = ScriptFrame::Kind::Repeat,
-            .address = continuation,
-            .remaining = static_cast<u16>(count == 0 ? 256 : count),
-        });
-        break;
-      }
-      case 0xcf:
-        if (state.stack.empty() || state.stack.back().kind != ScriptFrame::Kind::Repeat) {
-          return std::nullopt;
-        }
-        if (--state.stack.back().remaining != 0) {
-          state.pc = state.stack.back().address;
-          continue;
-        }
-        state.stack.pop_back();
-        break;
-      case 0xd0:
-        commands = kScriptCommandLimit;
-        continue;
-      case 0xd7:
-        state.pitch256 = static_cast<s8>(reader.u8At(operands)) * 256 + static_cast<u8>(state.pitch256);
-        state.absolutePitch = true;
-        break;
-      case 0xd8:
-        state.pitch256 = static_cast<s8>(static_cast<u8>((state.pitch256 >> 8) +
-                                                        static_cast<s8>(reader.u8At(operands)))) *
-                             256 +
-                         static_cast<u8>(state.pitch256);
-        break;
-      case 0xd9:
-        state.pitch256 =
-            addFinePitch(state.pitch256, static_cast<s8>(reader.u8At(operands)), state.absolutePitch);
-        break;
-      case 0xda:
-        state.keyOn = true;
-        if (!keyOnTick) {
-          keyOnTick = tick;
-          attackPitch = state.pitch256;
-          attackVolume = state.volume;
-          attackPan = state.pan;
-          attackAbsolute = state.absolutePitch;
-          attackPanExplicit = state.panExplicit;
-        }
-        break;
-      case 0xdb:
-        state.keyOn = false;
-        break;
-      case 0xdc:
-        state.volume = static_cast<u8>(state.volume + static_cast<s8>(reader.u8At(operands)));
-        break;
-      case 0xde:
-        state.rowAddress = relativeTarget(continuation, static_cast<s16>(reader.le16(operands)));
-        if (firstRow == 0) {
-          firstRow = state.rowAddress;
-        }
-        if (!reader.has(state.rowAddress, 7)) {
-          return std::nullopt;
-        }
-        break;
-      case 0xe2: {
-        const u8 index = reader.u8At(operands);
-        if (reader.has(layout.presetTableAddress + index, 1) &&
-            reader.has(layout.presetPitchHighAddress + index, 1)) {
-          state.pitch256 = static_cast<s8>(reader.u8At(layout.presetPitchHighAddress + index)) * 256 +
-                           reader.u8At(layout.presetTableAddress + index);
-          state.absolutePitch = true;
-          state.fineExplicit = true;
-        }
-        break;
-      }
-      case 0xe3: {
-        const u8 index = reader.u8At(operands);
-        if (reader.has(layout.presetTableAddress + index, 1)) {
-          state.volume = reader.u8At(layout.presetTableAddress + index);
-        }
-        break;
-      }
-      case 0xe4: {
-        const u8 index = reader.u8At(operands);
-        if (reader.has(layout.presetTableAddress + index, 1)) {
-          const u8 pan = reader.u8At(layout.presetTableAddress + index);
-          state.pan = (pan & 0x80) != 0 ? traits.initialPan : std::min(pan, traits.maximumPan);
-          state.panExplicit = true;
-        }
-        break;
-      }
-      case 0xe5: {
-        const u8 index = reader.u8At(operands);
-        u32 wait =
-            reader.has(layout.presetTableAddress + index, 1) ? reader.u8At(layout.presetTableAddress + index) : 1;
-        wait = std::max<u32>(wait, 1);
-        if (state.keyOn) {
-          samples.insert(samples.end(), wait, VoiceSample{.pitch256 = state.pitch256, .volume = state.volume});
-        }
-        tick += wait;
-        break;
-      }
-      default:
-        break;
-    }
-    state.pc = continuation;
-  }
-
-  if (firstRow == 0 || !reader.has(firstRow, 7)) {
-    return std::nullopt;
-  }
-  return ScriptAnalysis{
-      .scriptAddress = start,
-      .rowAddress = firstRow,
-      .scriptRange = reader.range(minimum, maximum - minimum),
-      .attackPitch256 = attackPitch,
-      .attackVolume = attackVolume,
-      .attackPan = attackPan,
-      .absolutePitch = attackAbsolute,
-      .panExplicit = attackPanExplicit,
-      .samples = std::move(samples),
-      .cycleStart = cycleStart,
-      .cycleLength = cycleLength,
-  };
+  return samples;
 }
 
 [[nodiscard]] LfoWaveform inferWaveform(const std::vector<s32>& samples) {
@@ -350,55 +89,43 @@ void includeRange(u32 begin, u32 size, u32& minimum, u32& maximum) {
   return LfoWaveform::Triangle;
 }
 
-[[nodiscard]] InstrumentModulation modulation(const ScriptAnalysis& script, double timerSeconds) {
+[[nodiscard]] InstrumentModulation modulation(const VoiceScriptAnalysis& script, double timerSeconds) {
   InstrumentModulation result;
-  if (!script.cycleStart || !script.cycleLength || *script.cycleLength < 2 ||
-      *script.cycleStart + *script.cycleLength > script.samples.size()) {
+  if (!script.cycleStart || !script.cycleLength || *script.cycleLength < 2) {
     return result;
   }
-  const auto first = script.samples.begin() + *script.cycleStart;
-  const auto last = first + *script.cycleLength;
+  const CycleSamples samples = sampleCycle(script);
   const double rate = 1.0 / (*script.cycleLength * timerSeconds);
 
-  std::vector<s32> pitch;
-  pitch.reserve(*script.cycleLength);
-  std::transform(first, last, std::back_inserter(pitch), [](const VoiceSample& sample) { return sample.pitch256; });
-  const auto [minimumPitch, maximumPitch] = std::minmax_element(pitch.begin(), pitch.end());
+  const auto [minimumPitch, maximumPitch] = std::minmax_element(samples.pitch.begin(), samples.pitch.end());
   if (*minimumPitch != *maximumPitch) {
     const double center = (*minimumPitch + *maximumPitch) / 2.0;
-    const auto changed = std::find_if(first, last, [&](const VoiceSample& sample) {
-      return sample.pitch256 != center;
-    });
-    const double delay = (*script.cycleStart + std::distance(first, changed)) * timerSeconds;
+    const auto changed = std::ranges::find_if(samples.pitch, [&](s32 pitch) { return pitch != center; });
+    const double delay = (*script.cycleStart + std::distance(samples.pitch.begin(), changed)) * timerSeconds;
     result.vibrato = VibratoSpec{
         .maxDepthCents = (*maximumPitch - *minimumPitch) * (50.0 / 256.0),
         .rateHertz = ModulationRange{.minimum = rate, .maximum = rate},
-        .waveform = inferWaveform(pitch),
+        .waveform = inferWaveform(samples.pitch),
         .delaySeconds = ModulationRange{.minimum = delay, .maximum = delay},
         .depthMode = ModulationDepthMode::Fixed,
     };
   }
 
-  std::vector<s32> volume;
-  volume.reserve(*script.cycleLength);
-  std::transform(first, last, std::back_inserter(volume), [](const VoiceSample& sample) { return sample.volume; });
-  const auto [minimumVolume, maximumVolume] = std::minmax_element(volume.begin(), volume.end());
+  const auto [minimumVolume, maximumVolume] = std::minmax_element(samples.volume.begin(), samples.volume.end());
   if (*minimumVolume != *maximumVolume && script.attackVolume != 0) {
     const auto decibels = [&](u8 value) {
       return value == 0 ? -96.0 : 20.0 * std::log10(value / static_cast<double>(script.attackVolume));
     };
     const double low = decibels(static_cast<u8>(*minimumVolume));
     const double high = decibels(static_cast<u8>(*maximumVolume));
-    const u8 cycleBaseline = *script.cycleStart == 0 ? script.attackVolume
-                                                     : script.samples[*script.cycleStart - 1].volume;
-    const auto changed = std::find_if(first, last, [&](const VoiceSample& sample) {
-      return sample.volume != cycleBaseline;
+    const auto changed = std::ranges::find_if(samples.volume, [&](s32 volume) {
+      return volume != samples.precedingVolume;
     });
-    const double delay = (*script.cycleStart + std::distance(first, changed)) * timerSeconds;
+    const double delay = (*script.cycleStart + std::distance(samples.volume.begin(), changed)) * timerSeconds;
     result.tremolo = TremoloSpec{
         .maxDepthDb = std::max(std::abs(low), std::abs(high)),
         .rateHertz = ModulationRange{.minimum = rate, .maximum = rate},
-        .waveform = inferWaveform(volume),
+        .waveform = inferWaveform(samples.volume),
         .gainMode = *maximumVolume <= script.attackVolume ? TremoloGainMode::NoBoost
                                                           : TremoloGainMode::BipolarAroundNominal,
         .delaySeconds = ModulationRange{.minimum = delay, .maximum = delay},
@@ -413,7 +140,7 @@ struct Patch {
   u16 descriptor = 0;
   std::optional<u8> rawKey;
   std::set<u8> outputKeys;
-  ScriptAnalysis script;
+  VoiceScriptAnalysis script;
 };
 
 [[nodiscard]] std::vector<std::pair<u8, u16>> percussionScripts(ByteReader reader, const Layout& layout,
@@ -438,6 +165,13 @@ struct Patch {
 
 [[nodiscard]] std::vector<Patch> collectPatches(ByteReader reader, const Layout& layout,
                                                 const ReferencedInstruments& references) {
+  const DriverConfig driver{
+      .data = reader,
+      .traits = driverTraits(layout.version),
+      .presetTable = layout.presetTableAddress,
+      .presetPitchHigh = layout.presetPitchHighAddress,
+      .panTable = layout.panTableAddress,
+  };
   std::vector<Patch> patches;
   for (const u16 descriptor : references.descriptors) {
     if (!reader.has(descriptor, 1)) {
@@ -445,7 +179,8 @@ struct Patch {
     }
     const bool percussion = (reader.u8At(descriptor) & 1) != 0;
     if (!percussion) {
-      if (auto script = analyzeScript(reader, layout, static_cast<u16>(descriptor + 1))) {
+      auto script = analyzeVoiceScript(driver, static_cast<u16>(descriptor + 1));
+      if (script.rowAddress) {
         std::set<u8> keys;
         if (const auto found = references.noteKeys.find(descriptor); found != references.noteKeys.end()) {
           keys = found->second;
@@ -454,7 +189,7 @@ struct Patch {
             .identity = descriptor,
             .descriptor = descriptor,
             .outputKeys = std::move(keys),
-            .script = std::move(*script),
+            .script = std::move(script),
         });
       }
       continue;
@@ -462,8 +197,8 @@ struct Patch {
 
     const auto used = references.percussionKeys.find(descriptor);
     for (const auto& [rawKey, address] : percussionScripts(reader, layout, descriptor)) {
-      auto script = analyzeScript(reader, layout, address);
-      if (!script) {
+      auto script = analyzeVoiceScript(driver, address);
+      if (!script.rowAddress) {
         continue;
       }
       std::set<u8> keys{rawKey};
@@ -477,16 +212,17 @@ struct Patch {
           .descriptor = descriptor,
           .rawKey = rawKey,
           .outputKeys = std::move(keys),
-          .script = std::move(*script),
+          .script = std::move(script),
       });
     }
   }
   for (const auto& [scriptAddress, keys] : references.directScriptKeys) {
-    if (auto script = analyzeScript(reader, layout, scriptAddress)) {
+    auto script = analyzeVoiceScript(driver, scriptAddress);
+    if (script.rowAddress) {
       patches.push_back(Patch{
           .identity = kDirectInstrumentFlag | scriptAddress,
           .outputKeys = keys.empty() ? std::set<u8>{60} : keys,
-          .script = std::move(*script),
+          .script = std::move(script),
       });
     }
   }
@@ -496,8 +232,8 @@ struct Patch {
 [[nodiscard]] std::vector<u8> referencedSrcns(ByteReader reader, const std::vector<Patch>& patches) {
   std::set<u8> unique;
   for (const Patch& patch : patches) {
-    if (reader.has(patch.script.rowAddress, 1)) {
-      unique.insert(reader.u8At(patch.script.rowAddress));
+    if (patch.script.rowAddress && reader.has(*patch.script.rowAddress, 1)) {
+      unique.insert(reader.u8At(*patch.script.rowAddress));
     }
   }
   return {unique.begin(), unique.end()};
@@ -508,10 +244,10 @@ struct Patch {
 }
 
 [[nodiscard]] double baseUnityKey(ByteReader reader, const Patch& patch, u8 outputKey) {
-  const u32 row = patch.script.rowAddress;
+  const u32 row = *patch.script.rowAddress;
   const double rowPitch = static_cast<s8>(reader.u8At(row + 5)) + reader.u8At(row + 6) / 256.0;
   const double scriptPitch = patch.script.attackPitch256 / 256.0;
-  if (patch.script.absolutePitch) {
+  if (patch.script.attackAbsolutePitch) {
     return outputKey + 72.0 - (scriptPitch + rowPitch + kPitchTableCorrection);
   }
   return 72.0 - (scriptPitch + rowPitch + kPitchTableCorrection);
@@ -519,7 +255,7 @@ struct Patch {
 
 [[nodiscard]] Region makeRegion(ByteReader reader, const Layout& layout, const Patch& patch, SampleRef sample,
                                 std::optional<u8> key) {
-  const u32 row = patch.script.rowAddress;
+  const u32 row = *patch.script.rowAddress;
   Region region{
       .sample = sample,
       .range = reader.range(row, 7),
@@ -586,10 +322,11 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
             .id();
 
     for (const Patch& patch : patches) {
-      if (patch.identity != identity || !reader.has(patch.script.rowAddress, 7)) {
+      if (patch.identity != identity || !patch.script.rowAddress || !reader.has(*patch.script.rowAddress, 7)) {
         continue;
       }
-      const u8 srcn = reader.u8At(patch.script.rowAddress);
+      const u16 row = *patch.script.rowAddress;
+      const u8 srcn = reader.u8At(row);
       const auto sample = samples.findSrcn(srcn);
       if (!sample) {
         continue;
@@ -599,22 +336,21 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
           .parent(root)
           .description(fmt::format("Fixed-clock script at ${:04X}", patch.script.scriptAddress));
 
-      const bool fixedPitch = patch.script.absolutePitch || patch.rawKey.has_value();
+      const bool fixedPitch = patch.script.attackAbsolutePitch || patch.rawKey.has_value();
       if (!fixedPitch) {
         instrument
             .region(*sample, makeRegion(reader, layout, patch, *sample, std::nullopt))
-            .source("Region", reader.range(patch.script.rowAddress, 7), "mori-snes-region")
+            .source("Region", reader.range(row, 7), "mori-snes-region")
             .parent(root)
-            .description(fmt::format("SRCN {}, DSP voice row ${:04X}", srcn, patch.script.rowAddress));
+            .description(fmt::format("SRCN {}, DSP voice row ${:04X}", srcn, row));
         continue;
       }
       for (const u8 key : patch.outputKeys) {
         instrument
             .region(*sample, makeRegion(reader, layout, patch, *sample, key))
-            .source(fmt::format("Region (key {})", key), reader.range(patch.script.rowAddress, 7),
-                    "mori-snes-region")
+            .source(fmt::format("Region (key {})", key), reader.range(row, 7), "mori-snes-region")
             .parent(root)
-            .description(fmt::format("SRCN {}, DSP voice row ${:04X}", srcn, patch.script.rowAddress));
+            .description(fmt::format("SRCN {}, DSP voice row ${:04X}", srcn, row));
       }
     }
   }
