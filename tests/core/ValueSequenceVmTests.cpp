@@ -85,13 +85,14 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
 }
 
 void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
+  constexpr u32 waitTicks = 1u << 24;
   const SequenceProgramConfig config{
       .timebase = Timebase{.ppqn = 48},
       .behavior = SequenceProgramBehavior{},
   };
   const SequenceRuntime runtime{
               .execute = [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter&,
-                            VmApi&) { return command.address.value == 0 ? Effects::wait(7) : Effects{}; },
+                            VmApi&) { return command.address.value == 0 ? Effects::wait(waitTicks) : Effects{}; },
   };
   TrackProgram track{.startAddress = Address{0}};
   appendTestCommand(track, Address{0}, 0, {}, {}, CommandFlow::fallthroughTo(Address{1}), SourceAnnotationId{20});
@@ -108,8 +109,8 @@ void sequenceVmTimesCommandsThatEmitNoPerformanceEvents() {
          "eventless source-timeline fixture should not invent musical performance events");
   expect(performance.sourceSpans ==
              std::vector<SourcePlaybackSpan>{
-                 {.annotation = SourceAnnotationId{20}, .beginTick = 0, .endTick = 7},
-                 {.annotation = SourceAnnotationId{21}, .channel = 6, .beginTick = 7, .endTick = 8},
+                 {.annotation = SourceAnnotationId{20}, .beginTick = 0, .endTick = waitTicks},
+                 {.annotation = SourceAnnotationId{21}, .channel = 6, .beginTick = waitTicks, .endTick = waitTicks + 1},
              },
          "source timeline should preserve eventless command timing and semantic channels");
 }
