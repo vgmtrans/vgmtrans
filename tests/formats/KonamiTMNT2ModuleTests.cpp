@@ -334,7 +334,8 @@ void konamiTmnt2AliasesMiscSamplesAndTrackLabels() {
   const auto layout = findLayout(source, reader, &diagnostics);
   expect(layout && diagnostics.empty() && layout->sequences.size() == 2 && layout->sequencePointers.size() == 3,
          "non-Vendetta duplicate sequence pointers should remain aliases, not terminate the table");
-  expect(layout->sampleInfos.size() == 2 && layout->sampleInfos[0].sampleIndex != layout->sampleInfos[1].sampleIndex,
+  expect(layout->sampleInfos.size() == 2 && layout->sampleInstruments.size() == 2 &&
+             layout->sampleInstruments[0].sampleIndex != layout->sampleInstruments[1].sampleIndex,
          "looping and one-shot instruments over the same bytes must retain distinct sample identities");
 
   ScanIdAllocator ids;

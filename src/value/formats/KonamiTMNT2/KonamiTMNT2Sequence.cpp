@@ -18,6 +18,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -87,19 +88,12 @@ constexpr u32 kMaxTrackCommands = 262144;
 }
 
 [[nodiscard]] std::pair<double, double> k053260Pan(u8 raw, Version version) {
-  u8 index = raw & 7;
-  if (index == 0) {
-    index = 4;
-  }
-  if (version == Version::Vendetta) {
-    index = static_cast<u8>(-index) & 7;
-  }
   static constexpr std::array<std::pair<double, double>, 8> gains{
       std::pair{0.707106781, 0.707106781}, std::pair{1.0, 0.0},           std::pair{0.913421, 0.406738},
       std::pair{0.819153, 0.579193},       std::pair{0.707107, 0.707107}, std::pair{0.579193, 0.819153},
       std::pair{0.406738, 0.913421},       std::pair{0.0, 1.0},
   };
-  return gains[index];
+  return gains[k053260PanIndex(raw, version)];
 }
 
 struct RuntimeConfig {
@@ -123,9 +117,10 @@ struct ProgramState {
   s32 globalTranspose = 0;
   s32 ymMasterAttenuation = 0;
   s32 sampleMasterAttenuation = 0;
-  std::vector<SampleInstrument> instruments;
-  std::vector<std::vector<Drum>> drums;
-  std::vector<u8> ymPan;
+  // makeCompiledRuntime owns RuntimeConfig for the lifetime of these immutable views.
+  std::span<const SampleInstrument> instruments;
+  std::span<const std::vector<Drum>> drums;
+  std::span<const u8> ymPan;
 
   [[nodiscard]] double ticksPerSecond() const { return driverTickRate(clkb, tickSkipInterval); }
 };
@@ -133,12 +128,10 @@ struct ProgramState {
 struct TrackState {
   TrackState(const TrackProgram& trackProgram, const RuntimeConfig& config)
       : version(config.version), chip(config.trackChips[trackProgram.sourceTrackNumber]),
-        sourceTrackNumber(trackProgram.sourceTrackNumber), baseDuration(version == Version::Vendetta ? 1 : 3) {}
+        baseDuration(version == Version::Vendetta ? 1 : 3) {}
 
   Version version;
   TrackChip chip;
-  u32 sourceTrackNumber = 0;
-  u8 state = 0;
   u8 program = 0;
   bool percussion = false;
   u8 drumBank = 0;
@@ -159,7 +152,6 @@ struct TrackState {
   u8 dxAttenuation = 0;
   u8 dxMultiplier = 1;
   u8 instrumentVolume = 0x7f;
-  u8 instrumentRelease = 0;
   u8 sequencePan = 0;
   u8 instrumentPan = 0;
   s32 pitchBendRaw = 0;
@@ -172,8 +164,6 @@ struct TrackState {
   u32 nativeLfoRampInterval = 0;
   std::optional<double> previousKey;
   PerformanceNoteId previousNote;
-  std::array<Address, 2> loopStart;
-  std::array<u8, 2> loopCount{};
   u8 warpCounter = 0;
   Address warpOrigin;
   Address warpDestination;
@@ -269,7 +259,6 @@ struct Playback {
     const auto& instrument = program.instruments[track.program];
     track.instrumentVolume = instrument.volume;
     track.instrumentPan = instrument.pan;
-    track.instrumentRelease = instrument.release;
     if (instrument.gate != 0) {
       track.gate = instrument.gate;
     }
@@ -278,10 +267,6 @@ struct Playback {
   }
 
   void setPercussion(u8 raw) {
-    if (fm()) {
-      track.state = raw;
-      return;
-    }
     if (raw == 0) {
       track.percussion = false;
       setProgram(track.program);
@@ -422,7 +407,6 @@ struct Playback {
         if (drum.valid) {
           track.instrumentVolume = drum.volume;
           track.instrumentPan = drum.pan;
-          track.instrumentRelease = drum.release;
           gain = noteGain();
           if (track.sequencePan == 0) {
             emitPan();
@@ -460,7 +444,6 @@ struct Playback {
   }
 
   void sampledRelease(u8 packed) {
-    track.instrumentRelease = packed;
     const double seconds =
         sampledReleaseSeconds(track.version, packed, track.instrumentVolume, program.ticksPerSecond());
     out.updateEnvelope(Envelope{.releaseSeconds = seconds}, EnvelopeFields::Release,
@@ -592,11 +575,6 @@ struct Playback {
     }
   }
 
-  void loopStart(u8 slot, Address address) {
-    track.loopStart[slot] = address;
-    track.loopCount[slot] = 0;
-  }
-
   [[nodiscard]] Effects loopEnd(u8 slot, u16 plays, Address destination) {
     if (plays == 0xffff) {
       return vm.declaredLoop(destination);
@@ -621,8 +599,6 @@ struct Playback {
     }
     return {};
   }
-
-  void tick() {}
 };
 
 using Cursor = CompilerCursor<TrackState, Playback>;
@@ -742,7 +718,12 @@ struct DecodeState {
       return event.invoke<&Playback::initialize>(base, instrument, attenuation, gate);
     }
     case 0xe1: {
-      auto event = cursor.command(fm ? "Channel State" : "Percussion Bank", SequenceSemantic::Instrument);
+      if (fm) {
+        auto event = cursor.command("Channel State", SequenceSemantic::State);
+        static_cast<void>(event.u8("value"));
+        return event;
+      }
+      auto event = cursor.command("Percussion Bank", SequenceSemantic::Instrument);
       return event.invoke<&Playback::setPercussion>(event.u8("value"));
     }
     case 0xe2: {
@@ -878,7 +859,7 @@ struct DecodeState {
           cursor.command(isEnd ? "Loop End" : "Loop Start", isEnd ? SequenceSemantic::Repeat : SequenceSemantic::Loop);
       if (!isEnd) {
         state.loops[slot] = event.nextAddress();
-        return event.invoke<&Playback::loopStart>(slot, state.loops[slot]);
+        return event;
       }
       const u8 rawCount = event.u8("plays", SemanticOperandRole::Count);
       const u16 plays = rawCount == 0 ? 256 : rawCount == 0xff ? 0xffff : rawCount;

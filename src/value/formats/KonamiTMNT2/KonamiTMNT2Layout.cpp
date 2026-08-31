@@ -163,7 +163,6 @@ void readSequences(Layout& layout, ByteReader reader, std::vector<Diagnostic>* d
 
     SequenceLayout sequence{
         .index = index,
-        .tableEntry = tableEntry,
         .trackTable = reader.range(sequenceOffset, typeSize + totalTracks * 2),
         .ymTrackCount = ymTracks,
         .totalTrackCount = totalTracks,
@@ -245,7 +244,6 @@ struct SampleKey {
     return found->second;
   }
   const u32 index = static_cast<u32>(layout.sampleInfos.size());
-  info.sampleIndex = index;
   layout.sampleInfos.push_back(info);
   samples.emplace(key, index);
   return index;
@@ -456,7 +454,6 @@ void readVendettaSynth(Layout& layout, ByteReader reader, const SourceSegment& p
         .pitch = reader.le16(offset),
         .adpcm = (reader.u8At(offset + 7) & 1) != 0,
         .range = reader.range(offset, 8),
-        .sampleIndex = index,
     });
   }
   for (auto& instrument : layout.sampleInstruments) {
@@ -498,20 +495,6 @@ void readVendettaSynth(Layout& layout, ByteReader reader, const SourceSegment& p
 }
 
 }  // namespace
-
-const char* versionName(Version version) {
-  switch (version) {
-    case Version::Tmnt2:
-      return "TMNT2";
-    case Version::SunsetRiders:
-      return "Sunset Riders";
-    case Version::BellsWhistles:
-      return "Bells & Whistles";
-    case Version::Vendetta:
-      return "Vendetta";
-  }
-  return "Konami TMNT2";
-}
 
 std::optional<Layout> findLayout(const SourceFile& source, ByteReader reader, std::vector<Diagnostic>* diagnostics) {
   if (source.attribute(mame::kMameFormatAttribute) != kFormatName) {
