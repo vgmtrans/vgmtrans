@@ -212,16 +212,20 @@ struct GlobalTransposePerformanceEvent {
 
 struct PitchBendPerformanceEvent {
   PerformanceEventHeader header;
-  // Musical bend amount. MIDI renderers quantize this using the active pitch-bend range.
+  // Musical bend amount and the collection-independent fallback for a source wheel.
   double semitones = 0.0;
   // A source pitch wheel may rely on the selected instrument for its range.
-  // Collection-aware lowerers use this position instead of the fallback above.
+  // Collection-aware consumers use this position instead of the fallback above.
   std::optional<double> normalizedWheelPosition;
   // Each event replaces one persistent layer; renderers add the active layers.
   // Layer zero retains ordinary bend/transition replacement semantics. An
   // independent pitch LFO or envelope uses another layer so neither is erased.
   PitchBendLayerId layer = kPrimaryPitchBendLayer;
 };
+
+[[nodiscard]] double effectivePitchBendSemitones(
+    const PitchBendPerformanceEvent& bend, u16 sourceRangeCents,
+    std::optional<u16> instrumentRangeCents) noexcept;
 
 struct PitchBendRangePerformanceEvent {
   PerformanceEventHeader header;

@@ -14,6 +14,15 @@
 
 namespace vgmtrans::core {
 
+double effectivePitchBendSemitones(const PitchBendPerformanceEvent& bend, u16 sourceRangeCents,
+                                   std::optional<u16> instrumentRangeCents) noexcept {
+  if (!bend.normalizedWheelPosition) {
+    return bend.semitones;
+  }
+  const double range = instrumentRangeCents.value_or(sourceRangeCents) / 100.0;
+  return std::clamp(*bend.normalizedWheelPosition, -1.0, 1.0) * range;
+}
+
 const PerformanceEventHeader& performanceEventHeader(const PerformanceEvent& event) {
   return std::visit([](const auto& typedEvent) -> const PerformanceEventHeader& { return typedEvent.header; }, event);
 }

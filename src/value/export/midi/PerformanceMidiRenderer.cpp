@@ -7,11 +7,13 @@
 #include "value/export/midi/PerformanceMidiRenderer.h"
 
 #include "value/base/LevelScale.h"
+#include "value/export/PerformanceInstrumentSelection.h"
 #include "value/export/SequenceModulationProfile.h"
 #include "value/export/midi/PitchTransitionMidiLowering.h"
 
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <optional>
 #include <span>
 #include <stdexcept>
@@ -279,30 +281,9 @@ struct MidiInstrumentSelection {
   std::optional<u16> pitchBendRangeCents;
 };
 
-[[nodiscard]] const Instrument* selectedInstrument(const InstrumentPerformanceEvent& event,
-                                                   std::span<const SoundBankAsset* const> soundBanks) {
-  const InstrumentAddress directAddress{.bank = event.bank, .program = event.program};
-  for (const auto* soundBank : soundBanks) {
-    if (soundBank == nullptr) {
-      continue;
-    }
-    const auto found = std::ranges::find_if(soundBank->instruments, [&](const Instrument& instrument) {
-      if (event.sourceInstrument) {
-        return instrument.identity && *instrument.identity == *event.sourceInstrument;
-      }
-      const InstrumentAddress address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
-      return address == directAddress;
-    });
-    if (found != soundBank->instruments.end()) {
-      return &*found;
-    }
-  }
-  return nullptr;
-}
-
 [[nodiscard]] MidiInstrumentSelection instrumentSelection(const InstrumentPerformanceEvent& event,
                                                           std::span<const SoundBankAsset* const> soundBanks) {
-  const Instrument* instrument = selectedInstrument(event, soundBanks);
+  const Instrument* instrument = findPerformanceInstrument(event, soundBanks);
   if (!event.sourceInstrument) {
     return MidiInstrumentSelection{
         .address = resolveInstrumentAddress(InstrumentAddress{.bank = event.bank, .program = event.program}, {}),
@@ -380,34 +361,22 @@ class PitchBendLayers {
   void apply(const PitchBendPerformanceEvent& bend) {
     const double normalized = std::clamp(bend.normalizedWheelPosition.value_or(0.0), -1.0, 1.0);
     if (bend.semitones == 0.0 && normalized == 0.0) {
-      layers.erase(bend.layer);
+      layers.erase(bend.layer.value);
       return;
     }
-    layers.insert_or_assign(
-        bend.layer,
-        Layer{
-            .semitones = bend.semitones,
-            .normalizedWheelPosition = bend.normalizedWheelPosition ? std::optional{normalized} : std::nullopt,
-        });
+    layers.insert_or_assign(bend.layer.value, bend);
   }
 
   [[nodiscard]] double semitones(u16 sourceRangeCents, std::optional<u16> instrumentRangeCents) const {
-    const double wheelRange = instrumentRangeCents.value_or(sourceRangeCents) / 100.0;
     double total = 0.0;
     for (const auto& entry : layers) {
-      const auto& layer = entry.second;
-      total += layer.normalizedWheelPosition ? *layer.normalizedWheelPosition * wheelRange : layer.semitones;
+      total += effectivePitchBendSemitones(entry.second, sourceRangeCents, instrumentRangeCents);
     }
     return total;
   }
 
  private:
-  struct Layer {
-    double semitones = 0.0;
-    std::optional<double> normalizedWheelPosition;
-  };
-
-  std::unordered_map<PitchBendLayerId, Layer> layers;
+  std::map<u32, PitchBendPerformanceEvent> layers;
 };
 
 struct RenderTrackState {
@@ -583,26 +552,38 @@ struct VoicePitchBendRangeChange {
   };
   for (const auto* event : timeline) {
     const auto& header = performanceEventHeader(*event);
-    while (nextVoice < voices.size() && std::tie(voices[nextVoice].startTick, voices[nextVoice].startSequence) <=
-                                            std::tie(header.tick, header.sequence)) {
+    bool pitchChanged = false;
+    while (nextVoice < voices.size() &&
+           std::tie(voices[nextVoice].startTick, voices[nextVoice].startSequence) <=
+               std::tie(header.tick, header.sequence)) {
       activeVoice = nextVoice++;
       voices[activeVoice].sourceCents = sourceCents;
-      observePitch();
+      pitchChanged = true;
     }
     if (const auto* range = std::get_if<PitchBendRangePerformanceEvent>(event)) {
       sourceCents = range->cents;
-      observePitch();
+      pitchChanged = true;
     } else if (const auto* instrument = std::get_if<InstrumentPerformanceEvent>(event)) {
       instrumentCents = instrumentSelection(*instrument, soundBanks).pitchBendRangeCents;
-      observePitch();
+      pitchChanged = true;
+    } else if (const auto* note = std::get_if<NotePerformanceEvent>(event);
+               note != nullptr && !note->extendsPrevious && note->instrumentAddress) {
+      const auto address = *note->instrumentAddress;
+      instrumentCents = instrumentSelection(
+                            InstrumentPerformanceEvent{.bank = address.bank, .program = address.program}, soundBanks)
+                            .pitchBendRangeCents;
+      pitchChanged = true;
     } else if (const auto* tuning = std::get_if<TuningPerformanceEvent>(event)) {
       activeTuningBend = tuningBendSemitones(tuning->cents, tuningRendering);
-      observePitch();
+      pitchChanged = true;
     } else if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(event)) {
       activeBendLayers.apply(*bend);
       if (activeVoice != voices.size()) {
         voices[activeVoice].hasAutomatedBend |= bend->header.automation.has_value();
       }
+      pitchChanged = true;
+    }
+    if (pitchChanged) {
       observePitch();
     }
   }
@@ -1581,7 +1562,8 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
   const PerformanceTempoMap globalTempos{performance};
   const std::vector<PerformanceTempoMap::Point> globalTempoPoints = globalTempos.points();
   std::vector<bool> renderedTempoPoints(globalTempoPoints.size(), false);
-  const PerformanceSequence loweredPerformance = lowerMidiPerformanceAutomation(performance, options, globalTempos);
+  const PerformanceSequence loweredPerformance =
+      lowerMidiPerformanceAutomation(performance, options, globalTempos, soundBanks);
   MidiSequence sequence{
       .timebase = loweredPerformance.timebase,
       .diagnostics = loweredPerformance.diagnostics,
