@@ -25,6 +25,7 @@ using namespace core;
 namespace {
 
 constexpr u32 kMaxCommands = 1048576;
+constexpr PitchBendLayerId kPitchWheelLayer{1};
 
 [[nodiscard]] double driverLevel(u8 value) {
   return value == 127 ? 1.0 : std::min<u8>(value, 127) / 128.0;
@@ -320,7 +321,7 @@ struct Playback {
         delayed.level(1.0);
         delayed.expression(1.0);
         delayed.channelPan(0.5);
-        delayed.pitchBend(0.0);
+        delayed.pitchBend(0.0, kPitchWheelLayer);
         delayed.vibratoDepth(0.0);
         delayed.tremoloLinearGainDepth(0.0);
         break;
@@ -345,8 +346,7 @@ struct Playback {
         semitones = wheel < 0.0 ? wheel * tone->bendDownSemitones : wheel * tone->bendUpSemitones;
       }
     }
-    out.at(eventTick(delta))
-        .pitchBend(PitchBendPerformanceEvent{.semitones = semitones, .normalizedWheelPosition = wheel});
+    out.at(eventTick(delta)).pitchBend(semitones, kPitchWheelLayer);
     return after(delta);
   }
 

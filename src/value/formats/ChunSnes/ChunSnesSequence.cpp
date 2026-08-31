@@ -23,6 +23,8 @@ using namespace core;
 
 namespace {
 
+constexpr PitchBendLayerId kTuningPitchLayer{1};
+
 constexpr std::array<u8, 22> kDurationRates{
     0x0d, 0x1a, 0x26, 0x33, 0x40, 0x4d, 0x5a, 0x66, 0x73, 0x80, 0x8c,
     0x99, 0xa6, 0xb3, 0xbf, 0xcc, 0xd9, 0xe6, 0xf2, 0xfe, 0xff, 0x00,
@@ -473,7 +475,7 @@ struct Playback {
     emitPan();
   }
 
-  void emitPitchOffset() { out.pitchBend(math::pitchCents(track.tuning) / 100.0); }
+  void emitPitchOffset() { out.pitchBend(math::pitchCents(track.tuning) / 100.0, kTuningPitchLayer); }
 
   void tuning(s8 value) {
     track.tuning = value;

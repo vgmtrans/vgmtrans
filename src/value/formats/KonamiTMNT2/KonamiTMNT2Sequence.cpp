@@ -49,6 +49,8 @@ double sampledReleaseSeconds(Version version, u8 packed, u8 volume, double ticks
 namespace {
 
 constexpr u32 kMaxTrackCommands = 262144;
+constexpr PitchBendLayerId kPitchBendLayer{1};
+constexpr PitchBendLayerId kSteppedModulationLayer{2};
 
 [[nodiscard]] double ym2151LfoRate(u8 raw) {
   // The YM2151 advances its 30-bit LFO phase accumulator once per
@@ -341,8 +343,7 @@ struct Playback {
 
   void pitchBend(u8 raw) {
     track.pitchBendRaw = signMagnitude(raw);
-    out.pitchBendRange(12);
-    out.pitchBend(track.pitchBendRaw / 64.0);
+    out.pitchBend(track.pitchBendRaw / 64.0, kPitchBendLayer);
   }
 
   void setPortamento(u8 raw) {
@@ -545,17 +546,16 @@ struct Playback {
     s32 pitch = 0;
     s32 volume = 0;
     u32 volumeCountdown = interval;
-    out.pitchBendRange(24);
     for (u32 tick = 1; tick < ticks; ++tick) {
       pitch += pitchDelta;
-      out.at(vm.tick() + tick).pitchBend((track.pitchBendRaw + pitch) / 64.0);
+      out.at(vm.tick() + tick).pitchBend(pitch / 64.0, kSteppedModulationLayer);
       if (--volumeCountdown == 0) {
         volume += volumeDelta;
         volumeCountdown = interval;
         out.at(vm.tick() + tick).expression(noteGain(-volume));
       }
     }
-    out.at(vm.tick() + ticks).pitchBend(track.pitchBendRaw / 64.0);
+    out.at(vm.tick() + ticks).pitchBend(0.0, kSteppedModulationLayer);
     out.at(vm.tick() + ticks).expression(noteGain());
   }
 

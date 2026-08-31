@@ -29,6 +29,7 @@ namespace {
 
 constexpr u32 kMaxCommands = 1048576;
 constexpr u32 kSeTrackFlag = 1u << 24;
+constexpr PitchBendLayerId kPitchWheelLayer{1};
 
 [[nodiscard]] constexpr bool isSeTrack(u32 sourceTrackNumber) noexcept {
   return (sourceTrackNumber & kSeTrackFlag) != 0;
@@ -224,7 +225,7 @@ struct Playback {
     // This is already the physical per-voice result. Supplying the normalized
     // wheel would make collection-aware MIDI rendering apply the instrument's
     // maximum range a second time.
-    delayed.pitchBend(PitchBendPerformanceEvent{.semitones = semitones});
+    delayed.pitchBend(semitones, kPitchWheelLayer);
   }
 
   void pruneReleasedNotes() {
@@ -543,7 +544,7 @@ struct Playback {
         delayed.level(1.0);
         delayed.expression(1.0);
         delayed.channelPan(0.5);
-        delayed.pitchBend(0.0);
+        delayed.pitchBend(0.0, kPitchWheelLayer);
         break;
       default:
         break;

@@ -549,7 +549,8 @@ void ndsSequenceComposesPitchBendRangeBehavior() {
   expect(performance.diagnostics.empty() && performance.tracks[0].events.size() == 2,
          "NDS composed pitch actions should render without additional commands");
   expect(std::get<PitchBendRangePerformanceEvent>(performance.tracks[0].events[0]).cents == 1200 &&
-             std::get<PitchBendPerformanceEvent>(performance.tracks[0].events[1]).semitones == 6.0,
+             std::get<PitchBendPerformanceEvent>(performance.tracks[0].events[1]).semitones == 6.0 &&
+             std::get<PitchBendPerformanceEvent>(performance.tracks[0].events[1]).layer != kPrimaryPitchBendLayer,
          "NDS pitch bend should observe the range state set by the preceding explicit action");
 }
 
@@ -814,6 +815,7 @@ void ndsSequenceRevealsRunningSineLfoAtDepthChange() {
 void ndsSequencePreservesPortamentoTimingIntent() {
   const PerformanceSequence performance = renderTestPerformance({
       0xc7, 0x01,        // note wait
+      0xc4, 0x40,        // persistent +1-semitone pitch wheel
       0xc9, 0x3c,        // portamento source C4 (and enable)
       0xcf, 0x10,        // fixed-clock portamento time
       0x40, 0x7f, 0x20,  // E4 for 32 ticks
@@ -876,6 +878,12 @@ void ndsSequencePreservesPortamentoTimingIntent() {
                                    return bend != nullptr && bend->value != 0;
                                  }),
          "pitch-bend lowering should reproduce NDS portamento without native portamento events");
+  const auto composedEndpoint = std::ranges::find_if(bent.tracks[0].events, [](const MidiEvent& event) {
+    const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+    return event.tick == 16 && bend != nullptr && bend->value > 0;
+  });
+  expect(composedEndpoint != bent.tracks[0].events.end(),
+         "the NDS pitch wheel should remain additive at a pitch-bend portamento endpoint");
 }
 
 void ndsSequencePreservesTiedSweepVoices() {

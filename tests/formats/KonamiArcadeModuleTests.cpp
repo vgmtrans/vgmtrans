@@ -674,9 +674,13 @@ void konamiArcadeGxDriverQuirksRemainRepresented() {
       std::ranges::none_of(pitchBends, [](const PitchBendPerformanceEvent* bend) { return bend->header.tick < 94; }) &&
           std::ranges::any_of(pitchBends,
                               [](const PitchBendPerformanceEvent* bend) {
-                                return bend->header.tick == 94 && std::abs(bend->semitones - 1.0) < 0.0001;
-                              }),
-      "F2 should retune the following note without bending the voice that is already playing");
+                                return bend->header.tick == 94 && std::abs(bend->semitones - 1.0) < 0.0001 &&
+                                       bend->layer != kPrimaryPitchBendLayer;
+                              }) &&
+          std::ranges::none_of(performance.tracks.front().events, [](const PerformanceEvent& event) {
+            return std::holds_alternative<PitchBendRangePerformanceEvent>(event);
+          }),
+      "F2 should retune the following note without bending the active voice or emitting an artificial range");
 }
 
 void konamiArcadeExpressionPersistsThroughSoftwareRelease() {

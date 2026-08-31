@@ -211,7 +211,9 @@ void dynamicDriverFeaturesRenderFromCapturedTables() {
          "captured Prism tables should drive tempo, notes, vibrato, looping volume/GAIN envelopes, echo, and slides");
   expect(
       std::ranges::any_of(
-          pitch, [](const PitchBendPerformanceEvent* event) { return std::abs(event->semitones - 0.125) < 0.000001; }),
+          pitch, [](const PitchBendPerformanceEvent* event) {
+            return std::abs(event->semitones - 0.125) < 0.000001 && event->layer != kPrimaryPitchBendLayer;
+          }),
       "table vibrato must preserve the SPC driver's signed 8.8-semitone samples");
   expect(std::ranges::any_of(reverb,
                              [](const ReverbPerformanceEvent* event) {
