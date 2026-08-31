@@ -10,6 +10,7 @@
 #include "value/session/Session.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <initializer_list>
 #include <limits>
@@ -76,6 +77,39 @@ public:
     word(0x2000, 0x3000);
     word(0x2002, 0x3000);
     write(0x3000, {0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
+  }
+
+  [[nodiscard]] static DriverFixture shien() {
+    DriverFixture fixture;
+    fixture.write(0x0200, {0xe8, 0x11, 0x8d, 0x5d, 0xcb, 0xf2, 0xc4, 0xf3,
+                           0xe8, 0xe0, 0x8d, 0x6c, 0xcb, 0xf2, 0xc4, 0xf3});
+    fixture.write(0x0300, {0x8d, 0x00, 0xf7, 0x29, 0x3a, 0x29, 0xfd, 0xf6, 0x00,
+                           0x17, 0xd5, 0x7e, 0x02, 0xf6, 0x0a, 0x17, 0x2f, 0x07});
+    fixture.write(0x0400, {0xf5, 0x0a, 0x02, 0xfd, 0xf6, 0x00, 0x18, 0xeb, 0x31,
+                           0xcf, 0xdd, 0xee, 0xcb, 0xf2, 0xc4, 0xf3, 0x6d, 0xe8,
+                           0x14, 0x80, 0xb5, 0x0a, 0x02, 0xfd, 0xf6, 0x00, 0x18});
+
+    fixture.write(0x1400, {0x04, 0x03, 0x40, 0xc7, 0x80, 0xc5, 0x40, 0xc0});
+    fixture.relative(0x1408, 0x1500);
+    fixture.write(0x140a, {0xc1, 0x0a, 0xf3, 0x00, 0xe7, 0x28, 0xee, 0x40, 0xf7,
+                           0x55, 0xd7, 0x03, 0xc0, 0x40, 0x02, 0xd6, 0xd5, 0x80, 0xe0});
+
+    fixture.data_[0x1500] = 1;
+    fixture.word(0x1501, 0x1510);  // Shien percussion entries are absolute.
+    fixture.write(0x1510, {0xef});
+    fixture.relative(0x1511, 0x1600);
+    fixture.write(0x1513, {0xcd, 0xf0, 0xeb, 0x04});
+    fixture.write(0x1517, {0x01, 0xea, 0x04, 0xed, 0xfc, 0x01, 0xea, 0xfc, 0xed, 0x04, 0xd9});
+    fixture.relative(0x1522, 0x1517);
+
+    fixture.data_[0x1700] = 0x80;
+    fixture.data_[0x170a] = 0x02;
+    constexpr std::array<u8, 21> pan{0x7f, 0x7e, 0x7d, 0x7c, 0x7a, 0x77, 0x73, 0x6e, 0x69, 0x67, 0x64,
+                                      0x50, 0x46, 0x3c, 0x32, 0x28, 0x1e, 0x14, 0x0a, 0x05, 0x00};
+    std::ranges::copy(pan, fixture.data_.begin() + 0x1800);
+    fixture.word(0x1100, 0x3000);
+    fixture.word(0x1102, 0x3000);
+    return fixture;
   }
 
   [[nodiscard]] const std::vector<u8>& data() const { return data_; }
@@ -310,6 +344,49 @@ void scannerBuildsScriptedSynthModulation() {
                         ", rate=" + std::to_string(region->modulation.vibrato->rateHertz.minimum)
                   : std::string{}) +
              ")");
+}
+
+void shienDialectUsesItsDriverTimingAndPointers() {
+  const DriverFixture fixture = DriverFixture::shien();
+  const auto layout = findLayout(ByteReader(SourceId{305}, fixture.data()));
+  expect(layout && layout->version == Version::Shien && layout->spcDirAddress == 0x1100 &&
+             layout->presetTableAddress == 0x1700 && layout->presetPitchHighAddress == 0x170a &&
+             layout->panTableAddress == 0x1800,
+         "Shien's relocated DIR, split pitch presets, and 21-step pan law should identify its driver dialect");
+
+  const SessionSnapshot snapshot = scan(fixture.data());
+  const Collection* collection = firstCollection(snapshot);
+  const SoundBankAsset* bank = firstSoundBank(snapshot);
+  const Region* region = firstRegion(bank);
+  const auto* sequence = collection == nullptr || !collection->members.sequence
+                             ? nullptr
+                             : snapshot.asset<SequenceProgramAsset>(*collection->members.sequence);
+  expect(snapshot.diagnostics().empty() && sequence != nullptr && bank != nullptr &&
+             !bank->instruments.empty() && bank->instruments.front().identity &&
+             bank->instruments.front().identity->key == 0x1500 && region != nullptr &&
+             region->modulation.vibrato && region->modulation.tremolo &&
+             std::abs(region->modulation.vibrato->delaySeconds->minimum - 4 * 0.0075) < 0.000001 &&
+             std::abs(region->modulation.vibrato->rateHertz.minimum - 1.0 / (2 * 0.0075)) < 0.000001,
+         "Shien's absolute percussion pointers and 7.5 ms voice-script modulation clock should produce its bank");
+
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program);
+  const PerformanceTrack& track = performance.tracks.front();
+  const auto tempos = events<TempoPerformanceEvent>(track);
+  const auto masters = events<MasterLevelPerformanceEvent>(track);
+  const auto ranges = events<PitchBendRangePerformanceEvent>(track);
+  const auto bends = events<PitchBendPerformanceEvent>(track);
+  const auto notes = events<NotePerformanceEvent>(track);
+  const auto reverbs = events<ReverbPerformanceEvent>(track);
+  expect(performance.diagnostics.empty() && !tempos.empty() &&
+             tempos.back()->microsecondsPerQuarter == 92'160'000u / 0x80 && !masters.empty() &&
+             std::abs(masters.back()->linearGain - 66.0 / 256.0) < 0.000001 && !ranges.empty() &&
+             ranges.back()->cents == 500 && !bends.empty() && std::abs(bends.back()->semitones - 2.5) < 0.000001 &&
+             notes.size() == 1 && notes.front()->durationTicks == 5 * 256 &&
+             std::abs(notes.front()->key - 2.5) < 0.000001 && !reverbs.empty() &&
+             reverbs.back()->delayMilliseconds == 48.0 && reverbs.back()->leftGain == -0.5 &&
+             reverbs.back()->feedback == 0.5 && reverbs.back()->send == 0.5,
+         "Shien's sparse command table should preserve tempo, master gain, pitch presets, bends, echo, notes, and "
+         "the inert F7 operand");
 }
 
 void loopingVoicePreludeRemainsSeparateFromItsVibratoCycle() {
@@ -560,6 +637,7 @@ void runMoriSnesModuleTests() {
   fixedClockModeUsesTimerDurations();
   sourceVoiceScriptChangesFutureReleaseBehavior();
   scannerBuildsScriptedSynthModulation();
+  shienDialectUsesItsDriverTimingAndPointers();
   loopingVoicePreludeRemainsSeparateFromItsVibratoCycle();
   preAttackFinePitchRemainsRelativeToTheSourceNote();
   physicalVoiceScriptsCanBoundNotes();
