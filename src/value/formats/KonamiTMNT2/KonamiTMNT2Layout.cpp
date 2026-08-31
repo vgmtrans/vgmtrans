@@ -11,11 +11,10 @@
 
 #include <algorithm>
 #include <charconv>
+#include <compare>
 #include <limits>
 #include <map>
-#include <ranges>
 #include <set>
-#include <tuple>
 #include <utility>
 
 namespace vgmtrans::formats::konami_tmnt2 {
@@ -121,7 +120,7 @@ void warn(std::vector<Diagnostic>* diagnostics, std::string message, SourceRange
 }
 
 void readSequences(Layout& layout, ByteReader reader, std::vector<Diagnostic>* diagnostics) {
-  std::set<u16> pointers;
+  std::map<u16, SourceRange> pointers;
   std::vector<std::pair<u16, SourceRange>> entries;
   u32 cursor = layout.sequenceTableOffset;
   u32 firstSequence = static_cast<u32>(layout.program.endOffset());
@@ -133,8 +132,9 @@ void readSequences(Layout& layout, ByteReader reader, std::vector<Diagnostic>* d
     if (layout.version == Version::Vendetta && pointers.contains(pointer)) {
       break;
     }
-    pointers.insert(pointer);
-    entries.emplace_back(pointer, reader.range(cursor, 2));
+    const SourceRange range = reader.range(cursor, 2);
+    pointers.try_emplace(pointer, range);
+    entries.emplace_back(pointer, range);
     firstSequence = std::min(firstSequence, static_cast<u32>(layout.program.offset + pointer));
     cursor += 2;
   }
@@ -142,12 +142,11 @@ void readSequences(Layout& layout, ByteReader reader, std::vector<Diagnostic>* d
 
   std::map<u16, u32> sequenceIndices;
   u32 index = 0;
-  for (const u16 pointer : pointers) {
+  for (const auto& [pointer, tableEntry] : pointers) {
     sequenceIndices.emplace(pointer, index);
-    const auto pointerEntry = std::ranges::find(entries, pointer, &std::pair<u16, SourceRange>::first);
     const u32 sequenceOffset = static_cast<u32>(layout.program.offset + pointer);
     if (!reader.has(sequenceOffset, layout.version == Version::Vendetta ? 24 : 1)) {
-      warn(diagnostics, "KonamiTMNT2 sequence pointer is outside the sound CPU ROM", pointerEntry->second);
+      warn(diagnostics, "KonamiTMNT2 sequence pointer is outside the sound CPU ROM", tableEntry);
       ++index;
       continue;
     }
@@ -164,7 +163,7 @@ void readSequences(Layout& layout, ByteReader reader, std::vector<Diagnostic>* d
 
     SequenceLayout sequence{
         .index = index,
-        .tableEntry = pointerEntry->second,
+        .tableEntry = tableEntry,
         .trackTable = reader.range(sequenceOffset, typeSize + totalTracks * 2),
         .ymTrackCount = ymTracks,
         .totalTrackCount = totalTracks,
@@ -202,6 +201,26 @@ void readSequences(Layout& layout, ByteReader reader, std::vector<Diagnostic>* d
   }
 }
 
+struct SampleKey {
+  u32 start;
+  u32 length;
+  u32 loopStart;
+  bool adpcm;
+  bool reverse;
+  bool loops;
+
+  auto operator<=>(const SampleKey&) const = default;
+};
+
+[[nodiscard]] SampleKey sampleKey(const SampleInfo& info) {
+  return SampleKey{info.start, info.length, info.loopStart, info.adpcm, info.reverse, info.loops};
+}
+
+[[nodiscard]] u32 readLe24(ByteReader reader, u32 offset) {
+  return static_cast<u32>(reader.u8At(offset)) | (static_cast<u32>(reader.u8At(offset + 1)) << 8) |
+         (static_cast<u32>(reader.u8At(offset + 2)) << 16);
+}
+
 [[nodiscard]] std::vector<u32> pointerTable(ByteReader reader, const Layout& layout, u32 table,
                                             u32 hardEnd = std::numeric_limits<u32>::max()) {
   std::vector<u32> result;
@@ -220,9 +239,8 @@ void readSequences(Layout& layout, ByteReader reader, std::vector<Diagnostic>* d
   return result;
 }
 
-[[nodiscard]] u32 addSample(Layout& layout, SampleInfo info,
-                            std::map<std::tuple<u32, u32, u32, bool, bool, bool>, u32>& samples) {
-  const auto key = std::tuple{info.start, info.length, info.loopStart, info.adpcm, info.reverse, info.loops};
+[[nodiscard]] u32 addSample(Layout& layout, SampleInfo info, std::map<SampleKey, u32>& samples) {
+  const SampleKey key = sampleKey(info);
   if (const auto found = samples.find(key); found != samples.end()) {
     return found->second;
   }
@@ -236,7 +254,7 @@ void readSequences(Layout& layout, ByteReader reader, std::vector<Diagnostic>* d
 void readTmnt2Synth(Layout& layout, ByteReader reader, std::vector<Diagnostic>* diagnostics) {
   layout.ym2151Patches = pointerTable(reader, layout, layout.ym2151TableOffset);
   const auto instrumentPointers = pointerTable(reader, layout, layout.k053260TableOffset, layout.drumTableOffset);
-  std::map<std::tuple<u32, u32, u32, bool, bool, bool>, u32> samples;
+  std::map<SampleKey, u32> samples;
 
   for (const u32 offset : instrumentPointers) {
     if (!reader.has(offset, 10)) {
@@ -252,8 +270,7 @@ void readTmnt2Synth(Layout& layout, ByteReader reader, std::vector<Diagnostic>* 
     const u32 loopStart = splitLoop ? reader.le16(offset + 1) : 0;
     const u32 length = reader.le16(offset + (splitLoop ? 3 : 1));
     const u32 startField = offset + (splitLoop ? 5 : 3);
-    const u32 start = static_cast<u32>(reader.u8At(startField)) | (static_cast<u32>(reader.u8At(startField + 1)) << 8) |
-                      (static_cast<u32>(reader.u8At(startField + 2)) << 16);
+    const u32 start = readLe24(reader, startField);
     const u32 common = offset + (splitLoop ? 8 : 6);
     const SampleInfo info{
         .start = start,
@@ -264,8 +281,7 @@ void readTmnt2Synth(Layout& layout, ByteReader reader, std::vector<Diagnostic>* 
         .loops = (flags & 3) != 0,
         .range = reader.range(offset, size),
     };
-    const bool validSample =
-        info.length != 0 && info.start <= layout.sound.size && info.length <= layout.sound.size - info.start;
+    const bool validSample = info.length != 0 && info.fitsIn(layout.sound.size);
     const u32 sample = validSample ? addSample(layout, info, samples) : kInvalidSampleIndex;
     layout.sampleInstruments.push_back(SampleInstrument{
         .volume = reader.u8At(common),
@@ -297,8 +313,7 @@ void readTmnt2Synth(Layout& layout, ByteReader reader, std::vector<Diagnostic>* 
       firstDrum = std::min(firstDrum, offset);
       drumPointerSet.insert(offset);
       const u8 flags = reader.u8At(offset + 3);
-      const u32 start = static_cast<u32>(reader.u8At(offset + 6)) | (static_cast<u32>(reader.u8At(offset + 7)) << 8) |
-                        (static_cast<u32>(reader.u8At(offset + 8)) << 16);
+      const u32 start = readLe24(reader, offset + 6);
       const SampleInfo info{
           .start = start,
           .length = reader.le16(offset + 4),
@@ -307,8 +322,7 @@ void readTmnt2Synth(Layout& layout, ByteReader reader, std::vector<Diagnostic>* 
           .loops = (flags & 3) != 0,
           .range = reader.range(offset, 14),
       };
-      const bool validSample =
-          info.length != 0 && info.start <= layout.sound.size && info.length <= layout.sound.size - info.start;
+      const bool validSample = info.length != 0 && info.fitsIn(layout.sound.size);
       const u32 sample = validSample ? addSample(layout, info, samples) : kInvalidSampleIndex;
       drums.push_back(Drum{
           .valid = validSample,
@@ -339,8 +353,7 @@ struct VendettaDrumRecord {
 
 [[nodiscard]] std::vector<VendettaDrumRecord> readVendettaDrumRecords(ByteReader reader, const Layout& layout,
                                                                       u32 begin, u32 end, u32 loadInstrument,
-                                                                      u32 setPan, u32 setPitch, u32 noteOn,
-                                                                      const std::vector<u32>& instrumentPointers) {
+                                                                      u32 setPan, u32 setPitch) {
   std::vector<VendettaDrumRecord> result;
   for (u32 offset = begin; offset + 3 <= end && reader.has(offset, 3);) {
     const u32 recordBegin = offset;
@@ -365,22 +378,16 @@ struct VendettaDrumRecord {
       } else if (opcode == 0xcd && reader.has(offset, 3)) {
         const u16 target = reader.le16(offset + 1);
         if (target == loadInstrument) {
-          const auto found = std::ranges::find(instrumentPointers, static_cast<u32>(layout.program.offset + hl));
-          if (found != instrumentPointers.end() && reader.has(*found, 3)) {
-            drum.sample = reader.u8At(*found);
-            drum.attenuation = reader.u8At(*found + 1);
-            drum.release = reader.u8At(*found + 2);
-          } else if (reader.has(layout.program.offset + hl, 3)) {
-            drum.sample = reader.u8At(layout.program.offset + hl);
-            drum.attenuation = reader.u8At(layout.program.offset + hl + 1);
-            drum.release = reader.u8At(layout.program.offset + hl + 2);
+          const u32 instrument = static_cast<u32>(layout.program.offset + hl);
+          if (reader.has(instrument, 3)) {
+            drum.sample = reader.u8At(instrument);
+            drum.attenuation = reader.u8At(instrument + 1);
+            drum.release = reader.u8At(instrument + 2);
           }
         } else if (target == setPan) {
           drum.pan = a;
         } else if (target == setPitch) {
           drum.pitch = hl;
-        } else if (target != noteOn) {
-          // Unknown calls do not affect the small register set emulated here.
         }
         offset += 3;
       } else if (opcode == 0xc3 && reader.has(offset, 3)) {
@@ -410,8 +417,7 @@ void readVendettaSynth(Layout& layout, ByteReader reader, const SourceSegment& p
   const auto loadInstrument = integer(program.attribute("load_instr_sub"));
   const auto setPan = integer(program.attribute("set_pan_sub"));
   const auto setPitch = integer(program.attribute("set_pitch_sub"));
-  const auto noteOn = integer(program.attribute("note_on_sub"));
-  if (!sampleTable || !drumBanks || !drums || !loadInstrument || !setPan || !setPitch || !noteOn) {
+  if (!sampleTable || !drumBanks || !drums || !loadInstrument || !setPan || !setPitch) {
     warn(diagnostics, "Vendetta K053260 metadata is incomplete", layout.program);
     return;
   }
@@ -430,8 +436,8 @@ void readVendettaSynth(Layout& layout, ByteReader reader, const SourceSegment& p
     });
   }
 
-  const auto records = readVendettaDrumRecords(reader, layout, *drums, layout.ym2151TableOffset, *loadInstrument,
-                                               *setPan, *setPitch, *noteOn, instrumentPointers);
+  const auto records =
+      readVendettaDrumRecords(reader, layout, *drums, layout.ym2151TableOffset, *loadInstrument, *setPan, *setPitch);
   std::map<u32, VendettaDrumRecord> recordsByCode;
   for (const auto& record : records) {
     recordsByCode.emplace(record.code, record);
@@ -445,8 +451,7 @@ void readVendettaSynth(Layout& layout, ByteReader reader, const SourceSegment& p
       break;
     }
     layout.sampleInfos.push_back(SampleInfo{
-        .start = static_cast<u32>(reader.u8At(offset + 4)) | (static_cast<u32>(reader.u8At(offset + 5)) << 8) |
-                 (static_cast<u32>(reader.u8At(offset + 6)) << 16),
+        .start = readLe24(reader, offset + 4),
         .length = reader.le16(offset + 2),
         .pitch = reader.le16(offset),
         .adpcm = (reader.u8At(offset + 7) & 1) != 0,

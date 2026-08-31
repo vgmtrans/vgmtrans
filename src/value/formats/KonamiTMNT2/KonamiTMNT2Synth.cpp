@@ -11,7 +11,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <limits>
 #include <string>
 
 namespace vgmtrans::formats::konami_tmnt2 {
@@ -19,22 +18,6 @@ namespace vgmtrans::formats::konami_tmnt2 {
 using namespace core;
 
 namespace {
-
-[[nodiscard]] double interruptRate(const Layout& layout) {
-  const double timerRate = kChipClock / (1024.0 * (256.0 - layout.clkb));
-  const u8 skip = layout.defaultTickSkipInterval;
-  return skip > 1 ? timerRate * (skip - 1.0) / skip : timerRate;
-}
-
-[[nodiscard]] double sampledReleaseSeconds(u8 packed, u8 startingVolume, const Layout& layout) {
-  const u8 delay = layout.version == Version::Vendetta ? 1 : packed >> 4;
-  const u8 rate = layout.version == Version::Vendetta ? packed : packed & 0x0f;
-  if (rate == 0 || delay == 0) {
-    return std::numeric_limits<double>::infinity();
-  }
-  const u32 steps = (std::max<int>(4, startingVolume & 0x7f) - 4 + rate - 1) / rate;
-  return steps * delay / interruptRate(layout);
-}
 
 [[nodiscard]] double pitchCents(u16 word) {
   const u16 period = word & 0x0fff;
@@ -136,10 +119,11 @@ std::vector<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layou
   auto bank = builder.soundBank(layout.game + " K053260 Instruments");
   auto& instruments = bank.instruments();
   auto& samples = bank.localSamples();
+  const double ticksPerSecond = driverTickRate(layout.clkb, layout.defaultTickSkipInterval);
 
   for (u32 index = 0; index < layout.sampleInfos.size(); ++index) {
     const auto& info = layout.sampleInfos[index];
-    if (info.start > layout.sound.size || info.length > layout.sound.size - info.start) {
+    if (!info.fitsIn(layout.sound.size)) {
       samples.warning("KonamiTMNT2 sample range is outside the sound ROM", info.range);
       continue;
     }
@@ -196,7 +180,8 @@ std::vector<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layou
                     .unityKey = unity,
                     .envelope =
                         Envelope{
-                            .releaseSeconds = sampledReleaseSeconds(source.release, source.volume, layout),
+                            .releaseSeconds =
+                                sampledReleaseSeconds(layout.version, source.release, source.volume, ticksPerSecond),
                         },
                     .pan = panPosition(source.pan, layout.version),
                 })
@@ -235,15 +220,16 @@ std::vector<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layou
         }
         const u8 key = static_cast<u8>(drum.bank * 16 + drum.slot);
         const auto sample = samples.find(drum.sampleIndex);
-        auto region = drumKit.region(
-            sample.value_or(SampleRef::none()),
-            Region{
-                .keyRange = KeyRange{.low = key, .high = key},
-                .range = drum.range,
-                .unityKey = key - pitchCents(drum.pitch) / 100.0,
-                .envelope = Envelope{.releaseSeconds = sampledReleaseSeconds(drum.release, drum.volume, layout)},
-                .pan = panPosition(drum.pan, layout.version),
-            });
+        auto region =
+            drumKit.region(sample.value_or(SampleRef::none()),
+                           Region{
+                               .keyRange = KeyRange{.low = key, .high = key},
+                               .range = drum.range,
+                               .unityKey = key - pitchCents(drum.pitch) / 100.0,
+                               .envelope = Envelope{.releaseSeconds = sampledReleaseSeconds(
+                                                        layout.version, drum.release, drum.volume, ticksPerSecond)},
+                               .pan = panPosition(drum.pan, layout.version),
+                           });
         region.source(fmt::format("Drum {}:{}", drum.bank, drum.slot), drum.range, "konami-tmnt2-drum")
             .derived("sample", drum.sampleIndex)
             .parent(drumSource.id());

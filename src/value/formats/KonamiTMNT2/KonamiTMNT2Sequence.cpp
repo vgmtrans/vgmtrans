@@ -27,18 +27,27 @@ namespace vgmtrans::formats::konami_tmnt2 {
 
 using namespace core;
 
+double driverTickRate(u8 clkb, u8 skipInterval) {
+  const double base = kChipClock / (1024.0 * (256.0 - clkb));
+  return skipInterval > 1 ? base * (skipInterval - 1.0) / skipInterval : base;
+}
+
+double sampledReleaseSeconds(Version version, u8 packed, u8 volume, double ticksPerSecond) {
+  const u8 packedDelay = packed >> 4;
+  const u32 delay = version == Version::Vendetta ? 1 : (packedDelay == 0 ? 256 : packedDelay);
+  const u8 rate = version == Version::Vendetta ? packed : packed & 0x0f;
+  if (rate == 0 || ticksPerSecond <= 0.0) {
+    return std::numeric_limits<double>::infinity();
+  }
+  // The gate-expiry tick applies the first attenuation step immediately. Each
+  // remaining step follows after the packed 8-bit countdown expires.
+  const u32 intervals = (std::max<int>(4, volume & 0x7f) - 4) / rate;
+  return intervals * delay / ticksPerSecond;
+}
+
 namespace {
 
 constexpr u32 kMaxTrackCommands = 262144;
-
-[[nodiscard]] double timerRate(u8 clkb) {
-  return kChipClock / (1024.0 * (256.0 - clkb));
-}
-
-[[nodiscard]] double effectiveTickRate(u8 clkb, u8 skipInterval) {
-  const double base = timerRate(clkb);
-  return skipInterval > 1 ? base * (skipInterval - 1.0) / skipInterval : base;
-}
 
 [[nodiscard]] double ym2151LfoRate(u8 raw) {
   // The YM2151 advances its 30-bit LFO phase accumulator once per
@@ -50,17 +59,7 @@ constexpr u32 kMaxTrackCommands = 262144;
 
 [[nodiscard]] u32 tempoMicrosecondsPerQuarter(u8 clkb, u8 skipInterval) {
   return static_cast<u32>(
-      std::clamp<double>(std::lround(kPpqn * 1'000'000.0 / effectiveTickRate(clkb, skipInterval)), 1.0, 60'000'000.0));
-}
-
-[[nodiscard]] double sampledReleaseSeconds(Version version, u8 packed, u8 volume, double ticksPerSecond) {
-  const u8 delay = version == Version::Vendetta ? 1 : packed >> 4;
-  const u8 rate = version == Version::Vendetta ? packed : packed & 0x0f;
-  if (delay == 0 || rate == 0 || ticksPerSecond <= 0.0) {
-    return std::numeric_limits<double>::infinity();
-  }
-  const u32 steps = (std::max<int>(4, volume & 0x7f) - 4 + rate - 1) / rate;
-  return steps * delay / ticksPerSecond;
+      std::clamp<double>(std::lround(kPpqn * 1'000'000.0 / driverTickRate(clkb, skipInterval)), 1.0, 60'000'000.0));
 }
 
 [[nodiscard]] double ymReleaseSeconds(const std::array<u8, 4>& rates) {
@@ -128,7 +127,7 @@ struct ProgramState {
   std::vector<std::vector<Drum>> drums;
   std::vector<u8> ymPan;
 
-  [[nodiscard]] double ticksPerSecond() const { return effectiveTickRate(clkb, tickSkipInterval); }
+  [[nodiscard]] double ticksPerSecond() const { return driverTickRate(clkb, tickSkipInterval); }
 };
 
 struct TrackState {
@@ -759,8 +758,7 @@ struct DecodeState {
       return event.invoke<&Playback::setAttenuation>(event.u8("attenuation", SemanticOperandRole::Level));
     }
     case 0xe5: {
-      const bool supported = !vendetta;
-      if (!supported) {
+      if (vendetta) {
         return ignored(cursor, "Unused");
       }
       auto event = cursor.command("Software Vibrato", SequenceSemantic::Modulation);
@@ -1046,10 +1044,7 @@ SequenceProgram decodeSequence(ByteReader reader, const Layout& layout, const Se
     if (layoutTrack == sequenceLayout.tracks.end()) {
       continue;
     }
-    const u32 localTrack = layoutTrack->chip == TrackChip::Ym2151 ? layoutTrack->number
-                                                                  : layoutTrack->number - sequenceLayout.ymTrackCount;
-    decodedTrack.name =
-        (layoutTrack->chip == TrackChip::Ym2151 ? "FM Track " : "Sampled Track ") + std::to_string(localTrack);
+    decodedTrack.name = sequenceLayout.trackName(layoutTrack->number);
     if (sourceMap != nullptr && decodedTrack.annotation.valid()) {
       AnnotationBuilder{*sourceMap, decodedTrack.annotation}.label(decodedTrack.name);
     }

@@ -94,17 +94,15 @@ namespace {
     for (u32 track = 0; track < sourceSequence.totalTrackCount; ++track) {
       const u32 offset = static_cast<u32>(sourceSequence.trackTable.offset + typeSize + track * 2);
       const u16 encoded = input.reader.le16(offset);
-      const bool fm = track < sourceSequence.ymTrackCount;
-      const u32 localTrack = fm ? track : track - sourceSequence.ymTrackCount;
-      const std::string label = (fm ? "FM Track " : "Sampled Track ") + std::to_string(localTrack) + " Pointer";
+      const std::string label = sourceSequence.trackName(track) + " Pointer";
       const u32 target = static_cast<u32>(layout->program.offset + encoded);
-      auto pointer =
-          encoded != 0 && input.reader.has(target, 1)
-              ? result.sourceMap().pointer(label, input.reader.range(offset, 2), input.reader.range(target, 1))
-              : result.sourceMap().entry(label, input.reader.range(offset, 2));
+      const SourceRange range = input.reader.range(offset, 2);
+      auto pointer = encoded != 0 && input.reader.has(target, 1)
+                         ? result.sourceMap().pointer(label, range, input.reader.range(target, 1))
+                         : result.sourceMap().entry(label, range);
       pointer.parent(trackTable)
           .kind("konami-tmnt2-track-pointer")
-          .field("address", input.reader.range(offset, 2), encoded, SourceValueDisplay::Address)
+          .field("address", range, encoded, SourceValueDisplay::Address)
           .derived("track", track);
       if (encoded == 0) {
         pointer.description("Unused track");

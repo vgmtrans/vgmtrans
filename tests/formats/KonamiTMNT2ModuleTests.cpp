@@ -408,6 +408,13 @@ void konamiTmnt2DialectWidthsMatchTheMusicParsers() {
 }
 
 void konamiTmnt2SampleReleaseTremoloAndAdpcmAreDistinct() {
+  expect(std::abs(sampledReleaseSeconds(Version::Tmnt2, 0xfe, 0x30, 100.0) - 0.45) < 0.0001,
+         "sample release should apply its first attenuation step immediately");
+  expect(std::abs(sampledReleaseSeconds(Version::Tmnt2, 0x01, 0x05, 100.0) - 2.56) < 0.0001,
+         "a zero release-delay nibble should wrap through the 8-bit 256-tick countdown");
+  expect(std::isinf(sampledReleaseSeconds(Version::Tmnt2, 0x10, 0x7f, 100.0)),
+         "a zero attenuation rate should remain an infinite release");
+
   std::vector<u8> bytes(0xa0);
   write(bytes, 0x80,
         {
