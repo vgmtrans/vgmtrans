@@ -1607,9 +1607,9 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
       return bend != nullptr && event.tick == 7 && bend->value == 4096;
     });
     const auto bendsAtTransitionTick =
-         std::ranges::count_if(delayedTransitionMidi.tracks[0].events, [](const MidiEvent& event) {
-           return event.tick == 7 && isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend);
-         });
+        std::ranges::count_if(delayedTransitionMidi.tracks[0].events, [](const MidiEvent& event) {
+          return event.tick == 7 && isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+        });
     const auto delayedTransitionRanges = midiPitchBendRanges(delayedTransitionMidi.tracks[0].events);
     expect(std::ranges::find(delayedTransitionRanges, std::pair<u64, u16>{4, 1100}) != delayedTransitionRanges.end() &&
                preservedBend != delayedTransitionMidi.tracks[0].events.end() &&
@@ -1697,6 +1697,56 @@ void performanceMidiRendererExpandsRangeForComposedPitchLayers() {
   expect(midiPitchBendRanges(events) == std::vector<std::pair<u64, u16>>{{0, 400}, {9, 600}} &&
              updatedBend != events.end(),
          "composed layers should expand the voice range and follow normalized-wheel range changes");
+}
+
+void performanceMidiRendererResolvesNormalizedWheelBeforeLoweringTransitions() {
+  PerformanceTrack track{.id = TrackId{0}, .endTick = 8};
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track, CommandId{17}, SourceAnnotationId{18}, 0, nextSequence, nextNote, nextAutomation};
+
+  const PerformanceNoteId first = out.note(NotePerformanceEvent{
+      .key = 60,
+      .linearVelocity = 1.0,
+      .durationTicks = 4,
+      .instrumentAddress = InstrumentAddress{.bank = 0, .program = 1},
+  });
+  out.pitchBend(PitchBendPerformanceEvent{.semitones = 1.0, .normalizedWheelPosition = 0.5});
+  const PerformanceNoteId second = out.at(4).note(62, 1.0, 4);
+  out.at(4).pitchSlide(second, 62, 65, 2).continueFrom(first);
+
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
+      .tracks = {track},
+  };
+  const SoundBankAsset soundBank{.instruments = {
+                                     Instrument{.explicitAddress = InstrumentAddress{.bank = 0, .program = 1},
+                                                .pitchBendRangeCents = 400},
+                                 }};
+  const std::array<const SoundBankAsset*, 1> soundBanks{&soundBank};
+  const PerformanceTempoMap tempos{performance};
+
+  const PerformanceSequence pitchBend = lowerMidiPerformanceAutomation(performance, {}, tempos, soundBanks);
+  const auto heldStart = std::ranges::find_if(pitchBend.tracks[0].events, [](const PerformanceEvent& event) {
+    const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
+    return bend != nullptr && bend->header.tick == 4 && bend->layer != kPrimaryPitchBendLayer;
+  });
+  const PerformanceSequence portamento = lowerMidiPerformanceAutomation(
+      performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento}, tempos, soundBanks);
+  const auto sourceReset = std::ranges::find_if(portamento.tracks[0].events, [](const PerformanceEvent& event) {
+    const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
+    return bend != nullptr && bend->header.tick == 4 && bend->layer == kPrimaryPitchBendLayer &&
+           bend->semitones == 0.0 && !bend->normalizedWheelPosition;
+  });
+  const MidiSequence midi = renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, soundBanks);
+
+  expect(heldStart != pitchBend.tracks[0].events.end() &&
+             std::get<PitchBendPerformanceEvent>(*heldStart).semitones == 0.0 &&
+             sourceReset != portamento.tracks[0].events.end() &&
+             midiPitchBendRanges(midi.tracks[0].events) == std::vector<std::pair<u64, u16>>{{0, 500}},
+         "transition lowering and range planning should share the selected instrument's normalized-wheel pitch");
 }
 
 void performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes() {
@@ -3030,6 +3080,7 @@ void runValueMidiTests() {
   performanceMidiRendererLeavesTerminalPitchBentWithoutAnotherAttack();
   performanceMidiRendererCombinesSourceBendWithPitchTransitions();
   performanceMidiRendererExpandsRangeForComposedPitchLayers();
+  performanceMidiRendererResolvesNormalizedWheelBeforeLoweringTransitions();
   performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes();
   performanceMidiRendererResolvesSourceInstrumentIdentityAtExport();
   performanceMidiRendererQuantizesPitchBendAndPortamento();
