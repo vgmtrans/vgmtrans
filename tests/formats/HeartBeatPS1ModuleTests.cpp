@@ -130,9 +130,7 @@ std::vector<const Event*> eventsOfType(const PerformanceTrack& track) {
   return events;
 }
 
-}  // namespace
-
-void heartBeatPs1SequenceModelsAuditedDriverFeatures() {
+void sequenceModelsAuditedDriverFeatures() {
   const auto bytes = heartBeatFixture();
   const ByteReader reader(SourceId{91}, bytes);
   const auto container = readHeartBeatPs1Container(reader, 0);
@@ -175,7 +173,7 @@ void heartBeatPs1SequenceModelsAuditedDriverFeatures() {
          "global wet depth and future-voice reverb routing should both remain audible");
 }
 
-void heartBeatPs1ModuleBuildsEmbeddedWaveBank() {
+void moduleBuildsEmbeddedWaveBank() {
   Session session;
   session.registerFormat(heartBeatPs1Module());
   session.addSource(SourceFile{.name = "HeartBeatPS1 fixture.bin"}, heartBeatFixture());
@@ -193,4 +191,11 @@ void heartBeatPs1ModuleBuildsEmbeddedWaveBank() {
          "program identity and its tone region should retain the source wave-bank ID");
   expect(std::abs(instrument.regions.front().unityKey - 59.5) < 0.000001 && instrument.reverb == 1.0,
          "fine tuning should use the driver's low seven bits and preserve tone-default reverb routing");
+}
+
+}  // namespace
+
+void runHeartBeatPs1ModuleTests() {
+  sequenceModelsAuditedDriverFeatures();
+  moduleBuildsEmbeddedWaveBank();
 }

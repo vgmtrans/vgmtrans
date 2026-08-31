@@ -34,19 +34,17 @@ struct HeartBeatPs1EventLayout {
   u32 offset = 0;
   u32 end = 0;
   u32 delta = 0;
-  u8 deltaSize = 0;
   u8 status = 0;
-  bool explicitStatus = false;
   u8 data1 = 0;
   u8 data2 = 0;
-  u32 dataBytes = 0;
+  u32 payloadSize = 0;
   std::optional<u32> loopDestination;
   u8 loopCount = 0;
 };
 
 struct HeartBeatPs1SequenceLayout {
-  u32 offset = 0;
-  u32 length = 0;
+  u32 containerOffset = 0;
+  u32 containerSize = 0;
   u32 qQesOffset = 0;
   u32 dataOffset = 0;
   u32 dataEnd = 0;
@@ -62,13 +60,11 @@ struct HeartBeatPs1SequenceLayout {
 };
 
 struct HeartBeatPs1BankLayout {
-  u32 containerOffset = 0;
   u32 sampleOffset = 0;
   u32 sampleSize = 0;
   u32 attributeOffset = 0;
   u32 attributeSize = 0;
   u16 bank = 0xffff;
-  u8 slot = 0;
   u8 programCount = 0;
   u16 toneCount = 0;
   u8 masterVolume = 127;
@@ -76,9 +72,7 @@ struct HeartBeatPs1BankLayout {
 };
 
 struct HeartBeatPs1ContainerLayout {
-  u32 offset = 0;
   u32 length = 0;
-  std::array<u16, 4> bankIds{0xffff, 0xffff, 0xffff, 0xffff};
   std::vector<HeartBeatPs1BankLayout> banks;
   std::optional<HeartBeatPs1SequenceLayout> sequence;
 };
