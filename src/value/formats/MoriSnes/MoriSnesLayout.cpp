@@ -26,15 +26,24 @@ constexpr auto kLoadSequence = makeMaskedBytePattern(
     "\x1c\xfd\xf6\x00\x00\xc4\x04\xf6\x00\x00\xc4\x05\x8d\x00\xf7\x04\x10\x05\x68\xff\xd0\x00\x6f",
     "xxx??xxx??xxxxxxxxxxx?x");
 constexpr auto kSetDir = makeMaskedBytePattern("\x8f\x00\xf3\x8f\x6c\xf2", "x?xxxx");
+constexpr auto kSetDirShien = makeMaskedBytePattern(
+    "\xe8\x00\x8d\x5d\xcb\xf2\xc4\xf3\xe8\x00\x8d\x6c\xcb\xf2\xc4\xf3",
+    "x?xxxxxxx?xxxxxx");
 
 // Preset commands E2-E5 use one byte table. The paired indexed loads in E2
 // establish both the base and its adjacent fine-pitch table.
 constexpr auto kLoadPresetPitch =
     makeMaskedBytePattern("\x6d\xf7\x2d\xfd\xf6\x00\x00\xd5\x7e\x02\xf6\x00\x00", "xxxxx??xxxx??");
+constexpr auto kLoadPresetPitchShien = makeMaskedBytePattern(
+    "\x8d\x00\xf7\x29\x3a\x29\xfd\xf6\x00\x00\xd5\x7e\x02\xf6\x00\x00\x2f\x07",
+    "xxxxxxxx??xxxx??xx");
 
 // The mixer indexes a 33-entry equal-power-ish table from opposite ends.
 constexpr auto kLoadPan = makeMaskedBytePattern(
     "\xf5\x0a\x02\xfd\xf6\x00\x00\xee\x6d\xcf\x7d\x9f\xc4\xf2", "xxxxx??xxxxxxx");
+constexpr auto kLoadPanShien = makeMaskedBytePattern(
+    "\xf5\x0a\x02\xfd\xf6\x00\x00\xeb\x31\xcf\xdd\xee\xcb\xf2\xc4\xf3\x6d\xe8\x14\x80\xb5\x0a\x02\xfd\xf6\x00\x00",
+    "xxxxx??xxxxxxxxxxxxxxxxxx??");
 
 [[nodiscard]] u16 relativeTarget(u16 continuation, s16 relative) {
   return static_cast<u16>(continuation + relative);
@@ -193,11 +202,30 @@ std::optional<Layout> findLayout(ByteReader reader) {
     return std::nullopt;
   }
   const auto loader = findBytePattern(reader, kLoadSequence);
-  const auto dir = findBytePattern(reader, kSetDir);
-  const auto presets = findBytePattern(reader, kLoadPresetPitch);
-  const auto pan = findBytePattern(reader, kLoadPan);
-  if (!loader || !dir || !presets || !pan) {
+  if (!loader) {
     return std::nullopt;
+  }
+
+  Version version;
+  std::optional<u32> dir;
+  std::optional<u32> presets;
+  std::optional<u32> pan;
+  const auto standardDir = findBytePattern(reader, kSetDir);
+  const auto standardPresets = findBytePattern(reader, kLoadPresetPitch);
+  const auto standardPan = findBytePattern(reader, kLoadPan);
+  if (standardDir && standardPresets && standardPan) {
+    version = Version::Gokinjo;
+    dir = standardDir;
+    presets = standardPresets;
+    pan = standardPan;
+  } else {
+    dir = findBytePattern(reader, kSetDirShien);
+    presets = findBytePattern(reader, kLoadPresetPitchShien);
+    pan = findBytePattern(reader, kLoadPanShien);
+    if (!dir || !presets || !pan) {
+      return std::nullopt;
+    }
+    version = Version::Shien;
   }
 
   const u16 songList = reader.le16(*loader + 3);
@@ -209,20 +237,24 @@ std::optional<Layout> findLayout(ByteReader reader) {
     return std::nullopt;
   }
 
-  const u16 presetTable = reader.le16(*presets + 5);
-  const u16 finePresetTable = reader.le16(*presets + 11);
+  const u16 presetTable = reader.le16(*presets + (version == Version::Shien ? 8u : 5u));
+  const u16 presetPitchHigh = reader.le16(*presets + (version == Version::Shien ? 14u : 11u));
   const u16 panTable = reader.le16(*pan + 5);
   const u16 directory = static_cast<u16>(reader.u8At(*dir + 1) << 8);
-  if (finePresetTable != static_cast<u16>(presetTable + 4) || !reader.has(presetTable, 5) ||
-      !reader.has(panTable, 33) || !reader.has(directory, 4)) {
+  const DriverTraits traits = driverTraits(version);
+  if ((version == Version::Gokinjo && presetPitchHigh != static_cast<u16>(presetTable + 4)) ||
+      !reader.has(presetTable, 1) || !reader.has(presetPitchHigh, 1) ||
+      !reader.has(panTable, traits.maximumPan + 1u) || !reader.has(directory, 4)) {
     return std::nullopt;
   }
 
   return Layout{
+      .version = version,
       .songListAddress = songList,
       .songHeaderAddress = selected->address,
       .spcDirAddress = directory,
       .presetTableAddress = presetTable,
+      .presetPitchHighAddress = presetPitchHigh,
       .panTableAddress = panTable,
       .songIndex = selected->index,
       .tracks = std::move(selected->tracks),
