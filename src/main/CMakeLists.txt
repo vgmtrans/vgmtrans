@@ -126,6 +126,7 @@ target_sources(vgmtransvaluecore
     ${PROJECT_SOURCE_DIR}/src/value/export/InstrumentVariants.cpp
     ${PROJECT_SOURCE_DIR}/src/value/export/ExportDiagnostics.h
     ${PROJECT_SOURCE_DIR}/src/value/export/PerformanceInstrumentSelection.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/PerformancePitchBendContext.h
     ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceEmitter.cpp
     ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.cpp
     ${PROJECT_SOURCE_DIR}/src/value/model/CollectionModel.cpp
