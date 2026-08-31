@@ -447,7 +447,7 @@ public:
     if (pendingTicks_ == 0) {
       return runtime_.tick;
     }
-    return runtime_.tick == std::numeric_limits<u64>::max() ? runtime_.tick : runtime_.tick + 1;
+    return tickAfter(observesEachWaitTick() ? 1 : pendingTicks_);
   }
   [[nodiscard]] std::optional<u64> loopStopTick() const noexcept { return loopStopTick_; }
 
@@ -456,14 +456,15 @@ public:
       return SequenceCoordinatorSignal::None;
     }
     if (pendingTicks_ != 0) {
-      if (runtime_.tick != std::numeric_limits<u64>::max()) {
-        ++runtime_.tick;
+      const u32 elapsed = observesEachWaitTick() ? 1 : pendingTicks_;
+      runtime_.tick = tickAfter(elapsed);
+      if (elapsed == 1) {
+        tickRuntime(pendingTickCommand_);
+        if (pendingTicks_ > 1 && !pendingDelayedCommand_) {
+          executeReadyCommandDuringWait();
+        }
       }
-      tickRuntime(pendingTickCommand_);
-      if (pendingTicks_ > 1 && !pendingDelayedCommand_) {
-        executeReadyCommandDuringWait();
-      }
-      --pendingTicks_;
+      pendingTicks_ -= elapsed;
       if (pendingTicks_ != 0) {
         return SequenceCoordinatorSignal::None;
       }
@@ -570,6 +571,17 @@ public:
   }
 
 private:
+  [[nodiscard]] bool observesEachWaitTick() const noexcept {
+    return sequenceRuntime_.tick != nullptr ||
+           (!pendingDelayedCommand_ && current_ && sequenceRuntime_.readyDuringWait != nullptr &&
+            track_.commands[*current_].execution.duringWait);
+  }
+
+  [[nodiscard]] u64 tickAfter(u32 ticks) const noexcept {
+    return ticks > std::numeric_limits<u64>::max() - runtime_.tick ? std::numeric_limits<u64>::max()
+                                                                   : runtime_.tick + ticks;
+  }
+
   [[nodiscard]] PerformanceEmitter outputAt(u64 tick, CommandId command = {}, SourceAnnotationId annotation = {}) {
     return {performanceTrack_,
             command,
