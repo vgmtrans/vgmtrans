@@ -8,7 +8,9 @@
 
 #include "value/extractors/MameRomSetExtractor.h"
 
+#include <algorithm>
 #include <string>
+#include <vector>
 
 namespace vgmtrans::formats::konami_tmnt2 {
 
@@ -32,13 +34,85 @@ namespace {
   if (!layout) {
     return result.finish();
   }
+
+  u64 sequenceTableEnd = layout->sequenceTable.endOffset();
+  for (const auto& sequence : layout->sequences) {
+    sequenceTableEnd = std::max(sequenceTableEnd, sequence.trackTable.endOffset());
+  }
+  const SourceRange sequenceTableRange{
+      .source = layout->sequenceTable.source,
+      .offset = layout->sequenceTable.offset,
+      .size = sequenceTableEnd - layout->sequenceTable.offset,
+  };
+  const auto sequenceTableBytes = input.reader.slice(sequenceTableRange.offset, sequenceTableRange.size);
+  auto sequenceTable = result.misc("Sequence Table", sequenceTableRange)
+                           .payload(std::vector<u8>(sequenceTableBytes.begin(), sequenceTableBytes.end()));
+  const SourceAnnotationId sequenceTableRoot = result.sourceMap()
+                                                   .table("Sequence Table", sequenceTableRange)
+                                                   .owner(ObjectRefs::misc(sequenceTable.id()))
+                                                   .kind("konami-tmnt2-sequence-table")
+                                                   .id();
+  const SourceAnnotationId pointerTable = result.sourceMap()
+                                              .table("Sequence Pointer Table", layout->sequenceTable)
+                                              .parent(sequenceTableRoot)
+                                              .kind("konami-tmnt2-sequence-pointer-table")
+                                              .id();
+  for (const auto& pointer : layout->sequencePointers) {
+    const auto sequence = std::ranges::find(layout->sequences, pointer.sequenceIndex, &SequenceLayout::index);
+    result.sourceMap()
+        .pointer("Sequence Pointer " + std::to_string(pointer.slot), pointer.range,
+                 sequence != layout->sequences.end()
+                     ? SourceTarget{sequence->trackTable}
+                     : SourceTarget{input.reader.range(layout->program.offset + pointer.encoded, 1)})
+        .parent(pointerTable)
+        .kind("konami-tmnt2-sequence-pointer")
+        .fieldsAsChildren()
+        .field("address", pointer.range, pointer.encoded, SourceValueDisplay::Address)
+        .derived("sequence_index", pointer.sequenceIndex);
+  }
+
   const auto synth = addSynth(result, *layout);
   for (const auto& sourceSequence : layout->sequences) {
-    auto sequence = result.sequence(sourceSequence.name, sourceSequence.trackTable);
+    const auto firstTrack = std::ranges::min_element(sourceSequence.tracks, {}, &TrackLayout::offset);
+    auto sequence = result.sequence(sourceSequence.name, input.reader.range(firstTrack->offset, 1));
     sequence.program(decodeSequence(input.reader, *layout, sourceSequence, sequence.id(), &result.sourceMap(),
                                     &result.diagnostics()));
+    const SourceAnnotationId trackTable = result.sourceMap()
+                                              .entry(sourceSequence.name + " Track Table", sourceSequence.trackTable)
+                                              .owner(ObjectRefs::misc(sequenceTable.id()))
+                                              .parent(sequenceTableRoot)
+                                              .kind("konami-tmnt2-sequence-track-table")
+                                              .id();
+    const u32 typeSize = layout->version == Version::Vendetta ? 0 : 1;
+    if (typeSize != 0) {
+      result.sourceMap()
+          .field("Sequence Type", input.reader.range(sourceSequence.trackTable.offset, 1),
+                 input.reader.u8At(sourceSequence.trackTable.offset))
+          .parent(trackTable)
+          .kind("konami-tmnt2-sequence-type");
+    }
+    for (u32 track = 0; track < sourceSequence.totalTrackCount; ++track) {
+      const u32 offset = static_cast<u32>(sourceSequence.trackTable.offset + typeSize + track * 2);
+      const u16 encoded = input.reader.le16(offset);
+      const bool fm = track < sourceSequence.ymTrackCount;
+      const u32 localTrack = fm ? track : track - sourceSequence.ymTrackCount;
+      const std::string label = (fm ? "FM Track " : "Sampled Track ") + std::to_string(localTrack) + " Pointer";
+      const u32 target = static_cast<u32>(layout->program.offset + encoded);
+      auto pointer =
+          encoded != 0 && input.reader.has(target, 1)
+              ? result.sourceMap().pointer(label, input.reader.range(offset, 2), input.reader.range(target, 1))
+              : result.sourceMap().entry(label, input.reader.range(offset, 2));
+      pointer.parent(trackTable)
+          .kind("konami-tmnt2-track-pointer")
+          .field("address", input.reader.range(offset, 2), encoded, SourceValueDisplay::Address)
+          .derived("track", track);
+      if (encoded == 0) {
+        pointer.description("Unused track");
+      }
+    }
     auto collection = result.collection(sourceSequence.name, collectionKey(input.source.id, sourceSequence.index));
     collection.sequence(sequence);
+    collection.misc(sequenceTable);
     for (const auto& bank : synth) {
       collection.soundBank(bank);
     }

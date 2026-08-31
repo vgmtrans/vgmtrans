@@ -3577,6 +3577,13 @@ constexpr ParitySuite kKonamiArcadeSuite{
     .midiComparison = {.useSharedPlayOnceHorizon = true},
 };
 
+constexpr ParitySuite kKonamiTmnt2Suite{
+    .format = "KonamiTMNT2",
+    .label = "KonamiTMNT2",
+    .filterCollectionsByFormat = true,
+    .midiComparison = {.useSharedPlayOnceHorizon = true},
+};
+
 constexpr ParitySuite kCpsSuite{
     .format = "CPS",
     .label = "CPS",
@@ -5353,6 +5360,11 @@ int compareKonamiArcadeDirectSummary(const std::filesystem::path& path) {
                           valueSummariesForSuite(path, kKonamiArcadeSuite));
 }
 
+int compareKonamiTmnt2DirectSummary(const std::filesystem::path& path) {
+  return runSummaryParity(kKonamiTmnt2Suite, legacySummariesForSuite(path, kKonamiTmnt2Suite),
+                          valueSummariesForSuite(path, kKonamiTmnt2Suite));
+}
+
 int compareCpsDirectSummary(const std::filesystem::path& path) {
   const auto legacy = legacySummariesForSuite(path, kCpsSuite);
   auto value = valueSummariesForSuite(path, kCpsSuite);
@@ -5378,6 +5390,79 @@ int compareNinSnesDirectMidi(const std::filesystem::path& path, u32 sequenceLoop
 int compareKonamiArcadeDirectMidi(const std::filesystem::path& path, u32 sequenceLoops = 0) {
   return runMidiParity(kKonamiArcadeSuite, legacyMidisForSuite(path, kKonamiArcadeSuite, sequenceLoops),
                        valueMidisForSuite(path, kKonamiArcadeSuite, sequenceLoops), sequenceLoops);
+}
+
+int compareKonamiTmnt2DirectMidi(const std::filesystem::path& path, u32 sequenceLoops = 0) {
+  return runMidiParity(kKonamiTmnt2Suite, legacyMidisForSuite(path, kKonamiTmnt2Suite, sequenceLoops),
+                       valueMidisForSuite(path, kKonamiTmnt2Suite, sequenceLoops), sequenceLoops);
+}
+
+std::vector<NormalizedMidiEvent> noteStructure(std::span<const u8> bytes, u32 tickScale = 1) {
+  auto events = normalizeMidi(bytes).events;
+  std::erase_if(events, [](const NormalizedMidiEvent& event) { return event.kind != "note"; });
+  for (auto& event : events) {
+    event.tick *= tickScale;
+    event.b = 0;
+    event.c = 0;
+  }
+  return events;
+}
+
+int compareKonamiTmnt2NoteStructure(const std::filesystem::path& path) {
+  const auto legacy = legacyMidisForSuite(path, kKonamiTmnt2Suite, 0);
+  const auto value = valueMidisForSuite(path, kKonamiTmnt2Suite, 0);
+  size_t mismatches = 0;
+  size_t comparedNotes = 0;
+  for (const auto& [name, legacyMidi] : legacy) {
+    const auto found = value.find(name);
+    if (found == value.end()) {
+      std::cout << name << ": missing from value scan\n";
+      ++mismatches;
+      continue;
+    }
+    const u32 legacyTickScale = name.starts_with("vendetta") ? 2 : 1;
+    const auto legacyNotes = noteStructure(legacyMidi, legacyTickScale);
+    const auto valueNotes = noteStructure(found->second);
+    const u32 trackCount = std::max(legacyNotes.empty() ? 0 : legacyNotes.back().track + 1,
+                                    valueNotes.empty() ? 0 : valueNotes.back().track + 1);
+    size_t mismatchingTracks = 0;
+    std::ostringstream details;
+    for (u32 track = 0; track < trackCount; ++track) {
+      std::vector<NormalizedMidiEvent> legacyTrack;
+      std::vector<NormalizedMidiEvent> valueTrack;
+      std::ranges::copy_if(legacyNotes, std::back_inserter(legacyTrack),
+                           [=](const NormalizedMidiEvent& event) { return event.track == track; });
+      std::ranges::copy_if(valueNotes, std::back_inserter(valueTrack),
+                           [=](const NormalizedMidiEvent& event) { return event.track == track; });
+      comparedNotes += std::min(legacyTrack.size(), valueTrack.size());
+      if (legacyTrack == valueTrack) {
+        continue;
+      }
+      ++mismatchingTracks;
+      const auto [legacyDifference, valueDifference] =
+          std::mismatch(legacyTrack.begin(), legacyTrack.end(), valueTrack.begin(), valueTrack.end());
+      const size_t index = static_cast<size_t>(legacyDifference - legacyTrack.begin());
+      details << "  track " << track << ": legacy=" << legacyTrack.size() << " value=" << valueTrack.size()
+              << " first=" << index << "\n";
+      if (legacyDifference != legacyTrack.end()) {
+        details << "    legacy: " << describeEvent(*legacyDifference) << "\n";
+      }
+      if (valueDifference != valueTrack.end()) {
+        details << "    value:  " << describeEvent(*valueDifference) << "\n";
+      }
+    }
+    if (mismatchingTracks == 0) {
+      std::cout << name << ": note structure ok (" << legacyNotes.size() << " notes)\n";
+      continue;
+    }
+    ++mismatches;
+    std::cout << name << ": " << mismatchingTracks << " track(s) differ (legacy=" << legacyNotes.size()
+              << " value=" << valueNotes.size() << ")\n"
+              << details.str();
+  }
+  std::cout << "KonamiTMNT2 note-structure audit: collections=" << legacy.size() << " compared-notes=" << comparedNotes
+            << " mismatches=" << mismatches << "\n";
+  return mismatches == 0 ? 0 : 1;
 }
 
 int compareCpsDirectMidi(const std::filesystem::path& path, u32 sequenceLoops = 0) {
@@ -5442,6 +5527,11 @@ int compareNinSnesDirectSynth(const std::filesystem::path& path) {
 int compareKonamiArcadeDirectSynth(const std::filesystem::path& path) {
   return runSynthParity(kKonamiArcadeSuite, legacySynthsForSuite(path, kKonamiArcadeSuite),
                         valueSynthsForSuite(path, kKonamiArcadeSuite));
+}
+
+int compareKonamiTmnt2DirectSynth(const std::filesystem::path& path) {
+  return runSynthParity(kKonamiTmnt2Suite, legacySynthsForSuite(path, kKonamiTmnt2Suite),
+                        valueSynthsForSuite(path, kKonamiTmnt2Suite));
 }
 
 int compareCpsDirectSynth(const std::filesystem::path& path) {
@@ -5665,6 +5755,10 @@ void printUsage(std::ostream& out) {
       << "  vgmtrans-parity konami-arcade-direct-midi <mame-zip-file> [sequence-loops]\n"
       << "  vgmtrans-parity konami-arcade-direct-synth <mame-zip-file>\n"
       << "  vgmtrans-parity konami-arcade-direct-summary <mame-zip-file>\n"
+      << "  vgmtrans-parity konami-tmnt2-direct-midi <mame-zip-file> [sequence-loops]\n"
+      << "  vgmtrans-parity konami-tmnt2-note-structure <mame-zip-file>\n"
+      << "  vgmtrans-parity konami-tmnt2-direct-synth <mame-zip-file>\n"
+      << "  vgmtrans-parity konami-tmnt2-direct-summary <mame-zip-file>\n"
       << "  vgmtrans-parity cps-direct-midi <mame-zip-file> [sequence-loops]\n"
       << "  vgmtrans-parity cps-direct-synth <mame-zip-file>\n"
       << "  vgmtrans-parity cps-direct-summary <mame-zip-file>\n"
@@ -5753,6 +5847,10 @@ int main(int argc, char** argv) {
       return compareKonamiArcadeDirectSummary(argv[2]);
     }
 
+    if (argc == 3 && std::string(argv[1]) == "konami-tmnt2-direct-summary") {
+      return compareKonamiTmnt2DirectSummary(argv[2]);
+    }
+
     if (argc == 3 && std::string(argv[1]) == "cps-direct-summary") {
       return compareCpsDirectSummary(argv[2]);
     }
@@ -5805,6 +5903,18 @@ int main(int argc, char** argv) {
       return compareKonamiArcadeDirectMidi(argv[2], parseLoopCount(argv[3]));
     }
 
+    if (argc == 3 && std::string(argv[1]) == "konami-tmnt2-direct-midi") {
+      return compareKonamiTmnt2DirectMidi(argv[2]);
+    }
+
+    if (argc == 4 && std::string(argv[1]) == "konami-tmnt2-direct-midi") {
+      return compareKonamiTmnt2DirectMidi(argv[2], parseLoopCount(argv[3]));
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "konami-tmnt2-note-structure") {
+      return compareKonamiTmnt2NoteStructure(argv[2]);
+    }
+
     if (argc == 3 && std::string(argv[1]) == "cps-direct-midi") {
       return compareCpsDirectMidi(argv[2]);
     }
@@ -5839,6 +5949,10 @@ int main(int argc, char** argv) {
 
     if (argc == 3 && std::string(argv[1]) == "konami-arcade-direct-synth") {
       return compareKonamiArcadeDirectSynth(argv[2]);
+    }
+
+    if (argc == 3 && std::string(argv[1]) == "konami-tmnt2-direct-synth") {
+      return compareKonamiTmnt2DirectSynth(argv[2]);
     }
 
     if (argc == 3 && std::string(argv[1]) == "cps-direct-synth") {

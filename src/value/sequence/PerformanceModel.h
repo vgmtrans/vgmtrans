@@ -579,6 +579,7 @@ struct PerformanceAutomation {
 struct PerformanceTrack {
   TrackId id;
   u32 sourceTrackNumber = 0;
+  std::string name;
   u64 endTick = 0;
   // Events are stored in chronological execution order.
   std::vector<PerformanceEvent> events;

@@ -192,6 +192,7 @@ struct SourceCommand {
 
 struct TrackProgram {
   u32 sourceTrackNumber = 0;
+  std::string name;
   Address startAddress;
   SourceAnnotationId annotation;
   // Commands are stored in strictly increasing source-address order, allowing

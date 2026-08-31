@@ -427,6 +427,7 @@ public:
         performanceTrack_(PerformanceTrack{
             .id = trackId,
             .sourceTrackNumber = track.sourceTrackNumber,
+            .name = track.name,
         }),
         trackState_(sequenceRuntime_.createTrackState ? sequenceRuntime_.createTrackState(program, track) : std::any{}),
         programState_(programState),

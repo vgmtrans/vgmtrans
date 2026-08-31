@@ -139,8 +139,7 @@ std::vector<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layou
 
   for (u32 index = 0; index < layout.sampleInfos.size(); ++index) {
     const auto& info = layout.sampleInfos[index];
-    const u32 relativeStart = info.reverse && info.start >= info.length ? info.start - info.length : info.start;
-    if (relativeStart > layout.sound.size || info.length > layout.sound.size - relativeStart) {
+    if (info.start > layout.sound.size || info.length > layout.sound.size - info.start) {
       samples.warning("KonamiTMNT2 sample range is outside the sound ROM", info.range);
       continue;
     }
@@ -153,7 +152,7 @@ std::vector<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layou
              Sample{
                  .name = name,
                  .codec = info.adpcm ? AudioCodec::KonamiK053260Adpcm : AudioCodec::PcmS8,
-                 .encodedData = reader.range(layout.sound.offset + relativeStart, info.length),
+                 .encodedData = reader.range(layout.sound.offset + info.start, info.length),
                  .sampleRate = static_cast<u32>(std::lround(kSampleRate)),
                  .bitsPerSample = static_cast<u16>(info.adpcm ? 16 : 8),
                  .reverse = info.reverse,

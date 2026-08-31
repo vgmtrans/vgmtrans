@@ -85,8 +85,17 @@ struct SequenceLayout {
   u32 index = 0;
   core::SourceRange tableEntry;
   core::SourceRange trackTable;
+  u32 ymTrackCount = 0;
+  u32 totalTrackCount = 0;
   std::vector<TrackLayout> tracks;
   std::string name;
+};
+
+struct SequencePointerLayout {
+  u32 slot = 0;
+  u16 encoded = 0;
+  u32 sequenceIndex = 0;
+  core::SourceRange range;
 };
 
 struct Layout {
@@ -100,6 +109,8 @@ struct Layout {
   u32 drumTableOffset = 0;
   u8 clkb = 0xf2;
   u8 defaultTickSkipInterval = 0;
+  core::SourceRange sequenceTable;
+  std::vector<SequencePointerLayout> sequencePointers;
   std::vector<SequenceLayout> sequences;
   std::vector<u32> ym2151Patches;
   std::vector<SampleInfo> sampleInfos;

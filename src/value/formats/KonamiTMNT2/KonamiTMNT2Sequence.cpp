@@ -40,6 +40,14 @@ constexpr u32 kMaxTrackCommands = 262144;
   return skipInterval > 1 ? base * (skipInterval - 1.0) / skipInterval : base;
 }
 
+[[nodiscard]] double ym2151LfoRate(u8 raw) {
+  // The YM2151 advances its 30-bit LFO phase accumulator once per
+  // clock/(2 * 32 operators). Register 18 is a 4.4 floating-point step with
+  // an implied leading one.
+  const u32 step = (0x10u | (raw & 0x0f)) << (raw >> 4);
+  return (kChipClock / 64.0) * step / static_cast<double>(u64{1} << 30);
+}
+
 [[nodiscard]] u32 tempoMicrosecondsPerQuarter(u8 clkb, u8 skipInterval) {
   return static_cast<u32>(
       std::clamp<double>(std::lround(kPpqn * 1'000'000.0 / effectiveTickRate(clkb, skipInterval)), 1.0, 60'000'000.0));
@@ -157,6 +165,12 @@ struct TrackState {
   u8 instrumentPan = 0;
   s32 pitchBendRaw = 0;
   u8 portamento = 0;
+  u8 nativeLfoFrequency = 0;
+  u8 nativeLfoPitchDepth = 0;
+  u8 nativeLfoAmplitudeDepth = 0;
+  u8 nativeLfoWaveform = 0;
+  u32 nativeLfoDelay = 0;
+  u32 nativeLfoRampInterval = 0;
   std::optional<double> previousKey;
   PerformanceNoteId previousNote;
   std::array<Address, 2> loopStart;
@@ -173,6 +187,43 @@ struct Playback {
   ProgramState& program;
 
   [[nodiscard]] bool fm() const { return track.chip == TrackChip::Ym2151; }
+
+  [[nodiscard]] LfoPerformanceContext nativeLfoContext() const {
+    static constexpr std::array<LfoWaveform, 4> shapes{LfoWaveform::SawtoothDown, LfoWaveform::Square,
+                                                       LfoWaveform::Triangle, LfoWaveform::Noise};
+    const double hertz = track.nativeLfoFrequency == 0 ? 0.0 : ym2151LfoRate(track.nativeLfoFrequency);
+    return LfoPerformanceContext{
+        .frequencyHz = hertz,
+        .shape = LfoShape{.waveform = shapes[track.nativeLfoWaveform & 3]},
+        .phaseRunsAtZeroDepth = true,
+        .tremoloGainMode = TremoloGainMode::NoBoost,
+    };
+  }
+
+  void emitNativeLfoDepth(PerformanceEmitter emitter, u8 sensitivity) const {
+    static constexpr std::array<double, 8> pitchSemitones{0.0, 0.05, 0.1, 0.2, 0.5, 1.0, 4.0, 7.0};
+    static constexpr std::array<double, 4> amplitudeDecibels{0.0, 23.9, 47.8, 95.6};
+    const auto context = nativeLfoContext();
+    emitter.vibratoDepth(pitchSemitones[sensitivity] * track.nativeLfoPitchDepth / 127.0, context);
+    emitter.tremoloDepth(amplitudeDecibels[sensitivity >> 1] * track.nativeLfoAmplitudeDepth / 127.0, context);
+  }
+
+  void beginNativeLfo(u32 noteDuration) {
+    if (!fm() || track.nativeLfoFrequency == 0) {
+      return;
+    }
+    emitNativeLfoDepth(out, 0);
+    if (track.nativeLfoRampInterval == 0) {
+      return;
+    }
+    for (u8 sensitivity = 1; sensitivity < 8; ++sensitivity) {
+      const u32 tick = track.nativeLfoDelay + sensitivity * track.nativeLfoRampInterval;
+      if (tick >= noteDuration) {
+        break;
+      }
+      emitNativeLfoDepth(out.at(vm.tick() + tick), sensitivity);
+    }
+  }
 
   void tempo(u8 skip) {
     program.tickSkipInterval = skip;
@@ -346,9 +397,9 @@ struct Playback {
     return std::max<u32>(1, result);
   }
 
-  [[nodiscard]] double noteGain() const {
+  [[nodiscard]] double noteGain(s32 dynamicAttenuation = 0) const {
     const s32 master = fm() ? program.ymMasterAttenuation : program.sampleMasterAttenuation;
-    const s32 attenuation = track.attenuation + track.dxAttenuation + master;
+    const s32 attenuation = track.attenuation + track.dxAttenuation + master + dynamicAttenuation;
     if (fm()) {
       return std::pow(10.0, -0.75 * std::clamp<s32>(attenuation, 0, 127) / 20.0);
     }
@@ -374,9 +425,6 @@ struct Playback {
           track.instrumentPan = drum.pan;
           track.instrumentRelease = drum.release;
           gain = noteGain();
-          if (drum.gate != 0) {
-            gate = drum.gate;
-          }
           if (track.sequencePan == 0) {
             emitPan();
           }
@@ -393,13 +441,15 @@ struct Playback {
     }
     key = std::clamp(key, 0.0, 127.0);
 
+    beginNativeLfo(gate);
+    const bool nativeLfo = fm() && track.nativeLfoFrequency != 0;
     const auto note = out.note(NotePerformanceEvent{
         .key = key,
         .linearVelocity = gain,
         .durationTicks = gate,
-        .restartsLfoPhase = true,
-        .restartsVibratoLfoPhase = true,
-        .restartsTremoloLfoPhase = true,
+        .restartsLfoPhase = !nativeLfo,
+        .restartsVibratoLfoPhase = !nativeLfo,
+        .restartsTremoloLfoPhase = !nativeLfo,
     });
     if (!track.percussion && track.portamento != 0 && track.previousKey && track.previousNote.valid() &&
         std::abs(*track.previousKey - key) > 0.001) {
@@ -426,7 +476,11 @@ struct Playback {
   }
 
   void ymReleaseUniform(u8 rate) {
-    ymRelease(static_cast<u8>((rate << 4) | rate), static_cast<u8>((rate << 4) | rate));
+    // The TMNT2 handler executes `AND $0f; SUB $0f` before writing the
+    // operator RR nibbles. In four-bit arithmetic that maps 0..15 to
+    // 1..15,0 rather than storing the sequence nibble directly.
+    const u8 nativeRate = static_cast<u8>((rate + 1) & 0x0f);
+    ymRelease(static_cast<u8>((nativeRate << 4) | nativeRate), static_cast<u8>((nativeRate << 4) | nativeRate));
   }
 
   void keyOff() {
@@ -437,8 +491,12 @@ struct Playback {
 
   void softwareVibrato(u8 selector, u8 packed) {
     const bool enabled = selector != 0;
-    const u8 depth = packed & 0x0f;
-    const u32 delay = (packed >> 4) * track.baseDuration + 1;
+    u8 depth = packed & 0x0f;
+    if (enabled && track.version == Version::SunsetRiders && depth == 0) {
+      depth = 1;
+    }
+    const u32 delay =
+        track.version == Version::Tmnt2 ? ((packed >> 4) * 2 + 1) : ((packed >> 4) * track.baseDuration + 1);
     const LfoPerformanceContext context{
         .cyclesPerTick = enabled ? std::optional<double>{1.0 / 16.0} : std::optional<double>{0.0},
         .delayTicks = delay,
@@ -465,34 +523,58 @@ struct Playback {
   }
 
   void nativeLfo(u8 frequency, u8 pmd, u8 amd, u8 waveform, u8 delay) {
-    const bool enabled = frequency != 0;
-    static constexpr std::array<LfoWaveform, 4> shapes{LfoWaveform::SawtoothDown, LfoWaveform::Square,
-                                                       LfoWaveform::Triangle, LfoWaveform::Noise};
-    const LfoPerformanceContext context{
-        .cyclesPerTick = enabled ? std::optional<double>{std::max(1, static_cast<int>(frequency)) / 256.0}
-                                 : std::optional<double>{0.0},
-        .delayTicks = delay,
-        .delayIsTempoRelative = true,
-        .shape = LfoShape{.waveform = shapes[waveform & 3]},
-        .phaseRunsAtZeroDepth = false,
-        .tremoloGainMode = TremoloGainMode::NoBoost,
-    };
-    out.vibratoDepth(enabled ? pmd * 7.0 / 127.0 : 0.0, context);
-    out.tremoloDepth(enabled ? amd * 48.0 / 127.0 : 0.0, context);
-    out.vibratoRateCyclesPerTick(enabled ? frequency / 256.0 : 0.0, context);
-    out.tremoloRateCyclesPerTick(enabled ? frequency / 256.0 : 0.0, context);
-    out.vibratoDelayTicks(enabled ? delay : 0);
-    out.tremoloDelayTicks(enabled ? delay : 0);
+    track.nativeLfoFrequency = frequency;
+    track.nativeLfoPitchDepth = pmd;
+    track.nativeLfoAmplitudeDepth = amd;
+    track.nativeLfoWaveform = waveform & 3;
+    if (frequency == 0) {
+      track.nativeLfoRampInterval = 0;
+      emitNativeLfoDepth(out, 0);
+      out.vibratoRate(0.0, nativeLfoContext());
+      out.tremoloRate(0.0, nativeLfoContext());
+      return;
+    }
+    if (track.version == Version::Vendetta) {
+      track.nativeLfoDelay = 0;
+      track.nativeLfoRampInterval = delay / 2;
+    } else {
+      track.nativeLfoDelay = track.version == Version::Tmnt2 ? delay : std::max<u32>(1, delay);
+      track.nativeLfoRampInterval = std::max<u32>(1, (waveform & 0xf0) >> 3);
+    }
+    const auto context = nativeLfoContext();
+    emitNativeLfoDepth(out, 0);
+    out.vibratoRate(*context.frequencyHz, context);
+    out.tremoloRate(*context.frequencyHz, context);
+  }
+
+  void nativeLfoTiming(u8 raw) {
+    if (track.version == Version::Vendetta) {
+      track.nativeLfoRampInterval = raw / 2;
+    } else {
+      track.nativeLfoDelay = track.version == Version::Tmnt2 ? raw : std::max<u32>(1, raw);
+    }
   }
 
   void steppedModulation(u8 count, u8 pitchStep, u8 packedVolume) {
-    const s32 pitch = signMagnitude(pitchStep);
-    const s32 volume = (packedVolume & 0x80) != 0 ? packedVolume & 0x0f : -static_cast<s32>(packedVolume & 0x0f);
-    track.pitchBendRaw += pitch * count;
-    track.attenuation = static_cast<u8>(std::clamp<s32>(track.attenuation - volume * count, 0, 127));
+    const u32 ticks = count == 0 ? 256 : count;
+    const s32 pitchDelta = signMagnitude(pitchStep);
+    const s32 volumeDelta = (packedVolume & 0x80) != 0 ? packedVolume & 0x0f : -static_cast<s32>(packedVolume & 0x0f);
+    const u32 interval = ((packedVolume >> 4) & 7) == 0 ? 256 : (packedVolume >> 4) & 7;
+    s32 pitch = 0;
+    s32 volume = 0;
+    u32 volumeCountdown = interval;
     out.pitchBendRange(24);
-    out.pitchBend(track.pitchBendRaw / 64.0);
-    out.expression(noteGain());
+    for (u32 tick = 1; tick < ticks; ++tick) {
+      pitch += pitchDelta;
+      out.at(vm.tick() + tick).pitchBend((track.pitchBendRaw + pitch) / 64.0);
+      if (--volumeCountdown == 0) {
+        volume += volumeDelta;
+        volumeCountdown = interval;
+        out.at(vm.tick() + tick).expression(noteGain(-volume));
+      }
+    }
+    out.at(vm.tick() + ticks).pitchBend(track.pitchBendRaw / 64.0);
+    out.at(vm.tick() + ticks).expression(noteGain());
   }
 
   void masterAdjust(u8 ym, u8 sampled) {
@@ -721,11 +803,13 @@ struct DecodeState {
       const u8 delay = event.u8("delay_or_ramp", SemanticOperandRole::Duration);
       return event.invoke<&Playback::nativeLfo>(frequency, pmd, amd, waveform, delay);
     }
-    case 0xea:
+    case 0xea: {
       if (!fm && !vendetta) {
         return ignored(cursor, "Unused");
       }
-      return ignored(cursor, "LFO Delay / Ramp", 1);
+      auto event = cursor.command(vendetta ? "LFO Ramp Interval" : "LFO Delay", SequenceSemantic::Modulation);
+      return event.invoke<&Playback::nativeLfoTiming>(event.u8("ticks", SemanticOperandRole::Duration));
+    }
     case 0xeb: {
       if (!fm && layout.version == Version::SunsetRiders) {
         return ignored(cursor, "Unused");
@@ -751,7 +835,7 @@ struct DecodeState {
       const u8 pitch = event.u8("pitch_step", SourceValueDisplay::Hex, SemanticOperandRole::Pitch);
       const u8 volume = event.u8("volume_step_and_interval", SourceValueDisplay::Hex, SemanticOperandRole::Level);
       event.invoke<&Playback::steppedModulation>(count, pitch, volume);
-      return event.wait(count);
+      return event.wait(count == 0 ? 256 : count);
     }
     case 0xef: {
       if (vendetta || (!fm && layout.version == Version::Tmnt2)) {
@@ -956,6 +1040,20 @@ SequenceProgram decodeSequence(ByteReader reader, const Layout& layout, const Se
     session.addTrack(track.number, track.pointer, track.offset, decode, track.offset);
   }
   auto program = session.finish(makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime)));
+  for (auto& decodedTrack : program.tracks) {
+    const auto layoutTrack =
+        std::ranges::find(sequenceLayout.tracks, decodedTrack.sourceTrackNumber, &TrackLayout::number);
+    if (layoutTrack == sequenceLayout.tracks.end()) {
+      continue;
+    }
+    const u32 localTrack = layoutTrack->chip == TrackChip::Ym2151 ? layoutTrack->number
+                                                                  : layoutTrack->number - sequenceLayout.ymTrackCount;
+    decodedTrack.name =
+        (layoutTrack->chip == TrackChip::Ym2151 ? "FM Track " : "Sampled Track ") + std::to_string(localTrack);
+    if (sourceMap != nullptr && decodedTrack.annotation.valid()) {
+      AnnotationBuilder{*sourceMap, decodedTrack.annotation}.label(decodedTrack.name);
+    }
+  }
   program.behavior.initialTempoMicrosecondsPerQuarter =
       tempoMicrosecondsPerQuarter(layout.clkb, layout.defaultTickSkipInterval);
   return program;

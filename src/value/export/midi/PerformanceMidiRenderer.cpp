@@ -1526,7 +1526,8 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
   for (size_t trackIndex = 0; trackIndex < loweredPerformance.tracks.size(); ++trackIndex) {
     const auto& performanceTrack = loweredPerformance.tracks[trackIndex];
     MidiTrack midiTrack{
-        .name = "Track " + std::to_string(performanceTrack.sourceTrackNumber),
+        .name = performanceTrack.name.empty() ? "Track " + std::to_string(performanceTrack.sourceTrackNumber)
+                                              : performanceTrack.name,
     };
     RenderTrackState renderState;
     renderState.levelHeadroom = levelHeadroom;
