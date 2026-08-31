@@ -32,6 +32,7 @@ using namespace core;
 namespace {
 
 constexpr u32 kCommandLimit = 32768;
+constexpr PitchBendLayerId kDriftAndVibratoLayer{1};
 
 namespace math {
 
@@ -320,7 +321,9 @@ struct Playback {
                       track.data.u8At(static_cast<u16>(track.panTable + pan)) / 127.0);
   }
 
-  void emitPitchBend() { out.pitchBend(track.accumulatedDrift + track.vibrato.sample / 256.0); }
+  void emitPitchBend() {
+    out.pitchBend(track.accumulatedDrift + track.vibrato.sample / 256.0, kDriftAndVibratoLayer);
+  }
 
   void emitMaster() {
     out.masterLevel(math::gain(

@@ -5,12 +5,15 @@
  */
 
 #include "value/formats/HeartBeatPS1/HeartBeatPS1.h"
+#include "../MidiTestSupport.h"
+#include "value/export/midi/PerformanceMidiRenderer.h"
 
 #include "value/session/Session.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/PsxSpu.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <stdexcept>
 #include <string>
@@ -53,7 +56,8 @@ std::vector<u8> heartBeatFixture() {
       0,    0xb0, 32,   0,    0,    0xc0, 0,  0, 0xb0, 56, 2,  0, 0xb0, 76, 63, 0, 0xb0, 77, 16,  0, 0xb0, 78, 1,   0,
       0xb0, 52,   2,    0,    0xb0, 54,   63, 0, 0xb0, 55, 32, 0, 0xb0, 92, 1,  0, 0xb0, 73, 100, 0, 0xb0, 72, 20,  0,
       0xb0, 74,   60,   0,    0xb0, 79,   8,  0, 0xb0, 22, 50, 0, 0xb0, 91, 1,  0, 0xb0, 5,  121, 0, 0x90, 60, 100, 0,
-      0xe0, 0x7f, 0x7f, 10,   0x80, 60,   0,  0, 0xb0, 99, 20, 0, 0xb0, 6,  2,  0, 0x90, 62, 100, 1, 0x80, 62, 0,   0,
+      0xe0, 0x00, 0x00, 1,    0xe0, 0x7f, 0x7f, 9, 0x80, 60, 0,  0, 0xb0, 99, 20, 0, 0xb0, 6, 2,   0, 0x90, 62, 100, 1,
+      0x80, 62,   0,    0,
       0xb0, 99,   30,   0xff, 0x2f, 0,
   };
   const u32 sequenceSize = 0x10 + static_cast<u32>(events.size());
@@ -167,8 +171,24 @@ void sequenceModelsAuditedDriverFeatures() {
                                  [](const auto* event) { return event->scope == VoiceEnvelopeScope::FutureAttacks; }),
          "dynamic SPU ADSR writes should affect future attacks, exactly like the driver");
   const auto bends = eventsOfType<PitchBendPerformanceEvent>(performance.tracks.front());
-  expect(!bends.empty() && std::abs(bends.back()->semitones - 12.0) < 0.001,
-         "pitch bend should use the selected tone's asymmetric upward range");
+  expect(bends.size() == 2 && std::abs(bends.front()->semitones + 6.0) < 0.001 &&
+             std::abs(bends.back()->semitones - 12.0) < 0.001 &&
+             std::ranges::all_of(bends, [](const auto* bend) {
+               return bend->layer != kPrimaryPitchBendLayer && !bend->normalizedWheelPosition;
+             }),
+         "pitch bend should retain the selected tone's physical asymmetric range on an independent layer");
+  const SoundBankAsset soundBank{
+      .instruments = {{.identity = heartBeatPs1InstrumentIdentity(1, 0), .pitchBendRangeCents = 1200}},
+  };
+  const std::array<const SoundBankAsset*, 1> soundBanks{&soundBank};
+  const MidiSequence midi =
+      renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, soundBanks);
+  expect(std::ranges::any_of(midi.tracks.front().events,
+                             [](const MidiEvent& event) {
+                               const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+                               return bend != nullptr && bend->value == -4096;
+                             }),
+         "collection-aware MIDI should not replace HeartBeat's six-semitone downward range with the instrument maximum");
   expect(eventsOfType<ReverbPerformanceEvent>(performance.tracks.front()).size() == 2,
          "global wet depth and future-voice reverb routing should both remain audible");
 }

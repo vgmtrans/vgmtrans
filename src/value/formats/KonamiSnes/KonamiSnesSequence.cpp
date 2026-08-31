@@ -728,10 +728,8 @@ struct Playback {
   }
 
   void beginPitchSlide(PitchSlideKind kind, u8 delay, u8 length, u8 targetNote) {
-    // A slide before any melodic note has no pitch to bend from. Keep the
-    // default bend range but do not invent a starting note.
+    // A slide before any melodic note has no pitch to bend from.
     if (!track.notePitch || length == 0) {
-      out.pitchBendRange(2);
       return;
     }
     const double target = track.noteSemitones(targetNote, kind == PitchSlideKind::V1);

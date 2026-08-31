@@ -459,7 +459,8 @@ void syntheticFeatures() {
          "note velocity should retain the driver's linear voice gain");
   const auto hasPhysicalBend = [&](double semitones) {
     return findEvent<PitchBendPerformanceEvent>(*rendered.performance, [&](const auto& event) {
-             return near(event.semitones, semitones) && !event.normalizedWheelPosition;
+             return near(event.semitones, semitones) && !event.normalizedWheelPosition &&
+                    event.layer != kPrimaryPitchBendLayer;
            }) != nullptr;
   };
   expect(hasPhysicalBend(383.0 / 128.0) && hasPhysicalBend(767.0 / 128.0) && hasPhysicalBend(-6.0),
@@ -721,7 +722,7 @@ void realArchive(const std::filesystem::path& path) {
       return std::ranges::any_of(track2->events, [&](const PerformanceEvent& event) {
         const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
         return bend != nullptr && bend->header.tick == tick && near(bend->semitones, semitones) &&
-               !bend->normalizedWheelPosition;
+               !bend->normalizedWheelPosition && bend->layer != kPrimaryPitchBendLayer;
       });
     };
     expect(bendAt(8760, 1535.0 / 128.0) && bendAt(9840, -12.0) && bendAt(77880, 3071.0 / 128.0),

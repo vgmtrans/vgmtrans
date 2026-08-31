@@ -177,6 +177,8 @@ void konamiTmnt2SteppedModulationRunsAndRestoresOverTime() {
             0x00,
             0x00,
             0x00,  // initialize
+            0xed,
+            0x20,  // persistent +1/2-semitone bend
             0xee,
             0x04,
             0x01,
@@ -198,9 +200,15 @@ void konamiTmnt2SteppedModulationRunsAndRestoresOverTime() {
       expressions.push_back(expression);
     }
   }
-  expect(bends.size() == 4 && bends[0]->header.tick == 1 && bends[2]->header.tick == 3 &&
-             bends.back()->header.tick == 4 && std::abs(bends.back()->semitones) < 0.0001,
-         "EE should emit each pitch step and restore the pre-command pitch at completion");
+  expect(bends.size() == 5 && bends[0]->header.tick == 0 && std::abs(bends[0]->semitones - 0.5) < 0.0001 &&
+             bends[0]->layer != kPrimaryPitchBendLayer && bends[1]->header.tick == 1 &&
+             bends[1]->layer != bends[0]->layer && std::abs(bends[1]->semitones - 1.0 / 64.0) < 0.0001 &&
+             bends[3]->header.tick == 3 && bends.back()->header.tick == 4 &&
+             std::abs(bends.back()->semitones) < 0.0001 &&
+             std::ranges::none_of(performance.tracks.front().events, [](const PerformanceEvent& event) {
+               return std::holds_alternative<PitchBendRangePerformanceEvent>(event);
+             }),
+         "EE should remain independent of the persistent bend and reset only its own pitch contribution");
   expect(expressions.size() >= 2 && expressions[expressions.size() - 2]->header.tick == 2 &&
              expressions.back()->header.tick == 4,
          "EE should apply its packed volume interval and restore the pre-command level");

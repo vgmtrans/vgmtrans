@@ -177,6 +177,8 @@ void interleavedRuntimePreservesDynamicDriverFeatures() {
              }) &&
              !performance.tracks[0].automations.empty(),
          "pitch tables should remain independent of the track's musical slides");
+  expect(events<PitchBendRangePerformanceEvent>(performance.tracks[0]).empty(),
+         "physical pitch-table values should not emit exporter-specific bend ranges");
 
   const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks[0]);
   expect(std::ranges::any_of(instruments, [](const InstrumentPerformanceEvent* event) {

@@ -192,7 +192,9 @@ void frameCurvesDynamicAdsrAndEchoRenderPhysically() {
              std::abs(notes.front()->key - 96.0) < 0.001 && notes.front()->durationTicks == 4 &&
              tempos.front()->microsecondsPerQuarter == 384000,
          "Compile notes and the tempo accumulator should render at their source timing");
-  expect(envelopes.size() >= 4 && levels.size() >= 3 && bends.size() >= 3 && pans.size() >= 2,
+  expect(envelopes.size() >= 4 && levels.size() >= 3 && bends.size() >= 3 &&
+             std::ranges::all_of(bends, [](const auto* bend) { return bend->layer != kPrimaryPitchBendLayer; }) &&
+             pans.size() >= 2,
          "ADSR/GAIN, software volume, vibrato, and pan curves should advance on driver frames");
   const double echoLeft = 64.0 / 127.0 * 64.0 / 256.0;
   const double echoRight = 64.0 / 127.0 * 191.0 / 256.0;

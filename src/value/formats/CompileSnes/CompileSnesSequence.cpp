@@ -22,6 +22,8 @@ using namespace core;
 
 namespace {
 
+constexpr PitchBendLayerId kTuningAndVibratoLayer{1};
+
 constexpr std::array<u8, 32> kVolumeTable{
     0x00, 0x03, 0x04, 0x05, 0x06, 0x07, 0x09, 0x0a, 0x0c, 0x0d, 0x0f, 0x12, 0x14, 0x17, 0x1a, 0x1c,
     0x1f, 0x24, 0x28, 0x2d, 0x31, 0x36, 0x3a, 0x3f, 0x47, 0x4f, 0x57, 0x5f, 0x67, 0x6f, 0x77, 0x7f,
@@ -447,7 +449,8 @@ struct Playback {
 
   void emitPitch() const {
     const u16 pitch = basePitch(track.rawNote);
-    out.pitchBend(math::pitchSemitones(pitch, track.tuning + static_cast<s8>(track.vibrato.value)));
+    out.pitchBend(math::pitchSemitones(pitch, track.tuning + static_cast<s8>(track.vibrato.value)),
+                  kTuningAndVibratoLayer);
   }
 
   void setAdsr(u8 index) {

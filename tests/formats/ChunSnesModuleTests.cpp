@@ -40,7 +40,7 @@ void runChunSnesModuleTests() {
       0xe2, 0x00,        // pitch script
       0xf9,              // top-level pattern end is a no-op
       0xfc,              // echo on
-      0xfb, 0x01, 0x06,  // slide the following note upward
+      0xfb, 0x01, 0x30,  // slide the following note upward while its pitch script runs
       0xed, 0x46,        // channel master volume
       0xf6, 0xfe,        // channel volume
       0xe6, 0x78, 0x60,  // first volume fade
@@ -87,8 +87,10 @@ void runChunSnesModuleTests() {
   for (const PerformanceEvent& event : performance.tracks.front().events) {
     envelope |= std::holds_alternative<EnvelopePerformanceEvent>(event);
     if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event)) {
-      negativePitchPeak |= bend->header.tick == 34 && bend->semitones == -0.09375;
-      positivePitchPeak |= bend->header.tick == 40 && bend->semitones == 0.09375;
+      negativePitchPeak |= bend->header.tick == 34 && bend->semitones == -0.09375 &&
+                           bend->layer != kPrimaryPitchBendLayer;
+      positivePitchPeak |= bend->header.tick == 40 && bend->semitones == 0.09375 &&
+                           bend->layer != kPrimaryPitchBendLayer;
     }
     reverb |= std::holds_alternative<ReverbPerformanceEvent>(event);
     if (const auto* level = std::get_if<LevelPerformanceEvent>(&event)) {
@@ -104,15 +106,28 @@ void runChunSnesModuleTests() {
   expect(silentFadeEndpoint, "two-stage volume fades should end at the driver's near-silent mixer level");
   expect(slide != performance.tracks.front().automations.end(), "pre-note slides should bind to the following note");
   const auto& transition = std::get<PitchTransitionIntent>(slide->intent);
-  expect(transition.startKey == 24.0 && transition.targetKey == 25.0 && transition.timing.timelineTicks == 6,
+  expect(transition.startKey == 24.0 && transition.targetKey == 25.0 && transition.timing.timelineTicks == 48,
          "pitch slides should retain their direction, distance, and duration");
 
   const MidiSequence midi = renderMidiSequence(performance);
   const bool upwardSlide = std::ranges::any_of(midi.tracks.front().events, [](const MidiEvent& event) {
     const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
-    return bend != nullptr && event.tick <= 6 && bend->value > 1024;
+    return bend != nullptr && event.tick <= 48 && bend->value > 0;
   });
   expect(upwardSlide, "upward slides should lower to positive pitch bends");
+  const auto bendAt = [&](u64 tick) -> const MidiChannelMessage* {
+    const auto found = std::ranges::find_if(midi.tracks.front().events, [=](const MidiEvent& event) {
+      return event.tick == tick && midiChannelMessage(event, MidiChannelMessageKind::PitchBend) != nullptr;
+    });
+    return found == midi.tracks.front().events.end()
+               ? nullptr
+               : midiChannelMessage(*found, MidiChannelMessageKind::PitchBend);
+  };
+  const auto* beforePitchPeak = bendAt(33);
+  const auto* negativePitchPeakMidi = bendAt(34);
+  expect(beforePitchPeak != nullptr && negativePitchPeakMidi != nullptr &&
+             negativePitchPeakMidi->value < beforePitchPeak->value,
+         "pitch-script modulation should remain additive while a pitch-bend slide is active");
 
   std::vector<u8> synchronizedAram(kAramSize);
   synchronizedAram[0x400] = 120;

@@ -36,6 +36,7 @@ constexpr double kDriverSweepsPerSecond = 192.0;
 constexpr double kDriverTempoBase = 240.0;
 constexpr double kLfoPhaseStepsPerCycle = 512.0;
 constexpr double kNitroSinePeak = 127.0;
+constexpr PitchBendLayerId kPitchWheelLayer{1};
 
 struct PendingBlock {
   u32 offset = 0;
@@ -303,7 +304,9 @@ struct Playback {
     return track.noteWait ? Effects::wait(duration) : Effects{};
   }
 
-  void pitchBend(s8 encoded) { out.pitchBend((encoded / 128.0) * track.pitchBendRangeSemitones); }
+  void pitchBend(s8 encoded) {
+    out.pitchBend((encoded / 128.0) * track.pitchBendRangeSemitones, kPitchWheelLayer);
+  }
 };
 
 using NdsCompilerCursor = CompilerCursor<TrackState, Playback>;

@@ -27,6 +27,7 @@ using namespace core;
 namespace {
 
 constexpr u32 kMaxTrackCommands = 32768;
+constexpr PitchBendLayerId kNotePitchOffsetLayer{1};
 
 [[nodiscard]] double attenuationGain(int attenuation) {
   const int clamped = std::clamp(attenuation, 0, 255);
@@ -434,9 +435,7 @@ struct Playback {
     const double outputBend = isDrum ? 0.0 : track.pitchBendSemitones;
     if (!track.emittedPitchBend || std::abs(*track.emittedPitchBend - outputBend) > 0.0001) {
       if (track.emittedPitchBend || std::abs(outputBend) > 0.0001) {
-        out.pitchBendRange(
-            static_cast<u8>(std::clamp<int>(std::max(2, static_cast<int>(std::ceil(std::abs(outputBend)))), 2, 127)));
-        out.pitchBend(outputBend);
+        out.pitchBend(outputBend, kNotePitchOffsetLayer);
       }
       track.emittedPitchBend = outputBend;
     }

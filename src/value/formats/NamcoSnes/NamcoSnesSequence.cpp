@@ -224,7 +224,6 @@ struct TrackState {
   VoiceInstrument emittedInstrument;
   std::optional<std::pair<u8, u8>> emittedMix;
   std::optional<double> pitchBend;
-  u8 pitchBendRange = 48;
 };
 
 struct Playback {
@@ -315,12 +314,6 @@ struct Playback {
   }
 
   void emitPitchBend(double semitones) {
-    const u8 requiredRange =
-        static_cast<u8>(std::clamp<int>(static_cast<int>(std::ceil(std::abs(semitones))), 2, 127));
-    if (requiredRange > track.pitchBendRange) {
-      track.pitchBendRange = requiredRange;
-      out.pitchBendRange(requiredRange);
-    }
     if (!track.pitchBend || std::abs(*track.pitchBend - semitones) > 0.0001) {
       out.pitchBend(semitones, kPitchTableBendLayer);
       track.pitchBend = semitones;
@@ -828,7 +821,6 @@ const SequenceProgramConfig& sequenceConfig() {
           .initialReverbSend = 0.0,
           .initialStereoBalance = StereoBalance{.leftGain = 0.5, .rightGain = 0.5},
           .initialMonoModeChannels = 0,
-          .initialPitchBendRangeSemitones = 48,
           .initialTempoMicrosecondsPerQuarter = 804000,
       },
   };
