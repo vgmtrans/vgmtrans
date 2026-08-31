@@ -34,6 +34,17 @@ enum class Version : u8 {
   Vendetta,
 };
 
+[[nodiscard]] constexpr u8 k053260PanIndex(u8 raw, Version version) {
+  u8 index = raw & 7;
+  if (index == 0) {
+    index = 4;
+  }
+  if (version == Version::Vendetta) {
+    index = static_cast<u8>(-index) & 7;
+  }
+  return index;
+}
+
 enum class TrackChip : u8 {
   Ym2151,
   K053260,
@@ -48,7 +59,6 @@ struct SampleInfo {
   bool reverse = false;
   bool loops = false;
   core::SourceRange range;
-  u32 sampleIndex = 0;
 
   [[nodiscard]] bool fitsIn(u64 size) const { return start <= size && length <= size - start; }
 };
@@ -85,7 +95,6 @@ struct TrackLayout {
 
 struct SequenceLayout {
   u32 index = 0;
-  core::SourceRange tableEntry;
   core::SourceRange trackTable;
   u32 ymTrackCount = 0;
   u32 totalTrackCount = 0;
@@ -125,7 +134,6 @@ struct Layout {
   std::vector<std::vector<Drum>> drumBanks;
 };
 
-[[nodiscard]] const char* versionName(Version version);
 [[nodiscard]] double driverTickRate(u8 clkb, u8 skipInterval);
 [[nodiscard]] double sampledReleaseSeconds(Version version, u8 packed, u8 volume, double ticksPerSecond);
 [[nodiscard]] std::optional<Layout> findLayout(const core::SourceFile& source, core::ByteReader reader,

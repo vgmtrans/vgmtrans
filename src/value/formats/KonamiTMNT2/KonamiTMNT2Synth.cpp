@@ -28,15 +28,8 @@ namespace {
 }
 
 [[nodiscard]] double panPosition(u8 raw, Version version) {
-  u8 pan = raw & 7;
-  if (pan == 0) {
-    pan = 4;
-  }
-  if (version == Version::Vendetta) {
-    pan = static_cast<u8>(-pan) & 7;
-  }
   static constexpr std::array<double, 8> positions{0.5, 0.0, 0.17, 0.30, 0.5, 0.70, 0.83, 1.0};
-  return positions[pan];
+  return positions[k053260PanIndex(raw, version)];
 }
 
 [[nodiscard]] Ym2151Voice ymVoice(ByteReader reader, u32 offset) {
