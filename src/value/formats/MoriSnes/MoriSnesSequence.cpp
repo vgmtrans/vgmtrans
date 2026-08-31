@@ -39,6 +39,7 @@ constexpr s8 kInitialEchoFeedback = 0x50;
 constexpr u8 kInitialEchoDelay = 4;
 constexpr u8 kInitialEchoFilter = 2;
 constexpr u32 kSequenceTickScale = 256;
+constexpr PitchBendLayerId kVoiceScriptPitchLayer{1};
 
 struct EventTiming {
   std::optional<u8> delay;
@@ -484,63 +485,37 @@ struct VoiceScriptState {
   return result;
 }
 
-void emitVoicePitchChanges(const VoiceLimits& script, PerformanceEmitter& out, PerformanceNoteId note,
-                           double key, double inheritedFine, u64 attackTick, u8 tempo, double timerMilliseconds) {
+void emitVoicePitchChanges(const VoiceLimits& script, PerformanceEmitter& out, double inheritedFine, u64 attackTick,
+                           u8 tempo) {
+  // The DSP voice offset is independent of the track's pitch wheel and remains
+  // live through release. A new physical attack starts with a fresh offset.
+  out.pitchBend(0.0, kVoiceScriptPitchLayer);
   if (script.attacks.size() != 1) {
     return;
   }
 
-  struct Change {
-    u32 tick = 0;
-    double key = 0.0;
+  const auto bend = [&](double pitch256, bool fineExplicit) {
+    const double replacedFine = fineExplicit && !script.attackFineExplicit ? inheritedFine : 0.0;
+    return (pitch256 - script.attackPitch256) / 256.0 - replacedFine;
+  };
+  const u32 scale = std::max<u8>(tempo, 1);
+  double currentBend = 0.0;
+  const auto emit = [&](u32 scriptTick, double value) {
+    if (value != currentBend) {
+      out.at(attackTick + scriptTick * scale).pitchBend(value, kVoiceScriptPitchLayer);
+      currentBend = value;
+    }
   };
 
-  const auto pointKey = [&](double pitch256, bool fineExplicit) {
-    const double replacedFine = fineExplicit && !script.attackFineExplicit ? inheritedFine : 0.0;
-    return key + (pitch256 - script.attackPitch256) / 256.0 - replacedFine;
-  };
-  std::vector<Change> changes;
-  s32 previous = script.attackPitch256;
-  bool previousFineExplicit = script.attackFineExplicit;
   for (const VoiceLimits::Point& point : script.points) {
     if (script.cycleStart && point.tick >= *script.cycleStart) {
       break;
     }
-    if (point.pitch256 != previous || point.fineExplicit != previousFineExplicit) {
-      changes.push_back(Change{.tick = point.tick, .key = pointKey(point.pitch256, point.fineExplicit)});
-      previous = point.pitch256;
-      previousFineExplicit = point.fineExplicit;
-    }
+    emit(point.tick, bend(point.pitch256, point.fineExplicit));
   }
   if (script.cycleStart && script.cyclePitchCenter256) {
-    const double centerKey = pointKey(*script.cyclePitchCenter256, script.cycleFineExplicit);
-    const double currentKey = changes.empty() ? key : changes.back().key;
-    if (currentKey != centerKey) {
-      changes.push_back(Change{.tick = *script.cycleStart, .key = centerKey});
-    }
+    emit(*script.cycleStart, bend(*script.cyclePitchCenter256, script.cycleFineExplicit));
   }
-  if (changes.empty()) {
-    return;
-  }
-
-  const u32 scale = std::max<u8>(tempo, 1);
-  const Change& last = changes.back();
-  auto slide = out.pitchSlide(note, key, last.key,
-                              PitchSlideTiming::fixedDuration(last.tick * scale,
-                                                              last.tick * timerMilliseconds));
-
-  double previousKey = key;
-  for (const Change& change : changes) {
-    const u32 tick = change.tick * scale;
-    // Voice-script pitch writes are instantaneous. Preserve the staircase by
-    // holding the previous value until the final fine timeline tick.
-    if (tick != 0) {
-      slide.sample(out.at(attackTick + tick - 1), previousKey);
-    }
-    slide.sample(out.at(attackTick + tick), change.key);
-    previousKey = change.key;
-  }
-  slide.preferPitchBend();
 }
 
 void emitVoiceVolumeChanges(const VoiceLimits& script, PerformanceEmitter& out, u64 attackTick, u8 tempo,
@@ -898,9 +873,8 @@ struct Playback {
     if (audioEndMilliseconds) {
       event.maximumDurationMilliseconds = std::max(0.0, *audioEndMilliseconds - now);
     }
+    emitVoicePitchChanges(limits, out, track.fineTuning / 256.0, nowTick, program.tempo);
     const PerformanceNoteId emitted = out.note(std::move(event));
-    emitVoicePitchChanges(limits, out, emitted, key, track.fineTuning / 256.0, nowTick, program.tempo,
-                          program.traits.timerMilliseconds());
     emitVoiceVolumeChanges(limits, out, nowTick, program.tempo, autoEndTick);
 
     if (limits.attacks.size() > 1) {
@@ -937,6 +911,7 @@ struct Playback {
         if (retriggerEnd) {
           retrigger.maximumDurationMilliseconds = std::max(0.0, *retriggerEnd - attackMilliseconds);
         }
+        output.pitchBend(0.0, kVoiceScriptPitchLayer);
         output.note(std::move(retrigger));
       }
     }
@@ -1233,9 +1208,8 @@ struct SfxPlayback {
       note.maximumDurationMilliseconds = *end * track.traits.timerMilliseconds();
     }
     const u64 attackTick = vm.tick();
-    const PerformanceNoteId emitted = out.note(std::move(note));
-    emitVoicePitchChanges(limits, out, emitted, 60.0, 0.0, attackTick, kInitialTempo,
-                          track.traits.timerMilliseconds());
+    emitVoicePitchChanges(limits, out, 0.0, attackTick, kInitialTempo);
+    out.note(std::move(note));
     emitVoiceVolumeChanges(limits, out, attackTick, kInitialTempo);
 
     if (limits.attacks.size() > 1) {
@@ -1253,6 +1227,7 @@ struct SfxPlayback {
         if (attack->keyOff) {
           retrigger.maximumDurationMilliseconds = *attack->keyOff * track.traits.timerMilliseconds();
         }
+        output.pitchBend(0.0, kVoiceScriptPitchLayer);
         output.note(std::move(retrigger));
       }
     }

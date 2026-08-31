@@ -24,6 +24,8 @@ using namespace vgmtrans::formats::mori_snes;
 
 namespace {
 
+constexpr PitchBendLayerId kVoiceScriptPitchLayer{1};
+
 void expect(bool condition, const std::string& message) {
   if (!condition) {
     throw std::runtime_error(message);
@@ -39,6 +41,13 @@ std::vector<const Event*> events(const PerformanceTrack& track) {
     }
   }
   return result;
+}
+
+bool hasPitchBend(const std::vector<const PitchBendPerformanceEvent*>& bends, PitchBendLayerId layer, u64 tick,
+                  double semitones) {
+  return std::ranges::any_of(bends, [&](const PitchBendPerformanceEvent* bend) {
+    return bend->layer == layer && bend->header.tick == tick && std::abs(bend->semitones - semitones) < 0.000001;
+  });
 }
 
 class DriverFixture {
@@ -207,6 +216,8 @@ void eventTimingAndAuditedCommandsRenderPhysically() {
   const auto notes = events<NotePerformanceEvent>(track);
   const auto levels = events<LevelPerformanceEvent>(track);
   const auto bends = events<PitchBendPerformanceEvent>(track);
+  const auto sourceBend = std::ranges::find_if(
+      bends, [](const PitchBendPerformanceEvent* bend) { return bend->layer == kPrimaryPitchBendLayer; });
   const auto ranges = events<PitchBendRangePerformanceEvent>(track);
   const auto tempos = events<TempoPerformanceEvent>(track);
   const auto reverbs = events<ReverbPerformanceEvent>(track);
@@ -221,8 +232,8 @@ void eventTimingAndAuditedCommandsRenderPhysically() {
              (notes.size() < 2 ? std::string{} : ", second=" + std::to_string(notes[1]->header.tick)) + ")");
   expect(!levels.empty() && std::abs(levels.back()->linearGain - 4.0 / 256.0) < 0.000001,
          "relative volume should use the driver's wrapping eight-bit addition");
-  expect(bends.size() == 1 && std::abs(bends.front()->semitones - 2.0) < 0.000001 &&
-             bends.front()->normalizedWheelPosition == 0.5 && !ranges.empty() && ranges.back()->cents == 400,
+  expect(sourceBend != bends.end() && std::abs((*sourceBend)->semitones - 2.0) < 0.000001 &&
+             (*sourceBend)->normalizedWheelPosition == 0.5 && !ranges.empty() && ranges.back()->cents == 400,
          "the audited eighth-semitone bend range and signed pitch wheel should be preserved");
   expect(tempos.size() == 1 && tempos.back()->microsecondsPerQuarter == 121344000u / 0x80,
          "E6 should halve later countdowns exactly without applying the speed change a second time to tempo "
@@ -375,12 +386,15 @@ void shienDialectUsesItsDriverTimingAndPointers() {
   const auto masters = events<MasterLevelPerformanceEvent>(track);
   const auto ranges = events<PitchBendRangePerformanceEvent>(track);
   const auto bends = events<PitchBendPerformanceEvent>(track);
+  const auto sourceBend = std::ranges::find_if(
+      bends, [](const PitchBendPerformanceEvent* bend) { return bend->layer == kPrimaryPitchBendLayer; });
   const auto notes = events<NotePerformanceEvent>(track);
   const auto reverbs = events<ReverbPerformanceEvent>(track);
   expect(performance.diagnostics.empty() && !tempos.empty() &&
              tempos.back()->microsecondsPerQuarter == 92'160'000u / 0x80 && !masters.empty() &&
              std::abs(masters.back()->linearGain - 66.0 / 256.0) < 0.000001 && !ranges.empty() &&
-             ranges.back()->cents == 500 && !bends.empty() && std::abs(bends.back()->semitones - 2.5) < 0.000001 &&
+             ranges.back()->cents == 500 && sourceBend != bends.end() &&
+             std::abs((*sourceBend)->semitones - 2.5) < 0.000001 &&
              notes.size() == 1 && notes.front()->durationTicks == 5 * 256 &&
              std::abs(notes.front()->key - 2.5) < 0.000001 && !reverbs.empty() &&
              reverbs.back()->delayMilliseconds == 48.0 && reverbs.back()->leftGain == -0.5 &&
@@ -392,6 +406,15 @@ void shienDialectUsesItsDriverTimingAndPointers() {
 void loopingVoicePreludeRemainsSeparateFromItsVibratoCycle() {
   DriverFixture fixture;
   std::vector<u8> bytes = fixture.data();
+  const std::vector<u8> source{
+      0xd6, 0x10,        // two-semitone source wheel
+      0xdd, 0x7f,        // source bend before the attack
+      0xc0, 0xf9, 0x00,  // melodic descriptor $1500
+      0x02, 0x04, 0x40, 0x80,
+      0xdd, 0x5d,  // source bend changes while the scripted offset is live
+      0xd0,
+  };
+  std::ranges::copy(source, bytes.begin() + 0x1400);
   const std::vector<u8> script{
       0xde, 0xfc, 0x00,              // DSP row $1600
       0xc5, 0xd2, 0xd8, 0xfe, 0xda,  // attack at -2 semitones
@@ -431,22 +454,17 @@ void loopingVoicePreludeRemainsSeparateFromItsVibratoCycle() {
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program);
   const PerformanceTrack& track = performance.tracks.front();
   const auto notes = events<NotePerformanceEvent>(track);
+  const auto bends = events<PitchBendPerformanceEvent>(track);
   const auto expressions = events<ExpressionPerformanceEvent>(track);
-  const auto* pitch = track.automations.empty()
-                          ? nullptr
-                          : std::get_if<PitchTransitionIntent>(&track.automations.front().intent);
   const auto faded = std::ranges::find_if(expressions, [](const ExpressionPerformanceEvent* expression) {
     return expression->header.tick == 15 * 0x20;
   });
-  expect(performance.diagnostics.empty() && !notes.empty() && pitch != nullptr &&
-             pitch->timing.timelineTicks == 5 * 0x20 &&
-             std::holds_alternative<FixedDurationPitchSlideTiming>(pitch->timing.physical) &&
-             std::abs(pitch->targetKey - pitch->startKey - 515.0 / 256.0) < 0.000001 &&
+  expect(performance.diagnostics.empty() && !notes.empty() && track.automations.empty() &&
+             hasPitchBend(bends, kPrimaryPitchBendLayer, 0, 2.0 * 127.0 / 128.0) &&
+             hasPitchBend(bends, kPrimaryPitchBendLayer, 2 * 0x100, 2.0 * 93.0 / 128.0) &&
+             hasPitchBend(bends, kVoiceScriptPitchLayer, 5 * 0x20, 515.0 / 256.0) &&
              faded != expressions.end() && std::abs((*faded)->linearGain - 140.0 / 210.0) < 0.000001,
-         "the pre-cycle pitch rise and volume fade should remain per-note fixed-clock automation" +
-             (pitch ? " (ticks=" + std::to_string(pitch->timing.timelineTicks) +
-                          ", delta=" + std::to_string(pitch->targetKey - pitch->startKey) + ")"
-                    : std::string{" (missing pitch)"}));
+         "the fixed-clock voice prelude should remain additive to source bends and separate from its steady vibrato");
 }
 
 void preAttackFinePitchRemainsRelativeToTheSourceNote() {
@@ -544,13 +562,17 @@ void physicalVoiceScriptsCanRetriggerNotes() {
 
   const PerformanceSequence performance = render(std::move(bytes));
   const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto bends = events<PitchBendPerformanceEvent>(performance.tracks.front());
+  const auto resets = std::ranges::count_if(bends, [](const PitchBendPerformanceEvent* bend) {
+    return bend->layer == kVoiceScriptPitchLayer && bend->semitones == 0.0;
+  });
   expect(performance.diagnostics.empty() && notes.size() == 2 && notes[0]->header.tick == 0 &&
              notes[0]->maximumDurationMilliseconds &&
              std::abs(*notes[0]->maximumDurationMilliseconds - 2 * 9.875) < 0.000001 &&
              notes[1]->header.tick == 3 * 0x20 && notes[1]->maximumDurationMilliseconds &&
              std::abs(*notes[1]->maximumDurationMilliseconds - 3 * 9.875) < 0.000001 &&
              std::abs(notes[1]->key - notes[0]->key - 1.0) < 0.000001 &&
-             std::abs(notes[1]->linearVelocity - 0.5 * 224.0 / 240.0) < 0.000001,
+             std::abs(notes[1]->linearVelocity - 0.5 * 224.0 / 240.0) < 0.000001 && resets == 2,
          "hardware voice scripts should preserve repeated KON/KOFF envelope attacks, pitch, volume, and fixed-clock "
          "timing");
 }
@@ -612,16 +634,13 @@ void liveSongSelectionAndHardwareSoundEffectsAreRecovered() {
   const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
   const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks.front());
   const auto expressions = events<ExpressionPerformanceEvent>(performance.tracks.front());
-  const auto* pitch = performance.tracks.front().automations.empty()
-                          ? nullptr
-                          : std::get_if<PitchTransitionIntent>(&performance.tracks.front().automations.front().intent);
+  const auto bends = events<PitchBendPerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->maximumDurationMilliseconds &&
              std::abs(*notes.front()->maximumDurationMilliseconds - 7 * 9.875) < 0.000001 &&
              instruments.size() == 1 && instruments.front()->sourceInstrument &&
-             instruments.front()->sourceInstrument->key == (kDirectInstrumentFlag | 0x1800) && pitch != nullptr &&
-             pitch->timing.timelineTicks == 5 * 0x20 &&
-             std::holds_alternative<FixedDurationPitchSlideTiming>(pitch->timing.physical) &&
-             std::abs(pitch->targetKey - 60.25) < 0.000001 && expressions.size() == 2 &&
+             instruments.front()->sourceInstrument->key == (kDirectInstrumentFlag | 0x1800) &&
+             performance.tracks.front().automations.empty() &&
+             hasPitchBend(bends, kVoiceScriptPitchLayer, 5 * 0x20, 0.25) && expressions.size() == 2 &&
              expressions.front()->header.tick == 0 && expressions.front()->linearGain == 1.0 &&
              expressions.back()->header.tick == 5 * 0x20 &&
              std::abs(expressions.back()->linearGain - 224.0 / 240.0) < 0.000001,
