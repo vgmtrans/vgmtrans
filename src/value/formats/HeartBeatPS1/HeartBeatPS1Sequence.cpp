@@ -58,16 +58,9 @@ struct RuntimeConfig {
 };
 
 struct ProgramState {
-  explicit ProgramState(const RuntimeConfig& config)
-      : numerator(config.numerator), denominator(config.denominator), ppqn(config.ppqn),
-        initialTempo(config.initialTempo), bankIds(config.bankIds), instruments(config.instruments) {}
+  explicit ProgramState(const RuntimeConfig& config) : config(config) {}
 
-  u8 numerator = 4;
-  u8 denominator = 4;
-  u16 ppqn = 480;
-  u32 initialTempo = 500000;
-  std::array<u16, 4> bankIds{};
-  std::vector<HeartBeatPs1InstrumentInfo> instruments;
+  const RuntimeConfig& config;
 };
 
 struct LfoState {
@@ -91,7 +84,6 @@ struct TrackState {
   u16 dynamicAdsr1 = 0;
   u16 dynamicAdsr2 = 0;
   bool initialized = false;
-  bool sustain = false;
   bool portamento = false;
   double portamentoMilliseconds = 0.0;
   std::optional<u8> previousKey;
@@ -110,12 +102,12 @@ struct Playback {
       return;
     }
     track.initialized = true;
-    track.bank = programState.bankIds.front();
-    track.ppqn = programState.ppqn;
-    track.tempo = programState.initialTempo;
+    track.bank = programState.config.bankIds.front();
+    track.ppqn = programState.config.ppqn;
+    track.tempo = programState.config.initialTempo;
     out.instrument(heartBeatPs1InstrumentIdentity(track.bank, track.program));
     if (track.channel == 0) {
-      out.timeSignature(programState.numerator, programState.denominator, 24);
+      out.timeSignature(programState.config.numerator, programState.config.denominator, 24);
     }
   }
 
@@ -126,10 +118,10 @@ struct Playback {
   [[nodiscard]] Effects after(u32 delta) const { return Effects::wait(delta); }
 
   [[nodiscard]] const HeartBeatPs1Tone* currentTone(u8 key) const {
-    const auto instrument = std::ranges::find_if(programState.instruments, [&](const auto& value) {
-      return value.bank == track.bank && value.program == track.program;
-    });
-    if (instrument == programState.instruments.end()) {
+    const auto& instruments = programState.config.instruments;
+    const auto instrument = std::ranges::find_if(
+        instruments, [&](const auto& value) { return value.bank == track.bank && value.program == track.program; });
+    if (instrument == instruments.end()) {
       return nullptr;
     }
     const auto tone = std::ranges::find_if(
@@ -242,8 +234,8 @@ struct Playback {
         delayed.reverb(value / 127.0);
         break;
       case 32:
-        if (value < programState.bankIds.size() && programState.bankIds[value] != 0xffff) {
-          track.bank = programState.bankIds[value];
+        if (value < programState.config.bankIds.size() && programState.config.bankIds[value] != 0xffff) {
+          track.bank = programState.config.bankIds[value];
           delayed.instrument(heartBeatPs1InstrumentIdentity(track.bank, track.program));
         }
         break;
@@ -268,8 +260,7 @@ struct Playback {
         emitVibrato(delayed);
         break;
       case 64:
-        track.sustain = value != 0;
-        delayed.sustainPedal(track.sustain);
+        delayed.sustainPedal(value != 0);
         break;
       case 71:
         track.dynamicAdsr2 = static_cast<u16>((track.dynamicAdsr2 & 0xc03f) | ((127u - value) & 0x7f) << 6);
@@ -318,7 +309,6 @@ struct Playback {
         break;
       case 121:
         track.modulation = 64;
-        track.sustain = false;
         track.portamento = false;
         track.vibrato = {};
         track.tremolo = {};
@@ -598,7 +588,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     event.derived("wheel", value, SemanticOperandRole::Pitch);
     return event.invoke<&Playback::pitchBend>(channel, value, source.delta);
   }
-  if (source.status == 0xff && source.data1 == 0x51 && source.dataBytes == 3) {
+  if (source.status == 0xff && source.data1 == 0x51 && source.payloadSize == 3) {
     const u32 payload = source.end - 3;
     const u32 tempo = (static_cast<u32>(reader.u8At(payload)) << 16) |
                       (static_cast<u32>(reader.u8At(payload + 1)) << 8) | reader.u8At(payload + 2);
@@ -647,16 +637,19 @@ SequenceProgram parseHeartBeatPs1Sequence(ByteReader reader, AssetId id, const H
 
   if (sourceMap != nullptr) {
     auto soundHeader =
-        sourceMap->header("HeartBeatPS1 Sound Header", reader.range(layout.offset, 0x3c))
+        sourceMap->header("HeartBeatPS1 Sound Header", reader.range(layout.containerOffset, 0x3c))
             .kind("heartbeat-ps1-sound-header")
             .owner(ObjectRefs::sequence(id))
             .fieldsAsChildren()
-            .field("sequence_size", reader.range(layout.offset, 4), layout.dataEnd - layout.qQesOffset)
-            .field("sequence_id", reader.range(layout.offset + 4, 2), layout.sequenceId)
-            .field("descriptor_count", reader.range(layout.offset + 6, 1), reader.u8At(layout.offset + 6))
-            .field("load_position", reader.range(layout.offset + 7, 1), reader.u8At(layout.offset + 7));
+            .field("sequence_size", reader.range(layout.containerOffset, 4), layout.dataEnd - layout.qQesOffset)
+            .field("sequence_id", reader.range(layout.containerOffset + 4, 2), layout.sequenceId)
+            .field("descriptor_count", reader.range(layout.containerOffset + 6, 1),
+                   reader.u8At(layout.containerOffset + 6))
+            .field("load_position", reader.range(layout.containerOffset + 7, 1),
+                   reader.u8At(layout.containerOffset + 7));
     for (u32 index = 0; index < layout.bankIds.size(); ++index) {
-      soundHeader.field("bank_id", reader.range(layout.offset + 0x14 + index * 0x0c, 2), layout.bankIds[index]);
+      soundHeader.field("bank_id", reader.range(layout.containerOffset + 0x14 + index * 0x0c, 2),
+                        layout.bankIds[index]);
     }
     sourceMap->header("qQES Sequence Header", reader.range(layout.qQesOffset, 0x10))
         .kind("heartbeat-ps1-sequence-header")

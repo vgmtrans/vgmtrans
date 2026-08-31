@@ -30,18 +30,16 @@ constexpr u32 kMaximumSectionSize = 0x200000;
          reader.u8At(offset + 2) == 'E' && reader.u8At(offset + 3) == 'S';
 }
 
-[[nodiscard]] bool readVlq(ByteReader reader, u32& cursor, u32 end, u32& value, u8& size) {
-  value = 0;
-  size = 0;
-  while (cursor < end && size < 4) {
+[[nodiscard]] std::optional<u32> readVlq(ByteReader reader, u32& cursor, u32 end) {
+  u32 value = 0;
+  for (u8 size = 0; cursor < end && size < 4; ++size) {
     const u8 byte = reader.u8At(cursor++);
     value = (value << 7) | (byte & 0x7f);
-    ++size;
     if ((byte & 0x80) == 0) {
-      return true;
+      return value;
     }
   }
-  return false;
+  return std::nullopt;
 }
 
 [[nodiscard]] std::optional<std::vector<HeartBeatPs1EventLayout>> readEvents(ByteReader reader, u32 begin, u32 end) {
@@ -62,24 +60,19 @@ constexpr u32 kMaximumSectionSize = 0x200000;
           .offset = cursor,
           .end = cursor + 3,
           .status = 0xff,
-          .explicitStatus = true,
           .data1 = 0x2f,
-          .dataBytes = 1,
       });
       return events;
     }
 
-    u32 delta = 0;
-    u8 deltaSize = 0;
-    if (!readVlq(reader, cursor, end, delta, deltaSize) || cursor >= end) {
+    const auto delta = readVlq(reader, cursor, end);
+    if (!delta || cursor >= end) {
       return std::nullopt;
     }
 
-    bool explicitStatus = false;
     u8 status = reader.u8At(cursor);
     if ((status & 0x80) != 0) {
       ++cursor;
-      explicitStatus = true;
       // The driver retains every status byte, including FF. Dragon Warrior
       // VII consequently encodes adjacent meta events with FF running status.
       runningStatus = status;
@@ -92,15 +85,13 @@ constexpr u32 kMaximumSectionSize = 0x200000;
 
     HeartBeatPs1EventLayout event{
         .offset = offset,
-        .delta = delta,
-        .deltaSize = deltaSize,
+        .delta = *delta,
         .status = status,
-        .explicitStatus = explicitStatus,
     };
     const u8 family = status & 0xf0;
     if (family >= 0x80 && family <= 0xe0) {
       const u32 bytes = family == 0xc0 || family == 0xd0 ? 1 : 2;
-      if (!rangeValid(reader, cursor, bytes) || cursor + bytes > end) {
+      if (bytes > end - cursor) {
         return std::nullopt;
       }
       event.data1 = reader.u8At(cursor++);
@@ -110,7 +101,6 @@ constexpr u32 kMaximumSectionSize = 0x200000;
       if ((event.data1 & 0x80) != 0 || (bytes == 2 && (event.data2 & 0x80) != 0)) {
         return std::nullopt;
       }
-      event.dataBytes = bytes;
 
       if (family == 0xb0) {
         const u8 channel = status & 0x0f;
@@ -132,15 +122,12 @@ constexpr u32 kMaximumSectionSize = 0x200000;
         return std::nullopt;
       }
       event.data1 = reader.u8At(cursor++);
-      u32 payloadSize = 0;
-      u8 lengthSize = 0;
-      if (!readVlq(reader, cursor, end, payloadSize, lengthSize) || !rangeValid(reader, cursor, payloadSize) ||
-          cursor + payloadSize > end) {
+      const auto payloadSize = readVlq(reader, cursor, end);
+      if (!payloadSize || *payloadSize > end - cursor) {
         return std::nullopt;
       }
-      event.data2 = payloadSize == 0 ? 0 : reader.u8At(cursor);
-      event.dataBytes = payloadSize;
-      cursor += payloadSize;
+      event.payloadSize = *payloadSize;
+      cursor += *payloadSize;
     } else {
       return std::nullopt;
     }
@@ -151,7 +138,7 @@ constexpr u32 kMaximumSectionSize = 0x200000;
 }
 
 [[nodiscard]] std::optional<HeartBeatPs1SequenceLayout> readSequence(ByteReader reader, u32 containerOffset,
-                                                                     u32 containerLength, u32 qQesOffset,
+                                                                     u32 containerSize, u32 qQesOffset,
                                                                      u32 sequenceSize, u16 sequenceId,
                                                                      const std::array<u16, 4>& bankIds) {
   if (sequenceSize < kSequenceHeaderSize || sequenceSize > kMaximumSectionSize ||
@@ -172,8 +159,8 @@ constexpr u32 kMaximumSectionSize = 0x200000;
     return std::nullopt;
   }
   return HeartBeatPs1SequenceLayout{
-      .offset = containerOffset,
-      .length = containerLength,
+      .containerOffset = containerOffset,
+      .containerSize = containerSize,
       .qQesOffset = qQesOffset,
       .dataOffset = qQesOffset + kSequenceHeaderSize,
       .dataEnd = qQesOffset + sequenceSize,
@@ -203,59 +190,57 @@ std::optional<HeartBeatPs1ContainerLayout> readHeartBeatPs1Container(ByteReader 
   }
 
   struct Descriptor {
-    u32 samples = 0;
-    u32 attributes = 0;
-    u16 bank = 0xffff;
+    u32 sampleSize = 0;
+    u32 attributeSize = 0;
+    u16 bankId = 0xffff;
   };
   std::array<Descriptor, 4> descriptors{};
   std::array<u16, 4> bankIds{0xffff, 0xffff, 0xffff, 0xffff};
   for (u32 index = 0; index < 4; ++index) {
-    const u32 record = offset + kDescriptorOffset + index * kDescriptorSize;
-    const u32 samples = reader.le32(record);
-    const u32 attributes = reader.le32(record + 4);
-    const u16 bank = reader.le16(record + 8);
-    if (samples > kMaximumSectionSize || attributes > kMaximumSectionSize || samples % 16 != 0 || attributes % 4 != 0 ||
-        (samples == 0) != (attributes == 0) || (bank != 0xffff && bank > 4)) {
+    const u32 descriptorOffset = offset + kDescriptorOffset + index * kDescriptorSize;
+    const u32 sampleSize = reader.le32(descriptorOffset);
+    const u32 attributeSize = reader.le32(descriptorOffset + 4);
+    const u16 bankId = reader.le16(descriptorOffset + 8);
+    if (sampleSize > kMaximumSectionSize || attributeSize > kMaximumSectionSize || sampleSize % 16 != 0 ||
+        attributeSize % 4 != 0 || (sampleSize == 0) != (attributeSize == 0) || (bankId != 0xffff && bankId > 4)) {
       return std::nullopt;
     }
-    descriptors[index] = Descriptor{.samples = samples, .attributes = attributes, .bank = bank};
-    bankIds[index] = bank;
+    descriptors[index] = Descriptor{.sampleSize = sampleSize, .attributeSize = attributeSize, .bankId = bankId};
+    bankIds[index] = bankId;
   }
 
-  HeartBeatPs1ContainerLayout container{.offset = offset, .bankIds = bankIds};
+  HeartBeatPs1ContainerLayout container;
   u64 cursor = static_cast<u64>(offset) + kContainerHeaderSize;
   for (u32 index = 0; index < descriptorCount; ++index) {
     const auto descriptor = descriptors[index];
-    if (descriptor.samples == 0) {
+    if (descriptor.sampleSize == 0) {
       continue;
     }
-    if (!rangeValid(reader, cursor, static_cast<u64>(descriptor.samples) + descriptor.attributes)) {
+    if (!rangeValid(reader, cursor, static_cast<u64>(descriptor.sampleSize) + descriptor.attributeSize)) {
       return std::nullopt;
     }
-    const u32 attributes = static_cast<u32>(cursor) + descriptor.samples;
-    if (descriptor.attributes < 8) {
+    const u32 attributeOffset = static_cast<u32>(cursor) + descriptor.sampleSize;
+    if (descriptor.attributeSize < 8) {
       return std::nullopt;
     }
-    const u8 programCount = reader.u8At(attributes + 1);
-    const u16 toneCount = reader.le16(attributes + 2);
+    const u8 programCount = reader.u8At(attributeOffset + 1);
+    const u16 toneCount = reader.le16(attributeOffset + 2);
     const u64 required = 8ull + static_cast<u64>(programCount) * 0x24 + static_cast<u64>(toneCount) * 0x14;
-    if (programCount == 0 || toneCount == 0 || required > descriptor.attributes) {
+    if (programCount == 0 || toneCount == 0 || required > descriptor.attributeSize) {
       return std::nullopt;
     }
     container.banks.push_back(HeartBeatPs1BankLayout{
-        .containerOffset = offset,
         .sampleOffset = static_cast<u32>(cursor),
-        .sampleSize = descriptor.samples,
-        .attributeOffset = attributes,
-        .attributeSize = descriptor.attributes,
-        .bank = descriptor.bank,
-        .slot = static_cast<u8>(index),
+        .sampleSize = descriptor.sampleSize,
+        .attributeOffset = attributeOffset,
+        .attributeSize = descriptor.attributeSize,
+        .bank = descriptor.bankId,
         .programCount = programCount,
         .toneCount = toneCount,
-        .masterVolume = reader.u8At(attributes + 4),
-        .masterPan = reader.u8At(attributes + 5),
+        .masterVolume = reader.u8At(attributeOffset + 4),
+        .masterPan = reader.u8At(attributeOffset + 5),
     });
-    cursor += static_cast<u64>(descriptor.samples) + descriptor.attributes;
+    cursor += static_cast<u64>(descriptor.sampleSize) + descriptor.attributeSize;
   }
 
   if (cursor > std::numeric_limits<u32>::max() || !rangeValid(reader, cursor, sequenceSize)) {
