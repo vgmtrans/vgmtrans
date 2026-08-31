@@ -29,6 +29,7 @@ inline constexpr char kCps1[] = "CPS1";
 inline constexpr char kCps2[] = "CPS2";
 inline constexpr char kGbaRom[] = "GbaRom";
 inline constexpr char kKonamiArcade[] = "KonamiArcade";
+inline constexpr char kKonamiTMNT2[] = "KonamiTMNT2";
 inline constexpr char kMameRomSet[] = "MameRomSet";
 inline constexpr char kNintendoDsRom[] = "NintendoDsRom";
 inline constexpr char kPlayStationRam[] = "PlayStationRam";

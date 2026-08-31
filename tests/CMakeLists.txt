@@ -10,6 +10,7 @@ target_sources(vgmtrans-value-core-tests
     formats/ItikitiSnesModuleTests.cpp
     formats/CpsModuleTests.cpp
     formats/KonamiArcadeModuleTests.cpp
+    formats/KonamiTMNT2ModuleTests.cpp
     formats/KonamiSnesModuleTests.cpp
     formats/Mp2kModuleTests.cpp
     formats/NeverlandSnesModuleTests.cpp
