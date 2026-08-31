@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <initializer_list>
 #include <stdexcept>
 #include <string>
 #include <variant>
@@ -55,32 +56,6 @@ std::vector<const ModulationPerformanceEvent*> modulationEvents(const Performanc
   return result;
 }
 
-Layout runtimeLayout(Version version) {
-  return Layout{
-      .version = version,
-      .sequenceHeaderAddress = 0,
-      .sequenceHeaderRange = {},
-      .localInstrumentTableAddress = 0,
-      .globalInstrumentTableAddress = 0,
-      .globalInstrumentCount = 1,
-      .spcDirAddress = 0,
-      .initialTempo = 120,
-      .timebase = 96,
-  };
-}
-
-PerformanceSequence render(std::vector<u8> bytes, Version version = Version::Standard) {
-  const Layout layout = runtimeLayout(version);
-  const SequenceProgramConfig config = sequenceConfig(layout);
-  SequenceProgram program{
-      .runtime = sequenceRuntime(layout),
-      .timebase = config.timebase,
-      .behavior = config.behavior,
-      .tracks = {decodeSourceTrack(ByteReader(SourceId{501}, bytes), layout, 0, 0)},
-  };
-  return SequenceVm(LoopPolicy::PlayOnce).render(program);
-}
-
 std::vector<u8> scannerFixture(Version version) {
   std::vector<u8> bytes(kAramSize);
   if (version == Version::Traverse) {
@@ -115,15 +90,25 @@ std::vector<u8> scannerFixture(Version version) {
   return bytes;
 }
 
+PerformanceSequence render(std::initializer_list<u8> track, Version version = Version::Standard) {
+  std::vector<u8> bytes = scannerFixture(version);
+  writeBytes(bytes, 0x3100, track);
+  const ByteReader reader(SourceId{501}, bytes);
+  const auto layout = findLayout(reader);
+  expect(layout.has_value(), "fixture driver signatures should produce a layout");
+  SequenceParse parsed = decodeSequence(reader, *layout, AssetId{501});
+  return SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
+}
+
 void layoutAndSynthUseAuditedDriverTables() {
   for (const Version version : {Version::Standard, Version::Traverse}) {
     const std::vector<u8> bytes = scannerFixture(version);
     const auto layout = findLayout(ByteReader(SourceId{502}, bytes));
     expect(layout && layout->version == version && layout->sequenceHeaderAddress == 0x3000 &&
-               layout->localInstrumentTableAddress == 0x3040 && layout->globalInstrumentTableAddress == 0x0140 &&
+               localInstrumentAddress(*layout, 0) == 0x3040 && layout->globalInstrumentTableAddress == 0x0140 &&
                layout->globalInstrumentCount == 2 && layout->spcDirAddress ==
                    (version == Version::Traverse ? 0xfc00 : 0xfb00) &&
-               layout->tracks[0] && layout->tracks[0]->address == 0x3100 &&
+               layout->tracks[0] == 0x3100 &&
                programSrcn(ByteReader(SourceId{502}, bytes), *layout, 1) == 1,
            "driver signatures should recover each version's live header, relative tracks, DIR, and SRCN tables");
     std::vector<u8> fallbackBytes = bytes;

@@ -8,6 +8,7 @@
 
 #include "value/sequence/CommandSourceMap.h"
 #include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/SequenceProgramConfig.h"
 #include "value/synth/SnesDsp.h"
 
 #include <algorithm>
@@ -15,7 +16,6 @@
 #include <cmath>
 #include <map>
 #include <optional>
-#include <string>
 #include <utility>
 #include <vector>
 
@@ -27,6 +27,7 @@ using namespace core;
 
 namespace {
 
+constexpr u32 kCommandLimit = 131072;
 constexpr std::array<u8, 16> kVolumeTable{
     0x00, 0x04, 0x08, 0x0c, 0x10, 0x14, 0x18, 0x1c,
     0x20, 0x24, 0x28, 0x2c, 0x30, 0x34, 0x38, 0x3c,
@@ -56,7 +57,9 @@ constexpr std::array<std::array<s8, 8>, 4> kFirPresets{{
                                     : std::optional<u8>{static_cast<u8>(found - kFirPresets.begin())};
 }
 
-[[nodiscard]] double volumeGain(Version version, u8 value) { return decodedVolume(version, value) / 255.0; }
+[[nodiscard]] u8 indexedVolumeValue(Version version, u8 index) {
+  return version == Version::Traverse ? static_cast<u8>(0xf0 + index) : index;
+}
 
 [[nodiscard]] u32 commandSize(ByteReader reader, u32 offset) {
   if (!reader.has(offset, 1)) {
@@ -78,9 +81,10 @@ constexpr std::array<std::array<s8, 8>, 4> kFirPresets{{
 struct RepeatInfo {
   Address start;
   Address end;
-  u32 plays;
+  u8 plays;
   u8 slot;
-  bool infinite;
+
+  [[nodiscard]] bool isInfinite() const { return plays == 0 || plays == 0xff; }
 };
 
 struct TrackLayout {
@@ -93,9 +97,8 @@ struct TrackLayout {
   struct OpenRepeat {
     u32 command;
     Address start;
-    u32 plays;
+    u8 plays;
     u8 slot;
-    bool infinite;
     std::vector<u32> breaks;
   };
 
@@ -114,7 +117,6 @@ struct TrackLayout {
           .start = Address{offset + size},
           .plays = count,
           .slot = static_cast<u8>(stack.size()),
-          .infinite = count == 0 || count == 0xff,
       });
     } else if (opcode == 0xee && !stack.empty()) {
       stack.back().breaks.push_back(offset);
@@ -126,7 +128,6 @@ struct TrackLayout {
           .end = Address{offset + size},
           .plays = open.plays,
           .slot = open.slot,
-          .infinite = open.infinite,
       };
       layout.begin.emplace(open.command, info);
       layout.end.emplace(offset, info);
@@ -134,7 +135,7 @@ struct TrackLayout {
         layout.breaks.emplace(branch, info);
       }
       // No bytes after a declared infinite repeat are reachable.
-      if (open.infinite) {
+      if (info.isInfinite()) {
         break;
       }
     }
@@ -146,14 +147,11 @@ struct TrackLayout {
   return layout;
 }
 
-struct RuntimeConfig {
-  Layout layout;
-};
-
 struct ProgramState {
-  explicit ProgramState(const RuntimeConfig& config) : layout(config.layout) {}
+  explicit ProgramState(const Layout& layout) : version(layout.version), echo(layout.echo) {}
 
-  Layout layout;
+  Version version;
+  EchoState echo;
   bool initialized = false;
 };
 
@@ -166,22 +164,17 @@ struct VibratoState {
 };
 
 struct TrackState {
-  explicit TrackState(const RuntimeConfig& config) : version(config.layout.version) {}
-
-  Version version;
   u8 octave = 3;
   u8 noteLength = 1;
   u8 quantize = 0;
   u8 rawVolume = 0;
-  u8 program = 0;
   s8 tuning = 0;
   s8 transpose = 0;
-  u8 pan = 0;
   bool previousSlur = false;
   bool previousWasRest = true;
-  std::optional<int> previousKey;
+  int previousKey = 0;
   // The driver compares note and octave before applying transpose or tuning.
-  std::optional<int> previousPitchKey;
+  int previousPitchKey = 0;
   PerformanceNoteId previousNote;
   u16 currentPitch = 0;
   VibratoState vibrato;
@@ -198,7 +191,7 @@ struct Playback {
       return;
     }
     program.initialized = true;
-    const EchoState& echo = program.layout.echo;
+    const EchoState& echo = program.echo;
     out.reverb(ReverbPerformanceEvent{
         .voiceMask = 0,
         .send = 0.0,
@@ -214,31 +207,27 @@ struct Playback {
 
   void volume(u8 value) {
     track.rawVolume = value;
-    out.level(volumeGain(track.version, value), ValueQuantization{.levels = 256});
+    out.level(decodedVolume(program.version, value) / 255.0, ValueQuantization{.levels = 256});
   }
 
-  void indexedVolume(u8 index) {
-    volume(track.version == Version::Traverse ? static_cast<u8>(0xf0 + index) : index);
-  }
+  void indexedVolume(u8 index) { volume(indexedVolumeValue(program.version, index)); }
 
   void stepVolume(int direction) {
-    const u8 stop = direction > 0 ? (track.version == Version::Traverse ? 0xff : 0x0f)
-                                  : (track.version == Version::Traverse ? 0xf0 : 0x00);
+    const u8 stop = direction > 0 ? (program.version == Version::Traverse ? 0xff : 0x0f)
+                                  : (program.version == Version::Traverse ? 0xf0 : 0x00);
     if (track.rawVolume == stop) {
       return;
     }
-    track.rawVolume = static_cast<u8>(track.rawVolume + direction);
-    volume(track.rawVolume);
+    volume(static_cast<u8>(track.rawVolume + direction));
   }
 
   void balance(u8 value) {
-    track.pan = std::min<u8>(value, 0x80);
-    out.stereoBalance((0x80 - track.pan) / 128.0, track.pan / 128.0);
+    const u8 position = std::min<u8>(value, 0x80);
+    out.stereoBalance((0x80 - position) / 128.0, position / 128.0);
   }
 
   void instrument(u8 value) {
-    track.program = value;
-    out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = value},
+    out.instrument(InstrumentIdentity{.domain = kInstrumentDomain, .key = value},
                    InstrumentEnvelopeMode::PreserveDynamicOverride);
   }
 
@@ -249,10 +238,10 @@ struct Playback {
   }
 
   void reverb(bool enabled) {
-    out.reverb(enabled ? std::abs(program.layout.echo.volume) / 128.0 : 0.0);
+    out.reverb(enabled ? std::abs(program.echo.volume) / 128.0 : 0.0);
   }
 
-  void beginRepeat(u8 slot, u32 plays) {
+  void beginRepeat(u8 slot, u8 plays) {
     RepeatCounter repeat = vm.repeatCounter(slot);
     if (repeat.firstVisit()) {
       repeat.start(plays);
@@ -352,23 +341,17 @@ struct Playback {
 
   void vibratoEnable(bool enabled) {
     track.vibrato.enabled = enabled;
-    if (track.currentPitch != 0) {
+    if (track.currentPitch != 0 || !enabled) {
       emitVibrato(track.currentPitch);
-    } else if (!enabled) {
-      out.vibratoDepth(0.0, LfoPerformanceContext{
-                                .restartMode = LfoRestartMode::None,
-                                .zeroDepthBehavior = LfoZeroDepthBehavior::HoldOutputUntilNextNote,
-                            });
     }
   }
 
   void extendPreviousNote(u32 duration) {
-    if (!track.previousNote.valid() || !track.previousKey) {
+    if (!track.previousNote.valid()) {
       return;
     }
     track.previousNote = out.note(NotePerformanceEvent{
-        .key = static_cast<double>(*track.previousKey),
-        .linearVelocity = 1.0,
+        .key = static_cast<double>(track.previousKey),
         .durationTicks = duration,
         .extendsPrevious = true,
         .restartsEnvelope = false,
@@ -405,14 +388,12 @@ struct Playback {
     emitVibrato(track.currentPitch);
     NotePerformanceEvent event{
         .key = static_cast<double>(sourceKey),
-        .linearVelocity = 1.0,
         .durationTicks = sounding,
-        .extendsPrevious = false,
         .restartsEnvelope = !continuesVoice,
         .restartsLfoPhase = !continuesVoice,
     };
-    if (continuesVoice && track.previousNote.valid() && track.previousKey) {
-      if (*track.previousKey == sourceKey) {
+    if (continuesVoice && track.previousNote.valid()) {
+      if (track.previousKey == sourceKey) {
         event.extendsPrevious = true;
         track.previousNote = out.note(std::move(event));
       } else {
@@ -434,8 +415,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, const Layout& layout,
                                                    const TrackLayout& trackLayout,
                                                    std::vector<Diagnostic>* diagnostics,
-                                                   SequenceReferences* references = nullptr) {
-  Cursor cursor(reader, begin, kAramSize, "pandora-box-snes", diagnostics);
+                                                   std::set<u8>& programs) {
+  Cursor cursor(reader, begin, kAramSize, kFormatId, diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
   }
@@ -463,9 +444,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   if (opcode < 0x60) {
     auto event = cursor.command("Indexed Volume", SequenceSemantic::Level);
     const u8 index = event.opcodeBits<0, 4>("index", SemanticOperandRole::Level);
-    event.derived("volume", decodedVolume(layout.version, layout.version == Version::Traverse
-                                                              ? static_cast<u8>(0xf0 + index)
-                                                              : index),
+    event.derived("volume", decodedVolume(layout.version, indexedVolumeValue(layout.version, index)),
                   SemanticOperandRole::Level);
     return event.invoke<&Playback::indexedVolume>(index);
   }
@@ -473,9 +452,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     auto event = cursor.command("Program Change", SequenceSemantic::Program);
     const u8 program = event.opcodeValue("program", static_cast<u8>(opcode - 0x60), SourceValueDisplay::Default,
                                          SemanticOperandRole::InstrumentProgram);
-    if (references != nullptr) {
-      references->programs.insert(program);
-    }
+    programs.insert(program);
     return event.invoke<&Playback::instrument>(program);
   }
 
@@ -534,10 +511,10 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       if (found == trackLayout.begin.end()) {
         return event.ignore();
       }
-      event.derived("total_plays", found->second.infinite ? 0u : count);
+      event.derived("total_plays", found->second.isInfinite() ? 0u : count);
       event.derived("destination", found->second.start, SourceValueDisplay::Address,
                     SemanticOperandRole::RepeatTarget);
-      return found->second.infinite ? event : event.invoke<&Playback::beginRepeat>(found->second.slot, count);
+      return found->second.isInfinite() ? event : event.invoke<&Playback::beginRepeat>(found->second.slot, count);
     }
     case 0xed: {
       auto event = cursor.command("Repeat End", SequenceSemantic::Repeat);
@@ -547,13 +524,14 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       }
       event.derived("destination", found->second.start, SourceValueDisplay::Address,
                     SemanticOperandRole::RepeatTarget);
-      return found->second.infinite ? event.declaredLoop(found->second.start)
-                                    : event.repeatUntil(found->second.slot, found->second.plays, found->second.start);
+      return found->second.isInfinite() ? event.declaredLoop(found->second.start)
+                                        : event.repeatUntil(found->second.slot, found->second.plays,
+                                                            found->second.start);
     }
     case 0xee: {
       auto event = cursor.command("Repeat Break", SequenceSemantic::RepeatBreak);
       const auto found = trackLayout.breaks.find(begin);
-      if (found == trackLayout.breaks.end() || found->second.infinite) {
+      if (found == trackLayout.breaks.end() || found->second.isInfinite()) {
         return event.ignore();
       }
       event.derived("destination", found->second.end, SourceValueDisplay::Address,
@@ -608,54 +586,32 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   }
 }
 
-[[nodiscard]] TrackProgram decodeTrack(ByteReader reader, const Layout& layout, u32 trackNumber, u32 startAddress,
-                                       std::optional<AssetId> sequenceId,
-                                       std::optional<SourceAnnotationId> headerAnnotation,
-                                       SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics,
-                                       SequenceReferences* references) {
-  const TrackLayout trackLayout = analyzeTrack(reader, startAddress);
-  const TrackDecodeScope tracks{
-      .reader = reader,
-      .bytecodeEnd = kAramSize,
-      .maxCommands = kCommandLimit,
-      .sequenceAsset = sequenceId,
-      .parentAnnotation = headerAnnotation,
-      .sourceMap = sourceMap,
-  };
-  return tracks.decode(trackNumber, startAddress, [&](u32 offset) {
-    return decodeCommand(reader, offset, layout, trackLayout, diagnostics, references);
-  });
-}
-
 }  // namespace
 
 u8 decodedVolume(Version version, u8 raw) {
-  if (version == Version::Traverse) {
-    return raw >= 0xf0 ? kVolumeTable[raw - 0xf0] : raw;
-  }
-  return raw < 0x10 ? kVolumeTable[raw] : raw;
+  const bool indexed = version == Version::Traverse ? raw >= 0xf0 : raw < 0x10;
+  return indexed ? kVolumeTable[raw & 0x0f] : raw;
 }
 
 DynamicAdsr dynamicAdsr(u8 attack, u8 decay, u8 sustainRate, u8 sustainLevel) {
-  const u8 ar = static_cast<u8>((attack * 15u) / 127u);
-  const u8 dr = static_cast<u8>((decay * 7u) / 127u);
-  const u8 sr = static_cast<u8>((sustainRate * 31u) / 127u);
-  const u8 sl = static_cast<u8>(7u - (sustainLevel * 7u) / 127u);
+  const auto scale = [](u8 value, u32 maximum) { return value * maximum / 127u; };
   return DynamicAdsr{
-      .adsr1 = static_cast<u8>(0x80 | (dr << 4) | ar),
-      .adsr2 = static_cast<u8>((sl << 5) | sr),
+      .adsr1 = static_cast<u8>(0x80 | (scale(decay, 7) << 4) | scale(attack, 15)),
+      .adsr2 = static_cast<u8>(((7u - scale(sustainLevel, 7)) << 5) | scale(sustainRate, 31)),
   };
 }
 
+namespace {
+
 SequenceProgramConfig sequenceConfig(const Layout& layout) {
   return SequenceProgramConfig{
-      .commandKindPrefix = "pandora-box-snes",
+      .commandKindPrefix = kFormatId,
       .timebase = Timebase{.ppqn = static_cast<u16>(layout.timebase / 4)},
       .behavior =
           SequenceProgramBehavior{
               .commandLimit = kCommandLimit,
               .preferredPitchTransitionRendering = PitchTransitionRenderingHint::PitchBend,
-              .initialSourceInstrument = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 0},
+              .initialSourceInstrument = InstrumentIdentity{.domain = kInstrumentDomain, .key = 0},
               .initialLevel = 0.0,
               .initialMasterLevel = std::abs(layout.echo.masterVolume) / 128.0,
               .initialReverbSend = 0.0,
@@ -666,75 +622,62 @@ SequenceProgramConfig sequenceConfig(const Layout& layout) {
   };
 }
 
-SequenceRuntime sequenceRuntime(const Layout& layout) {
-  return makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{.layout = layout});
+void annotateHeader(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder& sourceMap,
+                    SourceAnnotationId annotation) {
+  const u32 header = layout.sequenceHeaderAddress;
+  AnnotationBuilder{sourceMap, annotation}
+      .field("tempo", reader.range(header + 6, 1), layout.initialTempo, SourceValueDisplay::BeatsPerMinute)
+      .field("timebase", reader.range(header + 7, 1), layout.timebase)
+      .field("local_instrument_table_offset", reader.range(header + 0x0c, 1), layout.localInstrumentTableOffset,
+             SourceValueDisplay::Address);
+  auto echo = sourceMap.table("DSP Echo Configuration", reader.range(header + 0x20, 0x0c))
+                  .kind("pandora-box-snes-echo-config")
+                  .owner(ObjectRefs::sequence(sequenceId))
+                  .parent(annotation);
+  echo.fieldsAsChildren()
+      .field("master_volume", reader.range(header + 0x20, 1), reader.s8At(header + 0x20),
+             SourceValueDisplay::SignedDecimal)
+      .field("echo_volume", reader.range(header + 0x21, 1), reader.s8At(header + 0x21),
+             SourceValueDisplay::SignedDecimal)
+      .field("echo_delay", reader.range(header + 0x22, 1), reader.u8At(header + 0x22))
+      .field("echo_feedback", reader.range(header + 0x23, 1), reader.s8At(header + 0x23),
+             SourceValueDisplay::SignedDecimal);
+  for (u32 tap = 0; tap < 8; ++tap) {
+    echo.field(fmt::format("fir_{}", tap), reader.range(header + 0x24 + tap, 1), reader.s8At(header + 0x24 + tap),
+               SourceValueDisplay::SignedDecimal);
+  }
+  echo.description("MVOL, EVOL, EDL, EFB, and eight FIR coefficients; $FF in MVOL selects driver defaults");
 }
 
-TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, u32 trackNumber, u32 startAddress,
-                               std::vector<Diagnostic>* diagnostics) {
-  return decodeTrack(reader, layout, trackNumber, startAddress, std::nullopt, std::nullopt, nullptr, diagnostics,
-                     nullptr);
-}
+}  // namespace
 
 SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
                              std::vector<Diagnostic>* diagnostics) {
   const SequenceProgramConfig config = sequenceConfig(layout);
-  SequenceProgram program = config.makeProgram();
-  program.runtime = sequenceRuntime(layout);
-  SequenceReferences references{{0}};
+  SequenceDecodeSession sequence{reader, config, sequenceId,
+                                 reader.range(layout.sequenceHeaderAddress, kSequenceHeaderSize), sourceMap,
+                                 kCommandLimit, kAramSize};
+  std::set<u8> programs{0};
 
-  std::optional<SourceAnnotationId> headerAnnotation;
-  if (sourceMap != nullptr) {
-    auto header = sourceMap->header("Pandora Box SNES Sequence Header", layout.sequenceHeaderRange)
-                      .kind("pandora-box-snes-sequence-header")
-                      .owner(ObjectRefs::sequence(sequenceId))
-                      .field("tempo", reader.range(layout.sequenceHeaderAddress + 6, 1), layout.initialTempo,
-                             SourceValueDisplay::BeatsPerMinute)
-                      .field("timebase", reader.range(layout.sequenceHeaderAddress + 7, 1), layout.timebase)
-                      .field("local_instrument_table_offset", reader.range(layout.sequenceHeaderAddress + 0x0c, 1),
-                             reader.u8At(layout.sequenceHeaderAddress + 0x0c), SourceValueDisplay::Address);
-    headerAnnotation = header.id();
-    auto echo = sourceMap->table("DSP Echo Configuration", reader.range(layout.sequenceHeaderAddress + 0x20, 0x0c))
-                    .kind("pandora-box-snes-echo-config")
-                    .owner(ObjectRefs::sequence(sequenceId))
-                    .parent(*headerAnnotation);
-    echo.fieldsAsChildren()
-        .field("master_volume", reader.range(layout.sequenceHeaderAddress + 0x20, 1),
-               reader.s8At(layout.sequenceHeaderAddress + 0x20), SourceValueDisplay::SignedDecimal)
-        .field("echo_volume", reader.range(layout.sequenceHeaderAddress + 0x21, 1),
-               reader.s8At(layout.sequenceHeaderAddress + 0x21), SourceValueDisplay::SignedDecimal)
-        .field("echo_delay", reader.range(layout.sequenceHeaderAddress + 0x22, 1),
-               reader.u8At(layout.sequenceHeaderAddress + 0x22))
-        .field("echo_feedback", reader.range(layout.sequenceHeaderAddress + 0x23, 1),
-               reader.s8At(layout.sequenceHeaderAddress + 0x23), SourceValueDisplay::SignedDecimal);
-    for (u32 tap = 0; tap < 8; ++tap) {
-      echo.field(fmt::format("fir_{}", tap), reader.range(layout.sequenceHeaderAddress + 0x24 + tap, 1),
-                 reader.s8At(layout.sequenceHeaderAddress + 0x24 + tap), SourceValueDisplay::SignedDecimal);
-    }
-    echo.description("MVOL, EVOL, EDL, EFB, and eight FIR coefficients; $FF in MVOL selects driver defaults");
+  if (const auto header = sequence.headerAnnotation(); sourceMap != nullptr && header) {
+    annotateHeader(reader, layout, sequenceId, *sourceMap, *header);
   }
 
   for (u32 track = 0; track < layout.tracks.size(); ++track) {
     if (!layout.tracks[track]) {
       continue;
     }
-    const TrackPointer& pointer = *layout.tracks[track];
-    if (sourceMap != nullptr && headerAnnotation) {
-      sourceMap->pointer(fmt::format("Track {} Pointer", track + 1), pointer.source,
-                         SourceTarget{reader.range(pointer.address, 1)})
-          .kind("pandora-box-snes-track-pointer")
-          .owner(ObjectRefs::sequenceTrack(sequenceId, track))
-          .parent(*headerAnnotation);
-    }
-    TrackProgram decoded = decodeTrack(reader, layout, track, pointer.address, sequenceId, headerAnnotation, sourceMap,
-                                       diagnostics, &references);
-    decoded.sourceTrackNumber = track;
-    program.tracks.push_back(std::move(decoded));
+    const u16 address = *layout.tracks[track];
+    const SourceRange pointer = reader.range(layout.sequenceHeaderAddress + 0x10 + track * 2, 2);
+    const TrackLayout trackLayout = analyzeTrack(reader, address);
+    sequence.addTrack(
+        track, pointer, address,
+        [&](u32 offset) { return decodeCommand(reader, offset, layout, trackLayout, diagnostics, programs); },
+        reader.le16(pointer.offset));
   }
   return SequenceParse{
-      .program = std::move(program),
-      .references = std::move(references),
-      .headerRange = layout.sequenceHeaderRange,
+      .program = sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(layout)),
+      .programs = std::move(programs),
   };
 }
 
