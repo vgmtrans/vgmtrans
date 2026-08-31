@@ -96,7 +96,7 @@ std::vector<u8> heartBeatFixture() {
   bytes[tone + 9] = 127;
   bytes[tone + 10] = 64;
   bytes[tone + 11] = 60;
-  bytes[tone + 12] = 64;
+  bytes[tone + 12] = 0xc0;
   bytes[tone + 13] = 6;
   bytes[tone + 14] = 12;
   bytes[tone + 15] = 0;
@@ -192,5 +192,5 @@ void heartBeatPs1ModuleBuildsEmbeddedWaveBank() {
   expect(instrument.identity == heartBeatPs1InstrumentIdentity(1, 0) && instrument.regions.size() == 1,
          "program identity and its tone region should retain the source wave-bank ID");
   expect(std::abs(instrument.regions.front().unityKey - 59.5) < 0.000001 && instrument.reverb == 1.0,
-         "fractional root tuning and tone-default reverb routing should survive synth construction");
+         "fine tuning should use the driver's low seven bits and preserve tone-default reverb routing");
 }

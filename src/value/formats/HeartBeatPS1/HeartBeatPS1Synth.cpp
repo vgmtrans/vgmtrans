@@ -87,7 +87,7 @@ struct ParsedProgram {
     tone.pan = *record.u8At(10, "pan");
     const u8 root = *record.u8At(11, "root_key", SourceValueDisplay::MidiNote);
     const u8 fine = *record.u8At(12, "fine_tune");
-    tone.unityKey = root - fine / 128.0;
+    tone.unityKey = root - (fine & 0x7f) / 128.0;
     tone.bendDownSemitones = *record.u8At(13, "pitch_bend_down");
     tone.bendUpSemitones = *record.u8At(14, "pitch_bend_up");
     tone.keys.low = *record.u8At(15, "key_low", SourceValueDisplay::MidiNote);
