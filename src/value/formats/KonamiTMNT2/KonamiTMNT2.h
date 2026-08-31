@@ -49,6 +49,8 @@ struct SampleInfo {
   bool loops = false;
   core::SourceRange range;
   u32 sampleIndex = 0;
+
+  [[nodiscard]] bool fitsIn(u64 size) const { return start <= size && length <= size - start; }
 };
 
 struct SampleInstrument {
@@ -89,6 +91,11 @@ struct SequenceLayout {
   u32 totalTrackCount = 0;
   std::vector<TrackLayout> tracks;
   std::string name;
+
+  [[nodiscard]] std::string trackName(u32 track) const {
+    const bool fm = track < ymTrackCount;
+    return (fm ? "FM Track " : "Sampled Track ") + std::to_string(fm ? track : track - ymTrackCount);
+  }
 };
 
 struct SequencePointerLayout {
@@ -119,6 +126,8 @@ struct Layout {
 };
 
 [[nodiscard]] const char* versionName(Version version);
+[[nodiscard]] double driverTickRate(u8 clkb, u8 skipInterval);
+[[nodiscard]] double sampledReleaseSeconds(Version version, u8 packed, u8 volume, double ticksPerSecond);
 [[nodiscard]] std::optional<Layout> findLayout(const core::SourceFile& source, core::ByteReader reader,
                                                std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] core::SequenceProgram decodeSequence(core::ByteReader reader, const Layout& layout,
