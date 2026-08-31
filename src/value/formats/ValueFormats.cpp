@@ -22,6 +22,7 @@
 #include "value/formats/HudsonSnes/HudsonSnes.h"
 #include "value/formats/ItikitiSnes/ItikitiSnes.h"
 #include "value/formats/KonamiArcade/KonamiArcade.h"
+#include "value/formats/KonamiTMNT2/KonamiTMNT2.h"
 #include "value/formats/KonamiSnes/KonamiSnes.h"
 #include "value/formats/MP2k/MP2k.h"
 #include "value/formats/NeverlandSnes/NeverlandSnes.h"
@@ -111,6 +112,7 @@ void registerValueFormats(core::Session& session, const ValueFormatOptions& opti
   session.registerFormat(akao_snes::akaoSnesModule());
   session.registerFormat(akao::akaoModule());
   session.registerFormat(konami_arcade::konamiArcadeModule());
+  session.registerFormat(konami_tmnt2::module());
   session.registerFormat(konami_snes::konamiSnesModule());
   session.registerFormat(mp2k::mp2kModule());
   session.registerFormat(neverland_snes::module());

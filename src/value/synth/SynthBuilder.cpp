@@ -100,6 +100,8 @@ void annotateEnvelope(AnnotationBuilder& annotation, const Envelope& envelope) {
       return "GBA PSG programmable wave";
     case AudioCodec::PsxAdpcm:
       return "PSX ADPCM";
+    case AudioCodec::KonamiK053260Adpcm:
+      return "Konami K053260 ADPCM";
     case AudioCodec::KonamiK054539Adpcm:
       return "Konami K054539 ADPCM";
     case AudioCodec::OkiAdpcm:

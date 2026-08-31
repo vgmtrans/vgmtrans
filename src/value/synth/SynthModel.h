@@ -135,6 +135,7 @@ enum class AudioCodec {
   GbaPsg,
   GbaPsgWave,
   PsxAdpcm,
+  KonamiK053260Adpcm,
   KonamiK054539Adpcm,
   OkiAdpcm,
 };

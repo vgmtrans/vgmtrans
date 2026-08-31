@@ -291,6 +291,10 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcadeModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcadeSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcadeSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiTMNT2/KonamiTMNT2Layout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiTMNT2/KonamiTMNT2Module.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiTMNT2/KonamiTMNT2Sequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiTMNT2/KonamiTMNT2Synth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesSequence.cpp
