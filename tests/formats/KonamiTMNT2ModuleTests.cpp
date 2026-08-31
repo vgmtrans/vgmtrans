@@ -6,17 +6,21 @@
 
 #include "value/formats/KonamiTMNT2/KonamiTMNT2.h"
 
+#include "value/extractors/MameRomSetExtractor.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/SampleDecoder.h"
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <stdexcept>
 #include <string>
+#include <variant>
 #include <vector>
 
 using namespace vgmtrans::core;
 using namespace vgmtrans::formats::konami_tmnt2;
+namespace mame = vgmtrans::formats::mame;
 
 namespace {
 
@@ -28,6 +32,21 @@ void expect(bool condition, const std::string& message) {
 
 void write(std::vector<u8>& bytes, u32 offset, std::initializer_list<u8> values) {
   std::ranges::copy(values, bytes.begin() + offset);
+}
+
+void writeLe16(std::vector<u8>& bytes, u32 offset, u16 value) {
+  bytes[offset] = static_cast<u8>(value);
+  bytes[offset + 1] = static_cast<u8>(value >> 8);
+}
+
+template <class T>
+const T* firstAsset(const ScanResult& result) {
+  for (const auto& asset : result.assets) {
+    if (const auto* typed = std::get_if<T>(&asset)) {
+      return typed;
+    }
+  }
+  return nullptr;
 }
 
 SequenceProgram decode(std::vector<u8> bytes, Version version, TrackChip chip,
@@ -132,6 +151,14 @@ void konamiTmnt2ContextualFlowAndDynamicYmReleaseRender() {
                                       envelope->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks;
                              }),
          "DC should emit a sticky dynamic YM2151 release override");
+  const auto release = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event);
+    return envelope && envelope->update.fields == EnvelopeFields::Release;
+  });
+  expect(release != performance.tracks[0].events.end(), "TMNT2 DC should emit a release update");
+  const auto& releaseValues = std::get<EnvelopePerformanceEvent>(*release).update.values;
+  expect(releaseValues && releaseValues->releaseSeconds && std::isinf(*releaseValues->releaseSeconds),
+         "TMNT2 DC operand 15 should wrap to native YM2151 release rate zero");
   expect(std::ranges::any_of(performance.tracks[0].events,
                              [](const PerformanceEvent& event) {
                                const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
@@ -139,6 +166,196 @@ void konamiTmnt2ContextualFlowAndDynamicYmReleaseRender() {
                                       modulation->pitchDepthSemitones && *modulation->pitchDepthSemitones > 0.0;
                              }),
          "E5 should preserve the driver's software vibrato as physical modulation");
+}
+
+void konamiTmnt2SteppedModulationRunsAndRestoresOverTime() {
+  std::vector<u8> bytes(0xa0);
+  write(bytes, 0x80,
+        {
+            0xe0,
+            0x01,
+            0x00,
+            0x00,
+            0x00,  // initialize
+            0xee,
+            0x04,
+            0x01,
+            0x21,  // four ticks; +pitch, -volume every two ticks
+            0x11,
+            0xff,
+        });
+  const auto performance =
+      SequenceVm(LoopPolicy::PlayOnce).render(decode(std::move(bytes), Version::Tmnt2, TrackChip::Ym2151));
+  const auto renderedNotes = notes(performance);
+  expect(renderedNotes.size() == 1 && renderedNotes.front()->header.tick == 4,
+         "EE should block sequence execution for its full 8-bit step count");
+  std::vector<const PitchBendPerformanceEvent*> bends;
+  std::vector<const ExpressionPerformanceEvent*> expressions;
+  for (const auto& event : performance.tracks.front().events) {
+    if (const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event)) {
+      bends.push_back(bend);
+    } else if (const auto* expression = std::get_if<ExpressionPerformanceEvent>(&event)) {
+      expressions.push_back(expression);
+    }
+  }
+  expect(bends.size() == 4 && bends[0]->header.tick == 1 && bends[2]->header.tick == 3 &&
+             bends.back()->header.tick == 4 && std::abs(bends.back()->semitones) < 0.0001,
+         "EE should emit each pitch step and restore the pre-command pitch at completion");
+  expect(expressions.size() >= 2 && expressions[expressions.size() - 2]->header.tick == 2 &&
+             expressions.back()->header.tick == 4,
+         "EE should apply its packed volume interval and restore the pre-command level");
+}
+
+void konamiTmnt2NativeLfoUsesHardwareRateAndChannelRamp() {
+  std::vector<u8> bytes(0xa0);
+  write(bytes, 0x80,
+        {
+            0xe0,
+            0x01,
+            0x00,
+            0x00,
+            0x00,  // initialize
+            0xe9,
+            0xff,
+            0x7f,
+            0x7f,
+            0x12,
+            0x00,  // maximum PM/AM; two-tick ramp; zero delay clamps to one
+            0x18,
+            0xff,  // 24-tick note
+        });
+  const auto performance =
+      SequenceVm(LoopPolicy::PlayOnce).render(decode(std::move(bytes), Version::BellsWhistles, TrackChip::Ym2151));
+  const auto renderedNotes = notes(performance);
+  expect(renderedNotes.size() == 1 && !renderedNotes.front()->restartsVibratoLfoPhase.value_or(true) &&
+             !renderedNotes.front()->restartsTremoloLfoPhase.value_or(true),
+         "the native YM2151 LFO should remain free-running across note attacks");
+
+  std::vector<const ModulationPerformanceEvent*> pitchDepths;
+  std::vector<const ModulationPerformanceEvent*> amplitudeDepths;
+  const ModulationPerformanceEvent* rate = nullptr;
+  for (const auto& event : performance.tracks.front().events) {
+    const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+    if (modulation == nullptr) {
+      continue;
+    }
+    if (modulation->target == ModulationPerformanceTarget::VibratoDepth && modulation->pitchDepthSemitones &&
+        *modulation->pitchDepthSemitones > 0.0) {
+      pitchDepths.push_back(modulation);
+    } else if (modulation->target == ModulationPerformanceTarget::TremoloDepth && modulation->volumeDepthDecibels &&
+               *modulation->volumeDepthDecibels > 0.0) {
+      amplitudeDepths.push_back(modulation);
+    } else if (modulation->target == ModulationPerformanceTarget::VibratoRate) {
+      rate = modulation;
+    }
+  }
+  expect(rate && rate->context.frequencyHz && *rate->context.frequencyHz > 52.0 && *rate->context.frequencyHz < 54.0,
+         "E9 should convert the YM2151 register-18 4.4 rate to its physical frequency");
+  expect(pitchDepths.size() == 7 && pitchDepths.front()->header.tick == 3 && pitchDepths.back()->header.tick == 15 &&
+             std::abs(*pitchDepths.back()->pitchDepthSemitones - 7.0) < 0.0001,
+         "E9 should honor the per-note delay and seven-step PMS ramp");
+  expect(amplitudeDepths.size() == 6 && amplitudeDepths.front()->header.tick == 5 &&
+             amplitudeDepths.back()->header.tick == 15 &&
+             std::abs(*amplitudeDepths.back()->volumeDepthDecibels - 95.6) < 0.0001,
+         "E9 should ramp AMS at half the PMS sensitivity");
+
+  std::vector<u8> sunset(0xa0);
+  write(sunset, 0x80,
+        {
+            0xe0,
+            0x01,
+            0x00,
+            0x00,
+            0x00,  // initialize
+            0xe5,
+            0x01,
+            0x00,  // Sunset Riders promotes depth zero to one
+            0x11,
+            0xff,
+        });
+  const auto sunsetPerformance =
+      SequenceVm(LoopPolicy::PlayOnce).render(decode(std::move(sunset), Version::SunsetRiders, TrackChip::Ym2151));
+  expect(std::ranges::any_of(sunsetPerformance.tracks.front().events,
+                             [](const PerformanceEvent& event) {
+                               const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+                               return modulation && modulation->target == ModulationPerformanceTarget::VibratoDepth &&
+                                      modulation->pitchDepthSemitones &&
+                                      std::abs(*modulation->pitchDepthSemitones - 0.125) < 0.0001;
+                             }),
+         "Sunset Riders E5 should promote a zero depth nibble to the driver's minimum depth");
+}
+
+void konamiTmnt2AliasesMiscSamplesAndTrackLabels() {
+  constexpr u32 codeSize = 0x800;
+  constexpr u32 soundSize = 0x100;
+  std::vector<u8> bytes(codeSize + soundSize);
+
+  write(bytes, 0x40, {0x21, 0x00, 0x02, 0xe6, 0x7f, 0x07, 0x5f, 0x19});
+  write(bytes, 0x50, {0x13, 0x1a, 0x21, 0x00, 0x03, 0x07, 0x4f, 0x09, 0x4e});
+  write(bytes, 0x60, {0x4f, 0x06, 0x00, 0xdd, 0x7e, 0x00, 0x07, 0x5f, 0x50, 0x21, 0x00, 0x04, 0x19});
+  write(bytes, 0x80, {0x13, 0x1a, 0xd9, 0xcb, 0x7f, 0xca, 0x00, 0x00, 0x21, 0x00, 0x05, 0xe6, 0x7f});
+
+  writeLe16(bytes, 0x200, 0x240);
+  writeLe16(bytes, 0x202, 0x260);
+  writeLe16(bytes, 0x204, 0x240);  // alias: valid in every non-Vendetta table
+  bytes[0x240] = 1;
+  writeLe16(bytes, 0x241, 0x600);
+  bytes[0x260] = 1;
+  writeLe16(bytes, 0x261, 0x610);
+  write(bytes, 0x600, {0xe0, 0x01, 0x00, 0x00, 0x00, 0x11, 0xff});
+  write(bytes, 0x610, {0xe0, 0x01, 0x00, 0x00, 0x00, 0x21, 0xff});
+
+  writeLe16(bytes, 0x300, 0x350);
+  writeLe16(bytes, 0x302, 0x360);
+  write(bytes, 0x350, {0x08, 0x10, 0x00, 0x20, 0x00, 0x00, 0x7f, 0x00, 0x00, 0x00});
+  write(bytes, 0x360, {0x09, 0x10, 0x00, 0x20, 0x00, 0x00, 0x7f, 0x00, 0x00, 0x00});
+  for (u32 index = 0; index < 0x10; ++index) {
+    bytes[codeSize + 0x20 + index] = static_cast<u8>(index);
+  }
+
+  const SourceFile source{
+      .id = SourceId{502},
+      .name = "tmnt2 fixture",
+      .title = "tmnt2 fixture",
+      .size = bytes.size(),
+      .attributes =
+          {
+              {std::string(mame::kMameGameAttribute), "tmnt2"},
+              {std::string(mame::kMameFormatAttribute), std::string(kFormatName)},
+          },
+      .segments =
+          {
+              SourceSegment{.name = "soundcpu", .offset = 0, .size = codeSize},
+              SourceSegment{.name = "sound", .offset = codeSize, .size = soundSize},
+          },
+  };
+  const ByteReader reader(source.id, bytes);
+  std::vector<Diagnostic> diagnostics;
+  const auto layout = findLayout(source, reader, &diagnostics);
+  expect(layout && diagnostics.empty() && layout->sequences.size() == 2 && layout->sequencePointers.size() == 3,
+         "non-Vendetta duplicate sequence pointers should remain aliases, not terminate the table");
+  expect(layout->sampleInfos.size() == 2 && layout->sampleInfos[0].sampleIndex != layout->sampleInfos[1].sampleIndex,
+         "looping and one-shot instruments over the same bytes must retain distinct sample identities");
+
+  ScanIdAllocator ids;
+  const ScanResult result = module().scan(ScanInput{.source = source, .reader = reader, .ids = ids});
+  const auto* misc = firstAsset<MiscAsset>(result);
+  const auto* bank = firstAsset<SoundBankAsset>(result);
+  expect(result.diagnostics.empty() && result.explicitCollections.size() == 2 && misc != nullptr &&
+             misc->metadata.name == "Sequence Table" && misc->metadata.range.offset == 0x200 &&
+             misc->metadata.range.endOffset() == 0x273 && misc->payload.size() == 0x73,
+         "the complete pointer/track-table span should be published once as a shared Sequence Table misc asset");
+  expect(std::ranges::all_of(
+             result.explicitCollections,
+             [](const ExplicitCollection& collection) { return collection.members.miscAssets.size() == 1; }),
+         "every aliased sequence collection should attach the shared Sequence Table misc asset");
+  const auto* sequence = firstAsset<SequenceProgramAsset>(result);
+  expect(sequence && sequence->program.tracks.size() == 1 && sequence->program.tracks[0].name == "FM Track 0",
+         "sequence programs should preserve the driver's FM/Sampled track names");
+  expect(bank && bank->localSamples.samples.size() == 2 && bank->localSamples.samples[0].reverse &&
+             bank->localSamples.samples[0].encodedData.offset == codeSize + 0x20 &&
+             !bank->localSamples.samples[0].loop.enabled && bank->localSamples.samples[1].loop.enabled,
+         "reverse samples should slice from their stored low ROM address and retain independent loop modes");
 }
 
 void konamiTmnt2DialectWidthsMatchTheMusicParsers() {

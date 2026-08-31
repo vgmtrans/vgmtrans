@@ -121,18 +121,34 @@ void warn(std::vector<Diagnostic>* diagnostics, std::string message, SourceRange
 }
 
 void readSequences(Layout& layout, ByteReader reader, std::vector<Diagnostic>* diagnostics) {
-  std::set<u16> seen;
+  std::set<u16> pointers;
+  std::vector<std::pair<u16, SourceRange>> entries;
   u32 cursor = layout.sequenceTableOffset;
   u32 firstSequence = static_cast<u32>(layout.program.endOffset());
-  for (u32 index = 0; cursor + 2 <= firstSequence && reader.has(cursor, 2); ++index, cursor += 2) {
+  while (cursor + 2 <= firstSequence && reader.has(cursor, 2)) {
     const u16 pointer = reader.le16(cursor);
-    if (pointer == 0 || pointer >= layout.program.size || !seen.insert(pointer).second) {
+    if (pointer == 0 || pointer >= layout.program.size) {
       break;
     }
+    if (layout.version == Version::Vendetta && pointers.contains(pointer)) {
+      break;
+    }
+    pointers.insert(pointer);
+    entries.emplace_back(pointer, reader.range(cursor, 2));
     firstSequence = std::min(firstSequence, static_cast<u32>(layout.program.offset + pointer));
+    cursor += 2;
+  }
+  layout.sequenceTable = reader.range(layout.sequenceTableOffset, cursor - layout.sequenceTableOffset);
+
+  std::map<u16, u32> sequenceIndices;
+  u32 index = 0;
+  for (const u16 pointer : pointers) {
+    sequenceIndices.emplace(pointer, index);
+    const auto pointerEntry = std::ranges::find(entries, pointer, &std::pair<u16, SourceRange>::first);
     const u32 sequenceOffset = static_cast<u32>(layout.program.offset + pointer);
     if (!reader.has(sequenceOffset, layout.version == Version::Vendetta ? 24 : 1)) {
-      warn(diagnostics, "KonamiTMNT2 sequence pointer is outside the sound CPU ROM", reader.range(cursor, 2));
+      warn(diagnostics, "KonamiTMNT2 sequence pointer is outside the sound CPU ROM", pointerEntry->second);
+      ++index;
       continue;
     }
 
@@ -142,14 +158,17 @@ void readSequences(Layout& layout, ByteReader reader, std::vector<Diagnostic>* d
     const u32 totalTracks = ymTracks + sampleTracks;
     if (!reader.has(sequenceOffset + typeSize, totalTracks * 2)) {
       warn(diagnostics, "KonamiTMNT2 sequence track table is truncated", reader.range(sequenceOffset, typeSize));
+      ++index;
       continue;
     }
 
     SequenceLayout sequence{
         .index = index,
-        .tableEntry = reader.range(cursor, 2),
+        .tableEntry = pointerEntry->second,
         .trackTable = reader.range(sequenceOffset, typeSize + totalTracks * 2),
-        .name = layout.game + " song " + std::to_string(index),
+        .ymTrackCount = ymTracks,
+        .totalTrackCount = totalTracks,
+        .name = layout.game + " seq " + std::to_string(index),
     };
     for (u32 track = 0; track < totalTracks; ++track) {
       const u32 entry = sequenceOffset + typeSize + track * 2;
@@ -168,6 +187,18 @@ void readSequences(Layout& layout, ByteReader reader, std::vector<Diagnostic>* d
     if (!sequence.tracks.empty()) {
       layout.sequences.push_back(std::move(sequence));
     }
+    ++index;
+  }
+
+  layout.sequencePointers.reserve(entries.size());
+  for (u32 slot = 0; slot < entries.size(); ++slot) {
+    const auto& [encoded, range] = entries[slot];
+    layout.sequencePointers.push_back(SequencePointerLayout{
+        .slot = slot,
+        .encoded = encoded,
+        .sequenceIndex = sequenceIndices.at(encoded),
+        .range = range,
+    });
   }
 }
 
@@ -190,8 +221,8 @@ void readSequences(Layout& layout, ByteReader reader, std::vector<Diagnostic>* d
 }
 
 [[nodiscard]] u32 addSample(Layout& layout, SampleInfo info,
-                            std::map<std::tuple<u32, u32, u32, bool, bool>, u32>& samples) {
-  const auto key = std::tuple{info.start, info.length, info.loopStart, info.adpcm, info.reverse};
+                            std::map<std::tuple<u32, u32, u32, bool, bool, bool>, u32>& samples) {
+  const auto key = std::tuple{info.start, info.length, info.loopStart, info.adpcm, info.reverse, info.loops};
   if (const auto found = samples.find(key); found != samples.end()) {
     return found->second;
   }
@@ -205,7 +236,7 @@ void readSequences(Layout& layout, ByteReader reader, std::vector<Diagnostic>* d
 void readTmnt2Synth(Layout& layout, ByteReader reader, std::vector<Diagnostic>* diagnostics) {
   layout.ym2151Patches = pointerTable(reader, layout, layout.ym2151TableOffset);
   const auto instrumentPointers = pointerTable(reader, layout, layout.k053260TableOffset, layout.drumTableOffset);
-  std::map<std::tuple<u32, u32, u32, bool, bool>, u32> samples;
+  std::map<std::tuple<u32, u32, u32, bool, bool, bool>, u32> samples;
 
   for (const u32 offset : instrumentPointers) {
     if (!reader.has(offset, 10)) {
@@ -233,9 +264,8 @@ void readTmnt2Synth(Layout& layout, ByteReader reader, std::vector<Diagnostic>* 
         .loops = (flags & 3) != 0,
         .range = reader.range(offset, size),
     };
-    const u32 relativeStart = info.reverse && info.start >= info.length ? info.start - info.length : info.start;
     const bool validSample =
-        info.length != 0 && relativeStart <= layout.sound.size && info.length <= layout.sound.size - relativeStart;
+        info.length != 0 && info.start <= layout.sound.size && info.length <= layout.sound.size - info.start;
     const u32 sample = validSample ? addSample(layout, info, samples) : kInvalidSampleIndex;
     layout.sampleInstruments.push_back(SampleInstrument{
         .volume = reader.u8At(common),
@@ -277,9 +307,8 @@ void readTmnt2Synth(Layout& layout, ByteReader reader, std::vector<Diagnostic>* 
           .loops = (flags & 3) != 0,
           .range = reader.range(offset, 14),
       };
-      const u32 relativeStart = info.reverse && info.start >= info.length ? info.start - info.length : info.start;
       const bool validSample =
-          info.length != 0 && relativeStart <= layout.sound.size && info.length <= layout.sound.size - relativeStart;
+          info.length != 0 && info.start <= layout.sound.size && info.length <= layout.sound.size - info.start;
       const u32 sample = validSample ? addSample(layout, info, samples) : kInvalidSampleIndex;
       drums.push_back(Drum{
           .valid = validSample,
