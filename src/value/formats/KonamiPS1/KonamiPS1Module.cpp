@@ -26,14 +26,23 @@ namespace {
   }
 
   ScanResultBuilder result(input, std::string(kKonamiPs1FormatName), std::string(kKonamiPs1CollectionResolver));
+  const auto rootCounterTarget = findKonamiPs1RootCounterTarget(input.reader);
+  if (!rootCounterTarget) {
+    result.diagnostics().push_back(Diagnostic{
+        .severity = Severity::Error,
+        .message = "KonamiPS1 timer setup was not found",
+        .range = input.reader.range(layouts.front().offset, 4),
+    });
+    return result.finish();
+  }
   const auto tones = readKonamiPs1Tones(input.reader);
   for (const auto& layout : layouts) {
     const std::string name =
         layout.hasKdt2Header ? fmt::format("{} KDT {}", result.sourceDisplayName(), layout.sequenceId)
                              : fmt::format("{} KDT{} {:X}", result.sourceDisplayName(), layout.version, layout.offset);
     auto sequence = result.sequence(name, input.reader.range(layout.containerOffset, layout.containerLength));
-    sequence.program(
-        parseKonamiPs1Sequence(input.reader, sequence.id(), layout, tones, &result.sourceMap(), &result.diagnostics()));
+    sequence.program(parseKonamiPs1Sequence(input.reader, sequence.id(), layout, *rootCounterTarget, tones,
+                                            &result.sourceMap(), &result.diagnostics()));
   }
   return result.finish();
 }
