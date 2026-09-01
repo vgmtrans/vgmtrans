@@ -54,9 +54,7 @@ std::vector<DesiredCollection> resolveKonamiPs1Collections(const CollectionDisco
     for (const auto* bank : selectedBanks) {
       collection.soundBank(bank->metadata.id);
     }
-    if (selectedBanks.empty()) {
-      collection.requireSoundBank();
-    }
+    collection.requireSoundBank();
 
     for (const auto* pool : samples) {
       if (source && sourceId(pool->metadata) == source) {
