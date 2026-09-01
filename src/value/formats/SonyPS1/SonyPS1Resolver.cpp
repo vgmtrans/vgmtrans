@@ -12,7 +12,6 @@
 #include <filesystem>
 #include <optional>
 #include <string>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -266,7 +265,6 @@ std::vector<DesiredCollection> resolveSonyPs1Collections(const CollectionDiscove
   const auto instrumentEntries = instruments(context);
   const auto sampleEntries = samples(context);
   std::vector<DesiredCollection> collections;
-  std::unordered_set<u32> pairedBanks;
 
   for (const auto& sequence : sequenceEntries) {
     CollectionAssembly collection("source:" + std::to_string(sequence.source ? sequence.source->value : 0) +
@@ -276,25 +274,11 @@ std::vector<DesiredCollection> resolveSonyPs1Collections(const CollectionDiscove
     std::vector<SonySampleBinding> bindings;
     const auto banks = chooseInstruments(sequence, sequenceEntries, instrumentEntries);
     for (const auto* bank : banks) {
-      pairedBanks.insert(bank->asset.value);
       attachBank(collection, *bank, sampleEntries, bindings);
     }
     if (banks.empty()) {
       collection.requireSoundBank();
     }
-    collection.bind(sonyPs1Binder(std::move(bindings)));
-    collections.push_back(std::move(collection).finish());
-  }
-
-  for (const auto& bank : instrumentEntries) {
-    if (pairedBanks.contains(bank.asset.value)) {
-      continue;
-    }
-    CollectionAssembly collection(
-        "source:" + std::to_string(bank.source ? bank.source->value : 0) + ":bank:" + std::to_string(bank.asset.value),
-        bank.file == nullptr ? "Sony PS1 VAB" : bank.file->name);
-    std::vector<SonySampleBinding> bindings;
-    attachBank(collection, bank, sampleEntries, bindings);
     collection.bind(sonyPs1Binder(std::move(bindings)));
     collections.push_back(std::move(collection).finish());
   }

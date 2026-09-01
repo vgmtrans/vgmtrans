@@ -388,11 +388,11 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
   combined.addSource(SourceFile{.name = "combined.VAB"}, vabFixture(7, true));
   combined.scanPendingSources();
   const SessionSnapshot combinedSnapshot = combined.snapshot();
-  expect(combinedSnapshot.collections().size() == 1, "a standalone combined VAB should produce a synth collection");
-  const Collection& combinedCollection = combinedSnapshot.collections().front();
-  expect(combinedCollection.members.soundBanks.size() == 1 && combinedCollection.members.samplePools.empty(),
-         "a combined VAB should publish one self-contained sound bank");
-  const auto* instruments = combinedSnapshot.asset<SoundBankAsset>(combinedCollection.members.soundBanks[0]);
+  expect(combinedSnapshot.collections().empty(), "a standalone VAB should not produce a sequence-less collection");
+  const auto combinedBank = std::ranges::find_if(
+      combinedSnapshot.assets(), [](const Asset& asset) { return std::holds_alternative<SoundBankAsset>(asset); });
+  const auto* instruments =
+      combinedBank == combinedSnapshot.assets().end() ? nullptr : std::get_if<SoundBankAsset>(&*combinedBank);
   expect(instruments && instruments->localSamples.samples.size() == 1 && instruments->instruments.size() == 1 &&
              instruments->instruments[0].regions.size() == 1,
          "the VAB program and tone tables should build one playable region");
@@ -421,15 +421,13 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
   split.addSource(SourceFile{.name = "BANK.VB", .path = "/fixture/BANK.VB"}, body);
   split.scanPendingSources();
   const SessionSnapshot splitSnapshot = split.snapshot();
-  expect(splitSnapshot.collections().size() == 1 && splitSnapshot.collections()[0].members.soundBanks.size() == 1 &&
-             splitSnapshot.collections()[0].members.samplePools.size() == 1,
-         "matching split VH and VB sources should resolve into one exportable synth collection");
-  const Collection& splitCollection = splitSnapshot.collections()[0];
-  const auto splitBinding = bindCollection(splitSnapshot, splitCollection.id);
-  expect(splitBinding.collection.has_value(), "split VH/VB collection should bind successfully");
-  const auto& splitRegion = splitBinding.collection->soundBanks()[0].instruments[0].regions[0];
-  expect(splitRegion.sample.owner() == splitCollection.members.samplePools[0],
-         "split VH regions should bind explicitly to the selected VB sample pool");
+  expect(splitSnapshot.collections().empty(), "split VH/VB assets should not produce a sequence-less collection");
+  expect(
+      std::ranges::count_if(splitSnapshot.assets(),
+                            [](const Asset& asset) { return std::holds_alternative<SoundBankAsset>(asset); }) == 1 &&
+          std::ranges::count_if(splitSnapshot.assets(),
+                                [](const Asset& asset) { return std::holds_alternative<SamplePoolAsset>(asset); }) == 1,
+      "split VH/VB scanning should still publish the bank and sample assets");
 
   const auto bankBytes = vabFixture(7, true);
   const auto sequenceBytes = sequenceFixture({0x00, 0xff, 0x2f, 0x00});
