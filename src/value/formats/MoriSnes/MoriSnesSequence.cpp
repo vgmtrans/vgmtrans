@@ -1164,9 +1164,9 @@ void consumeTiming(Cursor::Event& event, u8 first, const InspectedEvent& inspect
 }  // namespace
 
 const SequenceProgramConfig& sequenceConfig(Version version) {
-  const auto makeConfig = [](Version version) {
-    const DriverTraits traits = driverTraits(version);
-    const double center = (version == Version::Shien ? 0x64 : 0x60) / 128.0;
+  const auto makeConfig = [](Version configVersion) {
+    const DriverTraits traits = driverTraits(configVersion);
+    const double center = (configVersion == Version::Shien ? 0x64 : 0x60) / 128.0;
     return SequenceProgramConfig{
         .commandKindPrefix = "mori-snes",
         .timebase = Timebase{.ppqn = kPpqn},
@@ -1199,7 +1199,7 @@ SequenceRuntime sequenceRuntime(ByteReader reader, const Layout& layout) {
 
 TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, u32 trackNumber, u32 startAddress,
                                std::vector<Diagnostic>* diagnostics) {
-  const TrackDecodeScope tracks{.reader = reader, .maxCommands = kCommandLimit, .bytecodeEnd = kAramSize};
+  const TrackDecodeScope tracks{.reader = reader, .bytecodeEnd = kAramSize, .maxCommands = kCommandLimit};
   return tracks.decode(trackNumber, startAddress,
                        [&](u32 offset) { return decodeCommand(reader, layout, offset, diagnostics); });
 }
