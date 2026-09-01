@@ -411,28 +411,13 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
 }
 
 [[nodiscard]] std::optional<DecodedSample> decodeSnesDspNoise(const Sample& sample) {
-  const u32 sampleCount = sample.loop.length == 0 ? kSnesDspNoiseLoopSamples : sample.loop.length;
+  const u32 sampleCount = sample.loop.length == 0 ? kSnesDspNoiseSampleCount : sample.loop.length;
   DecodedSample decoded{
       .sampleRate = sample.sampleRate == 0 ? kSnesDspSampleRate : sample.sampleRate,
       .channels = 1,
       .loop = sample.loop,
   };
-  decoded.pcm.reserve(sampleCount);
-
-  // The S-DSP uses a 15-bit LFSR with taps 0 and 1. FLG rate zero stops
-  // the counter; other rates hold each output for their counter period.
-  u16 noise = 0x4000;
-  const u32 period = snesDspNoisePeriodSamples(static_cast<u8>(sample.codecParameter));
-  u32 elapsed = 0;
-  for (u32 i = 0; i < sampleCount; ++i) {
-    if (period != 0 && ++elapsed == period) {
-      elapsed = 0;
-      const u32 feedback = (static_cast<u32>(noise) << 13) ^ (static_cast<u32>(noise) << 14);
-      noise = static_cast<u16>((feedback & 0x4000) ^ (noise >> 1));
-    }
-    const s32 output = static_cast<s32>(noise) * 2 - ((noise & 0x4000) != 0 ? 0x10000 : 0);
-    decoded.pcm.push_back(static_cast<s16>(output));
-  }
+  decoded.pcm = synthesizeSnesDspNoisePcm16(static_cast<u8>(sample.codecParameter), sampleCount);
   return decoded;
 }
 

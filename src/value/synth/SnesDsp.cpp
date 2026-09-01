@@ -298,9 +298,24 @@ s16 snesDspGainEnvelopeValue(u8 gain, s16 envelopeFrom, double elapsedSeconds) {
   return envelope;
 }
 
-u32 snesDspNoisePeriodSamples(u8 rate) {
+std::vector<s16> synthesizeSnesDspNoisePcm16(u8 rate, u32 sampleCount) {
+  std::vector<s16> samples;
+  samples.reserve(sampleCount);
+
   rate &= 0x1f;
-  return rate == 0 ? 0 : kCounterRates[rate];
+  const u32 period = rate == 0 ? 0 : kCounterRates[rate];
+  u16 noise = 0x4000;
+  u32 elapsed = 0;
+  for (u32 i = 0; i < sampleCount; ++i) {
+    if (period != 0 && ++elapsed == period) {
+      elapsed = 0;
+      const u32 feedback = (static_cast<u32>(noise) << 13) ^ (static_cast<u32>(noise) << 14);
+      noise = static_cast<u16>((feedback & 0x4000) ^ (noise >> 1));
+    }
+    const s32 output = static_cast<s32>(noise) * 2 - ((noise & 0x4000) != 0 ? 0x10000 : 0);
+    samples.push_back(static_cast<s16>(output));
+  }
+  return samples;
 }
 
 }  // namespace vgmtrans::core
