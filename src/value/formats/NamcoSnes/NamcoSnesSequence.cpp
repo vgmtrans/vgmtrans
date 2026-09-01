@@ -522,7 +522,7 @@ struct Playback {
       return;
     }
     out.tuning(0.0);
-    const double key = percussion ? percussion->key : std::min<int>(35 + (raw & 0x1f), 127);
+    const double key = percussion ? percussion->key : kNoiseOutputKeyBase + (raw & 0x1f);
     NotePerformanceEvent event{.key = key,
                                .linearVelocity = 1.0,
                                .durationTicks = std::numeric_limits<u32>::max(),
@@ -533,6 +533,16 @@ struct Playback {
     track.portamentoTarget.reset();
   }
 
+  void dispatchSource(u8 raw, std::optional<PercussionTrigger> percussion = {}) {
+    if (raw < kRest) {
+      startNote(raw, percussion);
+    } else if (raw == kRest) {
+      rest();
+    } else if (raw < 0x80) {
+      startNoise(raw, percussion);
+    }
+  }
+
   void trigger(u8 raw) {
     track.pendingNote.reset();
     track.triggerTicks = 0;
@@ -541,16 +551,8 @@ struct Playback {
     }
     track.liveControls = track.commandControls;
     track.gateTicks = 0;
-    if (raw == kRest) {
-      rest();
-      return;
-    }
-    if (raw < kRest) {
-      startNote(raw);
-      return;
-    }
     if (raw < 0x80) {
-      startNoise(raw);
+      dispatchSource(raw);
       return;
     }
 
@@ -564,15 +566,8 @@ struct Playback {
                                        .envelope = reader().u8At(row + 1),
                                        .volume = reader().u8At(row + 2),
                                        .balance = reader().u8At(row + 3)};
-    const u8 note = reader().u8At(row + 4);
     latchPercussion(percussion);
-    if (note < kRest) {
-      startNote(note, percussion);
-    } else if (note == kRest) {
-      rest();
-    } else if (note < 0x80) {
-      startNoise(note, percussion);
-    }
+    dispatchSource(reader().u8At(row + 4), percussion);
   }
 
   [[nodiscard]] Effects note(MaskedValues notes) {

@@ -24,6 +24,7 @@ inline constexpr u16 kPpqn = 48;
 inline constexpr u32 kCommandLimit = 65536;
 inline constexpr std::string_view kInstrumentDomain = "namco-snes.instrument";
 inline constexpr u32 kNoiseInstrumentKey = 0x100;
+inline constexpr u8 kNoiseOutputKeyBase = 35;
 inline constexpr u8 kRest = 0x54;
 
 enum class Version : u8 {

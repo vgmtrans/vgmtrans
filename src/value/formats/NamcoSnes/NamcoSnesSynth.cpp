@@ -106,7 +106,6 @@ struct Drum {
 
 [[nodiscard]] std::vector<u8> referencedSamples(const std::set<u8>& melodic, const std::vector<Drum>& drums) {
   std::set<u8> unique = melodic;
-  unique.insert(0);
   for (const Drum& drum : drums) {
     if (!drum.noise()) {
       unique.insert(drum.srcn);
@@ -193,7 +192,9 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
                                            std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const std::vector<Drum> drums = collectDrums(reader, layout, percussion);
-  const std::vector<u8> referenced = referencedSamples(srcns, drums);
+  std::set<u8> melodic = srcns;
+  melodic.insert(0);
+  const std::vector<u8> referenced = referencedSamples(melodic, drums);
   const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, referenced);
   if (catalog.samples.empty()) {
     return std::nullopt;
@@ -210,23 +211,19 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
       referencedNoise.insert(drum.noiseRate());
     }
   }
-  std::array<std::optional<SampleRef>, 32> noiseSamples;
+  std::array<SampleRef, 32> noiseSamples;
   for (const u8 rate : referencedNoise) {
-    auto sample = bank.localSamples().add(
-        kNoiseInstrumentKey + rate,
-        Sample{.name = fmt::format("DSP Noise {}", rate),
-               .codec = AudioCodec::SnesDspNoise,
-               .encodedData = reader.range(0, 0),
-               .sampleRate = kSnesDspSampleRate,
-               .loop = Loop{.enabled = true, .length = kSnesDspNoiseLoopSamples},
-               .codecParameter = rate});
-    if (sample) {
-      noiseSamples[rate] = sample.ref();
-    }
+    noiseSamples[rate] = bank.localSamples()
+                             .add(kNoiseInstrumentKey + rate,
+                                  Sample{.name = fmt::format("DSP Noise {}", rate),
+                                         .codec = AudioCodec::SnesDspNoise,
+                                         .encodedData = reader.range(0, 0),
+                                         .sampleRate = kSnesDspSampleRate,
+                                         .loop = Loop{.enabled = true, .length = kSnesDspNoiseSampleCount},
+                                         .codecParameter = rate})
+                             .ref();
   }
 
-  std::set<u8> melodic = srcns;
-  melodic.insert(0);
   for (const u8 srcn : melodic) {
     const auto sample = samples.findSrcn(srcn);
     const auto scale = tuning(reader, layout, srcn);
@@ -257,13 +254,10 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .name = "DSP Noise",
     });
     for (const u8 rate : noiseRates) {
-      if (noiseSamples[rate]) {
-        const u8 key = static_cast<u8>(35 + rate);
-        noise.region(*noiseSamples[rate],
-                     Region{.keyRange = KeyRange{.low = key, .high = key},
-                            .unityKey = static_cast<double>(key),
-                            .envelope = neutral});
-      }
+      const u8 key = static_cast<u8>(kNoiseOutputKeyBase + rate);
+      noise.region(noiseSamples[rate], Region{.keyRange = KeyRange{.low = key, .high = key},
+                                              .unityKey = static_cast<double>(key),
+                                              .envelope = neutral});
     }
   }
 
@@ -274,16 +268,14 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     });
     for (const Drum& drum : drums) {
       if (drum.noise()) {
-        if (noiseSamples[drum.noiseRate()]) {
-          kit.region(*noiseSamples[drum.noiseRate()],
-                     Region{.keyRange = KeyRange{.low = drum.index, .high = drum.index},
-                            .range = drum.source,
-                            .unityKey = static_cast<double>(drum.index),
-                            .envelope = neutral})
-              .source(fmt::format("Percussion {}", drum.index), drum.source, "namco-snes-percussion")
-              .description(fmt::format("DSP noise rate {}, envelope {}, volume ${:02X}, balance ${:02X}",
-                                       drum.noiseRate(), drum.envelope, drum.volume, drum.balance));
-        }
+        kit.region(noiseSamples[drum.noiseRate()],
+                   Region{.keyRange = KeyRange{.low = drum.index, .high = drum.index},
+                          .range = drum.source,
+                          .unityKey = static_cast<double>(drum.index),
+                          .envelope = neutral})
+            .source(fmt::format("Percussion {}", drum.index), drum.source, "namco-snes-percussion")
+            .description(fmt::format("DSP noise rate {}, envelope {}, volume ${:02X}, balance ${:02X}",
+                                     drum.noiseRate(), drum.envelope, drum.volume, drum.balance));
         continue;
       }
       const auto sample = samples.findSrcn(drum.srcn);
