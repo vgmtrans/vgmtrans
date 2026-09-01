@@ -841,7 +841,6 @@ SequenceProgram parseKonamiPs1Sequence(ByteReader reader, AssetId id, const Sequ
       .tones = std::move(tones),
   });
 
-  std::optional<SourceAnnotationId> trackParent;
   if (sourceMap != nullptr) {
     if (layout.hasKdt2Header) {
       sourceMap->header("KDT2 Container Header", reader.range(layout.containerOffset, 0x10))
@@ -869,7 +868,6 @@ SequenceProgram parseKonamiPs1Sequence(ByteReader reader, AssetId id, const Sequ
       header.field("track_size", reader.range(layout.offset + 0x10 + index * 2, 2),
                    layout.tracks[index].end - layout.tracks[index].offset);
     }
-    trackParent = header.id();
   }
 
   for (u32 index = 0; index < layout.tracks.size(); ++index) {
@@ -880,7 +878,6 @@ SequenceProgram parseKonamiPs1Sequence(ByteReader reader, AssetId id, const Sequ
         .maxCommands = kMaximumCommands,
         .sourceHasTracks = true,
         .sequenceAsset = id,
-        .parentAnnotation = trackParent,
         .sourceMap = sourceMap,
     };
     auto eventAt = [&](u32 offset) -> const EventLayout* {
