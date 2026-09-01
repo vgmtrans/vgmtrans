@@ -419,6 +419,7 @@ struct RenderTrackState {
   PanLaw sourcePanLaw = PanLaw::Unspecified;
   double simulatedPanOffset = 0.0;
   std::optional<u8> lastPanValue;
+  std::optional<u8> lastReverbValue;
   SimulatedLfoState panLfo;
 };
 
@@ -1376,8 +1377,12 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
         } else if constexpr (std::is_same_v<TypedEvent, ReverbPerformanceEvent>) {
           const bool enabled = !typedEvent.voiceMask ||
                                (sourceTrackNumber < 8 && (*typedEvent.voiceMask & (1u << sourceTrackNumber)) != 0);
-          addController(track, typedEvent.header.tick, channel, MidiController::Reverb,
-                        midiNormalized7(enabled ? typedEvent.send : 0.0));
+          const u8 value = midiNormalized7(enabled ? typedEvent.send : 0.0);
+          // Source DSP parameters can change without changing MIDI's single wet-send control.
+          if (!state.lastReverbValue || *state.lastReverbValue != value) {
+            addController(track, typedEvent.header.tick, channel, MidiController::Reverb, value);
+            state.lastReverbValue = value;
+          }
         } else if constexpr (std::is_same_v<TypedEvent, MonoModePerformanceEvent>) {
           addController(track, typedEvent.header.tick, channel, MidiController::MonoMode, typedEvent.channels);
         } else if constexpr (std::is_same_v<TypedEvent, TuningPerformanceEvent>) {

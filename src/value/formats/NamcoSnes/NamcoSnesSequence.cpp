@@ -142,7 +142,6 @@ struct ProgramState {
 
   DriverData data;
   ReverbPerformanceEvent echo{.voiceMask = 0};
-  bool echoEnabled = false;
 };
 
 enum class VoiceSource : u8 {
@@ -274,10 +273,6 @@ struct Playback {
       track.activate();
     }
     track.activeMask = mask;
-    if (track.number == 0 && program.echoEnabled) {
-      program.echo.voiceMask = math::dspVoiceMask(mask);
-      out.reverb(program.echo);
-    }
   }
 
   void control(u8 index, MaskedValues values) {
@@ -596,10 +591,9 @@ struct Playback {
     }
   }
 
-  void echoEnabled(u8 value) {
+  void echoVoices(u8 mask) {
     if (track.number == 0) {
-      program.echoEnabled = value != 0;
-      program.echo.voiceMask = program.echoEnabled ? math::dspVoiceMask(track.activeMask) : 0;
+      program.echo.voiceMask = math::dspVoiceMask(mask);
       out.reverb(program.echo);
     }
   }
@@ -779,8 +773,8 @@ struct SequenceReferences {
       return event.invoke<&Playback::slur>(event.u8("mask", SourceValueDisplay::Hex));
     }
     case 0x0d: {
-      auto event = cursor.command("Echo Enable", SequenceSemantic::State);
-      return event.invoke<&Playback::echoEnabled>(event.u8("enabled"));
+      auto event = cursor.command("Echo Voice Mask", SequenceSemantic::State);
+      return event.invoke<&Playback::echoVoices>(event.u8("mask", SourceValueDisplay::Hex));
     }
     case 0x0e:
       return cursor.command("Wait", SequenceSemantic::Wait).invoke<&Playback::wait>();

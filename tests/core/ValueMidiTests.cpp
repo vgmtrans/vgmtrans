@@ -849,6 +849,25 @@ void performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates() 
          "automation deduplication should not remove repeated writes from ordinary performance events");
 }
 
+void performanceMidiRendererSuppressesRedundantReverbSends() {
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {PerformanceTrack{.events = {
+                                      ReverbPerformanceEvent{.header = {.tick = 0}, .voiceMask = 1, .send = 0.0},
+                                      ReverbPerformanceEvent{
+                                          .header = {.tick = 1}, .voiceMask = 1, .send = 0.0, .feedback = 0.5},
+                                      ReverbPerformanceEvent{.header = {.tick = 2}, .voiceMask = 1, .send = 0.5},
+                                  }}},
+  };
+
+  const MidiSequence midi = renderMidiSequence(performance);
+  const auto& events = midi.tracks[0].events;
+  expect(std::ranges::count_if(events, [](const MidiEvent& event) {
+           return isMidiController(event, MidiController::Reverb);
+         }) == 2,
+         "physical reverb changes should emit CC91 only when their portable wet-send value changes");
+}
+
 void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
   PerformanceTrack track{
       .id = TrackId{0},
@@ -3092,6 +3111,7 @@ void runValueMidiTests() {
   performanceMidiRendererCanTerminatePreviousVoices();
   performanceMidiRendererLowersStructuredScalarAutomationPoints();
   performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates();
+  performanceMidiRendererSuppressesRedundantReverbSends();
   performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering();
   performanceMidiRendererAllowsMixedPitchTransitionRendering();
   performanceMidiRendererRetainsHeldVoiceAcrossChainedPitchBends();
