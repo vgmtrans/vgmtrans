@@ -9,7 +9,6 @@
 #include "value/scan/CollectionDiscovery.h"
 
 #include <string>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -68,35 +67,23 @@ std::vector<DesiredCollection> resolveCollections(const CollectionDiscoveryConte
   const auto banks = context.assetsWithData<SoundBankAsset, SoundBankData>();
 
   std::vector<DesiredCollection> collections;
-  std::unordered_set<u32> pairedBanks;
   for (const auto& sequence : sequences) {
+    const auto matches = matchingBanks(sequence, banks);
+    if (matches.empty()) {
+      continue;
+    }
     CollectionAssembly collection(
         "source:" + std::to_string(sequence.source == nullptr ? 0 : sequence.source->id.value) +
             ":sequence:" + std::to_string(sequence.asset->metadata.range.offset),
         sequence.asset->metadata.name);
     collection.sequence(sequence.id());
-    const auto matches = matchingBanks(sequence, banks);
     for (const auto* bank : matches) {
       collection.soundBank(bank->id());
-      pairedBanks.insert(bank->id().value);
     }
-    if (matches.empty()) {
-      collection.requireSoundBank();
-    } else if (matches.size() > 1) {
+    if (matches.size() > 1) {
       collection.ambiguous("SquarePS2 BGM matches multiple WD banks with the same driver ID", sequence.id(),
                            sequence.asset->metadata.range);
     }
-    collections.push_back(std::move(collection).finish());
-  }
-
-  for (const auto& bank : banks) {
-    if (pairedBanks.contains(bank.id().value)) {
-      continue;
-    }
-    CollectionAssembly collection("source:" + std::to_string(bank.source == nullptr ? 0 : bank.source->id.value) +
-                                      ":bank:" + std::to_string(bank.asset->metadata.id.value),
-                                  bank.asset->metadata.name);
-    collection.soundBank(bank.id());
     collections.push_back(std::move(collection).finish());
   }
   return collections;

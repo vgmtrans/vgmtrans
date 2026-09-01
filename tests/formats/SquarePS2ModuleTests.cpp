@@ -245,6 +245,11 @@ Session scan(std::string name, std::filesystem::path path, std::vector<u8> bytes
 }
 
 void syntheticArchiveCoversDriverFeatures() {
+  const SessionSnapshot wd = scan("bank.wd", "/fixture/bank.wd", wdFixture()).snapshot();
+  expect(wd.assets().size() == 1 && wd.collections().empty(), "a standalone WD should not create a collection");
+  const SessionSnapshot bgm = scan("music.bgm", "/fixture/music.bgm", bgmFixture()).snapshot();
+  expect(bgm.assets().size() == 1 && bgm.collections().empty(), "a standalone BGM should not create a collection");
+
   Session session = scan("fixture.psf2", "/fixture/fixture.psf2", psf2Fixture());
   const SessionSnapshot snapshot = session.snapshot();
   expect(std::ranges::none_of(snapshot.diagnostics(),
