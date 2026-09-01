@@ -156,6 +156,12 @@ std::vector<u8> wdFixture() {
   bytes[sampleOffset + 0x41] = 0;
   bytes[sampleOffset + 0x50] = 0x11;
   bytes[sampleOffset + 0x51] = 3;
+
+  // Match Bouncer's unpadded pointer table and placeholder sample size.
+  le32(bytes, 4, 0);
+  le32(bytes, 0x20, 0x28);
+  le32(bytes, 0x24, 0x68);
+  bytes.erase(bytes.begin() + 0x28, bytes.begin() + 0x30);
   return bytes;
 }
 

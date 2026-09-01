@@ -21,10 +21,6 @@ constexpr u32 kBgmHeaderSize = 0x20;
 constexpr u32 kWdHeaderSize = 0x20;
 constexpr u32 kRegionSize = 0x20;
 
-[[nodiscard]] u32 align4(u32 value) {
-  return (value + 3) & ~u32{3};
-}
-
 }  // namespace
 
 std::optional<BgmLayout> readBgmLayout(ByteReader reader, u32 offset) {
@@ -105,23 +101,35 @@ std::optional<WdLayout> readWdLayout(ByteReader reader, u32 offset) {
       .regionCount = reader.le32(offset + 0x0c),
       .instrumentTableOffset = offset + kWdHeaderSize,
   };
-  if (layout.sampleSize < 16 || layout.instrumentCount == 0 || layout.instrumentCount > 256 ||
-      layout.regionCount == 0 || layout.regionCount > 65536) {
+  if (layout.instrumentCount == 0 || layout.instrumentCount > 256 || layout.regionCount == 0 ||
+      layout.regionCount > 65536 || !reader.has(layout.instrumentTableOffset, layout.instrumentCount * 4)) {
     return std::nullopt;
   }
-  const u32 regionTableOffset = layout.instrumentTableOffset + align4(layout.instrumentCount) * 4;
-  const u64 sampleOffset = static_cast<u64>(regionTableOffset) + static_cast<u64>(layout.regionCount) * kRegionSize;
-  const u64 length = sampleOffset - offset + layout.sampleSize;
-  if (sampleOffset > std::numeric_limits<u32>::max() || length > std::numeric_limits<u32>::max() ||
-      !reader.has(offset, length)) {
+
+  const u32 firstRegion = reader.le32(layout.instrumentTableOffset);
+  const u32 pointerTableEnd = kWdHeaderSize + layout.instrumentCount * 4;
+  if (firstRegion < pointerTableEnd) {
+    return std::nullopt;
+  }
+
+  const u64 sampleOffset = static_cast<u64>(offset) + firstRegion + static_cast<u64>(layout.regionCount) * kRegionSize;
+  if (sampleOffset > reader.size() || sampleOffset > std::numeric_limits<u32>::max()) {
     return std::nullopt;
   }
   layout.sampleOffset = static_cast<u32>(sampleOffset);
+  // Some standalone Bouncer WDs carry a placeholder instead of this size.
+  const u64 sampleSize = layout.sampleSize < 0x40 && offset == 0 ? reader.size() - sampleOffset : layout.sampleSize;
+  const u64 length = sampleOffset - offset + sampleSize;
+  if (sampleSize < 16 || length > std::numeric_limits<u32>::max() || !reader.has(offset, length)) {
+    return std::nullopt;
+  }
+  layout.sampleSize = static_cast<u32>(sampleSize);
   layout.length = static_cast<u32>(length);
   for (u32 i = 0; i < layout.instrumentCount; ++i) {
     const u32 relative = reader.le32(layout.instrumentTableOffset + i * 4);
-    if (relative != 0 && (relative < regionTableOffset - offset || relative >= layout.sampleOffset - offset ||
-                          (relative - (regionTableOffset - offset)) % kRegionSize != 0)) {
+    if (relative != 0 && relative != std::numeric_limits<u32>::max() &&
+        (relative < firstRegion || relative > layout.sampleOffset - offset ||
+         (relative - firstRegion) % kRegionSize != 0)) {
       return std::nullopt;
     }
   }
