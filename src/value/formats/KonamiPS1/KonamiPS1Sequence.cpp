@@ -149,9 +149,6 @@ struct LfoState {
 };
 
 struct TrackState {
-  explicit TrackState(const TrackProgram& program) : channel(static_cast<u8>(program.sourceTrackNumber & 0x0f)) {}
-
-  u8 channel = 0;
   u16 bank = 0;
   u8 program = 0;
   u8 nrpnParameter = 127;
@@ -341,11 +338,6 @@ struct Playback {
     if (track.previousKey) {
       out.noteOff(*track.previousKey);
     }
-  }
-
-  void setChannel(u8 value) {
-    track.channel = value & 0x0f;
-    emitInstrument();
   }
 
   void setProgram(u8 value) {
@@ -659,6 +651,7 @@ struct ControllerInfo {
       break;
     case EventKind::SetChannel:
       label = "Set Channel";
+      playback = CommandPlaybackStatus::SourceOnly;
       break;
     case EventKind::Tempo:
       label = "Tempo";
@@ -712,7 +705,7 @@ struct ControllerInfo {
       return event.invoke<&Playback::note>(source.command, source.value);
     case EventKind::SetChannel:
       event.derived("channel", source.value, SemanticOperandRole::Channel);
-      return event.invoke<&Playback::setChannel>(source.value);
+      return event;
     case EventKind::Tempo: {
       event.derived("encoded_tempo", source.value);
       const u16 step = DriverTiming::tempoStep(source.value);
