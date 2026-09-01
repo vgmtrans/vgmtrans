@@ -83,9 +83,11 @@ struct Tone {
 
 [[nodiscard]] std::optional<SequenceLayout> readKonamiPs1SequenceLayout(core::ByteReader reader, u32 offset);
 [[nodiscard]] std::vector<SequenceLayout> findKonamiPs1Sequences(core::ByteReader reader);
+[[nodiscard]] std::optional<u16> findKonamiPs1RootCounterTarget(core::ByteReader reader);
 [[nodiscard]] std::vector<Tone> readKonamiPs1Tones(core::ByteReader reader);
 [[nodiscard]] core::SequenceProgram parseKonamiPs1Sequence(core::ByteReader reader, core::AssetId id,
-                                                           const SequenceLayout& layout, std::vector<Tone> tones = {},
+                                                           const SequenceLayout& layout, u16 rootCounterTarget,
+                                                           std::vector<Tone> tones = {},
                                                            core::SourceMapBuilder* sourceMap = nullptr,
                                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& konamiPs1SequenceConfig();

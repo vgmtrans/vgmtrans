@@ -28,7 +28,7 @@ using namespace core;
 namespace {
 
 constexpr u32 kMaximumCommands = 1048576;
-constexpr double kRootCounterClockHz = 33868800.0 / 8.0;
+constexpr double kRootCounterClockHz = 33'868'800.0 / 8.0;
 constexpr double kByteAccumulatorRange = 256.0;
 constexpr double kVoiceUpdateDivider = 11.0;
 constexpr u16 kInitialTempoStep = 0x68;
@@ -40,8 +40,8 @@ constexpr PitchBendLayerId kRandomPitchLayer{2};
 }
 
 struct DriverTiming {
-  explicit DriverTiming(const SequenceLayout& layout)
-      : ppqn(layout.ppqn), sequenceHz(kRootCounterClockHz / (layout.version == 1 ? 0x1ca0 : 0x1c00)),
+  explicit DriverTiming(const SequenceLayout& layout, u16 rootCounterTarget)
+      : ppqn(layout.ppqn), sequenceHz(kRootCounterClockHz / rootCounterTarget),
         voiceHz(sequenceHz / kVoiceUpdateDivider) {}
 
   [[nodiscard]] u32 driverPpqn() const {
@@ -830,9 +830,9 @@ const SequenceProgramConfig& konamiPs1SequenceConfig() {
 }
 
 SequenceProgram parseKonamiPs1Sequence(ByteReader reader, AssetId id, const SequenceLayout& layout,
-                                       std::vector<Tone> tones, SourceMapBuilder* sourceMap,
+                                       u16 rootCounterTarget, std::vector<Tone> tones, SourceMapBuilder* sourceMap,
                                        std::vector<Diagnostic>* diagnostics) {
-  const DriverTiming timing(layout);
+  const DriverTiming timing(layout, rootCounterTarget);
   SequenceProgram program = konamiPs1SequenceConfig().makeProgram();
   program.timebase.ppqn = layout.ppqn;
   program.behavior.initialTempoMicrosecondsPerQuarter = timing.tempoMicroseconds(kInitialTempoStep);
@@ -856,9 +856,9 @@ SequenceProgram parseKonamiPs1Sequence(ByteReader reader, AssetId id, const Sequ
     const u32 headerSize = layout.version == 1 ? 0x10 + layout.tracks.size() * 2 : 0x50;
     auto header =
         sourceMap
-            ->header(layout.version == 1 ? "KDT1 Sequence Header" : "KDT2 Sequence Header",
+            ->header(layout.version == 1 ? "KDT1 Sequence Header" : "Fixed-Table KDT Sequence Header",
                      reader.range(layout.offset, headerSize))
-            .kind(layout.version == 1 ? "konami-ps1-kdt1-header" : "konami-ps1-kdt2-sequence-header")
+            .kind(layout.version == 1 ? "konami-ps1-kdt1-header" : "konami-ps1-fixed-kdt-header")
             .owner(ObjectRefs::sequence(id))
             .fieldsAsChildren()
             .field("signature", reader.range(layout.offset, 4), reader.le32(layout.offset), SourceValueDisplay::Hex)

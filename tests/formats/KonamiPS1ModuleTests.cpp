@@ -24,6 +24,9 @@ using namespace vgmtrans::formats::konami_ps1;
 
 namespace {
 
+constexpr u16 kAzureDreamsCounterTarget = 0x1c00;
+constexpr u16 kSuikoden2CounterTarget = 0x1ca0;
+
 void expect(bool condition, const std::string& message) {
   if (!condition) {
     throw std::runtime_error(message);
@@ -65,12 +68,12 @@ std::vector<u8> kdt1(std::initializer_list<std::vector<u8>> tracks) {
   return bytes;
 }
 
-std::vector<u8> kdt2(std::vector<u8> track) {
+std::vector<u8> fixedKdt(std::vector<u8> track) {
   std::vector<u8> bytes(0x50 + track.size(), 0);
   bytes[0] = 'K';
   bytes[1] = 'D';
   bytes[2] = 'T';
-  bytes[3] = '2';
+  bytes[3] = ' ';
   le32(bytes, 4, static_cast<u32>(bytes.size()));
   le32(bytes, 8, 480);
   le32(bytes, 12, 1);
@@ -100,17 +103,19 @@ void layoutsUseAuditedSizesAndBothTableGenerations() {
              packedLayout->tracks.front().events[1].kind == EventKind::Program,
          "the data-byte carry bit should suppress only the following delta");
 
-  const auto fixed = kdt2(track);
+  const auto fixed = fixedKdt(track);
   const auto fixedLayout = readKonamiPs1SequenceLayout(ByteReader(SourceId{202}, fixed), 0);
   expect(fixedLayout && fixedLayout->version == 2 && fixedLayout->tracks.front().offset == 0x50,
-         "the original KDT2 generation should use its 32-slot, 0x50-byte header");
-  const auto fixedPerformance =
-      SequenceVm(LoopPolicy::PlayOnce)
-          .render(parseKonamiPs1Sequence(ByteReader(SourceId{202}, fixed), AssetId{202}, *fixedLayout));
+         "fixed-table KDT should use its 32-slot, 0x50-byte header");
+  expect(findKonamiPs1Sequences(ByteReader(SourceId{202}, fixed)).size() == 1,
+         "the scanner should recognize Azure Dreams' space-terminated KDT signature");
+  const auto fixedPerformance = SequenceVm(LoopPolicy::PlayOnce)
+                                    .render(parseKonamiPs1Sequence(ByteReader(SourceId{202}, fixed), AssetId{202},
+                                                                   *fixedLayout, kAzureDreamsCounterTarget));
   expect(fixedPerformance.initialTempoMicrosecondsPerQuarter == 500122 &&
              eventsOfType<TempoPerformanceEvent>(fixedPerformance.tracks.front()).front()->microsecondsPerQuarter ==
                  743039,
-         "fixed-table KDT2 should use Azure Dreams' 0x1c00 root counter");
+         "fixed-table KDT should use Azure Dreams' 0x1c00 root counter");
 
   const u32 wrappedSize = (static_cast<u32>(packed.size()) + 3) & ~3u;
   std::vector<u8> wrapped(0x10 + wrappedSize, 0);
@@ -168,7 +173,8 @@ void sequenceModelsDriverLfosAdsrReverbAndTempo() {
       .originalAdsr2 = initialAdsr2,
   };
   const PerformanceSequence performance =
-      SequenceVm(LoopPolicy::PlayOnce).render(parseKonamiPs1Sequence(reader, AssetId{204}, *layout, {tone}));
+      SequenceVm(LoopPolicy::PlayOnce)
+          .render(parseKonamiPs1Sequence(reader, AssetId{204}, *layout, kSuikoden2CounterTarget, {tone}));
   expect(performance.diagnostics.empty(), "audited KonamiPS1 feature fixture should render cleanly");
   const auto tempos = eventsOfType<TempoPerformanceEvent>(performance.tracks.front());
   expect(performance.initialTempoMicrosecondsPerQuarter == 511286 && tempos.size() == 1 &&
@@ -235,7 +241,7 @@ void cc119RestoresTheBankAdsr() {
   const auto performance =
       SequenceVm(LoopPolicy::PlayOnce)
           .render(parseKonamiPs1Sequence(
-              reader, AssetId{207}, *layout,
+              reader, AssetId{207}, *layout, kSuikoden2CounterTarget,
               {Tone{.adsr1 = adsr1, .adsr2 = adsr2, .originalAdsr1 = adsr1, .originalAdsr2 = adsr2}}));
   const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(performance.tracks.front());
   expect(envelopes.size() == 3 && envelopes.front()->update.values && !envelopes[1]->update.values &&
@@ -258,8 +264,8 @@ void sequenceModelsIndependentChannelAndRandomPitch() {
   const ByteReader reader(SourceId{206}, bytes);
   const auto layout = readKonamiPs1SequenceLayout(reader, 0);
   expect(layout.has_value(), "audited layered-pitch fixture should parse");
-  const auto performance =
-      SequenceVm(LoopPolicy::PlayOnce).render(parseKonamiPs1Sequence(reader, AssetId{206}, *layout));
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce)
+                               .render(parseKonamiPs1Sequence(reader, AssetId{206}, *layout, kSuikoden2CounterTarget));
   const auto modulation = eventsOfType<ModulationPerformanceEvent>(performance.tracks.front());
   const auto find = [&](ModulationPerformanceTarget target, PitchBendLayerId layer) {
     return std::ranges::find_if(
@@ -323,8 +329,8 @@ void loopUsesCc99AndDataEntryCount() {
                                          return event.loopDestination.has_value() && event.loopCount == 2;
                                        }),
          "CC99 20 / CC6 / CC99 30 should recover the driver's loop frame");
-  const auto performance =
-      SequenceVm(LoopPolicy::PlayOnce).render(parseKonamiPs1Sequence(reader, AssetId{205}, *layout));
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce)
+                               .render(parseKonamiPs1Sequence(reader, AssetId{205}, *layout, kSuikoden2CounterTarget));
   expect(eventsOfType<NotePerformanceEvent>(performance.tracks.front()).size() == 3,
          "a loop count of two should jump twice and play its body three times");
 }
@@ -349,8 +355,8 @@ void channelResetHardStopsSustainedVoices() {
   const ByteReader reader(SourceId{208}, bytes);
   const auto layout = readKonamiPs1SequenceLayout(reader, 0);
   expect(layout.has_value(), "channel-reset fixture should parse");
-  const auto performance =
-      SequenceVm(LoopPolicy::PlayOnce).render(parseKonamiPs1Sequence(reader, AssetId{208}, *layout));
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce)
+                               .render(parseKonamiPs1Sequence(reader, AssetId{208}, *layout, kSuikoden2CounterTarget));
   const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
   expect(notes.size() == 1 && notes.front()->durationTicks == 3,
          "CC120, CC121, and CC123 should hard-stop voices even when sustain has retained their release");
@@ -389,6 +395,8 @@ std::vector<u8> sourceWithVab() {
   le16(bytes, tone + 0x16, 1);
   le16(bytes, bankOffset + 0xa22, 2);
   bytes[bankOffset + headerSize + 1] = 1;
+  bytes.insert(bytes.end(), {0x00, 0xf2, 0x04, 0x3c, 0x02, 0x00, 0x84, 0x34, 0xa0, 0x1c,
+                             0x05, 0x24, 0x00, 0x00, 0x00, 0x0c, 0x00, 0x10, 0x06, 0x24});
   return bytes;
 }
 

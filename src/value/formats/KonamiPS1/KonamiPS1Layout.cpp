@@ -7,6 +7,7 @@
 #include "value/formats/KonamiPS1/KonamiPS1.h"
 
 #include "value/formats/SonyPS1/SonyPS1.h"
+#include "value/scan/BytePattern.h"
 
 #include <algorithm>
 #include <limits>
@@ -27,6 +28,9 @@ constexpr u32 kMaximumSequenceSize = 0x200000;
 constexpr u32 kProgramSize = 0x10;
 constexpr u32 kToneSize = 0x20;
 constexpr u32 kTonesPerProgram = 16;
+constexpr auto kSetRootCounter2 = makeMaskedBytePattern(
+    "\x00\xf2\x04\x3c\x02\x00\x84\x34\x00\x00\x05\x24\x00\x00\x00\x0c\x00\x10\x06\x24", "xxxxxxxx??xx???xxxxx");
+constexpr u32 kRootCounterTargetOffset = 8;
 
 [[nodiscard]] bool signature(ByteReader reader, u32 offset, char fourth) {
   return reader.has(offset, 4) && reader.u8At(offset) == 'K' && reader.u8At(offset + 1) == 'D' &&
@@ -143,11 +147,17 @@ constexpr u32 kTonesPerProgram = 16;
 
 }  // namespace
 
+std::optional<u16> findKonamiPs1RootCounterTarget(ByteReader reader) {
+  const auto setup = findBytePattern(reader, kSetRootCounter2);
+  return setup ? std::optional{reader.le16(*setup + kRootCounterTargetOffset)} : std::nullopt;
+}
+
 std::optional<SequenceLayout> readKonamiPs1SequenceLayout(ByteReader reader, u32 offset) {
-  if (!reader.has(offset, kHeaderSize) || (!signature(reader, offset, '1') && !signature(reader, offset, '2'))) {
+  if (!reader.has(offset, kHeaderSize) ||
+      (!signature(reader, offset, '1') && !signature(reader, offset, '2') && !signature(reader, offset, ' '))) {
     return std::nullopt;
   }
-  const u8 version = reader.u8At(offset + 3) - '0';
+  const u8 version = reader.u8At(offset + 3) == '1' ? 1 : 2;
   const u32 length = reader.le32(offset + 4);
   const u32 ppqn = reader.le32(offset + 8);
   const u32 trackCount = reader.le32(offset + 12);
@@ -165,9 +175,8 @@ std::optional<SequenceLayout> readKonamiPs1SequenceLayout(ByteReader reader, u32
       .version = version,
       .ppqn = ppqn,
   };
-  // KDT2 is the older 32-slot layout used by the Azure Dreams generation;
-  // KDT1 packs the table to its declared track count. Suikoden II's driver
-  // explicitly selects between these offsets (0x50 versus 0x10+2*N).
+  // Fixed-table KDT uses 32 slots; KDT1 packs the table to its declared track
+  // count. Suikoden II's driver explicitly selects between these layouts.
   u32 trackOffset = offset + (version == 1 ? kHeaderSize + trackCount * 2 : 0x50);
   const u32 sequenceEnd = offset + length;
   layout.tracks.reserve(trackCount);
@@ -189,9 +198,8 @@ std::optional<SequenceLayout> readKonamiPs1SequenceLayout(ByteReader reader, u32
     return std::nullopt;
   }
 
-  const u32 wrapperLength = version == 1 && offset >= kHeaderSize && signature(reader, offset - kHeaderSize, '2')
-                                ? reader.le32(offset - kHeaderSize + 4)
-                                : 0;
+  const u32 wrapperLength =
+      offset >= kHeaderSize && signature(reader, offset - kHeaderSize, '2') ? reader.le32(offset - kHeaderSize + 4) : 0;
   if (wrapperLength >= length && wrapperLength - length <= 3 && (wrapperLength & 3) == 0 &&
       reader.has(offset, wrapperLength)) {
     layout.containerOffset = offset - kHeaderSize;
@@ -210,7 +218,7 @@ std::vector<SequenceLayout> findKonamiPs1Sequences(ByteReader reader) {
   const u64 last = reader.size() - kHeaderSize;
   for (u64 candidate = 0; candidate <= last && candidate <= std::numeric_limits<u32>::max(); ++candidate) {
     const u32 offset = static_cast<u32>(candidate);
-    if (!signature(reader, offset, '1') && !signature(reader, offset, '2')) {
+    if (!signature(reader, offset, '1') && !signature(reader, offset, '2') && !signature(reader, offset, ' ')) {
       continue;
     }
     if (auto layout = readKonamiPs1SequenceLayout(reader, offset)) {
