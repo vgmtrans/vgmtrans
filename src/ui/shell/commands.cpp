@@ -980,6 +980,8 @@ std::string_view valueAudioCodecName(vgmtrans::core::AudioCodec codec) {
       return "pcm-s8";
     case vgmtrans::core::AudioCodec::SnesBrr:
       return "snes-brr";
+    case vgmtrans::core::AudioCodec::SnesDspNoise:
+      return "snes-dsp-noise";
     case vgmtrans::core::AudioCodec::PsxAdpcm:
       return "psx-adpcm";
     case vgmtrans::core::AudioCodec::KonamiK054539Adpcm:

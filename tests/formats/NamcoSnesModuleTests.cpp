@@ -75,6 +75,11 @@ public:
     return *this;
   }
 
+  DriverFixture& percussionSource(u8 index, u8 sourceKey) {
+    data_[0xdf00 + index * 5u + 4u] = sourceKey;
+    return *this;
+  }
+
   [[nodiscard]] const std::vector<u8>& data() const { return data_; }
   [[nodiscard]] u16 block() const { return block_; }
 
@@ -146,7 +151,7 @@ void layoutsCoverAllAuditedDriverRelocations() {
 
 void interleavedRuntimePreservesDynamicDriverFeatures() {
   DriverFixture fixture(Version::WagyanParadise);
-  fixture.sequence({
+  fixture.percussionSource(0, 0x7f).sequence({
       0x00, 4,    0x04, 1,    0x01, 0xc0, 0x20, 0xc0, 3,    4,    0x21, 0xc0, 0xa0, 0x80,
       0x22, 0xc0, 0xf4, 0x4f, 0x24, 0x80, 1,    0x28, 0x80, 0x80, 0x29, 0x80, 0,
       0x2a, 0xc0, 1,    0,    0x0b, 0x40, 2,    0x05, 0xc0, 0x0d, 1,    0x0a, 3,
@@ -185,7 +190,7 @@ void interleavedRuntimePreservesDynamicDriverFeatures() {
            return event->bank == 127 && event->program == 0;
          }) &&
              std::ranges::any_of(instruments, [](const InstrumentPerformanceEvent* event) {
-               return !event->sourceInstrument && event->bank == 0 && event->program == 126;
+               return event->sourceInstrument && event->sourceInstrument->key == kNoiseInstrumentKey;
              }),
          "percussion and DSP noise should remain distinct from melodic SRCN instruments");
 

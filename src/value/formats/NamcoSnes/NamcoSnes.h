@@ -23,6 +23,8 @@ inline constexpr u32 kTrackCount = 8;
 inline constexpr u16 kPpqn = 48;
 inline constexpr u32 kCommandLimit = 65536;
 inline constexpr std::string_view kInstrumentDomain = "namco-snes.instrument";
+inline constexpr u32 kNoiseInstrumentKey = 0x100;
+inline constexpr u8 kRest = 0x54;
 
 enum class Version : u8 {
   WagyanParadise,
@@ -55,6 +57,7 @@ struct SequenceParse {
   core::SequenceProgram program;
   std::set<u8> srcns;
   std::set<u8> percussion;
+  std::set<u8> noiseRates;
   core::SourceRange headerRange;
 };
 
@@ -68,6 +71,7 @@ struct SequenceParse {
 [[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
                                                                const std::set<u8>& srcns,
                                                                const std::set<u8>& percussion,
+                                                               const std::set<u8>& noiseRates,
                                                                std::string_view displayName);
 [[nodiscard]] core::FormatModule module();
 

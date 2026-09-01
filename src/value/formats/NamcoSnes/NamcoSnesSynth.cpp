@@ -12,6 +12,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <set>
@@ -29,6 +30,8 @@ namespace {
 constexpr double kDriverTickSeconds = 134.0 / 8000.0;
 constexpr u32 kDrumBank = 127;
 constexpr u32 kDrumProgram = 0;
+constexpr u32 kNoiseBank = 126;
+constexpr u32 kNoiseProgram = 0;
 
 [[nodiscard]] std::optional<u16> tableEntry(ByteReader reader, u16 table, u8 index) {
   const u32 pointer = table + index * 2u;
@@ -70,6 +73,9 @@ struct Drum {
   u8 balance;
   u8 sourceKey;
   SourceRange source;
+
+  [[nodiscard]] bool noise() const { return sourceKey > kRest && sourceKey < 0x80; }
+  [[nodiscard]] u8 noiseRate() const { return sourceKey & 0x1f; }
 };
 
 [[nodiscard]] std::vector<Drum> collectDrums(ByteReader reader, const Layout& layout,
@@ -82,7 +88,7 @@ struct Drum {
       continue;
     }
     const u8 sourceKey = reader.u8At(row + 4);
-    if (sourceKey >= 0x54) {
+    if (sourceKey == kRest || sourceKey >= 0x80) {
       continue;
     }
     drums.push_back(Drum{
@@ -102,7 +108,9 @@ struct Drum {
   std::set<u8> unique = melodic;
   unique.insert(0);
   for (const Drum& drum : drums) {
-    unique.insert(drum.srcn);
+    if (!drum.noise()) {
+      unique.insert(drum.srcn);
+    }
   }
   return {unique.begin(), unique.end()};
 }
@@ -181,6 +189,7 @@ Envelope driverEnvelope(ByteReader reader, const Layout& layout, u8 index) {
 
 std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
                                            const std::set<u8>& srcns, const std::set<u8>& percussion,
+                                           const std::set<u8>& noiseRates,
                                            std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const std::vector<Drum> drums = collectDrums(reader, layout, percussion);
@@ -194,6 +203,27 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   auto& instruments = bank.instruments();
   const SnesBrrSampleRefs samples = addSnesBrrSamples(bank.localSamples(), reader, catalog);
   const Envelope neutral = snesDspEnvelope(0, 0, 0x7f);
+
+  std::set<u8> referencedNoise = noiseRates;
+  for (const Drum& drum : drums) {
+    if (drum.noise()) {
+      referencedNoise.insert(drum.noiseRate());
+    }
+  }
+  std::array<std::optional<SampleRef>, 32> noiseSamples;
+  for (const u8 rate : referencedNoise) {
+    auto sample = bank.localSamples().add(
+        kNoiseInstrumentKey + rate,
+        Sample{.name = fmt::format("DSP Noise {}", rate),
+               .codec = AudioCodec::SnesDspNoise,
+               .encodedData = reader.range(0, 0),
+               .sampleRate = kSnesDspSampleRate,
+               .loop = Loop{.enabled = true, .length = kSnesDspNoiseLoopSamples},
+               .codecParameter = rate});
+    if (sample) {
+      noiseSamples[rate] = sample.ref();
+    }
+  }
 
   std::set<u8> melodic = srcns;
   melodic.insert(0);
@@ -220,12 +250,42 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .description(fmt::format("SRCN {}, scale ${:04X}", srcn, *scale));
   }
 
+  if (!noiseRates.empty()) {
+    auto noise = instruments.append(Instrument{
+        .explicitAddress = InstrumentAddress{.bank = kNoiseBank, .program = kNoiseProgram},
+        .identity = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = kNoiseInstrumentKey},
+        .name = "DSP Noise",
+    });
+    for (const u8 rate : noiseRates) {
+      if (noiseSamples[rate]) {
+        const u8 key = static_cast<u8>(35 + rate);
+        noise.region(*noiseSamples[rate],
+                     Region{.keyRange = KeyRange{.low = key, .high = key},
+                            .unityKey = static_cast<double>(key),
+                            .envelope = neutral});
+      }
+    }
+  }
+
   if (!drums.empty()) {
     auto kit = instruments.append(Instrument{
         .explicitAddress = InstrumentAddress{.bank = kDrumBank, .program = kDrumProgram},
         .name = "Percussion",
     });
     for (const Drum& drum : drums) {
+      if (drum.noise()) {
+        if (noiseSamples[drum.noiseRate()]) {
+          kit.region(*noiseSamples[drum.noiseRate()],
+                     Region{.keyRange = KeyRange{.low = drum.index, .high = drum.index},
+                            .range = drum.source,
+                            .unityKey = static_cast<double>(drum.index),
+                            .envelope = neutral})
+              .source(fmt::format("Percussion {}", drum.index), drum.source, "namco-snes-percussion")
+              .description(fmt::format("DSP noise rate {}, envelope {}, volume ${:02X}, balance ${:02X}",
+                                       drum.noiseRate(), drum.envelope, drum.volume, drum.balance));
+        }
+        continue;
+      }
       const auto sample = samples.findSrcn(drum.srcn);
       const auto scale = tuning(reader, layout, drum.srcn);
       if (!sample || !scale) {

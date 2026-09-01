@@ -88,6 +88,8 @@ void annotateEnvelope(AnnotationBuilder& annotation, const Envelope& envelope) {
       return "PCM 16-bit";
     case AudioCodec::SnesBrr:
       return "SNES BRR";
+    case AudioCodec::SnesDspNoise:
+      return "SNES DSP noise";
     case AudioCodec::NdsImaAdpcm:
       return "NDS IMA ADPCM";
     case AudioCodec::NdsPsg:

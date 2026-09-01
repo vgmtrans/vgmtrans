@@ -9,6 +9,7 @@
 #include "value/formats/Akao/Akao.h"
 #include "value/formats/SuzukiPS1/SuzukiPS1.h"
 #include "value/synth/SampleFiltering.h"
+#include "value/synth/SnesDsp.h"
 
 #include <cmath>
 
@@ -128,6 +129,20 @@ void synthSampleFilteringHonorsPolicyAndFormat() {
   expect(
       automatic.samples.size() == 1 && automatic.samples.front().decoded.pcm == psxFiltered.samples.front().decoded.pcm,
       "automatic sample filtering should use the owning format's recommendation");
+
+  collection.pool.samples.front() = Sample{
+      .codec = AudioCodec::SnesDspNoise,
+      .encodedData = SourceRange{.source = source},
+      .sampleRate = kSnesDspSampleRate,
+      .loop = Loop{.enabled = true, .length = 16},
+      .codecParameter = 31,
+  };
+  const auto noise = prepareSynthData(
+      SynthExportInput{.samplePools = collections, .sampleFiltering = SampleFilteringPolicy::None}, sources);
+  const auto requestedNoiseFilter = prepareSynthData(
+      SynthExportInput{.samplePools = collections, .sampleFiltering = SampleFilteringPolicy::SnesDspLowPass}, sources);
+  expect(noise.samples.front().decoded.pcm == requestedNoiseFilter.samples.front().decoded.pcm,
+         "DSP noise should bypass sample-response filtering even when explicitly requested");
 }
 
 void psxFormatsPreferSpuFiltering() {

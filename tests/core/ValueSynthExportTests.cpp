@@ -41,6 +41,22 @@ void snesBrrDecoderProducesPcm() {
   expect(!decodeSample(invalidRange, sourceBytes).has_value(), "BRR decoder should reject invalid source ranges");
 }
 
+void snesDspNoiseDecoderMatchesHardwareSequence() {
+  Sample sample{
+      .codec = AudioCodec::SnesDspNoise,
+      .sampleRate = kSnesDspSampleRate,
+      .loop = Loop{.enabled = true, .length = 4},
+      .codecParameter = 31,
+  };
+  const auto fastest = decodeSample(sample, {});
+  sample.codecParameter = 30;
+  const auto halfRate = decodeSample(sample, {});
+
+  expect(fastest && fastest->pcm == std::vector<s16>({16384, 8192, 4096, 2048}) && halfRate &&
+             halfRate->pcm == std::vector<s16>({-32768, 16384, 16384, 8192}),
+         "SNES noise should use the DSP's LFSR values and FLG counter periods");
+}
+
 void ndsImaAdpcmDecoderRejectsInvalidInitialIndex() {
   const Sample sample{
       .name = "adpcm",
@@ -1682,6 +1698,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
 
 void runValueSynthExportTests() {
   snesBrrDecoderProducesPcm();
+  snesDspNoiseDecoderMatchesHardwareSequence();
   ndsImaAdpcmDecoderRejectsInvalidInitialIndex();
   pcm16DecoderHonorsExplicitByteOrder();
   envelopePredicateDetectsCanonicalData();

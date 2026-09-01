@@ -11,6 +11,10 @@
 
 namespace vgmtrans::core {
 
+inline constexpr u32 kSnesDspSampleRate = 32000;
+// One complete cycle of the DSP's maximal 15-bit noise generator.
+inline constexpr u32 kSnesDspNoiseLoopSamples = 32767;
+
 [[nodiscard]] constexpr u8 snesDspKonamiAdsr1(u8 encoded) {
   return encoded >= 0xa0 ? 0 : static_cast<u8>(0x80 | (((encoded % 10) & 0x07) << 4) | (encoded / 10));
 }
@@ -31,5 +35,8 @@ namespace vgmtrans::core {
 // Returns the DSP ENVX value reached after running GAIN from envelopeFrom for
 // elapsedSeconds.
 [[nodiscard]] s16 snesDspGainEnvelopeValue(u8 gain, s16 envelopeFrom, double elapsedSeconds);
+// Zero denotes the stopped FLG rate. All other values are the exact number of
+// 32 kHz DSP samples between counter clocks.
+[[nodiscard]] u32 snesDspNoisePeriodSamples(u8 rate);
 
 }  // namespace vgmtrans::core
