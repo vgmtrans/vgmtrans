@@ -331,10 +331,11 @@ SequenceProgram parseSonyPs1Sequence(ByteReader reader, AssetId id, const SonyPs
   SequenceProgram program = sonyPs1SequenceConfig().makeProgram();
   program.timebase.ppqn = layout.ppqn;
   program.behavior.initialTempoMicrosecondsPerQuarter = layout.initialTempo;
+  const bool rhythmSpecified = layout.rhythmNumerator != 0;
   program.runtime = makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{
-                   .numerator = layout.rhythmNumerator,
-                   .denominator = static_cast<u8>(1u << layout.rhythmDenominatorPower),
-               });
+      .numerator = rhythmSpecified ? layout.rhythmNumerator : u8{4},
+      .denominator = rhythmSpecified ? static_cast<u8>(1u << layout.rhythmDenominatorPower) : u8{4},
+  });
 
   if (sourceMap != nullptr) {
     const u32 headerSize = layout.dataOffset - layout.offset;

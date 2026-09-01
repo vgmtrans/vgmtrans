@@ -84,7 +84,13 @@ constexpr u32 kPsxMainRamMask = 0x1fffff;
 }
 
 [[nodiscard]] bool validSequenceHeader(u16 ppqn, u32 tempo, u8 numerator, u8 denominatorPower) {
-  return ppqn != 0 && tempo != 0 && numerator != 0 && numerator <= 32 && denominatorPower <= 7;
+  if (ppqn == 0 || tempo == 0) {
+    return false;
+  }
+  if (numerator == 0) {
+    return denominatorPower == 0;
+  }
+  return numerator <= 32 && denominatorPower <= 7;
 }
 
 [[nodiscard]] bool zeroFilled(ByteReader reader, u32 offset, u32 end, u32 count) {
