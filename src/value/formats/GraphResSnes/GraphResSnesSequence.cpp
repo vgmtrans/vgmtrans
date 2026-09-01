@@ -506,7 +506,7 @@ struct Playback {
       emitEcho();
     }
 
-    if ((reg >> 4) != track.trackNumber) {
+    if (static_cast<u32>(reg >> 4) != track.trackNumber) {
       return;
     }
     switch (reg & 0x0f) {
