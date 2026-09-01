@@ -28,6 +28,12 @@ constexpr u32 kMaximumSequenceSize = 0x200000;
 constexpr u32 kProgramSize = 0x10;
 constexpr u32 kToneSize = 0x20;
 constexpr u32 kTonesPerProgram = 16;
+
+// 00 f2 04 3c  lui  a0, 0xf200
+// 02 00 84 34  ori  a0, a0, 2
+// ?? ?? 05 24  li   a1, rootCounterTarget
+// ?? ?? ?? 0c  jal  SetRCnt
+// 00 10 06 24  li   a2, 0x1000
 constexpr auto kSetRootCounter2 = makeMaskedBytePattern(
     "\x00\xf2\x04\x3c\x02\x00\x84\x34\x00\x00\x05\x24\x00\x00\x00\x0c\x00\x10\x06\x24", "xxxxxxxx??xx???xxxxx");
 constexpr u32 kRootCounterTargetOffset = 8;
