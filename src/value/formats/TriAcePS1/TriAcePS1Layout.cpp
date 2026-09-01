@@ -26,7 +26,8 @@ constexpr u32 kRegionSize = 20;
 }  // namespace
 
 std::optional<TriAcePs1SequenceLayout> readTriAcePs1SequenceLayout(ByteReader reader, u32 offset) {
-  if (!reader.has(offset, kSequenceHeaderSize) || reader.le16(offset) != 0xffff) {
+  if (!reader.has(offset, kSequenceHeaderSize) || reader.le16(offset) != 0xffff ||
+      reader.le16(offset + 8) != kTrackTable) {
     return std::nullopt;
   }
 

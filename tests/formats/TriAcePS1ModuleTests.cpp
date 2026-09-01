@@ -76,6 +76,7 @@ std::vector<u8> sequenceFixture(const std::vector<std::vector<u8>>& patterns) {
   constexpr u16 playlist = 0xd6;
   std::vector<u8> bytes(playlist + (patterns.size() + 1) * 2, 0);
   le16(bytes, 0, 0xffff);
+  le16(bytes, 8, 0x16);
   bytes[0x0f] = 80;
   bytes[0x10] = 4;
   bytes[0x11] = 4;
@@ -188,6 +189,10 @@ void triAcePs1SequenceExecutesAuditedDriverFeatures() {
   const ByteReader reader(SourceId{91}, bytes);
   const auto layout = readTriAcePs1SequenceLayout(reader, 0);
   expect(layout.has_value(), "TriAcePS1 sequence fixture should have a valid layout");
+  auto invalidHeader = bytes;
+  le16(invalidHeader, 8, 0);
+  expect(!readTriAcePs1SequenceLayout(ByteReader(SourceId{91}, invalidHeader), 0),
+         "TriAcePS1 detection should reject a mismatched track-table locator");
   const SequenceProgram program = parseTriAcePs1Sequence(reader, AssetId{91}, *layout);
   const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
   expect(performance.diagnostics.empty(), "audited TriAcePS1 fixture should render without diagnostics");
