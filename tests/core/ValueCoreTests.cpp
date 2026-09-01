@@ -40,6 +40,7 @@ void runFalcomSnesModuleTests();
 void runGraphResSnesModuleTests();
 void runHeartBeatSnesModuleTests();
 void runHeartBeatPs1ModuleTests();
+void runKonamiPs1ModuleTests();
 void runAsciiShuichiSnesModuleTests();
 void runPrismSnesModuleTests();
 void runHudsonSnesModuleTests();
@@ -438,6 +439,7 @@ int main() {
     suzukiPs1DynamicAdsrUsesAuditedDriverCommands();
     suzukiPs1ModuleBuildsFractionallyTunedWdsSynth();
     runHeartBeatPs1ModuleTests();
+    runKonamiPs1ModuleTests();
     runTriAcePs1ModuleTests();
     hosaSequencePreservesAuditedGrammarAndMixer();
     hosaVibratoUsesExactDriverTables();

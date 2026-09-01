@@ -31,9 +31,43 @@ constexpr u32 kToneSize = 0x20;
 constexpr u32 kTonesPerProgram = 16;
 constexpr u32 kSampleSizeTableBytes = 0x200;
 constexpr u32 kMaxSequenceEvents = 262144;
+constexpr u32 kPsxMainRamMask = 0x1fffff;
 
 [[nodiscard]] bool rangeValid(ByteReader reader, u64 offset, u64 size) {
   return offset <= reader.size() && size <= reader.size() - offset;
+}
+
+[[nodiscard]] std::optional<u32> psxMainRamOffset(u32 address, ByteReader reader) {
+  const u32 segment = address & 0xe0000000;
+  if (segment != 0x80000000 && segment != 0xa0000000) {
+    return std::nullopt;
+  }
+  const u32 offset = address & kPsxMainRamMask;
+  return offset < reader.size() ? std::optional{offset} : std::nullopt;
+}
+
+// Konami's two audited libsnd derivatives retain a compact runtime VAB record:
+// the header pointer is at +0 and the separately loaded sample body at +0x0c.
+// Following the pair is safe across relocated PSF RAM images because both
+// pointers and the complete VAB size table are validated before use.
+[[nodiscard]] std::optional<u32> findRuntimeLinkedSampleBody(ByteReader reader,
+                                                             const SonyPs1BankLayout& layout) {
+  std::optional<u32> found;
+  for (u64 candidate = 0; candidate + 0x10 <= reader.size(); candidate += 4) {
+    const auto header = psxMainRamOffset(reader.le32(candidate), reader);
+    if (!header || *header != layout.offset) {
+      continue;
+    }
+    const auto body = psxMainRamOffset(reader.le32(candidate + 0x0c), reader);
+    if (!body || !matchesSonyPs1SampleBodyAt(reader, *body, layout.sampleSizes)) {
+      continue;
+    }
+    if (found && *found != *body) {
+      return std::nullopt;
+    }
+    found = *body;
+  }
+  return found;
 }
 
 [[nodiscard]] bool seqSignature(ByteReader reader, u32 offset) {
@@ -374,7 +408,10 @@ std::optional<SonyPs1BankLayout> readSonyPs1BankLayout(ByteReader reader, u32 of
     layout.sampleSizes.push_back(size);
   }
   layout.expectedSampleBytes = static_cast<u32>(expected);
-  const auto locatedBody = matchSonyPs1SampleBody(reader, layout.sampleDataOffset, layout.sampleSizes);
+  auto locatedBody = matchSonyPs1SampleBody(reader, layout.sampleDataOffset, layout.sampleSizes);
+  if (!locatedBody && matchesSonyPs1SampleBodyAt(reader, layout.sampleDataOffset, layout.sampleSizes)) {
+    locatedBody = layout.sampleDataOffset;
+  }
   layout.hasSampleBody = locatedBody.has_value();
   if (locatedBody) {
     layout.sampleDataOffset = *locatedBody;
@@ -413,6 +450,15 @@ std::vector<SonyPs1BankLayout> findSonyPs1Banks(ByteReader reader) {
       if (layout.sampleDataOffset == layout.offset + layout.headerSize) {
         layout.length += layout.expectedSampleBytes;
       }
+    }
+  }
+  for (auto& layout : layouts) {
+    if (layout.hasSampleBody) {
+      continue;
+    }
+    if (const auto body = findRuntimeLinkedSampleBody(reader, layout)) {
+      layout.sampleDataOffset = *body;
+      layout.hasSampleBody = true;
     }
   }
   return layouts;

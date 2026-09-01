@@ -301,6 +301,10 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcadeModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcadeSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcadeSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiPS1/KonamiPS1Layout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiPS1/KonamiPS1Module.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiPS1/KonamiPS1Resolver.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiPS1/KonamiPS1Sequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiTMNT2/KonamiTMNT2Layout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiTMNT2/KonamiTMNT2Module.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiTMNT2/KonamiTMNT2Sequence.cpp
@@ -421,6 +425,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/HudsonSnes/HudsonSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/ItikitiSnes/ItikitiSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcade.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiPS1/KonamiPS1.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2k.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/MoriSnes/MoriSnes.h

@@ -295,6 +295,28 @@ std::vector<SonyPs1SampleBodyLayout> findSonyPs1SampleBodies(ByteReader reader) 
   return bodies;
 }
 
+bool matchesSonyPs1SampleBodyAt(ByteReader reader, u32 offset, const std::vector<u32>& sampleSizes) {
+  if (!validSampleStart(reader, offset, true)) {
+    return false;
+  }
+  bool foundSample = false;
+  bool foundAudio = false;
+  u64 sampleOffset = offset;
+  for (const u32 size : sampleSizes) {
+    if (size == 0) {
+      continue;
+    }
+    if (sampleOffset + size > std::numeric_limits<u32>::max() || !reader.has(sampleOffset, size) ||
+        !inspectPsxAdpcmStream(reader, static_cast<u32>(sampleOffset), static_cast<u32>(sampleOffset + size))) {
+      return false;
+    }
+    foundSample = true;
+    foundAudio |= std::ranges::any_of(reader.slice(sampleOffset, size), [](u8 byte) { return byte != 0; });
+    sampleOffset += size;
+  }
+  return foundSample && foundAudio;
+}
+
 std::optional<u32> matchSonyPs1SampleBody(ByteReader reader, u32 preferredOffset, const std::vector<u32>& sampleSizes,
                                           bool forceSingle) {
   const auto bodies = findSonyPs1SampleBodies(reader);

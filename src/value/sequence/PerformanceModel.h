@@ -397,6 +397,9 @@ struct LfoPerformanceContext {
   // Controls whether this event continues the LFO, moves it back to the start
   // of its waveform, or also begins its delay again.
   LfoRestartMode restartMode = LfoRestartMode::None;
+  // Voice LFOs normally restart on a fresh attack. Channel-wide oscillators
+  // can opt out and keep their phase while notes come and go.
+  bool restartsOnNote = true;
   bool phaseRunsAtZeroDepth = false;
   // Some register-driven oscillators also pause their delay counter while
   // either rate or depth is zero. The default keeps the existing behavior.
@@ -413,6 +416,9 @@ struct LfoPerformanceContext {
 struct ModulationPerformanceEvent {
   PerformanceEventHeader header;
   ModulationPerformanceTarget target = ModulationPerformanceTarget::VibratoDepth;
+  // Pitch modulation layers are persistent and additive, like ordinary pitch
+  // bend layers. Non-pitch modulation targets ignore this field.
+  PitchBendLayerId pitchLayer = kPrimaryPitchBendLayer;
   // Normalized source control value. Formats with physical modulation facts
   // provide those below; lowering uses this value when no physical fact exists.
   double amount = 0.0;

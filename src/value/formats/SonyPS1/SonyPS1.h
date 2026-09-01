@@ -104,6 +104,8 @@ struct SonyPs1SampleBodyLayout {
 [[nodiscard]] std::optional<SonyPs1BankLayout> readSonyPs1BankLayout(core::ByteReader reader, u32 offset);
 [[nodiscard]] std::vector<SonyPs1BankLayout> findSonyPs1Banks(core::ByteReader reader);
 [[nodiscard]] std::vector<SonyPs1SampleBodyLayout> findSonyPs1SampleBodies(core::ByteReader reader);
+[[nodiscard]] bool matchesSonyPs1SampleBodyAt(core::ByteReader reader, u32 offset,
+                                               const std::vector<u32>& sampleSizes);
 [[nodiscard]] std::optional<u32> matchSonyPs1SampleBody(core::ByteReader reader, u32 preferredOffset,
                                                         const std::vector<u32>& sampleSizes, bool forceSingle = false);
 

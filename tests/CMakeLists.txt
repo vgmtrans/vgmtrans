@@ -13,6 +13,7 @@ target_sources(vgmtrans-value-core-tests
     formats/MoriSnesModuleTests.cpp
     formats/CpsModuleTests.cpp
     formats/KonamiArcadeModuleTests.cpp
+    formats/KonamiPS1ModuleTests.cpp
     formats/KonamiTMNT2ModuleTests.cpp
     formats/KonamiSnesModuleTests.cpp
     formats/Mp2kModuleTests.cpp
@@ -54,6 +55,13 @@ target_link_libraries(vgmtrans-value-core-tests PRIVATE vgmtransvalueformats vgm
 target_compile_features(vgmtrans-value-core-tests PRIVATE cxx_std_20)
 
 add_test(NAME vgmtrans-value-core-tests COMMAND vgmtrans-value-core-tests)
+
+add_executable(vgmtrans-konami-ps1-tests
+  formats/KonamiPS1ModuleTests.cpp
+  formats/KonamiPS1TestMain.cpp)
+target_link_libraries(vgmtrans-konami-ps1-tests PRIVATE vgmtransvalueformats vgmtransvaluecore ZLIB::ZLIB)
+target_compile_features(vgmtrans-konami-ps1-tests PRIVATE cxx_std_20)
+add_test(NAME vgmtrans-konami-ps1-tests COMMAND vgmtrans-konami-ps1-tests)
 
 add_executable(vgmtrans-hosa-tests
   formats/HOSAModuleTests.cpp

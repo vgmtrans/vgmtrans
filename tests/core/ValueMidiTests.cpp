@@ -1257,6 +1257,138 @@ void performanceMidiRendererCombinesPitchSlidesWithSimulatedVibrato() {
          "sequence-event export should add simulated vibrato around the active pitch slide");
 }
 
+void performanceMidiRendererAddsIndependentPitchLfosWithoutRestartingChannelPhase() {
+  constexpr PitchBendLayerId channelLayer{1};
+  constexpr PitchBendLayerId voiceLayer{2};
+  const auto context = [](double phase, bool restartsOnNote) {
+    return LfoPerformanceContext{
+        .cyclesPerTick = 0.25,
+        .shape = LfoShape{.waveform = LfoWaveform::Triangle},
+        .initialPhaseCycles = phase,
+        .noteRestartInitialPhaseCycles = phase,
+        .restartMode = LfoRestartMode::None,
+        .restartsOnNote = restartsOnNote,
+    };
+  };
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 100},
+      .tracks = {PerformanceTrack{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .endTick = 6,
+          .events =
+              {
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0, .sequence = 0},
+                      .target = ModulationPerformanceTarget::VibratoRate,
+                      .pitchLayer = channelLayer,
+                      .context = context(0.5, false),
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0, .sequence = 1},
+                      .target = ModulationPerformanceTarget::VibratoDepth,
+                      .pitchLayer = channelLayer,
+                      .pitchDepthSemitones = 1.0,
+                      .context = context(0.5, false),
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0, .sequence = 2},
+                      .target = ModulationPerformanceTarget::VibratoRate,
+                      .pitchLayer = voiceLayer,
+                      .context = context(0.0, true),
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0, .sequence = 3},
+                      .target = ModulationPerformanceTarget::VibratoDepth,
+                      .pitchLayer = voiceLayer,
+                      .pitchDepthSemitones = 0.5,
+                      .context = context(0.0, true),
+                  },
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 0, .sequence = 4},
+                      .key = 60,
+                      .durationTicks = 2,
+                  },
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 2, .sequence = 5},
+                      .key = 62,
+                      .durationTicks = 4,
+                  },
+              },
+      }},
+  };
+  const MidiSequence midi = renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators);
+  const auto lastPitchBendAt = [&](u64 tick) -> std::optional<s16> {
+    std::optional<s16> result;
+    for (const auto& event : midi.tracks.front().events) {
+      if (const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+          bend != nullptr && event.tick == tick) {
+        result = bend->value;
+      }
+    }
+    return result;
+  };
+  expect(lastPitchBendAt(2) == -4096,
+         "a fresh note should restart only the voice LFO while preserving the additive channel LFO phase");
+  const auto combined = lastPitchBendAt(4);
+  expect(combined == 6144,
+         "independent pitch LFO layers should add before conversion to the shared MIDI pitch wheel (observed " +
+             (combined ? std::to_string(*combined) : std::string("none")) + ")");
+}
+
+void performanceMidiRendererSimulatesDeterministicSampleAndHoldNoise() {
+  constexpr PitchBendLayerId noiseLayer{2};
+  const auto context = LfoPerformanceContext{
+      .cyclesPerTick = 0.5,
+      .shape = LfoShape{.waveform = LfoWaveform::Noise},
+      .initialPhaseCycles = 0.0,
+      .restartMode = LfoRestartMode::None,
+      .restartsOnNote = true,
+      .phaseRunsAtZeroDepth = true,
+  };
+  const PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 100},
+      .tracks = {PerformanceTrack{
+          .id = TrackId{0},
+          .sourceTrackNumber = 0,
+          .endTick = 4,
+          .events =
+              {
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.sequence = 0},
+                      .target = ModulationPerformanceTarget::VibratoRate,
+                      .pitchLayer = noiseLayer,
+                      .context = context,
+                  },
+                  ModulationPerformanceEvent{
+                      .header = PerformanceEventHeader{.sequence = 1},
+                      .target = ModulationPerformanceTarget::VibratoDepth,
+                      .pitchLayer = noiseLayer,
+                      .pitchDepthSemitones = 3.0,
+                      .context = context,
+                  },
+                  NotePerformanceEvent{
+                      .header = PerformanceEventHeader{.sequence = 2},
+                      .key = 60,
+                      .durationTicks = 4,
+                  },
+              },
+      }},
+  };
+  const MidiSequence midi = renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators);
+  const auto nonzero = std::ranges::find_if(midi.tracks.front().events, [](const MidiEvent& event) {
+    const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+    return bend != nullptr && bend->value != 0;
+  });
+  const auto ranges = midiPitchBendRanges(midi.tracks.front().events);
+  expect(nonzero != midi.tracks.front().events.end() && nonzero->tick == 3 &&
+             ranges == std::vector<std::pair<u64, u16>>{{0, 200}, {0, 300}},
+         "noise modulation should reserve its range, hold zero through the first cycle, then hold a reproducible sample"
+         " (ranges=" +
+             std::to_string(ranges.size()) + ", first=" +
+             (ranges.empty() ? std::string("none") : std::to_string(ranges.front().second)) + ")");
+}
+
 void performanceMidiRendererUsesOnlyFrozenVibratoOffsetForPitchRange() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 100},
@@ -3119,6 +3251,8 @@ void runValueMidiTests() {
   performanceMidiRendererStartsANewVoiceAfterPitchBendContinuationWhenMidiPortamentoTakesOver();
   performanceMidiRendererResetsHeldPitchBeforeMidiPortamentoTakesOver();
   performanceMidiRendererCombinesPitchSlidesWithSimulatedVibrato();
+  performanceMidiRendererAddsIndependentPitchLfosWithoutRestartingChannelPhase();
+  performanceMidiRendererSimulatesDeterministicSampleAndHoldNoise();
   performanceMidiRendererUsesOnlyFrozenVibratoOffsetForPitchRange();
   performanceMidiRendererUsesWholeSemitonePitchBendRanges();
   performanceMidiRendererDoesNotRestartVibratoAtAHeldPitchSlideBoundary();
