@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <map>
 #include <set>
 #include <utility>
@@ -86,7 +87,7 @@ std::optional<ScanSoundBankDraft> addWd(ScanResultBuilder& result, const WdLayou
   }
   for (u32 program = 0; program < layout.instrumentCount; ++program) {
     const u32 relative = programOffsets[program];
-    if (relative == 0) {
+    if (relative == 0 || relative == std::numeric_limits<u32>::max()) {
       continue;
     }
     // Selection flags describe key/velocity thresholds; pointer spans own the records.
@@ -145,7 +146,7 @@ std::optional<ScanSoundBankDraft> addWd(ScanResultBuilder& result, const WdLayou
   instruments.source(SourceRole::Header, "WD Header", reader.range(layout.offset, 0x20), "square-ps2-wd-header")
       .fieldsAsChildren()
       .field("bank_id", reader.range(layout.offset + 2, 2), layout.bankId)
-      .field("sample_size", reader.range(layout.offset + 4, 4), layout.sampleSize)
+      .field("sample_size", reader.range(layout.offset + 4, 4), reader.le32(layout.offset + 4))
       .field("instrument_count", reader.range(layout.offset + 8, 4), layout.instrumentCount)
       .field("region_count", reader.range(layout.offset + 0x0c, 4), layout.regionCount);
 
