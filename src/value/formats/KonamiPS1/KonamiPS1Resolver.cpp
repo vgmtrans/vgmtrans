@@ -48,9 +48,7 @@ std::vector<DesiredCollection> resolveKonamiPs1Collections(const CollectionDisco
     if (selectedBanks.empty() && banks.size() == 1) {
       selectedBanks.push_back(banks.front());
     }
-    std::ranges::sort(selectedBanks, [](const SoundBankAsset* left, const SoundBankAsset* right) {
-      return left->metadata.range.offset < right->metadata.range.offset;
-    });
+    std::ranges::sort(selectedBanks, {}, [](const SoundBankAsset* bank) { return bank->metadata.range.offset; });
     for (const auto* bank : selectedBanks) {
       collection.soundBank(bank->metadata.id);
     }
@@ -61,7 +59,6 @@ std::vector<DesiredCollection> resolveKonamiPs1Collections(const CollectionDisco
         collection.samplePool(pool->metadata.id);
       }
     }
-    collection.bind(sony_ps1::bindSonyPs1Collection);
     collections.push_back(std::move(collection).finish());
   }
   return collections;
