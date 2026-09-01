@@ -338,13 +338,21 @@ struct SimulatedLfoState {
   u32 directionReversalTicks = 0;
   u32 directionTick = 0;
   bool phaseReversed = false;
+  bool restartsOnNote = true;
   bool phaseRunsAtZeroDepth = false;
   bool delayRunsWhileInactive = true;
   bool outputHeldUntilNextNote = false;
+  u64 noiseIndex = 0;
+  double noiseValue = 0.0;
   PanLaw panLaw = PanLaw::Unspecified;
   bool configured = false;
   bool started = false;
   bool producedSample = false;
+};
+
+struct SimulatedPitchLfoState {
+  SimulatedLfoState oscillator;
+  double semitones = 0.0;
 };
 
 [[nodiscard]] u16 wholeSemitonePitchBendRangeCents(u16 cents) {
@@ -394,8 +402,7 @@ struct RenderTrackState {
   std::optional<u16> voicePitchBendRangeCents;
   double tuningBendSemitones = 0.0;
   PitchBendLayers pitchBendLayers;
-  double simulatedVibratoSemitones = 0.0;
-  SimulatedLfoState vibrato;
+  std::map<u32, SimulatedPitchLfoState> pitchLfos;
   std::optional<s16> lastPitchBendValue;
   std::optional<size_t> lastPitchBendIndex;
   double sourceLevelGain = 1.0;
@@ -668,11 +675,31 @@ bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePer
   return state.pitchBendLayers.semitones(state.pitchBendContext);
 }
 
+[[nodiscard]] SimulatedPitchLfoState& pitchLfo(RenderTrackState& state, PitchBendLayerId layer) {
+  return state.pitchLfos[layer.value];
+}
+
+[[nodiscard]] double simulatedPitchLfoSemitones(const RenderTrackState& state) {
+  double semitones = 0.0;
+  for (const auto& entry : state.pitchLfos) {
+    semitones += entry.second.semitones;
+  }
+  return semitones;
+}
+
 [[nodiscard]] u16 requiredPitchBendRangeCents(const RenderTrackState& state) {
-  const bool vibratoPhaseAdvances = state.vibrato.cyclesPerTick.value_or(state.vibrato.frequencyHz) > 0.0;
-  const double voicePitch = state.tuningBendSemitones + layeredPitchBendSemitones(state);
-  const double possibleSemitones = vibratoPhaseAdvances ? std::abs(voicePitch) + state.vibrato.depth
-                                                        : std::abs(voicePitch + state.simulatedVibratoSemitones);
+  double voicePitch = state.tuningBendSemitones + layeredPitchBendSemitones(state);
+  double maximumLfoExcursion = 0.0;
+  for (const auto& entry : state.pitchLfos) {
+    const auto& pitch = entry.second;
+    const auto& lfo = pitch.oscillator;
+    if (lfo.cyclesPerTick.value_or(lfo.frequencyHz) > 0.0) {
+      maximumLfoExcursion += lfo.depth;
+    } else {
+      voicePitch += pitch.semitones;
+    }
+  }
+  const double possibleSemitones = std::abs(voicePitch) + maximumLfoExcursion;
   const int cents = std::max<int>(200, static_cast<int>(std::ceil(possibleSemitones * 100.0)));
   return static_cast<u16>(std::min<int>(cents, std::numeric_limits<u16>::max()));
 }
@@ -687,7 +714,12 @@ bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePer
                            static_cast<double>(std::numeric_limits<u16>::max())));
   const u16 range = std::max({state.voicePitchBendRangeCents.value_or(state.pitchBendContext.sourceRangeCents()),
                               state.pitchBendContext.instrumentRangeCents().value_or(0), tuningRangeCents});
-  return modulationConversion == ModulationConversionPolicy::SequenceEventSimulation
+  const bool simulatesPitchLfo =
+      modulationConversion == ModulationConversionPolicy::SequenceEventSimulation ||
+      std::ranges::any_of(state.pitchLfos, [](const auto& entry) {
+        return entry.first != kPrimaryPitchBendLayer.value && entry.second.oscillator.configured;
+      });
+  return simulatesPitchLfo
              ? std::max(range, requiredPitchBendRangeCents(state))
              : range;
 }
@@ -724,9 +756,8 @@ void addPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channe
 
 [[nodiscard]] double currentPitchBendSemitones(const RenderTrackState& state,
                                                ModulationConversionPolicy modulationConversion) {
-  return state.tuningBendSemitones + layeredPitchBendSemitones(state) +
-         (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation ? state.simulatedVibratoSemitones
-                                                                                      : 0.0);
+  static_cast<void>(modulationConversion);
+  return state.tuningBendSemitones + layeredPitchBendSemitones(state) + simulatedPitchLfoSemitones(state);
 }
 
 void refreshPitchBendRange(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, u16 cents,
@@ -812,6 +843,19 @@ void addCurrentPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u8
   return 0.0;
 }
 
+[[nodiscard]] bool generatedNoise(const SimulatedLfoState& lfo) {
+  return lfo.shape && lfo.shape->samples.empty() && lfo.shape->waveform == LfoWaveform::Noise;
+}
+
+void advanceNoise(SimulatedLfoState& lfo, u64 cycles) {
+  lfo.noiseIndex += cycles;
+  u32 value = static_cast<u32>(lfo.noiseIndex) + 0x6d2b79f5u;
+  value = (value ^ (value >> 16)) * 0x7feb352du;
+  value = (value ^ (value >> 15)) * 0x846ca68bu;
+  value ^= value >> 16;
+  lfo.noiseValue = static_cast<s8>(value & 0xff) / 128.0;
+}
+
 [[nodiscard]] double lfoValue(const SimulatedLfoState& lfo) {
   if (lfo.shape && !lfo.shape->samples.empty()) {
     const double phase = lfo.phaseCycles - std::floor(lfo.phaseCycles);
@@ -819,7 +863,9 @@ void addCurrentPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u8
         std::min(lfo.shape->samples.size() - 1, static_cast<size_t>(std::floor(phase * lfo.shape->samples.size())));
     return std::clamp(lfo.shape->samples[index], -1.0, 1.0);
   }
-  const double value = lfoValue(lfo.shape ? lfo.shape->waveform : LfoWaveform::Triangle, lfo.phaseCycles);
+  const double value = generatedNoise(lfo)
+                           ? lfo.noiseValue
+                           : lfoValue(lfo.shape ? lfo.shape->waveform : LfoWaveform::Triangle, lfo.phaseCycles);
   switch (lfo.polarity) {
     case LfoPolarity::Positive:
       return (value + 1.0) / 2.0;
@@ -862,6 +908,9 @@ void applyLfoRestart(SimulatedLfoState& lfo, u64 tick, LfoRestartMode mode,
   lfo.steppedDepthAttackPhaseCycles = 0.0;
   lfo.directionTick = 0;
   lfo.phaseReversed = false;
+  if (generatedNoise(lfo)) {
+    lfo.noiseValue = 0.0;
+  }
   lfo.started = true;
   lfo.producedSample = false;
 }
@@ -920,6 +969,7 @@ void configureLfo(SimulatedLfoState& lfo, u64 tick, const ModulationPerformanceE
   }
   lfo.phaseRunsAtZeroDepth = context.phaseRunsAtZeroDepth;
   lfo.delayRunsWhileInactive = context.delayRunsWhileInactive;
+  lfo.restartsOnNote = context.restartsOnNote;
   lfo.configured = true;
   applyLfoRestart(lfo, tick, lfo.started ? context.restartMode : LfoRestartMode::PhaseAndDelay, fallback);
 }
@@ -987,9 +1037,15 @@ void flushLfo(SimulatedLfoState& lfo, u64 upToTick, const PerformanceTempoMap& t
 
     const double phaseStep = lfo.cyclesPerTick.value_or(lfo.frequencyHz * tickSeconds);
     const auto advancePhase = [&]() {
-      lfo.phaseCycles = std::fmod(lfo.phaseCycles + (lfo.phaseReversed ? -phaseStep : phaseStep), 1.0);
+      const double phaseDelta = lfo.phaseReversed ? -phaseStep : phaseStep;
+      const double unwrappedPhase = lfo.phaseCycles + phaseDelta;
+      const double completedCycles = phaseDelta >= 0.0 ? std::floor(unwrappedPhase) : std::ceil(-unwrappedPhase);
+      lfo.phaseCycles = std::fmod(unwrappedPhase, 1.0);
       if (lfo.phaseCycles < 0.0) {
         lfo.phaseCycles += 1.0;
+      }
+      if (generatedNoise(lfo) && completedCycles > 0.0) {
+        advanceNoise(lfo, static_cast<u64>(std::min(completedCycles, 1000000.0)));
       }
       if (lfo.directionReversalTicks != 0 && ++lfo.directionTick == lfo.directionReversalTicks) {
         lfo.directionTick = 0;
@@ -997,10 +1053,10 @@ void flushLfo(SimulatedLfoState& lfo, u64 upToTick, const PerformanceTempoMap& t
       }
       if (lfo.activeSteppedDepthAttackSteps != 0 && lfo.steppedDepthAttackStep < lfo.activeSteppedDepthAttackSteps) {
         const double attackPhase = lfo.steppedDepthAttackPhaseCycles + phaseStep;
-        const u32 completedCycles = static_cast<u32>(std::floor(attackPhase));
+        const u32 completedAttackCycles = static_cast<u32>(std::floor(attackPhase));
         lfo.steppedDepthAttackPhaseCycles = attackPhase - std::floor(attackPhase);
         lfo.steppedDepthAttackStep =
-            std::min(lfo.activeSteppedDepthAttackSteps, lfo.steppedDepthAttackStep + completedCycles);
+            std::min(lfo.activeSteppedDepthAttackSteps, lfo.steppedDepthAttackStep + completedAttackCycles);
       }
     };
     if (lfo.producedSample && lfo.sampleImmediatelyOnNote) {
@@ -1033,71 +1089,119 @@ void flushLfo(SimulatedLfoState& lfo, u64 upToTick, const PerformanceTempoMap& t
 }
 
 void flushSimulatedVibrato(MidiTrack& track, RenderTrackState& state, u64 upToTick, u8 channel,
-                           const PerformanceTempoMap& tempos) {
-  flushLfo(state.vibrato, upToTick, tempos, [&](u64 tick, double value) {
-    state.simulatedVibratoSemitones = simulatedVibratoAtPhase(state.vibrato, value);
-    addCurrentPitchBend(track, state, tick, channel, ModulationConversionPolicy::SequenceEventSimulation, false);
-  });
+                           const PerformanceTempoMap& tempos, const NotePerformanceEvent* note = nullptr) {
+  const bool restartsPitch =
+      note != nullptr && note->restartsVibratoLfoPhase.value_or(!note->extendsPrevious && note->restartsLfoPhase);
+  const auto layerEnd = [&](const SimulatedPitchLfoState& pitch) {
+    return restartsPitch && pitch.oscillator.restartsOnNote && upToTick != 0 ? upToTick - 1 : upToTick;
+  };
+  while (true) {
+    std::optional<u64> nextTick;
+    for (const auto& entry : state.pitchLfos) {
+      const auto& pitch = entry.second;
+      if (pitch.oscillator.cursorTick < layerEnd(pitch)) {
+        nextTick = std::min(nextTick.value_or(pitch.oscillator.cursorTick + 1), pitch.oscillator.cursorTick + 1);
+      }
+    }
+    if (!nextTick) {
+      break;
+    }
+    bool sampled = false;
+    for (auto& entry : state.pitchLfos) {
+      auto& pitch = entry.second;
+      flushLfo(pitch.oscillator, std::min(*nextTick, layerEnd(pitch)), tempos, [&](u64, double value) {
+        pitch.semitones = simulatedVibratoAtPhase(pitch.oscillator, value);
+        sampled = true;
+      });
+    }
+    if (sampled) {
+      addCurrentPitchBend(track, state, *nextTick, channel, ModulationConversionPolicy::SequenceEventSimulation,
+                          false);
+    }
+  }
 }
 
 void setSimulatedVibratoDepth(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, double semitones,
-                              LfoZeroDepthBehavior zeroDepthBehavior) {
-  state.vibrato.depth = std::max(0.0, semitones);
-  state.vibrato.outputHeldUntilNextNote =
-      state.vibrato.depth <= 0.0 && zeroDepthBehavior == LfoZeroDepthBehavior::HoldOutputUntilNextNote;
-  if (state.vibrato.depth <= 0.0 && !state.vibrato.outputHeldUntilNextNote) {
-    state.simulatedVibratoSemitones = 0.0;
+                              LfoZeroDepthBehavior zeroDepthBehavior, PitchBendLayerId layer) {
+  auto& pitch = pitchLfo(state, layer);
+  auto& lfo = pitch.oscillator;
+  lfo.depth = std::max(0.0, semitones);
+  lfo.outputHeldUntilNextNote = lfo.depth <= 0.0 && zeroDepthBehavior == LfoZeroDepthBehavior::HoldOutputUntilNextNote;
+  if (lfo.depth <= 0.0 && !lfo.outputHeldUntilNextNote) {
+    pitch.semitones = 0.0;
     addCurrentPitchBend(track, state, tick, channel, ModulationConversionPolicy::SequenceEventSimulation, false);
   }
 }
 
 void sampleRestartedVibrato(MidiTrack& track, RenderTrackState& state, const ModulationPerformanceEvent& event,
                             u8 channel) {
-  const bool immediate = event.context.restartMode == LfoRestartMode::PhaseAndDelay &&
-                         state.vibrato.sampleImmediatelyOnNote && state.vibrato.delay.ticks == 0 &&
-                         state.vibrato.delay.milliseconds.value_or(0.0) <= 0.0 && state.vibrato.depth > 0.0 &&
-                         state.vibrato.cyclesPerTick.value_or(state.vibrato.frequencyHz) > 0.0;
+  auto& pitch = pitchLfo(state, event.pitchLayer);
+  auto& lfo = pitch.oscillator;
+  const bool immediate = event.context.restartMode == LfoRestartMode::PhaseAndDelay && lfo.sampleImmediatelyOnNote &&
+                         lfo.delay.ticks == 0 && lfo.delay.milliseconds.value_or(0.0) <= 0.0 && lfo.depth > 0.0 &&
+                         lfo.cyclesPerTick.value_or(lfo.frequencyHz) > 0.0;
   if (!immediate) {
     return;
   }
-  const double value = simulatedVibratoAtPhase(state.vibrato, lfoValue(state.vibrato));
-  state.vibrato.producedSample = true;
-  if (value != state.simulatedVibratoSemitones) {
-    state.simulatedVibratoSemitones = value;
+  const double value = simulatedVibratoAtPhase(lfo, lfoValue(lfo));
+  lfo.producedSample = true;
+  if (value != pitch.semitones) {
+    pitch.semitones = value;
     addCurrentPitchBend(track, state, event.header.tick, channel, ModulationConversionPolicy::SequenceEventSimulation,
                         false);
   }
 }
 
 void restartSimulatedVibratoForNote(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel) {
-  if (!state.vibrato.configured) {
-    return;
+  bool changed = false;
+  for (auto& entry : state.pitchLfos) {
+    auto& pitch = entry.second;
+    auto& lfo = pitch.oscillator;
+    if (!lfo.configured || !lfo.restartsOnNote) {
+      continue;
+    }
+    restartNoteLfo(lfo, tick);
+    lfo.outputHeldUntilNextNote = false;
+    const double previousSemitones = pitch.semitones;
+    const bool startsImmediately = lfo.sampleImmediatelyOnNote && lfo.delay.ticks == 0 &&
+                                   lfo.delay.milliseconds.value_or(0.0) <= 0.0 &&
+                                   lfo.cyclesPerTick.value_or(lfo.frequencyHz) > 0.0 && lfo.depth > 0.0;
+    pitch.semitones = startsImmediately ? simulatedVibratoAtPhase(lfo, lfoValue(lfo)) : 0.0;
+    lfo.producedSample = startsImmediately;
+    changed |= startsImmediately || previousSemitones != 0.0;
   }
-
-  restartNoteLfo(state.vibrato, tick);
-  state.vibrato.outputHeldUntilNextNote = false;
-  const double previousSemitones = state.simulatedVibratoSemitones;
-  const bool startsImmediately = state.vibrato.sampleImmediatelyOnNote && state.vibrato.delay.ticks == 0 &&
-                                 state.vibrato.delay.milliseconds.value_or(0.0) <= 0.0 &&
-                                 state.vibrato.cyclesPerTick.value_or(state.vibrato.frequencyHz) > 0.0 &&
-                                 state.vibrato.depth > 0.0;
-  state.simulatedVibratoSemitones =
-      startsImmediately ? simulatedVibratoAtPhase(state.vibrato, lfoValue(state.vibrato)) : 0.0;
-  state.vibrato.producedSample = startsImmediately;
-  if (startsImmediately || previousSemitones != 0.0) {
+  if (changed) {
     addCurrentPitchBend(track, state, tick, channel, ModulationConversionPolicy::SequenceEventSimulation, false);
   }
 }
 
 bool shouldRestartSimulatedVibratoForNote(const NotePerformanceEvent& note, const RenderTrackState& state) {
-  return note.restartsVibratoLfoPhase.value_or(!note.extendsPrevious && note.restartsLfoPhase) &&
-         state.vibrato.configured;
+  if (!note.restartsVibratoLfoPhase.value_or(!note.extendsPrevious && note.restartsLfoPhase)) {
+    return false;
+  }
+  return std::ranges::any_of(state.pitchLfos, [](const auto& entry) {
+    return entry.second.oscillator.configured && entry.second.oscillator.restartsOnNote;
+  });
 }
 
 [[nodiscard]] bool releaseHeldLfoOutput(SimulatedLfoState& lfo) {
   const bool wasHeld = lfo.outputHeldUntilNextNote;
   lfo.outputHeldUntilNextNote = false;
   return wasHeld;
+}
+
+void releaseHeldPitchLfoOutputs(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel) {
+  bool changed = false;
+  for (auto& entry : state.pitchLfos) {
+    auto& pitch = entry.second;
+    if (releaseHeldLfoOutput(pitch.oscillator) && pitch.semitones != 0.0) {
+      pitch.semitones = 0.0;
+      changed = true;
+    }
+  }
+  if (changed) {
+    addCurrentPitchBend(track, state, tick, channel, ModulationConversionPolicy::SequenceEventSimulation, false);
+  }
 }
 
 // Pan-law conversion can require gain above unity. A sequence-wide headroom
@@ -1278,13 +1382,12 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                 options, modulationConversion, false);
           }
           const u8 key = midiKey(typedEvent.key + globalTransposeAt(globalTransposes, typedEvent.header.tick));
+          if (shouldRestartSimulatedVibratoForNote(typedEvent, state)) {
+            restartSimulatedVibratoForNote(track, state, typedEvent.header.tick, channel);
+          } else {
+            releaseHeldPitchLfoOutputs(track, state, typedEvent.header.tick, channel);
+          }
           if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
-            if (shouldRestartSimulatedVibratoForNote(typedEvent, state)) {
-              restartSimulatedVibratoForNote(track, state, typedEvent.header.tick, channel);
-            } else if (releaseHeldLfoOutput(state.vibrato) && state.simulatedVibratoSemitones != 0.0) {
-              state.simulatedVibratoSemitones = 0.0;
-              addCurrentPitchBend(track, state, typedEvent.header.tick, channel, modulationConversion, false);
-            }
             if (shouldRestartSimulatedTremoloForNote(typedEvent, state)) {
               restartSimulatedTremoloForNote(track, state, typedEvent.header.tick, channel, options,
                                              modulationConversion);
@@ -1407,8 +1510,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           refreshPitchBendRange(track, state, typedEvent.header.tick, channel,
                                 effectivePitchBendRangeCents(state, modulationConversion), modulationConversion);
         } else if constexpr (std::is_same_v<TypedEvent, VibratoDelayPerformanceEvent>) {
-          setLfoDelay(state.vibrato, typedEvent.header.tick, typedEvent.delayTicks, typedEvent.milliseconds,
-                      typedEvent.tempoRelative, typedEvent.updateMode);
+          setLfoDelay(pitchLfo(state, kPrimaryPitchBendLayer).oscillator, typedEvent.header.tick, typedEvent.delayTicks,
+                      typedEvent.milliseconds, typedEvent.tempoRelative, typedEvent.updateMode);
           if (modulationConversion != ModulationConversionPolicy::SequenceEventSimulation) {
             addController(track, typedEvent.header.tick, channel, MidiController::VibratoDelay,
                           vibratoDelayControllerValue(typedEvent, modulationProfile));
@@ -1447,17 +1550,31 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
         } else if constexpr (std::is_same_v<TypedEvent, ModulationPerformanceEvent>) {
           const double normalizedAmount = modulationControllerAmount(typedEvent, modulationProfile);
           const u8 value = midiNormalized7(normalizedAmount);
+          const bool pitchTarget = typedEvent.target == ModulationPerformanceTarget::VibratoDepth ||
+                                   typedEvent.target == ModulationPerformanceTarget::VibratoRate;
+          if (pitchTarget && (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation ||
+                              typedEvent.pitchLayer != kPrimaryPitchBendLayer)) {
+            auto& lfo = pitchLfo(state, typedEvent.pitchLayer).oscillator;
+            configureLfo(lfo, typedEvent.header.tick, typedEvent);
+            if (typedEvent.target == ModulationPerformanceTarget::VibratoDepth) {
+              setSimulatedVibratoDepth(
+                  track, state, typedEvent.header.tick, channel,
+                  typedEvent.pitchDepthSemitones.value_or(std::clamp(typedEvent.amount, 0.0, 1.0) * 2.0),
+                  typedEvent.context.zeroDepthBehavior, typedEvent.pitchLayer);
+              refreshPitchBendRange(track, state, typedEvent.header.tick, channel,
+                                    effectivePitchBendRangeCents(state, modulationConversion), modulationConversion);
+              sampleRestartedVibrato(track, state, typedEvent, channel);
+            } else {
+              refreshPitchBendRange(track, state, typedEvent.header.tick, channel,
+                                    effectivePitchBendRangeCents(state, modulationConversion), modulationConversion);
+              if (state.lastPitchBendValue) {
+                addCurrentPitchBend(track, state, typedEvent.header.tick, channel, modulationConversion, false);
+              }
+            }
+            return;
+          }
           if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
             switch (typedEvent.target) {
-              case ModulationPerformanceTarget::VibratoDepth: {
-                configureLfo(state.vibrato, typedEvent.header.tick, typedEvent);
-                setSimulatedVibratoDepth(
-                    track, state, typedEvent.header.tick, channel,
-                    typedEvent.pitchDepthSemitones.value_or(std::clamp(typedEvent.amount, 0.0, 1.0) * 2.0),
-                    typedEvent.context.zeroDepthBehavior);
-                sampleRestartedVibrato(track, state, typedEvent, channel);
-                break;
-              }
               case ModulationPerformanceTarget::TremoloDepth: {
                 const bool physicalDecibels = typedEvent.volumeDepthDecibels.has_value();
                 const bool physicalLinearGain = typedEvent.volumeDepthLinearGain.has_value();
@@ -1478,12 +1595,6 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                                          options, modulationConversion);
                 break;
               }
-              case ModulationPerformanceTarget::VibratoRate:
-                configureLfo(state.vibrato, typedEvent.header.tick, typedEvent);
-                if (state.lastPitchBendValue) {
-                  addCurrentPitchBend(track, state, typedEvent.header.tick, channel, modulationConversion, false);
-                }
-                break;
               case ModulationPerformanceTarget::TremoloRate:
                 configureLfo(state.tremolo, typedEvent.header.tick, typedEvent,
                              typedEvent.context.shape ? LfoInitialPhaseFallback::Zero
@@ -1496,6 +1607,9 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                 break;
               case ModulationPerformanceTarget::PanRate:
                 configureLfo(state.panLfo, typedEvent.header.tick, typedEvent);
+                break;
+              case ModulationPerformanceTarget::VibratoDepth:
+              case ModulationPerformanceTarget::VibratoRate:
                 break;
             }
             return;
@@ -1596,29 +1710,28 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
                       pitchBendRangeChanges[nextPitchBendRangeChange].sequence) <=
                  std::tie(header.tick, header.sequence)) {
         const auto& change = pitchBendRangeChanges[nextPitchBendRangeChange++];
-        if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation && change.tick != 0) {
+        if (change.tick != 0) {
           // Finish the previous voice before changing the channel sensitivity.
           flushSimulatedVibrato(midiTrack, renderState, change.tick - 1, assignment.channel, globalTempos);
         }
         applyVoicePitchBendRangeChange(midiTrack, renderState, change, assignment.channel, modulationConversion);
       }
 
-      u64 flushTick = header.tick;
       const auto* note = std::get_if<NotePerformanceEvent>(event);
+      flushSimulatedVibrato(midiTrack, renderState, header.tick, assignment.channel, globalTempos, note);
+      u64 otherFlushTick = header.tick;
       if (note != nullptr &&
           ((modulationConversion == ModulationConversionPolicy::SequenceEventSimulation &&
-            (shouldRestartSimulatedVibratoForNote(*note, renderState) ||
-             shouldRestartSimulatedTremoloForNote(*note, renderState))) ||
+            shouldRestartSimulatedTremoloForNote(*note, renderState)) ||
            shouldRestartSimulatedPanForNote(*note, renderState)) &&
-          flushTick != 0) {
-        --flushTick;
+          otherFlushTick != 0) {
+        --otherFlushTick;
       }
       if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
-        flushSimulatedVibrato(midiTrack, renderState, flushTick, assignment.channel, globalTempos);
-        flushSimulatedTremolo(midiTrack, renderState, flushTick, assignment.channel, globalTempos, options,
+        flushSimulatedTremolo(midiTrack, renderState, otherFlushTick, assignment.channel, globalTempos, options,
                               modulationConversion);
       }
-      flushSimulatedPan(midiTrack, renderState, flushTick, assignment.channel, globalTempos, options);
+      flushSimulatedPan(midiTrack, renderState, otherFlushTick, assignment.channel, globalTempos, options);
       if (trackIndex == 0) {
         if (const auto* tempo = std::get_if<TempoPerformanceEvent>(event);
             tempo != nullptr && globalTempos.contains(*tempo)) {
@@ -1640,8 +1753,8 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
                    automationState);
     }
     u64 endTick = performanceTrack.endTick;
+    flushSimulatedVibrato(midiTrack, renderState, endTick, assignment.channel, globalTempos);
     if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
-      flushSimulatedVibrato(midiTrack, renderState, endTick, assignment.channel, globalTempos);
       flushSimulatedTremolo(midiTrack, renderState, endTick, assignment.channel, globalTempos, options,
                             modulationConversion);
     }

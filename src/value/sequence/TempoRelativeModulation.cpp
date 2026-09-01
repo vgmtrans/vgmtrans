@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iterator>
+#include <map>
 #include <optional>
 #include <tuple>
 #include <vector>
@@ -26,7 +27,7 @@ struct EventRef {
 };
 
 struct TrackModulationState {
-  std::optional<ModulationPerformanceEvent> vibratoRate;
+  std::map<u32, ModulationPerformanceEvent> vibratoRates;
   std::optional<ModulationPerformanceEvent> tremoloRate;
   std::optional<ModulationPerformanceEvent> panRate;
   std::optional<u32> vibratoDelayTicks;
@@ -59,13 +60,12 @@ struct TrackModulationState {
     TrackModulationState& state,
     ModulationPerformanceTarget target) {
   switch (target) {
-    case ModulationPerformanceTarget::VibratoRate:
-      return &state.vibratoRate;
     case ModulationPerformanceTarget::TremoloRate:
       return &state.tremoloRate;
     case ModulationPerformanceTarget::PanRate:
       return &state.panRate;
     case ModulationPerformanceTarget::VibratoDepth:
+    case ModulationPerformanceTarget::VibratoRate:
     case ModulationPerformanceTarget::TremoloDepth:
     case ModulationPerformanceTarget::PanDepth:
       return nullptr;
@@ -173,7 +173,9 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
           update.header = derivedHeader(*tempo, track);
           resolveContext(update, secondsPerTick);
         };
-        appendRate(trackState.vibratoRate);
+        for (const auto& entry : trackState.vibratoRates) {
+          appendRate(entry.second);
+        }
         appendRate(trackState.tremoloRate);
         appendRate(trackState.panRate);
 
@@ -201,7 +203,13 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
 
     if (auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
       resolveContext(*modulation, secondsPerTick);
-      if (auto* rate = relativeRate(state, modulation->target)) {
+      if (modulation->target == ModulationPerformanceTarget::VibratoRate) {
+        if (modulation->context.cyclesPerTick) {
+          state.vibratoRates.insert_or_assign(modulation->pitchLayer.value, *modulation);
+        } else {
+          state.vibratoRates.erase(modulation->pitchLayer.value);
+        }
+      } else if (auto* rate = relativeRate(state, modulation->target)) {
         if (modulation->context.cyclesPerTick) {
           *rate = *modulation;
         } else {

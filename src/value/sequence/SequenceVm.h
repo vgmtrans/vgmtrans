@@ -153,9 +153,11 @@ public:
   void legatoPedal(bool enabled);
   void modulation(ModulationPerformanceEvent event);
   void modulation(ModulationPerformanceTarget target, double amount);
-  void vibratoDepth(double semitones, LfoPerformanceContext context = {});
-  void vibratoRate(double hertz, LfoPerformanceContext context = {});
-  void vibratoRateCyclesPerTick(double cycles, LfoPerformanceContext context = {});
+  void vibratoDepth(double semitones, LfoPerformanceContext context = {},
+                    PitchBendLayerId layer = kPrimaryPitchBendLayer);
+  void vibratoRate(double hertz, LfoPerformanceContext context = {}, PitchBendLayerId layer = kPrimaryPitchBendLayer);
+  void vibratoRateCyclesPerTick(double cycles, LfoPerformanceContext context = {},
+                                PitchBendLayerId layer = kPrimaryPitchBendLayer);
   void tremoloDepth(double decibels, LfoPerformanceContext context = {});
   void tremoloLinearGainDepth(double gain, LfoPerformanceContext context = {});
   void tremoloRate(double hertz, LfoPerformanceContext context = {});

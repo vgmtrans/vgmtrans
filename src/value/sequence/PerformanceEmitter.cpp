@@ -507,9 +507,11 @@ void PerformanceEmitter::modulation(ModulationPerformanceTarget target, double a
 namespace {
 
 [[nodiscard]] ModulationPerformanceEvent physicalLfoEvent(ModulationPerformanceTarget target,
-                                                          LfoPerformanceContext context) {
+                                                          LfoPerformanceContext context,
+                                                          PitchBendLayerId pitchLayer = kPrimaryPitchBendLayer) {
   return ModulationPerformanceEvent{
       .target = target,
+      .pitchLayer = pitchLayer,
       .amount = 0.0,
       .context = std::move(context),
   };
@@ -517,22 +519,23 @@ namespace {
 
 }  // namespace
 
-void PerformanceEmitter::vibratoDepth(double semitones, LfoPerformanceContext context) {
-  auto event = physicalLfoEvent(ModulationPerformanceTarget::VibratoDepth, std::move(context));
+void PerformanceEmitter::vibratoDepth(double semitones, LfoPerformanceContext context, PitchBendLayerId layer) {
+  auto event = physicalLfoEvent(ModulationPerformanceTarget::VibratoDepth, std::move(context), layer);
   event.pitchDepthSemitones = semitones;
   modulation(std::move(event));
 }
 
-void PerformanceEmitter::vibratoRate(double hertz, LfoPerformanceContext context) {
+void PerformanceEmitter::vibratoRate(double hertz, LfoPerformanceContext context, PitchBendLayerId layer) {
   context.frequencyHz = hertz;
   context.cyclesPerTick.reset();
-  modulation(physicalLfoEvent(ModulationPerformanceTarget::VibratoRate, std::move(context)));
+  modulation(physicalLfoEvent(ModulationPerformanceTarget::VibratoRate, std::move(context), layer));
 }
 
-void PerformanceEmitter::vibratoRateCyclesPerTick(double cycles, LfoPerformanceContext context) {
+void PerformanceEmitter::vibratoRateCyclesPerTick(double cycles, LfoPerformanceContext context,
+                                                  PitchBendLayerId layer) {
   context.frequencyHz.reset();
   context.cyclesPerTick = cycles;
-  modulation(physicalLfoEvent(ModulationPerformanceTarget::VibratoRate, std::move(context)));
+  modulation(physicalLfoEvent(ModulationPerformanceTarget::VibratoRate, std::move(context), layer));
 }
 
 void PerformanceEmitter::tremoloDepth(double decibels, LfoPerformanceContext context) {
