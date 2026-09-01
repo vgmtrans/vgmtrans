@@ -21,9 +21,10 @@ using namespace core;
 
 namespace {
 
-constexpr u32 kHeaderSize = 0x10;
+constexpr u32 kKdtHeaderSize = 0x10;
+constexpr u32 kFixedKdtHeaderSize = 0x50;
 constexpr u32 kMaximumTracks = 64;
-constexpr u32 kMaximumEvents = 1048576;
+constexpr u32 kMaximumEvents = 1'048'576;
 constexpr u32 kMaximumSequenceSize = 0x200000;
 constexpr u32 kProgramSize = 0x10;
 constexpr u32 kToneSize = 0x20;
@@ -41,6 +42,10 @@ constexpr u32 kRootCounterTargetOffset = 8;
 [[nodiscard]] bool signature(ByteReader reader, u32 offset, char fourth) {
   return reader.has(offset, 4) && reader.u8At(offset) == 'K' && reader.u8At(offset + 1) == 'D' &&
          reader.u8At(offset + 2) == 'T' && reader.u8At(offset + 3) == static_cast<u8>(fourth);
+}
+
+[[nodiscard]] bool sequenceSignature(ByteReader reader, u32 offset) {
+  return signature(reader, offset, '1') || signature(reader, offset, '2') || signature(reader, offset, ' ');
 }
 
 [[nodiscard]] std::optional<u32> vlq(ByteReader reader, u32& offset, u32 end) {
@@ -141,9 +146,8 @@ constexpr u32 kRootCounterTargetOffset = 8;
     chained = event.chained;
     // Infinite loop ends often retain a structurally valid FF terminator after
     // their unreachable fallthrough path, so keep decoding to the track bound.
-    const bool terminal = event.kind == EventKind::End;
     track.events.push_back(event);
-    if (terminal) {
+    if (event.kind == EventKind::End) {
       // Declared track sizes include no reachable bytes after a terminal event.
       return offset == end ? std::optional{std::move(track)} : std::nullopt;
     }
@@ -159,17 +163,20 @@ std::optional<u16> findKonamiPs1RootCounterTarget(ByteReader reader) {
 }
 
 std::optional<SequenceLayout> readKonamiPs1SequenceLayout(ByteReader reader, u32 offset) {
-  if (!reader.has(offset, kHeaderSize) ||
-      (!signature(reader, offset, '1') && !signature(reader, offset, '2') && !signature(reader, offset, ' '))) {
+  if (!reader.has(offset, kKdtHeaderSize) || !sequenceSignature(reader, offset)) {
     return std::nullopt;
   }
-  const u8 version = reader.u8At(offset + 3) == '1' ? 1 : 2;
+  const bool packed = reader.u8At(offset + 3) == '1';
+  const u8 version = packed ? 1 : 2;
   const u32 length = reader.le32(offset + 4);
   const u32 ppqn = reader.le32(offset + 8);
   const u32 trackCount = reader.le32(offset + 12);
-  if (length < kHeaderSize || length > kMaximumSequenceSize || !reader.has(offset, length) || ppqn == 0 ||
-      ppqn > 9600 || trackCount == 0 || trackCount > kMaximumTracks || (version == 2 && trackCount > 32) ||
-      (version == 1 ? static_cast<u64>(kHeaderSize) + trackCount * 2 : 0x50ull) > length) {
+  if (length < kKdtHeaderSize || length > kMaximumSequenceSize || !reader.has(offset, length) || ppqn == 0 ||
+      ppqn > 9600 || trackCount == 0 || trackCount > kMaximumTracks || (!packed && trackCount > 32)) {
+    return std::nullopt;
+  }
+  const u32 headerSize = packed ? kKdtHeaderSize + trackCount * 2 : kFixedKdtHeaderSize;
+  if (headerSize > length) {
     return std::nullopt;
   }
 
@@ -183,11 +190,11 @@ std::optional<SequenceLayout> readKonamiPs1SequenceLayout(ByteReader reader, u32
   };
   // Fixed-table KDT uses 32 slots; KDT1 packs the table to its declared track
   // count. Suikoden II's driver explicitly selects between these layouts.
-  u32 trackOffset = offset + (version == 1 ? kHeaderSize + trackCount * 2 : 0x50);
+  u32 trackOffset = offset + headerSize;
   const u32 sequenceEnd = offset + length;
   layout.tracks.reserve(trackCount);
   for (u32 index = 0; index < trackCount; ++index) {
-    const u32 size = reader.le16(offset + kHeaderSize + index * 2);
+    const u32 size = reader.le16(offset + kKdtHeaderSize + index * 2);
     if (size == 0 || size > sequenceEnd - trackOffset) {
       return std::nullopt;
     }
@@ -198,19 +205,20 @@ std::optional<SequenceLayout> readKonamiPs1SequenceLayout(ByteReader reader, u32
     layout.tracks.push_back(std::move(*track));
     trackOffset += size;
   }
-  // The KDT1 size includes its header and track-size table. This exact check is
+  // The sequence size includes its header and track-size table. This exact check is
   // intentional: adding another 0x10 here was the legacy loading regression.
   if (trackOffset != sequenceEnd) {
     return std::nullopt;
   }
 
-  const u32 wrapperLength =
-      offset >= kHeaderSize && signature(reader, offset - kHeaderSize, '2') ? reader.le32(offset - kHeaderSize + 4) : 0;
+  const u32 wrapperLength = offset >= kKdtHeaderSize && signature(reader, offset - kKdtHeaderSize, '2')
+                                ? reader.le32(offset - kKdtHeaderSize + 4)
+                                : 0;
   if (wrapperLength >= length && wrapperLength - length <= 3 && (wrapperLength & 3) == 0 &&
       reader.has(offset, wrapperLength)) {
-    layout.containerOffset = offset - kHeaderSize;
-    layout.containerLength = wrapperLength + kHeaderSize;
-    layout.sequenceId = reader.le32(offset - kHeaderSize + 8);
+    layout.containerOffset = offset - kKdtHeaderSize;
+    layout.containerLength = wrapperLength + kKdtHeaderSize;
+    layout.sequenceId = reader.le32(offset - kKdtHeaderSize + 8);
     layout.hasKdt2Header = true;
   }
   return layout;
@@ -218,13 +226,13 @@ std::optional<SequenceLayout> readKonamiPs1SequenceLayout(ByteReader reader, u32
 
 std::vector<SequenceLayout> findKonamiPs1Sequences(ByteReader reader) {
   std::vector<SequenceLayout> layouts;
-  if (reader.size() < kHeaderSize) {
+  if (reader.size() < kKdtHeaderSize) {
     return layouts;
   }
-  const u64 last = reader.size() - kHeaderSize;
+  const u64 last = reader.size() - kKdtHeaderSize;
   for (u64 candidate = 0; candidate <= last && candidate <= std::numeric_limits<u32>::max(); ++candidate) {
     const u32 offset = static_cast<u32>(candidate);
-    if (!signature(reader, offset, '1') && !signature(reader, offset, '2') && !signature(reader, offset, ' ')) {
+    if (!sequenceSignature(reader, offset)) {
       continue;
     }
     if (auto layout = readKonamiPs1SequenceLayout(reader, offset)) {
@@ -243,6 +251,7 @@ std::vector<Tone> readKonamiPs1Tones(ByteReader reader) {
     const auto& layout = banks[bank];
     const u32 programs = layout.offset + 0x20;
     const u32 toneTable = programs + layout.programSlots * kProgramSize;
+    // Tone blocks are packed by non-empty program rather than indexed by program slot.
     u32 effectiveProgram = 0;
     for (u32 program = 0; program < layout.programSlots && effectiveProgram < layout.programCount; ++program) {
       const u32 programOffset = programs + program * kProgramSize;
@@ -250,7 +259,8 @@ std::vector<Tone> readKonamiPs1Tones(ByteReader reader) {
       if (count == 0) {
         continue;
       }
-      const u32 programTones = toneTable + effectiveProgram++ * kTonesPerProgram * kToneSize;
+      const u32 programTones = toneTable + effectiveProgram * kTonesPerProgram * kToneSize;
+      ++effectiveProgram;
       for (u32 index = 0; index < std::min<u32>(count, kTonesPerProgram); ++index) {
         const u32 toneOffset = programTones + index * kToneSize;
         const u8 low = reader.u8At(toneOffset + 6);

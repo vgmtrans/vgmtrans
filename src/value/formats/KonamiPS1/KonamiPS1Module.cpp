@@ -11,7 +11,6 @@
 #include <fmt/format.h>
 
 #include <string>
-#include <utility>
 
 namespace vgmtrans::formats::konami_ps1 {
 

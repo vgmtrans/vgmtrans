@@ -27,7 +27,7 @@ using namespace core;
 
 namespace {
 
-constexpr u32 kMaximumCommands = 1048576;
+constexpr u32 kMaximumCommands = 1'048'576;
 constexpr double kRootCounterClockHz = 33'868'800.0 / 8.0;
 constexpr double kByteAccumulatorRange = 256.0;
 constexpr double kVoiceUpdateDivider = 11.0;
@@ -36,13 +36,12 @@ constexpr PitchBendLayerId kChannelPitchLfoLayer{1};
 constexpr PitchBendLayerId kRandomPitchLayer{2};
 
 [[nodiscard]] double driverLevel(u8 value) {
-  return value == 127 ? 1.0 : std::min<u8>(value, 127) / 128.0;
+  return value == 127 ? 1.0 : value / 128.0;
 }
 
 struct DriverTiming {
-  explicit DriverTiming(const SequenceLayout& layout, u16 rootCounterTarget)
-      : ppqn(layout.ppqn), sequenceHz(kRootCounterClockHz / rootCounterTarget),
-        voiceHz(sequenceHz / kVoiceUpdateDivider) {}
+  explicit DriverTiming(u32 ppqn, u16 rootCounterTarget)
+      : ppqn(ppqn), sequenceHz(kRootCounterClockHz / rootCounterTarget), voiceHz(sequenceHz / kVoiceUpdateDivider) {}
 
   [[nodiscard]] u32 driverPpqn() const {
     switch (ppqn) {
@@ -199,7 +198,6 @@ struct Playback {
 
   [[nodiscard]] LfoPerformanceContext lfoContext(const LfoState& lfo) const {
     return LfoPerformanceContext{
-        .frequencyHz = lfo.rate * (programState.timing.voiceHz / kByteAccumulatorRange),
         .delayTicks = driverTicksToSequenceTicks(static_cast<u32>(lfo.delay) * 2),
         .delayMilliseconds = lfo.delay * (2000.0 / programState.timing.voiceHz),
         .shape = LfoShape{.waveform = LfoWaveform::Triangle},
@@ -211,6 +209,10 @@ struct Playback {
         .phaseRunsAtZeroDepth = false,
         .delayRunsWhileInactive = false,
     };
+  }
+
+  [[nodiscard]] double lfoFrequency(const LfoState& lfo) const {
+    return lfo.rate * (programState.timing.voiceHz / kByteAccumulatorRange);
   }
 
   [[nodiscard]] LfoPerformanceContext channelPitchContext() const {
@@ -276,7 +278,7 @@ struct Playback {
   void beginVibrato() {
     auto context = lfoContext(track.vibrato);
     const double depth = track.vibrato.depth / 64.0;
-    out.vibratoRate(*context.frequencyHz, context);
+    out.vibratoRate(lfoFrequency(track.vibrato), context);
     if (track.vibrato.ramp == 0 || depth == 0.0) {
       out.vibratoDepth(depth, std::move(context));
       return;
@@ -290,7 +292,7 @@ struct Playback {
   void beginTremolo() {
     auto context = lfoContext(track.tremolo);
     const double depth = track.tremolo.depth / 256.0;
-    out.tremoloRate(*context.frequencyHz, context);
+    out.tremoloRate(lfoFrequency(track.tremolo), context);
     if (track.tremolo.ramp == 0 || depth == 0.0) {
       out.tremoloLinearGainDepth(depth, std::move(context));
       return;
@@ -589,119 +591,55 @@ struct Playback {
 
 using Cursor = CompilerCursor<TrackState, Playback>;
 
-[[nodiscard]] bool controllerAffectsPlayback(u8 controller) {
+struct ControllerInfo {
+  std::string_view label;
+  bool affectsPlayback;
+};
+
+[[nodiscard]] ControllerInfo controllerInfo(u8 controller) {
   // CC4's raw-SPU pitch mode, CC12's post-mix squaring, CC15's phase inversion,
   // CC16's per-key pan, CC118's beat state, and CC126's voice allocator mode
   // have no lossless per-track performance representation. They remain named,
   // source-visible commands instead of being approximated as different effects.
+  // clang-format off
   switch (controller) {
-    case 0:
-    case 1:
-    case 2:
-    case 3:
-    case 5:
-    case 6:
-    case 7:
-    case 10:
-    case 11:
-    case 13:
-    case 14:
-    case 20:
-    case 21:
-    case 22:
-    case 23:
-    case 25:
-    case 26:
-    case 27:
-    case 28:
-    case 30:
-    case 64:
-    case 91:
-    case 98:
-    case 99:
-    case 119:
-    case 120:
-    case 121:
-    case 123:
-      return true;
-    default:
-      return false;
+    case 0: return {"Bank Select", true};
+    case 1: return {"Channel Pitch LFO Depth", true};
+    case 2: return {"Channel Pitch LFO Period", true};
+    case 3: return {"Channel Pitch LFO Mode", true};
+    case 4: return {"Pitch Calculation Mode", false};
+    case 5: return {"Portamento Time", true};
+    case 6: return {"NRPN Data Entry", true};
+    case 7: return {"Channel Volume", true};
+    case 10: return {"Channel Pan", true};
+    case 11: return {"Expression", true};
+    case 12: return {"Quadratic Volume Curve", false};
+    case 13: return {"Random Pitch Rate", true};
+    case 14: return {"Random Pitch Depth", true};
+    case 15: return {"Right Channel Phase Invert", false};
+    case 16: return {"Key Pan Scale", false};
+    case 20: return {"Vibrato Delay", true};
+    case 21: return {"Vibrato Rate", true};
+    case 22: return {"Vibrato Depth", true};
+    case 23: return {"Vibrato Depth Ramp", true};
+    case 25: return {"Tremolo Delay", true};
+    case 26: return {"Tremolo Rate", true};
+    case 27: return {"Tremolo Depth", true};
+    case 28: return {"Tremolo Depth Ramp", true};
+    case 30: return {"Sequence Volume", true};
+    case 64: return {"Sustain Pedal", true};
+    case 91: return {"Reverb Routing Override", true};
+    case 98: return {"NRPN Parameter", true};
+    case 99: return {"NRPN Tone / Loop", true};
+    case 118: return {"Sequence Beat", false};
+    case 119: return {"Restore Bank ADSR", true};
+    case 120: return {"All Sound Off", true};
+    case 121: return {"Reset Channel", true};
+    case 123: return {"All Notes Off", true};
+    case 126: return {"Mono Voice Mode", false};
+    default: return {"Control Change", false};
   }
-}
-
-[[nodiscard]] std::string_view controllerLabel(u8 controller) {
-  switch (controller) {
-    case 0:
-      return "Bank Select";
-    case 1:
-      return "Channel Pitch LFO Depth";
-    case 2:
-      return "Channel Pitch LFO Period";
-    case 3:
-      return "Channel Pitch LFO Mode";
-    case 4:
-      return "Pitch Calculation Mode";
-    case 5:
-      return "Portamento Time";
-    case 6:
-      return "NRPN Data Entry";
-    case 7:
-      return "Channel Volume";
-    case 10:
-      return "Channel Pan";
-    case 11:
-      return "Expression";
-    case 12:
-      return "Quadratic Volume Curve";
-    case 13:
-      return "Random Pitch Rate";
-    case 14:
-      return "Random Pitch Depth";
-    case 15:
-      return "Right Channel Phase Invert";
-    case 16:
-      return "Key Pan Scale";
-    case 20:
-      return "Vibrato Delay";
-    case 21:
-      return "Vibrato Rate";
-    case 22:
-      return "Vibrato Depth";
-    case 23:
-      return "Vibrato Depth Ramp";
-    case 25:
-      return "Tremolo Delay";
-    case 26:
-      return "Tremolo Rate";
-    case 27:
-      return "Tremolo Depth";
-    case 28:
-      return "Tremolo Depth Ramp";
-    case 30:
-      return "Sequence Volume";
-    case 64:
-      return "Sustain Pedal";
-    case 91:
-      return "Reverb Routing Override";
-    case 98:
-      return "NRPN Parameter";
-    case 99:
-      return "NRPN Tone / Loop";
-    case 118:
-      return "Sequence Beat";
-    case 119:
-      return "Restore Bank ADSR";
-    case 120:
-      return "All Sound Off";
-    case 121:
-      return "Reset Channel";
-    case 123:
-      return "All Notes Off";
-    case 126:
-      return "Mono Voice Mode";
-    default:
-      return "Control Change";
-  }
+  // clang-format on
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeEvent(ByteReader reader, u32 trackEnd, const EventLayout& source,
@@ -752,9 +690,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         label = "Loop Start";
         semantic = SequenceSemantic::Loop;
       } else {
-        label = controllerLabel(source.command);
-        playback = controllerAffectsPlayback(source.command) ? CommandPlaybackStatus::AffectsPlayback
-                                                             : CommandPlaybackStatus::SourceOnly;
+        const auto info = controllerInfo(source.command);
+        label = info.label;
+        playback = info.affectsPlayback ? CommandPlaybackStatus::AffectsPlayback : CommandPlaybackStatus::SourceOnly;
       }
       break;
   }
@@ -832,7 +770,7 @@ const SequenceProgramConfig& konamiPs1SequenceConfig() {
 SequenceProgram parseKonamiPs1Sequence(ByteReader reader, AssetId id, const SequenceLayout& layout,
                                        u16 rootCounterTarget, std::vector<Tone> tones, SourceMapBuilder* sourceMap,
                                        std::vector<Diagnostic>* diagnostics) {
-  const DriverTiming timing(layout, rootCounterTarget);
+  const DriverTiming timing(layout.ppqn, rootCounterTarget);
   SequenceProgram program = konamiPs1SequenceConfig().makeProgram();
   program.timebase.ppqn = layout.ppqn;
   program.behavior.initialTempoMicrosecondsPerQuarter = timing.tempoMicroseconds(kInitialTempoStep);
@@ -849,7 +787,7 @@ SequenceProgram parseKonamiPs1Sequence(ByteReader reader, AssetId id, const Sequ
           .fieldsAsChildren()
           .field("signature", reader.range(layout.containerOffset, 4), reader.le32(layout.containerOffset),
                  SourceValueDisplay::Hex)
-          .field("sequence_size", reader.range(layout.containerOffset + 4, 4), layout.length)
+          .field("sequence_size", reader.range(layout.containerOffset + 4, 4), layout.containerLength - 0x10)
           .field("sequence_id", reader.range(layout.containerOffset + 8, 4), layout.sequenceId);
     }
     const u32 headerSize = layout.version == 1 ? 0x10 + layout.tracks.size() * 2 : 0x50;
@@ -872,7 +810,7 @@ SequenceProgram parseKonamiPs1Sequence(ByteReader reader, AssetId id, const Sequ
 
   for (u32 index = 0; index < layout.tracks.size(); ++index) {
     const auto& sourceTrack = layout.tracks[index];
-    TrackDecodeScope tracks{
+    TrackDecodeScope trackScope{
         .reader = reader,
         .bytecodeEnd = sourceTrack.end,
         .maxCommands = kMaximumCommands,
@@ -884,7 +822,7 @@ SequenceProgram parseKonamiPs1Sequence(ByteReader reader, AssetId id, const Sequ
       const auto found = std::ranges::lower_bound(sourceTrack.events, offset, {}, &EventLayout::offset);
       return found != sourceTrack.events.end() && found->offset == offset ? &*found : nullptr;
     };
-    auto track = tracks.decode(index, sourceTrack.offset, [&](u32 offset) -> DecodedBytecodeCommand {
+    auto track = trackScope.decode(index, sourceTrack.offset, [&](u32 offset) -> DecodedBytecodeCommand {
       const auto* event = eventAt(offset);
       if (event == nullptr) {
         Cursor cursor(reader, offset, sourceTrack.end, kKonamiPs1CommandKindPrefix, diagnostics);
