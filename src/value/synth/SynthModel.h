@@ -129,6 +129,7 @@ enum class AudioCodec {
   PcmS8,
   PcmS16,
   SnesBrr,
+  SnesDspNoise,
   NdsImaAdpcm,
   NdsPsg,
   GbaBdpcm,

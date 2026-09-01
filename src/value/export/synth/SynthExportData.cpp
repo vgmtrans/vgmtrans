@@ -135,8 +135,6 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
     if (view.pool == nullptr) {
       continue;
     }
-    const SampleFilter selectedFilter = resolveSampleFilter(filtering, view.pool->preferredFilter);
-
     for (u32 sampleIndex = 0; sampleIndex < view.pool->samples.size(); ++sampleIndex) {
       if (sampleFilter != nullptr && std::ranges::none_of(*sampleFilter, [&](const SynthSampleIndexKey& key) {
             return key.owner == view.owner.value && key.index == sampleIndex;
@@ -144,6 +142,11 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
         continue;
       }
       const auto& sample = view.pool->samples[sampleIndex];
+      // S-DSP noise bypasses the BRR/Gaussian sample path, so no sample-response
+      // filter applies to it—even when one is requested.
+      const SampleFilter selectedFilter = sample.codec == AudioCodec::SnesDspNoise
+                                              ? SampleFilter::None
+                                              : resolveSampleFilter(filtering, view.pool->preferredFilter);
       if (!sources.contains(sample.encodedData.source)) {
         diagnostics.push_back(exportError("Sample source was not found", validDiagnosticRange(sample.encodedData)));
         continue;

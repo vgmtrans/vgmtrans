@@ -26,7 +26,6 @@ using namespace core;
 namespace {
 
 constexpr std::string_view kFormatId = "namco-snes";
-constexpr u8 kRest = 0x54;
 constexpr PitchBendLayerId kPitchTableBendLayer{1};
 namespace math {
 
@@ -256,7 +255,8 @@ struct Playback {
         out.instrument(127, 0, InstrumentEnvelopeMode::PreserveDynamicOverride);
         break;
       case VoiceSource::Noise:
-        out.instrument(0, 126, InstrumentEnvelopeMode::PreserveDynamicOverride);
+        out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = kNoiseInstrumentKey},
+                       InstrumentEnvelopeMode::PreserveDynamicOverride);
         break;
     }
   }
@@ -453,13 +453,22 @@ struct Playback {
     }
   }
 
-  void startNote(u8 sourceNote, std::optional<PercussionTrigger> percussion = {}) {
-    if (percussion) {
-      track.liveControls[kSrcn] = percussion->srcn;
-      track.liveControls[kEnvelope] = percussion->envelope;
-      track.liveControls[kVolume] = percussion->volume;
-      track.liveControls[kBalance] = percussion->balance;
+  void latchPercussion(const PercussionTrigger& percussion) {
+    track.liveControls[kSrcn] = percussion.srcn;
+    track.liveControls[kEnvelope] = percussion.envelope;
+    track.liveControls[kVolume] = percussion.volume;
+    track.liveControls[kBalance] = percussion.balance;
+  }
+
+  void rest() {
+    emitMix();
+    if (track.driverPitch) {
+      advancePitchModulation();
     }
+    endNote(vm.tick());
+  }
+
+  void startNote(u8 sourceNote, std::optional<PercussionTrigger> percussion = {}) {
     const u8 srcn = track.liveControls[kSrcn];
     const s8 transpose = static_cast<s8>(track.liveControls[kTranspose]);
     const u8 coarse = static_cast<u8>(sourceNote + transpose);
@@ -499,11 +508,12 @@ struct Playback {
     }
   }
 
-  void startNoise(u8 raw) {
+  void startNoise(u8 raw, std::optional<PercussionTrigger> percussion = {}) {
     const PerformanceNoteId previous = track.activeNote;
     const bool continues = track.slur && previous.valid();
     if (!track.slur) {
-      beginAttack(VoiceInstrument{.source = VoiceSource::Noise});
+      beginAttack(percussion ? VoiceInstrument{.source = VoiceSource::Percussion}
+                             : VoiceInstrument{.source = VoiceSource::Noise});
     }
     emitMix();
     if (track.slur && !previous.valid()) {
@@ -512,7 +522,7 @@ struct Playback {
       return;
     }
     out.tuning(0.0);
-    const double key = std::min<int>(35 + (raw & 0x1f), 127);
+    const double key = percussion ? percussion->key : std::min<int>(35 + (raw & 0x1f), 127);
     NotePerformanceEvent event{.key = key,
                                .linearVelocity = 1.0,
                                .durationTicks = std::numeric_limits<u32>::max(),
@@ -532,11 +542,7 @@ struct Playback {
     track.liveControls = track.commandControls;
     track.gateTicks = 0;
     if (raw == kRest) {
-      emitMix();
-      if (track.driverPitch) {
-        advancePitchModulation();
-      }
-      endNote(vm.tick());
+      rest();
       return;
     }
     if (raw < kRest) {
@@ -553,15 +559,20 @@ struct Playback {
     if (!reader().has(row, 5)) {
       return;
     }
+    const PercussionTrigger percussion{.key = index,
+                                       .srcn = reader().u8At(row),
+                                       .envelope = reader().u8At(row + 1),
+                                       .volume = reader().u8At(row + 2),
+                                       .balance = reader().u8At(row + 3)};
     const u8 note = reader().u8At(row + 4);
-    if (note >= kRest) {
-      return;
+    latchPercussion(percussion);
+    if (note < kRest) {
+      startNote(note, percussion);
+    } else if (note == kRest) {
+      rest();
+    } else if (note < 0x80) {
+      startNoise(note, percussion);
     }
-    startNote(note, PercussionTrigger{.key = index,
-                                      .srcn = reader().u8At(row),
-                                      .envelope = reader().u8At(row + 1),
-                                      .volume = reader().u8At(row + 2),
-                                      .balance = reader().u8At(row + 3)});
   }
 
   [[nodiscard]] Effects note(MaskedValues notes) {
@@ -681,9 +692,15 @@ template <class Event>
   return result;
 }
 
+struct SequenceReferences {
+  std::set<u8> srcns{0};
+  std::set<u8> percussion;
+  std::set<u8> noiseRates;
+};
+
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin,
-                                                   std::vector<Diagnostic>* diagnostics, std::set<u8>* srcns,
-                                                   std::set<u8>* percussion) {
+                                                   std::vector<Diagnostic>* diagnostics,
+                                                   SequenceReferences& references) {
   Cursor cursor(reader, begin, kFormatId, diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
@@ -741,11 +758,15 @@ template <class Event>
     case 0x09: {
       auto event = cursor.command("Notes", SequenceSemantic::Note);
       const MaskedValues notes = maskedValues(event, "note", SemanticOperandRole::NoteKey, SourceValueDisplay::Hex);
-      if (percussion != nullptr) {
-        for (u32 voice = 0; voice < kTrackCount; ++voice) {
-          if ((notes.mask & math::voiceBit(voice)) != 0 && notes.values[voice] >= 0x80) {
-            percussion->insert(notes.values[voice] & 0x7f);
-          }
+      for (u32 voice = 0; voice < kTrackCount; ++voice) {
+        if ((notes.mask & math::voiceBit(voice)) == 0) {
+          continue;
+        }
+        const u8 note = notes.values[voice];
+        if (note >= 0x80) {
+          references.percussion.insert(note & 0x7f);
+        } else if (note > kRest) {
+          references.noiseRates.insert(note & 0x1f);
         }
       }
       return event.invoke<&Playback::note>(notes);
@@ -794,10 +815,10 @@ template <class Event>
     const ParameterCommand& command = kParameterCommands[index];
     auto event = cursor.command(command.name, command.semantic);
     const MaskedValues values = maskedValues(event, "value", command.role);
-    if (index == kSrcn && srcns != nullptr) {
+    if (index == kSrcn) {
       for (u32 voice = 0; voice < kTrackCount; ++voice) {
         if ((values.mask & math::voiceBit(voice)) != 0) {
-          srcns->insert(values.values[voice]);
+          references.srcns.insert(values.values[voice]);
         }
       }
     }
@@ -831,13 +852,12 @@ SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetI
                              SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const ByteReader reader = source.reader();
   const SourceRange header = reader.range(layout.sequenceReferenceAddress, layout.sequenceReferenceSize);
-  std::set<u8> srcns{0};
-  std::set<u8> percussion;
+  SequenceReferences references;
   SequenceDecodeSession sequence{reader, sequenceConfig(), sequenceId, header, sourceMap, kCommandLimit, kAramSize};
   const u32 pointer = layout.sequenceReferenceAddress + layout.sequenceReferenceSize - 2u;
   sequence.addTrack(
       0, reader.range(pointer, 2), layout.sequenceAddress,
-      [&](u32 offset) { return decodeCommand(reader, offset, diagnostics, &srcns, &percussion); },
+      [&](u32 offset) { return decodeCommand(reader, offset, diagnostics, references); },
       layout.sequenceAddress);
   SequenceProgram program =
       sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(DriverData{std::move(source), layout}));
@@ -849,8 +869,9 @@ SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetI
   }
   return SequenceParse{
       .program = std::move(program),
-      .srcns = std::move(srcns),
-      .percussion = std::move(percussion),
+      .srcns = std::move(references.srcns),
+      .percussion = std::move(references.percussion),
+      .noiseRates = std::move(references.noiseRates),
       .headerRange = header,
   };
 }

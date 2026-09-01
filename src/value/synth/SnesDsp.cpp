@@ -18,7 +18,7 @@ namespace vgmtrans::core {
 
 namespace {
 
-constexpr double kSampleRate = 32000.0;
+constexpr double kSampleRate = kSnesDspSampleRate;
 constexpr std::array<unsigned, 32> kCounterRates{
     0x7800, 2048, 1536, 1280, 1024, 768, 640, 512, 384, 320, 256, 192, 160, 128, 96, 80,
     64,     48,   40,   32,   24,   20,  16,  12,  10,  8,   6,   5,   4,   3,   2,  1};
@@ -296,6 +296,11 @@ s16 snesDspGainEnvelopeValue(u8 gain, s16 envelopeFrom, double elapsedSeconds) {
     }
   }
   return envelope;
+}
+
+u32 snesDspNoisePeriodSamples(u8 rate) {
+  rate &= 0x1f;
+  return rate == 0 ? 0 : kCounterRates[rate];
 }
 
 }  // namespace vgmtrans::core

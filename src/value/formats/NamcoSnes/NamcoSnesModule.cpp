@@ -29,7 +29,7 @@ namespace {
       .program(std::move(parsed.program));
 
   auto collection = result.sourceCollection(name).sequence(sequence);
-  if (const auto synth = addSynth(result, *layout, parsed.srcns, parsed.percussion, name)) {
+  if (const auto synth = addSynth(result, *layout, parsed.srcns, parsed.percussion, parsed.noiseRates, name)) {
     collection.soundBank(*synth);
   } else {
     result.warning("NamcoSnes sequence found, but no valid instruments or samples were discovered",
