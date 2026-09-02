@@ -31,6 +31,7 @@ enum class NinSnesProfileId {
   QuintetIog,
   QuintetTs,
   FalcomYs4,
+  AirManagement,
 };
 
 enum class NinSnesBaseProfileId {

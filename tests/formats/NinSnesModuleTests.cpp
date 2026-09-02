@@ -29,7 +29,7 @@ constexpr std::array kProfileIds{
     ProfileId::Earlier,   ProfileId::Standard,  ProfileId::Rd1,         ProfileId::Rd2,          ProfileId::Hal,
     ProfileId::Konami,    ProfileId::Lemmings,  ProfileId::IntelliFe3,  ProfileId::IntelliTa,    ProfileId::IntelliFe4,
     ProfileId::Human,     ProfileId::Tose,      ProfileId::QuintetActR, ProfileId::QuintetActR2, ProfileId::QuintetIog,
-    ProfileId::QuintetTs, ProfileId::FalcomYs4,
+    ProfileId::QuintetTs, ProfileId::FalcomYs4, ProfileId::AirManagement,
 };
 
 void expect(bool condition, const std::string& message) {
@@ -183,6 +183,8 @@ void ninSnesProfilesDescribeEverySupportedDriverFamily() {
          "the four Quintet profiles should retain their two program-resolution models");
   expect(profile(ProfileId::FalcomYs4).addresses == AddressModel::FalcomBaseOffset,
          "Ys IV should select relocated Falcom addresses");
+  expect(profile(ProfileId::AirManagement).trackCount == 6,
+         "Air Management should reserve the final two SPC voices for its separate SFX sequencer");
 
   expect(Layout{.profile = ProfileId::Konami, .konamiBaseAddress = 0x3000}.resolveAddress(0x20) == 0x3020,
          "Konami profile addresses should be relative to the detected driver base");
@@ -293,6 +295,83 @@ void ninSnesScannerFindsRequestedSongAcrossSparseTable() {
   expect(
       isValidPlaylist(ByteReader(SourceId{7}, bytes), Layout{.profile = ProfileId::Earlier, .playlistAddress = 0x2100}),
       "an infinite repeat should not make adjacent data part of the playlist");
+}
+
+void ninSnesAirManagementUsesSixBgmTracksAndPendingRequest() {
+  std::vector<u8> bytes(kAramSize);
+
+  std::ranges::copy(
+      std::initializer_list<u8>{0x8d, 0x00, 0xf7, 0x1d, 0x3a, 0x1d, 0x2d, 0xf7, 0x1d,
+                                0x3a, 0x1d, 0x2f, 0x0b, 0x8d, 0x00, 0xf7, 0x1b, 0x3a,
+                                0x1b, 0x2d, 0xf7, 0x1b, 0x3a, 0x1b, 0xfd, 0xae, 0x6f},
+      bytes.begin() + 0x500);
+  std::ranges::copy(std::initializer_list<u8>{0xf5, 0x01, 0x20, 0xfd, 0xf5, 0x00, 0x20, 0xda, 0x1d},
+                    bytes.begin() + 0x520);
+  std::ranges::copy(std::initializer_list<u8>{0xf5, 0x01, 0x40, 0xfd, 0xf5, 0x00, 0x40, 0xda, 0x1b},
+                    bytes.begin() + 0x530);
+  std::ranges::copy(std::initializer_list<u8>{0x68, 0xe0, 0x90, 0x05, 0x3f, 0x00, 0x00, 0x2f, 0x00},
+                    bytes.begin() + 0x540);
+  std::ranges::copy(
+      std::initializer_list<u8>{0x1c, 0xfd, 0xf6, 0x41, 0x2f, 0x2d, 0xf6, 0x40,
+                                0x2f, 0x2d, 0xdd, 0x5c, 0xfd, 0xf6, 0xd6, 0x2f},
+      bytes.begin() + 0x560);
+  std::ranges::copy(
+      std::initializer_list<u8>{0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02,
+                                0x01, 0x01, 0x03, 0x00, 0x01, 0x02, 0x03, 0x01, 0x03,
+                                0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01},
+      bytes.begin() + 0x3036);
+  std::ranges::copy(
+      std::initializer_list<u8>{0xda, 0x14, 0x8d, 0x0b, 0x8f, 0x20, 0x47, 0x8f, 0x00,
+                                0x20, 0xf7, 0x14, 0xd6, 0x32, 0x00, 0xd0, 0x06, 0xe4,
+                                0x47, 0x04, 0x20, 0xc4, 0x20, 0xdc, 0xf7, 0x14, 0xd6,
+                                0x32, 0x00, 0xdc, 0x4b, 0x47, 0xd0, 0xe8},
+      bytes.begin() + 0x600);
+
+  writeLe16(bytes, 0x1d, 0xffff);
+  // The input port is the newest request; its $00 mirror can still contain the
+  // preceding song for one driver tick.
+  bytes[0] = 1;
+  bytes[0xf4] = 2;
+  writeLe16(bytes, 0x2000, 0xffff);
+  writeLe16(bytes, 0x2002, 0x2200);
+  writeLe16(bytes, 0x2004, 0x2300);
+  writeLe16(bytes, 0x2200, 0x2400);
+  writeLe16(bytes, 0x2202, 0);
+  writeSection(bytes, 0x2400, {{0, 0x2500}});
+  bytes[0x2500] = 0;
+  writeLe16(bytes, 0x2300, 0x2600);
+  writeLe16(bytes, 0x2302, 0);
+  writeSection(bytes, 0x2600, {{0, 0x260c}});
+  // This begins immediately after the six-pointer header. An eight-track
+  // parser mistakes the note bytes for a seventh pointer to $8018.
+  bytes[0x260c] = 0x18;
+  bytes[0x260d] = 0x80;
+  bytes[0x260e] = 0;
+
+  const ByteReader reader(SourceId{8}, bytes);
+  const auto layout = findLayout(reader);
+  expect(layout && layout->profile == ProfileId::AirManagement && layout->songIndex == 2 &&
+             layout->songListAddress == 0x2000 && layout->sectionPointerAddress == 0x1d &&
+             layout->playlistAddress == 0x2300,
+         "Air Management should select the pending BGM port request even before its mirror or playlist cursor updates");
+
+  const SequenceParse parsed = decodeSequence(reader, *layout, AssetId{1});
+  const auto play = std::ranges::find_if(parsed.program.sectionPlaylist->commands, [](const PlaylistCommand& command) {
+    return command.kind == PlaylistCommandKind::PlaySection;
+  });
+  expect(parsed.program.tracks.size() == 6 && play != parsed.program.sectionPlaylist->commands.end() &&
+             play->trackStarts.size() == 6,
+         "Air Management sections should expose only the six BGM tracks");
+
+  // A port-only request also identifies the correct song in stopped captures.
+  bytes[0] = 0;
+  const auto portOnlyLayout = findLayout(ByteReader(SourceId{8}, bytes));
+  expect(portOnlyLayout && portOnlyLayout->songIndex == 2,
+         "Air Management should retain a BGM identity from the input port after its mirror is cleared");
+
+  bytes[0xf4] = 0;
+  expect(!findLayout(ByteReader(SourceId{8}, bytes)),
+         "an Air Management driver with no request should not fall back to an unrelated resident song");
 }
 
 void ninSnesProfilesShareSquaredLevelCurve() {

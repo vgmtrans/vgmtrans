@@ -8,7 +8,6 @@
 #include "spdlog/fmt/fmt.h"
 
 namespace {
-constexpr size_t MAX_TRACKS = kNinSnesTrackCount;
 constexpr u8 SEQ_KEYOFS = 24;
 }  // namespace
 
@@ -608,7 +607,8 @@ bool NinSnesTrack::handleControllerEvent(NinSnesSeqEventType eventType, u32 begi
       const u8 spcEVOL_R = readByte(curOffset++);
 
       desc = "Channels: ";
-      for (int channelNo = MAX_TRACKS - 1; channelNo >= 0; channelNo--) {
+      for (int channelNo = static_cast<int>(parentSeq.trackCount()) - 1; channelNo >= 0;
+           channelNo--) {
         if ((spcEON & (1 << channelNo)) != 0) {
           fmt::format_to(std::back_inserter(desc), "{}", channelNo);
           parentSeq.track(channelNo)->addReverbNoItem(40);

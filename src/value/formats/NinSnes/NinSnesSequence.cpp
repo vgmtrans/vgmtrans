@@ -1992,6 +1992,7 @@ struct PlaylistDecode {
 [[nodiscard]] PlaylistDecode decodePlaylist(ByteReader reader, const Layout& layout, AssetId sequenceId,
                                             SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const Profile& selected = profile(layout.profile);
+  const u8 trackCount = selected.trackCount;
   std::map<u32, PlaylistCommand> commands;
   using SectionTracks = std::vector<std::optional<Address>>;
   std::map<u32, SectionTracks> sections;
@@ -2012,14 +2013,14 @@ struct PlaylistDecode {
     }
   };
   const auto decodeSection = [&](u16 address) -> std::optional<SectionTracks> {
-    if (!reader.has(address, kTrackCount * 2)) {
-      warn(fmt::format("NinSnes section ${:04X} did not contain eight track pointers", address),
+    if (!reader.has(address, trackCount * 2)) {
+      warn(fmt::format("NinSnes section ${:04X} did not contain {} track pointers", address, trackCount),
            reader.range(address, reader.has(address, 1) ? 1 : 0));
       return std::nullopt;
     }
-    SectionTracks trackStarts(kTrackCount);
+    SectionTracks trackStarts(trackCount);
     bool active = false;
-    for (u8 track = 0; track < kTrackCount; ++track) {
+    for (u8 track = 0; track < trackCount; ++track) {
       const u16 raw = reader.le16(address + track * 2);
       if ((raw & 0xff00) == 0) {
         continue;
@@ -2125,7 +2126,7 @@ struct PlaylistDecode {
                                  SourceValueDisplay::Hex);
     if (play) {
       annotation.derived("section", command.target.value, SourceValueDisplay::Address)
-          .link(SourceLinkRole::PointsTo, SourceTarget{reader.range(command.target.value, kTrackCount * 2)});
+          .link(SourceLinkRole::PointsTo, SourceTarget{reader.range(command.target.value, trackCount * 2)});
     } else if (repeat) {
       annotation
           .field("destination", reader.range(command.range.offset + 2, 2), command.target.value,
@@ -2138,7 +2139,7 @@ struct PlaylistDecode {
   }
 
   for (const auto& [address, trackStarts] : sections) {
-    auto annotation = sourceMap->header("Section", reader.range(address, kTrackCount * 2))
+    auto annotation = sourceMap->header("Section", reader.range(address, trackCount * 2))
                           .kind("nin-snes-section")
                           .parent(*decoded.annotation)
                           .owner(ObjectRefs::sequence(sequenceId));
@@ -2214,6 +2215,7 @@ const SequenceProgramConfig& sequenceConfig() {
 }
 
 bool isValidPlaylist(ByteReader reader, const Layout& layout) {
+  const u8 trackCount = profile(layout.profile).trackCount;
   const SectionPlaylist& playlist = decodePlaylist(reader, layout, AssetId{}, nullptr, nullptr).playlist;
   if (playlist.commands.empty() ||
       std::ranges::none_of(playlist.commands, [](const PlaylistCommand& command) {
@@ -2232,7 +2234,7 @@ bool isValidPlaylist(ByteReader reader, const Layout& layout) {
 
   for (const PlaylistCommand& command : playlist.commands) {
     if (command.kind == PlaylistCommandKind::PlaySection) {
-      if (command.trackStarts.size() != kTrackCount || !commandAddresses.contains(command.fallthrough.value)) {
+      if (command.trackStarts.size() != trackCount || !commandAddresses.contains(command.fallthrough.value)) {
         return false;
       }
     } else if (command.kind == PlaylistCommandKind::Repeat) {
@@ -2274,8 +2276,8 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
       .diagnostics = diagnostics,
   };
 
-  program.tracks.reserve(kTrackCount);
-  for (u8 track = 0; track < kTrackCount; ++track) {
+  program.tracks.reserve(selected.trackCount);
+  for (u8 track = 0; track < selected.trackCount; ++track) {
     std::vector<Address> starts;
     for (const PlaylistCommand& command : program.sectionPlaylist->commands) {
       if (command.kind == PlaylistCommandKind::PlaySection && track < command.trackStarts.size() &&

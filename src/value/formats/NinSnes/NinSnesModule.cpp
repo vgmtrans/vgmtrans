@@ -18,13 +18,14 @@ using namespace core;
 namespace {
 
 [[nodiscard]] SourceRange sequenceRange(ByteReader reader, const Layout& layout, const SequenceProgram& program) {
+  const u8 trackCount = profile(layout.profile).trackCount;
   u64 first = layout.playlistAddress;
   u64 last = first + 2;
   if (program.sectionPlaylist) {
     for (const PlaylistCommand& command : program.sectionPlaylist->commands) {
       if (command.kind == PlaylistCommandKind::PlaySection && !command.trackStarts.empty()) {
         first = std::min(first, command.target.value);
-        last = std::max(last, command.target.value + kTrackCount * 2);
+        last = std::max(last, command.target.value + trackCount * 2);
       }
       if (!command.range.valid()) {
         continue;

@@ -34,9 +34,11 @@ private:
   static BytePattern ptnJumpToVcmdSMW;
   static BytePattern ptnReadVcmdLengthSMW;
   static BytePattern ptnDispatchNoteYI;
+  static BytePattern ptnReadBgmAndSfxSectionPointersAirManagement;
   static BytePattern ptnIncSectionPtr;
   static BytePattern ptnLoadInstrTableAddress;
   static BytePattern ptnLoadInstrTableAddressSMW;
+  static BytePattern ptnLoadBgmTrackPointersAirManagement;
   static BytePattern ptnSetDIR;
   static BytePattern ptnSetDIRYI;
   static BytePattern ptnSetDIRVS;
