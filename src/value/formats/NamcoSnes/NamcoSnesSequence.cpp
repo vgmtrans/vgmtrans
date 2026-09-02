@@ -799,7 +799,7 @@ struct SequenceReferences {
       break;
   }
 
-  if (opcode >= 0x20 && opcode - 0x20 < kParameterCommands.size()) {
+  if (opcode >= 0x20 && static_cast<std::size_t>(opcode - 0x20) < kParameterCommands.size()) {
     const u8 index = opcode - 0x20;
     const ParameterCommand& command = kParameterCommands[index];
     auto event = cursor.command(command.name, command.semantic);
