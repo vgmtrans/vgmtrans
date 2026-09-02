@@ -72,7 +72,6 @@ struct Drum {
   u8 volume;
   u8 balance;
   u8 sourceKey;
-  SourceRange source;
 
   [[nodiscard]] bool noise() const { return sourceKey > kRest && sourceKey < 0x80; }
   [[nodiscard]] u8 noiseRate() const { return sourceKey & 0x1f; }
@@ -98,7 +97,6 @@ struct Drum {
         .volume = reader.u8At(row + 2),
         .balance = reader.u8At(row + 3),
         .sourceKey = sourceKey,
-        .source = reader.range(row, 5),
     });
   }
   return drums;
@@ -202,6 +200,48 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
 
   auto bank = builder.soundBank(fmt::format("{} Instruments", displayName));
   auto& instruments = bank.instruments();
+  // One four-byte DSP directory entry precedes each two-byte tuning entry.
+  const u32 tuningCount = (layout.tuningTableAddress - layout.spcDirAddress) / 4u;
+  const SourceAnnotationId tuningTable =
+      instruments
+          .source(SourceRole::Table, "Tuning Table",
+                  reader.range(layout.tuningTableAddress, tuningCount * 2u), "namco-snes-tuning-table")
+          .id();
+  for (u32 srcn = 0; srcn < tuningCount; ++srcn) {
+    const u32 address = layout.tuningTableAddress + srcn * 2u;
+    const bool used = std::ranges::binary_search(referenced, static_cast<u8>(srcn));
+    instruments
+        .source(SourceRole::TableEntry, fmt::format("Tuning {}{}", srcn, used ? "" : " (unused)"),
+                reader.range(address, 2), "namco-snes-tuning")
+        .parent(tuningTable)
+        .field("pitch_scale", reader.range(address, 2), reader.be16(address), SourceValueDisplay::Hex)
+        .description("Big-endian 8.8 pitch scale for the corresponding SRCN");
+  }
+  const u16 percussionAddress = layout.percussionTable(reader);
+  const u16 percussionEnd = layout.echoFilterTable(reader);
+  const u32 percussionCount = (percussionEnd - percussionAddress) / 5u;
+  const SourceAnnotationId percussionTable =
+      instruments
+          .source(SourceRole::Table, "Percussion Table",
+                  reader.range(percussionAddress, percussionEnd - percussionAddress), "namco-snes-percussion-table")
+          .description("Each row maps its percussion key to a sample, envelope, mix, and source key; "
+                       "$55-$7F source keys select DSP noise")
+          .id();
+  for (u32 index = 0; index < percussionCount; ++index) {
+    const u32 address = percussionAddress + index * 5u;
+    const auto byte = [&](u32 offset) { return reader.range(address + offset, 1); };
+    instruments
+        .source(SourceRole::TableEntry,
+                fmt::format("Percussion {}{}", index, percussion.contains(index) ? "" : " (unused)"),
+                reader.range(address, 5), "namco-snes-percussion")
+        .parent(percussionTable)
+        .fieldsAsChildren()
+        .field("sample_srcn", byte(0), reader.u8At(address))
+        .field("envelope_preset", byte(1), reader.u8At(address + 1))
+        .field("volume", byte(2), reader.u8At(address + 2), SourceValueDisplay::Hex)
+        .field("stereo_balance", byte(3), reader.u8At(address + 3), SourceValueDisplay::Hex)
+        .field("source_key", byte(4), reader.u8At(address + 4), SourceValueDisplay::Hex);
+  }
   const SnesBrrSampleRefs samples = addSnesBrrSamples(bank.localSamples(), reader, catalog);
   const Envelope neutral = snesDspEnvelope(0, 0, 0x7f);
 
@@ -230,21 +270,14 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     if (!sample || !scale) {
       continue;
     }
-    const u32 address = layout.tuningTableAddress + srcn * 2u;
     auto instrument = instruments.append(Instrument{
         .explicitAddress = InstrumentAddress{.bank = static_cast<u32>(srcn >> 7),
                                              .program = static_cast<u32>(srcn & 0x7f)},
         .identity = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = srcn},
         .name = fmt::format("Instrument {}", static_cast<unsigned>(srcn)),
-        .range = reader.range(address, 2),
     });
-    instrument
-        .region(*sample,
-                Region{.range = reader.range(address, 2),
-                       .unityKey = unityKey(layout.version, *scale),
-                       .envelope = neutral})
-        .source("Region", reader.range(address, 2), "namco-snes-region")
-        .description(fmt::format("SRCN {}, scale ${:04X}", srcn, *scale));
+    instrument.region(*sample, Region{.unityKey = unityKey(layout.version, *scale),
+                                      .envelope = neutral});
   }
 
   if (!noiseRates.empty()) {
@@ -270,12 +303,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
       if (drum.noise()) {
         kit.region(noiseSamples[drum.noiseRate()],
                    Region{.keyRange = KeyRange{.low = drum.index, .high = drum.index},
-                          .range = drum.source,
                           .unityKey = static_cast<double>(drum.index),
-                          .envelope = neutral})
-            .source(fmt::format("Percussion {}", drum.index), drum.source, "namco-snes-percussion")
-            .description(fmt::format("DSP noise rate {}, envelope {}, volume ${:02X}, balance ${:02X}",
-                                     drum.noiseRate(), drum.envelope, drum.volume, drum.balance));
+                          .envelope = neutral});
         continue;
       }
       const auto sample = samples.findSrcn(drum.srcn);
@@ -285,14 +314,10 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
       }
       Region region{
           .keyRange = KeyRange{.low = drum.index, .high = drum.index},
-          .range = drum.source,
           .unityKey = unityKey(layout.version, *scale) + drum.index - drum.sourceKey,
           .envelope = neutral,
       };
-      kit.region(*sample, std::move(region))
-          .source(fmt::format("Percussion {}", drum.index), drum.source, "namco-snes-percussion")
-          .description(fmt::format("SRCN {}, envelope {}, volume ${:02X}, balance ${:02X}, source key {}", drum.srcn,
-                                   drum.envelope, drum.volume, drum.balance, drum.sourceKey));
+      kit.region(*sample, std::move(region));
     }
   }
   return bank;

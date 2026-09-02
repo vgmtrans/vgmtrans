@@ -266,6 +266,9 @@ VGMFileTreeView::VGMFileTreeView(std::shared_ptr<const vgmtrans::core::SourceIns
         span.size = end - begin;
       }
     }
+    if (!span.valid()) {
+      return;
+    }
 
     const auto sourceItemForObject = [&](u32 index) {
       const auto range = rangeOf(objects[index]);
