@@ -18,7 +18,7 @@ constexpr Profile kUnknown{
     .programs = ProgramResolver::Direct,
 };
 
-constexpr std::array<Profile, 17> kProfiles{{
+constexpr std::array<Profile, 18> kProfiles{{
     {.id = ProfileId::Earlier,
      .name = "Earlier",
      .base = BaseProfile::Earlier,
@@ -64,6 +64,7 @@ constexpr std::array<Profile, 17> kProfiles{{
     {.id = ProfileId::QuintetIog, .name = "Quintet Illusion of Gaia", .programs = ProgramResolver::QuintetLookup},
     {.id = ProfileId::QuintetTs, .name = "Quintet Terranigma", .programs = ProgramResolver::QuintetLookup},
     {.id = ProfileId::FalcomYs4, .name = "Falcom Ys IV", .addresses = AddressModel::FalcomBaseOffset},
+    {.id = ProfileId::Koei, .name = "Koei", .sectionTrackCount = 6},
 }};
 
 }  // namespace

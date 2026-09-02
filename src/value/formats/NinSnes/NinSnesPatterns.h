@@ -54,6 +54,7 @@ struct Patterns {
   static Pattern ptnKonamiPercussionDispatch;
   static Pattern ptnKonamiTimer0Direct;
   static Pattern ptnKonamiTimer0Absolute;
+  static Pattern ptnKoeiSectionPointers;
   static Pattern ptnReadSongRequestPort;
   static Pattern ptnFixedPercussionBaseDispatch;
   static Pattern ptnFixedPercussionBaseLoader;

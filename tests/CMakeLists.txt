@@ -20,7 +20,6 @@ target_sources(vgmtrans-value-core-tests
     formats/NamcoSnesModuleTests.cpp
     formats/NeverlandSnesModuleTests.cpp
     formats/NinSnesModuleTests.cpp
-    formats/NinSnesKoeiTests.cpp
     formats/HOSAModuleTests.cpp
     formats/PandoraBoxSnesModuleTests.cpp
     formats/PrismSnesModuleTests.cpp

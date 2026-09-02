@@ -56,6 +56,7 @@ enum class ProfileId : u8 {
   QuintetIog,
   QuintetTs,
   FalcomYs4,
+  Koei,
 };
 
 enum class BaseProfile : u8 {
@@ -135,6 +136,7 @@ struct Profile {
   InstrumentLayout instruments = InstrumentLayout::Standard6Byte;
   InstrumentTableAddressModel instrumentTable = InstrumentTableAddressModel::Standard;
   IntelliMode intelli = IntelliMode::None;
+  u8 sectionTrackCount = kTrackCount;
   // Applied by the tempo command before it stores the driver's tempo value.
   u8 tempoCommandMultiplier = 1;
 };
@@ -152,8 +154,6 @@ struct Layout {
   u32 songListAddress = 0;
   u32 playlistAddress = 0;
   u8 sectionPointerAddress = 0;
-  // Number of track pointers stored in each section header.
-  u8 sectionTrackCount = kTrackCount;
 
   std::optional<u32> instrumentTableAddress;
   std::optional<u32> percussionTableAddress;

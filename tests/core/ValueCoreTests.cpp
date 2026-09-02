@@ -104,7 +104,7 @@ void konamiSnesPlayOnceCoordinatesGlobalLoopCompletion();
 void ninSnesProfilesDescribeEverySupportedDriverFamily();
 void ninSnesKonamiClockControlsTempo();
 void ninSnesScannerFindsRequestedSongAcrossSparseTable();
-void ninSnesKoeiDriverTraitsAndSixTrackSections();
+void ninSnesKoeiUsesSixBgmTracksAndPendingRequest();
 void ninSnesProfilesShareSquaredLevelCurve();
 void ninSnesProfilesShareTempoRelativeVibratoClock();
 void ninSnesProfilesEmitSubtractiveTremolo();
@@ -313,7 +313,7 @@ int main() {
     ninSnesProfilesDescribeEverySupportedDriverFamily();
     ninSnesKonamiClockControlsTempo();
     ninSnesScannerFindsRequestedSongAcrossSparseTable();
-    ninSnesKoeiDriverTraitsAndSixTrackSections();
+    ninSnesKoeiUsesSixBgmTracksAndPendingRequest();
     ninSnesProfilesShareSquaredLevelCurve();
     ninSnesProfilesShareTempoRelativeVibratoClock();
     ninSnesProfilesEmitSubtractiveTremolo();

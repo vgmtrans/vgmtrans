@@ -6,7 +6,6 @@
 
 #include "value/formats/NinSnes/NinSnes.h"
 
-#include "value/formats/NinSnes/KoeiSnesDriver.h"
 #include "value/formats/NinSnes/NinSnesPatterns.h"
 
 #include <algorithm>
@@ -399,16 +398,16 @@ std::optional<Layout> findLayout(ByteReader reader) {
   if (reader.size() != kAramSize) {
     return std::nullopt;
   }
-  const auto driverTraits = koei::detect(reader.slice(0, reader.size()));
 
   Signature signature = Signature::None;
   u8 sectionPointer = 0;
   std::optional<u16> konamiBase;
   std::optional<u16> falcomBaseAddress;
+  const auto koeiSectionReader = Patterns::ptnKoeiSectionPointers.find(reader);
 
-  if (driverTraits) {
+  if (koeiSectionReader) {
     signature = Signature::Standard;
-    sectionPointer = driverTraits->sectionPointerAddress;
+    sectionPointer = reader.u8At(*koeiSectionReader + 3);
   } else if (const auto standardOffset = Patterns::ptnIncSectionPtr.find(reader)) {
     signature = Signature::Standard;
     sectionPointer = reader.u8At(*standardOffset + 3);
@@ -465,7 +464,8 @@ std::optional<Layout> findLayout(ByteReader reader) {
 
   u32 instrumentCommandOffset = 0;
   if (profileId == ProfileId::Standard) {
-    profileId = classifyStandard(reader, *commands, konamiBase, instrumentCommandOffset);
+    profileId =
+        koeiSectionReader ? ProfileId::Koei : classifyStandard(reader, *commands, konamiBase, instrumentCommandOffset);
   }
   const Profile& selected = profile(profileId);
   if (selected.intelli != IntelliMode::None) {
@@ -523,7 +523,6 @@ std::optional<Layout> findLayout(ByteReader reader) {
       .profile = profileId,
       .songListAddress = songList->address,
       .sectionPointerAddress = sectionPointer,
-      .sectionTrackCount = driverTraits ? driverTraits->bgmTrackCount : static_cast<u8>(kTrackCount),
       .konamiBaseAddress = konamiBase.value_or(0),
       .quintetBgmInstrumentBase = quintetBase,
       .quintetInstrumentLookupAddress = quintetLookup,
@@ -628,31 +627,34 @@ std::optional<Layout> findLayout(ByteReader reader) {
     }
   };
 
-  if (driverTraits) {
-    const auto requested = std::ranges::find(entries, driverTraits->requestedSong, &SongEntry::index);
-    if (requested != entries.end()) {
-      queueCandidate(&*requested);
+  std::optional<u8> requestedSong;
+  if (selected.id == ProfileId::Koei) {
+    // The input port can be one driver tick newer than its direct-page mirror.
+    for (const u32 address : {0xf4u, 0u}) {
+      const u8 request = reader.u8At(address);
+      if (request != 0 && request != 0xff) {
+        requestedSong = request;
+        break;
+      }
     }
-  }
-
-  // Some rips are captured before the driver consumes the song request. Detect
-  // the command mirror it actually reads instead of assuming a driver profile.
-  if (const auto requestRead = Patterns::ptnReadSongRequestPort.find(reader)) {
+  } else if (const auto requestRead = Patterns::ptnReadSongRequestPort.find(reader)) {
+    // Some rips are captured before the driver consumes the song request.
     const u8 mirror = reader.u8At(*requestRead + 1);
     if (mirror < 4) {
       const u8 request = reader.u8At(0xf4 + mirror);
-      const u8 requestedSong = request & 0x1f;
-      if (request != 0xff && requestedSong != 0) {
-        const auto entry = std::ranges::find(entries, requestedSong, &SongEntry::index);
-        if (entry != entries.end()) {
-          queueCandidate(&*entry);
-        }
+      if (request != 0xff && (request & 0x1f) != 0) {
+        requestedSong = request & 0x1f;
       }
     }
   }
+  if (requestedSong) {
+    const auto entry = std::ranges::find(entries, *requestedSong, &SongEntry::index);
+    if (entry != entries.end()) {
+      queueCandidate(&*entry);
+    }
+  }
   queueCandidate(currentSong);
-
-  if (driverTraits && candidates.empty()) {
+  if (selected.id == ProfileId::Koei && candidates.empty()) {
     return std::nullopt;
   }
   for (const SongEntry& entry : entries) {
