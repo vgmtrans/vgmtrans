@@ -593,7 +593,9 @@ void liveSongSelectionAndHardwareSoundEffectsAreRecovered() {
          "a pending positive CPU command should select its real song slot instead of stale slot one");
 
   std::vector<u8> sfx = fixture.data();
-  std::fill_n(sfx.begin() + 0x0212, kTrackCount, u8{0xff});
+  for (u32 track = 0; track < kTrackCount; ++track) {
+    sfx[0x0212 + track] = 0xff;
+  }
   sfx[0x38] = 0x15;
   sfx[0x3a] = 0x7f;
   sfx[0x3b] = 0x10;
