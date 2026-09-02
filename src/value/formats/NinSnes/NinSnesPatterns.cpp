@@ -48,6 +48,11 @@ Pattern Patterns::ptnKonamiTimer0Direct("\xe8\xf0\xc4\xf1\xe8\x00\xc4\xfa\xe8\x0
 Pattern Patterns::ptnKonamiTimer0Absolute("\xe8\xf0\xc5\xf1\x00\xe8\x00\xc5\xfa\x00\xe8\x01\xc5\xf1\x00",
                                          "xxxxxx?xxxxxxxx", 15);
 
+// Koei places the BGM and SFX section readers together; the first cursor is BGM.
+Pattern Patterns::ptnKoeiSectionPointers("\x8d\x00\xf7\x1d\x3a\x1d\x2d\xf7\x1d\x3a\x1d\x2f\x0b\x8d"
+                                         "\x00\xf7\x1b\x3a\x1b\x2d\xf7\x1b\x3a\x1b\xfd\xae\x6f",
+                                         "xxxxxxxxxxxxxxxxxxxxxxxxxxx", 27);
+
 // Pilotwings:
 //   mov a,$00 / cmp a,#$ff / beq / and a,#$1f / bne start-song
 // $00-$03 are the canonical mirrors of input ports $F4-$F7.

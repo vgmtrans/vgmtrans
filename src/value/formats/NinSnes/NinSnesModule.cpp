@@ -24,7 +24,7 @@ namespace {
     for (const PlaylistCommand& command : program.sectionPlaylist->commands) {
       if (command.kind == PlaylistCommandKind::PlaySection && !command.trackStarts.empty()) {
         first = std::min(first, command.target.value);
-        last = std::max(last, command.target.value + layout.sectionTrackCount * 2);
+        last = std::max(last, command.target.value + command.trackStarts.size() * 2);
       }
       if (!command.range.valid()) {
         continue;
