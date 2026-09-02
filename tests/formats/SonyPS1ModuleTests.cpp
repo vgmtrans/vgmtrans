@@ -369,6 +369,26 @@ void sonyPs1SepAndVabLayoutsAreVersionAware() {
   expect(separated && separated->hasSampleBody && separated->sampleDataOffset == separatedBody,
          "a VAB header should locate a separately loaded sample body instead of decoding intervening RAM");
 
+  auto packedBytes = vabFixture(7, false);
+  const u32 packedSizeTable = static_cast<u32>(packedBytes.size()) - 0x200;
+  le16(packedBytes, 0x16, 2);
+  le16(packedBytes, packedSizeTable + 4, kFixtureVagSize >> 3);
+  const u32 packedBody = static_cast<u32>(packedBytes.size()) + 0x100;
+  packedBytes.resize(packedBody + kFixtureVagSize * 2, 0);
+  fillVag(packedBytes, packedBody);
+  for (u32 frame = 0; frame < kFixtureVagSize / kPsxAdpcmBlockBytes; ++frame) {
+    const u32 block = packedBody + kFixtureVagSize + frame * kPsxAdpcmBlockBytes;
+    packedBytes[block] = 0x11;
+    packedBytes[block + 1] = frame + 1 == kFixtureVagSize / kPsxAdpcmBlockBytes ? 1 : 0;
+    for (u32 byte = 2; byte < kPsxAdpcmBlockBytes; ++byte) {
+      packedBytes[block + byte] = static_cast<u8>(frame * 19 + byte);
+    }
+  }
+  const auto packed = readSonyPs1BankLayout(ByteReader(SourceId{89}, packedBytes), 0);
+  expect(packed && packed->hasSampleBody && packed->sampleDataOffset == packedBody &&
+             packed->expectedSampleBytes == kFixtureVagSize * 2,
+         "VAB size boundaries should locate a body whose later samples omit their silent leading frame");
+
   auto forcedBytes = vabFixture(7, false);
   const u32 forcedBody = static_cast<u32>(forcedBytes.size()) + 4;
   forcedBytes.resize(forcedBody + kFixtureVagSize + 0x30, 0);
