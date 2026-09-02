@@ -328,7 +328,12 @@ std::optional<u32> matchSonyPs1SampleBody(ByteReader reader, u32 preferredOffset
   std::optional<u32> closest;
   u64 closestDistance = std::numeric_limits<u64>::max();
   for (const auto& body : bodies) {
-    if (!matchesVab(body, sampleSizes)) {
+    // The VAB size table is authoritative when a body omits the conventional
+    // silent frame at the start of some samples. In that case the generic
+    // body parser can merge adjacent samples, but it still gives us a strongly
+    // validated collection start. Recheck that start using the declared VAB
+    // boundaries before rejecting it.
+    if (!matchesVab(body, sampleSizes) && !matchesSonyPs1SampleBodyAt(reader, body.offset, sampleSizes)) {
       continue;
     }
     const u64 distance = body.offset > preferredOffset ? body.offset - preferredOffset : preferredOffset - body.offset;
