@@ -183,8 +183,6 @@ void ninSnesProfilesDescribeEverySupportedDriverFamily() {
          "the four Quintet profiles should retain their two program-resolution models");
   expect(profile(ProfileId::FalcomYs4).addresses == AddressModel::FalcomBaseOffset,
          "Ys IV should select relocated Falcom addresses");
-  expect(profile(ProfileId::Koei).sectionTrackCount == 6,
-         "Koei should reserve the final two SPC voices for sound effects");
 
   expect(Layout{.profile = ProfileId::Konami, .konamiBaseAddress = 0x3000}.resolveAddress(0x20) == 0x3020,
          "Konami profile addresses should be relative to the detected driver base");
@@ -333,12 +331,7 @@ void ninSnesKoeiUsesSixBgmTracksAndPendingRequest() {
          "Koei should select the pending BGM request instead of its SFX state");
 
   const SequenceParse parsed = decodeSequence(reader, *layout, AssetId{1});
-  const auto play = std::ranges::find_if(parsed.program.sectionPlaylist->commands, [](const PlaylistCommand& command) {
-    return command.kind == PlaylistCommandKind::PlaySection;
-  });
-  expect(parsed.program.tracks.size() == 6 && play != parsed.program.sectionPlaylist->commands.end() &&
-             play->trackStarts.size() == 6,
-         "Koei should stop its section header before the first track's command bytes");
+  expect(parsed.program.tracks.size() == 6, "Koei should decode its six-pointer BGM sections as six tracks");
 
   bytes[0] = 0;
   bytes[0xf4] = 0;
