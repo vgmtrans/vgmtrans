@@ -125,7 +125,6 @@ private:
   NinSnesIntelliTADrumKitDef buildIntelliTADrumKitDef() const;
 
   u8 spcPercussionBaseInit;
-  u8 sectionTrackCount = kNinSnesTrackCount;
   int m_sectionForeverLoops = 0;
   std::map<u8, NinSnesPercussionDef> m_percussionInstrNoteMap;
   u32 m_nextIntelliTAOverrideProgram;

@@ -1,4 +1,4 @@
-#include "shared/KoeiSnesDriver.h"
+#include "value/formats/NinSnes/KoeiSnesDriver.h"
 #include "value/formats/NinSnes/NinSnes.h"
 
 #include <algorithm>
@@ -25,11 +25,11 @@ void writeLe16(std::vector<u8>& bytes, u32 offset, u16 value) {
 
 void ninSnesKoeiDriverTraitsAndSixTrackSections() {
   std::vector<u8> bytes(kAramSize);
-  std::ranges::copy(vgmtrans::shared::koei_snes::detail::kSixTrackLoader, bytes.begin() + 0x600);
+  std::ranges::copy(koei::detail::kSixTrackLoader, bytes.begin() + 0x600);
   bytes[0] = 1;
   bytes[0xf4] = 6;
 
-  const auto traits = vgmtrans::shared::koei_snes::detect(bytes);
+  const auto traits = koei::detect(bytes);
   expect(traits && traits->sectionPointerAddress == 0x1d && traits->bgmTrackCount == 6 &&
              traits->requestedSong == 6,
          "Koei detection should keep its BGM topology and request handshake outside NinSnes profiles");
