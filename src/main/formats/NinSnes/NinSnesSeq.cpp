@@ -53,6 +53,7 @@ NinSnesSeq::NinSnesSeq(RawFile* file, const NinSnesScanResult& scanResult)
   quintetBGMInstrBase = scanResult.quintetBGMInstrBase;
   quintetAddrBGMInstrLookup = scanResult.quintetAddrBGMInstrLookup;
   falcomBaseOffset = scanResult.falcomBaseOffset;
+  sectionTrackCount = scanResult.sectionTrackCount;
 }
 
 bool NinSnesSeq::load() {
@@ -107,8 +108,8 @@ void NinSnesSeq::createTracks() {
     return;
   }
 
-  reserveTracks(profile().trackCount);
-  for (u32 trackIndex = 0; trackIndex < profile().trackCount; trackIndex++) {
+  reserveTracks(nNumTracks);
+  for (u32 trackIndex = 0; trackIndex < nNumTracks; trackIndex++) {
     auto trackName = fmt::format("Track {}", trackIndex + 1);
     addTrack<NinSnesTrack>(this, dwStartOffset, 0, trackName);
   }
@@ -220,7 +221,7 @@ bool NinSnesSeq::addLoopForeverNoItem() {
 
 bool NinSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
-  nNumTracks = profile().trackCount;
+  nNumTracks = sectionTrackCount;
   createTracks();
 
   if (dwStartOffset + 2 > 0x10000) {
@@ -230,7 +231,7 @@ bool NinSnesSeq::parseHeader() {
   // validate first section
   u16 firstSectionPtr = dwStartOffset;
   u16 addrFirstSection = readShort(firstSectionPtr);
-  if (addrFirstSection + profile().trackCount * 2 > 0x10000) {
+  if (addrFirstSection + nNumTracks * 2 > 0x10000) {
     return false;
   }
 
@@ -238,7 +239,7 @@ bool NinSnesSeq::parseHeader() {
     addrFirstSection = convertToAPUAddress(addrFirstSection);
 
     u8 numActiveTracks = 0;
-    for (u8 trackIndex = 0; trackIndex < profile().trackCount; trackIndex++) {
+    for (u8 trackIndex = 0; trackIndex < nNumTracks; trackIndex++) {
       u16 addrTrackStart = readShort(addrFirstSection + trackIndex * 2);
       if (addrTrackStart != 0) {
         addrTrackStart = convertToAPUAddress(addrTrackStart);
@@ -490,7 +491,7 @@ bool NinSnesSection::load() {
 
 bool NinSnesSection::parseTrackPointers() {
   u32 curOffset = offset();
-  const u8 trackCount = parentSeq->profile().trackCount;
+  const size_t trackCount = parentSeq->trackCount();
 
   VGMHeader* header = nullptr;
   if (parentSeq->readMode == READMODE_ADD_TO_UI) {

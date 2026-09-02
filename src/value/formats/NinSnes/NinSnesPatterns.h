@@ -46,11 +46,9 @@ struct Patterns {
   static Pattern ptnJumpToVcmdSMW;
   static Pattern ptnReadVcmdLengthSMW;
   static Pattern ptnDispatchNoteYI;
-  static Pattern ptnReadBgmAndSfxSectionPointersAirManagement;
   static Pattern ptnIncSectionPtr;
   static Pattern ptnLoadInstrTableAddress;
   static Pattern ptnLoadInstrTableAddressSMW;
-  static Pattern ptnLoadBgmTrackPointersAirManagement;
   // Value-only behavioral probes; these do not participate in legacy format recognition.
   static Pattern ptnEarlierPercussionTable;
   static Pattern ptnKonamiPercussionDispatch;

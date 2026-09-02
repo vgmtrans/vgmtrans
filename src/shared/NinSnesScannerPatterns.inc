@@ -172,37 +172,6 @@ NINSNES_BYTE_PATTERN NINSNES_PATTERN_OWNER::ptnDispatchNoteYI("\x2d\x9f\x28\x07\
                                               "??x??",
                                               21);
 
-//; Air Management: Ozora ni Kakeru (Aerobiz)
-//; The BGM and SFX engines use the same section-pointer reader. Keep the
-//; paired dispatch here so detection chooses the first reader ($1d, BGM)
-//; instead of the later generic match ($1b, SFX).
-// 0a10: 8d 00     mov   y,#$00
-// 0a12: f7 1d     mov   a,($1d)+y
-// 0a14: 3a 1d     incw  $1d
-// 0a16: 2d        push  a
-// 0a17: f7 1d     mov   a,($1d)+y
-// 0a19: 3a 1d     incw  $1d
-// 0a1b: 2f 0b     bra   $0a28
-// 0a1d: 8d 00     mov   y,#$00
-// 0a1f: f7 1b     mov   a,($1b)+y
-// 0a21: 3a 1b     incw  $1b
-// 0a23: 2d        push  a
-// 0a24: f7 1b     mov   a,($1b)+y
-// 0a26: 3a 1b     incw  $1b
-// 0a28: fd        mov   y,a
-// 0a29: ae        pop   a
-// 0a2a: 6f        ret
-NINSNES_BYTE_PATTERN NINSNES_PATTERN_OWNER::ptnReadBgmAndSfxSectionPointersAirManagement(
-    "\x8d\x00\xf7\x1d\x3a\x1d\x2d\xf7"
-    "\x1d\x3a\x1d\x2f\x0b\x8d\x00\xf7"
-    "\x1b\x3a\x1b\x2d\xf7\x1b\x3a\x1b"
-    "\xfd\xae\x6f",
-    "xxxxxxxx"
-    "xxxxxxxx"
-    "xxxxxxxx"
-    "xxx",
-    27);
-
 //; Yoshi's Island SPC
 //; dereference and increment the section pointer $40/1
 // 06d7: 8d 00     mov   y,#$00
@@ -244,39 +213,6 @@ NINSNES_BYTE_PATTERN NINSNES_PATTERN_OWNER::ptnLoadInstrTableAddressSMW("\x8d\x0
                                                         "xxx??x??"
                                                         "xx?x?",
                                                         13);
-
-//; Air Management: Ozora ni Kakeru (Aerobiz)
-//; The driver dedicates voices 0-5 to BGM and copies six track pointers from
-//; each section in reverse order. Voices 6-7 are driven by a separate SFX
-//; playlist and must not be interpreted as part of the BGM section header.
-// 0c72: da 14     movw  $14,ya
-// 0c74: 8d 0b     mov   y,#$0b
-// 0c76: 8f 20 47  mov   $47,#$20
-// 0c79: 8f 00 20  mov   $20,#$00
-// 0c7c: f7 14     mov   a,($14)+y
-// 0c7e: d6 32 00  mov   $0032+y,a
-// 0c81: d0 06     bne   $0c89
-// 0c83: e4 47     mov   a,$47
-// 0c85: 04 20     or    a,$20
-// 0c87: c4 20     mov   $20,a
-// 0c89: dc        dec   y
-// 0c8a: f7 14     mov   a,($14)+y
-// 0c8c: d6 32 00  mov   $0032+y,a
-// 0c8f: dc        dec   y
-// 0c90: 4b 47     lsr   $47
-// 0c92: d0 e8     bne   $0c7c
-NINSNES_BYTE_PATTERN NINSNES_PATTERN_OWNER::ptnLoadBgmTrackPointersAirManagement(
-    "\xda\x14\x8d\x0b\x8f\x20\x47\x8f"
-    "\x00\x20\xf7\x14\xd6\x32\x00\xd0"
-    "\x06\xe4\x47\x04\x20\xc4\x20\xdc"
-    "\xf7\x14\xd6\x32\x00\xdc\x4b\x47"
-    "\xd0\xe8",
-    "xxxxxxxx"
-    "xxxxxxxx"
-    "xxxxxxxx"
-    "xxxxxxxx"
-    "xx",
-    34);
 
 //; Kirby Super Star SPC
 // 071e: 8f 5d f2  mov   $f2,#$5d
