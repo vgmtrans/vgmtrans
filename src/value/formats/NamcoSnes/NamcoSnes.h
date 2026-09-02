@@ -46,11 +46,14 @@ struct Layout {
   [[nodiscard]] u16 envelopePointerTable(core::ByteReader reader) const {
     return reader.le16(dataPointerBlockAddress);
   }
-  [[nodiscard]] u16 pitchPointerTable(core::ByteReader reader) const {
+  [[nodiscard]] u16 pitchEnvelopePointerTable(core::ByteReader reader) const {
     return reader.le16(dataPointerBlockAddress + 2);
   }
   [[nodiscard]] u16 percussionTable(core::ByteReader reader) const {
     return reader.le16(dataPointerBlockAddress + 4);
+  }
+  [[nodiscard]] u16 echoFilterTable(core::ByteReader reader) const {
+    return reader.le16(dataPointerBlockAddress + 6);
   }
 };
 
@@ -59,7 +62,6 @@ struct SequenceParse {
   std::set<u8> srcns;
   std::set<u8> percussion;
   std::set<u8> noiseRates;
-  core::SourceRange headerRange;
 };
 
 [[nodiscard]] const char* versionName(Version version);

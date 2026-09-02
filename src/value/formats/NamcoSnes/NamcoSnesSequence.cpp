@@ -26,7 +26,7 @@ using namespace core;
 namespace {
 
 constexpr std::string_view kFormatId = "namco-snes";
-constexpr PitchBendLayerId kPitchTableBendLayer{1};
+constexpr PitchBendLayerId kPitchEnvelopeBendLayer{1};
 namespace math {
 
 [[nodiscard]] constexpr u8 voiceBit(u32 track) { return static_cast<u8>(0x80u >> track); }
@@ -99,7 +99,7 @@ enum Parameter : u8 {
   kVolume,
   kBalance,
   kGate,
-  kPitchTable,
+  kPitchEnvelope,
   kTranspose,
   kFineTuning,
   kPortamento,
@@ -123,12 +123,12 @@ constexpr std::array<ParameterCommand, kParameterCount> kParameterCommands{{
     {"Voice Volume", SequenceSemantic::Level, SemanticOperandRole::Level},
     {"Stereo Balance", SequenceSemantic::Pan, SemanticOperandRole::Pan},
     {"Gate Time", SequenceSemantic::State, SemanticOperandRole::Duration},
-    {"Pitch Modulation Table", SequenceSemantic::Modulation, SemanticOperandRole::Modulation},
+    {"Pitch Envelope", SequenceSemantic::Modulation, SemanticOperandRole::Modulation},
     {"Transpose", SequenceSemantic::Pitch, SemanticOperandRole::Pitch},
     {"Fine Tuning", SequenceSemantic::Pitch, SemanticOperandRole::Pitch},
     {"Portamento Speed", SequenceSemantic::Portamento, SemanticOperandRole::Duration},
-    {"Pitch Table Rate", SequenceSemantic::Modulation, SemanticOperandRole::Modulation},
-    {"Pitch Table Depth", SequenceSemantic::Modulation, SemanticOperandRole::Modulation},
+    {"Pitch Envelope Rate", SequenceSemantic::Modulation, SemanticOperandRole::Modulation},
+    {"Pitch Envelope Depth", SequenceSemantic::Modulation, SemanticOperandRole::Modulation},
     {"Envelope Preset", SequenceSemantic::Envelope, SemanticOperandRole::Value},
 }};
 
@@ -174,7 +174,7 @@ struct TrackState {
     triggerTicks = 0;
     gateTicks = 0;
     driverPitch.reset();
-    pitchTable = 0;
+    pitchEnvelope = 0;
     pitchPosition = 0;
     pitchPhase = 0;
     pitchBend.reset();
@@ -185,7 +185,7 @@ struct TrackState {
     commandControls[kVolume] = 0x88;
     commandControls[kBalance] = 0x88;
     for (const Parameter parameter :
-         {kGate, kPitchTable, kTranspose, kFineTuning, kPortamento, kEnvelope}) {
+         {kGate, kPitchEnvelope, kTranspose, kFineTuning, kPortamento, kEnvelope}) {
       commandControls[parameter] = 0;
     }
     resetPhysicalVoice();
@@ -215,7 +215,7 @@ struct TrackState {
   // A target exists only while the per-tick driver slide is still active.
   std::optional<u16> portamentoTarget;
 
-  u16 pitchTable = 0;
+  u16 pitchEnvelope = 0;
   u8 pitchPosition = 0;
   u8 pitchPhase = 0;
 
@@ -310,7 +310,7 @@ struct Playback {
 
   void emitPitchBend(double semitones) {
     if (!track.pitchBend || std::abs(*track.pitchBend - semitones) > 0.0001) {
-      out.pitchBend(semitones, kPitchTableBendLayer);
+      out.pitchBend(semitones, kPitchEnvelopeBendLayer);
       track.pitchBend = semitones;
     }
   }
@@ -335,53 +335,53 @@ struct Playback {
   }
 
   [[nodiscard]] double modulationValue() const {
-    if (track.pitchTable == 0 || !reader().has(track.pitchTable + track.pitchPosition, 1)) {
+    if (track.pitchEnvelope == 0 || !reader().has(track.pitchEnvelope + track.pitchPosition, 1)) {
       return 0.0;
     }
-    const u8 nextPosition = resolvePitchPosition(track.pitchTable, static_cast<u8>(track.pitchPosition + 1),
+    const u8 nextPosition = resolvePitchPosition(track.pitchEnvelope, static_cast<u8>(track.pitchPosition + 1),
                                                  track.pitchPosition);
-    const double current = static_cast<int>(reader().u8At(track.pitchTable + track.pitchPosition)) - 0x64;
-    const double next = static_cast<int>(reader().u8At(track.pitchTable + nextPosition)) - 0x64;
+    const double current = static_cast<int>(reader().u8At(track.pitchEnvelope + track.pitchPosition)) - 0x64;
+    const double next = static_cast<int>(reader().u8At(track.pitchEnvelope + nextPosition)) - 0x64;
     const double interpolated = current + (next - current) * (track.pitchPhase / 256.0);
     return interpolated * math::modulationScale(layout().version, track.liveControls[kPitchDepth]);
   }
 
-  [[nodiscard]] bool selectPitchTable(bool restart) {
-    const u8 index = track.liveControls[kPitchTable];
+  [[nodiscard]] bool selectPitchEnvelope(bool restart) {
+    const u8 index = track.liveControls[kPitchEnvelope];
     if (index == 0) {
-      track.pitchTable = 0;
+      track.pitchEnvelope = 0;
       return false;
     }
-    const u16 pointers = layout().pitchPointerTable(reader());
+    const u16 pointers = layout().pitchEnvelopePointerTable(reader());
     // The driver doubles the index with ASL A, discarding its high bit.
     const u32 entry = pointers + static_cast<u8>(index << 1);
     if (!reader().has(entry, 2) || !reader().has(reader().le16(entry), 1)) {
-      track.pitchTable = 0;
+      track.pitchEnvelope = 0;
       return false;
     }
-    track.pitchTable = reader().le16(entry);
+    track.pitchEnvelope = reader().le16(entry);
     if (restart) {
-      track.pitchPosition = resolvePitchPosition(track.pitchTable, 0, 0);
+      track.pitchPosition = resolvePitchPosition(track.pitchEnvelope, 0, 0);
       track.pitchPhase = 0;
-    } else if (!reader().has(track.pitchTable + track.pitchPosition, 1)) {
-      track.pitchPosition = resolvePitchPosition(track.pitchTable, 0, 0);
+    } else if (!reader().has(track.pitchEnvelope + track.pitchPosition, 1)) {
+      track.pitchPosition = resolvePitchPosition(track.pitchEnvelope, 0, 0);
     }
     return true;
   }
 
   void beginPitchModulation() {
-    emitPitchBend(selectPitchTable(true) ? modulationValue() : 0.0);
+    emitPitchBend(selectPitchEnvelope(true) ? modulationValue() : 0.0);
   }
 
   void advancePitchModulation() {
-    if (!selectPitchTable(false)) {
+    if (!selectPitchEnvelope(false)) {
       emitPitchBend(0.0);
       return;
     }
     const u16 phase = static_cast<u16>(track.pitchPhase) + track.liveControls[kPitchRate];
     if (phase > 0xff) {
       track.pitchPhase = track.liveControls[kPitchRate];
-      track.pitchPosition = resolvePitchPosition(track.pitchTable, static_cast<u8>(track.pitchPosition + 1),
+      track.pitchPosition = resolvePitchPosition(track.pitchEnvelope, static_cast<u8>(track.pitchPosition + 1),
                                                  track.pitchPosition);
     } else {
       track.pitchPhase = static_cast<u8>(phase);
@@ -840,16 +840,20 @@ const SequenceProgramConfig& sequenceConfig() {
 SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetId sequenceId,
                              SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const ByteReader reader = source.reader();
-  const SourceRange header = reader.range(layout.sequenceReferenceAddress, layout.sequenceReferenceSize);
   SequenceReferences references;
-  SequenceDecodeSession sequence{reader, sequenceConfig(), sequenceId, header, sourceMap, kCommandLimit, kAramSize};
-  const u32 pointer = layout.sequenceReferenceAddress + layout.sequenceReferenceSize - 2u;
-  sequence.addTrack(
-      0, reader.range(pointer, 2), layout.sequenceAddress,
-      [&](u32 offset) { return decodeCommand(reader, offset, diagnostics, references); },
-      layout.sequenceAddress);
-  SequenceProgram program =
-      sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(DriverData{std::move(source), layout}));
+  TrackDecodeScope tracks{
+      .reader = reader,
+      .bytecodeEnd = kAramSize,
+      .maxCommands = kCommandLimit,
+      .sourceHasTracks = false,
+      .sequenceAsset = sequenceId,
+      .sourceMap = sourceMap,
+  };
+  SequenceProgram program = sequenceConfig().makeProgram();
+  program.tracks.push_back(tracks.decode(
+      0, layout.sequenceAddress,
+      [&](u32 offset) { return decodeCommand(reader, offset, diagnostics, references); }));
+  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(DriverData{std::move(source), layout});
   const TrackProgram stream = program.tracks.front();
   for (u32 voice = 1; voice < kTrackCount; ++voice) {
     TrackProgram copy = stream;
@@ -861,7 +865,6 @@ SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetI
       .srcns = std::move(references.srcns),
       .percussion = std::move(references.percussion),
       .noiseRates = std::move(references.noiseRates),
-      .headerRange = header,
   };
 }
 
