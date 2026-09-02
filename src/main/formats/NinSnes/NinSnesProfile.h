@@ -22,6 +22,7 @@ struct NinSnesProfile {
   NinSnesInstrumentLayoutId instrumentLayout;
   NinSnesInstrTableAddressModelId instrTableAddressModel;
   NinSnesIntelliModeId intelliMode;
+  u8 trackCount = 8;
 };
 
 struct NinSnesSeqStatus {

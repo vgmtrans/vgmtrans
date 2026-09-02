@@ -126,7 +126,11 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
   u16 konamiBaseAddress = 0xffff;
   u16 falcomBaseAddress = 0xffff;
   u16 falcomBaseOffset = 0;
-  if (file->searchBytePattern(ptnIncSectionPtr, ofsIncSectionPtr)) {
+  if (file->searchBytePattern(ptnReadBgmAndSfxSectionPointersAirManagement,
+                              ofsIncSectionPtr)) {
+    signature = NinSnesSignatureId::Standard;
+    addrSectionPtr = file->readByte(ofsIncSectionPtr + 3);
+  } else if (file->searchBytePattern(ptnIncSectionPtr, ofsIncSectionPtr)) {
     signature = NinSnesSignatureId::Standard;
     addrSectionPtr = file->readByte(ofsIncSectionPtr + 3);
   }
@@ -401,6 +405,11 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
     if (canonicalVcmdLayout) {
       u32 ofsWriteVolume;
 
+      u32 ofsAirManagementTrackLoader;
+      if (file->searchBytePattern(ptnLoadBgmTrackPointersAirManagement,
+                                  ofsAirManagementTrackLoader)) {
+        return NinSnesProfileId::AirManagement;
+      }
       if (file->searchBytePattern(ptnWriteVolumeKSS, ofsWriteVolume)) {
         return NinSnesProfileId::Hal;
       }
@@ -482,7 +491,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
   };
 
   auto hasIllegalTrackPointers = [&](u16 addrFirstSection) -> bool {
-    for (u8 trackIndex = 0; trackIndex < 8; trackIndex++) {
+    for (u8 trackIndex = 0; trackIndex < profile.trackCount; trackIndex++) {
       u16 addrTrackStart = file->readShort(addrFirstSection + trackIndex * 2);
       if (addrTrackStart == 0) {
         continue;
@@ -529,7 +538,8 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
       updateFalcomBaseOffset(firstSectionPtr);
       addrFirstSection =
           convertNinSnesAddress(profile, addrFirstSection, konamiBaseAddress, falcomBaseOffset);
-      if (addrFirstSection + 16 > 0x10000 || hasIllegalTrackPointers(addrFirstSection)) {
+      if (addrFirstSection + profile.trackCount * 2 > 0x10000 ||
+          hasIllegalTrackPointers(addrFirstSection)) {
         break;
       }
 
@@ -579,7 +589,27 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
   };
 
   const u8 songListLength = findSongListLength();
-  const auto guessedSongIndex = findCurrentSongIndex(songListLength);
+  std::optional<u8> guessedSongIndex;
+  if (profile.id == NinSnesProfileId::AirManagement) {
+    // The live input port can be one tick newer than its direct-page mirror.
+    // Prefer it so short/stopped rips select the requested BGM rather than the
+    // stale playlist still present in the six track cursors.
+    for (const u32 requestAddress : {u32{0xf4}, u32{0}}) {
+      const u8 requestedSong = file->readByte(requestAddress);
+      const u32 requestedSongPointer = addrSongList + requestedSong * 2;
+      if (requestedSong != 0 && requestedSong != 0xff && requestedSong < songListLength &&
+          requestedSongPointer + 2 <= 0x10000) {
+        const u16 requestedPlaylist = readSectionListPtr(requestedSongPointer);
+        if (requestedPlaylist >= 0x0100 && requestedPlaylist < 0xfff0) {
+          guessedSongIndex = requestedSong;
+          break;
+        }
+      }
+    }
+  }
+  if (!guessedSongIndex) {
+    guessedSongIndex = findCurrentSongIndex(songListLength);
+  }
   if (!guessedSongIndex) {
     return;
   }

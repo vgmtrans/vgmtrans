@@ -17,7 +17,6 @@ DECLARE_FORMAT(NinSnes);
 
 namespace {
 
-constexpr size_t MAX_TRACKS = kNinSnesTrackCount;
 constexpr u16 kNinSnesDefaultPitchBendRangeCents =
     NinSnesTrackState::kDefaultPitchBendRangeCents;
 
@@ -108,8 +107,8 @@ void NinSnesSeq::createTracks() {
     return;
   }
 
-  reserveTracks(MAX_TRACKS);
-  for (u32 trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+  reserveTracks(profile().trackCount);
+  for (u32 trackIndex = 0; trackIndex < profile().trackCount; trackIndex++) {
     auto trackName = fmt::format("Track {}", trackIndex + 1);
     addTrack<NinSnesTrack>(this, dwStartOffset, 0, trackName);
   }
@@ -221,7 +220,7 @@ bool NinSnesSeq::addLoopForeverNoItem() {
 
 bool NinSnesSeq::parseHeader() {
   setPPQN(SEQ_PPQN);
-  nNumTracks = MAX_TRACKS;
+  nNumTracks = profile().trackCount;
   createTracks();
 
   if (dwStartOffset + 2 > 0x10000) {
@@ -231,7 +230,7 @@ bool NinSnesSeq::parseHeader() {
   // validate first section
   u16 firstSectionPtr = dwStartOffset;
   u16 addrFirstSection = readShort(firstSectionPtr);
-  if (addrFirstSection + 16 > 0x10000) {
+  if (addrFirstSection + profile().trackCount * 2 > 0x10000) {
     return false;
   }
 
@@ -239,7 +238,7 @@ bool NinSnesSeq::parseHeader() {
     addrFirstSection = convertToAPUAddress(addrFirstSection);
 
     u8 numActiveTracks = 0;
-    for (u8 trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+    for (u8 trackIndex = 0; trackIndex < profile().trackCount; trackIndex++) {
       u16 addrTrackStart = readShort(addrFirstSection + trackIndex * 2);
       if (addrTrackStart != 0) {
         addrTrackStart = convertToAPUAddress(addrTrackStart);
@@ -491,14 +490,15 @@ bool NinSnesSection::load() {
 
 bool NinSnesSection::parseTrackPointers() {
   u32 curOffset = offset();
+  const u8 trackCount = parentSeq->profile().trackCount;
 
   VGMHeader* header = nullptr;
   if (parentSeq->readMode == READMODE_ADD_TO_UI) {
-    header = addHeader(curOffset, 16);
+    header = addHeader(curOffset, trackCount * 2);
   }
 
   u8 numActiveTracks = 0;
-  for (size_t trackIndex = 0; trackIndex < MAX_TRACKS; trackIndex++) {
+  for (size_t trackIndex = 0; trackIndex < trackCount; trackIndex++) {
     if (curOffset + 1 >= 0x10000) {
       return false;
     }
