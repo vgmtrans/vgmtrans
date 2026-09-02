@@ -909,7 +909,7 @@ struct DecodeState {
 
   std::function<void(u32, DecodeState&)> walk = [&](u32 offset, DecodeState& path) {
     while (remaining != 0 && reader.has(offset, 1) && offset < layout.program.endOffset()) {
-      const u8 callMask = static_cast<u8>(path.calls[0] | (path.calls[1] << 1));
+      const u8 callMask = static_cast<u8>((path.calls[0] ? 1u : 0u) | (path.calls[1] ? 2u : 0u));
       if (!visited.emplace(offset, callMask, path.loops[0].value, path.loops[1].value).second) {
         return;
       }
