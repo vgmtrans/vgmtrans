@@ -16,8 +16,6 @@ struct NinSnesScanResult {
   u32 songListAddr = 0;
   u32 songStartAddr = 0;
   u8 sectionPtrAddr = 0;
-  // Number of track pointers stored in each section header.
-  u8 sectionTrackCount = 8;
 
   u32 instrTableAddr = 0;
   u16 spcDirAddr = 0;

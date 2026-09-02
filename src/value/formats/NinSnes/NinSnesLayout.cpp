@@ -6,7 +6,7 @@
 
 #include "value/formats/NinSnes/NinSnes.h"
 
-#include "shared/KoeiSnesDriver.h"
+#include "value/formats/NinSnes/KoeiSnesDriver.h"
 #include "value/formats/NinSnes/NinSnesPatterns.h"
 
 #include <algorithm>
@@ -399,7 +399,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
   if (reader.size() != kAramSize) {
     return std::nullopt;
   }
-  const auto driverTraits = vgmtrans::shared::koei_snes::detect(reader.slice(0, reader.size()));
+  const auto driverTraits = koei::detect(reader.slice(0, reader.size()));
 
   Signature signature = Signature::None;
   u8 sectionPointer = 0;

@@ -5,7 +5,7 @@
 #include <span>
 #include <string_view>
 
-namespace vgmtrans::shared::koei_snes {
+namespace vgmtrans::formats::nin_snes::koei {
 
 struct Traits {
   std::uint8_t sectionPointerAddress;
@@ -49,4 +49,4 @@ inline std::optional<Traits> detect(std::span<const std::uint8_t> aram) {
                 .requestedSong = requestedSong};
 }
 
-}  // namespace vgmtrans::shared::koei_snes
+}  // namespace vgmtrans::formats::nin_snes::koei
