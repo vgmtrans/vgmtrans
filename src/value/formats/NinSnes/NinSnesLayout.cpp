@@ -6,6 +6,7 @@
 
 #include "value/formats/NinSnes/NinSnes.h"
 
+#include "shared/KoeiSnesDriver.h"
 #include "value/formats/NinSnes/NinSnesPatterns.h"
 
 #include <algorithm>
@@ -242,9 +243,6 @@ template <size_t Size>
 
   const bool canonical = commands.addressTable + (kStandardCommandLengths.size() * 2) == commands.lengthTable;
   if (canonical) {
-    if (Patterns::ptnLoadBgmTrackPointersAirManagement.find(reader)) {
-      return ProfileId::AirManagement;
-    }
     if (Patterns::ptnWriteVolumeKSS.find(reader)) {
       return ProfileId::Hal;
     }
@@ -401,16 +399,16 @@ std::optional<Layout> findLayout(ByteReader reader) {
   if (reader.size() != kAramSize) {
     return std::nullopt;
   }
+  const auto driverTraits = vgmtrans::shared::koei_snes::detect(reader.slice(0, reader.size()));
 
   Signature signature = Signature::None;
   u8 sectionPointer = 0;
   std::optional<u16> konamiBase;
   std::optional<u16> falcomBaseAddress;
 
-  if (const auto airManagementOffset =
-          Patterns::ptnReadBgmAndSfxSectionPointersAirManagement.find(reader)) {
+  if (driverTraits) {
     signature = Signature::Standard;
-    sectionPointer = reader.u8At(*airManagementOffset + 3);
+    sectionPointer = driverTraits->sectionPointerAddress;
   } else if (const auto standardOffset = Patterns::ptnIncSectionPtr.find(reader)) {
     signature = Signature::Standard;
     sectionPointer = reader.u8At(*standardOffset + 3);
@@ -525,6 +523,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
       .profile = profileId,
       .songListAddress = songList->address,
       .sectionPointerAddress = sectionPointer,
+      .sectionTrackCount = driverTraits ? driverTraits->bgmTrackCount : static_cast<u8>(kTrackCount),
       .konamiBaseAddress = konamiBase.value_or(0),
       .quintetBgmInstrumentBase = quintetBase,
       .quintetInstrumentLookupAddress = quintetLookup,
@@ -629,26 +628,11 @@ std::optional<Layout> findLayout(ByteReader reader) {
     }
   };
 
-  // Air Management handshakes the BGM request through input port $f4 and
-  // mirrors it to $00 once per driver tick. Several short RSN captures retain
-  // the new request only in the port while $00 and the playlist cursor still
-  // describe the preceding song, so the port must take precedence.
-  if (selected.id == ProfileId::AirManagement) {
-    const auto queueAirManagementRequest = [&](u32 address) {
-      if (!reader.has(address, 1)) {
-        return;
-      }
-      const u8 requestedSong = reader.u8At(address);
-      if (requestedSong == 0 || requestedSong == 0xff) {
-        return;
-      }
-      const auto entry = std::ranges::find(entries, requestedSong, &SongEntry::index);
-      if (entry != entries.end()) {
-        queueCandidate(&*entry);
-      }
-    };
-    queueAirManagementRequest(0xf4);
-    queueAirManagementRequest(0);
+  if (driverTraits) {
+    const auto requested = std::ranges::find(entries, driverTraits->requestedSong, &SongEntry::index);
+    if (requested != entries.end()) {
+      queueCandidate(&*requested);
+    }
   }
 
   // Some rips are captured before the driver consumes the song request. Detect
@@ -668,10 +652,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
   }
   queueCandidate(currentSong);
 
-  // A stopped Air Management driver can retain a complete song bank without a
-  // request in either handshake location. Returning the first resident entry
-  // in that state produced a convincing yet unrelated sequence.
-  if (selected.id == ProfileId::AirManagement && candidates.empty()) {
+  if (driverTraits && candidates.empty()) {
     return std::nullopt;
   }
   for (const SongEntry& entry : entries) {

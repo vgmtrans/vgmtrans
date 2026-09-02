@@ -8,6 +8,7 @@
 #include "NinSnesInstr.h"
 #include "NinSnesSeq.h"
 #include "ScannerManager.h"
+#include "shared/KoeiSnesDriver.h"
 
 #include <array>
 #include <optional>
@@ -116,6 +117,9 @@ void NinSnesScanner::loadFromScanResult(RawFile* file, const NinSnesScanResult& 
 void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
   NinSnesProfileId profileId = NinSnesProfileId::Unknown;
   NinSnesSignatureId signature = NinSnesSignatureId::None;
+  const auto driverTraits = vgmtrans::shared::koei_snes::detect(
+      std::span<const u8>{reinterpret_cast<const u8*>(file->data()), file->size()});
+  const u8 sectionTrackCount = driverTraits ? driverTraits->bgmTrackCount : 8;
 
   std::string basefilename = file->stem();
   std::string name = file->tag.hasTitle() ? file->tag.title : basefilename;
@@ -126,10 +130,9 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
   u16 konamiBaseAddress = 0xffff;
   u16 falcomBaseAddress = 0xffff;
   u16 falcomBaseOffset = 0;
-  if (file->searchBytePattern(ptnReadBgmAndSfxSectionPointersAirManagement,
-                              ofsIncSectionPtr)) {
+  if (driverTraits) {
     signature = NinSnesSignatureId::Standard;
-    addrSectionPtr = file->readByte(ofsIncSectionPtr + 3);
+    addrSectionPtr = driverTraits->sectionPointerAddress;
   } else if (file->searchBytePattern(ptnIncSectionPtr, ofsIncSectionPtr)) {
     signature = NinSnesSignatureId::Standard;
     addrSectionPtr = file->readByte(ofsIncSectionPtr + 3);
@@ -405,11 +408,6 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
     if (canonicalVcmdLayout) {
       u32 ofsWriteVolume;
 
-      u32 ofsAirManagementTrackLoader;
-      if (file->searchBytePattern(ptnLoadBgmTrackPointersAirManagement,
-                                  ofsAirManagementTrackLoader)) {
-        return NinSnesProfileId::AirManagement;
-      }
       if (file->searchBytePattern(ptnWriteVolumeKSS, ofsWriteVolume)) {
         return NinSnesProfileId::Hal;
       }
@@ -491,7 +489,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
   };
 
   auto hasIllegalTrackPointers = [&](u16 addrFirstSection) -> bool {
-    for (u8 trackIndex = 0; trackIndex < profile.trackCount; trackIndex++) {
+    for (u8 trackIndex = 0; trackIndex < sectionTrackCount; trackIndex++) {
       u16 addrTrackStart = file->readShort(addrFirstSection + trackIndex * 2);
       if (addrTrackStart == 0) {
         continue;
@@ -538,7 +536,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
       updateFalcomBaseOffset(firstSectionPtr);
       addrFirstSection =
           convertNinSnesAddress(profile, addrFirstSection, konamiBaseAddress, falcomBaseOffset);
-      if (addrFirstSection + profile.trackCount * 2 > 0x10000 ||
+      if (addrFirstSection + sectionTrackCount * 2 > 0x10000 ||
           hasIllegalTrackPointers(addrFirstSection)) {
         break;
       }
@@ -590,21 +588,12 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
 
   const u8 songListLength = findSongListLength();
   std::optional<u8> guessedSongIndex;
-  if (profile.id == NinSnesProfileId::AirManagement) {
-    // The live input port can be one tick newer than its direct-page mirror.
-    // Prefer it so short/stopped rips select the requested BGM rather than the
-    // stale playlist still present in the six track cursors.
-    for (const u32 requestAddress : {u32{0xf4}, u32{0}}) {
-      const u8 requestedSong = file->readByte(requestAddress);
-      const u32 requestedSongPointer = addrSongList + requestedSong * 2;
-      if (requestedSong != 0 && requestedSong != 0xff && requestedSong < songListLength &&
-          requestedSongPointer + 2 <= 0x10000) {
-        const u16 requestedPlaylist = readSectionListPtr(requestedSongPointer);
-        if (requestedPlaylist >= 0x0100 && requestedPlaylist < 0xfff0) {
-          guessedSongIndex = requestedSong;
-          break;
-        }
-      }
+  if (driverTraits && driverTraits->requestedSong != 0 &&
+      driverTraits->requestedSong < songListLength) {
+    const u8 requestedSong = driverTraits->requestedSong;
+    const u16 requestedPlaylist = readSectionListPtr(addrSongList + requestedSong * 2);
+    if (requestedPlaylist >= 0x0100 && requestedPlaylist < 0xfff0) {
+      guessedSongIndex = requestedSong;
     }
   }
   if (!guessedSongIndex) {
@@ -735,6 +724,7 @@ void NinSnesScanner::searchForNinSnesFromARAM(RawFile* file) {
   scanResult.songListAddr = addrSongList;
   scanResult.songStartAddr = addrSongStart;
   scanResult.sectionPtrAddr = addrSectionPtr;
+  scanResult.sectionTrackCount = sectionTrackCount;
   scanResult.instrTableAddr = addrInstrTable;
   scanResult.spcDirAddr = spcDirAddr;
   scanResult.konamiBaseAddress = konamiBaseAddress == 0xffff ? 0 : konamiBaseAddress;

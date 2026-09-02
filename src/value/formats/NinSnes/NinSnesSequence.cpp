@@ -1992,7 +1992,7 @@ struct PlaylistDecode {
 [[nodiscard]] PlaylistDecode decodePlaylist(ByteReader reader, const Layout& layout, AssetId sequenceId,
                                             SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const Profile& selected = profile(layout.profile);
-  const u8 trackCount = selected.trackCount;
+  const u8 trackCount = layout.sectionTrackCount;
   std::map<u32, PlaylistCommand> commands;
   using SectionTracks = std::vector<std::optional<Address>>;
   std::map<u32, SectionTracks> sections;
@@ -2215,7 +2215,7 @@ const SequenceProgramConfig& sequenceConfig() {
 }
 
 bool isValidPlaylist(ByteReader reader, const Layout& layout) {
-  const u8 trackCount = profile(layout.profile).trackCount;
+  const u8 trackCount = layout.sectionTrackCount;
   const SectionPlaylist& playlist = decodePlaylist(reader, layout, AssetId{}, nullptr, nullptr).playlist;
   if (playlist.commands.empty() ||
       std::ranges::none_of(playlist.commands, [](const PlaylistCommand& command) {
@@ -2276,8 +2276,8 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
       .diagnostics = diagnostics,
   };
 
-  program.tracks.reserve(selected.trackCount);
-  for (u8 track = 0; track < selected.trackCount; ++track) {
+  program.tracks.reserve(layout.sectionTrackCount);
+  for (u8 track = 0; track < layout.sectionTrackCount; ++track) {
     std::vector<Address> starts;
     for (const PlaylistCommand& command : program.sectionPlaylist->commands) {
       if (command.kind == PlaylistCommandKind::PlaySection && track < command.trackStarts.size() &&

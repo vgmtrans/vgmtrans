@@ -318,7 +318,6 @@ void applyDerivedSeqOverrides(NinSnesSeqDefinition& definition, const NinSnesPro
     case NinSnesProfileId::QuintetActR:
     case NinSnesProfileId::QuintetActR2:
     case NinSnesProfileId::FalcomYs4:
-    case NinSnesProfileId::AirManagement:
     default:
       break;
   }
@@ -338,7 +337,7 @@ constexpr NinSnesProfile kUnknownProfile{
     NinSnesIntelliModeId::None,
 };
 
-constexpr std::array<NinSnesProfile, 18> kProfiles{{
+constexpr std::array<NinSnesProfile, 17> kProfiles{{
     {NinSnesProfileId::Earlier, "Earlier", NinSnesBaseProfileId::Earlier,
      NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard,
      NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::StandardPercussion,
@@ -440,12 +439,6 @@ constexpr std::array<NinSnesProfile, 18> kProfiles{{
      NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::StandardPercussion,
      NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Standard6Byte,
      NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::None},
-
-    {NinSnesProfileId::AirManagement, "Air Management", NinSnesBaseProfileId::Standard,
-     NinSnesAddressModelId::Direct, NinSnesPlaylistModelId::Standard,
-     NinSnesNoteParamModelId::Standard, NinSnesProgramResolverId::StandardPercussion,
-     NinSnesPanModelId::StandardTable, NinSnesInstrumentLayoutId::Standard6Byte,
-     NinSnesInstrTableAddressModelId::Standard, NinSnesIntelliModeId::None, 6},
 }};
 
 }  // namespace
