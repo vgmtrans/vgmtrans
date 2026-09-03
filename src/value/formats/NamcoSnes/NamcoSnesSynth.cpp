@@ -15,6 +15,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <numeric>
 #include <set>
 #include <string>
 #include <vector>
@@ -123,8 +124,8 @@ struct Drum {
 
 }  // namespace
 
-Envelope driverEnvelope(ByteReader reader, const Layout& layout, u8 index) {
-  const auto script = tableEntry(reader, layout.envelopePointerTable(reader), index);
+Envelope driverAmplitudeEnvelope(ByteReader reader, const Layout& layout, u8 index) {
+  const auto script = tableEntry(reader, layout.amplitudeEnvelopePointerTable(reader), index);
   if (!script) {
     return snesDspEnvelope(0, 0, 0x7f);
   }
@@ -192,24 +193,26 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   const std::vector<Drum> drums = collectDrums(reader, layout, percussion);
   std::set<u8> melodic = srcns;
   melodic.insert(0);
-  const std::vector<u8> referenced = referencedSamples(melodic, drums);
-  const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, referenced);
+  const std::vector<u8> usedSrcns = referencedSamples(melodic, drums);
+  // The paired tables use one four-byte DIR and one two-byte tuning entry per SRCN.
+  const u32 srcnCount = (layout.tuningTableAddress - layout.spcDirAddress) / 4u;
+  std::vector<u8> allSrcns(srcnCount);
+  std::iota(allSrcns.begin(), allSrcns.end(), 0);
+  const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, allSrcns);
   if (catalog.samples.empty()) {
     return std::nullopt;
   }
 
   auto bank = builder.soundBank(fmt::format("{} Instruments", displayName));
   auto& instruments = bank.instruments();
-  // One four-byte DSP directory entry precedes each two-byte tuning entry.
-  const u32 tuningCount = (layout.tuningTableAddress - layout.spcDirAddress) / 4u;
   const SourceAnnotationId tuningTable =
       instruments
           .source(SourceRole::Table, "Tuning Table",
-                  reader.range(layout.tuningTableAddress, tuningCount * 2u), "namco-snes-tuning-table")
+                  reader.range(layout.tuningTableAddress, srcnCount * 2u), "namco-snes-tuning-table")
           .id();
-  for (u32 srcn = 0; srcn < tuningCount; ++srcn) {
+  for (u32 srcn = 0; srcn < srcnCount; ++srcn) {
     const u32 address = layout.tuningTableAddress + srcn * 2u;
-    const bool used = std::ranges::binary_search(referenced, static_cast<u8>(srcn));
+    const bool used = std::ranges::binary_search(usedSrcns, static_cast<u8>(srcn));
     instruments
         .source(SourceRole::TableEntry, fmt::format("Tuning {}{}", srcn, used ? "" : " (unused)"),
                 reader.range(address, 2), "namco-snes-tuning")
@@ -217,32 +220,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .field("pitch_scale", reader.range(address, 2), reader.be16(address), SourceValueDisplay::Hex)
         .description("Big-endian 8.8 pitch scale for the corresponding SRCN");
   }
-  const u16 percussionAddress = layout.percussionTable(reader);
-  const u16 percussionEnd = layout.echoFilterTable(reader);
-  const u32 percussionCount = (percussionEnd - percussionAddress) / 5u;
-  const SourceAnnotationId percussionTable =
-      instruments
-          .source(SourceRole::Table, "Percussion Table",
-                  reader.range(percussionAddress, percussionEnd - percussionAddress), "namco-snes-percussion-table")
-          .description("Each row maps its percussion key to a sample, envelope, mix, and source key; "
-                       "$55-$7F source keys select DSP noise")
-          .id();
-  for (u32 index = 0; index < percussionCount; ++index) {
-    const u32 address = percussionAddress + index * 5u;
-    const auto byte = [&](u32 offset) { return reader.range(address + offset, 1); };
-    instruments
-        .source(SourceRole::TableEntry,
-                fmt::format("Percussion {}{}", index, percussion.contains(index) ? "" : " (unused)"),
-                reader.range(address, 5), "namco-snes-percussion")
-        .parent(percussionTable)
-        .fieldsAsChildren()
-        .field("sample_srcn", byte(0), reader.u8At(address))
-        .field("envelope_preset", byte(1), reader.u8At(address + 1))
-        .field("volume", byte(2), reader.u8At(address + 2), SourceValueDisplay::Hex)
-        .field("stereo_balance", byte(3), reader.u8At(address + 3), SourceValueDisplay::Hex)
-        .field("source_key", byte(4), reader.u8At(address + 4), SourceValueDisplay::Hex);
-  }
-  const SnesBrrSampleRefs samples = addSnesBrrSamples(bank.localSamples(), reader, catalog);
+  const SnesBrrSampleRefs samples = addSnesBrrSamples(bank.localSamples(), reader, catalog, usedSrcns);
   const Envelope neutral = snesDspEnvelope(0, 0, 0x7f);
 
   std::set<u8> referencedNoise = noiseRates;

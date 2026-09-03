@@ -129,6 +129,11 @@ std::optional<SampleRef> SnesBrrSampleRefs::findSrcn(u8 srcn) const {
 
 SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reader, const SnesBrrCatalog& catalog,
                                     std::string_view directoryEntryKind) {
+  return addSnesBrrSamples(samples, reader, catalog, {}, directoryEntryKind);
+}
+
+SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reader, const SnesBrrCatalog& catalog,
+                                    std::span<const u8> usedSrcns, std::string_view directoryEntryKind) {
   samples.include(catalog.directoryRange);
   const SourceAnnotationId root =
       samples.source(SourceRole::Table, "Sample DIR", catalog.directoryRange, "snes-sample-dir").id();
@@ -139,6 +144,9 @@ SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reade
   canonicalSamples.reserve(catalog.samples.size());
   for (size_t index = 0; index < catalog.samples.size(); ++index) {
     const auto& info = catalog.samples[index];
+    const bool unused = !usedSrcns.empty() && std::ranges::find(usedSrcns, info.srcn) == usedSrcns.end();
+    const std::string name = fmt::format("Sample {}", info.srcn);
+    const char* suffix = unused ? " (unused)" : "";
     const u32 encodedLength = static_cast<u32>(info.stream.encodedData.size);
     const u32 decodedLength = (encodedLength / 9) * 16;
     const u32 lastBlockAddress = encodedLength >= 9 ? info.startAddress + encodedLength - 9 : info.startAddress;
@@ -147,7 +155,7 @@ SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reade
     const u32 loopStart = loopEnabled ? ((info.loopAddress - info.startAddress) / 9) * 16 : 0;
     auto sample = samples.add(
         info.srcn, Sample{
-                       .name = fmt::format("Sample {}", static_cast<unsigned>(info.srcn)),
+                       .name = name + suffix,
                        .codec = AudioCodec::SnesBrr,
                        .encodedData = info.stream.encodedData,
                        .sampleRate = 32000,
@@ -162,8 +170,7 @@ SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reade
                    });
 
     auto directoryEntry = sample
-                              .source(fmt::format("Sample {} DIR Entry", static_cast<unsigned>(info.srcn)),
-                                      info.directoryEntry, directoryEntryKind)
+                              .source(name + " DIR Entry" + suffix, info.directoryEntry, directoryEntryKind)
                               .field("start", reader.range(static_cast<u32>(info.directoryEntry.offset), 2),
                                      info.startAddress, SourceValueDisplay::Address)
                               .field("loop", reader.range(static_cast<u32>(info.directoryEntry.offset) + 2, 2),
@@ -171,8 +178,7 @@ SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reade
                               .link(SourceLinkRole::PointsTo, SourceTarget{info.stream.encodedData}, "BRR data")
                               .parent(root);
     sample
-        .source(fmt::format("Sample {} BRR Data", static_cast<unsigned>(info.srcn)), info.stream.encodedData,
-                "snes-brr-payload")
+        .source(name + " BRR Data" + suffix, info.stream.encodedData, "snes-brr-payload")
         .role(SourceRole::Payload)
         .parent(directoryEntry.id());
 
