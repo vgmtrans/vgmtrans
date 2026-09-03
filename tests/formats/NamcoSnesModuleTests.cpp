@@ -55,6 +55,14 @@ public:
     word(block_ + 2, 0xde00);
     word(block_ + 4, 0xdf00);
     word(block_ + 6, 0xe000);
+    if (version == Version::BlueCrystalRod) {
+      // Match the rip's DSP typo and make its live cursor, rather than song 1,
+      // identify the loaded directory row.
+      data_[0x0316] = 0x9c;
+      word(block_, 0xf020);
+      write(block_ + 8, {0, 0x00, 0x21});
+      data_[0x2100] = 0x03;
+    }
 
     word(0xdd00, 0xdd20);
     word(0xdd02, 0xdd23);
@@ -88,15 +96,16 @@ private:
   static u8 hi(u16 value) { return static_cast<u8>(value >> 8); }
 
   void selectSong(u8 song, u8 group, u16 address) {
-    data_[0x49 + group * 2u] = static_cast<u8>(0x80 | song);
+    data_[0x49 + group * 2u] = version_ == Version::BlueCrystalRod ? song : static_cast<u8>(0x80 | song);
     if (version_ == Version::YuuYuuHakushoTokubetsuHen) {
       const u16 list = static_cast<u16>(0xc100 + group * 0x20);
       word(block_ + 8 + group * 2u, list);
       word(list + song * 2u, address);
     } else {
-      const u32 row = block_ + 8 + song * 3u;
+      const u32 row = block_ + 8 + (song + (version_ == Version::BlueCrystalRod ? 1u : 0u)) * 3u;
       data_[row] = group;
       word(row + 1, address);
+      word(group * 2u, address);
     }
   }
 

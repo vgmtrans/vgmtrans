@@ -23,8 +23,8 @@ constexpr auto kTuningLoader =
                           "xxxxxx?xxx?xxxx");
 
 constexpr auto kDspDefaults = makeMaskedBytePattern(
-    "\x0c\x00\x1c\x00\x0d\x00\x2c\x00\x2d\x00\x3c\x00\x3d\x00\x4d\x00\x5d\x00\x6d\x00\x7d\x00\x6c\x00",
-    "x?x?x?x?x?x?x?x?x?x?x?x?");
+    "\x0c\x00\x1c\x00\x0d\x00\x2c\x00\x2d\x00\x3c\x00\x3d\x00\x4d\x00\x5d\x00\x6d\x00\x7d\x00",
+    "x?x?x?x?x?x?x?x?x?x?x?");
 
 [[nodiscard]] bool plausibleSequence(ByteReader reader, u16 address) {
   if (address == 0 || !reader.has(address, 1)) {
@@ -55,6 +55,19 @@ struct SequenceLocation {
                           .referenceSize = 3};
 }
 
+[[nodiscard]] std::optional<SequenceLocation> inlineSongFromCursor(ByteReader reader, u16 block, u8 group) {
+  const u16 cursor = reader.le16(group * 2u);
+  std::optional<SequenceLocation> selected;
+  for (u32 row = block + 8; row + 3 <= reader.le16(block); row += 3) {
+    const u16 start = reader.le16(row + 1);
+    if (reader.u8At(row) == group && start <= cursor && plausibleSequence(reader, start) &&
+        (!selected || start > selected->address)) {
+      selected = SequenceLocation{start, static_cast<u16>(row), 3};
+    }
+  }
+  return selected;
+}
+
 [[nodiscard]] std::optional<SequenceLocation> indirectSong(ByteReader reader, u16 block, u8 group, u8 state) {
   const u8 song = state & 0x7f;
   const u32 listPointer = block + 8 + group * 2u;
@@ -82,15 +95,20 @@ struct SequenceLocation {
                     : inlineSong(reader, static_cast<u16>(block + 8), group, state);
   };
 
-  // $49/$4b/$4d/$4f retain the song number for the four driver slots. Bit 7
-  // is set while a slot is resident, unlike $00-$07, which are live cursors.
+  // $49/$4b/$4d/$4f retain each slot's song number; zero is inactive and bit 7
+  // marks a resident song. Unlike those states, $00-$07 are live cursors.
   for (const bool requireResident : {true, false}) {
     for (u8 group = 0; group < 4; ++group) {
       const u8 state = reader.u8At(0x49 + group * 2u);
-      if ((state & 0x80) != (requireResident ? 0x80 : 0)) {
+      if (state == 0 || (state & 0x80) != (requireResident ? 0x80 : 0)) {
         continue;
       }
-      if (const auto selected = read(group, state)) {
+      // Blue Crystal Rod rips normalize newly started song numbers, but retain
+      // a live cursor that identifies the loaded directory row.
+      const auto selected = version == Version::BlueCrystalRod && !requireResident
+                                ? inlineSongFromCursor(reader, block, group)
+                                : read(group, state);
+      if (selected) {
         return selected;
       }
     }
