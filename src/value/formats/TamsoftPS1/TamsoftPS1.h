@@ -62,6 +62,7 @@ struct SequenceData {
   std::string stem;
   u32 song = 0;
   Generation generation = Generation::Ps1;
+  bool usesMusicBank = false;
 };
 
 struct BankData {

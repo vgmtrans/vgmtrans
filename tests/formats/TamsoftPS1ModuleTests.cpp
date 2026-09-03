@@ -187,20 +187,28 @@ void externalChannelBecomesAnInheritedDelayedTrack() {
          "F9 should inherit the source voice's current mixer state");
 }
 
-void modulePairsNativeTvbWithoutRenaming() {
+void modulePairsPs1MusicAndSfxBanksByRole() {
   Session session;
   session.registerFormat(module());
-  session.addSource(SourceFile{.name = "C00BGM.TSQ", .path = "/fixture/C00/C00BGM.TSQ"},
+  session.addSource(SourceFile{.name = "C27BGM.TSQ", .path = "/fixture/C27/C27BGM.TSQ"}, bgm(false));
+  session.addSource(SourceFile{.name = "C27.TSQ", .path = "/fixture/C27/C27.TSQ"},
                     sfx({0xe2, 1, 0xb0, 1, 0xf0, 0xff}));
-  session.addSource(SourceFile{.name = "C00.TVB", .path = "/fixture/C00/C00.TVB"}, bank(false));
+  session.addSource(SourceFile{.name = "C27.TVB", .path = "/fixture/C27/C27.TVB"}, bank(false));
+  session.addSource(SourceFile{.name = "BGM.TVB", .path = "/fixture/SYS/BGM.TVB"}, bank(false));
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
-  expect(snapshot.collections().size() == 1 && snapshot.collections().front().members.soundBanks.size() == 1,
-         "a CxxBGM TSQ should pair with its same-directory native .TVB bank");
-  const auto* soundBank = snapshot.asset<SoundBankAsset>(snapshot.collections().front().members.soundBanks.front());
-  expect(soundBank != nullptr && soundBank->instruments.size() == 1 &&
-             soundBank->instruments.front().identity == instrumentIdentity(1),
-         "the TVB should expose its playable program without a fake .TVB2 extension");
+  const auto pairedBank = [&](std::string_view collectionName) -> const SoundBankAsset* {
+    const auto collection = std::ranges::find_if(snapshot.collections(), [&](const Collection& candidate) {
+      return candidate.name.starts_with(collectionName);
+    });
+    return collection == snapshot.collections().end() || collection->members.soundBanks.size() != 1
+               ? nullptr
+               : snapshot.asset<SoundBankAsset>(collection->members.soundBanks.front());
+  };
+  const auto* music = pairedBank("C27BGM");
+  const auto* sfxBank = pairedBank("C27 (");
+  expect(music != nullptr && music->metadata.name == "BGM" && sfxBank != nullptr && sfxBank->metadata.name == "C27",
+         "PS1 music should use the global BGM bank while stage SFX uses its exact same-directory bank");
 }
 
 }  // namespace
@@ -209,5 +217,5 @@ void runTamsoftPs1ModuleTests() {
   layoutsDistinguishDriverGenerationsAndPlayedTracks();
   sequenceUsesAuditedMixerPitchReverbAndDelaySemantics();
   externalChannelBecomesAnInheritedDelayedTrack();
-  modulePairsNativeTvbWithoutRenaming();
+  modulePairsPs1MusicAndSfxBanksByRole();
 }
