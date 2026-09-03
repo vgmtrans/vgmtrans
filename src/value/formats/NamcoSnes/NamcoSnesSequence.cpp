@@ -105,7 +105,7 @@ enum Parameter : u8 {
   kPortamento,
   kPitchRate,
   kPitchDepth,
-  kEnvelope,
+  kAmplitudeEnvelope,
   kParameterCount,
 };
 
@@ -129,7 +129,7 @@ constexpr std::array<ParameterCommand, kParameterCount> kParameterCommands{{
     {"Portamento Speed", SequenceSemantic::Portamento, SemanticOperandRole::Duration},
     {"Pitch Envelope Rate", SequenceSemantic::Modulation, SemanticOperandRole::Modulation},
     {"Pitch Envelope Depth", SequenceSemantic::Modulation, SemanticOperandRole::Modulation},
-    {"Envelope Preset", SequenceSemantic::Envelope, SemanticOperandRole::Value},
+    {"Amplitude Envelope", SequenceSemantic::Envelope, SemanticOperandRole::Value},
 }};
 
 struct DriverData {
@@ -185,7 +185,7 @@ struct TrackState {
     commandControls[kVolume] = 0x88;
     commandControls[kBalance] = 0x88;
     for (const Parameter parameter :
-         {kGate, kPitchEnvelope, kTranspose, kFineTuning, kPortamento, kEnvelope}) {
+         {kGate, kPitchEnvelope, kTranspose, kFineTuning, kPortamento, kAmplitudeEnvelope}) {
       commandControls[parameter] = 0;
     }
     resetPhysicalVoice();
@@ -392,7 +392,7 @@ struct Playback {
   void beginAttack(VoiceInstrument instrument) {
     endNote(vm.tick());
     selectInstrument(instrument);
-    out.replaceEnvelope(driverEnvelope(reader(), layout(), track.liveControls[kEnvelope]),
+    out.replaceEnvelope(driverAmplitudeEnvelope(reader(), layout(), track.liveControls[kAmplitudeEnvelope]),
                         VoiceEnvelopeScope::FutureAttacks);
   }
 
@@ -450,7 +450,7 @@ struct Playback {
 
   void latchPercussion(const PercussionTrigger& percussion) {
     track.liveControls[kSrcn] = percussion.srcn;
-    track.liveControls[kEnvelope] = percussion.envelope;
+    track.liveControls[kAmplitudeEnvelope] = percussion.envelope;
     track.liveControls[kVolume] = percussion.volume;
     track.liveControls[kBalance] = percussion.balance;
   }

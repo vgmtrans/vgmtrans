@@ -81,7 +81,8 @@ public:
   [[nodiscard]] std::optional<SampleRef> findSrcn(u8 srcn) const;
 
 private:
-  friend SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder&, ByteReader, const SnesBrrCatalog&, std::string_view);
+  friend SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder&, ByteReader, const SnesBrrCatalog&,
+                                             std::span<const u8>, std::string_view);
 
   struct Entry {
     u8 srcn = 0;
@@ -96,5 +97,9 @@ private:
 [[nodiscard]] SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reader,
                                                   const SnesBrrCatalog& catalog,
                                                   std::string_view directoryEntryKind = "snes-sample-dir-entry");
+// A non-empty usedSrcns span labels every other catalog entry as unused.
+[[nodiscard]] SnesBrrSampleRefs addSnesBrrSamples(
+    SamplePoolBuilder& samples, ByteReader reader, const SnesBrrCatalog& catalog,
+    std::span<const u8> usedSrcns, std::string_view directoryEntryKind = "snes-sample-dir-entry");
 
 }  // namespace vgmtrans::core

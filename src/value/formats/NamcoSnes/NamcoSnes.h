@@ -43,7 +43,7 @@ struct Layout {
   u16 spcDirAddress;
   bool mono;
 
-  [[nodiscard]] u16 envelopePointerTable(core::ByteReader reader) const {
+  [[nodiscard]] u16 amplitudeEnvelopePointerTable(core::ByteReader reader) const {
     return reader.le16(dataPointerBlockAddress);
   }
   [[nodiscard]] u16 pitchEnvelopePointerTable(core::ByteReader reader) const {
@@ -70,7 +70,7 @@ struct SequenceParse {
                                            core::AssetId sequenceId, core::SourceMapBuilder* sourceMap = nullptr,
                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
-[[nodiscard]] core::Envelope driverEnvelope(core::ByteReader reader, const Layout& layout, u8 index);
+[[nodiscard]] core::Envelope driverAmplitudeEnvelope(core::ByteReader reader, const Layout& layout, u8 index);
 [[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
                                                                const std::set<u8>& srcns,
                                                                const std::set<u8>& percussion,
