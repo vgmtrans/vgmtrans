@@ -35,11 +35,22 @@ using BankEntry = AssetWithData<SoundBankAsset, BankData>;
 }
 
 [[nodiscard]] int matchScore(const SequenceEntry& sequence, const BankEntry& bank) {
-  if (sequence.data->generation != bank.data->generation || directory(sequence.source) != directory(bank.source)) {
+  if (sequence.data->generation != bank.data->generation) {
     return -1;
   }
   const std::string sequenceStem = folded(sequence.data->stem);
   const std::string bankStem = folded(bank.data->stem);
+
+  if (sequence.data->generation == Generation::Ps1) {
+    if (sequence.data->usesMusicBank) {
+      return bankStem == "BGM" ? 30 : -1;
+    }
+    return sequenceStem == bankStem && directory(sequence.source) == directory(bank.source) ? 30 : -1;
+  }
+
+  if (directory(sequence.source) != directory(bank.source)) {
+    return -1;
+  }
   if (sequenceStem == bankStem) {
     return 30;
   }
@@ -76,7 +87,7 @@ std::vector<DesiredCollection> resolveCollections(const CollectionDiscoveryConte
         matches.push_back(&bank);
       }
     }
-    if (matches.empty()) {
+    if (matches.empty() && sequence.data->generation == Generation::Ps2) {
       const auto sameGeneration = [&](const BankEntry& bank) {
         return bank.data->generation == sequence.data->generation;
       };

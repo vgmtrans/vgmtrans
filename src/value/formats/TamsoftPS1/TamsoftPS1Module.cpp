@@ -51,6 +51,9 @@ namespace {
   ScanResultBuilder result(input, std::string(kFormatName));
   const std::string fileStem = sourceStem(input.source);
   const std::string stem = fileStem.empty() ? result.sourceDisplayName() : fileStem;
+  const bool usesMusicBank = std::ranges::any_of(sequences, [](const SequenceLayout& layout) {
+    return layout.type == 0;
+  });
   if (bank && !addBank(result, *bank, stem)) {
     result.warning("Tamsoft TVB was recognized, but no playable instruments were found", input.reader.range(0, 0x800));
   }
@@ -59,7 +62,12 @@ namespace {
     auto sequence = result.sequence(name, input.reader.range(0, input.reader.size()));
     sequence
         .program(parseSequence(input.reader, sequence.id(), layout, &result.sourceMap(), &result.diagnostics()))
-        .data(SequenceData{.stem = stem, .song = layout.song, .generation = layout.generation});
+        .data(SequenceData{
+            .stem = stem,
+            .song = layout.song,
+            .generation = layout.generation,
+            .usesMusicBank = usesMusicBank,
+        });
   }
   return result.finish();
 }
