@@ -29,6 +29,7 @@ void runSonyPs1CollectionBindingTests();
 void suzukiPs1DynamicAdsrUsesAuditedDriverCommands();
 void suzukiPs1ModuleBuildsFractionallyTunedWdsSynth();
 void runTriAcePs1ModuleTests();
+void runTamsoftPs1ModuleTests();
 void hosaSequencePreservesAuditedGrammarAndMixer();
 void hosaVibratoUsesExactDriverTables();
 void hosaUnterminatedFinalTrackStopsAtZeroPadding();
@@ -443,6 +444,7 @@ int main() {
     runHeartBeatPs1ModuleTests();
     runKonamiPs1ModuleTests();
     runTriAcePs1ModuleTests();
+    runTamsoftPs1ModuleTests();
     hosaSequencePreservesAuditedGrammarAndMixer();
     hosaVibratoUsesExactDriverTables();
     hosaUnterminatedFinalTrackStopsAtZeroPadding();

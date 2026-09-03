@@ -389,6 +389,11 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1Module.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1Sequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1Synth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TamsoftPS1/TamsoftPS1Layout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TamsoftPS1/TamsoftPS1Module.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TamsoftPS1/TamsoftPS1Resolver.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TamsoftPS1/TamsoftPS1Sequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TamsoftPS1/TamsoftPS1Synth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnesLayout.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnesSequence.cpp
@@ -443,6 +448,7 @@ target_sources(vgmtransvalueformats
       ${PROJECT_SOURCE_DIR}/src/value/formats/SoftCreatSnes/SoftCreatSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SquarePS2/SquarePS2.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/TamsoftPS1/TamsoftPS1.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/formats/WolfTeamSnes/WolfTeamSnes.h
       ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.h
