@@ -20,6 +20,14 @@ namespace vgmtrans::formats::mp2k {
 
 inline constexpr std::string_view kMp2kFormatName = "MP2k";
 
+[[nodiscard]] inline std::optional<u32> romOffset(u32 address, core::ByteReader reader, u64 size = 1) {
+  if ((address & 0xfe000000) != 0x08000000) {
+    return std::nullopt;
+  }
+  const u32 offset = address & 0x01ffffff;
+  return reader.has(offset, size) ? std::optional<u32>{offset} : std::nullopt;
+}
+
 struct Mp2kEngine {
   u32 settingsOffset = 0;
   u32 songTableOffset = 0;
@@ -77,11 +85,13 @@ struct Mp2kLayout {
 [[nodiscard]] std::vector<Mp2kLayout> findMp2kLayouts(core::ScanResultBuilder& builder);
 
 [[nodiscard]] const core::SequenceProgramConfig& mp2kSequenceConfig();
-[[nodiscard]] core::SequenceProgram parseMp2kSequenceProgram(core::ByteReader reader, core::AssetId id,
+[[nodiscard]] core::SequenceProgram parseMp2kSequenceProgram(core::RetainedSource source, core::AssetId id,
                                                              const Mp2kSong& song, std::span<const Mp2kTone> tones,
                                                              core::SourceMapBuilder* sourceMap = nullptr,
                                                              std::vector<core::Diagnostic>* diagnostics = nullptr);
 
+[[nodiscard]] std::optional<Mp2kTone> parseMp2kTone(core::ByteReader reader, u32 offset,
+                                                    std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] core::ScanSamplePoolDraft addMp2kPsgSamples(core::ScanResultBuilder& builder, u32 sampleRate);
 [[nodiscard]] Mp2kScannedBank addMp2kInstrumentSet(core::ScanResultBuilder& builder, const Mp2kBank& bank,
                                                    u32 sampleRate, u8 directSoundMasterVolume, u8 dacBits,

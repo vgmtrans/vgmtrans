@@ -39,7 +39,7 @@ namespace {
   };
 }
 
-void scanLayout(const Mp2kLayout& layout, ScanResultBuilder& result) {
+void scanLayout(const Mp2kLayout& layout, ScanResultBuilder& result, const RetainedSource& source) {
   auto psg = addMp2kPsgSamples(result, layout.engine.sampleRate);
   std::map<u32, Mp2kScannedBank> banks;
   for (const auto& bank : layout.banks) {
@@ -58,8 +58,8 @@ void scanLayout(const Mp2kLayout& layout, ScanResultBuilder& result) {
     auto sequence = result.sequence(name, result.reader().range(song.offset, headerSize));
     const auto bank = banks.find(song.bankOffset);
     const std::span<const Mp2kTone> tones = bank == banks.end() ? std::span<const Mp2kTone>{} : bank->second.tones;
-    sequence.program(parseMp2kSequenceProgram(result.reader(), sequence.id(), song, tones, &result.sourceMap(),
-                                              &result.diagnostics()));
+    sequence.program(
+        parseMp2kSequenceProgram(source, sequence.id(), song, tones, &result.sourceMap(), &result.diagnostics()));
 
     auto collection =
         result.collection(name, collectionKey(result.source(), layout.engine.songTableOffset, song.index));
@@ -72,8 +72,9 @@ void scanLayout(const Mp2kLayout& layout, ScanResultBuilder& result) {
 
 [[nodiscard]] ScanResult scanMp2k(const ScanInput& input) {
   ScanResultBuilder result(input, std::string(kMp2kFormatName));
+  const RetainedSource source = input.retain();
   for (const auto& layout : findMp2kLayouts(result)) {
-    scanLayout(layout, result);
+    scanLayout(layout, result, source);
   }
   return result.finish();
 }

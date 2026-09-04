@@ -7,6 +7,7 @@
 #pragma once
 
 #include "value/base/CoreTypes.h"
+#include "value/synth/SynthMath.h"
 
 #include <cmath>
 #include <limits>
@@ -46,9 +47,13 @@ inline constexpr double kGbaMixerFrameRate = 16777216.0 / 280896.0;
   return rate == 0 ? 0.0 : directDecaySeconds(rate);
 }
 
-[[nodiscard]] inline double cgbEnvelopeSeconds(u8 rate) {
-  const u8 period = rate & 7;
-  return period == 0 ? 0.0 : 15.0 * period / 64.0;
+[[nodiscard]] inline double cgbEnvelopeSeconds(u8 counter, u8 levels = 15) {
+  return counter == 0 ? 0.0 : static_cast<double>(levels) * counter / 64.0;
+}
+
+[[nodiscard]] inline double cgbDecaySeconds(u8 counter, u8 levels = 15) {
+  // CGB envelopes step linearly in amplitude; SF2 and DLS decay linearly in dB.
+  return core::linearAmplitudeFadeToDbEnvelopeSeconds(cgbEnvelopeSeconds(counter, levels));
 }
 
 }  // namespace vgmtrans::formats::mp2k
