@@ -8,7 +8,9 @@
 #include "VGMSamp.h"
 #include "VGMSampColl.h"
 
+#include <span>
 #include <string>
+#include <utility>
 #include <vector>
 
 // All of the ADSR calculations herein (except where inaccurate) are derived from Neill Corlett's work in
@@ -337,7 +339,10 @@ class PSXSampColl : public VGMSampColl {
 
   bool parseSampleInfo() override;        //retrieve sample info, including pointers to data, # channels, rate, etc.
   static PSXSampColl *searchForPSXADPCM(RawFile *file, const std::string &format);
-  static std::vector<PSXSampColl *> searchForPSXADPCMs(RawFile *file, const std::string &format);
+  // Ranges are half-open and sorted by start offset.
+  static std::vector<PSXSampColl *>
+  searchForPSXADPCMs(RawFile *file, const std::string &format,
+                     std::span<const std::pair<u32, u32>> excludedRanges = {});
 
  protected:
   std::vector<SizeOffsetPair> vagLocations;

@@ -271,6 +271,7 @@ class SF2File: public RiffFile {
   ~SF2File() override = default;
 
   static int numOfGeneratorsForRgn(SynthRgn* rgn);
+  static bool canRepresent(const SynthFile& synthfile, const ConversionContext& context);
 
   std::vector<u8> saveToMem();
   bool saveSF2File(const std::filesystem::path &filepath);
