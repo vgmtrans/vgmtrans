@@ -59,6 +59,9 @@ namespace {
 
 constexpr double kPsgSampleFrequency = 440.0;
 constexpr u32 kPsgLoopGuardSamples = 8;
+constexpr u32 kPsgSquareReferencePeriod = 128;
+constexpr u32 kPsgSquareSampleRate = static_cast<u32>(kPsgSampleFrequency) * kPsgSquareReferencePeriod;
+constexpr u64 kPsgSquareKeyBase = u64{1} << 63;
 constexpr u64 kProgrammableWaveKeyBase = u64{1} << 32;
 // Aria routes the summed CGB envelope through one hardware-volume lane while
 // DirectSound mixes independent left and right lanes. With both GBA output
@@ -129,6 +132,17 @@ struct SynthContext {
 [[nodiscard]] double cgbClockHertz(u8 channel, u8 key, bool fixed, u8 dacBits) {
   const double numerator = channel == 3 ? 65536.0 : 131072.0;
   return numerator / (2048 - cgbFrequencyRegister(key, fixed, dacBits));
+}
+
+[[nodiscard]] u32 psgSquarePeriod(double hertz) {
+  // Keep sample playback near unity so transposition does not drag the
+  // pulse's band-limited edge harmonics down with its fundamental.
+  const s32 octave = std::clamp<s32>(std::lround(std::log2(hertz / kPsgSampleFrequency)), -3, 4);
+  return octave < 0 ? kPsgSquareReferencePeriod << -octave : kPsgSquareReferencePeriod >> octave;
+}
+
+[[nodiscard]] u64 psgSquareKey(u32 duty, u32 period) {
+  return period == kPsgSquareReferencePeriod ? duty : kPsgSquareKeyBase | (static_cast<u64>(duty) << 32) | period;
 }
 
 [[nodiscard]] InstrumentModulation mp2kModulation() {
@@ -232,12 +246,16 @@ struct SynthContext {
 [[nodiscard]] std::optional<Region> regionForTone(SynthContext& context, const Mp2kTone& tone, KeyRange keys,
                                                   std::optional<u8> rhythmKey = std::nullopt) {
   const u8 cgbType = tone.cgbType();
+  const u8 pitchKey = rhythmKey ? tone.key : keys.low;
+  const double cgbHertz =
+      cgbType >= 1 && cgbType <= 3 ? cgbClockHertz(cgbType, pitchKey, tone.fixed(), context.dacBits) : 0.0;
+  const u32 squarePeriod = cgbType == 1 || cgbType == 2 ? psgSquarePeriod(cgbHertz) : 0;
   std::optional<SampleRef> sample;
   double unity = 69.0;
   if (cgbType == 0) {
     sample = addPcmSample(context, tone.wave, tone.reverse(), unity);
   } else if (cgbType == 1 || cgbType == 2) {
-    sample = context.psg.find(tone.wave & 3);
+    sample = context.psg.find(psgSquareKey(tone.wave & 3, squarePeriod));
   } else if (cgbType == 3) {
     sample = programmableWave(context.builder, context.psg, tone.wave);
   } else if (cgbType == 4) {
@@ -247,12 +265,13 @@ struct SynthContext {
     return std::nullopt;
   }
 
-  const u8 pitchKey = rhythmKey ? tone.key : keys.low;
   if (cgbType == 4) {
     unity = keys.low - 12.0 * std::log2(noiseClockHertz(pitchKey) / context.sampleRate);
-  } else if (cgbType >= 1 && cgbType <= 3) {
-    unity = keys.low -
-            12.0 * std::log2(cgbClockHertz(cgbType, pitchKey, tone.fixed(), context.dacBits) / kPsgSampleFrequency);
+  } else if (cgbType == 1 || cgbType == 2) {
+    const double sampleHertz = static_cast<double>(kPsgSquareSampleRate) / squarePeriod;
+    unity = keys.low - 12.0 * std::log2(cgbHertz / sampleHertz);
+  } else if (cgbType == 3) {
+    unity = keys.low - 12.0 * std::log2(cgbHertz / kPsgSampleFrequency);
   } else if (cgbType == 0 && tone.fixed()) {
     // SoundMainRAM uses a literal 0x800000 phase increment for FIX voices,
     // so every played key must reproduce the sample at the mixer rate.
@@ -354,15 +373,19 @@ ScanSamplePoolDraft addMp2kPsgSamples(ScanResultBuilder& builder, u32 sampleRate
   auto pool = builder.samplePool("MP2k PSG samples");
   auto& samples = pool.samples();
   constexpr std::array<std::string_view, 4> names{"12.5%", "25%", "50%", "75%"};
+  const auto addSquare = [&](u32 duty, u32 period) {
+    samples.add(psgSquareKey(duty, period),
+                Sample{
+                    .name = fmt::format("PSG square {} ({} Hz)", names[duty], kPsgSquareSampleRate / period),
+                    .codec = AudioCodec::GbaPsg,
+                    .encodedData = builder.reader().range(0, 0),
+                    .sampleRate = kPsgSquareSampleRate,
+                    .loop = Loop{.enabled = true, .start = kPsgLoopGuardSamples, .length = period},
+                    .codecParameter = duty,
+                });
+  };
   for (u32 duty = 0; duty < names.size(); ++duty) {
-    samples.add(duty, Sample{
-                          .name = fmt::format("PSG square {}", names[duty]),
-                          .codec = AudioCodec::GbaPsg,
-                          .encodedData = builder.reader().range(0, 0),
-                          .sampleRate = sampleRate,
-                          .loop = Loop{.enabled = true, .start = kPsgLoopGuardSamples, .length = sampleRate},
-                          .codecParameter = duty,
-                      });
+    addSquare(duty, kPsgSquareReferencePeriod);
   }
   constexpr std::array noise{
       std::pair{"PSG noise (15-bit)", 32767u},
@@ -378,6 +401,13 @@ ScanSamplePoolDraft addMp2kPsgSamples(ScanResultBuilder& builder, u32 sampleRate
                          .loop = Loop{.enabled = true, .start = kPsgLoopGuardSamples, .length = noise[index].second},
                          .codecParameter = key,
                      });
+  }
+  for (u32 period = 8; period <= 1024; period *= 2) {
+    if (period != kPsgSquareReferencePeriod) {
+      for (u32 duty = 0; duty < names.size(); ++duty) {
+        addSquare(duty, period);
+      }
+    }
   }
   return pool;
 }

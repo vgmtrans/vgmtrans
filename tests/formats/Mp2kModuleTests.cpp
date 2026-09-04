@@ -212,8 +212,8 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
          "DirectSound attack conversion must retain the final partial integer step");
 
   const auto* psg = snapshot.asset<SamplePoolAsset>(collection.members.samplePools[0]);
-  expect(psg != nullptr && psg->pool.samples.size() == 7 && instruments->localSamples.samples.size() == 1,
-         "MP2k synth should generate square and both noise-width PSG sounds plus the referenced wave-RAM sound");
+  expect(psg != nullptr && psg->pool.samples.size() == 35 && instruments->localSamples.samples.size() == 1,
+         "MP2k synth should generate octave-banked square, both noise-width, and referenced wave-RAM sounds");
   expect(instruments->instruments[1].regions.size() == 128 && instruments->instruments[2].regions.size() == 128,
          "melodic PSG regions should retain the driver's key-clamped hardware frequency registers");
   const auto& waveA4 = instruments->instruments[1].regions[69];
@@ -222,6 +222,10 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
   const double squareA4Hertz = 440.0 * std::exp2((69.0 - squareA4.unityKey) / 12.0);
   expect(std::abs(waveA4Hertz - 65536.0 / 298.0) < 1e-9 && std::abs(squareA4Hertz - 131072.0 / 298.0) < 1e-9,
          "programmable wave must use half the square clock after the exact MP2k frequency-table lookup");
+  const auto& squareBass = instruments->instruments[2].regions[46];
+  const auto& squareBassSample = psg->pool.samples[squareBass.sample.index()];
+  expect(squareBassSample.sampleRate == 56320 && squareBassSample.loop.length == 512,
+         "bass square regions should use a nearby source octave instead of pitching the 440 Hz sample far downward");
   const auto decodedPcm = decodeSample(instruments->localSamples.samples.front(), session.sources().bytes(source));
   expect(decodedPcm && decodedPcm->pcm.size() == 16 && decodedPcm->loop.enabled && decodedPcm->loop.start == 8,
          "MP2k DirectSound samples should preserve PCM data and loop points");
@@ -446,7 +450,11 @@ void mp2kCgbFixedToneUsesDacResolutionMask() {
   expect(instruments && instruments->instruments.size() == 3 && instruments->instruments[2].regions.size() == 128,
          "CGB FIX fixture should retain singleton hardware-pitch regions");
   const Region& key37 = instruments->instruments[2].regions[37];
-  const double renderedFrequency = 440.0 * std::exp2((37.0 - key37.unityKey) / 12.0);
+  const auto* psg = snapshot.asset<SamplePoolAsset>(collection.members.samplePools.front());
+  expect(psg != nullptr, "CGB FIX fixture should retain its PSG sample pool");
+  const Sample& sample = psg->pool.samples[key37.sample.index()];
+  const double renderedFrequency =
+      static_cast<double>(sample.sampleRate) / sample.loop.length * std::exp2((37.0 - key37.unityKey) / 12.0);
   expect(std::abs(renderedFrequency - 131072.0 / (2048.0 - 158.0)) < 1e-9,
          "8-bit DAC mode should round a CGB FIX register upward to an even value");
 }
