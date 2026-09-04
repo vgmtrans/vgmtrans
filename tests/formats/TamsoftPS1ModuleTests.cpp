@@ -50,7 +50,7 @@ std::vector<u8> sfx(std::vector<u8> events) {
 }
 
 std::vector<u8> bgm(Generation generation) {
-  const u32 records = generation == Generation::Ps2 ? kPs2VoiceCount : kPs1VoiceCount;
+  const u32 records = generation == Generation::Ps2 ? 48 : 24;
   const u32 header = 8;
   const u32 track = header + records * 4;
   std::vector<u8> bytes(track + 1, 0);
@@ -65,13 +65,12 @@ std::vector<u8> bgm(Generation generation) {
 
 std::vector<u8> bank(Generation generation) {
   constexpr u32 sampleSize = 0x30;
-  std::vector<u8> bytes(kBankHeaderSize + sampleSize, 0);
+  std::vector<u8> bytes(0x800 + sampleSize, 0);
   le32(bytes, 4, 0x10);       // program 1
-  le32(bytes, kProgramTableSize - 4, sampleSize);
-  le32(bytes, kProgramTableSize + 4,
-       generation == Generation::Ps2 ? 0xd2f2e11e : 0xdfe080ff);
-  bytes[kBankHeaderSize + 0x10] = 0x11;
-  bytes[kBankHeaderSize + 0x11] = 1;
+  le32(bytes, 0x3fc, sampleSize);
+  le32(bytes, 0x404, generation == Generation::Ps2 ? 0xd2f2e11e : 0xdfe080ff);
+  bytes[0x810] = 0x11;
+  bytes[0x811] = 1;
   return bytes;
 }
 
@@ -89,12 +88,10 @@ std::vector<const Event*> events(const PerformanceTrack& track) {
 void layoutsDistinguishDriverGenerationsAndPlayedTracks() {
   const auto ps1 = readSequenceLayouts(ByteReader(SourceId{300}, bgm(Generation::Ps1)));
   const auto ps2 = readSequenceLayouts(ByteReader(SourceId{301}, bgm(Generation::Ps2)));
-  expect(ps1.size() == 1 && ps1.front().generation == Generation::Ps1 &&
-             ps1.front().tracks.size() == kPs1VoiceCount,
+  expect(ps1.size() == 1 && ps1.front().generation == Generation::Ps1 && ps1.front().tracks.size() == 24,
          "PS1 BGM headers should execute all 24 driver work records");
-  expect(ps2.size() == 1 && ps2.front().generation == Generation::Ps2 &&
-             ps2.front().headerSize == kPs2VoiceCount * 4 &&
-             ps2.front().tracks.size() == kPs2MusicVoiceCount,
+  expect(ps2.size() == 1 && ps2.front().generation == Generation::Ps2 && ps2.front().headerSize == 0xc0 &&
+             ps2.front().tracks.size() == 36,
          "HG2 should retain its 48-record header while executing the 36 records used by reqmus");
 
   const auto ps1Bank = readBankLayout(ByteReader(SourceId{302}, bank(Generation::Ps1)));

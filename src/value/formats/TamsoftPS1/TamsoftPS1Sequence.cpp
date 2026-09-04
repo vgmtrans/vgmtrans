@@ -28,10 +28,6 @@ namespace {
 
 constexpr u32 kPpqn = 24;
 constexpr u32 kMaximumCommands = 1'048'576;
-constexpr u8 kStereoBalanceUnit = 64;
-constexpr double kSpuRegisterMaximum = 16'383.0;
-constexpr u16 kSpuUnityPitch = 4096;
-constexpr double kSpuUnityKey = 48.0;
 constexpr u32 kPs1InitialTempo = 404'770;  // 53.2224 MHz / 3413 / 263 VBlanks per second.
 constexpr u32 kPs2InitialTempo = 400'400;  // NTSC 60000/1001 VBlanks per second.
 
@@ -60,11 +56,7 @@ constexpr std::array<u16, 73> kPitchTable{
   // (volume * side * 0x100) >> 8 to a 0x3fff-full-scale SPU register.
   // Keeping the default side (64) in this lane makes the independent E1
   // stereo-balance lane compose to the exact source gain.
-  return static_cast<double>(value) * kStereoBalanceUnit / kSpuRegisterMaximum;
-}
-
-[[nodiscard]] double stereoBalanceGain(u8 value) {
-  return static_cast<double>(value) / kStereoBalanceUnit;
+  return static_cast<double>(value) * 64.0 / 16'383.0;
 }
 
 [[nodiscard]] double signedReverbDepth(u8 value) {
@@ -76,15 +68,14 @@ constexpr std::array<u16, 73> kPitchTable{
 }
 
 [[nodiscard]] double pitchKey(u16 pitch) {
-  return pitch == 0 ? 0.0
-                    : kSpuUnityKey + 12.0 * std::log2(static_cast<double>(pitch) / kSpuUnityPitch);
+  return pitch == 0 ? 0.0 : 48.0 + 12.0 * std::log2(static_cast<double>(pitch) / 4096.0);
 }
 
 struct VoiceState {
   u8 program = 0;
   u8 volume = 200;
-  u8 left = kStereoBalanceUnit;
-  u8 right = kStereoBalanceUnit;
+  u8 left = 64;
+  u8 right = 64;
   u16 pitchScale = 0;
   bool reverb = false;
 
@@ -107,34 +98,32 @@ struct RuntimeConfig {
   std::vector<TrackSeed> seeds;
 };
 
-void closeDanglingNotes(PerformanceSequence& performance) {
-  // A driver voice can still be keyed when loop-limited rendering stops.
-  // Close that final attack at the rendered boundary instead of publishing
-  // an accidental zero-duration note.
-  for (auto& track : performance.tracks) {
-    std::set<u32> continuedNotes;
-    for (const auto& automation : track.automations) {
-      const auto* pitch = std::get_if<PitchTransitionIntent>(&automation.intent);
-      if (pitch != nullptr && pitch->previousNote) {
-        continuedNotes.insert(pitch->previousNote->value);
-      }
-    }
-    for (auto& event : track.events) {
-      auto* note = std::get_if<NotePerformanceEvent>(&event);
-      if (note != nullptr && note->durationTicks == 0 && !continuedNotes.contains(note->note.value)) {
-        const u64 available = track.endTick > note->header.tick ? track.endTick - note->header.tick : 1;
-        note->durationTicks = static_cast<u32>(std::min<u64>(available, std::numeric_limits<u32>::max()));
-      }
-    }
-  }
-}
-
 struct ProgramState {
   explicit ProgramState(const RuntimeConfig& config)
       : reverbMode(config.generation == Generation::Ps1 ? 3 : 0),
         reverbDepth(config.generation == Generation::Ps1 ? 0.5 : 32767.0 / 32768.0) {}
 
-  void finalizePerformance(PerformanceSequence& performance) { closeDanglingNotes(performance); }
+  void finalizePerformance(PerformanceSequence& performance) {
+    // A driver voice can still be keyed when loop-limited rendering stops.
+    // Close that final attack at the rendered boundary instead of publishing
+    // an accidental zero-duration note.
+    for (auto& track : performance.tracks) {
+      std::set<u32> continuedNotes;
+      for (const auto& automation : track.automations) {
+        const auto* pitch = std::get_if<PitchTransitionIntent>(&automation.intent);
+        if (pitch != nullptr && pitch->previousNote) {
+          continuedNotes.insert(pitch->previousNote->value);
+        }
+      }
+      for (auto& event : track.events) {
+        auto* note = std::get_if<NotePerformanceEvent>(&event);
+        if (note != nullptr && note->durationTicks == 0 && !continuedNotes.contains(note->note.value)) {
+          const u64 available = track.endTick > note->header.tick ? track.endTick - note->header.tick : 1;
+          note->durationTicks = static_cast<u32>(std::min<u64>(available, std::numeric_limits<u32>::max()));
+        }
+      }
+    }
+  }
 
   u8 reverbMode = 0;
   double reverbDepth = 0.0;
@@ -171,7 +160,7 @@ struct Playback {
     track.initialized = true;
     out.instrument(instrumentIdentity(track.program));
     out.level(levelGain(track.volume));
-    out.stereoBalance(stereoBalanceGain(track.left), stereoBalanceGain(track.right));
+    out.stereoBalance(track.left / 64.0, track.right / 64.0);
     emitReverb();
   }
 
@@ -195,8 +184,7 @@ struct Playback {
   void keyOn(u8 key) {
     const u16 pitch = key < kPitchTable.size()
                           ? kPitchTable[key]
-                          : static_cast<u16>(std::min(kSpuRegisterMaximum,
-                                                      kSpuUnityPitch * std::exp2((key - kSpuUnityKey) / 12.0)));
+                          : static_cast<u16>(std::min(16'383.0, 4096.0 * std::exp2((key - 48) / 12.0)));
     attack(pitchKey(scaledPitch(pitch, track.pitchScale)));
   }
 
@@ -208,7 +196,7 @@ struct Playback {
   void setStereoBalance(u8 left, u8 right) {
     track.left = left;
     track.right = right;
-    out.stereoBalance(stereoBalanceGain(left), stereoBalanceGain(right));
+    out.stereoBalance(left / 64.0, right / 64.0);
   }
 
   void setInstrument(u8 value) {
