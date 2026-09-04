@@ -94,6 +94,8 @@ void annotateEnvelope(AnnotationBuilder& annotation, const Envelope& envelope) {
       return "NDS IMA ADPCM";
     case AudioCodec::NdsPsg:
       return "NDS PSG";
+    case AudioCodec::GbaDirectSound:
+      return "GBA DirectSound";
     case AudioCodec::GbaBdpcm:
       return "GBA BDPCM";
     case AudioCodec::GbaPsg:

@@ -132,6 +132,7 @@ enum class AudioCodec {
   SnesDspNoise,
   NdsImaAdpcm,
   NdsPsg,
+  GbaDirectSound,
   GbaBdpcm,
   GbaPsg,
   GbaPsgWave,
@@ -158,7 +159,7 @@ struct Sample {
   bool reverse = false;
   Loop loop;
   Tuning pitch;
-  u32 codecParameter = 0;
+  u64 codecParameter = 0;
   double attenuationDb = 0.0;
 };
 

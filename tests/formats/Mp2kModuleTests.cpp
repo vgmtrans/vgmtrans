@@ -18,6 +18,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <numeric>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -212,40 +213,50 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
          "DirectSound attack conversion must retain the final partial integer step");
 
   const auto* psg = snapshot.asset<SamplePoolAsset>(collection.members.samplePools[0]);
-  expect(psg != nullptr && psg->pool.samples.size() == 11 && instruments->localSamples.samples.size() == 1,
-         "MP2k synth should generate only the square octaves used by the bank, both noise widths, and wave RAM");
+  expect(psg != nullptr && psg->pool.samples.size() == 18 && instruments->localSamples.samples.size() == 1,
+         "MP2k synth should generate only the square and wave octaves used by the bank plus both noise widths");
   expect(instruments->instruments[1].regions.size() == 128 && instruments->instruments[2].regions.size() == 128,
          "melodic PSG regions should retain the driver's key-clamped hardware frequency registers");
   const auto& waveA4 = instruments->instruments[1].regions[69];
   const auto& squareA4 = instruments->instruments[2].regions[69];
-  const double waveA4Hertz = 440.0 * std::exp2((69.0 - waveA4.unityKey) / 12.0);
-  const double squareA4Hertz = 440.0 * std::exp2((69.0 - squareA4.unityKey) / 12.0);
+  const auto sampleHertz = [&](const Region& region) {
+    const Sample& sample = psg->pool.samples[region.sample.index()];
+    return static_cast<double>(sample.sampleRate) / sample.loop.length;
+  };
+  const double waveA4Hertz = sampleHertz(waveA4) * std::exp2((69.0 - waveA4.unityKey) / 12.0);
+  const double squareA4Hertz = sampleHertz(squareA4) * std::exp2((69.0 - squareA4.unityKey) / 12.0);
   expect(std::abs(waveA4Hertz - 65536.0 / 298.0) < 1e-9 && std::abs(squareA4Hertz - 131072.0 / 298.0) < 1e-9,
          "programmable wave must use half the square clock after the exact MP2k frequency-table lookup");
   const auto& squareBass = instruments->instruments[2].regions[46];
   const auto& squareBassSample = psg->pool.samples[squareBass.sample.index()];
-  expect(squareBassSample.sampleRate == 56320 && squareBassSample.loop.length == 512,
-         "bass square regions should use a nearby source octave instead of pitching the 440 Hz sample far downward");
+  expect(squareBassSample.sampleRate == 44100 && squareBassSample.loop.length == 401,
+         "PSG samples should use the playback rate while reusing a nearby source octave");
   const auto decodedPcm = decodeSample(instruments->localSamples.samples.front(), session.sources().bytes(source));
-  expect(decodedPcm && decodedPcm->pcm.size() == 16 && decodedPcm->loop.enabled && decodedPcm->loop.start == 8,
-         "MP2k DirectSound samples should preserve PCM data and loop points");
+  expect(decodedPcm && decodedPcm->pcm.size() == 42 && decodedPcm->sampleRate == 65536 && decodedPcm->loop.enabled &&
+             decodedPcm->loop.start == 23,
+         "MP2k DirectSound samples should retain the driver's mixer-rate interpolation and held DAC output");
   const auto decodedWave = decodeSample(psg->pool.samples[waveA4.sample.index()], session.sources().bytes(source));
-  expect(decodedWave && decodedWave->pcm.size() == 48 && decodedWave->loop.start == 8 &&
-             decodedWave->loop.length == 32 && decodedWave->pcm[8] == -32768 && decodedWave->pcm[24] == 0 &&
-             decodedWave->pcm[38] == 28672 &&
-             std::ranges::equal(decodedWave->pcm.begin(), decodedWave->pcm.begin() + 8, decodedWave->pcm.begin() + 32,
-                                decodedWave->pcm.begin() + 40) &&
+  expect(decodedWave && decodedWave->sampleRate == 44100 && decodedWave->pcm.size() == 216 &&
+             decodedWave->loop.start == 8 && decodedWave->loop.length == 200 &&
+             std::ranges::equal(decodedWave->pcm.begin(), decodedWave->pcm.begin() + 8,
+                                decodedWave->pcm.begin() + 200, decodedWave->pcm.begin() + 208) &&
              std::ranges::equal(decodedWave->pcm.begin() + 8, decodedWave->pcm.begin() + 16,
-                                decodedWave->pcm.begin() + 40, decodedWave->pcm.end()),
-         "programmable-wave samples should retain the GBA DAC range and carry eight matching loop guards");
+                                decodedWave->pcm.begin() + 208, decodedWave->pcm.end()),
+         "programmable-wave samples should retain a band-limited GBA DAC cycle and matching loop guards");
   const auto decodedSquare = decodeSample(psg->pool.samples[squareA4.sample.index()], session.sources().bytes(source));
+  const auto squarePeriod = decodedSquare ? std::span<const s16>(decodedSquare->pcm).subspan(
+                                                decodedSquare->loop.start, decodedSquare->loop.length)
+                                          : std::span<const s16>{};
   expect(decodedSquare && decodedSquare->loop.start == 8 &&
              decodedSquare->pcm.size() == decodedSquare->loop.length + 16 &&
+             std::abs(std::accumulate(squarePeriod.begin(), squarePeriod.end(), s64{0})) <
+                 decodedSquare->loop.length &&
+             *std::ranges::max_element(squarePeriod) > 20000 && *std::ranges::min_element(squarePeriod) < -5000 &&
              std::ranges::equal(decodedSquare->pcm.begin(), decodedSquare->pcm.begin() + 8,
                                 decodedSquare->pcm.end() - 16, decodedSquare->pcm.end() - 8) &&
              std::ranges::equal(decodedSquare->pcm.begin() + 8, decodedSquare->pcm.begin() + 16,
                                 decodedSquare->pcm.end() - 8, decodedSquare->pcm.end()),
-         "generated square samples should preserve their full period between strict SoundFont loop guards");
+         "generated square samples should retain band-limited DC-balanced levels between strict loop guards");
 
   const CollectionPlayback playback =
       session.preparePlayback(collection.id, PlaybackRequest{.sequence = {.sequenceLoops = 0}});
