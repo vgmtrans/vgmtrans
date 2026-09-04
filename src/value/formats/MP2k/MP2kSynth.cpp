@@ -61,7 +61,6 @@ constexpr double kPsgSampleFrequency = 440.0;
 constexpr u32 kPsgLoopGuardSamples = 8;
 constexpr u32 kPsgSquareReferencePeriod = 128;
 constexpr u32 kPsgSquareSampleRate = static_cast<u32>(kPsgSampleFrequency) * kPsgSquareReferencePeriod;
-constexpr u64 kPsgSquareKeyBase = u64{1} << 63;
 constexpr u64 kProgrammableWaveKeyBase = u64{1} << 32;
 // Aria routes the summed CGB envelope through one hardware-volume lane while
 // DirectSound mixes independent left and right lanes. With both GBA output
@@ -139,10 +138,6 @@ struct SynthContext {
   // pulse's band-limited edge harmonics down with its fundamental.
   const s32 octave = std::clamp<s32>(std::lround(std::log2(hertz / kPsgSampleFrequency)), -3, 4);
   return octave < 0 ? kPsgSquareReferencePeriod << -octave : kPsgSquareReferencePeriod >> octave;
-}
-
-[[nodiscard]] u64 psgSquareKey(u32 duty, u32 period) {
-  return period == kPsgSquareReferencePeriod ? duty : kPsgSquareKeyBase | (static_cast<u64>(duty) << 32) | period;
 }
 
 [[nodiscard]] InstrumentModulation mp2kModulation() {
@@ -243,6 +238,25 @@ struct SynthContext {
   return entry.ref();
 }
 
+[[nodiscard]] SampleRef squareWave(SynthContext& context, u32 duty, u32 period) {
+  const u64 key = period * 4 + duty;
+  if (const auto existing = context.psg.find(key)) {
+    return *existing;
+  }
+  constexpr std::array<std::string_view, 4> names{"12.5%", "25%", "50%", "75%"};
+  return context.psg
+      .add(key,
+           Sample{
+               .name = fmt::format("PSG square {} ({} Hz)", names[duty], kPsgSquareSampleRate / period),
+               .codec = AudioCodec::GbaPsg,
+               .encodedData = context.builder.reader().range(0, 0),
+               .sampleRate = kPsgSquareSampleRate,
+               .loop = Loop{.enabled = true, .start = kPsgLoopGuardSamples, .length = period},
+               .codecParameter = duty,
+           })
+      .ref();
+}
+
 [[nodiscard]] std::optional<Region> regionForTone(SynthContext& context, const Mp2kTone& tone, KeyRange keys,
                                                   std::optional<u8> rhythmKey = std::nullopt) {
   const u8 cgbType = tone.cgbType();
@@ -255,7 +269,7 @@ struct SynthContext {
   if (cgbType == 0) {
     sample = addPcmSample(context, tone.wave, tone.reverse(), unity);
   } else if (cgbType == 1 || cgbType == 2) {
-    sample = context.psg.find(psgSquareKey(tone.wave & 3, squarePeriod));
+    sample = squareWave(context, tone.wave & 3, squarePeriod);
   } else if (cgbType == 3) {
     sample = programmableWave(context.builder, context.psg, tone.wave);
   } else if (cgbType == 4) {
@@ -372,21 +386,6 @@ std::vector<Mp2kTone> parseMp2kTones(ByteReader reader, const Mp2kBank& bank, st
 ScanSamplePoolDraft addMp2kPsgSamples(ScanResultBuilder& builder, u32 sampleRate) {
   auto pool = builder.samplePool("MP2k PSG samples");
   auto& samples = pool.samples();
-  constexpr std::array<std::string_view, 4> names{"12.5%", "25%", "50%", "75%"};
-  const auto addSquare = [&](u32 duty, u32 period) {
-    samples.add(psgSquareKey(duty, period),
-                Sample{
-                    .name = fmt::format("PSG square {} ({} Hz)", names[duty], kPsgSquareSampleRate / period),
-                    .codec = AudioCodec::GbaPsg,
-                    .encodedData = builder.reader().range(0, 0),
-                    .sampleRate = kPsgSquareSampleRate,
-                    .loop = Loop{.enabled = true, .start = kPsgLoopGuardSamples, .length = period},
-                    .codecParameter = duty,
-                });
-  };
-  for (u32 duty = 0; duty < names.size(); ++duty) {
-    addSquare(duty, kPsgSquareReferencePeriod);
-  }
   constexpr std::array noise{
       std::pair{"PSG noise (15-bit)", 32767u},
       std::pair{"PSG noise (7-bit)", 127u},
@@ -401,13 +400,6 @@ ScanSamplePoolDraft addMp2kPsgSamples(ScanResultBuilder& builder, u32 sampleRate
                          .loop = Loop{.enabled = true, .start = kPsgLoopGuardSamples, .length = noise[index].second},
                          .codecParameter = key,
                      });
-  }
-  for (u32 period = 8; period <= 1024; period *= 2) {
-    if (period != kPsgSquareReferencePeriod) {
-      for (u32 duty = 0; duty < names.size(); ++duty) {
-        addSquare(duty, period);
-      }
-    }
   }
   return pool;
 }

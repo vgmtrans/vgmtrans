@@ -212,8 +212,8 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
          "DirectSound attack conversion must retain the final partial integer step");
 
   const auto* psg = snapshot.asset<SamplePoolAsset>(collection.members.samplePools[0]);
-  expect(psg != nullptr && psg->pool.samples.size() == 35 && instruments->localSamples.samples.size() == 1,
-         "MP2k synth should generate octave-banked square, both noise-width, and referenced wave-RAM sounds");
+  expect(psg != nullptr && psg->pool.samples.size() == 11 && instruments->localSamples.samples.size() == 1,
+         "MP2k synth should generate only the square octaves used by the bank, both noise widths, and wave RAM");
   expect(instruments->instruments[1].regions.size() == 128 && instruments->instruments[2].regions.size() == 128,
          "melodic PSG regions should retain the driver's key-clamped hardware frequency registers");
   const auto& waveA4 = instruments->instruments[1].regions[69];
@@ -229,7 +229,7 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
   const auto decodedPcm = decodeSample(instruments->localSamples.samples.front(), session.sources().bytes(source));
   expect(decodedPcm && decodedPcm->pcm.size() == 16 && decodedPcm->loop.enabled && decodedPcm->loop.start == 8,
          "MP2k DirectSound samples should preserve PCM data and loop points");
-  const auto decodedWave = decodeSample(psg->pool.samples.back(), session.sources().bytes(source));
+  const auto decodedWave = decodeSample(psg->pool.samples[waveA4.sample.index()], session.sources().bytes(source));
   expect(decodedWave && decodedWave->pcm.size() == 48 && decodedWave->loop.start == 8 &&
              decodedWave->loop.length == 32 && decodedWave->pcm[8] == -32768 && decodedWave->pcm[24] == 0 &&
              decodedWave->pcm[38] == 28672 &&
@@ -238,7 +238,7 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
              std::ranges::equal(decodedWave->pcm.begin() + 8, decodedWave->pcm.begin() + 16,
                                 decodedWave->pcm.begin() + 40, decodedWave->pcm.end()),
          "programmable-wave samples should retain the GBA DAC range and carry eight matching loop guards");
-  const auto decodedSquare = decodeSample(psg->pool.samples[1], session.sources().bytes(source));
+  const auto decodedSquare = decodeSample(psg->pool.samples[squareA4.sample.index()], session.sources().bytes(source));
   expect(decodedSquare && decodedSquare->loop.start == 8 &&
              decodedSquare->pcm.size() == decodedSquare->loop.length + 16 &&
              std::ranges::equal(decodedSquare->pcm.begin(), decodedSquare->pcm.begin() + 8,
@@ -422,12 +422,11 @@ void mp2kNoiseUsesAuditedRegisterClockAndWidth() {
   const Region& noiseA4 = instruments->instruments[2].regions[69];
   const double renderedClock = 26758.0 * std::exp2((69.0 - noiseA4.unityKey) / 12.0);
   const double hardwareClock = 524288.0 / 7.0 / 4.0;  // gNoiseTable[48] = 0x17
-  expect(std::abs(renderedClock - hardwareClock) < 1e-9 && noiseA4.sample.index() == 5,
-         "noise key 69 should use register 0x17 and the tone's short-LFSR selector");
+  expect(std::abs(renderedClock - hardwareClock) < 1e-9, "noise key 69 should use the clock selected by register 0x17");
   const auto* psg = snapshot.asset<SamplePoolAsset>(collection.members.samplePools[0]);
-  expect(psg && psg->pool.samples[5].codecParameter == 5,
-         "short MP2k noise should reference the 7-bit GBA LFSR sample");
-  const auto decoded = decodeSample(psg->pool.samples[5], session.sources().bytes(source));
+  const Sample* noise = psg ? &psg->pool.samples[noiseA4.sample.index()] : nullptr;
+  expect(noise && noise->codecParameter == 5, "short MP2k noise should reference the 7-bit GBA LFSR sample");
+  const auto decoded = decodeSample(*noise, session.sources().bytes(source));
   expect(decoded && decoded->pcm.size() == 143 && decoded->loop.enabled && decoded->loop.start == 8 &&
              decoded->loop.length == 127 &&
              std::ranges::equal(decoded->pcm.begin(), decoded->pcm.begin() + 8, decoded->pcm.begin() + 127,
@@ -479,15 +478,25 @@ void mp2kCgbLengthClampsSequenceGateInPhysicalTime() {
 
 void mp2kCgbVolumeUsesCombinedHardwareQuantization() {
   std::vector<u8> bytes = mp2kFixture();
+  bytes.resize(0x1400);
   bytes[0x415] = 9;
   bytes[0x416] = 9;
   bytes[0x417] = 1;
-  const std::array<u8, 19> track{
+  const std::array<u8, 27> track{
       0xbd, 2, 0xbe, 82, 0xd4, 69, 32,  0x81,  // square: reference goal 10, note goal 2
       0xbd, 1, 0xbe, 58, 0xd4, 50, 119, 0x81,  // wave: reference goal 7, note goal 6
+      0xbd, 3, 0xbe, 75, 0xd4, 60, 120, 0x81,  // rhythm child: reference goal 9, note goal 8
       0xb1, 0, 0,
   };
   std::copy(track.begin(), track.end(), bytes.begin() + 0x320);
+  bytes[0x424] = 0x80;
+  le32(bytes, 0x428, 0x08000d00);
+  const size_t drum = 0xd00 + 60 * 12;
+  bytes[drum] = 2;
+  bytes[drum + 1] = 60;
+  le32(bytes, drum + 4, 1);
+  bytes[drum + 9] = 4;
+  bytes[drum + 10] = 4;
   Session session;
   session.registerFormat(mp2kModule());
   session.addSource(SourceFile{.name = "mp2k-cgb-volume.gba"}, bytes);
@@ -502,9 +511,9 @@ void mp2kCgbVolumeUsesCombinedHardwareQuantization() {
       notes.push_back(note);
     }
   }
-  expect(notes.size() == 2 && std::abs(notes[0]->linearVelocity - 0.2) < 1e-12 &&
-             std::abs(notes[1]->linearVelocity - 1.0) < 1e-12,
-         "CGB note velocity should be the ratio of quantized note and reference hardware levels");
+  expect(notes.size() == 3 && std::abs(notes[0]->linearVelocity - 0.2) < 1e-12 &&
+             std::abs(notes[1]->linearVelocity - 1.0) < 1e-12 && std::abs(notes[2]->linearVelocity - 8.0 / 9.0) < 1e-12,
+         "CGB note velocity should use the selected tone's quantized note-to-reference level ratio");
   expect(std::ranges::any_of(events,
                              [](const PerformanceEvent& event) {
                                const auto* level = std::get_if<LevelPerformanceEvent>(&event);
@@ -541,39 +550,13 @@ void mp2kCgbVolumeUsesCombinedHardwareQuantization() {
                       std::abs(*value.sustainAmplitude - 0.5) < 1e-12;
              }),
          "CGB ADSR should use the note's envelope goal and quantized wave sustain ratio");
-}
-
-void mp2kRhythmProgramUsesSelectedCgbTone() {
-  std::vector<u8> bytes = mp2kFixture();
-  bytes.resize(0x1400);
-  const std::array<u8, 9> track{0xbd, 3, 0xbe, 75, 0xd4, 60, 120, 0x81, 0xb1};
-  std::copy(track.begin(), track.end(), bytes.begin() + 0x320);
-  bytes[0x424] = 0x80;
-  le32(bytes, 0x428, 0x08000d00);
-  const size_t drum = 0xd00 + 60 * 12;
-  bytes[drum] = 2;
-  bytes[drum + 1] = 60;
-  le32(bytes, drum + 4, 1);
-  bytes[drum + 9] = 4;
-  bytes[drum + 10] = 4;
-
-  Session session;
-  session.registerFormat(mp2kModule());
-  session.addSource(SourceFile{.name = "mp2k-cgb-rhythm.gba"}, bytes);
-  session.scanPendingSources();
-  const SessionSnapshot snapshot = session.snapshot();
-  const CollectionPlayback playback = session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{});
-  const auto& events = playback.performance.tracks.front().events;
-  const auto note = std::ranges::find_if(
-      events, [](const PerformanceEvent& event) { return std::holds_alternative<NotePerformanceEvent>(event); });
-  expect(note != events.end() && std::abs(std::get<NotePerformanceEvent>(*note).linearVelocity - 8.0 / 9.0) < 1e-12 &&
-             std::ranges::any_of(events,
-                                 [](const PerformanceEvent& event) {
-                                   const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event);
-                                   return envelope && envelope->update.values &&
-                                          envelope->update.values->sustainAmplitude == 0.25;
-                                 }),
-         "rhythm programs should use the selected child tone's CGB volume quantization and envelope");
+  expect(std::ranges::any_of(events,
+                             [](const PerformanceEvent& event) {
+                               const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event);
+                               return envelope && envelope->header.tick == 2 && envelope->update.values &&
+                                      envelope->update.values->sustainAmplitude == 0.25;
+                             }),
+         "rhythm programs should use the selected child tone's CGB envelope");
 }
 
 void mp2kUndefinedJumpSlotsUseFine() {
@@ -762,7 +745,6 @@ void runMp2kModuleTests() {
   mp2kCgbFixedToneUsesDacResolutionMask();
   mp2kCgbLengthClampsSequenceGateInPhysicalTime();
   mp2kCgbVolumeUsesCombinedHardwareQuantization();
-  mp2kRhythmProgramUsesSelectedCgbTone();
   mp2kUndefinedJumpSlotsUseFine();
   mp2kPortConsumesItsRegisterOperands();
   mp2kUnknownMemaccDoesNotConsumeAJumpPointer();
