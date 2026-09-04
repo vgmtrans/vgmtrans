@@ -28,6 +28,10 @@ namespace {
 
 constexpr u32 kPpqn = 24;
 constexpr u32 kMaximumCommands = 1'048'576;
+constexpr u8 kStereoBalanceUnit = 64;
+constexpr double kSpuRegisterMaximum = 16'383.0;
+constexpr u16 kSpuUnityPitch = 4096;
+constexpr double kSpuUnityKey = 48.0;
 constexpr u32 kPs1InitialTempo = 404'770;  // 53.2224 MHz / 3413 / 263 VBlanks per second.
 constexpr u32 kPs2InitialTempo = 400'400;  // NTSC 60000/1001 VBlanks per second.
 
@@ -41,39 +45,12 @@ constexpr std::array<u16, 73> kPitchTable{
     0x2d41, 0x2ff2, 0x32cb, 0x35d1, 0x3904, 0x3c68, 0x3fff,
 };
 
-[[nodiscard]] u32 eventSize(u8 opcode) {
-  if (opcode < 0xe0 || opcode == 0xe8 || opcode == 0xe9 || opcode == 0xf0 || opcode == 0xff) {
-    return 1;
-  }
-  switch (opcode) {
-    case 0xe0:
-    case 0xe2:
-    case 0xe6:
-    case 0xe7:
-    case 0xf1:
-      return 2;
-    case 0xe1:
-    case 0xe3:
-    case 0xe4:
-    case 0xe5:
-    case 0xea:
-    case 0xf8:
-    case 0xf9:
-      return 3;
-    default:
-      return 1;
-  }
-}
-
-[[nodiscard]] std::optional<u32> relativeTarget(ByteReader reader, u32 offset) {
-  if (!reader.has(offset, 3)) {
-    return std::nullopt;
-  }
-  const s64 target = static_cast<s64>(offset) + 3 + static_cast<s16>(reader.le16(offset + 1));
+[[nodiscard]] std::optional<Address> relativeTarget(ByteReader reader, u32 offset, s16 relative) {
+  const s64 target = static_cast<s64>(offset) + 3 + relative;
   if (target < 0 || target >= static_cast<s64>(reader.size())) {
     return std::nullopt;
   }
-  return static_cast<u32>(target);
+  return Address{static_cast<u64>(target)};
 }
 
 [[nodiscard]] u32 delayTicks(u8 value) { return value == 0 ? 65'536 : value; }
@@ -83,10 +60,14 @@ constexpr std::array<u16, 73> kPitchTable{
   // (volume * side * 0x100) >> 8 to a 0x3fff-full-scale SPU register.
   // Keeping the default side (64) in this lane makes the independent E1
   // stereo-balance lane compose to the exact source gain.
-  return static_cast<double>(value) * 64.0 / 16'383.0;
+  return static_cast<double>(value) * kStereoBalanceUnit / kSpuRegisterMaximum;
 }
 
-[[nodiscard]] double reverbDepth(u8 value) {
+[[nodiscard]] double stereoBalanceGain(u8 value) {
+  return static_cast<double>(value) / kStereoBalanceUnit;
+}
+
+[[nodiscard]] double signedReverbDepth(u8 value) {
   return static_cast<double>(static_cast<s16>(static_cast<u16>(value) << 8)) / 32'768.0;
 }
 
@@ -95,62 +76,73 @@ constexpr std::array<u16, 73> kPitchTable{
 }
 
 [[nodiscard]] double pitchKey(u16 pitch) {
-  return pitch == 0 ? 0.0 : 48.0 + 12.0 * std::log2(static_cast<double>(pitch) / 4096.0);
+  return pitch == 0 ? 0.0
+                    : kSpuUnityKey + 12.0 * std::log2(static_cast<double>(pitch) / kSpuUnityPitch);
 }
 
-struct InitialTrackState {
-  u32 sourceSlot = 0;
-  u32 start = 0;
-  u64 startTick = 0;
-  u8 priority = 1;
+struct VoiceState {
   u8 program = 0;
   u8 volume = 200;
-  u8 left = 64;
-  u8 right = 64;
+  u8 left = kStereoBalanceUnit;
+  u8 right = kStereoBalanceUnit;
   u16 pitchScale = 0;
   bool reverb = false;
+
+  void selectProgram(u8 value) {
+    program = value;
+    pitchScale = 0;
+  }
+};
+
+struct TrackSeed {
+  VoiceState voice;
+  u32 sourceSlot = 0;
+  u32 start = 0;
+  u64 startDelayTicks = 0;
   bool fork = false;
 };
 
 struct RuntimeConfig {
   Generation generation = Generation::Ps1;
-  std::vector<InitialTrackState> tracks;
+  std::vector<TrackSeed> seeds;
 };
 
-struct ProgramState {
-  explicit ProgramState(const RuntimeConfig& config)
-      : mode(config.generation == Generation::Ps1 ? 3 : 0),
-        depth(config.generation == Generation::Ps1 ? 0.5 : 32767.0 / 32768.0) {}
-
-  void finalizePerformance(PerformanceSequence& performance) {
-    // A driver voice can still be keyed when loop-limited rendering stops.
-    // Close that final attack at the rendered boundary instead of publishing
-    // an accidental zero-duration note.
-    for (auto& track : performance.tracks) {
-      std::set<u32> continuedNotes;
-      for (const auto& automation : track.automations) {
-        const auto* pitch = std::get_if<PitchTransitionIntent>(&automation.intent);
-        if (pitch != nullptr && pitch->previousNote) {
-          continuedNotes.insert(pitch->previousNote->value);
-        }
+void closeDanglingNotes(PerformanceSequence& performance) {
+  // A driver voice can still be keyed when loop-limited rendering stops.
+  // Close that final attack at the rendered boundary instead of publishing
+  // an accidental zero-duration note.
+  for (auto& track : performance.tracks) {
+    std::set<u32> continuedNotes;
+    for (const auto& automation : track.automations) {
+      const auto* pitch = std::get_if<PitchTransitionIntent>(&automation.intent);
+      if (pitch != nullptr && pitch->previousNote) {
+        continuedNotes.insert(pitch->previousNote->value);
       }
-      for (auto& event : track.events) {
-        auto* note = std::get_if<NotePerformanceEvent>(&event);
-        if (note != nullptr && note->durationTicks == 0 && !continuedNotes.contains(note->note.value)) {
-          const u64 available = track.endTick > note->header.tick ? track.endTick - note->header.tick : 1;
-          note->durationTicks = static_cast<u32>(std::min<u64>(available, std::numeric_limits<u32>::max()));
-        }
+    }
+    for (auto& event : track.events) {
+      auto* note = std::get_if<NotePerformanceEvent>(&event);
+      if (note != nullptr && note->durationTicks == 0 && !continuedNotes.contains(note->note.value)) {
+        const u64 available = track.endTick > note->header.tick ? track.endTick - note->header.tick : 1;
+        note->durationTicks = static_cast<u32>(std::min<u64>(available, std::numeric_limits<u32>::max()));
       }
     }
   }
+}
 
-  u8 mode = 0;
-  double depth = 0.0;
+struct ProgramState {
+  explicit ProgramState(const RuntimeConfig& config)
+      : reverbMode(config.generation == Generation::Ps1 ? 3 : 0),
+        reverbDepth(config.generation == Generation::Ps1 ? 0.5 : 32767.0 / 32768.0) {}
+
+  void finalizePerformance(PerformanceSequence& performance) { closeDanglingNotes(performance); }
+
+  u8 reverbMode = 0;
+  double reverbDepth = 0.0;
 };
 
-struct TrackState : InitialTrackState {
+struct TrackState : VoiceState {
   TrackState(const TrackProgram& track, const RuntimeConfig& config)
-      : InitialTrackState(config.tracks.at(track.sourceTrackNumber)) {}
+      : VoiceState(config.seeds.at(track.sourceTrackNumber).voice) {}
 
   bool initialized = false;
   std::optional<PerformanceNoteId> note;
@@ -161,14 +153,14 @@ struct Playback {
   TrackState& track;
   PerformanceEmitter& out;
   VmApi& vm;
-  ProgramState& program;
+  ProgramState& programState;
 
   void emitReverb() {
     out.reverb(ReverbPerformanceEvent{
-        .send = track.reverb ? std::abs(program.depth) : 0.0,
-        .leftGain = program.depth,
-        .rightGain = program.depth,
-        .filterIndex = program.mode,
+        .send = track.reverb ? std::abs(programState.reverbDepth) : 0.0,
+        .leftGain = programState.reverbDepth,
+        .rightGain = programState.reverbDepth,
+        .filterIndex = programState.reverbMode,
     });
   }
 
@@ -179,7 +171,7 @@ struct Playback {
     track.initialized = true;
     out.instrument(instrumentIdentity(track.program));
     out.level(levelGain(track.volume));
-    out.stereoBalance(track.left / 64.0, track.right / 64.0);
+    out.stereoBalance(stereoBalanceGain(track.left), stereoBalanceGain(track.right));
     emitReverb();
   }
 
@@ -200,27 +192,27 @@ struct Playback {
     });
   }
 
-  void note(u8 key) {
+  void keyOn(u8 key) {
     const u16 pitch = key < kPitchTable.size()
                           ? kPitchTable[key]
-                          : static_cast<u16>(std::min(16'383.0, 4096.0 * std::exp2((key - 48) / 12.0)));
+                          : static_cast<u16>(std::min(kSpuRegisterMaximum,
+                                                      kSpuUnityPitch * std::exp2((key - kSpuUnityKey) / 12.0)));
     attack(pitchKey(scaledPitch(pitch, track.pitchScale)));
   }
 
-  void volume(u8 value) {
+  void setVolume(u8 value) {
     track.volume = value;
     out.level(levelGain(value));
   }
 
-  void balance(u8 left, u8 right) {
+  void setStereoBalance(u8 left, u8 right) {
     track.left = left;
     track.right = right;
-    out.stereoBalance(left / 64.0, right / 64.0);
+    out.stereoBalance(stereoBalanceGain(left), stereoBalanceGain(right));
   }
 
-  void tone(u8 value) {
-    track.program = value;
-    track.pitchScale = 0;
+  void setInstrument(u8 value) {
+    track.selectProgram(value);
     out.instrument(instrumentIdentity(value));
   }
 
@@ -240,38 +232,36 @@ struct Playback {
     track.noteStart = vm.tick();
   }
 
-  void pitchAttack(u16 value) { attack(pitchKey(scaledPitch(value, track.pitchScale))); }
+  void keyOnByPitch(u16 value) { attack(pitchKey(scaledPitch(value, track.pitchScale))); }
 
   void setReverbMode(u8 mode) {
-    program.mode = mode;
+    programState.reverbMode = mode;
     emitGlobalReverb();
   }
 
   void setReverbDepth(u8 depth) {
-    program.depth = reverbDepth(depth);
+    programState.reverbDepth = signedReverbDepth(depth);
     emitGlobalReverb();
   }
 
   void emitGlobalReverb() {
     out.reverb(ReverbPerformanceEvent{
         .voiceMask = 0xff,
-        .send = std::abs(program.depth),
-        .leftGain = program.depth,
-        .rightGain = program.depth,
-        .filterIndex = program.mode,
+        .send = std::abs(programState.reverbDepth),
+        .leftGain = programState.reverbDepth,
+        .rightGain = programState.reverbDepth,
+        .filterIndex = programState.reverbMode,
     });
   }
 
-  void reverb(bool enabled) {
+  void setReverbSend(bool enabled) {
     track.reverb = enabled;
     emitReverb();
   }
 
-  void pitchCenter(u16 value) { track.pitchScale = value; }
+  void setPitchScale(u16 value) { track.pitchScale = value; }
 
-  void priority(u8 value) { track.priority = value; }
-
-  void end() { closeVoice(); }
+  void keyOff() { closeVoice(); }
 };
 
 using Cursor = CompilerCursor<TrackState, Playback>;
@@ -292,23 +282,23 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     auto event = cursor.command("Note", SequenceSemantic::Note);
     const u8 key = opcode & 0x7f;
     event.derived("key", key, SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
-    return event.invoke<&Playback::note>(key);
+    return event.invoke<&Playback::keyOn>(key);
   }
 
   switch (opcode) {
     case 0xe0: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(event.u8("volume", SemanticOperandRole::Level));
+      return event.invoke<&Playback::setVolume>(event.u8("volume", SemanticOperandRole::Level));
     }
     case 0xe1: {
       auto event = cursor.command("Stereo Balance", SequenceSemantic::Pan);
       const u8 left = event.u8("left", SemanticOperandRole::Level);
       const u8 right = event.u8("right", SemanticOperandRole::Level);
-      return event.invoke<&Playback::balance>(left, right);
+      return event.invoke<&Playback::setStereoBalance>(left, right);
     }
     case 0xe2: {
       auto event = cursor.command("Instrument", SequenceSemantic::Instrument);
-      return event.invoke<&Playback::tone>(event.u8("program", SemanticOperandRole::InstrumentProgram));
+      return event.invoke<&Playback::setInstrument>(event.u8("program", SemanticOperandRole::InstrumentProgram));
     }
     case 0xe3: {
       auto event = cursor.noOp("Reserved Tempo Word");
@@ -322,8 +312,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xe5: {
       auto event = cursor.command("Key On By Pitch", SequenceSemantic::Note);
-      return event.invoke<&Playback::pitchAttack>(event.u16le("spu_pitch", SourceValueDisplay::Hex,
-                                                              SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::keyOnByPitch>(event.u16le("spu_pitch", SourceValueDisplay::Hex,
+                                                               SemanticOperandRole::Pitch));
     }
     case 0xe6: {
       auto event = cursor.command("Reverb Mode", SequenceSemantic::State);
@@ -334,56 +324,55 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return event.invoke<&Playback::setReverbDepth>(event.u8("depth", SemanticOperandRole::Level));
     }
     case 0xe8:
-      return cursor.command("Reverb Send On", SequenceSemantic::State).invoke<&Playback::reverb>(true);
+      return cursor.command("Reverb Send On", SequenceSemantic::State).invoke<&Playback::setReverbSend>(true);
     case 0xe9:
-      return cursor.command("Reverb Send Off", SequenceSemantic::State).invoke<&Playback::reverb>(false);
+      return cursor.command("Reverb Send Off", SequenceSemantic::State).invoke<&Playback::setReverbSend>(false);
     case 0xea: {
       auto event = cursor.command("Pitch Scale", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::pitchCenter>(event.u16le("scale", SourceValueDisplay::Hex,
-                                                              SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::setPitchScale>(event.u16le("scale", SourceValueDisplay::Hex,
+                                                                SemanticOperandRole::Pitch));
     }
     case 0xf0:
-      return cursor.command("Key Off", SequenceSemantic::Note).invoke<&Playback::end>();
+      return cursor.command("Key Off", SequenceSemantic::Note).invoke<&Playback::keyOff>();
     case 0xf1: {
-      auto event = cursor.command("Priority", SequenceSemantic::State);
-      return event.invoke<&Playback::priority>(event.u8("priority"));
+      auto event = cursor.command("Priority", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly);
+      static_cast<void>(event.u8("priority"));
+      return event;
     }
     case 0xf8: {
       auto event = cursor.command("Jump", SequenceSemantic::Loop);
       const s16 relative = event.s16le("relative", SourceValueDisplay::SignedDecimal);
-      const s64 destination = static_cast<s64>(offset) + 3 + relative;
-      if (destination < 0 || destination >= static_cast<s64>(reader.size())) {
+      const auto target = relativeTarget(reader, offset, relative);
+      if (!target) {
         event.warning("Tamsoft jump target is outside the TSQ file");
         return event.end();
       }
-      const Address target{static_cast<u64>(destination)};
-      event.derived("destination", target, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
-      return event.declaredLoop(target);
+      event.derived("destination", *target, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
+      return event.declaredLoop(*target);
     }
     case 0xf9: {
       auto event = cursor.command("External Channel", SequenceSemantic::State,
                                   CommandPlaybackStatus::AffectsControlFlow);
       const s16 relative = event.s16le("relative", SourceValueDisplay::SignedDecimal);
-      const s64 destination = static_cast<s64>(offset) + 3 + relative;
-      if (destination < 0 || destination >= static_cast<s64>(reader.size())) {
+      const auto target = relativeTarget(reader, offset, relative);
+      if (!target) {
         event.warning("Tamsoft external-channel target is outside the TSQ file");
         return event;
       }
-      const Address target{static_cast<u64>(destination)};
-      event.derived("destination", target, SourceValueDisplay::Address, SemanticOperandRole::CallTarget);
+      event.derived("destination", *target, SourceValueDisplay::Address, SemanticOperandRole::CallTarget);
       // Layout analysis materializes this cloned driver voice as its own track.
-      return event.discoverTarget(target);
+      return event.discoverTarget(*target);
     }
     case 0xff:
       return cursor.command("End", SequenceSemantic::End, CommandPlaybackStatus::StopsPlayback)
-          .invoke<&Playback::end>()
+          .invoke<&Playback::keyOff>()
           .end();
     default:
-      return cursor.unsupported("Undefined Event").invoke<&Playback::end>().end();
+      return cursor.unsupported("Undefined Event").invoke<&Playback::keyOff>().end();
   }
 }
 
-void report(std::vector<Diagnostic>* diagnostics, std::string message, SourceRange range) {
+void reportWarning(std::vector<Diagnostic>* diagnostics, std::string message, SourceRange range) {
   if (diagnostics != nullptr) {
     diagnostics->push_back(Diagnostic{
         .severity = Severity::Warning,
@@ -393,106 +382,115 @@ void report(std::vector<Diagnostic>* diagnostics, std::string message, SourceRan
   }
 }
 
-[[nodiscard]] std::vector<InitialTrackState> discoverTracks(ByteReader reader, const SequenceLayout& layout,
-                                                            std::vector<Diagnostic>* diagnostics) {
-  std::vector<InitialTrackState> tracks;
-  tracks.reserve(layout.generation == Generation::Ps2 ? 48 : 24);
+void updateInheritedState(TrackSeed& seed, ByteReader reader, u32 offset,
+                          const DecodedBytecodeCommand& command) {
+  if (command.presentation.playback == CommandPlaybackStatus::Unsupported) {
+    return;
+  }
+
+  if (command.opcode <= 0x7f) {
+    seed.startDelayTicks += delayTicks(command.opcode);
+    return;
+  }
+
+  switch (command.opcode) {
+    case 0xe0:
+      seed.voice.volume = reader.u8At(offset + 1);
+      break;
+    case 0xe1:
+      seed.voice.left = reader.u8At(offset + 1);
+      seed.voice.right = reader.u8At(offset + 2);
+      break;
+    case 0xe2:
+      seed.voice.selectProgram(reader.u8At(offset + 1));
+      break;
+    case 0xe8:
+      seed.voice.reverb = true;
+      break;
+    case 0xe9:
+      seed.voice.reverb = false;
+      break;
+    case 0xea:
+      seed.voice.pitchScale = reader.le16(offset + 1);
+      break;
+    default:
+      break;
+  }
+}
+
+[[nodiscard]] std::vector<TrackSeed> discoverVoiceSeeds(ByteReader reader, const SequenceLayout& layout,
+                                                        std::vector<Diagnostic>* diagnostics) {
+  const size_t voiceLimit = layout.generation == Generation::Ps2 ? kPs2VoiceCount : kPs1VoiceCount;
+  std::vector<TrackSeed> seeds;
+  seeds.reserve(voiceLimit);
   for (const auto& source : layout.tracks) {
-    tracks.push_back(InitialTrackState{
+    seeds.push_back(TrackSeed{
         .sourceSlot = source.slot,
         .start = source.offset,
-        .priority = source.priority,
     });
   }
 
-  const size_t voiceLimit = layout.generation == Generation::Ps2 ? 48 : 24;
   bool warnedRepeatedFork = false;
-  for (size_t trackIndex = 0; trackIndex < tracks.size(); ++trackIndex) {
-    InitialTrackState state = tracks[trackIndex];
+  for (size_t seedIndex = 0; seedIndex < seeds.size(); ++seedIndex) {
+    TrackSeed state = seeds[seedIndex];
     std::set<u32> visited;
     std::vector<u32> forkSites;
     u32 pc = state.start;
     for (u32 commands = 0; commands < kMaximumCommands && reader.has(pc, 1) && !visited.contains(pc); ++commands) {
       visited.insert(pc);
-      const u8 opcode = reader.u8At(pc);
-      const u32 size = eventSize(opcode);
-      if (!reader.has(pc, size)) {
+      const auto command = decodeCommand(reader, pc, nullptr);
+      updateInheritedState(state, reader, pc, command);
+
+      if (command.opcode == 0xf9 && !command.discoveryTargets.empty()) {
+        auto fork = state;
+        fork.start = static_cast<u32>(command.discoveryTargets.front().value);
+        fork.fork = true;
+        if (seeds.size() < voiceLimit) {
+          seeds.push_back(fork);
+        }
+        forkSites.push_back(pc);
+      }
+
+      if (command.flow.unconditionalJump()) {
+        const u32 target = static_cast<u32>(command.flow.defaultDestination()->value);
+        if (!warnedRepeatedFork && target <= pc &&
+            std::ranges::any_of(forkSites, [&](u32 site) { return site >= target; })) {
+          reportWarning(diagnostics,
+                        "F9 external-channel creation occurs inside a repeating jump; the first cloned voice is "
+                        "preserved without emulating repeated voice allocation",
+                        command.range);
+          warnedRepeatedFork = true;
+        }
+        pc = target;
+        continue;
+      }
+
+      const auto next = command.flow.discoveryContinuation();
+      if (!next) {
         break;
       }
-      if (opcode <= 0x7f) {
-        state.startTick += delayTicks(opcode);
-      } else {
-        switch (opcode) {
-          case 0xe0:
-            state.volume = reader.u8At(pc + 1);
-            break;
-          case 0xe1:
-            state.left = reader.u8At(pc + 1);
-            state.right = reader.u8At(pc + 2);
-            break;
-          case 0xe2:
-            state.program = reader.u8At(pc + 1);
-            state.pitchScale = 0;
-            break;
-          case 0xe8:
-            state.reverb = true;
-            break;
-          case 0xe9:
-            state.reverb = false;
-            break;
-          case 0xea:
-            state.pitchScale = reader.le16(pc + 1);
-            break;
-          case 0xf1:
-            state.priority = reader.u8At(pc + 1);
-            break;
-          case 0xf9:
-            if (const auto target = relativeTarget(reader, pc)) {
-              auto fork = state;
-              fork.start = *target;
-              fork.fork = true;
-              if (tracks.size() < voiceLimit) {
-                tracks.push_back(fork);
-              }
-              forkSites.push_back(pc);
-            }
-            break;
-          case 0xf8:
-            if (const auto target = relativeTarget(reader, pc)) {
-              if (!warnedRepeatedFork && *target <= pc &&
-                  std::ranges::any_of(forkSites, [&](u32 site) { return site >= *target; })) {
-                report(diagnostics,
-                       "F9 external-channel creation occurs inside a repeating jump; the first cloned voice is "
-                       "preserved without emulating repeated voice allocation",
-                       reader.range(pc, 3));
-                warnedRepeatedFork = true;
-              }
-              pc = *target;
-              continue;
-            }
-            return tracks;
-          case 0xff:
-            commands = kMaximumCommands;
-            continue;
-          default:
-            if (opcode >= 0xe0 && opcode != 0xe3 && opcode != 0xe4 && opcode != 0xe5 && opcode != 0xe6 &&
-                opcode != 0xe7 && opcode != 0xf0) {
-              commands = kMaximumCommands;
-              continue;
-            }
-            break;
-        }
-      }
-      pc += size;
+      pc = static_cast<u32>(next->value);
     }
   }
-  if (tracks.size() > voiceLimit) {
-    tracks.resize(voiceLimit);
-  }
-  return tracks;
+  return seeds;
 }
 
-[[nodiscard]] TrackProgram decodeTrack(ByteReader reader, AssetId id, u32 number, const InitialTrackState& source,
+void delayTrackStart(TrackProgram& track, u64 ticks, Address delayedStart) {
+  if (ticks == 0) {
+    return;
+  }
+
+  const Address actualStart = track.startAddress;
+  track.commands.push_back(SourceCommand{
+      .address = delayedStart,
+      .flow = CommandFlow::jumpTo(actualStart, Address{delayedStart.value + 1}),
+      .execution = CommandExecution{
+          .delayTicks = static_cast<u32>(std::min<u64>(ticks, std::numeric_limits<u32>::max()))},
+  });
+  track.startAddress = delayedStart;
+}
+
+[[nodiscard]] TrackProgram decodeTrack(ByteReader reader, AssetId id, u32 number, const TrackSeed& seed,
                                        SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const TrackDecodeScope scope{
       .reader = reader,
@@ -502,25 +500,13 @@ void report(std::vector<Diagnostic>* diagnostics, std::string message, SourceRan
       .sourceMap = sourceMap,
   };
   TrackProgram track =
-      scope.decode(number, source.start, [&](u32 offset) { return decodeCommand(reader, offset, diagnostics); });
+      scope.decode(number, seed.start, [&](u32 offset) { return decodeCommand(reader, offset, diagnostics); });
   track.sourceTrackNumber = number;
-  track.name = source.fork ? fmt::format("Track {} fork", source.sourceSlot + 1)
-                           : fmt::format("Track {}", source.sourceSlot + 1);
-  if (source.startTick != 0) {
-    const Address actualStart = track.startAddress;
-    const Address delayedStart{reader.size() + 1 + number};
-    track.commands.push_back(SourceCommand{
-        .address = delayedStart,
-        .flow = CommandFlow::jumpTo(actualStart, Address{delayedStart.value + 1}),
-        .execution = CommandExecution{.delayTicks = static_cast<u32>(std::min<u64>(
-                                          source.startTick, std::numeric_limits<u32>::max()))},
-    });
-    std::ranges::sort(track.commands,
-                      [](const SourceCommand& left, const SourceCommand& right) {
-                        return left.address.value < right.address.value;
-                      });
-    track.startAddress = delayedStart;
-  }
+  track.name = seed.fork ? fmt::format("Track {} fork", seed.sourceSlot + 1)
+                         : fmt::format("Track {}", seed.sourceSlot + 1);
+  // Synthetic command addresses follow every source byte, so appending keeps the
+  // command list ordered without a second sort.
+  delayTrackStart(track, seed.startDelayTicks, Address{reader.size() + 1 + number});
   return track;
 }
 
@@ -544,22 +530,18 @@ SequenceProgram parseSequence(ByteReader reader, AssetId id, const SequenceLayou
   SequenceProgram program = sequenceConfig().makeProgram();
   program.behavior.initialTempoMicrosecondsPerQuarter =
       layout.generation == Generation::Ps2 ? kPs2InitialTempo : kPs1InitialTempo;
-  auto tracks = discoverTracks(reader, layout, diagnostics);
-  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{
-      .generation = layout.generation,
-      .tracks = tracks,
-  });
+  auto seeds = discoverVoiceSeeds(reader, layout, diagnostics);
 
   if (sourceMap != nullptr) {
+    const u32 songEntry = layout.song * kSongEntrySize;
     sourceMap->table("Song Table", reader.range(0, layout.tableSize))
         .kind("tamsoft-ps1-song-table")
         .owner(ObjectRefs::sequence(id));
-    sourceMap->header("Song Entry", reader.range(layout.song * 4, 4))
+    sourceMap->header("Song Entry", reader.range(songEntry, kSongEntrySize))
         .kind("tamsoft-ps1-song-entry")
         .owner(ObjectRefs::sequence(id))
-        .field("type", reader.range(layout.song * 4, 2), layout.type)
-        .field("offset", reader.range(layout.song * 4 + 2, 2), layout.headerOffset,
-               SourceValueDisplay::Address);
+        .field("type", reader.range(songEntry, 2), layout.type)
+        .field("offset", reader.range(songEntry + 2, 2), layout.headerOffset, SourceValueDisplay::Address);
     if (layout.headerSize != 0) {
       sourceMap->table("Track Records", reader.range(layout.headerOffset, layout.headerSize))
           .kind("tamsoft-ps1-track-records")
@@ -567,9 +549,13 @@ SequenceProgram parseSequence(ByteReader reader, AssetId id, const SequenceLayou
     }
   }
 
-  for (u32 number = 0; number < tracks.size(); ++number) {
-    program.tracks.push_back(decodeTrack(reader, id, number, tracks[number], sourceMap, diagnostics));
+  for (u32 number = 0; number < seeds.size(); ++number) {
+    program.tracks.push_back(decodeTrack(reader, id, number, seeds[number], sourceMap, diagnostics));
   }
+  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{
+      .generation = layout.generation,
+      .seeds = std::move(seeds),
+  });
   return program;
 }
 

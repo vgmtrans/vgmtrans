@@ -22,8 +22,6 @@ using namespace core;
 
 namespace {
 
-constexpr u32 kSampleBase = 0x800;
-
 [[nodiscard]] u32 decodedAdsr(u32 stored, Generation generation) {
   // HG2 stores complemented SPU fields. load_tvbf reconstructs both register
   // words with this exact mask before chgtone writes them to the SPU2.
@@ -35,7 +33,7 @@ constexpr u32 kSampleBase = 0x800;
 bool addBank(ScanResultBuilder& result, const BankLayout& layout, std::string_view name) {
   const ByteReader reader = result.reader();
   std::set<u32> offsets;
-  for (u32 program = 1; program < 256; ++program) {
+  for (u32 program = 1; program < kProgramCount; ++program) {
     const u32 offset = reader.le32(program * 4);
     if (offset != 0 && offset < layout.sampleSize) {
       offsets.insert(offset);
@@ -44,9 +42,9 @@ bool addBank(ScanResultBuilder& result, const BankLayout& layout, std::string_vi
 
   std::map<u32, PsxAdpcmStream> streams;
   for (auto current = offsets.begin(); current != offsets.end(); ++current) {
-    const u32 boundary = kSampleBase +
-                         (std::next(current) == offsets.end() ? layout.sampleSize : *std::next(current));
-    if (const auto stream = inspectPsxAdpcmStream(reader, kSampleBase + *current, boundary)) {
+    const auto next = std::next(current);
+    const u32 boundary = kBankHeaderSize + (next == offsets.end() ? layout.sampleSize : *next);
+    if (const auto stream = inspectPsxAdpcmStream(reader, kBankHeaderSize + *current, boundary)) {
       streams.emplace(*current, *stream);
     }
   }
@@ -57,19 +55,20 @@ bool addBank(ScanResultBuilder& result, const BankLayout& layout, std::string_vi
   auto bank = result.soundBank(std::string(name), reader.range(0, reader.size()));
   auto& instruments = bank.instruments();
   auto& samples = bank.localSamples();
-  instruments.include(reader.range(0, kSampleBase));
-  samples.include(reader.range(kSampleBase, layout.sampleSize));
+  instruments.include(reader.range(0, kBankHeaderSize));
+  samples.include(reader.range(kBankHeaderSize, layout.sampleSize));
   const SourceAnnotationId pointerRoot =
-      instruments.source(SourceRole::Table, "Sample Pointer Table", reader.range(0, 0x400),
+      instruments.source(SourceRole::Table, "Sample Pointer Table", reader.range(0, kProgramTableSize),
                          "tamsoft-ps1-sample-pointers")
           .id();
   const SourceAnnotationId adsrRoot =
-      instruments.source(SourceRole::Table, "ADSR Table", reader.range(0x400, 0x400), "tamsoft-ps1-adsr-table")
+      instruments.source(SourceRole::Table, "ADSR Table",
+                         reader.range(kProgramTableSize, kProgramTableSize), "tamsoft-ps1-adsr-table")
           .id();
   const SourceAnnotationId sampleRoot =
       samples.source(SourceRole::SamplePool,
                      layout.generation == Generation::Ps2 ? "SPU2 ADPCM Sample Data" : "SPU ADPCM Sample Data",
-                     reader.range(kSampleBase, layout.sampleSize), "tamsoft-ps1-sample-data")
+                     reader.range(kBankHeaderSize, layout.sampleSize), "tamsoft-ps1-sample-data")
           .id();
 
   std::map<u32, SampleRef> sampleRefs;
@@ -91,16 +90,16 @@ bool addBank(ScanResultBuilder& result, const BankLayout& layout, std::string_vi
 
   const PsxSpuGeneration spuGeneration =
       layout.generation == Generation::Ps2 ? PsxSpuGeneration::Ps2 : PsxSpuGeneration::Ps1;
-  for (u32 program = 1; program < 256; ++program) {
+  for (u32 program = 1; program < kProgramCount; ++program) {
     const u32 sampleOffset = reader.le32(program * 4);
     const auto sample = sampleRefs.find(sampleOffset);
     if (sample == sampleRefs.end()) {
       continue;
     }
-    const u32 storedAdsr = reader.le32(0x400 + program * 4);
+    const u32 storedAdsr = reader.le32(kProgramTableSize + program * 4);
     const u32 adsr = decodedAdsr(storedAdsr, layout.generation);
     const SourceRange pointerRange = reader.range(program * 4, 4);
-    const SourceRange adsrRange = reader.range(0x400 + program * 4, 4);
+    const SourceRange adsrRange = reader.range(kProgramTableSize + program * 4, 4);
     auto instrument = instruments.append(Instrument{
         .explicitAddress = InstrumentAddress{.bank = program / 128, .program = program % 128},
         .identity = instrumentIdentity(static_cast<u8>(program)),

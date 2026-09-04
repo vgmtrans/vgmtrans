@@ -12,7 +12,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <filesystem>
 #include <stdexcept>
 #include <string>
 #include <variant>
@@ -50,8 +49,8 @@ std::vector<u8> sfx(std::vector<u8> events) {
   return bytes;
 }
 
-std::vector<u8> bgm(bool ps2) {
-  const u32 records = ps2 ? 48 : 24;
+std::vector<u8> bgm(Generation generation) {
+  const u32 records = generation == Generation::Ps2 ? kPs2VoiceCount : kPs1VoiceCount;
   const u32 header = 8;
   const u32 track = header + records * 4;
   std::vector<u8> bytes(track + 1, 0);
@@ -64,14 +63,15 @@ std::vector<u8> bgm(bool ps2) {
   return bytes;
 }
 
-std::vector<u8> bank(bool ps2) {
+std::vector<u8> bank(Generation generation) {
   constexpr u32 sampleSize = 0x30;
-  std::vector<u8> bytes(0x800 + sampleSize, 0);
+  std::vector<u8> bytes(kBankHeaderSize + sampleSize, 0);
   le32(bytes, 4, 0x10);       // program 1
-  le32(bytes, 0x3fc, sampleSize);
-  le32(bytes, 0x404, ps2 ? 0xd2f2e11e : 0xdfe080ff);
-  bytes[0x810] = 0x11;
-  bytes[0x811] = 1;
+  le32(bytes, kProgramTableSize - 4, sampleSize);
+  le32(bytes, kProgramTableSize + 4,
+       generation == Generation::Ps2 ? 0xd2f2e11e : 0xdfe080ff);
+  bytes[kBankHeaderSize + 0x10] = 0x11;
+  bytes[kBankHeaderSize + 0x11] = 1;
   return bytes;
 }
 
@@ -87,22 +87,24 @@ std::vector<const Event*> events(const PerformanceTrack& track) {
 }
 
 void layoutsDistinguishDriverGenerationsAndPlayedTracks() {
-  const auto ps1 = readSequenceLayouts(ByteReader(SourceId{300}, bgm(false)));
-  const auto ps2 = readSequenceLayouts(ByteReader(SourceId{301}, bgm(true)));
-  expect(ps1.size() == 1 && ps1.front().generation == Generation::Ps1 && ps1.front().tracks.size() == 24,
+  const auto ps1 = readSequenceLayouts(ByteReader(SourceId{300}, bgm(Generation::Ps1)));
+  const auto ps2 = readSequenceLayouts(ByteReader(SourceId{301}, bgm(Generation::Ps2)));
+  expect(ps1.size() == 1 && ps1.front().generation == Generation::Ps1 &&
+             ps1.front().tracks.size() == kPs1VoiceCount,
          "PS1 BGM headers should execute all 24 driver work records");
-  expect(ps2.size() == 1 && ps2.front().generation == Generation::Ps2 && ps2.front().headerSize == 0xc0 &&
-             ps2.front().tracks.size() == 36,
+  expect(ps2.size() == 1 && ps2.front().generation == Generation::Ps2 &&
+             ps2.front().headerSize == kPs2VoiceCount * 4 &&
+             ps2.front().tracks.size() == kPs2MusicVoiceCount,
          "HG2 should retain its 48-record header while executing the 36 records used by reqmus");
 
-  const auto ps1Bank = readBankLayout(ByteReader(SourceId{302}, bank(false)));
-  const auto ps2Bank = readBankLayout(ByteReader(SourceId{303}, bank(true)));
+  const auto ps1Bank = readBankLayout(ByteReader(SourceId{302}, bank(Generation::Ps1)));
+  const auto ps2Bank = readBankLayout(ByteReader(SourceId{303}, bank(Generation::Ps2)));
   expect(ps1Bank && ps1Bank->generation == Generation::Ps1 && ps2Bank && ps2Bank->generation == Generation::Ps2,
          "native TVB contents should distinguish direct PS1 ADSR words from HG2's stored encoding");
 
   Session session;
   session.registerFormat(module());
-  session.addSource(SourceFile{.name = "BGM.TVB"}, bank(true));
+  session.addSource(SourceFile{.name = "BGM.TVB"}, bank(Generation::Ps2));
   session.scanPendingSources();
   const auto snapshot = session.snapshot();
   const auto found = std::ranges::find_if(snapshot.assets(), [](const Asset& asset) {
@@ -190,11 +192,14 @@ void externalChannelBecomesAnInheritedDelayedTrack() {
 void modulePairsPs1MusicAndSfxBanksByRole() {
   Session session;
   session.registerFormat(module());
-  session.addSource(SourceFile{.name = "C27BGM.TSQ", .path = "/fixture/C27/C27BGM.TSQ"}, bgm(false));
+  session.addSource(SourceFile{.name = "C27BGM.TSQ", .path = "/fixture/C27/C27BGM.TSQ"},
+                    bgm(Generation::Ps1));
   session.addSource(SourceFile{.name = "C27.TSQ", .path = "/fixture/C27/C27.TSQ"},
                     sfx({0xe2, 1, 0xb0, 1, 0xf0, 0xff}));
-  session.addSource(SourceFile{.name = "C27.TVB", .path = "/fixture/C27/C27.TVB"}, bank(false));
-  session.addSource(SourceFile{.name = "BGM.TVB", .path = "/fixture/SYS/BGM.TVB"}, bank(false));
+  session.addSource(SourceFile{.name = "C27.TVB", .path = "/fixture/C27/C27.TVB"},
+                    bank(Generation::Ps1));
+  session.addSource(SourceFile{.name = "BGM.TVB", .path = "/fixture/SYS/BGM.TVB"},
+                    bank(Generation::Ps1));
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
   const auto pairedBank = [&](std::string_view collectionName) -> const SoundBankAsset* {
