@@ -471,6 +471,7 @@ void mp2kCgbLengthClampsSequenceGateInPhysicalTime() {
 
 void mp2kCgbVolumeUsesCombinedHardwareQuantization() {
   std::vector<u8> bytes = mp2kFixture();
+  bytes[0x415] = 9;
   bytes[0x416] = 9;
   bytes[0x417] = 1;
   const std::array<u8, 19> track{
@@ -508,21 +509,63 @@ void mp2kCgbVolumeUsesCombinedHardwareQuantization() {
                                    return level && level->header.tick == 1 && std::abs(level->linearGain - 0.5) < 1e-12;
                                  }),
          "CGB track level should use the 4-bit square goal and five-level wave-volume register map");
-  expect(std::ranges::any_of(events,
-                             [](const PerformanceEvent& event) {
-                               const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event);
-                               if (!envelope || envelope->header.tick != 1 || !envelope->update.values) {
-                                 return false;
-                               }
-                               const Envelope& value = *envelope->update.values;
-                               return envelope->update.fields == EnvelopeFields::All && value.attackSeconds &&
-                                      value.decaySeconds && value.releaseSeconds && value.sustainAmplitude &&
-                                      std::abs(*value.attackSeconds - 6.0 / 64.0) < 1e-12 &&
-                                      std::abs(*value.decaySeconds - 6.0 / 64.0) < 1e-12 &&
-                                      std::abs(*value.releaseSeconds - 6.0 / 64.0) < 1e-12 &&
-                                      std::abs(*value.sustainAmplitude - 0.5) < 1e-12;
-                             }),
+  expect(std::ranges::count_if(events,
+                               [](const PerformanceEvent& event) {
+                                 const auto* level = std::get_if<LevelPerformanceEvent>(&event);
+                                 return level && level->header.tick == 0 &&
+                                        std::abs(level->linearGain - 10.0 / 15.0) < 1e-12;
+                               }) == 1,
+         "a note should not re-emit an unchanged CGB track level");
+  expect(std::ranges::any_of(
+             events,
+             [](const PerformanceEvent& event) {
+               const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event);
+               if (!envelope || envelope->header.tick != 1 || !envelope->update.values) {
+                 return false;
+               }
+               const Envelope& value = *envelope->update.values;
+               return envelope->update.fields == EnvelopeFields::All && value.attackSeconds && value.holdSeconds &&
+                      value.decaySeconds && value.releaseSeconds && value.sustainAmplitude &&
+                      std::abs(*value.attackSeconds - 6.0 / 64.0) < 1e-12 &&
+                      std::abs(*value.holdSeconds - 9.0 / 64.0) < 1e-12 &&
+                      std::abs(*value.decaySeconds - linearAmplitudeFadeToDbEnvelopeSeconds(54.0 / 64.0)) < 1e-12 &&
+                      std::abs(*value.releaseSeconds - linearAmplitudeFadeToDbEnvelopeSeconds(6.0 / 64.0)) < 1e-12 &&
+                      std::abs(*value.sustainAmplitude - 0.5) < 1e-12;
+             }),
          "CGB ADSR should use the note's envelope goal and quantized wave sustain ratio");
+}
+
+void mp2kRhythmProgramUsesSelectedCgbTone() {
+  std::vector<u8> bytes = mp2kFixture();
+  bytes.resize(0x1400);
+  const std::array<u8, 9> track{0xbd, 3, 0xbe, 75, 0xd4, 60, 120, 0x81, 0xb1};
+  std::copy(track.begin(), track.end(), bytes.begin() + 0x320);
+  bytes[0x424] = 0x80;
+  le32(bytes, 0x428, 0x08000d00);
+  const size_t drum = 0xd00 + 60 * 12;
+  bytes[drum] = 2;
+  bytes[drum + 1] = 60;
+  le32(bytes, drum + 4, 1);
+  bytes[drum + 9] = 4;
+  bytes[drum + 10] = 4;
+
+  Session session;
+  session.registerFormat(mp2kModule());
+  session.addSource(SourceFile{.name = "mp2k-cgb-rhythm.gba"}, bytes);
+  session.scanPendingSources();
+  const SessionSnapshot snapshot = session.snapshot();
+  const CollectionPlayback playback = session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{});
+  const auto& events = playback.performance.tracks.front().events;
+  const auto note = std::ranges::find_if(
+      events, [](const PerformanceEvent& event) { return std::holds_alternative<NotePerformanceEvent>(event); });
+  expect(note != events.end() && std::abs(std::get<NotePerformanceEvent>(*note).linearVelocity - 8.0 / 9.0) < 1e-12 &&
+             std::ranges::any_of(events,
+                                 [](const PerformanceEvent& event) {
+                                   const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event);
+                                   return envelope && envelope->update.values &&
+                                          envelope->update.values->sustainAmplitude == 0.25;
+                                 }),
+         "rhythm programs should use the selected child tone's CGB volume quantization and envelope");
 }
 
 void mp2kUndefinedJumpSlotsUseFine() {
@@ -711,6 +754,7 @@ void runMp2kModuleTests() {
   mp2kCgbFixedToneUsesDacResolutionMask();
   mp2kCgbLengthClampsSequenceGateInPhysicalTime();
   mp2kCgbVolumeUsesCombinedHardwareQuantization();
+  mp2kRhythmProgramUsesSelectedCgbTone();
   mp2kUndefinedJumpSlotsUseFine();
   mp2kPortConsumesItsRegisterOperands();
   mp2kUnknownMemaccDoesNotConsumeAJumpPointer();

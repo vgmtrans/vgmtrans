@@ -24,6 +24,37 @@ namespace vgmtrans::formats::mp2k {
 
 using namespace core;
 
+std::optional<Mp2kTone> parseMp2kTone(ByteReader reader, u32 offset, std::vector<Diagnostic>* diagnostics) {
+  if (!reader.has(offset, 12)) {
+    return std::nullopt;
+  }
+  RecordReader record(reader, offset, offset + 12, diagnostics, diagnostics != nullptr);
+  const auto type = record.u8("type", SourceValueDisplay::Hex);
+  const auto key = record.u8("key", SourceValueDisplay::MidiNote);
+  const auto length = record.u8("length");
+  const auto panSweep = record.u8("pan_sweep", SourceValueDisplay::Hex);
+  const auto wave = record.u32le("wave", SourceValueDisplay::Address);
+  const auto attack = record.u8("attack");
+  const auto decay = record.u8("decay");
+  const auto sustain = record.u8("sustain");
+  const auto release = record.u8("release");
+  if (!record.ok()) {
+    return std::nullopt;
+  }
+  return Mp2kTone{
+      .type = *type,
+      .key = *key,
+      .length = *length,
+      .panSweep = *panSweep,
+      .wave = *wave,
+      .attack = *attack,
+      .decay = *decay,
+      .sustain = *sustain,
+      .release = *release,
+      .source = std::move(record).finish(),
+  };
+}
+
 namespace {
 
 constexpr double kPsgSampleFrequency = 440.0;
@@ -52,25 +83,13 @@ struct SynthContext {
   SamplePoolBuilder& pcm;
 };
 
-[[nodiscard]] std::optional<Mp2kTone> parseMp2kTone(ByteReader reader, u32 offset,
-                                                    std::vector<Diagnostic>* diagnostics);
-
-[[nodiscard]] std::optional<u32> romOffset(u32 address, ByteReader reader, u32 size = 1) {
-  if ((address & 0xfe000000) != 0x08000000) {
-    return std::nullopt;
-  }
-  const u32 offset = address & 0x01ffffff;
-  return reader.has(offset, size) ? std::optional<u32>{offset} : std::nullopt;
-}
-
 [[nodiscard]] Envelope envelopeFor(const Mp2kTone& tone, bool cgb) {
   return Envelope{
       .attackSeconds = cgb ? cgbEnvelopeSeconds(tone.attack) : directAttackSeconds(tone.attack),
-      // DirectSound changes ATK to DEC on the frame that reaches 0xff; decay
-      // is not evaluated until the following SoundMainRAM pass.
-      .holdSeconds = cgb ? std::optional<double>{} : std::optional{1.0 / kGbaMixerFrameRate},
-      .decaySeconds = cgb ? cgbEnvelopeSeconds(tone.decay) : directDecaySeconds(tone.decay),
-      .releaseSeconds = cgb ? cgbEnvelopeSeconds(tone.release) : directReleaseSeconds(tone.release),
+      // Decay begins after one CGB envelope period or the next DirectSound mixer pass.
+      .holdSeconds = cgb ? cgbEnvelopeSeconds(tone.decay, 1) : 1.0 / kGbaMixerFrameRate,
+      .decaySeconds = cgb ? cgbDecaySeconds(tone.decay) : directDecaySeconds(tone.decay),
+      .releaseSeconds = cgb ? cgbDecaySeconds(tone.release) : directReleaseSeconds(tone.release),
       .sustainAmplitude = cgb ? std::min<u8>(tone.sustain, 15) / 15.0 : tone.sustain / 255.0,
   };
 }
@@ -314,37 +333,6 @@ void addRhythmRegions(SynthContext& context, InstrumentSetBuilder::Entry instrum
                     static_cast<u8>(key));
     }
   }
-}
-
-std::optional<Mp2kTone> parseMp2kTone(ByteReader reader, u32 offset, std::vector<Diagnostic>* diagnostics) {
-  if (!reader.has(offset, 12)) {
-    return std::nullopt;
-  }
-  RecordReader record(reader, offset, offset + 12, diagnostics);
-  const auto type = record.u8("type", SourceValueDisplay::Hex);
-  const auto key = record.u8("key", SourceValueDisplay::MidiNote);
-  const auto length = record.u8("length");
-  const auto panSweep = record.u8("pan_sweep", SourceValueDisplay::Hex);
-  const auto wave = record.u32le("wave", SourceValueDisplay::Address);
-  const auto attack = record.u8("attack");
-  const auto decay = record.u8("decay");
-  const auto sustain = record.u8("sustain");
-  const auto release = record.u8("release");
-  if (!record.ok()) {
-    return std::nullopt;
-  }
-  return Mp2kTone{
-      .type = *type,
-      .key = *key,
-      .length = *length,
-      .panSweep = *panSweep,
-      .wave = *wave,
-      .attack = *attack,
-      .decay = *decay,
-      .sustain = *sustain,
-      .release = *release,
-      .source = std::move(record).finish(),
-  };
 }
 
 std::vector<Mp2kTone> parseMp2kTones(ByteReader reader, const Mp2kBank& bank, std::vector<Diagnostic>* diagnostics) {

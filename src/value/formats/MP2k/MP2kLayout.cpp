@@ -43,14 +43,6 @@ constexpr std::array<u8, 30> kSongSelectV2{
 };
 constexpr std::string_view kExactPatternMask = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
 
-[[nodiscard]] std::optional<u32> romOffset(u32 address, ByteReader reader) {
-  if ((address & 0xfe000000) != 0x08000000) {
-    return std::nullopt;
-  }
-  const u32 offset = address & 0x01ffffff;
-  return offset < reader.size() ? std::optional<u32>{offset} : std::nullopt;
-}
-
 struct PlayerTable {
   u32 offset = 0;
   u32 count = 0;
