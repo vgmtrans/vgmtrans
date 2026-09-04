@@ -1,0 +1,851 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include "value/export/midi/PitchTransitionMidiLowering.h"
+
+#include "value/export/PerformancePitchBendContext.h"
+
+#include <algorithm>
+#include <cmath>
+#include <iterator>
+#include <limits>
+#include <optional>
+#include <stdexcept>
+#include <tuple>
+#include <type_traits>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+
+namespace vgmtrans::core {
+
+namespace {
+
+struct PortamentoSegment {
+  PerformanceEventHeader header;
+  u64 startTick = 0;
+  u64 endTick = 0;
+  double key = 0.0;
+  // Pitch bend is channel-relative to the MIDI note that actually started the
+  // voice. A segment entered without a new attack inherits that note's key.
+  double bendBaseKey = 0.0;
+  bool extendsPrevious = false;
+  bool restartsEnvelope = true;
+};
+
+struct NoteSpan {
+  NotePerformanceEvent source;
+  u64 endTick = 0;
+  // A boundary pitch bend can carry the preceding MIDI voice into this
+  // logical note instead of retriggering its attack.
+  bool continuesPreviousVoice = false;
+  // Linked logical notes share one sounding MIDI voice and therefore one
+  // stable pitch-bend range.
+  PerformanceNoteId pitchBendVoice;
+  double bendBaseKey = 0.0;
+  // Empty unless MIDI portamento must replace this source note.
+  std::vector<PortamentoSegment> portamentoSegments;
+};
+
+// A persistent normalized wheel is interpreted using the source and instrument
+// ranges active at the moment its pitch is queried.
+class PitchBendRangeTimeline {
+ public:
+  PitchBendRangeTimeline(const std::vector<PerformanceEvent>& events,
+                         std::span<const SoundBankAsset* const> soundBanks)
+      : initial_(soundBanks) {
+    PerformancePitchBendContext context = initial_;
+
+    std::vector<const PerformanceEvent*> timeline;
+    timeline.reserve(events.size());
+    for (const auto& event : events) {
+      timeline.push_back(&event);
+    }
+    std::ranges::stable_sort(timeline, [](const PerformanceEvent* lhs, const PerformanceEvent* rhs) {
+      const auto& left = performanceEventHeader(*lhs);
+      const auto& right = performanceEventHeader(*rhs);
+      return std::tie(left.tick, left.sequence) < std::tie(right.tick, right.sequence);
+    });
+
+    for (const auto* event : timeline) {
+      if (context.apply(*event, soundBanks)) {
+        points_.push_back(Point{.header = performanceEventHeader(*event), .context = context});
+      }
+    }
+  }
+
+  [[nodiscard]] double semitones(const PitchBendPerformanceEvent& bend,
+                                 const PerformanceEventHeader& at) const {
+    const auto key = std::pair{at.tick, at.sequence};
+    const auto found = std::upper_bound(points_.begin(), points_.end(), key, [](const auto& value, const Point& point) {
+      return value < std::pair{point.header.tick, point.header.sequence};
+    });
+    const auto& context = found == points_.begin() ? initial_ : std::prev(found)->context;
+    return context.semitones(bend);
+  }
+
+ private:
+  struct Point {
+    PerformanceEventHeader header;
+    PerformancePitchBendContext context;
+  };
+
+  PerformancePitchBendContext initial_;
+  std::vector<Point> points_;
+};
+
+enum class PitchBendWriteKind {
+  Source,
+  AbsoluteTransition,
+  HeldTransition,
+};
+
+// Attack-free transitions use a separate layer so they can either inherit the
+// held pitch or establish a declared start without discarding source bends.
+struct PitchBendWrite {
+  PitchBendPerformanceEvent bend;
+  PitchBendWriteKind kind = PitchBendWriteKind::Source;
+  std::optional<PerformanceAutomationId> owner;
+  bool reset = false;
+  bool establishesHeldPitch = false;
+};
+
+struct PitchBendLayer {
+  PitchBendPerformanceEvent bend;
+  double ownerBaseSemitones = 0.0;
+  std::optional<PerformanceAutomationId> owner;
+};
+
+[[nodiscard]] u64 noteEnd(const NotePerformanceEvent& note) {
+  return note.header.tick > std::numeric_limits<u64>::max() - note.durationTicks
+             ? std::numeric_limits<u64>::max()
+             : note.header.tick + note.durationTicks;
+}
+
+[[nodiscard]] NoteSpan* findNote(std::vector<NoteSpan>& notes, PerformanceNoteId id) {
+  const auto found = std::ranges::find_if(notes, [id](const NoteSpan& note) { return note.source.note == id; });
+  return found == notes.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] const NoteSpan* findNote(const std::vector<NoteSpan>& notes, PerformanceNoteId id) {
+  const auto found = std::ranges::find_if(notes, [id](const NoteSpan& note) { return note.source.note == id; });
+  return found == notes.end() ? nullptr : &*found;
+}
+
+[[nodiscard]] std::vector<NoteSpan> collectNotes(const PerformanceTrack& track) {
+  std::vector<NoteSpan> notes;
+  for (const auto& event : track.events) {
+    const auto* source = std::get_if<NotePerformanceEvent>(&event);
+    if (source == nullptr || !source->note.valid()) {
+      continue;
+    }
+    if (auto* note = findNote(notes, source->note)) {
+      note->endTick = std::max(note->endTick, noteEnd(*source));
+    } else {
+      notes.push_back(NoteSpan{
+          .source = *source,
+          .endTick = noteEnd(*source),
+          .pitchBendVoice = source->note,
+          .bendBaseKey = source->key,
+      });
+    }
+  }
+  std::ranges::stable_sort(notes, [](const NoteSpan& lhs, const NoteSpan& rhs) {
+    return std::tie(lhs.source.header.tick, lhs.source.header.sequence) <
+           std::tie(rhs.source.header.tick, rhs.source.header.sequence);
+  });
+  return notes;
+}
+
+[[nodiscard]] double bendBaseKeyAt(const NoteSpan& note, u64 tick) {
+  double key = note.bendBaseKey;
+  for (const auto& segment : note.portamentoSegments) {
+    if (segment.startTick > tick) {
+      break;
+    }
+    key = segment.bendBaseKey;
+  }
+  return key;
+}
+
+[[nodiscard]] std::optional<double> primaryPitchBendAt(const std::vector<PerformanceEvent>& events,
+                                                       const PerformanceEventHeader& at,
+                                                       const PitchBendRangeTimeline& ranges) {
+  const PitchBendPerformanceEvent* latest = nullptr;
+  for (const auto& event : events) {
+    const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
+    if (bend == nullptr || bend->layer != kPrimaryPitchBendLayer ||
+        std::tie(bend->header.tick, bend->header.sequence) > std::tie(at.tick, at.sequence)) {
+      continue;
+    }
+    if (latest == nullptr ||
+        std::tie(latest->header.tick, latest->header.sequence) < std::tie(bend->header.tick, bend->header.sequence)) {
+      latest = bend;
+    }
+  }
+  return latest == nullptr ? std::nullopt : std::optional{ranges.semitones(*latest, at)};
+}
+
+[[nodiscard]] std::optional<double> establishedPitchBend(const std::vector<PerformanceEvent>& events,
+                                                         const NoteSpan& note,
+                                                         const PerformanceAutomation& automation,
+                                                         const PitchTransitionIntent& transition, u64 startTick,
+                                                         const PitchBendRangeTimeline& ranges) {
+  auto at = automation.header;
+  at.tick = startTick;
+  const auto bend = primaryPitchBendAt(events, at, ranges);
+  // Pitch bends may already have passed through the source's finite bend
+  // register, so allow a small quantization difference from the exact key.
+  if (!bend || std::abs(bendBaseKeyAt(note, startTick) + *bend - transition.startKey) >= 0.02) {
+    return std::nullopt;
+  }
+  return bend;
+}
+
+[[nodiscard]] PerformanceEventHeader atTick(const PerformanceEventHeader& origin, u64 tick, u64& nextSequence) {
+  auto header = origin;
+  header.tick = tick;
+  header.sequence = nextSequence++;
+  return header;
+}
+
+[[nodiscard]] PerformanceEventHeader atAutomationTick(const PerformanceAutomation& automation, u64 tick) {
+  auto header = automation.header;
+  header.tick = tick;
+  header.automation = automation.id;
+  return header;
+}
+
+void addWarning(PerformanceSequence& performance, const PerformanceAutomation& automation, std::string message) {
+  performance.diagnostics.push_back(Diagnostic{
+      .severity = Severity::Warning,
+      .message = std::move(message),
+      .annotation = automation.header.sourceAnnotation.valid()
+                        ? std::optional<SourceAnnotationId>{automation.header.sourceAnnotation}
+                        : std::nullopt,
+  });
+}
+
+[[nodiscard]] double physicalDurationMilliseconds(const PitchTransitionIntent& transition,
+                                                  const PerformanceTempoMap& tempos, u64 startTick) {
+  return std::visit(
+      [&](const auto& physical) {
+        using Physical = std::decay_t<decltype(physical)>;
+        if constexpr (std::is_same_v<Physical, TempoRelativePitchSlideTiming>) {
+          return tempos.durationMilliseconds(startTick, transition.timing.timelineTicks);
+        } else if constexpr (std::is_same_v<Physical, FixedDurationPitchSlideTiming>) {
+          return std::max(0.0, physical.milliseconds);
+        } else {
+          if (physical.semitonesPerSecond <= 0.0) {
+            return 0.0;
+          }
+          return std::abs(transition.targetKey - transition.startKey) / physical.semitonesPerSecond * 1000.0;
+        }
+      },
+      transition.timing.physical);
+}
+
+[[nodiscard]] bool affectsNote(const PerformanceAutomation& automation, const PitchTransitionIntent& transition,
+                               const NoteSpan& anchor, const NoteSpan& note) {
+  if (note.source.note == anchor.source.note) {
+    return true;
+  }
+  if (!transition.continuesAcrossNotes || note.source.lane != transition.lane ||
+      note.source.header.tick < anchor.source.header.tick) {
+    return false;
+  }
+  return note.endTick > automation.realization.startTick && note.source.header.tick <= automation.realization.endTick;
+}
+
+[[nodiscard]] PitchBendWrite transitionPitchBend(const PerformanceAutomation& automation,
+                                                 const PitchTransitionIntent& transition, u64 tick, double semitones,
+                                                 bool reset = false, bool establishesHeldPitch = false) {
+  return PitchBendWrite{
+      .bend =
+          PitchBendPerformanceEvent{
+              .header = atAutomationTick(automation, tick),
+              .semitones = semitones,
+          },
+      .kind = transition.previousNote ? PitchBendWriteKind::HeldTransition : PitchBendWriteKind::AbsoluteTransition,
+      .owner = automation.id,
+      .reset = reset,
+      .establishesHeldPitch = establishesHeldPitch,
+  };
+}
+
+[[nodiscard]] std::vector<PitchBendPerformanceEvent> resolvePitchBends(std::vector<PitchBendWrite> writes,
+                                                                       PitchBendLayerId heldTransitionLayer,
+                                                                       const PitchBendRangeTimeline& ranges) {
+  std::ranges::stable_sort(writes, [](const PitchBendWrite& lhs, const PitchBendWrite& rhs) {
+    return std::tie(lhs.bend.header.tick, lhs.bend.header.sequence) <
+           std::tie(rhs.bend.header.tick, rhs.bend.header.sequence);
+  });
+
+  PitchBendLayer primary;
+  PitchBendLayer heldVoice;
+  std::vector<PitchBendPerformanceEvent> resolved;
+  resolved.reserve(writes.size() * 2);
+  for (const auto& write : writes) {
+    if (write.kind == PitchBendWriteKind::Source) {
+      if (write.bend.layer == kPrimaryPitchBendLayer) {
+        primary.bend = write.bend;
+        primary.owner.reset();
+      }
+      resolved.push_back(write.bend);
+      continue;
+    }
+
+    const bool held = write.kind == PitchBendWriteKind::HeldTransition;
+    auto& layer = held ? heldVoice : primary;
+    if (write.reset) {
+      if (layer.owner != write.owner) {
+        continue;
+      }
+      layer = {};
+    } else {
+      if (!held) {
+        if (heldVoice.bend.semitones != 0.0) {
+          auto reset = write.bend;
+          reset.semitones = 0.0;
+          reset.normalizedWheelPosition.reset();
+          reset.layer = heldTransitionLayer;
+          reset.header.automation.reset();
+          resolved.push_back(std::move(reset));
+        }
+        heldVoice = {};
+      }
+      if (held && layer.owner != write.owner) {
+        // Cancel an interrupted absolute transition, but retain ownerless
+        // source bend beneath the held transition.
+        layer.ownerBaseSemitones =
+            write.establishesHeldPitch ? (primary.owner ? -ranges.semitones(primary.bend, write.bend.header) : 0.0)
+                                       : layer.bend.semitones;
+      }
+      layer.bend = write.bend;
+      layer.bend.semitones = (held ? layer.ownerBaseSemitones : 0.0) + write.bend.semitones;
+      layer.bend.normalizedWheelPosition.reset();
+      layer.owner = write.owner;
+    }
+
+    auto bend = write.bend;
+    bend.semitones = layer.bend.semitones;
+    bend.normalizedWheelPosition.reset();
+    bend.layer = held ? heldTransitionLayer : kPrimaryPitchBendLayer;
+    if (write.reset) {
+      // The reset occurs at the next attack, but it is not part of that voice's
+      // transition path.
+      bend.header.automation.reset();
+    }
+    resolved.push_back(std::move(bend));
+  }
+  return resolved;
+}
+
+[[nodiscard]] std::optional<double> establishedPitchBend(const std::vector<PitchBendWrite>& bends,
+                                                         const NoteSpan& note,
+                                                         const PerformanceAutomation& automation,
+                                                         const PitchTransitionIntent& transition, u64 startTick,
+                                                         PitchBendLayerId heldTransitionLayer,
+                                                         const PitchBendRangeTimeline& ranges) {
+  const auto resolved = resolvePitchBends(bends, heldTransitionLayer, ranges);
+  auto at = automation.header;
+  at.tick = startTick;
+  const PitchBendPerformanceEvent* primary = nullptr;
+  const PitchBendPerformanceEvent* held = nullptr;
+  for (const auto& bend : resolved) {
+    if (std::tie(bend.header.tick, bend.header.sequence) > std::tie(at.tick, at.sequence)) {
+      continue;
+    }
+    if (bend.layer == kPrimaryPitchBendLayer) {
+      primary = &bend;
+    } else if (bend.layer == heldTransitionLayer) {
+      held = &bend;
+    }
+  }
+  if (primary == nullptr && held == nullptr) {
+    return std::nullopt;
+  }
+  const double bendAtStart = (primary == nullptr ? 0.0 : ranges.semitones(*primary, at)) +
+                             (held == nullptr ? 0.0 : ranges.semitones(*held, at));
+  if (std::abs(bendBaseKeyAt(note, startTick) + bendAtStart - transition.startKey) >= 0.02) {
+    return std::nullopt;
+  }
+  return bendAtStart;
+}
+
+[[nodiscard]] bool appendPitchBends(std::vector<PitchBendWrite>& bends, const PerformanceAutomation& automation,
+                                    const PitchTransitionIntent& transition, const NoteSpan& note,
+                                    bool retainReleaseTail, PitchBendLayerId heldTransitionLayer,
+                                    const PitchBendRangeTimeline& ranges) {
+  const u64 startTick = std::max(note.source.header.tick, automation.realization.startTick);
+  const u64 endTick =
+      retainReleaseTail ? automation.realization.endTick : std::min(note.endTick, automation.realization.endTick);
+  if (startTick >= note.endTick || endTick < startTick) {
+    return false;
+  }
+
+  // A delayed slide may begin away from the note's nominal key.
+  const double noteBaseKey = bendBaseKeyAt(note, note.source.header.tick);
+  const bool startPitchEstablished = establishedPitchBend(bends, note, automation, transition, startTick,
+                                                          heldTransitionLayer, ranges)
+                                         .has_value();
+  // A held source voice may either continue from its live bend or explicitly
+  // reload the transition's declared start key at the note boundary.
+  const bool establishesHeldPitch = transition.previousNote && !startPitchEstablished;
+  if (startTick > note.source.header.tick && std::abs(transition.startKey - noteBaseKey) > 0.000001 &&
+      !startPitchEstablished) {
+    bends.push_back(transitionPitchBend(automation, transition, note.source.header.tick,
+                                        transition.previousNote ? 0.0 : transition.startKey - noteBaseKey));
+  }
+
+  const auto appendAt = [&](u64 tick) {
+    const u64 elapsed = tick - automation.realization.startTick;
+    const double transitionBaseKey = transition.previousNote && !establishesHeldPitch
+                                         ? transition.startKey
+                                         : bendBaseKeyAt(note, tick);
+    bends.push_back(transitionPitchBend(
+        automation, transition, tick,
+        pitchTransitionValueAt(transition, static_cast<u32>(std::min<u64>(elapsed, std::numeric_limits<u32>::max()))) -
+            transitionBaseKey,
+        false, establishesHeldPitch));
+  };
+
+  if (const auto* sampled = std::get_if<SampledAutomationCurve>(&transition.curve)) {
+    std::vector<u64> sampleTicks{startTick, endTick};
+    sampleTicks.reserve(sampled->samples.size() + note.portamentoSegments.size() + 2);
+    for (const AutomationSample& sample : sampled->samples) {
+      const u64 tick = automation.realization.startTick > std::numeric_limits<u64>::max() - sample.tickOffset
+                           ? std::numeric_limits<u64>::max()
+                           : automation.realization.startTick + sample.tickOffset;
+      if (tick >= startTick && tick <= endTick) {
+        sampleTicks.push_back(tick);
+      }
+    }
+    for (const PortamentoSegment& segment : note.portamentoSegments) {
+      if (segment.startTick >= startTick && segment.startTick <= endTick) {
+        sampleTicks.push_back(segment.startTick);
+      }
+    }
+    std::ranges::sort(sampleTicks);
+    const auto uniqueEnd = std::ranges::unique(sampleTicks).begin();
+    sampleTicks.erase(uniqueEnd, sampleTicks.end());
+    for (const u64 tick : sampleTicks) {
+      appendAt(tick);
+    }
+    return true;
+  }
+
+  for (u64 tick = startTick;; ++tick) {
+    appendAt(tick);
+    if (tick == endTick) {
+      break;
+    }
+  }
+  return true;
+}
+
+[[nodiscard]] bool transitionOwnsAttackAtEnd(const PerformanceAutomation& automation,
+                                             const PitchTransitionIntent& transition, const NoteSpan& anchor,
+                                             const NotePerformanceEvent& attack, const std::vector<NoteSpan>& notes) {
+  if (automation.realization.endReason != PerformanceAutomationEndReason::Completed ||
+      !transition.continuesAcrossNotes || attack.header.tick != automation.realization.endTick) {
+    return false;
+  }
+  const auto* note = findNote(notes, attack.note);
+  return note != nullptr && affectsNote(automation, transition, anchor, *note);
+}
+
+[[nodiscard]] std::optional<u64> nextIndependentAttack(const std::vector<PerformanceEvent>& events,
+                                                       const std::vector<NoteSpan>& notes,
+                                                       const PerformanceAutomation& automation,
+                                                       const PitchTransitionIntent& transition,
+                                                       const NoteSpan& anchor) {
+  std::optional<u64> next;
+  for (const auto& event : events) {
+    const auto* note = std::get_if<NotePerformanceEvent>(&event);
+    if (note == nullptr || note->extendsPrevious || note->header.tick < automation.realization.endTick ||
+        transitionOwnsAttackAtEnd(automation, transition, anchor, *note, notes)) {
+      continue;
+    }
+    next = next ? std::min(*next, note->header.tick) : note->header.tick;
+  }
+  return next;
+}
+
+[[nodiscard]] std::vector<PitchBendWrite> takeSourcePitchBends(std::vector<PerformanceEvent>& events) {
+  std::vector<PitchBendWrite> bends;
+  std::erase_if(events, [&](const PerformanceEvent& event) {
+    const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
+    if (bend == nullptr) {
+      return false;
+    }
+    bends.push_back(PitchBendWrite{.bend = *bend});
+    return true;
+  });
+  return bends;
+}
+
+[[nodiscard]] PitchBendLayerId unusedPitchBendLayer(const std::vector<PitchBendWrite>& bends) {
+  std::unordered_set<u32> used;
+  for (const auto& bend : bends) {
+    if (bend.bend.layer.valid()) {
+      used.insert(bend.bend.layer.value);
+    }
+  }
+  for (u32 candidate = 1; candidate != invalidIdValue; ++candidate) {
+    if (!used.contains(candidate)) {
+      return PitchBendLayerId{candidate};
+    }
+  }
+  throw std::overflow_error("Pitch bend layer space exhausted");
+}
+
+void lowerPitchBends(PerformanceSequence& performance, std::vector<PerformanceEvent>& events,
+                     const std::vector<NoteSpan>& notes, const std::vector<const PerformanceAutomation*>& transitions,
+                     const PitchBendRangeTimeline& ranges) {
+  auto bends = takeSourcePitchBends(events);
+  const PitchBendLayerId heldTransitionLayer = unusedPitchBendLayer(bends);
+  for (const auto* automation : transitions) {
+    const auto& transition = *pitchTransitionIntent(*automation);
+    const auto* anchor = findNote(notes, transition.note);
+    if (anchor == nullptr) {
+      addWarning(performance, *automation, "Pitch transition did not reference a rendered note");
+      continue;
+    }
+
+    std::vector<const NoteSpan*> affectedNotes;
+    for (const auto& note : notes) {
+      if (affectsNote(*automation, transition, *anchor, note)) {
+        affectedNotes.push_back(&note);
+      }
+    }
+    bool rendered = false;
+    for (const auto* note : affectedNotes) {
+      rendered |= appendPitchBends(bends, *automation, transition, *note, note == affectedNotes.back(),
+                                   heldTransitionLayer, ranges);
+    }
+    if (rendered) {
+      // Retain the terminal bend through note-off and the synth's release
+      // phase. Make its next-attack reset visible while lowering later
+      // transitions so they inherit the chronological pitch state.
+      if (const auto resetTick = nextIndependentAttack(events, notes, *automation, transition, *anchor)) {
+        bends.push_back(transitionPitchBend(*automation, transition, *resetTick, 0.0, true));
+      }
+    }
+  }
+
+  auto resolved = resolvePitchBends(std::move(bends), heldTransitionLayer, ranges);
+  for (auto& bend : resolved) {
+    events.emplace_back(std::move(bend));
+  }
+}
+
+void beginPortamentoRewrite(NoteSpan& note) {
+  if (!note.portamentoSegments.empty()) {
+    return;
+  }
+  note.portamentoSegments.push_back(PortamentoSegment{
+      .header = note.source.header,
+      .startTick = note.source.header.tick,
+      .endTick = note.endTick,
+      .key = note.source.key,
+      .bendBaseKey = note.bendBaseKey,
+      .restartsEnvelope = note.source.restartsEnvelope,
+  });
+}
+
+void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
+                        const PitchTransitionIntent& transition, bool sourceEstablishesStart) {
+  const u64 startTick = automation.realization.startTick;
+  if (startTick <= note.source.header.tick) {
+    note.portamentoSegments.front().key = transition.targetKey;
+    note.portamentoSegments.front().bendBaseKey = transition.targetKey;
+    note.portamentoSegments.front().extendsPrevious = false;
+    if (transition.previousNote) {
+      note.portamentoSegments.front().restartsEnvelope = false;
+    }
+    return;
+  }
+
+  const u64 clampedStart = std::min(startTick, note.endTick);
+  std::vector<PortamentoSegment> segments;
+  segments.reserve(note.portamentoSegments.size() + 1);
+  for (auto segment : note.portamentoSegments) {
+    if (segment.startTick >= clampedStart) {
+      continue;
+    }
+    if (segment.endTick > clampedStart) {
+      const u32 overlap = transition.portamentoRendering.overlapTicks;
+      segment.endTick = std::min(note.endTick, clampedStart > std::numeric_limits<u64>::max() - overlap
+                                                   ? std::numeric_limits<u64>::max()
+                                                   : clampedStart + overlap);
+      if (!sourceEstablishesStart) {
+        segment.key = transition.startKey;
+        segment.bendBaseKey = transition.startKey;
+      }
+    }
+    if (segment.endTick > segment.startTick) {
+      segments.push_back(std::move(segment));
+    }
+  }
+  if (clampedStart < note.endTick) {
+    segments.push_back(PortamentoSegment{
+        .header = automation.header,
+        .startTick = clampedStart,
+        .endTick = note.endTick,
+        .key = transition.targetKey,
+        .bendBaseKey = transition.targetKey,
+        .restartsEnvelope = false,
+    });
+  }
+  note.portamentoSegments = std::move(segments);
+}
+
+void linkPitchBendVoices(std::vector<NoteSpan>& notes, const std::vector<const PerformanceAutomation*>& transitions) {
+  for (const auto* automation : transitions) {
+    const auto& transition = *pitchTransitionIntent(*automation);
+    if (!transition.previousNote) {
+      continue;
+    }
+
+    auto* note = findNote(notes, transition.note);
+    auto* previous = findNote(notes, *transition.previousNote);
+    if (note == nullptr || previous == nullptr || note == previous ||
+        automation->realization.startTick > note->source.header.tick ||
+        std::tie(previous->source.header.tick, previous->source.header.sequence) >=
+            std::tie(note->source.header.tick, note->source.header.sequence) ||
+        previous->source.lane != note->source.lane) {
+      continue;
+    }
+
+    const double baseKey = bendBaseKeyAt(*previous, automation->realization.startTick);
+    note->continuesPreviousVoice = true;
+    note->pitchBendVoice = previous->pitchBendVoice;
+    note->bendBaseKey = baseKey;
+    if (!note->portamentoSegments.empty()) {
+      auto& first = note->portamentoSegments.front();
+      first.bendBaseKey = baseKey;
+      first.extendsPrevious = true;
+    }
+  }
+}
+
+void lowerPortamento(PerformanceSequence& performance, std::vector<PerformanceEvent>& events,
+                     const std::vector<PerformanceEvent>& sourceEvents, std::vector<NoteSpan>& notes,
+                     const std::vector<const PerformanceAutomation*>& transitions, const PerformanceTempoMap& tempos,
+                     u64& nextSequence, const PitchBendRangeTimeline& ranges) {
+  for (const auto* automation : transitions) {
+    const auto& transition = *pitchTransitionIntent(*automation);
+    auto* note = findNote(notes, transition.note);
+    if (note == nullptr) {
+      addWarning(performance, *automation, "Pitch transition did not reference a rendered note");
+      continue;
+    }
+    if (std::holds_alternative<SampledAutomationCurve>(transition.curve)) {
+      addWarning(performance, *automation,
+                 "Native MIDI portamento cannot preserve the transition's exact sampled pitch curve");
+    }
+
+    const u64 startTick = automation->realization.startTick;
+    if (startTick >= note->endTick) {
+      continue;
+    }
+    auto* previous = transition.previousNote ? findNote(notes, *transition.previousNote) : nullptr;
+    const NoteSpan* sourceNote = previous != nullptr ? previous : note;
+    const auto sourceBend = establishedPitchBend(sourceEvents, *sourceNote, *automation, transition, startTick, ranges);
+    beginPortamentoRewrite(*note);
+    if (startTick <= note->source.header.tick && previous != nullptr) {
+      beginPortamentoRewrite(*previous);
+      auto& segment = previous->portamentoSegments.back();
+      const u32 overlap = transition.portamentoRendering.overlapTicks;
+      const u64 overlapEnd = startTick > std::numeric_limits<u64>::max() - overlap ? std::numeric_limits<u64>::max()
+                                                                                   : startTick + overlap;
+      segment.endTick = std::max(segment.endTick, overlapEnd);
+    }
+    splitForPortamento(*note, *automation, transition, sourceBend.has_value());
+
+    if (sourceBend && std::abs(*sourceBend) > 0.000001) {
+      events.emplace_back(PitchBendPerformanceEvent{
+          .header = atTick(automation->header, startTick, nextSequence),
+          .semitones = 0.0,
+      });
+    }
+
+    if (transition.portamentoRendering.useCurrentTiming) {
+      events.emplace_back(PortamentoControlPerformanceEvent{
+          .header = atTick(automation->header, startTick, nextSequence),
+          .previousKey = transition.startKey,
+      });
+    } else {
+      events.emplace_back(PortamentoPerformanceEvent{
+          .header = atTick(automation->header, startTick, nextSequence),
+          .timeMilliseconds = physicalDurationMilliseconds(transition, tempos, startTick),
+          .previousKey = transition.startKey,
+      });
+    }
+    if (transition.portamentoRendering.restoreTimeMilliseconds) {
+      events.emplace_back(PortamentoPerformanceEvent{
+          .header = atTick(automation->header, note->endTick, nextSequence),
+          .timeMilliseconds = *transition.portamentoRendering.restoreTimeMilliseconds,
+      });
+    }
+  }
+}
+
+void appendSourceEvents(std::vector<PerformanceEvent>& events, const PerformanceTrack& track,
+                        const std::vector<NoteSpan>& notes, bool renderPortamentoSettings, u64& nextSequence) {
+  for (const auto& event : track.events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event); note != nullptr && note->note.valid()) {
+      const auto* span = findNote(notes, note->note);
+      if (span != nullptr && !span->portamentoSegments.empty()) {
+        continue;
+      }
+      if (span != nullptr && span->continuesPreviousVoice) {
+        auto continued = *note;
+        continued.extendsPrevious = true;
+        events.emplace_back(std::move(continued));
+        continue;
+      }
+    }
+    const bool midiPortamentoEvent =
+        std::holds_alternative<PortamentoPerformanceEvent>(event) ||
+        std::holds_alternative<PortamentoEnablePerformanceEvent>(event) ||
+        std::holds_alternative<PortamentoTimePerformanceEvent>(event) ||
+        std::holds_alternative<PortamentoControlPerformanceEvent>(event);
+    if (midiPortamentoEvent && !renderPortamentoSettings) {
+      continue;
+    }
+    if (const auto* settings = std::get_if<PitchTransitionSettingsPerformanceEvent>(&event)) {
+      if (renderPortamentoSettings) {
+        events.emplace_back(PortamentoPerformanceEvent{
+            .header = settings->header,
+            .timeMilliseconds = settings->timeMilliseconds,
+        });
+      }
+    } else {
+      events.push_back(event);
+    }
+  }
+
+  for (const auto& note : notes) {
+    for (const auto& segment : note.portamentoSegments) {
+      if (segment.endTick <= segment.startTick) {
+        continue;
+      }
+      auto header = segment.header;
+      header.tick = segment.startTick;
+      header.sequence = nextSequence++;
+      events.emplace_back(NotePerformanceEvent{
+          .header = header,
+          .key = segment.key,
+          .linearVelocity = note.source.linearVelocity,
+          .durationTicks =
+              static_cast<u32>(std::min<u64>(segment.endTick - segment.startTick, std::numeric_limits<u32>::max())),
+          .extendsPrevious = segment.extendsPrevious,
+          .restartsEnvelope = segment.restartsEnvelope,
+          .instrumentAddress = note.source.instrumentAddress,
+          .restartsLfoPhase = note.source.restartsLfoPhase,
+          .restartsVibratoLfoPhase = note.source.restartsVibratoLfoPhase,
+          .restartsTremoloLfoPhase = note.source.restartsTremoloLfoPhase,
+          .note = note.source.note,
+          .lane = note.source.lane,
+      });
+    }
+  }
+}
+
+[[nodiscard]] PitchTransitionRenderingHint effectiveRendering(const PerformanceSequence& performance,
+                                                              const MidiExportOptions& options,
+                                                              const PitchTransitionIntent& transition) {
+  if (transition.portamentoRendering.required) {
+    return PitchTransitionRenderingHint::Portamento;
+  }
+  if (options.pitchTransitions == MidiPitchTransitionRendering::Portamento) {
+    return PitchTransitionRenderingHint::Portamento;
+  }
+  if (options.pitchTransitions == MidiPitchTransitionRendering::PitchBend) {
+    return PitchTransitionRenderingHint::PitchBend;
+  }
+  return transition.preferredRendering.value_or(performance.preferredPitchTransitionRendering);
+}
+
+}  // namespace
+
+PerformanceSequence lowerMidiPerformanceAutomation(const PerformanceSequence& performance,
+                                                   const MidiExportOptions& options) {
+  return lowerMidiPerformanceAutomation(performance, options, PerformanceTempoMap{performance}, {});
+}
+
+PerformanceSequence lowerMidiPerformanceAutomation(const PerformanceSequence& performance,
+                                                   const MidiExportOptions& options,
+                                                   const PerformanceTempoMap& tempos,
+                                                   std::span<const SoundBankAsset* const> soundBanks) {
+  PerformanceSequence lowered = performance;
+
+  for (auto& track : lowered.tracks) {
+    u64 nextSequence = 0;
+    std::vector<const PerformanceAutomation*> portamentoTransitions;
+    std::vector<const PerformanceAutomation*> pitchBendTransitions;
+    for (const auto& event : track.events) {
+      nextSequence = std::max(nextSequence, performanceEventHeader(event).sequence + 1);
+    }
+    for (const auto& automation : track.automations) {
+      nextSequence = std::max(nextSequence, automation.header.sequence + 1);
+      if (const auto* transition = pitchTransitionIntent(automation)) {
+        if (automation.realization.endReason != PerformanceAutomationEndReason::Completed &&
+            automation.realization.endTick <= automation.realization.startTick) {
+          continue;
+        }
+        auto& transitions =
+            effectiveRendering(performance, options, *transition) == PitchTransitionRenderingHint::Portamento
+                ? portamentoTransitions
+                : pitchBendTransitions;
+        transitions.push_back(&automation);
+      }
+    }
+    const auto sortTransitions = [](auto& transitions) {
+      std::ranges::stable_sort(transitions, [](const auto* lhs, const auto* rhs) {
+        return std::tie(lhs->realization.startTick, lhs->header.sequence) <
+               std::tie(rhs->realization.startTick, rhs->header.sequence);
+      });
+    };
+    sortTransitions(portamentoTransitions);
+    sortTransitions(pitchBendTransitions);
+
+    std::optional<PitchBendRangeTimeline> pitchBendRanges;
+    if (!portamentoTransitions.empty() || !pitchBendTransitions.empty()) {
+      pitchBendRanges.emplace(track.events, soundBanks);
+    }
+
+    auto notes = collectNotes(track);
+    std::vector<PerformanceEvent> events;
+    events.reserve(track.events.size() + (portamentoTransitions.size() + pitchBendTransitions.size()) * 4);
+    if (!portamentoTransitions.empty()) {
+      lowerPortamento(lowered, events, track.events, notes, portamentoTransitions, tempos, nextSequence,
+                      *pitchBendRanges);
+    }
+    linkPitchBendVoices(notes, pitchBendTransitions);
+    const bool renderPortamentoSettings =
+        !portamentoTransitions.empty() || options.pitchTransitions == MidiPitchTransitionRendering::Portamento ||
+        (options.pitchTransitions == MidiPitchTransitionRendering::PreserveFormat &&
+         performance.preferredPitchTransitionRendering == PitchTransitionRenderingHint::Portamento);
+    appendSourceEvents(events, track, notes, renderPortamentoSettings, nextSequence);
+    if (!pitchBendTransitions.empty()) {
+      lowerPitchBends(lowered, events, notes, pitchBendTransitions, *pitchBendRanges);
+    }
+    std::ranges::stable_sort(events, [](const PerformanceEvent& lhs, const PerformanceEvent& rhs) {
+      const auto& left = performanceEventHeader(lhs);
+      const auto& right = performanceEventHeader(rhs);
+      return std::tie(left.tick, left.sequence) < std::tie(right.tick, right.sequence);
+    });
+    track.events = std::move(events);
+    std::erase_if(track.automations,
+                  [](const PerformanceAutomation& automation) { return pitchTransitionIntent(automation) != nullptr; });
+  }
+  return lowered;
+}
+
+}  // namespace vgmtrans::core

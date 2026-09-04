@@ -8,8 +8,6 @@
 
 #include "ColorHelpers.h"
 #include "SeekBar.h"
-#include "SequencePlayer.h"
-#include "services/NotificationCenter.h"
 #include "UIHelpers.h"
 
 #include <QEvent>
@@ -95,24 +93,16 @@ void PlaybackControls::setupControls() {
   m_slider->setSizePolicy(sliderPolicy);
   m_slider->setEnabled(false);
   m_slider->setToolTip("Seek");
-  connect(m_slider, &SeekBar::sliderMoved, [this](int value) {
-    seekingTo(value, PositionChangeOrigin::SeekBar);
+  connect(m_slider, &SeekBar::sliderMoved, this, [this](int value) {
+    emit seekingTo(value, PositionChangeOrigin::SeekBar);
   });
-  connect(m_slider, &SeekBar::sliderReleased, [this]() {
-    seekingTo(m_slider->value(), PositionChangeOrigin::SeekBar);
+  connect(m_slider, &SeekBar::sliderReleased, this, [this]() {
+    emit seekingTo(m_slider->value(), PositionChangeOrigin::SeekBar);
   });
   barLayout->addWidget(m_slider, 1);
 
-  connect(NotificationCenter::the(), &NotificationCenter::vgmCollSelected, this,
-          [this](VGMColl *coll, QWidget *) {
-            m_hasSelectedCollection = coll != nullptr;
-            playerStatusChanged(SequencePlayer::the().playing());
-          });
-  connect(&SequencePlayer::the(), &SequencePlayer::statusChange, this, &PlaybackControls::playerStatusChanged);
-  connect(&SequencePlayer::the(), &SequencePlayer::playbackPositionChanged, this,
-          &PlaybackControls::playbackRangeUpdate);
   updateSeekBarVisibility();
-  playerStatusChanged(SequencePlayer::the().playing());
+  playerStatusChanged(false);
 }
 
 void PlaybackControls::showPlayInfo() {
@@ -126,7 +116,7 @@ void PlaybackControls::changeEvent(QEvent *event) {
     const QString buttonStyle = toolBarButtonStyle(palette());
     m_play->setStyleSheet(buttonStyle);
     m_stop->setStyleSheet(buttonStyle);
-    playerStatusChanged(SequencePlayer::the().playing());
+    playerStatusChanged(m_playing);
   }
 }
 
@@ -135,13 +125,30 @@ void PlaybackControls::resizeEvent(QResizeEvent *event) {
   updateSeekBarVisibility();
 }
 
-void PlaybackControls::playbackRangeUpdate(int cur, int max, PositionChangeOrigin origin) {
+void PlaybackControls::setCollectionSelected(bool selected) {
+  m_hasSelectedCollection = selected;
+  playerStatusChanged(m_playing);
+}
+
+void PlaybackControls::setPlaybackState(bool playing, bool hasActiveCollection) {
+  m_playing = playing;
+  m_hasActiveCollection = hasActiveCollection;
+  playerStatusChanged(playing);
+}
+
+void PlaybackControls::setPlaybackPosition(int current, int maximum,
+                                           PositionChangeOrigin origin) {
+  playbackRangeUpdate(current, maximum, origin);
+}
+
+void PlaybackControls::playbackRangeUpdate(int current, int maximum,
+                                           PositionChangeOrigin origin) {
   const int previousMaximum = m_slider->maximum();
-  const bool rangeChanged = max != previousMaximum;
-  const bool forceImmediateUpdate = cur == m_slider->minimum() || rangeChanged;
+  const bool rangeChanged = maximum != previousMaximum;
+  const bool forceImmediateUpdate = current == m_slider->minimum() || rangeChanged;
 
   if (rangeChanged) {
-    m_slider->setRange(0, max);
+    m_slider->setRange(0, maximum);
   }
 
   if (m_slider->isSliderDown()) {
@@ -158,14 +165,13 @@ void PlaybackControls::playbackRangeUpdate(int cur, int max, PositionChangeOrigi
     m_skipNextPlaybackSliderUpdate = false;
   }
 
-  m_slider->setValue(cur);
+  m_slider->setValue(current);
 }
 
 void PlaybackControls::playerStatusChanged(bool playing) {
+  m_playing = playing;
   m_skipNextPlaybackSliderUpdate = false;
-  const bool hasActive = SequencePlayer::the().activeCollection() != nullptr;
-  const bool canPlay = m_hasSelectedCollection || hasActive;
-
+  const bool canPlay = m_hasSelectedCollection || m_hasActiveCollection;
   m_play->setEnabled(canPlay);
 
   QColor playColor = kPlayColor;
@@ -177,12 +183,12 @@ void PlaybackControls::playerStatusChanged(bool playing) {
                                         playColor));
 
   QColor stopColor = kStopColor;
-  m_stop->setEnabled(hasActive);
+  m_stop->setEnabled(m_hasActiveCollection);
   if (!m_stop->isEnabled()) {
     stopColor.setAlpha(kInactiveTransportIconAlpha);
   }
   m_stop->setIcon(gradientTransportIcon(QStringLiteral(":/icons/stop.svg"), stopColor));
-  m_slider->setEnabled(hasActive);
+  m_slider->setEnabled(m_hasActiveCollection);
 }
 
 void PlaybackControls::updateSeekBarVisibility() {

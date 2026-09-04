@@ -2,8 +2,15 @@
 # Dependencies
 # ~~~
 
+if(ENABLE_UI_QT)
+  message(STATUS "Using vendored BASS(MIDI) library")
+  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/bass ${CMAKE_CURRENT_BINARY_DIR}/lib/bass EXCLUDE_FROM_ALL SYSTEM)
+endif()
+
 # mio is a header-only library
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/mio ${CMAKE_CURRENT_BINARY_DIR}/lib/mio EXCLUDE_FROM_ALL SYSTEM)
+
+find_package(Threads REQUIRED)
 
 # nlohmann-json is a header-only library,
 # but some distros provide it as a system package
@@ -21,11 +28,6 @@ else()
     FILES
       ${PROJECT_SOURCE_DIR}/lib/nlohmann/json.hpp
   )
-endif()
-
-if(ENABLE_UI_QT)
-  message(STATUS "Using vendored BASS(MIDI) library")
-  add_subdirectory(${PROJECT_SOURCE_DIR}/lib/bass ${CMAKE_CURRENT_BINARY_DIR}/lib/bass EXCLUDE_FROM_ALL SYSTEM)
 endif()
 
 if(USE_SYSTEM_FMT)
@@ -46,6 +48,7 @@ endif()
 
 if(USE_SYSTEM_ZLIB)
   find_package(ZLIB REQUIRED)
+  set_property(TARGET ZLIB::ZLIB PROPERTY IMPORTED_GLOBAL TRUE)
 else()
   message(STATUS "Using vendored zlib library")
   set(ZLIB_BUILD_TESTING OFF CACHE BOOL "[zlib] Enable Zlib Examples as tests" FORCE)
@@ -94,12 +97,368 @@ if(USE_SYSTEM_LIBCHDR)
 else()
   message(STATUS "Using vendored libchdr library")
   set(WITH_SYSTEM_ZLIB ${USE_SYSTEM_ZLIB} CACHE BOOL "[libchdr] Use system provided zlib library" FORCE)
+  set(VGMTRANS_SAVED_BUILD_TESTING "${BUILD_TESTING}")
+  set(BUILD_TESTING OFF CACHE BOOL "[VGMTrans] Disable vendored libchdr tests" FORCE)
   add_subdirectory(${PROJECT_SOURCE_DIR}/lib/libchdr ${CMAKE_CURRENT_BINARY_DIR}/lib/libchdr EXCLUDE_FROM_ALL SYSTEM)
+  set(BUILD_TESTING "${VGMTRANS_SAVED_BUILD_TESTING}" CACHE BOOL "Build the testing tree." FORCE)
+  unset(VGMTRANS_SAVED_BUILD_TESTING)
 endif()
 
 # ~~~
 # Build
 # ~~~
+
+add_library(vgmtransvaluecore STATIC)
+vgmtrans_enable_project_warnings(vgmtransvaluecore)
+target_sources(vgmtransvaluecore
+  PRIVATE
+    ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionDiscovery.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/ModulationAnalysis.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/PitchTransitionMidiLowering.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/PitchTransitionMidiLowering.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/BinaryWriter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/BinaryWriter.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/CollectionBinding.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/CollectionBinding.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/CollectionStitch.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/InstrumentVariants.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/ExportDiagnostics.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/PerformanceInstrumentSelection.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/PerformancePitchBendContext.h
+    ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceEmitter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/model/CollectionModel.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/model/SourceMap.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/model/SourceInspection.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/model/SessionSnapshot.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/model/SessionSnapshotAccess.h
+    ${PROJECT_SOURCE_DIR}/src/value/session/SessionState.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/session/SessionState.h
+    ${PROJECT_SOURCE_DIR}/src/value/session/Session.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/synth/PsxAdpcm.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/synth/PsxSpu.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/synth/SampleDecoder.h
+    ${PROJECT_SOURCE_DIR}/src/value/synth/SynthBuilder.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/Scan.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/ScanResultBuilder.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/sequence/CommandSourceMap.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceProgram.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceVm.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/sequence/TempoRelativeModulation.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/base/RecordReader.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/platform/SnesSampleDirectory.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/synth/SampleFiltering.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/synth/SampleFiltering.h
+    ${PROJECT_SOURCE_DIR}/src/value/synth/SnesDsp.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/base/Source.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/synth/SynthMath.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/synth/DlsExporter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/Export.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/SequenceModulationProfile.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiExporter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiExporter.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiModel.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/MidiModel.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/synth/ModulationScaling.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/synth/ModulationScaling.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/PerformanceMidiRenderer.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/midi/PerformanceMidiRenderer.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/synth/SoundFontExporter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/synth/SynthExportData.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/synth/SynthExportData.h
+    ${PROJECT_SOURCE_DIR}/src/value/export/audio/WavExporter.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/export/audio/WavExporter.h
+    ${PROJECT_SOURCE_DIR}/src/value/validation/ScanValidation.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/validation/ScanValidation.h
+    ${PROJECT_SOURCE_DIR}/src/value/validation/SequenceValidation.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/validation/SequenceValidation.h
+    ${PROJECT_SOURCE_DIR}/src/value/validation/SynthValidation.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/validation/SynthValidation.h
+    ${PROJECT_SOURCE_DIR}/src/value/validation/ValidationReport.h
+  PUBLIC
+    FILE_SET HEADERS
+    BASE_DIRS ${PROJECT_SOURCE_DIR}/src
+    FILES
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/BytecodeDecode.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/CommandSourceMap.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/CompiledCommandRuntime.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/CompilerCursor.h
+      ${PROJECT_SOURCE_DIR}/src/value/base/CoreTypes.h
+      ${PROJECT_SOURCE_DIR}/src/value/base/Types.h
+      ${PROJECT_SOURCE_DIR}/src/value/base/RecordReader.h
+      ${PROJECT_SOURCE_DIR}/src/value/platform/SnesSampleDirectory.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/BytePattern.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/CollectionDiscovery.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/FormatModule.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/FormatRegistry.h
+      ${PROJECT_SOURCE_DIR}/src/value/base/LevelScale.h
+      ${PROJECT_SOURCE_DIR}/src/value/model/CollectionModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/model/EnvelopeModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/model/InstrumentIdentity.h
+      ${PROJECT_SOURCE_DIR}/src/value/model/MetadataModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/model/SourceMap.h
+      ${PROJECT_SOURCE_DIR}/src/value/model/SourceInspection.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/PerformanceModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/model/SessionSnapshot.h
+      ${PROJECT_SOURCE_DIR}/src/value/session/Session.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/ScanResultBuilder.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/ScanTypes.h
+      ${PROJECT_SOURCE_DIR}/src/value/scan/SourceExtractor.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceProgramConfig.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceExecution.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceMotion.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceProgram.h
+      ${PROJECT_SOURCE_DIR}/src/value/sequence/SequenceVm.h
+      ${PROJECT_SOURCE_DIR}/src/value/synth/SynthBuilder.h
+      ${PROJECT_SOURCE_DIR}/src/value/synth/SnesDsp.h
+      ${PROJECT_SOURCE_DIR}/src/value/base/Source.h
+      ${PROJECT_SOURCE_DIR}/src/value/synth/SynthModel.h
+      ${PROJECT_SOURCE_DIR}/src/value/synth/SynthMath.h
+      ${PROJECT_SOURCE_DIR}/src/value/synth/Ym2151.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/Export.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/CollectionStitch.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/DynamicEnvelope.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/InstrumentVariants.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/ExportPolicy.h
+      ${PROJECT_SOURCE_DIR}/src/value/export/ExportTypes.h
+)
+target_include_directories(
+  vgmtransvaluecore
+  PUBLIC
+    ${PROJECT_SOURCE_DIR}/src)
+target_compile_features(vgmtransvaluecore PUBLIC cxx_std_20)
+target_link_libraries(vgmtransvaluecore PRIVATE fmt::fmt Threads::Threads)
+
+add_library(vgmtransvalueformats STATIC)
+vgmtrans_enable_project_warnings(vgmtransvalueformats)
+target_sources(vgmtransvalueformats
+  PRIVATE
+    ${PROJECT_SOURCE_DIR}/src/value/extractors/MameRomSetExtractor.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesRsnExtractor.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/ValueFormats.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoInstrumentSet.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoResolver.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/AkaoVersion.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnesV4Lfo.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/AsciiShuichiSnes/AsciiShuichiSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/AsciiShuichiSnes/AsciiShuichiSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/AsciiShuichiSnes/AsciiShuichiSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/AsciiShuichiSnes/AsciiShuichiSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/ChunSnes/ChunSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/ChunSnes/ChunSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/ChunSnes/ChunSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/ChunSnes/ChunSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CompileSnes/CompileSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CompileSnes/CompileSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CompileSnes/CompileSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CompileSnes/CompileSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/CpsLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/CpsModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/CpsSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/CpsSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/FalcomSnes/FalcomSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/FalcomSnes/FalcomSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/FalcomSnes/FalcomSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/FalcomSnes/FalcomSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/GraphResSnes/GraphResSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/GraphResSnes/GraphResSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/GraphResSnes/GraphResSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/GraphResSnes/GraphResSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HeartBeatPS1/HeartBeatPS1Layout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HeartBeatPS1/HeartBeatPS1Module.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HeartBeatPS1/HeartBeatPS1Sequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HeartBeatPS1/HeartBeatPS1Synth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HeartBeatSnes/HeartBeatSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HeartBeatSnes/HeartBeatSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HeartBeatSnes/HeartBeatSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HeartBeatSnes/HeartBeatSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HudsonSnes/HudsonSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HudsonSnes/HudsonSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HudsonSnes/HudsonSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HudsonSnes/HudsonSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/ItikitiSnes/ItikitiSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/ItikitiSnes/ItikitiSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/ItikitiSnes/ItikitiSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/ItikitiSnes/ItikitiSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcadeLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcadeModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcadeSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcadeSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiPS1/KonamiPS1Layout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiPS1/KonamiPS1Module.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiPS1/KonamiPS1Resolver.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiPS1/KonamiPS1Sequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiTMNT2/KonamiTMNT2Layout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiTMNT2/KonamiTMNT2Module.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiTMNT2/KonamiTMNT2Sequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiTMNT2/KonamiTMNT2Synth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2kLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2kModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2kSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2kSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/MoriSnes/MoriSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/MoriSnes/MoriSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/MoriSnes/MoriSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/MoriSnes/MoriSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/MoriSnes/MoriSnesVoiceScript.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NamcoSnes/NamcoSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NamcoSnes/NamcoSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NamcoSnes/NamcoSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NamcoSnes/NamcoSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NeverlandSnes/NeverlandSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NeverlandSnes/NeverlandSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NeverlandSnes/NeverlandSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NeverlandSnes/NeverlandSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesPatterns.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesProfile.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HOSA/HOSABytecode.h
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HOSA/HOSALayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HOSA/HOSALfo.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HOSA/HOSALfo.h
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HOSA/HOSAModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HOSA/HOSASequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/HOSA/HOSASynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/PandoraBoxSnes/PandoraBoxSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/PandoraBoxSnes/PandoraBoxSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/PandoraBoxSnes/PandoraBoxSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/PandoraBoxSnes/PandoraBoxSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/PrismSnes/PrismSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/PrismSnes/PrismSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/PrismSnes/PrismSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/PrismSnes/PrismSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/RareSnes/RareSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/RareSnes/RareSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/RareSnes/RareSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/RareSnes/RareSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsEnvelope.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/NdsSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SegSat/SegSatLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SegSat/SegSatModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SegSat/SegSatSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SegSat/SegSatSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1Layout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1Module.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1Resolver.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1Samples.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1Sequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1Synth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS2/SonyPS2Layout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS2/SonyPS2Module.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS2/SonyPS2Resolver.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS2/SonyPS2Samples.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS2/SonyPS2Sequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS2/SonyPS2Synth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SoftCreatSnes/SoftCreatSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SoftCreatSnes/SoftCreatSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SoftCreatSnes/SoftCreatSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SoftCreatSnes/SoftCreatSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SquarePS2/SquarePS2Layout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SquarePS2/SquarePS2Module.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SquarePS2/SquarePS2Resolver.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SquarePS2/SquarePS2Sequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SquarePS2/SquarePS2Synth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1Layout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1Module.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1Sequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1Synth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TamsoftPS1/TamsoftPS1Layout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TamsoftPS1/TamsoftPS1Module.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TamsoftPS1/TamsoftPS1Resolver.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TamsoftPS1/TamsoftPS1Sequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TamsoftPS1/TamsoftPS1Synth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TriAcePS1/TriAcePS1Extractor.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TriAcePS1/TriAcePS1Layout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TriAcePS1/TriAcePS1Module.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TriAcePS1/TriAcePS1Sequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/TriAcePS1/TriAcePS1Synth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/WolfTeamSnes/WolfTeamSnesLayout.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/WolfTeamSnes/WolfTeamSnesModule.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/WolfTeamSnes/WolfTeamSnesSequence.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/WolfTeamSnes/WolfTeamSnesSynth.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/WolfTeamSnes/WolfTeamSnesGrammar.h
+  PUBLIC
+    FILE_SET HEADERS
+    BASE_DIRS ${PROJECT_SOURCE_DIR}/src
+    FILES
+      ${PROJECT_SOURCE_DIR}/src/value/extractors/MameRomSetExtractor.h
+      ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesRsnExtractor.h
+      ${PROJECT_SOURCE_DIR}/src/value/extractors/SnesSpcExtractor.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/ValueFormats.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/Akao/Akao.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/AkaoSnes/AkaoSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/AsciiShuichiSnes/AsciiShuichiSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CapcomSnes/CapcomSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/ChunSnes/ChunSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CompileSnes/CompileSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/CPS/Cps.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/FalcomSnes/FalcomSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/GraphResSnes/GraphResSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/HeartBeatPS1/HeartBeatPS1.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/HeartBeatSnes/HeartBeatSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/HudsonSnes/HudsonSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/ItikitiSnes/ItikitiSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiArcade/KonamiArcade.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiPS1/KonamiPS1.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/KonamiSnes/KonamiSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/MP2k/MP2k.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/MoriSnes/MoriSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NamcoSnes/NamcoSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NeverlandSnes/NeverlandSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/HOSA/HOSA.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/PandoraBoxSnes/PandoraBoxSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/PrismSnes/PrismSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/RareSnes/RareSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/NDS/Nds.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/SegSat/SegSat.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS1/SonyPS1.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/SonyPS2/SonyPS2.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/SoftCreatSnes/SoftCreatSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/SquarePS2/SquarePS2.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiPS1/SuzukiPS1.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/TamsoftPS1/TamsoftPS1.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/SuzukiSnes/SuzukiSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/formats/WolfTeamSnes/WolfTeamSnes.h
+      ${PROJECT_SOURCE_DIR}/src/value/extractors/PsfExtractor.h
+)
+target_link_libraries(
+  vgmtransvalueformats
+  PUBLIC vgmtransvaluecore unarr
+  PRIVATE fmt::fmt ZLIB::ZLIB minizip nlohmann_json::nlohmann_json)
+target_compile_features(vgmtransvalueformats PUBLIC cxx_std_20)
+target_compile_definitions(vgmtransvalueformats PRIVATE "DEV_ENV_BUILD_TREE=\"${CMAKE_CURRENT_BINARY_DIR}\"")
 
 add_library(vgmtranscore OBJECT)
 vgmtrans_enable_project_warnings(vgmtranscore)
@@ -169,6 +528,7 @@ target_sources(vgmtranscore
     formats/CapcomSnes/CapcomSnesInstr.cpp
     formats/CapcomSnes/CapcomSnesScanner.cpp
     formats/CapcomSnes/CapcomSnesSeq.cpp
+    formats/CapcomSnes/CapcomSnesDriverMath.cpp
     formats/ChunSnes/ChunSnesInstr.cpp
     formats/ChunSnes/ChunSnesScanner.cpp
     formats/ChunSnes/ChunSnesSeq.cpp
@@ -302,6 +662,7 @@ target_sources(vgmtranscore
       Root.h
       base/Binary.h
       base/Types.h
+      base/ToastType.h
     FILE_SET headers_formats TYPE HEADERS BASE_DIRS formats
     FILES
       formats/Akao/AkaoFormat.h
@@ -559,10 +920,12 @@ target_sources(vgmtranscore
 )
 
 configure_file("version.h.in" "version.h")
-target_include_directories(vgmtranscore PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+add_library(vgmtransversion INTERFACE)
+target_include_directories(vgmtransversion INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(vgmtranscore PUBLIC ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(
   vgmtranscore
-  PUBLIC spdlog::spdlog unarr ZLIB::ZLIB minizip mio chdr-static nlohmann_json::nlohmann_json
+  PUBLIC vgmtransvalueformats vgmtransvaluecore spdlog::spdlog unarr ZLIB::ZLIB minizip mio chdr-static nlohmann_json::nlohmann_json
 )
 target_compile_features(vgmtranscore PUBLIC cxx_std_20)
 
@@ -588,4 +951,5 @@ if(CMAKE_SYSTEM_NAME MATCHES "FreeBSD|OpenBSD|Linux")
     endif()
   endif()
   target_compile_definitions(vgmtranscore PUBLIC "VGMTRANS_DATA_DIR=\"${VGMTRANS_DATA_DIR}\"")
+  target_compile_definitions(vgmtransvalueformats PRIVATE "VGMTRANS_DATA_DIR=\"${VGMTRANS_DATA_DIR}\"")
 endif()

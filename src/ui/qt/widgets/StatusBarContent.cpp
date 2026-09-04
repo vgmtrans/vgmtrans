@@ -7,10 +7,44 @@
 
 #include "StatusBarContent.h"
 
-#include "services/NotificationCenter.h"
+#include "CapsuleText.h"
 
 #include <QHBoxLayout>
 #include <QIcon>
+#include <QPainter>
+
+#include <utility>
+
+class CapsuleTextLabel final : public QWidget {
+public:
+  using QWidget::QWidget;
+
+  void setText(QString text) {
+    content_ = CapsuleText{.prefix = std::move(text)};
+    update();
+  }
+
+  void setText(CapsuleText text) {
+    content_ = std::move(text);
+    update();
+  }
+
+  void setIndent(int indent) {
+    indent_ = indent;
+    update();
+  }
+
+protected:
+  void paintEvent(QPaintEvent*) override {
+    QPainter painter(this);
+    CapsuleTextLayout::paint(painter, contentsRect().adjusted(indent_, 0, 0, 0), content_, palette(),
+                             palette().color(QPalette::WindowText), false);
+  }
+
+private:
+  CapsuleText content_;
+  int indent_ = 0;
+};
 
 constexpr int maxHeight = 25; // Maximum height of the status bar
 constexpr int iconLabelWidth = 16;
@@ -24,7 +58,7 @@ StatusBarContent::StatusBarContent(QWidget *parent) : QWidget(parent)
 {
   iconLabel = new QLabel;
   nameLabel = new QLabel;
-  descriptionLabel = new QLabel;
+  descriptionLabel = new CapsuleTextLabel;
   offsetLabel = new QLabel;
   sizeLabel = new QLabel;
 
@@ -35,12 +69,21 @@ StatusBarContent::StatusBarContent(QWidget *parent) : QWidget(parent)
   QPalette palette = this->palette();
   QColor subduedTextColor = palette.color(QPalette::WindowText).darker(150);
 
-  for (QLabel* label : {iconLabel, nameLabel, descriptionLabel, offsetLabel, sizeLabel}) {
-    layout->addWidget(label, (label == descriptionLabel) ? 1 : 0);
+  for (QLabel* label : {iconLabel, nameLabel, offsetLabel, sizeLabel}) {
     label->setFont(labelFont);
     label->setStyleSheet(QString("color: %1").arg(subduedTextColor.name()));
     label->setMaximumHeight(maxHeight);
   }
+  layout->addWidget(iconLabel);
+  layout->addWidget(nameLabel);
+  layout->addWidget(descriptionLabel, 1);
+  layout->addWidget(offsetLabel);
+  layout->addWidget(sizeLabel);
+  descriptionLabel->setFont(labelFont);
+  QPalette descriptionPalette = descriptionLabel->palette();
+  descriptionPalette.setColor(QPalette::WindowText, subduedTextColor);
+  descriptionLabel->setPalette(descriptionPalette);
+  descriptionLabel->setMaximumHeight(maxHeight);
   iconLabel->setFixedWidth(iconLabelWidth);
   offsetLabel->setFixedWidth(offsetLabelWidth);
   sizeLabel->setFixedWidth(sizeLabelWidth);
@@ -54,12 +97,22 @@ StatusBarContent::StatusBarContent(QWidget *parent) : QWidget(parent)
   this->setLayout(layout);
   this->setMaximumHeight(maxHeight);
 
-  connect(NotificationCenter::the(), &NotificationCenter::statusUpdated, this, &StatusBarContent::setStatus);
 }
 
 void StatusBarContent::setStatus(const QString& name, const QString& description, const QIcon* icon, int offset, int size) const {
-  nameLabel->setText(name);
   descriptionLabel->setText(description);
+  setCommonStatus(name, icon, offset, size);
+}
+
+void StatusBarContent::setInspectorStatus(const QString& name, const CapsuleText& description,
+                                          const QIcon* icon, int offset, int size) const {
+  descriptionLabel->setText(description);
+  setCommonStatus(name, icon, offset, size);
+}
+
+void StatusBarContent::setCommonStatus(const QString& name, const QIcon* icon, int offset,
+                                       int size) const {
+  nameLabel->setText(name);
   if (icon)
     iconLabel->setPixmap(icon->pixmap(16, 16));
   else

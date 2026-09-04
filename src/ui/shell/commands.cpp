@@ -8,6 +8,9 @@
 
 #include "base/Types.h"
 #include "DBGVGMRoot.h"
+#include "value/export/synth/ModulationScaling.h"
+#include "value/session/Session.h"
+#include "value/formats/ValueFormats.h"
 #include "RawFile.h"
 #include "SeqTrack.h"
 #include "StitchExport.h"
@@ -23,8 +26,19 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
+#include <filesystem>
 #include <fstream>
+#include <limits>
+#include <optional>
+#include <span>
 #include <string>
+#include <string_view>
+#include <system_error>
+#include <type_traits>
+#include <unordered_set>
+#include <variant>
+#include <vector>
 
 #include <fmt/color.h>
 #include <fmt/format.h>
@@ -34,8 +48,9 @@ std::map<std::string, Command> commandRegistry;
 namespace {
 
 void printItemTree(VGMItem* item, int depth, int maxDepth) {
-  if (depth > maxDepth)
+  if (depth > maxDepth) {
     return;
+  }
   std::string indent(depth * 2, ' ');
   fmt::print("{}[0x{:x}:0x{:x}] {}\n", indent, item->offset(), item->length(), item->name());
   for (auto* child : item->children()) {
@@ -49,11 +64,10 @@ void listVGMFiles() {
   int count = 0;
   for (size_t i = 0; i < files.size(); ++i) {
     if (dynamic_cast<T*>(files[i])) {
-      fmt::print(
-          "[{}] [{}:{}] {} ({})\n", fmt::styled(fmt::format("#{}", i), fmt::fg(fmt::color::cyan)),
-          fmt::styled(fmt::format("0x{:x}", files[i]->startOffset()), fmt::fg(fmt::color::yellow)),
-          fmt::styled(fmt::format("0x{:x}", files[i]->size()), fmt::fg(fmt::color::yellow)),
-          files[i]->name(), fmt::styled(files[i]->formatName(), fmt::fg(fmt::color::dim_gray)));
+      fmt::print("[{}] [{}:{}] {} ({})\n", fmt::styled(fmt::format("#{}", i), fmt::fg(fmt::color::cyan)),
+                 fmt::styled(fmt::format("0x{:x}", files[i]->startOffset()), fmt::fg(fmt::color::yellow)),
+                 fmt::styled(fmt::format("0x{:x}", files[i]->size()), fmt::fg(fmt::color::yellow)), files[i]->name(),
+                 fmt::styled(files[i]->formatName(), fmt::fg(fmt::color::dim_gray)));
       count++;
     }
   }
@@ -69,11 +83,10 @@ void listAllVGMFiles() {
     return;
   }
   for (size_t i = 0; i < files.size(); ++i) {
-    fmt::print(
-        "[{}] [{}:{}] {} ({})\n", fmt::styled(fmt::format("#{}", i), fmt::fg(fmt::color::cyan)),
-        fmt::styled(fmt::format("0x{:x}", files[i]->startOffset()), fmt::fg(fmt::color::yellow)),
-        fmt::styled(fmt::format("0x{:x}", files[i]->size()), fmt::fg(fmt::color::yellow)),
-        files[i]->name(), fmt::styled(files[i]->formatName(), fmt::fg(fmt::color::dim_gray)));
+    fmt::print("[{}] [{}:{}] {} ({})\n", fmt::styled(fmt::format("#{}", i), fmt::fg(fmt::color::cyan)),
+               fmt::styled(fmt::format("0x{:x}", files[i]->startOffset()), fmt::fg(fmt::color::yellow)),
+               fmt::styled(fmt::format("0x{:x}", files[i]->size()), fmt::fg(fmt::color::yellow)), files[i]->name(),
+               fmt::styled(files[i]->formatName(), fmt::fg(fmt::color::dim_gray)));
   }
 }
 
@@ -119,9 +132,9 @@ VGMColl* getVGMColl(const std::string& indexStr) {
   return nullptr;
 }
 
-void printHexDump(const u8* data, size_t length) {
+void printHexDump(const u8* data, size_t length, size_t displayOffset = 0) {
   for (size_t i = 0; i < length; i += 16) {
-    fmt::print("{:08x}: ", i);
+    fmt::print("{:08x}: ", displayOffset + i);
     for (size_t j = 0; j < 16; ++j) {
       if (i + j < length) {
         fmt::print("{:02x} ", data[i + j]);
@@ -148,10 +161,931 @@ void writeToFile(const std::string& path, const char* data, size_t size) {
   }
 }
 
+bool ensureDirectory(const std::filesystem::path& dir) {
+  std::error_code error;
+  std::filesystem::create_directories(dir, error);
+  if (error) {
+    fmt::println("Failed to create {}: {}", dir.string(), error.message());
+    return false;
+  }
+  if (!std::filesystem::is_directory(dir, error)) {
+    fmt::println("{} is not a directory", dir.string());
+    return false;
+  }
+  return true;
+}
+
+bool writeValueArtifact(const std::filesystem::path& path, std::span<const u8> bytes) {
+  std::ofstream file(path, std::ios::binary);
+  if (!file) {
+    fmt::println("Failed to open {} for writing", path.string());
+    return false;
+  }
+
+  file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+  if (!file) {
+    fmt::println("Failed to write {}", path.string());
+    return false;
+  }
+
+  fmt::println("Wrote {} bytes to {}", bytes.size(), path.string());
+  return true;
+}
+
 void printChildren(VGMItem* item) {
   for (auto* child : item->children()) {
     fmt::print("  [0x{:x}:0x{:x}] {}\n", child->offset(), child->length(), child->name());
   }
+}
+
+const char* valueAssetKindName(const vgmtrans::core::Asset& asset) {
+  using namespace vgmtrans::core;
+  if (std::holds_alternative<SequenceProgramAsset>(asset)) {
+    return "sequence";
+  }
+  if (std::holds_alternative<SoundBankAsset>(asset)) {
+    return "instrument-set";
+  }
+  if (std::holds_alternative<SamplePoolAsset>(asset)) {
+    return "sample-collection";
+  }
+  return "misc";
+}
+
+const char* valueSeverityName(vgmtrans::core::Severity severity) {
+  using vgmtrans::core::Severity;
+  switch (severity) {
+    case Severity::Info:
+      return "info";
+    case Severity::Warning:
+      return "warning";
+    case Severity::Error:
+      return "error";
+  }
+  return "unknown";
+}
+
+void printValueDiagnostic(const vgmtrans::core::Diagnostic& diagnostic) {
+  fmt::print("[{}] {}", valueSeverityName(diagnostic.severity), diagnostic.message);
+  if (diagnostic.range) {
+    fmt::print(" (source #{} 0x{:x}:0x{:x})", diagnostic.range->source.value, diagnostic.range->offset,
+               diagnostic.range->size);
+  }
+  fmt::print("\n");
+}
+
+std::vector<u8> valueBytesForRawFile(const RawFile& file) {
+  const auto* begin = reinterpret_cast<const u8*>(file.data());
+  return std::vector<u8>(begin, begin + file.size());
+}
+
+vgmtrans::core::Session valueSessionForRawFile(const RawFile& file) {
+  vgmtrans::core::Session session;
+  vgmtrans::formats::registerValueFormats(session);
+  session.addSource(
+      vgmtrans::core::SourceFile{
+          .name = file.name(),
+          .path = file.path(),
+          .size = static_cast<u64>(file.size()),
+      },
+      valueBytesForRawFile(file));
+  return session;
+}
+
+vgmtrans::core::Session valueSessionForPath(const std::filesystem::path& path) {
+  vgmtrans::core::Session session;
+  vgmtrans::formats::registerValueFormats(session);
+  session.addSourceFromPath(path);
+  return session;
+}
+
+void printValueSessionSummary(const vgmtrans::core::SessionSnapshot& project) {
+  fmt::println("Sources: {}  Assets: {}  Collections: {}  Diagnostics: {}", project.sources().size(),
+               project.assets().size(), project.collections().size(), project.diagnostics().size());
+
+  for (const auto& diagnostic : project.diagnostics()) {
+    printValueDiagnostic(diagnostic);
+  }
+
+  for (size_t i = 0; i < project.assets().size(); ++i) {
+    const auto& asset = project.assets()[i];
+    const auto& meta = vgmtrans::core::metadata(asset);
+    fmt::print("asset #{} [{}] id={} format={} name='{}' range=0x{:x}:0x{:x}", i, valueAssetKindName(asset),
+               meta.id.value, meta.format, meta.name, meta.range.offset, meta.range.size);
+    if (std::holds_alternative<vgmtrans::core::SequenceProgramAsset>(asset)) {
+      const auto& sequence = std::get<vgmtrans::core::SequenceProgramAsset>(asset);
+      fmt::print(" tracks={}", sequence.program.tracks.size());
+    } else if (std::holds_alternative<vgmtrans::core::SoundBankAsset>(asset)) {
+      const auto& soundBank = std::get<vgmtrans::core::SoundBankAsset>(asset);
+      fmt::print(" instruments={}", soundBank.instruments.size());
+    } else if (std::holds_alternative<vgmtrans::core::SamplePoolAsset>(asset)) {
+      const auto& samples = std::get<vgmtrans::core::SamplePoolAsset>(asset);
+      fmt::print(" samples={}", samples.pool.samples.size());
+    }
+    fmt::print("\n");
+  }
+
+  for (size_t i = 0; i < project.collections().size(); ++i) {
+    const auto& collection = project.collections()[i];
+    const auto& members = collection.members;
+    fmt::println("collection #{} id={} name='{}' sequence={} soundBanks={} samplePools={}", i, collection.id.value,
+                 collection.name, members.sequence ? std::to_string(members.sequence->value) : std::string("-"),
+                 members.soundBanks.size(), members.samplePools.size());
+  }
+}
+
+void printValueSources(const vgmtrans::core::SessionSnapshot& project) {
+  if (project.sources().empty()) {
+    fmt::println("No value sources.");
+    return;
+  }
+
+  for (size_t i = 0; i < project.sources().size(); ++i) {
+    const auto& source = project.sources()[i];
+    fmt::print("source #{} id={} name='{}' size=0x{:x}", i, source.id.value, source.name, source.size);
+    if (source.title) {
+      fmt::print(" title='{}'", *source.title);
+    }
+    if (!source.path.empty()) {
+      fmt::print(" path='{}'", source.path.string());
+    }
+    if (source.derived()) {
+      fmt::print(" derived");
+    }
+    if (source.origin) {
+      fmt::print(" origin=source #{} 0x{:x}:0x{:x}", source.origin->source.value, source.origin->offset,
+                 source.origin->size);
+    }
+    fmt::print("\n");
+  }
+}
+
+std::optional<u64> parseValueInteger(const std::string& text) {
+  try {
+    size_t parsed = 0;
+    const auto value = std::stoull(text, &parsed, 0);
+    if (parsed != text.size()) {
+      return std::nullopt;
+    }
+    return static_cast<u64>(value);
+  } catch (...) {
+    return std::nullopt;
+  }
+}
+
+bool printValueSourceBytes(const vgmtrans::core::SourceStore& sources, const std::vector<std::string>& args,
+                           size_t sourceArgIndex) {
+  const auto sourceIndex = parseValueInteger(args[sourceArgIndex]);
+  const auto offset = parseValueInteger(args[sourceArgIndex + 1]);
+  const auto length = parseValueInteger(args[sourceArgIndex + 2]);
+  if (!sourceIndex || !offset || !length) {
+    fmt::println("Invalid arguments");
+    return false;
+  }
+
+  if (*sourceIndex > std::numeric_limits<u32>::max()) {
+    fmt::println("Source index out of bounds");
+    return false;
+  }
+
+  const auto sourceId = vgmtrans::core::SourceId{static_cast<u32>(*sourceIndex)};
+  if (!sources.contains(sourceId)) {
+    fmt::println("Source index out of bounds");
+    return false;
+  }
+
+  const auto bytes = sources.bytes(sourceId);
+  if (*offset > bytes.size() || *length > bytes.size() - static_cast<size_t>(*offset)) {
+    fmt::println("Range out of bounds (source size: 0x{:x})", bytes.size());
+    return false;
+  }
+
+  printHexDump(bytes.data() + static_cast<size_t>(*offset), static_cast<size_t>(*length), static_cast<size_t>(*offset));
+  return true;
+}
+
+bool valueRangeContains(vgmtrans::core::SourceRange outer, vgmtrans::core::SourceRange inner) {
+  if (!outer.valid() || !inner.valid() || outer.source != inner.source) {
+    return false;
+  }
+  return inner.offset >= outer.offset && inner.offset <= outer.endOffset() &&
+         inner.size <= outer.endOffset() - inner.offset;
+}
+
+bool valueAnnotationBelongsToAsset(const vgmtrans::core::SourceAnnotation& annotation, vgmtrans::core::AssetId assetId,
+                                   vgmtrans::core::SourceRange assetRange) {
+  if (annotation.owner && annotation.owner->asset == assetId) {
+    return true;
+  }
+  return valueRangeContains(assetRange, annotation.range);
+}
+
+bool valueSourceOutlineAutoVisible(vgmtrans::core::SourceRole role) {
+  switch (role) {
+    case vgmtrans::core::SourceRole::Unknown:
+    case vgmtrans::core::SourceRole::Field:
+    case vgmtrans::core::SourceRole::Opcode:
+    case vgmtrans::core::SourceRole::Operand:
+    case vgmtrans::core::SourceRole::Padding:
+      return false;
+    case vgmtrans::core::SourceRole::Source:
+    case vgmtrans::core::SourceRole::Section:
+    case vgmtrans::core::SourceRole::Header:
+    case vgmtrans::core::SourceRole::Sequence:
+    case vgmtrans::core::SourceRole::SequenceTrack:
+    case vgmtrans::core::SourceRole::Table:
+    case vgmtrans::core::SourceRole::TableEntry:
+    case vgmtrans::core::SourceRole::Pointer:
+    case vgmtrans::core::SourceRole::Payload:
+    case vgmtrans::core::SourceRole::DataBlock:
+    case vgmtrans::core::SourceRole::Command:
+    case vgmtrans::core::SourceRole::SoundBank:
+    case vgmtrans::core::SourceRole::Instrument:
+    case vgmtrans::core::SourceRole::Region:
+    case vgmtrans::core::SourceRole::SamplePool:
+    case vgmtrans::core::SourceRole::Sample:
+      return true;
+  }
+  return false;
+}
+
+bool valueSourceOutlineVisible(const vgmtrans::core::SourceAnnotation& annotation) {
+  switch (annotation.outline) {
+    case vgmtrans::core::SourceOutlinePolicy::Show:
+      return true;
+    case vgmtrans::core::SourceOutlinePolicy::Hide:
+      return false;
+    case vgmtrans::core::SourceOutlinePolicy::Auto:
+      return valueSourceOutlineAutoVisible(annotation.role);
+  }
+  return false;
+}
+
+std::string valueSourceText(const vgmtrans::core::SourceValue& value) {
+  if (const auto* boolValue = std::get_if<bool>(&value)) {
+    return *boolValue ? "true" : "false";
+  }
+  if (const auto* unsignedValue = std::get_if<u64>(&value)) {
+    return std::to_string(*unsignedValue);
+  }
+  if (const auto* signedValue = std::get_if<s64>(&value)) {
+    return std::to_string(*signedValue);
+  }
+  if (const auto* doubleValue = std::get_if<double>(&value)) {
+    return fmt::format("{}", *doubleValue);
+  }
+  if (const auto* text = std::get_if<std::string>(&value)) {
+    return *text;
+  }
+  return {};
+}
+
+std::string valueAnnotationDescription(const vgmtrans::core::SourceAnnotation& annotation) {
+  if (!annotation.description.empty()) {
+    return annotation.description;
+  }
+
+  std::string description;
+  for (const auto& field : annotation.fields) {
+    if (field.name.empty() || field.name == "opcode") {
+      continue;
+    }
+    const std::string value = valueSourceText(field.value);
+    if (value.empty()) {
+      continue;
+    }
+    if (!description.empty()) {
+      description += ", ";
+    }
+    description += field.name + " " + value;
+  }
+  return description;
+}
+
+std::string_view valueAnnotationKind(const vgmtrans::core::SourceAnnotation& annotation) {
+  return annotation.kind;
+}
+
+std::string_view valuePlaybackStatusName(vgmtrans::core::CommandPlaybackStatus status) {
+  switch (status) {
+    case vgmtrans::core::CommandPlaybackStatus::SourceOnly:
+      return "source-only";
+    case vgmtrans::core::CommandPlaybackStatus::NoOp:
+      return "no-op";
+    case vgmtrans::core::CommandPlaybackStatus::AffectsPlayback:
+      return "playback";
+    case vgmtrans::core::CommandPlaybackStatus::AffectsControlFlow:
+      return "control-flow";
+    case vgmtrans::core::CommandPlaybackStatus::StopsPlayback:
+      return "stops";
+    case vgmtrans::core::CommandPlaybackStatus::Unsupported:
+      return "unsupported";
+  }
+  return "unknown";
+}
+
+std::vector<vgmtrans::core::SourceAnnotationId> valueAssetAnnotationRoots(
+    const vgmtrans::core::SessionSnapshot& project, vgmtrans::core::AssetId assetId) {
+  const auto* asset = project.asset(assetId);
+  if (asset == nullptr) {
+    return {};
+  }
+
+  const auto& meta = vgmtrans::core::metadata(*asset);
+  const auto& sourceMap = project.sourceMap();
+  std::unordered_set<u32> included;
+  for (const auto& annotation : sourceMap.annotations()) {
+    if (valueSourceOutlineVisible(annotation) && valueAnnotationBelongsToAsset(annotation, assetId, meta.range)) {
+      included.insert(annotation.id.value);
+    }
+  }
+
+  std::vector<vgmtrans::core::SourceAnnotationId> roots;
+  for (const auto& annotation : sourceMap.annotations()) {
+    if (!included.contains(annotation.id.value)) {
+      continue;
+    }
+    if (!annotation.parent || !included.contains(annotation.parent->value)) {
+      roots.push_back(annotation.id);
+    }
+  }
+  return roots;
+}
+
+void printValueSourceAnnotationTree(const vgmtrans::core::SourceMap& sourceMap, vgmtrans::core::SourceAnnotationId id,
+                                    int depth, int maxDepth) {
+  if (depth > maxDepth) {
+    return;
+  }
+
+  const auto* annotation = sourceMap.find(id);
+  if (annotation == nullptr) {
+    return;
+  }
+
+  const std::string indent(static_cast<size_t>(depth) * 2, ' ');
+  fmt::print("{}#{} [{}] {} 0x{:x}:0x{:x}", indent, annotation->id.value, valueAnnotationKind(*annotation),
+             annotation->label, annotation->range.offset, annotation->range.size);
+  const std::string description = valueAnnotationDescription(*annotation);
+  if (!description.empty()) {
+    fmt::print(" - {}", description);
+  }
+  fmt::print("\n");
+
+  for (const auto child : sourceMap.childrenOf(annotation->id)) {
+    if (const auto* childAnnotation = sourceMap.find(child);
+        childAnnotation && valueSourceOutlineVisible(*childAnnotation)) {
+      printValueSourceAnnotationTree(sourceMap, child, depth + 1, maxDepth);
+    }
+  }
+}
+
+bool printValueAssetTree(const vgmtrans::core::SessionSnapshot& project, const std::vector<std::string>& args,
+                         size_t assetArgIndex) {
+  try {
+    const int assetIndex = std::stoi(args[assetArgIndex]);
+    if (assetIndex < 0 || static_cast<size_t>(assetIndex) >= project.assets().size()) {
+      fmt::println("Asset index out of bounds");
+      return false;
+    }
+
+    int maxDepth = 4;
+    const size_t depthArgIndex = assetArgIndex + 1;
+    if (args.size() > depthArgIndex) {
+      maxDepth = std::stoi(args[depthArgIndex]);
+    }
+
+    const auto assetId = vgmtrans::core::metadata(project.assets()[static_cast<size_t>(assetIndex)]).id;
+    const auto roots = valueAssetAnnotationRoots(project, assetId);
+    if (roots.empty()) {
+      fmt::println("Asset has no source outline");
+      return false;
+    }
+
+    for (const auto root : roots) {
+      printValueSourceAnnotationTree(project.sourceMap(), root, 0, maxDepth);
+    }
+    return true;
+  } catch (...) {
+    fmt::println("Invalid arguments");
+    return false;
+  }
+}
+
+bool printValueSequenceEvents(const vgmtrans::core::SessionSnapshot& project, const std::vector<std::string>& args,
+                              size_t assetArgIndex) {
+  try {
+    const int assetIndex = std::stoi(args[assetArgIndex]);
+    if (assetIndex < 0 || static_cast<size_t>(assetIndex) >= project.assets().size()) {
+      fmt::println("Asset index out of bounds");
+      return false;
+    }
+
+    const auto& asset = project.assets()[static_cast<size_t>(assetIndex)];
+    const auto* sequenceProgram = std::get_if<vgmtrans::core::SequenceProgramAsset>(&asset);
+    if (sequenceProgram == nullptr) {
+      fmt::println("Asset is not a sequence");
+      return false;
+    }
+
+    const int trackIndex = std::stoi(args[assetArgIndex + 1]);
+    const size_t trackCount = sequenceProgram->program.tracks.size();
+    if (trackIndex < 0 || static_cast<size_t>(trackIndex) >= trackCount) {
+      fmt::println("Track index out of bounds");
+      return false;
+    }
+
+    size_t limit = sequenceProgram->program.tracks[static_cast<size_t>(trackIndex)].commands.size();
+    const size_t limitArgIndex = assetArgIndex + 2;
+    if (args.size() > limitArgIndex) {
+      const int parsedLimit = std::stoi(args[limitArgIndex]);
+      if (parsedLimit < 0) {
+        fmt::println("Limit must be non-negative");
+        return false;
+      }
+      limit = static_cast<size_t>(parsedLimit);
+    }
+
+    const auto& track = sequenceProgram->program.tracks[static_cast<size_t>(trackIndex)];
+    const auto& sourceMap = project.sourceMap();
+    fmt::println("Commands for value sequence asset #{} track #{} (source track {}, start 0x{:x}):", assetIndex,
+                 trackIndex, track.sourceTrackNumber, track.startAddress.value);
+    const size_t count = std::min(limit, track.commands.size());
+    for (size_t i = 0; i < count; ++i) {
+      const auto& command = track.commands[i];
+      if (const auto* annotation = sourceMap.find(command.annotation)) {
+        const std::string description = valueAnnotationDescription(*annotation);
+        const std::string status = annotation->playbackStatus
+                                       ? fmt::format(" status={}", valuePlaybackStatusName(*annotation->playbackStatus))
+                                       : std::string{};
+        fmt::println("#{} 0x{:x}:0x{:x} annotation={} kind={}{} opcode=0x{:02x} {}{}{}", i, command.range.offset,
+                     command.range.size, annotation->id.value, valueAnnotationKind(*annotation), status, command.opcode,
+                     annotation->label, description.empty() ? "" : " - ", description);
+      } else {
+        fmt::println("#{} 0x{:x}:0x{:x} annotation={} opcode=0x{:02x}", i, command.range.offset, command.range.size,
+                     command.annotation.value, command.opcode);
+      }
+    }
+    if (count < track.commands.size()) {
+      fmt::println("... {} more commands", track.commands.size() - count);
+    }
+    return true;
+  } catch (...) {
+    fmt::println("Invalid arguments");
+    return false;
+  }
+}
+
+std::optional<vgmtrans::core::ExportKind> valueExportKindFromString(std::string kind) {
+  std::transform(kind.begin(), kind.end(), kind.begin(),
+                 [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+
+  if (kind == "midi" || kind == "mid") {
+    return vgmtrans::core::ExportKind::Midi;
+  }
+  if (kind == "sf2" || kind == "soundfont" || kind == "soundfont2") {
+    return vgmtrans::core::ExportKind::SoundFont2;
+  }
+  if (kind == "dls") {
+    return vgmtrans::core::ExportKind::Dls;
+  }
+  if (kind == "wav" || kind == "wave") {
+    return vgmtrans::core::ExportKind::Wav;
+  }
+  return std::nullopt;
+}
+
+std::optional<vgmtrans::core::ModulationScalingPolicy> valueModulationScalingPolicyFromString(std::string policy) {
+  std::transform(policy.begin(), policy.end(), policy.begin(),
+                 [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+
+  if (policy == "full" || policy == "full-range" || policy == "full-format-range") {
+    return vgmtrans::core::ModulationScalingPolicy::FullFormatRange;
+  }
+  if (policy == "observed" || policy == "observed-range" || policy == "observed-sequence-range") {
+    return vgmtrans::core::ModulationScalingPolicy::ObservedSequenceRange;
+  }
+  return std::nullopt;
+}
+
+std::optional<vgmtrans::core::ExportRequest> valueExportRequestFromArgs(const std::vector<std::string>& args,
+                                                                        size_t kindArgIndex) {
+  vgmtrans::core::ExportRequest request{
+      .sequence =
+          {
+              .loopPolicy = vgmtrans::core::LoopPolicy::PlayOnce,
+          },
+  };
+
+  bool sawKind = false;
+  for (size_t i = kindArgIndex; i < args.size(); ++i) {
+    std::string option = args[i];
+    std::transform(option.begin(), option.end(), option.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+
+    if (option == "--observed-modulation" || option == "--observed-modulation-scaling") {
+      request.modulationScaling = vgmtrans::core::ModulationScalingPolicy::ObservedSequenceRange;
+      continue;
+    }
+    if (option == "--full-modulation" || option == "--full-modulation-scaling") {
+      request.modulationScaling = vgmtrans::core::ModulationScalingPolicy::FullFormatRange;
+      continue;
+    }
+    if (option == "--dynamic-envelopes" || option == "--dynamic-envelope-variants") {
+      request.dynamicEnvelopes = vgmtrans::core::DynamicEnvelopePolicy::InstrumentVariants;
+      continue;
+    }
+    if (option == "--terminate-previous-voice") {
+      request.sequence.midi.terminatePreviousVoice = true;
+      continue;
+    }
+
+    std::string_view modulationPrefix = "--modulation-scaling=";
+    if (option.starts_with(modulationPrefix)) {
+      const auto policy = valueModulationScalingPolicyFromString(std::string(option.substr(modulationPrefix.size())));
+      if (!policy) {
+        fmt::println("Unknown modulation scaling policy '{}'. Use full or observed.",
+                     args[i].substr(modulationPrefix.size()));
+        return std::nullopt;
+      }
+      request.modulationScaling = *policy;
+      continue;
+    }
+    if (option == "--modulation-scaling") {
+      if (i + 1 >= args.size()) {
+        fmt::println("Missing value after --modulation-scaling. Use full or observed.");
+        return std::nullopt;
+      }
+      const auto policy = valueModulationScalingPolicyFromString(args[++i]);
+      if (!policy) {
+        fmt::println("Unknown modulation scaling policy '{}'. Use full or observed.", args[i]);
+        return std::nullopt;
+      }
+      request.modulationScaling = *policy;
+      continue;
+    }
+
+    if (option == "all") {
+      if (sawKind) {
+        fmt::println("Only one value export kind can be specified.");
+        return std::nullopt;
+      }
+      request.kinds = {
+          vgmtrans::core::ExportKind::Midi,
+          vgmtrans::core::ExportKind::SoundFont2,
+          vgmtrans::core::ExportKind::Dls,
+          vgmtrans::core::ExportKind::Wav,
+      };
+      sawKind = true;
+      continue;
+    }
+
+    const auto kind = valueExportKindFromString(option);
+    if (!kind) {
+      fmt::println("Unknown value export option '{}'. Use all, midi, sf2, dls, wav, --dynamic-envelopes, "
+                   "--terminate-previous-voice, or --modulation-scaling full|observed.",
+                   args[i]);
+      return std::nullopt;
+    }
+
+    if (sawKind) {
+      fmt::println("Only one value export kind can be specified.");
+      return std::nullopt;
+    }
+    request.kinds = {*kind};
+    sawKind = true;
+  }
+
+  return request;
+}
+
+std::string valueSafePathPart(std::string name) {
+  if (name.empty()) {
+    return "unnamed";
+  }
+
+  for (char& ch : name) {
+    const auto value = static_cast<unsigned char>(ch);
+    if (std::iscntrl(value) || ch == '/' || ch == '\\' || ch == ':' || ch == '*' || ch == '?' || ch == '"' ||
+        ch == '<' || ch == '>' || ch == '|') {
+      ch = '_';
+    }
+  }
+  return name;
+}
+
+std::string valueCollectionDirectoryName(size_t index, const vgmtrans::core::Collection& collection) {
+  return fmt::format("{:03}-collection-{}-{}", index, collection.id.value, valueSafePathPart(collection.name));
+}
+
+size_t writeValueArtifacts(const std::filesystem::path& dir, std::span<const vgmtrans::core::Artifact> artifacts) {
+  size_t written = 0;
+  for (const auto& artifact : artifacts) {
+    for (const auto& diagnostic : artifact.diagnostics) {
+      printValueDiagnostic(diagnostic);
+    }
+
+    if (artifact.bytes.empty()) {
+      fmt::println("Skipped empty artifact {}", artifact.filename);
+      continue;
+    }
+
+    if (writeValueArtifact(dir / artifact.filename, artifact.bytes)) {
+      ++written;
+    }
+  }
+  return written;
+}
+
+bool printValueNoCollections(const vgmtrans::core::SessionSnapshot& project) {
+  if (!project.collections().empty()) {
+    return false;
+  }
+
+  fmt::println("Value scan did not discover any collections.");
+  for (const auto& diagnostic : project.diagnostics()) {
+    printValueDiagnostic(diagnostic);
+  }
+  return true;
+}
+
+void printValueCollectionAssetRef(const vgmtrans::core::SessionSnapshot& project, std::string_view label, size_t index,
+                                  vgmtrans::core::AssetId id) {
+  const auto* asset = project.asset(id);
+  if (asset == nullptr) {
+    fmt::println("  {} #{} id={} missing", label, index, id.value);
+    return;
+  }
+
+  const auto& meta = vgmtrans::core::metadata(*asset);
+  fmt::println("  {} #{} id={} [{}] format={} name='{}' range=0x{:x}:0x{:x}", label, index, meta.id.value,
+               valueAssetKindName(*asset), meta.format, meta.name, meta.range.offset, meta.range.size);
+}
+
+void printValueCollectionInfo(const vgmtrans::core::SessionSnapshot& project,
+                              const vgmtrans::core::Collection& collection, size_t index) {
+  const auto& members = collection.members;
+  fmt::println("collection #{} id={} name='{}'", index, collection.id.value, collection.name);
+  if (members.sequence) {
+    printValueCollectionAssetRef(project, "Sequence", 0, *members.sequence);
+  } else {
+    fmt::println("  Sequence: none");
+  }
+
+  for (size_t i = 0; i < members.soundBanks.size(); ++i) {
+    printValueCollectionAssetRef(project, "SoundBank", i, members.soundBanks[i]);
+  }
+  for (size_t i = 0; i < members.samplePools.size(); ++i) {
+    printValueCollectionAssetRef(project, "SamplePool", i, members.samplePools[i]);
+  }
+  for (size_t i = 0; i < members.miscAssets.size(); ++i) {
+    printValueCollectionAssetRef(project, "Misc", i, members.miscAssets[i]);
+  }
+}
+
+bool printValueCollections(const vgmtrans::core::SessionSnapshot& project, const std::vector<std::string>& args,
+                           size_t collectionArgIndex) {
+  if (printValueNoCollections(project)) {
+    return false;
+  }
+
+  if (args.size() <= collectionArgIndex) {
+    for (size_t i = 0; i < project.collections().size(); ++i) {
+      const auto& collection = project.collections()[i];
+      const auto& members = collection.members;
+      fmt::println("collection #{} id={} name='{}' sequence={} soundBanks={} samplePools={} misc={}", i,
+                   collection.id.value, collection.name,
+                   members.sequence ? std::to_string(members.sequence->value) : std::string("-"),
+                   members.soundBanks.size(), members.samplePools.size(), members.miscAssets.size());
+    }
+    return true;
+  }
+
+  try {
+    const int collectionIndex = std::stoi(args[collectionArgIndex]);
+    if (collectionIndex < 0 || static_cast<size_t>(collectionIndex) >= project.collections().size()) {
+      fmt::println("Collection index out of bounds");
+      return false;
+    }
+    printValueCollectionInfo(project, project.collections()[static_cast<size_t>(collectionIndex)],
+                             static_cast<size_t>(collectionIndex));
+    return true;
+  } catch (...) {
+    fmt::println("Invalid arguments");
+    return false;
+  }
+}
+
+std::string valueSampleRefName(const vgmtrans::core::SampleRef& sample) {
+  if (sample.empty()) {
+    return "no sample";
+  }
+  if (sample.needsBinding()) {
+    return fmt::format("unbound sample {}", sample.index());
+  }
+  return fmt::format("owner {} sample {}", sample.owner().value, sample.index());
+}
+
+std::string valueEnvelopeName(const vgmtrans::core::Envelope& envelope) {
+  if (!vgmtrans::core::hasExplicitEnvelope(envelope)) {
+    return "none";
+  }
+  const auto stage = [](std::optional<double> seconds) {
+    if (!seconds) {
+      return std::string("-");
+    }
+    if (std::isinf(*seconds)) {
+      return std::string("inf");
+    }
+    return fmt::format("{:.3f}s", *seconds);
+  };
+  const std::string sustain =
+      envelope.sustainAmplitude ? fmt::format("{:.1f}%", *envelope.sustainAmplitude * 100.0) : "-";
+  return fmt::format("A {} H {} D {} S {} R {}", stage(envelope.attackSeconds), stage(envelope.holdSeconds),
+                     stage(envelope.decaySeconds), sustain, stage(envelope.releaseSeconds));
+}
+
+void printValueInstrument(const vgmtrans::core::Instrument& instrument, size_t index) {
+  const auto address = vgmtrans::core::resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
+  const auto modulation = vgmtrans::core::lowerSynthModulation(instrument.modulation);
+  fmt::println("instrument #{} bank={} program={} name='{}' range=0x{:x}:0x{:x} regions={} generators={} modulators={}",
+               index, address.bank, address.program, instrument.name, instrument.range.offset, instrument.range.size,
+               instrument.regions.size(), modulation.generators.size(), modulation.modulators.size());
+
+  for (size_t i = 0; i < instrument.regions.size(); ++i) {
+    const auto& region = instrument.regions[i];
+    fmt::println("  region #{} range=0x{:x}:0x{:x} key={}-{} vel={}-{} {} unity-key={:.3f} pan={:.3f} atten={:.2f}dB",
+                 i, region.range.offset, region.range.size, region.keyRange.low, region.keyRange.high,
+                 region.velocityRange.low, region.velocityRange.high, valueSampleRefName(region.sample),
+                 region.unityKey, region.pan, region.attenuationDb);
+    fmt::println("    envelope {}", valueEnvelopeName(region.envelope));
+  }
+}
+
+bool printValueInstruments(const vgmtrans::core::SessionSnapshot& project, const std::vector<std::string>& args,
+                           size_t assetArgIndex) {
+  try {
+    const int assetIndex = std::stoi(args[assetArgIndex]);
+    if (assetIndex < 0 || static_cast<size_t>(assetIndex) >= project.assets().size()) {
+      fmt::println("Asset index out of bounds");
+      return false;
+    }
+
+    const auto* soundBankAsset =
+        std::get_if<vgmtrans::core::SoundBankAsset>(&project.assets()[static_cast<size_t>(assetIndex)]);
+    if (soundBankAsset == nullptr) {
+      fmt::println("Asset is not a sound bank");
+      return false;
+    }
+
+    const auto& meta = soundBankAsset->metadata;
+    fmt::println("sound-bank asset #{} id={} format={} name='{}' range=0x{:x}:0x{:x} instruments={}", assetIndex,
+                 meta.id.value, meta.format, meta.name, meta.range.offset, meta.range.size,
+                 soundBankAsset->instruments.size());
+
+    const size_t instrumentArgIndex = assetArgIndex + 1;
+    if (args.size() <= instrumentArgIndex) {
+      for (size_t i = 0; i < soundBankAsset->instruments.size(); ++i) {
+        const auto& instrument = soundBankAsset->instruments[i];
+        const auto address = vgmtrans::core::resolveInstrumentAddress(instrument.explicitAddress, instrument.identity);
+        fmt::println("  instrument #{} bank={} program={} regions={} name='{}' range=0x{:x}:0x{:x}", i, address.bank,
+                     address.program, instrument.regions.size(), instrument.name, instrument.range.offset,
+                     instrument.range.size);
+      }
+      return true;
+    }
+
+    const int instrumentIndex = std::stoi(args[instrumentArgIndex]);
+    if (instrumentIndex < 0 || static_cast<size_t>(instrumentIndex) >= soundBankAsset->instruments.size()) {
+      fmt::println("Instrument index out of bounds");
+      return false;
+    }
+
+    printValueInstrument(soundBankAsset->instruments[static_cast<size_t>(instrumentIndex)],
+                         static_cast<size_t>(instrumentIndex));
+    return true;
+  } catch (...) {
+    fmt::println("Invalid arguments");
+    return false;
+  }
+}
+
+std::string_view valueAudioCodecName(vgmtrans::core::AudioCodec codec) {
+  switch (codec) {
+    case vgmtrans::core::AudioCodec::Unknown:
+      return "unknown";
+    case vgmtrans::core::AudioCodec::PcmS16:
+      return "pcm-s16";
+    case vgmtrans::core::AudioCodec::PcmS8:
+      return "pcm-s8";
+    case vgmtrans::core::AudioCodec::SnesBrr:
+      return "snes-brr";
+    case vgmtrans::core::AudioCodec::SnesDspNoise:
+      return "snes-dsp-noise";
+    case vgmtrans::core::AudioCodec::PsxAdpcm:
+      return "psx-adpcm";
+    case vgmtrans::core::AudioCodec::KonamiK054539Adpcm:
+      return "konami-k054539-adpcm";
+    case vgmtrans::core::AudioCodec::KonamiK053260Adpcm:
+      return "konami-k053260-adpcm";
+    case vgmtrans::core::AudioCodec::OkiAdpcm:
+      return "oki-adpcm";
+    case vgmtrans::core::AudioCodec::NdsImaAdpcm:
+      return "nds-ima-adpcm";
+    case vgmtrans::core::AudioCodec::NdsPsg:
+      return "nds-psg";
+    case vgmtrans::core::AudioCodec::GbaBdpcm:
+      return "gba-bdpcm";
+    case vgmtrans::core::AudioCodec::GbaPsg:
+      return "gba-psg";
+    case vgmtrans::core::AudioCodec::GbaPsgWave:
+      return "gba-psg-wave";
+  }
+  return "unknown";
+}
+
+std::string valueLoopName(const vgmtrans::core::Loop& loop) {
+  if (!loop.enabled) {
+    return "none";
+  }
+  return fmt::format("start=0x{:x} length=0x{:x}", loop.start, loop.length);
+}
+
+void printValueSample(const vgmtrans::core::Sample& sample, size_t index) {
+  fmt::println(
+      "sample #{} name='{}' codec={} data=0x{:x}:0x{:x} rate={}Hz channels={} bits={} tuning={}c atten={:.2f}dB", index,
+      sample.name, valueAudioCodecName(sample.codec), sample.encodedData.offset, sample.encodedData.size,
+      sample.sampleRate, sample.channels, sample.bitsPerSample, sample.pitch.cents, sample.attenuationDb);
+  fmt::println("  loop {}", valueLoopName(sample.loop));
+}
+
+bool printValueSamples(const vgmtrans::core::SessionSnapshot& project, const std::vector<std::string>& args,
+                       size_t assetArgIndex) {
+  try {
+    const int assetIndex = std::stoi(args[assetArgIndex]);
+    if (assetIndex < 0 || static_cast<size_t>(assetIndex) >= project.assets().size()) {
+      fmt::println("Asset index out of bounds");
+      return false;
+    }
+
+    const auto* sampleAsset =
+        std::get_if<vgmtrans::core::SamplePoolAsset>(&project.assets()[static_cast<size_t>(assetIndex)]);
+    if (sampleAsset == nullptr) {
+      fmt::println("Asset is not a sample pool");
+      return false;
+    }
+
+    const auto& meta = sampleAsset->metadata;
+    fmt::println("sample-pool asset #{} id={} format={} name='{}' range=0x{:x}:0x{:x} samples={}", assetIndex,
+                 meta.id.value, meta.format, meta.name, meta.range.offset, meta.range.size,
+                 sampleAsset->pool.samples.size());
+
+    const size_t sampleArgIndex = assetArgIndex + 1;
+    if (args.size() <= sampleArgIndex) {
+      for (size_t i = 0; i < sampleAsset->pool.samples.size(); ++i) {
+        const auto& sample = sampleAsset->pool.samples[i];
+        fmt::println("  sample #{} name='{}' codec={} data=0x{:x}:0x{:x} rate={}Hz channels={} bits={}", i, sample.name,
+                     valueAudioCodecName(sample.codec), sample.encodedData.offset, sample.encodedData.size,
+                     sample.sampleRate, sample.channels, sample.bitsPerSample);
+      }
+      return true;
+    }
+
+    const int sampleIndex = std::stoi(args[sampleArgIndex]);
+    if (sampleIndex < 0 || static_cast<size_t>(sampleIndex) >= sampleAsset->pool.samples.size()) {
+      fmt::println("Sample index out of bounds");
+      return false;
+    }
+
+    printValueSample(sampleAsset->pool.samples[static_cast<size_t>(sampleIndex)], static_cast<size_t>(sampleIndex));
+    return true;
+  } catch (...) {
+    fmt::println("Invalid arguments");
+    return false;
+  }
+}
+
+size_t exportValueCollectionsToDirectory(const vgmtrans::core::SessionSnapshot& project,
+                                         std::span<const vgmtrans::core::CollectionExport> exports,
+                                         const std::filesystem::path& dir) {
+  size_t written = 0;
+  for (size_t i = 0; i < exports.size(); ++i) {
+    const auto& collectionExport = exports[i];
+    const auto* collection = project.collection(collectionExport.collection);
+    if (collection == nullptr) {
+      fmt::println("Export skipped missing collection id {}", collectionExport.collection.value);
+      continue;
+    }
+
+    const auto collectionDir = dir / valueCollectionDirectoryName(i, *collection);
+    if (!ensureDirectory(collectionDir)) {
+      continue;
+    }
+
+    fmt::println("Exporting value collection '{}' to {}...", collection->name, collectionDir.string());
+    written += writeValueArtifacts(collectionDir, collectionExport.artifacts);
+  }
+  return written;
 }
 
 }  // namespace
@@ -228,8 +1162,7 @@ void rawfile_list(const std::vector<std::string>&) {
 void rawfile_info(const std::vector<std::string>& args) {
   RawFile* file = getRawFile(args[2]);
   if (file) {
-    fmt::print("Name: {}\nPath: {}\nDetails: {} bytes\n", file->name(), file->path().string(),
-               file->size());
+    fmt::print("Name: {}\nPath: {}\nDetails: {} bytes\n", file->name(), file->path().string(), file->size());
   }
 }
 
@@ -265,8 +1198,8 @@ void vgmfile_list(const std::vector<std::string>&) {
 void vgmfile_info(const std::vector<std::string>& args) {
   VGMFile* file = getVGMFile(args[2]);
   if (file) {
-    fmt::print("Name: {}\nFormat: {}\nID: {}\nOffset: 0x{:x}\nLength: 0x{:x}\n", file->name(),
-               file->formatName(), file->id(), file->startOffset(), file->size());
+    fmt::print("Name: {}\nFormat: {}\nID: {}\nOffset: 0x{:x}\nLength: 0x{:x}\n", file->name(), file->formatName(),
+               file->id(), file->startOffset(), file->size());
   }
 }
 
@@ -333,26 +1266,27 @@ void collection_info(const std::vector<std::string>& args) {
     }
     const auto& instrSets = coll->instrSets();
     for (size_t i = 0; i < instrSets.size(); ++i) {
-      fmt::print("  InstrSet #{} [0x{:x}:0x{:x}] {}\n", i, instrSets[i]->startOffset(),
-                 instrSets[i]->size(), instrSets[i]->name());
+      fmt::print("  InstrSet #{} [0x{:x}:0x{:x}] {}\n", i, instrSets[i]->startOffset(), instrSets[i]->size(),
+                 instrSets[i]->name());
     }
     const auto& sampColls = coll->sampColls();
     for (size_t i = 0; i < sampColls.size(); ++i) {
-      fmt::print("  SampColl #{} [0x{:x}:0x{:x}] {}\n", i, sampColls[i]->startOffset(),
-                 sampColls[i]->size(), sampColls[i]->name());
+      fmt::print("  SampColl #{} [0x{:x}:0x{:x}] {}\n", i, sampColls[i]->startOffset(), sampColls[i]->size(),
+                 sampColls[i]->name());
     }
     const auto& miscFiles = coll->miscFiles();
     for (size_t i = 0; i < miscFiles.size(); ++i) {
-      fmt::print("  Misc #{} [0x{:x}:0x{:x}] {}\n", i, miscFiles[i]->startOffset(),
-                 miscFiles[i]->size(), miscFiles[i]->name());
+      fmt::print("  Misc #{} [0x{:x}:0x{:x}] {}\n", i, miscFiles[i]->startOffset(), miscFiles[i]->size(),
+                 miscFiles[i]->name());
     }
   }
 }
 
 void collection_export(const std::vector<std::string>& args) {
   VGMColl* coll = getVGMColl(args[2]);
-  if (!coll)
+  if (!coll) {
     return;
+  }
 
   std::filesystem::path dir = args[3];
   if (!std::filesystem::exists(dir)) {
@@ -369,8 +1303,9 @@ void instrumentset_list(const std::vector<std::string>&) {
 
 void instrumentset_info(const std::vector<std::string>& args) {
   VGMFile* file = getVGMFile(args[2]);
-  if (!file)
+  if (!file) {
     return;
+  }
 
   VGMInstrSet* instrSet = dynamic_cast<VGMInstrSet*>(file);
   if (!instrSet) {
@@ -378,20 +1313,20 @@ void instrumentset_info(const std::vector<std::string>& args) {
     return;
   }
 
-  fmt::print("Name: {}\nFormat: {}\nOffset: 0x{:x}\nLength: 0x{:x}\n", instrSet->name(),
-             instrSet->formatName(), instrSet->startOffset(), instrSet->size());
+  fmt::print("Name: {}\nFormat: {}\nOffset: 0x{:x}\nLength: 0x{:x}\n", instrSet->name(), instrSet->formatName(),
+             instrSet->startOffset(), instrSet->size());
   fmt::println("Instruments:");
   for (size_t i = 0; i < instrSet->instrCount(); ++i) {
     VGMInstr* instr = instrSet->instr(i);
-    fmt::print("  Instr #{}: Bank {} Num {} - {}\n", i, instr->bank, instr->instrNum,
-               instr->name());
+    fmt::print("  Instr #{}: Bank {} Num {} - {}\n", i, instr->bank, instr->instrNum, instr->name());
   }
 }
 
 void instrumentset_inspect(const std::vector<std::string>& args) {
   VGMFile* file = getVGMFile(args[2]);
-  if (!file)
+  if (!file) {
     return;
+  }
 
   VGMInstrSet* instrSet = dynamic_cast<VGMInstrSet*>(file);
   if (!instrSet) {
@@ -409,10 +1344,9 @@ void instrumentset_inspect(const std::vector<std::string>& args) {
         VGMRgn* rgn = regions[i];
         fmt::print("  [Rgn #{}] [0x{:x}:0x{:x}] Key {}-{} Vel {}-{} Samp {} Unity {} ({})\n"
                    "    ADSR: A {:.3f}s D {:.3f}s S {:.1f}% R {:.3f}s\n",
-                   i, rgn->offset(), rgn->length(), rgn->keyLow, rgn->keyHigh, rgn->velLow,
-                   rgn->velHigh, rgn->sampNum, static_cast<int>(rgn->unityKey),
-                   MidiEvent::getNoteName(rgn->unityKey), rgn->attack_time, rgn->decay_time,
-                   rgn->sustain_level * 100.0, rgn->release_time);
+                   i, rgn->offset(), rgn->length(), rgn->keyLow, rgn->keyHigh, rgn->velLow, rgn->velHigh, rgn->sampNum,
+                   static_cast<int>(rgn->unityKey), MidiEvent::getNoteName(rgn->unityKey), rgn->attack_time,
+                   rgn->decay_time, rgn->sustain_level * 100.0, rgn->release_time);
       }
     } else {
       fmt::println("Instrument index out of bounds");
@@ -424,8 +1358,9 @@ void instrumentset_inspect(const std::vector<std::string>& args) {
 
 void instrumentset_export(const std::vector<std::string>& args) {
   VGMFile* file = getVGMFile(args[2]);
-  if (!file)
+  if (!file) {
     return;
+  }
 
   VGMInstrSet* instrSet = dynamic_cast<VGMInstrSet*>(file);
   if (!instrSet) {
@@ -462,8 +1397,9 @@ void samplecollection_list(const std::vector<std::string>&) {
 
 void samplecollection_info(const std::vector<std::string>& args) {
   VGMFile* file = getVGMFile(args[2]);
-  if (!file)
+  if (!file) {
     return;
+  }
 
   VGMSampColl* sampColl = dynamic_cast<VGMSampColl*>(file);
   if (!sampColl) {
@@ -471,25 +1407,25 @@ void samplecollection_info(const std::vector<std::string>& args) {
     return;
   }
 
-  fmt::print("Name: {}\nFormat: {}\nOffset: 0x{:x}\nLength: 0x{:x}\n", sampColl->name(),
-             sampColl->formatName(), sampColl->startOffset(), sampColl->size());
+  fmt::print("Name: {}\nFormat: {}\nOffset: 0x{:x}\nLength: 0x{:x}\n", sampColl->name(), sampColl->formatName(),
+             sampColl->startOffset(), sampColl->size());
   fmt::println("Samples ({}):", sampColl->sampleCount());
   for (size_t i = 0; i < sampColl->sampleCount(); ++i) {
     VGMSamp* samp = sampColl->sample(i);
-    fmt::print("  [{}] Def [{}:{}] Data [{}:{}] {} ({} Hz)\n",
-               fmt::styled(fmt::format("#{}", i), fmt::fg(fmt::color::cyan)),
-               fmt::styled(fmt::format("0x{:x}", samp->offset()), fmt::fg(fmt::color::yellow)),
-               fmt::styled(fmt::format("0x{:x}", samp->length()), fmt::fg(fmt::color::yellow)),
-               fmt::styled(fmt::format("0x{:x}", samp->dataOff), fmt::fg(fmt::color::yellow)),
-               fmt::styled(fmt::format("0x{:x}", samp->dataLength), fmt::fg(fmt::color::yellow)),
-               samp->name(), samp->rate);
+    fmt::print(
+        "  [{}] Def [{}:{}] Data [{}:{}] {} ({} Hz)\n", fmt::styled(fmt::format("#{}", i), fmt::fg(fmt::color::cyan)),
+        fmt::styled(fmt::format("0x{:x}", samp->offset()), fmt::fg(fmt::color::yellow)),
+        fmt::styled(fmt::format("0x{:x}", samp->length()), fmt::fg(fmt::color::yellow)),
+        fmt::styled(fmt::format("0x{:x}", samp->dataOff), fmt::fg(fmt::color::yellow)),
+        fmt::styled(fmt::format("0x{:x}", samp->dataLength), fmt::fg(fmt::color::yellow)), samp->name(), samp->rate);
   }
 }
 
 void samplecollection_inspect(const std::vector<std::string>& args) {
   VGMFile* file = getVGMFile(args[2]);
-  if (!file)
+  if (!file) {
     return;
+  }
 
   VGMSampColl* sampColl = dynamic_cast<VGMSampColl*>(file);
   if (!sampColl) {
@@ -501,14 +1437,13 @@ void samplecollection_inspect(const std::vector<std::string>& args) {
     int sampIdx = std::stoi(args[3]);
     if (sampIdx >= 0 && static_cast<size_t>(sampIdx) < sampColl->sampleCount()) {
       VGMSamp* samp = sampColl->sample(sampIdx);
-      fmt::print("{}\n",
-                 fmt::styled(fmt::format("Sample #{} Information:", sampIdx), fmt::emphasis::bold));
+      fmt::print("{}\n", fmt::styled(fmt::format("Sample #{} Information:", sampIdx), fmt::emphasis::bold));
       fmt::print("  {:<12} {}\n", "Name:", samp->name());
-      fmt::print("  {:<12} [{}:{}]\n", "Definition:",
-                 fmt::styled(fmt::format("0x{:x}", samp->offset()), fmt::fg(fmt::color::yellow)),
+      fmt::print("  {:<12} [{}:{}]\n",
+                 "Definition:", fmt::styled(fmt::format("0x{:x}", samp->offset()), fmt::fg(fmt::color::yellow)),
                  fmt::styled(fmt::format("0x{:x}", samp->length()), fmt::fg(fmt::color::yellow)));
-      fmt::print("  {:<12} [{}:{}] ({} bytes)\n", "Data:",
-                 fmt::styled(fmt::format("0x{:x}", samp->dataOff), fmt::fg(fmt::color::yellow)),
+      fmt::print("  {:<12} [{}:{}] ({} bytes)\n",
+                 "Data:", fmt::styled(fmt::format("0x{:x}", samp->dataOff), fmt::fg(fmt::color::yellow)),
                  fmt::styled(fmt::format("0x{:x}", samp->dataLength), fmt::fg(fmt::color::yellow)),
                  fmt::styled(std::to_string(samp->dataLength), fmt::fg(fmt::color::yellow)));
 
@@ -520,14 +1455,12 @@ void samplecollection_inspect(const std::vector<std::string>& args) {
                  "Size:", fmt::styled(std::to_string(totalSamples), fmt::fg(fmt::color::yellow)));
       fmt::print("  {:<12} {} Hz  Channels: {}  BPS: {}\n", "Format:", samp->rate, samp->channels,
                  samp->bitsPerSample());
-      fmt::print("  {:<12} Unity Key: {} ({})  Fine Tune: {}\n", "",
-                 static_cast<int>(samp->unityKey), MidiEvent::getNoteName(samp->unityKey),
-                 samp->fineTune);
+      fmt::print("  {:<12} Unity Key: {} ({})  Fine Tune: {}\n", "", static_cast<int>(samp->unityKey),
+                 MidiEvent::getNoteName(samp->unityKey), samp->fineTune);
 
       if (samp->loopStatus() != 0) {
-        fmt::print("  {:<12} Start 0x{:x}  Length 0x{:x}  Measure: {}\n",
-                   "Loop:", samp->loop.loopStart, samp->loop.loopLength,
-                   static_cast<int>(samp->loop.loopStartMeasure));
+        fmt::print("  {:<12} Start 0x{:x}  Length 0x{:x}  Measure: {}\n", "Loop:", samp->loop.loopStart,
+                   samp->loop.loopLength, static_cast<int>(samp->loop.loopStartMeasure));
       } else {
         fmt::print("  {:<12} None\n", "Loop:");
       }
@@ -541,8 +1474,9 @@ void samplecollection_inspect(const std::vector<std::string>& args) {
 
 void samplecollection_export(const std::vector<std::string>& args) {
   VGMFile* file = getVGMFile(args[2]);
-  if (!file)
+  if (!file) {
     return;
+  }
 
   VGMSampColl* sampColl = dynamic_cast<VGMSampColl*>(file);
   if (!sampColl) {
@@ -561,8 +1495,9 @@ void samplecollection_export(const std::vector<std::string>& args) {
 
 void samplecollection_dump(const std::vector<std::string>& args) {
   VGMFile* file = getVGMFile(args[2]);
-  if (!file)
+  if (!file) {
     return;
+  }
 
   VGMSampColl* sampColl = dynamic_cast<VGMSampColl*>(file);
   if (!sampColl) {
@@ -590,8 +1525,9 @@ void sequence_list(const std::vector<std::string>&) {
 
 void sequence_events(const std::vector<std::string>& args) {
   VGMFile* file = getVGMFile(args[2]);
-  if (!file)
+  if (!file) {
     return;
+  }
 
   VGMSeq* seq = dynamic_cast<VGMSeq*>(file);
   if (!seq) {
@@ -615,8 +1551,9 @@ void sequence_events(const std::vector<std::string>& args) {
 
 void sequence_export(const std::vector<std::string>& args) {
   VGMFile* file = getVGMFile(args[2]);
-  if (!file)
+  if (!file) {
     return;
+  }
 
   VGMSeq* seq = dynamic_cast<VGMSeq*>(file);
   if (!seq) {
@@ -651,8 +1588,7 @@ void collection_stitch(const std::vector<std::string>& args) {
 
     VGMSeq* seq = coll->seq();
     if (!seq) {
-      fmt::println("Collection '{}' has no sequence, so stitched export cannot be built.",
-                   coll->name());
+      fmt::println("Collection '{}' has no sequence, so stitched export cannot be built.", coll->name());
       return;
     }
 
@@ -666,8 +1602,7 @@ void collection_stitch(const std::vector<std::string>& args) {
   }
 
   conversion::StitchedExportResult exportResult;
-  if (!conversion::exportStitchedMidiAndSf2(entries, midiPath, sf2Path,
-                                            &exportResult)) {
+  if (!conversion::exportStitchedMidiAndSf2(entries, midiPath, sf2Path, &exportResult)) {
     fmt::println("Failed to export stitched output. Check logs for details.");
     return;
   }
@@ -680,22 +1615,294 @@ void collection_stitch(const std::vector<std::string>& args) {
       const VGMColl* coll = entries[i].collection;
       if (coll && coll->seq()) {
         chunkName = coll->seq()->name();
-      }
-      else if (coll) {
+      } else if (coll) {
         chunkName = coll->name();
-      }
-      else {
+      } else {
         chunkName = "(unknown)";
       }
     }
-    const u32 startTick =
-        (i < exportResult.mergeResult.startTimes.size())
-            ? exportResult.mergeResult.startTimes[i]
-            : 0;
-    const u32 bankOffset =
-        (i < exportResult.bankOffsets.size()) ? exportResult.bankOffsets[i] : 0;
-    fmt::println("  part {} (#{} '{}'): start tick {} bank +{}", i + 1, collectionIndices[i], chunkName,
-                 startTick, bankOffset);
+    const u32 startTick = (i < exportResult.mergeResult.startTimes.size()) ? exportResult.mergeResult.startTimes[i] : 0;
+    const u32 bankOffset = (i < exportResult.bankOffsets.size()) ? exportResult.bankOffsets[i] : 0;
+    fmt::println("  part {} (#{} '{}'): start tick {} bank +{}", i + 1, collectionIndices[i], chunkName, startTick,
+                 bankOffset);
+  }
+}
+
+void value_scan(const std::vector<std::string>& args) {
+  RawFile* file = getRawFile(args[2]);
+  if (!file) {
+    return;
+  }
+
+  auto session = valueSessionForRawFile(*file);
+  session.scanPendingSources();
+  const auto project = session.snapshot();
+  printValueSessionSummary(project);
+}
+
+void value_scan_path(const std::vector<std::string>& args) {
+  try {
+    auto session = valueSessionForPath(args[2]);
+    session.scanPendingSources();
+    const auto project = session.snapshot();
+    printValueSessionSummary(project);
+  } catch (const std::exception& ex) {
+    fmt::println("Failed to value-scan {}: {}", args[2], ex.what());
+  }
+}
+
+void value_sources(const std::vector<std::string>& args) {
+  RawFile* file = getRawFile(args[2]);
+  if (!file) {
+    return;
+  }
+
+  auto session = valueSessionForRawFile(*file);
+  session.scanPendingSources();
+  const auto project = session.snapshot();
+  printValueSources(project);
+}
+
+void value_sources_path(const std::vector<std::string>& args) {
+  try {
+    auto session = valueSessionForPath(args[2]);
+    session.scanPendingSources();
+    const auto project = session.snapshot();
+    printValueSources(project);
+  } catch (const std::exception& ex) {
+    fmt::println("Failed to value-sources {}: {}", args[2], ex.what());
+  }
+}
+
+void value_read_source(const std::vector<std::string>& args) {
+  RawFile* file = getRawFile(args[2]);
+  if (!file) {
+    return;
+  }
+
+  auto session = valueSessionForRawFile(*file);
+  session.scanPendingSources();
+  printValueSourceBytes(session.sources(), args, 3);
+}
+
+void value_read_source_path(const std::vector<std::string>& args) {
+  try {
+    auto session = valueSessionForPath(args[2]);
+    session.scanPendingSources();
+    printValueSourceBytes(session.sources(), args, 3);
+  } catch (const std::exception& ex) {
+    fmt::println("Failed to value-read-source {}: {}", args[2], ex.what());
+  }
+}
+
+void value_tree(const std::vector<std::string>& args) {
+  RawFile* file = getRawFile(args[2]);
+  if (!file) {
+    return;
+  }
+
+  auto session = valueSessionForRawFile(*file);
+  session.scanPendingSources();
+  const auto project = session.snapshot();
+  printValueAssetTree(project, args, 3);
+}
+
+void value_tree_path(const std::vector<std::string>& args) {
+  try {
+    auto session = valueSessionForPath(args[2]);
+    session.scanPendingSources();
+    const auto project = session.snapshot();
+    printValueAssetTree(project, args, 3);
+  } catch (const std::exception& ex) {
+    fmt::println("Failed to value-tree {}: {}", args[2], ex.what());
+  }
+}
+
+void value_events(const std::vector<std::string>& args) {
+  RawFile* file = getRawFile(args[2]);
+  if (!file) {
+    return;
+  }
+
+  auto session = valueSessionForRawFile(*file);
+  session.scanPendingSources();
+  const auto project = session.snapshot();
+  printValueSequenceEvents(project, args, 3);
+}
+
+void value_events_path(const std::vector<std::string>& args) {
+  try {
+    auto session = valueSessionForPath(args[2]);
+    session.scanPendingSources();
+    const auto project = session.snapshot();
+    printValueSequenceEvents(project, args, 3);
+  } catch (const std::exception& ex) {
+    fmt::println("Failed to value-events {}: {}", args[2], ex.what());
+  }
+}
+
+void value_collections(const std::vector<std::string>& args) {
+  RawFile* file = getRawFile(args[2]);
+  if (!file) {
+    return;
+  }
+
+  auto session = valueSessionForRawFile(*file);
+  session.scanPendingSources();
+  const auto project = session.snapshot();
+  printValueCollections(project, args, 3);
+}
+
+void value_collections_path(const std::vector<std::string>& args) {
+  try {
+    auto session = valueSessionForPath(args[2]);
+    session.scanPendingSources();
+    const auto project = session.snapshot();
+    printValueCollections(project, args, 3);
+  } catch (const std::exception& ex) {
+    fmt::println("Failed to value-collections {}: {}", args[2], ex.what());
+  }
+}
+
+void value_instruments(const std::vector<std::string>& args) {
+  RawFile* file = getRawFile(args[2]);
+  if (!file) {
+    return;
+  }
+
+  auto session = valueSessionForRawFile(*file);
+  session.scanPendingSources();
+  const auto project = session.snapshot();
+  printValueInstruments(project, args, 3);
+}
+
+void value_instruments_path(const std::vector<std::string>& args) {
+  try {
+    auto session = valueSessionForPath(args[2]);
+    session.scanPendingSources();
+    const auto project = session.snapshot();
+    printValueInstruments(project, args, 3);
+  } catch (const std::exception& ex) {
+    fmt::println("Failed to value-instruments {}: {}", args[2], ex.what());
+  }
+}
+
+void value_samples(const std::vector<std::string>& args) {
+  RawFile* file = getRawFile(args[2]);
+  if (!file) {
+    return;
+  }
+
+  auto session = valueSessionForRawFile(*file);
+  session.scanPendingSources();
+  const auto project = session.snapshot();
+  printValueSamples(project, args, 3);
+}
+
+void value_samples_path(const std::vector<std::string>& args) {
+  try {
+    auto session = valueSessionForPath(args[2]);
+    session.scanPendingSources();
+    const auto project = session.snapshot();
+    printValueSamples(project, args, 3);
+  } catch (const std::exception& ex) {
+    fmt::println("Failed to value-samples {}: {}", args[2], ex.what());
+  }
+}
+
+void value_export(const std::vector<std::string>& args) {
+  RawFile* file = getRawFile(args[2]);
+  if (!file) {
+    return;
+  }
+
+  auto session = valueSessionForRawFile(*file);
+  session.scanPendingSources();
+  const auto project = session.snapshot();
+  if (printValueNoCollections(project)) {
+    return;
+  }
+
+  try {
+    const int collectionIndex = std::stoi(args[3]);
+    if (collectionIndex < 0 || static_cast<size_t>(collectionIndex) >= project.collections().size()) {
+      fmt::println("Collection index out of bounds");
+      return;
+    }
+
+    std::filesystem::path dir = args[4];
+    if (!ensureDirectory(dir)) {
+      return;
+    }
+
+    const auto request = valueExportRequestFromArgs(args, 5);
+    if (!request) {
+      return;
+    }
+
+    const auto collectionId = project.collections()[static_cast<size_t>(collectionIndex)].id;
+    const auto artifacts = session.exportCollection(collectionId, *request);
+    const auto written = writeValueArtifacts(dir, artifacts);
+    fmt::println("Exported {} value artifacts for collection '{}'.", written,
+                 project.collections()[static_cast<size_t>(collectionIndex)].name);
+  } catch (...) {
+    fmt::println("Invalid arguments");
+  }
+}
+
+void value_export_all(const std::vector<std::string>& args) {
+  RawFile* file = getRawFile(args[2]);
+  if (!file) {
+    return;
+  }
+
+  auto session = valueSessionForRawFile(*file);
+  session.scanPendingSources();
+  const auto project = session.snapshot();
+  if (printValueNoCollections(project)) {
+    return;
+  }
+
+  std::filesystem::path dir = args[3];
+  if (!ensureDirectory(dir)) {
+    return;
+  }
+
+  const auto request = valueExportRequestFromArgs(args, 4);
+  if (!request) {
+    return;
+  }
+
+  const auto exports = session.exportAllCollections(*request);
+  const auto written = exportValueCollectionsToDirectory(project, exports, dir);
+
+  fmt::println("Exported {} value artifacts from {} collections.", written, exports.size());
+}
+
+void value_export_path(const std::vector<std::string>& args) {
+  try {
+    auto session = valueSessionForPath(args[2]);
+    session.scanPendingSources();
+    const auto project = session.snapshot();
+    if (printValueNoCollections(project)) {
+      return;
+    }
+
+    std::filesystem::path dir = args[3];
+    if (!ensureDirectory(dir)) {
+      return;
+    }
+
+    const auto request = valueExportRequestFromArgs(args, 4);
+    if (!request) {
+      return;
+    }
+
+    const auto exports = session.exportAllCollections(*request);
+    const auto written = exportValueCollectionsToDirectory(project, exports, dir);
+    fmt::println("Exported {} value artifacts from {} collections.", written, exports.size());
+  } catch (const std::exception& ex) {
+    fmt::println("Failed to value-export {}: {}", args[2], ex.what());
   }
 }
 
@@ -714,16 +1921,18 @@ void cmd_load(const std::vector<std::string>& args) {
 void cmd_help(const std::vector<std::string>&) {
   fmt::print("{}\n", fmt::styled("Nouns:", fmt::emphasis::bold));
   for (const auto& [name, cmd] : commandRegistry) {
-    if (name == "exit" || name == "quit" || name == "help" || name == "load")
+    if (name == "exit" || name == "quit" || name == "help" || name == "load") {
       continue;
+    }
 
     // Print command name in green, verbs in cyan
     fmt::print("  {}", fmt::styled(cmd.name, fmt::fg(fmt::color::green)));
     if (!cmd.verbs.empty()) {
       fmt::print(" <");
       for (size_t i = 0; i < cmd.verbs.size(); ++i) {
-        if (i > 0)
+        if (i > 0) {
           fmt::print("|");
+        }
         fmt::print("{}", fmt::styled(cmd.verbs[i].name, fmt::fg(fmt::color::cyan)));
       }
       fmt::print(">");
@@ -771,22 +1980,20 @@ void cmd_exit(const std::vector<std::string>&) {
 // ============================================================================
 
 void registerCommands() {
-  commandRegistry["rawfile"] = {
-      "rawfile",
-      "Operate on raw files",
-      {{"list", "", "List all loaded raw files", 2, rawfile_list},
-       {"info", "<index>", "Show information about a raw file", 3, rawfile_info},
-       {"read", "<index> <offset> <length>", "Read bytes from a raw file", 5, rawfile_read},
-       {"dump", "<index> <path>", "Dump raw file to disk", 4, rawfile_dump}}};
+  commandRegistry["rawfile"] = {"rawfile",
+                                "Operate on raw files",
+                                {{"list", "", "List all loaded raw files", 2, rawfile_list},
+                                 {"info", "<index>", "Show information about a raw file", 3, rawfile_info},
+                                 {"read", "<index> <offset> <length>", "Read bytes from a raw file", 5, rawfile_read},
+                                 {"dump", "<index> <path>", "Dump raw file to disk", 4, rawfile_dump}}};
 
-  commandRegistry["vgmfile"] = {
-      "vgmfile",
-      "Operate on parsed VGM files",
-      {{"list", "", "List all parsed VGM files", 2, vgmfile_list},
-       {"info", "<index>", "Show information about a VGM file", 3, vgmfile_info},
-       {"tree", "<index> [depth]", "Show item tree", 3, vgmfile_tree},
-       {"read", "<index> <offset> <length>", "Read bytes from a VGM file", 5, vgmfile_read},
-       {"dump", "<index> <path>", "Dump VGM file to disk", 4, vgmfile_dump}}};
+  commandRegistry["vgmfile"] = {"vgmfile",
+                                "Operate on parsed VGM files",
+                                {{"list", "", "List all parsed VGM files", 2, vgmfile_list},
+                                 {"info", "<index>", "Show information about a VGM file", 3, vgmfile_info},
+                                 {"tree", "<index> [depth]", "Show item tree", 3, vgmfile_tree},
+                                 {"read", "<index> <offset> <length>", "Read bytes from a VGM file", 5, vgmfile_read},
+                                 {"dump", "<index> <path>", "Dump VGM file to disk", 4, vgmfile_dump}}};
 
   commandRegistry["collection"] = {
       "collection",
@@ -795,18 +2002,15 @@ void registerCommands() {
        {"info", "<index>", "Show information about a collection", 3, collection_info},
        {"export", "<index> <dir>", "Export MIDI + SF2 to directory", 4, collection_export},
        {"stitch", "<midi_path> <sf2_path> <coll_idx...>",
-        "Stitch collections in order and export remapped MIDI + merged SF2", 5,
-        collection_stitch}}};
+        "Stitch collections in order and export remapped MIDI + merged SF2", 5, collection_stitch}}};
 
   commandRegistry["instrumentset"] = {
       "instrumentset",
       "Operate on instrument sets",
       {{"list", "", "List all instrument sets", 2, instrumentset_list},
        {"info", "<index>", "Show information about an instrument set", 3, instrumentset_info},
-       {"inspect", "<index> <instr_idx>", "Inspect an instrument's regions", 4,
-        instrumentset_inspect},
-       {"export", "<index> <path>", "Export instrument set as DLS or SF2", 4,
-        instrumentset_export}}};
+       {"inspect", "<index> <instr_idx>", "Inspect an instrument's regions", 4, instrumentset_inspect},
+       {"export", "<index> <path>", "Export instrument set as DLS or SF2", 4, instrumentset_export}}};
 
   commandRegistry["samplecollection"] = {
       "samplecollection",
@@ -823,6 +2027,48 @@ void registerCommands() {
       {{"list", "", "List all sequences", 2, sequence_list},
        {"events", "<index> <track_idx>", "List events in a sequence track", 4, sequence_events},
        {"export", "<index> <path>", "Export sequence as MIDI", 4, sequence_export}}};
+
+  commandRegistry["value"] = {
+      "value",
+      "Run the value-oriented scan/export pipeline",
+      {{"scan", "<rawfile_idx>", "Scan a raw file with value modules", 3, value_scan},
+       {"scan-path", "<path>", "Scan a filesystem path with value modules", 3, value_scan_path},
+       {"sources", "<rawfile_idx>", "List value sources after scanning a raw file", 3, value_sources},
+       {"sources-path", "<path>", "List value sources after scanning a filesystem path", 3, value_sources_path},
+       {"read-source", "<rawfile_idx> <source_idx> <offset> <length>", "Read bytes from a value source", 6,
+        value_read_source},
+       {"read-source-path", "<path> <source_idx> <offset> <length>",
+        "Read bytes from a value source after scanning a filesystem path", 6, value_read_source_path},
+       {"tree", "<rawfile_idx> <asset_idx> [depth]", "Show a value asset source outline", 4, value_tree},
+       {"tree-path", "<path> <asset_idx> [depth]", "Show a value asset source outline from a filesystem path", 4,
+        value_tree_path},
+       {"events", "<rawfile_idx> <asset_idx> <track_idx> [limit]", "List decoded commands in a value sequence track", 5,
+        value_events},
+       {"events-path", "<path> <asset_idx> <track_idx> [limit]",
+        "List decoded commands in a value sequence track from a filesystem path", 5, value_events_path},
+       {"collections", "<rawfile_idx> [collection_idx]", "List or inspect value collections", 3, value_collections},
+       {"collections-path", "<path> [collection_idx]", "List or inspect value collections from a filesystem path", 3,
+        value_collections_path},
+       {"instruments", "<rawfile_idx> <asset_idx> [instrument_idx]", "List or inspect a value sound bank", 4,
+        value_instruments},
+       {"instruments-path", "<path> <asset_idx> [instrument_idx]",
+        "List or inspect a value sound bank from a filesystem path", 4, value_instruments_path},
+       {"samples", "<rawfile_idx> <asset_idx> [sample_idx]", "List or inspect a value sample pool", 4,
+        value_samples},
+       {"samples-path", "<path> <asset_idx> [sample_idx]",
+        "List or inspect a value sample pool from a filesystem path", 4, value_samples_path},
+       {"export",
+        "<rawfile_idx> <collection_idx> <dir> [all|midi|sf2|dls|wav; default midi] "
+        "[--modulation-scaling full|observed] [--dynamic-envelopes] [--terminate-previous-voice]",
+        "Export value artifacts for a collection", 5, value_export},
+       {"export-all",
+        "<rawfile_idx> <dir> [all|midi|sf2|dls|wav; default midi] [--modulation-scaling full|observed] "
+        "[--dynamic-envelopes] [--terminate-previous-voice]",
+        "Export value artifacts for all collections", 4, value_export_all},
+       {"export-path",
+        "<path> <dir> [all|midi|sf2|dls|wav; default midi] [--modulation-scaling full|observed] "
+        "[--dynamic-envelopes] [--terminate-previous-voice]",
+        "Scan a filesystem path and export all value collections", 4, value_export_path}}};
 
   commandRegistry["help"] = {"help", "Show this help", {}};
   commandRegistry["exit"] = {"exit", "Exit the shell", {}};

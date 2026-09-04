@@ -1,0 +1,608 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include "value/formats/SonyPS1/SonyPS1.h"
+
+#include "value/export/CollectionBinding.h"
+#include "value/session/Session.h"
+#include "value/sequence/SequenceVm.h"
+#include "value/synth/PsxSpu.h"
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <stdexcept>
+#include <string>
+#include <variant>
+#include <vector>
+
+using namespace vgmtrans::core;
+using namespace vgmtrans::formats::sony_ps1;
+
+namespace {
+
+void expect(bool condition, const std::string& message) {
+  if (!condition) {
+    throw std::runtime_error(message);
+  }
+}
+
+void le16(std::vector<u8>& bytes, size_t offset, u16 value) {
+  bytes[offset] = static_cast<u8>(value);
+  bytes[offset + 1] = static_cast<u8>(value >> 8);
+}
+
+void le32(std::vector<u8>& bytes, size_t offset, u32 value) {
+  bytes[offset] = static_cast<u8>(value);
+  bytes[offset + 1] = static_cast<u8>(value >> 8);
+  bytes[offset + 2] = static_cast<u8>(value >> 16);
+  bytes[offset + 3] = static_cast<u8>(value >> 24);
+}
+
+void be16(std::vector<u8>& bytes, size_t offset, u16 value) {
+  bytes[offset] = static_cast<u8>(value >> 8);
+  bytes[offset + 1] = static_cast<u8>(value);
+}
+
+void be24(std::vector<u8>& bytes, size_t offset, u32 value) {
+  bytes[offset] = static_cast<u8>(value >> 16);
+  bytes[offset + 1] = static_cast<u8>(value >> 8);
+  bytes[offset + 2] = static_cast<u8>(value);
+}
+
+void be32(std::vector<u8>& bytes, size_t offset, u32 value) {
+  bytes[offset] = static_cast<u8>(value >> 24);
+  bytes[offset + 1] = static_cast<u8>(value >> 16);
+  bytes[offset + 2] = static_cast<u8>(value >> 8);
+  bytes[offset + 3] = static_cast<u8>(value);
+}
+
+std::vector<u8> sequenceFixture(std::initializer_list<u8> events, bool reversed = false) {
+  std::vector<u8> bytes(15 + events.size());
+  if (reversed) {
+    bytes[0] = 'p';
+    bytes[1] = 'Q';
+    bytes[2] = 'E';
+    bytes[3] = 'S';
+  } else {
+    bytes[0] = 'S';
+    bytes[1] = 'E';
+    bytes[2] = 'Q';
+    bytes[3] = 'p';
+  }
+  be32(bytes, 4, 1);
+  be16(bytes, 8, 96);
+  be24(bytes, 10, 500000);
+  bytes[13] = 4;
+  bytes[14] = 2;
+  std::ranges::copy(events, bytes.begin() + 15);
+  return bytes;
+}
+
+constexpr u32 kFixtureVagSize = 0xc0;
+
+void fillVag(std::vector<u8>& bytes, u32 offset) {
+  for (u32 frame = 1; frame < kFixtureVagSize / kPsxAdpcmBlockBytes; ++frame) {
+    const u32 block = offset + frame * kPsxAdpcmBlockBytes;
+    bytes[block] = 0x11;
+    bytes[block + 1] = frame + 1 == kFixtureVagSize / kPsxAdpcmBlockBytes ? 1 : 0;
+    for (u32 byte = 2; byte < kPsxAdpcmBlockBytes; ++byte) {
+      bytes[block + byte] = static_cast<u8>(frame * 17 + byte);
+    }
+  }
+}
+
+std::vector<u8> vabFixture(u32 version, bool body) {
+  const u32 programSlots = version > 4 ? 128 : 64;
+  const u32 sizeShift = version > 4 ? 3 : 2;
+  const u32 programTable = 0x20;
+  const u32 toneTable = programTable + programSlots * 0x10;
+  const u32 sizeTable = toneTable + 16 * 0x20;
+  const u32 sampleData = sizeTable + 0x200;
+  std::vector<u8> bytes(sampleData + (body ? kFixtureVagSize : 0), 0);
+  bytes[0] = 'p';
+  bytes[1] = 'B';
+  bytes[2] = 'A';
+  bytes[3] = 'V';
+  le32(bytes, 4, version);
+  le32(bytes, 8, 7);
+  le32(bytes, 0x0c, sampleData + kFixtureVagSize);
+  le16(bytes, 0x10, 0xeeee);
+  le16(bytes, 0x12, 1);
+  le16(bytes, 0x14, 1);
+  le16(bytes, 0x16, 1);
+  bytes[0x18] = 127;
+  bytes[0x19] = 64;
+
+  bytes[programTable] = 1;
+  bytes[programTable + 1] = 100;
+  bytes[programTable + 4] = 64;
+  bytes[toneTable + 2] = 80;
+  bytes[toneTable + 3] = 64;
+  bytes[toneTable + 4] = 60;
+  bytes[toneTable + 5] = 64;
+  bytes[toneTable + 6] = 12;
+  bytes[toneTable + 7] = 100;
+  le16(bytes, toneTable + 0x10, composePsxAdsr1(1, 0x70, 8, 8));
+  le16(bytes, toneTable + 0x12, composePsxAdsr2(1, 1, 0x40, 1, 0x10));
+  le16(bytes, toneTable + 0x14, 0);
+  le16(bytes, toneTable + 0x16, 1);
+  le16(bytes, sizeTable + 2, static_cast<u16>(kFixtureVagSize >> sizeShift));
+  if (body) {
+    fillVag(bytes, sampleData);
+  }
+  return bytes;
+}
+
+bool diagnosticContains(const std::vector<Diagnostic>& diagnostics, std::string_view text) {
+  return std::ranges::any_of(diagnostics, [&](const Diagnostic& diagnostic) {
+    return diagnostic.message.find(text) != std::string::npos;
+  });
+}
+
+Session sonyPs1CollectionSession(std::initializer_list<std::string_view> banks,
+                                 std::initializer_list<std::string_view> pools,
+                                 FormatModule module = sonyPs1Module()) {
+  Session session;
+  session.registerFormat(std::move(module));
+  const auto add = [&](std::string name, std::vector<u8> bytes) {
+    session.addSource(SourceFile{.name = name, .path = "/fixture/" + name}, std::move(bytes));
+  };
+  add("SONG.SEQ", sequenceFixture({0x00, 0xff, 0x2f, 0x00}));
+  for (const auto name : banks) {
+    add(std::string(name), vabFixture(7, false));
+  }
+  for (const auto name : pools) {
+    std::vector<u8> body(kFixtureVagSize, 0);
+    fillVag(body, 0);
+    add(std::string(name), std::move(body));
+  }
+  session.scanPendingSources();
+  return session;
+}
+
+const Collection& sonyPs1Collection(const SessionSnapshot& snapshot, size_t banks, size_t pools) {
+  const auto found = std::ranges::find_if(snapshot.collections(), [&](const Collection& collection) {
+    return collection.members.sequence && collection.members.soundBanks.size() == banks &&
+           collection.members.samplePools.size() == pools;
+  });
+  expect(found != snapshot.collections().end(), "the expected SonyPS1 collection should be discovered");
+  return *found;
+}
+
+template <class Event>
+std::vector<const Event*> eventsOfType(const PerformanceTrack& track) {
+  std::vector<const Event*> events;
+  for (const auto& value : track.events) {
+    if (const auto* event = std::get_if<Event>(&value)) {
+      events.push_back(event);
+    }
+  }
+  return events;
+}
+
+}  // namespace
+
+void sonyPs1SequenceSupportsBothLoopCountGenerations() {
+  const auto modern = sequenceFixture({
+      0x00, 0xc2, 0x02,                                                  // channel 2, program 2
+      0x00, 0x90, 0x3c, 0x64,                                            // note on
+      0x0a, 0x3c, 0x00,                                                  // running-status note off
+      0x00, 0xb0, 0x63, 0x14,                                            // loop start
+      0x00, 0xb0, 0x06, 0x02,                                            // later SDKs: count through Data Entry
+      0x00, 0x90, 0x3e, 0x64, 0x05, 0x3e, 0x00, 0x00, 0xb0, 0x63, 0x1e,  // loop end
+      0x00, 0xff, 0x2f, 0x00,
+  });
+  const ByteReader modernReader(SourceId{81}, modern);
+  const auto modernLayout = readSonyPs1SequenceLayout(modernReader, 0);
+  expect(modernLayout.has_value() && modernLayout->events.size() == 9,
+         "SonyPS1 should decode running status and the documented end marker");
+  const auto loopEnd = std::ranges::find_if(
+      modernLayout->events, [](const SonyPs1EventLayout& event) { return event.loopDestination.has_value(); });
+  expect(loopEnd != modernLayout->events.end() && loopEnd->loopCount == 2,
+         "later libsnd Data Entry loop counts should be attached to loop end");
+
+  SourceMapBuilder modernSourceMap;
+  const SequenceProgram program = parseSonyPs1Sequence(modernReader, AssetId{81}, *modernLayout, &modernSourceMap);
+  const SourceMap modernAnnotations = modernSourceMap.finish();
+  const auto modernCommands = modernAnnotations.withRole(SourceId{81}, SourceRole::Command);
+  expect(modernAnnotations.withRole(SourceId{81}, SourceRole::SequenceTrack).empty() && !modernCommands.empty() &&
+             std::ranges::all_of(modernCommands,
+                                 [&](SourceAnnotationId id) {
+                                   const SourceAnnotation& command = modernAnnotations.get(id);
+                                   return !command.parent && command.owner == ObjectRefs::sequence(AssetId{81});
+                                 }),
+         "SonyPS1 source events should be sequence-owned roots rather than children of a synthetic track");
+  const PerformanceSequence performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
+  expect(performance.diagnostics.empty(), "modern SonyPS1 loop fixture should render without diagnostics");
+  expect(std::ranges::any_of(performance.sourceSpans, [](const SourcePlaybackSpan& span) { return span.channel == 2; }),
+         "SonyPS1 playback spans should retain each event's source channel");
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.front());
+  expect(std::ranges::count(notes, 62.0, [](const NotePerformanceEvent* note) { return note->key; }) == 2,
+         "a loop count of two should play the enclosed note twice");
+  expect(notes.front()->durationTicks == 10, "velocity-zero note-on should close the matching active voice");
+
+  const auto legacy = sequenceFixture(
+      {
+          0x00,
+          0xb0,
+          0x63,
+          0x14,  // loop start
+          0x00,
+          0xb0,
+          0x62,
+          0x7f,  // early SDKs: count through NRPN LSB
+          0x00,
+          0xb0,
+          0x63,
+          0x1e,
+          0x00,
+          0xff,
+          0x2f,
+          0x00,
+      },
+      true);
+  const ByteReader legacyReader(SourceId{82}, legacy);
+  const auto legacyLayout = readSonyPs1SequenceLayout(legacyReader, 0);
+  expect(legacyLayout.has_value() && legacyLayout->events[2].loopCount == 127,
+         "early libsnd CC98 loop counts and pQES memory signatures should remain supported");
+
+  const auto rippedWithoutEnd = sequenceFixture({
+      0x00, 0xb0, 0x63, 0x14,                                            // loop start
+      0x00, 0xb0, 0x06, 0x7f,                                            // infinite loop
+      0x00, 0x90, 0x3c, 0x64, 0x0a, 0x3c, 0x00, 0x00, 0xb0, 0x63, 0x1e,  // loop end; no FF 2F follows in many PSF rips
+      0x00, 0x90, 0x00, 0x00,                                            // unrelated zero-filled RAM
+      0x00, 0x00, 0x00, 0x00,
+  });
+  const ByteReader rippedReader(SourceId{86}, rippedWithoutEnd);
+  const auto rippedLayout = readSonyPs1SequenceLayout(rippedReader, 0);
+  expect(rippedLayout && rippedLayout->events.size() == 5 && rippedLayout->length == 34,
+         "an infinite Sony loop should terminate layout discovery when a PSF rip omits End of Track");
+  const PerformanceSequence rippedPerformance =
+      SequenceVm(LoopPolicy::PlayOnce).render(parseSonyPs1Sequence(rippedReader, AssetId{86}, *rippedLayout));
+  expect(rippedPerformance.diagnostics.empty(), "a ripped sequence ending at its infinite loop should render cleanly");
+
+  const auto rippedWithoutEndOrLoop = sequenceFixture({
+      0x00, 0xc0, 0x02, 0x00, 0x90, 0x3c, 0x64, 0x0a, 0x3c, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  });
+  const ByteReader noEndReader(SourceId{89}, rippedWithoutEndOrLoop);
+  const auto noEndLayout = readSonyPs1SequenceLayout(noEndReader, 0);
+  expect(noEndLayout && noEndLayout->events.size() == 3 && noEndLayout->length == 25,
+         "ten zero-filled bytes should retain the legacy boundary for a PSF rip without End of Track");
+  const PerformanceSequence noEndPerformance =
+      SequenceVm(LoopPolicy::PlayOnce).render(parseSonyPs1Sequence(noEndReader, AssetId{89}, *noEndLayout));
+  expect(noEndPerformance.diagnostics.empty(), "a zero-terminated PSF sequence should render cleanly");
+  const auto noEndNotes = eventsOfType<NotePerformanceEvent>(noEndPerformance.tracks.front());
+  expect(noEndNotes.size() == 1 && noEndNotes.front()->durationTicks == 10,
+         "a zero-terminated PSF sequence should retain its decoded musical events");
+
+  const auto sustained = sequenceFixture({
+      0x00, 0x90, 0x3c, 0x64,  // note on
+      0x02, 0xb0, 0x40, 0x7f,  // sustain pedal down
+      0x03, 0x90, 0x3c, 0x00,  // note off, held by sustain
+      0x05, 0xb0, 0x40, 0x00,  // sustain pedal up
+      0x01, 0x90, 0x40, 0x64,  // note on with no matching note off
+      0x04, 0xff, 0x2f, 0x00,
+  });
+  const ByteReader sustainedReader(SourceId{90}, sustained);
+  const auto sustainedLayout = readSonyPs1SequenceLayout(sustainedReader, 0);
+  expect(sustainedLayout.has_value(), "SonyPS1 sustain fixture should have a valid sequence layout");
+  const PerformanceSequence sustainedPerformance =
+      SequenceVm(LoopPolicy::PlayOnce).render(parseSonyPs1Sequence(sustainedReader, AssetId{90}, *sustainedLayout));
+  const auto sustainedNotes = eventsOfType<NotePerformanceEvent>(sustainedPerformance.tracks.front());
+  expect(sustainedNotes.size() == 2 && sustainedNotes[0]->durationTicks == 10 && sustainedNotes[1]->header.tick == 11 &&
+             sustainedNotes[1]->durationTicks == 4,
+         "shared Note On/Off state should honor SonyPS1 sustain and close dangling notes at track end");
+}
+
+void sonyPs1TempoBytesPreserveSourceOrder() {
+  const auto bytes = sequenceFixture({
+      0x00,
+      0xff,
+      0x51,
+      0x01,
+      0x23,
+      0x45,
+      0x00,
+      0xff,
+      0x2f,
+      0x00,
+  });
+  const ByteReader reader(SourceId{91}, bytes);
+  const auto layout = readSonyPs1SequenceLayout(reader, 0);
+  expect(layout.has_value(), "SonyPS1 tempo fixture should have a valid sequence layout");
+
+  const PerformanceSequence performance =
+      SequenceVm(LoopPolicy::PlayOnce).render(parseSonyPs1Sequence(reader, AssetId{91}, *layout));
+  const auto tempos = eventsOfType<TempoPerformanceEvent>(performance.tracks.front());
+  expect(performance.diagnostics.empty() && tempos.size() == 1 && tempos.front()->microsecondsPerQuarter == 0x012345,
+         "SonyPS1 should assemble tempo bytes in encoded high-to-low order");
+}
+
+void sonyPs1SepAndVabLayoutsAreVersionAware() {
+  const std::vector<u8> end{0x00, 0xff, 0x2f, 0x00};
+  std::vector<u8> sep(19 + end.size() + 13 + end.size(), 0);
+  sep[0] = 'S';
+  sep[1] = 'E';
+  sep[2] = 'Q';
+  sep[3] = 'p';
+  be16(sep, 4, 0);
+  be16(sep, 6, 0);
+  be16(sep, 8, 48);
+  be24(sep, 10, 500000);
+  sep[13] = 4;
+  sep[14] = 2;
+  be32(sep, 15, static_cast<u32>(end.size()));
+  std::ranges::copy(end, sep.begin() + 19);
+  const u32 second = 19 + end.size();
+  be16(sep, second, 1);
+  be16(sep, second + 2, 96);
+  be24(sep, second + 4, 400000);
+  sep[second + 7] = 3;
+  sep[second + 8] = 2;
+  be32(sep, second + 9, static_cast<u32>(end.size()));
+  std::ranges::copy(end, sep.begin() + second + 13);
+  const auto sepLayouts = findSonyPs1Sequences(ByteReader(SourceId{83}, sep));
+  expect(sepLayouts.size() == 2 && sepLayouts[0].sepFirst && !sepLayouts[1].sepFirst && sepLayouts[1].sequenceId == 1 &&
+             sepLayouts[1].ppqn == 96,
+         "SEP should expose every packed sequence with its own short header");
+
+  const auto oldBytes = vabFixture(4, true);
+  const auto lateBytes = vabFixture(7, true);
+  const auto old = readSonyPs1BankLayout(ByteReader(SourceId{84}, oldBytes), 0);
+  const auto late = readSonyPs1BankLayout(ByteReader(SourceId{85}, lateBytes), 0);
+  expect(old && old->programSlots == 64 && old->sampleSizeShift == 2 && old->expectedSampleBytes == kFixtureVagSize,
+         "VAB versions through 4 should use the 64-program, four-byte-size layout");
+  expect(
+      late && late->programSlots == 128 && late->sampleSizeShift == 3 && late->expectedSampleBytes == kFixtureVagSize,
+      "VAB versions above 4 should use the 128-program, eight-byte-size layout");
+
+  auto separatedBytes = vabFixture(7, false);
+  const u32 separatedBody = static_cast<u32>(separatedBytes.size()) + 0x100;
+  separatedBytes.resize(separatedBody + kFixtureVagSize, 0);
+  fillVag(separatedBytes, separatedBody);
+  const auto separated = readSonyPs1BankLayout(ByteReader(SourceId{87}, separatedBytes), 0);
+  expect(separated && separated->hasSampleBody && separated->sampleDataOffset == separatedBody,
+         "a VAB header should locate a separately loaded sample body instead of decoding intervening RAM");
+
+  auto packedBytes = vabFixture(7, false);
+  const u32 packedSizeTable = static_cast<u32>(packedBytes.size()) - 0x200;
+  le16(packedBytes, 0x16, 2);
+  le16(packedBytes, packedSizeTable + 4, kFixtureVagSize >> 3);
+  const u32 packedBody = static_cast<u32>(packedBytes.size()) + 0x100;
+  packedBytes.resize(packedBody + kFixtureVagSize * 2, 0);
+  fillVag(packedBytes, packedBody);
+  for (u32 frame = 0; frame < kFixtureVagSize / kPsxAdpcmBlockBytes; ++frame) {
+    const u32 block = packedBody + kFixtureVagSize + frame * kPsxAdpcmBlockBytes;
+    packedBytes[block] = 0x11;
+    packedBytes[block + 1] = frame + 1 == kFixtureVagSize / kPsxAdpcmBlockBytes ? 1 : 0;
+    for (u32 byte = 2; byte < kPsxAdpcmBlockBytes; ++byte) {
+      packedBytes[block + byte] = static_cast<u8>(frame * 19 + byte);
+    }
+  }
+  const auto packed = readSonyPs1BankLayout(ByteReader(SourceId{89}, packedBytes), 0);
+  expect(packed && packed->hasSampleBody && packed->sampleDataOffset == packedBody &&
+             packed->expectedSampleBytes == kFixtureVagSize * 2,
+         "VAB size boundaries should locate a body whose later samples omit their silent leading frame");
+
+  auto forcedBytes = vabFixture(7, false);
+  const u32 forcedBody = static_cast<u32>(forcedBytes.size()) + 4;
+  forcedBytes.resize(forcedBody + kFixtureVagSize + 0x30, 0);
+  fillVag(forcedBytes, forcedBody);
+  for (u32 block = forcedBody + kFixtureVagSize; block < forcedBytes.size(); block += kPsxAdpcmBlockBytes) {
+    forcedBytes[block + 1] = 7;
+    std::fill_n(forcedBytes.begin() + block + 2, 14, 0x77);
+  }
+  const auto forced = findSonyPs1Banks(ByteReader(SourceId{88}, forcedBytes));
+  expect(forced.size() == 1 && forced.front().hasSampleBody && forced.front().sampleDataOffset == forcedBody,
+         "a sole VAB and sample collection should retain the legacy matcher's forced one-to-one pairing");
+}
+
+void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
+  Session combined;
+  combined.registerFormat(sonyPs1Module());
+  combined.addSource(SourceFile{.name = "combined.VAB"}, vabFixture(7, true));
+  combined.scanPendingSources();
+  const SessionSnapshot combinedSnapshot = combined.snapshot();
+  expect(combinedSnapshot.collections().empty(), "a standalone VAB should not produce a sequence-less collection");
+  const auto combinedBank = std::ranges::find_if(
+      combinedSnapshot.assets(), [](const Asset& asset) { return std::holds_alternative<SoundBankAsset>(asset); });
+  const auto* instruments =
+      combinedBank == combinedSnapshot.assets().end() ? nullptr : std::get_if<SoundBankAsset>(&*combinedBank);
+  expect(instruments && instruments->localSamples.samples.size() == 1 && instruments->instruments.size() == 1 &&
+             instruments->instruments[0].regions.size() == 1,
+         "the VAB program and tone tables should build one playable region");
+  const Region& region = instruments->instruments[0].regions[0];
+  expect(std::abs(region.unityKey - 59.5) < 0.000001,
+         "VAB shift should remain as fractional driver pitch instead of being rounded");
+  expect(region.keyRange.low == 12 && region.keyRange.high == 100 &&
+             region.envelope == psxSpuEnvelope(composePsxAdsr1(1, 0x70, 8, 8), composePsxAdsr2(1, 1, 0x40, 1, 0x10)),
+         "VAB key ranges and native SPU ADSR registers should be retained");
+  const SourceMap& combinedSources = combinedSnapshot.sourceMap();
+  const auto programSources = combinedSources.ownedBy(ObjectRefs::instrument(instruments->metadata.id, 0));
+  const auto toneSources = combinedSources.ownedBy(ObjectRefs::region(instruments->metadata.id, 0, 0));
+  const SourceAnnotation* programSource =
+      programSources.empty() ? nullptr : combinedSources.find(programSources.front());
+  const SourceAnnotation* toneSource = toneSources.empty() ? nullptr : combinedSources.find(toneSources.front());
+  expect(programSource != nullptr && programSource->category() == "sony-ps1-program" &&
+             programSource->fieldsAsChildren && toneSource != nullptr && toneSource->category() == "sony-ps1-tone" &&
+             toneSource->fieldsAsChildren,
+         "VAB program and tone attributes should appear as selectable virtual children");
+
+  Session split;
+  split.registerFormat(sonyPs1Module());
+  split.addSource(SourceFile{.name = "BANK.VH", .path = "/fixture/BANK.VH"}, vabFixture(7, false));
+  std::vector<u8> body(kFixtureVagSize, 0);
+  fillVag(body, 0);
+  split.addSource(SourceFile{.name = "BANK.VB", .path = "/fixture/BANK.VB"}, body);
+  split.scanPendingSources();
+  const SessionSnapshot splitSnapshot = split.snapshot();
+  expect(splitSnapshot.collections().empty(), "split VH/VB assets should not produce a sequence-less collection");
+  expect(
+      std::ranges::count_if(splitSnapshot.assets(),
+                            [](const Asset& asset) { return std::holds_alternative<SoundBankAsset>(asset); }) == 1 &&
+          std::ranges::count_if(splitSnapshot.assets(),
+                                [](const Asset& asset) { return std::holds_alternative<SamplePoolAsset>(asset); }) == 1,
+      "split VH/VB scanning should still publish the bank and sample assets");
+
+  const auto bankBytes = vabFixture(7, true);
+  const auto sequenceBytes = sequenceFixture({0x00, 0xff, 0x2f, 0x00});
+  const u32 secondBank = static_cast<u32>(bankBytes.size() + 0x100);
+  const u32 firstSequence = static_cast<u32>(secondBank + bankBytes.size() + 0x100);
+  const u32 secondSequence = static_cast<u32>(firstSequence + sequenceBytes.size() + 0x100);
+  std::vector<u8> pairedBytes(secondSequence + sequenceBytes.size(), 0);
+  std::ranges::copy(bankBytes, pairedBytes.begin());
+  std::ranges::copy(bankBytes, pairedBytes.begin() + secondBank);
+  std::ranges::copy(sequenceBytes, pairedBytes.begin() + firstSequence);
+  std::ranges::copy(sequenceBytes, pairedBytes.begin() + secondSequence);
+
+  Session paired;
+  paired.registerFormat(sonyPs1Module());
+  paired.addSource(SourceFile{.name = "paired.psf"}, std::move(pairedBytes));
+  paired.scanPendingSources();
+  const SessionSnapshot pairedSnapshot = paired.snapshot();
+  const Collection* latestCollection = nullptr;
+  const auto bankForSequence = [&](u32 sequenceOffset) {
+    for (const auto& collection : pairedSnapshot.collections()) {
+      const auto* sequence = pairedSnapshot.asset<SequenceProgramAsset>(*collection.members.sequence);
+      if (sequence->metadata.range.offset == sequenceOffset) {
+        if (sequenceOffset == secondSequence) {
+          latestCollection = &collection;
+        }
+        expect(collection.members.soundBanks.size() == 1 && collection.members.samplePools.empty(),
+               "each same-source SonyPS1 sequence should resolve to one combined VAB");
+        return pairedSnapshot.asset<SoundBankAsset>(collection.members.soundBanks.front())->metadata.range.offset;
+      }
+    }
+    return std::numeric_limits<u64>::max();
+  };
+  expect(bankForSequence(secondSequence) == secondBank && bankForSequence(firstSequence) == 0,
+         "same-source SonyPS1 sequences and VABs should pair in descending offset order");
+  const auto* sequence = pairedSnapshot.asset<SequenceProgramAsset>(*latestCollection->members.sequence);
+  SequenceRuntime runtime = sequence->program.runtime;
+  const SoundBankAsset foreignBank{
+      .metadata = AssetMetadata{.id = AssetId{999}, .format = "Foreign", .name = "Foreign Bank"},
+      .instruments = {Instrument{
+          .explicitAddress = InstrumentAddress{.bank = 42, .program = 7},
+          .name = "Foreign Instrument",
+      }},
+  };
+  std::vector<SoundBankAsset> resolvedInstruments{
+      foreignBank,
+      *pairedSnapshot.asset<SoundBankAsset>(latestCollection->members.soundBanks.front()),
+  };
+  std::vector<const SamplePoolAsset*> resolvedSamples;
+  std::vector<Diagnostic> bindingDiagnostics;
+  CollectionBindingContext binding{
+      sequence, runtime, resolvedInstruments, resolvedSamples, {}, bindingDiagnostics,
+  };
+  bindSonyPs1Collection(binding);
+  expect(resolvedInstruments.size() == 2 && resolvedInstruments.front().metadata.id == foreignBank.metadata.id &&
+             resolvedInstruments.front().instruments.front().explicitAddress ==
+                 InstrumentAddress{.bank = 42, .program = 7},
+         "SonyPS1 binding should preserve foreign banks and their addresses");
+  const auto& instrument = resolvedInstruments.back().instruments.front();
+  expect(instrument.explicitAddress && instrument.explicitAddress->bank == 0,
+         "the selected VAB should be rebased among Sony banks without foreign members shifting its slot");
+}
+
+void runSonyPs1CollectionBindingTests() {
+  {
+    Session session = sonyPs1CollectionSession({"A.VH", "B.VH"}, {"COMMON.VB"});
+    const SessionSnapshot snapshot = session.snapshot();
+    const Collection& collection = sonyPs1Collection(snapshot, 2, 1);
+    const AssetId poolId = collection.members.samplePools.front();
+    const auto resolved = bindCollection(snapshot, collection.id);
+    const auto usesPool = [poolId](const BoundCollection& bound) {
+      return std::ranges::all_of(bound.soundBanks(), [poolId](const SoundBankAsset& bank) {
+        return bank.instruments.front().regions.front().sample.owner() == poolId;
+      });
+    };
+    expect(resolved.collection && usesPool(*resolved.collection),
+           "a discovered SonyPS1 collection should preserve both edges to one deduplicated pool");
+
+    const CollectionId manualId = session.createUserCollection(
+        "Manual Sony Collection",
+        CollectionMembers{
+            .sequence = collection.members.sequence,
+            .soundBanks = collection.members.soundBanks,
+            .samplePools = collection.members.samplePools,
+        });
+    const auto manual = bindCollection(session.snapshot(), manualId);
+    expect(manual.collection && usesPool(*manual.collection),
+           "a user-created SonyPS1 collection should reuse one uniquely compatible pool for both banks");
+
+    const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.members.sequence);
+    std::vector<SoundBankAsset> banks;
+    for (const AssetId id : collection.members.soundBanks) {
+      banks.push_back(*snapshot.asset<SoundBankAsset>(id));
+    }
+    std::vector<const SamplePoolAsset*> pools{snapshot.asset<SamplePoolAsset>(poolId)};
+    const auto rejects = [&](std::vector<SoundBankAsset> selectedBanks,
+                             std::vector<const SamplePoolAsset*> selectedPools, std::string_view message) {
+      SequenceRuntime runtime = sequence->program.runtime;
+      std::vector<Diagnostic> diagnostics;
+      CollectionBindingContext context{sequence, runtime, selectedBanks, selectedPools, {}, diagnostics};
+      collection.binder(context);
+      expect(context.failed && diagnosticContains(diagnostics, message),
+             "SonyPS1 binding should reject an invalid captured relationship");
+    };
+    rejects({banks.front()}, pools, "missing sound bank");
+    rejects(banks, {}, "missing sample pool");
+    banks.front().instruments.front().regions.front().sample = SampleRef::unbound(1);
+    rejects(banks, pools, "outside its external sample pool");
+  }
+
+  {
+    FormatModule module = sonyPs1Module();
+    auto resolver = module.resolveCollections;
+    module.resolveCollections = [resolver = std::move(resolver)](const CollectionDiscoveryContext& context) {
+      auto collections = resolver(context);
+      for (auto& collection : collections) {
+        std::ranges::reverse(collection.members.samplePools);
+      }
+      return collections;
+    };
+    Session session = sonyPs1CollectionSession({"A.VH", "B.VH"}, {"A.VB", "B.VB"}, std::move(module));
+    const SessionSnapshot snapshot = session.snapshot();
+    const Collection& collection = sonyPs1Collection(snapshot, 2, 2);
+    const auto binding = bindCollection(snapshot, collection.id);
+    expect(binding.collection.has_value(), "SonyPS1 binding should not depend on pool member order");
+    const auto& banks = binding.collection->soundBanks();
+    expect(banks[0].instruments.front().regions.front().sample.owner() == collection.members.samplePools[1] &&
+               banks[1].instruments.front().regions.front().sample.owner() == collection.members.samplePools[0],
+           "each SonyPS1 bank should bind to its resolver-selected pool ID after member reordering");
+  }
+
+  {
+    Session session = sonyPs1CollectionSession({"BANK.VH"}, {"X.VB", "Y.VB"});
+    const SessionSnapshot snapshot = session.snapshot();
+    const Collection& discovered = sonyPs1Collection(snapshot, 1, 0);
+    expect(discovered.issueImpact() == CollectionIssueImpact::Ambiguous,
+           "equally compatible SonyPS1 pools should be reported as ambiguous");
+    CollectionMembers members = discovered.members;
+    for (const auto& asset : snapshot.assets()) {
+      if (const auto* pool = std::get_if<SamplePoolAsset>(&asset)) {
+        members.samplePools.push_back(pool->metadata.id);
+      }
+    }
+    expect(members.sequence && members.soundBanks.size() == 1 && members.samplePools.size() == 2,
+           "the ambiguity fixture should publish one bank and two compatible pools");
+    const CollectionId collection = session.createUserCollection("Ambiguous Sony Collection", std::move(members));
+    const auto binding = bindCollection(session.snapshot(), collection);
+    expect(!binding.collection && diagnosticContains(binding.diagnostics, "matches multiple external sample pools"),
+           "a user-created SonyPS1 collection should fail explicitly when its pool mapping is ambiguous");
+  }
+
+  {
+    Session session = sonyPs1CollectionSession({"BANK.VH"}, {"BANK.VB", "BANK.VB"});
+    const SessionSnapshot snapshot = session.snapshot();
+    const Collection& collection = sonyPs1Collection(snapshot, 1, 0);
+    expect(collection.issueImpact() == CollectionIssueImpact::Ambiguous && collection.members.samplePools.empty(),
+           "multiple same-stem SonyPS1 pools should not produce an arbitrary captured relationship");
+  }
+}

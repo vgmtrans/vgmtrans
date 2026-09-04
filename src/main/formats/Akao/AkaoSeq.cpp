@@ -1508,7 +1508,7 @@ bool AkaoTrack::readEvent() {
       const u8 beatsPerMeasure = readByte(curOffset++);
       if (ticksPerBeat != 0 && beatsPerMeasure != 0) {
         const u8 denom = static_cast<u8>((parentSeq->ppqn() * 4) / ticksPerBeat); // or should it always be 4? no idea
-        addTimeSig(beginOffset, curOffset - beginOffset, beatsPerMeasure, denom, ticksPerBeat);
+        insertTimeSig(beginOffset, curOffset - beginOffset, beatsPerMeasure, denom, ticksPerBeat, getTime());
       } else {
         addGenericEvent(beginOffset, curOffset - beginOffset, "Time Signature", "", Type::TimeSignature);
       }

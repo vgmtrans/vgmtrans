@@ -16,24 +16,30 @@ class QTreeWidget;
 class QLabel;
 class QPushButton;
 
+namespace vgmtrans::ui {
+class WorkspaceController;
+}
+
 class ReportDialog : public QWidget {
   Q_OBJECT
 
 public:
-  explicit ReportDialog(QWidget* parent = nullptr);
+  explicit ReportDialog(vgmtrans::ui::WorkspaceController& workspace,
+                        QWidget* parent = nullptr);
 
 private:
   void updateUrlStatus();
   QUrl buildReportUrl() const;
   void submitReport();
 
-  QTimer* m_update_timer;
-  QLineEdit* m_title_edit;
-  QPlainTextEdit* m_desc_edit;
-  QPlainTextEdit* m_steps_edit;
-  QPlainTextEdit* m_expected_edit;
-  QListWidget* m_raw_list;
-  QTreeWidget* m_vgm_tree;
-  QLabel* m_feedback_label;
-  QPushButton* m_submit_button;
+  vgmtrans::ui::WorkspaceController& m_workspace;
+  QTimer* m_update_timer{};
+  QLineEdit* m_title_edit{};
+  QPlainTextEdit* m_desc_edit{};
+  QPlainTextEdit* m_steps_edit{};
+  QPlainTextEdit* m_expected_edit{};
+  QListWidget* m_raw_list{};
+  QTreeWidget* m_vgm_tree{};
+  QLabel* m_feedback_label{};
+  QPushButton* m_submit_button{};
 };

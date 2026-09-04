@@ -6,24 +6,20 @@
 
 #include "widgets/StitchUI.h"
 
-#include "base/Types.h"
+#include "application/WorkspaceController.h"
 #include "ColorHelpers.h"
-#include "QtVGMRoot.h"
-#include "Root.h"
-#include "services/NotificationCenter.h"
-#include "StitchExport.h"
-#include "util/Path.h"
+#include "models/ValueModels.h"
 #include "util/UIHelpers.h"
-#include "VGMColl.h"
-#include "VGMSeq.h"
+#include "value/export/CollectionStitch.h"
 #include "widgets/EmptyStateWidget.h"
 #include "workarea/MdiArea.h"
-#include "workarea/VGMCollListView.h"
+#include "workarea/CollectionListView.h"
 
 #include <algorithm>
-#include <cstdint>
+#include <exception>
 #include <filesystem>
 #include <functional>
+#include <optional>
 #include <span>
 #include <string>
 #include <unordered_set>
@@ -44,6 +40,8 @@
 #include <QMouseEvent>
 #include <QPointer>
 #include <QPushButton>
+#include <QRegularExpression>
+#include <QSaveFile>
 #include <QScreen>
 #include <QShowEvent>
 #include <QSignalBlocker>
@@ -53,7 +51,7 @@
 
 namespace {
 
-constexpr int RoleCollectionPointer = Qt::UserRole;
+constexpr int RoleCollectionId = Qt::UserRole;
 constexpr QSize kQueueIconSize(16, 16);
 constexpr QSize kActionIconSize(16, 16);
 constexpr int kQueueRowHeight = 28;
@@ -61,123 +59,149 @@ constexpr int kBalloonMinWidth = 420;
 constexpr int kBalloonMinHeight = 320;
 constexpr int kAnchorVerticalGap = 6;
 
-std::vector<VGMColl*> dedupeCollections(std::span<VGMColl* const> collections) {
-  std::vector<VGMColl*> deduped;
+std::vector<vgmtrans::core::CollectionId> dedupeCollections(
+    std::span<const vgmtrans::core::CollectionId> collections) {
+  std::vector<vgmtrans::core::CollectionId> deduped;
   deduped.reserve(collections.size());
-  std::unordered_set<VGMColl*> seen;
+  std::unordered_set<u32> seen;
 
-  for (VGMColl* coll : collections) {
-    if (!coll) {
-      continue;
-    }
-    if (seen.insert(coll).second) {
-      deduped.push_back(coll);
+  for (const auto collection : collections) {
+    if (collection.valid() && seen.insert(collection.value).second) {
+      deduped.push_back(collection);
     }
   }
 
   return deduped;
 }
 
-bool collectionExists(VGMColl* coll) {
-  if (!coll) {
-    return false;
-  }
-
-  const auto allCollections = qtVGMRoot.vgmColls();
-  return std::find(allCollections.begin(), allCollections.end(), coll) != allCollections.end();
+bool collectionExists(const vgmtrans::ui::WorkspaceController& workspace, vgmtrans::core::CollectionId collection) {
+  return workspace.snapshot().collection(collection) != nullptr;
 }
 
-std::string buildExportSuccessMessage(const std::filesystem::path &midiPath,
-                                      const std::filesystem::path &sf2Path,
-                                      const conversion::MidiMergeResult &mergeResult,
-                                      const std::vector<conversion::MidiMergeEntry> &entries,
-                                      const std::vector<u8> &bankOffsets) {
+std::string buildExportSuccessMessage(const std::filesystem::path& midiPath, const std::filesystem::path& sf2Path,
+                                      const vgmtrans::core::CollectionStitchResult& result,
+                                      const vgmtrans::core::SessionSnapshot& snapshot) {
   std::string message = "Stitched export created:\n";
   message += "MIDI: " + midiPath.string() + "\n";
   message += "SF2: " + sf2Path.string();
 
-  const bool hasPartDetails =
-      mergeResult.startTimes.size() == entries.size() &&
-      bankOffsets.size() == entries.size();
-  if (!hasPartDetails) {
+  if (result.parts.empty()) {
     return message;
   }
 
   message += "\n\nParts:\n";
-  for (size_t i = 0; i < entries.size(); ++i) {
-    message += entries[i].label;
+  for (size_t i = 0; i < result.parts.size(); ++i) {
+    const auto& part = result.parts[i];
+    const auto* collection = snapshot.collection(part.collection);
+    message += collection != nullptr ? collection->name : "(unknown collection)";
     message += " - tick ";
-    message += std::to_string(mergeResult.startTimes[i]);
-    message += ", bank +";
-    message += std::to_string(bankOffsets[i]);
-    if (i + 1 < entries.size()) {
+    message += std::to_string(part.startTick);
+    message += ", banks ";
+    for (size_t bank = 0; bank < part.banks.size(); ++bank) {
+      if (bank != 0) {
+        message += ", ";
+      }
+      message += std::to_string(part.banks[bank].source) + "->" + std::to_string(part.banks[bank].target);
+    }
+    if (i + 1 < result.parts.size()) {
       message += "\n";
     }
   }
   return message;
 }
 
-bool exportStitchedCollections(const std::vector<VGMColl*> &orderedCollections) {
+std::string diagnosticText(const vgmtrans::core::CollectionStitchResult& result) {
+  std::string text;
+  std::unordered_set<std::string> seen;
+  const auto add = [&](const std::vector<vgmtrans::core::Diagnostic>& diagnostics) {
+    for (const auto& diagnostic : diagnostics) {
+      if (!diagnostic.message.empty() && seen.insert(diagnostic.message).second) {
+        if (!text.empty()) {
+          text += '\n';
+        }
+        text += diagnostic.message;
+      }
+    }
+  };
+  add(result.midi.diagnostics);
+  add(result.soundFont.diagnostics);
+  return text;
+}
+
+bool writeArtifact(const std::filesystem::path& path, const vgmtrans::core::Artifact& artifact, std::string& error) {
+  QSaveFile file(QString::fromStdWString(path.wstring()));
+  if (!file.open(QIODevice::WriteOnly)) {
+    error = file.errorString().toStdString();
+    return false;
+  }
+  const auto size = static_cast<qsizetype>(artifact.bytes.size());
+  if (file.write(reinterpret_cast<const char*>(artifact.bytes.data()), size) != size || !file.commit()) {
+    error = file.errorString().toStdString();
+    return false;
+  }
+  return true;
+}
+
+bool exportStitchedCollections(vgmtrans::ui::WorkspaceController& workspace,
+                               const vgmtrans::core::ExportRequest& request,
+                               const std::vector<vgmtrans::core::CollectionId>& orderedCollections,
+                               const stitchui::ShowToast& showToast) {
   if (orderedCollections.size() < 2) {
-    pRoot->UI_toast("Select at least two collections to stitch.", ToastType::Info);
+    showToast(QStringLiteral("Select at least two collections to stitch."), ToastType::Info, 3000);
     return false;
   }
 
-  std::vector<conversion::MidiMergeEntry> entries;
-  entries.reserve(orderedCollections.size());
-
-  for (VGMColl *coll : orderedCollections) {
-    if (!coll) {
-      continue;
-    }
-
-    auto *seq = coll->seq();
-    if (!seq) {
-      pRoot->UI_toast("Each selected collection must contain a sequence for stitched export.",
-                      ToastType::Error, 15000);
+  for (const auto id : orderedCollections) {
+    const auto* collection = workspace.snapshot().collection(id);
+    if (collection == nullptr || !collection->members.sequence) {
+      showToast(QStringLiteral("Each selected collection must contain a sequence for stitched export."),
+                ToastType::Error, 15000);
       return false;
     }
-
-    entries.push_back({coll, coll->name()});
   }
 
-  if (entries.size() < 2) {
-    pRoot->UI_toast("Select at least two collections containing sequences.",
-                    ToastType::Info);
-    return false;
+  const auto* first = workspace.snapshot().collection(orderedCollections.front());
+  QString suggestedFileName =
+      QString::fromStdString(first != nullptr ? first->name : std::string("stitched-collections"));
+  suggestedFileName.replace(QRegularExpression(QStringLiteral(R"([\\/:*?"<>|])")), QStringLiteral("_"));
+  if (suggestedFileName.isEmpty()) {
+    suggestedFileName = QStringLiteral("stitched-collections");
   }
+  suggestedFileName += QStringLiteral(".mid");
 
-  std::filesystem::path suggestedFileName = makeSafeFileName(entries.front().label);
-  if (suggestedFileName.empty()) {
-    suggestedFileName = "stitched-collections";
-  }
-  suggestedFileName.replace_extension("mid");
-
-  const std::filesystem::path midiPath = pRoot->UI_getSaveFilePath(
-      suggestedFileName.string(),
-      "mid");
+  std::filesystem::path midiPath = openSaveFileDialog(std::filesystem::path(suggestedFileName.toStdWString()), "mid");
   if (midiPath.empty()) {
     return false;
+  }
+  if (!midiPath.has_extension()) {
+    midiPath.replace_extension("mid");
   }
 
   auto sf2Path = midiPath;
   sf2Path.replace_extension("sf2");
 
-  conversion::StitchedExportResult exportResult;
-  if (!conversion::exportStitchedMidiAndSf2(entries, midiPath, sf2Path,
-                                            &exportResult)) {
-    pRoot->UI_toast("Failed to stitch selected collections. Check logs for details.",
-                    ToastType::Error, 15000);
+  vgmtrans::core::CollectionStitchResult result;
+  try {
+    result = workspace.stitchCollections(orderedCollections, request);
+  } catch (const std::exception& error) {
+    showToast(QString::fromUtf8(error.what()), ToastType::Error, 15000);
+    return false;
+  }
+  if (!result.complete()) {
+    const std::string details = diagnosticText(result);
+    showToast(QString::fromStdString(details.empty() ? "Failed to stitch selected collections." : details),
+              ToastType::Error, 15000);
     return false;
   }
 
-  pRoot->UI_toast(
-      buildExportSuccessMessage(midiPath, sf2Path,
-                                exportResult.mergeResult,
-                                entries,
-                                exportResult.bankOffsets),
-      ToastType::Success,
-      10000);
+  std::string error;
+  if (!writeArtifact(midiPath, result.midi, error) || !writeArtifact(sf2Path, result.soundFont, error)) {
+    showToast(QString::fromStdString("Failed to write stitched export: " + error), ToastType::Error, 15000);
+    return false;
+  }
+
+  showToast(QString::fromStdString(buildExportSuccessMessage(midiPath, sf2Path, result, workspace.snapshot())),
+            ToastType::Success, 10000);
   return true;
 }
 
@@ -195,29 +219,42 @@ InstructionHint defaultEmptyStateHeadingHint(const QString &iconPath,
   return hint;
 }
 
-QString collectionLabel(const VGMColl *coll) {
-  QString label = coll ? QString::fromStdString(coll->name())
-                       : QStringLiteral("(unknown collection)");
-  if (coll && coll->seq()) {
+QString collectionLabel(const vgmtrans::ui::WorkspaceController& workspace,
+                        vgmtrans::core::CollectionId collectionId) {
+  const auto* collection = workspace.snapshot().collection(collectionId);
+  QString label = collection != nullptr ? QString::fromStdString(collection->name)
+                                        : QStringLiteral("(unknown collection)");
+  if (collection != nullptr && collection->members.sequence) {
+    const auto* sequence = workspace.snapshot().asset(*collection->members.sequence);
     label += QStringLiteral(" - ");
-    label += QString::fromStdString(coll->seq()->name());
+    label += sequence != nullptr ? QString::fromStdString(vgmtrans::core::metadata(*sequence).name)
+                                 : QStringLiteral("(missing sequence)");
   }
   return label;
 }
 
-QListWidgetItem *makeCollectionItem(VGMColl *coll) {
-  auto *item = new QListWidgetItem(collectionLabel(coll));
-  item->setData(RoleCollectionPointer,
-                static_cast<qulonglong>(reinterpret_cast<uintptr_t>(coll)));
+QListWidgetItem* makeCollectionItem(const vgmtrans::ui::WorkspaceController& workspace,
+                                    vgmtrans::core::CollectionId collection) {
+  auto* item = new QListWidgetItem(collectionLabel(workspace, collection));
+  item->setData(RoleCollectionId, collection.value);
   item->setSizeHint(QSize(0, kQueueRowHeight));
   return item;
 }
 
-VGMColl* collFromItem(const QListWidgetItem* item) {
-  return item
-             ? reinterpret_cast<VGMColl*>(
-                   static_cast<uintptr_t>(item->data(RoleCollectionPointer).toULongLong()))
-             : nullptr;
+std::optional<vgmtrans::core::CollectionId> collectionFromItem(const QListWidgetItem* item) {
+  return item != nullptr ? std::optional{vgmtrans::core::CollectionId{item->data(RoleCollectionId).toUInt()}}
+                         : std::nullopt;
+}
+
+std::vector<vgmtrans::core::CollectionId> selectedCollections(const CollectionListView& list) {
+  std::vector<vgmtrans::core::CollectionId> collections;
+  if (list.selectionModel() == nullptr) {
+    return collections;
+  }
+  for (const auto& index : list.selectionModel()->selectedRows()) {
+    collections.push_back(vgmtrans::core::CollectionId{index.data(vgmtrans::ui::IdRole).toUInt()});
+  }
+  return collections;
 }
 
 void configureActionButton(QPushButton* button, const QString& text, const QString& toolTip) {
@@ -251,7 +288,7 @@ protected:
 
 class StitchQueueListWidget final : public QListWidget {
 public:
-  using ExternalDropHandler = std::function<void(const std::vector<VGMColl*>&, int)>;
+  using ExternalDropHandler = std::function<void(const std::vector<vgmtrans::core::CollectionId>&, int)>;
   using RemoveSelectionHandler = std::function<void()>;
 
   explicit StitchQueueListWidget(QWidget* parent = nullptr) : QListWidget(parent) {
@@ -291,7 +328,7 @@ protected:
   }
 
   void dragEnterEvent(QDragEnterEvent* event) override {
-    if (qobject_cast<VGMCollListView*>(event->source())) {
+    if (qobject_cast<CollectionListView*>(event->source())) {
       event->acceptProposedAction();
       return;
     }
@@ -299,7 +336,7 @@ protected:
   }
 
   void dragMoveEvent(QDragMoveEvent* event) override {
-    if (qobject_cast<VGMCollListView*>(event->source())) {
+    if (qobject_cast<CollectionListView*>(event->source())) {
       event->acceptProposedAction();
       return;
     }
@@ -307,7 +344,7 @@ protected:
   }
 
   void dropEvent(QDropEvent* event) override {
-    if (auto* sourceList = qobject_cast<VGMCollListView*>(event->source())) {
+    if (auto* sourceList = qobject_cast<CollectionListView*>(event->source())) {
       if (m_externalDropHandler) {
         int insertionRow = count();
         const QModelIndex hoveredIndex = indexAt(event->position().toPoint());
@@ -318,7 +355,7 @@ protected:
           }
         }
 
-        m_externalDropHandler(sourceList->selectedCollections(), insertionRow);
+        m_externalDropHandler(selectedCollections(*sourceList), insertionRow);
       }
 
       event->acceptProposedAction();
@@ -335,8 +372,8 @@ private:
 
 class StitchExportBalloon final : public QFrame {
 public:
-  explicit StitchExportBalloon(QWidget* parent = nullptr)
-  : QFrame(parent, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint) {
+  StitchExportBalloon(vgmtrans::ui::WorkspaceController& workspace, QWidget* parent = nullptr)
+      : QFrame(parent, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint), workspace_(workspace) {
     setObjectName(QStringLiteral("stitchExportBalloon"));
     setFrameShape(QFrame::NoFrame);
     setFrameShadow(QFrame::Plain);
@@ -418,7 +455,7 @@ public:
     actionRow->addWidget(m_exportButton);
     rootLayout->addLayout(actionRow);
 
-    m_queueList->setExternalDropHandler([this](const std::vector<VGMColl*>& collections, int row) {
+    m_queueList->setExternalDropHandler([this](const std::vector<vgmtrans::core::CollectionId>& collections, int row) {
       addCollections(collections, row);
     });
     m_queueList->setRemoveSelectionHandler([this]() {
@@ -435,7 +472,7 @@ public:
     });
 
     connect(m_exportButton, &QPushButton::clicked, this, [this]() {
-      if (exportStitchedCollections(orderedCollections())) {
+      if (exportStitchedCollections(workspace_, request_, orderedCollections(), callbacks_.showToast)) {
         hide();
       }
     });
@@ -445,14 +482,18 @@ public:
     connect(m_queueList->model(), &QAbstractItemModel::rowsInserted, this, [this]() { refreshUi(); });
     connect(m_queueList->model(), &QAbstractItemModel::rowsRemoved, this, [this]() { refreshUi(); });
     connect(m_queueList->model(), &QAbstractItemModel::rowsMoved, this, [this]() { refreshUi(); });
-    connect(&qtVGMRoot, &QtVGMRoot::UI_endRemoveVGMColls, this, [this]() {
-      pruneMissingQueueCollections();
-    });
+    connect(&workspace_, &vgmtrans::ui::WorkspaceController::snapshotChanged, this,
+            [this]() { pruneMissingQueueCollections(); });
 
     refreshUi();
   }
 
-  void openForCollections(const std::vector<VGMColl*>& initialCollections, QWidget* anchor,
+  void configure(vgmtrans::core::ExportRequest request, stitchui::Callbacks callbacks) {
+    request_ = std::move(request);
+    callbacks_ = std::move(callbacks);
+  }
+
+  void openForCollections(const std::vector<vgmtrans::core::CollectionId>& initialCollections, QWidget* anchor,
                           QAbstractButton* toggleButton = nullptr) {
     if (toggleButton) {
       setToggleButton(toggleButton);
@@ -490,7 +531,9 @@ private:
     if (m_toggleButton) {
       m_toggleButton->setChecked(true);
     }
-    NotificationCenter::the()->setCollectionStitchUiVisible(true);
+    if (callbacks_.visibilityChanged) {
+      callbacks_.visibilityChanged(true);
+    }
     QFrame::showEvent(event);
   }
 
@@ -498,18 +541,18 @@ private:
     if (m_toggleButton) {
       m_toggleButton->setChecked(false);
     }
-    NotificationCenter::the()->setCollectionStitchUiVisible(false);
-    NotificationCenter::the()->setStitchPlanCollections({});
+    if (callbacks_.visibilityChanged) {
+      callbacks_.visibilityChanged(false);
+    }
+    if (callbacks_.planChanged) {
+      callbacks_.planChanged(std::span<const vgmtrans::core::CollectionId>{});
+    }
     QFrame::hideEvent(event);
   }
 
-  bool containsCollection(VGMColl* coll) const {
-    if (!coll) {
-      return false;
-    }
-
+  bool containsCollection(vgmtrans::core::CollectionId collection) const {
     for (int row = 0; row < m_queueList->count(); ++row) {
-      if (collFromItem(m_queueList->item(row)) == coll) {
+      if (collectionFromItem(m_queueList->item(row)) == collection) {
         return true;
       }
     }
@@ -533,7 +576,8 @@ private:
     QSignalBlocker modelSignalBlocker(m_queueList->model());
 
     for (int row = m_queueList->count() - 1; row >= 0; --row) {
-      if (!collectionExists(collFromItem(m_queueList->item(row)))) {
+      const auto collection = collectionFromItem(m_queueList->item(row));
+      if (!collection || !collectionExists(workspace_, *collection)) {
         delete m_queueList->takeItem(row);
         removedAny = true;
       }
@@ -544,46 +588,37 @@ private:
     }
   }
 
-  void addCollections(const std::vector<VGMColl*>& collections, int insertionRow) {
+  void addCollections(const std::vector<vgmtrans::core::CollectionId>& collections, int insertionRow) {
     if (collections.empty()) {
       return;
     }
 
-    const std::vector<VGMColl*> deduped = dedupeCollections(collections);
+    const auto deduped = dedupeCollections(collections);
     int targetRow = std::clamp(insertionRow, 0, m_queueList->count());
 
-    for (VGMColl* coll : deduped) {
-      if (!collectionExists(coll) || containsCollection(coll)) {
+    for (const auto collection : deduped) {
+      if (!collectionExists(workspace_, collection) || containsCollection(collection)) {
         continue;
       }
 
-      m_queueList->insertItem(targetRow++, makeCollectionItem(coll));
+      m_queueList->insertItem(targetRow++, makeCollectionItem(workspace_, collection));
     }
 
     refreshUi();
   }
 
-  std::vector<VGMColl*> orderedCollections() const {
-    std::vector<VGMColl*> ordered;
+  std::vector<vgmtrans::core::CollectionId> orderedCollections() const {
+    std::vector<vgmtrans::core::CollectionId> ordered;
     ordered.reserve(static_cast<size_t>(m_queueList->count()));
 
     for (int row = 0; row < m_queueList->count(); ++row) {
-      if (VGMColl* coll = collFromItem(m_queueList->item(row)); coll && collectionExists(coll)) {
-        ordered.push_back(coll);
+      const auto collection = collectionFromItem(m_queueList->item(row));
+      if (collection && collectionExists(workspace_, *collection)) {
+        ordered.push_back(*collection);
       }
     }
 
     return ordered;
-  }
-
-  void publishStitchPlanCollections() const {
-    QList<VGMColl*> ordered;
-    const std::vector<VGMColl*> orderedVector = orderedCollections();
-    ordered.reserve(static_cast<qsizetype>(orderedVector.size()));
-    for (VGMColl* coll : orderedVector) {
-      ordered.append(coll);
-    }
-    NotificationCenter::the()->setStitchPlanCollections(ordered);
   }
 
   void refreshUi() {
@@ -610,8 +645,10 @@ private:
     refreshButtonIcon(m_clearButton, QStringLiteral(":/icons/close-circle.svg"));
     refreshButtonIcon(m_exportButton, QStringLiteral(":/icons/export.svg"));
     refreshStencilToolButton(m_closeButton, QStringLiteral(":/icons/toast_close.svg"), palette);
-
-    publishStitchPlanCollections();
+    if (callbacks_.planChanged) {
+      const auto collections = orderedCollections();
+      callbacks_.planChanged(collections);
+    }
   }
 
   void positionRelativeTo(QWidget* anchor) {
@@ -678,20 +715,20 @@ private:
   QWidget* m_headingDragHandle = nullptr;
   QToolButton* m_closeButton = nullptr;
   QPointer<QAbstractButton> m_toggleButton;
+  vgmtrans::ui::WorkspaceController& workspace_;
+  vgmtrans::core::ExportRequest request_;
+  stitchui::Callbacks callbacks_;
 };
 
 QPointer<StitchExportBalloon> g_stitchExportBalloon;
 
-StitchExportBalloon* ensureStitchExportBalloon(QWidget* owner) {
+StitchExportBalloon* ensureStitchExportBalloon(vgmtrans::ui::WorkspaceController& workspace, QWidget* owner) {
   StitchExportBalloon* existingBalloon = g_stitchExportBalloon.data();
   if (!existingBalloon || existingBalloon->parentWidget() != owner) {
     if (existingBalloon) {
-      if (existingBalloon->isVisible()) {
-        NotificationCenter::the()->setCollectionStitchUiVisible(false);
-      }
       existingBalloon->deleteLater();
     }
-    g_stitchExportBalloon = new StitchExportBalloon(owner);
+    g_stitchExportBalloon = new StitchExportBalloon(workspace, owner);
   }
   return g_stitchExportBalloon.data();
 }
@@ -700,21 +737,23 @@ StitchExportBalloon* ensureStitchExportBalloon(QWidget* owner) {
 
 namespace stitchui {
 
-void openCollectionStitchBalloon(std::span<VGMColl* const> initialCollections,
-                                 QWidget* parent,
-                                 QWidget* anchor,
-                                 QAbstractButton* toggleButton) {
+void openCollectionStitchBalloon(vgmtrans::ui::WorkspaceController& workspace,
+                                 std::span<const vgmtrans::core::CollectionId> initialCollections,
+                                 const vgmtrans::core::ExportRequest& request, Callbacks callbacks, QWidget* parent,
+                                 QWidget* anchor, QAbstractButton* toggleButton) {
   QWidget* owner = parent ? parent : QApplication::activeWindow();
-  StitchExportBalloon* balloon = ensureStitchExportBalloon(owner);
+  StitchExportBalloon* balloon = ensureStitchExportBalloon(workspace, owner);
+  balloon->configure(request, std::move(callbacks));
   balloon->openForCollections(dedupeCollections(initialCollections), anchor ? anchor : owner, toggleButton);
 }
 
-bool toggleCollectionStitchBalloon(std::span<VGMColl* const> initialCollections,
-                                   QWidget* parent,
-                                   QWidget* anchor,
-                                   QAbstractButton* toggleButton) {
+bool toggleCollectionStitchBalloon(vgmtrans::ui::WorkspaceController& workspace,
+                                   std::span<const vgmtrans::core::CollectionId> initialCollections,
+                                   const vgmtrans::core::ExportRequest& request, Callbacks callbacks, QWidget* parent,
+                                   QWidget* anchor, QAbstractButton* toggleButton) {
   QWidget* owner = parent ? parent : QApplication::activeWindow();
-  StitchExportBalloon* balloon = ensureStitchExportBalloon(owner);
+  StitchExportBalloon* balloon = ensureStitchExportBalloon(workspace, owner);
+  balloon->configure(request, std::move(callbacks));
   if (toggleButton) {
     balloon->setToggleButton(toggleButton);
   }
