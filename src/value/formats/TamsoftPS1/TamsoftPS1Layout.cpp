@@ -21,6 +21,7 @@ namespace {
 
 constexpr u32 kTrackRecordSize = 4;
 constexpr u32 kPs1MaximumRequestSlots = 64;
+constexpr u32 kPs2MusicVoiceCount = 36;
 constexpr u32 kSilenceStream = 0x00fffff0;
 
 [[nodiscard]] bool isSilence(ByteReader reader, u32 offset) {

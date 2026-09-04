@@ -29,7 +29,6 @@ inline constexpr u32 kProgramTableSize = kProgramCount * 4;
 inline constexpr u32 kBankHeaderSize = kProgramTableSize * 2;
 inline constexpr u32 kPs1VoiceCount = 24;
 inline constexpr u32 kPs2VoiceCount = 48;
-inline constexpr u32 kPs2MusicVoiceCount = 36;
 
 enum class Generation : u8 {
   Ps1,

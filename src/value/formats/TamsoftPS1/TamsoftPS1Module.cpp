@@ -24,16 +24,14 @@ namespace {
   return value;
 }
 
-[[nodiscard]] std::filesystem::path sourcePath(const SourceFile& source) {
-  return source.path.empty() ? std::filesystem::path(source.name) : source.path;
-}
-
 [[nodiscard]] std::string sourceExtension(const SourceFile& source) {
-  return lowercase(sourcePath(source).extension().string());
+  const std::filesystem::path path = source.path.empty() ? std::filesystem::path(source.name) : source.path;
+  return lowercase(path.extension().string());
 }
 
 [[nodiscard]] std::string sourceStem(const SourceFile& source) {
-  std::string stem = sourcePath(source).stem().string();
+  const std::filesystem::path path = source.path.empty() ? std::filesystem::path(source.name) : source.path;
+  std::string stem = path.stem().string();
   if (stem.empty() && source.title) {
     stem = *source.title;
   }
