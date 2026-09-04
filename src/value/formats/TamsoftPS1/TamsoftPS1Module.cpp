@@ -19,19 +19,21 @@ using namespace core;
 
 namespace {
 
-[[nodiscard]] std::string lower(std::string value) {
+[[nodiscard]] std::string lowercase(std::string value) {
   std::ranges::transform(value, value.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
   return value;
 }
 
+[[nodiscard]] std::filesystem::path sourcePath(const SourceFile& source) {
+  return source.path.empty() ? std::filesystem::path(source.name) : source.path;
+}
+
 [[nodiscard]] std::string sourceExtension(const SourceFile& source) {
-  const std::filesystem::path path = source.path.empty() ? std::filesystem::path(source.name) : source.path;
-  return lower(path.extension().string());
+  return lowercase(sourcePath(source).extension().string());
 }
 
 [[nodiscard]] std::string sourceStem(const SourceFile& source) {
-  const std::filesystem::path path = source.path.empty() ? std::filesystem::path(source.name) : source.path;
-  std::string stem = path.stem().string();
+  std::string stem = sourcePath(source).stem().string();
   if (stem.empty() && source.title) {
     stem = *source.title;
   }
@@ -51,11 +53,14 @@ namespace {
   ScanResultBuilder result(input, std::string(kFormatName));
   const std::string fileStem = sourceStem(input.source);
   const std::string stem = fileStem.empty() ? result.sourceDisplayName() : fileStem;
+  // A TSQ is loaded as one driver bank. Mixed files such as C13BGM therefore
+  // use BGM.TVB for every song entry, including embedded sound effects.
   const bool usesMusicBank = std::ranges::any_of(sequences, [](const SequenceLayout& layout) {
     return layout.type == 0;
   });
   if (bank && !addBank(result, *bank, stem)) {
-    result.warning("Tamsoft TVB was recognized, but no playable instruments were found", input.reader.range(0, 0x800));
+    result.warning("Tamsoft TVB was recognized, but no playable instruments were found",
+                   input.reader.range(0, kBankHeaderSize));
   }
   for (const auto& layout : sequences) {
     const std::string name = fmt::format("{} ({})", stem, layout.song);

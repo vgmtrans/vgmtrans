@@ -21,12 +21,12 @@ namespace {
 using SequenceEntry = AssetWithData<SequenceProgramAsset, SequenceData>;
 using BankEntry = AssetWithData<SoundBankAsset, BankData>;
 
-[[nodiscard]] std::string folded(std::string value) {
+[[nodiscard]] std::string uppercase(std::string value) {
   std::ranges::transform(value, value.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
   return value;
 }
 
-[[nodiscard]] std::filesystem::path directory(const SourceFile* source) {
+[[nodiscard]] std::filesystem::path sourceDirectory(const SourceFile* source) {
   if (source == nullptr) {
     return {};
   }
@@ -38,17 +38,18 @@ using BankEntry = AssetWithData<SoundBankAsset, BankData>;
   if (sequence.data->generation != bank.data->generation) {
     return -1;
   }
-  const std::string sequenceStem = folded(sequence.data->stem);
-  const std::string bankStem = folded(bank.data->stem);
+  const std::string sequenceStem = uppercase(sequence.data->stem);
+  const std::string bankStem = uppercase(bank.data->stem);
 
   if (sequence.data->generation == Generation::Ps1) {
+    // Wonderful uses the shared SYS/BGM.TVB across directories for music TSQs.
     if (sequence.data->usesMusicBank) {
       return bankStem == "BGM" ? 30 : -1;
     }
-    return sequenceStem == bankStem && directory(sequence.source) == directory(bank.source) ? 30 : -1;
+    return sequenceStem == bankStem && sourceDirectory(sequence.source) == sourceDirectory(bank.source) ? 30 : -1;
   }
 
-  if (directory(sequence.source) != directory(bank.source)) {
+  if (sourceDirectory(sequence.source) != sourceDirectory(bank.source)) {
     return -1;
   }
   if (sequenceStem == bankStem) {

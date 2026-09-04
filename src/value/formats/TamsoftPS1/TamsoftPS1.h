@@ -23,6 +23,13 @@ namespace vgmtrans::formats::tamsoft_ps1 {
 inline constexpr std::string_view kFormatName = "TamsoftPS1";
 inline constexpr std::string_view kCommandKindPrefix = "tamsoft-ps1:sequence";
 inline constexpr std::string_view kInstrumentDomain = "tamsoft-ps1.instrument";
+inline constexpr u32 kSongEntrySize = 4;
+inline constexpr u32 kProgramCount = 256;
+inline constexpr u32 kProgramTableSize = kProgramCount * 4;
+inline constexpr u32 kBankHeaderSize = kProgramTableSize * 2;
+inline constexpr u32 kPs1VoiceCount = 24;
+inline constexpr u32 kPs2VoiceCount = 48;
+inline constexpr u32 kPs2MusicVoiceCount = 36;
 
 enum class Generation : u8 {
   Ps1,
@@ -38,9 +45,7 @@ enum class Generation : u8 {
 
 struct TrackLayout {
   u32 slot = 0;
-  u32 headerOffset = 0;
   u32 offset = 0;
-  u8 priority = 1;
 };
 
 struct SequenceLayout {
