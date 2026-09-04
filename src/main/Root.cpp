@@ -25,6 +25,7 @@
 #include "VGMSeq.h"
 
 #include <cassert>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -34,14 +35,14 @@
 
 #include <spdlog/fmt/std.h>
 
-VGMRoot *pRoot;
+VGMRoot* pRoot;
 
 VGMRoot::VGMRoot() = default;
 VGMRoot::~VGMRoot() = default;
 
 VGMFile* variantToVGMFile(VGMFileVariant variant) {
-  VGMFile *vgmFilePtr = nullptr;
-  std::visit([&vgmFilePtr](auto *vgm) { vgmFilePtr = static_cast<VGMFile *>(vgm); }, variant);
+  VGMFile* vgmFilePtr = nullptr;
+  std::visit([&vgmFilePtr](auto* vgm) { vgmFilePtr = static_cast<VGMFile*>(vgm); }, variant);
   return vgmFilePtr;
 }
 
@@ -60,13 +61,13 @@ VGMFileVariant vgmFileToVariant(VGMFile* file) {
 }
 
 bool VGMRoot::init() {
-    UI_setRootPtr(&pRoot);
-    return true;
+  UI_setRootPtr(&pRoot);
+  return true;
 }
 
 /* Opens up a file from the filesystem and scans it.
  * Returns bool indicating if VGMFiles were found. */
-bool VGMRoot::openRawFile(const std::filesystem::path &filePath) {
+bool VGMRoot::openRawFile(const std::filesystem::path& filePath) {
   std::unique_ptr<DiskFile> newFile;
 
   try {
@@ -82,8 +83,8 @@ bool VGMRoot::openRawFile(const std::filesystem::path &filePath) {
 }
 
 /* Creates a new file backed by RAM */
-bool VGMRoot::createVirtFile(const u8 *databuf, u32 fileSize, const std::string& filename,
-                             const std::filesystem::path &parRawFileFullPath, const VGMTag& tag) {
+bool VGMRoot::createVirtFile(const u8* databuf, u32 fileSize, const std::string& filename,
+                             const std::filesystem::path& parRawFileFullPath, const VGMTag& tag) {
   assert(fileSize != 0);
 
   return loadRawFile(std::make_unique<VirtFile>(databuf, fileSize, filename, parRawFileFullPath, tag));
@@ -96,10 +97,19 @@ bool VGMRoot::loadRawFile(std::unique_ptr<RawFile> newRawFile) {
     return false;
   }
 
+  const auto duplicate = std::ranges::find_if(m_ownedRawFiles, [&newRawFile](const auto& loaded) {
+    return loaded->path() == newRawFile->path() && loaded->size() == newRawFile->size() &&
+           std::memcmp(loaded->data(), newRawFile->data(), newRawFile->size()) == 0;
+  });
+  if (duplicate != m_ownedRawFiles.end()) {
+    L_DEBUG("Skipping duplicate raw file '{}'", newRawFile->name());
+    return true;
+  }
+
   RawFile* rawFile = newRawFile.get();
   pushLoadRawFile();
   if (rawFile->useLoaders()) {
-    for (const auto &l : LoaderManager::get().loaders()) {
+    for (const auto& l : LoaderManager::get().loaders()) {
       l->apply(rawFile);
       auto res = l->results();
 
@@ -119,17 +129,16 @@ bool VGMRoot::loadRawFile(std::unique_ptr<RawFile> newRawFile) {
      * Make use of the extension to run only a subset of scanners.
      * Unsure how good of an idea this is
      */
-    auto specific_scanners =
-      ScannerManager::get().scannersWithExtension(rawFile->extension());
+    auto specific_scanners = ScannerManager::get().scannersWithExtension(rawFile->extension());
     if (!specific_scanners.empty()) {
-      for (const auto &scanner : specific_scanners) {
+      for (const auto& scanner : specific_scanners) {
         scanner->scan(rawFile);
         if (auto matcher = scanner->format()->matcher.get()) {
           matcher->onFinishedScan(rawFile);
         }
       }
     } else {
-      for (const auto &scanner : ScannerManager::get().scanners()) {
+      for (const auto& scanner : ScannerManager::get().scanners()) {
         scanner->scan(rawFile);
         if (auto matcher = scanner->format()->matcher.get()) {
           matcher->onFinishedScan(rawFile);
@@ -149,9 +158,10 @@ bool VGMRoot::loadRawFile(std::unique_ptr<RawFile> newRawFile) {
   return foundFiles;
 }
 
-bool VGMRoot::removeRawFile(RawFile *rawfile) {
-  if (!rawfile)
+bool VGMRoot::removeRawFile(RawFile* rawfile) {
+  if (!rawfile) {
     return false;
+  }
 
   auto iter = std::ranges::find(m_rawfiles, rawfile);
   if (iter == m_rawfiles.end()) {
@@ -160,7 +170,7 @@ bool VGMRoot::removeRawFile(RawFile *rawfile) {
   }
 
   auto vgmfiles = rawfile->containedVGMFiles();
-  for (const auto &vgmfile : vgmfiles) {
+  for (const auto& vgmfile : vgmfiles) {
     removeVGMFile(vgmfile, false);
   }
 
@@ -169,9 +179,8 @@ bool VGMRoot::removeRawFile(RawFile *rawfile) {
   m_rawfiles.erase(iter);
   popRemoveRawFiles();
 
-  auto ownedIter = std::ranges::find_if(m_ownedRawFiles, [rawfile](const auto& ownedRawFile) {
-    return ownedRawFile.get() == rawfile;
-  });
+  auto ownedIter = std::ranges::find_if(m_ownedRawFiles,
+                                        [rawfile](const auto& ownedRawFile) { return ownedRawFile.get() == rawfile; });
   if (ownedIter != m_ownedRawFiles.end()) {
     m_ownedRawFiles.erase(ownedIter);
   } else {
@@ -216,11 +225,12 @@ void VGMRoot::sinkVGMFile(std::unique_ptr<VGMFile>&& file, bool useMatcher) {
 
 // Removes a VGMFile from the interface.  The UI_RemoveVGMFile will handle the
 // interface-specific stuff
-void VGMRoot::removeVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file, bool bRemoveEmptyRawFile) {
+void VGMRoot::removeVGMFile(std::variant<VGMSeq*, VGMInstrSet*, VGMSampColl*, VGMMiscFile*> file,
+                            bool bRemoveEmptyRawFile) {
   auto targFile = variantToVGMFile(file);
   // First we should call the format's onClose handler in case it needs to use
   // the RawFile before we close it (FilenameMatcher, for ex)
-  if (Format *fmt = targFile->format()) {
+  if (Format* fmt = targFile->format()) {
     fmt->onCloseFile(file);
   }
 
@@ -247,9 +257,8 @@ void VGMRoot::removeVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *,
     }
   }
 
-  auto ownedIter = std::ranges::find_if(m_ownedVGMFiles, [targFile](const auto& ownedVGMFile) {
-    return ownedVGMFile.get() == targFile;
-  });
+  auto ownedIter = std::ranges::find_if(
+      m_ownedVGMFiles, [targFile](const auto& ownedVGMFile) { return ownedVGMFile.get() == targFile; });
   if (ownedIter != m_ownedVGMFiles.end()) {
     m_ownedVGMFiles.erase(ownedIter);
   } else {
@@ -277,7 +286,7 @@ void VGMRoot::sinkVGMColl(std::unique_ptr<VGMColl>&& coll) {
   m_ownedVGMColls.emplace_back(std::move(coll));
 }
 
-void VGMRoot::removeVGMColl(VGMColl *coll) {
+void VGMRoot::removeVGMColl(VGMColl* coll) {
   auto iter = std::ranges::find(m_vgmcolls, coll);
   pushRemoveVGMColls();
   if (iter != m_vgmcolls.end()) {
@@ -290,9 +299,8 @@ void VGMRoot::removeVGMColl(VGMColl *coll) {
   UI_removeVGMColl(coll);
   popRemoveVGMColls();
 
-  auto ownedIter = std::ranges::find_if(m_ownedVGMColls, [coll](const auto& ownedColl) {
-    return ownedColl.get() == coll;
-  });
+  auto ownedIter =
+      std::ranges::find_if(m_ownedVGMColls, [coll](const auto& ownedColl) { return ownedColl.get() == coll; });
   if (ownedIter != m_ownedVGMColls.end()) {
     m_ownedVGMColls.erase(ownedIter);
   } else {
@@ -303,14 +311,15 @@ void VGMRoot::removeVGMColl(VGMColl *coll) {
 void VGMRoot::removeAllFilesAndCollections() {
   pushRemoveAll();
 
-  for (auto vgmcoll : m_vgmcolls)
+  for (auto vgmcoll : m_vgmcolls) {
     UI_removeVGMColl(vgmcoll);
+  }
   m_vgmcolls.clear();
   m_ownedVGMColls.clear();
 
   for (auto variant : m_vgmfiles) {
     auto vgmfile = variantToVGMFile(variant);
-    if (Format *fmt = vgmfile->format()) {
+    if (Format* fmt = vgmfile->format()) {
       fmt->onCloseFile(variant);
     }
     UI_removeVGMFile(vgmfile);
@@ -318,8 +327,9 @@ void VGMRoot::removeAllFilesAndCollections() {
   m_vgmfiles.clear();
   m_ownedVGMFiles.clear();
 
-  for (auto rawfile: m_rawfiles)
+  for (auto rawfile : m_rawfiles) {
     UI_removeRawFile(rawfile);
+  }
   m_rawfiles.clear();
   m_ownedRawFiles.clear();
 
@@ -327,43 +337,51 @@ void VGMRoot::removeAllFilesAndCollections() {
 }
 
 void VGMRoot::pushLoadRawFile() {
-  if (rawFileLoadRecurseStack++ == 0)
+  if (rawFileLoadRecurseStack++ == 0) {
     this->UI_beginLoadRawFile();
+  }
 }
 
 void VGMRoot::popLoadRawFile() {
-  if (--rawFileLoadRecurseStack == 0)
+  if (--rawFileLoadRecurseStack == 0) {
     this->UI_endLoadRawFile();
+  }
 }
 
 void VGMRoot::pushRemoveRawFiles() {
-  if (rawFileRemoveStack++ == 0)
+  if (rawFileRemoveStack++ == 0) {
     this->UI_beginRemoveRawFiles();
+  }
 }
 
 void VGMRoot::popRemoveRawFiles() {
-  if (--rawFileRemoveStack == 0)
+  if (--rawFileRemoveStack == 0) {
     this->UI_endRemoveRawFiles();
+  }
 }
 
 void VGMRoot::pushRemoveVGMFiles() {
-  if (vgmFileRemoveStack++ == 0)
+  if (vgmFileRemoveStack++ == 0) {
     this->UI_beginRemoveVGMFiles();
+  }
 }
 
 void VGMRoot::popRemoveVGMFiles() {
-  if (--vgmFileRemoveStack == 0)
+  if (--vgmFileRemoveStack == 0) {
     this->UI_endRemoveVGMFiles();
+  }
 }
 
 void VGMRoot::pushRemoveVGMColls() {
-  if (vgmCollRemoveStack++ == 0)
+  if (vgmCollRemoveStack++ == 0) {
     this->UI_beginRemoveVGMColls();
+  }
 }
 
 void VGMRoot::popRemoveVGMColls() {
-  if (--vgmCollRemoveStack == 0)
+  if (--vgmCollRemoveStack == 0) {
     this->UI_endRemoveVGMColls();
+  }
 }
 
 void VGMRoot::pushRemoveAll() {
@@ -382,21 +400,21 @@ void VGMRoot::popRemoveAll() {
 // By default, it simply sorts out what type of file was added and then calls a more
 // specific virtual function for the file type.  It is virtual in case a user-interface
 // wants do something universally whenever any type of VGMFiles is added.
-void VGMRoot::UI_addVGMFile(std::variant<VGMSeq *, VGMInstrSet *, VGMSampColl *, VGMMiscFile *> file) {
-  if(auto seq = std::get_if<VGMSeq *>(&file)) {
+void VGMRoot::UI_addVGMFile(std::variant<VGMSeq*, VGMInstrSet*, VGMSampColl*, VGMMiscFile*> file) {
+  if (auto seq = std::get_if<VGMSeq*>(&file)) {
     UI_addVGMSeq(*seq);
-  } else if(auto instr = std::get_if<VGMInstrSet *>(&file)) {
+  } else if (auto instr = std::get_if<VGMInstrSet*>(&file)) {
     UI_addVGMInstrSet(*instr);
-  } else if(auto sampcoll = std::get_if<VGMSampColl *>(&file)) {
+  } else if (auto sampcoll = std::get_if<VGMSampColl*>(&file)) {
     UI_addVGMSampColl(*sampcoll);
-  } else if(auto misc = std::get_if<VGMMiscFile *>(&file)) {
+  } else if (auto misc = std::get_if<VGMMiscFile*>(&file)) {
     UI_addVGMMisc(*misc);
   }
 }
 
 // Given a pointer to a buffer of data, size, and a filename, this function writes the data
 // into a file on the filesystem.
-bool VGMRoot::UI_writeBufferToFile(const std::filesystem::path &filepath, u8 *buf, size_t size) {
+bool VGMRoot::UI_writeBufferToFile(const std::filesystem::path& filepath, u8* buf, size_t size) {
   std::ofstream outfile(filepath, std::ios::out | std::ios::trunc | std::ios::binary);
 
   if (!outfile.is_open()) {
@@ -404,13 +422,13 @@ bool VGMRoot::UI_writeBufferToFile(const std::filesystem::path &filepath, u8 *bu
     return false;
   }
 
-  outfile.write(reinterpret_cast<char *>(buf), size);
+  outfile.write(reinterpret_cast<char*>(buf), size);
   outfile.close();
   return true;
 }
 
 // Adds a log item to the interface. The UI_AddLog function will handle the interface-specific stuff
-void VGMRoot::log(LogItem *theLog) {
+void VGMRoot::log(LogItem* theLog) {
   UI_log(theLog);
 }
 
