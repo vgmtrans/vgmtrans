@@ -27,7 +27,7 @@
 #include <QPushButton>
 #include <QRadioButton>
 
-ManualCollectionDialog::ManualCollectionDialog(QWidget *parent) : QDialog(parent) {
+ManualCollectionDialog::ManualCollectionDialog(QWidget* parent) : QDialog(parent) {
   setWindowTitle("Manual collection creation");
   setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint & Qt::Sheet);
   setWindowModality(Qt::WindowModal);
@@ -67,14 +67,13 @@ ManualCollectionDialog::ManualCollectionDialog(QWidget *parent) : QDialog(parent
   l->addWidget(attempt, 7, 1);
   setLayout(l);
 
-  connect(m_name_field, &QLineEdit::textChanged,
-          [=](const QString &text) { attempt->setEnabled(!text.isEmpty()); });
+  connect(m_name_field, &QLineEdit::textChanged, [=](const QString& text) { attempt->setEnabled(!text.isEmpty()); });
   connect(attempt, &QPushButton::pressed, this, &ManualCollectionDialog::createCollection);
   connect(cancel, &QPushButton::pressed, this, &ManualCollectionDialog::close);
 }
 
-QListWidget *ManualCollectionDialog::makeSequenceList() {
-  std::vector<VGMFile *> seqs;
+QListWidget* ManualCollectionDialog::makeSequenceList() {
+  std::vector<VGMFile*> seqs;
   const auto& files = qtVGMRoot.vgmFiles();
   for (const auto& fileVariant : files) {
     if (std::holds_alternative<VGMSeq*>(fileVariant)) {
@@ -94,8 +93,8 @@ QListWidget *ManualCollectionDialog::makeSequenceList() {
   return widget;
 }
 
-QListWidget *ManualCollectionDialog::makeInstrumentSetList() {
-  std::vector<VGMFile *> instrSets;
+QListWidget* ManualCollectionDialog::makeInstrumentSetList() {
+  std::vector<VGMFile*> instrSets;
   const auto& files = qtVGMRoot.vgmFiles();
   for (const auto& fileVariant : files) {
     if (std::holds_alternative<VGMInstrSet*>(fileVariant)) {
@@ -115,8 +114,8 @@ QListWidget *ManualCollectionDialog::makeInstrumentSetList() {
   return widget;
 }
 
-QListWidget *ManualCollectionDialog::makeSampleCollectionList() {
-  std::vector<VGMFile *> sampColls;
+QListWidget* ManualCollectionDialog::makeSampleCollectionList() {
+  std::vector<VGMFile*> sampColls;
   const auto& files = qtVGMRoot.vgmFiles();
   for (const auto& fileVariant : files) {
     if (std::holds_alternative<VGMSampColl*>(fileVariant)) {
@@ -140,7 +139,7 @@ void ManualCollectionDialog::createCollection() {
   VGMSeq* chosen_seq = nullptr;
   for (int i = 0; i < m_seq_list->count(); i++) {
     auto item = m_seq_list->item(i);
-    auto radio = qobject_cast<QRadioButton *>(m_seq_list->itemWidget(item));
+    auto radio = qobject_cast<QRadioButton*>(m_seq_list->itemWidget(item));
     if (radio->isChecked()) {
       chosen_seq = static_cast<VGMSeq*>(item->data(Qt::UserRole).value<void*>());
       break;
@@ -159,7 +158,7 @@ void ManualCollectionDialog::createCollection() {
 
   for (int i = 0; i < m_instr_list->count(); i++) {
     auto item = m_instr_list->item(i);
-    auto radio = qobject_cast<QCheckBox *>(m_instr_list->itemWidget(item));
+    auto radio = qobject_cast<QCheckBox*>(m_instr_list->itemWidget(item));
     if (radio->checkState() == (Qt::Checked)) {
       auto chosen_set = static_cast<VGMInstrSet*>(item->data(Qt::UserRole).value<void*>());
       coll->attachInstrSet(chosen_set);
@@ -167,14 +166,13 @@ void ManualCollectionDialog::createCollection() {
   }
   if (coll->instrSets().empty()) {
     coll->removeFileAssocs();
-    QMessageBox::critical(this, "Error creating collection",
-                          "At least an instrument set must be selected");
+    QMessageBox::critical(this, "Error creating collection", "At least an instrument set must be selected");
     return;
   }
 
   for (int i = 0; i < m_samp_list->count(); i++) {
     auto item = m_samp_list->item(i);
-    auto radio = qobject_cast<QCheckBox *>(m_samp_list->itemWidget(item));
+    auto radio = qobject_cast<QCheckBox*>(m_samp_list->itemWidget(item));
     if (radio->checkState() == (Qt::Checked)) {
       auto sampcoll = static_cast<VGMSampColl*>(item->data(Qt::UserRole).value<void*>());
       coll->attachSampColl(sampcoll);
@@ -183,7 +181,8 @@ void ManualCollectionDialog::createCollection() {
 
   if (coll->sampColls().empty() && coll->instrSets().front()->sampColl() == nullptr) {
     pRoot->UI_toast("The created collection does not contain a sample collection. "
-                    "The instrument bank will be silent.", ToastType::Warning);
+                    "The instrument bank will be silent.",
+                    ToastType::Warning);
   }
 
   if (!coll->load()) {
@@ -192,6 +191,6 @@ void ManualCollectionDialog::createCollection() {
     return;
   }
 
-  coll.release();
+  pRoot->sinkVGMColl(std::move(coll));
   close();
 }
