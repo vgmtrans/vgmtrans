@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <complex>
 #include <iterator>
 #include <limits>
 #include <numeric>
@@ -38,13 +39,17 @@ constexpr std::array<s16, 49> kOkiStepTable = {
 };
 constexpr std::array<s8, 8> kOkiIndexShift = {-1, -1, -1, -1, 2, 4, 6, 8};
 constexpr double kPi = 3.14159265358979323846264338327950288;
-
 s32 clipSigned15(s32 x) {
   return (x & 16384) ? (x | ~16383) : (x & 16383);
 }
 
 s32 clampSigned16(s32 x) {
   return std::clamp<s32>(x, -32768, 32767);
+}
+
+[[nodiscard]] s32 arithmeticShiftRight(s32 value, u32 bits) {
+  return value >= 0 ? value >> bits
+                    : -static_cast<s32>((static_cast<u32>(-value) + (u32{1} << bits) - 1) >> bits);
 }
 
 void decodeBrrBlock(std::span<s16, 16> output, u8 header, std::span<const u8, 8> payload, s32& previous1,
@@ -101,6 +106,10 @@ void decodeBrrBlock(std::span<s16, 16> output, u8 header, std::span<const u8, 8>
 
 [[nodiscard]] u16 le16(std::span<const u8> bytes, size_t offset) {
   return static_cast<u16>(bytes[offset] | (bytes[offset + 1] << 8));
+}
+
+[[nodiscard]] u32 le32(std::span<const u8> bytes, size_t offset) {
+  return static_cast<u32>(le16(bytes, offset)) | (static_cast<u32>(le16(bytes, offset + 2)) << 16);
 }
 
 void processNdsImaNibble(u8 data4Bit, int& index, int& pcm16) {
@@ -226,6 +235,41 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
                                            return sum;
                                          });
     samples[i] = static_cast<s16>(std::clamp(std::round(value * 0x7fff * 2.0), -32768.0, 32767.0));
+  }
+  return samples;
+}
+
+[[nodiscard]] std::vector<s16> synthesizeBandLimitedStepPcm16(std::span<const s16> steps, u32 sampleCount) {
+  // Mednafen's GBA APU uses Blip_Synth's default -8 dB-at-Nyquist kernel;
+  // applying the same logarithmic tilt keeps the exported cycle alias-free.
+  constexpr double kTrebleDb = -8.0;
+  std::vector<s16> samples(sampleCount);
+  if (steps.empty() || sampleCount == 0) {
+    return samples;
+  }
+
+  const u32 harmonics = (sampleCount - 1) / 2;
+  std::vector<std::complex<double>> coefficients(harmonics + 1);
+  coefficients[0] = std::accumulate(steps.begin(), steps.end(), 0.0) / steps.size();
+  for (u32 harmonic = 1; harmonic <= harmonics; ++harmonic) {
+    std::complex<double> sum{};
+    for (u32 step = 0; step < steps.size(); ++step) {
+      const double phase = -2.0 * kPi * harmonic * (step + 0.5) / steps.size();
+      sum += static_cast<double>(steps[step]) * std::polar(1.0, phase);
+    }
+    const double trebleGain = std::pow(10.0, kTrebleDb * harmonic / harmonics / 20.0);
+    coefficients[harmonic] =
+        sum * (std::sin(kPi * harmonic / steps.size()) / (kPi * harmonic)) * trebleGain;
+  }
+
+  for (u32 i = 0; i < sampleCount; ++i) {
+    double value = coefficients[0].real();
+    for (u32 harmonic = 1; harmonic <= harmonics; ++harmonic) {
+      value += 2.0 * (coefficients[harmonic] *
+                      std::polar(1.0, 2.0 * kPi * harmonic * i / sampleCount))
+                         .real();
+    }
+    samples[i] = static_cast<s16>(std::clamp(std::round(value), -32768.0, 32767.0));
   }
   return samples;
 }
@@ -519,8 +563,66 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   return decoded;
 }
 
+[[nodiscard]] std::optional<DecodedSample> decodeGbaDirectSound(const Sample& sample,
+                                                                std::span<const u8> sourceBytes) {
+  if (!rangeIsValid(sample, sourceBytes) || sample.encodedData.size < 16 || sample.sampleRate == 0) {
+    return std::nullopt;
+  }
+  const auto header = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
+  const bool compressed = le16(header, 0) != 0;
+  const bool loops = !sample.reverse && (header[3] & 0xc0) != 0;
+  const u32 loopStart = le32(header, 8);
+  const u32 sampleCount = le32(header, 12);
+  const u64 encodedBytes = compressed ? ((static_cast<u64>(sampleCount) + 63) / 64) * 33 : sampleCount;
+  if (sampleCount == 0 || (loops && loopStart >= sampleCount) || encodedBytes > header.size() - 16) {
+    return std::nullopt;
+  }
+
+  Sample body = sample;
+  body.encodedData.offset += 16;
+  body.encodedData.size = encodedBytes;
+  body.loop = {};
+  body.codecParameter = sampleCount;
+  auto source = compressed ? decodeGbaBdpcm(body, sourceBytes) : decodePcmS8(body, sourceBytes);
+  if (!source) {
+    return std::nullopt;
+  }
+
+  const u32 mixerRate = static_cast<u32>(sample.codecParameter >> 32);
+  if (mixerRate == 0) {
+    return std::nullopt;
+  }
+  constexpr u64 unit = u64{1} << 23;
+  const u32 phaseStep = static_cast<u32>(sample.codecParameter);
+  const u64 step = phaseStep == 0 ? unit : phaseStep;
+  const u64 mixerFrames = (static_cast<u64>(sampleCount) * unit + step - 1) / step;
+  const u64 outputFrames = (mixerFrames * sample.sampleRate + mixerRate - 1) / mixerRate;
+  if (outputFrames > std::numeric_limits<u32>::max()) {
+    return std::nullopt;
+  }
+
+  DecodedSample decoded{.sampleRate = sample.sampleRate, .channels = 1};
+  decoded.pcm.reserve(static_cast<size_t>(outputFrames));
+  for (u64 frame = 0; frame < outputFrames; ++frame) {
+    const u64 position = (frame * mixerRate / sample.sampleRate) * step;
+    const u32 index = static_cast<u32>(position >> 23);
+    const u32 next = index + 1 < sampleCount ? index + 1 : loops ? loopStart : index;
+    const s32 first = source->pcm[index] >> 8;
+    const s32 difference = (source->pcm[next] >> 8) - first;
+    const s32 fraction = static_cast<s32>(position & (unit - 1));
+    decoded.pcm.push_back(static_cast<s16>((first + arithmeticShiftRight(fraction * difference, 23)) << 8));
+  }
+  if (loops) {
+    const u64 mixerLoopStart = (static_cast<u64>(loopStart) * unit + step - 1) / step;
+    decoded.loop.enabled = true;
+    decoded.loop.start = static_cast<u32>((mixerLoopStart * sample.sampleRate + mixerRate - 1) / mixerRate);
+    decoded.loop.length = static_cast<u32>(decoded.pcm.size()) - decoded.loop.start;
+  }
+  return decoded;
+}
+
 [[nodiscard]] std::optional<DecodedSample> decodeGbaPsg(const Sample& sample) {
-  constexpr std::array<double, 4> duties{0.125, 0.25, 0.5, 0.75};
+  constexpr std::array<u8, 4> highSteps{1, 2, 4, 6};
   const size_t guard = sample.loop.enabled ? sample.loop.start : 0;
   const u64 sampleCountWithGuards = static_cast<u64>(guard) * 2 + sample.loop.length;
   if (sample.loop.length == 0 || sampleCountWithGuards > std::numeric_limits<u32>::max() ||
@@ -540,8 +642,12 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
     period = synthesizeLfsrNoisePcm16(sample.loop.length + 1, 0x7f, 0x60);
     period.erase(period.begin());
   } else {
-    period = synthesizeBandLimitedPulsePcm16(duties[sample.codecParameter & 3], sample.sampleRate, sample.loop.length,
-                                             static_cast<double>(sample.sampleRate) / sample.loop.length);
+    const u32 high = highSteps[sample.codecParameter & 3];
+    // The analog output blocks the duty-dependent DC component.
+    std::array<s16, 8> steps{};
+    steps.fill(static_cast<s16>(-static_cast<s32>(high) * 4096));
+    std::fill_n(steps.begin(), high, static_cast<s16>((8 - high) * 4096));
+    period = synthesizeBandLimitedStepPcm16(steps, sample.loop.length);
   }
   decoded.pcm.reserve(static_cast<size_t>(sampleCountWithGuards));
   decoded.pcm.insert(decoded.pcm.end(), period.end() - static_cast<std::ptrdiff_t>(guard), period.end());
@@ -566,14 +672,18 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
     wave[index++] = static_cast<s16>((static_cast<s32>(packed >> 4) - 8) << 12);
     wave[index++] = static_cast<s16>((static_cast<s32>(packed & 0x0f) - 8) << 12);
   }
-  const size_t guard = sample.loop.enabled ? sample.loop.start : 0;
-  if (guard > wave.size() || (sample.loop.enabled && sample.loop.length != wave.size())) {
+  if (sample.loop.length == 0) {
     return std::nullopt;
   }
-  decoded.pcm.reserve(wave.size() + guard * 2);
-  decoded.pcm.insert(decoded.pcm.end(), wave.end() - static_cast<std::ptrdiff_t>(guard), wave.end());
-  decoded.pcm.insert(decoded.pcm.end(), wave.begin(), wave.end());
-  decoded.pcm.insert(decoded.pcm.end(), wave.begin(), wave.begin() + static_cast<std::ptrdiff_t>(guard));
+  std::vector<s16> period = synthesizeBandLimitedStepPcm16(wave, sample.loop.length);
+  const size_t guard = sample.loop.enabled ? sample.loop.start : 0;
+  if (guard > period.size()) {
+    return std::nullopt;
+  }
+  decoded.pcm.reserve(period.size() + guard * 2);
+  decoded.pcm.insert(decoded.pcm.end(), period.end() - static_cast<std::ptrdiff_t>(guard), period.end());
+  decoded.pcm.insert(decoded.pcm.end(), period.begin(), period.end());
+  decoded.pcm.insert(decoded.pcm.end(), period.begin(), period.begin() + static_cast<std::ptrdiff_t>(guard));
   return decoded;
 }
 
@@ -593,6 +703,8 @@ std::optional<DecodedSample> decodeSample(const Sample& sample, std::span<const 
       return decodeNdsImaAdpcm(sample, sourceBytes);
     case AudioCodec::NdsPsg:
       return decodeNdsPsg(sample, sourceBytes);
+    case AudioCodec::GbaDirectSound:
+      return decodeGbaDirectSound(sample, sourceBytes);
     case AudioCodec::GbaBdpcm:
       return decodeGbaBdpcm(sample, sourceBytes);
     case AudioCodec::GbaPsg:
