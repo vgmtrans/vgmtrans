@@ -523,7 +523,8 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   constexpr std::array<double, 4> duties{0.125, 0.25, 0.5, 0.75};
   const size_t guard = sample.loop.enabled ? sample.loop.start : 0;
   const u64 sampleCountWithGuards = static_cast<u64>(guard) * 2 + sample.loop.length;
-  if (sampleCountWithGuards > std::numeric_limits<u32>::max() || guard > sample.loop.length) {
+  if (sample.loop.length == 0 || sampleCountWithGuards > std::numeric_limits<u32>::max() ||
+      guard > sample.loop.length) {
     return std::nullopt;
   }
   DecodedSample decoded{.sampleRate = sample.sampleRate, .channels = 1, .loop = sample.loop};
@@ -539,7 +540,8 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
     period = synthesizeLfsrNoisePcm16(sample.loop.length + 1, 0x7f, 0x60);
     period.erase(period.begin());
   } else {
-    period = synthesizeBandLimitedPulsePcm16(duties[sample.codecParameter & 3], sample.sampleRate, sample.loop.length);
+    period = synthesizeBandLimitedPulsePcm16(duties[sample.codecParameter & 3], sample.sampleRate, sample.loop.length,
+                                             static_cast<double>(sample.sampleRate) / sample.loop.length);
   }
   decoded.pcm.reserve(static_cast<size_t>(sampleCountWithGuards));
   decoded.pcm.insert(decoded.pcm.end(), period.end() - static_cast<std::ptrdiff_t>(guard), period.end());
