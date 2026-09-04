@@ -75,7 +75,6 @@ struct TrackState {
   bool usesModulation = false;
   s32 transpose = 0;
   u8 bendRange = 2;
-  u8 program = 0;
   Mp2kTone tone{.type = 1};
   u8 previousKey = 0;
   u8 previousVelocity = 0;
@@ -140,11 +139,7 @@ struct Playback {
     if (!table) {
       return {};
     }
-    const u32 offset = *table + index * 12;
-    if (!programState.reader.has(offset, 12)) {
-      return {};
-    }
-    return parseMp2kTone(programState.reader, offset).value_or(Mp2kTone{});
+    return parseMp2kTone(programState.reader, *table + index * 12).value_or(Mp2kTone{});
   }
 
   [[nodiscard]] s8 notePan(const Mp2kTone& tone) const {
@@ -186,10 +181,8 @@ struct Playback {
     if (tone.cgbType() != 3) {
       return std::min<u8>(envelope, 15) / 15.0;
     }
-    constexpr std::array<double, 16> waveLevels{
-        0.0, 0.0, 0.25, 0.25, 0.25, 0.25, 0.5, 0.5, 0.5, 0.5, 0.75, 0.75, 0.75, 0.75, 1.0, 1.0,
-    };
-    return waveLevels[std::min<u8>(envelope, 15)];
+    // MP2k maps the 4-bit envelope to the wave channel's five quarter-scale levels.
+    return std::min<u8>(4, (std::min<u8>(envelope, 15) + 2) / 4) / 4.0;
   }
 
   void emitLevel(const Mp2kTone& tone, s8 voicePan = 0) {
@@ -356,7 +349,6 @@ struct Playback {
   }
 
   void program(u8 number) {
-    track.program = number;
     track.tone = number < programState.tones.size() ? programState.tones[number] : Mp2kTone{};
     track.cgbEnvelopeOverride = false;
     out.instrument(0, number, InstrumentEnvelopeMode::UseInstrumentEnvelope);
