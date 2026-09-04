@@ -80,8 +80,6 @@ bool addBank(ScanResultBuilder& result, const BankLayout& layout, std::string_vi
                                           .codec = AudioCodec::PsxAdpcm,
                                           .encodedData = stream.encodedData,
                                           .sampleRate = sampleRate,
-                                          .channels = 1,
-                                          .bitsPerSample = 16,
                                           .loop = stream.loop,
                                       });
     sample.source(sample.value().name, stream.encodedData, "psx-adpcm-sample").parent(sampleRoot);
@@ -111,7 +109,6 @@ bool addBank(ScanResultBuilder& result, const BankLayout& layout, std::string_vi
     instrument
         .region(sample->second,
                 Region{
-                    .keyRange = KeyRange{.low = 0, .high = 127},
                     .range = adsrRange,
                     .unityKey = 48.0,
                     .envelope = psxSpuEnvelope(static_cast<u16>(adsr), static_cast<u16>(adsr >> 16), spuGeneration),
