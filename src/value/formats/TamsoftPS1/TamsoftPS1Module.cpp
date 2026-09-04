@@ -24,22 +24,10 @@ namespace {
   return value;
 }
 
-[[nodiscard]] std::string sourceExtension(const SourceFile& source) {
-  const std::filesystem::path path = source.path.empty() ? std::filesystem::path(source.name) : source.path;
-  return lowercase(path.extension().string());
-}
-
-[[nodiscard]] std::string sourceStem(const SourceFile& source) {
-  const std::filesystem::path path = source.path.empty() ? std::filesystem::path(source.name) : source.path;
-  std::string stem = path.stem().string();
-  if (stem.empty() && source.title) {
-    stem = *source.title;
-  }
-  return stem;
-}
-
 [[nodiscard]] ScanResult scan(const ScanInput& input) {
-  const std::string extension = sourceExtension(input.source);
+  const std::filesystem::path path =
+      input.source.path.empty() ? std::filesystem::path(input.source.name) : input.source.path;
+  const std::string extension = lowercase(path.extension().string());
   const bool sequenceCandidate = extension.empty() || extension == ".tsq";
   const bool bankCandidate = extension.empty() || extension == ".tvb" || extension == ".tvb2";
   const auto sequences = sequenceCandidate ? readSequenceLayouts(input.reader) : std::vector<SequenceLayout>{};
@@ -49,8 +37,13 @@ namespace {
   }
 
   ScanResultBuilder result(input, std::string(kFormatName));
-  const std::string fileStem = sourceStem(input.source);
-  const std::string stem = fileStem.empty() ? result.sourceDisplayName() : fileStem;
+  std::string stem = path.stem().string();
+  if (stem.empty() && input.source.title) {
+    stem = *input.source.title;
+  }
+  if (stem.empty()) {
+    stem = result.sourceDisplayName();
+  }
   // A TSQ is loaded as one driver bank. Mixed files such as C13BGM therefore
   // use BGM.TVB for every song entry, including embedded sound effects.
   const bool usesMusicBank = std::ranges::any_of(sequences, [](const SequenceLayout& layout) {

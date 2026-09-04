@@ -144,9 +144,10 @@ struct Playback {
   VmApi& vm;
   ProgramState& programState;
 
-  void emitReverb() {
+  void emitReverb(std::optional<u8> voiceMask = std::nullopt) {
     out.reverb(ReverbPerformanceEvent{
-        .send = track.reverb ? std::abs(programState.reverbDepth) : 0.0,
+        .voiceMask = voiceMask,
+        .send = (voiceMask.has_value() || track.reverb) ? std::abs(programState.reverbDepth) : 0.0,
         .leftGain = programState.reverbDepth,
         .rightGain = programState.reverbDepth,
         .filterIndex = programState.reverbMode,
@@ -224,22 +225,12 @@ struct Playback {
 
   void setReverbMode(u8 mode) {
     programState.reverbMode = mode;
-    emitGlobalReverb();
+    emitReverb(u8{0xff});
   }
 
   void setReverbDepth(u8 depth) {
     programState.reverbDepth = signedReverbDepth(depth);
-    emitGlobalReverb();
-  }
-
-  void emitGlobalReverb() {
-    out.reverb(ReverbPerformanceEvent{
-        .voiceMask = 0xff,
-        .send = std::abs(programState.reverbDepth),
-        .leftGain = programState.reverbDepth,
-        .rightGain = programState.reverbDepth,
-        .filterIndex = programState.reverbMode,
-    });
+    emitReverb(u8{0xff});
   }
 
   void setReverbSend(bool enabled) {
