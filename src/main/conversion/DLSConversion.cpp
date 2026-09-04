@@ -2,7 +2,7 @@
  * VGMTrans (c) - 2002-2024
  * Licensed under the zlib license
  * See the included LICENSE for more information
-*/
+ */
 #include "DLSConversion.h"
 
 #include "base/Types.h"
@@ -22,25 +22,21 @@
 
 namespace conversion {
 
-void unpackSampColl(DLSFile &dls, const VGMSampColl *sampColl, std::vector<VGMSamp *> &finalSamps) {
+void unpackSampColl(DLSFile& dls, const VGMSampColl* sampColl, std::vector<VGMSamp*>& finalSamps) {
   assert(sampColl != nullptr);
 
   size_t nSamples = sampColl->sampleCount();
   for (size_t i = 0; i < nSamples; i++) {
-    VGMSamp *samp = sampColl->sample(i);
+    VGMSamp* samp = sampColl->sample(i);
 
     BPS targetBps = samp->bps();
-    std::vector<u8> uncompSampBuf = samp->toPcm(
-      targetBps == BPS::PCM8 ? Signedness::Unsigned : Signedness::Signed,
-      Endianness::Little,
-      targetBps
-    );
+    std::vector<u8> uncompSampBuf =
+        samp->toPcm(targetBps == BPS::PCM8 ? Signedness::Unsigned : Signedness::Signed, Endianness::Little, targetBps);
 
     u16 bitsPerSample = static_cast<u16>(samp->bitsPerSample());
     u16 blockAlign = bitsPerSample / 8 * samp->channels;
-    dls.addWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign,
-                bitsPerSample, static_cast<u32>(uncompSampBuf.size()), uncompSampBuf.data(),
-                samp->name());
+    dls.addWave(1, samp->channels, samp->rate, samp->rate * blockAlign, blockAlign, bitsPerSample,
+                static_cast<u32>(uncompSampBuf.size()), uncompSampBuf.data(), samp->name());
     finalSamps.push_back(samp);
   }
 }
@@ -54,13 +50,8 @@ bool createDLSFile(DLSFile& dls, const VGMColl& coll, const ConversionContext& c
   return createDLSFile(dls, coll.instrSets(), coll.sampColls(), &coll, context);
 }
 
-bool createDLSFile(
-  DLSFile& dls,
-  std::span<VGMInstrSet* const> instrsets,
-  std::span<VGMSampColl* const> sampcolls,
-  const VGMColl* coll,
-  const ConversionContext& context
-) {
+bool createDLSFile(DLSFile& dls, std::span<VGMInstrSet* const> instrsets, std::span<VGMSampColl* const> sampcolls,
+                   const VGMColl* coll, const ConversionContext& context) {
   bool result = true;
   for (auto* instrset : instrsets) {
     instrset->prepareForExport(coll);
@@ -74,28 +65,24 @@ bool createDLSFile(
   return result;
 }
 
-bool mainDLSCreation(
-  DLSFile& dls,
-  std::span<VGMInstrSet* const> m_instrsets,
-  std::span<VGMSampColl* const> m_sampcolls,
-  const ConversionContext& context
-) {
+bool mainDLSCreation(DLSFile& dls, std::span<VGMInstrSet* const> m_instrsets, std::span<VGMSampColl* const> m_sampcolls,
+                     const ConversionContext& context) {
   if (m_instrsets.empty()) {
     L_ERROR("No instrument sets available to create DLS");
     return false;
   }
 
-  std::vector<VGMSamp *> finalSamps;
-  std::vector<VGMSampColl *> finalSampColls;
+  std::vector<VGMSamp*> finalSamps;
+  std::vector<VGMSampColl*> finalSampColls;
 
   /* Grab samples either from the local sampcolls or from the instrument sets */
   if (!m_sampcolls.empty()) {
-    for (auto & sampcoll : m_sampcolls) {
+    for (auto& sampcoll : m_sampcolls) {
       finalSampColls.push_back(sampcoll);
       unpackSampColl(dls, sampcoll, finalSamps);
     }
   } else {
-    for (auto & instrset : m_instrsets) {
+    for (auto& instrset : m_instrsets) {
       if (auto instrset_sampcoll = instrset->sampColl()) {
         finalSampColls.push_back(instrset_sampcoll);
         unpackSampColl(dls, instrset_sampcoll, finalSamps);
@@ -109,7 +96,7 @@ bool mainDLSCreation(
   }
 
   for (size_t inst = 0; inst < m_instrsets.size(); inst++) {
-    VGMInstrSet *set = m_instrsets[inst];
+    VGMInstrSet* set = m_instrsets[inst];
     const auto& instrs = set->exportInstrs();
     size_t nInstrs = instrs.size();
     for (size_t i = 0; i < nInstrs; i++) {
@@ -118,11 +105,11 @@ bool mainDLSCreation(
       std::string name = vgminstr->name();
       auto bank_no = vgminstr->bank;
       /*
-      * The ulBank field follows this structure:
-      * F|00000000000000000|CC0|0|CC32
-      * where F = 0 if the instrument is melodic, 1 otherwise
-      * (length of each CC is 7 bits, obviously)
-      */
+       * The ulBank field follows this structure:
+       * F|00000000000000000|CC0|0|CC32
+       * where F = 0 if the instrument is melodic, 1 otherwise
+       * (length of each CC is 7 bits, obviously)
+       */
       if (auto bs = context.bankSelectStyle; bs == BankSelectStyle::GS) {
         bank_no &= 0x7f;
         bank_no = bank_no << 8;
@@ -131,22 +118,24 @@ bool mainDLSCreation(
         const u8 bank_lsb = bank_no & 0x7f;
         bank_no = (bank_msb << 8) | bank_lsb;
       }
-      DLSInstr *newInstr = dls.addInstr(bank_no, vgminstr->instrNum, name);
+      DLSInstr* newInstr = dls.addInstr(bank_no, vgminstr->instrNum, name);
       for (u32 j = 0; j < nRgns; j++) {
-        VGMRgn *rgn = vgminstr->regions()[j];
+        VGMRgn* rgn = vgminstr->regions()[j];
         //				if (rgn->sampNum+1 > sampColl->sampleCount())	//does thereferenced sample exist?
         //					continue;
 
         // Determine the SampColl associated with this rgn.  If there's an explicit pointer to it, use that.
-        VGMSampColl *sampColl = rgn->sampCollPtr;
+        VGMSampColl* sampColl = rgn->sampCollPtr;
         if (!sampColl) {
           // If rgn is of an InstrSet with an embedded SampColl, use that SampColl.
-          if (static_cast<VGMInstrSet*>(rgn->vgmFile())->sampColl())
+          if (static_cast<VGMInstrSet*>(rgn->vgmFile())->sampColl()) {
             sampColl = static_cast<VGMInstrSet*>(rgn->vgmFile())->sampColl();
+          }
 
-            // If that does not exist, assume the first SampColl
-          else
+          // If that does not exist, assume the first SampColl
+          else {
             sampColl = finalSampColls[0];
+          }
         }
 
         // Determine the sample number within the rgn's associated SampColl
@@ -155,7 +144,7 @@ bool mainDLSCreation(
         // see sampOffset declaration in header file for more info.
         if (rgn->sampOffset != -1) {
           bool bFoundIt = false;
-          for (u32 s = 0; s < sampColl->sampleCount(); s++) {             //for every sample
+          for (u32 s = 0; s < sampColl->sampleCount(); s++) {  // for every sample
             auto* sample = sampColl->sample(s);
             if (std::cmp_equal(rgn->sampOffset, sample->offset()) ||
                 std::cmp_equal(rgn->sampOffset, sample->offset() - sampColl->offset() - sampColl->sampDataOffset)) {
@@ -167,29 +156,38 @@ bool mainDLSCreation(
           }
           if (!bFoundIt) {
             L_ERROR("Failed matching region to a sample with offset {:#x} (Instrset "
-                    "{}, Instr {}, Region {})", rgn->sampOffset, inst, i, j);
+                    "{}, Instr {}, Region {})",
+                    rgn->sampOffset, inst, i, j);
             realSampNum = 0;
           }
         }
-          // Otherwise, the sample number should be explicitly defined in the rgn.
-        else
-          realSampNum = rgn->sampNum;
+        // Otherwise, the sample number should be explicitly defined in the rgn.
+        else {
+          const auto sampleIndex = sampColl->sampleIndexForSlot(rgn->sampNum);
+          if (!sampleIndex) {
+            L_DEBUG("Skipping region that references absent sample slot {}", rgn->sampNum);
+            continue;
+          }
+          realSampNum = *sampleIndex;
+        }
 
         // Determine the sampCollNum (index into our finalSampColls vector)
         unsigned int sampCollNum = 0;
         for (unsigned int k = 0; k < finalSampColls.size(); k++) {
-          if (finalSampColls[k] == sampColl)
+          if (finalSampColls[k] == sampColl) {
             sampCollNum = k;
+          }
         }
         // now we add the number of samples from the preceding SampColls to the value to
         // get the real sampNum in the final DLS file.
-        for (unsigned int k = 0; k < sampCollNum; k++)
+        for (unsigned int k = 0; k < sampCollNum; k++) {
           realSampNum += finalSampColls[k]->sampleCount();
+        }
 
         // For collections with multiple SampColls
         // If a SampColl ptr is given, find the SampColl and adjust the sample number of the region
         // to compensate for all preceding SampColl samples.
-        //if (rgn->sampCollNum == -1)	//if a sampCollPtr is defined
+        // if (rgn->sampCollNum == -1)	//if a sampCollPtr is defined
         //{
         //	// find the sampColl's index in samplecolls (the sampCollNum, effectively)
         //	for (u32 i=0; i < finalSampColls.size(); i++)
@@ -198,10 +196,11 @@ bool mainDLSCreation(
         //			rgn->sampCollNum = i;
         //	}
         //}
-        //if (rgn->sampCollNum != -1)		//if a sampCollNum is defined
+        // if (rgn->sampCollNum != -1)		//if a sampCollNum is defined
         //{									//then sampNum represents the sample number in the specific sample collection
         //	for (int k=0; k < rgn->sampCollNum; k++)
-        //		realSampNum += finalSampColls[k]->sampleCount();	//so now we add all previous sample collection samples to the value to get the real (absolute) sampNum
+        //		realSampNum += finalSampColls[k]->sampleCount();	//so now we add all previous sample collection samples
+        //to the value to get the real (absolute) sampNum
         //}
 
         if (realSampNum >= finalSamps.size()) {
@@ -209,46 +208,51 @@ bool mainDLSCreation(
           realSampNum = finalSamps.size() - 1;
         }
 
-        DLSRgn *newRgn = newInstr->addRgn();
+        DLSRgn* newRgn = newInstr->addRgn();
         newRgn->setRanges(rgn->keyLow, rgn->keyHigh, rgn->velLow, rgn->velHigh);
         newRgn->setWaveLinkInfo(0, 0, 1, static_cast<u32>(realSampNum));
 
-        VGMSamp *samp = finalSamps[realSampNum]; //sampColl->sample(rgn->sampNum);
-        DLSWsmp *newWsmp = newRgn->addWsmp();
+        VGMSamp* samp = finalSamps[realSampNum];  // sampColl->sample(rgn->sampNum);
+        DLSWsmp* newWsmp = newRgn->addWsmp();
 
         // This is a really loopy way of determining the loop information, pardon the pun.  However, it works.
-        // There might be a way to simplify this, but I don't want to test out whether another method breaks anything just yet
-        // Use the sample's loopStatus to determine if a loop occurs.  If it does, see if the sample provides loop info
-        // (gathered during ADPCM > PCM conversion.  If the sample doesn't provide loop offset info, then use the region's
-        // loop info.
+        // There might be a way to simplify this, but I don't want to test out whether another method breaks anything
+        // just yet Use the sample's loopStatus to determine if a loop occurs.  If it does, see if the sample provides
+        // loop info (gathered during ADPCM > PCM conversion.  If the sample doesn't provide loop offset info, then use
+        // the region's loop info.
         if (samp->bPSXLoopInfoPrioritizing) {
           if (samp->loop.loopStatus != -1) {
-            if (samp->loop.loopStart != 0 || samp->loop.loopLength != 0)
+            if (samp->loop.loopStart != 0 || samp->loop.loopLength != 0) {
               newWsmp->setLoopInfo(samp->loop, samp);
-            else {
+            } else {
               rgn->loop.loopStatus = samp->loop.loopStatus;
               newWsmp->setLoopInfo(rgn->loop, samp);
             }
-          } else
-              throw;
-        }
-          // The normal method: First, we check if the rgn has loop info defined.
-          // If it doesn't, then use the sample's loop info.
-        else if (rgn->loop.loopStatus == -1) {
-          if (samp->loop.loopStatus != -1)
-            newWsmp->setLoopInfo(samp->loop, samp);
-          else
+          } else {
             throw;
-        } else
+          }
+        }
+        // The normal method: First, we check if the rgn has loop info defined.
+        // If it doesn't, then use the sample's loop info.
+        else if (rgn->loop.loopStatus == -1) {
+          if (samp->loop.loopStatus != -1) {
+            newWsmp->setLoopInfo(samp->loop, samp);
+          } else {
+            throw;
+          }
+        } else {
           newWsmp->setLoopInfo(rgn->loop, samp);
+        }
 
         s8 realUnityKey;
-        if (rgn->unityKey == -1)
+        if (rgn->unityKey == -1) {
           realUnityKey = samp->unityKey;
-        else
+        } else {
           realUnityKey = rgn->unityKey;
-        if (realUnityKey == -1)
+        }
+        if (realUnityKey == -1) {
           realUnityKey = 0x3C;
+        }
 
         // With DLS2, we could make WSMP blocks on the waves, then apply extra finetune and
         // gain/attenuation on the region articulation. For unity key, we would have to use the
@@ -262,9 +266,9 @@ bool mainDLSCreation(
         long convHold = secondsToDlsTimecents(rgn->hold_time);
         long convDecay = secondsToDlsTimecents(rgn->decay_time);
         long convSustainLev;
-        if (rgn->sustain_level == -1)
-          convSustainLev = 0x03e80000;        //sustain at full if no sustain level provided
-        else {
+        if (rgn->sustain_level == -1) {
+          convSustainLev = 0x03e80000;  // sustain at full if no sustain level provided
+        } else {
           // the DLS envelope is a range from 0 to -96db.
           double attenInDB = ampToDb(rgn->sustain_level);
           convSustainLev = static_cast<long>(((96.0 - attenInDB) / 96.0) * 0x03e80000);
@@ -272,7 +276,7 @@ bool mainDLSCreation(
 
         long convRelease = secondsToDlsTimecents(rgn->release_time);
 
-        DLSArt *newArt = newRgn->addArt();
+        DLSArt* newArt = newRgn->addArt();
         newArt->addPan(convertPercentPanTo10thPercentUnits(rgn->pan) * 65536);
         newArt->addADSR(convAttack, 0, convHold, convDecay, convSustainLev, convRelease, 0);
         if (rgn->lfoVibDepthCents() > 0 && rgn->lfoVibFreqHz() > 0) {
@@ -295,4 +299,4 @@ bool mainDLSCreation(
   return true;
 }
 
-} // conversion
+}  // namespace conversion
