@@ -77,6 +77,10 @@ else()
   target_link_libraries(minizip PUBLIC ZLIB::ZLIB)
 endif()
 
+if(NOT WIN32)
+  find_package(Iconv REQUIRED)
+endif()
+
 if(USE_SYSTEM_UNARR)
   find_package(unarr 1.1.0 REQUIRED)
 else()
@@ -239,6 +243,13 @@ target_sources(vgmtranscore
     formats/PS1/PS1Seq.cpp
     formats/PS1/PS1SeqScanner.cpp
     formats/PS1/Vab.cpp
+    formats/PSDSE/PSDSEFormat.cpp
+    formats/PSDSE/PSDSEInstrSet.cpp
+    formats/PSDSE/PSDSEPS2Header.cpp
+    formats/PSDSE/PSDSEPS2InstrSet.cpp
+    formats/PSDSE/PSDSEPS2Seq.cpp
+    formats/PSDSE/PSDSEScanner.cpp
+    formats/PSDSE/PSDSESeq.cpp
     formats/PandoraBoxSnes/PandoraBoxSnesInstr.cpp
     formats/PandoraBoxSnes/PandoraBoxSnesScanner.cpp
     formats/PandoraBoxSnes/PandoraBoxSnesSeq.cpp
@@ -275,10 +286,15 @@ target_sources(vgmtranscore
     formats/common/SNESDSP.cpp
     formats/common/YM2151InstrSet.cpp
     io/RawFile.cpp
+    loaders/At7Loader.cpp
     loaders/CHDLoader.cpp
     loaders/CPS3Decrypt.cpp
+    loaders/DarcLoader.cpp
     loaders/KabukiDecrypt.cpp
+    loaders/Lpc2Loader.cpp
     loaders/MAMELoader.cpp
+    loaders/NisDsarcLoader.cpp
+    loaders/NitroFsLoader.cpp
     loaders/PSF2Loader.cpp
     loaders/PSFLoader.cpp
     loaders/PSFMetadataHints.cpp
@@ -428,6 +444,16 @@ target_sources(vgmtranscore
       formats/PS1/PS1Seq.h
       formats/PS1/PS1SeqScanner.h
       formats/PS1/Vab.h
+      formats/PSDSE/PSDSEEnvelopeCurve.h
+      formats/PSDSE/PSDSEFormat.h
+      formats/PSDSE/PSDSEHeader.h
+      formats/PSDSE/PSDSEInstrSet.h
+      formats/PSDSE/PSDSEMatcher.h
+      formats/PSDSE/PSDSEPS2Header.h
+      formats/PSDSE/PSDSEPS2InstrSet.h
+      formats/PSDSE/PSDSEPS2Seq.h
+      formats/PSDSE/PSDSEScanner.h
+      formats/PSDSE/PSDSESeq.h
       formats/PandoraBoxSnes/PandoraBoxSnesFormat.h
       formats/PandoraBoxSnes/PandoraBoxSnesInstr.h
       formats/PandoraBoxSnes/PandoraBoxSnesScanner.h
@@ -545,11 +571,16 @@ target_sources(vgmtranscore
       conversion/VGMExport.h
     FILE_SET headers_loaders TYPE HEADERS BASE_DIRS loaders
     FILES
+      loaders/At7Loader.h
       loaders/CHDLoader.h
       loaders/CPS3Decrypt.h
+      loaders/DarcLoader.h
       loaders/KabukiDecrypt.h
+      loaders/Lpc2Loader.h
       loaders/LoaderManager.h
       loaders/MAMELoader.h
+      loaders/NisDsarcLoader.h
+      loaders/NitroFsLoader.h
       loaders/PSF2Loader.h
       loaders/PSFLoader.h
       loaders/PSFMetadataHints.h
@@ -564,6 +595,9 @@ target_link_libraries(
   vgmtranscore
   PUBLIC spdlog::spdlog unarr ZLIB::ZLIB minizip mio chdr-static nlohmann_json::nlohmann_json
 )
+if(NOT WIN32)
+  target_link_libraries(vgmtranscore PUBLIC Iconv::Iconv)
+endif()
 target_compile_features(vgmtranscore PUBLIC cxx_std_20)
 
 include(CheckCXXSourceCompiles)
