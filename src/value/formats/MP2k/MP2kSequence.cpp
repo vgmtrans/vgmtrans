@@ -68,6 +68,13 @@ struct ActiveNote {
   u64 endTick = 0;
 };
 
+enum class CgbRoute { Left, Both, Right };
+
+struct CgbMix {
+  u8 envelope;
+  CgbRoute route;
+};
+
 struct TrackState {
   explicit TrackState(const TrackProgram& program)
       : usesModulation(trackUsesSemantic(program, SequenceSemantic::Modulation)) {}
@@ -86,6 +93,7 @@ struct TrackState {
   bool cgbEnvelopeOverride = false;
   double emittedLevel = 0.0;
   std::optional<double> emittedReverb;
+  std::optional<CgbRoute> emittedCgbRoute;
   u32 sampleStart = 0;
   std::array<u8, 256> soundRegisters{};
   LfoState lfo;
@@ -157,7 +165,7 @@ struct Playback {
     return arithmeticShiftRight(track.lfo.depth * triangle, 6);
   }
 
-  [[nodiscard]] u8 cgbEnvelopeGoal(u8 velocity, s8 voicePan, bool modulated) const {
+  [[nodiscard]] CgbMix cgbMix(u8 velocity, s8 voicePan, bool modulated) const {
     u32 combined = static_cast<u32>(track.volume) * 64 >> 5;
     const s32 modulation = modulated ? modulationValue() : 0;
     if (modulated && track.lfo.type == 1) {
@@ -174,22 +182,27 @@ struct Playback {
         std::min<u32>(255, static_cast<u32>(velocity) * static_cast<u32>(voicePan + 128) * rightTrack >> 14);
     const u32 left =
         std::min<u32>(255, static_cast<u32>(velocity) * static_cast<u32>(127 - voicePan) * leftTrack >> 14);
-    return static_cast<u8>(std::min<u32>(15, (left + right) >> 4));
+    CgbRoute route = CgbRoute::Both;
+    if (right < left && (left >> 1) >= right) {
+      route = CgbRoute::Left;
+    } else if ((right >> 1) >= left) {
+      route = CgbRoute::Right;
+    }
+    return CgbMix{.envelope = static_cast<u8>(std::min<u32>(15, (left + right) >> 4)), .route = route};
   }
 
-  [[nodiscard]] static double cgbOutputLevel(const Mp2kTone& tone, u8 envelope) {
+  [[nodiscard]] static double cgbSpeakerLevel(const Mp2kTone& tone, u8 envelope) {
+    // The driver's full SOUNDCNT_H/NR50 mix contributes envelope / 32 to each routed speaker.
     if (tone.cgbType() != 3) {
-      // CgbSound routes each voice at envelope / 32 per speaker. Constant-sum
-      // pan supplies the other half, so the aggregate source gain is / 16.
-      return std::min<u8>(envelope, 15) / 16.0;
+      return std::min<u8>(envelope, 15) / 32.0;
     }
     // MP2k maps the 4-bit envelope to the wave channel's five quarter-scale levels.
-    return std::min<u8>(4, (std::min<u8>(envelope, 15) + 2) / 4) / 4.0;
+    return std::min<u8>(4, (std::min<u8>(envelope, 15) + 2) / 4) / 8.0;
   }
 
   void emitLevel(const Mp2kTone& tone, s8 voicePan = 0) {
     const double level = tone.cgbType() == 0 ? levelFrom7BitLinear(track.volume)
-                                             : cgbOutputLevel(tone, cgbEnvelopeGoal(127, voicePan, false));
+                                             : cgbSpeakerLevel(tone, cgbMix(127, voicePan, false).envelope);
     if (level != track.emittedLevel) {
       track.emittedLevel = level;
       out.level(level, kMp2kLevelQuantization);
@@ -205,20 +218,41 @@ struct Playback {
   }
 
   void emitCgbEnvelope(const Mp2kTone& tone, u8 goal) {
-    const double peak = cgbOutputLevel(tone, goal);
+    const double peak = cgbSpeakerLevel(tone, goal);
     const u8 sustainGoal = static_cast<u8>((static_cast<u32>(goal) * tone.sustain + 15) >> 4);
     out.updateEnvelope(EnvelopeUpdate::replace(Envelope{
         .attackSeconds = cgbEnvelopeSeconds(tone.attack, goal),
         .holdSeconds = cgbEnvelopeSeconds(tone.decay, 1),
         .decaySeconds = cgbDecaySeconds(tone.decay, goal),
         .releaseSeconds = cgbDecaySeconds(tone.release, goal),
-        .sustainAmplitude = peak == 0.0 ? 0.0 : cgbOutputLevel(tone, sustainGoal) / peak,
+        .sustainAmplitude = peak == 0.0 ? 0.0 : cgbSpeakerLevel(tone, sustainGoal) / peak,
     }));
+  }
+
+  void emitPan(std::optional<CgbRoute> cgbRoute, bool force = false) {
+    if (!force && track.emittedCgbRoute == cgbRoute) {
+      return;
+    }
+    track.emittedCgbRoute = cgbRoute;
+    if (cgbRoute) {
+      out.stereoBalance(*cgbRoute == CgbRoute::Right ? 0.0 : 1.0, *cgbRoute == CgbRoute::Left ? 0.0 : 1.0);
+    } else {
+      out.pan(panPosition(track.pan), 255.0 / 256.0);
+    }
   }
 
   void pan(u8 value) {
     track.pan = value;
-    out.pan(panPosition(value), 255.0 / 256.0);
+    if (track.emittedCgbRoute) {
+      const Mp2kTone tone = noteTone(track.previousKey);
+      const s8 voicePan = notePan(tone);
+      if (tone.cgbType() != 0) {
+        emitPan(cgbMix(track.previousVelocity, voicePan, true).route);
+        emitLevel(tone, voicePan);
+        return;
+      }
+    }
+    emitPan(std::nullopt, true);
     emitLevel(track.tone);
   }
 
@@ -398,18 +432,22 @@ struct Playback {
     emitLevel(tone, voicePan);
     emitReverb(tone);
     if (tone.cgbType() != 0) {
-      const u8 referenceGoal = cgbEnvelopeGoal(127, voicePan, false);
-      const u8 noteGoal = cgbEnvelopeGoal(velocity, voicePan, true);
-      const double reference = cgbOutputLevel(tone, referenceGoal);
-      emitCgbEnvelope(tone, noteGoal);
+      const CgbMix referenceMix = cgbMix(127, voicePan, false);
+      const CgbMix noteMix = cgbMix(velocity, voicePan, true);
+      emitPan(noteMix.route);
+      const double referenceLevel = cgbSpeakerLevel(tone, referenceMix.envelope);
+      emitCgbEnvelope(tone, noteMix.envelope);
       track.cgbEnvelopeOverride = true;
-      noteVelocity = reference == 0.0 ? 0.0 : cgbOutputLevel(tone, noteGoal) / reference;
+      noteVelocity = referenceLevel == 0.0 ? 0.0 : cgbSpeakerLevel(tone, noteMix.envelope) / referenceLevel;
       if (track.lfo.type == 1) {
         noteVelocity /= (modulationValue() + 128) / 128.0;
       }
-    } else if (track.cgbEnvelopeOverride) {
-      out.restoreEnvelope();
-      track.cgbEnvelopeOverride = false;
+    } else {
+      emitPan(std::nullopt);
+      if (track.cgbEnvelopeOverride) {
+        out.restoreEnvelope();
+        track.cgbEnvelopeOverride = false;
+      }
     }
     std::optional<double> maximumDurationMilliseconds;
     const u8 cgbType = tone.cgbType();

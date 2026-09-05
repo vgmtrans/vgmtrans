@@ -312,7 +312,7 @@ struct SynthContext {
     unity += static_cast<s32>(*rhythmKey) - tone.key;
   }
   double pan = 0.5;
-  if (rhythmKey && (tone.panSweep & 0x80) != 0) {
+  if (cgbType == 0 && rhythmKey && (tone.panSweep & 0x80) != 0) {
     const s8 rhythmPan = static_cast<s8>(static_cast<u8>((tone.panSweep + 0x40) * 2));
     const double position = (2.0 * rhythmPan + 1.0) / 255.0;
     pan = (position + 1.0) * 0.5;
