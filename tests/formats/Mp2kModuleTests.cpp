@@ -173,13 +173,18 @@ void le32(std::vector<u8>& bytes, size_t offset, u32 value) {
   return psf22(executable, "[TAG]\n_lib=" + std::string(library) + "\ntitle=Selected Song\n");
 }
 
+SourceId scanMp2k(Session& session, std::string name, std::vector<u8> bytes) {
+  session.registerFormat(mp2kModule());
+  const SourceId source = session.addSource(SourceFile{.name = std::move(name)}, std::move(bytes));
+  session.scanPendingSources();
+  return source;
+}
+
 void mp2kModuleBuildsAuditedSequenceAndSynth() {
   constexpr double gbaFrameRate = 16777216.0 / 280896.0;
   const std::vector<u8> bytes = mp2kFixture();
   Session session;
-  session.registerFormat(mp2kModule());
-  const SourceId source = session.addSource(SourceFile{.name = "mp2k-fixture.gba"}, bytes);
-  session.scanPendingSources();
+  const SourceId source = scanMp2k(session, "mp2k-fixture.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.collections().size() == 1, "MP2k fixture should produce one collection");
   const Collection& collection = snapshot.collections().front();
@@ -192,9 +197,9 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
   expect(instruments->instruments[0].modulation.vibrato && instruments->instruments[0].modulation.tremolo &&
              instruments->instruments[0].modulation.vibrato->waveform == LfoWaveform::Triangle,
          "MP2k instruments should advertise the audited triangle vibrato and tremolo ranges");
-  expect(std::ranges::all_of(instruments->instruments, [](const Instrument& instrument) {
-           return std::abs(instrument.regions.front().attenuationDb) < 1e-12;
-         }),
+  expect(std::ranges::all_of(
+             instruments->instruments,
+             [](const Instrument& instrument) { return std::abs(instrument.regions.front().attenuationDb) < 1e-12; }),
          "full-scale DirectSound and hardware-normalized CGB samples must remain at unity");
   expect(instruments->instruments[0].regions.front().envelope.attackSeconds == 0.0,
          "DirectSound attack 0xff must be at full scale on the first mixer frame");
@@ -235,25 +240,17 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
              decodedPcm->loop.start == 23,
          "MP2k DirectSound samples should retain the driver's mixer-rate interpolation and held DAC output");
   const auto decodedWave = decodeSample(psg->pool.samples[waveA4.sample.index()], session.sources().bytes(source));
-  const auto wavePeriod = decodedWave ? std::span<const s16>(decodedWave->pcm).subspan(decodedWave->loop.start,
-                                                                                       decodedWave->loop.length)
-                                      : std::span<const s16>{};
   expect(decodedWave && decodedWave->sampleRate == 44100 && decodedWave->pcm.size() == 216 &&
-             decodedWave->loop.start == 8 && decodedWave->loop.length == 200 &&
-             std::abs(std::accumulate(wavePeriod.begin(), wavePeriod.end(), s64{0})) < decodedWave->loop.length &&
-             std::ranges::equal(decodedWave->pcm.begin(), decodedWave->pcm.begin() + 8,
-                                decodedWave->pcm.begin() + 200, decodedWave->pcm.begin() + 208) &&
-             std::ranges::equal(decodedWave->pcm.begin() + 8, decodedWave->pcm.begin() + 16,
-                                decodedWave->pcm.begin() + 208, decodedWave->pcm.end()),
-         "programmable-wave samples should retain a band-limited GBA DAC cycle and matching loop guards");
+             decodedWave->loop.start == 8 && decodedWave->loop.length == 200,
+         "programmable-wave samples should retain a band-limited GBA DAC cycle");
   const auto decodedSquare = decodeSample(psg->pool.samples[squareA4.sample.index()], session.sources().bytes(source));
-  const auto squarePeriod = decodedSquare ? std::span<const s16>(decodedSquare->pcm).subspan(
-                                                decodedSquare->loop.start, decodedSquare->loop.length)
-                                          : std::span<const s16>{};
+  const auto squarePeriod =
+      decodedSquare
+          ? std::span<const s16>(decodedSquare->pcm).subspan(decodedSquare->loop.start, decodedSquare->loop.length)
+          : std::span<const s16>{};
   expect(decodedSquare && decodedSquare->loop.start == 8 &&
              decodedSquare->pcm.size() == decodedSquare->loop.length + 16 &&
-             std::abs(std::accumulate(squarePeriod.begin(), squarePeriod.end(), s64{0})) <
-                 decodedSquare->loop.length &&
+             std::abs(std::accumulate(squarePeriod.begin(), squarePeriod.end(), s64{0})) < decodedSquare->loop.length &&
              *std::ranges::max_element(squarePeriod) > 20000 && *std::ranges::min_element(squarePeriod) < -5000 &&
              std::ranges::equal(decodedSquare->pcm.begin(), decodedSquare->pcm.begin() + 8,
                                 decodedSquare->pcm.end() - 16, decodedSquare->pcm.end() - 8) &&
@@ -364,47 +361,30 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
          "MP2k MODT should expose its exact linear tremolo and pan excursions");
 }
 
-void mp2kBdpcmDecoderUsesDecodedSampleCount() {
+void mp2kBdpcmDecoderPreservesSampleCountAndDirection() {
   std::vector<u8> source(33);
   source[0] = 10;
   source[1] = 1;
   source[2] = 0x12;
-  const Sample sample{
+  Sample sample{
       .codec = AudioCodec::GbaBdpcm,
       .encodedData = SourceRange{.source = SourceId{1}, .offset = 0, .size = source.size()},
       .sampleRate = 26758,
       .codecParameter = 4,
   };
-  const auto decoded = decodeSample(sample, source);
-  expect(decoded && decoded->pcm.size() == 4 && decoded->pcm[0] == 10 * 256 && decoded->pcm[1] == 11 * 256 &&
-             decoded->pcm[2] == 12 * 256 && decoded->pcm[3] == 16 * 256,
-         "GBA BDPCM should decode the low-only first delta byte and stop at WaveData::size");
-}
-
-void mp2kReverseBdpcmDecodesInPlaybackOrder() {
-  std::vector<u8> source(33);
-  source[0] = 10;
-  source[1] = 1;
-  source[2] = 0x12;
-  const Sample sample{
-      .codec = AudioCodec::GbaBdpcm,
-      .encodedData = SourceRange{.source = SourceId{1}, .offset = 0, .size = source.size()},
-      .sampleRate = 26758,
-      .reverse = true,
-      .codecParameter = 4,
-  };
-  const auto decoded = decodeSample(sample, source);
-  expect(decoded && decoded->pcm == std::vector<s16>({16 * 256, 12 * 256, 11 * 256, 10 * 256}),
-         "reverse BDPCM should decode blocks forward before reversing decoded playback samples");
+  const auto forward = decodeSample(sample, source);
+  sample.reverse = true;
+  const auto reverse = decodeSample(sample, source);
+  expect(forward && forward->pcm == std::vector<s16>({10 * 256, 11 * 256, 12 * 256, 16 * 256}) && reverse &&
+             reverse->pcm == std::vector<s16>({16 * 256, 12 * 256, 11 * 256, 10 * 256}),
+         "GBA BDPCM should honor WaveData::size and reverse only the decoded playback samples");
 }
 
 void mp2kFixedReverseDirectSoundUsesMixerRate() {
   std::vector<u8> bytes = mp2kFixture();
   bytes[0x400] = 0x18;  // DirectSound FIX | REV
   Session session;
-  session.registerFormat(mp2kModule());
-  const SourceId source = session.addSource(SourceFile{.name = "mp2k-fixed-reverse.gba"}, bytes);
-  session.scanPendingSources();
+  const SourceId source = scanMp2k(session, "mp2k-fixed-reverse.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
   const Collection& collection = snapshot.collections().front();
   const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
@@ -425,9 +405,7 @@ void mp2kNoiseUsesAuditedRegisterClockAndWidth() {
   bytes[0x418] = 4;       // CGB noise
   le32(bytes, 0x41c, 1);  // 7-bit/short LFSR
   Session session;
-  session.registerFormat(mp2kModule());
-  const SourceId source = session.addSource(SourceFile{.name = "mp2k-noise.gba"}, bytes);
-  session.scanPendingSources();
+  const SourceId source = scanMp2k(session, "mp2k-noise.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
   const Collection& collection = snapshot.collections().front();
   const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
@@ -442,8 +420,7 @@ void mp2kNoiseUsesAuditedRegisterClockAndWidth() {
   expect(noise && noise->codecParameter == 5, "short MP2k noise should reference the 7-bit GBA LFSR sample");
   const auto decoded = decodeSample(*noise, session.sources().bytes(source));
   expect(decoded && decoded->pcm.size() == 143 && decoded->loop.enabled && decoded->loop.start == 8 &&
-             decoded->loop.length == 127 &&
-             *std::ranges::max_element(decoded->pcm) == 0x4000 &&
+             decoded->loop.length == 127 && *std::ranges::max_element(decoded->pcm) == 0x4000 &&
              *std::ranges::min_element(decoded->pcm) == -0x4000 &&
              std::ranges::equal(decoded->pcm.begin(), decoded->pcm.begin() + 8, decoded->pcm.begin() + 127,
                                 decoded->pcm.begin() + 135) &&
@@ -456,9 +433,7 @@ void mp2kCgbFixedToneUsesDacResolutionMask() {
   std::vector<u8> bytes = mp2kFixture();
   bytes[0x418] = 0x0a;  // channel 2 | FIX
   Session session;
-  session.registerFormat(mp2kModule());
-  session.addSource(SourceFile{.name = "mp2k-cgb-fixed.gba"}, bytes);
-  session.scanPendingSources();
+  scanMp2k(session, "mp2k-cgb-fixed.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
   const Collection& collection = snapshot.collections().front();
   const auto* instruments = snapshot.asset<SoundBankAsset>(collection.members.soundBanks.front());
@@ -479,9 +454,7 @@ void mp2kCgbLengthClampsSequenceGateInPhysicalTime() {
   const std::array<u8, 15> track{0xbb, 75, 0xbd, 2, 0xcd, 10, 32, 0xff, 60, 100, 0xb0, 0xb1, 0, 0, 0};
   std::copy(track.begin(), track.end(), bytes.begin() + 0x320);
   Session session;
-  session.registerFormat(mp2kModule());
-  session.addSource(SourceFile{.name = "mp2k-cgb-length.gba"}, bytes);
-  session.scanPendingSources();
+  scanMp2k(session, "mp2k-cgb-length.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
   const CollectionPlayback playback = session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{});
   const auto note = std::ranges::find_if(playback.performance.tracks.front().events, [](const PerformanceEvent& event) {
@@ -519,9 +492,7 @@ void mp2kCgbVolumeUsesCombinedHardwareQuantization() {
   bytes[pannedDrum + 3] = 0xa0;
   le32(bytes, pannedDrum + 4, 1);
   Session session;
-  session.registerFormat(mp2kModule());
-  session.addSource(SourceFile{.name = "mp2k-cgb-volume.gba"}, bytes);
-  session.scanPendingSources();
+  scanMp2k(session, "mp2k-cgb-volume.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
   const CollectionPlayback playback = session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{});
   const auto& events = playback.performance.tracks.front().events;
@@ -602,9 +573,7 @@ void mp2kCgbPanUsesDiscreteHardwareRouting() {
   };
   std::copy(track.begin(), track.end(), bytes.begin() + 0x320);
   Session session;
-  session.registerFormat(mp2kModule());
-  session.addSource(SourceFile{.name = "mp2k-cgb-pan.gba"}, bytes);
-  session.scanPendingSources();
+  scanMp2k(session, "mp2k-cgb-pan.gba", bytes);
   const auto playback = session.preparePlayback(session.snapshot().collections().front().id, PlaybackRequest{});
   const auto& events = playback.performance.tracks.front().events;
   const auto routedAt = [&](u64 tick, double left, double right) {
@@ -622,9 +591,7 @@ void mp2kUndefinedJumpSlotsUseFine() {
   const std::array<u8, 12> track{0xbd, 0, 0xbe, 127, 0xd4, 60, 127, 0xb6, 0xd4, 64, 127, 0xb1};
   std::copy(track.begin(), track.end(), bytes.begin() + 0x320);
   Session session;
-  session.registerFormat(mp2kModule());
-  session.addSource(SourceFile{.name = "mp2k-undefined-fine.gba"}, bytes);
-  session.scanPendingSources();
+  scanMp2k(session, "mp2k-undefined-fine.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
   const CollectionPlayback playback = session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{});
   std::vector<const NotePerformanceEvent*> notes;
@@ -642,9 +609,7 @@ void mp2kPortConsumesItsRegisterOperands() {
   const std::array<u8, 12> track{0xbd, 0, 0xbe, 127, 0xcc, 0x20, 0x77, 0xd4, 60, 127, 0x81, 0xb1};
   std::copy(track.begin(), track.end(), bytes.begin() + 0x320);
   Session session;
-  session.registerFormat(mp2kModule());
-  session.addSource(SourceFile{.name = "mp2k-port.gba"}, bytes);
-  session.scanPendingSources();
+  scanMp2k(session, "mp2k-port.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
   const CollectionPlayback playback = session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{});
   expect(std::ranges::count_if(
@@ -658,9 +623,7 @@ void mp2kUnknownMemaccDoesNotConsumeAJumpPointer() {
   const std::array<u8, 14> track{0xbd, 0, 0xbe, 127, 0xb9, 18, 0, 0, 0xd4, 60, 127, 0x81, 0xb1, 0};
   std::copy(track.begin(), track.end(), bytes.begin() + 0x320);
   Session session;
-  session.registerFormat(mp2kModule());
-  session.addSource(SourceFile{.name = "mp2k-memacc.gba"}, bytes);
-  session.scanPendingSources();
+  scanMp2k(session, "mp2k-memacc.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
   const CollectionPlayback playback = session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{});
   expect(std::ranges::count_if(
@@ -710,9 +673,7 @@ void mp2kSongSelectLiteralsFindSparseTableAndRespectPlayerCapacity() {
 
 void mp2kDirectSoundMasterVolumeAffectsOnlyPcmVoices() {
   Session session;
-  session.registerFormat(mp2kModule());
-  session.addSource(SourceFile{.name = "mp2k-master-volume.gba"}, mp2kFixture(7));
-  session.scanPendingSources();
+  scanMp2k(session, "mp2k-master-volume.gba", mp2kFixture(7));
   const SessionSnapshot snapshot = session.snapshot();
   const auto* instruments = snapshot.asset<SoundBankAsset>(snapshot.collections().front().members.soundBanks.front());
   expect(instruments && instruments->instruments.size() == 3 && !instruments->instruments[0].regions.empty() &&
@@ -783,9 +744,7 @@ void mp2kSkipsEmptyPcmCollections() {
   bytes[0x3a0] = 0xb1;
 
   Session session;
-  session.registerFormat(mp2kModule());
-  session.addSource(SourceFile{.name = "mp2k-empty-pcm-bank.gba"}, bytes);
-  session.scanPendingSources();
+  scanMp2k(session, "mp2k-empty-pcm-bank.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
   expect(snapshot.collections().size() == 2 && snapshot.diagnostics().empty(),
          "MP2k banks without valid DirectSound samples must not emit source-less PCM assets");
@@ -796,8 +755,7 @@ void mp2kSkipsEmptyPcmCollections() {
 void runMp2kModuleTests() {
   mp2kModuleBuildsAuditedSequenceAndSynth();
   mp2kDirectSoundMasterVolumeAffectsOnlyPcmVoices();
-  mp2kBdpcmDecoderUsesDecodedSampleCount();
-  mp2kReverseBdpcmDecodesInPlaybackOrder();
+  mp2kBdpcmDecoderPreservesSampleCountAndDirection();
   mp2kFixedReverseDirectSoundUsesMixerRate();
   mp2kNoiseUsesAuditedRegisterClockAndWidth();
   mp2kCgbFixedToneUsesDacResolutionMask();
