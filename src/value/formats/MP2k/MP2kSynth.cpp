@@ -113,9 +113,9 @@ constexpr std::array<u32, 2> kNoisePeriods{32767, 127};
 
 struct SynthContext {
   ScanResultBuilder& builder;
-  u32 sampleRate = 0;
-  u8 directSoundMasterVolume = 15;
-  u8 dacBits = 8;
+  u32 sampleRate;
+  u8 directSoundMasterVolume;
+  u8 dacBits;
   SamplePoolBuilder& psg;
   SamplePoolBuilder& pcm;
 };
@@ -166,22 +166,23 @@ struct SynthContext {
 }
 
 [[nodiscard]] InstrumentModulation mp2kModulation() {
-  const double maximumRate = 127.0 * kGbaMixerFrameRate / 256.0;
+  const ModulationRange rate{.minimum = 0.0, .maximum = 127.0 * kGbaMixerFrameRate / 256.0};
+  const ModulationRange delay{.minimum = 0.0, .maximum = 255.0 / kGbaMixerFrameRate};
   return InstrumentModulation{
       .vibrato =
           VibratoSpec{
               .maxDepthCents = 127.0 * 100.0 / 16.0,
-              .rateHertz = {.minimum = 0.0, .maximum = maximumRate},
+              .rateHertz = rate,
               .waveform = LfoWaveform::Triangle,
-              .delaySeconds = ModulationRange{.minimum = 0.0, .maximum = 255.0 / kGbaMixerFrameRate},
+              .delaySeconds = delay,
           },
       .tremolo =
           TremoloSpec{
               .maxDepthDb = 20.0 * std::log10(1.0 + 127.0 / 128.0),
-              .rateHertz = {.minimum = 0.0, .maximum = maximumRate},
+              .rateHertz = rate,
               .waveform = LfoWaveform::Triangle,
               .gainMode = TremoloGainMode::BipolarAroundNominal,
-              .delaySeconds = ModulationRange{.minimum = 0.0, .maximum = 255.0 / kGbaMixerFrameRate},
+              .delaySeconds = delay,
           },
   };
 }
@@ -286,11 +287,11 @@ struct SynthContext {
 [[nodiscard]] std::optional<Region> regionForTone(SynthContext& context, const Mp2kTone& tone, KeyRange keys,
                                                   std::optional<u8> rhythmKey = std::nullopt) {
   const u8 cgbType = tone.cgbType();
+  const bool pitchedPsg = cgbType >= 1 && cgbType <= 3;
   const u8 pitchKey = rhythmKey ? tone.key : keys.low;
-  const double cgbHertz =
-      cgbType >= 1 && cgbType <= 3 ? cgbClockHertz(cgbType, pitchKey, tone.fixed(), context.dacBits) : 0.0;
+  const double cgbHertz = pitchedPsg ? cgbClockHertz(cgbType, pitchKey, tone.fixed(), context.dacBits) : 0.0;
   const u32 psgSampleRate = std::min(kPsgRenderSampleRate, kGbaCpuFrequency >> context.dacBits);
-  const u32 psgPeriod = cgbType >= 1 && cgbType <= 3 ? psgReferencePeriod(cgbHertz, psgSampleRate) : 0;
+  const u32 psgPeriod = pitchedPsg ? psgReferencePeriod(cgbHertz, psgSampleRate) : 0;
   std::optional<SampleRef> sample;
   double unity = 69.0;
   if (cgbType == 0) {
@@ -311,7 +312,7 @@ struct SynthContext {
 
   if (cgbType == 4) {
     unity = keys.low - 12.0 * std::log2(noiseClockHertz(pitchKey) / context.sampleRate);
-  } else if (cgbType >= 1 && cgbType <= 3) {
+  } else if (pitchedPsg) {
     unity = keys.low - 12.0 * std::log2(cgbHertz / (static_cast<double>(psgSampleRate) / psgPeriod));
   } else if (cgbType == 0 && tone.fixed()) {
     // SoundMainRAM uses a literal 0x800000 phase increment for FIX voices,

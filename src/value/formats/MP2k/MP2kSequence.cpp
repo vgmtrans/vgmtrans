@@ -305,10 +305,9 @@ struct Playback {
   void lfoDelay(u8 delay) {
     syncLfo();
     track.lfo.delay = delay;
-    if (!initializeLfo()) {
-      emitLfoRate(track.lfo.type);
-      emitLfoDepth(track.lfo.type, track.lfo.depth);
-    }
+    track.lfo.emitted = true;
+    emitLfoRate(track.lfo.type);
+    emitLfoDepth(track.lfo.type, track.lfo.depth);
   }
 
   void modulationDepth(u8 depth) {
@@ -561,15 +560,12 @@ struct DecodeContext {
   if (!encoded.valid) {
     return std::nullopt;
   }
-  if ((encoded.value & 0xfe000000) != 0x08000000) {
-    event.warning("MP2k command pointer is outside GBA ROM");
+  const auto offset = romOffset(encoded.value, reader);
+  if (!offset) {
+    event.warning("Invalid MP2k command pointer");
     return std::nullopt;
   }
-  const Address result{encoded.value & 0x01ffffff};
-  if (result.value >= reader.size()) {
-    return std::nullopt;
-  }
-  return event.resolvedValue(name, encoded, result, SourceValueDisplay::Address, role);
+  return event.resolvedValue(name, encoded, Address{*offset}, SourceValueDisplay::Address, role);
 }
 
 [[nodiscard]] u8 parameter(Mp2kCursor& cursor, Mp2kCursor::Event& event, bool running, std::string_view name,
@@ -801,8 +797,10 @@ struct DecodeContext {
 
 }  // namespace
 
-const SequenceProgramConfig& mp2kSequenceConfig() {
-  static const SequenceProgramConfig config = SequenceProgramConfig{
+SequenceProgram parseMp2kSequenceProgram(RetainedSource source, AssetId id, const Mp2kSong& song,
+                                         std::span<const Mp2kTone> tones, SourceMapBuilder* sourceMap,
+                                         std::vector<Diagnostic>* diagnostics) {
+  static const SequenceProgramConfig config{
       .commandKindPrefix = "mp2k",
       .timebase = Timebase{.ppqn = 24},
       .behavior =
@@ -817,14 +815,7 @@ const SequenceProgramConfig& mp2kSequenceConfig() {
                   static_cast<u32>(std::llround(60000000.0 / (kGbaMixerFrameRate * 60.0 / 24.0))),
           },
   };
-  return config;
-}
-
-SequenceProgram parseMp2kSequenceProgram(RetainedSource source, AssetId id, const Mp2kSong& song,
-                                         std::span<const Mp2kTone> tones, SourceMapBuilder* sourceMap,
-                                         std::vector<Diagnostic>* diagnostics) {
   const ByteReader reader = source.reader();
-  const SequenceProgramConfig& config = mp2kSequenceConfig();
   const u32 headerSize = 8 + song.declaredTracks * 4;
   SequenceProgram program = config.makeProgram();
   RuntimeConfig runtime{
