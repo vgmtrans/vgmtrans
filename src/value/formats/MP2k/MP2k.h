@@ -92,10 +92,11 @@ struct Mp2kLayout {
 
 [[nodiscard]] std::optional<Mp2kTone> parseMp2kTone(core::ByteReader reader, u32 offset,
                                                     std::vector<core::Diagnostic>* diagnostics = nullptr);
-[[nodiscard]] core::ScanSamplePoolDraft addMp2kPsgSamples(core::ScanResultBuilder& builder, u32 sampleRate);
+[[nodiscard]] std::optional<Mp2kTone> mp2kToneForKey(core::ByteReader reader, const Mp2kTone& tone, u8 key,
+                                                     std::vector<core::Diagnostic>* diagnostics = nullptr);
+[[nodiscard]] core::Envelope mp2kEnvelope(const Mp2kTone& tone);
 [[nodiscard]] Mp2kScannedBank addMp2kInstrumentSet(core::ScanResultBuilder& builder, const Mp2kBank& bank,
-                                                   u32 sampleRate, u8 directSoundMasterVolume, u8 dacBits,
-                                                   core::ScanSamplePoolDraft& psgSamples);
+                                                   const Mp2kEngine& engine, core::ScanSamplePoolDraft& psgSamples);
 
 [[nodiscard]] core::FormatModule mp2kModule();
 

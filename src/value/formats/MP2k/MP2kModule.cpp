@@ -40,11 +40,10 @@ namespace {
 }
 
 void scanLayout(const Mp2kLayout& layout, ScanResultBuilder& result, const RetainedSource& source) {
-  auto psg = addMp2kPsgSamples(result, layout.engine.sampleRate);
+  auto psg = result.samplePool("MP2k PSG samples");
   std::map<u32, Mp2kScannedBank> banks;
   for (const auto& bank : layout.banks) {
-    banks.emplace(bank.offset, addMp2kInstrumentSet(result, bank, layout.engine.sampleRate,
-                                                    layout.engine.directSoundMasterVolume, layout.engine.dacBits, psg));
+    banks.emplace(bank.offset, addMp2kInstrumentSet(result, bank, layout.engine, psg));
   }
 
   const auto selected = selectedSong(result.sourceFile());

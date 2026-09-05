@@ -23,10 +23,8 @@ inline constexpr double kGbaMixerFrameRate = 16777216.0 / 280896.0;
   // SoundMainRAM applies the first attack step before the new channel's first
   // audible frame. Give the linear target envelope the exact same area as the
   // stepped 8-bit ramp, including its final clamped step.
-  u32 lostLevel = 0;
-  for (u32 level = rate; level < 255; level += rate) {
-    lostLevel += 255 - level;
-  }
+  const u32 steps = 254 / rate;
+  const u32 lostLevel = 255 * steps - rate * steps * (steps + 1) / 2;
   return 2.0 * lostLevel / (255.0 * kGbaMixerFrameRate);
 }
 
@@ -40,15 +38,8 @@ inline constexpr double kGbaMixerFrameRate = 16777216.0 / 280896.0;
   return (envelopeRangeDb / 20.0) * std::log(10.0) / (kGbaMixerFrameRate * std::log(256.0 / rate));
 }
 
-[[nodiscard]] inline double directReleaseSeconds(u8 rate) {
-  // Preserve the same dB slope across SoundFont's 100 dB release range rather
-  // than stretching the 8-bit integer's much earlier underflow to -100 dB.
-  // A zero multiplier silences the first release mixer pass.
-  return rate == 0 ? 0.0 : directDecaySeconds(rate);
-}
-
 [[nodiscard]] inline double cgbEnvelopeSeconds(u8 counter, u8 levels = 15) {
-  return counter == 0 ? 0.0 : static_cast<double>(levels) * counter / 64.0;
+  return static_cast<double>(levels) * counter / 64.0;
 }
 
 [[nodiscard]] inline double cgbDecaySeconds(u8 counter, u8 levels = 15) {

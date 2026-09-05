@@ -133,7 +133,6 @@ enum class AudioCodec {
   NdsImaAdpcm,
   NdsPsg,
   GbaDirectSound,
-  GbaBdpcm,
   GbaPsg,
   GbaPsgWave,
   PsxAdpcm,

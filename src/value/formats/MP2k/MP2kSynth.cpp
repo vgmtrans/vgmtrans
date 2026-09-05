@@ -55,10 +55,41 @@ std::optional<Mp2kTone> parseMp2kTone(ByteReader reader, u32 offset, std::vector
   };
 }
 
+std::optional<Mp2kTone> mp2kToneForKey(ByteReader reader, const Mp2kTone& tone, u8 key,
+                                       std::vector<Diagnostic>* diagnostics) {
+  if (!tone.table()) {
+    return tone;
+  }
+  u32 index = key;
+  if (tone.split()) {
+    if (!reader.has(tone.source.range.offset + 8, 4)) {
+      return std::nullopt;
+    }
+    const auto keymap = romOffset(reader.le32(tone.source.range.offset + 8), reader, 128);
+    if (!keymap) {
+      return std::nullopt;
+    }
+    index = reader.u8At(*keymap + key);
+  }
+  const auto tones = romOffset(tone.wave, reader);
+  return tones ? parseMp2kTone(reader, *tones + index * 12, diagnostics) : std::nullopt;
+}
+
+Envelope mp2kEnvelope(const Mp2kTone& tone) {
+  const bool cgb = tone.cgbType() != 0;
+  return Envelope{
+      .attackSeconds = cgb ? cgbEnvelopeSeconds(tone.attack) : directAttackSeconds(tone.attack),
+      // Decay begins after one CGB envelope period or the next DirectSound mixer pass.
+      .holdSeconds = cgb ? cgbEnvelopeSeconds(tone.decay, 1) : 1.0 / kGbaMixerFrameRate,
+      .decaySeconds = cgb ? cgbDecaySeconds(tone.decay) : directDecaySeconds(tone.decay),
+      .releaseSeconds = cgb ? cgbDecaySeconds(tone.release) : directDecaySeconds(tone.release),
+      .sustainAmplitude = cgb ? std::min<u8>(tone.sustain, 15) / 15.0 : tone.sustain / 255.0,
+  };
+}
+
 namespace {
 
 constexpr double kPsgSampleFrequency = 440.0;
-// Match the playback engine and Mednafen's default Blip_Buffer output rate.
 constexpr u32 kPsgRenderSampleRate = 44100;
 constexpr u32 kPsgLoopGuardSamples = 8;
 constexpr u32 kGbaCpuFrequency = 16777216;
@@ -75,6 +106,10 @@ constexpr std::array<u32, 12> kDirectSoundFrequencyTable{
     2147483648u, 2275179671u, 2410468894u, 2553802834u, 2705659852u, 2866546760u,
     3037000500u, 3217589947u, 3408917802u, 3611622603u, 3826380858u, 4053909305u,
 };
+constexpr std::array<std::string_view, 4> kSquareNames{"PSG square 12.5%", "PSG square 25%", "PSG square 50%",
+                                                       "PSG square 75%"};
+constexpr std::array<std::string_view, 2> kNoiseNames{"PSG noise (15-bit)", "PSG noise (7-bit)"};
+constexpr std::array<u32, 2> kNoisePeriods{32767, 127};
 
 struct SynthContext {
   ScanResultBuilder& builder;
@@ -84,17 +119,6 @@ struct SynthContext {
   SamplePoolBuilder& psg;
   SamplePoolBuilder& pcm;
 };
-
-[[nodiscard]] Envelope envelopeFor(const Mp2kTone& tone, bool cgb) {
-  return Envelope{
-      .attackSeconds = cgb ? cgbEnvelopeSeconds(tone.attack) : directAttackSeconds(tone.attack),
-      // Decay begins after one CGB envelope period or the next DirectSound mixer pass.
-      .holdSeconds = cgb ? cgbEnvelopeSeconds(tone.decay, 1) : 1.0 / kGbaMixerFrameRate,
-      .decaySeconds = cgb ? cgbDecaySeconds(tone.decay) : directDecaySeconds(tone.decay),
-      .releaseSeconds = cgb ? cgbDecaySeconds(tone.release) : directReleaseSeconds(tone.release),
-      .sustainAmplitude = cgb ? std::min<u8>(tone.sustain, 15) / 15.0 : tone.sustain / 255.0,
-  };
-}
 
 [[nodiscard]] double directSoundMasterAttenuation(u8 volume) {
   // The software mixer scales its 8-bit envelope by (masterVolume + 1) / 16
@@ -241,21 +265,20 @@ struct SynthContext {
   return entry.ref();
 }
 
-[[nodiscard]] SampleRef squareWave(SynthContext& context, u32 duty, u32 sampleRate, u32 period) {
-  const u64 key = period * 4 + duty;
+[[nodiscard]] SampleRef generatedPsgSample(SynthContext& context, u64 key, std::string_view name, u32 sampleRate,
+                                           u32 period, u32 parameter) {
   if (const auto existing = context.psg.find(key)) {
     return *existing;
   }
-  constexpr std::array<std::string_view, 4> names{"12.5%", "25%", "50%", "75%"};
   return context.psg
       .add(key,
            Sample{
-               .name = fmt::format("PSG square {}", names[duty]),
+               .name = std::string(name),
                .codec = AudioCodec::GbaPsg,
                .encodedData = context.builder.reader().range(0, 0),
                .sampleRate = sampleRate,
                .loop = Loop{.enabled = true, .start = kPsgLoopGuardSamples, .length = period},
-               .codecParameter = duty,
+               .codecParameter = parameter,
            })
       .ref();
 }
@@ -273,11 +296,14 @@ struct SynthContext {
   if (cgbType == 0) {
     sample = addPcmSample(context, tone, rhythmKey, unity);
   } else if (cgbType == 1 || cgbType == 2) {
-    sample = squareWave(context, tone.wave & 3, psgSampleRate, psgPeriod);
+    const u32 duty = tone.wave & 3;
+    sample = generatedPsgSample(context, psgPeriod * 4 + duty, kSquareNames[duty], psgSampleRate, psgPeriod, duty);
   } else if (cgbType == 3) {
     sample = programmableWave(context, tone.wave, psgSampleRate, psgPeriod);
   } else if (cgbType == 4) {
-    sample = context.psg.find(4 + (tone.wave & 1));
+    const u32 width = tone.wave & 1;
+    sample =
+        generatedPsgSample(context, 4 + width, kNoiseNames[width], context.sampleRate, kNoisePeriods[width], 4 + width);
   }
   if (!sample) {
     return std::nullopt;
@@ -305,7 +331,7 @@ struct SynthContext {
       .sample = *sample,
       .range = tone.source.range,
       .unityKey = unity,
-      .envelope = envelopeFor(tone, cgbType != 0),
+      .envelope = mp2kEnvelope(tone),
       .pan = pan,
       .attenuationDb = cgbType == 0 ? directSoundMasterAttenuation(context.directSoundMasterVolume) : 0.0,
   };
@@ -330,10 +356,9 @@ void addToneRegion(SynthContext& context, InstrumentSetBuilder::Entry instrument
 }
 
 void addSplitRegions(SynthContext& context, InstrumentSetBuilder::Entry instrument, const Mp2kTone& tone) {
-  const auto tones = romOffset(tone.wave, context.builder.reader(), 12);
   const auto keymap =
       romOffset(context.builder.reader().le32(tone.source.range.offset + 8), context.builder.reader(), 128);
-  if (!tones || !keymap) {
+  if (!keymap) {
     return;
   }
 
@@ -343,8 +368,8 @@ void addSplitRegions(SynthContext& context, InstrumentSetBuilder::Entry instrume
     while (high + 1 < 128 && context.builder.reader().u8At(*keymap + high + 1) == index) {
       ++high;
     }
-    if (const auto sub = parseMp2kTone(context.builder.reader(), *tones + static_cast<u32>(index) * 12,
-                                       &context.builder.diagnostics());
+    if (const auto sub =
+            mp2kToneForKey(context.builder.reader(), tone, static_cast<u8>(low), &context.builder.diagnostics());
         sub && !sub->table()) {
       addToneRegion(context, instrument, *sub, KeyRange{.low = static_cast<u8>(low), .high = static_cast<u8>(high)});
     }
@@ -353,12 +378,9 @@ void addSplitRegions(SynthContext& context, InstrumentSetBuilder::Entry instrume
 }
 
 void addRhythmRegions(SynthContext& context, InstrumentSetBuilder::Entry instrument, const Mp2kTone& tone) {
-  const auto tones = romOffset(tone.wave, context.builder.reader(), 128 * 12);
-  if (!tones) {
-    return;
-  }
   for (u32 key = 0; key < 128; ++key) {
-    if (const auto drum = parseMp2kTone(context.builder.reader(), *tones + key * 12, &context.builder.diagnostics());
+    if (const auto drum =
+            mp2kToneForKey(context.builder.reader(), tone, static_cast<u8>(key), &context.builder.diagnostics());
         drum && !drum->table()) {
       addToneRegion(context, instrument, *drum, KeyRange{.low = static_cast<u8>(key), .high = static_cast<u8>(key)},
                     static_cast<u8>(key));
@@ -381,37 +403,16 @@ std::vector<Mp2kTone> parseMp2kTones(ByteReader reader, const Mp2kBank& bank, st
 
 }  // namespace
 
-ScanSamplePoolDraft addMp2kPsgSamples(ScanResultBuilder& builder, u32 sampleRate) {
-  auto pool = builder.samplePool("MP2k PSG samples");
-  auto& samples = pool.samples();
-  constexpr std::array noise{
-      std::pair{"PSG noise (15-bit)", 32767u},
-      std::pair{"PSG noise (7-bit)", 127u},
-  };
-  for (u32 index = 0; index < noise.size(); ++index) {
-    const u32 key = 4 + index;
-    samples.add(key, Sample{
-                         .name = noise[index].first,
-                         .codec = AudioCodec::GbaPsg,
-                         .encodedData = builder.reader().range(0, 0),
-                         .sampleRate = sampleRate,
-                         .loop = Loop{.enabled = true, .start = kPsgLoopGuardSamples, .length = noise[index].second},
-                         .codecParameter = key,
-                     });
-  }
-  return pool;
-}
-
-Mp2kScannedBank addMp2kInstrumentSet(ScanResultBuilder& builder, const Mp2kBank& bank, u32 sampleRate,
-                                     u8 directSoundMasterVolume, u8 dacBits, ScanSamplePoolDraft& psg) {
+Mp2kScannedBank addMp2kInstrumentSet(ScanResultBuilder& builder, const Mp2kBank& bank, const Mp2kEngine& engine,
+                                     ScanSamplePoolDraft& psg) {
   std::vector<Mp2kTone> tones = parseMp2kTones(builder.reader(), bank, &builder.diagnostics());
   auto bankDraft = builder.soundBank(fmt::format("MP2k bank {:#x}", bank.offset));
   auto& instruments = bankDraft.instruments();
   SynthContext context{
       .builder = builder,
-      .sampleRate = sampleRate,
-      .directSoundMasterVolume = directSoundMasterVolume,
-      .dacBits = dacBits,
+      .sampleRate = engine.sampleRate,
+      .directSoundMasterVolume = engine.directSoundMasterVolume,
+      .dacBits = engine.dacBits,
       .psg = psg.samples(),
       .pcm = bankDraft.localSamples(),
   };

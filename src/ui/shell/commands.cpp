@@ -996,8 +996,6 @@ std::string_view valueAudioCodecName(vgmtrans::core::AudioCodec codec) {
       return "nds-psg";
     case vgmtrans::core::AudioCodec::GbaDirectSound:
       return "gba-directsound";
-    case vgmtrans::core::AudioCodec::GbaBdpcm:
-      return "gba-bdpcm";
     case vgmtrans::core::AudioCodec::GbaPsg:
       return "gba-psg";
     case vgmtrans::core::AudioCodec::GbaPsgWave:

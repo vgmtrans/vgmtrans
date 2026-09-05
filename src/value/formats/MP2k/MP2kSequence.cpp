@@ -75,8 +75,6 @@ struct CgbMix {
 };
 
 struct TrackState {
-  explicit TrackState(const TrackProgram&) {}
-
   s32 transpose = 0;
   u8 bendRange = 2;
   Mp2kTone tone{.type = 1};
@@ -109,26 +107,7 @@ struct Playback {
   ProgramState& programState;
 
   [[nodiscard]] Mp2kTone noteTone(u8 key) const {
-    if (!track.tone.table()) {
-      return track.tone;
-    }
-    u32 index = key;
-    if (track.tone.split()) {
-      if (!programState.reader.has(track.tone.source.range.offset + 8, 4)) {
-        return {};
-      }
-      const auto keymap =
-          romOffset(programState.reader.le32(track.tone.source.range.offset + 8), programState.reader, 128);
-      if (!keymap) {
-        return {};
-      }
-      index = programState.reader.u8At(*keymap + key);
-    }
-    const auto table = romOffset(track.tone.wave, programState.reader);
-    if (!table) {
-      return {};
-    }
-    return parseMp2kTone(programState.reader, *table + index * 12).value_or(Mp2kTone{});
+    return mp2kToneForKey(programState.reader, track.tone, key).value_or(Mp2kTone{});
   }
 
   [[nodiscard]] s8 notePan(const Mp2kTone& tone) const {
@@ -462,30 +441,22 @@ struct Playback {
 
   void attack(u8 value) {
     track.tone.attack = value;
-    out.updateEnvelope(EnvelopeUpdate::set(
-        Envelope{.attackSeconds = track.tone.cgbType() != 0 ? cgbEnvelopeSeconds(value) : directAttackSeconds(value)},
-        EnvelopeFields::Attack));
+    out.updateEnvelope(EnvelopeUpdate::set(mp2kEnvelope(track.tone), EnvelopeFields::Attack));
   }
 
   void decay(u8 value) {
     track.tone.decay = value;
-    out.updateEnvelope(EnvelopeUpdate::set(
-        Envelope{.decaySeconds = track.tone.cgbType() != 0 ? cgbDecaySeconds(value) : directDecaySeconds(value)},
-        EnvelopeFields::Decay));
+    out.updateEnvelope(EnvelopeUpdate::set(mp2kEnvelope(track.tone), EnvelopeFields::Decay));
   }
 
   void sustain(u8 value) {
     track.tone.sustain = value;
-    out.updateEnvelope(EnvelopeUpdate::set(
-        Envelope{.sustainAmplitude = track.tone.cgbType() != 0 ? std::min<u8>(value, 15) / 15.0 : value / 255.0},
-        EnvelopeFields::Sustain));
+    out.updateEnvelope(EnvelopeUpdate::set(mp2kEnvelope(track.tone), EnvelopeFields::Sustain));
   }
 
   void release(u8 value) {
     track.tone.release = value;
-    out.updateEnvelope(EnvelopeUpdate::set(
-        Envelope{.releaseSeconds = track.tone.cgbType() != 0 ? cgbDecaySeconds(value) : directReleaseSeconds(value)},
-        EnvelopeFields::Release));
+    out.updateEnvelope(EnvelopeUpdate::set(mp2kEnvelope(track.tone), EnvelopeFields::Release));
   }
 
   [[nodiscard]] Effects repeat(u8 count, Address destination) {
