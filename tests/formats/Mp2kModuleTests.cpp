@@ -513,6 +513,11 @@ void mp2kCgbVolumeUsesCombinedHardwareQuantization() {
   le32(bytes, drum + 4, 1);
   bytes[drum + 9] = 4;
   bytes[drum + 10] = 4;
+  const size_t pannedDrum = 0xd00 + 61 * 12;
+  bytes[pannedDrum] = 2;
+  bytes[pannedDrum + 1] = 61;
+  bytes[pannedDrum + 3] = 0xa0;
+  le32(bytes, pannedDrum + 4, 1);
   Session session;
   session.registerFormat(mp2kModule());
   session.addSource(SourceFile{.name = "mp2k-cgb-volume.gba"}, bytes);
@@ -520,6 +525,12 @@ void mp2kCgbVolumeUsesCombinedHardwareQuantization() {
   const SessionSnapshot snapshot = session.snapshot();
   const CollectionPlayback playback = session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{});
   const auto& events = playback.performance.tracks.front().events;
+  const auto* instruments = snapshot.asset<SoundBankAsset>(snapshot.collections().front().members.soundBanks.front());
+  expect(instruments && instruments->instruments.size() > 3, "CGB rhythm fixture should produce its source program");
+  const auto pannedRegion = std::ranges::find_if(instruments->instruments[3].regions,
+                                                 [](const Region& region) { return region.keyRange.low == 61; });
+  expect(pannedRegion != instruments->instruments[3].regions.end() && pannedRegion->pan == 0.5,
+         "CGB rhythm pan should affect the hardware route without also panning the synthesized sample");
 
   std::vector<const NotePerformanceEvent*> notes;
   for (const auto& event : events) {
@@ -534,21 +545,28 @@ void mp2kCgbVolumeUsesCombinedHardwareQuantization() {
                              [](const PerformanceEvent& event) {
                                const auto* level = std::get_if<LevelPerformanceEvent>(&event);
                                return level && level->header.tick == 0 &&
-                                      std::abs(level->linearGain - 10.0 / 16.0) < 1e-12;
+                                      std::abs(level->linearGain - 10.0 / 32.0) < 1e-12;
                              }) &&
              std::ranges::any_of(events,
                                  [](const PerformanceEvent& event) {
                                    const auto* level = std::get_if<LevelPerformanceEvent>(&event);
-                                   return level && level->header.tick == 1 && std::abs(level->linearGain - 0.5) < 1e-12;
+                                   return level && level->header.tick == 1 &&
+                                          std::abs(level->linearGain - 0.25) < 1e-12;
                                  }),
          "CGB track level should use the 4-bit square goal and five-level wave-volume register map");
   expect(std::ranges::count_if(events,
                                [](const PerformanceEvent& event) {
                                  const auto* level = std::get_if<LevelPerformanceEvent>(&event);
                                  return level && level->header.tick == 0 &&
-                                        std::abs(level->linearGain - 10.0 / 16.0) < 1e-12;
+                                        std::abs(level->linearGain - 10.0 / 32.0) < 1e-12;
                                }) == 1,
          "a note should not re-emit an unchanged CGB track level");
+  expect(std::ranges::any_of(events,
+                             [](const PerformanceEvent& event) {
+                               const auto* balance = std::get_if<StereoBalancePerformanceEvent>(&event);
+                               return balance && balance->leftGain == 1.0 && balance->rightGain == 1.0;
+                             }),
+         "a centered CGB channel should be routed to both hardware outputs");
   expect(std::ranges::any_of(
              events,
              [](const PerformanceEvent& event) {
@@ -573,6 +591,30 @@ void mp2kCgbVolumeUsesCombinedHardwareQuantization() {
                                       envelope->update.values->sustainAmplitude == 0.25;
                              }),
          "rhythm programs should use the selected child tone's CGB envelope");
+}
+
+void mp2kCgbPanUsesDiscreteHardwareRouting() {
+  std::vector<u8> bytes = mp2kFixture();
+  const std::array<u8, 25> track{
+      0xbd, 2,   0xbe, 127, 0xbf, 0,    0xd4, 60, 127, 0x81,  // left
+      0xbf, 64,  0xd4, 62,  127,  0x81,                       // both
+      0xbf, 127, 0xd4, 64,  127,  0x81, 0xb1, 0,  0,          // right
+  };
+  std::copy(track.begin(), track.end(), bytes.begin() + 0x320);
+  Session session;
+  session.registerFormat(mp2kModule());
+  session.addSource(SourceFile{.name = "mp2k-cgb-pan.gba"}, bytes);
+  session.scanPendingSources();
+  const auto playback = session.preparePlayback(session.snapshot().collections().front().id, PlaybackRequest{});
+  const auto& events = playback.performance.tracks.front().events;
+  const auto routedAt = [&](u64 tick, double left, double right) {
+    return std::ranges::any_of(events, [&](const PerformanceEvent& event) {
+      const auto* balance = std::get_if<StereoBalancePerformanceEvent>(&event);
+      return balance && balance->header.tick == tick && balance->leftGain == left && balance->rightGain == right;
+    });
+  };
+  expect(routedAt(0, 1.0, 0.0) && routedAt(1, 1.0, 1.0) && routedAt(2, 0.0, 1.0),
+         "CGB pan should select left, both, or right instead of scaling a continuously panned voice");
 }
 
 void mp2kUndefinedJumpSlotsUseFine() {
@@ -761,6 +803,7 @@ void runMp2kModuleTests() {
   mp2kCgbFixedToneUsesDacResolutionMask();
   mp2kCgbLengthClampsSequenceGateInPhysicalTime();
   mp2kCgbVolumeUsesCombinedHardwareQuantization();
+  mp2kCgbPanUsesDiscreteHardwareRouting();
   mp2kUndefinedJumpSlotsUseFine();
   mp2kPortConsumesItsRegisterOperands();
   mp2kUnknownMemaccDoesNotConsumeAJumpPointer();
