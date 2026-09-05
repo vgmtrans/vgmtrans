@@ -41,8 +41,6 @@ constexpr std::array<u8, 30> kSongSelectV2{
     0x00, 0xb5, 0x00, 0x04, 0x07, 0x4b, 0x08, 0x49, 0x40, 0x0b, 0x40, 0x18, 0x82, 0x88, 0x51,
     0x00, 0x89, 0x18, 0x89, 0x00, 0xc9, 0x18, 0x0a, 0x68, 0x01, 0x68, 0x10, 0x1c, 0x00, 0xf0,
 };
-constexpr std::string_view kExactPatternMask = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
-
 struct PlayerTable {
   u32 offset = 0;
   u32 count = 0;
@@ -85,8 +83,7 @@ struct EngineSettings {
   const u32 rateIndex = encodedRate == 0 ? kDefaultSampleRateIndex : encodedRate;
   const u8 masterVolume = encodedMasterVolume == 0 ? kDefaultDirectSoundMasterVolume : encodedMasterVolume;
   EngineSettings result{
-      .engine = {.settingsOffset = offset,
-                 .songTableOffset = static_cast<u32>(songTable),
+      .engine = {.songTableOffset = static_cast<u32>(songTable),
                  .sampleRate = kSampleRates[rateIndex],
                  .directSoundMasterVolume = masterVolume,
                  .dacBits = static_cast<u8>(dacBits),
@@ -310,7 +307,7 @@ std::vector<Mp2kLayout> findMp2kLayouts(ScanResultBuilder& builder) {
 
   const auto scanPattern = [&](std::span<const u8> pattern) {
     u32 begin = 0;
-    while (const auto signature = findBytePattern(reader, MaskedBytePattern{pattern, kExactPatternMask}, begin)) {
+    while (const auto signature = findBytes(reader, pattern, begin)) {
       begin = *signature + 1;
       const auto settings = settingsForSignature(reader, *signature);
       std::optional<Mp2kLayout> layout;

@@ -29,7 +29,6 @@ inline constexpr std::string_view kMp2kFormatName = "MP2k";
 }
 
 struct Mp2kEngine {
-  u32 settingsOffset = 0;
   u32 songTableOffset = 0;
   u32 sampleRate = 0;
   u8 directSoundMasterVolume = 15;
@@ -84,14 +83,13 @@ struct Mp2kLayout {
 
 [[nodiscard]] std::vector<Mp2kLayout> findMp2kLayouts(core::ScanResultBuilder& builder);
 
-[[nodiscard]] const core::SequenceProgramConfig& mp2kSequenceConfig();
 [[nodiscard]] core::SequenceProgram parseMp2kSequenceProgram(core::RetainedSource source, core::AssetId id,
                                                              const Mp2kSong& song, std::span<const Mp2kTone> tones,
-                                                             core::SourceMapBuilder* sourceMap = nullptr,
-                                                             std::vector<core::Diagnostic>* diagnostics = nullptr);
+                                                             core::SourceMapBuilder* sourceMap,
+                                                             std::vector<core::Diagnostic>* diagnostics);
 
 [[nodiscard]] std::optional<Mp2kTone> parseMp2kTone(core::ByteReader reader, u32 offset,
-                                                    std::vector<core::Diagnostic>* diagnostics = nullptr);
+                                                    std::vector<core::Diagnostic>* diagnostics);
 [[nodiscard]] std::optional<Mp2kTone> mp2kToneForKey(core::ByteReader reader, const Mp2kTone& tone, u8 key,
                                                      std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] core::Envelope mp2kEnvelope(const Mp2kTone& tone);
