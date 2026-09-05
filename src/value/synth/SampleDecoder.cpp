@@ -200,10 +200,11 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   return samples;
 }
 
+// Creates a playable sample for a Nintendo DS pulse channel. dutyCycle says
+// how much of each cycle is high, baseFrequencyHz sets the pitch, and
+// sampleRate and sampleCount describe the generated sample.
 [[nodiscard]] std::vector<s16> synthesizeBandLimitedPulsePcm16(double dutyCycle, u32 sampleRate, u32 sampleCount,
                                                                double baseFrequencyHz = 440.0) {
-  // PSG pulse instruments likewise have no source PCM. Band-limiting the generated
-  // waveform avoids the harsh aliasing that a naive square wave would introduce.
   std::vector<s16> samples(sampleCount);
   if (samples.empty() || sampleRate == 0 || baseFrequencyHz <= 0.0) {
     return samples;
@@ -211,6 +212,8 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
 
   std::vector<double> coefficients = {dutyCycle - 0.5};
   int harmonic = 1;
+  // A pulse contains increasingly high multiples of its base pitch. Keep only
+  // those below half the sample rate; faster ones would become false tones.
   const u32 maxHarmonics = static_cast<u32>(sampleRate / (baseFrequencyHz * 2.0));
   std::generate_n(std::back_inserter(coefficients), maxHarmonics, [dutyCycle, &harmonic]() {
     const double value = std::sin(harmonic * dutyCycle * kPi) * 2.0 / (harmonic * kPi);
@@ -231,13 +234,20 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   return samples;
 }
 
+// Creates a playable sample loop from one cycle of a GBA hardware waveform.
+// Each value in steps is the output level held during one equal slice of that
+// cycle. MP2k passes eight values for a pulse channel—1, 2, 4, or 6 high slices
+// followed by low slices—or 32 values for a programmable wave. sampleCount
+// sets the length of the new loop.
 [[nodiscard]] std::vector<s16> synthesizeBandLimitedStepPcm16(std::span<const s16> steps, u32 sampleCount) {
-  // Project the hardware step waveform onto the harmonics representable by the exported PCM loop.
   std::vector<s16> samples(sampleCount);
   if (steps.empty() || sampleCount == 0) {
     return samples;
   }
 
+  // Rebuild the shape by layering waves that repeat 1, 2, 3, ... times per
+  // loop. Stop before a repetition is reduced to only two output samples,
+  // which is too little to reproduce it reliably.
   const u32 harmonics = (sampleCount - 1) / 2;
   std::vector<std::complex<double>> coefficients(harmonics + 1);
   coefficients[0] = std::accumulate(steps.begin(), steps.end(), 0.0) / steps.size();
@@ -611,6 +621,8 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
 }
 
 [[nodiscard]] std::optional<DecodedSample> decodeGbaPsg(const Sample& sample) {
+  // Each GBA pulse cycle has eight equal slices. Its four duty settings keep
+  // the output high for 1, 2, 4, or 6 of them.
   constexpr std::array<u8, 4> highSteps{1, 2, 4, 6};
   if (sample.loop.length == 0) {
     return std::nullopt;
