@@ -116,17 +116,10 @@ struct SynthContext {
   return 524288.0 / divisor / std::exp2((reg >> 4) + 1.0);
 }
 
-[[nodiscard]] s32 arithmeticShiftRight(s32 value, u32 bits) {
-  if (value >= 0 || bits == 0) {
-    return value >> bits;
-  }
-  return -static_cast<s32>((static_cast<u32>(-value) + (u32{1} << bits) - 1) >> bits);
-}
-
 [[nodiscard]] u16 cgbFrequencyRegister(u8 key, bool fixed, u8 dacBits) {
   const u8 index = key <= 35 ? 0 : std::min<u8>(key - 36, 130);
   const u32 octave = index / 12;
-  u16 frequency = static_cast<u16>(2048 + arithmeticShiftRight(kCgbFrequencyTable[index % 12], octave));
+  u16 frequency = static_cast<u16>(2048 + (kCgbFrequencyTable[index % 12] >> octave));
   if (fixed && dacBits >= 9) {
     frequency = static_cast<u16>((frequency + 2) & 0x7fc);
   } else if (fixed && dacBits == 8) {
@@ -146,10 +139,6 @@ struct SynthContext {
   const s32 octave = std::clamp<s32>(std::lround(std::log2(hertz / kPsgSampleFrequency)), -3, 4);
   const double referenceHertz = std::ldexp(kPsgSampleFrequency, octave);
   return std::max<u32>(1, std::lround(sampleRate / referenceHertz));
-}
-
-[[nodiscard]] u32 psgRenderSampleRate(u8 dacBits) {
-  return std::min(kPsgRenderSampleRate, kGbaCpuFrequency >> dacBits);
 }
 
 [[nodiscard]] InstrumentModulation mp2kModulation() {
@@ -198,8 +187,7 @@ struct SynthContext {
     return std::nullopt;
   }
   const double naturalKey = 60.0 + 12.0 * std::log2(context.sampleRate * 1024.0 / *frequency);
-  const u8 renderKey = rhythmKey.value_or(static_cast<u8>(std::clamp(std::lround(naturalKey), 0l, 127l)));
-  const u8 sourceKey = rhythmKey ? tone.key : renderKey;
+  const u8 sourceKey = rhythmKey ? tone.key : static_cast<u8>(std::clamp(std::lround(naturalKey), 0l, 127l));
   const u32 phaseStep = tone.fixed() ? 0 : directSoundPhaseStep(*frequency, sourceKey, context.sampleRate);
   const u64 sampleKey = (static_cast<u64>(tone.reverse()) << 57) | (static_cast<u64>(phaseStep) << 25) | *offset;
   unityKey = sourceKey;
@@ -231,26 +219,25 @@ struct SynthContext {
   return entry.ref();
 }
 
-[[nodiscard]] std::optional<SampleRef> programmableWave(ScanResultBuilder& builder, SamplePoolBuilder& psg,
-                                                        u32 pointer, u32 sampleRate, u32 period) {
-  const auto offset = romOffset(pointer, builder.reader(), 16);
+[[nodiscard]] std::optional<SampleRef> programmableWave(SynthContext& context, u32 pointer, u32 sampleRate,
+                                                        u32 period) {
+  const auto offset = romOffset(pointer, context.builder.reader(), 16);
   if (!offset) {
     return std::nullopt;
   }
   const u64 key = (static_cast<u64>(period) << 32) | *offset;
-  if (const auto existing = psg.find(key)) {
+  if (const auto existing = context.psg.find(key)) {
     return existing;
   }
   const std::string name = fmt::format("PSG programmable wave {:#x}", *offset);
-  auto entry = psg.add(key, Sample{
-                                .name = fmt::format("{} ({:.0f} Hz)", name,
-                                                    static_cast<double>(sampleRate) / period),
-                                .codec = AudioCodec::GbaPsgWave,
-                                .encodedData = builder.reader().range(*offset, 16),
-                                .sampleRate = sampleRate,
-                                .loop = Loop{.enabled = true, .start = kPsgLoopGuardSamples, .length = period},
-                            });
-  entry.source(name, builder.reader().range(*offset, 16), "mp2k-programmable-wave");
+  auto entry = context.psg.add(key, Sample{
+                                        .name = name,
+                                        .codec = AudioCodec::GbaPsgWave,
+                                        .encodedData = context.builder.reader().range(*offset, 16),
+                                        .sampleRate = sampleRate,
+                                        .loop = Loop{.enabled = true, .start = kPsgLoopGuardSamples, .length = period},
+                                    });
+  entry.source(name, context.builder.reader().range(*offset, 16), "mp2k-programmable-wave");
   return entry.ref();
 }
 
@@ -263,8 +250,7 @@ struct SynthContext {
   return context.psg
       .add(key,
            Sample{
-               .name = fmt::format("PSG square {} ({:.0f} Hz)", names[duty],
-                                   static_cast<double>(sampleRate) / period),
+               .name = fmt::format("PSG square {}", names[duty]),
                .codec = AudioCodec::GbaPsg,
                .encodedData = context.builder.reader().range(0, 0),
                .sampleRate = sampleRate,
@@ -280,7 +266,7 @@ struct SynthContext {
   const u8 pitchKey = rhythmKey ? tone.key : keys.low;
   const double cgbHertz =
       cgbType >= 1 && cgbType <= 3 ? cgbClockHertz(cgbType, pitchKey, tone.fixed(), context.dacBits) : 0.0;
-  const u32 psgSampleRate = psgRenderSampleRate(context.dacBits);
+  const u32 psgSampleRate = std::min(kPsgRenderSampleRate, kGbaCpuFrequency >> context.dacBits);
   const u32 psgPeriod = cgbType >= 1 && cgbType <= 3 ? psgReferencePeriod(cgbHertz, psgSampleRate) : 0;
   std::optional<SampleRef> sample;
   double unity = 69.0;
@@ -289,7 +275,7 @@ struct SynthContext {
   } else if (cgbType == 1 || cgbType == 2) {
     sample = squareWave(context, tone.wave & 3, psgSampleRate, psgPeriod);
   } else if (cgbType == 3) {
-    sample = programmableWave(context.builder, context.psg, tone.wave, psgSampleRate, psgPeriod);
+    sample = programmableWave(context, tone.wave, psgSampleRate, psgPeriod);
   } else if (cgbType == 4) {
     sample = context.psg.find(4 + (tone.wave & 1));
   }
@@ -299,10 +285,7 @@ struct SynthContext {
 
   if (cgbType == 4) {
     unity = keys.low - 12.0 * std::log2(noiseClockHertz(pitchKey) / context.sampleRate);
-  } else if (cgbType == 1 || cgbType == 2) {
-    const double sampleHertz = static_cast<double>(psgSampleRate) / psgPeriod;
-    unity = keys.low - 12.0 * std::log2(cgbHertz / sampleHertz);
-  } else if (cgbType == 3) {
+  } else if (cgbType >= 1 && cgbType <= 3) {
     unity = keys.low - 12.0 * std::log2(cgbHertz / (static_cast<double>(psgSampleRate) / psgPeriod));
   } else if (cgbType == 0 && tone.fixed()) {
     // SoundMainRAM uses a literal 0x800000 phase increment for FIX voices,

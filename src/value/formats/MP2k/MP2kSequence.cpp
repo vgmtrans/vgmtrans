@@ -59,7 +59,6 @@ struct LfoState {
   u8 phase = 0;
   u8 delayRemaining = 0;
   u64 tick = 0;
-  bool clocked = false;
   bool emitted = false;
 };
 
@@ -68,7 +67,7 @@ struct ActiveNote {
   u64 endTick = 0;
 };
 
-enum class CgbRoute { Left, Both, Right };
+enum class CgbRoute { Direct, Left, Both, Right };
 
 struct CgbMix {
   u8 envelope;
@@ -76,41 +75,24 @@ struct CgbMix {
 };
 
 struct TrackState {
-  explicit TrackState(const TrackProgram& program)
-      : usesModulation(trackUsesSemantic(program, SequenceSemantic::Modulation)) {}
+  explicit TrackState(const TrackProgram&) {}
 
-  bool usesModulation = false;
   s32 transpose = 0;
   u8 bendRange = 2;
   Mp2kTone tone{.type = 1};
   u8 previousKey = 0;
   u8 previousVelocity = 0;
   u8 patternDepth = 0;
-  u8 pseudoEchoVolume = 0;
-  u8 pseudoEchoLength = 0;
   u8 volume = 0;
   u8 pan = 64;
   bool cgbEnvelopeOverride = false;
   double emittedLevel = 0.0;
-  std::optional<double> emittedReverb;
-  std::optional<CgbRoute> emittedCgbRoute;
-  u32 sampleStart = 0;
-  std::array<u8, 256> soundRegisters{};
+  double emittedReverb = -1.0;
+  CgbRoute emittedRoute = CgbRoute::Direct;
   LfoState lfo;
   std::map<u8, PerformanceNoteId> tiedNotes;
   std::vector<ActiveNote> activeNotes;
 };
-
-[[nodiscard]] s32 arithmeticShiftRight(s32 value, u32 bits) {
-  if (value >= 0 || bits == 0) {
-    return value >> bits;
-  }
-  return -static_cast<s32>((static_cast<u32>(-value) + (u32{1} << bits) - 1) >> bits);
-}
-
-[[nodiscard]] double levelFrom7BitLinear(u8 value) {
-  return value / 127.0;
-}
 
 [[nodiscard]] double panPosition(u8 value) {
   // TrkVolPitSet forms y = 2 * (value - 64), then uses (127-y)/256
@@ -126,18 +108,17 @@ struct Playback {
   VmApi& vm;
   ProgramState& programState;
 
-  [[nodiscard]] bool cgbTone() const { return track.tone.cgbType() != 0; }
-
   [[nodiscard]] Mp2kTone noteTone(u8 key) const {
     if (!track.tone.table()) {
       return track.tone;
     }
     u32 index = key;
     if (track.tone.split()) {
-      const u64 pointer = track.tone.source.range.offset + 8;
-      const auto keymap = programState.reader.has(pointer, 4)
-                              ? romOffset(programState.reader.le32(pointer), programState.reader, 128)
-                              : std::nullopt;
+      if (!programState.reader.has(track.tone.source.range.offset + 8, 4)) {
+        return {};
+      }
+      const auto keymap =
+          romOffset(programState.reader.le32(track.tone.source.range.offset + 8), programState.reader, 128);
       if (!keymap) {
         return {};
       }
@@ -162,7 +143,7 @@ struct Playback {
     }
     const u8 phase = track.lfo.phase;
     const s32 triangle = phase < 0x40 || phase >= 0xc0 ? static_cast<s8>(phase) : 0x80 - phase;
-    return arithmeticShiftRight(track.lfo.depth * triangle, 6);
+    return track.lfo.depth * triangle >> 6;
   }
 
   [[nodiscard]] CgbMix cgbMix(u8 velocity, s8 voicePan, bool modulated) const {
@@ -193,16 +174,13 @@ struct Playback {
 
   [[nodiscard]] static double cgbSpeakerLevel(const Mp2kTone& tone, u8 envelope) {
     // The driver's full SOUNDCNT_H/NR50 mix contributes envelope / 32 to each routed speaker.
-    if (tone.cgbType() != 3) {
-      return std::min<u8>(envelope, 15) / 32.0;
-    }
-    // MP2k maps the 4-bit envelope to the wave channel's five quarter-scale levels.
-    return std::min<u8>(4, (std::min<u8>(envelope, 15) + 2) / 4) / 8.0;
+    const u8 level = std::min<u8>(envelope, 15);
+    return tone.cgbType() == 3 ? std::min<u8>(4, (level + 2) / 4) / 8.0 : level / 32.0;
   }
 
   void emitLevel(const Mp2kTone& tone, s8 voicePan = 0) {
-    const double level = tone.cgbType() == 0 ? levelFrom7BitLinear(track.volume)
-                                             : cgbSpeakerLevel(tone, cgbMix(127, voicePan, false).envelope);
+    const double level =
+        tone.cgbType() == 0 ? track.volume / 127.0 : cgbSpeakerLevel(tone, cgbMix(127, voicePan, false).envelope);
     if (level != track.emittedLevel) {
       track.emittedLevel = level;
       out.level(level, kMp2kLevelQuantization);
@@ -229,13 +207,13 @@ struct Playback {
     }));
   }
 
-  void emitPan(std::optional<CgbRoute> cgbRoute, bool force = false) {
-    if (!force && track.emittedCgbRoute == cgbRoute) {
+  void emitPan(CgbRoute route, bool force = false) {
+    if (!force && track.emittedRoute == route) {
       return;
     }
-    track.emittedCgbRoute = cgbRoute;
-    if (cgbRoute) {
-      out.stereoBalance(*cgbRoute == CgbRoute::Right ? 0.0 : 1.0, *cgbRoute == CgbRoute::Left ? 0.0 : 1.0);
+    track.emittedRoute = route;
+    if (route != CgbRoute::Direct) {
+      out.stereoBalance(route == CgbRoute::Right ? 0.0 : 1.0, route == CgbRoute::Left ? 0.0 : 1.0);
     } else {
       out.pan(panPosition(track.pan), 255.0 / 256.0);
     }
@@ -243,7 +221,7 @@ struct Playback {
 
   void pan(u8 value) {
     track.pan = value;
-    if (track.emittedCgbRoute) {
+    if (track.emittedRoute != CgbRoute::Direct) {
       const Mp2kTone tone = noteTone(track.previousKey);
       const s8 voicePan = notePan(tone);
       if (tone.cgbType() != 0) {
@@ -252,17 +230,12 @@ struct Playback {
         return;
       }
     }
-    emitPan(std::nullopt, true);
+    emitPan(CgbRoute::Direct, true);
     emitLevel(track.tone);
   }
 
   void syncLfo() {
     const u64 now = vm.tick();
-    if (!track.lfo.clocked) {
-      track.lfo.tick = now;
-      track.lfo.clocked = true;
-      return;
-    }
     u64 elapsed = now - track.lfo.tick;
     track.lfo.tick = now;
     if (track.lfo.speed == 0 || track.lfo.depth == 0) {
@@ -329,7 +302,7 @@ struct Playback {
   }
 
   bool initializeLfo() {
-    if (!track.usesModulation || track.lfo.emitted) {
+    if (track.lfo.emitted) {
       return false;
     }
     track.lfo.emitted = true;
@@ -417,7 +390,6 @@ struct Playback {
 
   void note(u8 key, u8 velocity, u32 duration, bool tie) {
     syncLfo();
-    initializeLfo();
     track.previousKey = key;
     track.previousVelocity = velocity;
     std::erase_if(track.activeNotes, [&](const ActiveNote& note) { return note.endTick <= vm.tick(); });
@@ -426,7 +398,7 @@ struct Playback {
       track.lfo.phase = 0;
       track.lfo.delayRemaining = track.lfo.delay;
     }
-    double noteVelocity = levelFrom7BitLinear(velocity);
+    double noteVelocity = velocity / 127.0;
     const Mp2kTone tone = noteTone(key);
     const s8 voicePan = notePan(tone);
     emitLevel(tone, voicePan);
@@ -443,7 +415,7 @@ struct Playback {
         noteVelocity /= (modulationValue() + 128) / 128.0;
       }
     } else {
-      emitPan(std::nullopt);
+      emitPan(CgbRoute::Direct);
       if (track.cgbEnvelopeOverride) {
         out.restoreEnvelope();
         track.cgbEnvelopeOverride = false;
@@ -488,33 +460,31 @@ struct Playback {
 
   void tonePanSweep(u8 panSweep) { track.tone.panSweep = panSweep; }
 
-  void port(u8 address, u8 value) { track.soundRegisters[address] = value; }
-
   void attack(u8 value) {
     track.tone.attack = value;
     out.updateEnvelope(EnvelopeUpdate::set(
-        Envelope{.attackSeconds = cgbTone() ? cgbEnvelopeSeconds(value) : directAttackSeconds(value)},
+        Envelope{.attackSeconds = track.tone.cgbType() != 0 ? cgbEnvelopeSeconds(value) : directAttackSeconds(value)},
         EnvelopeFields::Attack));
   }
 
   void decay(u8 value) {
     track.tone.decay = value;
-    out.updateEnvelope(
-        EnvelopeUpdate::set(Envelope{.decaySeconds = cgbTone() ? cgbDecaySeconds(value) : directDecaySeconds(value)},
-                            EnvelopeFields::Decay));
+    out.updateEnvelope(EnvelopeUpdate::set(
+        Envelope{.decaySeconds = track.tone.cgbType() != 0 ? cgbDecaySeconds(value) : directDecaySeconds(value)},
+        EnvelopeFields::Decay));
   }
 
   void sustain(u8 value) {
     track.tone.sustain = value;
-    out.updateEnvelope(
-        EnvelopeUpdate::set(Envelope{.sustainAmplitude = cgbTone() ? std::min<u8>(value, 15) / 15.0 : value / 255.0},
-                            EnvelopeFields::Sustain));
+    out.updateEnvelope(EnvelopeUpdate::set(
+        Envelope{.sustainAmplitude = track.tone.cgbType() != 0 ? std::min<u8>(value, 15) / 15.0 : value / 255.0},
+        EnvelopeFields::Sustain));
   }
 
   void release(u8 value) {
     track.tone.release = value;
     out.updateEnvelope(EnvelopeUpdate::set(
-        Envelope{.releaseSeconds = cgbTone() ? cgbDecaySeconds(value) : directReleaseSeconds(value)},
+        Envelope{.releaseSeconds = track.tone.cgbType() != 0 ? cgbDecaySeconds(value) : directReleaseSeconds(value)},
         EnvelopeFields::Release));
   }
 
@@ -735,9 +705,11 @@ struct DecodeContext {
         case 7:
           return event.invoke<&Playback::release>(event.u8("release"));
         case 8:
-          return event.set<&TrackState::pseudoEchoVolume>(event.u8("pseudo_echo_volume"));
+          static_cast<void>(event.u8("pseudo_echo_volume"));
+          return event;
         case 9:
-          return event.set<&TrackState::pseudoEchoLength>(event.u8("pseudo_echo_length"));
+          static_cast<void>(event.u8("pseudo_echo_length"));
+          return event;
         case 10:
           return event.invoke<&Playback::toneLength>(event.u8("length"));
         case 11:
@@ -745,7 +717,8 @@ struct DecodeContext {
         case 12:
           return event.wait(event.u16le("ticks", SourceValueDisplay::Default, SemanticOperandRole::Duration));
         case 13:
-          return event.set<&TrackState::sampleStart>(event.u32le("sample_start"));
+          static_cast<void>(event.u32le("sample_start"));
+          return event;
         default:
           event.warning("Unknown MP2k extended command stopped playback");
           return event.stop();
@@ -753,8 +726,9 @@ struct DecodeContext {
     }
     case 0xcc: {
       auto event = cursor.command("Sound Register Write", SequenceSemantic::State);
-      const u8 address = parameter(cursor, event, running, "register_offset", SourceValueDisplay::Hex);
-      return event.invoke<&Playback::port>(address, event.u8("value", SourceValueDisplay::Hex));
+      static_cast<void>(parameter(cursor, event, running, "register_offset", SourceValueDisplay::Hex));
+      static_cast<void>(event.u8("value", SourceValueDisplay::Hex));
+      return event;
     }
     case 0xce: {
       auto event = cursor.command("End Tie", SequenceSemantic::Note);
