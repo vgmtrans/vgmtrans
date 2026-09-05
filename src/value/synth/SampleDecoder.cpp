@@ -232,9 +232,7 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
 }
 
 [[nodiscard]] std::vector<s16> synthesizeBandLimitedStepPcm16(std::span<const s16> steps, u32 sampleCount) {
-  // Mednafen's GBA APU uses Blip_Synth's default -8 dB-at-Nyquist kernel;
-  // applying the same logarithmic tilt keeps the exported cycle alias-free.
-  constexpr double kTrebleDb = -8.0;
+  // Project the hardware step waveform onto the harmonics representable by the exported PCM loop.
   std::vector<s16> samples(sampleCount);
   if (steps.empty() || sampleCount == 0) {
     return samples;
@@ -249,8 +247,7 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
       const double phase = -2.0 * kPi * harmonic * (step + 0.5) / steps.size();
       sum += static_cast<double>(steps[step]) * std::polar(1.0, phase);
     }
-    const double trebleGain = std::pow(10.0, kTrebleDb * harmonic / harmonics / 20.0);
-    coefficients[harmonic] = sum * (std::sin(kPi * harmonic / steps.size()) / (kPi * harmonic)) * trebleGain;
+    coefficients[harmonic] = sum * (std::sin(kPi * harmonic / steps.size()) / (kPi * harmonic));
   }
 
   for (u32 i = 0; i < sampleCount; ++i) {
