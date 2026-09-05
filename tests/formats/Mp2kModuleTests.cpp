@@ -192,11 +192,10 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
   expect(instruments->instruments[0].modulation.vibrato && instruments->instruments[0].modulation.tremolo &&
              instruments->instruments[0].modulation.vibrato->waveform == LfoWaveform::Triangle,
          "MP2k instruments should advertise the audited triangle vibrato and tremolo ranges");
-  expect(std::abs(instruments->instruments[0].regions.front().attenuationDb) < 1e-12 &&
-             std::abs(instruments->instruments[1].regions.front().attenuationDb - 20.0 * std::log10(2.0)) < 1e-12 &&
-             std::abs(instruments->instruments[2].regions.front().attenuationDb - 20.0 * std::log10(2.0)) < 1e-12,
-         "full-scale DirectSound must remain at unity while CGB voices retain the driver's single-lane mixer "
-         "scaling");
+  expect(std::ranges::all_of(instruments->instruments, [](const Instrument& instrument) {
+           return std::abs(instrument.regions.front().attenuationDb) < 1e-12;
+         }),
+         "full-scale DirectSound and hardware-normalized CGB samples must remain at unity");
   expect(instruments->instruments[0].regions.front().envelope.attackSeconds == 0.0,
          "DirectSound attack 0xff must be at full scale on the first mixer frame");
   expect(instruments->instruments[0].regions.front().envelope.holdSeconds &&
@@ -236,8 +235,12 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
              decodedPcm->loop.start == 23,
          "MP2k DirectSound samples should retain the driver's mixer-rate interpolation and held DAC output");
   const auto decodedWave = decodeSample(psg->pool.samples[waveA4.sample.index()], session.sources().bytes(source));
+  const auto wavePeriod = decodedWave ? std::span<const s16>(decodedWave->pcm).subspan(decodedWave->loop.start,
+                                                                                       decodedWave->loop.length)
+                                      : std::span<const s16>{};
   expect(decodedWave && decodedWave->sampleRate == 44100 && decodedWave->pcm.size() == 216 &&
              decodedWave->loop.start == 8 && decodedWave->loop.length == 200 &&
+             std::abs(std::accumulate(wavePeriod.begin(), wavePeriod.end(), s64{0})) < decodedWave->loop.length &&
              std::ranges::equal(decodedWave->pcm.begin(), decodedWave->pcm.begin() + 8,
                                 decodedWave->pcm.begin() + 200, decodedWave->pcm.begin() + 208) &&
              std::ranges::equal(decodedWave->pcm.begin() + 8, decodedWave->pcm.begin() + 16,
@@ -440,6 +443,8 @@ void mp2kNoiseUsesAuditedRegisterClockAndWidth() {
   const auto decoded = decodeSample(*noise, session.sources().bytes(source));
   expect(decoded && decoded->pcm.size() == 143 && decoded->loop.enabled && decoded->loop.start == 8 &&
              decoded->loop.length == 127 &&
+             *std::ranges::max_element(decoded->pcm) == 0x4000 &&
+             *std::ranges::min_element(decoded->pcm) == -0x4000 &&
              std::ranges::equal(decoded->pcm.begin(), decoded->pcm.begin() + 8, decoded->pcm.begin() + 127,
                                 decoded->pcm.begin() + 135) &&
              std::ranges::equal(decoded->pcm.begin() + 8, decoded->pcm.begin() + 16, decoded->pcm.begin() + 135,
@@ -529,7 +534,7 @@ void mp2kCgbVolumeUsesCombinedHardwareQuantization() {
                              [](const PerformanceEvent& event) {
                                const auto* level = std::get_if<LevelPerformanceEvent>(&event);
                                return level && level->header.tick == 0 &&
-                                      std::abs(level->linearGain - 10.0 / 15.0) < 1e-12;
+                                      std::abs(level->linearGain - 10.0 / 16.0) < 1e-12;
                              }) &&
              std::ranges::any_of(events,
                                  [](const PerformanceEvent& event) {
@@ -541,7 +546,7 @@ void mp2kCgbVolumeUsesCombinedHardwareQuantization() {
                                [](const PerformanceEvent& event) {
                                  const auto* level = std::get_if<LevelPerformanceEvent>(&event);
                                  return level && level->header.tick == 0 &&
-                                        std::abs(level->linearGain - 10.0 / 15.0) < 1e-12;
+                                        std::abs(level->linearGain - 10.0 / 16.0) < 1e-12;
                                }) == 1,
          "a note should not re-emit an unchanged CGB track level");
   expect(std::ranges::any_of(
@@ -672,7 +677,7 @@ void mp2kDirectSoundMasterVolumeAffectsOnlyPcmVoices() {
              !instruments->instruments[1].regions.empty(),
          "MP2k master-volume fixture should retain its PCM and CGB instruments");
   expect(std::abs(instruments->instruments[0].regions.front().attenuationDb - 20.0 * std::log10(2.0)) < 1e-12 &&
-             std::abs(instruments->instruments[1].regions.front().attenuationDb - 20.0 * std::log10(2.0)) < 1e-12,
+             std::abs(instruments->instruments[1].regions.front().attenuationDb) < 1e-12,
          "the DirectSound master nibble and the CGB driver's independent mixer path should remain distinct");
 }
 

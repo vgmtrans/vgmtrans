@@ -185,7 +185,8 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   return 0.5;
 }
 
-[[nodiscard]] std::vector<s16> synthesizeLfsrNoisePcm16(u32 sampleCount, u16 lfsrSeed = 0x7fff, u16 lfsrTap = 0x6000) {
+[[nodiscard]] std::vector<s16> synthesizeLfsrNoisePcm16(u32 sampleCount, u16 lfsrSeed = 0x7fff,
+                                                        u16 lfsrTap = 0x6000, s16 amplitude = 0x7fff) {
   // PSG noise is not sample data in ROM. Emit a deterministic loopable waveform so synth
   // exporters have a concrete sample to reference.
   std::vector<s16> samples(sampleCount);
@@ -194,15 +195,15 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   }
 
   u16 value = lfsrSeed;
-  samples[0] = 0x7fff;
+  samples[0] = amplitude;
   for (u32 i = 1; i < sampleCount; ++i) {
     const bool carry = (value & 0x0001) != 0;
     value >>= 1;
     if (carry) {
-      samples[i] = -0x7fff;
+      samples[i] = static_cast<s16>(-amplitude);
       value ^= lfsrTap;
     } else {
-      samples[i] = 0x7fff;
+      samples[i] = amplitude;
     }
   }
   return samples;
@@ -636,10 +637,10 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
     return std::nullopt;
   }
   if (sample.codecParameter == 4) {
-    period = synthesizeLfsrNoisePcm16(sample.loop.length + 1);
+    period = synthesizeLfsrNoisePcm16(sample.loop.length + 1, 0x7fff, 0x6000, 0x4000);
     period.erase(period.begin());
   } else if (sample.codecParameter == 5) {
-    period = synthesizeLfsrNoisePcm16(sample.loop.length + 1, 0x7f, 0x60);
+    period = synthesizeLfsrNoisePcm16(sample.loop.length + 1, 0x7f, 0x60, 0x4000);
     period.erase(period.begin());
   } else {
     const u32 high = highSteps[sample.codecParameter & 3];
@@ -664,13 +665,15 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
   DecodedSample decoded{.sampleRate = sample.sampleRate, .channels = 1, .loop = sample.loop};
   std::array<s16, 32> wave{};
+  const s32 sum = std::accumulate(encoded.begin(), encoded.end(), s32{0}, [](s32 value, u8 packed) {
+    return value + (packed >> 4) + (packed & 0x0f);
+  });
   size_t index = 0;
   for (const u8 packed : encoded) {
-    // The GBA wave channel converts each unsigned nibble to 2 * (n - 8).
-    // Scaling that exact asymmetric -16..14 DAC range to PCM16 preserves both
-    // its zero point and its amplitude relative to the other PSG channels.
-    wave[index++] = static_cast<s16>((static_cast<s32>(packed >> 4) - 8) << 12);
-    wave[index++] = static_cast<s16>((static_cast<s32>(packed & 0x0f) - 8) << 12);
+    // The hardware DAC emits n / 16; its analog high-pass removes the cycle's
+    // DC component. This integer form preserves that scale exactly in PCM16.
+    wave[index++] = static_cast<s16>(((packed >> 4) * 32 - sum) * 64);
+    wave[index++] = static_cast<s16>(((packed & 0x0f) * 32 - sum) * 64);
   }
   if (sample.loop.length == 0) {
     return std::nullopt;

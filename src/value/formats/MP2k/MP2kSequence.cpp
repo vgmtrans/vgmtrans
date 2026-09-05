@@ -179,7 +179,9 @@ struct Playback {
 
   [[nodiscard]] static double cgbOutputLevel(const Mp2kTone& tone, u8 envelope) {
     if (tone.cgbType() != 3) {
-      return std::min<u8>(envelope, 15) / 15.0;
+      // CgbSound routes each voice at envelope / 32 per speaker. Constant-sum
+      // pan supplies the other half, so the aggregate source gain is / 16.
+      return std::min<u8>(envelope, 15) / 16.0;
     }
     // MP2k maps the 4-bit envelope to the wave channel's five quarter-scale levels.
     return std::min<u8>(4, (std::min<u8>(envelope, 15) + 2) / 4) / 4.0;
