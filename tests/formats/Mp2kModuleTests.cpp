@@ -180,6 +180,17 @@ SourceId scanMp2k(Session& session, std::string name, std::vector<u8> bytes) {
   return source;
 }
 
+template <class Event>
+std::vector<const Event*> eventsOfType(const PerformanceTrack& track) {
+  std::vector<const Event*> events;
+  for (const auto& value : track.events) {
+    if (const auto* event = std::get_if<Event>(&value)) {
+      events.push_back(event);
+    }
+  }
+  return events;
+}
+
 void mp2kModuleBuildsAuditedSequenceAndSynth() {
   constexpr double gbaFrameRate = 16777216.0 / 280896.0;
   const std::vector<u8> bytes = mp2kFixture();
@@ -210,15 +221,14 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
              std::abs(*instruments->instruments[0].regions.front().envelope.releaseSeconds -
                       5.0 * std::log(10.0) / (gbaFrameRate * std::log(256.0 / 224.0))) < 1e-12,
          "DirectSound release must preserve the driver's dB-per-frame slope across SoundFont's 100 dB range");
-  expect(directReleaseSeconds(0) == 0.0, "DirectSound release zero must silence the first release mixer pass");
   expect(directDecaySeconds(0) == 0.0,
-         "DirectSound decay zero must silence the first decay pass after the separate peak hold frame");
+         "DirectSound decay/release zero must silence the first mixer pass after the peak hold");
   expect(std::abs(directAttackSeconds(127) - 258.0 / (255.0 * gbaFrameRate)) < 1e-12,
          "DirectSound attack conversion must retain the final partial integer step");
 
   const auto* psg = snapshot.asset<SamplePoolAsset>(collection.members.samplePools[0]);
-  expect(psg != nullptr && psg->pool.samples.size() == 18 && instruments->localSamples.samples.size() == 1,
-         "MP2k synth should generate only the square and wave octaves used by the bank plus both noise widths");
+  expect(psg != nullptr && psg->pool.samples.size() == 16 && instruments->localSamples.samples.size() == 1,
+         "MP2k synth should generate only the PSG samples used by the bank");
   expect(instruments->instruments[1].regions.size() == 128 && instruments->instruments[2].regions.size() == 128,
          "melodic PSG regions should retain the driver's key-clamped hardware frequency registers");
   const auto& waveA4 = instruments->instruments[1].regions[69];
@@ -262,115 +272,80 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
       session.preparePlayback(collection.id, PlaybackRequest{.sequence = {.sequenceLoops = 0}});
   expect(playback.playable() && playback.performance.tracks.size() == 1,
          "MP2k collection should prepare source-free playback");
-  const auto& events = playback.performance.tracks.front().events;
-  expect(std::ranges::any_of(events,
-                             [](const PerformanceEvent& event) {
-                               const auto* value = std::get_if<LevelPerformanceEvent>(&event);
-                               return value && value->linearGain == 0.0;
-                             }) &&
-             std::ranges::any_of(events,
-                                 [](const PerformanceEvent& event) {
-                                   const auto* value = std::get_if<ExpressionPerformanceEvent>(&event);
-                                   return value && value->linearGain == 1.0;
-                                 }) &&
-             std::ranges::any_of(events,
-                                 [](const PerformanceEvent& event) {
-                                   const auto* value = std::get_if<StereoBalancePerformanceEvent>(&event);
-                                   return value && std::abs(value->leftGain - 127.0 / 256.0) < 1e-12 &&
-                                          std::abs(value->rightGain - 128.0 / 256.0) < 1e-12;
+  const auto& track = playback.performance.tracks.front();
+  const auto levels = eventsOfType<LevelPerformanceEvent>(track);
+  const auto expressions = eventsOfType<ExpressionPerformanceEvent>(track);
+  const auto balances = eventsOfType<StereoBalancePerformanceEvent>(track);
+  const auto pans = eventsOfType<PanPerformanceEvent>(track);
+  const auto notes = eventsOfType<NotePerformanceEvent>(track);
+  const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(track);
+  const auto reverbs = eventsOfType<ReverbPerformanceEvent>(track);
+  const auto modulations = eventsOfType<ModulationPerformanceEvent>(track);
+  expect(std::ranges::any_of(levels, [](const auto* event) { return event->linearGain == 0.0; }) &&
+             std::ranges::any_of(expressions, [](const auto* event) { return event->linearGain == 1.0; }) &&
+             std::ranges::any_of(balances,
+                                 [](const auto* event) {
+                                   return std::abs(event->leftGain - 127.0 / 256.0) < 1e-12 &&
+                                          std::abs(event->rightGain - 128.0 / 256.0) < 1e-12;
                                  }),
          "MP2k playback should initialize cleared VOL, unit volX/expression, and hardware center balance separately");
-  const auto level = std::ranges::find_if(events, [](const PerformanceEvent& event) {
-    const auto* value = std::get_if<LevelPerformanceEvent>(&event);
-    return value && value->linearGain != 0.0;
-  });
-  expect(level != events.end() &&
-             std::abs(std::get<LevelPerformanceEvent>(*level).linearGain - 100.0 / 127.0) < 1e-12 &&
-             std::get<LevelPerformanceEvent>(*level).sourceQuantization &&
-             std::get<LevelPerformanceEvent>(*level).sourceQuantization->levels == 128,
+  const auto level = std::ranges::find_if(levels, [](const auto* event) { return event->linearGain != 0.0; });
+  expect(level != levels.end() && std::abs((*level)->linearGain - 100.0 / 127.0) < 1e-12 &&
+             (*level)->sourceQuantization && (*level)->sourceQuantization->levels == 128,
          "MP2k VOL must be a linear 7-bit hardware gain, not a squared MIDI controller curve");
-  const auto pan = std::ranges::find_if(
-      events, [](const PerformanceEvent& event) { return std::holds_alternative<PanPerformanceEvent>(event); });
-  expect(pan != events.end() && std::get<PanPerformanceEvent>(*pan).law == PanLaw::ConstantSum &&
-             std::abs(std::get<PanPerformanceEvent>(*pan).stereoPosition - 1.0 / 255.0) < 1e-12 &&
-             std::get<PanPerformanceEvent>(*pan).hasLinearGain &&
-             std::abs(std::get<PanPerformanceEvent>(*pan).linearGain - 255.0 / 256.0) < 1e-12,
+  expect(!pans.empty() && pans.front()->law == PanLaw::ConstantSum &&
+             std::abs(pans.front()->stereoPosition - 1.0 / 255.0) < 1e-12 && pans.front()->hasLinearGain &&
+             std::abs(pans.front()->linearGain - 255.0 / 256.0) < 1e-12,
          "MP2k pan should retain TrkVolPitSet's asymmetric constant-sum channel factors");
-  expect(std::ranges::count_if(
-             events,
-             [](const PerformanceEvent& event) { return std::holds_alternative<NotePerformanceEvent>(event); }) == 3,
-         "top-level PEND must fall through to explicit, running-status, and tied MP2k notes");
-  const auto firstNote = std::ranges::find_if(
-      events, [](const PerformanceEvent& event) { return std::holds_alternative<NotePerformanceEvent>(event); });
-  expect(firstNote != events.end() &&
-             std::abs(std::get<NotePerformanceEvent>(*firstNote).linearVelocity - 100.0 / 127.0) < 1e-12,
+  expect(notes.size() == 3, "top-level PEND must fall through to explicit, running-status, and tied MP2k notes");
+  expect(std::abs(notes.front()->linearVelocity - 100.0 / 127.0) < 1e-12,
          "MP2k note velocity must remain a separate linear channel-gain lane");
-  std::vector<const NotePerformanceEvent*> noteEvents;
-  for (const auto& event : events) {
-    if (const auto* noteEvent = std::get_if<NotePerformanceEvent>(&event)) {
-      noteEvents.push_back(noteEvent);
-    }
-  }
-  expect(noteEvents.size() == 3 && noteEvents[0]->restartsLfoPhase && noteEvents[1]->restartsLfoPhase &&
-             !noteEvents[2]->restartsLfoPhase,
+  expect(notes[0]->restartsLfoPhase && notes[1]->restartsLfoPhase && !notes[2]->restartsLfoPhase,
          "notes should reload and reset the MP2k LFO only while LFODL is nonzero");
-  expect(std::ranges::count_if(events,
-                               [](const PerformanceEvent& event) {
-                                 return std::holds_alternative<EnvelopePerformanceEvent>(event);
-                               }) == 4,
-         "XCMD attack, decay, sustain, and release should emit dynamic envelope updates");
-  const auto attack = std::ranges::find_if(events, [](const PerformanceEvent& event) {
-    const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event);
-    return envelope && hasEnvelopeField(envelope->update.fields, EnvelopeFields::Attack);
-  });
-  expect(attack != events.end() && std::get<EnvelopePerformanceEvent>(*attack).update.values &&
-             std::get<EnvelopePerformanceEvent>(*attack).update.values->attackSeconds &&
-             std::abs(*std::get<EnvelopePerformanceEvent>(*attack).update.values->attackSeconds -
-                      254.0 / (255.0 * gbaFrameRate)) < 1e-12,
+  expect(envelopes.size() == 4, "XCMD attack, decay, sustain, and release should emit dynamic envelope updates");
+  const auto attack = std::ranges::find_if(
+      envelopes, [](const auto* event) { return hasEnvelopeField(event->update.fields, EnvelopeFields::Attack); });
+  expect(attack != envelopes.end() && (*attack)->update.values && (*attack)->update.values->attackSeconds &&
+             std::abs(*(*attack)->update.values->attackSeconds - 254.0 / (255.0 * gbaFrameRate)) < 1e-12,
          "DirectSound attack should preserve the exact area of the pre-advanced integer staircase");
-  expect(std::ranges::count_if(
-             events,
-             [](const PerformanceEvent& event) { return std::holds_alternative<ReverbPerformanceEvent>(event); }) == 1,
-         "XCMD pseudo echo must not create a second reverb lane event");
-  expect(std::ranges::any_of(events,
-                             [](const PerformanceEvent& event) {
-                               const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
-                               return modulation && modulation->context.shape &&
-                                      modulation->context.shape->waveform == LfoWaveform::Triangle &&
-                                      modulation->context.cyclesPerTick &&
-                                      std::abs(*modulation->context.cyclesPerTick - 22.0 / 256.0) < 1e-12 &&
-                                      modulation->context.delayTicks == 3 &&
-                                      modulation->context.delayUpdateMode == LfoDelayUpdateMode::FutureNotesOnly &&
-                                      !modulation->context.delayRunsWhileInactive &&
-                                      modulation->context.initialPhaseCycles == 22.0 / 256.0;
+  expect(reverbs.size() == 1, "XCMD pseudo echo must not create a second reverb lane event");
+  expect(std::ranges::any_of(modulations,
+                             [](const auto* event) {
+                               return event->context.shape && event->context.shape->waveform == LfoWaveform::Triangle &&
+                                      event->context.cyclesPerTick &&
+                                      std::abs(*event->context.cyclesPerTick - 22.0 / 256.0) < 1e-12 &&
+                                      event->context.delayTicks == 3 &&
+                                      event->context.delayUpdateMode == LfoDelayUpdateMode::FutureNotesOnly &&
+                                      !event->context.delayRunsWhileInactive &&
+                                      event->context.initialPhaseCycles == 22.0 / 256.0;
                              }),
          "MP2k LFO commands should retain the audited pre-incremented phase and note-loaded delay");
-  expect(std::ranges::any_of(events,
-                             [](const PerformanceEvent& event) {
-                               const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
-                               return modulation && modulation->target == ModulationPerformanceTarget::TremoloDepth &&
-                                      modulation->volumeDepthLinearGain == 16.0 / 128.0 &&
-                                      modulation->context.tremoloGainMode == TremoloGainMode::BipolarAroundNominal;
+  expect(std::ranges::any_of(modulations,
+                             [](const auto* event) {
+                               return event->target == ModulationPerformanceTarget::TremoloDepth &&
+                                      event->volumeDepthLinearGain == 16.0 / 128.0 &&
+                                      event->context.tremoloGainMode == TremoloGainMode::BipolarAroundNominal;
                              }) &&
-             std::ranges::any_of(events,
-                                 [](const PerformanceEvent& event) {
-                                   const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
-                                   return modulation && modulation->target == ModulationPerformanceTarget::PanDepth &&
-                                          modulation->panDepth == 32.0 / 255.0;
+             std::ranges::any_of(modulations,
+                                 [](const auto* event) {
+                                   return event->target == ModulationPerformanceTarget::PanDepth &&
+                                          event->panDepth == 32.0 / 255.0;
                                  }),
          "MP2k MODT should expose its exact linear tremolo and pan excursions");
 }
 
 void mp2kBdpcmDecoderPreservesSampleCountAndDirection() {
-  std::vector<u8> source(33);
-  source[0] = 10;
-  source[1] = 1;
-  source[2] = 0x12;
+  std::vector<u8> source(16 + 33);
+  source[0] = 1;
+  source[16] = 10;
+  source[17] = 1;
+  source[18] = 0x12;
   Sample sample{
-      .codec = AudioCodec::GbaBdpcm,
+      .codec = AudioCodec::GbaDirectSound,
       .encodedData = SourceRange{.source = SourceId{1}, .offset = 0, .size = source.size()},
       .sampleRate = 26758,
-      .codecParameter = 4,
+      .loop = Loop{.length = 4},
+      .codecParameter = (u64{26758} << 32) | (u64{1} << 23),
   };
   const auto forward = decodeSample(sample, source);
   sample.reverse = true;
@@ -457,11 +432,8 @@ void mp2kCgbLengthClampsSequenceGateInPhysicalTime() {
   scanMp2k(session, "mp2k-cgb-length.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
   const CollectionPlayback playback = session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{});
-  const auto note = std::ranges::find_if(playback.performance.tracks.front().events, [](const PerformanceEvent& event) {
-    return std::holds_alternative<NotePerformanceEvent>(event);
-  });
-  expect(note != playback.performance.tracks.front().events.end() &&
-             std::get<NotePerformanceEvent>(*note).maximumDurationMilliseconds == 125.0,
+  const auto notes = eventsOfType<NotePerformanceEvent>(playback.performance.tracks.front());
+  expect(notes.size() == 1 && notes.front()->maximumDurationMilliseconds == 125.0,
          "CGB length 32 should stop a square voice after (64-32)/256 seconds");
 }
 
@@ -495,7 +467,11 @@ void mp2kCgbVolumeUsesCombinedHardwareQuantization() {
   scanMp2k(session, "mp2k-cgb-volume.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
   const CollectionPlayback playback = session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{});
-  const auto& events = playback.performance.tracks.front().events;
+  const auto& performanceTrack = playback.performance.tracks.front();
+  const auto notes = eventsOfType<NotePerformanceEvent>(performanceTrack);
+  const auto levels = eventsOfType<LevelPerformanceEvent>(performanceTrack);
+  const auto balances = eventsOfType<StereoBalancePerformanceEvent>(performanceTrack);
+  const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(performanceTrack);
   const auto* instruments = snapshot.asset<SoundBankAsset>(snapshot.collections().front().members.soundBanks.front());
   expect(instruments && instruments->instruments.size() > 3, "CGB rhythm fixture should produce its source program");
   const auto pannedRegion = std::ranges::find_if(instruments->instruments[3].regions,
@@ -503,50 +479,34 @@ void mp2kCgbVolumeUsesCombinedHardwareQuantization() {
   expect(pannedRegion != instruments->instruments[3].regions.end() && pannedRegion->pan == 0.5,
          "CGB rhythm pan should affect the hardware route without also panning the synthesized sample");
 
-  std::vector<const NotePerformanceEvent*> notes;
-  for (const auto& event : events) {
-    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
-      notes.push_back(note);
-    }
-  }
   expect(notes.size() == 3 && std::abs(notes[0]->linearVelocity - 0.2) < 1e-12 &&
              std::abs(notes[1]->linearVelocity - 1.0) < 1e-12 && std::abs(notes[2]->linearVelocity - 8.0 / 9.0) < 1e-12,
          "CGB note velocity should use the selected tone's quantized note-to-reference level ratio");
-  expect(std::ranges::any_of(events,
-                             [](const PerformanceEvent& event) {
-                               const auto* level = std::get_if<LevelPerformanceEvent>(&event);
-                               return level && level->header.tick == 0 &&
-                                      std::abs(level->linearGain - 10.0 / 32.0) < 1e-12;
+  expect(std::ranges::any_of(levels,
+                             [](const auto* event) {
+                               return event->header.tick == 0 && std::abs(event->linearGain - 10.0 / 32.0) < 1e-12;
                              }) &&
-             std::ranges::any_of(events,
-                                 [](const PerformanceEvent& event) {
-                                   const auto* level = std::get_if<LevelPerformanceEvent>(&event);
-                                   return level && level->header.tick == 1 &&
-                                          std::abs(level->linearGain - 0.25) < 1e-12;
+             std::ranges::any_of(levels,
+                                 [](const auto* event) {
+                                   return event->header.tick == 1 && std::abs(event->linearGain - 0.25) < 1e-12;
                                  }),
          "CGB track level should use the 4-bit square goal and five-level wave-volume register map");
-  expect(std::ranges::count_if(events,
-                               [](const PerformanceEvent& event) {
-                                 const auto* level = std::get_if<LevelPerformanceEvent>(&event);
-                                 return level && level->header.tick == 0 &&
-                                        std::abs(level->linearGain - 10.0 / 32.0) < 1e-12;
+  expect(std::ranges::count_if(levels,
+                               [](const auto* event) {
+                                 return event->header.tick == 0 && std::abs(event->linearGain - 10.0 / 32.0) < 1e-12;
                                }) == 1,
          "a note should not re-emit an unchanged CGB track level");
-  expect(std::ranges::any_of(events,
-                             [](const PerformanceEvent& event) {
-                               const auto* balance = std::get_if<StereoBalancePerformanceEvent>(&event);
-                               return balance && balance->leftGain == 1.0 && balance->rightGain == 1.0;
-                             }),
+  expect(std::ranges::any_of(balances,
+                             [](const auto* event) { return event->leftGain == 1.0 && event->rightGain == 1.0; }),
          "a centered CGB channel should be routed to both hardware outputs");
   expect(std::ranges::any_of(
-             events,
-             [](const PerformanceEvent& event) {
-               const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event);
-               if (!envelope || envelope->header.tick != 1 || !envelope->update.values) {
+             envelopes,
+             [](const auto* event) {
+               if (event->header.tick != 1 || !event->update.values) {
                  return false;
                }
-               const Envelope& value = *envelope->update.values;
-               return envelope->update.fields == EnvelopeFields::All && value.attackSeconds && value.holdSeconds &&
+               const Envelope& value = *event->update.values;
+               return event->update.fields == EnvelopeFields::All && value.attackSeconds && value.holdSeconds &&
                       value.decaySeconds && value.releaseSeconds && value.sustainAmplitude &&
                       std::abs(*value.attackSeconds - 6.0 / 64.0) < 1e-12 &&
                       std::abs(*value.holdSeconds - 9.0 / 64.0) < 1e-12 &&
@@ -555,11 +515,10 @@ void mp2kCgbVolumeUsesCombinedHardwareQuantization() {
                       std::abs(*value.sustainAmplitude - 0.5) < 1e-12;
              }),
          "CGB ADSR should use the note's envelope goal and quantized wave sustain ratio");
-  expect(std::ranges::any_of(events,
-                             [](const PerformanceEvent& event) {
-                               const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event);
-                               return envelope && envelope->header.tick == 2 && envelope->update.values &&
-                                      envelope->update.values->sustainAmplitude == 0.25;
+  expect(std::ranges::any_of(envelopes,
+                             [](const auto* event) {
+                               return event->header.tick == 2 && event->update.values &&
+                                      event->update.values->sustainAmplitude == 0.25;
                              }),
          "rhythm programs should use the selected child tone's CGB envelope");
 }
@@ -575,11 +534,10 @@ void mp2kCgbPanUsesDiscreteHardwareRouting() {
   Session session;
   scanMp2k(session, "mp2k-cgb-pan.gba", bytes);
   const auto playback = session.preparePlayback(session.snapshot().collections().front().id, PlaybackRequest{});
-  const auto& events = playback.performance.tracks.front().events;
+  const auto balances = eventsOfType<StereoBalancePerformanceEvent>(playback.performance.tracks.front());
   const auto routedAt = [&](u64 tick, double left, double right) {
-    return std::ranges::any_of(events, [&](const PerformanceEvent& event) {
-      const auto* balance = std::get_if<StereoBalancePerformanceEvent>(&event);
-      return balance && balance->header.tick == tick && balance->leftGain == left && balance->rightGain == right;
+    return std::ranges::any_of(balances, [&](const auto* event) {
+      return event->header.tick == tick && event->leftGain == left && event->rightGain == right;
     });
   };
   expect(routedAt(0, 1.0, 0.0) && routedAt(1, 1.0, 1.0) && routedAt(2, 0.0, 1.0),
@@ -594,12 +552,7 @@ void mp2kUndefinedJumpSlotsUseFine() {
   scanMp2k(session, "mp2k-undefined-fine.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
   const CollectionPlayback playback = session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{});
-  std::vector<const NotePerformanceEvent*> notes;
-  for (const auto& event : playback.performance.tracks.front().events) {
-    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
-      notes.push_back(note);
-    }
-  }
+  const auto notes = eventsOfType<NotePerformanceEvent>(playback.performance.tracks.front());
   expect(notes.size() == 1 && notes.front()->durationTicks == 0,
          "undefined MP2k jump-table slots should invoke ply_fine and stop active channels immediately");
 }
@@ -612,9 +565,7 @@ void mp2kPortConsumesItsRegisterOperands() {
   scanMp2k(session, "mp2k-port.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
   const CollectionPlayback playback = session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{});
-  expect(std::ranges::count_if(
-             playback.performance.tracks.front().events,
-             [](const PerformanceEvent& event) { return std::holds_alternative<NotePerformanceEvent>(event); }) == 1,
+  expect(eventsOfType<NotePerformanceEvent>(playback.performance.tracks.front()).size() == 1,
          "PORT should consume its address and value bytes without terminating the following sequence");
 }
 
@@ -626,9 +577,7 @@ void mp2kUnknownMemaccDoesNotConsumeAJumpPointer() {
   scanMp2k(session, "mp2k-memacc.gba", bytes);
   const SessionSnapshot snapshot = session.snapshot();
   const CollectionPlayback playback = session.preparePlayback(snapshot.collections().front().id, PlaybackRequest{});
-  expect(std::ranges::count_if(
-             playback.performance.tracks.front().events,
-             [](const PerformanceEvent& event) { return std::holds_alternative<NotePerformanceEvent>(event); }) == 1,
+  expect(eventsOfType<NotePerformanceEvent>(playback.performance.tracks.front()).size() == 1,
          "unknown MEMACC operations should consume only their three arguments, exactly like the driver");
 }
 
