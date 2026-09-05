@@ -62,10 +62,6 @@ constexpr double kPsgSampleFrequency = 440.0;
 constexpr u32 kPsgRenderSampleRate = 44100;
 constexpr u32 kPsgLoopGuardSamples = 8;
 constexpr u32 kGbaCpuFrequency = 16777216;
-// Aria routes the summed CGB envelope through one hardware-volume lane while
-// DirectSound mixes independent left and right lanes. With both GBA output
-// ratios at full scale, the CGB path is therefore one half of DirectSound.
-constexpr double kPsgDacAttenuationDb = 6.020599913279624;
 constexpr std::array<u8, 60> kNoiseRegisters{
     0xd7, 0xd6, 0xd5, 0xd4, 0xc7, 0xc6, 0xc5, 0xc4, 0xb7, 0xb6, 0xb5, 0xb4, 0xa7, 0xa6, 0xa5,
     0xa4, 0x97, 0x96, 0x95, 0x94, 0x87, 0x86, 0x85, 0x84, 0x77, 0x76, 0x75, 0x74, 0x67, 0x66,
@@ -328,10 +324,7 @@ struct SynthContext {
       .unityKey = unity,
       .envelope = envelopeFor(tone, cgbType != 0),
       .pan = pan,
-      // The driver collapses the CGB voice's two channel-volume bytes into
-      // one envelope lane; DirectSound retains and mixes both lanes.
-      .attenuationDb =
-          cgbType == 0 ? directSoundMasterAttenuation(context.directSoundMasterVolume) : kPsgDacAttenuationDb,
+      .attenuationDb = cgbType == 0 ? directSoundMasterAttenuation(context.directSoundMasterVolume) : 0.0,
   };
 }
 
