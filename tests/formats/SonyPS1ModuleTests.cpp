@@ -84,11 +84,11 @@ std::vector<u8> sequenceFixture(std::initializer_list<u8> events, bool reversed 
 
 constexpr u32 kFixtureVagSize = 0xc0;
 
-void fillVag(std::vector<u8>& bytes, u32 offset) {
-  for (u32 frame = 1; frame < kFixtureVagSize / kPsxAdpcmBlockBytes; ++frame) {
+void fillVag(std::vector<u8>& bytes, u32 offset, u32 size = kFixtureVagSize) {
+  for (u32 frame = 1; frame < size / kPsxAdpcmBlockBytes; ++frame) {
     const u32 block = offset + frame * kPsxAdpcmBlockBytes;
     bytes[block] = 0x11;
-    bytes[block + 1] = frame + 1 == kFixtureVagSize / kPsxAdpcmBlockBytes ? 1 : 0;
+    bytes[block + 1] = frame + 1 == size / kPsxAdpcmBlockBytes ? 1 : 0;
     for (u32 byte = 2; byte < kPsxAdpcmBlockBytes; ++byte) {
       bytes[block + byte] = static_cast<u8>(frame * 17 + byte);
     }
@@ -416,6 +416,7 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
   expect(instruments && instruments->localSamples.samples.size() == 1 && instruments->instruments.size() == 1 &&
              instruments->instruments[0].regions.size() == 1,
          "the VAB program and tone tables should build one playable region");
+  expect(combinedSnapshot.assets().size() == 1, "a combined VAB should not gain a duplicate raw sample pool");
   const Region& region = instruments->instruments[0].regions[0];
   expect(std::abs(region.unityKey - 59.5) < 0.000001,
          "VAB shift should remain as fractional driver pitch instead of being rounded");
@@ -508,6 +509,64 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths() {
   const auto& instrument = resolvedInstruments.back().instruments.front();
   expect(instrument.explicitAddress && instrument.explicitAddress->bank == 0,
          "the selected VAB should be rebased among Sony banks without foreign members shifting its slot");
+}
+
+void sonyPs1RawSamplesSupportManualCollections() {
+  std::vector<u8> body(0x1e0, 0);
+  fillVag(body, 0);
+  body[0xc1] = 7;
+  std::fill_n(body.begin() + 0xc2, 14, 0x77);  // Terminal padding belongs to VAB storage.
+  for (u32 offset = 0xd0; offset < 0x100; offset += 16) {
+    body[offset] = 0x11;  // Leftover audio between banks is not a sample.
+  }
+  fillVag(body, 0x100, 0xe0);
+
+  for (bool duplicate : {false, true}) {
+    Session session;
+    session.registerFormat(sonyPs1Module());
+    session.addSource(SourceFile{.name = "song"}, sequenceFixture({0x00, 0xff, 0x2f, 0x00}));
+    for (u32 size : {0xd0, 0xe0}) {
+      auto header = vabFixture(7, false);
+      le32(header, 0x0c, static_cast<u32>(header.size()) + size);
+      le16(header, header.size() - 0x1fe, static_cast<u16>(size >> 3));
+      session.addSource(SourceFile{.name = "header"}, std::move(header));
+    }
+    auto bytes = body;
+    if (duplicate) {
+      bytes.insert(bytes.end(), body.begin(), body.begin() + 0xd0);
+    }
+    bytes.resize(bytes.size() + 0x20, 0xff);  // Unrelated file tail.
+    session.addSource(SourceFile{.name = "audio"}, std::move(bytes));
+    session.scanPendingSources();
+    const auto snapshot = session.snapshot();
+    const auto& discovered = sonyPs1Collection(snapshot, 2, 0);
+    const auto pool = std::ranges::find_if(
+        snapshot.assets(), [](const Asset& asset) { return std::holds_alternative<SamplePoolAsset>(asset); });
+    expect(pool != snapshot.assets().end(), "raw audio should be detected without a filename extension");
+    const auto& samples = std::get<SamplePoolAsset>(*pool);
+    expect(samples.pool.samples.size() == (duplicate ? 3 : 2) && samples.pool.samples[0].encodedData.size == 0xc0,
+           "raw detection should retain every sample without decoding gaps or terminal padding");
+    for (u32 bank = 0; bank < 2; ++bank) {
+      const auto id =
+          session.createUserCollection("Manual", CollectionMembers{.sequence = discovered.members.sequence,
+                                                                   .soundBanks = {discovered.members.soundBanks[bank]},
+                                                                   .samplePools = {samples.metadata.id}});
+      const auto bound = bindCollection(session.snapshot(), id);
+      if (duplicate && bank == 0) {
+        expect(!bound.collection, "multiple matching positions in one raw pool should be ambiguous");
+      } else {
+        expect(bound.collection.has_value(), "both the first and later banks should bind manually");
+        const auto sample = bound.collection->soundBanks()[0].instruments[0].regions[0].sample;
+        expect(sample.owner() == samples.metadata.id && sample.index() == bank,
+               "manual binding should use the selected bank's sample position");
+      }
+    }
+  }
+  body[0xb0] = 0x50;
+  expect(!readSonyPs1RawSampleBody(ByteReader(SourceId{1}, body)),
+         "invalid ADPCM after the statistical probe should reject raw detection");
+  std::fill(body.begin(), body.end(), 0);
+  expect(!readSonyPs1RawSampleBody(ByteReader(SourceId{1}, body)), "silence alone should not establish raw detection");
 }
 
 void runSonyPs1CollectionBindingTests() {

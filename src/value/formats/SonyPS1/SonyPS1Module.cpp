@@ -8,9 +8,6 @@
 
 #include <fmt/format.h>
 
-#include <algorithm>
-#include <cctype>
-#include <filesystem>
 #include <limits>
 #include <map>
 #include <string>
@@ -22,14 +19,6 @@ namespace vgmtrans::formats::sony_ps1 {
 using namespace core;
 
 namespace {
-
-[[nodiscard]] bool rawVbSource(const SourceFile& source) {
-  std::filesystem::path path = source.path.empty() ? std::filesystem::path(source.name) : source.path;
-  std::string extension = path.extension().string();
-  std::ranges::transform(extension, extension.begin(),
-                         [](unsigned char value) { return static_cast<char>(std::tolower(value)); });
-  return extension == ".vb";
-}
 
 [[nodiscard]] std::vector<u16> bankNumbers(const std::vector<SonyPs1BankLayout>& layouts) {
   if (layouts.size() <= 1) {
@@ -53,7 +42,9 @@ namespace {
 [[nodiscard]] ScanResult scanSonyPs1(const ScanInput& input) {
   const auto bankLayouts = findSonyPs1Banks(input.reader);
   const auto sequenceLayouts = findSonyPs1Sequences(input.reader);
-  const bool rawBody = bankLayouts.empty() && sequenceLayouts.empty() && rawVbSource(input.source);
+  // Headerless discovery applies to raw inputs beginning with audio. Known
+  // RAM images and recognized Sony containers retain their bank-owned samples.
+  const bool rawBody = bankLayouts.empty() && sequenceLayouts.empty() && !input.source.knownFormat;
   if (bankLayouts.empty() && sequenceLayouts.empty() && !rawBody) {
     return {};
   }

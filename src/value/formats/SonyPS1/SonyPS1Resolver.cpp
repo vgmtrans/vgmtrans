@@ -48,6 +48,7 @@ struct SampleEntry {
 struct SonySampleBinding {
   AssetId soundBank;
   AssetId samplePool;
+  u32 firstSample = 0;
 };
 
 [[nodiscard]] bool needsExternalSamples(const SoundBankAsset& bank) {
@@ -95,13 +96,13 @@ struct SonySampleBinding {
 
 [[nodiscard]] std::vector<InstrumentEntry> instruments(const CollectionDiscoveryContext& context) {
   std::vector<InstrumentEntry> entries;
-  for (const auto& entry : context.assetsWithData<SoundBankAsset, SonyPs1SampleSize>()) {
+  for (const auto& entry : context.assetsWithData<SoundBankAsset, SonyPs1BankLayout>()) {
     entries.push_back(InstrumentEntry{
         .asset = entry.id(),
         .source = entry.sourceId(),
         .file = entry.source,
         .offset = entry.asset->metadata.range.offset,
-        .sampleBytes = entry.data->bytes,
+        .sampleBytes = entry.data->expectedSampleBytes,
         .needsExternalSamples = needsExternalSamples(*entry.asset),
     });
   }
@@ -110,12 +111,12 @@ struct SonySampleBinding {
 
 [[nodiscard]] std::vector<SampleEntry> samples(const CollectionDiscoveryContext& context) {
   std::vector<SampleEntry> entries;
-  for (const auto& entry : context.assetsWithData<SamplePoolAsset, SonyPs1SampleSize>()) {
+  for (const auto& entry : context.assetsWithData<SamplePoolAsset, SonyPs1SampleBodyLayout>()) {
     entries.push_back(SampleEntry{
         .asset = entry.id(),
         .source = entry.sourceId(),
         .file = entry.source,
-        .sampleBytes = entry.data->bytes,
+        .sampleBytes = entry.data->length,
     });
   }
   return entries;
@@ -197,17 +198,25 @@ void attachBank(CollectionAssembly& collection, const InstrumentEntry& bank, con
   });
 }
 
-void applySampleBinding(CollectionBindingContext& context, SoundBankAsset& bank, const SamplePoolAsset& pool) {
+void applySampleBinding(CollectionBindingContext& context, SoundBankAsset& bank, const SamplePoolAsset& pool,
+                        u32 firstSample) {
+  const auto& sizes = bank.privateData.get<SonyPs1BankLayout>()->sampleSizes;
   for (auto& instrument : bank.instruments) {
     for (auto& region : instrument.regions) {
       if (!region.sample.needsBinding()) {
         continue;
       }
-      if (region.sample.index() >= pool.pool.samples.size()) {
+      const u32 index = region.sample.index();
+      if (index >= sizes.size() || sizes[index] == 0) {
         context.fail("Sony PS1 sound bank refers outside its external sample pool", region.range);
         return;
       }
-      region.sample = SampleRef::resolved(pool.metadata.id, region.sample.index());
+      const u32 sample = firstSample + index - static_cast<u32>(std::count(sizes.begin(), sizes.begin() + index, 0));
+      if (sample >= pool.pool.samples.size()) {
+        context.fail("Sony PS1 sound bank refers outside its external sample pool", region.range);
+        return;
+      }
+      region.sample = SampleRef::resolved(pool.metadata.id, sample);
     }
   }
 }
@@ -239,7 +248,7 @@ void applySonyPs1Bindings(CollectionBindingContext& context, std::span<const Son
       context.fail("Sony PS1 sample binding refers to a missing sample pool", bank->metadata.range);
       return;
     }
-    applySampleBinding(context, *bank, *pool);
+    applySampleBinding(context, *bank, *pool, binding.firstSample);
     if (context.failed) {
       return;
     }
@@ -291,28 +300,35 @@ void bindSonyPs1Collection(CollectionBindingContext& context) {
     if (bank.metadata.format != kSonyPs1FormatName || !needsExternalSamples(bank)) {
       continue;
     }
-    const auto* bankData = bank.privateData.get<SonyPs1SampleSize>();
+    const auto* bankData = bank.privateData.get<SonyPs1BankLayout>();
     if (bankData == nullptr) {
       context.fail("Sony PS1 sound bank has no retained external sample size", bank.metadata.range);
       return;
     }
     const SamplePoolAsset* selected = nullptr;
+    u32 firstSample = 0;
     for (const auto* pool : context.samplePools) {
-      const auto* poolData = pool->privateData.get<SonyPs1SampleSize>();
-      if (pool->metadata.format != kSonyPs1FormatName || poolData == nullptr || poolData->bytes != bankData->bytes) {
+      const auto* poolData = pool->privateData.get<SonyPs1SampleBodyLayout>();
+      if (pool->metadata.format != kSonyPs1FormatName || poolData == nullptr) {
         continue;
       }
-      if (selected != nullptr) {
-        context.fail("Sony PS1 sound bank matches multiple external sample pools", bank.metadata.range);
+      const auto starts = findSonyPs1SampleStarts(*poolData, bankData->sampleSizes);
+      if (starts.empty()) {
+        continue;
+      }
+      if (selected != nullptr || starts.size() > 1) {
+        context.fail("Sony PS1 sound bank matches multiple external sample pools or positions", bank.metadata.range);
         return;
       }
       selected = pool;
+      firstSample = starts.front();
     }
     if (selected == nullptr) {
       context.fail("Sony PS1 sound bank has no matching external sample pool", bank.metadata.range);
       return;
     }
-    bindings.push_back(SonySampleBinding{.soundBank = bank.metadata.id, .samplePool = selected->metadata.id});
+    bindings.push_back(SonySampleBinding{
+        .soundBank = bank.metadata.id, .samplePool = selected->metadata.id, .firstSample = firstSample});
   }
   applySonyPs1Bindings(context, bindings);
 }
