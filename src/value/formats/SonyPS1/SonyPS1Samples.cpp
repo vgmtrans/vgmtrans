@@ -221,19 +221,20 @@ constexpr u32 kBackScanLimit = 0x5000;
   return body;
 }
 
-[[nodiscard]] bool matchesVab(const SonyPs1SampleBodyLayout& body, const std::vector<u32>& sizes) {
-  u64 expectedOffset = 0;
+[[nodiscard]] bool matchesVab(std::span<const SonyPs1SampleLayout> samples, const std::vector<u32>& sizes,
+                              u32 padding = 32) {
+  u64 expectedOffset = samples.empty() ? 0 : samples.front().offset;
   size_t sampleIndex = 0;
   for (const u32 size : sizes) {
     if (size == 0) {
       continue;
     }
-    if (sampleIndex >= body.samples.size()) {
+    if (sampleIndex >= samples.size()) {
       return false;
     }
-    const auto& sample = body.samples[sampleIndex++];
-    if (sample.offset - body.offset != expectedOffset || sample.storageLength < size ||
-        sample.storageLength > size + 32) {
+    const auto& sample = samples[sampleIndex++];
+    if (sample.offset != expectedOffset || sample.storageLength < size ||
+        sample.storageLength > static_cast<u64>(size) + padding) {
       return false;
     }
     expectedOffset += size;
@@ -242,6 +243,63 @@ constexpr u32 kBackScanLimit = 0x5000;
 }
 
 }  // namespace
+
+std::optional<SonyPs1SampleBodyLayout> readSonyPs1RawSampleBody(ByteReader reader) {
+  // Standalone detection requires audio at the file start, not an embedded
+  // match somewhere in a container. Keep the legacy statistical start test.
+  if (reader.size() > std::numeric_limits<u32>::max() || !zeroBlock(reader, 0) ||
+      zeroBlock(reader, kPsxAdpcmBlockBytes)) {
+    return std::nullopt;
+  }
+  const auto validBlock = [&](u32 offset) {
+    return reader.has(offset, kPsxAdpcmBlockBytes) && validFilterShift(reader.u8At(offset)) &&
+           validFlags(reader.u8At(offset + 1));
+  };
+  SonyPs1SampleBodyLayout body;
+  bool strongStart = false;
+  for (u32 offset = 0; reader.has(offset, 2 * kPsxAdpcmBlockBytes) && validBlock(offset);
+       offset += kPsxAdpcmBlockBytes) {
+    // Ignore padding or leftover audio between samples.
+    if (!zeroBlock(reader, offset) || zeroBlock(reader, offset + kPsxAdpcmBlockBytes)) {
+      continue;
+    }
+    const auto stream = inspectPsxAdpcmStream(reader, offset, static_cast<u32>(reader.size()));
+    if (!stream) {
+      return std::nullopt;
+    }
+    u32 end = offset + static_cast<u32>(stream->encodedData.size);
+    if ((reader.u8At(end - kPsxAdpcmBlockBytes + 1) & 1) == 0) {
+      return std::nullopt;
+    }
+    for (u32 block = offset + kPsxAdpcmBlockBytes; block < end; block += kPsxAdpcmBlockBytes) {
+      if (!validBlock(block) || zeroBlock(reader, block)) {
+        return std::nullopt;
+      }
+    }
+    strongStart |= stream->encodedData.size >= (kReadAheadBlocks + 1) * kPsxAdpcmBlockBytes &&
+                   validSampleStart(reader, offset, false);
+    // Terminal 00 07 77 ... frames count toward storage, not playable audio.
+    while (validBlock(end) && reader.u8At(end + 1) == 7) {
+      end += kPsxAdpcmBlockBytes;
+    }
+    body.samples.push_back({.offset = offset, .storageLength = end - offset, .stream = *stream});
+    body.length = end;
+    offset = end - kPsxAdpcmBlockBytes;
+  }
+  return strongStart ? std::optional{std::move(body)} : std::nullopt;
+}
+
+std::vector<u32> findSonyPs1SampleStarts(const SonyPs1SampleBodyLayout& body, const std::vector<u32>& sizes) {
+  std::vector<u32> starts;
+  for (u32 first = 0; first < body.samples.size() && starts.size() < 2; ++first) {
+    // Exact boundaries are required without a header-to-body link. Two matches
+    // suffice to report ambiguity, even when both are in the same raw file.
+    if (matchesVab(std::span(body.samples).subspan(first), sizes, 0)) {
+      starts.push_back(first);
+    }
+  }
+  return starts;
+}
 
 std::vector<SonyPs1SampleBodyLayout> findSonyPs1SampleBodies(ByteReader reader) {
   std::vector<SonyPs1SampleBodyLayout> bodies;
@@ -333,7 +391,7 @@ std::optional<u32> matchSonyPs1SampleBody(ByteReader reader, u32 preferredOffset
     // body parser can merge adjacent samples, but it still gives us a strongly
     // validated collection start. Recheck that start using the declared VAB
     // boundaries before rejecting it.
-    if (!matchesVab(body, sampleSizes) && !matchesSonyPs1SampleBodyAt(reader, body.offset, sampleSizes)) {
+    if (!matchesVab(body.samples, sampleSizes) && !matchesSonyPs1SampleBodyAt(reader, body.offset, sampleSizes)) {
       continue;
     }
     const u64 distance = body.offset > preferredOffset ? body.offset - preferredOffset : preferredOffset - body.offset;

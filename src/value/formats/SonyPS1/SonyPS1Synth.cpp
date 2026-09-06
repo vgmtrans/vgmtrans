@@ -55,27 +55,13 @@ struct PanGains {
   return {position, loudest};
 }
 
-[[nodiscard]] std::vector<PsxAdpcmStream> inspectRawBody(ByteReader reader) {
-  const auto bodies = findSonyPs1SampleBodies(reader);
-  if (bodies.empty()) {
-    return {};
-  }
-  const auto body = std::ranges::max_element(bodies, {}, &SonyPs1SampleBodyLayout::length);
-  std::vector<PsxAdpcmStream> streams;
-  streams.reserve(body->samples.size());
-  for (const auto& sample : body->samples) {
-    streams.push_back(sample.stream);
-  }
-  return streams;
-}
-
 }  // namespace
 
 void addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLayout& layout, u16 bank) {
   const ByteReader reader = result.reader();
   const std::string name = fmt::format("Sony PS1 VAB {}", bank);
   auto bankDraft = result.soundBank(name);
-  bankDraft.data(SonyPs1SampleSize{.bytes = layout.expectedSampleBytes});
+  bankDraft.data(layout);
   auto& instruments = bankDraft.instruments();
   auto& samples = bankDraft.localSamples();
 
@@ -223,20 +209,20 @@ void addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLayout& layout, 
 
 bool addSonyPs1RawSampleBody(ScanResultBuilder& result) {
   const ByteReader reader = result.reader();
-  const auto streams = inspectRawBody(reader);
-  if (streams.empty()) {
+  const auto layout = readSonyPs1RawSampleBody(reader);
+  if (!layout) {
     return false;
   }
 
-  auto pool = result.samplePool(result.sourceDisplayName() + " VAG Samples");
-  pool.data(SonyPs1SampleSize{.bytes = static_cast<u32>(reader.size())});
+  auto pool = result.samplePool(result.sourceDisplayName() + " PSX Sample Collection");
+  pool.data(*layout);
   auto& samples = pool.samples();
-  const SourceRange body = reader.range(0, reader.size());
+  const SourceRange body = reader.range(layout->offset, layout->length);
   const SourceAnnotationId root =
       samples.source(SourceRole::SamplePool, "VAB Sample Body", body, "sony-ps1-vab-body").id();
   samples.include(body);
-  for (u32 index = 0; index < streams.size(); ++index) {
-    const auto& stream = streams[index];
+  for (u32 index = 0; index < layout->samples.size(); ++index) {
+    const auto& stream = layout->samples[index].stream;
     auto entry = samples.add(index, Sample{
                                         .name = fmt::format("VAG {}", index + 1),
                                         .codec = AudioCodec::PsxAdpcm,

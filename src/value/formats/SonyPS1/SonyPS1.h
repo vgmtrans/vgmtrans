@@ -24,12 +24,6 @@ inline constexpr std::string_view kSonyPs1CollectionResolver = "sony-ps1";
 inline constexpr std::string_view kSonyPs1InstrumentDomain = "sony-ps1.instrument";
 inline constexpr std::string_view kSonyPs1CommandKindPrefix = "sony-ps1:sequence";
 
-// Retained on split VAB headers and sample bodies so manual collections can
-// pair them without source reparsing or registry access.
-struct SonyPs1SampleSize {
-  u32 bytes = 0;
-};
-
 [[nodiscard]] inline core::InstrumentIdentity sonyPs1InstrumentIdentity(u16 bank, u8 program) {
   return core::InstrumentIdentity{
       .domain = std::string(kSonyPs1InstrumentDomain),
@@ -104,6 +98,9 @@ struct SonyPs1SampleBodyLayout {
 [[nodiscard]] std::optional<SonyPs1BankLayout> readSonyPs1BankLayout(core::ByteReader reader, u32 offset);
 [[nodiscard]] std::vector<SonyPs1BankLayout> findSonyPs1Banks(core::ByteReader reader);
 [[nodiscard]] std::vector<SonyPs1SampleBodyLayout> findSonyPs1SampleBodies(core::ByteReader reader);
+[[nodiscard]] std::optional<SonyPs1SampleBodyLayout> readSonyPs1RawSampleBody(core::ByteReader reader);
+[[nodiscard]] std::vector<u32> findSonyPs1SampleStarts(const SonyPs1SampleBodyLayout& body,
+                                                       const std::vector<u32>& sizes);
 [[nodiscard]] bool matchesSonyPs1SampleBodyAt(core::ByteReader reader, u32 offset,
                                                const std::vector<u32>& sampleSizes);
 [[nodiscard]] std::optional<u32> matchSonyPs1SampleBody(core::ByteReader reader, u32 preferredOffset,
