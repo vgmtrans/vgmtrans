@@ -27,6 +27,18 @@ std::optional<u32> Pattern::find(core::ByteReader reader) const {
 #undef NINSNES_PATTERN_OWNER
 #undef NINSNES_BYTE_PATTERN
 
+// FE4 adds only the high byte of its page-aligned instrument table, after
+// checking the voice mask. It does not use the standard two-byte ADC probe.
+Pattern Patterns::ptnLoadInstrTableAddressFE4(
+    "\x8d\x06\xcf\xda\x0e\xe4\x14\x24\x15\xd0\x2a\x60\x98\xfe\x0f\x4d\x7d\x9f\x5c\x08\x04\x5d",
+    "xxxx?x?x?x?xx??xxxxxxx", 22);
+
+// FE3 / Metal Combat FB: keep transpose when the upper nibble is zero,
+// otherwise look up one of seven signed offsets in the driver's own table.
+Pattern Patterns::ptnFe3VoiceTranspose(
+    "\x28\x70\xf0\x08\x9f\xfd\xf6\xfd\x08\xd5\x41\x03\xae",
+    "xxxxxxx??x??x", 13);
+
 // Super Mario World and Pilotwings:
 //   setc / sbc a,#$d0 / mov y,#6 / mov $14,#<table / mov $15,#>table / call instrument-loader
 Pattern Patterns::ptnEarlierPercussionTable("\x80\xa8\xd0\x8d\x06\x8f\x00\x14\x8f\x00\x15\x3f\x00\x00",

@@ -51,6 +51,8 @@ struct Patterns {
   static Pattern ptnLoadInstrTableAddressSMW;
   // Value-only behavioral probes; these do not participate in legacy format recognition.
   static Pattern ptnEarlierPercussionTable;
+  static Pattern ptnLoadInstrTableAddressFE4;
+  static Pattern ptnFe3VoiceTranspose;
   static Pattern ptnKonamiPercussionDispatch;
   static Pattern ptnKonamiTimer0Direct;
   static Pattern ptnKonamiTimer0Absolute;

@@ -57,6 +57,13 @@ target_compile_features(vgmtrans-value-core-tests PRIVATE cxx_std_20)
 
 add_test(NAME vgmtrans-value-core-tests COMMAND vgmtrans-value-core-tests)
 
+add_executable(vgmtrans-nin-snes-tests
+  formats/NinSnesModuleTests.cpp
+  formats/NinSnesTestMain.cpp)
+target_link_libraries(vgmtrans-nin-snes-tests PRIVATE vgmtransvalueformats vgmtransvaluecore ZLIB::ZLIB)
+target_compile_features(vgmtrans-nin-snes-tests PRIVATE cxx_std_20)
+add_test(NAME vgmtrans-nin-snes-tests COMMAND vgmtrans-nin-snes-tests)
+
 add_executable(vgmtrans-konami-ps1-tests
   formats/KonamiPS1ModuleTests.cpp
   formats/KonamiPS1TestMain.cpp)

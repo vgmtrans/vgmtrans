@@ -23,6 +23,7 @@
 #include <set>
 #include <span>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -38,12 +39,27 @@ constexpr u8 kIntelliDrumSlots = 16;
 constexpr u8 kDefaultTempo = 0x20;
 constexpr u16 kNoPercussionSourceNote = 0x100;
 
+struct PercussionEntry {
+  u8 patch = 0;
+  u8 note = 0;
+  u8 pan = 0;
+};
+
+struct EnvelopeRegisters {
+  u8 adsr1 = 0;
+  u8 adsr2 = 0;
+  u8 gain = 0;
+};
+
 struct RuntimeConfig {
   ProfileId profile = ProfileId::Standard;
   u8 tempoTimerTarget = kStandardTimerTarget;
   std::optional<u8> fixedPercussionBase;
   u8 intelliConditionalMask = 0;
   std::vector<u8> programMap;
+  std::vector<u8> intelliTransposeTable;
+  std::array<PercussionEntry, kIntelliDrumSlots> intelliPercussionTable{};
+  std::map<u32, EnvelopeRegisters> instrumentEnvelopes;
 };
 
 [[nodiscard]] constexpr u32 drumInstrumentKey(u8 program) {
@@ -236,13 +252,14 @@ enum class EventType : u8 {
   IntelliJump,
   IntelliFe3F5,
   IntelliWritePort,
-  IntelliFe3F9,
+  IntelliFe3Percussion,
   IntelliDefineVoice,
   IntelliLoadVoice,
   IntelliAdsr,
   IntelliGainDurationRate,
   IntelliGainDuration,
   IntelliGain,
+  IntelliReleaseGainOff,
   IntelliCustomPercussion,
   IntelliTaSubevent,
   IntelliFe4Subevent,
@@ -260,7 +277,8 @@ struct Definition {
   std::array<EventType, 256> events{};
   std::vector<u8> volume;
   std::vector<u8> duration;
-  std::vector<u8> intelliDurationVolume;
+  std::vector<u8> intelliDuration;
+  std::vector<u8> intelliVolume;
 };
 
 template <size_t Size>
@@ -311,6 +329,8 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
   definition.events.fill(EventType::Unknown0);
   definition.volume = layout.volumeTable;
   definition.duration = layout.durationRateTable;
+  definition.intelliDuration = layout.intelliDurationRateTable;
+  definition.intelliVolume = layout.intelliVolumeTable;
 
   if (selected.base == BaseProfile::Earlier) {
     definition.status = Status{.noteMin = 0x80, .noteMax = 0xc5, .percussionMin = 0xd0, .percussionMax = 0xd9};
@@ -374,14 +394,15 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
     definition.events[0xf6] = EventType::IntelliWritePort;
     definition.events[0xf7] = EventType::IntelliConditionalJump;
     definition.events[0xf8] = EventType::IntelliJump;
-    definition.events[0xf9] = EventType::IntelliFe3F9;
+    definition.events[0xf9] = EventType::IntelliFe3Percussion;
     definition.events[0xfa] = EventType::IntelliDefineVoice;
     definition.events[0xfb] = EventType::IntelliLoadVoice;
     definition.events[0xfc] = EventType::IntelliAdsr;
     definition.events[0xfd] = EventType::IntelliGainDurationRate;
     useDefault(definition.volume, math::kVolumeIntelli);
     useDefault(definition.duration, math::kDurationIntelli);
-    useDefault(definition.intelliDurationVolume, math::kIntelliFe3);
+    useDefault(definition.intelliDuration, math::kIntelliFe3);
+    useDefault(definition.intelliVolume, math::kIntelliFe3);
   } else if (selected.intelli == IntelliMode::Ta || selected.intelli == IntelliMode::Fe4) {
     if (selected.intelli == IntelliMode::Fe4) {
       for (u16 opcode = 1; opcode < definition.status.noteMin; ++opcode) {
@@ -395,7 +416,7 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
     definition.events[0xf8] =
         selected.intelli == IntelliMode::Ta ? EventType::IntelliGainDurationRate : EventType::IntelliGain;
     definition.events[0xf9] =
-        selected.intelli == IntelliMode::Ta ? EventType::IntelliGainDuration : EventType::Unknown0;
+        selected.intelli == IntelliMode::Ta ? EventType::IntelliGainDuration : EventType::IntelliReleaseGainOff;
     definition.events[0xfa] = EventType::IntelliDefineVoice;
     definition.events[0xfb] = EventType::IntelliLoadVoice;
     definition.events[0xfc] = EventType::IntelliCustomPercussion;
@@ -405,7 +426,8 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
       useDefault(definition.volume, math::kVolumeIntelli);
       useDefault(definition.duration, math::kDurationIntelli);
     } else {
-      useDefault(definition.intelliDurationVolume, math::kIntelliFe4);
+      useDefault(definition.intelliDuration, math::kIntelliFe4);
+      useDefault(definition.intelliVolume, math::kIntelliFe4);
     }
   } else {
     loadStandardCommands(definition.events, 0xe0);
@@ -469,12 +491,6 @@ struct VoiceRecord {
   u8 tuningTranspose = 0;
 };
 
-struct PercussionEntry {
-  u8 patch = 0;
-  u8 note = 0;
-  u8 pan = 0;
-};
-
 struct VibratoConfig {
   u8 delay = 0;
   u8 rate = 0;
@@ -520,6 +536,10 @@ struct EchoState {
 
   void disable() { event.voiceMask = 0; }
 
+  void channel(u8 bit, bool enabled) {
+    event.voiceMask = enabled ? (*event.voiceMask | bit) : (*event.voiceMask & static_cast<u8>(~bit));
+  }
+
   void setParameters(u8 delay, s8 feedback, u8 filter) {
     event.delayMilliseconds = static_cast<double>(delay & 0x0f) * 16.0;
     event.feedback = feedback / 128.0;
@@ -561,7 +581,9 @@ private:
 struct ProgramState {
   ProgramState(const SequenceProgram& program, const RuntimeConfig& config)
       : selected(profile(config.profile)), tempoTimerTarget(config.tempoTimerTarget),
-        fixedPercussionBase(config.fixedPercussionBase), intelliConditionalMask(config.intelliConditionalMask) {
+        fixedPercussionBase(config.fixedPercussionBase), intelliConditionalMask(config.intelliConditionalMask),
+        intelliTransposeTable(config.intelliTransposeTable), initialPercussionTable(config.intelliPercussionTable),
+        baseEnvelopes(config.instrumentEnvelopes) {
     for (u32 encoded = 0; encoded < basePrograms.size(); ++encoded) {
       basePrograms[encoded] = encoded < config.programMap.size() ? config.programMap[encoded] : encoded;
     }
@@ -577,12 +599,13 @@ struct ProgramState {
     tempo = kDefaultTempo;
     globalTranspose = 0;
     percussionBase = fixedPercussionBase.value_or(0);
-    customNoteParameters = false;
     intelliFlags = 0;
     voiceTable.clear();
-    percussionTable = {};
+    percussionTable = initialPercussionTable;
     programs = basePrograms;
     nextOverrideProgram = 0x80;
+    overridePrograms.clear();
+    instrumentEnvelopes = baseEnvelopes;
     tempoState.reset(kDefaultTempo);
     tempoState.clearAutomation();
     tempoAutomationTrack.reset();
@@ -617,8 +640,15 @@ struct ProgramState {
 
   [[nodiscard]] u32 registerOverride(u8 logical, u8 srcn, u8 adsr1, u8 adsr2, u8 gain, u8 pitchHigh, u8 pitchLow,
                                      Address sourceAddress) {
+    const auto key = std::tuple{logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow};
+    if (const auto existing = overridePrograms.find(key); existing != overridePrograms.end()) {
+      programs[logical] = existing->second;
+      return existing->second;
+    }
     const u32 program = nextOverrideProgram++;
+    overridePrograms.emplace(key, program);
     programs[logical] = program;
+    instrumentEnvelopes[program] = EnvelopeRegisters{adsr1, adsr2, gain};
     if (collecting) {
       recipes.overrides.push_back(InstrumentOverride{
           .program = program,
@@ -647,28 +677,36 @@ struct ProgramState {
     };
   }
 
-  [[nodiscard]] DrumKit currentIntelliDrumKit(u8 percussionMinimum) const {
+  [[nodiscard]] bool usesCustomPercussion() const {
+    // FE4 always reads its percussion table; FE3 and TA can select the
+    // ordinary percussion-base path using their flags command.
+    return selected.intelli == IntelliMode::Fe3 ? (intelliFlags & 1) == 0
+           : selected.intelli == IntelliMode::Fe4 || (intelliFlags & 0x40) != 0;
+  }
+
+  [[nodiscard]] DrumKit currentIntelliDrumKit(u8 percussionMinimum, s16 transpose) const {
     DrumKit kit;
-    kit.slots.reserve(kIntelliDrumSlots);
-    const bool useCustom = (intelliFlags & 0x40) != 0;
-    for (u8 slot = 0; slot < kIntelliDrumSlots; ++slot) {
+    const u8 slots = selected.intelli == IntelliMode::Fe3 ? 12 : kIntelliDrumSlots;
+    kit.slots.reserve(slots);
+    const bool useCustom = usesCustomPercussion();
+    for (u8 slot = 0; slot < slots; ++slot) {
       u8 patch = static_cast<u8>(percussionMinimum + slot);
       u8 note = 0xa4;
       if (useCustom) {
-        patch = percussionTable[slot].patch & 0xbf;
+        patch = percussionTable[slot].patch & (selected.intelli == IntelliMode::Fe4 ? 0x3f : 0xbf);
         note = percussionTable[slot].note;
       }
       kit.slots.push_back(DrumSlot{
           .key = static_cast<u8>(0x24 + slot),
           .sourceProgram = resolveProgram(patch, percussionMinimum),
-          .sourceKey = static_cast<s16>((note & 0x7f) + kMelodicKeyCorrection),
+          .sourceKey = static_cast<s16>((note & 0x7f) + kMelodicKeyCorrection + transpose),
       });
     }
     return kit;
   }
 
-  [[nodiscard]] u8 ensureIntelliDrumKit(u8 percussionMinimum) {
-    DrumKit candidate = currentIntelliDrumKit(percussionMinimum);
+  [[nodiscard]] u8 ensureIntelliDrumKit(u8 percussionMinimum, s16 transpose) {
+    DrumKit candidate = currentIntelliDrumKit(percussionMinimum, transpose);
     const auto found =
         std::ranges::find_if(recipes.drumKits, [&](const DrumKit& kit) { return kit.slots == candidate.slots; });
     if (found != recipes.drumKits.end()) {
@@ -710,12 +748,16 @@ struct ProgramState {
   s8 globalTranspose = 0;
   u8 percussionBase = 0;
   std::optional<u8> fixedPercussionBase;
-  bool customNoteParameters = false;
   u8 intelliFlags = 0;
   u8 intelliConditionalMask = 0;
+  std::vector<u8> intelliTransposeTable;
   std::vector<VoiceRecord> voiceTable;
+  std::array<PercussionEntry, kIntelliDrumSlots> initialPercussionTable{};
   std::array<PercussionEntry, kIntelliDrumSlots> percussionTable{};
   u32 nextOverrideProgram = 0x80;
+  std::map<std::tuple<u8, u8, u8, u8, u8, u8, u8>, u32> overridePrograms;
+  std::map<u32, EnvelopeRegisters> baseEnvelopes;
+  std::map<u32, EnvelopeRegisters> instrumentEnvelopes;
   std::map<u8, DrumSlot> standardDrums;
   EchoState echo;
   SequenceRecipes recipes;
@@ -753,7 +795,11 @@ struct PitchState {
 };
 
 struct TrackState {
-  TrackState(const SequenceProgram&, const TrackProgram& track) : trackNumber(track.sourceTrackNumber) {
+  TrackState(const SequenceProgram&, const TrackProgram& track, const RuntimeConfig& config)
+      : trackNumber(track.sourceTrackNumber) {
+    if (const auto initial = config.instrumentEnvelopes.find(0); initial != config.instrumentEnvelopes.end()) {
+      envelope = initial->second;
+    }
     volume.reset(0xff);
     pan.reset(10);
     vibratoDepth.resetDepth(0);
@@ -763,11 +809,8 @@ struct TrackState {
   void beginSection() {
     inPattern = false;
     patternRemaining = 0;
-    lastWasPercussion = false;
-    melodicProgram = 0;
-    currentLogicalProgram.reset();
-    legato = false;
-    // Volume, pan, pitch, and modulation state carry across section boundaries.
+    // Instruments, legato, volume, pan, pitch, and modulation carry across
+    // section boundaries; the driver only clears its pattern/fade counters.
   }
 
   u32 trackNumber = 0;
@@ -777,6 +820,7 @@ struct TrackState {
   s8 transpose = 0;
   bool legato = false;
   bool voiceHeld = false;
+  EnvelopeRegisters envelope;
   bool inPattern = false;
   u8 patternRemaining = 0;
   Address patternStart;
@@ -787,7 +831,6 @@ struct TrackState {
   PitchEnvelope pitchEnvelope;
   PitchState pitch;
   u32 melodicProgram = 0;
-  std::optional<u8> currentLogicalProgram;
   bool lastWasPercussion = false;
   u8 percussionProgram = 0;
   PerformanceNoteId lastNote;
@@ -808,16 +851,21 @@ struct Playback {
       return track.noteLength;
     }
     const u8 scaled = static_cast<u8>((track.noteLength * track.durationRate) >> 8);
-    const u8 maximum = static_cast<u8>(track.noteLength - 2);
+    const u8 maximum = std::max<u8>(1, static_cast<u8>(track.noteLength - 2));
     return std::min(std::max<u8>(scaled, 1), maximum);
   }
 
   void updateVoiceHold() {
-    const bool held = program.selected.id == ProfileId::Konami && track.durationRate == 0;
+    const bool held = track.legato || (program.selected.id == ProfileId::Konami && track.durationRate == 0);
     if (held != track.voiceHeld) {
       out.legatoPedal(held);
     }
     track.voiceHeld = held;
+  }
+
+  void legato(bool enabled) {
+    track.legato = enabled;
+    updateVoiceHold();
   }
 
   void emitVoiceNote(double key, u32 duration) {
@@ -869,20 +917,20 @@ struct Playback {
   }
 
   void fe3CustomParameter(u8 raw, u8 resolved) {
-    if (program.customNoteParameters) {
+    if ((program.intelliFlags & 0x80) != 0) {
       intelliParameter(raw, resolved);
     }
   }
 
   void fe3StandardParameter(bool present, u8 durationRate, u8 velocity) {
-    if (present && !program.customNoteParameters) {
+    if (present && (program.intelliFlags & 0x80) == 0) {
       track.durationRate = durationRate;
       track.velocity = velocity;
     }
   }
 
   [[nodiscard]] Effects fe3ParameterFlow(Address standardDestination, Address customDestination) {
-    return vm.jump(program.customNoteParameters ? customDestination : standardDestination);
+    return vm.jump((program.intelliFlags & 0x80) != 0 ? customDestination : standardDestination);
   }
 
   void switchToMelodicProgram() {
@@ -893,9 +941,11 @@ struct Playback {
   }
 
   void melodicProgram(u8 encoded, u8 percussionMinimum) {
-    u8 logical = 0;
-    track.melodicProgram = program.resolveProgram(encoded, percussionMinimum, &logical);
-    track.currentLogicalProgram = logical;
+    track.melodicProgram = program.resolveProgram(encoded, percussionMinimum);
+    if (const auto envelope = program.instrumentEnvelopes.find(track.melodicProgram);
+        envelope != program.instrumentEnvelopes.end()) {
+      track.envelope = envelope->second;
+    }
     if (!track.lastWasPercussion) {
       out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = track.melodicProgram});
     }
@@ -1058,17 +1108,22 @@ struct Playback {
   [[nodiscard]] Effects percussion(u8 slot, u8 percussionMinimum, bool intelli, u16 sourceNote) {
     const u8 duration = soundingDuration();
     if (intelli) {
-      const bool custom = (program.intelliFlags & 0x40) != 0;
+      const bool custom = program.usesCustomPercussion();
       const PercussionEntry entry = program.percussionTable[slot];
-      const u8 patch = custom ? static_cast<u8>(entry.patch & 0xbf) : static_cast<u8>(percussionMinimum + slot);
+      const u8 patchMask = program.selected.intelli == IntelliMode::Fe4 ? 0x3f : 0xbf;
+      const u8 patch = custom ? static_cast<u8>(entry.patch & patchMask) : static_cast<u8>(percussionMinimum + slot);
+      const u32 sourceProgram = program.resolveProgram(patch, percussionMinimum);
+      if (const auto envelope = program.instrumentEnvelopes.find(sourceProgram);
+          envelope != program.instrumentEnvelopes.end()) {
+        track.envelope = envelope->second;
+      }
       if (custom && entry.pan < 0x80) {
-        emitPan(out, entry.pan);
+        pan(entry.pan);
       }
       if (custom) {
-        out.reverb((entry.patch & 0x40) != 0 ? 40.0 / 127.0 : 0.0);
+        channelEcho((entry.patch & 0x40) != 0);
       }
-      static_cast<void>(program.resolveProgram(patch, percussionMinimum));
-      const u8 kit = program.ensureIntelliDrumKit(percussionMinimum);
+      const u8 kit = program.ensureIntelliDrumKit(percussionMinimum, track.transpose + program.globalTranspose);
       switchToDrumProgram(kit);
       const double key = 0x24 + slot - program.globalTranspose;
       beginNotePitch(static_cast<u8>(0x24 + slot - program.globalTranspose));
@@ -1336,6 +1391,11 @@ struct Playback {
     out.reverb(program.echo.current());
   }
 
+  void channelEcho(bool enabled) {
+    program.echo.channel(static_cast<u8>(1u << track.trackNumber), enabled);
+    out.reverb(program.echo.current());
+  }
+
   void echoOff() {
     program.echo.disable();
     out.reverb(program.echo.current());
@@ -1404,23 +1464,19 @@ struct Playback {
 
   void overwriteInstrument(u8 logical, u8 srcn, u8 adsr1, u8 adsr2, u8 gain, u8 pitchHigh, u8 pitchLow,
                            Address sourceAddress) {
-    const u32 newProgram =
-        program.registerOverride(logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow, sourceAddress);
-    if (track.currentLogicalProgram == logical) {
-      track.melodicProgram = newProgram;
-      if (!track.lastWasPercussion) {
-        out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = newProgram});
-      }
-    }
+    // FA writes the shared RAM table. DSP registers change only when a
+    // channel next selects that instrument (D6/DA/FB or percussion).
+    static_cast<void>(program.registerOverride(logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow, sourceAddress));
   }
 
   void loadVoice(u8 index, u8 percussionMinimum, IntelliMode mode) {
     // The declared table is the only typed data boundary; bytes belonging to
     // following commands are not silently reinterpreted as voice records.
-    if (index >= program.voiceTable.size()) {
+    const u8 slot = index & 0x3f;  // The driver computes an eight-bit index * 4.
+    if (slot >= program.voiceTable.size()) {
       return;
     }
-    const VoiceRecord& record = program.voiceTable[index];
+    const VoiceRecord& record = program.voiceTable[slot];
     volume(record.volume);
     const u8 panValue = mode == IntelliMode::Fe3 ? record.pan : record.pan & 0x1f;
     pan(panValue);
@@ -1432,21 +1488,46 @@ struct Playback {
       const u8 tuning = record.tuningTranspose & 0x0f;
       const u8 transposeIndex = (record.tuningTranspose >> 4) & 7;
       if (tuning != 0) {
-        tuningCents = ((tuning - 1) * 5 / 256.0) * 100.0;
+        out.tuning(((tuning - 1) * 5 / 256.0) * 100.0);
       }
       if (transposeIndex != 0) {
-        transpose = transposes[transposeIndex - 1];
+        transpose = program.intelliTransposeTable.size() == 7
+                        ? static_cast<s8>(program.intelliTransposeTable[transposeIndex - 1])
+                        : transposes[transposeIndex - 1];
       }
     } else {
       tuningCents = (((record.pan >> 5) & 7) * 5 / 256.0) * 100.0;
       transpose = static_cast<s8>(record.tuningTranspose);
+      out.tuning(tuningCents);
+      if ((index & 0x80) != 0) {
+        vibratoOff();
+      }
+      if (mode == IntelliMode::Fe4 && (index & 0x40) != 0) {
+        track.pitch.motion.clear();
+      }
     }
     track.transpose = transpose;
-    out.tuning(tuningCents);
     melodicProgram(record.instrument, percussionMinimum);
   }
 
-  void clearPercussionTable() { program.percussionTable = {}; }
+  void intelliAdsr(u8 adsr1, u8 adsr2) {
+    track.envelope.adsr1 = adsr1;
+    track.envelope.adsr2 = adsr2;
+    // Rate-based GAIN depends on the live ENVX value. Preserve the registers
+    // but emit only envelopes that the static model can describe faithfully.
+    if ((adsr1 & 0x80) != 0 || (track.envelope.gain & 0x80) == 0) {
+      out.replaceEnvelope(snesDspEnvelope(adsr1, adsr2, track.envelope.gain),
+                          VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    }
+  }
+
+  void intelliGain(u8 gain) {
+    track.envelope.gain = gain;
+    if ((track.envelope.adsr1 & 0x80) == 0 && (gain & 0x80) == 0) {
+      out.replaceEnvelope(snesDspEnvelope(track.envelope.adsr1, track.envelope.adsr2, gain),
+                          VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    }
+  }
 
   void percussionEntry(u8 slot, u8 patch, u8 note, u8 pan) {
     if (slot < program.percussionTable.size()) {
@@ -1468,17 +1549,7 @@ struct Playback {
     if (param < 0xf0) {
       return;
     }
-    const bool enabled = (param & 8) == 0;
-    switch (param & 7) {
-      case 0:
-        intelliFlags(0x40, enabled);
-        break;
-      case 7:
-        program.customNoteParameters = enabled;
-        break;
-      default:
-        break;
-    }
+    intelliFlags(static_cast<u8>(1u << (param & 7)), (param & 8) == 0);
   }
 
   [[nodiscard]] Effects intelliConditionalJump(Address destination) {
@@ -1552,9 +1623,15 @@ struct DecodeContext {
   std::vector<std::pair<u8, u8>> parameters;
   while (event.peekU8() <= 0x7f && parameters.size() < 0x80) {
     const u8 raw = event.u8(fmt::format("parameter_{}", parameters.size() + 1), SourceValueDisplay::Hex);
-    const u8 resolved = context.definition.intelliDurationVolume[raw & 0x3f];
+    const auto& table = raw < 0x40 ? context.definition.intelliDuration : context.definition.intelliVolume;
+    const u8 resolved = table[raw & 0x3f];
     event.derived(fmt::format("resolved_{}", parameters.size() + 1), resolved);
     parameters.emplace_back(raw, resolved);
+    // A velocity byte terminates the parameter list. Only duration bytes
+    // loop back to read another parameter in both FE3 and FE4.
+    if (raw >= 0x40) {
+      break;
+    }
   }
 
   if (context.selected.intelli != IntelliMode::Fe3) {
@@ -1617,9 +1694,7 @@ struct DecodeContext {
       auto event = cursor.command("Percussion Note", SequenceSemantic::Note);
       const u8 slot = event.opcodeValue("slot", static_cast<u8>(opcode - context.definition.status.percussionMin),
                                         SourceValueDisplay::Decimal);
-      const bool intelli =
-          (context.selected.intelli == IntelliMode::Ta || context.selected.intelli == IntelliMode::Fe4) &&
-          slot < kIntelliDrumSlots;
+      const bool intelli = context.selected.intelli != IntelliMode::None && slot < kIntelliDrumSlots;
       u16 sourceNote = kNoPercussionSourceNote;
       if (context.layout.percussionTableAddress) {
         const u32 address = *context.layout.percussionTableAddress + slot * 6;
@@ -1815,15 +1890,13 @@ struct DecodeContext {
       return event;
     }
     case EventType::IntelliEchoOn:
-      return cursor.command("Echo On", SequenceSemantic::State).emitReverb(40.0 / 127.0);
+      return cursor.command("Echo On", SequenceSemantic::State).invoke<&Playback::channelEcho>(true);
     case EventType::IntelliEchoOff:
-      return cursor.command("Echo Off", SequenceSemantic::State).emitReverb(0.0);
+      return cursor.command("Echo Off", SequenceSemantic::State).invoke<&Playback::channelEcho>(false);
     case EventType::IntelliLegatoOn:
-      return cursor.command("Legato On", SequenceSemantic::State).set<&TrackState::legato>(true).emitLegatoPedal(true);
+      return cursor.command("Legato On", SequenceSemantic::State).invoke<&Playback::legato>(true);
     case EventType::IntelliLegatoOff:
-      return cursor.command("Legato Off", SequenceSemantic::State)
-          .set<&TrackState::legato>(false)
-          .emitLegatoPedal(false);
+      return cursor.command("Legato Off", SequenceSemantic::State).invoke<&Playback::legato>(false);
     case EventType::IntelliConditionalJump: {
       auto event = cursor.command("Conditional Short Jump", SequenceSemantic::Jump);
       const u8 distance = event.u8("distance");
@@ -1847,18 +1920,27 @@ struct DecodeContext {
       event.u8("value");
       return event;
     }
-    case EventType::IntelliFe3F9: {
-      auto event = cursor.sourceOnly("Unknown FE3 Table", "unknown");
-      for (u8 index = 0; index < 36; ++index) {
-        event.u8(fmt::format("byte_{}", index + 1), SourceValueDisplay::Hex);
+    case EventType::IntelliFe3Percussion: {
+      auto event = cursor.command("Custom Percussion Table", SequenceSemantic::State);
+      std::array<u8, 12> patches{};
+      std::array<u8, 12> notes{};
+      for (u8 slot = 0; slot < 12; ++slot) {
+        patches[slot] = event.u8(fmt::format("patch_{}", slot), SourceValueDisplay::Hex);
       }
-      return event;
+      for (u8 slot = 0; slot < 12; ++slot) {
+        notes[slot] = event.u8(fmt::format("note_{}", slot), SourceValueDisplay::Hex);
+      }
+      for (u8 slot = 0; slot < 12; ++slot) {
+        const u8 pan = event.u8(fmt::format("pan_{}", slot), SourceValueDisplay::Hex);
+        event.invoke<&Playback::percussionEntry>(slot, patches[slot], notes[slot], pan);
+      }
+      return event;  // F5 selects the mode; F9 only copies the three arrays.
     }
     case EventType::IntelliDefineVoice: {
       auto event = cursor.command("Voice Parameter Definition", SequenceSemantic::Program);
       const s8 parameter = event.s8("count_or_instrument", SourceValueDisplay::SignedDecimal);
-      if (parameter >= 0) {
-        const u8 count = static_cast<u8>(parameter);
+      if (parameter >= 0 || !context.layout.intelliInstrumentOverwrite) {
+        const u8 count = static_cast<u8>(parameter) & 0x3f;
         event.invoke<&Playback::defineVoiceTable>(count);
         for (u8 index = 0; index < count; ++index) {
           const u8 instrument = event.u8(fmt::format("instrument_{}", index), SemanticOperandRole::Instrument);
@@ -1879,11 +1961,8 @@ struct DecodeContext {
       const u8 gain = event.u8("gain", SourceValueDisplay::Hex);
       const u8 pitchHigh = event.u8("pitch_high", SourceValueDisplay::Hex);
       const u8 pitchLow = event.u8("pitch_low", SourceValueDisplay::Hex);
-      if (context.selected.intelli == IntelliMode::Ta) {
-        return event.invoke<&Playback::overwriteInstrument>(logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow,
-                                                            Address{begin});
-      }
-      return event.ignore();
+      return event.invoke<&Playback::overwriteInstrument>(logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow,
+                                                          Address{begin});
     }
     case EventType::IntelliLoadVoice: {
       auto event = cursor.command("Load Voice Parameters", SequenceSemantic::Program);
@@ -1892,43 +1971,47 @@ struct DecodeContext {
                                                 context.selected.intelli);
     }
     case EventType::IntelliAdsr: {
-      auto event = cursor.sourceOnly("ADSR");
-      event.u8("adsr1", SourceValueDisplay::Hex);
-      event.u8("adsr2", SourceValueDisplay::Hex);
-      return event;
+      auto event = cursor.command("ADSR", SequenceSemantic::State);
+      const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
+      const u8 adsr2 = event.u8("adsr2", SourceValueDisplay::Hex);
+      return event.invoke<&Playback::intelliAdsr>(adsr1, adsr2);
     }
     case EventType::IntelliGainDurationRate: {
       auto event = cursor.command("GAIN Duration Rate", SequenceSemantic::State);
-      const u8 rate = event.u8("duration_rate");
-      event.u8("gain", SourceValueDisplay::Hex);
-      if (context.selected.intelli == IntelliMode::Ta) {
-        return event.set<&TrackState::durationRate>(rate);
-      }
-      return event.ignore();
+      event.u8("duration_rate");
+      const u8 gain = event.u8("gain", SourceValueDisplay::Hex);
+      event.invoke<&Playback::intelliGain>(gain);
+      // This is the independent counter for switching ADSR to GAIN,
+      // not the note's key-off duration rate.
+      return event;
     }
     case EventType::IntelliGainDuration: {
       auto event = cursor.command("GAIN Duration", SequenceSemantic::State);
-      const u8 rate = event.u8("duration_rate");
-      return context.selected.intelli == IntelliMode::Ta ? event.set<&TrackState::durationRate>(rate) : event.ignore();
+      event.u8("duration_rate");
+      return event.ignore();
     }
+    case EventType::IntelliReleaseGainOff:
+      // FE4's zero-length F9 enters the release-GAIN store with A=0.
+      return cursor.sourceOnly("Clear Release GAIN");
     case EventType::IntelliGain: {
-      auto event = cursor.sourceOnly("GAIN");
-      event.u8("gain", SourceValueDisplay::Hex);
-      return event;
+      auto event = cursor.command("GAIN", SequenceSemantic::State);
+      return event.invoke<&Playback::intelliGain>(event.u8("gain", SourceValueDisplay::Hex));
     }
     case EventType::IntelliCustomPercussion: {
       auto event = cursor.command("Custom Percussion Table", SequenceSemantic::State);
       const u8 packedCount = event.u8("packed_count", SourceValueDisplay::Hex);
       const u8 count = static_cast<u8>((packedCount & 0x0f) + 1);
       event.derived("count", count);
-      event.invoke<&Playback::clearPercussionTable>();
+      const u8 firstSlot = static_cast<u8>((packedCount * 3) >> 8);
+      event.derived("first_slot", firstSlot);
       for (u8 slot = 0; slot < count; ++slot) {
         const u8 patch =
             event.u8(fmt::format("patch_{}", slot), SourceValueDisplay::Hex, SemanticOperandRole::Instrument);
-        const u8 note = event.u8(fmt::format("note_{}", slot), SourceValueDisplay::MidiNote);
+        const u8 note =
+            event.u8(fmt::format("note_{}", slot), SourceValueDisplay::MidiNote);
         const u8 pan = event.u8(fmt::format("pan_{}", slot));
-        if (slot < kIntelliDrumSlots) {
-          event.invoke<&Playback::percussionEntry>(slot, patch, note, pan);
+        if (firstSlot + slot < kIntelliDrumSlots) {
+          event.invoke<&Playback::percussionEntry>(static_cast<u8>(firstSlot + slot), patch, note, pan);
         }
       }
       return event.invoke<&Playback::enableCustomPercussion>();
@@ -1947,10 +2030,10 @@ struct DecodeContext {
         return event.invoke<&Playback::intelliFlags>(mask, subtype == 1);
       }
       if (type == EventType::IntelliTaSubevent && subtype == 3) {
-        return event.set<&TrackState::legato>(true).emitLegatoPedal(true);
+        return event.invoke<&Playback::legato>(true);
       }
       if (type == EventType::IntelliTaSubevent && subtype == 4) {
-        return event.set<&TrackState::legato>(false).emitLegatoPedal(false);
+        return event.invoke<&Playback::legato>(false);
       }
       if (type == EventType::IntelliTaSubevent && subtype == 5) {
         event.u8("global_byte", SourceValueDisplay::Hex);
@@ -2256,6 +2339,28 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     runtime.intelliConditionalMask = reader.u8At(0xb9);
   }
   runtime.programMap = buildProgramMap(reader, layout);
+  runtime.intelliTransposeTable = layout.intelliTransposeTable;
+  if (selected.intelli != IntelliMode::None && layout.instrumentTableAddress) {
+    for (u32 index = 0; index < instrumentSlotCount(selected); ++index) {
+      const u32 address = *layout.instrumentTableAddress + index * instrumentHeaderSize(selected);
+      if (!reader.has(address, 4)) {
+        break;
+      }
+      runtime.instrumentEnvelopes.emplace(index, EnvelopeRegisters{
+          reader.u8At(address + 1), reader.u8At(address + 2), reader.u8At(address + 3)});
+    }
+  }
+  if (layout.intelliPercussionTableAddress) {
+    const u8 count = selected.intelli == IntelliMode::Fe3 ? 12 : kIntelliDrumSlots;
+    const u32 address = *layout.intelliPercussionTableAddress;
+    if (reader.has(address, count * 3)) {
+      for (u8 slot = 0; slot < count; ++slot) {
+        runtime.intelliPercussionTable[slot] = PercussionEntry{
+            reader.u8At(address + slot), reader.u8At(address + count + slot),
+            reader.u8At(address + count * 2 + slot)};
+      }
+    }
+  }
   program.behavior.initialTempoMicrosecondsPerQuarter =
       math::tempoMicrosecondsPerQuarter(kDefaultTempo, layout.tempoTimerTarget);
   const auto initialBalance = math::panGains(selected, math::kPan, 10);
