@@ -51,8 +51,8 @@ enum class MidiTuningRendering {
 };
 
 struct MidiExportOptions {
-  // Auto follows neutral source quantization when available, then falls back
-  // to the legacy precision hint used by unmigrated formats.
+  // Auto uses 14 bits for source scales with more than 128 levels, or 7 bits
+  // when the source scale is smaller or unspecified.
   MidiLevelResolution volumeResolution = MidiLevelResolution::Auto;
   MidiLevelResolution expressionResolution = MidiLevelResolution::Auto;
   bool skipChannel10 = true;

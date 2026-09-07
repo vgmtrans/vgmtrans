@@ -151,6 +151,17 @@ Remove two discarded pure queries: a playlist annotation ID lookup and a
 temporary automation-output view. The latter's fade already declares its end
 tick. All 17 CTest targets pass after rebuilding, without compiler warnings.
 
+### Retire the obsolete dynamic-envelope entry point
+
+Production export already uses instrument-variant materialization, which
+combines envelope and stereo variants in one pass. Remove the compatibility
+header, result alias, and wrapper used only by tests. Those tests now exercise
+the production entry point with explicit envelope options. Also correct the
+MIDI resolution comment: its fallback is seven-bit output, not a legacy hint.
+
+The complete default build succeeds, including the Qt application and shell
+executable. All 17 CTest targets pass; the build has no compiler warnings.
+
 ## Further investigation
 
 - Compiler cursor: duplicated adapters for emitting ordinary performance events;

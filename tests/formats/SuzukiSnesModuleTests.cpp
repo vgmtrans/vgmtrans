@@ -7,7 +7,7 @@
 #include "value/formats/SuzukiSnes/SuzukiSnes.h"
 #include "../MidiTestSupport.h"
 
-#include "value/export/DynamicEnvelope.h"
+#include "value/export/InstrumentVariants.h"
 #include "value/export/SequenceModulationProfile.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/sequence/SequenceVm.h"
@@ -431,7 +431,8 @@ void laterE0UsesTheSustainRateAsAGatedRelease() {
                                  }}},
       }},
   }};
-  const auto materialized = materializeDynamicEnvelopes(performance, sets);
+  const auto materialized =
+      materializeInstrumentVariants(performance, sets, InstrumentVariantOptions{.dynamicEnvelopes = true});
   const auto notes = events<NotePerformanceEvent>(materialized.performance.tracks.front());
   expect(notes.size() == 1 && notes.front()->instrumentAddress,
          "E0 should select a materialized envelope variant for the following attack");

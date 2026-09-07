@@ -6,7 +6,7 @@
 
 #include "value/extractors/MameRomSetExtractor.h"
 #include "../MidiTestSupport.h"
-#include "value/export/DynamicEnvelope.h"
+#include "value/export/InstrumentVariants.h"
 #include "value/export/SequenceModulationProfile.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
 #include "value/formats/KonamiArcade/KonamiArcade.h"
@@ -337,7 +337,8 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
          "the full signed range of loop loudness deltas should survive attenuation-domain conversion");
 
   std::array<SoundBankAsset, 1> dynamicInstruments{*instruments};
-  const auto materialized = materializeDynamicEnvelopes(performance, dynamicInstruments);
+  const auto materialized = materializeInstrumentVariants(performance, dynamicInstruments,
+                                                          InstrumentVariantOptions{.dynamicEnvelopes = true});
   const auto selectedAddress = [&](PerformanceNoteId note) {
     for (const auto& event : materialized.performance.tracks[0].events) {
       if (const auto* noteEvent = std::get_if<NotePerformanceEvent>(&event);
