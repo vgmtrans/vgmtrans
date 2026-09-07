@@ -122,8 +122,8 @@ private:
   std::vector<Sample> samples_;
   std::vector<EntryState> states_;
   std::unordered_map<u64, u32> indexes_;
-  std::optional<SourceRange> includedRange_;
-  std::optional<SourceRange> observedRange_;
+  SourceRange includedRange_;
+  SourceRange observedRange_;
   bool finished_ = false;
 };
 
@@ -214,13 +214,11 @@ private:
 
   struct RegionState {
     bool rangeWasExplicit = false;
-    std::optional<SourceRange> observedRange;
     std::vector<SourceAnnotationId> sources;
   };
 
   struct InstrumentState {
     bool rangeWasExplicit = false;
-    std::optional<SourceRange> observedRange;
     std::vector<SourceAnnotationId> sources;
     std::optional<SourceAnnotationId> latestSource;
     std::vector<RegionState> regions;
@@ -249,8 +247,8 @@ private:
   std::vector<Instrument> instruments_;
   std::vector<InstrumentState> states_;
   std::unordered_map<u64, u32> indexes_;
-  std::optional<SourceRange> includedRange_;
-  std::optional<SourceRange> observedRange_;
+  SourceRange includedRange_;
+  SourceRange observedRange_;
   bool finished_ = false;
 };
 

@@ -65,6 +65,20 @@ Tests cover all eight integer readers in both access modes, including signed
 values, endian order, annotations, partial consumption, and diagnostic count.
 The same four CTest targets pass after this change, with no compiler warnings.
 
+### Accumulate source ranges in one place
+
+`SourceRange::include` now owns the common covering-range operation. It keeps
+the first source, ignores invalid and foreign ranges, and includes zero-length
+anchors. Source maps, inspection, sequence extents, AKAO banks, and synth
+builders use the same operation instead of maintaining local min/max loops.
+
+Synth builders no longer wrap already-nullable ranges in `optional`, or store
+separate observed copies of instrument and region ranges. Explicit ranges
+remain authoritative. The range regression test covers disjoint records,
+anchors, and source boundaries; the existing builder and inspection tests
+cover their ownership policies. Core, Square PS2, Sony PS2, UI, and parity
+self-tests all pass (5 CTest targets), with no compiler warnings.
+
 ## Further investigation
 
 - Compiler cursor: duplicated adapters for emitting ordinary performance events;

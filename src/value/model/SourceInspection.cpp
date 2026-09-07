@@ -38,9 +38,7 @@ std::shared_ptr<const SourceInspection> SourceInspection::create(AssetMetadata m
         annotation.range.size > sourceBytes->size() - annotation.range.offset) {
       return {};
     }
-    const u64 begin = std::min(inspectionRange.offset, annotation.range.offset);
-    const u64 end = std::max(inspectionRange.endOffset(), annotation.range.endOffset());
-    inspectionRange = SourceRange{.source = inspectionRange.source, .offset = begin, .size = end - begin};
+    inspectionRange.include(annotation.range);
   }
   if (sourceMap.empty()) {
     return {};

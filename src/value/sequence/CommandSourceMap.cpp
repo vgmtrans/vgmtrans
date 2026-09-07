@@ -59,20 +59,11 @@ void finishTrackAnnotation(ByteReader reader, u32 startOffset, SourceMapBuilder*
     return;
   }
 
-  std::optional<SourceRange> span;
+  SourceRange span;
   for (const SourceCommand& command : track.commands) {
-    if (!command.range.valid() || (span && command.range.source != span->source)) {
-      continue;
-    }
-    if (!span) {
-      span = command.range;
-      continue;
-    }
-    const u64 begin = std::min(span->offset, command.range.offset);
-    const u64 end = std::max(span->endOffset(), command.range.endOffset());
-    *span = SourceRange{.source = span->source, .offset = begin, .size = end - begin};
+    span.include(command.range);
   }
-  AnnotationBuilder{*sourceMap, *annotation}.range(span.value_or(reader.range(startOffset, 0)));
+  AnnotationBuilder{*sourceMap, *annotation}.range(span.valid() ? span : reader.range(startOffset, 0));
 }
 
 [[nodiscard]] std::optional<Address> operandAddress(const SemanticOperand& operand) {
