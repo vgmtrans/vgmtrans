@@ -64,22 +64,9 @@ void warn(std::vector<Diagnostic>* diagnostics, std::string message, SourceRange
   return static_cast<u32>(segment.offset + *relative);
 }
 
-[[nodiscard]] std::optional<u32> find(ByteReader reader, SourceRange range, MaskedBytePattern pattern) {
-  if (!pattern.valid() || pattern.size() > range.size) {
-    return std::nullopt;
-  }
-  const u64 last = range.endOffset() - pattern.size();
-  for (u64 offset = range.offset; offset <= last; ++offset) {
-    if (matchesBytePattern(reader, offset, pattern)) {
-      return static_cast<u32>(offset);
-    }
-  }
-  return std::nullopt;
-}
-
 [[nodiscard]] std::optional<u32> patternPointer(ByteReader reader, SourceRange range, MaskedBytePattern pattern,
                                                 u32 operandOffset) {
-  const auto match = find(reader, range, pattern);
+  const auto match = findBytePattern(reader, pattern, range.offset, range.endOffset());
   if (!match || !reader.has(*match + operandOffset, 2)) {
     return std::nullopt;
   }

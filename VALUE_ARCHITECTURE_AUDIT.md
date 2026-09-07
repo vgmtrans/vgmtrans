@@ -477,6 +477,17 @@ Saturn. Remove 25 remaining C-style discard casts around annotation reads;
 these reads intentionally retain fields even when their values are unused.
 The full build and all 17 CTest targets pass without compiler warnings.
 
+### Share bounded byte-pattern searching
+
+Let the shared masked-pattern scanner accept an exclusive end offset. Remove
+the two local linear searches in KonamiArcade and KonamiTMNT2; both now use the
+same anchored scanner as other formats. Bounds still require a complete match
+and are capped by the available source bytes.
+
+Extend scanner tests for exact end boundaries, crossing matches, empty and
+reversed ranges, oversized limits, and all-wildcard patterns. The full build
+and all 17 CTest targets pass without compiler warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

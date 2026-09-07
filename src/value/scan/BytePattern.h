@@ -9,6 +9,7 @@
 #include "value/base/Source.h"
 
 #include <algorithm>
+#include <limits>
 #include <optional>
 #include <span>
 #include <string_view>
@@ -93,12 +94,15 @@ template <size_t ByteCount, size_t MaskCount>
   return pattern.matches(reader.slice(offset, pattern.size()));
 }
 
-[[nodiscard]] inline std::optional<u32> findBytePattern(ByteReader reader, MaskedBytePattern pattern, u32 begin = 0) {
-  if (!pattern.valid() || pattern.size() > reader.size() || begin > reader.size() - pattern.size()) {
+// Search only complete patterns within [begin, endOffset), bounded by the source.
+[[nodiscard]] inline std::optional<u32> findBytePattern(ByteReader reader, MaskedBytePattern pattern, u32 begin = 0,
+                                                        u64 endOffset = std::numeric_limits<u64>::max()) {
+  const u64 limit = std::min(endOffset, reader.size());
+  if (!pattern.valid() || pattern.size() > limit || begin > limit - pattern.size()) {
     return std::nullopt;
   }
 
-  const auto bytes = reader.slice(0, reader.size());
+  const auto bytes = reader.slice(0, limit);
   const size_t lastOffset = bytes.size() - pattern.size();
   const size_t anchor = pattern.mask.find('x');
   if (anchor == std::string_view::npos) {
