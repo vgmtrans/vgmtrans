@@ -465,9 +465,7 @@ struct Playback {
     return track.conditional ? vm.finiteBranch(destination) : Effects{};
   }
 
-  void meta(u8 slot, u8 value) {
-    out.marker(MarkerPerformanceEvent{.text = "CPS Meta " + std::to_string(slot) + "=" + std::to_string(value)});
-  }
+  void meta(u8 slot, u8 value) { out.marker("CPS Meta " + std::to_string(slot) + "=" + std::to_string(value)); }
 };
 
 using Cursor = CompilerCursor<TrackState, Playback>;

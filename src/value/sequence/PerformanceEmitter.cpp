@@ -222,22 +222,14 @@ bool PerformanceEmitter::setNoteEnd(PerformanceNoteId target, u64 endTick) {
   return target.valid() && reviseNoteEnd(track_.events, target, endTick);
 }
 
-void PerformanceEmitter::tempo(TempoPerformanceEvent event) {
-  append(std::move(event));
-}
-
 void PerformanceEmitter::tempo(u32 microsecondsPerQuarter) {
-  tempo(TempoPerformanceEvent{
+  append(TempoPerformanceEvent{
       .microsecondsPerQuarter = microsecondsPerQuarter,
   });
 }
 
-void PerformanceEmitter::timeSignature(TimeSignaturePerformanceEvent event) {
-  append(std::move(event));
-}
-
 void PerformanceEmitter::timeSignature(u8 numerator, u8 denominator, u8 clocksPerMetronomeClick) {
-  timeSignature(TimeSignaturePerformanceEvent{
+  append(TimeSignaturePerformanceEvent{
       .numerator = numerator,
       .denominator = denominator,
       .clocksPerMetronomeClick = clocksPerMetronomeClick,
@@ -287,36 +279,28 @@ void PerformanceEmitter::restoreEnvelope(EnvelopeFields fields, VoiceEnvelopeSco
   updateEnvelope(EnvelopeUpdate::restore(fields), scope);
 }
 
-void PerformanceEmitter::level(LevelPerformanceEvent event) {
-  append(std::move(event));
-}
-
 void PerformanceEmitter::level(double linearGain, ValueQuantization sourceQuantization) {
-  level(LevelPerformanceEvent{
+  append(LevelPerformanceEvent{
       .linearGain = linearGain,
       .sourceQuantization = sourceQuantization,
   });
 }
 
 void PerformanceEmitter::level(double linearGain) {
-  level(LevelPerformanceEvent{
+  append(LevelPerformanceEvent{
       .linearGain = linearGain,
   });
 }
 
-void PerformanceEmitter::expression(ExpressionPerformanceEvent event) {
-  append(std::move(event));
-}
-
 void PerformanceEmitter::expression(double linearGain, ValueQuantization sourceQuantization) {
-  expression(ExpressionPerformanceEvent{
+  append(ExpressionPerformanceEvent{
       .linearGain = linearGain,
       .sourceQuantization = sourceQuantization,
   });
 }
 
 void PerformanceEmitter::expression(double linearGain) {
-  expression(ExpressionPerformanceEvent{
+  append(ExpressionPerformanceEvent{
       .linearGain = linearGain,
   });
 }
@@ -348,23 +332,15 @@ void PerformanceEmitter::channelPan(double position) {
   });
 }
 
-void PerformanceEmitter::stereoBalance(StereoBalancePerformanceEvent event) {
-  append(std::move(event));
-}
-
 void PerformanceEmitter::stereoBalance(double leftGain, double rightGain) {
-  stereoBalance(StereoBalancePerformanceEvent{
+  append(StereoBalancePerformanceEvent{
       .leftGain = leftGain,
       .rightGain = rightGain,
   });
 }
 
-void PerformanceEmitter::masterLevel(MasterLevelPerformanceEvent event) {
-  append(std::move(event));
-}
-
 void PerformanceEmitter::masterLevel(double linearGain) {
-  masterLevel(MasterLevelPerformanceEvent{
+  append(MasterLevelPerformanceEvent{
       .linearGain = linearGain,
   });
 }
@@ -379,22 +355,14 @@ void PerformanceEmitter::reverb(double send) {
   });
 }
 
-void PerformanceEmitter::tuning(TuningPerformanceEvent event) {
-  append(std::move(event));
-}
-
 void PerformanceEmitter::tuning(double cents) {
-  tuning(TuningPerformanceEvent{
+  append(TuningPerformanceEvent{
       .cents = cents,
   });
 }
 
-void PerformanceEmitter::globalTranspose(GlobalTransposePerformanceEvent event) {
-  append(std::move(event));
-}
-
 void PerformanceEmitter::globalTranspose(s32 semitones) {
-  globalTranspose(GlobalTransposePerformanceEvent{
+  append(GlobalTransposePerformanceEvent{
       .semitones = semitones,
   });
 }
@@ -456,32 +424,20 @@ void PerformanceEmitter::tremoloDelayPhysical(u32 delayTicks, double millisecond
   });
 }
 
-void PerformanceEmitter::portamentoEnable(PortamentoEnablePerformanceEvent event) {
-  append(std::move(event));
-}
-
 void PerformanceEmitter::portamentoEnable(bool enabled) {
-  portamentoEnable(PortamentoEnablePerformanceEvent{
+  append(PortamentoEnablePerformanceEvent{
       .enabled = enabled,
   });
 }
 
-void PerformanceEmitter::pitchTransitionSettings(PitchTransitionSettingsPerformanceEvent event) {
-  append(std::move(event));
-}
-
 void PerformanceEmitter::pitchTransitionSettings(double timeMilliseconds) {
-  pitchTransitionSettings(PitchTransitionSettingsPerformanceEvent{
+  append(PitchTransitionSettingsPerformanceEvent{
       .timeMilliseconds = timeMilliseconds,
   });
 }
 
-void PerformanceEmitter::legatoPedal(LegatoPedalPerformanceEvent event) {
-  append(std::move(event));
-}
-
 void PerformanceEmitter::legatoPedal(bool enabled) {
-  legatoPedal(LegatoPedalPerformanceEvent{
+  append(LegatoPedalPerformanceEvent{
       .enabled = enabled,
   });
 }
@@ -578,8 +534,8 @@ void PerformanceEmitter::panLfoRateCyclesPerTick(double cycles, LfoPerformanceCo
   modulation(std::move(event));
 }
 
-void PerformanceEmitter::marker(MarkerPerformanceEvent event) {
-  append(std::move(event));
+void PerformanceEmitter::marker(std::string text) {
+  append(MarkerPerformanceEvent{.text = std::move(text)});
 }
 
 PitchSlideBinding PerformanceEmitter::pitchSlide(PerformanceNoteId note, double startKey, double targetKey,
