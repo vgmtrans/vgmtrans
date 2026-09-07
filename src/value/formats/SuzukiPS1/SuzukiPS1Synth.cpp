@@ -53,7 +53,7 @@ constexpr u32 kInstrumentSize = 0x10;
   } else {
     const u32 rates = *record.u32leAt(8, "adsr_rates", SourceValueDisplay::Hex);
     const u16 modes = *record.u16leAt(12, "adsr_modes", SourceValueDisplay::Hex);
-    (void)record.rangeAt(14, 2, "reserved");
+    record.rangeAt(14, 2, "reserved");
     // WDS packs the attack, sustain, and release modes into adjacent
     // three-bit fields. Name them before selecting their native SPU bits.
     const u8 attackMode = modes & 0x07;

@@ -97,7 +97,7 @@ constexpr u32 kRegionSize = 0x10;
     }
     const u32 count = reader.u8At(*offset);
     RecordReader record(reader, *offset, *offset + 4 + count * kRegionSize);
-    (void)record.u8At(0, "region_count");
+    record.u8At(0, "region_count");
     Instrument instrument{.source = std::move(record).finish()};
     std::vector<Region> raw;
     raw.reserve(count);

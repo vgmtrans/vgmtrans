@@ -56,8 +56,8 @@ struct ParsedRegion {
   region.level = *record.u8At(0x16, "level");
   region.pan = *record.u8At(0x17, "pan", SourceValueDisplay::Hex);
   region.routing = *record.u8At(0x18, "routing", SourceValueDisplay::Hex);
-  (void)record.rangeAt(0x10, 2, "pitch_fraction");
-  (void)record.rangeAt(0x19, 7, "reserved");
+  record.rangeAt(0x10, 2, "pitch_fraction");
+  record.rangeAt(0x19, 7, "reserved");
   region.source = std::move(record).finish();
   return region;
 }

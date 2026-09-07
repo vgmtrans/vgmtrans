@@ -469,6 +469,14 @@ positions, retained concrete references, and separate directory/payload source
 annotations for every SRCN. The full build and all 17 CTest targets pass without
 compiler warnings.
 
+### Use the shared readers directly in format code
+
+Delete five format-local bounds helpers that exactly duplicate ByteReader.has,
+and use the shared method in HeartBeat PS1, Suzuki PS1, Sony PS1, and Sega
+Saturn. Remove 25 remaining C-style discard casts around annotation reads;
+these reads intentionally retain fields even when their values are unused.
+The full build and all 17 CTest targets pass without compiler warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

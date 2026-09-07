@@ -64,35 +64,31 @@ struct ParsedInstrument {
   std::vector<ParsedRegion> regions;
 };
 
-[[nodiscard]] bool rangeValid(ByteReader reader, u64 offset, u64 size) {
-  return offset <= reader.size() && size <= reader.size() - offset;
-}
-
 [[nodiscard]] SourceRecord regionSource(ByteReader reader, u32 offset) {
   RecordReader record(reader, offset, offset + 0x20);
   // Parsing below uses these values directly. RecordReader is used here to
   // retain the exact byte range for every TreeView child.
-  (void)record.u8At(0, "key_low", SourceValueDisplay::MidiNote);
-  (void)record.u8At(1, "key_high", SourceValueDisplay::MidiNote);
-  (void)record.u32beAt(2, "address_and_flags", SourceValueDisplay::Hex);
-  (void)record.u16beAt(6, "loop_start");
-  (void)record.u16beAt(8, "loop_end");
-  (void)record.u16beAt(10, "adsr_1", SourceValueDisplay::Hex);
-  (void)record.u16beAt(12, "adsr_2", SourceValueDisplay::Hex);
-  (void)record.u8At(14, "modulation_flags", SourceValueDisplay::Hex);
-  (void)record.u8At(15, "total_level");
-  (void)record.u16beAt(16, "pitch", SourceValueDisplay::Hex);
-  (void)record.u16beAt(18, "modulation", SourceValueDisplay::Hex);
-  (void)record.u16beAt(20, "lfo", SourceValueDisplay::Hex);
-  (void)record.u16beAt(22, "effect_output", SourceValueDisplay::Hex);
-  (void)record.u8At(24, "direct_output", SourceValueDisplay::Hex);
-  (void)record.u8At(25, "unity_key", SourceValueDisplay::MidiNote);
-  (void)record.s8At(26, "fine_tune");
-  (void)record.u8At(27, "reserved_27", SourceValueDisplay::Hex);
-  (void)record.u8At(28, "reserved_28", SourceValueDisplay::Hex);
-  (void)record.u8At(29, "velocity_table");
-  (void)record.u8At(30, "peg_table");
-  (void)record.u8At(31, "plfo_table");
+  record.u8At(0, "key_low", SourceValueDisplay::MidiNote);
+  record.u8At(1, "key_high", SourceValueDisplay::MidiNote);
+  record.u32beAt(2, "address_and_flags", SourceValueDisplay::Hex);
+  record.u16beAt(6, "loop_start");
+  record.u16beAt(8, "loop_end");
+  record.u16beAt(10, "adsr_1", SourceValueDisplay::Hex);
+  record.u16beAt(12, "adsr_2", SourceValueDisplay::Hex);
+  record.u8At(14, "modulation_flags", SourceValueDisplay::Hex);
+  record.u8At(15, "total_level");
+  record.u16beAt(16, "pitch", SourceValueDisplay::Hex);
+  record.u16beAt(18, "modulation", SourceValueDisplay::Hex);
+  record.u16beAt(20, "lfo", SourceValueDisplay::Hex);
+  record.u16beAt(22, "effect_output", SourceValueDisplay::Hex);
+  record.u8At(24, "direct_output", SourceValueDisplay::Hex);
+  record.u8At(25, "unity_key", SourceValueDisplay::MidiNote);
+  record.s8At(26, "fine_tune");
+  record.u8At(27, "reserved_27", SourceValueDisplay::Hex);
+  record.u8At(28, "reserved_28", SourceValueDisplay::Hex);
+  record.u8At(29, "velocity_table");
+  record.u8At(30, "peg_table");
+  record.u8At(31, "plfo_table");
   return std::move(record).finish();
 }
 
@@ -118,7 +114,7 @@ struct ParsedInstrument {
   const u32 loopStartFrames = reader.be16(regionOffset + 6);
   const u32 loopEndFrames = reader.be16(regionOffset + 8);
   if (sampleOffset <= bank.offset || sampleOffset >= bank.offset + 0x7fffe || loopEndFrames < loopStartFrames ||
-      !rangeValid(reader, sampleOffset, static_cast<u64>(loopEndFrames) * bytesPerFrame)) {
+      !reader.has(sampleOffset, static_cast<u64>(loopEndFrames) * bytesPerFrame)) {
     return std::nullopt;
   }
   const u8 loopMode = static_cast<u8>((reader.u8At(regionOffset + 3) >> 5) & 3);
@@ -270,7 +266,7 @@ struct PanAndAttenuation {
                                                              SegSatDriverVersion version, u32 offset) {
   const u8 index = reader.u8At(offset + 31);
   const u32 table = bank.offset + bank.plfoTables + static_cast<u32>(index) * 4;
-  if (table + 4 > bank.offset + bank.firstInstrument || !rangeValid(reader, table, 4)) {
+  if (table + 4 > bank.offset + bank.firstInstrument || !reader.has(table, 4)) {
     return std::nullopt;
   }
 

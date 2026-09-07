@@ -22,14 +22,10 @@ constexpr u32 kSequenceHeaderSize = 0x22;
 constexpr u32 kBankHeaderSize = 0x30;
 constexpr u32 kInstrumentRecordSize = 0x10;
 
-[[nodiscard]] bool rangeValid(ByteReader reader, u64 offset, u64 size) {
-  return offset <= reader.size() && size <= reader.size() - offset;
-}
-
 }  // namespace
 
 std::optional<SuzukiPs1SequenceLayout> readSuzukiPs1SequenceLayout(ByteReader reader, u32 offset) {
-  if (!rangeValid(reader, offset, kSequenceHeaderSize) || reader.le32(offset) != kSequenceSignature) {
+  if (!reader.has(offset, kSequenceHeaderSize) || reader.le32(offset) != kSequenceSignature) {
     return std::nullopt;
   }
 
@@ -42,8 +38,8 @@ std::optional<SuzukiPs1SequenceLayout> readSuzukiPs1SequenceLayout(ByteReader re
       .titleOffset = reader.le16(offset + 0x1e),
       .percussionOffset = reader.le16(offset + 0x20),
   };
-  if (layout.length < kSequenceHeaderSize || !rangeValid(reader, offset, layout.length) || layout.trackCount == 0 ||
-      !rangeValid(reader, offset + kSequenceHeaderSize, layout.trackCount * 2ull) ||
+  if (layout.length < kSequenceHeaderSize || !reader.has(offset, layout.length) || layout.trackCount == 0 ||
+      !reader.has(offset + kSequenceHeaderSize, layout.trackCount * 2ull) ||
       layout.titleOffset < kSequenceHeaderSize + layout.trackCount * 2u || layout.titleOffset >= layout.length ||
       layout.percussionOffset < layout.titleOffset || layout.percussionOffset > layout.length) {
     return std::nullopt;
@@ -84,7 +80,7 @@ std::vector<SuzukiPs1SequenceLayout> findSuzukiPs1Sequences(ByteReader reader) {
 }
 
 std::optional<SuzukiPs1BankLayout> readSuzukiPs1BankLayout(ByteReader reader, u32 offset) {
-  if (!rangeValid(reader, offset, kBankHeaderSize)) {
+  if (!reader.has(offset, kBankHeaderSize)) {
     return std::nullopt;
   }
   const u32 signature = reader.le32(offset);
@@ -100,7 +96,7 @@ std::optional<SuzukiPs1BankLayout> readSuzukiPs1BankLayout(ByteReader reader, u3
   const u64 minimumHeader = kBankHeaderSize + (static_cast<u64>(highestProgram) + 1) * kInstrumentRecordSize;
   const u64 length = static_cast<u64>(headerSize) + sampleSize;
   if (headerSize < minimumHeader || highestProgram > 255 || bank > 0xffff || length > totalSize ||
-      length > std::numeric_limits<u32>::max() || !rangeValid(reader, offset, length) || sampleSize < 16 ||
+      length > std::numeric_limits<u32>::max() || !reader.has(offset, length) || sampleSize < 16 ||
       !reader.has(offset + headerSize, 16)) {
     return std::nullopt;
   }
