@@ -21,39 +21,6 @@ namespace vgmtrans::core {
 
 namespace detail {
 
-// Remaining counter values are part of VisitState, so each legitimate finite
-// pass is distinct. When the same command, call stack, and counters recur, the
-// future control flow is identical and the VM has found a real loop.
-class RepeatState {
-public:
-  [[nodiscard]] bool active(u8 slot) const { return remaining_.contains(slot); }
-
-  [[nodiscard]] u32 remainingPlays(u8 slot) const {
-    const auto found = remaining_.find(slot);
-    return found != remaining_.end() ? found->second : 0;
-  }
-
-  void start(u8 slot, u32 totalPlays) { remaining_[slot] = totalPlays; }
-
-  [[nodiscard]] bool consumeReplay(u8 slot) {
-    auto found = remaining_.find(slot);
-    if (found == remaining_.end() || found->second <= 1) {
-      return false;
-    }
-    --found->second;
-    return true;
-  }
-
-  void finish(u8 slot) { remaining_.erase(slot); }
-
-  void clear() { remaining_.clear(); }
-
-  [[nodiscard]] std::map<u8, u32> snapshot() const { return remaining_; }
-
-private:
-  std::map<u8, u32> remaining_;
-};
-
 // Mutable playback state for one track. The parsed SequenceProgram stays unchanged
 // while the VM advances ticks, calls, repeats, and loop detection.
 struct VmTrackRuntime {
@@ -62,7 +29,8 @@ struct VmTrackRuntime {
   u32 nextAutomation = 0;
   ActiveNoteState activeNotes;
   std::vector<u32> callStack;
-  RepeatState repeat;
+  // Remaining plays distinguish legitimate finite passes in loop detection.
+  std::map<u8, u32> repeat;
   CommandId lastCommand;
 };
 
@@ -125,7 +93,7 @@ public:
     return VisitState{
         .commandIndex = commandIndex,
         .callStack = runtime.callStack,
-        .repeat = runtime.repeat.snapshot(),
+        .repeat = runtime.repeat,
     };
   }
 
@@ -876,11 +844,11 @@ private:
 
 }  // namespace
 
-RepeatCounter::RepeatCounter(detail::RepeatState& state, u8 slot) noexcept : state_(&state), slot_(slot) {
+RepeatCounter::RepeatCounter(std::map<u8, u32>& remaining, u8 slot) noexcept : remaining_(&remaining), slot_(slot) {
 }
 
 bool RepeatCounter::active() const {
-  return state_ != nullptr && state_->active(slot_);
+  return remaining_->contains(slot_);
 }
 
 bool RepeatCounter::firstVisit() const {
@@ -888,23 +856,25 @@ bool RepeatCounter::firstVisit() const {
 }
 
 u32 RepeatCounter::remainingPlays() const {
-  return state_ != nullptr ? state_->remainingPlays(slot_) : 0;
+  const auto found = remaining_->find(slot_);
+  return found != remaining_->end() ? found->second : 0;
 }
 
 void RepeatCounter::start(u32 totalPlays) {
-  if (state_ != nullptr) {
-    state_->start(slot_, totalPlays);
-  }
+  (*remaining_)[slot_] = totalPlays;
 }
 
 bool RepeatCounter::consumeReplay() {
-  return state_ != nullptr && state_->consumeReplay(slot_);
+  const auto found = remaining_->find(slot_);
+  if (found == remaining_->end() || found->second <= 1) {
+    return false;
+  }
+  --found->second;
+  return true;
 }
 
 void RepeatCounter::finish() {
-  if (state_ != nullptr) {
-    state_->finish(slot_);
-  }
+  remaining_->erase(slot_);
 }
 
 Effects VmApi::fallthrough() const noexcept {

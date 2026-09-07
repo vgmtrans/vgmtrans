@@ -286,6 +286,18 @@ The full build and all 17 CTest targets pass without compiler warnings. The
 4,608-configuration comparison produces identical bytes for all 9,216 SF2/DLS
 outputs, including instrument and region modulation together.
 
+### Remove the repeat-state forwarding layer
+
+`RepeatCounter` now operates directly on the VM's map of remaining plays. Remove
+the private `RepeatState` wrapper and impossible null-state checks: counters
+can only be constructed by `VmApi` with an existing map. Preserve the public
+counter operations and map snapshots used for finite-repeat loop detection.
+This removes one class and 31 production lines.
+
+The full build and all 17 CTest targets pass without compiler warnings. Existing
+VM coverage exercises finite repeats, nested calls and repeats, counter reuse,
+repeat breaks, loop candidates, and section transitions.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
