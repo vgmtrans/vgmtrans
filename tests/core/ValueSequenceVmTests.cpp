@@ -551,7 +551,11 @@ void sequenceVmEmitsProgramInitialChannelState() {
 }
 
 void sequenceVmEmitsInitialMasterLevelOnce() {
-  const SequenceProgramConfig config = probeSequenceConfig(SequenceProgramBehavior{.initialMasterLevel = 0.25});
+  const SequenceProgramConfig config = probeSequenceConfig(SequenceProgramBehavior{
+      .initialMasterLevel = 0.25,
+      .initialChannelPan = 0.0,
+      .initialPitchBendRangeSemitones = 255,
+  });
   const auto makeTrack = [&](u32 id) {
     TrackProgram track{.sourceTrackNumber = id, .startAddress = Address{0}};
     const std::array<u8, 1> endBytes{0xff};
@@ -577,6 +581,20 @@ void sequenceVmEmitsInitialMasterLevelOnce() {
              !std::get<MasterLevelPerformanceEvent>(*first).header.sourceCommand.valid() &&
              second == performance.tracks[1].events.end(),
          "VM should initialize song-wide master gain once, independently of per-track levels");
+
+  u64 order = 0;
+  for (const auto& track : performance.tracks) {
+    const auto& pan = std::get<ChannelPanPerformanceEvent>(track.events[track.id.value == 0 ? 1 : 0]);
+    const auto& bendRange = std::get<PitchBendRangePerformanceEvent>(track.events.back());
+    expect(pan.position == 0.0 && bendRange.cents == 25500,
+           "initial state should retain explicit zero pan and the full source bend range");
+    for (const auto& event : track.events) {
+      const auto& header = performanceEventHeader(event);
+      expect(header.track == track.id && header.tick == 0 && header.sequence == order++ &&
+                 !header.sourceCommand.valid() && !header.sourceAnnotation.valid() && !header.automation,
+             "initial events should keep global ordering and track identity without fabricated source provenance");
+    }
+  }
 }
 
 void sequenceVmExposesSubroutineStateFromItsCallStack() {

@@ -123,6 +123,7 @@ public:
   void masterLevel(double linearGain);
   void reverb(ReverbPerformanceEvent event);
   void reverb(double send);
+  void monoMode(u8 channels);
   void tuning(double cents);
   void globalTranspose(s32 semitones);
   void pitchBend(PitchBendPerformanceEvent event);

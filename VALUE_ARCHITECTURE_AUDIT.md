@@ -423,6 +423,20 @@ searched only explicit addresses; update their melodic checks to use resolved
 addresses, while retaining checks for explicit drum-bank policy. All 17 CTest
 targets pass, including synth export, instrument selection, and format suites.
 
+### Initialize VM tracks through ordinary performance emission
+
+Use `PerformanceEmitter` for initial track state instead of independently
+constructing each event and assigning sequence numbers in a second pass.
+Add its small mono-mode operation to cover the one initial event that lacked
+an emission method. Initialization still emits only declared values, preserves
+order, and emits master gain once per sequence. This removes 29 production
+lines while sharing event construction and provenance rules.
+
+Extend existing VM coverage for initial channel pan, the full eight-bit bend
+range, and song-wide ordering across tracks. Verify that initial events have
+track identity but no invented source command, source annotation, or automation.
+The full build and all 17 CTest targets pass without compiler warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

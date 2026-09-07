@@ -157,66 +157,33 @@ void addLoopMarker(PerformanceTrack& track, CommandId sourceCommand, u64 tick, u
   });
 }
 
-void addInitialTrackEvents(PerformanceTrack& track, const SequenceProgramBehavior& behavior, bool includeGlobalEvents) {
-  const PerformanceEventHeader header{
-      .track = track.id,
-      .tick = 0,
-  };
-
+void addInitialTrackEvents(PerformanceEmitter out, const SequenceProgramBehavior& behavior, bool includeGlobalEvents) {
   if (behavior.initialReverbSend) {
-    track.events.emplace_back(ReverbPerformanceEvent{
-        .header = header,
-        .send = *behavior.initialReverbSend,
-    });
+    out.reverb(*behavior.initialReverbSend);
   }
   if (behavior.initialLevel) {
-    track.events.emplace_back(LevelPerformanceEvent{
-        .header = header,
-        .linearGain = *behavior.initialLevel,
-    });
+    out.level(*behavior.initialLevel);
   }
   if (includeGlobalEvents && behavior.initialMasterLevel) {
-    track.events.emplace_back(MasterLevelPerformanceEvent{
-        .header = header,
-        .linearGain = *behavior.initialMasterLevel,
-    });
+    out.masterLevel(*behavior.initialMasterLevel);
   }
   if (behavior.initialExpression) {
-    track.events.emplace_back(ExpressionPerformanceEvent{
-        .header = header,
-        .linearGain = *behavior.initialExpression,
-    });
+    out.expression(*behavior.initialExpression);
   }
   if (behavior.initialChannelPan) {
-    track.events.emplace_back(ChannelPanPerformanceEvent{
-        .header = header,
-        .position = *behavior.initialChannelPan,
-    });
+    out.channelPan(*behavior.initialChannelPan);
   }
   if (behavior.initialStereoBalance) {
-    track.events.emplace_back(StereoBalancePerformanceEvent{
-        .header = header,
-        .leftGain = behavior.initialStereoBalance->leftGain,
-        .rightGain = behavior.initialStereoBalance->rightGain,
-    });
+    out.stereoBalance(behavior.initialStereoBalance->leftGain, behavior.initialStereoBalance->rightGain);
   }
   if (behavior.initialMonoModeChannels) {
-    track.events.emplace_back(MonoModePerformanceEvent{
-        .header = header,
-        .channels = *behavior.initialMonoModeChannels,
-    });
+    out.monoMode(*behavior.initialMonoModeChannels);
   }
   if (behavior.initialPitchBendRangeSemitones) {
-    track.events.emplace_back(PitchBendRangePerformanceEvent{
-        .header = header,
-        .cents = static_cast<u16>(static_cast<u16>(*behavior.initialPitchBendRangeSemitones) * 100),
-    });
+    out.pitchBendRange(*behavior.initialPitchBendRangeSemitones);
   }
   if (behavior.initialSourceInstrument) {
-    track.events.emplace_back(InstrumentPerformanceEvent{
-        .header = header,
-        .sourceInstrument = *behavior.initialSourceInstrument,
-    });
+    out.instrument(*behavior.initialSourceInstrument);
   }
 }
 
@@ -382,10 +349,7 @@ public:
         trackState_(sequenceRuntime_.createTrackState ? sequenceRuntime_.createTrackState(program, track) : std::any{}),
         programState_(programState),
         current_(startsActive ? track.commandIndex(track.startAddress) : std::optional<u32>{}) {
-    addInitialTrackEvents(performanceTrack_, behavior_, includeGlobalInitialEvents);
-    for (auto& event : performanceTrack_.events) {
-      std::visit([&](auto& typedEvent) { typedEvent.header.sequence = outputSequence_++; }, event);
-    }
+    addInitialTrackEvents(outputAt(0), behavior_, includeGlobalInitialEvents);
     if (startsActive && !current_ && !track_.commands.empty()) {
       warn(fmt::format("Sequence track start ${:04X} was not decoded", track_.startAddress.value), {});
     }
