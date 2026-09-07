@@ -167,23 +167,20 @@ void layoutProfilesAndLiveSongAreAudited() {
 void profileSpecificOperandLengthsRemainAligned() {
   DriverFixture cosmo(Version::CosmoGang);
   cosmo.commands({0xc0, 0xfb, 1, 2, 3, 4, 5, 0xff});
-  TrackProgram cosmoTrack =
-      decodeSourceTrack(ByteReader(SourceId{302}, cosmo.data()), Version::CosmoGang, 0, 0x5200, 0, 0x10);
+  TrackProgram cosmoTrack = decodeSourceTrack(ByteReader(SourceId{302}, cosmo.data()), Version::CosmoGang, 0, 0x5200);
   expect(cosmoTrack.commands.size() == 3 && cosmoTrack.commands[0].range.size == 1 &&
              cosmoTrack.commands[1].range.size == 6,
          "Cosmo Gang C0-D0 aliases and five-operand FB must follow its distinct dispatch table");
 
   DriverFixture dualOrb(Version::DualOrb);
   dualOrb.commands({0xc0, 0x03, 0x52, 0xff});
-  TrackProgram dualOrbTrack =
-      decodeSourceTrack(ByteReader(SourceId{303}, dualOrb.data()), Version::DualOrb, 0, 0x5200, 0, 0x10);
+  TrackProgram dualOrbTrack = decodeSourceTrack(ByteReader(SourceId{303}, dualOrb.data()), Version::DualOrb, 0, 0x5200);
   expect(dualOrbTrack.commands.size() == 2 && dualOrbTrack.commands.front().range.size == 3,
          "Dual Orb C0-C5 must remain two-byte conditional jumps rather than later-driver tempo commands");
 
   DriverFixture modern(Version::Modern);
   modern.commands({0xc0, 0x82, 0xff});
-  TrackProgram modernTrack =
-      decodeSourceTrack(ByteReader(SourceId{304}, modern.data()), Version::Modern, 0, 0x5200, 0, 0x10);
+  TrackProgram modernTrack = decodeSourceTrack(ByteReader(SourceId{304}, modern.data()), Version::Modern, 0, 0x5200);
   expect(modernTrack.commands.size() == 2 && modernTrack.commands.front().range.size == 2,
          "later Prism drivers must decode C0-C4 as one-operand timer-target tempo commands");
 }
@@ -221,7 +218,10 @@ void dynamicDriverFeaturesRenderFromCapturedTables() {
                                       event->delayMilliseconds == 64.0;
                              }),
          "echo must retain voice masks, signed stereo gains, feedback, FIR identity, and EDL timing");
-  expect(parsed.programs.contains(2), "instrument discovery should retain referenced SRCN identities");
+  expect(std::ranges::any_of(
+             events<InstrumentPerformanceEvent>(track),
+             [](const auto* event) { return event->sourceInstrument && event->sourceInstrument->key == 2; }),
+         "instrument changes should retain their source SRCN identity");
 }
 
 void gainTablesControlNoteAmplitude() {
@@ -302,7 +302,17 @@ void leadingTiesAreSilentDelays() {
 
 void moduleBuildsTunedSnesSynth() {
   DriverFixture fixture(Version::Modern);
-  fixture.commands({0xfe, 0x02, 0xec, 0xff, 0x3c, 0x08, 0xff});
+  fixture.commands({0xfe, 0x02, 0xec, 0xff, 0x3c, 0x08, 0xfe, 0x07, 0xff})
+      .pointer(0x600c, 0x6210)
+      .pointer(0x600e, 0x6210)
+      .bytes(0x6210, {0x01})
+      .pointer(0x6010, 0xffff)
+      .pointer(0x6014, 0x6100)
+      .pointer(0x6016, 0x6101)
+      .bytes(0x6100, {0x03})
+      .pointer(0x601c, 0xffff)
+      .pointer(0x63fc, 0x6200)
+      .pointer(0x63fe, 0x6200);
   Session session;
   session.registerFormat(module());
   session.addSource(SourceFile{.name = "PrismSnes fixture.aram"}, fixture.data());
@@ -313,6 +323,12 @@ void moduleBuildsTunedSnesSynth() {
              collection->members.soundBanks.size() == 1 && collection->members.samplePools.empty(),
          "PrismSnes scanning should publish one sequence, sound bank, and explicit collection");
   const auto* set = snapshot.asset<SoundBankAsset>(collection->members.soundBanks.front());
+  expect(set != nullptr && set->instruments.size() == 3 && set->localSamples.samples.size() == 3 &&
+             set->instruments[0].identity == InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 2} &&
+             set->instruments[1].identity == InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 3} &&
+             set->instruments[2].identity == InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = 255},
+         "Prism should export every valid directory patch in SRCN order, including unreferenced patches, while "
+         "rejecting out-of-range samples and misaligned loops even when referenced");
   const Region* region = set != nullptr && !set->instruments.empty() && !set->instruments.front().regions.empty()
                              ? &set->instruments.front().regions.front()
                              : nullptr;
