@@ -9,7 +9,9 @@
 #include "value/base/Source.h"
 #include "value/synth/SynthBuilder.h"
 
+#include <functional>
 #include <optional>
+#include <ranges>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -73,6 +75,21 @@ private:
 
 [[nodiscard]] SnesBrrCatalog readSnesBrrCatalog(ByteReader reader, u32 directoryAddress,
                                                 std::span<const u8> referencedSrcns);
+
+// Read samples directly from a format's instrument records. The catalog owns
+// sorting, deduplication, and validation; callers only identify the SRCN field.
+template <std::ranges::input_range Instruments, class Srcn>
+[[nodiscard]] SnesBrrCatalog readSnesBrrCatalog(ByteReader reader, u32 directoryAddress, Instruments&& instruments,
+                                                Srcn srcn) {
+  std::vector<u8> referencedSrcns;
+  if constexpr (std::ranges::sized_range<Instruments>) {
+    referencedSrcns.reserve(std::ranges::size(instruments));
+  }
+  for (const auto& instrument : instruments) {
+    referencedSrcns.push_back(std::invoke(srcn, instrument));
+  }
+  return readSnesBrrCatalog(reader, directoryAddress, referencedSrcns);
+}
 
 // Concrete references created while adding an SNES catalog. SRCNs with
 // equivalent BRR data and loop behavior resolve to the first matching sample.

@@ -25,17 +25,6 @@ namespace {
   return 12.0 * std::log2((1024.0 + tuning) / 1024.0);
 }
 
-[[nodiscard]] std::vector<u8> referencedSrcns(const SequenceRecipes& recipes) {
-  std::vector<u8> result;
-  result.reserve(recipes.patches.size());
-  for (const PatchRecipe& patch : recipes.patches) {
-    result.push_back(patch.srcn);
-  }
-  std::ranges::sort(result);
-  result.erase(std::ranges::unique(result).begin(), result.end());
-  return result;
-}
-
 }  // namespace
 
 std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
@@ -45,8 +34,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   }
 
   const ByteReader reader = builder.reader();
-  const std::vector<u8> srcns = referencedSrcns(recipes);
-  const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, *layout.spcDirAddress, srcns);
+  const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, *layout.spcDirAddress, recipes.patches, &PatchRecipe::srcn);
   if (catalog.samples.empty()) {
     return std::nullopt;
   }

@@ -107,12 +107,8 @@ std::optional<ScanSoundBankDraft> addCapcomSnesSynth(ScanResultBuilder& builder,
                                                      u32 spcDirAddress, std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const auto instrumentInfos = parseCapcomSnesInstrumentInfos(reader, instrumentTableAddress, spcDirAddress);
-  std::vector<u8> referencedSrcns;
-  referencedSrcns.reserve(instrumentInfos.size());
-  for (const auto& info : instrumentInfos) {
-    referencedSrcns.push_back(info.srcn);
-  }
-  const auto sampleCatalog = readSnesBrrCatalog(reader, spcDirAddress, referencedSrcns);
+  const auto sampleCatalog =
+      readSnesBrrCatalog(reader, spcDirAddress, instrumentInfos, &CapcomSnesInstrumentInfo::srcn);
   if (sampleCatalog.samples.empty()) {
     return std::nullopt;
   }

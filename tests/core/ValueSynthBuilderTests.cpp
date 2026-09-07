@@ -5,6 +5,7 @@
  */
 
 #include "value/base/RecordReader.h"
+#include "value/platform/SnesSampleDirectory.h"
 #include "value/scan/ScanResultBuilder.h"
 
 #include <algorithm>
@@ -49,6 +50,25 @@ void recordReaderFinishesOnePortableSourceValue() {
   expect(record.range == SourceRange{.source = source, .offset = 4, .size = 8} && record.fields.size() == 2 &&
              record.fields[0].range.offset == 8 && record.fields[1].range.offset == 4,
          "a finished source record should keep one covering range and every exact field range");
+}
+
+void brrCatalogProjectsInstrumentsInSampleOrder() {
+  struct Patch {
+    u8 srcn;
+  };
+  const std::vector<Patch> patches{{2}, {3}, {1}, {2}};
+  std::vector<u8> bytes(0x80);
+  bytes[4] = 0x40;
+  bytes[8] = 0x50;
+  bytes[12] = bytes[13] = 0xff;   // Invalid sample address.
+  bytes[0x40] = bytes[0x50] = 1;  // Complete, non-looping BRR blocks.
+  const SourceId source{29};
+  const auto catalog = readSnesBrrCatalog(ByteReader(source, bytes), 0, patches, &Patch::srcn);
+  expect(catalog.samples.size() == 2 && catalog.samples[0].srcn == 1 && catalog.samples[1].srcn == 2,
+         "instrument projection must retain sorted unique sample numbers and reject invalid streams");
+  expect(catalog.directoryRange == SourceRange{.source = source, .offset = 4, .size = 8} &&
+             catalog.samples[0].stream.encodedData == SourceRange{.source = source, .offset = 0x40, .size = 9},
+         "projected instruments must retain exact directory and payload source ranges");
 }
 
 void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
@@ -454,6 +474,7 @@ void detachedBuildersUseTheSameAuthoringSurface() {
 
 void runValueSynthBuilderTests() {
   recordReaderFinishesOnePortableSourceValue();
+  brrCatalogProjectsInstrumentsInSampleOrder();
   sampleBuilderKeepsKeysDenseAndAnnotationsOwned();
   instrumentBuilderGroupsEntriesAndProjectsRegionIdentity();
   soundBankOwnsNoncontiguousSamplesWithoutInventingOneSourceRange();
