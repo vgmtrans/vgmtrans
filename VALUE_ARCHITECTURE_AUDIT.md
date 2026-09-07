@@ -51,6 +51,20 @@ Remove the repeated collectors and redundant AKAO/Konami sample-reader wrapper
 APIs. A synthetic catalog test covers unordered records, duplicate SRCNs,
 invalid streams, and exact directory/payload ranges.
 
+### Share fixed-width record reads
+
+The sixteen sequential and positioned integer readers repeated bounds checks,
+cursor updates, numeric conversion, source ranges, and field annotation. Two
+private helpers now own that work. Their public named readers are unchanged,
+and the helpers remain implemented in the `.cpp` file.
+
+Keep separate bounds policies: sequential reads stop after the first failure;
+positioned reads can recover other complete fields from a damaged record.
+Variable-length, 24-bit, and raw-byte reads retain their specific behavior.
+Tests cover all eight integer readers in both access modes, including signed
+values, endian order, annotations, partial consumption, and diagnostic count.
+The same four CTest targets pass after this change, with no compiler warnings.
+
 ## Further investigation
 
 - Compiler cursor: duplicated adapters for emitting ordinary performance events;
@@ -59,8 +73,6 @@ invalid streams, and exact directory/payload ranges.
 - Runtime: repeated per-track initialization flags and `beforeCommand` guards;
   distinguish track startup from song-wide and per-command behavior before
   centralizing it.
-- Record reader: repeated fixed-width read/annotation logic; preserve the
-  different failure policies of sequential and positioned reads.
 - Synth construction and source maps: repeated range accumulation and envelope
   projection; preserve ownership, authoritative explicit ranges, and aliases.
 - VM scheduling, collection binding, export lowering, and instrument variants:
