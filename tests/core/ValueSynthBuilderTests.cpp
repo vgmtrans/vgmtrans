@@ -52,6 +52,42 @@ void recordReaderFinishesOnePortableSourceValue() {
          "a finished source record should keep one covering range and every exact field range");
 }
 
+void recordReaderPreservesNumericFieldsAndFailurePolicies() {
+  const SourceId source{29};
+  const std::vector<u8> bytes{0, 0xfe, 0xdc, 0xba, 0x98};
+  const auto check = [&](auto sequential, auto positioned, auto expected, u32 width) {
+    RecordReader stream(ByteReader(source, bytes), 1, 5);
+    RecordReader record(ByteReader(source, bytes), 1, 5);
+    const auto first = (stream.*sequential)("value", SourceValueDisplay::Hex);
+    const auto second = (record.*positioned)(0, "value", SourceValueDisplay::Hex);
+    const SourceRange range{.source = source, .offset = 1, .size = width};
+    expect(first && second && first.value == expected && second.value == expected &&
+               first.range == range && second.range == range && stream.position() == 1 + width &&
+               record.position() == 1 + width,
+           "numeric record reads must preserve signedness, byte order, field ranges, and cursor position");
+    const SourceRecord fields = std::move(record).finish();
+    expect(fields.fields.size() == 1 && fields.fields[0].value == makeSourceValue(expected) &&
+               fields.fields[0].display == SourceValueDisplay::Hex,
+           "record fields must retain their numeric type and requested display style");
+  };
+  check(&RecordReader::u8, &RecordReader::u8At, u8{0xfe}, 1);
+  check(&RecordReader::s8, &RecordReader::s8At, s8{-2}, 1);
+  check(&RecordReader::u16be, &RecordReader::u16beAt, u16{0xfedc}, 2);
+  check(&RecordReader::u16le, &RecordReader::u16leAt, u16{0xdcfe}, 2);
+  check(&RecordReader::s16be, &RecordReader::s16beAt, s16{-292}, 2);
+  check(&RecordReader::s16le, &RecordReader::s16leAt, s16{-8962}, 2);
+  check(&RecordReader::u32be, &RecordReader::u32beAt, u32{0xfedcba98}, 4);
+  check(&RecordReader::u32le, &RecordReader::u32leAt, u32{0x98badcfe}, 4);
+
+  std::vector<Diagnostic> diagnostics;
+  RecordReader damaged(ByteReader(source, bytes), 1, 4, &diagnostics);
+  expect(!damaged.u32be("too wide") && !damaged.u8("after failure") && damaged.position() == 4,
+         "a truncated sequential field must consume available bytes and stop later sequential reads");
+  expect(*damaged.s16beAt(0, "recoverable") == -292 && !damaged.ok() && diagnostics.size() == 1 &&
+             diagnostics[0].range == SourceRange{.source = source, .offset = 1, .size = 3},
+         "positioned reads may recover complete fields without clearing failure or duplicating diagnostics");
+}
+
 void brrCatalogProjectsInstrumentsInSampleOrder() {
   struct Patch {
     u8 srcn;
@@ -474,6 +510,7 @@ void detachedBuildersUseTheSameAuthoringSurface() {
 
 void runValueSynthBuilderTests() {
   recordReaderFinishesOnePortableSourceValue();
+  recordReaderPreservesNumericFieldsAndFailurePolicies();
   brrCatalogProjectsInstrumentsInSampleOrder();
   sampleBuilderKeepsKeysDenseAndAnnotationsOwned();
   instrumentBuilderGroupsEntriesAndProjectsRegionIdentity();

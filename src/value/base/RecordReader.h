@@ -86,6 +86,11 @@ public:
   [[nodiscard]] SourceRecord finish() && noexcept;
 
 private:
+  template <class T, auto Read>
+  [[nodiscard]] RangedValue<T> number(std::string_view name, SourceValueDisplay display);
+  template <class T, auto Read>
+  [[nodiscard]] RangedValue<T> numberAt(u64 relativeOffset, std::string_view name, SourceValueDisplay display);
+
   bool require(u32 size, std::string_view field);
   [[nodiscard]] std::optional<u32> requireAt(u64 relativeOffset, u64 size, std::string_view field);
   void field(std::string_view name, SourceRange range, SourceValue value, SourceValueDisplay display);

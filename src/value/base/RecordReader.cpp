@@ -38,46 +38,46 @@ RecordReader::RecordReader(ByteReader reader, u32 offset, u32 end, std::vector<D
       diagnostics_(diagnostics), captureFields_(captureFields) {
 }
 
-RangedValue<::u8> RecordReader::u8(std::string_view name, SourceValueDisplay display) {
-  if (!require(1, name)) {
+// Sequential reads stop after the first failure. Positioned reads may still
+// recover other fields in a damaged record; keep those bounds policies separate.
+template <class T, auto Read>
+RangedValue<T> RecordReader::number(std::string_view name, SourceValueDisplay display) {
+  if (!require(sizeof(T), name)) {
     return {};
   }
-  const SourceRange sourceRange = reader_.range(position_, 1);
-  const auto value = reader_.u8At(position_++);
+  const SourceRange sourceRange = reader_.range(position_, sizeof(T));
+  const auto value = static_cast<T>((reader_.*Read)(position_));
+  position_ += sizeof(T);
   field(name, sourceRange, makeSourceValue(value), display);
-  return RangedValue<::u8>{value, sourceRange};
+  return {value, sourceRange};
+}
+
+template <class T, auto Read>
+RangedValue<T> RecordReader::numberAt(u64 relativeOffset, std::string_view name, SourceValueDisplay display) {
+  const auto position = requireAt(relativeOffset, sizeof(T), name);
+  if (!position) {
+    return {};
+  }
+  const SourceRange sourceRange = reader_.range(*position, sizeof(T));
+  const auto value = static_cast<T>((reader_.*Read)(*position));
+  field(name, sourceRange, makeSourceValue(value), display);
+  return {value, sourceRange};
+}
+
+RangedValue<::u8> RecordReader::u8(std::string_view name, SourceValueDisplay display) {
+  return number<::u8, &ByteReader::u8At>(name, display);
 }
 
 RangedValue<::s8> RecordReader::s8(std::string_view name, SourceValueDisplay display) {
-  if (!require(1, name)) {
-    return {};
-  }
-  const SourceRange sourceRange = reader_.range(position_, 1);
-  const auto value = reader_.s8At(position_++);
-  field(name, sourceRange, makeSourceValue(value), display);
-  return RangedValue<::s8>{value, sourceRange};
+  return number<::s8, &ByteReader::s8At>(name, display);
 }
 
 RangedValue<u16> RecordReader::u16be(std::string_view name, SourceValueDisplay display) {
-  if (!require(2, name)) {
-    return {};
-  }
-  const SourceRange sourceRange = reader_.range(position_, 2);
-  const auto value = reader_.be16(position_);
-  position_ += 2;
-  field(name, sourceRange, makeSourceValue(value), display);
-  return RangedValue<u16>{value, sourceRange};
+  return number<u16, &ByteReader::be16>(name, display);
 }
 
 RangedValue<u16> RecordReader::u16le(std::string_view name, SourceValueDisplay display) {
-  if (!require(2, name)) {
-    return {};
-  }
-  const SourceRange sourceRange = reader_.range(position_, 2);
-  const auto value = reader_.le16(position_);
-  position_ += 2;
-  field(name, sourceRange, makeSourceValue(value), display);
-  return RangedValue<u16>{value, sourceRange};
+  return number<u16, &ByteReader::le16>(name, display);
 }
 
 RangedValue<u32> RecordReader::u24le(std::string_view name, SourceValueDisplay display) {
@@ -92,25 +92,11 @@ RangedValue<u32> RecordReader::u24le(std::string_view name, SourceValueDisplay d
 }
 
 RangedValue<u32> RecordReader::u32be(std::string_view name, SourceValueDisplay display) {
-  if (!require(4, name)) {
-    return {};
-  }
-  const SourceRange sourceRange = reader_.range(position_, 4);
-  const auto value = reader_.be32(position_);
-  position_ += 4;
-  field(name, sourceRange, makeSourceValue(value), display);
-  return RangedValue<u32>{value, sourceRange};
+  return number<u32, &ByteReader::be32>(name, display);
 }
 
 RangedValue<u32> RecordReader::u32le(std::string_view name, SourceValueDisplay display) {
-  if (!require(4, name)) {
-    return {};
-  }
-  const SourceRange sourceRange = reader_.range(position_, 4);
-  const auto value = reader_.le32(position_);
-  position_ += 4;
-  field(name, sourceRange, makeSourceValue(value), display);
-  return RangedValue<u32>{value, sourceRange};
+  return number<u32, &ByteReader::le32>(name, display);
 }
 
 RangedValue<u32> RecordReader::varLen(std::string_view name, SourceValueDisplay display) {
@@ -147,113 +133,43 @@ RangedValue<std::string> RecordReader::rawBytes(std::string_view name, u32 size)
 }
 
 RangedValue<s16> RecordReader::s16be(std::string_view name, SourceValueDisplay display) {
-  if (!require(2, name)) {
-    return {};
-  }
-  const SourceRange sourceRange = reader_.range(position_, 2);
-  const auto value = static_cast<s16>(reader_.be16(position_));
-  position_ += 2;
-  field(name, sourceRange, makeSourceValue(value), display);
-  return RangedValue<s16>{value, sourceRange};
+  return number<s16, &ByteReader::be16>(name, display);
 }
 
 RangedValue<s16> RecordReader::s16le(std::string_view name, SourceValueDisplay display) {
-  if (!require(2, name)) {
-    return {};
-  }
-  const SourceRange sourceRange = reader_.range(position_, 2);
-  const auto value = static_cast<s16>(reader_.le16(position_));
-  position_ += 2;
-  field(name, sourceRange, makeSourceValue(value), display);
-  return RangedValue<s16>{value, sourceRange};
+  return number<s16, &ByteReader::le16>(name, display);
 }
 
 RangedValue<::u8> RecordReader::u8At(u64 relativeOffset, std::string_view name, SourceValueDisplay display) {
-  const auto position = requireAt(relativeOffset, 1, name);
-  if (!position) {
-    return {};
-  }
-  const SourceRange sourceRange = reader_.range(*position, 1);
-  const auto value = reader_.u8At(*position);
-  field(name, sourceRange, makeSourceValue(value), display);
-  return RangedValue<::u8>{value, sourceRange};
+  return numberAt<::u8, &ByteReader::u8At>(relativeOffset, name, display);
 }
 
 RangedValue<::s8> RecordReader::s8At(u64 relativeOffset, std::string_view name, SourceValueDisplay display) {
-  const auto position = requireAt(relativeOffset, 1, name);
-  if (!position) {
-    return {};
-  }
-  const SourceRange sourceRange = reader_.range(*position, 1);
-  const auto value = reader_.s8At(*position);
-  field(name, sourceRange, makeSourceValue(value), display);
-  return RangedValue<::s8>{value, sourceRange};
+  return numberAt<::s8, &ByteReader::s8At>(relativeOffset, name, display);
 }
 
 RangedValue<u16> RecordReader::u16beAt(u64 relativeOffset, std::string_view name, SourceValueDisplay display) {
-  const auto position = requireAt(relativeOffset, 2, name);
-  if (!position) {
-    return {};
-  }
-  const SourceRange sourceRange = reader_.range(*position, 2);
-  const auto value = reader_.be16(*position);
-  field(name, sourceRange, makeSourceValue(value), display);
-  return RangedValue<u16>{value, sourceRange};
+  return numberAt<u16, &ByteReader::be16>(relativeOffset, name, display);
 }
 
 RangedValue<u16> RecordReader::u16leAt(u64 relativeOffset, std::string_view name, SourceValueDisplay display) {
-  const auto position = requireAt(relativeOffset, 2, name);
-  if (!position) {
-    return {};
-  }
-  const SourceRange sourceRange = reader_.range(*position, 2);
-  const auto value = reader_.le16(*position);
-  field(name, sourceRange, makeSourceValue(value), display);
-  return RangedValue<u16>{value, sourceRange};
+  return numberAt<u16, &ByteReader::le16>(relativeOffset, name, display);
 }
 
 RangedValue<s16> RecordReader::s16beAt(u64 relativeOffset, std::string_view name, SourceValueDisplay display) {
-  const auto position = requireAt(relativeOffset, 2, name);
-  if (!position) {
-    return {};
-  }
-  const SourceRange sourceRange = reader_.range(*position, 2);
-  const auto value = static_cast<s16>(reader_.be16(*position));
-  field(name, sourceRange, makeSourceValue(value), display);
-  return RangedValue<s16>{value, sourceRange};
+  return numberAt<s16, &ByteReader::be16>(relativeOffset, name, display);
 }
 
 RangedValue<s16> RecordReader::s16leAt(u64 relativeOffset, std::string_view name, SourceValueDisplay display) {
-  const auto position = requireAt(relativeOffset, 2, name);
-  if (!position) {
-    return {};
-  }
-  const SourceRange sourceRange = reader_.range(*position, 2);
-  const auto value = static_cast<s16>(reader_.le16(*position));
-  field(name, sourceRange, makeSourceValue(value), display);
-  return RangedValue<s16>{value, sourceRange};
+  return numberAt<s16, &ByteReader::le16>(relativeOffset, name, display);
 }
 
 RangedValue<u32> RecordReader::u32beAt(u64 relativeOffset, std::string_view name, SourceValueDisplay display) {
-  const auto position = requireAt(relativeOffset, 4, name);
-  if (!position) {
-    return {};
-  }
-  const SourceRange sourceRange = reader_.range(*position, 4);
-  const auto value = reader_.be32(*position);
-  field(name, sourceRange, makeSourceValue(value), display);
-  return RangedValue<u32>{value, sourceRange};
+  return numberAt<u32, &ByteReader::be32>(relativeOffset, name, display);
 }
 
 RangedValue<u32> RecordReader::u32leAt(u64 relativeOffset, std::string_view name, SourceValueDisplay display) {
-  const auto position = requireAt(relativeOffset, 4, name);
-  if (!position) {
-    return {};
-  }
-  const SourceRange sourceRange = reader_.range(*position, 4);
-  const auto value = reader_.le32(*position);
-  field(name, sourceRange, makeSourceValue(value), display);
-  return RangedValue<u32>{value, sourceRange};
+  return numberAt<u32, &ByteReader::le32>(relativeOffset, name, display);
 }
 
 std::optional<SourceRange> RecordReader::rangeAt(u64 relativeOffset, u64 size, std::string_view name) {
