@@ -66,19 +66,6 @@ void warn(std::vector<Diagnostic>* diagnostics, std::string message, SourceRange
   return static_cast<u32>(group.offset + relative);
 }
 
-[[nodiscard]] std::optional<u32> findInRange(ByteReader reader, SourceRange range, MaskedBytePattern pattern) {
-  if (!pattern.valid() || pattern.size() > range.size) {
-    return std::nullopt;
-  }
-  const u64 end = range.endOffset() - pattern.size();
-  for (u64 offset = range.offset; offset <= end; ++offset) {
-    if (matchesBytePattern(reader, offset, pattern)) {
-      return static_cast<u32>(offset);
-    }
-  }
-  return std::nullopt;
-}
-
 [[nodiscard]] double nmiRate(u8 timer, u8 skipCount) {
   return ((38.0 + timer) * (kK054539ClockRate / 384.0 / 14400.0)) / (skipCount + 1.0);
 }
@@ -105,8 +92,8 @@ void warn(std::vector<Diagnostic>* diagnostics, std::string message, SourceRange
     return false;
   }
 
-  const auto nmiSkipPattern = findInRange(reader, layout.code, kMysticNmiSkip);
-  const auto nmiTimerPattern = findInRange(reader, layout.code, kMysticSetNmiRate);
+  const auto nmiSkipPattern = findBytePattern(reader, kMysticNmiSkip, layout.code.offset, layout.code.endOffset());
+  const auto nmiTimerPattern = findBytePattern(reader, kMysticSetNmiRate, layout.code.offset, layout.code.endOffset());
   if (!nmiSkipPattern || !nmiTimerPattern || !reader.has(*nmiSkipPattern + 1, 1) ||
       !reader.has(*nmiTimerPattern + 1, 1)) {
     warn(diagnostics, "KonamiArcade MysticWarrior interrupt timing code was not found", layout.code);
@@ -138,7 +125,7 @@ void warn(std::vector<Diagnostic>* diagnostics, std::string message, SourceRange
   std::optional<u32> drumTableRelative = parseOffset(codeSegment.attribute("drum_table"));
 
   if (!sequenceRelative) {
-    const auto pattern = findInRange(reader, layout.code, kGxSequenceTable);
+    const auto pattern = findBytePattern(reader, kGxSequenceTable, layout.code.offset, layout.code.endOffset());
     if (pattern && reader.has(*pattern + 2, 4)) {
       const u32 sequenceTableTable = reader.be32(*pattern + 2);
       if (const auto table = absoluteOffset(layout.code, sequenceTableTable, 8)) {
@@ -151,14 +138,14 @@ void warn(std::vector<Diagnostic>* diagnostics, std::string message, SourceRange
   }
 
   if (!sampleTablesRelative) {
-    const auto pattern = findInRange(reader, layout.code, kGxSampleTables);
+    const auto pattern = findBytePattern(reader, kGxSampleTables, layout.code.offset, layout.code.endOffset());
     if (pattern && reader.has(*pattern + 2, 4)) {
       sampleTablesRelative = reader.be32(*pattern + 2);
     }
   }
 
   if (!drumSamplesRelative || !drumTableRelative) {
-    const auto pattern = findInRange(reader, layout.code, kGxDrumTables);
+    const auto pattern = findBytePattern(reader, kGxDrumTables, layout.code.offset, layout.code.endOffset());
     if (pattern && reader.has(*pattern + 10, 4) && reader.has(*pattern + 18, 4)) {
       drumSamplesRelative = reader.be32(*pattern + 10);
       drumTableRelative = reader.be32(*pattern + 18);
@@ -189,7 +176,8 @@ void warn(std::vector<Diagnostic>* diagnostics, std::string message, SourceRange
   }
 
   u8 timer = 109;
-  if (const auto pattern = findInRange(reader, layout.code, kGxSetNmiRate); pattern && reader.has(*pattern + 3, 1)) {
+  if (const auto pattern = findBytePattern(reader, kGxSetNmiRate, layout.code.offset, layout.code.endOffset());
+      pattern && reader.has(*pattern + 3, 1)) {
     timer = reader.u8At(*pattern + 3);
   }
   layout.nmiRateHertz = nmiRate(timer, 1);

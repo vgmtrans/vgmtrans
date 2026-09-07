@@ -31,6 +31,13 @@ void bytePatternSearchHonorsMasksAndStartOffsets() {
          "masked search should handle leading wildcards");
   expect(findBytePattern(reader, makeMaskedBytePattern("\x00\x00", "??"), 6) == 6,
          "an all-wildcard pattern should match at the starting offset");
+  expect(findBytePattern(reader, masked, 0, 4) == 1 && !findBytePattern(reader, masked, 0, 3) &&
+             !findBytePattern(reader, masked, 2, 7) && findBytePattern(reader, masked, 2, 8) == 5,
+         "bounded searches must include patterns ending at the limit and reject patterns crossing it");
+  expect(!findBytePattern(reader, masked, 5, 4) && !findBytePattern(reader, masked, 0, 0) &&
+             findBytePattern(reader, masked, 2, std::numeric_limits<u64>::max()) == 5 &&
+             !findBytePattern(reader, makeMaskedBytePattern("\x00\x00", "??"), 6, 7),
+         "search bounds must reject empty and reversed ranges and constrain wildcard-only patterns");
   expect(findBytes(reader, std::array<u8, 2>{0xaa, 0x40}) == 5,
          "exact byte search should share the pattern scanner's offset result");
 }
