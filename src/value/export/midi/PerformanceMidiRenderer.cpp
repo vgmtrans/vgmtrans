@@ -345,7 +345,6 @@ struct SimulatedLfoState {
   u64 noiseIndex = 0;
   double noiseValue = 0.0;
   PanLaw panLaw = PanLaw::Unspecified;
-  bool configured = false;
   bool started = false;
   bool producedSample = false;
 };
@@ -394,7 +393,6 @@ struct RenderTrackState {
   // generated selection can explicitly return to bank zero.
   u16 midiBank = 0;
   u8 midiProgram = 0;
-  u16 pitchBendRangeCents = 200;
   std::optional<u16> lastPitchBendRangeCents;
   PerformancePitchBendContext pitchBendContext;
   // Slides may replace the sequence range, but they must not reduce the range
@@ -403,7 +401,6 @@ struct RenderTrackState {
   double tuningBendSemitones = 0.0;
   PitchBendLayers pitchBendLayers;
   std::map<u32, SimulatedPitchLfoState> pitchLfos;
-  std::optional<s16> lastPitchBendValue;
   std::optional<size_t> lastPitchBendIndex;
   double sourceLevelGain = 1.0;
   std::optional<ValueQuantization> sourceLevelQuantization;
@@ -717,57 +714,48 @@ bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePer
   const bool simulatesPitchLfo =
       modulationConversion == ModulationConversionPolicy::SequenceEventSimulation ||
       std::ranges::any_of(state.pitchLfos, [](const auto& entry) {
-        return entry.first != kPrimaryPitchBendLayer.value && entry.second.oscillator.configured;
+        return entry.first != kPrimaryPitchBendLayer.value && entry.second.oscillator.started;
       });
   return simulatesPitchLfo
              ? std::max(range, requiredPitchBendRangeCents(state))
              : range;
 }
 
-void ensurePitchBendRange(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, u16 cents) {
+[[nodiscard]] u16 ensurePitchBendRange(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, u16 cents) {
   const u16 range = wholeSemitonePitchBendRangeCents(cents);
-  if (state.lastPitchBendRangeCents && *state.lastPitchBendRangeCents == range) {
-    state.pitchBendRangeCents = range;
-    return;
+  if (state.lastPitchBendRangeCents != range) {
+    addPitchBendRange(track, tick, channel, range);
+    state.lastPitchBendRangeCents = range;
   }
-  addPitchBendRange(track, tick, channel, range);
-  state.pitchBendRangeCents = range;
-  state.lastPitchBendRangeCents = range;
+  return range;
 }
 
 void addPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, s16 value, bool force = false) {
-  if (!force && state.lastPitchBendValue && *state.lastPitchBendValue == value) {
-    return;
-  }
-  if (state.lastPitchBendIndex && *state.lastPitchBendIndex < track.events.size()) {
+  if (state.lastPitchBendIndex) {
     MidiEvent& previous = track.events[*state.lastPitchBendIndex];
-    auto* message = std::get_if<MidiChannelMessage>(&previous.payload);
-    if (previous.tick == tick && message != nullptr && message->kind == MidiChannelMessageKind::PitchBend &&
-        message->channel == channel) {
-      message->value = value;
-      state.lastPitchBendValue = value;
+    auto& message = std::get<MidiChannelMessage>(previous.payload);
+    if (!force && message.value == value) {
+      return;
+    }
+    if (previous.tick == tick) {
+      message.value = value;
       return;
     }
   }
   state.lastPitchBendIndex = track.events.size();
   track.events.push_back(midi::pitchBend(tick, channel, value));
-  state.lastPitchBendValue = value;
 }
 
-[[nodiscard]] double currentPitchBendSemitones(const RenderTrackState& state,
-                                               ModulationConversionPolicy modulationConversion) {
-  static_cast<void>(modulationConversion);
+[[nodiscard]] double currentPitchBendSemitones(const RenderTrackState& state) {
   return state.tuningBendSemitones + layeredPitchBendSemitones(state) + simulatedPitchLfoSemitones(state);
 }
 
-void refreshPitchBendRange(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, u16 cents,
-                           ModulationConversionPolicy modulationConversion) {
-  ensurePitchBendRange(track, state, tick, channel, cents);
-  if (state.lastPitchBendValue) {
+void refreshPitchBendRange(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, u16 cents) {
+  const u16 range = ensurePitchBendRange(track, state, tick, channel, cents);
+  if (state.lastPitchBendIndex) {
     // A source or instrument range can reinterpret a normalized layer even
     // when whole-semitone MIDI sensitivity remains unchanged.
-    addPitchBend(track, state, tick, channel,
-                 midiPitchBend(currentPitchBendSemitones(state, modulationConversion), state.pitchBendRangeCents));
+    addPitchBend(track, state, tick, channel, midiPitchBend(currentPitchBendSemitones(state), range));
   }
 }
 
@@ -776,11 +764,11 @@ void applyInstrumentPitchBendRange(MidiTrack& track, RenderTrackState& state, u6
   const u16 previousRange = effectivePitchBendRangeCents(state, modulationConversion);
   state.pitchBendContext.setInstrumentRangeCents(cents);
   const u16 range = effectivePitchBendRangeCents(state, modulationConversion);
-  if (!state.lastPitchBendValue &&
+  if (!state.lastPitchBendIndex &&
       wholeSemitonePitchBendRangeCents(range) == wholeSemitonePitchBendRangeCents(previousRange)) {
     return;
   }
-  refreshPitchBendRange(track, state, tick, channel, range, modulationConversion);
+  refreshPitchBendRange(track, state, tick, channel, range);
 }
 
 void applyInstrumentSelection(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
@@ -806,14 +794,14 @@ void applyVoicePitchBendRangeChange(MidiTrack& track, RenderTrackState& state, c
                                     u8 channel, ModulationConversionPolicy modulationConversion) {
   state.pitchBendContext.setSourceRangeCents(change.sourceCents);
   state.voicePitchBendRangeCents = change.voiceCents;
-  refreshPitchBendRange(track, state, change.tick, channel, effectivePitchBendRangeCents(state, modulationConversion),
-                        modulationConversion);
+  refreshPitchBendRange(track, state, change.tick, channel, effectivePitchBendRangeCents(state, modulationConversion));
 }
 
 void addCurrentPitchBend(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
                          ModulationConversionPolicy modulationConversion, bool force = true) {
-  ensurePitchBendRange(track, state, tick, channel, effectivePitchBendRangeCents(state, modulationConversion));
-  const s16 value = midiPitchBend(currentPitchBendSemitones(state, modulationConversion), state.pitchBendRangeCents);
+  const u16 range =
+      ensurePitchBendRange(track, state, tick, channel, effectivePitchBendRangeCents(state, modulationConversion));
+  const s16 value = midiPitchBend(currentPitchBendSemitones(state), range);
   addPitchBend(track, state, tick, channel, value, force);
 }
 
@@ -970,7 +958,6 @@ void configureLfo(SimulatedLfoState& lfo, u64 tick, const ModulationPerformanceE
   lfo.phaseRunsAtZeroDepth = context.phaseRunsAtZeroDepth;
   lfo.delayRunsWhileInactive = context.delayRunsWhileInactive;
   lfo.restartsOnNote = context.restartsOnNote;
-  lfo.configured = true;
   applyLfoRestart(lfo, tick, lfo.started ? context.restartMode : LfoRestartMode::PhaseAndDelay, fallback);
 }
 
@@ -994,7 +981,6 @@ void setLfoDelay(SimulatedLfoState& lfo, u64 tick, u32 delayTicks, std::optional
       .tempoRelative = tempoRelative,
   };
   applyLfoDelayUpdate(lfo, std::move(delay), updateMode);
-  lfo.configured = true;
   if (!lfo.started) {
     applyLfoRestart(lfo, tick, LfoRestartMode::PhaseAndDelay, fallback);
   }
@@ -1157,7 +1143,7 @@ void restartSimulatedVibratoForNote(MidiTrack& track, RenderTrackState& state, u
   for (auto& entry : state.pitchLfos) {
     auto& pitch = entry.second;
     auto& lfo = pitch.oscillator;
-    if (!lfo.configured || !lfo.restartsOnNote) {
+    if (!lfo.started || !lfo.restartsOnNote) {
       continue;
     }
     restartNoteLfo(lfo, tick);
@@ -1180,7 +1166,7 @@ bool shouldRestartSimulatedVibratoForNote(const NotePerformanceEvent& note, cons
     return false;
   }
   return std::ranges::any_of(state.pitchLfos, [](const auto& entry) {
-    return entry.second.oscillator.configured && entry.second.oscillator.restartsOnNote;
+    return entry.second.oscillator.started && entry.second.oscillator.restartsOnNote;
   });
 }
 
@@ -1280,7 +1266,7 @@ void setSimulatedTremoloDepth(MidiTrack& track, RenderTrackState& state, u64 tic
 
 void restartSimulatedTremoloForNote(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
                                     const MidiExportOptions& options, ModulationConversionPolicy modulationConversion) {
-  if (!state.tremolo.configured) {
+  if (!state.tremolo.started) {
     return;
   }
 
@@ -1302,8 +1288,7 @@ void restartSimulatedTremoloForNote(MidiTrack& track, RenderTrackState& state, u
 }
 
 bool shouldRestartSimulatedTremoloForNote(const NotePerformanceEvent& note, const RenderTrackState& state) {
-  return note.restartsTremoloLfoPhase.value_or(!note.extendsPrevious && note.restartsLfoPhase) &&
-         state.tremolo.configured;
+  return note.restartsTremoloLfoPhase.value_or(!note.extendsPrevious && note.restartsLfoPhase) && state.tremolo.started;
 }
 
 void addCombinedPan(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, const MidiExportOptions& options,
@@ -1350,7 +1335,7 @@ void setSimulatedPanDepth(MidiTrack& track, RenderTrackState& state, u64 tick, u
 
 void restartSimulatedPanForNote(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
                                 const MidiExportOptions& options) {
-  if (!state.panLfo.configured) {
+  if (!state.panLfo.started) {
     return;
   }
   restartNoteLfo(state.panLfo, tick);
@@ -1361,7 +1346,7 @@ void restartSimulatedPanForNote(MidiTrack& track, RenderTrackState& state, u64 t
 }
 
 bool shouldRestartSimulatedPanForNote(const NotePerformanceEvent& note, const RenderTrackState& state) {
-  return !note.extendsPrevious && note.restartsLfoPhase && state.panLfo.configured;
+  return !note.extendsPrevious && note.restartsLfoPhase && state.panLfo.started;
 }
 
 void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEvent& event, u8 channel,
@@ -1508,7 +1493,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
         } else if constexpr (std::is_same_v<TypedEvent, PitchBendRangePerformanceEvent>) {
           state.pitchBendContext.setSourceRangeCents(typedEvent.cents);
           refreshPitchBendRange(track, state, typedEvent.header.tick, channel,
-                                effectivePitchBendRangeCents(state, modulationConversion), modulationConversion);
+                                effectivePitchBendRangeCents(state, modulationConversion));
         } else if constexpr (std::is_same_v<TypedEvent, VibratoDelayPerformanceEvent>) {
           setLfoDelay(pitchLfo(state, kPrimaryPitchBendLayer).oscillator, typedEvent.header.tick, typedEvent.delayTicks,
                       typedEvent.milliseconds, typedEvent.tempoRelative, typedEvent.updateMode);
@@ -1556,12 +1541,12 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                   typedEvent.pitchDepthSemitones.value_or(std::clamp(typedEvent.amount, 0.0, 1.0) * 2.0),
                   typedEvent.context.zeroDepthBehavior, typedEvent.pitchLayer);
               refreshPitchBendRange(track, state, typedEvent.header.tick, channel,
-                                    effectivePitchBendRangeCents(state, modulationConversion), modulationConversion);
+                                    effectivePitchBendRangeCents(state, modulationConversion));
               sampleRestartedVibrato(track, state, typedEvent, channel);
             } else {
               refreshPitchBendRange(track, state, typedEvent.header.tick, channel,
-                                    effectivePitchBendRangeCents(state, modulationConversion), modulationConversion);
-              if (state.lastPitchBendValue) {
+                                    effectivePitchBendRangeCents(state, modulationConversion));
+              if (state.lastPitchBendIndex) {
                 addCurrentPitchBend(track, state, typedEvent.header.tick, channel, modulationConversion, false);
               }
             }
