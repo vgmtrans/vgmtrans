@@ -59,7 +59,6 @@ constexpr double kSoundFontVolumeEnvelopeRangeDb = 100.0;
 
 constexpr u32 kSf2SamplePaddingFrames = 46;
 constexpr u8 kDefaultRootKey = 60;
-constexpr u32 kBaseInstrumentRegionGenerators = 9;
 constexpr u32 kEnvelopeInstrumentRegionGenerators = 5;
 constexpr std::array<u16, kEnvelopeInstrumentRegionGenerators> kSfEnvelopeGenerators{
     kSfGenAttackVolEnv, kSfGenHoldVolEnv, kSfGenDecayVolEnv, kSfGenSustainVolEnv, kSfGenReleaseVolEnv,
@@ -365,54 +364,6 @@ struct SfLayout {
   return layout;
 }
 
-[[nodiscard]] u32 instrumentRegionGeneratorCount(
-    const ResolvedSynthRegion& region,
-    ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators) {
-  return kBaseInstrumentRegionGenerators + kEnvelopeInstrumentRegionGenerators +
-         static_cast<u32>(
-             std::ranges::count_if(region.generators, [modulationConversion](const SynthGenerator& generator) {
-               return shouldExportSynthGenerator(generator, modulationConversion) &&
-                      sf2GeneratorForDestination(generator.destination).has_value();
-             }));
-}
-
-[[nodiscard]] u32 instrumentRegionModulatorCount(
-    const ResolvedSynthRegion& region,
-    ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators) {
-  return static_cast<u32>(
-      std::ranges::count_if(region.modulators, [modulationConversion](const SynthModulator& modulator) {
-        return sf2ModulatorFor(modulator, nullptr, ModulationScalingPolicy::FullFormatRange, modulationConversion)
-            .has_value();
-      }));
-}
-
-[[nodiscard]] u32 instrumentGlobalGeneratorCount(
-    const ResolvedSynthInstrument& instrument,
-    ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators) {
-  return static_cast<u32>(
-      std::ranges::count_if(instrument.generators, [modulationConversion](const SynthGenerator& generator) {
-        return shouldExportSynthGenerator(generator, modulationConversion) &&
-               sf2GeneratorForDestination(generator.destination).has_value();
-      }));
-}
-
-[[nodiscard]] u32 instrumentGlobalModulatorCount(
-    const ResolvedSynthInstrument& instrument,
-    ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators) {
-  return static_cast<u32>(
-      std::ranges::count_if(instrument.modulators, [modulationConversion](const SynthModulator& modulator) {
-        return sf2ModulatorFor(modulator, nullptr, ModulationScalingPolicy::FullFormatRange, modulationConversion)
-            .has_value();
-      }));
-}
-
-[[nodiscard]] bool hasInstrumentGlobalZone(
-    const ResolvedSynthInstrument& instrument,
-    ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators) {
-  return instrumentGlobalGeneratorCount(instrument, modulationConversion) != 0 ||
-         instrumentGlobalModulatorCount(instrument, modulationConversion) != 0;
-}
-
 [[nodiscard]] std::vector<Chunk> infoChunks(const std::string& name) {
   std::vector<u8> ifil;
   writeLe16(ifil, 2);
@@ -501,191 +452,121 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
   writeLe16(bytes, static_cast<u16>(value));
 }
 
-[[nodiscard]] Chunk phdrChunk(std::span<const SfPreset> presets) {
-  // MIDI bank/program addresses remain one-to-one with presets even when several
-  // envelope variants share the same sample-mapped SF2 instrument.
-  std::vector<u8> payload;
-  for (u32 i = 0; i < presets.size(); ++i) {
-    const auto& resolved = *presets[i].source;
-    const auto& instrument = *resolved.instrument;
-    writeFixedString(payload, sf2Name(instrument.name, "Preset"), 20);
-    writeLe16(payload, clampU16(resolved.address.program));
-    writeLe16(payload, sf2Bank(resolved.address.bank));
-    writeIndex(payload, i);
-    writeLe32(payload, 0);
-    writeLe32(payload, 0);
-    writeLe32(payload, 0);
-  }
-
-  writeFixedString(payload, "EOP", 20);
-  writeLe16(payload, 0);
-  writeLe16(payload, 0);
-  writeIndex(payload, presets.size());
-  writeLe32(payload, 0);
-  writeLe32(payload, 0);
-  writeLe32(payload, 0);
-  return makeChunk("phdr", std::move(payload));
-}
-
-[[nodiscard]] Chunk pbagChunk(std::span<const SfPreset> presets) {
-  std::vector<u8> payload;
-  u32 generatorIndex = 0;
+[[nodiscard]] std::array<Chunk, 4> presetChunks(std::span<const SfPreset> presets) {
+  // Presets retain their individual bank/program addresses even when envelope
+  // variants share an SF2 instrument. Every preset has one local zone.
+  std::vector<u8> headers;
+  std::vector<u8> bags;
+  std::vector<u8> generators;
   for (const auto& preset : presets) {
-    writeIndex(payload, generatorIndex);
-    writeLe16(payload, 0);
-    generatorIndex += 2 + std::ranges::count_if(preset.envelopeOffsets, [](s16 value) { return value != 0; });
-  }
-  writeIndex(payload, generatorIndex);
-  writeLe16(payload, 0);
-  return makeChunk("pbag", std::move(payload));
-}
+    const auto& resolved = *preset.source;
+    writeFixedString(headers, sf2Name(resolved.instrument->name, "Preset"), 20);
+    writeLe16(headers, clampU16(resolved.address.program));
+    writeLe16(headers, sf2Bank(resolved.address.bank));
+    writeIndex(headers, bags.size() / 4);
+    writeLe32(headers, 0);
+    writeLe32(headers, 0);
+    writeLe32(headers, 0);
 
-[[nodiscard]] Chunk pgenChunk(std::span<const SfPreset> presets) {
-  std::vector<u8> payload;
-  for (const auto& preset : presets) {
-    writeAmountGen(payload, kSfGenReverbEffectsSend, sf2ReverbSend(preset.source->instrument->reverb));
-    writeEnvelope(payload, preset.envelopeOffsets, true);
-    writeLe16(payload, kSfGenInstrument);
-    writeIndex(payload, preset.instrumentIndex);
-  }
-  writeWordGen(payload, 0, 0);
-  return makeChunk("pgen", std::move(payload));
-}
-
-[[nodiscard]] Chunk terminalModChunk(std::string id) {
-  std::vector<u8> payload(10);
-  return makeChunk(std::move(id), std::move(payload));
-}
-
-[[nodiscard]] Chunk instChunk(std::span<const ResolvedSynthInstrument> instruments,
-                              ModulationConversionPolicy modulationConversion) {
-  // SF2 instruments point into bag tables. Instruments with global generators/modulators
-  // get one global bag before their sample regions.
-  std::vector<u8> payload;
-  u32 bagIndex = 0;
-  for (const auto& instrument : instruments) {
-    writeFixedString(payload, sf2Name(instrument.instrument->name, "Instrument"), 20);
-    writeIndex(payload, bagIndex);
-    bagIndex += static_cast<u32>(instrument.regions.size()) +
-                (hasInstrumentGlobalZone(instrument, modulationConversion) ? 1 : 0);
+    writeIndex(bags, generators.size() / 4);
+    writeLe16(bags, 0);
+    writeAmountGen(generators, kSfGenReverbEffectsSend, sf2ReverbSend(resolved.instrument->reverb));
+    writeEnvelope(generators, preset.envelopeOffsets, true);
+    writeLe16(generators, kSfGenInstrument);
+    writeIndex(generators, preset.instrumentIndex);
   }
 
-  writeFixedString(payload, "EOI", 20);
-  writeIndex(payload, bagIndex);
-  return makeChunk("inst", std::move(payload));
+  writeFixedString(headers, "EOP", 20);
+  writeLe16(headers, 0);
+  writeLe16(headers, 0);
+  writeIndex(headers, bags.size() / 4);
+  writeLe32(headers, 0);
+  writeLe32(headers, 0);
+  writeLe32(headers, 0);
+  writeIndex(bags, generators.size() / 4);
+  writeLe16(bags, 0);
+  writeWordGen(generators, 0, 0);
+  return {makeChunk("phdr", std::move(headers)), makeChunk("pbag", std::move(bags)),
+          makeChunk("pmod", std::vector<u8>(10)), makeChunk("pgen", std::move(generators))};
 }
 
-[[nodiscard]] Chunk ibagChunk(std::span<const ResolvedSynthInstrument> instruments,
-                              ModulationConversionPolicy modulationConversion) {
-  // Bags are index pairs into generator/modulator arrays. Counts must be predicted before
-  // writing igen/imod so the table offsets line up exactly.
-  std::vector<u8> payload;
-  u32 generatorIndex = 0;
-  u32 modulatorIndex = 0;
-  for (const auto& instrument : instruments) {
-    if (hasInstrumentGlobalZone(instrument, modulationConversion)) {
-      writeIndex(payload, generatorIndex);
-      writeIndex(payload, modulatorIndex);
-      generatorIndex += instrumentGlobalGeneratorCount(instrument, modulationConversion);
-      modulatorIndex += instrumentGlobalModulatorCount(instrument, modulationConversion);
-    }
+[[nodiscard]] std::array<Chunk, 4> instrumentChunks(std::span<const ResolvedSynthInstrument> instruments,
+                                                    std::span<const DecodedSfSample> samples,
+                                                    const MidiModulationUsage* midiModulationUsage,
+                                                    ModulationScalingPolicy modulationScaling,
+                                                    ModulationConversionPolicy modulationConversion) {
+  std::vector<u8> headers;
+  std::vector<u8> bags;
+  std::vector<u8> modulators;
+  std::vector<u8> generators;
 
-    for (const auto& region : instrument.regions) {
-      writeIndex(payload, generatorIndex);
-      writeIndex(payload, modulatorIndex);
-      generatorIndex += instrumentRegionGeneratorCount(region, modulationConversion);
-      modulatorIndex += instrumentRegionModulatorCount(region, modulationConversion);
-    }
-  }
-
-  writeIndex(payload, generatorIndex);
-  writeIndex(payload, modulatorIndex);
-  return makeChunk("ibag", std::move(payload));
-}
-
-[[nodiscard]] Chunk imodChunk(std::span<const ResolvedSynthInstrument> instruments,
-                              const MidiModulationUsage* midiModulationUsage, ModulationScalingPolicy modulationScaling,
-                              ModulationConversionPolicy modulationConversion) {
-  std::vector<u8> payload;
-  for (const auto& instrument : instruments) {
-    for (const auto& modulator : instrument.modulators) {
-      const auto record = sf2ModulatorFor(modulator, midiModulationUsage, modulationScaling, modulationConversion);
-      if (!record) {
-        continue;
-      }
-
-      writeWordGen(payload, record->source, record->destination);
-      writeLeS16(payload, record->amount);
-      writeLe16(payload, 0);
-      writeLe16(payload, kSfTransformLinear);
-    }
-    for (const auto& region : instrument.regions) {
-      for (const auto& modulator : region.modulators) {
-        const auto record = sf2ModulatorFor(modulator, midiModulationUsage, modulationScaling, modulationConversion);
-        if (!record) {
-          continue;
-        }
-
-        writeWordGen(payload, record->source, record->destination);
-        writeLeS16(payload, record->amount);
-        writeLe16(payload, 0);
-        writeLe16(payload, kSfTransformLinear);
-      }
-    }
-  }
-
-  payload.insert(payload.end(), 10, 0);
-  return makeChunk("imod", std::move(payload));
-}
-
-[[nodiscard]] Chunk igenChunk(std::span<const ResolvedSynthInstrument> instruments,
-                              std::span<const DecodedSfSample> samplesByIndex,
-                              ModulationConversionPolicy modulationConversion) {
-  // Region generators are written in SF2's required order: ranges and placement first,
-  // then envelope/tuning/sample linkage. Unsupported SynthGenerator destinations are skipped.
-  std::vector<u8> payload;
-  for (const auto& instrument : instruments) {
-    for (const auto& generator : instrument.generators) {
+  // Each bag points at the records already written. Adding a generator or
+  // modulator needs no separate count or prediction pass.
+  const auto writeBag = [&](size_t generatorOffset, size_t modulatorOffset) {
+    writeIndex(bags, generatorOffset / 4);
+    writeIndex(bags, modulatorOffset / 10);
+  };
+  const auto writeModulation = [&](std::span<const SynthGenerator> sourceGenerators,
+                                   std::span<const SynthModulator> sourceModulators) {
+    for (const auto& generator : sourceGenerators) {
       if (!shouldExportSynthGenerator(generator, modulationConversion)) {
         continue;
       }
-      const auto sf2Generator = sf2GeneratorForDestination(generator.destination);
-      if (!sf2Generator) {
-        continue;
+      if (const auto destination = sf2GeneratorForDestination(generator.destination)) {
+        writeAmountGen(generators, *destination, sf2GeneratorAmount(generator));
       }
-
-      writeAmountGen(payload, *sf2Generator, sf2GeneratorAmount(generator));
     }
-    for (const auto& sfRegion : instrument.regions) {
-      const auto& region = *sfRegion.region;
-      const auto& sample = samplesByIndex[sfRegion.sampleIndex];
-      const auto pitch = sf2RegionPitch(region);
-
-      writeRangeGen(payload, kSfGenKeyRange, region.keyRange.low, region.keyRange.high);
-      writeRangeGen(payload, kSfGenVelRange, region.velocityRange.low, region.velocityRange.high);
-      for (const auto& generator : sfRegion.generators) {
-        if (!shouldExportSynthGenerator(generator, modulationConversion)) {
-          continue;
-        }
-        const auto sf2Generator = sf2GeneratorForDestination(generator.destination);
-        if (sf2Generator) {
-          writeAmountGen(payload, *sf2Generator, sf2GeneratorAmount(generator));
-        }
+    for (const auto& modulator : sourceModulators) {
+      if (const auto record =
+              sf2ModulatorFor(modulator, midiModulationUsage, modulationScaling, modulationConversion)) {
+        writeWordGen(modulators, record->source, record->destination);
+        writeLeS16(modulators, record->amount);
+        writeLe16(modulators, 0);
+        writeLe16(modulators, kSfTransformLinear);
       }
-      writeAmountGen(payload, kSfGenInitialAttenuation,
+    }
+  };
+
+  for (const auto& instrument : instruments) {
+    writeFixedString(headers, sf2Name(instrument.instrument->name, "Instrument"), 20);
+    writeIndex(headers, bags.size() / 4);
+
+    const size_t globalGeneratorOffset = generators.size();
+    const size_t globalModulatorOffset = modulators.size();
+    writeModulation(instrument.generators, instrument.modulators);
+    if (generators.size() != globalGeneratorOffset || modulators.size() != globalModulatorOffset) {
+      writeBag(globalGeneratorOffset, globalModulatorOffset);
+    }
+
+    for (const auto& resolved : instrument.regions) {
+      const auto& region = *resolved.region;
+      const auto& sample = samples[resolved.sampleIndex];
+      const auto pitch = sf2RegionPitch(region);
+      writeBag(generators.size(), modulators.size());
+
+      // SF2 requires ranges before other generators and sample linkage last.
+      writeRangeGen(generators, kSfGenKeyRange, region.keyRange.low, region.keyRange.high);
+      writeRangeGen(generators, kSfGenVelRange, region.velocityRange.low, region.velocityRange.high);
+      writeModulation(resolved.generators, resolved.modulators);
+      writeAmountGen(generators, kSfGenInitialAttenuation,
                      static_cast<s16>(sf2Attenuation(region, Sample{.attenuationDb = sample.attenuationDb})));
-      writeAmountGen(payload, kSfGenPan, sf2Pan(region.pan));
-      writeAmountGen(payload, kSfGenCoarseTune, pitch.coarseTune);
-      writeAmountGen(payload, kSfGenFineTune, pitch.fineTune);
-      writeEnvelope(payload, sf2Envelope(region));
-      writeWordGen(payload, kSfGenOverridingRootKey, pitch.rootKey);
-      writeWordGen(payload, kSfGenSampleModes, effectiveSfLoop(region, sample).enabled ? 1 : 0);
-      writeWordGen(payload, kSfGenSampleId, sfRegion.sampleIndex);
+      writeAmountGen(generators, kSfGenPan, sf2Pan(region.pan));
+      writeAmountGen(generators, kSfGenCoarseTune, pitch.coarseTune);
+      writeAmountGen(generators, kSfGenFineTune, pitch.fineTune);
+      writeEnvelope(generators, sf2Envelope(region));
+      writeWordGen(generators, kSfGenOverridingRootKey, pitch.rootKey);
+      writeWordGen(generators, kSfGenSampleModes, effectiveSfLoop(region, sample).enabled ? 1 : 0);
+      writeWordGen(generators, kSfGenSampleId, resolved.sampleIndex);
     }
   }
 
-  writeWordGen(payload, 0, 0);
-  return makeChunk("igen", std::move(payload));
+  writeFixedString(headers, "EOI", 20);
+  writeIndex(headers, bags.size() / 4);
+  writeBag(generators.size(), modulators.size());
+  modulators.insert(modulators.end(), 10, 0);
+  writeWordGen(generators, 0, 0);
+  return {makeChunk("inst", std::move(headers)), makeChunk("ibag", std::move(bags)),
+          makeChunk("imod", std::move(modulators)), makeChunk("igen", std::move(generators))};
 }
 
 [[nodiscard]] std::vector<SfSampleHeaderInfo> sampleHeaderInfo(std::span<const DecodedSfSample> samples,
@@ -749,16 +630,13 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
                                             const MidiModulationUsage* midiModulationUsage,
                                             ModulationScalingPolicy modulationScaling,
                                             ModulationConversionPolicy modulationConversion) {
+  auto [phdr, pbag, pmod, pgen] = presetChunks(layout.presets);
+  auto [inst, ibag, imod, igen] =
+      instrumentChunks(layout.instruments, samples, midiModulationUsage, modulationScaling, modulationConversion);
   return {
-      phdrChunk(layout.presets),
-      pbagChunk(layout.presets),
-      terminalModChunk("pmod"),
-      pgenChunk(layout.presets),
-      instChunk(layout.instruments, modulationConversion),
-      ibagChunk(layout.instruments, modulationConversion),
-      imodChunk(layout.instruments, midiModulationUsage, modulationScaling, modulationConversion),
-      igenChunk(layout.instruments, samples, modulationConversion),
-      shdrChunk(samples, layout.instruments),
+      std::move(phdr), std::move(pbag), std::move(pmod),
+      std::move(pgen), std::move(inst), std::move(ibag),
+      std::move(imod), std::move(igen), shdrChunk(samples, layout.instruments),
   };
 }
 
