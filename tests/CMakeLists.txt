@@ -1,3 +1,14 @@
+if(ENABLE_SHELL)
+  add_executable(vgmtrans-shell-tests shell/ShellTests.cpp)
+  target_link_libraries(vgmtrans-shell-tests PRIVATE vgmtransshell)
+  target_compile_features(vgmtrans-shell-tests PRIVATE cxx_std_20)
+  add_test(NAME vgmtrans-shell-tests COMMAND vgmtrans-shell-tests)
+  add_test(NAME vgmtrans-shell-cli-tests
+    COMMAND ${CMAKE_COMMAND} -DSHELL_EXECUTABLE=$<TARGET_FILE:vgmtrans-shell>
+            -DTEST_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/shell-cli
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/shell/ShellCliTests.cmake)
+endif()
+
 add_executable(vgmtrans-value-core-tests)
 target_sources(vgmtrans-value-core-tests
   PRIVATE

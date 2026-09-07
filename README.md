@@ -25,6 +25,10 @@ Prebuilt binaries for Windows, macOS, and Linux:
 * [Official releases](https://github.com/vgmtrans/vgmtrans/releases)
 * [Latest preview build](https://github.com/vgmtrans/vgmtrans-preview/releases/tag/unstable)
 
+## Command-line shell
+
+For interactive inspection and scripted conversion, see the [vgmtrans-shell guide](src/ui/shell/README.md).
+
 ## Supported Formats
 
 The following formats are supported with varying degrees of accuracy:
