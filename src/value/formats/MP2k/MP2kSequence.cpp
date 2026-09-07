@@ -731,7 +731,7 @@ struct DecodeContext {
     case 0xb3: {
       auto event = cursor.command("Pattern", SequenceSemantic::Call);
       const auto destination = pointer(event, context.reader, "destination", SemanticOperandRole::CallTarget);
-      return destination ? event.invoke<&Playback::pattern>(*destination).mayBranchTo(*destination) : event.stop();
+      return destination ? event.invoke<&Playback::pattern>(*destination).discoverTarget(*destination) : event.stop();
     }
     case 0xb4: {
       auto event = cursor.command("Pattern End", SequenceSemantic::Return);
@@ -739,13 +739,13 @@ struct DecodeContext {
       // The driver ignores PEND outside a pattern, so discovery must retain
       // both the physical continuation and a caller's return address.
       event.discoverTarget(event.nextAddress());
-      return event.discoverReturn();
+      return event.return_();
     }
     case 0xb5: {
       auto event = cursor.command("Repeat", SequenceSemantic::Repeat);
       const u8 count = event.u8("count");
       const auto destination = pointer(event, context.reader, "destination", SemanticOperandRole::JumpTarget);
-      return destination ? event.invoke<&Playback::repeat>(count, *destination).mayBranchTo(*destination)
+      return destination ? event.invoke<&Playback::repeat>(count, *destination).discoverTarget(*destination)
                          : event.stop();
     }
     case 0xb9: {
@@ -760,7 +760,7 @@ struct DecodeContext {
           return event.stop();
         }
         destination = *parsed;
-        event.mayBranchTo(destination);
+        event.discoverTarget(destination);
       }
       return event.invoke<&Playback::memAccess>(operation, address, data, destination);
     }

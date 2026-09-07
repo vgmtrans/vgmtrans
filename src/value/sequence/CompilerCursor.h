@@ -535,16 +535,9 @@ public:
       return *this;
     }
 
+    // Set the default return path for decoding and execution. A runtime body
+    // may override it, for example when the same opcode ends playback at top level.
     Event& return_() {
-      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      setDefaultTransition(CommandTransition::return_());
-      return *this;
-    }
-
-    // Some drivers use one opcode for both top-level end and subroutine
-    // return. Discovery treats it as a block return while a typed runtime
-    // body chooses the actual result from call history.
-    Event& discoverReturn() {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       setDefaultTransition(CommandTransition::return_());
       return *this;
@@ -564,15 +557,8 @@ public:
       return *this;
     }
 
-    // Record a conditional branch destination while a format-specific body
-    // decides at runtime whether the branch is taken.
-    Event& mayBranchTo(Address destination) {
-      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      discoveryTargets_.push_back(destination);
-      return *this;
-    }
-
-    // Records a decoder-only alternative that is not the command's default path.
+    // Decode an additional reachable block without changing the default path.
+    // Conditional branches supply their runtime decision through invokeFlow().
     Event& discoverTarget(Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
       discoveryTargets_.push_back(destination);

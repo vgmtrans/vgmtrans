@@ -572,7 +572,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const Address destination{*source.loopDestination};
       event.derived("repeat_count", source.loopCount);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
-      return event.invoke<&Playback::loopEnd>(source.loopCount, destination, source.delta).mayBranchTo(destination);
+      return event.invoke<&Playback::loopEnd>(source.loopCount, destination, source.delta).discoverTarget(destination);
     }
     if (source.data1 == 99 && source.data2 == 20) {
       event.derived("loop_start", Address{source.end}, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);

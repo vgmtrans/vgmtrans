@@ -435,7 +435,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         return event.ignore();
       }
       event.derived("destination", found->second.start, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-      event.mayBranchTo(found->second.start);
+      event.discoverTarget(found->second.start);
       return event.invoke<&Playback::endRepeat>(found->second.slot, found->second.plays, found->second.start);
     }
     case 0x9a: {
@@ -445,7 +445,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         return event.ignore();
       }
       event.derived("destination", found->second.end, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-      event.mayBranchTo(found->second.end);
+      event.discoverTarget(found->second.end);
       return event.invoke<&Playback::repeatBreak>(found->second.slot, found->second.end);
     }
     case 0xa0: {

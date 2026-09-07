@@ -1556,7 +1556,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     case 0xff: {
       auto event = cursor.command("End", SequenceSemantic::End);
       event.invoke<&Playback::endOrReturn>();
-      return event.discoverReturn();
+      return event.return_();
     }
     default:
       return cursor.unsupported("Unknown Opcode", "unknown").stop();

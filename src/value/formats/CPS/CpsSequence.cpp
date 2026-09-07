@@ -878,7 +878,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
                                    : static_cast<s16>(raw);
       const Address destination{static_cast<u32>(event.nextAddress().value + displacement)};
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-      event.mayBranchTo(destination);
+      event.discoverTarget(destination);
       return opcode == 0xcc ? event.invoke<&Playback::branchIfFirst>(destination)
                             : event.invoke<&Playback::branchIfRepeated>(destination);
     }

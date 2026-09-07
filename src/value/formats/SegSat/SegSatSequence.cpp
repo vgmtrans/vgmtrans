@@ -516,7 +516,7 @@ struct DecodedControllerChange {
                                                 SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
       const u8 count = event.u8("event_count");
       const Address continuation = event.nextAddress();
-      return event.invoke<&Playback::beginCountedLoop>(destination, count, continuation).mayBranchTo(destination);
+      return event.invoke<&Playback::beginCountedLoop>(destination, count, continuation).discoverTarget(destination);
     }
     case 0x82: {
       auto event = cursor.command("Forever Loop", SequenceSemantic::Loop);

@@ -581,7 +581,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x80: {
       auto event = cursor.command("Pattern End", SequenceSemantic::End);
       for (const u32 pattern : layout.patternAddresses) {
-        event.mayBranchTo(Address{pattern});
+        event.discoverTarget(Address{pattern});
       }
       return event.invokeFlow<&Playback::patternEnd>().end();
     }
@@ -655,7 +655,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       event.derived("destination", found->second.destination, SourceValueDisplay::Address,
                     SemanticOperandRole::RepeatTarget);
       event.derived("playlist_index", found->second.patternIndex);
-      event.mayBranchTo(found->second.destination);
+      event.discoverTarget(found->second.destination);
       return event.invokeFlow<&Playback::repeatEnd>(count, found->second.destination, found->second.patternIndex);
     }
     case 0x8f: {

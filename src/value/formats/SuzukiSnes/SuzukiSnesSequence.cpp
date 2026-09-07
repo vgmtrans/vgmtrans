@@ -750,7 +750,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       }
       event.derived("destination", found->second.start, SourceValueDisplay::Address,
                     SemanticOperandRole::RepeatTarget);
-      event.mayBranchTo(found->second.start);
+      event.discoverTarget(found->second.start);
       return event.invoke<&Playback::endRepeat>(found->second.slot, found->second.totalPlays, found->second.start);
     }
     case 0xd6: {

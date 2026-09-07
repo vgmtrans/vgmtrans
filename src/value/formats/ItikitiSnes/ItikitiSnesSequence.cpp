@@ -804,7 +804,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u16 relative = event.u16le("relative", SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
       const Address destination = relativeTarget(sequenceBase, relative);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-      return event.invoke<&Playback::conditionalSignalJump>(destination).mayBranchTo(destination);
+      return event.invoke<&Playback::conditionalSignalJump>(destination).discoverTarget(destination);
     }
     case 0x2e:
       return cursor.command("Repeat End", SequenceSemantic::Repeat).invokeFlow<&Playback::repeatEnd>();
@@ -814,7 +814,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u16 relative = event.u16le("relative", SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
       const Address destination = relativeTarget(sequenceBase, relative);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-      return event.invoke<&Playback::repeatBreak>(count, destination).mayBranchTo(destination);
+      return event.invoke<&Playback::repeatBreak>(count, destination).discoverTarget(destination);
     }
     default:
       return cursor.unsupported("Invalid Command").stop();

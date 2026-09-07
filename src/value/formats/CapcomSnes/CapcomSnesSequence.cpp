@@ -450,7 +450,7 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
       const u8 slot = event.derived("slot", static_cast<u8>(cursor.opcode() - 0x12 + 1));
       const u8 attributes = event.u8("attributes", SourceValueDisplay::Hex);
       const Address destination = event.address("destination", SemanticOperandRole::RepeatTarget);
-      event.mayBranchTo(destination);
+      event.discoverTarget(destination);
       return event.invoke<&Playback::repeatBreak>(slot - 1, attributes, destination);
     }
     case 0x16: {

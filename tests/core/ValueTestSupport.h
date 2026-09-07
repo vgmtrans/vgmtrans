@@ -759,7 +759,7 @@ using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
                                   ProbeRepeatBreakCommand::playbackStatus, "repeat-break");
       const u8 slot = event.u8("slot");
       const Address destination = event.addressLe("destination", SemanticOperandRole::RepeatTarget);
-      return event.invoke<&ProbePlayback::repeatBreak>(slot, destination).mayBranchTo(destination);
+      return event.invoke<&ProbePlayback::repeatBreak>(slot, destination).discoverTarget(destination);
     }
     case 0xff:
       return cursor.command(ProbeEndCommand::name, SequenceSemantic::End, ProbeEndCommand::playbackStatus, "end").end();

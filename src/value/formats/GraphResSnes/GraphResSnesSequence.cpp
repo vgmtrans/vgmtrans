@@ -658,7 +658,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 count = event.u8("count");
       const Address destination = relativeTarget(event, begin, SemanticOperandRole::RepeatTarget);
       const Address exit{static_cast<u16>(begin + 4)};
-      return event.invokeFlow<&Playback::loopEnd>(count, destination, exit).mayBranchTo(destination);
+      return event.invokeFlow<&Playback::loopEnd>(count, destination, exit).discoverTarget(destination);
     }
     case 0xec: {
       auto event = cursor.command("Duration Rate", SequenceSemantic::State);
@@ -674,7 +674,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 count = event.u8("count");
       const Address destination = relativeTarget(event, begin, SemanticOperandRole::RepeatTarget);
       const Address exit{static_cast<u16>(begin + 4)};
-      return event.invokeFlow<&Playback::unstackedLoop>(count, destination, exit).mayBranchTo(destination);
+      return event.invokeFlow<&Playback::unstackedLoop>(count, destination, exit).discoverTarget(destination);
     }
     case 0xef: {
       auto event = cursor.command("Pitch Offset", SequenceSemantic::Pitch);

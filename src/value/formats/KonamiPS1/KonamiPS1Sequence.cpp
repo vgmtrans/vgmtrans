@@ -729,7 +729,7 @@ struct ControllerInfo {
         const Address destination{*source.loopDestination};
         event.derived("repeat_count", source.loopCount);
         event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
-        return event.invokeFlow<&Playback::loopEnd>(source.loopCount, destination).mayBranchTo(destination);
+        return event.invokeFlow<&Playback::loopEnd>(source.loopCount, destination).discoverTarget(destination);
       }
       if (source.command == 99 && source.value == 20) {
         event.derived("loop_start", Address{source.end}, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);

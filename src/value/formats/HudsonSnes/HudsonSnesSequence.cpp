@@ -1093,7 +1093,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x19: {
       event.label("Conditional Branch");
       const Address destination = event.addressLe("destination", SemanticOperandRole::JumpTarget);
-      return event.invoke<&Playback::conditionalBranch>(subcommand, destination).mayBranchTo(destination);
+      return event.invoke<&Playback::conditionalBranch>(subcommand, destination).discoverTarget(destination);
     }
     case 0x1a:
       event.label("ADSR Attack Rate");
@@ -1342,7 +1342,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xff: {
       auto event = cursor.command("End / Return", SequenceSemantic::End);
       event.invoke<&Playback::endOrReturn>();
-      return event.discoverReturn();
+      return event.return_();
     }
     default:
       return cursor.unsupported("Unsupported HudsonSnes Command").stop();

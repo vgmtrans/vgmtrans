@@ -162,16 +162,46 @@ MIDI resolution comment: its fallback is seven-bit output, not a legacy hint.
 The complete default build succeeds, including the Qt application and shell
 executable. All 17 CTest targets pass; the build has no compiler warnings.
 
+### Give each control-flow operation one name
+
+Remove two aliases with identical implementations. `return_()` declares the
+default return transition, which a runtime handler may override;
+`discoverTarget()` adds a reachable bytecode block without choosing the runtime
+path. The former `discoverReturn()` name obscured that it set a default runtime
+transition, while `mayBranchTo()` duplicated decoder-only target discovery.
+Update all format and test callers. Distinct jump semantics retain their named
+helpers. The full application build and all 17 CTest targets pass without
+compiler warnings.
+
 ## Further investigation
 
-- Compiler cursor: duplicated adapters for emitting ordinary performance events;
-  control-flow helpers whose names imply distinctions their implementations do
-  not make.
-- Runtime: repeated per-track initialization flags and `beforeCommand` guards;
-  distinguish track startup from song-wide and per-command behavior before
-  centralizing it.
-- Synth construction and source maps: repeated range accumulation and envelope
-  projection; preserve ownership, authoritative explicit ranges, and aliases.
-- VM scheduling, collection binding, export lowering, and instrument variants:
-  continue looking for redundant state and representations. Avoid speculative
-  exporter interfaces for formats the application does not yet support.
+- Continue auditing export lowering, instrument selection, envelope projection,
+  and remaining format-local helpers for redundant state and work.
+- Real-file parity remains unverified. An optional corpus-path question is
+  pending; the absence of a corpus does not block further code investigation.
+
+## Design decisions retained after inspection
+
+- Keep SequenceVM and the compiled command representation. Flattening every
+  command into a vector of operations would reintroduce an intermediate
+  instruction list and add allocation to simple commands. Most commands need
+  only one body; remove forwarding helpers without adding that representation.
+- Keep source-driver initialization rules explicit for now. Several apparent
+  startup guards initialize a whole song, others initialize one track, and
+  Sony PS2 also resets section state. Per-command hooks also perform real
+  driver work. A new lifecycle hook needs a stronger benefit than removing a
+  few boolean guards.
+- Keep explicit draft types and scanner finalization validation. A generic
+  draft framework would complicate four small author-facing types. The first
+  finalization pass checks all required programs/payloads before consuming any
+  draft, so folding it into the materialization loop would weaken recovery.
+- Keep immutable chunk storage and source ownership. These preserve snapshot
+  lifetimes and stable references; replacing them with copied flat vectors is
+  not a sound line-count reduction.
+- Keep export selection policies distinct where behavior differs. Ordinary
+  performance lookup uses exact source identity; variant materialization also
+  supports address fallback. A shared search must preserve those policies.
+- Keep export-specific lowering in the export layer. The existing neutral
+  performance and synth data are the extension point for future targets;
+  adding speculative Furnace interfaces would add concepts without serving a
+  current conversion.
