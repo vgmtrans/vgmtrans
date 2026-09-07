@@ -437,6 +437,26 @@ range, and song-wide ordering across tracks. Verify that initial events have
 track identity but no invented source command, source annotation, or automation.
 The full build and all 17 CTest targets pass without compiler warnings.
 
+### Remove duplicate MIDI oscillator and pitch-bend state
+
+Use one LFO started flag: configuration and startup already occurred together
+at every renderer boundary. Keep the emitted bend's stable event index and
+read its value directly instead of maintaining a second cache. The track
+retains insertion order throughout rendering, and only the bend writer sets
+this index. Return the effective bend range from its emission helper rather
+than retaining another copy. Remove the unused conversion-policy argument and
+its forwarding through range refresh. This removes three state fields and 15
+production lines.
+
+The full build and all 17 CTest targets pass without compiler warnings.
+Independent comparisons retain identical MIDI bytes and diagnostic counts for
+3,456 LFO/controller scenarios and 2,592 portamento scenarios. The LFO matrix
+covers all generated waveforms, phase/restart and delay policies, zero-depth
+behavior, layered bends, repeated and same-tick bends, sensitivity changes,
+channel pan resets, and both modulation export policies. The updated renderer
+also passes that matrix when compiled directly with AddressSanitizer, UBSan,
+and float-cast-overflow checks.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
