@@ -275,6 +275,17 @@ model or the scalar vocabulary formats already use.
 
 The full build and all 17 CTest targets pass without compiler warnings.
 
+### Share DLS articulation writing across scopes
+
+Instrument and region modulation now pass through one local connection writer,
+preserving instrument-before-region ordering. Filtering, scaling, and omitted
+connections no longer have two implementations in the articulation builder.
+Remove the DLS alias for the shared decoded-sample type as well.
+
+The full build and all 17 CTest targets pass without compiler warnings. The
+4,608-configuration comparison produces identical bytes for all 9,216 SF2/DLS
+outputs, including instrument and region modulation together.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
