@@ -326,6 +326,22 @@ its include while preserving those entry points and their behavior. The final
 full build and all 17 CTest targets pass without compiler warnings. All 9,216
 SF2/DLS outputs in the 4,608-configuration comparison remain byte-identical.
 
+### Consolidate flat portamento lowering state
+
+Make glide time optional in `PortamentoPerformanceEvent`: absent time retains
+the current setting while a previous key can still trigger a transition. Remove
+the separate control event and its duplicate renderer branch. Remove the
+seven-bit time event, which had only a synthetic test producer. That test now
+uses the physical settings event emitted by formats and verifies both timing
+and the full 14-bit result. Format interpreters continue to emit structured
+transition intent and physical settings.
+
+The full build and all 17 CTest targets pass without compiler warnings. An
+independent comparison of 2,592 MIDI exports covers current/restored timing,
+linked notes, rendering hints and policies, physical timing modes, zero/short/
+long durations, transposition, existing bends, and tempo changes. All bytes and
+diagnostic counts match the previous implementation.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

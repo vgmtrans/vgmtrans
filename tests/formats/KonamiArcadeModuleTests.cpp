@@ -404,11 +404,9 @@ void konamiArcadeModuleBuildsSequencesSynthAndCollections() {
              transitions[1]->startKey == 70.0 && transitions[1]->targetKey == 72.0 &&
              std::holds_alternative<FixedDurationPitchSlideTiming>(transitions[1]->timing.physical),
          "continuous and delayed slides should retain typed intent without linking across a release gap");
-  expect(std::ranges::none_of(performance.tracks[0].events,
-                              [](const PerformanceEvent& event) {
-                                return std::holds_alternative<PortamentoPerformanceEvent>(event) ||
-                                       std::holds_alternative<PortamentoControlPerformanceEvent>(event);
-                              }),
+  expect(std::ranges::none_of(
+             performance.tracks[0].events,
+             [](const PerformanceEvent& event) { return std::holds_alternative<PortamentoPerformanceEvent>(event); }),
          "KonamiArcade format code should not preselect a MIDI slide representation");
 
   const std::array<const SoundBankAsset*, 1> soundBanks{instruments};

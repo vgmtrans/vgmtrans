@@ -554,9 +554,7 @@ void akaoPortamentoRetainsPitchTransitionIntent() {
   expect(std::ranges::none_of(performance.tracks[0].events,
                               [](const PerformanceEvent& event) {
                                 return std::holds_alternative<PortamentoPerformanceEvent>(event) ||
-                                       std::holds_alternative<PortamentoEnablePerformanceEvent>(event) ||
-                                       std::holds_alternative<PortamentoTimePerformanceEvent>(event) ||
-                                       std::holds_alternative<PortamentoControlPerformanceEvent>(event);
+                                       std::holds_alternative<PortamentoEnablePerformanceEvent>(event);
                               }),
          "Akao format code should not preselect a MIDI portamento representation");
 

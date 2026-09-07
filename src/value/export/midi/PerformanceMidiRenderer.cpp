@@ -1526,8 +1526,10 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                           tremoloDelayControllerValue(typedEvent, modulationProfile));
           }
         } else if constexpr (std::is_same_v<TypedEvent, PortamentoPerformanceEvent>) {
-          midi::appendController14(track, typedEvent.header.tick, channel, MidiController::PortamentoTime,
-                                   data14(typedEvent.timeMilliseconds), true);
+          if (typedEvent.timeMilliseconds) {
+            midi::appendController14(track, typedEvent.header.tick, channel, MidiController::PortamentoTime,
+                                     data14(*typedEvent.timeMilliseconds), true);
+          }
           if (typedEvent.previousKey) {
             const double previousKey =
                 *typedEvent.previousKey + globalTransposeAt(globalTransposes, typedEvent.header.tick);
@@ -1537,14 +1539,6 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
         } else if constexpr (std::is_same_v<TypedEvent, PortamentoEnablePerformanceEvent>) {
           addController(track, typedEvent.header.tick, channel, MidiController::Portamento,
                         typedEvent.enabled ? 127 : 0);
-        } else if constexpr (std::is_same_v<TypedEvent, PortamentoTimePerformanceEvent>) {
-          addController(track, typedEvent.header.tick, channel, MidiController::PortamentoTime,
-                        data7(typedEvent.timeMilliseconds));
-        } else if constexpr (std::is_same_v<TypedEvent, PortamentoControlPerformanceEvent>) {
-          const double previousKey =
-              typedEvent.previousKey + globalTransposeAt(globalTransposes, typedEvent.header.tick);
-          addController(track, typedEvent.header.tick, channel, MidiController::PortamentoControl,
-                        midiKey(previousKey));
         } else if constexpr (std::is_same_v<TypedEvent, LegatoPedalPerformanceEvent>) {
           addController(track, typedEvent.header.tick, channel, MidiController::Legato, typedEvent.enabled ? 127 : 0);
         } else if constexpr (std::is_same_v<TypedEvent, ModulationPerformanceEvent>) {
