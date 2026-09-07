@@ -9,13 +9,6 @@
 
 namespace vgmtrans::core {
 
-[[nodiscard]] s32 synthAmountFromHertz(double hertz);
-[[nodiscard]] s32 synthAmountFromHertzRange(double minHertz, double maxHertz);
-[[nodiscard]] s32 synthAmountFromSeconds(double seconds);
-[[nodiscard]] s32 synthAmountFromSecondsRange(double minSeconds, double maxSeconds);
-[[nodiscard]] s32 synthAmountFromCentibels(double centibels);
-[[nodiscard]] s32 synthAmountFromDecibels(double decibels);
-[[nodiscard]] double synthSecondsRangeMinimum(double seconds);
 [[nodiscard]] double linearAmplitudeToAttenuationDb(double amplitude, double silenceDb = 96.0);
 // Returns the dB-linear envelope duration that best approximates a
 // linear-amplitude fade lasting secondsToSilence.

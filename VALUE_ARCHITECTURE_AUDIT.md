@@ -312,6 +312,20 @@ diagnostics, multiple source records per sample, references surviving
 finalization, and stable draft views. The full build and all 17 CTest targets
 pass without compiler warnings. This removes 50 production lines.
 
+### Keep modulation export units out of general synth math
+
+Move SoundFont/DLS frequency, timecent, delay-floor, and controller-range
+conversions from `synth/SynthMath` into `export/synth/ModulationScaling`. Keep
+physical amplitude, envelope, and pan helpers in general synth math. The MIDI
+modulation normalizer now shares its conversion units with export lowering
+directly. Keep the seconds-range helper private and simplify bounded timecent
+conversion with a clamp.
+
+The full build exposed a legacy modulation dependency on these helpers; update
+its include while preserving those entry points and their behavior. The final
+full build and all 17 CTest targets pass without compiler warnings. All 9,216
+SF2/DLS outputs in the 4,608-configuration comparison remain byte-identical.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

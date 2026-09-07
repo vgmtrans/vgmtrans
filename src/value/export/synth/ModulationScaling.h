@@ -56,6 +56,15 @@ struct LoweredSynthModulation {
   std::vector<SynthModulator> modulators;
 };
 
+// SoundFont/DLS controller units used by modulation lowering and MIDI
+// normalization. Source formats retain physical Hz/seconds instead.
+[[nodiscard]] s32 synthAmountFromHertz(double hertz);
+[[nodiscard]] s32 synthAmountFromHertzRange(double minHertz, double maxHertz);
+[[nodiscard]] s32 synthAmountFromSeconds(double seconds);
+[[nodiscard]] s32 synthAmountFromCentibels(double centibels);
+[[nodiscard]] s32 synthAmountFromDecibels(double decibels);
+[[nodiscard]] double synthSecondsRangeMinimum(double seconds);
+
 // Translate physical instrument modulation once before an exporter writes its
 // target-specific records.
 [[nodiscard]] LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulation);
