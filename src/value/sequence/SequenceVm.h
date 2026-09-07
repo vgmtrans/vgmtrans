@@ -121,8 +121,7 @@ public:
   void expression(double linearGain, ValueQuantization sourceQuantization);
   void expression(double linearGain);
   void pan(PanPerformanceEvent event);
-  void pan(double stereoPosition);
-  void pan(double stereoPosition, double linearGain);
+  void pan(double stereoPosition, double linearGain = 1.0);
   void channelPan(ChannelPanPerformanceEvent event);
   void channelPan(double position);
   void stereoBalance(StereoBalancePerformanceEvent event);

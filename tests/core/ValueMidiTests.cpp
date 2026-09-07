@@ -382,7 +382,7 @@ void performanceMidiRendererKeepsPanGainOutOfExpression() {
       .tracks = {PerformanceTrack{
           .id = TrackId{0},
           .sourceTrackNumber = 0,
-          .endTick = 36,
+          .endTick = 72,
           .events =
               {
                   ExpressionPerformanceEvent{
@@ -404,7 +404,20 @@ void performanceMidiRendererKeepsPanGainOutOfExpression() {
                       .stereoPosition = 0.0,
                       .law = PanLaw::EqualPower,
                       .linearGain = 0.25,
-                      .hasLinearGain = true,
+                  },
+                  PanPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 48},
+                      .law = PanLaw::EqualPower,
+                  },
+                  PanPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 60},
+                      .law = PanLaw::EqualPower,
+                      .linearGain = 0.25,
+                  },
+                  PanPerformanceEvent{
+                      .header = PerformanceEventHeader{.tick = 72},
+                      .law = PanLaw::EqualPower,
+                      .linearGain = 1.0,
                   },
               },
       }},
@@ -421,13 +434,13 @@ void performanceMidiRendererKeepsPanGainOutOfExpression() {
     return values;
   };
 
-  const std::vector<u8> expectedVolume{90, 127, 64};
+  const std::vector<u8> expectedVolume{90, 127, 64, 127, 64, 127};
   for (const auto policy :
        {ModulationConversionPolicy::SynthModulators, ModulationConversionPolicy::SequenceEventSimulation}) {
     expect(controllerValues(policy, MidiController::Expression) == std::vector<u8>{64},
            "pan compensation should not rewrite source expression");
     expect(controllerValues(policy, MidiController::ChannelVolume) == expectedVolume,
-           "pan compensation should compose with channel volume");
+           "pan gain must compose with channel volume and reset for both omitted and explicit unit gain");
   }
 
   PerformanceSequence precisePerformance = performance;
@@ -494,7 +507,6 @@ void performanceMidiRendererRetainsPanLawDuringLfoSimulation() {
                       .stereoPosition = 0.0,
                       .law = PanLaw::ConstantSum,
                       .linearGain = 255.0 / 256.0,
-                      .hasLinearGain = true,
                   },
                   ModulationPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0, .sequence = 1},

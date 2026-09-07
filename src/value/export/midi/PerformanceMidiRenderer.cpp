@@ -498,7 +498,7 @@ struct VoicePitchBendRangeChange {
     double sourcePanLinearGain = 1.0;
     for (const PerformanceEvent* event : timeline) {
       if (const auto* pan = std::get_if<PanPerformanceEvent>(event)) {
-        sourcePanLinearGain = pan->hasLinearGain ? pan->linearGain : 1.0;
+        sourcePanLinearGain = pan->linearGain;
         observe(lowerPositionalPan(pan->law, pan->stereoPosition).gain * sourcePanLinearGain);
       } else if (const auto* balance = std::get_if<StereoBalancePerformanceEvent>(event)) {
         const double left = std::abs(balance->leftGain);
@@ -1441,7 +1441,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                                 automationState);
         } else if constexpr (std::is_same_v<TypedEvent, PanPerformanceEvent>) {
           state.sourcePanPosition = typedEvent.stereoPosition;
-          state.sourcePanLinearGain = typedEvent.hasLinearGain ? typedEvent.linearGain : 1.0;
+          state.sourcePanLinearGain = typedEvent.linearGain;
           state.sourcePanLaw = typedEvent.law;
           addCombinedPan(track, state, typedEvent.header.tick, channel, options, automationState,
                          automationState == nullptr);

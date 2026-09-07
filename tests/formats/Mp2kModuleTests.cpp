@@ -294,7 +294,7 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
              (*level)->sourceQuantization && (*level)->sourceQuantization->levels == 128,
          "MP2k VOL must be a linear 7-bit hardware gain, not a squared MIDI controller curve");
   expect(!pans.empty() && pans.front()->law == PanLaw::ConstantSum &&
-             std::abs(pans.front()->stereoPosition - 1.0 / 255.0) < 1e-12 && pans.front()->hasLinearGain &&
+             std::abs(pans.front()->stereoPosition - 1.0 / 255.0) < 1e-12 &&
              std::abs(pans.front()->linearGain - 255.0 / 256.0) < 1e-12,
          "MP2k pan should retain TrkVolPitSet's asymmetric constant-sum channel factors");
   expect(notes.size() == 3, "top-level PEND must fall through to explicit, running-status, and tied MP2k notes");
