@@ -354,6 +354,12 @@ void PerformanceEmitter::reverb(double send) {
   });
 }
 
+void PerformanceEmitter::monoMode(u8 channels) {
+  append(MonoModePerformanceEvent{
+      .channels = channels,
+  });
+}
+
 void PerformanceEmitter::tuning(double cents) {
   append(TuningPerformanceEvent{
       .cents = cents,
