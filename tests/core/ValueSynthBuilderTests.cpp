@@ -9,6 +9,7 @@
 #include "value/scan/ScanResultBuilder.h"
 
 #include <algorithm>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -105,6 +106,25 @@ void brrCatalogProjectsInstrumentsInSampleOrder() {
   expect(catalog.directoryRange == SourceRange{.source = source, .offset = 4, .size = 8} &&
              catalog.samples[0].stream.encodedData == SourceRange{.source = source, .offset = 0x40, .size = 9},
          "projected instruments must retain exact directory and payload source ranges");
+  const auto checkRange = [&](auto&& srcns) {
+    const auto ranged = readSnesBrrCatalog(ByteReader(source, bytes), 0, std::forward<decltype(srcns)>(srcns));
+    expect(ranged.samples.size() == 2 && ranged.samples[0].srcn == 1 && ranged.samples[1].srcn == 2 &&
+               ranged.directoryRange == catalog.directoryRange,
+           "sample-number ranges must use the same ordering, deduplication, and validation as projected records");
+  };
+  std::vector<u8> srcns{2, 3, 1, 2};
+  checkRange(srcns);
+  checkRange(std::as_const(srcns));
+  checkRange(std::span<const u8>{srcns});
+  checkRange(std::set<u8>{1, 2, 3});
+  checkRange(std::views::iota(1, 4));
+  expect(srcns == std::vector<u8>({2, 3, 1, 2}), "catalog construction must not reorder the caller's sample numbers");
+  checkRange(std::move(srcns));
+  const auto empty = readSnesBrrCatalog(ByteReader{}, 0, std::vector<Patch>{}, [](const Patch&) -> u8 {
+    throw std::logic_error("an empty range must not evaluate the SRCN projection");
+  });
+  expect(empty.samples.empty() && !empty.directoryRange.valid(),
+         "empty input must produce an empty catalog without reading the source");
 }
 
 void brrAliasesRetainLoopIdentityAndSeparateSourceRecords() {

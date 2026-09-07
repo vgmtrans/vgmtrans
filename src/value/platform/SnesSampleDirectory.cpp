@@ -92,8 +92,7 @@ std::optional<u32> SnesBrrCatalog::canonicalIndex(u8 srcn) const {
   return static_cast<u32>(std::distance(samples.begin(), canonical));
 }
 
-SnesBrrCatalog readSnesBrrCatalog(ByteReader reader, u32 directoryAddress, std::span<const u8> referencedSrcns) {
-  std::vector<u8> srcns(referencedSrcns.begin(), referencedSrcns.end());
+SnesBrrCatalog readSnesBrrCatalog(ByteReader reader, u32 directoryAddress, std::vector<u8> srcns) {
   std::ranges::sort(srcns);
   const auto duplicates = std::ranges::unique(srcns);
   srcns.erase(duplicates.begin(), duplicates.end());

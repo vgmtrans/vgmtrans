@@ -15,7 +15,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
-#include <numeric>
+#include <ranges>
 #include <set>
 #include <string>
 #include <vector>
@@ -196,9 +196,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   const std::vector<u8> usedSrcns = referencedSamples(melodic, drums);
   // The paired tables use one four-byte DIR and one two-byte tuning entry per SRCN.
   const u32 srcnCount = (layout.tuningTableAddress - layout.spcDirAddress) / 4u;
-  std::vector<u8> allSrcns(srcnCount);
-  std::iota(allSrcns.begin(), allSrcns.end(), 0);
-  const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, allSrcns);
+  const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, std::views::iota(0u, srcnCount));
   if (catalog.samples.empty()) {
     return std::nullopt;
   }

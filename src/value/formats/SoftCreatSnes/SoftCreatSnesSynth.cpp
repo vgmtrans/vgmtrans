@@ -40,8 +40,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
       !reader.has(layout.fineTableAddress, tableSize)) {
     return std::nullopt;
   }
-  std::vector<u8> srcns(referencedInstruments.begin(), referencedInstruments.end());
-  const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, srcns);
+  const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, referencedInstruments);
   if (catalog.samples.empty()) {
     return std::nullopt;
   }
@@ -68,7 +67,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
                     SourceValueDisplay::Cents);
   }
   const SnesBrrSampleRefs samples = addSnesBrrSamples(bank.localSamples(), reader, catalog);
-  for (const u8 srcn : srcns) {
+  for (const u8 srcn : referencedInstruments) {
     const auto sample = samples.findSrcn(srcn);
     const u32 coarseAddress = layout.coarseTableAddress + srcn;
     const u32 fineAddress = layout.fineTableAddress + srcn;

@@ -72,9 +72,6 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
       patches.push_back(patch);
     }
   }
-  if (patches.empty()) {
-    return std::nullopt;
-  }
   const SnesBrrCatalog catalog =
       readSnesBrrCatalog(reader, layout.spcDirAddress, patches, [](const Patch& patch) { return *patch.srcn; });
   if (catalog.samples.empty()) {

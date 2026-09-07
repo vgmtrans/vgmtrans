@@ -283,7 +283,7 @@ std::optional<ScanSoundBankDraft> addKonamiSnesSynth(ScanResultBuilder& builder,
       readSnesBrrCatalog(reader, *layout.spcDirAddress, instrumentInfos, &KonamiSnesInstrumentInfo::srcn);
   // Do not publish half of a synth. A sound bank without sample data (or
   // vice versa) cannot produce a usable export.
-  if (instrumentInfos.empty() || sampleCatalog.samples.empty()) {
+  if (sampleCatalog.samples.empty()) {
     return std::nullopt;
   }
 
