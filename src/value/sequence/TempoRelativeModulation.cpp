@@ -14,6 +14,7 @@
 #include <map>
 #include <optional>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -27,13 +28,11 @@ struct EventRef {
 };
 
 struct TrackModulationState {
-  std::map<u32, ModulationPerformanceEvent> vibratoRates;
-  std::optional<ModulationPerformanceEvent> tremoloRate;
-  std::optional<ModulationPerformanceEvent> panRate;
-  std::optional<u32> vibratoDelayTicks;
-  std::optional<u32> tremoloDelayTicks;
-  LfoDelayUpdateMode vibratoDelayUpdateMode = LfoDelayUpdateMode::CurrentAndFutureNotes;
-  LfoDelayUpdateMode tremoloDelayUpdateMode = LfoDelayUpdateMode::CurrentAndFutureNotes;
+  // Vibrato rates are independent per pitch layer; tremolo and pan have one
+  // rate each. Ordering by target then layer preserves derived event order.
+  std::map<std::pair<ModulationPerformanceTarget, u32>, ModulationPerformanceEvent> rates;
+  std::optional<VibratoDelayPerformanceEvent> vibratoDelay;
+  std::optional<TremoloDelayPerformanceEvent> tremoloDelay;
 };
 
 [[nodiscard]] double tickSeconds(const PerformanceSequence& performance, u32 microsecondsPerQuarter) {
@@ -54,23 +53,6 @@ struct TrackModulationState {
     return 0.0;
   }
   return static_cast<double>(ticks) * secondsPerTick * 1000.0;
-}
-
-[[nodiscard]] std::optional<ModulationPerformanceEvent>* relativeRate(
-    TrackModulationState& state,
-    ModulationPerformanceTarget target) {
-  switch (target) {
-    case ModulationPerformanceTarget::TremoloRate:
-      return &state.tremoloRate;
-    case ModulationPerformanceTarget::PanRate:
-      return &state.panRate;
-    case ModulationPerformanceTarget::VibratoDepth:
-    case ModulationPerformanceTarget::VibratoRate:
-    case ModulationPerformanceTarget::TremoloDepth:
-    case ModulationPerformanceTarget::PanDepth:
-      return nullptr;
-  }
-  return nullptr;
 }
 
 [[nodiscard]] PerformanceEventHeader derivedHeader(const TempoPerformanceEvent& tempo,
@@ -165,79 +147,55 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
           continue;
         }
         auto& trackState = states[trackIndex];
-        const auto appendRate = [&](const std::optional<ModulationPerformanceEvent>& rate) {
-          if (!rate || !rate->context.cyclesPerTick) {
-            return;
-          }
-          auto& update = std::get<ModulationPerformanceEvent>(derived[trackIndex].emplace_back(*rate));
+        for (const auto& [key, rate] : trackState.rates) {
+          auto& update = std::get<ModulationPerformanceEvent>(derived[trackIndex].emplace_back(rate));
           update.header = derivedHeader(*tempo, track);
           resolveContext(update, secondsPerTick);
-        };
-        for (const auto& entry : trackState.vibratoRates) {
-          appendRate(entry.second);
         }
-        appendRate(trackState.tremoloRate);
-        appendRate(trackState.panRate);
 
-        if (trackState.vibratoDelayTicks) {
-          derived[trackIndex].emplace_back(VibratoDelayPerformanceEvent{
-              .header = derivedHeader(*tempo, track),
-              .delayTicks = *trackState.vibratoDelayTicks,
-              .milliseconds = delayMilliseconds(*trackState.vibratoDelayTicks, secondsPerTick),
-              .tempoRelative = true,
-              .updateMode = trackState.vibratoDelayUpdateMode,
-          });
-        }
-        if (trackState.tremoloDelayTicks) {
-          derived[trackIndex].emplace_back(TremoloDelayPerformanceEvent{
-              .header = derivedHeader(*tempo, track),
-              .delayTicks = *trackState.tremoloDelayTicks,
-              .milliseconds = delayMilliseconds(*trackState.tremoloDelayTicks, secondsPerTick),
-              .tempoRelative = true,
-              .updateMode = trackState.tremoloDelayUpdateMode,
-          });
-        }
+        const auto appendDelay = [&](const auto& delay) {
+          if (delay) {
+            auto update = *delay;
+            update.header = derivedHeader(*tempo, track);
+            update.milliseconds = delayMilliseconds(update.delayTicks, secondsPerTick);
+            derived[trackIndex].emplace_back(std::move(update));
+          }
+        };
+        appendDelay(trackState.vibratoDelay);
+        appendDelay(trackState.tremoloDelay);
       }
       continue;
     }
 
     if (auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
       resolveContext(*modulation, secondsPerTick);
-      if (modulation->target == ModulationPerformanceTarget::VibratoRate) {
+      if (modulation->target == ModulationPerformanceTarget::VibratoRate ||
+          modulation->target == ModulationPerformanceTarget::TremoloRate ||
+          modulation->target == ModulationPerformanceTarget::PanRate) {
+        const u32 layer =
+            modulation->target == ModulationPerformanceTarget::VibratoRate ? modulation->pitchLayer.value : 0;
+        const auto key = std::pair{modulation->target, layer};
         if (modulation->context.cyclesPerTick) {
-          state.vibratoRates.insert_or_assign(modulation->pitchLayer.value, *modulation);
+          state.rates.insert_or_assign(key, *modulation);
         } else {
-          state.vibratoRates.erase(modulation->pitchLayer.value);
-        }
-      } else if (auto* rate = relativeRate(state, modulation->target)) {
-        if (modulation->context.cyclesPerTick) {
-          *rate = *modulation;
-        } else {
-          rate->reset();
+          state.rates.erase(key);
         }
       }
       continue;
     }
 
+    const auto resolveDelay = [&](auto& delay, auto& stored) {
+      if (delay.tempoRelative) {
+        delay.milliseconds = delayMilliseconds(delay.delayTicks, secondsPerTick);
+        stored = delay;
+      } else {
+        stored.reset();
+      }
+    };
     if (auto* delay = std::get_if<VibratoDelayPerformanceEvent>(&event)) {
-      if (delay->tempoRelative) {
-        delay->milliseconds = delayMilliseconds(delay->delayTicks, secondsPerTick);
-        state.vibratoDelayTicks = delay->delayTicks;
-        state.vibratoDelayUpdateMode = delay->updateMode;
-      } else {
-        state.vibratoDelayTicks.reset();
-      }
-      continue;
-    }
-
-    if (auto* delay = std::get_if<TremoloDelayPerformanceEvent>(&event)) {
-      if (delay->tempoRelative) {
-        delay->milliseconds = delayMilliseconds(delay->delayTicks, secondsPerTick);
-        state.tremoloDelayTicks = delay->delayTicks;
-        state.tremoloDelayUpdateMode = delay->updateMode;
-      } else {
-        state.tremoloDelayTicks.reset();
-      }
+      resolveDelay(*delay, state.vibratoDelay);
+    } else if (auto* delay = std::get_if<TremoloDelayPerformanceEvent>(&event)) {
+      resolveDelay(*delay, state.tremoloDelay);
     }
   }
 
