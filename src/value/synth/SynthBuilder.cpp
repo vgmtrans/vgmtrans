@@ -289,9 +289,7 @@ void SamplePoolBuilder::addFallbackSources() {
       continue;
     }
     const std::string label = samples_[index].name.empty() ? "Sample " + std::to_string(index) : samples_[index].name;
-    auto annotation = sourceMap_->annotation(SourceRole::Sample, label, samples_[index].encodedData)
-                          .owner(ObjectRefs::sample(asset_, index));
-    states_[index].sources.push_back(annotation.id());
+    addEntrySource(index, label, samples_[index].encodedData, {});
   }
 }
 
@@ -526,7 +524,6 @@ AnnotationBuilder InstrumentSetBuilder::addInstrumentSource(u32 index, std::stri
     annotation.kind(kind);
   }
   states_[index].sources.push_back(annotation.id());
-  states_[index].latestSource = annotation.id();
   linkInstrumentSamples(index, annotation.id());
   return annotation;
 }
@@ -542,8 +539,9 @@ AnnotationBuilder InstrumentSetBuilder::addRegionSource(u32 instrumentIndex, u32
   if (!kind.empty()) {
     annotation.kind(kind);
   }
-  if (states_[instrumentIndex].latestSource) {
-    annotation.parent(*states_[instrumentIndex].latestSource);
+  const auto& instrumentSources = states_[instrumentIndex].sources;
+  if (!instrumentSources.empty()) {
+    annotation.parent(instrumentSources.back());
   }
   states_[instrumentIndex].regions[regionIndex].sources.push_back(annotation.id());
   linkSample(annotation.id(), instruments_[instrumentIndex].regions[regionIndex].sample, "Sample");
@@ -560,11 +558,7 @@ void InstrumentSetBuilder::addFallbackSources() {
     if (state.sources.empty() && instrument.range.valid()) {
       const std::string label =
           instrument.name.empty() ? "Instrument " + std::to_string(instrumentIndex) : instrument.name;
-      auto annotation = sourceMap_->annotation(SourceRole::Instrument, label, instrument.range)
-                            .owner(ObjectRefs::instrument(asset_, instrumentIndex));
-      state.sources.push_back(annotation.id());
-      state.latestSource = annotation.id();
-      linkInstrumentSamples(instrumentIndex, annotation.id());
+      addInstrumentSource(instrumentIndex, label, instrument.range, {});
     }
     for (u32 regionIndex = 0; regionIndex < instrument.regions.size(); ++regionIndex) {
       auto& region = instrument.regions[regionIndex];
@@ -572,13 +566,7 @@ void InstrumentSetBuilder::addFallbackSources() {
       if (!regionState.sources.empty() || !region.range.valid()) {
         continue;
       }
-      auto annotation = sourceMap_->annotation(SourceRole::Region, "Region", region.range)
-                            .owner(ObjectRefs::region(asset_, instrumentIndex, regionIndex));
-      if (state.latestSource) {
-        annotation.parent(*state.latestSource);
-      }
-      regionState.sources.push_back(annotation.id());
-      linkSample(annotation.id(), region.sample, "Sample");
+      addRegionSource(instrumentIndex, regionIndex, "Region", region.range, {});
     }
   }
 }

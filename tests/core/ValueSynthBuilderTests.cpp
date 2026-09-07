@@ -206,6 +206,8 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
 
   const auto instrumentSource =
       kit.source("Drum Kit", SourceRange{.source = source, .offset = 16, .size = 8}, "probe-drum-kit");
+  const auto latestInstrumentSource =
+      kit.source("Kit Mapping", SourceRange{.source = source, .offset = 16, .size = 8}, "probe-kit-mapping");
   auto secondRegion = kit.region(SampleRef::resolved(samplesAsset, 4), Region{});
   const auto secondRegionSource =
       secondRegion.source("Snare", SourceRange{.source = source, .offset = 24, .size = 4}, "probe-snare");
@@ -241,7 +243,7 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
          "instrument add should report a duplicate grouping key once");
 
   const auto instrumentSources = annotations.ownedBy(ObjectRefs::instrument(instrumentsAsset, 0));
-  expect(instrumentSources == std::vector<SourceAnnotationId>{instrumentSource.id()},
+  expect(instrumentSources == std::vector<SourceAnnotationId>{instrumentSource.id(), latestInstrumentSource.id()},
          "instrument annotations should use the dense model index rather than the grouping key");
   const SourceAnnotation& instrumentAnnotation = annotations.get(instrumentSource.id());
   expect(hasLink(instrumentAnnotation, SourceLinkRole::UsesSample, SourceTarget{ObjectRefs::sample(samplesAsset, 3)}) &&
@@ -261,8 +263,8 @@ void instrumentBuilderGroupsEntriesAndProjectsRegionIdentity() {
          "region records should share stable ownership, avoid guessed parents, and expose exact fields as children");
   const auto secondRegionSources = annotations.ownedBy(ObjectRefs::region(instrumentsAsset, 0, 1));
   expect(secondRegionSources == std::vector<SourceAnnotationId>{secondRegionSource.id()} &&
-             annotations.get(secondRegionSource.id()).parent == instrumentSource.id(),
-         "region sources added after an instrument source should inherit that source parent");
+             annotations.get(secondRegionSource.id()).parent == latestInstrumentSource.id(),
+         "region sources should inherit the most recently added instrument source parent");
   expect(hasLink(annotations.get(secondRegionSource.id()), SourceLinkRole::UsesSample,
                  SourceTarget{ObjectRefs::sample(samplesAsset, 4)}),
          "a region source should link to its exact concrete sample");

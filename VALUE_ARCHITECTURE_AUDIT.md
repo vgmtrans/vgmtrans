@@ -359,6 +359,19 @@ byte order, reverse playback, and loop metadata. PCM and metadata are identical.
 The updated decoder was also compiled directly with AddressSanitizer, UBSan,
 and float-cast-overflow checks for that comparison; no errors were reported.
 
+### Reuse source-annotation construction and derive the latest parent
+
+Fallback sample, instrument, and region annotations now use the same methods
+as explicit annotations, sharing ownership, parent selection, and sample links.
+Remove the separately retained latest instrument annotation: the ordered source
+list already supplies it. Extend the instrument-builder test to check parent
+selection after multiple instrument annotations. This removes 15 production
+lines without changing the format-facing API.
+
+The full build and all 17 CTest targets pass without compiler warnings,
+including fallback ownership, sample links, explicit ranges, and annotation
+parent tests.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
