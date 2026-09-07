@@ -27,11 +27,6 @@ constexpr u16 kWaveFormatPcm = 1;
 constexpr u16 kBitsPerSample = 16;
 constexpr u16 kDlsConnSrcNone = 0;
 constexpr u16 kDlsConnSrcLfo = 0x0001;
-constexpr u16 kDlsConnSrcKeyOnVelocity = 0x0002;
-constexpr u16 kDlsConnSrcKeyNumber = 0x0003;
-constexpr u16 kDlsConnSrcEg1 = 0x0004;
-constexpr u16 kDlsConnSrcPitchWheel = 0x0006;
-constexpr u16 kDlsConnSrcPolyPressure = 0x0007;
 constexpr u16 kDlsConnSrcChannelPressure = 0x0008;
 constexpr u16 kDlsConnSrcVibrato = 0x0009;
 constexpr u16 kDlsConnSrcCc1 = 0x0081;
@@ -119,12 +114,8 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
 [[nodiscard]] std::optional<DlsConnection> dlsConnectionForGenerator(const SynthGenerator& generator) {
   // Generators with no controller source become DLS connections that are always active.
   switch (generator.destination) {
-    case SynthDestination::Pitch:
-      return DlsConnection{.destination = kDlsConnDstPitch, .scale = dlsPitchScale(generator.amount)};
     case SynthDestination::VolumeAttenuation:
       return DlsConnection{.destination = kDlsConnDstAttenuation, .scale = dls16Dot16Scale(generator.amount)};
-    case SynthDestination::Pan:
-      return DlsConnection{.destination = kDlsConnDstPan, .scale = dls16Dot16Scale(generator.amount)};
     case SynthDestination::VibratoDepth:
       return DlsConnection{
           .source = kDlsConnSrcVibrato,
@@ -145,33 +136,7 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
       return DlsConnection{.destination = kDlsConnDstLfoFrequency, .scale = dlsPitchScale(generator.amount)};
     case SynthDestination::TremoloDelay:
       return DlsConnection{.destination = kDlsConnDstLfoStartDelay, .scale = dls16Dot16Scale(generator.amount)};
-    case SynthDestination::FilterCutoff:
     case SynthDestination::Unknown:
-      return std::nullopt;
-  }
-
-  return std::nullopt;
-}
-
-[[nodiscard]] std::optional<u16> dlsSourceForSynthSource(SynthSource source) {
-  switch (source) {
-    case SynthSource::NoteOnVelocity:
-      return kDlsConnSrcKeyOnVelocity;
-    case SynthSource::KeyNumber:
-      return kDlsConnSrcKeyNumber;
-    case SynthSource::Lfo:
-      return kDlsConnSrcLfo;
-    case SynthSource::Envelope:
-      return kDlsConnSrcEg1;
-    case SynthSource::MidiController:
-      return std::nullopt;
-    case SynthSource::ChannelPressure:
-      return kDlsConnSrcChannelPressure;
-    case SynthSource::PolyPressure:
-      return kDlsConnSrcPolyPressure;
-    case SynthSource::PitchWheel:
-      return kDlsConnSrcPitchWheel;
-    case SynthSource::Unknown:
       return std::nullopt;
   }
 
@@ -191,9 +156,6 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
       return kDlsConnSrcCc93;
     case SynthDestination::TremoloDelay:
       return kDlsConnSrcCc91;
-    case SynthDestination::Pitch:
-    case SynthDestination::FilterCutoff:
-    case SynthDestination::Pan:
     case SynthDestination::Unknown:
       return std::nullopt;
   }
@@ -210,73 +172,27 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
   if (!shouldExportSynthModulator(modulator, modulationConversion)) {
     return std::nullopt;
   }
-  const auto source = modulator.source ? dlsSourceForSynthSource(*modulator.source)
-                                       : dlsDefaultSourceForDestination(modulator.destination);
+  const auto source = modulator.source == SynthSource::ChannelPressure
+                          ? std::optional{kDlsConnSrcChannelPressure}
+                          : dlsDefaultSourceForDestination(modulator.destination);
   if (!source) {
     return std::nullopt;
   }
 
   const auto amount = scaledSynthModulatorAmount(modulator, midiModulationUsage, modulationScaling);
 
-  switch (modulator.destination) {
-    case SynthDestination::Pitch:
-      return DlsConnection{
-          .source = *source,
-          .destination = kDlsConnDstPitch,
-          .scale = dlsPitchScale(amount),
-      };
-    case SynthDestination::VolumeAttenuation:
-      return DlsConnection{
-          .source = *source,
-          .destination = kDlsConnDstAttenuation,
-          .scale = dls16Dot16Scale(amount),
-      };
-    case SynthDestination::Pan:
-      return DlsConnection{
-          .source = *source,
-          .destination = kDlsConnDstPan,
-          .scale = dls16Dot16Scale(amount),
-      };
-    case SynthDestination::VibratoDepth:
-      return DlsConnection{
-          .source = kDlsConnSrcVibrato,
-          .control = *source,
-          .destination = kDlsConnDstPitch,
-          .scale = dlsPitchScale(amount),
-      };
-    case SynthDestination::VibratoRate:
-      return DlsConnection{
-          .source = *source,
-          .destination = kDlsConnDstVibFrequency,
-          .scale = dlsPitchScale(amount),
-      };
-    case SynthDestination::VibratoDelay:
-      return std::nullopt;
-    case SynthDestination::TremoloDelay:
-      return DlsConnection{
-          .source = *source,
-          .destination = kDlsConnDstLfoStartDelay,
-          .scale = dls16Dot16Scale(amount),
-      };
-    case SynthDestination::TremoloDepth:
-      return DlsConnection{
-          .source = kDlsConnSrcLfo,
-          .control = *source,
-          .destination = kDlsConnDstAttenuation,
-          .scale = dls16Dot16Scale(amount),
-      };
-    case SynthDestination::TremoloRate:
-      return DlsConnection{
-          .source = *source,
-          .destination = kDlsConnDstLfoFrequency,
-          .scale = dlsPitchScale(amount),
-      };
-    case SynthDestination::FilterCutoff:
-    case SynthDestination::Unknown:
-      return std::nullopt;
+  // Depth connections already use an oscillator source; the controller gates
+  // that source. Rate and attenuation connections take the controller directly.
+  auto connection = dlsConnectionForGenerator(SynthGenerator{.destination = modulator.destination, .amount = amount});
+  if (!connection || modulator.destination == SynthDestination::VibratoDelay) {
+    return std::nullopt;
   }
-
-  return std::nullopt;
+  if (connection->source == kDlsConnSrcNone) {
+    connection->source = *source;
+  } else {
+    connection->control = *source;
+  }
+  return connection;
 }
 
 [[nodiscard]] s32 dlsEnvelopeTimecents(std::optional<double> seconds) {

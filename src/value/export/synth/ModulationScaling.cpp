@@ -31,7 +31,7 @@ namespace {
 
 [[nodiscard]] const MidiModulationMaximum* maximumForDefaultModulator(const SynthModulator& modulator,
                                                                       const MidiModulationUsage& usage) noexcept {
-  if (modulator.source) {
+  if (modulator.source != SynthSource::DefaultController) {
     return nullptr;
   }
 
@@ -50,9 +50,6 @@ namespace {
       return nullptr;
     case SynthDestination::VolumeAttenuation:
       return maximum(usage.tremoloDepth);
-    case SynthDestination::Pitch:
-    case SynthDestination::FilterCutoff:
-    case SynthDestination::Pan:
     case SynthDestination::Unknown:
       return nullptr;
   }
@@ -267,9 +264,6 @@ bool shouldExportSynthGenerator(const SynthGenerator& generator, ModulationConve
     case SynthDestination::TremoloDelay:
       return false;
     case SynthDestination::VolumeAttenuation:
-    case SynthDestination::Pitch:
-    case SynthDestination::FilterCutoff:
-    case SynthDestination::Pan:
     case SynthDestination::Unknown:
       return true;
   }
@@ -290,10 +284,7 @@ bool shouldExportSynthModulator(const SynthModulator& modulator, ModulationConve
     case SynthDestination::TremoloDelay:
       return false;
     case SynthDestination::VolumeAttenuation:
-      return modulator.source.has_value();
-    case SynthDestination::Pitch:
-    case SynthDestination::FilterCutoff:
-    case SynthDestination::Pan:
+      return modulator.source != SynthSource::DefaultController;
     case SynthDestination::Unknown:
       return true;
   }

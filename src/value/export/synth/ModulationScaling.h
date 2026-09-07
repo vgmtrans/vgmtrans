@@ -18,12 +18,10 @@ namespace vgmtrans::core {
 
 // Export-lowering vocabulary. These records are deliberately outside the
 // synth model: format authors describe physical modulation there, and only
-// exporters need routing destinations and controller sources.
+// exporters need routing destinations and controller sources. Keep this limited
+// to the routes produced by physical modulation lowering.
 enum class SynthDestination {
-  Pitch,
-  FilterCutoff,
   VolumeAttenuation,
-  Pan,
   VibratoDepth,
   VibratoRate,
   VibratoDelay,
@@ -34,15 +32,8 @@ enum class SynthDestination {
 };
 
 enum class SynthSource {
-  NoteOnVelocity,
-  KeyNumber,
-  Lfo,
-  Envelope,
-  MidiController,
+  DefaultController,
   ChannelPressure,
-  PolyPressure,
-  PitchWheel,
-  Unknown,
 };
 
 struct SynthGenerator {
@@ -53,7 +44,7 @@ struct SynthGenerator {
 };
 
 struct SynthModulator {
-  std::optional<SynthSource> source;
+  SynthSource source = SynthSource::DefaultController;
   SynthDestination destination = SynthDestination::Unknown;
   s32 amount = 0;
 

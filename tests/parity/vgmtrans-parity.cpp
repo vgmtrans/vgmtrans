@@ -498,14 +498,8 @@ u32 sourceRelativeOffset(const SourceStore& sources, SourceRange range) {
 
 [[nodiscard]] s32 destinationCode(SynthDestination destination) {
   switch (destination) {
-    case SynthDestination::Pitch:
-      return 1;
-    case SynthDestination::FilterCutoff:
-      return 2;
     case SynthDestination::VolumeAttenuation:
       return 3;
-    case SynthDestination::Pan:
-      return 4;
     case SynthDestination::VibratoDepth:
       return 10;
     case SynthDestination::VibratoRate:
@@ -546,33 +540,8 @@ u32 sourceRelativeOffset(const SourceStore& sources, SourceRange range) {
   return destinationCode(SynthDestination::Unknown);
 }
 
-[[nodiscard]] std::optional<s32> sourceCode(std::optional<SynthSource> source) {
-  if (!source) {
-    return std::nullopt;
-  }
-
-  switch (*source) {
-    case SynthSource::NoteOnVelocity:
-      return 1;
-    case SynthSource::KeyNumber:
-      return 2;
-    case SynthSource::Lfo:
-      return 3;
-    case SynthSource::Envelope:
-      return 4;
-    case SynthSource::MidiController:
-      return 1000;
-    case SynthSource::ChannelPressure:
-      return 128;
-    case SynthSource::PolyPressure:
-      return 129;
-    case SynthSource::PitchWheel:
-      return 130;
-    case SynthSource::Unknown:
-      return -1;
-  }
-
-  return -1;
+[[nodiscard]] std::optional<s32> sourceCode(SynthSource source) {
+  return source == SynthSource::ChannelPressure ? std::optional<s32>{128} : std::nullopt;
 }
 
 [[nodiscard]] std::optional<s32> sourceCode(std::optional<ModSource> source) {

@@ -3230,7 +3230,7 @@ void observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators()
       .amount = 180,
   };
   const SynthModulator explicitVibratoDepth{
-      .source = SynthSource::NoteOnVelocity,
+      .source = SynthSource::ChannelPressure,
       .destination = SynthDestination::VibratoDepth,
       .amount = 300,
   };
