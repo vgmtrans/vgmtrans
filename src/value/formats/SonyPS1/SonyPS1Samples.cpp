@@ -332,7 +332,9 @@ std::vector<SonyPs1SampleBodyLayout> findSonyPs1SampleBodies(ByteReader reader) 
         }
         continue;
       }
-      if (!validSampleStart(reader, candidate, true)) {
+      // The later sample already passed the statistical test. Walk backward
+      // using ADPCM frame validity, stopping at consecutive zero blocks.
+      if (zeroBlock(reader, candidate + kPsxAdpcmBlockBytes)) {
         break;
       }
       start = candidate;

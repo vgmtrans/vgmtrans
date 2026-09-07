@@ -90,7 +90,7 @@ constexpr u32 kPsxMainRamMask = 0x1fffff;
   if (numerator == 0) {
     return denominatorPower == 0;
   }
-  return numerator <= 32 && denominatorPower <= 7;
+  return denominatorPower <= 7;
 }
 
 [[nodiscard]] bool zeroFilled(ByteReader reader, u32 offset, u32 end, u32 count) {
