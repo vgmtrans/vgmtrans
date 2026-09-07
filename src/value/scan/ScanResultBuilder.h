@@ -127,8 +127,7 @@ private:
 // asset metadata setup, diagnostics, and scanner-known collections.
 class ScanResultBuilder {
 public:
-  ScanResultBuilder(ScanInput input, std::string format);
-  ScanResultBuilder(ScanInput input, std::string format, std::string collectionResolver);
+  ScanResultBuilder(ScanInput input, std::string format, std::string collectionResolver = {});
   ~ScanResultBuilder();
 
   [[nodiscard]] SourceId source() const noexcept { return input_.source.id; }
@@ -144,8 +143,7 @@ public:
   [[nodiscard]] ScanSamplePoolDraft samplePool(std::string name, SourceRange range = {});
   [[nodiscard]] ScanMiscDraft misc(std::string name, SourceRange range);
 
-  [[nodiscard]] ScanCollectionBuilder collection(std::string name);
-  [[nodiscard]] ScanCollectionBuilder collection(std::string name, CollectionKey key);
+  [[nodiscard]] ScanCollectionBuilder collection(std::string name, CollectionKey key = {});
   // Use when a scanner produces one collection per source and its display name
   // should not affect collection identity.
   [[nodiscard]] ScanCollectionBuilder sourceCollection(std::string name);
@@ -164,7 +162,6 @@ private:
   friend class ScanMiscDraft;
 
   [[nodiscard]] AssetMetadata metadata(AssetId id, std::string name, SourceRange range) const;
-  [[nodiscard]] CollectionKey defaultCollectionKey(std::string_view name) const;
   [[nodiscard]] ExplicitCollection& explicitCollection(size_t index);
 
   void setSequenceRange(size_t slot, SourceRange range);

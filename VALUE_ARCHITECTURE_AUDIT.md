@@ -372,6 +372,17 @@ The full build and all 17 CTest targets pass without compiler warnings,
 including fallback ownership, sample links, explicit ranges, and annotation
 parent tests.
 
+### Use scan-builder defaults without forwarding overloads
+
+Replace the forwarding constructor and collection overload with default
+arguments. The existing collection implementation already supplies missing
+resolver and identity values, so remove the separate default-key helper and
+its extra name copy. This removes 18 production lines and keeps scanner calls
+unchanged.
+
+The full build and all 17 CTest targets pass without compiler warnings,
+including collection identity and session resolution coverage.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
