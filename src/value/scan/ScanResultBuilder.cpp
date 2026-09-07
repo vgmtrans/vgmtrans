@@ -126,10 +126,6 @@ ScanCollectionBuilder& ScanCollectionBuilder::misc(AssetId asset) {
   return *this;
 }
 
-ScanResultBuilder::ScanResultBuilder(ScanInput input, std::string format)
-    : ScanResultBuilder(std::move(input), std::move(format), {}) {
-}
-
 ScanResultBuilder::ScanResultBuilder(ScanInput input, std::string format, std::string collectionResolver)
     : input_(std::move(input)), format_(std::move(format)),
       collectionResolver_(collectionResolver.empty() ? format_ : std::move(collectionResolver)),
@@ -192,10 +188,6 @@ ScanMiscDraft ScanResultBuilder::misc(std::string name, SourceRange range) {
   const size_t slot = drafts_.size();
   drafts_.push_back(std::make_unique<DraftSlot>(PendingMisc{.id = id, .name = std::move(name), .range = range}));
   return ScanMiscDraft(*this, slot, id);
-}
-
-ScanCollectionBuilder ScanResultBuilder::collection(std::string name) {
-  return collection(name, defaultCollectionKey(name));
 }
 
 ScanCollectionBuilder ScanResultBuilder::collection(std::string name, CollectionKey key) {
@@ -309,13 +301,6 @@ AssetMetadata ScanResultBuilder::metadata(AssetId id, std::string name, SourceRa
       .format = format_,
       .name = std::move(name),
       .range = range,
-  };
-}
-
-CollectionKey ScanResultBuilder::defaultCollectionKey(std::string_view name) const {
-  return CollectionKey{
-      .resolver = collectionResolver_,
-      .value = namedSourceCollectionKey(input_.source.id, name),
   };
 }
 
