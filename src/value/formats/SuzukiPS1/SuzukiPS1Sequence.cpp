@@ -372,11 +372,10 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   if (status < 0x80) {
     auto event = cursor.command("Note", SequenceSemantic::Note);
     const u8 packed = event.u8("note_and_duration", SourceValueDisplay::Hex);
-    const u8 scaleStep = event.derived("scale_step", static_cast<u8>(packed / 19), SourceValueDisplay::Default,
-                                       SemanticOperandRole::NoteKey);
+    const u8 scaleStep = event.derived("scale_step", static_cast<u8>(packed / 19));
     const u8 index = packed % 19;
-    const u16 duration = index == 0 ? event.u8("duration", SemanticOperandRole::Duration) : kDuration[index];
-    event.derived("velocity", status, SemanticOperandRole::Level);
+    const u16 duration = index == 0 ? event.u8("duration") : kDuration[index];
+    event.derived("velocity", status);
     return event.invoke<&Playback::note>(status, scaleStep, duration);
   }
   if (status > 0xfe || kCommandSize[status - 0x80] == 0) {
@@ -386,11 +385,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   switch (status) {
     case 0x80: {
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
-      return event.invoke<&Playback::rest>(event.u8("duration", SemanticOperandRole::Duration));
+      return event.invoke<&Playback::rest>(event.u8("duration"));
     }
     case 0x81: {
       auto event = cursor.command("Tie", SequenceSemantic::Note);
-      return event.invoke<&Playback::tie>(event.u8("duration", SemanticOperandRole::Duration));
+      return event.invoke<&Playback::tie>(event.u8("duration"));
     }
     case 0x90: {
       auto event = cursor.command("End of Track", SequenceSemantic::End);
@@ -457,7 +456,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xa2: {
       auto event = cursor.command("Tempo Slide", SequenceSemantic::Tempo);
-      const u8 duration = event.u8("duration", SemanticOperandRole::Duration);
+      const u8 duration = event.u8("duration");
       const u8 target = event.u8("target");
       event.derived("target_tempo", target * (75.0 / 64.0), SourceValueDisplay::BeatsPerMinute);
       return event.invoke<&Playback::tempoSlide>(duration, target);
@@ -529,96 +528,96 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xd1:
     case 0xd2: {
       auto event = cursor.command("Pitch Parameter", SequenceSemantic::Pitch, CommandPlaybackStatus::SourceOnly);
-      event.s8("value", SemanticOperandRole::Pitch);
+      event.s8("value");
       return event;
     }
     case 0xd4: {
       auto event = cursor.command("Portamento", SequenceSemantic::Portamento, CommandPlaybackStatus::SourceOnly);
-      event.u8("duration", SemanticOperandRole::Duration);
-      event.s8("depth", SemanticOperandRole::Pitch);
+      event.u8("duration");
+      event.s8("depth");
       return event;
     }
     case 0xd6: {
       auto event = cursor.command("Detune Parameter", SequenceSemantic::Pitch, CommandPlaybackStatus::SourceOnly);
-      event.s8("value", SemanticOperandRole::Pitch);
+      event.s8("value");
       return event;
     }
     case 0xd7: {
       auto event =
           cursor.command("Pitch Modulation Depth", SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
-      event.u8("depth", SemanticOperandRole::Modulation);
+      event.u8("depth");
       return event;
     }
     case 0xd8:
     case 0xd9: {
       auto event = cursor.command(status == 0xd8 ? "Pitch Modulation Shape" : "Pitch Modulation Envelope",
                                   SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
-      event.u8("parameter_1", SemanticOperandRole::Modulation);
-      event.u8("parameter_2", SemanticOperandRole::Modulation);
-      event.u8("parameter_3", SemanticOperandRole::Modulation);
+      event.u8("parameter_1");
+      event.u8("parameter_2");
+      event.u8("parameter_3");
       return event;
     }
     case 0xe0: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
-      const u8 value = event.u8("volume", SemanticOperandRole::Level);
+      const u8 value = event.u8("volume");
       return event.emitLevel(linearController(value));
     }
     case 0xe1: {
       auto event =
           cursor.command("Relative Volume Parameter", SequenceSemantic::Level, CommandPlaybackStatus::SourceOnly);
-      event.s8("value", SemanticOperandRole::Level);
+      event.s8("value");
       return event;
     }
     case 0xe2: {
       auto event = cursor.command("Volume Slide", SequenceSemantic::Level);
-      const u8 duration = event.u8("duration", SemanticOperandRole::Duration);
-      const u8 target = event.u8("target", SemanticOperandRole::Level);
+      const u8 duration = event.u8("duration");
+      const u8 target = event.u8("target");
       return event.invoke<&Playback::volumeSlide>(duration, target);
     }
     case 0xe3: {
       auto event =
           cursor.command("Volume Modulation Depth", SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
-      event.u8("depth", SemanticOperandRole::Modulation);
+      event.u8("depth");
       return event;
     }
     case 0xe4:
     case 0xe5: {
       auto event = cursor.command(status == 0xe4 ? "Volume Modulation Shape" : "Volume Modulation Envelope",
                                   SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
-      event.u8("parameter_1", SemanticOperandRole::Modulation);
-      event.u8("parameter_2", SemanticOperandRole::Modulation);
-      event.u8("parameter_3", SemanticOperandRole::Modulation);
+      event.u8("parameter_1");
+      event.u8("parameter_2");
+      event.u8("parameter_3");
       return event;
     }
     case 0xe8: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      const u8 value = event.u8("pan", SemanticOperandRole::Pan);
+      const u8 value = event.u8("pan");
       return event.emitPan(panPosition(value));
     }
     case 0xe9: {
       auto event = cursor.command("Relative Pan Parameter", SequenceSemantic::Pan, CommandPlaybackStatus::SourceOnly);
-      event.s8("value", SemanticOperandRole::Pan);
+      event.s8("value");
       return event;
     }
     case 0xea: {
       auto event = cursor.command("Pan Slide", SequenceSemantic::Pan);
-      const u8 duration = event.u8("duration", SemanticOperandRole::Duration);
-      const u8 target = event.u8("target", SemanticOperandRole::Pan);
+      const u8 duration = event.u8("duration");
+      const u8 target = event.u8("target");
       return event.invoke<&Playback::panSlide>(duration, target);
     }
     case 0xeb: {
       auto event =
           cursor.command("Pan Modulation Depth", SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
-      event.u8("depth", SemanticOperandRole::Modulation);
+      event.u8("depth");
       return event;
     }
     case 0xec:
     case 0xed: {
       auto event = cursor.command(status == 0xec ? "Pan Modulation Shape" : "Pan Modulation Envelope",
                                   SequenceSemantic::Modulation, CommandPlaybackStatus::SourceOnly);
-      event.u8("parameter_1", SemanticOperandRole::Modulation);
-      event.u8("parameter_2", SemanticOperandRole::Modulation);
-      event.u8("parameter_3", SemanticOperandRole::Modulation);
+      event.u8("parameter_1");
+      event.u8("parameter_2");
+      event.u8("parameter_3");
       return event;
     }
     case 0xfe: {

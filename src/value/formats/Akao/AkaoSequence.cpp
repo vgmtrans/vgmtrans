@@ -182,7 +182,7 @@ using AkaoEvent = AkaoCursor::Event;
 // positions. This general helper converts one when the caller already knows
 // what the address is for, such as a repeat, call, or conditional jump.
 [[nodiscard]] Address relativeAddress(AkaoEvent& event, const AkaoProfile& profile, u32 operandOffset,
-                                      std::string_view name, SemanticOperandRole role = SemanticOperandRole::Address) {
+                                      std::string_view name, SemanticOperandRole role = SemanticOperandRole::Value) {
   const s16 relative = event.s16le(name);
   const Address destination{profile.relativeDestination(operandOffset, relative)};
   event.derived(fmt::format("{}_absolute", name), destination, SourceValueDisplay::Address, role);
@@ -368,7 +368,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     case 0x12: {
       auto event = subCommand(cursor, "Volume Fade", SequenceSemantic::Level);
       const u16 duration = event.resolved("duration_ticks", event.rawU8("duration"), akaoZeroAs256);
-      const u8 target = event.u8("target_volume", SemanticOperandRole::Level);
+      const u8 target = event.u8("target_volume");
       return event.invoke(
           [](Playback& playback, u16 fadeTicks, u8 targetVolume) {
             const auto automation = playback.out.fade(PerformanceAutomationTarget::Level,
@@ -417,7 +417,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
 
     if (rest) {
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
-      const u32 delta = inlineDuration ? event.u8("duration", SemanticOperandRole::Duration) : fallbackDelta;
+      const u32 delta = inlineDuration ? event.u8("duration") : fallbackDelta;
       return event.invoke(
           [](Playback& playback, u32 encodedDelta, u32 defaultDelta) -> Effects {
             const u32 duration = playback.consumeDelta(encodedDelta, defaultDelta);
@@ -428,7 +428,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     }
     if (tie) {
       auto event = cursor.command("Tie", SequenceSemantic::Note);
-      const u32 delta = inlineDuration ? event.u8("duration", SemanticOperandRole::Duration) : fallbackDelta;
+      const u32 delta = inlineDuration ? event.u8("duration") : fallbackDelta;
       return event.invoke(
           [](Playback& playback, u32 encodedDelta, u32 defaultDelta, bool modernDriver) -> Effects {
             const u32 duration = playback.consumeDelta(encodedDelta, defaultDelta);
@@ -446,9 +446,8 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     auto event = cursor.command("Note", SequenceSemantic::Note);
     // The opcode stores a scale step. Octave and transposition are applied
     // later because their values depend on the path taken through the track.
-    const u8 relativeKey = event.opcodeValue("scale_step", static_cast<u8>(noteByte / 11), SourceValueDisplay::Default,
-                                             SemanticOperandRole::NoteKey);
-    const u32 delta = inlineDuration ? event.u8("duration", SemanticOperandRole::Duration) : fallbackDelta;
+    const u8 relativeKey = event.opcodeValue("scale_step", static_cast<u8>(noteByte / 11));
+    const u32 delta = inlineDuration ? event.u8("duration") : fallbackDelta;
     return event.invoke(
         [](Playback& playback, u8 scaleStep, u32 encodedDelta, u32 defaultDelta, bool modernDriver) -> Effects {
           const u32 duration = playback.consumeDelta(encodedDelta, defaultDelta);
@@ -487,19 +486,19 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     }
     case 0xa2: {
       auto event = cursor.command("Next Note Length", SequenceSemantic::State);
-      event.set<&TrackState::oneTimeDuration>(event.u8("duration", SemanticOperandRole::Duration));
+      event.set<&TrackState::oneTimeDuration>(event.u8("duration"));
       return event.set<&TrackState::useOneTimeDuration>(true);
     }
     case 0xa3: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
-      const u8 volume = event.u8("volume", SemanticOperandRole::Level);
+      const u8 volume = event.u8("volume");
       event.set<&TrackState::volume>(volume);
       return event.emitLevel(akaoLinearControllerGain(volume));
     }
     case 0xa4: {
       auto event = cursor.command("Pitch Slide", SequenceSemantic::Pitch);
       const u16 duration = event.resolved("duration_ticks", event.rawU8("duration"), akaoZeroAs256);
-      const s8 semitones = event.s8("semitones", SemanticOperandRole::Pitch);
+      const s8 semitones = event.s8("semitones");
       return event.invoke<&Playback::queuePitchSlide>(duration, semitones);
     }
     case 0xa5: {
@@ -518,14 +517,14 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     }
     case 0xa8: {
       auto event = cursor.command("Expression", SequenceSemantic::Level);
-      const u8 expression = event.u8("expression", SemanticOperandRole::Level);
+      const u8 expression = event.u8("expression");
       event.set<&TrackState::expression>(expression);
       return event.emitExpression(akaoLinearControllerGain(expression));
     }
     case 0xa9: {
       auto event = cursor.command("Expression Fade", SequenceSemantic::Level);
       const u16 duration = event.resolved("duration_ticks", event.rawU8("duration"), akaoZeroAs256);
-      const u8 target = event.u8("target_expression", SemanticOperandRole::Level);
+      const u8 target = event.u8("target_expression");
       return event.invoke(
           [](Playback& playback, u16 fadeTicks, u8 targetExpression) {
             const auto automation = playback.out.fade(PerformanceAutomationTarget::Expression,
@@ -538,14 +537,14 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     }
     case 0xaa: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      const u8 pan = event.u8("pan", SemanticOperandRole::Pan);
+      const u8 pan = event.u8("pan");
       event.set<&TrackState::pan>(pan);
       return event.emitPan(stereoPositionFromPan(pan));
     }
     case 0xab: {
       auto event = cursor.command("Pan Fade", SequenceSemantic::Pan);
       const u16 duration = event.resolved("duration_ticks", event.rawU8("duration"), akaoZeroAs256);
-      const u8 target = event.u8("target_pan", SemanticOperandRole::Pan);
+      const u8 target = event.u8("target_pan");
       return event.invoke(
           [](Playback& playback, u16 fadeTicks, u8 targetPan) {
             const double targetPosition = stereoPositionFromPan(targetPan);
@@ -558,11 +557,11 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     }
     case 0xc0: {
       auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.set<&TrackState::transpose>(event.s8("semitones", SemanticOperandRole::Pitch));
+      return event.set<&TrackState::transpose>(event.s8("semitones"));
     }
     case 0xc1: {
       auto event = cursor.command("Transpose (Relative)", SequenceSemantic::Pitch);
-      const s8 semitones = event.s8("semitones", SemanticOperandRole::Pitch);
+      const s8 semitones = event.s8("semitones");
       return event.invoke(
           [](Playback& playback, s8 relative) {
             playback.track.transpose =
@@ -619,7 +618,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
       return cursor.command("Legato Off", SequenceSemantic::State).set<&TrackState::legato>(false);
     case 0xd8: {
       auto event = cursor.command("Tuning", SequenceSemantic::Pitch);
-      const s8 tuning = event.s8("tuning", SemanticOperandRole::Pitch);
+      const s8 tuning = event.s8("tuning");
       event.set<&TrackState::tuning>(tuning);
       // Preserve Akao's original pitch resolution by first rounding through
       // the 14-bit bend value used with its twelve-semitone bend range.
@@ -630,7 +629,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     }
     case 0xd9: {
       auto event = cursor.command("Tuning (Relative)", SequenceSemantic::Pitch);
-      const s8 tuning = event.s8("tuning", SemanticOperandRole::Pitch);
+      const s8 tuning = event.s8("tuning");
       return event.invoke(
           [](Playback& playback, s8 relative) {
             playback.track.tuning =
@@ -651,7 +650,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
     }
     case 0xdc: {
       auto event = cursor.command("Fixed Note Length", SequenceSemantic::State);
-      const s8 relativeLength = event.s8("relative_length", SemanticOperandRole::Duration);
+      const s8 relativeLength = event.s8("relative_length");
       return event.invoke(
           [](Playback& playback, s8 relative) {
             playback.track.fixedDuration =

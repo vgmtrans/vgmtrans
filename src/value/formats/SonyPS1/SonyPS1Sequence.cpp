@@ -217,11 +217,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
                                        SequenceSemantic semantic,
                                        CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback) {
   auto event = cursor.command(label, semantic, playback);
-  event.opcodeValue("delta_byte_0", cursor.opcode(), SourceValueDisplay::Hex, SemanticOperandRole::Duration);
+  event.opcodeValue("delta_byte_0", cursor.opcode(), SourceValueDisplay::Hex);
   for (u32 i = 1; i < source.deltaSize; ++i) {
-    event.u8("delta_byte", SourceValueDisplay::Hex, SemanticOperandRole::Duration);
+    event.u8("delta_byte", SourceValueDisplay::Hex);
   }
-  event.derived("delta", source.delta, SemanticOperandRole::Duration);
+  event.derived("delta", source.delta);
   if (source.explicitStatus) {
     event.u8("status", SourceValueDisplay::Hex);
   } else {
@@ -244,8 +244,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   const u8 channel = source.status & 0x0f;
   if (family == 0x90) {
     auto event = beginEvent(cursor, source, source.data2 == 0 ? "Note Off" : "Note On", SequenceSemantic::Note);
-    const u8 key = event.u8("key", SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
-    const u8 velocity = event.u8("velocity", SemanticOperandRole::Level);
+    const u8 key = event.u8("key", SourceValueDisplay::MidiNote);
+    const u8 velocity = event.u8("velocity");
     return event.invoke<&Playback::note>(channel, key, velocity, source.delta);
   }
   if (family == 0xc0) {
@@ -255,10 +255,10 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   }
   if (family == 0xe0) {
     auto event = beginEvent(cursor, source, "Pitch Bend", SequenceSemantic::Pitch);
-    event.u8("lsb", SemanticOperandRole::Pitch);
-    const u8 msb = event.u8("msb", SemanticOperandRole::Pitch);
+    event.u8("lsb");
+    const u8 msb = event.u8("msb");
     event.derived("driver_wheel", static_cast<s16>((static_cast<int>(msb) - 64) * 128),
-                  SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
+                  SourceValueDisplay::SignedDecimal);
     return event.invoke<&Playback::pitchBend>(channel, msb, source.delta);
   }
   if (family == 0xb0) {
@@ -277,7 +277,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     if (loopEnd) {
       const Address destination{*source.loopDestination};
-      event.derived("repeat_count", source.loopCount, SemanticOperandRole::Count);
+      event.derived("repeat_count", source.loopCount);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
       event.invoke<&Playback::loopEnd>(source.loopCount, destination, source.delta)
           .mayBranchTo(destination);

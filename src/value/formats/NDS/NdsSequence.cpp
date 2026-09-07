@@ -326,11 +326,11 @@ struct SequenceDecodeContext {
 // Reads a three-byte relative address and records both that value and the final
 // destination it points to.
 [[nodiscard]] Address targetAddress(const SequenceDecodeContext& context, NdsCompilerCursor::Event& event,
-                                    SemanticOperandRole role) {
+                                    SemanticOperandRole role = SemanticOperandRole::Value) {
   const u32 relative = event.u24le("relative", SourceValueDisplay::Address);
   const Address destination{context.dataBase() + relative};
   return event.derived("destination", destination, SourceValueDisplay::Address,
-                       destination.value < context.range.sequenceEnd ? role : SemanticOperandRole::Address);
+                       destination.value < context.range.sequenceEnd ? role : SemanticOperandRole::Value);
 }
 
 // One source opcode is read and compiled in one block. Event operations append
@@ -344,17 +344,16 @@ struct SequenceDecodeContext {
 
   if (cursor.opcode() <= 0x7f) {
     auto event = cursor.command("Note", SequenceSemantic::Note);
-    const u8 key =
-        event.opcodeValue("key", cursor.opcode(), SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
-    const u8 velocity = event.u8("velocity", SemanticOperandRole::Level);
-    const u32 duration = event.varLen("duration", SemanticOperandRole::Duration);
+    const u8 key = event.opcodeValue("key", cursor.opcode(), SourceValueDisplay::MidiNote);
+    const u8 velocity = event.u8("velocity");
+    const u32 duration = event.varLen("duration");
     return event.invoke<&Playback::note>(key, velocity, duration);
   }
 
   switch (cursor.opcode()) {
     case 0x80: {
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
-      return event.wait(event.varLen("duration", SemanticOperandRole::Duration));
+      return event.wait(event.varLen("duration"));
     }
     case 0x81: {
       auto event = cursor.command("Program", SequenceSemantic::Program);
@@ -366,7 +365,7 @@ struct SequenceDecodeContext {
     case 0x93: {
       auto event = cursor.sourceOnly("Open Track");
       event.u8("track");
-      static_cast<void>(targetAddress(context, event, SemanticOperandRole::Address));
+      static_cast<void>(targetAddress(context, event));
       return event;
     }
     case 0x94:
@@ -457,8 +456,7 @@ struct SequenceDecodeContext {
     }
     case 0xc9: {
       auto event = cursor.command("Portamento Control", SequenceSemantic::Portamento);
-      return event.invoke<&Playback::portamentoControl>(
-          event.u8("key", SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey));
+      return event.invoke<&Playback::portamentoControl>(event.u8("key", SourceValueDisplay::MidiNote));
     }
     case 0xca: {
       auto event = cursor.command("Modulation Depth", SequenceSemantic::Modulation);
@@ -539,8 +537,7 @@ struct SequenceDecodeContext {
     }
     case 0xe3: {
       auto event = cursor.command("Sweep Pitch", SequenceSemantic::Pitch);
-      return event.set<&TrackState::sweepPitch>(
-          event.s16le("pitch", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+      return event.set<&TrackState::sweepPitch>(event.s16le("pitch", SourceValueDisplay::SignedDecimal));
     }
     case 0xfc:
       return cursor.ignored("Loop End", 0);

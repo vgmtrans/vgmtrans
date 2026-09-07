@@ -128,13 +128,13 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
     case 0x42:
     case 0x43: {
       auto event = cursor.command("Note", SequenceSemantic::Note);
-      const u8 key = event.opcodeBits<0, 2>("key", SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
-      const u32 duration = event.varLen("duration", SourceValueDisplay::Default, SemanticOperandRole::Duration);
+      const u8 key = event.opcodeBits<0, 2>("key", SourceValueDisplay::MidiNote);
+      const u32 duration = event.varLen("duration");
       return event.invoke<&CompilerProbePlayback::note>(static_cast<u8>(60 + key), duration);
     }
     case 0x50: {
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
-      return event.wait(event.varLen("duration", SourceValueDisplay::Default, SemanticOperandRole::Duration));
+      return event.wait(event.varLen("duration"));
     }
     case 0x60: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
@@ -156,7 +156,7 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
     case 0x64: {
       auto event = cursor.command("Equal-Valued Target", SequenceSemantic::Jump);
       const Address destination = event.address("destination", SemanticOperandRole::JumpTarget);
-      event.u16be("count", SourceValueDisplay::Default, SemanticOperandRole::Count);
+      event.u16be("count");
       return event.jump(destination);
     }
     case 0x69: {
@@ -478,7 +478,7 @@ void compilerCursorKeepsExactTargetOperandRoles() {
       decodeProbeCommand(ByteReader(SourceId{17}, bytes), 0, static_cast<u32>(bytes.size()));
   expect(command.operands.size() == 2, "equal-valued target fixture should decode both operands");
   expect(command.operands[0].role == SemanticOperandRole::JumpTarget &&
-             command.operands[1].role == SemanticOperandRole::Count,
+             command.operands[1].role == SemanticOperandRole::Value,
          "flow declaration must not relabel a different operand with the same numeric value");
 }
 

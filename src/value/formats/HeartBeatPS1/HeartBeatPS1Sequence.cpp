@@ -546,19 +546,19 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   if (source.end > source.offset + 1) {
     static_cast<void>(event.rawBytes("encoded_bytes", source.end - source.offset - 1));
   }
-  event.derived("delta", source.delta, SemanticOperandRole::Duration);
+  event.derived("delta", source.delta);
   event.derived("status", source.status, SourceValueDisplay::Hex);
   if (source.status < 0xf0) {
     event.derived("channel", channel, SemanticOperandRole::Channel);
   }
   if (family == 0x80) {
-    event.derived("key", source.data1, SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
-    event.derived("velocity", source.data2, SemanticOperandRole::Level);
+    event.derived("key", source.data1, SourceValueDisplay::MidiNote);
+    event.derived("velocity", source.data2);
     return event.invoke<&Playback::noteOff>(channel, source.data1, source.delta);
   }
   if (family == 0x90) {
-    event.derived("key", source.data1, SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
-    event.derived("velocity", source.data2, SemanticOperandRole::Level);
+    event.derived("key", source.data1, SourceValueDisplay::MidiNote);
+    event.derived("velocity", source.data2);
     return event.invoke<&Playback::noteOn>(channel, source.data1, source.data2, source.delta);
   }
   if (family == 0xa0 || family == 0xd0) {
@@ -570,7 +570,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
                   source.data1 == 32 ? SemanticOperandRole::InstrumentBank : SemanticOperandRole::Value);
     if (source.loopDestination) {
       const Address destination{*source.loopDestination};
-      event.derived("repeat_count", source.loopCount, SemanticOperandRole::Count);
+      event.derived("repeat_count", source.loopCount);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
       return event.invoke<&Playback::loopEnd>(source.loopCount, destination, source.delta).mayBranchTo(destination);
     }
@@ -585,7 +585,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   }
   if (family == 0xe0) {
     const u16 value = static_cast<u16>((source.data2 << 7) | source.data1);
-    event.derived("wheel", value, SemanticOperandRole::Pitch);
+    event.derived("wheel", value);
     return event.invoke<&Playback::pitchBend>(channel, value, source.delta);
   }
   if (source.status == 0xff && source.data1 == 0x51 && source.payloadSize == 3) {

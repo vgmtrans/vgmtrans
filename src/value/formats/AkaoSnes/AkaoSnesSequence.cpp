@@ -1625,7 +1625,7 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
 
   const u8 opcode = cursor.opcode();
   const EventType type = eventType(profile.version, profile.minorVersion, opcode);
-  const auto relocated = [&](auto& event, SemanticOperandRole role = SemanticOperandRole::Address) {
+  const auto relocated = [&](auto& event, SemanticOperandRole role = SemanticOperandRole::Value) {
     const auto stored = event.rawU16le("stored_destination", SourceValueDisplay::Address);
     return event.resolved(
         "destination", stored,
@@ -1667,12 +1667,12 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
 
     case EventType::Volume: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(event.u8("volume", SemanticOperandRole::Level));
+      return event.invoke<&Playback::volume>(event.u8("volume"));
     }
     case EventType::VolumeFade: {
       auto event = cursor.command("Volume Fade", SequenceSemantic::Level);
       const u16 length = profile.version == AKAOSNES_V1 ? event.u16le("length") : event.u8("length");
-      const u8 target = event.u8("volume", SemanticOperandRole::Level);
+      const u8 target = event.u8("volume");
       return length == 0 ? event.invoke<&Playback::volume>(target)
                          : event.invoke(
                                [](Playback& playback, u16 ticks, u8 volume) {
@@ -1684,12 +1684,12 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
     }
     case EventType::Pan: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      return event.invoke<&Playback::pan>(event.u8("pan", SemanticOperandRole::Pan));
+      return event.invoke<&Playback::pan>(event.u8("pan"));
     }
     case EventType::PanFade: {
       auto event = cursor.command("Pan Fade", SequenceSemantic::Pan);
       const u16 length = profile.version == AKAOSNES_V1 ? event.u16le("length") : event.u8("length");
-      const u8 target = event.u8("pan", SemanticOperandRole::Pan);
+      const u8 target = event.u8("pan");
       return length == 0
                  ? event.invoke<&Playback::pan>(target)
                  : event.invoke(

@@ -675,14 +675,14 @@ struct DecodeState {
           return event.invoke<&Playback::ymReleaseUniform>(event.u8("rate"));
         }
         auto event = cursor.command("Operator Release Rates", SequenceSemantic::Envelope);
-        const u8 first = event.u8("operators_1_2", SourceValueDisplay::Hex, SemanticOperandRole::Value);
-        const u8 second = event.u8("operators_3_4", SourceValueDisplay::Hex, SemanticOperandRole::Value);
+        const u8 first = event.u8("operators_1_2", SourceValueDisplay::Hex);
+        const u8 second = event.u8("operators_3_4", SourceValueDisplay::Hex);
         return event.invoke<&Playback::ymRelease>(first, second);
       }
       auto event = cursor.command("Sample Release", SequenceSemantic::Envelope);
-      const u8 packed = event.u8("delay_and_rate", SourceValueDisplay::Hex, SemanticOperandRole::Value);
-      event.derived("delay", static_cast<u8>(packed >> 4), SemanticOperandRole::Duration);
-      event.derived("attenuation_step", static_cast<u8>(packed & 0x0f), SemanticOperandRole::Level);
+      const u8 packed = event.u8("delay_and_rate", SourceValueDisplay::Hex);
+      event.derived("delay", static_cast<u8>(packed >> 4));
+      event.derived("attenuation_step", static_cast<u8>(packed & 0x0f));
       return event.invoke<&Playback::sampledRelease>(packed);
     }
     case 0xdd:
@@ -702,19 +702,19 @@ struct DecodeState {
       return cursor.command("Half Duration Toggle", SequenceSemantic::State).invoke<&Playback::toggleHalfDuration>();
     case 0xe0: {
       auto event = cursor.command("Initialize Channel", SequenceSemantic::State);
-      u8 base = event.u8("base_duration", SemanticOperandRole::Duration);
+      u8 base = event.u8("base_duration");
       if (base == 0) {
-        const u8 skip = event.u8("tick_skip_interval", SemanticOperandRole::Duration);
+        const u8 skip = event.u8("tick_skip_interval");
         event.invoke<&Playback::tempo>(skip);
-        base = event.u8("effective_base_duration", SemanticOperandRole::Duration);
+        base = event.u8("effective_base_duration");
       }
       if (!fm && (base & 0xf0) != 0) {
-        const u8 attenuation = event.u8("attenuation", SemanticOperandRole::Level);
+        const u8 attenuation = event.u8("attenuation");
         return event.invoke<&Playback::initializeDrums>(base, attenuation);
       }
       const u8 instrument = event.u8("program", SemanticOperandRole::InstrumentProgram);
-      const u8 attenuation = event.u8("attenuation", SemanticOperandRole::Level);
-      const u8 gate = event.u8("gate_fraction", SemanticOperandRole::Duration);
+      const u8 attenuation = event.u8("attenuation");
+      const u8 gate = event.u8("gate_fraction");
       return event.invoke<&Playback::initialize>(base, instrument, attenuation, gate);
     }
     case 0xe1: {
@@ -728,7 +728,7 @@ struct DecodeState {
     }
     case 0xe2: {
       auto event = cursor.command("Base Duration", SequenceSemantic::State);
-      return event.invoke<&Playback::setBaseDuration>(event.u8("ticks", SemanticOperandRole::Duration));
+      return event.invoke<&Playback::setBaseDuration>(event.u8("ticks"));
     }
     case 0xe3: {
       auto event = cursor.command("Program", SequenceSemantic::Program);
@@ -736,7 +736,7 @@ struct DecodeState {
     }
     case 0xe4: {
       auto event = cursor.command("Attenuation", SequenceSemantic::Level);
-      return event.invoke<&Playback::setAttenuation>(event.u8("attenuation", SemanticOperandRole::Level));
+      return event.invoke<&Playback::setAttenuation>(event.u8("attenuation"));
     }
     case 0xe5: {
       if (vendetta) {
@@ -772,14 +772,14 @@ struct DecodeState {
         return ignored(cursor, "Unused");
       }
       auto event = cursor.command("YM2151 Native LFO", SequenceSemantic::Modulation);
-      const u8 frequency = event.u8("frequency", SemanticOperandRole::Modulation);
+      const u8 frequency = event.u8("frequency");
       if (frequency == 0) {
         return event.invoke<&Playback::nativeLfo>(frequency, u8{0}, u8{0}, u8{0}, u8{0});
       }
-      const u8 pmd = event.u8("pitch_depth", SemanticOperandRole::Modulation);
-      const u8 amd = event.u8("amplitude_depth", SemanticOperandRole::Modulation);
+      const u8 pmd = event.u8("pitch_depth");
+      const u8 amd = event.u8("amplitude_depth");
       const u8 waveform = event.u8("waveform_and_ramp", SourceValueDisplay::Hex);
-      const u8 delay = event.u8("delay_or_ramp", SemanticOperandRole::Duration);
+      const u8 delay = event.u8("delay_or_ramp");
       return event.invoke<&Playback::nativeLfo>(frequency, pmd, amd, waveform, delay);
     }
     case 0xea: {
@@ -787,32 +787,31 @@ struct DecodeState {
         return ignored(cursor, "Unused");
       }
       auto event = cursor.command(vendetta ? "LFO Ramp Interval" : "LFO Delay", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::nativeLfoTiming>(event.u8("ticks", SemanticOperandRole::Duration));
+      return event.invoke<&Playback::nativeLfoTiming>(event.u8("ticks"));
     }
     case 0xeb: {
       if (!fm && layout.version == Version::SunsetRiders) {
         return ignored(cursor, "Unused");
       }
       auto event = cursor.command("Portamento", SequenceSemantic::Portamento);
-      return event.invoke<&Playback::setPortamento>(event.u8("rate", SemanticOperandRole::Duration));
+      return event.invoke<&Playback::setPortamento>(event.u8("rate"));
     }
     case 0xec: {
       auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::transpose>(
-          event.u8("packed_semitones", SourceValueDisplay::Hex, SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::transpose>(event.u8("packed_semitones", SourceValueDisplay::Hex));
     }
     case 0xed: {
       auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::pitchBend>(event.u8("bend", SourceValueDisplay::Hex, SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::pitchBend>(event.u8("bend", SourceValueDisplay::Hex));
     }
     case 0xee: {
       if (vendetta) {
         return ignored(cursor, "Unused");
       }
       auto event = cursor.command("Stepped Pitch / Volume Modulation", SequenceSemantic::Modulation);
-      const u8 count = event.u8("steps", SemanticOperandRole::Count);
-      const u8 pitch = event.u8("pitch_step", SourceValueDisplay::Hex, SemanticOperandRole::Pitch);
-      const u8 volume = event.u8("volume_step_and_interval", SourceValueDisplay::Hex, SemanticOperandRole::Level);
+      const u8 count = event.u8("steps");
+      const u8 pitch = event.u8("pitch_step", SourceValueDisplay::Hex);
+      const u8 volume = event.u8("volume_step_and_interval", SourceValueDisplay::Hex);
       event.invoke<&Playback::steppedModulation>(count, pitch, volume);
       return event.wait(count == 0 ? 256 : count);
     }
@@ -861,7 +860,7 @@ struct DecodeState {
         state.loops[slot] = event.nextAddress();
         return event;
       }
-      const u8 rawCount = event.u8("plays", SemanticOperandRole::Count);
+      const u8 rawCount = event.u8("plays");
       const u16 plays = rawCount == 0 ? 256 : rawCount == 0xff ? 0xffff : rawCount;
       event.derived("destination", target, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
       event.mayBranchTo(target);

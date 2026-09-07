@@ -592,14 +592,13 @@ struct DecodeContext {
     const bool tie = status == 0xcf;
     auto event = cursor.command(tie ? "Tie" : "Note", SequenceSemantic::Note);
     const u32 duration = tie ? 0 : kClockTable[status - 0xcf];
-    const u8 key = optionalParameter(cursor, event, running, state.key, "key", SourceValueDisplay::MidiNote,
-                                     SemanticOperandRole::NoteKey);
+    const u8 key = optionalParameter(cursor, event, running, state.key, "key", SourceValueDisplay::MidiNote);
     u8 velocity = state.velocity;
     u32 gate = duration;
     if (event.peekU8() && *event.peekU8() < 0x80) {
-      velocity = event.u8("velocity", SemanticOperandRole::Level);
+      velocity = event.u8("velocity");
       if (event.peekU8() && *event.peekU8() < 0x80) {
-        gate += event.u8("gate_extension", SemanticOperandRole::Duration);
+        gate += event.u8("gate_extension");
       }
     }
     state.key = key;
@@ -636,8 +635,7 @@ struct DecodeContext {
     }
     case 0xc3: {
       auto event = cursor.command("LFO Delay", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::lfoDelay>(
-          parameter(cursor, event, running, "ticks", SourceValueDisplay::Default, SemanticOperandRole::Duration));
+      return event.invoke<&Playback::lfoDelay>(parameter(cursor, event, running, "ticks"));
     }
     case 0xc4: {
       auto event = cursor.command("Modulation Depth", SequenceSemantic::Modulation);
@@ -682,7 +680,7 @@ struct DecodeContext {
         case 11:
           return event.invoke<&Playback::tonePanSweep>(event.u8("pan_sweep", SourceValueDisplay::Hex));
         case 12:
-          return event.wait(event.u16le("ticks", SourceValueDisplay::Default, SemanticOperandRole::Duration));
+          return event.wait(event.u16le("ticks"));
         case 13:
           static_cast<void>(event.u32le("sample_start"));
           return event;
@@ -699,8 +697,7 @@ struct DecodeContext {
     }
     case 0xce: {
       auto event = cursor.command("End Tie", SequenceSemantic::Note);
-      const u8 key = optionalParameter(cursor, event, running, state.key, "key", SourceValueDisplay::MidiNote,
-                                       SemanticOperandRole::NoteKey);
+      const u8 key = optionalParameter(cursor, event, running, state.key, "key", SourceValueDisplay::MidiNote);
       return event.invoke<&Playback::endTie>(key);
     }
     default:

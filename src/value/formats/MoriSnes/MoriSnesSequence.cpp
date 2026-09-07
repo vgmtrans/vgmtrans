@@ -995,12 +995,12 @@ void consumeTiming(Cursor::Event& event, u8 first, const InspectedEvent& inspect
   if (!inspected.timing.delay) {
     return;
   }
-  event.opcodeValue("delta", first, SourceValueDisplay::Default, SemanticOperandRole::Duration);
+  event.opcodeValue("delta", first);
   if (inspected.timing.duration) {
-    static_cast<void>(event.u8("duration", SemanticOperandRole::Duration));
+    static_cast<void>(event.u8("duration"));
   }
   if (inspected.timing.velocity) {
-    static_cast<void>(event.u8("velocity", SemanticOperandRole::Level));
+    static_cast<void>(event.u8("velocity"));
   }
   static_cast<void>(event.u8("status", SourceValueDisplay::Hex));
 }
@@ -1021,7 +1021,7 @@ void consumeTiming(Cursor::Event& event, u8 first, const InspectedEvent& inspect
 
   if (status < 0xc0) {
     const u8 note = status & 0x1f;
-    event.derived("note_index", note, SemanticOperandRole::NoteKey);
+    event.derived("note_index", note);
     std::optional<u8> parameter;
     if (status >= 0xa0) {
       parameter = event.u8("note_parameter", SourceValueDisplay::Hex);
@@ -1049,28 +1049,25 @@ void consumeTiming(Cursor::Event& event, u8 first, const InspectedEvent& inspect
       return event.invoke<&Playback::instrument>(inspected.timing, descriptor);
     }
     case 0xc1:
-      return event.invoke<&Playback::pan>(inspected.timing, event.u8("pan", SemanticOperandRole::Pan));
+      return event.invoke<&Playback::pan>(inspected.timing, event.u8("pan"));
     case 0xc2:
-      return event.invoke<&Playback::masterVolume>(inspected.timing,
-                                                   event.u8("volume", SemanticOperandRole::Level));
+      return event.invoke<&Playback::masterVolume>(inspected.timing, event.u8("volume"));
     case 0xc3:
       return event.invoke<&Playback::tempo>(inspected.timing, event.u8("tempo"));
     case 0xc4:
-      return event.invoke<&Playback::transpose>(inspected.timing,
-                                                event.s8("semitones", SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::transpose>(inspected.timing, event.s8("semitones"));
     case 0xc5:
-      return event.invoke<&Playback::volume>(inspected.timing, event.u8("volume", SemanticOperandRole::Level));
+      return event.invoke<&Playback::volume>(inspected.timing, event.u8("volume"));
     case 0xc6:
       return event.invoke<&Playback::priority>(inspected.timing, event.u8("priority"));
     case 0xc7:
-      return event.invoke<&Playback::fineTuning>(inspected.timing,
-                                                 event.u8("fraction", SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::fineTuning>(inspected.timing, event.u8("fraction"));
     case 0xc8:
     case 0xc9:
       return event.invoke<&Playback::echoEnabled>(inspected.timing, *command == 0xc8);
     case 0xca: {
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      const s8 volume = event.s8("volume", SemanticOperandRole::Level);
+      const u8 delay = event.u8("delay");
+      const s8 volume = event.s8("volume");
       const s8 feedback = event.s8("feedback");
       return event.invoke<&Playback::echoParameters>(inspected.timing, delay, volume, feedback,
                                                      event.u8("fir_preset"));
@@ -1092,7 +1089,7 @@ void consumeTiming(Cursor::Event& event, u8 first, const InspectedEvent& inspect
     case 0xcd:
       return event.invoke<&Playback::wait>(inspected.timing).return_();
     case 0xce: {
-      const u8 count = event.u8("count", SemanticOperandRole::Count);
+      const u8 count = event.u8("count");
       return event.invokeFlow<&Playback::repeatStart>(inspected.timing, count, event.nextAddress());
     }
     case 0xcf:
@@ -1100,9 +1097,7 @@ void consumeTiming(Cursor::Event& event, u8 first, const InspectedEvent& inspect
     case 0xd0:
       return event.end();
     case 0xd1:
-      return event.invoke<&Playback::noteBase>(inspected.timing,
-                                               event.u8("note", SourceValueDisplay::MidiNote,
-                                                        SemanticOperandRole::NoteKey));
+      return event.invoke<&Playback::noteBase>(inspected.timing, event.u8("note", SourceValueDisplay::MidiNote));
     case 0xd2:
       return event.invoke<&Playback::changeOctave>(inspected.timing, s8{12});
     case 0xd3:
@@ -1112,28 +1107,22 @@ void consumeTiming(Cursor::Event& event, u8 first, const InspectedEvent& inspect
     case 0xd5:
       return event.invoke<&Playback::mode>(inspected.timing, event.u8("flags", SourceValueDisplay::Hex));
     case 0xd6:
-      return event.invoke<&Playback::bendRange>(inspected.timing,
-                                                event.u8("eighth_semitones", SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::bendRange>(inspected.timing, event.u8("eighth_semitones"));
     case 0xd7:
-      return event.invoke<&Playback::transpose>(inspected.timing,
-                                                event.s8("semitones", SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::transpose>(inspected.timing, event.s8("semitones"));
     case 0xd8:
-      return event.invoke<&Playback::transposeAdd>(inspected.timing,
-                                                   event.s8("semitones", SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::transposeAdd>(inspected.timing, event.s8("semitones"));
     case 0xd9:
-      return event.invoke<&Playback::fineTuningAdd>(inspected.timing,
-                                                    event.s8("fraction", SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::fineTuningAdd>(inspected.timing, event.s8("fraction"));
     case 0xda:
     case 0xdb:
       // These handlers manipulate the current hardware-voice mask. The source
       // track pass has no voice mask selected, so both are inert in song data.
       return event.invoke<&Playback::wait>(inspected.timing);
     case 0xdc:
-      return event.invoke<&Playback::relativeVolume>(inspected.timing,
-                                                     event.s8("delta", SemanticOperandRole::Level));
+      return event.invoke<&Playback::relativeVolume>(inspected.timing, event.s8("delta"));
     case 0xdd:
-      return event.invoke<&Playback::pitchBend>(inspected.timing,
-                                               event.s8("position", SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::pitchBend>(inspected.timing, event.s8("position"));
     case 0xde: {
       const s16 relative = event.s16le("relative", SourceValueDisplay::SignedDecimal,
                                       SemanticOperandRole::InstrumentTablePointer);

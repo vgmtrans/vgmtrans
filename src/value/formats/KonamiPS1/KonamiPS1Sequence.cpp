@@ -694,14 +694,14 @@ struct ControllerInfo {
   if (source.end > source.offset + 1) {
     static_cast<void>(event.rawBytes("encoded_bytes", source.end - source.offset - 1));
   }
-  event.derived("delta", source.delta, SemanticOperandRole::Duration);
+  event.derived("delta", source.delta);
   event.derived("chained", source.chained, SourceValueDisplay::Boolean);
   event.delay(source.delta);
 
   switch (source.kind) {
     case EventKind::Note:
-      event.derived("key", source.command, SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
-      event.derived("velocity", source.value, SemanticOperandRole::Level);
+      event.derived("key", source.command, SourceValueDisplay::MidiNote);
+      event.derived("velocity", source.value);
       return event.invoke<&Playback::note>(source.command, source.value);
     case EventKind::SetChannel:
       event.derived("channel", source.value, SemanticOperandRole::Channel);
@@ -714,7 +714,7 @@ struct ControllerInfo {
       return event.invoke<&Playback::tempo>(source.value);
     }
     case EventKind::PitchBend:
-      event.derived("wheel_msb", source.value, SemanticOperandRole::Pitch);
+      event.derived("wheel_msb", source.value);
       return event.invoke<&Playback::pitchBend>(source.value);
     case EventKind::Program:
       event.derived("program", source.value, SemanticOperandRole::InstrumentProgram);
@@ -729,7 +729,7 @@ struct ControllerInfo {
                     source.command == 0 ? SemanticOperandRole::InstrumentBank : SemanticOperandRole::Value);
       if (source.loopDestination) {
         const Address destination{*source.loopDestination};
-        event.derived("repeat_count", source.loopCount, SemanticOperandRole::Count);
+        event.derived("repeat_count", source.loopCount);
         event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
         return event.invokeFlow<&Playback::loopEnd>(source.loopCount, destination).mayBranchTo(destination);
       }

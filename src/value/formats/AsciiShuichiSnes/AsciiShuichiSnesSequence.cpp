@@ -510,7 +510,7 @@ constexpr std::array<Command, 23> kEarlyCommands{
   if (event.peekU8().value_or(0xff) >= 0x80) {
     return std::nullopt;
   }
-  return event.u8("length", SemanticOperandRole::Duration);
+  return event.u8("length");
 }
 
 [[nodiscard]] u8 programOperand(Cursor::Event& event, std::set<u8>* programs) {
@@ -531,9 +531,8 @@ Cursor::Event& selectInstrument(Cursor::Event& event, u8 program) {
 [[nodiscard]] u8 targetNote(Cursor::Event& event, u8 noteBase) {
   const auto encoded = event.rawU8("encoded_target", SourceValueDisplay::Hex);
   return event.resolved(
-      "target_note", encoded,
-      [=](u8 value) { return static_cast<u8>(value - noteBase + kOutputKeyOffset); },
-      SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
+      "target_note", encoded, [=](u8 value) { return static_cast<u8>(value - noteBase + kOutputKeyOffset); },
+      SourceValueDisplay::MidiNote);
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeFir(Cursor& cursor) {
@@ -564,7 +563,7 @@ Cursor::Event& selectInstrument(Cursor::Event& event, u8 program) {
     }
     case 0x84: {
       auto event = cursor.command("Repeat End", SequenceSemantic::Repeat);
-      const u8 count = event.u8("count", SemanticOperandRole::Count);
+      const u8 count = event.u8("count");
       return event.invokeFlow<&Playback::repeatEnd>(count, event.nextAddress());
     }
     case 0x85:
@@ -600,68 +599,67 @@ Cursor::Event& selectInstrument(Cursor::Event& event, u8 program) {
     }
     case Command::Transpose: {
       auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.set<&TrackState::transpose>(event.s8("semitones", SemanticOperandRole::Pitch));
+      return event.set<&TrackState::transpose>(event.s8("semitones"));
     }
     case Command::RelativeTranspose: {
       auto event = cursor.command("Relative Transpose", SequenceSemantic::Pitch);
-      return event.add<&TrackState::transpose>(event.s8("semitones", SemanticOperandRole::Pitch));
+      return event.add<&TrackState::transpose>(event.s8("semitones"));
     }
     case Command::FineTuning: {
       auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::fineTuning>(event.s8("fraction", SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::fineTuning>(event.s8("fraction"));
     }
     case Command::PitchSlide: {
       auto event = cursor.command("Pitch Slide to Note", SequenceSemantic::Pitch);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      const u8 duration = event.u8("duration", SemanticOperandRole::Duration);
+      const u8 delay = event.u8("delay");
+      const u8 duration = event.u8("duration");
       event.invoke<&Playback::pitchSlide>(delay, duration, targetNote(event, layout.noteBase()));
       return event.duringWaitWhen<&Playback::canInlineNoteControl>();
     }
     case Command::DurationRate: {
       auto event = cursor.command("Duration Rate", SequenceSemantic::State);
-      const u8 rate = event.u8("rate", SemanticOperandRole::Duration);
+      const u8 rate = event.u8("rate");
       return event.set<&TrackState::durationUsesRate>(true).set<&TrackState::durationRate>(rate);
     }
     case Command::VolumeAndPan: {
       auto event = cursor.command("Volume and Pan", SequenceSemantic::Level);
-      const u8 volume = event.u8("volume", SemanticOperandRole::Level);
-      const u8 pan = event.u8("pan", SemanticOperandRole::Pan);
+      const u8 volume = event.u8("volume");
+      const u8 pan = event.u8("pan");
       return event.invoke<&Playback::volume>(volume).invoke<&Playback::pan>(pan);
     }
     case Command::Volume: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(event.u8("volume", SemanticOperandRole::Level));
+      return event.invoke<&Playback::volume>(event.u8("volume"));
     }
     case Command::RelativeVolume: {
       auto event = cursor.command("Relative Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::relativeVolume>(event.s8("delta", SemanticOperandRole::Level));
+      return event.invoke<&Playback::relativeVolume>(event.s8("delta"));
     }
     case Command::TemporaryVolume: {
       auto event = cursor.command("Temporary Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::temporaryVolume>(event.s8("delta", SemanticOperandRole::Level));
+      return event.invoke<&Playback::temporaryVolume>(event.s8("delta"));
     }
     case Command::Pan: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      return event.invoke<&Playback::pan>(event.u8("pan", SemanticOperandRole::Pan));
+      return event.invoke<&Playback::pan>(event.u8("pan"));
     }
     case Command::AutomaticPan: {
       auto event = cursor.command("Automatic Pan", SequenceSemantic::Pan);
-      const u8 interval = event.u8("interval_minus_one", SemanticOperandRole::Duration);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      return event.invoke<&Playback::panFade>(interval, delay, event.u8("endpoint_and_mode", SemanticOperandRole::Pan));
+      const u8 interval = event.u8("interval_minus_one");
+      const u8 delay = event.u8("delay");
+      return event.invoke<&Playback::panFade>(interval, delay, event.u8("endpoint_and_mode"));
     }
     case Command::VolumeFade: {
       auto event = cursor.command("Volume Fade", SequenceSemantic::Level);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      const u8 interval = event.u8("interval", SemanticOperandRole::Duration);
-      const s8 step = event.s8("step", SemanticOperandRole::Level);
-      return event.invoke<&Playback::volumeFade>(delay, interval, step,
-                                                 event.u8("step_count", SemanticOperandRole::Count));
+      const u8 delay = event.u8("delay");
+      const u8 interval = event.u8("interval");
+      const s8 step = event.s8("step");
+      return event.invoke<&Playback::volumeFade>(delay, interval, step, event.u8("step_count"));
     }
     case Command::EchoVolume: {
       auto event = cursor.command("Echo Volume", SequenceSemantic::State);
-      const s8 left = event.s8("left", SemanticOperandRole::Level);
-      return event.invoke<&Playback::echoVolume>(left, event.s8("right", SemanticOperandRole::Level));
+      const s8 left = event.s8("left");
+      return event.invoke<&Playback::echoVolume>(left, event.s8("right"));
     }
     case Command::EchoParameters: {
       auto event = cursor.command("Echo Parameters", SequenceSemantic::State);
@@ -675,10 +673,10 @@ Cursor::Event& selectInstrument(Cursor::Event& event, u8 program) {
     }
     case Command::Vibrato: {
       auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      const u8 rate = event.u8("step_interval", SemanticOperandRole::Modulation);
-      const s8 step = event.s8("pitch_step", SemanticOperandRole::Modulation);
-      const u8 width = event.u8("direction_width", SemanticOperandRole::Duration);
+      const u8 delay = event.u8("delay");
+      const u8 rate = event.u8("step_interval");
+      const s8 step = event.s8("pitch_step");
+      const u8 width = event.u8("direction_width");
       return event.invoke<&Playback::vibrato>(Vibrato{.delay = delay, .rate = rate, .step = step, .width = width});
     }
     case Command::VibratoOff:
@@ -703,9 +701,9 @@ Cursor::Event& selectInstrument(Cursor::Event& event, u8 program) {
     case Command::Combined: {
       auto event = cursor.command("Program, Volume, Pan and Transpose", SequenceSemantic::State);
       const u8 program = programOperand(event, programs);
-      const u8 volume = event.u8("volume", SemanticOperandRole::Level);
-      const u8 pan = event.u8("pan", SemanticOperandRole::Pan);
-      const s8 transpose = event.s8("transpose", SemanticOperandRole::Pitch);
+      const u8 volume = event.u8("volume");
+      const u8 pan = event.u8("pan");
+      const s8 transpose = event.s8("transpose");
       selectInstrument(event, program);
       return event.invoke<&Playback::volume>(volume)
           .invoke<&Playback::pan>(pan)
@@ -713,7 +711,7 @@ Cursor::Event& selectInstrument(Cursor::Event& event, u8 program) {
     }
     case Command::DurationTicks: {
       auto event = cursor.command("Duration Ticks", SequenceSemantic::State);
-      const u8 ticks = event.u8("ticks", SemanticOperandRole::Duration);
+      const u8 ticks = event.u8("ticks");
       return event.set<&TrackState::durationUsesRate>(false).set<&TrackState::duration>(ticks);
     }
     case Command::WriteCpuPort: {
@@ -725,7 +723,7 @@ Cursor::Event& selectInstrument(Cursor::Event& event, u8 program) {
       return cursor.command("End Voice", SequenceSemantic::End).end();
     case Command::MasterVolume: {
       auto event = cursor.command("Master Volume", SequenceSemantic::Level);
-      const u8 volume = event.u8("volume", SemanticOperandRole::Level);
+      const u8 volume = event.u8("volume");
       return event.emitMasterLevel(std::abs(static_cast<s8>(volume)) / 127.0);
     }
     default:
@@ -749,7 +747,7 @@ Cursor::Event& selectInstrument(Cursor::Event& event, u8 program) {
   if (opcode >= layout.noteBase()) {
     auto event = cursor.command("Note", SequenceSemantic::Note);
     const u8 key = event.opcodeValue("key", static_cast<u8>(opcode - layout.noteBase() + kOutputKeyOffset),
-                                     SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
+                                     SourceValueDisplay::MidiNote);
     const std::optional<u8> length = optionalLength(event);
     const bool followedByRest = event.peekU8() == (layout.version == Version::Early ? 0x9b : 0x9f);
     return event.invoke<&Playback::note>(key, length, followedByRest);
