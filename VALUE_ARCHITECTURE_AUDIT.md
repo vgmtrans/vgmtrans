@@ -237,6 +237,19 @@ warnings. A before/after comparison across 4,608 configurations, each containing
 mixed instruments, multiple regions, and an envelope variant, produces identical
 bytes for all 9,216 SF2/DLS outputs.
 
+### Retain decoded samples through SoundFont writing
+
+Remove the SoundFont-only sample record and the pass that moved every decoded
+sample into it. The sample-header writer calculates its frame offsets directly,
+including padding, and checks their range before narrowing. Names, tuning, PCM,
+and loop data continue to use the shared decoded-sample record. This removes
+another type, an unused local-index field, and 34 production lines.
+
+The full build and all 17 CTest targets pass without compiler warnings. Extend
+the 4,608-configuration differential test to three sample lengths, multiple
+sample references, loop offsets, tuning, and an empty name. All 9,216 SF2/DLS
+outputs remain byte-for-byte identical to the earlier exporter.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
