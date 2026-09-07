@@ -30,7 +30,6 @@ using namespace core;
 namespace {
 
 constexpr u32 kCommandLimit = 32768;
-constexpr u32 kStatesPerAddress = 16;
 constexpr std::array<std::array<s8, 8>, 4> kFirPresets{{
     {{0x7f, 0, 0, 0, 0, 0, 0, 0}},
     {{0x58, -0x41, -0x25, -0x10, -2, 7, 0x0c, 0x0c}},
@@ -106,8 +105,47 @@ struct VibratoState {
   bool startsNegative = false;
   u8 delay = 0;
   u8 step = 0;
-  u8 interval = 0;
+  u8 halfCycleTicks = 0;
 };
+
+[[nodiscard]] LfoPerformanceContext vibratoContext(const VibratoState& vibrato, double referencePitch) {
+  const u32 halfCycle = math::ticks(vibrato.halfCycleTicks);
+  std::vector<double> samples;
+  samples.reserve(halfCycle * 2);
+  int offset = 0;
+  int step = vibrato.startsNegative ? -vibrato.step : vibrato.step;
+  // Notes begin halfway through the first direction interval so the signed
+  // pitch accumulator oscillates around zero; later reversals use the full interval.
+  u8 directionTicks = static_cast<u8>(vibrato.halfCycleTicks >> 1);
+  for (u32 sample = 0; sample < halfCycle * 2; ++sample) {
+    offset += step;
+    if (--directionTicks == 0) {
+      directionTicks = vibrato.halfCycleTicks;
+      if (directionTicks != 0) {
+        step = -step;
+      }
+    }
+    samples.push_back(math::semitones(referencePitch + offset, referencePitch));
+  }
+
+  const auto [lowest, highest] = std::ranges::minmax_element(samples);
+  const ModulationRange range{.minimum = std::min(0.0, *lowest), .maximum = std::max(0.0, *highest)};
+  for (double& value : samples) {
+    const double extent = value < 0.0 ? -range.minimum : range.maximum;
+    value = extent == 0.0 ? 0.0 : value / extent;
+  }
+  return {
+      .cyclesPerTick = 1.0 / (2.0 * halfCycle),
+      .delayTicks = vibrato.delay,
+      .delayIsTempoRelative = true,
+      .shape = LfoShape{.waveform = LfoWaveform::Triangle, .samples = std::move(samples)},
+      .polarity = LfoPolarity::Bipolar,
+      .initialPhaseCycles = 0.0,
+      .pitchRangeSemitones = range,
+      .sampleImmediatelyOnNote = true,
+      .restartMode = LfoRestartMode::PhaseAndDelay,
+  };
+}
 
 struct TrackState {
   TrackState(const TrackProgram& sourceTrack, const RuntimeConfig& config)
@@ -276,26 +314,11 @@ struct Playback {
       }
       return;
     }
-    const u32 halfCycle = math::ticks(static_cast<u8>(vibrato.interval >> 1));
-    const double rawDepth = vibrato.step * halfCycle;
-    const LfoPolarity polarity = vibrato.startsNegative ? LfoPolarity::Negative : LfoPolarity::Positive;
-    const double minimum =
-        vibrato.startsNegative ? math::semitones(track.referencePitch - rawDepth, track.referencePitch) : 0.0;
-    const double maximum =
-        vibrato.startsNegative ? 0.0 : math::semitones(track.referencePitch + rawDepth, track.referencePitch);
-    const LfoPerformanceContext context{
-        .cyclesPerTick = 1.0 / (2.0 * halfCycle),
-        .delayTicks = vibrato.delay,
-        .delayIsTempoRelative = true,
-        .shape = LfoShape{.waveform = LfoWaveform::Triangle},
-        .polarity = polarity,
-        .initialPhaseCycles = vibrato.startsNegative ? 0.25 : 0.75,
-        .pitchRangeSemitones = ModulationRange{.minimum = minimum, .maximum = maximum},
-        .sampleImmediatelyOnNote = true,
-        .restartMode = LfoRestartMode::PhaseAndDelay,
-    };
-    out.vibratoDepth(std::max(std::abs(minimum), std::abs(maximum)), context);
-    out.vibratoRateCyclesPerTick(*context.cyclesPerTick, context);
+    LfoPerformanceContext context = vibratoContext(vibrato, track.referencePitch);
+    const ModulationRange range = *context.pitchRangeSemitones;
+    const double cyclesPerTick = *context.cyclesPerTick;
+    out.vibratoRateCyclesPerTick(cyclesPerTick, context);
+    out.vibratoDepth(std::max(std::abs(range.minimum), std::abs(range.maximum)), std::move(context));
     track.vibratoOutputActive = true;
   }
 
@@ -660,8 +683,14 @@ struct Playback {
       }
     }
   }
-  void vibrato(bool negative, u8 delay, u8 step, u8 interval) {
-    track.vibrato = {.enabled = true, .startsNegative = negative, .delay = delay, .step = step, .interval = interval};
+  void vibrato(bool negative, u8 delay, u8 step, u8 halfCycleTicks) {
+    track.vibrato = {
+        .enabled = true,
+        .startsNegative = negative,
+        .delay = delay,
+        .step = step,
+        .halfCycleTicks = halfCycleTicks,
+    };
   }
   void vibratoOff() {
     track.vibrato.enabled = false;
@@ -1166,7 +1195,6 @@ struct DiscoveredCommand {
   std::vector<DiscoveryPoint> pending{{.offset = startAddress}};
   std::set<DiscoveryPoint> visited;
   std::map<u32, DiscoveredCommand> commands;
-  std::map<u32, u32> stateVisits;
 
   const auto queue = [&](Address address, DiscoveryPoint point) {
     if (address.value < kAramSize && reader.has(address.value, 1)) {
@@ -1178,11 +1206,9 @@ struct DiscoveredCommand {
   while (!pending.empty() && visited.size() < kCommandLimit) {
     DiscoveryPoint point = std::move(pending.back());
     pending.pop_back();
-    if (!reader.has(point.offset, 1) || stateVisits[point.offset] >= kStatesPerAddress ||
-        !visited.insert(point).second) {
+    if (!reader.has(point.offset, 1) || !visited.insert(point).second) {
       continue;
     }
-    ++stateVisits[point.offset];
     DecodeState nextState = point.state;
     DecodedBytecodeCommand decoded =
         decodeCommand(reader, layout, point.offset, nextState, diagnostics, referencedInstruments);
