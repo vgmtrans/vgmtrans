@@ -214,16 +214,6 @@ std::vector<AkaoSnesInstrumentInfo> parseAkaoSnesInstrumentInfos(ByteReader read
   return infos;
 }
 
-SnesBrrCatalog readAkaoSnesSamples(ByteReader reader, u32 spcDirAddress,
-                                   const std::vector<AkaoSnesInstrumentInfo>& instruments) {
-  std::vector<u8> srcns;
-  srcns.reserve(instruments.size());
-  for (const auto& instrument : instruments) {
-    srcns.push_back(instrument.srcn);
-  }
-  return readSnesBrrCatalog(reader, spcDirAddress, srcns);
-}
-
 void addAkaoSnesInstruments(InstrumentSetBuilder& instruments, ByteReader reader, const AkaoSnesLayout& layout,
                             const std::vector<AkaoSnesInstrumentInfo>& instrumentInfos,
                             const SnesBrrSampleRefs& sampleRefs) {
@@ -316,7 +306,8 @@ std::optional<ScanSoundBankDraft> addAkaoSnesSynth(ScanResultBuilder& builder, c
   if (instrumentInfos.empty() || !layout.spcDirAddress) {
     return std::nullopt;
   }
-  const auto sampleCatalog = readAkaoSnesSamples(reader, *layout.spcDirAddress, instrumentInfos);
+  const auto sampleCatalog =
+      readSnesBrrCatalog(reader, *layout.spcDirAddress, instrumentInfos, &AkaoSnesInstrumentInfo::srcn);
   if (sampleCatalog.samples.empty()) {
     return std::nullopt;
   }

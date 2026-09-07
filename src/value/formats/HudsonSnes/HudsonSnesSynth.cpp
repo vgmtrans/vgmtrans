@@ -83,16 +83,6 @@ struct Patch {
   return found == patches.end() ? nullptr : &*found;
 }
 
-[[nodiscard]] std::vector<u8> referencedSrcns(const std::vector<Patch>& patches) {
-  std::vector<u8> result;
-  for (const Patch& patch : patches) {
-    result.push_back(patch.row.srcn);
-  }
-  std::ranges::sort(result);
-  result.erase(std::ranges::unique(result).begin(), result.end());
-  return result;
-}
-
 void addMelodic(InstrumentSetBuilder& instruments, const std::vector<Patch>& patches,
                 const SnesBrrSampleRefs& samples) {
   for (const Patch& patch : patches) {
@@ -165,7 +155,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   if (patches.empty()) {
     return std::nullopt;
   }
-  const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, referencedSrcns(patches));
+  const SnesBrrCatalog catalog =
+      readSnesBrrCatalog(reader, layout.spcDirAddress, patches, [](const Patch& patch) { return patch.row.srcn; });
   if (catalog.samples.empty()) {
     return std::nullopt;
   }

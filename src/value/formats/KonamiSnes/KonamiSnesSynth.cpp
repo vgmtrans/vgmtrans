@@ -215,18 +215,6 @@ std::vector<KonamiSnesInstrumentInfo> parseKonamiSnesInstrumentInfos(ByteReader 
   return infos;
 }
 
-SnesBrrCatalog parseKonamiSnesSampleInfos(ByteReader reader, u32 spcDirAddress,
-                                          const std::vector<KonamiSnesInstrumentInfo>& instruments) {
-  // Read only samples referenced by accepted instruments. The shared sample
-  // reader removes duplicate sample numbers and follows each stream to its end.
-  std::vector<u8> srcns;
-  srcns.reserve(instruments.size());
-  for (const auto& instrument : instruments) {
-    srcns.push_back(instrument.srcn);
-  }
-  return readSnesBrrCatalog(reader, spcDirAddress, srcns);
-}
-
 namespace {
 
 void addKonamiSnesInstruments(InstrumentSetBuilder& instruments, ByteReader reader,
@@ -291,7 +279,8 @@ std::optional<ScanSoundBankDraft> addKonamiSnesSynth(ScanResultBuilder& builder,
                                                      const std::vector<KonamiSnesInstrumentInfo>& instrumentInfos,
                                                      std::string_view displayName) {
   const ByteReader reader = builder.reader();
-  const auto sampleCatalog = parseKonamiSnesSampleInfos(reader, *layout.spcDirAddress, instrumentInfos);
+  const auto sampleCatalog =
+      readSnesBrrCatalog(reader, *layout.spcDirAddress, instrumentInfos, &KonamiSnesInstrumentInfo::srcn);
   // Do not publish half of a synth. A sound bank without sample data (or
   // vice versa) cannot produce a usable export.
   if (instrumentInfos.empty() || sampleCatalog.samples.empty()) {

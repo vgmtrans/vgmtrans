@@ -55,15 +55,6 @@ struct Patch {
   return result;
 }
 
-[[nodiscard]] std::vector<u8> programs(const std::vector<Patch>& patches) {
-  std::vector<u8> result;
-  result.reserve(patches.size());
-  for (const Patch& patch : patches) {
-    result.push_back(patch.program);
-  }
-  return result;
-}
-
 }  // namespace
 
 std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
@@ -73,7 +64,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   if (patches.empty()) {
     return std::nullopt;
   }
-  const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, programs(patches));
+  const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, patches, &Patch::program);
   if (catalog.samples.empty()) {
     return std::nullopt;
   }

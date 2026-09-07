@@ -55,15 +55,6 @@ namespace {
   return result;
 }
 
-[[nodiscard]] std::vector<u8> referencedSrcns(const std::vector<InstrumentInfo>& patches) {
-  std::vector<u8> result;
-  result.reserve(patches.size());
-  for (const InstrumentInfo& patch : patches) {
-    result.push_back(patch.program);
-  }
-  return result;
-}
-
 void addInstruments(InstrumentSetBuilder& instruments, const std::vector<InstrumentInfo>& patches,
                     const SnesBrrSampleRefs& samples, const Layout& layout) {
   for (const InstrumentInfo& patch : patches) {
@@ -134,7 +125,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   if (patches.empty()) {
     return std::nullopt;
   }
-  SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.instruments.sampleDirAddress, referencedSrcns(patches));
+  SnesBrrCatalog catalog =
+      readSnesBrrCatalog(reader, layout.instruments.sampleDirAddress, patches, &InstrumentInfo::program);
   const u32 minimumSampleStart =
       layout.variant == Variant::Arcus
           ? layout.instruments.sampleDirAddress + 0x100

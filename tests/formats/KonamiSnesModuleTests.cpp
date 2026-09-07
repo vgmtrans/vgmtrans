@@ -547,7 +547,8 @@ void konamiSnesSynthParsersStopAtInvalidBankedInstrument() {
   expect(instruments.size() == 1, "KonamiSnes parser should stop at the first invalid banked instrument");
   expect(instruments.front().index == 0 && instruments.front().source.range.offset == 0x4000,
          "KonamiSnes parser should preserve the sparse source instrument index and address");
-  const auto samples = parseKonamiSnesSampleInfos(ByteReader(SourceId{8}, bytes), *layout->spcDirAddress, instruments);
+  const auto samples = readSnesBrrCatalog(ByteReader(SourceId{8}, bytes), *layout->spcDirAddress, instruments,
+                                          &KonamiSnesInstrumentInfo::srcn);
   expect(samples.samples.size() == 1 && samples.samples.front().srcn == 0 &&
              samples.samples.front().stream.encodedData.size == 9,
          "KonamiSnes sample parser should keep only samples used by valid instruments");

@@ -34,15 +34,6 @@ namespace {
   return result;
 }
 
-[[nodiscard]] std::vector<u8> referencedSrcns(const std::vector<InstrumentInfo>& instruments) {
-  std::vector<u8> result;
-  result.reserve(instruments.size());
-  for (const InstrumentInfo& instrument : instruments) {
-    result.push_back(instrument.program);
-  }
-  return result;
-}
-
 }  // namespace
 
 std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
@@ -52,7 +43,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   if (instrumentInfo.empty()) {
     return std::nullopt;
   }
-  const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, referencedSrcns(instrumentInfo));
+  const SnesBrrCatalog catalog =
+      readSnesBrrCatalog(reader, layout.spcDirAddress, instrumentInfo, &InstrumentInfo::program);
   if (catalog.samples.empty()) {
     return std::nullopt;
   }
