@@ -91,8 +91,7 @@ private:
   };
 
   [[nodiscard]] bool validIndex(u32 index) const noexcept;
-  [[nodiscard]] AnnotationBuilder addEntrySource(u32 index, std::string_view label, SourceRange range,
-                                                 std::string_view kind);
+  AnnotationBuilder addEntrySource(u32 index, std::string_view label, SourceRange range, std::string_view kind);
   void addFallbackSources();
   void annotateValues();
   void recordRange(SourceRange range, bool explicitlyIncluded);
@@ -202,7 +201,6 @@ private:
   struct InstrumentState {
     bool rangeWasExplicit = false;
     std::vector<SourceAnnotationId> sources;
-    std::optional<SourceAnnotationId> latestSource;
     std::vector<RegionState> regions;
   };
 
@@ -210,10 +208,9 @@ private:
   [[nodiscard]] bool validRegion(u32 instrumentIndex, u32 regionIndex) const noexcept;
   [[nodiscard]] Entry appendAccepted(Instrument instrument);
   [[nodiscard]] RegionEntry appendRegion(u32 instrumentIndex, SampleRef sample, Region region);
-  [[nodiscard]] AnnotationBuilder addInstrumentSource(u32 index, std::string_view label, SourceRange range,
-                                                      std::string_view kind);
-  [[nodiscard]] AnnotationBuilder addRegionSource(u32 instrumentIndex, u32 regionIndex, std::string_view label,
-                                                  SourceRange range, std::string_view kind);
+  AnnotationBuilder addInstrumentSource(u32 index, std::string_view label, SourceRange range, std::string_view kind);
+  AnnotationBuilder addRegionSource(u32 instrumentIndex, u32 regionIndex, std::string_view label, SourceRange range,
+                                    std::string_view kind);
   void addFallbackSources();
   void annotateValues();
   void linkInstrumentSamples(u32 instrumentIndex, SourceAnnotationId annotation);
