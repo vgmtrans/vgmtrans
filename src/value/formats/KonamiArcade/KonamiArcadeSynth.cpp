@@ -184,7 +184,6 @@ ScanSoundBankDraft addKonamiArcadeSynth(ScanResultBuilder& builder, const Konami
     const std::string name = fmt::format("Instrument {} Bank {}", program, bank);
     auto instrument = instruments.add(
         index, Instrument{
-                   .explicitAddress = InstrumentAddress{.bank = bank, .program = program},
                    .identity = InstrumentIdentity{.domain = std::string(kKonamiArcadeInstrumentDomain), .key = index},
                    .name = name,
                    .range = range,
@@ -219,7 +218,6 @@ ScanSoundBankDraft addKonamiArcadeSynth(ScanResultBuilder& builder, const Konami
     instruments.source(SourceRole::Table, "Drum Kit Table", drumTable, "konami-arcade-drum-table");
     auto drumKit = instruments.add(
         0x100, Instrument{
-                   .explicitAddress = InstrumentAddress{.bank = 2, .program = 0},
                    .identity = InstrumentIdentity{.domain = std::string(kKonamiArcadeInstrumentDomain), .key = 0x100},
                    .name = "Drum Kit",
                    .range = drumTable,

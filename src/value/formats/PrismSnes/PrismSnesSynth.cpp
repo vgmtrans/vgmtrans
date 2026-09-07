@@ -89,8 +89,6 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     const double semitones = patch.tuning / 256.0;
     const SourceRange range = patch.adsr1Source;
     auto entry = instruments.append(Instrument{
-        .explicitAddress = InstrumentAddress{.bank = static_cast<u32>(patch.program >> 7),
-                                             .program = static_cast<u32>(patch.program & 0x7f)},
         .identity = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = patch.program},
         .name = fmt::format("Instrument {}", patch.program),
         .range = range,

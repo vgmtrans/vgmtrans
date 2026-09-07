@@ -346,7 +346,6 @@ Cps1SynthDrafts addCps1Synth(ScanResultBuilder& builder, CpsLayout& layout) {
       auto instrument = ym.add(
           index,
           Instrument{
-              .explicitAddress = InstrumentAddress{.bank = 0, .program = index},
               .identity = InstrumentIdentity{.domain = std::string(kCps1Ym2151Domain), .key = index},
               .reverb = 0.0,
               .name = name,
@@ -406,7 +405,6 @@ Cps1SynthDrafts addCps1Synth(ScanResultBuilder& builder, CpsLayout& layout) {
       const std::string name = fmt::format("OKI Instrument {}", program);
       auto instrument =
           oki.add(program, Instrument{
-                               .explicitAddress = InstrumentAddress{.bank = 0, .program = program},
                                .identity = InstrumentIdentity{.domain = std::string(kCps1OkiDomain), .key = program},
                                .reverb = 0.0,
                                .name = name,
@@ -429,7 +427,6 @@ Cps1SynthDrafts addCps1Synth(ScanResultBuilder& builder, CpsLayout& layout) {
       const std::string name = fmt::format("OKI Instrument {}", program);
       auto instrument =
           oki.add(program, Instrument{
-                               .explicitAddress = InstrumentAddress{.bank = 0, .program = program},
                                .identity = InstrumentIdentity{.domain = std::string(kCps1OkiDomain), .key = program},
                                .reverb = 0.0,
                                .name = name,

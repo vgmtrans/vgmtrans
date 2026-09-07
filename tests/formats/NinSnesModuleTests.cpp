@@ -1282,7 +1282,8 @@ void ninSnesKonamiPercussionUsesDriverMapAndNeutralTuning() {
   const auto* instruments = std::get_if<SoundBankAsset>(&scan.assets[0]);
   expect(instruments != nullptr, "Konami synth fixture should produce an instrument set");
   const auto melodic = std::ranges::find_if(instruments->instruments, [](const Instrument& instrument) {
-    return instrument.explicitAddress == InstrumentAddress{.bank = 0, .program = 20};
+    return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) ==
+           InstrumentAddress{.bank = 0, .program = 20};
   });
   const auto drums = std::ranges::find_if(instruments->instruments, [](const Instrument& instrument) {
     return instrument.explicitAddress == InstrumentAddress{.bank = 0x7f, .program = 0};
@@ -1345,7 +1346,8 @@ void ninSnesEarlierPercussionUsesSeparateSixByteTable() {
   expect(instruments != nullptr && instruments->instruments.size() == 2,
          "the separate percussion row should remain an internal drum source");
   const auto melodic = std::ranges::find_if(instruments->instruments, [](const Instrument& instrument) {
-    return instrument.explicitAddress == InstrumentAddress{.bank = 0, .program = 0};
+    return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) ==
+           InstrumentAddress{.bank = 0, .program = 0};
   });
   const auto drum = std::ranges::find_if(instruments->instruments, [](const Instrument& instrument) {
     return instrument.explicitAddress == InstrumentAddress{.bank = 0x7f, .program = 0};
@@ -1427,8 +1429,11 @@ void ninSnesIdentityMappedSilentSlotsAreSparse() {
 
   const ScanResult scan = scanSynth(std::move(bytes), layout, "Sparse");
   const auto* instruments = std::get_if<SoundBankAsset>(&scan.assets[0]);
-  expect(instruments != nullptr && instruments->instruments.size() == 2 &&
-             instruments->instruments[0].explicitAddress == InstrumentAddress{.bank = 0, .program = 0} &&
-             instruments->instruments[1].explicitAddress == InstrumentAddress{.bank = 0, .program = 2},
-         "identity-mapped silent slots should be skipped without scanning into the following known structure");
+  expect(
+      instruments != nullptr && instruments->instruments.size() == 2 &&
+          resolveInstrumentAddress(instruments->instruments[0].explicitAddress, instruments->instruments[0].identity) ==
+              InstrumentAddress{.bank = 0, .program = 0} &&
+          resolveInstrumentAddress(instruments->instruments[1].explicitAddress, instruments->instruments[1].identity) ==
+              InstrumentAddress{.bank = 0, .program = 2},
+      "identity-mapped silent slots should be skipped without scanning into the following known structure");
 }

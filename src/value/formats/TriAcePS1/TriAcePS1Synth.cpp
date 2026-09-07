@@ -189,13 +189,7 @@ std::optional<ScanSoundBankDraft> addTriAcePs1Bank(ScanResultBuilder& result, co
   }
 
   for (const auto& source : parsed) {
-    const u16 encoded = static_cast<u16>((source.bank << 8) | source.program);
     auto instrument = instruments.append(Instrument{
-        .explicitAddress =
-            InstrumentAddress{
-                .bank = static_cast<u32>(encoded >> 7),
-                .program = static_cast<u32>(encoded & 0x7f),
-            },
         .identity = triAcePs1InstrumentIdentity(source.bank, source.program),
         .name = fmt::format("Instrument {:02X}:{:02X}", source.bank, source.program),
         .range = reader.range(source.source.range.offset,
