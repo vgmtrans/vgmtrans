@@ -244,6 +244,49 @@ void performanceEmitterBindsScalarAutomationWithoutExposingStorage() {
   expect(rejectedOtherTrack, "an automation binding should not attach to another performance track");
 }
 
+void sequenceMotionPreservesDelayAndTargetCompletion() {
+  SequenceLinearMotion<s32> motion;
+  expect(motion.begin(SequenceMotionPlan<s32>::targetOverTicks(10, 3, 1)).status == SequenceMotionStatus::Delayed,
+         "a delayed fade must start without advancing the value");
+  expect(motion.tick().status == SequenceMotionStatus::Delayed && motion.current() == 0,
+         "the delay must expire before the first arithmetic step");
+  expect(motion.tick().current == 3 && motion.tick().current == 6,
+         "integer fades must retain truncation of each computed step");
+  expect(motion.tick().status == SequenceMotionStatus::Finished && motion.current() == 10 && !motion.active(),
+         "the last timed tick must reach the target exactly despite step truncation");
+
+  motion.reset(0);
+  static_cast<void>(motion.begin(SequenceMotionPlan<s32>::targetOverTicksWithStep(10, 1, 2)));
+  expect(motion.tick().current == 1 && motion.tick().current == 10,
+         "a supplied timed step must be preserved until the final target snap");
+  static_cast<void>(motion.begin(SequenceMotionPlan<s32>::targetByStep(0, -4)));
+  expect(motion.tick().current == 6 && motion.tick().current == 2 && motion.tick().current == 0 && !motion.active(),
+         "step-based motion must stop when it crosses the target");
+  expect(motion.begin(SequenceMotionPlan<s32>::targetOverTicks(7, 0, 5)).status == SequenceMotionStatus::Finished &&
+             motion.current() == 7 && !motion.active(),
+         "zero-duration fades must finish immediately even when a delay was requested");
+  expect(motion.begin(SequenceMotionPlan<s32>::targetByStep(2, 0, 5)).status == SequenceMotionStatus::Finished &&
+             motion.current() == 2 && !motion.active(),
+         "zero-step motion must finish immediately instead of remaining active forever");
+}
+
+void fixedPointMotionRetargetsFromTheRoundedSourceValue() {
+  for (const auto rounding : {SequenceFixedPointRounding::Floor, SequenceFixedPointRounding::TowardZero,
+                              SequenceFixedPointRounding::Nearest}) {
+    SequenceFixedPointAutomation<> motion;
+    motion.setRounding(rounding);
+    static_cast<void>(motion.begin(SequenceFixedPointMotion<>::toRawTarget(-5, 2)));
+    expect(motion.tick().current == -640, "fixed-point motion must retain fractional steps internally");
+    const s32 raw = rounding == SequenceFixedPointRounding::TowardZero ? -2 : -3;
+    expect(motion.currentRaw() == raw, "negative raw values must obey the driver's selected rounding policy");
+    static_cast<void>(motion.begin(SequenceFixedPointMotion<>::toRawTarget(0, 2)));
+    expect(motion.currentFixed() == raw * 256 && motion.tick().current == raw * 128,
+           "retargeting must discard the old fractional accumulator before computing the next step");
+    expect(motion.tick().status == SequenceMotionStatus::Finished && motion.currentRaw() == 0,
+           "a retargeted fixed-point fade must still finish on its declared target tick");
+  }
+}
+
 void performanceBoundValueOwnsReplacementLifecycle() {
   PerformanceTrack track{.id = TrackId{3}};
   u64 nextSequence = 0;
@@ -423,6 +466,8 @@ void runValueSequenceModelTests() {
   collectionIssuesDeriveImpact();
   performanceAutomationRetainsIntentAlongsideOneEventTimeline();
   performanceEmitterBindsScalarAutomationWithoutExposingStorage();
+  sequenceMotionPreservesDelayAndTargetCompletion();
+  fixedPointMotionRetargetsFromTheRoundedSourceValue();
   performanceBoundValueOwnsReplacementLifecycle();
   performanceEmitterResolvesDeclaredPanLawIntoEvents();
   pitchTransitionApiPreservesSamplesAndRealizedLifecycle();

@@ -72,10 +72,7 @@ struct SequenceMotionPlan {
 template <typename ValueType>
 class SequenceLinearMotion {
 public:
-  void reset(ValueType current = {}) {
-    current_ = current;
-    clear();
-  }
+  void reset(ValueType current = {}) { setCurrent(current); }
 
   void setCurrent(ValueType current) {
     current_ = current;
@@ -101,47 +98,25 @@ public:
     ticksRemaining_ = plan.ticks;
     mode_ = plan.mode;
 
-    if (plan.mode == SequenceMotionMode::TargetOverTicks) {
-      if (plan.ticks == 0) {
-        setCurrent(plan.target);
-        return {SequenceMotionStatus::Finished, previous, current_, current_ != previous};
-      }
-      step_ = static_cast<ValueType>((plan.target - current_) / static_cast<ValueType>(plan.ticks));
-      return {plan.delay != 0 ? SequenceMotionStatus::Delayed : SequenceMotionStatus::Running, previous, current_,
-              false};
-    }
-
-    if (plan.mode == SequenceMotionMode::TargetOverTicksWithStep) {
-      if (plan.ticks == 0) {
-        setCurrent(plan.target);
-        return {SequenceMotionStatus::Finished, previous, current_, current_ != previous};
-      }
-      step_ = plan.step;
-      return {plan.delay != 0 ? SequenceMotionStatus::Delayed : SequenceMotionStatus::Running, previous, current_,
-              false};
-    }
-
-    step_ = plan.step;
-    if (current_ == target_) {
-      clear();
-      return {SequenceMotionStatus::Finished, previous, current_, false};
-    }
-    if (step_ == ValueType{}) {
+    if (plan.usesTicks() && plan.ticks == 0) {
       setCurrent(plan.target);
+      return {SequenceMotionStatus::Finished, previous, current_, current_ != previous};
+    }
+
+    step_ = plan.mode == SequenceMotionMode::TargetOverTicks
+                ? static_cast<ValueType>((plan.target - current_) / static_cast<ValueType>(plan.ticks))
+                : plan.step;
+    if (!plan.usesTicks() && (current_ == target_ || step_ == ValueType{})) {
+      if (current_ == target_) {
+        clear();
+      } else {
+        setCurrent(plan.target);
+      }
       return {SequenceMotionStatus::Finished, previous, current_, current_ != previous};
     }
 
     return {plan.delay != 0 ? SequenceMotionStatus::Delayed : SequenceMotionStatus::Running, previous, current_,
             false};
-  }
-
-  template <typename Apply>
-  [[nodiscard]] SequenceMotionTick<ValueType> begin(const SequenceMotionPlan<ValueType>& plan, Apply&& apply) {
-    const auto motionTick = begin(plan);
-    if (motionTick.status == SequenceMotionStatus::Finished && motionTick.changed) {
-      std::forward<Apply>(apply)(motionTick.current);
-    }
-    return motionTick;
   }
 
   [[nodiscard]] bool active() const {
@@ -150,10 +125,6 @@ public:
   }
 
   [[nodiscard]] ValueType current() const { return current_; }
-  [[nodiscard]] ValueType target() const { return target_; }
-  [[nodiscard]] ValueType step() const { return step_; }
-  [[nodiscard]] u32 ticksRemaining() const { return ticksRemaining_; }
-  [[nodiscard]] bool usesTicks() const { return mode_ != SequenceMotionMode::TargetByStep; }
 
   [[nodiscard]] SequenceMotionTick<ValueType> tick() {
     const ValueType previous = current_;
@@ -245,52 +216,27 @@ public:
 
   void reset(ValueType rawCurrent = {}) { value_.reset(toFixed(rawCurrent)); }
   void setCurrentRaw(ValueType rawCurrent) { value_.setCurrent(toFixed(rawCurrent)); }
-  void setCurrentFixedPreservingMotion(ValueType fixedCurrent) { value_.setCurrentPreservingMotion(fixedCurrent); }
 
   [[nodiscard]] bool active() const { return value_.active(); }
   [[nodiscard]] ValueType currentFixed() const { return value_.current(); }
   [[nodiscard]] ValueType currentRaw() const { return rawFromFixed(value_.current()); }
-  [[nodiscard]] ValueType targetRaw() const { return rawFromFixed(value_.target()); }
-  [[nodiscard]] ValueType step() const { return value_.step(); }
 
   void setRounding(SequenceFixedPointRounding rounding) {
     rounding_ = rounding;
   }
 
-  [[nodiscard]] ValueType stepFixedToTargetRaw(ValueType targetRaw, u32 ticks) const {
-    if (ticks == 0) {
-      return {};
-    }
-    return static_cast<ValueType>((toFixed(targetRaw) - toFixed(currentRaw())) / static_cast<ValueType>(ticks));
-  }
-
   [[nodiscard]] SequenceMotionTick<ValueType> begin(
       const SequenceFixedPointMotion<ValueType, FractionBits>& rawMotion) {
+    // Drivers retarget from the rounded raw value, discarding the old fraction.
+    // Linear motion then computes the step in fixed-point units.
     value_.setCurrentPreservingMotion(toFixed(currentRaw()));
-    SequenceMotionPlan<ValueType> fixedMotion{
+    return value_.begin(SequenceMotionPlan<ValueType>{
         toFixed(rawMotion.targetRaw),
         rawMotion.stepFixed,
         rawMotion.ticks,
         rawMotion.delay,
         rawMotion.mode,
-    };
-    if (rawMotion.mode == SequenceMotionMode::TargetOverTicks) {
-      fixedMotion.mode = SequenceMotionMode::TargetOverTicksWithStep;
-      fixedMotion.step = stepFixedToTargetRaw(rawMotion.targetRaw, rawMotion.ticks);
-    }
-    return value_.begin(fixedMotion);
-  }
-
-  template <typename ApplyRaw>
-  [[nodiscard]] SequenceMotionTick<ValueType> begin(const SequenceFixedPointMotion<ValueType, FractionBits>& rawMotion,
-                                                    ApplyRaw&& applyRaw) {
-    const ValueType previousRaw = currentRaw();
-    const auto motionTick = begin(rawMotion);
-    const ValueType nextRaw = currentRaw();
-    if (motionTick.status == SequenceMotionStatus::Finished && nextRaw != previousRaw) {
-      std::forward<ApplyRaw>(applyRaw)(nextRaw);
-    }
-    return motionTick;
+    });
   }
 
   [[nodiscard]] SequenceMotionTick<ValueType> tick() { return value_.tick(); }

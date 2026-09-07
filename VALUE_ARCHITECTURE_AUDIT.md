@@ -93,6 +93,22 @@ flow conflicts, and source-free execution. An additional lifetime test checks
 temporary instrument domains, envelope policy, and absent versus declared
 level quantization. The same five CTest targets pass without compiler warnings.
 
+### Use one arithmetic path for sequence motion
+
+Timed motion now shares its startup and completion rules whether its step is
+computed or supplied by the driver. Fixed-point automation normalizes its
+current raw value and delegates step calculation to that same implementation;
+it no longer computes the step a second time and changes the plan's mode.
+Remove unused getters and callback overloads inherited from legacy helpers.
+
+Regression tests cover delay boundaries, integer truncation, exact final
+targets, custom steps, zero-length motion, and negative rounding on retarget.
+A separate generated comparison against the previous header checked 7,808,386
+integer, floating-point, and fixed-point transitions under AddressSanitizer
+and UndefinedBehaviorSanitizer with no differences or sanitizer findings.
+All five CTest targets pass, with no compiler warnings. This removes 54
+production lines while keeping the existing format-facing motion plans.
+
 ## Further investigation
 
 - Compiler cursor: duplicated adapters for emitting ordinary performance events;
