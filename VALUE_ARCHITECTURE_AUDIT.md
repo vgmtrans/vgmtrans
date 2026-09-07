@@ -457,6 +457,18 @@ channel pan resets, and both modulation export policies. The updated renderer
 also passes that matrix when compiled directly with AddressSanitizer, UBSan,
 and float-cast-overflow checks.
 
+### Remove redundant sample references and unread format state
+
+Use the SNES builder's existing reference entries to resolve canonical samples,
+rather than maintaining a second vector containing the same references. Remove
+the unread Sega Saturn velocity-table cache and Prism sequence-list address;
+the actual velocity-table source field and sequence discovery remain intact.
+
+Add shared-builder coverage for BRR aliases with matching and differing loop
+positions, retained concrete references, and separate directory/payload source
+annotations for every SRCN. The full build and all 17 CTest targets pass without
+compiler warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

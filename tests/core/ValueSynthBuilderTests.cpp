@@ -107,6 +107,38 @@ void brrCatalogProjectsInstrumentsInSampleOrder() {
          "projected instruments must retain exact directory and payload source ranges");
 }
 
+void brrAliasesRetainLoopIdentityAndSeparateSourceRecords() {
+  const SourceId source{29};
+  const AssetId asset{40};
+  std::vector<u8> bytes(0x80);
+  for (u8 srcn = 1; srcn <= 3; ++srcn) {
+    bytes[srcn * 4] = 0x40;
+    bytes[srcn * 4 + 2] = srcn == 1 ? 0x40 : 0x49;
+  }
+  bytes[0x49] = 3;  // Two BRR blocks, with a looping end block.
+  const ByteReader reader(source, bytes);
+  const std::vector<u8> srcns{3, 1, 2};
+  const auto catalog = readSnesBrrCatalog(reader, 0, srcns);
+  SourceMapBuilder sourceMap;
+  SamplePoolBuilder samples(asset, &sourceMap);
+  const auto refs = addSnesBrrSamples(samples, reader, catalog);
+  const auto built = std::move(samples).finish();
+  const auto annotations = sourceMap.finish();
+  expect(refs.findSrcn(1) && refs.findSrcn(2) && refs.findSrcn(3) && !refs.findSrcn(4) &&
+             refs.findSrcn(1)->index() == 0 && refs.findSrcn(2)->index() == 1 && refs.findSrcn(3)->index() == 1 &&
+             refs.findSrcn(3)->owner() == asset,
+         "aliases must share a concrete reference only when both BRR data and loop position match");
+  expect(built.value.samples.size() == 3 && built.value.samples[0].loop.start == 0 &&
+             built.value.samples[1].loop.start == 16 && built.value.samples[2].loop.start == 16,
+         "aliased directory entries must retain their individual sample values");
+  for (u32 index = 0; index < 3; ++index) {
+    const auto sources = annotations.ownedBy(ObjectRefs::sample(asset, index));
+    expect(sources.size() == 2 && annotations.get(sources[0]).range == reader.range((index + 1) * 4, 4) &&
+               annotations.get(sources[1]).parent == sources[0],
+           "each SRCN must retain its own directory annotation and payload child");
+  }
+}
+
 void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
   const SourceId source{30};
   const AssetId asset{40};
@@ -512,6 +544,7 @@ void runValueSynthBuilderTests() {
   recordReaderFinishesOnePortableSourceValue();
   recordReaderPreservesNumericFieldsAndFailurePolicies();
   brrCatalogProjectsInstrumentsInSampleOrder();
+  brrAliasesRetainLoopIdentityAndSeparateSourceRecords();
   sampleBuilderKeepsKeysDenseAndAnnotationsOwned();
   instrumentBuilderGroupsEntriesAndProjectsRegionIdentity();
   soundBankOwnsNoncontiguousSamplesWithoutInventingOneSourceRange();

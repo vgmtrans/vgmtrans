@@ -204,7 +204,6 @@ std::optional<Layout> findLayout(ByteReader reader) {
 
   return Layout{
       .version = version,
-      .sequenceListAddress = sequenceList,
       .sequenceHeaderAddress = song->header,
       .commandTableAddress = commandTable,
       .spcDirAddress = static_cast<u16>(reader.u8At(dspTable + 5) << 8),

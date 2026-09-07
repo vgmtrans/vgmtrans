@@ -140,10 +140,7 @@ SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reade
 
   SnesBrrSampleRefs refs;
   refs.entries_.reserve(catalog.samples.size());
-  std::vector<SampleRef> canonicalSamples;
-  canonicalSamples.reserve(catalog.samples.size());
-  for (size_t index = 0; index < catalog.samples.size(); ++index) {
-    const auto& info = catalog.samples[index];
+  for (const auto& info : catalog.samples) {
     const bool unused = !usedSrcns.empty() && std::ranges::find(usedSrcns, info.srcn) == usedSrcns.end();
     const std::string name = fmt::format("Sample {}", info.srcn);
     const char* suffix = unused ? " (unused)" : "";
@@ -184,10 +181,9 @@ SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reade
 
     SampleRef canonical = sample.ref();
     const auto canonicalIndex = catalog.canonicalIndex(info.srcn);
-    if (canonicalIndex && *canonicalIndex < canonicalSamples.size()) {
-      canonical = canonicalSamples[*canonicalIndex];
+    if (canonicalIndex && *canonicalIndex < refs.entries_.size()) {
+      canonical = refs.entries_[*canonicalIndex].sample;
     }
-    canonicalSamples.push_back(canonical);
     refs.entries_.push_back(SnesBrrSampleRefs::Entry{
         .srcn = info.srcn,
         .sample = canonical,
