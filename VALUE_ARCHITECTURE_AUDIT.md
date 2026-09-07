@@ -137,6 +137,20 @@ fixed-clock modulation, both delay types, future-note delay policy, and tempo
 source attribution. All 17 CTest targets pass after rebuilding, without compiler
 warnings. The resolver is 42 lines shorter.
 
+### Let side-effecting reads and automation run directly
+
+Record reads annotate fields, and automation startup/callback ticks update
+state even when callers do not need their return values. Remove `nodiscard`
+from these operations and from automation-intent emission. Queries, explicit
+failure results, and unbound tick results retain their checks. The decoded
+field API already allowed most such calls; remove the redundant casts there
+as well. This removes 145 discard wrappers across formats, shared helpers,
+and their tests without changing the operations performed.
+
+Remove two discarded pure queries: a playlist annotation ID lookup and a
+temporary automation-output view. The latter's fade already declares its end
+tick. All 17 CTest targets pass after rebuilding, without compiler warnings.
+
 ## Further investigation
 
 - Compiler cursor: duplicated adapters for emitting ordinary performance events;

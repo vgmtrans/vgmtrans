@@ -1590,14 +1590,12 @@ struct Playback {
         track.v1Envelope.advance(tempoMicrosecondsPerQuarter(context.version, context.minorVersion, track.tempo) /
                                  (1'000'000.0 * kAkaoSnesPpqn));
     const u8 volumeBeforeTick = currentVolume();
-    static_cast<void>(
-        track.volume.tickRaw([&](s32 value) { emitVolume(track.volume.output(out), static_cast<u8>(value)); }));
+    track.volume.tickRaw([&](s32 value) { emitVolume(track.volume.output(out), static_cast<u8>(value)); });
     if (v1EnvelopeChanged && currentVolume() == volumeBeforeTick) {
       emitVolume(out, currentVolume());
     }
-    static_cast<void>(track.pan.tickRaw([&](s32 value) { emitPan(track.pan.output(out), static_cast<u8>(value)); }));
-    static_cast<void>(
-        track.tempoState.tickRaw([&](s32 value) { applyTempo(track.tempoState.output(out), static_cast<u8>(value)); }));
+    track.pan.tickRaw([&](s32 value) { emitPan(track.pan.output(out), static_cast<u8>(value)); });
+    track.tempoState.tickRaw([&](s32 value) { applyTempo(track.tempoState.output(out), static_cast<u8>(value)); });
     if (terminalPitchWaitBoundary()) {
       return;
     }
@@ -1676,9 +1674,9 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
       return length == 0 ? event.invoke<&Playback::volume>(target)
                          : event.invoke(
                                [](Playback& playback, u16 ticks, u8 volume) {
-                                 static_cast<void>(playback.track.volume.begin(
+                                 playback.track.volume.begin(
                                      playback.out.fade(PerformanceAutomationTarget::Level, channelLevel(volume), ticks),
-                                     SequenceFixedPointMotion<s32>::toRawTarget(volume, ticks)));
+                                     SequenceFixedPointMotion<s32>::toRawTarget(volume, ticks));
                                },
                                length, target);
     }
@@ -1696,9 +1694,9 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
                        [](Playback& playback, u16 ticks, u8 rawPan) {
                          const u8 pan = static_cast<u8>(rawPan << (playback.track.pan8Bit ? 0 : 1));
                          const double rightGain = rightGainFromPan(pan);
-                         static_cast<void>(playback.track.pan.begin(
+                         playback.track.pan.begin(
                              playback.out.fade(PerformanceAutomationTarget::Pan, (rightGain * 2.0) - 1.0, ticks),
-                             SequenceFixedPointMotion<s32>::toRawTarget(pan, ticks)));
+                             SequenceFixedPointMotion<s32>::toRawTarget(pan, ticks));
                        },
                        length, target);
     }
@@ -1976,12 +1974,12 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
                        [](Playback& playback, u16 ticks, u8 rawTempo) {
                          playback.track.tempoState.setCurrentRaw(playback.track.tempo);
                          const u8 tempo = playback.normalizedTempo(rawTempo);
-                         static_cast<void>(playback.track.tempoState.begin(
+                         playback.track.tempoState.begin(
                              playback.out.fade(PerformanceAutomationTarget::Tempo,
                                                static_cast<double>(tempoMicrosecondsPerQuarter(
                                                    playback.context.version, playback.context.minorVersion, tempo)),
                                                ticks),
-                             SequenceFixedPointMotion<s32>::toRawTarget(tempo, ticks)));
+                             SequenceFixedPointMotion<s32>::toRawTarget(tempo, ticks));
                        },
                        length, target);
     }

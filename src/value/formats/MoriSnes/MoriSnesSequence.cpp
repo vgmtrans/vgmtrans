@@ -997,12 +997,12 @@ void consumeTiming(Cursor::Event& event, u8 first, const InspectedEvent& inspect
   }
   event.opcodeValue("delta", first);
   if (inspected.timing.duration) {
-    static_cast<void>(event.u8("duration"));
+    event.u8("duration");
   }
   if (inspected.timing.velocity) {
-    static_cast<void>(event.u8("velocity"));
+    event.u8("velocity");
   }
-  static_cast<void>(event.u8("status", SourceValueDisplay::Hex));
+  event.u8("status", SourceValueDisplay::Hex);
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, const Layout& layout, u32 begin,
@@ -1035,7 +1035,7 @@ void consumeTiming(Cursor::Event& event, u8 first, const InspectedEvent& inspect
   const std::optional<u8> command = canonicalCommand(layout.version, status);
   if (!command) {
     if (commandSize(layout.version, status) != 0) {
-      static_cast<void>(event.u8("value", SourceValueDisplay::Hex));
+      event.u8("value", SourceValueDisplay::Hex);
     }
     return event.invoke<&Playback::wait>(inspected.timing);
   }

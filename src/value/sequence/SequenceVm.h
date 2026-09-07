@@ -190,12 +190,12 @@ public:
   [[nodiscard]] std::optional<double> currentPitchTransitionKey(PerformanceNoteId note,
                                                                 PerformanceLaneId lane = PerformanceLaneId{0}) const;
 
-  [[nodiscard]] PerformanceAutomationBinding fade(PerformanceAutomationTarget target, double targetValue,
-                                                  u32 durationTicks, u32 delayTicks = 0);
-  [[nodiscard]] PerformanceAutomationBinding step(PerformanceAutomationTarget target, double targetValue,
-                                                  u32 durationTicks = 0, u32 delayTicks = 0);
-  [[nodiscard]] PerformanceAutomationBinding noteEnvelope(PerformanceAutomationTarget target, double targetValue,
-                                                          u32 durationTicks, u32 delayTicks = 0);
+  PerformanceAutomationBinding fade(PerformanceAutomationTarget target, double targetValue, u32 durationTicks,
+                                    u32 delayTicks = 0);
+  PerformanceAutomationBinding step(PerformanceAutomationTarget target, double targetValue, u32 durationTicks = 0,
+                                    u32 delayTicks = 0);
+  PerformanceAutomationBinding noteEnvelope(PerformanceAutomationTarget target, double targetValue, u32 durationTicks,
+                                            u32 delayTicks = 0);
 
 private:
   friend class PerformanceAutomationBinding;

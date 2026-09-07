@@ -61,8 +61,8 @@ struct ParsedProgram {
     }
     program.volume = *record.u8At(0x20, "volume");
     program.pan = *record.u8At(0x21, "pan");
-    static_cast<void>(record.u8At(0x22, "unknown_22", SourceValueDisplay::Hex));
-    static_cast<void>(record.u8At(0x23, "unknown_23", SourceValueDisplay::Hex));
+    record.u8At(0x22, "unknown_22", SourceValueDisplay::Hex);
+    record.u8At(0x23, "unknown_23", SourceValueDisplay::Hex);
     program.source = std::move(record).finish();
     programs.push_back(std::move(program));
   }
@@ -82,7 +82,7 @@ struct ParsedProgram {
         .adsr1 = *record.u16leAt(4, "adsr1", SourceValueDisplay::Hex),
         .adsr2 = *record.u16leAt(6, "adsr2", SourceValueDisplay::Hex),
     };
-    static_cast<void>(record.u8At(8, "unknown_08", SourceValueDisplay::Hex));
+    record.u8At(8, "unknown_08", SourceValueDisplay::Hex);
     tone.volume = *record.u8At(9, "volume");
     tone.pan = *record.u8At(10, "pan");
     const u8 root = *record.u8At(11, "root_key", SourceValueDisplay::MidiNote);
@@ -93,8 +93,8 @@ struct ParsedProgram {
     tone.keys.low = *record.u8At(15, "key_low", SourceValueDisplay::MidiNote);
     tone.keys.high = *record.u8At(16, "key_high", SourceValueDisplay::MidiNote);
     tone.flags = *record.u8At(17, "flags", SourceValueDisplay::Hex);
-    static_cast<void>(record.u8At(18, "priority"));
-    static_cast<void>(record.u8At(19, "reserved", SourceValueDisplay::Hex));
+    record.u8At(18, "priority");
+    record.u8At(19, "reserved", SourceValueDisplay::Hex);
     record.derived("unity_key", tone.unityKey);
     tone.source = std::move(record).finish();
     tones.push_back(std::move(tone));

@@ -700,7 +700,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x15: {
       auto event = cursor.command("Repeat Break", SequenceSemantic::RepeatBreak);
       const u8 slot = opcode - 0x12;
-      static_cast<void>(event.u8("note_state", SourceValueDisplay::Hex));
+      event.u8("note_state", SourceValueDisplay::Hex);
       const u16 raw = event.u16be("stored_relative_destination", SourceValueDisplay::Address);
       const Address destination = isCps1(version) && version <= CpsVersion::Cps1V425
                                       ? Address{programBase + raw}

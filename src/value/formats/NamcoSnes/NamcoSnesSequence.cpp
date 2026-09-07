@@ -793,7 +793,7 @@ struct SequenceReferences {
     }
     case 0x14: {
       auto event = cursor.sourceOnly("Echo Start Address", "echo-start-address");
-      static_cast<void>(event.u8("esa_high", SourceValueDisplay::Hex));
+      event.u8("esa_high", SourceValueDisplay::Hex);
       return event;
     }
     default:

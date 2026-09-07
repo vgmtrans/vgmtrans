@@ -664,8 +664,8 @@ struct SequenceDecodeContext {
 
   if (context.reader().u8At(offset) == 0x80) {
     RecordReader delay{context.reader(), offset, context.range.sequenceEnd};
-    static_cast<void>(delay.u8("opcode"));
-    static_cast<void>(delay.varLen("duration"));
+    delay.u8("opcode");
+    delay.varLen("duration");
     if (!delay.ok()) {
       return {offset};
     }

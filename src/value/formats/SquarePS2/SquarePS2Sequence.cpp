@@ -379,8 +379,7 @@ struct Playback {
                                         : PerformanceAutomationTarget::VibratoDepth;
     const double value = lfo.mode == 0 ? vibratoDepth(depth) : tremoloDepth(depth);
     if (lfo.mode < 2) {
-      const auto automation = emitter.fade(target, value, duration);
-      static_cast<void>(automation.at(emitter, tick + duration));
+      emitter.fade(target, value, duration);
     }
     auto terminal = out.at(tick + duration);
     emitLfoDepth(terminal, lfo);

@@ -425,7 +425,7 @@ struct Playback {
     const double initialDepth = vibratoDepthSemitones(initial, track.lastVibratoBase);
     out.vibratoDepth(initialDepth, lfoContext());
     if (ramp != 0) {
-      static_cast<void>(out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth, target, ramp, track.vibratoDelay));
+      out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth, target, ramp, track.vibratoDelay);
     } else if (target != initialDepth) {
       out.vibratoDepth(target, lfoContext());
     }
@@ -755,12 +755,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return cursor.ignored("Echo Feedback/FIR", 2, "echo-feedback-fir");
     case 0xad: {
       auto event = cursor.command("Phase/Surround", SequenceSemantic::Pan, CommandPlaybackStatus::SourceOnly);
-      static_cast<void>(event.u8("mode"));
+      event.u8("mode");
       return event;
     }
     case 0xae: {
       auto event = cursor.command("Random Volume", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly);
-      static_cast<void>(event.u8("enabled"));
+      event.u8("enabled");
       return event;
     }
     case 0xaf: {
@@ -774,7 +774,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xb2: {
       auto event = cursor.command("Gate Jitter", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly);
-      static_cast<void>(event.u8("enabled"));
+      event.u8("enabled");
       return event;
     }
     default:
@@ -850,13 +850,13 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         return cursor.unsupported("Invalid Middle-Family Opcode", "invalid").stop();
       }
       auto event = command("Driver Flag", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly, "driver-flag");
-      static_cast<void>(event.u8("enabled"));
+      event.u8("enabled");
       return event;
     }
     case 0xe6:
       if (middle) {
         auto event = command("Control E6", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly, "control");
-        static_cast<void>(event.rawBytes("bytes", 2));
+        event.rawBytes("bytes", 2);
         return event;
       }
       return cursor.noOp("No Operation", "nop");
@@ -865,7 +865,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       if (middle) {
         auto event = command(opcode == 0xe8 ? "Control E8" : "Control E9", SequenceSemantic::State,
                              CommandPlaybackStatus::SourceOnly, "control");
-        static_cast<void>(event.rawBytes("bytes", 3));
+        event.rawBytes("bytes", 3);
         return event;
       }
       return cursor.noOp("No Operation", "nop");
@@ -882,7 +882,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xf2:
       if (middle) {
         auto event = command("Control F2", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly, "control");
-        static_cast<void>(event.rawBytes("bytes", 1));
+        event.rawBytes("bytes", 1);
         return event;
       }
       return cursor.noOp("No Operation", "nop");
@@ -897,16 +897,16 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xef: {
       auto event =
           command("Echo Feedback", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly, "echo-feedback");
-      static_cast<void>(event.u8("feedback"));
+      event.u8("feedback");
       if (middle) {
-        static_cast<void>(event.u8("unknown"));
+        event.u8("unknown");
       }
       return event;
     }
     case 0xe3: {
       auto event =
           command("Release/Modulation Flag", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly, "driver-flag");
-      static_cast<void>(event.u8("value"));
+      event.u8("value");
       return event;
     }
     default:

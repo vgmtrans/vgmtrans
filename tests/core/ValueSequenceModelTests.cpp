@@ -256,10 +256,10 @@ void sequenceMotionPreservesDelayAndTargetCompletion() {
          "the last timed tick must reach the target exactly despite step truncation");
 
   motion.reset(0);
-  static_cast<void>(motion.begin(SequenceMotionPlan<s32>::targetOverTicksWithStep(10, 1, 2)));
+  motion.begin(SequenceMotionPlan<s32>::targetOverTicksWithStep(10, 1, 2));
   expect(motion.tick().current == 1 && motion.tick().current == 10,
          "a supplied timed step must be preserved until the final target snap");
-  static_cast<void>(motion.begin(SequenceMotionPlan<s32>::targetByStep(0, -4)));
+  motion.begin(SequenceMotionPlan<s32>::targetByStep(0, -4));
   expect(motion.tick().current == 6 && motion.tick().current == 2 && motion.tick().current == 0 && !motion.active(),
          "step-based motion must stop when it crosses the target");
   expect(motion.begin(SequenceMotionPlan<s32>::targetOverTicks(7, 0, 5)).status == SequenceMotionStatus::Finished &&
@@ -275,11 +275,11 @@ void fixedPointMotionRetargetsFromTheRoundedSourceValue() {
                               SequenceFixedPointRounding::Nearest}) {
     SequenceFixedPointAutomation<> motion;
     motion.setRounding(rounding);
-    static_cast<void>(motion.begin(SequenceFixedPointMotion<>::toRawTarget(-5, 2)));
+    motion.begin(SequenceFixedPointMotion<>::toRawTarget(-5, 2));
     expect(motion.tick().current == -640, "fixed-point motion must retain fractional steps internally");
     const s32 raw = rounding == SequenceFixedPointRounding::TowardZero ? -2 : -3;
     expect(motion.currentRaw() == raw, "negative raw values must obey the driver's selected rounding policy");
-    static_cast<void>(motion.begin(SequenceFixedPointMotion<>::toRawTarget(0, 2)));
+    motion.begin(SequenceFixedPointMotion<>::toRawTarget(0, 2));
     expect(motion.currentFixed() == raw * 256 && motion.tick().current == raw * 128,
            "retargeting must discard the old fractional accumulator before computing the next step");
     expect(motion.tick().status == SequenceMotionStatus::Finished && motion.currentRaw() == 0,
@@ -296,10 +296,10 @@ void performanceBoundValueOwnsReplacementLifecycle() {
   PerformanceBoundValue<SequenceLinearMotion<double>> value;
   value.reset(0.0);
 
-  static_cast<void>(value.begin(out.fade(PerformanceAutomationTarget::Level, 1.0, 8),
-                                SequenceMotionPlan<double>::targetOverTicks(1.0, 8)));
-  static_cast<void>(value.begin(out.at(3).fade(PerformanceAutomationTarget::Level, 0.5, 4),
-                                SequenceMotionPlan<double>::targetOverTicks(0.5, 4)));
+  value.begin(out.fade(PerformanceAutomationTarget::Level, 1.0, 8),
+              SequenceMotionPlan<double>::targetOverTicks(1.0, 8));
+  value.begin(out.at(3).fade(PerformanceAutomationTarget::Level, 0.5, 4),
+              SequenceMotionPlan<double>::targetOverTicks(0.5, 4));
   value.setCurrentAt(5, 0.25);
 
   expect(track.automations.size() == 2 && track.automations[0].realization.endTick == 3 &&

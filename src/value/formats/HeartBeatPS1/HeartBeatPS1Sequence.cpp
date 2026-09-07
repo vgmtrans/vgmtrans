@@ -544,7 +544,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 
   auto event = cursor.command(label, semantic, playback);
   if (source.end > source.offset + 1) {
-    static_cast<void>(event.rawBytes("encoded_bytes", source.end - source.offset - 1));
+    event.rawBytes("encoded_bytes", source.end - source.offset - 1);
   }
   event.derived("delta", source.delta);
   event.derived("status", source.status, SourceValueDisplay::Hex);

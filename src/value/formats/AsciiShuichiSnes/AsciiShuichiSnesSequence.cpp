@@ -695,7 +695,7 @@ Cursor::Event& selectInstrument(Cursor::Event& event, u8 program) {
                  : cursor.unsupported("Invalid Command").stop();
     case Command::MuteVoiceMask: {
       auto event = cursor.sourceOnly("Mute Voice Mask", "mute-voice-mask");
-      static_cast<void>(event.u8("mask", SourceValueDisplay::Hex));
+      event.u8("mask", SourceValueDisplay::Hex);
       return event;
     }
     case Command::Combined: {
@@ -716,7 +716,7 @@ Cursor::Event& selectInstrument(Cursor::Event& event, u8 program) {
     }
     case Command::WriteCpuPort: {
       auto event = cursor.sourceOnly("Write CPU Port", "cpu-port");
-      static_cast<void>(event.u8("value", SourceValueDisplay::Hex));
+      event.u8("value", SourceValueDisplay::Hex);
       return event;
     }
     case Command::EndVoice:

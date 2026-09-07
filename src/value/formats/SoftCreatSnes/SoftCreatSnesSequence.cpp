@@ -1102,7 +1102,7 @@ struct DecodeState {
     }
     case 0xb5: {
       auto event = cursor.sourceOnly("Trigger Sound Effect", "sound-effect");
-      static_cast<void>(event.u8("effect", SemanticOperandRole::InstrumentProgram));
+      event.u8("effect", SemanticOperandRole::InstrumentProgram);
       return event;
     }
     case 0xb6: {
@@ -1143,7 +1143,7 @@ struct DecodeState {
     case 0xc4: {
       auto event = cursor.sourceOnly(command == 0xc3 ? "External SFX Slot" : "External SFX Priority",
                                      "sound-effect-state");
-      static_cast<void>(event.u8(command == 0xc3 ? "slot" : "priority"));
+      event.u8(command == 0xc3 ? "slot" : "priority");
       return event;
     }
     case 0xc5:

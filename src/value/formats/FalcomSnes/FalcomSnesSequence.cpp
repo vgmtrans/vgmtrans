@@ -597,7 +597,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 count = event.u8("count");
       const Address cell = event.nextAddress();
       event.derived("counter", cell, SourceValueDisplay::Address);
-      static_cast<void>(event.u8("counter_initial"));
+      event.u8("counter_initial");
       return event.invoke<&Playback::repeatStart>(cell, count);
     }
     case 0xee: {
@@ -643,12 +643,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xf4: {
       auto event = cursor.sourceOnly("DSP FLG / Noise", "noise");
-      static_cast<void>(event.u8("flg", SourceValueDisplay::Hex));
+      event.u8("flg", SourceValueDisplay::Hex);
       return event;
     }
     case 0xf5: {
       auto event = cursor.sourceOnly("DSP Pitch Modulation", "pitch-modulation");
-      static_cast<void>(event.u8("enabled"));
+      event.u8("enabled");
       return event;
     }
     case 0xf6: {
@@ -678,7 +678,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Overwrite FIR Preset", SequenceSemantic::State);
       const u8 preset = event.u8("preset");
       for (u32 coefficient = 0; coefficient < 8; ++coefficient) {
-        static_cast<void>(event.s8(names[coefficient]));
+        event.s8(names[coefficient]);
       }
       return event.invoke<&Playback::overwriteFirPreset>(preset);
     }
