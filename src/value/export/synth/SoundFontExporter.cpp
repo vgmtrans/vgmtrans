@@ -66,16 +66,6 @@ constexpr std::array<u16, kEnvelopeInstrumentRegionGenerators> kSfEnvelopeGenera
 
 using Chunk = RiffChunk;
 
-struct DecodedSfSample {
-  u32 localIndex = 0;
-  std::string name;
-  Tuning pitch;
-  double attenuationDb = 0.0;
-  DecodedSample decoded;
-  u32 startFrame = 0;
-  u32 endFrame = 0;
-};
-
 struct SfRegionPitch {
   u8 rootKey = kDefaultRootKey;
   s16 coarseTune = 0;
@@ -185,7 +175,7 @@ struct SfLayout {
   };
 }
 
-[[nodiscard]] Loop effectiveSfLoop(const Region& region, const DecodedSfSample& sample) {
+[[nodiscard]] Loop effectiveSfLoop(const Region& region, const DecodedSynthSample& sample) {
   return region.loop.value_or(sample.decoded.loop);
 }
 
@@ -377,38 +367,7 @@ struct SfLayout {
   };
 }
 
-[[nodiscard]] std::vector<DecodedSfSample> sf2Samples(std::vector<DecodedSynthSample> decodedSamples) {
-  // SF2 stores all sample PCM in one smpl chunk. startFrame/endFrame are offsets into
-  // that concatenated stream, including the mandatory pad after each sample.
-  std::vector<DecodedSfSample> samples;
-  samples.reserve(decodedSamples.size());
-  for (auto& sample : decodedSamples) {
-    samples.push_back(DecodedSfSample{
-        .localIndex = sample.localIndex,
-        .name = sf2Name(std::move(sample.name), "Sample"),
-        .pitch = sample.pitch,
-        .attenuationDb = sample.attenuationDb,
-        .decoded = std::move(sample.decoded),
-    });
-  }
-
-  u32 frameCursor = 0;
-  for (auto& sample : samples) {
-    if (sample.decoded.pcm.size() > std::numeric_limits<u32>::max()) {
-      throw std::overflow_error("SF2 sample is too large");
-    }
-    sample.startFrame = frameCursor;
-    sample.endFrame = frameCursor + static_cast<u32>(sample.decoded.pcm.size());
-    if (sample.endFrame > std::numeric_limits<u32>::max() - kSf2SamplePaddingFrames) {
-      throw std::overflow_error("SF2 sample data is too large");
-    }
-    frameCursor = sample.endFrame + kSf2SamplePaddingFrames;
-  }
-
-  return samples;
-}
-
-[[nodiscard]] Chunk smplChunk(std::span<const DecodedSfSample> samples) {
+[[nodiscard]] Chunk smplChunk(std::span<const DecodedSynthSample> samples) {
   std::vector<u8> payload;
   for (const auto& sample : samples) {
     for (const s16 value : sample.decoded.pcm) {
@@ -491,7 +450,7 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
 }
 
 [[nodiscard]] std::array<Chunk, 4> instrumentChunks(std::span<const ResolvedSynthInstrument> instruments,
-                                                    std::span<const DecodedSfSample> samples,
+                                                    std::span<const DecodedSynthSample> samples,
                                                     const MidiModulationUsage* midiModulationUsage,
                                                     ModulationScalingPolicy modulationScaling,
                                                     ModulationConversionPolicy modulationConversion) {
@@ -569,7 +528,7 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
           makeChunk("imod", std::move(modulators)), makeChunk("igen", std::move(generators))};
 }
 
-[[nodiscard]] std::vector<SfSampleHeaderInfo> sampleHeaderInfo(std::span<const DecodedSfSample> samples,
+[[nodiscard]] std::vector<SfSampleHeaderInfo> sampleHeaderInfo(std::span<const DecodedSynthSample> samples,
                                                                std::span<const ResolvedSynthInstrument> instruments) {
   // SF2 sample headers have their own original-key/correction fields. Pick the first
   // region that references each sample so sample headers stay consistent with zones.
@@ -593,24 +552,32 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
   return info;
 }
 
-[[nodiscard]] Chunk shdrChunk(std::span<const DecodedSfSample> samples,
+[[nodiscard]] Chunk shdrChunk(std::span<const DecodedSynthSample> samples,
                               std::span<const ResolvedSynthInstrument> instruments) {
   const auto headers = sampleHeaderInfo(samples, instruments);
   std::vector<u8> payload;
+  u32 startFrame = 0;
   for (size_t i = 0; i < samples.size(); ++i) {
     const auto& sample = samples[i];
+    // Offsets include each preceding sample's required silence padding.
+    const u64 end = static_cast<u64>(startFrame) + sample.decoded.pcm.size();
+    if (end > std::numeric_limits<u32>::max() - kSf2SamplePaddingFrames) {
+      throw std::overflow_error("SF2 sample data is too large");
+    }
+    const auto endFrame = static_cast<u32>(end);
     writeFixedString(payload, sf2Name(sample.name, "Sample"), 20);
-    writeLe32(payload, sample.startFrame);
-    writeLe32(payload, sample.endFrame);
-    const u32 loopStart = sample.startFrame + headers[i].loop.start;
+    writeLe32(payload, startFrame);
+    writeLe32(payload, endFrame);
+    const u32 loopStart = startFrame + headers[i].loop.start;
     const u32 loopEnd = loopStart + headers[i].loop.length;
     writeLe32(payload, loopStart);
-    writeLe32(payload, std::min(loopEnd, sample.endFrame));
+    writeLe32(payload, std::min(loopEnd, endFrame));
     writeLe32(payload, sample.decoded.sampleRate == 0 ? 32000 : sample.decoded.sampleRate);
     writeU8(payload, headers[i].pitch.originalKey);
     writeU8(payload, static_cast<u8>(headers[i].pitch.correction));
     writeLe16(payload, 0);
     writeLe16(payload, 1);
+    startFrame = endFrame + kSf2SamplePaddingFrames;
   }
 
   writeFixedString(payload, "EOS", 20);
@@ -626,7 +593,7 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
   return makeChunk("shdr", std::move(payload));
 }
 
-[[nodiscard]] std::vector<Chunk> pdtaChunks(const SfLayout& layout, std::span<const DecodedSfSample> samples,
+[[nodiscard]] std::vector<Chunk> pdtaChunks(const SfLayout& layout, std::span<const DecodedSynthSample> samples,
                                             const MidiModulationUsage* midiModulationUsage,
                                             ModulationScalingPolicy modulationScaling,
                                             ModulationConversionPolicy modulationConversion) {
@@ -645,13 +612,12 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
 SynthExportResult buildSoundFont2(const SynthExportInput& input, const SourceStore& sources) {
   // SoundFont 2 sample data is mono PCM16. Shared decode/resolve helpers do the expensive
   // source work once before this file-specific table writer assembles RIFF chunks.
-  auto [decodedSamples, instruments, diagnostics] =
+  auto [samples, instruments, diagnostics] =
       prepareSynthData(input, sources,
                        SynthSampleDecodeOptions{
                            .requireMono = true,
                            .nonMonoWarning = "Skipping non-mono sample for SoundFont2 export",
                        });
-  auto samples = sf2Samples(std::move(decodedSamples));
 
   if (samples.empty()) {
     diagnostics.push_back(exportError("No decodable samples available for SoundFont2 export"));
