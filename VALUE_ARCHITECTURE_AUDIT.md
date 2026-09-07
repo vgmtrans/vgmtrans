@@ -342,6 +342,23 @@ linked notes, rendering hints and policies, physical timing modes, zero/short/
 long durations, transposition, existing bends, and tempo changes. All bytes and
 diagnostic counts match the previous implementation.
 
+### Assemble ordinary sample-decoder output once
+
+PCM8, PCM16, BRR, PSX ADPCM, Konami delta PCM, and OKI ADPCM now return PCM
+vectors from their codec loops. One local adapter validates the source range
+and assembles the unchanged rate, channel, and loop metadata. Keep predictor-
+header parsing, waveform generation, and GBA resampling explicit where their
+requirements differ. Combine the two Konami wrappers into one decoder whose
+table directly identifies their one differing delta. Remove the unused source
+argument from NDS waveform generation. This removes 54 production lines.
+
+The full build and all 17 CTest targets pass without compiler warnings. A
+50,400-result before/after comparison covers all codec enum values, empty and
+truncated data, out-of-range and overflowing offsets, channels, rate defaults,
+byte order, reverse playback, and loop metadata. PCM and metadata are identical.
+The updated decoder was also compiled directly with AddressSanitizer, UBSan,
+and float-cast-overflow checks for that comparison; no errors were reported.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

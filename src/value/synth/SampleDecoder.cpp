@@ -284,37 +284,19 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   return decoded;
 }
 
-[[nodiscard]] std::optional<DecodedSample> decodePcmS8(const Sample& sample, std::span<const u8> sourceBytes) {
-  if (!rangeIsValid(sample, sourceBytes)) {
-    return std::nullopt;
-  }
-
-  const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
-  DecodedSample decoded{
-      .sampleRate = sample.sampleRate,
-      .channels = sample.channels,
-      .loop = sample.loop,
-  };
-  decoded.pcm.reserve(encoded.size());
+[[nodiscard]] std::vector<s16> decodePcmS8(const Sample& sample, std::span<const u8> encoded) {
+  std::vector<s16> decoded;
+  decoded.reserve(encoded.size());
   for (size_t index = 0; index < encoded.size(); ++index) {
     const size_t sourceIndex = sample.reverse ? encoded.size() - 1 - index : index;
-    decoded.pcm.push_back(static_cast<s16>(static_cast<s8>(encoded[sourceIndex])) << 8);
+    decoded.push_back(static_cast<s16>(static_cast<s8>(encoded[sourceIndex])) << 8);
   }
   return decoded;
 }
 
-[[nodiscard]] std::optional<DecodedSample> decodePcmS16(const Sample& sample, std::span<const u8> sourceBytes) {
-  if (!rangeIsValid(sample, sourceBytes)) {
-    return std::nullopt;
-  }
-
-  const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
-  DecodedSample decoded{
-      .sampleRate = sample.sampleRate,
-      .channels = sample.channels,
-      .loop = sample.loop,
-  };
-  decoded.pcm.reserve(encoded.size() / 2);
+[[nodiscard]] std::vector<s16> decodePcmS16(const Sample& sample, std::span<const u8> encoded) {
+  std::vector<s16> decoded;
+  decoded.reserve(encoded.size() / 2);
   const size_t sampleCount = encoded.size() / 2;
   for (size_t index = 0; index < sampleCount; ++index) {
     const size_t sourceIndex = sample.reverse ? sampleCount - 1 - index : index;
@@ -322,27 +304,25 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
     const u16 value = sample.bigEndian
                           ? static_cast<u16>((static_cast<u16>(encoded[offset]) << 8) | encoded[offset + 1])
                           : le16(encoded, offset);
-    decoded.pcm.push_back(static_cast<s16>(value));
+    decoded.push_back(static_cast<s16>(value));
   }
   return decoded;
 }
 
-[[nodiscard]] std::optional<DecodedSample> decodeKonamiDeltaPcm(const Sample& sample, std::span<const u8> sourceBytes,
-                                                                const std::array<s32, 16>& deltas) {
-  if (!rangeIsValid(sample, sourceBytes)) {
-    return std::nullopt;
-  }
-  const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
-  DecodedSample decoded{
-      .sampleRate = sample.sampleRate,
-      .channels = sample.channels,
-      .loop = sample.loop,
+[[nodiscard]] std::vector<s16> decodeKonamiDeltaPcm(const Sample& sample, std::span<const u8> encoded) {
+  // K053260 differs only at nibble 8: its largest negative delta is zero on K054539.
+  std::array<s32, 16> deltas{
+      0, 256, 512, 1024, 2048, 4096, 8192, 16384, 0, -16384, -8192, -4096, -2048, -1024, -512, -256,
   };
-  decoded.pcm.reserve(encoded.size() * 2);
+  if (sample.codec == AudioCodec::KonamiK053260Adpcm) {
+    deltas[8] = -32768;
+  }
+  std::vector<s16> decoded;
+  decoded.reserve(encoded.size() * 2);
   s32 previous = 0;
   auto emit = [&](u8 nibble) {
     previous = std::clamp<s32>(previous + deltas[nibble & 0x0f], -32768, 32767);
-    decoded.pcm.push_back(static_cast<s16>(previous));
+    decoded.push_back(static_cast<s16>(previous));
   };
   for (size_t index = 0; index < encoded.size(); ++index) {
     const size_t sourceIndex = sample.reverse ? encoded.size() - 1 - index : index;
@@ -353,40 +333,13 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   return decoded;
 }
 
-[[nodiscard]] std::optional<DecodedSample> decodeKonamiK054539Adpcm(const Sample& sample,
-                                                                    std::span<const u8> sourceBytes) {
-  static constexpr std::array<s32, 16> deltas{
-      0, 256, 512, 1024, 2048, 4096, 8192, 16384, 0, -16384, -8192, -4096, -2048, -1024, -512, -256,
-  };
-  return decodeKonamiDeltaPcm(sample, sourceBytes, deltas);
-}
-
-[[nodiscard]] std::optional<DecodedSample> decodeKonamiK053260Adpcm(const Sample& sample,
-                                                                    std::span<const u8> sourceBytes) {
-  // K053260 PPCM differs from K054539 DPCM only at nibble 8: it is the
-  // largest negative delta rather than a zero delta.
-  static constexpr std::array<s32, 16> deltas{
-      0, 256, 512, 1024, 2048, 4096, 8192, 16384, -32768, -16384, -8192, -4096, -2048, -1024, -512, -256,
-  };
-  return decodeKonamiDeltaPcm(sample, sourceBytes, deltas);
-}
-
-[[nodiscard]] std::optional<DecodedSample> decodeOkiAdpcm(const Sample& sample, std::span<const u8> sourceBytes) {
-  if (!rangeIsValid(sample, sourceBytes)) {
-    return std::nullopt;
-  }
-
-  const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
-  DecodedSample decoded{
-      .sampleRate = sample.sampleRate,
-      .channels = sample.channels,
-      .loop = sample.loop,
-  };
+[[nodiscard]] std::vector<s16> decodeOkiAdpcm(const Sample& sample, std::span<const u8> encoded) {
+  std::vector<s16> decoded;
   if (encoded.empty() && sample.codecParameter != 0) {
-    decoded.pcm.assign(sample.codecParameter, 0);
+    decoded.assign(sample.codecParameter, 0);
     return decoded;
   }
-  decoded.pcm.reserve(encoded.size() * 2);
+  decoded.reserve(encoded.size() * 2);
 
   s32 signal = 0;
   s32 stepIndex = 0;
@@ -409,7 +362,7 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
     // The MSM6295 path used by CPS1 scales the 12-bit decoder output by 11
     // before presenting PCM. Keeping that conversion here preserves the
     // hardware level without target-specific negative attenuation.
-    decoded.pcm.push_back(static_cast<s16>(std::clamp<s32>(signal * 11, -32768, 32767)));
+    decoded.push_back(static_cast<s16>(std::clamp<s32>(signal * 11, -32768, 32767)));
   };
   for (const u8 value : encoded) {
     emit(value >> 4);
@@ -451,7 +404,7 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   return decoded;
 }
 
-[[nodiscard]] std::optional<DecodedSample> decodeNdsPsg(const Sample& sample, std::span<const u8>) {
+[[nodiscard]] std::optional<DecodedSample> decodeNdsPsg(const Sample& sample) {
   const u32 sampleCount = sample.loop.length != 0 ? sample.loop.length : 32768;
   DecodedSample decoded{
       .sampleRate = sample.sampleRate == 0 ? 32768 : sample.sampleRate,
@@ -475,44 +428,24 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   return decoded;
 }
 
-[[nodiscard]] std::optional<DecodedSample> decodePsxAdpcm(const Sample& sample, std::span<const u8> sourceBytes) {
-  if (!rangeIsValid(sample, sourceBytes)) {
-    return std::nullopt;
-  }
-
-  const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
-  DecodedSample decoded{
-      .sampleRate = sample.sampleRate,
-      .channels = sample.channels,
-      .loop = sample.loop,
-  };
-  decoded.pcm.reserve((encoded.size() / kPsxAdpcmBlockBytes) * kPsxAdpcmFramesPerBlock);
+[[nodiscard]] std::vector<s16> decodePsxAdpcm(const Sample&, std::span<const u8> encoded) {
+  std::vector<s16> decoded;
+  decoded.reserve((encoded.size() / kPsxAdpcmBlockBytes) * kPsxAdpcmFramesPerBlock);
 
   s32 previous1 = 0;
   s32 previous2 = 0;
   for (size_t offset = 0; offset + kPsxAdpcmBlockBytes <= encoded.size(); offset += kPsxAdpcmBlockBytes) {
-    const auto outputOffset = decoded.pcm.size();
-    decoded.pcm.resize(outputOffset + kPsxAdpcmFramesPerBlock);
-    decodePsxAdpcmBlock(
-        std::span<s16, kPsxAdpcmFramesPerBlock>(decoded.pcm.data() + outputOffset, kPsxAdpcmFramesPerBlock),
-        std::span<const u8, kPsxAdpcmBlockBytes>(encoded.data() + offset, kPsxAdpcmBlockBytes), previous1, previous2);
+    const auto outputOffset = decoded.size();
+    decoded.resize(outputOffset + kPsxAdpcmFramesPerBlock);
+    decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock>(decoded.data() + outputOffset, kPsxAdpcmFramesPerBlock),
+                        std::span<const u8, kPsxAdpcmBlockBytes>(encoded.data() + offset, kPsxAdpcmBlockBytes),
+                        previous1, previous2);
   }
   return decoded;
 }
 
-[[nodiscard]] std::optional<DecodedSample> decodeSnesBrr(const Sample& sample, std::span<const u8> sourceBytes) {
-  const auto offset = sample.encodedData.offset;
-  const auto size = sample.encodedData.size;
-  if (offset > sourceBytes.size() || size > sourceBytes.size() - offset) {
-    return std::nullopt;
-  }
-
-  const auto encoded = sourceBytes.subspan(offset, size);
-  DecodedSample decoded{
-      .sampleRate = sample.sampleRate,
-      .channels = sample.channels,
-      .loop = sample.loop,
-  };
+[[nodiscard]] std::vector<s16> decodeSnesBrr(const Sample&, std::span<const u8> encoded) {
+  std::vector<s16> decoded;
 
   s32 previous1 = 0;
   s32 previous2 = 0;
@@ -521,9 +454,9 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
     // but respecting the flag here keeps the decoder robust for larger source ranges.
     const auto header = encoded[blockOffset];
     const auto payload = encoded.subspan(blockOffset + 1, 8);
-    const auto outputOffset = decoded.pcm.size();
-    decoded.pcm.resize(outputOffset + 16);
-    decodeBrrBlock(std::span<s16, 16>(decoded.pcm.data() + outputOffset, 16), header,
+    const auto outputOffset = decoded.size();
+    decoded.resize(outputOffset + 16);
+    decodeBrrBlock(std::span<s16, 16>(decoded.data() + outputOffset, 16), header,
                    std::span<const u8, 8>(payload.data(), 8), previous1, previous2);
 
     if ((header & 0x01) != 0) {
@@ -668,19 +601,33 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
 }  // namespace
 
 std::optional<DecodedSample> decodeSample(const Sample& sample, std::span<const u8> sourceBytes) {
+  // Ordinary byte codecs change only PCM. Keep range validation and unchanged
+  // playback metadata here; generators and resamplers assemble their own result.
+  const auto decodePcm = [&](auto decode) -> std::optional<DecodedSample> {
+    if (!rangeIsValid(sample, sourceBytes)) {
+      return std::nullopt;
+    }
+    const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
+    return DecodedSample{
+        .sampleRate = sample.sampleRate,
+        .channels = sample.channels,
+        .pcm = decode(sample, encoded),
+        .loop = sample.loop,
+    };
+  };
   switch (sample.codec) {
     case AudioCodec::PcmS8:
-      return decodePcmS8(sample, sourceBytes);
+      return decodePcm(decodePcmS8);
     case AudioCodec::PcmS16:
-      return decodePcmS16(sample, sourceBytes);
+      return decodePcm(decodePcmS16);
     case AudioCodec::SnesBrr:
-      return decodeSnesBrr(sample, sourceBytes);
+      return decodePcm(decodeSnesBrr);
     case AudioCodec::SnesDspNoise:
       return decodeSnesDspNoise(sample);
     case AudioCodec::NdsImaAdpcm:
       return decodeNdsImaAdpcm(sample, sourceBytes);
     case AudioCodec::NdsPsg:
-      return decodeNdsPsg(sample, sourceBytes);
+      return decodeNdsPsg(sample);
     case AudioCodec::GbaDirectSound:
       return decodeGbaDirectSound(sample, sourceBytes);
     case AudioCodec::GbaPsg:
@@ -688,13 +635,12 @@ std::optional<DecodedSample> decodeSample(const Sample& sample, std::span<const 
     case AudioCodec::GbaPsgWave:
       return decodeGbaPsgWave(sample, sourceBytes);
     case AudioCodec::PsxAdpcm:
-      return decodePsxAdpcm(sample, sourceBytes);
+      return decodePcm(decodePsxAdpcm);
     case AudioCodec::KonamiK053260Adpcm:
-      return decodeKonamiK053260Adpcm(sample, sourceBytes);
     case AudioCodec::KonamiK054539Adpcm:
-      return decodeKonamiK054539Adpcm(sample, sourceBytes);
+      return decodePcm(decodeKonamiDeltaPcm);
     case AudioCodec::OkiAdpcm:
-      return decodeOkiAdpcm(sample, sourceBytes);
+      return decodePcm(decodeOkiAdpcm);
     case AudioCodec::Unknown:
       return std::nullopt;
   }
