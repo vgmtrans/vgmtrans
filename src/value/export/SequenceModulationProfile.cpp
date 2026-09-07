@@ -7,7 +7,7 @@
 #include "value/export/SequenceModulationProfile.h"
 
 #include "value/synth/SynthModel.h"
-#include "value/synth/SynthMath.h"
+#include "value/export/synth/ModulationScaling.h"
 
 #include <algorithm>
 #include <cmath>

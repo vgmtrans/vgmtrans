@@ -6,10 +6,9 @@
 
 #include "value/export/synth/ModulationScaling.h"
 
-#include "value/synth/SynthMath.h"
-
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <optional>
 #include <type_traits>
 #include <variant>
@@ -17,6 +16,13 @@
 namespace vgmtrans::core {
 
 namespace {
+
+s32 synthAmountFromSecondsRange(double minSeconds, double maxSeconds) {
+  const s32 minAmount = synthAmountFromSeconds(synthSecondsRangeMinimum(minSeconds));
+  const s32 maxAmount = synthAmountFromSeconds(maxSeconds);
+  const double fullScaleRange = (maxAmount - minAmount) * 128.0 / 127.0;
+  return static_cast<s32>(std::lround(fullScaleRange));
+}
 
 [[nodiscard]] bool shouldScale(const MidiModulationMaximum* maximum, ModulationScalingPolicy policy) noexcept {
   // Only scale when the observed maximum leaves unused controller headroom. Full-range
@@ -65,6 +71,40 @@ namespace {
 }
 
 }  // namespace
+
+s32 synthAmountFromHertz(double hertz) {
+  // SF2 and DLS express LFO frequency in absolute cents relative to C-1.
+  return static_cast<s32>(std::lround(1200.0 * std::log2(hertz / 8.176)));
+}
+
+s32 synthAmountFromHertzRange(double minHertz, double maxHertz) {
+  const double minCents = static_cast<double>(synthAmountFromHertz(minHertz));
+  const double maxCents = static_cast<double>(synthAmountFromHertz(maxHertz));
+  return static_cast<s32>(std::lround((maxCents - minCents) * 128.0 / 127.0));
+}
+
+s32 synthAmountFromSeconds(double seconds) {
+  if (seconds <= 0.0 || !std::isfinite(seconds)) {
+    return std::numeric_limits<s16>::min();
+  }
+
+  const double timecents = std::round(1200.0 * std::log2(seconds));
+  return static_cast<s32>(std::clamp(timecents, static_cast<double>(std::numeric_limits<s16>::min()),
+                                     static_cast<double>(std::numeric_limits<s16>::max())));
+}
+
+s32 synthAmountFromCentibels(double centibels) {
+  return static_cast<s32>(std::lround(centibels));
+}
+
+s32 synthAmountFromDecibels(double decibels) {
+  return static_cast<s32>(std::lround(decibels * 10.0));
+}
+
+double synthSecondsRangeMinimum(double seconds) {
+  // The smallest normal SF2 delay is -12000 timecents.
+  return std::max(seconds, 1.0 / 1024.0);
+}
 
 LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulation) {
   LoweredSynthModulation lowered;
