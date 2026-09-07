@@ -1775,7 +1775,8 @@ void ninSnesSunsoftRecognizesBothRevisionsAndBgmLayouts() {
 
 void ninSnesSunsoftCommandsPreserveEchoAndEnvelopeState() {
   for (const ProfileId id : {ProfileId::SunsoftEarlier, ProfileId::Sunsoft}) {
-    auto bytes = sunsoftDriverFixture(id);
+    std::vector<u8> bytes(kAramSize);
+    std::ranges::copy(std::initializer_list<u8>{0, 0xff, 0xe0, 0x40, 1, 0}, bytes.begin() + 0x4000);
     writeLe16(bytes, 0x100, 0x200);
     writeSection(bytes, 0x200, {{0, 0x300}, {1, 0x380}});
     const std::vector<u8> track{
@@ -1829,7 +1830,7 @@ void ninSnesSunsoftCommandsPreserveEchoAndEnvelopeState() {
 
 void ninSnesSunsoftFeAndGateFollowRevision() {
   for (const ProfileId id : {ProfileId::SunsoftEarlier, ProfileId::Sunsoft}) {
-    auto bytes = sunsoftDriverFixture(id);
+    std::vector<u8> bytes(kAramSize);
     writeLe16(bytes, 0x100, 0x200);
     writeSection(bytes, 0x200, {{0, 0x300}, {1, 0x340}});
     const bool earlier = id == ProfileId::SunsoftEarlier;
@@ -1873,9 +1874,12 @@ void ninSnesSunsoftFeAndGateFollowRevision() {
 
 void ninSnesSunsoftNoiseInstrumentsPreserveLaterSamples() {
   for (const ProfileId id : {ProfileId::SunsoftEarlier, ProfileId::Sunsoft}) {
-    auto bytes = sunsoftDriverFixture(id);
+    std::vector<u8> bytes(kAramSize);
     std::ranges::copy(std::initializer_list<u8>{0x9f, 0xff, 0xe0, 0, 1, 0, 0, 0xff, 0xe0, 0, 2, 0},
                       bytes.begin() + 0x4000);
+    writeLe16(bytes, 0x5000, 0x6000);
+    writeLe16(bytes, 0x5002, 0x6000);
+    bytes[0x6000] = 3;
     Layout layout = standardLayout();
     layout.profile = id;
     layout.instrumentTableAddress = 0x4000;

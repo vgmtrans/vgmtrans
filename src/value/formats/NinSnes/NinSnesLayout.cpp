@@ -244,11 +244,11 @@ template <size_t Size>
   }
 
   if (commands.count == 31 &&
-      Patterns::ptnSunsoftEchoOn.matches(reader, reader.le16(commands.addressTable + 27 * 2)) &&
-      Patterns::ptnSunsoftAdsr.matches(reader, reader.le16(commands.addressTable + 29 * 2))) {
+      Patterns::ptnSunsoftEchoOn.matches(reader, reader.le16(commands.addressTable + (0xfb - commands.first) * 2)) &&
+      Patterns::ptnSunsoftAdsr.matches(reader, reader.le16(commands.addressTable + (0xfd - commands.first) * 2))) {
     // Hashire Hebereke (S1.20): FB/FC echo, FD ADSR, FE skips two bytes.
     // Albert Odyssey 2: FE instead sets a second music-volume multiplier.
-    const u16 tail = commands.lengthTable + 27;
+    const u16 tail = commands.lengthTable + (0xfb - commands.first);
     if (matchesTable(reader, tail, std::array<u8, 4>{0, 0, 2, 2})) {
       return ProfileId::SunsoftEarlier;
     }
