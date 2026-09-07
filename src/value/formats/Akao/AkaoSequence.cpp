@@ -264,7 +264,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
   const u16 count = event.resolved("count", event.rawU8("raw_count"), akaoZeroAs256);
   const Address destination =
       relativeAddress(event, profile, operandOffset, "relative", SemanticOperandRole::RepeatTarget);
-  event.mayBranchTo(destination);
+  event.discoverTarget(destination);
   return event.invoke(
       [](Playback& playback, u16 matchingPlay, Address branchDestination) -> Effects {
         if (playback.track.repeats.currentCompletedPlays() + 1 == matchingPlay) {
@@ -588,7 +588,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
       repeats.completeCurrentPlay();
       repeats.finishFallthrough();
       event.derived("destination", target, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-      event.mayBranchTo(target);
+      event.discoverTarget(target);
       return event.invoke(
           [](Playback& playback, u16 totalPlays) -> Effects {
             const u8 slot = playback.track.repeats.layer;

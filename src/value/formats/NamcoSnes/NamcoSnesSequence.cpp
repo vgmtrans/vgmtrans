@@ -711,9 +711,7 @@ struct SequenceReferences {
       return event.call(event.addressLe("destination", SemanticOperandRole::CallTarget));
     }
     case 0x03:
-      return cursor.command("Return / End", SequenceSemantic::End)
-          .invokeFlow<&Playback::returnOrEnd>()
-          .discoverReturn();
+      return cursor.command("Return / End", SequenceSemantic::End).invokeFlow<&Playback::returnOrEnd>().return_();
     case 0x04: {
       auto event = cursor.command("Timebase Multiplier", SequenceSemantic::State);
       return event.invoke<&Playback::multiplier>(event.u8("multiplier"));
@@ -729,7 +727,7 @@ struct SequenceReferences {
       const Address destination = event.addressLe("destination", SemanticOperandRole::RepeatTarget);
       const u8 slot = opcode == 0x06 ? 0 : 1;
       event.invokeFlow<&Playback::repeatUntil>(slot, count, destination);
-      return event.mayBranchTo(destination);
+      return event.discoverTarget(destination);
     }
     case 0x07:
     case 0x10: {
@@ -739,7 +737,7 @@ struct SequenceReferences {
       const Address destination = event.addressLe("destination", SemanticOperandRole::RepeatTarget);
       const u8 slot = opcode == 0x07 ? 0 : 1;
       event.invokeFlow<&Playback::repeatBreak>(slot, count, destination);
-      return event.mayBranchTo(destination);
+      return event.discoverTarget(destination);
     }
     case 0x08: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);

@@ -1002,7 +1002,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       if (discoveredLoops[slot].value != 0) {
         event.derived("destination", discoveredLoops[slot], SourceValueDisplay::Address,
                       SemanticOperandRole::RepeatTarget);
-        event.mayBranchTo(discoveredLoops[slot]);
+        event.discoverTarget(discoveredLoops[slot]);
       }
       return event.invokeFlow<&Playback::loopEnd>(slot, count, attenuation, transpose);
     }
@@ -1083,7 +1083,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       if (discoveredSubroutine.value != 0) {
         event.derived("destination", discoveredSubroutine, SourceValueDisplay::Address,
                       SemanticOperandRole::CallTarget);
-        event.mayBranchTo(discoveredSubroutine);
+        event.discoverTarget(discoveredSubroutine);
       }
       return event.invokeFlow<&Playback::subroutineBoundary>(event.nextAddress());
     }
@@ -1134,7 +1134,7 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
     case 0xff: {
       auto event = cursor.command("Return / End", SequenceSemantic::End);
       event.invoke<&Playback::returnOrEnd>();
-      return event.discoverReturn();
+      return event.return_();
     }
     default:
       return cursor.unsupported("Unknown Opcode").stop();

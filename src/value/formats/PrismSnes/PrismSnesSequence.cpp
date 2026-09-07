@@ -1259,7 +1259,7 @@ struct WalkState {
   if (version == Version::DualOrb && opcode <= 0xc5) {
     auto event = cursor.command("Conditional Jump", SequenceSemantic::Jump);
     const Address destination = event.addressLe("destination", SemanticOperandRole::JumpTarget);
-    return event.invoke<&Playback::conditionalJump>(destination).mayBranchTo(destination);
+    return event.invoke<&Playback::conditionalJump>(destination).discoverTarget(destination);
   }
   if (version == Version::Modern && opcode <= 0xc4) {
     auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
@@ -1270,7 +1270,7 @@ struct WalkState {
     case 0xc5: {
       auto event = cursor.command("Conditional Jump", SequenceSemantic::Jump);
       const Address destination = event.addressLe("destination", SemanticOperandRole::JumpTarget);
-      return event.invoke<&Playback::conditionalJump>(destination).mayBranchTo(destination);
+      return event.invoke<&Playback::conditionalJump>(destination).discoverTarget(destination);
     }
     case 0xc6:
       return cursor.command("Set Condition", SequenceSemantic::State).invoke<&Playback::condition>();
@@ -1349,7 +1349,7 @@ struct WalkState {
                         : event.repeatUntil(static_cast<u8>(opcode - 0xde), static_cast<u32>(count) + 1, destination);
     }
     case 0xe0:
-      return cursor.command("Return If Called", SequenceSemantic::Return).invoke<&Playback::return_>().discoverReturn();
+      return cursor.command("Return If Called", SequenceSemantic::Return).invoke<&Playback::return_>().return_();
     case 0xe1: {
       auto event = cursor.command("Call", SequenceSemantic::Call);
       return event.call(event.addressLe("destination", SemanticOperandRole::CallTarget));

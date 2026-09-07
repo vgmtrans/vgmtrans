@@ -279,8 +279,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const Address destination{*source.loopDestination};
       event.derived("repeat_count", source.loopCount);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
-      event.invoke<&Playback::loopEnd>(source.loopCount, destination, source.delta)
-          .mayBranchTo(destination);
+      event.invoke<&Playback::loopEnd>(source.loopCount, destination, source.delta).discoverTarget(destination);
       return event;
     }
     return event.invoke<&Playback::controller>(channel, controller, value, source.delta);

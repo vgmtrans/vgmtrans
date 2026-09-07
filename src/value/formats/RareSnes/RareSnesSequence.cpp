@@ -1306,7 +1306,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case Kind::Return: {
       auto event = cursor.command("Pattern Return", SequenceSemantic::Return);
       event.invoke<&Playback::return_>();
-      return event.discoverReturn();
+      return event.return_();
     }
     case Kind::DefaultDurationOn: {
       auto event = cursor.command("Default Duration On", SequenceSemantic::State);
@@ -1481,7 +1481,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       for (u32 index = 0; index < destinationCount; ++index) {
         const Address destination =
             event.addressLe(fmt::format("destination_{}", index), SemanticOperandRole::JumpTarget);
-        event.mayBranchTo(destination);
+        event.discoverTarget(destination);
         destinations.push_back(destination);
       }
       return event.invokeFlow<&Playback::conditional>(std::move(destinations));

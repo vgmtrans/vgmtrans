@@ -510,7 +510,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x01: {
       event.label("Repeat End");
       const Address destination = readRelativeTarget(event, sequenceBase, SemanticOperandRole::RepeatTarget);
-      return event.invoke<&Playback::conditionalLoop>(destination).mayBranchTo(destination);
+      return event.invoke<&Playback::conditionalLoop>(destination).discoverTarget(destination);
     }
     case 0x02:
       return event.label("No Operation").ignore();

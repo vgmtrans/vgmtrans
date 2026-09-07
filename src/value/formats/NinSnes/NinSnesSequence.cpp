@@ -1581,7 +1581,7 @@ struct DecodeContext {
                 SemanticOperandRole::JumpTarget);
   event.derived("custom_destination", customDestination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
   event.invoke<&Playback::fe3ParameterFlow>(standardDestination, customDestination);
-  return event.mayBranchTo(standardDestination);
+  return event.discoverTarget(standardDestination);
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(const DecodeContext& context, u32 begin) {
@@ -1601,7 +1601,7 @@ struct DecodeContext {
     case EventType::End: {
       auto event = cursor.command("Section End / Pattern Return", SequenceSemantic::End);
       event.invoke<&Playback::endOrReturn>();
-      return event.discoverReturn();
+      return event.return_();
     }
     case EventType::Note: {
       auto event = cursor.command("Note", SequenceSemantic::Note);
@@ -1829,7 +1829,7 @@ struct DecodeContext {
       const u8 distance = event.u8("distance");
       const Address destination{event.nextAddress().value + distance};
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-      return event.invoke<&Playback::intelliConditionalJump>(destination).mayBranchTo(destination);
+      return event.invoke<&Playback::intelliConditionalJump>(destination).discoverTarget(destination);
     }
     case EventType::IntelliJump: {
       auto event = cursor.command("Short Jump", SequenceSemantic::Jump);

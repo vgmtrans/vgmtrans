@@ -801,7 +801,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 value = event.u8("value");
       const Address destination = relativeTarget(relative, begin + 4);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-      event.mayBranchTo(destination);
+      event.discoverTarget(destination);
       return event.invoke<&Playback::conditional>(destination, value);
     }
     case 0xe1:
@@ -917,7 +917,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       // The driver treats F9 as a no-op at top level, so both the physical
       // continuation and a caller's return address are reachable.
       event.discoverTarget(event.nextAddress());
-      return event.discoverReturn();
+      return event.return_();
     }
     case 0xfa: {
       auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
@@ -940,7 +940,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xff: {
       auto event = cursor.command("Return / End", SequenceSemantic::End);
       event.invoke<&Playback::returnOrEnd>();
-      return event.discoverReturn();
+      return event.return_();
     }
     default:
       return cursor.unsupported("Unknown Opcode").stop();

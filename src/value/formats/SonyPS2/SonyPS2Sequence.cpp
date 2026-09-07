@@ -840,7 +840,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       event.derived("repeat_count", source.loopCount);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
       return event.invokeFlow<&Playback::loop>(source.loopId, source.loopCount, destination, source.delta)
-          .mayBranchTo(destination);
+          .discoverTarget(destination);
     }
     return event.invoke<&Playback::controller>(source.channel, source.data1, source.data2, source.delta);
   }
@@ -1054,7 +1054,7 @@ struct SeEvent {
     event.derived("repeat_count", source.loopCount);
     event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::LoopTarget);
     return event.invokeFlow<&Playback::loop>(source.loopId, source.loopCount, destination, source.delta)
-        .mayBranchTo(destination);
+        .discoverTarget(destination);
   }
   if (source.endEvent) {
     return event.wait(source.delta).end();

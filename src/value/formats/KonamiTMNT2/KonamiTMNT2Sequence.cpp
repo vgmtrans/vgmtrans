@@ -863,7 +863,7 @@ struct DecodeState {
       const u8 rawCount = event.u8("plays");
       const u16 plays = rawCount == 0 ? 256 : rawCount == 0xff ? 0xffff : rawCount;
       event.derived("destination", target, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
-      event.mayBranchTo(target);
+      event.discoverTarget(target);
       state.loops[slot] = {};
       return event.invokeFlow<&Playback::loopEnd>(slot, plays, target);
     }

@@ -980,7 +980,7 @@ struct DurationValue {
       auto event = cursor.command("Loop End", SequenceSemantic::Repeat);
       const u8 slot = event.u8("slot");
       const Address destination = event.addressLe("destination", SemanticOperandRole::RepeatTarget);
-      return event.invoke<&Playback::loopEnd>(slot, destination).mayBranchTo(destination);
+      return event.invoke<&Playback::loopEnd>(slot, destination).discoverTarget(destination);
     }
     case 0x82:
     case 0x86:
@@ -1059,7 +1059,7 @@ struct DurationValue {
     case 0x95: {
       auto event = cursor.command("Jump Until Volume Target", SequenceSemantic::Jump);
       const Address destination = event.addressLe("destination", SemanticOperandRole::JumpTarget);
-      return event.invoke<&Playback::volumeTargetBranch>(destination).mayBranchTo(destination);
+      return event.invoke<&Playback::volumeTargetBranch>(destination).discoverTarget(destination);
     }
     case 0x96: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
@@ -1128,7 +1128,7 @@ struct DurationValue {
         const u32 next = begin + 2;
         const Address skip{next + commandSize(reader, next, layout.version)};
         event.derived("skip_destination", skip, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
-        return event.invoke<&Playback::conditionalDo>(branch, skip).mayBranchTo(skip);
+        return event.invoke<&Playback::conditionalDo>(branch, skip).discoverTarget(skip);
       }
     case 0xa5:
       if (layout.version == Version::Aleste) {
@@ -1137,7 +1137,7 @@ struct DurationValue {
         auto event = cursor.command("Branch ID Jump", SequenceSemantic::Jump);
         const u8 branch = event.u8("branch_id");
         const Address destination = event.addressLe("destination", SemanticOperandRole::JumpTarget);
-        return event.invoke<&Playback::conditionalBranch>(branch, destination).mayBranchTo(destination);
+        return event.invoke<&Playback::conditionalBranch>(branch, destination).discoverTarget(destination);
       }
     case 0xa6:
     case 0xa7:
@@ -1170,7 +1170,7 @@ struct DurationValue {
       auto event = cursor.command("Loop Break", SequenceSemantic::RepeatBreak);
       const u8 slot = event.u8("slot");
       const Address destination = event.addressLe("destination", SemanticOperandRole::RepeatTarget);
-      return event.invoke<&Playback::loopBreak>(slot, destination).mayBranchTo(destination);
+      return event.invoke<&Playback::loopBreak>(slot, destination).discoverTarget(destination);
     }
     case 0xae:
     case 0xaf:

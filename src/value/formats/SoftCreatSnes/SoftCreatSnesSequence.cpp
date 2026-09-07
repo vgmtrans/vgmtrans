@@ -1036,7 +1036,7 @@ struct DecodeState {
         return event.stop();
       }
       for (size_t choice = 1; choice < choices.size(); ++choice) {
-        event.mayBranchTo(choices[choice]);
+        event.discoverTarget(choices[choice]);
       }
       // Randomness is external to the portable sequence VM. Preserve all
       // source paths and render the first path deterministically.
@@ -1052,14 +1052,15 @@ struct DecodeState {
       auto event = cursor.command(command == 0xa7 ? "Jump If Flag Set" : "Jump If Flag Clear", SequenceSemantic::Jump);
       const u8 flag = event.u8("flag");
       const Address destination = event.addressLe("destination", SemanticOperandRole::JumpTarget);
-      return event.invoke<&Playback::flagJump>(flag, command == 0xa7, destination).mayBranchTo(destination);
+      return event.invoke<&Playback::flagJump>(flag, command == 0xa7, destination).discoverTarget(destination);
     }
     case 0xa9:
     case 0xba: {
       auto event = cursor.command(command == 0xa9 ? "Wait Until Flag Set" : "Wait Until Flag Clear",
                                   SequenceSemantic::Wait);
       const u8 flag = event.u8("flag");
-      return event.invokeFlow<&Playback::waitFlag>(flag, command == 0xa9, Address{begin}).mayBranchTo(Address{begin});
+      return event.invokeFlow<&Playback::waitFlag>(flag, command == 0xa9, Address{begin})
+          .discoverTarget(Address{begin});
     }
     case 0xaa:
     case 0xab:

@@ -177,14 +177,14 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
     case 0x6a: {
       auto event = cursor.command("Return Boundary Before Jump", SequenceSemantic::Jump);
       const Address destination = event.address("destination", SemanticOperandRole::JumpTarget);
-      event.discoverReturn();
+      event.return_();
       return event.jump(destination);
     }
     case 0x6b: {
       auto event = cursor.command("Return Boundary After Jump", SequenceSemantic::Jump);
       const Address destination = event.address("destination", SemanticOperandRole::JumpTarget);
       event.jump(destination);
-      return event.discoverReturn();
+      return event.return_();
     }
     case 0x70: {
       auto event = cursor.sourceOnly("Conditional Fields");
@@ -532,7 +532,7 @@ void compilerCursorRejectsConflictingDefaultFlowDeclarations() {
   };
   expect(rejects({0x69, 0x00, 0x01, 0x00, 0x02}), "a command should reject a second default transition");
   expect(rejects({0x6a, 0x00, 0x01}) && rejects({0x6b, 0x00, 0x01}),
-         "a discover-return command should conflict with another default transition in either declaration order");
+         "a default return should conflict with another default transition in either declaration order");
 }
 
 void compilerCursorRejectsConflictingComposedFlow() {

@@ -2009,7 +2009,7 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Loop Break", SequenceSemantic::RepeatBreak);
       const u8 count = event.u8("count");
       const Address destination = relocated(event, SemanticOperandRole::JumpTarget);
-      return event.invoke<&Playback::loopBreak>(count, destination).mayBranchTo(destination);
+      return event.invoke<&Playback::loopBreak>(count, destination).discoverTarget(destination);
     }
     case EventType::Goto: {
       auto event = cursor.command("Jump", SequenceSemantic::Jump);
