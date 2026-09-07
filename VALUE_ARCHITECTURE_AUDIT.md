@@ -205,6 +205,22 @@ without compiler warnings. An independent before/after comparison exercised
 waveform, depth mode, delay, rate, gain, conversion policy, and observed scaling:
 all 9,216 generated SF2/DLS exports are byte-for-byte identical.
 
+### Bound physical duration conversion before casting
+
+The tempo map converted an arbitrarily large floating-point tick duration to
+an integer before clamping it. UBSan confirmed an out-of-range conversion for
+the largest finite double. Saturate against the remaining `u32` duration
+capacity before casting. Preserve the existing half-down rounding and invalid
+input handling. Remove the per-change insertion-order field because the stable
+sort already preserves insertion order for equal tick/sequence pairs.
+
+Regression coverage includes tied tempo writes, redundant writes, exact tempo
+boundaries, half-tick rounding near the maximum, huge finite durations, and
+invalid durations. The UBSan reproducer now returns the maximum tick count
+without errors. The full build and all 17 CTest targets pass. A broader rebuild
+also exposed a shadowed delay variable in the earlier modulation refactor;
+rename it, leaving the final build free of compiler warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

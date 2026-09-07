@@ -656,7 +656,6 @@ private:
     u32 microsecondsPerQuarter = 500000;
     TrackId track;
     u64 sequence = 0;
-    size_t order = 0;
   };
 
   Timebase timebase_;
