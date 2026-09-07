@@ -163,7 +163,7 @@ void ninSnesProfilesDescribeEverySupportedDriverFamily() {
              profile(ProfileId::IntelliFe3).noteParameters == NoteParameterModel::IntelliTable &&
              profile(ProfileId::IntelliFe3).intelli == IntelliMode::Fe3,
          "FE3 should select its Intelligent Systems command and note tables");
-  expect(profile(ProfileId::IntelliTa).programs == ProgramResolver::IntelliTaOverride &&
+  expect(profile(ProfileId::IntelliTa).programs == ProgramResolver::StandardPercussion &&
              profile(ProfileId::IntelliTa).intelli == IntelliMode::Ta,
          "TA should select dynamic instrument overrides");
   expect(profile(ProfileId::IntelliFe4).noteParameters == NoteParameterModel::IntelliTable &&
@@ -1436,4 +1436,252 @@ void ninSnesIdentityMappedSilentSlotsAreSparse() {
           resolveInstrumentAddress(instruments->instruments[1].explicitAddress, instruments->instruments[1].identity) ==
               InstrumentAddress{.bank = 0, .program = 2},
       "identity-mapped silent slots should be skipped without scanning into the following known structure");
+}
+
+void ninSnesMetalCombatRecognizesDriverWithoutInstrumentOverwrite() {
+  std::vector<u8> bytes(kAramSize);
+  const auto write = [&](size_t offset, std::initializer_list<u8> data) {
+    std::ranges::copy(data, bytes.begin() + offset);
+  };
+  // Metal Combat's playlist reader, dispatch, FE3 note parameters and FA
+  // handler. Unlike FE3, FA starts directly with the voice-table pointer.
+  write(0x500, {0x8d, 0x00, 0xf7, 0x1d, 0x3a, 0x1d, 0x2d, 0xf7, 0x1d, 0x3a, 0x1d, 0xfd, 0xae});
+  write(0x520, {0xf5, 0xe3, 0x18, 0xfd, 0xf5, 0xe2, 0x18, 0xda, 0x1d});
+  write(0x540, {0x68, 0xd6, 0x90, 0x05, 0x3f, 0x45, 0x08, 0x2f, 0xce});
+  write(0x560, {0x1c, 0xfd, 0xf6, 0x22, 0x07, 0x2d, 0xf6, 0x21, 0x07, 0x2d, 0xdd, 0x5c, 0xfd, 0xf6, 0xc7, 0x07});
+  write(0x580, {0x68, 0x40, 0xb0, 0x0c, 0x28, 0x3f, 0xfd, 0xf6, 0x00, 0xff, 0xd5, 0x01, 0x02, 0x5f, 0x43, 0x07,
+                0x28, 0x3f, 0xfd, 0xf6, 0x00, 0xff, 0xd5, 0x10, 0x02, 0x5f, 0x22, 0x07});
+  write(0x5a0, {0xf4, 0x20, 0xc4, 0xb6, 0xf4, 0x21, 0xc4, 0xb7, 0xe8, 0x04, 0xcf, 0x60, 0x94, 0x20, 0xd4,
+                0x20, 0x90, 0x02, 0xbb, 0x21, 0x6f});
+  write(0x5c0, {0x8d, 0x06, 0xcf, 0xda, 0x15, 0x60, 0x98, 0x80, 0x15, 0x98, 0x19, 0x16});
+  write(0x5d0, {0xe8, 0x1b, 0x8d, 0x5d, 0x3f, 0xf2, 0x05});
+  write(0x900, {0x28, 0x70, 0xf0, 0x08, 0x9f, 0xfd, 0xf6, 0x1f, 0x09, 0xd5, 0x41, 0x03, 0xae});
+  write(0x920, {0xe8, 0xf4, 0xfa, 0, 6, 12, 24});
+  bytes[0xff01] = 12;
+  write(0x81d, {1, 1, 2, 3, 0, 1, 2, 1, 2, 1, 1, 3, 0, 1, 2, 3, 1, 3, 3, 0,
+                1, 3, 0, 3, 3, 3, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1, 2, 2});
+  writeLe16(bytes, 0x18e4, 0x2000);
+  writeLe16(bytes, 0x2000, 0x2100);
+  writeLe16(bytes, 0x2002, 0);
+  writeSection(bytes, 0x2100, {{0, 0x2200}});
+  write(0x2200, {0xd6, 0, 4, 0x7f, 0x80, 0});
+  write(0x1980, {0, 0xfe, 0xe0, 0xb8, 4, 0});
+  writeLe16(bytes, 0x1b00, 0x3000);
+  writeLe16(bytes, 0x1b02, 0x3000);
+  bytes[0x3000] = 3;
+
+  const auto layout = findLayout(ByteReader(SourceId{1}, bytes));
+  expect(layout && layout->profile == ProfileId::IntelliFe3 && layout->instrumentTableAddress == 0x1980 &&
+             layout->spcDirAddress == 0x1b00 && !layout->intelliInstrumentOverwrite &&
+             layout->intelliTransposeTable == std::vector<u8>{0xe8, 0xf4, 0xfa, 0, 6, 12, 24} &&
+             layout->intelliDurationRateTable[1] == 12 && layout->intelliVolumeTable[1] == 12,
+         "Metal Combat's earlier FA handler must not prevent recognition of its FE3-family sound bank");
+  const ScanResult result = scanSynth(bytes, *layout, "Metal Combat");
+  expect(!result.assets.empty(), "the detected Metal Combat table should produce a sound bank");
+  bytes[0x81d + 39] = 0;
+  expect(findLayout(ByteReader(SourceId{1}, bytes))->profile == ProfileId::Unknown,
+         "the full FE3 command-length table must still be validated");
+
+  bytes[0x541] = 0xda;
+  std::fill(bytes.begin() + 0x580, bytes.begin() + 0x600, 0);
+  write(0x580, {0x01, 0x30, 0x13, 0x68, 0x40, 0x28, 0x3f, 0xfd, 0xf6, 0x00, 0xff, 0xb0, 0x05, 0xd5,
+                0x11, 0x02, 0x2f, 0xee, 0xd5, 0x20, 0x02});
+  write(0x5a0, {0x30, 0xdd, 0xf4, 0x20, 0xc4, 0xb6, 0xf4, 0x21, 0xc4, 0xb7, 0xe8, 0x04, 0xcf, 0x60,
+                0x94, 0x20, 0xd4, 0x20, 0x90, 0x02, 0xbb, 0x21, 0x6f});
+  write(0x5c0, {0x8d, 0x06, 0xcf, 0xda, 0x0e, 0xe4, 0x14, 0x24, 0x15, 0xd0, 0x2a, 0x60, 0x98, 0xfe,
+                0x0f, 0x4d, 0x7d, 0x9f, 0x5c, 0x08, 0x04, 0x5d});
+  write(0x5e0, {0xe8, 0x1b, 0x8d, 0x5d, 0x3f, 0xf2, 0x05});
+  write(0x821, {1, 1, 2, 3, 0, 1, 2, 1, 2, 1, 1, 3, 0, 1, 2, 3, 1, 3,
+                3, 0, 1, 3, 0, 3, 3, 3, 1, 0, 0, 2, 1, 0, 1, 1, 1, 1});
+  const auto fe4 = findLayout(ByteReader(SourceId{1}, bytes));
+  expect(fe4 && fe4->profile == ProfileId::IntelliFe4 && fe4->instrumentTableAddress == 0xfe00 &&
+             fe4->intelliDurationRateTable[1] == 12,
+         "FE4's page-aligned loader and embedded note table must be detected independently");
+}
+
+namespace {
+std::vector<u8> intelligentSequence(std::initializer_list<u8> commands) {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+  std::ranges::copy(commands, bytes.begin() + 0x300);
+  return bytes;
+}
+}  // namespace
+
+void ninSnesIntelligentPercussionUsesRevisionSpecificTables() {
+  auto bytes = intelligentSequence({0xf9});
+  for (u8 slot = 0; slot < 12; ++slot) {
+    bytes[0x301 + slot] = slot + 3;
+    bytes[0x30d + slot] = 0xa0 + slot;
+    bytes[0x319 + slot] = 0xff;
+  }
+  std::ranges::copy(std::initializer_list<u8>{4, 0x7f, 0xca, 0xf5, 0xf0, 0xf0, 8, 0xca, 0}, bytes.begin() + 0x325);
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::IntelliFe3;
+  auto parsed = decodeSequence(ByteReader(SourceId{1}, bytes), layout, AssetId{1});
+  expect(parsed.recipes.drumKits.size() == 2 && parsed.recipes.drumKits[0].slots.size() == 12 &&
+             parsed.recipes.drumKits[0].slots[0].sourceProgram == 3 &&
+             parsed.recipes.drumKits[0].slots[0].sourceKey == 56 &&
+             parsed.recipes.drumKits[1].slots[0].sourceProgram == 8,
+         "FE3 F9 supplies planar tables, and F5 F0 selects ordinary percussion-base instruments");
+
+  for (ProfileId id : {ProfileId::IntelliTa, ProfileId::IntelliFe4}) {
+    // A shorter FC replaces only its prefix. FE4 keeps using the table even
+    // after FD clears bit 6; TA switches back to its percussion base.
+    bytes = intelligentSequence({0xfc, 1, 3, 0xa0, 0xff, 4, 0xa1, 0xff,
+                                 0xfc, 0, 5, 0xa2, 0xff, 4, 0x7f, 0xcb,
+                                 0xfd, 2, 0x40, 0xca, 0});
+    layout.profile = id;
+    parsed = decodeSequence(ByteReader(SourceId{1}, bytes), layout, AssetId{1});
+    expect(parsed.recipes.drumKits[0].slots[0].sourceProgram == 5 &&
+               parsed.recipes.drumKits[0].slots[1].sourceProgram == 4,
+           "FC must preserve untouched percussion slots");
+    expect(id == ProfileId::IntelliFe4 ? parsed.recipes.drumKits.size() == 1 : parsed.recipes.drumKits.size() == 2,
+           "only TA's percussion dispatch tests flag bit 6");
+  }
+}
+
+void ninSnesIntelligentVoiceLoadingPreservesTuningAndMasksIndex() {
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::IntelliFe3;
+  layout.intelliTransposeTable = {0xe8, 0xf4, 0xfa, 0, 6, 12, 24};
+  auto bytes = intelligentSequence({0xea, 0x80, 0xfa, 1, 5, 0xff, 10, 0x30, 0xfb, 0x40, 4, 0x7f, 0x80, 0});
+  auto performance = render(bytes, layout);
+  std::vector<double> keys;
+  unsigned tuningEvents = 0;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      keys.push_back(note->key);
+    }
+    tuningEvents += std::holds_alternative<TuningPerformanceEvent>(event);
+  }
+  expect(keys == std::vector<double>{18} && tuningEvents == 1,
+         "Metal Combat FB uses its -6 transpose, wraps the record index, and keeps zero-nibble tuning");
+
+  layout.profile = ProfileId::IntelliTa;
+  bytes = intelligentSequence({0xdd, 0, 0x40, 8, 0xfa, 1, 5, 0xff, 10, 7, 0xfb, 0x80, 4, 0x7f, 0x80, 0});
+  performance = render(bytes, layout);
+  const auto note = std::ranges::find_if(performance.tracks[0].events, [](const auto& event) {
+    return std::holds_alternative<NotePerformanceEvent>(event);
+  });
+  expect(note != performance.tracks[0].events.end() && std::get<NotePerformanceEvent>(*note).key == 31,
+         "TA's FB high flag bits must not make a valid voice-table index disappear");
+}
+
+void ninSnesIntelligentOverridesApplyOnInstrumentLoadAndDeduplicate() {
+  Layout layout = standardLayout();
+  for (ProfileId id : {ProfileId::IntelliFe3, ProfileId::IntelliTa}) {
+    layout.profile = id;
+    const u8 program = id == ProfileId::IntelliFe3 ? 0xd6 : 0xda;
+    auto bytes = intelligentSequence({program, 2, 4, 0x7f, 0x80,
+                                     0xfa, 0x82, 3, 0xff, 0xe0, 0, 1, 0, 0x80,
+                                     program, 2, 0x80,
+                                     0xfa, 0x82, 3, 0xff, 0xe0, 0, 1, 0, program, 2, 0x80, 0});
+    const auto parsed = decodeSequence(ByteReader(SourceId{1}, bytes), layout, AssetId{1});
+    expect(parsed.recipes.overrides.size() == 1 && parsed.recipes.overrides[0].srcn == 3,
+           "FE3 and TA must capture instrument overwrites once per distinct definition");
+    const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
+    for (const auto& event : performance.tracks[0].events) {
+      if (const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&event)) {
+        expect(instrument->header.tick != 4, "FA only changes RAM; it must not change the active DSP instrument");
+      }
+    }
+  }
+}
+
+void ninSnesIntelligentEchoAdsrAndGainKeepIndependentState() {
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::IntelliTa;
+  auto bytes = intelligentSequence({0xef, 3, 0x40, 0x20, 0xf6, 0xf5,
+                                   0xf7, 0x8f, 0xe2, 0xf8, 0x10, 0xb8,
+                                   16, 0x7f, 0x80, 0xf9, 0x20, 0x80, 0});
+  const auto performance = render(bytes, layout);
+  std::vector<ReverbPerformanceEvent> echoes;
+  unsigned envelopes = 0;
+  unsigned notes = 0;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* echo = std::get_if<ReverbPerformanceEvent>(&event); echo && echo->voiceMask) {
+      echoes.push_back(*echo);
+    }
+    if (const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event)) {
+      ++envelopes;
+      expect(envelope->update.values == snesDspEnvelope(0x8f, 0xe2, 0), "F7 must emit its DSP ADSR envelope");
+    }
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      ++notes;
+      expect(note->durationTicks == 14, "GAIN timing commands must not replace the note key-off duration rate");
+    }
+  }
+  expect(echoes.size() == 3 && echoes[1].voiceMask == 2 && echoes[2].voiceMask == 3 &&
+             echoes[0].leftGain == echoes[2].leftGain && echoes[0].rightGain == echoes[2].rightGain &&
+             envelopes == 1 && notes == 2,
+         "channel echo must preserve global volume and the other channels' echo bits");
+}
+
+void ninSnesIntelligentNoiseRowsDoNotTerminateSoundBanks() {
+  std::vector<u8> bytes(kAramSize);
+  std::ranges::copy(std::initializer_list<u8>{0x9f, 0xff, 0xe0, 0, 1, 0,
+                                             0, 0xff, 0xe0, 0, 1, 0}, bytes.begin() + 0x4000);
+  writeLe16(bytes, 0x5000, 0x6000);
+  writeLe16(bytes, 0x5002, 0x6000);
+  bytes[0x6000] = 3;
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::IntelliFe3;
+  layout.instrumentTableAddress = 0x4000;
+  layout.spcDirAddress = 0x5000;
+  layout.playlistAddress = 0x400c;
+  const auto result = scanSynth(bytes, layout, "Noise");
+  const auto& bank = std::get<SoundBankAsset>(result.assets[0]);
+  expect(bank.instruments.size() == 2 && bank.instruments[0].regions.size() == 128 &&
+             bank.localSamples.samples.size() == 2,
+         "negative Intelligent Systems SRCNs must produce noise without hiding later BRR instruments");
+  const auto& region = bank.instruments[0].regions[72];
+  expect(region.unityKey == 72 && region.keyRange == KeyRange{72, 72} &&
+             bank.localSamples.samples[region.sample.index()].codec == AudioCodec::SnesDspNoise &&
+             bank.localSamples.samples[region.sample.index()].codecParameter == 31,
+         "DSP noise must retain its clock rate and ignore melodic pitch");
+}
+
+void ninSnesIntelligentSparsePaddingDoesNotHideSongBank() {
+  std::vector<u8> bytes(kAramSize);
+  std::ranges::copy(std::initializer_list<u8>{0, 0xff, 0xe0, 0, 1, 0,
+                                             0xff, 0xff, 0, 0, 0, 0,
+                                             1, 0xff, 0xe0, 0, 1, 0}, bytes.begin() + 0x4000);
+  writeLe16(bytes, 0x4012, 0x6000);
+  writeLe16(bytes, 0x4014, 0x6000);
+  writeLe16(bytes, 0x4016, 0x6000);
+  writeLe16(bytes, 0x4018, 0x6000);
+  bytes[0x6000] = 3;
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::IntelliTa;
+  layout.instrumentTableAddress = 0x4000;
+  layout.spcDirAddress = 0x4012;
+  const auto result = scanSynth(bytes, layout, "Sparse Intelligent Systems");
+  const auto& bank = std::get<SoundBankAsset>(result.assets[0]);
+  expect(bank.instruments.size() == 2 && bank.instruments[1].identity->key == 2,
+         "mixed padding must not hide later instruments or make the DIR part of the instrument table");
+}
+
+void ninSnesIntelligentSectionPreservesVoiceAndLegato() {
+  auto bytes = intelligentSequence({0xd6, 5, 0xf3, 4, 0x7f, 0x80, 0});
+  writeLe16(bytes, 0x102, 0x220);
+  writeSection(bytes, 0x220, {{0, 0x400}});
+  std::ranges::copy(std::initializer_list<u8>{4, 0x80, 0xf4, 2, 0x80, 0}, bytes.begin() + 0x400);
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::IntelliFe3;
+  const auto performance = render(bytes, layout);
+  std::vector<NotePerformanceEvent> notes;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(*note);
+    }
+    if (const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&event)) {
+      expect(instrument->sourceInstrument && instrument->sourceInstrument->key == 5,
+             "section entry must retain the selected instrument");
+    }
+  }
+  expect(notes.size() == 3 && notes[1].extendsPrevious && notes[1].durationTicks >= 4 &&
+             notes[2].durationTicks == 1,
+         "legato must survive section entry, and two-tick notes must have a nonzero key-off duration");
 }

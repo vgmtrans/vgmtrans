@@ -210,13 +210,16 @@ template <size_t Size>
 }
 
 [[nodiscard]] ProfileId classifyIntelligent(ByteReader reader, const VoiceCommandInfo& commands) {
-  if (!Patterns::ptnIntelliVCmdFA.find(reader)) {
-    return ProfileId::Unknown;
-  }
+  // Metal Combat has the FE3 command/note tables, but its FA handler has no
+  // negative-argument instrument-overwrite branch. That optional extension
+  // must not gate recognition of the whole driver (and its sound bank).
   if (Patterns::ptnDispatchNoteFE3.find(reader)) {
     return commands.first == 0xd6 && matchesTable(reader, commands.lengthTable, kIntelliFe3CommandLengths)
                ? ProfileId::IntelliFe3
                : ProfileId::Unknown;
+  }
+  if (!Patterns::ptnIntelliVCmdFA.find(reader)) {
+    return ProfileId::Unknown;
   }
   if (Patterns::ptnDispatchNoteFE4.find(reader)) {
     return commands.first == 0xda && matchesTable(reader, commands.lengthTable, kIntelliFe4CommandLengths)
@@ -314,6 +317,12 @@ template <size_t Size>
         probe.tableAddress += 4;
       }
     }
+  } else if (selected.intelli == IntelliMode::Fe4) {
+    const auto offset = Patterns::ptnLoadInstrTableAddressFE4.find(reader);
+    if (!offset) {
+      return std::nullopt;
+    }
+    probe.tableAddress = reader.u8At(*offset + 13) << 8;
   } else if (const auto earlierOffset = Patterns::ptnLoadInstrTableAddressSMW.find(reader)) {
     probe.tableAddress = reader.u8At(*earlierOffset + 3) | (reader.u8At(*earlierOffset + 6) << 8);
   } else if (selected.instrumentTable == InstrumentTableAddressModel::Human) {
@@ -390,6 +399,59 @@ template <size_t Size>
       .slotCount = slotCount,
       .programBase = programBase,
   };
+}
+
+void loadIntelligentTables(ByteReader reader, const VoiceCommandInfo& commands, Layout& layout) {
+  const Profile& selected = profile(layout.profile);
+  if (selected.intelli != IntelliMode::None) {
+    const u8 opcode = selected.intelli == IntelliMode::Fe3 ? 0xf9 : 0xfc;
+    const u32 entry = commands.addressTable + (opcode - commands.first) * 2;
+    if (reader.has(entry, 2)) {
+      const u16 handler = reader.le16(entry);
+      if (selected.intelli == IntelliMode::Fe3) {
+        // F9 copies three contiguous 12-byte arrays with MOV abs+Y,A.
+        if (reader.has(handler, 16) && reader.u8At(handler + 6) == 0x8d &&
+            reader.u8At(handler + 7) == 0x23 && reader.u8At(handler + 10) == 0xd6) {
+          layout.intelliPercussionTableAddress = reader.le16(handler + 11);
+        }
+      } else {
+        // FC deinterleaves triples into three 16-byte arrays. Derive their
+        // base from the actual stores, since FE4 and TA use different RAM.
+        for (u32 offset = handler; offset < handler + 48 && reader.has(offset, 15); ++offset) {
+          if (reader.u8At(offset) == 0xd5 && reader.u8At(offset + 3) == 0xfc &&
+              reader.u8At(offset + 4) == 0xf7 && reader.u8At(offset + 6) == 0xd5 &&
+              reader.u8At(offset + 9) == 0xfc && reader.u8At(offset + 10) == 0xf7 &&
+              reader.u8At(offset + 12) == 0xd5 &&
+              reader.le16(offset + 7) == reader.le16(offset + 1) + 16 &&
+              reader.le16(offset + 13) == reader.le16(offset + 1) + 32) {
+            layout.intelliPercussionTableAddress = reader.le16(offset + 1);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  if (selected.intelli == IntelliMode::Fe3) {
+    if (const auto note = Patterns::ptnDispatchNoteFE3.find(reader)) {
+      layout.intelliDurationRateTable = readTable(reader, reader.le16(*note + 8), 64);
+      layout.intelliVolumeTable = readTable(reader, reader.le16(*note + 20), 64);
+    }
+    if (const auto voice = Patterns::ptnFe3VoiceTranspose.find(reader)) {
+      layout.intelliTransposeTable = readTable(reader, reader.le16(*voice + 7) + 1, 7);
+    }
+    const u32 faEntry = commands.addressTable + (0xfa - commands.first) * 2;
+    if (reader.has(faEntry, 2)) {
+      const u16 handler = reader.le16(faEntry);
+      layout.intelliInstrumentOverwrite = reader.has(handler, 1) && reader.u8At(handler) == 0x30;
+    }
+  } else if (selected.intelli == IntelliMode::Fe4) {
+    if (const auto note = Patterns::ptnDispatchNoteFE4.find(reader)) {
+      layout.intelliDurationRateTable = readTable(reader, reader.le16(*note + 9), 64);
+      layout.intelliVolumeTable = layout.intelliDurationRateTable;
+    }
+  }
+
 }
 
 }  // namespace
@@ -532,6 +594,8 @@ std::optional<Layout> findLayout(ByteReader reader) {
       .volumeTable = std::move(volumeTable),
       .durationRateTable = std::move(durationRateTable),
   };
+
+  loadIntelligentTables(reader, *commands, baseLayout);
 
   if (selected.base == BaseProfile::Earlier) {
     if (const auto offset = Patterns::ptnEarlierPercussionTable.find(reader)) {

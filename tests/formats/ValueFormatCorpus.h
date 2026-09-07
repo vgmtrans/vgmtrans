@@ -68,6 +68,16 @@ inline int scanValueFormatArchive(const std::filesystem::path& path, const Value
       exportFailures += artifacts.size() != corpus.exports->kinds.size();
       for (const Artifact& artifact : artifacts) {
         exportFailures += artifact.bytes.empty() || !artifact.diagnostics.empty();
+        for (const Diagnostic& diagnostic : artifact.diagnostics) {
+          std::cerr << artifact.filename;
+          if (diagnostic.range) {
+            const auto source = std::ranges::find(snapshot.sources(), diagnostic.range->source, &SourceFile::id);
+            if (source != snapshot.sources().end()) {
+              std::cerr << " (" << source->name << ')';
+            }
+          }
+          std::cerr << ": " << diagnostic.message << '\n';
+        }
         if (corpus.outputDirectory) {
           std::ofstream output(*corpus.outputDirectory / artifact.filename, std::ios::binary);
           output.write(reinterpret_cast<const char*>(artifact.bytes.data()),
@@ -77,9 +87,11 @@ inline int scanValueFormatArchive(const std::filesystem::path& path, const Value
       }
     }
   }
-  const auto missingSoundBanks = std::ranges::count_if(snapshot.collections(), [&](const Collection& collection) {
-    return corpus.requireSoundBank && collection.members.sequence && collection.members.soundBanks.empty() &&
-           std::ranges::find(sequences, *collection.members.sequence) != sequences.end();
+  const auto missingSoundBanks = std::ranges::count_if(sequences, [&](AssetId sequence) {
+    return corpus.requireSoundBank &&
+           std::ranges::none_of(snapshot.collections(), [&](const Collection& collection) {
+             return collection.members.sequence == sequence && !collection.members.soundBanks.empty();
+           });
   });
 
   std::cout << "sources " << snapshot.sources().size() << ", assets " << snapshot.assets().size() << ", collections "

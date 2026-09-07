@@ -93,7 +93,6 @@ enum class ProgramResolver : u8 {
   StandardPercussion,
   QuintetActRBase,
   QuintetLookup,
-  IntelliTaOverride,
 };
 
 enum class PanModel : u8 {
@@ -172,6 +171,12 @@ struct Layout {
 
   std::vector<u8> volumeTable;
   std::vector<u8> durationRateTable;
+  std::vector<u8> intelliDurationRateTable;
+  std::vector<u8> intelliVolumeTable;
+  std::vector<u8> intelliTransposeTable;
+  // The early FE3-family driver in Metal Combat only defines voice tables.
+  bool intelliInstrumentOverwrite = true;
+  std::optional<u16> intelliPercussionTableAddress;
 
   [[nodiscard]] u16 resolveAddress(u16 rawAddress) const;
 };
