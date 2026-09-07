@@ -221,7 +221,6 @@ target_sources(vgmtransvaluecore
       ${PROJECT_SOURCE_DIR}/src/value/synth/Ym2151.h
       ${PROJECT_SOURCE_DIR}/src/value/export/Export.h
       ${PROJECT_SOURCE_DIR}/src/value/export/CollectionStitch.h
-      ${PROJECT_SOURCE_DIR}/src/value/export/DynamicEnvelope.h
       ${PROJECT_SOURCE_DIR}/src/value/export/InstrumentVariants.h
       ${PROJECT_SOURCE_DIR}/src/value/export/ExportPolicy.h
       ${PROJECT_SOURCE_DIR}/src/value/export/ExportTypes.h

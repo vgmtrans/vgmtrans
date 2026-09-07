@@ -7,7 +7,6 @@
 #include "ValueTestSupport.h"
 #include "../MidiTestSupport.h"
 
-#include "value/export/DynamicEnvelope.h"
 #include "value/export/InstrumentVariants.h"
 
 namespace {
@@ -144,7 +143,8 @@ void dynamicEnvelopeMaterializationIsIncrementalAndDeduplicated() {
       },
   });
 
-  const auto materialized = materializeDynamicEnvelopes(performance, sets);
+  const auto materialized =
+      materializeInstrumentVariants(performance, sets, InstrumentVariantOptions{.dynamicEnvelopes = true});
   expect(materialized.diagnostics.empty(), "valid future-note envelope updates should not warn");
   expect(sets[0].instruments.size() == 5, "only four distinct effective envelopes should create variants");
 
@@ -221,7 +221,8 @@ void dynamicEnvelopeInstrumentSelectionControlsOverrideCarry() {
       },
   });
 
-  const auto materialized = materializeDynamicEnvelopes(performance, sets);
+  const auto materialized =
+      materializeInstrumentVariants(performance, sets, InstrumentVariantOptions{.dynamicEnvelopes = true});
   const size_t first = selectedInstrumentForNote(materialized, PerformanceNoteId{1}, sets[0]);
   const size_t preserved = selectedInstrumentForNote(materialized, PerformanceNoteId{3}, sets[0]);
   expect(first >= 2, "a dynamic override should materialize a variant before an instrument change");
@@ -259,7 +260,8 @@ void dynamicEnvelopeActiveVoiceLimitationIsExplicit() {
       },
   });
 
-  const auto materialized = materializeDynamicEnvelopes(performance, sets);
+  const auto materialized =
+      materializeInstrumentVariants(performance, sets, InstrumentVariantOptions{.dynamicEnvelopes = true});
   expect(std::ranges::any_of(
              materialized.diagnostics,
              [](const Diagnostic& diagnostic) { return diagnostic.code == "dynamic-envelope-active-voice"; }),
@@ -312,7 +314,8 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero() {
       },
   });
 
-  const auto materialized = materializeDynamicEnvelopes(performance, sets);
+  const auto materialized =
+      materializeInstrumentVariants(performance, sets, InstrumentVariantOptions{.dynamicEnvelopes = true});
   expect(sets[0].instruments.size() == 129 &&
              sets[0].instruments.back().explicitAddress == std::optional{InstrumentAddress{.bank = 1, .program = 0}},
          "the allocator should move to the next free bank after bank zero is occupied");
@@ -356,7 +359,8 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments() {
           .note = PerformanceNoteId{1},
       },
   });
-  const auto materialized = materializeDynamicEnvelopes(performance, sets);
+  const auto materialized =
+      materializeInstrumentVariants(performance, sets, InstrumentVariantOptions{.dynamicEnvelopes = true});
   const size_t selected = selectedInstrumentForNote(materialized, PerformanceNoteId{1}, sets[0]);
   expect(selected == 1, "the dynamic note should select its generated prepared instrument");
 

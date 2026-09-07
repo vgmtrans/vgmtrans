@@ -7,7 +7,7 @@
 #include "value/formats/CapcomSnes/CapcomSnes.h"
 #include "../MidiTestSupport.h"
 
-#include "value/export/DynamicEnvelope.h"
+#include "value/export/InstrumentVariants.h"
 #include "value/export/Export.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
@@ -1436,7 +1436,8 @@ void capcomSnesReleaseRateIsStickyAcrossInstrumentChanges() {
               },
           },
   }};
-  const auto materialized = materializeDynamicEnvelopes(performance, sets);
+  const auto materialized =
+      materializeInstrumentVariants(performance, sets, InstrumentVariantOptions{.dynamicEnvelopes = true});
   std::vector<const NotePerformanceEvent*> notes;
   for (const auto& event : materialized.performance.tracks.front().events) {
     if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
