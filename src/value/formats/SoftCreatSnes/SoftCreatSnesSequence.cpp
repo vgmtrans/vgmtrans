@@ -260,6 +260,9 @@ struct Playback {
   }
 
   void instrument(u8 srcn) {
+    if (track.srcn == srcn) {
+      return;
+    }
     track.srcn = srcn;
     out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = srcn},
                    InstrumentEnvelopeMode::PreserveDynamicOverride);
@@ -289,9 +292,7 @@ struct Playback {
 
   [[nodiscard]] double outputPitch(double pitch) const {
     const u16 raw = static_cast<u16>(std::clamp(std::lround(pitch), 0l, 0xffffl));
-    // The DSP writer adds detune to PITCHL after saving the carry from the
-    // main pitch sum, so this adjustment deliberately cannot carry to PITCHH.
-    return static_cast<double>((raw & 0xff00u) | static_cast<u8>(raw + track.detune));
+    return static_cast<u16>(raw + track.detune);
   }
 
   void emitPitch() {
