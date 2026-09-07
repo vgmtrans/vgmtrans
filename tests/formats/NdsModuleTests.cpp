@@ -769,14 +769,14 @@ void ndsSynthModulatorsUseSequenceLfoRanges() {
   const LoweredSynthModulation lowered = lowerSynthModulation(modulation);
   expect(std::ranges::any_of(lowered.modulators,
                              [](const SynthModulator& modulator) {
-                               return !modulator.source && modulator.destination == SynthDestination::VibratoDepth &&
-                                      modulator.amount == 99;
+                               return modulator.source == SynthSource::DefaultController &&
+                                      modulator.destination == SynthDestination::VibratoDepth && modulator.amount == 99;
                              }),
          "NDS vibrato metadata should lower to an explicit synth depth modulator");
   expect(std::ranges::any_of(lowered.modulators,
                              [](const SynthModulator& modulator) {
-                               return !modulator.source && modulator.destination == SynthDestination::TremoloDepth &&
-                                      modulator.amount == 60;
+                               return modulator.source == SynthSource::DefaultController &&
+                                      modulator.destination == SynthDestination::TremoloDepth && modulator.amount == 60;
                              }),
          "NDS tremolo metadata should lower to an explicit synth depth modulator");
 }

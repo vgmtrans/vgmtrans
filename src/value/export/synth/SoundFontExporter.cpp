@@ -25,7 +25,6 @@ namespace vgmtrans::core {
 namespace {
 
 constexpr u16 kSfGenVibLfoToPitch = 6;
-constexpr u16 kSfGenInitialFilterFc = 8;
 constexpr u16 kSfGenModLfoToVolume = 13;
 constexpr u16 kSfGenReverbEffectsSend = 16;
 constexpr u16 kSfGenPan = 17;
@@ -47,13 +46,8 @@ constexpr u16 kSfGenFineTune = 52;
 constexpr u16 kSfGenSampleId = 53;
 constexpr u16 kSfGenSampleModes = 54;
 constexpr u16 kSfGenOverridingRootKey = 58;
-constexpr u16 kSfModNoteOnVelocity = 2;
-constexpr u16 kSfModKeyNumber = 3;
-constexpr u16 kSfModPolyPressure = 10;
 constexpr u16 kSfModChannelPressure = 13;
 constexpr u16 kSfModMidiContinuousController = 1u << 7;
-constexpr u16 kSfModBipolar = 1u << 9;
-constexpr u16 kSfModPitchWheel = kSfModBipolar | 14;
 constexpr u16 kSfModModWheel = kSfModMidiContinuousController | 1;
 constexpr u16 kSfModSoundController6 = kSfModMidiContinuousController | 75;
 constexpr u16 kSfModVibratoRate = kSfModMidiContinuousController | 76;
@@ -202,14 +196,8 @@ struct SfLayout {
 
 [[nodiscard]] std::optional<u16> sf2GeneratorForDestination(SynthDestination destination) {
   switch (destination) {
-    case SynthDestination::Pitch:
-      return kSfGenFineTune;
-    case SynthDestination::FilterCutoff:
-      return kSfGenInitialFilterFc;
     case SynthDestination::VolumeAttenuation:
       return kSfGenInitialAttenuation;
-    case SynthDestination::Pan:
-      return kSfGenPan;
     case SynthDestination::VibratoDepth:
       return kSfGenVibLfoToPitch;
     case SynthDestination::VibratoRate:
@@ -233,29 +221,6 @@ struct SfLayout {
   return clampS16(generator.amount);
 }
 
-[[nodiscard]] std::optional<u16> sf2SourceForSynthSource(SynthSource source) {
-  switch (source) {
-    case SynthSource::NoteOnVelocity:
-      return kSfModNoteOnVelocity;
-    case SynthSource::KeyNumber:
-      return kSfModKeyNumber;
-    case SynthSource::Lfo:
-    case SynthSource::Envelope:
-    case SynthSource::MidiController:
-      return std::nullopt;
-    case SynthSource::ChannelPressure:
-      return kSfModChannelPressure;
-    case SynthSource::PolyPressure:
-      return kSfModPolyPressure;
-    case SynthSource::PitchWheel:
-      return kSfModPitchWheel;
-    case SynthSource::Unknown:
-      return std::nullopt;
-  }
-
-  return std::nullopt;
-}
-
 [[nodiscard]] std::optional<u16> sf2DefaultSourceForDestination(SynthDestination destination) {
   switch (destination) {
     case SynthDestination::VibratoDepth:
@@ -271,9 +236,6 @@ struct SfLayout {
       return kSfModSoundController6;
     case SynthDestination::TremoloDelay:
       return kSfModSoundController10;
-    case SynthDestination::Pitch:
-    case SynthDestination::FilterCutoff:
-    case SynthDestination::Pan:
     case SynthDestination::Unknown:
       return std::nullopt;
   }
@@ -290,8 +252,9 @@ struct SfLayout {
   if (!shouldExportSynthModulator(modulator, modulationConversion)) {
     return std::nullopt;
   }
-  const auto source = modulator.source ? sf2SourceForSynthSource(*modulator.source)
-                                       : sf2DefaultSourceForDestination(modulator.destination);
+  const auto source = modulator.source == SynthSource::ChannelPressure
+                          ? std::optional{kSfModChannelPressure}
+                          : sf2DefaultSourceForDestination(modulator.destination);
   const auto destination = sf2GeneratorForDestination(modulator.destination);
   if (!source || !destination) {
     return std::nullopt;

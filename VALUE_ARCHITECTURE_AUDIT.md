@@ -186,6 +186,25 @@ A focused cursor test covers encoded signed offsets, resolved address links,
 booleans, signed enums, strings, fractions, and signed reads. The full build and
 all 17 CTest targets pass without compiler warnings.
 
+### Limit synth routing to implemented physical modulation
+
+Remove unused pitch, filter, and pan routes from the modulation intermediary;
+ordinary tuning and pan still use the synth model's dedicated fields. Replace
+the optional general-purpose source enum with its two actual choices: the
+destination's default controller and channel pressure. None of the removed
+routes had a producer in value code. Retain the unknown-destination sentinel.
+
+DLS generators and modulators now share one destination/scale mapping. The
+controller becomes a direct connection source for rates and attenuation, or
+controls the existing oscillator source for depth. Preserve the established
+unsupported DLS vibrato-delay modulation behavior.
+
+This removes 139 production lines. All 17 CTest targets and the full build pass
+without compiler warnings. An independent before/after comparison exercised
+4,608 physical-modulation configurations across instrument/region scope,
+waveform, depth mode, delay, rate, gain, conversion policy, and observed scaling:
+all 9,216 generated SF2/DLS exports are byte-for-byte identical.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
