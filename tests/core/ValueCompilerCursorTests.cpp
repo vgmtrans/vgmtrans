@@ -196,6 +196,19 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
       }
       return event;
     }
+    case 0x71: {
+      auto event = cursor.sourceOnly("Resolved Fields");
+      const auto relative = event.rawS8("relative");
+      event.resolvedValue("destination", relative, Address{12}, SourceValueDisplay::Address,
+                          SemanticOperandRole::JumpTarget);
+      enum class Mode : s8 { Alternate = -2 };
+      event.derived("enabled", true);
+      event.derived("mode", Mode::Alternate, SourceValueDisplay::Enum);
+      event.derived("label", "source label");
+      event.derived("fine", 1.5);
+      event.s8("signed");
+      return event;
+    }
     case 0xff:
       return cursor.command("End", SequenceSemantic::End).end();
     default: {
@@ -313,6 +326,23 @@ void compilerCursorOwnsOutputValuesAfterDecoding() {
   expect(continuous.linearGain == 0.5 && !continuous.sourceQuantization && quantized.linearGain == 0.75 &&
              quantized.sourceQuantization && quantized.sourceQuantization->levels == 64,
          "compiled level output must distinguish unspecified quantization from a declared native scale");
+}
+
+void compilerCursorPreservesEncodedAndResolvedSourceFields() {
+  const std::vector<u8> bytes{0x71, 0xfc, 0xff, 0xff};
+  SourceMapBuilder builder;
+  const auto track = decodeProbeTrack(ByteReader(SourceId{7}, bytes), static_cast<u32>(bytes.size()), &builder);
+  const auto sourceMap = builder.finish();
+  const auto& annotation = sourceMap.get(track.commands[0].annotation);
+  const auto& fields = annotation.fields;
+  expect(fields.size() == 8 && std::get<s64>(fields[1].value) == -4 && fields[1].range.offset == 1 &&
+             fields[1].range.size == 1 && std::get<u64>(fields[2].value) == 12 && !fields[2].range.valid() &&
+             hasLinkRole(annotation, SourceLinkRole::JumpTarget),
+         "resolved addresses must retain the encoded signed field, derived numeric address, and source link");
+  expect(std::get<bool>(fields[3].value) && std::get<s64>(fields[4].value) == -2 &&
+             std::get<std::string>(fields[5].value) == "source label" && std::get<double>(fields[6].value) == 1.5 &&
+             std::get<s64>(fields[7].value) == -1,
+         "decoded source fields must preserve booleans, enum signedness, strings, fractions, and signed reads");
 }
 
 void compilerCursorCompilesControlFlow() {
@@ -672,6 +702,7 @@ void trackDecodeSourceHierarchyDistinguishesTrackedAndTracklessFormats() {
 void runValueCompilerCursorTests() {
   compilerCursorCompilesAndExecutesTypedCommands();
   compilerCursorOwnsOutputValuesAfterDecoding();
+  compilerCursorPreservesEncodedAndResolvedSourceFields();
   compilerCursorCompilesControlFlow();
   compilerCursorCompilesRepeatsAndConditionalFields();
   compilerCursorComposesOperationsIntoOneBody();

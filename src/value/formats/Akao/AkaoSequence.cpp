@@ -883,15 +883,8 @@ namespace {
 
 void collectReferences(const DecodedBytecodeCommand& command, AkaoSequenceReferences& references) {
   const auto unsignedValue = [](const SemanticOperand& operand) -> std::optional<u32> {
-    u64 value = 0;
-    if (const auto* address = std::get_if<Address>(&operand.value)) {
-      value = address->value;
-    } else if (const auto* integer = std::get_if<u64>(&operand.value)) {
-      value = *integer;
-    } else {
-      return std::nullopt;
-    }
-    return value <= std::numeric_limits<u32>::max() ? std::optional{static_cast<u32>(value)} : std::nullopt;
+    const auto* value = std::get_if<u64>(&operand.value);
+    return value && *value <= std::numeric_limits<u32>::max() ? std::optional{static_cast<u32>(*value)} : std::nullopt;
   };
 
   std::optional<u32> bank;

@@ -26,20 +26,15 @@ namespace vgmtrans::core {
 namespace detail {
 
 template <class T>
-[[nodiscard]] SemanticOperandValue semanticValue(T value) {
-  using Value = std::remove_cvref_t<T>;
-  if constexpr (std::is_same_v<Value, Address> || std::is_same_v<Value, bool> || std::is_same_v<Value, std::string>) {
-    return SemanticOperandValue{std::move(value)};
-  } else if constexpr (std::is_same_v<Value, std::string_view>) {
-    return SemanticOperandValue{std::string(value)};
-  } else if constexpr (std::is_enum_v<Value>) {
-    return semanticValue(static_cast<std::underlying_type_t<Value>>(value));
-  } else if constexpr (std::is_floating_point_v<Value>) {
-    return SemanticOperandValue{static_cast<double>(value)};
-  } else if constexpr (std::is_signed_v<Value>) {
-    return SemanticOperandValue{static_cast<s64>(value)};
+[[nodiscard]] SourceValue semanticValue(T value) {
+  if constexpr (std::is_same_v<T, Address>) {
+    return makeSourceValue(value.value);
+  } else if constexpr (std::is_enum_v<T>) {
+    return makeSourceValue(static_cast<std::underlying_type_t<T>>(value));
+  } else if constexpr (std::is_same_v<T, const char*> || std::is_same_v<T, char*>) {
+    return makeSourceValue(std::string_view(value));
   } else {
-    return SemanticOperandValue{static_cast<u64>(value)};
+    return makeSourceValue(std::move(value));
   }
 }
 
@@ -711,7 +706,7 @@ private:
     return field.value;
   }
 
-  void add(std::string_view name, SemanticOperandValue value, SourceRange range, SourceValueDisplay display,
+  void add(std::string_view name, SourceValue value, SourceRange range, SourceValueDisplay display,
            SemanticOperandRole role) {
     operands_.push_back(SemanticOperand{
         .value = std::move(value),
