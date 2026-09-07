@@ -10,7 +10,6 @@
 #include "value/scan/BytePattern.h"
 
 #include <algorithm>
-#include <charconv>
 #include <compare>
 #include <limits>
 #include <map>
@@ -41,23 +40,8 @@ void warn(std::vector<Diagnostic>* diagnostics, std::string message, SourceRange
   }
 }
 
-[[nodiscard]] std::optional<u32> integer(std::optional<std::string_view> text) {
-  if (!text) {
-    return std::nullopt;
-  }
-  int base = 10;
-  if (text->starts_with("0x") || text->starts_with("0X")) {
-    text->remove_prefix(2);
-    base = 16;
-  }
-  u32 result = 0;
-  const auto parsed = std::from_chars(text->data(), text->data() + text->size(), result, base);
-  return parsed.ec == std::errc{} && parsed.ptr == text->data() + text->size() ? std::optional<u32>{result}
-                                                                               : std::nullopt;
-}
-
 [[nodiscard]] std::optional<u32> address(const SourceSegment& segment, std::string_view attribute) {
-  const auto relative = integer(segment.attribute(attribute));
+  const auto relative = mame::parseInteger(segment.attribute(attribute));
   if (!relative || *relative > segment.size || segment.offset + *relative > std::numeric_limits<u32>::max()) {
     return std::nullopt;
   }
@@ -399,9 +383,9 @@ void readVendettaSynth(Layout& layout, ByteReader reader, const SourceSegment& p
   const auto sampleTable = address(program, "k053260_samp_info_table");
   const auto drumBanks = address(program, "k053260_drum_banks");
   const auto drums = address(program, "k053260_drums");
-  const auto loadInstrument = integer(program.attribute("load_instr_sub"));
-  const auto setPan = integer(program.attribute("set_pan_sub"));
-  const auto setPitch = integer(program.attribute("set_pitch_sub"));
+  const auto loadInstrument = mame::parseInteger(program.attribute("load_instr_sub"));
+  const auto setPan = mame::parseInteger(program.attribute("set_pan_sub"));
+  const auto setPitch = mame::parseInteger(program.attribute("set_pitch_sub"));
   if (!sampleTable || !drumBanks || !drums || !loadInstrument || !setPan || !setPitch) {
     warn(diagnostics, "Vendetta K053260 metadata is incomplete", layout.program);
     return;
@@ -500,8 +484,9 @@ std::optional<Layout> findLayout(const SourceFile& source, ByteReader reader, st
       .game = std::string(source.attribute(mame::kMameGameAttribute).value_or("Konami")),
       .program = reader.range(program->offset, program->size),
       .sound = reader.range(sound->offset, sound->size),
-      .clkb = static_cast<u8>(integer(program->attribute("CLKB")).value_or(0xf2)),
-      .defaultTickSkipInterval = static_cast<u8>(integer(program->attribute("default_tick_skip_interval")).value_or(0)),
+      .clkb = static_cast<u8>(mame::parseInteger(program->attribute("CLKB")).value_or(0xf2)),
+      .defaultTickSkipInterval =
+          static_cast<u8>(mame::parseInteger(program->attribute("default_tick_skip_interval")).value_or(0)),
   };
 
   if (layout.version == Version::Vendetta) {

@@ -311,23 +311,16 @@ void appendBuffer(std::vector<u8>& output, std::span<const u8> bytes, bool swap1
   }
 }
 
-[[nodiscard]] u32 hexAttribute(const RomGroupDefinition& group, std::string_view name) {
+[[nodiscard]] u32 requiredIntegerAttribute(const RomGroupDefinition& group, std::string_view name) {
   const auto found = group.attributes.find(name);
   if (found == group.attributes.end()) {
     throw std::runtime_error("ROM group encryption is missing attribute '" + std::string(name) + "'");
   }
-  std::string_view text = found->second;
-  int base = 10;
-  if (text.starts_with("0x") || text.starts_with("0X")) {
-    text.remove_prefix(2);
-    base = 16;
-  }
-  u32 value = 0;
-  const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value, base);
-  if (error != std::errc{} || end != text.data() + text.size()) {
+  const auto value = parseInteger(found->second);
+  if (!value) {
     throw std::runtime_error("ROM group encryption attribute '" + std::string(name) + "' is not an integer");
   }
-  return value;
+  return *value;
 }
 
 [[nodiscard]] constexpr u8 kabukiBitswap1(u8 source, u32 key, u32 select) {
@@ -430,6 +423,20 @@ void decryptCps3(std::vector<u8>& bytes, u32 key1, u32 key2) {
 
 }  // namespace
 
+std::optional<u32> parseInteger(std::optional<std::string_view> text) {
+  if (!text || text->empty()) {
+    return std::nullopt;
+  }
+  int base = 10;
+  if (text->starts_with("0x") || text->starts_with("0X")) {
+    text->remove_prefix(2);
+    base = 16;
+  }
+  u32 value = 0;
+  const auto [end, error] = std::from_chars(text->data(), text->data() + text->size(), value, base);
+  return error == std::errc{} && end == text->data() + text->size() ? std::optional<u32>{value} : std::nullopt;
+}
+
 std::vector<u8> assembleRomGroup(const RomGroupDefinition& group, std::vector<std::vector<u8>> buffers) {
   if (!group.encryption.empty() && group.encryption != "kabuki" && group.encryption != "cps3") {
     throw std::runtime_error("unsupported ROM group encryption '" + group.encryption + "'");
@@ -487,10 +494,12 @@ std::vector<u8> assembleRomGroup(const RomGroupDefinition& group, std::vector<st
       break;
   }
   if (group.encryption == "kabuki") {
-    decryptKabukiData(output, hexAttribute(group, "kabuki_swap_key1"), hexAttribute(group, "kabuki_swap_key2"),
-                      hexAttribute(group, "kabuki_addr_key"), hexAttribute(group, "kabuki_xor_key"));
+    decryptKabukiData(output, requiredIntegerAttribute(group, "kabuki_swap_key1"),
+                      requiredIntegerAttribute(group, "kabuki_swap_key2"),
+                      requiredIntegerAttribute(group, "kabuki_addr_key"),
+                      requiredIntegerAttribute(group, "kabuki_xor_key"));
   } else if (group.encryption == "cps3") {
-    decryptCps3(output, hexAttribute(group, "key1"), hexAttribute(group, "key2"));
+    decryptCps3(output, requiredIntegerAttribute(group, "key1"), requiredIntegerAttribute(group, "key2"));
   }
   return output;
 }

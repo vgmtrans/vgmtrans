@@ -9,7 +9,6 @@
 #include "value/extractors/MameRomSetExtractor.h"
 #include "value/scan/BytePattern.h"
 
-#include <charconv>
 #include <cmath>
 #include <limits>
 #include <string>
@@ -42,22 +41,6 @@ void warn(std::vector<Diagnostic>* diagnostics, std::string message, SourceRange
   }
 }
 
-[[nodiscard]] std::optional<u32> parseOffset(std::optional<std::string_view> text) {
-  if (!text || text->empty()) {
-    return std::nullopt;
-  }
-  std::string_view value = *text;
-  int base = 10;
-  if (value.size() > 2 && value[0] == '0' && (value[1] == 'x' || value[1] == 'X')) {
-    value.remove_prefix(2);
-    base = 16;
-  }
-  u32 result = 0;
-  const auto parsed = std::from_chars(value.data(), value.data() + value.size(), result, base);
-  return parsed.ec == std::errc{} && parsed.ptr == value.data() + value.size() ? std::optional<u32>{result}
-                                                                               : std::nullopt;
-}
-
 [[nodiscard]] std::optional<u32> absoluteOffset(SourceRange group, u32 relative, u32 size = 1) {
   if (relative > group.size || size > group.size - relative ||
       group.offset + relative > std::numeric_limits<u32>::max()) {
@@ -83,10 +66,10 @@ void warn(std::vector<Diagnostic>* diagnostics, std::string message, SourceRange
 
 [[nodiscard]] bool discoverMysticLayout(KonamiArcadeLayout& layout, const SourceSegment& codeSegment, ByteReader reader,
                                         std::vector<Diagnostic>* diagnostics) {
-  const auto sequenceTable = parseOffset(codeSegment.attribute("seq_table"));
-  const auto sampleTables = parseOffset(codeSegment.attribute("samp_tables"));
-  const auto drumSamples = parseOffset(codeSegment.attribute("drum_samp_table"));
-  const auto drumTable = parseOffset(codeSegment.attribute("drum_table"));
+  const auto sequenceTable = mame::parseInteger(codeSegment.attribute("seq_table"));
+  const auto sampleTables = mame::parseInteger(codeSegment.attribute("samp_tables"));
+  const auto drumSamples = mame::parseInteger(codeSegment.attribute("drum_samp_table"));
+  const auto drumTable = mame::parseInteger(codeSegment.attribute("drum_table"));
   if (!sequenceTable || !sampleTables || !drumSamples || !drumTable) {
     warn(diagnostics, "KonamiArcade MysticWarrior ROM definition is missing required table offsets", layout.code);
     return false;
@@ -119,10 +102,10 @@ void warn(std::vector<Diagnostic>* diagnostics, std::string message, SourceRange
 
 [[nodiscard]] bool discoverGxLayout(KonamiArcadeLayout& layout, const SourceSegment& codeSegment, ByteReader reader,
                                     std::vector<Diagnostic>* diagnostics) {
-  std::optional<u32> sequenceRelative = parseOffset(codeSegment.attribute("seq_table"));
-  std::optional<u32> sampleTablesRelative = parseOffset(codeSegment.attribute("samp_tables"));
-  std::optional<u32> drumSamplesRelative = parseOffset(codeSegment.attribute("drum_samp_table"));
-  std::optional<u32> drumTableRelative = parseOffset(codeSegment.attribute("drum_table"));
+  std::optional<u32> sequenceRelative = mame::parseInteger(codeSegment.attribute("seq_table"));
+  std::optional<u32> sampleTablesRelative = mame::parseInteger(codeSegment.attribute("samp_tables"));
+  std::optional<u32> drumSamplesRelative = mame::parseInteger(codeSegment.attribute("drum_samp_table"));
+  std::optional<u32> drumTableRelative = mame::parseInteger(codeSegment.attribute("drum_table"));
 
   if (!sequenceRelative) {
     const auto pattern = findBytePattern(reader, kGxSequenceTable, layout.code.offset, layout.code.endOffset());

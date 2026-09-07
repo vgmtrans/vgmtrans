@@ -488,6 +488,19 @@ Extend scanner tests for exact end boundaries, crossing matches, empty and
 reversed ranges, oversized limits, and all-wildcard patterns. The full build
 and all 17 CTest targets pass without compiler warnings.
 
+### Share ROM definition integer parsing
+
+Give MAME ROM metadata one integer parser and remove the copies in CPS,
+KonamiArcade, and KonamiTMNT2. Encryption keys use the same parser while
+retaining their distinct missing/invalid-attribute diagnostics. Source formats
+continue to own their address and range validation; decimal-only metadata in
+other extractors retains its existing policy.
+
+Extend ROM metadata coverage for decimal, hexadecimal, leading zeroes, the
+unsigned limit, missing values, prefixes without digits, signs, whitespace,
+partial values, and overflow. The full build and all 17 CTest targets pass
+without compiler warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
