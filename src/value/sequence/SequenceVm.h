@@ -29,7 +29,6 @@ struct ActiveNoteState {
   bool sustain = false;
 };
 
-class RepeatState;
 struct VmApiAccess;
 struct VmTrackRuntime;
 [[nodiscard]] std::any analyzeSequenceProgram(const SequenceVm& vm, const SequenceProgram& program,
@@ -56,9 +55,9 @@ public:
 private:
   friend class VmApi;
 
-  RepeatCounter(detail::RepeatState& state, u8 slot) noexcept;
+  RepeatCounter(std::map<u8, u32>& remaining, u8 slot) noexcept;
 
-  detail::RepeatState* state_ = nullptr;
+  std::map<u8, u32>* remaining_;
   u8 slot_ = 0;
 };
 
