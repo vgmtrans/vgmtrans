@@ -501,6 +501,24 @@ unsigned limit, missing values, prefixes without digits, signs, whitespace,
 partial values, and overflow. The full build and all 17 CTest targets pass
 without compiler warnings.
 
+### Resolve VM jump destinations and loop points in one path
+
+Replace four jump helpers with one ordered implementation: resolve the target,
+report any missing destination, then apply the explicit jump semantics. Normal
+and finite branches stop there; candidate loops require a previous visit while
+declared loops can begin at the current tick. Both loop forms share LoopPoint
+construction and the existing loop policy. This removes 43 production lines
+and three private methods without changing SequenceVM's execution model.
+
+The full build and all 17 CTest targets pass without compiler warnings. An
+independent before/after comparison produces identical serialized execution
+traces for 13,824 programs covering all jump semantics, calls/returns, repeat
+state, runtime overrides, missing targets, one to three tracks, loop inference,
+all loop policies, and zero to two extra repeats. Traces include event ordering,
+note timing, loop markers, source spans, and diagnostic text/ranges. The updated
+VM also completes that matrix under AddressSanitizer, UBSan, and float-cast-
+overflow checks.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

@@ -702,82 +702,39 @@ private:
     pendingTickCommand_ = commandIndex;
   }
 
-  void applyJump(CommandId commandId, const SourceCommand& command, Address destinationAddress,
-                 JumpSemantics semantics) {
+  void applyJump(CommandId commandId, const SourceCommand& command, Address destination, JumpSemantics semantics) {
+    current_ = track_.commandIndex(destination);
+    arrivedByControlFlow_ = semantics == JumpSemantics::Normal || semantics == JumpSemantics::LoopCandidate;
+    if (!current_) {
+      const std::string_view target = semantics == JumpSemantics::FiniteBranch   ? "branch"
+                                      : semantics == JumpSemantics::DeclaredLoop ? "loop"
+                                                                                 : "jump";
+      warn(fmt::format("Sequence {} target ${:04X} was not decoded", target, destination.value), command.range);
+      return;
+    }
+
+    const VisitRecord* previous = nullptr;
     switch (semantics) {
       case JumpSemantics::Normal:
-        applyPlainJump(command, destinationAddress, true, "jump");
-        break;
       case JumpSemantics::FiniteBranch:
-        applyPlainJump(command, destinationAddress, false, "branch");
-        break;
+        return;
       case JumpSemantics::LoopCandidate:
-        applyLoopCandidateJump(commandId, command, destinationAddress);
+        previous = loopDetector_.findLoopCandidateIgnoringRepeatState(*current_, runtime_.callStack);
+        if (previous == nullptr) {
+          return;
+        }
         break;
       case JumpSemantics::DeclaredLoop:
-        applyDeclaredLoop(commandId, command, destinationAddress);
+        previous = loopDetector_.findExact(LoopDetector::visitState(*current_, runtime_));
         break;
     }
-  }
-
-  void applyPlainJump(const SourceCommand& command, Address destinationAddress, bool arrivedByControlFlow,
-                      std::string_view targetName) {
-    current_ = track_.commandIndex(destinationAddress);
-    arrivedByControlFlow_ = arrivedByControlFlow;
-    if (!current_) {
-      warn(fmt::format("Sequence {} target ${:04X} was not decoded", targetName, destinationAddress.value),
-           command.range);
-    }
-  }
-
-  void applyLoopCandidateJump(CommandId commandId, const SourceCommand& command, Address destinationAddress) {
-    const auto destination = track_.commandIndex(destinationAddress);
-    if (!destination) {
-      warn(fmt::format("Sequence jump target ${:04X} was not decoded", destinationAddress.value), command.range);
-      current_ = std::nullopt;
-      arrivedByControlFlow_ = true;
-      return;
-    }
-
-    const VisitRecord* previousVisit =
-        loopDetector_.findLoopCandidateIgnoringRepeatState(*destination, runtime_.callStack);
-    if (previousVisit == nullptr) {
-      current_ = destination;
-      arrivedByControlFlow_ = true;
-      return;
-    }
 
     const LoopPoint loop{
-        .start = *previousVisit,
+        .start = previous ? *previous : VisitRecord{.tick = runtime_.tick, .command = CommandId{*current_}},
         .endCommand = commandId,
         .endTick = runtime_.tick,
     };
-    handleLoop(loop, *destination);
-  }
-
-  void applyDeclaredLoop(CommandId commandId, const SourceCommand& command, Address destinationAddress) {
-    const auto destination = track_.commandIndex(destinationAddress);
-    if (!destination) {
-      warn(fmt::format("Sequence loop target ${:04X} was not decoded", destinationAddress.value), command.range);
-      current_ = std::nullopt;
-      arrivedByControlFlow_ = false;
-      return;
-    }
-
-    VisitRecord start{
-        .tick = runtime_.tick,
-        .command = CommandId{*destination},
-    };
-    if (const auto* previous = loopDetector_.findExact(LoopDetector::visitState(*destination, runtime_))) {
-      start = *previous;
-    }
-
-    const LoopPoint loop{
-        .start = start,
-        .endCommand = commandId,
-        .endTick = runtime_.tick,
-    };
-    handleLoop(loop, *destination);
+    handleLoop(loop, *current_);
   }
 
   void warn(std::string message, SourceRange range) {
