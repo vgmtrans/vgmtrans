@@ -23,6 +23,10 @@ inline constexpr std::string_view kMameGameAttribute = "mame.game";
 inline constexpr std::string_view kMameFormatAttribute = "mame.format";
 inline constexpr std::string_view kMameFormatVersionAttribute = "mame.format-version";
 
+// ROM definition integers are decimal or 0x-prefixed hexadecimal. Missing,
+// partial, negative, and out-of-range values have no integer interpretation.
+[[nodiscard]] std::optional<u32> parseInteger(std::optional<std::string_view> text);
+
 enum class RomLoadMethod {
   Append,
   AppendSwap16,

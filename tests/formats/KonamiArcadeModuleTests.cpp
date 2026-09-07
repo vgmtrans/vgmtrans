@@ -188,6 +188,14 @@ KonamiArcadeFixture makeMysticWarriorFixture() {
 }  // namespace
 
 void mameRomDatabaseAndGroupAssemblyAreValueOriented() {
+  expect(mame::parseInteger("0") == 0 && mame::parseInteger("012") == 12 && mame::parseInteger("0x100") == 256 &&
+             mame::parseInteger("0XAbCd") == 43981 && mame::parseInteger("4294967295") == 0xffffffff &&
+             mame::parseInteger("0xffffffff") == 0xffffffff,
+         "ROM attributes must share decimal and hexadecimal unsigned 32-bit interpretation");
+  expect(!mame::parseInteger(std::nullopt), "a missing ROM attribute must remain distinct from zero");
+  for (std::string_view text : {"", "0x", "0X", "-1", "+1", " 1", "1 ", "1g", "0xgg", "4294967296", "0x100000000"}) {
+    expect(!mame::parseInteger(text), "ROM attributes must reject malformed, partial, and overflowing integers");
+  }
   std::istringstream json{R"json(
     {"games":[{
       "name":"fixture",

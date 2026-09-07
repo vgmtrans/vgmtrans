@@ -9,7 +9,6 @@
 #include "value/extractors/MameRomSetExtractor.h"
 
 #include <algorithm>
-#include <charconv>
 #include <limits>
 #include <map>
 #include <ranges>
@@ -19,20 +18,6 @@ namespace vgmtrans::formats::cps {
 using namespace core;
 
 namespace {
-
-[[nodiscard]] std::optional<u32> integer(std::optional<std::string_view> text) {
-  if (!text) {
-    return std::nullopt;
-  }
-  int base = 10;
-  if (text->starts_with("0x") || text->starts_with("0X")) {
-    text->remove_prefix(2);
-    base = 16;
-  }
-  u32 value = 0;
-  const auto [end, error] = std::from_chars(text->data(), text->data() + text->size(), value, base);
-  return error == std::errc{} && end == text->data() + text->size() ? std::optional<u32>{value} : std::nullopt;
-}
 
 void warning(std::vector<Diagnostic>* diagnostics, std::string message, SourceRange range = {}) {
   if (diagnostics != nullptr) {
@@ -45,7 +30,7 @@ void warning(std::vector<Diagnostic>* diagnostics, std::string message, SourceRa
 }
 
 [[nodiscard]] std::optional<u32> segmentAddress(const SourceSegment& segment, std::string_view name) {
-  const auto value = integer(segment.attribute(name));
+  const auto value = mame::parseInteger(segment.attribute(name));
   if (!value || *value > segment.size || *value > std::numeric_limits<u32>::max() - segment.offset) {
     return std::nullopt;
   }
@@ -202,7 +187,7 @@ void warning(std::vector<Diagnostic>* diagnostics, std::string message, SourceRa
                                    std::vector<Diagnostic>* diagnostics) {
   const auto seqTable = segmentAddress(program, "seq_table");
   const auto sampleTable = segmentAddress(program, "samp_table");
-  const auto banks = integer(program.attribute("num_instr_banks"));
+  const auto banks = mame::parseInteger(program.attribute("num_instr_banks"));
   const auto instruments =
       segmentAddress(program, cps2UsesFixedInstrumentTable(layout.version) ? "instr_table" : "instr_table_ptrs");
   if (!seqTable || !sampleTable || !banks || !instruments || *banks == 0) {
@@ -214,7 +199,7 @@ void warning(std::vector<Diagnostic>* diagnostics, std::string message, SourceRa
   layout.instrumentTableOffset = *instruments;
   layout.instrumentBanks = *banks;
 
-  if (const auto length = integer(program.attribute("samp_table_length"))) {
+  if (const auto length = mame::parseInteger(program.attribute("samp_table_length"))) {
     layout.sampleInfoTableLength = *length;
   }
   if (layout.sampleInfoTableLength == 0 && !isCps3(layout.version)) {
