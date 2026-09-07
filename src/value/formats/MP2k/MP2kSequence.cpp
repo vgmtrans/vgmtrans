@@ -670,10 +670,10 @@ struct DecodeContext {
         case 7:
           return event.invoke<&Playback::release>(event.u8("release"));
         case 8:
-          static_cast<void>(event.u8("pseudo_echo_volume"));
+          event.u8("pseudo_echo_volume");
           return event;
         case 9:
-          static_cast<void>(event.u8("pseudo_echo_length"));
+          event.u8("pseudo_echo_length");
           return event;
         case 10:
           return event.invoke<&Playback::toneLength>(event.u8("length"));
@@ -682,7 +682,7 @@ struct DecodeContext {
         case 12:
           return event.wait(event.u16le("ticks"));
         case 13:
-          static_cast<void>(event.u32le("sample_start"));
+          event.u32le("sample_start");
           return event;
         default:
           event.warning("Unknown MP2k extended command stopped playback");
@@ -692,7 +692,7 @@ struct DecodeContext {
     case 0xcc: {
       auto event = cursor.command("Sound Register Write", SequenceSemantic::State);
       static_cast<void>(parameter(cursor, event, running, "register_offset", SourceValueDisplay::Hex));
-      static_cast<void>(event.u8("value", SourceValueDisplay::Hex));
+      event.u8("value", SourceValueDisplay::Hex);
       return event;
     }
     case 0xce: {
@@ -766,7 +766,7 @@ struct DecodeContext {
     }
     case 0xba: {
       auto event = cursor.sourceOnly("Priority");
-      static_cast<void>(event.u8("priority"));
+      event.u8("priority");
       return event;
     }
     case 0xbb: {

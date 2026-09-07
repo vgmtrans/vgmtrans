@@ -291,9 +291,9 @@ public:
     }
 
     template <class T, class Resolved>
-    [[nodiscard]] Resolved resolvedValue(std::string_view name, const EncodedSemanticField<T>& source,
-                                         Resolved resolved, SourceValueDisplay display = SourceValueDisplay::Default,
-                                         SemanticOperandRole role = SemanticOperandRole::Value) {
+    Resolved resolvedValue(std::string_view name, const EncodedSemanticField<T>& source, Resolved resolved,
+                           SourceValueDisplay display = SourceValueDisplay::Default,
+                           SemanticOperandRole role = SemanticOperandRole::Value) {
       if (source.valid) {
         cursor_.operands_.push_back(SemanticOperand{
             .value = detail::semanticValue(resolved),
@@ -708,7 +708,7 @@ public:
   [[nodiscard]] DecodedBytecodeCommand ignored(std::string_view label, u32 operandBytes,
                                                std::string_view category = {}) {
     auto event = sourceOnly(label, category);
-    static_cast<void>(event.rawBytes("bytes", operandBytes));
+    event.rawBytes("bytes", operandBytes);
     return event;
   }
 

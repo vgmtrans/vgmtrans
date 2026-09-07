@@ -281,7 +281,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xe3: {
       auto event = cursor.noOp("Reserved Tempo Word");
-      static_cast<void>(event.u16le("value", SourceValueDisplay::Hex));
+      event.u16le("value", SourceValueDisplay::Hex);
       return event;
     }
     case 0xe4: {
@@ -312,7 +312,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return cursor.command("Key Off", SequenceSemantic::Note).invoke<&Playback::keyOff>();
     case 0xf1: {
       auto event = cursor.command("Priority", SequenceSemantic::State, CommandPlaybackStatus::SourceOnly);
-      static_cast<void>(event.u8("priority"));
+      event.u8("priority");
       return event;
     }
     case 0xf8: {

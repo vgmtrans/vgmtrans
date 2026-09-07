@@ -438,10 +438,9 @@ struct Playback {
 
   void volumeFade(u8 target, u8 duration) {
     if (duration != 0) {
-      static_cast<void>(
-          track.volume.begin(out.fade(PerformanceAutomationTarget::Level,
-                                      math::channelGain(track.channelMaster, target, track.alternateVolume), duration),
-                             SequenceFixedPointMotion<s32>::toRawTarget(target, duration)));
+      track.volume.begin(out.fade(PerformanceAutomationTarget::Level,
+                                  math::channelGain(track.channelMaster, target, track.alternateVolume), duration),
+                         SequenceFixedPointMotion<s32>::toRawTarget(target, duration));
     }
   }
 
@@ -465,7 +464,7 @@ struct Playback {
 
   void panFade(s8 target, u8 duration) {
     if (duration != 0) {
-      static_cast<void>(out.fade(PerformanceAutomationTarget::Pan, math::panPosition(target), duration));
+      out.fade(PerformanceAutomationTarget::Pan, math::panPosition(target), duration);
       track.pan = target;
     }
   }
@@ -555,7 +554,7 @@ struct Playback {
     speed = std::max(1u, speed);
     const u32 distance = std::abs(static_cast<int>(target) - program.masterVolume);
     const u32 ticks = std::max(1u, (distance + speed - 1) / speed);
-    static_cast<void>(out.fade(PerformanceAutomationTarget::MasterLevel, math::masterGain(target), ticks));
+    out.fade(PerformanceAutomationTarget::MasterLevel, math::masterGain(target), ticks);
     program.masterVolume = target;
   }
 
@@ -714,7 +713,7 @@ struct Playback {
       emitLevel();
     }
 
-    static_cast<void>(track.volume.tickRaw([&](s32) { emitLevel(track.volume.output(out)); }));
+    track.volume.tickRaw([&](s32) { emitLevel(track.volume.output(out)); });
 
     advanceGainEnvelope();
 

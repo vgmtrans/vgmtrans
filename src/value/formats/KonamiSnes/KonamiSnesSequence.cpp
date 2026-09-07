@@ -771,11 +771,11 @@ struct Playback {
       // Preserve only the raw motion until a nonzero note makes the mixer write
       // VOL(L/R) again.
       state->interruptAutomationAt(vm.tick());
-      static_cast<void>(state->begin(motion));
+      state->begin(motion);
     } else {
       auto automation =
           stepBased ? out.step(automationTarget, targetValue, ticks) : out.fade(automationTarget, targetValue, ticks);
-      static_cast<void>(state->begin(std::move(automation), motion));
+      state->begin(std::move(automation), motion);
     }
   }
 
@@ -851,23 +851,23 @@ struct Playback {
   void tick() {
     // Commands start motion, but only note/rest time advances it. Emit changes
     // on each elapsed music tick so MIDI and event simulation see the ramp.
-    static_cast<void>(track.tempoState.tickRaw([&](s32 rawTempo) {
+    track.tempoState.tickRaw([&](s32 rawTempo) {
       const u8 value = static_cast<u8>(std::clamp<s32>(rawTempo, 0, 0xff));
       if (value == track.tempo) {
         return;
       }
       track.tempo = value;
       track.tempoState.output(out).tempo(tempoMicrosecondsPerQuarter(track.version, value));
-    }));
-    static_cast<void>(track.volume.tickRaw([&](s32 rawVolume) {
+    });
+    track.volume.tickRaw([&](s32 rawVolume) {
       const auto value = static_cast<u8>(std::clamp<s32>(rawVolume, 0, 0xff));
       emitLevel(track.volume.output(out), value);
-    }));
-    static_cast<void>(track.pan.tickRaw([&](s32 rawPan) {
+    });
+    track.pan.tickRaw([&](s32 rawPan) {
       const auto value = static_cast<u8>(std::clamp<s32>(rawPan, 0, 0xff));
       const PanGains gains = panGains(track.version, value);
       track.pan.output(out).stereoBalance(gains.left, gains.right);
-    }));
+    });
     const auto fadeTick = track.vibrato.depthState.tickFade();
     if (fadeTick.shouldApply()) {
       emitVibratoDepth(track.vibrato.depthState.fadeOutput(out));

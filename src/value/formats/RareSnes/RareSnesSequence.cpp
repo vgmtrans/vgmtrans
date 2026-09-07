@@ -1063,7 +1063,7 @@ struct Playback {
       return;
     }
     const u32 updates = static_cast<u32>(127 * 256 / amount);
-    static_cast<void>(out.fade(PerformanceAutomationTarget::MasterLevel, 0.0, timelineTicks(updates, program.tempo)));
+    out.fade(PerformanceAutomationTarget::MasterLevel, 0.0, timelineTicks(updates, program.tempo));
   }
 
   void boundedVolumeMotion(u8 flags, u8 interval, u8 delta, u8 delay, s8 minimum, s8 maximum) {
@@ -1078,9 +1078,8 @@ struct Playback {
     const double rightGain = signedGain(targetRight);
     const double total = leftGain + rightGain;
     const double pan = total == 0.0 ? 0.0 : std::clamp((rightGain - leftGain) / total, -1.0, 1.0);
-    static_cast<void>(out.fade(PerformanceAutomationTarget::Pan, pan, duration, delayTicks));
-    static_cast<void>(
-        out.fade(PerformanceAutomationTarget::Level, std::max(leftGain, rightGain), duration, delayTicks));
+    out.fade(PerformanceAutomationTarget::Pan, pan, duration, delayTicks);
+    out.fade(PerformanceAutomationTarget::Level, std::max(leftGain, rightGain), duration, delayTicks);
     track.left = targetLeft;
     track.right = targetRight;
   }
@@ -1205,7 +1204,7 @@ struct Playback {
     program.masterRight = applySteps(program.masterRight, rightStep);
     const double target = std::max(signedGain(program.masterLeft), signedGain(program.masterRight));
     const u32 duration = static_cast<u32>(interval + 1) * steps;
-    static_cast<void>(out.fade(PerformanceAutomationTarget::MasterLevel, target, duration));
+    out.fade(PerformanceAutomationTarget::MasterLevel, target, duration);
   }
 };
 
@@ -1381,7 +1380,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case Kind::Tuning: {
       if (profile == Profile::Battlemaniacs && trackNumber == 5) {
         auto event = cursor.noOp("Percussion Fine Tuning NOP", "percussion-tuning-nop");
-        static_cast<void>(event.rawBytes("reserved", 1));
+        event.rawBytes("reserved", 1);
         return event;
       }
       auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
@@ -1411,7 +1410,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return cursor.command("Echo All Off", SequenceSemantic::State).invoke<&Playback::echoAllOff>();
     case Kind::EchoFir: {
       auto event = cursor.sourceOnly("Echo FIR", "echo-fir");
-      static_cast<void>(event.rawBytes("coefficients", 8));
+      event.rawBytes("coefficients", 8);
       return event;
     }
     case Kind::NoiseClock: {
@@ -1549,12 +1548,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case Kind::Nop2: {
       auto event = cursor.noOp("NOP", "nop");
-      static_cast<void>(event.rawBytes("reserved", 2));
+      event.rawBytes("reserved", 2);
       return event;
     }
     case Kind::Nop4: {
       auto event = cursor.noOp("NOP", "nop");
-      static_cast<void>(event.rawBytes("reserved", 4));
+      event.rawBytes("reserved", 4);
       return event;
     }
     case Kind::DriverReset:

@@ -541,8 +541,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return cursor.noOp("NOP");
     case 0xf1: {
       auto event = cursor.sourceOnly("Raw DSP Write", "raw-dsp-write");
-      static_cast<void>(event.u8("register", SourceValueDisplay::Hex));
-      static_cast<void>(event.u8("value", SourceValueDisplay::Hex));
+      event.u8("register", SourceValueDisplay::Hex);
+      event.u8("value", SourceValueDisplay::Hex);
       return event;
     }
     case 0xf2: {
@@ -559,7 +559,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 decay = event.u8("decay");
       const u8 sustainRate = event.u8("sustain_rate");
       const u8 sustainLevel = event.u8("sustain_level");
-      static_cast<void>(event.u8("unused"));
+      event.u8("unused");
       const DynamicAdsr adsr = dynamicAdsr(attack, decay, sustainRate, sustainLevel);
       event.derived("adsr1", adsr.adsr1, SourceValueDisplay::Hex);
       event.derived("adsr2", adsr.adsr2, SourceValueDisplay::Hex);
@@ -567,7 +567,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xf4: {
       auto event = cursor.sourceOnly("Unused Driver Parameter", "unused-driver-parameter");
-      static_cast<void>(event.u8("value", SourceValueDisplay::Hex));
+      event.u8("value", SourceValueDisplay::Hex);
       return event;
     }
     case 0xf5:

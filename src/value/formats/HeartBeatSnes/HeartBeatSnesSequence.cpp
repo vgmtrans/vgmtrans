@@ -324,8 +324,8 @@ struct Playback {
       pan(target);
       return;
     }
-    static_cast<void>(track.pan.begin(out.fade(PerformanceAutomationTarget::Pan, math::panPosition(target), length),
-                                      SequenceFixedPointMotion<s32>::toRawTarget(target, length)));
+    track.pan.begin(out.fade(PerformanceAutomationTarget::Pan, math::panPosition(target), length),
+                    SequenceFixedPointMotion<s32>::toRawTarget(target, length));
   }
 
   void vibrato(u8 delay, u8 rate, u8 depth) {
@@ -375,9 +375,8 @@ struct Playback {
       volume(target);
       return;
     }
-    static_cast<void>(
-        track.volume.begin(out.fade(PerformanceAutomationTarget::Level, math::channelGain(target), length),
-                           SequenceFixedPointMotion<s32>::toRawTarget(target, length)));
+    track.volume.begin(out.fade(PerformanceAutomationTarget::Level, math::channelGain(target), length),
+                       SequenceFixedPointMotion<s32>::toRawTarget(target, length));
   }
 
   [[nodiscard]] static double masterRelativeGain(u8 value) {
@@ -395,9 +394,8 @@ struct Playback {
       masterVolume(target);
       return;
     }
-    static_cast<void>(program.masterVolume.begin(
-        out.fade(PerformanceAutomationTarget::MasterLevel, masterRelativeGain(target), length),
-        SequenceFixedPointMotion<s32>::toRawTarget(target, length)));
+    program.masterVolume.begin(out.fade(PerformanceAutomationTarget::MasterLevel, masterRelativeGain(target), length),
+                               SequenceFixedPointMotion<s32>::toRawTarget(target, length));
     program.masterVolumeTrack = track.trackNumber;
   }
 
@@ -472,20 +470,20 @@ struct Playback {
   }
 
   void tick() {
-    static_cast<void>(track.volume.tickRaw([&](s32 value) {
+    track.volume.tickRaw([&](s32 value) {
       track.volume.output(out).level(math::channelGain(static_cast<u8>(std::clamp<s32>(value, 0, 0xff))),
                                      ValueQuantization{.levels = 256});
-    }));
-    static_cast<void>(track.pan.tickRaw([&](s32) { emitPan(track.pan.output(out)); }));
+    });
+    track.pan.tickRaw([&](s32) { emitPan(track.pan.output(out)); });
     const auto vibratoTick = track.vibrato.depthState.tickFade();
     if (vibratoTick.shouldApply() && vibratoTick.changed) {
       emitVibratoDepth(track.vibrato.depthState.currentDepth(), track.vibrato.depthState.fadeOutput(out));
     }
     if (program.masterVolumeTrack == track.trackNumber) {
-      static_cast<void>(program.masterVolume.tickRaw([&](s32 value) {
+      program.masterVolume.tickRaw([&](s32 value) {
         const auto volume = static_cast<u8>(std::clamp<s32>(value, 0, 0xff));
         program.masterVolume.output(out).masterLevel(masterRelativeGain(volume));
-      }));
+      });
       if (!program.masterVolume.active()) {
         program.masterVolumeTrack.reset();
       }
@@ -734,7 +732,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return cursor.sourceOnly(opcode == 0xf5 ? "DSP Noise On" : "DSP Noise Off", "noise");
     case 0xf7: {
       auto event = cursor.sourceOnly("DSP Noise Frequency", "noise-frequency");
-      static_cast<void>(event.u8("clock", SourceValueDisplay::Hex));
+      event.u8("clock", SourceValueDisplay::Hex);
       return event;
     }
     case 0xf8:

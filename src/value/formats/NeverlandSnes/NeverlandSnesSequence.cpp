@@ -635,7 +635,7 @@ template <auto Handler, class... Args>
 [[nodiscard]] DecodedBytecodeCommand valueSubcommand(Cursor& cursor, std::string_view label,
                                                      SequenceSemantic semantic, Args... args) {
   auto event = cursor.command(label, semantic);
-  static_cast<void>(event.u8("command", SourceValueDisplay::Hex));
+  event.u8("command", SourceValueDisplay::Hex);
   return event.invoke<Handler>(event.u8("value", SourceValueDisplay::Hex), args...);
 }
 
@@ -643,16 +643,16 @@ template <auto Handler, class... Args>
 [[nodiscard]] DecodedBytecodeCommand fixedSubcommand(Cursor& cursor, std::string_view label,
                                                      SequenceSemantic semantic, Args... args) {
   auto event = cursor.command(label, semantic);
-  static_cast<void>(event.u8("command", SourceValueDisplay::Hex));
-  static_cast<void>(event.u8("value", SourceValueDisplay::Hex));
+  event.u8("command", SourceValueDisplay::Hex);
+  event.u8("value", SourceValueDisplay::Hex);
   return event.invoke<Handler>(args...);
 }
 
 [[nodiscard]] DecodedBytecodeCommand sourceSubcommand(Cursor& cursor, std::string_view label,
                                                       SequenceSemantic semantic, std::string_view category) {
   auto event = cursor.command(label, semantic, CommandPlaybackStatus::SourceOnly, category);
-  static_cast<void>(event.u8("command", SourceValueDisplay::Hex));
-  static_cast<void>(event.u8("value", SourceValueDisplay::Hex));
+  event.u8("command", SourceValueDisplay::Hex);
+  event.u8("value", SourceValueDisplay::Hex);
   return event;
 }
 
@@ -812,7 +812,7 @@ template <auto Handler, class... Args>
       const u8 wait = event.u8("wait");
       const u8 scale = event.u8("scale");
       if (layout.version == Version::Original) {
-        static_cast<void>(event.u8("unused"));
+        event.u8("unused");
       }
       return event.invokeFlow<&Playback::tuning>(wait, scale);
     }

@@ -333,9 +333,8 @@ struct Playback {
     out.vibratoDepth(0.0, context);
     out.vibratoRateCyclesPerTick(track.vibratoRate / 64.0, context);
     if (const u32 ramp = automaticVibratoRampTicks(); ramp != 0) {
-      static_cast<void>(out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth,
-                                         std::abs(static_cast<double>(track.automaticVibratoDepth)), ramp,
-                                         track.vibratoDelay));
+      out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth,
+                       std::abs(static_cast<double>(track.automaticVibratoDepth)), ramp, track.vibratoDelay);
     }
   }
 

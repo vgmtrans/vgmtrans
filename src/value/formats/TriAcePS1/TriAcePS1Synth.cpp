@@ -66,8 +66,8 @@ struct ParsedInstrument {
         .adsr1 = *header.u16leAt(2, "adsr1", SourceValueDisplay::Hex),
         .adsr2 = *header.u16leAt(4, "adsr2", SourceValueDisplay::Hex),
     };
-    static_cast<void>(header.u8At(6, "unknown_06", SourceValueDisplay::Hex));
-    static_cast<void>(header.u8At(7, "region_count"));
+    header.u8At(6, "unknown_06", SourceValueDisplay::Hex);
+    header.u8At(7, "region_count");
     instrument.source = std::move(header).finish();
     instrument.regions.reserve(count);
 
@@ -91,8 +91,8 @@ struct ParsedInstrument {
           .semitone = *region.s8At(13, "semitone_tune"),
           .fine = *region.s8At(14, "fine_tune"),
       };
-      static_cast<void>(region.u8At(15, "unknown_0f", SourceValueDisplay::Hex));
-      static_cast<void>(region.u32leAt(16, "unknown_10", SourceValueDisplay::Hex));
+      region.u8At(15, "unknown_0f", SourceValueDisplay::Hex);
+      region.u32leAt(16, "unknown_10", SourceValueDisplay::Hex);
       parsed.source = std::move(region).finish();
       instrument.regions.push_back(std::move(parsed));
     }

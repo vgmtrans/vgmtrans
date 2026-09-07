@@ -281,9 +281,8 @@ struct Playback {
       return;
     }
     out.vibratoDepth(0.0, context);
-    static_cast<void>(out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth, depth,
-                                       driverTicksToSequenceTicks(track.vibrato.ramp),
-                                       driverTicksToSequenceTicks(static_cast<u32>(track.vibrato.delay) * 2)));
+    out.noteEnvelope(PerformanceAutomationTarget::VibratoDepth, depth, driverTicksToSequenceTicks(track.vibrato.ramp),
+                     driverTicksToSequenceTicks(static_cast<u32>(track.vibrato.delay) * 2));
   }
 
   void beginTremolo() {
@@ -295,9 +294,8 @@ struct Playback {
       return;
     }
     out.tremoloLinearGainDepth(0.0, context);
-    static_cast<void>(out.noteEnvelope(PerformanceAutomationTarget::TremoloDepth, depth,
-                                       driverTicksToSequenceTicks(track.tremolo.ramp),
-                                       driverTicksToSequenceTicks(static_cast<u32>(track.tremolo.delay) * 2)));
+    out.noteEnvelope(PerformanceAutomationTarget::TremoloDepth, depth, driverTicksToSequenceTicks(track.tremolo.ramp),
+                     driverTicksToSequenceTicks(static_cast<u32>(track.tremolo.delay) * 2));
   }
 
   void applyToneState(Tone* tone) {
@@ -692,7 +690,7 @@ struct ControllerInfo {
 
   auto event = cursor.command(label, semantic, playback);
   if (source.end > source.offset + 1) {
-    static_cast<void>(event.rawBytes("encoded_bytes", source.end - source.offset - 1));
+    event.rawBytes("encoded_bytes", source.end - source.offset - 1);
   }
   event.derived("delta", source.delta);
   event.derived("chained", source.chained, SourceValueDisplay::Boolean);

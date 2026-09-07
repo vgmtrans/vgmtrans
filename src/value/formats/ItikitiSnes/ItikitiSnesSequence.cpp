@@ -376,9 +376,8 @@ struct Playback {
       tempo(target);
       return;
     }
-    static_cast<void>(program.tempo.begin(
-        out.fade(PerformanceAutomationTarget::Tempo, math::tempoMicrosecondsPerQuarter(target), length),
-        SequenceFixedPointMotion<s32>::toRawTarget(target, length)));
+    program.tempo.begin(out.fade(PerformanceAutomationTarget::Tempo, math::tempoMicrosecondsPerQuarter(target), length),
+                        SequenceFixedPointMotion<s32>::toRawTarget(target, length));
     program.tempoTrack = track.trackNumber;
   }
 
@@ -392,9 +391,9 @@ struct Playback {
       volume(target);
       return;
     }
-    static_cast<void>(track.volume.begin(
+    track.volume.begin(
         out.fade(PerformanceAutomationTarget::Level, math::channelGain(target, track.channelVolume), length),
-        SequenceFixedPointMotion<s32>::toRawTarget(target, length)));
+        SequenceFixedPointMotion<s32>::toRawTarget(target, length));
   }
 
   void pan(u8 value) {
@@ -407,8 +406,8 @@ struct Playback {
       pan(target);
       return;
     }
-    static_cast<void>(track.pan.begin(out.fade(PerformanceAutomationTarget::Pan, math::panPosition(target), length),
-                                      SequenceFixedPointMotion<s32>::toRawTarget(target, length)));
+    track.pan.begin(out.fade(PerformanceAutomationTarget::Pan, math::panPosition(target), length),
+                    SequenceFixedPointMotion<s32>::toRawTarget(target, length));
   }
 
   void programChange(u8 value) {
@@ -568,13 +567,13 @@ struct Playback {
   }
 
   void tick() {
-    static_cast<void>(track.volume.tickRaw([&](s32) { emitLevel(track.volume.output(out)); }));
-    static_cast<void>(track.pan.tickRaw([&](s32) { emitPan(track.pan.output(out)); }));
+    track.volume.tickRaw([&](s32) { emitLevel(track.volume.output(out)); });
+    track.pan.tickRaw([&](s32) { emitPan(track.pan.output(out)); });
     if (program.tempoTrack == track.trackNumber) {
-      static_cast<void>(program.tempo.tickRaw([&](s32 value) {
+      program.tempo.tickRaw([&](s32 value) {
         program.tempo.output(out).tempo(
             math::tempoMicrosecondsPerQuarter(static_cast<u8>(std::clamp<s32>(value, 0, 0xff))));
-      }));
+      });
       if (!program.tempo.active()) {
         program.tempoTrack.reset();
       }
@@ -651,7 +650,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0x08: {
       auto event = cursor.sourceOnly("DSP Noise Frequency (Driver Bug)", "noise-frequency");
-      static_cast<void>(event.u8("clock", SourceValueDisplay::Hex));
+      event.u8("clock", SourceValueDisplay::Hex);
       return event;
     }
     case 0x09: {
@@ -790,7 +789,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0x2b: {
       auto event = cursor.sourceOnly("Main CPU Output Cursor", "cpu-output-cursor");
-      static_cast<void>(event.u16le("cursor", SourceValueDisplay::Address));
+      event.u16le("cursor", SourceValueDisplay::Address);
       return event;
     }
     case 0x2c: {

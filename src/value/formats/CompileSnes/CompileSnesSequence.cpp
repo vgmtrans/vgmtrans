@@ -996,7 +996,7 @@ struct DurationValue {
     }
     case 0x85: {
       auto event = cursor.sourceOnly("Main CPU Command", "cpu-command");
-      static_cast<void>(event.rawBytes("arguments", 3));
+      event.rawBytes("arguments", 3);
       return event;
     }
     case 0x87: {
@@ -1018,7 +1018,7 @@ struct DurationValue {
     }
     case 0x8b: {
       auto event = cursor.sourceOnly("Voice DSP Control", "voice-dsp-control");
-      static_cast<void>(event.rawBytes("arguments", 2));
+      event.rawBytes("arguments", 2);
       return event;
     }
     case 0x8c:
@@ -1031,7 +1031,7 @@ struct DurationValue {
     case 0x8e:
     case 0x8f: {
       auto event = cursor.sourceOnly(opcode == 0x8e ? "Noise Clock Envelope" : "Noise Clock Add", "noise");
-      static_cast<void>(event.u8("value", SourceValueDisplay::Hex));
+      event.u8("value", SourceValueDisplay::Hex);
       return event;
     }
     case 0x90: {
@@ -1040,7 +1040,7 @@ struct DurationValue {
     }
     case 0x91: {
       auto event = cursor.sourceOnly("CPU Flags", "cpu-flags");
-      static_cast<void>(event.u8("flags", SourceValueDisplay::Hex));
+      event.u8("flags", SourceValueDisplay::Hex);
       return event;
     }
     case 0x92: {
@@ -1084,7 +1084,7 @@ struct DurationValue {
       return cursor.command("Return", SequenceSemantic::Return).return_();
     case 0x9c: {
       auto event = cursor.sourceOnly("Table Transpose", "table-transpose");
-      static_cast<void>(event.rawBytes("arguments", 2));
+      event.rawBytes("arguments", 2);
       return event;
     }
     case 0x9d: {
@@ -1163,7 +1163,7 @@ struct DurationValue {
     }
     case 0xac: {
       auto event = cursor.sourceOnly("Noise Clock", "noise");
-      static_cast<void>(event.u8("clock", SourceValueDisplay::Hex));
+      event.u8("clock", SourceValueDisplay::Hex);
       return event;
     }
     case 0xad: {
@@ -1184,7 +1184,7 @@ struct DurationValue {
       return cursor.sourceOnly("NOP", "nop");
     case 0xb1: {
       auto event = cursor.sourceOnly("CPU / SFX Control", "cpu-sfx-control");
-      static_cast<void>(event.u8("value", SourceValueDisplay::Hex));
+      event.u8("value", SourceValueDisplay::Hex);
       return event;
     }
     default:

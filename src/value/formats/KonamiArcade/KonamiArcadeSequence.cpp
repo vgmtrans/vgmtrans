@@ -635,9 +635,9 @@ struct Playback {
       sequence.tempo.setCurrentAt(vm.tick(), sequence.channelTempos[track.sourceTrackNumber]);
       sequence.tempoSlideLastTick = vm.tick();
       sequence.nmiRateHertz = nmiRate;
-      static_cast<void>(sequence.tempo.begin(
+      sequence.tempo.begin(
           out.fade(PerformanceAutomationTarget::Tempo, tempoMicrosecondsPerQuarter(nmiRate, target), duration),
-          SequenceMotionPlan<double>::targetOverTicks(static_cast<double>(target), duration)));
+          SequenceMotionPlan<double>::targetOverTicks(static_cast<double>(target), duration));
       return;
     }
 
@@ -645,8 +645,8 @@ struct Playback {
     const PerformanceAutomationTarget automationTarget =
         kind == 1 ? PerformanceAutomationTarget::Level : PerformanceAutomationTarget::Pan;
     const double targetValue = kind == 1 ? volumeGain(target) : (static_cast<double>(panIndex(target)) - 7.0) / 7.0;
-    static_cast<void>(state->begin(out.fade(automationTarget, targetValue, duration),
-                                   SequenceMotionPlan<double>::targetOverTicks(static_cast<double>(target), duration)));
+    state->begin(out.fade(automationTarget, targetValue, duration),
+                 SequenceMotionPlan<double>::targetOverTicks(static_cast<double>(target), duration));
   }
 
   void portamento(u8 raw) {
@@ -760,15 +760,15 @@ struct Playback {
   [[nodiscard]] Effects returnOrEnd() { return vm.inSubroutine() ? vm.return_() : vm.end(); }
 
   void tick() {
-    static_cast<void>(track.volume.tickChanged([&](double value) {
+    track.volume.tickChanged([&](double value) {
       track.volume.output(out).level(
           LevelScale::linearFromLinear(volumeGain(static_cast<u8>(std::clamp(value, 0.0, 255.0)))),
           ValueQuantization{.levels = 128});
-    }));
-    static_cast<void>(track.pan.tickChanged([&](double value) {
+    });
+    track.pan.tickChanged([&](double value) {
       const auto [left, right] = stereoGains(static_cast<u8>(std::clamp(value, 0.0, 255.0)) | 0x10);
       track.pan.output(out).stereoBalance(left, right);
-    }));
+    });
     if (sequence.tempoSlideLastTick && vm.tick() > *sequence.tempoSlideLastTick) {
       sequence.tempoSlideLastTick = vm.tick();
       const auto tempoTick = sequence.tempo.tickChanged([&](double value) {
@@ -971,11 +971,11 @@ using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
       // has no faithful sequence-tick/MIDI representation yet, but retain its
       // decoded parameters instead of presenting it as unknown.
       auto event = cursor.sourceOnly("Random Pitch Spikes");
-      static_cast<void>(event.u8("rate"));
+      event.u8("rate");
       const u8 maskHigh = event.u8("mask_high", SourceValueDisplay::Hex);
       const u8 maskLow = event.u8("mask_low", SourceValueDisplay::Hex);
       const u16 mask = static_cast<u16>((static_cast<u16>(maskHigh) << 8) | maskLow);
-      static_cast<void>(event.derived("maximum_offset_semitones", mask / 256.0));
+      event.derived("maximum_offset_semitones", mask / 256.0);
       return event;
     }
     case 0xe6:

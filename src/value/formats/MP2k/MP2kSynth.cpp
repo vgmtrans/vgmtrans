@@ -197,7 +197,7 @@ struct SynthContext {
 
   RecordReader header(builder.reader(), *offset, *offset + 16, &builder.diagnostics());
   const auto type = header.u16le("type", SourceValueDisplay::Hex);
-  static_cast<void>(header.u8("reserved", SourceValueDisplay::Hex));
+  header.u8("reserved", SourceValueDisplay::Hex);
   const auto flags = header.u8("flags", SourceValueDisplay::Hex);
   const auto frequency = header.u32le("frequency");
   const auto encodedLoopStart = header.u32le("loop_start");

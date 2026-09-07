@@ -665,7 +665,7 @@ struct Playback {
     if (track.lastNote.valid() && from < 0x80 && to < 0x80) {
       const double start = static_cast<u8>(from + track.transpose);
       const double target = static_cast<u8>(to + track.transpose);
-      static_cast<void>(out.retargetPitchSlide(track.lastNote, start, target, length));
+      out.retargetPitchSlide(track.lastNote, start, target, length);
       track.lastKey = target;
     }
     return wait;
@@ -756,7 +756,7 @@ struct Playback {
   void pitchDrift(s8 amount) {
     if (track.lastNote.valid() && track.lastKey) {
       const double current = out.currentPitchTransitionKey(track.lastNote).value_or(*track.lastKey);
-      static_cast<void>(out.retargetPitchSlide(track.lastNote, *track.lastKey, current, 0));
+      out.retargetPitchSlide(track.lastNote, *track.lastKey, current, 0);
     }
     track.pitchDrift = amount;
   }
@@ -1315,7 +1315,7 @@ struct WalkState {
     case 0xd6:
     case 0xd7: {
       auto event = cursor.sourceOnly("Start Song");
-      static_cast<void>(event.u8("song_index"));
+      event.u8("song_index");
       return event;
     }
     case 0xd8: {
@@ -1337,7 +1337,7 @@ struct WalkState {
       return cursor.sourceOnly("Default Length Off", "default-length-off");
     case 0xdd: {
       auto event = cursor.sourceOnly("Default Length", "default-length");
-      static_cast<void>(event.u8("length"));
+      event.u8("length");
       return event;
     }
     case 0xde:
@@ -1427,7 +1427,7 @@ struct WalkState {
       return cursor.sourceOnly("Manual Duration", "manual-duration");
     case 0xf3: {
       auto event = cursor.sourceOnly("Automatic Duration Threshold", "automatic-duration-threshold");
-      static_cast<void>(event.u8("threshold"));
+      event.u8("threshold");
       return event;
     }
     case 0xf4: {

@@ -384,8 +384,7 @@ using CapcomCursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
       const auto raw = event.rawU16be("raw");
       const u32 tempo = raw.valid ? math::tempoMicrosecondsPerQuarter(raw.value) : 0;
-      static_cast<void>(
-          event.resolvedValue("tempo", raw, tempoBeatsPerMinute(tempo), SourceValueDisplay::BeatsPerMinute));
+      event.resolvedValue("tempo", raw, tempoBeatsPerMinute(tempo), SourceValueDisplay::BeatsPerMinute);
       return event.invoke<&Playback::tempo>(tempo);
     }
     case 0x06: {

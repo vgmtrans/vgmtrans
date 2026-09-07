@@ -612,7 +612,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
 [[nodiscard]] DecodedBytecodeCommand ignored(Cursor& cursor, std::string_view label, u8 bytes = 0) {
   auto event = cursor.sourceOnly(label);
   for (u8 index = 0; index < bytes; ++index) {
-    static_cast<void>(event.u8("data_" + std::to_string(index + 1), SourceValueDisplay::Hex));
+    event.u8("data_" + std::to_string(index + 1), SourceValueDisplay::Hex);
   }
   return event;
 }
@@ -720,7 +720,7 @@ struct DecodeState {
     case 0xe1: {
       if (fm) {
         auto event = cursor.command("Channel State", SequenceSemantic::State);
-        static_cast<void>(event.u8("value"));
+        event.u8("value");
         return event;
       }
       auto event = cursor.command("Percussion Bank", SequenceSemantic::Instrument);

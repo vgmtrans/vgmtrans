@@ -91,7 +91,7 @@ public:
     mode_ = SequenceMotionMode::TargetOverTicks;
   }
 
-  [[nodiscard]] SequenceMotionTick<ValueType> begin(const SequenceMotionPlan<ValueType>& plan) {
+  SequenceMotionTick<ValueType> begin(const SequenceMotionPlan<ValueType>& plan) {
     const ValueType previous = current_;
     target_ = plan.target;
     delay_ = plan.delay;
@@ -164,7 +164,7 @@ public:
   }
 
   template <typename Apply>
-  [[nodiscard]] SequenceMotionTick<ValueType> tickChanged(Apply&& apply, bool applyDelayedStep = false) {
+  SequenceMotionTick<ValueType> tickChanged(Apply&& apply, bool applyDelayedStep = false) {
     const auto motionTick = tick();
     if (motionTick.shouldApply(applyDelayedStep) && motionTick.changed) {
       std::forward<Apply>(apply)(motionTick.current);
@@ -225,8 +225,7 @@ public:
     rounding_ = rounding;
   }
 
-  [[nodiscard]] SequenceMotionTick<ValueType> begin(
-      const SequenceFixedPointMotion<ValueType, FractionBits>& rawMotion) {
+  SequenceMotionTick<ValueType> begin(const SequenceFixedPointMotion<ValueType, FractionBits>& rawMotion) {
     // Drivers retarget from the rounded raw value, discarding the old fraction.
     // Linear motion then computes the step in fixed-point units.
     value_.setCurrentPreservingMotion(toFixed(currentRaw()));
@@ -242,7 +241,7 @@ public:
   [[nodiscard]] SequenceMotionTick<ValueType> tick() { return value_.tick(); }
 
   template <typename ApplyRaw>
-  [[nodiscard]] SequenceMotionTick<ValueType> tickRaw(ApplyRaw&& applyRaw, bool applyDelayedStep = false) {
+  SequenceMotionTick<ValueType> tickRaw(ApplyRaw&& applyRaw, bool applyDelayedStep = false) {
     const ValueType previousRaw = currentRaw();
     const auto motionTick = tick();
     if (motionTick.shouldApply(applyDelayedStep)) {

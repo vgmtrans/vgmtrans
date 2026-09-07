@@ -77,7 +77,7 @@ public:
     fade_.setCurrent(initialDepth);
     auto plan = *fadePlan_;
     plan.delay = delayTicks;
-    static_cast<void>(fade_.begin(plan));
+    fade_.begin(plan);
     return true;
   }
 

@@ -504,8 +504,8 @@ struct Playback {
     if (length == 0) {
       return;
     }
-    static_cast<void>(track.volume.begin(out.fade(PerformanceAutomationTarget::Level, math::levelGain(target), length),
-                                         SequenceFixedPointMotion<s32>::toRawTarget(target, length)));
+    track.volume.begin(out.fade(PerformanceAutomationTarget::Level, math::levelGain(target), length),
+                       SequenceFixedPointMotion<s32>::toRawTarget(target, length));
   }
 
   void emitPan(PerformanceEmitter output, u8 value) const {
@@ -523,8 +523,8 @@ struct Playback {
     if (length == 0) {
       return;
     }
-    static_cast<void>(track.pan.begin(out.fade(PerformanceAutomationTarget::Pan, math::panPosition(target), length),
-                                      SequenceFixedPointMotion<s32>::toRawTarget(target, length)));
+    track.pan.begin(out.fade(PerformanceAutomationTarget::Pan, math::panPosition(target), length),
+                    SequenceFixedPointMotion<s32>::toRawTarget(target, length));
   }
 
   void vibrato(u8 period, s8 step, u8 delay) {
@@ -630,13 +630,12 @@ struct Playback {
         track.pitchSlideBinding.clear();
       }
     }
-    static_cast<void>(track.volume.tickRaw([&](s32 value) {
+    track.volume.tickRaw([&](s32 value) {
       track.volume.output(out).level(math::levelGain(static_cast<u8>(std::clamp<s32>(value, 0, 0x7f))),
                                      ValueQuantization{.levels = 128});
-    }));
-    static_cast<void>(track.pan.tickRaw([&](s32 value) {
-      emitPan(track.pan.output(out), static_cast<u8>(std::clamp<s32>(value, 0, 0xff)));
-    }));
+    });
+    track.pan.tickRaw(
+        [&](s32 value) { emitPan(track.pan.output(out), static_cast<u8>(std::clamp<s32>(value, 0, 0xff))); });
   }
 };
 
@@ -713,7 +712,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xcf: {
       auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
       const auto raw = event.rawS8("raw");
-      static_cast<void>(event.resolvedValue("cents", raw, raw.value * 6.25, SourceValueDisplay::Cents));
+      event.resolvedValue("cents", raw, raw.value * 6.25, SourceValueDisplay::Cents);
       return event.invoke<&Playback::tuning>(raw.value);
     }
     case 0xd0: {
@@ -723,8 +722,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xd1: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
       const auto raw = event.rawU8("timer_target");
-      static_cast<void>(event.resolvedValue("tempo", raw, tempoBeatsPerMinute(math::tempoMicrosecondsPerQuarter(raw.value)),
-                                           SourceValueDisplay::BeatsPerMinute));
+      event.resolvedValue("tempo", raw, tempoBeatsPerMinute(math::tempoMicrosecondsPerQuarter(raw.value)),
+                          SourceValueDisplay::BeatsPerMinute);
       return event.invoke<&Playback::tempo>(raw.value);
     }
     case 0xd2:
