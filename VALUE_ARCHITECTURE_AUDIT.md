@@ -250,6 +250,19 @@ the 4,608-configuration differential test to three sample lengths, multiple
 sample references, loop offsets, tuning, and an empty name. All 9,216 SF2/DLS
 outputs remain byte-for-byte identical to the earlier exporter.
 
+### Make pan gain authoritative
+
+Remove `PanPerformanceEvent::hasLinearGain`. Every producer already uses unit
+gain by default, and both renderer consumers reset to unit gain when the flag
+is absent. The flag adds no needed state; it only allows an explicitly supplied
+gain to be silently ignored. Use the gain directly and combine the emitter's
+pan overloads with a unit-gain default.
+
+Extend MIDI regression coverage to check non-unit gain followed by omitted
+gain, then non-unit gain followed by explicit unit gain, under both modulation
+conversion policies. MP2k retains its asymmetric physical gain. The full build
+and all 17 CTest targets pass without compiler warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

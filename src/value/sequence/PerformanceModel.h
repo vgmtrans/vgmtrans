@@ -153,11 +153,9 @@ struct PanPerformanceEvent {
   // it on the event makes the performance IR self-contained.
   PanLaw law = PanLaw::Unspecified;
   // Some source pan laws also change loudness. Keep that scalar on the event;
-  // destination-specific gain compensation belongs to the renderer.
+  // each pan event replaces it, defaulting to unit gain. Destination-specific
+  // gain compensation belongs to the renderer.
   double linearGain = 1.0;
-  // True means the source pan law intentionally supplied linearGain, even when it
-  // is 1.0 and should reset previous pan gain compensation.
-  bool hasLinearGain = false;
 };
 
 struct ChannelPanPerformanceEvent {

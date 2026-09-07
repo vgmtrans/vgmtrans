@@ -331,17 +331,10 @@ void PerformanceEmitter::pan(PanPerformanceEvent event) {
   append(std::move(event));
 }
 
-void PerformanceEmitter::pan(double stereoPosition) {
-  pan(PanPerformanceEvent{
-      .stereoPosition = stereoPosition,
-  });
-}
-
 void PerformanceEmitter::pan(double stereoPosition, double linearGain) {
   pan(PanPerformanceEvent{
       .stereoPosition = stereoPosition,
       .linearGain = linearGain,
-      .hasLinearGain = true,
   });
 }
 
