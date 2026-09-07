@@ -249,7 +249,7 @@ void gainTablesControlNoteAmplitude() {
                               [](const PerformanceAutomation& automation) {
                                 const auto* intent = std::get_if<ScalarPerformanceAutomationIntent>(&automation.intent);
                                 return intent != nullptr && intent->target == PerformanceAutomationTarget::Expression &&
-                                       intent->restartsOnNote;
+                                       intent->motion == PerformanceAutomationMotion::NoteEnvelope;
                               }),
       "FD must execute its GAIN table as a note-local amplitude envelope, including the delayed decay phase");
 }

@@ -383,6 +383,17 @@ unchanged.
 The full build and all 17 CTest targets pass without compiler warnings,
 including collection identity and session resolution coverage.
 
+### Represent note-envelope intent with one discriminator
+
+Rename scalar automation's `Envelope` motion to `NoteEnvelope` and remove its
+redundant `restartsOnNote` flag. All producers paired the envelope motion with
+that flag; the other motions always left it false. The motion now communicates
+the complete distinction and cannot disagree with a second setting. Keep the
+separate LFO-context restart flag, which controls actual oscillator behavior.
+
+Update the existing core and format assertions to check the explicit motion.
+The full build and all 17 CTest targets pass without compiler warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

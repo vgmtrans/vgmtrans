@@ -201,7 +201,7 @@ void sequenceModelsDriverLfosAdsrReverbAndTempo() {
                                  return intent &&
                                         (intent->target == PerformanceAutomationTarget::VibratoDepth ||
                                          intent->target == PerformanceAutomationTarget::TremoloDepth) &&
-                                        intent->restartsOnNote;
+                                        intent->motion == PerformanceAutomationMotion::NoteEnvelope;
                                }) == 2,
          "both driver depth ramps should be represented as note-restarting automation");
 

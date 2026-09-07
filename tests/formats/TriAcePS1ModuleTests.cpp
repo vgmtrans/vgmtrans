@@ -234,9 +234,9 @@ void triAcePs1SequenceExecutesAuditedDriverFeatures() {
     const auto* intent = std::get_if<ScalarPerformanceAutomationIntent>(&automation.intent);
     return intent != nullptr && intent->target == PerformanceAutomationTarget::VibratoDepth;
   });
-  expect(rampIntent != nullptr && rampIntent->motion == PerformanceAutomationMotion::Envelope &&
+  expect(rampIntent != nullptr && rampIntent->motion == PerformanceAutomationMotion::NoteEnvelope &&
              rampIntent->targetValue == 4.0 && rampIntent->durationTicks == 4 && rampIntent->delayTicks == 2 &&
-             rampIntent->restartsOnNote && rampCount == 2,
+             rampCount == 2,
          "automatic vibrato depth should ramp once per music tick after the note delay, restarting only for fresh "
          "attacks");
 

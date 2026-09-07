@@ -246,8 +246,8 @@ void modulationRemainsPhysical() {
          "vibrato and tremolo should retain their audited triangle rate, depth, delay, and attenuation polarity");
   expect(vibratoDepth.size() == 6 && vibratoDepth[2]->header.tick == 2 && vibratoDepth[3]->header.tick == 3 &&
              vibratoDepth[4]->header.tick == 4 && vibratoDepth[5]->header.tick == 5 && fade != nullptr &&
-             fade->motion == PerformanceAutomationMotion::Envelope && fade->durationTicks == 4 &&
-             fade->delayTicks == 2 && fade->restartsOnNote,
+             fade->motion == PerformanceAutomationMotion::NoteEnvelope && fade->durationTicks == 4 &&
+             fade->delayTicks == 2,
          "vibrato fades should restart per note with the driver's delayed integer depth steps");
 }
 

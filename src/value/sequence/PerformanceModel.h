@@ -452,7 +452,7 @@ enum class PerformanceAutomationTarget {
 enum class PerformanceAutomationMotion {
   TargetOverTicks,
   TargetByStep,
-  Envelope,
+  NoteEnvelope,
 };
 
 // Scalar automation retains the intent behind an exact series of realized
@@ -464,7 +464,6 @@ struct ScalarPerformanceAutomationIntent {
   std::optional<double> targetValue;
   u32 durationTicks = 0;
   u32 delayTicks = 0;
-  bool restartsOnNote = false;
 };
 
 struct LinearAutomationCurve {};

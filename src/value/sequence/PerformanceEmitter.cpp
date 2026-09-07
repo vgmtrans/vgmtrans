@@ -47,14 +47,13 @@ void reviseNoteEnd(NotePerformanceEvent& note, u64 endTick) {
 [[nodiscard]] ScalarPerformanceAutomationIntent scalarAutomationIntent(PerformanceAutomationTarget target,
                                                                        PerformanceAutomationMotion motion,
                                                                        double targetValue, u32 durationTicks,
-                                                                       u32 delayTicks, bool restartsOnNote = false) {
+                                                                       u32 delayTicks) {
   return ScalarPerformanceAutomationIntent{
       .target = target,
       .motion = motion,
       .targetValue = targetValue,
       .durationTicks = durationTicks,
       .delayTicks = delayTicks,
-      .restartsOnNote = restartsOnNote,
   };
 }
 
@@ -653,8 +652,8 @@ PerformanceAutomationBinding PerformanceEmitter::step(PerformanceAutomationTarge
 
 PerformanceAutomationBinding PerformanceEmitter::noteEnvelope(PerformanceAutomationTarget target, double targetValue,
                                                               u32 durationTicks, u32 delayTicks) {
-  return beginAutomation(scalarAutomationIntent(target, PerformanceAutomationMotion::Envelope, targetValue,
-                                                durationTicks, delayTicks, true));
+  return beginAutomation(scalarAutomationIntent(target, PerformanceAutomationMotion::NoteEnvelope, targetValue,
+                                                durationTicks, delayTicks));
 }
 
 PerformanceEmitter PerformanceEmitter::withAutomation(const PerformanceAutomationBinding& automation) const {

@@ -223,7 +223,7 @@ void performanceEmitterBindsScalarAutomationWithoutExposingStorage() {
   const auto& intent = std::get<ScalarPerformanceAutomationIntent>(track.automations[0].intent);
   expect(intent.target == PerformanceAutomationTarget::Pitch &&
              intent.motion == PerformanceAutomationMotion::TargetOverTicks && intent.targetValue == 2.0 &&
-             intent.durationTicks == 2 && intent.delayTicks == 1 && !intent.restartsOnNote,
+             intent.durationTicks == 2 && intent.delayTicks == 1,
          "emitter automation helpers should construct the declared source intent");
   expect(performanceEventHeader(track.events[0]).sourceCommand == CommandId{9} &&
              performanceEventHeader(track.events[0]).sourceAnnotation == SourceAnnotationId{11},
