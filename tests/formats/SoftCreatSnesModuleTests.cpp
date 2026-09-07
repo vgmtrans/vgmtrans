@@ -475,6 +475,15 @@ void perNoteVolumePrecedesLiteralDuration() {
 }
 
 void pitchEffectsRetainPhysicalTiming() {
+  const PerformanceSequence detuned = render({0x8d, 10, 0x34, 1, 0x80});
+  const auto detuneBends = events<PitchBendPerformanceEvent>(detuned.tracks.front());
+  expect(detuneBends.size() == 1 && detuneBends.front()->semitones > 0.0 && detuneBends.front()->semitones < 0.2,
+         "detune should carry from the DSP pitch low byte into its high byte");
+
+  const PerformanceSequence repeatedInstrument = render({0x89, 25, 0x32, 1, 0x89, 25, 0x32, 1, 0x80});
+  expect(events<InstrumentPerformanceEvent>(repeatedInstrument.tracks.front()).size() == 2,
+         "selecting the current SRCN should not emit another program change");
+
   const PerformanceSequence portamento = render({0x86, 4, 0x32, 0x90, 0x40, 0x3e, 0x80});
   expect(portamento.diagnostics.empty() &&
              std::ranges::any_of(portamento.tracks.front().automations, [](const PerformanceAutomation& automation) {
