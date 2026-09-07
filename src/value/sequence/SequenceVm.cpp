@@ -21,14 +21,6 @@ namespace vgmtrans::core {
 
 namespace detail {
 
-struct RepeatStateSnapshot {
-  std::map<u8, u32> remaining;
-
-  friend bool operator<(const RepeatStateSnapshot& lhs, const RepeatStateSnapshot& rhs) {
-    return lhs.remaining < rhs.remaining;
-  }
-};
-
 // Remaining counter values are part of VisitState, so each legitimate finite
 // pass is distinct. When the same command, call stack, and counters recur, the
 // future control flow is identical and the VM has found a real loop.
@@ -56,7 +48,7 @@ public:
 
   void clear() { remaining_.clear(); }
 
-  [[nodiscard]] RepeatStateSnapshot snapshot() const { return RepeatStateSnapshot{.remaining = remaining_}; }
+  [[nodiscard]] std::map<u8, u32> snapshot() const { return remaining_; }
 
 private:
   std::map<u8, u32> remaining_;
@@ -85,7 +77,6 @@ struct VmApiAccess {
 
 namespace {
 
-using detail::RepeatStateSnapshot;
 using detail::VmTrackRuntime;
 
 [[nodiscard]] Diagnostic vmWarning(std::string message, SourceRange range) {
@@ -107,7 +98,7 @@ using detail::VmTrackRuntime;
 struct VisitState {
   u32 commandIndex = 0;
   std::vector<u32> callStack;
-  RepeatStateSnapshot repeat;
+  std::map<u8, u32> repeat;
 
   friend bool operator<(const VisitState& lhs, const VisitState& rhs) {
     return std::tie(lhs.commandIndex, lhs.callStack, lhs.repeat) <
@@ -124,15 +115,6 @@ struct LoopPoint {
   VisitRecord start;
   CommandId endCommand;
   u64 endTick = 0;
-};
-
-enum class LoopActionKind {
-  ContinueExecution,
-  StopTrack,
-};
-
-struct LoopAction {
-  LoopActionKind kind = LoopActionKind::ContinueExecution;
 };
 
 // LoopDetector only answers "have we executed this same playback state before?"
@@ -638,7 +620,8 @@ private:
     const VisitState visitState = LoopDetector::visitState(commandIndex, runtime_);
     const auto loop = loopDetector_.observe(visitState, runtime_, arrivedByControlFlow_);
     if (behavior_.inferLoopsFromRepeatedState && loop) {
-      if (handleLoop(*loop, commandIndex, visitState).kind == LoopActionKind::StopTrack) {
+      handleLoop(*loop, commandIndex, visitState);
+      if (!current_) {
         return SequenceCoordinatorSignal::None;
       }
     }
@@ -695,8 +678,7 @@ private:
     return signal;
   }
 
-  [[nodiscard]] LoopAction handleLoop(const LoopPoint& loop, u32 replayIndex,
-                                      std::optional<VisitState> recordAfterClear = std::nullopt) {
+  void handleLoop(const LoopPoint& loop, u32 replayIndex, std::optional<VisitState> recordAfterClear = std::nullopt) {
     // Once a loop is identified, all loop sources use the same export policy:
     // preserve markers, replay for the requested loop count, or stop the track.
     if (loopPolicy_ == LoopPolicy::Preserve) {
@@ -704,25 +686,16 @@ private:
       addLoopMarker(performanceTrack_, loop.endCommand, loop.endTick, outputSequence_, "Loop End");
       current_ = std::nullopt;
       arrivedByControlFlow_ = false;
-      return LoopAction{.kind = LoopActionKind::StopTrack};
-    }
-
-    if (loopPolicy_ == LoopPolicy::PlayOnce && loopRepeats_ < options_.sequenceLoops) {
-      ++loopRepeats_;
-      loopDetector_.clear();
-      if (recordAfterClear) {
-        loopDetector_.record(*recordAfterClear, VisitRecord{.tick = loop.endTick, .command = CommandId{replayIndex}});
-      }
-      current_ = replayIndex;
-      arrivedByControlFlow_ = true;
-      return LoopAction{.kind = LoopActionKind::ContinueExecution};
+      return;
     }
 
     if (loopPolicy_ == LoopPolicy::PlayOnce) {
-      // Keep shorter channel loops running while the scheduler discovers the
-      // longest requested endpoint. The sequence-level cutoff removes any
-      // temporary events rendered past that common boundary.
-      if (!loopStopTick_) {
+      if (loopRepeats_ < options_.sequenceLoops) {
+        ++loopRepeats_;
+      } else if (!loopStopTick_) {
+        // Keep shorter channel loops running while the scheduler discovers the
+        // longest requested endpoint. The sequence-level cutoff removes any
+        // temporary events rendered past that common boundary.
         loopStopTick_ = loop.endTick;
       }
       loopDetector_.clear();
@@ -731,13 +704,12 @@ private:
       }
       current_ = replayIndex;
       arrivedByControlFlow_ = true;
-      return LoopAction{.kind = LoopActionKind::ContinueExecution};
+      return;
     }
 
     loopStopTick_ = loop.endTick;
     current_ = std::nullopt;
     arrivedByControlFlow_ = false;
-    return LoopAction{.kind = LoopActionKind::StopTrack};
   }
 
   void applyTransition(CommandId commandId, const SourceCommand& command, const CommandTransition& transition) {
@@ -848,7 +820,7 @@ private:
         .endCommand = commandId,
         .endTick = runtime_.tick,
     };
-    static_cast<void>(handleLoop(loop, *destination));
+    handleLoop(loop, *destination);
   }
 
   void applyDeclaredLoop(CommandId commandId, const SourceCommand& command, Address destinationAddress) {
@@ -873,7 +845,7 @@ private:
         .endCommand = commandId,
         .endTick = runtime_.tick,
     };
-    static_cast<void>(handleLoop(loop, *destination));
+    handleLoop(loop, *destination);
   }
 
   void warn(std::string message, SourceRange range) {
@@ -1197,11 +1169,9 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
       return tracks;
     };
 
-    const bool hasPrepass = runtime.finishPrepass != nullptr;
-    if (hasPrepass) {
-      // Run commands in normal time order but discard every emitted event. This
-      // preserves song-wide interactions between tracks during collection,
-      // then lets the format prepare its state for the real render.
+    if (runtime.finishPrepass != nullptr || analyzedProgramState != nullptr) {
+      // Analysis and formats with a prepass execute the same silent pass in
+      // normal time order. Keep its song-wide state and discard its events.
       PerformanceSequence prepass{
           .timebase = program.timebase,
           .initialTempoMicrosecondsPerQuarter = behavior.initialTempoMicrosecondsPerQuarter,
@@ -1210,20 +1180,12 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
       if (analyzedProgramState != nullptr) {
         sequence.diagnostics = std::move(prepass.diagnostics);
       }
-      runtime.finishPrepass(programState);
+      if (runtime.finishPrepass != nullptr) {
+        runtime.finishPrepass(programState);
+      }
     }
     if (analyzedProgramState != nullptr) {
-      // Analysis needs the same control-flow semantics as rendering, but a
-      // format with a prepass has already executed everything required to
-      // collect its durable result. Do not perform the discarded output pass.
-      if (!hasPrepass) {
-        PerformanceSequence analysis{
-            .timebase = program.timebase,
-            .initialTempoMicrosecondsPerQuarter = behavior.initialTempoMicrosecondsPerQuarter,
-        };
-        analysis.tracks = renderSemanticPass(analysis, programState);
-        sequence.diagnostics = std::move(analysis.diagnostics);
-      }
+      // Analysis already collected its result; only rendering needs an output pass.
       *analyzedProgramState = std::move(programState);
       return sequence;
     }
