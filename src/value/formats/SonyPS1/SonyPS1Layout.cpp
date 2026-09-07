@@ -33,10 +33,6 @@ constexpr u32 kSampleSizeTableBytes = 0x200;
 constexpr u32 kMaxSequenceEvents = 262144;
 constexpr u32 kPsxMainRamMask = 0x1fffff;
 
-[[nodiscard]] bool rangeValid(ByteReader reader, u64 offset, u64 size) {
-  return offset <= reader.size() && size <= reader.size() - offset;
-}
-
 [[nodiscard]] std::optional<u32> psxMainRamOffset(u32 address, ByteReader reader) {
   const u32 segment = address & 0xe0000000;
   if (segment != 0x80000000 && segment != 0xa0000000) {
@@ -159,7 +155,7 @@ constexpr u32 kPsxMainRamMask = 0x1fffff;
     event.status = status;
 
     const auto data = [&](u8 count) -> bool {
-      if (!rangeValid(reader, offset, count) || offset + count > end) {
+      if (!reader.has(offset, count) || offset + count > end) {
         return false;
       }
       event.dataBytes = count;
@@ -191,7 +187,7 @@ constexpr u32 kPsxMainRamMask = 0x1fffff;
           return std::nullopt;
         }
         if (event.data1 == 0x51) {
-          if (!rangeValid(reader, offset, 3) || offset + 3 > end) {
+          if (!reader.has(offset, 3) || offset + 3 > end) {
             return std::nullopt;
           }
           event.data2 = reader.u8At(offset);
@@ -242,7 +238,7 @@ constexpr u32 kPsxMainRamMask = 0x1fffff;
 }
 
 [[nodiscard]] std::optional<SonyPs1SequenceLayout> readOrdinarySequence(ByteReader reader, u32 offset) {
-  if (!rangeValid(reader, offset, kSeqHeaderSize) || !seqSignature(reader, offset) || reader.be32(offset + 4) != 1) {
+  if (!reader.has(offset, kSeqHeaderSize) || !seqSignature(reader, offset) || reader.be32(offset + 4) != 1) {
     return std::nullopt;
   }
   const u16 ppqn = reader.be16(offset + 8);
@@ -277,15 +273,14 @@ constexpr u32 kPsxMainRamMask = 0x1fffff;
 [[nodiscard]] std::vector<SonyPs1SequenceLayout> readSep(ByteReader reader, u32 offset, u32& containerEnd) {
   std::vector<SonyPs1SequenceLayout> layouts;
   containerEnd = offset;
-  if (!rangeValid(reader, offset, kSepFirstHeaderSize) || !seqSignature(reader, offset) ||
-      reader.be16(offset + 4) > 1) {
+  if (!reader.has(offset, kSepFirstHeaderSize) || !seqSignature(reader, offset) || reader.be16(offset + 4) > 1) {
     return layouts;
   }
 
   u32 header = offset;
   u16 expectedId = reader.be16(offset + 6);
   bool first = true;
-  while (rangeValid(reader, header, first ? kSepFirstHeaderSize : kSepSequenceHeaderSize)) {
+  while (reader.has(header, first ? kSepFirstHeaderSize : kSepSequenceHeaderSize)) {
     const u32 fields = first ? header + 6 : header;
     const u16 sequenceId = reader.be16(fields);
     const u16 ppqn = reader.be16(fields + 2);
@@ -296,7 +291,7 @@ constexpr u32 kPsxMainRamMask = 0x1fffff;
     const u32 headerSize = first ? kSepFirstHeaderSize : kSepSequenceHeaderSize;
     if (sequenceId != expectedId || !validSequenceHeader(ppqn, tempo, numerator, denominator) || dataSize < 3 ||
         dataSize > std::numeric_limits<u32>::max() - header - headerSize ||
-        !rangeValid(reader, header + headerSize, dataSize)) {
+        !reader.has(header + headerSize, dataSize)) {
       break;
     }
     const u32 dataOffset = header + headerSize;
@@ -363,7 +358,7 @@ std::vector<SonyPs1SequenceLayout> findSonyPs1Sequences(ByteReader reader) {
 }
 
 std::optional<SonyPs1BankLayout> readSonyPs1BankLayout(ByteReader reader, u32 offset) {
-  if (!rangeValid(reader, offset, kVabHeaderSize)) {
+  if (!reader.has(offset, kVabHeaderSize)) {
     return std::nullopt;
   }
   const u32 signature = reader.le32(offset);
@@ -398,7 +393,7 @@ std::optional<SonyPs1BankLayout> readSonyPs1BankLayout(ByteReader reader, u32 of
   const u64 toneTable = static_cast<u64>(offset) + kVabHeaderSize + layout.programSlots * kProgramSize;
   const u64 sizeTable = toneTable + static_cast<u64>(layout.programCount) * kTonesPerProgram * kToneSize;
   const u64 sampleData = sizeTable + kSampleSizeTableBytes;
-  if (sampleData > std::numeric_limits<u32>::max() || !rangeValid(reader, offset, sampleData - offset)) {
+  if (sampleData > std::numeric_limits<u32>::max() || !reader.has(offset, sampleData - offset)) {
     return std::nullopt;
   }
   layout.headerSize = static_cast<u32>(sampleData - offset);

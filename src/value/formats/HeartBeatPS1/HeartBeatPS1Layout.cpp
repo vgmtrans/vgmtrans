@@ -21,12 +21,8 @@ constexpr u32 kDescriptorSize = 0x0c;
 constexpr u32 kSequenceHeaderSize = 0x10;
 constexpr u32 kMaximumSectionSize = 0x200000;
 
-[[nodiscard]] bool rangeValid(ByteReader reader, u64 offset, u64 size) {
-  return offset <= reader.size() && size <= reader.size() - offset;
-}
-
 [[nodiscard]] bool qQesAt(ByteReader reader, u32 offset) {
-  return rangeValid(reader, offset, 4) && reader.u8At(offset) == 'q' && reader.u8At(offset + 1) == 'Q' &&
+  return reader.has(offset, 4) && reader.u8At(offset) == 'q' && reader.u8At(offset + 1) == 'Q' &&
          reader.u8At(offset + 2) == 'E' && reader.u8At(offset + 3) == 'S';
 }
 
@@ -142,7 +138,7 @@ constexpr u32 kMaximumSectionSize = 0x200000;
                                                                      u32 sequenceSize, u16 sequenceId,
                                                                      const std::array<u16, 4>& bankIds) {
   if (sequenceSize < kSequenceHeaderSize || sequenceSize > kMaximumSectionSize ||
-      !rangeValid(reader, qQesOffset, sequenceSize) || !qQesAt(reader, qQesOffset)) {
+      !reader.has(qQesOffset, sequenceSize) || !qQesAt(reader, qQesOffset)) {
     return std::nullopt;
   }
   const u16 ppqn = reader.be16(qQesOffset + 8);
@@ -179,7 +175,7 @@ constexpr u32 kMaximumSectionSize = 0x200000;
 }  // namespace
 
 std::optional<HeartBeatPs1ContainerLayout> readHeartBeatPs1Container(ByteReader reader, u32 offset) {
-  if (!rangeValid(reader, offset, kContainerHeaderSize)) {
+  if (!reader.has(offset, kContainerHeaderSize)) {
     return std::nullopt;
   }
   const u32 sequenceSize = reader.le32(offset);
@@ -216,7 +212,7 @@ std::optional<HeartBeatPs1ContainerLayout> readHeartBeatPs1Container(ByteReader 
     if (descriptor.sampleSize == 0) {
       continue;
     }
-    if (!rangeValid(reader, cursor, static_cast<u64>(descriptor.sampleSize) + descriptor.attributeSize)) {
+    if (!reader.has(cursor, static_cast<u64>(descriptor.sampleSize) + descriptor.attributeSize)) {
       return std::nullopt;
     }
     const u32 attributeOffset = static_cast<u32>(cursor) + descriptor.sampleSize;
@@ -243,7 +239,7 @@ std::optional<HeartBeatPs1ContainerLayout> readHeartBeatPs1Container(ByteReader 
     cursor += static_cast<u64>(descriptor.sampleSize) + descriptor.attributeSize;
   }
 
-  if (cursor > std::numeric_limits<u32>::max() || !rangeValid(reader, cursor, sequenceSize)) {
+  if (cursor > std::numeric_limits<u32>::max() || !reader.has(cursor, sequenceSize)) {
     return std::nullopt;
   }
   const u64 totalLength = cursor + sequenceSize - offset;

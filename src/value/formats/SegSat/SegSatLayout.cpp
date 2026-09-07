@@ -19,10 +19,6 @@ using namespace core;
 
 namespace {
 
-[[nodiscard]] bool has(ByteReader reader, u64 offset, u64 size) {
-  return offset <= reader.size() && size <= reader.size() - offset;
-}
-
 struct NormalStreamAnalysis {
   u32 end = 0;
   std::vector<u8> referencedBanks;
@@ -49,7 +45,7 @@ struct NormalStreamAnalysis {
       ++offset;
       break;
     }
-    if (size > end - offset || !has(reader, offset, size)) {
+    if (size > end - offset || !reader.has(offset, size)) {
       break;
     }
     if (commands < 262144 && (status & 0xf0) == 0xb0 && reader.u8At(offset + 1) == 32) {
@@ -67,7 +63,7 @@ struct NormalStreamAnalysis {
 template <size_t Size>
 [[nodiscard]] bool matches(ByteReader reader, u32 offset, const std::array<u8, Size>& pattern,
                            const std::array<bool, Size>& exact) {
-  if (!has(reader, offset, Size)) {
+  if (!reader.has(offset, Size)) {
     return false;
   }
   for (size_t index = 0; index < Size; ++index) {
@@ -91,7 +87,7 @@ template <size_t Size>
 }  // namespace
 
 std::optional<SegSatBankLayout> readSegSatBankLayout(ByteReader reader, u32 base) {
-  if (!has(reader, base, 10)) {
+  if (!reader.has(base, 10)) {
     return std::nullopt;
   }
 
@@ -116,7 +112,7 @@ std::optional<SegSatBankLayout> readSegSatBankLayout(ByteReader reader, u32 base
   }
 
   const u16 instrumentCount = static_cast<u16>((mixes - 8) / 2);
-  if (instrumentCount == 0 || instrumentCount > 256 || !has(reader, base + 8, instrumentCount * 2u)) {
+  if (instrumentCount == 0 || instrumentCount > 256 || !reader.has(base + 8, instrumentCount * 2u)) {
     return std::nullopt;
   }
 
@@ -124,7 +120,7 @@ std::optional<SegSatBankLayout> readSegSatBankLayout(ByteReader reader, u32 base
   u32 instrumentEnd = base + firstInstrument;
   for (u32 index = 0; index < instrumentCount; ++index) {
     const u16 relative = reader.be16(base + 8 + index * 2);
-    if (relative <= previous || ((relative - previous) & 0x1f) != 4 || !has(reader, base + relative, 4)) {
+    if (relative <= previous || ((relative - previous) & 0x1f) != 4 || !reader.has(base + relative, 4)) {
       return std::nullopt;
     }
     const u32 regionCount = segSatRegionCount(reader.u8At(base + relative + 2));
@@ -204,7 +200,7 @@ std::vector<SegSatSequenceLayout> findSegSatSequences(ByteReader reader) {
       continue;
     }
     const u32 tableSize = 2 + static_cast<u32>(sequenceCount) * 4;
-    if (!has(reader, table, tableSize + 16) || reader.be32(table + 2) != tableSize) {
+    if (!reader.has(table, tableSize + 16) || reader.be32(table + 2) != tableSize) {
       continue;
     }
 
@@ -214,7 +210,7 @@ std::vector<SegSatSequenceLayout> findSegSatSequences(ByteReader reader) {
     bool valid = true;
     for (u32 index = 0; index < sequenceCount; ++index) {
       const u32 pointer = reader.be32(table + 2 + index * 4);
-      if (pointer <= previous || !has(reader, table + pointer, 16)) {
+      if (pointer <= previous || !reader.has(table + pointer, 16)) {
         valid = false;
         break;
       }
@@ -231,7 +227,7 @@ std::vector<SegSatSequenceLayout> findSegSatSequences(ByteReader reader) {
       const u16 tempoCount = reader.be16(offset + 2);
       const u16 normal = reader.be16(offset + 4);
       const u16 tempoLoop = reader.be16(offset + 6);
-      if (normal != 8u + static_cast<u32>(tempoCount) * 8 || tempoLoop >= normal || !has(reader, offset, normal + 1)) {
+      if (normal != 8u + static_cast<u32>(tempoCount) * 8 || tempoLoop >= normal || !reader.has(offset, normal + 1)) {
         valid = false;
         break;
       }
@@ -285,7 +281,7 @@ SegSatDriverVersion determineSegSatDriverVersion(ByteReader reader) {
     }
   }
   for (u32 offset = 0; offset < end; ++offset) {
-    if (matches(reader, offset, v208, v208Exact) && has(reader, offset + 16, 2) &&
+    if (matches(reader, offset, v208, v208Exact) && reader.has(offset + 16, 2) &&
         reader.be16(offset + 16) == static_cast<u16>(offset + 2)) {
       return SegSatDriverVersion::V2_08;
     }
