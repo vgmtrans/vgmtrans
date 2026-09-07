@@ -669,9 +669,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   const u8 opcode = cursor.opcode();
   if (opcode < 0x80) {
     auto event = cursor.command("Note", SequenceSemantic::Note);
-    const u8 key = event.opcodeValue("key", opcode, SourceValueDisplay::Default, SemanticOperandRole::NoteKey);
-    const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-    const u8 gate = event.u8("gate_minus_one", SemanticOperandRole::Duration);
+    const u8 key = event.opcodeValue("key", opcode);
+    const u8 delay = event.u8("delay");
+    const u8 gate = event.u8("gate_minus_one");
     const u8 velocity = event.u8("velocity");
     return event.invoke<&Playback::lateNote>(key, delay, gate, velocity);
   }
@@ -679,7 +679,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   switch (opcode) {
     case 0x90: {
       auto event = cursor.command("Wait", SequenceSemantic::Rest);
-      return event.wait(event.u8("delay", SemanticOperandRole::Duration));
+      return event.wait(event.u8("delay"));
     }
     case 0x91:
     case 0xfd: {
@@ -694,23 +694,23 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0x93: {
       auto event = cursor.command("Loop End", SequenceSemantic::Repeat);
-      const u8 count = event.u8("count", SemanticOperandRole::Count);
+      const u8 count = event.u8("count");
       return event.invokeFlow<&Playback::endRepeat>(count);
     }
     case 0x94: {
       auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      return event.invoke<&Playback::delayedPitchBend>(delay, event.u8("bend", SemanticOperandRole::Pitch));
+      const u8 delay = event.u8("delay");
+      return event.invoke<&Playback::delayedPitchBend>(delay, event.u8("bend"));
     }
     case 0x95: {
       auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
+      const u8 delay = event.u8("delay");
       return event.invoke<&Playback::tempo>(delay, event.u8("scale"));
     }
     case 0x96: {
       auto event = cursor.command("Program Change", SequenceSemantic::Program);
       if (layout.lateTraits.programChangeHasDelay) {
-        const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
+        const u8 delay = event.u8("delay");
         return event.invoke<&Playback::delayedProgramChange>(
             delay, event.u8("program", SemanticOperandRole::InstrumentProgram));
       }
@@ -718,18 +718,18 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0x97: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      return event.invoke<&Playback::level>(delay, event.u8("volume", SemanticOperandRole::Level));
+      const u8 delay = event.u8("delay");
+      return event.invoke<&Playback::level>(delay, event.u8("volume"));
     }
     case 0x98: {
       auto event = cursor.command("Expression", SequenceSemantic::Level);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      return event.invoke<&Playback::expression>(delay, event.u8("expression", SemanticOperandRole::Level));
+      const u8 delay = event.u8("delay");
+      return event.invoke<&Playback::expression>(delay, event.u8("expression"));
     }
     case 0x99: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      return event.invoke<&Playback::pan>(delay, event.u8("pan", SemanticOperandRole::Pan));
+      const u8 delay = event.u8("delay");
+      return event.invoke<&Playback::pan>(delay, event.u8("pan"));
     }
     case 0x9a:
       return cursor.ignored("No Operation", 2, "nop");
@@ -739,14 +739,13 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0x9c: {
       auto event = cursor.command("Vibrato/LFO Parameters", SequenceSemantic::Modulation);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
-      return event.invoke<&Playback::lateVibratoParameters>(delay, depth,
-                                                            event.u8("rate", SemanticOperandRole::Modulation));
+      const u8 delay = event.u8("delay");
+      const u8 depth = event.u8("depth");
+      return event.invoke<&Playback::lateVibratoParameters>(delay, depth, event.u8("rate"));
     }
     case 0xa2: {
       auto event = cursor.command("Fine Tune", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::fineTune>(event.u8("centered_value", SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::fineTune>(event.u8("centered_value"));
     }
     case 0xa3: {
       auto event = cursor.command("Echo Send", SequenceSemantic::State);
@@ -793,9 +792,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   const u8 opcode = cursor.opcode();
   if (opcode < 0x80) {
     auto event = cursor.command("Note", SequenceSemantic::Note);
-    const u8 key = event.opcodeValue("packed_key", opcode, SourceValueDisplay::Hex, SemanticOperandRole::NoteKey);
-    const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-    const u8 gate = event.u8("gate", SemanticOperandRole::Duration);
+    const u8 key = event.opcodeValue("packed_key", opcode, SourceValueDisplay::Hex);
+    const u8 delay = event.u8("delay");
+    const u8 gate = event.u8("gate");
     return event.invoke<&Playback::segmentedNote>(key, delay, gate, event.u8("velocity"));
   }
 
@@ -806,7 +805,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   switch (opcode) {
     case 0xe0: {
       auto event = command("Rest / Key Off", SequenceSemantic::Rest);
-      return event.invoke<&Playback::rest>(event.u8("delay", SemanticOperandRole::Duration));
+      return event.invoke<&Playback::rest>(event.u8("delay"));
     }
     case 0xfd: {
       auto event = command("Segment Boundary", SequenceSemantic::End);
@@ -819,17 +818,17 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return cursor.noOp("No Operation", "nop");
     case 0xe1: {
       auto event = command("Volume", SequenceSemantic::Level);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      return event.invoke<&Playback::level>(delay, event.u8("volume", SemanticOperandRole::Level));
+      const u8 delay = event.u8("delay");
+      return event.invoke<&Playback::level>(delay, event.u8("volume"));
     }
     case 0xe2: {
       auto event = command("Pan", SequenceSemantic::Pan);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      return event.invoke<&Playback::pan>(delay, event.u8("pan", SemanticOperandRole::Pan));
+      const u8 delay = event.u8("delay");
+      return event.invoke<&Playback::pan>(delay, event.u8("pan"));
     }
     case 0xe7: {
       auto event = command("Tempo/Speed", SequenceSemantic::Tempo);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
+      const u8 delay = event.u8("delay");
       return event.invoke<&Playback::tempo>(delay, event.u8("scale"));
     }
     case 0xec: {
@@ -838,8 +837,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xee: {
       auto event = command("Active Voice Pitch Bend", SequenceSemantic::Pitch);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      return event.invoke<&Playback::activeVoicePitch>(delay, event.u8("offset", SemanticOperandRole::Pitch));
+      const u8 delay = event.u8("delay");
+      return event.invoke<&Playback::activeVoicePitch>(delay, event.u8("offset"));
     }
     case 0xe4: {
       auto event = command("Vibrato Toggle", SequenceSemantic::Modulation);
@@ -872,14 +871,13 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return cursor.noOp("No Operation", "nop");
     case 0xe5: {
       auto event = command("Vibrato Parameters", SequenceSemantic::Modulation);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
-      return event.invoke<&Playback::segmentedVibratoParameters>(
-          delay, depth, event.u8("rate_nibble", SemanticOperandRole::Modulation));
+      const u8 delay = event.u8("delay");
+      const u8 depth = event.u8("depth");
+      return event.invoke<&Playback::segmentedVibratoParameters>(delay, depth, event.u8("rate_nibble"));
     }
     case 0xf4: {
       auto event = command("Fine Tune", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::fineTune>(event.u8("centered_value", SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::fineTune>(event.u8("centered_value"));
     }
     case 0xf2:
       if (middle) {

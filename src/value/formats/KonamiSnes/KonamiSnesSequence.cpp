@@ -1147,17 +1147,17 @@ using KonamiCursor = CompilerCursor<TrackState, Playback>;
   DecodedPitchSlide slide{
       .kind = pitchSlideKind(version),
       .delay = event.u8("slide_delay"),
-      .length = event.u8("slide_length", SemanticOperandRole::Duration),
-      .targetNote = event.u8("target_note", SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey),
+      .length = event.u8("slide_length"),
+      .targetNote = event.u8("target_note", SourceValueDisplay::MidiNote),
   };
   // The driver carries a precalculated delta in later layouts. Playback derives
   // the same motion from target and length, but the original field is still
   // read and annotated so source inspection remains complete.
   if (slide.kind == PitchSlideKind::V2 && slide.length != 0) {
     event.u8("reserved", SourceValueDisplay::Hex);
-    event.s16le("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
+    event.s16le("delta", SourceValueDisplay::SignedDecimal);
   } else if (slide.kind == PitchSlideKind::V3) {
-    event.s16le("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
+    event.s16le("delta", SourceValueDisplay::SignedDecimal);
   }
   return slide;
 }
@@ -1197,18 +1197,17 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
   // length byte; opcodes 0x80-0xdf reuse the previous length with bit 7 set.
   if (opcode <= 0x5f || (opcode >= 0x80 && opcode <= 0xdf)) {
     auto event = cursor.command("Note", SequenceSemantic::Note);
-    const u8 key = event.opcodeValue("key", static_cast<u8>(opcode & 0x7f), SourceValueDisplay::MidiNote,
-                                     SemanticOperandRole::NoteKey);
+    const u8 key = event.opcodeValue("key", static_cast<u8>(opcode & 0x7f), SourceValueDisplay::MidiNote);
     if ((opcode & 0x80) == 0) {
-      event.set<&TrackState::noteLength>(event.u8("length", SemanticOperandRole::Duration));
+      event.set<&TrackState::noteLength>(event.u8("length"));
     }
-    u8 velocity = event.u8("velocity_or_duration", SemanticOperandRole::Level);
+    u8 velocity = event.u8("velocity_or_duration");
     // A clear high bit means this byte is a new duration rate and another byte
     // follows for velocity. A set high bit means it is velocity by itself.
     if ((velocity & 0x80) == 0) {
-      const u8 rate = event.derived("duration_rate", velocity, SemanticOperandRole::Duration);
+      const u8 rate = event.derived("duration_rate", velocity);
       event.set<&TrackState::noteDurationRate>(rate);
-      velocity = event.u8("velocity", SemanticOperandRole::Level);
+      velocity = event.u8("velocity");
     }
     velocity &= 0x7f;
     event.invoke<&Playback::note>(key, velocity);
@@ -1253,14 +1252,13 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       }
       if (version == KONAMISNES_V1) {
         auto event = cursor.command("Default Duration", SequenceSemantic::State);
-        return event.set<&TrackState::noteDurationRate>(event.u8("duration_rate", SemanticOperandRole::Duration));
+        return event.set<&TrackState::noteDurationRate>(event.u8("duration_rate"));
       }
       return unknownCommand(cursor, 0);
     case 0x63: {
       if (version == KONAMISNES_V1) {
         auto event = cursor.command("Default Note Volume", SequenceSemantic::State);
-        return event.set<&TrackState::defaultNoteVolume>(
-            static_cast<u8>(event.u8("volume", SemanticOperandRole::Level) & 0x7f));
+        return event.set<&TrackState::defaultNoteVolume>(static_cast<u8>(event.u8("volume") & 0x7f));
       }
       if (version == KONAMISNES_V6) {
         return cursor.command("Echo Voice On", SequenceSemantic::State).invoke<&Playback::setEchoVoice>(true);
@@ -1270,8 +1268,8 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     case 0x64: {
       if (version == KONAMISNES_V1) {
         auto event = cursor.command("Default Duration And Note Volume", SequenceSemantic::State);
-        const u8 rate = event.u8("duration_rate", SemanticOperandRole::Duration);
-        const u8 volume = event.u8("volume", SemanticOperandRole::Level);
+        const u8 rate = event.u8("duration_rate");
+        const u8 volume = event.u8("volume");
         return event.invoke<&Playback::setDefaults>(rate, volume);
       }
       if (version == KONAMISNES_V6) {
@@ -1309,7 +1307,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       return unknownCommand(cursor, 0);
     case 0xe0: {
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
-      event.set<&TrackState::noteLength>(event.u8("length", SemanticOperandRole::Duration));
+      event.set<&TrackState::noteLength>(event.u8("length"));
       if (const auto slide = readInlinePitchSlide(event, version)) {
         appendPitchSlide(event, *slide);
       }
@@ -1318,8 +1316,8 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     }
     case 0xe1: {
       auto event = cursor.command("Tie", SequenceSemantic::Note);
-      event.set<&TrackState::noteLength>(event.u8("length", SemanticOperandRole::Duration));
-      const u8 rate = event.u8("duration_rate", SemanticOperandRole::Duration);
+      event.set<&TrackState::noteLength>(event.u8("length"));
+      const u8 rate = event.u8("duration_rate");
       event.set<&TrackState::noteDurationRate>(rate);
       event.invoke<&Playback::tie>();
       return event.wait<&TrackState::noteLength>();
@@ -1333,7 +1331,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     }
     case 0xe3: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      const u8 raw = event.u8("pan", SemanticOperandRole::Pan);
+      const u8 raw = event.u8("pan");
       const bool instrumentPanOff = version <= KONAMISNES_V2 ? raw == 0x15 : raw == 0x2a;
       const bool instrumentPanOn = version <= KONAMISNES_V2 ? raw == 0x16 : raw == 0x2c;
       // The two values immediately beyond the normal pan range toggle an
@@ -1347,9 +1345,9 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     }
     case 0xe4: {
       auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
-      const u8 arg1 = event.u8("delay_or_fade", SemanticOperandRole::Modulation);
-      const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
-      const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
+      const u8 arg1 = event.u8("delay_or_fade");
+      const u8 rate = event.u8("rate");
+      const u8 depth = event.u8("depth");
       const u8 delay = event.derived("delay", vibrato::delayFromArg1(version, arg1));
       const u8 fade = event.derived("built_in_fade", vibrato::inlineFadeLength(version, arg1));
       return event.invoke<&Playback::configureVibrato>(delay, rate, depth, fade);
@@ -1372,9 +1370,9 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     case 0xe9: {
       auto event = cursor.command(opcode == 0xe7 ? "Loop End" : "Loop End #2", SequenceSemantic::Repeat);
       const u8 slot = event.derived("slot", static_cast<u8>(opcode == 0xe7 ? 0 : 1));
-      const u8 times = event.u8("times", SemanticOperandRole::Count);
-      const s8 volumeDelta = event.s8("volume_delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-      const s8 pitchDelta = event.s8("pitch_delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
+      const u8 times = event.u8("times");
+      const s8 volumeDelta = event.s8("volume_delta", SourceValueDisplay::SignedDecimal);
+      const s8 pitchDelta = event.s8("pitch_delta", SourceValueDisplay::SignedDecimal);
       return event.invokeFlow<&Playback::loopEnd>(slot, times, volumeDelta, pitchDelta);
     }
     case 0xe8: {
@@ -1406,14 +1404,13 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
         const s8 step = event.s8("step");
         return event.invoke<&Playback::beginFade>(target, true, destination, u8{0}, step);
       }
-      const u8 ticks = event.u8("length", SemanticOperandRole::Duration);
+      const u8 ticks = event.u8("length");
       const u8 destination = event.u8("target");
       return event.invoke<&Playback::beginFade>(target, false, destination, ticks, s8{0});
     }
     case 0xec: {
       auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.set<&TrackState::transpose>(
-          event.s8("semitones", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+      return event.set<&TrackState::transpose>(event.s8("semitones", SourceValueDisplay::SignedDecimal));
     }
     case 0xed:
       if (isLateVersion(version)) {
@@ -1423,31 +1420,30 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       return unknownCommand(cursor, 3);
     case 0xee: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(event.u8("volume", SemanticOperandRole::Level));
+      return event.invoke<&Playback::volume>(event.u8("volume"));
     }
     case 0xf0: {
       auto event = cursor.command("Portamento", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::configurePortamento>(event.u8("speed", SemanticOperandRole::Duration));
+      return event.invoke<&Playback::configurePortamento>(event.u8("speed"));
     }
     case 0xf1: {
       auto event = cursor.command("Pitch Envelope", SequenceSemantic::Pitch);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
+      const u8 delay = event.u8("delay");
       if (isLateVersion(version)) {
-        const u8 length = event.u8("length", SemanticOperandRole::Duration);
-        const s8 offset = event.s8("offset", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
+        const u8 length = event.u8("length");
+        const s8 offset = event.s8("offset", SourceValueDisplay::SignedDecimal);
         // This shapes the exact late curve; fixed-duration playback currently
         // retains its endpoints and timing while that curve remains deferred.
-        event.s16le("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
+        event.s16le("delta", SourceValueDisplay::SignedDecimal);
         return event.invoke<&Playback::configurePitchEnvelope>(delay, length, static_cast<s16>(offset));
       }
-      const u8 speed = event.u8("speed", SemanticOperandRole::Duration);
-      const u8 depth = event.u8("depth", SemanticOperandRole::Pitch);
+      const u8 speed = event.u8("speed");
+      const u8 depth = event.u8("depth");
       return event.invoke<&Playback::configurePitchEnvelope>(delay, speed, static_cast<s16>(depth));
     }
     case 0xf2: {
       auto event = cursor.command("Tuning", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::tuning>(
-          event.s8("tuning", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::tuning>(event.s8("tuning", SourceValueDisplay::SignedDecimal));
     }
     case 0xf3: {
       auto event = cursor.command("Pitch Slide", SequenceSemantic::Pitch);
@@ -1480,7 +1476,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
     }
     case 0xf9: {
       auto event = cursor.command("Vibrato Fade", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::setVibratoFade>(event.u8("length", SemanticOperandRole::Duration));
+      return event.invoke<&Playback::setVibratoFade>(event.u8("length"));
     }
     case 0xfa: {
       auto event = cursor.command("ADSR / GAIN", SequenceSemantic::Envelope);
@@ -1536,7 +1532,7 @@ void appendPitchSlide(KonamiCursor::Event& event, const DecodedPitchSlide& slide
       }
       if (version >= KONAMISNES_V5) {
         auto event = cursor.command("Program And Volume", SequenceSemantic::Program);
-        const u8 volume = event.u8("volume", SemanticOperandRole::Level);
+        const u8 volume = event.u8("volume");
         const u8 program = event.u8("raw");
         event.derived("bank", program >> 7, SemanticOperandRole::InstrumentBank);
         event.derived("program", program & 0x7f, SemanticOperandRole::InstrumentProgram);

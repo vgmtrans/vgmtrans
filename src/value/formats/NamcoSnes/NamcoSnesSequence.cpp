@@ -112,7 +112,7 @@ enum Parameter : u8 {
 struct ParameterCommand {
   std::string_view name;
   SequenceSemantic semantic;
-  SemanticOperandRole role;
+  SemanticOperandRole role = SemanticOperandRole::Value;
 };
 
 using ControlValues = std::array<u8, kParameterCount>;
@@ -120,16 +120,16 @@ constexpr ControlValues kDefaultControls{0, 0x88, 0x88, 0, 0, 0, 0, 0, 0, 0, 0};
 
 constexpr std::array<ParameterCommand, kParameterCount> kParameterCommands{{
     {"Instrument", SequenceSemantic::Program, SemanticOperandRole::Instrument},
-    {"Voice Volume", SequenceSemantic::Level, SemanticOperandRole::Level},
-    {"Stereo Balance", SequenceSemantic::Pan, SemanticOperandRole::Pan},
-    {"Gate Time", SequenceSemantic::State, SemanticOperandRole::Duration},
-    {"Pitch Envelope", SequenceSemantic::Modulation, SemanticOperandRole::Modulation},
-    {"Transpose", SequenceSemantic::Pitch, SemanticOperandRole::Pitch},
-    {"Fine Tuning", SequenceSemantic::Pitch, SemanticOperandRole::Pitch},
-    {"Portamento Speed", SequenceSemantic::Portamento, SemanticOperandRole::Duration},
-    {"Pitch Envelope Rate", SequenceSemantic::Modulation, SemanticOperandRole::Modulation},
-    {"Pitch Envelope Depth", SequenceSemantic::Modulation, SemanticOperandRole::Modulation},
-    {"Amplitude Envelope", SequenceSemantic::Envelope, SemanticOperandRole::Value},
+    {"Voice Volume", SequenceSemantic::Level},
+    {"Stereo Balance", SequenceSemantic::Pan},
+    {"Gate Time", SequenceSemantic::State},
+    {"Pitch Envelope", SequenceSemantic::Modulation},
+    {"Transpose", SequenceSemantic::Pitch},
+    {"Fine Tuning", SequenceSemantic::Pitch},
+    {"Portamento Speed", SequenceSemantic::Portamento},
+    {"Pitch Envelope Rate", SequenceSemantic::Modulation},
+    {"Pitch Envelope Depth", SequenceSemantic::Modulation},
+    {"Amplitude Envelope", SequenceSemantic::Envelope},
 }};
 
 struct DriverData {
@@ -667,8 +667,9 @@ struct Playback {
 using Cursor = CompilerCursor<TrackState, Playback>;
 
 template <class Event>
-[[nodiscard]] MaskedValues maskedValues(Event& event, std::string_view valueName, SemanticOperandRole role,
-                                        SourceValueDisplay display = SourceValueDisplay::Default) {
+[[nodiscard]] MaskedValues maskedValues(Event& event, std::string_view valueName,
+                                        SourceValueDisplay display = SourceValueDisplay::Default,
+                                        SemanticOperandRole role = SemanticOperandRole::Value) {
   MaskedValues result;
   result.mask = event.u8("voice_mask", SourceValueDisplay::Hex);
   for (u32 voice = 0; voice < kTrackCount; ++voice) {
@@ -699,7 +700,7 @@ struct SequenceReferences {
   switch (opcode) {
     case 0x00: {
       auto event = cursor.command("Delta Time", SequenceSemantic::State);
-      return event.invoke<&Playback::delta>(event.u8("ticks", SemanticOperandRole::Duration));
+      return event.invoke<&Playback::delta>(event.u8("ticks"));
     }
     case 0x01: {
       auto event = cursor.command("Active Voices", SequenceSemantic::State);
@@ -719,12 +720,12 @@ struct SequenceReferences {
     }
     case 0x05: {
       auto event = cursor.command("Master Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::masterVolume>(event.u8("volume", SemanticOperandRole::Level));
+      return event.invoke<&Playback::masterVolume>(event.u8("volume"));
     }
     case 0x06:
     case 0x0f: {
       auto event = cursor.command(opcode == 0x06 ? "Repeat Until A" : "Repeat Until B", SequenceSemantic::Repeat);
-      const u8 count = event.u8("count", SemanticOperandRole::Count);
+      const u8 count = event.u8("count");
       const Address destination = event.addressLe("destination", SemanticOperandRole::RepeatTarget);
       const u8 slot = opcode == 0x06 ? 0 : 1;
       event.invokeFlow<&Playback::repeatUntil>(slot, count, destination);
@@ -734,7 +735,7 @@ struct SequenceReferences {
     case 0x10: {
       auto event =
           cursor.command(opcode == 0x07 ? "Repeat Break A" : "Repeat Break B", SequenceSemantic::RepeatBreak);
-      const u8 count = event.u8("count", SemanticOperandRole::Count);
+      const u8 count = event.u8("count");
       const Address destination = event.addressLe("destination", SemanticOperandRole::RepeatTarget);
       const u8 slot = opcode == 0x07 ? 0 : 1;
       event.invokeFlow<&Playback::repeatBreak>(slot, count, destination);
@@ -746,7 +747,7 @@ struct SequenceReferences {
     }
     case 0x09: {
       auto event = cursor.command("Notes", SequenceSemantic::Note);
-      const MaskedValues notes = maskedValues(event, "note", SemanticOperandRole::NoteKey, SourceValueDisplay::Hex);
+      const MaskedValues notes = maskedValues(event, "note", SourceValueDisplay::Hex);
       for (u32 voice = 0; voice < kTrackCount; ++voice) {
         if ((notes.mask & math::voiceBit(voice)) == 0) {
           continue;
@@ -766,7 +767,7 @@ struct SequenceReferences {
     }
     case 0x0b: {
       auto event = cursor.command("Note Trigger Delay", SequenceSemantic::State);
-      return event.invoke<&Playback::noteDelay>(maskedValues(event, "delay", SemanticOperandRole::Duration));
+      return event.invoke<&Playback::noteDelay>(maskedValues(event, "delay"));
     }
     case 0x0c: {
       auto event = cursor.command("Legato Voice Mask", SequenceSemantic::State);
@@ -788,7 +789,7 @@ struct SequenceReferences {
     }
     case 0x13: {
       auto event = cursor.command("Echo Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::echoVolume>(event.s8("volume", SemanticOperandRole::Level));
+      return event.invoke<&Playback::echoVolume>(event.s8("volume"));
     }
     case 0x14: {
       auto event = cursor.sourceOnly("Echo Start Address", "echo-start-address");
@@ -803,7 +804,7 @@ struct SequenceReferences {
     const u8 index = opcode - 0x20;
     const ParameterCommand& command = kParameterCommands[index];
     auto event = cursor.command(command.name, command.semantic);
-    const MaskedValues values = maskedValues(event, "value", command.role);
+    const MaskedValues values = maskedValues(event, "value", SourceValueDisplay::Default, command.role);
     if (index == kSrcn) {
       for (u32 voice = 0; voice < kTrackCount; ++voice) {
         if ((values.mask & math::voiceBit(voice)) != 0) {

@@ -925,16 +925,16 @@ struct DurationValue {
     }
     DurationValue value{.present = true};
     if (*suffix == 0xde || *suffix == 0xef) {
-      value.ticks = math::ticks(event.u8("duration", SemanticOperandRole::Duration));
+      value.ticks = math::ticks(event.u8("duration"));
     } else {
       const u8 index = static_cast<u8>(*suffix < 0xf0 ? *suffix - 0xde : *suffix - 0xef);
       const u8 raw =
           reader.has(layout.durationTableAddress + index, 1) ? reader.u8At(layout.durationTableAddress + index) : 1;
       value.ticks = math::ticks(raw);
-      event.derived("duration", value.ticks, SemanticOperandRole::Duration);
+      event.derived("duration", value.ticks);
     }
     if (*suffix >= 0xef) {
-      value.gate = event.u8("gate", SourceValueDisplay::Hex, SemanticOperandRole::Duration);
+      value.gate = event.u8("gate", SourceValueDisplay::Hex);
     }
     return value;
   };
@@ -942,7 +942,7 @@ struct DurationValue {
   if (opcode <= 0x7f) {
     auto event =
         cursor.command(opcode == 0 ? "Rest" : "Note", opcode == 0 ? SequenceSemantic::Rest : SequenceSemantic::Note);
-    event.opcodeValue("note", opcode, SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
+    event.opcodeValue("note", opcode, SourceValueDisplay::MidiNote);
     const DurationValue duration = parseDuration(event);
     return event.invoke<&Playback::note>(opcode, duration.ticks, duration.gate, duration.present);
   }
@@ -954,7 +954,7 @@ struct DurationValue {
     if (reader.has(row + 7, 1) && reader.u8At(row + 7) == 0) {
       const auto next = event.peekU8();
       if (next && *next < 0x80) {
-        raw = event.u8("note", SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
+        raw = event.u8("note", SourceValueDisplay::MidiNote);
       }
     }
     const DurationValue duration = parseDuration(event);
@@ -992,7 +992,7 @@ struct DurationValue {
     }
     case 0x84: {
       auto event = cursor.command("Portamento Rate", SequenceSemantic::Portamento);
-      return event.invoke<&Playback::portamento>(event.u8("divisor", SemanticOperandRole::State));
+      return event.invoke<&Playback::portamento>(event.u8("divisor"));
     }
     case 0x85: {
       auto event = cursor.sourceOnly("Main CPU Command", "cpu-command");
@@ -1001,7 +1001,7 @@ struct DurationValue {
     }
     case 0x87: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(event.u8("volume", SemanticOperandRole::Level));
+      return event.invoke<&Playback::volume>(event.u8("volume"));
     }
     case 0x88: {
       auto event = cursor.command("Volume Envelope / Tremolo", SequenceSemantic::Modulation);
@@ -1010,11 +1010,11 @@ struct DurationValue {
     }
     case 0x89: {
       auto event = cursor.command("Transpose Add", SequenceSemantic::Pitch);
-      return event.add<&TrackState::transpose>(event.s8("semitones", SemanticOperandRole::Pitch));
+      return event.add<&TrackState::transpose>(event.s8("semitones"));
     }
     case 0x8a: {
       auto event = cursor.command("Volume Add", SequenceSemantic::Level);
-      return event.invoke<&Playback::volumeAdd>(event.s8("delta", SemanticOperandRole::Level));
+      return event.invoke<&Playback::volumeAdd>(event.s8("delta"));
     }
     case 0x8b: {
       auto event = cursor.sourceOnly("Voice DSP Control", "voice-dsp-control");
@@ -1026,7 +1026,7 @@ struct DurationValue {
     case 0x8d: {
       auto event = cursor.command("Loop Count", SequenceSemantic::Repeat);
       const u8 slot = event.u8("slot");
-      return event.invoke<&Playback::loopSet>(slot, event.u8("count", SemanticOperandRole::Count));
+      return event.invoke<&Playback::loopSet>(slot, event.u8("count"));
     }
     case 0x8e:
     case 0x8f: {
@@ -1049,12 +1049,12 @@ struct DurationValue {
     }
     case 0x93: {
       auto event = cursor.command("Volume Sweep", SequenceSemantic::Level);
-      const u8 target = event.u8("target_and_direction", SourceValueDisplay::Hex, SemanticOperandRole::Level);
+      const u8 target = event.u8("target_and_direction", SourceValueDisplay::Hex);
       return event.invoke<&Playback::volumeSweep>(target, event.u8("speed"));
     }
     case 0x94: {
       auto event = cursor.command("Pitch Sweep", SequenceSemantic::Pitch);
-      return event.set<&TrackState::pitchSweep>(event.s8("rate_and_direction", SemanticOperandRole::Pitch));
+      return event.set<&TrackState::pitchSweep>(event.s8("rate_and_direction"));
     }
     case 0x95: {
       auto event = cursor.command("Jump Until Volume Target", SequenceSemantic::Jump);
@@ -1067,9 +1067,7 @@ struct DurationValue {
     }
     case 0x97: {
       auto event = cursor.command("Tuning Add", SequenceSemantic::Pitch);
-      const s16 value = layout.early()
-                            ? event.s8("delta", SemanticOperandRole::Pitch)
-                            : event.s16le("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
+      const s16 value = layout.early() ? event.s8("delta") : event.s16le("delta", SourceValueDisplay::SignedDecimal);
       return event.invoke<&Playback::tuning>(value);
     }
     case 0x98: {
@@ -1091,7 +1089,7 @@ struct DurationValue {
     }
     case 0x9d: {
       auto event = cursor.command("Gate", SequenceSemantic::State);
-      return event.set<&TrackState::gate>(event.u8("gate", SourceValueDisplay::Hex, SemanticOperandRole::Duration));
+      return event.set<&TrackState::gate>(event.u8("gate", SourceValueDisplay::Hex));
     }
     case 0x9e: {
       auto event = cursor.command("Conditional Jump", SequenceSemantic::Jump);
@@ -1118,7 +1116,7 @@ struct DurationValue {
     case 0xa3: {
       auto event = cursor.command("Pan Envelope", SequenceSemantic::Pan);
       const u8 index = event.u8("curve");
-      const s8 direct = index == 0 ? event.s8("pan", SemanticOperandRole::Pan) : 0;
+      const s8 direct = index == 0 ? event.s8("pan") : 0;
       return event.invoke<&Playback::panEnvelope>(index, direct);
     }
     case 0xa4:
@@ -1161,7 +1159,7 @@ struct DurationValue {
                  : cursor.sourceOnly("NOP", "nop");
     case 0xab: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      return event.invoke<&Playback::pan>(event.s8("pan", SemanticOperandRole::Pan));
+      return event.invoke<&Playback::pan>(event.s8("pan"));
     }
     case 0xac: {
       auto event = cursor.sourceOnly("Noise Clock", "noise");

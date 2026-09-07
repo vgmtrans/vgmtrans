@@ -349,16 +349,18 @@ using Cursor = CompilerCursor<TrackHandle, Playback>;
   if (!cursor.hasOpcode()) return cursor.truncated();
   const u8 status = cursor.opcode();
 
-  auto readVariable = [](auto& event, std::string_view name, SemanticOperandRole role) -> u16 {
-    const u8 first = event.u8(name, SourceValueDisplay::Hex, role);
-    if ((first & 0x80) == 0) return first;
-    return static_cast<u16>(((first & 0x7f) << 7) |
-                            (event.u8("value_low", SourceValueDisplay::Hex, role) & 0x7f));
+  auto readVariable = [](auto& event, std::string_view name) -> u16 {
+    const u8 first = event.u8(name, SourceValueDisplay::Hex);
+    if ((first & 0x80) == 0)
+      return first;
+    return static_cast<u16>(((first & 0x7f) << 7) | (event.u8("value_low", SourceValueDisplay::Hex) & 0x7f));
   };
   auto readTiming = [&](auto& event) -> u16 {
-    if ((status & 0x60) == 0x40) return readVariable(event, "delta", SemanticOperandRole::Duration);
+    if ((status & 0x60) == 0x40) {
+      return readVariable(event, "delta");
+    }
     if ((status & 0x60) == 0x60) {
-      const u8 index = event.u8("delta_index", SourceValueDisplay::Hex, SemanticOperandRole::Duration) & 0x1f;
+      const u8 index = event.u8("delta_index", SourceValueDisplay::Hex) & 0x1f;
       return config.durations[index];
     }
     return kReuseTiming;
@@ -366,14 +368,11 @@ using Cursor = CompilerCursor<TrackHandle, Playback>;
 
   if (status < 0x80) {
     auto event = cursor.command("Note", SequenceSemantic::Note);
-    const u8 encodedNote = event.u8("note", SourceValueDisplay::Hex, SemanticOperandRole::NoteKey);
+    const u8 encodedNote = event.u8("note", SourceValueDisplay::Hex);
     const u16 delta = readTiming(event);
     const u8 durationIndex = status & 0x1f;
-    const u16 duration = durationIndex == 0x1f ? readVariable(event, "duration", SemanticOperandRole::Duration)
-                                               : config.durations[durationIndex];
-    const u8 velocity = (encodedNote & 0x80) != 0
-                            ? event.u8("velocity", SemanticOperandRole::Level)
-                            : kReuseVelocity;
+    const u16 duration = durationIndex == 0x1f ? readVariable(event, "duration") : config.durations[durationIndex];
+    const u8 velocity = (encodedNote & 0x80) != 0 ? event.u8("velocity") : kReuseVelocity;
     return event.invoke<&Playback::note>(encodedNote & 0x7f, duration, delta, (status & 0x60) == 0x20,
                                          velocity);
   }
@@ -381,7 +380,7 @@ using Cursor = CompilerCursor<TrackHandle, Playback>;
     auto event = cursor.command("Relative Note", SequenceSemantic::Note);
     const bool ascending = (status & 0x10) != 0;
     event.derived("direction", std::string(ascending ? "up" : "down"));
-    event.derived("distance", status & 0x0f, SemanticOperandRole::Pitch);
+    event.derived("distance", status & 0x0f);
     return event.invoke<&Playback::relativeNote>(ascending, status & 0x0f);
   }
 
@@ -408,31 +407,29 @@ using Cursor = CompilerCursor<TrackHandle, Playback>;
     }
     case 4: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(event.u8("volume", SemanticOperandRole::Level))
-          .invoke<&Playback::controlWait>(readTiming(event));
+      return event.invoke<&Playback::volume>(event.u8("volume")).invoke<&Playback::controlWait>(readTiming(event));
     }
     case 5: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      return event.invoke<&Playback::pan>(event.u8("pan", SemanticOperandRole::Pan))
-          .invoke<&Playback::controlWait>(readTiming(event));
+      return event.invoke<&Playback::pan>(event.u8("pan")).invoke<&Playback::controlWait>(readTiming(event));
     }
     case 6: {
       auto event = cursor.command("Expression", SequenceSemantic::Level);
-      return event.invoke<&Playback::expression>(event.u8("expression", SemanticOperandRole::Level))
+      return event.invoke<&Playback::expression>(event.u8("expression"))
           .invoke<&Playback::controlWait>(readTiming(event));
     }
     case 7: {
       auto event = cursor.command("Auto Pan", SequenceSemantic::Modulation);
-      const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
-      const u8 period = event.u8("half_period", SemanticOperandRole::Duration);
+      const u8 depth = event.u8("depth");
+      const u8 period = event.u8("half_period");
       return event.invoke<&Playback::autoPan>(depth, period).invoke<&Playback::controlWait>(readTiming(event));
     }
     case 8: {
       auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
-      const u8 depth = event.u8("depth", SourceValueDisplay::Hex, SemanticOperandRole::Modulation);
-      const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
-      const u8 waveform = event.u8("waveform", SourceValueDisplay::Hex, SemanticOperandRole::Modulation);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
+      const u8 depth = event.u8("depth", SourceValueDisplay::Hex);
+      const u8 rate = event.u8("rate");
+      const u8 waveform = event.u8("waveform", SourceValueDisplay::Hex);
+      const u8 delay = event.u8("delay");
       return event.invoke<&Playback::vibrato>(depth, rate, waveform, delay)
           .invoke<&Playback::controlWait>(readTiming(event));
     }
@@ -445,13 +442,13 @@ using Cursor = CompilerCursor<TrackHandle, Playback>;
     }
     case 10: {
       auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
-      const u8 low = event.u8("low", SourceValueDisplay::Hex, SemanticOperandRole::Pitch);
-      const u8 high = event.u8("high", SourceValueDisplay::Hex, SemanticOperandRole::Pitch);
+      const u8 low = event.u8("low", SourceValueDisplay::Hex);
+      const u8 high = event.u8("high", SourceValueDisplay::Hex);
       return event.invoke<&Playback::pitchBend>(low, high).invoke<&Playback::controlWait>(readTiming(event));
     }
     case 14: {
       auto event = cursor.command("Portamento On", SequenceSemantic::Portamento);
-      return event.invoke<&Playback::portamentoOn>(event.u8("duration", SemanticOperandRole::Duration))
+      return event.invoke<&Playback::portamentoOn>(event.u8("duration"))
           .invoke<&Playback::controlWait>(readTiming(event));
     }
     case 15: {

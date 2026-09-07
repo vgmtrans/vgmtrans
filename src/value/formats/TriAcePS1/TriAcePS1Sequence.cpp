@@ -566,14 +566,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return cursor.unsupported("Undecodable TriAcePS1 Note").stop();
     }
     auto event = cursor.command("Note", SequenceSemantic::Note);
-    event.derived("key", opcode, SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
-    const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
-    const u8 duration = found->second.durationImplied
-                            ? event.derived("duration", found->second.duration, SemanticOperandRole::Duration)
-                            : event.u8("duration", SemanticOperandRole::Duration);
-    const u8 velocity = found->second.velocityImplied
-                            ? event.derived("velocity", found->second.velocity, SemanticOperandRole::Level)
-                            : event.u8("velocity", SemanticOperandRole::Level);
+    event.derived("key", opcode, SourceValueDisplay::MidiNote);
+    const u8 delta = event.u8("delta");
+    const u8 duration =
+        found->second.durationImplied ? event.derived("duration", found->second.duration) : event.u8("duration");
+    const u8 velocity =
+        found->second.velocityImplied ? event.derived("velocity", found->second.velocity) : event.u8("velocity");
     return event.invoke<&Playback::note>(opcode, delta, duration, velocity);
   }
   if (opcode > 0x9e || kCommandSize[opcode - 0x80] == 0) {
@@ -590,59 +588,59 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0x81: {
       auto event = cursor.command("Voice Priority", SequenceSemantic::State);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
+      const u8 delta = event.u8("delta");
       event.u8("priority");
       return event.wait(delta);
     }
     case 0x82: {
       auto event = cursor.command("Tempo Modifier", SequenceSemantic::Tempo);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
+      const u8 delta = event.u8("delta");
       const s8 modifier = event.s8("modifier");
       return event.invoke<&Playback::tempoModifier>(modifier).wait(delta);
     }
     case 0x83: {
       auto event = cursor.command("Instrument", SequenceSemantic::Program);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
+      const u8 delta = event.u8("delta");
       const u8 program = event.u8("program", SemanticOperandRole::InstrumentProgram);
       const u8 bank = event.u8("bank", SemanticOperandRole::InstrumentBank);
       return event.invoke<&Playback::selectInstrument>(program, bank, true).wait(delta);
     }
     case 0x84: {
       auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
-      return event.invoke<&Playback::pitchBend>(event.s8("value", SemanticOperandRole::Pitch)).wait(delta);
+      const u8 delta = event.u8("delta");
+      return event.invoke<&Playback::pitchBend>(event.s8("value")).wait(delta);
     }
     case 0x85: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
-      const u8 value = event.u8("volume", SemanticOperandRole::Level);
+      const u8 delta = event.u8("delta");
+      const u8 value = event.u8("volume");
       return event.emitLevel(linearController(value), ValueQuantization{.levels = 128}).wait(delta);
     }
     case 0x86: {
       auto event = cursor.command("Expression", SequenceSemantic::Level);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
-      const u8 value = event.u8("expression", SemanticOperandRole::Level);
+      const u8 delta = event.u8("delta");
+      const u8 value = event.u8("expression");
       return event.emitExpression(linearController(value)).wait(delta);
     }
     case 0x87: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
-      const u8 value = event.u8("pan", SemanticOperandRole::Pan);
+      const u8 delta = event.u8("delta");
+      const u8 value = event.u8("pan");
       return event.invoke<&Playback::channelPan>(value).wait(delta);
     }
     case 0x88: {
       auto event = cursor.command("Manual Vibrato Depth", SequenceSemantic::Modulation);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
-      return event.invoke<&Playback::manualVibrato>(event.s8("depth", SemanticOperandRole::Modulation)).wait(delta);
+      const u8 delta = event.u8("delta");
+      return event.invoke<&Playback::manualVibrato>(event.s8("depth")).wait(delta);
     }
     case 0x89: {
       auto event = cursor.command("Sustain", SequenceSemantic::State);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
+      const u8 delta = event.u8("delta");
       return event.invoke<&Playback::sustain>(event.u8("enabled", SourceValueDisplay::Boolean) != 0).wait(delta);
     }
     case 0x8a: {
       auto event = cursor.command("Global Reverb Depth", SequenceSemantic::State);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
+      const u8 delta = event.u8("delta");
       return event.invoke<&Playback::reverbDepth>(event.u8("depth")).wait(delta);
     }
     case 0x8d:
@@ -663,78 +661,78 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0x8f: {
       auto event = cursor.command("Rest", SequenceSemantic::Rest);
-      return event.wait(event.u8("delta", SemanticOperandRole::Duration));
+      return event.wait(event.u8("delta"));
     }
     case 0x90: {
       auto event = cursor.command("Reverb Send", SequenceSemantic::State);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
+      const u8 delta = event.u8("delta");
       return event.emitReverb(event.u8("enabled", SourceValueDisplay::Boolean) != 0 ? 1.0 : 0.0).wait(delta);
     }
     case 0x91: {
       auto event = cursor.command("Reverb Phase", SequenceSemantic::State);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
+      const u8 delta = event.u8("delta");
       return event.invoke<&Playback::reverbPhase>(event.u8("mode")).wait(delta);
     }
     case 0x92: {
       auto event = cursor.command("Voice Phase", SequenceSemantic::State);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
+      const u8 delta = event.u8("delta");
       return event.invoke<&Playback::voicePhase>(event.u8("mode")).wait(delta);
     }
     case 0x93: {
       auto event = cursor.command("Automatic Vibrato", SequenceSemantic::Modulation);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
+      const u8 delta = event.u8("delta");
       return event.invoke<&Playback::automaticVibratoEnabled>(event.u8("enabled", SourceValueDisplay::Boolean) != 0)
           .wait(delta);
     }
     case 0x94: {
       auto event = cursor.command("Vibrato Parameters", SequenceSemantic::Modulation);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      const s8 depth = event.s8("target_depth", SemanticOperandRole::Modulation);
-      const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
+      const u8 delta = event.u8("delta");
+      const u8 delay = event.u8("delay");
+      const s8 depth = event.s8("target_depth");
+      const u8 rate = event.u8("rate");
       return event.invoke<&Playback::vibratoParameters>(delay, depth, rate).wait(delta);
     }
     case 0x95: {
       auto event = cursor.command("Fine Tune", SequenceSemantic::Pitch);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
-      return event.invoke<&Playback::fineTune>(event.s8("value", SemanticOperandRole::Pitch)).wait(delta);
+      const u8 delta = event.u8("delta");
+      return event.invoke<&Playback::fineTune>(event.s8("value")).wait(delta);
     }
     case 0x96: {
       auto event = cursor.command("Pitch Bend Range", SequenceSemantic::Pitch);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
-      return event.invoke<&Playback::bendRange>(event.u8("semitones", SemanticOperandRole::Pitch)).wait(delta);
+      const u8 delta = event.u8("delta");
+      return event.invoke<&Playback::bendRange>(event.u8("semitones")).wait(delta);
     }
     case 0x97: {
       auto event = cursor.command("Dynamic ADSR", SequenceSemantic::Envelope);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
+      const u8 delta = event.u8("delta");
       const u16 adsr1 = event.u16le("adsr1", SourceValueDisplay::Hex);
       const u16 adsr2 = event.u16le("adsr2", SourceValueDisplay::Hex);
       return event.invoke<&Playback::adsr>(adsr1, adsr2).wait(delta);
     }
     case 0x99: {
       auto event = cursor.command("Random Pitch", SequenceSemantic::Pitch);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
+      const u8 delta = event.u8("delta");
       return event.invoke<&Playback::randomPitch>(event.u8("enabled", SourceValueDisplay::Boolean) != 0).wait(delta);
     }
     case 0x9a: {
       auto event = cursor.command("Harmony Track", SequenceSemantic::State);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
+      const u8 delta = event.u8("delta");
       return event.invoke<&Playback::harmonyEnabled>(event.u8("enabled", SourceValueDisplay::Boolean) != 0).wait(delta);
     }
     case 0x9b: {
       auto event = cursor.command("Harmony Parameters", SequenceSemantic::State);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Duration);
-      const u8 delay = event.u8("harmony_delay", SemanticOperandRole::Duration);
-      const s8 transpose = event.s8("transpose", SemanticOperandRole::Pitch);
-      const s8 fine = event.s8("fine_tune", SemanticOperandRole::Pitch);
-      const u8 volume = event.u8("volume", SemanticOperandRole::Level);
-      const u8 pan = event.u8("pan", SemanticOperandRole::Pan);
+      const u8 delta = event.u8("delta");
+      const u8 delay = event.u8("harmony_delay");
+      const s8 transpose = event.s8("transpose");
+      const s8 fine = event.s8("fine_tune");
+      const u8 volume = event.u8("volume");
+      const u8 pan = event.u8("pan");
       return event.invoke<&Playback::harmonyParameters>(delay, transpose, fine, volume, pan).wait(delta);
     }
     case 0x9e: {
       auto event = cursor.command("Implied Note Parameters", SequenceSemantic::State);
-      event.u8("duration", SemanticOperandRole::Duration);
-      event.u8("velocity", SemanticOperandRole::Level);
+      event.u8("duration");
+      event.u8("velocity");
       return event;
     }
     default:

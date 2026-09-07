@@ -30,21 +30,11 @@ struct DecodedCommandPresentation {
 
 using SemanticOperandValue = std::variant<bool, u64, s64, double, Address, std::string>;
 
-// The role is intentionally small and format-independent. Operand names are
-// each format's vocabulary; roles let generic projection and transient format
-// analysis recognize the few relationships shared by all drivers.
+// Roles identify relationships used by source links, channel attribution, and
+// instrument discovery. Ordinary values need only a name and display style.
 enum class SemanticOperandRole : u8 {
   Value,
   Channel,
-  NoteKey,
-  Duration,
-  Pitch,
-  Level,
-  Pan,
-  Modulation,
-  State,
-  Count,
-  Address,
   JumpTarget,
   CallTarget,
   LoopTarget,

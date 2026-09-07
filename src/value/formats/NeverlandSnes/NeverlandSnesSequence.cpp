@@ -618,7 +618,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   if ((opcode & 0x80) != 0) {
     auto event = cursor.command("Section Transpose", SequenceSemantic::Pitch);
     const u8 semitones = opcode & 0x7f;
-    event.opcodeValue("semitones", semitones, SourceValueDisplay::Default, SemanticOperandRole::Pitch);
+    event.opcodeValue("semitones", semitones);
     return event.invoke<&Playback::transpose>(semitones);
   }
   auto event = cursor.command("Section", SequenceSemantic::Call);
@@ -762,10 +762,10 @@ template <auto Handler, class... Args>
     auto event = cursor.command("Note", SequenceSemantic::Note);
     const bool save = opcode < 0x80;
     const u8 key = opcode & 0x7f;
-    event.opcodeValue("key", key, SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
-    const u8 wait = save ? event.u8("wait", SemanticOperandRole::Duration) : 0;
-    const u8 duration = save ? event.u8("duration", SemanticOperandRole::Duration) : 0;
-    const u8 velocity = save ? event.u8("volume", SemanticOperandRole::Level) : 0;
+    event.opcodeValue("key", key, SourceValueDisplay::MidiNote);
+    const u8 wait = save ? event.u8("wait") : 0;
+    const u8 duration = save ? event.u8("duration") : 0;
+    const u8 velocity = save ? event.u8("volume") : 0;
     return event.invokeFlow<&Playback::note>(key, wait, duration, velocity, save);
   }
 
@@ -774,33 +774,31 @@ template <auto Handler, class... Args>
       auto event = cursor.command(layout.version == Version::Modern ? "Modulation" : "Reserved Wait",
                                   layout.version == Version::Modern ? SequenceSemantic::Modulation
                                                                     : SequenceSemantic::Rest);
-      const u8 wait = event.u8("wait", SemanticOperandRole::Duration);
-      const u8 value = event.u8(layout.version == Version::Modern ? "strength" : "unused",
-                                layout.version == Version::Modern ? SemanticOperandRole::Modulation
-                                                                  : SemanticOperandRole::Value);
+      const u8 wait = event.u8("wait");
+      const u8 value = event.u8(layout.version == Version::Modern ? "strength" : "unused");
       return layout.version == Version::Modern ? event.invokeFlow<&Playback::modulation>(wait, value)
                                                : event.invokeFlow<&Playback::delay>(wait);
     }
     case 0xf1: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
-      const u8 wait = event.u8("wait", SemanticOperandRole::Duration);
-      return event.invokeFlow<&Playback::volume>(wait, event.u8("volume", SemanticOperandRole::Level));
+      const u8 wait = event.u8("wait");
+      return event.invokeFlow<&Playback::volume>(wait, event.u8("volume"));
     }
     case 0xf2: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      const u8 wait = event.u8("wait", SemanticOperandRole::Duration);
-      return event.invokeFlow<&Playback::pan>(wait, event.u8("pan", SemanticOperandRole::Pan));
+      const u8 wait = event.u8("wait");
+      return event.invokeFlow<&Playback::pan>(wait, event.u8("pan"));
     }
     case 0xf3:
       if (layout.version == Version::Modern) {
         auto event = cursor.command("Delay", SequenceSemantic::Rest);
-        return event.invokeFlow<&Playback::delay>(event.u8("wait", SemanticOperandRole::Duration));
+        return event.invokeFlow<&Playback::delay>(event.u8("wait"));
       }
       return cursor.ignored("Reserved", 1, "reserved");
     case 0xf4:
       if (layout.version == Version::Modern) {
         auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
-        const u8 wait = event.u8("wait", SemanticOperandRole::Duration);
+        const u8 wait = event.u8("wait");
         return event.invokeFlow<&Playback::tempo>(wait, event.u8("timer_target"));
       }
       return cursor.ignored("Reserved", 1, "reserved");
@@ -811,8 +809,8 @@ template <auto Handler, class... Args>
       return cursor.ignored("Reserved", layout.version == Version::Original ? 1 : 0, "reserved");
     case 0xf6: {
       auto event = cursor.command("Pitch Scale", SequenceSemantic::Pitch);
-      const u8 wait = event.u8("wait", SemanticOperandRole::Duration);
-      const u8 scale = event.u8("scale", SemanticOperandRole::Pitch);
+      const u8 wait = event.u8("wait");
+      const u8 scale = event.u8("scale");
       if (layout.version == Version::Original) {
         static_cast<void>(event.u8("unused"));
       }
@@ -820,7 +818,7 @@ template <auto Handler, class... Args>
     }
     case 0xf7: {
       auto event = cursor.command("Program Change", SequenceSemantic::Program);
-      const u8 wait = event.u8("wait", SemanticOperandRole::Duration);
+      const u8 wait = event.u8("wait");
       const u8 program = event.u8("program", SemanticOperandRole::InstrumentProgram);
       if (references != nullptr) {
         references->insert(program);
@@ -832,7 +830,7 @@ template <auto Handler, class... Args>
           .invokeFlow<&Playback::repeatStart>(Address{static_cast<u16>(begin + 1)});
     case 0xfc: {
       auto event = cursor.command("Repeat End", SequenceSemantic::Repeat);
-      return event.invokeFlow<&Playback::repeatEnd>(event.u8("count", SemanticOperandRole::Count));
+      return event.invokeFlow<&Playback::repeatEnd>(event.u8("count"));
     }
     case 0xfd:
       return cursor.command("Section End", SequenceSemantic::Return)

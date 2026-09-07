@@ -1215,15 +1215,14 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   auto event = cursor.command(cursor.opcode() == 0x80 ? "Rest" : "Note",
                               cursor.opcode() == 0x80 ? SequenceSemantic::Rest : SequenceSemantic::Note,
                               CommandPlaybackStatus::AffectsPlayback, cursor.opcode() == 0x80 ? "rest" : "note");
-  const u8 encoded =
-      event.opcodeValue("key", cursor.opcode(), SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
+  const u8 encoded = event.opcodeValue("key", cursor.opcode(), SourceValueDisplay::MidiNote);
   u16 duration = 0;
   if (state.defaultDuration) {
-    duration = event.derived("duration", u16{0}, SemanticOperandRole::Duration);
+    duration = event.derived("duration", u16{0});
   } else if (state.longDuration) {
-    duration = event.u16be("duration", SourceValueDisplay::Default, SemanticOperandRole::Duration);
+    duration = event.u16be("duration");
   } else {
-    duration = event.u8("duration", SemanticOperandRole::Duration);
+    duration = event.u8("duration");
   }
   if (state.defaultDuration) {
     if (profile == Profile::Battlemaniacs && trackNumber == 5) {
@@ -1281,18 +1280,17 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("Volume L/R", SequenceSemantic::Level);
       if (selected == Kind::BtmVolume && trackNumber == 5) {
         const u8 slot = event.u8("percussion_slot", SemanticOperandRole::InstrumentProgram);
-        const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-        const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+        const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal);
+        const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal);
         return event.invoke<&Playback::btmPercussionVolume>(slot, left, right);
       }
-      const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-      const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal);
+      const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal);
       return event.invoke<&Playback::volume>(left, right);
     }
     case Kind::CenterVolume: {
       auto event = cursor.command("Centered Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::centerVolume>(
-          event.s8("volume", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level));
+      return event.invoke<&Playback::centerVolume>(event.s8("volume", SourceValueDisplay::SignedDecimal));
     }
     case Kind::Jump:
     case Kind::BtmJump: {
@@ -1302,7 +1300,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case Kind::Call:
     case Kind::CallOnce: {
       auto event = cursor.command(selected == Kind::Call ? "Pattern Repeat" : "Pattern Play", SequenceSemantic::Call);
-      const u8 times = selected == Kind::Call ? event.u8("times", SemanticOperandRole::Count) : u8{1};
+      const u8 times = selected == Kind::Call ? event.u8("times") : u8{1};
       const Address destination = event.addressLe("destination", SemanticOperandRole::CallTarget);
       return event.invoke<&Playback::call>(times, destination).call(destination);
     }
@@ -1313,9 +1311,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case Kind::DefaultDurationOn: {
       auto event = cursor.command("Default Duration On", SequenceSemantic::State);
-      const u16 duration = state.longDuration
-                               ? event.u16be("duration", SourceValueDisplay::Default, SemanticOperandRole::Duration)
-                               : event.u8("duration", SemanticOperandRole::Duration);
+      const u16 duration = state.longDuration ? event.u16be("duration") : event.u8("duration");
       state.defaultDuration = duration != 0;
       return event.set<&TrackState::defaultDuration>(duration);
     }
@@ -1333,12 +1329,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const bool shortEnvelope = selected == Kind::PitchSlidePingPong;
       auto event =
           cursor.command(!shortEnvelope ? "Pitch Envelope" : "Ping-Pong Pitch Envelope", SequenceSemantic::Pitch);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      const u8 interval = event.u8("interval", SemanticOperandRole::Duration);
-      const u8 encodedSteps = event.u8(shortEnvelope ? "half_cycle_steps" : "steps", SemanticOperandRole::Count);
-      const s8 delta = event.s8("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
+      const u8 delay = event.u8("delay");
+      const u8 interval = event.u8("interval");
+      const u8 encodedSteps = event.u8(shortEnvelope ? "half_cycle_steps" : "steps");
+      const s8 delta = event.s8("delta", SourceValueDisplay::SignedDecimal);
       const u8 steps = shortEnvelope ? static_cast<u8>(encodedSteps * 2) : encodedSteps;
-      const u8 invertedSteps = shortEnvelope ? encodedSteps : event.u8("inverted_steps", SemanticOperandRole::Count);
+      const u8 invertedSteps = shortEnvelope ? encodedSteps : event.u8("inverted_steps");
       return event.invoke<&Playback::configurePitch>(opcode == 0x09 || opcode == 0x26, delay, interval, steps, delta,
                                                      invertedSteps, u8{1});
     }
@@ -1355,10 +1351,10 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case Kind::Vibrato: {
       auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
-      const u8 period = event.u8("period", SemanticOperandRole::Modulation);
-      const u8 interval = event.u8("interval", SemanticOperandRole::Duration);
-      const s8 delta = event.s8("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
-      const u8 delay = opcode == 0x0d || opcode == 0x08 ? 0 : event.u8("delay", SemanticOperandRole::Duration);
+      const u8 period = event.u8("period");
+      const u8 interval = event.u8("interval");
+      const s8 delta = event.s8("delta", SourceValueDisplay::SignedDecimal);
+      const u8 delay = opcode == 0x0d || opcode == 0x08 ? 0 : event.u8("delay");
       const bool battlemaniacs = profile == Profile::Battlemaniacs;
       return event.invoke<&Playback::vibrato>(period, static_cast<u8>(battlemaniacs ? interval + 1 : interval), delta,
                                               delay, static_cast<u8>(battlemaniacs ? 8 : 1));
@@ -1374,13 +1370,13 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case Kind::MasterVolumeStereo:
     case Kind::BtmMasterVolume: {
       auto event = cursor.command("Master Volume L/R", SequenceSemantic::Level);
-      const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-      const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal);
+      const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal);
       return event.invoke<&Playback::masterStereo>(left, right);
     }
     case Kind::MasterVolumeScalar: {
       auto event = cursor.command("Master Volume", SequenceSemantic::Level);
-      return event.emitMasterLevel(event.u8("percent", SemanticOperandRole::Level) / 100.0);
+      return event.emitMasterLevel(event.u8("percent") / 100.0);
     }
     case Kind::Tuning: {
       if (profile == Profile::Battlemaniacs && trackNumber == 5) {
@@ -1389,24 +1385,21 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         return event;
       }
       auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::tuning>(
-          event.s8("tuning", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch), source);
+      return event.invoke<&Playback::tuning>(event.s8("tuning", SourceValueDisplay::SignedDecimal), source);
     }
     case Kind::Transpose: {
       auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.set<&TrackState::transpose>(
-          event.s8("semitones", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+      return event.set<&TrackState::transpose>(event.s8("semitones", SourceValueDisplay::SignedDecimal));
     }
     case Kind::TransposeAdd: {
       auto event = cursor.command("Relative Transpose", SequenceSemantic::Pitch);
-      return event.add<&TrackState::transpose>(
-          event.s8("semitones", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+      return event.add<&TrackState::transpose>(event.s8("semitones", SourceValueDisplay::SignedDecimal));
     }
     case Kind::EchoParameters: {
       auto event = cursor.command("Echo Parameters", SequenceSemantic::State);
       const s8 feedback = event.s8("feedback", SourceValueDisplay::SignedDecimal);
-      const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-      const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal);
+      const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal);
       return event.invoke([](Playback& playback, s8 fb, s8 l, s8 r) { playback.echoParameters(fb, l, r); }, feedback,
                           left, right);
     }
@@ -1424,7 +1417,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case Kind::NoiseClock: {
       auto event = cursor.sourceOnly(profile == Profile::Battlemaniacs ? "Noise Clock / Echo Writes" : "Noise Clock",
                                      "noise-clock");
-      event.u8("clock", SourceValueDisplay::Hex, SemanticOperandRole::State);
+      event.u8("clock", SourceValueDisplay::Hex);
       return event;
     }
     case Kind::NoiseOn:
@@ -1435,20 +1428,20 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case Kind::AltNote2: {
       auto event =
           cursor.command(selected == Kind::AltNote1 ? "Alternate Note 1" : "Alternate Note 2", SequenceSemantic::State);
-      const u8 note = event.u8("note", SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
+      const u8 note = event.u8("note", SourceValueDisplay::MidiNote);
       return selected == Kind::AltNote1 ? event.set<&TrackState::altNote1>(note)
                                         : event.set<&TrackState::altNote2>(note);
     }
     case Kind::ProgramVolume: {
       auto event = cursor.command("Program And Volume", SequenceSemantic::Program);
       const u8 programValue = event.u8("program", SemanticOperandRole::InstrumentProgram);
-      const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-      const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal);
+      const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal);
       return event.invoke<&Playback::programVolume>(programValue, left, right, source);
     }
     case Kind::FadeOut: {
       auto event = cursor.command("Fade Out", SequenceSemantic::Level);
-      return event.invoke<&Playback::fadeOut>(event.u8("step", SemanticOperandRole::Level));
+      return event.invoke<&Playback::fadeOut>(event.u8("step"));
     }
     case Kind::Timer: {
       auto event = cursor.command("Timer 0 Frequency", SequenceSemantic::Tempo);
@@ -1459,11 +1452,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 base = selected == Kind::BtmSavePreset ? 0x2a : 0x1c;
       const u8 slot = static_cast<u8>(opcode - base);
       auto event = cursor.command("Save Volume/Envelope Preset", SequenceSemantic::State);
-      const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-      const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal);
+      const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal);
       const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
       const u8 adsr2 = event.u8("adsr2", SourceValueDisplay::Hex);
-      const u8 keyoff = selected == Kind::BtmSavePreset ? event.u8("keyoff", SemanticOperandRole::Duration) : 0;
+      const u8 keyoff = selected == Kind::BtmSavePreset ? event.u8("keyoff") : 0;
       return event.invoke<&Playback::savePreset>(slot, left, right, adsr1, adsr2, keyoff, source);
     }
     case Kind::LoadPreset:
@@ -1496,15 +1489,14 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case Kind::SetCondition: {
       auto event = cursor.command("Set Conditional Index", SequenceSemantic::State);
-      return event.invoke([](Playback& playback, u8 value) { playback.program.condition = value; },
-                          event.u8("index", SemanticOperandRole::State));
+      return event.invoke([](Playback& playback, u8 value) { playback.program.condition = value; }, event.u8("index"));
     }
     case Kind::Tremolo: {
       auto event = cursor.command("Tremolo", SequenceSemantic::Modulation);
-      const u8 period = event.u8("period", SemanticOperandRole::Modulation);
-      const u8 interval = event.u8("interval", SemanticOperandRole::Duration);
-      const s8 delta = event.s8("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
+      const u8 period = event.u8("period");
+      const u8 interval = event.u8("interval");
+      const s8 delta = event.s8("delta", SourceValueDisplay::SignedDecimal);
+      const u8 delay = event.u8("delay");
       return event.invoke<&Playback::tremolo>(period, interval, delta, delay);
     }
     case Kind::TremoloOff:
@@ -1517,17 +1509,17 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case Kind::VoiceParametersShort: {
       auto event = cursor.command("Voice Parameters", SequenceSemantic::Program);
       const u8 programValue = event.u8("program", SemanticOperandRole::InstrumentProgram);
-      const s8 transposeValue = event.s8("transpose", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
-      const s8 tuningValue = event.s8("tuning", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
+      const s8 transposeValue = event.s8("transpose", SourceValueDisplay::SignedDecimal);
+      const s8 tuningValue = event.s8("tuning", SourceValueDisplay::SignedDecimal);
       return event.invoke<&Playback::voiceShort>(programValue, transposeValue, tuningValue, source);
     }
     case Kind::VoiceParameters: {
       auto event = cursor.command("Voice Parameters", SequenceSemantic::Program);
       const u8 programValue = event.u8("program", SemanticOperandRole::InstrumentProgram);
-      const s8 transposeValue = event.s8("transpose", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
-      const s8 tuningValue = event.s8("tuning", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
-      const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-      const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      const s8 transposeValue = event.s8("transpose", SourceValueDisplay::SignedDecimal);
+      const s8 tuningValue = event.s8("tuning", SourceValueDisplay::SignedDecimal);
+      const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal);
+      const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal);
       const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
       const u8 adsr2 = event.u8("adsr2", SourceValueDisplay::Hex);
       return event.invoke<&Playback::voice>(programValue, transposeValue, tuningValue, left, right, adsr1, adsr2,
@@ -1539,20 +1531,20 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case Kind::VolumePresets: {
       auto event = cursor.command("Volume Presets", SequenceSemantic::State);
-      const s8 left1 = event.s8("left_1", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-      const s8 right1 = event.s8("right_1", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-      const s8 left2 = event.s8("left_2", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-      const s8 right2 = event.s8("right_2", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      const s8 left1 = event.s8("left_1", SourceValueDisplay::SignedDecimal);
+      const s8 right1 = event.s8("right_1", SourceValueDisplay::SignedDecimal);
+      const s8 left2 = event.s8("left_2", SourceValueDisplay::SignedDecimal);
+      const s8 right2 = event.s8("right_2", SourceValueDisplay::SignedDecimal);
       return event.invoke<&Playback::volumePresets>(left1, right1, left2, right2);
     }
     case Kind::BoundedVolumeMotion: {
       auto event = cursor.command("Bounded Stereo Volume Motion", SequenceSemantic::Level);
       const u8 flags = event.u8("direction_flags", SourceValueDisplay::Hex);
-      const u8 interval = event.u8("interval", SemanticOperandRole::Duration);
-      const u8 delta = event.u8("delta", SemanticOperandRole::Level);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      const s8 minimum = event.s8("minimum", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-      const s8 maximum = event.s8("maximum", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      const u8 interval = event.u8("interval");
+      const u8 delta = event.u8("delta");
+      const u8 delay = event.u8("delay");
+      const s8 minimum = event.s8("minimum", SourceValueDisplay::SignedDecimal);
+      const s8 maximum = event.s8("maximum", SourceValueDisplay::SignedDecimal);
       return event.invoke<&Playback::boundedVolumeMotion>(flags, interval, delta, delay, minimum, maximum);
     }
     case Kind::Nop2: {
@@ -1575,11 +1567,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
         const u8 adsr2 = event.u8("adsr2", SourceValueDisplay::Hex);
         const u8 gain = event.u8("gain", SourceValueDisplay::Hex);
-        const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-        const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+        const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal);
+        const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal);
         const u8 flags = event.u8("dsp_flags", SourceValueDisplay::Hex);
-        const u8 keyoff = event.u8("keyoff", SemanticOperandRole::Duration);
-        const s8 base = event.s8("base_note", SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
+        const u8 keyoff = event.u8("keyoff");
+        const s8 base = event.s8("base_note", SourceValueDisplay::MidiNote);
         return event.invoke<&Playback::btmInstrument>(slot, srcn, adsr1, adsr2, gain, left, right, flags, keyoff, base,
                                                       source);
       }
@@ -1587,24 +1579,23 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
       const u8 adsr2 = event.u8("adsr2", SourceValueDisplay::Hex);
       const u8 gain = event.u8("gain", SourceValueDisplay::Hex);
-      const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-      const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal);
+      const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal);
       const u8 flags = event.u8("dsp_flags", SourceValueDisplay::Hex);
-      const u8 keyoff = event.u8("keyoff", SemanticOperandRole::Duration);
-      const s8 tuningValue = event.s8("tuning", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
+      const u8 keyoff = event.u8("keyoff");
+      const s8 tuningValue = event.s8("tuning", SourceValueDisplay::SignedDecimal);
       return event.invoke<&Playback::btmInstrument>(srcn, srcn, adsr1, adsr2, gain, left, right, flags, keyoff,
                                                     tuningValue, source);
     }
     case Kind::BtmPitchEnvelope: {
       auto event = cursor.command("Pitch Envelope", SequenceSemantic::Pitch);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      const u8 interval = static_cast<u8>(event.u8("interval", SemanticOperandRole::Duration) + 1);
-      const u8 encodedSteps = event.u8("steps", SemanticOperandRole::Count);
-      const s8 delta = event.s8("delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
+      const u8 delay = event.u8("delay");
+      const u8 interval = static_cast<u8>(event.u8("interval") + 1);
+      const u8 encodedSteps = event.u8("steps");
+      const s8 delta = event.s8("delta", SourceValueDisplay::SignedDecimal);
       const bool pingPong = opcode == 0x18 || opcode == 0x19;
       const u8 steps = pingPong ? static_cast<u8>(encodedSteps & 0xfe) : encodedSteps;
-      const u8 invertedSteps =
-          pingPong ? static_cast<u8>(encodedSteps / 2) : event.u8("inverted_steps", SemanticOperandRole::Count);
+      const u8 invertedSteps = pingPong ? static_cast<u8>(encodedSteps / 2) : event.u8("inverted_steps");
       return event.invoke<&Playback::configurePitch>(opcode == 0x0b || opcode == 0x18, delay, interval, steps, delta,
                                                      invertedSteps, u8{8});
     }
@@ -1614,12 +1605,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         const u8 slot = event.u8("percussion_slot", SemanticOperandRole::InstrumentProgram);
         const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
         const u8 adsr2 = event.u8("adsr2", SourceValueDisplay::Hex);
-        const u8 keyoff = event.u8("keyoff", SemanticOperandRole::Duration);
+        const u8 keyoff = event.u8("keyoff");
         return event.invoke<&Playback::btmPercussionAdsrKeyoff>(slot, adsr1, adsr2, keyoff, source);
       }
       const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
       const u8 adsr2 = event.u8("adsr2", SourceValueDisplay::Hex);
-      const u8 keyoff = event.u8("keyoff", SemanticOperandRole::Duration);
+      const u8 keyoff = event.u8("keyoff");
       return event.invoke<&Playback::btmAdsrKeyoff>(adsr1, adsr2, keyoff, source);
     }
     case Kind::BtmCpuPort: {
@@ -1629,27 +1620,26 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case Kind::BtmGlobalTranspose: {
       auto event = cursor.command("Global Transpose", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::globalTranspose>(
-          event.s8("semitones", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::globalTranspose>(event.s8("semitones", SourceValueDisplay::SignedDecimal));
     }
     case Kind::BtmGainKeyoff: {
       auto event = cursor.command("GAIN / Key-Off", SequenceSemantic::State);
       if (trackNumber == 5) {
         const u8 slot = event.u8("percussion_slot", SemanticOperandRole::InstrumentProgram);
         const u8 gain = event.u8("gain", SourceValueDisplay::Hex);
-        const u8 keyoff = event.u8("keyoff", SemanticOperandRole::Duration);
+        const u8 keyoff = event.u8("keyoff");
         return event.invoke<&Playback::btmPercussionGainKeyoff>(slot, gain, keyoff, source);
       }
       const u8 gain = event.u8("gain", SourceValueDisplay::Hex);
-      const u8 keyoff = event.u8("keyoff", SemanticOperandRole::Duration);
+      const u8 keyoff = event.u8("keyoff");
       return event.invoke<&Playback::btmGainKeyoff>(gain, keyoff, source);
     }
     case Kind::BtmEchoParameters: {
       auto event = cursor.command("Echo Parameters", SequenceSemantic::State);
       const u8 delay = event.u8("delay");
       const s8 feedback = event.s8("feedback", SourceValueDisplay::SignedDecimal);
-      const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-      const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
+      const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal);
+      const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal);
       return event.invoke([](Playback& playback, s8 fb, s8 l, s8 r, u8 d) { playback.echoParameters(fb, l, r, d); },
                           feedback, left, right, delay);
     }
@@ -1658,10 +1648,10 @@ using Cursor = CompilerCursor<TrackState, Playback>;
           .invoke<&Playback::fixedPan>(static_cast<u8>(opcode - 0x23));
     case Kind::BtmMasterFade: {
       auto event = cursor.command("Master Volume Fade", SequenceSemantic::Level);
-      const s8 left = event.s8("left_step", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-      const s8 right = event.s8("right_step", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-      const u8 interval = event.u8("interval", SemanticOperandRole::Duration);
-      const u8 steps = event.u8("steps", SemanticOperandRole::Count);
+      const s8 left = event.s8("left_step", SourceValueDisplay::SignedDecimal);
+      const s8 right = event.s8("right_step", SourceValueDisplay::SignedDecimal);
+      const u8 interval = event.u8("interval");
+      const u8 steps = event.u8("steps");
       return event.invoke<&Playback::btmMasterFade>(left, right, interval, steps);
     }
     case Kind::BtmDspFlags: {

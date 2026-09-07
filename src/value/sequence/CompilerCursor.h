@@ -355,11 +355,11 @@ public:
     // such as a loop start with no encoded destination.
     [[nodiscard]] Address nextAddress() const { return Address{cursor_.record_.position()}; }
 
-    [[nodiscard]] Address address(std::string_view name, SemanticOperandRole role = SemanticOperandRole::Address) {
+    [[nodiscard]] Address address(std::string_view name, SemanticOperandRole role = SemanticOperandRole::Value) {
       return Address{u16be(name, SourceValueDisplay::Address, role)};
     }
 
-    [[nodiscard]] Address addressLe(std::string_view name, SemanticOperandRole role = SemanticOperandRole::Address) {
+    [[nodiscard]] Address addressLe(std::string_view name, SemanticOperandRole role = SemanticOperandRole::Value) {
       return Address{u16le(name, SourceValueDisplay::Address, role)};
     }
 

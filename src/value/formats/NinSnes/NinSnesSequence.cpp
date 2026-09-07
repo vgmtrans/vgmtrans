@@ -1513,8 +1513,7 @@ struct DecodeContext {
 [[nodiscard]] DecodedBytecodeCommand decodeNoteParameters(Cursor& cursor, const DecodeContext& context, EventType type,
                                                           u32 begin) {
   auto event = cursor.command("Note Parameters", SequenceSemantic::State);
-  const u8 duration =
-      event.opcodeValue("duration", cursor.opcode(), SourceValueDisplay::Decimal, SemanticOperandRole::Duration);
+  const u8 duration = event.opcodeValue("duration", cursor.opcode(), SourceValueDisplay::Decimal);
 
   if (type == EventType::LemmingsNoteParameter) {
     bool hasDuration = false;
@@ -1523,13 +1522,13 @@ struct DecodeContext {
     u8 velocity = 0;
     if (event.peekU8() <= 0x7f) {
       hasDuration = true;
-      const u8 raw = event.u8("duration_rate", SemanticOperandRole::Duration);
+      const u8 raw = event.u8("duration_rate");
       durationRate = static_cast<u8>((raw << 1) + (raw >> 1) + (raw & 1));
-      event.derived("resolved_duration_rate", durationRate, SemanticOperandRole::Duration);
+      event.derived("resolved_duration_rate", durationRate);
       if (event.peekU8() <= 0x7f) {
         hasVelocity = true;
-        velocity = static_cast<u8>(event.u8("velocity", SemanticOperandRole::Level) << 1);
-        event.derived("resolved_velocity", velocity, SemanticOperandRole::Level);
+        velocity = static_cast<u8>(event.u8("velocity") << 1);
+        event.derived("resolved_velocity", velocity);
       }
     }
     return event.invoke<&Playback::lemmingsParameters>(duration, hasDuration, durationRate, hasVelocity, velocity);
@@ -1544,8 +1543,8 @@ struct DecodeContext {
       const u8 packed = event.u8("quantize_velocity", SourceValueDisplay::Hex);
       durationRate = context.definition.duration[(packed >> 4) & 7];
       velocity = context.definition.volume[packed & 15];
-      event.derived("duration_rate", durationRate, SemanticOperandRole::Duration);
-      event.derived("velocity", velocity, SemanticOperandRole::Level);
+      event.derived("duration_rate", durationRate);
+      event.derived("velocity", velocity);
     }
     return event.invoke<&Playback::standardParameters>(duration, present, durationRate, velocity);
   }
@@ -1555,8 +1554,7 @@ struct DecodeContext {
   while (event.peekU8() <= 0x7f && parameters.size() < 0x80) {
     const u8 raw = event.u8(fmt::format("parameter_{}", parameters.size() + 1), SourceValueDisplay::Hex);
     const u8 resolved = context.definition.intelliDurationVolume[raw & 0x3f];
-    event.derived(fmt::format("resolved_{}", parameters.size() + 1), resolved,
-                  raw < 0x40 ? SemanticOperandRole::Duration : SemanticOperandRole::Level);
+    event.derived(fmt::format("resolved_{}", parameters.size() + 1), resolved);
     parameters.emplace_back(raw, resolved);
   }
 
@@ -1609,7 +1607,7 @@ struct DecodeContext {
     case EventType::Note: {
       auto event = cursor.command("Note", SequenceSemantic::Note);
       const u8 key = event.opcodeValue("key", static_cast<u8>(opcode - context.definition.status.noteMin),
-                                       SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
+                                       SourceValueDisplay::MidiNote);
       return event.invoke<&Playback::note>(key);
     }
     case EventType::Tie:
@@ -1619,7 +1617,7 @@ struct DecodeContext {
     case EventType::Percussion: {
       auto event = cursor.command("Percussion Note", SequenceSemantic::Note);
       const u8 slot = event.opcodeValue("slot", static_cast<u8>(opcode - context.definition.status.percussionMin),
-                                        SourceValueDisplay::Decimal, SemanticOperandRole::NoteKey);
+                                        SourceValueDisplay::Decimal);
       const bool intelli =
           (context.selected.intelli == IntelliMode::Ta || context.selected.intelli == IntelliMode::Fe4) &&
           slot < kIntelliDrumSlots;
@@ -1653,37 +1651,37 @@ struct DecodeContext {
       const u16 stored = event.u16le("stored_destination", SourceValueDisplay::Address);
       const Address destination = context.address(stored);
       event.derived("destination", destination, SourceValueDisplay::Address, SemanticOperandRole::CallTarget);
-      const u8 times = event.u8("times", SemanticOperandRole::Count);
+      const u8 times = event.u8("times");
       event.invoke<&Playback::beginPattern>(times, destination);
       return event.call(destination);
     }
     case EventType::Pan: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      return event.invoke<&Playback::pan>(event.u8("pan", SemanticOperandRole::Pan));
+      return event.invoke<&Playback::pan>(event.u8("pan"));
     }
     case EventType::PanFade: {
       auto event = cursor.command("Pan Fade", SequenceSemantic::Pan);
-      const u8 length = event.u8("length", SemanticOperandRole::Duration);
-      const u8 pan = event.u8("pan", SemanticOperandRole::Pan);
+      const u8 length = event.u8("length");
+      const u8 pan = event.u8("pan");
       return event.invoke<&Playback::panFade>(length, pan);
     }
     case EventType::VibratoOn: {
       auto event = cursor.command("Vibrato", SequenceSemantic::Modulation);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Modulation);
-      const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
-      const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
+      const u8 delay = event.u8("delay");
+      const u8 rate = event.u8("rate");
+      const u8 depth = event.u8("depth");
       return event.invoke<&Playback::vibratoOn>(delay, rate, depth);
     }
     case EventType::VibratoOff:
       return cursor.command("Vibrato Off", SequenceSemantic::Modulation).invoke<&Playback::vibratoOff>();
     case EventType::MasterVolume: {
       auto event = cursor.command("Master Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::masterVolume>(event.u8("volume", SemanticOperandRole::Level));
+      return event.invoke<&Playback::masterVolume>(event.u8("volume"));
     }
     case EventType::MasterVolumeFade: {
       auto event = cursor.command("Master Volume Fade", SequenceSemantic::Level);
-      const u8 length = event.u8("length", SemanticOperandRole::Duration);
-      const u8 volume = event.u8("volume", SemanticOperandRole::Level);
+      const u8 length = event.u8("length");
+      const u8 volume = event.u8("volume");
       return event.invoke<&Playback::masterVolumeFade>(length, volume);
     }
     case EventType::Tempo: {
@@ -1692,50 +1690,48 @@ struct DecodeContext {
     }
     case EventType::TempoFade: {
       auto event = cursor.command("Tempo Fade", SequenceSemantic::Tempo);
-      const u8 length = event.u8("length", SemanticOperandRole::Duration);
+      const u8 length = event.u8("length");
       const u8 tempo = event.u8("tempo");
       return event.invoke<&Playback::tempoFade>(length, tempo);
     }
     case EventType::GlobalTranspose: {
       auto event = cursor.command("Global Transpose", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::globalTranspose>(
-          event.s8("semitones", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::globalTranspose>(event.s8("semitones", SourceValueDisplay::SignedDecimal));
     }
     case EventType::Transpose: {
       auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.set<&TrackState::transpose>(
-          event.s8("semitones", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+      return event.set<&TrackState::transpose>(event.s8("semitones", SourceValueDisplay::SignedDecimal));
     }
     case EventType::TremoloOn: {
       auto event = cursor.command("Tremolo On", SequenceSemantic::Modulation);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      const u8 rate = event.u8("rate", SemanticOperandRole::Modulation);
-      const u8 depth = event.u8("depth", SemanticOperandRole::Modulation);
+      const u8 delay = event.u8("delay");
+      const u8 rate = event.u8("rate");
+      const u8 depth = event.u8("depth");
       return event.invoke<&Playback::tremoloOn>(delay, rate, depth);
     }
     case EventType::TremoloOff:
       return cursor.command("Tremolo Off", SequenceSemantic::Modulation).invoke<&Playback::tremoloOff>();
     case EventType::Volume: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(event.u8("volume", SemanticOperandRole::Level));
+      return event.invoke<&Playback::volume>(event.u8("volume"));
     }
     case EventType::VolumeFade: {
       auto event = cursor.command("Volume Fade", SequenceSemantic::Level);
-      const u8 length = event.u8("length", SemanticOperandRole::Duration);
-      const u8 volume = event.u8("volume", SemanticOperandRole::Level);
+      const u8 length = event.u8("length");
+      const u8 volume = event.u8("volume");
       return event.invoke<&Playback::volumeFade>(length, volume);
     }
     case EventType::VibratoFade: {
       auto event = cursor.command("Vibrato Fade", SequenceSemantic::Modulation);
-      return event.invoke<&Playback::vibratoFade>(event.u8("length", SemanticOperandRole::Duration));
+      return event.invoke<&Playback::vibratoFade>(event.u8("length"));
     }
     case EventType::PitchEnvelopeTo:
     case EventType::PitchEnvelopeFrom: {
       auto event = cursor.command(type == EventType::PitchEnvelopeTo ? "Pitch Envelope To" : "Pitch Envelope From",
                                   SequenceSemantic::Pitch);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      const u8 length = event.u8("length", SemanticOperandRole::Duration);
-      const s8 semitones = event.s8("semitones", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
+      const u8 delay = event.u8("delay");
+      const u8 length = event.u8("length");
+      const s8 semitones = event.s8("semitones", SourceValueDisplay::SignedDecimal);
       return event.invoke<&Playback::pitchEnvelope>(
           type == EventType::PitchEnvelopeTo ? PitchEnvelope::Mode::To : PitchEnvelope::Mode::From, delay, length,
           semitones);
@@ -1745,7 +1741,7 @@ struct DecodeContext {
           .set<&TrackState::pitchEnvelope>(PitchEnvelope{});
     case EventType::Tuning: {
       auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
-      const u8 tuning = event.u8("tuning", SemanticOperandRole::Pitch);
+      const u8 tuning = event.u8("tuning");
       return event.emitTuning((tuning / 256.0) * 100.0);
     }
     case EventType::EchoOn: {
@@ -1766,16 +1762,16 @@ struct DecodeContext {
     }
     case EventType::EchoVolumeFade: {
       auto event = cursor.command("Echo Volume Fade", SequenceSemantic::State);
-      const u8 length = event.u8("length", SemanticOperandRole::Duration);
+      const u8 length = event.u8("length");
       const u8 volumeLeft = event.u8("volume_left");
       const u8 volumeRight = event.u8("volume_right");
       return event.invoke<&Playback::echoVolumeFade>(length, volumeLeft, volumeRight);
     }
     case EventType::PitchSlide: {
       auto event = cursor.command("Pitch Slide", SequenceSemantic::Pitch);
-      const u8 delay = event.u8("delay", SemanticOperandRole::Duration);
-      const u8 length = event.u8("length", SemanticOperandRole::Duration);
-      const u8 target = event.u8("target_note", SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
+      const u8 delay = event.u8("delay");
+      const u8 length = event.u8("length");
+      const u8 target = event.u8("target_note", SourceValueDisplay::MidiNote);
       // During a preceding wait, execute F9 early only after the current pitch change ends.
       return event.invoke<&Playback::pitchSlide>(delay, length, target).duringWaitWhen<&Playback::pitchMotionIdle>();
     }
@@ -1790,9 +1786,9 @@ struct DecodeContext {
     }
     case EventType::KonamiLoopEnd: {
       auto event = cursor.command("Loop End", SequenceSemantic::Repeat);
-      const u8 times = event.u8("times", SemanticOperandRole::Count);
-      const s8 volumeDelta = event.s8("volume_delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Level);
-      const s8 pitchDelta = event.s8("pitch_delta", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch);
+      const u8 times = event.u8("times");
+      const s8 volumeDelta = event.s8("volume_delta", SourceValueDisplay::SignedDecimal);
+      const s8 pitchDelta = event.s8("pitch_delta", SourceValueDisplay::SignedDecimal);
       event.invokeFlow([times, volumeDelta, pitchDelta](Playback& playback) {
         return playback.konamiLoop(times, volumeDelta, pitchDelta, playback.track.konamiLoopStart);
       });
@@ -1809,7 +1805,7 @@ struct DecodeContext {
     }
     case EventType::QuintetTuning: {
       auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
-      const u8 tuning = event.u8("tuning", SemanticOperandRole::Pitch);
+      const u8 tuning = event.u8("tuning");
       return event.emitTuning((tuning / 256.0) * 61.8);
     }
     case EventType::QuintetAdsr: {
@@ -1867,9 +1863,9 @@ struct DecodeContext {
         event.invoke<&Playback::defineVoiceTable>(count);
         for (u8 index = 0; index < count; ++index) {
           const u8 instrument = event.u8(fmt::format("instrument_{}", index), SemanticOperandRole::Instrument);
-          const u8 volume = event.u8(fmt::format("volume_{}", index), SemanticOperandRole::Level);
-          const u8 pan = event.u8(fmt::format("pan_{}", index), SemanticOperandRole::Pan);
-          const u8 tuningTranspose = event.u8(fmt::format("tuning_transpose_{}", index), SemanticOperandRole::Pitch);
+          const u8 volume = event.u8(fmt::format("volume_{}", index));
+          const u8 pan = event.u8(fmt::format("pan_{}", index));
+          const u8 tuningTranspose = event.u8(fmt::format("tuning_transpose_{}", index));
           event.invoke<&Playback::defineVoice>(index, instrument, volume, pan, tuningTranspose);
         }
         return event;
@@ -1904,7 +1900,7 @@ struct DecodeContext {
     }
     case EventType::IntelliGainDurationRate: {
       auto event = cursor.command("GAIN Duration Rate", SequenceSemantic::State);
-      const u8 rate = event.u8("duration_rate", SemanticOperandRole::Duration);
+      const u8 rate = event.u8("duration_rate");
       event.u8("gain", SourceValueDisplay::Hex);
       if (context.selected.intelli == IntelliMode::Ta) {
         return event.set<&TrackState::durationRate>(rate);
@@ -1913,7 +1909,7 @@ struct DecodeContext {
     }
     case EventType::IntelliGainDuration: {
       auto event = cursor.command("GAIN Duration", SequenceSemantic::State);
-      const u8 rate = event.u8("duration_rate", SemanticOperandRole::Duration);
+      const u8 rate = event.u8("duration_rate");
       return context.selected.intelli == IntelliMode::Ta ? event.set<&TrackState::durationRate>(rate) : event.ignore();
     }
     case EventType::IntelliGain: {
@@ -1925,14 +1921,13 @@ struct DecodeContext {
       auto event = cursor.command("Custom Percussion Table", SequenceSemantic::State);
       const u8 packedCount = event.u8("packed_count", SourceValueDisplay::Hex);
       const u8 count = static_cast<u8>((packedCount & 0x0f) + 1);
-      event.derived("count", count, SemanticOperandRole::Count);
+      event.derived("count", count);
       event.invoke<&Playback::clearPercussionTable>();
       for (u8 slot = 0; slot < count; ++slot) {
         const u8 patch =
             event.u8(fmt::format("patch_{}", slot), SourceValueDisplay::Hex, SemanticOperandRole::Instrument);
-        const u8 note =
-            event.u8(fmt::format("note_{}", slot), SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
-        const u8 pan = event.u8(fmt::format("pan_{}", slot), SemanticOperandRole::Pan);
+        const u8 note = event.u8(fmt::format("note_{}", slot), SourceValueDisplay::MidiNote);
+        const u8 pan = event.u8(fmt::format("pan_{}", slot));
         if (slot < kIntelliDrumSlots) {
           event.invoke<&Playback::percussionEntry>(slot, patch, note, pan);
         }

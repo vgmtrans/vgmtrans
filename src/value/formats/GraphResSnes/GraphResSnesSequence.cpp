@@ -610,12 +610,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     const u8 key = opcode & 0x0f;
     auto event = cursor.command(key == kRestKey ? "Rest" : (key == kInvalidNoteKey ? "Invalid Note" : "Note"),
                                 key == kRestKey ? SequenceSemantic::Rest : SequenceSemantic::Note);
-    event.opcodeValue("key", key, SourceValueDisplay::MidiNote, SemanticOperandRole::NoteKey);
+    event.opcodeValue("key", key, SourceValueDisplay::MidiNote);
     const bool hasLength = (opcode & 0x10) != 0;
-    const u8 length = hasLength ? event.u8("length", SemanticOperandRole::Duration) : 0;
+    const u8 length = hasLength ? event.u8("length") : 0;
     const bool tiesNext = reader.has(begin + 1u + (hasLength ? 1u : 0u), 1) &&
                           reader.u8At(begin + 1u + (hasLength ? 1u : 0u)) == 0xfe;
-    event.derived("ties_next", tiesNext, SemanticOperandRole::State);
+    event.derived("ties_next", tiesNext);
     return event.invoke<&Playback::note>(key, length, hasLength, tiesNext);
   }
   if (opcode < 0x90) {
@@ -635,15 +635,15 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   switch (opcode) {
     case 0xe4: {
       auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::transpose>(event.s8("semitones", SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::transpose>(event.s8("semitones"));
     }
     case 0xe5: {
       auto event = cursor.command("Master Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::masterVolume>(event.u8("volume", SemanticOperandRole::Level));
+      return event.invoke<&Playback::masterVolume>(event.u8("volume"));
     }
     case 0xe6: {
       auto event = cursor.command("Echo Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::echoVolume>(event.u8("volume", SemanticOperandRole::Level));
+      return event.invoke<&Playback::echoVolume>(event.u8("volume"));
     }
     case 0xe7:
       return cursor.command("Octave Down", SequenceSemantic::Pitch).invoke<&Playback::octaveAdd>(-1);
@@ -655,14 +655,14 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return cursor.command("Loop Start", SequenceSemantic::Repeat).invoke<&Playback::loopStart>();
     case 0xeb: {
       auto event = cursor.command("Loop End", SequenceSemantic::Repeat);
-      const u8 count = event.u8("count", SemanticOperandRole::Count);
+      const u8 count = event.u8("count");
       const Address destination = relativeTarget(event, begin, SemanticOperandRole::RepeatTarget);
       const Address exit{static_cast<u16>(begin + 4)};
       return event.invokeFlow<&Playback::loopEnd>(count, destination, exit).mayBranchTo(destination);
     }
     case 0xec: {
       auto event = cursor.command("Duration Rate", SequenceSemantic::State);
-      return event.invoke<&Playback::durationRate>(event.u8("eighths", SemanticOperandRole::Duration));
+      return event.invoke<&Playback::durationRate>(event.u8("eighths"));
     }
     case 0xed: {
       auto event = cursor.command("DSP Write", SequenceSemantic::State);
@@ -671,21 +671,20 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xee: {
       auto event = cursor.command("Unstacked Loop", SequenceSemantic::Repeat);
-      const u8 count = event.u8("count", SemanticOperandRole::Count);
+      const u8 count = event.u8("count");
       const Address destination = relativeTarget(event, begin, SemanticOperandRole::RepeatTarget);
       const Address exit{static_cast<u16>(begin + 4)};
       return event.invokeFlow<&Playback::unstackedLoop>(count, destination, exit).mayBranchTo(destination);
     }
     case 0xef: {
       auto event = cursor.command("Pitch Offset", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::pitchOffset>(
-          event.s16le("offset", SourceValueDisplay::SignedDecimal, SemanticOperandRole::Pitch));
+      return event.invoke<&Playback::pitchOffset>(event.s16le("offset", SourceValueDisplay::SignedDecimal));
     }
     case 0xf0:
       return cursor.command("Toggle Noise", SequenceSemantic::State).invoke<&Playback::noiseToggle>();
     case 0xf1: {
       auto event = cursor.command("Volume", SequenceSemantic::Level);
-      return event.invoke<&Playback::volume>(event.u8("volume", SemanticOperandRole::Level));
+      return event.invoke<&Playback::volume>(event.u8("volume"));
     }
     case 0xf3: {
       auto event = cursor.command("Master / Echo Fade Rate", SequenceSemantic::Level);
@@ -693,7 +692,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xf4: {
       auto event = cursor.command("Pan", SequenceSemantic::Pan);
-      return event.invoke<&Playback::pan>(event.s8("pan", SemanticOperandRole::Pan));
+      return event.invoke<&Playback::pan>(event.s8("pan"));
     }
     case 0xf7: {
       auto event = cursor.command("ADSR", SequenceSemantic::Envelope);
@@ -730,7 +729,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xfd: {
       auto event = cursor.command("Default Note Length", SequenceSemantic::State);
-      return event.invoke<&Playback::defaultLength>(event.u8("length", SemanticOperandRole::Duration));
+      return event.invoke<&Playback::defaultLength>(event.u8("length"));
     }
     case 0xfe:
       return cursor.sourceOnly("Tie Marker", "tie-marker");
