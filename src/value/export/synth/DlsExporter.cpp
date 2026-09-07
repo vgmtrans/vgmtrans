@@ -50,9 +50,7 @@ constexpr double kDlsVolumeEnvelopeRangeDb = 96.0;
 
 using Chunk = RiffChunk;
 
-using DecodedDlsSample = DecodedSynthSample;
-
-[[nodiscard]] Loop effectiveRegionLoop(const Region& region, const DecodedDlsSample& sample) {
+[[nodiscard]] Loop effectiveRegionLoop(const Region& region, const DecodedSynthSample& sample) {
   Loop loop = region.loop.value_or(sample.decoded.loop);
   if (loop.enabled && loop.length == 0) {
     const auto channels = std::max<u16>(1, sample.decoded.channels);
@@ -104,7 +102,7 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
   return dls16Dot16Scale(cents);
 }
 
-[[nodiscard]] s32 dlsAttenuation(const Region& region, const DecodedDlsSample& sample) {
+[[nodiscard]] s32 dlsAttenuation(const Region& region, const DecodedSynthSample& sample) {
   constexpr double centibelsPerDb = 10.0;
   const double units = std::clamp((region.attenuationDb + sample.attenuationDb) * centibelsPerDb * 65536.0, 0.0,
                                   static_cast<double>(std::numeric_limits<s32>::max()));
@@ -253,7 +251,7 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
   return makeChunk("rgnh", std::move(payload));
 }
 
-[[nodiscard]] Chunk wsmpChunk(const Region& region, const DecodedDlsSample& sample) {
+[[nodiscard]] Chunk wsmpChunk(const Region& region, const DecodedSynthSample& sample) {
   // wsmp carries sample playback metadata for a region: unity key, fine tune,
   // attenuation, and loop points.
   const Loop loop = effectiveRegionLoop(region, sample);
@@ -314,38 +312,23 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   writeConnection(connections, kDlsConnDstEg1SustainLevel,
                   explicitEnvelope ? dlsSustainLevel(envelope) : kDlsSustainLevelFullScale);
   writeConnection(connections, kDlsConnDstEg1ReleaseTime, dlsEnvelopeTimecents(envelope.releaseSeconds));
-  for (const auto& generator : instrument.generators) {
-    if (!shouldExportSynthGenerator(generator, modulationConversion)) {
-      continue;
+  const auto writeModulation = [&](const auto& scope) {
+    for (const auto& generator : scope.generators) {
+      if (shouldExportSynthGenerator(generator, modulationConversion)) {
+        if (const auto connection = dlsConnectionForGenerator(generator)) {
+          writeConnection(connections, *connection);
+        }
+      }
     }
-    const auto connection = dlsConnectionForGenerator(generator);
-    if (!connection) {
-      continue;
+    for (const auto& modulator : scope.modulators) {
+      if (const auto connection =
+              dlsConnectionForModulator(modulator, midiModulationUsage, modulationScaling, modulationConversion)) {
+        writeConnection(connections, *connection);
+      }
     }
-    writeConnection(connections, *connection);
-  }
-  for (const auto& modulator : instrument.modulators) {
-    const auto connection =
-        dlsConnectionForModulator(modulator, midiModulationUsage, modulationScaling, modulationConversion);
-    if (!connection) {
-      continue;
-    }
-    writeConnection(connections, *connection);
-  }
-  for (const auto& generator : resolvedRegion.generators) {
-    if (!shouldExportSynthGenerator(generator, modulationConversion)) {
-      continue;
-    }
-    if (const auto connection = dlsConnectionForGenerator(generator)) {
-      writeConnection(connections, *connection);
-    }
-  }
-  for (const auto& modulator : resolvedRegion.modulators) {
-    if (const auto connection =
-            dlsConnectionForModulator(modulator, midiModulationUsage, modulationScaling, modulationConversion)) {
-      writeConnection(connections, *connection);
-    }
-  }
+  };
+  writeModulation(instrument);
+  writeModulation(resolvedRegion);
 
   std::vector<u8> art;
   writeLe32(art, 8);
@@ -355,8 +338,8 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 }
 
 [[nodiscard]] Chunk rgn2Chunk(const ResolvedSynthInstrument& instrument, const ResolvedSynthRegion& resolvedRegion,
-                              std::span<const DecodedDlsSample> samples, const MidiModulationUsage* midiModulationUsage,
-                              ModulationScalingPolicy modulationScaling,
+                              std::span<const DecodedSynthSample> samples,
+                              const MidiModulationUsage* midiModulationUsage, ModulationScalingPolicy modulationScaling,
                               ModulationConversionPolicy modulationConversion) {
   const auto& region = *resolvedRegion.region;
   const auto& sample = samples[resolvedRegion.sampleIndex];
@@ -370,7 +353,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
                        });
 }
 
-[[nodiscard]] Chunk lrgnList(const ResolvedSynthInstrument& instrument, std::span<const DecodedDlsSample> samples,
+[[nodiscard]] Chunk lrgnList(const ResolvedSynthInstrument& instrument, std::span<const DecodedSynthSample> samples,
                              const MidiModulationUsage* midiModulationUsage, ModulationScalingPolicy modulationScaling,
                              ModulationConversionPolicy modulationConversion) {
   std::vector<Chunk> regions;
@@ -382,7 +365,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   return makeListChunk("lrgn", std::move(regions));
 }
 
-[[nodiscard]] Chunk insList(const ResolvedSynthInstrument& instrument, std::span<const DecodedDlsSample> samples,
+[[nodiscard]] Chunk insList(const ResolvedSynthInstrument& instrument, std::span<const DecodedSynthSample> samples,
                             const MidiModulationUsage* midiModulationUsage, ModulationScalingPolicy modulationScaling,
                             ModulationConversionPolicy modulationConversion) {
   return makeListChunk("ins ",
@@ -394,8 +377,8 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 }
 
 [[nodiscard]] Chunk linsList(std::span<const ResolvedSynthInstrument> instruments,
-                             std::span<const DecodedDlsSample> samples, const MidiModulationUsage* midiModulationUsage,
-                             ModulationScalingPolicy modulationScaling,
+                             std::span<const DecodedSynthSample> samples,
+                             const MidiModulationUsage* midiModulationUsage, ModulationScalingPolicy modulationScaling,
                              ModulationConversionPolicy modulationConversion) {
   std::vector<Chunk> instrumentChunks;
   instrumentChunks.reserve(instruments.size());
@@ -406,7 +389,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   return makeListChunk("lins", std::move(instrumentChunks));
 }
 
-[[nodiscard]] Chunk fmtChunk(const DecodedDlsSample& sample) {
+[[nodiscard]] Chunk fmtChunk(const DecodedSynthSample& sample) {
   const u16 channels = std::max<u8>(sample.decoded.channels, 1);
   const u32 sampleRate = sample.decoded.sampleRate == 0 ? 32000 : sample.decoded.sampleRate;
   const u16 blockAlign = static_cast<u16>(channels * (kBitsPerSample / 8));
@@ -423,7 +406,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   return makeChunk("fmt ", std::move(payload));
 }
 
-[[nodiscard]] Chunk dataChunk(const DecodedDlsSample& sample) {
+[[nodiscard]] Chunk dataChunk(const DecodedSynthSample& sample) {
   std::vector<u8> payload;
   payload.reserve(sample.decoded.pcm.size() * 2);
   for (const s16 value : sample.decoded.pcm) {
@@ -432,7 +415,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   return makeChunk("data", std::move(payload));
 }
 
-[[nodiscard]] Chunk waveList(const DecodedDlsSample& sample) {
+[[nodiscard]] Chunk waveList(const DecodedSynthSample& sample) {
   return makeListChunk("wave", {
                                    fmtChunk(sample),
                                    dataChunk(sample),
@@ -455,7 +438,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   return makeChunk("ptbl", std::move(payload));
 }
 
-[[nodiscard]] std::vector<Chunk> waveChunks(std::span<const DecodedDlsSample> samples) {
+[[nodiscard]] std::vector<Chunk> waveChunks(std::span<const DecodedSynthSample> samples) {
   std::vector<Chunk> waves;
   waves.reserve(samples.size());
   for (const auto& sample : samples) {
