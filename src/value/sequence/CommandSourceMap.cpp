@@ -14,24 +14,10 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <type_traits>
 
 namespace vgmtrans::core {
 
 namespace {
-
-[[nodiscard]] SourceValue sourceValue(const SemanticOperandValue& value) {
-  return std::visit(
-      [](const auto& typedValue) -> SourceValue {
-        using T = std::decay_t<decltype(typedValue)>;
-        if constexpr (std::is_same_v<T, Address>) {
-          return makeSourceValue(typedValue.value);
-        } else {
-          return makeSourceValue(typedValue);
-        }
-      },
-      value);
-}
 
 [[nodiscard]] std::optional<SourceAnnotationId> createTrackAnnotation(
     ByteReader reader, u32 trackIndex, u32 startOffset, std::optional<AssetId> sequenceAsset,
@@ -67,9 +53,6 @@ void finishTrackAnnotation(ByteReader reader, u32 startOffset, SourceMapBuilder*
 }
 
 [[nodiscard]] std::optional<Address> operandAddress(const SemanticOperand& operand) {
-  if (const auto* address = std::get_if<Address>(&operand.value)) {
-    return *address;
-  }
   if (const auto* value = std::get_if<u64>(&operand.value)) {
     return Address{*value};
   }
@@ -110,16 +93,16 @@ void projectOperand(AnnotationBuilder& annotation, const SemanticOperand& operan
     const std::string_view encodedName =
         operand.encodedName.empty() ? std::string_view{operand.name} : std::string_view{operand.encodedName};
     if (operand.range.valid()) {
-      annotation.field(encodedName, operand.range, sourceValue(*operand.encodedValue), operand.encodedDisplay);
+      annotation.field(encodedName, operand.range, *operand.encodedValue, operand.encodedDisplay);
     }
-    annotation.derived(operand.name, sourceValue(operand.value), operand.display);
+    annotation.derived(operand.name, operand.value, operand.display);
     return;
   }
 
   if (operand.range.valid()) {
-    annotation.field(operand.name, operand.range, sourceValue(operand.value), operand.display);
+    annotation.field(operand.name, operand.range, operand.value, operand.display);
   } else {
-    annotation.derived(operand.name, sourceValue(operand.value), operand.display);
+    annotation.derived(operand.name, operand.value, operand.display);
   }
 }
 

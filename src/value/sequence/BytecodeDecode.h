@@ -14,7 +14,6 @@
 #include <string>
 #include <string_view>
 #include <utility>
-#include <variant>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -27,8 +26,6 @@ struct DecodedCommandPresentation {
   SequenceSemantic semantic = SequenceSemantic::Unknown;
   CommandPlaybackStatus playback = CommandPlaybackStatus::AffectsPlayback;
 };
-
-using SemanticOperandValue = std::variant<bool, u64, s64, double, Address, std::string>;
 
 // Roles identify relationships used by source links, channel attribution, and
 // instrument discovery. Ordinary values need only a name and display style.
@@ -46,12 +43,12 @@ enum class SemanticOperandRole : u8 {
 };
 
 struct SemanticOperand {
-  SemanticOperandValue value;
+  SourceValue value = false;
   SourceRange range;
   std::string name;
   SourceValueDisplay display = SourceValueDisplay::Default;
   SemanticOperandRole role = SemanticOperandRole::Value;
-  std::optional<SemanticOperandValue> encodedValue;
+  std::optional<SourceValue> encodedValue;
   std::string encodedName;
   SourceValueDisplay encodedDisplay = SourceValueDisplay::Default;
 };

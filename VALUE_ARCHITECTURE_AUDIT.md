@@ -173,6 +173,19 @@ Update all format and test callers. Distinct jump semantics retain their named
 helpers. The full application build and all 17 CTest targets pass without
 compiler warnings.
 
+### Use one value representation for decoded source fields
+
+Decoded operands now use `SourceValue` directly instead of a second variant
+that the source-map projection immediately converted. Runtime arguments retain
+their typed values; source addresses retain their numeric value, display style,
+and relationship role. This removes the conversion visitor and duplicate
+address handling in source projection and AKAO reference discovery. String
+literals also produce text fields instead of requiring an explicit string.
+
+A focused cursor test covers encoded signed offsets, resolved address links,
+booleans, signed enums, strings, fractions, and signed reads. The full build and
+all 17 CTest targets pass without compiler warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
