@@ -10,6 +10,19 @@
 
 namespace {
 
+void sourceRangesAccumulateOneSourceIncludingAnchors() {
+  const SourceId source{3};
+  SourceRange span;
+  span.include(SourceRange{.offset = 100, .size = 100});
+  expect(!span.valid(), "an invalid input must not establish a covering range");
+  span.include(SourceRange{.source = source, .offset = 40, .size = 0});
+  span.include(SourceRange{.source = source, .offset = 10, .size = 4});
+  span.include(SourceRange{.source = source, .offset = 30, .size = 2});
+  span.include(SourceRange{.source = SourceId{4}, .offset = 0, .size = 100});
+  expect(span == SourceRange{.source = source, .offset = 10, .size = 30},
+         "a covering range must include zero-size anchors and disjoint records without merging other sources");
+}
+
 void sourceMapBuilderRecordsAnnotationsFieldsAndLinks() {
   ScanIdAllocator ids;
   SourceMapBuilder builder([&ids]() { return ids.nextSourceAnnotationId(); });
@@ -467,6 +480,7 @@ void sessionSnapshotCarriesScannerSourceMap() {
 }  // namespace
 
 void runValueSourceMapTests() {
+  sourceRangesAccumulateOneSourceIncludingAnchors();
   sourceMapBuilderRecordsAnnotationsFieldsAndLinks();
   sourceAnnotationsCarryOutlinePolicyForTreeConsumers();
   sourceMapRejectsDuplicateAnnotationIds();

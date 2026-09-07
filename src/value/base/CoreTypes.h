@@ -8,6 +8,7 @@
 
 #include "value/base/Types.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <functional>
 #include <limits>
@@ -78,6 +79,22 @@ struct SourceRange {
 
   [[nodiscard]] constexpr bool valid() const noexcept { return source.valid(); }
   [[nodiscard]] constexpr u64 endOffset() const noexcept { return offset + size; }
+
+  // Expand to cover ranges from the same source, adopting the first valid
+  // range. Invalid and foreign ranges do not contribute; zero-size anchors do.
+  constexpr void include(SourceRange range) noexcept {
+    if (!range.valid()) {
+      return;
+    }
+    if (!valid()) {
+      *this = range;
+    } else if (source == range.source) {
+      const u64 end = std::max(endOffset(), range.endOffset());
+      offset = std::min(offset, range.offset);
+      size = end - offset;
+    }
+  }
+
   friend constexpr bool operator==(SourceRange, SourceRange) noexcept = default;
 };
 

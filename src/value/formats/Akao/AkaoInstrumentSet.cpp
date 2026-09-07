@@ -301,29 +301,12 @@ void addSyntheticArticulationInstruments(std::vector<Instrument>& instruments,
   return parsed;
 }
 
-void includeSpan(std::optional<SourceRange>& span, SourceRange range) {
-  if (!range.valid()) {
-    return;
-  }
-  if (!span) {
-    span = range;
-    return;
-  }
-  if (span->source != range.source) {
-    return;
-  }
-  const u64 start = std::min(span->offset, range.offset);
-  const u64 end = std::max(span->endOffset(), range.endOffset());
-  span->offset = start;
-  span->size = end - start;
-}
-
-[[nodiscard]] std::optional<SourceRange> instrumentSpan(const std::vector<Instrument>& instruments) {
-  std::optional<SourceRange> span;
+[[nodiscard]] SourceRange instrumentSpan(const std::vector<Instrument>& instruments) {
+  SourceRange span;
   for (const Instrument& instrument : instruments) {
-    includeSpan(span, instrument.range);
+    span.include(instrument.range);
     for (const Region& region : instrument.regions) {
-      includeSpan(span, region.range);
+      span.include(region.range);
     }
   }
   return span;
@@ -331,18 +314,18 @@ void includeSpan(std::optional<SourceRange>& span, SourceRange range) {
 
 [[nodiscard]] SourceRange soundBankRange(ByteReader reader, const AkaoSequenceAnalysis& sequence,
                                          const std::vector<Instrument>& instruments) {
-  std::optional<SourceRange> span = instrumentSpan(instruments);
+  SourceRange span = instrumentSpan(instruments);
   const u64 sequenceEnd = static_cast<u64>(sequence.header.offset) + sequence.header.length;
   const auto includeAnchor = [&](u32 offset) {
     if (offset < sequenceEnd && reader.has(offset, 0)) {
-      includeSpan(span, reader.range(offset, 0));
+      span.include(reader.range(offset, 0));
     }
   };
 
   if (sequence.header.soundBankOffset) {
     const u32 offset = *sequence.header.soundBankOffset;
     if (offset < sequenceEnd && reader.has(offset, 0)) {
-      includeSpan(span, reader.range(offset, std::min<u64>(0x20, sequenceEnd - offset)));
+      span.include(reader.range(offset, std::min<u64>(0x20, sequenceEnd - offset)));
     }
   }
   if (sequence.header.drumSetOffset) {
@@ -358,7 +341,7 @@ void includeSpan(std::optional<SourceRange>& span, SourceRange range) {
   // Individual-articulation sequences have no local instrument table. They
   // still need a durable, inspectable bank asset, anchored to the sequence that
   // defines its programs.
-  return span.value_or(reader.range(sequence.header.offset, 0));
+  return span.valid() ? span : reader.range(sequence.header.offset, 0);
 }
 
 [[nodiscard]] std::string_view instrumentKind(const InstrumentAddress& address) {

@@ -40,17 +40,14 @@ bool sequenceUsesSemantic(const SequenceProgram& program, SequenceSemantic seman
 }
 
 SourceRange sequenceSourceRange(ByteReader reader, SourceRange baseRange, const SequenceProgram& program) {
-  u64 first = baseRange.offset;
-  u64 last = baseRange.endOffset();
   for (const TrackProgram& track : program.tracks) {
     for (const SourceCommand& command : track.commands) {
       if (command.range.valid() && command.range.source == baseRange.source) {
-        first = std::min(first, command.range.offset);
-        last = std::max(last, command.range.endOffset());
+        baseRange.include(command.range);
       }
     }
   }
-  return reader.range(first, last - first);
+  return reader.range(baseRange.offset, baseRange.size);
 }
 
 }  // namespace vgmtrans::core

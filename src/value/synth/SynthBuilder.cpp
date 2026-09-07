@@ -16,25 +16,6 @@ namespace vgmtrans::core {
 
 namespace {
 
-void mergeRange(std::optional<SourceRange>& destination, SourceRange range) {
-  if (!range.valid()) {
-    return;
-  }
-  if (!destination) {
-    destination = range;
-    return;
-  }
-  // A SourceRange can describe only one source. Exact records from any other
-  // source remain in SourceMap instead of being folded into a false span.
-  if (destination->source != range.source) {
-    return;
-  }
-  const u64 begin = std::min(destination->offset, range.offset);
-  const u64 end = std::max(destination->endOffset(), range.endOffset());
-  destination->offset = begin;
-  destination->size = end - begin;
-}
-
 std::optional<SourceRange> diagnosticRange(SourceRange range) {
   return range.valid() ? std::optional<SourceRange>{range} : std::nullopt;
 }
@@ -256,10 +237,7 @@ SamplePoolBuilder& SamplePoolBuilder::include(SourceRange range) {
 }
 
 SourceRange SamplePoolBuilder::range() const noexcept {
-  if (includedRange_) {
-    return *includedRange_;
-  }
-  return observedRange_.value_or(SourceRange{});
+  return includedRange_.valid() ? includedRange_ : observedRange_;
 }
 
 void SamplePoolBuilder::warning(std::string message, SourceRange range) {
@@ -361,7 +339,7 @@ void SamplePoolBuilder::annotateValues() {
 }
 
 void SamplePoolBuilder::recordRange(SourceRange range, bool explicitlyIncluded) {
-  mergeRange(explicitlyIncluded ? includedRange_ : observedRange_, range);
+  (explicitlyIncluded ? includedRange_ : observedRange_).include(range);
 }
 
 void SamplePoolBuilder::report(Severity severity, std::string code, std::string message, SourceRange range) {
@@ -448,10 +426,7 @@ InstrumentSetBuilder& InstrumentSetBuilder::include(SourceRange range) {
 }
 
 SourceRange InstrumentSetBuilder::range() const noexcept {
-  if (includedRange_) {
-    return *includedRange_;
-  }
-  return observedRange_.value_or(SourceRange{});
+  return includedRange_.valid() ? includedRange_ : observedRange_;
 }
 
 void InstrumentSetBuilder::warning(std::string message, SourceRange range) {
@@ -673,23 +648,21 @@ void InstrumentSetBuilder::linkSample(SourceAnnotationId annotation, SampleRef s
 void InstrumentSetBuilder::recordInstrumentRange(u32 index, SourceRange range) {
   auto& state = states_[index];
   recordRange(range, false);
-  mergeRange(state.observedRange, range);
-  if (!state.rangeWasExplicit && state.observedRange) {
-    instruments_[index].range = *state.observedRange;
+  if (!state.rangeWasExplicit) {
+    instruments_[index].range.include(range);
   }
 }
 
 void InstrumentSetBuilder::recordRegionRange(u32 instrumentIndex, u32 regionIndex, SourceRange range) {
   auto& state = states_[instrumentIndex].regions[regionIndex];
   recordRange(range, false);
-  mergeRange(state.observedRange, range);
-  if (!state.rangeWasExplicit && state.observedRange) {
-    instruments_[instrumentIndex].regions[regionIndex].range = *state.observedRange;
+  if (!state.rangeWasExplicit) {
+    instruments_[instrumentIndex].regions[regionIndex].range.include(range);
   }
 }
 
 void InstrumentSetBuilder::recordRange(SourceRange range, bool explicitlyIncluded) {
-  mergeRange(explicitlyIncluded ? includedRange_ : observedRange_, range);
+  (explicitlyIncluded ? includedRange_ : observedRange_).include(range);
 }
 
 void InstrumentSetBuilder::report(Severity severity, std::string code, std::string message, SourceRange range) {

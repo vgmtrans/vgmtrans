@@ -18,22 +18,9 @@ using namespace core;
 namespace {
 
 [[nodiscard]] SourceRange sequenceRange(ByteReader reader, const Layout& layout, const SequenceProgram& program) {
-  const auto include = [&](SourceRange& result, SourceRange range) {
-    if (!range.valid() || range.source != result.source) {
-      return;
-    }
-    const u64 begin = std::min(result.offset, range.offset);
-    const u64 end = std::max(result.endOffset(), range.endOffset());
-    result = reader.range(static_cast<u32>(begin), static_cast<u32>(end - begin));
-  };
-  SourceRange result = layout.sequenceHeaderRange;
-  include(result, layout.initialTempoRange);
-  for (const TrackProgram& track : program.tracks) {
-    for (const SourceCommand& command : track.commands) {
-      include(result, command.range);
-    }
-  }
-  return result;
+  SourceRange range = layout.sequenceHeaderRange;
+  range.include(layout.initialTempoRange);
+  return sequenceSourceRange(reader, range, program);
 }
 
 [[nodiscard]] ScanResult scan(const ScanInput& input) {
