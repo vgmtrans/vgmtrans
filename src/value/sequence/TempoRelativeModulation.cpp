@@ -192,10 +192,10 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
         stored.reset();
       }
     };
-    if (auto* delay = std::get_if<VibratoDelayPerformanceEvent>(&event)) {
-      resolveDelay(*delay, state.vibratoDelay);
-    } else if (auto* delay = std::get_if<TremoloDelayPerformanceEvent>(&event)) {
-      resolveDelay(*delay, state.tremoloDelay);
+    if (auto* vibrato = std::get_if<VibratoDelayPerformanceEvent>(&event)) {
+      resolveDelay(*vibrato, state.vibratoDelay);
+    } else if (auto* tremolo = std::get_if<TremoloDelayPerformanceEvent>(&event)) {
+      resolveDelay(*tremolo, state.tremoloDelay);
     }
   }
 

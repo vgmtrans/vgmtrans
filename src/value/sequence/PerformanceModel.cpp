@@ -74,12 +74,11 @@ PerformanceTempoMap::PerformanceTempoMap(const PerformanceSequence& performance)
           .microsecondsPerQuarter = tempo->microsecondsPerQuarter,
           .track = tempo->header.track,
           .sequence = tempo->header.sequence,
-          .order = changes_.size(),
       });
     }
   }
   std::ranges::stable_sort(changes_, [](const Change& lhs, const Change& rhs) {
-    return std::tie(lhs.tick, lhs.sequence, lhs.order) < std::tie(rhs.tick, rhs.sequence, rhs.order);
+    return std::tie(lhs.tick, lhs.sequence) < std::tie(rhs.tick, rhs.sequence);
   });
   std::optional<u32> currentTempo;
   std::erase_if(changes_, [&](const Change& change) {
@@ -165,6 +164,9 @@ u32 PerformanceTempoMap::durationTicksForMilliseconds(u64 startTick, double mill
   }
 
   const double exactTailTicks = remainingMicroseconds * ppqn / std::max<u32>(tempo, 1);
+  if (exactTailTicks >= std::numeric_limits<u32>::max() - elapsedTicks) {
+    return std::numeric_limits<u32>::max();
+  }
   const auto wholeTailTicks = static_cast<u64>(exactTailTicks);
   elapsedTicks += wholeTailTicks + (exactTailTicks - wholeTailTicks > 0.5 ? 1 : 0);
   return static_cast<u32>(std::min<u64>(elapsedTicks, std::numeric_limits<u32>::max()));
