@@ -124,6 +124,19 @@ inferred and declared loops, loop counts, synchronized cutoffs, section
 playlists, and sustained notes. All 17 configured CTest targets have now been
 rebuilt and pass, including the additional standalone format suites.
 
+### Keep tempo-relative modulation state in its existing event types
+
+Vibrato, tremolo, and pan rates now use one collection keyed by target and
+pitch layer. Only vibrato has multiple layers. This removes separate storage,
+lookup, replacement, and tempo-update paths while preserving derived event
+order. Delays retain their event values directly instead of splitting ticks
+and update policy into parallel fields and rebuilding the events later.
+
+Tests exercise concurrent rates, independent vibrato layers, replacement with
+fixed-clock modulation, both delay types, future-note delay policy, and tempo
+source attribution. All 17 CTest targets pass after rebuilding, without compiler
+warnings. The resolver is 42 lines shorter.
+
 ## Further investigation
 
 - Compiler cursor: duplicated adapters for emitting ordinary performance events;

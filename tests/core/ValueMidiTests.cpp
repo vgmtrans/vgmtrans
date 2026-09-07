@@ -3116,6 +3116,66 @@ void tempoRelativeModulationFollowsTheGlobalTempoTimeline() {
          "sequence-event simulation should preserve a sequence-clocked LFO's exact phase across tempo changes");
 }
 
+void tempoRelativeModulationKeepsIndependentRatesAndDelayPolicies() {
+  PerformanceSequence performance{
+      .timebase = Timebase{.ppqn = 100},
+      .initialTempoMicrosecondsPerQuarter = 1'000'000,
+      .tracks = {{.id = TrackId{0}, .endTick = 40}, {.id = TrackId{1}, .endTick = 40}},
+  };
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{performance.tracks[0], CommandId{7}, SourceAnnotationId{8}, 0,
+                         nextSequence,          nextNote,     nextAutomation};
+  out.vibratoRateCyclesPerTick(0.25, {}, PitchBendLayerId{2});
+  out.vibratoRateCyclesPerTick(0.125, {}, PitchBendLayerId{0});
+  out.panLfoRateCyclesPerTick(0.5);
+  out.tremoloRateCyclesPerTick(0.375);
+  out.vibratoDelay(VibratoDelayPerformanceEvent{
+      .delayTicks = 4, .tempoRelative = true, .updateMode = LfoDelayUpdateMode::FutureNotesOnly});
+  out.tremoloDelay(TremoloDelayPerformanceEvent{
+      .delayTicks = 8, .tempoRelative = true, .updateMode = LfoDelayUpdateMode::FutureNotesOnly});
+  out.at(20).vibratoRate(7.0, {}, PitchBendLayerId{2});
+  out.at(20).tremoloRate(9.0);
+  out.at(20).vibratoDelay(VibratoDelayPerformanceEvent{.milliseconds = 3.0});
+  PerformanceEmitter tempo{performance.tracks[1], CommandId{9}, SourceAnnotationId{10}, 0,
+                           nextSequence,          nextNote,     nextAutomation};
+  tempo.at(10).tempo(500'000);
+  tempo.at(30).tempo(250'000);
+
+  resolveTempoRelativeModulation(performance);
+  const auto at = [&](u64 tick) {
+    std::vector<const PerformanceEvent*> events;
+    for (const auto& event : performance.tracks[0].events) {
+      if (performanceEventHeader(event).tick == tick) {
+        events.push_back(&event);
+      }
+    }
+    return events;
+  };
+  const auto first = at(10);
+  const auto second = at(30);
+  expect(first.size() == 6 && second.size() == 3,
+         "fixed-clock replacements must remove only their own rate or delay from future tempo updates");
+  for (size_t i = 0; i < 4; ++i) {
+    const auto& rate = std::get<ModulationPerformanceEvent>(*first[i]);
+    expect(rate.context.frequencyHz == (i + 1) * 25.0 && rate.header.sourceAnnotation == SourceAnnotationId{10} &&
+               !rate.header.sourceCommand.valid() && rate.header.track == TrackId{0},
+           "derived rates must retain target/layer order and attribute the update to the tempo's source");
+  }
+  expect(std::get<ModulationPerformanceEvent>(*first[0]).pitchLayer == PitchBendLayerId{0} &&
+             std::get<ModulationPerformanceEvent>(*first[1]).pitchLayer == PitchBendLayerId{2} &&
+             std::get<ModulationPerformanceEvent>(*second[0]).context.frequencyHz == 50.0 &&
+             std::get<ModulationPerformanceEvent>(*second[1]).context.frequencyHz == 200.0,
+         "independent vibrato layers and pan must survive another layer's fixed-clock replacement");
+  const auto& vibratoDelay = std::get<VibratoDelayPerformanceEvent>(*first[4]);
+  const auto& tremoloDelay = std::get<TremoloDelayPerformanceEvent>(*second[2]);
+  expect(vibratoDelay.milliseconds == 20.0 && tremoloDelay.milliseconds == 20.0 &&
+             vibratoDelay.updateMode == LfoDelayUpdateMode::FutureNotesOnly &&
+             tremoloDelay.updateMode == LfoDelayUpdateMode::FutureNotesOnly,
+         "tempo updates must preserve both delay policies while resolving their physical duration");
+}
+
 void observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators() {
   MidiSequence midiSequence{
       .timebase = Timebase{.ppqn = 48},
@@ -3283,6 +3343,7 @@ void runValueMidiTests() {
   modulationAnalysisReportsObservedPerformanceMaxima();
   physicalModulationProfileDrivesMidiAndSynthFromOnePlan();
   tempoRelativeModulationFollowsTheGlobalTempoTimeline();
+  tempoRelativeModulationKeepsIndependentRatesAndDelayPolicies();
   observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators();
   observedModulationScalingUsesPreciseNormalizedAmounts();
 }
