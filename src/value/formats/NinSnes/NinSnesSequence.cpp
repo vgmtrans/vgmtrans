@@ -220,7 +220,7 @@ enum class EventType : u8 {
   VibratoOff,
   MasterVolume,
   MasterVolumeFade,
-  SunsoftVolume,
+  VolumeMultiplier,
   Tempo,
   TempoFade,
   GlobalTranspose,
@@ -443,7 +443,7 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
       definition.events[0xfb] = EventType::ChannelEchoOn;
       definition.events[0xfc] = EventType::ChannelEchoOff;
       definition.events[0xfd] = EventType::Adsr;
-      definition.events[0xfe] = selected.id == ProfileId::SunsoftEarlier ? EventType::Nop2 : EventType::SunsoftVolume;
+      definition.events[0xfe] = selected.id == ProfileId::SunsoftEarlier ? EventType::Nop2 : EventType::VolumeMultiplier;
       break;
     case ProfileId::Rd1:
       definition.events[0xfb] = EventType::Unknown2;
@@ -521,9 +521,7 @@ struct VibratoConfig {
 struct EchoState {
   void reset() {
     event = ReverbPerformanceEvent{.voiceMask = 0};
-    leftVolume.reset(0);
-    rightVolume.reset(0);
-    lastAdvanceTick.reset();
+    setVolume(0, 0);
   }
 
   [[nodiscard]] ReverbPerformanceEvent current() const {
@@ -538,6 +536,10 @@ struct EchoState {
 
   void set(u8 mask, u8 left, u8 right) {
     event.voiceMask = mask;
+    setVolume(left, right);
+  }
+
+  void setVolume(u8 left, u8 right) {
     leftVolume.reset(static_cast<s8>(left));
     rightVolume.reset(static_cast<s8>(right));
     lastAdvanceTick.reset();
@@ -557,7 +559,7 @@ struct EchoState {
 
   [[nodiscard]] bool beginFade(u8 length, u8 left, u8 right) {
     if (length == 0) {
-      set(*event.voiceMask, left, right);
+      setVolume(left, right);
       return true;
     }
     leftVolume.begin(SequenceFixedPointMotion<s32>::toRawTarget(static_cast<s8>(left), length));
@@ -619,7 +621,7 @@ struct ProgramState {
     tempoState.clearAutomation();
     tempoAutomationTrack.reset();
     masterVolume = selected.initialMasterVolume;
-    sunsoftVolume = 0xff;
+    volumeMultiplier = 0xff;
     masterVolumeState.reset(masterVolume);
     masterVolumeState.clearAutomation();
     masterVolumeAutomationTrack.reset();
@@ -753,7 +755,7 @@ struct ProgramState {
   PerformanceBoundValue<SequenceFixedPointAutomation<s32>> tempoState;
   std::optional<u32> tempoAutomationTrack;
   u8 masterVolume = 0xff;
-  u8 sunsoftVolume = 0xff;
+  u8 volumeMultiplier = 0xff;
   PerformanceBoundValue<SequenceFixedPointAutomation<s32>> masterVolumeState;
   std::optional<u32> masterVolumeAutomationTrack;
   s8 globalTranspose = 0;
@@ -1326,14 +1328,14 @@ struct Playback {
   }
 
   [[nodiscard]] double masterGain(u8 value) const {
-    return math::levelGain(value) * math::levelGain(program.sunsoftVolume);
+    return math::levelGain(value) * math::levelGain(program.volumeMultiplier);
   }
 
-  void sunsoftVolume(u8 value) {
+  void volumeMultiplier(u8 value) {
     // The combined output changes immediately, but E6's source-domain fade
     // keeps running. End its old output binding without clearing that motion.
     program.masterVolumeState.interruptAutomationAt(vm.tick());
-    program.sunsoftVolume = value;
+    program.volumeMultiplier = value;
     out.masterLevel(masterGain(program.masterVolume));
   }
 
@@ -1430,7 +1432,7 @@ struct Playback {
   void echoOff() {
     if (isSunsoft(program.selected.id)) {
       // F6 zeros EVOL but keeps the channel masks used by FB/FC.
-      program.echo.set(*program.echo.current().voiceMask, 0, 0);
+      program.echo.setVolume(0, 0);
     } else {
       program.echo.disable();
     }
@@ -1788,9 +1790,9 @@ struct DecodeContext {
       auto event = cursor.command("Master Volume", SequenceSemantic::Level);
       return event.invoke<&Playback::masterVolume>(event.u8("volume"));
     }
-    case EventType::SunsoftVolume: {
-      auto event = cursor.command("Music Volume Multiplier", SequenceSemantic::Level);
-      return event.invoke<&Playback::sunsoftVolume>(event.u8("volume"));
+    case EventType::VolumeMultiplier: {
+      auto event = cursor.command("Volume Multiplier", SequenceSemantic::Level);
+      return event.invoke<&Playback::volumeMultiplier>(event.u8("volume"));
     }
     case EventType::MasterVolumeFade: {
       auto event = cursor.command("Master Volume Fade", SequenceSemantic::Level);
