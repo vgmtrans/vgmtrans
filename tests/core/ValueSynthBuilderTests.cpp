@@ -132,8 +132,7 @@ void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
       }},
   };
   first.source("First Entry", firstRecord, "probe-sample-entry").parent(root.id()).outline(SourceOutlinePolicy::Show);
-  auto alias = samples.alias(9, 7);
-  alias.source("Alias Entry", SourceRange{.source = source, .offset = 12, .size = 4}, "probe-sample-alias")
+  first.source("Additional Entry", SourceRange{.source = source, .offset = 12, .size = 4}, "probe-sample-entry")
       .parent(root.id());
 
   auto second = samples.add(20, Sample{
@@ -142,26 +141,27 @@ void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
                                 });
   expect(second.ref().index() == 1, "a sparse source key should still receive the next dense index");
   expect(!samples.add(7, Sample{}), "a duplicate source key should not return a usable entry");
-  expect(!samples.alias(11, 99), "an alias to a missing key should not return a usable entry");
   expect(samples.size() == 2, "rejected sample keys must not change later dense indexes");
   expect(samples.range() == directory, "an included table range should remain the asset's primary range");
+  const auto firstRef = samples.find(7);
+  const auto secondRef = samples.find(20);
+  expect(firstRef && firstRef->owner() == asset && firstRef->index() == 0 && secondRef && secondRef->owner() == asset &&
+             secondRef->index() == 1 && !samples.find(99),
+         "sample lookup should resolve sparse keys to dense references and reject missing keys");
 
   const auto built = std::move(samples).finish();
   const auto& collection = built.value;
-  const auto& retained = built.refs;
   const SourceMap annotations = sourceMap.finish();
   expect(built.range == directory, "finish should return the final sample collection range");
   expect(collection.samples.size() == 2, "sample builder should finish ordinary sample values");
-  expect(retained.find(7) && retained.find(7)->index() == 0 && retained.find(9) && retained.find(9)->index() == 0,
-         "retained lookup should preserve direct and alias mappings after finish");
-  expect(retained.find(20) && retained.find(20)->index() == 1,
-         "retained lookup should preserve sparse source keys after finish");
-  expect(diagnostics.size() == 2 && diagnostics[0].code == "synth.sample-key.duplicate" &&
-             diagnostics[1].code == "synth.sample-alias.missing-target",
-         "sample builder should diagnose duplicate keys and missing aliases once");
+  expect(firstRef && collection.samples[firstRef->index()].name == "First" && secondRef &&
+             collection.samples[secondRef->index()].name == "Fallback",
+         "concrete sample references should retain their meaning after finalization");
+  expect(diagnostics.size() == 1 && diagnostics[0].code == "synth.sample-key.duplicate",
+         "sample builder should diagnose a duplicate key once");
 
   const auto firstSources = annotations.ownedBy(ObjectRefs::sample(asset, 0));
-  expect(firstSources.size() == 2, "an alias should add provenance to the existing sample rather than duplicate it");
+  expect(firstSources.size() == 2, "additional source records should retain the same sample owner");
   const SourceAnnotation& firstAnnotation = annotations.get(firstSources[0]);
   const SourceField* srcn = fieldNamed(firstAnnotation, "srcn");
   expect(firstAnnotation.outline == SourceOutlinePolicy::Show && srcn != nullptr &&
@@ -366,10 +366,9 @@ void scanResultBuilderRetainsSampleKeysAndExposesExistingRegions() {
   auto& samples = pool.samples();
   const AssetId samplesAsset = pool.id();
   samples.add(12, Sample{.name = "Sparse Sample", .encodedData = input.reader.range(32, 4)});
-  samples.alias(20, 12);
-  const auto sample = samples.find(20);
+  const auto sample = samples.find(12);
   expect(sample && sample->owner() == samplesAsset && sample->index() == 0,
-         "a sample draft should retain sparse and alias keys for later instrument tables");
+         "a sample draft should retain sparse keys for later instrument tables");
   if (!samples.find(99)) {
     samples.warning("Required sample 99 was not found", input.reader.range(4, 1));
   }
@@ -463,14 +462,13 @@ void scanResultBuilderDraftViewsRemainStableAsTheResultGrows() {
   for (u32 index = 0; index < 64; ++index) {
     result.misc("Padding", input.reader.range(index, 1)).payload({static_cast<u8>(index)});
   }
-  samples.alias(9, 7);
   sample.source("Stable Sample", input.reader.range(12, 4), "probe-stable-sample");
-  const auto alias = samples.find(9);
+  const auto retained = samples.find(7);
 
   const ScanResult scan = result.finish();
   const auto& sampleAsset = std::get<SamplePoolAsset>(scan.assets.front());
-  expect(sampleAsset.pool.samples.size() == 1 && pool.id() == sampleAsset.metadata.id && alias &&
-             alias->owner() == pool.id() && alias->index() == 0,
+  expect(sampleAsset.pool.samples.size() == 1 && pool.id() == sampleAsset.metadata.id && retained &&
+             retained->owner() == pool.id() && retained->index() == 0,
          "draft proxies and sparse lookups should survive growth of the result-owned draft list");
   expect(scan.sourceMap.ownedBy(ObjectRefs::sample(pool.id(), 0)).size() == 1,
          "entries obtained before result growth should still publish their source annotations");

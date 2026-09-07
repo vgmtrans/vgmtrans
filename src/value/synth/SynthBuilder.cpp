@@ -151,18 +151,6 @@ void annotateSynthValue(AnnotationBuilder annotation, const Region& region) {
   annotateEnvelope(annotation, region.envelope);
 }
 
-SampleRefLookup::SampleRefLookup(AssetId owner, std::unordered_map<u64, u32> indexes)
-    : owner_(owner), indexes_(std::move(indexes)) {
-}
-
-std::optional<SampleRef> SampleRefLookup::find(u64 sourceKey) const {
-  const auto found = indexes_.find(sourceKey);
-  if (found == indexes_.end()) {
-    return std::nullopt;
-  }
-  return SampleRef::resolved(owner_, found->second);
-}
-
 SamplePoolBuilder::SamplePoolBuilder(AssetId asset, SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics)
     : asset_(asset), sourceMap_(sourceMap), diagnostics_(diagnostics) {
 }
@@ -183,26 +171,6 @@ SamplePoolBuilder::Entry SamplePoolBuilder::add(u64 sourceKey, Sample sample) {
   states_.emplace_back();
   recordRange(samples_.back().encodedData, false);
   return Entry{*this, index};
-}
-
-SamplePoolBuilder::Entry SamplePoolBuilder::alias(u64 aliasKey, u64 existingKey) {
-  if (finished_) {
-    throw std::logic_error("Cannot add a sample alias after SamplePoolBuilder::finish()");
-  }
-  if (indexes_.contains(aliasKey)) {
-    report(Severity::Error, "synth.sample-key.duplicate", "Duplicate sample source key " + std::to_string(aliasKey),
-           {});
-    return {};
-  }
-  const auto found = indexes_.find(existingKey);
-  if (found == indexes_.end()) {
-    report(Severity::Error, "synth.sample-alias.missing-target",
-           "Sample alias " + std::to_string(aliasKey) + " refers to missing source key " + std::to_string(existingKey),
-           {});
-    return {};
-  }
-  indexes_.emplace(aliasKey, found->second);
-  return Entry{*this, found->second};
 }
 
 std::optional<SampleRef> SamplePoolBuilder::find(u64 sourceKey) const {
@@ -255,10 +223,10 @@ BuiltSamplePool SamplePoolBuilder::finish() && {
   addFallbackSources();
   annotateValues();
   const SourceRange finalRange = range();
+  indexes_.clear();
   finished_ = true;
   return BuiltSamplePool{
       .value = SamplePool{.samples = std::move(samples_)},
-      .refs = SampleRefLookup{asset_, std::move(indexes_)},
       .range = finalRange,
   };
 }

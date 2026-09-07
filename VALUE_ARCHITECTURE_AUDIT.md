@@ -298,6 +298,20 @@ The full build and all 17 CTest targets pass without compiler warnings. Existing
 VM coverage exercises finite repeats, nested calls and repeats, counter reuse,
 repeat breaks, loop candidates, and section transitions.
 
+### Remove unused sample-builder alias and retained-lookup APIs
+
+Repository-wide call-site inspection found that `SamplePoolBuilder::alias` and
+the finalized `SampleRefLookup` were used only in tests. Remove both features;
+formats already resolve sparse keys during construction and retain concrete
+`SampleRef` values. Finalization releases the temporary key map instead of
+returning another object that every scanner discards. SNES catalog alias
+resolution remains its own live, format-specific behavior.
+
+Adapt builder tests to retain coverage of sparse and missing keys, duplicate
+diagnostics, multiple source records per sample, references surviving
+finalization, and stable draft views. The full build and all 17 CTest targets
+pass without compiler warnings. This removes 50 production lines.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

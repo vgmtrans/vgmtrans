@@ -25,25 +25,8 @@ void annotateSynthValue(AnnotationBuilder annotation, const Sample& sample);
 void annotateSynthValue(AnnotationBuilder annotation, const Instrument& instrument);
 void annotateSynthValue(AnnotationBuilder annotation, const Region& region);
 
-// A read-only copy of a sample builder's source-key lookup. Formats that
-// discover instruments after committing their sample asset can retain this
-// small value without retaining construction state.
-class SampleRefLookup {
-public:
-  [[nodiscard]] std::optional<SampleRef> find(u64 sourceKey) const;
-
-private:
-  friend class SamplePoolBuilder;
-
-  SampleRefLookup(AssetId owner, std::unordered_map<u64, u32> indexes);
-
-  AssetId owner_;
-  std::unordered_map<u64, u32> indexes_;
-};
-
 struct BuiltSamplePool {
   SamplePool value;
-  SampleRefLookup refs;
   SourceRange range;
 };
 
@@ -62,7 +45,6 @@ public:
   SamplePoolBuilder& operator=(SamplePoolBuilder&&) noexcept = default;
 
   Entry add(u64 sourceKey, Sample sample);
-  Entry alias(u64 aliasKey, u64 existingKey);
   [[nodiscard]] std::optional<SampleRef> find(u64 sourceKey) const;
 
   // Asset-level source structures, such as a sample directory table, use this
