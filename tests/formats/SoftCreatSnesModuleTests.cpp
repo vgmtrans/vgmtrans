@@ -75,7 +75,7 @@ std::vector<const Event*> events(const PerformanceTrack& track) {
   return result;
 }
 
-PerformanceSequence render(std::initializer_list<u8> commands, Version version = Version::V2) {
+PerformanceSequence render(const std::vector<u8>& commands, Version version = Version::V2) {
   std::vector<u8> bytes(kAramSize);
   constexpr u16 start = 0x1000;
   std::ranges::copy(commands, bytes.begin() + start);
@@ -348,7 +348,7 @@ void versionedOpcodesRetainTheirRealOperandLengths() {
 void physicalEffectsAndSoftwareGainRender() {
   const PerformanceSequence performance = render(
       {0x86, 8, 0xb3, 0x70, 0x80, 0xa2, 1, 0, 3, 0x7f, 3, 0x40, 3, 0x92, 2,
-       0x8e, 0, 4, 2, 1, 0xaa, 0xac, 0x40, 0xad, 0xc0, 0xae, 0xe0,
+       0x8e, 0, 4, 7, 1, 0xaa, 0xac, 0x40, 0xad, 0xc0, 0xae, 0xe0,
        0xaf, 0x7f, 0, 0, 0, 0, 0, 0, 0, 0x80});
   const PerformanceTrack& track = performance.tracks.front();
   const auto notes = events<NotePerformanceEvent>(track);
@@ -366,11 +366,13 @@ void physicalEffectsAndSoftwareGainRender() {
            return event->target == ModulationPerformanceTarget::VibratoDepth && event->pitchDepthSemitones &&
                   *event->pitchDepthSemitones > 0.001 && event->context.shape &&
                   event->context.shape->waveform == LfoWaveform::Triangle &&
-                  event->context.polarity == LfoPolarity::Positive && event->context.pitchRangeSemitones &&
-                  event->context.pitchRangeSemitones->minimum == 0.0 &&
-                  event->context.pitchRangeSemitones->maximum > 0.0;
+                  event->context.polarity == LfoPolarity::Bipolar && event->context.pitchRangeSemitones &&
+                  event->context.pitchRangeSemitones->minimum < 0.0 &&
+                  event->context.pitchRangeSemitones->maximum > 0.0 && event->context.cyclesPerTick &&
+                  std::abs(*event->context.cyclesPerTick - 1.0 / 14.0) < 0.000001 &&
+                  event->context.shape->samples.size() == 14;
          }),
-         "additive one-sided triangle vibrato should retain its physical pitch range and shape");
+         "vibrato should retain its bipolar physical range, stepped shape, and full direction interval");
   expect(reverb.size() >= 5 && reverb.back()->voiceMask == 1 && reverb.back()->leftGain &&
              *reverb.back()->leftGain == 0.5 && reverb.back()->rightGain && *reverb.back()->rightGain == -0.5 &&
              reverb.back()->feedback == -0.25 && reverb.back()->filterIndex == 0,
@@ -440,6 +442,18 @@ void durationModesLegatoAndRepeatsAreStateful() {
   expect(polymorphicTail.diagnostics.empty() &&
              std::ranges::count_if(polymorphicNotes, [](const auto* note) { return !note->extendsPrevious; }) == 2,
          "a byte that becomes a per-note suffix on a later pass should retain both control-flow interpretations");
+
+  constexpr u16 subroutine = 0x1100;
+  std::vector<u8> repeatedCalls(0x104);
+  for (u32 offset = 0; offset < 60; offset += 3) {
+    repeatedCalls[offset] = 0x82;
+    writeLe16(repeatedCalls, offset + 1, subroutine);
+  }
+  repeatedCalls[60] = 0x80;
+  writeBytes(repeatedCalls, subroutine - 0x1000, {0x32, 1, 0x83});
+  const PerformanceSequence manyCalls = render(repeatedCalls, Version::V7);
+  expect(manyCalls.diagnostics.empty() && events<NotePerformanceEvent>(manyCalls.tracks.front()).size() == 20,
+         "repeated calls to one pattern should decode every return continuation");
 }
 
 void finiteRepeatsAreNotSongLoops() {
