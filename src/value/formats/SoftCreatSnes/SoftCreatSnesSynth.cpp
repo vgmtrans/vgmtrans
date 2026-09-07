@@ -33,14 +33,14 @@ namespace {
 }  // namespace
 
 std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
-                                           const SequenceReferences& references, std::string_view displayName) {
+                                           const std::set<u8>& referencedInstruments, std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const u32 tableSize = tuningTableSize(layout);
   if (tableSize == 0 || !reader.has(layout.coarseTableAddress, tableSize) ||
       !reader.has(layout.fineTableAddress, tableSize)) {
     return std::nullopt;
   }
-  std::vector<u8> srcns(references.srcns.begin(), references.srcns.end());
+  std::vector<u8> srcns(referencedInstruments.begin(), referencedInstruments.end());
   const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, srcns);
   if (catalog.samples.empty()) {
     return std::nullopt;

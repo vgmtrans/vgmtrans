@@ -50,6 +50,10 @@ namespace math {
 
 [[nodiscard]] constexpr double signedGain(s8 value) { return value / 128.0; }
 
+[[nodiscard]] double semitones(double pitch, double reference) {
+  return 12.0 * std::log2(std::max(1.0, pitch) / reference);
+}
+
 [[nodiscard]] std::optional<u8> firPreset(const std::array<s8, 8>& coefficients) {
   const auto found = std::ranges::find(kFirPresets, coefficients);
   return found == kFirPresets.end() ? std::nullopt
@@ -256,8 +260,7 @@ struct Playback {
     if (!track.lastNote.valid() || track.referencePitch <= 0.0) {
       return;
     }
-    const double physical = std::max(1.0, outputPitch(track.currentPitch));
-    const double bend = 12.0 * std::log2(physical / track.referencePitch);
+    const double bend = math::semitones(outputPitch(track.currentPitch), track.referencePitch);
     if (!track.lastPitchBend || std::abs(*track.lastPitchBend - bend) > 0.000001) {
       out.pitchBend(bend);
       track.lastPitchBend = bend;
@@ -276,13 +279,10 @@ struct Playback {
     const u32 halfCycle = math::ticks(static_cast<u8>(vibrato.interval >> 1));
     const double rawDepth = vibrato.step * halfCycle;
     const LfoPolarity polarity = vibrato.startsNegative ? LfoPolarity::Negative : LfoPolarity::Positive;
-    const double minimum = vibrato.startsNegative
-                               ? 12.0 * std::log2(std::max(1.0, track.referencePitch - rawDepth) /
-                                                track.referencePitch)
-                               : 0.0;
-    const double maximum = vibrato.startsNegative
-                               ? 0.0
-                               : 12.0 * std::log2((track.referencePitch + rawDepth) / track.referencePitch);
+    const double minimum =
+        vibrato.startsNegative ? math::semitones(track.referencePitch - rawDepth, track.referencePitch) : 0.0;
+    const double maximum =
+        vibrato.startsNegative ? 0.0 : math::semitones(track.referencePitch + rawDepth, track.referencePitch);
     const LfoPerformanceContext context{
         .cyclesPerTick = 1.0 / (2.0 * halfCycle),
         .delayTicks = vibrato.delay,
@@ -465,10 +465,12 @@ struct Playback {
         releaseGain();
       }
     }
-    if (track.gainAutomation.valid() && track.gainMode == GainMode::Preset) {
-      tickPresetGain();
-    } else if (track.gainAutomation.valid() && track.gainMode == GainMode::Stream) {
-      tickStreamGain();
+    if (track.gainAutomation.valid()) {
+      if (track.gainMode == GainMode::Preset) {
+        tickPresetGain();
+      } else {
+        tickStreamGain();
+      }
     }
     tickTargetPitch();
     if (track.portamentoStep == 0) {
@@ -581,13 +583,13 @@ struct Playback {
     const s8 noteTranspose = bypass ? 0 : track.transpose;
     const double key = 24.0 + static_cast<u8>(rawNote + noteTranspose);
     const u8 internal = static_cast<u8>(rawNote + coarse(track.srcn) + noteTranspose);
-    const u32 length = math::ticks(encodedDuration);
+    beginDuration(encodedDuration);
     const bool continues = !track.retrigger && track.lastNote.valid();
     const PerformanceNoteId previousNote = track.lastNote;
     NotePerformanceEvent event{
         .key = key,
         .linearVelocity = 1.0,
-        .durationTicks = length,
+        .durationTicks = track.remaining,
         .restartsEnvelope = !continues,
         .restartsLfoPhase = !continues,
     };
@@ -600,7 +602,7 @@ struct Playback {
       }
     } else {
       track.lastNote = out.note(std::move(event));
-      attachGain(length);
+      attachGain(track.remaining);
     }
     if (track.gainRetriggers) {
       restartGain();
@@ -616,10 +618,8 @@ struct Playback {
     track.referencePitch = tunedPitch(internal, track.srcn);
     if (track.haveCurrentPitch && track.portamentoStep != 0 &&
         std::abs(track.currentPitch - track.targetPitch) >= 1.0) {
-      const double startKey =
-          key + 12.0 * std::log2(std::max(1.0, outputPitch(track.currentPitch)) / track.referencePitch);
-      const double targetKey =
-          key + 12.0 * std::log2(std::max(1.0, outputPitch(track.targetPitch)) / track.referencePitch);
+      const double startKey = key + math::semitones(outputPitch(track.currentPitch), track.referencePitch);
+      const double targetKey = key + math::semitones(outputPitch(track.targetPitch), track.referencePitch);
       const u32 slideTicks = static_cast<u32>(
           std::ceil(std::abs(track.targetPitch - track.currentPitch) / track.portamentoStep));
       auto slide = out.pitchSlide(track.lastNote, startKey, targetKey, slideTicks).preferPitchBend();
@@ -637,8 +637,7 @@ struct Playback {
     }
     emitVibrato();
 
-    beginDuration(encodedDuration);
-    return wait(length, runtimeContinuation);
+    return wait(track.remaining, runtimeContinuation);
   }
 
   void directVolume(StereoSide side, s8 value) {
@@ -791,7 +790,10 @@ struct DecodeState {
 };
 
 [[nodiscard]] u8 canonicalOpcode(Version version, u8 opcode) {
-  if (version == Version::MaximumCarnage) {
+  if (version == Version::V1 && opcode >= 0x80) {
+    return (opcode & 1) == 0 ? static_cast<u8>(0x80 + (opcode - 0x80) / 2) : 0xff;
+  }
+  if (version == Version::V6c) {
     if (opcode >= 0x8c && opcode <= 0xa8) {
       return static_cast<u8>(opcode + 1);
     }
@@ -799,14 +801,14 @@ struct DecodeState {
       return static_cast<u8>(opcode + 6);
     }
   }
-  if (version == Version::LateNoEcho && opcode >= 0xaa && opcode <= 0xb0) {
+  if (version == Version::V6d && opcode >= 0xaa && opcode <= 0xb0) {
     return 0xb0;
   }
   return opcode;
 }
 
-[[nodiscard]] bool isAlias(Version version, u8 opcode) {
-  return dialect(version).noteAliasOpcode == opcode;
+[[nodiscard]] bool isAlias(const Layout& layout, u8 opcode) {
+  return layout.noteAliasTableAddress && dialect(layout.version).noteAliasOpcode == opcode;
 }
 
 [[nodiscard]] GainRow readGainRow(Cursor::Event& event) {
@@ -823,13 +825,13 @@ struct DecodeState {
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, const Layout& layout, u32 begin,
                                                    DecodeState& state, std::vector<Diagnostic>* diagnostics,
-                                                   SequenceReferences* references) {
+                                                   std::set<u8>* referencedInstruments) {
   Cursor cursor(reader, begin, "softcreat-snes", diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
   }
   const u8 opcode = cursor.opcode();
-  if (opcode < 0x80 || isAlias(layout.version, opcode)) {
+  if (opcode < 0x80 || isAlias(layout, opcode)) {
     u8 note = opcode;
     auto event = cursor.command(opcode == 0 ? "Rest" : (opcode < 0x80 ? "Note" : "Indexed Note"),
                                 opcode == 0 ? SequenceSemantic::Rest : SequenceSemantic::Note);
@@ -853,10 +855,10 @@ struct DecodeState {
     const u8 duration =
         literalDuration ? event.u8("duration", SemanticOperandRole::Duration) : state.defaultDuration;
     state.explicitDuration = false;
-    if (references != nullptr && note != 0 && state.drumTable && note >= 0x12) {
+    if (referencedInstruments != nullptr && note != 0 && state.drumTable && note >= 0x12) {
       const u16 entry = static_cast<u16>(*state.drumTable + (note - 0x12u) * 4u);
       if (reader.has(entry, 4)) {
-        references->srcns.insert(reader.u8At(entry));
+        referencedInstruments->insert(reader.u8At(entry));
       }
     }
     const Address continuation = event.nextAddress();
@@ -866,7 +868,7 @@ struct DecodeState {
   if (opcode >= dialect(layout.version).commandCutoff || opcode == 0x80) {
     return cursor.command("End", SequenceSemantic::End).end();
   }
-  if (layout.version == Version::Plok && opcode == 0xb9) {
+  if (layout.version == Version::V2b && opcode == 0xb9) {
     return cursor.sourceOnly("Driver Stack Assertion", "stack-assertion");
   }
 
@@ -904,8 +906,8 @@ struct DecodeState {
     case 0x89: {
       auto event = cursor.command("Instrument", SequenceSemantic::Program);
       const u8 srcn = event.u8("srcn", SemanticOperandRole::InstrumentProgram);
-      if (references != nullptr) {
-        references->srcns.insert(srcn);
+      if (referencedInstruments != nullptr) {
+        referencedInstruments->insert(srcn);
       }
       return event.invoke<&Playback::instrument>(srcn);
     }
@@ -999,15 +1001,16 @@ struct DecodeState {
     }
     case 0xa3:
     case 0xa4: {
-      auto event = cursor.command(command == 0xa3 ? "Random Jump" : "Random Call",
-                                  command == 0xa3 ? SequenceSemantic::Jump : SequenceSemantic::Call);
+      const bool isCall = command == 0xa4;
+      auto event = cursor.command(isCall ? "Random Call" : "Random Jump",
+                                  isCall ? SequenceSemantic::Call : SequenceSemantic::Jump);
       const u8 count = event.u8("choices", SemanticOperandRole::Count);
       std::vector<Address> choices;
       choices.reserve(count);
       for (u32 choice = 0; choice < count && event.ok(); ++choice) {
         choices.push_back(event.addressLe(fmt::format("destination_{}", choice),
-                                          command == 0xa3 ? SemanticOperandRole::JumpTarget
-                                                          : SemanticOperandRole::CallTarget));
+                                          isCall ? SemanticOperandRole::CallTarget
+                                                 : SemanticOperandRole::JumpTarget));
       }
       if (choices.empty()) {
         return event.stop();
@@ -1017,7 +1020,7 @@ struct DecodeState {
       }
       // Randomness is external to the portable sequence VM. Preserve all
       // source paths and render the first path deterministically.
-      return command == 0xa3 ? event.jump(choices.front()) : event.call(choices.front());
+      return isCall ? event.call(choices.front()) : event.jump(choices.front());
     }
     case 0xa5:
     case 0xa6: {
@@ -1136,8 +1139,8 @@ struct DecodeState {
 struct DiscoveryPoint {
   u32 offset = 0;
   DecodeState state;
-  std::vector<u32> returns;
-  std::vector<u32> repeats;
+  std::vector<u32> returnStack;
+  std::vector<u32> repeatStack;
 
   friend auto operator<=>(const DiscoveryPoint&, const DiscoveryPoint&) = default;
 };
@@ -1150,7 +1153,7 @@ struct DiscoveredCommand {
 [[nodiscard]] TrackProgram decodeTrack(ByteReader reader, const Layout& layout, u32 trackNumber, u32 startAddress,
                                        std::optional<AssetId> sequence, std::optional<SourceAnnotationId> parent,
                                        SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics,
-                                       SequenceReferences* references) {
+                                       std::set<u8>* referencedInstruments) {
   TrackDecodeScope scope{
       .reader = reader,
       .bytecodeEnd = kAramSize,
@@ -1182,14 +1185,14 @@ struct DiscoveredCommand {
     ++stateVisits[point.offset];
     DecodeState nextState = point.state;
     DecodedBytecodeCommand decoded =
-        decodeCommand(reader, layout, point.offset, nextState, diagnostics, references);
+        decodeCommand(reader, layout, point.offset, nextState, diagnostics, referencedInstruments);
     const auto [existing, inserted] = commands.try_emplace(
         point.offset, DiscoveredCommand{.command = decoded, .initialState = point.state});
     if (!inserted && existing->second.command.range.size != decoded.range.size) {
       const DecodeState& original = existing->second.initialState;
       DecodeState withoutVolumeDifference = point.state;
       withoutVolumeDifference.perNoteVolume = original.perNoteVolume;
-      const bool volumeSuffixOnly = (decoded.opcode < 0x80 || isAlias(layout.version, decoded.opcode)) &&
+      const bool volumeSuffixOnly = (decoded.opcode < 0x80 || isAlias(layout, decoded.opcode)) &&
                                     original == withoutVolumeDifference &&
                                     original.perNoteVolume != point.state.perNoteVolume;
       if (!volumeSuffixOnly) {
@@ -1207,47 +1210,42 @@ struct DiscoveredCommand {
     const u8 command = canonicalOpcode(layout.version, decoded.opcode);
     const Address continuation = decoded.flow.continuation;
     if (command == 0x84) {
-      point.repeats.push_back(static_cast<u32>(continuation.value));
+      point.repeatStack.push_back(static_cast<u32>(continuation.value));
       queue(continuation, std::move(point));
       continue;
     }
     if (command == 0x85) {
-      if (point.repeats.empty()) {
+      if (point.repeatStack.empty()) {
         continue;
       }
-      queue(Address{point.repeats.back()}, point);
-      point.repeats.pop_back();
+      queue(Address{point.repeatStack.back()}, point);
+      point.repeatStack.pop_back();
       queue(continuation, std::move(point));
       continue;
     }
 
-    const auto queueAlternatives = [&] {
-      for (const Address target : decoded.discoveryTargets) {
-        queue(target, point);
-      }
-    };
+    for (const Address target : decoded.discoveryTargets) {
+      queue(target, point);
+    }
     switch (decoded.flow.defaultTransition.kind) {
       case CommandTransitionKind::Fallthrough:
-        queueAlternatives();
         queue(continuation, std::move(point));
         break;
       case CommandTransitionKind::Jump:
-        queueAlternatives();
         if (const auto target = decoded.flow.defaultDestination()) {
           queue(*target, std::move(point));
         }
         break;
       case CommandTransitionKind::Call:
-        point.returns.push_back(static_cast<u32>(continuation.value));
-        queueAlternatives();
+        point.returnStack.push_back(static_cast<u32>(continuation.value));
         if (const auto target = decoded.flow.defaultDestination()) {
           queue(*target, std::move(point));
         }
         break;
       case CommandTransitionKind::Return:
-        if (!point.returns.empty()) {
-          const Address target{point.returns.back()};
-          point.returns.pop_back();
+        if (!point.returnStack.empty()) {
+          const Address target{point.returnStack.back()};
+          point.returnStack.pop_back();
           queue(target, std::move(point));
         }
         break;
@@ -1296,7 +1294,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
                              std::vector<Diagnostic>* diagnostics) {
   SequenceProgram program = sequenceConfig().makeProgram();
   program.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(layout.initialTimer);
-  SequenceReferences references;
+  std::set<u8> referencedInstruments{0};
 
   std::optional<SourceAnnotationId> headerParent;
   if (sourceMap != nullptr) {
@@ -1325,10 +1323,10 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
           .parent(*headerParent);
     }
     program.tracks.push_back(decodeTrack(reader, layout, track, pointer.address, sequenceId, headerParent, sourceMap,
-                                         diagnostics, &references));
+                                         diagnostics, &referencedInstruments));
   }
   program.runtime = sequenceRuntime(RetainedSource::copyOf(reader), layout);
-  return SequenceParse{.program = std::move(program), .references = std::move(references)};
+  return SequenceParse{.program = std::move(program), .referencedInstruments = std::move(referencedInstruments)};
 }
 
 }  // namespace vgmtrans::formats::softcreat_snes
