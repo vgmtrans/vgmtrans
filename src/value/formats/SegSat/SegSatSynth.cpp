@@ -52,7 +52,6 @@ struct ParsedRegion {
   SourceRecord source;
   SampleData sample;
   Region region;
-  u8 vlIndex = 0;
   u8 totalLevel = 0;
   InstrumentModulation modulation;
 };
@@ -397,7 +396,6 @@ struct PanAndAttenuation {
                   .pan = output.position,
                   .attenuationDb = output.attenuationDb,
               },
-          .vlIndex = reader.u8At(regionOffset + 29),
           .totalLevel = reader.u8At(regionOffset + 15),
           .modulation = regionModulation(reader, bank, version, regionOffset),
       };

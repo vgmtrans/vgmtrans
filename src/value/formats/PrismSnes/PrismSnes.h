@@ -37,7 +37,6 @@ struct TrackHeader {
 
 struct Layout {
   Version version = Version::Modern;
-  u16 sequenceListAddress = 0;
   u16 sequenceHeaderAddress = 0;
   u16 commandTableAddress = 0;
   u16 spcDirAddress = 0;
