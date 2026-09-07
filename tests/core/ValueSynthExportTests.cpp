@@ -527,6 +527,19 @@ void soundFontExporterWritesSfbkRiffFile() {
   expect(chunkSize(shared.bytes, "phdr") == 3 * 38 && chunkSize(shared.bytes, "inst") == 2 * 22 &&
              soundFontPgenContainsAmount(shared.bytes, 34, 1200),
          "SoundFont envelope variants should share one sample-mapped instrument through preset ADSR offsets");
+
+  soundBank.instruments.resize(1);
+  auto& regions = soundBank.instruments.front().regions;
+  const Region region = regions.front();
+  regions.resize(5000, region);
+  bool rejectedOverflow = false;
+  try {
+    static_cast<void>(buildSoundFont2(
+        SynthExportInput{.name = "Too many zones", .soundBanks = soundBanks, .samplePools = samples}, sources));
+  } catch (const std::overflow_error&) {
+    rejectedOverflow = true;
+  }
+  expect(rejectedOverflow, "SoundFont table offsets must reject generator indexes that exceed 16 bits");
 }
 
 void dlsExporterWritesDlsRiffFile() {

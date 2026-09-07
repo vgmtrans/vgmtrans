@@ -221,6 +221,22 @@ without errors. The full build and all 17 CTest targets pass. A broader rebuild
 also exposed a shadowed delay variable in the earlier modulation refactor;
 rename it, leaving the final build free of compiler warnings.
 
+### Write SoundFont indexes from actual table positions
+
+Build each preset/instrument table together with its bags, generators, and
+modulators. Indexes come from the serialized record buffers; remove the five
+instrument counting/global-zone helpers and the separate preset generator
+prediction. An empty global zone is omitted based on the records actually
+produced. This removes 122 production lines and eliminates the requirement to
+keep counting and writing paths synchronized when export behavior changes.
+
+Keep generator ordering, terminal records, 16-bit index checks, and shared
+sample-map envelope variants. Add a regression that rejects an oversized
+generator table. The full build and all 17 CTest targets pass without compiler
+warnings. A before/after comparison across 4,608 configurations, each containing
+mixed instruments, multiple regions, and an envelope variant, produces identical
+bytes for all 9,216 SF2/DLS outputs.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
