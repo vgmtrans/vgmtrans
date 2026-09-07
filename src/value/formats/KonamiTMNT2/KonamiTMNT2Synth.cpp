@@ -94,7 +94,6 @@ std::vector<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layou
       instruments
           .add(index,
                Instrument{
-                   .explicitAddress = InstrumentAddress{.bank = index >> 7, .program = index & 0x7f},
                    .identity = InstrumentIdentity{.domain = std::string(kYm2151Domain), .key = index},
                    .reverb = 0.0,
                    .name = name,
@@ -149,7 +148,6 @@ std::vector<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layou
     const std::string name = fmt::format("K053260 Instrument {}", index);
     auto instrument =
         instruments.add(index, Instrument{
-                                   .explicitAddress = InstrumentAddress{.bank = index >> 7, .program = index & 0x7f},
                                    .identity = InstrumentIdentity{.domain = std::string(kK053260Domain), .key = index},
                                    .reverb = 0.0,
                                    .name = name,
@@ -199,7 +197,6 @@ std::vector<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layou
   if (drumRange.valid()) {
     auto drumKit =
         instruments.add(0x100, Instrument{
-                                   .explicitAddress = InstrumentAddress{.bank = 2, .program = 0},
                                    .identity = InstrumentIdentity{.domain = std::string(kK053260Domain), .key = 0x100},
                                    .reverb = 0.0,
                                    .name = "K053260 Drum Kit",

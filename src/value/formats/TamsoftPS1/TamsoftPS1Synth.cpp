@@ -99,7 +99,6 @@ bool addBank(ScanResultBuilder& result, const BankLayout& layout, std::string_vi
     const SourceRange pointerRange = reader.range(program * 4, 4);
     const SourceRange adsrRange = reader.range(kProgramTableSize + program * 4, 4);
     auto instrument = instruments.append(Instrument{
-        .explicitAddress = InstrumentAddress{.bank = program / 128, .program = program % 128},
         .identity = instrumentIdentity(static_cast<u8>(program)),
         .reverb = 0.0,
         .name = fmt::format("Instrument {}", program),

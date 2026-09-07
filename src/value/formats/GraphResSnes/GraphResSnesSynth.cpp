@@ -66,8 +66,6 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
       continue;
     }
     auto entry = instruments.append(Instrument{
-        .explicitAddress = InstrumentAddress{.bank = static_cast<u32>(program >> 7),
-                                             .program = static_cast<u32>(program & 0x7f)},
         .identity = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = program},
         .name = fmt::format("Instrument {}", program),
         .range = source,

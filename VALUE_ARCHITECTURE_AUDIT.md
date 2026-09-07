@@ -408,6 +408,21 @@ test passes against the previous implementation as well as the simplification.
 Retain source-instrument identity coverage through emitted instrument events.
 The full build and all 17 CTest targets pass without compiler warnings.
 
+### Let source identities supply ordinary export addresses
+
+Remove explicit instrument addresses that duplicate the shared identity
+resolver's sequential mapping in 11 formats: CPS1, GraphResSnes, HeartBeatPS1,
+KonamiArcade, KonamiTMNT2, NamcoSnes, NinSnes, PrismSnes, SoftCreatSnes,
+TamsoftPS1, and TriAcePS1. Remove the now-unused packed-address temporaries.
+Keep explicit mappings where bank/program policy differs, including drum banks
+and formats that retain an eight-bit program in bank zero. This removes 31
+production lines and keeps routine target-address arithmetic out of formats.
+
+The full build passes without compiler warnings. NinSnes tests initially
+searched only explicit addresses; update their melodic checks to use resolved
+addresses, while retaining checks for explicit drum-bank policy. All 17 CTest
+targets pass, including synth export, instrument selection, and format suites.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

@@ -199,14 +199,11 @@ std::optional<HeartBeatPs1ScannedBank> addHeartBeatPs1Bank(ScanResultBuilder& re
       continue;
     }
 
-    const u32 exportBank = static_cast<u32>(layout.bank) * 2 + sourceProgram.number / 128;
     u8 bendRange = 0;
     for (const auto& tone : runtime.tones) {
       bendRange = std::max({bendRange, tone.bendDownSemitones, tone.bendUpSemitones});
     }
     auto instrument = instruments.append(Instrument{
-        .explicitAddress =
-            InstrumentAddress{.bank = exportBank, .program = static_cast<u32>(sourceProgram.number & 0x7f)},
         .identity = heartBeatPs1InstrumentIdentity(layout.bank, sourceProgram.number),
         .pitchBendRangeCents = static_cast<u16>(bendRange * 100),
         .reverb =

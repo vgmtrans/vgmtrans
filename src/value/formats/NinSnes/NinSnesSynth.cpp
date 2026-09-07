@@ -304,11 +304,6 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
     const std::string name = info.override ? fmt::format("Instrument {} (Overwrite)", info.program)
                                            : fmt::format("Instrument {}", info.program);
     auto instrument = builder.add(info.program, Instrument{
-                                                    .explicitAddress =
-                                                        InstrumentAddress{
-                                                            .bank = info.program >> 7,
-                                                            .program = info.program & 0x7f,
-                                                        },
                                                     .identity =
                                                         InstrumentIdentity{
                                                             .domain = std::string(kInstrumentDomain),

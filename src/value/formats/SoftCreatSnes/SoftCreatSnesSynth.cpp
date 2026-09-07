@@ -81,8 +81,6 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     const u8 fine = reader.u8At(fineAddress);
     const double tuning = coarse + fineTuningCents(fine) / 100.0;
     auto entry = instruments.append(Instrument{
-        .explicitAddress = InstrumentAddress{.bank = static_cast<u32>(srcn >> 7),
-                                             .program = static_cast<u32>(srcn & 0x7f)},
         .identity = InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = srcn},
         .name = fmt::format("Instrument {}", srcn),
         .range = coarseSource,
