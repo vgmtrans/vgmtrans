@@ -203,6 +203,7 @@ enum class EventType : u8 {
   Unknown4,
   Nop,
   Nop1,
+  Nop2,
   End,
   NoteParameter,
   LemmingsNoteParameter,
@@ -219,6 +220,7 @@ enum class EventType : u8 {
   VibratoOff,
   MasterVolume,
   MasterVolumeFade,
+  SunsoftVolume,
   Tempo,
   TempoFade,
   GlobalTranspose,
@@ -244,8 +246,8 @@ enum class EventType : u8 {
   KonamiAdsrGain,
   QuintetTuning,
   QuintetAdsr,
-  IntelliEchoOn,
-  IntelliEchoOff,
+  ChannelEchoOn,
+  ChannelEchoOff,
   IntelliLegatoOn,
   IntelliLegatoOff,
   IntelliConditionalJump,
@@ -255,7 +257,7 @@ enum class EventType : u8 {
   IntelliFe3Percussion,
   IntelliDefineVoice,
   IntelliLoadVoice,
-  IntelliAdsr,
+  Adsr,
   IntelliGainDurationRate,
   IntelliGainDuration,
   IntelliGain,
@@ -386,8 +388,8 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
       definition.events[opcode] = EventType::IntelliNoteParameter;
     }
     loadStandardCommands(definition.events, 0xd6);
-    definition.events[0xf1] = EventType::IntelliEchoOn;
-    definition.events[0xf2] = EventType::IntelliEchoOff;
+    definition.events[0xf1] = EventType::ChannelEchoOn;
+    definition.events[0xf2] = EventType::ChannelEchoOff;
     definition.events[0xf3] = EventType::IntelliLegatoOn;
     definition.events[0xf4] = EventType::IntelliLegatoOff;
     definition.events[0xf5] = EventType::IntelliFe3F5;
@@ -397,7 +399,7 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
     definition.events[0xf9] = EventType::IntelliFe3Percussion;
     definition.events[0xfa] = EventType::IntelliDefineVoice;
     definition.events[0xfb] = EventType::IntelliLoadVoice;
-    definition.events[0xfc] = EventType::IntelliAdsr;
+    definition.events[0xfc] = EventType::Adsr;
     definition.events[0xfd] = EventType::IntelliGainDurationRate;
     useDefault(definition.volume, math::kVolumeIntelli);
     useDefault(definition.duration, math::kDurationIntelli);
@@ -410,9 +412,9 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
       }
     }
     loadStandardCommands(definition.events, 0xda);
-    definition.events[0xf5] = EventType::IntelliEchoOn;
-    definition.events[0xf6] = EventType::IntelliEchoOff;
-    definition.events[0xf7] = selected.intelli == IntelliMode::Ta ? EventType::IntelliAdsr : EventType::IntelliGain;
+    definition.events[0xf5] = EventType::ChannelEchoOn;
+    definition.events[0xf6] = EventType::ChannelEchoOff;
+    definition.events[0xf7] = selected.intelli == IntelliMode::Ta ? EventType::Adsr : EventType::IntelliGain;
     definition.events[0xf8] =
         selected.intelli == IntelliMode::Ta ? EventType::IntelliGainDurationRate : EventType::IntelliGain;
     definition.events[0xf9] =
@@ -436,6 +438,13 @@ void loadStandardCommands(std::array<EventType, 256>& events, u8 first) {
   }
 
   switch (selected.id) {
+    case ProfileId::SunsoftEarlier:
+    case ProfileId::Sunsoft:
+      definition.events[0xfb] = EventType::ChannelEchoOn;
+      definition.events[0xfc] = EventType::ChannelEchoOff;
+      definition.events[0xfd] = EventType::Adsr;
+      definition.events[0xfe] = selected.id == ProfileId::SunsoftEarlier ? EventType::Nop2 : EventType::SunsoftVolume;
+      break;
     case ProfileId::Rd1:
       definition.events[0xfb] = EventType::Unknown2;
       definition.events[0xfc] = EventType::Unknown0;
@@ -609,7 +618,8 @@ struct ProgramState {
     tempoState.reset(kDefaultTempo);
     tempoState.clearAutomation();
     tempoAutomationTrack.reset();
-    masterVolume = 0xff;
+    masterVolume = selected.initialMasterVolume;
+    sunsoftVolume = 0xff;
     masterVolumeState.reset(masterVolume);
     masterVolumeState.clearAutomation();
     masterVolumeAutomationTrack.reset();
@@ -743,6 +753,7 @@ struct ProgramState {
   PerformanceBoundValue<SequenceFixedPointAutomation<s32>> tempoState;
   std::optional<u32> tempoAutomationTrack;
   u8 masterVolume = 0xff;
+  u8 sunsoftVolume = 0xff;
   PerformanceBoundValue<SequenceFixedPointAutomation<s32>> masterVolumeState;
   std::optional<u32> masterVolumeAutomationTrack;
   s8 globalTranspose = 0;
@@ -850,7 +861,7 @@ struct Playback {
     if (track.legato || (program.selected.id == ProfileId::Konami && track.durationRate == 0)) {
       return track.noteLength;
     }
-    const u8 scaled = static_cast<u8>((track.noteLength * track.durationRate) >> 8);
+    const u8 scaled = static_cast<u8>(((track.noteLength * track.durationRate) >> 8) + program.selected.noteGateBias);
     const u8 maximum = std::max<u8>(1, static_cast<u8>(track.noteLength - 2));
     return std::min(std::max<u8>(scaled, 1), maximum);
   }
@@ -940,12 +951,16 @@ struct Playback {
     }
   }
 
-  void melodicProgram(u8 encoded, u8 percussionMinimum) {
-    track.melodicProgram = program.resolveProgram(encoded, percussionMinimum);
-    if (const auto envelope = program.instrumentEnvelopes.find(track.melodicProgram);
+  void loadInstrumentEnvelope(u32 sourceProgram) {
+    if (const auto envelope = program.instrumentEnvelopes.find(sourceProgram);
         envelope != program.instrumentEnvelopes.end()) {
       track.envelope = envelope->second;
     }
+  }
+
+  void melodicProgram(u8 encoded, u8 percussionMinimum) {
+    track.melodicProgram = program.resolveProgram(encoded, percussionMinimum);
+    loadInstrumentEnvelope(track.melodicProgram);
     if (!track.lastWasPercussion) {
       out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = track.melodicProgram});
     }
@@ -1113,10 +1128,7 @@ struct Playback {
       const u8 patchMask = program.selected.intelli == IntelliMode::Fe4 ? 0x3f : 0xbf;
       const u8 patch = custom ? static_cast<u8>(entry.patch & patchMask) : static_cast<u8>(percussionMinimum + slot);
       const u32 sourceProgram = program.resolveProgram(patch, percussionMinimum);
-      if (const auto envelope = program.instrumentEnvelopes.find(sourceProgram);
-          envelope != program.instrumentEnvelopes.end()) {
-        track.envelope = envelope->second;
-      }
+      loadInstrumentEnvelope(sourceProgram);
       if (custom && entry.pan < 0x80) {
         pan(entry.pan);
       }
@@ -1137,6 +1149,13 @@ struct Playback {
       const u8 key = static_cast<u8>(0x24 + logical - program.percussionBase);
       program.rememberStandardDrum(logical, sourceProgram, key, program.globalTranspose, sourceNote);
       switchToDrumProgram(0);
+      if (isSunsoft(program.selected.id)) {
+        // Every percussion note runs the instrument loader, even when the
+        // exported drum-kit program stays the same. It replaces any FD ADSR
+        // override and supplies the GAIN register for a subsequent FD.
+        loadInstrumentEnvelope(sourceProgram);
+        out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+      }
       const double outputKey = key - program.globalTranspose + static_cast<double>(track.konamiLoopPitchDelta) / 256.0;
       beginNotePitch(static_cast<u8>(key - program.globalTranspose));
       emitVoiceNote(outputKey, duration);
@@ -1306,11 +1325,23 @@ struct Playback {
                        SequenceFixedPointMotion<s32>::toRawTarget(value, length));
   }
 
+  [[nodiscard]] double masterGain(u8 value) const {
+    return math::levelGain(value) * math::levelGain(program.sunsoftVolume);
+  }
+
+  void sunsoftVolume(u8 value) {
+    // The combined output changes immediately, but E6's source-domain fade
+    // keeps running. End its old output binding without clearing that motion.
+    program.masterVolumeState.interruptAutomationAt(vm.tick());
+    program.sunsoftVolume = value;
+    out.masterLevel(masterGain(program.masterVolume));
+  }
+
   void masterVolume(u8 value) {
     program.masterVolume = value;
     program.masterVolumeState.setCurrentAt(vm.tick(), value);
     program.masterVolumeAutomationTrack.reset();
-    out.masterLevel(math::levelGain(value));
+    out.masterLevel(masterGain(value));
   }
 
   void masterVolumeFade(u8 length, u8 value) {
@@ -1319,7 +1350,7 @@ struct Playback {
       return;
     }
     program.masterVolumeState.setCurrentRaw(program.masterVolume);
-    program.masterVolumeState.begin(out.fade(PerformanceAutomationTarget::MasterLevel, math::levelGain(value), length),
+    program.masterVolumeState.begin(out.fade(PerformanceAutomationTarget::MasterLevel, masterGain(value), length),
                                     SequenceFixedPointMotion<s32>::toRawTarget(value, length));
     program.masterVolumeAutomationTrack = track.trackNumber;
   }
@@ -1358,7 +1389,7 @@ struct Playback {
   void advanceMasterFade() {
     program.masterVolumeState.tickRaw([&](s32 value) {
       program.masterVolume = static_cast<u8>(std::clamp<s32>(value, 0, 0xff));
-      program.masterVolumeState.output(out).masterLevel(math::levelGain(program.masterVolume));
+      program.masterVolumeState.output(out).masterLevel(masterGain(program.masterVolume));
     });
     if (!program.masterVolumeState.active()) {
       program.masterVolumeAutomationTrack.reset();
@@ -1397,7 +1428,12 @@ struct Playback {
   }
 
   void echoOff() {
-    program.echo.disable();
+    if (isSunsoft(program.selected.id)) {
+      // F6 zeros EVOL but keeps the channel masks used by FB/FC.
+      program.echo.set(*program.echo.current().voiceMask, 0, 0);
+    } else {
+      program.echo.disable();
+    }
     out.reverb(program.echo.current());
   }
 
@@ -1510,7 +1546,7 @@ struct Playback {
     melodicProgram(record.instrument, percussionMinimum);
   }
 
-  void intelliAdsr(u8 adsr1, u8 adsr2) {
+  void adsr(u8 adsr1, u8 adsr2) {
     track.envelope.adsr1 = adsr1;
     track.envelope.adsr2 = adsr2;
     // Rate-based GAIN depends on the live ENVX value. Preserve the registers
@@ -1752,6 +1788,10 @@ struct DecodeContext {
       auto event = cursor.command("Master Volume", SequenceSemantic::Level);
       return event.invoke<&Playback::masterVolume>(event.u8("volume"));
     }
+    case EventType::SunsoftVolume: {
+      auto event = cursor.command("Music Volume Multiplier", SequenceSemantic::Level);
+      return event.invoke<&Playback::sunsoftVolume>(event.u8("volume"));
+    }
     case EventType::MasterVolumeFade: {
       auto event = cursor.command("Master Volume Fade", SequenceSemantic::Level);
       const u8 length = event.u8("length");
@@ -1889,9 +1929,9 @@ struct DecodeContext {
       event.u8("sustain_level");
       return event;
     }
-    case EventType::IntelliEchoOn:
+    case EventType::ChannelEchoOn:
       return cursor.command("Echo On", SequenceSemantic::State).invoke<&Playback::channelEcho>(true);
-    case EventType::IntelliEchoOff:
+    case EventType::ChannelEchoOff:
       return cursor.command("Echo Off", SequenceSemantic::State).invoke<&Playback::channelEcho>(false);
     case EventType::IntelliLegatoOn:
       return cursor.command("Legato On", SequenceSemantic::State).invoke<&Playback::legato>(true);
@@ -1970,11 +2010,11 @@ struct DecodeContext {
       return event.invoke<&Playback::loadVoice>(index, context.definition.status.percussionMin,
                                                 context.selected.intelli);
     }
-    case EventType::IntelliAdsr: {
+    case EventType::Adsr: {
       auto event = cursor.command("ADSR", SequenceSemantic::State);
       const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
       const u8 adsr2 = event.u8("adsr2", SourceValueDisplay::Hex);
-      return event.invoke<&Playback::intelliAdsr>(adsr1, adsr2);
+      return event.invoke<&Playback::adsr>(adsr1, adsr2);
     }
     case EventType::IntelliGainDurationRate: {
       auto event = cursor.command("GAIN Duration Rate", SequenceSemantic::State);
@@ -2042,9 +2082,13 @@ struct DecodeContext {
     }
     case EventType::Nop:
       return cursor.sourceOnly("NOP");
-    case EventType::Nop1: {
+    case EventType::Nop1:
+    case EventType::Nop2: {
       auto event = cursor.sourceOnly("NOP");
       event.u8("argument", SourceValueDisplay::Hex);
+      if (type == EventType::Nop2) {
+        event.u8("argument_2", SourceValueDisplay::Hex);
+      }
       return event;
     }
     case EventType::Unknown1:
@@ -2340,7 +2384,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   }
   runtime.programMap = buildProgramMap(reader, layout);
   runtime.intelliTransposeTable = layout.intelliTransposeTable;
-  if (selected.intelli != IntelliMode::None && layout.instrumentTableAddress) {
+  if ((selected.intelli != IntelliMode::None || isSunsoft(selected.id)) && layout.instrumentTableAddress) {
     for (u32 index = 0; index < instrumentSlotCount(selected); ++index) {
       const u32 address = *layout.instrumentTableAddress + index * instrumentHeaderSize(selected);
       if (!reader.has(address, 4)) {
@@ -2363,6 +2407,9 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   }
   program.behavior.initialTempoMicrosecondsPerQuarter =
       math::tempoMicrosecondsPerQuarter(kDefaultTempo, layout.tempoTimerTarget);
+  if (selected.initialMasterVolume != 0xff) {
+    program.behavior.initialMasterLevel = math::levelGain(selected.initialMasterVolume);
+  }
   const auto initialBalance = math::panGains(selected, math::kPan, 10);
   program.behavior.initialStereoBalance = StereoBalance{initialBalance.left, initialBalance.right};
   program.sectionPlaylist = std::move(playlist.playlist);

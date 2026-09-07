@@ -29,7 +29,7 @@ constexpr std::array kProfileIds{
     ProfileId::Earlier,   ProfileId::Standard,  ProfileId::Rd1,         ProfileId::Rd2,          ProfileId::Hal,
     ProfileId::Konami,    ProfileId::Lemmings,  ProfileId::IntelliFe3,  ProfileId::IntelliTa,    ProfileId::IntelliFe4,
     ProfileId::Human,     ProfileId::Tose,      ProfileId::QuintetActR, ProfileId::QuintetActR2, ProfileId::QuintetIog,
-    ProfileId::QuintetTs, ProfileId::FalcomYs4, ProfileId::Koei,
+    ProfileId::QuintetTs, ProfileId::FalcomYs4, ProfileId::Koei,        ProfileId::SunsoftEarlier, ProfileId::Sunsoft,
 };
 
 void expect(bool condition, const std::string& message) {
@@ -374,7 +374,7 @@ void ninSnesProfilesShareSquaredLevelCurve() {
     const auto& events = performance.tracks[0].events;
     const auto level = std::ranges::find_if(
         events, [](const PerformanceEvent& event) { return std::holds_alternative<LevelPerformanceEvent>(event); });
-    const auto master = std::ranges::find_if(events, [](const PerformanceEvent& event) {
+    const auto master = std::find_if(events.rbegin(), events.rend(), [](const PerformanceEvent& event) {
       return std::holds_alternative<MasterLevelPerformanceEvent>(event);
     });
     const std::string label(driver.name);
@@ -383,7 +383,7 @@ void ninSnesProfilesShareSquaredLevelCurve() {
            label + " should expose squared channel gain, got " +
                std::to_string(std::get<LevelPerformanceEvent>(*level).linearGain));
     if (opcodes.master != 0) {
-      expect(master != events.end(), label + " should emit master gain");
+      expect(master != events.rend(), label + " should emit master gain");
       expect(
           std::abs(std::get<MasterLevelPerformanceEvent>(*master).linearGain - ninSnesLevelGain(kMasterLevel)) < 0.0001,
           label + " should expose squared master gain, got " +
@@ -397,12 +397,12 @@ void ninSnesProfilesShareSquaredLevelCurve() {
         volume = candidate;
       }
     }
-    const auto masterVolume = std::ranges::find_if(
-        midi.tracks[0].events, [](const MidiEvent& event) { return midiMasterVolume(event).has_value(); });
+    const auto masterVolume = std::find_if(
+        midi.tracks[0].events.rbegin(), midi.tracks[0].events.rend(), [](const MidiEvent& event) { return midiMasterVolume(event).has_value(); });
     expect(volume != nullptr && volume->value <= static_cast<u16>(kChannelLevel / 2),
            label + " should combine its pan gain without increasing the source channel level");
     if (opcodes.master != 0) {
-      expect(masterVolume != midi.tracks[0].events.end() &&
+      expect(masterVolume != midi.tracks[0].events.rend() &&
                  (*midiMasterVolume(*masterVolume) >> 7) == static_cast<u16>(kMasterLevel / 2),
              label + " should retain the legacy master-volume MSB");
     }
@@ -1684,4 +1684,209 @@ void ninSnesIntelligentSectionPreservesVoiceAndLegato() {
   expect(notes.size() == 3 && notes[1].extendsPrevious && notes[1].durationTicks >= 4 &&
              notes[2].durationTicks == 1,
          "legato must survive section entry, and two-tick notes must have a nonzero key-off duration");
+}
+
+namespace {
+
+std::vector<u8> sunsoftDriverFixture(ProfileId id) {
+  std::vector<u8> bytes(kAramSize);
+  const auto write = [&](u32 address, std::initializer_list<u8> data) {
+    std::ranges::copy(data, bytes.begin() + address);
+  };
+  // Relocated fragments of the supplied drivers. The BGM reader and song
+  // table precede the independent SFX copies in both revisions.
+  write(0x500, {0x8d, 0x00, 0xf7, 0x40, 0x3a, 0x40, 0x2d, 0xf7, 0x40, 0x3a, 0x40, 0xfd, 0xae});
+  write(0x520, {0xf5, 0x01, 0x20, 0xfd, 0xf5, 0x00, 0x20, 0xda, 0x40});
+  write(0x540, {0x68, 0xe0, 0x90, 0x05, 0x3f, 0x60, 0x05, 0x2f, 0x96});
+  write(0x560, {0x1c, 0xfd, 0xf6, 0x41, 0x2f, 0x2d, 0xf6, 0x40, 0x2f, 0x2d, 0xdd, 0x5c, 0xfd, 0xf6, 0xde, 0x2f});
+  write(0x580, {0x2d, 0x9f, 0x28, 0x07, 0xfd, 0xf6, 0x00, 0x31, 0xd5, 0x01, 0x02,
+                0xae, 0x28, 0x0f, 0xfd, 0xf6, 0x08, 0x31, 0xd5, 0x10, 0x02});
+  write(0x5a0, {0x8d, 0x06, 0xcf, 0xda, 0x14, 0x60, 0x98, 0x00, 0x14, 0x98, 0x40, 0x15});
+  write(0x5c0, {0xe8, 0x50, 0x8d, 0x5d, 0x3f, 0xe8, 0x09});
+  write(0x600, {0xe5, 0xbc, 0x03, 0x04, 0x47, 0xc5, 0xbc, 0x03, 0xe4, 0x47,
+                0x48, 0xff, 0x25, 0xbe, 0x03, 0xc5, 0xbe, 0x03, 0x2f, 0x12});
+  write(0x640, {0x7d, 0x9f, 0x5c, 0x08, 0x05, 0xc4, 0x14, 0xdd, 0xeb, 0x14});
+  writeLe16(bytes, 0x3000 + 27 * 2, 0x600);
+  writeLe16(bytes, 0x3000 + 29 * 2, 0x640);
+  write(0x303e, {1, 1, 2, 3, 0, 1, 2, 1, 2, 1, 1, 3, 0, 1, 2, 3,
+                 1, 3, 3, 0, 1, 3, 0, 3, 3, 3, 1, 0, 0, 2});
+  bytes[0x303e + 30] = id == ProfileId::SunsoftEarlier ? 2 : 1;
+  write(0x3100, {0x32, 0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xff});
+  write(0x3108, {0x0a, 0x19, 0x28, 0x3c, 0x50, 0x64, 0x7d, 0x96,
+                 0xaa, 0xb9, 0xc8, 0xd4, 0xe1, 0xeb, 0xf5, 0xff});
+  writeLe16(bytes, 0x2002, 0x2200);
+  writeLe16(bytes, 0x2000 + 0x2a * 2, 0x2300);
+  writeLe16(bytes, 0x2200, 0x2400);
+  writeSection(bytes, 0x2400, {{0, 0x2600}});
+  write(0x2600, {20, 0x20, 0x80, 0});
+  writeLe16(bytes, 0x2300, 0x2500);
+  writeSection(bytes, 0x2500, {{0, 0x250c}, {5, 0x2700}});
+  // For the earlier revision these bytes immediately follow its six pointers.
+  // Reading them as pointers would create two spurious music tracks.
+  write(0x250c, {20, 0x2f, 0x81, 0});
+  if (id == ProfileId::Sunsoft) {
+    writeSection(bytes, 0x2500, {{0, 0x2610}, {7, 0x2700}});
+    write(0x2610, {20, 0x2f, 0x81, 0});
+  }
+  write(0x2700, {20, 0x7f, 0x82, 0});
+  write(0x4000, {0, 0xff, 0xe0, 0x40, 1, 0});
+  writeLe16(bytes, 0x5000, 0x6000);
+  writeLe16(bytes, 0x5002, 0x6000);
+  bytes[0x6000] = 3;
+  bytes[0] = 1;
+  bytes[0xf4] = 0xaa;  // handshake bit plus BGM request $2A
+  bytes[0xf5] = 2;     // unrelated SFX request
+  writeLe16(bytes, 0x40, 0x2202);
+  return bytes;
+}
+
+}  // namespace
+
+void ninSnesSunsoftRecognizesBothRevisionsAndBgmLayouts() {
+  for (const ProfileId id : {ProfileId::SunsoftEarlier, ProfileId::Sunsoft}) {
+    auto bytes = sunsoftDriverFixture(id);
+    const ByteReader reader(SourceId{1}, bytes);
+    const auto layout = findLayout(reader);
+    expect(layout && layout->profile == id && layout->songIndex == 0x2a &&
+               layout->sectionPointerAddress == 0x40 && layout->playlistAddress == 0x2300 &&
+               layout->instrumentTableAddress == 0x4000 && layout->spcDirAddress == 0x5000,
+           "Sunsoft recognition should retain the full seven-bit BGM request and standard instrument addressing");
+    expect(layout->durationRateTable == std::vector<u8>({0x32, 0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xff}) &&
+               layout->volumeTable.front() == 10 && layout->volumeTable.back() == 255,
+           "Sunsoft should read the driver's nonstandard duration and velocity tables");
+    const auto parsed = decodeSequence(reader, *layout, AssetId{1});
+    const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
+    expect(performance.diagnostics.empty() && performance.tracks.size() == (id == ProfileId::SunsoftEarlier ? 6 : 8),
+           "Sunsoft should decode exactly the BGM track count for its revision");
+    expect(!scanSynth(bytes, *layout, "Sunsoft").assets.empty(), "both Sunsoft revisions should load their sound bank");
+
+    bytes[0xf4] = 0xfe;  // reserved driver control, not song $7E
+    bytes[0] = 0x7e;
+    expect(findLayout(reader)->songIndex == 1, "Sunsoft driver controls must not replace the current BGM song");
+    bytes[0x303e + 30] = 3;
+    expect(findLayout(reader)->profile == ProfileId::Unknown,
+           "an unrecognized Sunsoft command tail needs a safe fallback");
+    bytes[0x303e + 30] = id == ProfileId::SunsoftEarlier ? 2 : 1;
+    writeLe16(bytes, 0x3000 + 29 * 2, 0x680);
+    expect(!isSunsoft(findLayout(reader)->profile),
+           "Sunsoft probes must match the command targets, not unrelated code");
+  }
+}
+
+void ninSnesSunsoftCommandsPreserveEchoAndEnvelopeState() {
+  for (const ProfileId id : {ProfileId::SunsoftEarlier, ProfileId::Sunsoft}) {
+    auto bytes = sunsoftDriverFixture(id);
+    writeLe16(bytes, 0x100, 0x200);
+    writeSection(bytes, 0x200, {{0, 0x300}, {1, 0x380}});
+    const std::vector<u8> track{
+        0xe0, 0, 0xf5, 3, 0x40, 0x20, 0xfc, 4, 0x7f, 0x80,
+        0xfb, 0xfd, 0x8f, 0xe0, 0x80, 0xfd, 0, 0, 0x80,
+        0xe0, 0, 0xfd, 0, 0, 0x80, 0xf6, 0xfc, 0xfb, 4, 0xc9, 0};
+    std::ranges::copy(track, bytes.begin() + 0x300);
+    std::ranges::copy(std::initializer_list<u8>{20, 0x7f, 0x81, 0}, bytes.begin() + 0x380);
+    Layout layout = standardLayout();
+    layout.profile = id;
+    layout.instrumentTableAddress = 0x4000;
+    const auto performance = render(bytes, layout);
+    expect(performance.diagnostics.empty(), "Sunsoft echo and ADSR commands should consume their exact operands");
+    std::vector<const ReverbPerformanceEvent*> echo;
+    std::vector<const EnvelopePerformanceEvent*> envelopes;
+    for (const auto& event : performance.tracks[0].events) {
+      if (const auto* change = std::get_if<ReverbPerformanceEvent>(&event); change && change->voiceMask) {
+        echo.push_back(change);
+      }
+      if (const auto* change = std::get_if<EnvelopePerformanceEvent>(&event)) {
+        envelopes.push_back(change);
+      }
+    }
+    expect(echo.size() == 6 && echo[1]->voiceMask == 2 && echo[2]->voiceMask == 3 &&
+               echo[2]->leftGain == echo[0]->leftGain && echo.back()->voiceMask == 3 && echo.back()->send == 0,
+           "FB/FC must preserve other voices and EVOL; F6 must zero EVOL before later channel toggles");
+    expect(envelopes.size() == 3 && envelopes[0]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
+               envelopes[0]->update.values == snesDspEnvelope(0x8f, 0xe0, 0x40) &&
+               envelopes[1]->update.values == snesDspEnvelope(0, 0, 0x40) &&
+               envelopes[2]->update.values == envelopes[1]->update.values,
+           "FD writes ADSR registers while preserving the selected instrument's GAIN");
+    expect(std::ranges::none_of(performance.tracks[1].events, [](const auto& event) {
+      return std::holds_alternative<EnvelopePerformanceEvent>(event);
+    }), "FD must affect only its own voice");
+
+    std::ranges::copy(std::initializer_list<u8>{0, 0xff, 0xe0, 0x20, 1, 0}, bytes.begin() + 0x4006);
+    std::ranges::copy(std::initializer_list<u8>{0xe0, 0, 0xfa, 1, 4, 0x7f, 0xca, 0xfd, 0, 0, 0xca, 0},
+                      bytes.begin() + 0x300);
+    const auto drums = render(bytes, layout);
+    std::vector<EnvelopeUpdate> drumEnvelopes;
+    for (const auto& event : drums.tracks[0].events) {
+      if (const auto* change = std::get_if<EnvelopePerformanceEvent>(&event)) {
+        drumEnvelopes.push_back(change->update);
+      }
+    }
+    expect(drumEnvelopes.size() == 3 && !drumEnvelopes[0].values &&
+               drumEnvelopes[1].values == snesDspEnvelope(0, 0, 0x20) && !drumEnvelopes[2].values,
+           "percussion must load its own GAIN and restore its instrument envelope on every attack");
+  }
+}
+
+void ninSnesSunsoftFeAndGateFollowRevision() {
+  for (const ProfileId id : {ProfileId::SunsoftEarlier, ProfileId::Sunsoft}) {
+    auto bytes = sunsoftDriverFixture(id);
+    writeLe16(bytes, 0x100, 0x200);
+    writeSection(bytes, 0x200, {{0, 0x300}, {1, 0x340}});
+    const bool earlier = id == ProfileId::SunsoftEarlier;
+    std::vector<u8> track{0xe5, 0x80, 0xe6, 8, 0x40, 4, 0xc9, 0xfe, 0x80};
+    if (earlier) {
+      track.push_back(0);  // FE's second ignored operand must not end the track.
+    }
+    track.insert(track.end(), {20, 0x20, 0x80, 0});
+    std::ranges::copy(track, bytes.begin() + 0x300);
+    std::ranges::copy(std::initializer_list<u8>{24, 0xc9, 0}, bytes.begin() + 0x340);
+    Layout layout = standardLayout();
+    layout.profile = id;
+    layout.durationRateTable = {0x32, 0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xff};
+    const auto parsed = decodeSequence(ByteReader(SourceId{1}, bytes), layout, AssetId{1});
+    const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
+    expect(performance.diagnostics.empty() && parsed.program.behavior.initialMasterLevel == ninSnesLevelGain(0xb0),
+           "Sunsoft should start with the driver's initial master volume");
+    bool noteFound = false;
+    bool fadeFinished = false;
+    for (const auto& event : performance.tracks[0].events) {
+      if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+        noteFound = note->header.tick == 4 && note->durationTicks == (earlier ? 9 : 10) && note->key == 24;
+      }
+      if (const auto* master = std::get_if<MasterLevelPerformanceEvent>(&event); master && master->header.tick == 8) {
+        const double expected = ninSnesLevelGain(0x40) * (earlier ? 1 : ninSnesLevelGain(0x80));
+        fadeFinished = std::abs(master->linearGain - expected) < 0.000001;
+      }
+    }
+    expect(noteFound,
+           "FE operand lengths and the revision-specific gate calculation must keep the following note intact");
+    expect(fadeFinished, "Sunsoft FE must preserve an active E6 fade and scale its output only in the later revision");
+    // Rendering the captured program again must reset the extra global gain.
+    const auto replay = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
+    expect(replay.diagnostics.empty() && std::ranges::any_of(replay.tracks[0].events, [](const auto& event) {
+             const auto* master = std::get_if<MasterLevelPerformanceEvent>(&event);
+             return master && master->header.tick == 0 && master->linearGain == ninSnesLevelGain(0x80);
+           }),
+           "Sunsoft volume state must reset for each render");
+  }
+}
+
+void ninSnesSunsoftNoiseInstrumentsPreserveLaterSamples() {
+  for (const ProfileId id : {ProfileId::SunsoftEarlier, ProfileId::Sunsoft}) {
+    auto bytes = sunsoftDriverFixture(id);
+    std::ranges::copy(std::initializer_list<u8>{0x9f, 0xff, 0xe0, 0, 1, 0, 0, 0xff, 0xe0, 0, 2, 0},
+                      bytes.begin() + 0x4000);
+    Layout layout = standardLayout();
+    layout.profile = id;
+    layout.instrumentTableAddress = 0x4000;
+    layout.spcDirAddress = 0x5000;
+    const auto scan = scanSynth(bytes, layout, "Sunsoft noise");
+    const auto* bank = std::get_if<SoundBankAsset>(&scan.assets[0]);
+    expect(bank && bank->instruments.size() == 2 && bank->instruments[0].regions.size() == 128 &&
+               bank->localSamples.samples[bank->instruments[0].regions[0].sample.index()].codec ==
+                   AudioCodec::SnesDspNoise &&
+               bank->localSamples.samples[bank->instruments[0].regions[0].sample.index()].codecParameter == 31 &&
+               bank->instruments[1].regions.size() == 1,
+           "Sunsoft negative SRCNs must create noise instruments without hiding following sampled instruments");
+  }
 }

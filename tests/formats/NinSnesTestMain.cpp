@@ -45,6 +45,10 @@ void ninSnesKonamiPercussionUsesDriverMapAndNeutralTuning();
 void ninSnesEarlierPercussionUsesSeparateSixByteTable();
 void ninSnesGainModeInstrumentsUseDspEnvelope();
 void ninSnesIdentityMappedSilentSlotsAreSparse();
+void ninSnesSunsoftRecognizesBothRevisionsAndBgmLayouts();
+void ninSnesSunsoftCommandsPreserveEchoAndEnvelopeState();
+void ninSnesSunsoftFeAndGateFollowRevision();
+void ninSnesSunsoftNoiseInstrumentsPreserveLaterSamples();
 
 int main(int argc, char** argv) {
   try {
@@ -95,6 +99,10 @@ int main(int argc, char** argv) {
     ninSnesEarlierPercussionUsesSeparateSixByteTable();
     ninSnesGainModeInstrumentsUseDspEnvelope();
     ninSnesIdentityMappedSilentSlotsAreSparse();
+    ninSnesSunsoftRecognizesBothRevisionsAndBgmLayouts();
+    ninSnesSunsoftCommandsPreserveEchoAndEnvelopeState();
+    ninSnesSunsoftFeAndGateFollowRevision();
+    ninSnesSunsoftNoiseInstrumentsPreserveLaterSamples();
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
     return 1;

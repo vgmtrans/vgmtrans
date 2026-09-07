@@ -57,7 +57,13 @@ enum class ProfileId : u8 {
   QuintetTs,
   FalcomYs4,
   Koei,
+  SunsoftEarlier,
+  Sunsoft,
 };
+
+[[nodiscard]] constexpr bool isSunsoft(ProfileId id) {
+  return id == ProfileId::SunsoftEarlier || id == ProfileId::Sunsoft;
+}
 
 enum class BaseProfile : u8 {
   Unknown,
@@ -138,6 +144,9 @@ struct Profile {
   u8 sectionTrackCount = kTrackCount;
   // Applied by the tempo command before it stores the driver's tempo value.
   u8 tempoCommandMultiplier = 1;
+  u8 initialMasterVolume = 0xff;
+  // Added after the duration-rate multiply, before the two-tick key-off gap.
+  u8 noteGateBias = 0;
 };
 
 struct KonamiPercussionLayout {

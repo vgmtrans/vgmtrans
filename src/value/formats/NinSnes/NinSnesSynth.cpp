@@ -48,9 +48,10 @@ struct InstrumentRegion {
 };
 
 [[nodiscard]] bool isNoise(const Profile& selected, const InstrumentInfo& info) {
-  // FE3 / Metal Combat and TA / Panel de Pon interpret negative SRCNs as
-  // DSP noise, with the clock rate in bits 0-4. FE4 uses literal SRCNs.
-  return (selected.intelli == IntelliMode::Fe3 || selected.intelli == IntelliMode::Ta) && info.srcn >= 0x80;
+  // Sunsoft, FE3 / Metal Combat and TA / Panel de Pon interpret negative
+  // SRCNs as DSP noise, with the clock rate in bits 0-4. FE4 uses literal SRCNs.
+  return (isSunsoft(selected.id) || selected.intelli == IntelliMode::Fe3 || selected.intelli == IntelliMode::Ta) &&
+         info.srcn >= 0x80;
 }
 
 [[nodiscard]] bool blankSlot(ByteReader reader, const Profile& selected, u16 program, u32 address) {
@@ -143,7 +144,8 @@ struct InstrumentRegion {
   if (layout.percussionTableAddress) {
     tableEnd = std::min(tableEnd, *layout.percussionTableAddress);
   }
-  if (selected.intelli != IntelliMode::None && *layout.spcDirAddress > *layout.instrumentTableAddress) {
+  if ((selected.intelli != IntelliMode::None || isSunsoft(selected.id)) &&
+      *layout.spcDirAddress > *layout.instrumentTableAddress) {
     tableEnd = std::min<u32>(tableEnd, *layout.spcDirAddress);
   }
   for (u16 program = 0; program < instrumentSlotCount(selected); ++program) {

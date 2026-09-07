@@ -21,6 +21,7 @@ public:
   Pattern(const char* bytes, const char* mask, size_t size);
 
   [[nodiscard]] std::optional<u32> find(core::ByteReader reader) const;
+  [[nodiscard]] bool matches(core::ByteReader reader, u32 offset) const;
 
 private:
   std::vector<u8> bytes_;
@@ -60,6 +61,8 @@ struct Patterns {
   static Pattern ptnReadSongRequestPort;
   static Pattern ptnFixedPercussionBaseDispatch;
   static Pattern ptnFixedPercussionBaseLoader;
+  static Pattern ptnSunsoftEchoOn;
+  static Pattern ptnSunsoftAdsr;
   static Pattern ptnSetDIR;
   static Pattern ptnSetDIRYI;
   static Pattern ptnSetDIRVS;

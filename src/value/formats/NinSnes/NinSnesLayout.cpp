@@ -243,6 +243,21 @@ template <size_t Size>
     return classifyIntelligent(reader, commands);
   }
 
+  if (commands.count == 31 &&
+      Patterns::ptnSunsoftEchoOn.matches(reader, reader.le16(commands.addressTable + 27 * 2)) &&
+      Patterns::ptnSunsoftAdsr.matches(reader, reader.le16(commands.addressTable + 29 * 2))) {
+    // Hashire Hebereke (S1.20): FB/FC echo, FD ADSR, FE skips two bytes.
+    // Albert Odyssey 2: FE instead sets a second music-volume multiplier.
+    const u16 tail = commands.lengthTable + 27;
+    if (matchesTable(reader, tail, std::array<u8, 4>{0, 0, 2, 2})) {
+      return ProfileId::SunsoftEarlier;
+    }
+    if (matchesTable(reader, tail, std::array<u8, 4>{0, 0, 2, 1})) {
+      return ProfileId::Sunsoft;
+    }
+    return ProfileId::Unknown;
+  }
+
   const bool canonical = commands.addressTable + (kStandardCommandLengths.size() * 2) == commands.lengthTable;
   if (canonical) {
     if (Patterns::ptnWriteVolumeKSS.find(reader)) {
@@ -697,6 +712,16 @@ std::optional<Layout> findLayout(ByteReader reader) {
     for (const u32 address : {0xf4u, 0u}) {
       const u8 request = reader.u8At(address);
       if (request != 0 && request != 0xff) {
+        requestedSong = request;
+        break;
+      }
+    }
+  } else if (isSunsoft(selected.id)) {
+    // Sunsoft strips the port handshake bit, then reserves 7D-7F for driver
+    // controls. BGM uses port 0; the other ports drive independent SFX players.
+    for (const u32 address : {0xf4u, 0u}) {
+      const u8 request = reader.u8At(address) & 0x7f;
+      if (request != 0 && request < 0x7d) {
         requestedSong = request;
         break;
       }
