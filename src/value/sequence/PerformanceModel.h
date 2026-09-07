@@ -267,7 +267,10 @@ struct TremoloDelayPerformanceEvent {
 
 struct PortamentoPerformanceEvent {
   PerformanceEventHeader header;
-  double timeMilliseconds = 0.0;
+  // Flat lowering state. Formats describe glides through PitchTransitionIntent
+  // and PitchTransitionSettingsPerformanceEvent. Absent time retains the
+  // currently configured glide rate.
+  std::optional<double> timeMilliseconds;
   // A missing source key configures the glide time without triggering a
   // transition. A present key also identifies the pitch the next note should
   // glide from.
@@ -277,18 +280,6 @@ struct PortamentoPerformanceEvent {
 struct PortamentoEnablePerformanceEvent {
   PerformanceEventHeader header;
   bool enabled = false;
-};
-
-struct PortamentoTimePerformanceEvent {
-  PerformanceEventHeader header;
-  // Musical glide time. MIDI renderers decide whether to write 7-bit or 14-bit controller data.
-  double timeMilliseconds = 0.0;
-};
-
-struct PortamentoControlPerformanceEvent {
-  PerformanceEventHeader header;
-  // MIDI-lowering artifact. Format interpreters should emit PitchTransitionIntent instead.
-  double previousKey = 0.0;
 };
 
 struct PitchTransitionSettingsPerformanceEvent {
@@ -443,10 +434,9 @@ using PerformanceEvent =
                  ChannelPanPerformanceEvent, StereoBalancePerformanceEvent, MasterLevelPerformanceEvent,
                  ReverbPerformanceEvent, MonoModePerformanceEvent, TuningPerformanceEvent,
                  GlobalTransposePerformanceEvent, PortamentoPerformanceEvent, PortamentoEnablePerformanceEvent,
-                 PortamentoTimePerformanceEvent, PortamentoControlPerformanceEvent, PitchBendPerformanceEvent,
-                 PitchBendRangePerformanceEvent, VibratoDelayPerformanceEvent, TremoloDelayPerformanceEvent,
-                 PitchTransitionSettingsPerformanceEvent, LegatoPedalPerformanceEvent, ModulationPerformanceEvent,
-                 MarkerPerformanceEvent>;
+                 PitchBendPerformanceEvent, PitchBendRangePerformanceEvent, VibratoDelayPerformanceEvent,
+                 TremoloDelayPerformanceEvent, PitchTransitionSettingsPerformanceEvent, LegatoPedalPerformanceEvent,
+                 ModulationPerformanceEvent, MarkerPerformanceEvent>;
 
 enum class PerformanceAutomationTarget {
   Tempo,

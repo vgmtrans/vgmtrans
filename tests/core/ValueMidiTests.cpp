@@ -2047,7 +2047,7 @@ void performanceMidiRendererQuantizesPitchBendAndPortamento() {
                       .header = PerformanceEventHeader{.tick = 0},
                       .semitones = 1.0,
                   },
-                  PortamentoTimePerformanceEvent{
+                  PitchTransitionSettingsPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 12},
                       .timeMilliseconds = 83.0,
                   },
@@ -2068,9 +2068,11 @@ void performanceMidiRendererQuantizesPitchBendAndPortamento() {
   expect(std::ranges::any_of(events,
                              [](const MidiEvent& event) {
                                const auto* time = midiController(event, MidiController::PortamentoTime);
-                               return time != nullptr && event.tick == 12 && time->value == 83;
+                               return time != nullptr && event.tick == 12 && time->value == 0;
                              }),
-         "MIDI renderer should quantize performance portamento milliseconds");
+         "MIDI renderer should write the high seven bits of the physical portamento time");
+  expect(firstMidiController14(events, MidiController::PortamentoTime) == 83,
+         "MIDI renderer should retain the full physical portamento time");
 }
 
 void performanceMidiRendererSkipsRedundantPitchBends() {

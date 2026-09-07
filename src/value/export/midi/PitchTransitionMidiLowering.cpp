@@ -674,18 +674,13 @@ void lowerPortamento(PerformanceSequence& performance, std::vector<PerformanceEv
       });
     }
 
-    if (transition.portamentoRendering.useCurrentTiming) {
-      events.emplace_back(PortamentoControlPerformanceEvent{
-          .header = atTick(automation->header, startTick, nextSequence),
-          .previousKey = transition.startKey,
-      });
-    } else {
-      events.emplace_back(PortamentoPerformanceEvent{
-          .header = atTick(automation->header, startTick, nextSequence),
-          .timeMilliseconds = physicalDurationMilliseconds(transition, tempos, startTick),
-          .previousKey = transition.startKey,
-      });
-    }
+    events.emplace_back(PortamentoPerformanceEvent{
+        .header = atTick(automation->header, startTick, nextSequence),
+        .timeMilliseconds = transition.portamentoRendering.useCurrentTiming
+                                ? std::nullopt
+                                : std::optional{physicalDurationMilliseconds(transition, tempos, startTick)},
+        .previousKey = transition.startKey,
+    });
     if (transition.portamentoRendering.restoreTimeMilliseconds) {
       events.emplace_back(PortamentoPerformanceEvent{
           .header = atTick(automation->header, note->endTick, nextSequence),
@@ -710,11 +705,8 @@ void appendSourceEvents(std::vector<PerformanceEvent>& events, const Performance
         continue;
       }
     }
-    const bool midiPortamentoEvent =
-        std::holds_alternative<PortamentoPerformanceEvent>(event) ||
-        std::holds_alternative<PortamentoEnablePerformanceEvent>(event) ||
-        std::holds_alternative<PortamentoTimePerformanceEvent>(event) ||
-        std::holds_alternative<PortamentoControlPerformanceEvent>(event);
+    const bool midiPortamentoEvent = std::holds_alternative<PortamentoPerformanceEvent>(event) ||
+                                     std::holds_alternative<PortamentoEnablePerformanceEvent>(event);
     if (midiPortamentoEvent && !renderPortamentoSettings) {
       continue;
     }
