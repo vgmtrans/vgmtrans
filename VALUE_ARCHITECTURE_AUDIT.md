@@ -519,10 +519,30 @@ note timing, loop markers, source spans, and diagnostic text/ranges. The updated
 VM also completes that matrix under AddressSanitizer, UBSan, and float-cast-
 overflow checks.
 
+### Let SNES catalogs own input normalization and empty-result checks
+
+Accept sample-number ranges directly, with the existing projection reserved for
+instrument records. Pass the collected vector by value into catalog assembly
+so it can sort in place; moved and projected inputs no longer need a second
+copy. NinSnes and NamcoSnes use integer ranges for complete directory scans,
+and SoftCreatSnes passes its existing set. Remove redundant empty-input guards
+from 16 formats; their existing empty-catalog check covers the same case. This
+removes 51 production lines without another format-facing abstraction.
+
+Extend the shared test across mutable/const/moved vectors, spans, sets, integer
+ranges, and empty projected records. Verify that retained inputs are unchanged,
+empty inputs read no source bytes, and all forms retain identical ordering and
+validation. The full build and all 17 CTest targets pass without compiler
+warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
   and remaining format-local helpers for redundant state and work.
+- SonyPS2 still approximates key/velocity-dependent regions during scanning
+  under a 3,000-region budget chosen for SF2 table limits. Moving this policy
+  to export needs a source-neutral representation of that response; merely
+  renaming the limit would not remove the coupling.
 - Real-file parity remains unverified. An optional corpus-path question is
   pending; the absence of a corpus does not block further code investigation.
 
@@ -551,3 +571,7 @@ overflow checks.
   performance and synth data are the extension point for future targets;
   adding speculative Furnace interfaces would add concepts without serving a
   current conversion.
+
+- Keep version opcode tables as direct byte-layout descriptions where the
+  versions differ substantially. Factoring short repeated tails into extra
+  dispatch rules would trade visible data for more decoding logic.

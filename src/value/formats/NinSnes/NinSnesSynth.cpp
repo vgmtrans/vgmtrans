@@ -17,6 +17,7 @@
 #include <cmath>
 #include <map>
 #include <optional>
+#include <ranges>
 #include <vector>
 
 namespace vgmtrans::formats::nin_snes {
@@ -216,19 +217,10 @@ struct InstrumentRegion {
 
 [[nodiscard]] SnesBrrCatalog collectSamples(ByteReader reader, const Layout& layout,
                                             const std::vector<InstrumentInfo>& instruments) {
-  std::vector<u8> srcns;
   if (profile(layout.profile).intelli == IntelliMode::Ta) {
-    srcns.resize(0x80);
-    for (u8 srcn = 0; srcn < 0x80; ++srcn) {
-      srcns[srcn] = srcn;
-    }
-  } else {
-    srcns.reserve(instruments.size());
-    for (const auto& instrument : instruments) {
-      srcns.push_back(instrument.srcn);
-    }
+    return readSnesBrrCatalog(reader, *layout.spcDirAddress, std::views::iota(0, 0x80));
   }
-  return readSnesBrrCatalog(reader, *layout.spcDirAddress, srcns);
+  return readSnesBrrCatalog(reader, *layout.spcDirAddress, instruments, &InstrumentInfo::srcn);
 }
 
 [[nodiscard]] double standardUnityKey(const Profile& selected, u8 pitchHigh, u8 pitchLow) {

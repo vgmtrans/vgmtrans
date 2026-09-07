@@ -122,9 +122,6 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   }
   const ByteReader reader = builder.reader();
   const std::vector<InstrumentInfo> patches = collectInstruments(reader, layout);
-  if (patches.empty()) {
-    return std::nullopt;
-  }
   SnesBrrCatalog catalog =
       readSnesBrrCatalog(reader, layout.instruments.sampleDirAddress, patches, &InstrumentInfo::program);
   const u32 minimumSampleStart =

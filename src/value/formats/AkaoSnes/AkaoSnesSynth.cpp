@@ -303,7 +303,7 @@ std::optional<ScanSoundBankDraft> addAkaoSnesSynth(ScanResultBuilder& builder, c
                                                    std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const auto instrumentInfos = parseAkaoSnesInstrumentInfos(reader, layout, &builder.diagnostics());
-  if (instrumentInfos.empty() || !layout.spcDirAddress) {
+  if (!layout.spcDirAddress) {
     return std::nullopt;
   }
   const auto sampleCatalog =

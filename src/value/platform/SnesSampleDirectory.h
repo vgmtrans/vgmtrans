@@ -14,6 +14,7 @@
 #include <ranges>
 #include <span>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace vgmtrans::core {
@@ -73,22 +74,21 @@ private:
   u32 baseAddress_ = 0;
 };
 
-[[nodiscard]] SnesBrrCatalog readSnesBrrCatalog(ByteReader reader, u32 directoryAddress,
-                                                std::span<const u8> referencedSrcns);
+[[nodiscard]] SnesBrrCatalog readSnesBrrCatalog(ByteReader reader, u32 directoryAddress, std::vector<u8> srcns);
 
-// Read samples directly from a format's instrument records. The catalog owns
-// sorting, deduplication, and validation; callers only identify the SRCN field.
-template <std::ranges::input_range Instruments, class Srcn>
-[[nodiscard]] SnesBrrCatalog readSnesBrrCatalog(ByteReader reader, u32 directoryAddress, Instruments&& instruments,
-                                                Srcn srcn) {
+// Accept sample-number ranges or instrument records with an SRCN projection.
+// The catalog owns sorting, deduplication, and validation.
+template <std::ranges::input_range Entries, class Srcn = std::identity>
+[[nodiscard]] SnesBrrCatalog readSnesBrrCatalog(ByteReader reader, u32 directoryAddress, Entries&& entries,
+                                                Srcn srcn = {}) {
   std::vector<u8> referencedSrcns;
-  if constexpr (std::ranges::sized_range<Instruments>) {
-    referencedSrcns.reserve(std::ranges::size(instruments));
+  if constexpr (std::ranges::sized_range<Entries>) {
+    referencedSrcns.reserve(std::ranges::size(entries));
   }
-  for (const auto& instrument : instruments) {
-    referencedSrcns.push_back(std::invoke(srcn, instrument));
+  for (const auto& entry : entries) {
+    referencedSrcns.push_back(std::invoke(srcn, entry));
   }
-  return readSnesBrrCatalog(reader, directoryAddress, referencedSrcns);
+  return readSnesBrrCatalog(reader, directoryAddress, std::move(referencedSrcns));
 }
 
 // Concrete references created while adding an SNES catalog. SRCNs with

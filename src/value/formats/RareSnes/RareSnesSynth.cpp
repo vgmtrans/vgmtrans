@@ -29,7 +29,7 @@ namespace {
 
 std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
                                            const SequenceRecipes& recipes, std::string_view displayName) {
-  if (!layout.spcDirAddress || recipes.patches.empty()) {
+  if (!layout.spcDirAddress) {
     return std::nullopt;
   }
 

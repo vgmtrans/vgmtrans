@@ -280,9 +280,6 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
                                            const ReferencedInstruments& references, std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const std::vector<Patch> patches = collectPatches(reader, layout, references);
-  if (patches.empty()) {
-    return std::nullopt;
-  }
   const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, referencedSrcns(reader, patches));
   if (catalog.samples.empty()) {
     return std::nullopt;
