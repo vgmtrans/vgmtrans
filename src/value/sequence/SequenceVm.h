@@ -97,9 +97,7 @@ public:
   // Revises one particular source note. This is used by drivers which can keep
   // several gated notes in flight and then key them all off together.
   [[nodiscard]] bool setNoteEnd(PerformanceNoteId note, u64 endTick);
-  void tempo(TempoPerformanceEvent event);
   void tempo(u32 microsecondsPerQuarter);
-  void timeSignature(TimeSignaturePerformanceEvent event);
   void timeSignature(u8 numerator, u8 denominator, u8 clocksPerMetronomeClick);
   void instrument(InstrumentPerformanceEvent event);
   void instrument(InstrumentIdentity sourceInstrument,
@@ -114,25 +112,19 @@ public:
                       VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks);
   void restoreEnvelope(EnvelopeFields fields = EnvelopeFields::All,
                        VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks);
-  void level(LevelPerformanceEvent event);
   void level(double linearGain, ValueQuantization sourceQuantization);
   void level(double linearGain);
-  void expression(ExpressionPerformanceEvent event);
   void expression(double linearGain, ValueQuantization sourceQuantization);
   void expression(double linearGain);
   void pan(PanPerformanceEvent event);
   void pan(double stereoPosition, double linearGain = 1.0);
   void channelPan(ChannelPanPerformanceEvent event);
   void channelPan(double position);
-  void stereoBalance(StereoBalancePerformanceEvent event);
   void stereoBalance(double leftGain, double rightGain);
-  void masterLevel(MasterLevelPerformanceEvent event);
   void masterLevel(double linearGain);
   void reverb(ReverbPerformanceEvent event);
   void reverb(double send);
-  void tuning(TuningPerformanceEvent event);
   void tuning(double cents);
-  void globalTranspose(GlobalTransposePerformanceEvent event);
   void globalTranspose(s32 semitones);
   void pitchBend(PitchBendPerformanceEvent event);
   void pitchBend(double semitones, PitchBendLayerId layer = kPrimaryPitchBendLayer);
@@ -144,11 +136,8 @@ public:
   void tremoloDelay(TremoloDelayPerformanceEvent event);
   void tremoloDelayTicks(u32 delayTicks);
   void tremoloDelayPhysical(u32 delayTicks, double milliseconds);
-  void portamentoEnable(PortamentoEnablePerformanceEvent event);
   void portamentoEnable(bool enabled);
-  void pitchTransitionSettings(PitchTransitionSettingsPerformanceEvent event);
   void pitchTransitionSettings(double timeMilliseconds);
-  void legatoPedal(LegatoPedalPerformanceEvent event);
   void legatoPedal(bool enabled);
   void modulation(ModulationPerformanceEvent event);
   void modulation(ModulationPerformanceTarget target, double amount);
@@ -164,7 +153,7 @@ public:
   void panLfoDepth(double depth, LfoPerformanceContext context = {});
   void panLfoRate(double hertz, LfoPerformanceContext context = {});
   void panLfoRateCyclesPerTick(double cycles, LfoPerformanceContext context = {});
-  void marker(MarkerPerformanceEvent event);
+  void marker(std::string text);
 
   // Declares a note-anchored transition between absolute keys, where 60.0 is
   // middle C and 60.5 is halfway to C-sharp. Unlike fade(Pitch, ...), this

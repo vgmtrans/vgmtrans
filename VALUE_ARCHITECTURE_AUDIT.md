@@ -263,6 +263,18 @@ gain, then non-unit gain followed by explicit unit gain, under both modulation
 conversion policies. MP2k retains its asymmetric physical gain. The full build
 and all 17 CTest targets pass without compiler warnings.
 
+### Narrow the emitter to the operations formats use
+
+Remove eleven event-object overloads whose only callers were the corresponding
+scalar helpers. The scalar operations now append their event directly. Retain
+structured overloads where formats use additional event options, and keep
+quantized and unquantized controller calls distinct. Marker emission accepts
+its text directly, simplifying the CPS and Sony PS2 call sites. This removes
+61 production lines and eleven public overloads without changing the event
+model or the scalar vocabulary formats already use.
+
+The full build and all 17 CTest targets pass without compiler warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

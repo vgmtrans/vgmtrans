@@ -495,9 +495,9 @@ struct Playback {
           // it cannot retain core selection or wet-only voice routing.
           delayed.reverb(value / 127.0);
         } else if (track.nrpnMsb == 0x10 && track.nrpnLsb == 0) {
-          delayed.marker(MarkerPerformanceEvent{.text = "SonyPS2 mark callback " + std::to_string(value)});
+          delayed.marker("SonyPS2 mark callback " + std::to_string(value));
         } else if (track.nrpnMsb == 0x11) {
-          delayed.marker(MarkerPerformanceEvent{.text = "SonyPS2 mark MSB callback " + std::to_string(value)});
+          delayed.marker("SonyPS2 mark MSB callback " + std::to_string(value));
         }
         // The remaining reverb NRPNs configure negative-phase sends, the
         // algorithm, delay, and feedback. They remain visible in the source
@@ -509,13 +509,9 @@ struct Playback {
         break;
       case 38:
         if (track.dataEntryNrpn == std::pair<u8, u8>{0x10, 1}) {
-          delayed.marker(MarkerPerformanceEvent{
-              .text = "SonyPS2 mark callback " + std::to_string((track.dataEntryMsb << 7) | value),
-          });
+          delayed.marker("SonyPS2 mark callback " + std::to_string((track.dataEntryMsb << 7) | value));
         } else if (track.dataEntryNrpn && track.dataEntryNrpn->first == 0x12) {
-          delayed.marker(MarkerPerformanceEvent{
-              .text = "SonyPS2 mark MSB callback " + std::to_string((track.dataEntryMsb << 7) | value),
-          });
+          delayed.marker("SonyPS2 mark MSB callback " + std::to_string((track.dataEntryMsb << 7) | value));
         }
         track.dataEntryNrpn.reset();
         break;
