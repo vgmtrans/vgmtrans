@@ -21,6 +21,10 @@ std::optional<u32> Pattern::find(core::ByteReader reader) const {
   return core::findBytePattern(reader, core::MaskedBytePattern{bytes_, mask_});
 }
 
+bool Pattern::matches(core::ByteReader reader, u32 offset) const {
+  return core::matchesBytePattern(reader, offset, core::MaskedBytePattern{bytes_, mask_});
+}
+
 #define NINSNES_BYTE_PATTERN Pattern
 #define NINSNES_PATTERN_OWNER Patterns
 #include "../../../shared/NinSnesScannerPatterns.inc"
@@ -69,6 +73,17 @@ Pattern Patterns::ptnKoeiSectionPointers("\x8d\x00\xf7\x1d\x3a\x1d\x2d\xf7\x1d\x
 //   mov a,$00 / cmp a,#$ff / beq / and a,#$1f / bne start-song
 // $00-$03 are the canonical mirrors of input ports $F4-$F7.
 Pattern Patterns::ptnReadSongRequestPort("\xe4\x00\x68\xff\xf0\x00\x28\x1f\xd0\x00", "x?xxx?xxx?", 10);
+
+// Sunsoft FB sets this voice in the echo-enable mask and clears it in the
+// echo-disable mask. Match the actual command target, not an SFX copy.
+Pattern Patterns::ptnSunsoftEchoOn(
+    "\xe5\xbc\x03\x04\x47\xc5\xbc\x03\xe4\x47\x48\xff\x25\xbe\x03\xc5\xbe\x03\x2f\x12",
+    "x??xxx??xxxxx??x??xx", 20);
+
+// Sunsoft FD builds the voice's ADSR1 register address, then writes two DSP
+// registers. Both revisions share this prefix; the earlier one also saves
+// the values for restoration after a sound effect.
+Pattern Patterns::ptnSunsoftAdsr("\x7d\x9f\x5c\x08\x05\xc4\x14\xdd\xeb\x14", "xxxxxx?xx?", 10);
 
 // Some HAL derivatives bypass the variable written by FA and apply a fixed
 // percussion base directly in either note dispatch or the instrument loader.
