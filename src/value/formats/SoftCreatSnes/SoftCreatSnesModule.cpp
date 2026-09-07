@@ -29,7 +29,7 @@ namespace {
       .program(std::move(parsed.program));
 
   auto collection = result.sourceCollection(displayName).sequence(sequence);
-  if (const auto synth = addSynth(result, *layout, parsed.references, displayName)) {
+  if (const auto synth = addSynth(result, *layout, parsed.referencedInstruments, displayName)) {
     collection.soundBank(*synth);
   } else {
     result.warning("SoftCreatSnes sequence found, but no valid referenced BRR instruments were discovered",

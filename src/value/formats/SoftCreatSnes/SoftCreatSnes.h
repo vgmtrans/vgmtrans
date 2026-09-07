@@ -33,13 +33,16 @@ inline constexpr core::Envelope kNeutralGainEnvelope{
     .sustainAmplitude = 1.0,
 };
 
-// The command cutoff identifies five materially different sequence languages.
+// Driver generations with materially different command numbering or dispatch.
 enum class Version : u8 {
-  Early,            // Equinox; Spider-Man and the X-Men
-  Plok,
-  MaximumCarnage,
-  LateEcho,         // The Tick; Ken Griffey Jr. MLB
-  LateNoEcho,       // Tin Star; Foreman For Real
+  V1,
+  V2,   // shared V2a/V3/V4 command set
+  V2b,  // V2 variant with its additional commands
+  V5,
+  V6,  // shared V6a/V6b command set
+  V6c,
+  V6d,
+  V7,
 };
 
 struct Dialect {
@@ -48,19 +51,17 @@ struct Dialect {
 };
 
 [[nodiscard]] constexpr Dialect dialect(Version version) noexcept {
-  switch (version) {
-    case Version::Early:
-      return {.commandCutoff = 0xb8};
-    case Version::Plok:
-      return {.commandCutoff = 0xba, .noteAliasOpcode = 0xb8};
-    case Version::MaximumCarnage:
-      return {.commandCutoff = 0xbd, .noteAliasOpcode = 0xb3};
-    case Version::LateEcho:
-      return {.commandCutoff = 0xc7, .noteAliasOpcode = 0xb9};
-    case Version::LateNoEcho:
-      return {.commandCutoff = 0xc3, .noteAliasOpcode = 0xb9};
-  }
-  return {};
+  constexpr std::array dialects{
+      Dialect{0xc4},       // V1
+      Dialect{0xb8},       // V2
+      Dialect{0xba, 0xb8}, // V2b
+      Dialect{0xb9, 0xb9}, // V5; aliases are decoded before the cutoff
+      Dialect{0xc7, 0xb9}, // V6
+      Dialect{0xbd, 0xb3}, // V6c
+      Dialect{0xc3, 0xb9}, // V6d
+      Dialect{0xc3, 0xb9}, // V7
+  };
+  return dialects[static_cast<size_t>(version)];
 }
 
 struct TrackPointer {
@@ -79,10 +80,10 @@ struct EchoState {
 };
 
 struct Layout {
-  Version version = Version::Early;
+  Version version = Version::V2;
   u8 songIndex = 0;
   u8 initialTimer = 0x85;
-  u8 musicVolume = 0x80;
+  u16 musicVolume = 0x80;
   u16 pitchLowTableAddress = 0;
   u16 pitchHighTableAddress = 0;
   u16 coarseTableAddress = 0;
@@ -95,13 +96,9 @@ struct Layout {
   EchoState echo;
 };
 
-struct SequenceReferences {
-  std::set<u8> srcns{0};
-};
-
 struct SequenceParse {
   core::SequenceProgram program;
-  SequenceReferences references;
+  std::set<u8> referencedInstruments{0};
 };
 
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);
@@ -114,7 +111,7 @@ struct SequenceParse {
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
 [[nodiscard]] core::SequenceRuntime sequenceRuntime(core::RetainedSource source, const Layout& layout);
 [[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
-                                                               const SequenceReferences& references,
+                                                               const std::set<u8>& referencedInstruments,
                                                                std::string_view displayName);
 [[nodiscard]] core::FormatModule module();
 

@@ -38,6 +38,32 @@ void writeBytes(std::vector<u8>& bytes, u32 offset, std::initializer_list<u8> va
   std::ranges::copy(values, bytes.begin() + offset);
 }
 
+std::array<u16, kTrackCount> pointerColumns(u16 first, u16 stride) {
+  std::array<u16, kTrackCount> columns{};
+  for (u32 track = 0; track < kTrackCount; ++track) {
+    columns[track] = static_cast<u16>(first + track * stride);
+  }
+  return columns;
+}
+
+void writeModernPointerColumns(std::vector<u8>& bytes, u8 songCount,
+                               const std::array<u16, kTrackCount>& lowColumns, u16 highOffset) {
+  bytes[0x0102] = songCount;
+  for (u32 track = 0; track < kTrackCount; ++track) {
+    const u32 highLoad = 0x0100 + 8 + track * 17;
+    const u32 lowLoad = highLoad + 7;
+    bytes[highLoad] = 0xf6;  // MOV A,!abs+Y
+    bytes[lowLoad] = 0xf6;
+    writeLe16(bytes, highLoad + 1, static_cast<u16>(lowColumns[track] + highOffset));
+    writeLe16(bytes, lowLoad + 1, lowColumns[track]);
+  }
+}
+
+void writeSplitPointer(std::vector<u8>& bytes, u16 lowColumn, u16 highColumn, u8 song, u16 address) {
+  bytes[lowColumn + song] = static_cast<u8>(address);
+  bytes[highColumn + song] = static_cast<u8>(address >> 8);
+}
+
 template <class Event>
 std::vector<const Event*> events(const PerformanceTrack& track) {
   std::vector<const Event*> result;
@@ -49,7 +75,7 @@ std::vector<const Event*> events(const PerformanceTrack& track) {
   return result;
 }
 
-PerformanceSequence render(std::initializer_list<u8> commands, Version version = Version::Early) {
+PerformanceSequence render(std::initializer_list<u8> commands, Version version = Version::V2) {
   std::vector<u8> bytes(kAramSize);
   constexpr u16 start = 0x1000;
   std::ranges::copy(commands, bytes.begin() + start);
@@ -76,31 +102,51 @@ PerformanceSequence render(std::initializer_list<u8> commands, Version version =
   return SequenceVm(LoopPolicy::PlayOnce).render(program);
 }
 
-std::vector<u8> scannerFixture() {
+// Synthetic ARAM made from the scanner's minimal instruction shapes. It is not
+// an SPC dump: every address and data value is fabricated, with no song or BRR payload.
+std::vector<u8> modernScannerFixture() {
   std::vector<u8> bytes(kAramSize);
+
+  // Sequence loader: compare the song index, then read high and low pointer
+  // bytes through MOV A,!abs+Y. Remaining track loads are generated below.
   writeBytes(bytes, 0x0100,
-             {0x7d, 0x68, 0x05, 0xb0, 0xfa, 0xfd, 0xcd, 0x00, 0xf6, 0x03, 0x20, 0xf0, 0x0a,
-              0xc4, 0x31, 0xf6, 0x00, 0x20, 0xc4, 0x30, 0x3f, 0x38, 0x06, 0x3d, 0x3d});
-  writeBytes(bytes, 0x0180,
+             {0x7d, 0x68, 0x05, 0xb0, 0xfa, 0xfd, 0xcd, 0x00, 0xf6, 0x00, 0x00, 0xf0, 0x0a,
+              0xc4, 0x31, 0xf6, 0x00, 0x00, 0xc4, 0x30, 0x3f, 0x38, 0x06, 0x3d, 0x3d});
+  const auto columns = pointerColumns(0x2000, 0x10);
+  writeModernPointerColumns(bytes, 5, columns, 5);
+
+  // Command dispatcher: reject opcodes at the cutoff, then indirect through
+  // the handler table at $1000.
+  writeBytes(bytes, 0x0200,
              {0x3f, 0x85, 0x07, 0x10, 0x1d, 0x68, 0xc7, 0xb0, 0x0b, 0x1c,
               0xfd, 0xf6, 0x70, 0x0b, 0x2d, 0xf6, 0x00, 0x10, 0x2d, 0x6f});
+
+  // Instrument coarse tuning lookup at $4200.
   writeBytes(bytes, 0x0300,
              {0xfb, 0x20, 0x60, 0x96, 0x00, 0x42, 0x5b, 0xc0, 0xb0, 0x04,
               0x60, 0x95, 0x40, 0x02, 0xd5, 0xb0, 0x02, 0xd5, 0x90, 0x02});
+
+  // Note-pitch lookups at $4000/$4055 and fine tuning at $4100.
   writeBytes(bytes, 0x0340,
              {0xf6, 0x00, 0x40, 0xc4, 0xd9, 0xf6, 0x55, 0x40, 0xc4, 0xda, 0xfb, 0x20, 0xf6,
               0x00, 0x41, 0xfd, 0x6d, 0xe4, 0xd9, 0xcf, 0xcb, 0xdd, 0xee, 0xe4, 0xda, 0xcf,
               0x8f, 0x00, 0xde, 0x7a, 0xdd, 0x7a, 0xd9});
+
+  // Immediate loads form the envelope-table address $4300.
   writeBytes(bytes, 0x0400, {0xe8, 0x00, 0xc4, 0xd9, 0xe8, 0x43, 0xc4, 0xda});
+
+  // Timer target $92, followed by the DSP register IDs and their fabricated,
+  // zero-initialized parallel values. DIR selects page $44.
   writeBytes(bytes, 0x0480, {0x8f, 0x92, 0xfc, 0x8f, 0x04, 0xf1});
   writeBytes(bytes, 0x0500,
              {0x2c, 0x3c, 0x5c, 0x2d, 0x3d, 0x4d, 0x7d, 0x6d, 0x0d, 0x5d, 0x0f, 0x1f, 0x2f, 0x3f,
               0x4f, 0x5f, 0x6f, 0x7f, 0x05, 0x15, 0x25, 0x35, 0x45, 0x55, 0x65, 0x75, 0xff});
   bytes[0x0500 + 27 + 9] = 0x44;
+
+  // Minimal live state: song 2 contains one terminated track and one BRR sample.
   bytes[0xe4] = 2;
   bytes[0xe8] = 0x70;
-  bytes[0x2002] = 0x00;
-  bytes[0x2005] = 0x30;
+  writeSplitPointer(bytes, columns[0], columns[0] + 5, 2, 0x3000);
   bytes[0x3000] = 0x80;
   writeLe16(bytes, 0x4400, 0x4500);
   writeLe16(bytes, 0x4402, 0x4500);
@@ -108,11 +154,54 @@ std::vector<u8> scannerFixture() {
   return bytes;
 }
 
-void layoutUsesLiveSongAndAuditedTables() {
-  expect(module().name == "SoftCreatSnes", "the value format should expose its complete driver name");
-  const std::vector<u8> bytes = scannerFixture();
+// Synthetic V1 layout. Each byte run is the minimum scanner signature for the
+// named operation; operands and data addresses are intentionally fabricated.
+std::vector<u8> v1ScannerFixture() {
+  std::vector<u8> bytes(kAramSize);
+
+  // Sequence loader: read three adjacent 32-song pointer columns at
+  // $2000/$2020/$2040.
+  writeBytes(bytes, 0x0100,
+             {0x3f, 0x00, 0x06, 0xf5, 0x00, 0x20, 0xc4, 0x30, 0xf5,
+              0x20, 0x20, 0xc4, 0x31, 0xf5, 0x40, 0x20, 0xc4, 0x32});
+
+  // V1 dispatch indexes the handler table at $1000 with even opcodes.
+  writeBytes(bytes, 0x0200,
+             {0x3f, 0x00, 0x0a, 0x10, 0x0a, 0xfd, 0xf6, 0x01,
+              0x10, 0x2d, 0xf6, 0x00, 0x10, 0x2d, 0x6f});
+
+  // Instrument coarse tuning lookup at $5084.
+  writeBytes(bytes, 0x0300,
+             {0xfb, 0x20, 0x60, 0x96, 0x84, 0x50, 0x5b, 0xc0,
+              0xb0, 0x04, 0x60, 0x95, 0x40, 0x02});
+  // Note-pitch lookups at $4000/$4055 and fine tuning at $50a4.
+  writeBytes(bytes, 0x0340,
+             {0xf6, 0x00, 0x40, 0xc4, 0xd6, 0xf6, 0x55, 0x40, 0xc4, 0xd7, 0xfb,
+              0x20, 0xf6, 0xa4, 0x50, 0xfd, 0x6d, 0xe4, 0xd6, 0xcf, 0xcb, 0xd8,
+              0xee, 0xe4, 0xd7, 0xcf, 0x8f, 0x00, 0xd9, 0x7a, 0xd8, 0x7a, 0xd6});
+  // Envelope lookup at $1090; timer $42 is doubled by the V1 driver.
+  writeBytes(bytes, 0x0400, {0xfb, 0x61, 0xf6, 0x90, 0x10, 0xd4, 0xa0});
+  writeBytes(bytes, 0x0480, {0x8f, 0x42, 0xfa, 0x8f, 0x81, 0xf1});
+
+  // A nearby one-track song must beat a more populated but distant candidate.
+  constexpr u8 selectedSong = 5;
+  constexpr u8 distantSong = 6;
+  writeSplitPointer(bytes, 0x2000, 0x2020, selectedSong, 0x3000);
+  writeLe16(bytes, 0x30, 0x3005);
+  bytes[0x3000] = 0x40;
+  for (u32 track = 0; track < kTrackCount; ++track) {
+    const u16 competing = static_cast<u16>(0x6000 + track * 0x20);
+    const u16 lowColumn = static_cast<u16>(0x2000 + track * 0x40);
+    writeSplitPointer(bytes, lowColumn, lowColumn + 0x20, distantSong, competing);
+    bytes[competing] = 0x40;
+  }
+  return bytes;
+}
+
+void modernLayoutFindsRelocatedTables() {
+  const std::vector<u8> bytes = modernScannerFixture();
   const auto layout = findLayout(ByteReader(SourceId{302}, bytes));
-  expect(layout && layout->version == Version::LateEcho && layout->songIndex == 2 &&
+  expect(layout && layout->version == Version::V6 && layout->songIndex == 2 &&
              layout->tracks[0].address == 0x3000 && layout->pitchLowTableAddress == 0x4000 &&
              layout->pitchHighTableAddress == 0x4055 && layout->coarseTableAddress == 0x4200 &&
              layout->fineTableAddress == 0x4100 && layout->envelopeTableAddress == 0x4300 &&
@@ -120,11 +209,73 @@ void layoutUsesLiveSongAndAuditedTables() {
          "SoftCreatSnes layout should use the live song and recover every relocated driver table");
 }
 
+void v5LayoutUsesOverlappingPointerColumns() {
+  auto bytes = modernScannerFixture();
+  bytes[0x0206] = 0xb9;
+  bytes[0xe4] = 1;
+  std::fill(bytes.begin() + 0x2000, bytes.begin() + 0x2050, 0);
+
+  // This generation packs its low/high pointer columns at irregular,
+  // overlapping offsets. Song 1 points track 0 at our synthetic terminator.
+  const std::array<u16, kTrackCount> lowColumns{0x2000, 0x2006, 0x200a, 0x200e,
+                                                0x2012, 0x2016, 0x201a, 0x201e};
+  writeModernPointerColumns(bytes, 4, lowColumns, 2);
+  writeSplitPointer(bytes, lowColumns[0], lowColumns[0] + 2, 1, 0x3000);
+  bytes[0x3000] = 0x40;
+
+  const auto layout = findLayout(ByteReader(SourceId{305}, bytes));
+  expect(layout && layout->version == Version::V5 && layout->songIndex == 1 &&
+             layout->tracks[0].address == 0x3000,
+         "V5 should use its overlapping pointer columns and $B9 cutoff");
+}
+
+void v7LayoutAlignsPrefixedDspValues() {
+  auto bytes = modernScannerFixture();
+  bytes[0x0206] = 0xc3;
+  bytes[0xe4] = 7;
+  bytes[0xe6] = 0x7f;
+  bytes[0xe8] = 0;
+
+  // Three DSP register IDs precede the regular register table. Their matching
+  // values precede its values too, so DIR remains aligned at index 9.
+  writeBytes(bytes, 0x04fd, {0x6c, 0x0c, 0x1c});
+  bytes[0x0500 + 30 + 9] = 0xff;
+
+  const auto columns = pointerColumns(0x2000, 4);
+  std::fill(bytes.begin() + 0x2000, bytes.begin() + 0x2020, 0);
+  writeModernPointerColumns(bytes, 2, columns, 2);
+  writeSplitPointer(bytes, columns[0], columns[0] + 2, 0, 0x3000);
+  writeSplitPointer(bytes, columns[0], columns[0] + 2, 1, 0x3100);
+  bytes[0x3000] = 0x80;
+  bytes[0x3100] = 0x40;
+
+  // V7 track init copies the live music volume into track state.
+  writeBytes(bytes, 0x0638, {0xe4, 0xe6, 0xd5, 0x66, 0x03});
+  writeLe16(bytes, 0x1000 + (0xaau - 0x80u) * 2u, 0x0600);
+
+  const auto layout = findLayout(ByteReader(SourceId{306}, bytes));
+  expect(layout && layout->version == Version::V7 && layout->songIndex == 1 &&
+             layout->tracks[0].address == 0x3100 && layout->musicVolume == 0x7f &&
+             layout->spcDirAddress == 0xff00,
+         "V7 should retain echo commands and align prefixed DSP values");
+}
+
+void v1LayoutSelectsTheCurrentSequence() {
+  const auto layout = findLayout(ByteReader(SourceId{307}, v1ScannerFixture()));
+  expect(layout && layout->version == Version::V1 && layout->songIndex == 5 &&
+             layout->tracks[0].address == 0x3000 && layout->initialTimer == 0x84 &&
+             layout->musicVolume == 0x100 && layout->pitchLowTableAddress == 0x4000 &&
+             layout->pitchHighTableAddress == 0x4055 && layout->coarseTableAddress == 0x5084 &&
+             layout->fineTableAddress == 0x50a4 && layout->envelopeTableAddress == 0x1090 &&
+             layout->spcDirAddress == 0x5000,
+         "the V1 layout should recover its current sequence, timer, tuning, envelope, and sample tables");
+}
+
 void instrumentAnnotationsReflectTheSynthModel() {
   Session session;
   session.registerFormat(module());
   const SourceId source =
-      session.addSource(SourceFile{.name = "SoftCreatSnes fixture.aram"}, scannerFixture());
+      session.addSource(SourceFile{.name = "synthetic-softcreat.aram"}, modernScannerFixture());
   session.scanPendingSources();
   const SessionSnapshot snapshot = session.snapshot();
   const auto* bank = snapshot.collections().empty() || snapshot.collections().front().members.soundBanks.empty()
@@ -133,34 +284,33 @@ void instrumentAnnotationsReflectTheSynthModel() {
   expect(bank != nullptr && bank->instruments.size() == 1,
          "SoftCreatSnes scanning should publish its referenced instrument");
 
-  const auto instrumentSources = snapshot.sourceMap().ownedBy(ObjectRefs::instrument(bank->metadata.id, 0));
-  const auto root = std::ranges::find_if(instrumentSources, [&](SourceAnnotationId id) {
-    return snapshot.sourceMap().get(id).category() == "softcreat-snes-instrument";
-  });
-  expect(root != instrumentSources.end(), "SoftCreatSnes instruments should expose a source annotation");
-  const auto tables = snapshot.sourceMap().annotationsForAsset(bank->metadata.id);
-  const auto table = [&](std::string_view kind) -> const SourceAnnotation* {
-    const auto found = std::ranges::find_if(tables, [&](SourceAnnotationId id) {
-      return snapshot.sourceMap().get(id).category() == kind;
+  const auto annotation = [&](const auto& ids, std::string_view category) -> const SourceAnnotation* {
+    const auto found = std::ranges::find_if(ids, [&](SourceAnnotationId id) {
+      return snapshot.sourceMap().get(id).category() == category;
     });
-    return found == tables.end() ? nullptr : &snapshot.sourceMap().get(*found);
+    return found == ids.end() ? nullptr : &snapshot.sourceMap().get(*found);
   };
-  const SourceAnnotation* coarseTable = table("softcreat-snes-coarse-tuning-table");
-  const SourceAnnotation* fineTable = table("softcreat-snes-fine-tuning-table");
+  const SourceAnnotation* instrument =
+      annotation(snapshot.sourceMap().ownedBy(ObjectRefs::instrument(bank->metadata.id, 0)),
+                 "softcreat-snes-instrument");
+  expect(instrument != nullptr, "SoftCreatSnes instruments should expose a source annotation");
+  const auto tables = snapshot.sourceMap().annotationsForAsset(bank->metadata.id);
+  const SourceAnnotation* coarseTable = annotation(tables, "softcreat-snes-coarse-tuning-table");
+  const SourceAnnotation* fineTable = annotation(tables, "softcreat-snes-fine-tuning-table");
   expect(coarseTable != nullptr && coarseTable->range.offset == 0x4200 && coarseTable->range.size == 0x100 &&
              coarseTable->fields.size() == 0x100 && fineTable != nullptr && fineTable->range.offset == 0x4100 &&
              fineTable->range.size == 0x100 && fineTable->fields.size() == 0x100,
          "SoftCreatSnes should annotate every entry in both complete tuning tables");
-  const SourceAnnotation& instrument = snapshot.sourceMap().get(*root);
-  expect(instrument.parent == coarseTable->id,
+  expect(instrument->parent == coarseTable->id,
          "referenced instruments should be rooted in the source table that defines their coarse tuning");
-  expect(instrument.fieldsAsChildren &&
-             std::ranges::count_if(instrument.fields, [](const SourceField& field) { return field.range.valid(); }) == 2,
+  expect(instrument->fieldsAsChildren &&
+             std::ranges::count_if(instrument->fields, [](const SourceField& field) { return field.range.valid(); }) ==
+                 2,
          "SoftCreatSnes instruments should expose their two source-backed tuning fields");
   expect(bank->instruments.front().regions.size() == 1 && !bank->instruments.front().regions.front().range.valid() &&
              snapshot.sourceMap().ownedBy(ObjectRefs::region(bank->metadata.id, 0, 0)).empty(),
          "SoftCreatSnes's derived playable region should remain in the synth model without claiming source bytes");
-  expect(std::ranges::all_of(instrument.fields, [&](const SourceField& field) {
+  expect(std::ranges::all_of(instrument->fields, [&](const SourceField& field) {
            return !field.range.valid() || field.range.source == source;
          }),
          "SoftCreatSnes instrument fields should retain their source identity");
@@ -168,19 +318,31 @@ void instrumentAnnotationsReflectTheSynthModel() {
 
 void versionedOpcodesRetainTheirRealOperandLengths() {
   std::vector<u8> bytes(kAramSize);
+  writeBytes(bytes, 0x1000, {0xb9, 0, 4, 0x80});
+  bytes[0x2000] = 0x20;
+  Layout v5{.version = Version::V5, .noteAliasTableAddress = 0x2000};
+  const TrackProgram v5Track = decodeSourceTrack(ByteReader(SourceId{303}, bytes), v5, 0, 0x1000);
+  expect(v5Track.commands.size() == 2 && v5Track.commands.front().semantic == SequenceSemantic::Note,
+         "V5 should decode a valid $B9 note alias before applying its $B9 cutoff");
+
   writeBytes(bytes, 0x1000, {0xa1, 1, 2, 3, 4, 5, 6, 7, 0x80});
-  Layout maximum{.version = Version::MaximumCarnage};
-  const TrackProgram maxTrack = decodeSourceTrack(ByteReader(SourceId{303}, bytes), maximum, 0, 0x1000);
-  expect(maxTrack.commands.size() == 2 && maxTrack.commands.front().range.size == 8 &&
-             maxTrack.commands.front().semantic == SequenceSemantic::Envelope,
-         "Maximum Carnage A1 should be the seven-byte inline software envelope");
+  Layout v6c{.version = Version::V6c};
+  const TrackProgram v6cTrack = decodeSourceTrack(ByteReader(SourceId{304}, bytes), v6c, 0, 0x1000);
+  expect(v6cTrack.commands.size() == 2 && v6cTrack.commands.front().range.size == 8 &&
+             v6cTrack.commands.front().semantic == SequenceSemantic::Envelope,
+         "V6c A1 should be the seven-byte inline software envelope");
 
   writeBytes(bytes, 0x1000, {0xaa, 0x40, 0x80});
-  Layout late{.version = Version::LateNoEcho};
-  const TrackProgram lateTrack = decodeSourceTrack(ByteReader(SourceId{304}, bytes), late, 0, 0x1000);
-  expect(lateTrack.commands.size() == 2 && lateTrack.commands.front().range.size == 2 &&
-             lateTrack.commands.front().semantic == SequenceSemantic::Level,
-         "Tin Star/Foreman AA should consume a volume-decay factor, not toggle echo");
+  Layout v6d{.version = Version::V6d};
+  const TrackProgram v6dTrack = decodeSourceTrack(ByteReader(SourceId{305}, bytes), v6d, 0, 0x1000);
+  expect(v6dTrack.commands.size() == 2 && v6dTrack.commands.front().range.size == 2 &&
+             v6dTrack.commands.front().semantic == SequenceSemantic::Level,
+         "V6d AA should consume a volume-decay factor, not toggle echo");
+
+  const PerformanceSequence v1 = render({0x8c, 4, 0x92, 3, 0x20, 0x80}, Version::V1);
+  const auto v1Notes = events<NotePerformanceEvent>(v1.tracks.front());
+  expect(v1.diagnostics.empty() && v1Notes.size() == 1 && v1Notes.front()->durationTicks == 4,
+         "V1 should decode its even-numbered commands as their later equivalents");
 }
 
 void physicalEffectsAndSoftwareGainRender() {
@@ -267,13 +429,13 @@ void durationModesLegatoAndRepeatsAreStateful() {
          "a zero repeat byte should wrap through all 256 SPC700 counter values");
 
   const PerformanceSequence perNote =
-      render({0x86, 3, 0xbf, 0, 0x20, 1, 0x40, 0xc0, 2, 0x80}, Version::LateEcho);
+      render({0x86, 3, 0xbf, 0, 0x20, 1, 0x40, 0xc0, 2, 0x80}, Version::V6);
   expect(perNote.diagnostics.empty() && events<NotePerformanceEvent>(perNote.tracks.front()).size() == 2 &&
              !events<StereoBalancePerformanceEvent>(perNote.tracks.front()).empty(),
          "late per-note volume mode should consume a suffix on rests and notes and affect the mixer");
 
   const PerformanceSequence polymorphicTail =
-      render({0x84, 2, 0, 1, 0xbf, 0x86, 1, 1, 0x40, 0x86, 0, 0x85, 0x80}, Version::LateEcho);
+      render({0x84, 2, 0, 1, 0xbf, 0x86, 1, 1, 0x40, 0x86, 0, 0x85, 0x80}, Version::V6);
   const auto polymorphicNotes = events<NotePerformanceEvent>(polymorphicTail.tracks.front());
   expect(polymorphicTail.diagnostics.empty() &&
              std::ranges::count_if(polymorphicNotes, [](const auto* note) { return !note->extendsPrevious; }) == 2,
@@ -290,7 +452,7 @@ void finiteRepeatsAreNotSongLoops() {
 
 void perNoteVolumePrecedesLiteralDuration() {
   const PerformanceSequence performance =
-      render({0xb9, 0x19, 100, 12, 0x80}, Version::MaximumCarnage);
+      render({0xb9, 0x19, 100, 12, 0x80}, Version::V6c);
   const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
   const auto balance = events<StereoBalancePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->durationTicks == 12 &&
@@ -330,7 +492,10 @@ void pitchEffectsRetainPhysicalTiming() {
 }  // namespace
 
 void runSoftCreatSnesModuleTests() {
-  layoutUsesLiveSongAndAuditedTables();
+  modernLayoutFindsRelocatedTables();
+  v5LayoutUsesOverlappingPointerColumns();
+  v7LayoutAlignsPrefixedDspValues();
+  v1LayoutSelectsTheCurrentSequence();
   instrumentAnnotationsReflectTheSynthModel();
   versionedOpcodesRetainTheirRealOperandLengths();
   physicalEffectsAndSoftwareGainRender();
