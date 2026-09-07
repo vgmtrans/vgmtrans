@@ -334,7 +334,7 @@ void sonyPs1SepAndVabLayoutsAreVersionAware() {
   be16(sep, 6, 0);
   be16(sep, 8, 48);
   be24(sep, 10, 500000);
-  sep[13] = 4;
+  sep[13] = 65;  // Resident Evil uses numerators above the old arbitrary limit of 32.
   sep[14] = 2;
   be32(sep, 15, static_cast<u32>(end.size()));
   std::ranges::copy(end, sep.begin() + 19);
@@ -348,7 +348,7 @@ void sonyPs1SepAndVabLayoutsAreVersionAware() {
   std::ranges::copy(end, sep.begin() + second + 13);
   const auto sepLayouts = findSonyPs1Sequences(ByteReader(SourceId{83}, sep));
   expect(sepLayouts.size() == 2 && sepLayouts[0].sepFirst && !sepLayouts[1].sepFirst && sepLayouts[1].sequenceId == 1 &&
-             sepLayouts[1].ppqn == 96,
+             sepLayouts[1].ppqn == 96 && sepLayouts[0].rhythmNumerator == 65,
          "SEP should expose every packed sequence with its own short header");
 
   const auto oldBytes = vabFixture(4, true);
@@ -388,6 +388,14 @@ void sonyPs1SepAndVabLayoutsAreVersionAware() {
   expect(packed && packed->hasSampleBody && packed->sampleDataOffset == packedBody &&
              packed->expectedSampleBytes == kFixtureVagSize * 2,
          "VAB size boundaries should locate a body whose later samples omit their silent leading frame");
+
+  std::fill_n(packedBytes.begin() + packedBody + kFixtureVagSize, kPsxAdpcmBlockBytes, 0);
+  for (u32 block = 1; block <= 10; ++block) {
+    std::fill_n(packedBytes.begin() + packedBody + block * kPsxAdpcmBlockBytes + 2, 14, 0);
+  }
+  const auto quiet = readSonyPs1BankLayout(ByteReader(SourceId{92}, packedBytes), 0);
+  expect(quiet && quiet->hasSampleBody && quiet->sampleDataOffset == packedBody,
+         "sample discovery should recover a quiet first sample from a later sample without container metadata");
 
   auto forcedBytes = vabFixture(7, false);
   const u32 forcedBody = static_cast<u32>(forcedBytes.size()) + 4;
