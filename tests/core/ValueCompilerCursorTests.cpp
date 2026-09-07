@@ -23,7 +23,8 @@ struct CompilerProbeProgramState {
 };
 
 struct CompilerPrepassProgramState : CompilerProbeProgramState {
-  void finishPrepass() {}
+  u32 completedPrepasses = 0;
+  void finishPrepass() { ++completedPrepasses; }
 };
 
 struct CompilerProbePlayback {
@@ -564,16 +565,22 @@ void compilerCursorAnalysisStopsAfterItsScheduledPrepass() {
   const std::vector<u8> bytes{0x21, 0xff};
   const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{15}, bytes), static_cast<u32>(bytes.size()));
   const SequenceProgramConfig config = compilerProbeConfig();
-  const SequenceProgram program{
+  SequenceProgram program{
       .runtime = makeCompiledRuntime<ProbeCursor, CompilerPrepassProgramState>(),
       .timebase = config.timebase,
       .behavior = config.behavior,
       .tracks = {track},
   };
 
+  const auto state = analyzeCompiledProgram<CompilerPrepassProgramState>(
+      program, [](const CompilerPrepassProgramState& state) { return state; });
+  expect(state.executedCommands == 2 && state.completedPrepasses == 1,
+         "compiled analysis should finish one scheduled prepass without executing a discarded output pass");
+
+  program.runtime = compilerProbeRuntime();
   const u32 executed =
-      analyzeCompiledProgram<CompilerPrepassProgramState>(program, &CompilerPrepassProgramState::executedCommands);
-  expect(executed == 2, "compiled analysis should not execute a discarded output pass after its scheduled prepass");
+      analyzeCompiledProgram<CompilerProbeProgramState>(program, &CompilerProbeProgramState::executedCommands);
+  expect(executed == 2, "analysis without a prepass hook must still execute the program exactly once");
 }
 
 void compilerCursorAnalysisReportsPrepassDiagnostics() {

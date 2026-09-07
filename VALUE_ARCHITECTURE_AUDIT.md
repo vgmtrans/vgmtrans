@@ -109,6 +109,21 @@ and UndefinedBehaviorSanitizer with no differences or sanitizer findings.
 All five CTest targets pass, with no compiler warnings. This removes 54
 production lines while keeping the existing format-facing motion plans.
 
+### Remove duplicate VM loop and analysis paths
+
+Loop handling already changes the executor's current command. Remove the
+extra action enum and result wrapper that repeated whether that command still
+exists. Requested loop repeats and temporary replays while coordinating the
+sequence endpoint now share their setup. Repeat snapshots use their existing
+map value directly instead of a one-field wrapper with a forwarding comparison.
+
+Analysis and prepass rendering use one silent-pass path. Tests verify that
+analysis executes once both with and without a prepass hook, and invokes that
+hook exactly once when present. Existing VM tests cover finite repeats,
+inferred and declared loops, loop counts, synchronized cutoffs, section
+playlists, and sustained notes. All 17 configured CTest targets have now been
+rebuilt and pass, including the additional standalone format suites.
+
 ## Further investigation
 
 - Compiler cursor: duplicated adapters for emitting ordinary performance events;
