@@ -93,84 +93,6 @@ template <class Playback, class Callable, class... Arguments>
   return first;
 }
 
-template <class Playback, auto Member, class Argument>
-void setMember(Playback& playback, Argument value) {
-  using Value = std::remove_cvref_t<decltype(playback.track.*Member)>;
-  playback.track.*Member = static_cast<Value>(value);
-}
-
-template <class Playback, auto Member, class Argument>
-void addMember(Playback& playback, Argument value) {
-  using Value = std::remove_cvref_t<decltype(playback.track.*Member)>;
-  playback.track.*Member += static_cast<Value>(value);
-}
-
-template <class Playback, auto Member>
-void toggleMember(Playback& playback) {
-  static_assert(std::is_same_v<std::remove_cvref_t<decltype(playback.track.*Member)>, bool>);
-  playback.track.*Member = !(playback.track.*Member);
-}
-
-template <class Playback>
-void emitLevel(Playback& playback, double gain) {
-  playback.out.level(gain);
-}
-
-template <class Playback>
-void emitQuantizedLevel(Playback& playback, double gain, u32 levels) {
-  playback.out.level(gain, ValueQuantization{.levels = levels});
-}
-
-template <class Playback>
-void emitExpression(Playback& playback, double gain) {
-  playback.out.expression(gain);
-}
-
-template <class Playback>
-void emitPan(Playback& playback, double position) {
-  playback.out.pan(position);
-}
-
-template <class Playback>
-void emitStereoBalance(Playback& playback, double leftGain, double rightGain) {
-  playback.out.stereoBalance(leftGain, rightGain);
-}
-
-template <class Playback>
-void emitInstrument(Playback& playback, u32 bank, u32 program, InstrumentEnvelopeMode envelopeMode) {
-  playback.out.instrument(bank, program, envelopeMode);
-}
-
-template <class Playback>
-void emitSourceInstrument(Playback& playback, std::string domain, u32 key, InstrumentEnvelopeMode envelopeMode) {
-  playback.out.instrument(
-      InstrumentIdentity{
-          .domain = std::move(domain),
-          .key = key,
-      },
-      envelopeMode);
-}
-
-template <class Playback>
-void emitTempo(Playback& playback, u32 microsecondsPerQuarter) {
-  playback.out.tempo(microsecondsPerQuarter);
-}
-
-template <class Playback>
-void emitMasterLevel(Playback& playback, double gain) {
-  playback.out.masterLevel(gain);
-}
-
-template <class Playback>
-void emitReverb(Playback& playback, double send) {
-  playback.out.reverb(send);
-}
-
-template <class Playback>
-void emitTuning(Playback& playback, double cents) {
-  playback.out.tuning(cents);
-}
-
 template <class Playback, EnvelopeFields Field>
 void emitEnvelopeField(Playback& playback, double value, VoiceEnvelopeScope scope) {
   static_assert(Field == EnvelopeFields::Attack || Field == EnvelopeFields::Hold || Field == EnvelopeFields::Decay ||
@@ -191,46 +113,6 @@ void emitEnvelopeField(Playback& playback, double value, VoiceEnvelopeScope scop
     envelope.sustainAmplitude = value;
   }
   playback.out.updateEnvelope(std::move(envelope), Field, scope);
-}
-
-template <class Playback>
-void restoreEnvelope(Playback& playback, EnvelopeFields fields, VoiceEnvelopeScope scope) {
-  playback.out.restoreEnvelope(fields, scope);
-}
-
-template <class Playback>
-void emitGlobalTranspose(Playback& playback, s32 semitones) {
-  playback.out.globalTranspose(semitones);
-}
-
-template <class Playback>
-void emitLegatoPedal(Playback& playback, bool enabled) {
-  playback.out.legatoPedal(enabled);
-}
-
-template <class Playback>
-void emitPitchBend(Playback& playback, double semitones) {
-  playback.out.pitchBend(semitones);
-}
-
-template <class Playback>
-void emitPitchBendRange(Playback& playback, u8 semitones) {
-  playback.out.pitchBendRange(semitones);
-}
-
-template <class Playback>
-[[nodiscard]] Effects wait(Playback&, u32 ticks) {
-  return Effects::wait(ticks);
-}
-
-template <class Playback>
-[[nodiscard]] Effects repeatUntil(Playback& playback, u8 slot, u32 totalPlays, Address destination) {
-  return playback.vm.countedRepeatUntil(slot, totalPlays, destination);
-}
-
-template <class Playback>
-[[nodiscard]] Effects repeatBreak(Playback& playback, u8 slot, Address destination) {
-  return playback.vm.countedRepeatBreak(slot, destination).effects;
 }
 
 }  // namespace detail
@@ -453,7 +335,9 @@ public:
       return *this;
     }
 
-    Event& wait(auto ticks) { return append<&detail::wait<Playback>>(std::move(ticks)); }
+    Event& wait(u32 ticks) {
+      return appendCallable([ticks](Playback&) { return Effects::wait(ticks); });
+    }
 
     Event& delay(u32 ticks) {
       execution_.delayTicks = ticks;
@@ -479,39 +363,52 @@ public:
       });
     }
 
-    Event& emitLevel(auto gain) { return append<&detail::emitLevel<Playback>>(std::move(gain)); }
-
-    Event& emitLevel(auto gain, ValueQuantization quantization) {
-      return append<&detail::emitQuantizedLevel<Playback>>(std::move(gain), quantization.levels);
+    Event& emitLevel(double gain) {
+      return appendCallable([=](Playback& playback) { playback.out.level(gain); });
     }
 
-    Event& emitExpression(auto gain) { return append<&detail::emitExpression<Playback>>(std::move(gain)); }
-
-    Event& emitPan(auto position) { return append<&detail::emitPan<Playback>>(std::move(position)); }
-
-    Event& emitStereoBalance(auto leftGain, auto rightGain) {
-      return append<&detail::emitStereoBalance<Playback>>(std::move(leftGain), std::move(rightGain));
+    Event& emitLevel(double gain, ValueQuantization quantization) {
+      return appendCallable([=](Playback& playback) { playback.out.level(gain, quantization); });
     }
 
-    Event& emitInstrument(auto bank, auto program,
+    Event& emitExpression(double gain) {
+      return appendCallable([=](Playback& playback) { playback.out.expression(gain); });
+    }
+
+    Event& emitPan(double position) {
+      return appendCallable([=](Playback& playback) { playback.out.pan(position); });
+    }
+
+    Event& emitStereoBalance(double leftGain, double rightGain) {
+      return appendCallable([=](Playback& playback) { playback.out.stereoBalance(leftGain, rightGain); });
+    }
+
+    Event& emitInstrument(u32 bank, u32 program,
                           InstrumentEnvelopeMode envelopeMode = InstrumentEnvelopeMode::UseInstrumentEnvelope) {
-      return append<&detail::emitInstrument<Playback>>(std::move(bank), std::move(program), envelopeMode);
+      return appendCallable([=](Playback& playback) { playback.out.instrument(bank, program, envelopeMode); });
     }
 
-    Event& emitInstrument(std::string_view domain, auto key,
+    Event& emitInstrument(std::string_view domain, u32 key,
                           InstrumentEnvelopeMode envelopeMode = InstrumentEnvelopeMode::UseInstrumentEnvelope) {
-      return append<&detail::emitSourceInstrument<Playback>>(domain, std::move(key), envelopeMode);
+      return appendCallable([identity = InstrumentIdentity{.domain = std::string(domain), .key = key},
+                             envelopeMode](Playback& playback) { playback.out.instrument(identity, envelopeMode); });
     }
 
-    Event& emitTempo(auto microsecondsPerQuarter) {
-      return append<&detail::emitTempo<Playback>>(std::move(microsecondsPerQuarter));
+    Event& emitTempo(u32 microsecondsPerQuarter) {
+      return appendCallable([=](Playback& playback) { playback.out.tempo(microsecondsPerQuarter); });
     }
 
-    Event& emitMasterLevel(auto gain) { return append<&detail::emitMasterLevel<Playback>>(std::move(gain)); }
+    Event& emitMasterLevel(double gain) {
+      return appendCallable([=](Playback& playback) { playback.out.masterLevel(gain); });
+    }
 
-    Event& emitReverb(auto send) { return append<&detail::emitReverb<Playback>>(std::move(send)); }
+    Event& emitReverb(double send) {
+      return appendCallable([=](Playback& playback) { playback.out.reverb(send); });
+    }
 
-    Event& emitTuning(auto cents) { return append<&detail::emitTuning<Playback>>(std::move(cents)); }
+    Event& emitTuning(double cents) {
+      return appendCallable([=](Playback& playback) { playback.out.tuning(cents); });
+    }
 
     template <EnvelopeFields Field>
     Event& emitEnvelopeField(auto value, VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks) {
@@ -520,36 +417,51 @@ public:
 
     Event& restoreEnvelope(EnvelopeFields fields = EnvelopeFields::All,
                            VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks) {
-      return append<&detail::restoreEnvelope<Playback>>(fields, scope);
+      return appendCallable([=](Playback& playback) { playback.out.restoreEnvelope(fields, scope); });
     }
 
-    Event& emitGlobalTranspose(auto semitones) {
-      return append<&detail::emitGlobalTranspose<Playback>>(std::move(semitones));
+    Event& emitGlobalTranspose(s32 semitones) {
+      return appendCallable([=](Playback& playback) { playback.out.globalTranspose(semitones); });
     }
 
-    Event& emitLegatoPedal(auto enabled) { return append<&detail::emitLegatoPedal<Playback>>(std::move(enabled)); }
+    Event& emitLegatoPedal(bool enabled) {
+      return appendCallable([=](Playback& playback) { playback.out.legatoPedal(enabled); });
+    }
 
-    Event& emitPitchBend(auto semitones) { return append<&detail::emitPitchBend<Playback>>(std::move(semitones)); }
+    Event& emitPitchBend(double semitones) {
+      return appendCallable([=](Playback& playback) { playback.out.pitchBend(semitones); });
+    }
 
-    Event& emitPitchBendRange(auto semitones) {
-      return append<&detail::emitPitchBendRange<Playback>>(std::move(semitones));
+    Event& emitPitchBendRange(::u8 semitones) {
+      return appendCallable([=](Playback& playback) { playback.out.pitchBendRange(semitones); });
     }
 
     template <auto Member, class Value>
     Event& set(Value value) {
-      using Argument = decltype(detail::storedCommandValue(std::move(value)));
-      return append<&detail::setMember<Playback, Member, Argument>>(std::move(value));
+      return appendCallable(
+          [](Playback& playback, const auto& argument) {
+            using MemberValue = std::remove_cvref_t<decltype(playback.track.*Member)>;
+            playback.track.*Member = static_cast<MemberValue>(argument);
+          },
+          std::move(value));
     }
 
     template <auto Member, class Value>
     Event& add(Value value) {
-      using Argument = decltype(detail::storedCommandValue(std::move(value)));
-      return append<&detail::addMember<Playback, Member, Argument>>(std::move(value));
+      return appendCallable(
+          [](Playback& playback, const auto& argument) {
+            using MemberValue = std::remove_cvref_t<decltype(playback.track.*Member)>;
+            playback.track.*Member += static_cast<MemberValue>(argument);
+          },
+          std::move(value));
     }
 
     template <auto Member>
     Event& toggle() {
-      return append<&detail::toggleMember<Playback, Member>>();
+      return appendCallable([](Playback& playback) {
+        static_assert(std::is_same_v<std::remove_cvref_t<decltype(playback.track.*Member)>, bool>);
+        playback.track.*Member = !(playback.track.*Member);
+      });
     }
 
     template <auto Method, class... Arguments>
@@ -640,14 +552,14 @@ public:
 
     Event& repeatUntil(::u8 slot, u32 totalPlays, Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      append<&detail::repeatUntil<Playback>>(slot, totalPlays, destination);
+      appendCallable([=](Playback& playback) { return playback.vm.countedRepeatUntil(slot, totalPlays, destination); });
       discoveryTargets_.push_back(destination);
       return *this;
     }
 
     Event& repeatBreak(::u8 slot, Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      append<&detail::repeatBreak<Playback>>(slot, destination);
+      appendCallable([=](Playback& playback) { return playback.vm.countedRepeatBreak(slot, destination).effects; });
       discoveryTargets_.push_back(destination);
       return *this;
     }

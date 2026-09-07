@@ -79,6 +79,20 @@ anchors, and source boundaries; the existing builder and inspection tests
 cover their ownership policies. Core, Square PS2, Sony PS2, UI, and parity
 self-tests all pass (5 CTest targets), with no compiler warnings.
 
+### Keep compiled operations beside their public methods
+
+Remove the second layer of private templates behind ordinary compiler-cursor
+operations. Output, state updates, waits, and counted repeats now construct
+their small command bodies directly. Scalar output parameters use the
+emitter's concrete types instead of instantiating templates just to convert
+them later. Source instrument identities own their strings when compiled.
+
+This removes 88 production lines and 23 private helper names without adding an
+abstraction. Existing tests cover command ordering, state updates, repeats,
+flow conflicts, and source-free execution. An additional lifetime test checks
+temporary instrument domains, envelope policy, and absent versus declared
+level quantization. The same five CTest targets pass without compiler warnings.
+
 ## Further investigation
 
 - Compiler cursor: duplicated adapters for emitting ordinary performance events;

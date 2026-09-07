@@ -123,6 +123,13 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
       return event.wait<&CompilerProbeState::readyDuringWaitAtTick>()
           .duringWaitWhen<&CompilerProbePlayback::readyDuringWait>();
     }
+    case 0x2d: {
+      auto event = cursor.command("Owned Output", SequenceSemantic::Program);
+      std::string domain = "temporary source instrument domain";
+      event.emitInstrument(domain, 257, InstrumentEnvelopeMode::PreserveDynamicOverride);
+      domain.assign(domain.size(), 'x');
+      return event.emitLevel(0.5).emitLevel(0.75, ValueQuantization{.levels = 64});
+    }
     case 0x40:
     case 0x41:
     case 0x42:
@@ -279,6 +286,32 @@ void compilerCursorCompilesAndExecutesTypedCommands() {
          "compiled direct output should preserve its decoded value");
   expect(note.key == 65.0 && note.linearVelocity == 1.0 && note.durationTicks == 4,
          "generated member invocation should observe preceding typed track-state operations");
+}
+
+void compilerCursorOwnsOutputValuesAfterDecoding() {
+  TrackProgram track;
+  {
+    const std::vector<u8> bytes{0x2d, 0xff};
+    track = decodeProbeTrack(ByteReader(SourceId{7}, bytes), static_cast<u32>(bytes.size()));
+  }
+  const SequenceProgram program{
+      .runtime = compilerProbeRuntime(),
+      .timebase = Timebase{.ppqn = 48},
+      .tracks = {track},
+  };
+  const auto performance = SequenceVm().render(program);
+  const auto& events = performance.tracks[0].events;
+  expect(events.size() == 3, "compiled output must retain every operation after source storage is gone");
+  const auto& instrument = std::get<InstrumentPerformanceEvent>(events[0]);
+  const auto& continuous = std::get<LevelPerformanceEvent>(events[1]);
+  const auto& quantized = std::get<LevelPerformanceEvent>(events[2]);
+  expect(
+      instrument.sourceInstrument == InstrumentIdentity{.domain = "temporary source instrument domain", .key = 257} &&
+          instrument.envelopeMode == InstrumentEnvelopeMode::PreserveDynamicOverride,
+      "compiled instrument selections must own a copy of the source domain and preserve envelope policy");
+  expect(continuous.linearGain == 0.5 && !continuous.sourceQuantization && quantized.linearGain == 0.75 &&
+             quantized.sourceQuantization && quantized.sourceQuantization->levels == 64,
+         "compiled level output must distinguish unspecified quantization from a declared native scale");
 }
 
 void compilerCursorCompilesControlFlow() {
@@ -631,6 +664,7 @@ void trackDecodeSourceHierarchyDistinguishesTrackedAndTracklessFormats() {
 
 void runValueCompilerCursorTests() {
   compilerCursorCompilesAndExecutesTypedCommands();
+  compilerCursorOwnsOutputValuesAfterDecoding();
   compilerCursorCompilesControlFlow();
   compilerCursorCompilesRepeatsAndConditionalFields();
   compilerCursorComposesOperationsIntoOneBody();
