@@ -1233,8 +1233,7 @@ struct WalkState {
 }
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, Version version,
-                                                   const DecodeState& state, std::set<u8>* programs,
-                                                   std::vector<Diagnostic>* diagnostics) {
+                                                   const DecodeState& state, std::vector<Diagnostic>* diagnostics) {
   Cursor cursor(reader, begin, "prism-snes", diagnostics);
   if (!cursor.hasOpcode()) {
     return cursor.truncated();
@@ -1478,9 +1477,6 @@ struct WalkState {
     case 0xfe: {
       auto event = cursor.command("Instrument", SequenceSemantic::Program);
       const u8 value = event.u8("srcn", SemanticOperandRole::InstrumentProgram);
-      if (programs != nullptr) {
-        programs->insert(value);
-      }
       return event.invoke<&Playback::programChange>(value);
     }
     case 0xff:
@@ -1491,7 +1487,6 @@ struct WalkState {
 }
 
 [[nodiscard]] TrackProgram decodeTrack(ByteReader reader, Version version, u32 trackNumber, u32 startAddress,
-                                       u8 logicalChannel, u8 physicalChannelFlags, std::set<u8>* programs,
                                        std::vector<Diagnostic>* diagnostics, const TrackDecodeScope& scope) {
   auto session = scope.begin(trackNumber, startAddress);
   std::deque<WalkState> pending{{.offset = startAddress}};
@@ -1522,8 +1517,7 @@ struct WalkState {
     }
     states.try_emplace(walk.offset, walk.decode);
     const DecodedBytecodeCommand& command =
-        session.findOrAppend(decodeCommand(reader, walk.offset, version, walk.decode, programs, diagnostics),
-                             walk.offset);
+        session.findOrAppend(decodeCommand(reader, walk.offset, version, walk.decode, diagnostics), walk.offset);
     const u32 continuation = static_cast<u32>(command.flow.continuation.value);
     DecodeState next = walk.decode;
     if (opcode == 0xdc) {
@@ -1593,11 +1587,10 @@ const SequenceProgramConfig& sequenceConfig() {
   return config;
 }
 
-TrackProgram decodeSourceTrack(ByteReader reader, Version version, u32 trackNumber, u32 startAddress, u8 logicalChannel,
-                               u8 physicalChannelFlags, std::set<u8>* programs, std::vector<Diagnostic>* diagnostics) {
+TrackProgram decodeSourceTrack(ByteReader reader, Version version, u32 trackNumber, u32 startAddress,
+                               std::vector<Diagnostic>* diagnostics) {
   const TrackDecodeScope scope{.reader = reader, .maxCommands = kCommandLimit};
-  return decodeTrack(reader, version, trackNumber, startAddress, logicalChannel, physicalChannelFlags, programs,
-                     diagnostics, scope);
+  return decodeTrack(reader, version, trackNumber, startAddress, diagnostics, scope);
 }
 
 SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
@@ -1623,7 +1616,6 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
       .data = RuntimeData::capture(reader, layout),
   };
   runtime.tracks.reserve(layout.tracks.size());
-  std::set<u8> programs{0};
   for (u32 index = 0; index < layout.tracks.size(); ++index) {
     const TrackHeader& track = layout.tracks[index];
     runtime.tracks.push_back(RuntimeTrackConfig{
@@ -1645,13 +1637,11 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         pointer.parent(*headerAnnotation);
       }
     }
-    program.tracks.push_back(decodeTrack(reader, layout.version, index, track.startAddress, track.logicalChannel,
-                                         track.physicalChannelFlags, &programs, diagnostics, scope));
+    program.tracks.push_back(decodeTrack(reader, layout.version, index, track.startAddress, diagnostics, scope));
   }
   program.runtime = makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime));
   return SequenceParse{
       .program = std::move(program),
-      .programs = std::move(programs),
       .headerRange = header,
   };
 }

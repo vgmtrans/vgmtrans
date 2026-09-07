@@ -394,6 +394,20 @@ separate LFO-context restart flag, which controls actual oscillator behavior.
 Update the existing core and format assertions to check the explicit motion.
 The full build and all 17 CTest targets pass without compiler warnings.
 
+### Discover Prism patches directly from the sample directory
+
+Prism's synth discovery already included every valid directory entry, making
+the collected sequence-program set irrelevant after validation. Replace the
+set union and second directory scan with one ordered traversal. Remove the
+program-set plumbing from sequence decoding and two unused channel arguments;
+runtime channel configuration remains in its existing typed settings.
+
+Extend the scanner fixture to cover unreferenced patches, SRCN 255, duplicate
+sample data, invalid addresses, and misaligned loops. The expanded discovery
+test passes against the previous implementation as well as the simplification.
+Retain source-instrument identity coverage through emitted instrument events.
+The full build and all 17 CTest targets pass without compiler warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

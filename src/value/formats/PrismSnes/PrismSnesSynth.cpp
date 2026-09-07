@@ -12,7 +12,6 @@
 #include <fmt/format.h>
 
 #include <cmath>
-#include <set>
 #include <string>
 #include <vector>
 
@@ -37,18 +36,11 @@ struct Patch {
   SourceRange tuningLowSource;
 };
 
-[[nodiscard]] std::vector<Patch> collectPatches(ByteReader reader, const Layout& layout, const std::set<u8>& programs) {
+[[nodiscard]] std::vector<Patch> collectPatches(ByteReader reader, const Layout& layout) {
   std::vector<Patch> patches;
   const SnesSampleDirectory directory(reader, layout.spcDirAddress);
-  std::set<u8> availablePrograms = programs;
   for (u16 candidate = 0; candidate < 0x100; ++candidate) {
     const u8 program = static_cast<u8>(candidate);
-    const auto sample = directory.entry(program);
-    if (sample && sample->stream && sample->startAddress >= layout.spcDirAddress) {
-      availablePrograms.insert(program);
-    }
-  }
-  for (const u8 program : availablePrograms) {
     const auto sample = directory.entry(program);
     if (!sample || !sample->stream || sample->startAddress < layout.spcDirAddress) {
       continue;
@@ -74,9 +66,9 @@ struct Patch {
 }  // namespace
 
 std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
-                                           const std::set<u8>& programs, std::string_view displayName) {
+                                           std::string_view displayName) {
   const ByteReader reader = builder.reader();
-  const std::vector<Patch> patches = collectPatches(reader, layout, programs);
+  const std::vector<Patch> patches = collectPatches(reader, layout);
   if (patches.empty()) {
     return std::nullopt;
   }

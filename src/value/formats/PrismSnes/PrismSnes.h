@@ -12,7 +12,6 @@
 #include "value/sequence/SequenceProgramConfig.h"
 
 #include <optional>
-#include <set>
 #include <string_view>
 #include <vector>
 
@@ -56,15 +55,13 @@ struct Layout {
 
 struct SequenceParse {
   core::SequenceProgram program;
-  std::set<u8> programs;
   core::SourceRange headerRange;
 };
 
 [[nodiscard]] const char* versionName(Version version);
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);
 [[nodiscard]] core::TrackProgram decodeSourceTrack(core::ByteReader reader, Version version, u32 trackNumber,
-                                                   u32 startAddress, u8 logicalChannel, u8 physicalChannelFlags,
-                                                   std::set<u8>* programs = nullptr,
+                                                   u32 startAddress,
                                                    std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] SequenceParse decodeSequence(core::ByteReader reader, const Layout& layout, core::AssetId sequenceId,
                                            core::SourceMapBuilder* sourceMap = nullptr,
@@ -72,7 +69,6 @@ struct SequenceParse {
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
 [[nodiscard]] core::Envelope driverEnvelope(u8 adsr1, u8 adsr2);
 [[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
-                                                               const std::set<u8>& programs,
                                                                std::string_view displayName);
 [[nodiscard]] core::FormatModule module();
 
