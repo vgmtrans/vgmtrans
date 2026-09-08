@@ -610,6 +610,15 @@ This removes 26 production lines. The full build and all 17 CTest targets pass
 without warnings, including standalone, collection-bound, selection, failure,
 modulation-policy, and playback preparation coverage.
 
+### Share Sony PS2 two-byte channel-message decoding
+
+Handle Sony's compressed A0 dictionary note before the ordinary two-byte
+channel-message family, removing its duplicate data-byte reader branch.
+Uncompressed polyphonic pressure still consumes both bytes and permits later
+commands; running status and omitted-delta flags retain the same read order.
+This removes 10 production lines. The full build and all 17 CTest targets pass
+without warnings, including the Sony PS2 MIDI decoding fixtures.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
