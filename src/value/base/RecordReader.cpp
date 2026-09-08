@@ -7,7 +7,6 @@
 #include "value/base/RecordReader.h"
 
 #include <algorithm>
-#include <limits>
 #include <string>
 #include <utility>
 
@@ -34,8 +33,9 @@ namespace {
 
 RecordReader::RecordReader(ByteReader reader, u32 offset, u32 end, std::vector<Diagnostic>* diagnostics,
                            bool captureFields)
-    : reader_(reader), begin_(offset), position_(offset), end_(static_cast<u32>(std::min<u64>(end, reader.size()))),
-      diagnostics_(diagnostics), captureFields_(captureFields) {
+    : reader_(reader), begin_(static_cast<u32>(std::min<u64>(offset, reader.size()))), position_(begin_),
+      end_(static_cast<u32>(std::clamp<u64>(end, begin_, reader.size()))), diagnostics_(diagnostics),
+      captureFields_(captureFields) {
 }
 
 // Sequential reads stop after the first failure. Positioned reads may still
@@ -120,7 +120,7 @@ RangedValue<u32> RecordReader::varLen(std::string_view name, SourceValueDisplay 
 
 RangedValue<std::string> RecordReader::rawBytes(std::string_view name, u32 size) {
   const u32 begin = position_;
-  const u32 available = begin <= end_ ? std::min(size, end_ - begin) : 0;
+  const u32 available = std::min(size, end_ - begin);
   const std::string value = hexBytes(reader_.slice(begin, available));
   position_ += available;
   if (available != 0) {
@@ -178,7 +178,7 @@ std::optional<SourceRange> RecordReader::rangeAt(u64 relativeOffset, u64 size, s
 }
 
 std::optional<::u8> RecordReader::peekU8() const {
-  if (failed_ || position_ >= end_ || !reader_.has(position_, 1)) {
+  if (failed_ || position_ >= end_) {
     return std::nullopt;
   }
   return reader_.u8At(position_);
@@ -193,12 +193,12 @@ SourceRecord RecordReader::finish() && noexcept {
 }
 
 bool RecordReader::require(u32 size, std::string_view fieldName) {
-  if (!failed_ && position_ <= end_ && size <= end_ - position_ && reader_.has(position_, size)) {
+  if (!failed_ && size <= end_ - position_) {
     return true;
   }
 
   const u32 fieldBegin = position_;
-  const u32 available = !failed_ && position_ <= end_ ? std::min(size, end_ - position_) : 0;
+  const u32 available = !failed_ ? std::min(size, end_ - position_) : 0;
   if (!failed_ && diagnostics_ != nullptr) {
     diagnostics_->push_back(Diagnostic{
         .severity = Severity::Warning,
@@ -213,20 +213,15 @@ bool RecordReader::require(u32 size, std::string_view fieldName) {
 }
 
 std::optional<u32> RecordReader::requireAt(u64 relativeOffset, u64 size, std::string_view fieldName) {
-  const bool validOffset = relativeOffset <= std::numeric_limits<u64>::max() - begin_;
-  const u64 absolute = validOffset ? static_cast<u64>(begin_) + relativeOffset : std::numeric_limits<u64>::max();
-  if (absolute <= end_ && size <= end_ - absolute && reader_.has(absolute, size)) {
-    const auto position = static_cast<u32>(absolute);
-    position_ = std::max(position_, static_cast<u32>(absolute + size));
-    return position;
-  }
-
   u32 fieldBegin = begin_;
   u32 available = 0;
-  if (absolute <= end_) {
-    fieldBegin = static_cast<u32>(absolute);
+  if (relativeOffset <= end_ - begin_) {
+    fieldBegin += static_cast<u32>(relativeOffset);
     available = static_cast<u32>(std::min<u64>(size, end_ - fieldBegin));
     position_ = std::max(position_, fieldBegin + available);
+    if (size == available) {
+      return fieldBegin;
+    }
   }
   if (!failed_ && diagnostics_ != nullptr) {
     diagnostics_->push_back(Diagnostic{

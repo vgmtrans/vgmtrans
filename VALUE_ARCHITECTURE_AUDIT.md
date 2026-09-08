@@ -616,8 +616,29 @@ Handle Sony's compressed A0 dictionary note before the ordinary two-byte
 channel-message family, removing its duplicate data-byte reader branch.
 Uncompressed polyphonic pressure still consumes both bytes and permits later
 commands; running status and omitted-delta flags retain the same read order.
-This removes 10 production lines. The full build and all 17 CTest targets pass
+This removes 11 production lines. The full build and all 17 CTest targets pass
 without warnings, including the Sony PS2 MIDI decoding fixtures.
+
+### Establish record-reader bounds once
+
+Normalize the record window in its constructor so begin <= position <= end <=
+source size, then remove six redundant bounds conditions from sequential,
+positioned, raw-byte, and peek reads. Reversed windows become empty at their
+bounded starting offset, and offsets beyond the source become empty at EOF.
+This prevents an observed reversed-record size of 4,294,967,294 bytes and an
+exception from rawBytes on an out-of-source empty window. Valid-window behavior,
+sticky sequential failure, positioned recovery, and diagnostic deduplication
+remain unchanged. Positioned reads reject relative offsets outside the window
+before address arithmetic, and successful/truncated reads share their cursor
+update. This removes three production lines and the separate overflow path.
+
+Regression tests exercise normal, reversed, empty, out-of-source, and integer-
+limit windows. A direct reader build passes AddressSanitizer and UBSan across
+82,944 windows and 1,990,656 mixed operations, checking cursor, field, finished
+record, and diagnostic ranges after every operation. The consolidated positioned
+read path also reproduces identical serialized cursor states, fields, and
+diagnostics across that matrix. The full build and all 17 CTest targets pass
+without warnings.
 
 ## Further investigation
 

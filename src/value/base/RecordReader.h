@@ -23,6 +23,8 @@ namespace vgmtrans::core {
 // their returned value; ok() and diagnostics still report incomplete records.
 class RecordReader {
 public:
+  // Clamp the window to the source. Reversed or out-of-source windows are
+  // empty, so every cursor and range stays within the source bounds.
   RecordReader(ByteReader reader, u32 offset, u32 end, std::vector<Diagnostic>* diagnostics = nullptr,
                bool captureFields = true);
 

@@ -121,6 +121,38 @@ void recordReaderPreservesNumericFieldsAndFailurePolicies() {
          "positioned reads may recover complete fields without clearing failure or duplicating diagnostics");
 }
 
+void recordReaderNormalizesWindowBoundaries() {
+  const SourceId source{29};
+  const std::vector<u8> bytes{0, 1, 2, 3, 4};
+  const ByteReader reader(source, bytes);
+  struct Window {
+    u32 begin;
+    u32 end;
+    u32 expectedBegin;
+    u32 expectedSize;
+  };
+  constexpr u32 maximum = std::numeric_limits<u32>::max();
+  for (const auto [begin, end, expectedBegin, expectedSize] :
+       {Window{0, 0, 0, 0}, Window{4, 2, 4, 0}, Window{12, 14, 5, 0}, Window{maximum, maximum, 5, 0},
+        Window{2, maximum, 2, 3}, Window{0, 3, 0, 3}}) {
+    std::vector<Diagnostic> diagnostics;
+    RecordReader record(reader, begin, end, &diagnostics);
+    expect(record.begin() == expectedBegin && record.position() == expectedBegin && record.bytes().empty(),
+           "a record must start with an empty consumed range at a bounded source offset");
+    const auto raw = record.rawBytes("payload", maximum);
+    expect(static_cast<bool>(raw) == (expectedSize != 0) && record.size() == expectedSize &&
+               record.bytes().size() == expectedSize && !record.ok() && diagnostics.size() == 1 &&
+               diagnostics[0].range == reader.range(expectedBegin + expectedSize, 0),
+           "oversized raw reads must retain available bytes and report truncation without throwing");
+    expect(!record.u8("after failure") && !record.rangeAt(std::numeric_limits<u64>::max(), 2, "overflow") &&
+               static_cast<bool>(record.u8At(0, "recoverable")) == (expectedSize != 0) && diagnostics.size() == 1,
+           "window normalization must preserve sticky sequential failure, positioned recovery, and one diagnostic");
+    const auto finished = std::move(record).finish();
+    expect(finished.range == reader.range(expectedBegin, expectedSize),
+           "finished empty and truncated windows must not produce underflowed source ranges");
+  }
+}
+
 void brrCatalogProjectsInstrumentsInSampleOrder() {
   struct Patch {
     u8 srcn;
@@ -596,6 +628,7 @@ void runValueSynthBuilderTests() {
   envelopeAnnotationsPreservePhysicalValues();
   recordReaderFinishesOnePortableSourceValue();
   recordReaderPreservesNumericFieldsAndFailurePolicies();
+  recordReaderNormalizesWindowBoundaries();
   brrCatalogProjectsInstrumentsInSampleOrder();
   brrAliasesRetainLoopIdentityAndSeparateSourceRecords();
   sampleBuilderKeepsKeysDenseAndAnnotationsOwned();
