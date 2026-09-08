@@ -710,6 +710,17 @@ This removes 20 production lines and repeated control flow. The full build and
 all 17 CTest targets pass without warnings, including source/asset removal,
 collection reconciliation, and missing-reference diagnostic coverage.
 
+### Simplify extraction ownership and queueing
+
+Give archive handles their existing library close functions directly as
+unique_ptr deleters, removing three custom closer types and their redundant
+null checks. Queue extracted children directly: SourceStore assigns each one a
+fresh ID, so the separate queued-ID set could never reject a child. Remove its
+plumbing and the single-use child-admission wrapper while preserving persistent
+scanned-source tracking. This removes 39 production lines. Add the stitching
+test's missing direct set include exposed by the narrower Session header. The
+full build and all 17 CTest targets pass without warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

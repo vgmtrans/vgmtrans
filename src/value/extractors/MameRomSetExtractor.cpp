@@ -114,15 +114,7 @@ int ZCALLBACK errorMemory(voidpf, voidpf handle) {
   return stream != nullptr && stream->error ? 1 : 0;
 }
 
-struct ZipCloser {
-  void operator()(void* archive) const noexcept {
-    if (archive != nullptr) {
-      static_cast<void>(unzClose(archive));
-    }
-  }
-};
-
-using ZipPtr = std::unique_ptr<void, ZipCloser>;
+using ZipPtr = std::unique_ptr<void, decltype(&unzClose)>;
 
 [[nodiscard]] ZipPtr openZip(std::span<const u8> bytes, MemoryStream& stream) {
   stream.bytes = bytes;
@@ -136,7 +128,7 @@ using ZipPtr = std::unique_ptr<void, ZipCloser>;
       .zerror_file = errorMemory,
       .opaque = &stream,
   };
-  return ZipPtr{unzOpen2_64(&stream, &functions)};
+  return ZipPtr{unzOpen2_64(&stream, &functions), unzClose};
 }
 
 [[nodiscard]] std::string scalarString(const json& value) {

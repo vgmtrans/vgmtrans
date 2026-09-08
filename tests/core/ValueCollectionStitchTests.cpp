@@ -9,6 +9,8 @@
 #include "SessionSnapshotBuilder.h"
 #include "value/export/CollectionStitch.h"
 
+#include <set>
+
 namespace {
 
 struct StitchProgramState {

@@ -363,10 +363,9 @@ void Session::scanSourceAndDerived(SourceId id) {
   const size_t assetsBefore = state_->assets().size();
   const size_t diagnosticsBefore = state_->diagnostics().size();
   std::vector<SourceId> queue{id};
-  std::set<u32> queued{id.value};
 
   for (size_t index = 0; index < queue.size(); ++index) {
-    scanOneSource(queue[index], queue, queued);
+    scanOneSource(queue[index], queue);
   }
 
   // Diagnostic-only scans remain open so their failures retain valid source
@@ -380,7 +379,7 @@ void Session::scanSourceAndDerived(SourceId id) {
 
 // Unknown sources use normal discovery. A known format restricts both stages to
 // processors that advertise that representation, independent of source origin.
-void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<u32>& queued) {
+void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue) {
   if (!scannedSources_.insert(id.value).second) {
     return;
   }
@@ -421,7 +420,9 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
       const bool consumed = !result.sources.empty();
       state_->addDiagnostics(std::move(result.diagnostics));
       if (consumed) {
-        addExtractedSources(std::move(result.sources), source.id, queue, queued);
+        for (auto& extracted : result.sources) {
+          queue.push_back(sources_.addDerived(std::move(extracted.file), std::move(extracted.bytes), source.id));
+        }
         return;
       }
     } catch (const std::exception& ex) {
@@ -486,16 +487,6 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue, std::set<
         .message = "No registered processor accepts known source format '" + *source.knownFormat + "'",
         .range = SourceRange{.source = source.id, .offset = 0, .size = source.size},
     }});
-  }
-}
-
-void Session::addExtractedSources(std::vector<ExtractedSource> extractedSources, SourceId defaultParent,
-                                  std::vector<SourceId>& queue, std::set<u32>& queued) {
-  for (auto& extracted : extractedSources) {
-    const SourceId derived = sources_.addDerived(std::move(extracted.file), std::move(extracted.bytes), defaultParent);
-    if (queued.insert(derived.value).second) {
-      queue.push_back(derived);
-    }
   }
 }
 
