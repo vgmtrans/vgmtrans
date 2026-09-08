@@ -5,50 +5,13 @@
  */
 
 #include "ValueFormatCorpus.h"
-#include "value/formats/NinSnes/NinSnes.h"
 
 #include <exception>
 #include <filesystem>
 #include <iostream>
 #include <optional>
 
-void ninSnesMetalCombatRecognizesDriverWithoutInstrumentOverwrite();
-void ninSnesIntelligentPercussionUsesRevisionSpecificTables();
-void ninSnesIntelligentVoiceLoadingPreservesTuningAndMasksIndex();
-void ninSnesIntelligentOverridesApplyOnInstrumentLoadAndDeduplicate();
-void ninSnesIntelligentEchoAdsrAndGainKeepIndependentState();
-void ninSnesIntelligentNoiseRowsDoNotTerminateSoundBanks();
-void ninSnesIntelligentSparsePaddingDoesNotHideSongBank();
-void ninSnesIntelligentSectionPreservesVoiceAndLegato();
-void ninSnesProfilesDescribeEverySupportedDriverFamily();
-void ninSnesKonamiClockControlsTempo();
-void ninSnesScannerFindsRequestedSongAcrossSparseTable();
-void ninSnesKoeiUsesSixBgmTracksAndPendingRequest();
-void ninSnesProfilesShareSquaredLevelCurve();
-void ninSnesProfilesShareTempoRelativeVibratoClock();
-void ninSnesProfilesEmitSubtractiveTremolo();
-void ninSnesStandardEchoUsesMaskLevelAndDisable();
-void ninSnesKonamiLoopAppliesAndClearsReplayDeltas();
-void ninSnesKonamiAdsrGainEmitsNeutralEnvelopeState();
-void ninSnesNoteVelocityPreservesLegacyCurve();
-void ninSnesIntelligentVoiceTablesUseTypedPlaybackState();
-void ninSnesProgramResolutionIsCapturedByRuntime();
-void ninSnesFe3ConditionalJumpUsesCapturedDriverState();
-void ninSnesControllerFadesRemainInTheSourceDomain();
-void ninSnesPrepassClearsMasterVolumeAutomationBinding();
-void ninSnesPlaylistCarriesTiesAcrossSectionParserResets();
-void ninSnesKonamiZeroDurationRateContinuesHeldVoice();
-void ninSnesF9UsesSharedPitchTransitions();
-void ninSnesPercussionStartsPerNoteVibratoFade();
-void ninSnesFixedPercussionBaseIgnoresFaOperand();
-void ninSnesKonamiPercussionUsesDriverMapAndNeutralTuning();
-void ninSnesEarlierPercussionUsesSeparateSixByteTable();
-void ninSnesGainModeInstrumentsUseDspEnvelope();
-void ninSnesIdentityMappedSilentSlotsAreSparse();
-void ninSnesSunsoftRecognizesBgmLayouts();
-void ninSnesSunsoftCommandsPreserveEchoAndEnvelopeState();
-void ninSnesSunsoftFeAndGateFollowRevision();
-void ninSnesSunsoftNoiseInstrumentsPreserveLaterSamples();
+void runNinSnesTests();
 
 int main(int argc, char** argv) {
   try {
@@ -66,43 +29,7 @@ int main(int argc, char** argv) {
                        .requireSoundBank = true,
                    });
     }
-    ninSnesMetalCombatRecognizesDriverWithoutInstrumentOverwrite();
-    ninSnesIntelligentPercussionUsesRevisionSpecificTables();
-    ninSnesIntelligentVoiceLoadingPreservesTuningAndMasksIndex();
-    ninSnesIntelligentOverridesApplyOnInstrumentLoadAndDeduplicate();
-    ninSnesIntelligentEchoAdsrAndGainKeepIndependentState();
-    ninSnesIntelligentNoiseRowsDoNotTerminateSoundBanks();
-    ninSnesIntelligentSparsePaddingDoesNotHideSongBank();
-    ninSnesIntelligentSectionPreservesVoiceAndLegato();
-    ninSnesProfilesDescribeEverySupportedDriverFamily();
-    ninSnesKonamiClockControlsTempo();
-    ninSnesScannerFindsRequestedSongAcrossSparseTable();
-    ninSnesKoeiUsesSixBgmTracksAndPendingRequest();
-    ninSnesProfilesShareSquaredLevelCurve();
-    ninSnesProfilesShareTempoRelativeVibratoClock();
-    ninSnesProfilesEmitSubtractiveTremolo();
-    ninSnesStandardEchoUsesMaskLevelAndDisable();
-    ninSnesKonamiLoopAppliesAndClearsReplayDeltas();
-    ninSnesKonamiAdsrGainEmitsNeutralEnvelopeState();
-    ninSnesNoteVelocityPreservesLegacyCurve();
-    ninSnesIntelligentVoiceTablesUseTypedPlaybackState();
-    ninSnesProgramResolutionIsCapturedByRuntime();
-    ninSnesFe3ConditionalJumpUsesCapturedDriverState();
-    ninSnesControllerFadesRemainInTheSourceDomain();
-    ninSnesPrepassClearsMasterVolumeAutomationBinding();
-    ninSnesPlaylistCarriesTiesAcrossSectionParserResets();
-    ninSnesKonamiZeroDurationRateContinuesHeldVoice();
-    ninSnesF9UsesSharedPitchTransitions();
-    ninSnesPercussionStartsPerNoteVibratoFade();
-    ninSnesFixedPercussionBaseIgnoresFaOperand();
-    ninSnesKonamiPercussionUsesDriverMapAndNeutralTuning();
-    ninSnesEarlierPercussionUsesSeparateSixByteTable();
-    ninSnesGainModeInstrumentsUseDspEnvelope();
-    ninSnesIdentityMappedSilentSlotsAreSparse();
-    ninSnesSunsoftRecognizesBgmLayouts();
-    ninSnesSunsoftCommandsPreserveEchoAndEnvelopeState();
-    ninSnesSunsoftFeAndGateFollowRevision();
-    ninSnesSunsoftNoiseInstrumentsPreserveLaterSamples();
+    runNinSnesTests();
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
     return 1;

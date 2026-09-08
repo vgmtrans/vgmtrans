@@ -614,7 +614,6 @@ struct ProgramState {
     voiceTable.clear();
     percussionTable = initialPercussionTable;
     programs = basePrograms;
-    nextOverrideProgram = 0x80;
     overridePrograms.clear();
     instrumentEnvelopes = baseEnvelopes;
     tempoState.reset(kDefaultTempo);
@@ -650,16 +649,15 @@ struct ProgramState {
     return static_cast<u8>(encoded * selected.tempoCommandMultiplier);
   }
 
-  [[nodiscard]] u32 registerOverride(u8 logical, u8 srcn, u8 adsr1, u8 adsr2, u8 gain, u8 pitchHigh, u8 pitchLow,
-                                     Address sourceAddress) {
+  void registerOverride(u8 logical, u8 srcn, u8 adsr1, u8 adsr2, u8 gain, u8 pitchHigh, u8 pitchLow,
+                        Address sourceAddress) {
     const auto key = std::tuple{logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow};
-    if (const auto existing = overridePrograms.find(key); existing != overridePrograms.end()) {
-      programs[logical] = existing->second;
-      return existing->second;
-    }
-    const u32 program = nextOverrideProgram++;
-    overridePrograms.emplace(key, program);
+    const auto [entry, inserted] = overridePrograms.try_emplace(key, 0x80u + static_cast<u32>(overridePrograms.size()));
+    const u32 program = entry->second;
     programs[logical] = program;
+    if (!inserted) {
+      return;
+    }
     instrumentEnvelopes[program] = EnvelopeRegisters{adsr1, adsr2, gain};
     if (collecting) {
       recipes.overrides.push_back(InstrumentOverride{
@@ -674,7 +672,6 @@ struct ProgramState {
           .source = sourceRanges.contains(sourceAddress.value) ? sourceRanges.at(sourceAddress.value) : SourceRange{},
       });
     }
-    return program;
   }
 
   void rememberStandardDrum(u8 logicalProgram, u32 sourceProgram, u8 key, s8 transpose, u16 sourceNote) {
@@ -696,29 +693,25 @@ struct ProgramState {
            : selected.intelli == IntelliMode::Fe4 || (intelliFlags & 0x40) != 0;
   }
 
-  [[nodiscard]] DrumKit currentIntelliDrumKit(u8 percussionMinimum, s16 transpose) const {
-    DrumKit kit;
-    const u8 slots = selected.intelli == IntelliMode::Fe3 ? 12 : kIntelliDrumSlots;
-    kit.slots.reserve(slots);
-    const bool useCustom = usesCustomPercussion();
-    for (u8 slot = 0; slot < slots; ++slot) {
-      u8 patch = static_cast<u8>(percussionMinimum + slot);
-      u8 note = 0xa4;
-      if (useCustom) {
-        patch = percussionTable[slot].patch & (selected.intelli == IntelliMode::Fe4 ? 0x3f : 0xbf);
-        note = percussionTable[slot].note;
-      }
-      kit.slots.push_back(DrumSlot{
-          .key = static_cast<u8>(0x24 + slot),
-          .sourceProgram = resolveProgram(patch, percussionMinimum),
-          .sourceKey = static_cast<s16>((note & 0x7f) + kMelodicKeyCorrection + transpose),
-      });
-    }
-    return kit;
+  [[nodiscard]] u32 intelliPercussionProgram(u8 slot, u8 percussionMinimum) const {
+    const u8 patch = usesCustomPercussion()
+                         ? percussionTable[slot].patch & (selected.intelli == IntelliMode::Fe4 ? 0x3f : 0xbf)
+                         : percussionMinimum + slot;
+    return resolveProgram(patch, percussionMinimum);
   }
 
   [[nodiscard]] u8 ensureIntelliDrumKit(u8 percussionMinimum, s16 transpose) {
-    DrumKit candidate = currentIntelliDrumKit(percussionMinimum, transpose);
+    DrumKit candidate;
+    const u8 slots = selected.intelli == IntelliMode::Fe3 ? 12 : kIntelliDrumSlots;
+    candidate.slots.reserve(slots);
+    for (u8 slot = 0; slot < slots; ++slot) {
+      const u8 note = usesCustomPercussion() ? percussionTable[slot].note : 0xa4;
+      candidate.slots.push_back(DrumSlot{
+          .key = static_cast<u8>(0x24 + slot),
+          .sourceProgram = intelliPercussionProgram(slot, percussionMinimum),
+          .sourceKey = static_cast<s16>((note & 0x7f) + kMelodicKeyCorrection + transpose),
+      });
+    }
     const auto found =
         std::ranges::find_if(recipes.drumKits, [&](const DrumKit& kit) { return kit.slots == candidate.slots; });
     if (found != recipes.drumKits.end()) {
@@ -767,7 +760,6 @@ struct ProgramState {
   std::vector<VoiceRecord> voiceTable;
   std::array<PercussionEntry, kIntelliDrumSlots> initialPercussionTable{};
   std::array<PercussionEntry, kIntelliDrumSlots> percussionTable{};
-  u32 nextOverrideProgram = 0x80;
   std::map<std::tuple<u8, u8, u8, u8, u8, u8, u8>, u32> overridePrograms;
   std::map<u32, EnvelopeRegisters> baseEnvelopes;
   std::map<u32, EnvelopeRegisters> instrumentEnvelopes;
@@ -1127,10 +1119,7 @@ struct Playback {
     if (intelli) {
       const bool custom = program.usesCustomPercussion();
       const PercussionEntry entry = program.percussionTable[slot];
-      const u8 patchMask = program.selected.intelli == IntelliMode::Fe4 ? 0x3f : 0xbf;
-      const u8 patch = custom ? static_cast<u8>(entry.patch & patchMask) : static_cast<u8>(percussionMinimum + slot);
-      const u32 sourceProgram = program.resolveProgram(patch, percussionMinimum);
-      loadInstrumentEnvelope(sourceProgram);
+      loadInstrumentEnvelope(program.intelliPercussionProgram(slot, percussionMinimum));
       if (custom && entry.pan < 0x80) {
         pan(entry.pan);
       }
@@ -1505,7 +1494,7 @@ struct Playback {
                            Address sourceAddress) {
     // FA writes the shared RAM table. DSP registers change only when a
     // channel next selects that instrument (D6/DA/FB or percussion).
-    static_cast<void>(program.registerOverride(logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow, sourceAddress));
+    program.registerOverride(logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow, sourceAddress);
   }
 
   void loadVoice(u8 index, u8 percussionMinimum, IntelliMode mode) {
@@ -1520,7 +1509,6 @@ struct Playback {
     const u8 panValue = mode == IntelliMode::Fe3 ? record.pan : record.pan & 0x1f;
     pan(panValue);
 
-    double tuningCents = 0.0;
     s8 transpose = track.transpose;
     if (mode == IntelliMode::Fe3) {
       constexpr std::array<s8, 7> transposes{-24, -12, -1, 0, 1, 12, 24};
@@ -1535,7 +1523,7 @@ struct Playback {
                         : transposes[transposeIndex - 1];
       }
     } else {
-      tuningCents = (((record.pan >> 5) & 7) * 5 / 256.0) * 100.0;
+      const double tuningCents = (((record.pan >> 5) & 7) * 5 / 256.0) * 100.0;
       transpose = static_cast<s8>(record.tuningTranspose);
       out.tuning(tuningCents);
       if ((index & 0x80) != 0) {
@@ -2045,17 +2033,15 @@ struct DecodeContext {
       const u8 packedCount = event.u8("packed_count", SourceValueDisplay::Hex);
       const u8 count = static_cast<u8>((packedCount & 0x0f) + 1);
       event.derived("count", count);
+      // MUL leaves the high byte as the first slot; shorter writes keep the rest.
       const u8 firstSlot = static_cast<u8>((packedCount * 3) >> 8);
       event.derived("first_slot", firstSlot);
       for (u8 slot = 0; slot < count; ++slot) {
         const u8 patch =
             event.u8(fmt::format("patch_{}", slot), SourceValueDisplay::Hex, SemanticOperandRole::Instrument);
-        const u8 note =
-            event.u8(fmt::format("note_{}", slot), SourceValueDisplay::MidiNote);
+        const u8 note = event.u8(fmt::format("note_{}", slot), SourceValueDisplay::MidiNote);
         const u8 pan = event.u8(fmt::format("pan_{}", slot));
-        if (firstSlot + slot < kIntelliDrumSlots) {
-          event.invoke<&Playback::percussionEntry>(static_cast<u8>(firstSlot + slot), patch, note, pan);
-        }
+        event.invoke<&Playback::percussionEntry>(static_cast<u8>(firstSlot + slot), patch, note, pan);
       }
       return event.invoke<&Playback::enableCustomPercussion>();
     }
