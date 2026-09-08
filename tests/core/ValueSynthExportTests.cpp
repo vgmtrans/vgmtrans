@@ -306,6 +306,13 @@ void regionModulationExportsAtTheRegionScope() {
                                       .rateHertz = {.minimum = 0.17, .maximum = 0.17},
                                       .depthMode = ModulationDepthMode::Fixed,
                                   },
+                              .tremolo =
+                                  TremoloSpec{
+                                      .maxDepthDb = 1.5,
+                                      .rateHertz = {2.0, 4.0},
+                                      .gainMode = TremoloGainMode::NoBoost,
+                                      .depthMode = ModulationDepthMode::Fixed,
+                                  },
                           },
                   },
                   Region{
@@ -319,8 +326,24 @@ void regionModulationExportsAtTheRegionScope() {
                                       .rateHertz = {.minimum = 0.34, .maximum = 0.34},
                                       .depthMode = ModulationDepthMode::Fixed,
                                   },
+                              .tremolo =
+                                  TremoloSpec{
+                                      .maxDepthDb = 2.5,
+                                      .rateHertz = {2.0, 4.0},
+                                      .gainMode = TremoloGainMode::NoBoost,
+                                  },
                           },
                   },
+              },
+          .modulation =
+              InstrumentModulation{
+                  .tremolo =
+                      TremoloSpec{
+                          .maxDepthDb = 4.5,
+                          .rateHertz = {2.0, 4.0},
+                          .gainMode = TremoloGainMode::NoBoost,
+                          .depthMode = ModulationDepthMode::Fixed,
+                      },
               },
       }},
   };
@@ -340,6 +363,30 @@ void regionModulationExportsAtTheRegionScope() {
   expect(dls.diagnostics.empty() && dlsArt2ContainsConnection(dls.bytes, 0x0009, 0x0003, 7 * 65536) &&
              dlsArt2ContainsConnection(dls.bytes, 0x0009, 0x0003, 13 * 65536),
          "DLS should preserve each region's vibrato depth");
+
+  auto simulatedInput = input;
+  simulatedInput.modulationConversion = ModulationConversionPolicy::SequenceEventSimulation;
+  const auto simulatedSf = buildSoundFont2(simulatedInput, sources);
+  const auto simulatedDls = buildDls(simulatedInput, sources);
+  expect(simulatedSf.diagnostics.empty() && chunkSize(simulatedSf.bytes, "imod") == 10 &&
+             !soundFontIgenContainsAmount(simulatedSf.bytes, 6, 7) &&
+             !soundFontIgenContainsAmount(simulatedSf.bytes, 6, 13) &&
+             soundFontIgenContainsAmount(simulatedSf.bytes, 48, 15) &&
+             soundFontIgenContainsAmount(simulatedSf.bytes, 48, 45) &&
+             !soundFontIgenContainsAmount(simulatedSf.bytes, 48, 25),
+         "SF2 simulation should omit oscillators and controllers while retaining fixed no-boost attenuation at both "
+         "scopes");
+  expect(simulatedDls.diagnostics.empty() &&
+             !dlsArt2Contains(simulatedDls.bytes,
+                              [&](size_t offset) {
+                                return readLe16(simulatedDls.bytes, offset) != 0 ||
+                                       readLe16(simulatedDls.bytes, offset + 2) != 0;
+                              }) &&
+             dlsArt2ContainsConnection(simulatedDls.bytes, 0, 0x0001, 15 * 65536) &&
+             dlsArt2ContainsConnection(simulatedDls.bytes, 0, 0x0001, 45 * 65536) &&
+             !dlsArt2ContainsConnection(simulatedDls.bytes, 0, 0x0001, 25 * 65536),
+         "DLS simulation should omit oscillators and controllers while retaining fixed no-boost attenuation at both "
+         "scopes");
 }
 
 void wavExporterWritesPcm16RiffFile() {
@@ -527,6 +574,21 @@ void soundFontExporterWritesSfbkRiffFile() {
   expect(chunkSize(shared.bytes, "phdr") == 3 * 38 && chunkSize(shared.bytes, "inst") == 2 * 22 &&
              soundFontPgenContainsAmount(shared.bytes, 34, 1200),
          "SoundFont envelope variants should share one sample-mapped instrument through preset ADSR offsets");
+
+  soundBank.instruments.back().modulation.vibrato->maxDepthCents = 240.0;
+  for (const auto conversion :
+       {ModulationConversionPolicy::SynthModulators, ModulationConversionPolicy::SequenceEventSimulation}) {
+    const auto distinctModulation = buildSoundFont2(
+        SynthExportInput{
+            .name = "Probe", .soundBanks = soundBanks, .samplePools = samples, .modulationConversion = conversion},
+        sources);
+    const bool simulated = conversion == ModulationConversionPolicy::SequenceEventSimulation;
+    expect(distinctModulation.diagnostics.empty() && chunkSize(distinctModulation.bytes, "phdr") == 3 * 38 &&
+               chunkSize(distinctModulation.bytes, "inst") == (simulated ? 2 : 3) * 22 &&
+               (!simulated || soundFontPgenContainsAmount(distinctModulation.bytes, 34, 1200)),
+           "only exported modulation should distinguish SF2 instruments; shared presets must retain their envelope "
+           "offsets");
+  }
 
   soundBank.instruments.resize(1);
   auto& regions = soundBank.instruments.front().regions;
