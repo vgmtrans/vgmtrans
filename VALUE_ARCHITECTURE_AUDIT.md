@@ -599,6 +599,17 @@ projections, clamped programs, the last portable address, exhaustion diagnostics
 and fallback to the base instrument. The full build and all 17 CTest targets
 pass without warnings.
 
+### Share synth artifact preparation and borrow standalone banks
+
+Use one synth artifact wrapper for SF2 and DLS. Assemble export inputs directly
+there and derive filename/media type from the selected format for both success
+and failure, removing the extra input adapter and duplicated export wrappers.
+Standalone export borrows the immutable bank from its snapshot instead of
+copying every instrument, region, and local sample before read-only export.
+This removes 26 production lines. The full build and all 17 CTest targets pass
+without warnings, including standalone, collection-bound, selection, failure,
+modulation-policy, and playback preparation coverage.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

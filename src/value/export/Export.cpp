@@ -20,6 +20,7 @@
 #include "value/export/audio/WavExporter.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <exception>
 #include <filesystem>
@@ -173,11 +174,22 @@ void appendWavArtifacts(std::vector<Artifact>& artifacts, std::string_view baseN
   return artifacts;
 }
 
-[[nodiscard]] SynthExportInput synthExportInput(const SynthCollectionView& collection, const ExportRequest& request,
-                                                const MidiModulationUsage* midiModulation,
-                                                ModulationConversionPolicy modulationConversion,
-                                                const PerformanceSequence* sequenceUsage) {
-  return SynthExportInput{
+[[nodiscard]] Artifact synthArtifact(std::string_view name, SynthExportFormat format, SynthExportResult result) {
+  const bool soundFont = format == SynthExportFormat::SoundFont2;
+  return Artifact{
+      .filename = filenamePart(std::string(name)) + (soundFont ? ".sf2" : ".dls"),
+      .mediaType = soundFont ? "audio/soundfont" : "audio/dls",
+      .bytes = std::move(result.bytes),
+      .diagnostics = std::move(result.diagnostics),
+  };
+}
+
+[[nodiscard]] Artifact exportSynth(const SynthCollectionView& collection, SynthExportFormat format,
+                                   const SourceStore& sources, const ExportRequest& request,
+                                   const MidiModulationUsage* midiModulation,
+                                   ModulationConversionPolicy modulationConversion,
+                                   const PerformanceSequence* sequenceUsage = nullptr) {
+  const SynthExportInput input{
       .name = std::string(collection.name),
       .soundBanks = collection.soundBanks,
       .samplePools = collection.samplePools,
@@ -188,32 +200,9 @@ void appendWavArtifacts(std::vector<Artifact>& artifacts, std::string_view baseN
       .modulationConversion = modulationConversion,
       .sampleFiltering = request.sampleFiltering,
   };
-}
-
-[[nodiscard]] Artifact synthArtifact(const SynthCollectionView& collection, SynthExportResult result,
-                                     std::string_view extension, std::string_view mediaType) {
-  return Artifact{
-      .filename = filenamePart(std::string(collection.name)) + std::string(extension),
-      .mediaType = std::string(mediaType),
-      .bytes = std::move(result.bytes),
-      .diagnostics = std::move(result.diagnostics),
-  };
-}
-
-[[nodiscard]] Artifact exportSoundFont2(const SynthCollectionView& collection, const SourceStore& sources,
-                                        const ExportRequest& request, const MidiModulationUsage* midiModulation,
-                                        ModulationConversionPolicy modulationConversion,
-                                        const PerformanceSequence* sequenceUsage = nullptr) {
-  const auto input = synthExportInput(collection, request, midiModulation, modulationConversion, sequenceUsage);
-  return synthArtifact(collection, buildSoundFont2(input, sources), ".sf2", "audio/soundfont");
-}
-
-[[nodiscard]] Artifact exportDls(const SynthCollectionView& collection, const SourceStore& sources,
-                                 const ExportRequest& request, const MidiModulationUsage* midiModulation,
-                                 ModulationConversionPolicy modulationConversion,
-                                 const PerformanceSequence* sequenceUsage = nullptr) {
-  const auto input = synthExportInput(collection, request, midiModulation, modulationConversion, sequenceUsage);
-  return synthArtifact(collection, buildDls(input, sources), ".dls", "audio/dls");
+  return synthArtifact(
+      collection.name, format,
+      format == SynthExportFormat::SoundFont2 ? buildSoundFont2(input, sources) : buildDls(input, sources));
 }
 
 Artifact exportStandaloneSequenceMidi(const SessionSnapshot& snapshot, AssetId sequenceId,
@@ -286,24 +275,18 @@ Artifact exportSoundBank(const SessionSnapshot& snapshot, const SourceStore& sou
   const bool soundFont = format == SynthExportFormat::SoundFont2;
   const ExportKind kind = soundFont ? ExportKind::SoundFont2 : ExportKind::Dls;
   const std::string extension = soundFont ? ".sf2" : ".dls";
-  const std::string mediaType = soundFont ? "audio/soundfont" : "audio/dls";
   const auto* asset = snapshot.asset(soundBankId);
   const auto* soundBank = asset != nullptr ? std::get_if<SoundBankAsset>(asset) : nullptr;
   if (soundBank == nullptr) {
-    return Artifact{
-        .filename = "sound-bank-" + std::to_string(soundBankId.value) + extension,
-        .mediaType = mediaType,
-        .diagnostics = {exportError(asset == nullptr ? "Sound bank asset was not found" : "Asset is not a sound bank")},
-    };
+    return synthArtifact(
+        "sound-bank-" + std::to_string(soundBankId.value), format,
+        SynthExportResult{.diagnostics = {exportError(asset == nullptr ? "Sound bank asset was not found"
+                                                                       : "Asset is not a sound bank")}});
   }
 
   const std::string baseName = artifactBaseName(soundBank->metadata, "sound-bank");
   const auto failedArtifact = [&](std::vector<Diagnostic> diagnostics) {
-    return Artifact{
-        .filename = baseName + extension,
-        .mediaType = mediaType,
-        .diagnostics = std::move(diagnostics),
-    };
+    return synthArtifact(baseName, format, SynthExportResult{.diagnostics = std::move(diagnostics)});
   };
   const size_t collectionCount = snapshot.countCollectionsContaining(soundBankId);
   if (collectionCount > 1) {
@@ -342,14 +325,10 @@ Artifact exportSoundBank(const SessionSnapshot& snapshot, const SourceStore& sou
   if (!validation.empty()) {
     return failedArtifact(validation.takeDiagnostics());
   }
-  std::vector<SoundBankAsset> soundBanks{*soundBank};
-  const std::vector<const SoundBankAsset*> banks{&soundBanks.front()};
+  const std::array banks{soundBank};
   const SynthCollectionView synth{baseName, banks, samplePools};
 
-  auto artifact = soundFont
-                      ? exportSoundFont2(synth, sources, request, nullptr, ModulationConversionPolicy::SynthModulators)
-                      : exportDls(synth, sources, request, nullptr, ModulationConversionPolicy::SynthModulators);
-  return artifact;
+  return exportSynth(synth, format, sources, request, nullptr, ModulationConversionPolicy::SynthModulators);
 }
 
 std::vector<Artifact> exportSamples(const SessionSnapshot& snapshot, const SourceStore& sources, AssetId ownerId) {
@@ -424,7 +403,7 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
   const auto synthConversion = loweredMidi ? request.modulationConversion : ModulationConversionPolicy::SynthModulators;
   workspace.prepareSynth(synthConversion, exportRequest.modulationScaling);
   const SynthCollectionView synth{bound.baseName(), instruments, bound.samplePools()};
-  auto soundFont = exportSoundFont2(synth, sources, exportRequest, nullptr, synthConversion);
+  auto soundFont = exportSynth(synth, SynthExportFormat::SoundFont2, sources, exportRequest, nullptr, synthConversion);
 
   playback.midi = std::move(midi.bytes);
   playback.soundFont = std::move(soundFont.bytes);
@@ -494,17 +473,12 @@ std::vector<Artifact> exportCollectionImpl(const SessionSnapshot& snapshot, cons
   const PerformanceSequence* sequenceUsage = request.exportOnlyUsedInstruments ? preparedPerformance : nullptr;
   const MidiModulationUsage* observedUsage = workspace.modulationUsage ? &*workspace.modulationUsage : nullptr;
   const auto writeSynth = [&](SynthExportFormat format) {
-    const bool soundFont = format == SynthExportFormat::SoundFont2;
-    const std::string_view extension = soundFont ? ".sf2" : ".dls";
-    const std::string_view mediaType = soundFont ? "audio/soundfont" : "audio/dls";
     if (synthRequiresPerformance && preparedPerformance == nullptr) {
-      return synthArtifact(SynthCollectionView{bound.baseName(), {}, {}},
-                           SynthExportResult{.diagnostics = rendering.diagnostics}, extension, mediaType);
+      return synthArtifact(bound.baseName(), format, SynthExportResult{.diagnostics = rendering.diagnostics});
     }
 
     const SynthCollectionView synth{bound.baseName(), exportedBanks, bound.samplePools(), selectedSoundBank.has_value()};
-    auto artifact = soundFont ? exportSoundFont2(synth, sources, request, observedUsage, synthConversion, sequenceUsage)
-                              : exportDls(synth, sources, request, observedUsage, synthConversion, sequenceUsage);
+    auto artifact = exportSynth(synth, format, sources, request, observedUsage, synthConversion, sequenceUsage);
     if (!rendering.performance) {
       artifact.diagnostics.insert(artifact.diagnostics.begin(), rendering.diagnostics.begin(),
                                   rendering.diagnostics.end());
