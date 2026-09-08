@@ -45,7 +45,7 @@ void ninSnesKonamiPercussionUsesDriverMapAndNeutralTuning();
 void ninSnesEarlierPercussionUsesSeparateSixByteTable();
 void ninSnesGainModeInstrumentsUseDspEnvelope();
 void ninSnesIdentityMappedSilentSlotsAreSparse();
-void ninSnesSunsoftRecognizesBothRevisionsAndBgmLayouts();
+void ninSnesSunsoftRecognizesBgmLayouts();
 void ninSnesSunsoftCommandsPreserveEchoAndEnvelopeState();
 void ninSnesSunsoftFeAndGateFollowRevision();
 void ninSnesSunsoftNoiseInstrumentsPreserveLaterSamples();
@@ -99,7 +99,7 @@ int main(int argc, char** argv) {
     ninSnesEarlierPercussionUsesSeparateSixByteTable();
     ninSnesGainModeInstrumentsUseDspEnvelope();
     ninSnesIdentityMappedSilentSlotsAreSparse();
-    ninSnesSunsoftRecognizesBothRevisionsAndBgmLayouts();
+    ninSnesSunsoftRecognizesBgmLayouts();
     ninSnesSunsoftCommandsPreserveEchoAndEnvelopeState();
     ninSnesSunsoftFeAndGateFollowRevision();
     ninSnesSunsoftNoiseInstrumentsPreserveLaterSamples();

@@ -30,6 +30,7 @@ constexpr std::array kProfileIds{
     ProfileId::Konami,    ProfileId::Lemmings,  ProfileId::IntelliFe3,  ProfileId::IntelliTa,    ProfileId::IntelliFe4,
     ProfileId::Human,     ProfileId::Tose,      ProfileId::QuintetActR, ProfileId::QuintetActR2, ProfileId::QuintetIog,
     ProfileId::QuintetTs, ProfileId::FalcomYs4, ProfileId::Koei,        ProfileId::SunsoftEarlier, ProfileId::Sunsoft,
+    ProfileId::SunsoftBenkei,
 };
 
 void expect(bool condition, const std::string& message) {
@@ -1690,15 +1691,17 @@ namespace {
 
 std::vector<u8> sunsoftDriverFixture(ProfileId id) {
   std::vector<u8> bytes(kAramSize);
+  const u16 lengthTable = id == ProfileId::SunsoftBenkei ? 0x3036 : 0x303e;
+  const u8 song = id == ProfileId::SunsoftBenkei ? 0x7d : 0x2a;
   const auto write = [&](u32 address, std::initializer_list<u8> data) {
     std::ranges::copy(data, bytes.begin() + address);
   };
-  // Relocated fragments of the supplied drivers. The BGM reader and song
-  // table precede the independent SFX copies in both revisions.
+  // Relocated driver fragments; Benkei's reader order is overridden below.
   write(0x500, {0x8d, 0x00, 0xf7, 0x40, 0x3a, 0x40, 0x2d, 0xf7, 0x40, 0x3a, 0x40, 0xfd, 0xae});
   write(0x520, {0xf5, 0x01, 0x20, 0xfd, 0xf5, 0x00, 0x20, 0xda, 0x40});
   write(0x540, {0x68, 0xe0, 0x90, 0x05, 0x3f, 0x60, 0x05, 0x2f, 0x96});
   write(0x560, {0x1c, 0xfd, 0xf6, 0x41, 0x2f, 0x2d, 0xf6, 0x40, 0x2f, 0x2d, 0xdd, 0x5c, 0xfd, 0xf6, 0xde, 0x2f});
+  writeLe16(bytes, 0x560 + 14, lengthTable - 0x60);
   write(0x580, {0x2d, 0x9f, 0x28, 0x07, 0xfd, 0xf6, 0x00, 0x31, 0xd5, 0x01, 0x02,
                 0xae, 0x28, 0x0f, 0xfd, 0xf6, 0x08, 0x31, 0xd5, 0x10, 0x02});
   write(0x5a0, {0x8d, 0x06, 0xcf, 0xda, 0x14, 0x60, 0x98, 0x00, 0x14, 0x98, 0x40, 0x15});
@@ -1708,14 +1711,14 @@ std::vector<u8> sunsoftDriverFixture(ProfileId id) {
   write(0x640, {0x7d, 0x9f, 0x5c, 0x08, 0x05, 0xc4, 0x14, 0xdd, 0xeb, 0x14});
   writeLe16(bytes, 0x3000 + 27 * 2, 0x600);
   writeLe16(bytes, 0x3000 + 29 * 2, 0x640);
-  write(0x303e, {1, 1, 2, 3, 0, 1, 2, 1, 2, 1, 1, 3, 0, 1, 2, 3,
-                 1, 3, 3, 0, 1, 3, 0, 3, 3, 3, 1, 0, 0, 2});
-  bytes[0x303e + 30] = id == ProfileId::SunsoftEarlier ? 2 : 1;
+  write(lengthTable, {1, 1, 2, 3, 0, 1, 2, 1, 2, 1, 1, 3, 0, 1, 2, 3,
+                      1, 3, 3, 0, 1, 3, 0, 3, 3, 3, 1, 0, 0, 2});
+  bytes[lengthTable + 30] = id == ProfileId::SunsoftEarlier ? 2 : 1;
   write(0x3100, {0x32, 0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xff});
   write(0x3108, {0x0a, 0x19, 0x28, 0x3c, 0x50, 0x64, 0x7d, 0x96,
                  0xaa, 0xb9, 0xc8, 0xd4, 0xe1, 0xeb, 0xf5, 0xff});
   writeLe16(bytes, 0x2002, 0x2200);
-  writeLe16(bytes, 0x2000 + 0x2a * 2, 0x2300);
+  writeLe16(bytes, 0x2000 + song * 2, 0x2300);
   writeLe16(bytes, 0x2200, 0x2400);
   writeSection(bytes, 0x2400, {{0, 0x2600}});
   write(0x2600, {20, 0x20, 0x80, 0});
@@ -1734,21 +1737,31 @@ std::vector<u8> sunsoftDriverFixture(ProfileId id) {
   writeLe16(bytes, 0x5002, 0x6000);
   bytes[0x6000] = 3;
   bytes[0] = 1;
-  bytes[0xf4] = 0xaa;  // handshake bit plus BGM request $2A
+  bytes[0xf4] = id == ProfileId::SunsoftBenkei ? song : (0x80 | song);
   bytes[0xf5] = 2;     // unrelated SFX request
   writeLe16(bytes, 0x40, 0x2202);
+  if (id == ProfileId::SunsoftBenkei) {
+    // Benkei's SFX reader/table precede BGM, captured before its cursor and mirror initialize.
+    write(0x500, {0x8d, 0, 0xf7, 0xd0, 0x3a, 0xd0, 0x2d, 0xf7, 0xd0, 0x3a, 0xd0, 0xfd, 0xae, 0x6f,
+                  0x8d, 0, 0xf7, 0x40, 0x3a, 0x40, 0x2d, 0xf7, 0x40, 0x3a, 0x40, 0xfd, 0xae, 0x6f});
+    write(0x4e0, {0xf5, 1, 0x21, 0xfd, 0xf5, 0, 0x21, 0xda, 0xd0});
+    writeLe16(bytes, 0x2102, 0x2200);
+    writeLe16(bytes, 0x40, 0);
+    bytes[0] = 0;
+  }
   return bytes;
 }
 
 }  // namespace
 
-void ninSnesSunsoftRecognizesBothRevisionsAndBgmLayouts() {
-  for (const ProfileId id : {ProfileId::SunsoftEarlier, ProfileId::Sunsoft}) {
+void ninSnesSunsoftRecognizesBgmLayouts() {
+  for (const ProfileId id : {ProfileId::SunsoftEarlier, ProfileId::Sunsoft, ProfileId::SunsoftBenkei}) {
     auto bytes = sunsoftDriverFixture(id);
     const ByteReader reader(SourceId{1}, bytes);
     const auto layout = findLayout(reader);
-    expect(layout && layout->profile == id && layout->songIndex == 0x2a &&
-               layout->sectionPointerAddress == 0x40 && layout->playlistAddress == 0x2300 &&
+    expect(layout && layout->profile == id && layout->songIndex == (id == ProfileId::SunsoftBenkei ? 0x7d : 0x2a) &&
+               layout->sectionPointerAddress == 0x40 && layout->songListAddress == 0x2000 &&
+               layout->playlistAddress == 0x2300 &&
                layout->instrumentTableAddress == 0x4000 && layout->spcDirAddress == 0x5000,
            "Sunsoft recognition should retain the full seven-bit BGM request and standard instrument addressing");
     expect(layout->durationRateTable == std::vector<u8>({0x32, 0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xff}) &&
@@ -1756,13 +1769,22 @@ void ninSnesSunsoftRecognizesBothRevisionsAndBgmLayouts() {
            "Sunsoft should read the driver's nonstandard duration and velocity tables");
     const auto parsed = decodeSequence(reader, *layout, AssetId{1});
     const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
-    expect(performance.diagnostics.empty() && performance.tracks.size() == (id == ProfileId::SunsoftEarlier ? 6 : 8),
-           "Sunsoft should decode exactly the BGM track count for its revision");
-    expect(!scanSynth(bytes, *layout, "Sunsoft").assets.empty(), "both Sunsoft revisions should load their sound bank");
+    expect(performance.diagnostics.empty() && performance.tracks.size() == (id == ProfileId::Sunsoft ? 8 : 6) &&
+               parsed.program.behavior.initialMasterLevel.value_or(1.0) ==
+                   (id == ProfileId::SunsoftBenkei ? 1.0 : ninSnesLevelGain(0xb0)),
+           "Sunsoft should use its revision's BGM track count and initial volume");
+    expect(!scanSynth(bytes, *layout, "Sunsoft").assets.empty(), "Sunsoft revisions should load their sound bank");
 
-    bytes[0xf4] = 0xfe;  // reserved driver control, not song $7E
-    bytes[0] = 0x7e;
-    expect(findLayout(reader)->songIndex == 1, "Sunsoft driver controls must not replace the current BGM song");
+    writeLe16(bytes, 0x40, 0x2202);
+    const auto controls = id == ProfileId::SunsoftBenkei ? std::array{0xf0, 0xf1, 0xff} : std::array{0xfd, 0xfe, 0xff};
+    for (const u8 control : controls) {
+      writeLe16(bytes, 0x2000 + (control & 0x7f) * 2, 0x2300);
+      bytes[0xf4] = bytes[0] = control;
+      expect(findLayout(reader)->songIndex == 1, "Sunsoft driver controls must not replace the current BGM song");
+    }
+    if (id == ProfileId::SunsoftBenkei) {
+      continue;  // Benkei has no FB-FE command extension.
+    }
     bytes[0x303e + 30] = 3;
     expect(findLayout(reader)->profile == ProfileId::Unknown,
            "an unrecognized Sunsoft command tail needs a safe fallback");
@@ -1873,7 +1895,7 @@ void ninSnesSunsoftFeAndGateFollowRevision() {
 }
 
 void ninSnesSunsoftNoiseInstrumentsPreserveLaterSamples() {
-  for (const ProfileId id : {ProfileId::SunsoftEarlier, ProfileId::Sunsoft}) {
+  for (const ProfileId id : {ProfileId::SunsoftEarlier, ProfileId::Sunsoft, ProfileId::SunsoftBenkei}) {
     std::vector<u8> bytes(kAramSize);
     std::ranges::copy(std::initializer_list<u8>{0x9f, 0xff, 0xe0, 0, 1, 0, 0, 0xff, 0xe0, 0, 2, 0},
                       bytes.begin() + 0x4000);

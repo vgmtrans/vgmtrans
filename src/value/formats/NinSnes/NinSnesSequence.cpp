@@ -1328,6 +1328,7 @@ struct Playback {
   }
 
   [[nodiscard]] double masterGain(u8 value) const {
+    // Albert applies FE before squaring; multiplying the squared gains is equivalent.
     return math::levelGain(value) * math::levelGain(program.volumeMultiplier);
   }
 
@@ -1431,7 +1432,7 @@ struct Playback {
 
   void echoOff() {
     if (isSunsoft(program.selected.id)) {
-      // F6 zeros EVOL but keeps the channel masks used by FB/FC.
+      // Sunsoft F6 zeros EVOL but retains the channel mask.
       program.echo.setVolume(0, 0);
     } else {
       program.echo.disable();

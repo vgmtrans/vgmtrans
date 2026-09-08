@@ -18,7 +18,7 @@ constexpr Profile kUnknown{
     .programs = ProgramResolver::Direct,
 };
 
-constexpr std::array<Profile, 20> kProfiles{{
+constexpr std::array<Profile, 21> kProfiles{{
     {.id = ProfileId::Earlier,
      .name = "Earlier",
      .base = BaseProfile::Earlier,
@@ -63,11 +63,15 @@ constexpr std::array<Profile, 20> kProfiles{{
     {.id = ProfileId::QuintetTs, .name = "Quintet Terranigma", .programs = ProgramResolver::QuintetLookup},
     {.id = ProfileId::FalcomYs4, .name = "Falcom Ys IV", .addresses = AddressModel::FalcomBaseOffset},
     {.id = ProfileId::Koei, .name = "Koei", .sectionTrackCount = 6},
+    // Hashire reserves voices 6/7 for SFX; Albert uses all eight and adds one
+    // after the gate-duration multiply.
     {.id = ProfileId::SunsoftEarlier,
      .name = "Sunsoft (earlier)",
      .sectionTrackCount = 6,
      .initialMasterVolume = 0xb0},
     {.id = ProfileId::Sunsoft, .name = "Sunsoft", .initialMasterVolume = 0xb0, .noteGateBias = 1},
+    // Benkei also says S1.20, but has only E0-FA and starts master volume at FF.
+    {.id = ProfileId::SunsoftBenkei, .name = "Sunsoft (Benkei Gaiden)", .sectionTrackCount = 6},
 }};
 
 }  // namespace
