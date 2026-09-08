@@ -85,7 +85,7 @@ using SequenceExportRequest = SequenceRenderOptions;
 struct PlaybackRequest {
   SequenceRenderOptions sequence;
   ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;
-  DynamicEnvelopePolicy dynamicEnvelopes = DynamicEnvelopePolicy::Ignore;
+  DynamicEnvelopePolicy dynamicEnvelopes = DynamicEnvelopePolicy::InstrumentVariants;
   SampleFilteringPolicy sampleFiltering = SampleFilteringPolicy::FormatPreferred;
 };
 
@@ -96,7 +96,7 @@ struct ExportRequest {
   SequenceRenderOptions sequence;
   ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange;
   ModulationConversionPolicy modulationConversion = ModulationConversionPolicy::SynthModulators;
-  DynamicEnvelopePolicy dynamicEnvelopes = DynamicEnvelopePolicy::Ignore;
+  DynamicEnvelopePolicy dynamicEnvelopes = DynamicEnvelopePolicy::InstrumentVariants;
   SampleFilteringPolicy sampleFiltering = SampleFilteringPolicy::FormatPreferred;
   // Instrument-container exports retain only instruments selected by rendered
   // notes, plus the samples referenced by those instruments.

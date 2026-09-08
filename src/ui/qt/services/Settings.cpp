@@ -163,7 +163,7 @@ vgmtrans::core::DynamicEnvelopePolicy Settings::ConversionSettings::dynamicEnvel
   settings.beginGroup(QStringLiteral("ConversionOptions"));
   const int value =
       settings.value(QStringLiteral("dynamicEnvelopeConversion"),
-                     static_cast<int>(vgmtrans::core::DynamicEnvelopePolicy::Ignore))
+                     static_cast<int>(vgmtrans::core::DynamicEnvelopePolicy::InstrumentVariants))
           .toInt();
   settings.endGroup();
   switch (static_cast<vgmtrans::core::DynamicEnvelopePolicy>(value)) {
@@ -171,7 +171,7 @@ vgmtrans::core::DynamicEnvelopePolicy Settings::ConversionSettings::dynamicEnvel
     case vgmtrans::core::DynamicEnvelopePolicy::InstrumentVariants:
       return static_cast<vgmtrans::core::DynamicEnvelopePolicy>(value);
   }
-  return vgmtrans::core::DynamicEnvelopePolicy::Ignore;
+  return vgmtrans::core::DynamicEnvelopePolicy::InstrumentVariants;
 }
 
 void Settings::ConversionSettings::setDynamicEnvelopeConversion(

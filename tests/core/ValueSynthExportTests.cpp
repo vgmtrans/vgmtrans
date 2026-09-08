@@ -1109,8 +1109,11 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
   missingRuntimeBuilder.collections = snapshot.collections();
   const SessionSnapshot missingRuntimeSnapshot = missingRuntimeBuilder.finish();
 
-  const auto baseline =
-      exportCollection(missingRuntimeSnapshot, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Dls}});
+  const auto baseline = exportCollection(missingRuntimeSnapshot, sources, CollectionId{0},
+                                         ExportRequest{
+                                             .kinds = {ExportKind::Dls},
+                                             .dynamicEnvelopes = DynamicEnvelopePolicy::Ignore,
+                                         });
   expect(baseline.size() == 1 && !baseline[0].bytes.empty(),
          "ordinary full-bank synth export should survive a sequence rendering failure");
   diagnosticWithMessage(baseline[0].diagnostics, "Sequence program has no runtime executor");
@@ -1119,6 +1122,7 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
     const auto failed = exportCollection(missingRuntimeSnapshot, sources, CollectionId{0},
                                          ExportRequest{
                                              .kinds = {kind},
+                                             .dynamicEnvelopes = DynamicEnvelopePolicy::Ignore,
                                              .exportOnlyUsedInstruments = true,
                                          });
     expect(failed.size() == 1 && failed[0].bytes.empty(),
@@ -1363,6 +1367,12 @@ void collectionBindingProducesAnImmutableInstrumentView() {
          "bound instrument data should replace durable data instead of being appended");
   expect(containsAscii(dls, "Prepared Instrument") && !containsAscii(dls, "Durable Instrument"),
          "collection export should use only the binder's authoritative instrument view");
+
+  const auto usedOnly = exportCollection(snapshot, sources, CollectionId{0},
+                                         ExportRequest{.kinds = {ExportKind::Dls}, .exportOnlyUsedInstruments = true});
+  expect(usedOnly.size() == 1 && usedOnly.front().bytes.empty(),
+         "used-instrument export should still require a sequence even for bank-only collections");
+  diagnosticWithMessage(usedOnly.front().diagnostics, "Collection does not reference a sequence asset");
 
   const auto failed = bindCollection(snapshotWithBinder([](CollectionBindingContext& context) {
                                        context.soundBanks.front().instruments.front().name = "Partially Bound";

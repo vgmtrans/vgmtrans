@@ -89,7 +89,7 @@ value wins.
 | Pitch Transition Rendering | `--pitch-transitions preserve\|portamento\|pitch-bend` | `preserve` |
 | Tuning Rendering | `--tuning pitch-bend\|rpn` | `pitch-bend` |
 | Modulation Conversion | `--modulation synth\|events` | `synth` |
-| Dynamic Envelope Conversion | `--dynamic-envelopes` / `--no-dynamic-envelopes` | Ignore |
+| Dynamic Envelope Conversion | `--dynamic-envelopes` / `--no-dynamic-envelopes` | Instrument variants |
 | Sequence Loops | `--loops N` (extra repeats after the first playthrough) | `1` |
 | Export used instrument data only | `--used-instruments` / `--all-instruments` | All |
 | Terminate previous voice on new attack | `--terminate-previous-voice` / `--no-terminate-previous-voice` | Off |
