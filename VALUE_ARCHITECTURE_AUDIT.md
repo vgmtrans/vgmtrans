@@ -650,6 +650,20 @@ scope requirement. All 21,504 synth outputs are byte-identical to the preceding
 modulation-policy revision. The full build and all 17 CTest targets pass without
 warnings.
 
+### Store loop visits without duplicating command identity
+
+Loop detection now stores each state's visit tick directly. The loop start's
+source command comes from the replay destination, which already identifies the
+visited command, eliminating the separate VisitRecord type and its duplicate
+command field. Defaulted comparisons replace manually repeated field lists for
+track and playlist visit states. This removes ten production lines.
+
+All 13,824 before/after VM traces are identical across jump semantics, loop
+policies, repeat counts, calls, missing destinations, and multiple tracks,
+including event provenance, source spans, markers, and diagnostics. A direct
+VM build passes the same matrix under AddressSanitizer and UBSan. The full
+build and all 17 CTest targets pass without warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

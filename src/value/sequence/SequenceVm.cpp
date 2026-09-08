@@ -9,12 +9,12 @@
 
 #include <any>
 #include <algorithm>
+#include <compare>
 #include <fmt/format.h>
 #include <limits>
 #include <map>
 #include <memory>
 #include <optional>
-#include <tuple>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -68,19 +68,11 @@ struct VisitState {
   std::vector<u32> callStack;
   std::map<u8, u32> repeat;
 
-  friend bool operator<(const VisitState& lhs, const VisitState& rhs) {
-    return std::tie(lhs.commandIndex, lhs.callStack, lhs.repeat) <
-           std::tie(rhs.commandIndex, rhs.callStack, rhs.repeat);
-  }
-};
-
-struct VisitRecord {
-  u64 tick = 0;
-  CommandId command;
+  friend auto operator<=>(const VisitState&, const VisitState&) = default;
 };
 
 struct LoopPoint {
-  VisitRecord start;
+  u64 startTick = 0;
   CommandId endCommand;
   u64 endTick = 0;
 };
@@ -105,43 +97,43 @@ public:
         return std::nullopt;
       }
       return LoopPoint{
-          .start = previous->second,
+          .startTick = previous->second,
           .endCommand = runtime.lastCommand.valid() ? runtime.lastCommand : commandId,
           .endTick = runtime.tick,
       };
     }
 
-    visited_.emplace(state, VisitRecord{.tick = runtime.tick, .command = commandId});
+    visited_.emplace(state, runtime.tick);
     return std::nullopt;
   }
 
-  [[nodiscard]] const VisitRecord* findExact(const VisitState& state) const {
+  [[nodiscard]] std::optional<u64> findExact(const VisitState& state) const {
     const auto found = visited_.find(state);
-    return found != visited_.end() ? &found->second : nullptr;
+    return found != visited_.end() ? std::optional{found->second} : std::nullopt;
   }
 
-  [[nodiscard]] const VisitRecord* findLoopCandidateIgnoringRepeatState(u32 commandIndex,
-                                                                        const std::vector<u32>& callStack) const {
+  [[nodiscard]] std::optional<u64> findLoopCandidateIgnoringRepeatState(u32 commandIndex,
+                                                                     const std::vector<u32>& callStack) const {
     // LoopCandidate is a source-driver hint that the jump target is a loop point.
     // Repeat counters are ignored here so the hint still applies when the loop
     // command appears while a finite repeat is active.
-    for (const auto& [state, record] : visited_) {
+    for (const auto& [state, tick] : visited_) {
       if (state.commandIndex == commandIndex && state.callStack == callStack) {
-        return &record;
+        return tick;
       }
     }
-    return nullptr;
+    return std::nullopt;
   }
 
   void clear() { visited_.clear(); }
 
-  void record(const VisitState& state, VisitRecord record) { visited_.emplace(state, std::move(record)); }
+  void record(const VisitState& state, u64 tick) { visited_.emplace(state, tick); }
 
 private:
   // A command reached through a different return stack or repeat-counter state
   // is distinct playback. This keeps normal calls/repeats from looking like
   // infinite loops while still stopping true control-flow cycles.
-  std::map<VisitState, VisitRecord> visited_;
+  std::map<VisitState, u64> visited_;
 };
 
 void addLoopMarker(PerformanceTrack& track, CommandId sourceCommand, u64 tick, u64& nextSequence, std::string text) {
@@ -232,9 +224,7 @@ struct PlaylistVisitState {
   u32 commandIndex = 0;
   std::map<u32, u32> repeatRemaining;
 
-  friend bool operator<(const PlaylistVisitState& lhs, const PlaylistVisitState& rhs) {
-    return std::tie(lhs.commandIndex, lhs.repeatRemaining) < std::tie(rhs.commandIndex, rhs.repeatRemaining);
-  }
+  friend auto operator<=>(const PlaylistVisitState&, const PlaylistVisitState&) = default;
 };
 
 struct PlaylistAdvance {
@@ -614,7 +604,7 @@ private:
     // Once a loop is identified, all loop sources use the same export policy:
     // preserve markers, replay for the requested loop count, or stop the track.
     if (loopPolicy_ == LoopPolicy::Preserve) {
-      addLoopMarker(performanceTrack_, loop.start.command, loop.start.tick, outputSequence_, "Loop Start");
+      addLoopMarker(performanceTrack_, CommandId{replayIndex}, loop.startTick, outputSequence_, "Loop Start");
       addLoopMarker(performanceTrack_, loop.endCommand, loop.endTick, outputSequence_, "Loop End");
       current_ = std::nullopt;
       arrivedByControlFlow_ = false;
@@ -632,7 +622,7 @@ private:
       }
       loopDetector_.clear();
       if (recordAfterClear) {
-        loopDetector_.record(*recordAfterClear, VisitRecord{.tick = loop.endTick, .command = CommandId{replayIndex}});
+        loopDetector_.record(*recordAfterClear, loop.endTick);
       }
       current_ = replayIndex;
       arrivedByControlFlow_ = true;
@@ -713,14 +703,14 @@ private:
       return;
     }
 
-    const VisitRecord* previous = nullptr;
+    std::optional<u64> previous;
     switch (semantics) {
       case JumpSemantics::Normal:
       case JumpSemantics::FiniteBranch:
         return;
       case JumpSemantics::LoopCandidate:
         previous = loopDetector_.findLoopCandidateIgnoringRepeatState(*current_, runtime_.callStack);
-        if (previous == nullptr) {
+        if (!previous) {
           return;
         }
         break;
@@ -730,7 +720,7 @@ private:
     }
 
     const LoopPoint loop{
-        .start = previous ? *previous : VisitRecord{.tick = runtime_.tick, .command = CommandId{*current_}},
+        .startTick = previous.value_or(runtime_.tick),
         .endCommand = commandId,
         .endTick = runtime_.tick,
     };
