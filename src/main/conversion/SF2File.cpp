@@ -7,6 +7,7 @@
 
 #include "base/Types.h"
 #include "ConversionContext.h"
+#include "LogManager.h"
 #include "Root.h"
 #include "ScaleConversion.h"
 #include "SynthFile.h"
@@ -25,6 +26,16 @@ namespace {
 constexpr double kEmu8000InitialAttenuationScale = 2.5;
 constexpr double kSoundFontCentibelsPerDecibel = 10.0;
 constexpr double kSoundFontMaxInitialAttenuationCentibels = 1440.0;
+
+u16 sf2BankForSourceBank(u32 bank, const ConversionContext& context) {
+  const u16 bank16 = static_cast<u16>(bank);
+  if (context.bankSelectStyle == BankSelectStyle::MMA) {
+    return bank16 & 0x3fff;
+  }
+  // GS MIDI conversion emits the low seven bits as CC0. Keep percussion bank
+  // 128 intact because SoundFont reserves it for channel-10 drum presets.
+  return bank16 == 128 ? 128 : bank16 & 0x7f;
+}
 
 std::optional<SFModulator> sf2SourceForModSource(ModSource source) {
   constexpr u16 midiContinuousController = 1u << 7;
@@ -132,6 +143,43 @@ int SF2File::numOfGeneratorsForRgn(SynthRgn* rgn) {
   return numOfGenerators;
 }
 
+bool SF2File::canRepresent(const SynthFile& synthfile, const ConversionContext& context) {
+  constexpr uint64_t maxIndex = std::numeric_limits<u16>::max();
+  uint64_t instrumentBags = 0;
+  uint64_t instrumentGenerators = 0;
+  uint64_t instrumentModulators = 0;
+  uint64_t sampleDataBytes = 0;
+
+  for (const SynthInstr* instr : synthfile.instrs()) {
+    if (hasInstrumentGlobalZone(instr, context)) {
+      ++instrumentBags;
+      instrumentGenerators += instr->generators().size();
+      instrumentModulators += numSf2ModulatorsForInstr(instr, context);
+    }
+    instrumentBags += instr->regions().size();
+    for (SynthRgn* region : instr->regions()) {
+      instrumentGenerators += numOfGeneratorsForRgn(region);
+    }
+  }
+  for (const SynthWave* wave : synthfile.waves()) {
+    sampleDataBytes += static_cast<uint64_t>(wave->dataSize) + 46 * sizeof(u16);
+  }
+
+  const uint64_t presetGenerators = synthfile.instrCount() * 2;
+  const bool representable =
+      synthfile.instrCount() <= maxIndex && presetGenerators <= maxIndex &&
+      instrumentBags <= maxIndex && instrumentGenerators <= maxIndex &&
+      instrumentModulators <= maxIndex && synthfile.waveCount() <= maxIndex &&
+      sampleDataBytes <= std::numeric_limits<u32>::max();
+  if (!representable) {
+    L_ERROR("SoundFont 2.01 limits exceeded: {} presets, {} preset generators, {} instrument bags, "
+            "{} instrument generators, {} instrument modulators, {} samples, {} sample-data bytes",
+            synthfile.instrCount(), presetGenerators, instrumentBags, instrumentGenerators,
+            instrumentModulators, synthfile.waveCount(), sampleDataBytes);
+  }
+  return representable;
+}
+
 SF2File::SF2File(SynthFile* synthfile, const ConversionContext& context)
     : RiffFile(synthfile->m_name, "sfbk") {
 
@@ -183,16 +231,9 @@ SF2File::SF2File(SynthFile* synthfile, const ConversionContext& context)
     memcpy(presetHdr.achPresetName, instr->name.c_str(), std::min(instr->name.length(), static_cast<size_t>(20)));
     presetHdr.wPreset = static_cast<u16>(instr->ulInstrument);
 
-    // Despite being a 16-bit value, SF2 only supports banks up to 128. Since
-    // it's pretty common to have either MSB or LSB be 0, we'll use MSB if the
-    // value is greater than 128
-    u16 bank16 = static_cast<u16>(instr->ulBank);
-
-    if (bank16 > 128) {
-      presetHdr.wBank = (bank16 >> 8) & 0x7F;
-    } else {
-      presetHdr.wBank = bank16;
-    }
+    // Use the same bank convention as the paired MIDI. The old high-byte
+    // heuristic could place a preset in a different bank from its sequence.
+    presetHdr.wBank = sf2BankForSourceBank(instr->ulBank, context);
     presetHdr.wPresetBagNdx = static_cast<u16>(i);
     presetHdr.dwLibrary = 0;
     presetHdr.dwGenre = 0;

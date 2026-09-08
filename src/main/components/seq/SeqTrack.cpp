@@ -227,8 +227,13 @@ void SeqTrack::addInitialMidiEvents(int trackNum) {
   pMidiTrack->addMidiPort(channelGroup);
 
   if (trackNum == 0) {
-    pMidiTrack->addGMReset();
-    pMidiTrack->addGM2Reset();
+    // A GM reset forces synthesizers such as FluidSynth to ignore GS CC0 bank
+    // selects. Emit the reset matching the bank convention used below.
+    if (parentSeq->conversionContext().bankSelectStyle == BankSelectStyle::GS) {
+      pMidiTrack->addGSReset();
+    } else {
+      pMidiTrack->addGM2Reset();
+    }
     if (parentSeq->alwaysWriteInitialTempo())
       pMidiTrack->addTempoBPM(parentSeq->initialTempoBPM);
   }
@@ -1748,7 +1753,7 @@ void SeqTrack::addProgramChangeNoItem(u32 progNum, bool requireBank) const {
   }
 }
 
-void SeqTrack::addBankSelect(u32 offset, u32 length, u8 bank, const std::string& sEventName) {
+void SeqTrack::addBankSelect(u32 offset, u32 length, u16 bank, const std::string& sEventName) {
   bool isNewOffset = onEvent(offset, length);
 
   recordSeqEvent<BankSelectSeqEvent>(isNewOffset, getTime(), bank, offset, length, sEventName);
@@ -1758,13 +1763,13 @@ void SeqTrack::addBankSelect(u32 offset, u32 length, u8 bank, const std::string&
   addBankSelectNoItem(bank);
 }
 
-void SeqTrack::addBankSelectNoItem(u8 bank) const {
+void SeqTrack::addBankSelectNoItem(u16 bank) const {
   if (readMode == READMODE_CONVERT_TO_MIDI) {
     if (auto style = parentSeq->conversionContext().bankSelectStyle;
         style == BankSelectStyle::GS) {
       pMidiTrack->addBankSelect(channel, bank & 0x7f);
     } else if (style == BankSelectStyle::MMA) {
-      pMidiTrack->addBankSelect(channel, bank >> 7);
+      pMidiTrack->addBankSelect(channel, (bank >> 7) & 0x7f);
       pMidiTrack->addBankSelectFine(channel, bank & 0x7f);
     }
   }
