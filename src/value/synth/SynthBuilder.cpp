@@ -32,31 +32,21 @@ void annotateLoop(AnnotationBuilder& annotation, const Loop& loop) {
 }
 
 void annotateEnvelope(AnnotationBuilder& annotation, const Envelope& envelope) {
-  if (envelope.attackSeconds) {
-    annotation.derived(std::isinf(*envelope.attackSeconds) ? "attack_infinite" : "attack_seconds",
-                       std::isinf(*envelope.attackSeconds) ? SourceValue{true} : SourceValue{*envelope.attackSeconds});
-  }
-  if (envelope.holdSeconds) {
-    annotation.derived(std::isinf(*envelope.holdSeconds) ? "hold_infinite" : "hold_seconds",
-                       std::isinf(*envelope.holdSeconds) ? SourceValue{true} : SourceValue{*envelope.holdSeconds});
-  }
-  if (envelope.decaySeconds) {
-    annotation.derived(std::isinf(*envelope.decaySeconds) ? "decay_infinite" : "decay_seconds",
-                       std::isinf(*envelope.decaySeconds) ? SourceValue{true} : SourceValue{*envelope.decaySeconds});
-  }
-  if (envelope.secondDecaySeconds) {
-    annotation.derived(
-        std::isinf(*envelope.secondDecaySeconds) ? "second_decay_infinite" : "second_decay_seconds",
-        std::isinf(*envelope.secondDecaySeconds) ? SourceValue{true} : SourceValue{*envelope.secondDecaySeconds});
-  }
+  const auto time = [&](std::string_view stage, std::optional<double> seconds) {
+    if (seconds) {
+      const bool infinite = std::isinf(*seconds);
+      annotation.derived(std::string(stage) + (infinite ? "_infinite" : "_seconds"),
+                         infinite ? SourceValue{true} : SourceValue{*seconds});
+    }
+  };
+  time("attack", envelope.attackSeconds);
+  time("hold", envelope.holdSeconds);
+  time("decay", envelope.decaySeconds);
+  time("second_decay", envelope.secondDecaySeconds);
   if (envelope.sustainAmplitude) {
     annotation.derived("sustain_level", *envelope.sustainAmplitude, SourceValueDisplay::Percent);
   }
-  if (envelope.releaseSeconds) {
-    annotation.derived(
-        std::isinf(*envelope.releaseSeconds) ? "release_infinite" : "release_seconds",
-        std::isinf(*envelope.releaseSeconds) ? SourceValue{true} : SourceValue{*envelope.releaseSeconds});
-  }
+  time("release", envelope.releaseSeconds);
 }
 
 [[nodiscard]] std::string_view audioCodecName(AudioCodec codec) {

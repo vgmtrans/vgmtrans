@@ -570,6 +570,19 @@ instrument tables. Directly instrumented synth preparation/lowering/writers
 pass AddressSanitizer, UBSan, and float-cast-overflow checks and reproduce the
 updated bytes. The full build and all 17 CTest targets pass without warnings.
 
+### Construct source annotations through one entry point
+
+Make SourceMapBuilder::annotation own construction directly; remove the private
+add/allocateId forwarding methods and let field/pointer helpers use their
+ordinary fluent operations. Share envelope-stage labeling in one local helper,
+preserving stage order, omitted optionals, infinite-stage booleans, and physical
+seconds. This removes 24 production lines without another public abstraction.
+
+Add coverage for empty envelopes, zero sustain/attack, finite stages, infinite
+stages, derived ranges, and display hints. Existing source-map tests cover
+custom allocation, duplicate IDs, fields, hierarchy, and links. The full build
+and all 17 CTest targets pass without warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

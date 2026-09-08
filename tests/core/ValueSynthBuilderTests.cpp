@@ -9,6 +9,7 @@
 #include "value/scan/ScanResultBuilder.h"
 
 #include <algorithm>
+#include <limits>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -39,6 +40,37 @@ bool unsignedFieldEquals(const SourceAnnotation& annotation, std::string_view na
   const SourceField* field = fieldNamed(annotation, name);
   const auto* value = field == nullptr ? nullptr : std::get_if<u64>(&field->value);
   return value != nullptr && *value == expected;
+}
+
+void envelopeAnnotationsPreservePhysicalValues() {
+  SourceMapBuilder sourceMap;
+  const SourceRange range{.source = SourceId{3}, .offset = 10, .size = 4};
+  const auto empty = sourceMap.annotation(SourceRole::Region, "Empty", range);
+  annotateSynthValue(empty, Region{});
+  const auto timed = sourceMap.annotation(SourceRole::Region, "Timed", range);
+  annotateSynthValue(timed, Region{.envelope = Envelope{
+                                       .attackSeconds = 0.0,
+                                       .holdSeconds = std::numeric_limits<double>::infinity(),
+                                       .decaySeconds = 1.25,
+                                       .secondDecaySeconds = std::numeric_limits<double>::infinity(),
+                                       .releaseSeconds = 2.5,
+                                       .sustainAmplitude = 0.0,
+                                   }});
+  const auto map = sourceMap.finish();
+  const auto& emptyFields = map.get(empty.id()).fields;
+  const auto& fields = map.get(timed.id()).fields;
+  const std::vector<std::pair<std::string, SourceValue>> expected{
+      {"attack_seconds", 0.0},         {"hold_infinite", true}, {"decay_seconds", 1.25},
+      {"second_decay_infinite", true}, {"sustain_level", 0.0},  {"release_seconds", 2.5},
+  };
+  expect(fields.size() == emptyFields.size() + expected.size(),
+         "absent envelope stages must not produce derived fields");
+  for (size_t index = 0; index < expected.size(); ++index) {
+    const auto& field = fields[emptyFields.size() + index];
+    expect(field.name == expected[index].first && field.value == expected[index].second && !field.range.valid() &&
+               field.display == (index == 4 ? SourceValueDisplay::Percent : SourceValueDisplay::Default),
+           "envelope annotations must retain stage order, zero and infinite values, and sustain display units");
+  }
 }
 
 void recordReaderFinishesOnePortableSourceValue() {
@@ -561,6 +593,7 @@ void detachedBuildersUseTheSameAuthoringSurface() {
 }  // namespace
 
 void runValueSynthBuilderTests() {
+  envelopeAnnotationsPreservePhysicalValues();
   recordReaderFinishesOnePortableSourceValue();
   recordReaderPreservesNumericFieldsAndFailurePolicies();
   brrCatalogProjectsInstrumentsInSampleOrder();
