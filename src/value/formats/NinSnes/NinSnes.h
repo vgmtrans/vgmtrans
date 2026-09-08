@@ -59,10 +59,11 @@ enum class ProfileId : u8 {
   Koei,
   SunsoftEarlier,
   Sunsoft,
+  SunsoftBenkei,
 };
 
 [[nodiscard]] constexpr bool isSunsoft(ProfileId id) {
-  return id == ProfileId::SunsoftEarlier || id == ProfileId::Sunsoft;
+  return id == ProfileId::SunsoftEarlier || id == ProfileId::Sunsoft || id == ProfileId::SunsoftBenkei;
 }
 
 enum class BaseProfile : u8 {

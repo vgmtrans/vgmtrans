@@ -481,10 +481,14 @@ std::optional<Layout> findLayout(ByteReader reader) {
   std::optional<u16> konamiBase;
   std::optional<u16> falcomBaseAddress;
   const auto koeiSectionReader = Patterns::ptnKoeiSectionPointers.find(reader);
+  const auto benkeiSectionReader = Patterns::ptnSunsoftBenkeiSectionPointers.find(reader);
 
   if (koeiSectionReader) {
     signature = Signature::Standard;
     sectionPointer = reader.u8At(*koeiSectionReader + 3);
+  } else if (benkeiSectionReader) {
+    signature = Signature::Standard;
+    sectionPointer = reader.u8At(*benkeiSectionReader + 17);
   } else if (const auto standardOffset = Patterns::ptnIncSectionPtr.find(reader)) {
     signature = Signature::Standard;
     sectionPointer = reader.u8At(*standardOffset + 3);
@@ -543,6 +547,9 @@ std::optional<Layout> findLayout(ByteReader reader) {
   if (profileId == ProfileId::Standard) {
     profileId =
         koeiSectionReader ? ProfileId::Koei : classifyStandard(reader, *commands, konamiBase, instrumentCommandOffset);
+    if (profileId == ProfileId::Standard && benkeiSectionReader && commands->count == kStandardCommandLengths.size()) {
+      profileId = ProfileId::SunsoftBenkei;
+    }
   }
   const Profile& selected = profile(profileId);
   if (selected.intelli != IntelliMode::None) {
@@ -717,11 +724,17 @@ std::optional<Layout> findLayout(ByteReader reader) {
       }
     }
   } else if (isSunsoft(selected.id)) {
-    // Sunsoft strips the port handshake bit, then reserves 7D-7F for driver
-    // controls. BGM uses port 0; the other ports drive independent SFX players.
+    // BGM uses port 0 and seven-bit song indices. Benkei reserves F0/F1/FF
+    // before doubling the index; the other revisions strip the handshake bit
+    // and reserve 7D-7F. Other ports drive independent SFX players.
+    // Rips may contain a pending request before BGM or its port mirror initializes.
     for (const u32 address : {0xf4u, 0u}) {
-      const u8 request = reader.u8At(address) & 0x7f;
-      if (request != 0 && request < 0x7d) {
+      const u8 port = reader.u8At(address);
+      const u8 request = port & 0x7f;
+      const bool control = selected.id == ProfileId::SunsoftBenkei
+                               ? port == 0xf0 || port == 0xf1 || port == 0xff
+                               : request >= 0x7d;
+      if (request != 0 && !control) {
         requestedSong = request;
         break;
       }

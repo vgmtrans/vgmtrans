@@ -85,6 +85,13 @@ Pattern Patterns::ptnSunsoftEchoOn(
 // the values for restoration after a sound effect.
 Pattern Patterns::ptnSunsoftAdsr("\x7d\x9f\x5c\x08\x05\xc4\x14\xdd\xeb\x14", "xxxxxx?xx?", 10);
 
+// Benkei Gaiden places the SFX reader ($D0) immediately before BGM ($40).
+// Both match the standard reader signature; the second one selects music.
+Pattern Patterns::ptnSunsoftBenkeiSectionPointers(
+    "\x8d\x00\xf7\xd0\x3a\xd0\x2d\xf7\xd0\x3a\xd0\xfd\xae\x6f"
+    "\x8d\x00\xf7\x40\x3a\x40\x2d\xf7\x40\x3a\x40\xfd\xae\x6f",
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxx", 28);
+
 // Some HAL derivatives bypass the variable written by FA and apply a fixed
 // percussion base directly in either note dispatch or the instrument loader.
 //

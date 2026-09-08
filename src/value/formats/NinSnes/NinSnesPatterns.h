@@ -63,6 +63,7 @@ struct Patterns {
   static Pattern ptnFixedPercussionBaseLoader;
   static Pattern ptnSunsoftEchoOn;
   static Pattern ptnSunsoftAdsr;
+  static Pattern ptnSunsoftBenkeiSectionPointers;
   static Pattern ptnSetDIR;
   static Pattern ptnSetDIRYI;
   static Pattern ptnSetDIRVS;
