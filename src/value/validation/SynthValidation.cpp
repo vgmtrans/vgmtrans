@@ -11,7 +11,6 @@
 #include <algorithm>
 #include <cmath>
 #include <set>
-#include <type_traits>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -154,14 +153,8 @@ ValidationReport validateSoundBank(const SoundBankAsset& soundBank) {
                    validRange(instrument.range));
     }
     if (instrument.synthVoice) {
-      std::visit(
-          [&](const auto& voice) {
-            using Voice = std::decay_t<decltype(voice)>;
-            if constexpr (std::is_same_v<Voice, Ym2151Voice>) {
-              validateYm2151Voice(report, voice, instrument.range);
-            }
-          },
-          *instrument.synthVoice);
+      std::visit([&](const Ym2151Voice& voice) { validateYm2151Voice(report, voice, instrument.range); },
+                 *instrument.synthVoice);
     }
 
     for (const auto& region : instrument.regions) {

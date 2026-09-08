@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
-#include <type_traits>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -114,14 +113,11 @@ void annotateSynthValue(AnnotationBuilder annotation, const Instrument& instrume
   }
   if (instrument.synthVoice) {
     std::visit(
-        [&](const auto& voice) {
-          using Voice = std::decay_t<decltype(voice)>;
-          if constexpr (std::is_same_v<Voice, Ym2151Voice>) {
-            annotation.derived("synth", "YM2151", SourceValueDisplay::Enum)
-                .derived("algorithm", voice.algorithm)
-                .derived("feedback", voice.feedback)
-                .derived("operator_mask", voice.operatorMask, SourceValueDisplay::Hex);
-          }
+        [&](const Ym2151Voice& voice) {
+          annotation.derived("synth", "YM2151", SourceValueDisplay::Enum)
+              .derived("algorithm", voice.algorithm)
+              .derived("feedback", voice.feedback)
+              .derived("operator_mask", voice.operatorMask, SourceValueDisplay::Hex);
         },
         *instrument.synthVoice);
   }

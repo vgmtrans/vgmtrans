@@ -732,6 +732,15 @@ selector, both key orders, zero/all-one bytes, and each source bit independently
 The full build and all 17 CTest targets pass without warnings, including the
 existing Kabuki and CPS3 address-path fixtures.
 
+### Use explicit chip-voice visitors
+
+Annotation and validation visitors now accept the concrete supported voice type
+instead of introducing type aliases and conditional template branches. Adding
+another voice alternative will require an explicit handler rather than silently
+skipping its annotations or validation. CPS and Konami TMNT2 assign voice values
+directly without spelling the variant wrapper. This removes 12 production
+lines. The full build and all 17 CTest targets pass without warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
