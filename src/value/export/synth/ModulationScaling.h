@@ -67,7 +67,9 @@ struct LoweredSynthModulation {
 
 // Translate physical instrument modulation once before an exporter writes its
 // target-specific records.
-[[nodiscard]] LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulation);
+[[nodiscard]] LoweredSynthModulation lowerSynthModulation(
+    const InstrumentModulation& modulation,
+    ModulationConversionPolicy conversion = ModulationConversionPolicy::SynthModulators);
 
 // Helpers used when the user wants vibrato/tremolo controls scaled to the values
 // observed in the sequence instead of the full possible 0-127 range.
@@ -79,11 +81,5 @@ void applyMidiModulationScaling(MidiSequence& sequence, const MidiModulationUsag
 
 [[nodiscard]] s32 scaledSynthModulatorAmount(const SynthModulator& modulator, const MidiModulationUsage* usage,
                                              ModulationScalingPolicy policy) noexcept;
-
-[[nodiscard]] bool shouldExportSynthGenerator(const SynthGenerator& generator,
-                                              ModulationConversionPolicy conversion) noexcept;
-
-[[nodiscard]] bool shouldExportSynthModulator(const SynthModulator& modulator,
-                                              ModulationConversionPolicy conversion) noexcept;
 
 }  // namespace vgmtrans::core

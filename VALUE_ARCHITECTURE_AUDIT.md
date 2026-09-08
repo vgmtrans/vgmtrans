@@ -547,6 +547,29 @@ The existing typed-miscellaneous-asset binder test verifies that its selected
 payload is available during binding. The full build and all 17 CTest targets
 pass without compiler warnings.
 
+### Apply modulation conversion policy during shared synth preparation
+
+Lower modulation under the requested conversion policy before the SF2 or DLS
+writer receives it. Remove two destination-filter functions and the conversion
+argument threaded through both writers' chunk assembly. Sequence simulation
+keeps fixed no-boost tremolo attenuation while discarding oscillator and
+controller records, as before. This removes 60 production lines.
+
+Filtering before SF2 layout also lets presets whose only difference was
+suppressed modulation share an instrument table. Regression coverage checks
+instrument/region attenuation, controller suppression, and distinct native
+modulation versus shared simulation presets with preserved envelope offsets.
+
+An independent 21,504-file comparison covers absent/present vibrato and tremolo,
+all six waveforms and unspecified shape, fixed/controller depth, gain modes,
+fixed/varying rates, delays, both conversion/scaling policies, and observed
+controller maxima of zero, 38, and 127. All 10,752 DLS files and 5,928 SF2 files
+are byte-identical. The other 4,824 SF2 files have identical resolved preset
+generators/modulators, sample data/headers, and metadata, with smaller shared
+instrument tables. Directly instrumented synth preparation/lowering/writers
+pass AddressSanitizer, UBSan, and float-cast-overflow checks and reproduce the
+updated bytes. The full build and all 17 CTest targets pass without warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

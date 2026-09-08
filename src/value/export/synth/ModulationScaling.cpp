@@ -106,7 +106,8 @@ double synthSecondsRangeMinimum(double seconds) {
   return std::max(seconds, 1.0 / 1024.0);
 }
 
-LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulation) {
+LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulation,
+                                            ModulationConversionPolicy conversion) {
   LoweredSynthModulation lowered;
 
   if (modulation.vibrato && canUseNativeSynthLfo(modulation.vibrato->waveform)) {
@@ -212,6 +213,14 @@ LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulati
     }
   }
 
+  if (conversion == ModulationConversionPolicy::SequenceEventSimulation) {
+    // Sequence events supply the varying modulation. Keep only the static
+    // attenuation that places a fixed no-boost tremolo below nominal gain.
+    std::erase_if(lowered.generators, [](const SynthGenerator& generator) {
+      return generator.destination != SynthDestination::VolumeAttenuation;
+    });
+    lowered.modulators.clear();
+  }
   return lowered;
 }
 
@@ -288,47 +297,6 @@ s32 scaledSynthModulatorAmount(const SynthModulator& modulator, const MidiModula
                                        ? observedMaximum->normalized
                                        : (static_cast<double>(observedMaximum->controllerValue) / 127.0);
   return static_cast<s32>(std::lround(static_cast<double>(modulator.amount) * normalizedMaximum));
-}
-
-bool shouldExportSynthGenerator(const SynthGenerator& generator, ModulationConversionPolicy conversion) noexcept {
-  if (conversion == ModulationConversionPolicy::SynthModulators) {
-    return true;
-  }
-
-  switch (generator.destination) {
-    case SynthDestination::VibratoDepth:
-    case SynthDestination::VibratoRate:
-    case SynthDestination::VibratoDelay:
-    case SynthDestination::TremoloDepth:
-    case SynthDestination::TremoloRate:
-    case SynthDestination::TremoloDelay:
-      return false;
-    case SynthDestination::VolumeAttenuation:
-    case SynthDestination::Unknown:
-      return true;
-  }
-  return true;
-}
-
-bool shouldExportSynthModulator(const SynthModulator& modulator, ModulationConversionPolicy conversion) noexcept {
-  if (conversion == ModulationConversionPolicy::SynthModulators) {
-    return true;
-  }
-
-  switch (modulator.destination) {
-    case SynthDestination::VibratoDepth:
-    case SynthDestination::VibratoRate:
-    case SynthDestination::VibratoDelay:
-    case SynthDestination::TremoloDepth:
-    case SynthDestination::TremoloRate:
-    case SynthDestination::TremoloDelay:
-      return false;
-    case SynthDestination::VolumeAttenuation:
-      return modulator.source != SynthSource::DefaultController;
-    case SynthDestination::Unknown:
-      return true;
-  }
-  return true;
 }
 
 }  // namespace vgmtrans::core

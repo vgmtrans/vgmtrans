@@ -248,12 +248,12 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
 
 [[nodiscard]] std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
     std::span<const Instrument* const> selectedInstruments, const SynthSampleIndexMap& samples,
-    std::vector<Diagnostic>& diagnostics) {
+    ModulationConversionPolicy conversion, std::vector<Diagnostic>& diagnostics) {
   // Drop only regions whose samples cannot be resolved. The rest of the instrument can
   // still produce a useful partial export.
   std::vector<ResolvedSynthInstrument> instruments;
   for (const auto* instrument : selectedInstruments) {
-    auto modulation = lowerSynthModulation(instrument->modulation);
+    auto modulation = lowerSynthModulation(instrument->modulation, conversion);
     ResolvedSynthInstrument resolvedInstrument{
         .instrument = instrument,
         .address = resolveInstrumentAddress(instrument->explicitAddress, instrument->identity),
@@ -266,7 +266,7 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
         continue;
       }
 
-      auto regionModulation = lowerSynthModulation(region.modulation);
+      auto regionModulation = lowerSynthModulation(region.modulation, conversion);
       resolvedInstrument.regions.push_back(ResolvedSynthRegion{
           .region = &region,
           .sampleIndex = *sampleIndex,
@@ -435,7 +435,8 @@ PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceSt
                                         filterSamples ? &sampleReferences : nullptr, input.sampleFiltering);
   const auto samplesByReference =
       materializePhaseInvertedSamples(prepared.samples, sampleReferences, filterSamples);
-  prepared.instruments = resolveSynthInstruments(instruments, samplesByReference, prepared.diagnostics);
+  prepared.instruments =
+      resolveSynthInstruments(instruments, samplesByReference, input.modulationConversion, prepared.diagnostics);
   return prepared;
 }
 
