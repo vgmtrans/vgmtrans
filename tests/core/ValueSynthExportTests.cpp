@@ -474,10 +474,10 @@ void soundFontExporterWritesSfbkRiffFile() {
   const std::array<const SoundBankAsset*, 1> soundBanks{&soundBank};
   const std::array<const SamplePoolAsset*, 1> samples{&samplePool};
   const MidiModulationUsage midiModulationUsage{
-      .vibratoDepth = MidiModulationMaximum{.controllerValue = 38},
-      .vibratoRate = MidiModulationMaximum{.controllerValue = 12},
-      .tremoloDepth = MidiModulationMaximum{.controllerValue = 24},
-      .tremoloRate = MidiModulationMaximum{.controllerValue = 12},
+      .vibratoDepth = 38.0 / 127.0,
+      .vibratoRate = 12.0 / 127.0,
+      .tremoloDepth = 24.0 / 127.0,
+      .tremoloRate = 12.0 / 127.0,
   };
   const auto result = buildSoundFont2(
       SynthExportInput{
@@ -673,10 +673,10 @@ void dlsExporterWritesDlsRiffFile() {
   const std::array<const SoundBankAsset*, 1> soundBanks{&soundBank};
   const std::array<const SamplePoolAsset*, 1> samples{&samplePool};
   const MidiModulationUsage midiModulationUsage{
-      .vibratoDepth = MidiModulationMaximum{.controllerValue = 38},
-      .vibratoRate = MidiModulationMaximum{.controllerValue = 12},
-      .tremoloDepth = MidiModulationMaximum{.controllerValue = 24},
-      .tremoloRate = MidiModulationMaximum{.controllerValue = 12},
+      .vibratoDepth = 38.0 / 127.0,
+      .vibratoRate = 12.0 / 127.0,
+      .tremoloDepth = 24.0 / 127.0,
+      .tremoloRate = 12.0 / 127.0,
   };
   const auto result = buildDls(
       SynthExportInput{

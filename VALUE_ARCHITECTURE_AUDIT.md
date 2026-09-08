@@ -664,6 +664,24 @@ including event provenance, source spans, markers, and diagnostics. A direct
 VM build passes the same matrix under AddressSanitizer and UBSan. The full
 build and all 17 CTest targets pass without warnings.
 
+### Keep one precise modulation maximum
+
+Represent observed modulation maxima as optional normalized values. Remove
+MidiModulationMaximum and its independently maintained controller byte; derive
+that byte only when export scaling needs it. Collection stitching now merges
+ordinary optional values, and one private MIDI scaler handles both precise
+source amounts and already-quantized controls. This removes 51 production lines
+and the synth fallback for manually populated controller-only maxima.
+
+All 9,312 before/after modulation scenarios are identical, including all 127
+MIDI rounding boundaries and adjacent floating-point values, absent and zero
+maxima, all modulation targets, both scaling policies, and precise versus
+quantized controls. The direct analysis/scaling build passes that matrix under
+AddressSanitizer and UBSan. All 21,504 SF2/DLS outputs are byte-identical. Add
+regression coverage for sub-byte maxima, zero versus unobserved controls, and
+the shared MIDI/synth headroom decision. The full build and all 17 CTest targets
+pass without warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

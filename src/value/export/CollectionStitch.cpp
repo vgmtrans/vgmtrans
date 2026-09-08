@@ -56,24 +56,11 @@ void fail(CollectionStitchResult& result, std::string message) {
   result.soundFont.diagnostics.push_back(diagnostic);
 }
 
-void mergeMaximum(std::optional<MidiModulationMaximum>& destination,
-                  const std::optional<MidiModulationMaximum>& source) {
-  if (!source) {
-    return;
-  }
-  if (!destination) {
-    destination = source;
-    return;
-  }
-  destination->controllerValue = std::max(destination->controllerValue, source->controllerValue);
-  destination->normalized = std::max(destination->normalized, source->normalized);
-}
-
 void mergeModulationUsage(MidiModulationUsage& destination, const MidiModulationUsage& source) {
-  mergeMaximum(destination.vibratoDepth, source.vibratoDepth);
-  mergeMaximum(destination.vibratoRate, source.vibratoRate);
-  mergeMaximum(destination.tremoloDepth, source.tremoloDepth);
-  mergeMaximum(destination.tremoloRate, source.tremoloRate);
+  destination.vibratoDepth = std::max(destination.vibratoDepth, source.vibratoDepth);
+  destination.vibratoRate = std::max(destination.vibratoRate, source.vibratoRate);
+  destination.tremoloDepth = std::max(destination.tremoloDepth, source.tremoloDepth);
+  destination.tremoloRate = std::max(destination.tremoloRate, source.tremoloRate);
 }
 
 [[nodiscard]] bool preparePart(StitchPart& part, const SessionSnapshot& snapshot, const ExportRequest& request,
