@@ -35,6 +35,7 @@ enum class Signature : u8 {
   Tose,
   Quintet,
   FalcomYs4,
+  Quest,
 };
 
 enum class ProfileId : u8 {
@@ -60,6 +61,7 @@ enum class ProfileId : u8 {
   SunsoftEarlier,
   Sunsoft,
   SunsoftBenkei,
+  Quest,
 };
 
 [[nodiscard]] constexpr bool isSunsoft(ProfileId id) {
@@ -83,10 +85,12 @@ enum class PlaylistModel : u8 {
   Unknown,
   Standard,
   Tose,
+  Quest,
 };
 
 [[nodiscard]] constexpr bool isInfinitePlaylistRepeat(PlaylistModel model, u16 value) {
-  return value <= 0xff && (model == PlaylistModel::Tose ? value == 0 || value == 0xff : value > 0x80);
+  return value <= 0xff && (model == PlaylistModel::Tose ? value == 0 || value == 0xff
+                         : model == PlaylistModel::Quest ? value == 0xff : value > 0x80);
 }
 
 enum class NoteParameterModel : u8 {
@@ -181,6 +185,8 @@ struct Layout {
 
   std::vector<u8> volumeTable;
   std::vector<u8> durationRateTable;
+  // Quest stores separate left/right pan tables (21 entries each).
+  std::vector<u8> questPanTable;
   std::vector<u8> intelliDurationRateTable;
   std::vector<u8> intelliVolumeTable;
   std::vector<u8> intelliTransposeTable;
@@ -201,6 +207,8 @@ struct InstrumentOverride {
   u8 pitchHigh = 0;
   u8 pitchLow = 0;
   core::SourceRange source;
+  // Explicit noise selection in drivers whose instrument SRCNs are literal.
+  bool noise = false;
 };
 
 struct DrumSlot {

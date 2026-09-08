@@ -18,7 +18,7 @@ constexpr Profile kUnknown{
     .programs = ProgramResolver::Direct,
 };
 
-constexpr std::array<Profile, 21> kProfiles{{
+constexpr std::array<Profile, 22> kProfiles{{
     {.id = ProfileId::Earlier,
      .name = "Earlier",
      .base = BaseProfile::Earlier,
@@ -72,6 +72,8 @@ constexpr std::array<Profile, 21> kProfiles{{
     {.id = ProfileId::Sunsoft, .name = "Sunsoft", .initialMasterVolume = 0xb0, .noteGateBias = 1},
     // Benkei also says S1.20, but has only E0-FA and starts master volume at FF.
     {.id = ProfileId::SunsoftBenkei, .name = "Sunsoft (Benkei Gaiden)", .sectionTrackCount = 6},
+    {.id = ProfileId::Quest, .name = "Quest (Tactics Ogre)", .playlist = PlaylistModel::Quest,
+     .programs = ProgramResolver::Direct, .initialMasterVolume = 0},
 }};
 
 }  // namespace
