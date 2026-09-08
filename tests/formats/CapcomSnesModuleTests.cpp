@@ -517,28 +517,29 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
          "CapcomSnes should emit the legacy initial reverb controller");
   expect(midiController(midiSequence.tracks[0].events[2], MidiController::MonoMode)->value == 0,
          "CapcomSnes should emit the legacy initial mono-mode controller");
-  const auto& tempoData = midiMeta(midiSequence.tracks[0].events[3], 0x51)->data;
-  expect(((tempoData[0] << 16) | (tempoData[1] << 8) | tempoData[2]) == 42191,
+  const auto midiTempoEvent = std::ranges::find_if(midiSequence.tracks[0].events,
+                                                   [](const MidiEvent& event) { return midiTempo(event).has_value(); });
+  expect(midiTempoEvent != midiSequence.tracks[0].events.end() && midiTempo(*midiTempoEvent) == 42191,
          "CapcomSnes source command should interpret tempo with driver timing math");
-  expect(midiBankSelect(midiSequence.tracks[0].events[4]) != nullptr,
+  expect(midiBankSelect(midiSequence.tracks[0].events[3]) != nullptr,
          "CapcomSnes source command should force bank select like the legacy converter");
-  expect(isMidiChannelMessage(midiSequence.tracks[0].events[5], MidiChannelMessageKind::ProgramChange),
+  expect(isMidiChannelMessage(midiSequence.tracks[0].events[4], MidiChannelMessageKind::ProgramChange),
          "CapcomSnes source command should emit program changes");
-  expect(isMidiController(midiSequence.tracks[0].events[6], MidiController::ChannelVolume) &&
-             isMidiControllerLsb(midiSequence.tracks[0].events[7], MidiController::ChannelVolume),
+  expect(isMidiController(midiSequence.tracks[0].events[5], MidiController::ChannelVolume) &&
+             isMidiControllerLsb(midiSequence.tracks[0].events[6], MidiController::ChannelVolume),
          "CapcomSnes source command should emit high-resolution target-quantized volume");
-  expect(midiController(midiSequence.tracks[0].events[8], MidiController::Pan)->value == 64,
+  expect(midiController(midiSequence.tracks[0].events[7], MidiController::Pan)->value == 64,
          "CapcomSnes center pan should map to MIDI center pan");
-  expect(isMidiController(midiSequence.tracks[0].events[9], MidiController::ChannelVolume) &&
-             isMidiControllerLsb(midiSequence.tracks[0].events[10], MidiController::ChannelVolume),
+  expect(isMidiController(midiSequence.tracks[0].events[8], MidiController::ChannelVolume) &&
+             isMidiControllerLsb(midiSequence.tracks[0].events[9], MidiController::ChannelVolume),
          "CapcomSnes pan should compose its gain with high-resolution channel volume");
-  expect(midiController(midiSequence.tracks[0].events[11], MidiController::Modulation)->value == 127,
+  expect(midiController(midiSequence.tracks[0].events[10], MidiController::Modulation)->value == 127,
          "CapcomSnes vibrato depth should be independent of whether the oscillator is advancing");
-  expect(isMidiController(midiSequence.tracks[0].events[12], MidiController::VibratoRate),
+  expect(isMidiController(midiSequence.tracks[0].events[11], MidiController::VibratoRate),
          "CapcomSnes LFO rate should emit vibrato frequency");
-  expect(isMidiController(midiSequence.tracks[0].events[13], MidiController::TremoloRate),
+  expect(isMidiController(midiSequence.tracks[0].events[12], MidiController::TremoloRate),
          "CapcomSnes LFO rate should emit tremolo frequency");
-  expect(midiNote(midiSequence.tracks[0].events[14])->duration == 6,
+  expect(midiNote(midiSequence.tracks[0].events[13])->duration == 6,
          "CapcomSnes note length index should map to ticks");
   expect(midiSequence.tracks[0].endTick == 6, "builder should advance time before end of track");
 

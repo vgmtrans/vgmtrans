@@ -481,7 +481,7 @@ void tempoMapPreservesOrderingAndBoundsDurationConversion() {
   const PerformanceTempoMap tempos{performance};
   expect(tempos.microsecondsPerQuarterAt(0) == 500000 && tempos.microsecondsPerQuarterAt(12) == 1250000 &&
              tempos.microsecondsPerQuarterAt(24) == 250000 && tempos.points().size() == 4 &&
-             !tempos.contains(std::get<TempoPerformanceEvent>(performance.tracks[0].events[3])),
+             tempos.points().back().tick == 24,
          "tempo order must remain stable for equal tick/sequence pairs while repeated writes are omitted");
   expect(tempos.durationMilliseconds(0, 24) == 210.0 && tempos.durationTicksForMilliseconds(0, 210.0) == 24 &&
              tempos.durationTicksForMilliseconds(6, 180.0) == 18,

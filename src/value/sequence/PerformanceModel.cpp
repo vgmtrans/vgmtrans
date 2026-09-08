@@ -72,7 +72,6 @@ PerformanceTempoMap::PerformanceTempoMap(const PerformanceSequence& performance)
       changes_.push_back(Change{
           .tick = tempo->header.tick,
           .microsecondsPerQuarter = tempo->microsecondsPerQuarter,
-          .track = tempo->header.track,
           .sequence = tempo->header.sequence,
       });
     }
@@ -170,13 +169,6 @@ u32 PerformanceTempoMap::durationTicksForMilliseconds(u64 startTick, double mill
   const auto wholeTailTicks = static_cast<u64>(exactTailTicks);
   elapsedTicks += wholeTailTicks + (exactTailTicks - wholeTailTicks > 0.5 ? 1 : 0);
   return static_cast<u32>(std::min<u64>(elapsedTicks, std::numeric_limits<u32>::max()));
-}
-
-bool PerformanceTempoMap::contains(const TempoPerformanceEvent& event) const {
-  return std::ranges::any_of(changes_, [&](const Change& change) {
-    return change.tick == event.header.tick && change.track == event.header.track &&
-           change.sequence == event.header.sequence && change.microsecondsPerQuarter == event.microsecondsPerQuarter;
-  });
 }
 
 std::vector<PerformanceTempoMap::Point> PerformanceTempoMap::points() const {
