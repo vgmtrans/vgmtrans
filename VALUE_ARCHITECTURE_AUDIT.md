@@ -535,6 +535,18 @@ empty inputs read no source bytes, and all forms retain identical ordering and
 validation. The full build and all 17 CTest targets pass without compiler
 warnings.
 
+### Retain miscellaneous assets only where binding uses them
+
+Remove the unused miscellaneous-asset list from BoundCollection. Selected
+miscellaneous assets are still resolved, validated, and exposed to the format
+binder, and the retained snapshot keeps their payloads alive. Exporters need
+only the resulting bound instruments and sequence runtime, so they no longer
+receive a second, unused view of the binding inputs.
+
+The existing typed-miscellaneous-asset binder test verifies that its selected
+payload is available during binding. The full build and all 17 CTest targets
+pass without compiler warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
