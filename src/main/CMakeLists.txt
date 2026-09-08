@@ -290,6 +290,7 @@ target_sources(vgmtranscore
     loaders/CHDLoader.cpp
     loaders/CPS3Decrypt.cpp
     loaders/DarcLoader.cpp
+    loaders/NintendoU8Loader.cpp
     loaders/KabukiDecrypt.cpp
     loaders/Lpc2Loader.cpp
     loaders/MAMELoader.cpp
@@ -575,6 +576,7 @@ target_sources(vgmtranscore
       loaders/CHDLoader.h
       loaders/CPS3Decrypt.h
       loaders/DarcLoader.h
+      loaders/NintendoU8Loader.h
       loaders/KabukiDecrypt.h
       loaders/Lpc2Loader.h
       loaders/LoaderManager.h
