@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bitset>
 #include <cmath>
 #include <limits>
 #include <set>
@@ -203,30 +204,31 @@ public:
   }
 
   [[nodiscard]] std::optional<InstrumentAddress> allocate() {
-    for (u32 bank = 0; bank < 128; ++bank) {
-      for (u32 program = 0; program < 128; ++program) {
-        if (used_.insert({bank, program}).second) {
-          return InstrumentAddress{.bank = bank, .program = program};
-        }
-      }
+    while (next_ < reserved_.size() && reserved_[next_]) {
+      ++next_;
     }
-    return std::nullopt;
+    if (next_ == reserved_.size()) {
+      return std::nullopt;
+    }
+    const u32 address = next_++;
+    return InstrumentAddress{.bank = address / 128, .program = address % 128};
   }
 
 private:
   void reserve(InstrumentAddress address) {
     const u32 program = std::min<u32>(address.program, 127);
     // MIDI and DLS retain the low seven bank bits.
-    used_.insert({address.bank & 0x7f, program});
+    reserved_.set((address.bank & 0x7f) * 128 + program);
     // SF2's established lowering treats larger logical banks as a packed
     // high-byte value. Reserve that projection too.
     const u32 soundFontBank = address.bank > 128 ? (address.bank >> 8) & 0x7f : address.bank;
     if (soundFontBank < 128) {
-      used_.insert({soundFontBank, program});
+      reserved_.set(soundFontBank * 128 + program);
     }
   }
 
-  std::set<std::pair<u32, u32>> used_;
+  std::bitset<128 * 128> reserved_;
+  u32 next_ = 0;
 };
 
 struct VariantRecord {
