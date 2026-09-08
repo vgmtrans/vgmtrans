@@ -701,6 +701,15 @@ owner-qualified phase references, inverted-only and shared originals, PCM
 saturation, unused invalid samples, and stable table order. The full build and
 all 17 CTest targets pass without warnings.
 
+### Reduce collection queries to the information callers use
+
+Collection removal asks directly whether any member is being removed, replacing
+an optional asset result that no caller consumed. Missing-role diagnostics use
+one value construction with their existing conditional severity and message.
+This removes 20 production lines and repeated control flow. The full build and
+all 17 CTest targets pass without warnings, including source/asset removal,
+collection reconciliation, and missing-reference diagnostic coverage.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
