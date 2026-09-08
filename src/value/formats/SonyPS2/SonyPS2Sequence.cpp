@@ -659,16 +659,6 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         event.data1 = *first;
         event.dataBytes = 1;
       }
-    } else if (family >= 0x90 && family <= 0xe0 && family != 0xa0) {
-      const auto first = dataByte();
-      const auto second = dataByte();
-      if (!first || !second) {
-        event.malformed = true;
-      } else {
-        event.data1 = *first;
-        event.data2 = *second;
-        event.dataBytes = 2;
-      }
     } else if (family == 0xa0 && layout.compression == 1) {
       const auto packed = dataByte();
       if (!packed) {
@@ -685,7 +675,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
           event.dataBytes = 2;
         }
       }
-    } else if (family == 0xa0) {
+    } else if (family >= 0x90 && family <= 0xe0) {
       // In compressed blocks Sony repurposes A0 as a dictionary note. In an
       // ordinary block it retains MIDI's two-byte Polyphonic Key Pressure
       // encoding. modmidi forwards it even though this modhsyn build ignores
