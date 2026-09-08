@@ -682,6 +682,25 @@ regression coverage for sub-byte maxima, zero versus unobserved controls, and
 the shared MIDI/synth headroom decision. The full build and all 17 CTest targets
 pass without warnings.
 
+### Decode directly into the final synth sample table
+
+Combine sample decoding, phase inversion, and sample-index construction in one
+pass. Remove the separate materialization pass and the owner/index fields it
+required on every decoded sample. Copy PCM only when both polarities are
+retained; an inverted-only sample moves into its final slot. Referenced samples
+are a set, replacing hand-written deduplication and linear membership scans.
+Internal pool views now borrow a required pool reference. This removes 38
+production lines while retaining sample ordering and partial-export behavior.
+
+All 1,536 before/after scenarios produce identical prepared sample tables,
+region indexes, diagnostics, and SF2/DLS bytes. These cover local/external pools,
+repeated inputs, null input views, missing samples/sources, stereo restrictions,
+selection/filtering policies, and both polarities. A direct preparation build
+passes the matrix under AddressSanitizer and UBSan. Add a regression test for
+owner-qualified phase references, inverted-only and shared originals, PCM
+saturation, unused invalid samples, and stable table order. The full build and
+all 17 CTest targets pass without warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
