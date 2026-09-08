@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <charconv>
 #include <cstring>
 #include <fstream>
@@ -315,53 +316,28 @@ void appendBuffer(std::vector<u8>& output, std::span<const u8> bytes, bool swap1
   return *value;
 }
 
-[[nodiscard]] constexpr u8 kabukiBitswap1(u8 source, u32 key, u32 select) {
+[[nodiscard]] constexpr u8 kabukiBitswap(u8 source, u32 key, u32 select, bool reverseKey) {
   u32 value = source;
-  if ((select & (1u << ((key >> 0) & 7u))) != 0) {
-    value = (value & 0xfcu) | ((value & 0x01u) << 1) | ((value & 0x02u) >> 1);
-  }
-  if ((select & (1u << ((key >> 4) & 7u))) != 0) {
-    value = (value & 0xf3u) | ((value & 0x04u) << 1) | ((value & 0x08u) >> 1);
-  }
-  if ((select & (1u << ((key >> 8) & 7u))) != 0) {
-    value = (value & 0xcfu) | ((value & 0x10u) << 1) | ((value & 0x20u) >> 1);
-  }
-  if ((select & (1u << ((key >> 12) & 7u))) != 0) {
-    value = (value & 0x3fu) | ((value & 0x40u) << 1) | ((value & 0x80u) >> 1);
+  for (u32 pair = 0; pair < 4; ++pair) {
+    const u32 keyShift = (reverseKey ? 3 - pair : pair) * 4;
+    if ((select & (1u << ((key >> keyShift) & 7u))) != 0) {
+      const u32 low = 1u << (pair * 2);
+      const u32 high = low << 1;
+      value = (value & ~(low | high)) | ((value & low) << 1) | ((value & high) >> 1);
+    }
   }
   return static_cast<u8>(value);
-}
-
-[[nodiscard]] constexpr u8 kabukiBitswap2(u8 source, u32 key, u32 select) {
-  u32 value = source;
-  if ((select & (1u << ((key >> 12) & 7u))) != 0) {
-    value = (value & 0xfcu) | ((value & 0x01u) << 1) | ((value & 0x02u) >> 1);
-  }
-  if ((select & (1u << ((key >> 8) & 7u))) != 0) {
-    value = (value & 0xf3u) | ((value & 0x04u) << 1) | ((value & 0x08u) >> 1);
-  }
-  if ((select & (1u << ((key >> 4) & 7u))) != 0) {
-    value = (value & 0xcfu) | ((value & 0x10u) << 1) | ((value & 0x20u) >> 1);
-  }
-  if ((select & (1u << ((key >> 0) & 7u))) != 0) {
-    value = (value & 0x3fu) | ((value & 0x40u) << 1) | ((value & 0x80u) >> 1);
-  }
-  return static_cast<u8>(value);
-}
-
-[[nodiscard]] constexpr u8 rotateLeft1(u8 value) {
-  return static_cast<u8>((value << 1) | (value >> 7));
 }
 
 [[nodiscard]] constexpr u8 kabukiByteDecode(u8 source, u32 swapKey1, u32 swapKey2, u32 xorKey, u32 select) {
-  u8 value = kabukiBitswap1(source, swapKey1 & 0xffffu, select & 0xffu);
-  value = rotateLeft1(value);
-  value = kabukiBitswap2(value, swapKey1 >> 16, select & 0xffu);
+  u8 value = kabukiBitswap(source, swapKey1 & 0xffffu, select & 0xffu, /*reverseKey=*/false);
+  value = std::rotl(value, 1);
+  value = kabukiBitswap(value, swapKey1 >> 16, select & 0xffu, /*reverseKey=*/true);
   value ^= static_cast<u8>(xorKey);
-  value = rotateLeft1(value);
-  value = kabukiBitswap2(value, swapKey2 & 0xffffu, select >> 8);
-  value = rotateLeft1(value);
-  return kabukiBitswap1(value, swapKey2 >> 16, select >> 8);
+  value = std::rotl(value, 1);
+  value = kabukiBitswap(value, swapKey2 & 0xffffu, select >> 8, /*reverseKey=*/true);
+  value = std::rotl(value, 1);
+  return kabukiBitswap(value, swapKey2 >> 16, select >> 8, /*reverseKey=*/false);
 }
 
 void decryptKabukiData(std::vector<u8>& bytes, u32 swapKey1, u32 swapKey2, u32 addressKey, u32 xorKey) {
@@ -375,13 +351,9 @@ void decryptKabukiData(std::vector<u8>& bytes, u32 swapKey1, u32 swapKey2, u32 a
   }
 }
 
-[[nodiscard]] constexpr u16 rotateLeft16(u16 value, u32 count) {
-  return static_cast<u16>((value << count) | (value >> (16 - count)));
-}
-
 [[nodiscard]] constexpr u16 cps3RotateXor(u16 value, u16 xorValue) {
-  u16 result = static_cast<u16>(value + rotateLeft16(value, 2));
-  result = static_cast<u16>(rotateLeft16(result, 4) ^ (result & (value ^ xorValue)));
+  u16 result = static_cast<u16>(value + std::rotl(value, 2));
+  result = static_cast<u16>(std::rotl(result, 4) ^ (result & (value ^ xorValue)));
   return result;
 }
 
