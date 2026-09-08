@@ -57,11 +57,10 @@ namespace {
 BoundCollection::BoundCollection(SessionSnapshot snapshot, CollectionId id, std::string baseName,
                                  const SequenceProgramAsset* sequence, SequenceRuntime sequenceRuntime,
                                  std::vector<SoundBankAsset> soundBanks,
-                                 std::vector<const SamplePoolAsset*> samplePools,
-                                 std::vector<const MiscAsset*> miscAssets)
+                                 std::vector<const SamplePoolAsset*> samplePools)
     : snapshot_(std::move(snapshot)), id_(id), baseName_(std::move(baseName)), sequence_(sequence),
       sequenceRuntime_(std::move(sequenceRuntime)), soundBanks_(std::move(soundBanks)),
-      samplePools_(std::move(samplePools)), miscAssets_(std::move(miscAssets)) {
+      samplePools_(std::move(samplePools)) {
 }
 
 CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, CollectionId collectionId) {
@@ -173,7 +172,7 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
   }
   return CollectionBindingResult{
       .collection = BoundCollection(snapshot, collection->id, std::move(baseName), sequence, std::move(sequenceRuntime),
-                                    std::move(soundBanks), std::move(samplePools), std::move(miscAssets)),
+                                    std::move(soundBanks), std::move(samplePools)),
       .diagnostics = std::move(diagnostics),
   };
 }

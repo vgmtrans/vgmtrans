@@ -34,7 +34,6 @@ public:
   }
   [[nodiscard]] const std::vector<SoundBankAsset>& soundBanks() const noexcept { return soundBanks_; }
   [[nodiscard]] const std::vector<const SamplePoolAsset*>& samplePools() const noexcept { return samplePools_; }
-  [[nodiscard]] const std::vector<const MiscAsset*>& miscAssets() const noexcept { return miscAssets_; }
 
 private:
   friend CollectionBindingResult bindCollection(const SessionSnapshot&, CollectionId);
@@ -43,7 +42,7 @@ private:
 
   BoundCollection(SessionSnapshot snapshot, CollectionId id, std::string baseName, const SequenceProgramAsset* sequence,
                   SequenceRuntime sequenceRuntime, std::vector<SoundBankAsset> soundBanks,
-                  std::vector<const SamplePoolAsset*> samplePools, std::vector<const MiscAsset*> miscAssets);
+                  std::vector<const SamplePoolAsset*> samplePools);
 
   SessionSnapshot snapshot_;
   CollectionId id_;
@@ -52,7 +51,6 @@ private:
   SequenceRuntime sequenceRuntime_;
   std::vector<SoundBankAsset> soundBanks_;
   std::vector<const SamplePoolAsset*> samplePools_;
-  std::vector<const MiscAsset*> miscAssets_;
 };
 
 // A BoundCollection exists only after every fatal membership and format-binding

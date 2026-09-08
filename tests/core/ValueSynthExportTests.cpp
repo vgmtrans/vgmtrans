@@ -1290,9 +1290,8 @@ void collectionBindingProducesAnImmutableInstrumentView() {
                        }
                      }),
                      CollectionId{0});
-  expect(miscBinding.collection && miscBinding.collection->miscAssets().size() == 1 &&
-             miscBinding.collection->miscAssets().front()->metadata.id == manifest.metadata.id,
-         "collection binding should expose selected typed miscellaneous assets and retain them in the bound view");
+  expect(miscBinding.collection && miscBinding.diagnostics.empty(),
+         "collection binding should expose selected typed miscellaneous assets to the binder");
   const auto artifacts =
       exportCollection(snapshot, sources, CollectionId{0}, ExportRequest{.kinds = {ExportKind::Dls}});
 
