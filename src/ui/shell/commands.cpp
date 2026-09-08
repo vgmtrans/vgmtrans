@@ -6,6 +6,8 @@
 
 #include "commands.h"
 
+#include "ExportOptions.h"
+
 #include <algorithm>
 #include <array>
 #include <charconv>
@@ -554,66 +556,8 @@ void Context::writeArtifacts(const std::filesystem::path& directory, std::span<c
   }
 }
 
-ExportKind exportKind(std::string_view text) {
-  if (text == "midi") {
-    return ExportKind::Midi;
-  }
-  if (text == "sf2") {
-    return ExportKind::SoundFont2;
-  }
-  if (text == "dls") {
-    return ExportKind::Dls;
-  }
-  if (text == "wav") {
-    return ExportKind::Wav;
-  }
-  throw std::invalid_argument("expected midi, sf2, dls, or wav");
-}
-
-ExportRequest exportRequest(Args args) {
-  ExportRequest request;
-  for (size_t i = 0; i < args.size(); ++i) {
-    const auto& arg = args[i];
-    const auto next = [&]() -> const std::string& {
-      if (++i == args.size()) {
-        throw std::invalid_argument("missing value after " + arg);
-      }
-      return args[i];
-    };
-    if (arg == "--loops") {
-      request.sequence.sequenceLoops = number(next());
-    } else if (arg == "--dynamic-envelopes") {
-      request.dynamicEnvelopes = DynamicEnvelopePolicy::InstrumentVariants;
-    } else if (arg == "--used-instruments") {
-      request.exportOnlyUsedInstruments = true;
-    } else if (arg == "--simulate-modulation") {
-      request.modulationConversion = ModulationConversionPolicy::SequenceEventSimulation;
-    } else if (arg == "--modulation-scaling") {
-      const auto& policy = next();
-      if (policy != "full" && policy != "observed") {
-        throw std::invalid_argument("modulation scaling must be full or observed");
-      }
-      request.modulationScaling =
-          policy == "full" ? ModulationScalingPolicy::FullFormatRange : ModulationScalingPolicy::ObservedSequenceRange;
-    } else if (!arg.starts_with("--")) {
-      const auto kinds = arg == "all"
-                             ? std::vector{ExportKind::Midi, ExportKind::SoundFont2, ExportKind::Dls, ExportKind::Wav}
-                             : std::vector{exportKind(arg)};
-      for (const auto kind : kinds) {
-        if (std::ranges::find(request.kinds, kind) != request.kinds.end()) {
-          throw std::invalid_argument("repeated export format: " + arg);
-        }
-        request.kinds.push_back(kind);
-      }
-    } else {
-      throw std::invalid_argument("unknown export option: " + arg);
-    }
-  }
-  return request;
-}
-
 void exportCollections(Context& context, Args args) {
-  const auto request = exportRequest(args.subspan(2));
+  const auto request = parseExportOptions(args.subspan(2), ExportTarget::Collection);
   const auto snapshot = context.session.snapshot();
   const std::filesystem::path directory(args[1]);
   if (args[0] != "all") {
@@ -634,17 +578,21 @@ void exportCollections(Context& context, Args args) {
 void exportAsset(Context& context, Args args) {
   const auto snapshot = context.session.snapshot();
   const auto id = metadata(asset(snapshot, args[0])).id;
-  const auto kind = exportKind(args[2]);
+  const auto kind = parseExportKind(args[2]);
+  const auto target = kind == ExportKind::Midi  ? ExportTarget::Sequence
+                      : kind == ExportKind::Wav ? ExportTarget::Samples
+                                                : ExportTarget::SoundBank;
+  const auto request = parseExportOptions(args.subspan(3), target);
   std::vector<Artifact> artifacts;
   switch (kind) {
     case ExportKind::Midi:
-      artifacts.push_back(context.session.exportSequenceMidi(id, {}));
+      artifacts.push_back(context.session.exportSequenceMidi(id, request.sequence));
       break;
     case ExportKind::SoundFont2:
-      artifacts.push_back(context.session.exportSoundBank(id, SynthExportFormat::SoundFont2, {}));
+      artifacts.push_back(context.session.exportSoundBank(id, SynthExportFormat::SoundFont2, request));
       break;
     case ExportKind::Dls:
-      artifacts.push_back(context.session.exportSoundBank(id, SynthExportFormat::Dls, {}));
+      artifacts.push_back(context.session.exportSoundBank(id, SynthExportFormat::Dls, request));
       break;
     case ExportKind::Wav:
       artifacts = context.session.exportSamples(id);
@@ -663,10 +611,7 @@ void stitch(Context& context, Args args) {
   if (ids.empty()) {
     throw std::invalid_argument("stitch requires collection IDs in playback order");
   }
-  const auto request = exportRequest(args.subspan(i));
-  if (!request.kinds.empty()) {
-    throw std::invalid_argument("stitch always exports MIDI and SF2");
-  }
+  const auto request = parseExportOptions(args.subspan(i), ExportTarget::Stitch);
   auto result = context.session.stitchCollections(ids, request);
   const std::array artifacts{std::move(result.midi), std::move(result.soundFont)};
   context.writeArtifacts(args[0], artifacts);
@@ -717,8 +662,8 @@ constexpr Command commands[] = {
     {"dump", "<source-id> <path>", "Write the original bytes of a source", 2, 2, dump},
     {"export", "<collection-id|all> <directory> [formats...] [options]", "Export collections (default: midi)", 2,
      unlimited, exportCollections},
-    {"export-asset", "<asset-id> <directory> <midi|sf2|dls|wav>", "Export one sequence, bank, or sample pool", 3, 3,
-     exportAsset},
+    {"export-asset", "<asset-id> <directory> <midi|sf2|dls|wav> [options]", "Export one sequence, bank, or sample pool",
+     3, unlimited, exportAsset},
     {"stitch", "<directory> <collection-id>... [options]", "Join collections in order into MIDI and SF2", 2, unlimited,
      stitch},
     {"diagnostics", "", "Show scan diagnostics", 0, 0, diagnostics},
@@ -736,15 +681,10 @@ const Command& findCommand(std::string_view name) {
 }
 
 void printExportHelp(std::ostream& out) {
-  out << "Formats: midi, sf2, dls, wav, all. Combine formats (e.g. midi sf2); default: midi.\n"
-         "Export and stitch options:\n"
-         "  --loops N                    Extra sequence repeats (default: 1)\n"
-         "  --dynamic-envelopes          Export envelope changes as instrument variants\n"
-         "  --used-instruments           Keep only instruments used by rendered notes\n"
-         "  --simulate-modulation        Render modulation into MIDI events\n"
-         "  --modulation-scaling POLICY  full (default) or observed\n"
+  out << "Collection formats: midi, sf2, dls, wav, all. Combine formats (e.g. midi sf2); default: midi.\n"
          "Export all writes a collection-<id> subdirectory for each collection.\n"
-         "WAV exports individual samples. Existing output files are replaced.\n";
+         "WAV exports individual samples. Existing output files are replaced.\n\n";
+  printExportOptions(out);
 }
 
 void help(Context& context, Args args) {
@@ -754,7 +694,7 @@ void help(Context& context, Args args) {
   }
   const auto& command = findCommand(args[0]);
   context.out << fmt::format("{} {}\n{}\n", command.name, command.arguments, command.description);
-  if (command.name == "export" || command.name == "stitch") {
+  if (command.name == "export" || command.name == "export-asset" || command.name == "stitch") {
     printExportHelp(context.out);
   }
 }

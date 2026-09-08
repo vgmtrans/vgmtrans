@@ -1,6 +1,6 @@
 # The command layer has no terminal or legacy dependencies and is exercised
 # directly by the shell integration tests.
-add_library(vgmtransshell STATIC commands.cpp)
+add_library(vgmtransshell STATIC commands.cpp ExportOptions.cpp)
 vgmtrans_enable_project_warnings(vgmtransshell)
 target_include_directories(vgmtransshell PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(vgmtransshell PUBLIC vgmtransvaluecore PRIVATE fmt::fmt)
