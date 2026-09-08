@@ -23,25 +23,6 @@ namespace {
 
 constexpr std::array<u8, 7> kRarSignature{'R', 'a', 'r', '!', 0x1a, 0x07, 0x00};
 
-struct StreamCloser {
-  void operator()(ar_stream* stream) const noexcept {
-    if (stream != nullptr) {
-      ar_close(stream);
-    }
-  }
-};
-
-struct ArchiveCloser {
-  void operator()(ar_archive* archive) const noexcept {
-    if (archive != nullptr) {
-      ar_close_archive(archive);
-    }
-  }
-};
-
-using StreamPtr = std::unique_ptr<ar_stream, StreamCloser>;
-using ArchivePtr = std::unique_ptr<ar_archive, ArchiveCloser>;
-
 [[nodiscard]] bool hasRarSignature(std::span<const u8> bytes) {
   return bytes.size() >= kRarSignature.size() &&
          std::ranges::equal(kRarSignature, bytes.subspan(0, kRarSignature.size()));
@@ -64,13 +45,13 @@ using ArchivePtr = std::unique_ptr<ar_archive, ArchiveCloser>;
   ExtractionResult result;
   const auto sourceRange = input.reader.range(0, input.reader.size());
 
-  StreamPtr stream(ar_open_memory(bytes.data(), bytes.size()));
+  std::unique_ptr<ar_stream, decltype(&ar_close)> stream(ar_open_memory(bytes.data(), bytes.size()), ar_close);
   if (stream == nullptr) {
     result.diagnostics.push_back(warning("RSN archive could not be opened", sourceRange));
     return result;
   }
 
-  ArchivePtr archive(ar_open_rar_archive(stream.get()));
+  std::unique_ptr<ar_archive, decltype(&ar_close_archive)> archive(ar_open_rar_archive(stream.get()), ar_close_archive);
   if (archive == nullptr) {
     result.diagnostics.push_back(warning("RSN RAR archive could not be parsed", sourceRange));
     return result;

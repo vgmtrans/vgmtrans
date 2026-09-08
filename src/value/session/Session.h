@@ -16,7 +16,6 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
-#include <set>
 #include <span>
 #include <unordered_set>
 #include <vector>
@@ -70,9 +69,7 @@ private:
   void invalidateSnapshot() noexcept;
   void sealFormats() noexcept;
   void scanSourceAndDerived(SourceId id);
-  void scanOneSource(SourceId source, std::vector<SourceId>& queue, std::set<u32>& queued);
-  void addExtractedSources(std::vector<ExtractedSource> extractedSources, SourceId defaultParent,
-                           std::vector<SourceId>& queue, std::set<u32>& queued);
+  void scanOneSource(SourceId source, std::vector<SourceId>& queue);
   void removeSourceFamily(SourceId source, std::vector<SourceId>& removed);
   void rebuildCollections();
 
