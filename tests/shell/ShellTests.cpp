@@ -318,13 +318,16 @@ void exportOptionParsing() {
                             "--modulation=synth",
                             "--modulation-scaling=observed",
                             "--modulation-scaling=full",
-                            "--dynamic-envelopes",
                             "--no-dynamic-envelopes",
+                            "--dynamic-envelopes",
                             "--used-instruments",
                             "--all-instruments",
                             "--sample-filter=snes",
                             "--sample-filter=auto"});
   const auto defaults = parse({});
+  expect(defaults.dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants &&
+             parse({"--no-dynamic-envelopes"}).dynamicEnvelopes == DynamicEnvelopePolicy::Ignore,
+         "dynamic envelope conversion should default to enabled and allow opting out");
   expect(reset.sequence.sequenceLoops == defaults.sequence.sequenceLoops &&
              reset.sequence.midi.bankSelectStyle == defaults.sequence.midi.bankSelectStyle &&
              reset.sequence.midi.pitchTransitions == defaults.sequence.midi.pitchTransitions &&

@@ -438,7 +438,8 @@ std::vector<Artifact> exportCollectionImpl(const SessionSnapshot& snapshot, cons
   const bool exportsSynth = std::ranges::any_of(
       kinds, [](ExportKind kind) { return kind == ExportKind::SoundFont2 || kind == ExportKind::Dls; });
   const bool synthRequiresPerformance =
-      request.dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants || request.exportOnlyUsedInstruments;
+      (bound.hasSequence() && request.dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants) ||
+      request.exportOnlyUsedInstruments;
   const bool needsRendering = exportsMidi || (exportsSynth && (bound.hasSequence() || synthRequiresPerformance));
 
   if (needsRendering) {

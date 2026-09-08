@@ -167,8 +167,8 @@ void MenuBar::appendOptionsMenu() {
   appendEnumOptions(
       m_optionsMenu, tr("Dynamic Envelope Conversion"), Settings::the()->conversion.dynamicEnvelopeConversion(),
       std::array{
-          std::pair{tr("Ignore (Default)"), DynamicEnvelopePolicy::Ignore},
-          std::pair{tr("Instrument Variants"), DynamicEnvelopePolicy::InstrumentVariants},
+          std::pair{tr("Ignore"), DynamicEnvelopePolicy::Ignore},
+          std::pair{tr("Instrument Variants (Default)"), DynamicEnvelopePolicy::InstrumentVariants},
       },
       [](DynamicEnvelopePolicy conversion) { Settings::the()->conversion.setDynamicEnvelopeConversion(conversion); });
 

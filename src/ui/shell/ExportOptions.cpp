@@ -104,9 +104,9 @@ constexpr Option options[] = {
            choice<ModulationScalingPolicy>(v, {{"full", ModulationScalingPolicy::FullFormatRange},
                                                {"observed", ModulationScalingPolicy::ObservedSequenceRange}});
      }},
-    {"--dynamic-envelopes", "", "Convert dynamic envelopes to instrument variants", false,
+    {"--dynamic-envelopes", "", "Convert dynamic envelopes to instrument variants (default)", false,
      [](ExportRequest& r, std::string_view) { r.dynamicEnvelopes = DynamicEnvelopePolicy::InstrumentVariants; }},
-    {"--no-dynamic-envelopes", "", "Ignore dynamic envelope changes (default)", false,
+    {"--no-dynamic-envelopes", "", "Ignore dynamic envelope changes", false,
      [](ExportRequest& r, std::string_view) { r.dynamicEnvelopes = DynamicEnvelopePolicy::Ignore; }},
     {"--used-instruments", "", "Export only instruments used by rendered notes", false,
      [](ExportRequest& r, std::string_view) { r.exportOnlyUsedInstruments = true; }},

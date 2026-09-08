@@ -2742,9 +2742,9 @@ void exportRequestSequenceLoopsAffectMidiLowering() {
          "collection export should default to native synth modulation");
   expect(PlaybackRequest{}.modulationConversion == ModulationConversionPolicy::SynthModulators,
          "backend-neutral playback requests should default to native synth modulation");
-  expect(ExportRequest{}.dynamicEnvelopes == DynamicEnvelopePolicy::Ignore &&
-             PlaybackRequest{}.dynamicEnvelopes == DynamicEnvelopePolicy::Ignore,
-         "dynamic envelope materialization should remain explicitly opt-in");
+  expect(ExportRequest{}.dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants &&
+             PlaybackRequest{}.dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants,
+         "export and playback should materialize dynamic envelopes by default");
   expect(ExportRequest{}.sampleFiltering == SampleFilteringPolicy::FormatPreferred &&
              PlaybackRequest{}.sampleFiltering == SampleFilteringPolicy::FormatPreferred,
          "sample filtering should use each format's recommendation by default");
