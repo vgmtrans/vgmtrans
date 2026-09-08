@@ -9,27 +9,13 @@
 #include "value/export/SequenceModulationProfile.h"
 
 #include <algorithm>
-#include <cmath>
 
 namespace vgmtrans::core {
 
 namespace {
 
-[[nodiscard]] u8 midiControllerValue(double normalized) {
-  return static_cast<u8>(
-      std::clamp<int>(static_cast<int>(std::lround(std::clamp(normalized, 0.0, 1.0) * 127.0)), 0, 127));
-}
-
-void observe(std::optional<MidiModulationMaximum>& maximum, double normalized) {
-  const double clampedNormalized = std::clamp(normalized, 0.0, 1.0);
-  const u8 controller = midiControllerValue(clampedNormalized);
-  if (!maximum) {
-    maximum = MidiModulationMaximum{.controllerValue = controller, .normalized = clampedNormalized};
-    return;
-  }
-
-  maximum->controllerValue = std::max(maximum->controllerValue, controller);
-  maximum->normalized = std::max(maximum->normalized, clampedNormalized);
+void observe(std::optional<double>& maximum, double normalized) {
+  maximum = std::max(maximum.value_or(0.0), std::clamp(normalized, 0.0, 1.0));
 }
 
 void observePerformanceModulation(MidiModulationUsage& usage, const ModulationPerformanceEvent& event,

@@ -14,20 +14,13 @@ namespace vgmtrans::core {
 
 struct SequenceModulationProfile;
 
-struct MidiModulationMaximum {
-  // MIDI scaling uses the quantized controller maximum; synth scaling uses
-  // the precise normalized amount that produced it.
-  u8 controllerValue = 0;
-  double normalized = 0.0;
-};
-
 struct MidiModulationUsage {
-  // Aggregate maxima for the whole sequence. Analyze PerformanceSequence so
-  // source meaning is read before MIDI quantization.
-  std::optional<MidiModulationMaximum> vibratoDepth;
-  std::optional<MidiModulationMaximum> vibratoRate;
-  std::optional<MidiModulationMaximum> tremoloDepth;
-  std::optional<MidiModulationMaximum> tremoloRate;
+  // Maxima in [0, 1] for the whole sequence, before MIDI quantization.
+  // Empty means unobserved; zero means observed but inactive.
+  std::optional<double> vibratoDepth;
+  std::optional<double> vibratoRate;
+  std::optional<double> tremoloDepth;
+  std::optional<double> tremoloRate;
 };
 
 [[nodiscard]] bool hasMidiModulationUsage(const MidiModulationUsage& usage) noexcept;

@@ -2874,14 +2874,13 @@ PerformanceSequence observedModulationPerformance() {
 void modulationAnalysisReportsObservedPerformanceMaxima() {
   const auto usage = analyzePerformanceModulationUsage(observedModulationPerformance());
   expect(hasMidiModulationUsage(usage), "performance modulation analysis should report observed driver modulation");
-  expect(usage.vibratoDepth && usage.vibratoDepth->controllerValue == 82,
+  expect(usage.vibratoDepth == 82.0 / 127.0,
          "performance modulation analysis should report global vibrato depth maximum");
-  expect(usage.vibratoRate && usage.vibratoRate->controllerValue == 29,
+  expect(usage.vibratoRate == 29.0 / 127.0,
          "performance modulation analysis should report global vibrato rate maximum");
-  expect(usage.tremoloDepth && usage.tremoloDepth->controllerValue == 40,
+  expect(usage.tremoloDepth == 40.0 / 127.0,
          "performance modulation analysis should report global tremolo depth maximum");
-  expect(usage.tremoloRate && usage.tremoloRate->controllerValue == 9,
-         "performance modulation analysis should report global tremolo rate maximum");
+  expect(usage.tremoloRate == 9.0 / 127.0, "performance modulation analysis should report global tremolo rate maximum");
 }
 
 void physicalModulationProfileDrivesMidiAndSynthFromOnePlan() {
@@ -3219,7 +3218,8 @@ void observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators()
   };
 
   const auto usage = analyzePerformanceModulationUsage(observedModulationPerformance());
-  expect(scaledMidiModulationControllerValue(41, &*usage.vibratoDepth, ModulationScalingPolicy::FullFormatRange) == 41,
+  applyMidiModulationScaling(midiSequence, usage, ModulationScalingPolicy::FullFormatRange);
+  expect(midiController(midiSequence.tracks[0].events[1], MidiController::Modulation)->value == 41,
          "full-range modulation scaling should leave MIDI controller values unchanged");
 
   applyMidiModulationScaling(midiSequence, usage, ModulationScalingPolicy::ObservedSequenceRange);
@@ -3294,6 +3294,33 @@ void observedModulationScalingUsesPreciseNormalizedAmounts() {
          "observed modulation scaling should expand the precise observed maximum to full controller range");
 }
 
+void observedModulationScalingPreservesQuantizationBoundaries() {
+  struct Case {
+    std::optional<double> maximum;
+    s32 quantized;
+    s32 precise;
+    s32 synth;
+  };
+  for (const Case test :
+       {Case{std::nullopt, 63, 63, 1000}, Case{0.0, 0, 0, 0}, Case{1e-12, 0, 64, 0}, Case{0.5 / 127.0, 127, 64, 4},
+        Case{126.49 / 127.0, 64, 64, 996}, Case{126.5 / 127.0, 63, 63, 1000}}) {
+    const MidiModulationUsage usage{.vibratoDepth = test.maximum};
+    MidiSequence sequence{.tracks = {MidiTrack{.events = {
+                                                   midi::controller(0, 0, MidiController::Modulation, 63),
+                                                   midi::controller(1, 0, MidiController::Modulation, 63, 20,
+                                                                    test.maximum.value_or(0.0) / 2.0),
+                                               }}}};
+    applyMidiModulationScaling(sequence, usage, ModulationScalingPolicy::ObservedSequenceRange);
+    expect(
+        midiController(sequence.tracks[0].events[0], MidiController::Modulation)->value == test.quantized &&
+            midiController(sequence.tracks[0].events[1], MidiController::Modulation)->value == test.precise,
+        "scaling must distinguish unobserved, zero, sub-byte, and full-range maxima while retaining source precision");
+    expect(scaledSynthModulatorAmount(SynthModulator{.destination = SynthDestination::VibratoDepth, .amount = 1000},
+                                      &usage, ModulationScalingPolicy::ObservedSequenceRange) == test.synth,
+           "synth scaling must use the precise maximum and the same quantized headroom decision as MIDI");
+  }
+}
+
 }  // namespace
 
 void runValueMidiTests() {
@@ -3360,4 +3387,5 @@ void runValueMidiTests() {
   tempoRelativeModulationKeepsIndependentRatesAndDelayPolicies();
   observedModulationScalingRescalesMidiControllersAndDefaultSynthModulators();
   observedModulationScalingUsesPreciseNormalizedAmounts();
+  observedModulationScalingPreservesQuantizationBoundaries();
 }

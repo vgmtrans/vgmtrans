@@ -24,43 +24,57 @@ s32 synthAmountFromSecondsRange(double minSeconds, double maxSeconds) {
   return static_cast<s32>(std::lround(fullScaleRange));
 }
 
-[[nodiscard]] bool shouldScale(const MidiModulationMaximum* maximum, ModulationScalingPolicy policy) noexcept {
+[[nodiscard]] u8 midiControllerValue(double normalized) noexcept {
+  return static_cast<u8>(std::lround(std::clamp(normalized, 0.0, 1.0) * 127.0));
+}
+
+[[nodiscard]] bool shouldScale(std::optional<double> maximum, ModulationScalingPolicy policy) noexcept {
   // Only scale when the observed maximum leaves unused controller headroom. Full-range
   // data already has the best available 7-bit resolution.
-  return policy == ModulationScalingPolicy::ObservedSequenceRange && maximum != nullptr &&
-         maximum->controllerValue < 127;
+  return policy == ModulationScalingPolicy::ObservedSequenceRange && maximum && midiControllerValue(*maximum) < 127;
 }
 
-[[nodiscard]] const MidiModulationMaximum* maximum(const std::optional<MidiModulationMaximum>& value) noexcept {
-  return value ? &*value : nullptr;
+[[nodiscard]] u8 scaledMidiModulationControllerValue(u8 value, std::optional<double> normalizedAmount,
+                                                     std::optional<double> maximum,
+                                                     ModulationScalingPolicy policy) noexcept {
+  if (!shouldScale(maximum, policy)) {
+    return value;
+  }
+  double amount = value;
+  double range = midiControllerValue(*maximum);
+  if (normalizedAmount && *maximum > 0.0) {
+    amount = std::clamp(*normalizedAmount, 0.0, *maximum);
+    range = *maximum;
+  }
+  return range > 0.0 ? static_cast<u8>(std::clamp<long>(std::lround(amount * 127.0 / range), 0, 127)) : 0;
 }
 
-[[nodiscard]] const MidiModulationMaximum* maximumForDefaultModulator(const SynthModulator& modulator,
-                                                                      const MidiModulationUsage& usage) noexcept {
+[[nodiscard]] std::optional<double> maximumForDefaultModulator(const SynthModulator& modulator,
+                                                               const MidiModulationUsage& usage) noexcept {
   if (modulator.source != SynthSource::DefaultController) {
-    return nullptr;
+    return std::nullopt;
   }
 
   switch (modulator.destination) {
     case SynthDestination::VibratoDepth:
-      return maximum(usage.vibratoDepth);
+      return usage.vibratoDepth;
     case SynthDestination::VibratoRate:
-      return maximum(usage.vibratoRate);
+      return usage.vibratoRate;
     case SynthDestination::VibratoDelay:
-      return nullptr;
+      return std::nullopt;
     case SynthDestination::TremoloDepth:
-      return maximum(usage.tremoloDepth);
+      return usage.tremoloDepth;
     case SynthDestination::TremoloRate:
-      return maximum(usage.tremoloRate);
+      return usage.tremoloRate;
     case SynthDestination::TremoloDelay:
-      return nullptr;
+      return std::nullopt;
     case SynthDestination::VolumeAttenuation:
-      return maximum(usage.tremoloDepth);
+      return usage.tremoloDepth;
     case SynthDestination::Unknown:
-      return nullptr;
+      return std::nullopt;
   }
 
-  return nullptr;
+  return std::nullopt;
 }
 
 [[nodiscard]] bool canUseNativeSynthLfo(std::optional<LfoWaveform> waveform) noexcept {
@@ -224,31 +238,6 @@ LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulati
   return lowered;
 }
 
-u8 scaledMidiModulationControllerValue(u8 value, const MidiModulationMaximum* maximum,
-                                       ModulationScalingPolicy policy) noexcept {
-  if (!shouldScale(maximum, policy)) {
-    return value;
-  }
-  if (maximum->controllerValue == 0) {
-    return 0;
-  }
-
-  return static_cast<u8>(std::clamp<s32>(
-      static_cast<s32>(std::lround((static_cast<double>(value) * 127.0) / maximum->controllerValue)), 0, 127));
-}
-
-u8 scaledMidiModulationControllerValue(u8 value, std::optional<double> normalizedAmount,
-                                       const MidiModulationMaximum* maximum, ModulationScalingPolicy policy) noexcept {
-  if (!shouldScale(maximum, policy) || !normalizedAmount || maximum->normalized <= 0.0) {
-    return scaledMidiModulationControllerValue(value, maximum, policy);
-  }
-
-  return static_cast<u8>(std::clamp<s32>(
-      static_cast<s32>(
-          std::lround((std::clamp(*normalizedAmount, 0.0, maximum->normalized) * 127.0) / maximum->normalized)),
-      0, 127));
-}
-
 void applyMidiModulationScaling(MidiSequence& sequence, const MidiModulationUsage& usage,
                                 ModulationScalingPolicy policy) {
   for (auto& track : sequence.tracks) {
@@ -257,19 +246,19 @@ void applyMidiModulationScaling(MidiSequence& sequence, const MidiModulationUsag
       if (message == nullptr || message->kind != MidiChannelMessageKind::ControlChange) {
         continue;
       }
-      const MidiModulationMaximum* observedMaximum = nullptr;
+      std::optional<double> observedMaximum;
       switch (static_cast<MidiController>(message->parameter)) {
         case MidiController::Modulation:
-          observedMaximum = maximum(usage.vibratoDepth);
+          observedMaximum = usage.vibratoDepth;
           break;
         case MidiController::VibratoRate:
-          observedMaximum = maximum(usage.vibratoRate);
+          observedMaximum = usage.vibratoRate;
           break;
         case MidiController::TremoloDepth:
-          observedMaximum = maximum(usage.tremoloDepth);
+          observedMaximum = usage.tremoloDepth;
           break;
         case MidiController::TremoloRate:
-          observedMaximum = maximum(usage.tremoloRate);
+          observedMaximum = usage.tremoloRate;
           break;
         default:
           continue;
@@ -286,17 +275,14 @@ s32 scaledSynthModulatorAmount(const SynthModulator& modulator, const MidiModula
     return modulator.amount;
   }
 
-  const auto* observedMaximum = maximumForDefaultModulator(modulator, *usage);
+  const auto observedMaximum = maximumForDefaultModulator(modulator, *usage);
   if (!shouldScale(observedMaximum, policy)) {
     return modulator.amount;
   }
 
   // If MIDI controller values are expanded upward, the synth-side modulator amount must
   // shrink by the same ratio so the audible depth stays unchanged.
-  const double normalizedMaximum = observedMaximum->normalized > 0.0
-                                       ? observedMaximum->normalized
-                                       : (static_cast<double>(observedMaximum->controllerValue) / 127.0);
-  return static_cast<s32>(std::lround(static_cast<double>(modulator.amount) * normalizedMaximum));
+  return static_cast<s32>(std::lround(static_cast<double>(modulator.amount) * *observedMaximum));
 }
 
 }  // namespace vgmtrans::core
