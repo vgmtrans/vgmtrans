@@ -43,22 +43,10 @@ template <typename T, typename Predicate>
   return sharedVector(std::move(filtered));
 }
 
-[[nodiscard]] std::optional<AssetId> referencedAsset(const CollectionMembers& members,
-                                                     const std::unordered_set<u32>& assetIds) {
-  if (members.sequence && assetIds.contains(members.sequence->value)) {
-    return members.sequence;
-  }
-  const auto find = [&](const std::vector<AssetId>& ids) -> std::optional<AssetId> {
-    const auto found = std::ranges::find_if(ids, [&](AssetId id) { return assetIds.contains(id.value); });
-    return found != ids.end() ? std::optional{*found} : std::nullopt;
-  };
-  if (auto found = find(members.soundBanks)) {
-    return found;
-  }
-  if (auto found = find(members.samplePools)) {
-    return found;
-  }
-  return find(members.miscAssets);
+[[nodiscard]] bool referencesAnyAsset(const CollectionMembers& members, const std::unordered_set<u32>& assetIds) {
+  const auto matches = [&](AssetId id) { return assetIds.contains(id.value); };
+  return (members.sequence && matches(*members.sequence)) || std::ranges::any_of(members.soundBanks, matches) ||
+         std::ranges::any_of(members.samplePools, matches) || std::ranges::any_of(members.miscAssets, matches);
 }
 
 [[nodiscard]] DesiredCollection desiredCollection(const ExplicitCollection& collection) {
@@ -319,7 +307,7 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
   };
 
   std::erase_if(explicitCollections_, [&](const ExplicitCollectionEntry& entry) {
-    return sourceIds.contains(entry.origin.value) || referencedAsset(entry.collection.members, assetIds).has_value();
+    return sourceIds.contains(entry.origin.value) || referencesAnyAsset(entry.collection.members, assetIds);
   });
 
   std::vector<ScanChunk> remainingChunks;
@@ -368,7 +356,7 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
   std::erase_if(diagnostics_, removesDiagnostic);
 
   std::erase_if(collections_, [&](const Collection& collection) {
-    return !collection.isDiscovered() && referencedAsset(collection.members, assetIds);
+    return !collection.isDiscovered() && referencesAnyAsset(collection.members, assetIds);
   });
   rebuildViews();
   rebuildIndexes();

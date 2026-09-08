@@ -14,21 +14,13 @@ namespace vgmtrans::core {
 namespace {
 
 [[nodiscard]] CollectionIssue missingRoleIssue(std::string code, std::string role, std::optional<AssetId> asset) {
-  if (asset) {
-    return CollectionIssue{
-        .impact = CollectionIssueImpact::Incomplete,
-        .severity = Severity::Error,
-        .code = std::move(code),
-        .message = "Collection references missing " + role + " asset " + std::to_string(asset->value),
-        .asset = asset,
-    };
-  }
-
   return CollectionIssue{
       .impact = CollectionIssueImpact::Incomplete,
-      .severity = Severity::Warning,
+      .severity = asset ? Severity::Error : Severity::Warning,
       .code = std::move(code),
-      .message = "Collection has no " + role + " asset",
+      .message = asset ? "Collection references missing " + role + " asset " + std::to_string(asset->value)
+                       : "Collection has no " + role + " asset",
+      .asset = asset,
   };
 }
 
