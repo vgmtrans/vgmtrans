@@ -343,6 +343,51 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero() {
          "a tied extension should not reselect its instrument");
 }
 
+void variantAddressesRespectExportProjectionsAndExhaustion() {
+  std::vector<SoundBankAsset> sets{SoundBankAsset{
+      .instruments = {testInstrument(0, Envelope{.attackSeconds = 1.0})},
+  }};
+  std::vector<PerformanceEvent> events;
+  for (u32 address = 0; address < 128 * 128; ++address) {
+    if (address == 1 || address == 128 || address == 256 || address == 384 || address == 511 || address == 16383) {
+      continue;
+    }
+    events.push_back(InstrumentPerformanceEvent{.bank = address / 128, .program = address % 128});
+  }
+  // Reserve holes through the MIDI/DLS bank projection, SF2's packed bank,
+  // and the exporters' clamped program respectively.
+  events.push_back(InstrumentPerformanceEvent{.bank = 129, .program = 0});
+  events.push_back(InstrumentPerformanceEvent{.bank = 512, .program = 0});
+  events.push_back(InstrumentPerformanceEvent{.bank = 3, .program = 255});
+  events.push_back(InstrumentPerformanceEvent{
+      .sourceInstrument = InstrumentIdentity{.domain = "dynamic-envelope-test", .key = 0},
+  });
+  for (u32 note = 1; note <= 4; ++note) {
+    events.push_back(EnvelopePerformanceEvent{
+        .header = eventHeader(note * 4, events.size()),
+        .update = EnvelopeUpdate::set(Envelope{.attackSeconds = note + 1.0}, EnvelopeFields::Attack),
+    });
+    events.push_back(NotePerformanceEvent{
+        .header = eventHeader(note * 4, events.size()),
+        .key = 60,
+        .durationTicks = 1,
+        .note = PerformanceNoteId{note},
+    });
+  }
+  const auto materialized = materializeInstrumentVariants(sequenceWithEvents(std::move(events)), sets,
+                                                          InstrumentVariantOptions{.dynamicEnvelopes = true});
+  expect(
+      sets[0].instruments.size() == 4 &&
+          selectedAddressForNote(materialized.performance, PerformanceNoteId{1}) == InstrumentAddress{0, 1} &&
+          selectedAddressForNote(materialized.performance, PerformanceNoteId{2}) == InstrumentAddress{3, 0} &&
+          selectedAddressForNote(materialized.performance, PerformanceNoteId{3}) == InstrumentAddress{127, 127} &&
+          selectedAddressForNote(materialized.performance, PerformanceNoteId{4}) == InstrumentAddress{0, 0},
+      "variants must fill available addresses in bank/program order and restore the base when all addresses are used");
+  expect(materialized.diagnostics.size() == 1 &&
+             materialized.diagnostics[0].code == "dynamic-envelope-addresses-exhausted",
+         "exhausting portable addresses must retain the existing warning");
+}
+
 void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments() {
   Instrument instrument = testInstrument(0, Envelope{.attackSeconds = 1.0});
   instrument.regions[0].sample = SampleRef::resolved(AssetId{10}, 0);
@@ -502,6 +547,7 @@ void runValueInstrumentVariantTests() {
   dynamicEnvelopeInstrumentSelectionControlsOverrideCarry();
   dynamicEnvelopeActiveVoiceLimitationIsExplicit();
   dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero();
+  variantAddressesRespectExportProjectionsAndExhaustion();
   dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments();
   signedStereoMaterializationUsesAttackTimeVariants();
   signedStereoMaterializationLeavesOrdinaryTracksAlone();

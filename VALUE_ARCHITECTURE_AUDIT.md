@@ -583,6 +583,22 @@ stages, derived ranges, and display hints. Existing source-map tests cover
 custom allocation, duplicate IDs, fields, hierarchy, and links. The full build
 and all 17 CTest targets pass without warnings.
 
+### Allocate variant addresses with one forward scan
+
+Replace repeated searches from bank zero with a reservation bitmap and a
+monotonic cursor through the fixed 128-by-128 portable address space. Each
+address is examined at most once across the whole materialization, and
+allocation no longer grows a tree of assigned address pairs. This is an
+algorithm simplification rather than a line-count reduction (two additional
+production lines). Preserve both existing bank projections and program clamping.
+
+A before/after matrix returns identical addresses for 65,536 allocations with
+mixed bank/program and source-identity reservations. Add an integration test
+for sparse remaining addresses, reservations through MIDI/DLS and SF2 bank
+projections, clamped programs, the last portable address, exhaustion diagnostics,
+and fallback to the base instrument. The full build and all 17 CTest targets
+pass without warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
