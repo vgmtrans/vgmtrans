@@ -98,7 +98,7 @@ std::vector<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layou
                    .reverb = 0.0,
                    .name = name,
                    .range = range,
-                   .synthVoice = Instrument::SynthVoice{ymVoice(reader, offset)},
+                   .synthVoice = ymVoice(reader, offset),
                })
           .source(name, range, "konami-tmnt2-ym2151-patch");
     }

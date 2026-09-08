@@ -343,15 +343,14 @@ Cps1SynthDrafts addCps1Synth(ScanResultBuilder& builder, CpsLayout& layout) {
       const SourceRange range = reader.range(offset, patchSize);
       const std::string name = fmt::format("YM2151 Instrument {}", index);
       const s8 transpose = layout.cps1InstrumentTransposes[index];
-      auto instrument = ym.add(
-          index,
-          Instrument{
-              .identity = InstrumentIdentity{.domain = std::string(kCps1Ym2151Domain), .key = index},
-              .reverb = 0.0,
-              .name = name,
-              .range = range,
-              .synthVoice = Instrument::SynthVoice{cps1Voice(reader, offset, layout.version, layout.masterVolume)},
-          });
+      auto instrument =
+          ym.add(index, Instrument{
+                            .identity = InstrumentIdentity{.domain = std::string(kCps1Ym2151Domain), .key = index},
+                            .reverb = 0.0,
+                            .name = name,
+                            .range = range,
+                            .synthVoice = cps1Voice(reader, offset, layout.version, layout.masterVolume),
+                        });
       instrument.source(name, range, "cps1-ym2151-patch").derived("transpose", transpose);
     }
     drafts.ym2151 = ymDraft;
