@@ -1775,6 +1775,11 @@ void ninSnesSunsoftRecognizesBgmLayouts() {
            "Sunsoft should use its revision's BGM track count and initial volume");
     expect(!scanSynth(bytes, *layout, "Sunsoft").assets.empty(), "Sunsoft revisions should load their sound bank");
 
+    std::copy_n(bytes.begin() + 0x4000, 6, bytes.begin() + 0x4006);
+    std::fill_n(bytes.begin() + 0x4000, 6, 0);
+    expect(findLayout(reader)->instrumentTableAddress == 0x4000,
+           "empty leading instrument slots must not shift the driver's table base (Pirates of Dark Water)");
+
     writeLe16(bytes, 0x40, 0x2202);
     const auto controls = id == ProfileId::SunsoftBenkei ? std::array{0xf0, 0xf1, 0xff} : std::array{0xfd, 0xfe, 0xff};
     for (const u8 control : controls) {
