@@ -46,11 +46,8 @@ struct SynthSampleDecodeOptions {
   std::string nonMonoWarning;
 };
 
-// Decoded sample plus its original owner/index identity. Synth exporters use
-// this to build one flat sample table without losing region references.
+// One entry in the flat sample table consumed by synth container writers.
 struct DecodedSynthSample {
-  AssetId owner;
-  u32 localIndex = 0;
   std::string name;
   Tuning pitch;
   double attenuationDb = 0.0;

@@ -16,6 +16,7 @@
 #include <limits>
 #include <map>
 #include <optional>
+#include <set>
 #include <utility>
 
 namespace vgmtrans::core {
@@ -31,12 +32,12 @@ struct SynthSampleIndexKey {
 };
 
 using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
-using SynthSampleIndexList = std::vector<SynthSampleIndexKey>;
+using SynthSampleReferences = std::set<SynthSampleIndexKey>;
 using SynthInstrumentList = std::vector<const Instrument*>;
 
 struct SamplePoolView {
   AssetId owner;
-  const SamplePool* pool;
+  const SamplePool& pool;
 };
 
 constexpr double kPerceivedHalfLoudnessDb = 10.0;
@@ -121,42 +122,41 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
   return instruments;
 }
 
-[[nodiscard]] std::vector<DecodedSynthSample> decodeSynthSamples(std::span<const SamplePoolView> samplePools,
-                                                                 const SourceStore& sources,
-                                                                 std::vector<Diagnostic>& diagnostics,
-                                                                 const SynthSampleDecodeOptions& options,
-                                                                 const SynthSampleIndexList* sampleFilter,
-                                                                 SampleFilteringPolicy filtering) {
-  // Decode once into a flat vector. Container exporters then decide how to lay out that
-  // PCM, but all of them share the same source-range diagnostics.
-  std::vector<DecodedSynthSample> samples;
+[[nodiscard]] SynthSampleIndexMap decodeSynthSamples(PreparedSynthData& prepared,
+                                                     std::span<const SamplePoolView> samplePools,
+                                                     const SourceStore& sources,
+                                                     const SynthSampleDecodeOptions& options,
+                                                     const SynthSampleReferences& references, bool discardUnreferenced,
+                                                     SampleFilteringPolicy filtering) {
+  // Decode once into the final sample table, including any phase-inverted
+  // variants. Container exporters share its indexes and source diagnostics.
+  SynthSampleIndexMap indexes;
 
   for (const auto& view : samplePools) {
-    if (view.pool == nullptr) {
-      continue;
-    }
-    const SampleFilter selectedFilter = resolveSampleFilter(filtering, view.pool->preferredFilter);
+    const SampleFilter selectedFilter = resolveSampleFilter(filtering, view.pool.preferredFilter);
 
-    for (u32 sampleIndex = 0; sampleIndex < view.pool->samples.size(); ++sampleIndex) {
-      if (sampleFilter != nullptr && std::ranges::none_of(*sampleFilter, [&](const SynthSampleIndexKey& key) {
-            return key.owner == view.owner.value && key.index == sampleIndex;
-          })) {
+    for (u32 sampleIndex = 0; sampleIndex < view.pool.samples.size(); ++sampleIndex) {
+      const bool keepOriginal = !discardUnreferenced || references.contains({view.owner.value, sampleIndex, false});
+      const bool keepInverted = references.contains({view.owner.value, sampleIndex, true});
+      if (!keepOriginal && !keepInverted) {
         continue;
       }
-      const auto& sample = view.pool->samples[sampleIndex];
+      const auto& sample = view.pool.samples[sampleIndex];
       if (!sources.contains(sample.encodedData.source)) {
-        diagnostics.push_back(exportError("Sample source was not found", validDiagnosticRange(sample.encodedData)));
+        prepared.diagnostics.push_back(
+            exportError("Sample source was not found", validDiagnosticRange(sample.encodedData)));
         continue;
       }
 
       auto decoded = decodeSample(sample, sources.bytes(sample.encodedData.source));
       if (!decoded) {
-        diagnostics.push_back(exportError("Unsupported sample codec", validDiagnosticRange(sample.encodedData)));
+        prepared.diagnostics.push_back(
+            exportError("Unsupported sample codec", validDiagnosticRange(sample.encodedData)));
         continue;
       }
 
       if (options.requireMono && decoded->channels != 1) {
-        diagnostics.push_back(exportWarning(
+        prepared.diagnostics.push_back(exportWarning(
             options.nonMonoWarning.empty() ? "Skipping non-mono sample for synth export" : options.nonMonoWarning,
             validDiagnosticRange(sample.encodedData)));
         continue;
@@ -168,32 +168,36 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
         applySampleFilter(*decoded, selectedFilter);
       }
 
-      samples.push_back(DecodedSynthSample{
-          .owner = view.owner,
-          .localIndex = sampleIndex,
+      DecodedSynthSample original{
           .name = sample.name,
           .pitch = sample.pitch,
           .attenuationDb = sample.attenuationDb,
           .decoded = std::move(*decoded),
-      });
+      };
+      if (keepInverted) {
+        auto inverted = keepOriginal ? original : std::move(original);
+        inverted.name += " [inverted]";
+        for (s16& value : inverted.decoded.pcm) {
+          value = value == std::numeric_limits<s16>::min() ? std::numeric_limits<s16>::max() : static_cast<s16>(-value);
+        }
+        indexes[{view.owner.value, sampleIndex, true}] = clampU16(static_cast<u32>(prepared.samples.size()));
+        prepared.samples.push_back(std::move(inverted));
+      }
+      if (keepOriginal) {
+        indexes[{view.owner.value, sampleIndex, false}] = clampU16(static_cast<u32>(prepared.samples.size()));
+        prepared.samples.push_back(std::move(original));
+      }
     }
   }
 
-  return samples;
+  return indexes;
 }
 
-[[nodiscard]] SynthSampleIndexList referencedSamples(std::span<const Instrument* const> instruments) {
-  SynthSampleIndexList samples;
+[[nodiscard]] SynthSampleReferences referencedSamples(std::span<const Instrument* const> instruments) {
+  SynthSampleReferences samples;
   for (const auto* instrument : instruments) {
     for (const auto& region : instrument->regions) {
-      const SynthSampleIndexKey sample{
-          region.sample.owner().value,
-          region.sample.index(),
-          region.invertSamplePhase,
-      };
-      if (std::ranges::find(samples, sample) == samples.end()) {
-        samples.push_back(sample);
-      }
+      samples.insert({region.sample.owner().value, region.sample.index(), region.invertSamplePhase});
     }
   }
   return samples;
@@ -208,42 +212,6 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
   }
 
   return found->second;
-}
-
-[[nodiscard]] SynthSampleIndexMap materializePhaseInvertedSamples(std::vector<DecodedSynthSample>& samples,
-                                                                  const SynthSampleIndexList& references,
-                                                                  bool discardUnreferenced) {
-  SynthSampleIndexMap indexes;
-  if (std::ranges::none_of(references, &SynthSampleIndexKey::phaseInverted)) {
-    for (u32 i = 0; i < samples.size(); ++i) {
-      indexes[{samples[i].owner.value, samples[i].localIndex, false}] = clampU16(i);
-    }
-    return indexes;
-  }
-
-  std::vector<DecodedSynthSample> materialized;
-  materialized.reserve(samples.size() * 2);
-  for (auto& sample : samples) {
-    const auto referenced = [&](bool inverted) {
-      return std::ranges::find(references, SynthSampleIndexKey{sample.owner.value, sample.localIndex, inverted}) !=
-             references.end();
-    };
-    if (referenced(true)) {
-      DecodedSynthSample inverted = sample;
-      inverted.name += " [inverted]";
-      for (s16& value : inverted.decoded.pcm) {
-        value = value == std::numeric_limits<s16>::min() ? std::numeric_limits<s16>::max() : static_cast<s16>(-value);
-      }
-      indexes[{sample.owner.value, sample.localIndex, true}] = clampU16(static_cast<u32>(materialized.size()));
-      materialized.push_back(std::move(inverted));
-    }
-    if (!discardUnreferenced || referenced(false)) {
-      indexes[{sample.owner.value, sample.localIndex, false}] = clampU16(static_cast<u32>(materialized.size()));
-      materialized.push_back(std::move(sample));
-    }
-  }
-  samples = std::move(materialized);
-  return indexes;
 }
 
 [[nodiscard]] std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
@@ -417,20 +385,17 @@ PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceSt
   samplePools.reserve(input.soundBanks.size() + input.samplePools.size());
   for (const auto* bank : input.soundBanks) {
     if (bank != nullptr) {
-      samplePools.push_back(SamplePoolView{.owner = bank->metadata.id, .pool = &bank->localSamples});
+      samplePools.push_back(SamplePoolView{.owner = bank->metadata.id, .pool = bank->localSamples});
     }
   }
   for (const auto* pool : input.samplePools) {
     if (pool != nullptr) {
-      samplePools.push_back(SamplePoolView{.owner = pool->metadata.id, .pool = &pool->pool});
+      samplePools.push_back(SamplePoolView{.owner = pool->metadata.id, .pool = pool->pool});
     }
   }
-  const SynthSampleIndexList sampleReferences = referencedSamples(instruments);
   const bool filterSamples = input.sequenceUsage != nullptr || input.filterSamplesToReferencedInstruments;
-  prepared.samples = decodeSynthSamples(samplePools, sources, prepared.diagnostics, options,
-                                        filterSamples ? &sampleReferences : nullptr, input.sampleFiltering);
-  const auto samplesByReference =
-      materializePhaseInvertedSamples(prepared.samples, sampleReferences, filterSamples);
+  const auto samplesByReference = decodeSynthSamples(
+      prepared, samplePools, sources, options, referencedSamples(instruments), filterSamples, input.sampleFiltering);
   prepared.instruments =
       resolveSynthInstruments(instruments, samplesByReference, input.modulationConversion, prepared.diagnostics);
   return prepared;

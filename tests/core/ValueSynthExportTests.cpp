@@ -1768,6 +1768,49 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
          "playback preparation should preserve a useful MIDI failure diagnostic");
 }
 
+void synthPreparationKeepsSampleIdentityAndPhaseOrdering() {
+  SourceStore sources;
+  const auto source = sources.add(SourceFile{.name = "phases.pcm"}, {0, 128, 232, 3});
+  const auto sample = [&](std::string name) {
+    return Sample{.name = std::move(name),
+                  .codec = AudioCodec::PcmS16,
+                  .encodedData = SourceRange{.source = source, .size = 4},
+                  .sampleRate = 32000};
+  };
+  SoundBankAsset bank{.metadata = {.id = AssetId{1}}, .localSamples = {.samples = {sample("Local"), sample("Unused")}}};
+  bank.localSamples.samples[1].encodedData.source = SourceId{999};
+  const SamplePoolAsset pool{.metadata = {.id = AssetId{2}},
+                             .pool = {.samples = {sample("External0"), sample("External1")}}};
+  bank.instruments.push_back(
+      Instrument{.regions = {
+                     Region{.sample = SampleRef::resolved(pool.metadata.id, 0)},
+                     Region{.sample = SampleRef::resolved(bank.metadata.id, 0), .invertSamplePhase = true},
+                     Region{.sample = SampleRef::resolved(pool.metadata.id, 0), .invertSamplePhase = true},
+                     Region{.sample = SampleRef::resolved(pool.metadata.id, 1)},
+                     Region{.sample = SampleRef::resolved(pool.metadata.id, 0), .invertSamplePhase = true},
+                 }});
+  const std::array<const SoundBankAsset*, 1> banks{&bank};
+  const std::array<const SamplePoolAsset*, 1> pools{&pool};
+  const auto prepared = prepareSynthData(
+      SynthExportInput{.soundBanks = banks, .samplePools = pools, .filterSamplesToReferencedInstruments = true},
+      sources);
+  expect(prepared.diagnostics.empty() && prepared.samples.size() == 4 && prepared.instruments.size() == 1,
+         "filtered preparation should skip unused invalid samples and share repeated phase references");
+  expect(prepared.samples[0].name == "Local [inverted]" && prepared.samples[1].name == "External0 [inverted]" &&
+             prepared.samples[2].name == "External0" && prepared.samples[3].name == "External1",
+         "samples should retain pool order with each inverted sample immediately before its retained original");
+  expect(prepared.samples[0].decoded.pcm == std::vector<s16>{32767, -1000} &&
+             prepared.samples[1].decoded.pcm == prepared.samples[0].decoded.pcm &&
+             prepared.samples[2].decoded.pcm == std::vector<s16>{-32768, 1000},
+         "inversion must saturate the minimum PCM value and leave a retained original unchanged");
+  std::vector<u16> indexes;
+  for (const auto& region : prepared.instruments[0].regions) {
+    indexes.push_back(region.sampleIndex);
+  }
+  expect(indexes == std::vector<u16>{2, 0, 1, 3, 1},
+         "regions must resolve both sample ownership and phase into the final sample table");
+}
+
 }  // namespace
 
 void runValueSynthExportTests() {
@@ -1791,4 +1834,5 @@ void runValueSynthExportTests() {
   synthOnlyExportRendersSequencesWithoutOriginalModulation();
   exportDiagnosticsPreserveSourceRanges();
   collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair();
+  synthPreparationKeepsSampleIdentityAndPhaseOrdering();
 }
