@@ -2607,6 +2607,50 @@ void performanceMidiRendererSimulatesTremoloUsingGlobalTempo() {
          "global tempo output should be written once on the first MIDI track");
 }
 
+void performanceMidiRendererUsesGlobalTempoOrderAtTrackBoundaries() {
+  const PerformanceSequence performance{
+      .initialTempoMicrosecondsPerQuarter = 1000000,
+      .tracks =
+          {
+              PerformanceTrack{
+                  .id = TrackId{0},
+                  .endTick = 20,
+                  .events =
+                      {
+                          TempoPerformanceEvent{.header = {.track = TrackId{0}, .tick = 12, .sequence = 10},
+                                                .microsecondsPerQuarter = 250000},
+                          TempoPerformanceEvent{.header = {.track = TrackId{0}, .tick = 30, .sequence = 12},
+                                                .microsecondsPerQuarter = 500000},
+                      }},
+              PerformanceTrack{
+                  .id = TrackId{1},
+                  .endTick = 40,
+                  .events =
+                      {
+                          TempoPerformanceEvent{.header = {.track = TrackId{1}, .tick = 12, .sequence = 1},
+                                                .microsecondsPerQuarter = 750000},
+                          TempoPerformanceEvent{.header = {.track = TrackId{1}, .tick = 24, .sequence = 11},
+                                                .microsecondsPerQuarter = 250000},
+                      }},
+          },
+  };
+  const auto midi = renderMidiSequence(performance);
+  std::vector<std::pair<u64, u32>> tempos;
+  for (const auto& event : midi.tracks[0].events) {
+    if (const auto tempo = midiTempo(event)) {
+      tempos.emplace_back(event.tick, *tempo);
+    }
+  }
+  expect(tempos == std::vector<std::pair<u64, u32>>{{0, 1000000}, {12, 750000}, {12, 250000}, {30, 500000}},
+         "MIDI must use global tempo order, including initial tempo and deduplication across tracks");
+  expect(PerformanceTempoMap{performance}.microsecondsPerQuarterAt(12) == tempos[2].second,
+         "the last MIDI tempo at a shared tick must match the tempo used for physical duration calculations");
+  expect(midi.tracks[0].endTick == 30 &&
+             std::ranges::none_of(midi.tracks[1].events,
+                                  [](const MidiEvent& event) { return midiMeta(event, 0x51) != nullptr; }),
+         "the conductor track must cover all global tempos and remain their only output location");
+}
+
 void performanceMidiRendererHonorsNoBoostTremoloPhaseAndResetPolicy() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 100},
@@ -3378,6 +3422,7 @@ void runValueMidiTests() {
   performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes();
   performanceMidiRendererReplacesSavedNoteDelay();
   performanceMidiRendererSimulatesTremoloUsingGlobalTempo();
+  performanceMidiRendererUsesGlobalTempoOrderAtTrackBoundaries();
   performanceMidiRendererHonorsNoBoostTremoloPhaseAndResetPolicy();
   exportRequestSequenceLoopsAffectMidiLowering();
   standaloneSequenceExportDoesNotRequireACollection();

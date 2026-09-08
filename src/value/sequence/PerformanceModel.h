@@ -634,14 +634,12 @@ public:
   [[nodiscard]] double tickSeconds(u64 tick) const;
   [[nodiscard]] double durationMilliseconds(u64 startTick, u32 durationTicks) const;
   [[nodiscard]] u32 durationTicksForMilliseconds(u64 startTick, double milliseconds) const;
-  [[nodiscard]] bool contains(const TempoPerformanceEvent& event) const;
   [[nodiscard]] std::vector<Point> points() const;
 
 private:
   struct Change {
     u64 tick = 0;
     u32 microsecondsPerQuarter = 500000;
-    TrackId track;
     u64 sequence = 0;
   };
 

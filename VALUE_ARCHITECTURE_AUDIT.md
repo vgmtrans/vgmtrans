@@ -741,10 +741,31 @@ skipping its annotations or validation. CPS and Konami TMNT2 assign voice values
 directly without spelling the variant wrapper. This removes 12 production
 lines. The full build and all 17 CTest targets pass without warnings.
 
+### Write MIDI tempos directly from the global map
+
+Write the conductor track's tempo events in one pass over PerformanceTempoMap,
+removing the separate source-track insertion path, duplicate-output bitmap,
+event-membership query, and retained track identity. This removes 29 production
+lines and fixes simultaneous changes from different tracks being written in an
+order that disagreed with the tempo used for physical duration calculations.
+The conductor's end tick now also covers every retained tempo point.
+
+The 2,304-scenario comparison found 1,024 ordering disagreements before this
+change and none afterward. Non-tempo MIDI bytes remain identical. The direct
+renderer/tempo-map build passed that matrix under AddressSanitizer and UBSan.
+Add a regression for cross-track ordering, repeated values, initial tempo, and
+conductor duration. Update the Capcom SNES fixture to locate tempo metadata
+directly while preserving its note/controller ordering checks; its old fixed
+index caused the initial core-test crash. The full build and all 17 CTest
+targets now pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
   and remaining format-local helpers for redundant state and work.
+- Pitch-transition lowering retains an unread pitchBendVoice field. Investigate
+  how fixed physical note-duration limits interact with note extensions and
+  portamento splitting; generated segments currently omit that limit.
 - SonyPS2 still approximates key/velocity-dependent regions during scanning
   under a 3,000-region budget chosen for SF2 table limits. Moving this policy
   to export needs a source-neutral representation of that response; merely

@@ -1645,7 +1645,6 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
 
   const PerformanceTempoMap globalTempos{performance};
   const std::vector<PerformanceTempoMap::Point> globalTempoPoints = globalTempos.points();
-  std::vector<bool> renderedTempoPoints(globalTempoPoints.size(), false);
   const PerformanceSequence loweredPerformance =
       lowerMidiPerformanceAutomation(performance, options, globalTempos, soundBanks);
   MidiSequence sequence{
@@ -1711,20 +1710,6 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
                               modulationConversion);
       }
       flushSimulatedPan(midiTrack, renderState, otherFlushTick, assignment.channel, globalTempos, options);
-      if (trackIndex == 0) {
-        if (const auto* tempo = std::get_if<TempoPerformanceEvent>(event);
-            tempo != nullptr && globalTempos.contains(*tempo)) {
-          midiTrack.events.push_back(tempoEvent(tempo->header.tick, tempo->microsecondsPerQuarter));
-          for (size_t index = 0; index < globalTempoPoints.size(); ++index) {
-            if (!renderedTempoPoints[index] && globalTempoPoints[index].tick == tempo->header.tick &&
-                globalTempoPoints[index].microsecondsPerQuarter == tempo->microsecondsPerQuarter) {
-              renderedTempoPoints[index] = true;
-              break;
-            }
-          }
-          continue;
-        }
-      }
       MidiControllerState* automationState =
           header.automation ? &automationControllerStates[*header.automation] : nullptr;
       addMidiEvent(midiTrack, renderState, *event, assignment.channel, performanceTrack.sourceTrackNumber,
@@ -1739,11 +1724,7 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
     }
     flushSimulatedPan(midiTrack, renderState, endTick, assignment.channel, globalTempos, options);
     if (trackIndex == 0) {
-      for (size_t index = 0; index < globalTempoPoints.size(); ++index) {
-        if (renderedTempoPoints[index]) {
-          continue;
-        }
-        const auto& tempo = globalTempoPoints[index];
+      for (const auto& tempo : globalTempoPoints) {
         midiTrack.events.push_back(tempoEvent(tempo.tick, tempo.microsecondsPerQuarter));
         endTick = std::max(endTick, tempo.tick);
       }
