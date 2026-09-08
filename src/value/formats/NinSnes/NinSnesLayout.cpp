@@ -325,13 +325,8 @@ template <size_t Size>
 
   InstrumentProbe probe;
   if (const auto standardOffset = Patterns::ptnLoadInstrTableAddress.find(reader)) {
+    // The loader gives the exact base; leading empty instrument slots do not shift it.
     probe.tableAddress = reader.u8At(*standardOffset + 7) | (reader.u8At(*standardOffset + 10) << 8);
-    if (reader.has(probe.tableAddress, 4)) {
-      const u32 firstWord = reader.le32(probe.tableAddress);
-      if (firstWord == 0 || firstWord == 0xffffffff) {
-        probe.tableAddress += 4;
-      }
-    }
   } else if (selected.intelli == IntelliMode::Fe4) {
     const auto offset = Patterns::ptnLoadInstrTableAddressFE4.find(reader);
     if (!offset) {
