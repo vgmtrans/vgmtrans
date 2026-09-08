@@ -470,65 +470,11 @@ SourceMapBuilder::SourceMapBuilder(std::function<SourceAnnotationId()> nextId) :
 }
 
 AnnotationBuilder SourceMapBuilder::source(std::string_view label, SourceRange range) {
-  return add(SourceRole::Source, label, range);
+  return annotation(SourceRole::Source, label, range);
 }
 
 AnnotationBuilder SourceMapBuilder::annotation(SourceRole role, std::string_view label, SourceRange range) {
-  return add(role, label, range);
-}
-
-// Turns a parsed record into one source annotation so its overall byte range
-// and decoded fields stay together in the source map.
-AnnotationBuilder SourceMapBuilder::annotation(SourceRole role, std::string_view label, const SourceRecord& record) {
-  return add(role, label, record.range).fields(record.fields);
-}
-
-AnnotationBuilder SourceMapBuilder::section(std::string_view label, SourceRange range) {
-  return add(SourceRole::Section, label, range);
-}
-
-AnnotationBuilder SourceMapBuilder::header(std::string_view label, SourceRange range) {
-  return add(SourceRole::Header, label, range);
-}
-
-AnnotationBuilder SourceMapBuilder::table(std::string_view label, SourceRange range) {
-  return add(SourceRole::Table, label, range);
-}
-
-AnnotationBuilder SourceMapBuilder::entry(std::string_view label, SourceRange range) {
-  return add(SourceRole::TableEntry, label, range);
-}
-
-AnnotationBuilder SourceMapBuilder::field(std::string_view label, SourceRange range, SourceValue value) {
-  auto annotation = add(SourceRole::Field, label, range);
-  annotation.field(label, range, std::move(value));
-  return annotation;
-}
-
-AnnotationBuilder SourceMapBuilder::pointer(std::string_view label, SourceRange range, SourceTarget target) {
-  auto annotation = add(SourceRole::Pointer, label, range);
-  annotation.link(SourceLinkRole::PointsTo, std::move(target));
-  return annotation;
-}
-
-AnnotationBuilder SourceMapBuilder::command(std::string_view label, SourceRange range, SequenceSemantic semantic) {
-  auto annotation = add(SourceRole::Command, label, range);
-  if (semantic != SequenceSemantic::Unknown) {
-    annotation.sequenceSemantic(semantic);
-  }
-  return annotation;
-}
-
-SourceMap SourceMapBuilder::finish() {
-  return SourceMap{std::move(annotations_)};
-}
-
-SourceAnnotationId SourceMapBuilder::allocateId() {
-  return nextId_ ? nextId_() : SourceAnnotationId{nextLocalId_++};
-}
-
-AnnotationBuilder SourceMapBuilder::add(SourceRole role, std::string_view label, SourceRange range) {
-  const auto id = allocateId();
+  const auto id = nextId_ ? nextId_() : SourceAnnotationId{nextLocalId_++};
   if (id.valid() && annotationsById_.contains(id.value)) {
     throw std::logic_error("Duplicate SourceAnnotationId in SourceMapBuilder");
   }
@@ -544,6 +490,48 @@ AnnotationBuilder SourceMapBuilder::add(SourceRole role, std::string_view label,
     annotationsById_.emplace(id.value, index);
   }
   return AnnotationBuilder{*this, id};
+}
+
+// Turns a parsed record into one source annotation so its overall byte range
+// and decoded fields stay together in the source map.
+AnnotationBuilder SourceMapBuilder::annotation(SourceRole role, std::string_view label, const SourceRecord& record) {
+  return annotation(role, label, record.range).fields(record.fields);
+}
+
+AnnotationBuilder SourceMapBuilder::section(std::string_view label, SourceRange range) {
+  return annotation(SourceRole::Section, label, range);
+}
+
+AnnotationBuilder SourceMapBuilder::header(std::string_view label, SourceRange range) {
+  return annotation(SourceRole::Header, label, range);
+}
+
+AnnotationBuilder SourceMapBuilder::table(std::string_view label, SourceRange range) {
+  return annotation(SourceRole::Table, label, range);
+}
+
+AnnotationBuilder SourceMapBuilder::entry(std::string_view label, SourceRange range) {
+  return annotation(SourceRole::TableEntry, label, range);
+}
+
+AnnotationBuilder SourceMapBuilder::field(std::string_view label, SourceRange range, SourceValue value) {
+  return annotation(SourceRole::Field, label, range).field(label, range, std::move(value));
+}
+
+AnnotationBuilder SourceMapBuilder::pointer(std::string_view label, SourceRange range, SourceTarget target) {
+  return annotation(SourceRole::Pointer, label, range).link(SourceLinkRole::PointsTo, std::move(target));
+}
+
+AnnotationBuilder SourceMapBuilder::command(std::string_view label, SourceRange range, SequenceSemantic semantic) {
+  auto result = annotation(SourceRole::Command, label, range);
+  if (semantic != SequenceSemantic::Unknown) {
+    result.sequenceSemantic(semantic);
+  }
+  return result;
+}
+
+SourceMap SourceMapBuilder::finish() {
+  return SourceMap{std::move(annotations_)};
 }
 
 SourceAnnotation* SourceMapBuilder::annotation(SourceAnnotationId id) {

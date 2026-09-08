@@ -358,8 +358,6 @@ public:
 private:
   friend class AnnotationBuilder;
 
-  [[nodiscard]] SourceAnnotationId allocateId();
-  [[nodiscard]] AnnotationBuilder add(SourceRole role, std::string_view label, SourceRange range);
   [[nodiscard]] SourceAnnotation* annotation(SourceAnnotationId id);
 
   std::function<SourceAnnotationId()> nextId_;
