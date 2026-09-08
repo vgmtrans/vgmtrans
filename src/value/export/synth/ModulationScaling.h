@@ -54,6 +54,8 @@ struct SynthModulator {
 struct LoweredSynthModulation {
   std::vector<SynthGenerator> generators;
   std::vector<SynthModulator> modulators;
+
+  friend bool operator==(const LoweredSynthModulation&, const LoweredSynthModulation&) = default;
 };
 
 // SoundFont/DLS controller units used by modulation lowering and MIDI

@@ -640,6 +640,16 @@ read path also reproduces identical serialized cursor states, fields, and
 diagnostics across that matrix. The full build and all 17 CTest targets pass
 without warnings.
 
+### Retain lowered modulation as one value
+
+Resolved synth instruments and regions now retain LoweredSynthModulation
+directly instead of unpacking and redeclaring its two vectors. Their writers
+consume that concrete type, and SF2 layout compares it as a value. This removes
+five production lines, two temporary unpacking steps, and an implicit generic
+scope requirement. All 21,504 synth outputs are byte-identical to the preceding
+modulation-policy revision. The full build and all 17 CTest targets pass without
+warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
