@@ -5,6 +5,7 @@
  */
 
 #include "value/formats/NinSnes/NinSnes.h"
+#include "value/formats/NinSnes/NinSnesQuest.h"
 
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
@@ -2359,8 +2360,12 @@ bool isValidPlaylist(ByteReader reader, const Layout& layout) {
 SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
                              std::vector<Diagnostic>* diagnostics) {
   const Profile& selected = profile(layout.profile);
-  const Definition definition = makeDefinition(layout);
   PlaylistDecode playlist = decodePlaylist(reader, layout, sequenceId, sourceMap, diagnostics);
+  if (selected.id == ProfileId::Quest) {
+    return quest::decodeSequence(reader, layout, std::move(playlist.playlist), sequenceId, playlist.annotation,
+                                 sourceMap, diagnostics);
+  }
+  const Definition definition = makeDefinition(layout);
 
   SequenceProgram program = sequenceConfig().makeProgram();
   RuntimeConfig runtime{

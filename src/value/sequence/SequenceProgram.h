@@ -231,6 +231,9 @@ struct PlaylistCommand {
 struct SectionPlaylist {
   Address startAddress;
   std::vector<PlaylistCommand> commands;
+  // Wait for every active track to end the section before advancing the playlist.
+  // When false, the first track to end the section advances the playlist.
+  bool waitForAllTracks = false;
 };
 
 // Positional pan needs a source-domain law to define its channel gains.

@@ -333,6 +333,7 @@ target_sources(vgmtransvalueformats
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesModule.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesPatterns.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesProfile.cpp
+    ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesQuest.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesSequence.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/NinSnes/NinSnesSynth.cpp
     ${PROJECT_SOURCE_DIR}/src/value/formats/HOSA/HOSABytecode.h

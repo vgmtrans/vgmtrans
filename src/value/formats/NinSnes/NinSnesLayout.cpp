@@ -7,6 +7,7 @@
 #include "value/formats/NinSnes/NinSnes.h"
 
 #include "value/formats/NinSnes/NinSnesPatterns.h"
+#include "value/formats/NinSnes/NinSnesQuest.h"
 
 #include <algorithm>
 #include <array>
@@ -469,6 +470,9 @@ void loadIntelligentTables(ByteReader reader, const VoiceCommandInfo& commands, 
 std::optional<Layout> findLayout(ByteReader reader) {
   if (reader.size() != kAramSize) {
     return std::nullopt;
+  }
+  if (const auto quest = quest::findLayout(reader)) {
+    return quest;
   }
 
   Signature signature = Signature::None;

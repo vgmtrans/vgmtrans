@@ -38,6 +38,7 @@ struct InstrumentInfo {
   SourceRecord source;
   bool override = false;
   bool drumSource = false;
+  bool noise = false;
 };
 
 struct InstrumentRegion {
@@ -50,8 +51,8 @@ struct InstrumentRegion {
 [[nodiscard]] bool isNoise(const Profile& selected, const InstrumentInfo& info) {
   // Sunsoft, FE3 / Metal Combat and TA / Panel de Pon interpret negative
   // SRCNs as DSP noise, with the clock rate in bits 0-4. FE4 uses literal SRCNs.
-  return (isSunsoft(selected.id) || selected.intelli == IntelliMode::Fe3 || selected.intelli == IntelliMode::Ta) &&
-         info.srcn >= 0x80;
+  return info.noise || ((isSunsoft(selected.id) || selected.intelli == IntelliMode::Fe3 ||
+                         selected.intelli == IntelliMode::Ta) && info.srcn >= 0x80);
 }
 
 [[nodiscard]] bool blankSlot(ByteReader reader, const Profile& selected, u16 program, u32 address) {
@@ -93,7 +94,7 @@ struct InstrumentRegion {
   if (isNoise(selected, info)) {
     return true;
   }
-  if (info.srcn >= 0x80 && selected.intelli != IntelliMode::Fe4) {
+  if (info.srcn >= 0x80 && selected.intelli != IntelliMode::Fe4 && selected.id != ProfileId::Quest) {
     return false;
   }
   const auto directory = readSnesSampleDirectoryEntry(reader, directoryAddress + info.srcn * 4, inspectSample);
@@ -239,6 +240,7 @@ struct InstrumentRegion {
         .pitchLow = definition.pitchLow,
         .source = SourceRecord{.range = definition.source},
         .override = true,
+        .noise = definition.noise,
     });
   }
   return infos;

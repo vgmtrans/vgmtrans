@@ -993,6 +993,10 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
         }
 
         if (signal == SequenceCoordinatorSignal::SectionEnd && playlist) {
+          if (program.sectionPlaylist->waitForAllTracks &&
+              std::ranges::any_of(executors, [](const auto& executor) { return executor->active(); })) {
+            continue;
+          }
           const u64 boundary = executors[selected]->tick();
           // Tracks are visited in stable source order, so keep same-tick work
           // from tracks processed before the boundary command.
@@ -1020,7 +1024,8 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
 
         const bool hasLoopBoundary =
             std::ranges::any_of(executors, [](const auto& executor) { return executor->loopStopTick().has_value(); });
-        if (!playlist && loopPolicy == LoopPolicy::PlayOnce && hasLoopBoundary &&
+        if ((!playlist || program.sectionPlaylist->waitForAllTracks) &&
+            loopPolicy == LoopPolicy::PlayOnce && hasLoopBoundary &&
             std::ranges::all_of(executors,
                                 [](const auto& executor) { return !executor->active() || executor->loopStopTick(); })) {
           sequenceEndTick = 0;

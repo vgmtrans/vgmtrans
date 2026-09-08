@@ -1856,6 +1856,254 @@ void ninSnesSunsoftFeAndGateFollowRevision() {
   }
 }
 
+
+Layout questLayout() {
+  auto layout = standardLayout();
+  layout.profile = ProfileId::Quest;
+  layout.signature = Signature::Quest;
+  return layout;
+}
+
+std::vector<NotePerformanceEvent> questNotes(const PerformanceSequence& performance, u32 track = 0) {
+  expect(performance.diagnostics.empty(), "Quest performance must not contain runtime diagnostics");
+  std::vector<NotePerformanceEvent> notes;
+  for (const auto& event : performance.tracks[track].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(*note);
+    }
+  }
+  return notes;
+}
+
+std::vector<u8> questDriverFixture() {
+  std::vector<u8> bytes(kAramSize);
+  const auto write = [&](u32 address, std::initializer_list<u8> data) {
+    std::ranges::copy(data, bytes.begin() + address);
+  };
+  // Relocated executable probes and data, not a copyrighted SPC image.
+  write(0x800, {0x68, 0xc8, 0x90, 0xb6, 0x68, 0xd8, 0xb0, 6,    0x68, 0xca, 0xb0, 0xc5, 0x2f, 0xda,
+                0x1c, 0x80, 0xa8, 0xb0, 0x5d, 0xe8, 9,    0x2d, 0xe8, 0x0e, 0x2d, 0x1f, 0,    9});
+  write(0x840, {0xe4, 0xbc, 0x9c, 0x1c, 0xfd, 0x8f, 0x81, 0x5d, 0xe5, 0x80, 5,    0xe9, 0x81, 5,
+                0xc4, 0x0c, 0xd8, 0x0d, 0xf7, 0x0c, 0xc4, 0x40, 0xfc, 0xf7, 0x0c, 0xc4, 0x41});
+  write(0x880, {0x08, 0x80, 0x8d, 6, 0xcf, 0xda, 0x0c, 0x8d, 0, 0xf4, 0x28, 0x28, 0xd7});
+  write(0x8a0, {0xf5, 0, 0x21, 0x68, 7, 0xf0, 0x2b, 0x60, 0x84, 0x58, 0xfd, 0xf6, 0, 0x3000 >> 8});
+  write(0x8c0, {0x28, 0x0f, 0x04, 0x59, 0xfd, 0x80, 0xb6, 8, 0x30, 0x48, 0xff, 0xfd, 0xcf, 0xdd});
+  write(0x8e0, {0xfd, 0xf6, 0x35, 0x30, 0xc4, 5, 0xf6, 0x20, 0x30, 0xeb, 4, 0xcf, 0xdb, 0x93});
+  write(0x920, {0xf5, 0x60, 0x30, 0x30, 0x0b, 0xc4, 0xf2, 0xf5, 0x61, 0x30, 0xc4, 0xf3, 0x3d, 0x3d, 0x2f, 0xf0});
+  write(0x3060, {0x0c, 0x55, 0x1c, 0x55, 0x5d, 2, 0xff});
+  write(0x3000, {0x23, 0x46, 0x69, 0x8c, 0xaf, 0xd2, 0xf5, 0xff});
+  write(0x3008, {0x19, 0x28, 0x37, 0x46, 0x55, 0x64, 0x73, 0x82, 0x91, 0xa0, 0xaf, 0xbe, 0xcd, 0xdc, 0xeb, 0xff});
+  write(0x3020,
+        {0,   8,   17,  26,  35,  44,  55,  67,  80,  95,  104, 110, 114, 117, 119, 121, 123, 124, 125, 126, 127,
+         127, 126, 125, 124, 123, 121, 119, 117, 114, 110, 104, 95,  80,  67,  55,  44,  35,  26,  17,  8,   0});
+  writeLe16(bytes, 0x580, 0x2000);
+  writeLe16(bytes, 0x2000, 0x2100);
+  writeLe16(bytes, 0x2002, 0x2200);
+  writeLe16(bytes, 0x2100, 0x2300);
+  writeLe16(bytes, 0x2200, 0x2400);
+  writeSection(bytes, 0x2300, {{0, 0x2500}});
+  writeSection(bytes, 0x2400, {{0, 0x2600}, {7, 0x2700}});
+  write(0x2500, {24, 0x7f, 0x80, 0});
+  write(0x2600, {24, 0x7f, 0x81, 0});
+  write(0x2700, {48, 0x7f, 0x82, 0});
+  bytes[0xb9] = 2;
+  bytes[0xbc] = 1;
+  return bytes;
+}
+
+void ninSnesQuestSupportsTacticsOgre() {
+  expect(profile(ProfileId::Quest).id == ProfileId::Quest, "Quest must have a named profile");
+  {
+    auto bytes = questDriverFixture();
+    const ByteReader reader(SourceId{1}, bytes);
+    const auto layout = findLayout(reader);
+    expect(layout && layout->profile == ProfileId::Quest && layout->songIndex == 2 &&
+               layout->playlistAddress == 0x2200 && layout->instrumentTableAddress == 0x300 &&
+               layout->spcDirAddress == 0x200 && layout->durationRateTable[6] == 0xf5 &&
+               layout->volumeTable[15] == 0xff && layout->questPanTable.size() == 42,
+           "Quest scanner must read relocated BGM tables and prioritize the pending one-based song request");
+    const auto performance = render(bytes, *layout);
+    expect(questNotes(performance, 7).size() == 1 && performance.tracks[0].endTick == 48,
+           "Quest sections must wait for all eight channels rather than ending with the first one");
+    bytes[0xb9] = 0;
+    bytes[0xf4] = 0xff;
+    expect(findLayout(reader)->songIndex == 1, "Quest handshake bytes must not select another song");
+    bytes[0x883] = 5;
+    expect(!findLayout(reader), "a different instrument stride must not be mistaken for the Quest driver");
+  }
+  {
+    auto bytes = sequenceBytes({0xe5, 0x80, 0xed, 0x40, 0xe7, 120,  0xe1, 0x14, 24,   0x3f,
+                                      0x80, 24,   0x7a, 0xc8, 0x81, 0x7e, 0xc9, 0x7f, 0xc9, 0});
+    const auto performance = render(bytes, questLayout());
+    const auto notes = questNotes(performance);
+    expect(notes.size() == 2 && notes[0].durationTicks == 47 && notes[1].header.tick == 48 &&
+               notes[1].durationTicks == 23 && performance.tracks[0].endTick == 408,
+           "Quest folds ties before gating, keeps the last gate, and expands 7E/7F to 144/192 ticks");
+    expect(
+        std::abs(notes[0].linearVelocity - 223.0 / 255.0) < 1e-9 && notes[1].linearVelocity == notes[0].linearVelocity,
+        "tie lookahead updates the gate but does not change velocity");
+    bool tempo = false, volume = false, master = false, pan = false;
+    for (const auto& event : performance.tracks[0].events) {
+      if (const auto* e = std::get_if<TempoPerformanceEvent>(&event)) {
+        tempo |= e->microsecondsPerQuarter == 204000;
+      }
+      if (const auto* e = std::get_if<LevelPerformanceEvent>(&event)) {
+        volume |= e->linearGain == 64.0 / 255.0;
+      }
+      if (const auto* e = std::get_if<MasterLevelPerformanceEvent>(&event)) {
+        master |= e->linearGain == 128.0 / 255.0;
+      }
+      if (const auto* e = std::get_if<StereoBalancePerformanceEvent>(&event)) {
+        pan |= e->leftGain == 127.0 / 128.0 && e->rightGain == 0;
+      }
+    }
+    expect(tempo && volume && master && pan, "Quest timer divisor and linear levels must match the hardware writes");
+    bytes = sequenceBytes({0xde, 0x2c, 1, 0x3f, 0x80, 0});
+    const auto longNotes = questNotes(render(bytes, questLayout()));
+    expect(longNotes.size() == 1 && longNotes[0].durationTicks == 164,
+           "Quest long durations must use the driver's divide/multiply gate calculation");
+    bytes = sequenceBytes({24, 0});
+    const auto parsed = decodeSequence(ByteReader(SourceId{1}, bytes), questLayout(), AssetId{1});
+    expect(parsed.program.tracks[0].commands.size() == 2,
+           "zero after a duration must remain a terminator, not a packed velocity byte");
+  }
+  {
+    // Finite calls inside loops must expose their counters to loop detection.
+    auto bytes = sequenceBytes({4, 0x7f, 0xeb, 3, 0xef, 0, 4, 2, 0xec, 0xef, 0, 5, 0xff});
+    std::ranges::copy(std::initializer_list<u8>{0xef, 0x20, 4, 2, 0}, bytes.begin() + 0x400);
+    std::ranges::copy(std::initializer_list<u8>{0x80, 0}, bytes.begin() + 0x420);
+    std::ranges::copy(std::initializer_list<u8>{0x81, 0xef, 0, 5, 0xff}, bytes.begin() + 0x500);
+    const auto performance = render(bytes, questLayout());
+    const auto notes = questNotes(performance);
+    expect(notes.size() == 13 && notes.back().header.tick == 48 && performance.tracks[0].endTick == 52,
+           "Quest must complete nested finite calls and stop the final per-track infinite jump");
+    // A second section retains the default duration and controller state.
+    bytes = sequenceBytes({4, 0x7f, 0x80, 0});
+    writeLe16(bytes, 0x102, 0x220);
+    writeSection(bytes, 0x220, {{0, 0x400}});
+    bytes[0x400] = 0x81;
+    const auto sections = questNotes(render(bytes, questLayout()));
+    expect(sections.size() == 2 && sections[1].header.tick == 4 && sections[1].durationTicks == 3,
+           "Quest keeps note parameters across section changes");
+  }
+  {
+    auto bytes = sequenceBytes({0xe0, 0, 0xf6, 0xff, 0, 0xb6, 24, 0x3f, 0x80, 0x81, 0});
+    Layout layout = questLayout();
+    layout.instrumentTableAddress = 0x4000;
+    std::ranges::copy(std::initializer_list<u8>{0, 0x8f, 0xe0, 0x40, 1, 0}, bytes.begin() + 0x4000);
+    const auto performance = render(bytes, layout);
+    const auto notes = questNotes(performance);
+    expect(notes.size() == 2 && notes[0].durationTicks == 13 && notes[1].durationTicks == 13,
+           "F6 FF must start the GAIN release at the gate");
+    bool released = false, restored = false;
+    for (const auto& event : performance.tracks[0].events) {
+      if (const auto* e = std::get_if<EnvelopePerformanceEvent>(&event)) {
+        released |= e->header.tick == 0 && e->update.values &&
+                    e->update.values->releaseSeconds == snesDspGainEnvelopeSeconds(0xb6, 0x7ff, 0);
+        restored |= e->header.tick == 24 && e->update.values == snesDspEnvelope(0x8f, 0xe0, 0x40);
+      }
+    }
+    expect(released && restored,
+           "release GAIN must be available before the attack and preserve the next note's attack envelope");
+  }
+  {
+    // Embedded zero bytes must remain operands in variable-length commands.
+    // Table writes take effect only when loaded.
+    auto bytes = sequenceBytes({0xfd, 2,    1, 0x8f, 0xe0, 0x40, 1,    0,    0xe0, 2,    4,    0x7f, 0x80,
+                                      0xfd, 2,    1, 0x8f, 0xe0, 0x40, 1,    0,    0xf6, 0,    0xf6, 4,    0,
+                                      0xb8, 0xf6, 4, 0x8f, 0xe0, 0x40, 0xf7, 0x80, 0,    0xf7, 2,    0x20, 4,
+                                      0x7f, 0,    0, 0,    0,    0,    0,    0,    0xfd, 0xfd, 0x8f, 0xe0, 0x40,
+                                      0xfd, 0xfc, 0, 1,    0xe2, 5,    0xea, 2,    0x81, 0xfa, 2,    0xca, 0});
+    const auto parsed = decodeSequence(ByteReader(SourceId{1}, bytes), questLayout(), AssetId{1});
+    const auto notes = questNotes(SequenceVm(LoopPolicy::PlayOnce).render(parsed.program));
+    expect(notes.size() == 3 && notes[1].key == 32 && notes[2].key == 62,
+           "Quest variable operands and percussion must preserve stream boundaries and transpose rules");
+    expect(parsed.recipes.overrides.size() == 2 && parsed.recipes.overrides[0].pitchHigh == 1 &&
+               parsed.recipes.overrides[1].pitchHigh == 2,
+           "Quest deduplicates table writes and captures active tuning changes as distinct instruments");
+  }
+  {
+    auto bytes = sequenceBytes({0xfc, 0, 0xe0, 1,    0xe1, 0x8a, 0xe5, 0x80, 0xed, 0x80, 0xe7, 120,  0xe8, 4, 60,
+                                      0xee, 4, 0x40, 0xe3, 2,    64,   8,    0xf0, 3,    16,   8,    0x7f, 0x80, 0});
+    const auto performance = render(bytes, questLayout());
+    bool echoPreserved = false, tempo = false, volume = false, vibrato = false, pan = false;
+    for (const auto& event : performance.tracks[0].events) {
+      if (const auto* e = std::get_if<ReverbPerformanceEvent>(&event)) {
+        echoPreserved = e->voiceMask == 1;
+      }
+      if (const auto* e = std::get_if<TempoPerformanceEvent>(&event)) {
+        tempo |= e->header.tick == 4 && e->microsecondsPerQuarter == 414000;
+      }
+      if (const auto* e = std::get_if<LevelPerformanceEvent>(&event)) {
+        volume |= e->header.tick == 4 && e->linearGain == 64.0 / 255.0;
+      }
+      if (const auto* e = std::get_if<ModulationPerformanceEvent>(&event)) {
+        vibrato |= e->target == ModulationPerformanceTarget::VibratoRate && e->context.frequencyHz == 6.25;
+      }
+      if (const auto* e = std::get_if<StereoBalancePerformanceEvent>(&event)) {
+        pan |= e->leftGain == -104.0 / 128.0 && e->rightGain == 104.0 / 128.0;
+      }
+    }
+    expect(
+        echoPreserved && tempo && volume && vibrato && pan,
+        "Quest preserves echo on program changes, fades timer divisors, and uses a fixed vibrato clock and pan phase");
+    bytes = sequenceBytes({0xe9, 0xf4, 4, 0x7f, 0xa4, 0xfa, 0, 0xca, 0});
+    const auto notes = questNotes(render(bytes, questLayout()));
+    expect(notes.size() == 2 && notes[0].key == 49 && notes[1].key == 60,
+           "Quest carries overflow from global transpose into the channel addition, excluding percussion");
+  }
+  {
+    auto bytes = sequenceBytes({0xe0, 0xff, 31, 4, 0x7f, 0x80, 0});
+    auto layout = questLayout();
+    layout.instrumentTableAddress = 0x4000;
+    layout.spcDirAddress = 0x5000;
+    const auto parsed = decodeSequence(ByteReader(SourceId{1}, bytes), layout, AssetId{1});
+    expect(parsed.recipes.overrides.size() == 1 && parsed.recipes.overrides[0].noise,
+           "E0 FF must create explicit noise, independently of literal SRCN values");
+    const auto result = scanSynth(bytes, layout, "Quest noise", parsed.recipes);
+    const auto& bank = std::get<SoundBankAsset>(result.assets[0]);
+    expect(bank.localSamples.samples.size() == 1 && bank.localSamples.samples[0].codec == AudioCodec::SnesDspNoise &&
+               bank.localSamples.samples[0].codecParameter == 31,
+           "Quest noise must export a procedural sample with its DSP clock");
+  }
+  {
+    auto bytes = sequenceBytes({4, 0x7f, 0xca, 0xfd, 0, 1, 0x8f, 0xe0, 0, 1, 0, 0xca, 0xe0, 0, 0xca, 0});
+    const auto performance = render(bytes, questLayout());
+    std::vector<u32> notePrograms;
+    u32 currentProgram = 0;
+    for (const auto& event : performance.tracks[0].events) {
+      if (const auto* e = std::get_if<InstrumentPerformanceEvent>(&event); e && e->sourceInstrument) {
+        currentProgram = e->sourceInstrument->key;
+      } else if (std::holds_alternative<NotePerformanceEvent>(event)) {
+        notePrograms.push_back(currentProgram);
+      }
+    }
+    expect(notePrograms == std::vector<u32>{0, 0, 128},
+           "repeated percussion retains its active instrument until a program change invalidates the cache");
+    bytes = sequenceBytes({1, 0x7f, 0x80, 0});
+    writeLe16(bytes, 0x102, 0x81);
+    writeLe16(bytes, 0x104, 0x100);
+    expect(questNotes(render(bytes, questLayout())).size() == 130,
+           "Quest playlist repeat 81 is 129 additional plays, not an infinite loop");
+  }
+  {
+    auto bytes = sequenceBytes({0xef, 0, 3, 1, 0});
+    std::vector<Diagnostic> diagnostics;
+    const auto parsed =
+        decodeSequence(ByteReader(SourceId{1}, bytes), questLayout(), AssetId{1}, nullptr, &diagnostics);
+    expect(
+        std::ranges::any_of(diagnostics, [](const auto& d) { return d.message == "Quest subroutine stack overflow"; }),
+        "recursive Quest calls must stop at the driver's four-frame stack limit");
+    bytes =
+        sequenceBytes({0xfd, 0xff, 1, 0x8f, 0xe0, 0, 1, 0, 4, 0x7f, 0x80, 0xfd, 0xfe, 2, 0x8f, 0xe0, 0, 0x81, 0});
+    const auto inlineProgram = decodeSequence(ByteReader(SourceId{1}, bytes), questLayout(), AssetId{1});
+    expect(inlineProgram.recipes.overrides.size() == 2 && inlineProgram.recipes.overrides[0].srcn == 1 &&
+               inlineProgram.recipes.overrides[1].srcn == 2 &&
+               questNotes(SequenceVm(LoopPolicy::PlayOnce).render(inlineProgram.program)).size() == 2,
+           "inline instruments and partial SRCN edits must preserve their data and command boundaries");
+  }
+}
+
 }  // namespace
 
 void runNinSnesTests() {
@@ -1894,4 +2142,5 @@ void runNinSnesTests() {
   ninSnesSunsoftRecognizesBgmLayouts();
   ninSnesSunsoftCommandsPreserveEchoAndEnvelopeState();
   ninSnesSunsoftFeAndGateFollowRevision();
+  ninSnesQuestSupportsTacticsOgre();
 }
