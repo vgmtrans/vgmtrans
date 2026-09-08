@@ -296,13 +296,13 @@ struct SfLayout {
 }
 
 [[nodiscard]] bool sameSampleMap(const ResolvedSynthInstrument& lhs, const ResolvedSynthInstrument& rhs) {
-  return lhs.generators == rhs.generators && lhs.modulators == rhs.modulators &&
+  return lhs.modulation == rhs.modulation &&
          std::ranges::equal(lhs.regions, rhs.regions, [](const ResolvedSynthRegion& a, const ResolvedSynthRegion& b) {
            const auto& x = *a.region;
            const auto& y = *b.region;
            return a.sampleIndex == b.sampleIndex && x.keyRange == y.keyRange && x.velocityRange == y.velocityRange &&
                   x.unityKey == y.unityKey && x.loop == y.loop && x.pan == y.pan &&
-                  x.attenuationDb == y.attenuationDb && a.generators == b.generators && a.modulators == b.modulators;
+                  x.attenuationDb == y.attenuationDb && a.modulation == b.modulation;
          });
 }
 
@@ -460,14 +460,13 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
     writeIndex(bags, generatorOffset / 4);
     writeIndex(bags, modulatorOffset / 10);
   };
-  const auto writeModulation = [&](std::span<const SynthGenerator> sourceGenerators,
-                                   std::span<const SynthModulator> sourceModulators) {
-    for (const auto& generator : sourceGenerators) {
+  const auto writeModulation = [&](const LoweredSynthModulation& modulation) {
+    for (const auto& generator : modulation.generators) {
       if (const auto destination = sf2GeneratorForDestination(generator.destination)) {
         writeAmountGen(generators, *destination, sf2GeneratorAmount(generator));
       }
     }
-    for (const auto& modulator : sourceModulators) {
+    for (const auto& modulator : modulation.modulators) {
       if (const auto record = sf2ModulatorFor(modulator, midiModulationUsage, modulationScaling)) {
         writeWordGen(modulators, record->source, record->destination);
         writeLeS16(modulators, record->amount);
@@ -483,7 +482,7 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
 
     const size_t globalGeneratorOffset = generators.size();
     const size_t globalModulatorOffset = modulators.size();
-    writeModulation(instrument.generators, instrument.modulators);
+    writeModulation(instrument.modulation);
     if (generators.size() != globalGeneratorOffset || modulators.size() != globalModulatorOffset) {
       writeBag(globalGeneratorOffset, globalModulatorOffset);
     }
@@ -497,7 +496,7 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
       // SF2 requires ranges before other generators and sample linkage last.
       writeRangeGen(generators, kSfGenKeyRange, region.keyRange.low, region.keyRange.high);
       writeRangeGen(generators, kSfGenVelRange, region.velocityRange.low, region.velocityRange.high);
-      writeModulation(resolved.generators, resolved.modulators);
+      writeModulation(resolved.modulation);
       writeAmountGen(generators, kSfGenInitialAttenuation,
                      static_cast<s16>(sf2Attenuation(region, Sample{.attenuationDb = sample.attenuationDb})));
       writeAmountGen(generators, kSfGenPan, sf2Pan(region.pan));

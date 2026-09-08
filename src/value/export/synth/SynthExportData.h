@@ -60,16 +60,14 @@ struct DecodedSynthSample {
 struct ResolvedSynthRegion {
   const Region* region = nullptr;
   u16 sampleIndex = 0;
-  std::vector<SynthGenerator> generators;
-  std::vector<SynthModulator> modulators;
+  LoweredSynthModulation modulation;
 };
 
 struct ResolvedSynthInstrument {
   const Instrument* instrument = nullptr;
   InstrumentAddress address;
   std::vector<ResolvedSynthRegion> regions;
-  std::vector<SynthGenerator> generators;
-  std::vector<SynthModulator> modulators;
+  LoweredSynthModulation modulation;
 };
 
 struct PreparedSynthData {

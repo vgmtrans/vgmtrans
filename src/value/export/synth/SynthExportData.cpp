@@ -253,12 +253,10 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
   // still produce a useful partial export.
   std::vector<ResolvedSynthInstrument> instruments;
   for (const auto* instrument : selectedInstruments) {
-    auto modulation = lowerSynthModulation(instrument->modulation, conversion);
     ResolvedSynthInstrument resolvedInstrument{
         .instrument = instrument,
         .address = resolveInstrumentAddress(instrument->explicitAddress, instrument->identity),
-        .generators = std::move(modulation.generators),
-        .modulators = std::move(modulation.modulators),
+        .modulation = lowerSynthModulation(instrument->modulation, conversion),
     };
     for (const auto& region : instrument->regions) {
       const auto sampleIndex = resolveRegionSampleIndex(region, samples, diagnostics);
@@ -266,12 +264,10 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
         continue;
       }
 
-      auto regionModulation = lowerSynthModulation(region.modulation, conversion);
       resolvedInstrument.regions.push_back(ResolvedSynthRegion{
           .region = &region,
           .sampleIndex = *sampleIndex,
-          .generators = std::move(regionModulation.generators),
-          .modulators = std::move(regionModulation.modulators),
+          .modulation = lowerSynthModulation(region.modulation, conversion),
       });
     }
 

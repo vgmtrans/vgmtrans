@@ -308,7 +308,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   writeConnection(connections, kDlsConnDstEg1SustainLevel,
                   explicitEnvelope ? dlsSustainLevel(envelope) : kDlsSustainLevelFullScale);
   writeConnection(connections, kDlsConnDstEg1ReleaseTime, dlsEnvelopeTimecents(envelope.releaseSeconds));
-  const auto writeModulation = [&](const auto& scope) {
+  const auto writeModulation = [&](const LoweredSynthModulation& scope) {
     for (const auto& generator : scope.generators) {
       if (const auto connection = dlsConnectionForGenerator(generator)) {
         writeConnection(connections, *connection);
@@ -320,8 +320,8 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
       }
     }
   };
-  writeModulation(instrument);
-  writeModulation(resolvedRegion);
+  writeModulation(instrument.modulation);
+  writeModulation(resolvedRegion.modulation);
 
   std::vector<u8> art;
   writeLe32(art, 8);
