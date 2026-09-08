@@ -69,14 +69,53 @@ WAV means individual samples, not a recording of the sequence.
 titles do not collide. Existing output files are replaced. Empty or failed
 artifacts are reported without writing placeholder files; successful artifacts
 from a partial export are still saved, and the command returns failure.
-Collection export and stitching support the core's loop, dynamic envelope,
-used instrument, and modulation policies listed by `help export`.
-`export-asset` uses the core defaults; export a collection to customize policies.
 
 Single and double quotes preserve spaces in command arguments. Quoted and
 unquoted fragments can be combined. Backslashes are literal, including in
 Windows paths. There is no variable expansion, globbing, command substitution,
 or host shell execution inside the command language.
+
+## Conversion options
+
+All conversion settings in Qt's **Options** menu are available as export flags.
+Options apply to the current command; each export starts with the core defaults.
+Use `help export`, `help export-asset`, or `help stitch` to see choices and defaults.
+Both `--option value` and `--option=value` work. If a setting is repeated, the last
+value wins.
+
+| Qt option | Shell flag and choices | Shell default |
+| --- | --- | --- |
+| Bank Select Style | `--bank-select gs\|mma` | `gs` (CC0 only) |
+| Pitch Transition Rendering | `--pitch-transitions preserve\|portamento\|pitch-bend` | `preserve` |
+| Tuning Rendering | `--tuning pitch-bend\|rpn` | `pitch-bend` |
+| Modulation Conversion | `--modulation synth\|events` | `synth` |
+| Dynamic Envelope Conversion | `--dynamic-envelopes` / `--no-dynamic-envelopes` | Ignore |
+| Sequence Loops | `--loops N` (extra repeats after the first playthrough) | `1` |
+| Export used instrument data only | `--used-instruments` / `--all-instruments` | All |
+| Terminate previous voice on new attack | `--terminate-previous-voice` / `--no-terminate-previous-voice` | Off |
+| Skip MIDI channel 10 | `--skip-channel-10` / `--use-channel-10` | Skip |
+| Sample Filtering | `--sample-filter auto\|none\|snes\|psx` | `auto` (format recommended) |
+
+`rpn` selects coarse/fine tune RPNs. `snes` and `psx` select the SNES S-DSP and
+PlayStation SPU low-pass filters. `--dynamic-envelopes` creates instrument variants.
+The existing `--simulate-modulation` flag is an alias for `--modulation events`.
+`--modulation-scaling full|observed` selects the modulator range (default: `full`).
+The shell retains the core's default of exporting all instrument data; use
+`--used-instruments` to match Qt's default.
+
+`export` and `stitch` accept all options. `export-asset ... midi` accepts loops,
+bank select, pitch transitions, tuning, voice termination, and channel 10 options;
+standalone MIDI always simulates modulation as MIDI events.
+`export-asset ... sf2` and `dls` accept all options supported by the core request.
+Sample filtering applies to SF2/DLS only: WAV export always writes the original
+decoded samples, and `export-asset ... wav` accepts no conversion options.
+Settings apply to the relevant outputs, as in Qt.
+
+```text
+export 0 output midi sf2 --pitch-transitions pitch-bend --tuning rpn --sample-filter snes
+export-asset 0 output midi --bank-select mma --use-channel-10 --loops 0
+stitch output 0 1 --modulation events --dynamic-envelopes --used-instruments
+```
 
 ## Implementation
 
@@ -84,6 +123,8 @@ or host shell execution inside the command language.
 arguments, and handles terminal input and history. `commands.cpp` borrows that
 session and output streams for each command. A single constant command table
 supplies dispatch, argument counts, help, and completion.
+`ExportOptions.cpp` maps flags directly into core export requests and keeps option
+parsing, target support, and help in one table.
 
 Commands mutate the session through its public API, read immutable
 `SessionSnapshot` / `SourceInspection` values, and persist the `Artifact` values

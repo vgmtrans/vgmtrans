@@ -5,6 +5,7 @@
  */
 
 #include "commands.h"
+#include "ExportOptions.h"
 #include "value/export/CollectionStitch.h"
 #include "value/scan/ScanResultBuilder.h"
 #include "value/sequence/SequenceVm.h"
@@ -72,7 +73,10 @@ ScanResult scanProbe(const ScanInput& input, bool emptyBank) {
       .runtime = {.execute =
                       [](const SourceCommand& command, std::any&, std::any&, PerformanceEmitter& out, VmApi&) {
                         if (command.address.value == 0) {
-                          out.note(60, 1.0, 12);
+                          out.instrument(3, 7);
+                          out.tuning(35);
+                          const auto voice = out.note(60, 1.0, 12);
+                          out.pitchSlide(voice, 60, 64, 4).preferPortamento();
                           return Effects::wait(12);
                         }
                         return Effects{};
@@ -104,7 +108,7 @@ ScanResult scanProbe(const ScanInput& input, bool emptyBank) {
                                                  });
   if (!emptyBank) {
     bank.instruments()
-        .append(Instrument{.name = "Instrument"})
+        .append(Instrument{.explicitAddress = InstrumentAddress{.bank = 3, .program = 7}, .name = "Instrument"})
         .region(sample.ref(), Region{.range = input.reader.range(2, 8)});
   }
   result.sourceCollection("Same title").sequence(sequence).soundBank(bank);
@@ -153,7 +157,7 @@ struct Fixture {
   }
 
   void seed() {
-    const auto id = session.addSource(SourceFile{.name = "probe"}, {0x7f, 0xfe, 0, 0, 0, 0, 0, 0, 0, 0});
+    const auto id = session.addSource(SourceFile{.name = "probe"}, {0x7f, 0xfe, 0, 0x40, 0, 0xc0, 0, 0x40, 0, 0xc0});
     session.scanSource(id);
     expect(session.snapshot().assets().size() >= 2, "probe should admit a sequence and bank");
   }
@@ -277,6 +281,153 @@ void loadingAndErrors(const std::filesystem::path& directory) {
   expect(readFile(directory / "dump.bin") == readFile(source), "dump should preserve source bytes");
 }
 
+void exportOptionParsing() {
+  const auto parse = [](std::initializer_list<std::string> args, ExportTarget target = ExportTarget::Collection) {
+    return parseExportOptions(std::vector<std::string>(args), target);
+  };
+  const auto custom =
+      parse({"sf2", "--loops=0x2", "--bank-select", "mma", "--pitch-transitions=pitch-bend", "--tuning", "rpn",
+             "--terminate-previous-voice", "--use-channel-10", "--modulation=events", "--modulation-scaling",
+             "observed", "--dynamic-envelopes", "--used-instruments", "--sample-filter=psx", "midi"});
+  expect(custom.kinds == std::vector{ExportKind::SoundFont2, ExportKind::Midi} && custom.sequence.sequenceLoops == 2,
+         "formats and spaced/equals options should combine in command order");
+  expect(custom.sequence.midi.bankSelectStyle == MidiBankSelectStyle::MsbAndLsb &&
+             custom.sequence.midi.pitchTransitions == MidiPitchTransitionRendering::PitchBend &&
+             custom.sequence.midi.tuning == MidiTuningRendering::CoarseAndFineTune &&
+             custom.sequence.midi.terminatePreviousVoice && !custom.sequence.midi.skipChannel10,
+         "MIDI options must select the corresponding core policies");
+  expect(custom.modulationConversion == ModulationConversionPolicy::SequenceEventSimulation &&
+             custom.modulationScaling == ModulationScalingPolicy::ObservedSequenceRange &&
+             custom.dynamicEnvelopes == DynamicEnvelopePolicy::InstrumentVariants && custom.exportOnlyUsedInstruments &&
+             custom.sampleFiltering == SampleFilteringPolicy::PsxSpuLowPass,
+         "sound bank options must select the corresponding core policies");
+  const auto reset = parse({"--loops",
+                            "2",
+                            "--loops=1",
+                            "--bank-select=mma",
+                            "--bank-select=gs",
+                            "--pitch-transitions=portamento",
+                            "--pitch-transitions=preserve",
+                            "--tuning=rpn",
+                            "--tuning=pitch-bend",
+                            "--terminate-previous-voice",
+                            "--no-terminate-previous-voice",
+                            "--use-channel-10",
+                            "--skip-channel-10",
+                            "--simulate-modulation",
+                            "--modulation=synth",
+                            "--modulation-scaling=observed",
+                            "--modulation-scaling=full",
+                            "--dynamic-envelopes",
+                            "--no-dynamic-envelopes",
+                            "--used-instruments",
+                            "--all-instruments",
+                            "--sample-filter=snes",
+                            "--sample-filter=auto"});
+  const auto defaults = parse({});
+  expect(reset.sequence.sequenceLoops == defaults.sequence.sequenceLoops &&
+             reset.sequence.midi.bankSelectStyle == defaults.sequence.midi.bankSelectStyle &&
+             reset.sequence.midi.pitchTransitions == defaults.sequence.midi.pitchTransitions &&
+             reset.sequence.midi.tuning == defaults.sequence.midi.tuning &&
+             reset.sequence.midi.terminatePreviousVoice == defaults.sequence.midi.terminatePreviousVoice &&
+             reset.sequence.midi.skipChannel10 == defaults.sequence.midi.skipChannel10 &&
+             reset.modulationConversion == defaults.modulationConversion &&
+             reset.modulationScaling == defaults.modulationScaling &&
+             reset.dynamicEnvelopes == defaults.dynamicEnvelopes &&
+             reset.exportOnlyUsedInstruments == defaults.exportOnlyUsedInstruments &&
+             reset.sampleFiltering == defaults.sampleFiltering && defaults.kinds.empty(),
+         "explicit defaults should restore core defaults, with the last setting winning");
+  expect(
+      parse({"--pitch-transitions=portamento"}, ExportTarget::Sequence).sequence.midi.pitchTransitions ==
+              MidiPitchTransitionRendering::Portamento &&
+          parse({"--sample-filter=none"}, ExportTarget::SoundBank).sampleFiltering == SampleFilteringPolicy::None &&
+          parse({"--sample-filter=snes"}, ExportTarget::Stitch).sampleFiltering ==
+              SampleFilteringPolicy::SnesDspLowPass &&
+          parse({"--simulate-modulation"}).modulationConversion == ModulationConversionPolicy::SequenceEventSimulation,
+      "all rendering choices and the existing modulation alias should remain accessible");
+
+  for (const auto& args : std::initializer_list<std::vector<std::string>>{{"--loops"},
+                                                                          {"--loops="},
+                                                                          {"--loops=-1"},
+                                                                          {"--loops=4294967296"},
+                                                                          {"--loops=2junk"},
+                                                                          {"--bank-select", "--tuning=rpn"},
+                                                                          {"--bank-select=bad"},
+                                                                          {"--pitch-transitions=bad"},
+                                                                          {"--tuning=bad"},
+                                                                          {"--modulation=bad"},
+                                                                          {"--modulation-scaling=bad"},
+                                                                          {"--sample-filter=bad"},
+                                                                          {"--used-instruments=false"},
+                                                                          {"--unknown"},
+                                                                          {"all", "sf2"}}) {
+    bool rejected = false;
+    try {
+      (void)parseExportOptions(args, ExportTarget::Collection);
+    } catch (const std::invalid_argument&) {
+      rejected = true;
+    }
+    expect(rejected, "invalid options should fail: " + args.front());
+  }
+}
+
+void exportOptionsReachCore(const std::filesystem::path& directory) {
+  Fixture fixture;
+  fixture.seed();
+  const auto exportDir = directory / "options";
+  const auto destination = "'" + exportDir.string() + "'";
+  ExportRequest request{.kinds = {ExportKind::Midi, ExportKind::SoundFont2, ExportKind::Dls}};
+  request.sequence.sequenceLoops = 0;
+  request.sequence.midi.bankSelectStyle = MidiBankSelectStyle::MsbAndLsb;
+  request.sequence.midi.pitchTransitions = MidiPitchTransitionRendering::PitchBend;
+  request.sequence.midi.tuning = MidiTuningRendering::CoarseAndFineTune;
+  request.sequence.midi.skipChannel10 = false;
+  request.sequence.midi.terminatePreviousVoice = true;
+  request.sampleFiltering = SampleFilteringPolicy::SnesDspLowPass;
+  request.exportOnlyUsedInstruments = true;
+  const std::string sequenceOptions = " --loops=0 --bank-select mma --pitch-transitions pitch-bend --tuning=rpn"
+                                      " --use-channel-10 --terminate-previous-voice";
+  const std::string options = sequenceOptions + " --sample-filter snes --used-instruments";
+  fixture.ok("export 0 " + destination + " midi sf2 dls" + options);
+  const auto expected = fixture.session.exportCollection(CollectionId{0}, request);
+  const auto defaults = fixture.session.exportCollection(CollectionId{0}, ExportRequest{.kinds = request.kinds});
+  expect(expected.size() == 3 && defaults.size() == 3, "probe should export MIDI, SF2, and DLS");
+  for (size_t i = 0; i < expected.size(); ++i) {
+    expect(!expected[i].bytes.empty() && readFile(exportDir / expected[i].filename) == expected[i].bytes &&
+               expected[i].bytes != defaults[i].bytes,
+           "collection options should change the exported artifacts exactly as the core does");
+  }
+  fixture.ok("export-asset 0 " + destination + " midi" + sequenceOptions);
+  const auto midi = fixture.session.exportSequenceMidi(AssetId{0}, request.sequence);
+  expect(readFile(exportDir / midi.filename) == midi.bytes, "standalone MIDI should honor sequence options");
+  // Isolate pitch rendering: a tuning or loop change must not hide a dropped pitch option.
+  fixture.ok("export-asset 0 " + destination + " midi --pitch-transitions=pitch-bend");
+  const auto pitchBend = readFile(exportDir / midi.filename);
+  fixture.ok("export-asset 0 " + destination + " midi --pitch-transitions=portamento");
+  expect(readFile(exportDir / midi.filename) != pitchBend, "pitch transition choices should change MIDI output");
+  for (const auto& [name, format] :
+       {std::pair{"sf2", SynthExportFormat::SoundFont2}, std::pair{"dls", SynthExportFormat::Dls}}) {
+    fixture.ok("export-asset 1 " + destination + " " + name + options);
+    const auto bank = fixture.session.exportSoundBank(AssetId{1}, format, request);
+    expect(readFile(exportDir / bank.filename) == bank.bytes, "standalone banks should honor conversion options");
+  }
+  fixture.seed();
+  fixture.ok("stitch " + destination + " 1 0" + options);
+  const auto stitched = fixture.session.stitchCollections(std::array{CollectionId{1}, CollectionId{0}}, request);
+  expect(stitched.complete() && readFile(exportDir / stitched.midi.filename) == stitched.midi.bytes &&
+             readFile(exportDir / stitched.soundFont.filename) == stitched.soundFont.bytes,
+         "stitching should honor the same conversion options");
+  const auto rejectedDir = directory / "unsupported-options";
+  const auto rejected = "'" + rejectedDir.string() + "'";
+  fixture.fails("export-asset 0 " + rejected + " midi --sample-filter=snes");
+  expect(fixture.errors.str().find("requires a collection or sound bank export") != std::string::npos,
+         "standalone MIDI should explain unsupported sound bank options");
+  fixture.fails("export-asset 1 " + rejected + " wav --sample-filter=none");
+  fixture.fails("export-asset 1 " + rejected + " sf2 midi");
+  fixture.fails("stitch " + rejected + " 0 --loops 0 sf2");
+  expect(!std::filesystem::exists(rejectedDir), "unsupported options must fail before writing artifacts");
+}
+
 void exportsUseCoreArtifacts(const std::filesystem::path& directory) {
   Fixture fixture;
   fixture.seed();
@@ -344,6 +495,8 @@ int main() {
     persistentSessionAndStableIds();
     commandValidationAndCollections();
     loadingAndErrors(directory.path);
+    exportOptionParsing();
+    exportOptionsReachCore(directory.path);
     exportsUseCoreArtifacts(directory.path);
     std::cout << "Shell integration tests passed\n";
     return 0;
