@@ -721,6 +721,17 @@ scanned-source tracking. This removes 39 production lines. Add the stitching
 test's missing direct set include exposed by the narrower Session header. The
 full build and all 17 CTest targets pass without warnings.
 
+### Express arcade decryption through shared bit operations
+
+Replace Kabuki's two hand-expanded bit-pair permutations with one four-pair
+loop whose key order is explicit at each call. Use standard fixed-width
+rotations for Kabuki and CPS3 instead of two more local helpers. This removes
+28 production lines. Before/after comparison passes 41,943,040 permutation
+checks under AddressSanitizer and UBSan, covering every effective key and
+selector, both key orders, zero/all-one bytes, and each source bit independently.
+The full build and all 17 CTest targets pass without warnings, including the
+existing Kabuki and CPS3 address-path fixtures.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
