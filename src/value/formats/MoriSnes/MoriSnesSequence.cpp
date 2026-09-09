@@ -30,7 +30,6 @@ using namespace core;
 
 namespace {
 
-constexpr u8 kInitialMasterVolume = 0xf0;
 constexpr u8 kInitialTrackVolume = 0xc8;
 constexpr u8 kInitialTempo = 0x20;
 constexpr s8 kInitialEchoVolume = 0x12;
@@ -100,6 +99,11 @@ struct InspectedEvent {
   return kPpqn * timerTarget * 125u / tempo;
 }
 
+[[nodiscard]] u8 tempoAccumulatorStep(DriverTraits traits, u8 operand) {
+  // CB Chara's handler stores twice the operand in the accumulator step.
+  return traits.version == Version::CbChara ? static_cast<u8>(operand << 1) : operand;
+}
+
 [[nodiscard]] double signedDspGain(s8 value) { return value / 128.0; }
 
 [[nodiscard]] double byteGain(u8 value) { return value / 256.0; }
@@ -107,6 +111,9 @@ struct InspectedEvent {
 [[nodiscard]] double sourceVelocityGain(u8 value) { return static_cast<u8>(value << 1) / 256.0; }
 
 [[nodiscard]] double masterGain(DriverTraits traits, u8 value) {
+  if (usesEarlySparseDriver(traits.version)) {
+    return value / 256.0;
+  }
   if (traits.version == Version::Shien) {
     // Shien first doubles C5 with saturation, then halves the high byte of
     // C5*$80. The mixer finally applies 2*($1f+1), where $1f starts at $7f.
@@ -240,6 +247,8 @@ struct ProgramState : DriverConfig {
     double attackMilliseconds = 0.0;
     std::optional<u64> ownerEndTick;
     std::optional<double> ownerEndMilliseconds;
+    std::optional<u64> gateEndTick;
+    std::optional<double> gateEndMilliseconds;
     std::optional<u64> audioEndTick;
     std::optional<double> audioEndMilliseconds;
   };
@@ -295,6 +304,13 @@ struct ProgramState : DriverConfig {
 
   void expireVoices(u64 tick, double now) {
     for (HardwareVoice& voice : voices) {
+      const bool gateEnded = (voice.gateEndTick && *voice.gateEndTick < tick) ||
+                             (voice.gateEndMilliseconds && *voice.gateEndMilliseconds < now);
+      if (voice.ownerActive && gateEnded) {
+        voice.priority = 1;
+        voice.gateEndTick.reset();
+        voice.gateEndMilliseconds.reset();
+      }
       // Source commands run before the hardware-voice pass in the same timer
       // interrupt, so a voice whose counter reaches zero exactly now can still
       // be found or stolen by this source tick.
@@ -324,10 +340,13 @@ struct ProgramState : DriverConfig {
         selected = index;
       }
     }
-    const bool sameOwner = std::ranges::any_of(voices, [&](const HardwareVoice& voice) {
-      return voice.ownerActive && voice.ownerTrack == track;
-    });
-    if (voices[selected].priority != 0 && !sameOwner && voices[selected].priority >= priority) {
+    // Early drivers always compare priorities; later ones exempt a free voice or its current owner.
+    const bool bypassPriority = !usesEarlySparseDriver(traits.version) &&
+                                (voices[selected].priority == 0 ||
+                                 std::ranges::any_of(voices, [&](const HardwareVoice& voice) {
+                                   return voice.ownerActive && voice.ownerTrack == track;
+                                 }));
+    if (voices[selected].priority >= priority && !bypassPriority) {
       return nullptr;
     }
     HardwareVoice& voice = voices[selected];
@@ -406,7 +425,7 @@ struct TrackState : DriverConfig {
   u8 pan = traits.initialPan;
   u8 bendRange = traits.initialBendRange;
   u8 priority = 0x40;
-  u8 mode = 0x08;
+  u8 mode = traits.echoMask;
   u8 group = 0;
   bool echoEnabled = true;
   u16 descriptor = 0;
@@ -424,10 +443,9 @@ struct Playback {
 
   [[nodiscard]] u32 clockTicks(u8 raw, bool applyFastMode = true) const {
     const u8 physical = applyFastMode && program.fast ? raw >> 1 : raw;
-    // In normal music mode the driver decrements countdowns only when the
-    // 8.8 tempo accumulator carries. Mode bit 2 instead decrements them on
-    // every 9.875 ms Timer 0 interrupt.
-    const u32 scale = (track.mode & 0x04) != 0 ? program.tempo : kSequenceTickScale;
+    // In normal music mode countdowns follow the 8.8 tempo accumulator. The
+    // variant's fixed-clock flag instead decrements them on every Timer 0 tick.
+    const u32 scale = (track.mode & track.traits.fixedClockMask) != 0 ? program.tempo : kSequenceTickScale;
     return static_cast<u32>(physical) * scale;
   }
 
@@ -444,8 +462,8 @@ struct Playback {
       }
     }
     if (!noteDelay) {
-      // The dispatcher clears the source countdown before every C0-E6
-      // handler. State and flow commands therefore consume no song time.
+      // The dispatcher clears the source countdown before command handlers,
+      // so state and flow commands consume no song time.
       return 0;
     }
     return clockTicks(timing.delay.value_or(track.delta));
@@ -491,7 +509,7 @@ struct Playback {
     const VoiceScriptAnalysis& limits = program.voice(track.scriptAddress, track.percussion, note);
     const u8 physicalDuration = program.fast ? track.duration >> 1 : track.duration;
     const u32 gateClocks = physicalDuration + limits.releaseDelay.value_or(0);
-    const bool fixedClock = (track.mode & 0x04) != 0;
+    const bool fixedClock = (track.mode & track.traits.fixedClockMask) != 0;
     const std::optional<u64> autoEndTick = track.duration != 0 && !fixedClock
                                               ? std::optional{nowTick + gateClocks * kSequenceTickScale}
                                               : std::nullopt;
@@ -504,6 +522,7 @@ struct Playback {
         tied->tieEligible = false;
         const u32 tiedClocks = physicalDuration + tied->releaseDelay;
         if (tied->fixedClock) {
+          tied->gateEndMilliseconds = now + physicalDuration * program.traits.timerMilliseconds();
           const double tiedEnd = now + tiedClocks * program.traits.timerMilliseconds();
           tied->ownerEndMilliseconds = tied->ownerEndMilliseconds
                                             ? std::min(*tied->ownerEndMilliseconds, tiedEnd)
@@ -513,6 +532,7 @@ struct Playback {
                                             : std::optional{tiedEnd};
           program.limitNoteMilliseconds(*tied, *tied->audioEndMilliseconds);
         } else {
+          tied->gateEndTick = nowTick + physicalDuration * kSequenceTickScale;
           const u64 tiedEnd = nowTick + tiedClocks * kSequenceTickScale;
           tied->ownerEndTick = tied->ownerEndTick ? std::min(*tied->ownerEndTick, tiedEnd)
                                                   : std::optional{tiedEnd};
@@ -609,6 +629,13 @@ struct Playback {
     voice->audioEndMilliseconds = audioEndMilliseconds;
     voice->ownerEndTick = autoEndTick;
     voice->ownerEndMilliseconds = autoEndMilliseconds;
+    if (track.duration != 0) {
+      if (fixedClock) {
+        voice->gateEndMilliseconds = now + physicalDuration * track.traits.timerMilliseconds();
+      } else {
+        voice->gateEndTick = nowTick + physicalDuration * kSequenceTickScale;
+      }
+    }
     if (limits.scriptEnd) {
       const double scriptedEnd = now + *limits.scriptEnd * program.traits.timerMilliseconds();
       voice->ownerEndMilliseconds = voice->ownerEndMilliseconds
@@ -647,7 +674,7 @@ struct Playback {
 
   [[nodiscard]] Effects tempo(const EventTiming& timing, u8 value) {
     const u32 delay = beginEvent(timing);
-    program.setTempo(vm.tick(), value);
+    program.setTempo(vm.tick(), tempoAccumulatorStep(program.traits, value));
     out.tempo(tempoMicrosecondsPerQuarter(program.tempo, program.traits.timerTarget));
     return Effects::wait(delay);
   }
@@ -679,7 +706,8 @@ struct Playback {
 
   [[nodiscard]] Effects echoEnabled(const EventTiming& timing, bool enabled) {
     const u32 delay = beginEvent(timing);
-    track.mode = enabled ? static_cast<u8>(track.mode | 0x08) : static_cast<u8>(track.mode & ~u8{0x08});
+    track.mode = enabled ? static_cast<u8>(track.mode | track.traits.echoMask)
+                         : static_cast<u8>(track.mode & ~track.traits.echoMask);
     track.echoEnabled = enabled;
     return Effects::wait(delay);
   }
@@ -743,7 +771,7 @@ struct Playback {
   [[nodiscard]] Effects mode(const EventTiming& timing, u8 value) {
     const u32 delay = beginEvent(timing);
     track.mode = static_cast<u8>((track.mode & ~u8{2}) | value);
-    track.echoEnabled = (track.mode & 0x08) != 0;
+    track.echoEnabled = (track.mode & track.traits.echoMask) != 0;
     return Effects::wait(delay);
   }
 
@@ -1016,7 +1044,8 @@ void consumeTiming(Cursor::Event& event, u8 first, const InspectedEvent& inspect
     return cursor.truncated();
   }
   const u8 status = inspected.status;
-  auto event = cursor.command(commandLabel(layout.version, status), commandSemantic(layout.version, status));
+  const Version version = layout.traits.version;
+  auto event = cursor.command(commandLabel(version, status), commandSemantic(version, status));
   consumeTiming(event, cursor.opcode(), inspected);
 
   if (status < 0xc0) {
@@ -1029,12 +1058,12 @@ void consumeTiming(Cursor::Event& event, u8 first, const InspectedEvent& inspect
     return event.invoke<&Playback::note>(inspected.timing, note, parameter);
   }
 
-  if (!isCommand(layout.version, status)) {
+  if (!isCommand(version, status)) {
     return event.stop();
   }
-  const std::optional<u8> command = canonicalCommand(layout.version, status);
+  const std::optional<u8> command = canonicalCommand(version, status);
   if (!command) {
-    if (commandSize(layout.version, status) != 0) {
+    if (commandSize(version, status) != 0) {
       event.u8("value", SourceValueDisplay::Hex);
     }
     return event.invoke<&Playback::wait>(inspected.timing);
@@ -1152,34 +1181,28 @@ void consumeTiming(Cursor::Event& event, u8 first, const InspectedEvent& inspect
 
 }  // namespace
 
-const SequenceProgramConfig& sequenceConfig(Version version) {
-  const auto makeConfig = [](Version configVersion) {
-    const DriverTraits traits = driverTraits(configVersion);
-    const double center = (configVersion == Version::Shien ? 0x64 : 0x60) / 128.0;
-    return SequenceProgramConfig{
-        .commandKindPrefix = "mori-snes",
-        .timebase = Timebase{.ppqn = kPpqn},
-        .behavior =
-            SequenceProgramBehavior{
-                .commandLimit = kCommandLimit,
-                .initialLevel = byteGain(kInitialTrackVolume),
-                .initialMasterLevel = masterGain(traits, kInitialMasterVolume),
-                .initialReverbSend = echoSend(kInitialEchoVolume),
-                .initialStereoBalance = StereoBalance{.leftGain = center, .rightGain = center},
-                .initialPitchBendRangeSemitones = traits.initialBendRange / 8,
-                .initialTempoMicrosecondsPerQuarter = tempoMicrosecondsPerQuarter(kInitialTempo, traits.timerTarget),
-            },
-    };
+SequenceProgramConfig sequenceConfig(DriverTraits traits) {
+  const double center = (usesSparseCommands(traits.version) ? 0x64 : 0x60) / 128.0;
+  return SequenceProgramConfig{
+      .commandKindPrefix = "mori-snes",
+      .timebase = Timebase{.ppqn = kPpqn, .midiPpqn = kMidiPpqn},
+      .behavior =
+          SequenceProgramBehavior{
+              .commandLimit = kCommandLimit,
+              .initialLevel = byteGain(kInitialTrackVolume),
+              .initialMasterLevel = masterGain(traits, traits.initialMasterVolume),
+              .initialReverbSend = echoSend(kInitialEchoVolume),
+              .initialStereoBalance = StereoBalance{.leftGain = center, .rightGain = center},
+              .initialPitchBendRangeSemitones = traits.initialBendRange / 8,
+              .initialTempoMicrosecondsPerQuarter = tempoMicrosecondsPerQuarter(kInitialTempo, traits.timerTarget),
+          },
   };
-  static const SequenceProgramConfig gokinjo = makeConfig(Version::Gokinjo);
-  static const SequenceProgramConfig shien = makeConfig(Version::Shien);
-  return version == Version::Shien ? shien : gokinjo;
 }
 
 SequenceRuntime sequenceRuntime(ByteReader reader, const Layout& layout) {
   return makeCompiledRuntime<Cursor, ProgramState>(DriverConfig{
       .data = reader,
-      .traits = driverTraits(layout.version),
+      .traits = layout.traits,
       .presetTable = layout.presetTableAddress,
       .presetPitchHigh = layout.presetPitchHighAddress,
       .panTable = layout.panTableAddress,
@@ -1203,7 +1226,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
                                               .owner(ObjectRefs::sequence(sequenceId))
                                               .id()
                                         : SourceAnnotationId{};
-    SequenceProgram program = sequenceConfig(layout.version).makeProgram();
+    SequenceProgram program = sequenceConfig(layout.traits).makeProgram();
     program.behavior.initialLevel = 1.0;
     program.behavior.initialReverbSend = 0.0;
     std::vector<u16> scripts;
@@ -1249,7 +1272,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     program.runtime = makeCompiledRuntime<SfxCursor>(SfxRuntimeConfig{
         .driver = DriverConfig{
             .data = reader,
-            .traits = driverTraits(layout.version),
+            .traits = layout.traits,
             .presetTable = layout.presetTableAddress,
             .presetPitchHigh = layout.presetPitchHighAddress,
             .panTable = layout.panTableAddress,
@@ -1265,7 +1288,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
 
   const u32 headerSize = layout.tracks.size() * 3u + 1u;
   const SourceRange header = reader.range(layout.songHeaderAddress, headerSize);
-  SequenceDecodeSession sequence{reader, sequenceConfig(layout.version), sequenceId, header, sourceMap, kCommandLimit,
+  SequenceDecodeSession sequence{reader, sequenceConfig(layout.traits), sequenceId, header, sourceMap, kCommandLimit,
                                  kAramSize};
   for (const TrackHeader& track : layout.tracks) {
     const u16 encoded = reader.le16(track.range.offset + 1);
@@ -1273,7 +1296,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
                       [&](u32 offset) { return decodeCommand(reader, layout, offset, diagnostics); }, encoded);
   }
   SequenceProgram program = sequence.finish(sequenceRuntime(reader, layout));
-  const DriverTraits traits = driverTraits(layout.version);
+  const DriverTraits traits = layout.traits;
   if (reader.has(layout.panTableAddress + traits.initialPan, 1)) {
     const double center = reader.u8At(layout.panTableAddress + traits.initialPan) / 128.0;
     program.behavior.initialStereoBalance = StereoBalance{.leftGain = center, .rightGain = center};

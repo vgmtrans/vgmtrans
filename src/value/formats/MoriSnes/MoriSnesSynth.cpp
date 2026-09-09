@@ -148,7 +148,7 @@ struct Patch {
   std::vector<std::pair<u8, u16>> scripts;
   u32 entry = descriptor + 1u;
   u32 boundary = kAramSize;
-  const bool absolute = driverTraits(layout.version).absolutePercussionPointers;
+  const bool absolute = layout.traits.absolutePercussionPointers;
   for (u8 key = 0; key < 32 && entry + 2 <= boundary && reader.has(entry, 2); ++key) {
     const u16 continuation = static_cast<u16>(entry + 2);
     const u16 script = absolute ? reader.le16(entry)
@@ -167,7 +167,7 @@ struct Patch {
                                                 const ReferencedInstruments& references) {
   const DriverConfig driver{
       .data = reader,
-      .traits = driverTraits(layout.version),
+      .traits = layout.traits,
       .presetTable = layout.presetTableAddress,
       .presetPitchHigh = layout.presetPitchHighAddress,
       .panTable = layout.panTableAddress,
@@ -243,9 +243,17 @@ struct Patch {
   return volume == 0 ? 96.0 : -20.0 * std::log10(volume / 256.0);
 }
 
-[[nodiscard]] double baseUnityKey(ByteReader reader, const Patch& patch, u8 outputKey) {
+[[nodiscard]] double rowPitchSemitones(ByteReader reader, u32 row, DriverTraits traits) {
+  if (!traits.multiplicativeTuning) {
+    return static_cast<s8>(reader.u8At(row + 5)) + reader.u8At(row + 6) / 256.0;
+  }
+  const u16 multiplier = static_cast<u16>(reader.u8At(row + 5) << 8 | reader.u8At(row + 6));
+  return multiplier == 0 ? 0.0 : 12.0 * std::log2(multiplier / 256.0);
+}
+
+[[nodiscard]] double baseUnityKey(ByteReader reader, const Patch& patch, u8 outputKey, DriverTraits traits) {
   const u32 row = *patch.script.rowAddress;
-  const double rowPitch = static_cast<s8>(reader.u8At(row + 5)) + reader.u8At(row + 6) / 256.0;
+  const double rowPitch = rowPitchSemitones(reader, row, traits);
   const double scriptPitch = patch.script.attackPitch256 / 256.0;
   if (patch.script.attackAbsolutePitch) {
     return outputKey + 72.0 - (scriptPitch + rowPitch + kPitchTableCorrection);
@@ -256,17 +264,18 @@ struct Patch {
 [[nodiscard]] Region makeRegion(ByteReader reader, const Layout& layout, const Patch& patch, SampleRef sample,
                                 std::optional<u8> key) {
   const u32 row = *patch.script.rowAddress;
+  const DriverTraits& traits = layout.traits;
   Region region{
       .sample = sample,
       .range = reader.range(row, 7),
-      .unityKey = baseUnityKey(reader, patch, key.value_or(60)),
+      .unityKey = baseUnityKey(reader, patch, key.value_or(60), traits),
       .envelope = driverEnvelope(reader.u8At(row + 1), reader.u8At(row + 2), reader.u8At(row + 3)),
       // Voice-script C1 overrides the copied source pan at note-on. Sequence
       // playback emits that effective table-based balance per attack so it is
       // not combined a second time with a region pan.
       .pan = 0.5,
       .attenuationDb = attenuationDb(patch.script.attackVolume),
-      .modulation = modulation(patch.script, driverTraits(layout.version).timerSeconds()),
+      .modulation = modulation(patch.script, traits.timerSeconds()),
   };
   if (key) {
     region.keyRange = KeyRange{.low = *key, .high = *key};

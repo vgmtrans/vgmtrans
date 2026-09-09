@@ -65,6 +65,11 @@ struct Address {
 
 struct Timebase {
   u32 ppqn = 48;
+  // Zero keeps ppqn; formats with a finer internal clock may request a
+  // conventional MIDI division without compromising playback analysis.
+  u32 midiPpqn = 0;
+
+  [[nodiscard]] constexpr u32 midiDivision() const { return midiPpqn == 0 ? ppqn : midiPpqn; }
 };
 
 // How export should treat source loops. The parsed sequence still keeps the
