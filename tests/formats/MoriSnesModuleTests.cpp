@@ -58,6 +58,7 @@ public:
     write(0x0200, {0x8f, 0x20, 0xf3, 0x8f, 0x6c, 0xf2});
     write(0x0300, {0x6d, 0xf7, 0x2d, 0xfd, 0xf6, 0x00, 0x10, 0xd5, 0x7e, 0x02, 0xf6, 0x04, 0x10});
     write(0x0400, {0xf5, 0x0a, 0x02, 0xfd, 0xf6, 0x00, 0x11, 0xee, 0x6d, 0xcf, 0x7d, 0x9f, 0xc4, 0xf2});
+    write(0x0500, {0x8f, 0x4f, 0xfa, 0x8f, 0x01, 0xf1, 0x6f});
 
     word(0x1200, 0xffff);
     word(0x1202, 0x1300);
@@ -88,6 +89,31 @@ public:
     write(0x3000, {0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});
   }
 
+  [[nodiscard]] static DriverFixture shinNekketsu() {
+    DriverFixture fixture;
+    fixture.write(0x0400, {0xf5, 0x0a, 0x02, 0xfd, 0xf6, 0x00, 0x11, 0xeb, 0x35,
+                           0xcf, 0x7d, 0x9f, 0xc4, 0xf2, 0xcb, 0xf3, 0x2d, 0xe8,
+                           0x20, 0x80, 0xb5, 0x0a, 0x02, 0xfd, 0xf6, 0x00, 0x11});
+    fixture.write(0x0500, {0x8f, 0x3c, 0xfa, 0x8f, 0x01, 0xf1, 0x6f});
+    return fixture;
+  }
+
+  [[nodiscard]] static DriverFixture cbChara(u8 timerTarget = 0x30) {
+    DriverFixture fixture;
+    fixture.write(0x0200, {0xe8, 0x20, 0x8d, 0x5d, 0xcb, 0xf2, 0xc4, 0xf3,
+                           0xe8, 0xe0, 0x8d, 0x6c, 0xcb, 0xf2, 0xc4, 0xf3});
+    fixture.write(0x0400, {0xf5, 0x40, 0x02, 0xfd, 0xf6, 0x00, 0x11, 0xeb, 0x2e, 0xcf,
+                           0xdd, 0xee, 0xcb, 0xf2, 0xc4, 0xf3, 0xfc, 0x6d, 0xe8, 0x14,
+                           0x80, 0xb5, 0x40, 0x02, 0xfd, 0xf6, 0x00, 0x11});
+    fixture.write(0x0500, {0xe8, timerTarget, 0xc5, 0xfa, 0x00, 0xe8, 0x01, 0xc5, 0xf1, 0x00, 0x8d, 0x64});
+    fixture.data_[0x1407] = 0xd9;
+    fixture.data_[0x1501] = 0xef;
+    fixture.write(0x1504, {0xcd, 0xf0, 0xeb, 0x04});
+    fixture.write(0x1508, {0x01, 0xea, 0x04, 0xed, 0xfc, 0x01, 0xea, 0xfc, 0xed, 0x04, 0xd9});
+    fixture.write(0x1600, {0x00, 0x8f, 0xe0, 0x00, 0x02, 0x04, 0x00});
+    return fixture;
+  }
+
   [[nodiscard]] static DriverFixture shien() {
     DriverFixture fixture;
     fixture.write(0x0200, {0xe8, 0x11, 0x8d, 0x5d, 0xcb, 0xf2, 0xc4, 0xf3,
@@ -97,6 +123,7 @@ public:
     fixture.write(0x0400, {0xf5, 0x0a, 0x02, 0xfd, 0xf6, 0x00, 0x18, 0xeb, 0x31,
                            0xcf, 0xdd, 0xee, 0xcb, 0xf2, 0xc4, 0xf3, 0x6d, 0xe8,
                            0x14, 0x80, 0xb5, 0x0a, 0x02, 0xfd, 0xf6, 0x00, 0x18});
+    fixture.write(0x0500, {0xe8, 0x3c, 0xc4, 0xfa, 0xe8, 0x01, 0xc4, 0xf1, 0x6f});
 
     fixture.write(0x1400, {0x04, 0x03, 0x40, 0xc7, 0x80, 0xc5, 0x40, 0xc0});
     fixture.relative(0x1408, 0x1500);
@@ -140,27 +167,31 @@ private:
   std::vector<u8> data_;
 };
 
-Layout directLayout() {
+Layout directLayout(Version version = Version::Gokinjo, u8 timerTarget = 0x4f) {
   return Layout{
+      .traits = driverTraits(version, timerTarget),
       .presetTableAddress = 0x1000,
       .panTableAddress = 0x1100,
   };
 }
 
-PerformanceSequence render(std::vector<u8> bytes) {
+PerformanceSequence render(std::vector<u8> bytes, Version version = Version::Gokinjo, u8 timerTarget = 0x4f,
+                           std::vector<u32> starts = {0}) {
   bytes.resize(kAramSize);
   for (u32 index = 0; index < 33; ++index) {
     bytes[0x1100 + index] = static_cast<u8>(128 - index * 4);
   }
-  const Layout layout = directLayout();
-  const SequenceProgramConfig& config = sequenceConfig();
+  const Layout layout = directLayout(version, timerTarget);
+  const SequenceProgramConfig config = sequenceConfig(layout.traits);
   const ByteReader reader(SourceId{301}, bytes);
   SequenceProgram program{
       .runtime = sequenceRuntime(reader, layout),
       .timebase = config.timebase,
       .behavior = config.behavior,
-      .tracks = {decodeSourceTrack(reader, layout, 0, 0)},
   };
+  for (u32 index = 0; index < starts.size(); ++index) {
+    program.tracks.push_back(decodeSourceTrack(reader, layout, index, starts[index]));
+  }
   return SequenceVm(LoopPolicy::PlayOnce).render(program);
 }
 
@@ -306,6 +337,23 @@ void zeroDurationNotesReuseTheDriverVoice() {
          "attack");
 }
 
+void cbCharaEqualPriorityVoiceCannotStealAnotherTrack() {
+  std::vector<u8> bytes(kAramSize);
+  std::vector<u32> starts;
+  for (u32 track = 0; track < 8; ++track) {
+    const u32 start = track * 0x10;
+    starts.push_back(start);
+    std::ranges::copy(std::array<u8, 5>{4, 0, 0x40, 0x80, 0xe0}, bytes.begin() + start);
+  }
+  std::ranges::copy(std::array<u8, 6>{1, 0, 0x40, 0x80, 0x81, 0xe0}, bytes.begin() + starts.back());
+
+  const PerformanceSequence performance = render(std::move(bytes), Version::CbChara, 0x30, std::move(starts));
+  const auto first = events<NotePerformanceEvent>(performance.tracks.front());
+  const auto last = events<NotePerformanceEvent>(performance.tracks.back());
+  expect(first.size() == 1 && first.front()->durationTicks == std::numeric_limits<u32>::max() && last.size() == 1,
+         "an equal-priority request should be rejected instead of stealing another track's hardware voice");
+}
+
 void fixedClockModeUsesTimerDurations() {
   std::vector<u8> bytes{
       0xd5, 0x04,
@@ -360,7 +408,7 @@ void scannerBuildsScriptedSynthModulation() {
 void shienDialectUsesItsDriverTimingAndPointers() {
   const DriverFixture fixture = DriverFixture::shien();
   const auto layout = findLayout(ByteReader(SourceId{305}, fixture.data()));
-  expect(layout && layout->version == Version::Shien && layout->spcDirAddress == 0x1100 &&
+  expect(layout && layout->traits.version == Version::Shien && layout->spcDirAddress == 0x1100 &&
              layout->presetTableAddress == 0x1700 && layout->presetPitchHighAddress == 0x170a &&
              layout->panTableAddress == 0x1800,
          "Shien's relocated DIR, split pitch presets, and 21-step pan law should identify its driver dialect");
@@ -401,6 +449,40 @@ void shienDialectUsesItsDriverTimingAndPointers() {
              reverbs.back()->feedback == 0.5 && reverbs.back()->send == 0.5,
          "Shien's sparse command table should preserve tempo, master gain, pitch presets, bends, echo, notes, and "
          "the inert F7 operand");
+}
+
+void shinNekketsuMixerSelectsItsPhysicalClock() {
+  const DriverFixture fixture = DriverFixture::shinNekketsu();
+  const auto layout = findLayout(ByteReader(SourceId{306}, fixture.data()));
+  expect(layout && layout->traits.version == Version::ShinNekketsu &&
+             !layout->traits.absolutePercussionPointers && layout->traits.timerMilliseconds() == 7.5,
+         "Shin Nekketsu's direct-write pan mixer should retain standard pointers while selecting its 7.5 ms clock");
+}
+
+void cbCharaUsesTheEarlySparseDialect() {
+  const DriverFixture fixture = DriverFixture::cbChara();
+  const DriverFixture combatribes = DriverFixture::cbChara(0x28);
+  const auto layout = findLayout(ByteReader(SourceId{307}, fixture.data()));
+  const auto combatribesLayout = findLayout(ByteReader(SourceId{308}, combatribes.data()));
+  const SessionSnapshot snapshot = scan(fixture.data());
+  const Region* region = firstRegion(firstSoundBank(snapshot));
+  const double expectedUnityKey = 72.0 - 12.0 * std::log2(4286.0 / 4096.0) - 24.0;
+  const PerformanceSequence performance = render({0xc7, 0x5a, 0xe0}, Version::CbChara, 0x30);
+  const PerformanceSequence combatribesPerformance = render({0xc7, 0x7f, 0xe0}, Version::Combatribes, 0x28);
+  const auto tempos = events<TempoPerformanceEvent>(performance.tracks.front());
+  const auto combatribesTempos = events<TempoPerformanceEvent>(combatribesPerformance.tracks.front());
+
+  expect(layout && layout->traits.version == Version::CbChara && layout->spcDirAddress == 0x2000 &&
+             layout->panTableAddress == 0x1100 && layout->traits.timerMilliseconds() == 6.0 &&
+             layout->traits.fixedClockMask == 0x08 && layout->traits.echoMask == 0x10 &&
+             layout->traits.absolutePercussionPointers &&
+             canonicalCommand(Version::CbChara, 0xd9) == 0xcb && isCommand(Version::CbChara, 0xf2) &&
+             !isCommand(Version::CbChara, 0xf3) && region &&
+             std::abs(region->unityKey - expectedUnityKey) < 0.000001 && tempos.size() == 1 &&
+             tempos.back()->microsecondsPerQuarter == 409'600 && combatribesLayout &&
+             combatribesLayout->traits.version == Version::Combatribes && combatribesTempos.size() == 1 &&
+             combatribesTempos.back()->microsecondsPerQuarter == 483'779,
+         "early sparse revisions should preserve their distinct clocks and tempo handlers");
 }
 
 void loopingVoicePreludeRemainsSeparateFromItsVibratoCycle() {
@@ -457,13 +539,14 @@ void loopingVoicePreludeRemainsSeparateFromItsVibratoCycle() {
   const auto bends = events<PitchBendPerformanceEvent>(track);
   const auto expressions = events<ExpressionPerformanceEvent>(track);
   const auto faded = std::ranges::find_if(expressions, [](const ExpressionPerformanceEvent* expression) {
-    return expression->header.tick == 15 * 0x20;
+    return expression->header.tick == 15 * 0x20 &&
+           std::abs(expression->linearGain - 140.0 / 210.0) < 0.000001;
   });
   expect(performance.diagnostics.empty() && !notes.empty() && track.automations.empty() &&
              hasPitchBend(bends, kPrimaryPitchBendLayer, 0, 2.0 * 127.0 / 128.0) &&
              hasPitchBend(bends, kPrimaryPitchBendLayer, 2 * 0x100, 2.0 * 93.0 / 128.0) &&
              hasPitchBend(bends, kVoiceScriptPitchLayer, 5 * 0x20, 515.0 / 256.0) &&
-             faded != expressions.end() && std::abs((*faded)->linearGain - 140.0 / 210.0) < 0.000001,
+             faded != expressions.end(),
          "the fixed-clock voice prelude should remain additive to source bends and separate from its steady vibrato");
 }
 
@@ -655,9 +738,12 @@ void liveSongSelectionAndHardwareSoundEffectsAreRecovered() {
 void runMoriSnesModuleTests() {
   eventTimingAndAuditedCommandsRenderPhysically();
   zeroDurationNotesReuseTheDriverVoice();
+  cbCharaEqualPriorityVoiceCannotStealAnotherTrack();
   fixedClockModeUsesTimerDurations();
   sourceVoiceScriptChangesFutureReleaseBehavior();
   scannerBuildsScriptedSynthModulation();
+  shinNekketsuMixerSelectsItsPhysicalClock();
+  cbCharaUsesTheEarlySparseDialect();
   shienDialectUsesItsDriverTimingAndPointers();
   loopingVoicePreludeRemainsSeparateFromItsVibratoCycle();
   preAttackFinePitchRemainsRelativeToTheSourceNote();

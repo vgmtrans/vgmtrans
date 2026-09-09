@@ -220,7 +220,7 @@ void remapPart(StitchPart& part) {
 [[nodiscard]] u32 commonPpqn(const std::vector<StitchPart>& parts) {
   u32 common = 0;
   for (const auto& part : parts) {
-    const u32 ppqn = normalizedPpqn(part.midi.timebase.ppqn);
+    const u32 ppqn = normalizedPpqn(part.midi.timebase.midiDivision());
     if (common == 0) {
       common = ppqn;
       continue;

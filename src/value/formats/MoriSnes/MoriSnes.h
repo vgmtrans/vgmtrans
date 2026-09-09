@@ -23,17 +23,26 @@ namespace vgmtrans::formats::mori_snes {
 inline constexpr u32 kAramSize = 0x10000;
 inline constexpr u32 kTrackCount = 10;
 inline constexpr u32 kCommandLimit = 131072;
-// Source waits are decremented by an 8-bit tempo accumulator, while hardware
-// voice gates use every Timer 0 interrupt. Keeping the accumulator denominator
-// in the timeline represents both clocks exactly.
 inline constexpr u16 kPpqn = 48 * 256;
+inline constexpr u16 kMidiPpqn = 96;
 inline constexpr std::string_view kInstrumentDomain = "mori-snes.instrument";
 inline constexpr u32 kDirectInstrumentFlag = 0x10000;
 
 enum class Version : u8 {
   Gokinjo,
+  ShinNekketsu,
+  CbChara,
+  Combatribes,
   Shien,
 };
+
+[[nodiscard]] constexpr bool usesEarlySparseDriver(Version version) {
+  return version == Version::CbChara || version == Version::Combatribes;
+}
+
+[[nodiscard]] constexpr bool usesSparseCommands(Version version) {
+  return usesEarlySparseDriver(version) || version == Version::Shien;
+}
 
 struct DriverTraits {
   Version version;
@@ -41,30 +50,39 @@ struct DriverTraits {
   u8 initialPan;
   u8 maximumPan;
   u8 initialBendRange;
+  u8 initialMasterVolume;
+  u8 fixedClockMask;
+  u8 echoMask;
+  u16 trackSongIndexAddress;
   bool absolutePercussionPointers;
+  bool multiplicativeTuning;
 
   [[nodiscard]] constexpr double timerMilliseconds() const { return timerTarget * 0.125; }
   [[nodiscard]] constexpr double timerSeconds() const { return timerTarget * 0.000125; }
 };
 
-[[nodiscard]] constexpr DriverTraits driverTraits(Version version) {
-  return version == Version::Shien
-             ? DriverTraits{.version = version,
-                            .timerTarget = 0x3c,
-                            .initialPan = 0x0a,
-                            .maximumPan = 0x14,
-                            .initialBendRange = 0x28,
-                            .absolutePercussionPointers = true}
-             : DriverTraits{.version = version,
-                            .timerTarget = 0x4f,
-                            .initialPan = 0x10,
-                            .maximumPan = 0x20,
-                            .initialBendRange = 0x20,
-                            .absolutePercussionPointers = false};
+[[nodiscard]] constexpr DriverTraits driverTraits(Version version, u8 timerTarget) {
+  const bool sparse = usesSparseCommands(version);
+  const bool early = usesEarlySparseDriver(version);
+  return DriverTraits{
+      .version = version,
+      .timerTarget = timerTarget,
+      .initialPan = static_cast<u8>(sparse ? 0x0a : 0x10),
+      .maximumPan = static_cast<u8>(sparse ? 0x14 : 0x20),
+      .initialBendRange = static_cast<u8>(sparse ? 0x28 : 0x20),
+      .initialMasterVolume = static_cast<u8>(version == Version::CbChara      ? 0x64
+                                            : version == Version::Combatribes ? 0x78
+                                                                                : 0xf0),
+      .fixedClockMask = static_cast<u8>(version == Version::CbChara ? 0x08 : 0x04),
+      .echoMask = static_cast<u8>(version == Version::CbChara ? 0x10 : 0x08),
+      .trackSongIndexAddress = static_cast<u16>(early ? 0x025a : 0x0212),
+      .absolutePercussionPointers = sparse,
+      .multiplicativeTuning = early,
+  };
 }
 
-// Raw Shien status -> equivalent Gokinjo status. Zeroes are real no-ops in the
-// SPC dispatch table; $F7 alone consumes a synchronization-counter operand.
+// Raw sparse-dialect status -> equivalent Gokinjo status. Zeroes are real
+// no-ops in the SPC dispatch table; Shien's $F7 consumes a sync operand.
 inline constexpr std::array<u8, 56> kShienCommands{
     0xc0, 0xc1, 0,    0,    0,    0xc2, 0,    0xc3, 0,    0,    0xc4, 0,    0,    0xc5, 0,    0xc6,  // Cx
     0,    0,    0,    0,    0xc7, 0xc8, 0xc9, 0xca, 0,    0xcb, 0xcc, 0xcd, 0xce, 0xcf, 0,    0,     // Dx
@@ -73,7 +91,7 @@ inline constexpr std::array<u8, 56> kShienCommands{
 };
 
 [[nodiscard]] constexpr std::optional<u8> canonicalCommand(Version version, u8 status) {
-  if (version == Version::Gokinjo) {
+  if (!usesSparseCommands(version)) {
     return status >= 0xc0 && status <= 0xe6 ? std::optional{status} : std::nullopt;
   }
   const u8 command = status >= 0xc0 && status <= 0xf7 ? kShienCommands[status - 0xc0] : 0;
@@ -81,7 +99,8 @@ inline constexpr std::array<u8, 56> kShienCommands{
 }
 
 [[nodiscard]] constexpr bool isCommand(Version version, u8 status) {
-  return status >= 0xc0 && status <= (version == Version::Shien ? 0xf7 : 0xe6);
+  const u8 last = version == Version::Shien ? 0xf7 : usesSparseCommands(version) ? 0xf2 : 0xe6;
+  return status >= 0xc0 && status <= last;
 }
 
 [[nodiscard]] constexpr u8 commandSize(Version version, u8 status) {
@@ -108,7 +127,7 @@ struct SfxVoice {
 };
 
 struct Layout {
-  Version version = Version::Gokinjo;
+  DriverTraits traits{};
   u16 songListAddress = 0;
   u16 songHeaderAddress = 0;
   u16 spcDirAddress = 0;
@@ -142,7 +161,7 @@ struct SequenceParse {
 [[nodiscard]] SequenceParse decodeSequence(core::ByteReader reader, const Layout& layout, core::AssetId sequenceId,
                                            core::SourceMapBuilder* sourceMap = nullptr,
                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
-[[nodiscard]] const core::SequenceProgramConfig& sequenceConfig(Version version = Version::Gokinjo);
+[[nodiscard]] core::SequenceProgramConfig sequenceConfig(DriverTraits traits);
 [[nodiscard]] core::SequenceRuntime sequenceRuntime(core::ByteReader reader, const Layout& layout);
 [[nodiscard]] core::Envelope driverEnvelope(u8 adsr1, u8 adsr2, u8 gain);
 [[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
