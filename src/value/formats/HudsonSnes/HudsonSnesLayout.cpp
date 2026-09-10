@@ -169,10 +169,10 @@ void appendRecipeRows(ByteReader reader, CountedBlock block, HeaderField field, 
 }
 
 void readInitialEcho(ByteReader reader, u32 address, ParsedHeader& header) {
-  header.initialEchoLeft = static_cast<s8>(reader.u8At(address));
-  header.initialEchoRight = static_cast<s8>(reader.u8At(address + 1));
+  header.initialEchoLeft = reader.s8At(address);
+  header.initialEchoRight = reader.s8At(address + 1);
   header.initialEchoDelay = reader.u8At(address + 2);
-  header.initialEchoFeedback = static_cast<s8>(reader.u8At(address + 3));
+  header.initialEchoFeedback = reader.s8At(address + 3);
   header.initialEchoFilter = reader.u8At(address + 4);
   header.initialEchoMask = reader.u8At(address + 5);
 }
@@ -219,7 +219,7 @@ void decodePitchScripts(ByteReader reader, const std::vector<u16>& pointers, Seq
         }
         script.steps.push_back(PitchScriptStep{
             .duration = opcode,
-            .target = static_cast<s8>(reader.u8At(cursor + 1)),
+            .target = reader.s8At(cursor + 1),
         });
         cursor += 2;
         last = std::max(last, cursor);
@@ -277,7 +277,7 @@ void decodeVolumeCurves(ByteReader reader, const std::vector<u16>& pointers, Seq
     VolumeCurve curve{.index = static_cast<u8>(index), .source = reader.range(start, 128)};
     curve.offsets.reserve(128);
     for (u32 note = 0; note < 128; ++note) {
-      curve.offsets.push_back(static_cast<s8>(reader.u8At(start + note)));
+      curve.offsets.push_back(reader.s8At(start + note));
     }
     recipes.volumeCurves.push_back(std::move(curve));
   }
@@ -637,8 +637,8 @@ void supplementLiveRecipes(ByteReader reader, const Layout& layout, SequenceRefe
       continue;
     }
     row.pitchScale = static_cast<u16>((reader.u8At(tuning) << 8) | reader.u8At(tuning + 1));
-    row.coarseTuning = static_cast<s8>(reader.u8At(tuning + 2));
-    row.fineTuning = static_cast<s8>(reader.u8At(tuning + 3));
+    row.coarseTuning = reader.s8At(tuning + 2);
+    row.fineTuning = reader.s8At(tuning + 3);
   }
 }
 

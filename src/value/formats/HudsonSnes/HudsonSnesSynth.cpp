@@ -48,9 +48,8 @@ struct Patch {
   }
   constexpr double pitchTableCorrection = 4286.0 / 4096.0;
   const double multiplier = rawScale / 256.0;
-  const double semitones = std::log2(multiplier * pitchTableCorrection) * 12.0 +
-                           static_cast<s8>(reader.u8At(address + 2)) +
-                           static_cast<s8>(reader.u8At(address + 3)) / 256.0;
+  const double semitones =
+      std::log2(multiplier * pitchTableCorrection) * 12.0 + reader.s8At(address + 2) + reader.s8At(address + 3) / 256.0;
   return 72.0 - semitones;
 }
 

@@ -295,9 +295,9 @@ std::optional<Layout> findLayout(ByteReader reader) {
       .gainEnvelopeTableAddress = gainEnvelopes,
       .pitchReference =
           static_cast<u16>(version == Version::Summer ? 0x1ede : winterPitchReference(reader, miniSequences)),
-      .echo = EchoState{.left = static_cast<s8>(reader.u8At(*dsp + 13)),
-                        .right = static_cast<s8>(reader.u8At(*dsp + 11)),
-                        .feedback = static_cast<s8>(reader.u8At(*dsp + 21)),
+      .echo = EchoState{.left = reader.s8At(*dsp + 13),
+                        .right = reader.s8At(*dsp + 11),
+                        .feedback = reader.s8At(*dsp + 21),
                         .delay = static_cast<u8>(reader.u8At(*dsp + 3) & 0x0f)},
   };
 }

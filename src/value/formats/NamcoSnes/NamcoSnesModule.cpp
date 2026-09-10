@@ -152,7 +152,7 @@ void addSongTables(ScanResultBuilder& result, const Layout& layout,
                      .fieldsAsChildren();
     for (u32 coefficient = 0; coefficient < 8; ++coefficient) {
       entry.field("coefficient_" + std::to_string(coefficient), reader.range(address + coefficient, 1),
-                  static_cast<s8>(reader.u8At(address + coefficient)), SourceValueDisplay::SignedDecimal);
+                  reader.s8At(address + coefficient), SourceValueDisplay::SignedDecimal);
     }
   }
   collection.misc(asset);

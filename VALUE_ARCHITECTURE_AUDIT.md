@@ -1145,6 +1145,17 @@ the references returned by sample construction. Shared-builder coverage also
 checks separate annotations for aliases and missing SRCNs. The full build is
 warning-free and all 20 CTest targets pass.
 
+### Use signed byte reads directly in format fields
+
+Replace 63 immediate unsigned-byte-to-signed-byte casts across 16 format files
+with the existing ByteReader::s8At. Signed tuning, pan, envelope, and DSP fields
+now state their representation at the read. Keep casts that implement wrapping
+arithmetic and reads through Prism's custom runtime memory unchanged. No new
+reader API or source semantics are introduced; shorter expressions also remove
+five production lines after formatting.
+
+The full build is warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

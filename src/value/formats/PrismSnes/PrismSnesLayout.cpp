@@ -140,7 +140,7 @@ void scoreLiveState(ByteReader reader, SongCandidate& song) {
   for (u8 preset = 0; preset < kFirPresets.size(); ++preset) {
     bool matches = reader.has(address, 8);
     for (u32 coefficient = 0; matches && coefficient < 8; ++coefficient) {
-      matches = static_cast<s8>(reader.u8At(address + coefficient)) == kFirPresets[preset][coefficient];
+      matches = reader.s8At(address + coefficient) == kFirPresets[preset][coefficient];
     }
     if (matches) {
       return preset;
