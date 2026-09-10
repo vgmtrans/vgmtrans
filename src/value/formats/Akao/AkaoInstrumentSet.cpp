@@ -6,6 +6,7 @@
 
 #include "value/formats/Akao/Akao.h"
 
+#include "value/synth/PsxAdpcm.h"
 #include "value/synth/PsxSpu.h"
 #include "value/synth/SynthMath.h"
 
@@ -228,7 +229,7 @@ void addDrumInstrument(std::vector<Instrument>& instruments, ByteReader reader, 
 }
 
 void addSyntheticArticulationInstruments(std::vector<Instrument>& instruments,
-                                         const AkaoArticulationMap& articulations) {
+                                         const AkaoArticulationMap& articulations, const std::set<u32>& noAttackIds) {
   for (const auto& [articulationId, binding] : articulations) {
     Region region{
         .keyRange = KeyRange{.low = 0, .high = 127},
@@ -245,6 +246,14 @@ void addSyntheticArticulationInstruments(std::vector<Instrument>& instruments,
         .range = binding.articulation.source.range,
         .regions = {region},
     });
+    if (noAttackIds.contains(articulationId)) {
+      auto sustain = instruments.back();
+      sustain.explicitAddress->bank = 2;
+      sustain.name += " [no attack]";
+      sustain.regions[0].sampleStartFrame = psxAdpcmDecodedOffset(binding.articulation.loopPoint);
+      if (sustain.regions[0].loop) sustain.regions[0].loop->start = 0;
+      instruments.push_back(std::move(sustain));
+    }
   }
 }
 
@@ -443,6 +452,7 @@ AkaoInstrumentSetBuild buildAkaoInstrumentSet(const ScanInput& input, const Akao
           AkaoInstrumentSetBindingData{
               .regions = std::move(parsed.binding),
               .usesIndividualArticulations = sequence.references.usesIndividualArticulations,
+              .noAttackArticulationIds = sequence.references.noAttackArticulationIds,
           },
   };
 }
@@ -467,7 +477,7 @@ bool applyAkaoArticulations(SoundBankAsset& instruments, const AkaoInstrumentSet
     }
   }
   if (recipe.usesIndividualArticulations) {
-    addSyntheticArticulationInstruments(instruments.instruments, articulations);
+    addSyntheticArticulationInstruments(instruments.instruments, articulations, recipe.noAttackArticulationIds);
   }
   return true;
 }

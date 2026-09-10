@@ -102,6 +102,8 @@ struct Region {
   // Invert the decoded waveform before synth export. This permits layered
   // regions to retain signed hardware stereo gains.
   bool invertSamplePhase = false;
+  // Skip decoded frames while retaining the codec history used to decode them.
+  u32 sampleStartFrame = 0;
   // Layered hardware voices may give each zone an independent LFO. Keeping
   // that modulation on the region avoids applying one layer's curve to every
   // sample in the instrument.

@@ -119,6 +119,7 @@ struct AkaoSequenceReferences {
   std::set<u32> drumInstrumentTableOffsets;
   std::set<u32> individualArticulationIds;
   bool usesIndividualArticulations = false;
+  std::set<u32> noAttackArticulationIds;
 };
 
 struct AkaoSequenceAnalysis {
@@ -161,6 +162,7 @@ struct AkaoInstrumentSetBindingData {
   // Parallel to the durable instrument and region vectors built during scan.
   std::vector<std::vector<AkaoRegionBindingData>> regions;
   bool usesIndividualArticulations = false;
+  std::set<u32> noAttackArticulationIds;
 };
 
 struct AkaoSoundBankData {

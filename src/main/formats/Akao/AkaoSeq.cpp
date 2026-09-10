@@ -570,7 +570,8 @@ bool AkaoTrack::readEvent() {
       : status_byte;
 
     const bool op_rest = note_byte >= 0x8F;
-    const bool op_tie = !op_rest && note_byte >= 0x83;
+    // 12 pitches * 11 durations: 0x83 is the final B note, ties begin at 0x84.
+    const bool op_tie = !op_rest && note_byte >= 0x84;
     const bool op_note = !op_rest && !op_tie;
     const auto delta_time_from_op = static_cast<u8>(DELTA_TIME_TABLE[note_byte % 11]);
 
