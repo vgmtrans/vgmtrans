@@ -43,6 +43,7 @@ struct InstrumentInfo {
 
 struct InstrumentRegion {
   SampleRef sample;
+  u16 pitchScale = 0;
   Region region;
   SourceRecord source;
   bool noise = false;
@@ -254,16 +255,50 @@ struct InstrumentRegion {
   return readSnesBrrCatalog(reader, *layout.spcDirAddress, sampledInstruments, &InstrumentInfo::srcn);
 }
 
-[[nodiscard]] double standardUnityKey(const Profile& selected, u8 pitchHigh, u8 pitchLow) {
-  const u16 pitchScale = selected.instruments == InstrumentLayout::Earlier5Byte
-                             ? static_cast<u16>(static_cast<s8>(pitchHigh) * 256)
-                             : static_cast<u16>((pitchHigh << 8) | pitchLow);
+[[nodiscard]] u16 readPitchScale(const Profile& selected, const InstrumentInfo& info) {
+  return selected.instruments == InstrumentLayout::Earlier5Byte
+             ? static_cast<u16>(static_cast<s8>(info.pitchHigh) * 256)
+             : static_cast<u16>((info.pitchHigh << 8) | info.pitchLow);
+}
+
+[[nodiscard]] double standardUnityKey(u16 pitchScale) {
   if (pitchScale == 0) {
     return 96.0;
   }
   // The DSP masks the final note pitch to 14 bits, not the instrument's scale.
   // Wrapping at a fixed reference note incorrectly detunes high-scale bass samples.
   return 96.0 - std::log2(pitchScale * (4286.0 / 4096.0) / 256.0) * 12.0;
+}
+
+void applyPitchWrap(Region& region, u16 pitchScale, int key) {
+  if (pitchScale == 0 || key < 24) {
+    return;
+  }
+  // N-SPC interpolates this octave, shifts it, then multiplies by the scale.
+  // Keep the integer truncation: rounding near $4000 changes the wrapped pitch drastically.
+  constexpr std::array<u16, 13> pitches{0x085f, 0x08de, 0x0965, 0x09f4, 0x0a8c, 0x0b2c, 0x0bd6,
+                                       0x0c8b, 0x0d4a, 0x0e14, 0x0eea, 0x0fcd, 0x10be};
+  const int note = key - 24;
+  // The driver slightly adjusts notes outside its middle register before interpolation.
+  const int correction = note >= 0x34 ? note - 0x34 : note < 0x13 ? (note - 0x13) * 2 : 0;
+  const int pitchKey = note * 256 + correction;
+  // Outside the driver's seven octaves its shift loop yields zero, not overflow.
+  if (pitchKey < 0 || pitchKey >= 84 * 256) {
+    return;
+  }
+  const int semitone = pitchKey >> 8;
+  const int index = semitone % 12;
+  const u32 interpolated = pitches[index] + ((pitches[index + 1] - pitches[index]) * (pitchKey & 0xff) >> 8);
+  const u32 basePitch = (interpolated * 2) >> (6 - semitone / 12);
+  const u32 pitch = (basePitch * pitchScale) >> 8;
+  if (pitch <= 0x3fff) {
+    return;
+  }
+  const u32 wrapped = pitch & 0x3fff;
+  region.unityKey = wrapped == 0 ? key : key - 12.0 * std::log2(wrapped / 4096.0);
+  if (wrapped == 0) {
+    region.attenuationDb = 144.0;
+  }
 }
 
 [[nodiscard]] double konamiUnityKey(s8 coarse, u8 fine) {
@@ -284,7 +319,7 @@ struct InstrumentRegion {
     }
     return konamiUnityKey(coarse, fine);
   }
-  return standardUnityKey(selected, info.pitchHigh, info.pitchLow);
+  return standardUnityKey(readPitchScale(selected, info));
 }
 
 void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layout& layout,
@@ -294,6 +329,8 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
   std::map<u32, InstrumentRegion> regionsByProgram;
   for (const InstrumentInfo& info : infos) {
     const bool noise = isNoise(selected, info);
+    const u16 pitchScale = selected.instruments == InstrumentLayout::KonamiTuningTable
+                               ? u16{0} : readPitchScale(selected, info);
     const auto sample = noise ? std::optional<SampleRef>{noiseSamples.at(info.srcn & 0x1f)}
                               : samples.findSrcn(info.srcn);
     if (!sample) {
@@ -309,6 +346,7 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
     };
     regionsByProgram.emplace(info.program, InstrumentRegion{
                                                .sample = *sample,
+                                               .pitchScale = pitchScale,
                                                .region = region,
                                                .source = info.source,
                                                .noise = noise,
@@ -339,9 +377,25 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
         instrument.region(*sample, region).source("Noise", info.source, "nin-snes-region");
       }
     } else {
-      instrument.region(*sample, region)
-          .source("Region", info.source, "nin-snes-region")
-          .description(fmt::format("Sample {}", sample->index()));
+      const auto addRegion = [&](const Region& zone) {
+        instrument.region(*sample, zone)
+            .source("Region", info.source, "nin-snes-region")
+            .description(fmt::format("Sample {}", sample->index()));
+      };
+      Region zone = region;
+      for (int key = 0; key < 128; ++key) {
+        Region tuned = region;
+        if (recipes.usedNotes.contains({info.program, static_cast<u8>(key)})) {
+          applyPitchWrap(tuned, pitchScale, key);
+        }
+        if (tuned.unityKey != zone.unityKey || tuned.attenuationDb != zone.attenuationDb) {
+          addRegion(zone);
+          zone = tuned;
+          zone.keyRange.low = static_cast<u8>(key);
+        }
+        zone.keyRange.high = static_cast<u8>(key);
+      }
+      addRegion(zone);
     }
   }
 
@@ -373,6 +427,8 @@ void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layo
       if (selected.id == ProfileId::Konami) {
         // Konami's percussion loader explicitly clears melodic coarse/fine tuning.
         region.unityKey = konamiUnityKey(0, 0);
+      } else if (!source->noise) {
+        applyPitchWrap(region, source->pitchScale, slot->sourceKey);
       }
       region.unityKey = source->noise ? slot->key
                                     : region.unityKey + static_cast<int>(slot->key) - slot->sourceKey;

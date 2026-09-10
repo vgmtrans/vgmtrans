@@ -12,8 +12,10 @@
 #include "value/sequence/SequenceProgramConfig.h"
 
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace vgmtrans::formats::nin_snes {
@@ -227,6 +229,8 @@ struct DrumKit {
 };
 
 struct SequenceRecipes {
+  // Resolved instrument IDs and transposed MIDI keys encountered during analysis.
+  std::set<std::pair<u32, u8>> usedNotes;
   std::vector<InstrumentOverride> overrides;
   std::vector<DrumKit> drumKits;
 };

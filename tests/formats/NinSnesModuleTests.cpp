@@ -1362,24 +1362,77 @@ void ninSnesGainModeInstrumentsUseDspEnvelope() {
          "direct GAIN should become the DSP's fixed sustain level instead of an unspecified envelope");
 }
 
-void ninSnesLargePitchScalesPreserveBassTuning() {
-  std::vector<u8> bytes(kAramSize);
-  std::ranges::copy(std::initializer_list<u8>{0, 0xff, 0xec, 0xb8, 0x24, 0}, bytes.begin() + 0x4000);
-  writeLe16(bytes, 0x5000, 0x6000);
-  writeLe16(bytes, 0x5002, 0x6000);
-  bytes[0x6000] = 1;
-  Layout layout = standardLayout();
-  layout.instrumentTableAddress = 0x4000;
-  layout.spcDirAddress = 0x5000;
-  const ScanResult scan = scanSynth(std::move(bytes), layout, "Bass tuning");
-  const auto& bank = std::get<SoundBankAsset>(scan.assets[0]);
-  expect(bank.instruments.size() == 1 && bank.instruments[0].regions.size() == 1,
-         "the bass fixture should produce one instrument region");
-  // O-chan's Select Menu plays MIDI key 36 with DSP pitch $12b4, safely below $4000.
-  const double rate = std::exp2((36.0 - bank.instruments[0].regions[0].unityKey) / 12.0);
-  // Allow 1% for the driver's integer pitch table and low-note correction.
-  expect(std::abs(rate / (0x12b4 / 4096.0) - 1.0) < 0.01,
-         "a large instrument scale must preserve the bass note's actual playback rate");
+void ninSnesPitchWrappingUsesThePlayedNote() {
+  const auto bytes = sequenceBytes({0xe0, 3, 0xe9, 5, 0xea, 2, 4, 0x7f, 0x80, 0x80, 0xe0, 4, 0x81, 0});
+  const auto parsed = decodeSequence(ByteReader(SourceId{1}, bytes), standardLayout(), AssetId{1});
+  expect(parsed.recipes.usedNotes == std::set<std::pair<u32, u8>>{{3, 31}, {4, 32}},
+         "note usage must resolve programs, apply both transposes, and deduplicate repeated notes");
+  // Driver register results at MIDI keys 36, 59, 60, 61 and 84. Include O-chan's
+  // bass, SimCity's percussion, and scales immediately around a wrap to zero.
+  struct Case { u16 scale; std::array<u16, 5> pitches; };
+  for (const auto& test : {Case{0x0100, {133, 505, 535, 567, 2146}},
+                          Case{0x2400, {4788, 1796, 2876, 4028, 11720}},
+                          Case{0x8000, {640, 15488, 2944, 7040, 12544}},
+                          Case{0x1e9f, {4072, 15463, 16382, 978, 176}},
+                          Case{0x1ea0, {4073, 15465, 0, 980, 185}},
+                          Case{0x1ea1, {4073, 15467, 2, 982, 193}}}) {
+    std::vector<u8> bytes(kAramSize);
+    std::ranges::copy(std::initializer_list<u8>{0, 0xff, 0xec, 0xb8,
+                       static_cast<u8>(test.scale >> 8), static_cast<u8>(test.scale)}, bytes.begin() + 0x4000);
+    writeLe16(bytes, 0x5000, 0x6000);
+    writeLe16(bytes, 0x5002, 0x6000);
+    bytes[0x6000] = 1;
+    Layout layout = standardLayout();
+    layout.instrumentTableAddress = 0x4000;
+    layout.spcDirAddress = 0x5000;
+    SequenceRecipes recipes;
+    constexpr std::array<u8, 5> keys{36, 59, 60, 61, 84};
+    DrumKit kit;
+    for (u8 i = 0; i < keys.size(); ++i) {
+      kit.slots.push_back({.key = static_cast<u8>(36 + i), .sourceProgram = 0, .sourceKey = keys[i]});
+      recipes.usedNotes.emplace(0, keys[i]);
+    }
+    recipes.drumKits.push_back(kit);
+    for (const ProfileId id : {ProfileId::Standard, ProfileId::SunsoftEarlier}) {
+      layout.profile = id;
+      const ScanResult scan = scanSynth(bytes, layout, "Pitch wrapping", recipes);
+      const auto& bank = std::get<SoundBankAsset>(scan.assets[0]);
+      expect(bank.instruments.size() == 2 && bank.instruments[1].regions.size() == keys.size(),
+             "the fixture should produce melodic and percussion regions");
+      const auto& melodic = bank.instruments[0].regions;
+      for (int key = 0; key < 128; ++key) {
+        expect(std::ranges::count_if(melodic, [key](const Region& r) {
+                 return key >= r.keyRange.low && key <= r.keyRange.high;
+               }) == 1, "pitch regions must cover every MIDI key exactly once");
+      }
+      for (size_t i = 0; i < keys.size(); ++i) {
+        const auto region = std::ranges::find_if(melodic, [&](const Region& r) {
+          return keys[i] >= r.keyRange.low && keys[i] <= r.keyRange.high;
+        });
+        const auto& drum = bank.instruments[1].regions[i];
+        const double rate = std::exp2((keys[i] - region->unityKey) / 12.0);
+        const double drumRate = std::exp2((drum.keyRange.low - drum.unityKey) / 12.0);
+        // Unwrapped tuning retains the existing equal-tempered approximation.
+        expect(test.pitches[i] == 0 ? region->attenuationDb >= 144 && drum.attenuationDb >= 144
+                                   : std::abs(rate / (test.pitches[i] / 4096.0) - 1.0) < 0.01,
+               "pitch mismatch at scale " + std::to_string(test.scale) + " key " + std::to_string(keys[i]));
+        expect(std::abs(rate - drumRate) < 0.000001,
+               "melodic notes and percussion must use identical pitch math at the same source note");
+      }
+    }
+    if (test.scale == 0x2400) {
+      for (const bool played : {false, true}) {
+        recipes.usedNotes = {{0, 36}};
+        if (played) {
+          recipes.usedNotes.emplace(0, 59);
+        }
+        const auto scan = scanSynth(bytes, layout, "Used notes", recipes);
+        const auto& regions = std::get<SoundBankAsset>(scan.assets[0]).instruments[0].regions;
+        expect(regions.size() == (played ? 3 : 1),
+               "only a played overflowing key should split the normal region around itself");
+      }
+    }
+  }
 }
 
 void ninSnesIdentityMappedSilentSlotsAreSparse() {
@@ -2055,6 +2108,8 @@ void ninSnesQuestSupportsTacticsOgre() {
     expect(parsed.recipes.overrides.size() == 2 && parsed.recipes.overrides[0].pitchHigh == 1 &&
                parsed.recipes.overrides[1].pitchHigh == 2,
            "Quest deduplicates table writes and captures active tuning changes as distinct instruments");
+    expect(parsed.recipes.usedNotes == std::set<std::pair<u32, u8>>{{128, 24}, {128, 62}, {129, 32}},
+           "Quest note usage must follow active instrument versions and its percussion transpose rules");
   }
   {
     auto bytes = sequenceBytes({0xfc, 0, 0xe0, 1,    0xe1, 0x8a, 0xe5, 0x80, 0xed, 0x80, 0xe7, 120,  0xe8, 4, 60,
@@ -2164,7 +2219,7 @@ void runNinSnesTests() {
   ninSnesKonamiPercussionUsesDriverMapAndNeutralTuning();
   ninSnesEarlierPercussionUsesSeparateSixByteTable();
   ninSnesGainModeInstrumentsUseDspEnvelope();
-  ninSnesLargePitchScalesPreserveBassTuning();
+  ninSnesPitchWrappingUsesThePlayedNote();
   ninSnesIdentityMappedSilentSlotsAreSparse();
   ninSnesMetalCombatRecognizesDriverWithoutInstrumentOverwrite();
   ninSnesIntelligentPercussionUsesRevisionSpecificTables();
