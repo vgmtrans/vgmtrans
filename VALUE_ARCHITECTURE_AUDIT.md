@@ -901,6 +901,20 @@ address fallback, and ordinary performance lookup requires an exact identity.
 A new regression covers these differences with duplicate and conflicting
 identity/address matches. The full build and all 20 CTest targets pass.
 
+### Start timing queries at the relevant tempo point
+
+Physical-duration conversion now obtains the starting tempo through the shared
+lookup and begins iteration at the first subsequent change. Remove the repeated
+prefix scans and their per-point before-start branch. Sampled pitch lookup also
+uses the preceding sample directly after upper_bound; a separate end-of-curve
+branch returned the same value. Together these remove 14 production lines.
+
+All 312,320 before/after timing and sampled-pitch query results are byte-identical,
+including empty and repeated points, zero tempos/divisions, half-tick rounding,
+extreme durations, and saturated tick boundaries. The direct changed-component
+build passes under AddressSanitizer and UBSan. The full build and all 20 CTest
+targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

@@ -43,15 +43,7 @@ double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elaps
   if (const auto* sampled = std::get_if<SampledAutomationCurve>(&transition.curve);
       sampled != nullptr && !sampled->samples.empty()) {
     const auto upper = std::ranges::upper_bound(sampled->samples, clampedElapsed, {}, &AutomationSample::tickOffset);
-    if (upper == sampled->samples.begin()) {
-      return sampled->samples.front().value;
-    }
-    if (upper == sampled->samples.end()) {
-      return sampled->samples.back().value;
-    }
-
-    const auto& previous = *std::prev(upper);
-    return previous.value;
+    return upper == sampled->samples.begin() ? sampled->samples.front().value : std::prev(upper)->value;
   }
 
   if (duration == 0) {
@@ -92,21 +84,18 @@ double PerformanceTempoMap::durationMilliseconds(u64 startTick, u32 durationTick
   const u64 endTick = startTick > std::numeric_limits<u64>::max() - durationTicks ? std::numeric_limits<u64>::max()
                                                                                   : startTick + durationTicks;
   const double ppqn = std::max<u16>(timebase_.ppqn, 1);
-  u32 tempo = initialTempoMicrosecondsPerQuarter_;
+  u32 tempo = microsecondsPerQuarterAt(startTick);
   u64 cursor = startTick;
   double microseconds = 0.0;
 
-  for (const auto& change : points_) {
-    if (change.tick <= startTick) {
-      tempo = change.microsecondsPerQuarter;
-      continue;
-    }
-    if (change.tick >= endTick) {
+  for (auto change = std::ranges::upper_bound(points_, startTick, {}, &Point::tick); change != points_.end();
+       ++change) {
+    if (change->tick >= endTick) {
       break;
     }
-    microseconds += static_cast<double>(change.tick - cursor) * tempo / ppqn;
-    cursor = change.tick;
-    tempo = change.microsecondsPerQuarter;
+    microseconds += static_cast<double>(change->tick - cursor) * tempo / ppqn;
+    cursor = change->tick;
+    tempo = change->microsecondsPerQuarter;
   }
   microseconds += static_cast<double>(endTick - cursor) * tempo / ppqn;
   return microseconds / 1000.0;
@@ -118,16 +107,13 @@ u32 PerformanceTempoMap::durationTicksForMilliseconds(u64 startTick, double mill
   }
   const double ppqn = std::max<u16>(timebase_.ppqn, 1);
   double remainingMicroseconds = milliseconds * 1000.0;
-  u32 tempo = initialTempoMicrosecondsPerQuarter_;
+  u32 tempo = microsecondsPerQuarterAt(startTick);
   u64 cursor = startTick;
   u64 elapsedTicks = 0;
 
-  for (const auto& change : points_) {
-    if (change.tick <= startTick) {
-      tempo = change.microsecondsPerQuarter;
-      continue;
-    }
-    const u64 segmentTicks = change.tick - cursor;
+  for (auto change = std::ranges::upper_bound(points_, startTick, {}, &Point::tick); change != points_.end();
+       ++change) {
+    const u64 segmentTicks = change->tick - cursor;
     const double segmentMicroseconds = static_cast<double>(segmentTicks) * tempo / ppqn;
     if (remainingMicroseconds <= segmentMicroseconds) {
       break;
@@ -137,8 +123,8 @@ u32 PerformanceTempoMap::durationTicksForMilliseconds(u64 startTick, double mill
     if (elapsedTicks >= std::numeric_limits<u32>::max()) {
       return std::numeric_limits<u32>::max();
     }
-    cursor = change.tick;
-    tempo = change.microsecondsPerQuarter;
+    cursor = change->tick;
+    tempo = change->microsecondsPerQuarter;
   }
 
   const double exactTailTicks = remainingMicroseconds * ppqn / std::max<u32>(tempo, 1);
