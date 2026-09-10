@@ -1003,6 +1003,21 @@ that cannot resize the prepared bank list. This removes three production lines,
 one temporary container, and its string copies. The full build and all 20 CTest
 targets pass, including binding failures and rejection of identity changes.
 
+### Share PlayStation exponential-envelope rate selection
+
+Replace three eight-case switches with one amplitude-band rate-offset table.
+Decay and release select their decrement directly; sustain also calculates
+the lower band boundary instead of listing it in every branch. Remove the
+decay-rate correction that cannot trigger for the register's four-bit field.
+This removes 86 production lines without changing the emulated steps or the
+format-facing envelope API.
+
+All 3,200 before/after PS1/PS2 envelopes match bit-for-bit, including every
+attack rate/mode, decay rate/sustain level, sustain rate/mode/direction, and
+release rate/mode, plus mixed register values. Both versions and the shared
+synth math are compiled with AddressSanitizer and UBSan for the comparison.
+The full build and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

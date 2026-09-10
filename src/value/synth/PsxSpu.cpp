@@ -18,6 +18,9 @@ namespace vgmtrans::core {
 
 namespace {
 
+// Exponential stages select a rate adjustment from the current amplitude band.
+constexpr std::array<int, 8> kExponentialRateOffsets{0, 4, 6, 8, 9, 10, 11, 12};
+
 [[nodiscard]] int nonnegative(int value) {
   return std::max(value, 0);
 }
@@ -50,7 +53,7 @@ namespace {
 Envelope psxSpuEnvelope(u16 adsr1, u16 adsr2, PsxSpuGeneration generation) {
   u8 attackMode = (adsr1 & 0x8000) >> 15;
   u8 attackRate = (adsr1 & 0x7f00) >> 8;
-  u8 decayRate = (adsr1 & 0x00f0) >> 4;
+  const u8 decayRate = (adsr1 & 0x00f0) >> 4;
   const u8 sustainLevel = adsr1 & 0x000f;
   const u8 sustainMode = (adsr2 & 0x8000) >> 15;
   const u8 sustainDirection = (adsr2 & 0x4000) >> 14;
@@ -82,37 +85,8 @@ Envelope psxSpuEnvelope(u16 adsr1, u16 adsr2, PsxSpuGeneration generation) {
   u32 realSustainLevel = 0;
   int steps = 0;
   for (; envelopeLevel > 0; ++steps) {
-    if (4 * (decayRate ^ 0x1f) < 0x18) {
-      decayRate = 0;
-    }
-    switch ((envelopeLevel >> 28) & 0x7) {
-      case 0:
-        envelopeLevel -= rates[nonnegative((4 * (decayRate ^ 0x1f)) - 0x18 + 0) + 32];
-        break;
-      case 1:
-        envelopeLevel -= rates[nonnegative((4 * (decayRate ^ 0x1f)) - 0x18 + 4) + 32];
-        break;
-      case 2:
-        envelopeLevel -= rates[nonnegative((4 * (decayRate ^ 0x1f)) - 0x18 + 6) + 32];
-        break;
-      case 3:
-        envelopeLevel -= rates[nonnegative((4 * (decayRate ^ 0x1f)) - 0x18 + 8) + 32];
-        break;
-      case 4:
-        envelopeLevel -= rates[nonnegative((4 * (decayRate ^ 0x1f)) - 0x18 + 9) + 32];
-        break;
-      case 5:
-        envelopeLevel -= rates[nonnegative((4 * (decayRate ^ 0x1f)) - 0x18 + 10) + 32];
-        break;
-      case 6:
-        envelopeLevel -= rates[nonnegative((4 * (decayRate ^ 0x1f)) - 0x18 + 11) + 32];
-        break;
-      case 7:
-        envelopeLevel -= rates[nonnegative((4 * (decayRate ^ 0x1f)) - 0x18 + 12) + 32];
-        break;
-      default:
-        break;
-    }
+    const int rateOffset = kExponentialRateOffsets[(envelopeLevel >> 28) & 0x7];
+    envelopeLevel -= rates[nonnegative(4 * (decayRate ^ 0x1f) - 0x18 + rateOffset) + 32];
     if (!sustainLevelFound && ((envelopeLevel >> 27) & 0xf) <= sustainLevel) {
       realSustainLevel = envelopeLevel;
       sustainLevelFound = true;
@@ -129,44 +103,10 @@ Envelope psxSpuEnvelope(u16 adsr1, u16 adsr2, PsxSpuGeneration generation) {
     } else {
       steps = 0;
       while (envelopeLevel > 0) {
-        long envelopeLevelDiff = 0;
-        long envelopeLevelTarget = 0;
-        switch ((envelopeLevel >> 28) & 0x7) {
-          case 0:
-            envelopeLevelTarget = 0x00000000;
-            envelopeLevelDiff = rates[nonnegative((sustainRate ^ 0x7f) - 0x1b + 0) + 32];
-            break;
-          case 1:
-            envelopeLevelTarget = 0x0fffffff;
-            envelopeLevelDiff = rates[nonnegative((sustainRate ^ 0x7f) - 0x1b + 4) + 32];
-            break;
-          case 2:
-            envelopeLevelTarget = 0x1fffffff;
-            envelopeLevelDiff = rates[nonnegative((sustainRate ^ 0x7f) - 0x1b + 6) + 32];
-            break;
-          case 3:
-            envelopeLevelTarget = 0x2fffffff;
-            envelopeLevelDiff = rates[nonnegative((sustainRate ^ 0x7f) - 0x1b + 8) + 32];
-            break;
-          case 4:
-            envelopeLevelTarget = 0x3fffffff;
-            envelopeLevelDiff = rates[nonnegative((sustainRate ^ 0x7f) - 0x1b + 9) + 32];
-            break;
-          case 5:
-            envelopeLevelTarget = 0x4fffffff;
-            envelopeLevelDiff = rates[nonnegative((sustainRate ^ 0x7f) - 0x1b + 10) + 32];
-            break;
-          case 6:
-            envelopeLevelTarget = 0x5fffffff;
-            envelopeLevelDiff = rates[nonnegative((sustainRate ^ 0x7f) - 0x1b + 11) + 32];
-            break;
-          case 7:
-            envelopeLevelTarget = 0x6fffffff;
-            envelopeLevelDiff = rates[nonnegative((sustainRate ^ 0x7f) - 0x1b + 12) + 32];
-            break;
-          default:
-            break;
-        }
+        const long band = (envelopeLevel >> 28) & 0x7;
+        const long envelopeLevelTarget = band == 0 ? 0 : (band << 28) - 1;
+        const long envelopeLevelDiff =
+            rates[nonnegative((sustainRate ^ 0x7f) - 0x1b + kExponentialRateOffsets[band]) + 32];
         const long stepCount = (envelopeLevel - envelopeLevelTarget + (envelopeLevelDiff - 1)) / envelopeLevelDiff;
         envelopeLevel -= envelopeLevelDiff * stepCount;
         steps += static_cast<int>(stepCount);
@@ -192,34 +132,8 @@ Envelope psxSpuEnvelope(u16 adsr1, u16 adsr2, PsxSpuGeneration generation) {
     }
     steps = 0;
     for (; envelopeLevel > 0; ++steps) {
-      switch ((envelopeLevel >> 28) & 0x7) {
-        case 0:
-          envelopeLevel -= rates[nonnegative((4 * (releaseRate ^ 0x1f)) - 0x18 + 0) + 32];
-          break;
-        case 1:
-          envelopeLevel -= rates[nonnegative((4 * (releaseRate ^ 0x1f)) - 0x18 + 4) + 32];
-          break;
-        case 2:
-          envelopeLevel -= rates[nonnegative((4 * (releaseRate ^ 0x1f)) - 0x18 + 6) + 32];
-          break;
-        case 3:
-          envelopeLevel -= rates[nonnegative((4 * (releaseRate ^ 0x1f)) - 0x18 + 8) + 32];
-          break;
-        case 4:
-          envelopeLevel -= rates[nonnegative((4 * (releaseRate ^ 0x1f)) - 0x18 + 9) + 32];
-          break;
-        case 5:
-          envelopeLevel -= rates[nonnegative((4 * (releaseRate ^ 0x1f)) - 0x18 + 10) + 32];
-          break;
-        case 6:
-          envelopeLevel -= rates[nonnegative((4 * (releaseRate ^ 0x1f)) - 0x18 + 11) + 32];
-          break;
-        case 7:
-          envelopeLevel -= rates[nonnegative((4 * (releaseRate ^ 0x1f)) - 0x18 + 12) + 32];
-          break;
-        default:
-          break;
-      }
+      const int rateOffset = kExponentialRateOffsets[(envelopeLevel >> 28) & 0x7];
+      envelopeLevel -= rates[nonnegative(4 * (releaseRate ^ 0x1f) - 0x18 + rateOffset) + 32];
     }
     samples = steps;
   }
