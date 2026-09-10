@@ -1059,6 +1059,20 @@ direct sanitized comparison preserves 30,720 ordinary GAIN queries and verifies
 all 128 large-interval cases; the 131,072 envelope comparisons still match.
 The full build and all 20 CTest targets pass.
 
+### Keep SoundFont sample-index limits out of shared synth preparation
+
+Remove the shared 16-bit sample-index clamp. Prepared sample references now
+retain 32-bit indexes, which DLS writes directly; SoundFont uses its existing
+checked table-index writer at the actual serialization boundary. Previously,
+every sample after index 65,535 silently referenced sample 65,535 in both
+exporters. This removes three production lines and one helper while correcting
+the export-layer separation.
+
+A regression fails before the fix and verifies distinct PCM at sample 65,536,
+the emitted DLS wave link, SoundFont rejection of that unrepresentable link,
+and successful SoundFont output at index 65,535. The full build is warning-free
+and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

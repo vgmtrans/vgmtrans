@@ -56,7 +56,7 @@ struct DecodedSynthSample {
 
 struct ResolvedSynthRegion {
   const Region* region = nullptr;
-  u16 sampleIndex = 0;
+  u32 sampleIndex = 0;
   LoweredSynthModulation modulation;
 };
 

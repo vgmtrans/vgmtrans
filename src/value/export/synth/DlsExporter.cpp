@@ -271,7 +271,7 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
   return makeChunk("wsmp", std::move(payload));
 }
 
-[[nodiscard]] Chunk wlnkChunk(u16 waveIndex) {
+[[nodiscard]] Chunk wlnkChunk(u32 waveIndex) {
   std::vector<u8> payload;
   writeLe16(payload, 0);
   writeLe16(payload, 0);

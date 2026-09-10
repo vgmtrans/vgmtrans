@@ -505,7 +505,8 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
       writeEnvelope(generators, sf2Envelope(region));
       writeWordGen(generators, kSfGenOverridingRootKey, pitch.rootKey);
       writeWordGen(generators, kSfGenSampleModes, effectiveSfLoop(region, sample).enabled ? 1 : 0);
-      writeWordGen(generators, kSfGenSampleId, resolved.sampleIndex);
+      writeLe16(generators, kSfGenSampleId);
+      writeIndex(generators, resolved.sampleIndex);
     }
   }
 

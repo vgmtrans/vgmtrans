@@ -619,6 +619,47 @@ void soundFontExporterWritesSfbkRiffFile() {
   expect(rejectedOverflow, "SoundFont table offsets must reject generator indexes that exceed 16 bits");
 }
 
+void synthSampleIndexesRetainTheirRangeUntilContainerExport() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "wide-sample-table.pcm"}, {0, 127});
+  constexpr u32 lastSample = 65536;
+  SoundBankAsset bank{.metadata = AssetMetadata{.id = AssetId{1}}};
+  bank.localSamples.samples.resize(lastSample + 1, Sample{
+                                                       .codec = AudioCodec::PcmS8,
+                                                       .encodedData = SourceRange{.source = source, .size = 1},
+                                                       .sampleRate = 32000,
+                                                   });
+  bank.localSamples.samples.back().encodedData.offset = 1;
+  bank.instruments.push_back(Instrument{
+      .regions = {Region{.sample = SampleRef::resolved(bank.metadata.id, lastSample)}},
+  });
+  const std::array<const SoundBankAsset*, 1> banks{&bank};
+  const SynthExportInput input{.soundBanks = banks};
+  const auto prepared = prepareSynthData(input, sources);
+  const u32 resolved = prepared.instruments.at(0).regions.at(0).sampleIndex;
+  expect(prepared.diagnostics.empty() && prepared.samples.size() == lastSample + 1 && resolved == lastSample &&
+             prepared.samples[resolved].decoded.pcm == std::vector<s16>{32512},
+         "shared synth preparation must retain distinct samples beyond the SoundFont index range");
+
+  const auto dls = buildDls(input, sources);
+  expect(dls.diagnostics.empty() && readLe32(dls.bytes, asciiOffset(dls.bytes, "wlnk") + 16) == lastSample,
+         "DLS wave links must retain the full 32-bit sample index");
+
+  bool rejectedOverflow = false;
+  try {
+    static_cast<void>(buildSoundFont2(input, sources));
+  } catch (const std::overflow_error&) {
+    rejectedOverflow = true;
+  }
+  expect(rejectedOverflow, "SoundFont must reject an unrepresentable sample link instead of changing its sample");
+
+  bank.instruments.front().regions.front().sample = SampleRef::resolved(bank.metadata.id, lastSample - 1);
+  bank.localSamples.samples.pop_back();
+  const auto soundFont = buildSoundFont2(input, sources);
+  expect(soundFont.diagnostics.empty() && soundFontIgenContainsAmount(soundFont.bytes, 53, -1),
+         "the largest representable SoundFont sample index must still be written intact");
+}
+
 void dlsExporterWritesDlsRiffFile() {
   constexpr double lfoStepHertz = 1000.0 / 16384.0;
   SourceStore sources;
@@ -1828,11 +1869,11 @@ void synthPreparationKeepsSampleIdentityAndPhaseOrdering() {
              prepared.samples[1].decoded.pcm == prepared.samples[0].decoded.pcm &&
              prepared.samples[2].decoded.pcm == std::vector<s16>{-32768, 1000},
          "inversion must saturate the minimum PCM value and leave a retained original unchanged");
-  std::vector<u16> indexes;
+  std::vector<u32> indexes;
   for (const auto& region : prepared.instruments[0].regions) {
     indexes.push_back(region.sampleIndex);
   }
-  expect(indexes == std::vector<u16>{2, 0, 1, 3, 1},
+  expect(indexes == std::vector<u32>{2, 0, 1, 3, 1},
          "regions must resolve both sample ownership and phase into the final sample table");
   bank.localSamples.samples[0].loop = {.enabled = true, .start = 1, .length = 1};
   bank.instruments[0].regions[1].sampleStartFrame = 1;
@@ -1859,6 +1900,7 @@ void runValueSynthExportTests() {
   regionModulationExportsAtTheRegionScope();
   wavExporterWritesPcm16RiffFile();
   soundFontExporterWritesSfbkRiffFile();
+  synthSampleIndexesRetainTheirRangeUntilContainerExport();
   dlsExporterWritesDlsRiffFile();
   standaloneSynthExportsKeepNativeModulation();
   sampleReferenceValidationEnforcesOwnership();
