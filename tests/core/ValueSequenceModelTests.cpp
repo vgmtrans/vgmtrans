@@ -503,6 +503,33 @@ void tempoMapPreservesOrderingAndBoundsDurationConversion() {
          "finite durations must saturate before integer conversion, while invalid durations produce zero ticks");
 }
 
+void tempoMapRetainsInitialTempoAndOwnsItsPoints() {
+  PerformanceSequence performance{
+      .initialTempoMicrosecondsPerQuarter = 1000000,
+      .tracks = {PerformanceTrack{
+          .events =
+              {
+                  TempoPerformanceEvent{.header = {.tick = 8}, .microsecondsPerQuarter = 1000000},
+                  TempoPerformanceEvent{.header = {.tick = 16}, .microsecondsPerQuarter = 500000},
+              }}},
+  };
+  const PerformanceTempoMap tempos{performance};
+  performance.tracks.clear();
+  const auto points = tempos.points();
+  expect(
+      points.size() == 3 && points[0].tick == 0 && points[0].microsecondsPerQuarter == 1000000 && points[1].tick == 8 &&
+          points[1].microsecondsPerQuarter == 1000000 && points[2].tick == 16 &&
+          points[2].microsecondsPerQuarter == 500000 && tempos.microsecondsPerQuarterAt(8) == 1000000,
+      "tempo points must outlive source events and retain the first explicit write alongside implicit initial tempo");
+
+  performance.tracks = {PerformanceTrack{.events = {TempoPerformanceEvent{.microsecondsPerQuarter = 750000}}}};
+  const auto atStart = PerformanceTempoMap{performance}.points();
+  expect(atStart.size() == 1 && atStart[0].tick == 0 && atStart[0].microsecondsPerQuarter == 750000,
+         "an explicit tempo at tick zero must replace the implicit initial tempo");
+  expect(PerformanceTempoMap{PerformanceSequence{}}.points().empty(),
+         "the default initial tempo must not introduce a redundant output event");
+}
+
 }  // namespace
 
 void runValueSequenceModelTests() {
@@ -522,4 +549,5 @@ void runValueSequenceModelTests() {
   continuedVoiceResolvesPriorPitchMotion();
   previousNoteEndRetainsContinuationChainBehavior();
   tempoMapPreservesOrderingAndBoundsDurationConversion();
+  tempoMapRetainsInitialTempoAndOwnsItsPoints();
 }
