@@ -1045,6 +1045,20 @@ the Hudson fixture to compare native release with its distinct GAIN release
 instead of testing a deleted forwarding function. The full build and all
 20 CTest targets pass.
 
+### Avoid an unnecessary integer limit in SNES GAIN evaluation
+
+Keep the elapsed hardware-update count as a rounded double instead of narrowing
+it to u64. The envelope reaches an endpoint within 2,047 updates, so a larger
+finite interval needs no additional integer representation or saturation path.
+This also fixes a sanitizer-confirmed floating-to-integer overflow when the
+elapsed interval produces an infinite intermediate count.
+
+Add coverage for all four GAIN modes and 32 rates at the largest finite double,
+including stopped counters, plus fractional/complete hardware periods. The
+direct sanitized comparison preserves 30,720 ordinary GAIN queries and verifies
+all 128 large-interval cases; the 131,072 envelope comparisons still match.
+The full build and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

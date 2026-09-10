@@ -216,8 +216,7 @@ s16 snesDspGainEnvelopeValue(u8 gain, s16 envelopeFrom, double elapsedSeconds) {
   if (rate == 0) {
     return envelope;
   }
-  const auto updates =
-      static_cast<u64>(std::floor(elapsedSeconds * kSampleRate / static_cast<double>(kCounterRates[rate])));
+  const double updates = std::floor(elapsedSeconds * kSampleRate / kCounterRates[rate]);
   for (u64 i = 0; i < updates; ++i) {
     if ((mode < 6 && envelope == 0) || (mode >= 6 && envelope == 0x7ff)) {
       break;

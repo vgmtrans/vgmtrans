@@ -57,6 +57,21 @@ void snesDspNoiseDecoderMatchesHardwareSequence() {
          "SNES noise should use the DSP's LFSR values and FLG counter periods");
 }
 
+void snesGainEvaluationHandlesLongIntervals() {
+  const double large = std::numeric_limits<double>::max();
+  for (u8 mode = 4; mode < 8; ++mode) {
+    for (u8 rate = 0; rate < 32; ++rate) {
+      const auto gain = static_cast<u8>((mode << 5) | rate);
+      const s16 expected = rate == 0 ? 0x321 : (mode < 6 ? 0 : 0x7ff);
+      expect(snesDspGainEnvelopeValue(gain, 0x321, large) == expected,
+             "long finite GAIN intervals must reach the endpoint or retain a stopped counter's value");
+    }
+  }
+  expect(snesDspGainEnvelopeValue(0x9f, 0x7ff, 0.5 / kSnesDspSampleRate) == 0x7ff &&
+             snesDspGainEnvelopeValue(0x9f, 0x7ff, 1.0 / kSnesDspSampleRate) == 0x7df,
+         "GAIN evaluation must still wait for a complete hardware counter period before stepping");
+}
+
 void ndsImaAdpcmDecoderRejectsInvalidInitialIndex() {
   const Sample sample{
       .name = "adpcm",
@@ -1834,6 +1849,7 @@ void synthPreparationKeepsSampleIdentityAndPhaseOrdering() {
 void runValueSynthExportTests() {
   snesBrrDecoderProducesPcm();
   snesDspNoiseDecoderMatchesHardwareSequence();
+  snesGainEvaluationHandlesLongIntervals();
   ndsImaAdpcmDecoderRejectsInvalidInitialIndex();
   pcm16DecoderHonorsExplicitByteOrder();
   envelopePredicateDetectsCanonicalData();
