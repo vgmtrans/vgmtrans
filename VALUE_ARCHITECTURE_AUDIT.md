@@ -915,6 +915,16 @@ extreme durations, and saturated tick boundaries. The direct changed-component
 build passes under AddressSanitizer and UBSan. The full build and all 20 CTest
 targets pass.
 
+### Let stable sorting preserve modulation source order
+
+Remove the original event index from tempo-relative modulation's EventRef.
+Timeline construction already visits tracks and their events in order, so
+stable sorting by tick and sequence preserves the same tie order without
+storing and comparing those positions. Use a range loop to collect relevant
+events directly. This removes seven production lines and one temporary field.
+The full build and all 20 CTest targets pass, including cross-track tempo
+changes, independent modulation layers, and physical delay policies.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

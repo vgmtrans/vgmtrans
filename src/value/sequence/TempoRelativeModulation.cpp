@@ -24,7 +24,6 @@ namespace {
 struct EventRef {
   PerformanceEvent* event = nullptr;
   size_t trackIndex = 0;
-  size_t eventIndex = 0;
 };
 
 struct TrackModulationState {
@@ -107,22 +106,16 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
   std::vector<EventRef> timeline;
   for (size_t trackIndex = 0; trackIndex < performance.tracks.size(); ++trackIndex) {
     auto& track = performance.tracks[trackIndex];
-    for (size_t eventIndex = 0; eventIndex < track.events.size(); ++eventIndex) {
-      if (!belongsInTimeline(track.events[eventIndex])) {
-        continue;
+    for (auto& event : track.events) {
+      if (belongsInTimeline(event)) {
+        timeline.push_back(EventRef{.event = &event, .trackIndex = trackIndex});
       }
-      timeline.push_back(EventRef{
-          .event = &track.events[eventIndex],
-          .trackIndex = trackIndex,
-          .eventIndex = eventIndex,
-      });
     }
   }
   std::ranges::stable_sort(timeline, [](const EventRef& lhs, const EventRef& rhs) {
     const auto& left = performanceEventHeader(*lhs.event);
     const auto& right = performanceEventHeader(*rhs.event);
-    return std::tie(left.tick, left.sequence, lhs.trackIndex, lhs.eventIndex) <
-           std::tie(right.tick, right.sequence, rhs.trackIndex, rhs.eventIndex);
+    return std::tie(left.tick, left.sequence) < std::tie(right.tick, right.sequence);
   });
 
   std::vector<TrackModulationState> states(performance.tracks.size());
