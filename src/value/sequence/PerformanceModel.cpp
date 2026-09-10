@@ -63,35 +63,30 @@ double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elaps
 PerformanceTempoMap::PerformanceTempoMap(const PerformanceSequence& performance)
     : timebase_(performance.timebase),
       initialTempoMicrosecondsPerQuarter_(performance.initialTempoMicrosecondsPerQuarter) {
+  std::vector<const TempoPerformanceEvent*> tempos;
   for (const auto& track : performance.tracks) {
     for (const auto& event : track.events) {
-      const auto* tempo = std::get_if<TempoPerformanceEvent>(&event);
-      if (tempo == nullptr) {
-        continue;
+      if (const auto* tempo = std::get_if<TempoPerformanceEvent>(&event)) {
+        tempos.push_back(tempo);
       }
-      changes_.push_back(Change{
-          .tick = tempo->header.tick,
-          .microsecondsPerQuarter = tempo->microsecondsPerQuarter,
-          .sequence = tempo->header.sequence,
-      });
     }
   }
-  std::ranges::stable_sort(changes_, [](const Change& lhs, const Change& rhs) {
-    return std::tie(lhs.tick, lhs.sequence) < std::tie(rhs.tick, rhs.sequence);
+  std::ranges::stable_sort(tempos, [](const auto* lhs, const auto* rhs) {
+    return std::tie(lhs->header.tick, lhs->header.sequence) < std::tie(rhs->header.tick, rhs->header.sequence);
   });
-  std::optional<u32> currentTempo;
-  std::erase_if(changes_, [&](const Change& change) {
-    if (currentTempo && *currentTempo == change.microsecondsPerQuarter) {
-      return true;
+  for (const auto* tempo : tempos) {
+    if (points_.empty() || points_.back().microsecondsPerQuarter != tempo->microsecondsPerQuarter) {
+      points_.push_back(Point{.tick = tempo->header.tick, .microsecondsPerQuarter = tempo->microsecondsPerQuarter});
     }
-    currentTempo = change.microsecondsPerQuarter;
-    return false;
-  });
+  }
+  if (initialTempoMicrosecondsPerQuarter_ != 500000 && (points_.empty() || points_.front().tick != 0)) {
+    points_.insert(points_.begin(), Point{.tick = 0, .microsecondsPerQuarter = initialTempoMicrosecondsPerQuarter_});
+  }
 }
 
 u32 PerformanceTempoMap::microsecondsPerQuarterAt(u64 tick) const {
   u32 microsecondsPerQuarter = initialTempoMicrosecondsPerQuarter_;
-  for (const auto& change : changes_) {
+  for (const auto& change : points_) {
     if (change.tick > tick) {
       break;
     }
@@ -117,7 +112,7 @@ double PerformanceTempoMap::durationMilliseconds(u64 startTick, u32 durationTick
   u64 cursor = startTick;
   double microseconds = 0.0;
 
-  for (const auto& change : changes_) {
+  for (const auto& change : points_) {
     if (change.tick <= startTick) {
       tempo = change.microsecondsPerQuarter;
       continue;
@@ -143,7 +138,7 @@ u32 PerformanceTempoMap::durationTicksForMilliseconds(u64 startTick, double mill
   u64 cursor = startTick;
   u64 elapsedTicks = 0;
 
-  for (const auto& change : changes_) {
+  for (const auto& change : points_) {
     if (change.tick <= startTick) {
       tempo = change.microsecondsPerQuarter;
       continue;
@@ -169,24 +164,6 @@ u32 PerformanceTempoMap::durationTicksForMilliseconds(u64 startTick, double mill
   const auto wholeTailTicks = static_cast<u64>(exactTailTicks);
   elapsedTicks += wholeTailTicks + (exactTailTicks - wholeTailTicks > 0.5 ? 1 : 0);
   return static_cast<u32>(std::min<u64>(elapsedTicks, std::numeric_limits<u32>::max()));
-}
-
-std::vector<PerformanceTempoMap::Point> PerformanceTempoMap::points() const {
-  std::vector<Point> result;
-  result.reserve(changes_.size() + 1);
-  if (initialTempoMicrosecondsPerQuarter_ != 500000 && (changes_.empty() || changes_.front().tick != 0)) {
-    result.push_back(Point{
-        .tick = 0,
-        .microsecondsPerQuarter = initialTempoMicrosecondsPerQuarter_,
-    });
-  }
-  for (const Change& change : changes_) {
-    result.push_back(Point{
-        .tick = change.tick,
-        .microsecondsPerQuarter = change.microsecondsPerQuarter,
-    });
-  }
-  return result;
 }
 
 const PerformanceTrack* performanceTrackById(const PerformanceSequence& sequence, TrackId id) {

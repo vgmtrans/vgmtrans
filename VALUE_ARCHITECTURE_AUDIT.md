@@ -766,13 +766,31 @@ fixture: its articulation omitted the sample-pool ID required by a resolved
 sample reference. Supply a valid fixture ID without changing production code
 or the sustain assertions. The full build and all 20 current CTest targets pass.
 
+### Store the tempo map in its final point representation
+
+Build the tempo map's owned points directly from temporarily sorted source-event
+references. Remove the separate Change type, retained execution-order field,
+deduplication state, and repeated point conversion. Include implicit initial
+tempo once during construction. This removes 30 production lines while keeping
+the public value-returning points API safe for temporary maps.
+
+All 13,824 before/after cases produce identical tempo points, tick durations,
+tempo lookups, and physical-time conversions. The matrix includes equal-order
+events, multiple tracks, repeated values, zero tempo/PPQN, initial tempos, and
+large tick/time bounds, and passes with direct tempo-map instrumentation under
+AddressSanitizer and UBSan. Add regression coverage for source-event lifetimes,
+implicit/explicit initial tempo, and the first explicit repeated value. The
+full build and all 20 CTest targets pass without warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
   and remaining format-local helpers for redundant state and work.
 - Pitch-transition lowering retains an unread pitchBendVoice field. Investigate
   how fixed physical note-duration limits interact with note extensions and
-  portamento splitting; generated segments currently omit that limit.
+  portamento splitting; generated segments currently omit that limit. A direct
+  probe confirms that a note capped at tick 14 after a tempo change ends at tick
+  40 in native-portamento mode, and a delayed slide can recreate it at tick 20.
 - SonyPS2 still approximates key/velocity-dependent regions during scanning
   under a 3,000-region budget chosen for SF2 table limits. Moving this policy
   to export needs a source-neutral representation of that response; merely

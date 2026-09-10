@@ -619,8 +619,7 @@ struct PerformanceSequence {
 };
 
 // One song-wide tempo view shared by physical-time lowering and MIDI rendering.
-// Changes retain event identity so redundant source tempo writes can be omitted
-// after a PerformanceSequence is copied for lowering.
+// Points follow source execution order and omit repeated tempo values.
 class PerformanceTempoMap {
 public:
   struct Point {
@@ -634,18 +633,12 @@ public:
   [[nodiscard]] double tickSeconds(u64 tick) const;
   [[nodiscard]] double durationMilliseconds(u64 startTick, u32 durationTicks) const;
   [[nodiscard]] u32 durationTicksForMilliseconds(u64 startTick, double milliseconds) const;
-  [[nodiscard]] std::vector<Point> points() const;
+  [[nodiscard]] std::vector<Point> points() const { return points_; }
 
 private:
-  struct Change {
-    u64 tick = 0;
-    u32 microsecondsPerQuarter = 500000;
-    u64 sequence = 0;
-  };
-
   Timebase timebase_;
   u32 initialTempoMicrosecondsPerQuarter_ = 500000;
-  std::vector<Change> changes_;
+  std::vector<Point> points_;
 };
 
 [[nodiscard]] const PerformanceEventHeader& performanceEventHeader(const PerformanceEvent& event);
