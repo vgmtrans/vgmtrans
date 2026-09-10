@@ -326,13 +326,12 @@ template <size_t Size>
 
   InstrumentProbe probe;
   if (const auto standardOffset = Patterns::ptnLoadInstrTableAddress.find(reader)) {
-    // The loader gives the exact base; leading empty instrument slots do not shift it.
     probe.tableAddress = reader.u8At(*standardOffset + 7) | (reader.u8At(*standardOffset + 10) << 8);
-    if (reader.has(probe.tableAddress, 4)) {
-      const u32 firstWord = reader.le32(probe.tableAddress);
-      if (firstWord == 0 || firstWord == 0xffffffff) {
-        probe.tableAddress += 4;
-      }
+    // Detect Hyper Zone's loader by matching the SPC700 instructions
+    // "mov y,#$04; mov $12,y" immediately after the address calculation.
+    // This loader reads instrument records four bytes past the calculated address.
+    if (matchesTable(reader, *standardOffset + 12, std::array<u8, 4>{0x8d, 0x04, 0xcb, 0x12})) {
+      probe.tableAddress += 4;
     }
   } else if (selected.intelli == IntelliMode::Fe4) {
     const auto offset = Patterns::ptnLoadInstrTableAddressFE4.find(reader);

@@ -1823,6 +1823,10 @@ void ninSnesSunsoftRecognizesBgmLayouts() {
     std::fill_n(bytes.begin() + 0x4000, 6, 0);
     expect(findLayout(reader)->instrumentTableAddress == 0x4000,
            "empty leading instrument slots must not shift the driver's table base (Pirates of Dark Water)");
+    std::ranges::copy(std::initializer_list<u8>{0x8d, 0x04, 0xcb, 0x12}, bytes.begin() + 0x5ac);
+    expect(findLayout(reader)->instrumentTableAddress == 0x4004,
+           "Hyper Zone's loader must read instrument records four bytes past the calculated address");
+    std::fill_n(bytes.begin() + 0x5ac, 4, 0);
 
     writeLe16(bytes, 0x40, 0x2202);
     const auto controls = id == ProfileId::SunsoftBenkei ? std::array{0xf0, 0xf1, 0xff} : std::array{0xfd, 0xfe, 0xff};
