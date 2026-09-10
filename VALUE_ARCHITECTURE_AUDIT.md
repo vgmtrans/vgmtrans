@@ -870,6 +870,16 @@ attribution, ordering, and invalid-binding rejection. The full build and all
 20 CTest targets pass, including automation provenance, motion interruption,
 and VM initialization ordering coverage.
 
+### Track used synth instruments as a membership set
+
+Replace the temporary used-instrument list with a set. Insertions now deduplicate
+directly, and final filtering uses contains instead of another linear search.
+The separate bank-ordered instrument list still determines export order, and
+identity/address fallback retains its existing all-match behavior. This removes
+two production lines and the manual duplicate-check branch. The full build and
+all 20 CTest targets pass, including used-only SF2/DLS preparation and semantic
+instrument selection.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

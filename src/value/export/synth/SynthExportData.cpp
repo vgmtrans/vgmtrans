@@ -35,6 +35,7 @@ struct SynthSampleIndexKey {
 using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
 using SynthSampleReferences = std::set<SynthSampleIndexKey>;
 using SynthInstrumentList = std::vector<const Instrument*>;
+using SynthInstrumentSet = std::set<const Instrument*>;
 
 struct SamplePoolView {
   AssetId owner;
@@ -48,29 +49,27 @@ constexpr double kPerceivedHalfLoudnessDb = 10.0;
 }
 
 template <typename Predicate>
-bool markMatchingInstruments(SynthInstrumentList& used, std::span<const Instrument* const> instruments,
+bool markMatchingInstruments(SynthInstrumentSet& used, std::span<const Instrument* const> instruments,
                              Predicate matches) {
   bool found = false;
   for (const auto* instrument : instruments) {
     if (matches(*instrument)) {
       found = true;
-      if (std::ranges::find(used, instrument) == used.end()) {
-        used.push_back(instrument);
-      }
+      used.insert(instrument);
     }
   }
   return found;
 }
 
 void markInstrumentAddress(InstrumentAddress address, std::span<const Instrument* const> instruments,
-                           SynthInstrumentList& used) {
+                           SynthInstrumentSet& used) {
   markMatchingInstruments(used, instruments, [&](const Instrument& instrument) {
     return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == address;
   });
 }
 
 void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
-                            std::span<const Instrument* const> instruments, SynthInstrumentList& used) {
+                            std::span<const Instrument* const> instruments, SynthInstrumentSet& used) {
   if (selection.sourceInstrument) {
     if (markMatchingInstruments(used, instruments, [&](const Instrument& instrument) {
           return instrument.identity && *instrument.identity == *selection.sourceInstrument;
@@ -102,7 +101,7 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
     return instruments;
   }
 
-  SynthInstrumentList used;
+  SynthInstrumentSet used;
   for (const auto& track : sequenceUsage->tracks) {
     // A track uses bank/program zero until its first instrument change.
     InstrumentPerformanceEvent selection;
@@ -118,8 +117,7 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
       }
     }
   }
-  std::erase_if(instruments,
-                [&](const Instrument* instrument) { return std::ranges::find(used, instrument) == used.end(); });
+  std::erase_if(instruments, [&](const Instrument* instrument) { return !used.contains(instrument); });
   return instruments;
 }
 
