@@ -31,13 +31,12 @@ constexpr unsigned kNdsAdpcmTable[89] = {
     0x0E4C, 0x0FBA, 0x114C, 0x1307, 0x14EE, 0x1706, 0x1954, 0x1BDC, 0x1EA5, 0x21B6, 0x2515, 0x28CA, 0x2CDF,
     0x315B, 0x364B, 0x3BB9, 0x41B2, 0x4844, 0x4F7E, 0x5771, 0x602F, 0x69CE, 0x7462, 0x7FFF};
 
-constexpr int kNdsImaIndexTable[9] = {-1, -1, -1, -1, 2, 4, 6, 8};
 constexpr std::array<s16, 49> kOkiStepTable = {
     16,  17,  19,  21,  23,  25,  28,  31,  34,  37,  41,   45,   50,   55,   60,   66,  73,
     80,  88,  97,  107, 118, 130, 143, 157, 173, 190, 209,  230,  253,  279,  307,  337, 371,
     408, 449, 494, 544, 598, 658, 724, 796, 876, 963, 1060, 1166, 1282, 1411, 1552,
 };
-constexpr std::array<s8, 8> kOkiIndexShift = {-1, -1, -1, -1, 2, 4, 6, 8};
+constexpr std::array<s8, 8> kAdpcmIndexShift = {-1, -1, -1, -1, 2, 4, 6, 8};
 constexpr double kPi = 3.14159265358979323846264338327950288;
 s32 clipSigned15(s32 x) {
   return (x & 16384) ? (x | ~16383) : (x & 16383);
@@ -103,26 +102,25 @@ void decodeBrrBlock(std::span<s16, 16> output, u8 header, std::span<const u8, 8>
   return static_cast<u16>(bytes[offset] | (bytes[offset + 1] << 8));
 }
 
-void processNdsImaNibble(u8 data4Bit, int& index, int& pcm16) {
-  // Nintendo DS ADPCM is IMA-style but uses the console's step/index tables and stores
-  // the initial PCM/index immediately before the encoded payload.
-  int diff = static_cast<int>(kNdsAdpcmTable[index] / 8);
-  if ((data4Bit & 1) != 0) {
-    diff += static_cast<int>(kNdsAdpcmTable[index] / 4);
+// NDS IMA and OKI use the same nibble weights, truncating each term separately.
+[[nodiscard]] s32 adpcmMagnitude(s32 step, u8 nibble) {
+  s32 difference = step / 8;
+  if ((nibble & 1) != 0) {
+    difference += step / 4;
   }
-  if ((data4Bit & 2) != 0) {
-    diff += static_cast<int>(kNdsAdpcmTable[index] / 2);
+  if ((nibble & 2) != 0) {
+    difference += step / 2;
   }
-  if ((data4Bit & 4) != 0) {
-    diff += static_cast<int>(kNdsAdpcmTable[index]);
+  if ((nibble & 4) != 0) {
+    difference += step;
   }
+  return difference;
+}
 
-  if ((data4Bit & 8) == 0) {
-    pcm16 = pcm16 > 0x7fff - diff ? 0x7fff : pcm16 + diff;
-  } else {
-    pcm16 = pcm16 < -0x7fff + diff ? -0x7fff : pcm16 - diff;
-  }
-  index = std::clamp(index + kNdsImaIndexTable[data4Bit & 7], 0, 88);
+void processNdsImaNibble(u8 nibble, int& index, int& pcm16) {
+  const s32 difference = adpcmMagnitude(kNdsAdpcmTable[index], nibble);
+  pcm16 = (nibble & 8) == 0 ? std::min(pcm16 + difference, 0x7fff) : std::max(pcm16 - difference, -0x7fff);
+  index = std::clamp(index + kAdpcmIndexShift[nibble & 7], 0, 88);
 }
 
 void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::span<const u8, kPsxAdpcmBlockBytes> block,
@@ -152,28 +150,6 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
 
   previous1 = s1;
   previous2 = s2;
-}
-
-[[nodiscard]] double ndsPsgDutyCycle(u32 dutyIndex) {
-  switch (dutyIndex & 7u) {
-    case 7:
-      return 0.0;
-    case 0:
-      return 0.125;
-    case 1:
-      return 0.25;
-    case 2:
-      return 0.375;
-    case 3:
-      return 0.5;
-    case 4:
-      return 0.625;
-    case 5:
-      return 0.75;
-    case 6:
-      return 0.875;
-  }
-  return 0.5;
 }
 
 [[nodiscard]] std::vector<s16> synthesizeLfsrNoisePcm16(u32 sampleCount, u16 lfsrSeed = 0x7fff, u16 lfsrTap = 0x6000,
@@ -344,20 +320,10 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
   s32 signal = 0;
   s32 stepIndex = 0;
   auto emit = [&](u8 nibble) {
-    const s32 step = kOkiStepTable[stepIndex];
-    s32 difference = step / 8;
-    if ((nibble & 1) != 0) {
-      difference += step / 4;
-    }
-    if ((nibble & 2) != 0) {
-      difference += step / 2;
-    }
-    if ((nibble & 4) != 0) {
-      difference += step;
-    }
+    const s32 difference = adpcmMagnitude(kOkiStepTable[stepIndex], nibble);
     signal += (nibble & 8) != 0 ? -difference : difference;
     signal = std::clamp<s32>(signal, -2048, 2047);
-    stepIndex = std::clamp<s32>(stepIndex + kOkiIndexShift[nibble & 7], 0, 48);
+    stepIndex = std::clamp<s32>(stepIndex + kAdpcmIndexShift[nibble & 7], 0, 48);
 
     // The MSM6295 path used by CPS1 scales the 12-bit decoder output by 11
     // before presenting PCM. Keeping that conversion here preserves the
@@ -405,6 +371,7 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
 }
 
 [[nodiscard]] std::optional<DecodedSample> decodeNdsPsg(const Sample& sample) {
+  constexpr std::array<double, 8> dutyCycles{0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 0.0};
   const u32 sampleCount = sample.loop.length != 0 ? sample.loop.length : 32768;
   DecodedSample decoded{
       .sampleRate = sample.sampleRate == 0 ? 32768 : sample.sampleRate,
@@ -412,7 +379,7 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
       .loop = sample.loop,
   };
   decoded.pcm = sample.codecParameter == 8 ? synthesizeLfsrNoisePcm16(sampleCount)
-                                           : synthesizeBandLimitedPulsePcm16(ndsPsgDutyCycle(sample.codecParameter),
+                                           : synthesizeBandLimitedPulsePcm16(dutyCycles[sample.codecParameter & 7],
                                                                              decoded.sampleRate, sampleCount);
   return decoded;
 }
