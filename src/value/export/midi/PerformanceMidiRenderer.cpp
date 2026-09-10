@@ -595,14 +595,9 @@ struct VoicePitchBendRangeChange {
 }
 
 [[nodiscard]] s32 globalTransposeAt(std::span<const GlobalTransposePerformanceEvent* const> changes, u64 tick) {
-  s32 semitones = 0;
-  for (const auto* change : changes) {
-    if (change->header.tick > tick) {
-      break;
-    }
-    semitones = change->semitones;
-  }
-  return semitones;
+  const auto upper =
+      std::ranges::upper_bound(changes, tick, {}, [](const auto* change) { return change->header.tick; });
+  return upper == changes.begin() ? 0 : (*std::prev(upper))->semitones;
 }
 
 bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePerformanceEvent& note, u8 channel) {

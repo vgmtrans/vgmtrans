@@ -827,6 +827,16 @@ lines without adding a builder API. The full build and all 20 CTest targets
 pass, including range derivation with annotations disabled and format source
 inspection coverage.
 
+### Search sorted tempo and transpose points directly
+
+Use upper_bound for point-in-time tempo and global-transpose lookup, selecting
+the last change at or before the requested tick. This replaces two prefix scans
+with logarithmic searches and removes 10 production lines. A linear reference
+agrees on 1,572,864 tempo queries, including empty maps, repeated ticks, initial
+values, and large ticks. All 1,152 MIDI scenarios remain byte-identical. Direct
+changed-component builds pass under AddressSanitizer and UBSan, and the full
+build and all 20 CTest targets pass without warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

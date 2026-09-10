@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <limits>
 #include <optional>
 #include <tuple>
@@ -74,14 +75,8 @@ PerformanceTempoMap::PerformanceTempoMap(const PerformanceSequence& performance)
 }
 
 u32 PerformanceTempoMap::microsecondsPerQuarterAt(u64 tick) const {
-  u32 microsecondsPerQuarter = initialTempoMicrosecondsPerQuarter_;
-  for (const auto& change : points_) {
-    if (change.tick > tick) {
-      break;
-    }
-    microsecondsPerQuarter = change.microsecondsPerQuarter;
-  }
-  return microsecondsPerQuarter;
+  const auto upper = std::ranges::upper_bound(points_, tick, {}, &Point::tick);
+  return upper == points_.begin() ? initialTempoMicrosecondsPerQuarter_ : std::prev(upper)->microsecondsPerQuarter;
 }
 
 double PerformanceTempoMap::tickSeconds(u64 tick) const {
