@@ -1116,6 +1116,21 @@ The full build is warning-free and all 20 CTest targets pass, including AKAO's
 sampled driver curve and Suzuki's automatic portamento, slides across ties,
 repeated slide continuation, and interruption fixtures.
 
+### Share synth LFO timing and depth lowering
+
+Consolidate vibrato/tremolo timing generators, timing modulators, and
+fixed-versus-controller depth selection inside lowerSynthModulation. Keep
+channel-pressure routing, tremolo attenuation, and record order explicit.
+Sequence-event simulation now constructs only the retained static no-boost
+attenuation instead of building and then removing the other records. This
+removes 49 production lines without adding a format-facing API.
+
+All 313,600 before/after comparisons preserve exact ordered generator and
+modulator vectors under AddressSanitizer and UBSan. Coverage combines absent
+and present LFOs, all waveform choices, fixed/controller depths, both gain
+modes, constant/varying rates and delays, zero/nonzero depths, and both export
+policies. The full build is warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
