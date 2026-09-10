@@ -675,14 +675,11 @@ PerformanceEmitter PerformanceEmitter::withAutomation(const PerformanceAutomatio
 }
 
 void PerformanceEmitter::append(PerformanceEvent event) {
+  std::visit([&](auto& typedEvent) { typedEvent.header = header(); }, event);
   if (automation_) {
-    if (*automation_ >= track_.automations.size()) {
-      throw std::logic_error("Performance automation binding was not valid for this track");
-    }
     auto& automation = track_.automations[*automation_];
     automation.realization.endTick = std::max(automation.realization.endTick, tick_);
   }
-  std::visit([&](auto& typedEvent) { typedEvent.header = header(); }, event);
   track_.events.emplace_back(std::move(event));
 }
 
@@ -863,27 +860,22 @@ void PerformanceEmitter::interruptPitchSlidesForNewNote(PerformanceLaneId lane) 
 }
 
 PerformanceEventHeader PerformanceEmitter::header() {
+  PerformanceEventHeader result{
+      .sourceCommand = sourceCommand_,
+      .sourceAnnotation = sourceAnnotation_,
+      .track = track_.id,
+  };
   if (automation_) {
     if (*automation_ >= track_.automations.size()) {
       throw std::logic_error("Performance automation binding was not valid for this track");
     }
     const auto& automation = track_.automations[*automation_];
-    return PerformanceEventHeader{
-        .sourceCommand = automation.header.sourceCommand,
-        .sourceAnnotation = automation.header.sourceAnnotation,
-        .track = automation.header.track,
-        .tick = tick_,
-        .sequence = nextSequence_++,
-        .automation = automation.id,
-    };
+    result = automation.header;
+    result.automation = automation.id;
   }
-  return PerformanceEventHeader{
-      .sourceCommand = sourceCommand_,
-      .sourceAnnotation = sourceAnnotation_,
-      .track = track_.id,
-      .tick = tick_,
-      .sequence = nextSequence_++,
-  };
+  result.tick = tick_;
+  result.sequence = nextSequence_++;
+  return result;
 }
 
 }  // namespace vgmtrans::core

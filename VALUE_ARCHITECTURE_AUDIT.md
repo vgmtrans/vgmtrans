@@ -860,6 +860,16 @@ AddressSanitizer and UBSan across 3,458 physical-limit scenarios, including
 unidentified notes and saturated end ticks. All 864 uncapped before/after MIDI
 scenarios remain byte-identical.
 
+### Construct and validate emitted headers once
+
+PerformanceEmitter now chooses the command or automation's source header and
+then stamps its tick and execution sequence in one place. Append uses that
+validated header before updating the automation lifetime, removing a duplicate
+binding check. This removes eight production lines while preserving source
+attribution, ordering, and invalid-binding rejection. The full build and all
+20 CTest targets pass, including automation provenance, motion interruption,
+and VM initialization ordering coverage.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
