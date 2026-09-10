@@ -1073,6 +1073,20 @@ the emitted DLS wave link, SoundFont rejection of that unrepresentable link,
 and successful SoundFont output at index 65,535. The full build is warning-free
 and all 20 CTest targets pass.
 
+### Share the identical NDS and OKI ADPCM nibble arithmetic
+
+Use one magnitude calculation and index-adjustment table for NDS IMA and OKI
+ADPCM. Their step tables, predictor widths, clipping rules, nibble order, and
+output scaling remain explicit in their respective decoders. Replace the NDS
+PSG duty switch with its eight-value table. This removes 33 production lines.
+
+The before/after decoder comparison matches PCM and metadata exactly for
+363,280 NDS ADPCM cases, 2,048 OKI cases, and 240 PSG cases. Coverage includes
+every predictor index and packed byte, predictor extrema, long streams,
+empty input, masked duty parameters, and sample-rate defaults. Both decoder
+versions and their shared synth dependencies were compiled with AddressSanitizer
+and UBSan. The full build and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
