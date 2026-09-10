@@ -36,7 +36,7 @@ struct TrackModulationState {
 
 [[nodiscard]] double tickSeconds(const PerformanceSequence& performance, u32 microsecondsPerQuarter) {
   return static_cast<double>(microsecondsPerQuarter) /
-         (1'000'000.0 * static_cast<double>(std::max<u16>(performance.timebase.ppqn, 1)));
+         (1'000'000.0 * static_cast<double>(std::max<u32>(performance.timebase.ppqn, 1)));
 }
 
 [[nodiscard]] double hertz(double cyclesPerTick, double secondsPerTick) {

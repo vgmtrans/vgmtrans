@@ -73,7 +73,7 @@ u32 PerformanceTempoMap::microsecondsPerQuarterAt(u64 tick) const {
 
 double PerformanceTempoMap::tickSeconds(u64 tick) const {
   return (static_cast<double>(microsecondsPerQuarterAt(tick)) / 1'000'000.0) /
-         static_cast<double>(std::max<u16>(timebase_.ppqn, 1));
+         static_cast<double>(std::max<u32>(timebase_.ppqn, 1));
 }
 
 double PerformanceTempoMap::durationMilliseconds(u64 startTick, u32 durationTicks) const {
@@ -83,7 +83,7 @@ double PerformanceTempoMap::durationMilliseconds(u64 startTick, u32 durationTick
 
   const u64 endTick = startTick > std::numeric_limits<u64>::max() - durationTicks ? std::numeric_limits<u64>::max()
                                                                                   : startTick + durationTicks;
-  const double ppqn = std::max<u16>(timebase_.ppqn, 1);
+  const double ppqn = std::max<u32>(timebase_.ppqn, 1);
   u32 tempo = microsecondsPerQuarterAt(startTick);
   u64 cursor = startTick;
   double microseconds = 0.0;
@@ -105,7 +105,7 @@ u32 PerformanceTempoMap::durationTicksForMilliseconds(u64 startTick, double mill
   if (!(milliseconds > 0.0) || !std::isfinite(milliseconds)) {
     return 0;
   }
-  const double ppqn = std::max<u16>(timebase_.ppqn, 1);
+  const double ppqn = std::max<u32>(timebase_.ppqn, 1);
   double remainingMicroseconds = milliseconds * 1000.0;
   u32 tempo = microsecondsPerQuarterAt(startTick);
   u64 cursor = startTick;
