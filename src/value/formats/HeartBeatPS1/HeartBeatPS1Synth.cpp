@@ -228,7 +228,6 @@ std::optional<HeartBeatPs1ScannedBank> addHeartBeatPs1Bank(ScanResultBuilder& re
           .region(sample->second,
                   Region{
                       .keyRange = tone.keys,
-                      .range = tone.source.range,
                       .unityKey = tone.unityKey,
                       .envelope = psxSpuEnvelope(tone.adsr1, tone.adsr2),
                       .loop = streams.at(tone.sampleOffset).loop,

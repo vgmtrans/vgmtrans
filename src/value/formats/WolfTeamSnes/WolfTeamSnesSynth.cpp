@@ -103,7 +103,6 @@ void addInstruments(InstrumentSetBuilder& instruments, const std::vector<Instrum
     entry
         .region(*sample,
                 Region{
-                    .range = patch.patchSource,
                     .unityKey = unityKey,
                     .envelope = snesDspEnvelope(patch.adsr1, patch.adsr2, patch.gain),
                     .attenuationDb = attenuation(gain),

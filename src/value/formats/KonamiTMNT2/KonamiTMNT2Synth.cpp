@@ -167,7 +167,6 @@ std::vector<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layou
     instrument
         .region(*sample,
                 Region{
-                    .range = source.range,
                     .unityKey = unity,
                     .envelope =
                         Envelope{

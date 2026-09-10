@@ -817,6 +817,16 @@ renderer/tempo-map build passes under AddressSanitizer and UBSan. Add a focused
 regression for distinct and equal sequence values across tracks. The full build
 and all 20 CTest targets pass without warnings.
 
+### Declare a region's source range once
+
+Remove 21 duplicate range assignments across 17 format synth builders. Each
+affected region immediately supplies the same range through its sole source
+annotation call, which already records the durable range even without a source
+map. The source call is now its single definition. This removes 19 production
+lines without adding a builder API. The full build and all 20 CTest targets
+pass, including range derivation with annotations disabled and format source
+inspection coverage.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

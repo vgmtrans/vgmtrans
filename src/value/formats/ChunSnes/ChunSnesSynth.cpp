@@ -112,7 +112,6 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     entry
         .region(*sample,
                 Region{
-                    .range = patch.sampleInfoSource,
                     .unityKey = unityKey(layout, patch.pitchScale),
                     .envelope = envelope,
                 })

@@ -99,7 +99,6 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     entry
         .region(*sample,
                 Region{
-                    .range = range,
                     .unityKey = 93.0 - semitones,
                     .envelope = driverEnvelope(patch.adsr1, patch.adsr2),
                 })

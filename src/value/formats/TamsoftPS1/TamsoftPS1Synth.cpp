@@ -108,7 +108,6 @@ bool addBank(ScanResultBuilder& result, const BankLayout& layout, std::string_vi
     instrument
         .region(sample->second,
                 Region{
-                    .range = adsrRange,
                     .unityKey = 48.0,
                     .envelope = psxSpuEnvelope(static_cast<u16>(adsr), static_cast<u16>(adsr >> 16), spuGeneration),
                     .loop = streams.at(sampleOffset).loop,

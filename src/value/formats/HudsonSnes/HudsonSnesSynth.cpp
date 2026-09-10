@@ -102,7 +102,6 @@ void addMelodic(InstrumentSetBuilder& instruments, const std::vector<Patch>& pat
     entry
         .region(*sample,
                 Region{
-                    .range = patch.row.source,
                     .unityKey = patch.unityKey,
                     .envelope = driverEnvelope(patch.row.adsr1, patch.row.adsr2, patch.row.gain),
                 })
@@ -136,7 +135,6 @@ void addDrums(InstrumentSetBuilder& instruments, const SequenceRecipes& recipes,
         .region(*sample,
                 Region{
                     .keyRange = KeyRange{.low = key, .high = key},
-                    .range = drum.source,
                     .unityKey = patch->unityKey + key - drum.sourceKey,
                     .envelope = driverEnvelope(patch->row.adsr1, patch->row.adsr2, patch->row.gain),
                 })
