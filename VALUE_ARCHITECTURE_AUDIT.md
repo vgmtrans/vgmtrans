@@ -800,6 +800,23 @@ MIDI voice linking and range planning already use the continuation and bend
 state. This removes five production lines. The full build and all 20 CTest
 targets pass, including linked and mixed-mode pitch-transition regressions.
 
+### Share ordered collection of global performance events
+
+Tempo, transposition, and time-signature handling now borrow typed events
+through one orderedPerformanceEvents helper. Remove the renderer's separate
+transpose record and two collection/sorting implementations. Convert time
+signatures directly when writing the conductor. This removes 34 production
+lines and fixes simultaneous cross-track transpose/meter changes previously
+ordered by track enumeration rather than execution sequence.
+
+An independent MIDI parser checks 1,152 before/after scenarios against expected
+global order: 512 previously disagreed and none disagree now. All 384 cases
+without cross-track tick collisions remain byte-identical; events other than
+transposed note keys and time signatures are unchanged throughout. The direct
+renderer/tempo-map build passes under AddressSanitizer and UBSan. Add a focused
+regression for distinct and equal sequence values across tracks. The full build
+and all 20 CTest targets pass without warnings.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

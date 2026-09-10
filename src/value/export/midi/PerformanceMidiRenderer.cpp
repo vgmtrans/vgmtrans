@@ -427,12 +427,6 @@ struct RenderTrackState {
   SimulatedLfoState panLfo;
 };
 
-struct GlobalTransposeChange {
-  u64 tick = 0;
-  s32 semitones = 0;
-  size_t sequence = 0;
-};
-
 using PerformanceTimeline = std::vector<const PerformanceEvent*>;
 using PerformanceTimelines = std::vector<PerformanceTimeline>;
 
@@ -600,53 +594,15 @@ struct VoicePitchBendRangeChange {
   return changes;
 }
 
-[[nodiscard]] std::vector<GlobalTransposeChange> collectGlobalTransposeChanges(const PerformanceTimelines& timelines) {
-  std::vector<GlobalTransposeChange> changes;
-  for (const auto& timeline : timelines) {
-    for (const auto* event : timeline) {
-      const auto* transpose = std::get_if<GlobalTransposePerformanceEvent>(event);
-      if (transpose == nullptr) {
-        continue;
-      }
-      changes.push_back(GlobalTransposeChange{
-          .tick = transpose->header.tick,
-          .semitones = transpose->semitones,
-          .sequence = changes.size(),
-      });
-    }
-  }
-  std::ranges::stable_sort(changes, [](const GlobalTransposeChange& lhs, const GlobalTransposeChange& rhs) {
-    return std::tie(lhs.tick, lhs.sequence) < std::tie(rhs.tick, rhs.sequence);
-  });
-  return changes;
-}
-
-[[nodiscard]] s32 globalTransposeAt(std::span<const GlobalTransposeChange> changes, u64 tick) {
+[[nodiscard]] s32 globalTransposeAt(std::span<const GlobalTransposePerformanceEvent* const> changes, u64 tick) {
   s32 semitones = 0;
-  for (const auto& change : changes) {
-    if (change.tick > tick) {
+  for (const auto* change : changes) {
+    if (change->header.tick > tick) {
       break;
     }
-    semitones = change.semitones;
+    semitones = change->semitones;
   }
   return semitones;
-}
-
-[[nodiscard]] std::vector<MidiEvent> collectGlobalTimeSignatures(const PerformanceTimelines& timelines) {
-  std::vector<MidiEvent> timeSignatures;
-  for (const auto& timeline : timelines) {
-    for (const auto* event : timeline) {
-      const auto* timeSignature = std::get_if<TimeSignaturePerformanceEvent>(event);
-      if (timeSignature == nullptr) {
-        continue;
-      }
-      timeSignatures.push_back(timeSignatureEvent(timeSignature->header.tick, timeSignature->numerator,
-                                                  timeSignature->denominator, timeSignature->clocksPerMetronomeClick));
-    }
-  }
-  std::ranges::stable_sort(timeSignatures,
-                           [](const MidiEvent& lhs, const MidiEvent& rhs) { return lhs.tick < rhs.tick; });
-  return timeSignatures;
 }
 
 bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePerformanceEvent& note, u8 channel) {
@@ -1350,7 +1306,7 @@ bool shouldRestartSimulatedPanForNote(const NotePerformanceEvent& note, const Re
 }
 
 void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEvent& event, u8 channel,
-                  u32 sourceTrackNumber, std::span<const GlobalTransposeChange> globalTransposes,
+                  u32 sourceTrackNumber, std::span<const GlobalTransposePerformanceEvent* const> globalTransposes,
                   const PerformanceTempoMap& globalTempos, const MidiExportOptions& options,
                   ModulationConversionPolicy modulationConversion, std::span<const SoundBankAsset* const> soundBanks,
                   const SequenceModulationProfile* modulationProfile, MidiControllerState* automationState) {
@@ -1653,8 +1609,8 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
   };
   sequence.tracks.reserve(loweredPerformance.tracks.size());
   const PerformanceTimelines timelines = buildPerformanceTimelines(loweredPerformance);
-  const std::vector<GlobalTransposeChange> globalTransposes = collectGlobalTransposeChanges(timelines);
-  const std::vector<MidiEvent> globalTimeSignatures = collectGlobalTimeSignatures(timelines);
+  const auto globalTransposes = orderedPerformanceEvents<GlobalTransposePerformanceEvent>(loweredPerformance);
+  const auto globalTimeSignatures = orderedPerformanceEvents<TimeSignaturePerformanceEvent>(loweredPerformance);
   const double levelHeadroom = panLevelHeadroom(timelines);
 
   for (size_t trackIndex = 0; trackIndex < loweredPerformance.tracks.size(); ++trackIndex) {
@@ -1728,9 +1684,11 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
         midiTrack.events.push_back(tempoEvent(tempo.tick, tempo.microsecondsPerQuarter));
         endTick = std::max(endTick, tempo.tick);
       }
-      midiTrack.events.insert(midiTrack.events.end(), globalTimeSignatures.begin(), globalTimeSignatures.end());
-      for (const auto& timeSignature : globalTimeSignatures) {
-        endTick = std::max(endTick, timeSignature.tick);
+      for (const auto* timeSignature : globalTimeSignatures) {
+        midiTrack.events.push_back(timeSignatureEvent(timeSignature->header.tick, timeSignature->numerator,
+                                                      timeSignature->denominator,
+                                                      timeSignature->clocksPerMetronomeClick));
+        endTick = std::max(endTick, timeSignature->header.tick);
       }
     }
     midiTrack.endTick = endTick;
