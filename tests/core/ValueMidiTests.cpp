@@ -225,6 +225,86 @@ void performanceMidiRendererTrustsSourceNoteExtensions() {
   expect(midiSequence.tracks[0].endTick == 30, "performance renderer should preserve track end ticks");
 }
 
+void performanceMidiRendererKeepsPhysicalLimitsAcrossPortamentoFragments() {
+  for (const auto mode : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
+    for (const u64 slideTick : {4, 20}) {
+      for (const double limitMilliseconds : {0.0, 1000.0}) {
+        PerformanceTrack track{.id = TrackId{0}, .endTick = 44};
+        u64 nextSequence = 0;
+        u32 nextNote = 0;
+        u32 nextAutomation = 0;
+        PerformanceEmitter out{track, CommandId{1}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
+        const auto held = out.note(
+            NotePerformanceEvent{.key = 60, .durationTicks = 40, .maximumDurationMilliseconds = limitMilliseconds});
+        out.at(8).tempo(1000000);
+        out.at(slideTick).pitchSlide(held, 60, 64, 8);
+        out.at(40).note(67, 1.0, 4);
+        const PerformanceSequence performance{.timebase = {.ppqn = 10}, .tracks = {track}};
+        const auto midi = renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = mode});
+        const auto notes = midiNotes(midi.tracks[0].events);
+        // At 50 ms/tick through tick 8, then 100 ms/tick, the timer expires at 14.
+        const u64 stopTick = limitMilliseconds == 0.0 ? 0 : 14;
+        const bool split = mode == MidiPitchTransitionRendering::Portamento && slideTick < stopTick;
+        expect(notes.size() == (split ? 3 : 2) && notes.front().tick == 0 &&
+                   notes.front().duration == (split ? 5 : stopTick),
+               "a hardware timer must survive portamento splitting, including a zero-duration source attack");
+        if (split) {
+          expect(notes[1].tick == 4 && notes[1].duration == 10,
+                 "the destination fragment must inherit the source attack's stop time across tempo changes");
+        }
+        expect(notes.back().tick == 40 && notes.back().key == 67 && notes.back().duration == 4,
+               "a genuine new attack must reset the previous voice's duration limit");
+        const auto& source = std::get<NotePerformanceEvent>(performance.tracks[0].events.front());
+        expect(source.durationTicks == 40 && source.maximumDurationMilliseconds == limitMilliseconds,
+               "MIDI duration limits must leave the source performance intact");
+      }
+    }
+  }
+}
+
+void performanceMidiRendererKeepsPhysicalLimitsAcrossVoiceContinuations() {
+  for (const auto mode : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
+    for (const bool changesKey : {false, true}) {
+      for (const bool laterLimit : {false, true}) {
+        PerformanceTrack track{.id = TrackId{0}, .endTick = 40};
+        u64 nextSequence = 0;
+        u32 nextNote = 0;
+        u32 nextAutomation = 0;
+        PerformanceEmitter out{track, CommandId{1}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
+        const auto held = out.note(
+            NotePerformanceEvent{.key = 60,
+                                 .durationTicks = laterLimit ? 40u : 4u,
+                                 .maximumDurationMilliseconds = laterLimit ? std::nullopt : std::optional{1000.0}});
+        if (laterLimit) {
+          out.at(2).pitchSlide(held, 60, 62, 2).portamentoOverlap(24);
+        }
+        const auto next = out.at(4).note(
+            NotePerformanceEvent{.key = changesKey ? 64.0 : 60.0,
+                                 .durationTicks = 36,
+                                 .maximumDurationMilliseconds = laterLimit ? std::optional{1000.0} : std::nullopt,
+                                 .extendsPrevious = !changesKey});
+        if (changesKey) {
+          out.at(4).pitchSlide(next, laterLimit ? 62 : 60, 64, 8).continueFrom(held).portamentoOverlap(24);
+        }
+        out.at(8).tempo(1000000);
+        const auto midi = renderMidiSequence(PerformanceSequence{.timebase = {.ppqn = 10}, .tracks = {track}},
+                                             MidiExportOptions{.pitchTransitions = mode});
+        const auto notes = midiNotes(midi.tracks[0].events);
+        const u64 stopTick = laterLimit ? 16 : 14;
+        expect(!notes.empty() &&
+                   std::ranges::all_of(
+                       notes, [stopTick](const MidiNoteView& note) { return note.tick + note.duration <= stopTick; }) &&
+                   notes.back().tick + notes.back().duration == stopTick,
+               "continuations must honor inherited and newly shortened hardware limits on every live fragment");
+        if ((!changesKey && !laterLimit) || mode == MidiPitchTransitionRendering::PitchBend) {
+          expect(notes.size() == 1 && notes[0].tick == 0 && notes[0].duration == stopTick,
+                 "same-voice MIDI extensions must stop at the hardware deadline");
+        }
+      }
+    }
+  }
+}
+
 void performanceMidiRendererSelectsTuningRepresentation() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
@@ -3424,6 +3504,8 @@ void runValueMidiTests() {
   midiExporterOrdersGeneratedNoteOffBeforeSameTickNoteOn();
   midiExporterKeepsZeroDurationNotePairedAtSameTick();
   performanceMidiRendererTrustsSourceNoteExtensions();
+  performanceMidiRendererKeepsPhysicalLimitsAcrossPortamentoFragments();
+  performanceMidiRendererKeepsPhysicalLimitsAcrossVoiceContinuations();
   performanceMidiRendererSelectsTuningRepresentation();
   performanceMidiRendererWritesTimeSignaturesToFirstTrack();
   performanceMidiRendererUsesGlobalExecutionOrderForTransposeAndMeter();

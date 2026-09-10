@@ -387,8 +387,29 @@ class PitchBendLayers {
   std::map<u32, PitchBendPerformanceEvent> layers;
 };
 
+[[nodiscard]] u64 physicalNoteEnd(const NotePerformanceEvent& note, const PerformanceTempoMap& tempos) {
+  const auto ticks = tempos.durationTicksForMilliseconds(note.header.tick, *note.maximumDurationMilliseconds);
+  return note.header.tick + std::min<u64>(ticks, std::numeric_limits<u64>::max() - note.header.tick);
+}
+
 struct RenderTrackState {
+  RenderTrackState(const PerformanceTrack& source, const PerformanceTempoMap& tempos) {
+    // Use original limits: pitch lowering merges extensions and changes fragment ticks.
+    for (const auto& event : source.events) {
+      const auto* note = std::get_if<NotePerformanceEvent>(&event);
+      if (note != nullptr && note->note.valid() && note->maximumDurationMilliseconds) {
+        const u64 limit = physicalNoteEnd(*note, tempos);
+        auto& end = sourceNoteEndLimits.try_emplace(note->note, limit).first->second;
+        end = std::min(end, limit);
+      }
+    }
+  }
+
+  std::unordered_map<PerformanceNoteId, u64> sourceNoteEndLimits;
   std::optional<size_t> lastNoteIndex;
+  // One hardware stop time applies to all MIDI fragments of a source voice.
+  size_t voiceStartIndex = 0;
+  std::optional<u64> voiceEndLimit;
   // MIDI starts in bank/program zero. Keep the actual emitted state so a
   // generated selection can explicitly return to bank zero.
   u16 midiBank = 0;
@@ -600,7 +621,39 @@ struct VoicePitchBendRangeChange {
   return upper == changes.begin() ? 0 : (*std::prev(upper))->semitones;
 }
 
-bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePerformanceEvent& note, u8 channel) {
+[[nodiscard]] std::optional<u32> physicalNoteDuration(MidiTrack& track, RenderTrackState& state,
+                                                      const NotePerformanceEvent& note,
+                                                      const PerformanceTempoMap& tempos) {
+  const bool freshAttack = !note.extendsPrevious && note.restartsEnvelope;
+  if (freshAttack) {
+    state.voiceStartIndex = track.events.size();
+    state.voiceEndLimit.reset();
+  }
+  const auto sourceLimit = state.sourceNoteEndLimits.find(note.note);
+  if (sourceLimit != state.sourceNoteEndLimits.end() || note.maximumDurationMilliseconds) {
+    const u64 limit =
+        sourceLimit != state.sourceNoteEndLimits.end() ? sourceLimit->second : physicalNoteEnd(note, tempos);
+    if (!state.voiceEndLimit || limit < *state.voiceEndLimit) {
+      state.voiceEndLimit = limit;
+      for (size_t i = state.voiceStartIndex; i < track.events.size(); ++i) {
+        auto& event = track.events[i];
+        if (auto* fragment = std::get_if<NoteDuration>(&event.payload)) {
+          fragment->duration = static_cast<u32>(std::min<u64>(fragment->duration, limit - std::min(limit, event.tick)));
+        }
+      }
+    }
+  }
+  if (!state.voiceEndLimit) {
+    return note.durationTicks;
+  }
+  if (!freshAttack && note.header.tick >= *state.voiceEndLimit) {
+    return std::nullopt;
+  }
+  return static_cast<u32>(std::min<u64>(note.durationTicks, *state.voiceEndLimit - note.header.tick));
+}
+
+bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePerformanceEvent& note, u8 channel,
+                        u32 duration) {
   if (!note.extendsPrevious || !state.lastNoteIndex || *state.lastNoteIndex >= track.events.size()) {
     return false;
   }
@@ -612,7 +665,7 @@ bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePer
   }
 
   const u64 previousEnd = previousEvent.tick + previous->duration;
-  const u64 extensionEnd = note.header.tick + note.durationTicks;
+  const u64 extensionEnd = note.header.tick + duration;
   if (extensionEnd > previousEnd) {
     previous->duration = static_cast<u32>(extensionEnd - previousEvent.tick);
   }
@@ -1309,6 +1362,10 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
       [&](const auto& typedEvent) {
         using TypedEvent = std::decay_t<decltype(typedEvent)>;
         if constexpr (std::is_same_v<TypedEvent, NotePerformanceEvent>) {
+          const auto duration = physicalNoteDuration(track, state, typedEvent, globalTempos);
+          if (!duration) {
+            return;
+          }
           if (!typedEvent.extendsPrevious && typedEvent.instrumentAddress) {
             const auto address = *typedEvent.instrumentAddress;
             applyInstrumentSelection(
@@ -1335,7 +1392,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           if (shouldRestartSimulatedPanForNote(typedEvent, state)) {
             restartSimulatedPanForNote(track, state, typedEvent.header.tick, channel, options);
           }
-          if (extendPreviousNote(track, state, typedEvent, channel)) {
+          if (extendPreviousNote(track, state, typedEvent, channel, *duration)) {
             return;
           }
           if (options.terminatePreviousVoice && typedEvent.restartsEnvelope && state.lastNoteIndex) {
@@ -1349,13 +1406,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             addCombinedLevel(track, state, typedEvent.header.tick, channel, options);
           }
           state.lastNoteIndex = track.events.size();
-          u32 duration = typedEvent.durationTicks;
-          if (typedEvent.maximumDurationMilliseconds) {
-            duration = std::min(duration, globalTempos.durationTicksForMilliseconds(
-                                              typedEvent.header.tick, *typedEvent.maximumDurationMilliseconds));
-          }
           track.events.push_back(
-              midi::note(typedEvent.header.tick, channel, key, midiVelocity(typedEvent.linearVelocity), duration));
+              midi::note(typedEvent.header.tick, channel, key, midiVelocity(typedEvent.linearVelocity), *duration));
         } else if constexpr (std::is_same_v<TypedEvent, TempoPerformanceEvent>) {
           // Tempo is song-wide. Effective changes are written once on the
           // first MIDI track after all source tracks have been lowered.
@@ -1614,7 +1666,7 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
         .name = performanceTrack.name.empty() ? "Track " + std::to_string(performanceTrack.sourceTrackNumber)
                                               : performanceTrack.name,
     };
-    RenderTrackState renderState;
+    RenderTrackState renderState{performance.tracks[trackIndex], globalTempos};
     renderState.levelHeadroom = levelHeadroom;
     std::unordered_map<PerformanceAutomationId, MidiControllerState> automationControllerStates;
     const auto pitchBendRangeChanges = planVoicePitchBendRanges(timelines[trackIndex], options.tuning, soundBanks);
