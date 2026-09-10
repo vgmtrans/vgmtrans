@@ -935,6 +935,17 @@ The return values and implementation are unchanged, including the ability to
 check whether a previous note existed. The full rebuild is warning-free and all
 20 CTest targets pass. Verify that each format edit only removes its outer cast.
 
+### Keep one temporary default-transition state in the compiler cursor
+
+Replace the cursor event's partial CommandFlow and separate declaration flag
+with one optional CommandTransition. Assemble the durable flow record, including
+its continuation address, only when the command is finished. Truncation still
+discards executable behavior and forces an end transition. This removes five
+production lines, one temporary flag, and the unused intermediate continuation.
+Strengthen the ignored-command fixture with a declared jump so it verifies that
+ignore clears control flow as well as behavior and presentation. The full build
+and all 20 CTest targets pass, including conflicting transitions and truncation.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
