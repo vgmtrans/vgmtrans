@@ -130,55 +130,32 @@ struct CompiledCommandRuntime {
                         [&](Playback& playback) { return command.execution.duringWait(&playback); });
   }
 
-  static void tick(const SourceCommand&, std::any& programState, std::any& trackState, PerformanceEmitter& out,
-                   VmApi& vm) {
-    // Rebuild the lightweight Playback view for each elapsed tick so active
-    // fades can use the current emitter and VM position without storing either.
-    withPlayback(programState, trackState, out, vm, [](Playback& playback) { playback.tick(); });
-  }
-
-  static void finishPrepass(std::any& programState) {
-    auto& typedProgramState = std::any_cast<ProgramState&>(programState);
-    // Give the format one clear boundary between silent collection and the
-    // real render. Collected results remain in the same typed object.
-    typedProgramState.finishPrepass();
-  }
-
-  static void beginTrackSection(std::any& trackState) {
-    auto& typedTrackState = std::any_cast<TrackState&>(trackState);
-    typedTrackState.beginSection();
-  }
-
-  static void finalizePerformance(std::any& programState, PerformanceSequence& performance) {
-    auto& typedProgramState = std::any_cast<ProgramState&>(programState);
-    typedProgramState.finalizePerformance(performance);
+  static void installHooks(SequenceRuntime& runtime) {
+    runtime.execute = execute;
+    runtime.readyDuringWait = readyDuringWait;
+    if constexpr (requires(Playback& playback) { playback.tick(); }) {
+      // Rebuild the lightweight view so fades use the current emitter and VM position.
+      runtime.tick = [](const SourceCommand&, std::any& programState, std::any& trackState, PerformanceEmitter& out,
+                        VmApi& vm) {
+        withPlayback(programState, trackState, out, vm, [](Playback& playback) { playback.tick(); });
+      };
+    }
+    if constexpr (requires(ProgramState& state) { state.finishPrepass(); }) {
+      // Collected results stay in the same typed object for the real render.
+      runtime.finishPrepass = [](std::any& state) { std::any_cast<ProgramState&>(state).finishPrepass(); };
+    }
+    if constexpr (requires(TrackState& state) { state.beginSection(); }) {
+      runtime.beginTrackSection = [](std::any& state) { std::any_cast<TrackState&>(state).beginSection(); };
+    }
+    if constexpr (requires(ProgramState& state, PerformanceSequence& performance) {
+                    state.finalizePerformance(performance);
+                  }) {
+      runtime.finalizePerformance = [](std::any& state, PerformanceSequence& performance) {
+        std::any_cast<ProgramState&>(state).finalizePerformance(performance);
+      };
+    }
   }
 };
-
-namespace detail {
-
-template <class TrackState, class Playback, class ProgramState>
-void installCompiledRuntimeHooks(SequenceRuntime& runtime) {
-  using Compiled = CompiledCommandRuntime<TrackState, Playback, ProgramState>;
-  runtime.execute = Compiled::execute;
-  runtime.readyDuringWait = Compiled::readyDuringWait;
-  if constexpr (requires(Playback& playback) { playback.tick(); }) {
-    runtime.tick = Compiled::tick;
-  }
-  if constexpr (requires(ProgramState& state) { state.finishPrepass(); }) {
-    runtime.finishPrepass = Compiled::finishPrepass;
-  }
-  if constexpr (requires(TrackState& state) { state.beginSection(); }) {
-    runtime.beginTrackSection = Compiled::beginTrackSection;
-  }
-  if constexpr (requires(ProgramState& state, PerformanceSequence& performance) {
-                  state.finalizePerformance(performance);
-                }) {
-    runtime.finalizePerformance = Compiled::finalizePerformance;
-  }
-}
-
-}  // namespace detail
 
 // Construct one complete erased runtime for a format whose state needs no
 // program-specific immutable configuration.
@@ -193,7 +170,7 @@ template <class Cursor, class ProgramState = EmptyCompiledProgramState>
   runtime.createTrackState = [](const SequenceProgram& program, const TrackProgram& track) {
     return Compiled::createTrackState(program, track);
   };
-  detail::installCompiledRuntimeHooks<TrackState, Playback, ProgramState>(runtime);
+  Compiled::installHooks(runtime);
   return runtime;
 }
 
@@ -221,7 +198,7 @@ template <class Cursor, class ProgramState = EmptyCompiledProgramState, class Co
   runtime.createTrackState = [settings](const SequenceProgram& sequence, const TrackProgram& track) {
     return Compiled::createTrackState(sequence, track, *settings);
   };
-  detail::installCompiledRuntimeHooks<TrackState, Playback, ProgramState>(runtime);
+  Compiled::installHooks(runtime);
   return runtime;
 }
 

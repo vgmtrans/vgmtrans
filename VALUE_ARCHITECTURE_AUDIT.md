@@ -782,6 +782,16 @@ AddressSanitizer and UBSan. Add regression coverage for source-event lifetimes,
 implicit/explicit initial tempo, and the first explicit repeated value. The
 full build and all 20 CTest targets pass without warnings.
 
+### Register runtime hooks beside their implementations
+
+Keep optional lifecycle-hook registration inside CompiledCommandRuntime and
+implement the four small hooks directly at their registration sites. Remove
+the separate templated installer and forwarding methods for tick, prepass,
+section start, and performance finalization. The format-facing construction
+API and optional-hook behavior are unchanged. This removes 23 production
+lines. The full build and all 20 CTest targets pass without warnings, including
+compiled prepasses and the formats that use section and finalization hooks.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
