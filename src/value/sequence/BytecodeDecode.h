@@ -69,12 +69,9 @@ struct DecodedBytecodeCommand {
 // executable IR. SourceMap projection retains both forms without making
 // playback know about source bytes.
 template <class T>
-struct EncodedSemanticField {
-  T value{};
-  SourceRange range;
+struct EncodedSemanticField : RangedValue<T> {
   std::string_view name;
   SourceValueDisplay display = SourceValueDisplay::Default;
-  bool valid = false;
 };
 
 [[nodiscard]] inline bool hasBytecodeBytes(ByteReader reader, u32 offset, u32 size, u32 end) {

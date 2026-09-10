@@ -946,6 +946,16 @@ Strengthen the ignored-command fixture with a declared jump so it verifies that
 ignore clears control flow as well as behavior and presentation. The full build
 and all 20 CTest targets pass, including conflicting transitions and truncation.
 
+### Reuse the reader's ranged value for encoded command fields
+
+EncodedSemanticField now extends RangedValue with only its source-field name
+and display policy. Remove the duplicate value/range/validity members and the
+compiler helper that copied them individually. Raw field readers return the
+reader result with its presentation metadata directly, while format callers
+retain the same value, range, and validity access. This removes 15 production
+lines. The full rebuild and all 20 CTest targets pass, including raw/resolved
+source fields and truncated command handling.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
