@@ -50,14 +50,10 @@ struct SnesBrrSample {
   SnesBrrStream stream;
 };
 
-// Shared decoded view used by SNES formats. Collection order follows SRCN;
-// canonicalIndex() resolves aliases with equivalent BRR data and loop behavior.
+// Shared decoded view used by SNES formats. Collection order follows SRCN.
 struct SnesBrrCatalog {
   std::vector<SnesBrrSample> samples;
   SourceRange directoryRange;
-
-  [[nodiscard]] std::optional<u32> index(u8 srcn) const;
-  [[nodiscard]] std::optional<u32> canonicalIndex(u8 srcn) const;
 };
 
 [[nodiscard]] std::optional<SnesSampleDirectoryEntry> readSnesSampleDirectoryEntry(ByteReader reader, u32 entryAddress,

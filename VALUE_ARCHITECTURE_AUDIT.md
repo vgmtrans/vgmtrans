@@ -1131,6 +1131,20 @@ and present LFOs, all waveform choices, fixed/controller depths, both gain
 modes, constant/varying rates and delays, zero/nonzero depths, and both export
 policies. The full build is warning-free and all 20 CTest targets pass.
 
+### Resolve BRR aliases directly while constructing sample references
+
+Remove the catalog's index and canonicalIndex methods. Their production caller
+already has the current sample; it now searches only preceding samples and
+reuses the corresponding concrete reference. The catalog becomes a plain
+decoded value, and alias construction loses an extra SRCN lookup and two
+optional-index branches. Data/loop identity and per-SRCN annotations remain
+unchanged. This removes 20 production lines.
+
+The Tales loop-position regression now parses real directory bytes and checks
+the references returned by sample construction. Shared-builder coverage also
+checks separate annotations for aliases and missing SRCNs. The full build is
+warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
