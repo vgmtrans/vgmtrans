@@ -603,11 +603,11 @@ struct Playback {
         .restartsLfoPhase = true,
     };
     if (continuesVoice) {
-      static_cast<void>(out.setNoteEnd(previous, vm.tick()));
+      out.setNoteEnd(previous, vm.tick());
       track.lastNote = out.continueVoice(previous, event);
     } else {
       if (startsFresh && previous.valid()) {
-        static_cast<void>(out.setNoteEnd(previous, vm.tick()));
+        out.setNoteEnd(previous, vm.tick());
       }
       track.lastNote = out.note(std::move(event));
     }

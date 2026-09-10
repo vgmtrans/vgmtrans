@@ -451,7 +451,7 @@ struct Playback {
     }
     for (auto& voice : track.activeVoices) {
       if (voice.sustained && voice.endTick <= tick) {
-        static_cast<void>(out.setNoteEnd(voice.note, tick));
+        out.setNoteEnd(voice.note, tick);
       }
       voice.sustained = false;
     }

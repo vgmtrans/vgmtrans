@@ -317,7 +317,7 @@ struct Playback {
   void keyOff() {
     purgeNotes();
     for (const ActiveNote& note : track.activeNotes) {
-      static_cast<void>(out.setNoteEnd(note.id, vm.tick()));
+      out.setNoteEnd(note.id, vm.tick());
     }
     track.activeNotes.clear();
   }
@@ -330,7 +330,7 @@ struct Playback {
           continue;
         }
 
-        static_cast<void>(out.setNoteEnd(candidate->id, vm.tick() + duration));
+        out.setNoteEnd(candidate->id, vm.tick() + duration);
         candidate->baseDspPitch = baseDspPitch;
         candidate->fineDspPitchOffset = fineDspPitchOffset;
         candidate->endTick = vm.tick() + duration;

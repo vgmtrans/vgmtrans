@@ -925,6 +925,16 @@ events directly. This removes seven production lines and one temporary field.
 The full build and all 20 CTest targets pass, including cross-track tempo
 changes, independent modulation layers, and physical delay policies.
 
+### Make note-end status optional for format authors
+
+Remove nodiscard from the two mutating note-end setters. Every production format
+intentionally discarded their boolean result, so the annotation required noise
+without exposing an unhandled format decision. Remove 25 discard casts across
+18 files in 17 formats; calls now read directly as setNoteEnd or setPreviousNoteEnd.
+The return values and implementation are unchanged, including the ability to
+check whether a previous note existed. The full rebuild is warning-free and all
+20 CTest targets pass. Verify that each format edit only removes its outer cast.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

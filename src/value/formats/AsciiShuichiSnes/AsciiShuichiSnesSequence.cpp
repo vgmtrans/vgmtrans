@@ -270,7 +270,7 @@ struct Playback {
     if (!track.lastNote.valid()) {
       return;
     }
-    static_cast<void>(out.setNoteEnd(track.lastNote, track.noteStartTick + track.noteWaitTicks));
+    out.setNoteEnd(track.lastNote, track.noteStartTick + track.noteWaitTicks);
     track.slurNext = true;
   }
 

@@ -914,7 +914,7 @@ private:
     const u8 attenuation = static_cast<u8>(track.softwareReleaseAttenuation >> 8);
     // The DSP voice remains keyed on until the update after software volume
     // reaches zero.
-    static_cast<void>(out.setPreviousNoteEnd(vm.tick() + 1));
+    out.setPreviousNoteEnd(vm.tick() + 1);
     if (attenuation >= track.currentNoteVolume) {
       emitLevel(out);
       track.softwareReleaseTicks = 0;

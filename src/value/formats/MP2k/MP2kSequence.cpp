@@ -359,7 +359,7 @@ struct Playback {
   void pitchBend(u8 raw) { out.pitchBend((static_cast<s32>(raw) - 64) * track.bendRange / 64.0); }
 
   void closeNote(PerformanceNoteId id, u64 tick) {
-    static_cast<void>(out.setNoteEnd(id, tick));
+    out.setNoteEnd(id, tick);
     if (const auto found = std::ranges::find(track.activeNotes, id, &ActiveNote::id);
         found != track.activeNotes.end()) {
       found->endTick = tick;
@@ -482,7 +482,7 @@ struct Playback {
   void finish() {
     for (const auto& note : track.activeNotes) {
       if (note.endTick > vm.tick()) {
-        static_cast<void>(out.setNoteEnd(note.id, vm.tick()));
+        out.setNoteEnd(note.id, vm.tick());
       }
     }
     track.activeNotes.clear();

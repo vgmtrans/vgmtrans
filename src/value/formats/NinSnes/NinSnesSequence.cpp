@@ -1169,7 +1169,7 @@ struct Playback {
 
   [[nodiscard]] Effects rest() {
     if (track.voiceHeld && track.lastNote.valid()) {
-      static_cast<void>(out.setPreviousNoteEnd(vm.tick() + soundingDuration()));
+      out.setPreviousNoteEnd(vm.tick() + soundingDuration());
     }
     updateVoiceHold();
     if (!track.voiceHeld) {
