@@ -156,7 +156,6 @@ std::optional<ScannedBank> addBank(ScanResultBuilder& result, const BankLayout& 
                                           .encodedData = stream.encodedData,
                                           .sampleRate = kPs1SpuSampleRate,
                                           .channels = 1,
-                                          .bitsPerSample = 16,
                                           .loop = stream.loop,
                                       });
     sample.source(fmt::format("Sample {}", index), stream.encodedData, "psx-adpcm-sample").parent(sampleRoot);

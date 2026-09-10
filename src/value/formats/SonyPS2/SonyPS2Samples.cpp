@@ -130,7 +130,6 @@ bool addSampleBody(ScanResultBuilder& result) {
                                               .encodedData = item.stream.encodedData,
                                               .sampleRate = kPs2SpuSampleRate,
                                               .channels = 1,
-                                              .bitsPerSample = 16,
                                               .loop = item.stream.loop,
                                           });
     entry.source(entry.value().name, item.stream.encodedData, "sony-ps2-vag-stream").parent(bodySource);

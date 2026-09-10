@@ -159,7 +159,6 @@ std::optional<ScanSoundBankDraft> addWd(ScanResultBuilder& result, const WdLayou
                                          .encodedData = stream.encodedData,
                                          .sampleRate = kPs2SpuSampleRate,
                                          .channels = 1,
-                                         .bitsPerSample = 16,
                                          .loop = stream.loop,
                                      });
     entry.source(fmt::format("Sample {}", index), stream.encodedData, "psx-adpcm-sample");

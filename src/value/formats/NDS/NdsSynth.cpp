@@ -200,7 +200,6 @@ void addNdsWave(ScanResultBuilder& builder, RecordReader& archive, SamplePoolBui
                .codec = kWaveCodecs[*waveType],
                .encodedData = *dataRange,
                .sampleRate = sampleRate,
-               .bitsPerSample = static_cast<u16>(type == WaveType::Pcm8 ? 8 : 16),
                .loop = Loop{.enabled = loops, .start = loopStart, .length = loopLength},
            })
       .source(sampleName + " Header", source, "swar-sample-header")

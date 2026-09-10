@@ -48,48 +48,49 @@ void annotateEnvelope(AnnotationBuilder& annotation, const Envelope& envelope) {
   time("release", envelope.releaseSeconds);
 }
 
-[[nodiscard]] std::string_view audioCodecName(AudioCodec codec) {
+[[nodiscard]] std::pair<std::string_view, u16> audioCodecInfo(AudioCodec codec) {
   switch (codec) {
     case AudioCodec::Unknown:
-      return "Unknown";
+      return {"Unknown", 16};
     case AudioCodec::PcmS8:
-      return "PCM 8-bit";
+      return {"PCM 8-bit", 8};
     case AudioCodec::PcmS16:
-      return "PCM 16-bit";
+      return {"PCM 16-bit", 16};
     case AudioCodec::SnesBrr:
-      return "SNES BRR";
+      return {"SNES BRR", 16};
     case AudioCodec::SnesDspNoise:
-      return "SNES DSP noise";
+      return {"SNES DSP noise", 16};
     case AudioCodec::NdsImaAdpcm:
-      return "NDS IMA ADPCM";
+      return {"NDS IMA ADPCM", 16};
     case AudioCodec::NdsPsg:
-      return "NDS PSG";
+      return {"NDS PSG", 16};
     case AudioCodec::GbaDirectSound:
-      return "GBA DirectSound";
+      return {"GBA DirectSound", 8};
     case AudioCodec::GbaPsg:
-      return "GBA PSG";
+      return {"GBA PSG", 16};
     case AudioCodec::GbaPsgWave:
-      return "GBA PSG programmable wave";
+      return {"GBA PSG programmable wave", 16};
     case AudioCodec::PsxAdpcm:
-      return "PSX ADPCM";
+      return {"PSX ADPCM", 16};
     case AudioCodec::KonamiK053260Adpcm:
-      return "Konami K053260 ADPCM";
+      return {"Konami K053260 ADPCM", 16};
     case AudioCodec::KonamiK054539Adpcm:
-      return "Konami K054539 ADPCM";
+      return {"Konami K054539 ADPCM", 16};
     case AudioCodec::OkiAdpcm:
-      return "OKI ADPCM";
+      return {"OKI ADPCM", 4};
   }
-  return "Unknown";
+  return {"Unknown", 16};
 }
 
 }  // namespace
 
 void annotateSynthValue(AnnotationBuilder annotation, const Sample& sample) {
-  annotation.derived("codec", audioCodecName(sample.codec), SourceValueDisplay::Enum)
+  const auto [codecName, bitsPerSample] = audioCodecInfo(sample.codec);
+  annotation.derived("codec", codecName, SourceValueDisplay::Enum)
       .derived("encoded_bytes", sample.encodedData.size)
       .derived("effective_sample_rate", sample.sampleRate)
       .derived("channels", sample.channels)
-      .derived("bits_per_sample", sample.bitsPerSample);
+      .derived("bits_per_sample", bitsPerSample);
   if (sample.reverse) {
     annotation.derived("reverse", true, SourceValueDisplay::Boolean);
   }

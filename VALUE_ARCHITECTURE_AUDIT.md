@@ -1087,6 +1087,20 @@ empty input, masked duty parameters, and sample-rate defaults. Both decoder
 versions and their shared synth dependencies were compiled with AddressSanitizer
 and UBSan. The full build and all 20 CTest targets pass.
 
+### Derive sample bit-depth metadata from the codec
+
+Remove Sample::bitsPerSample and 18 repeated assignments in format and platform
+code. Its only consumer was source annotation; the existing codec-name lookup
+now supplies the matching inspector bit depth as well. Format authors specify
+the codec once, avoiding inconsistent values such as an eight-bit PCM sample
+retaining the old sixteen-bit default. Existing codec display conventions are
+preserved, and decoding and container output do not consult this metadata.
+This removes 18 production lines and one independently maintained model field.
+
+The existing sample-builder fixture now checks eight-bit metadata without a
+separate bit-depth assignment. The complete 310-step rebuild is warning-free
+and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

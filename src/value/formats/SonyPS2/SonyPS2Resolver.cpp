@@ -272,7 +272,6 @@ private:
         .encodedData = stream->encodedData,
         .sampleRate = kPs2SpuSampleRate,
         .channels = 1,
-        .bitsPerSample = 16,
         .loop = loop,
     });
     return true;

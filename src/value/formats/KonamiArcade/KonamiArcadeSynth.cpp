@@ -147,7 +147,6 @@ ScanSoundBankDraft addKonamiArcadeSynth(ScanResultBuilder& builder, const Konami
                  .codec = codec(info.type),
                  .encodedData = encoded,
                  .sampleRate = kKonamiArcadeSampleRate,
-                 .bitsPerSample = static_cast<u16>(info.type == KonamiSampleType::Pcm8 ? 8 : 16),
                  .reverse = info.reverse,
                  .loop =
                      Loop{

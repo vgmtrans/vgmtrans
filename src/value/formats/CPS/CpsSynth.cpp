@@ -378,7 +378,6 @@ Cps1SynthDrafts addCps1Synth(ScanResultBuilder& builder, CpsLayout& layout) {
                  .codec = AudioCodec::OkiAdpcm,
                  .encodedData = reader.range(empty ? row : layout.sampleRom.offset + start, length),
                  .sampleRate = kCps1OkiSampleRate,
-                 .bitsPerSample = 4,
                  .codecParameter = empty ? 8u : 0u,
              })
         .source(name + " Directory Entry", reader.range(row, 8), "cps1-oki-sample-info");
@@ -472,7 +471,6 @@ ScanSoundBankDraft addCpsQSoundSynth(ScanResultBuilder& builder, const CpsLayout
                  .codec = AudioCodec::PcmS8,
                  .encodedData = reader.range(layout.sampleRom.offset + relative, length),
                  .sampleRate = isCps3(layout.version) ? kCps3SampleRate : kCps2SampleRate,
-                 .bitsPerSample = 8,
                  .loop =
                      Loop{.enabled = loops, .start = loops ? loopStart : 0, .length = loops ? length - loopStart : 0},
              })

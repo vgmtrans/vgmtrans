@@ -247,6 +247,7 @@ void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
 
   auto first = samples.add(7, Sample{
                                   .name = "First",
+                                  .codec = AudioCodec::PcmS8,
                                   .encodedData = SourceRange{.source = source, .offset = 100, .size = 9},
                               });
   expect(first.ref().index() == 0, "first sample source key should receive dense index zero");
@@ -295,7 +296,7 @@ void sampleBuilderKeepsKeysDenseAndAnnotationsOwned() {
   expect(firstAnnotation.outline == SourceOutlinePolicy::Show && srcn != nullptr &&
              srcn->range == SourceRange{.source = source, .offset = 8, .size = 1} &&
              srcn->display == SourceValueDisplay::Hex && unsignedFieldEquals(firstAnnotation, "channels", 1) &&
-             unsignedFieldEquals(firstAnnotation, "bits_per_sample", 16) &&
+             unsignedFieldEquals(firstAnnotation, "bits_per_sample", 8) &&
              unsignedFieldEquals(firstAnnotation, "effective_sample_rate", 0),
          "synth source records should retain field ranges, display hints, and outline presentation for future views");
   const auto fallbackSources = annotations.ownedBy(ObjectRefs::sample(asset, 1));
