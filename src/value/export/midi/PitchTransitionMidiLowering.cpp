@@ -722,24 +722,16 @@ void appendSourceEvents(std::vector<PerformanceEvent>& events, const Performance
       if (segment.endTick <= segment.startTick) {
         continue;
       }
-      auto header = segment.header;
-      header.tick = segment.startTick;
-      header.sequence = nextSequence++;
-      events.emplace_back(NotePerformanceEvent{
-          .header = header,
-          .key = segment.key,
-          .linearVelocity = note.source.linearVelocity,
-          .durationTicks =
-              static_cast<u32>(std::min<u64>(segment.endTick - segment.startTick, std::numeric_limits<u32>::max())),
-          .extendsPrevious = segment.extendsPrevious,
-          .restartsEnvelope = segment.restartsEnvelope,
-          .instrumentAddress = note.source.instrumentAddress,
-          .restartsLfoPhase = note.source.restartsLfoPhase,
-          .restartsVibratoLfoPhase = note.source.restartsVibratoLfoPhase,
-          .restartsTremoloLfoPhase = note.source.restartsTremoloLfoPhase,
-          .note = note.source.note,
-          .lane = note.source.lane,
-      });
+      auto event = note.source;
+      event.header = segment.header;
+      event.header.tick = segment.startTick;
+      event.header.sequence = nextSequence++;
+      event.key = segment.key;
+      event.durationTicks =
+          static_cast<u32>(std::min<u64>(segment.endTick - segment.startTick, std::numeric_limits<u32>::max()));
+      event.extendsPrevious = segment.extendsPrevious;
+      event.restartsEnvelope = segment.restartsEnvelope;
+      events.emplace_back(std::move(event));
     }
   }
 }

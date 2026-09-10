@@ -837,14 +837,33 @@ values, and large ticks. All 1,152 MIDI scenarios remain byte-identical. Direct
 changed-component builds pass under AddressSanitizer and UBSan, and the full
 build and all 20 CTest targets pass without warnings.
 
+### Preserve source voice duration limits through MIDI lowering
+
+Create native-portamento fragments by copying the source note and overriding
+only their timing, pitch, and continuation flags. This removes eight lines of
+manual field copying and preserves source attributes previously omitted from
+generated notes, including the physical duration limit.
+
+MIDI rendering now collects absolute hardware stop times from original note
+events and applies one boundary to all fragments of a continuing voice. This
+also covers limits declared by later events sharing a note identity, which
+portamento lowering merges. Extensions cannot bypass a timer or recreate an
+expired voice; a tighter continuation limit shortens all overlapping fragments,
+and a genuine new attack resets the boundary. Source performance data remains
+unchanged. The additional renderer state handles correctness missing from the
+former per-note clamp without adding format code or public model fields.
+
+Add regressions for tempo changes, zero limits, delayed slides, fresh attacks,
+same-pitch extensions, linked transitions, and later limits with overlapping
+fragments. All 20 CTest targets pass. Direct renderer/lowering builds pass under
+AddressSanitizer and UBSan across 3,458 physical-limit scenarios, including
+unidentified notes and saturated end ticks. All 864 uncapped before/after MIDI
+scenarios remain byte-identical.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
   and remaining format-local helpers for redundant state and work.
-- Investigate how fixed physical note-duration limits interact with note extensions and
-  portamento splitting; generated segments currently omit that limit. A direct
-  probe confirms that a note capped at tick 14 after a tempo change ends at tick
-  40 in native-portamento mode, and a delayed slide can recreate it at tick 20.
 - SonyPS2 still approximates key/velocity-dependent regions during scanning
   under a 3,000-region budget chosen for SF2 table limits. Moving this policy
   to export needs a source-neutral representation of that response; merely
