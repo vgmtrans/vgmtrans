@@ -128,7 +128,6 @@ struct SequenceParse {
 };
 
 [[nodiscard]] const char* versionName(Version version);
-[[nodiscard]] core::Envelope driverEnvelope(u8 adsr1, u8 adsr2, u8 gain);
 [[nodiscard]] double driverPseudoReleaseSeconds(u8 gain);
 [[nodiscard]] std::optional<ParsedHeader> parseHeader(core::ByteReader reader, Version version, u32 address);
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);

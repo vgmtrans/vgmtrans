@@ -185,9 +185,9 @@ void earlyGateReleaseStateMachineMatchesSuperBomberman2() {
              notes[0]->durationTicks == 4 && notes[1]->header.tick == 6 && notes[1]->durationTicks == 4,
          "Hudson early quantize 8 should raise KOF on the penultimate driver tick");
 
-  const Envelope envelope = driverEnvelope(0x8f, 0xe0, 0x8a);
+  const Envelope envelope = snesDspEnvelope(0x8f, 0xe0, 0x8a);
   expect(envelope.decaySeconds == 0.0 && envelope.secondDecaySeconds && std::isinf(*envelope.secondDecaySeconds) &&
-             envelope.releaseSeconds == snesDspEnvelope(0x8f, 0xe0, 0x8a).releaseSeconds &&
+             envelope.releaseSeconds && *envelope.releaseSeconds < driverPseudoReleaseSeconds(0x8a) &&
              std::abs(driverPseudoReleaseSeconds(0x8a) - 0.512) < 0.000001,
          "Super Bomberman 2's 8F E0 8A instrument should distinguish native KOF from its gated GAIN release");
 

@@ -458,16 +458,16 @@ struct Playback {
     track.gainEnvelope.reset(0);
     if (index < 0x80) {
       const u16 pair = data().adsr(index);
-      out.replaceEnvelope(driverEnvelope(static_cast<u8>(pair), static_cast<u8>(pair >> 8)),
+      out.replaceEnvelope(snesDspEnvelope(static_cast<u8>(pair), static_cast<u8>(pair >> 8), 0),
                           VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
       return;
     }
     if (index == 0x80) {
-      out.replaceEnvelope(driverEnvelope(0, 0, 0x7f), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+      out.replaceEnvelope(snesDspEnvelope(0, 0, 0x7f), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
       return;
     }
     track.gainEnvelope.reset(index & 0x7f);
-    out.replaceEnvelope(driverEnvelope(0, 0, 0), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    out.replaceEnvelope(snesDspEnvelope(0, 0, 0), VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
 
   void program(u8 srcn) {
@@ -826,7 +826,7 @@ struct Playback {
       emitPan();
     }
     if (gainChanged) {
-      out.replaceEnvelope(driverEnvelope(0, 0, track.gainEnvelope.value),
+      out.replaceEnvelope(snesDspEnvelope(0, 0, track.gainEnvelope.value),
                           VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
     }
   }

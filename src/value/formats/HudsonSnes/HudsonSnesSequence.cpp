@@ -223,7 +223,7 @@ namespace math {
 }
 
 [[nodiscard]] Envelope envelope(const InstrumentRow& instrument, bool pseudoRelease = false) {
-  Envelope result = driverEnvelope(instrument.adsr1, instrument.adsr2, instrument.gain);
+  Envelope result = snesDspEnvelope(instrument.adsr1, instrument.adsr2, instrument.gain);
   if (pseudoRelease) {
     result.releaseSeconds = driverPseudoReleaseSeconds(instrument.gain);
   }
@@ -381,7 +381,7 @@ struct Playback {
                          EnvelopeFields::Release, scope);
       track.pseudoReleaseGain = track.envelope->gain;
     } else if (track.pseudoReleaseGain) {
-      const Envelope native = driverEnvelope(track.envelope->adsr1, track.envelope->adsr2, track.envelope->gain);
+      const Envelope native = snesDspEnvelope(track.envelope->adsr1, track.envelope->adsr2, track.envelope->gain);
       out.updateEnvelope(Envelope{.releaseSeconds = native.releaseSeconds}, EnvelopeFields::Release, scope);
       track.pseudoReleaseGain.reset();
     }

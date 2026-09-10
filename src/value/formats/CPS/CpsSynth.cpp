@@ -89,9 +89,9 @@ struct QSoundSampleInfo {
   const u16 rr = kDecayRates[std::min<u8>(release, 63)];
   const double rate = cpsDriverRateHertz(version);
 
-  const auto stageSeconds = [rate](u16 sourceRate, bool zeroMeansInfinite) {
+  const auto stageSeconds = [rate](u16 sourceRate) {
     if (sourceRate == 0) {
-      return zeroMeansInfinite ? std::numeric_limits<double>::infinity() : 0.0;
+      return std::numeric_limits<double>::infinity();
     }
     if (sourceRate == 0xffff) {
       return 0.0;
@@ -105,18 +105,14 @@ struct QSoundSampleInfo {
     return ticks / rate;
   };
 
-  const double decaySeconds = stageSeconds(dr, true);
-  const double secondDecaySeconds = stageSeconds(sr, true);
   const double sustainAmplitude = isCps3(version) ? (std::min<u8>(sustainLevel, 127) + 1) / 128.0 : sl / 65535.0;
   return Envelope{
-      .attackSeconds = stageSeconds(ar, true),
-      .decaySeconds = std::isinf(decaySeconds) ? decaySeconds : linearAmplitudeFadeToDbEnvelopeSeconds(decaySeconds),
+      .attackSeconds = stageSeconds(ar),
+      .decaySeconds = linearAmplitudeFadeToDbEnvelopeSeconds(stageSeconds(dr)),
       .secondDecaySeconds = dr == 0 || sustainAmplitude == 0.0
                                 ? std::nullopt
-                                : std::optional{std::isinf(secondDecaySeconds)
-                                                    ? secondDecaySeconds
-                                                    : linearAmplitudeFadeToDbEnvelopeSeconds(secondDecaySeconds)},
-      .releaseSeconds = linearAmplitudeFadeToDbEnvelopeSeconds(stageSeconds(rr, true)),
+                                : std::optional{linearAmplitudeFadeToDbEnvelopeSeconds(stageSeconds(sr))},
+      .releaseSeconds = linearAmplitudeFadeToDbEnvelopeSeconds(stageSeconds(rr)),
       .sustainAmplitude = sustainAmplitude,
   };
 }

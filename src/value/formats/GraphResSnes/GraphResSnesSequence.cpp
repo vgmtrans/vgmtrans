@@ -364,7 +364,7 @@ struct Playback {
       return;
     }
     track.appliedEnvelope = track.pendingEnvelope;
-    out.replaceEnvelope(driverEnvelope(track.appliedEnvelope.adsr1, track.appliedEnvelope.adsr2),
+    out.replaceEnvelope(snesDspEnvelope(track.appliedEnvelope.adsr1, track.appliedEnvelope.adsr2, 0),
                         VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
 
@@ -512,11 +512,11 @@ struct Playback {
     switch (reg & 0x0f) {
       case 5:
         track.appliedEnvelope.adsr1 = value;
-        out.replaceEnvelope(driverEnvelope(value, track.appliedEnvelope.adsr2), VoiceEnvelopeScope::ActiveVoices);
+        out.replaceEnvelope(snesDspEnvelope(value, track.appliedEnvelope.adsr2, 0), VoiceEnvelopeScope::ActiveVoices);
         break;
       case 6:
         track.appliedEnvelope.adsr2 = value;
-        out.replaceEnvelope(driverEnvelope(track.appliedEnvelope.adsr1, value), VoiceEnvelopeScope::ActiveVoices);
+        out.replaceEnvelope(snesDspEnvelope(track.appliedEnvelope.adsr1, value, 0), VoiceEnvelopeScope::ActiveVoices);
         break;
       case 7:
         track.appliedEnvelope = EnvelopeSettings{.adsr1 = 0, .adsr2 = 0};
