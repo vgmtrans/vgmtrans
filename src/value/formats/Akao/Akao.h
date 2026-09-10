@@ -27,6 +27,11 @@ namespace vgmtrans::formats::akao {
 inline constexpr std::string_view kAkaoFormatName = "Akao";
 inline constexpr std::string_view kAkaoCollectionResolver = "Akao";
 
+// Pointer-based key-split commands and their bank entries share this source identity.
+[[nodiscard]] inline core::InstrumentIdentity akaoMelodicTableIdentity(u32 offset) {
+  return {.domain = "akao-melodic-table", .key = offset};
+}
+
 struct AkaoSampleCoverageProvider {
   std::size_t index = 0;
   std::optional<u32> sampleSetId;

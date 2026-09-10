@@ -137,6 +137,7 @@ void addMelodicInstrument(std::vector<Instrument>& instruments, ByteReader reade
   const auto& last = regions.values.back();
   instruments.push_back(Instrument{
       .explicitAddress = InstrumentAddress{.bank = 1, .program = program},
+      .identity = akaoMelodicTableIdentity(offset),
       .name = fmt::format("Instrument {}", program),
       .range = reader.range(offset, static_cast<u32>(last.range.offset + last.range.size - offset)),
       .regions = std::move(regions.values),
