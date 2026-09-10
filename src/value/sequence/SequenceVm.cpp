@@ -91,20 +91,15 @@ public:
 
   [[nodiscard]] std::optional<LoopPoint> observe(const VisitState& state, const VmTrackRuntime& runtime,
                                                  bool arrivedByControlFlow) {
-    const CommandId commandId{state.commandIndex};
-    if (const auto previous = visited_.find(state); previous != visited_.end()) {
-      if (!arrivedByControlFlow) {
-        return std::nullopt;
-      }
-      return LoopPoint{
-          .startTick = previous->second,
-          .endCommand = runtime.lastCommand.valid() ? runtime.lastCommand : commandId,
-          .endTick = runtime.tick,
-      };
+    const auto [previous, inserted] = visited_.try_emplace(state, runtime.tick);
+    if (inserted || !arrivedByControlFlow) {
+      return std::nullopt;
     }
-
-    visited_.emplace(state, runtime.tick);
-    return std::nullopt;
+    return LoopPoint{
+        .startTick = previous->second,
+        .endCommand = runtime.lastCommand.valid() ? runtime.lastCommand : CommandId{state.commandIndex},
+        .endTick = runtime.tick,
+    };
   }
 
   [[nodiscard]] std::optional<u64> findExact(const VisitState& state) const {
@@ -248,7 +243,7 @@ public:
           .commandIndex = *current_,
           .repeatRemaining = repeatRemaining_,
       };
-      if (const auto previous = visited_.find(state); previous != visited_.end()) {
+      if (const auto [previous, inserted] = visited_.try_emplace(state, tick); !inserted) {
         if (loopPolicy_ == LoopPolicy::PlayOnce && loopRepeats_ < options_.sequenceLoops) {
           ++loopRepeats_;
           visited_.clear();
@@ -259,8 +254,6 @@ public:
                   loopPolicy_ == LoopPolicy::Preserve ? std::optional<u64>{previous->second} : std::nullopt,
           };
         }
-      } else {
-        visited_.emplace(state, tick);
       }
 
       const PlaylistCommand& command = playlist_.commands[*current_];
@@ -564,12 +557,7 @@ private:
     }
     const CommandTransition effectiveTransition = effects.flowOverride.value_or(command.flow.defaultTransition);
     if (command.annotation.valid()) {
-      u64 endTick = beginTick == std::numeric_limits<u64>::max() ? beginTick : beginTick + 1;
-      if (beginTick <= std::numeric_limits<u64>::max() - effects.advanceTicks) {
-        endTick = std::max(endTick, beginTick + effects.advanceTicks);
-      } else {
-        endTick = std::numeric_limits<u64>::max();
-      }
+      u64 endTick = tickAfter(std::max(effects.advanceTicks, 1u));
       for (size_t i = firstEvent; i < performanceTrack_.events.size(); ++i) {
         endTick = std::max(endTick, eventEndTick(performanceTrack_.events[i]));
       }
