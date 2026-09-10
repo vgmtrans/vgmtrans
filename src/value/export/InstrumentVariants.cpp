@@ -159,19 +159,16 @@ template <typename Predicate>
 
 [[nodiscard]] std::optional<InstrumentRef> resolveSelection(const InstrumentPerformanceEvent& selection,
                                                             std::span<const SoundBankAsset> soundBanks) {
+  InstrumentAddress address{.bank = selection.bank, .program = selection.program};
   if (selection.sourceInstrument) {
     if (auto resolved = findInstrument(soundBanks, [&](const Instrument& instrument) {
           return instrument.identity && *instrument.identity == *selection.sourceInstrument;
         })) {
       return resolved;
     }
-    const auto fallback = resolveInstrumentAddress({}, selection.sourceInstrument);
-    return findInstrument(soundBanks, [&](const Instrument& instrument) {
-      return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == fallback;
-    });
+    address = resolveInstrumentAddress({}, selection.sourceInstrument);
   }
 
-  const InstrumentAddress address{.bank = selection.bank, .program = selection.program};
   return findInstrument(soundBanks, [&](const Instrument& instrument) {
     return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == address;
   });

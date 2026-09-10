@@ -889,6 +889,18 @@ and immediately unwrapping an optional Address. This removes seven production
 lines. The full build and all 20 CTest targets pass, including encoded/resolved
 operand fields and call, jump, and repeat source links.
 
+### Keep one address search per instrument-selection policy
+
+Used-instrument filtering and variant materialization now resolve their fallback
+address before using the ordinary address search. Remove the duplicate search
+bodies, the private selector/public forwarding pair, and the redundant list
+alias. Callers now reach the implementation through selectSynthInstruments.
+This removes 12 production lines while keeping the policies distinct: filtering
+retains every matching instrument in bank order, variants choose the first with
+address fallback, and ordinary performance lookup requires an exact identity.
+A new regression covers these differences with duplicate and conflicting
+identity/address matches. The full build and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
