@@ -64,6 +64,7 @@ struct Patterns {
   static Pattern ptnSunsoftEchoOn;
   static Pattern ptnSunsoftAdsr;
   static Pattern ptnSunsoftBenkeiSectionPointers;
+  static Pattern ptnSunsoftSectionTracks;
   static Pattern ptnSetDIR;
   static Pattern ptnSetDIRYI;
   static Pattern ptnSetDIRVS;

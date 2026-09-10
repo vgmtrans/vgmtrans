@@ -167,6 +167,7 @@ struct Layout {
   u32 songListAddress = 0;
   u32 playlistAddress = 0;
   u8 sectionPointerAddress = 0;
+  std::optional<u8> sectionTrackCount;
 
   std::optional<u32> instrumentTableAddress;
   std::optional<u32> percussionTableAddress;
@@ -195,6 +196,7 @@ struct Layout {
   std::optional<u16> intelliPercussionTableAddress;
 
   [[nodiscard]] u16 resolveAddress(u16 rawAddress) const;
+  [[nodiscard]] u8 trackCount() const;
 };
 
 struct InstrumentOverride {
