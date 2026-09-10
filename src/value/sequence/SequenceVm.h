@@ -92,10 +92,10 @@ public:
   PerformanceNoteId continueVoice(PerformanceNoteId previousNote, NotePerformanceEvent event);
   // Formats whose slide command follows its note can revise the most recently
   // emitted note chain once the delayed transition point becomes known.
-  [[nodiscard]] bool setPreviousNoteEnd(u64 endTick);
+  bool setPreviousNoteEnd(u64 endTick);
   // Revises one particular source note. This is used by drivers which can keep
   // several gated notes in flight and then key them all off together.
-  [[nodiscard]] bool setNoteEnd(PerformanceNoteId note, u64 endTick);
+  bool setNoteEnd(PerformanceNoteId note, u64 endTick);
   void tempo(u32 microsecondsPerQuarter);
   void timeSignature(u8 numerator, u8 denominator, u8 clocksPerMetronomeClick);
   void instrument(InstrumentPerformanceEvent event);

@@ -291,7 +291,7 @@ struct Playback {
   [[nodiscard]] Effects tie() {
     if (track.lastNote.valid() && track.lastKey) {
       const u32 duration = math::soundingTicks(track.noteLength, track.durationRate);
-      static_cast<void>(out.setNoteEnd(track.lastNote, vm.tick()));
+      out.setNoteEnd(track.lastNote, vm.tick());
       track.lastNote = out.note(NotePerformanceEvent{
           .key = *track.lastKey,
           .linearVelocity = math::squaredGain(track.velocity),
@@ -305,7 +305,7 @@ struct Playback {
 
   [[nodiscard]] Effects rest() {
     if (track.legato && track.lastNote.valid()) {
-      static_cast<void>(out.setNoteEnd(track.lastNote, vm.tick() + track.noteLength));
+      out.setNoteEnd(track.lastNote, vm.tick() + track.noteLength);
     } else {
       track.lastNote = {};
       track.lastKey.reset();

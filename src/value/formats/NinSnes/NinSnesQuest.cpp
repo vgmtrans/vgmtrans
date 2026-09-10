@@ -465,7 +465,7 @@ struct Playback {
     track.legato = enabled;
     out.legatoPedal(enabled);
     if (!enabled && track.lastNote.valid()) {
-      static_cast<void>(out.setNoteEnd(track.lastNote, vm.tick()));
+      out.setNoteEnd(track.lastNote, vm.tick());
       track.lastNote = {};
     }
   }

@@ -169,7 +169,7 @@ struct Playback {
     if (!track.note) {
       return;
     }
-    static_cast<void>(out.setNoteEnd(*track.note, std::max<u64>(vm.tick(), track.noteStart + 1)));
+    out.setNoteEnd(*track.note, std::max<u64>(vm.tick(), track.noteStart + 1));
     track.note.reset();
   }
 
@@ -211,7 +211,7 @@ struct Playback {
     }
     const double target = pitchKey(scaledPitch(value, track.pitchScale));
     const PerformanceNoteId previous = *track.note;
-    static_cast<void>(out.setNoteEnd(previous, vm.tick()));
+    out.setNoteEnd(previous, vm.tick());
     track.note = out.continueVoice(
         previous,
         NotePerformanceEvent{

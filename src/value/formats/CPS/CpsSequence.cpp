@@ -415,7 +415,7 @@ struct Playback {
     const bool hold = (encodedKey & 0x80) != 0;
     const bool continuesPreviousVoice = track.held && track.previousKey && track.previousNote.valid();
     if (continuesPreviousVoice) {
-      static_cast<void>(out.setPreviousNoteEnd(vm.tick()));
+      out.setPreviousNoteEnd(vm.tick());
     }
     const double key =
         std::clamp<double>((encodedKey & 0x7f) + track.transpose + track.transposeAdjustment, 0.0, 127.0);

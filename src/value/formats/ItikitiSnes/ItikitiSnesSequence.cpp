@@ -294,7 +294,7 @@ struct Playback {
     };
 
     if (glide) {
-      static_cast<void>(out.setNoteEnd(previous, vm.tick()));
+      out.setNoteEnd(previous, vm.tick());
       if (std::abs(*previousKey - key) < 0.000001) {
         event.extendsPrevious = true;
         track.lastNote = out.note(std::move(event));
@@ -323,7 +323,7 @@ struct Playback {
   [[nodiscard]] Effects tie(u8 lengthIndex, u8 literal) {
     const u32 length = noteLength(lengthIndex, literal);
     if (track.lastNote.valid()) {
-      static_cast<void>(out.setNoteEnd(track.lastNote, vm.tick() + (length > 2 ? length - 2 : length)));
+      out.setNoteEnd(track.lastNote, vm.tick() + (length > 2 ? length - 2 : length));
     }
     return Effects::wait(length);
   }

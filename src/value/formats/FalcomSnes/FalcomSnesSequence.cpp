@@ -253,7 +253,7 @@ struct Playback {
         .restartsVibratoLfoPhase = !continues,
     };
     if (continues) {
-      static_cast<void>(out.setNoteEnd(track.lastNote, vm.tick()));
+      out.setNoteEnd(track.lastNote, vm.tick());
       track.lastNote = out.note(std::move(event));
     } else {
       emitMix();

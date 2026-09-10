@@ -468,7 +468,7 @@ struct Playback {
 
   void keyOff() {
     if (track.previousNote.valid()) {
-      static_cast<void>(out.setPreviousNoteEnd(vm.tick()));
+      out.setPreviousNoteEnd(vm.tick());
     }
   }
 

@@ -629,7 +629,7 @@ struct Playback {
         .restartsLfoPhase = !continues,
     };
     if (track.interruptedNote.valid()) {
-      static_cast<void>(out.setNoteEnd(track.interruptedNote, vm.tick()));
+      out.setNoteEnd(track.interruptedNote, vm.tick());
       track.interruptedNote = {};
     }
     if (!continues) {

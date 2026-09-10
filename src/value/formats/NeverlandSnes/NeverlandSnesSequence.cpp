@@ -332,7 +332,7 @@ struct Playback {
     double key = math::melodicKey(effective);
     if (duration == 0 && (!track.percussion || track.layout.version == Version::Original)) {
       if (track.lastNote.valid()) {
-        static_cast<void>(out.setNoteEnd(track.lastNote, vm.tick() + wait));
+        out.setNoteEnd(track.lastNote, vm.tick() + wait);
       }
       // A zero gate is a pure wait on melodic voices. It also forces the next
       // same-key note to attack instead of extending the current voice.

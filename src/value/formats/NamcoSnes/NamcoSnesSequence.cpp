@@ -235,7 +235,7 @@ struct Playback {
 
   void endNote(u64 tick) {
     if (track.activeNote.valid()) {
-      static_cast<void>(out.setNoteEnd(track.activeNote, tick));
+      out.setNoteEnd(track.activeNote, tick);
     }
     track.activeNote = {};
   }

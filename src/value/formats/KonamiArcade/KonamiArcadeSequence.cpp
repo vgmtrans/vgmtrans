@@ -406,7 +406,7 @@ struct Playback {
 
   void rest(u8 delta) {
     if (track.zeroReleaseVoiceActive && track.previousNote.valid()) {
-      static_cast<void>(out.setPreviousNoteEnd(vm.tick() + delta));
+      out.setPreviousNoteEnd(vm.tick() + delta);
     }
     if (isGx()) {
       // GX clears the live duration but retains the separately stored
@@ -513,7 +513,7 @@ struct Playback {
     const bool tied = continuesPreviousVoice && std::abs(*track.previousKey - key) < 0.001;
     if (!continuesPreviousVoice && track.zeroReleaseVoiceActive && track.previousNote.valid() &&
         track.previousNoteStart + track.previousGateDuration > vm.tick()) {
-      static_cast<void>(out.setPreviousNoteEnd(vm.tick()));
+      out.setPreviousNoteEnd(vm.tick());
     }
     double noteGain = gain;
     if (!isDrum && (track.previousTied || durationRate >= 100)) {
