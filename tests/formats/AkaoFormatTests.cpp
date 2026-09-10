@@ -14,6 +14,7 @@
 #include "ValueFormatTestSupport.h"
 
 #include <algorithm>
+#include <array>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -197,6 +198,66 @@ void akaoSequenceAnalysisUsesSemanticOperands() {
          "Akao analysis should collect drum tables from semantic operands");
   expect(analysis.references.usesIndividualArticulations && analysis.references.individualArticulationIds.contains(9),
          "Akao analysis should collect individual articulation ids from semantic operands");
+}
+
+void akaoPointerInstrumentsSelectTheirExportedPrograms() {
+  for (const auto version : {AkaoPs1Version::Version1_1, AkaoPs1Version::Version1_2,
+                             AkaoPs1Version::Version2}) {
+    std::vector<u8> bytes(0x90, 0xa0);
+    u32 position = 0x20;
+    // Select the higher table first: program numbers follow table order, not
+    // the order in which playback encounters instrument commands.
+    for (const u32 table : {0x70u, 0x60u}) {
+      bytes[position++] = 0xfc;
+      if (version != AkaoPs1Version::Version1_1) {
+        bytes[position++] = 0x14;
+      }
+      writeLeS16(bytes, position, static_cast<s16>(table - (position + 2)));
+      position += 2;
+      bytes[position++] = 0x02;
+      std::fill_n(bytes.begin() + table, 8, 0);
+      bytes[table] = 5;
+      bytes[table + 2] = 127;
+    }
+    const auto analysis = analyzeFixtureTrack(bytes, version, 0x20, bytes.size());
+    ScanIdAllocator ids;
+    ScanInput input{
+        .source = SourceFile{.id = SourceId{20}, .name = "key-split.akao", .size = bytes.size()},
+        .reader = ByteReader(SourceId{20}, bytes),
+        .ids = ids,
+    };
+    InstrumentSetBuilder builder{AssetId{99}};
+    (void)buildAkaoInstrumentSet(input, analysis, builder);
+    SoundBankAsset bank{.instruments = std::move(builder).finish().values};
+    expect(bank.instruments.size() == 2, "pointer fixture should export both instrument tables");
+    const auto config = makeAkaoConfig(version);
+    const SequenceProgram program{
+        .runtime = akaoSequenceRuntime(),
+        .timebase = config.timebase,
+        .behavior = config.behavior,
+        .tracks = {decodeFixtureTrack(bytes, version, 0x20, bytes.size())},
+    };
+    const auto performance = SequenceVm().render(program);
+    const std::array<const SoundBankAsset*, 1> banks{&bank};
+    const auto midi = renderMidiSequence(performance, {}, ModulationConversionPolicy::SynthModulators, banks);
+    std::vector<u8> programs;
+    u16 selectedBank = 0;
+    size_t notes = 0;
+    for (const auto& event : midi.tracks[0].events) {
+      if (const auto* select = midiBankSelect(event)) {
+        selectedBank = select->bank;
+      }
+      if (const auto* change = midiChannelMessage(event, MidiChannelMessageKind::ProgramChange)) {
+        programs.push_back(static_cast<u8>(change->value));
+      }
+      if (midiNote(event)) {
+        expect(selectedBank == 1 && programs.size() == notes + 1 && programs.back() == 1 - notes,
+               "each note must select its table's SF2 bank/program before sounding");
+        ++notes;
+      }
+    }
+    expect(notes == 2, "both pointer-selected instruments should produce notes");
+  }
 }
 
 void akaoTablePointersUseNonControlSourceLinks() {

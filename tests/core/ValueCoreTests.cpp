@@ -158,6 +158,7 @@ void akaoSequenceLayoutRejectsFalsePositiveHeaders();
 void akaoSequenceDecodesLegacyRelativeJumpTargets();
 void akaoSequenceDecodesConditionalBranchSideTargets();
 void akaoSequenceAnalysisUsesSemanticOperands();
+void akaoPointerInstrumentsSelectTheirExportedPrograms();
 void akaoTablePointersUseNonControlSourceLinks();
 void akaoSequenceDecodesRepeatFlowWithoutManualLayerLeaks();
 void akaoRepeatSourceLinksUseSpecificRolesOnly();
@@ -344,6 +345,7 @@ int main() {
     akaoSequenceDecodesLegacyRelativeJumpTargets();
     akaoSequenceDecodesConditionalBranchSideTargets();
     akaoSequenceAnalysisUsesSemanticOperands();
+    akaoPointerInstrumentsSelectTheirExportedPrograms();
     akaoTablePointersUseNonControlSourceLinks();
     akaoSequenceDecodesRepeatFlowWithoutManualLayerLeaks();
     akaoRepeatSourceLinksUseSpecificRolesOnly();

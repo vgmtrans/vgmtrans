@@ -202,10 +202,11 @@ using AkaoEvent = AkaoCursor::Event;
   return backward ? event.loopCandidate(destination) : event.jump(destination);
 }
 
-void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOffset, SemanticOperandRole role) {
+u32 relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOffset, SemanticOperandRole role) {
   const s16 relative = event.s16le("relative");
   const Address destination{profile.relativeDestination(operandOffset, relative)};
   event.derived("relative_absolute", destination, SourceValueDisplay::Address, role);
+  return destination.value;
 }
 
 [[nodiscard]] DecodedBytecodeCommand preserve(AkaoEvent& event, u32 operands) {
@@ -222,8 +223,10 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
 [[nodiscard]] DecodedBytecodeCommand customInstrumentTable(AkaoEvent& event, const AkaoProfile& profile,
                                                            u32 operandOffset) {
   event.derived("bank", 1u, SemanticOperandRole::InstrumentBank);
-  relativePointer(event, profile, operandOffset, SemanticOperandRole::InstrumentTablePointer);
-  return event.ignore();
+  const u32 table = relativePointer(event, profile, operandOffset, SemanticOperandRole::InstrumentTablePointer);
+  return event.invoke([](Playback& playback, u32 offset) {
+    playback.out.instrument(akaoMelodicTableIdentity(offset));
+  }, table);
 }
 
 [[nodiscard]] DecodedBytecodeCommand drumKitOn(AkaoEvent& event) {
@@ -745,7 +748,7 @@ void relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOf
       break;
     case 0xfc:
       if (profile.version == AkaoPs1Version::Version1_1) {
-        auto event = cursor.sourceOnly("Program Change (Key-Split Instrument)");
+        auto event = cursor.command("Program Change (Key-Split Instrument)", SequenceSemantic::Program);
         return customInstrumentTable(event, profile, begin + 1);
       }
       break;
