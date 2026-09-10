@@ -73,25 +73,6 @@ std::optional<SnesSampleDirectoryEntry> readSnesSampleDirectoryEntry(ByteReader 
   return result;
 }
 
-std::optional<u32> SnesBrrCatalog::index(u8 srcn) const {
-  const auto found = std::ranges::find(samples, srcn, &SnesBrrSample::srcn);
-  return found == samples.end() ? std::nullopt
-                                : std::optional<u32>{static_cast<u32>(std::distance(samples.begin(), found))};
-}
-
-std::optional<u32> SnesBrrCatalog::canonicalIndex(u8 srcn) const {
-  const auto found = index(srcn);
-  if (!found) {
-    return std::nullopt;
-  }
-  const SnesBrrSample& target = samples[*found];
-  const auto canonical = std::ranges::find_if(samples, [&](const SnesBrrSample& candidate) {
-    return candidate.startAddress == target.startAddress && candidate.stream.loops == target.stream.loops &&
-           (!target.stream.loops || candidate.loopAddress == target.loopAddress);
-  });
-  return static_cast<u32>(std::distance(samples.begin(), canonical));
-}
-
 SnesBrrCatalog readSnesBrrCatalog(ByteReader reader, u32 directoryAddress, std::vector<u8> srcns) {
   std::ranges::sort(srcns);
   const auto duplicates = std::ranges::unique(srcns);
@@ -178,9 +159,13 @@ SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reade
         .parent(directoryEntry.id());
 
     SampleRef canonical = sample.ref();
-    const auto canonicalIndex = catalog.canonicalIndex(info.srcn);
-    if (canonicalIndex && *canonicalIndex < refs.entries_.size()) {
-      canonical = refs.entries_[*canonicalIndex].sample;
+    const auto earlierSamples = std::span(catalog.samples).first(refs.entries_.size());
+    const auto alias = std::ranges::find_if(earlierSamples, [&](const SnesBrrSample& candidate) {
+      return candidate.startAddress == info.startAddress && candidate.stream.loops == info.stream.loops &&
+             (!info.stream.loops || candidate.loopAddress == info.loopAddress);
+    });
+    if (alias != earlierSamples.end()) {
+      canonical = refs.entries_[std::distance(earlierSamples.begin(), alias)].sample;
     }
     refs.entries_.push_back(SnesBrrSampleRefs::Entry{
         .srcn = info.srcn,

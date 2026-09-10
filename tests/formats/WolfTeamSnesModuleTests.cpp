@@ -502,13 +502,19 @@ void scannerBuildsArcusPitchModel() {
 }
 
 void brrAliasesIncludeLoopPosition() {
-  const SnesBrrStream stream{.loops = true};
-  const SnesBrrCatalog catalog{.samples = {
-                                   {.srcn = 18, .startAddress = 0x8e8a, .loopAddress = 0x91b4, .stream = stream},
-                                   {.srcn = 49, .startAddress = 0x8e8a, .loopAddress = 0x937f, .stream = stream},
-                                   {.srcn = 53, .startAddress = 0x8e8a, .loopAddress = 0x937f, .stream = stream},
-                               }};
-  expect(catalog.canonicalIndex(18) == 0 && catalog.canonicalIndex(49) == 1 && catalog.canonicalIndex(53) == 1,
+  std::vector<u8> bytes(kAramSize);
+  const std::array<u8, 3> srcns{18, 49, 53};
+  for (const u8 srcn : srcns) {
+    writeLe16(bytes, 0x4000 + srcn * 4, 0x8e8a);
+    writeLe16(bytes, 0x4002 + srcn * 4, srcn == 18 ? 0x91b4 : 0x937f);
+  }
+  bytes[0x9388] = 3;
+  const ByteReader reader(SourceId{1}, bytes);
+  const auto catalog = readSnesBrrCatalog(reader, 0x4000, srcns);
+  SamplePoolBuilder samples(AssetId{1});
+  const auto refs = addSnesBrrSamples(samples, reader, catalog);
+  expect(refs.findSrcn(18) && refs.findSrcn(49) && refs.findSrcn(53) && refs.findSrcn(18)->index() == 0 &&
+             refs.findSrcn(49)->index() == 1 && refs.findSrcn(53)->index() == 1,
          "BRR aliases must include the Tales sample's loop position in their identity");
 }
 
