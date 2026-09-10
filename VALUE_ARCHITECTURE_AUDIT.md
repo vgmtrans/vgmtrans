@@ -956,6 +956,20 @@ retain the same value, range, and validity access. This removes 15 production
 lines. The full rebuild and all 20 CTest targets pass, including raw/resolved
 source fields and truncated command handling.
 
+### Preserve the full internal clock in physical timing
+
+Remove four 16-bit narrowings from shared tempo and modulation calculations.
+Timebase already supports a 32-bit internal PPQN independently of the requested
+MIDI division; physical timing must use that full value. The new regression
+fails before the fix and verifies tick duration, forward/reverse duration
+conversion across tempo changes, and modulation rates/delays at divisions of
+100, 65,536, 131,072, and 2^30 with a separate MIDI division of 48. Source-layout
+fields that actually encode 16-bit divisions remain unchanged.
+
+The full build and all 20 CTest targets pass. The existing 312,320 timing and
+sampled-pitch queries remain byte-identical for divisions through 65,535, with
+the changed PerformanceModel compiled under AddressSanitizer and UBSan.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

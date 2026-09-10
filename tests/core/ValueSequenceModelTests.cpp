@@ -6,6 +6,7 @@
 
 #include "ValueTestSupport.h"
 #include "value/sequence/SequenceMotion.h"
+#include "value/sequence/TempoRelativeModulation.h"
 #include "value/validation/SequenceValidation.h"
 
 namespace {
@@ -503,6 +504,36 @@ void tempoMapPreservesOrderingAndBoundsDurationConversion() {
          "finite durations must saturate before integer conversion, while invalid durations produce zero ticks");
 }
 
+void physicalTimingUsesTheFullInternalDivision() {
+  for (u32 ppqn : {100u, 65536u, 131072u, 1u << 30}) {
+    PerformanceSequence performance{
+        .timebase = {.ppqn = ppqn, .midiPpqn = 48},
+        .tracks = {PerformanceTrack{
+            .events =
+                {
+                    ModulationPerformanceEvent{
+                        .target = ModulationPerformanceTarget::VibratoRate,
+                        .context = {.cyclesPerTick = 2.0 / ppqn, .delayTicks = ppqn / 4, .delayIsTempoRelative = true}},
+                    TempoPerformanceEvent{.header = {.tick = ppqn / 2}, .microsecondsPerQuarter = 1000000},
+                }}},
+    };
+    const PerformanceTempoMap tempos{performance};
+    expect(std::abs(tempos.tickSeconds(0) * ppqn - 0.5) < 1e-12 &&
+               std::abs(tempos.tickSeconds(ppqn / 2) * ppqn - 1.0) < 1e-12,
+           "physical tick duration must use the full internal division independently of MIDI division");
+    expect(tempos.durationMilliseconds(0, ppqn) == 750.0 && tempos.durationMilliseconds(ppqn / 4, ppqn / 2) == 375.0 &&
+               tempos.durationTicksForMilliseconds(0, 750.0) == ppqn &&
+               tempos.durationTicksForMilliseconds(ppqn / 4, 375.0) == ppqn / 2,
+           "duration conversion must preserve quarter-note timing across tempo changes at large divisions");
+
+    resolveTempoRelativeModulation(performance);
+    const auto rates = orderedPerformanceEvents<ModulationPerformanceEvent>(performance);
+    expect(rates.size() == 2 && rates[0]->context.frequencyHz == 4.0 && rates[0]->context.delayMilliseconds == 125.0 &&
+               rates[1]->context.frequencyHz == 2.0 && rates[1]->context.delayMilliseconds == 250.0,
+           "tempo-relative modulation must preserve physical rates and delays at large internal divisions");
+  }
+}
+
 void tempoMapRetainsInitialTempoAndOwnsItsPoints() {
   PerformanceSequence performance{
       .initialTempoMicrosecondsPerQuarter = 1000000,
@@ -549,5 +580,6 @@ void runValueSequenceModelTests() {
   continuedVoiceResolvesPriorPitchMotion();
   previousNoteEndRetainsContinuationChainBehavior();
   tempoMapPreservesOrderingAndBoundsDurationConversion();
+  physicalTimingUsesTheFullInternalDivision();
   tempoMapRetainsInitialTempoAndOwnsItsPoints();
 }
