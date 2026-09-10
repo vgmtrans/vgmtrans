@@ -1819,6 +1819,14 @@ void synthPreparationKeepsSampleIdentityAndPhaseOrdering() {
   }
   expect(indexes == std::vector<u16>{2, 0, 1, 3, 1},
          "regions must resolve both sample ownership and phase into the final sample table");
+  bank.localSamples.samples[0].loop = {.enabled = true, .start = 1, .length = 1};
+  bank.instruments[0].regions[1].sampleStartFrame = 1;
+  const auto trimmed = prepareSynthData(
+      SynthExportInput{.soundBanks = banks, .samplePools = pools, .filterSamplesToReferencedInstruments = true}, sources);
+  const auto& sustain = trimmed.samples[trimmed.instruments[0].regions[1].sampleIndex].decoded;
+  expect(trimmed.diagnostics.empty() && sustain.pcm == std::vector<s16>{-1000} &&
+             sustain.loop == Loop{.enabled = true, .start = 0, .length = 1},
+         "sample-start trimming must preserve phase and rebase the loop");
 }
 
 }  // namespace

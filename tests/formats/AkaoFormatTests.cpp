@@ -198,6 +198,13 @@ void akaoSequenceAnalysisUsesSemanticOperands() {
          "Akao analysis should collect drum tables from semantic operands");
   expect(analysis.references.usesIndividualArticulations && analysis.references.individualArticulationIds.contains(9),
          "Akao analysis should collect individual articulation ids from semantic operands");
+  SoundBankAsset bank;
+  const AkaoInstrumentSetBindingData recipe{.usesIndividualArticulations = true,
+                                           .noAttackArticulationIds = analysis.references.noAttackArticulationIds};
+  expect(applyAkaoArticulations(bank, recipe, {{9, {.articulation = {.loopPoint = 32}}}}) &&
+             bank.instruments.size() == 2 && bank.instruments[0].regions[0].sampleStartFrame == 0 &&
+             bank.instruments[1].regions[0].sampleStartFrame == 56 && bank.instruments[1].explicitAddress->bank == 2,
+         "F2 should select a sustain variant while retaining the full-sample instrument");
 }
 
 void akaoPointerInstrumentsSelectTheirExportedPrograms() {
@@ -459,7 +466,7 @@ void akaoLoopBranchUsesCurrentRepeatPass() {
 void akaoTieAfterRestDoesNotExtendPreviousNote() {
   std::vector<u8> bytes(0x40, 0xa0);
   constexpr u32 start = 0x20;
-  bytes[start] = 0x08;
+  bytes[start] = 0x83;  // Last B note; ties start at 0x84.
   bytes[start + 1] = 0x8c;
   bytes[start + 2] = 0x91;
   bytes[start + 3] = 0x8c;
@@ -479,7 +486,9 @@ void akaoTieAfterRestDoesNotExtendPreviousNote() {
   const auto noteCount = std::ranges::count_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<NotePerformanceEvent>(event);
   });
-  expect(noteCount == 2, "Akao tie after a rest should not extend the previous note");
+  expect(noteCount == 2, "0x83 must sound a note, and a tie after a rest must not extend it");
+  const auto notes = midiNotes(renderMidiSequence(performance).tracks[0].events);
+  expect(notes.size() == 1 && notes[0].key == 59, "0x83 must export as B, not a tie");
 }
 
 void akaoTempoFadeEmitsDriverTickRamp() {

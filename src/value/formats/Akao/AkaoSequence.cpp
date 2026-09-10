@@ -214,10 +214,12 @@ u32 relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOff
   return event.ignore();
 }
 
-[[nodiscard]] DecodedBytecodeCommand programArticulation(AkaoEvent& event) {
+[[nodiscard]] DecodedBytecodeCommand programArticulation(AkaoEvent& event, bool noAttack = false) {
   const u8 articulation = event.u8("articulation", SemanticOperandRole::InstrumentProgram);
-  event.derived("bank", 0u, SemanticOperandRole::InstrumentBank);
-  return event.invoke<&Playback::instrument>(0u, articulation);
+  // Bank 2 selects the sustain-only variant for F2 / subcommand 0A.
+  const u32 bank = noAttack ? 2u : 0u;
+  event.derived("bank", bank, SemanticOperandRole::InstrumentBank);
+  return event.invoke<&Playback::instrument>(bank, articulation);
 }
 
 [[nodiscard]] DecodedBytecodeCommand customInstrumentTable(AkaoEvent& event, const AkaoProfile& profile,
@@ -350,7 +352,7 @@ u32 relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOff
     }
     case 0x0a: {
       auto event = subCommand(cursor, "Program Change w/o Attack", SequenceSemantic::Program);
-      return programArticulation(event);
+      return programArticulation(event, true);
     }
     case 0x0e: {
       if (profile.version32()) {
@@ -414,7 +416,9 @@ u32 relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOff
     const bool inlineDuration = profile.noteHasInlineDuration(status);
     const u8 noteByte = inlineDuration ? static_cast<u8>((status - 0xf0) * 11) : status;
     const bool rest = noteByte >= 0x8f;
-    const bool tie = !rest && noteByte >= 0x83;
+    // Twelve pitches each have eleven durations: 0x83 is the final B note.
+    // SaGa Frontier SCUS_942.30 compares against 0x84 at 0x8004934c.
+    const bool tie = !rest && noteByte >= 0x84;
     const u32 fallbackDelta = kDeltaTimeTable[noteByte % 11];
     const bool modern = profile.version3OrLater();
 
@@ -713,7 +717,7 @@ u32 relativePointer(AkaoEvent& event, const AkaoProfile& profile, u32 operandOff
     case 0xf2:
       if (profile.legacyFamily()) {
         auto event = cursor.command("Program Change w/o Attack", SequenceSemantic::Program);
-        return programArticulation(event);
+        return programArticulation(event, true);
       }
       break;
     case 0xf4:
@@ -917,10 +921,13 @@ void collectReferences(const DecodedBytecodeCommand& command, AkaoSequenceRefere
     (bank == 127 ? references.drumInstrumentTableOffsets : references.customInstrumentTableOffsets)
         .insert(*instrumentTable);
   }
-  if (bank != 0 || programs.empty()) {
+  if ((bank != 0 && bank != 2) || programs.empty()) {
     return;
   }
   references.usesIndividualArticulations = true;
+  if (bank == 2) {
+    references.noAttackArticulationIds.insert(programs.begin(), programs.end());
+  }
   for (const u32 articulation : programs) {
     if (articulation != 0) {
       references.individualArticulationIds.insert(articulation);

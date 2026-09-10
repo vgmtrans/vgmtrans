@@ -27,6 +27,7 @@ struct SynthSampleIndexKey {
   u32 owner = invalidIdValue;
   u32 index = invalidIdValue;
   bool phaseInverted = false;
+  u32 startFrame = 0;
 
   friend auto operator<=>(const SynthSampleIndexKey&, const SynthSampleIndexKey&) = default;
 };
@@ -131,16 +132,16 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
   // Decode once into the final sample table, including any phase-inverted
   // variants. Container exporters share its indexes and source diagnostics.
   SynthSampleIndexMap indexes;
+  auto needed = references;
 
   for (const auto& view : samplePools) {
     const SampleFilter selectedFilter = resolveSampleFilter(filtering, view.pool.preferredFilter);
 
     for (u32 sampleIndex = 0; sampleIndex < view.pool.samples.size(); ++sampleIndex) {
-      const bool keepOriginal = !discardUnreferenced || references.contains({view.owner.value, sampleIndex, false});
-      const bool keepInverted = references.contains({view.owner.value, sampleIndex, true});
-      if (!keepOriginal && !keepInverted) {
-        continue;
-      }
+      if (!discardUnreferenced) needed.insert({view.owner.value, sampleIndex});
+      const auto first = needed.lower_bound({view.owner.value, sampleIndex});
+      const auto last = needed.upper_bound({view.owner.value, sampleIndex, true, std::numeric_limits<u32>::max()});
+      if (first == last) continue;
       const auto& sample = view.pool.samples[sampleIndex];
       if (!sources.contains(sample.encodedData.source)) {
         prepared.diagnostics.push_back(
@@ -168,24 +169,35 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
         applySampleFilter(*decoded, selectedFilter);
       }
 
-      DecodedSynthSample original{
-          .name = sample.name,
-          .pitch = sample.pitch,
-          .attenuationDb = sample.attenuationDb,
-          .decoded = std::move(*decoded),
-      };
-      if (keepInverted) {
-        auto inverted = keepOriginal ? original : std::move(original);
-        inverted.name += " [inverted]";
-        for (s16& value : inverted.decoded.pcm) {
-          value = value == std::numeric_limits<s16>::min() ? std::numeric_limits<s16>::max() : static_cast<s16>(-value);
+      // Visit inverted variants first, preserving the existing sample order.
+      for (auto it = last; it != first;) {
+        const auto& key = *--it;
+        auto audio = it == first ? std::move(*decoded) : *decoded;
+        if (key.startFrame != 0) {
+          const u64 skip = static_cast<u64>(key.startFrame) * audio.channels;
+          if (skip >= audio.pcm.size()) {
+            prepared.diagnostics.push_back(exportError("Sample start frame is outside decoded sample data"));
+            continue;
+          }
+          // Trim after decoding/filtering to preserve ADPCM predictor history.
+          audio.pcm.erase(audio.pcm.begin(), audio.pcm.begin() + skip);
+          const u32 loopEnd = audio.loop.start + audio.loop.length;
+          audio.loop.start -= std::min(audio.loop.start, key.startFrame);
+          audio.loop.length = loopEnd - std::min(loopEnd, key.startFrame) - audio.loop.start;
+          audio.loop.enabled &= audio.loop.length != 0;
         }
-        indexes[{view.owner.value, sampleIndex, true}] = clampU16(static_cast<u32>(prepared.samples.size()));
-        prepared.samples.push_back(std::move(inverted));
-      }
-      if (keepOriginal) {
-        indexes[{view.owner.value, sampleIndex, false}] = clampU16(static_cast<u32>(prepared.samples.size()));
-        prepared.samples.push_back(std::move(original));
+        if (key.phaseInverted) {
+          for (s16& value : audio.pcm) {
+            value = value == std::numeric_limits<s16>::min() ? std::numeric_limits<s16>::max() : static_cast<s16>(-value);
+          }
+        }
+        indexes[key] = clampU16(static_cast<u32>(prepared.samples.size()));
+        prepared.samples.push_back(DecodedSynthSample{
+            .name = sample.name + (key.startFrame ? " [sustain]" : "") + (key.phaseInverted ? " [inverted]" : ""),
+            .pitch = sample.pitch,
+            .attenuationDb = sample.attenuationDb,
+            .decoded = std::move(audio),
+        });
       }
     }
   }
@@ -197,21 +209,10 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
   SynthSampleReferences samples;
   for (const auto* instrument : instruments) {
     for (const auto& region : instrument->regions) {
-      samples.insert({region.sample.owner().value, region.sample.index(), region.invertSamplePhase});
+      samples.insert({region.sample.owner().value, region.sample.index(), region.invertSamplePhase, region.sampleStartFrame});
     }
   }
   return samples;
-}
-
-[[nodiscard]] std::optional<u16> resolveRegionSampleIndex(const Region& region, const SynthSampleIndexMap& samples,
-                                                          std::vector<Diagnostic>& diagnostics) {
-  const auto found = samples.find({region.sample.owner().value, region.sample.index(), region.invertSamplePhase});
-  if (found == samples.end()) {
-    diagnostics.push_back(exportError("Region sample reference was not found", validDiagnosticRange(region.range)));
-    return std::nullopt;
-  }
-
-  return found->second;
 }
 
 [[nodiscard]] std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
@@ -227,14 +228,16 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
         .modulation = lowerSynthModulation(instrument->modulation, conversion),
     };
     for (const auto& region : instrument->regions) {
-      const auto sampleIndex = resolveRegionSampleIndex(region, samples, diagnostics);
-      if (!sampleIndex) {
+      const auto sample = samples.find({region.sample.owner().value, region.sample.index(), region.invertSamplePhase,
+                                        region.sampleStartFrame});
+      if (sample == samples.end()) {
+        diagnostics.push_back(exportError("Region sample reference was not found", validDiagnosticRange(region.range)));
         continue;
       }
 
       resolvedInstrument.regions.push_back(ResolvedSynthRegion{
           .region = &region,
-          .sampleIndex = *sampleIndex,
+          .sampleIndex = sample->second,
           .modulation = lowerSynthModulation(region.modulation, conversion),
       });
     }
