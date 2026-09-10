@@ -314,7 +314,7 @@ void applyPitchWrap(Region& region, u16 pitchScale, int key) {
     u8 fine = 0;
     if (info.tuningProgram < layout.konamiTuningTableSize &&
         reader.has(layout.konamiTuningTableAddress + layout.konamiTuningTableSize + info.tuningProgram, 1)) {
-      coarse = static_cast<s8>(reader.u8At(layout.konamiTuningTableAddress + info.tuningProgram));
+      coarse = reader.s8At(layout.konamiTuningTableAddress + info.tuningProgram);
       fine = reader.u8At(layout.konamiTuningTableAddress + layout.konamiTuningTableSize + info.tuningProgram);
     }
     return konamiUnityKey(coarse, fine);

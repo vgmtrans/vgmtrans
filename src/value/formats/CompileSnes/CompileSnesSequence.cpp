@@ -102,7 +102,7 @@ public:
         .branchId = reader.u8At(item + 7),
         .program = reader.u8At(item + 10),
         .adsr = reader.u8At(item + 11),
-        .pan = static_cast<s8>(reader.u8At(item + 12)),
+        .pan = reader.s8At(item + 12),
     };
   }
 

@@ -245,7 +245,7 @@ struct Patch {
 
 [[nodiscard]] double rowPitchSemitones(ByteReader reader, u32 row, DriverTraits traits) {
   if (!traits.multiplicativeTuning) {
-    return static_cast<s8>(reader.u8At(row + 5)) + reader.u8At(row + 6) / 256.0;
+    return reader.s8At(row + 5) + reader.u8At(row + 6) / 256.0;
   }
   const u16 multiplier = static_cast<u16>(reader.u8At(row + 5) << 8 | reader.u8At(row + 6));
   return multiplier == 0 ? 0.0 : 12.0 * std::log2(multiplier / 256.0);

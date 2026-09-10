@@ -85,9 +85,8 @@ struct RuntimeConfig {
     const u8 srcn = reader.u8At(row);
     config.patches[program] = RuntimePatch{
         .adsr2 = reader.u8At(row + 2),
-        .tuning = reader.has(layout.tuningTableAddress + srcn, 1)
-                      ? static_cast<s8>(reader.u8At(layout.tuningTableAddress + srcn))
-                      : s8{0},
+        .tuning =
+            reader.has(layout.tuningTableAddress + srcn, 1) ? reader.s8At(layout.tuningTableAddress + srcn) : s8{0},
     };
   }
   return config;

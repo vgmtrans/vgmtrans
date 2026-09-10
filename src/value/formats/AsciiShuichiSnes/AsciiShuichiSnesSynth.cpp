@@ -73,7 +73,7 @@ struct Patch {
         .adsr1 = reader.u8At(row + 1),
         .adsr2 = reader.u8At(row + 2),
         .gain = reader.u8At(row + 3),
-        .tuning = static_cast<s8>(reader.u8At(tuning)),
+        .tuning = reader.s8At(tuning),
         .source = reader.range(row, 4),
         .tuningSource = reader.range(tuning, 1),
     });

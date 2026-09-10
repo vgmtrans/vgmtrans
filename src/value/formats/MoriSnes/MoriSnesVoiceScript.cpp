@@ -225,19 +225,17 @@ VoiceScriptAnalysis analyzeVoiceScript(const DriverConfig& driver, u16 script, s
         result.scriptEnd = keyOnTick ? tick - *keyOnTick : tick;
         return finish();
       case 0xd7:
-        state.pitch256 = static_cast<s8>(reader.u8At(operands)) * 256 + static_cast<u8>(state.pitch256);
+        state.pitch256 = reader.s8At(operands) * 256 + static_cast<u8>(state.pitch256);
         state.absolutePitch = true;
         point();
         break;
       case 0xd8:
-        state.pitch256 =
-            static_cast<s8>(static_cast<u8>((state.pitch256 >> 8) + static_cast<s8>(reader.u8At(operands)))) * 256 +
-            static_cast<u8>(state.pitch256);
+        state.pitch256 = static_cast<s8>(static_cast<u8>((state.pitch256 >> 8) + reader.s8At(operands))) * 256 +
+                         static_cast<u8>(state.pitch256);
         point();
         break;
       case 0xd9:
-        state.pitch256 =
-            addFinePitch(state.pitch256, static_cast<s8>(reader.u8At(operands)), state.absolutePitch);
+        state.pitch256 = addFinePitch(state.pitch256, reader.s8At(operands), state.absolutePitch);
         point();
         break;
       case 0xda:
@@ -273,7 +271,7 @@ VoiceScriptAnalysis analyzeVoiceScript(const DriverConfig& driver, u16 script, s
         activeAttack.reset();
         break;
       case 0xdc:
-        state.volume = static_cast<u8>(state.volume + static_cast<s8>(reader.u8At(operands)));
+        state.volume = static_cast<u8>(state.volume + reader.s8At(operands));
         point();
         break;
       case 0xde: {
@@ -292,8 +290,7 @@ VoiceScriptAnalysis analyzeVoiceScript(const DriverConfig& driver, u16 script, s
       case 0xe2: {
         const u8 index = reader.u8At(operands);
         if (reader.has(driver.presetTable + index, 1) && reader.has(driver.presetPitchHigh + index, 1)) {
-          state.pitch256 = static_cast<s8>(reader.u8At(driver.presetPitchHigh + index)) * 256 +
-                           reader.u8At(driver.presetTable + index);
+          state.pitch256 = reader.s8At(driver.presetPitchHigh + index) * 256 + reader.u8At(driver.presetTable + index);
           state.fineExplicit = true;
           state.absolutePitch = true;
           point();

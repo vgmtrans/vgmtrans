@@ -842,7 +842,7 @@ struct Playback {
     const u32 delay = beginEvent(timing);
     if (track.data.has(track.presetTable + index, 1) && track.data.has(track.presetPitchHigh + index, 1)) {
       track.fineTuning = track.data.u8At(track.presetTable + index);
-      track.transpose = static_cast<s8>(track.data.u8At(track.presetPitchHigh + index));
+      track.transpose = track.data.s8At(track.presetPitchHigh + index);
     }
     return Effects::wait(delay);
   }

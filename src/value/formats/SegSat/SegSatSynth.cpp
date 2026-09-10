@@ -358,7 +358,7 @@ struct PanAndAttenuation {
     ParsedInstrument instrument{
         .index = index,
         .range = reader.range(offset, 4 + regionCount * 0x20),
-        .volumeBias = static_cast<s8>(reader.u8At(offset + 3)),
+        .volumeBias = reader.s8At(offset + 3),
         .pitchBendRangeCents = pitchBendRangeCents(reader.u8At(offset)),
     };
 
@@ -371,7 +371,7 @@ struct PanAndAttenuation {
         continue;
       }
 
-      const s8 fine = static_cast<s8>(reader.u8At(regionOffset + 26));
+      const s8 fine = reader.s8At(regionOffset + 26);
       const s16 fineCents = static_cast<s16>((fine / 128.0) * 50.0);
       const auto output = directOutput(reader.u8At(regionOffset + 24));
       ParsedRegion parsed{
@@ -520,7 +520,7 @@ SegSatVelocityBank readSegSatVelocityBank(ByteReader reader, const SegSatBankLay
     const u32 instrumentOffset = layout.offset + reader.be16(layout.offset + 8 + index * 2);
     const u32 regionCount = segSatRegionCount(reader.u8At(instrumentOffset + 2));
     SegSatVelocityInstrument instrument{
-        .volumeBias = static_cast<s8>(reader.u8At(instrumentOffset + 3)),
+        .volumeBias = reader.s8At(instrumentOffset + 3),
     };
     instrument.regions.reserve(regionCount);
     for (u32 regionIndex = 0; regionIndex < regionCount; ++regionIndex) {

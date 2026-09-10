@@ -144,7 +144,7 @@ std::optional<Layout> findLayout(ByteReader reader) {
       .pitchTableListAddress = early ? u16{0} : reader.le16(engine + 0x16),
       .regularPitchTableAddress = regularPitch,
       .spcDirAddress = static_cast<u16>(reader.u8At(engine + 0x0e) << 8),
-      .globalTranspose = static_cast<s8>(reader.u8At(engine + 0x0f)),
+      .globalTranspose = reader.s8At(engine + 0x0f),
       .stereoEnabled = (reader.u8At(1) & 4) != 0,
   };
 }
@@ -169,7 +169,7 @@ std::optional<InstrumentInfo> readInstrumentInfo(ByteReader reader, const Layout
   }
   return InstrumentInfo{
       .program = program,
-      .transpose = static_cast<s8>(reader.u8At(address)),
+      .transpose = reader.s8At(address),
       .pitchTable = pitchTable,
       .pitchTableAddress = pitchTableAddress,
       .source = reader.range(address, layout.early() ? 1 : 2),

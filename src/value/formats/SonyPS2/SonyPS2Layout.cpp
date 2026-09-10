@@ -159,7 +159,7 @@ std::optional<SequenceLayout> readSequenceLayout(ByteReader reader, u32 offset) 
 
   if (layout.seSequences) {
     const u8 masterVolume = reader.u8At(layout.seSequences->offset + 20);
-    const s8 masterPan = static_cast<s8>(reader.u8At(layout.seSequences->offset + 21));
+    const s8 masterPan = reader.s8At(layout.seSequences->offset + 21);
     const u16 masterScale = reader.le16(layout.seSequences->offset + 22);
     for (u32 set = 0; set < layout.seSequences->entries.size(); ++set) {
       const auto setAddress = layout.seSequences->entries[set];
@@ -169,7 +169,7 @@ std::optional<SequenceLayout> readSequenceLayout(ByteReader reader, u32 offset) 
       const u32 maximumSequence = reader.le32(*setAddress);
       const u32 tableRelative = reader.le32(*setAddress + 4);
       const u8 setVolume = reader.u8At(*setAddress + 8);
-      const s8 setPan = static_cast<s8>(reader.u8At(*setAddress + 9));
+      const s8 setPan = reader.s8At(*setAddress + 9);
       const u16 setScale = reader.le16(*setAddress + 10);
       if (maximumSequence >= 128 || tableRelative >= layout.seSequences->size ||
           !reader.has(layout.seSequences->offset + tableRelative, static_cast<u64>(maximumSequence + 1) * 4)) {
@@ -192,7 +192,7 @@ std::optional<SequenceLayout> readSequenceLayout(ByteReader reader, u32 offset) 
           continue;
         }
         const u8 sequenceVolume = reader.u8At(sequenceOffset + 4);
-        const s8 sequencePan = static_cast<s8>(reader.u8At(sequenceOffset + 5));
+        const s8 sequencePan = reader.s8At(sequenceOffset + 5);
         const u16 sequenceScale = reader.le16(sequenceOffset + 6);
         const u64 combinedScale = static_cast<u64>(masterScale) * setScale * sequenceScale;
         const int combinedPan = std::clamp(std::abs(static_cast<int>(masterPan)) + std::abs(static_cast<int>(setPan)) +
