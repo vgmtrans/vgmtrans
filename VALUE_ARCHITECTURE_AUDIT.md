@@ -759,6 +759,13 @@ directly while preserving its note/controller ordering checks; its old fixed
 index caused the initial core-test crash. The full build and all 17 CTest
 targets now pass.
 
+### Restore the AKAO sustain fixture's sample identity
+
+The resumed audit's unchanged baseline aborted in the new sustain-only AKAO
+fixture: its articulation omitted the sample-pool ID required by a resolved
+sample reference. Supply a valid fixture ID without changing production code
+or the sustain assertions. The full build and all 20 current CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
