@@ -123,117 +123,68 @@ double synthSecondsRangeMinimum(double seconds) {
 LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulation,
                                             ModulationConversionPolicy conversion) {
   LoweredSynthModulation lowered;
+  const bool nativeLfo = conversion != ModulationConversionPolicy::SequenceEventSimulation;
 
-  if (modulation.vibrato && canUseNativeSynthLfo(modulation.vibrato->waveform)) {
-    const auto& vibrato = *modulation.vibrato;
+  const auto addTimingGenerators = [&](const auto& lfo, SynthDestination rate, SynthDestination delay) {
     lowered.generators.push_back(SynthGenerator{
-        .destination = SynthDestination::VibratoRate,
-        .amount = synthAmountFromHertz(vibrato.rateHertz.minimum),
+        .destination = rate,
+        .amount = synthAmountFromHertz(lfo.rateHertz.minimum),
     });
-    if (vibrato.delaySeconds) {
+    if (lfo.delaySeconds) {
       lowered.generators.push_back(SynthGenerator{
-          .destination = SynthDestination::VibratoDelay,
-          .amount = synthAmountFromSeconds(synthSecondsRangeMinimum(vibrato.delaySeconds->minimum)),
+          .destination = delay,
+          .amount = synthAmountFromSeconds(synthSecondsRangeMinimum(lfo.delaySeconds->minimum)),
       });
     }
-
-    if (vibrato.depthMode == ModulationDepthMode::Fixed) {
-      lowered.generators.push_back(SynthGenerator{
-          .destination = SynthDestination::VibratoDepth,
-          .amount = static_cast<s32>(std::lround(vibrato.maxDepthCents)),
-      });
+  };
+  const auto addTimingModulators = [&](const auto& lfo, SynthDestination rate, SynthDestination delay) {
+    const s32 rateAmount = synthAmountFromHertzRange(lfo.rateHertz.minimum, lfo.rateHertz.maximum);
+    if (rateAmount != 0) {
+      lowered.modulators.push_back(SynthModulator{.destination = rate, .amount = rateAmount});
+    }
+    if (lfo.delaySeconds) {
+      const s32 delayAmount = synthAmountFromSecondsRange(lfo.delaySeconds->minimum, lfo.delaySeconds->maximum);
+      if (delayAmount != 0) {
+        lowered.modulators.push_back(SynthModulator{.destination = delay, .amount = delayAmount});
+      }
+    }
+  };
+  const auto addDepth = [&](SynthDestination destination, s32 amount, ModulationDepthMode mode) {
+    if (mode == ModulationDepthMode::Fixed) {
+      lowered.generators.push_back(SynthGenerator{.destination = destination, .amount = amount});
     } else {
+      lowered.modulators.push_back(SynthModulator{.destination = destination, .amount = amount});
+    }
+  };
+
+  if (nativeLfo && modulation.vibrato && canUseNativeSynthLfo(modulation.vibrato->waveform)) {
+    const auto& vibrato = *modulation.vibrato;
+    addTimingGenerators(vibrato, SynthDestination::VibratoRate, SynthDestination::VibratoDelay);
+    if (vibrato.depthMode != ModulationDepthMode::Fixed) {
       lowered.modulators.push_back(SynthModulator{
           .source = SynthSource::ChannelPressure,
           .destination = SynthDestination::VibratoDepth,
           .amount = 0,
       });
-      lowered.modulators.push_back(SynthModulator{
-          .destination = SynthDestination::VibratoDepth,
-          .amount = static_cast<s32>(std::lround(vibrato.maxDepthCents)),
-      });
     }
-    const s32 rateAmount = synthAmountFromHertzRange(vibrato.rateHertz.minimum, vibrato.rateHertz.maximum);
-    if (rateAmount != 0) {
-      lowered.modulators.push_back(SynthModulator{
-          .destination = SynthDestination::VibratoRate,
-          .amount = rateAmount,
-      });
-    }
-    if (vibrato.delaySeconds) {
-      const s32 delayAmount = synthAmountFromSecondsRange(vibrato.delaySeconds->minimum, vibrato.delaySeconds->maximum);
-      if (delayAmount != 0) {
-        lowered.modulators.push_back(SynthModulator{
-            .destination = SynthDestination::VibratoDelay,
-            .amount = delayAmount,
-        });
-      }
-    }
+    addDepth(SynthDestination::VibratoDepth, static_cast<s32>(std::lround(vibrato.maxDepthCents)), vibrato.depthMode);
+    addTimingModulators(vibrato, SynthDestination::VibratoRate, SynthDestination::VibratoDelay);
   }
 
   if (modulation.tremolo && canUseNativeSynthLfo(modulation.tremolo->waveform)) {
     const auto& tremolo = *modulation.tremolo;
-    lowered.generators.push_back(SynthGenerator{
-        .destination = SynthDestination::TremoloRate,
-        .amount = synthAmountFromHertz(tremolo.rateHertz.minimum),
-    });
-    if (tremolo.delaySeconds) {
-      lowered.generators.push_back(SynthGenerator{
-          .destination = SynthDestination::TremoloDelay,
-          .amount = synthAmountFromSeconds(synthSecondsRangeMinimum(tremolo.delaySeconds->minimum)),
-      });
+    const s32 depth = synthAmountFromDecibels(tremolo.maxDepthDb);
+    if (nativeLfo) {
+      addTimingGenerators(tremolo, SynthDestination::TremoloRate, SynthDestination::TremoloDelay);
+      addTimingModulators(tremolo, SynthDestination::TremoloRate, SynthDestination::TremoloDelay);
+      addDepth(SynthDestination::TremoloDepth, depth, tremolo.depthMode);
     }
-
-    const s32 rateAmount = synthAmountFromHertzRange(tremolo.rateHertz.minimum, tremolo.rateHertz.maximum);
-    if (rateAmount != 0) {
-      lowered.modulators.push_back(SynthModulator{
-          .destination = SynthDestination::TremoloRate,
-          .amount = rateAmount,
-      });
+    // Simulated modulation still needs the static attenuation that places a
+    // fixed no-boost tremolo below nominal gain.
+    if (tremolo.gainMode == TremoloGainMode::NoBoost &&
+        (nativeLfo || tremolo.depthMode == ModulationDepthMode::Fixed)) {
+      addDepth(SynthDestination::VolumeAttenuation, depth, tremolo.depthMode);
     }
-    if (tremolo.delaySeconds) {
-      const s32 delayAmount = synthAmountFromSecondsRange(tremolo.delaySeconds->minimum, tremolo.delaySeconds->maximum);
-      if (delayAmount != 0) {
-        lowered.modulators.push_back(SynthModulator{
-            .destination = SynthDestination::TremoloDelay,
-            .amount = delayAmount,
-        });
-      }
-    }
-    const s32 tremoloDepth = synthAmountFromDecibels(tremolo.maxDepthDb);
-    if (tremolo.depthMode == ModulationDepthMode::Fixed) {
-      lowered.generators.push_back(SynthGenerator{
-          .destination = SynthDestination::TremoloDepth,
-          .amount = tremoloDepth,
-      });
-    } else {
-      lowered.modulators.push_back(SynthModulator{
-          .destination = SynthDestination::TremoloDepth,
-          .amount = tremoloDepth,
-      });
-    }
-    if (tremolo.gainMode == TremoloGainMode::NoBoost) {
-      if (tremolo.depthMode == ModulationDepthMode::Fixed) {
-        lowered.generators.push_back(SynthGenerator{
-            .destination = SynthDestination::VolumeAttenuation,
-            .amount = tremoloDepth,
-        });
-      } else {
-        lowered.modulators.push_back(SynthModulator{
-            .destination = SynthDestination::VolumeAttenuation,
-            .amount = tremoloDepth,
-        });
-      }
-    }
-  }
-
-  if (conversion == ModulationConversionPolicy::SequenceEventSimulation) {
-    // Sequence events supply the varying modulation. Keep only the static
-    // attenuation that places a fixed no-boost tremolo below nominal gain.
-    std::erase_if(lowered.generators, [](const SynthGenerator& generator) {
-      return generator.destination != SynthDestination::VolumeAttenuation;
-    });
-    lowered.modulators.clear();
   }
   return lowered;
 }
