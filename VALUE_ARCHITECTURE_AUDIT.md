@@ -970,6 +970,16 @@ The full build and all 20 CTest targets pass. The existing 312,320 timing and
 sampled-pitch queries remain byte-identical for divisions through 65,535, with
 the changed PerformanceModel compiled under AddressSanitizer and UBSan.
 
+### Remove duplicate visit and tick bookkeeping from SequenceVM
+
+Use try_emplace to record command and playlist visits while retrieving any
+earlier visit. This removes the separate lookup/insertion paths without
+changing which arrival kinds count as loops or how repeat state distinguishes
+visits. Source spans now reuse the executor's saturating tick calculation
+instead of repeating it locally. This removes 12 production lines and adds
+no new VM concepts. The full build and all 20 CTest targets pass, including
+finite repeats, inferred/declared loops, playlists, and source playback spans.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
