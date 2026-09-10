@@ -99,13 +99,10 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
   }
 
   std::vector<SoundBankAsset> soundBanks;
-  std::vector<std::pair<AssetId, std::string>> bankIdentities;
   soundBanks.reserve(members.soundBanks.size());
-  bankIdentities.reserve(members.soundBanks.size());
   for (const AssetId assetId : members.soundBanks) {
     if (const auto* bank = snapshot.asset<SoundBankAsset>(assetId)) {
       soundBanks.push_back(*bank);
-      bankIdentities.emplace_back(bank->metadata.id, bank->metadata.format);
     } else {
       diagnostics.push_back(exportError("Collection sound bank asset was not found"));
       failed = true;
@@ -142,8 +139,8 @@ CollectionBindingResult bindCollection(const SessionSnapshot& snapshot, Collecti
       failed = context.failed;
       for (size_t index = 0; index < soundBanks.size(); ++index) {
         const auto& metadata = soundBanks[index].metadata;
-        const auto& [id, format] = bankIdentities[index];
-        if (metadata.id != id || metadata.format != format) {
+        const auto& original = snapshot.asset<SoundBankAsset>(members.soundBanks[index])->metadata;
+        if (metadata.id != original.id || metadata.format != original.format) {
           diagnostics.push_back(exportError("Collection binding changed sound bank identity, format, or order"));
           failed = true;
           break;

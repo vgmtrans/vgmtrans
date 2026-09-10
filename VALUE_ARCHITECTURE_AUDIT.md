@@ -993,6 +993,16 @@ Coverage verifies both byte orders, the unsigned maximum, exact end boundaries,
 truncated and overflowing offsets, and record-local bounds and source fields.
 The full rebuild is warning-free and all 20 CTest targets pass.
 
+### Validate bound bank identities against the immutable snapshot
+
+Remove the temporary vector of copied bank IDs and format strings from
+collection binding. Original metadata remains available in the snapshot under
+the fixed collection member order, so validation can compare with that source
+directly. Missing members still prevent binding, and callbacks receive a span
+that cannot resize the prepared bank list. This removes three production lines,
+one temporary container, and its string copies. The full build and all 20 CTest
+targets pass, including binding failures and rejection of identity changes.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
