@@ -109,6 +109,8 @@ public:
   [[nodiscard]] s8 s8At(u64 offset) const;
   [[nodiscard]] u16 le16(u64 offset) const;
   [[nodiscard]] u16 be16(u64 offset) const;
+  [[nodiscard]] u32 le24(u64 offset) const;
+  [[nodiscard]] u32 be24(u64 offset) const;
   [[nodiscard]] u32 le32(u64 offset) const;
   [[nodiscard]] u32 be32(u64 offset) const;
   [[nodiscard]] std::span<const u8> slice(SourceRange range) const;

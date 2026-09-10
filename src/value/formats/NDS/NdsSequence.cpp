@@ -674,8 +674,7 @@ struct SequenceDecodeContext {
 
   while (hasBytecodeBytes(context.reader(), offset, 5, context.range.sequenceEnd) &&
          context.reader().u8At(offset) == 0x93) {
-    const u32 relative = context.reader().u8At(offset + 2) | (context.reader().u8At(offset + 3) << 8) |
-                         (context.reader().u8At(offset + 4) << 16);
+    const u32 relative = context.reader().le24(offset + 2);
     const u32 destination = context.dataBase() + relative;
     if (destination < context.range.sequenceEnd) {
       secondaryTracks.push_back(destination);

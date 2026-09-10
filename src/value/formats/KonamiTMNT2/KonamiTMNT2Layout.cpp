@@ -186,11 +186,6 @@ struct SampleKey {
   return SampleKey{info.start, info.length, info.loopStart, info.adpcm, info.reverse, info.loops};
 }
 
-[[nodiscard]] u32 readLe24(ByteReader reader, u32 offset) {
-  return static_cast<u32>(reader.u8At(offset)) | (static_cast<u32>(reader.u8At(offset + 1)) << 8) |
-         (static_cast<u32>(reader.u8At(offset + 2)) << 16);
-}
-
 [[nodiscard]] std::vector<u32> pointerTable(ByteReader reader, const Layout& layout, u32 table,
                                             u32 hardEnd = std::numeric_limits<u32>::max()) {
   std::vector<u32> result;
@@ -239,7 +234,7 @@ void readTmnt2Synth(Layout& layout, ByteReader reader, std::vector<Diagnostic>* 
     const u32 loopStart = splitLoop ? reader.le16(offset + 1) : 0;
     const u32 length = reader.le16(offset + (splitLoop ? 3 : 1));
     const u32 startField = offset + (splitLoop ? 5 : 3);
-    const u32 start = readLe24(reader, startField);
+    const u32 start = reader.le24(startField);
     const u32 common = offset + (splitLoop ? 8 : 6);
     const SampleInfo info{
         .start = start,
@@ -282,7 +277,7 @@ void readTmnt2Synth(Layout& layout, ByteReader reader, std::vector<Diagnostic>* 
       firstDrum = std::min(firstDrum, offset);
       drumPointerSet.insert(offset);
       const u8 flags = reader.u8At(offset + 3);
-      const u32 start = readLe24(reader, offset + 6);
+      const u32 start = reader.le24(offset + 6);
       const SampleInfo info{
           .start = start,
           .length = reader.le16(offset + 4),
@@ -420,7 +415,7 @@ void readVendettaSynth(Layout& layout, ByteReader reader, const SourceSegment& p
       break;
     }
     layout.sampleInfos.push_back(SampleInfo{
-        .start = readLe24(reader, offset + 4),
+        .start = reader.le24(offset + 4),
         .length = reader.le16(offset + 2),
         .pitch = reader.le16(offset),
         .adpcm = (reader.u8At(offset + 7) & 1) != 0,

@@ -112,6 +112,18 @@ void recordReaderPreservesNumericFieldsAndFailurePolicies() {
   check(&RecordReader::u32be, &RecordReader::u32beAt, u32{0xfedcba98}, 4);
   check(&RecordReader::u32le, &RecordReader::u32leAt, u32{0x98badcfe}, 4);
 
+  RecordReader packed(ByteReader(source, bytes), 1, 4);
+  const auto packedValue = packed.u24le("packed", SourceValueDisplay::Hex);
+  const auto packedFields = std::move(packed).finish().fields;
+  expect(packedValue && packedValue.value == 0xbadcfe && packedValue.range.size == 3 && packed.position() == 4 &&
+             packedFields.size() == 1 && packedFields[0].range == packedValue.range &&
+             packedFields[0].value == makeSourceValue(u32{0xbadcfe}) &&
+             packedFields[0].display == SourceValueDisplay::Hex,
+         "24-bit record reads must retain their three-byte extent and unsigned source-field value");
+  RecordReader truncatedPacked(ByteReader(source, bytes), 1, 3);
+  expect(!truncatedPacked.u24le("packed") && truncatedPacked.position() == 3 && !truncatedPacked.ok(),
+         "24-bit record reads must honor the record boundary even when more source bytes exist");
+
   std::vector<Diagnostic> diagnostics;
   RecordReader damaged(ByteReader(source, bytes), 1, 4, &diagnostics);
   expect(!damaged.u32be("too wide") && !damaged.u8("after failure") && damaged.position() == 4,

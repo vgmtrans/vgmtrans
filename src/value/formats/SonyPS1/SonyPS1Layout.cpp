@@ -74,11 +74,6 @@ constexpr u32 kPsxMainRamMask = 0x1fffff;
   return signature == kSeqSignature || signature == kReversedSeqSignature;
 }
 
-[[nodiscard]] u32 be24(ByteReader reader, u32 offset) {
-  return (static_cast<u32>(reader.u8At(offset)) << 16) | (static_cast<u32>(reader.u8At(offset + 1)) << 8) |
-         reader.u8At(offset + 2);
-}
-
 [[nodiscard]] bool validSequenceHeader(u16 ppqn, u32 tempo, u8 numerator, u8 denominatorPower) {
   if (ppqn == 0 || tempo == 0) {
     return false;
@@ -242,7 +237,7 @@ constexpr u32 kPsxMainRamMask = 0x1fffff;
     return std::nullopt;
   }
   const u16 ppqn = reader.be16(offset + 8);
-  const u32 tempo = be24(reader, offset + 10);
+  const u32 tempo = reader.be24(offset + 10);
   const u8 numerator = reader.u8At(offset + 13);
   const u8 denominator = reader.u8At(offset + 14);
   if (!validSequenceHeader(ppqn, tempo, numerator, denominator)) {
@@ -284,7 +279,7 @@ constexpr u32 kPsxMainRamMask = 0x1fffff;
     const u32 fields = first ? header + 6 : header;
     const u16 sequenceId = reader.be16(fields);
     const u16 ppqn = reader.be16(fields + 2);
-    const u32 tempo = be24(reader, fields + 4);
+    const u32 tempo = reader.be24(fields + 4);
     const u8 numerator = reader.u8At(fields + 7);
     const u8 denominator = reader.u8At(fields + 8);
     const u32 dataSize = reader.be32(fields + 9);

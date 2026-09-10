@@ -980,6 +980,19 @@ instead of repeating it locally. This removes 12 production lines and adds
 no new VM concepts. The full build and all 20 CTest targets pass, including
 finite repeats, inferred/declared loops, playlists, and source playback spans.
 
+### Read packed 24-bit values through the shared byte reader
+
+Add le24 and be24 beside the existing endian-specific integer readers. Replace
+13 manual reads across CPS, HeartBeatPS1, KonamiArcade, KonamiTMNT2, NDS, and
+SonyPS1, removing two format-local reader helpers. RecordReader's 24-bit read
+now uses its ordinary numeric path with an explicit three-byte width, removing
+the separate bounds/range/field bookkeeping. This removes 11 production lines
+overall while making format layouts read directly as integer fields.
+
+Coverage verifies both byte orders, the unsigned maximum, exact end boundaries,
+truncated and overflowing offsets, and record-local bounds and source fields.
+The full rebuild is warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

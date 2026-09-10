@@ -40,14 +40,14 @@ RecordReader::RecordReader(ByteReader reader, u32 offset, u32 end, std::vector<D
 
 // Sequential reads stop after the first failure. Positioned reads may still
 // recover other fields in a damaged record; keep those bounds policies separate.
-template <class T, auto Read>
+template <class T, auto Read, u32 Size>
 RangedValue<T> RecordReader::number(std::string_view name, SourceValueDisplay display) {
-  if (!require(sizeof(T), name)) {
+  if (!require(Size, name)) {
     return {};
   }
-  const SourceRange sourceRange = reader_.range(position_, sizeof(T));
+  const SourceRange sourceRange = reader_.range(position_, Size);
   const auto value = static_cast<T>((reader_.*Read)(position_));
-  position_ += sizeof(T);
+  position_ += Size;
   field(name, sourceRange, makeSourceValue(value), display);
   return {value, sourceRange};
 }
@@ -81,14 +81,7 @@ RangedValue<u16> RecordReader::u16le(std::string_view name, SourceValueDisplay d
 }
 
 RangedValue<u32> RecordReader::u24le(std::string_view name, SourceValueDisplay display) {
-  if (!require(3, name)) {
-    return {};
-  }
-  const SourceRange sourceRange = reader_.range(position_, 3);
-  const u32 value = reader_.u8At(position_) | (reader_.u8At(position_ + 1) << 8) | (reader_.u8At(position_ + 2) << 16);
-  position_ += 3;
-  field(name, sourceRange, makeSourceValue(value), display);
-  return RangedValue<u32>{value, sourceRange};
+  return number<u32, &ByteReader::le24, 3>(name, display);
 }
 
 RangedValue<u32> RecordReader::u32be(std::string_view name, SourceValueDisplay display) {

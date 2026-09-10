@@ -80,6 +80,18 @@ u16 ByteReader::be16(u64 offset) const {
   return static_cast<u16>((bytes_[offset] << 8) | bytes_[offset + 1]);
 }
 
+u32 ByteReader::le24(u64 offset) const {
+  require(offset, 3);
+  return static_cast<u32>(bytes_[offset]) | (static_cast<u32>(bytes_[offset + 1]) << 8) |
+         (static_cast<u32>(bytes_[offset + 2]) << 16);
+}
+
+u32 ByteReader::be24(u64 offset) const {
+  require(offset, 3);
+  return (static_cast<u32>(bytes_[offset]) << 16) | (static_cast<u32>(bytes_[offset + 1]) << 8) |
+         static_cast<u32>(bytes_[offset + 2]);
+}
+
 u32 ByteReader::le32(u64 offset) const {
   require(offset, 4);
   return static_cast<u32>(bytes_[offset]) | (static_cast<u32>(bytes_[offset + 1]) << 8) |

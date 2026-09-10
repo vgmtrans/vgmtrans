@@ -89,8 +89,7 @@ void annotateArticulationTable(SourceMapBuilder& sourceMap, ByteReader reader, c
     if ((first == 0 && second == 0) || (first == 0xffffffff && second == 0xffffffff)) {
       continue;
     }
-    const u32 unknown = (static_cast<u32>(reader.u8At(row + 5)) << 16) | (static_cast<u32>(reader.u8At(row + 6)) << 8) |
-                        reader.u8At(row + 7);
+    const u32 unknown = reader.be24(row + 5);
     sourceMap.entry(fmt::format("Articulation {}", index), reader.range(row, rowSize))
         .kind("cps-qsound-articulation")
         .parent(table)
