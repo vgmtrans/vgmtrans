@@ -32,7 +32,7 @@ struct SynthSampleIndexKey {
   friend auto operator<=>(const SynthSampleIndexKey&, const SynthSampleIndexKey&) = default;
 };
 
-using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
+using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u32>;
 using SynthSampleReferences = std::set<SynthSampleIndexKey>;
 using SynthInstrumentSet = std::set<const Instrument*>;
 
@@ -42,10 +42,6 @@ struct SamplePoolView {
 };
 
 constexpr double kPerceivedHalfLoudnessDb = 10.0;
-
-[[nodiscard]] u16 clampU16(u32 value) {
-  return static_cast<u16>(std::min<u32>(value, std::numeric_limits<u16>::max()));
-}
 
 template <typename Predicate>
 bool markMatchingInstruments(SynthInstrumentSet& used, std::span<const Instrument* const> instruments,
@@ -150,7 +146,7 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
             value = value == std::numeric_limits<s16>::min() ? std::numeric_limits<s16>::max() : static_cast<s16>(-value);
           }
         }
-        indexes[key] = clampU16(static_cast<u32>(prepared.samples.size()));
+        indexes[key] = static_cast<u32>(prepared.samples.size());
         prepared.samples.push_back(DecodedSynthSample{
             .name = sample.name + (key.startFrame ? " [sustain]" : "") + (key.phaseInverted ? " [inverted]" : ""),
             .pitch = sample.pitch,
