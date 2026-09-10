@@ -1362,6 +1362,26 @@ void ninSnesGainModeInstrumentsUseDspEnvelope() {
          "direct GAIN should become the DSP's fixed sustain level instead of an unspecified envelope");
 }
 
+void ninSnesLargePitchScalesPreserveBassTuning() {
+  std::vector<u8> bytes(kAramSize);
+  std::ranges::copy(std::initializer_list<u8>{0, 0xff, 0xec, 0xb8, 0x24, 0}, bytes.begin() + 0x4000);
+  writeLe16(bytes, 0x5000, 0x6000);
+  writeLe16(bytes, 0x5002, 0x6000);
+  bytes[0x6000] = 1;
+  Layout layout = standardLayout();
+  layout.instrumentTableAddress = 0x4000;
+  layout.spcDirAddress = 0x5000;
+  const ScanResult scan = scanSynth(std::move(bytes), layout, "Bass tuning");
+  const auto& bank = std::get<SoundBankAsset>(scan.assets[0]);
+  expect(bank.instruments.size() == 1 && bank.instruments[0].regions.size() == 1,
+         "the bass fixture should produce one instrument region");
+  // O-chan's Select Menu plays MIDI key 36 with DSP pitch $12b4, safely below $4000.
+  const double rate = std::exp2((36.0 - bank.instruments[0].regions[0].unityKey) / 12.0);
+  // Allow 1% for the driver's integer pitch table and low-note correction.
+  expect(std::abs(rate / (0x12b4 / 4096.0) - 1.0) < 0.01,
+         "a large instrument scale must preserve the bass note's actual playback rate");
+}
+
 void ninSnesIdentityMappedSilentSlotsAreSparse() {
   std::vector<u8> bytes(kAramSize);
   constexpr u32 kInstrumentTable = 0x4000;
@@ -1648,7 +1668,7 @@ void ninSnesIntelligentSectionPreservesVoiceAndLegato() {
          "legato must survive section entry, and two-tick notes must have a nonzero key-off duration");
 }
 
-std::vector<u8> sunsoftDriverFixture(ProfileId id) {
+std::vector<u8> sunsoftDriverFixture(ProfileId id, u8 trackCount) {
   std::vector<u8> bytes(kAramSize);
   const u16 lengthTable = id == ProfileId::SunsoftBenkei ? 0x3036 : 0x303e;
   const u8 song = id == ProfileId::SunsoftBenkei ? 0x7d : 0x2a;
@@ -1686,10 +1706,14 @@ std::vector<u8> sunsoftDriverFixture(ProfileId id) {
   // For the earlier revision these bytes immediately follow its six pointers.
   // Reading them as pointers would create two spurious music tracks.
   write(0x250c, {20, 0x2f, 0x81, 0});
-  if (id == ProfileId::Sunsoft) {
-    writeSection(bytes, 0x2500, {{0, 0x2610}, {7, 0x2700}});
+  if (trackCount == 8) {
+    writeSection(bytes, 0x2500, {{0, 0x2610}, {6, 0x2700}, {7, 0x2700}});
     write(0x2610, {20, 0x2f, 0x81, 0});
   }
+  // Ignore an eight-channel SFX copy preceding the actual music loader.
+  write(0x680, {0xda, 0x16, 0x8d, 0x0f, 0xf7, 0x16, 0xd6, 0x20, 0, 0xdc, 0x10, 0xf8});
+  write(0x6a0, {0xda, 0x16, 0x8d, static_cast<u8>(trackCount * 2 - 1),
+                0xf7, 0x16, 0xd6, 0x30, 0, 0xdc, 0x10, 0xf8});
   write(0x2700, {20, 0x7f, 0x82, 0});
   write(0x4000, {0, 0xff, 0xe0, 0x40, 1, 0});
   writeLe16(bytes, 0x5000, 0x6000);
@@ -1712,8 +1736,10 @@ std::vector<u8> sunsoftDriverFixture(ProfileId id) {
 }
 
 void ninSnesSunsoftRecognizesBgmLayouts() {
-  for (const ProfileId id : {ProfileId::SunsoftEarlier, ProfileId::Sunsoft, ProfileId::SunsoftBenkei}) {
-    auto bytes = sunsoftDriverFixture(id);
+  for (const auto [id, trackCount] : {std::pair{ProfileId::SunsoftEarlier, 6},
+                                     {ProfileId::SunsoftEarlier, 8},  // Popun / Pirates
+                                     {ProfileId::Sunsoft, 8}, {ProfileId::SunsoftBenkei, 6}}) {
+    auto bytes = sunsoftDriverFixture(id, trackCount);
     const ByteReader reader(SourceId{1}, bytes);
     const auto layout = findLayout(reader);
     expect(layout && layout->profile == id && layout->songIndex == (id == ProfileId::SunsoftBenkei ? 0x7d : 0x2a) &&
@@ -1726,10 +1752,18 @@ void ninSnesSunsoftRecognizesBgmLayouts() {
            "Sunsoft should read the driver's nonstandard duration and velocity tables");
     const auto parsed = decodeSequence(reader, *layout, AssetId{1});
     const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
-    expect(performance.diagnostics.empty() && performance.tracks.size() == (id == ProfileId::Sunsoft ? 8 : 6) &&
+    expect(performance.diagnostics.empty() && performance.tracks.size() == trackCount &&
                parsed.program.behavior.initialMasterLevel.value_or(1.0) ==
                    (id == ProfileId::SunsoftBenkei ? 1.0 : ninSnesLevelGain(0xb0)),
            "Sunsoft should use its revision's BGM track count and initial volume");
+    if (trackCount == 8) {
+      for (const u8 track : {6, 7}) {
+        expect(std::ranges::any_of(performance.tracks[track].events, [](const auto& event) {
+                 const auto* note = std::get_if<NotePerformanceEvent>(&event);
+                 return note && note->header.tick == 0 && note->key == 26;
+               }), "eight-channel Sunsoft drivers must retain notes on the last two music channels");
+      }
+    }
     expect(!scanSynth(bytes, *layout, "Sunsoft").assets.empty(), "Sunsoft revisions should load their sound bank");
 
     std::copy_n(bytes.begin() + 0x4000, 6, bytes.begin() + 0x4006);
@@ -2130,6 +2164,7 @@ void runNinSnesTests() {
   ninSnesKonamiPercussionUsesDriverMapAndNeutralTuning();
   ninSnesEarlierPercussionUsesSeparateSixByteTable();
   ninSnesGainModeInstrumentsUseDspEnvelope();
+  ninSnesLargePitchScalesPreserveBassTuning();
   ninSnesIdentityMappedSilentSlotsAreSparse();
   ninSnesMetalCombatRecognizesDriverWithoutInstrumentOverwrite();
   ninSnesIntelligentPercussionUsesRevisionSpecificTables();

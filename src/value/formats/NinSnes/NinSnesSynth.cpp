@@ -255,25 +255,15 @@ struct InstrumentRegion {
 }
 
 [[nodiscard]] double standardUnityKey(const Profile& selected, u8 pitchHigh, u8 pitchLow) {
-  u16 pitchScale = selected.instruments == InstrumentLayout::Earlier5Byte
-                       ? static_cast<u16>(static_cast<s8>(pitchHigh) * 256)
-                       : static_cast<u16>((pitchHigh << 8) | pitchLow);
+  const u16 pitchScale = selected.instruments == InstrumentLayout::Earlier5Byte
+                             ? static_cast<u16>(static_cast<s8>(pitchHigh) * 256)
+                             : static_cast<u16>((pitchHigh << 8) | pitchLow);
   if (pitchScale == 0) {
     return 96.0;
   }
-  if (((static_cast<u32>(0x0217) * pitchScale) >> 8) > 0x3fff) {
-    pitchScale = static_cast<u16>((((static_cast<u32>(0x0217) * pitchScale) >> 8) & 0x3fff) * 256.0 / 0x0217);
-  }
-  double coarse = 0.0;
-  double fine = std::modf(std::log2(pitchScale * (4286.0 / 4096.0) / 256.0) * 12.0, &coarse);
-  if (fine >= 0.5) {
-    coarse += 1.0;
-    fine -= 1.0;
-  } else if (fine <= -0.5) {
-    coarse -= 1.0;
-    fine += 1.0;
-  }
-  return 96.0 - coarse - fine;
+  // The DSP masks the final note pitch to 14 bits, not the instrument's scale.
+  // Wrapping at a fixed reference note incorrectly detunes high-scale bass samples.
+  return 96.0 - std::log2(pitchScale * (4286.0 / 4096.0) / 256.0) * 12.0;
 }
 
 [[nodiscard]] double konamiUnityKey(s8 coarse, u8 fine) {

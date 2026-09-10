@@ -85,6 +85,11 @@ Pattern Patterns::ptnSunsoftEchoOn(
 // the values for restoration after a sound effect.
 Pattern Patterns::ptnSunsoftAdsr("\x7d\x9f\x5c\x08\x05\xc4\x14\xdd\xeb\x14", "xxxxxx?xx?", 10);
 
+// Copy BGM section pointers into $30 onwards. Keep the destination fixed
+// to exclude the separate SFX loader at $20 in Hebereke no Popun.
+Pattern Patterns::ptnSunsoftSectionTracks("\xda\x16\x8d\x0f\xf7\x16\xd6\x30\x00\xdc\x10\xf8",
+                                        "xxx?xxxxxxxx", 12);
+
 // Benkei Gaiden places the SFX reader ($D0) immediately before BGM ($40).
 // Both match the standard reader signature; the second one selects music.
 Pattern Patterns::ptnSunsoftBenkeiSectionPointers(

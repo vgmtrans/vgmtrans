@@ -618,6 +618,17 @@ std::optional<Layout> findLayout(ByteReader reader) {
 
   loadIntelligentTables(reader, *commands, baseLayout);
 
+  // Hashire and Popun share command lengths but load six and eight music
+  // tracks respectively. Read the section size independently of the profile.
+  if (isSunsoft(selected.id)) {
+    if (const auto offset = Patterns::ptnSunsoftSectionTracks.find(reader)) {
+      const u8 lastByte = reader.u8At(*offset + 3);
+      if (lastByte == 0x0b || lastByte == 0x0f) {
+        baseLayout.sectionTrackCount = (lastByte + 1) / 2;
+      }
+    }
+  }
+
   if (selected.base == BaseProfile::Earlier) {
     if (const auto offset = Patterns::ptnEarlierPercussionTable.find(reader)) {
       const u16 address = reader.u8At(*offset + 6) | (reader.u8At(*offset + 9) << 8);

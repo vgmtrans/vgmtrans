@@ -100,6 +100,10 @@ u16 Layout::resolveAddress(u16 rawAddress) const {
   }
 }
 
+u8 Layout::trackCount() const {
+  return sectionTrackCount.value_or(nin_snes::profile(profile).sectionTrackCount);
+}
+
 u32 instrumentHeaderSize(const Profile& selected) {
   return selected.instruments == InstrumentLayout::Earlier5Byte ? 5 : 6;
 }
