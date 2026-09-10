@@ -342,7 +342,6 @@ struct TrackState {
   u8 panLfoPeriod = 0;
   s8 panLfoStep = 0;
   bool pitchSlideRepeat = false;
-  bool pitchSlideActive = false;
   double pitchSlideStep = 0.0;
   double pitchSlideTarget = 0.0;
   u64 pitchSlideEndTick = 0;
@@ -566,8 +565,7 @@ struct Playback {
   void activatePitchSlide(PitchSlideBinding slide, PerformanceNoteId note, double start, double target, u32 length) {
     slide.preferPitchBend();
     track.pitchSlideBinding = slide;
-    track.pitchSlideActive = length != 0;
-    track.pitchSlideStep = length == 0 ? 0.0 : (target - start) / length;
+    track.pitchSlideStep = (target - start) / length;
     track.pitchSlideTarget = target;
     track.pitchSlideEndTick = vm.tick() + length;
     track.pitchSlideNote = note;
@@ -601,7 +599,6 @@ struct Playback {
       return;
     }
     track.pitchSlideRepeat = false;
-    track.pitchSlideActive = false;
     track.queuedPitchSlideLength = 0;
     track.queuedPitchSlideSemitones = 0;
     track.pitchSlideBinding.interrupt(out);
@@ -618,7 +615,7 @@ struct Playback {
   }
 
   void tick() {
-    if (track.pitchSlideActive && vm.tick() >= track.pitchSlideEndTick) {
+    if (track.pitchSlideBinding.valid() && vm.tick() >= track.pitchSlideEndTick) {
       if (track.pitchSlideRepeat) {
         constexpr u32 kRepeatedPitchSlideTicks = 256;
         const double start = track.pitchSlideTarget;
@@ -626,7 +623,6 @@ struct Playback {
         auto slide = out.pitchSlide(track.pitchSlideNote, start, target, kRepeatedPitchSlideTicks);
         activatePitchSlide(slide, track.pitchSlideNote, start, target, kRepeatedPitchSlideTicks);
       } else {
-        track.pitchSlideActive = false;
         track.pitchSlideBinding.clear();
       }
     }

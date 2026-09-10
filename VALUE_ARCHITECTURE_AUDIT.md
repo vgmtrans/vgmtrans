@@ -1101,6 +1101,21 @@ The existing sample-builder fixture now checks eight-bit metadata without a
 separate bit-depth assignment. The complete 310-step rebuild is warning-free
 and all 20 CTest targets pass.
 
+### Remove redundant pitch-slide activity flags
+
+AKAO SNES now uses its remaining step count to determine whether a slide is
+active. Suzuki SNES uses its retained automation binding, which is cleared on
+completion or interruption. Remove both separately maintained activity flags,
+their synchronization branches, and guards already established by the callers:
+AKAO starts with a valid pitch base and positive step count, while Suzuki's
+three activation paths all supply a valid note and nonzero duration. This
+removes 16 production lines without merging source arithmetic and output
+bindings, which still serve distinct roles.
+
+The full build is warning-free and all 20 CTest targets pass, including AKAO's
+sampled driver curve and Suzuki's automatic portamento, slides across ties,
+repeated slide continuation, and interruption fixtures.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
