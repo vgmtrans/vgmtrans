@@ -137,7 +137,7 @@ public:
 
     [[nodiscard]] EncodedSemanticField<::u8> rawU8(std::string_view name,
                                                    SourceValueDisplay display = SourceValueDisplay::Default) {
-      return field(cursor_.record_.u8(name, display), name, display);
+      return {cursor_.record_.u8(name, display), name, display};
     }
 
     ::s8 s8(std::string_view name, SourceValueDisplay display = SourceValueDisplay::SignedDecimal,
@@ -151,7 +151,7 @@ public:
 
     [[nodiscard]] EncodedSemanticField<::s8> rawS8(std::string_view name,
                                                    SourceValueDisplay display = SourceValueDisplay::SignedDecimal) {
-      return field(cursor_.record_.s8(name, display), name, display);
+      return {cursor_.record_.s8(name, display), name, display};
     }
 
     u16 u16be(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
@@ -161,7 +161,7 @@ public:
 
     [[nodiscard]] EncodedSemanticField<u16> rawU16be(std::string_view name,
                                                      SourceValueDisplay display = SourceValueDisplay::Default) {
-      return field(cursor_.record_.u16be(name, display), name, display);
+      return {cursor_.record_.u16be(name, display), name, display};
     }
 
     u16 u16le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
@@ -171,7 +171,7 @@ public:
 
     [[nodiscard]] EncodedSemanticField<u16> rawU16le(std::string_view name,
                                                      SourceValueDisplay display = SourceValueDisplay::Default) {
-      return field(cursor_.record_.u16le(name, display), name, display);
+      return {cursor_.record_.u16le(name, display), name, display};
     }
 
     s16 s16le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::SignedDecimal,
@@ -191,7 +191,7 @@ public:
 
     [[nodiscard]] EncodedSemanticField<u32> rawU32be(std::string_view name,
                                                      SourceValueDisplay display = SourceValueDisplay::Default) {
-      return field(cursor_.record_.u32be(name, display), name, display);
+      return {cursor_.record_.u32be(name, display), name, display};
     }
 
     u32 u32le(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
@@ -201,7 +201,7 @@ public:
 
     [[nodiscard]] EncodedSemanticField<u32> rawU32le(std::string_view name,
                                                      SourceValueDisplay display = SourceValueDisplay::Default) {
-      return field(cursor_.record_.u32le(name, display), name, display);
+      return {cursor_.record_.u32le(name, display), name, display};
     }
 
     u32 varLen(std::string_view name, SourceValueDisplay display = SourceValueDisplay::Default,
@@ -604,18 +604,6 @@ public:
         throw std::logic_error("Compiled sequence command declared more than one default transition");
       }
       defaultTransition_ = transition;
-    }
-
-    template <class T>
-    [[nodiscard]] static EncodedSemanticField<T> field(const RangedValue<T>& source, std::string_view name,
-                                                       SourceValueDisplay display) {
-      return EncodedSemanticField<T>{
-          .value = source.value,
-          .range = source.range,
-          .name = name,
-          .display = display,
-          .valid = source.valid,
-      };
     }
 
     [[nodiscard]] DecodedBytecodeCommand finish() {
