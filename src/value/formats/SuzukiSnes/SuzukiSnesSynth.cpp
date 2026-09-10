@@ -124,7 +124,6 @@ void addMelodicInstruments(InstrumentSetBuilder& instruments, const std::vector<
     entry
         .region(*sample,
                 Region{
-                    .range = patch.programSource,
                     .unityKey = unityKey(patch.tuning),
                     .envelope = snesDspEnvelope(patch.adsr1, patch.adsr2, 0),
                     .attenuationDb = attenuation(patch.volume),
@@ -163,7 +162,6 @@ void addDrumKit(InstrumentSetBuilder& instruments, const SequenceRecipes& recipe
         .region(*sample,
                 Region{
                     .keyRange = KeyRange{.low = outputKey, .high = outputKey},
-                    .range = drum.source,
                     .unityKey = root,
                     .envelope = snesDspEnvelope(patch->adsr1, patch->adsr2, 0),
                     .pan = drum.pan / 256.0,

@@ -297,7 +297,6 @@ void addQSoundRegion(InstrumentSetBuilder& instruments, InstrumentSetBuilder::En
       .region(*sample,
               Region{
                   .keyRange = keys,
-                  .range = range,
                   .unityKey = sampleInfos[sampleIndex].unityKey - fineSemitones,
                   .envelope = qsoundEnvelope(version, attack, decay, sustainLevel, sustain, release),
                   .pan = pan,
@@ -412,7 +411,7 @@ Cps1SynthDrafts addCps1Synth(ScanResultBuilder& builder, CpsLayout& layout) {
       instrument.source(name, range, "cps1-oki-instrument").derived("sample", sampleIndex);
       if (sample) {
         instrument
-            .region(*sample, Region{.range = range, .unityKey = 60.0, .envelope = Envelope{.releaseSeconds = 10.0}})
+            .region(*sample, Region{.unityKey = 60.0, .envelope = Envelope{.releaseSeconds = 10.0}})
             .source("Region", range, "cps1-oki-region");
       }
     }
@@ -432,7 +431,7 @@ Cps1SynthDrafts addCps1Synth(ScanResultBuilder& builder, CpsLayout& layout) {
                                .range = range,
                            });
       instrument.source(name, range, "cps1-oki-instrument").derived("sample", program - 1);
-      instrument.region(*sample, Region{.range = range, .unityKey = 60.0, .envelope = Envelope{.releaseSeconds = 10.0}})
+      instrument.region(*sample, Region{.unityKey = 60.0, .envelope = Envelope{.releaseSeconds = 10.0}})
           .source("Region", range, "cps1-oki-region");
     }
   }

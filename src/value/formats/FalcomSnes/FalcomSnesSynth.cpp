@@ -100,7 +100,6 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     instrument
         .region(*sample,
                 Region{
-                    .range = patch.source,
                     .unityKey = unityKey(patch.pitchScale),
                     .envelope = snesDspEnvelope(static_cast<u8>(patch.adsr1 | 0x80), patch.adsr2, 0),
                 })

@@ -114,7 +114,6 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     entry
         .region(*sample,
                 Region{
-                    .range = patch.source,
                     .unityKey = 81.0 - driverTuningCents(patch.tuning) / 100.0,
                     .envelope = driverEnvelope(patch.adsr1, patch.adsr2, patch.gain),
                 })

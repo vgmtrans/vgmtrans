@@ -89,7 +89,6 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
     entry
         .region(*sample,
                 Region{
-                    .range = patch.source,
                     // The audited pitch table reaches the DSP's $1000 unity
                     // ratio at sequence octave 3, A (exported key 45).
                     .unityKey = 45.0,

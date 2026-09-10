@@ -197,7 +197,6 @@ ScanSoundBankDraft addKonamiArcadeSynth(ScanResultBuilder& builder, const Konami
     instrument
         .region(*sample,
                 Region{
-                    .range = range,
                     .unityKey = 66.0,
                     .envelope = Envelope{.releaseSeconds = 0.0},
                 })
