@@ -1032,6 +1032,19 @@ UBSan. The comparison covers every ADSR register combination, every GAIN mode
 and rate, and GAIN independence while ADSR is enabled. The full build and all
 20 CTest targets pass.
 
+### Let format code use shared envelope helpers directly
+
+Remove the forwarding driverEnvelope functions and declarations from Compile,
+GraphRes, and Hudson SNES. Their call sites now use snesDspEnvelope directly,
+with formerly implicit zero GAIN values visible where needed. Keep wrappers
+that perform actual driver-specific normalization. CPS also relies on the
+shared fade conversion's existing infinity handling instead of branching
+around it, and its local stage helper no longer accepts an unused policy flag.
+This removes 21 production lines and three format-facing helper names. Update
+the Hudson fixture to compare native release with its distinct GAIN release
+instead of testing a deleted forwarding function. The full build and all
+20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

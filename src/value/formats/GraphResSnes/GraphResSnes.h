@@ -70,7 +70,6 @@ struct SequenceParse {
 [[nodiscard]] SequenceParse decodeSequence(core::RetainedSource source, const Layout& layout,
                                            core::AssetId sequenceId, core::SourceMapBuilder* sourceMap = nullptr,
                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
-[[nodiscard]] core::Envelope driverEnvelope(u8 adsr1, u8 adsr2);
 [[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
                                                                const std::set<u8>& programs,
                                                                std::string_view displayName);

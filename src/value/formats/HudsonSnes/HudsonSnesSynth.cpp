@@ -21,12 +21,6 @@ namespace vgmtrans::formats::hudson_snes {
 
 using namespace core;
 
-Envelope driverEnvelope(u8 adsr1, u8 adsr2, u8 gain) {
-  // Ordinary expiration uses native KOF. The shared conversion compensates
-  // its short linear-amplitude fade for dB-linear SoundFont/DLS envelopes.
-  return snesDspEnvelope(adsr1, adsr2, gain);
-}
-
 double driverPseudoReleaseSeconds(u8 gain) {
   const u8 mode = gain >> 5;
   if (mode == 4) {
@@ -103,7 +97,7 @@ void addMelodic(InstrumentSetBuilder& instruments, const std::vector<Patch>& pat
         .region(*sample,
                 Region{
                     .unityKey = patch.unityKey,
-                    .envelope = driverEnvelope(patch.row.adsr1, patch.row.adsr2, patch.row.gain),
+                    .envelope = snesDspEnvelope(patch.row.adsr1, patch.row.adsr2, patch.row.gain),
                 })
         .source("Region", patch.row.source, "hudson-snes-region")
         .description(fmt::format("SRCN {}", patch.row.srcn));
@@ -136,7 +130,7 @@ void addDrums(InstrumentSetBuilder& instruments, const SequenceRecipes& recipes,
                 Region{
                     .keyRange = KeyRange{.low = key, .high = key},
                     .unityKey = patch->unityKey + key - drum.sourceKey,
-                    .envelope = driverEnvelope(patch->row.adsr1, patch->row.adsr2, patch->row.gain),
+                    .envelope = snesDspEnvelope(patch->row.adsr1, patch->row.adsr2, patch->row.gain),
                 })
         .source(fmt::format("Drum {}", drum.note), drum.source, "hudson-snes-drum-region")
         .description(

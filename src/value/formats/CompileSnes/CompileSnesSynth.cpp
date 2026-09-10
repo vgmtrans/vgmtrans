@@ -15,10 +15,6 @@ namespace vgmtrans::formats::compile_snes {
 
 using namespace core;
 
-Envelope driverEnvelope(u8 adsr1, u8 adsr2, u8 gain) {
-  return snesDspEnvelope(adsr1, adsr2, gain);
-}
-
 namespace {
 
 [[nodiscard]] std::vector<InstrumentInfo> collectInstruments(ByteReader reader, const Layout& layout,
@@ -74,7 +70,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
                     .unityKey = unityKey,
                     // Compile owns ADSR in track state; this is merely a safe
                     // fallback for consumers that ignore dynamic overrides.
-                    .envelope = driverEnvelope(0x8f, 0xe0),
+                    .envelope = snesDspEnvelope(0x8f, 0xe0, 0),
                 })
         .source("Region", info.source, "compile-snes-region")
         .description(fmt::format("SRCN {}, unity key {:.3f}", info.program, unityKey));

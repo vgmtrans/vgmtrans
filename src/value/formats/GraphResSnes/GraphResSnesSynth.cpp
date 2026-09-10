@@ -18,12 +18,6 @@ namespace vgmtrans::formats::graph_res_snes {
 
 using namespace core;
 
-// For regular instruments, the two ADSR bytes describe how the volume rises
-// and falls. The chip's other volume mode is unused, so pass zero for it.
-Envelope driverEnvelope(u8 adsr1, u8 adsr2) {
-  return snesDspEnvelope(adsr1, adsr2, 0);
-}
-
 namespace {
 
 // A program number directly selects an entry in the sample list. Keep only
@@ -76,7 +70,9 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
         .region(*sample,
                 Region{
                     .unityKey = kUnityKey,
-                    .envelope = driverEnvelope(kDefaultAdsr1, kDefaultAdsr2),
+                    // Regular instruments use ADSR; the chip's GAIN
+                    // mode is unused here.
+                    .envelope = snesDspEnvelope(kDefaultAdsr1, kDefaultAdsr2, 0),
                 })
         .source("Region", source, "graph-res-snes-region")
         .parent(root)
