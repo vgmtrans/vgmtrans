@@ -107,6 +107,7 @@ struct TrackState {
   u8 gate = 0;
   u8 velocity = 0;
   u8 logicalProgram = 0;
+  u32 activeProgram = 0;
   u8 percussionNote = 0;
   InstrumentBytes instrument{};
   s8 transpose = 0;
@@ -254,7 +255,8 @@ struct Playback {
     logical &= 0x7f;
     track.logicalProgram = logical;
     track.instrument = program.instruments[logical];
-    out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = program.programs[logical]});
+    track.activeProgram = program.programs[logical];
+    out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = track.activeProgram});
     out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
 
@@ -272,8 +274,8 @@ struct Playback {
   // the shared row and take effect only when a channel next loads that program.
   void inlineInstrument(InstrumentBytes bytes, SourceRange source, bool noise = false) {
     track.instrument = bytes;
-    out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain),
-                                     .key = program.instrumentVersion(track.logicalProgram, bytes, source, noise)});
+    track.activeProgram = program.instrumentVersion(track.logicalProgram, bytes, source, noise);
+    out.instrument(InstrumentIdentity{.domain = std::string(kInstrumentDomain), .key = track.activeProgram});
   }
 
   void writeInstrument(u8 logical, InstrumentBytes bytes, SourceRange source) {
@@ -403,6 +405,7 @@ struct Playback {
     const u16 globalSum = (opcode & 0x7f) + static_cast<u8>(program.transpose);
     const u8 raw = static_cast<u8>((drum ? 0x24 : globalSum + (globalSum > 0xff)) + static_cast<u8>(track.transpose));
     const double key = 24.0 + raw;
+    program.recipes.usedNotes.emplace(track.activeProgram, static_cast<u8>(std::min(24u + raw, 127u)));
     if (track.releaseApplied) {
       out.replaceEnvelope(snesDspEnvelope(track.instrument[1], track.instrument[2], track.instrument[3]),
                           VoiceEnvelopeScope::FutureAttacks);

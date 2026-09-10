@@ -1110,6 +1110,10 @@ struct Playback {
     switchToMelodicProgram();
     const double key =
         kMelodicKeyCorrection + noteIndex + track.transpose + static_cast<double>(track.konamiLoopPitchDelta) / 256.0;
+    if (program.collecting) {
+      program.recipes.usedNotes.emplace(
+          track.melodicProgram, static_cast<u8>(std::clamp(std::lround(key + program.globalTranspose), 0l, 127l)));
+    }
     beginNotePitch(noteIndex);
     emitVoiceNote(key, soundingDuration() + (track.legato ? 1u : 0u));
     return Effects::wait(track.noteLength);
