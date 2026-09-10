@@ -1018,6 +1018,20 @@ release rate/mode, plus mixed register values. Both versions and the shared
 synth math are compiled with AddressSanitizer and UBSan for the comparison.
 The full build and all 20 CTest targets pass.
 
+### Construct SNES envelopes directly in the shared model
+
+Remove SnesEnvelopeSeconds, its private conversion entry point, and the second
+pass that normalized and copied every field. Construct Envelope directly and
+represent unbounded stages as infinity where they are known, eliminating the
+temporary negative-duration sentinels. Compute native key-off release once
+from the retained release level. This removes 62 production lines, one
+intermediate representation, and two private helpers.
+
+All 131,072 before/after envelopes match bit-for-bit under AddressSanitizer and
+UBSan. The comparison covers every ADSR register combination, every GAIN mode
+and rate, and GAIN independence while ADSR is enabled. The full build and all
+20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
