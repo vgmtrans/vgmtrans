@@ -792,12 +792,19 @@ API and optional-hook behavior are unchanged. This removes 23 production
 lines. The full build and all 20 CTest targets pass without warnings, including
 compiled prepasses and the formats that use section and finalization hooks.
 
+### Remove unused pitch-transition voice identity
+
+Remove NoteSpan's pitchBendVoice field, its initialization/propagation, and the
+obsolete comment describing its former purpose. No code read this identity;
+MIDI voice linking and range planning already use the continuation and bend
+state. This removes five production lines. The full build and all 20 CTest
+targets pass, including linked and mixed-mode pitch-transition regressions.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
   and remaining format-local helpers for redundant state and work.
-- Pitch-transition lowering retains an unread pitchBendVoice field. Investigate
-  how fixed physical note-duration limits interact with note extensions and
+- Investigate how fixed physical note-duration limits interact with note extensions and
   portamento splitting; generated segments currently omit that limit. A direct
   probe confirms that a note capped at tick 14 after a tempo change ends at tick
   40 in native-portamento mode, and a delayed slide can recreate it at tick 20.
