@@ -89,7 +89,6 @@ void addSonyPs1Bank(ScanResultBuilder& result, const SonyPs1BankLayout& layout, 
                                             .encodedData = stream.encodedData,
                                             .sampleRate = kPs1SpuSampleRate,
                                             .channels = 1,
-                                            .bitsPerSample = 16,
                                             .loop = stream.loop,
                                         });
         entry.source(fmt::format("VAG {}", index + 1), stream.encodedData, "sony-ps1-vag").parent(root);
@@ -229,7 +228,6 @@ bool addSonyPs1RawSampleBody(ScanResultBuilder& result) {
                                         .encodedData = stream.encodedData,
                                         .sampleRate = kPs1SpuSampleRate,
                                         .channels = 1,
-                                        .bitsPerSample = 16,
                                         .loop = stream.loop,
                                     });
     entry.source(fmt::format("VAG {}", index + 1), stream.encodedData, "sony-ps1-vag").parent(root);

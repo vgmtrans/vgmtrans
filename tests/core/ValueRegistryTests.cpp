@@ -174,7 +174,6 @@ void scanResultBuilderCoversCommonScannerPlumbing() {
                      .encodedData = input.reader.range(1, 2),
                      .sampleRate = 32000,
                      .channels = 1,
-                     .bitsPerSample = 8,
                  });
   const auto misc =
       out.misc("Builder Misc", input.reader.range(0, 1)).data(BuilderPrivateData{.value = 44}).payload({0xaa});

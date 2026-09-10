@@ -130,7 +130,6 @@ std::vector<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layou
                  .codec = info.adpcm ? AudioCodec::KonamiK053260Adpcm : AudioCodec::PcmS8,
                  .encodedData = reader.range(layout.sound.offset + info.start, info.length),
                  .sampleRate = static_cast<u32>(std::lround(kSampleRate)),
-                 .bitsPerSample = static_cast<u16>(info.adpcm ? 16 : 8),
                  .reverse = info.reverse,
                  .loop = Loop{.enabled = info.loops, .start = loopStart, .length = frames - loopStart},
              })

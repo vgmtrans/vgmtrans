@@ -274,7 +274,6 @@ struct ParsedSamplePool {
                 .encodedData = sampleInfo->encodedData,
                 .sampleRate = kPs1SpuSampleRate,
                 .channels = 1,
-                .bitsPerSample = 16,
                 .loop = sampleInfo->loop,
             },
     });

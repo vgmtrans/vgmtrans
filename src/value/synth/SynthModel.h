@@ -151,7 +151,6 @@ struct Sample {
   SourceRange encodedData;
   u32 sampleRate = 0;
   u8 channels = 1;
-  u16 bitsPerSample = 16;
   // PCM byte order is source data, not a property of the host. Compressed
   // codecs ignore this flag.
   bool bigEndian = false;

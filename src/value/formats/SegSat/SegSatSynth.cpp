@@ -437,7 +437,6 @@ std::optional<ScanSoundBankDraft> addSegSatBank(ScanResultBuilder& builder, cons
                  .codec = parsedRegion->sample.pcm16 ? AudioCodec::PcmS16 : AudioCodec::PcmS8,
                  .encodedData = reader.range(offset, parsedRegion->sample.bytes),
                  .sampleRate = 44100,
-                 .bitsPerSample = static_cast<u16>(parsedRegion->sample.pcm16 ? 16 : 8),
                  .bigEndian = parsedRegion->sample.pcm16,
                  .reverse = parsedRegion->sample.reverse,
                  .loop =

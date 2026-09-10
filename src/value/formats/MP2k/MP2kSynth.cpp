@@ -234,7 +234,6 @@ struct SynthContext {
                      .codec = AudioCodec::GbaDirectSound,
                      .encodedData = builder.reader().range(*offset, encodedBytes + 16),
                      .sampleRate = kGbaCpuFrequency >> context.dacBits,
-                     .bitsPerSample = 8,
                      .reverse = tone.reverse(),
                      .loop = Loop{.enabled = loops, .start = loopStart, .length = *decodedSamples - loopStart},
                      // High word: software-mixer rate; low word: Q23 source-phase increment.

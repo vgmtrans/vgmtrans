@@ -156,7 +156,6 @@ SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reade
                        .encodedData = info.stream.encodedData,
                        .sampleRate = 32000,
                        .channels = 1,
-                       .bitsPerSample = 16,
                        .loop =
                            Loop{
                                .enabled = loopEnabled,
