@@ -311,9 +311,8 @@ public:
     // command, so callers may freely mix chained and standalone calls.
     Event& ignore() {
       execution_ = {};
-      flow_ = {};
+      defaultTransition_.reset();
       discoveryTargets_.clear();
-      hasDefaultTransition_ = false;
       presentation_.playback = initialPlayback_;
       return *this;
     }
@@ -601,11 +600,10 @@ public:
     }
 
     void setDefaultTransition(CommandTransition transition) {
-      if (hasDefaultTransition_) {
+      if (defaultTransition_) {
         throw std::logic_error("Compiled sequence command declared more than one default transition");
       }
-      flow_.defaultTransition = transition;
-      hasDefaultTransition_ = true;
+      defaultTransition_ = transition;
     }
 
     template <class T>
@@ -625,17 +623,16 @@ public:
         throw std::logic_error("Compiler cursor event was finalized more than once");
       }
       finished_ = true;
-      return cursor_.finish(std::move(presentation_), std::move(execution_), std::move(flow_),
-                            std::move(discoveryTargets_));
+      return cursor_.finish(std::move(presentation_), std::move(execution_),
+                            defaultTransition_.value_or(CommandTransition{}), std::move(discoveryTargets_));
     }
 
     CompilerCursor& cursor_;
     DecodedCommandPresentation presentation_;
     CommandPlaybackStatus initialPlayback_;
     CommandExecution execution_;
-    CommandFlow flow_;
+    std::optional<CommandTransition> defaultTransition_;
     std::vector<Address> discoveryTargets_;
-    bool hasDefaultTransition_ = false;
     bool finished_ = false;
   };
 
@@ -694,7 +691,7 @@ public:
   }
 
   [[nodiscard]] DecodedBytecodeCommand truncated() {
-    return finish(truncatedPresentation(), {}, CommandFlow::end(Address{record_.position()}), {});
+    return finish(truncatedPresentation(), {}, CommandTransition::end(), {});
   }
 
 private:
@@ -741,20 +738,18 @@ private:
   }
 
   [[nodiscard]] DecodedBytecodeCommand finish(DecodedCommandPresentation presentation, CommandExecution execution,
-                                              CommandFlow flow, std::vector<Address> discoveryTargets) {
-    const bool truncated = !record_.ok();
-    flow.continuation = Address{record_.position()};
-    if (truncated) {
+                                              CommandTransition transition, std::vector<Address> discoveryTargets) {
+    if (!record_.ok()) {
       presentation = truncatedPresentation();
       execution = {};
-      flow = CommandFlow::end(Address{record_.position()});
+      transition = CommandTransition::end();
       discoveryTargets.clear();
     }
 
     return DecodedBytecodeCommand{
         .range = record_.range(),
         .opcode = opcode_,
-        .flow = std::move(flow),
+        .flow = {.continuation = Address{record_.position()}, .defaultTransition = transition},
         .discoveryTargets = std::move(discoveryTargets),
         .operands = std::move(operands_),
         .execution = std::move(execution),

@@ -106,7 +106,7 @@ DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
       return cursor.sourceOnly("Promoted Action").set<&CompilerProbeState::enabled>(true);
     case 0x29: {
       auto event = cursor.sourceOnly("Ignored Action");
-      event.set<&CompilerProbeState::enabled>(false);
+      event.set<&CompilerProbeState::enabled>(false).jump(Address{0});
       return event.ignore();
     }
     case 0x2a: {
