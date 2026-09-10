@@ -63,18 +63,7 @@ double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elaps
 PerformanceTempoMap::PerformanceTempoMap(const PerformanceSequence& performance)
     : timebase_(performance.timebase),
       initialTempoMicrosecondsPerQuarter_(performance.initialTempoMicrosecondsPerQuarter) {
-  std::vector<const TempoPerformanceEvent*> tempos;
-  for (const auto& track : performance.tracks) {
-    for (const auto& event : track.events) {
-      if (const auto* tempo = std::get_if<TempoPerformanceEvent>(&event)) {
-        tempos.push_back(tempo);
-      }
-    }
-  }
-  std::ranges::stable_sort(tempos, [](const auto* lhs, const auto* rhs) {
-    return std::tie(lhs->header.tick, lhs->header.sequence) < std::tie(rhs->header.tick, rhs->header.sequence);
-  });
-  for (const auto* tempo : tempos) {
+  for (const auto* tempo : orderedPerformanceEvents<TempoPerformanceEvent>(performance)) {
     if (points_.empty() || points_.back().microsecondsPerQuarter != tempo->microsecondsPerQuarter) {
       points_.push_back(Point{.tick = tempo->header.tick, .microsecondsPerQuarter = tempo->microsecondsPerQuarter});
     }

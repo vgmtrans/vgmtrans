@@ -11,8 +11,10 @@
 #include "value/model/ModulationModel.h"
 #include "value/sequence/SequenceProgram.h"
 
+#include <algorithm>
 #include <optional>
 #include <string>
+#include <tuple>
 #include <variant>
 #include <vector>
 
@@ -617,6 +619,23 @@ struct PerformanceSequence {
   std::vector<SourcePlaybackSpan> sourceSpans;
   std::vector<Diagnostic> diagnostics;
 };
+
+// Borrow events of one type in song-wide tick/execution order. The sequence
+// owns the returned events and must remain unchanged while they are used.
+template <class Event>
+[[nodiscard]] std::vector<const Event*> orderedPerformanceEvents(const PerformanceSequence& performance) {
+  std::vector<const Event*> events;
+  for (const auto& track : performance.tracks) {
+    for (const auto& event : track.events) {
+      if (const auto* typed = std::get_if<Event>(&event)) {
+        events.push_back(typed);
+      }
+    }
+  }
+  std::ranges::stable_sort(events, {},
+                           [](const Event* event) { return std::tie(event->header.tick, event->header.sequence); });
+  return events;
+}
 
 // One song-wide tempo view shared by physical-time lowering and MIDI rendering.
 // Points follow source execution order and omit repeated tempo values.

@@ -335,6 +335,52 @@ void performanceMidiRendererWritesTimeSignaturesToFirstTrack() {
          "performance renderer should not duplicate time signatures on their source track");
 }
 
+void performanceMidiRendererUsesGlobalExecutionOrderForTransposeAndMeter() {
+  for (const u64 otherSequence : {1u, 10u}) {
+    const PerformanceSequence performance{
+        .tracks =
+            {
+                PerformanceTrack{
+                    .id = TrackId{0},
+                    .endTick = 13,
+                    .events =
+                        {
+                            GlobalTransposePerformanceEvent{.header = {.tick = 12, .sequence = 10}, .semitones = 5},
+                            TimeSignaturePerformanceEvent{
+                                .header = {.tick = 12, .sequence = 10}, .numerator = 3, .denominator = 4},
+                            NotePerformanceEvent{.header = {.tick = 12, .sequence = 11}, .key = 60, .durationTicks = 1},
+                        }},
+                PerformanceTrack{.id = TrackId{1},
+                                 .endTick = 12,
+                                 .events =
+                                     {
+                                         GlobalTransposePerformanceEvent{
+                                             .header = {.track = TrackId{1}, .tick = 12, .sequence = otherSequence},
+                                             .semitones = -3},
+                                         TimeSignaturePerformanceEvent{
+                                             .header = {.track = TrackId{1}, .tick = 12, .sequence = otherSequence},
+                                             .numerator = 4,
+                                             .denominator = 4},
+                                     }},
+            },
+    };
+    const auto midi = renderMidiSequence(performance);
+    const auto notes = midiNotes(midi.tracks[0].events);
+    expect(notes.size() == 1 && notes[0].key == (otherSequence == 1 ? 65 : 57),
+           "global transposition must follow execution order, preserving track order only for equal sequence values");
+    std::vector<u8> meters;
+    for (const auto& event : midi.tracks[0].events) {
+      if (const auto* signature = midiMeta(event, 0x58)) {
+        meters.push_back(signature->data[0]);
+      }
+    }
+    expect(
+        meters == (otherSequence == 1 ? std::vector<u8>{4, 3} : std::vector<u8>{3, 4}) &&
+            std::ranges::none_of(midi.tracks[1].events, [](const MidiEvent& event) { return midiMeta(event, 0x58); }),
+        "the conductor's time signatures must use the same stable global execution order");
+  }
+}
+
 void performanceMidiRendererWritesPanGainResetWhenRequested() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
@@ -3380,6 +3426,7 @@ void runValueMidiTests() {
   performanceMidiRendererTrustsSourceNoteExtensions();
   performanceMidiRendererSelectsTuningRepresentation();
   performanceMidiRendererWritesTimeSignaturesToFirstTrack();
+  performanceMidiRendererUsesGlobalExecutionOrderForTransposeAndMeter();
   performanceMidiRendererWritesPanGainResetWhenRequested();
   performanceMidiRendererKeepsPanGainOutOfExpression();
   performanceMidiRendererLowersDeclaredPanLaws();
