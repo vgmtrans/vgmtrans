@@ -1056,7 +1056,6 @@ struct TrackState {
   s16 currentPitchBendValue = 0;
   u16 pendingPitchSlideSteps = 0;
   s8 pendingPitchSlideSemitones = 0;
-  bool pitchSlideActive = false;
   u16 pitchSlideStepsRemaining = 0;
   s32 pitchSlideStep = 0;
   s32 pitchSlideFinalPitch = kNominalDspPitch * kPitchFractionScale;
@@ -1155,7 +1154,6 @@ struct Playback {
 
   void resetPitchBendForNewNote() {
     track.pitchBaseValid = false;
-    track.pitchSlideActive = false;
     track.pitchSlideStepsRemaining = 0;
     track.pitchSlideNote = {};
     if (track.pitchBendAtRest()) {
@@ -1209,20 +1207,13 @@ struct Playback {
 
   void samplePitchSlide() { track.pitchSlideAutomation.sample(out, pitchSlideKey(track.currentPitch)); }
 
-  [[nodiscard]] bool advancePitchSlide() {
-    if (!track.pitchSlideActive || !track.pitchBaseValid) {
-      return false;
-    }
-    if (track.pitchSlideStepsRemaining == 0) {
-      track.pitchSlideActive = false;
+  bool advancePitchSlide() {
+    if (track.pitchSlideStepsRemaining == 0 || !track.pitchBaseValid) {
       return false;
     }
     --track.pitchSlideStepsRemaining;
     track.currentPitch =
         track.pitchSlideStepsRemaining == 0 ? track.pitchSlideFinalPitch : track.currentPitch + track.pitchSlideStep;
-    if (track.pitchSlideStepsRemaining == 0) {
-      track.pitchSlideActive = false;
-    }
     return true;
   }
 
@@ -1242,10 +1233,7 @@ struct Playback {
     track.pitchSlideStep = akaoSnesPitchSlideStep(context.version, track.currentPitch, targetPitch, steps);
     track.pitchSlideFinalPitch = track.currentPitch + (track.pitchSlideStep * static_cast<s32>(steps));
     track.pitchSlideStepsRemaining = steps;
-    track.pitchSlideActive = true;
-    if (!advancePitchSlide()) {
-      return;
-    }
+    advancePitchSlide();
     // The first driver step is already audible at the note tick, leaving
     // steps - 1 timeline ticks between that pitch and the destination.
     if (steps == 1) {
