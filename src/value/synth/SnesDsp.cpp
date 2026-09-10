@@ -29,27 +29,12 @@ struct GainEnvelope {
   double physicalSeconds = 0.0;
 };
 
-struct SnesEnvelopeSeconds {
-  double attack = 0.0;
-  double decay = 0.0;
-  double sustainLevel = 0.0;
-  double sustain = 0.0;
-  double release = 0.0;
-};
-
 [[nodiscard]] double ampToDb(double amp) {
   constexpr double maxAttenuationDb = 100.0;
   if (amp == 0.0) {
     return maxAttenuationDb;
   }
   return std::min(-20.0 * std::log10(amp), maxAttenuationDb);
-}
-
-[[nodiscard]] double envelopeSeconds(double seconds) {
-  if (seconds < 0.0 || !std::isfinite(seconds)) {
-    return std::numeric_limits<double>::infinity();
-  }
-  return std::max(0.0, seconds);
 }
 
 [[nodiscard]] double adsrAttackSeconds(u8 rate) {
@@ -149,93 +134,46 @@ struct SnesEnvelopeSeconds {
   };
 }
 
-[[nodiscard]] SnesEnvelopeSeconds convertSnesAdsr(u8 adsr1, u8 adsr2, u8 gain, u16 envelopeFrom) {
-  const bool adsrEnabled = (adsr1 & 0x80) != 0;
-
-  if (adsrEnabled) {
-    const u8 attackRate = adsr1 & 0x0f;
-    const u8 decayRate = (adsr1 & 0x70) >> 4;
-    const u8 sustainLevel = (adsr2 & 0xe0) >> 5;
-    const u8 sustainRate = adsr2 & 0x1f;
-
-    const double attackSeconds = adsrAttackSeconds(attackRate);
-
-    s16 envelope = 0x7ff;
-    s16 envelopeSustainStart = envelope;
-    double decaySeconds = 0.0;
-    if (sustainLevel != 7) {
-      const u8 decayGainRate = 0x10 | (decayRate << 1);
-      const auto decay =
-          emulateGainEnvelope(0xa0 | decayGainRate, envelope, static_cast<s16>((sustainLevel << 8) | 0xff));
-      envelopeSustainStart = decay.envelope;
-      envelope = decay.envelope;
-      decaySeconds = decay.seconds;
-    }
-
-    double sustainSeconds = -1.0;
-    if (sustainRate != 0) {
-      sustainSeconds = emulateGainEnvelope(0xa0 | sustainRate, envelope, 0).seconds;
-    }
-
-    const u32 releaseSamples = (envelopeSustainStart + 7) / 8;
-    return SnesEnvelopeSeconds{
-        .attack = attackSeconds,
-        .decay = decaySeconds,
-        .sustainLevel = (sustainLevel + 1) / 8.0,
-        .sustain = sustainSeconds,
-        .release = linearAmplitudeFadeToDbEnvelopeSeconds(releaseSamples / kSampleRate),
-    };
-  }
-
-  const u8 mode = gain >> 5;
-  if (mode < 4) {
-    const u32 releaseSamples = (envelopeFrom + 7) / 8;
-    return SnesEnvelopeSeconds{
-        .attack = 0.0,
-        .decay = -1.0,
-        .sustainLevel = (gain & 0x7f) / 128.0,
-        .sustain = -1.0,
-        .release = linearAmplitudeFadeToDbEnvelopeSeconds(releaseSamples / kSampleRate),
-    };
-  }
-
-  const s16 envelopeTo = mode >= 6 ? 0x7ff : 0;
-  const auto gainEnvelope = emulateGainEnvelope(gain, static_cast<s16>(envelopeFrom), envelopeTo);
-  if (mode >= 6) {
-    const u32 releaseSamples = (envelopeTo + 7) / 8;
-    return SnesEnvelopeSeconds{
-        .attack = gainEnvelope.seconds,
-        .decay = -1.0,
-        .sustainLevel = 1.0,
-        .sustain = -1.0,
-        .release = linearAmplitudeFadeToDbEnvelopeSeconds(releaseSamples / kSampleRate),
-    };
-  }
-
-  const u32 releaseSamples = (envelopeFrom + 7) / 8;
-  return SnesEnvelopeSeconds{
-      .attack = 0.0,
-      .decay = gainEnvelope.seconds,
-      .sustainLevel = 0.0,
-      .sustain = 0.0,
-      .release = linearAmplitudeFadeToDbEnvelopeSeconds(releaseSamples / kSampleRate),
-  };
-}
-
 }  // namespace
 
 Envelope snesDspEnvelope(u8 adsr1, u8 adsr2, u8 gain) {
-  const auto envelope = convertSnesAdsr(adsr1, adsr2, gain, 0x7ff);
-  const bool adsrEnabled = (adsr1 & 0x80) != 0;
-
-  return Envelope{
-      .attackSeconds = envelopeSeconds(envelope.attack),
+  Envelope result{
+      .attackSeconds = 0.0,
       .holdSeconds = 0.0,
-      .decaySeconds = envelopeSeconds(envelope.decay),
-      .secondDecaySeconds = adsrEnabled ? std::optional{envelopeSeconds(envelope.sustain)} : std::nullopt,
-      .releaseSeconds = envelopeSeconds(envelope.release),
-      .sustainAmplitude = std::clamp(envelope.sustainLevel, 0.0, 1.0),
+      .decaySeconds = std::numeric_limits<double>::infinity(),
+      .sustainAmplitude = 1.0,
   };
+  s16 releaseLevel = 0x7ff;
+  if ((adsr1 & 0x80) != 0) {
+    const u8 decayRate = (adsr1 & 0x70) >> 4;
+    const u8 sustainLevel = (adsr2 & 0xe0) >> 5;
+    const u8 sustainRate = adsr2 & 0x1f;
+    result.attackSeconds = adsrAttackSeconds(adsr1 & 0x0f);
+    result.decaySeconds = 0.0;
+    if (sustainLevel != 7) {
+      const u8 decayGainRate = 0x10 | (decayRate << 1);
+      const auto decay =
+          emulateGainEnvelope(0xa0 | decayGainRate, releaseLevel, static_cast<s16>((sustainLevel << 8) | 0xff));
+      releaseLevel = decay.envelope;
+      result.decaySeconds = decay.seconds;
+    }
+    result.secondDecaySeconds = sustainRate == 0 ? std::numeric_limits<double>::infinity()
+                                                 : emulateGainEnvelope(0xa0 | sustainRate, releaseLevel, 0).seconds;
+    result.sustainAmplitude = (sustainLevel + 1) / 8.0;
+  } else {
+    const u8 mode = gain >> 5;
+    if (mode < 4) {
+      result.sustainAmplitude = (gain & 0x7f) / 128.0;
+    } else if (mode >= 6) {
+      result.attackSeconds = emulateGainEnvelope(gain, 0x7ff, 0x7ff).seconds;
+    } else {
+      result.decaySeconds = emulateGainEnvelope(gain, 0x7ff, 0).seconds;
+      result.sustainAmplitude = 0.0;
+    }
+  }
+  const u32 releaseSamples = (releaseLevel + 7) / 8;
+  result.releaseSeconds = linearAmplitudeFadeToDbEnvelopeSeconds(releaseSamples / kSampleRate);
+  return result;
 }
 
 double snesDspAdsrAttackSeconds(u8 attackRate) {
