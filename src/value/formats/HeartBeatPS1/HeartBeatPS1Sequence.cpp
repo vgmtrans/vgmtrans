@@ -590,8 +590,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   }
   if (source.status == 0xff && source.data1 == 0x51 && source.payloadSize == 3) {
     const u32 payload = source.end - 3;
-    const u32 tempo = (static_cast<u32>(reader.u8At(payload)) << 16) |
-                      (static_cast<u32>(reader.u8At(payload + 1)) << 8) | reader.u8At(payload + 2);
+    const u32 tempo = reader.be24(payload);
     event.derived("microseconds_per_quarter", tempo);
     return event.invoke<&Playback::tempo>(tempo, source.delta);
   }

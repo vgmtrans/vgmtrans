@@ -199,10 +199,8 @@ void readSampleInfos(KonamiArcadeLayout& layout, ByteReader reader, std::vector<
         type = KonamiSampleType::Unknown;
       }
       layout.sampleInfos.push_back(KonamiArcadeSampleInfo{
-          .loopOffset = static_cast<u32>(reader.u8At(offset)) | (static_cast<u32>(reader.u8At(offset + 1)) << 8) |
-                        (static_cast<u32>(reader.u8At(offset + 2)) << 16),
-          .startOffset = static_cast<u32>(reader.u8At(offset + 3)) | (static_cast<u32>(reader.u8At(offset + 4)) << 8) |
-                         (static_cast<u32>(reader.u8At(offset + 5)) << 16),
+          .loopOffset = reader.le24(offset),
+          .startOffset = reader.le24(offset + 3),
           .type = type,
           .reverse = (flags & 0x20) != 0,
           .loops = reader.u8At(offset + 7) != 0,

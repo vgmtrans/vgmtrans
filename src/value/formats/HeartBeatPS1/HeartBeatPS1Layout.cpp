@@ -142,8 +142,7 @@ constexpr u32 kMaximumSectionSize = 0x200000;
     return std::nullopt;
   }
   const u16 ppqn = reader.be16(qQesOffset + 8);
-  const u32 tempo = (static_cast<u32>(reader.u8At(qQesOffset + 10)) << 16) |
-                    (static_cast<u32>(reader.u8At(qQesOffset + 11)) << 8) | reader.u8At(qQesOffset + 12);
+  const u32 tempo = reader.be24(qQesOffset + 10);
   const u8 numerator = reader.u8At(qQesOffset + 13);
   const u8 denominatorPower = reader.u8At(qQesOffset + 14);
   const u8 trackCount = reader.u8At(qQesOffset + 15);

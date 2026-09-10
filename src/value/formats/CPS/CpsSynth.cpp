@@ -370,10 +370,8 @@ Cps1SynthDrafts addCps1Synth(ScanResultBuilder& builder, CpsLayout& layout) {
     if (!reader.has(row, 8)) {
       break;
     }
-    const u32 start = (static_cast<u32>(reader.u8At(row)) << 16) | (static_cast<u32>(reader.u8At(row + 1)) << 8) |
-                      reader.u8At(row + 2);
-    const u32 end = (static_cast<u32>(reader.u8At(row + 3)) << 16) | (static_cast<u32>(reader.u8At(row + 4)) << 8) |
-                    reader.u8At(row + 5);
+    const u32 start = reader.be24(row);
+    const u32 end = reader.be24(row + 3);
     const bool empty = start == 0 || start == 0xffffff || end <= start || start >= layout.sampleRom.size;
     const u32 length = empty ? 0 : static_cast<u32>(std::min<u64>(end - start, layout.sampleRom.size - start));
     const std::string name = fmt::format("{}OKI Sample {}", empty ? "Empty " : "", index);

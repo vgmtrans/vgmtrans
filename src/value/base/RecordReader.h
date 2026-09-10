@@ -85,7 +85,7 @@ public:
   [[nodiscard]] SourceRecord finish() && noexcept;
 
 private:
-  template <class T, auto Read>
+  template <class T, auto Read, u32 Size = sizeof(T)>
   RangedValue<T> number(std::string_view name, SourceValueDisplay display);
   template <class T, auto Read>
   RangedValue<T> numberAt(u64 relativeOffset, std::string_view name, SourceValueDisplay display);

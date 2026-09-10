@@ -34,6 +34,8 @@ void byteReaderChecksBoundsAndEndian() {
   expect(reader.u8At(1) == 0x34, "reader should read u8");
   expect(reader.le16(1) == 0x1234, "reader should read little-endian u16");
   expect(reader.be16(1) == 0x3412, "reader should read big-endian u16");
+  expect(reader.le24(2) == 0x567812 && reader.be24(2) == 0x127856,
+         "24-bit reads must accept exactly three available bytes and preserve byte order");
   expect(reader.le32(1) == 0x56781234, "reader should read little-endian u32");
   expect(reader.be32(1) == 0x34127856, "reader should read big-endian u32");
 
@@ -44,6 +46,21 @@ void byteReaderChecksBoundsAndEndian() {
     threw = true;
   }
   expect(threw, "reader should throw on out-of-range access");
+
+  const std::array<u8, 3> maximumBytes{0xff, 0xff, 0xff};
+  const ByteReader maximum{SourceId{7}, maximumBytes};
+  for (const auto read : {&ByteReader::le24, &ByteReader::be24}) {
+    expect((maximum.*read)(0) == 0xffffff, "24-bit reads must preserve every bit without sign extension");
+    for (const u64 offset : {u64{3}, u64{5}, std::numeric_limits<u64>::max()}) {
+      threw = false;
+      try {
+        static_cast<void>((reader.*read)(offset));
+      } catch (const std::out_of_range&) {
+        threw = true;
+      }
+      expect(threw, "24-bit reads must reject truncated and overflowing source offsets");
+    }
+  }
 }
 
 void sourceCommandsRetainOnlySemanticData() {
