@@ -8,6 +8,7 @@
 #include "../MidiTestSupport.h"
 
 #include "value/export/InstrumentVariants.h"
+#include "value/export/PerformanceInstrumentSelection.h"
 
 namespace {
 
@@ -61,6 +62,48 @@ size_t selectedInstrumentForNote(const InstrumentVariantMaterialization& materia
     throw std::runtime_error("Test instrument was not found");
   }
   return static_cast<size_t>(std::distance(soundBank.instruments.begin(), instrument));
+}
+
+void instrumentSelectionPreservesIdentityAndFallbackPolicies() {
+  Instrument addressMatch = testInstrument(5, {});
+  addressMatch.identity->domain = "other";
+  addressMatch.name = "Address match";
+  Instrument exactMatch = testInstrument(5, {});
+  exactMatch.explicitAddress = InstrumentAddress{.program = 7};
+  exactMatch.name = "Identity match";
+  const SoundBankAsset bank{.instruments = {addressMatch, exactMatch, addressMatch, exactMatch}};
+
+  for (const u32 mode : {0, 1, 2}) {
+    InstrumentPerformanceEvent selection{.header = eventHeader(0, 0), .program = 5};
+    if (mode != 2) {
+      selection.sourceInstrument =
+          InstrumentIdentity{.domain = mode == 0 ? "dynamic-envelope-test" : "missing", .key = 5};
+    }
+    const auto performance = sequenceWithEvents({
+        selection,
+        EnvelopePerformanceEvent{
+            .header = eventHeader(0, 1),
+            .update = EnvelopeUpdate::set(Envelope{.attackSeconds = 0.25}, EnvelopeFields::Attack)},
+        NotePerformanceEvent{.header = eventHeader(0, 2), .key = 60, .durationTicks = 4, .note = PerformanceNoteId{1}},
+    });
+    const std::array<const SoundBankAsset*, 2> inputs{nullptr, &bank};
+    const auto selected = selectSynthInstruments(inputs, &performance);
+    const size_t first = mode == 0 ? 1 : 0;
+    expect(selected == std::vector<const Instrument*>{&bank.instruments[first], &bank.instruments[first + 2]},
+           "used-instrument filtering must prefer exact identities, fall back to addresses, and retain every match in "
+           "bank order");
+    expect(findPerformanceInstrument(selection, inputs) == (mode == 1 ? nullptr : &bank.instruments[first]),
+           "ordinary performance lookup must require an exact identity and select only its first match");
+
+    std::array banks{bank};
+    const auto materialized =
+        materializeInstrumentVariants(performance, banks, InstrumentVariantOptions{.dynamicEnvelopes = true});
+    expect(
+        materialized.diagnostics.empty() && banks[0].instruments.size() == 5 &&
+            banks[0].instruments.back().name == bank.instruments[first].name + " [dynamic envelope]" &&
+            selectedInstrumentForNote(materialized, PerformanceNoteId{1}, banks[0]) == 4,
+        "variant materialization must prefer exact identities, fall back to addresses, and clone only the first match");
+  }
 }
 
 void dynamicEnvelopeMaterializationIsIncrementalAndDeduplicated() {
@@ -543,6 +586,7 @@ void signedStereoMaterializationLeavesOrdinaryTracksAlone() {
 }  // namespace
 
 void runValueInstrumentVariantTests() {
+  instrumentSelectionPreservesIdentityAndFallbackPolicies();
   dynamicEnvelopeMaterializationIsIncrementalAndDeduplicated();
   dynamicEnvelopeInstrumentSelectionControlsOverrideCarry();
   dynamicEnvelopeActiveVoiceLimitationIsExplicit();

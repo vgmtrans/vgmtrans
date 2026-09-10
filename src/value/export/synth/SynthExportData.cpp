@@ -34,7 +34,6 @@ struct SynthSampleIndexKey {
 
 using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u16>;
 using SynthSampleReferences = std::set<SynthSampleIndexKey>;
-using SynthInstrumentList = std::vector<const Instrument*>;
 using SynthInstrumentSet = std::set<const Instrument*>;
 
 struct SamplePoolView {
@@ -70,55 +69,17 @@ void markInstrumentAddress(InstrumentAddress address, std::span<const Instrument
 
 void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
                             std::span<const Instrument* const> instruments, SynthInstrumentSet& used) {
+  InstrumentAddress address{.bank = selection.bank, .program = selection.program};
   if (selection.sourceInstrument) {
     if (markMatchingInstruments(used, instruments, [&](const Instrument& instrument) {
           return instrument.identity && *instrument.identity == *selection.sourceInstrument;
         })) {
       return;
     }
-    const auto fallbackAddress = resolveInstrumentAddress({}, selection.sourceInstrument);
-    markMatchingInstruments(used, instruments, [&](const Instrument& instrument) {
-      return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == fallbackAddress;
-    });
-    return;
+    address = resolveInstrumentAddress({}, selection.sourceInstrument);
   }
 
-  markInstrumentAddress(InstrumentAddress{.bank = selection.bank, .program = selection.program}, instruments, used);
-}
-
-[[nodiscard]] SynthInstrumentList selectInstruments(std::span<const SoundBankAsset* const> soundBanks,
-                                                    const PerformanceSequence* sequenceUsage) {
-  SynthInstrumentList instruments;
-  for (const auto* soundBank : soundBanks) {
-    if (soundBank == nullptr) {
-      continue;
-    }
-    for (const auto& instrument : soundBank->instruments) {
-      instruments.push_back(&instrument);
-    }
-  }
-  if (sequenceUsage == nullptr) {
-    return instruments;
-  }
-
-  SynthInstrumentSet used;
-  for (const auto& track : sequenceUsage->tracks) {
-    // A track uses bank/program zero until its first instrument change.
-    InstrumentPerformanceEvent selection;
-    for (const auto& event : track.events) {
-      if (const auto* change = std::get_if<InstrumentPerformanceEvent>(&event)) {
-        selection = *change;
-      } else if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
-        if (note->instrumentAddress) {
-          markInstrumentAddress(*note->instrumentAddress, instruments, used);
-        } else {
-          markSelectedInstrument(selection, instruments, used);
-        }
-      }
-    }
-  }
-  std::erase_if(instruments, [&](const Instrument* instrument) { return !used.contains(instrument); });
-  return instruments;
+  markInstrumentAddress(address, instruments, used);
 }
 
 [[nodiscard]] SynthSampleIndexMap decodeSynthSamples(PreparedSynthData& prepared,
@@ -312,7 +273,37 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
 
 std::vector<const Instrument*> selectSynthInstruments(std::span<const SoundBankAsset* const> soundBanks,
                                                       const PerformanceSequence* sequenceUsage) {
-  return selectInstruments(soundBanks, sequenceUsage);
+  std::vector<const Instrument*> instruments;
+  for (const auto* soundBank : soundBanks) {
+    if (soundBank == nullptr) {
+      continue;
+    }
+    for (const auto& instrument : soundBank->instruments) {
+      instruments.push_back(&instrument);
+    }
+  }
+  if (sequenceUsage == nullptr) {
+    return instruments;
+  }
+
+  SynthInstrumentSet used;
+  for (const auto& track : sequenceUsage->tracks) {
+    // A track uses bank/program zero until its first instrument change.
+    InstrumentPerformanceEvent selection;
+    for (const auto& event : track.events) {
+      if (const auto* change = std::get_if<InstrumentPerformanceEvent>(&event)) {
+        selection = *change;
+      } else if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+        if (note->instrumentAddress) {
+          markInstrumentAddress(*note->instrumentAddress, instruments, used);
+        } else {
+          markSelectedInstrument(selection, instruments, used);
+        }
+      }
+    }
+  }
+  std::erase_if(instruments, [&](const Instrument* instrument) { return !used.contains(instrument); });
+  return instruments;
 }
 
 Envelope approximateEnvelopeAsAdsr(Envelope envelope, double attenuationRangeDb) {
@@ -381,7 +372,7 @@ Envelope approximateEnvelopeAsAdsr(Envelope envelope, double attenuationRangeDb)
 PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceStore& sources,
                                    const SynthSampleDecodeOptions& options) {
   PreparedSynthData prepared;
-  const auto instruments = selectInstruments(input.soundBanks, input.sequenceUsage);
+  const auto instruments = selectSynthInstruments(input.soundBanks, input.sequenceUsage);
   std::vector<SamplePoolView> samplePools;
   samplePools.reserve(input.soundBanks.size() + input.samplePools.size());
   for (const auto* bank : input.soundBanks) {
