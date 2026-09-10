@@ -880,6 +880,15 @@ two production lines and the manual duplicate-check branch. The full build and
 all 20 CTest targets pass, including used-only SF2/DLS preparation and semantic
 instrument selection.
 
+### Read source-link offsets without a temporary address wrapper
+
+Remove the single-use operandAddress helper from command source projection.
+Its caller now checks the unsigned operand directly when creating a source
+range, preserving the rejection of non-address values without constructing
+and immediately unwrapping an optional Address. This removes seven production
+lines. The full build and all 20 CTest targets pass, including encoded/resolved
+operand fields and call, jump, and repeat source links.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

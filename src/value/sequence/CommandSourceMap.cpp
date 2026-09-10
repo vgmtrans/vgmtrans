@@ -52,13 +52,6 @@ void finishTrackAnnotation(ByteReader reader, u32 startOffset, SourceMapBuilder*
   AnnotationBuilder{*sourceMap, *annotation}.range(span.valid() ? span : reader.range(startOffset, 0));
 }
 
-[[nodiscard]] std::optional<Address> operandAddress(const SemanticOperand& operand) {
-  if (const auto* value = std::get_if<u64>(&operand.value)) {
-    return Address{*value};
-  }
-  return std::nullopt;
-}
-
 [[nodiscard]] std::optional<u32> operandUnsigned32(const SemanticOperand& operand) {
   const auto* value = std::get_if<u64>(&operand.value);
   if (value == nullptr || *value > std::numeric_limits<u32>::max()) {
@@ -135,9 +128,9 @@ void projectOperand(AnnotationBuilder& annotation, const SemanticOperand& operan
     projectOperand(annotation, operand);
 
     if (const auto role = linkRole(operand.role)) {
-      if (const auto destination = operandAddress(operand)) {
+      if (const auto* destination = std::get_if<u64>(&operand.value)) {
         annotation.link(
-            *role, SourceTarget{SourceRange{.source = command.range.source, .offset = destination->value, .size = 1}});
+            *role, SourceTarget{SourceRange{.source = command.range.source, .offset = *destination, .size = 1}});
       }
     }
     if (operand.role == SemanticOperandRole::InstrumentBank) {
