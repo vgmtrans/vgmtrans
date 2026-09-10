@@ -42,9 +42,6 @@ struct NoteSpan {
   // A boundary pitch bend can carry the preceding MIDI voice into this
   // logical note instead of retriggering its attack.
   bool continuesPreviousVoice = false;
-  // Linked logical notes share one sounding MIDI voice and therefore one
-  // stable pitch-bend range.
-  PerformanceNoteId pitchBendVoice;
   double bendBaseKey = 0.0;
   // Empty unless MIDI portamento must replace this source note.
   std::vector<PortamentoSegment> portamentoSegments;
@@ -148,7 +145,6 @@ struct PitchBendLayer {
       notes.push_back(NoteSpan{
           .source = *source,
           .endTick = noteEnd(*source),
-          .pitchBendVoice = source->note,
           .bendBaseKey = source->key,
       });
     }
@@ -623,7 +619,6 @@ void linkPitchBendVoices(std::vector<NoteSpan>& notes, const std::vector<const P
 
     const double baseKey = bendBaseKeyAt(*previous, automation->realization.startTick);
     note->continuesPreviousVoice = true;
-    note->pitchBendVoice = previous->pitchBendVoice;
     note->bendBaseKey = baseKey;
     if (!note->portamentoSegments.empty()) {
       auto& first = note->portamentoSegments.front();
