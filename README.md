@@ -4,6 +4,13 @@
 [![Preview builds](https://img.shields.io/badge/Download-Preview-f97316?style=for-the-badge)](https://github.com/vgmtrans/vgmtrans-preview/releases/tag/unstable)
 [![Releases](https://img.shields.io/badge/Download-Stable%20Releases-238636?style=for-the-badge)](https://github.com/vgmtrans/vgmtrans/releases)
 
+> [!IMPORTANT]
+> **Notice regarding vgmtrans.com**
+>
+> **vgmtrans.com is not an official VGMTrans website and is not authorized to represent or speak on behalf of the VGMTrans project.** The VGMTrans project does not operate or endorse vgmtrans.com, and does not provide or verify downloads distributed through it.
+>
+> For official VGMTrans downloads, use the links in the [Download](#download) section below.
+
 VGMTrans is a cross-platform desktop app for **detecting, inspecting, and converting sequenced video game music**
 into standard formats like **MIDI**, **SoundFont2 (SF2)**, and **DLS**.
 
