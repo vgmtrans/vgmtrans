@@ -1,0 +1,109 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include "value/formats/Akao/Akao.h"
+
+#include <fmt/format.h>
+
+#include <algorithm>
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace vgmtrans::formats::akao {
+
+using namespace core;
+
+namespace {
+
+[[nodiscard]] std::vector<u32> akaoOffsets(ByteReader reader) {
+  std::vector<u32> offsets;
+  for (u64 offset = 0; offset + 0x10 <= reader.size(); ++offset) {
+    if (reader.be32(offset) == kAkaoSignature) {
+      offsets.push_back(static_cast<u32>(offset));
+    }
+  }
+  return offsets;
+}
+
+void scanSamplePools(const ScanInput& input, ScanResultBuilder& result, std::span<const u32> offsets,
+                     std::optional<AkaoSplitSampleLocation> hardcodedSampleLocation) {
+  const AkaoPs1Version sourceVersion = determineVersionFromSource(input.source);
+
+  for (const u32 offset : offsets) {
+    if (input.reader.le16(offset + 6) != 0 || !isPossibleAkaoSamplePool(input.reader, offset)) {
+      continue;
+    }
+    const AkaoPs1Version version =
+        sourceVersion == AkaoPs1Version::Unknown ? guessSampleVersion(input.reader, offset) : sourceVersion;
+    if (!parseAkaoSamplePool(input, result, offset, version)) {
+      result.warning("Akao sample pool header was detected but sample data could not be parsed",
+                     input.reader.range(offset, 0x40));
+    }
+  }
+
+  if (hardcodedSampleLocation) {
+    static_cast<void>(parseAkaoSamplePool(input, result, *hardcodedSampleLocation));
+  }
+}
+
+void scanSequences(const ScanInput& input, ScanResultBuilder& result, std::span<const u32> offsets) {
+  for (const u32 offset : offsets) {
+    const auto layout = readAkaoSequenceLayout(input, offset);
+    if (!layout) {
+      continue;
+    }
+
+    const std::string sequenceName = fmt::format("Akao Seq {:02X}", layout->header.sequenceId);
+    auto sequence = result.sequence(sequenceName, input.reader.range(offset, layout->header.length));
+    auto parsed = parseAkaoSequence(input, sequence.id(), *layout, &result.sourceMap(), &result.diagnostics());
+    auto bank = result.soundBank(akaoInstrumentSetName(parsed.analysis));
+    auto built = buildAkaoInstrumentSet(input, parsed.analysis, bank.instruments());
+    parsed.analysis.requiredArticulations = std::move(built.requiredArticulations);
+    std::erase(parsed.analysis.requiredArticulations, 0);
+    std::ranges::sort(parsed.analysis.requiredArticulations);
+    parsed.analysis.requiredArticulations.erase(std::ranges::unique(parsed.analysis.requiredArticulations).begin(),
+                                                parsed.analysis.requiredArticulations.end());
+    sequence
+        .data(AkaoSequenceData{
+            .sequenceId = parsed.analysis.header.sequenceId,
+            .sampleSetId = parsed.analysis.header.sampleSetId,
+            .requiredArticulations = parsed.analysis.requiredArticulations,
+            .structuralInstrumentSet = bank.id(),
+        })
+        .program(std::move(parsed.program));
+    bank.data(AkaoSoundBankData{.binding = std::move(built.binding)});
+  }
+}
+
+[[nodiscard]] ScanResult scanAkao(const ScanInput& input) {
+  const auto offsets = akaoOffsets(input.reader);
+  const auto hardcodedSampleLocation = ff7HardcodedAkaoSampleLocation(input.reader);
+  if (offsets.empty() && !hardcodedSampleLocation) {
+    return {};
+  }
+
+  ScanResultBuilder result(input, std::string(kAkaoFormatName), std::string(kAkaoCollectionResolver));
+  scanSamplePools(input, result, offsets, hardcodedSampleLocation);
+  scanSequences(input, result, offsets);
+  return result.finish();
+}
+
+}  // namespace
+
+FormatModule akaoModule() {
+  return FormatModule{
+      .name = std::string(kAkaoFormatName),
+      .preferredSampleFilter = SampleFilter::PsxSpuLowPass,
+      .acceptedFormats = {source_formats::kPlayStationRam},
+      .scan = scanAkao,
+      .collectionResolverId = std::string(kAkaoCollectionResolver),
+      .resolveCollections = resolveAkaoCollections,
+      .bindCollection = bindAkaoCollection,
+  };
+}
+
+}  // namespace vgmtrans::formats::akao

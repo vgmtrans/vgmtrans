@@ -1,154 +1,139 @@
 /*
- * VGMTrans (c) 2002-2021
+ * VGMTrans (c) 2002-2026
  * Licensed under the zlib license,
  * refer to the included LICENSE.txt file
  */
 
 #include "VGMFileView.h"
 
-#include "base/Types.h"
-#include "Helpers.h"
 #include "hexview/HexView.h"
-#include "MdiArea.h"
-#include "Root.h"
-#include "SeqEvent.h"
-#include "SeqTrack.h"
-#include "SequencePlayer.h"
 #include "SnappingSplitter.h"
-#include "VGMColl.h"
-#include "VGMFile.h"
 #include "VGMFileTreeView.h"
-#include "VGMSeq.h"
+#include "workarea/SourceInspectorPresentation.h"
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
+#include <unordered_set>
+#include <utility>
 
-#include <QApplication>
+#include <QFocusEvent>
+#include <QFontMetricsF>
 #include <QShortcut>
-#include <QtGlobal>
+#include <QSignalBlocker>
+#include <QTimer>
+#include <QVBoxLayout>
 
-VGMFileView::VGMFileView(VGMFile *vgmfile)
-    : QMdiSubWindow(), m_vgmfile(vgmfile), m_hexview(new HexView(vgmfile)) {
-  m_splitter = new SnappingSplitter(Qt::Horizontal, this);
+namespace {
 
-  setWindowTitle(QString::fromStdString(m_vgmfile->name()));
-  setWindowIcon(iconForFile(vgmFileToVariant(vgmfile)));
+int boundedInt(u64 value) {
+  return static_cast<int>(std::min<u64>(value, std::numeric_limits<int>::max()));
+}
+
+}  // namespace
+
+VGMFileView::VGMFileView(std::shared_ptr<const vgmtrans::core::SourceInspection> inspection,
+                         const vgmtrans::core::Asset& asset, QWidget* parent)
+    : QWidget(parent), inspection_(std::move(inspection)) {
+  Q_ASSERT(inspection_);
+  setWindowTitle(QString::fromStdString(inspection_->metadata().name));
   setAttribute(Qt::WA_DeleteOnClose);
-  // Keep a stable default cursor across MDI tabs; embedded RHI windows can leak resize cursors.
   setCursor(Qt::ArrowCursor);
 
-  m_treeview = new VGMFileTreeView(m_vgmfile, this);
+  splitter_ = new SnappingSplitter(Qt::Horizontal, this);
+  hexView_ = new HexView(inspection_, splitter_);
+  treeView_ = new VGMFileTreeView(inspection_, asset, splitter_);
 
-  m_hexview->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-  m_splitter->addWidget(m_hexview);
-  m_splitter->addWidget(m_treeview);
-  m_splitter->setSizes(QList<int>{hexViewFullWidth(), treeViewMinimumWidth});
-  m_splitter->setStretchFactor(0, 0);
-  m_splitter->setStretchFactor(1, 1);
-  m_splitter->persistState();
+  hexView_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  splitter_->addWidget(hexView_);
+  splitter_->addWidget(treeView_);
+  splitter_->setSizes(QList<int>{hexView_->getViewportFullWidth(), treeViewMinimumWidth});
+  splitter_->setStretchFactor(0, 0);
+  splitter_->setStretchFactor(1, 1);
+  splitter_->persistState();
   resetSnapRanges();
-  m_hexview->setMaximumWidth(hexViewFullWidth());
-  m_treeview->setMinimumWidth(treeViewMinimumWidth);
+  hexView_->setMaximumWidth(hexView_->getViewportFullWidth());
+  treeView_->setMinimumWidth(treeViewMinimumWidth);
+  defaultHexFont_ = hexView_->font();
 
-  m_defaultHexFont = m_hexview->font();
+  auto* layout = new QVBoxLayout(this);
+  layout->setContentsMargins(0, 0, 0, 0);
+  layout->setSpacing(0);
+  layout->addWidget(splitter_);
 
-  connect(m_hexview, &HexView::selectionChanged, this, &VGMFileView::onSelectionChange);
-  connect(m_hexview, &HexView::seekToEventRequested, this, &VGMFileView::seekToEvent);
-
-  connect(m_treeview, &VGMFileTreeView::currentItemChanged,
-          [&](const QTreeWidgetItem *item, QTreeWidgetItem *) {
-            if (item == nullptr) {
-              // If the VGMFileTreeView deselected, then so should the HexView
-              onSelectionChange(nullptr);
-              return;
+  connect(hexView_, &HexView::selectionChanged, this, &VGMFileView::onSelectionChange);
+  connect(hexView_, &HexView::seekToEventRequested, this, &VGMFileView::seekToAnnotation);
+  connect(hexView_, &HexView::notePreviewRequested, this, &VGMFileView::notePreviewRequested);
+  connect(hexView_, &HexView::notePreviewStopped, this, &VGMFileView::notePreviewStopped);
+  connect(treeView_, &VGMFileTreeView::seekToAnnotationRequested, this, &VGMFileView::seekToAnnotation);
+  connect(treeView_, &VGMFileTreeView::statusItemChanged, this, &VGMFileView::updateStatus);
+  connect(treeView_, &QTreeWidget::currentItemChanged, this,
+          [this](QTreeWidgetItem* item, QTreeWidgetItem*) {
+            const auto sourceItem = treeView_->sourceItemForItem(item);
+            if (sourceItem.valid()) {
+              onSelectionChange(sourceItem);
+            } else {
+              hexView_->setSelectedRange(treeView_->rangeForItem(item));
             }
-            auto vgmitem = static_cast<VGMItem *>(item->data(0, Qt::UserRole).value<void *>());
-            onSelectionChange(vgmitem);
           });
 
-  connect(new QShortcut(QKeySequence::ZoomIn, this), &QShortcut::activated,
-          this, &VGMFileView::increaseHexViewFont);
-
-  auto *shortcutEqual = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Equal), this);
-  connect(shortcutEqual, &QShortcut::activated, this, &VGMFileView::increaseHexViewFont);
-
-  connect(new QShortcut(QKeySequence::ZoomOut, this), &QShortcut::activated,
-          this, &VGMFileView::decreaseHexViewFont);
-
-  connect(new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_0), this), &QShortcut::activated,
-          this, &VGMFileView::resetHexViewFont);
-
-  connect(&SequencePlayer::the(), &SequencePlayer::playbackPositionChanged,
-          this, &VGMFileView::onPlaybackPositionChanged);
-  connect(&SequencePlayer::the(), &SequencePlayer::statusChange,
-          this, &VGMFileView::onPlayerStatusChanged);
-
-  setWidget(m_splitter);
+  connect(new QShortcut(QKeySequence::ZoomIn, this), &QShortcut::activated, this, &VGMFileView::increaseHexViewFont);
+  connect(new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Equal), this), &QShortcut::activated, this,
+          &VGMFileView::increaseHexViewFont);
+  connect(new QShortcut(QKeySequence::ZoomOut, this), &QShortcut::activated, this, &VGMFileView::decreaseHexViewFont);
+  connect(new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_0), this), &QShortcut::activated, this,
+          &VGMFileView::resetHexViewFont);
 }
 
 void VGMFileView::focusInEvent(QFocusEvent* event) {
-  QMdiSubWindow::focusInEvent(event);
-
-  m_treeview->updateStatusBar();
+  QWidget::focusInEvent(event);
+  treeView_->updateStatusBar();
 }
 
 void VGMFileView::resetSnapRanges() const {
-  m_splitter->clearSnapRanges();
-  m_splitter->addSnapRange(0, hexViewWidthSansAsciiAndAddress(), hexViewWidthSansAscii());
-  m_splitter->addSnapRange(0, hexViewWidthSansAscii(), hexViewFullWidth());
-}
-
-int VGMFileView::hexViewFullWidth() const {
-  return m_hexview->getViewportFullWidth();
-}
-
-int VGMFileView::hexViewWidthSansAscii() const {
-  return m_hexview->getViewportWidthSansAscii();
-}
-
-int VGMFileView::hexViewWidthSansAsciiAndAddress() const {
-  return m_hexview->getViewportWidthSansAsciiAndAddress();
+  splitter_->clearSnapRanges();
+  for (const auto range : hexView_->splitterSnapRanges()) {
+    splitter_->addSnapRange(0, range.lowerBound, range.upperBound);
+  }
 }
 
 void VGMFileView::updateHexViewFont(qreal sizeIncrement) const {
-  // Increment the font size until it has an actual effect on width
-  QFont font = m_hexview->font();
-  QFontMetricsF fontMetrics(font);
-  const qreal origWidth = fontMetrics.horizontalAdvance("A");
+  QFont font = hexView_->font();
+  QFontMetricsF metrics(font);
+  const qreal originalWidth = metrics.horizontalAdvance("A");
   qreal fontSize = font.pointSizeF();
-  for (int i = 0; i < 3; i++) {
+  for (int index = 0; index < 3; ++index) {
     fontSize += sizeIncrement;
     font.setPointSizeF(fontSize);
-    fontMetrics = QFontMetricsF(font);
-    if (!qFuzzyCompare(fontMetrics.horizontalAdvance("A"), origWidth)) {
+    metrics = QFontMetricsF(font);
+    if (!qFuzzyCompare(metrics.horizontalAdvance("A"), originalWidth)) {
       break;
     }
   }
-
   applyHexViewFont(font);
 }
 
 void VGMFileView::applyHexViewFont(QFont font) const {
-  const QList<int> splitterSizes = m_splitter->sizes();
-  const int actualWidthBeforeResize = splitterSizes.isEmpty() ? hexViewFullWidth() : splitterSizes.first();
-  const int fullWidthBeforeResize = std::max(1, hexViewFullWidth());
+  const QList<int> splitterSizes = splitter_->sizes();
+  const int actualWidthBeforeResize =
+      splitterSizes.isEmpty() ? hexView_->getViewportFullWidth() : splitterSizes.first();
+  const int fullWidthBeforeResize = std::max(1, hexView_->getViewportFullWidth());
 
-  m_hexview->setFont(font);
-  m_hexview->setMaximumWidth(hexViewFullWidth());
+  hexView_->setFont(font);
+  hexView_->setMaximumWidth(hexView_->getViewportFullWidth());
 
-  const float percentHexViewVisible = static_cast<float>(actualWidthBeforeResize) /
-                                      static_cast<float>(fullWidthBeforeResize);
-  const int fullWidthAfterResize = std::max(1, hexViewFullWidth());
+  const float percentVisible = static_cast<float>(actualWidthBeforeResize) / static_cast<float>(fullWidthBeforeResize);
+  const int fullWidthAfterResize = std::max(1, hexView_->getViewportFullWidth());
   const int widthChange = fullWidthAfterResize - fullWidthBeforeResize;
-  const auto scaledWidthChange = static_cast<int>(std::round(static_cast<float>(widthChange) * percentHexViewVisible));
+  const int scaledWidthChange = static_cast<int>(std::round(static_cast<float>(widthChange) * percentVisible));
   const int newWidth = std::max(1, actualWidthBeforeResize + scaledWidthChange);
   resetSnapRanges();
-  m_splitter->setSizes(QList<int>{newWidth, treeViewMinimumWidth});
-  m_splitter->persistState();
+  splitter_->setSizes(QList<int>{newWidth, treeViewMinimumWidth});
+  splitter_->persistState();
 }
 
 void VGMFileView::resetHexViewFont() {
-  applyHexViewFont(m_defaultHexFont);
+  applyHexViewFont(defaultHexFont_);
 }
 
 void VGMFileView::increaseHexViewFont() {
@@ -159,257 +144,163 @@ void VGMFileView::decreaseHexViewFont() {
   updateHexViewFont(-0.5);
 }
 
-void VGMFileView::closeEvent(QCloseEvent *) {
-  MdiArea::the()->removeView(m_vgmfile);
+void VGMFileView::onSelectionChange(vgmtrans::core::SourceInspectionItem item) {
+  hexView_->setSelectedItem(item);
+  const QSignalBlocker blocker(treeView_);
+  if (treeView_->sourceItemForItem(treeView_->currentItem()) != item) {
+    treeView_->setSelectedItem(item);
+  }
+  updateStatus(item);
 }
 
-void VGMFileView::onSelectionChange(VGMItem *item) const {
-  m_hexview->setSelectedItem(item);
-  if (item) {
-    auto widget_item = m_treeview->getTreeWidgetItem(item);
-    m_treeview->blockSignals(true);
-    m_treeview->setCurrentItem(widget_item);
-    m_treeview->blockSignals(false);
-  } else {
-    m_treeview->setCurrentItem(nullptr);
-    m_treeview->clearSelection();
-  }
-}
-
-void VGMFileView::seekToEvent(VGMItem* item) const {
-  auto* event = dynamic_cast<SeqEvent*>(item);
-  if (!event || !event->parentTrack || !event->parentTrack->parentSeq) {
+void VGMFileView::seekToAnnotation(vgmtrans::core::SourceAnnotationId annotation) {
+  if (!annotation.valid()) {
     return;
   }
-  if (m_vgmfile->hasAssocColls()) {
-    auto assocColl = m_vgmfile->assocColls().front();
-    if (SequencePlayer::the().activeCollection() != assocColl) {
-      auto& seqPlayer = SequencePlayer::the();
-      seqPlayer.setActiveCollection(assocColl);
-    }
-  }
-
-  const auto& timeline = event->parentTrack->parentSeq->timedEventIndex();
-  if (!timeline.finalized()) {
-    return;
-  }
-  u32 tick = 0;
-  if (!timeline.firstStartTick(event, tick)) {
-    return;
-  }
-
-  SequencePlayer::the().seek(static_cast<int>(tick), PositionChangeOrigin::HexView);
-}
-
-void VGMFileView::ensureTrackIndexMap(VGMSeq* seq) {
-  if (!seq) {
-    m_trackIndexSeq = nullptr;
-    m_trackIndexByPtr.clear();
-    m_trackIndexByMidiPtr.clear();
-    return;
-  }
-
-  if (m_trackIndexSeq == seq && m_trackIndexByPtr.size() == seq->trackCount()) {
-    return;
-  }
-
-  m_trackIndexSeq = seq;
-  m_trackIndexByPtr.clear();
-  m_trackIndexByMidiPtr.clear();
-  for (size_t i = 0; i < seq->trackCount(); ++i) {
-    auto* track = seq->track(i);
-    if (!track) {
-      continue;
-    }
-    const int trackIndex = static_cast<int>(i);
-    m_trackIndexByPtr[track] = trackIndex;
-    if (track->pMidiTrack) {
-      m_trackIndexByMidiPtr.emplace(track->pMidiTrack, trackIndex);
-    }
+  emit seekToAnnotationRequested(annotation);
+  const auto found = std::ranges::find_if(
+      playbackTimeline_, [annotation](const auto& span) { return span.annotation == annotation; });
+  if (found != playbackTimeline_.end()) {
+    emit playbackSeekRequested(boundedInt(found->beginTick), PositionChangeOrigin::HexView);
   }
 }
 
-int VGMFileView::trackIndexForEvent(const SeqEvent* event) const {
-  if (!event) {
-    return -1;
-  }
-
-  if (event->parentTrack) {
-    const auto trackIt = m_trackIndexByPtr.find(event->parentTrack);
-    if (trackIt != m_trackIndexByPtr.end()) {
-      return trackIt->second;
-    }
-    if (event->parentTrack->pMidiTrack) {
-      const auto midiIt = m_trackIndexByMidiPtr.find(event->parentTrack->pMidiTrack);
-      if (midiIt != m_trackIndexByMidiPtr.end()) {
-        return midiIt->second;
-      }
-    }
-  }
-
-  return static_cast<int>(event->channel);
+void VGMFileView::setSeekModifierActive(bool active) {
+  hexView_->setSeekModifierActive(active);
 }
 
-void VGMFileView::onPlaybackPositionChanged(int current, int max, PositionChangeOrigin origin) {
-  if (!isVisible()) {
-    return;
-  }
-  const bool hexVisible = m_hexview && m_hexview->isVisible();
-  const bool treeVisible = m_treeview && m_treeview->isVisible();
-  if (!hexVisible && !treeVisible) {
-    return;
-  }
+void VGMFileView::setPlaybackAnnotations(const std::vector<vgmtrans::core::SourceAnnotationId>& annotations,
+                                         const std::vector<QColor>& colors) {
+  hexView_->setPlaybackActive(!annotations.empty());
+  hexView_->setPlaybackSelectionsForAnnotations(annotations, colors);
+  treeView_->setPlaybackAnnotations(annotations);
+}
 
-  auto* seq = dynamic_cast<VGMSeq*>(m_vgmfile);
-  if (!seq) {
-    return;
-  }
+void VGMFileView::setPlaybackTimeline(std::vector<vgmtrans::core::SourcePlaybackSpan> timeline) {
+  playbackTimeline_ = std::move(timeline);
+  lastPlaybackAnnotations_.clear();
+  lastPlaybackColors_.clear();
+  lastPlaybackPosition_ = 0;
+  clearPlaybackAnnotations(false);
+}
 
-  const auto* coll = SequencePlayer::the().activeCollection();
-  if (!coll || !coll->containsVGMFile(m_vgmfile)) {
-    if (hexVisible) {
-      m_hexview->setPlaybackActive(false);
-      m_hexview->clearPlaybackSelections(false);
-      m_lastPlaybackItems.clear();
-      m_lastPlaybackItemColors.clear();
-    }
-    if (treeVisible) {
-      m_treeview->setPlaybackItems({});
-    }
+void VGMFileView::onPlaybackPositionChanged(int current, int maximum, PositionChangeOrigin origin) {
+  if (!isVisible() || playbackTimeline_.empty()) {
     return;
   }
 
-  const bool shouldHighlight = SequencePlayer::the().playing() || current > 0;
-  if (!shouldHighlight) {
-    if (hexVisible) {
-      m_hexview->setPlaybackActive(false);
-      m_hexview->clearPlaybackSelections(false);
-      m_lastPlaybackItems.clear();
-      m_lastPlaybackItemColors.clear();
-    }
-    if (treeVisible) {
-      m_treeview->setPlaybackItems({});
-    }
-    return;
-  }
-
-  const auto& timeline = seq->timedEventIndex();
-  if (!timeline.finalized()) {
-    m_playbackCursor.reset();
-    m_playbackTimeline = nullptr;
-    if (hexVisible) {
-      m_hexview->setPlaybackActive(false);
-      m_hexview->clearPlaybackSelections(false);
-      m_lastPlaybackItems.clear();
-      m_lastPlaybackItemColors.clear();
-    }
-    if (treeVisible) {
-      m_treeview->setPlaybackItems({});
-    }
-    return;
-  }
-
-  if (m_playbackTimeline != &timeline || !m_playbackCursor) {
-    m_playbackTimeline = &timeline;
-    m_playbackCursor = std::make_unique<SeqEventTimeIndex::Cursor>(timeline);
-  }
-
-  const int tickDiff = current - m_lastPlaybackPosition;
-  m_playbackTimedEvents.clear();
+  const int tickDifference = current - lastPlaybackPosition_;
+  std::vector<vgmtrans::core::SourcePlaybackSpan> spans;
   switch (origin) {
     case PositionChangeOrigin::Playback:
-      if (tickDiff <= 20)
-        m_playbackCursor->getActiveInRange(m_lastPlaybackPosition, current, m_playbackTimedEvents);
-      else
-        m_playbackCursor->getActiveAt(current, m_playbackTimedEvents);
+      spans = tickDifference >= 0 && tickDifference <= 20
+                  ? playbackSpansInRange(lastPlaybackPosition_, current)
+                  : playbackSpansInRange(current, current);
       break;
     case PositionChangeOrigin::SeekBar:
-      // This intended to distinguish between a drag and a seek to a further position of a sequence.
-      // We want a drag to highlight passed through events.
-      if (tickDiff >= -500 && tickDiff <= 500) {
-        // Select all events passed through. We will fade the ones skipped past in the next step.
-        int lesser = std::min(m_lastPlaybackPosition, current);
-        int greater = std::max(m_lastPlaybackPosition, current);
-        m_playbackCursor->getActiveInRange(lesser, greater, m_playbackTimedEvents);
-
-        // Select only the items at the current position to make the others fade - we accomplish
-        // this by calling this method with origin HexView, which will use a getActiveAt selection.
-        QTimer::singleShot(0, m_hexview, [this, current, max] {
-          onPlaybackPositionChanged(current, max, PositionChangeOrigin::HexView);
+      if (tickDifference >= -500 && tickDifference <= 500) {
+        spans =
+            playbackSpansInRange(std::min(lastPlaybackPosition_, current), std::max(lastPlaybackPosition_, current));
+        // Passed-through events remain visible for this frame. The immediate
+        // HexView-origin refresh retains only events active at the destination,
+        // allowing the rest to use the renderer's existing fade path.
+        QTimer::singleShot(0, this, [this, current, maximum] {
+          onPlaybackPositionChanged(current, maximum, PositionChangeOrigin::HexView);
         });
       } else {
-        m_playbackCursor->getActiveAt(current, m_playbackTimedEvents);
+        spans = playbackSpansInRange(current, current);
       }
       break;
     case PositionChangeOrigin::HexView:
-      m_playbackCursor->getActiveAt(current, m_playbackTimedEvents);
+      spans = playbackSpansInRange(current, current);
       break;
   }
-  m_lastPlaybackPosition = current;
+  lastPlaybackPosition_ = current;
 
-  ensureTrackIndexMap(seq);
-  m_playbackItems.clear();
-  m_playbackItemColors.clear();
-  m_playbackItems.reserve(m_playbackTimedEvents.size());
-  m_playbackItemColors.reserve(m_playbackTimedEvents.size());
-  for (const auto* timed : m_playbackTimedEvents) {
-    if (!timed || !timed->event) {
+  std::vector<vgmtrans::core::SourceAnnotationId> annotations;
+  std::vector<QColor> colors;
+  annotations.reserve(spans.size());
+  colors.reserve(spans.size());
+  std::unordered_set<u32> seen;
+  for (const auto& span : spans) {
+    if (!span.annotation.valid() || !seen.insert(span.annotation.value).second) {
       continue;
     }
-    auto* event = timed->event;
-    m_playbackItems.push_back(event);
-    QColor glowColor = colorForItemType(event->type);
-    if (const auto* seqEvent = dynamic_cast<const SeqEvent*>(event)) {
-      const int trackIndex = trackIndexForEvent(seqEvent);
-      if (trackIndex >= 0) {
-        glowColor = colorForTrackIndex(trackIndex);
-      }
-    }
-    m_playbackItemColors.push_back(glowColor);
+    annotations.push_back(span.annotation);
+    const u32 colorIndex = span.channel.value_or(playbackTrackIndex(span.annotation));
+    colors.push_back(QColor::fromHsv(static_cast<int>((colorIndex * 43) % 360), 190, 235));
   }
 
-  if (treeVisible) {
-    m_treeview->setPlaybackItems(m_playbackItems);
-  }
-
-  if (hexVisible) {
-    m_hexview->setPlaybackActive(shouldHighlight);
-  }
-
-  if (m_playbackItems == m_lastPlaybackItems &&
-      m_playbackItemColors == m_lastPlaybackItemColors) {
-    if (hexVisible) {
-      m_hexview->requestPlaybackFrame();
-    }
+  if (annotations == lastPlaybackAnnotations_ && colors == lastPlaybackColors_) {
+    hexView_->requestPlaybackFrame();
     return;
   }
-
-  m_lastPlaybackItems = m_playbackItems;
-  m_lastPlaybackItemColors = m_playbackItemColors;
-  if (hexVisible) {
-    m_hexview->setPlaybackSelectionsForItems(m_playbackItems, m_playbackItemColors);
-  }
+  lastPlaybackAnnotations_ = annotations;
+  lastPlaybackColors_ = colors;
+  setPlaybackAnnotations(annotations, colors);
 }
 
-void VGMFileView::onPlayerStatusChanged(bool playing) {
-  if (playing || !m_hexview)
-    return;
-  if (SequencePlayer::the().activeCollection() != nullptr)
-    return;
-  m_playbackTimedEvents.clear();
-  m_playbackItems.clear();
-  m_playbackItemColors.clear();
-  m_lastPlaybackItems.clear();
-  m_lastPlaybackItemColors.clear();
-  m_lastPlaybackPosition = 0;
-  m_playbackCursor.reset();
-  m_playbackTimeline = nullptr;
-  m_trackIndexSeq = nullptr;
-  m_trackIndexByPtr.clear();
-  m_trackIndexByMidiPtr.clear();
-  m_hexview->setPlaybackActive(false);
-  m_hexview->clearPlaybackSelections(false);
-  if (m_treeview) {
-    m_treeview->setPlaybackItems({});
+void VGMFileView::clearPlaybackAnnotations(bool fade) {
+  hexView_->clearPlaybackSelections(fade);
+  hexView_->setPlaybackActive(false);
+  treeView_->setPlaybackAnnotations({});
+}
+
+void VGMFileView::refreshStatus() {
+  treeView_->updateStatusBar();
+}
+
+u32 VGMFileView::playbackTrackIndex(
+    vgmtrans::core::SourceAnnotationId annotationId) const {
+  while (annotationId.valid()) {
+    const auto* annotation = inspection_->annotation(annotationId);
+    if (annotation == nullptr) {
+      break;
+    }
+    if (annotation->owner &&
+        annotation->owner->kind == vgmtrans::core::ObjectKind::SequenceTrack) {
+      return annotation->owner->index0;
+    }
+    annotationId = annotation->parent.value_or(vgmtrans::core::SourceAnnotationId{});
   }
+  return 0;
+}
+
+std::vector<vgmtrans::core::SourcePlaybackSpan>
+VGMFileView::playbackSpansInRange(int startTick, int endTick) const {
+  if (endTick < startTick) {
+    std::swap(startTick, endTick);
+  }
+  const u64 firstTick = static_cast<u64>(std::max(0, startTick));
+  const u64 lastTick = static_cast<u64>(std::max(0, endTick));
+  std::vector<vgmtrans::core::SourcePlaybackSpan> result;
+  for (const auto& span : playbackTimeline_) {
+    if (span.beginTick > lastTick) {
+      break;
+    }
+    if (span.endTick > firstTick) {
+      result.push_back(span);
+    }
+  }
+  return result;
+}
+
+void VGMFileView::updateStatus(vgmtrans::core::SourceInspectionItem item) {
+  const auto* annotation = inspection_->annotation(item);
+  if (annotation == nullptr) {
+    emit statusChanged({}, {}, {}, -1, -1);
+    return;
+  }
+  if (const auto* field = inspection_->field(item)) {
+    const auto range = inspection_->range(item);
+    emit statusChanged(
+        QStringLiteral("<b>%1</b>").arg(SourceInspectorPresentation::fieldLabel(*field)),
+        CapsuleText{.prefix = SourceInspectorPresentation::fieldValue(*field)},
+        SourceInspectorPresentation::fieldIcon(), boundedInt(range.offset), boundedInt(range.size));
+    return;
+  }
+  emit statusChanged(QStringLiteral("<b>%1</b>").arg(QString::fromStdString(annotation->label)),
+                     SourceInspectorPresentation::description(*annotation),
+                     SourceInspectorPresentation::icon(*annotation), boundedInt(annotation->range.offset),
+                     boundedInt(annotation->range.size));
 }

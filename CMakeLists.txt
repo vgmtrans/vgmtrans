@@ -10,6 +10,7 @@ project(
   LANGUAGES C CXX)
 
 include(GNUInstallDirs)
+include(CTest)
 
 set(PROJECT_CHANGELOG_FILE "${PROJECT_SOURCE_DIR}/CHANGELOG.md")
 set(BUILD_CHANGELOG_SCRIPT "${PROJECT_SOURCE_DIR}/build-aux/build-changelog.py")
@@ -112,3 +113,7 @@ include(VGMTransWarnings)
 # ~~~
 
 add_subdirectory(src)
+
+if(BUILD_TESTING)
+  add_subdirectory(tests)
+endif()

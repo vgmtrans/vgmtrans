@@ -1,0 +1,483 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include "value/formats/NinSnes/NinSnes.h"
+
+#include "value/base/RecordReader.h"
+#include "value/platform/SnesSampleDirectory.h"
+#include "value/synth/SnesDsp.h"
+
+#include <fmt/format.h>
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <map>
+#include <optional>
+#include <ranges>
+#include <vector>
+
+namespace vgmtrans::formats::nin_snes {
+
+using namespace core;
+
+namespace {
+
+struct InstrumentInfo {
+  u32 program = 0;
+  u8 tuningProgram = 0;
+  u8 srcn = 0;
+  u8 adsr1 = 0;
+  u8 adsr2 = 0;
+  u8 gain = 0;
+  u8 pitchHigh = 0;
+  u8 pitchLow = 0;
+  SourceRecord source;
+  bool override = false;
+  bool drumSource = false;
+  bool noise = false;
+};
+
+struct InstrumentRegion {
+  SampleRef sample;
+  u16 pitchScale = 0;
+  Region region;
+  SourceRecord source;
+  bool noise = false;
+};
+
+[[nodiscard]] bool isNoise(const Profile& selected, const InstrumentInfo& info) {
+  // Sunsoft, FE3 / Metal Combat and TA / Panel de Pon interpret negative
+  // SRCNs as DSP noise, with the clock rate in bits 0-4. FE4 uses literal SRCNs.
+  return info.noise || ((isSunsoft(selected.id) || selected.intelli == IntelliMode::Fe3 ||
+                         selected.intelli == IntelliMode::Ta) && info.srcn >= 0x80);
+}
+
+[[nodiscard]] bool blankSlot(ByteReader reader, const Profile& selected, u16 program, u32 address) {
+  if (selected.instruments == InstrumentLayout::Earlier5Byte) {
+    return false;
+  }
+  const u32 size = instrumentHeaderSize(selected);
+  if (!reader.has(address, size)) {
+    return false;
+  }
+  bool allZero = true;
+  bool allFf = true;
+  bool identityMappedSilent = reader.u8At(address) == static_cast<u8>(program);
+  for (u32 offset = 0; offset < size; ++offset) {
+    const u8 byte = reader.u8At(address + offset);
+    allZero &= byte == 0;
+    allFf &= byte == 0xff;
+    identityMappedSilent &= offset == 0 || byte == 0;
+  }
+  // Some drivers initialize unused rows with only their identity-mapped SRCN.
+  // Zero ADSR, GAIN, and pitch fields make the row unambiguously silent, but
+  // it remains a sparse slot rather than terminating later instrument banks.
+  return allZero || allFf || identityMappedSilent;
+}
+
+[[nodiscard]] bool validHeader(ByteReader reader, const Profile& selected, const InstrumentInfo& info,
+                               u16 directoryAddress, bool inspectSample) {
+  bool onlyPaddingBytes = true;
+  for (u32 offset = 0; offset < instrumentHeaderSize(selected); ++offset) {
+    const u8 byte = reader.u8At(static_cast<u32>(info.source.range.offset) + offset);
+    onlyPaddingBytes &= byte == 0x00 || byte == 0xff;
+  }
+  if (onlyPaddingBytes) {
+    return false;
+  }
+  if (info.adsr1 == 0 && info.gain == 0) {
+    return false;
+  }
+  if (isNoise(selected, info)) {
+    return true;
+  }
+  if (info.srcn >= 0x80 && selected.intelli != IntelliMode::Fe4 && selected.id != ProfileId::Quest) {
+    return false;
+  }
+  const auto directory = readSnesSampleDirectoryEntry(reader, directoryAddress + info.srcn * 4, inspectSample);
+  if (!directory || directory->startAddress > directory->loopAddress || !directory->loopAddressIsBlockAligned()) {
+    return false;
+  }
+  if (inspectSample && !directory->stream) {
+    return false;
+  }
+  return true;
+}
+
+[[nodiscard]] InstrumentInfo readInstrument(ByteReader reader, const Profile& selected, u32 program, u32 address) {
+  const bool earlier = selected.instruments == InstrumentLayout::Earlier5Byte;
+  RecordReader record(reader, address, address + instrumentHeaderSize(selected));
+  const u8 srcn = *record.u8("srcn", SourceValueDisplay::Hex);
+  const u8 adsr1 = *record.u8("adsr1", SourceValueDisplay::Hex);
+  const u8 adsr2 = *record.u8("adsr2", SourceValueDisplay::Hex);
+  const u8 gain = *record.u8("gain", SourceValueDisplay::Hex);
+  const u8 pitchHigh = *record.u8("pitch_high", SourceValueDisplay::Hex);
+  const u8 pitchLow = earlier ? 0 : *record.u8("pitch_low", SourceValueDisplay::Hex);
+  return InstrumentInfo{
+      .program = program,
+      .tuningProgram = static_cast<u8>(program),
+      .srcn = srcn,
+      .adsr1 = adsr1,
+      .adsr2 = adsr2,
+      .gain = gain,
+      .pitchHigh = pitchHigh,
+      .pitchLow = pitchLow,
+      .source = std::move(record).finish(),
+  };
+}
+
+[[nodiscard]] std::vector<InstrumentInfo> collectBaseInstruments(ByteReader reader, const Layout& layout) {
+  std::vector<InstrumentInfo> infos;
+  if (!layout.instrumentTableAddress || !layout.spcDirAddress) {
+    return infos;
+  }
+  const Profile& selected = profile(layout.profile);
+  const u32 size = instrumentHeaderSize(selected);
+  u32 tableEnd = kAramSize;
+  for (const u32 boundary : {layout.songListAddress, layout.playlistAddress}) {
+    if (boundary > *layout.instrumentTableAddress) {
+      tableEnd = std::min(tableEnd, boundary);
+    }
+  }
+  if (layout.percussionTableAddress) {
+    tableEnd = std::min(tableEnd, *layout.percussionTableAddress);
+  }
+  if ((selected.intelli != IntelliMode::None || isSunsoft(selected.id)) &&
+      *layout.spcDirAddress > *layout.instrumentTableAddress) {
+    tableEnd = std::min<u32>(tableEnd, *layout.spcDirAddress);
+  }
+  for (u16 program = 0; program < instrumentSlotCount(selected); ++program) {
+    const u32 address = *layout.instrumentTableAddress + program * size;
+    if (address + size > tableEnd) {
+      break;
+    }
+    if (!reader.has(address, size)) {
+      break;
+    }
+    if (blankSlot(reader, selected, program, address)) {
+      continue;
+    }
+    InstrumentInfo info = readInstrument(reader, selected, program, address);
+    if (isNoise(selected, info)) {
+      if (validHeader(reader, selected, info, *layout.spcDirAddress, false)) {
+        infos.push_back(std::move(info));
+      }
+      continue;
+    }
+    const u32 directoryEntry = *layout.spcDirAddress + info.srcn * 4;
+    if (reader.has(directoryEntry, 4)) {
+      const u16 start = reader.le16(directoryEntry);
+      const u16 loop = reader.le16(directoryEntry + 2);
+      if ((start == 0 && loop == 0) || (start == 0xffff && loop == 0xffff)) {
+        continue;
+      }
+    }
+    // Most driver tables end at an invalid header. Intelligent Systems also
+    // has structurally invalid holes inside its bounded table.
+    if (!validHeader(reader, selected, info, *layout.spcDirAddress, false)) {
+      // Intelligent Systems banks have partially cleared/padded rows between
+      // their resident instruments and song-specific instruments at index 32.
+      if (selected.intelli != IntelliMode::None) {
+        continue;
+      }
+      break;
+    }
+    if (!validHeader(reader, selected, info, *layout.spcDirAddress, true)) {
+      continue;
+    }
+    if ((selected.base == BaseProfile::Earlier || selected.id == ProfileId::Standard) &&
+        reader.le16(directoryEntry) < directoryEntry + 4) {
+      continue;
+    }
+    infos.push_back(std::move(info));
+  }
+  return infos;
+}
+
+[[nodiscard]] std::vector<InstrumentInfo> collectEarlierPercussion(ByteReader reader, const Layout& layout,
+                                                                   const SequenceRecipes& recipes) {
+  std::vector<InstrumentInfo> infos;
+  if (!layout.percussionTableAddress || !layout.spcDirAddress || recipes.drumKits.empty()) {
+    return infos;
+  }
+  const Profile& selected = profile(layout.profile);
+  for (const DrumSlot& slot : recipes.drumKits.front().slots) {
+    if (slot.sourceProgram < kEarlierPercussionProgramBase) {
+      continue;
+    }
+    const u32 address = *layout.percussionTableAddress + (slot.sourceProgram - kEarlierPercussionProgramBase) * 6;
+    InstrumentInfo info = readInstrument(reader, selected, slot.sourceProgram, address);
+    info.source.range = reader.range(address, 6);
+    info.source.fields.push_back(SourceField{
+        .name = "note",
+        .range = reader.range(address + 5, 1),
+        .value = makeSourceValue(reader.u8At(address + 5)),
+        .display = SourceValueDisplay::Hex,
+    });
+    info.drumSource = true;
+    if (validHeader(reader, selected, info, *layout.spcDirAddress, true)) {
+      infos.push_back(std::move(info));
+    }
+  }
+  return infos;
+}
+
+[[nodiscard]] std::vector<InstrumentInfo> collectOverrides(const SequenceRecipes& recipes) {
+  std::vector<InstrumentInfo> infos;
+  infos.reserve(recipes.overrides.size());
+  for (const auto& definition : recipes.overrides) {
+    infos.push_back(InstrumentInfo{
+        .program = definition.program,
+        .tuningProgram = definition.tuningProgram,
+        .srcn = definition.srcn,
+        .adsr1 = definition.adsr1,
+        .adsr2 = definition.adsr2,
+        .gain = definition.gain,
+        .pitchHigh = definition.pitchHigh,
+        .pitchLow = definition.pitchLow,
+        .source = SourceRecord{.range = definition.source},
+        .override = true,
+        .noise = definition.noise,
+    });
+  }
+  return infos;
+}
+
+[[nodiscard]] SnesBrrCatalog collectSamples(ByteReader reader, const Layout& layout,
+                                            const std::vector<InstrumentInfo>& instruments) {
+  auto sampledInstruments = instruments | std::views::filter([&](const InstrumentInfo& instrument) {
+    return !isNoise(profile(layout.profile), instrument);
+  });
+  return readSnesBrrCatalog(reader, *layout.spcDirAddress, sampledInstruments, &InstrumentInfo::srcn);
+}
+
+[[nodiscard]] u16 readPitchScale(const Profile& selected, const InstrumentInfo& info) {
+  return selected.instruments == InstrumentLayout::Earlier5Byte
+             ? static_cast<u16>(static_cast<s8>(info.pitchHigh) * 256)
+             : static_cast<u16>((info.pitchHigh << 8) | info.pitchLow);
+}
+
+[[nodiscard]] double standardUnityKey(u16 pitchScale) {
+  if (pitchScale == 0) {
+    return 96.0;
+  }
+  // The DSP masks the final note pitch to 14 bits, not the instrument's scale.
+  // Wrapping at a fixed reference note incorrectly detunes high-scale bass samples.
+  return 96.0 - std::log2(pitchScale * (4286.0 / 4096.0) / 256.0) * 12.0;
+}
+
+void applyPitchWrap(Region& region, u16 pitchScale, int key) {
+  if (pitchScale == 0 || key < 24) {
+    return;
+  }
+  // N-SPC interpolates this octave, shifts it, then multiplies by the scale.
+  // Keep the integer truncation: rounding near $4000 changes the wrapped pitch drastically.
+  constexpr std::array<u16, 13> pitches{0x085f, 0x08de, 0x0965, 0x09f4, 0x0a8c, 0x0b2c, 0x0bd6,
+                                       0x0c8b, 0x0d4a, 0x0e14, 0x0eea, 0x0fcd, 0x10be};
+  const int note = key - 24;
+  // The driver slightly adjusts notes outside its middle register before interpolation.
+  const int correction = note >= 0x34 ? note - 0x34 : note < 0x13 ? (note - 0x13) * 2 : 0;
+  const int pitchKey = note * 256 + correction;
+  // Outside the driver's seven octaves its shift loop yields zero, not overflow.
+  if (pitchKey < 0 || pitchKey >= 84 * 256) {
+    return;
+  }
+  const int semitone = pitchKey >> 8;
+  const int index = semitone % 12;
+  const u32 interpolated = pitches[index] + ((pitches[index + 1] - pitches[index]) * (pitchKey & 0xff) >> 8);
+  const u32 basePitch = (interpolated * 2) >> (6 - semitone / 12);
+  const u32 pitch = (basePitch * pitchScale) >> 8;
+  if (pitch <= 0x3fff) {
+    return;
+  }
+  const u32 wrapped = pitch & 0x3fff;
+  region.unityKey = wrapped == 0 ? key : key - 12.0 * std::log2(wrapped / 4096.0);
+  if (wrapped == 0) {
+    region.attenuationDb = 144.0;
+  }
+}
+
+[[nodiscard]] double konamiUnityKey(s8 coarse, u8 fine) {
+  const double correction = std::log2(4045.0 / 4096.0) * 12.0;
+  const auto fineCents = static_cast<s16>(((fine / 256.0) + correction) * 100.0);
+  return 71.0 - coarse - fineCents / 100.0;
+}
+
+[[nodiscard]] double unityKey(ByteReader reader, const Layout& layout, const InstrumentInfo& info) {
+  const Profile& selected = profile(layout.profile);
+  if (selected.instruments == InstrumentLayout::KonamiTuningTable && layout.konamiTuningTableAddress != 0) {
+    s8 coarse = 0;
+    u8 fine = 0;
+    if (info.tuningProgram < layout.konamiTuningTableSize &&
+        reader.has(layout.konamiTuningTableAddress + layout.konamiTuningTableSize + info.tuningProgram, 1)) {
+      coarse = static_cast<s8>(reader.u8At(layout.konamiTuningTableAddress + info.tuningProgram));
+      fine = reader.u8At(layout.konamiTuningTableAddress + layout.konamiTuningTableSize + info.tuningProgram);
+    }
+    return konamiUnityKey(coarse, fine);
+  }
+  return standardUnityKey(readPitchScale(selected, info));
+}
+
+void addInstruments(InstrumentSetBuilder& builder, ByteReader reader, const Layout& layout,
+                    const SequenceRecipes& recipes, const std::vector<InstrumentInfo>& infos,
+                    const SnesBrrSampleRefs& samples, const std::map<u8, SampleRef>& noiseSamples) {
+  const Profile& selected = profile(layout.profile);
+  std::map<u32, InstrumentRegion> regionsByProgram;
+  for (const InstrumentInfo& info : infos) {
+    const bool noise = isNoise(selected, info);
+    const u16 pitchScale = selected.instruments == InstrumentLayout::KonamiTuningTable
+                               ? u16{0} : readPitchScale(selected, info);
+    const auto sample = noise ? std::optional<SampleRef>{noiseSamples.at(info.srcn & 0x1f)}
+                              : samples.findSrcn(info.srcn);
+    if (!sample) {
+      builder.warning(fmt::format("Instrument {} sample {} was not found", info.program, info.srcn), info.source.range);
+      continue;
+    }
+    const bool rateBasedGain = (info.adsr1 & 0x80) == 0 && (info.gain & 0x80) != 0;
+    Region region{
+        .unityKey = unityKey(reader, layout, info),
+        // Direct GAIN is fully described by the header. Rate-based GAIN starts
+        // from the DSP's live envelope, so a static region cannot infer it.
+        .envelope = rateBasedGain ? Envelope{} : snesDspEnvelope(info.adsr1, info.adsr2, info.gain),
+    };
+    regionsByProgram.emplace(info.program, InstrumentRegion{
+                                               .sample = *sample,
+                                               .pitchScale = pitchScale,
+                                               .region = region,
+                                               .source = info.source,
+                                               .noise = noise,
+                                           });
+    if (info.drumSource) {
+      continue;
+    }
+
+    const std::string name = info.override ? fmt::format("Instrument {} (Overwrite)", info.program)
+                                           : fmt::format("Instrument {}", info.program);
+    auto instrument = builder.add(info.program, Instrument{
+                                                    .identity =
+                                                        InstrumentIdentity{
+                                                            .domain = std::string(kInstrumentDomain),
+                                                            .key = info.program,
+                                                        },
+                                                    .name = name,
+                                                });
+    if (info.source.range.valid()) {
+      instrument.source(name, info.source, info.override ? "nin-snes-instrument-override" : "nin-snes-instrument");
+    }
+    if (noise) {
+      // Noise ignores DSP pitch. A fixed-pitch region per key also preserves
+      // that behavior in SoundFonts, which otherwise transpose the sample.
+      for (u8 key = 0; key < 128; ++key) {
+        region.keyRange = KeyRange{.low = key, .high = key};
+        region.unityKey = key;
+        instrument.region(*sample, region).source("Noise", info.source, "nin-snes-region");
+      }
+    } else {
+      const auto addRegion = [&](const Region& zone) {
+        instrument.region(*sample, zone)
+            .source("Region", info.source, "nin-snes-region")
+            .description(fmt::format("Sample {}", sample->index()));
+      };
+      Region zone = region;
+      for (int key = 0; key < 128; ++key) {
+        Region tuned = region;
+        if (recipes.usedNotes.contains({info.program, static_cast<u8>(key)})) {
+          applyPitchWrap(tuned, pitchScale, key);
+        }
+        if (tuned.unityKey != zone.unityKey || tuned.attenuationDb != zone.attenuationDb) {
+          addRegion(zone);
+          zone = tuned;
+          zone.keyRange.low = static_cast<u8>(key);
+        }
+        zone.keyRange.high = static_cast<u8>(key);
+      }
+      addRegion(zone);
+    }
+  }
+
+  for (const DrumKit& kit : recipes.drumKits) {
+    std::vector<std::pair<const DrumSlot*, const InstrumentRegion*>> resolvedSlots;
+    for (const DrumSlot& slot : kit.slots) {
+      if (const auto source = regionsByProgram.find(slot.sourceProgram); source != regionsByProgram.end()) {
+        resolvedSlots.emplace_back(&slot, &source->second);
+      }
+    }
+    if (resolvedSlots.empty()) {
+      builder.warning(fmt::format("Drum kit {} had no resolvable regions", kit.program));
+      continue;
+    }
+
+    const u32 key = (0x7fu << 7) | kit.program;
+    auto drum = builder.add(key, Instrument{
+                                     .explicitAddress = InstrumentAddress{.bank = 0x7f, .program = kit.program},
+                                     .identity =
+                                         InstrumentIdentity{
+                                             .domain = std::string(kInstrumentDomain),
+                                             .key = key,
+                                         },
+                                     .name = fmt::format("Drum Kit {}", kit.program),
+                                 });
+    for (const auto& [slot, source] : resolvedSlots) {
+      Region region = source->region;
+      region.keyRange = KeyRange{.low = slot->key, .high = slot->key};
+      if (selected.id == ProfileId::Konami) {
+        // Konami's percussion loader explicitly clears melodic coarse/fine tuning.
+        region.unityKey = konamiUnityKey(0, 0);
+      } else if (!source->noise) {
+        applyPitchWrap(region, source->pitchScale, slot->sourceKey);
+      }
+      region.unityKey = source->noise ? slot->key
+                                    : region.unityKey + static_cast<int>(slot->key) - slot->sourceKey;
+      drum.region(source->sample, std::move(region))
+          .source(fmt::format("Drum {}", slot->key), source->source, "nin-snes-drum-region");
+    }
+  }
+}
+
+}  // namespace
+
+std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
+                                           const SequenceRecipes& recipes, std::string_view displayName) {
+  if (!layout.instrumentTableAddress || !layout.spcDirAddress) {
+    return std::nullopt;
+  }
+  const ByteReader reader = builder.reader();
+  std::vector<InstrumentInfo> instruments = collectBaseInstruments(reader, layout);
+  std::vector<InstrumentInfo> overrides = collectOverrides(recipes);
+  instruments.insert(instruments.end(), overrides.begin(), overrides.end());
+  std::vector<InstrumentInfo> percussion = collectEarlierPercussion(reader, layout, recipes);
+  instruments.insert(instruments.end(), percussion.begin(), percussion.end());
+  const SnesBrrCatalog catalog = collectSamples(reader, layout, instruments);
+  const Profile& selected = profile(layout.profile);
+  const bool hasNoise =
+      std::ranges::any_of(instruments, [&](const InstrumentInfo& info) { return isNoise(selected, info); });
+  if (instruments.empty() || (catalog.samples.empty() && !hasNoise)) {
+    return std::nullopt;
+  }
+
+  auto bank = builder.soundBank(fmt::format("{} Instruments", displayName));
+  const SnesBrrSampleRefs sampleRefs = addSnesBrrSamples(bank.localSamples(), reader, catalog);
+  std::map<u8, SampleRef> noiseSamples;
+  for (const InstrumentInfo& info : instruments) {
+    const u8 rate = info.srcn & 0x1f;
+    if (isNoise(selected, info) && !noiseSamples.contains(rate)) {
+      noiseSamples.emplace(rate, bank.localSamples()
+                                     .add(0x100u + rate,
+                                          Sample{.name = fmt::format("DSP Noise {}", rate),
+                                                 .codec = AudioCodec::SnesDspNoise,
+                                                 .encodedData = reader.range(0, 0),
+                                                 .sampleRate = kSnesDspSampleRate,
+                                                 .loop = Loop{.enabled = true, .length = kSnesDspNoiseSampleCount},
+                                                 .codecParameter = rate})
+                                     .ref());
+    }
+  }
+  addInstruments(bank.instruments(), reader, layout, recipes, instruments, sampleRefs, noiseSamples);
+  return bank;
+}
+
+}  // namespace vgmtrans::formats::nin_snes

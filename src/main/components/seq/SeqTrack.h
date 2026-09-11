@@ -242,8 +242,8 @@ private:
   void insertNoteByDur(u32 offset, u32 length, s8 key, s8 vel, u32 dur, u32 absTime, const std::string &sEventName = "Note On With Duration");
   void insertNoteByDurNoItem(s8 key, s8 vel, u32 dur, u32 absTime);
 
-  void makePrevDurNoteEnd() const;
-  void makePrevDurNoteEnd(u32 absTime) const;
+  void makePrevDurNoteEnd();
+  void makePrevDurNoteEnd(u32 absTime);
   void limitPrevDurNoteEnd() const;
   void limitPrevDurNoteEnd(u32 absTime) const;
   void addVol(u32 offset, u32 length, u8 vol, const std::string &sEventName = "Volume");
@@ -254,6 +254,7 @@ private:
   void addExpression(u32 offset, u32 length, u8 level, const std::string &sEventName = "Expression");
   void addExpression(u32 offset, u32 length, double levelPercent, Resolution res, const std::string &sEventName = "Expression");
   void addExpressionNoItem(u8 level);
+  void addExpressionNoItem(double levelPercent, Resolution res);
   void addExpressionSlide(u32 offset, u32 length, u32 dur, u8 targExpr, const std::string &sEventName = "Expression Slide");
   void insertExpression(u32 offset, u32 length, u8 level, u32 absTime, const std::string &sEventName = "Expression");
   void insertExpressionNoItem(u8 level, u32 absTime);
@@ -264,6 +265,8 @@ private:
 
   void addPan(u32 offset, u32 length, u8 pan, const std::string &sEventName = "Pan");
   void addPanNoItem(u8 pan);
+  void addMidiPan(u32 offset, u32 length, u8 pan, const std::string &sEventName = "Pan");
+  void addMidiPanNoItem(u8 pan);
   void addPanSlide(u32 offset, u32 length, u32 dur, u8 targPan, const std::string &sEventName = "Pan Slide");
   void insertPan(u32 offset, u32 length, u8 pan, u32 absTime, const std::string &sEventName = "Pan");
   void addReverb(u32 offset, u32 length, u8 reverb, const std::string &sEventName = "Reverb");
@@ -377,10 +380,13 @@ private:
   u8 octave;
   u16 vol;
   Resolution volResolution;
+  double volLevel;
   u16 expression;
   Resolution expressionResolution;
+  double expressionLevel;
   u16 mastVol;
   Resolution masterVolResolution;
+  double masterVolLevel;
   double panVolumeCorrectionRate; // as percentage of original volume (default: 1.0)
   u16 prevPan;
   u8 prevReverb;

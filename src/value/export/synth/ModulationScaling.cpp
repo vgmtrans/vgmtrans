@@ -1,0 +1,288 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include "value/export/synth/ModulationScaling.h"
+
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <optional>
+#include <type_traits>
+#include <variant>
+
+namespace vgmtrans::core {
+
+namespace {
+
+s32 synthAmountFromSecondsRange(double minSeconds, double maxSeconds) {
+  const s32 minAmount = synthAmountFromSeconds(synthSecondsRangeMinimum(minSeconds));
+  const s32 maxAmount = synthAmountFromSeconds(maxSeconds);
+  const double fullScaleRange = (maxAmount - minAmount) * 128.0 / 127.0;
+  return static_cast<s32>(std::lround(fullScaleRange));
+}
+
+[[nodiscard]] u8 midiControllerValue(double normalized) noexcept {
+  return static_cast<u8>(std::lround(std::clamp(normalized, 0.0, 1.0) * 127.0));
+}
+
+[[nodiscard]] bool shouldScale(std::optional<double> maximum, ModulationScalingPolicy policy) noexcept {
+  // Only scale when the observed maximum leaves unused controller headroom. Full-range
+  // data already has the best available 7-bit resolution.
+  return policy == ModulationScalingPolicy::ObservedSequenceRange && maximum && midiControllerValue(*maximum) < 127;
+}
+
+[[nodiscard]] u8 scaledMidiModulationControllerValue(u8 value, std::optional<double> normalizedAmount,
+                                                     std::optional<double> maximum,
+                                                     ModulationScalingPolicy policy) noexcept {
+  if (!shouldScale(maximum, policy)) {
+    return value;
+  }
+  double amount = value;
+  double range = midiControllerValue(*maximum);
+  if (normalizedAmount && *maximum > 0.0) {
+    amount = std::clamp(*normalizedAmount, 0.0, *maximum);
+    range = *maximum;
+  }
+  return range > 0.0 ? static_cast<u8>(std::clamp<long>(std::lround(amount * 127.0 / range), 0, 127)) : 0;
+}
+
+[[nodiscard]] std::optional<double> maximumForDefaultModulator(const SynthModulator& modulator,
+                                                               const MidiModulationUsage& usage) noexcept {
+  if (modulator.source != SynthSource::DefaultController) {
+    return std::nullopt;
+  }
+
+  switch (modulator.destination) {
+    case SynthDestination::VibratoDepth:
+      return usage.vibratoDepth;
+    case SynthDestination::VibratoRate:
+      return usage.vibratoRate;
+    case SynthDestination::VibratoDelay:
+      return std::nullopt;
+    case SynthDestination::TremoloDepth:
+      return usage.tremoloDepth;
+    case SynthDestination::TremoloRate:
+      return usage.tremoloRate;
+    case SynthDestination::TremoloDelay:
+      return std::nullopt;
+    case SynthDestination::VolumeAttenuation:
+      return usage.tremoloDepth;
+    case SynthDestination::Unknown:
+      return std::nullopt;
+  }
+
+  return std::nullopt;
+}
+
+[[nodiscard]] bool canUseNativeSynthLfo(std::optional<LfoWaveform> waveform) noexcept {
+  // SF2 and DLS cannot select an LFO waveform. Their built-in periodic LFO is
+  // still a useful approximation for sine, square, triangle, and sawtooth.
+  // Noise has no comparable native representation.
+  return waveform != LfoWaveform::Noise;
+}
+
+}  // namespace
+
+s32 synthAmountFromHertz(double hertz) {
+  // SF2 and DLS express LFO frequency in absolute cents relative to C-1.
+  return static_cast<s32>(std::lround(1200.0 * std::log2(hertz / 8.176)));
+}
+
+s32 synthAmountFromHertzRange(double minHertz, double maxHertz) {
+  const double minCents = static_cast<double>(synthAmountFromHertz(minHertz));
+  const double maxCents = static_cast<double>(synthAmountFromHertz(maxHertz));
+  return static_cast<s32>(std::lround((maxCents - minCents) * 128.0 / 127.0));
+}
+
+s32 synthAmountFromSeconds(double seconds) {
+  if (seconds <= 0.0 || !std::isfinite(seconds)) {
+    return std::numeric_limits<s16>::min();
+  }
+
+  const double timecents = std::round(1200.0 * std::log2(seconds));
+  return static_cast<s32>(std::clamp(timecents, static_cast<double>(std::numeric_limits<s16>::min()),
+                                     static_cast<double>(std::numeric_limits<s16>::max())));
+}
+
+s32 synthAmountFromCentibels(double centibels) {
+  return static_cast<s32>(std::lround(centibels));
+}
+
+s32 synthAmountFromDecibels(double decibels) {
+  return static_cast<s32>(std::lround(decibels * 10.0));
+}
+
+double synthSecondsRangeMinimum(double seconds) {
+  // The smallest normal SF2 delay is -12000 timecents.
+  return std::max(seconds, 1.0 / 1024.0);
+}
+
+LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulation,
+                                            ModulationConversionPolicy conversion) {
+  LoweredSynthModulation lowered;
+
+  if (modulation.vibrato && canUseNativeSynthLfo(modulation.vibrato->waveform)) {
+    const auto& vibrato = *modulation.vibrato;
+    lowered.generators.push_back(SynthGenerator{
+        .destination = SynthDestination::VibratoRate,
+        .amount = synthAmountFromHertz(vibrato.rateHertz.minimum),
+    });
+    if (vibrato.delaySeconds) {
+      lowered.generators.push_back(SynthGenerator{
+          .destination = SynthDestination::VibratoDelay,
+          .amount = synthAmountFromSeconds(synthSecondsRangeMinimum(vibrato.delaySeconds->minimum)),
+      });
+    }
+
+    if (vibrato.depthMode == ModulationDepthMode::Fixed) {
+      lowered.generators.push_back(SynthGenerator{
+          .destination = SynthDestination::VibratoDepth,
+          .amount = static_cast<s32>(std::lround(vibrato.maxDepthCents)),
+      });
+    } else {
+      lowered.modulators.push_back(SynthModulator{
+          .source = SynthSource::ChannelPressure,
+          .destination = SynthDestination::VibratoDepth,
+          .amount = 0,
+      });
+      lowered.modulators.push_back(SynthModulator{
+          .destination = SynthDestination::VibratoDepth,
+          .amount = static_cast<s32>(std::lround(vibrato.maxDepthCents)),
+      });
+    }
+    const s32 rateAmount = synthAmountFromHertzRange(vibrato.rateHertz.minimum, vibrato.rateHertz.maximum);
+    if (rateAmount != 0) {
+      lowered.modulators.push_back(SynthModulator{
+          .destination = SynthDestination::VibratoRate,
+          .amount = rateAmount,
+      });
+    }
+    if (vibrato.delaySeconds) {
+      const s32 delayAmount = synthAmountFromSecondsRange(vibrato.delaySeconds->minimum, vibrato.delaySeconds->maximum);
+      if (delayAmount != 0) {
+        lowered.modulators.push_back(SynthModulator{
+            .destination = SynthDestination::VibratoDelay,
+            .amount = delayAmount,
+        });
+      }
+    }
+  }
+
+  if (modulation.tremolo && canUseNativeSynthLfo(modulation.tremolo->waveform)) {
+    const auto& tremolo = *modulation.tremolo;
+    lowered.generators.push_back(SynthGenerator{
+        .destination = SynthDestination::TremoloRate,
+        .amount = synthAmountFromHertz(tremolo.rateHertz.minimum),
+    });
+    if (tremolo.delaySeconds) {
+      lowered.generators.push_back(SynthGenerator{
+          .destination = SynthDestination::TremoloDelay,
+          .amount = synthAmountFromSeconds(synthSecondsRangeMinimum(tremolo.delaySeconds->minimum)),
+      });
+    }
+
+    const s32 rateAmount = synthAmountFromHertzRange(tremolo.rateHertz.minimum, tremolo.rateHertz.maximum);
+    if (rateAmount != 0) {
+      lowered.modulators.push_back(SynthModulator{
+          .destination = SynthDestination::TremoloRate,
+          .amount = rateAmount,
+      });
+    }
+    if (tremolo.delaySeconds) {
+      const s32 delayAmount = synthAmountFromSecondsRange(tremolo.delaySeconds->minimum, tremolo.delaySeconds->maximum);
+      if (delayAmount != 0) {
+        lowered.modulators.push_back(SynthModulator{
+            .destination = SynthDestination::TremoloDelay,
+            .amount = delayAmount,
+        });
+      }
+    }
+    const s32 tremoloDepth = synthAmountFromDecibels(tremolo.maxDepthDb);
+    if (tremolo.depthMode == ModulationDepthMode::Fixed) {
+      lowered.generators.push_back(SynthGenerator{
+          .destination = SynthDestination::TremoloDepth,
+          .amount = tremoloDepth,
+      });
+    } else {
+      lowered.modulators.push_back(SynthModulator{
+          .destination = SynthDestination::TremoloDepth,
+          .amount = tremoloDepth,
+      });
+    }
+    if (tremolo.gainMode == TremoloGainMode::NoBoost) {
+      if (tremolo.depthMode == ModulationDepthMode::Fixed) {
+        lowered.generators.push_back(SynthGenerator{
+            .destination = SynthDestination::VolumeAttenuation,
+            .amount = tremoloDepth,
+        });
+      } else {
+        lowered.modulators.push_back(SynthModulator{
+            .destination = SynthDestination::VolumeAttenuation,
+            .amount = tremoloDepth,
+        });
+      }
+    }
+  }
+
+  if (conversion == ModulationConversionPolicy::SequenceEventSimulation) {
+    // Sequence events supply the varying modulation. Keep only the static
+    // attenuation that places a fixed no-boost tremolo below nominal gain.
+    std::erase_if(lowered.generators, [](const SynthGenerator& generator) {
+      return generator.destination != SynthDestination::VolumeAttenuation;
+    });
+    lowered.modulators.clear();
+  }
+  return lowered;
+}
+
+void applyMidiModulationScaling(MidiSequence& sequence, const MidiModulationUsage& usage,
+                                ModulationScalingPolicy policy) {
+  for (auto& track : sequence.tracks) {
+    for (auto& event : track.events) {
+      auto* message = std::get_if<MidiChannelMessage>(&event.payload);
+      if (message == nullptr || message->kind != MidiChannelMessageKind::ControlChange) {
+        continue;
+      }
+      std::optional<double> observedMaximum;
+      switch (static_cast<MidiController>(message->parameter)) {
+        case MidiController::Modulation:
+          observedMaximum = usage.vibratoDepth;
+          break;
+        case MidiController::VibratoRate:
+          observedMaximum = usage.vibratoRate;
+          break;
+        case MidiController::TremoloDepth:
+          observedMaximum = usage.tremoloDepth;
+          break;
+        case MidiController::TremoloRate:
+          observedMaximum = usage.tremoloRate;
+          break;
+        default:
+          continue;
+      }
+      message->value = scaledMidiModulationControllerValue(static_cast<u8>(message->value), message->normalizedAmount,
+                                                           observedMaximum, policy);
+    }
+  }
+}
+
+s32 scaledSynthModulatorAmount(const SynthModulator& modulator, const MidiModulationUsage* usage,
+                               ModulationScalingPolicy policy) noexcept {
+  if (usage == nullptr) {
+    return modulator.amount;
+  }
+
+  const auto observedMaximum = maximumForDefaultModulator(modulator, *usage);
+  if (!shouldScale(observedMaximum, policy)) {
+    return modulator.amount;
+  }
+
+  // If MIDI controller values are expanded upward, the synth-side modulator amount must
+  // shrink by the same ratio so the audible depth stays unchanged.
+  return static_cast<s32>(std::lround(static_cast<double>(modulator.amount) * *observedMaximum));
+}
+
+}  // namespace vgmtrans::core

@@ -1,0 +1,863 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include "value/formats/MP2k/MP2k.h"
+
+#include "value/formats/MP2k/MP2kEnvelope.h"
+
+#include "value/sequence/BytecodeDecode.h"
+#include "value/sequence/CommandSourceMap.h"
+#include "value/sequence/CompiledCommandRuntime.h"
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <limits>
+#include <map>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace vgmtrans::formats::mp2k {
+
+using namespace core;
+
+namespace {
+
+constexpr u32 kMaxTrackCommands = 262144;
+constexpr ValueQuantization kMp2kLevelQuantization{.levels = 128};
+constexpr std::array<u8, 49> kClockTable{
+    0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+    28, 30, 32, 36, 40, 42, 44, 48, 52, 54, 56, 60, 64, 66, 68, 72, 76, 78, 80, 84, 88, 90, 92, 96,
+};
+
+struct RuntimeConfig {
+  RetainedSource source;
+  std::vector<Mp2kTone> tones;
+  double reverbSend = 0.0;
+};
+
+struct ProgramState {
+  explicit ProgramState(const RuntimeConfig& config)
+      : reader(config.source.reader()), tones(config.tones), reverbSend(config.reverbSend) {}
+
+  ByteReader reader;
+  std::span<const Mp2kTone> tones;
+  double reverbSend = 0.0;
+  std::array<u8, 256> memory{};
+};
+
+struct LfoState {
+  u8 speed = 22;
+  u8 delay = 0;
+  u8 depth = 0;
+  u8 type = 0;
+  u8 phase = 0;
+  u8 delayRemaining = 0;
+  u64 tick = 0;
+  bool emitted = false;
+};
+
+struct ActiveNote {
+  PerformanceNoteId id;
+  u64 endTick = 0;
+};
+
+enum class CgbRoute { Direct, Left, Both, Right };
+
+struct CgbMix {
+  u8 envelope;
+  CgbRoute route;
+};
+
+struct TrackState {
+  s32 transpose = 0;
+  u8 bendRange = 2;
+  Mp2kTone tone{.type = 1};
+  u8 previousKey = 0;
+  u8 previousVelocity = 0;
+  u8 patternDepth = 0;
+  u8 volume = 0;
+  u8 pan = 64;
+  bool cgbEnvelopeOverride = false;
+  double emittedLevel = 0.0;
+  double emittedReverb = -1.0;
+  CgbRoute emittedRoute = CgbRoute::Direct;
+  LfoState lfo;
+  std::map<u8, PerformanceNoteId> tiedNotes;
+  std::vector<ActiveNote> activeNotes;
+};
+
+[[nodiscard]] double panPosition(u8 value) {
+  // TrkVolPitSet forms y = 2 * (value - 64), then uses (127-y)/256
+  // and (y+128)/256 as its left/right factors. The position describes their
+  // ratio; Playback::pan retains the separate 255/256 total gain.
+  const s32 y = std::clamp((static_cast<s32>(value) - 64) * 2, -128, 127);
+  return (2.0 * y + 1.0) / 255.0;
+}
+
+struct Playback {
+  TrackState& track;
+  PerformanceEmitter& out;
+  VmApi& vm;
+  ProgramState& programState;
+
+  [[nodiscard]] Mp2kTone noteTone(u8 key) const {
+    return mp2kToneForKey(programState.reader, track.tone, key).value_or(Mp2kTone{});
+  }
+
+  [[nodiscard]] s8 notePan(const Mp2kTone& tone) const {
+    return track.tone.rhythm() && (tone.panSweep & 0x80) != 0
+               ? static_cast<s8>(static_cast<u8>((tone.panSweep + 0x40) * 2))
+               : 0;
+  }
+
+  [[nodiscard]] s32 modulationValue() const {
+    if (track.lfo.speed == 0 || track.lfo.depth == 0 || track.lfo.delayRemaining != 0) {
+      return 0;
+    }
+    const u8 phase = track.lfo.phase;
+    const s32 triangle = phase < 0x40 || phase >= 0xc0 ? static_cast<s8>(phase) : 0x80 - phase;
+    return track.lfo.depth * triangle >> 6;
+  }
+
+  [[nodiscard]] CgbMix cgbMix(u8 velocity, s8 voicePan, bool modulated) const {
+    u32 combined = static_cast<u32>(track.volume) * 64 >> 5;
+    const s32 modulation = modulated ? modulationValue() : 0;
+    if (modulated && track.lfo.type == 1) {
+      combined = combined * static_cast<u32>(modulation + 128) >> 7;
+    }
+    s32 position = (static_cast<s32>(track.pan) - 64) * 2;
+    if (modulated && track.lfo.type == 2) {
+      position += modulation;
+    }
+    position = std::clamp(position, -128, 127);
+    const u32 rightTrack = combined * static_cast<u32>(position + 128) >> 8;
+    const u32 leftTrack = combined * static_cast<u32>(127 - position) >> 8;
+    const u32 right =
+        std::min<u32>(255, static_cast<u32>(velocity) * static_cast<u32>(voicePan + 128) * rightTrack >> 14);
+    const u32 left =
+        std::min<u32>(255, static_cast<u32>(velocity) * static_cast<u32>(127 - voicePan) * leftTrack >> 14);
+    CgbRoute route = CgbRoute::Both;
+    if (right < left && (left >> 1) >= right) {
+      route = CgbRoute::Left;
+    } else if ((right >> 1) >= left) {
+      route = CgbRoute::Right;
+    }
+    return CgbMix{.envelope = static_cast<u8>(std::min<u32>(15, (left + right) >> 4)), .route = route};
+  }
+
+  [[nodiscard]] static double cgbSpeakerLevel(const Mp2kTone& tone, u8 envelope) {
+    // The driver's full SOUNDCNT_H/NR50 mix contributes envelope / 32 to each routed speaker.
+    const u8 level = std::min<u8>(envelope, 15);
+    return tone.cgbType() == 3 ? std::min<u8>(4, (level + 2) / 4) / 8.0 : level / 32.0;
+  }
+
+  void emitLevel(const Mp2kTone& tone, s8 voicePan = 0) {
+    const double level =
+        tone.cgbType() == 0 ? track.volume / 127.0 : cgbSpeakerLevel(tone, cgbMix(127, voicePan, false).envelope);
+    if (level != track.emittedLevel) {
+      track.emittedLevel = level;
+      out.level(level, kMp2kLevelQuantization);
+    }
+  }
+
+  void emitReverb(const Mp2kTone& tone) {
+    const double send = tone.cgbType() == 0 ? programState.reverbSend : 0.0;
+    if (track.emittedReverb != send) {
+      track.emittedReverb = send;
+      out.reverb(send);
+    }
+  }
+
+  void emitCgbEnvelope(const Mp2kTone& tone, u8 goal) {
+    const double peak = cgbSpeakerLevel(tone, goal);
+    const u8 sustainGoal = static_cast<u8>((static_cast<u32>(goal) * tone.sustain + 15) >> 4);
+    out.updateEnvelope(EnvelopeUpdate::replace(Envelope{
+        .attackSeconds = cgbEnvelopeSeconds(tone.attack, goal),
+        .holdSeconds = cgbEnvelopeSeconds(tone.decay, 1),
+        .decaySeconds = cgbDecaySeconds(tone.decay, goal),
+        .releaseSeconds = cgbDecaySeconds(tone.release, goal),
+        .sustainAmplitude = peak == 0.0 ? 0.0 : cgbSpeakerLevel(tone, sustainGoal) / peak,
+    }));
+  }
+
+  void emitPan(CgbRoute route, bool force = false) {
+    if (!force && track.emittedRoute == route) {
+      return;
+    }
+    track.emittedRoute = route;
+    if (route != CgbRoute::Direct) {
+      out.stereoBalance(route == CgbRoute::Right ? 0.0 : 1.0, route == CgbRoute::Left ? 0.0 : 1.0);
+    } else {
+      out.pan(panPosition(track.pan), 255.0 / 256.0);
+    }
+  }
+
+  void pan(u8 value) {
+    track.pan = value;
+    if (track.emittedRoute != CgbRoute::Direct) {
+      const Mp2kTone tone = noteTone(track.previousKey);
+      const s8 voicePan = notePan(tone);
+      if (tone.cgbType() != 0) {
+        emitPan(cgbMix(track.previousVelocity, voicePan, true).route);
+        emitLevel(tone, voicePan);
+        return;
+      }
+    }
+    emitPan(CgbRoute::Direct, true);
+    emitLevel(track.tone);
+  }
+
+  void syncLfo() {
+    const u64 now = vm.tick();
+    u64 elapsed = now - track.lfo.tick;
+    track.lfo.tick = now;
+    if (track.lfo.speed == 0 || track.lfo.depth == 0) {
+      return;
+    }
+    const u64 delayed = std::min<u64>(elapsed, track.lfo.delayRemaining);
+    track.lfo.delayRemaining -= static_cast<u8>(delayed);
+    elapsed -= delayed;
+    track.lfo.phase = static_cast<u8>(track.lfo.phase + elapsed * track.lfo.speed);
+  }
+
+  [[nodiscard]] LfoPerformanceContext lfoContext(bool restartPhase = false) const {
+    // MPlayMain increments the byte accumulator before calculating its first
+    // triangle sample. A note-triggered delay consumes exactly N source ticks
+    // before sampling this already-advanced phase on tick N.
+    const double resetPhase = track.lfo.speed / 256.0;
+    return LfoPerformanceContext{
+        .cyclesPerTick = track.lfo.speed / 256.0,
+        .delayTicks = track.lfo.delay,
+        .delayIsTempoRelative = true,
+        .shape = LfoShape{.waveform = LfoWaveform::Triangle},
+        .initialPhaseCycles = resetPhase,
+        .delayUpdateMode = LfoDelayUpdateMode::FutureNotesOnly,
+        .restartMode = restartPhase ? LfoRestartMode::Phase : LfoRestartMode::None,
+        .phaseRunsAtZeroDepth = false,
+        .delayRunsWhileInactive = false,
+        .tremoloGainMode = TremoloGainMode::BipolarAroundNominal,
+    };
+  }
+
+  void emitLfoDepth(u8 type, u8 depth, bool restartPhase = false) {
+    auto context = lfoContext(restartPhase);
+    switch (type) {
+      case 0:
+        out.vibratoDepth(depth / 16.0, std::move(context));
+        break;
+      case 1:
+        out.tremoloLinearGainDepth(depth / 128.0, std::move(context));
+        break;
+      case 2:
+        out.panLfoDepth(2.0 * depth / 255.0, std::move(context));
+        break;
+      default:
+        break;
+    }
+  }
+
+  void emitLfoRate(u8 type, bool restartPhase = false) {
+    const double cycles = track.lfo.speed / 256.0;
+    auto context = lfoContext(restartPhase);
+    switch (type) {
+      case 0:
+        out.vibratoRateCyclesPerTick(cycles, std::move(context));
+        break;
+      case 1:
+        out.tremoloRateCyclesPerTick(cycles, std::move(context));
+        break;
+      case 2:
+        out.panLfoRateCyclesPerTick(cycles, std::move(context));
+        break;
+      default:
+        break;
+    }
+  }
+
+  bool initializeLfo() {
+    if (track.lfo.emitted) {
+      return false;
+    }
+    track.lfo.emitted = true;
+    emitLfoRate(track.lfo.type);
+    emitLfoDepth(track.lfo.type, track.lfo.depth);
+    return true;
+  }
+
+  void lfoSpeed(u8 speed) {
+    syncLfo();
+    const bool restart = track.lfo.speed == 0 || speed == 0;
+    track.lfo.speed = speed;
+    if (speed == 0) {
+      track.lfo.phase = 0;
+    }
+    if (!initializeLfo()) {
+      emitLfoRate(track.lfo.type, restart);
+    }
+  }
+
+  void lfoDelay(u8 delay) {
+    syncLfo();
+    track.lfo.delay = delay;
+    track.lfo.emitted = true;
+    emitLfoRate(track.lfo.type);
+    emitLfoDepth(track.lfo.type, track.lfo.depth);
+  }
+
+  void modulationDepth(u8 depth) {
+    syncLfo();
+    const bool restart = depth == 0;
+    track.lfo.depth = depth;
+    if (depth == 0) {
+      track.lfo.phase = 0;
+    }
+    if (!initializeLfo()) {
+      emitLfoDepth(track.lfo.type, depth, restart);
+    }
+  }
+
+  void modulationType(u8 type) {
+    syncLfo();
+    const bool alreadyEmitted = track.lfo.emitted;
+    if (alreadyEmitted) {
+      emitLfoDepth(track.lfo.type, 0);
+    }
+    track.lfo.type = type;
+    if (!initializeLfo() && alreadyEmitted) {
+      emitLfoRate(type);
+      emitLfoDepth(type, track.lfo.depth);
+    }
+  }
+
+  void program(u8 number) {
+    track.tone = number < programState.tones.size() ? programState.tones[number] : Mp2kTone{};
+    track.cgbEnvelopeOverride = false;
+    out.instrument(0, number, InstrumentEnvelopeMode::UseInstrumentEnvelope);
+    emitReverb(track.tone);
+    emitLevel(track.tone);
+  }
+
+  void tempo(u8 raw) {
+    if (raw == 0) {
+      return;
+    }
+    const double bpm = raw * 2.0 * kGbaMixerFrameRate / 60.0;
+    out.tempo(static_cast<u32>(std::llround(60000000.0 / bpm)));
+  }
+
+  void volume(u8 value) {
+    track.volume = value;
+    emitLevel(track.tone);
+  }
+
+  void pitchBend(u8 raw) { out.pitchBend((static_cast<s32>(raw) - 64) * track.bendRange / 64.0); }
+
+  void closeNote(PerformanceNoteId id, u64 tick) {
+    static_cast<void>(out.setNoteEnd(id, tick));
+    if (const auto found = std::ranges::find(track.activeNotes, id, &ActiveNote::id);
+        found != track.activeNotes.end()) {
+      found->endTick = tick;
+    }
+  }
+
+  void note(u8 key, u8 velocity, u32 duration, bool tie) {
+    syncLfo();
+    track.previousKey = key;
+    track.previousVelocity = velocity;
+    std::erase_if(track.activeNotes, [&](const ActiveNote& note) { return note.endTick <= vm.tick(); });
+    const double playedKey = std::clamp<s32>(static_cast<s32>(key) + track.transpose, 0, 127);
+    if (track.lfo.delay != 0) {
+      track.lfo.phase = 0;
+      track.lfo.delayRemaining = track.lfo.delay;
+    }
+    double noteVelocity = velocity / 127.0;
+    const Mp2kTone tone = noteTone(key);
+    const s8 voicePan = notePan(tone);
+    emitLevel(tone, voicePan);
+    emitReverb(tone);
+    if (tone.cgbType() != 0) {
+      const CgbMix referenceMix = cgbMix(127, voicePan, false);
+      const CgbMix noteMix = cgbMix(velocity, voicePan, true);
+      emitPan(noteMix.route);
+      const double referenceLevel = cgbSpeakerLevel(tone, referenceMix.envelope);
+      emitCgbEnvelope(tone, noteMix.envelope);
+      track.cgbEnvelopeOverride = true;
+      noteVelocity = referenceLevel == 0.0 ? 0.0 : cgbSpeakerLevel(tone, noteMix.envelope) / referenceLevel;
+      if (track.lfo.type == 1) {
+        noteVelocity /= (modulationValue() + 128) / 128.0;
+      }
+    } else {
+      emitPan(CgbRoute::Direct);
+      if (track.cgbEnvelopeOverride) {
+        out.restoreEnvelope();
+        track.cgbEnvelopeOverride = false;
+      }
+    }
+    std::optional<double> maximumDurationMilliseconds;
+    const u8 cgbType = tone.cgbType();
+    if (cgbType != 0 && tone.length != 0) {
+      const u32 counter = cgbType == 3 ? 256u - tone.length : 64u - (tone.length & 0x3f);
+      maximumDurationMilliseconds = counter * 1000.0 / 256.0;
+    }
+    const auto note = out.note(NotePerformanceEvent{
+        .key = playedKey,
+        .linearVelocity = noteVelocity,
+        .durationTicks = tie ? std::numeric_limits<u32>::max() : duration,
+        .maximumDurationMilliseconds = maximumDurationMilliseconds,
+        .restartsLfoPhase = track.lfo.delay != 0,
+    });
+    if (tie) {
+      if (const auto found = track.tiedNotes.find(key); found != track.tiedNotes.end()) {
+        closeNote(found->second, vm.tick());
+      }
+      track.tiedNotes.insert_or_assign(key, note);
+    }
+    const u64 endTick = tie || vm.tick() > std::numeric_limits<u64>::max() - duration ? std::numeric_limits<u64>::max()
+                                                                                      : vm.tick() + duration;
+    track.activeNotes.push_back(ActiveNote{.id = note, .endTick = endTick});
+  }
+
+  void endTie(u8 key) {
+    if (const auto found = track.tiedNotes.find(key); found != track.tiedNotes.end()) {
+      closeNote(found->second, vm.tick());
+      track.tiedNotes.erase(found);
+    }
+  }
+
+  void toneWave(u32 wave) { track.tone.wave = wave; }
+
+  void toneType(u8 type) { track.tone.type = type; }
+
+  void toneLength(u8 length) { track.tone.length = length; }
+
+  void tonePanSweep(u8 panSweep) { track.tone.panSweep = panSweep; }
+
+  void attack(u8 value) {
+    track.tone.attack = value;
+    out.updateEnvelope(EnvelopeUpdate::set(mp2kEnvelope(track.tone), EnvelopeFields::Attack));
+  }
+
+  void decay(u8 value) {
+    track.tone.decay = value;
+    out.updateEnvelope(EnvelopeUpdate::set(mp2kEnvelope(track.tone), EnvelopeFields::Decay));
+  }
+
+  void sustain(u8 value) {
+    track.tone.sustain = value;
+    out.updateEnvelope(EnvelopeUpdate::set(mp2kEnvelope(track.tone), EnvelopeFields::Sustain));
+  }
+
+  void release(u8 value) {
+    track.tone.release = value;
+    out.updateEnvelope(EnvelopeUpdate::set(mp2kEnvelope(track.tone), EnvelopeFields::Release));
+  }
+
+  [[nodiscard]] Effects repeat(u8 count, Address destination) {
+    return count == 0 ? vm.declaredLoop(destination) : vm.countedRepeatUntil(0, count, destination);
+  }
+
+  [[nodiscard]] Effects pattern(Address destination) {
+    if (track.patternDepth == 3) {
+      finish();
+      return vm.end();
+    }
+    ++track.patternDepth;
+    return vm.call(destination);
+  }
+
+  [[nodiscard]] Effects patternEnd() {
+    if (track.patternDepth == 0) {
+      return vm.fallthrough();
+    }
+    --track.patternDepth;
+    return vm.return_();
+  }
+
+  void finish() {
+    for (const auto& note : track.activeNotes) {
+      if (note.endTick > vm.tick()) {
+        static_cast<void>(out.setNoteEnd(note.id, vm.tick()));
+      }
+    }
+    track.activeNotes.clear();
+    track.tiedNotes.clear();
+  }
+
+  [[nodiscard]] Effects memAccess(u8 operation, u8 address, u8 data, Address destination) {
+    u8& target = programState.memory[address];
+    const u8 other = programState.memory[data];
+    switch (operation) {
+      case 0:
+        target = data;
+        return {};
+      case 1:
+        target = static_cast<u8>(target + data);
+        return {};
+      case 2:
+        target = static_cast<u8>(target - data);
+        return {};
+      case 3:
+        target = other;
+        return {};
+      case 4:
+        target = static_cast<u8>(target + other);
+        return {};
+      case 5:
+        target = static_cast<u8>(target - other);
+        return {};
+      default:
+        break;
+    }
+    bool take = false;
+    const u8 compared = operation < 12 ? data : other;
+    switch ((operation - 6) % 6) {
+      case 0:
+        take = target == compared;
+        break;
+      case 1:
+        take = target != compared;
+        break;
+      case 2:
+        take = target > compared;
+        break;
+      case 3:
+        take = target >= compared;
+        break;
+      case 4:
+        take = target <= compared;
+        break;
+      case 5:
+        take = target < compared;
+        break;
+    }
+    return operation <= 17 && take ? vm.finiteBranch(destination) : Effects{};
+  }
+};
+
+using Mp2kCursor = CompilerCursor<TrackState, Playback>;
+
+struct DecodeState {
+  u8 runningStatus = 0xcf;
+  u8 key = 0;
+  u8 velocity = 0;
+};
+
+struct DecodeContext {
+  ByteReader reader;
+  u32 end = 0;
+  std::vector<Diagnostic>* diagnostics = nullptr;
+};
+
+[[nodiscard]] std::optional<Address> pointer(Mp2kCursor::Event& event, ByteReader reader, std::string_view name,
+                                             SemanticOperandRole role) {
+  const auto encoded = event.rawU32le("encoded_pointer", SourceValueDisplay::Address);
+  if (!encoded.valid) {
+    return std::nullopt;
+  }
+  const auto offset = romOffset(encoded.value, reader);
+  if (!offset) {
+    event.warning("Invalid MP2k command pointer");
+    return std::nullopt;
+  }
+  return event.resolvedValue(name, encoded, Address{*offset}, SourceValueDisplay::Address, role);
+}
+
+[[nodiscard]] u8 parameter(Mp2kCursor& cursor, Mp2kCursor::Event& event, bool running, std::string_view name,
+                           SourceValueDisplay display = SourceValueDisplay::Default,
+                           SemanticOperandRole role = SemanticOperandRole::Value) {
+  return running ? event.opcodeValue(name, cursor.opcode(), display, role) : event.u8(name, display, role);
+}
+
+[[nodiscard]] u8 optionalParameter(Mp2kCursor& cursor, Mp2kCursor::Event& event, bool running, u8 previous,
+                                   std::string_view name, SourceValueDisplay display,
+                                   SemanticOperandRole role = SemanticOperandRole::Value) {
+  if (running) {
+    return parameter(cursor, event, true, name, display, role);
+  }
+  const auto next = event.peekU8();
+  return next && *next < 0x80 ? event.u8(name, display, role) : previous;
+}
+
+[[nodiscard]] DecodedBytecodeCommand decodeStatus(const DecodeContext& context, u32 begin, DecodeState& state,
+                                                  u8 status, bool running) {
+  Mp2kCursor cursor(context.reader, begin, context.end, "mp2k", context.diagnostics);
+
+  if (status >= 0xcf) {
+    const bool tie = status == 0xcf;
+    auto event = cursor.command(tie ? "Tie" : "Note", SequenceSemantic::Note);
+    const u32 duration = tie ? 0 : kClockTable[status - 0xcf];
+    const u8 key = optionalParameter(cursor, event, running, state.key, "key", SourceValueDisplay::MidiNote);
+    u8 velocity = state.velocity;
+    u32 gate = duration;
+    if (event.peekU8() && *event.peekU8() < 0x80) {
+      velocity = event.u8("velocity");
+      if (event.peekU8() && *event.peekU8() < 0x80) {
+        gate += event.u8("gate_extension");
+      }
+    }
+    state.key = key;
+    state.velocity = velocity;
+    return event.invoke<&Playback::note>(key, velocity, gate, tie);
+  }
+
+  switch (status) {
+    case 0xbd: {
+      auto event = cursor.command("Program", SequenceSemantic::Program);
+      return event.invoke<&Playback::program>(parameter(cursor, event, running, "program", SourceValueDisplay::Default,
+                                                        SemanticOperandRole::InstrumentProgram));
+    }
+    case 0xbe: {
+      auto event = cursor.command("Volume", SequenceSemantic::Level);
+      return event.invoke<&Playback::volume>(parameter(cursor, event, running, "volume"));
+    }
+    case 0xbf: {
+      auto event = cursor.command("Pan", SequenceSemantic::Pan);
+      return event.invoke<&Playback::pan>(parameter(cursor, event, running, "pan"));
+    }
+    case 0xc0: {
+      auto event = cursor.command("Pitch Bend", SequenceSemantic::Pitch);
+      return event.invoke<&Playback::pitchBend>(parameter(cursor, event, running, "bend"));
+    }
+    case 0xc1: {
+      auto event = cursor.command("Pitch Bend Range", SequenceSemantic::Pitch);
+      const u8 range = parameter(cursor, event, running, "semitones");
+      return event.set<&TrackState::bendRange>(range).emitPitchBendRange(range);
+    }
+    case 0xc2: {
+      auto event = cursor.command("LFO Speed", SequenceSemantic::Modulation);
+      return event.invoke<&Playback::lfoSpeed>(parameter(cursor, event, running, "speed"));
+    }
+    case 0xc3: {
+      auto event = cursor.command("LFO Delay", SequenceSemantic::Modulation);
+      return event.invoke<&Playback::lfoDelay>(parameter(cursor, event, running, "ticks"));
+    }
+    case 0xc4: {
+      auto event = cursor.command("Modulation Depth", SequenceSemantic::Modulation);
+      return event.invoke<&Playback::modulationDepth>(parameter(cursor, event, running, "depth"));
+    }
+    case 0xc5: {
+      auto event = cursor.command("Modulation Type", SequenceSemantic::Modulation);
+      return event.invoke<&Playback::modulationType>(parameter(cursor, event, running, "type"));
+    }
+    case 0xc8: {
+      auto event = cursor.command("Tune", SequenceSemantic::Pitch);
+      const u8 raw = parameter(cursor, event, running, "tune");
+      return event.emitTuning((static_cast<s32>(raw) - 64) * 100.0 / 64.0);
+    }
+    case 0xcd: {
+      auto event = cursor.command("Extended Command", SequenceSemantic::State);
+      const u8 sub = parameter(cursor, event, running, "subcommand", SourceValueDisplay::Hex);
+      switch (sub) {
+        case 0:
+        case 3:
+          return event.invoke<&Playback::finish>().end();
+        case 1:
+          return event.invoke<&Playback::toneWave>(event.u32le("wave", SourceValueDisplay::Address));
+        case 2:
+          return event.invoke<&Playback::toneType>(event.u8("type", SourceValueDisplay::Hex));
+        case 4:
+          return event.invoke<&Playback::attack>(event.u8("attack"));
+        case 5:
+          return event.invoke<&Playback::decay>(event.u8("decay"));
+        case 6:
+          return event.invoke<&Playback::sustain>(event.u8("sustain"));
+        case 7:
+          return event.invoke<&Playback::release>(event.u8("release"));
+        case 8:
+          event.u8("pseudo_echo_volume");
+          return event;
+        case 9:
+          event.u8("pseudo_echo_length");
+          return event;
+        case 10:
+          return event.invoke<&Playback::toneLength>(event.u8("length"));
+        case 11:
+          return event.invoke<&Playback::tonePanSweep>(event.u8("pan_sweep", SourceValueDisplay::Hex));
+        case 12:
+          return event.wait(event.u16le("ticks"));
+        case 13:
+          event.u32le("sample_start");
+          return event;
+        default:
+          event.warning("Unknown MP2k extended command stopped playback");
+          return event.stop();
+      }
+    }
+    case 0xcc: {
+      auto event = cursor.command("Sound Register Write", SequenceSemantic::State);
+      static_cast<void>(parameter(cursor, event, running, "register_offset", SourceValueDisplay::Hex));
+      event.u8("value", SourceValueDisplay::Hex);
+      return event;
+    }
+    case 0xce: {
+      auto event = cursor.command("End Tie", SequenceSemantic::Note);
+      const u8 key = optionalParameter(cursor, event, running, state.key, "key", SourceValueDisplay::MidiNote);
+      return event.invoke<&Playback::endTie>(key);
+    }
+    default:
+      return cursor.command("Undefined MP2k Command", SequenceSemantic::End).invoke<&Playback::finish>().end();
+  }
+}
+
+[[nodiscard]] DecodedBytecodeCommand decodeCommand(const DecodeContext& context, u32 begin, DecodeState& state) {
+  const u8 opcode = context.reader.u8At(begin);
+  if (opcode < 0x80) {
+    return decodeStatus(context, begin, state, state.runningStatus, true);
+  }
+  if (opcode <= 0xb0) {
+    Mp2kCursor cursor(context.reader, begin, context.end, "mp2k", context.diagnostics);
+    return cursor.command("Wait", SequenceSemantic::Rest).wait(kClockTable[opcode - 0x80]);
+  }
+  if (opcode >= 0xbd) {
+    state.runningStatus = opcode;
+    return decodeStatus(context, begin, state, opcode, false);
+  }
+
+  Mp2kCursor cursor(context.reader, begin, context.end, "mp2k", context.diagnostics);
+  switch (opcode) {
+    case 0xb1:
+      return cursor.command("End", SequenceSemantic::End).invoke<&Playback::finish>().end();
+    case 0xb2: {
+      auto event = cursor.command("Goto", SequenceSemantic::Jump);
+      const auto destination = pointer(event, context.reader, "destination", SemanticOperandRole::JumpTarget);
+      return destination ? event.loopCandidate(*destination) : event.stop();
+    }
+    case 0xb3: {
+      auto event = cursor.command("Pattern", SequenceSemantic::Call);
+      const auto destination = pointer(event, context.reader, "destination", SemanticOperandRole::CallTarget);
+      return destination ? event.invoke<&Playback::pattern>(*destination).discoverTarget(*destination) : event.stop();
+    }
+    case 0xb4: {
+      auto event = cursor.command("Pattern End", SequenceSemantic::Return);
+      event.invoke<&Playback::patternEnd>();
+      // The driver ignores PEND outside a pattern, so discovery must retain
+      // both the physical continuation and a caller's return address.
+      event.discoverTarget(event.nextAddress());
+      return event.return_();
+    }
+    case 0xb5: {
+      auto event = cursor.command("Repeat", SequenceSemantic::Repeat);
+      const u8 count = event.u8("count");
+      const auto destination = pointer(event, context.reader, "destination", SemanticOperandRole::JumpTarget);
+      return destination ? event.invoke<&Playback::repeat>(count, *destination).discoverTarget(*destination)
+                         : event.stop();
+    }
+    case 0xb9: {
+      auto event = cursor.command("Memory Access", SequenceSemantic::State);
+      const u8 operation = event.u8("operation");
+      const u8 address = event.u8("address");
+      const u8 data = event.u8("data");
+      Address destination{};
+      if (operation >= 6 && operation <= 17) {
+        const auto parsed = pointer(event, context.reader, "destination", SemanticOperandRole::JumpTarget);
+        if (!parsed) {
+          return event.stop();
+        }
+        destination = *parsed;
+        event.discoverTarget(destination);
+      }
+      return event.invoke<&Playback::memAccess>(operation, address, data, destination);
+    }
+    case 0xba: {
+      auto event = cursor.sourceOnly("Priority");
+      event.u8("priority");
+      return event;
+    }
+    case 0xbb: {
+      auto event = cursor.command("Tempo", SequenceSemantic::Tempo);
+      return event.invoke<&Playback::tempo>(event.u8("tempo"));
+    }
+    case 0xbc: {
+      auto event = cursor.command("Transpose", SequenceSemantic::State);
+      return event.set<&TrackState::transpose>(event.s8("semitones"));
+    }
+    default:
+      return cursor.command("Undefined MP2k Command", SequenceSemantic::End).invoke<&Playback::finish>().end();
+  }
+}
+
+[[nodiscard]] TrackProgram decodeTrack(const TrackDecodeScope& tracks, u32 index, u32 start,
+                                       std::vector<Diagnostic>* diagnostics) {
+  DecodeState state;
+  const DecodeContext context{
+      .reader = tracks.reader,
+      .end = static_cast<u32>(std::min<u64>(tracks.reader.size(), std::numeric_limits<u32>::max())),
+      .diagnostics = diagnostics};
+  return tracks.decode(index, start, [&](u32 offset) { return decodeCommand(context, offset, state); });
+}
+
+}  // namespace
+
+SequenceProgram parseMp2kSequenceProgram(RetainedSource source, AssetId id, const Mp2kSong& song,
+                                         std::span<const Mp2kTone> tones, SourceMapBuilder* sourceMap,
+                                         std::vector<Diagnostic>* diagnostics) {
+  static const SequenceProgramConfig config{
+      .commandKindPrefix = "mp2k",
+      .timebase = Timebase{.ppqn = 24},
+      .behavior =
+          SequenceProgramBehavior{
+              .commandLimit = kMaxTrackCommands,
+              .panLaw = PanLaw::ConstantSum,
+              .initialLevel = 0.0,
+              .initialExpression = 1.0,
+              .initialStereoBalance = StereoBalance{.leftGain = 127.0 / 256.0, .rightGain = 128.0 / 256.0},
+              .initialPitchBendRangeSemitones = 2,
+              .initialTempoMicrosecondsPerQuarter =
+                  static_cast<u32>(std::llround(60000000.0 / (kGbaMixerFrameRate * 60.0 / 24.0))),
+          },
+  };
+  const ByteReader reader = source.reader();
+  const u32 headerSize = 8 + song.declaredTracks * 4;
+  SequenceProgram program = config.makeProgram();
+  RuntimeConfig runtime{
+      .source = std::move(source),
+      .tones = std::vector<Mp2kTone>(tones.begin(), tones.end()),
+      .reverbSend = song.reverb / 127.0,
+  };
+  program.runtime = makeCompiledRuntime<Mp2kCursor, ProgramState>(std::move(runtime));
+
+  std::optional<SourceAnnotationId> header;
+  if (sourceMap && reader.has(song.offset, headerSize)) {
+    auto annotation = sourceMap->header("MP2k Song Header", reader.range(song.offset, headerSize))
+                          .kind("mp2k-song-header")
+                          .owner(ObjectRefs::sequence(id))
+                          .field("track_count", reader.range(song.offset, 1), song.declaredTracks)
+                          .field("block_count", reader.range(song.offset + 1, 1), reader.u8At(song.offset + 1))
+                          .field("priority", reader.range(song.offset + 2, 1), reader.u8At(song.offset + 2))
+                          .field("reverb", reader.range(song.offset + 3, 1), reader.u8At(song.offset + 3));
+    header = annotation.id();
+  }
+
+  const TrackDecodeScope tracks{
+      .reader = reader,
+      .bytecodeEnd = static_cast<u32>(std::min<u64>(reader.size(), std::numeric_limits<u32>::max())),
+      .maxCommands = kMaxTrackCommands,
+      .sequenceAsset = id,
+      .parentAnnotation = header,
+      .sourceMap = sourceMap,
+  };
+  for (u32 track = 0; track < song.activeTracks; ++track) {
+    const u32 pointerOffset = song.offset + 8 + track * 4;
+    const u32 encoded = reader.le32(pointerOffset);
+    const u32 start = encoded & 0x01ffffff;
+    if (sourceMap) {
+      auto pointerAnnotation =
+          sourceMap->pointer("Track Pointer", reader.range(pointerOffset, 4), SourceTarget{reader.range(start, 1)})
+              .kind("mp2k-track-pointer")
+              .derived("track", track);
+      if (header) {
+        pointerAnnotation.parent(*header);
+      }
+    }
+    program.tracks.push_back(decodeTrack(tracks, track, start, diagnostics));
+  }
+  return program;
+}
+
+}  // namespace vgmtrans::formats::mp2k

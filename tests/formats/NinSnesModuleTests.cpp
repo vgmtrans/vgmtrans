@@ -1,0 +1,2240 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#include "value/formats/NinSnes/NinSnes.h"
+#include "../MidiTestSupport.h"
+
+#include "value/formats/NinSnes/NinSnesPatterns.h"
+#include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/sequence/SequenceVm.h"
+#include "value/synth/SnesDsp.h"
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <set>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+using namespace vgmtrans::core;
+using namespace vgmtrans::formats::nin_snes;
+
+namespace {
+
+constexpr std::array kProfileIds{
+    ProfileId::Earlier,   ProfileId::Standard,  ProfileId::Rd1,         ProfileId::Rd2,          ProfileId::Hal,
+    ProfileId::Konami,    ProfileId::Lemmings,  ProfileId::IntelliFe3,  ProfileId::IntelliTa,    ProfileId::IntelliFe4,
+    ProfileId::Human,     ProfileId::Tose,      ProfileId::QuintetActR, ProfileId::QuintetActR2, ProfileId::QuintetIog,
+    ProfileId::QuintetTs, ProfileId::FalcomYs4, ProfileId::Koei,        ProfileId::SunsoftEarlier, ProfileId::Sunsoft,
+    ProfileId::SunsoftBenkei,
+};
+
+void expect(bool condition, const std::string& message) {
+  if (!condition) {
+    throw std::runtime_error(message);
+  }
+}
+
+void writeLe16(std::vector<u8>& bytes, size_t offset, u16 value) {
+  bytes[offset] = static_cast<u8>(value);
+  bytes[offset + 1] = static_cast<u8>(value >> 8);
+}
+
+Layout standardLayout(u16 playlist = 0x100) {
+  return Layout{
+      .signature = Signature::Standard,
+      .profile = ProfileId::Standard,
+      .playlistAddress = playlist,
+  };
+}
+
+ScanResult scanSynth(std::vector<u8> bytes, const Layout& layout, std::string_view name,
+                     const SequenceRecipes& recipes = {}) {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = std::string(name) + ".spc"}, std::move(bytes));
+  ScanIdAllocator ids;
+  ScanResultBuilder result(
+      ScanInput{
+          .source = sources.source(source),
+          .reader = sources.reader(source),
+          .ids = ids,
+      },
+      "NinSnes");
+  expect(addSynth(result, layout, recipes, name).has_value(), "NinSnes synth fixture should produce assets");
+  return result.finish();
+}
+
+void writeSection(std::vector<u8>& bytes, u16 address, std::initializer_list<std::pair<u8, u16>> tracks) {
+  for (const auto [track, start] : tracks) {
+    writeLe16(bytes, address + static_cast<size_t>(track) * 2, start);
+  }
+}
+
+std::vector<u8> sequenceBytes(std::initializer_list<u8> commands) {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+  std::ranges::copy(commands, bytes.begin() + 0x300);
+  return bytes;
+}
+
+PerformanceSequence render(std::vector<u8> bytes, const Layout& layout = standardLayout()) {
+  SequenceParse parsed = decodeSequence(ByteReader(SourceId{7}, bytes), layout, AssetId{1});
+  return SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
+}
+
+double ninSnesLevelGain(u8 raw) {
+  const double normalized = raw / 255.0;
+  return normalized * normalized;
+}
+
+struct LevelOpcodes {
+  u8 master;
+  u8 channel;
+  u8 rest;
+};
+
+struct ModulationOpcodes {
+  u8 vibrato;
+  u8 tremolo;
+  u8 tremoloOff;
+  u8 tempo;
+  u8 rest;
+};
+
+LevelOpcodes levelOpcodes(const Profile& driver) {
+  if (driver.base == BaseProfile::Earlier) {
+    return {.master = 0xe0, .channel = 0xe7, .rest = 0xc7};
+  }
+  if (driver.intelli == IntelliMode::Fe3) {
+    return {.master = 0xdb, .channel = 0xe3, .rest = 0xc9};
+  }
+  if (driver.intelli == IntelliMode::Ta || driver.intelli == IntelliMode::Fe4) {
+    return {.master = 0xdf, .channel = 0xe7, .rest = 0xc9};
+  }
+  const bool hasMasterVolume = driver.id != ProfileId::Konami && driver.id != ProfileId::Lemmings;
+  return {.master = static_cast<u8>(hasMasterVolume ? 0xe5 : 0), .channel = 0xed, .rest = 0xc9};
+}
+
+ModulationOpcodes modulationOpcodes(const Profile& driver) {
+  if (driver.base == BaseProfile::Earlier) {
+    return {.vibrato = 0xde, .tremolo = 0xe5, .tremoloOff = 0xe6, .tempo = 0xe2, .rest = 0xc7};
+  }
+  if (driver.intelli == IntelliMode::Fe3) {
+    return {.vibrato = 0xd9, .tremolo = 0xe1, .tremoloOff = 0xe2, .tempo = 0xdd, .rest = 0xc9};
+  }
+  if (driver.intelli == IntelliMode::Ta || driver.intelli == IntelliMode::Fe4) {
+    return {.vibrato = 0xdd, .tremolo = 0xe5, .tremoloOff = 0xe6, .tempo = 0xe1, .rest = 0xc9};
+  }
+  return {.vibrato = 0xe3, .tremolo = 0xeb, .tremoloOff = 0xec, .tempo = 0xe7, .rest = 0xc9};
+}
+
+u8 pitchSlideOpcode(const Profile& driver) {
+  if (driver.base == BaseProfile::Earlier) {
+    return 0xdd;
+  }
+  if (driver.intelli == IntelliMode::Fe3) {
+    return 0xef;
+  }
+  if (driver.intelli == IntelliMode::Ta || driver.intelli == IntelliMode::Fe4) {
+    return 0xf3;
+  }
+  return 0xf9;
+}
+
+void ninSnesProfilesDescribeEverySupportedDriverFamily() {
+  std::set<std::string_view> names;
+  for (const ProfileId id : kProfileIds) {
+    const Profile& driver = profile(id);
+    expect(driver.id == id && driver.base != BaseProfile::Unknown,
+           "every public NinSnes profile should resolve to a complete driver description");
+    expect(names.emplace(driver.name).second, "NinSnes profile names should be unique");
+  }
+  expect(profile(ProfileId::Unknown).id == ProfileId::Unknown,
+         "the unknown profile should remain an explicit safe fallback");
+
+  expect(profile(ProfileId::Earlier).base == BaseProfile::Earlier &&
+             profile(ProfileId::Earlier).instruments == InstrumentLayout::Earlier5Byte,
+         "the early driver should retain its original note and instrument layout");
+  expect(profile(ProfileId::Hal).pan == PanModel::HalTable, "HAL should select its reversed pan table");
+  expect(profile(ProfileId::Konami).addresses == AddressModel::KonamiBase &&
+             profile(ProfileId::Konami).instruments == InstrumentLayout::KonamiTuningTable,
+         "Konami should declare both of its independent driver deviations");
+  expect(profile(ProfileId::Lemmings).noteParameters == NoteParameterModel::Lemmings,
+         "Lemmings should select its packed note-parameter model");
+  expect(profile(ProfileId::IntelliFe3).base == BaseProfile::Intelli &&
+             profile(ProfileId::IntelliFe3).noteParameters == NoteParameterModel::IntelliTable &&
+             profile(ProfileId::IntelliFe3).intelli == IntelliMode::Fe3,
+         "FE3 should select its Intelligent Systems command and note tables");
+  expect(profile(ProfileId::IntelliTa).programs == ProgramResolver::StandardPercussion &&
+             profile(ProfileId::IntelliTa).intelli == IntelliMode::Ta,
+         "TA should select dynamic instrument overrides");
+  expect(profile(ProfileId::IntelliFe4).noteParameters == NoteParameterModel::IntelliTable &&
+             profile(ProfileId::IntelliFe4).intelli == IntelliMode::Fe4,
+         "FE4 should select its Intelligent Systems note table");
+  expect(profile(ProfileId::Human).programs == ProgramResolver::Direct &&
+             profile(ProfileId::Human).instrumentTable == InstrumentTableAddressModel::Human,
+         "Human Entertainment should use direct programs and its table locator");
+  expect(profile(ProfileId::Tose).playlist == PlaylistModel::Tose &&
+             profile(ProfileId::Tose).pan == PanModel::ToseLinear &&
+             profile(ProfileId::Tose).instrumentTable == InstrumentTableAddressModel::Tose,
+         "TOSE should declare its playlist, pan, and instrument-table variants");
+  expect(profile(ProfileId::QuintetActR).programs == ProgramResolver::QuintetActRBase &&
+             profile(ProfileId::QuintetActR2).programs == ProgramResolver::QuintetLookup &&
+             profile(ProfileId::QuintetIog).programs == ProgramResolver::QuintetLookup &&
+             profile(ProfileId::QuintetTs).programs == ProgramResolver::QuintetLookup,
+         "the four Quintet profiles should retain their two program-resolution models");
+  expect(profile(ProfileId::FalcomYs4).addresses == AddressModel::FalcomBaseOffset,
+         "Ys IV should select relocated Falcom addresses");
+
+  expect(Layout{.profile = ProfileId::Konami, .konamiBaseAddress = 0x3000}.resolveAddress(0x20) == 0x3020,
+         "Konami profile addresses should be relative to the detected driver base");
+  expect(Layout{.profile = ProfileId::FalcomYs4, .falcomBaseOffset = 0x4000}.resolveAddress(0x20) == 0x4020,
+         "Falcom profile addresses should include the relocated sequence offset");
+  expect(
+      instrumentHeaderSize(profile(ProfileId::Earlier)) == 5 && instrumentHeaderSize(profile(ProfileId::Standard)) == 6,
+      "early and standard drivers should retain their distinct instrument layouts");
+}
+
+void ninSnesKonamiClockControlsTempo() {
+  std::vector<u8> direct(32);
+  std::ranges::copy(std::initializer_list<u8>{0xe8, 0xf0, 0xc4, 0xf1, 0xe8, 0x40, 0xc4, 0xfa, 0xe8, 0x01, 0xc4, 0xf1},
+                    direct.begin());
+  std::vector<u8> absolute(32);
+  std::ranges::copy(std::initializer_list<u8>{0xe8, 0xf0, 0xc5, 0xf1, 0x00, 0xe8, 0x20, 0xc5, 0xfa, 0x00, 0xe8, 0x01,
+                                              0xc5, 0xf1, 0x00},
+                    absolute.begin());
+  expect(detectKonamiTempoTimerTarget(ByteReader(SourceId{1}, direct)) == 0x40 &&
+             detectKonamiTempoTimerTarget(ByteReader(SourceId{1}, absolute)) == 0x20,
+         "Konami timer detection should cover the Parodius and Gradius register-write forms");
+
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+  std::ranges::copy(std::initializer_list<u8>{0xe7, 0x40, 4, 0x7f, 0xc9, 0}, bytes.begin() + 0x300);
+
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::Konami;
+  layout.tempoTimerTarget = 0x40;
+  const PerformanceSequence performance = render(std::move(bytes), layout);
+  const auto tempo = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<TempoPerformanceEvent>(event);
+  });
+  expect(profile(ProfileId::Konami).tempoCommandMultiplier == 2 &&
+             performance.initialTempoMicrosecondsPerQuarter == 3'072'000 &&
+             tempo != performance.tracks[0].events.end() &&
+             std::get<TempoPerformanceEvent>(*tempo).microsecondsPerQuarter == 768'000,
+         "Konami's tempo command doubling should partially offset its slower timer");
+}
+
+void ninSnesScannerFindsRequestedSongAcrossSparseTable() {
+  std::vector<u8> bytes(kAramSize);
+
+  // Earlier driver signatures and its command tables. Pilotwings uses this
+  // profile while retaining the later five-bit song request protocol.
+  std::ranges::copy(
+      std::initializer_list<u8>{0x8d, 0x00, 0xf7, 0x40, 0x3a, 0x40, 0x2d, 0xf7, 0x40, 0x3a, 0x40, 0xfd, 0xae},
+      bytes.begin() + 0x500);
+  std::ranges::copy(std::initializer_list<u8>{0xf5, 0x01, 0x20, 0xfd, 0xf5, 0x00, 0x20, 0xda, 0x40},
+                    bytes.begin() + 0x520);
+  std::ranges::copy(std::initializer_list<u8>{0x68, 0xe0, 0x90, 0x05, 0x3f, 0x00, 0x00, 0x2f, 0x00},
+                    bytes.begin() + 0x540);
+  std::ranges::copy(std::initializer_list<u8>{0x1c, 0x5d, 0xe8, 0x00, 0x1f, 0x76, 0x0f}, bytes.begin() + 0x560);
+  std::ranges::copy(std::initializer_list<u8>{0xe4, 0x00, 0x68, 0xff, 0xf0, 0xe8, 0x28, 0x1f, 0xd0, 0x8f},
+                    bytes.begin() + 0x580);
+  std::ranges::copy(
+      std::initializer_list<u8>{0x68, 0xda, 0x90, 0x0a, 0x6d, 0xfd, 0xae, 0x60, 0x96, 0x56, 0x0f, 0xfd, 0x2f, 0xe3},
+      bytes.begin() + 0x5a0);
+  std::ranges::copy(
+      std::initializer_list<u8>{0x80, 0xa8, 0xd0, 0x8d, 0x06, 0x8f, 0x00, 0x14, 0x8f, 0x30, 0x15, 0x3f, 0x56, 0x0d},
+      bytes.begin() + 0x5c0);
+  // Song 2 is an unloaded hole between two valid resident playlists.
+  writeLe16(bytes, 0x2002, 0x2100);
+  writeLe16(bytes, 0x2004, 0x2200);
+  writeLe16(bytes, 0x2006, 0x2300);
+  writeLe16(bytes, 0x40, 0x2102);
+  bytes[0xf4] = 3;
+
+  writeLe16(bytes, 0x2100, 0x2400);
+  writeLe16(bytes, 0x2102, 0xff);
+  writeLe16(bytes, 0x2104, 0x2100);
+  writeLe16(bytes, 0x2106, 0xffff);
+  writeSection(bytes, 0x2400, {{0, 0x2500}});
+  bytes[0x2500] = 0;
+
+  writeLe16(bytes, 0x2200, 0x2600);
+  writeLe16(bytes, 0x2202, 0);
+
+  writeLe16(bytes, 0x2300, 0x2700);
+  writeLe16(bytes, 0x2302, 0);
+  writeSection(bytes, 0x2700, {{0, 0x2800}});
+  bytes[0x2800] = 0;
+
+  writeLe16(bytes, 0x2040, 0x2900);
+  writeLe16(bytes, 0x2900, 0x2a00);
+  writeLe16(bytes, 0x2902, 0);
+  writeSection(bytes, 0x2a00, {{0, 0x2b00}});
+  bytes[0x2b00] = 0;
+
+  const auto requested = findLayout(ByteReader(SourceId{7}, bytes));
+  expect(requested && requested->profile == ProfileId::Earlier && requested->songIndex == 3 &&
+             requested->playlistAddress == 0x2300 && requested->percussionTableAddress == 0x3000,
+         "a pending N-SPC request should select a valid song beyond an unloaded table hole");
+
+  bytes[0xf4] = 0;
+  writeLe16(bytes, 0x40, 0x2302);
+  const auto playing = findLayout(ByteReader(SourceId{7}, bytes));
+  expect(playing && playing->songIndex == 3 && playing->playlistAddress == 0x2300,
+         "the live playlist cursor should select the playing song when no request is pending");
+
+  writeLe16(bytes, 0x40, 0x2902);
+  const auto later = findLayout(ByteReader(SourceId{7}, bytes));
+  expect(later && later->songIndex == 32 && later->playlistAddress == 0x2900,
+         "the live playlist cursor should select songs beyond the five-bit request range");
+
+  expect(
+      isValidPlaylist(ByteReader(SourceId{7}, bytes), Layout{.profile = ProfileId::Earlier, .playlistAddress = 0x2100}),
+      "an infinite repeat should not make adjacent data part of the playlist");
+}
+
+void ninSnesKoeiUsesSixBgmTracksAndPendingRequest() {
+  std::vector<u8> bytes(kAramSize);
+  const auto write = [&](size_t offset, std::initializer_list<u8> data) {
+    std::ranges::copy(data, bytes.begin() + offset);
+  };
+
+  write(0x500, {0x8d, 0x00, 0xf7, 0x1d, 0x3a, 0x1d, 0x2d, 0xf7, 0x1d, 0x3a, 0x1d, 0x2f, 0x0b, 0x8d,
+                0x00, 0xf7, 0x1b, 0x3a, 0x1b, 0x2d, 0xf7, 0x1b, 0x3a, 0x1b, 0xfd, 0xae, 0x6f});
+  write(0x520, {0xf5, 0x01, 0x20, 0xfd, 0xf5, 0x00, 0x20, 0xda, 0x1d});
+  write(0x540, {0x68, 0xe0, 0x90, 0x05, 0x3f, 0x00, 0x00, 0x2f, 0x00});
+  write(0x560, {0x1c, 0xfd, 0xf6, 0x41, 0x2f, 0x2d, 0xf6, 0x40, 0x2f, 0x2d, 0xdd, 0x5c, 0xfd, 0xf6, 0xd6, 0x2f});
+  write(0x3036, {0x01, 0x01, 0x02, 0x03, 0x00, 0x01, 0x02, 0x01, 0x02, 0x01, 0x01, 0x03, 0x00, 0x01,
+                 0x02, 0x03, 0x01, 0x03, 0x03, 0x00, 0x01, 0x03, 0x00, 0x03, 0x03, 0x03, 0x01});
+
+  bytes[0] = 1;
+  bytes[0xf4] = 2;
+  writeLe16(bytes, 0x1d, 0xffff);
+  writeLe16(bytes, 0x2000, 0xffff);
+  writeLe16(bytes, 0x2002, 0x2200);
+  writeLe16(bytes, 0x2004, 0x2300);
+  writeLe16(bytes, 0x2200, 0x2400);
+  writeLe16(bytes, 0x2202, 0);
+  writeSection(bytes, 0x2400, {{0, 0x2500}});
+  bytes[0x2500] = 0;
+  writeLe16(bytes, 0x2300, 0x2600);
+  writeLe16(bytes, 0x2302, 0);
+  writeSection(bytes, 0x2600, {{0, 0x260c}});
+  write(0x260c, {0x18, 0x80, 0});
+
+  const ByteReader reader(SourceId{8}, bytes);
+  const auto layout = findLayout(reader);
+  expect(layout && layout->profile == ProfileId::Koei && layout->songIndex == 2 &&
+             layout->sectionPointerAddress == 0x1d && layout->playlistAddress == 0x2300,
+         "Koei should select the pending BGM request instead of its SFX state");
+
+  const SequenceParse parsed = decodeSequence(reader, *layout, AssetId{1});
+  expect(parsed.program.tracks.size() == 6, "Koei should decode its six-pointer BGM sections as six tracks");
+
+  bytes[0] = 0;
+  bytes[0xf4] = 0;
+  expect(!findLayout(ByteReader(SourceId{8}, bytes)),
+         "Koei should not fall back to an unrelated resident song without BGM state");
+}
+
+void ninSnesProfilesShareSquaredLevelCurve() {
+  constexpr u8 kMasterLevel = 120;
+  constexpr u8 kChannelLevel = 140;
+
+  for (const ProfileId id : kProfileIds) {
+    std::vector<u8> bytes(kAramSize);
+    writeLe16(bytes, 0x100, 0x200);
+    writeLe16(bytes, 0x102, 0);
+    writeSection(bytes, 0x200, {{0, 0x300}});
+
+    const Profile& driver = profile(id);
+    const LevelOpcodes opcodes = levelOpcodes(driver);
+    size_t offset = 0x300;
+    if (opcodes.master != 0) {
+      bytes[offset++] = opcodes.master;
+      bytes[offset++] = kMasterLevel;
+    }
+    bytes[offset++] = opcodes.channel;
+    bytes[offset++] = kChannelLevel;
+    bytes[offset++] = 1;
+    bytes[offset++] = opcodes.rest;
+    bytes[offset] = 0;
+
+    Layout layout = standardLayout();
+    layout.profile = id;
+    if (driver.base == BaseProfile::Intelli) {
+      layout.signature = Signature::Intelligent;
+    } else if (driver.base == BaseProfile::Earlier) {
+      layout.signature = Signature::Earlier;
+    }
+
+    const PerformanceSequence performance = render(std::move(bytes), layout);
+    const auto& events = performance.tracks[0].events;
+    const auto level = std::ranges::find_if(
+        events, [](const PerformanceEvent& event) { return std::holds_alternative<LevelPerformanceEvent>(event); });
+    const auto master = std::find_if(events.rbegin(), events.rend(), [](const PerformanceEvent& event) {
+      return std::holds_alternative<MasterLevelPerformanceEvent>(event);
+    });
+    const std::string label(driver.name);
+    expect(level != events.end(), label + " should emit channel gain");
+    expect(std::abs(std::get<LevelPerformanceEvent>(*level).linearGain - ninSnesLevelGain(kChannelLevel)) < 0.0001,
+           label + " should expose squared channel gain, got " +
+               std::to_string(std::get<LevelPerformanceEvent>(*level).linearGain));
+    if (opcodes.master != 0) {
+      expect(master != events.rend(), label + " should emit master gain");
+      expect(
+          std::abs(std::get<MasterLevelPerformanceEvent>(*master).linearGain - ninSnesLevelGain(kMasterLevel)) < 0.0001,
+          label + " should expose squared master gain, got " +
+              std::to_string(std::get<MasterLevelPerformanceEvent>(*master).linearGain));
+    }
+
+    const MidiSequence midi = renderMidiSequence(performance);
+    const MidiChannelMessage* volume = nullptr;
+    for (const MidiEvent& event : midi.tracks[0].events) {
+      if (const auto* candidate = midiController(event, MidiController::ChannelVolume)) {
+        volume = candidate;
+      }
+    }
+    const auto masterVolume = std::find_if(
+        midi.tracks[0].events.rbegin(), midi.tracks[0].events.rend(), [](const MidiEvent& event) { return midiMasterVolume(event).has_value(); });
+    expect(volume != nullptr && volume->value <= static_cast<u16>(kChannelLevel / 2),
+           label + " should combine its pan gain without increasing the source channel level");
+    if (opcodes.master != 0) {
+      expect(masterVolume != midi.tracks[0].events.rend() &&
+                 (*midiMasterVolume(*masterVolume) >> 7) == static_cast<u16>(kMasterLevel / 2),
+             label + " should retain the legacy master-volume MSB");
+    }
+  }
+}
+
+void ninSnesProfilesShareTempoRelativeVibratoClock() {
+  for (const ProfileId id : kProfileIds) {
+    std::vector<u8> bytes(kAramSize);
+    writeLe16(bytes, 0x100, 0x200);
+    writeLe16(bytes, 0x102, 0);
+    writeSection(bytes, 0x200, {{0, 0x300}, {1, 0x320}});
+
+    const Profile& driver = profile(id);
+    const ModulationOpcodes opcodes = modulationOpcodes(driver);
+    size_t first = 0x300;
+    bytes[first++] = opcodes.vibrato;
+    bytes[first++] = 3;
+    bytes[first++] = 0x20;
+    bytes[first++] = 0x40;
+    bytes[first++] = 4;
+    bytes[first++] = opcodes.rest;
+    bytes[first++] = 4;
+    bytes[first++] = opcodes.rest;
+    bytes[first] = 0;
+
+    size_t second = 0x320;
+    bytes[second++] = 4;
+    bytes[second++] = opcodes.rest;
+    bytes[second++] = opcodes.tempo;
+    bytes[second++] = static_cast<u8>(0x40 / driver.tempoCommandMultiplier);
+    bytes[second++] = 4;
+    bytes[second++] = opcodes.rest;
+    bytes[second] = 0;
+
+    Layout layout = standardLayout();
+    layout.profile = id;
+    if (driver.base == BaseProfile::Intelli) {
+      layout.signature = Signature::Intelligent;
+    } else if (driver.base == BaseProfile::Earlier) {
+      layout.signature = Signature::Earlier;
+    }
+
+    const PerformanceSequence performance = render(std::move(bytes), layout);
+    std::vector<const ModulationPerformanceEvent*> rates;
+    for (const PerformanceEvent& event : performance.tracks[0].events) {
+      const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+      if (modulation != nullptr && modulation->target == ModulationPerformanceTarget::VibratoRate) {
+        rates.push_back(modulation);
+      }
+    }
+    const std::string label(driver.name);
+    expect(rates.size() == 2 && rates[0]->context.cyclesPerTick && rates[1]->context.cyclesPerTick &&
+               rates[0]->context.frequencyHz && rates[1]->context.frequencyHz &&
+               std::abs(*rates[0]->context.cyclesPerTick - 0.125) < 0.0001 &&
+               std::abs(*rates[1]->context.cyclesPerTick - 0.125) < 0.0001 &&
+               std::abs(*rates[0]->context.frequencyHz - 7.8125) < 0.0001 &&
+               std::abs(*rates[1]->context.frequencyHz - 15.625) < 0.0001,
+           label + " should share the sequence-clocked N-SPC vibrato behavior");
+  }
+}
+
+void ninSnesProfilesEmitSubtractiveTremolo() {
+  constexpr u8 kDelay = 3;
+  constexpr u8 kRate = 0x20;
+  constexpr u8 kDepth = 0x40;
+
+  for (const ProfileId id : kProfileIds) {
+    std::vector<u8> bytes(kAramSize);
+    writeLe16(bytes, 0x100, 0x200);
+    writeLe16(bytes, 0x102, 0);
+    writeSection(bytes, 0x200, {{0, 0x300}});
+
+    const Profile& driver = profile(id);
+    const ModulationOpcodes opcodes = modulationOpcodes(driver);
+    size_t cursor = 0x300;
+    bytes[cursor++] = opcodes.tremolo;
+    bytes[cursor++] = kDelay;
+    bytes[cursor++] = kRate;
+    bytes[cursor++] = kDepth;
+    bytes[cursor++] = opcodes.tremoloOff;
+    bytes[cursor++] = 4;
+    bytes[cursor++] = opcodes.rest;
+    bytes[cursor] = 0;
+
+    Layout layout = standardLayout();
+    layout.profile = id;
+    if (driver.base == BaseProfile::Intelli) {
+      layout.signature = Signature::Intelligent;
+    } else if (driver.base == BaseProfile::Earlier) {
+      layout.signature = Signature::Earlier;
+    }
+
+    const PerformanceSequence performance = render(std::move(bytes), layout);
+    std::vector<const ModulationPerformanceEvent*> depths;
+    const ModulationPerformanceEvent* rate = nullptr;
+    const TremoloDelayPerformanceEvent* delay = nullptr;
+    for (const PerformanceEvent& event : performance.tracks[0].events) {
+      if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
+        if (modulation->target == ModulationPerformanceTarget::TremoloDepth) {
+          depths.push_back(modulation);
+        } else if (modulation->target == ModulationPerformanceTarget::TremoloRate) {
+          rate = modulation;
+        }
+      } else if (const auto* tremoloDelay = std::get_if<TremoloDelayPerformanceEvent>(&event)) {
+        delay = tremoloDelay;
+      }
+    }
+
+    const int trough = driver.base == BaseProfile::Earlier ? 255 - ((255 * ((255 * kDepth) >> 8)) >> 8) : 255 - kDepth;
+    const double expectedDepth = 20.0 * std::log10(255.0 / trough);
+    const std::string label(driver.name);
+    expect(depths.size() == 2, label + " should emit tremolo-on and tremolo-off depth events");
+    expect(depths[0]->volumeDepthDecibels && std::abs(*depths[0]->volumeDepthDecibels - expectedDepth) < 0.0001,
+           label + " should convert N-SPC tremolo depth to physical decibels");
+    expect(depths[0]->context.shape && depths[0]->context.shape->waveform == LfoWaveform::Triangle &&
+               depths[0]->context.initialPhaseCycles == 0.25 && !depths[0]->context.phaseRunsAtZeroDepth &&
+               depths[0]->context.tremoloGainMode == TremoloGainMode::NoBoost,
+           label + " should emit a subtractive triangle beginning at nominal gain");
+    expect(depths[1]->volumeDepthDecibels == 0.0, label + " should disable tremolo by clearing its depth");
+    expect(rate != nullptr && rate->context.cyclesPerTick && rate->context.frequencyHz &&
+               std::abs(*rate->context.cyclesPerTick - 0.125) < 0.0001 &&
+               std::abs(*rate->context.frequencyHz - 7.8125) < 0.0001 && rate->context.initialPhaseCycles == 0.25,
+           label + " should use the sequence-clocked N-SPC tremolo rate");
+    expect(delay != nullptr && delay->delayTicks == kDelay && delay->milliseconds &&
+               std::abs(*delay->milliseconds - 48.0) < 0.0001 && delay->tempoRelative,
+           label + " should resolve the N-SPC tremolo delay against tempo");
+  }
+}
+
+void ninSnesStandardEchoUsesMaskLevelAndDisable() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}, {1, 0x320}});
+
+  std::ranges::copy(
+      std::initializer_list<u8>{
+          0xf5,
+          0x03,
+          0x40,
+          0x20,  // EON 0/1, EVOL +64/+32
+          0xf7,
+          0x03,
+          0xc0,
+          0x02,  // 48 ms, EFB -0.5, FIR 2
+          0xf8,
+          0x04,
+          0x00,
+          0xe0,  // fade EVOL to 0/-32
+          4,
+          0xc9,
+          0xf6,  // finish the fade, then disable echo
+          4,
+          0xc9,
+          0,
+      },
+      bytes.begin() + 0x300);
+  std::ranges::copy(std::initializer_list<u8>{8, 0x7f, 0x80, 0}, bytes.begin() + 0x320);
+
+  const PerformanceSequence performance = render(std::move(bytes));
+  const MidiSequence midi = renderMidiSequence(performance);
+  expect(performance.tracks.size() == 8, "standard echo fixture should retain all eight DSP voices");
+  for (size_t index = 0; index < midi.tracks.size(); ++index) {
+    const bool enabled = std::ranges::any_of(midi.tracks[index].events, [](const MidiEvent& event) {
+      const auto* reverb = midiController(event, MidiController::Reverb);
+      return reverb != nullptr && event.tick == 0 && reverb->value != 0;
+    });
+    const bool disabled = std::ranges::any_of(midi.tracks[index].events, [](const MidiEvent& event) {
+      const auto* reverb = midiController(event, MidiController::Reverb);
+      return reverb != nullptr && event.tick == 4 && reverb->value == 0;
+    });
+    expect(enabled == (index < 2) && (index >= 2 || disabled),
+           "standard echo should apply EON globally and honor echo-off on track " + std::to_string(index));
+  }
+
+  std::vector<const ReverbPerformanceEvent*> changes;
+  for (const PerformanceEvent& event : performance.tracks[0].events) {
+    if (const auto* reverb = std::get_if<ReverbPerformanceEvent>(&event);
+        reverb != nullptr && reverb->leftGain && reverb->rightGain) {
+      changes.push_back(reverb);
+    }
+  }
+
+  expect(changes.size() >= 6, "standard N-SPC echo should retain setup, parameters, and fade samples");
+  expect(changes[1]->delayMilliseconds && *changes[1]->delayMilliseconds == 48.0 && changes[1]->feedback &&
+             std::abs(*changes[1]->feedback + 0.5) < 0.0001 && changes[1]->filterIndex == 2,
+         "standard N-SPC F7 should preserve EDL, signed EFB, and FIR-table state");
+  const bool reachedFadeTarget = std::ranges::any_of(changes, [](const ReverbPerformanceEvent* change) {
+    return std::abs(*change->leftGain) < 0.0001 && std::abs(*change->rightGain + (32.0 / 127.0)) < 0.0001 &&
+           std::abs(change->send - (32.0 / 127.0)) < 0.0001;
+  });
+  expect(reachedFadeTarget, "standard N-SPC F8 should reach its signed stereo target over the requested duration");
+}
+
+void ninSnesKonamiLoopAppliesAndClearsReplayDeltas() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+
+  std::ranges::copy(
+      std::initializer_list<u8>{
+          0xe5,  // loop start
+          4,
+          0x7f,
+          0x80,  // packed parameters and C note
+          0xe6,
+          3,
+          0xf6,
+          0x01,  // three plays; -10 velocity and +1/16 semitone per replay
+          4,
+          0x7f,
+          0x80,  // loop deltas must be clear after the final pass
+          0,
+      },
+      bytes.begin() + 0x300);
+
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::Konami;
+  layout.volumeTable.assign(16, 0);
+  layout.volumeTable[15] = 100;
+  const PerformanceSequence performance = render(std::move(bytes), layout);
+
+  std::vector<const NotePerformanceEvent*> notes;
+  for (const PerformanceEvent& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(note);
+    }
+  }
+  expect(notes.size() == 4, "Konami N-SPC loop should play three passes plus the following note");
+  constexpr std::array expectedVelocities{100, 90, 80, 100};
+  constexpr std::array expectedKeys{24.0, 24.0625, 24.125, 24.0};
+  for (size_t index = 0; index < notes.size(); ++index) {
+    expect(std::abs(notes[index]->linearVelocity - ninSnesLevelGain(expectedVelocities[index])) < 0.0001,
+           "Konami N-SPC loop should apply its accumulated per-note volume delta");
+    expect(std::abs(notes[index]->key - expectedKeys[index]) < 0.0001,
+           "Konami N-SPC loop should apply its accumulated 1/16-semitone pitch delta");
+  }
+}
+
+void ninSnesKonamiAdsrGainEmitsNeutralEnvelopeState() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+
+  constexpr u8 attackDecay = 0x96;
+  constexpr u8 sustain = 0xd2;
+  constexpr u8 gain = 0;
+  constexpr u8 gainMode = 0xa0;
+  constexpr u8 directGain = 0x7f;
+  std::ranges::copy(
+      std::initializer_list<u8>{
+          0xfb,
+          attackDecay,
+          sustain,
+          gain,
+          0xfb,
+          gainMode,
+          sustain,
+          directGain,
+          0xe0,
+          1,
+          4,
+          0x7f,
+          0x80,
+          0,
+      },
+      bytes.begin() + 0x300);
+
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::Konami;
+  const PerformanceSequence performance = render(std::move(bytes), layout);
+  std::vector<const EnvelopePerformanceEvent*> envelopes;
+  std::vector<const InstrumentPerformanceEvent*> instruments;
+  for (const PerformanceEvent& event : performance.tracks[0].events) {
+    if (const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event)) {
+      envelopes.push_back(envelope);
+    } else if (const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&event)) {
+      instruments.push_back(instrument);
+    }
+  }
+  expect(envelopes.size() == 2, "Konami FB commands should emit two envelope events");
+  expect(envelopes[0]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
+             envelopes[0]->update.fields == EnvelopeFields::All &&
+             envelopes[0]->update.values == snesDspEnvelope(0x8f, 0xe2, gain),
+         "Konami FB should expand its packed attack, decay, and sustain parameters to DSP ADSR values");
+  expect(envelopes[1]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
+             envelopes[1]->update.fields == EnvelopeFields::All &&
+             envelopes[1]->update.values == snesDspEnvelope(0, 0xe2, directGain),
+         "Konami FB attack/decay parameters at or above A0 should select direct GAIN mode");
+  expect(!instruments.empty() && instruments.back()->envelopeMode == InstrumentEnvelopeMode::UseInstrumentEnvelope,
+         "a later Konami program change should select the instrument's native envelope");
+}
+
+void ninSnesNoteVelocityPreservesLegacyCurve() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+
+  bytes[0x300] = 3;
+  bytes[0x301] = 0x7f;
+  bytes[0x302] = 0x80;
+  bytes[0x303] = 3;
+  bytes[0x304] = 0x77;
+  bytes[0x305] = 0x80;
+  bytes[0x306] = 0;
+
+  Layout layout = standardLayout();
+  layout.volumeTable.assign(16, 0);
+  layout.volumeTable[7] = 152;
+  layout.volumeTable[15] = 252;
+  const PerformanceSequence performance = render(std::move(bytes), layout);
+  const MidiSequence midi = renderMidiSequence(performance);
+  std::vector<u8> velocities;
+  for (const MidiEvent& event : midi.tracks[0].events) {
+    if (const auto* note = std::get_if<NoteDuration>(&event.payload)) {
+      velocities.push_back(note->velocity);
+    }
+  }
+
+  expect(velocities == std::vector<u8>{126, 76},
+         "NinSnes note velocity should preserve the legacy full/echo pair instead of compressing it to 126/98");
+}
+
+void ninSnesProgramResolutionIsCapturedByRuntime() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+  std::ranges::copy(std::initializer_list<u8>{0xe0, 2, 3, 0x7f, 0x80, 0}, bytes.begin() + 0x300);
+
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::QuintetActR;
+  layout.quintetBgmInstrumentBase = 10;
+  const PerformanceSequence performance = render(std::move(bytes), layout);
+  const auto instrument = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+    return std::holds_alternative<InstrumentPerformanceEvent>(event);
+  });
+  const auto* change = instrument == performance.tracks[0].events.end()
+                           ? nullptr
+                           : std::get_if<InstrumentPerformanceEvent>(&*instrument);
+  expect(change != nullptr && change->sourceInstrument && change->sourceInstrument->key == 12,
+         "NinSnes runtime configuration should retain the parsed source-program mapping (got " +
+             (change != nullptr && change->sourceInstrument ? std::to_string(change->sourceInstrument->key) : "none") +
+             ")");
+}
+
+void ninSnesFe3ConditionalJumpUsesCapturedDriverState() {
+  const auto endTick = [](u8 mask) {
+    std::vector<u8> bytes(kAramSize);
+    writeLe16(bytes, 0x100, 0x200);
+    writeLe16(bytes, 0x102, 0);
+    writeSection(bytes, 0x200, {{0, 0x300}});
+    std::ranges::copy(std::initializer_list<u8>{0xf7, 3, 3, 0xc9, 0, 1, 0xc9, 0}, bytes.begin() + 0x300);
+    bytes[0xb9] = mask;
+    Layout layout = standardLayout();
+    layout.signature = Signature::Intelligent;
+    layout.profile = ProfileId::IntelliFe3;
+    return render(std::move(bytes), layout).tracks[0].endTick;
+  };
+
+  expect(endTick(0) == 1 && endTick(1) == 3,
+         "FE3 F7 should branch only when the captured per-channel driver condition bit is clear");
+}
+
+void ninSnesControllerFadesRemainInTheSourceDomain() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+
+  bytes[0x300] = 0xe1;  // pan hard right
+  bytes[0x301] = 0;
+  bytes[0x302] = 0xe2;  // fade through center to hard left
+  bytes[0x303] = 2;
+  bytes[0x304] = 20;
+  bytes[0x305] = 0xed;  // half channel level
+  bytes[0x306] = 0x80;
+  bytes[0x307] = 0xee;  // fade to full channel level
+  bytes[0x308] = 2;
+  bytes[0x309] = 0xff;
+  bytes[0x30a] = 3;
+  bytes[0x30b] = 0xc9;  // wait while both fades advance
+  bytes[0x30c] = 0;
+
+  const PerformanceSequence performance = render(std::move(bytes));
+  const auto& events = performance.tracks[0].events;
+  std::vector<const StereoBalancePerformanceEvent*> balances;
+  std::vector<const LevelPerformanceEvent*> levels;
+  for (const PerformanceEvent& event : events) {
+    if (const auto* balance = std::get_if<StereoBalancePerformanceEvent>(&event);
+        balance != nullptr && balance->header.sourceCommand.valid()) {
+      balances.push_back(balance);
+    }
+    if (const auto* level = std::get_if<LevelPerformanceEvent>(&event)) {
+      levels.push_back(level);
+    }
+  }
+
+  expect(balances.size() >= 3 && balances[0]->header.tick == 0 && balances[0]->leftGain == 0.0 &&
+             balances[1]->header.tick == 1 && balances[1]->leftGain > 0.0 && balances[1]->rightGain > 0.0 &&
+             balances[2]->header.tick == 2 && balances[2]->rightGain == 0.0,
+         "pan fades should interpolate the N-SPC pan value and emit its actual left/right gains");
+  expect(levels.size() >= 3 && std::abs(levels[0]->linearGain - ninSnesLevelGain(128)) < 0.0001 &&
+             levels[1]->linearGain > levels[0]->linearGain && std::abs(levels[2]->linearGain - 1.0) < 0.0001,
+         "volume fades should interpolate the driver's eight-bit level instead of MIDI controller values");
+}
+
+void ninSnesPrepassClearsMasterVolumeAutomationBinding() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+
+  // The scheduled recipe prepass leaves the completed fade bound to its
+  // discarded performance track. The real render must start with fresh
+  // performance bindings while retaining the reset source-domain value.
+  std::ranges::copy(
+      std::initializer_list<u8>{
+          0xe5,
+          0xff,  // master volume
+          0xe6,
+          4,
+          0x80,  // master volume fade
+          4,
+          0xc9,
+          0,  // wait for the fade, then end
+      },
+      bytes.begin() + 0x300);
+
+  const PerformanceSequence performance = render(std::move(bytes));
+  expect(performance.tracks[0].automations.size() == 1,
+         "the real render should replace the discarded prepass master-volume binding");
+  const auto* automation = std::get_if<ScalarPerformanceAutomationIntent>(&performance.tracks[0].automations[0].intent);
+  expect(automation != nullptr && automation->target == PerformanceAutomationTarget::MasterLevel &&
+             automation->durationTicks == 4,
+         "the real render should retain the structured master-volume fade");
+}
+
+void ninSnesPlaylistCarriesTiesAcrossSectionParserResets() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0x220);
+  writeLe16(bytes, 0x104, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+  writeSection(bytes, 0x220, {{0, 0x320}});
+
+  // Establish channel state, then play standard note C for 24 ticks.
+  bytes[0x300] = 0xed;
+  bytes[0x301] = 0x80;
+  bytes[0x302] = 24;
+  bytes[0x303] = 0x7f;
+  bytes[0x304] = 0x80;
+  bytes[0x305] = 0;
+
+  // Section changes reset per-section control flow, but the driver's musical
+  // state persists. The fade continues from half volume, and a leading tie
+  // extends the preceding note.
+  bytes[0x320] = 0xee;
+  bytes[0x321] = 2;
+  bytes[0x322] = 0xff;
+  bytes[0x323] = 12;
+  bytes[0x324] = 0x7f;
+  bytes[0x325] = 0xc8;
+  bytes[0x326] = 0xc9;
+  bytes[0x327] = 0;
+
+  const PerformanceSequence performance = render(std::move(bytes));
+  expect(performance.diagnostics.empty(), "cross-section tie fixture should render without diagnostics");
+  const MidiSequence midi = renderMidiSequence(performance);
+  const auto note = std::ranges::find_if(midi.tracks[0].events, [](const MidiEvent& event) {
+    return std::holds_alternative<NoteDuration>(event.payload);
+  });
+  expect(note != midi.tracks[0].events.end() && note->tick == 0 && std::get<NoteDuration>(note->payload).duration == 34,
+         "a leading tie in the next section should extend the previous duration note");
+  expect(std::ranges::any_of(performance.tracks[0].events,
+                             [](const PerformanceEvent& event) {
+                               const auto* level = std::get_if<LevelPerformanceEvent>(&event);
+                               return level != nullptr && level->header.tick == 25 &&
+                                      level->linearGain > ninSnesLevelGain(128) && level->linearGain < 1.0;
+                             }),
+         "a fade in the next section should continue from the preceding channel level");
+}
+
+void ninSnesKonamiZeroDurationRateContinuesHeldVoice() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0x220);
+  writeLe16(bytes, 0x104, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+  writeSection(bytes, 0x220, {{0, 0x320}});
+
+  // A normal note precedes the zero-rate run. The first zero-rate note still
+  // attacks, then leaves the driver's voice-hold bit set for the next section.
+  std::ranges::copy(std::initializer_list<u8>{4, 0x6f, 0x80, 4, 0x0f, 0x84, 0}, bytes.begin() + 0x300);
+
+  // The next note changes pitch without a new attack. A zero-rate rest keeps
+  // that voice sounding, and the first later gated note is still part of the
+  // held voice before it clears the hold bit.
+  std::ranges::copy(std::initializer_list<u8>{4, 0x0f, 0x87, 0xc9, 4, 0x6f, 0x89, 0}, bytes.begin() + 0x320);
+
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::Konami;
+  layout.durationRateTable = {0x00, 0xe6, 0xf0, 0xf5, 0xfa, 0xfc, 0xfe, 0xff};
+  const PerformanceSequence performance = render(bytes, layout);
+  expect(performance.diagnostics.empty(), "Konami zero-rate hold fixture should render without diagnostics");
+
+  std::vector<const NotePerformanceEvent*> notes;
+  std::vector<const PitchTransitionIntent*> transitions;
+  std::vector<const LegatoPedalPerformanceEvent*> pedals;
+  for (const PerformanceEvent& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(note);
+    } else if (const auto* pedal = std::get_if<LegatoPedalPerformanceEvent>(&event)) {
+      pedals.push_back(pedal);
+    }
+  }
+  for (const PerformanceAutomation& automation : performance.tracks[0].automations) {
+    if (const auto* transition = pitchTransitionIntent(automation)) {
+      transitions.push_back(transition);
+    }
+  }
+
+  expect(notes.size() == 4 && notes[0]->header.tick == 0 && notes[0]->durationTicks == 2 &&
+             notes[1]->header.tick == 4 && notes[1]->durationTicks == 4 && notes[2]->header.tick == 8 &&
+             notes[2]->durationTicks == 8 && notes[3]->header.tick == 16 && notes[3]->durationTicks == 2,
+         "zero-rate notes and rests should preserve the driver's full held-voice timeline");
+  expect(transitions.size() == 2 && transitions[0]->previousNote == std::optional{notes[1]->note} &&
+             transitions[0]->note == notes[2]->note && transitions[0]->startKey == 28.0 &&
+             transitions[0]->targetKey == 31.0 && transitions[0]->timing.timelineTicks == 0 &&
+             transitions[1]->previousNote == std::optional{notes[2]->note} && transitions[1]->note == notes[3]->note &&
+             transitions[1]->startKey == 31.0 && transitions[1]->targetKey == 33.0 &&
+             transitions[1]->timing.timelineTicks == 0,
+         "middle and terminal notes should continue the held voice with instant pitch changes");
+  expect(pedals.size() == 2 && pedals[0]->header.tick == 4 && pedals[0]->enabled && pedals[1]->header.tick == 16 &&
+             !pedals[1]->enabled,
+         "CC68 intent should bracket the exact zero-rate held-note run");
+
+  const MidiSequence midi = renderMidiSequence(performance);
+  std::vector<std::pair<u64, NoteDuration>> attacks;
+  for (const MidiEvent& event : midi.tracks[0].events) {
+    if (const auto* note = std::get_if<NoteDuration>(&event.payload)) {
+      attacks.emplace_back(event.tick, *note);
+    }
+  }
+  expect(attacks.size() == 2 && attacks[0].first == 0 && attacks[0].second.key == 24 &&
+             attacks[0].second.duration == 2 && attacks[1].first == 4 && attacks[1].second.key == 28 &&
+             attacks[1].second.duration == 14,
+         "pitch-bend lowering should render the zero-rate run as one sustained physical attack");
+
+  Layout standard = standardLayout();
+  standard.durationRateTable = layout.durationRateTable;
+  const PerformanceSequence standardPerformance = render(std::move(bytes), standard);
+  std::vector<u32> standardDurations;
+  bool standardHasHold = false;
+  for (const PerformanceEvent& event : standardPerformance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      standardDurations.push_back(note->durationTicks);
+    }
+    standardHasHold |= std::holds_alternative<LegatoPedalPerformanceEvent>(event);
+  }
+  const bool standardHasContinuation = std::ranges::any_of(
+      standardPerformance.tracks[0].automations,
+      [](const PerformanceAutomation& automation) { return pitchTransitionIntent(automation) != nullptr; });
+  expect(standardDurations == std::vector<u32>{2, 1, 1, 2} && !standardHasHold && !standardHasContinuation,
+         "zero duration rate should retain ordinary one-tick gates outside the Konami driver");
+}
+
+void ninSnesF9UsesSharedPitchTransitions() {
+  const auto renderCommands = [&](std::initializer_list<u8> commands) { return render(sequenceBytes(commands)); };
+
+  // C glides to C-sharp after a two-tick delay. Three source steps divide one
+  // semitone as 85/256, 85/256, and the exact final target.
+  const PerformanceSequence performance = renderCommands({12, 0x7f, 0x80, 0xf9, 2, 3, 1, 0});
+  expect(performance.diagnostics.empty() && performance.tracks[0].automations.size() == 1,
+         "NinSnes F9 should produce one shared pitch transition");
+  const PerformanceAutomation& automation = performance.tracks[0].automations.front();
+  const auto* transition = pitchTransitionIntent(automation);
+  expect(transition != nullptr && automation.realization.startTick == 2 && automation.realization.endTick == 5 &&
+             transition->startKey == 24.0 && transition->targetKey == 25.0 && transition->timing.timelineTicks == 3,
+         "F9 should retain its note anchor, delay, duration, and destination");
+  const SequenceParse parsed = decodeSequence(ByteReader(SourceId{7}, sequenceBytes({12, 0x7f, 0x80, 0xf9, 2, 3, 1, 0})),
+                                                                  standardLayout(), AssetId{1});
+  const auto& commands = parsed.program.tracks[0].commands;
+  const auto decodedSlide = std::ranges::find(commands, u8{0xf9}, &SourceCommand::opcode);
+  expect(decodedSlide != commands.end() && decodedSlide->range.size == 4 && decodedSlide->address.value == 0x303 &&
+             decodedSlide->execution.duringWait,
+         "F9 should remain an independent source command with generic during-wait eligibility");
+  const auto* sampled = transition == nullptr ? nullptr : std::get_if<SampledAutomationCurve>(&transition->curve);
+  expect(sampled != nullptr && sampled->samples.size() == 4 && sampled->samples[0].tickOffset == 0 &&
+             sampled->samples[0].value == 24.0 && sampled->samples[1].tickOffset == 1 &&
+             std::abs(sampled->samples[1].value - (24.0 + 85.0 / 256.0)) < 0.000001 &&
+             sampled->samples[2].tickOffset == 2 &&
+             std::abs(sampled->samples[2].value - (24.0 + 170.0 / 256.0)) < 0.000001 &&
+             sampled->samples[3].tickOffset == 3 && sampled->samples[3].value == 25.0,
+         "F9 should retain the driver's exact fixed-point pitch staircase");
+  expect(std::ranges::none_of(
+             performance.tracks[0].events,
+             [](const PerformanceEvent& event) { return std::holds_alternative<PitchBendPerformanceEvent>(event); }),
+         "F9 format playback should not choose a MIDI pitch representation");
+
+  const MidiSequence pitchBend = renderMidiSequence(performance);
+  expect(std::ranges::any_of(pitchBend.tracks[0].events,
+                             [](const MidiEvent& event) {
+                               const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+                               return bend != nullptr && bend->value != 0;
+                             }) &&
+             std::ranges::none_of(
+                 pitchBend.tracks[0].events,
+                 [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }),
+         "NinSnes should retain exact F9 pitch bends by default");
+
+  const MidiSequence portamento =
+      renderMidiSequence(performance, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
+  expect(std::ranges::any_of(
+             portamento.tracks[0].events,
+             [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }) &&
+             std::ranges::none_of(
+                 portamento.tracks[0].events,
+                 [](const MidiEvent& event) { return isMidiChannelMessage(event, MidiChannelMessageKind::PitchBend); }),
+         "an explicit portamento export should lower F9 as native portamento");
+
+  // A note pitch envelope owns the same driver motion first. F9 begins only
+  // after that motion finishes and retains the pitch the envelope established.
+  const PerformanceSequence afterEnvelope = renderCommands({0xf1, 0, 2, 2, 10, 0x7f, 0x80, 0xf9, 1, 3, 5, 0});
+  const auto* envelopeTransition = pitchTransitionIntent(afterEnvelope.tracks[0].automations.front());
+  const auto* envelopeSamples =
+      envelopeTransition == nullptr ? nullptr : std::get_if<SampledAutomationCurve>(&envelopeTransition->curve);
+  expect(envelopeTransition != nullptr && afterEnvelope.tracks[0].automations.front().realization.startTick == 3 &&
+             envelopeTransition->startKey == 26.0 && envelopeTransition->targetKey == 29.0 &&
+             envelopeSamples != nullptr && envelopeSamples->samples.size() == 4,
+         "F9 should start from a completed pitch envelope without losing its queued timing");
+
+  const MidiSequence envelopePitchBend = renderMidiSequence(afterEnvelope);
+  expect(std::ranges::none_of(envelopePitchBend.tracks[0].events,
+                              [](const MidiEvent& event) {
+                                const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+                                return bend != nullptr && event.tick == 0 && bend->value != 0;
+                              }) &&
+             std::ranges::any_of(envelopePitchBend.tracks[0].events,
+                                 [](const MidiEvent& event) {
+                                   const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+                                   return bend != nullptr && event.tick == 1 && bend->value != 0;
+                                 }),
+         "pitch-bend lowering should not apply F9's post-envelope starting pitch at note attack");
+
+  const MidiSequence envelopePortamento = renderMidiSequence(
+      afterEnvelope, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
+  expect(std::ranges::any_of(envelopePortamento.tracks[0].events,
+                             [](const MidiEvent& event) {
+                               const auto* note = std::get_if<NoteDuration>(&event.payload);
+                               return note != nullptr && event.tick == 0 && note->key == 24;
+                             }) &&
+             std::ranges::any_of(envelopePortamento.tracks[0].events,
+                                 [](const MidiEvent& event) {
+                                   const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+                                   return bend != nullptr && event.tick == 3 && bend->value == 0;
+                                 }),
+         "native portamento should preserve the preceding envelope and center its bend at the F9 handoff");
+
+  const PerformanceSequence consecutive =
+      renderCommands({5, 0x7f, 0x80, 0xf9, 0, 3, 3, 0xf9, 0, 3, 6, 10, 0x7f, 0xc8, 0});
+  const MidiSequence consecutivePitchBend = renderMidiSequence(consecutive);
+  expect(std::ranges::none_of(consecutivePitchBend.tracks[0].events,
+                              [](const MidiEvent& event) {
+                                const auto* bend = midiChannelMessage(event, MidiChannelMessageKind::PitchBend);
+                                return bend != nullptr && event.tick == 0 && bend->value != 0;
+                              }),
+         "a later F9 should inherit the preceding transition instead of pre-bending the note attack");
+
+  // Adjacent F9 commands are queued by the driver. If the wait expires before
+  // the first delayed slide starts, the last command replaces it at that tick.
+  const PerformanceSequence queued = renderCommands({5, 0x7f, 0x80, 0xf9, 8, 3, 4, 0xf9, 2, 3, 6, 10, 0x7f, 0xc8, 0});
+  expect(queued.tracks[0].automations.size() == 2 &&
+             queued.tracks[0].automations[0].realization.endReason == PerformanceAutomationEndReason::Continued &&
+             queued.tracks[0].automations[0].realization.endTick ==
+                 queued.tracks[0].automations[0].realization.startTick &&
+             queued.tracks[0].automations[1].realization.startTick == 7,
+         "queued F9 replacement should retain the source driver's execution timing");
+  const MidiSequence queuedPortamento =
+      renderMidiSequence(queued, MidiExportOptions{.pitchTransitions = MidiPitchTransitionRendering::Portamento});
+  expect(std::ranges::count_if(
+             queuedPortamento.tracks[0].events,
+             [](const MidiEvent& event) { return isMidiController(event, MidiController::PortamentoControl); }) == 1,
+         "a canceled delayed F9 should not leave a zero-length portamento behind");
+
+  for (const ProfileId id : kProfileIds) {
+    std::vector<u8> bytes(kAramSize);
+    writeLe16(bytes, 0x100, 0x200);
+    writeLe16(bytes, 0x102, 0);
+    writeSection(bytes, 0x200, {{0, 0x300}});
+    const u8 slide = pitchSlideOpcode(profile(id));
+    std::ranges::copy(std::initializer_list<u8>{12, 0x7f, 0x80, slide, 0, 3, 1, 0}, bytes.begin() + 0x300);
+
+    Layout layout = standardLayout();
+    layout.profile = id;
+    if (profile(id).base == BaseProfile::Intelli) {
+      layout.signature = Signature::Intelligent;
+    } else if (profile(id).base == BaseProfile::Earlier) {
+      layout.signature = Signature::Earlier;
+    }
+    const PerformanceSequence variant = render(std::move(bytes), layout);
+    expect(std::ranges::any_of(
+               variant.tracks[0].automations,
+               [](const PerformanceAutomation& candidate) { return pitchTransitionIntent(candidate) != nullptr; }),
+           std::string(profile(id).name) + " should use the shared pitch-transition path");
+  }
+}
+
+void ninSnesPercussionStartsPerNoteVibratoFade() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+
+  // Configure vibrato and its reusable per-note fade, then play percussion.
+  // Percussion reaches the same voice pitch/vibrato path as melodic notes in
+  // the driver; only its instrument and output key are different.
+  bytes[0x300] = 0xe3;
+  bytes[0x301] = 0;
+  bytes[0x302] = 0x20;
+  bytes[0x303] = 0x80;
+  bytes[0x304] = 0xf0;
+  bytes[0x305] = 8;
+  bytes[0x306] = 24;
+  bytes[0x307] = 0x7f;
+  bytes[0x308] = 0xca;
+  bytes[0x309] = 0;
+
+  const PerformanceSequence performance = render(std::move(bytes));
+  const size_t vibratoFadeSamples =
+      std::ranges::count_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
+        const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+        return modulation != nullptr && modulation->target == ModulationPerformanceTarget::VibratoDepth &&
+               modulation->header.tick != 0;
+      });
+  expect(vibratoFadeSamples != 0, "percussion notes should advance a configured per-note vibrato fade");
+}
+
+void ninSnesFixedPercussionBaseIgnoresFaOperand() {
+  std::vector<u8> driverBytes(0x100);
+  std::ranges::copy(std::initializer_list<u8>{0xd5, 0x11, 0x02, 0xfd, 0x10, 0x03, 0x80, 0xa8, 0xca, 0x8d, 0x06, 0xcf},
+                    driverBytes.begin() + 0x20);
+  expect(detectFixedPercussionBase(ByteReader(SourceId{7}, driverBytes), 0xca) == 0,
+         "the Vegas Stakes loader form should detect fixed percussion base zero");
+
+  std::ranges::fill(driverBytes, 0);
+  std::ranges::copy(std::initializer_list<u8>{0x68, 0xca, 0x90, 0x07, 0xa8, 0xa7, 0x3f, 0x11, 0x0b, 0x8d, 0xa4},
+                    driverBytes.begin() + 0x20);
+  expect(detectFixedPercussionBase(ByteReader(SourceId{7}, driverBytes), 0xca) == 0x23,
+         "the Kirby's Dream Land 3 dispatch form should expose its hard-coded percussion base");
+
+  std::ranges::fill(driverBytes, 0);
+  std::ranges::copy(std::initializer_list<u8>{0xd5, 0x11, 0x02, 0xfd, 0x10, 0x06, 0x80, 0xa8, 0xca, 0x60, 0x84, 0x5f,
+                                              0x8d, 0x06, 0xcf},
+                    driverBytes.begin() + 0x20);
+  expect(!detectFixedPercussionBase(ByteReader(SourceId{7}, driverBytes), 0xca),
+         "the normal FA-controlled loader should remain dynamic");
+
+  std::vector<u8> sequenceBytes(kAramSize);
+  writeLe16(sequenceBytes, 0x100, 0x200);
+  writeLe16(sequenceBytes, 0x102, 0);
+  writeSection(sequenceBytes, 0x200, {{0, 0x300}});
+  std::ranges::copy(std::initializer_list<u8>{3, 0x7f, 0xfa, 5, 0xca, 0}, sequenceBytes.begin() + 0x300);
+
+  const auto sourceProgram = [&](std::optional<u8> fixedBase) {
+    Layout layout = standardLayout();
+    layout.fixedPercussionBase = fixedBase;
+    const SequenceParse parsed = decodeSequence(ByteReader(SourceId{7}, sequenceBytes), layout, AssetId{1});
+    const auto command = std::ranges::find(parsed.program.tracks[0].commands, u8{0xfa}, &SourceCommand::opcode);
+    expect(command != parsed.program.tracks[0].commands.end() && command->range.size == 2,
+           "FA should still consume its operand in fixed-base drivers");
+    expect(parsed.recipes.drumKits.size() == 1 && parsed.recipes.drumKits[0].slots.size() == 1,
+           "the percussion fixture should produce one drum mapping");
+    return parsed.recipes.drumKits[0].slots[0].sourceProgram;
+  };
+
+  expect(sourceProgram(std::nullopt) == 5, "normal drivers should continue applying the FA percussion base");
+  expect(sourceProgram(0) == 0, "fixed-base drivers should ignore FA while retaining the detected base");
+  expect(sourceProgram(0x23) == 0x23, "a nonzero fixed percussion base should override the FA operand");
+}
+
+void ninSnesKonamiPercussionUsesDriverMapAndNeutralTuning() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+
+  // Konami FA consumes no operands. The following 04 7F is a normal note
+  // parameter command, followed by percussion slot CA.
+  std::ranges::copy(std::initializer_list<u8>{0xfa, 4, 0x7f, 0xca, 0}, bytes.begin() + 0x300);
+  bytes[0x3702] = 0xb0;
+
+  // Program 20 deliberately uses SRCN 1. Tuning must be selected by program
+  // for melodic playback, while the percussion branch clears it entirely.
+  std::ranges::copy(std::initializer_list<u8>{1, 0xff, 0xe0, 0, 0, 0}, bytes.begin() + 0x4000 + 20 * 6);
+  bytes[0x3800 + 1] = 0xf9;
+  bytes[0x3800 + 20] = 5;
+  writeLe16(bytes, 0x5000 + 4, 0x6000);
+  writeLe16(bytes, 0x5000 + 6, 0x6000);
+  bytes[0x6000] = 0x01;
+
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::Konami;
+  layout.fixedPercussionBase = 20;
+  layout.konamiPercussion = KonamiPercussionLayout{
+      .tableAddress = 0x3700,
+      .slotCount = 1,
+      .programBase = 20,
+  };
+  layout.konamiTuningTableAddress = 0x3800;
+  layout.konamiTuningTableSize = 21;
+  layout.instrumentTableAddress = 0x4000;
+  layout.spcDirAddress = 0x5000;
+
+  const SequenceParse parsed = decodeSequence(ByteReader(SourceId{7}, bytes), layout, AssetId{1});
+  const auto fa = std::ranges::find(parsed.program.tracks[0].commands, u8{0xfa}, &SourceCommand::opcode);
+  const auto parameters = std::ranges::find(parsed.program.tracks[0].commands, u8{4}, &SourceCommand::opcode);
+  expect(fa != parsed.program.tracks[0].commands.end() && fa->range.size == 1 &&
+             parameters != parsed.program.tracks[0].commands.end() && parameters->address.value == 0x301,
+         "Konami FA should remain a zero-operand NOP without swallowing the following note parameters");
+  expect(parsed.recipes.drumKits.size() == 1 && parsed.recipes.drumKits[0].slots.size() == 1 &&
+             parsed.recipes.drumKits[0].slots[0] == DrumSlot{.key = 36, .sourceProgram = 20, .sourceKey = 72},
+         "Konami percussion should use its fixed program base and per-slot played note");
+
+  const ScanResult scan = scanSynth(std::move(bytes), layout, "Konami percussion", parsed.recipes);
+  const auto* instruments = std::get_if<SoundBankAsset>(&scan.assets[0]);
+  expect(instruments != nullptr, "Konami synth fixture should produce an instrument set");
+  const auto melodic = std::ranges::find_if(instruments->instruments, [](const Instrument& instrument) {
+    return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) ==
+           InstrumentAddress{.bank = 0, .program = 20};
+  });
+  const auto drums = std::ranges::find_if(instruments->instruments, [](const Instrument& instrument) {
+    return instrument.explicitAddress == InstrumentAddress{.bank = 0x7f, .program = 0};
+  });
+  expect(melodic != instruments->instruments.end() && melodic->regions.size() == 1 &&
+             std::abs(melodic->regions[0].unityKey - 66.21) < 0.001,
+         "Konami melodic tuning should be indexed by program rather than SRCN");
+  expect(drums != instruments->instruments.end() && drums->regions.size() == 1 &&
+             std::abs(drums->regions[0].unityKey - 35.21) < 0.001,
+         "Konami drums should combine the table note with neutralized melodic tuning");
+}
+
+void ninSnesEarlierPercussionUsesSeparateSixByteTable() {
+  std::vector<u8> bytes(kAramSize);
+  writeLe16(bytes, 0x100, 0x200);
+  writeLe16(bytes, 0x102, 0);
+  writeSection(bytes, 0x200, {{0, 0x300}});
+  std::ranges::copy(std::initializer_list<u8>{3, 0x7f, 0xd0, 0}, bytes.begin() + 0x300);
+
+  // Prototype melodic instruments have five-byte rows. Percussion lives in a
+  // separate six-byte table whose final byte is the note used to pitch the hit.
+  std::ranges::copy(std::initializer_list<u8>{0, 0x8f, 0xe0, 0, 1}, bytes.begin() + 0x4000);
+  std::ranges::copy(std::initializer_list<u8>{1, 0x8f, 0xe0, 0, 1, 0xa8}, bytes.begin() + 0x4005);
+  writeLe16(bytes, 0x5000, 0x6000);
+  writeLe16(bytes, 0x5002, 0x6000);
+  writeLe16(bytes, 0x5004, 0x6009);
+  writeLe16(bytes, 0x5006, 0x6009);
+  bytes[0x6000] = 0x01;
+  bytes[0x6009] = 0x01;
+
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "earlier-percussion.spc"}, std::move(bytes));
+  Layout layout{
+      .signature = Signature::Earlier,
+      .profile = ProfileId::Earlier,
+      .playlistAddress = 0x100,
+      .instrumentTableAddress = 0x4000,
+      .percussionTableAddress = 0x4005,
+      .spcDirAddress = 0x5000,
+  };
+  const SequenceParse parsed = decodeSequence(sources.reader(source), layout, AssetId{1});
+  expect(parsed.recipes.drumKits.size() == 1 && parsed.recipes.drumKits[0].slots.size() == 1 &&
+             parsed.recipes.drumKits[0].slots[0].sourceProgram == kEarlierPercussionProgramBase &&
+             parsed.recipes.drumKits[0].slots[0].sourceKey == 0x40,
+         "prototype percussion should resolve its separate row and source pitch");
+
+  ScanIdAllocator ids;
+  ScanResultBuilder result(
+      ScanInput{
+          .source = sources.source(source),
+          .reader = sources.reader(source),
+          .ids = ids,
+      },
+      "NinSnes");
+  const auto synth = addSynth(result, layout, parsed.recipes, "Earlier");
+  expect(synth.has_value(), "prototype percussion should produce an exportable drum kit");
+
+  const ScanResult scan = result.finish();
+  const auto* instruments = std::get_if<SoundBankAsset>(&scan.assets[0]);
+  expect(instruments != nullptr && instruments->instruments.size() == 2,
+         "the separate percussion row should remain an internal drum source");
+  const auto melodic = std::ranges::find_if(instruments->instruments, [](const Instrument& instrument) {
+    return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) ==
+           InstrumentAddress{.bank = 0, .program = 0};
+  });
+  const auto drum = std::ranges::find_if(instruments->instruments, [](const Instrument& instrument) {
+    return instrument.explicitAddress == InstrumentAddress{.bank = 0x7f, .program = 0};
+  });
+  expect(melodic != instruments->instruments.end() && drum != instruments->instruments.end() &&
+             melodic->regions.size() == 1 && drum->regions.size() == 1 && drum->regions[0].keyRange.low == 0x24 &&
+             drum->regions[0].keyRange.high == 0x24 &&
+             drum->regions[0].sample.index() != melodic->regions[0].sample.index(),
+         "the drum kit should use the percussion sample on its MIDI drum key");
+  expect(std::abs(drum->regions[0].unityKey - (melodic->regions[0].unityKey - 28.0)) < 0.0001,
+         "the percussion row's sixth byte should determine the exported drum pitch");
+
+  const auto drumSource = std::ranges::find_if(scan.sourceMap.annotations(), [](const SourceAnnotation& annotation) {
+    return annotation.category() == "nin-snes-drum-region";
+  });
+  expect(drumSource != scan.sourceMap.annotations().end() && drumSource->fieldsAsChildren,
+         "NinSnes drum records should opt their exact fields into TreeView child projection");
+  const auto sourceBackedFields =
+      std::ranges::count_if(drumSource->fields, [](const SourceField& field) { return field.range.valid(); });
+  expect(sourceBackedFields == 6 && drumSource->fields[0].name == "srcn" && drumSource->fields[5].name == "note" &&
+             drumSource->fields[5].range.offset == 0x400a,
+         "a prototype drum record should retain all six individually selectable source fields");
+}
+
+void ninSnesGainModeInstrumentsUseDspEnvelope() {
+  std::vector<u8> bytes(kAramSize);
+
+  // One direct-GAIN instrument followed by a structurally invalid header that
+  // terminates the table. Its sample is a single non-looping BRR block.
+  bytes[0x4000] = 0;
+  bytes[0x4001] = 0;
+  bytes[0x4002] = 0;
+  bytes[0x4003] = 0x7f;
+  bytes[0x4004] = 1;
+  bytes[0x4005] = 0;
+  bytes[0x4006] = 0x80;
+  writeLe16(bytes, 0x5000, 0x6000);
+  writeLe16(bytes, 0x5002, 0x6000);
+  bytes[0x6000] = 0x01;
+
+  Layout layout = standardLayout();
+  layout.instrumentTableAddress = 0x4000;
+  layout.spcDirAddress = 0x5000;
+
+  const ScanResult scan = scanSynth(std::move(bytes), layout, "GAIN");
+  const auto* instruments = std::get_if<SoundBankAsset>(&scan.assets[0]);
+  expect(
+      instruments != nullptr && instruments->instruments.size() == 1 && instruments->instruments[0].regions.size() == 1,
+      "direct-GAIN fixture should produce one instrument region");
+  const Envelope& envelope = instruments->instruments[0].regions[0].envelope;
+  expect(envelope.sustainAmplitude && *envelope.sustainAmplitude > 0.99 && *envelope.sustainAmplitude < 1.0,
+         "direct GAIN should become the DSP's fixed sustain level instead of an unspecified envelope");
+}
+
+void ninSnesPitchWrappingUsesThePlayedNote() {
+  const auto bytes = sequenceBytes({0xe0, 3, 0xe9, 5, 0xea, 2, 4, 0x7f, 0x80, 0x80, 0xe0, 4, 0x81, 0});
+  const auto parsed = decodeSequence(ByteReader(SourceId{1}, bytes), standardLayout(), AssetId{1});
+  expect(parsed.recipes.usedNotes == std::set<std::pair<u32, u8>>{{3, 31}, {4, 32}},
+         "note usage must resolve programs, apply both transposes, and deduplicate repeated notes");
+  // Driver register results at MIDI keys 36, 59, 60, 61 and 84. Include O-chan's
+  // bass, SimCity's percussion, and scales immediately around a wrap to zero.
+  struct Case { u16 scale; std::array<u16, 5> pitches; };
+  for (const auto& test : {Case{0x0100, {133, 505, 535, 567, 2146}},
+                          Case{0x2400, {4788, 1796, 2876, 4028, 11720}},
+                          Case{0x8000, {640, 15488, 2944, 7040, 12544}},
+                          Case{0x1e9f, {4072, 15463, 16382, 978, 176}},
+                          Case{0x1ea0, {4073, 15465, 0, 980, 185}},
+                          Case{0x1ea1, {4073, 15467, 2, 982, 193}}}) {
+    std::vector<u8> bytes(kAramSize);
+    std::ranges::copy(std::initializer_list<u8>{0, 0xff, 0xec, 0xb8,
+                       static_cast<u8>(test.scale >> 8), static_cast<u8>(test.scale)}, bytes.begin() + 0x4000);
+    writeLe16(bytes, 0x5000, 0x6000);
+    writeLe16(bytes, 0x5002, 0x6000);
+    bytes[0x6000] = 1;
+    Layout layout = standardLayout();
+    layout.instrumentTableAddress = 0x4000;
+    layout.spcDirAddress = 0x5000;
+    SequenceRecipes recipes;
+    constexpr std::array<u8, 5> keys{36, 59, 60, 61, 84};
+    DrumKit kit;
+    for (u8 i = 0; i < keys.size(); ++i) {
+      kit.slots.push_back({.key = static_cast<u8>(36 + i), .sourceProgram = 0, .sourceKey = keys[i]});
+      recipes.usedNotes.emplace(0, keys[i]);
+    }
+    recipes.drumKits.push_back(kit);
+    for (const ProfileId id : {ProfileId::Standard, ProfileId::SunsoftEarlier}) {
+      layout.profile = id;
+      const ScanResult scan = scanSynth(bytes, layout, "Pitch wrapping", recipes);
+      const auto& bank = std::get<SoundBankAsset>(scan.assets[0]);
+      expect(bank.instruments.size() == 2 && bank.instruments[1].regions.size() == keys.size(),
+             "the fixture should produce melodic and percussion regions");
+      const auto& melodic = bank.instruments[0].regions;
+      for (int key = 0; key < 128; ++key) {
+        expect(std::ranges::count_if(melodic, [key](const Region& r) {
+                 return key >= r.keyRange.low && key <= r.keyRange.high;
+               }) == 1, "pitch regions must cover every MIDI key exactly once");
+      }
+      for (size_t i = 0; i < keys.size(); ++i) {
+        const auto region = std::ranges::find_if(melodic, [&](const Region& r) {
+          return keys[i] >= r.keyRange.low && keys[i] <= r.keyRange.high;
+        });
+        const auto& drum = bank.instruments[1].regions[i];
+        const double rate = std::exp2((keys[i] - region->unityKey) / 12.0);
+        const double drumRate = std::exp2((drum.keyRange.low - drum.unityKey) / 12.0);
+        // Unwrapped tuning retains the existing equal-tempered approximation.
+        expect(test.pitches[i] == 0 ? region->attenuationDb >= 144 && drum.attenuationDb >= 144
+                                   : std::abs(rate / (test.pitches[i] / 4096.0) - 1.0) < 0.01,
+               "pitch mismatch at scale " + std::to_string(test.scale) + " key " + std::to_string(keys[i]));
+        expect(std::abs(rate - drumRate) < 0.000001,
+               "melodic notes and percussion must use identical pitch math at the same source note");
+      }
+    }
+    if (test.scale == 0x2400) {
+      for (const bool played : {false, true}) {
+        recipes.usedNotes = {{0, 36}};
+        if (played) {
+          recipes.usedNotes.emplace(0, 59);
+        }
+        const auto scan = scanSynth(bytes, layout, "Used notes", recipes);
+        const auto& regions = std::get<SoundBankAsset>(scan.assets[0]).instruments[0].regions;
+        expect(regions.size() == (played ? 3 : 1),
+               "only a played overflowing key should split the normal region around itself");
+      }
+    }
+  }
+}
+
+void ninSnesIdentityMappedSilentSlotsAreSparse() {
+  std::vector<u8> bytes(kAramSize);
+  constexpr u32 kInstrumentTable = 0x4000;
+  constexpr u16 kDirectory = 0x5000;
+  constexpr u16 kSample = 0x6000;
+
+  std::ranges::copy(
+      std::initializer_list<u8>{
+          0, 0xff, 0xe0, 0, 1, 0,  // valid
+          1, 0,    0,    0, 0, 0,  // identity-mapped silent
+          2, 0xff, 0xe0, 0, 1, 0,  // valid after the sparse slot
+          3, 0xff, 0xe0, 0, 1, 0,  // valid-looking start of the next structure
+      },
+      bytes.begin() + kInstrumentTable);
+  for (const u8 srcn : {u8{0}, u8{1}, u8{2}, u8{3}}) {
+    writeLe16(bytes, kDirectory + srcn * 4, kSample);
+    writeLe16(bytes, kDirectory + srcn * 4 + 2, kSample);
+  }
+  bytes[kSample] = 0x01;
+
+  Layout layout = standardLayout();
+  layout.songListAddress = kInstrumentTable + 3 * 6;
+  layout.instrumentTableAddress = kInstrumentTable;
+  layout.spcDirAddress = kDirectory;
+
+  const ScanResult scan = scanSynth(std::move(bytes), layout, "Sparse");
+  const auto* instruments = std::get_if<SoundBankAsset>(&scan.assets[0]);
+  expect(
+      instruments != nullptr && instruments->instruments.size() == 2 &&
+          resolveInstrumentAddress(instruments->instruments[0].explicitAddress, instruments->instruments[0].identity) ==
+              InstrumentAddress{.bank = 0, .program = 0} &&
+          resolveInstrumentAddress(instruments->instruments[1].explicitAddress, instruments->instruments[1].identity) ==
+              InstrumentAddress{.bank = 0, .program = 2},
+      "identity-mapped silent slots should be skipped without scanning into the following known structure");
+}
+
+void ninSnesMetalCombatRecognizesDriverWithoutInstrumentOverwrite() {
+  std::vector<u8> bytes(kAramSize);
+  const auto write = [&](size_t offset, std::initializer_list<u8> data) {
+    std::ranges::copy(data, bytes.begin() + offset);
+  };
+  // Metal Combat's playlist reader, dispatch, FE3 note parameters and FA
+  // handler. Unlike FE3, FA starts directly with the voice-table pointer.
+  write(0x500, {0x8d, 0x00, 0xf7, 0x1d, 0x3a, 0x1d, 0x2d, 0xf7, 0x1d, 0x3a, 0x1d, 0xfd, 0xae});
+  write(0x520, {0xf5, 0xe3, 0x18, 0xfd, 0xf5, 0xe2, 0x18, 0xda, 0x1d});
+  write(0x540, {0x68, 0xd6, 0x90, 0x05, 0x3f, 0x45, 0x08, 0x2f, 0xce});
+  write(0x560, {0x1c, 0xfd, 0xf6, 0x22, 0x07, 0x2d, 0xf6, 0x21, 0x07, 0x2d, 0xdd, 0x5c, 0xfd, 0xf6, 0xc7, 0x07});
+  write(0x580, {0x68, 0x40, 0xb0, 0x0c, 0x28, 0x3f, 0xfd, 0xf6, 0x00, 0xff, 0xd5, 0x01, 0x02, 0x5f, 0x43, 0x07,
+                0x28, 0x3f, 0xfd, 0xf6, 0x00, 0xff, 0xd5, 0x10, 0x02, 0x5f, 0x22, 0x07});
+  write(0x5a0, {0xf4, 0x20, 0xc4, 0xb6, 0xf4, 0x21, 0xc4, 0xb7, 0xe8, 0x04, 0xcf, 0x60, 0x94, 0x20, 0xd4,
+                0x20, 0x90, 0x02, 0xbb, 0x21, 0x6f});
+  write(0x5c0, {0x8d, 0x06, 0xcf, 0xda, 0x15, 0x60, 0x98, 0x80, 0x15, 0x98, 0x19, 0x16});
+  write(0x5d0, {0xe8, 0x1b, 0x8d, 0x5d, 0x3f, 0xf2, 0x05});
+  write(0x900, {0x28, 0x70, 0xf0, 0x08, 0x9f, 0xfd, 0xf6, 0x1f, 0x09, 0xd5, 0x41, 0x03, 0xae});
+  write(0x920, {0xe8, 0xf4, 0xfa, 0, 6, 12, 24});
+  bytes[0xff01] = 12;
+  write(0x81d, {1, 1, 2, 3, 0, 1, 2, 1, 2, 1, 1, 3, 0, 1, 2, 3, 1, 3, 3, 0,
+                1, 3, 0, 3, 3, 3, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1, 2, 2});
+  writeLe16(bytes, 0x18e4, 0x2000);
+  writeLe16(bytes, 0x2000, 0x2100);
+  writeLe16(bytes, 0x2002, 0);
+  writeSection(bytes, 0x2100, {{0, 0x2200}});
+  write(0x2200, {0xd6, 0, 4, 0x7f, 0x80, 0});
+  write(0x1980, {0, 0xfe, 0xe0, 0xb8, 4, 0});
+  writeLe16(bytes, 0x1b00, 0x3000);
+  writeLe16(bytes, 0x1b02, 0x3000);
+  bytes[0x3000] = 3;
+
+  const auto layout = findLayout(ByteReader(SourceId{1}, bytes));
+  expect(layout && layout->profile == ProfileId::IntelliFe3 && layout->instrumentTableAddress == 0x1980 &&
+             layout->spcDirAddress == 0x1b00 && !layout->intelliInstrumentOverwrite &&
+             layout->intelliTransposeTable == std::vector<u8>{0xe8, 0xf4, 0xfa, 0, 6, 12, 24} &&
+             layout->intelliDurationRateTable[1] == 12 && layout->intelliVolumeTable[1] == 12,
+         "Metal Combat's earlier FA handler must not prevent recognition of its FE3-family sound bank");
+  const ScanResult result = scanSynth(bytes, *layout, "Metal Combat");
+  expect(!result.assets.empty(), "the detected Metal Combat table should produce a sound bank");
+  bytes[0x81d + 39] = 0;
+  expect(findLayout(ByteReader(SourceId{1}, bytes))->profile == ProfileId::Unknown,
+         "the full FE3 command-length table must still be validated");
+
+  bytes[0x541] = 0xda;
+  std::fill(bytes.begin() + 0x580, bytes.begin() + 0x600, 0);
+  write(0x580, {0x01, 0x30, 0x13, 0x68, 0x40, 0x28, 0x3f, 0xfd, 0xf6, 0x00, 0xff, 0xb0, 0x05, 0xd5,
+                0x11, 0x02, 0x2f, 0xee, 0xd5, 0x20, 0x02});
+  write(0x5a0, {0x30, 0xdd, 0xf4, 0x20, 0xc4, 0xb6, 0xf4, 0x21, 0xc4, 0xb7, 0xe8, 0x04, 0xcf, 0x60,
+                0x94, 0x20, 0xd4, 0x20, 0x90, 0x02, 0xbb, 0x21, 0x6f});
+  write(0x5c0, {0x8d, 0x06, 0xcf, 0xda, 0x0e, 0xe4, 0x14, 0x24, 0x15, 0xd0, 0x2a, 0x60, 0x98, 0xfe,
+                0x0f, 0x4d, 0x7d, 0x9f, 0x5c, 0x08, 0x04, 0x5d});
+  write(0x5e0, {0xe8, 0x1b, 0x8d, 0x5d, 0x3f, 0xf2, 0x05});
+  write(0x821, {1, 1, 2, 3, 0, 1, 2, 1, 2, 1, 1, 3, 0, 1, 2, 3, 1, 3,
+                3, 0, 1, 3, 0, 3, 3, 3, 1, 0, 0, 2, 1, 0, 1, 1, 1, 1});
+  const auto fe4 = findLayout(ByteReader(SourceId{1}, bytes));
+  expect(fe4 && fe4->profile == ProfileId::IntelliFe4 && fe4->instrumentTableAddress == 0xfe00 &&
+             fe4->intelliDurationRateTable[1] == 12,
+         "FE4's page-aligned loader and embedded note table must be detected independently");
+}
+
+void ninSnesIntelligentPercussionUsesRevisionSpecificTables() {
+  auto bytes = sequenceBytes({0xf9});
+  for (u8 slot = 0; slot < 12; ++slot) {
+    bytes[0x301 + slot] = slot + 3;
+    bytes[0x30d + slot] = 0xa0 + slot;
+    bytes[0x319 + slot] = 0xff;
+  }
+  std::ranges::copy(std::initializer_list<u8>{4, 0x7f, 0xca, 0xf5, 0xf0, 0xf0, 8, 0xca, 0}, bytes.begin() + 0x325);
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::IntelliFe3;
+  auto parsed = decodeSequence(ByteReader(SourceId{1}, bytes), layout, AssetId{1});
+  expect(parsed.recipes.drumKits.size() == 2 && parsed.recipes.drumKits[0].slots.size() == 12 &&
+             parsed.recipes.drumKits[0].slots[0].sourceProgram == 3 &&
+             parsed.recipes.drumKits[0].slots[0].sourceKey == 56 &&
+             parsed.recipes.drumKits[1].slots[0].sourceProgram == 8,
+         "FE3 F9 supplies planar tables, and F5 F0 selects ordinary percussion-base instruments");
+
+  for (ProfileId id : {ProfileId::IntelliTa, ProfileId::IntelliFe4}) {
+    // A shorter FC replaces only its prefix. FE4 keeps using the table even
+    // after FD clears bit 6; TA switches back to its percussion base.
+    bytes = sequenceBytes({0xfc, 1, 3, 0xa0, 0xff, 4, 0xa1, 0xff,
+                           0xfc, 0, 5, 0xa2, 0xff, 4, 0x7f, 0xcb,
+                           0xfd, 2, 0x40, 0xca, 0});
+    layout.profile = id;
+    parsed = decodeSequence(ByteReader(SourceId{1}, bytes), layout, AssetId{1});
+    expect(parsed.recipes.drumKits[0].slots[0].sourceProgram == 5 &&
+               parsed.recipes.drumKits[0].slots[1].sourceProgram == 4,
+           "FC must preserve untouched percussion slots");
+    expect(id == ProfileId::IntelliFe4 ? parsed.recipes.drumKits.size() == 1 : parsed.recipes.drumKits.size() == 2,
+           "only TA's percussion dispatch tests flag bit 6");
+  }
+}
+
+void ninSnesIntelligentVoiceLoadingPreservesTuningAndMasksIndex() {
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::IntelliFe3;
+  layout.intelliTransposeTable = {0xe8, 0xf4, 0xfa, 0, 6, 12, 24};
+  auto bytes = sequenceBytes({0xea, 0x80, 0xfa, 1, 5, 0x80, 10, 0x30, 0xfb, 0x40, 4, 0x7f, 0x80, 0});
+  auto performance = render(bytes, layout);
+  std::vector<double> keys;
+  unsigned tuningEvents = 0;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      keys.push_back(note->key);
+    }
+    tuningEvents += std::holds_alternative<TuningPerformanceEvent>(event);
+  }
+  expect(keys == std::vector<double>{18} && tuningEvents == 1,
+         "Metal Combat FB uses its -6 transpose, wraps the record index, and keeps zero-nibble tuning");
+
+  expect(std::ranges::any_of(performance.tracks[0].events, [](const auto& event) {
+           const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&event);
+           return instrument && instrument->sourceInstrument && instrument->sourceInstrument->key == 5;
+         }) && std::ranges::any_of(performance.tracks[0].events, [](const auto& event) {
+           const auto* level = std::get_if<LevelPerformanceEvent>(&event);
+           return level && std::abs(level->linearGain - ninSnesLevelGain(0x80)) < 0.0001;
+         }),
+         "FB must apply the inline voice record's instrument and volume");
+
+  layout.profile = ProfileId::IntelliTa;
+  bytes = sequenceBytes({0xdd, 0, 0x40, 8, 0xfa, 1, 5, 0xff, 10, 7, 0xfb, 0x80, 4, 0x7f, 0x80, 0});
+  performance = render(bytes, layout);
+  const auto note = std::ranges::find_if(performance.tracks[0].events, [](const auto& event) {
+    return std::holds_alternative<NotePerformanceEvent>(event);
+  });
+  expect(note != performance.tracks[0].events.end() && std::get<NotePerformanceEvent>(*note).key == 31,
+         "TA's FB high flag bits must not make a valid voice-table index disappear");
+}
+
+void ninSnesIntelligentOverridesApplyOnInstrumentLoadAndDeduplicate() {
+  Layout layout = standardLayout();
+  for (ProfileId id : {ProfileId::IntelliFe3, ProfileId::IntelliTa}) {
+    layout.profile = id;
+    const u8 program = id == ProfileId::IntelliFe3 ? 0xd6 : 0xda;
+    auto bytes = sequenceBytes({program, 2, 4, 0x7f, 0x80,
+                                0xfa, 0x82, 3, 0xff, 0xe0, 0, 1, 0, 0x80,
+                                program, 2, 0x80,
+                                0xfa, 0x82, 3, 0xff, 0xe0, 0, 1, 0, program, 2, 0x80, 0});
+    const auto parsed = decodeSequence(ByteReader(SourceId{1}, bytes), layout, AssetId{1});
+    expect(parsed.recipes.overrides.size() == 1 && parsed.recipes.overrides[0].srcn == 3,
+           "FE3 and TA must capture instrument overwrites once per distinct definition");
+    const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
+    for (const auto& event : performance.tracks[0].events) {
+      if (const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&event)) {
+        expect(instrument->header.tick != 4, "FA only changes RAM; it must not change the active DSP instrument");
+      }
+    }
+  }
+}
+
+void ninSnesIntelligentEchoAdsrAndGainKeepIndependentState() {
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::IntelliTa;
+  auto bytes = sequenceBytes({0xef, 3, 0x40, 0x20, 0xf6, 0xf5,
+                              0xf7, 0x8f, 0xe2, 0xf8, 0x10, 0xb8,
+                              16, 0x7f, 0x80, 0xf9, 0x20, 0x80, 0});
+  const auto performance = render(bytes, layout);
+  std::vector<ReverbPerformanceEvent> echoes;
+  unsigned envelopes = 0;
+  unsigned notes = 0;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* echo = std::get_if<ReverbPerformanceEvent>(&event); echo && echo->voiceMask) {
+      echoes.push_back(*echo);
+    }
+    if (const auto* envelope = std::get_if<EnvelopePerformanceEvent>(&event)) {
+      ++envelopes;
+      expect(envelope->update.values == snesDspEnvelope(0x8f, 0xe2, 0), "F7 must emit its DSP ADSR envelope");
+    }
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      ++notes;
+      expect(note->durationTicks == 14, "GAIN timing commands must not replace the note key-off duration rate");
+    }
+  }
+  expect(echoes.size() == 3 && echoes[1].voiceMask == 2 && echoes[2].voiceMask == 3 &&
+             echoes[0].leftGain == echoes[2].leftGain && echoes[0].rightGain == echoes[2].rightGain &&
+             envelopes == 1 && notes == 2,
+         "channel echo must preserve global volume and the other channels' echo bits");
+}
+
+void ninSnesNoiseRowsDoNotTerminateSoundBanks() {
+  std::vector<u8> bytes(kAramSize);
+  std::ranges::copy(std::initializer_list<u8>{0x9f, 0xff, 0xe0, 0, 1, 0,
+                                             0, 0xff, 0xe0, 0, 1, 0}, bytes.begin() + 0x4000);
+  writeLe16(bytes, 0x5000, 0x6000);
+  writeLe16(bytes, 0x5002, 0x6000);
+  bytes[0x6000] = 3;
+  Layout layout = standardLayout();
+  layout.instrumentTableAddress = 0x4000;
+  layout.spcDirAddress = 0x5000;
+  layout.playlistAddress = 0x400c;
+  for (const auto id : {ProfileId::IntelliFe3, ProfileId::IntelliTa, ProfileId::SunsoftEarlier,
+                        ProfileId::Sunsoft, ProfileId::SunsoftBenkei}) {
+    layout.profile = id;
+    const auto result = scanSynth(bytes, layout, "Noise");
+    const auto& bank = std::get<SoundBankAsset>(result.assets[0]);
+    expect(bank.instruments.size() == 2 && bank.instruments[0].regions.size() == 128 &&
+               bank.localSamples.samples.size() == 2 && bank.instruments[1].regions.size() == 1,
+           "negative SRCNs must produce noise without hiding later BRR instruments");
+    const auto& region = bank.instruments[0].regions[72];
+    expect(region.unityKey == 72 && region.keyRange == KeyRange{72, 72} &&
+               bank.localSamples.samples[region.sample.index()].codec == AudioCodec::SnesDspNoise &&
+               bank.localSamples.samples[region.sample.index()].codecParameter == 31,
+           "DSP noise must retain its clock rate and ignore melodic pitch");
+  }
+}
+
+void ninSnesIntelligentSparsePaddingDoesNotHideSongBank() {
+  std::vector<u8> bytes(kAramSize);
+  std::ranges::copy(std::initializer_list<u8>{0, 0xff, 0xe0, 0, 1, 0,
+                                             0xff, 0xff, 0, 0, 0, 0,
+                                             1, 0xff, 0xe0, 0, 1, 0}, bytes.begin() + 0x4000);
+  writeLe16(bytes, 0x4012, 0x6000);
+  writeLe16(bytes, 0x4014, 0x6000);
+  writeLe16(bytes, 0x4016, 0x6000);
+  writeLe16(bytes, 0x4018, 0x6000);
+  bytes[0x6000] = 3;
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::IntelliTa;
+  layout.instrumentTableAddress = 0x4000;
+  layout.spcDirAddress = 0x4012;
+  const auto result = scanSynth(bytes, layout, "Sparse Intelligent Systems");
+  const auto& bank = std::get<SoundBankAsset>(result.assets[0]);
+  expect(bank.instruments.size() == 2 && bank.instruments[1].identity->key == 2,
+         "mixed padding must not hide later instruments or make the DIR part of the instrument table");
+}
+
+void ninSnesIntelligentSectionPreservesVoiceAndLegato() {
+  auto bytes = sequenceBytes({0xd6, 5, 0xf3, 4, 0x7f, 0x80, 0});
+  writeLe16(bytes, 0x102, 0x220);
+  writeSection(bytes, 0x220, {{0, 0x400}});
+  std::ranges::copy(std::initializer_list<u8>{4, 0x80, 0xf4, 2, 0x80, 0}, bytes.begin() + 0x400);
+  Layout layout = standardLayout();
+  layout.profile = ProfileId::IntelliFe3;
+  const auto performance = render(bytes, layout);
+  std::vector<NotePerformanceEvent> notes;
+  for (const auto& event : performance.tracks[0].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(*note);
+    }
+    if (const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&event)) {
+      expect(instrument->sourceInstrument && instrument->sourceInstrument->key == 5,
+             "section entry must retain the selected instrument");
+    }
+  }
+  expect(notes.size() == 3 && notes[1].extendsPrevious && notes[1].durationTicks >= 4 &&
+             notes[2].durationTicks == 1,
+         "legato must survive section entry, and two-tick notes must have a nonzero key-off duration");
+}
+
+std::vector<u8> sunsoftDriverFixture(ProfileId id, u8 trackCount) {
+  std::vector<u8> bytes(kAramSize);
+  const u16 lengthTable = id == ProfileId::SunsoftBenkei ? 0x3036 : 0x303e;
+  const u8 song = id == ProfileId::SunsoftBenkei ? 0x7d : 0x2a;
+  const auto write = [&](u32 address, std::initializer_list<u8> data) {
+    std::ranges::copy(data, bytes.begin() + address);
+  };
+  // Relocated driver fragments; Benkei's reader order is overridden below.
+  write(0x500, {0x8d, 0x00, 0xf7, 0x40, 0x3a, 0x40, 0x2d, 0xf7, 0x40, 0x3a, 0x40, 0xfd, 0xae});
+  write(0x520, {0xf5, 0x01, 0x20, 0xfd, 0xf5, 0x00, 0x20, 0xda, 0x40});
+  write(0x540, {0x68, 0xe0, 0x90, 0x05, 0x3f, 0x60, 0x05, 0x2f, 0x96});
+  write(0x560, {0x1c, 0xfd, 0xf6, 0x41, 0x2f, 0x2d, 0xf6, 0x40, 0x2f, 0x2d, 0xdd, 0x5c, 0xfd, 0xf6, 0xde, 0x2f});
+  writeLe16(bytes, 0x560 + 14, lengthTable - 0x60);
+  write(0x580, {0x2d, 0x9f, 0x28, 0x07, 0xfd, 0xf6, 0x00, 0x31, 0xd5, 0x01, 0x02,
+                0xae, 0x28, 0x0f, 0xfd, 0xf6, 0x08, 0x31, 0xd5, 0x10, 0x02});
+  write(0x5a0, {0x8d, 0x06, 0xcf, 0xda, 0x14, 0x60, 0x98, 0x00, 0x14, 0x98, 0x40, 0x15});
+  write(0x5c0, {0xe8, 0x50, 0x8d, 0x5d, 0x3f, 0xe8, 0x09});
+  write(0x600, {0xe5, 0xbc, 0x03, 0x04, 0x47, 0xc5, 0xbc, 0x03, 0xe4, 0x47,
+                0x48, 0xff, 0x25, 0xbe, 0x03, 0xc5, 0xbe, 0x03, 0x2f, 0x12});
+  write(0x640, {0x7d, 0x9f, 0x5c, 0x08, 0x05, 0xc4, 0x14, 0xdd, 0xeb, 0x14});
+  writeLe16(bytes, 0x3000 + 27 * 2, 0x600);
+  writeLe16(bytes, 0x3000 + 29 * 2, 0x640);
+  write(lengthTable, {1, 1, 2, 3, 0, 1, 2, 1, 2, 1, 1, 3, 0, 1, 2, 3,
+                      1, 3, 3, 0, 1, 3, 0, 3, 3, 3, 1, 0, 0, 2});
+  bytes[lengthTable + 30] = id == ProfileId::SunsoftEarlier ? 2 : 1;
+  write(0x3100, {0x32, 0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xff});
+  write(0x3108, {0x0a, 0x19, 0x28, 0x3c, 0x50, 0x64, 0x7d, 0x96,
+                 0xaa, 0xb9, 0xc8, 0xd4, 0xe1, 0xeb, 0xf5, 0xff});
+  writeLe16(bytes, 0x2002, 0x2200);
+  writeLe16(bytes, 0x2000 + song * 2, 0x2300);
+  writeLe16(bytes, 0x2200, 0x2400);
+  writeSection(bytes, 0x2400, {{0, 0x2600}});
+  write(0x2600, {20, 0x20, 0x80, 0});
+  writeLe16(bytes, 0x2300, 0x2500);
+  writeSection(bytes, 0x2500, {{0, 0x250c}, {5, 0x2700}});
+  // For the earlier revision these bytes immediately follow its six pointers.
+  // Reading them as pointers would create two spurious music tracks.
+  write(0x250c, {20, 0x2f, 0x81, 0});
+  if (trackCount == 8) {
+    writeSection(bytes, 0x2500, {{0, 0x2610}, {6, 0x2700}, {7, 0x2700}});
+    write(0x2610, {20, 0x2f, 0x81, 0});
+  }
+  // Ignore an eight-channel SFX copy preceding the actual music loader.
+  write(0x680, {0xda, 0x16, 0x8d, 0x0f, 0xf7, 0x16, 0xd6, 0x20, 0, 0xdc, 0x10, 0xf8});
+  write(0x6a0, {0xda, 0x16, 0x8d, static_cast<u8>(trackCount * 2 - 1),
+                0xf7, 0x16, 0xd6, 0x30, 0, 0xdc, 0x10, 0xf8});
+  write(0x2700, {20, 0x7f, 0x82, 0});
+  write(0x4000, {0, 0xff, 0xe0, 0x40, 1, 0});
+  writeLe16(bytes, 0x5000, 0x6000);
+  writeLe16(bytes, 0x5002, 0x6000);
+  bytes[0x6000] = 3;
+  bytes[0] = 1;
+  bytes[0xf4] = id == ProfileId::SunsoftBenkei ? song : (0x80 | song);
+  bytes[0xf5] = 2;     // unrelated SFX request
+  writeLe16(bytes, 0x40, 0x2202);
+  if (id == ProfileId::SunsoftBenkei) {
+    // Benkei's SFX reader/table precede BGM, captured before its cursor and mirror initialize.
+    write(0x500, {0x8d, 0, 0xf7, 0xd0, 0x3a, 0xd0, 0x2d, 0xf7, 0xd0, 0x3a, 0xd0, 0xfd, 0xae, 0x6f,
+                  0x8d, 0, 0xf7, 0x40, 0x3a, 0x40, 0x2d, 0xf7, 0x40, 0x3a, 0x40, 0xfd, 0xae, 0x6f});
+    write(0x4e0, {0xf5, 1, 0x21, 0xfd, 0xf5, 0, 0x21, 0xda, 0xd0});
+    writeLe16(bytes, 0x2102, 0x2200);
+    writeLe16(bytes, 0x40, 0);
+    bytes[0] = 0;
+  }
+  return bytes;
+}
+
+void ninSnesSunsoftRecognizesBgmLayouts() {
+  for (const auto [id, trackCount] : {std::pair{ProfileId::SunsoftEarlier, 6},
+                                     {ProfileId::SunsoftEarlier, 8},  // Popun / Pirates
+                                     {ProfileId::Sunsoft, 8}, {ProfileId::SunsoftBenkei, 6}}) {
+    auto bytes = sunsoftDriverFixture(id, trackCount);
+    const ByteReader reader(SourceId{1}, bytes);
+    const auto layout = findLayout(reader);
+    expect(layout && layout->profile == id && layout->songIndex == (id == ProfileId::SunsoftBenkei ? 0x7d : 0x2a) &&
+               layout->sectionPointerAddress == 0x40 && layout->songListAddress == 0x2000 &&
+               layout->playlistAddress == 0x2300 &&
+               layout->instrumentTableAddress == 0x4000 && layout->spcDirAddress == 0x5000,
+           "Sunsoft recognition should retain the full seven-bit BGM request and standard instrument addressing");
+    expect(layout->durationRateTable == std::vector<u8>({0x32, 0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xff}) &&
+               layout->volumeTable.front() == 10 && layout->volumeTable.back() == 255,
+           "Sunsoft should read the driver's nonstandard duration and velocity tables");
+    const auto parsed = decodeSequence(reader, *layout, AssetId{1});
+    const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
+    expect(performance.diagnostics.empty() && performance.tracks.size() == trackCount &&
+               parsed.program.behavior.initialMasterLevel.value_or(1.0) ==
+                   (id == ProfileId::SunsoftBenkei ? 1.0 : ninSnesLevelGain(0xb0)),
+           "Sunsoft should use its revision's BGM track count and initial volume");
+    if (trackCount == 8) {
+      for (const u8 track : {6, 7}) {
+        expect(std::ranges::any_of(performance.tracks[track].events, [](const auto& event) {
+                 const auto* note = std::get_if<NotePerformanceEvent>(&event);
+                 return note && note->header.tick == 0 && note->key == 26;
+               }), "eight-channel Sunsoft drivers must retain notes on the last two music channels");
+      }
+    }
+    expect(!scanSynth(bytes, *layout, "Sunsoft").assets.empty(), "Sunsoft revisions should load their sound bank");
+
+    std::copy_n(bytes.begin() + 0x4000, 6, bytes.begin() + 0x4006);
+    std::fill_n(bytes.begin() + 0x4000, 6, 0);
+    expect(findLayout(reader)->instrumentTableAddress == 0x4000,
+           "empty leading instrument slots must not shift the driver's table base (Pirates of Dark Water)");
+    std::ranges::copy(std::initializer_list<u8>{0x8d, 0x04, 0xcb, 0x12}, bytes.begin() + 0x5ac);
+    expect(findLayout(reader)->instrumentTableAddress == 0x4004,
+           "Hyper Zone's loader must read instrument records four bytes past the calculated address");
+    std::fill_n(bytes.begin() + 0x5ac, 4, 0);
+
+    writeLe16(bytes, 0x40, 0x2202);
+    const auto controls = id == ProfileId::SunsoftBenkei ? std::array{0xf0, 0xf1, 0xff} : std::array{0xfd, 0xfe, 0xff};
+    for (const u8 control : controls) {
+      writeLe16(bytes, 0x2000 + (control & 0x7f) * 2, 0x2300);
+      bytes[0xf4] = bytes[0] = control;
+      expect(findLayout(reader)->songIndex == 1, "Sunsoft driver controls must not replace the current BGM song");
+    }
+    if (id == ProfileId::SunsoftBenkei) {
+      continue;  // Benkei has no FB-FE command extension.
+    }
+    bytes[0x303e + 30] = 3;
+    expect(findLayout(reader)->profile == ProfileId::Unknown,
+           "an unrecognized Sunsoft command tail needs a safe fallback");
+    bytes[0x303e + 30] = id == ProfileId::SunsoftEarlier ? 2 : 1;
+    writeLe16(bytes, 0x3000 + 29 * 2, 0x680);
+    expect(!isSunsoft(findLayout(reader)->profile),
+           "Sunsoft probes must match the command targets, not unrelated code");
+  }
+}
+
+void ninSnesSunsoftCommandsPreserveEchoAndEnvelopeState() {
+  for (const ProfileId id : {ProfileId::SunsoftEarlier, ProfileId::Sunsoft}) {
+    std::vector<u8> bytes(kAramSize);
+    std::ranges::copy(std::initializer_list<u8>{0, 0xff, 0xe0, 0x40, 1, 0}, bytes.begin() + 0x4000);
+    writeLe16(bytes, 0x100, 0x200);
+    writeSection(bytes, 0x200, {{0, 0x300}, {1, 0x380}});
+    const std::vector<u8> track{
+        0xe0, 0, 0xf5, 3, 0x40, 0x20, 0xfc, 4, 0x7f, 0x80,
+        0xfb, 0xfd, 0x8f, 0xe0, 0x80, 0xfd, 0, 0, 0x80,
+        0xe0, 0, 0xfd, 0, 0, 0x80, 0xf6, 0xfc, 0xfb, 4, 0xc9, 0};
+    std::ranges::copy(track, bytes.begin() + 0x300);
+    std::ranges::copy(std::initializer_list<u8>{20, 0x7f, 0x81, 0}, bytes.begin() + 0x380);
+    Layout layout = standardLayout();
+    layout.profile = id;
+    layout.instrumentTableAddress = 0x4000;
+    const auto performance = render(bytes, layout);
+    expect(performance.diagnostics.empty(), "Sunsoft echo and ADSR commands should consume their exact operands");
+    std::vector<const ReverbPerformanceEvent*> echo;
+    std::vector<const EnvelopePerformanceEvent*> envelopes;
+    for (const auto& event : performance.tracks[0].events) {
+      if (const auto* change = std::get_if<ReverbPerformanceEvent>(&event); change && change->voiceMask) {
+        echo.push_back(change);
+      }
+      if (const auto* change = std::get_if<EnvelopePerformanceEvent>(&event)) {
+        envelopes.push_back(change);
+      }
+    }
+    expect(echo.size() == 6 && echo[1]->voiceMask == 2 && echo[2]->voiceMask == 3 &&
+               echo[2]->leftGain == echo[0]->leftGain && echo.back()->voiceMask == 3 && echo.back()->send == 0,
+           "FB/FC must preserve other voices and EVOL; F6 must zero EVOL before later channel toggles");
+    expect(envelopes.size() == 3 && envelopes[0]->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
+               envelopes[0]->update.values == snesDspEnvelope(0x8f, 0xe0, 0x40) &&
+               envelopes[1]->update.values == snesDspEnvelope(0, 0, 0x40) &&
+               envelopes[2]->update.values == envelopes[1]->update.values,
+           "FD writes ADSR registers while preserving the selected instrument's GAIN");
+    expect(std::ranges::none_of(performance.tracks[1].events, [](const auto& event) {
+      return std::holds_alternative<EnvelopePerformanceEvent>(event);
+    }), "FD must affect only its own voice");
+
+    std::ranges::copy(std::initializer_list<u8>{0, 0xff, 0xe0, 0x20, 1, 0}, bytes.begin() + 0x4006);
+    std::ranges::copy(std::initializer_list<u8>{0xe0, 0, 0xfa, 1, 4, 0x7f, 0xca, 0xfd, 0, 0, 0xca, 0},
+                      bytes.begin() + 0x300);
+    const auto drums = render(bytes, layout);
+    std::vector<EnvelopeUpdate> drumEnvelopes;
+    for (const auto& event : drums.tracks[0].events) {
+      if (const auto* change = std::get_if<EnvelopePerformanceEvent>(&event)) {
+        drumEnvelopes.push_back(change->update);
+      }
+    }
+    expect(drumEnvelopes.size() == 3 && !drumEnvelopes[0].values &&
+               drumEnvelopes[1].values == snesDspEnvelope(0, 0, 0x20) && !drumEnvelopes[2].values,
+           "percussion must load its own GAIN and restore its instrument envelope on every attack");
+  }
+}
+
+void ninSnesSunsoftFeAndGateFollowRevision() {
+  for (const ProfileId id : {ProfileId::SunsoftEarlier, ProfileId::Sunsoft}) {
+    std::vector<u8> bytes(kAramSize);
+    writeLe16(bytes, 0x100, 0x200);
+    writeSection(bytes, 0x200, {{0, 0x300}, {1, 0x340}});
+    const bool earlier = id == ProfileId::SunsoftEarlier;
+    std::vector<u8> track{0xe5, 0x80, 0xe6, 8, 0x40, 4, 0xc9, 0xfe, 0x80};
+    if (earlier) {
+      track.push_back(0);  // FE's second ignored operand must not end the track.
+    }
+    track.insert(track.end(), {20, 0x20, 0x80, 0});
+    std::ranges::copy(track, bytes.begin() + 0x300);
+    std::ranges::copy(std::initializer_list<u8>{24, 0xc9, 0}, bytes.begin() + 0x340);
+    Layout layout = standardLayout();
+    layout.profile = id;
+    layout.durationRateTable = {0x32, 0x65, 0x7f, 0x98, 0xb2, 0xcb, 0xe5, 0xff};
+    const auto parsed = decodeSequence(ByteReader(SourceId{1}, bytes), layout, AssetId{1});
+    const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
+    expect(performance.diagnostics.empty() && parsed.program.behavior.initialMasterLevel == ninSnesLevelGain(0xb0),
+           "Sunsoft should start with the driver's initial master volume");
+    bool noteFound = false;
+    bool fadeFinished = false;
+    for (const auto& event : performance.tracks[0].events) {
+      if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+        noteFound = note->header.tick == 4 && note->durationTicks == (earlier ? 9 : 10) && note->key == 24;
+      }
+      if (const auto* master = std::get_if<MasterLevelPerformanceEvent>(&event); master && master->header.tick == 8) {
+        const double expected = ninSnesLevelGain(0x40) * (earlier ? 1 : ninSnesLevelGain(0x80));
+        fadeFinished = std::abs(master->linearGain - expected) < 0.000001;
+      }
+    }
+    expect(noteFound,
+           "FE operand lengths and the revision-specific gate calculation must keep the following note intact");
+    expect(fadeFinished, "Sunsoft FE must preserve an active E6 fade and scale its output only in the later revision");
+    // Rendering the captured program again must reset the extra global gain.
+    const auto replay = SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
+    expect(replay.diagnostics.empty() && std::ranges::any_of(replay.tracks[0].events, [](const auto& event) {
+             const auto* master = std::get_if<MasterLevelPerformanceEvent>(&event);
+             return master && master->header.tick == 0 && master->linearGain == ninSnesLevelGain(0x80);
+           }),
+           "Sunsoft volume state must reset for each render");
+  }
+}
+
+
+Layout questLayout() {
+  auto layout = standardLayout();
+  layout.profile = ProfileId::Quest;
+  layout.signature = Signature::Quest;
+  return layout;
+}
+
+std::vector<NotePerformanceEvent> questNotes(const PerformanceSequence& performance, u32 track = 0) {
+  expect(performance.diagnostics.empty(), "Quest performance must not contain runtime diagnostics");
+  std::vector<NotePerformanceEvent> notes;
+  for (const auto& event : performance.tracks[track].events) {
+    if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+      notes.push_back(*note);
+    }
+  }
+  return notes;
+}
+
+std::vector<u8> questDriverFixture() {
+  std::vector<u8> bytes(kAramSize);
+  const auto write = [&](u32 address, std::initializer_list<u8> data) {
+    std::ranges::copy(data, bytes.begin() + address);
+  };
+  // Relocated executable probes and data, not a copyrighted SPC image.
+  write(0x800, {0x68, 0xc8, 0x90, 0xb6, 0x68, 0xd8, 0xb0, 6,    0x68, 0xca, 0xb0, 0xc5, 0x2f, 0xda,
+                0x1c, 0x80, 0xa8, 0xb0, 0x5d, 0xe8, 9,    0x2d, 0xe8, 0x0e, 0x2d, 0x1f, 0,    9});
+  write(0x840, {0xe4, 0xbc, 0x9c, 0x1c, 0xfd, 0x8f, 0x81, 0x5d, 0xe5, 0x80, 5,    0xe9, 0x81, 5,
+                0xc4, 0x0c, 0xd8, 0x0d, 0xf7, 0x0c, 0xc4, 0x40, 0xfc, 0xf7, 0x0c, 0xc4, 0x41});
+  write(0x880, {0x08, 0x80, 0x8d, 6, 0xcf, 0xda, 0x0c, 0x8d, 0, 0xf4, 0x28, 0x28, 0xd7});
+  write(0x8a0, {0xf5, 0, 0x21, 0x68, 7, 0xf0, 0x2b, 0x60, 0x84, 0x58, 0xfd, 0xf6, 0, 0x3000 >> 8});
+  write(0x8c0, {0x28, 0x0f, 0x04, 0x59, 0xfd, 0x80, 0xb6, 8, 0x30, 0x48, 0xff, 0xfd, 0xcf, 0xdd});
+  write(0x8e0, {0xfd, 0xf6, 0x35, 0x30, 0xc4, 5, 0xf6, 0x20, 0x30, 0xeb, 4, 0xcf, 0xdb, 0x93});
+  write(0x920, {0xf5, 0x60, 0x30, 0x30, 0x0b, 0xc4, 0xf2, 0xf5, 0x61, 0x30, 0xc4, 0xf3, 0x3d, 0x3d, 0x2f, 0xf0});
+  write(0x3060, {0x0c, 0x55, 0x1c, 0x55, 0x5d, 2, 0xff});
+  write(0x3000, {0x23, 0x46, 0x69, 0x8c, 0xaf, 0xd2, 0xf5, 0xff});
+  write(0x3008, {0x19, 0x28, 0x37, 0x46, 0x55, 0x64, 0x73, 0x82, 0x91, 0xa0, 0xaf, 0xbe, 0xcd, 0xdc, 0xeb, 0xff});
+  write(0x3020,
+        {0,   8,   17,  26,  35,  44,  55,  67,  80,  95,  104, 110, 114, 117, 119, 121, 123, 124, 125, 126, 127,
+         127, 126, 125, 124, 123, 121, 119, 117, 114, 110, 104, 95,  80,  67,  55,  44,  35,  26,  17,  8,   0});
+  writeLe16(bytes, 0x580, 0x2000);
+  writeLe16(bytes, 0x2000, 0x2100);
+  writeLe16(bytes, 0x2002, 0x2200);
+  writeLe16(bytes, 0x2100, 0x2300);
+  writeLe16(bytes, 0x2200, 0x2400);
+  writeSection(bytes, 0x2300, {{0, 0x2500}});
+  writeSection(bytes, 0x2400, {{0, 0x2600}, {7, 0x2700}});
+  write(0x2500, {24, 0x7f, 0x80, 0});
+  write(0x2600, {24, 0x7f, 0x81, 0});
+  write(0x2700, {48, 0x7f, 0x82, 0});
+  bytes[0xb9] = 2;
+  bytes[0xbc] = 1;
+  return bytes;
+}
+
+void ninSnesQuestSupportsTacticsOgre() {
+  expect(profile(ProfileId::Quest).id == ProfileId::Quest, "Quest must have a named profile");
+  {
+    auto bytes = questDriverFixture();
+    const ByteReader reader(SourceId{1}, bytes);
+    const auto layout = findLayout(reader);
+    expect(layout && layout->profile == ProfileId::Quest && layout->songIndex == 2 &&
+               layout->playlistAddress == 0x2200 && layout->instrumentTableAddress == 0x300 &&
+               layout->spcDirAddress == 0x200 && layout->durationRateTable[6] == 0xf5 &&
+               layout->volumeTable[15] == 0xff && layout->questPanTable.size() == 42,
+           "Quest scanner must read relocated BGM tables and prioritize the pending one-based song request");
+    const auto performance = render(bytes, *layout);
+    expect(questNotes(performance, 7).size() == 1 && performance.tracks[0].endTick == 48,
+           "Quest sections must wait for all eight channels rather than ending with the first one");
+    bytes[0xb9] = 0;
+    bytes[0xf4] = 0xff;
+    expect(findLayout(reader)->songIndex == 1, "Quest handshake bytes must not select another song");
+    bytes[0x883] = 5;
+    expect(!findLayout(reader), "a different instrument stride must not be mistaken for the Quest driver");
+  }
+  {
+    auto bytes = sequenceBytes({0xe5, 0x80, 0xed, 0x40, 0xe7, 120,  0xe1, 0x14, 24,   0x3f,
+                                      0x80, 24,   0x7a, 0xc8, 0x81, 0x7e, 0xc9, 0x7f, 0xc9, 0});
+    const auto performance = render(bytes, questLayout());
+    const auto notes = questNotes(performance);
+    expect(notes.size() == 2 && notes[0].durationTicks == 47 && notes[1].header.tick == 48 &&
+               notes[1].durationTicks == 23 && performance.tracks[0].endTick == 408,
+           "Quest folds ties before gating, keeps the last gate, and expands 7E/7F to 144/192 ticks");
+    expect(
+        std::abs(notes[0].linearVelocity - 223.0 / 255.0) < 1e-9 && notes[1].linearVelocity == notes[0].linearVelocity,
+        "tie lookahead updates the gate but does not change velocity");
+    bool tempo = false, volume = false, master = false, pan = false;
+    for (const auto& event : performance.tracks[0].events) {
+      if (const auto* e = std::get_if<TempoPerformanceEvent>(&event)) {
+        tempo |= e->microsecondsPerQuarter == 204000;
+      }
+      if (const auto* e = std::get_if<LevelPerformanceEvent>(&event)) {
+        volume |= e->linearGain == 64.0 / 255.0;
+      }
+      if (const auto* e = std::get_if<MasterLevelPerformanceEvent>(&event)) {
+        master |= e->linearGain == 128.0 / 255.0;
+      }
+      if (const auto* e = std::get_if<StereoBalancePerformanceEvent>(&event)) {
+        pan |= e->leftGain == 127.0 / 128.0 && e->rightGain == 0;
+      }
+    }
+    expect(tempo && volume && master && pan, "Quest timer divisor and linear levels must match the hardware writes");
+    bytes = sequenceBytes({0xde, 0x2c, 1, 0x3f, 0x80, 0});
+    const auto longNotes = questNotes(render(bytes, questLayout()));
+    expect(longNotes.size() == 1 && longNotes[0].durationTicks == 164,
+           "Quest long durations must use the driver's divide/multiply gate calculation");
+    bytes = sequenceBytes({24, 0});
+    const auto parsed = decodeSequence(ByteReader(SourceId{1}, bytes), questLayout(), AssetId{1});
+    expect(parsed.program.tracks[0].commands.size() == 2,
+           "zero after a duration must remain a terminator, not a packed velocity byte");
+  }
+  {
+    // Finite calls inside loops must expose their counters to loop detection.
+    auto bytes = sequenceBytes({4, 0x7f, 0xeb, 3, 0xef, 0, 4, 2, 0xec, 0xef, 0, 5, 0xff});
+    std::ranges::copy(std::initializer_list<u8>{0xef, 0x20, 4, 2, 0}, bytes.begin() + 0x400);
+    std::ranges::copy(std::initializer_list<u8>{0x80, 0}, bytes.begin() + 0x420);
+    std::ranges::copy(std::initializer_list<u8>{0x81, 0xef, 0, 5, 0xff}, bytes.begin() + 0x500);
+    const auto performance = render(bytes, questLayout());
+    const auto notes = questNotes(performance);
+    expect(notes.size() == 13 && notes.back().header.tick == 48 && performance.tracks[0].endTick == 52,
+           "Quest must complete nested finite calls and stop the final per-track infinite jump");
+    // A second section retains the default duration and controller state.
+    bytes = sequenceBytes({4, 0x7f, 0x80, 0});
+    writeLe16(bytes, 0x102, 0x220);
+    writeSection(bytes, 0x220, {{0, 0x400}});
+    bytes[0x400] = 0x81;
+    const auto sections = questNotes(render(bytes, questLayout()));
+    expect(sections.size() == 2 && sections[1].header.tick == 4 && sections[1].durationTicks == 3,
+           "Quest keeps note parameters across section changes");
+  }
+  {
+    auto bytes = sequenceBytes({0xe0, 0, 0xf6, 0xff, 0, 0xb6, 24, 0x3f, 0x80, 0x81, 0});
+    Layout layout = questLayout();
+    layout.instrumentTableAddress = 0x4000;
+    std::ranges::copy(std::initializer_list<u8>{0, 0x8f, 0xe0, 0x40, 1, 0}, bytes.begin() + 0x4000);
+    const auto performance = render(bytes, layout);
+    const auto notes = questNotes(performance);
+    expect(notes.size() == 2 && notes[0].durationTicks == 13 && notes[1].durationTicks == 13,
+           "F6 FF must start the GAIN release at the gate");
+    bool released = false, restored = false;
+    for (const auto& event : performance.tracks[0].events) {
+      if (const auto* e = std::get_if<EnvelopePerformanceEvent>(&event)) {
+        released |= e->header.tick == 0 && e->update.values &&
+                    e->update.values->releaseSeconds == snesDspGainEnvelopeSeconds(0xb6, 0x7ff, 0);
+        restored |= e->header.tick == 24 && e->update.values == snesDspEnvelope(0x8f, 0xe0, 0x40);
+      }
+    }
+    expect(released && restored,
+           "release GAIN must be available before the attack and preserve the next note's attack envelope");
+  }
+  {
+    // Embedded zero bytes must remain operands in variable-length commands.
+    // Table writes take effect only when loaded.
+    auto bytes = sequenceBytes({0xfd, 2,    1, 0x8f, 0xe0, 0x40, 1,    0,    0xe0, 2,    4,    0x7f, 0x80,
+                                      0xfd, 2,    1, 0x8f, 0xe0, 0x40, 1,    0,    0xf6, 0,    0xf6, 4,    0,
+                                      0xb8, 0xf6, 4, 0x8f, 0xe0, 0x40, 0xf7, 0x80, 0,    0xf7, 2,    0x20, 4,
+                                      0x7f, 0,    0, 0,    0,    0,    0,    0,    0xfd, 0xfd, 0x8f, 0xe0, 0x40,
+                                      0xfd, 0xfc, 0, 1,    0xe2, 5,    0xea, 2,    0x81, 0xfa, 2,    0xca, 0});
+    const auto parsed = decodeSequence(ByteReader(SourceId{1}, bytes), questLayout(), AssetId{1});
+    const auto notes = questNotes(SequenceVm(LoopPolicy::PlayOnce).render(parsed.program));
+    expect(notes.size() == 3 && notes[1].key == 32 && notes[2].key == 62,
+           "Quest variable operands and percussion must preserve stream boundaries and transpose rules");
+    expect(parsed.recipes.overrides.size() == 2 && parsed.recipes.overrides[0].pitchHigh == 1 &&
+               parsed.recipes.overrides[1].pitchHigh == 2,
+           "Quest deduplicates table writes and captures active tuning changes as distinct instruments");
+    expect(parsed.recipes.usedNotes == std::set<std::pair<u32, u8>>{{128, 24}, {128, 62}, {129, 32}},
+           "Quest note usage must follow active instrument versions and its percussion transpose rules");
+  }
+  {
+    auto bytes = sequenceBytes({0xfc, 0, 0xe0, 1,    0xe1, 0x8a, 0xe5, 0x80, 0xed, 0x80, 0xe7, 120,  0xe8, 4, 60,
+                                      0xee, 4, 0x40, 0xe3, 2,    64,   8,    0xf0, 3,    16,   8,    0x7f, 0x80, 0});
+    const auto performance = render(bytes, questLayout());
+    bool echoPreserved = false, tempo = false, volume = false, vibrato = false, pan = false;
+    for (const auto& event : performance.tracks[0].events) {
+      if (const auto* e = std::get_if<ReverbPerformanceEvent>(&event)) {
+        echoPreserved = e->voiceMask == 1;
+      }
+      if (const auto* e = std::get_if<TempoPerformanceEvent>(&event)) {
+        tempo |= e->header.tick == 4 && e->microsecondsPerQuarter == 414000;
+      }
+      if (const auto* e = std::get_if<LevelPerformanceEvent>(&event)) {
+        volume |= e->header.tick == 4 && e->linearGain == 64.0 / 255.0;
+      }
+      if (const auto* e = std::get_if<ModulationPerformanceEvent>(&event)) {
+        vibrato |= e->target == ModulationPerformanceTarget::VibratoRate && e->context.frequencyHz == 6.25;
+      }
+      if (const auto* e = std::get_if<StereoBalancePerformanceEvent>(&event)) {
+        pan |= e->leftGain == -104.0 / 128.0 && e->rightGain == 104.0 / 128.0;
+      }
+    }
+    expect(
+        echoPreserved && tempo && volume && vibrato && pan,
+        "Quest preserves echo on program changes, fades timer divisors, and uses a fixed vibrato clock and pan phase");
+    bytes = sequenceBytes({0xe9, 0xf4, 4, 0x7f, 0xa4, 0xfa, 0, 0xca, 0});
+    const auto notes = questNotes(render(bytes, questLayout()));
+    expect(notes.size() == 2 && notes[0].key == 49 && notes[1].key == 60,
+           "Quest carries overflow from global transpose into the channel addition, excluding percussion");
+  }
+  {
+    auto bytes = sequenceBytes({0xe0, 0xff, 31, 4, 0x7f, 0x80, 0});
+    auto layout = questLayout();
+    layout.instrumentTableAddress = 0x4000;
+    layout.spcDirAddress = 0x5000;
+    const auto parsed = decodeSequence(ByteReader(SourceId{1}, bytes), layout, AssetId{1});
+    expect(parsed.recipes.overrides.size() == 1 && parsed.recipes.overrides[0].noise,
+           "E0 FF must create explicit noise, independently of literal SRCN values");
+    const auto result = scanSynth(bytes, layout, "Quest noise", parsed.recipes);
+    const auto& bank = std::get<SoundBankAsset>(result.assets[0]);
+    expect(bank.localSamples.samples.size() == 1 && bank.localSamples.samples[0].codec == AudioCodec::SnesDspNoise &&
+               bank.localSamples.samples[0].codecParameter == 31,
+           "Quest noise must export a procedural sample with its DSP clock");
+  }
+  {
+    auto bytes = sequenceBytes({4, 0x7f, 0xca, 0xfd, 0, 1, 0x8f, 0xe0, 0, 1, 0, 0xca, 0xe0, 0, 0xca, 0});
+    const auto performance = render(bytes, questLayout());
+    std::vector<u32> notePrograms;
+    u32 currentProgram = 0;
+    for (const auto& event : performance.tracks[0].events) {
+      if (const auto* e = std::get_if<InstrumentPerformanceEvent>(&event); e && e->sourceInstrument) {
+        currentProgram = e->sourceInstrument->key;
+      } else if (std::holds_alternative<NotePerformanceEvent>(event)) {
+        notePrograms.push_back(currentProgram);
+      }
+    }
+    expect(notePrograms == std::vector<u32>{0, 0, 128},
+           "repeated percussion retains its active instrument until a program change invalidates the cache");
+    bytes = sequenceBytes({1, 0x7f, 0x80, 0});
+    writeLe16(bytes, 0x102, 0x81);
+    writeLe16(bytes, 0x104, 0x100);
+    expect(questNotes(render(bytes, questLayout())).size() == 130,
+           "Quest playlist repeat 81 is 129 additional plays, not an infinite loop");
+  }
+  {
+    auto bytes = sequenceBytes({0xef, 0, 3, 1, 0});
+    std::vector<Diagnostic> diagnostics;
+    const auto parsed =
+        decodeSequence(ByteReader(SourceId{1}, bytes), questLayout(), AssetId{1}, nullptr, &diagnostics);
+    expect(
+        std::ranges::any_of(diagnostics, [](const auto& d) { return d.message == "Quest subroutine stack overflow"; }),
+        "recursive Quest calls must stop at the driver's four-frame stack limit");
+    bytes =
+        sequenceBytes({0xfd, 0xff, 1, 0x8f, 0xe0, 0, 1, 0, 4, 0x7f, 0x80, 0xfd, 0xfe, 2, 0x8f, 0xe0, 0, 0x81, 0});
+    const auto inlineProgram = decodeSequence(ByteReader(SourceId{1}, bytes), questLayout(), AssetId{1});
+    expect(inlineProgram.recipes.overrides.size() == 2 && inlineProgram.recipes.overrides[0].srcn == 1 &&
+               inlineProgram.recipes.overrides[1].srcn == 2 &&
+               questNotes(SequenceVm(LoopPolicy::PlayOnce).render(inlineProgram.program)).size() == 2,
+           "inline instruments and partial SRCN edits must preserve their data and command boundaries");
+  }
+}
+
+}  // namespace
+
+void runNinSnesTests() {
+  ninSnesProfilesDescribeEverySupportedDriverFamily();
+  ninSnesKonamiClockControlsTempo();
+  ninSnesScannerFindsRequestedSongAcrossSparseTable();
+  ninSnesKoeiUsesSixBgmTracksAndPendingRequest();
+  ninSnesProfilesShareSquaredLevelCurve();
+  ninSnesProfilesShareTempoRelativeVibratoClock();
+  ninSnesProfilesEmitSubtractiveTremolo();
+  ninSnesStandardEchoUsesMaskLevelAndDisable();
+  ninSnesKonamiLoopAppliesAndClearsReplayDeltas();
+  ninSnesKonamiAdsrGainEmitsNeutralEnvelopeState();
+  ninSnesNoteVelocityPreservesLegacyCurve();
+  ninSnesProgramResolutionIsCapturedByRuntime();
+  ninSnesFe3ConditionalJumpUsesCapturedDriverState();
+  ninSnesControllerFadesRemainInTheSourceDomain();
+  ninSnesPrepassClearsMasterVolumeAutomationBinding();
+  ninSnesPlaylistCarriesTiesAcrossSectionParserResets();
+  ninSnesKonamiZeroDurationRateContinuesHeldVoice();
+  ninSnesF9UsesSharedPitchTransitions();
+  ninSnesPercussionStartsPerNoteVibratoFade();
+  ninSnesFixedPercussionBaseIgnoresFaOperand();
+  ninSnesKonamiPercussionUsesDriverMapAndNeutralTuning();
+  ninSnesEarlierPercussionUsesSeparateSixByteTable();
+  ninSnesGainModeInstrumentsUseDspEnvelope();
+  ninSnesPitchWrappingUsesThePlayedNote();
+  ninSnesIdentityMappedSilentSlotsAreSparse();
+  ninSnesMetalCombatRecognizesDriverWithoutInstrumentOverwrite();
+  ninSnesIntelligentPercussionUsesRevisionSpecificTables();
+  ninSnesIntelligentVoiceLoadingPreservesTuningAndMasksIndex();
+  ninSnesIntelligentOverridesApplyOnInstrumentLoadAndDeduplicate();
+  ninSnesIntelligentEchoAdsrAndGainKeepIndependentState();
+  ninSnesNoiseRowsDoNotTerminateSoundBanks();
+  ninSnesIntelligentSparsePaddingDoesNotHideSongBank();
+  ninSnesIntelligentSectionPreservesVoiceAndLegato();
+  ninSnesSunsoftRecognizesBgmLayouts();
+  ninSnesSunsoftCommandsPreserveEchoAndEnvelopeState();
+  ninSnesSunsoftFeAndGateFollowRevision();
+  ninSnesQuestSupportsTacticsOgre();
+}

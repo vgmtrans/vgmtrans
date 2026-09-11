@@ -1,0 +1,122 @@
+/*
+ * VGMTrans (c) 2002-2026
+ * Licensed under the zlib license,
+ * refer to the included LICENSE.txt file
+ */
+
+#pragma once
+
+#include "value/base/Source.h"
+#include "value/synth/SynthBuilder.h"
+
+#include <functional>
+#include <optional>
+#include <ranges>
+#include <span>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+namespace vgmtrans::core {
+
+class SourceMapBuilder;
+struct SamplePool;
+
+struct SnesBrrStream {
+  SourceRange encodedData;
+  bool loops = false;
+};
+
+[[nodiscard]] std::optional<SnesBrrStream> inspectSnesBrrStream(ByteReader reader, u32 startAddress);
+
+struct SnesSampleDirectoryEntry {
+  u8 index = 0;
+  SourceRange entryRange;
+  u16 startAddress = 0;
+  u16 loopAddress = 0;
+  std::optional<SnesBrrStream> stream;
+
+  [[nodiscard]] bool loopAddressIsBlockAligned() const noexcept {
+    return loopAddress >= startAddress && ((loopAddress - startAddress) % 9) == 0;
+  }
+};
+
+// A fully validated BRR sample referenced through an SPC sample directory.
+struct SnesBrrSample {
+  u8 srcn = 0;
+  SourceRange directoryEntry;
+  u16 startAddress = 0;
+  u16 loopAddress = 0;
+  SnesBrrStream stream;
+};
+
+// Shared decoded view used by SNES formats. Collection order follows SRCN;
+// canonicalIndex() resolves aliases with equivalent BRR data and loop behavior.
+struct SnesBrrCatalog {
+  std::vector<SnesBrrSample> samples;
+  SourceRange directoryRange;
+
+  [[nodiscard]] std::optional<u32> index(u8 srcn) const;
+  [[nodiscard]] std::optional<u32> canonicalIndex(u8 srcn) const;
+};
+
+[[nodiscard]] std::optional<SnesSampleDirectoryEntry> readSnesSampleDirectoryEntry(ByteReader reader, u32 entryAddress,
+                                                                                   bool inspectStream = true);
+
+class SnesSampleDirectory {
+public:
+  SnesSampleDirectory(ByteReader reader, u32 baseAddress) : reader_(reader), baseAddress_(baseAddress) {}
+
+  [[nodiscard]] std::optional<SnesSampleDirectoryEntry> entry(u8 index, bool inspectStream = true) const;
+
+private:
+  ByteReader reader_;
+  u32 baseAddress_ = 0;
+};
+
+[[nodiscard]] SnesBrrCatalog readSnesBrrCatalog(ByteReader reader, u32 directoryAddress, std::vector<u8> srcns);
+
+// Accept sample-number ranges or instrument records with an SRCN projection.
+// The catalog owns sorting, deduplication, and validation.
+template <std::ranges::input_range Entries, class Srcn = std::identity>
+[[nodiscard]] SnesBrrCatalog readSnesBrrCatalog(ByteReader reader, u32 directoryAddress, Entries&& entries,
+                                                Srcn srcn = {}) {
+  std::vector<u8> referencedSrcns;
+  if constexpr (std::ranges::sized_range<Entries>) {
+    referencedSrcns.reserve(std::ranges::size(entries));
+  }
+  for (const auto& entry : entries) {
+    referencedSrcns.push_back(std::invoke(srcn, entry));
+  }
+  return readSnesBrrCatalog(reader, directoryAddress, std::move(referencedSrcns));
+}
+
+// Concrete references created while adding an SNES catalog. SRCNs with
+// equivalent BRR data and loop behavior resolve to the first matching sample.
+class SnesBrrSampleRefs {
+public:
+  [[nodiscard]] std::optional<SampleRef> findSrcn(u8 srcn) const;
+
+private:
+  friend SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder&, ByteReader, const SnesBrrCatalog&,
+                                             std::span<const u8>, std::string_view);
+
+  struct Entry {
+    u8 srcn = 0;
+    SampleRef sample;
+  };
+
+  std::vector<Entry> entries_;
+};
+
+// Populate the generic sample builder with neutral BRR samples and the standard
+// DIR/payload source structure used by SNES formats.
+[[nodiscard]] SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reader,
+                                                  const SnesBrrCatalog& catalog,
+                                                  std::string_view directoryEntryKind = "snes-sample-dir-entry");
+// A non-empty usedSrcns span labels every other catalog entry as unused.
+[[nodiscard]] SnesBrrSampleRefs addSnesBrrSamples(
+    SamplePoolBuilder& samples, ByteReader reader, const SnesBrrCatalog& catalog,
+    std::span<const u8> usedSrcns, std::string_view directoryEntryKind = "snes-sample-dir-entry");
+
+}  // namespace vgmtrans::core
