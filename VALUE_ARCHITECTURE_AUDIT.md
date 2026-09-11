@@ -1156,6 +1156,23 @@ five production lines after formatting.
 
 The full build is warning-free and all 20 CTest targets pass.
 
+### Calculate MIDI stereo compensation directly
+
+Remove redundant hard-left and hard-right branches from lowerStereoBalance:
+its angle calculation already produces the exact endpoint positions. Equal
+channels still select center, including silence. Compute the combined MIDI
+channel gain directly instead of retaining two temporary channel amplitudes,
+and remove the unreachable zero-gain fallback. This removes 16 production
+lines while preserving quantization and gain compensation.
+
+All 1,329,449 before/after comparisons match pan and gain bit-for-bit under
+AddressSanitizer, UBSan, and float-cast-overflow checks. Coverage includes every
+signed eight-bit channel pair at four scales, constant-sum positions, MIDI pan
+rounding boundaries, signed zero, subnormal and extreme finite values, and one
+million deterministic random pairs. Existing renderer tests cover pan gain
+headroom, phase-inverted channel magnitudes, and expression independence.
+The full build is warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
