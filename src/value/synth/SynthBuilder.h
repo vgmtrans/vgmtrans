@@ -89,7 +89,6 @@ private:
   [[nodiscard]] bool validIndex(u32 index) const noexcept;
   AnnotationBuilder addEntrySource(u32 index, std::string_view label, SourceRange range, std::string_view kind);
   void finishSources();
-  void recordRange(SourceRange range, bool explicitlyIncluded);
   void report(Severity severity, std::string code, std::string message, SourceRange range);
 
   AssetId asset_;
@@ -211,7 +210,6 @@ private:
   void linkSample(SourceAnnotationId annotation, SampleRef sample, std::string_view label);
   void recordInstrumentRange(u32 index, SourceRange range);
   void recordRegionRange(u32 instrumentIndex, u32 regionIndex, SourceRange range);
-  void recordRange(SourceRange range, bool explicitlyIncluded);
   void report(Severity severity, std::string code, std::string message, SourceRange range);
 
   AssetId asset_;

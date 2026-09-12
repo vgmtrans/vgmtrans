@@ -156,7 +156,7 @@ SamplePoolBuilder::Entry SamplePoolBuilder::add(u64 sourceKey, Sample sample) {
   indexes_.emplace(sourceKey, index);
   samples_.push_back(std::move(sample));
   sources_.emplace_back();
-  recordRange(samples_.back().encodedData, false);
+  observedRange_.include(samples_.back().encodedData);
   return Entry{*this, index};
 }
 
@@ -170,7 +170,7 @@ std::optional<SampleRef> SamplePoolBuilder::find(u64 sourceKey) const {
 
 AnnotationBuilder SamplePoolBuilder::source(SourceRole role, std::string_view label, SourceRange range,
                                             std::string_view kind) {
-  recordRange(range, false);
+  observedRange_.include(range);
   if (sourceMap_ == nullptr || !range.valid()) {
     return {};
   }
@@ -187,7 +187,7 @@ AnnotationBuilder SamplePoolBuilder::source(SourceRole role, std::string_view la
 }
 
 SamplePoolBuilder& SamplePoolBuilder::include(SourceRange range) {
-  recordRange(range, true);
+  includedRange_.include(range);
   return *this;
 }
 
@@ -254,7 +254,7 @@ bool SamplePoolBuilder::validIndex(u32 index) const noexcept {
 
 AnnotationBuilder SamplePoolBuilder::addEntrySource(u32 index, std::string_view label, SourceRange range,
                                                     std::string_view kind) {
-  recordRange(range, false);
+  observedRange_.include(range);
   if (sourceMap_ == nullptr || !range.valid()) {
     return {};
   }
@@ -280,10 +280,6 @@ void SamplePoolBuilder::finishSources() {
       annotateSynthValue(AnnotationBuilder{*sourceMap_, source}, sample);
     }
   }
-}
-
-void SamplePoolBuilder::recordRange(SourceRange range, bool explicitlyIncluded) {
-  (explicitlyIncluded ? includedRange_ : observedRange_).include(range);
 }
 
 void SamplePoolBuilder::report(Severity severity, std::string code, std::string message, SourceRange range) {
@@ -348,7 +344,7 @@ std::optional<InstrumentSetBuilder::Entry> InstrumentSetBuilder::find(u64 groupi
 
 AnnotationBuilder InstrumentSetBuilder::source(SourceRole role, std::string_view label, SourceRange range,
                                                std::string_view kind) {
-  recordRange(range, false);
+  observedRange_.include(range);
   if (sourceMap_ == nullptr || !range.valid()) {
     return {};
   }
@@ -365,7 +361,7 @@ AnnotationBuilder InstrumentSetBuilder::source(SourceRole role, std::string_view
 }
 
 InstrumentSetBuilder& InstrumentSetBuilder::include(SourceRange range) {
-  recordRange(range, true);
+  includedRange_.include(range);
   return *this;
 }
 
@@ -464,11 +460,11 @@ bool InstrumentSetBuilder::validRegion(u32 instrumentIndex, u32 regionIndex) con
 
 InstrumentSetBuilder::Entry InstrumentSetBuilder::appendAccepted(Instrument instrument) {
   const u32 index = static_cast<u32>(instruments_.size());
-  recordRange(instrument.range, false);
+  observedRange_.include(instrument.range);
   InstrumentState state{.rangeWasExplicit = instrument.range.valid()};
   state.regions.reserve(instrument.regions.size());
   for (const auto& region : instrument.regions) {
-    recordRange(region.range, false);
+    observedRange_.include(region.range);
     state.regions.push_back(RegionState{.rangeWasExplicit = region.range.valid()});
   }
   instruments_.push_back(std::move(instrument));
@@ -480,7 +476,7 @@ InstrumentSetBuilder::RegionEntry InstrumentSetBuilder::appendRegion(u32 instrum
                                                                      Region region) {
   region.sample = sample;
   const u32 regionIndex = static_cast<u32>(instruments_[instrumentIndex].regions.size());
-  recordRange(region.range, false);
+  observedRange_.include(region.range);
   states_[instrumentIndex].regions.push_back(RegionState{.rangeWasExplicit = region.range.valid()});
   instruments_[instrumentIndex].regions.push_back(std::move(region));
   for (const auto source : states_[instrumentIndex].sources) {
@@ -567,7 +563,7 @@ void InstrumentSetBuilder::linkSample(SourceAnnotationId annotation, SampleRef s
 
 void InstrumentSetBuilder::recordInstrumentRange(u32 index, SourceRange range) {
   auto& state = states_[index];
-  recordRange(range, false);
+  observedRange_.include(range);
   if (!state.rangeWasExplicit) {
     instruments_[index].range.include(range);
   }
@@ -575,14 +571,10 @@ void InstrumentSetBuilder::recordInstrumentRange(u32 index, SourceRange range) {
 
 void InstrumentSetBuilder::recordRegionRange(u32 instrumentIndex, u32 regionIndex, SourceRange range) {
   auto& state = states_[instrumentIndex].regions[regionIndex];
-  recordRange(range, false);
+  observedRange_.include(range);
   if (!state.rangeWasExplicit) {
     instruments_[instrumentIndex].regions[regionIndex].range.include(range);
   }
-}
-
-void InstrumentSetBuilder::recordRange(SourceRange range, bool explicitlyIncluded) {
-  (explicitlyIncluded ? includedRange_ : observedRange_).include(range);
 }
 
 void InstrumentSetBuilder::report(Severity severity, std::string code, std::string message, SourceRange range) {
