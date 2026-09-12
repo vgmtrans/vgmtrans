@@ -1495,6 +1495,20 @@ This removes 22 production lines without adding a shared framework. Existing
 repeat, final-pass break, and infinite-loop coverage passes. The full build is
 warning-free and all 20 CTest targets pass; no test code is added.
 
+### Let modulation measurements represent their own absence
+
+Collection preparation and stitching now retain MidiModulationUsage directly.
+Its four optional maxima already distinguish unobserved controllers from
+observed zero values; an outer optional supplied no further information.
+Stitching merges the measurements directly, and MIDI scaling owns the early
+return for empty usage instead of requiring every caller to check it.
+An empty usage value also leaves synth modulator amounts unchanged.
+
+This removes nine production lines and the nested presence checks. Existing
+unobserved/zero/quantization-boundary, MIDI/synth scaling, and stitched-export
+coverage passes. The full build is warning-free and all 20 CTest targets pass;
+no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

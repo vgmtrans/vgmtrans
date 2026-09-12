@@ -220,10 +220,7 @@ void CollectionWorkspace::prepareSynth(ModulationConversionPolicy conversion, Mo
     }
   }
   if (scaling == ModulationScalingPolicy::ObservedSequenceRange) {
-    auto usage = analyzePerformanceModulationUsage(*performance(), &rendering.modulation);
-    if (hasMidiModulationUsage(usage)) {
-      modulationUsage = std::move(usage);
-    }
+    modulationUsage = analyzePerformanceModulationUsage(*performance(), &rendering.modulation);
   }
 }
 

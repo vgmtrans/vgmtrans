@@ -91,9 +91,7 @@ namespace {
     // Scale once while preparing the MIDI so every artifact uses the same
     // controller range as its companion synth modulators.
     const auto usage = analyzePerformanceModulationUsage(*rendering.performance, &rendering.modulation);
-    if (hasMidiModulationUsage(usage)) {
-      applyMidiModulationScaling(midi, usage, modulationScaling);
-    }
+    applyMidiModulationScaling(midi, usage, modulationScaling);
   }
   return midi;
 }
@@ -458,14 +456,14 @@ std::vector<Artifact> exportCollectionImpl(const SessionSnapshot& snapshot, cons
   }
 
   const PerformanceSequence* sequenceUsage = request.exportOnlyUsedInstruments ? preparedPerformance : nullptr;
-  const MidiModulationUsage* observedUsage = workspace.modulationUsage ? &*workspace.modulationUsage : nullptr;
   const auto writeSynth = [&](SynthExportFormat format) {
     if (synthRequiresPerformance && preparedPerformance == nullptr) {
       return synthArtifact(bound.baseName(), format, SynthExportResult{.diagnostics = rendering.diagnostics});
     }
 
     const SynthCollectionView synth{bound.baseName(), exportedBanks, bound.samplePools(), selectedSoundBank.has_value()};
-    auto artifact = exportSynth(synth, format, sources, request, observedUsage, synthConversion, sequenceUsage);
+    auto artifact =
+        exportSynth(synth, format, sources, request, &workspace.modulationUsage, synthConversion, sequenceUsage);
     if (!rendering.performance) {
       artifact.diagnostics.insert(artifact.diagnostics.begin(), rendering.diagnostics.begin(),
                                   rendering.diagnostics.end());

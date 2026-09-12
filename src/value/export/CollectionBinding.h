@@ -88,7 +88,7 @@ public:
   BoundCollection collection;
   RenderedCollection rendering;
   std::optional<PerformanceSequence> exportPerformance;
-  std::optional<MidiModulationUsage> modulationUsage;
+  MidiModulationUsage modulationUsage;
   std::vector<Diagnostic> diagnostics;
 };
 
