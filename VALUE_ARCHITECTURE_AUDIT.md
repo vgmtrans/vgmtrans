@@ -1953,6 +1953,25 @@ rules. A temporary sanitized comparison matches bytes and storage sizes for
 4,096 nested RIFF cases. The full build is warning-free and all 20 CTest targets
 pass. The comparison harness is not committed.
 
+## Retain only HeartBeatPS1 pitch limits for sequence playback
+
+HeartBeatPS1 runtime tones now contain only key ranges and the native upward
+and downward pitch-wheel limits. Sample locations, tuning, ADSR, mix values,
+flags, and source records are decoded when building the bank instead of being
+retained in every sequence configuration. All tone records still contribute
+sample boundaries, including tones unused by a program; referenced tones keep
+their original playback lookup order even when their samples are unplayable.
+Instrument metadata is complete before insertion into the shared builder.
+
+A bank whose programs reference no valid tones previously published an empty
+sound bank before returning failure. Program filtering now rejects it before
+creating the draft. The regression reproduced that publication before the fix.
+This removes 20 production lines. The existing fixture gains 17 net test lines
+covering rejected-bank publication and scanned asymmetric pitch limits; its
+existing tuning/reverb checks also pass. The full build is warning-free and
+all 20 CTest targets pass. Next work prioritizes shared structural changes to
+format authoring, as requested, over further isolated format cleanups.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

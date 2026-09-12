@@ -77,18 +77,11 @@ struct HeartBeatPs1ContainerLayout {
   std::optional<HeartBeatPs1SequenceLayout> sequence;
 };
 
+// Per-key native pitch-wheel limits needed by sequence playback.
 struct HeartBeatPs1Tone {
-  u32 sampleOffset = 0;
-  u16 adsr1 = 0;
-  u16 adsr2 = 0;
-  u8 volume = 127;
-  u8 pan = 64;
-  double unityKey = 60.0;
   u8 bendDownSemitones = 2;
   u8 bendUpSemitones = 2;
   core::KeyRange keys;
-  u8 flags = 0;
-  core::SourceRecord source;
 };
 
 struct HeartBeatPs1InstrumentInfo {

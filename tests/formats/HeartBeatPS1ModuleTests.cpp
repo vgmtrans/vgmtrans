@@ -48,7 +48,7 @@ void be16(std::vector<u8>& bytes, size_t offset, u16 value) {
   bytes[offset + 1] = static_cast<u8>(value);
 }
 
-std::vector<u8> heartBeatFixture() {
+std::vector<u8> heartBeatFixture(bool hasProgramTone = true) {
   constexpr u32 headerSize = 0x3c;
   constexpr u32 sampleSize = 0x20;
   constexpr u32 attributeSize = 8 + 0x24 + 0x14;
@@ -89,7 +89,7 @@ std::vector<u8> heartBeatFixture() {
   for (u32 index = 0; index < 16; ++index) {
     le16(bytes, program + index * 2, 0xffff);
   }
-  le16(bytes, program, 0);
+  le16(bytes, program, hasProgramTone ? 0 : 0xffff);
   bytes[program + 0x20] = 127;
   bytes[program + 0x21] = 64;
 
@@ -211,6 +211,22 @@ void moduleBuildsEmbeddedWaveBank() {
          "program identity and its tone region should retain the source wave-bank ID");
   expect(std::abs(instrument.regions.front().unityKey - 59.5) < 0.000001 && instrument.reverb == 1.0,
          "fine tuning should use the driver's low seven bits and preserve tone-default reverb routing");
+  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.members.sequence);
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program);
+  const auto bends = eventsOfType<PitchBendPerformanceEvent>(performance.tracks.front());
+  expect(bends.size() == 2 && std::abs(bends.front()->semitones + 6.0) < 0.001 &&
+             std::abs(bends.back()->semitones - 12.0) < 0.001,
+         "scanning should retain each tone's asymmetric pitch limits for playback");
+}
+
+void moduleSkipsBanksWithoutReferencedTones() {
+  Session session;
+  session.registerFormat(heartBeatPs1Module());
+  session.addSource(SourceFile{.name = "unreferenced-tones.bin"}, heartBeatFixture(false));
+  session.scanPendingSources();
+  expect(std::ranges::none_of(session.snapshot().assets(),
+                              [](const Asset& asset) { return std::holds_alternative<SoundBankAsset>(asset); }),
+         "a bank without referenced tones must not publish an empty sound bank");
 }
 
 }  // namespace
@@ -218,4 +234,5 @@ void moduleBuildsEmbeddedWaveBank() {
 void runHeartBeatPs1ModuleTests() {
   sequenceModelsAuditedDriverFeatures();
   moduleBuildsEmbeddedWaveBank();
+  moduleSkipsBanksWithoutReferencedTones();
 }

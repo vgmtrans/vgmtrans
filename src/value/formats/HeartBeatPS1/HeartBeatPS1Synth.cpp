@@ -58,6 +58,9 @@ struct ParsedProgram {
     for (u32 tone = 0; tone < program.toneIndices.size(); ++tone) {
       program.toneIndices[tone] = *record.u16leAt(tone * 2, fmt::format("tone_{}", tone), SourceValueDisplay::Hex);
     }
+    if (std::ranges::none_of(program.toneIndices, [&](u16 tone) { return tone < layout.toneCount; })) {
+      continue;
+    }
     program.volume = *record.u8At(0x20, "volume");
     program.pan = *record.u8At(0x21, "pan");
     record.u8At(0x22, "unknown_22", SourceValueDisplay::Hex);
@@ -68,51 +71,24 @@ struct ParsedProgram {
   return programs;
 }
 
-[[nodiscard]] std::vector<HeartBeatPs1Tone> readTones(ByteReader reader, const HeartBeatPs1BankLayout& layout) {
-  std::vector<HeartBeatPs1Tone> tones;
-  tones.reserve(layout.toneCount);
-  const u32 begin =
-      layout.attributeOffset + kAttributeHeaderSize + static_cast<u32>(layout.programCount) * kProgramSize;
-  for (u32 index = 0; index < layout.toneCount; ++index) {
-    const u32 offset = begin + index * kToneSize;
-    RecordReader record(reader, offset, offset + kToneSize);
-    HeartBeatPs1Tone tone{
-        .sampleOffset = *record.u32leAt(0, "sample_offset", SourceValueDisplay::Address),
-        .adsr1 = *record.u16leAt(4, "adsr1", SourceValueDisplay::Hex),
-        .adsr2 = *record.u16leAt(6, "adsr2", SourceValueDisplay::Hex),
-    };
-    record.u8At(8, "unknown_08", SourceValueDisplay::Hex);
-    tone.volume = *record.u8At(9, "volume");
-    tone.pan = *record.u8At(10, "pan");
-    const u8 root = *record.u8At(11, "root_key", SourceValueDisplay::MidiNote);
-    const u8 fine = *record.u8At(12, "fine_tune");
-    tone.unityKey = root - (fine & 0x7f) / 128.0;
-    tone.bendDownSemitones = *record.u8At(13, "pitch_bend_down");
-    tone.bendUpSemitones = *record.u8At(14, "pitch_bend_up");
-    tone.keys.low = *record.u8At(15, "key_low", SourceValueDisplay::MidiNote);
-    tone.keys.high = *record.u8At(16, "key_high", SourceValueDisplay::MidiNote);
-    tone.flags = *record.u8At(17, "flags", SourceValueDisplay::Hex);
-    record.u8At(18, "priority");
-    record.u8At(19, "reserved", SourceValueDisplay::Hex);
-    record.derived("unity_key", tone.unityKey);
-    tone.source = std::move(record).finish();
-    tones.push_back(std::move(tone));
-  }
-  return tones;
-}
-
 }  // namespace
 
 std::optional<HeartBeatPs1ScannedBank> addHeartBeatPs1Bank(ScanResultBuilder& result,
                                                            const HeartBeatPs1BankLayout& layout) {
   const ByteReader reader = result.reader();
   const auto programs = readPrograms(reader, layout);
-  const auto tones = readTones(reader, layout);
+  if (programs.empty()) {
+    return std::nullopt;
+  }
+  const u32 toneBegin =
+      layout.attributeOffset + kAttributeHeaderSize + static_cast<u32>(layout.programCount) * kProgramSize;
 
   std::set<u32> sampleOffsets;
-  for (const auto& tone : tones) {
-    if (tone.sampleOffset < layout.sampleSize && tone.keys.low <= tone.keys.high) {
-      sampleOffsets.insert(tone.sampleOffset);
+  for (u32 index = 0; index < layout.toneCount; ++index) {
+    const u32 offset = toneBegin + index * kToneSize;
+    const u32 sampleOffset = reader.le32(offset);
+    if (sampleOffset < layout.sampleSize && reader.u8At(offset + 15) <= reader.u8At(offset + 16)) {
+      sampleOffsets.insert(sampleOffset);
     }
   }
   const auto streams =
@@ -164,57 +140,68 @@ std::optional<HeartBeatPs1ScannedBank> addHeartBeatPs1Bank(ScanResultBuilder& re
   std::vector<HeartBeatPs1InstrumentInfo> runtimeInstruments;
   for (const auto& sourceProgram : programs) {
     HeartBeatPs1InstrumentInfo runtime{.bank = layout.bank, .program = sourceProgram.number};
-    for (const u16 toneIndex : sourceProgram.toneIndices) {
-      if (toneIndex != 0xffff && toneIndex < tones.size()) {
-        runtime.tones.push_back(tones[toneIndex]);
-      }
-    }
-    if (runtime.tones.empty()) {
-      continue;
-    }
-
     u8 bendRange = 0;
-    for (const auto& tone : runtime.tones) {
-      bendRange = std::max({bendRange, tone.bendDownSemitones, tone.bendUpSemitones});
+    bool reverb = false;
+    for (const u16 toneIndex : sourceProgram.toneIndices) {
+      if (toneIndex < layout.toneCount) {
+        const u32 offset = toneBegin + static_cast<u32>(toneIndex) * kToneSize;
+        bendRange = std::max({bendRange, reader.u8At(offset + 13), reader.u8At(offset + 14)});
+        reverb |= (reader.u8At(offset + 17) & 4) != 0;
+      }
     }
     auto instrument = instruments.append(Instrument{
         .identity = heartBeatPs1InstrumentIdentity(layout.bank, sourceProgram.number),
         .pitchBendRangeCents = static_cast<u16>(bendRange * 100),
-        .reverb =
-            std::ranges::any_of(runtime.tones, [](const auto& tone) { return (tone.flags & 4) != 0; }) ? 1.0 : 0.0,
+        .reverb = reverb ? 1.0 : 0.0,
         .name = fmt::format("Instrument {}", sourceProgram.number),
         .range = sourceProgram.source.range,
     });
     instrument.source(instrument.value().name, sourceProgram.source, "heartbeat-ps1-program").parent(programRoot);
 
     for (const u16 toneIndex : sourceProgram.toneIndices) {
-      if (toneIndex == 0xffff || toneIndex >= tones.size()) {
+      if (toneIndex >= layout.toneCount) {
         continue;
       }
-      const HeartBeatPs1Tone& tone = tones[toneIndex];
-      const auto sample = samples.find(tone.sampleOffset);
+      const u32 offset = toneBegin + static_cast<u32>(toneIndex) * kToneSize;
+      RecordReader record(reader, offset, offset + kToneSize);
+      const u32 sampleOffset = *record.u32leAt(0, "sample_offset", SourceValueDisplay::Address);
+      const u16 adsr1 = *record.u16leAt(4, "adsr1", SourceValueDisplay::Hex);
+      const u16 adsr2 = *record.u16leAt(6, "adsr2", SourceValueDisplay::Hex);
+      record.u8At(8, "unknown_08", SourceValueDisplay::Hex);
+      const u8 volume = *record.u8At(9, "volume");
+      const u8 pan = *record.u8At(10, "pan");
+      const u8 root = *record.u8At(11, "root_key", SourceValueDisplay::MidiNote);
+      const u8 fine = *record.u8At(12, "fine_tune");
+      const double unityKey = root - (fine & 0x7f) / 128.0;
+      HeartBeatPs1Tone tone;
+      tone.bendDownSemitones = *record.u8At(13, "pitch_bend_down");
+      tone.bendUpSemitones = *record.u8At(14, "pitch_bend_up");
+      tone.keys.low = *record.u8At(15, "key_low", SourceValueDisplay::MidiNote);
+      tone.keys.high = *record.u8At(16, "key_high", SourceValueDisplay::MidiNote);
+      record.u8At(17, "flags", SourceValueDisplay::Hex);
+      record.u8At(18, "priority");
+      record.u8At(19, "reserved", SourceValueDisplay::Hex);
+      record.derived("unity_key", unityKey);
+      runtime.tones.push_back(tone);
+      const auto sample = samples.find(sampleOffset);
       if (!sample || tone.keys.low > tone.keys.high) {
         continue;
       }
-      const double gain =
-          driverLevel(layout.masterVolume) * driverLevel(sourceProgram.volume) * driverLevel(tone.volume);
+      const double gain = driverLevel(layout.masterVolume) * driverLevel(sourceProgram.volume) * driverLevel(volume);
       instrument
           .region(*sample,
                   Region{
                       .keyRange = tone.keys,
-                      .unityKey = tone.unityKey,
-                      .envelope = psxSpuEnvelope(tone.adsr1, tone.adsr2),
-                      .loop = streams.at(tone.sampleOffset).loop,
-                      .pan = driverPan(layout.masterPan, sourceProgram.pan, tone.pan),
+                      .unityKey = unityKey,
+                      .envelope = psxSpuEnvelope(adsr1, adsr2),
+                      .loop = streams.at(sampleOffset).loop,
+                      .pan = driverPan(layout.masterPan, sourceProgram.pan, pan),
                       .attenuationDb = linearAmplitudeToAttenuationDb(gain),
                   })
-          .source(fmt::format("Tone {}", toneIndex), tone.source, "heartbeat-ps1-tone")
+          .source(fmt::format("Tone {}", toneIndex), std::move(record).finish(), "heartbeat-ps1-tone")
           .parent(toneRoot);
     }
     runtimeInstruments.push_back(std::move(runtime));
-  }
-  if (runtimeInstruments.empty()) {
-    return std::nullopt;
   }
   return HeartBeatPs1ScannedBank{.bank = bank, .instruments = std::move(runtimeInstruments)};
 }
