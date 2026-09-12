@@ -100,7 +100,6 @@ enum class PitchBendWriteKind {
 struct PitchBendWrite {
   PitchBendPerformanceEvent bend;
   PitchBendWriteKind kind = PitchBendWriteKind::Source;
-  std::optional<PerformanceAutomationId> owner;
   bool reset = false;
   bool establishesHeldPitch = false;
 };
@@ -254,35 +253,41 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
               .semitones = semitones,
           },
       .kind = transition.previousNote ? PitchBendWriteKind::HeldTransition : PitchBendWriteKind::AbsoluteTransition,
-      .owner = automation.id,
       .reset = reset,
       .establishesHeldPitch = establishesHeldPitch,
   };
 }
 
-[[nodiscard]] std::vector<PitchBendPerformanceEvent> resolvePitchBends(std::vector<PitchBendWrite> writes,
-                                                                       PitchBendLayerId heldTransitionLayer,
-                                                                       const PitchBendRangeTimeline& ranges) {
-  std::ranges::stable_sort(writes, {}, [](const PitchBendWrite& write) { return write.bend.header.order(); });
+template <class Emit>
+void resolvePitchBends(std::span<const PitchBendWrite> writes, PitchBendLayerId heldTransitionLayer,
+                       const PitchBendRangeTimeline& ranges, Emit emit,
+                       const PerformanceEventHeader* through = nullptr) {
+  std::vector<const PitchBendWrite*> ordered;
+  ordered.reserve(writes.size());
+  for (const auto& write : writes) {
+    if (through == nullptr || write.bend.header.order() <= through->order()) {
+      ordered.push_back(&write);
+    }
+  }
+  std::ranges::stable_sort(ordered, {}, [](const PitchBendWrite* write) { return write->bend.header.order(); });
 
   PitchBendLayer primary;
   PitchBendLayer heldVoice;
-  std::vector<PitchBendPerformanceEvent> resolved;
-  resolved.reserve(writes.size() * 2);
-  for (const auto& write : writes) {
+  for (const auto* entry : ordered) {
+    const auto& write = *entry;
     if (write.kind == PitchBendWriteKind::Source) {
       if (write.bend.layer == kPrimaryPitchBendLayer) {
         primary.bend = write.bend;
         primary.owner.reset();
       }
-      resolved.push_back(write.bend);
+      emit(write.bend);
       continue;
     }
 
     const bool held = write.kind == PitchBendWriteKind::HeldTransition;
     auto& layer = held ? heldVoice : primary;
     if (write.reset) {
-      if (layer.owner != write.owner) {
+      if (layer.owner != write.bend.header.automation) {
         continue;
       }
       layer = {};
@@ -294,11 +299,11 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
           reset.normalizedWheelPosition.reset();
           reset.layer = heldTransitionLayer;
           reset.header.automation.reset();
-          resolved.push_back(std::move(reset));
+          emit(std::move(reset));
         }
         heldVoice = {};
       }
-      if (held && layer.owner != write.owner) {
+      if (held && layer.owner != write.bend.header.automation) {
         // Cancel an interrupted absolute transition, but retain ownerless
         // source bend beneath the held transition.
         layer.ownerBaseSemitones =
@@ -308,7 +313,7 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
       layer.bend = write.bend;
       layer.bend.semitones = (held ? layer.ownerBaseSemitones : 0.0) + write.bend.semitones;
       layer.bend.normalizedWheelPosition.reset();
-      layer.owner = write.owner;
+      layer.owner = write.bend.header.automation;
     }
 
     auto bend = write.bend;
@@ -320,9 +325,8 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
       // transition path.
       bend.header.automation.reset();
     }
-    resolved.push_back(std::move(bend));
+    emit(std::move(bend));
   }
-  return resolved;
 }
 
 [[nodiscard]] std::optional<double> establishedPitchBend(const std::vector<PitchBendWrite>& bends,
@@ -331,26 +335,25 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
                                                          const PitchTransitionIntent& transition, u64 startTick,
                                                          PitchBendLayerId heldTransitionLayer,
                                                          const PitchBendRangeTimeline& ranges) {
-  const auto resolved = resolvePitchBends(bends, heldTransitionLayer, ranges);
   auto at = automation.header;
   at.tick = startTick;
-  const PitchBendPerformanceEvent* primary = nullptr;
-  const PitchBendPerformanceEvent* held = nullptr;
-  for (const auto& bend : resolved) {
-    if (bend.header.order() > at.order()) {
-      continue;
-    }
-    if (bend.layer == kPrimaryPitchBendLayer) {
-      primary = &bend;
-    } else if (bend.layer == heldTransitionLayer) {
-      held = &bend;
-    }
-  }
-  if (primary == nullptr && held == nullptr) {
+  std::optional<PitchBendPerformanceEvent> primary;
+  std::optional<PitchBendPerformanceEvent> held;
+  resolvePitchBends(
+      bends, heldTransitionLayer, ranges,
+      [&](const PitchBendPerformanceEvent& bend) {
+        if (bend.layer == kPrimaryPitchBendLayer) {
+          primary = bend;
+        } else if (bend.layer == heldTransitionLayer) {
+          held = bend;
+        }
+      },
+      &at);
+  if (!primary && !held) {
     return std::nullopt;
   }
-  const double bendAtStart = (primary == nullptr ? 0.0 : ranges.semitones(*primary, at)) +
-                             (held == nullptr ? 0.0 : ranges.semitones(*held, at));
+  const double bendAtStart =
+      (primary ? ranges.semitones(*primary, at) : 0.0) + (held ? ranges.semitones(*held, at) : 0.0);
   if (std::abs(bendBaseKeyAt(note, startTick) + bendAtStart - transition.startKey) >= 0.02) {
     return std::nullopt;
   }
@@ -516,10 +519,8 @@ void lowerPitchBends(PerformanceSequence& performance, std::vector<PerformanceEv
     }
   }
 
-  auto resolved = resolvePitchBends(std::move(bends), heldTransitionLayer, ranges);
-  for (auto& bend : resolved) {
-    events.emplace_back(std::move(bend));
-  }
+  resolvePitchBends(bends, heldTransitionLayer, ranges,
+                    [&](PitchBendPerformanceEvent bend) { events.emplace_back(std::move(bend)); });
 }
 
 void beginPortamentoRewrite(NoteSpan& note) {
