@@ -7,6 +7,7 @@
 #include "value/export/CollectionBinding.h"
 #include "value/extractors/PsfExtractor.h"
 #include "value/formats/SquarePS2/SquarePS2.h"
+#include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
 #include "value/synth/PsxSpu.h"
 
@@ -324,6 +325,47 @@ void syntheticArchiveCoversDriverFeatures() {
   expect(playback.playable(), "SquarePS2 playback preparation should produce both MIDI and SoundFont data");
 }
 
+void fadesUseTheDelayedCommandTime() {
+  const std::vector<u8> events{
+      0x08, 0x22, 0x40,        // tick 8: level 64
+      0x00, 0x23, 0x08, 0x20,  // tick 8: fade level to 32 over eight ticks
+      0x04, 0x26, 0x00,        // tick 12: hard left
+      0x00, 0x27, 0x04, 0x7f,  // tick 12: fade to hard right over four ticks
+      0x08, 0x00,              // tick 20: end
+  };
+  const BgmLayout layout{.tracks = {{.length = static_cast<u32>(events.size())}}};
+  const auto program = parseBgm(ByteReader{SourceId{1}, events}, AssetId{1}, layout);
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
+  expect(performance.diagnostics.empty(), "delayed fades should render without diagnostics");
+  const auto& track = performance.tracks.at(0);
+  expect(track.automations.size() == 2, "level and pan should each declare one fade");
+  for (size_t i = 0; i < track.automations.size(); ++i) {
+    const auto& automation = track.automations[i];
+    const auto& intent = std::get<ScalarPerformanceAutomationIntent>(automation.intent);
+    expect(automation.header.tick == (i == 0 ? 8 : 12) && automation.realization.startTick == automation.header.tick &&
+               automation.realization.endTick == 16 && intent.durationTicks == (i == 0 ? 8 : 4) &&
+               intent.target == (i == 0 ? PerformanceAutomationTarget::Level : PerformanceAutomationTarget::Pan),
+           "fades should start after the command delta and finish after their own duration");
+    const auto terminal = std::ranges::find_if(track.events, [&](const PerformanceEvent& event) {
+      return performanceEventHeader(event).automation == automation.id;
+    });
+    expect(terminal != track.events.end() && performanceEventHeader(*terminal).tick == 16 &&
+               performanceEventHeader(*terminal).sourceCommand == automation.header.sourceCommand,
+           "each fade endpoint should retain its source command and automation ownership");
+    const double value = i == 0 ? std::get<LevelPerformanceEvent>(*terminal).linearGain
+                                : std::get<PanPerformanceEvent>(*terminal).stereoPosition;
+    expect(std::abs(value - (i == 0 ? 33.0 / 128.0 : 1.0)) < 0.0001,
+           "fade endpoints should retain their neutral gain and pan values");
+  }
+  const auto level = std::ranges::find_if(track.events, [](const PerformanceEvent& event) {
+    const auto* value = std::get_if<LevelPerformanceEvent>(&event);
+    return value && value->header.sourceCommand.valid() && !value->header.automation;
+  });
+  expect(level != track.events.end() && performanceEventHeader(*level).tick == 8 &&
+             std::get<LevelPerformanceEvent>(*level).sourceQuantization.levels == 128,
+         "the immediate level command should retain its delta and source quantization");
+}
+
 void miniArchiveLoadsLibraryFilesystem() {
   const auto unique = std::chrono::steady_clock::now().time_since_epoch().count();
   const auto directory = std::filesystem::temp_directory_path() / ("vgmtrans-psf2-" + std::to_string(unique));
@@ -412,6 +454,7 @@ void scanRealArchive(const std::filesystem::path& path) {
 int main(int argc, char** argv) {
   try {
     syntheticArchiveCoversDriverFeatures();
+    fadesUseTheDelayedCommandTime();
     miniArchiveLoadsLibraryFilesystem();
     if (argc > 1) {
       scanRealArchive(argv[1]);
