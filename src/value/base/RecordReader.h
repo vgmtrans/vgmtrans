@@ -92,6 +92,7 @@ private:
 
   bool require(u32 size, std::string_view field);
   [[nodiscard]] std::optional<u32> requireAt(u64 relativeOffset, u64 size, std::string_view field);
+  void fail(std::string_view field, SourceRange range);
   void field(std::string_view name, SourceRange range, SourceValue value, SourceValueDisplay display);
 
   ByteReader reader_;

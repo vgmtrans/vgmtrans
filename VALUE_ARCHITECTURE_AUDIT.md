@@ -1795,6 +1795,17 @@ grows by seven lines. A temporary comparison matches PCM and metadata in
 payloads, empty payloads, and relocated streams. The harness is not committed.
 The full build is warning-free and all 20 CTest targets pass.
 
+## Share record-reader truncation handling
+
+`RecordReader::require()` and `requireAt()` now use one failure operation to
+emit the first truncation diagnostic and retain failure state. Sequential
+reads return immediately after failure; their first truncated read consumes
+the remaining bytes directly. Positioned reads still recover valid fields
+without clearing failure. This removes duplicated error construction and
+unnecessary cursor arithmetic, with a net reduction of two production lines.
+Existing reader, compiler, and format tests cover those policies; no tests
+were added. The full build is warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

@@ -186,22 +186,15 @@ SourceRecord RecordReader::finish() && noexcept {
 }
 
 bool RecordReader::require(u32 size, std::string_view fieldName) {
-  if (!failed_ && size <= end_ - position_) {
+  if (failed_) {
+    return false;
+  }
+  if (size <= end_ - position_) {
     return true;
   }
 
-  const u32 fieldBegin = position_;
-  const u32 available = !failed_ ? std::min(size, end_ - position_) : 0;
-  if (!failed_ && diagnostics_ != nullptr) {
-    diagnostics_->push_back(Diagnostic{
-        .severity = Severity::Warning,
-        .code = "truncated-record",
-        .message = "Truncated field '" + std::string(fieldName) + "'",
-        .range = reader_.range(fieldBegin, available),
-    });
-  }
-  position_ += available;
-  failed_ = true;
+  fail(fieldName, reader_.range(position_, end_ - position_));
+  position_ = end_;
   return false;
 }
 
@@ -216,16 +209,20 @@ std::optional<u32> RecordReader::requireAt(u64 relativeOffset, u64 size, std::st
       return fieldBegin;
     }
   }
+  fail(fieldName, reader_.range(fieldBegin, available));
+  return std::nullopt;
+}
+
+void RecordReader::fail(std::string_view fieldName, SourceRange range) {
   if (!failed_ && diagnostics_ != nullptr) {
     diagnostics_->push_back(Diagnostic{
         .severity = Severity::Warning,
         .code = "truncated-record",
         .message = "Truncated field '" + std::string(fieldName) + "'",
-        .range = reader_.range(fieldBegin, available),
+        .range = range,
     });
   }
   failed_ = true;
-  return std::nullopt;
 }
 
 void RecordReader::field(std::string_view name, SourceRange range, SourceValue value, SourceValueDisplay display) {
