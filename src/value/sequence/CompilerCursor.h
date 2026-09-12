@@ -290,16 +290,11 @@ public:
                            SourceValueDisplay display = SourceValueDisplay::Default,
                            SemanticOperandRole role = SemanticOperandRole::Value) {
       if (source.valid) {
-        cursor_.operands_.push_back(SemanticOperand{
-            .value = detail::semanticValue(resolved),
-            .range = source.range,
-            .name = std::string(name),
-            .display = display,
-            .role = role,
-            .encodedValue = detail::semanticValue(source.value),
-            .encodedName = std::string(source.name),
-            .encodedDisplay = source.display,
-        });
+        if (!name.empty() && source.range.valid()) {
+          cursor_.add(source.name.empty() ? name : source.name, detail::semanticValue(source.value), source.range,
+                      source.display, SemanticOperandRole::Value);
+        }
+        cursor_.add(name, detail::semanticValue(resolved), {}, display, role);
       }
       return resolved;
     }
@@ -679,13 +674,17 @@ private:
 
   void add(std::string_view name, SourceValue value, SourceRange range, SourceValueDisplay display,
            SemanticOperandRole role) {
-    operands_.push_back(SemanticOperand{
-        .value = std::move(value),
-        .range = range,
-        .name = std::string(name),
-        .display = display,
-        .role = role,
-    });
+    if (role != SemanticOperandRole::Value) {
+      operands_.push_back(SemanticOperand{.value = value, .role = role});
+    }
+    if (!name.empty()) {
+      fields_.push_back(SourceField{
+          .name = std::string(name),
+          .range = range.valid() ? range : SourceRange{},
+          .value = std::move(value),
+          .display = display,
+      });
+    }
   }
 
   void warning(std::string message) {
@@ -725,6 +724,7 @@ private:
         .opcode = opcode_,
         .flow = {.continuation = Address{record_.position()}, .defaultTransition = transition},
         .discoveryTargets = std::move(discoveryTargets),
+        .fields = std::move(fields_),
         .operands = std::move(operands_),
         .execution = std::move(execution),
         .presentation = std::move(presentation),
@@ -736,6 +736,7 @@ private:
   std::vector<Diagnostic>* diagnostics_ = nullptr;
   ::u8 opcode_ = 0;
   SourceRange opcodeRange_;
+  std::vector<SourceField> fields_;
   std::vector<SemanticOperand> operands_;
 };
 

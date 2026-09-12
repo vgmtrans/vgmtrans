@@ -540,10 +540,10 @@ void compilerCursorKeepsExactTargetOperandRoles() {
   const std::vector<u8> bytes{0x64, 0x12, 0x34, 0x12, 0x34};
   const DecodedBytecodeCommand command =
       decodeProbeCommand(ByteReader(SourceId{17}, bytes), 0, static_cast<u32>(bytes.size()));
-  expect(command.operands.size() == 2, "equal-valued target fixture should decode both operands");
-  expect(command.operands[0].role == SemanticOperandRole::JumpTarget &&
-             command.operands[1].role == SemanticOperandRole::Value,
-         "flow declaration must not relabel a different operand with the same numeric value");
+  expect(command.fields.size() == 2 && command.fields[0].value == command.fields[1].value,
+         "equal-valued target fixture should preserve both source fields");
+  expect(command.operands.size() == 1 && command.operands[0].role == SemanticOperandRole::JumpTarget,
+         "only the tagged target should contribute a semantic operand");
 }
 
 void compilerCursorRejectsConflictingDefaultFlowDeclarations() {
