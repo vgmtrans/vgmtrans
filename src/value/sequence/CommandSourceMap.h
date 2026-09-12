@@ -86,9 +86,7 @@ struct TrackDecodeScope {
       return TrackProgram{.sourceTrackNumber = trackIndex};
     }
     auto session = begin(trackIndex, static_cast<u32>(startAddresses.front().value));
-    const u32 end = bytecodeEnd == std::numeric_limits<u32>::max()
-                        ? static_cast<u32>(reader.size())
-                        : std::min(static_cast<u32>(reader.size()), bytecodeEnd);
+    const u32 end = std::min(static_cast<u32>(reader.size()), bytecodeEnd);
     decodeBytecode(reader, end, startAddresses, maxCommands, session, std::move(decodeCommand));
     return session.finish();
   }
