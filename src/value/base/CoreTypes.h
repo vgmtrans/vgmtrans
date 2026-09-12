@@ -80,6 +80,30 @@ struct SourceRange {
   [[nodiscard]] constexpr bool valid() const noexcept { return source.valid(); }
   [[nodiscard]] constexpr u64 endOffset() const noexcept { return offset + size; }
 
+  // Range containment includes an empty range at the end boundary.
+  [[nodiscard]] constexpr bool contains(SourceRange range) const noexcept {
+    if (!valid() || !range.valid() || source != range.source) {
+      return false;
+    }
+    return range.offset >= offset && range.offset <= endOffset() && range.size <= endOffset() - range.offset;
+  }
+
+  // Byte queries are half-open; zero-size ranges match their anchor offset.
+  [[nodiscard]] constexpr bool containsOffset(SourceId querySource, u64 queryOffset) const noexcept {
+    return valid() && source == querySource &&
+           (size == 0 ? offset == queryOffset : offset <= queryOffset && queryOffset < endOffset());
+  }
+
+  [[nodiscard]] constexpr bool intersects(SourceRange range) const noexcept {
+    if (!valid() || !range.valid() || source != range.source) {
+      return false;
+    }
+    if (size == 0 || range.size == 0) {
+      return containsOffset(range.source, range.offset) || range.containsOffset(source, offset);
+    }
+    return offset < range.endOffset() && range.offset < endOffset();
+  }
+
   // Expand to cover ranges from the same source, adopting the first valid
   // range. Invalid and foreign ranges do not contribute; zero-size anchors do.
   constexpr void include(SourceRange range) noexcept {
