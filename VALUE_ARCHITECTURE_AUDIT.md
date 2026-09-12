@@ -1188,6 +1188,24 @@ An exhaustive scan regression reconstructs both output channel gains for all
 It fails on the old implementation at direct-output byte 33. The full build
 is warning-free and all 20 CTest targets pass with the correction.
 
+### Finalize synth source annotations in one pass
+
+Combine fallback-source creation and final property annotation in each synth
+builder. Each value now gets its fallback, if needed, and derived fields in
+the same traversal. Property projection only appends fields, so annotation
+allocation order, IDs, parent links, and sample links remain unchanged. Final
+projection still occurs after all format-authored source fields and regions.
+
+The sample builder now stores its per-sample source lists directly instead of
+wrapping each list in an otherwise empty EntryState. Together these changes
+remove 29 production lines, two private methods, and one state type. Explicit
+ranges, multiple source records, source-free derived values, and detached
+builders retain their existing behavior.
+
+Existing synth-builder tests cover fallback and explicit records, ownership,
+sample links, final region counts, sparse keys, and detached construction. The
+full build is warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

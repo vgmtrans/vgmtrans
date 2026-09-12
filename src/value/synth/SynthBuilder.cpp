@@ -155,7 +155,7 @@ SamplePoolBuilder::Entry SamplePoolBuilder::add(u64 sourceKey, Sample sample) {
   const u32 index = static_cast<u32>(samples_.size());
   indexes_.emplace(sourceKey, index);
   samples_.push_back(std::move(sample));
-  states_.emplace_back();
+  sources_.emplace_back();
   recordRange(samples_.back().encodedData, false);
   return Entry{*this, index};
 }
@@ -207,8 +207,7 @@ BuiltSamplePool SamplePoolBuilder::finish() && {
   if (finished_) {
     throw std::logic_error("SamplePoolBuilder was finished more than once");
   }
-  addFallbackSources();
-  annotateValues();
+  finishSources();
   const SourceRange finalRange = range();
   indexes_.clear();
   finished_ = true;
@@ -263,30 +262,22 @@ AnnotationBuilder SamplePoolBuilder::addEntrySource(u32 index, std::string_view 
   if (!kind.empty()) {
     annotation.kind(kind);
   }
-  states_[index].sources.push_back(annotation.id());
+  sources_[index].push_back(annotation.id());
   return annotation;
 }
 
-void SamplePoolBuilder::addFallbackSources() {
+void SamplePoolBuilder::finishSources() {
   if (sourceMap_ == nullptr) {
     return;
   }
   for (u32 index = 0; index < samples_.size(); ++index) {
-    if (!states_[index].sources.empty() || !samples_[index].encodedData.valid()) {
-      continue;
+    const auto& sample = samples_[index];
+    if (sources_[index].empty() && sample.encodedData.valid()) {
+      const std::string label = sample.name.empty() ? "Sample " + std::to_string(index) : sample.name;
+      addEntrySource(index, label, sample.encodedData, {});
     }
-    const std::string label = samples_[index].name.empty() ? "Sample " + std::to_string(index) : samples_[index].name;
-    addEntrySource(index, label, samples_[index].encodedData, {});
-  }
-}
-
-void SamplePoolBuilder::annotateValues() {
-  if (sourceMap_ == nullptr) {
-    return;
-  }
-  for (u32 index = 0; index < samples_.size(); ++index) {
-    for (const SourceAnnotationId source : states_[index].sources) {
-      annotateSynthValue(AnnotationBuilder{*sourceMap_, source}, samples_[index]);
+    for (const SourceAnnotationId source : sources_[index]) {
+      annotateSynthValue(AnnotationBuilder{*sourceMap_, source}, sample);
     }
   }
 }
@@ -394,8 +385,7 @@ BuiltInstrumentSet InstrumentSetBuilder::finish() && {
   if (finished_) {
     throw std::logic_error("InstrumentSetBuilder was finished more than once");
   }
-  addFallbackSources();
-  annotateValues();
+  finishSources();
   const SourceRange finalRange = range();
   finished_ = true;
   return BuiltInstrumentSet{
@@ -535,42 +525,29 @@ AnnotationBuilder InstrumentSetBuilder::addRegionSource(u32 instrumentIndex, u32
   return annotation;
 }
 
-void InstrumentSetBuilder::addFallbackSources() {
-  if (sourceMap_ == nullptr) {
-    return;
-  }
-  for (u32 instrumentIndex = 0; instrumentIndex < instruments_.size(); ++instrumentIndex) {
-    auto& instrument = instruments_[instrumentIndex];
-    auto& state = states_[instrumentIndex];
-    if (state.sources.empty() && instrument.range.valid()) {
-      const std::string label =
-          instrument.name.empty() ? "Instrument " + std::to_string(instrumentIndex) : instrument.name;
-      addInstrumentSource(instrumentIndex, label, instrument.range, {});
-    }
-    for (u32 regionIndex = 0; regionIndex < instrument.regions.size(); ++regionIndex) {
-      auto& region = instrument.regions[regionIndex];
-      auto& regionState = state.regions[regionIndex];
-      if (!regionState.sources.empty() || !region.range.valid()) {
-        continue;
-      }
-      addRegionSource(instrumentIndex, regionIndex, "Region", region.range, {});
-    }
-  }
-}
-
-void InstrumentSetBuilder::annotateValues() {
+void InstrumentSetBuilder::finishSources() {
   if (sourceMap_ == nullptr) {
     return;
   }
   for (u32 instrumentIndex = 0; instrumentIndex < instruments_.size(); ++instrumentIndex) {
     const auto& instrument = instruments_[instrumentIndex];
     const auto& state = states_[instrumentIndex];
+    if (state.sources.empty() && instrument.range.valid()) {
+      const std::string label =
+          instrument.name.empty() ? "Instrument " + std::to_string(instrumentIndex) : instrument.name;
+      addInstrumentSource(instrumentIndex, label, instrument.range, {});
+    }
     for (const SourceAnnotationId source : state.sources) {
       annotateSynthValue(AnnotationBuilder{*sourceMap_, source}, instrument);
     }
     for (u32 regionIndex = 0; regionIndex < instrument.regions.size(); ++regionIndex) {
-      for (const SourceAnnotationId source : state.regions[regionIndex].sources) {
-        annotateSynthValue(AnnotationBuilder{*sourceMap_, source}, instrument.regions[regionIndex]);
+      const auto& region = instrument.regions[regionIndex];
+      const auto& regionState = state.regions[regionIndex];
+      if (regionState.sources.empty() && region.range.valid()) {
+        addRegionSource(instrumentIndex, regionIndex, "Region", region.range, {});
+      }
+      for (const SourceAnnotationId source : regionState.sources) {
+        annotateSynthValue(AnnotationBuilder{*sourceMap_, source}, region);
       }
     }
   }

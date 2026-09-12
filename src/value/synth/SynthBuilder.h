@@ -86,14 +86,9 @@ public:
 private:
   friend class Entry;
 
-  struct EntryState {
-    std::vector<SourceAnnotationId> sources;
-  };
-
   [[nodiscard]] bool validIndex(u32 index) const noexcept;
   AnnotationBuilder addEntrySource(u32 index, std::string_view label, SourceRange range, std::string_view kind);
-  void addFallbackSources();
-  void annotateValues();
+  void finishSources();
   void recordRange(SourceRange range, bool explicitlyIncluded);
   void report(Severity severity, std::string code, std::string message, SourceRange range);
 
@@ -101,7 +96,7 @@ private:
   SourceMapBuilder* sourceMap_ = nullptr;
   std::vector<Diagnostic>* diagnostics_ = nullptr;
   std::vector<Sample> samples_;
-  std::vector<EntryState> states_;
+  std::vector<std::vector<SourceAnnotationId>> sources_;
   std::unordered_map<u64, u32> indexes_;
   SourceRange includedRange_;
   SourceRange observedRange_;
@@ -211,8 +206,7 @@ private:
   AnnotationBuilder addInstrumentSource(u32 index, std::string_view label, SourceRange range, std::string_view kind);
   AnnotationBuilder addRegionSource(u32 instrumentIndex, u32 regionIndex, std::string_view label, SourceRange range,
                                     std::string_view kind);
-  void addFallbackSources();
-  void annotateValues();
+  void finishSources();
   void linkInstrumentSamples(u32 instrumentIndex, SourceAnnotationId annotation);
   void linkSample(SourceAnnotationId annotation, SampleRef sample, std::string_view label);
   void recordInstrumentRange(u32 index, SourceRange range);
