@@ -1067,7 +1067,7 @@ struct Playback {
     resetPitchForNote();
     track.pitch.baseValid = true;
     track.pitch.base = static_cast<s32>(rawNote & 0x7f) * 256;
-    track.pitch.motion.setCurrent(track.pitch.base);
+    track.pitch.motion.reset(track.pitch.base);
 
     if (track.pitchEnvelope.mode != PitchEnvelope::Mode::None && track.pitchEnvelope.length != 0) {
       const s32 offset = static_cast<s32>(track.pitchEnvelope.semitones) * 256;
@@ -1075,7 +1075,7 @@ struct Playback {
       if (track.pitchEnvelope.mode == PitchEnvelope::Mode::To) {
         target += offset;
       } else {
-        track.pitch.motion.setCurrent(track.pitch.base - offset);
+        track.pitch.motion.reset(track.pitch.base - offset);
       }
       beginPitchBendMotion(track.pitchEnvelope.delay, track.pitchEnvelope.length, target);
     }
@@ -1291,7 +1291,7 @@ struct Playback {
       return;
     }
     const u8 driverTempo = program.commandTempo(value);
-    program.tempoState.setCurrentRaw(program.tempo);
+    program.tempoState.reset(program.tempo);
     program.tempoState.begin(out.fade(PerformanceAutomationTarget::Tempo,
                                       static_cast<double>(
                                           math::tempoMicrosecondsPerQuarter(driverTempo, program.tempoTimerTarget)),
@@ -1340,7 +1340,7 @@ struct Playback {
       masterVolume(value);
       return;
     }
-    program.masterVolumeState.setCurrentRaw(program.masterVolume);
+    program.masterVolumeState.reset(program.masterVolume);
     program.masterVolumeState.begin(out.fade(PerformanceAutomationTarget::MasterLevel, masterGain(value), length),
                                     SequenceFixedPointMotion<s32>::toRawTarget(value, length));
     program.masterVolumeAutomationTrack = track.trackNumber;

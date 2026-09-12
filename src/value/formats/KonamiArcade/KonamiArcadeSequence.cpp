@@ -174,7 +174,7 @@ struct TrackState {
 
   TrackState(const TrackProgram& track, const RuntimeConfig& config)
       : version(config.version), sourceTrackNumber(track.sourceTrackNumber) {
-    pan.setCurrent(8.0);
+    pan.reset(8.0);
   }
 
   KonamiArcadeVersion version = KonamiArcadeVersion::MysticWarrior;
@@ -218,7 +218,7 @@ struct TrackState {
 
 struct SequenceState {
   SequenceState() {
-    tempo.setCurrent(120.0);
+    tempo.reset(120.0);
     channelTempos.fill(120.0);
   }
 

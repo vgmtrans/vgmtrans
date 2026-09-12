@@ -292,11 +292,7 @@ public:
   template <class Value>
   void setCurrentAt(u64 tick, Value value) {
     binding_.interruptAt(tick);
-    if constexpr (requires(ValueState& state) { state.setCurrentRaw(value); }) {
-      ValueState::setCurrentRaw(value);
-    } else {
-      ValueState::setCurrent(value);
-    }
+    ValueState::reset(value);
   }
 
   template <class Plan>

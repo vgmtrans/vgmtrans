@@ -72,15 +72,9 @@ struct SequenceMotionPlan {
 template <typename ValueType>
 class SequenceLinearMotion {
 public:
-  void reset(ValueType current = {}) { setCurrent(current); }
-
-  void setCurrent(ValueType current) {
+  void reset(ValueType current = {}) {
     current_ = current;
     clear();
-  }
-
-  void setCurrentPreservingMotion(ValueType current) {
-    current_ = current;
   }
 
   void clear() {
@@ -99,7 +93,7 @@ public:
     mode_ = plan.mode;
 
     if (plan.usesTicks() && plan.ticks == 0) {
-      setCurrent(plan.target);
+      reset(plan.target);
       return {SequenceMotionStatus::Finished, previous, current_, current_ != previous};
     }
 
@@ -110,7 +104,7 @@ public:
       if (current_ == target_) {
         clear();
       } else {
-        setCurrent(plan.target);
+        reset(plan.target);
       }
       return {SequenceMotionStatus::Finished, previous, current_, current_ != previous};
     }
@@ -215,7 +209,6 @@ public:
   }
 
   void reset(ValueType rawCurrent = {}) { value_.reset(toFixed(rawCurrent)); }
-  void setCurrentRaw(ValueType rawCurrent) { value_.setCurrent(toFixed(rawCurrent)); }
 
   [[nodiscard]] bool active() const { return value_.active(); }
   [[nodiscard]] ValueType currentFixed() const { return value_.current(); }
@@ -228,7 +221,7 @@ public:
   SequenceMotionTick<ValueType> begin(const SequenceFixedPointMotion<ValueType, FractionBits>& rawMotion) {
     // Drivers retarget from the rounded raw value, discarding the old fraction.
     // Linear motion then computes the step in fixed-point units.
-    value_.setCurrentPreservingMotion(toFixed(currentRaw()));
+    value_.reset(toFixed(currentRaw()));
     return value_.begin(SequenceMotionPlan<ValueType>{
         toFixed(rawMotion.targetRaw),
         rawMotion.stepFixed,

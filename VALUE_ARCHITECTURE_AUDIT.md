@@ -1522,6 +1522,21 @@ This removes ten production lines. Existing source hierarchy, command ordering,
 track-range, and malformed-command coverage passes. The full build is
 warning-free and all 20 CTest targets pass; no test code is added.
 
+### Give immediate motion resets one operation
+
+SequenceLinearMotion and SequenceFixedPointAutomation now use reset for setting
+an immediate source value and cancelling motion. Remove the equivalent
+setCurrent/setCurrentRaw aliases and the binding adapter's type-dependent
+setter selection. Fixed-point retargeting also uses reset before installing
+its new plan, removing the otherwise unused preserving-motion setter.
+Rounding remains configured independently, and timed binding interruption
+still occurs through setCurrentAt.
+
+This removes 11 production lines and three redundant motion entry points.
+Existing delay, completion, all three fixed-point rounding modes, bound-value
+replacement, and format fade coverage passes. The full build is warning-free
+and all 20 CTest targets pass; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

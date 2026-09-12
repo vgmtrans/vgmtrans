@@ -1920,7 +1920,7 @@ using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
                  ? event.invoke<&Playback::tempoChange>(target)
                  : event.invoke(
                        [](Playback& playback, u16 ticks, u8 rawTempo) {
-                         playback.track.tempoState.setCurrentRaw(playback.track.tempo);
+                         playback.track.tempoState.reset(playback.track.tempo);
                          const u8 tempo = playback.normalizedTempo(rawTempo);
                          playback.track.tempoState.begin(
                              playback.out.fade(PerformanceAutomationTarget::Tempo,

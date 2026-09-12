@@ -43,7 +43,7 @@ public:
 
   [[nodiscard]] s32 targetDepth() const { return targetDepth_; }
   [[nodiscard]] s32 currentDepth() const { return std::clamp(fade_.current(), s32{0}, targetDepth_); }
-  void resetCurrentDepth() { fade_.setCurrent(targetDepth_); }
+  void resetCurrentDepth() { fade_.reset(targetDepth_); }
 
   // Cancels both future restarts and live motion while preserving the current
   // depth value.
@@ -74,7 +74,7 @@ public:
     if (!fadePlan_) {
       return false;
     }
-    fade_.setCurrent(initialDepth);
+    fade_.reset(initialDepth);
     auto plan = *fadePlan_;
     plan.delay = delayTicks;
     fade_.begin(plan);
