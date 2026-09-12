@@ -62,6 +62,8 @@ void psxAdpcmInspectionFindsStreamAndLoopBoundaries() {
          "PSX ADPCM frame helpers should use the native sixteen-byte block size");
   expect(!inspectPsxAdpcmStream(reader, 0, kPsxAdpcmBlockBytes - 1),
          "PSX ADPCM inspection should reject a range without one complete block");
+  expect(stream->loopAt(47) == Loop{.enabled = true, .start = 56, .length = 28} && !stream->loopAt(48),
+         "loop overrides should round byte offsets down to whole blocks and reject the stream boundary");
 }
 
 void psxAdpcmCatalogBoundsStreamsAndKeepsSampleReferences() {
@@ -80,6 +82,8 @@ void psxAdpcmCatalogBoundsStreamsAndKeepsSampleReferences() {
          "sample offsets should bound unterminated streams and omit incomplete final blocks");
   expect(streams.at(16).loop == Loop{.enabled = true, .start = 0, .length = 56},
          "loop positions should remain relative to each sample");
+  expect(streams.at(0).loopAt(0) == Loop{.enabled = false, .start = 0, .length = 28},
+         "a loop override should preserve the stream's disabled loop flag");
 
   for (const bool attachParent : {false, true}) {
     SourceMapBuilder sourceMap;

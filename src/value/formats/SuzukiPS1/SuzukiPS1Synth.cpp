@@ -150,16 +150,7 @@ std::optional<SuzukiPs1ScannedBank> addSuzukiPs1Bank(ScanResultBuilder& result, 
         .envelope = psxSpuEnvelope(source.adsr1, source.adsr2),
     };
     if (source.loopOffset != 0) {
-      const auto stream = sampleStreams.find(source.sampleOffset);
-      if (stream != sampleStreams.end() && source.loopOffset < stream->second.encodedData.size) {
-        const u32 frames = psxAdpcmDecodedFrames(static_cast<u32>(stream->second.encodedData.size));
-        const u32 loopStart = psxAdpcmDecodedOffset(source.loopOffset);
-        region.loop = Loop{
-            .enabled = stream->second.loop.enabled,
-            .start = loopStart,
-            .length = loopStart < frames ? frames - loopStart : 0,
-        };
-      }
+      region.loop = sampleStreams.at(source.sampleOffset).loopAt(source.loopOffset);
     }
     instrument.region(*sample, std::move(region)).source("Region", source.source.range, "suzuki-ps1-region");
   }
