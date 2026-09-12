@@ -545,7 +545,7 @@ public:
 
     Event& repeatBreak(::u8 slot, Address destination) {
       presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      appendCallable([=](Playback& playback) { return playback.vm.countedRepeatBreak(slot, destination).effects; });
+      appendCallable([=](Playback& playback) { return playback.vm.countedRepeatBreak(slot, destination); });
       discoveryTargets_.push_back(destination);
       return *this;
     }

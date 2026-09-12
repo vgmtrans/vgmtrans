@@ -1642,6 +1642,18 @@ instruments; the short filtering regression checks the annotation actually
 built for retained samples. The full build is warning-free and all 20 CTest
 targets pass.
 
+### Return repeat-break effects directly
+
+Remove BranchResult and its duplicate taken flag. Both counted-repeat helpers
+now return Effects; formats that apply branch-only changes inspect flowOverride,
+which is present exactly when the repeat branch is taken. Capcom note attributes
+and Suzuki PS1 octave restoration use the same rule as repeat-until.
+
+This removes 10 production lines and one public result type. Existing tests
+cover side effects on the final pass, finite branches to previously visited
+commands, and format repeat behavior. The full build is warning-free and all
+20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

@@ -834,20 +834,14 @@ Effects VmApi::countedRepeatUntil(u8 slot, u32 totalPlays, Address destination) 
   return Effects{};
 }
 
-BranchResult VmApi::countedRepeatBreak(u8 slot, Address destination) {
+Effects VmApi::countedRepeatBreak(u8 slot, Address destination) {
   RepeatCounter counter = repeatCounter(slot);
   if (counter.remainingPlays() == 1) {
     counter.finish();
-    return BranchResult{
-        .taken = true,
-        .effects = finiteBranch(destination),
-    };
+    return finiteBranch(destination);
   }
 
-  return BranchResult{
-      .taken = false,
-      .effects = Effects{},
-  };
+  return Effects{};
 }
 
 u64 VmApi::tick() const noexcept {

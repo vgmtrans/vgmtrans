@@ -694,11 +694,11 @@ struct ProbePlayback {
   }
 
   Effects repeatBreak(u8 slot, Address destination) {
-    const BranchResult branch = vm.countedRepeatBreak(slot, destination);
-    if (branch.taken) {
+    const Effects effects = vm.countedRepeatBreak(slot, destination);
+    if (effects.flowOverride) {
       out.instrument(0, 99);
     }
-    return branch.effects;
+    return effects;
   }
 };
 

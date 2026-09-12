@@ -343,11 +343,11 @@ struct Playback {
   }
 
   Effects repeatBreak(u8 slot, Address destination) {
-    const BranchResult branch = vm.countedRepeatBreak(slot, destination);
-    if (branch.taken && track.repeatEndKnown[slot]) {
+    const Effects effects = vm.countedRepeatBreak(slot, destination);
+    if (effects.flowOverride && track.repeatEndKnown[slot]) {
       track.octave = track.repeatEndOctave[slot];
     }
-    return branch.effects;
+    return effects;
   }
 };
 
