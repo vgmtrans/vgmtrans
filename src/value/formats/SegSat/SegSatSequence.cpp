@@ -577,11 +577,6 @@ double segSatRegionReferenceGain(SegSatVolumeModel model, const SegSatVlTable& t
   return gain;
 }
 
-u8 segSatMidiVelocity(u8 velocity, const SegSatVlTable& table, u8 totalLevel, s8 volumeBias) {
-  const double gain = segSatLinearGain(SegSatVolumeModel::V1_33, velocity, table, totalLevel, volumeBias, 127, 127);
-  return LevelScale::midi7FromLinear(gain);
-}
-
 void finalizeSegSatPerformance(PerformanceSequence& performance, std::span<const SegSatVelocityBank> banks,
                                SegSatVolumeModel model, std::span<const SegSatControllerChange> controllerChanges) {
   const std::vector<VoiceLevel> voices = possibleVoices(banks);
