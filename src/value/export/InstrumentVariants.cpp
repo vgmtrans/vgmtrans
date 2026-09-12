@@ -153,10 +153,6 @@ template <typename Predicate>
   return std::nullopt;
 }
 
-[[nodiscard]] InstrumentAddress instrumentAddress(InstrumentRef ref) {
-  return resolveInstrumentAddress(ref.instrument->explicitAddress, ref.instrument->identity);
-}
-
 [[nodiscard]] std::optional<InstrumentRef> resolveSelection(const InstrumentPerformanceEvent& selection,
                                                             std::span<const SoundBankAsset> soundBanks) {
   InstrumentAddress address{.bank = selection.bank, .program = selection.program};
@@ -184,17 +180,12 @@ public:
     }
     for (const auto& track : performance.tracks) {
       for (const auto& event : track.events) {
-        const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event);
-        if (selection == nullptr) {
-          continue;
-        }
-        if (selection->sourceInstrument) {
-          reserve(resolveInstrumentAddress({}, selection->sourceInstrument));
-        } else {
-          reserve(InstrumentAddress{
-              .bank = selection->bank,
-              .program = selection->program,
-          });
+        if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event)) {
+          reserve(selection->sourceInstrument
+                      ? resolveInstrumentAddress({}, selection->sourceInstrument)
+                      : InstrumentAddress{.bank = selection->bank, .program = selection->program});
+        } else if (const auto* note = std::get_if<NotePerformanceEvent>(&event); note && note->instrumentAddress) {
+          reserve(*note->instrumentAddress);
         }
       }
     }
@@ -230,7 +221,6 @@ private:
 
 struct VariantRecord {
   InstrumentRef base;
-  InstrumentAddress address;
   Instrument instrument;
 };
 
@@ -395,7 +385,12 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
       const bool hasEnvelope = options.dynamicEnvelopes && envelope != envelopeStates.end() &&
                                envelope->second.fields != EnvelopeFields::None;
       const bool envelopeOnly = hasEnvelope && !materializeStereo;
-      const auto baseRef = selectedInstrument;
+      const auto baseRef =
+          note->instrumentAddress
+              ? resolveSelection(InstrumentPerformanceEvent{.bank = note->instrumentAddress->bank,
+                                                            .program = note->instrumentAddress->program},
+                                 soundBanks)
+              : selectedInstrument;
       if (!baseRef) {
         if ((hasEnvelope || materializeStereo) && !warnedMissingInstrument) {
           result.diagnostics.push_back(instrumentNotFoundWarning(envelopeOnly, note->header));
@@ -404,10 +399,9 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
         continue;
       }
 
-      InstrumentAddress selectedAddress = instrumentAddress(*baseRef);
-      bool usesVariant = false;
+      const auto& base = *baseRef->instrument;
+      std::optional<InstrumentAddress> variantAddress;
       if (hasEnvelope || materializeStereo) {
-        const auto& base = *baseRef->instrument;
         if (base.regions.empty()) {
           if (regionlessInstrumentWarnings.insert(&base).second) {
             result.diagnostics.push_back(noRegionsWarning(envelopeOnly, note->header));
@@ -428,8 +422,7 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
 
           if (envelopeDiffers || materializeStereo) {
             if (const auto* existing = findVariant(variants, *baseRef, variant)) {
-              selectedAddress = existing->address;
-              usesVariant = true;
+              variantAddress = existing->instrument.explicitAddress;
             } else if (const auto address = addresses.allocate()) {
               variant.identity.reset();
               variant.explicitAddress = *address;
@@ -438,11 +431,9 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
               } else {
                 variant.name = base.name.empty() ? "Instrument variant" : base.name + " [variant]";
               }
-              selectedAddress = *address;
-              usesVariant = true;
+              variantAddress = *address;
               variants.push_back(VariantRecord{
                   .base = *baseRef,
-                  .address = *address,
                   .instrument = std::move(variant),
               });
             } else {
@@ -452,10 +443,11 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
         }
       }
 
-      if (usesVariant || previousAttackUsedVariant) {
-        note->instrumentAddress = selectedAddress;
+      if (variantAddress || previousAttackUsedVariant) {
+        note->instrumentAddress =
+            variantAddress.value_or(resolveInstrumentAddress(base.explicitAddress, base.identity));
       }
-      previousAttackUsedVariant = usesVariant;
+      previousAttackUsedVariant = variantAddress.has_value();
     }
 
     if (materializeStereo) {

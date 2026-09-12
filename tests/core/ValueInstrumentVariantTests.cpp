@@ -73,9 +73,9 @@ void instrumentSelectionPreservesIdentityAndFallbackPolicies() {
   exactMatch.name = "Identity match";
   const SoundBankAsset bank{.instruments = {addressMatch, exactMatch, addressMatch, exactMatch}};
 
-  for (const u32 mode : {0, 1, 2}) {
+  for (const u32 mode : {0, 1, 2, 3}) {
     InstrumentPerformanceEvent selection{.header = eventHeader(0, 0), .program = 5};
-    if (mode != 2) {
+    if (mode < 2) {
       selection.sourceInstrument =
           InstrumentIdentity{.domain = mode == 0 ? "dynamic-envelope-test" : "missing", .key = 5};
     }
@@ -84,15 +84,19 @@ void instrumentSelectionPreservesIdentityAndFallbackPolicies() {
         EnvelopePerformanceEvent{
             .header = eventHeader(0, 1),
             .update = EnvelopeUpdate::set(Envelope{.attackSeconds = 0.25}, EnvelopeFields::Attack)},
-        NotePerformanceEvent{.header = eventHeader(0, 2), .key = 60, .durationTicks = 4, .note = PerformanceNoteId{1}},
+        NotePerformanceEvent{.header = eventHeader(0, 2),
+                             .key = 60,
+                             .durationTicks = 4,
+                             .instrumentAddress = mode == 3 ? std::optional{InstrumentAddress{0, 7}} : std::nullopt,
+                             .note = PerformanceNoteId{1}},
     });
     const std::array<const SoundBankAsset*, 2> inputs{nullptr, &bank};
     const auto selected = selectSynthInstruments(inputs, &performance);
-    const size_t first = mode == 0 ? 1 : 0;
+    const size_t first = mode == 0 || mode == 3 ? 1 : 0;
     expect(selected == std::vector<const Instrument*>{&bank.instruments[first], &bank.instruments[first + 2]},
            "used-instrument filtering must prefer exact identities, fall back to addresses, and retain every match in "
            "bank order");
-    expect(findPerformanceInstrument(selection, inputs) == (mode == 1 ? nullptr : &bank.instruments[first]),
+    expect(findPerformanceInstrument(selection, inputs) == (mode == 1 ? nullptr : &bank.instruments[mode == 0 ? 1 : 0]),
            "ordinary performance lookup must require an exact identity and select only its first match");
 
     std::array banks{bank};
@@ -400,7 +404,7 @@ void variantAddressesRespectExportProjectionsAndExhaustion() {
   // Reserve holes through the MIDI/DLS bank projection, SF2's packed bank,
   // and the exporters' clamped program respectively.
   events.push_back(InstrumentPerformanceEvent{.bank = 129, .program = 0});
-  events.push_back(InstrumentPerformanceEvent{.bank = 512, .program = 0});
+  events.push_back(NotePerformanceEvent{.instrumentAddress = InstrumentAddress{512, 0}});
   events.push_back(InstrumentPerformanceEvent{.bank = 3, .program = 255});
   events.push_back(InstrumentPerformanceEvent{
       .sourceInstrument = InstrumentIdentity{.domain = "dynamic-envelope-test", .key = 0},
