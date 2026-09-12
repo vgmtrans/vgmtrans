@@ -67,6 +67,9 @@ struct SequenceMotionPlan {
 template <typename ValueType>
 class SequenceLinearMotion {
 public:
+  SequenceLinearMotion() = default;
+  explicit SequenceLinearMotion(ValueType current) : current_(current), target_(current) {}
+
   void reset(ValueType current = {}) {
     current_ = current;
     clear();
@@ -196,6 +199,9 @@ enum class SequenceFixedPointRounding {
 template <typename ValueType = s32, unsigned FractionBits = 8>
 class SequenceFixedPointAutomation {
 public:
+  SequenceFixedPointAutomation() = default;
+  explicit SequenceFixedPointAutomation(ValueType rawCurrent) : value_(toFixed(rawCurrent)) {}
+
   static constexpr ValueType kScale = static_cast<ValueType>(1) << FractionBits;
 
   static constexpr ValueType toFixed(ValueType rawValue) {

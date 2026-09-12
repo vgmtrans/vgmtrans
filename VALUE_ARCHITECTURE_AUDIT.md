@@ -1590,6 +1590,20 @@ effects, conflicting flow, source lifetime, and malformed-command coverage
 passes. The full build is warning-free and all 20 CTest targets pass; no test
 code is added.
 
+### Declare motion starting values at construction
+
+Linear and fixed-point motion values accept an initial source value, and
+PerformanceBoundValue inherits those constructors. Eight formats now declare
+their starting volume, pan, and tempo directly instead of resetting freshly
+constructed values. Version-dependent values remain in constructor initializers.
+Remove NinSnes's constructor-only PitchState::reset and zero-depth LFO reset,
+which repeat the member defaults. Prepass and live-motion resets remain intact.
+
+This removes 33 production lines. A temporary sanitized comparison matches
+140,544 constructor/reset scenarios across integer, floating-point, fixed-point,
+and bound motion values. The full build is warning-free and all 20 CTest targets
+pass; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

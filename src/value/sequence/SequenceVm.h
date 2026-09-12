@@ -283,6 +283,7 @@ template <class ValueState>
 class PerformanceBoundValue : public ValueState {
 public:
   using ValueState::begin;
+  using ValueState::ValueState;
 
   void bind(PerformanceAutomationBinding binding) { binding_.replaceWith(std::move(binding)); }
   void interruptAutomationAt(u64 tick) { binding_.interruptAt(tick); }

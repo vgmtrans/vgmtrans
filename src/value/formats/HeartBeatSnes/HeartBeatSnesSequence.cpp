@@ -140,18 +140,13 @@ struct PitchEnvelope {
 };
 
 struct ProgramState {
-  ProgramState() { masterVolume.reset(0xc0); }
-
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> masterVolume;
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> masterVolume{0xc0};
   std::optional<u32> masterVolumeTrack;
   ReverbPerformanceEvent echo{.voiceMask = 0};
 };
 
 struct TrackState {
-  explicit TrackState(const TrackProgram& sourceTrack) : trackNumber(sourceTrack.sourceTrackNumber) {
-    volume.reset(0xff);
-    pan.reset(10);
-  }
+  explicit TrackState(const TrackProgram& sourceTrack) : trackNumber(sourceTrack.sourceTrackNumber) {}
 
   u32 trackNumber;
   u8 noteLength = 0x10;
@@ -164,8 +159,8 @@ struct TrackState {
 
   PerformanceNoteId lastNote;
   std::optional<double> lastKey;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan;
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume{0xff};
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan{10};
 
   VibratoState vibrato;
   TremoloConfig tremolo;

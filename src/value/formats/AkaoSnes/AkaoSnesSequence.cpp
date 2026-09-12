@@ -878,11 +878,7 @@ struct PitchEnvelopeState {
 struct TrackState {
   TrackState(const SequenceProgram&, const TrackProgram& track, const RuntimeConfig& config)
       : sourceTrack(track), trackNumber(track.sourceTrackNumber), pan8Bit(akaoSnesUses8BitPan(config.profile)),
-        v1Envelope(config.v1VolumeEnvelopes ? &*config.v1VolumeEnvelopes : nullptr) {
-    volume.reset(0xff);
-    pan.reset(0x80);
-    tempoState.reset(kDefaultTempo);
-  }
+        v1Envelope(config.v1VolumeEnvelopes ? &*config.v1VolumeEnvelopes : nullptr) {}
 
   [[nodiscard]] bool pitchBendAtRest() const {
     return currentPitchBendRangeCents == kDefaultPitchBendRangeCents && currentPitchBendValue == 0;
@@ -985,9 +981,9 @@ struct TrackState {
   u8 tempo = kDefaultTempo;
   bool pan8Bit = true;
   bool sharedTempoApplied = false;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> tempoState;
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume{0xff};
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan{0x80};
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> tempoState{kDefaultTempo};
   AkaoSnesV1EnvelopeState v1Envelope;
   std::optional<u64> lastTieableNoteTick;
   std::optional<u64> pitchAutomationStopTick;
