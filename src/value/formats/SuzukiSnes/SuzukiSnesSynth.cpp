@@ -135,7 +135,7 @@ void addMelodicInstruments(InstrumentSetBuilder& instruments, const std::vector<
 
 void addDrumKit(InstrumentSetBuilder& instruments, const SequenceRecipes& recipes, const std::vector<Patch>& patches,
                 const SnesBrrSampleRefs& samples) {
-  std::optional<InstrumentSetBuilder::Entry> kit;
+  InstrumentSetBuilder::Entry kit;
   for (const DrumSlot& drum : recipes.drums) {
     if (drum.note > 127 - kDrumKeyBias || drum.volume > 0x7f) {
       instruments.warning("Drum row has an out-of-range key or volume", drum.source);
@@ -158,15 +158,14 @@ void addDrumKit(InstrumentSetBuilder& instruments, const SequenceRecipes& recipe
 
     const u8 outputKey = static_cast<u8>(drum.note + kDrumKeyBias);
     const double root = unityKey(patch->tuning) + outputKey - drum.sourceKey;
-    (*kit)
-        .region(*sample,
-                Region{
-                    .keyRange = KeyRange{.low = outputKey, .high = outputKey},
-                    .unityKey = root,
-                    .envelope = snesDspEnvelope(patch->adsr1, patch->adsr2, 0),
-                    .pan = drum.pan / 256.0,
-                    .attenuationDb = attenuation(drum.volume),
-                })
+    kit.region(*sample,
+               Region{
+                   .keyRange = KeyRange{.low = outputKey, .high = outputKey},
+                   .unityKey = root,
+                   .envelope = snesDspEnvelope(patch->adsr1, patch->adsr2, 0),
+                   .pan = drum.pan / 256.0,
+                   .attenuationDb = attenuation(drum.volume),
+               })
         .source(fmt::format("Drum {}", drum.note), drum.source, "suzuki-snes-drum-region")
         .description(
             fmt::format("Program {}, source key {}, SRCN {}", drum.sourceProgram, drum.sourceKey, patch->srcn));
