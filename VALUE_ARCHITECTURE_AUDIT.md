@@ -1604,6 +1604,23 @@ This removes 33 production lines. A temporary sanitized comparison matches
 and bound motion values. The full build is warning-free and all 20 CTest targets
 pass; no test code is added.
 
+### Track MIDI controller values on the channel
+
+Volume, expression, and pan duplicate suppression now uses the last value
+written to the MIDI channel. Separate caches per automation could suppress a
+necessary sample after an intervening source write changed that controller.
+Every write now updates channel state; ordinary source commands still force
+their repeated writes to survive. Pan simulation also avoids redundant
+quantized volume updates when its gain compensation changes.
+
+Remove the automation-controller map, its helper type, two forwarding helpers,
+and the separate volume-emitted flag. This removes 31 production lines. The
+existing controller fixture now uses the emitter and checks restoration after
+interleaved writes; it is 46 lines shorter despite covering the regression.
+The regression fails before the fix. The full build is warning-free and all
+20 CTest targets pass, including seven/fourteen-bit resolution and pan/LFO
+coverage.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

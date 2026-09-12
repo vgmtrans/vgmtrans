@@ -889,102 +889,56 @@ void performanceMidiRendererLowersStructuredScalarAutomationPoints() {
 }
 
 void performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates() {
-  const PerformanceSequence performance{
-      .timebase = Timebase{.ppqn = 48},
-      .tracks = {PerformanceTrack{
-          .id = TrackId{0},
-          .endTick = 4,
-          .events =
-              {
-                  LevelPerformanceEvent{
-                      .header =
-                          PerformanceEventHeader{.tick = 0, .sequence = 0, .automation = PerformanceAutomationId{0}},
-                      .linearGain = 0.5,
-                  },
-                  LevelPerformanceEvent{
-                      .header =
-                          PerformanceEventHeader{.tick = 1, .sequence = 1, .automation = PerformanceAutomationId{0}},
-                      .linearGain = 0.5,
-                  },
-                  ExpressionPerformanceEvent{
-                      .header =
-                          PerformanceEventHeader{.tick = 0, .sequence = 2, .automation = PerformanceAutomationId{1}},
-                      .linearGain = 0.75,
-                  },
-                  ExpressionPerformanceEvent{
-                      .header =
-                          PerformanceEventHeader{.tick = 2, .sequence = 3, .automation = PerformanceAutomationId{1}},
-                      .linearGain = 0.75,
-                  },
-                  PanPerformanceEvent{
-                      .header =
-                          PerformanceEventHeader{.tick = 0, .sequence = 4, .automation = PerformanceAutomationId{2}},
-                      .stereoPosition = 0.0,
-                      .law = PanLaw::EqualPower,
-                  },
-                  PanPerformanceEvent{
-                      .header =
-                          PerformanceEventHeader{.tick = 3, .sequence = 5, .automation = PerformanceAutomationId{2}},
-                      .stereoPosition = 0.0,
-                      .law = PanLaw::EqualPower,
-                  },
-              },
-          .automations =
-              {
-                  PerformanceAutomation{
-                      .id = PerformanceAutomationId{0},
-                      .intent =
-                          ScalarPerformanceAutomationIntent{
-                              .target = PerformanceAutomationTarget::Level,
-                          },
-                  },
-                  PerformanceAutomation{
-                      .id = PerformanceAutomationId{1},
-                      .intent =
-                          ScalarPerformanceAutomationIntent{
-                              .target = PerformanceAutomationTarget::Expression,
-                          },
-                  },
-                  PerformanceAutomation{
-                      .id = PerformanceAutomationId{2},
-                      .intent =
-                          ScalarPerformanceAutomationIntent{
-                              .target = PerformanceAutomationTarget::Pan,
-                          },
-                  },
-              },
-      }},
-  };
+  PerformanceTrack track{.id = TrackId{0}, .endTick = 4};
+  u64 nextSequence = 0;
+  u32 nextNote = 0;
+  u32 nextAutomation = 0;
+  PerformanceEmitter out{track,        CommandId{1}, SourceAnnotationId{2}, 0,
+                         nextSequence, nextNote,     nextAutomation,        PanLaw::EqualPower};
+  const auto level = out.fade(PerformanceAutomationTarget::Level, 0.5, 1);
+  level.output(out).level(0.5);
+  level.at(out, 1).level(0.5);
+  const auto expression = out.fade(PerformanceAutomationTarget::Expression, 0.75, 2);
+  expression.output(out).expression(0.75);
+  expression.at(out, 2).expression(0.75);
+  const auto pan = out.fade(PerformanceAutomationTarget::Pan, 0.0, 3);
+  pan.output(out).pan(0.0);
+  pan.at(out, 3).pan(0.0);
 
-  const MidiSequence midi = renderMidiSequence(performance);
-  expect(std::ranges::count_if(
-             midi.tracks[0].events,
-             [](const MidiEvent& event) { return isMidiController(event, MidiController::ChannelVolume); }) == 1 &&
-             std::ranges::count_if(
-                 midi.tracks[0].events,
-                 [](const MidiEvent& event) { return isMidiController(event, MidiController::Expression); }) == 1 &&
-             std::ranges::count_if(
-                 midi.tracks[0].events,
-                 [](const MidiEvent& event) { return isMidiController(event, MidiController::Pan); }) == 1,
-         "automation lowering should suppress repeated quantized volume, expression, and pan values");
+  for (const bool interveningWrites : {false, true}) {
+    if (interveningWrites) {
+      // These source commands follow the initial samples at tick zero. Each
+      // automation must restore its value when its next sample arrives.
+      out.level(0.25);
+      out.expression(0.25);
+      out.pan(1.0);
+    }
+    PerformanceSequence performance{.timebase = {.ppqn = 48}, .tracks = {track}};
+    const auto midi = renderMidiSequence(performance);
+    for (const auto controller : {MidiController::ChannelVolume, MidiController::Expression, MidiController::Pan}) {
+      expect(std::ranges::count_if(midi.tracks[0].events,
+                                   [=](const MidiEvent& event) { return isMidiController(event, controller); }) ==
+                 (interveningWrites ? 3 : 1),
+             "automation samples must compare against the channel value after any intervening source writes");
+    }
 
-  PerformanceSequence flatPerformance = performance;
-  auto& flatTrack = flatPerformance.tracks.front();
-  for (auto& event : flatTrack.events) {
-    std::visit([](auto& typed) { typed.header.automation.reset(); }, event);
+    auto& flatTrack = performance.tracks.front();
+    for (auto& event : flatTrack.events) {
+      std::visit([](auto& typed) { typed.header.automation.reset(); }, event);
+    }
+    flatTrack.automations.clear();
+    const auto flatMidi = renderMidiSequence(performance);
+    if (interveningWrites) {
+      expect(encodeMidiFile(midi) == encodeMidiFile(flatMidi),
+             "interleaved automation and source writes must preserve the exact controller sequence");
+    } else {
+      for (const auto controller : {MidiController::ChannelVolume, MidiController::Expression, MidiController::Pan}) {
+        expect(std::ranges::count_if(flatMidi.tracks[0].events,
+                                     [=](const MidiEvent& event) { return isMidiController(event, controller); }) == 2,
+               "automation deduplication should not remove repeated ordinary performance writes");
+      }
+    }
   }
-  flatTrack.automations.clear();
-  const MidiSequence flatMidi = renderMidiSequence(flatPerformance);
-  expect(std::ranges::count_if(
-             flatMidi.tracks[0].events,
-             [](const MidiEvent& event) { return isMidiController(event, MidiController::ChannelVolume); }) == 2 &&
-             std::ranges::count_if(
-                 flatMidi.tracks[0].events,
-                 [](const MidiEvent& event) { return isMidiController(event, MidiController::Expression); }) == 2 &&
-             std::ranges::count_if(
-                 flatMidi.tracks[0].events,
-                 [](const MidiEvent& event) { return isMidiController(event, MidiController::Pan); }) == 2,
-         "automation deduplication should not remove repeated writes from ordinary performance events");
 }
 
 void performanceMidiRendererSuppressesRedundantReverbSends() {
