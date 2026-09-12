@@ -167,8 +167,7 @@ struct TrackState {
   std::optional<double> tieKey;
   double tieVelocity = 1.0;
   std::array<u8, 16> repeatOctave{};
-  std::array<u8, 16> repeatEndOctave{};
-  std::array<bool, 16> repeatEndKnown{};
+  std::array<std::optional<u8>, 16> repeatEndOctave{};
   u8 repeatPointOctave = 3;
 };
 
@@ -327,12 +326,11 @@ struct Playback {
 
   void beginRepeat(u8 slot) {
     track.repeatOctave[slot] = track.octave;
-    track.repeatEndKnown[slot] = false;
+    track.repeatEndOctave[slot].reset();
   }
 
   Effects endRepeat(u8 slot, u32 plays, Address start) {
-    if (!track.repeatEndKnown[slot]) {
-      track.repeatEndKnown[slot] = true;
+    if (!track.repeatEndOctave[slot]) {
       track.repeatEndOctave[slot] = track.octave;
     }
     Effects effects = vm.countedRepeatUntil(slot, plays, start);
@@ -344,8 +342,8 @@ struct Playback {
 
   Effects repeatBreak(u8 slot, Address destination) {
     const Effects effects = vm.countedRepeatBreak(slot, destination);
-    if (effects.flowOverride && track.repeatEndKnown[slot]) {
-      track.octave = track.repeatEndOctave[slot];
+    if (effects.flowOverride && track.repeatEndOctave[slot]) {
+      track.octave = *track.repeatEndOctave[slot];
     }
     return effects;
   }
