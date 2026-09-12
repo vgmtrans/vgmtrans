@@ -117,11 +117,6 @@ struct TrackState {
   bool initialized = false;
 };
 
-struct ProgramState {
-  explicit ProgramState(const RuntimeConfig& config) : programs(config.programs) {}
-  std::vector<ProgramRuntimeInfo> programs;
-};
-
 [[nodiscard]] double linearMidi7(u8 value) {
   return std::min<u8>(value, 127) / 127.0;
 }
@@ -168,13 +163,13 @@ struct Playback {
   TrackState& track;
   PerformanceEmitter& out;
   VmApi& vm;
-  ProgramState& programState;
+  const RuntimeConfig& config;
 
   [[nodiscard]] const ProgramRuntimeInfo* selectedProgram() const {
-    const auto found = std::ranges::find_if(programState.programs, [&](const ProgramRuntimeInfo& candidate) {
+    const auto found = std::ranges::find_if(config.programs, [&](const ProgramRuntimeInfo& candidate) {
       return candidate.bank == track.bank && candidate.program == track.program;
     });
-    return found == programState.programs.end() ? nullptr : &*found;
+    return found == config.programs.end() ? nullptr : &*found;
   }
 
   [[nodiscard]] TrackState::ActiveNote bendRangeForKey(u8 key) const {
@@ -1076,7 +1071,7 @@ const SequenceProgramConfig& sequenceConfig() {
 }
 
 SequenceRuntime sequenceRuntime(RuntimeConfig config) {
-  return makeCompiledRuntime<Cursor, ProgramState>(std::move(config));
+  return makeCompiledRuntime<Cursor, RuntimeConfig>(std::move(config));
 }
 
 SequenceProgram parseMidiSequence(ByteReader reader, AssetId id, const MidiBlockLayout& layout,

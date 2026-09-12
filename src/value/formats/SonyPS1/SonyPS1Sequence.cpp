@@ -29,13 +29,6 @@ struct RuntimeConfig {
   u8 denominator = 4;
 };
 
-struct ProgramState {
-  explicit ProgramState(const RuntimeConfig& config) : numerator(config.numerator), denominator(config.denominator) {}
-
-  u8 numerator = 4;
-  u8 denominator = 4;
-};
-
 struct TrackState {
   explicit TrackState(const TrackProgram& program)
       : channel(static_cast<u8>(program.sourceTrackNumber)), program(static_cast<u8>(program.sourceTrackNumber)) {}
@@ -68,7 +61,7 @@ struct Playback {
   TrackState& track;
   PerformanceEmitter& out;
   VmApi& vm;
-  ProgramState& programState;
+  const RuntimeConfig& config;
 
   void beforeCommand() {
     if (track.initialized) {
@@ -77,7 +70,7 @@ struct Playback {
     track.initialized = true;
     out.instrument(sonyPs1InstrumentIdentity(track.bank, track.program));
     if (track.channel == 0) {
-      out.timeSignature(programState.numerator, programState.denominator, 24);
+      out.timeSignature(config.numerator, config.denominator, 24);
     }
   }
 
@@ -322,7 +315,7 @@ SequenceProgram parseSonyPs1Sequence(ByteReader reader, AssetId id, const SonyPs
   program.timebase.ppqn = layout.ppqn;
   program.behavior.initialTempoMicrosecondsPerQuarter = layout.initialTempo;
   const bool rhythmSpecified = layout.rhythmNumerator != 0;
-  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{
+  program.runtime = makeCompiledRuntime<Cursor, RuntimeConfig>(RuntimeConfig{
       .numerator = rhythmSpecified ? layout.rhythmNumerator : u8{4},
       .denominator = rhythmSpecified ? static_cast<u8>(1u << layout.rhythmDenominatorPower) : u8{4},
   });
