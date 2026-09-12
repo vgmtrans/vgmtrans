@@ -1842,6 +1842,23 @@ stream and checks that it has no sample link; that assertion failed before
 the fix. Test code grows by 14 lines overall. The full build is warning-free
 and all 20 CTest targets pass.
 
+## Resolve synth sample requests in one table
+
+Synth preparation now keeps one table from requested sample variants to
+optional decoded indexes. Decoding fills each existing entry directly instead
+of maintaining a separate requirement set and inserting the same keys into
+another index map. Failed requests retain an empty index; every region's key
+is present by construction. This removes one container type and the second
+insertion path without changing the public model; line count grows by one.
+
+A temporary comparison matches all prepared sample values, region indexes,
+modulation, and diagnostics in 3,072 before/after scenarios covering selection,
+filtering, missing sources/pools, rejected codecs, mono restrictions, duplicate
+owners, phase inversion, and sample-start trimming. Both implementations run
+under AddressSanitizer and UBSan. The harness is not committed; existing synth
+regressions cover the retained behavior. The full build is warning-free and
+all 20 CTest targets pass. No test code was added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
