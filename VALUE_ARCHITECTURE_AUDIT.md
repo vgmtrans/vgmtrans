@@ -1654,6 +1654,21 @@ cover side effects on the final pass, finite branches to previously visited
 commands, and format repeat behavior. The full build is warning-free and all
 20 CTest targets pass.
 
+### Keep live and saved track positions in one value
+
+The executor and synchronized-loop checkpoints now use the same TrackPosition:
+command index, pending time, tick callback source, and delayed-command state.
+Saving and restoring copies that value directly, removing a second field list
+and manual synchronization. Section changes reset the position as a whole;
+format state, call/repeat state, and the advancing clock retain their existing
+boundary rules.
+
+This removes eight production lines. A temporary before/after comparison matches
+3,456 scenarios spanning checkpoint offsets, waits, delayed commands, tick
+callbacks, and loop counts (trace digest 76111302ff6e9327). Existing section and
+HOSA loop tests pass. The full build is warning-free and all 20 CTest targets
+pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
