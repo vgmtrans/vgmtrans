@@ -7,7 +7,7 @@
 #include "value/formats/HeartBeatSnes/HeartBeatSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
@@ -168,10 +168,7 @@ struct TrackState {
   u8 repeatCount = 0;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   [[nodiscard]] LfoPerformanceContext vibratoContext() const {
@@ -486,7 +483,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] Address readRelativeTarget(Cursor::Event& event, u32 sequenceBase, SemanticOperandRole role) {
   const u16 relative = event.u16le("relative", SourceValueDisplay::Address, role);
@@ -760,7 +757,7 @@ const SequenceProgramConfig& sequenceConfig() {
 }
 
 SequenceRuntime sequenceRuntime() {
-  return makeCompiledRuntime<Cursor, ProgramState>();
+  return makeCompiledRuntime<Playback, ProgramState>();
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, Version version, u32 trackNumber, u32 startAddress, u32 sequenceBase,

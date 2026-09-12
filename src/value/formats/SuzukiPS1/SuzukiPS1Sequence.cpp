@@ -8,7 +8,7 @@
 
 #include "value/base/LevelScale.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/PsxSpu.h"
 
@@ -165,10 +165,7 @@ struct TrackState {
   u8 repeatPointOctave = 3;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   const RuntimeConfig& config;
 
   void beforeCommand() {
@@ -343,7 +340,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end, const TrackLayout& layout,
                                                    std::vector<Diagnostic>* diagnostics) {
@@ -661,7 +658,7 @@ SequenceProgram parseSuzukiPs1Sequence(ByteReader reader, AssetId id, const Suzu
   for (u32 i = 0; i < layout.trackAddresses.size(); ++i) {
     sequence.addTrack(decodeTrack(sequence.trackScope(), i, layout.trackAddresses[i], diagnostics));
   }
-  return sequence.finish(makeCompiledRuntime<Cursor, RuntimeConfig>(
+  return sequence.finish(makeCompiledRuntime<Playback, RuntimeConfig>(
       RuntimeConfig{.defaultBank = layout.defaultBank, .envelopes = envelopes}));
 }
 

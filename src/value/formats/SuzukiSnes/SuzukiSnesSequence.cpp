@@ -7,7 +7,7 @@
 #include "value/formats/SuzukiSnes/SuzukiSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
 
@@ -349,10 +349,7 @@ struct TrackState {
   PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan{0x80};
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   [[nodiscard]] u32 soundingTicks(u32 length) const {
@@ -630,7 +627,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, Version version,
                                                    const TrackLayout& layout, std::vector<Diagnostic>* diagnostics) {
@@ -955,7 +952,7 @@ const SequenceProgramConfig& sequenceConfig() {
 }
 
 SequenceRuntime sequenceRuntime(Version version) {
-  return makeCompiledRuntime<Cursor, ProgramState>(version);
+  return makeCompiledRuntime<Playback, ProgramState>(version);
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, Version version, u32 trackNumber, u32 startAddress,

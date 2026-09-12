@@ -8,7 +8,7 @@
 
 #include "value/base/RecordReader.h"
 #include "value/sequence/BytecodeDecode.h"
-#include "value/sequence/SequenceVm.h"
+#include "value/sequence/CompiledCommandRuntime.h"
 
 #include <algorithm>
 #include <functional>
@@ -115,10 +115,9 @@ void emitEnvelopeField(Playback& playback, double value, VoiceEnvelopeScope scop
 // CompilerCursor gives formats one imperative command block. Reads add source
 // metadata immediately; event operations compose one typed executable body for
 // later, source-free SequenceVm execution.
-template <class TrackStateType, class PlaybackType>
+template <class PlaybackType>
 class CompilerCursor {
 public:
-  using TrackState = TrackStateType;
   using Playback = PlaybackType;
 
   class Event {

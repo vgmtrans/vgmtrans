@@ -8,7 +8,7 @@
 
 #include "value/base/LevelScale.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
@@ -100,11 +100,7 @@ struct TrackState {
 
 // Playback holds the few runtime services shared by several commands. One-off
 // behavior stays beside the opcode that invokes it below.
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
-
+struct Playback : SequencePlayback<TrackState> {
   void instrument(u32 bank, u32 program) { out.instrument(bank, program, true); }
 
   [[nodiscard]] u32 consumeDelta(u32 encodedDelta, u32 fallbackDelta) {
@@ -163,7 +159,7 @@ struct Playback {
   }
 };
 
-using AkaoCursor = CompilerCursor<TrackState, Playback>;
+using AkaoCursor = CompilerCursor<Playback>;
 using AkaoEvent = AkaoCursor::Event;
 
 [[nodiscard]] AkaoEvent subCommand(AkaoCursor& cursor, std::string_view label, SequenceSemantic semantic) {
@@ -883,7 +879,7 @@ SequenceProgramConfig makeAkaoConfig(AkaoPs1Version version) {
 }
 
 SequenceRuntime akaoSequenceRuntime() {
-  return makeCompiledRuntime<AkaoCursor>();
+  return makeCompiledRuntime<Playback>();
 }
 
 namespace {

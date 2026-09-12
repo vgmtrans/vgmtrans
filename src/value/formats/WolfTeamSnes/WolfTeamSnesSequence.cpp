@@ -8,7 +8,7 @@
 #include "value/formats/WolfTeamSnes/WolfTeamSnesGrammar.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/synth/SnesDsp.h"
 
 #include <fmt/format.h>
@@ -294,10 +294,7 @@ struct NotePitch {
   double tuningCents = 0.0;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   void beforeCommand() {
@@ -658,7 +655,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] DecodedBytecodeCommand decodeLateCommand(ByteReader reader, u32 begin, const Layout& layout,
                                                        std::vector<Diagnostic>* diagnostics) {
@@ -1084,7 +1081,7 @@ SequenceProgram decodeSequence(ByteReader reader, const Layout& layout, AssetId 
     }
     sequence.addTrack(decodeTrack(tracks, layout, channel, diagnostics));
   }
-  return sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime)));
+  return sequence.finish(makeCompiledRuntime<Playback, ProgramState>(std::move(runtime)));
 }
 
 }  // namespace vgmtrans::formats::wolf_team_snes

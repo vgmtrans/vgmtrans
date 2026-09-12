@@ -7,7 +7,7 @@
 #include "value/formats/ChunSnes/ChunSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
 
@@ -318,10 +318,7 @@ struct TrackState {
   TimedScriptCursor gainEnvelope;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   void beforeCommand() {
@@ -724,7 +721,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] Address relativeTarget(s16 relative, u32 continuation) {
   return Address{static_cast<u32>(continuation + relative) & 0xffff};
@@ -982,7 +979,7 @@ SequenceProgram decodeSequence(RetainedSource source, const Layout& layout, Asse
   }
   const u8 initialTempo = reader.u8At(layout.sequenceHeaderAddress);
   SequenceProgram program =
-      sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(DriverData{std::move(source), layout, initialTempo}));
+      sequence.finish(makeCompiledRuntime<Playback, ProgramState>(DriverData{std::move(source), layout, initialTempo}));
   program.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicroseconds(initialTempo);
   return program;
 }

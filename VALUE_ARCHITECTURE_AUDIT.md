@@ -2051,11 +2051,48 @@ of 395 scanned sequence ranges across 36 formats matched the previous output
 exactly; its capture hook and outputs remain outside committed source. This is
 fixture coverage, not real-file corpus parity.
 
+## Share playback context and bind runtimes directly to Playback
+
+SequencePlayback provides the borrowed track, emitter, and VM references used
+by compiled format methods. Its TrackState alias supplies the runtime's state
+factory type. Thirty-nine playback implementations across 37 formats now name
+that context once instead of repeating its fields and repeating the state type
+again in their compiler cursor. Typical declarations become:
+
+```cpp
+struct Playback : SequencePlayback<TrackState> { /* driver methods */ };
+using Cursor = CompilerCursor<Playback>;
+// Supply ProgramState only when the format needs song-wide state.
+auto runtime = makeCompiledRuntime<Playback, ProgramState>(config);
+```
+
+Runtime creation and runtime-family identity now depend on Playback and
+ProgramState directly. CompilerCursor no longer carries a runtime state type,
+and Mori's sound effects no longer need a synthetic cursor type merely to
+construct their runtime. The runtime header no longer includes the compiler;
+CompilerCursor supplies the combined compiler/runtime authoring surface.
+
+The shared context owns no state and introduces no allocation. The adapter
+still borrows optional program state and refreshes its emitter/VM references
+for commands, wait polling, and ticks. HOSA explicitly names its VM handle type
+and resolves it into program-owned playback state in its constructor. Akao SNES
+keeps its profile reference, and Prism's child playback uses the same context.
+
+Verification: the warning-free full build and all 20 CTest targets passed,
+including existing state-factory, prepass, polling, playback, and runtime-family
+checks. A temporary standalone compilation confirmed that the runtime header
+needs neither CompilerCursor, BytecodeDecode, nor RecordReader. No new tests
+were added; adapting the existing fixtures removes 15 test lines. Production
+code is 117 lines smaller.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding
   setup, source metadata handoffs, and repeated scan-to-playback preparation.
   Continue checking export lowering and instrument selection for redundant work.
+- Static instrument discovery can include every reachable bytecode branch,
+  while recipe analysis may depend on executed driver state. Preserve that
+  distinction when considering a shared replacement for format reference sets.
 - Five formats copy a decoded stream into several playback tracks. Sharing
   those commands must retain each channel's independent VM state and the
   TrackId mapping used by source-command lookup; merely hiding the copy loop

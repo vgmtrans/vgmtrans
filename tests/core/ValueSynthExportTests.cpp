@@ -1259,19 +1259,12 @@ struct PreparedProbeProgramState {
 
 struct ForeignRuntimeTrackState {};
 
-struct ForeignRuntimePlayback {
-  ForeignRuntimePlayback(ForeignRuntimeTrackState&, PerformanceEmitter&, VmApi&) {}
-};
-
-struct ForeignRuntimeCursor {
-  using TrackState = ForeignRuntimeTrackState;
-  using Playback = ForeignRuntimePlayback;
-};
+struct ForeignRuntimePlayback : SequencePlayback<ForeignRuntimeTrackState> {};
 
 void bindPerformanceRuntime(CollectionBindingContext& context) {
   const auto* sequence = context.sequence;
   const bool fail = sequence != nullptr && sequence->metadata.name == "Failing Sequence";
-  if (!context.replaceSequenceRuntime(makeCompiledRuntime<ProbeCompilerCursor, PreparedProbeProgramState>(fail))) {
+  if (!context.replaceSequenceRuntime(makeCompiledRuntime<ProbePlayback, PreparedProbeProgramState>(fail))) {
     return;
   }
   context.warning("Collection binding warning");
@@ -1291,7 +1284,7 @@ void collectionBindingAppliesToWholeExport() {
       .metadata = AssetMetadata{.id = AssetId{0}, .format = "Performance Finalizer", .name = "Sequence"},
       .program =
           SequenceProgram{
-              .runtime = makeCompiledRuntime<ProbeCompilerCursor, PreparedProbeProgramState>(false),
+              .runtime = makeCompiledRuntime<ProbePlayback, PreparedProbeProgramState>(false),
               .timebase = config.timebase,
               .behavior = config.behavior,
               .tracks = {track},
@@ -1343,7 +1336,7 @@ void collectionBindingAppliesToWholeExport() {
   mismatchedCollection.id = CollectionId{2};
   mismatchedCollection.key->value = "runtime-mismatch";
   mismatchedCollection.binder = [](CollectionBindingContext& context) {
-    if (!context.replaceSequenceRuntime(makeCompiledRuntime<ForeignRuntimeCursor>())) {
+    if (!context.replaceSequenceRuntime(makeCompiledRuntime<ForeignRuntimePlayback>())) {
       return;
     }
   };

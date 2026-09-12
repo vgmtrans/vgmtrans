@@ -8,7 +8,7 @@
 
 #include "value/base/LevelScale.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 
@@ -225,10 +225,7 @@ struct SequenceState {
   double nmiRateHertz = 0.0;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   SequenceState& sequence;
 
   [[nodiscard]] bool isGx() const { return track.version == KonamiArcadeVersion::Gx; }
@@ -781,7 +778,7 @@ struct Playback {
   }
 };
 
-using KonamiArcadeCursor = CompilerCursor<TrackState, Playback>;
+using KonamiArcadeCursor = CompilerCursor<Playback>;
 
 [[nodiscard]] Address readDestination(KonamiArcadeCursor::Event& event, const KonamiArcadeLayout& layout,
                                       const KonamiArcadeSequenceLayout& sequence, SemanticOperandRole role,
@@ -1179,7 +1176,7 @@ SequenceProgram decodeKonamiArcadeSequence(ByteReader reader, const KonamiArcade
   }
 
   return sequence.finish(
-      makeCompiledRuntime<KonamiArcadeCursor, SequenceState>(TrackState::RuntimeConfig{.version = layout.version}));
+      makeCompiledRuntime<Playback, SequenceState>(TrackState::RuntimeConfig{.version = layout.version}));
 }
 
 }  // namespace vgmtrans::formats::konami_arcade

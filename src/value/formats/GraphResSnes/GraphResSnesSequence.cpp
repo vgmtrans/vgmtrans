@@ -7,7 +7,7 @@
 #include "value/formats/GraphResSnes/GraphResSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/synth/SnesDsp.h"
 
 #include <algorithm>
@@ -167,10 +167,7 @@ struct TrackState {
   std::optional<double> lastPitchBend;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   // The fade keeps fractional progress in its low byte. Subtract its whole
@@ -585,7 +582,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 // Jump commands store a signed distance from the command itself, not a full
 // address. Addresses wrap around at the end of the sound processor's memory.
@@ -764,7 +761,7 @@ SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetI
         [&](u32 offset) { return decodeCommand(reader, offset, layout, diagnostics, &programs); }, track.startAddress);
   }
   SequenceProgram program = sequence.finish(
-      makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{.source = std::move(source), .layout = layout}));
+      makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{.source = std::move(source), .layout = layout}));
   return SequenceParse{.program = std::move(program), .programs = std::move(programs)};
 }
 

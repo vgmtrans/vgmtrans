@@ -8,7 +8,7 @@
 
 #include "value/base/LevelScale.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 
 #include <algorithm>
 #include <array>
@@ -277,11 +277,7 @@ struct TrackState {
   std::optional<Address> foreverLoopStart;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
-
+struct Playback : SequencePlayback<TrackState> {
   [[nodiscard]] Effects afterEvent(u16 delta) {
     Effects effects = Effects::wait(delta);
     if (track.remainingLoopEvents != 0 && --track.remainingLoopEvents == 0) {
@@ -408,7 +404,7 @@ struct Playback {
   }
 };
 
-using SegSatCursor = CompilerCursor<TrackState, Playback>;
+using SegSatCursor = CompilerCursor<Playback>;
 
 struct DecodedControllerChange {
   Address address;
@@ -549,7 +545,7 @@ struct DecodedControllerChange {
 }  // namespace
 
 SequenceRuntime segSatSequenceRuntime(SegSatRuntimeConfig config) {
-  return makeCompiledRuntime<SegSatCursor, ProgramState>(std::move(config));
+  return makeCompiledRuntime<Playback, ProgramState>(std::move(config));
 }
 
 double segSatLinearGain(SegSatVolumeModel model, u8 velocity, const SegSatVlTable& table, u8 totalLevel, s8 volumeBias,
@@ -732,7 +728,7 @@ SegSatSequenceParse parseSegSatSequence(ByteReader reader, AssetId id, const Seg
     copy.sourceTrackNumber = channel;
     program.tracks.push_back(std::move(copy));
   }
-  program.runtime = makeCompiledRuntime<SegSatCursor, ProgramState>();
+  program.runtime = makeCompiledRuntime<Playback, ProgramState>();
 
   if (sourceMap != nullptr && header) {
     sourceMap

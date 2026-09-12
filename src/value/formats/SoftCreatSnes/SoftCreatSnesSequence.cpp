@@ -7,7 +7,7 @@
 #include "value/formats/SoftCreatSnes/SoftCreatSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 
 #include <algorithm>
 #include <array>
@@ -212,10 +212,7 @@ struct TrackState {
   PerformanceAutomationBinding gainAutomation;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   [[nodiscard]] u8 voiceBit() const { return static_cast<u8>(1u << std::min<u32>(track.trackNumber, 7)); }
@@ -808,7 +805,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 struct DecodeState {
   u8 defaultDuration = 0;
@@ -1298,7 +1295,7 @@ const SequenceProgramConfig& sequenceConfig() {
 }
 
 SequenceRuntime sequenceRuntime(RetainedSource source, const Layout& layout) {
-  return makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{.source = std::move(source), .layout = layout});
+  return makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{.source = std::move(source), .layout = layout});
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, u32 trackNumber, u32 startAddress,

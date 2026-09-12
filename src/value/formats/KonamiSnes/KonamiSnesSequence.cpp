@@ -9,7 +9,7 @@
 #include "value/base/LevelScale.h"
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
@@ -448,10 +448,7 @@ struct TrackState {
 };
 
 // History-dependent driver behavior stays close to the opcode switch below.
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   void note(u8 key, u8 sourceVelocity) {
@@ -1137,7 +1134,7 @@ private:
   }
 };
 
-using KonamiCursor = CompilerCursor<TrackState, Playback>;
+using KonamiCursor = CompilerCursor<Playback>;
 
 // Pitch slides can be standalone commands or an immediate suffix of a note or
 // rest. This reads the version-specific suffix once into the containing event.
@@ -1609,7 +1606,7 @@ const SequenceProgramConfig& konamiSnesSequenceConfig(KonamiSnesVersion version)
 }
 
 SequenceRuntime konamiSnesSequenceRuntime(KonamiSnesVersion version, bool indexedEchoFilter) {
-  return makeCompiledRuntime<KonamiCursor, ProgramState>(
+  return makeCompiledRuntime<Playback, ProgramState>(
       RuntimeConfig{.version = version, .indexedEchoFilter = indexedEchoFilter});
 }
 
@@ -1677,7 +1674,7 @@ SequenceProgram decodeKonamiSnesSequence(ByteReader reader, const KonamiSnesLayo
       .indexedEchoFilter = layout.indexedEchoFilter,
       .instruments = instruments,
   };
-  return sequence.finish(makeCompiledRuntime<KonamiCursor, ProgramState>(std::move(runtime)));
+  return sequence.finish(makeCompiledRuntime<Playback, ProgramState>(std::move(runtime)));
 }
 
 }  // namespace vgmtrans::formats::konami_snes

@@ -10,7 +10,7 @@
 #include "value/formats/NDS/NdsEnvelope.h"
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 
 #include <algorithm>
 #include <cmath>
@@ -78,10 +78,7 @@ struct TrackState {
 
 // Only driver behavior that depends on runtime track history needs a method.
 // Ordinary commands compile directly to VM actions in decodeCommand below.
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   void tie(bool enabled) {
@@ -309,7 +306,7 @@ struct Playback {
   }
 };
 
-using NdsCompilerCursor = CompilerCursor<TrackState, Playback>;
+using NdsCompilerCursor = CompilerCursor<Playback>;
 
 // NDS-specific decode state stays beside the shared track-discovery service.
 // Relative addresses and malformed-range policy are SSEQ semantics, not generic
@@ -714,7 +711,7 @@ const SequenceProgramConfig& ndsSequenceConfig() {
 }
 
 SequenceRuntime ndsSequenceRuntime() {
-  return makeCompiledRuntime<NdsCompilerCursor, ProgramState>();
+  return makeCompiledRuntime<Playback, ProgramState>();
 }
 
 // Creates the sequence program, describes its header, and decodes all tracks

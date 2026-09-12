@@ -8,7 +8,7 @@
 
 #include "value/base/LevelScale.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
@@ -57,10 +57,7 @@ struct PanGains {
   return PanGains{.left = left * left, .right = 1.0};
 }
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   const RuntimeConfig& config;
 
   void beforeCommand() {
@@ -195,7 +192,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] Cursor::Event beginEvent(Cursor& cursor, const SonyPs1EventLayout& source, std::string_view label,
                                        SequenceSemantic semantic,
@@ -315,7 +312,7 @@ SequenceProgram parseSonyPs1Sequence(ByteReader reader, AssetId id, const SonyPs
   program.timebase.ppqn = layout.ppqn;
   program.behavior.initialTempoMicrosecondsPerQuarter = layout.initialTempo;
   const bool rhythmSpecified = layout.rhythmNumerator != 0;
-  program.runtime = makeCompiledRuntime<Cursor, RuntimeConfig>(RuntimeConfig{
+  program.runtime = makeCompiledRuntime<Playback, RuntimeConfig>(RuntimeConfig{
       .numerator = rhythmSpecified ? layout.rhythmNumerator : u8{4},
       .denominator = rhythmSpecified ? static_cast<u8>(1u << layout.rhythmDenominatorPower) : u8{4},
   });

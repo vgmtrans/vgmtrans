@@ -8,7 +8,7 @@
 
 #include "value/formats/NinSnes/NinSnesPatterns.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
 
@@ -205,10 +205,7 @@ struct Slide {
   u8 note = 0;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   void beforeCommand() {
@@ -679,7 +676,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] u16 shortLength(u8 value) {
   return value == 0x7e ? 0x90 : value == 0x7f ? 0xc0 : value;
@@ -1209,7 +1206,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, SectionPla
     program.tracks.push_back(scope.decode(
         track, starts, [&](u32 address) { return decodeCommand(reader, decodeLayout, address, diagnostics); }));
   }
-  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(std::move(config));
+  program.runtime = makeCompiledRuntime<Playback, ProgramState>(std::move(config));
   auto recipes = analyzeCompiledProgram<ProgramState>(program, &ProgramState::recipes, diagnostics);
   return SequenceParse{.program = std::move(program), .recipes = std::move(recipes)};
 }

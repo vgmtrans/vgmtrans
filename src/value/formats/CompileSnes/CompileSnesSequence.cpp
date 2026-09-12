@@ -7,7 +7,7 @@
 #include "value/formats/CompileSnes/CompileSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/synth/SnesDsp.h"
 
 #include <algorithm>
@@ -395,10 +395,7 @@ struct TrackState {
   u8 panAccumulator = 0;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& programState;
 
   [[nodiscard]] const DriverData& data() const { return *programState.data; }
@@ -832,7 +829,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 struct DurationValue {
   u32 ticks = 1;
@@ -1235,7 +1232,7 @@ SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetI
   }
 
   SequenceProgram program =
-      sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(DriverData{std::move(source), layout}));
+      sequence.finish(makeCompiledRuntime<Playback, ProgramState>(DriverData{std::move(source), layout}));
   return SequenceParse{.program = std::move(program), .programs = std::move(programs)};
 }
 

@@ -8,7 +8,7 @@
 #include "value/formats/MoriSnes/MoriSnesVoiceScript.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 
 #include <fmt/format.h>
 
@@ -424,10 +424,7 @@ struct TrackState : DriverConfig {
   u8 repeatDepth = 0;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   [[nodiscard]] u32 clockTicks(u8 raw, bool applyFastMode = true) const {
@@ -864,7 +861,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 struct SfxRuntimeConfig {
   DriverConfig driver;
@@ -878,11 +875,7 @@ struct SfxTrackState : DriverConfig {
   u16 script = 0;
 };
 
-struct SfxPlayback {
-  SfxTrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
-
+struct SfxPlayback : SequencePlayback<SfxTrackState> {
   [[nodiscard]] Effects play() {
     const VoiceScriptAnalysis limits = analyzeVoiceScript(track, track.script);
     const auto emitPan = [&](PerformanceEmitter output, u8 value, bool explicitPan) {
@@ -931,11 +924,6 @@ struct SfxPlayback {
     }
     return {};
   }
-};
-
-struct SfxCursor {
-  using TrackState = SfxTrackState;
-  using Playback = SfxPlayback;
 };
 
 [[nodiscard]] const char* commandLabel(Version version, u8 status) {
@@ -1189,7 +1177,7 @@ SequenceProgramConfig sequenceConfig(DriverTraits traits) {
 }
 
 SequenceRuntime sequenceRuntime(ByteReader reader, const Layout& layout) {
-  return makeCompiledRuntime<Cursor, ProgramState>(DriverConfig{
+  return makeCompiledRuntime<Playback, ProgramState>(DriverConfig{
       .data = reader,
       .traits = layout.traits,
       .presetTable = layout.presetTableAddress,
@@ -1258,14 +1246,15 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
           .commands = {std::move(command)},
       });
     }
-    program.runtime = makeCompiledRuntime<SfxCursor>(SfxRuntimeConfig{
-        .driver = DriverConfig{
-            .data = reader,
-            .traits = layout.traits,
-            .presetTable = layout.presetTableAddress,
-            .presetPitchHigh = layout.presetPitchHighAddress,
-            .panTable = layout.panTableAddress,
-        },
+    program.runtime = makeCompiledRuntime<SfxPlayback>(SfxRuntimeConfig{
+        .driver =
+            DriverConfig{
+                .data = reader,
+                .traits = layout.traits,
+                .presetTable = layout.presetTableAddress,
+                .presetPitchHigh = layout.presetPitchHighAddress,
+                .panTable = layout.panTableAddress,
+            },
         .scripts = std::move(scripts),
     });
     return SequenceParse{

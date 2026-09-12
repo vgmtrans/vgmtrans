@@ -7,7 +7,7 @@
 #include "value/formats/FalcomSnes/FalcomSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/synth/SnesDsp.h"
 
 #include <algorithm>
@@ -202,10 +202,7 @@ struct TrackState {
   std::map<u16, u8> repeatCells;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   void emitMix() const {
@@ -488,7 +485,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] Address relativeTarget(u32 continuation, s16 relative) {
   return Address{static_cast<u16>(continuation + relative)};
@@ -747,7 +744,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         [&](u32 offset) { return decodeCommand(reader, offset, durations, diagnostics, &programs); }, relative);
   }
   SequenceProgram program =
-      sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{.patches = patches}));
+      sequence.finish(makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{.patches = patches}));
   return SequenceParse{
       .program = std::move(program),
       .programs = std::move(programs),

@@ -7,7 +7,7 @@
 #include "value/formats/TamsoftPS1/TamsoftPS1.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <fmt/format.h>
@@ -138,10 +138,7 @@ struct TrackState : VoiceState {
   u64 noteStart = 0;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& programState;
 
   void emitReverb(std::optional<u8> voiceMask = std::nullopt) {
@@ -243,7 +240,7 @@ struct Playback {
   void keyOff() { closeVoice(); }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 offset,
                                                     std::vector<Diagnostic>* diagnostics) {
@@ -528,7 +525,7 @@ SequenceProgram parseSequence(ByteReader reader, AssetId id, const SequenceLayou
   for (u32 number = 0; number < seeds.size(); ++number) {
     program.tracks.push_back(decodeTrack(reader, id, number, seeds[number], sourceMap, diagnostics));
   }
-  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{
+  program.runtime = makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{
       .generation = layout.generation,
       .seeds = std::move(seeds),
   });
