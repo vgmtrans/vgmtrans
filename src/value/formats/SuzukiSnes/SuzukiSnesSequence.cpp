@@ -320,10 +320,7 @@ struct ProgramState {
 struct TrackState {
   explicit TrackState(Version newVersion)
       : version(newVersion), durationRate(math::initialDurationRate(version)),
-        sourceProgram(math::initialProgram(version)) {
-    volume.reset(math::initialVolume(version));
-    pan.reset(0x80);
-  }
+        sourceProgram(math::initialProgram(version)), volume(math::initialVolume(version)) {}
 
   Version version;
   s32 octave = 6;
@@ -349,7 +346,7 @@ struct TrackState {
   std::optional<double> lastKey;
   std::array<s32, 4> repeatOctaves{};
   PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan;
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan{0x80};
 };
 
 struct Playback {

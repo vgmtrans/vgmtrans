@@ -155,8 +155,6 @@ struct ProgramState {
     for (u32 i = 0; i < programs.size(); ++i) {
       programs[i] = i;
     }
-    master.reset(0);
-    tempo.reset(0x80);
   }
 
   // RAM rows are mutable, but exported notes must keep the instrument they
@@ -191,7 +189,7 @@ struct ProgramState {
   s8 transpose = 0;
   u8 percussionBase = 0;
   SequenceFixedPointAutomation<s32> master;
-  SequenceFixedPointAutomation<s32> tempo;
+  SequenceFixedPointAutomation<s32> tempo{0x80};
   std::optional<u64> lastTick;
   ReverbPerformanceEvent reverb{.voiceMask = 0};
 };

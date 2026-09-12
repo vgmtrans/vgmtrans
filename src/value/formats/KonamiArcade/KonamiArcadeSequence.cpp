@@ -173,9 +173,7 @@ struct TrackState {
   };
 
   TrackState(const TrackProgram& track, const RuntimeConfig& config)
-      : version(config.version), sourceTrackNumber(track.sourceTrackNumber) {
-    pan.reset(8.0);
-  }
+      : version(config.version), sourceTrackNumber(track.sourceTrackNumber) {}
 
   KonamiArcadeVersion version = KonamiArcadeVersion::MysticWarrior;
   u32 sourceTrackNumber = 0;
@@ -192,7 +190,7 @@ struct TrackState {
   std::array<s16, 2> loopTranspose{};
   double nmiRateHertz = 0.0;
   PerformanceBoundValue<SequenceLinearMotion<double>> volume;
-  PerformanceBoundValue<SequenceLinearMotion<double>> pan;
+  PerformanceBoundValue<SequenceLinearMotion<double>> pan{8.0};
   double pitchBendSemitones = 0.0;
   std::optional<double> emittedPitchBend;
   std::optional<double> emittedTuningCents;
@@ -217,14 +215,11 @@ struct TrackState {
 };
 
 struct SequenceState {
-  SequenceState() {
-    tempo.reset(120.0);
-    channelTempos.fill(120.0);
-  }
+  SequenceState() { channelTempos.fill(120.0); }
 
   // EB owns one song-wide accumulator. EA on any channel cancels it, and
   // each update copies its tempo into every active channel.
-  PerformanceBoundValue<SequenceLinearMotion<double>> tempo;
+  PerformanceBoundValue<SequenceLinearMotion<double>> tempo{120.0};
   std::array<double, kKonamiArcadeMaxTracks> channelTempos;
   std::optional<u64> tempoSlideLastTick;
   double nmiRateHertz = 0.0;

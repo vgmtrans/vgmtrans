@@ -775,16 +775,6 @@ struct PitchEnvelope {
 struct PitchState {
   static constexpr u16 kDefaultRangeCents = 200;
 
-  void reset() {
-    baseValid = false;
-    base = 0;
-    motion.reset();
-    transition.clear();
-    transitionNoteKey = 0.0;
-    rangeCents = kDefaultRangeCents;
-    bend = 0;
-  }
-
   bool baseValid = false;
   s32 base = 0;
   SequenceLinearMotion<s32> motion;
@@ -800,10 +790,6 @@ struct TrackState {
     if (const auto initial = config.instrumentEnvelopes.find(0); initial != config.instrumentEnvelopes.end()) {
       envelope = initial->second;
     }
-    volume.reset(0xff);
-    pan.reset(10);
-    vibratoDepth.resetDepth(0);
-    pitch.reset();
   }
 
   void beginSection() {
@@ -835,8 +821,8 @@ struct TrackState {
   u8 percussionProgram = 0;
   PerformanceNoteId lastNote;
   std::optional<double> lastKey;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan;
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume{0xff};
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan{10};
   SequenceLfoDepthFadeState vibratoDepth;
 };
 

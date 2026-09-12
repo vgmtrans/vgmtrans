@@ -292,7 +292,6 @@ struct TrackState {
   };
 
   explicit TrackState(const TrackProgram& trackProgram) : trackNumber(trackProgram.sourceTrackNumber) {
-    volume.reset(0x80);
     volume.setRounding(SequenceFixedPointRounding::Nearest);
   }
 
@@ -300,7 +299,7 @@ struct TrackState {
   u16 noteLength = 1;
   u8 durationRate = 0xcc;
   u8 channelMaster = 0x60;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume;
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume{0x80};
   u8 alternateVolume = 0xff;
   s8 alternateRate = 0;
   s8 pan = 0;

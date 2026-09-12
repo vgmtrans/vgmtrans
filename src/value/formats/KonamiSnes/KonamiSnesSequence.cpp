@@ -348,13 +348,11 @@ struct TrackEnvelopeState {
 // Only values that persist from one executed command to the next live here.
 struct TrackState {
   TrackState(const TrackProgram& track, const RuntimeConfig& config)
-      : version(config.version), voiceBit(static_cast<u8>(1u << std::min<u32>(track.sourceTrackNumber, 7))) {
+      : version(config.version), voiceBit(static_cast<u8>(1u << std::min<u32>(track.sourceTrackNumber, 7))),
+        pan(version <= KONAMISNES_V2 ? 10 : 20) {
     const auto* initialInstrument = config.instrument(0);
     envelope.selectInstrument(version, initialInstrument);
     instrumentVolume = initialInstrument == nullptr ? 0 : initialInstrument->volume;
-    pan.reset(version <= KONAMISNES_V2 ? 10 : 20);
-    volume.reset(0);
-    tempoState.reset(kKonamiSnesDefaultTempo);
   }
 
   [[nodiscard]] u8 noteDuration(u8 length) const {
@@ -435,7 +433,7 @@ struct TrackState {
   // raw values are converted to tempo, gain, or pan only when a tick changes.
   PerformanceBoundValue<SequenceFixedPointAutomation<s32>> pan;
   PerformanceBoundValue<SequenceFixedPointAutomation<s32>> volume;
-  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> tempoState;
+  PerformanceBoundValue<SequenceFixedPointAutomation<s32>> tempoState{kKonamiSnesDefaultTempo};
   // The driver restarts this reusable depth fade for every note, independently
   // of the oscillator settings that remain active on the track.
   LfoState vibrato;
