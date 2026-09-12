@@ -1250,6 +1250,19 @@ four previous implementations against the shared methods over 21,609 range
 pairs, including empty ranges and extreme offsets. The full build is warning-free
 and all 20 CTest targets pass; no test code is added.
 
+### Construct MIDI instrument selection once
+
+Resolve the selected instrument once, adjust the address for source identities,
+then construct the MIDI selection in one place. This removes three parallel
+result constructions and the unnecessary address resolver call for an already
+explicit bank/program. Exact identity lookup, first-match behavior, missing
+instrument fallback, forced bank selection, and pitch-bend ranges are unchanged.
+
+This removes 10 production lines. A temporary sanitized comparison checks
+1,160,250 selections, including null banks, duplicate identities, explicit
+addresses, unknown identities, and extreme bank/program values. The full build
+is warning-free and all 20 CTest targets pass; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

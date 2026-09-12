@@ -269,27 +269,17 @@ struct MidiInstrumentSelection {
 [[nodiscard]] MidiInstrumentSelection instrumentSelection(const InstrumentPerformanceEvent& event,
                                                           std::span<const SoundBankAsset* const> soundBanks) {
   const Instrument* instrument = findPerformanceInstrument(event, soundBanks);
-  if (!event.sourceInstrument) {
-    return MidiInstrumentSelection{
-        .address = resolveInstrumentAddress(InstrumentAddress{.bank = event.bank, .program = event.program}, {}),
-        .forceBankSelect = event.forceBankSelect,
-        .pitchBendRangeCents = instrument != nullptr ? instrument->pitchBendRangeCents : std::nullopt,
-    };
+  InstrumentAddress address{.bank = event.bank, .program = event.program};
+  if (event.sourceInstrument) {
+    // A sequential key is a deterministic fallback for incomplete collections.
+    // This is an export policy, not a bank convention imposed on format code.
+    address = resolveInstrumentAddress(instrument != nullptr ? instrument->explicitAddress : std::nullopt,
+                                       event.sourceInstrument);
   }
-
-  if (instrument != nullptr) {
-    return MidiInstrumentSelection{
-        .address = resolveInstrumentAddress(instrument->explicitAddress, instrument->identity),
-        .forceBankSelect = true,
-        .pitchBendRangeCents = instrument->pitchBendRangeCents,
-    };
-  }
-
-  // A sequential key is a deterministic fallback for incomplete collections.
-  // This is an export policy, not a bank convention imposed on format code.
   return MidiInstrumentSelection{
-      .address = resolveInstrumentAddress({}, event.sourceInstrument),
-      .forceBankSelect = true,
+      .address = address,
+      .forceBankSelect = event.sourceInstrument.has_value() || event.forceBankSelect,
+      .pitchBendRangeCents = instrument != nullptr ? instrument->pitchBendRangeCents : std::nullopt,
   };
 }
 
