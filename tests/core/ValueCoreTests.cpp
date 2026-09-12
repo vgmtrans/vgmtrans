@@ -28,6 +28,7 @@ void sonyPs1ModuleBuildsCombinedAndSplitVabSynths();
 void sonyPs1RawSamplesSupportManualCollections();
 void runSonyPs1CollectionBindingTests();
 void suzukiPs1DynamicAdsrUsesAuditedDriverCommands();
+void suzukiPs1RepeatsRestoreTheirSavedOctaves();
 void suzukiPs1ModuleBuildsFractionallyTunedWdsSynth();
 void runTriAcePs1ModuleTests();
 void runTamsoftPs1ModuleTests();
@@ -398,6 +399,7 @@ int main() {
     segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources();
     segSatSsfExtractorUsesFourByteMiniHeader();
     suzukiPs1DynamicAdsrUsesAuditedDriverCommands();
+    suzukiPs1RepeatsRestoreTheirSavedOctaves();
     suzukiPs1ModuleBuildsFractionallyTunedWdsSynth();
     runHeartBeatPs1ModuleTests();
     runKonamiPs1ModuleTests();

@@ -160,6 +160,27 @@ void suzukiPs1DynamicAdsrUsesAuditedDriverCommands() {
          "C0 should load the current program from a bank selected by FE");
 }
 
+void suzukiPs1RepeatsRestoreTheirSavedOctaves() {
+  const auto bytes = sequenceFixture({
+      0x98, 2, 100,  1, 0x9a, 0x94, 0, 0x99,  // repeat C3 twice, remembering octave zero at the end
+      100,  1,                                // the final-pass break restores octave zero
+      0x98, 2, 100,  1, 0x9a, 0x94, 2, 0x99,  // reuse the repeat slot, now ending in octave two
+      100,  1, 0x90,                          // the second break restores octave two
+  });
+  const ByteReader reader(SourceId{72}, bytes);
+  const auto layout = readSuzukiPs1SequenceLayout(reader, 0);
+  expect(layout.has_value(), "repeat fixture should have a valid sequence layout");
+  const auto program = parseSuzukiPs1Sequence(reader, AssetId{72}, *layout, {});
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(program);
+  expect(performance.diagnostics.empty(), "finite repeats should render without diagnostics");
+  const auto notes = eventsOfType<NotePerformanceEvent>(performance.tracks.at(0));
+  const std::vector<double> expectedKeys{36, 36, 0, 0, 0, 24};
+  expect(notes.size() == expectedKeys.size(), "both repeats should play twice and continue after their break");
+  for (size_t i = 0; i < notes.size(); ++i) {
+    expect(notes[i]->key == expectedKeys[i], "repeat entry and exit should restore their own saved octaves");
+  }
+}
+
 void suzukiPs1ModuleBuildsFractionallyTunedWdsSynth() {
   Session session;
   session.registerFormat(suzukiPs1Module());

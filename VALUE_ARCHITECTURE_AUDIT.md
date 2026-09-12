@@ -1695,6 +1695,20 @@ fixture checks delayed level/pan fades, endpoint values and ownership, and
 immediate level quantization. The full build is warning-free and all 20 CTest
 targets pass, including existing portamento, envelope, LFO, and song-loop coverage.
 
+## Remove redundant pitch and repeat state
+
+Akao SNES now uses one constant reference pitch instead of storing and resetting
+the same value on every track. Its separate eligibility flag is named
+`noteAllowsPitchBend`, reflecting the actual distinction between melodic and
+percussion notes. Pitch calculations and note lifecycle behavior are unchanged.
+
+Suzuki PS1 stores its saved repeat-end octave as an optional value, eliminating
+the parallel validity array and its synchronization. A compact sequence test
+checks entry-octave restoration, a final-pass break restoring octave zero, and
+reuse of the same repeat slot with a different exit octave. It passes both
+before and after the refactor. Existing Akao pitch coverage also passes; the
+full build is warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

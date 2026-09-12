@@ -32,6 +32,7 @@ namespace {
 constexpr u16 kDefaultPitchBendRangeCents = 200;
 constexpr s32 kNominalDspPitch = 0x1000;
 constexpr s32 kPitchFractionScale = 0x100;
+constexpr s32 kPitchBase = kNominalDspPitch * kPitchFractionScale;
 constexpr u8 kDefaultTempo = 0x20;
 constexpr u8 kNoteVelocity = 100;
 
@@ -988,16 +989,15 @@ struct TrackState {
   std::optional<u64> lastTieableNoteTick;
   std::optional<u64> pitchAutomationStopTick;
   PitchEnvelopeState pitchEnvelope;
-  bool pitchBaseValid = false;
-  s32 pitchBase = kNominalDspPitch * kPitchFractionScale;
-  s32 currentPitch = kNominalDspPitch * kPitchFractionScale;
+  bool noteAllowsPitchBend = false;
+  s32 currentPitch = kPitchBase;
   u16 currentPitchBendRangeCents = kDefaultPitchBendRangeCents;
   s16 currentPitchBendValue = 0;
   u16 pendingPitchSlideSteps = 0;
   s8 pendingPitchSlideSemitones = 0;
   u16 pitchSlideStepsRemaining = 0;
   s32 pitchSlideStep = 0;
-  s32 pitchSlideFinalPitch = kNominalDspPitch * kPitchFractionScale;
+  s32 pitchSlideFinalPitch = kPitchBase;
   s16 pitchSlideBaseNote = 0;
   s16 pitchSlideCurrentNote = 0;
   double pitchSlideBaseKey = 0.0;
@@ -1082,8 +1082,8 @@ struct Playback {
   }
 
   void emitPitchBendForCurrentPitch(PerformanceEmitter output) {
-    const s16 value = akaoSnesPitchBendValue(track.currentPitch, track.pitchBase, track.currentPitchBendRangeCents);
-    const double semitones = akaoSnesPitchCents(track.currentPitch, track.pitchBase) / 100.0;
+    const s16 value = akaoSnesPitchBendValue(track.currentPitch, kPitchBase, track.currentPitchBendRangeCents);
+    const double semitones = akaoSnesPitchCents(track.currentPitch, kPitchBase) / 100.0;
     if (track.currentPitchBendValue == value) {
       return;
     }
@@ -1092,7 +1092,7 @@ struct Playback {
   }
 
   void resetPitchBendForNewNote() {
-    track.pitchBaseValid = false;
+    track.noteAllowsPitchBend = false;
     track.pitchSlideStepsRemaining = 0;
     track.pitchSlideNote = {};
     if (track.pitchBendAtRest()) {
@@ -1108,21 +1108,21 @@ struct Playback {
 
   void beginPitchEnvelopeForNote() {
     auto& envelope = track.pitchEnvelope;
-    if (!akaoSnesSupportsPitchEnvelope(context.version) || !envelope.enabled || !track.pitchBaseValid) {
+    if (!akaoSnesSupportsPitchEnvelope(context.version) || !envelope.enabled || !track.noteAllowsPitchBend) {
       return;
     }
     const s32 targetPitch = akaoSnesPitchForSemitoneOffset(envelope.semitones);
-    const s32 rawDiff = (targetPitch - track.pitchBase) / kPitchFractionScale;
+    const s32 rawDiff = (targetPitch - kPitchBase) / kPitchFractionScale;
     const s32 rawMagnitude = rawDiff < 0 ? -rawDiff : rawDiff;
     envelope.targetOffset = (envelope.semitones < 0 ? -rawMagnitude : rawMagnitude) * kPitchFractionScale;
     envelope.activeDelay = envelope.delay;
     envelope.activeCount = context.version == AKAOSNES_V1 ? envelope.length : 0;
     envelope.progress = 0;
     envelope.active = envelope.targetOffset != 0 && envelope.progressStep != 0;
-    track.currentPitch = track.pitchBase;
+    track.currentPitch = kPitchBase;
     if (envelope.active) {
-      emitPitchBendRange(akaoSnesPitchBendRangeCents(track.pitchBase, track.pitchBase + envelope.targetOffset,
-                                                     kDefaultPitchBendRangeCents));
+      emitPitchBendRange(
+          akaoSnesPitchBendRangeCents(kPitchBase, kPitchBase + envelope.targetOffset, kDefaultPitchBendRangeCents));
     }
   }
 
@@ -1131,9 +1131,8 @@ struct Playback {
     if (!validForPitchBend) {
       return;
     }
-    track.pitchBase = kNominalDspPitch * kPitchFractionScale;
-    track.currentPitch = track.pitchBase;
-    track.pitchBaseValid = true;
+    track.currentPitch = kPitchBase;
+    track.noteAllowsPitchBend = true;
     track.pitchSlideBaseNote = akaoSnesCorrectedNote(note, track.transpose);
     track.pitchSlideCurrentNote = track.pitchSlideBaseNote;
     track.pitchSlideBaseKey = static_cast<double>(note) + track.transpose;
@@ -1141,13 +1140,13 @@ struct Playback {
   }
 
   [[nodiscard]] double pitchSlideKey(s32 pitch) const {
-    return track.pitchSlideBaseKey + (akaoSnesPitchCents(pitch, track.pitchBase) / 100.0);
+    return track.pitchSlideBaseKey + (akaoSnesPitchCents(pitch, kPitchBase) / 100.0);
   }
 
   void samplePitchSlide() { track.pitchSlideAutomation.sample(out, pitchSlideKey(track.currentPitch)); }
 
   bool advancePitchSlide() {
-    if (track.pitchSlideStepsRemaining == 0 || !track.pitchBaseValid) {
+    if (track.pitchSlideStepsRemaining == 0 || !track.noteAllowsPitchBend) {
       return false;
     }
     --track.pitchSlideStepsRemaining;
@@ -1164,7 +1163,7 @@ struct Playback {
     const u16 steps = track.pendingPitchSlideSteps;
     const s8 semitones = track.pendingPitchSlideSemitones;
     track.clearPendingPitchSlide();
-    if (!track.pitchBaseValid || !track.pitchSlideNote.valid()) {
+    if (!track.noteAllowsPitchBend || !track.pitchSlideNote.valid()) {
       return;
     }
     track.pitchSlideCurrentNote = static_cast<s16>(track.pitchSlideCurrentNote + semitones);
@@ -1177,7 +1176,7 @@ struct Playback {
     // steps - 1 timeline ticks between that pitch and the destination.
     if (steps == 1) {
       track.pitchSlideAutomation.interrupt(out);
-      emitPitchBendRange(akaoSnesPitchBendRangeCents(track.pitchBase, track.currentPitch, kDefaultPitchBendRangeCents));
+      emitPitchBendRange(akaoSnesPitchBendRangeCents(kPitchBase, track.currentPitch, kDefaultPitchBendRangeCents));
       emitPitchBendForCurrentPitch(out);
       return;
     }
@@ -1209,7 +1208,7 @@ struct Playback {
   }
 
   void updatePitchEnvelope() {
-    if (!akaoSnesSupportsPitchEnvelope(context.version) || !track.pitchEnvelope.active || !track.pitchBaseValid ||
+    if (!akaoSnesSupportsPitchEnvelope(context.version) || !track.pitchEnvelope.active || !track.noteAllowsPitchBend ||
         terminalPitchWaitBoundary() || !track.pitchEnvelopeDelayElapsed()) {
       return;
     }
@@ -1217,7 +1216,7 @@ struct Playback {
     if (!track.advancePitchEnvelopeTick(context.version, currentOffset)) {
       return;
     }
-    track.currentPitch = track.pitchBase + currentOffset;
+    track.currentPitch = kPitchBase + currentOffset;
     emitPitchBendForCurrentPitch(track.pitchEnvelopeAutomation.output(out));
   }
 
