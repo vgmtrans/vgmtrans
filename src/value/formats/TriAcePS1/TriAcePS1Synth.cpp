@@ -14,7 +14,6 @@
 #include <fmt/format.h>
 
 #include <algorithm>
-#include <map>
 #include <set>
 #include <utility>
 #include <vector>
@@ -115,19 +114,8 @@ std::optional<ScanSoundBankDraft> addTriAcePs1Bank(ScanResultBuilder& result, co
       }
     }
   }
-  if (offsets.empty()) {
-    return std::nullopt;
-  }
-
-  const u32 sampleEnd = layout.sampleSectionOffset + layout.sampleSectionSize;
-  std::map<u32, PsxAdpcmStream> streams;
-  for (auto current = offsets.begin(); current != offsets.end(); ++current) {
-    const u32 boundary =
-        std::next(current) == offsets.end() ? sampleEnd : layout.sampleSectionOffset + *std::next(current);
-    if (const auto stream = inspectPsxAdpcmStream(reader, layout.sampleSectionOffset + *current, boundary)) {
-      streams.emplace(*current, *stream);
-    }
-  }
+  const auto streams = inspectPsxAdpcmStreams(reader, layout.sampleSectionOffset, offsets,
+                                              layout.sampleSectionOffset + layout.sampleSectionSize);
   if (streams.empty()) {
     return std::nullopt;
   }
@@ -172,20 +160,7 @@ std::optional<ScanSoundBankDraft> addTriAcePs1Bank(ScanResultBuilder& result, co
                   reader.range(layout.sampleSectionOffset, layout.sampleSectionSize), "triace-ps1-sample-data")
           .id();
 
-  std::map<u32, SampleRef> sampleRefs;
-  for (const auto& [offset, stream] : streams) {
-    const u32 index = static_cast<u32>(sampleRefs.size());
-    auto entry = samples.add(offset, Sample{
-                                         .name = fmt::format("Sample {}", index),
-                                         .codec = AudioCodec::PsxAdpcm,
-                                         .encodedData = stream.encodedData,
-                                         .sampleRate = kPs1SpuSampleRate,
-                                         .channels = 1,
-                                         .loop = stream.loop,
-                                     });
-    entry.source(fmt::format("Sample {}", index), stream.encodedData, "psx-adpcm-sample").parent(sampleRoot);
-    sampleRefs.emplace(offset, entry.ref());
-  }
+  addPsxAdpcmSamples(samples, streams, kPs1SpuSampleRate, sampleRoot);
 
   for (const auto& source : parsed) {
     auto instrument = instruments.append(Instrument{
@@ -197,8 +172,8 @@ std::optional<ScanSoundBankDraft> addTriAcePs1Bank(ScanResultBuilder& result, co
     instrument.source(instrument.value().name, source.source, "triace-ps1-instrument").parent(instrumentRoot);
 
     for (const auto& sourceRegion : source.regions) {
-      const auto sample = sampleRefs.find(sourceRegion.sampleOffset);
-      if (sample == sampleRefs.end()) {
+      const auto sample = samples.find(sourceRegion.sampleOffset);
+      if (!sample) {
         continue;
       }
       Region region{
@@ -224,7 +199,7 @@ std::optional<ScanSoundBankDraft> addTriAcePs1Bank(ScanResultBuilder& result, co
           };
         }
       }
-      instrument.region(sample->second, std::move(region)).source("Region", sourceRegion.source, "triace-ps1-region");
+      instrument.region(*sample, std::move(region)).source("Region", sourceRegion.source, "triace-ps1-region");
     }
   }
 
