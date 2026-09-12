@@ -53,27 +53,30 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
   const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&renderedTrack.events[0]);
   expect(instrument != nullptr && instrument->program == 5,
          "program command should emit a target-neutral instrument event");
-  expect(instrument->header.sourceCommand == CommandId{0} && instrument->header.tick == 0,
+  expect(instrument->header.sourceCommand.id == CommandId{0} && instrument->header.tick == 0,
          "instrument event should link to the source command and tick");
 
   const auto* note = std::get_if<NotePerformanceEvent>(&renderedTrack.events[1]);
   expect(note != nullptr, "note command should emit a target-neutral note event");
   expect(note->key == 64.0 && note->linearVelocity == 0.5 && note->durationTicks == 12,
          "note event should use driver state and config context while staying MIDI-neutral");
-  expect(note->header.sourceCommand == noteCommandId && note->header.tick == 0,
+  expect(note->header.sourceCommand.id == noteCommandId && note->header.tick == 0,
          "note event should link back to the source command that emitted it");
   expect(program.tracks[0].command(noteCommandId) == &program.tracks[0].commands[1],
          "track program should resolve source commands by positional command id");
-  expect(sourceCommandForEvent(program, note->header) == &program.tracks[0].commands[1],
+  expect(program.command(note->header.sourceCommand) == &program.tracks[0].commands[1],
          "performance event source links should resolve back to source commands");
+  auto movedNote = note->header;
+  movedNote.track = TrackId{8};
+  expect(program.command(movedNote.sourceCommand) == &program.tracks[0].commands[1],
+         "moving a performance event should preserve its original command");
 
-  const auto noteEvents = performanceEventsForCommand(renderedTrack, noteCommandId);
+  const auto noteEvents = performanceEventsForCommand(renderedTrack, {TrackId{0}, noteCommandId});
   expect(noteEvents.size() == 1 && noteEvents[0] == &renderedTrack.events[1],
          "performance helper should collect events emitted by one source command");
   expect(performanceTrackById(performance, TrackId{0}) == &performance.tracks[0],
          "performance helper should resolve rendered tracks by stable track id");
-  expect(sourceCommandForEvent(program, PerformanceEventHeader{.sourceCommand = CommandId{99}, .track = TrackId{0}}) ==
-             nullptr,
+  expect(program.command({TrackId{0}, CommandId{99}}) == nullptr,
          "performance source-link helper should return null for a missing command");
 
   expect(performance.sourceSpans ==
@@ -238,9 +241,9 @@ void sequenceVmPreservesDeclaredLoopAsPerformanceMarkers() {
 
   const MarkerPerformanceEvent* loopStart = probeMarkerAt(performance.tracks[0], "Loop Start", 0);
   const MarkerPerformanceEvent* loopEnd = probeMarkerAt(performance.tracks[0], "Loop End", 12);
-  expect(loopStart != nullptr && loopStart->header.sourceCommand == noteCommand,
+  expect(loopStart != nullptr && loopStart->header.sourceCommand.id == noteCommand,
          "preserved declared-loop should mark the declared loop target as loop start");
-  expect(loopEnd != nullptr && loopEnd->header.sourceCommand == loopCommand,
+  expect(loopEnd != nullptr && loopEnd->header.sourceCommand.id == loopCommand,
          "preserved declared-loop should mark the explicit loop command as loop end");
 }
 
@@ -339,9 +342,9 @@ void sequenceVmPreservesLoopCandidateAsPerformanceMarkers() {
 
   const MarkerPerformanceEvent* loopStart = probeMarkerAt(performance.tracks[0], "Loop Start", 0);
   const MarkerPerformanceEvent* loopEnd = probeMarkerAt(performance.tracks[0], "Loop End", 12);
-  expect(loopStart != nullptr && loopStart->header.sourceCommand == noteCommand,
+  expect(loopStart != nullptr && loopStart->header.sourceCommand.id == noteCommand,
          "preserved loop-candidate should mark the visited destination as loop start");
-  expect(loopEnd != nullptr && loopEnd->header.sourceCommand == jumpCommand,
+  expect(loopEnd != nullptr && loopEnd->header.sourceCommand.id == jumpCommand,
          "preserved loop-candidate should mark the jump command as loop end");
 }
 
@@ -394,9 +397,9 @@ void sequenceVmPreservesLoopsAsPerformanceMarkers() {
   };
   const MarkerPerformanceEvent* loopStart = markerAt("Loop Start", 0);
   const MarkerPerformanceEvent* loopEnd = markerAt("Loop End", 12);
-  expect(loopStart != nullptr && loopStart->header.sourceCommand == noteCommand,
+  expect(loopStart != nullptr && loopStart->header.sourceCommand.id == noteCommand,
          "preserve-loop VM should link loop-start marker to the repeated command");
-  expect(loopEnd != nullptr && loopEnd->header.sourceCommand == jumpCommand,
+  expect(loopEnd != nullptr && loopEnd->header.sourceCommand.id == jumpCommand,
          "preserve-loop VM should link loop-end marker to the command that jumped back");
 
   const MidiSequence midi = renderMidiSequence(performance);
@@ -924,9 +927,9 @@ void sequenceVmPreservesLoopMarkersForInteriorJumpTarget() {
   expect(performance.tracks[0].endTick == 24, "interior loop target should stop at the repeated command");
   const MarkerPerformanceEvent* loopStart = probeMarkerAt(performance.tracks[0], "Loop Start", 12);
   const MarkerPerformanceEvent* loopEnd = probeMarkerAt(performance.tracks[0], "Loop End", 24);
-  expect(loopStart != nullptr && loopStart->header.sourceCommand == loopStartCommand,
+  expect(loopStart != nullptr && loopStart->header.sourceCommand.id == loopStartCommand,
          "preserve-loop marker should attach to the interior repeated command");
-  expect(loopEnd != nullptr && loopEnd->header.sourceCommand == jumpCommand,
+  expect(loopEnd != nullptr && loopEnd->header.sourceCommand.id == jumpCommand,
          "preserve-loop marker should attach to the jump into the decoded block");
 }
 

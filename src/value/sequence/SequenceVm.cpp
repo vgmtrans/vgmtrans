@@ -134,7 +134,7 @@ void addLoopMarker(PerformanceTrack& track, CommandId sourceCommand, u64 tick, u
   track.events.emplace_back(MarkerPerformanceEvent{
       .header =
           PerformanceEventHeader{
-              .sourceCommand = sourceCommand,
+              .sourceCommand = {track.id, sourceCommand},
               .track = track.id,
               .tick = tick,
               .sequence = nextSequence++,
@@ -468,7 +468,7 @@ private:
 
   [[nodiscard]] PerformanceEmitter outputAt(u64 tick, CommandId command = {}, SourceAnnotationId annotation = {}) {
     return {performanceTrack_,
-            command,
+            {performanceTrack_.id, command},
             annotation,
             tick,
             outputSequence_,

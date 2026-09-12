@@ -14,6 +14,7 @@
 #include <cmath>
 #include <set>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 
@@ -129,14 +130,17 @@ void applyEnvelopeUpdate(EnvelopeOverride& state, const EnvelopeUpdate& update) 
                         "Could not allocate another portable bank/program address for an instrument variant", header);
 }
 
-[[nodiscard]] u64 warningSourceKey(const PerformanceEventHeader& header) noexcept {
+enum class WarningSourceKind { Annotation, Command, Event };
+using WarningSourceKey = std::tuple<WarningSourceKind, u32, u64>;
+
+[[nodiscard]] WarningSourceKey warningSourceKey(const PerformanceEventHeader& header) noexcept {
   if (header.sourceAnnotation.valid()) {
-    return header.sourceAnnotation.value;
+    return {WarningSourceKind::Annotation, header.sourceAnnotation.value, 0};
   }
   if (header.sourceCommand.valid()) {
-    return (u64{1} << 63) | header.sourceCommand.value;
+    return {WarningSourceKind::Command, header.sourceCommand.track.value, header.sourceCommand.id.value};
   }
-  return (u64{1} << 62) ^ (static_cast<u64>(header.track.value) << 32) ^ header.sequence;
+  return {WarningSourceKind::Event, header.track.value, header.sequence};
 }
 
 template <typename Predicate>
@@ -284,8 +288,8 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
   InstrumentVariantMaterialization result{.performance = performance};
   AddressAllocator addresses{soundBanks, performance};
   std::vector<VariantRecord> variants;
-  std::set<u64> activeEnvelopeWarnings;
-  std::set<u64> activeStereoWarnings;
+  std::set<WarningSourceKey> activeEnvelopeWarnings;
+  std::set<WarningSourceKey> activeStereoWarnings;
   std::set<const Instrument*> regionlessInstrumentWarnings;
 
   for (auto& track : result.performance.tracks) {

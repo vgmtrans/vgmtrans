@@ -4019,7 +4019,7 @@ SimulatedModulationStats simulatedModulationStats(std::span<const u8> midiBytes)
 std::string performanceEventLocation(const SequenceProgram& program, const PerformanceEventHeader& header) {
   std::ostringstream out;
   out << "track=" << header.track.value << " tick=" << header.tick;
-  const auto* command = sourceCommandForEvent(program, header);
+  const auto* command = program.command(header.sourceCommand);
   if (command != nullptr) {
     out << " addr=0x" << std::hex << command->address.value << std::dec << " opcode=0x" << std::hex
         << static_cast<int>(command->opcode) << std::dec;

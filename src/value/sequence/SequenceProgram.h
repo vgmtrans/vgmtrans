@@ -190,6 +190,16 @@ struct SourceCommand {
   CommandExecution execution;
 };
 
+// Positional identity in the decoded program, independent of where its events
+// are placed when performance tracks are merged, split, or reordered.
+struct SourceCommandRef {
+  TrackId track;
+  CommandId id;
+
+  [[nodiscard]] constexpr bool valid() const noexcept { return track.valid() && id.valid(); }
+  friend bool operator==(SourceCommandRef, SourceCommandRef) noexcept = default;
+};
+
 struct TrackProgram {
   u32 sourceTrackNumber = 0;
   std::string name;
@@ -290,6 +300,8 @@ struct SequenceProgram {
   // the channel or slot identity encoded by the source format.
   std::vector<TrackProgram> tracks;
   std::optional<SectionPlaylist> sectionPlaylist;
+
+  [[nodiscard]] const SourceCommand* command(SourceCommandRef source) const;
 };
 
 [[nodiscard]] bool trackUsesSemantic(const TrackProgram& track, SequenceSemantic semantic);

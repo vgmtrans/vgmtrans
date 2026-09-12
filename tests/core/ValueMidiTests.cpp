@@ -233,7 +233,8 @@ void performanceMidiRendererKeepsPhysicalLimitsAcrossPortamentoFragments() {
         u64 nextSequence = 0;
         u32 nextNote = 0;
         u32 nextAutomation = 0;
-        PerformanceEmitter out{track, CommandId{1}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
+        PerformanceEmitter out{
+            track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
         const auto held = out.note(
             NotePerformanceEvent{.key = 60, .durationTicks = 40, .maximumDurationMilliseconds = limitMilliseconds});
         out.at(8).tempo(1000000);
@@ -270,7 +271,8 @@ void performanceMidiRendererKeepsPhysicalLimitsAcrossVoiceContinuations() {
         u64 nextSequence = 0;
         u32 nextNote = 0;
         u32 nextAutomation = 0;
-        PerformanceEmitter out{track, CommandId{1}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
+        PerformanceEmitter out{
+            track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
         const auto held = out.note(
             NotePerformanceEvent{.key = 60,
                                  .durationTicks = laterLimit ? 40u : 4u,
@@ -804,7 +806,7 @@ void performanceMidiRendererCanTerminatePreviousVoices() {
 
 void performanceMidiRendererLowersStructuredScalarAutomationPoints() {
   const PerformanceEventHeader origin{
-      .sourceCommand = CommandId{7},
+      .sourceCommand = {TrackId{0}, CommandId{7}},
       .track = TrackId{0},
       .tick = 0,
       .sequence = 0,
@@ -820,7 +822,7 @@ void performanceMidiRendererLowersStructuredScalarAutomationPoints() {
                   LevelPerformanceEvent{
                       .header =
                           PerformanceEventHeader{
-                              .sourceCommand = CommandId{7},
+                              .sourceCommand = {TrackId{0}, CommandId{7}},
                               .track = TrackId{0},
                               .tick = 0,
                               .sequence = 1,
@@ -836,7 +838,7 @@ void performanceMidiRendererLowersStructuredScalarAutomationPoints() {
                   LevelPerformanceEvent{
                       .header =
                           PerformanceEventHeader{
-                              .sourceCommand = CommandId{7},
+                              .sourceCommand = {TrackId{0}, CommandId{7}},
                               .track = TrackId{0},
                               .tick = 2,
                               .sequence = 3,
@@ -893,8 +895,8 @@ void performanceMidiRendererSuppressesOnlyAutomationOwnedControllerDuplicates() 
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track,        CommandId{1}, SourceAnnotationId{2}, 0,
-                         nextSequence, nextNote,     nextAutomation,        PanLaw::EqualPower};
+  PerformanceEmitter out{track,    {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence,
+                         nextNote, nextAutomation,           PanLaw::EqualPower};
   const auto level = out.fade(PerformanceAutomationTarget::Level, 0.5, 1);
   level.output(out).level(0.5);
   level.at(out, 1).level(0.5);
@@ -969,7 +971,8 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{1}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence, nextNote,
+                         nextAutomation};
   out.tempo(1'000'000);
   const PerformanceNoteId note = out.note(NotePerformanceEvent{
       .key = 64,
@@ -988,7 +991,8 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
   u64 rateSequence = 0;
   u32 rateNote = 0;
   u32 rateAutomation = 0;
-  PerformanceEmitter rateOut{rateTrack, CommandId{3}, SourceAnnotationId{4}, 0, rateSequence, rateNote, rateAutomation};
+  PerformanceEmitter rateOut{
+      rateTrack, {rateTrack.id, CommandId{3}}, SourceAnnotationId{4}, 0, rateSequence, rateNote, rateAutomation};
   const PerformanceNoteId rateNoteId = rateOut.note(64, 1.0, 8);
   rateOut.pitchSlide(rateNoteId, 60, 64, PitchSlideTiming::fixedRate(4, 2.0));
 
@@ -1000,8 +1004,8 @@ void performanceMidiRendererChoosesPitchTransitionRepresentationAtLowering() {
   u64 fixedSequence = 0;
   u32 fixedNote = 0;
   u32 fixedAutomation = 0;
-  PerformanceEmitter fixedOut{fixedTrack,    CommandId{5}, SourceAnnotationId{6}, 0,
-                              fixedSequence, fixedNote,    fixedAutomation};
+  PerformanceEmitter fixedOut{
+      fixedTrack, {fixedTrack.id, CommandId{5}}, SourceAnnotationId{6}, 0, fixedSequence, fixedNote, fixedAutomation};
   const PerformanceNoteId fixedNoteId = fixedOut.note(64, 1.0, 8);
   fixedOut.pitchSlide(fixedNoteId, 60, 64, PitchSlideTiming::fixedDuration(4, 125.0));
 
@@ -1090,7 +1094,8 @@ void performanceMidiRendererAllowsMixedPitchTransitionRendering() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{1}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence, nextNote,
+                         nextAutomation};
   const PerformanceNoteId first = out.note(60, 1.0, 4);
   const PerformanceNoteId second = out.at(4).note(64, 1.0, 4);
   out.at(4).pitchSlide(second, 60, 64, 4).continueFrom(first).preferPortamento();
@@ -1159,7 +1164,8 @@ void performanceMidiRendererRetainsHeldVoiceAcrossChainedPitchBends() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{1}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence, nextNote,
+                         nextAutomation};
   const PerformanceNoteId first = out.note(60, 1.0, 4);
   out.pitchSlide(first, 56, 60, 8);
   const PerformanceNoteId second = out.at(4).note(62, 1.0, 4);
@@ -1202,7 +1208,8 @@ void performanceMidiRendererHonorsRequiredPortamento() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{3}, SourceAnnotationId{4}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{3}}, SourceAnnotationId{4}, 0, nextSequence, nextNote,
+                         nextAutomation};
   out.portamentoEnable(true);
   out.note(60, 1.0, 8);
   const PerformanceNoteId destination = out.at(4).note(64, 1.0, 4);
@@ -1244,7 +1251,8 @@ void performanceMidiRendererStartsANewVoiceAfterPitchBendContinuationWhenMidiPor
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{5}, SourceAnnotationId{6}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{5}}, SourceAnnotationId{6}, 0, nextSequence, nextNote,
+                         nextAutomation};
   const PerformanceNoteId first = out.note(60, 1.0, 4);
   const PerformanceNoteId second = out.at(4).note(64, 1.0, 4);
   out.at(4).pitchSlide(second, 60, 64, 3).continueFrom(first).preferPitchBend();
@@ -1277,7 +1285,8 @@ void performanceMidiRendererResetsHeldPitchBeforeMidiPortamentoTakesOver() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{7}, SourceAnnotationId{8}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{7}}, SourceAnnotationId{8}, 0, nextSequence, nextNote,
+                         nextAutomation};
   const PerformanceNoteId first = out.note(60, 1.0, 4);
   const PerformanceNoteId second = out.at(4).note(64, 1.0, 8);
   out.at(4).pitchSlide(second, 60, 64, 4).continueFrom(first).preferPitchBend();
@@ -1309,7 +1318,8 @@ void performanceMidiRendererCombinesPitchSlidesWithSimulatedVibrato() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{1}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence, nextNote,
+                         nextAutomation};
   out.tempo(1'000'000);
   out.modulation(ModulationPerformanceEvent{
       .target = ModulationPerformanceTarget::VibratoRate,
@@ -1568,7 +1578,8 @@ void performanceMidiRendererDoesNotRestartVibratoAtAHeldPitchSlideBoundary() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{9}, SourceAnnotationId{10}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{9}}, SourceAnnotationId{10}, 0, nextSequence, nextNote,
+                         nextAutomation};
   out.tempo(1'000'000);
   out.modulation(ModulationPerformanceEvent{
       .target = ModulationPerformanceTarget::VibratoRate,
@@ -1617,7 +1628,8 @@ void performanceMidiRendererPreservesExactSamplesAndChainedPitchContinuity() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{3}, SourceAnnotationId{4}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{3}}, SourceAnnotationId{4}, 0, nextSequence, nextNote,
+                         nextAutomation};
   const PerformanceNoteId note = out.note(64, 1.0, 8);
   auto first = out.pitchSlide(note, 60, 62, 2);
   first.sample(out.at(1), 61.5);
@@ -1657,7 +1669,8 @@ void performanceMidiRendererKeepsSampledPitchCurvesSparse() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{4}, SourceAnnotationId{5}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{4}}, SourceAnnotationId{5}, 0, nextSequence, nextNote,
+                         nextAutomation};
   const PerformanceNoteId note = out.note(60, 1.0, 8);
   out.pitchSlide(note, 60, 62, 6).sample(out.at(4), 61);
 
@@ -1686,7 +1699,8 @@ void performanceMidiRendererResetsInterruptedPitchBeforeTheNewNote() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{5}, SourceAnnotationId{6}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{5}}, SourceAnnotationId{6}, 0, nextSequence, nextNote,
+                         nextAutomation};
   const PerformanceNoteId firstNote = out.note(64, 1.0, 8);
   out.pitchSlide(firstNote, 60, 64, 6);
   out.at(3).note(67, 1.0, 3);
@@ -1715,7 +1729,8 @@ void performanceMidiRendererDefersPitchResetUntilTheNextAttack() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{7}, SourceAnnotationId{8}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{7}}, SourceAnnotationId{8}, 0, nextSequence, nextNote,
+                         nextAutomation};
   const PerformanceNoteId slidingNote = out.note(60, 1.0, 2);
   out.pitchSlide(slidingNote, 60, 64, 4);
   out.at(12).note(67, 1.0, 4);
@@ -1749,7 +1764,8 @@ void performanceMidiLoweringAppliesPitchResetsBeforeLaterTransitions() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{8}, SourceAnnotationId{9}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{8}}, SourceAnnotationId{9}, 0, nextSequence, nextNote,
+                         nextAutomation};
   const PerformanceNoteId oldVoice = out.note(60, 1.0, 4);
   out.pitchSlide(oldVoice, 60, 56, 4);
   const PerformanceNoteId heldStart = out.at(8).note(68, 1.0, 2);
@@ -1788,7 +1804,8 @@ void performanceMidiRendererLeavesTerminalPitchBentWithoutAnotherAttack() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{9}, SourceAnnotationId{10}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{9}}, SourceAnnotationId{10}, 0, nextSequence, nextNote,
+                         nextAutomation};
   const PerformanceNoteId note = out.note(60, 1.0, 8);
   out.pitchSlide(note, 60, 64, 4);
 
@@ -1817,7 +1834,8 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{11}, SourceAnnotationId{12}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{11}}, SourceAnnotationId{12}, 0, nextSequence, nextNote,
+                         nextAutomation};
   out.pitchBendRange(12);
   const PerformanceNoteId first = out.note(60, 1.0, 4);
   out.at(4).pitchBend(0.25);
@@ -1853,8 +1871,10 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
       .sourceTrackNumber = 1,
       .endTick = 12,
   };
-  PerformanceEmitter delayedTransitionOut{delayedTransitionTrack, CommandId{13}, SourceAnnotationId{14}, 0,
-                                          nextSequence,           nextNote,      nextAutomation};
+  PerformanceEmitter delayedTransitionOut{delayedTransitionTrack, {delayedTransitionTrack.id, CommandId{13}},
+                                          SourceAnnotationId{14}, 0,
+                                          nextSequence,           nextNote,
+                                          nextAutomation};
   delayedTransitionOut.pitchBendRange(2);
   delayedTransitionOut.note(60, 1.0, 4);
   constexpr PitchBendLayerId modulationLayer{1};
@@ -1894,8 +1914,9 @@ void performanceMidiRendererCombinesSourceBendWithPitchTransitions() {
       .sourceTrackNumber = 1,
       .endTick = 12,
   };
-  PerformanceEmitter sameVoiceOut{sameVoiceTrack, CommandId{13}, SourceAnnotationId{14}, 0,
-                                  nextSequence,   nextNote,      nextAutomation};
+  PerformanceEmitter sameVoiceOut{
+      sameVoiceTrack, {sameVoiceTrack.id, CommandId{13}}, SourceAnnotationId{14}, 0, nextSequence, nextNote,
+      nextAutomation};
   const PerformanceNoteId sameVoiceNote = sameVoiceOut.note(64, 1.0, 8);
   sameVoiceOut.pitchBend(1.0);
   sameVoiceOut.at(4).pitchSlide(sameVoiceNote, 65, 67, 2);
@@ -1935,7 +1956,8 @@ void performanceMidiRendererExpandsRangeForComposedPitchLayers() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{15}, SourceAnnotationId{16}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{15}}, SourceAnnotationId{16}, 0, nextSequence, nextNote,
+                         nextAutomation};
   constexpr PitchBendLayerId secondLayer{1};
 
   out.note(60, 1.0, 8);
@@ -1976,7 +1998,8 @@ void performanceMidiRendererResolvesNormalizedWheelBeforeLoweringTransitions() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{17}, SourceAnnotationId{18}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{17}}, SourceAnnotationId{18}, 0, nextSequence, nextNote,
+                         nextAutomation};
 
   const PerformanceNoteId first = out.note(NotePerformanceEvent{
       .key = 60,
@@ -2030,7 +2053,8 @@ void performanceMidiLoweringCanContinueAnAbsoluteCurveAcrossNewNotes() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{7}, SourceAnnotationId{8}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{7}}, SourceAnnotationId{8}, 0, nextSequence, nextNote,
+                         nextAutomation};
   const PerformanceNoteId firstNote = out.note(64, 1.0, 4);
   out.pitchSlide(firstNote, 60, 68, 8).continueAcrossNotes();
   out.at(4).note(67, 1.0, 4);
@@ -3016,7 +3040,8 @@ void physicalModulationProfileDrivesMidiAndSynthFromOnePlan() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{0}, SourceAnnotationId{0}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{0}}, SourceAnnotationId{0}, 0, nextSequence, nextNote,
+                         nextAutomation};
 
   out.vibratoRate(2.0, LfoPerformanceContext{.shape = LfoShape{.waveform = LfoWaveform::SawtoothUp}});
   out.vibratoDepth(0.5);
@@ -3262,8 +3287,9 @@ void tempoRelativeModulationKeepsIndependentRatesAndDelayPolicies() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{performance.tracks[0], CommandId{7}, SourceAnnotationId{8}, 0,
-                         nextSequence,          nextNote,     nextAutomation};
+  PerformanceEmitter out{
+      performance.tracks[0], {performance.tracks[0].id, CommandId{7}}, SourceAnnotationId{8}, 0, nextSequence, nextNote,
+      nextAutomation};
   out.vibratoRateCyclesPerTick(0.25, {}, PitchBendLayerId{2});
   out.vibratoRateCyclesPerTick(0.125, {}, PitchBendLayerId{0});
   out.panLfoRateCyclesPerTick(0.5);
@@ -3275,8 +3301,10 @@ void tempoRelativeModulationKeepsIndependentRatesAndDelayPolicies() {
   out.at(20).vibratoRate(7.0, {}, PitchBendLayerId{2});
   out.at(20).tremoloRate(9.0);
   out.at(20).vibratoDelay(VibratoDelayPerformanceEvent{.milliseconds = 3.0});
-  PerformanceEmitter tempo{performance.tracks[1], CommandId{9}, SourceAnnotationId{10}, 0,
-                           nextSequence,          nextNote,     nextAutomation};
+  PerformanceEmitter tempo{performance.tracks[1],  {performance.tracks[1].id, CommandId{9}},
+                           SourceAnnotationId{10}, 0,
+                           nextSequence,           nextNote,
+                           nextAutomation};
   tempo.at(10).tempo(500'000);
   tempo.at(30).tempo(250'000);
 

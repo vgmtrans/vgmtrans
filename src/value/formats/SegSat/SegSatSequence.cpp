@@ -158,9 +158,13 @@ void updateChannelLevel(SegSatVolumeModel model, ChannelLevel& channel, u8 contr
 }
 
 [[nodiscard]] const SegSatControllerChange* controllerChange(std::span<const SegSatControllerChange> changes,
-                                                             CommandId command) {
-  const auto found = std::ranges::lower_bound(changes, command.value, {}, &SegSatControllerChange::command);
-  return found != changes.end() && found->command == command.value ? &*found : nullptr;
+                                                             SourceCommandRef command) {
+  // Source track zero is the independent tempo stream, which has its own command IDs.
+  if (!command.valid() || command.track == TrackId{0}) {
+    return nullptr;
+  }
+  const auto found = std::ranges::lower_bound(changes, command.id.value, {}, &SegSatControllerChange::command);
+  return found != changes.end() && found->command == command.id.value ? &*found : nullptr;
 }
 
 [[nodiscard]] std::vector<VoiceLevel> possibleVoices(std::span<const SegSatVelocityBank> banks) {
