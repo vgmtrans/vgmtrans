@@ -1410,6 +1410,25 @@ collections, boundary controller state, modulation scaling, and instrument
 variants. The full build is warning-free and all 20 CTest targets pass; no test
 code is added.
 
+### Resolve synth modulation scaling before container layout
+
+Shared synth preparation now applies observed-range scaling alongside physical
+modulation lowering for both instrument and region scopes. SF2 and DLS writers
+encode the prepared amounts directly. Remove scaling settings from nine writer
+functions, including DLS's repeated per-region calculation of instrument amounts.
+No public API is added.
+
+SoundFont layout can also share instruments when their modulation becomes
+identical after scaling. A 12-line addition to the existing envelope-variant
+fixture fails before the change and verifies shared layout while preserving both
+presets and their envelope offsets afterward.
+
+This removes 12 production lines. A temporary sanitized comparison produces
+identical bytes in 2,304 scenarios for each of SF2 and DLS, covering instrument
+and region scopes, fixed/controller depths, both conversion/scaling policies,
+waveforms, delays, and absent, zero, fractional, or full observed maxima. The
+full build is warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
