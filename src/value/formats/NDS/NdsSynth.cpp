@@ -155,14 +155,9 @@ void addNdsWave(ScanResultBuilder& builder, RecordReader& archive, SamplePoolBui
     return;
   }
 
-  // ADPCM stores a four-byte predictor header between the common SWAV header and
-  // encodedData. SampleDecoder reads that predictor immediately before encodedData.
-  if (adpcm && !archive.rangeAt(relativeOffset, 0x10, "SWAR ADPCM sample header")) {
-    return;
-  }
-  const u32 dataLength = totalDataBytes - (adpcm ? 4 : 0);
-  const u64 dataOffset = static_cast<u64>(relativeOffset) + (adpcm ? 0x10 : 0x0c);
-  const auto dataRange = archive.rangeAt(dataOffset, dataLength, "SWAR sample data");
+  // Keep the ADPCM predictor header inside the encoded stream.
+  const u64 dataOffset = static_cast<u64>(relativeOffset) + 0x0c;
+  const auto dataRange = archive.rangeAt(dataOffset, totalDataBytes, "SWAR sample data");
   if (!dataRange) {
     return;
   }
@@ -170,21 +165,16 @@ void addNdsWave(ScanResultBuilder& builder, RecordReader& archive, SamplePoolBui
   u32 loopStart = loopOffsetBytes;
   u32 loopLength = nonLoopLengthBytes;
   if (adpcm) {
-    const u32 decodedSampleCount = dataLength * 2 + 1;
-
-    // Preserve the legacy ADPCM loop metadata even when looping is disabled;
-    // SF2/DLS headers consume it independently of Loop::enabled.
+    // Loop coordinates include the predictor's initial frame. Preserve them
+    // even when the source disables looping.
     if (loopOffsetBytes >= 4) {
       loopStart = (loopOffsetBytes - 4) * 2 + 1;
-      if (loopStart > decodedSampleCount) {
-        return;
-      }
-      loopLength = decodedSampleCount - loopStart;
+      loopLength = nonLoopLengthBytes * 2;
     } else if (loops) {
       return;
     } else {
       loopStart = 0;
-      loopLength = decodedSampleCount;
+      loopLength = (totalDataBytes - 4) * 2 + 1;
     }
   } else if (type == WaveType::Pcm16) {
     loopStart /= 2;
