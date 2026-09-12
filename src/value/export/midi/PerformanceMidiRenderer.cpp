@@ -1539,53 +1539,39 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             }
             return;
           }
-          if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
-            switch (typedEvent.target) {
-              case ModulationPerformanceTarget::TremoloDepth: {
-                const bool physicalDecibels = typedEvent.volumeDepthDecibels.has_value();
-                const bool physicalLinearGain = typedEvent.volumeDepthLinearGain.has_value();
-                const auto fallback = !typedEvent.context.shape && !physicalDecibels && !physicalLinearGain
-                                          ? LfoInitialPhaseFallback::UnipolarTremoloNominalGain
-                                          : LfoInitialPhaseFallback::Zero;
-                configureLfo(state.tremolo, typedEvent.header.tick, typedEvent, fallback);
-                const auto unit = physicalDecibels
-                                      ? RenderTrackState::TremoloDepthUnit::Decibels
-                                      : (physicalLinearGain ? RenderTrackState::TremoloDepthUnit::LinearGain
-                                                            : RenderTrackState::TremoloDepthUnit::LegacyUnipolar);
-                setSimulatedTremoloDepth(track, state, typedEvent.header.tick, channel,
-                                         physicalDecibels
-                                             ? *typedEvent.volumeDepthDecibels
-                                             : (physicalLinearGain ? *typedEvent.volumeDepthLinearGain
-                                                                   : std::clamp(typedEvent.amount, 0.0, 1.0) * 0.5),
-                                         unit, typedEvent.context.tremoloGainMode, typedEvent.context.zeroDepthBehavior,
-                                         options, modulationConversion);
-                break;
-              }
-              case ModulationPerformanceTarget::TremoloRate:
-                configureLfo(state.tremolo, typedEvent.header.tick, typedEvent,
-                             typedEvent.context.shape ? LfoInitialPhaseFallback::Zero
-                                                      : LfoInitialPhaseFallback::UnipolarTremoloNominalGain);
-                break;
-              case ModulationPerformanceTarget::PanDepth:
-                configureLfo(state.panLfo, typedEvent.header.tick, typedEvent);
-                setSimulatedPanDepth(track, state, typedEvent.header.tick, channel,
-                                     typedEvent.panDepth.value_or(normalizedAmount), options);
-                break;
-              case ModulationPerformanceTarget::PanRate:
-                configureLfo(state.panLfo, typedEvent.header.tick, typedEvent);
-                break;
-              case ModulationPerformanceTarget::VibratoDepth:
-              case ModulationPerformanceTarget::VibratoRate:
-                break;
-            }
-            return;
-          }
+          // MIDI has no pan-LFO controller, so both policies simulate it.
           if (typedEvent.target == ModulationPerformanceTarget::PanDepth ||
               typedEvent.target == ModulationPerformanceTarget::PanRate) {
             configureLfo(state.panLfo, typedEvent.header.tick, typedEvent);
             if (typedEvent.target == ModulationPerformanceTarget::PanDepth) {
               setSimulatedPanDepth(track, state, typedEvent.header.tick, channel,
                                    typedEvent.panDepth.value_or(normalizedAmount), options);
+            }
+            return;
+          }
+          if (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation) {
+            if (typedEvent.target == ModulationPerformanceTarget::TremoloDepth) {
+              const bool physicalDecibels = typedEvent.volumeDepthDecibels.has_value();
+              const bool physicalLinearGain = typedEvent.volumeDepthLinearGain.has_value();
+              const auto fallback = !typedEvent.context.shape && !physicalDecibels && !physicalLinearGain
+                                        ? LfoInitialPhaseFallback::UnipolarTremoloNominalGain
+                                        : LfoInitialPhaseFallback::Zero;
+              configureLfo(state.tremolo, typedEvent.header.tick, typedEvent, fallback);
+              const auto unit = physicalDecibels
+                                    ? RenderTrackState::TremoloDepthUnit::Decibels
+                                    : (physicalLinearGain ? RenderTrackState::TremoloDepthUnit::LinearGain
+                                                          : RenderTrackState::TremoloDepthUnit::LegacyUnipolar);
+              setSimulatedTremoloDepth(track, state, typedEvent.header.tick, channel,
+                                       physicalDecibels
+                                           ? *typedEvent.volumeDepthDecibels
+                                           : (physicalLinearGain ? *typedEvent.volumeDepthLinearGain
+                                                                 : std::clamp(typedEvent.amount, 0.0, 1.0) * 0.5),
+                                       unit, typedEvent.context.tremoloGainMode, typedEvent.context.zeroDepthBehavior,
+                                       options, modulationConversion);
+            } else if (typedEvent.target == ModulationPerformanceTarget::TremoloRate) {
+              configureLfo(state.tremolo, typedEvent.header.tick, typedEvent,
+                           typedEvent.context.shape ? LfoInitialPhaseFallback::Zero
+                                                    : LfoInitialPhaseFallback::UnipolarTremoloNominalGain);
             }
             return;
           }
