@@ -12,7 +12,6 @@
 #include <array>
 #include <bitset>
 #include <cmath>
-#include <limits>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -372,9 +371,7 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
         continue;
       }
 
-      const u64 noteEnd = note->header.tick > std::numeric_limits<u64>::max() - note->durationTicks
-                              ? std::numeric_limits<u64>::max()
-                              : note->header.tick + note->durationTicks;
+      const u64 noteEnd = addTicks(note->header.tick, note->durationTicks);
       auto& voiceEnd = voiceEnds[note->lane];
       voiceEnd = note->extendsPrevious ? std::max(voiceEnd, noteEnd) : noteEnd;
       if (note->extendsPrevious) {

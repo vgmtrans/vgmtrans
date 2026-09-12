@@ -340,7 +340,7 @@ class PitchBendLayers {
 
 [[nodiscard]] u64 physicalNoteEnd(const NotePerformanceEvent& note, const PerformanceTempoMap& tempos) {
   const auto ticks = tempos.durationTicksForMilliseconds(note.header.tick, *note.maximumDurationMilliseconds);
-  return note.header.tick + std::min<u64>(ticks, std::numeric_limits<u64>::max() - note.header.tick);
+  return addTicks(note.header.tick, ticks);
 }
 
 struct RenderTrackState {

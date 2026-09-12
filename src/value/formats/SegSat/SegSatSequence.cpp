@@ -14,7 +14,6 @@
 #include <array>
 #include <cmath>
 #include <iterator>
-#include <limits>
 #include <optional>
 #include <string_view>
 #include <utility>
@@ -239,9 +238,7 @@ struct ProgramState {
         const auto& header = performanceEventHeader(event);
         u64 end = header.tick;
         if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
-          end = note->header.tick > std::numeric_limits<u64>::max() - note->durationTicks
-                    ? std::numeric_limits<u64>::max()
-                    : note->header.tick + note->durationTicks;
+          end = addTicks(note->header.tick, note->durationTicks);
         }
         track.endTick = std::max(track.endTick, end);
       }

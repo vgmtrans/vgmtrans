@@ -12,6 +12,7 @@
 #include "value/sequence/SequenceProgram.h"
 
 #include <algorithm>
+#include <limits>
 #include <optional>
 #include <string>
 #include <utility>
@@ -19,6 +20,11 @@
 #include <vector>
 
 namespace vgmtrans::core {
+
+// Timeline arithmetic clamps at the last representable tick instead of wrapping.
+[[nodiscard]] constexpr u64 addTicks(u64 tick, u64 ticks) noexcept {
+  return tick > std::numeric_limits<u64>::max() - ticks ? std::numeric_limits<u64>::max() : tick + ticks;
+}
 
 [[nodiscard]] constexpr double tempoBeatsPerMinute(u32 microsecondsPerQuarter) noexcept {
   return microsecondsPerQuarter == 0 ? 0.0 : 60000000.0 / microsecondsPerQuarter;

@@ -418,8 +418,7 @@ struct Playback {
       }
       track.tiedNotes.insert_or_assign(key, note);
     }
-    const u64 endTick = tie || vm.tick() > std::numeric_limits<u64>::max() - duration ? std::numeric_limits<u64>::max()
-                                                                                      : vm.tick() + duration;
+    const u64 endTick = tie ? std::numeric_limits<u64>::max() : addTicks(vm.tick(), duration);
     track.activeNotes.push_back(ActiveNote{.id = note, .endTick = endTick});
   }
 

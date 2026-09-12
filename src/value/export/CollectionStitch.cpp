@@ -242,9 +242,7 @@ void remapPart(StitchPart& part) {
 
 [[nodiscard]] u64 eventEnd(const MidiEvent& event) {
   const auto* note = std::get_if<NoteDuration>(&event.payload);
-  return note != nullptr && event.tick > std::numeric_limits<u64>::max() - note->duration
-             ? std::numeric_limits<u64>::max()
-             : event.tick + (note != nullptr ? note->duration : 0);
+  return addTicks(event.tick, note != nullptr ? note->duration : 0);
 }
 
 [[nodiscard]] bool retime(MidiEvent& event, u32 sourcePpqn, u32 targetPpqn, u64 start) {

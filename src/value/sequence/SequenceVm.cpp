@@ -11,7 +11,6 @@
 #include <algorithm>
 #include <compare>
 #include <fmt/format.h>
-#include <limits>
 #include <map>
 #include <memory>
 #include <optional>
@@ -211,8 +210,7 @@ void endSourceSpansAt(std::vector<SourcePlaybackSpan>& spans, u64 endTick) {
   if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
     duration = std::max<u64>(1, note->durationTicks);
   }
-  return header.tick > std::numeric_limits<u64>::max() - duration ? std::numeric_limits<u64>::max()
-                                                                  : header.tick + duration;
+  return addTicks(header.tick, duration);
 }
 
 struct PlaylistVisitState {
@@ -343,7 +341,7 @@ public:
     if (position_.pendingTicks == 0) {
       return runtime_.tick;
     }
-    return tickAfter(observesEachWaitTick() ? 1 : position_.pendingTicks);
+    return addTicks(runtime_.tick, observesEachWaitTick() ? 1 : position_.pendingTicks);
   }
   [[nodiscard]] std::optional<u64> loopStopTick() const noexcept { return loopStopTick_; }
 
@@ -353,7 +351,7 @@ public:
     }
     if (position_.pendingTicks != 0) {
       const u32 elapsed = observesEachWaitTick() ? 1 : position_.pendingTicks;
-      runtime_.tick = tickAfter(elapsed);
+      runtime_.tick = addTicks(runtime_.tick, elapsed);
       if (elapsed == 1) {
         tickRuntime(position_.tickCommand);
         if (position_.pendingTicks > 1 && !position_.delayedCommand) {
@@ -468,11 +466,6 @@ private:
             track_.commands[*position_.command].execution.duringWait);
   }
 
-  [[nodiscard]] u64 tickAfter(u32 ticks) const noexcept {
-    return ticks > std::numeric_limits<u64>::max() - runtime_.tick ? std::numeric_limits<u64>::max()
-                                                                   : runtime_.tick + ticks;
-  }
-
   [[nodiscard]] PerformanceEmitter outputAt(u64 tick, CommandId command = {}, SourceAnnotationId annotation = {}) {
     return {performanceTrack_,
             command,
@@ -552,7 +545,7 @@ private:
     }
     const CommandTransition effectiveTransition = effects.flowOverride.value_or(command.flow.defaultTransition);
     if (command.annotation.valid()) {
-      u64 endTick = tickAfter(std::max(effects.advanceTicks, 1u));
+      u64 endTick = addTicks(runtime_.tick, std::max(effects.advanceTicks, 1u));
       for (size_t i = firstEvent; i < performanceTrack_.events.size(); ++i) {
         endTick = std::max(endTick, eventEndTick(performanceTrack_.events[i]));
       }
