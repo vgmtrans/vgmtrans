@@ -229,9 +229,9 @@ struct VariantRecord {
 }
 
 [[nodiscard]] const VariantRecord* findVariant(std::span<const VariantRecord> variants, InstrumentRef base,
-                                               const Instrument& candidate) {
+                                               std::span<const Region> regions) {
   const auto found = std::ranges::find_if(variants, [&](const VariantRecord& variant) {
-    return variant.base == base && std::ranges::equal(variant.instrument.regions, candidate.regions, sameVariantRegion);
+    return variant.base == base && std::ranges::equal(variant.instrument.regions, regions, sameVariantRegion);
   });
   return found == variants.end() ? nullptr : &*found;
 }
@@ -252,32 +252,28 @@ struct VariantRecord {
   return std::ranges::any_of(voiceEnds, [tick](const auto& voice) { return voice.second > tick; });
 }
 
-void splitIntoStereoLayers(Instrument& instrument, double leftGain, double rightGain, double pan) {
+void appendStereoLayers(std::vector<Region>& layers, const Region& source, double leftGain, double rightGain,
+                        double pan) {
   constexpr double piOverTwo = 1.57079632679489661923;
-  std::vector<Region> layers;
-  layers.reserve(instrument.regions.size() * 2);
-  for (const Region& source : instrument.regions) {
-    // SF2 combines channel and region pan additively. Resolve that composition
-    // at attack time, then express its signed left/right output as two layers.
-    const double position = std::clamp(source.pan + pan - 0.5, 0.0, 1.0);
-    const std::array gains{
-        leftGain * std::cos(position * piOverTwo),
-        rightGain * std::sin(position * piOverTwo),
-    };
-    for (size_t channel = 0; channel < gains.size(); ++channel) {
-      if (std::abs(gains[channel]) < 0.000000001) {
-        continue;
-      }
-      Region layer = source;
-      layer.pan = static_cast<double>(channel);
-      layer.attenuationDb += linearAmplitudeToAttenuationDb(std::abs(gains[channel]));
-      if (gains[channel] < 0.0) {
-        layer.invertSamplePhase = !layer.invertSamplePhase;
-      }
-      layers.push_back(std::move(layer));
+  // SF2 combines channel and region pan additively. Resolve that composition
+  // at attack time, then express its signed left/right output as two layers.
+  const double position = std::clamp(source.pan + pan - 0.5, 0.0, 1.0);
+  const std::array gains{
+      leftGain * std::cos(position * piOverTwo),
+      rightGain * std::sin(position * piOverTwo),
+  };
+  for (size_t channel = 0; channel < gains.size(); ++channel) {
+    if (std::abs(gains[channel]) < 0.000000001) {
+      continue;
     }
+    Region layer = source;
+    layer.pan = static_cast<double>(channel);
+    layer.attenuationDb += linearAmplitudeToAttenuationDb(std::abs(gains[channel]));
+    if (gains[channel] < 0.0) {
+      layer.invertSamplePhase = !layer.invertSamplePhase;
+    }
+    layers.push_back(std::move(layer));
   }
-  instrument.regions = std::move(layers);
 }
 
 }  // namespace
@@ -404,23 +400,27 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
             result.diagnostics.push_back(noRegionsWarning(envelopeOnly, note->header));
           }
         } else {
-          Instrument variant = base;
-          bool envelopeDiffers = false;
-          if (hasEnvelope) {
-            for (auto& region : variant.regions) {
-              const auto effective = applyEnvelopeOverride(region.envelope, envelope->second);
-              envelopeDiffers = envelopeDiffers || effective != region.envelope;
-              region.envelope = effective;
+          std::vector<Region> regions;
+          regions.reserve(base.regions.size() * (materializeStereo ? 2 : 1));
+          const double pan = materializeStereo ? pans.try_emplace(note->lane, 0.5).first->second : 0.5;
+          for (auto region : base.regions) {
+            if (hasEnvelope) {
+              region.envelope = applyEnvelopeOverride(region.envelope, envelope->second);
+            }
+            if (materializeStereo) {
+              appendStereoLayers(regions, region, leftGain, rightGain, pan);
+            } else {
+              regions.push_back(std::move(region));
             }
           }
-          if (materializeStereo) {
-            splitIntoStereoLayers(variant, leftGain, rightGain, pans.try_emplace(note->lane, 0.5).first->second);
-          }
 
-          if (envelopeDiffers || materializeStereo) {
-            if (const auto* existing = findVariant(variants, *baseRef, variant)) {
+          if (materializeStereo ||
+              !std::ranges::equal(regions, base.regions, {}, &Region::envelope, &Region::envelope)) {
+            if (const auto* existing = findVariant(variants, *baseRef, regions)) {
               variantAddress = existing->instrument.explicitAddress;
             } else if (const auto address = addresses.allocate()) {
+              Instrument variant = base;
+              variant.regions = std::move(regions);
               variant.identity.reset();
               variant.explicitAddress = *address;
               if (envelopeOnly) {
