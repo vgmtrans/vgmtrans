@@ -1298,6 +1298,18 @@ A 13-line regression added to the existing Rare opcode test fails with the old
 map and passes with the current-command range. The full build is warning-free
 and all 20 CTest targets pass.
 
+### Make synth range accumulation explicit at each call
+
+Remove the two recordRange wrappers that dispatch between included and observed
+ranges using a boolean. Builders now call SourceRange::include on the named
+range directly. This removes ten production lines and makes the distinction
+visible at each update without another helper or boolean argument.
+
+Explicit-range precedence and instrument/region range ownership remain unchanged.
+Existing synth-builder tests cover those rules, invalid/foreign ranges, fallback
+records, and detached builders. The full build is warning-free and all 20 CTest
+targets pass; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
