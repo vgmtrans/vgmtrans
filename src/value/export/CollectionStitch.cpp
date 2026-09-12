@@ -263,19 +263,18 @@ void remapPart(StitchPart& part) {
   return true;
 }
 
-[[nodiscard]] std::optional<ComposedMidi> composeMidi(const std::vector<StitchPart>& parts,
+[[nodiscard]] std::optional<ComposedMidi> composeMidi(std::vector<StitchPart>& parts,
                                                       MidiBankSelectStyle bankStyle) {
   ComposedMidi composition;
   composition.midi.timebase.ppqn = commonPpqn(parts);
   u64 cursor = 0;
   for (size_t partIndex = 0; partIndex < parts.size(); ++partIndex) {
-    const auto& part = parts[partIndex];
+    auto& part = parts[partIndex];
     composition.starts.push_back(cursor);
     const u32 sourcePpqn = normalizedPpqn(part.midi.timebase.ppqn);
     u64 end = 0;
-    for (const auto& sourceTrack : part.midi.tracks) {
-      auto track = sourceTrack;
-      end = std::max(end, sourceTrack.endTick);
+    for (auto& track : part.midi.tracks) {
+      end = std::max(end, track.endTick);
       for (auto& event : track.events) {
         end = std::max(end, eventEnd(event));
         if (!retime(event, sourcePpqn, composition.midi.timebase.ppqn, cursor)) {
@@ -299,7 +298,7 @@ void remapPart(StitchPart& part) {
         }
         track.events.insert(track.events.begin(), initialState.events.begin(), initialState.events.end());
       }
-      const auto trackEnd = scaled(sourceTrack.endTick, sourcePpqn, composition.midi.timebase.ppqn);
+      const auto trackEnd = scaled(track.endTick, sourcePpqn, composition.midi.timebase.ppqn);
       if (!trackEnd || *trackEnd > std::numeric_limits<u64>::max() - cursor) {
         return std::nullopt;
       }

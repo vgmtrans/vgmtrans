@@ -1396,6 +1396,20 @@ eight tracks, competing tempo commands, fades, and active LFOs under both
 modulation policies. The full build is warning-free and all 20 CTest targets
 pass; no test code is added.
 
+### Move prepared MIDI tracks into stitched output
+
+Composition now retimes each prepared MIDI track in place and moves it into the
+result. Remove the extra full-track copy and the sourceTrack/track distinction.
+The private preparation workspace owns these tracks exclusively, and subsequent
+stitching work reads only the banks, instruments, samples, and collection IDs.
+Failure still discards the private workspace.
+
+This removes one production line and avoids copying every event and payload in
+every stitched track. Existing stitch coverage checks PPQN conversion, repeated
+collections, boundary controller state, modulation scaling, and instrument
+variants. The full build is warning-free and all 20 CTest targets pass; no test
+code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
