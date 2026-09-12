@@ -1549,6 +1549,19 @@ This removes 14 production lines and one unused public method. Existing builder
 grouping, entry validity, and drum-kit coverage passes. The full build is
 warning-free and all 20 CTest targets pass; no test code is added.
 
+### Keep performance event ordering on its header
+
+PerformanceEventHeader::order supplies the existing tick/execution-order key.
+Timeline sorting, command-event lookup, normalized-wheel context queries, and
+MIDI voice-link checks use it directly instead of rebuilding two-field
+comparisons. Standard range projections remove repeated comparator bodies.
+Equal keys retain stable insertion order. Delayed transitions still sort by
+realization.startTick, which can differ from their source header tick.
+
+This removes 34 production lines. Existing same-tick global ordering, tempo
+ties, modulation updates, and mixed pitch-transition coverage passes. The full
+build is warning-free and all 20 CTest targets pass; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

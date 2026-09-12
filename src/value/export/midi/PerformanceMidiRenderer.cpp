@@ -19,7 +19,6 @@
 #include <span>
 #include <stdexcept>
 #include <string>
-#include <tuple>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -460,11 +459,8 @@ struct VoicePitchBendRangeChange {
   }
   for (auto& timeline : timelines) {
     timeline.insert(timeline.end(), globalReverb.begin(), globalReverb.end());
-    std::ranges::stable_sort(timeline, [](const PerformanceEvent* lhs, const PerformanceEvent* rhs) {
-      const auto& left = performanceEventHeader(*lhs);
-      const auto& right = performanceEventHeader(*rhs);
-      return std::tie(left.tick, left.sequence) < std::tie(right.tick, right.sequence);
-    });
+    std::ranges::stable_sort(timeline, {},
+                             [](const PerformanceEvent* event) { return performanceEventHeader(*event).order(); });
   }
   return timelines;
 }
@@ -545,8 +541,7 @@ struct VoicePitchBendRangeChange {
     const auto& header = performanceEventHeader(*event);
     bool pitchChanged = false;
     while (nextVoice < voices.size() &&
-           std::tie(voices[nextVoice].startTick, voices[nextVoice].startSequence) <=
-               std::tie(header.tick, header.sequence)) {
+           std::pair{voices[nextVoice].startTick, voices[nextVoice].startSequence} <= header.order()) {
       activeVoice = nextVoice++;
       voices[activeVoice].sourceCents = pitchContext.sourceRangeCents();
       pitchChanged = true;
@@ -1647,9 +1642,8 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
     for (const auto* event : timelines[trackIndex]) {
       const auto& header = performanceEventHeader(*event);
       while (nextPitchBendRangeChange < pitchBendRangeChanges.size() &&
-             std::tie(pitchBendRangeChanges[nextPitchBendRangeChange].tick,
-                      pitchBendRangeChanges[nextPitchBendRangeChange].sequence) <=
-                 std::tie(header.tick, header.sequence)) {
+             std::pair{pitchBendRangeChanges[nextPitchBendRangeChange].tick,
+                       pitchBendRangeChanges[nextPitchBendRangeChange].sequence} <= header.order()) {
         const auto& change = pitchBendRangeChanges[nextPitchBendRangeChange++];
         if (change.tick != 0) {
           // Finish the previous voice before changing the channel sensitivity.

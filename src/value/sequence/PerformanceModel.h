@@ -14,7 +14,7 @@
 #include <algorithm>
 #include <optional>
 #include <string>
-#include <tuple>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -47,6 +47,8 @@ struct PerformanceEventHeader {
   // Realized events stay in the track's single timeline. This optional
   // association preserves the higher-level motion that produced them.
   std::optional<PerformanceAutomationId> automation;
+
+  [[nodiscard]] constexpr auto order() const noexcept { return std::pair{tick, sequence}; }
 };
 
 struct NotePerformanceEvent {
@@ -632,8 +634,7 @@ template <class Event>
       }
     }
   }
-  std::ranges::stable_sort(events, {},
-                           [](const Event* event) { return std::tie(event->header.tick, event->header.sequence); });
+  std::ranges::stable_sort(events, {}, [](const Event* event) { return event->header.order(); });
   return events;
 }
 
