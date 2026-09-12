@@ -1223,6 +1223,20 @@ the 128-level boundary, and larger native scales. It also checks returning to
 unknown quantization after a precise source controller.
 The full build is warning-free and all 20 CTest targets pass.
 
+### Route pan LFO simulation through one path
+
+Pan LFOs are simulated for both modulation conversion policies. Handle that
+target before the policy split instead of implementing it in both branches.
+The remaining simulation branch handles only tremolo; vibrato routing and
+source-controller output keep their existing rules. This removes 14 production
+lines and the duplicate pan configuration/depth-update path.
+
+A temporary before/after comparison produces identical MIDI bytes with all six
+modulation targets, both policies, primary and additional pitch layers, physical
+and normalized depths, and automatic/forced controller resolutions. Existing
+pan-law and modulation regressions pass. The full build is warning-free and all
+20 CTest targets pass; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
