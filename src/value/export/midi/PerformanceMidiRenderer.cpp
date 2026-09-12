@@ -271,12 +271,13 @@ struct SimulatedLfoState {
   double frequencyHz = 0.0;
   std::optional<double> cyclesPerTick;
   SimulatedLfoDelay delay;
-  std::optional<SimulatedLfoDelay> noteRestartDelay;
+  SimulatedLfoDelay noteRestartDelay;
   u32 delayCounterTicks = 0;
   double delayCounterMilliseconds = 0.0;
   u64 cursorTick = 0;
   double phaseCycles = 0.0;
-  std::optional<LfoShape> shape;
+  // The immutable lowered performance owns waveform tables throughout rendering.
+  const LfoShape* shape = nullptr;
   LfoPolarity polarity = LfoPolarity::Bipolar;
   std::optional<double> initialPhaseCycles;
   std::optional<double> noteRestartInitialPhaseCycles;
@@ -298,6 +299,11 @@ struct SimulatedLfoState {
   PanLaw panLaw = PanLaw::Unspecified;
   bool started = false;
   bool producedSample = false;
+
+  [[nodiscard]] bool canSampleImmediately() const {
+    return sampleImmediatelyOnNote && delay.ticks == 0 && delay.milliseconds.value_or(0.0) <= 0.0 &&
+           cyclesPerTick.value_or(frequencyHz) > 0.0 && depth > 0.0;
+  }
 };
 
 struct SimulatedPitchLfoState {
@@ -876,7 +882,7 @@ void configureLfo(SimulatedLfoState& lfo, u64 tick, const ModulationPerformanceE
     lfo.frequencyHz = std::max(0.0, *context.frequencyHz);
   }
   if (context.shape) {
-    lfo.shape = context.shape;
+    lfo.shape = &*context.shape;
   }
   if (context.polarity) {
     lfo.polarity = *context.polarity;
@@ -917,9 +923,7 @@ void configureLfo(SimulatedLfoState& lfo, u64 tick, const ModulationPerformanceE
 
 void restartNoteLfo(SimulatedLfoState& lfo, u64 tick,
                     LfoInitialPhaseFallback fallback = LfoInitialPhaseFallback::Zero) {
-  if (lfo.noteRestartDelay) {
-    lfo.delay = *lfo.noteRestartDelay;
-  }
+  lfo.delay = lfo.noteRestartDelay;
   applyLfoRestart(lfo, tick, LfoRestartMode::PhaseAndDelay, fallback);
   if (lfo.noteRestartInitialPhaseCycles) {
     lfo.phaseCycles = *lfo.noteRestartInitialPhaseCycles - std::floor(*lfo.noteRestartInitialPhaseCycles);
@@ -1077,10 +1081,7 @@ void sampleRestartedVibrato(MidiTrack& track, RenderTrackState& state, const Mod
                             u8 channel) {
   auto& pitch = pitchLfo(state, event.pitchLayer);
   auto& lfo = pitch.oscillator;
-  const bool immediate = event.context.restartMode == LfoRestartMode::PhaseAndDelay && lfo.sampleImmediatelyOnNote &&
-                         lfo.delay.ticks == 0 && lfo.delay.milliseconds.value_or(0.0) <= 0.0 && lfo.depth > 0.0 &&
-                         lfo.cyclesPerTick.value_or(lfo.frequencyHz) > 0.0;
-  if (!immediate) {
+  if (event.context.restartMode != LfoRestartMode::PhaseAndDelay || !lfo.canSampleImmediately()) {
     return;
   }
   const double value = simulatedVibratoAtPhase(lfo, lfoValue(lfo));
@@ -1103,9 +1104,7 @@ void restartSimulatedVibratoForNote(MidiTrack& track, RenderTrackState& state, u
     restartNoteLfo(lfo, tick);
     lfo.outputHeldUntilNextNote = false;
     const double previousSemitones = pitch.semitones;
-    const bool startsImmediately = lfo.sampleImmediatelyOnNote && lfo.delay.ticks == 0 &&
-                                   lfo.delay.milliseconds.value_or(0.0) <= 0.0 &&
-                                   lfo.cyclesPerTick.value_or(lfo.frequencyHz) > 0.0 && lfo.depth > 0.0;
+    const bool startsImmediately = lfo.canSampleImmediately();
     pitch.semitones = startsImmediately ? simulatedVibratoAtPhase(lfo, lfoValue(lfo)) : 0.0;
     lfo.producedSample = startsImmediately;
     changed |= startsImmediately || previousSemitones != 0.0;
@@ -1233,9 +1232,7 @@ void restartSimulatedTremoloForNote(MidiTrack& track, RenderTrackState& state, u
   state.tremolo.outputHeldUntilNextNote = false;
   const bool delayed = state.tremolo.delay.ticks != 0 || state.tremolo.delay.milliseconds.value_or(0.0) > 0.0;
   const double gain = delayed ? 1.0 : tremoloGainAtCurrentPhase(state);
-  state.tremolo.producedSample = !delayed && state.tremolo.sampleImmediatelyOnNote &&
-                                 state.tremolo.cyclesPerTick.value_or(state.tremolo.frequencyHz) > 0.0 &&
-                                 state.tremolo.depth > 0.0;
+  state.tremolo.producedSample = state.tremolo.canSampleImmediately();
   if (gain != state.simulatedTremoloGain) {
     state.simulatedTremoloGain = gain;
     addCombinedExpression(track, state, tick, channel, options, modulationConversion);
