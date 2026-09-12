@@ -137,14 +137,14 @@ struct LevelPerformanceEvent {
   PerformanceEventHeader header;
   // Interpreted loudness as linear amplitude/gain, not a MIDI controller value.
   double linearGain = 1.0;
-  std::optional<ValueQuantization> sourceQuantization;
+  ValueQuantization sourceQuantization;
 };
 
 struct ExpressionPerformanceEvent {
   PerformanceEventHeader header;
   // Interpreted expression as linear amplitude/gain, not a MIDI controller value.
   double linearGain = 1.0;
-  std::optional<ValueQuantization> sourceQuantization;
+  ValueQuantization sourceQuantization;
 };
 
 struct PanPerformanceEvent {

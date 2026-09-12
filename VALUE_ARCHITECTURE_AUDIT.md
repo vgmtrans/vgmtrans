@@ -1206,6 +1206,23 @@ Existing synth-builder tests cover fallback and explicit records, ownership,
 sample links, final region counts, sparse keys, and detached construction. The
 full build is warning-free and all 20 CTest targets pass.
 
+### Give unknown source quantization one representation
+
+ValueQuantization already defines zero levels as continuous or unknown. Remove
+the optional wrapper from level/expression events and MIDI rendering state;
+an absent wrapper and a present zero had identical behavior. Give the emitter
+and compiler cursor default quantization arguments instead of retaining three
+extra overloads. Format calls remain unchanged, and native level counts remain
+explicit values independent of the destination's controller resolution.
+
+This removes 18 production lines and two test lines. Existing assertions now
+inspect the native level count directly; no additional test code is committed.
+A temporary check confirms identical MIDI bytes across automatic and forced
+volume/expression resolutions, both modulation modes, unknown quantization,
+the 128-level boundary, and larger native scales. It also checks returning to
+unknown quantization after a precise source controller.
+The full build is warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

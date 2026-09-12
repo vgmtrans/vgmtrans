@@ -111,10 +111,8 @@ public:
                       VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks);
   void restoreEnvelope(EnvelopeFields fields = EnvelopeFields::All,
                        VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks);
-  void level(double linearGain, ValueQuantization sourceQuantization);
-  void level(double linearGain);
-  void expression(double linearGain, ValueQuantization sourceQuantization);
-  void expression(double linearGain);
+  void level(double linearGain, ValueQuantization sourceQuantization = {});
+  void expression(double linearGain, ValueQuantization sourceQuantization = {});
   void pan(PanPerformanceEvent event);
   void pan(double stereoPosition, double linearGain = 1.0);
   void channelPan(ChannelPanPerformanceEvent event);

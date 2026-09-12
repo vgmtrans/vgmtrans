@@ -357,11 +357,7 @@ public:
       });
     }
 
-    Event& emitLevel(double gain) {
-      return appendCallable([=](Playback& playback) { playback.out.level(gain); });
-    }
-
-    Event& emitLevel(double gain, ValueQuantization quantization) {
+    Event& emitLevel(double gain, ValueQuantization quantization = {}) {
       return appendCallable([=](Playback& playback) { playback.out.level(gain, quantization); });
     }
 

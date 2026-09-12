@@ -285,22 +285,10 @@ void PerformanceEmitter::level(double linearGain, ValueQuantization sourceQuanti
   });
 }
 
-void PerformanceEmitter::level(double linearGain) {
-  append(LevelPerformanceEvent{
-      .linearGain = linearGain,
-  });
-}
-
 void PerformanceEmitter::expression(double linearGain, ValueQuantization sourceQuantization) {
   append(ExpressionPerformanceEvent{
       .linearGain = linearGain,
       .sourceQuantization = sourceQuantization,
-  });
-}
-
-void PerformanceEmitter::expression(double linearGain) {
-  append(ExpressionPerformanceEvent{
-      .linearGain = linearGain,
   });
 }
 

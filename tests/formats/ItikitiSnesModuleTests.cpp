@@ -260,9 +260,8 @@ void trackAndMasterVolumeRetainIndependentResolution() {
 
   expect(performance.diagnostics.empty() && levels.size() == 3 && levels[0]->linearGain == 1.0 &&
              std::abs(levels[1]->linearGain - half) < 0.000001 &&
-             std::abs(levels[2]->linearGain - half * half) < 0.000001 && levels[1]->sourceQuantization &&
-             levels[1]->sourceQuantization->levels == 256 && levels[2]->sourceQuantization &&
-             levels[2]->sourceQuantization->levels == 256,
+             std::abs(levels[2]->linearGain - half * half) < 0.000001 && levels[1]->sourceQuantization.levels == 256 &&
+             levels[2]->sourceQuantization.levels == 256,
          "track and channel volume should multiply independently at their full eight-bit precision");
   expect(masters.size() == 2 && std::abs(masters.front()->linearGain - 24.0 / 255.0) < 0.000001 &&
              std::abs(masters.back()->linearGain - half) < 0.000001,

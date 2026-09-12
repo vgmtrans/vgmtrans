@@ -323,8 +323,8 @@ void compilerCursorOwnsOutputValuesAfterDecoding() {
       instrument.sourceInstrument == InstrumentIdentity{.domain = "temporary source instrument domain", .key = 257} &&
           instrument.envelopeMode == InstrumentEnvelopeMode::PreserveDynamicOverride,
       "compiled instrument selections must own a copy of the source domain and preserve envelope policy");
-  expect(continuous.linearGain == 0.5 && !continuous.sourceQuantization && quantized.linearGain == 0.75 &&
-             quantized.sourceQuantization && quantized.sourceQuantization->levels == 64,
+  expect(continuous.linearGain == 0.5 && continuous.sourceQuantization.levels == 0 && quantized.linearGain == 0.75 &&
+             quantized.sourceQuantization.levels == 64,
          "compiled level output must distinguish unspecified quantization from a declared native scale");
 }
 

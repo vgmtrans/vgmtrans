@@ -190,11 +190,11 @@ struct LoweredStereoBalance {
 }
 
 [[nodiscard]] MidiLevelResolution resolveLevelResolution(MidiLevelResolution requested,
-                                                         std::optional<ValueQuantization> quantization = std::nullopt) {
+                                                         ValueQuantization quantization = {}) {
   if (requested != MidiLevelResolution::Auto) {
     return requested;
   }
-  if (quantization && quantization->levels > 128) {
+  if (quantization.levels > 128) {
     return MidiLevelResolution::FourteenBit;
   }
   return MidiLevelResolution::SevenBit;
@@ -219,7 +219,7 @@ struct MidiControllerState {
 
 void addLevelController(MidiTrack& track, std::optional<MidiLevelState>* state, u64 tick, u8 channel,
                         MidiController controller, double linearGain, MidiLevelResolution requestedResolution,
-                        std::optional<ValueQuantization> quantization = std::nullopt) {
+                        ValueQuantization quantization = {}) {
   const MidiLevelResolution resolution = resolveLevelResolution(requestedResolution, quantization);
   const u16 value = resolution == MidiLevelResolution::FourteenBit ? LevelScale::midi14FromLinear(linearGain)
                                                                    : LevelScale::midi7FromLinear(linearGain);
@@ -239,13 +239,13 @@ void addLevelController(MidiTrack& track, std::optional<MidiLevelState>* state, 
 }
 
 void addVolume(MidiTrack& track, MidiControllerState* state, u64 tick, u8 channel, double linearGain,
-               const MidiExportOptions& options, std::optional<ValueQuantization> quantization = std::nullopt) {
+               const MidiExportOptions& options, ValueQuantization quantization = {}) {
   addLevelController(track, state != nullptr ? &state->volume : nullptr, tick, channel, MidiController::ChannelVolume,
                      linearGain, options.volumeResolution, quantization);
 }
 
 void addExpression(MidiTrack& track, MidiControllerState* state, u64 tick, u8 channel, double linearGain,
-                   const MidiExportOptions& options, std::optional<ValueQuantization> quantization = std::nullopt) {
+                   const MidiExportOptions& options, ValueQuantization quantization = {}) {
   addLevelController(track, state != nullptr ? &state->expression : nullptr, tick, channel, MidiController::Expression,
                      linearGain, options.expressionResolution, quantization);
 }
@@ -408,12 +408,12 @@ struct RenderTrackState {
   std::map<u32, SimulatedPitchLfoState> pitchLfos;
   std::optional<size_t> lastPitchBendIndex;
   double sourceLevelGain = 1.0;
-  std::optional<ValueQuantization> sourceLevelQuantization;
+  ValueQuantization sourceLevelQuantization;
   double panLevelGain = 1.0;
   double levelHeadroom = 1.0;
   bool levelEmitted = false;
   double sourceExpressionGain = 1.0;
-  std::optional<ValueQuantization> sourceExpressionQuantization;
+  ValueQuantization sourceExpressionQuantization;
   double simulatedTremoloGain = 1.0;
   enum class TremoloDepthUnit {
     LegacyUnipolar,
@@ -1195,7 +1195,7 @@ void addCombinedExpression(MidiTrack& track, RenderTrackState& state, u64 tick, 
                            MidiControllerState* automationState = nullptr) {
   const bool simulatingTremolo = modulationConversion == ModulationConversionPolicy::SequenceEventSimulation;
   addExpression(track, automationState, tick, channel, state.sourceExpressionGain * state.simulatedTremoloGain, options,
-                simulatingTremolo ? std::nullopt : state.sourceExpressionQuantization);
+                simulatingTremolo ? ValueQuantization{} : state.sourceExpressionQuantization);
 }
 
 [[nodiscard]] double simulatedTremoloGain(const RenderTrackState& state, double lfoValue) {
