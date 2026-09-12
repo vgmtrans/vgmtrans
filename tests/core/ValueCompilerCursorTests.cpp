@@ -635,30 +635,32 @@ void trackDecodeSessionOrdersExceptionalWalkerCommands() {
   const std::vector<u8> bytes{0x40, 0x01, 0xff};
   const u32 end = static_cast<u32>(bytes.size());
   const ByteReader reader(SourceId{30}, bytes);
-  const TrackDecodeScope tracks{
-      .reader = reader,
-      .bytecodeEnd = end,
-  };
-  auto session = tracks.begin(0, 0);
+  SourceMapBuilder sourceMap;
+  SequenceDecodeSession sequence{reader, compilerProbeConfig(), AssetId{30}, reader.range(0, 1), &sourceMap, 4096, end};
+  const auto header = sequence.header().label("Custom Header");
+  const auto pointer = sequence.trackPointer(0, reader.range(0, 1), 0).derived("custom_field", 1);
+  auto session = sequence.trackScope().begin(0, 0);
   session.findOrAppend(decodeProbeCommand(reader, 2, end), 2);
   session.findOrAppend(decodeProbeCommand(reader, 0, end), 0);
   const DecodedBytecodeCommand& retained = session.findOrAppend(decodeProbeCommand(reader, 1, end), 0);
-  const TrackProgram track = session.finish();
+  TrackProgram track = session.finish();
 
   expect(retained.opcode == 0x40 && track.commands.size() == 2 && track.commands[0].address.value == 0 &&
              track.commands[1].address.value == 2,
          "track decode session should retain the first command per address and order commands by source address");
 
-  const SequenceProgramConfig config = compilerProbeConfig();
-  const PerformanceSequence performance = SequenceVm().render(SequenceProgram{
-      .runtime = compilerProbeRuntime(),
-      .timebase = config.timebase,
-      .behavior = config.behavior,
-      .tracks = {track},
-  });
+  const auto trackAnnotation = track.annotation;
+  sequence.addTrack(std::move(track));
+  const PerformanceSequence performance = SequenceVm().render(sequence.finish(compilerProbeRuntime()));
   expect(
       performance.diagnostics.empty() && performance.tracks[0].events.size() == 1 && performance.tracks[0].endTick == 1,
       "ordered exceptional-walker commands should retain their decoded execution flow");
+  const SourceMap annotations = sourceMap.finish();
+  expect(annotations.find(header.id())->label == "Custom Header" &&
+             annotations.find(pointer.id())->parent == header.id() &&
+             annotations.find(pointer.id())->fields.back().name == "custom_field" &&
+             !annotations.find(trackAnnotation)->parent && annotations.assetOwner(trackAnnotation) == AssetId{30},
+         "custom walkers should share editable sequence annotations and track ownership");
 }
 
 void trackDecodeSourceHierarchyDistinguishesTrackedAndTracklessFormats() {

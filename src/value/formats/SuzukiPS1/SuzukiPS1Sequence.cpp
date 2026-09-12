@@ -612,16 +612,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   }
 }
 
-[[nodiscard]] TrackProgram decodeTrack(ByteReader reader, AssetId sequence, u32 trackIndex, u32 start, u32 end,
-                                       SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+[[nodiscard]] TrackProgram decodeTrack(const TrackDecodeScope& tracks, u32 trackIndex, u32 start,
+                                       std::vector<Diagnostic>* diagnostics) {
+  const ByteReader reader = tracks.reader;
+  const u32 end = tracks.bytecodeEnd;
   const TrackLayout layout = analyzeTrack(reader, start, end);
-  const TrackDecodeScope tracks{
-      .reader = reader,
-      .bytecodeEnd = end,
-      .maxCommands = kMaxCommands,
-      .sequenceAsset = sequence,
-      .sourceMap = sourceMap,
-  };
   return tracks.decode(trackIndex, start,
                        [&](u32 offset) { return decodeCommand(reader, offset, end, layout, diagnostics); });
 }
@@ -645,33 +640,29 @@ const SequenceProgramConfig& suzukiPs1SequenceConfig() {
 SequenceProgram parseSuzukiPs1Sequence(ByteReader reader, AssetId id, const SuzukiPs1SequenceLayout& layout,
                                        const std::vector<SuzukiPs1Envelope>& envelopes, SourceMapBuilder* sourceMap,
                                        std::vector<Diagnostic>* diagnostics) {
-  SequenceProgram program = suzukiPs1SequenceConfig().makeProgram();
-  RuntimeConfig runtime{.defaultBank = layout.defaultBank, .envelopes = envelopes};
-  program.runtime = makeCompiledRuntime<Cursor, RuntimeConfig>(std::move(runtime));
-
+  SequenceDecodeSession sequence(reader, suzukiPs1SequenceConfig(), id, reader.range(layout.offset, 0x22), sourceMap,
+                                 kMaxCommands, layout.offset + layout.length);
+  sequence.header()
+      .label("SuzukiPS1 Sequence Header")
+      .kind("suzuki-ps1-sequence-header")
+      .field("size", reader.range(layout.offset + 0x08, 2), layout.length)
+      .field("track_count", reader.range(layout.offset + 0x14, 1), layout.trackCount)
+      .field("percussion_count", reader.range(layout.offset + 0x15, 1), layout.percussionCount)
+      .field("default_bank", reader.range(layout.offset + 0x16, 2), layout.defaultBank)
+      .field("title_offset", reader.range(layout.offset + 0x1e, 2), layout.titleOffset, SourceValueDisplay::Address)
+      .field("percussion_offset", reader.range(layout.offset + 0x20, 2), layout.percussionOffset,
+             SourceValueDisplay::Address);
   if (sourceMap != nullptr) {
-    sourceMap->header("SuzukiPS1 Sequence Header", reader.range(layout.offset, 0x22))
-        .kind("suzuki-ps1-sequence-header")
-        .owner(ObjectRefs::sequence(id))
-        .field("size", reader.range(layout.offset + 0x08, 2), layout.length)
-        .field("track_count", reader.range(layout.offset + 0x14, 1), layout.trackCount)
-        .field("percussion_count", reader.range(layout.offset + 0x15, 1), layout.percussionCount)
-        .field("default_bank", reader.range(layout.offset + 0x16, 2), layout.defaultBank)
-        .field("title_offset", reader.range(layout.offset + 0x1e, 2), layout.titleOffset, SourceValueDisplay::Address)
-        .field("percussion_offset", reader.range(layout.offset + 0x20, 2), layout.percussionOffset,
-               SourceValueDisplay::Address);
     sourceMap->table("Track Pointers", reader.range(layout.offset + 0x22, layout.trackCount * 2))
         .kind("suzuki-ps1-track-pointers")
         .owner(ObjectRefs::sequence(id));
   }
 
-  const u32 end = layout.offset + layout.length;
   for (u32 i = 0; i < layout.trackAddresses.size(); ++i) {
-    auto track = decodeTrack(reader, id, i, layout.trackAddresses[i], end, sourceMap, diagnostics);
-    track.sourceTrackNumber = i;
-    program.tracks.push_back(std::move(track));
+    sequence.addTrack(decodeTrack(sequence.trackScope(), i, layout.trackAddresses[i], diagnostics));
   }
-  return program;
+  return sequence.finish(makeCompiledRuntime<Cursor, RuntimeConfig>(
+      RuntimeConfig{.defaultBank = layout.defaultBank, .envelopes = envelopes}));
 }
 
 }  // namespace vgmtrans::formats::suzuki_ps1

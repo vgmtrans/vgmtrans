@@ -2110,25 +2110,21 @@ SequenceProgram parseAkaoSnesSequence(ByteReader reader, const AkaoSnesLayout& l
   const SequenceHeaderInfo header = sequenceHeaderInfo(reader, layout);
   const SourceRange headerRange = reader.range(header.headerOffset, header.headerSize);
   SequenceDecodeSession session(reader, sharedConfig(), sequenceId, headerRange, sourceMap, 16384, header.sequenceEnd);
-  if (sourceMap != nullptr) {
-    if (const auto annotation = session.headerAnnotation()) {
-      auto source = AnnotationBuilder{*sourceMap, *annotation}
-                        .derived("version", akaoSnesVersionName(layout.version))
-                        .derived("minor_version", akaoSnesMinorVersionName(layout.minorVersion))
-                        .derived("apu_reloc_base", header.apuRelocBase, SourceValueDisplay::Address);
-      if (akaoSnesRelocatable(layout.version) && reader.has(header.headerOffset, 2)) {
-        source.field("rom_reloc_base", reader.range(header.headerOffset, 2), reader.le16(header.headerOffset),
-                     SourceValueDisplay::Address);
-        const u32 endPointerOffset = layout.version == AKAOSNES_V4 ? header.headerOffset + 2
-                                                                   : header.trackPointerOffset + kAkaoSnesMaxTracks * 2;
-        if (reader.has(endPointerOffset, 2)) {
-          source.field("stored_sequence_end", reader.range(endPointerOffset, 2), reader.le16(endPointerOffset),
-                       SourceValueDisplay::Address);
-        }
-      }
-      source.derived("sequence_end", header.sequenceEnd, SourceValueDisplay::Address);
+  auto source = session.header()
+                    .derived("version", akaoSnesVersionName(layout.version))
+                    .derived("minor_version", akaoSnesMinorVersionName(layout.minorVersion))
+                    .derived("apu_reloc_base", header.apuRelocBase, SourceValueDisplay::Address);
+  if (akaoSnesRelocatable(layout.version) && reader.has(header.headerOffset, 2)) {
+    source.field("rom_reloc_base", reader.range(header.headerOffset, 2), reader.le16(header.headerOffset),
+                 SourceValueDisplay::Address);
+    const u32 endPointerOffset =
+        layout.version == AKAOSNES_V4 ? header.headerOffset + 2 : header.trackPointerOffset + kAkaoSnesMaxTracks * 2;
+    if (reader.has(endPointerOffset, 2)) {
+      source.field("stored_sequence_end", reader.range(endPointerOffset, 2), reader.le16(endPointerOffset),
+                   SourceValueDisplay::Address);
     }
   }
+  source.derived("sequence_end", header.sequenceEnd, SourceValueDisplay::Address);
   const AkaoSnesProfile profile{.version = layout.version, .minorVersion = layout.minorVersion};
 
   for (u32 trackNumber = 0; trackNumber < kAkaoSnesMaxTracks; ++trackNumber) {

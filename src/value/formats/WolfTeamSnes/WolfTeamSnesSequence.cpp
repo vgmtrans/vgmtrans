@@ -917,18 +917,10 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   }
 }
 
-[[nodiscard]] TrackProgram decodeTrack(ByteReader reader, const Layout& layout, const ChannelLayout& channel,
-                                       std::optional<AssetId> sequence, std::optional<SourceAnnotationId> parent,
-                                       SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+[[nodiscard]] TrackProgram decodeTrack(const TrackDecodeScope& scope, const Layout& layout,
+                                       const ChannelLayout& channel, std::vector<Diagnostic>* diagnostics) {
+  const ByteReader reader = scope.reader;
   const u32 start = channel.streamStarts.empty() ? 0 : channel.streamStarts.front();
-  TrackDecodeScope scope{
-      .reader = reader,
-      .bytecodeEnd = kAramSize,
-      .maxCommands = kMaxTrackCommands,
-      .sequenceAsset = sequence,
-      .parentAnnotation = parent,
-      .sourceMap = sourceMap,
-  };
   auto session = scope.begin(channel.index, start);
 
   for (const u16 streamStart : channel.streamStarts) {
@@ -1021,30 +1013,28 @@ const SequenceProgramConfig& sequenceConfig() {
 
 TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, const ChannelLayout& channel,
                                std::vector<Diagnostic>* diagnostics) {
-  return decodeTrack(reader, layout, channel, std::nullopt, std::nullopt, nullptr, diagnostics);
+  const TrackDecodeScope scope{.reader = reader, .bytecodeEnd = kAramSize, .maxCommands = kMaxTrackCommands};
+  return decodeTrack(scope, layout, channel, diagnostics);
 }
 
 SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
                              std::vector<Diagnostic>* diagnostics) {
   const SourceRange headerRange = reader.range(layout.sequenceHeaderAddress, layout.headerLength);
-  const auto& config = sequenceConfig();
-  SequenceProgram program = config.makeProgram();
+  auto config = sequenceConfig();
+  config.behavior = behavior(reader, layout);
+  SequenceDecodeSession sequence{reader, config, sequenceId, headerRange, sourceMap, kMaxTrackCommands, kAramSize};
   RuntimeConfig runtime = runtimeConfig(reader, layout);
-  program.behavior = behavior(reader, layout);
-
-  std::optional<SourceAnnotationId> headerParent;
+  auto tracks = sequence.trackScope();
+  const auto header =
+      sequence.header().label(fmt::format("Wolf Team SNES {} Sequence Header", variantName(layout.variant)));
   if (sourceMap != nullptr) {
-    auto header =
-        sourceMap->header(fmt::format("Wolf Team SNES {} Sequence Header", variantName(layout.variant)), headerRange)
-            .kind("wolf-team-snes-sequence-header")
-            .owner(ObjectRefs::sequence(sequenceId));
-    headerParent = header.id();
+    tracks.parentAnnotation = header.id();
     sourceMap
         ->field("Tempo/Timing", reader.range(layout.sequenceHeaderAddress + 0x22, 1),
                 reader.u8At(layout.sequenceHeaderAddress + 0x22))
         .kind("wolf-team-snes-header-tempo")
         .owner(ObjectRefs::sequence(sequenceId))
-        .parent(*headerParent);
+        .parent(header.id());
   }
 
   for (const ChannelLayout& channel : layout.channels) {
@@ -1058,7 +1048,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
       trackRuntime.streamStarts.push_back(Address{start});
     }
     runtime.tracks.emplace(channel.index, std::move(trackRuntime));
-    if (sourceMap != nullptr && headerParent) {
+    if (sourceMap != nullptr) {
       const SourceRange statusRange = reader.range(channel.descriptorRange.offset, 1);
       const SourceRange tablePointerRange = reader.range(channel.descriptorRange.offset + 1, 2);
       const u64 pointerBytes = channel.streamStarts.size() * 2;
@@ -1067,19 +1057,19 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
       sourceMap->field(fmt::format("Channel {} Status", channel.index + 1), statusRange, channel.status)
           .kind("wolf-team-snes-channel-status")
           .owner(ObjectRefs::sequenceTrack(sequenceId, channel.index))
-          .parent(*headerParent);
+          .parent(header.id());
       sourceMap
           ->pointer(fmt::format("Channel {} Stream Table", channel.index + 1), tablePointerRange,
                     SourceTarget{tableRange})
           .kind("wolf-team-snes-channel-pointer")
           .field("destination", tablePointerRange, channel.pointerTableAddress, SourceValueDisplay::Address)
           .owner(ObjectRefs::sequenceTrack(sequenceId, channel.index))
-          .parent(*headerParent);
+          .parent(header.id());
       const SourceAnnotationId table =
           sourceMap->table(fmt::format("Channel {} Stream Pointer Table", channel.index + 1), tableRange)
               .kind("wolf-team-snes-stream-pointer-table")
               .owner(ObjectRefs::sequenceTrack(sequenceId, channel.index))
-              .parent(*headerParent)
+              .parent(header.id())
               .id();
       for (size_t stream = 0; stream < channel.streamStarts.size(); ++stream) {
         const SourceRange pointer = reader.range(channel.pointerTableAddress + stream * 2, 2);
@@ -1092,10 +1082,10 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
             .parent(table);
       }
     }
-    program.tracks.push_back(decodeTrack(reader, layout, channel, sequenceId, headerParent, sourceMap, diagnostics));
+    sequence.addTrack(decodeTrack(tracks, layout, channel, diagnostics));
   }
-  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime));
-  return SequenceParse{.program = std::move(program), .headerRange = headerRange};
+  return SequenceParse{.program = sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime))),
+                       .headerRange = headerRange};
 }
 
 }  // namespace vgmtrans::formats::wolf_team_snes

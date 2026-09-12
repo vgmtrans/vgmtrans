@@ -645,8 +645,8 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
                                  kCommandLimit, kAramSize};
   std::set<u8> programs{0};
 
-  if (const auto header = sequence.headerAnnotation(); sourceMap != nullptr && header) {
-    annotateHeader(reader, layout, sequenceId, *sourceMap, *header);
+  if (sourceMap != nullptr) {
+    annotateHeader(reader, layout, sequenceId, *sourceMap, sequence.header().id());
   }
 
   for (u32 track = 0; track < layout.tracks.size(); ++track) {
