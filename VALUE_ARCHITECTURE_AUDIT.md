@@ -1859,6 +1859,19 @@ under AddressSanitizer and UBSan. The harness is not committed; existing synth
 regressions cover the retained behavior. The full build is warning-free and
 all 20 CTest targets pass. No test code was added.
 
+## Find loop hints through the VM's existing visit ordering
+
+Loop-candidate lookup now uses the visit map's command/call-stack ordering
+instead of scanning every recorded state. An empty repeat map is the first
+possible repeat state for that prefix; checking the returned command and stack
+preserves the previous first-match behavior, including ignoring finite-repeat
+counters. The lookup visits logarithmically many map entries and needs no
+additional index or state. Production line count is unchanged.
+
+Existing VM regressions cover unvisited targets, active repeat counters,
+preserved markers, and coordinated loop stopping. No test code was added.
+The full build is warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
