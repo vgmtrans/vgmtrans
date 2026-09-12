@@ -8,20 +8,12 @@
 
 #include "value/base/CoreTypes.h"
 
-#include <optional>
 #include <string>
 #include <utility>
 
 namespace vgmtrans::core {
 
-[[nodiscard]] inline std::optional<SourceRange> validDiagnosticRange(SourceRange range) {
-  if (!range.valid()) {
-    return std::nullopt;
-  }
-  return range;
-}
-
-[[nodiscard]] inline Diagnostic exportError(std::string message, std::optional<SourceRange> range = std::nullopt) {
+[[nodiscard]] inline Diagnostic exportError(std::string message, SourceRange range = {}) {
   return Diagnostic{
       .severity = Severity::Error,
       .message = std::move(message),
@@ -29,7 +21,7 @@ namespace vgmtrans::core {
   };
 }
 
-[[nodiscard]] inline Diagnostic exportWarning(std::string message, std::optional<SourceRange> range = std::nullopt) {
+[[nodiscard]] inline Diagnostic exportWarning(std::string message, SourceRange range = {}) {
   return Diagnostic{
       .severity = Severity::Warning,
       .message = std::move(message),

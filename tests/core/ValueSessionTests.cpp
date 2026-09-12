@@ -310,6 +310,11 @@ void sessionReportsMissingSequenceRuntime() {
         sequence->program.runtime = {};
       }
     }
+    result.diagnostics.push_back(Diagnostic{
+        .severity = Severity::Warning,
+        .message = "Unattributed format warning",
+        .range = SourceRange{},
+    });
     return result;
   };
   session.registerFormat(std::move(module));
@@ -318,12 +323,14 @@ void sessionReportsMissingSequenceRuntime() {
   session.scanPendingSources();
   const SessionSnapshot project = session.snapshot();
   expect(project.collections().size() == 1, "missing runtime fixture should still scan sequence collections");
-  expect(project.diagnostics().size() == 2, "missing runtime fixture should keep scan and validation diagnostics");
+  expect(project.diagnostics().size() == 3, "missing runtime fixture should keep scan and validation diagnostics");
+  expectDiagnosticRange(project.diagnostics(), "Unattributed format warning",
+                        SourceRange{.source = SourceId{0}, .offset = 0, .size = 1});
 
   const auto& diagnostic = diagnosticWithMessage(project.diagnostics(), "Sequence program has no runtime executor");
   expect(diagnostic.severity == Severity::Error, "missing sequence runtime should be reported as an error");
-  expect(diagnostic.range && diagnostic.range->source == SourceId{0} && diagnostic.range->offset == 0 &&
-             diagnostic.range->size == 1,
+  expect(diagnostic.range.valid() && diagnostic.range.source == SourceId{0} && diagnostic.range.offset == 0 &&
+             diagnostic.range.size == 1,
          "missing sequence runtime diagnostic should point at the sequence asset range");
 
   const auto exports = session.exportAllCollections(ExportRequest{

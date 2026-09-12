@@ -78,7 +78,7 @@ CollectionAssembly& CollectionAssembly::bind(CollectionBinder binder) {
 }
 
 CollectionAssembly& CollectionAssembly::ambiguous(std::string message, std::optional<AssetId> asset,
-                                                  std::optional<SourceRange> range) {
+                                                  SourceRange range) {
   collection_.issues.push_back(ambiguousMatchIssue(std::move(message), asset, range));
   return *this;
 }

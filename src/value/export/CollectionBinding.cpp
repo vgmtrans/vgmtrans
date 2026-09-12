@@ -26,7 +26,7 @@ namespace {
     return RenderedCollection{
         .diagnostics =
             {
-                exportError("Sequence program has no runtime executor", validDiagnosticRange(sequence.metadata.range)),
+                exportError("Sequence program has no runtime executor", sequence.metadata.range),
             },
     };
   }
@@ -41,11 +41,11 @@ namespace {
   } catch (const std::exception& error) {
     return RenderedCollection{
         .diagnostics = {exportError("Sequence rendering failed: " + std::string(error.what()),
-                                    validDiagnosticRange(sequence.metadata.range))},
+                                    sequence.metadata.range)},
     };
   } catch (...) {
     return RenderedCollection{
-        .diagnostics = {exportError("Sequence rendering failed", validDiagnosticRange(sequence.metadata.range))},
+        .diagnostics = {exportError("Sequence rendering failed", sequence.metadata.range)},
     };
   }
   auto modulation = analyzeSequenceModulation(performance);

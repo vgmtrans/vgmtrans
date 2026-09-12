@@ -183,7 +183,7 @@ CollectionId SessionState::createUserCollection(std::string name, CollectionMemb
   return id;
 }
 
-void SessionState::addError(std::string message, std::optional<SourceRange> range) {
+void SessionState::addError(std::string message, SourceRange range) {
   diagnostics_.push_back(Diagnostic{
       .severity = Severity::Error,
       .message = std::move(message),
@@ -299,7 +299,7 @@ void SessionState::removeDiscoveredData(const std::unordered_set<u32>& sourceIds
     return target != nullptr && target->asset.valid() && assetIds.contains(target->asset.value);
   };
   const auto removesDiagnostic = [&](const Diagnostic& diagnostic) {
-    const bool removedSource = diagnostic.range && sourceIds.contains(diagnostic.range->source.value);
+    const bool removedSource = diagnostic.range.valid() && sourceIds.contains(diagnostic.range.source.value);
     const bool removedObject =
         diagnostic.object && diagnostic.object->asset.valid() && assetIds.contains(diagnostic.object->asset.value);
     const bool removedAnnotation = diagnostic.annotation && removedAnnotations.contains(diagnostic.annotation->value);

@@ -99,7 +99,7 @@ public:
   // then recover current collection members through CollectionBindingContext.
   CollectionAssembly& bind(CollectionBinder binder);
   CollectionAssembly& ambiguous(std::string message, std::optional<AssetId> asset = std::nullopt,
-                                std::optional<SourceRange> range = std::nullopt);
+                                SourceRange range = {});
   CollectionAssembly& requireSoundBank();
 
   [[nodiscard]] DesiredCollection finish() &&;

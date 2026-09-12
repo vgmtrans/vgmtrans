@@ -24,7 +24,7 @@ void warning(std::vector<Diagnostic>* diagnostics, std::string message, SourceRa
     diagnostics->push_back(Diagnostic{
         .severity = Severity::Warning,
         .message = std::move(message),
-        .range = range.valid() ? std::optional<SourceRange>{range} : std::nullopt,
+        .range = range,
     });
   }
 }

@@ -70,8 +70,8 @@ inline int scanValueFormatArchive(const std::filesystem::path& path, const Value
         exportFailures += artifact.bytes.empty() || !artifact.diagnostics.empty();
         for (const Diagnostic& diagnostic : artifact.diagnostics) {
           std::cerr << artifact.filename;
-          if (diagnostic.range) {
-            const auto source = std::ranges::find(snapshot.sources(), diagnostic.range->source, &SourceFile::id);
+          if (diagnostic.range.valid()) {
+            const auto source = std::ranges::find(snapshot.sources(), diagnostic.range.source, &SourceFile::id);
             if (source != snapshot.sources().end()) {
               std::cerr << " (" << source->name << ')';
             }

@@ -47,7 +47,7 @@ struct CollectionIssue {
   std::string code;
   std::string message;
   std::optional<AssetId> asset;
-  std::optional<SourceRange> range;
+  SourceRange range;
 };
 
 struct DesiredCollection {
@@ -67,7 +67,6 @@ struct DesiredCollection {
 [[nodiscard]] CollectionIssue missingSoundBankIssue(std::optional<AssetId> asset = std::nullopt);
 [[nodiscard]] CollectionIssue missingSamplePoolIssue(std::optional<AssetId> asset = std::nullopt);
 [[nodiscard]] CollectionIssue ambiguousMatchIssue(std::string message = "Collection has ambiguous matches",
-                                                  std::optional<AssetId> asset = std::nullopt,
-                                                  std::optional<SourceRange> range = std::nullopt);
+                                                  std::optional<AssetId> asset = std::nullopt, SourceRange range = {});
 
 }  // namespace vgmtrans::core

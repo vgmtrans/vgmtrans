@@ -71,8 +71,8 @@ void printDiagnostic(std::ostream& out, const Diagnostic& diagnostic) {
     out << " [" << diagnostic.code << ']';
   }
   out << ": " << diagnostic.message;
-  if (diagnostic.range) {
-    out << " (" << rangeText(*diagnostic.range) << ')';
+  if (diagnostic.range.valid()) {
+    out << " (" << rangeText(diagnostic.range) << ')';
   }
   out << '\n';
 }

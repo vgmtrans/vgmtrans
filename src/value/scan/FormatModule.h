@@ -88,7 +88,7 @@ private:
     diagnostics.push_back(Diagnostic{
         .severity = severity,
         .message = std::move(message),
-        .range = range.valid() ? std::optional<SourceRange>{range} : std::nullopt,
+        .range = range,
     });
   }
 

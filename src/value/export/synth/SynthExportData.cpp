@@ -99,22 +99,20 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
       if (first == last) continue;
       const auto& sample = view.pool.samples[sampleIndex];
       if (!sources.contains(sample.encodedData.source)) {
-        prepared.diagnostics.push_back(
-            exportError("Sample source was not found", validDiagnosticRange(sample.encodedData)));
+        prepared.diagnostics.push_back(exportError("Sample source was not found", sample.encodedData));
         continue;
       }
 
       auto decoded = decodeSample(sample, sources.bytes(sample.encodedData.source));
       if (!decoded) {
-        prepared.diagnostics.push_back(
-            exportError("Unsupported sample codec", validDiagnosticRange(sample.encodedData)));
+        prepared.diagnostics.push_back(exportError("Unsupported sample codec", sample.encodedData));
         continue;
       }
 
       if (options.requireMono && decoded->channels != 1) {
         prepared.diagnostics.push_back(exportWarning(
             options.nonMonoWarning.empty() ? "Skipping non-mono sample for synth export" : options.nonMonoWarning,
-            validDiagnosticRange(sample.encodedData)));
+            sample.encodedData));
         continue;
       }
 
@@ -186,7 +184,7 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
       const auto sample = samples.find({region.sample.owner().value, region.sample.index(), region.invertSamplePhase,
                                         region.sampleStartFrame});
       if (sample == samples.end()) {
-        diagnostics.push_back(exportError("Region sample reference was not found", validDiagnosticRange(region.range)));
+        diagnostics.push_back(exportError("Region sample reference was not found", region.range));
         continue;
       }
 

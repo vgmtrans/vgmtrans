@@ -25,7 +25,7 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
         report.error("sequence.track.command-order",
                      "Sequence track contained duplicate or out-of-order command address " +
                          std::to_string(command.address.value),
-                     command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
+                     command.range);
       }
     }
     if (!track.commands.empty() &&
@@ -43,9 +43,8 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
     for (const auto& command : playlist.commands) {
       if (!playlistAddresses.insert(command.address.value).second) {
         report.error("sequence.playlist.duplicate-command",
-                     "Sequence playlist contained duplicate command address " +
-                         std::to_string(command.address.value),
-                     command.range.valid() ? std::optional<SourceRange>{command.range} : std::nullopt);
+                     "Sequence playlist contained duplicate command address " + std::to_string(command.address.value),
+                     command.range);
       }
     }
     if (!playlistAddresses.contains(playlist.startAddress.value)) {
