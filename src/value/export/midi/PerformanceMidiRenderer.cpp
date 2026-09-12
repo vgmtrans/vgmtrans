@@ -210,20 +210,14 @@ struct MidiLevelState {
   friend bool operator==(const MidiLevelState&, const MidiLevelState&) = default;
 };
 
-struct MidiControllerState {
-  std::optional<MidiLevelState> volume;
-  std::optional<MidiLevelState> expression;
-  std::optional<u8> pan;
-};
-
-void addLevelController(MidiTrack& track, std::optional<MidiLevelState>* state, u64 tick, u8 channel,
+void addLevelController(MidiTrack& track, std::optional<MidiLevelState>& state, u64 tick, u8 channel,
                         MidiController controller, double linearGain, MidiLevelResolution requestedResolution,
-                        ValueQuantization quantization = {}) {
+                        ValueQuantization quantization, bool force) {
   const MidiLevelResolution resolution = resolveLevelResolution(requestedResolution, quantization);
   const u16 value = resolution == MidiLevelResolution::FourteenBit ? LevelScale::midi14FromLinear(linearGain)
                                                                    : LevelScale::midi7FromLinear(linearGain);
   const MidiLevelState nextState{.resolution = resolution, .value = value};
-  if (state != nullptr && state->has_value() && **state == nextState) {
+  if (!force && state == nextState) {
     return;
   }
 
@@ -232,31 +226,15 @@ void addLevelController(MidiTrack& track, std::optional<MidiLevelState>* state, 
   } else {
     addController(track, tick, channel, controller, static_cast<u8>(value));
   }
-  if (state != nullptr) {
-    *state = nextState;
-  }
+  state = nextState;
 }
 
-void addVolume(MidiTrack& track, MidiControllerState* state, u64 tick, u8 channel, double linearGain,
-               const MidiExportOptions& options, ValueQuantization quantization = {}) {
-  addLevelController(track, state != nullptr ? &state->volume : nullptr, tick, channel, MidiController::ChannelVolume,
-                     linearGain, options.volumeResolution, quantization);
-}
-
-void addExpression(MidiTrack& track, MidiControllerState* state, u64 tick, u8 channel, double linearGain,
-                   const MidiExportOptions& options, ValueQuantization quantization = {}) {
-  addLevelController(track, state != nullptr ? &state->expression : nullptr, tick, channel, MidiController::Expression,
-                     linearGain, options.expressionResolution, quantization);
-}
-
-void addPan(MidiTrack& track, MidiControllerState* state, u64 tick, u8 channel, u8 value) {
-  if (state != nullptr && state->pan && *state->pan == value) {
+void addPan(MidiTrack& track, std::optional<u8>& state, u64 tick, u8 channel, u8 value, bool force) {
+  if (!force && state == value) {
     return;
   }
   addController(track, tick, channel, MidiController::Pan, value);
-  if (state != nullptr) {
-    state->pan = value;
-  }
+  state = value;
 }
 
 struct MidiInstrumentSelection {
@@ -400,7 +378,10 @@ struct RenderTrackState {
   ValueQuantization sourceLevelQuantization;
   double panLevelGain = 1.0;
   double levelHeadroom = 1.0;
-  bool levelEmitted = false;
+  // The channel has one value per controller, shared by all automations and
+  // ordinary writes. Source commands can force a repeated write to survive.
+  std::optional<MidiLevelState> lastVolume;
+  std::optional<MidiLevelState> lastExpression;
   double sourceExpressionGain = 1.0;
   ValueQuantization sourceExpressionQuantization;
   double simulatedTremoloGain = 1.0;
@@ -1167,20 +1148,21 @@ void releaseHeldPitchLfoOutputs(MidiTrack& track, RenderTrackState& state, u64 t
 // factor bounds that gain without changing the mix between tracks. Keep it on
 // channel volume so source expression remains an independent control flow.
 void addCombinedLevel(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, const MidiExportOptions& options,
-                      MidiControllerState* automationState = nullptr) {
-  addVolume(track, automationState, tick, channel, state.sourceLevelGain * state.panLevelGain * state.levelHeadroom,
-            options, state.sourceLevelQuantization);
-  state.levelEmitted = true;
+                      bool force = true) {
+  addLevelController(track, state.lastVolume, tick, channel, MidiController::ChannelVolume,
+                     state.sourceLevelGain * state.panLevelGain * state.levelHeadroom, options.volumeResolution,
+                     state.sourceLevelQuantization, force);
 }
 
 // Source expression and simulated tremolo share the remaining MIDI expression
 // controller. Pan conversion deliberately does not participate in this product.
 void addCombinedExpression(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
                            const MidiExportOptions& options, ModulationConversionPolicy modulationConversion,
-                           MidiControllerState* automationState = nullptr) {
+                           bool force = true) {
   const bool simulatingTremolo = modulationConversion == ModulationConversionPolicy::SequenceEventSimulation;
-  addExpression(track, automationState, tick, channel, state.sourceExpressionGain * state.simulatedTremoloGain, options,
-                simulatingTremolo ? ValueQuantization{} : state.sourceExpressionQuantization);
+  addLevelController(track, state.lastExpression, tick, channel, MidiController::Expression,
+                     state.sourceExpressionGain * state.simulatedTremoloGain, options.expressionResolution,
+                     simulatingTremolo ? ValueQuantization{} : state.sourceExpressionQuantization, force);
 }
 
 [[nodiscard]] double simulatedTremoloGain(const RenderTrackState& state, double lfoValue) {
@@ -1265,7 +1247,7 @@ bool shouldRestartSimulatedTremoloForNote(const NotePerformanceEvent& note, cons
 }
 
 void addCombinedPan(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel, const MidiExportOptions& options,
-                    MidiControllerState* automationState = nullptr, bool force = false) {
+                    bool force = false) {
   const double position = std::clamp(state.sourcePanPosition + state.simulatedPanOffset, -1.0, 1.0);
   const PanLaw law = state.panLfo.panLaw != PanLaw::Unspecified ? state.panLfo.panLaw : state.sourcePanLaw;
   u8 value = midiPan(position);
@@ -1275,17 +1257,10 @@ void addCombinedPan(MidiTrack& track, RenderTrackState& state, u64 tick, u8 chan
     value = lowered.pan;
     levelGain = lowered.gain * state.sourcePanLinearGain;
   }
-  if (automationState == nullptr && !force && state.lastPanValue && *state.lastPanValue == value) {
-    if (levelGain == state.panLevelGain) {
-      return;
-    }
-  } else {
-    addPan(track, automationState, tick, channel, value);
-    state.lastPanValue = value;
-  }
+  addPan(track, state.lastPanValue, tick, channel, value, force);
   if (levelGain != state.panLevelGain) {
     state.panLevelGain = levelGain;
-    addCombinedLevel(track, state, tick, channel, options, automationState);
+    addCombinedLevel(track, state, tick, channel, options, force);
   }
 }
 
@@ -1326,7 +1301,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                   u32 sourceTrackNumber, std::span<const GlobalTransposePerformanceEvent* const> globalTransposes,
                   const PerformanceTempoMap& globalTempos, const MidiExportOptions& options,
                   ModulationConversionPolicy modulationConversion, std::span<const SoundBankAsset* const> soundBanks,
-                  const SequenceModulationProfile* modulationProfile, MidiControllerState* automationState) {
+                  const SequenceModulationProfile* modulationProfile) {
+  const bool forceControllers = !performanceEventHeader(event).automation;
   std::visit(
       [&](const auto& typedEvent) {
         using TypedEvent = std::decay_t<decltype(typedEvent)>;
@@ -1370,7 +1346,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             addController(track, typedEvent.header.tick, channel, MidiController::AllSoundOff, 0,
                           kVoiceTerminationPriority);
           }
-          if (!state.levelEmitted &&
+          if (!state.lastVolume &&
               (state.levelHeadroom != 1.0 || state.sourceLevelGain != 1.0 || state.panLevelGain != 1.0)) {
             addCombinedLevel(track, state, typedEvent.header.tick, channel, options);
           }
@@ -1390,18 +1366,17 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
         } else if constexpr (std::is_same_v<TypedEvent, LevelPerformanceEvent>) {
           state.sourceLevelGain = typedEvent.linearGain;
           state.sourceLevelQuantization = typedEvent.sourceQuantization;
-          addCombinedLevel(track, state, typedEvent.header.tick, channel, options, automationState);
+          addCombinedLevel(track, state, typedEvent.header.tick, channel, options, forceControllers);
         } else if constexpr (std::is_same_v<TypedEvent, ExpressionPerformanceEvent>) {
           state.sourceExpressionGain = typedEvent.linearGain;
           state.sourceExpressionQuantization = typedEvent.sourceQuantization;
           addCombinedExpression(track, state, typedEvent.header.tick, channel, options, modulationConversion,
-                                automationState);
+                                forceControllers);
         } else if constexpr (std::is_same_v<TypedEvent, PanPerformanceEvent>) {
           state.sourcePanPosition = typedEvent.stereoPosition;
           state.sourcePanLinearGain = typedEvent.linearGain;
           state.sourcePanLaw = typedEvent.law;
-          addCombinedPan(track, state, typedEvent.header.tick, channel, options, automationState,
-                         automationState == nullptr);
+          addCombinedPan(track, state, typedEvent.header.tick, channel, options, forceControllers);
         } else if constexpr (std::is_same_v<TypedEvent, ChannelPanPerformanceEvent>) {
           // MIDI/SF2 already applies CC10 to each voice's intrinsic region pan.
           // Preserve that native composition without aggregate-pan gain repair.
@@ -1411,11 +1386,10 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           state.simulatedPanOffset = 0.0;
           state.panLfo = {};
           const u8 value = data7(std::clamp(typedEvent.position, 0.0, 1.0) * 127.0);
-          addPan(track, automationState, typedEvent.header.tick, channel, value);
-          state.lastPanValue = value;
+          addPan(track, state.lastPanValue, typedEvent.header.tick, channel, value, forceControllers);
           if (state.panLevelGain != 1.0) {
             state.panLevelGain = 1.0;
-            addCombinedLevel(track, state, typedEvent.header.tick, channel, options, automationState);
+            addCombinedLevel(track, state, typedEvent.header.tick, channel, options, forceControllers);
           }
         } else if constexpr (std::is_same_v<TypedEvent, StereoBalancePerformanceEvent>) {
           const LoweredStereoBalance lowered = lowerStereoBalance(typedEvent.leftGain, typedEvent.rightGain);
@@ -1425,10 +1399,9 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           state.sourcePanPosition = sum == 0.0 ? 0.0 : (right - left) / sum;
           state.sourcePanLinearGain = sum;
           state.sourcePanLaw = PanLaw::Unspecified;
-          addPan(track, automationState, typedEvent.header.tick, channel, lowered.pan);
-          state.lastPanValue = lowered.pan;
+          addPan(track, state.lastPanValue, typedEvent.header.tick, channel, lowered.pan, forceControllers);
           state.panLevelGain = lowered.gain;
-          addCombinedLevel(track, state, typedEvent.header.tick, channel, options, automationState);
+          addCombinedLevel(track, state, typedEvent.header.tick, channel, options, forceControllers);
         } else if constexpr (std::is_same_v<TypedEvent, MasterLevelPerformanceEvent>) {
           const u16 value = LevelScale::midi14FromLinear(typedEvent.linearGain);
           track.events.push_back(midi::sysex(
@@ -1623,7 +1596,6 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
     };
     RenderTrackState renderState{performance.tracks[trackIndex], globalTempos};
     renderState.levelHeadroom = levelHeadroom;
-    std::unordered_map<PerformanceAutomationId, MidiControllerState> automationControllerStates;
     const auto pitchBendRangeChanges = planVoicePitchBendRanges(timelines[trackIndex], options.tuning, soundBanks);
     size_t nextPitchBendRangeChange = 0;
     const auto assignment = midiChannelAssignment(trackIndex, options);
@@ -1667,11 +1639,8 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
                               modulationConversion);
       }
       flushSimulatedPan(midiTrack, renderState, otherFlushTick, assignment.channel, globalTempos, options);
-      MidiControllerState* automationState =
-          header.automation ? &automationControllerStates[*header.automation] : nullptr;
       addMidiEvent(midiTrack, renderState, *event, assignment.channel, performanceTrack.sourceTrackNumber,
-                   globalTransposes, globalTempos, options, modulationConversion, soundBanks, modulationProfile,
-                   automationState);
+                   globalTransposes, globalTempos, options, modulationConversion, soundBanks, modulationProfile);
     }
     u64 endTick = performanceTrack.endTick;
     flushSimulatedVibrato(midiTrack, renderState, endTick, assignment.channel, globalTempos);
