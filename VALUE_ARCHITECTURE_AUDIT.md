@@ -1370,6 +1370,19 @@ missing-runtime session test fails before the change and passes afterward;
 adapting the shared assertion helper leaves a net six added test lines. The full
 build is warning-free and all 20 CTest targets pass.
 
+### Read AkaoSnes pitch boundaries from the current track
+
+Replace the program-wide terminal-pitch address set and its full command walk
+with a short look-ahead in Playback. The track already owns the decoded command
+graph; playback inspects at most two commands to recognize an end or envelope-off
+followed by an end or backward jump. Note commands occupy one byte, so a jump
+before their continuation is a jump back to or before that note.
+
+This removes 23 production lines, the extra set, and its initialization pass.
+Existing coverage checks terminal envelope boundaries, backward loops, sounding
+note transitions, and rests. The full build is warning-free and all 20 CTest
+targets pass; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
