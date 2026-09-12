@@ -1872,6 +1872,28 @@ Existing VM regressions cover unvisited targets, active repeat counters,
 preserved markers, and coordinated loop stopping. No test code was added.
 The full build is warning-free and all 20 CTest targets pass.
 
+## Simplify retained MIDI oscillator state
+
+Future-note LFO delay is now an ordinary value. Before the first delay update,
+both current and future delay are zero; every subsequent update already sets
+the future value. There was no distinct absent state to preserve at note
+restart. One `canSampleImmediately()` predicate now serves the command-restart,
+note-vibrato, and note-tremolo paths.
+
+Oscillators also borrow their waveform from the immutable lowered performance
+instead of copying its optional sample table on every configuration event.
+That performance outlives all per-track rendering state, and configuration
+only receives its retained events. This removes repeated waveform allocation
+without changing the public performance model. Net production reduction is
+three lines; no test code is added.
+
+A temporary comparison produces identical MIDI bytes and diagnostic counts
+in 3,072 scenarios across both modulation policies, waveform/sample tables,
+restart modes, inactive oscillators, current/future delay changes, physical and
+tick delays, and note extensions. Both renderer versions run under
+AddressSanitizer and UBSan; the harness is not committed. The full build is
+warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
@@ -1881,6 +1903,9 @@ The full build is warning-free and all 20 CTest targets pass.
   PitchTransitionIntent::previousNote can express continuity before note flags
   reflect it; existing linked-note tests require the prior instrument's pitch
   context. Resetting every plain note's instrument would break that behavior.
+  Pitch-bend lowering also requires an uncanceled link beginning by the note's
+  attack, a matching lane, and an earlier predecessor before inheriting a
+  voice. A canonical continuity analysis must preserve those conditions.
 - SonyPS2 still approximates key/velocity-dependent regions during scanning
   under a 3,000-region budget chosen for SF2 table limits. Moving this policy
   to export needs a source-neutral representation of that response; merely
