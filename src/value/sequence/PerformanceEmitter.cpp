@@ -675,43 +675,6 @@ void PerformanceEmitter::append(PerformanceEvent event) {
   track_.events.emplace_back(std::move(event));
 }
 
-void PerformanceEmitter::automationSample(u32 automation, double value) {
-  if (automation >= track_.automations.size()) {
-    throw std::logic_error("Performance automation binding was not valid for this track");
-  }
-  auto* pitch = pitchTransitionIntent(track_.automations[automation]);
-  if (pitch == nullptr) {
-    throw std::logic_error("Only pitch-transition automation accepts scalar pitch samples");
-  }
-  if (!std::holds_alternative<SampledAutomationCurve>(pitch->curve)) {
-    SampledAutomationCurve sampled;
-    sampled.samples.push_back(AutomationSample{
-        .tickOffset = 0,
-        .value = pitch->startKey,
-    });
-    if (pitch->timing.timelineTicks != 0) {
-      sampled.samples.push_back(AutomationSample{
-          .tickOffset = pitch->timing.timelineTicks,
-          .value = pitch->targetKey,
-      });
-    }
-    pitch->curve = std::move(sampled);
-  }
-  auto& samples = std::get<SampledAutomationCurve>(pitch->curve).samples;
-  const u64 startTick = track_.automations[automation].realization.startTick;
-  const u64 elapsed = tick_ > startTick ? tick_ - startTick : 0;
-  const u32 offset = static_cast<u32>(std::min<u64>(elapsed, std::numeric_limits<u32>::max()));
-  const auto found = std::ranges::lower_bound(samples, offset, {}, &AutomationSample::tickOffset);
-  if (found != samples.end() && found->tickOffset == offset) {
-    found->value = value;
-  } else {
-    samples.insert(found, AutomationSample{
-                              .tickOffset = offset,
-                              .value = value,
-                          });
-  }
-}
-
 void PerformanceAutomationBinding::stop(const PerformanceEmitter& out) const {
   if (owner_ == nullptr) {
     return;
@@ -757,15 +720,41 @@ void PerformanceAutomationBinding::interruptAt(u64 tick) {
   clear();
 }
 
-void PerformanceAutomationBinding::sample(const PerformanceEmitter& out, double value) const {
+void PitchSlideBinding::sample(const PerformanceEmitter& out, double key) const {
   if (owner_ == nullptr) {
     return;
   }
   if (owner_ != &out.track_) {
     throw std::logic_error("Performance automation binding belongs to another track");
   }
-  auto output = out;
-  output.automationSample(automation_, value);
+  auto* pitch = intent();
+  if (!std::holds_alternative<SampledAutomationCurve>(pitch->curve)) {
+    SampledAutomationCurve sampled;
+    sampled.samples.push_back(AutomationSample{
+        .tickOffset = 0,
+        .value = pitch->startKey,
+    });
+    if (pitch->timing.timelineTicks != 0) {
+      sampled.samples.push_back(AutomationSample{
+          .tickOffset = pitch->timing.timelineTicks,
+          .value = pitch->targetKey,
+      });
+    }
+    pitch->curve = std::move(sampled);
+  }
+  auto& samples = std::get<SampledAutomationCurve>(pitch->curve).samples;
+  const u64 startTick = owner_->automations[automation_].realization.startTick;
+  const u64 elapsed = out.tick_ > startTick ? out.tick_ - startTick : 0;
+  const u32 offset = static_cast<u32>(std::min<u64>(elapsed, std::numeric_limits<u32>::max()));
+  const auto found = std::ranges::lower_bound(samples, offset, {}, &AutomationSample::tickOffset);
+  if (found != samples.end() && found->tickOffset == offset) {
+    found->value = key;
+  } else {
+    samples.insert(found, AutomationSample{
+                              .tickOffset = offset,
+                              .value = key,
+                          });
+  }
 }
 
 PitchTransitionIntent* PitchSlideBinding::intent() const {

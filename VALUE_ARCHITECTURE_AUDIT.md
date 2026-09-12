@@ -1669,6 +1669,18 @@ callbacks, and loop counts (trace digest 76111302ff6e9327). Existing section and
 HOSA loop tests pass. The full build is warning-free and all 20 CTest targets
 pass.
 
+## Restrict sampled pitch output to pitch bindings
+
+Move `sample()` from `PerformanceAutomationBinding` to `PitchSlideBinding`.
+Scalar fades never supported this operation: the general binding forwarded to
+an emitter method that rejected every non-pitch automation at runtime. The pitch
+binding now updates its own intent directly, using its existing validation and
+preserving sampled endpoints, ordering, replacement, and track ownership checks.
+
+This removes ten production lines and an unsupported operation from the general
+API. Existing pitch sampling and lifecycle coverage passes without additional
+test scaffolding. The full build is warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

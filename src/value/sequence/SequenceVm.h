@@ -182,12 +182,12 @@ public:
 
 private:
   friend class PerformanceAutomationBinding;
+  friend class PitchSlideBinding;
 
   [[nodiscard]] PerformanceAutomationBinding beginAutomation(ScalarPerformanceAutomationIntent intent);
   [[nodiscard]] PerformanceEmitter withAutomation(const PerformanceAutomationBinding& automation) const;
   [[nodiscard]] PerformanceEventHeader header();
   void append(PerformanceEvent event);
-  void automationSample(u32 automation, double value);
   void interruptPitchSlidesForNewNote(PerformanceLaneId lane);
   [[nodiscard]] detail::ActiveNoteState& activeNotes() const;
   void finishActiveNote(const detail::ActiveNoteState::Note& note, u64 endTick);
@@ -226,7 +226,6 @@ public:
   // Song-wide automation can be interrupted by a command emitted from a
   // different track, where no owner-track PerformanceEmitter is available.
   void interruptAt(u64 tick);
-  void sample(const PerformanceEmitter& out, double value) const;
 
 private:
   friend class PerformanceEmitter;
@@ -249,6 +248,8 @@ class PitchSlideBinding : public PerformanceAutomationBinding {
 public:
   PitchSlideBinding() = default;
 
+  // Add the source driver's calculated pitch at this emitter's tick.
+  void sample(const PerformanceEmitter& out, double key) const;
   PitchSlideBinding& continueFrom(PerformanceNoteId previousNote);
   PitchSlideBinding& continueAcrossNotes(bool enabled = true);
   // Export preferences; neither changes the source transition's semantics.
