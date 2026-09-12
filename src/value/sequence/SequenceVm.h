@@ -71,6 +71,8 @@ public:
                      std::vector<SourcePlaybackSpan>* sourceSpans = nullptr);
 
   [[nodiscard]] PerformanceEmitter at(u64 tick) const;
+  // Emits relative to this emitter, saturating at the last tick without advancing the VM.
+  [[nodiscard]] PerformanceEmitter after(u32 ticks) const;
   PerformanceNoteId note(NotePerformanceEvent event);
   PerformanceNoteId note(double key, double linearVelocity, u32 durationTicks, bool extendsPrevious = false);
   // The VM pairs separate Note On and Note Off commands into an ordinary

@@ -112,12 +112,6 @@ struct Playback {
     }
   }
 
-  [[nodiscard]] u64 eventTick(u32 delta) const {
-    return vm.tick() > std::numeric_limits<u64>::max() - delta ? std::numeric_limits<u64>::max() : vm.tick() + delta;
-  }
-
-  [[nodiscard]] Effects after(u32 delta) const { return Effects::wait(delta); }
-
   [[nodiscard]] const HeartBeatPs1Tone* currentTone(u8 key) const {
     const auto& instruments = programState.config.instruments;
     const auto instrument = std::ranges::find_if(
@@ -137,9 +131,9 @@ struct Playback {
 
   Effects noteOn(u8 channel, u8 key, u8 velocity, u32 delta) {
     if (channel != track.channel) {
-      return after(delta);
+      return Effects::wait(delta);
     }
-    auto delayed = out.at(eventTick(delta));
+    auto delayed = out.after(delta);
     const PerformanceNoteId note = delayed.noteOn(key, driverLevel(velocity));
     if (track.portamento && track.previousKey && *track.previousKey != key && track.portamentoMilliseconds > 0.0) {
       delayed
@@ -149,22 +143,22 @@ struct Playback {
           .useCurrentPortamentoTiming();
     }
     track.previousKey = key;
-    return after(delta);
+    return Effects::wait(delta);
   }
 
   Effects noteOff(u8 channel, u8 key, u32 delta) {
     if (channel == track.channel) {
-      out.at(eventTick(delta)).noteOff(key);
+      out.after(delta).noteOff(key);
     }
-    return after(delta);
+    return Effects::wait(delta);
   }
 
   Effects program(u8 channel, u8 value, u32 delta) {
     if (channel == track.channel) {
       track.program = value;
-      out.at(eventTick(delta)).instrument(heartBeatPs1InstrumentIdentity(track.bank, track.program));
+      out.after(delta).instrument(heartBeatPs1InstrumentIdentity(track.bank, track.program));
     }
-    return after(delta);
+    return Effects::wait(delta);
   }
 
   [[nodiscard]] LfoPerformanceContext lfoContext(const LfoState& state) const {
@@ -202,9 +196,9 @@ struct Playback {
 
   Effects controller(u8 channel, u8 controller, u8 value, u32 delta) {
     if (channel != track.channel) {
-      return after(delta);
+      return Effects::wait(delta);
     }
-    auto delayed = out.at(eventTick(delta));
+    auto delayed = out.after(delta);
     switch (controller) {
       case 1:
         track.modulation = value;
@@ -331,12 +325,12 @@ struct Playback {
         // remain fully decoded even though value-core has no matching event.
         break;
     }
-    return after(delta);
+    return Effects::wait(delta);
   }
 
   Effects pitchBend(u8 channel, u16 value, u32 delta) {
     if (channel != track.channel) {
-      return after(delta);
+      return Effects::wait(delta);
     }
     const double wheel =
         value < 8192 ? (static_cast<double>(value) - 8192.0) / 8192.0 : (static_cast<double>(value) - 8192.0) / 8191.0;
@@ -346,24 +340,24 @@ struct Playback {
         semitones = wheel < 0.0 ? wheel * tone->bendDownSemitones : wheel * tone->bendUpSemitones;
       }
     }
-    out.at(eventTick(delta)).pitchBend(semitones, kPitchWheelLayer);
-    return after(delta);
+    out.after(delta).pitchBend(semitones, kPitchWheelLayer);
+    return Effects::wait(delta);
   }
 
   Effects tempo(u32 microsecondsPerQuarter, u32 delta) {
     if (microsecondsPerQuarter != 0) {
       track.tempo = microsecondsPerQuarter;
       if (track.channel == 0) {
-        out.at(eventTick(delta)).tempo(microsecondsPerQuarter);
+        out.after(delta).tempo(microsecondsPerQuarter);
       }
     }
-    return after(delta);
+    return Effects::wait(delta);
   }
 
-  Effects sourceOnly(u32 delta) { return after(delta); }
+  Effects sourceOnly(u32 delta) { return Effects::wait(delta); }
 
   Effects loopEnd(u8 count, Address destination, u32 delta) {
-    Effects effects = after(delta);
+    Effects effects = Effects::wait(delta);
     if (count == 127) {
       effects.flowOverride = vm.declaredLoop(destination).flowOverride;
     } else if (count != 0) {

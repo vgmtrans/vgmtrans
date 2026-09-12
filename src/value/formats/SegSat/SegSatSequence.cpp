@@ -285,10 +285,6 @@ struct Playback {
   PerformanceEmitter& out;
   VmApi& vm;
 
-  [[nodiscard]] u64 eventTick(u16 delta) const {
-    return vm.tick() > std::numeric_limits<u64>::max() - delta ? std::numeric_limits<u64>::max() : vm.tick() + delta;
-  }
-
   [[nodiscard]] Effects afterEvent(u16 delta) {
     Effects effects = Effects::wait(delta);
     if (track.remainingLoopEvents != 0 && --track.remainingLoopEvents == 0) {
@@ -306,14 +302,14 @@ struct Playback {
     duration = static_cast<u16>(duration + track.durationExtension);
     track.durationExtension = 0;
     if (channel == track.channel) {
-      out.at(eventTick(delta)).note(key, LevelScale::linearFromMidi7(velocity), duration);
+      out.after(delta).note(key, LevelScale::linearFromMidi7(velocity), duration);
     }
     return afterEvent(delta);
   }
 
   Effects controller(u8 channel, u8 controller, u8 value, u16 delta) {
     if (channel == track.channel) {
-      auto delayed = out.at(eventTick(delta));
+      auto delayed = out.after(delta);
       switch (controller) {
         case 1:
           delayed.modulation(ModulationPerformanceTarget::VibratoDepth, value / 127.0);
@@ -372,7 +368,7 @@ struct Playback {
     // streams and must not change the active instrument.
     if ((encodedProgram & 0x80) == 0 && channel == track.channel) {
       track.program = encodedProgram;
-      out.at(eventTick(delta)).instrument(segSatInstrumentIdentity(track.bank, track.program));
+      out.after(delta).instrument(segSatInstrumentIdentity(track.bank, track.program));
     }
     return afterEvent(delta);
   }
@@ -383,11 +379,10 @@ struct Playback {
     if ((encoded & 0x80) == 0 && channel == track.channel) {
       const s16 bend = static_cast<s16>((static_cast<s32>(encoded) << 7) - 8192);
       const double wheelPosition = bend / 8192.0;
-      out.at(eventTick(delta))
-          .pitchBend(PitchBendPerformanceEvent{
-              .semitones = wheelPosition * 2.0,
-              .normalizedWheelPosition = wheelPosition,
-          });
+      out.after(delta).pitchBend(PitchBendPerformanceEvent{
+          .semitones = wheelPosition * 2.0,
+          .normalizedWheelPosition = wheelPosition,
+      });
     }
     return afterEvent(delta);
   }

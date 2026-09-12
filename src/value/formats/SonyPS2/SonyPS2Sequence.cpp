@@ -122,10 +122,6 @@ struct ProgramState {
   std::vector<ProgramRuntimeInfo> programs;
 };
 
-[[nodiscard]] u64 delayedTick(const VmApi& vm, u32 delta) {
-  return vm.tick() > std::numeric_limits<u64>::max() - delta ? std::numeric_limits<u64>::max() : vm.tick() + delta;
-}
-
 [[nodiscard]] double linearMidi7(u8 value) {
   return std::min<u8>(value, 127) / 127.0;
 }
@@ -319,11 +315,9 @@ struct Playback {
     }
   }
 
-  [[nodiscard]] Effects after(u32 delta) const { return Effects::wait(delta); }
-
   Effects note(u8 channel, u8 key, u8 velocity, u32 delta) {
     if (channel == track.channel) {
-      auto delayed = out.at(delayedTick(vm, delta));
+      auto delayed = out.after(delta);
       if (velocity == 0) {
         delayed.noteOff(key);
         releaseNotes(key);
@@ -336,22 +330,22 @@ struct Playback {
         track.activeNotes.push_back(note);
       }
     }
-    return after(delta);
+    return Effects::wait(delta);
   }
 
   Effects noteOff(u8 channel, u8 key, u32 delta) {
     if (channel == track.channel) {
-      auto delayed = out.at(delayedTick(vm, delta));
+      auto delayed = out.after(delta);
       delayed.noteOff(key);
       releaseNotes(key);
       capturePortamentoSource(key);
     }
-    return after(delta);
+    return Effects::wait(delta);
   }
 
   Effects seNote(u8 set, u8 timbre, u8 key, u8 velocity, bool noteOnOnly, u32 delta) {
     if (track.seSequence && set == track.seSet && timbre == track.seTimbre && key == track.seKey) {
-      auto delayed = out.at(delayedTick(vm, delta));
+      auto delayed = out.after(delta);
       if (velocity == 0) {
         delayed.noteOff(key);
         track.seNote = {};
@@ -364,38 +358,38 @@ struct Playback {
         track.seTerminalKey = key;
       }
     }
-    return after(delta);
+    return Effects::wait(delta);
   }
 
   Effects sePitch(u8 set, u8 timbre, u8 key, u16 cents, bool negative, u32 time, u32 delta) {
     if (track.seSequence && set == track.seSet && timbre == track.seTimbre && key == track.seKey &&
         track.seNote.valid()) {
-      auto delayed = out.at(delayedTick(vm, delta));
+      auto delayed = out.after(delta);
       const double start = delayed.currentPitchTransitionKey(track.seNote).value_or(track.seTerminalKey);
       const double target = start + (negative ? -cents : cents) / 100.0;
       const u32 duration = std::max<u32>(time, 1);
       delayed.pitchSlide(track.seNote, start, target, PitchSlideTiming::fixedDuration(duration, duration));
       track.seTerminalKey = target;
     }
-    return after(delta);
+    return Effects::wait(delta);
   }
 
   Effects programChange(u8 channel, u8 value, u32 delta) {
     if (channel == track.channel) {
       track.bank = track.pendingBank;
       track.program = value;
-      auto delayed = out.at(delayedTick(vm, delta));
+      auto delayed = out.after(delta);
       delayed.instrument(instrumentIdentity(track.bank, track.program));
       updateProgramSettings(delayed);
     }
-    return after(delta);
+    return Effects::wait(delta);
   }
 
   Effects controller(u8 channel, u8 controller, u8 value, u32 delta) {
     if (channel != track.channel) {
-      return after(delta);
+      return Effects::wait(delta);
     }
-    auto delayed = out.at(delayedTick(vm, delta));
+    auto delayed = out.after(delta);
     switch (controller) {
       case 0:
         // Like the driver, Bank Select only stages the bank used by the next
@@ -545,14 +539,14 @@ struct Playback {
       default:
         break;
     }
-    return after(delta);
+    return Effects::wait(delta);
   }
 
   Effects pitchBend(u8 channel, u16 value, u32 delta) {
     if (channel == track.channel) {
       track.pitchBendValue = std::min<u16>(value, 16383);
       if (!track.activeNotes.empty()) {
-        auto delayed = out.at(delayedTick(vm, delta));
+        auto delayed = out.after(delta);
         // The original driver updates every live voice with that voice's split
         // range. A track-wide event is exact while those ranges agree; if they
         // differ concurrently, prefer the most recently started voice until
@@ -560,21 +554,21 @@ struct Playback {
         emitCurrentPitchBend(delayed, track.activeNotes.back());
       }
     }
-    return after(delta);
+    return Effects::wait(delta);
   }
 
   Effects tempo(u32 microseconds, u32 delta) {
     if (microseconds != 0) {
       track.currentTempo = microseconds;
       if (track.channel == 0) {
-        out.at(delayedTick(vm, delta)).tempo(microseconds);
+        out.after(delta).tempo(microseconds);
       }
     }
-    return after(delta);
+    return Effects::wait(delta);
   }
 
   Effects loop(u8 slot, u8 count, Address destination, u32 delta) {
-    Effects effects = after(delta);
+    Effects effects = Effects::wait(delta);
     if (count == 0) {
       effects.flowOverride = vm.declaredLoop(destination).flowOverride;
     } else {
