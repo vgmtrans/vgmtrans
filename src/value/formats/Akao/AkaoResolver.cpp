@@ -25,16 +25,10 @@ namespace {
 using SequenceEntry = AssetWithData<SequenceProgramAsset, AkaoSequenceData>;
 using SampleEntry = AssetWithData<SamplePoolAsset, AkaoSamplePoolData>;
 
-[[nodiscard]] bool covers(const AkaoSampleCoverageProvider& provider, u32 value) {
-  return value >= provider.first && static_cast<u64>(value) < static_cast<u64>(provider.first) + provider.count;
-}
-
-void markCovered(std::set<u32>& remaining, const AkaoSampleCoverageProvider& provider) {
-  for (auto it = remaining.begin(); it != remaining.end();) {
-    if (covers(provider, *it)) {
-      it = remaining.erase(it);
-    } else {
-      ++it;
+void markCovered(std::set<u32>& remaining, const SampleEntry& sample) {
+  for (const auto& articulation : sample.data->articulations) {
+    if (articulation.sample.valid()) {
+      remaining.erase(articulation.articulationId);
     }
   }
 }
@@ -80,36 +74,47 @@ std::vector<SampleEntry> chooseSamplesForSequence(const SequenceEntry& sequence,
     return leftLocal != rightLocal ? leftLocal : left.id().value > right.id().value;
   });
 
-  std::vector<AkaoSampleCoverageProvider> providers;
-  providers.reserve(candidates.size());
-  for (std::size_t i = 0; i < candidates.size(); ++i) {
-    const auto& candidate = candidates[i];
-    providers.push_back(AkaoSampleCoverageProvider{
-        .index = i,
-        .sampleSetId = candidate.data->sampleSetId,
-        .first = candidate.data->firstArticulationId,
-        .count = candidate.data->articulationCount,
-    });
-  }
-
-  const std::vector<u32> required(remaining.begin(), remaining.end());
-  const auto selection = selectAkaoSampleCoverage(sequence.data->sampleSetId, required, providers);
-
-  if (sequence.data->sampleSetId && *sequence.data->sampleSetId > 0 && !isolated &&
-      !selection.requestedSampleSetFound) {
-    collection.incomplete(CollectionIssue{
-        .severity = Severity::Warning,
-        .code = "missing-preferred-sample-set",
-        .message = missingSampleMessage(sequence),
-        .asset = sequence.id(),
-    });
-  }
-
   std::vector<SampleEntry> selected;
-  for (const std::size_t selectedIndex : selection.providers) {
-    selected.push_back(candidates[selectedIndex]);
+  const auto select = [&](const SampleEntry& sample) {
+    selected.push_back(sample);
+    markCovered(remaining, sample);
+  };
+  const auto requestedSampleSetId = sequence.data->sampleSetId;
+  if (requestedSampleSetId && *requestedSampleSetId > 0) {
+    const auto preferred = std::ranges::find_if(
+        candidates, [&](const SampleEntry& sample) { return sample.data->sampleSetId == requestedSampleSetId; });
+    if (preferred != candidates.end()) {
+      select(*preferred);
+    } else if (!isolated) {
+      collection.incomplete(CollectionIssue{
+          .severity = Severity::Warning,
+          .code = "missing-preferred-sample-set",
+          .message = missingSampleMessage(sequence),
+          .asset = sequence.id(),
+      });
+    }
   }
-  remaining = std::set<u32>(selection.missing.begin(), selection.missing.end());
+
+  // Honor the preferred set, then fill gaps with actual playable articulations
+  // in source priority order. A declared ID range may contain rejected samples.
+  for (const auto& candidate : candidates) {
+    if (std::ranges::any_of(selected, [&](const SampleEntry& sample) { return sample.id() == candidate.id(); })) {
+      continue;
+    }
+    const bool sameSampleSet = requestedSampleSetId.value_or(0) == candidate.data->sampleSetId.value_or(0);
+    const bool contributes = std::ranges::any_of(candidate.data->articulations, [&](const auto& articulation) {
+      return articulation.sample.valid() && remaining.contains(articulation.articulationId);
+    });
+    if ((!sameSampleSet || !selected.empty()) && !contributes) {
+      continue;
+    }
+    select(candidate);
+    if (remaining.empty()) {
+      break;
+    }
+  }
+  // Retain the source table ordering for stable binding of overlapping IDs.
+  std::ranges::sort(selected, {}, [](const SampleEntry& sample) { return sample.data->firstArticulationId; });
   return selected;
 }
 
@@ -147,76 +152,15 @@ void attachSamplesAndReportGaps(CollectionAssembly& collection, const SequenceEn
       continue;
     }
     for (const auto& articulation : data->articulations) {
-      articulations[articulation.articulationId] = AkaoArticulationBinding{
-          .samplePool = samplePool->metadata.id,
-          .sampleIndex = articulation.sampleIndex,
-          .articulation = articulation,
-      };
+      if (articulation.sample.valid()) {
+        articulations[articulation.articulationId] = articulation;
+      }
     }
   }
   return articulations;
 }
 
 }  // namespace
-
-AkaoSampleCoverageSelection selectAkaoSampleCoverage(std::optional<u32> requestedSampleSetId,
-                                                     const std::vector<u32>& required,
-                                                     const std::vector<AkaoSampleCoverageProvider>& providers) {
-  // An Akao sequence refers to articulation IDs, while each discovered sample
-  // collection supplies only a range of those IDs. A sequence may therefore
-  // need several collections. If the sequence header specifies a sample-set
-  // ID, first select the first matching collection. Providers arrive in
-  // matching priority order: collections from the sequence's source first,
-  // then most recently discovered collections. Continue in that order when
-  // selecting collections that supply required articulations. Return any
-  // required articulation IDs that remain uncovered so the resolver can
-  // explain an incomplete match.
-  const auto& ordered = providers;
-
-  std::set<u32> remaining(required.begin(), required.end());
-  std::vector<AkaoSampleCoverageProvider> selected;
-  bool requestedSampleSetFound = false;
-
-  // First honor the sequence's explicit sample-set ID, when it has one.
-  if (requestedSampleSetId && *requestedSampleSetId > 0) {
-    const auto preferred = std::ranges::find_if(ordered, [&](const AkaoSampleCoverageProvider& provider) {
-      return provider.sampleSetId && *provider.sampleSetId == *requestedSampleSetId;
-    });
-    if (preferred != ordered.end()) {
-      requestedSampleSetFound = true;
-      selected.push_back(*preferred);
-      markCovered(remaining, *preferred);
-    }
-  }
-
-  // A missing or zero sample-set ID denotes Akao's unnamed sample set.
-  for (const auto& provider : ordered) {
-    if (std::ranges::find(selected, provider.index, &AkaoSampleCoverageProvider::index) != selected.end()) {
-      continue;
-    }
-    const bool sameSampleSet = requestedSampleSetId.value_or(0) == provider.sampleSetId.value_or(0);
-    const bool contributes = std::ranges::any_of(remaining, [&](u32 value) { return covers(provider, value); });
-    if ((!sameSampleSet || !selected.empty()) && !contributes) {
-      continue;
-    }
-    selected.push_back(provider);
-    markCovered(remaining, provider);
-    if (remaining.empty()) {
-      break;
-    }
-  }
-
-  // Order the chosen collections by the articulation ranges they supply rather
-  // than by source offset, giving later sample binding a stable order.
-  std::ranges::sort(selected, {}, &AkaoSampleCoverageProvider::first);
-  AkaoSampleCoverageSelection result{.requestedSampleSetFound = requestedSampleSetFound};
-  result.providers.reserve(selected.size());
-  for (const auto& provider : selected) {
-    result.providers.push_back(provider.index);
-  }
-  result.missing.assign(remaining.begin(), remaining.end());
-  return result;
-}
 
 std::vector<DesiredCollection> resolveAkaoCollections(const CollectionDiscoveryContext& context) {
   const auto sequences = context.assetsWithData<SequenceProgramAsset, AkaoSequenceData>();

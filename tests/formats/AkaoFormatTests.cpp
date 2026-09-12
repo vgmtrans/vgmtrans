@@ -201,7 +201,7 @@ void akaoSequenceAnalysisUsesSemanticOperands() {
   SoundBankAsset bank;
   const AkaoInstrumentSetBindingData recipe{.usesIndividualArticulations = true,
                                            .noAttackArticulationIds = analysis.references.noAttackArticulationIds};
-  expect(applyAkaoArticulations(bank, recipe, {{9, {.samplePool = AssetId{1}, .articulation = {.loopPoint = 32}}}}) &&
+  expect(applyAkaoArticulations(bank, recipe, {{9, {.loopPoint = 32, .sample = SampleRef::resolved(AssetId{1}, 0)}}}) &&
              bank.instruments.size() == 2 && bank.instruments[0].regions[0].sampleStartFrame == 0 &&
              bank.instruments[1].regions[0].sampleStartFrame == 56 && bank.instruments[1].explicitAddress->bank == 2,
          "F2 should select a sustain variant while retaining the full-sample instrument");
@@ -742,21 +742,7 @@ void akaoMelodicRegionsDropAdvancingOverlaps() {
          "Akao region after dropped overlap should bridge the uncovered key range");
 }
 
-void akaoSampleSelectionKeepsPreferredAndRequiredCollections() {
-  const std::vector<AkaoSampleCoverageProvider> candidates{
-      AkaoSampleCoverageProvider{.index = 0, .sampleSetId = 0, .first = 0, .count = 32},
-      AkaoSampleCoverageProvider{.index = 1, .sampleSetId = 5, .first = 32, .count = 81},
-      AkaoSampleCoverageProvider{.index = 2, .sampleSetId = 29, .first = 128, .count = 22},
-  };
-  const std::vector<u32> required{32, 128};
-
-  const auto selected = selectAkaoSampleCoverage(29, required, candidates);
-  expect(selected.providers == std::vector<std::size_t>{1, 2} && selected.missing.empty() &&
-             selected.requestedSampleSetFound,
-         "Akao sample selection should combine the preferred sample set with required-articulation coverage");
-}
-
-void akaoCollectionPrefersCompleteSamplesFromSequenceSource() {
+void akaoSampleSelectionUsesPlayableArticulations() {
   SourceStore sources;
   const SourceId sequenceSource = sources.add(SourceFile{.name = "sequence.bin"}, std::vector<u8>(1024));
   const SourceId unrelatedSource = sources.add(SourceFile{.name = "unrelated.bin"}, std::vector<u8>(1024));
@@ -774,7 +760,7 @@ void akaoCollectionPrefersCompleteSamplesFromSequenceSource() {
       .privateData = AssetPrivateData::make(AkaoSequenceData{
           .sequenceId = 1,
           .sampleSetId = 7,
-          .requiredArticulations = {5},
+          .requiredArticulations = {5, 9},
           .structuralInstrumentSet = bankId,
       }),
   });
@@ -784,26 +770,46 @@ void akaoCollectionPrefersCompleteSamplesFromSequenceSource() {
                                 .name = "Bank",
                                 .range = sources.reader(sequenceSource).range(40, 20)},
   });
-  const auto samples = [&](AssetId id, SourceId source, u64 offset) {
+  const auto samples = [&](AssetId id, SourceId source, u16 sampleSet, std::vector<AkaoArticulation> articulations) {
     return SamplePoolAsset{
         .metadata = AssetMetadata{.id = id,
                                   .format = std::string(kAkaoFormatName),
                                   .name = "Samples",
-                                  .range = sources.reader(source).range(offset, 20)},
+                                  .range = sources.reader(source).range(100, 20)},
+        .pool = {.samples = std::vector<Sample>(articulations.size())},
         .privateData = AssetPrivateData::make(AkaoSamplePoolData{
-            .sampleSetId = 7,
-            .firstArticulationId = 0,
-            .articulationCount = 16,
+            .sampleSetId = sampleSet,
+            .firstArticulationId = articulations.empty() ? 0 : articulations.front().articulationId,
+            .articulations = std::move(articulations),
         }),
     };
   };
-  assets.emplace_back(samples(localSamplesId, sequenceSource, 100));
-  assets.emplace_back(samples(unrelatedSamplesId, unrelatedSource, 900));
-
-  const CollectionDiscoveryContext context(sources, SharedSequence<Asset>{std::move(assets)});
-  const auto collections = resolveAkaoCollections(context);
-  expect(collections.size() == 1 && collections.front().members.samplePools == std::vector{localSamplesId},
+  const auto resolve = [&](std::vector<AkaoArticulation> local, std::vector<AkaoArticulation> unrelated,
+                           u16 unrelatedSet = 7) {
+    auto candidates = assets;
+    candidates.emplace_back(samples(localSamplesId, sequenceSource, 7, std::move(local)));
+    candidates.emplace_back(samples(unrelatedSamplesId, unrelatedSource, unrelatedSet, std::move(unrelated)));
+    const CollectionDiscoveryContext context(sources, SharedSequence<Asset>{std::move(candidates)});
+    return resolveAkaoCollections(context);
+  };
+  const AkaoArticulation localFive{.articulationId = 5, .sample = SampleRef::resolved(localSamplesId, 0)};
+  const AkaoArticulation localNine{.articulationId = 9, .sample = SampleRef::resolved(localSamplesId, 1)};
+  const AkaoArticulation unrelatedFive{.articulationId = 5, .sample = SampleRef::resolved(unrelatedSamplesId, 0)};
+  const AkaoArticulation unrelatedNine{.articulationId = 9, .sample = SampleRef::resolved(unrelatedSamplesId, 0)};
+  const auto local = resolve({localFive, localNine}, {unrelatedFive, unrelatedNine});
+  expect(local.size() == 1 && local.front().members.samplePools == std::vector{localSamplesId},
          "Akao matching should not let a newer unrelated pool outrank complete local samples");
+
+  const auto supplemented = resolve({localFive, {.articulationId = 9}}, {unrelatedNine}, 29);
+  expect(supplemented.size() == 1 &&
+             supplemented.front().members.samplePools == std::vector{localSamplesId, unrelatedSamplesId} &&
+             supplemented.front().issues.empty(),
+         "a different sample set should fill a preferred pool's gap when an articulation has no playable sample");
+  const auto missing = resolve({localFive, {.articulationId = 9}}, {});
+  expect(missing.size() == 1 && missing.front().issues.size() == 1 &&
+             missing.front().issues.front().code == "missing-articulation-coverage" &&
+             missing.front().issues.front().message.ends_with(" 9"),
+         "a declared articulation without a playable sample should remain missing from coverage");
 }
 
 void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView() {
@@ -830,13 +836,17 @@ void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView() {
 
   constexpr u32 sampleOffset = 0x200;
   constexpr u32 artOffset = sampleOffset + 0x40;
-  constexpr u32 sampleDataOffset = artOffset + 0x10;
+  constexpr u32 sampleDataOffset = artOffset + 0x20;
   writeBe32(bytes, sampleOffset, 0x414b414f);
   writeLe16(bytes, sampleOffset + 4, 1);
-  writeLe32(bytes, sampleOffset + 0x14, 0x10);
+  writeLe32(bytes, sampleOffset + 0x14, 0x20);
   writeLe32(bytes, sampleOffset + 0x18, 5);
-  writeLe32(bytes, sampleOffset + 0x1c, 1);
+  writeLe32(bytes, sampleOffset + 0x1c, 2);
   writeLe16(bytes, artOffset + 0x0a, 60);
+  // The second articulation points to an incomplete eight-byte ADPCM block.
+  writeLe32(bytes, artOffset + 0x10, 0x18);
+  writeLe32(bytes, artOffset + 0x14, 0x18);
+  writeLe16(bytes, artOffset + 0x1a, 60);
   bytes[sampleDataOffset + 1] = 1;
 
   Session session;
@@ -938,7 +948,7 @@ void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView() {
   const auto* articulationTable =
       annotationWithKind(project.sourceMap(), SourceId{0}, SourceRole::Table, "akao-articulation-table");
   expect(articulationTable != nullptr && articulationTable->range.offset == artOffset &&
-             articulationTable->range.size == 0x10,
+             articulationTable->range.size == 0x20,
          "Akao sample scan should annotate the articulation table");
   const auto* articulationEntry =
       annotationWithKind(project.sourceMap(), SourceId{0}, SourceRole::TableEntry, "akao-articulation");
@@ -949,6 +959,12 @@ void akaoScanPublishesStructuralInstrumentSetAndBindsCollectionView() {
          "Akao articulation annotation should expose the articulation id");
   expect(hasLinkRole(*articulationEntry, SourceLinkRole::UsesSample),
          "Akao articulation annotation should link to the sample it resolves to");
+  const auto& annotations = project.sourceMap().annotations();
+  const auto missingSample = std::ranges::find_if(annotations, [&](const SourceAnnotation& annotation) {
+    return annotation.kind == "akao-articulation" && annotation.range.offset == artOffset + 0x10;
+  });
+  expect(missingSample != annotations.end() && !hasLinkRole(*missingSample, SourceLinkRole::UsesSample),
+         "an articulation with an incomplete sample must not bind to sample zero");
 
   const auto* sequence = project.asset<SequenceProgramAsset>(sequenceId);
   const auto* sequenceData = sequence->privateData.get<AkaoSequenceData>();

@@ -38,22 +38,20 @@ namespace {
   return psxSpuEnvelope(adsr1, adsr2);
 }
 
-void applyArticulationToRegion(Region& region, const AkaoArticulationBinding* binding, u8 attackRate, u8 sustainRate,
+void applyArticulationToRegion(Region& region, const AkaoArticulation* articulation, u8 attackRate, u8 sustainRate,
                                u8 sustainMode, u8 releaseRate, bool drum, u8 drumRelativeUnityKey = 0) {
-  if (binding == nullptr) {
+  if (articulation == nullptr) {
     return;
   }
-  const AkaoArticulation& articulation = binding->articulation;
-  region.sample = SampleRef::resolved(binding->samplePool, binding->sampleIndex);
+  region.sample = articulation->sample;
   const double rootKey =
-      drum ? articulation.unityKey + region.keyRange.low - drumRelativeUnityKey : articulation.unityKey;
-  region.unityKey = rootKey - (articulation.fineTuneCents / 100.0);
-  region.envelope = akaoRegionEnvelope(articulation, attackRate, sustainRate, sustainMode, releaseRate);
-  region.loop = articulation.loop;
+      drum ? articulation->unityKey + region.keyRange.low - drumRelativeUnityKey : articulation->unityKey;
+  region.unityKey = rootKey - (articulation->fineTuneCents / 100.0);
+  region.envelope = akaoRegionEnvelope(*articulation, attackRate, sustainRate, sustainMode, releaseRate);
+  region.loop = articulation->loop;
 }
 
-[[nodiscard]] const AkaoArticulationBinding* findArticulation(const AkaoArticulationMap& articulations,
-                                                              u32 articulationId) {
+[[nodiscard]] const AkaoArticulation* findArticulation(const AkaoArticulationMap& articulations, u32 articulationId) {
   const auto found = articulations.find(articulationId);
   return found == articulations.end() ? nullptr : &found->second;
 }
@@ -230,27 +228,27 @@ void addDrumInstrument(std::vector<Instrument>& instruments, ByteReader reader, 
 
 void addSyntheticArticulationInstruments(std::vector<Instrument>& instruments,
                                          const AkaoArticulationMap& articulations, const std::set<u32>& noAttackIds) {
-  for (const auto& [articulationId, binding] : articulations) {
+  for (const auto& [articulationId, articulation] : articulations) {
     Region region{
         .keyRange = KeyRange{.low = 0, .high = 127},
         .velocityRange = VelocityRange{.low = 0, .high = 127},
-        .sample = SampleRef::resolved(binding.samplePool, binding.sampleIndex),
-        .range = binding.articulation.source.range,
-        .unityKey = binding.articulation.unityKey - (binding.articulation.fineTuneCents / 100.0),
-        .envelope = psxSpuEnvelope(binding.articulation.adsr1, binding.articulation.adsr2),
-        .loop = binding.articulation.loop,
+        .sample = articulation.sample,
+        .range = articulation.source.range,
+        .unityKey = articulation.unityKey - (articulation.fineTuneCents / 100.0),
+        .envelope = psxSpuEnvelope(articulation.adsr1, articulation.adsr2),
+        .loop = articulation.loop,
     };
     instruments.push_back(Instrument{
         .explicitAddress = InstrumentAddress{.bank = 0, .program = articulationId},
         .name = fmt::format("Articulation {}", articulationId),
-        .range = binding.articulation.source.range,
+        .range = articulation.source.range,
         .regions = {region},
     });
     if (noAttackIds.contains(articulationId)) {
       auto sustain = instruments.back();
       sustain.explicitAddress->bank = 2;
       sustain.name += " [no attack]";
-      sustain.regions[0].sampleStartFrame = psxAdpcmDecodedOffset(binding.articulation.loopPoint);
+      sustain.regions[0].sampleStartFrame = psxAdpcmDecodedOffset(articulation.loopPoint);
       if (sustain.regions[0].loop) sustain.regions[0].loop->start = 0;
       instruments.push_back(std::move(sustain));
     }
