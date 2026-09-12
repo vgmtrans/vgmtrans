@@ -27,11 +27,11 @@ namespace {
 
   ScanResultBuilder result(input, std::string(kSuzukiPs1FormatName));
   std::vector<ScanSoundBankDraft> banks;
-  std::vector<SuzukiPs1Instrument> instruments;
+  std::vector<SuzukiPs1Envelope> envelopes;
   for (const auto& layout : bankLayouts) {
     if (auto bank = addSuzukiPs1Bank(result, layout)) {
-      for (auto& instrument : bank->instruments) {
-        instruments.push_back(std::move(instrument));
+      for (const auto& envelope : bank->envelopes) {
+        envelopes.push_back(envelope);
       }
       banks.push_back(bank->bank);
     } else {
@@ -44,7 +44,7 @@ namespace {
     const std::string name =
         layout.title.empty() ? fmt::format("SuzukiPS1 Sequence {:X}", layout.offset) : layout.title;
     auto sequence = result.sequence(name, input.reader.range(layout.offset, layout.length));
-    sequence.program(parseSuzukiPs1Sequence(input.reader, sequence.id(), layout, instruments, &result.sourceMap(),
+    sequence.program(parseSuzukiPs1Sequence(input.reader, sequence.id(), layout, envelopes, &result.sourceMap(),
                                             &result.diagnostics()));
     auto collection =
         result
