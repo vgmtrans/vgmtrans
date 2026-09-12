@@ -1278,6 +1278,26 @@ construction, incomplete drafts, empty assets, and retained views across result
 growth. The full build is warning-free and all 20 CTest targets pass; no test
 code is added.
 
+### Read executing-command metadata without format-local indexes
+
+Expose the current command's SourceRange through VmApi. NinSnes and RareSnes
+now use that metadata directly for sequence-defined instruments instead of
+building address-to-range maps over every parsed command. Their program state
+constructors need only format settings. Rare presets retain a SourceRange when
+later reuse requires it, and format commands no longer capture and forward
+their own source address through playback methods.
+
+This removes 17 production lines, two runtime maps, and their initialization
+walks. It also corrects source attribution when Battlemaniacs melodic and
+percussion tracks interpret the same address as different-length commands;
+the old global address map retained only the first interpretation. Untouched
+default patches now remain unattributed instead of borrowing command zero's
+range. Playback still reads no source bytes.
+
+A 13-line regression added to the existing Rare opcode test fails with the old
+map and passes with the current-command range. The full build is warning-free
+and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

@@ -591,18 +591,13 @@ private:
 };
 
 struct ProgramState {
-  ProgramState(const SequenceProgram& program, const RuntimeConfig& config)
+  explicit ProgramState(const RuntimeConfig& config)
       : selected(profile(config.profile)), tempoTimerTarget(config.tempoTimerTarget),
         fixedPercussionBase(config.fixedPercussionBase), intelliConditionalMask(config.intelliConditionalMask),
         intelliTransposeTable(config.intelliTransposeTable), initialPercussionTable(config.intelliPercussionTable),
         baseEnvelopes(config.instrumentEnvelopes) {
     for (u32 encoded = 0; encoded < basePrograms.size(); ++encoded) {
       basePrograms[encoded] = encoded < config.programMap.size() ? config.programMap[encoded] : encoded;
-    }
-    for (const auto& track : program.tracks) {
-      for (const auto& command : track.commands) {
-        sourceRanges.emplace(command.address.value, command.range);
-      }
     }
     resetRuntime();
   }
@@ -651,7 +646,7 @@ struct ProgramState {
   }
 
   void registerOverride(u8 logical, u8 srcn, u8 adsr1, u8 adsr2, u8 gain, u8 pitchHigh, u8 pitchLow,
-                        Address sourceAddress) {
+                        SourceRange source) {
     const auto key = std::tuple{logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow};
     const auto [entry, inserted] = overridePrograms.try_emplace(key, 0x80u + static_cast<u32>(overridePrograms.size()));
     const u32 program = entry->second;
@@ -670,7 +665,7 @@ struct ProgramState {
           .gain = gain,
           .pitchHigh = pitchHigh,
           .pitchLow = pitchLow,
-          .source = sourceRanges.contains(sourceAddress.value) ? sourceRanges.at(sourceAddress.value) : SourceRange{},
+          .source = source,
       });
     }
   }
@@ -744,7 +739,6 @@ struct ProgramState {
   u8 tempoTimerTarget = kStandardTimerTarget;
   std::array<u32, 256> basePrograms{};
   std::array<u32, 256> programs{};
-  std::map<u64, SourceRange> sourceRanges;
   u8 tempo = kDefaultTempo;
   PerformanceBoundValue<SequenceFixedPointAutomation<s32>> tempoState;
   std::optional<u32> tempoAutomationTrack;
@@ -1495,11 +1489,10 @@ struct Playback {
     }
   }
 
-  void overwriteInstrument(u8 logical, u8 srcn, u8 adsr1, u8 adsr2, u8 gain, u8 pitchHigh, u8 pitchLow,
-                           Address sourceAddress) {
+  void overwriteInstrument(u8 logical, u8 srcn, u8 adsr1, u8 adsr2, u8 gain, u8 pitchHigh, u8 pitchLow) {
     // FA writes the shared RAM table. DSP registers change only when a
     // channel next selects that instrument (D6/DA/FB or percussion).
-    program.registerOverride(logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow, sourceAddress);
+    program.registerOverride(logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow, vm.sourceRange());
   }
 
   void loadVoice(u8 index, u8 percussionMinimum, IntelliMode mode) {
@@ -1997,8 +1990,7 @@ struct DecodeContext {
       const u8 gain = event.u8("gain", SourceValueDisplay::Hex);
       const u8 pitchHigh = event.u8("pitch_high", SourceValueDisplay::Hex);
       const u8 pitchLow = event.u8("pitch_low", SourceValueDisplay::Hex);
-      return event.invoke<&Playback::overwriteInstrument>(logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow,
-                                                          Address{begin});
+      return event.invoke<&Playback::overwriteInstrument>(logical, srcn, adsr1, adsr2, gain, pitchHigh, pitchLow);
     }
     case EventType::IntelliLoadVoice: {
       auto event = cursor.command("Load Voice Parameters", SequenceSemantic::Program);

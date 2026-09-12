@@ -115,7 +115,7 @@ struct Preset {
   u8 adsr1 = 0;
   u8 adsr2 = 0;
   u8 keyoff = 0;
-  Address source;
+  SourceRange source;
 };
 
 struct PitchEffect {
@@ -553,14 +553,9 @@ struct RuntimeConfig {
 };
 
 struct ProgramState {
-  ProgramState(const SequenceProgram& program, const RuntimeConfig& config)
+  explicit ProgramState(const RuntimeConfig& config)
       : selected(config.profile), initialTempo(config.initialTempo), initialTimer(config.initialTimer),
         srcns(config.srcns) {
-    for (const TrackProgram& track : program.tracks) {
-      for (const SourceCommand& command : track.commands) {
-        sourceRanges.emplace(command.address.value, command.range);
-      }
-    }
     resetRuntime();
   }
 
@@ -582,11 +577,6 @@ struct ProgramState {
       return srcns[sourceProgram];
     }
     return sourceProgram;
-  }
-
-  [[nodiscard]] SourceRange source(Address address) const {
-    const auto found = sourceRanges.find(address.value);
-    return found == sourceRanges.end() ? SourceRange{} : found->second;
   }
 
   [[nodiscard]] u32 patch(PatchRecipe candidate) {
@@ -616,7 +606,6 @@ struct ProgramState {
   u8 initialTempo = 0;
   u8 initialTimer = 0;
   std::vector<u8> srcns;
-  std::map<u32, SourceRange> sourceRanges;
   u8 tempo = 0;
   u8 timer = 0;
   s8 masterLeft = 0x7f;
@@ -666,7 +655,7 @@ struct TrackState {
   u8 altNote1 = 0x81;
   u8 altNote2 = 0x81;
   std::array<Preset, 5> presets{};
-  Address patchSource;
+  SourceRange patchSource;
   PitchEffect pitch;
   Vibrato vibrato;
   Tremolo tremolo;
@@ -713,28 +702,28 @@ struct Playback {
 
   void centerVolume(s8 value) { volume(value, value); }
 
-  void programChange(u8 sourceProgram, Address source) {
+  void programChange(u8 sourceProgram) {
     track.sourceProgram = sourceProgram;
-    track.patchSource = source;
+    track.patchSource = vm.sourceRange();
     if (track.profile == Profile::DonkeyKongCountry || track.profile == Profile::BattletoadsDoubleDragon) {
       track.tuning = 0;
     }
   }
 
-  void programVolume(u8 sourceProgram, s8 left, s8 right, Address source) {
-    programChange(sourceProgram, source);
+  void programVolume(u8 sourceProgram, s8 left, s8 right) {
+    programChange(sourceProgram);
     volume(left, right);
   }
 
-  void adsr(u8 adsr1, u8 adsr2, Address source) {
+  void adsr(u8 adsr1, u8 adsr2) {
     track.adsr1 = adsr1;
     track.adsr2 = adsr2;
-    track.patchSource = source;
+    track.patchSource = vm.sourceRange();
   }
 
-  void tuning(s8 value, Address source) {
+  void tuning(s8 value) {
     track.tuning = value;
-    track.patchSource = source;
+    track.patchSource = vm.sourceRange();
   }
 
   void tempo(u8 value) {
@@ -847,7 +836,7 @@ struct Playback {
         .adsr1 = track.adsr1,
         .adsr2 = track.adsr2,
         .gain = track.gain,
-        .source = program.source(track.patchSource),
+        .source = track.patchSource,
     };
   }
 
@@ -961,7 +950,7 @@ struct Playback {
     return vm.finiteBranch(destinations[index]);
   }
 
-  void savePreset(u8 slot, s8 left, s8 right, u8 adsr1, u8 adsr2, u8 keyoff, Address source) {
+  void savePreset(u8 slot, s8 left, s8 right, u8 adsr1, u8 adsr2, u8 keyoff) {
     if (slot < track.presets.size()) {
       track.presets[slot] = Preset{
           .left = left,
@@ -969,7 +958,7 @@ struct Playback {
           .adsr1 = adsr1,
           .adsr2 = adsr2,
           .keyoff = keyoff,
-          .source = source,
+          .source = vm.sourceRange(),
       };
     }
   }
@@ -995,23 +984,22 @@ struct Playback {
     track.presets[1].right = right2;
   }
 
-  void resetAdsr(bool hard, Address source) {
+  void resetAdsr(bool hard) {
     track.adsr1 = hard ? 0x8f : 0x8e;
     track.adsr2 = 0xe0;
-    track.patchSource = source;
+    track.patchSource = vm.sourceRange();
   }
 
-  void voiceShort(u8 sourceProgram, s8 transposeValue, s8 tuningValue, Address source) {
-    programChange(sourceProgram, source);
+  void voiceShort(u8 sourceProgram, s8 transposeValue, s8 tuningValue) {
+    programChange(sourceProgram);
     track.transpose = transposeValue;
     track.tuning = tuningValue;
   }
 
-  void voice(u8 sourceProgram, s8 transposeValue, s8 tuningValue, s8 left, s8 right, u8 adsr1, u8 adsr2,
-             Address source) {
-    voiceShort(sourceProgram, transposeValue, tuningValue, source);
+  void voice(u8 sourceProgram, s8 transposeValue, s8 tuningValue, s8 left, s8 right, u8 adsr1, u8 adsr2) {
+    voiceShort(sourceProgram, transposeValue, tuningValue);
     volume(left, right);
-    adsr(adsr1, adsr2, source);
+    adsr(adsr1, adsr2);
   }
 
   void masterStereo(s8 left, s8 right) {
@@ -1085,7 +1073,7 @@ struct Playback {
   }
 
   void btmInstrument(u8 slotOrSrcn, u8 srcn, u8 adsr1, u8 adsr2, u8 gain, s8 left, s8 right, u8 dspFlags, u8 keyoff,
-                     s8 tuningOrBase, Address source) {
+                     s8 tuningOrBase) {
     PatchRecipe patch{
         .sourceProgram = slotOrSrcn,
         .srcn = srcn,
@@ -1093,7 +1081,7 @@ struct Playback {
         .adsr1 = adsr1,
         .adsr2 = adsr2,
         .gain = gain,
-        .source = program.source(source),
+        .source = vm.sourceRange(),
     };
     if (track.trackNumber == 5) {
       program.percussion[slotOrSrcn & 7] = BattlemaniacsPercussion{
@@ -1112,13 +1100,13 @@ struct Playback {
     track.adsr2 = adsr2;
     track.gain = gain;
     track.keyoff = keyoff;
-    track.patchSource = source;
+    track.patchSource = vm.sourceRange();
     volume(left, right);
     echoChannel((dspFlags & 0x04) != 0);
   }
 
-  void btmAdsrKeyoff(u8 adsr1, u8 adsr2, u8 keyoff, Address source) {
-    adsr(adsr1, adsr2, source);
+  void btmAdsrKeyoff(u8 adsr1, u8 adsr2, u8 keyoff) {
+    adsr(adsr1, adsr2);
     track.keyoff = keyoff;
   }
 
@@ -1131,32 +1119,32 @@ struct Playback {
     percussion->right = right;
   }
 
-  void btmPercussionAdsrKeyoff(u8 slot, u8 adsr1, u8 adsr2, u8 keyoff, Address source) {
+  void btmPercussionAdsrKeyoff(u8 slot, u8 adsr1, u8 adsr2, u8 keyoff) {
     auto& percussion = program.percussion[slot & 7];
     if (!percussion) {
       return;
     }
     percussion->patch.adsr1 = adsr1;
     percussion->patch.adsr2 = adsr2;
-    percussion->patch.source = program.source(source);
+    percussion->patch.source = vm.sourceRange();
     percussion->keyoff = keyoff;
   }
 
-  void btmGainKeyoff(u8 gain, u8 keyoff, Address source) {
+  void btmGainKeyoff(u8 gain, u8 keyoff) {
     track.adsr1 = 0;
     track.gain = gain;
     track.keyoff = keyoff;
-    track.patchSource = source;
+    track.patchSource = vm.sourceRange();
   }
 
-  void btmPercussionGainKeyoff(u8 slot, u8 gain, u8 keyoff, Address source) {
+  void btmPercussionGainKeyoff(u8 slot, u8 gain, u8 keyoff) {
     auto& percussion = program.percussion[slot & 7];
     if (!percussion) {
       return;
     }
     percussion->patch.adsr1 = 0;
     percussion->patch.gain = gain;
-    percussion->patch.source = program.source(source);
+    percussion->patch.source = vm.sourceRange();
     percussion->keyoff = keyoff;
   }
 
@@ -1265,14 +1253,13 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   }
 
   const Kind selected = kind(profile, opcode);
-  const Address source{begin};
   switch (selected) {
     case Kind::End:
       return cursor.command("End", SequenceSemantic::End).end();
     case Kind::Program: {
       auto event = cursor.command("Program", SequenceSemantic::Program);
       const u8 value = event.u8("program", SemanticOperandRole::InstrumentProgram);
-      return event.invoke<&Playback::programChange>(value, source);
+      return event.invoke<&Playback::programChange>(value);
     }
     case Kind::Volume:
     case Kind::BtmVolume: {
@@ -1364,7 +1351,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       auto event = cursor.command("ADSR", SequenceSemantic::State);
       const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
       const u8 adsr2 = event.u8("adsr2", SourceValueDisplay::Hex);
-      return event.invoke<&Playback::adsr>(adsr1, adsr2, source);
+      return event.invoke<&Playback::adsr>(adsr1, adsr2);
     }
     case Kind::MasterVolumeStereo:
     case Kind::BtmMasterVolume: {
@@ -1384,7 +1371,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         return event;
       }
       auto event = cursor.command("Fine Tuning", SequenceSemantic::Pitch);
-      return event.invoke<&Playback::tuning>(event.s8("tuning", SourceValueDisplay::SignedDecimal), source);
+      return event.invoke<&Playback::tuning>(event.s8("tuning", SourceValueDisplay::SignedDecimal));
     }
     case Kind::Transpose: {
       auto event = cursor.command("Transpose", SequenceSemantic::Pitch);
@@ -1436,7 +1423,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 programValue = event.u8("program", SemanticOperandRole::InstrumentProgram);
       const s8 left = event.s8("left", SourceValueDisplay::SignedDecimal);
       const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal);
-      return event.invoke<&Playback::programVolume>(programValue, left, right, source);
+      return event.invoke<&Playback::programVolume>(programValue, left, right);
     }
     case Kind::FadeOut: {
       auto event = cursor.command("Fade Out", SequenceSemantic::Level);
@@ -1456,7 +1443,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
       const u8 adsr2 = event.u8("adsr2", SourceValueDisplay::Hex);
       const u8 keyoff = selected == Kind::BtmSavePreset ? event.u8("keyoff") : 0;
-      return event.invoke<&Playback::savePreset>(slot, left, right, adsr1, adsr2, keyoff, source);
+      return event.invoke<&Playback::savePreset>(slot, left, right, adsr1, adsr2, keyoff);
     }
     case Kind::LoadPreset:
     case Kind::BtmLoadPreset: {
@@ -1504,13 +1491,13 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return cursor.command("All Pitch/Volume LFOs Off", SequenceSemantic::Modulation).invoke<&Playback::allLfoOff>();
     case Kind::ResetAdsr:
       return cursor.command(opcode == 0x20 ? "Reset ADSR" : "Reset ADSR Soft", SequenceSemantic::State)
-          .invoke<&Playback::resetAdsr>(opcode == 0x20, source);
+          .invoke<&Playback::resetAdsr>(opcode == 0x20);
     case Kind::VoiceParametersShort: {
       auto event = cursor.command("Voice Parameters", SequenceSemantic::Program);
       const u8 programValue = event.u8("program", SemanticOperandRole::InstrumentProgram);
       const s8 transposeValue = event.s8("transpose", SourceValueDisplay::SignedDecimal);
       const s8 tuningValue = event.s8("tuning", SourceValueDisplay::SignedDecimal);
-      return event.invoke<&Playback::voiceShort>(programValue, transposeValue, tuningValue, source);
+      return event.invoke<&Playback::voiceShort>(programValue, transposeValue, tuningValue);
     }
     case Kind::VoiceParameters: {
       auto event = cursor.command("Voice Parameters", SequenceSemantic::Program);
@@ -1521,8 +1508,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const s8 right = event.s8("right", SourceValueDisplay::SignedDecimal);
       const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
       const u8 adsr2 = event.u8("adsr2", SourceValueDisplay::Hex);
-      return event.invoke<&Playback::voice>(programValue, transposeValue, tuningValue, left, right, adsr1, adsr2,
-                                            source);
+      return event.invoke<&Playback::voice>(programValue, transposeValue, tuningValue, left, right, adsr1, adsr2);
     }
     case Kind::EchoDelay: {
       auto event = cursor.command("Echo Delay", SequenceSemantic::State);
@@ -1571,8 +1557,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         const u8 flags = event.u8("dsp_flags", SourceValueDisplay::Hex);
         const u8 keyoff = event.u8("keyoff");
         const s8 base = event.s8("base_note", SourceValueDisplay::MidiNote);
-        return event.invoke<&Playback::btmInstrument>(slot, srcn, adsr1, adsr2, gain, left, right, flags, keyoff, base,
-                                                      source);
+        return event.invoke<&Playback::btmInstrument>(slot, srcn, adsr1, adsr2, gain, left, right, flags, keyoff, base);
       }
       const u8 srcn = event.u8("srcn", SemanticOperandRole::Instrument);
       const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
@@ -1584,7 +1569,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 keyoff = event.u8("keyoff");
       const s8 tuningValue = event.s8("tuning", SourceValueDisplay::SignedDecimal);
       return event.invoke<&Playback::btmInstrument>(srcn, srcn, adsr1, adsr2, gain, left, right, flags, keyoff,
-                                                    tuningValue, source);
+                                                    tuningValue);
     }
     case Kind::BtmPitchEnvelope: {
       auto event = cursor.command("Pitch Envelope", SequenceSemantic::Pitch);
@@ -1605,12 +1590,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
         const u8 adsr2 = event.u8("adsr2", SourceValueDisplay::Hex);
         const u8 keyoff = event.u8("keyoff");
-        return event.invoke<&Playback::btmPercussionAdsrKeyoff>(slot, adsr1, adsr2, keyoff, source);
+        return event.invoke<&Playback::btmPercussionAdsrKeyoff>(slot, adsr1, adsr2, keyoff);
       }
       const u8 adsr1 = event.u8("adsr1", SourceValueDisplay::Hex);
       const u8 adsr2 = event.u8("adsr2", SourceValueDisplay::Hex);
       const u8 keyoff = event.u8("keyoff");
-      return event.invoke<&Playback::btmAdsrKeyoff>(adsr1, adsr2, keyoff, source);
+      return event.invoke<&Playback::btmAdsrKeyoff>(adsr1, adsr2, keyoff);
     }
     case Kind::BtmCpuPort: {
       auto event = cursor.sourceOnly("Write SNES Port", "write-port");
@@ -1627,11 +1612,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         const u8 slot = event.u8("percussion_slot", SemanticOperandRole::InstrumentProgram);
         const u8 gain = event.u8("gain", SourceValueDisplay::Hex);
         const u8 keyoff = event.u8("keyoff");
-        return event.invoke<&Playback::btmPercussionGainKeyoff>(slot, gain, keyoff, source);
+        return event.invoke<&Playback::btmPercussionGainKeyoff>(slot, gain, keyoff);
       }
       const u8 gain = event.u8("gain", SourceValueDisplay::Hex);
       const u8 keyoff = event.u8("keyoff");
-      return event.invoke<&Playback::btmGainKeyoff>(gain, keyoff, source);
+      return event.invoke<&Playback::btmGainKeyoff>(gain, keyoff);
     }
     case Kind::BtmEchoParameters: {
       auto event = cursor.command("Echo Parameters", SequenceSemantic::State);

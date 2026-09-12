@@ -854,6 +854,10 @@ u64 VmApi::tick() const noexcept {
   return runtime_.tick;
 }
 
+SourceRange VmApi::sourceRange() const noexcept {
+  return command_.range;
+}
+
 const PerformanceSequence& VmApi::sequence() const noexcept {
   return sequence_;
 }
