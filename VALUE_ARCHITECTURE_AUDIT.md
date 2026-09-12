@@ -1733,6 +1733,27 @@ waits, fades, sampled pitch, and portamento overlap. No new test scaffolding is
 needed for this extraction. The full 175-step build is warning-free and all 20
 CTest targets pass.
 
+## Resolve pitch writes directly into their consumer
+
+The pitch resolver now visits resolved events directly. Start-pitch queries
+retain only the latest primary and held bends; final lowering appends events
+directly into its output. Sorting uses references to pending writes, and a
+query includes only writes through its requested tick and execution order.
+This removes the copied write buffer, complete intermediate output buffer, and
+second scan that previously answered each query. Future writes cannot produce
+backdated output, so excluding them preserves the queried prefix exactly.
+
+Remove `PitchBendWrite::owner`, which duplicated its event header's automation
+ID. Retain `PitchBendLayer::owner`: source automation provenance does not imply
+that a transition owns the live layer, so that state has a separate meaning.
+
+Production line count is essentially unchanged (one line added), but the query
+path no longer constructs a full resolved timeline. A temporary before/after
+comparison matches event headers, note and pitch fields, and MIDI bytes in 600
+cases across all three rendering modes, including sampled, delayed, interrupted,
+linked, and multi-layer pitch. The harness is not committed. The full build is
+warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
