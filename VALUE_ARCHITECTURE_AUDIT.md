@@ -1482,6 +1482,19 @@ This removes 11 production lines. Existing voice ownership, stealing, gating,
 and release-clock coverage passes. The full build is warning-free and all 20
 CTest targets pass; no test code is added.
 
+### Keep repeat metadata in one command-address map
+
+SuzukiPS1, SuzukiSnes, and PandoraBoxSnes now keep repeat metadata in one map
+instead of separate start, end, and break maps. Their linear layout walks give
+each command address exactly one role, which its opcode already identifies.
+SuzukiPS1 and PandoraBoxSnes also build RepeatInfo directly in the open frame,
+removing duplicated fields and the copy into a second representation at closure.
+Unclosed repeats remain unpublished, preserving their ignored-command behavior.
+
+This removes 22 production lines without adding a shared framework. Existing
+repeat, final-pass break, and infinite-loop coverage passes. The full build is
+warning-free and all 20 CTest targets pass; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

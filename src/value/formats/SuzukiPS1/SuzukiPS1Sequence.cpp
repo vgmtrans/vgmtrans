@@ -72,9 +72,7 @@ struct RepeatInfo {
 
 struct TrackLayout {
   std::optional<Address> repeatPoint;
-  std::map<u32, RepeatInfo> begin;
-  std::map<u32, RepeatInfo> end;
-  std::map<u32, RepeatInfo> breaks;
+  std::map<u32, RepeatInfo> repeats;
 };
 
 [[nodiscard]] u32 encodedSize(ByteReader reader, u32 offset, u32 end) {
@@ -97,9 +95,7 @@ struct TrackLayout {
 [[nodiscard]] TrackLayout analyzeTrack(ByteReader reader, u32 start, u32 end) {
   struct OpenRepeat {
     u32 command = 0;
-    Address start;
-    u32 plays = 1;
-    u8 slot = 0;
+    RepeatInfo info;
     std::vector<u32> breaks;
   };
 
@@ -116,25 +112,20 @@ struct TrackLayout {
     } else if (status == 0x98) {
       stack.push_back(OpenRepeat{
           .command = offset,
-          .start = Address{offset + size},
-          .plays = totalPlays(reader.u8At(offset + 1)),
-          .slot = static_cast<u8>(std::min<std::size_t>(stack.size(), 15)),
+          .info = RepeatInfo{.start = Address{offset + size},
+                             .plays = totalPlays(reader.u8At(offset + 1)),
+                             .slot = static_cast<u8>(std::min<std::size_t>(stack.size(), 15))},
       });
     } else if (status == 0x9a && !stack.empty()) {
       stack.back().breaks.push_back(offset);
     } else if (status == 0x99 && !stack.empty()) {
       OpenRepeat open = std::move(stack.back());
       stack.pop_back();
-      const RepeatInfo info{
-          .start = open.start,
-          .end = Address{offset + size},
-          .plays = open.plays,
-          .slot = open.slot,
-      };
-      layout.begin.emplace(open.command, info);
-      layout.end.emplace(offset, info);
+      open.info.end = Address{offset + size};
+      layout.repeats.emplace(open.command, open.info);
+      layout.repeats.emplace(offset, open.info);
       for (const u32 branch : open.breaks) {
-        layout.breaks.emplace(branch, info);
+        layout.repeats.emplace(branch, open.info);
       }
     }
     offset += size;
@@ -420,8 +411,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x98: {
       auto event = cursor.command("Repeat Begin", SequenceSemantic::Repeat);
       const u8 rawCount = event.u8("count");
-      const auto found = layout.begin.find(begin);
-      if (found == layout.begin.end()) {
+      const auto found = layout.repeats.find(begin);
+      if (found == layout.repeats.end()) {
         return event.ignore();
       }
       event.derived("total_plays", totalPlays(rawCount));
@@ -430,8 +421,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0x99: {
       auto event = cursor.command("Repeat End", SequenceSemantic::Repeat);
-      const auto found = layout.end.find(begin);
-      if (found == layout.end.end()) {
+      const auto found = layout.repeats.find(begin);
+      if (found == layout.repeats.end()) {
         return event.ignore();
       }
       event.derived("destination", found->second.start, SourceValueDisplay::Address, SemanticOperandRole::RepeatTarget);
@@ -440,8 +431,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0x9a: {
       auto event = cursor.command("Repeat Break", SequenceSemantic::RepeatBreak);
-      const auto found = layout.breaks.find(begin);
-      if (found == layout.breaks.end()) {
+      const auto found = layout.repeats.find(begin);
+      if (found == layout.repeats.end()) {
         return event.ignore();
       }
       event.derived("destination", found->second.end, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);

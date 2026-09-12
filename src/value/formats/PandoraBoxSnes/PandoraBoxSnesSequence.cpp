@@ -88,17 +88,13 @@ struct RepeatInfo {
 };
 
 struct TrackLayout {
-  std::map<u32, RepeatInfo> begin;
-  std::map<u32, RepeatInfo> end;
-  std::map<u32, RepeatInfo> breaks;
+  std::map<u32, RepeatInfo> repeats;
 };
 
 [[nodiscard]] TrackLayout analyzeTrack(ByteReader reader, u32 start) {
   struct OpenRepeat {
     u32 command;
-    Address start;
-    u8 plays;
-    u8 slot;
+    RepeatInfo info;
     std::vector<u32> breaks;
   };
 
@@ -114,28 +110,21 @@ struct TrackLayout {
       const u8 count = reader.u8At(offset + 1);
       stack.push_back(OpenRepeat{
           .command = offset,
-          .start = Address{offset + size},
-          .plays = count,
-          .slot = static_cast<u8>(stack.size()),
+          .info = RepeatInfo{.start = Address{offset + size}, .plays = count, .slot = static_cast<u8>(stack.size())},
       });
     } else if (opcode == 0xee && !stack.empty()) {
       stack.back().breaks.push_back(offset);
     } else if (opcode == 0xed && !stack.empty()) {
       OpenRepeat open = std::move(stack.back());
       stack.pop_back();
-      const RepeatInfo info{
-          .start = open.start,
-          .end = Address{offset + size},
-          .plays = open.plays,
-          .slot = open.slot,
-      };
-      layout.begin.emplace(open.command, info);
-      layout.end.emplace(offset, info);
+      open.info.end = Address{offset + size};
+      layout.repeats.emplace(open.command, open.info);
+      layout.repeats.emplace(offset, open.info);
       for (const u32 branch : open.breaks) {
-        layout.breaks.emplace(branch, info);
+        layout.repeats.emplace(branch, open.info);
       }
       // No bytes after a declared infinite repeat are reachable.
-      if (info.isInfinite()) {
+      if (open.info.isInfinite()) {
         break;
       }
     }
@@ -505,8 +494,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xec: {
       auto event = cursor.command("Repeat Begin", SequenceSemantic::Repeat);
       const u8 count = event.u8("count");
-      const auto found = trackLayout.begin.find(begin);
-      if (found == trackLayout.begin.end()) {
+      const auto found = trackLayout.repeats.find(begin);
+      if (found == trackLayout.repeats.end()) {
         return event.ignore();
       }
       event.derived("total_plays", found->second.isInfinite() ? 0u : count);
@@ -516,8 +505,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xed: {
       auto event = cursor.command("Repeat End", SequenceSemantic::Repeat);
-      const auto found = trackLayout.end.find(begin);
-      if (found == trackLayout.end.end()) {
+      const auto found = trackLayout.repeats.find(begin);
+      if (found == trackLayout.repeats.end()) {
         return event.ignore();
       }
       event.derived("destination", found->second.start, SourceValueDisplay::Address,
@@ -528,8 +517,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xee: {
       auto event = cursor.command("Repeat Break", SequenceSemantic::RepeatBreak);
-      const auto found = trackLayout.breaks.find(begin);
-      if (found == trackLayout.breaks.end() || found->second.isInfinite()) {
+      const auto found = trackLayout.repeats.find(begin);
+      if (found == trackLayout.repeats.end() || found->second.isInfinite()) {
         return event.ignore();
       }
       event.derived("destination", found->second.end, SourceValueDisplay::Address,

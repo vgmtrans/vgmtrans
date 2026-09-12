@@ -172,9 +172,7 @@ struct RepeatInfo {
 };
 
 struct TrackLayout {
-  std::map<u32, RepeatInfo> starts;
-  std::map<u32, RepeatInfo> ends;
-  std::map<u32, RepeatInfo> breaks;
+  std::map<u32, RepeatInfo> repeats;
   std::optional<Address> loopPoint;
 };
 
@@ -295,10 +293,10 @@ struct TrackLayout {
       OpenRepeat open = std::move(stack.back());
       stack.pop_back();
       open.info.end = Address{next};
-      layout.starts.emplace(open.command, open.info);
-      layout.ends.emplace(offset, open.info);
+      layout.repeats.emplace(open.command, open.info);
+      layout.repeats.emplace(offset, open.info);
       for (const u32 breakAddress : open.breaks) {
-        layout.breaks.emplace(breakAddress, open.info);
+        layout.repeats.emplace(breakAddress, open.info);
       }
     } else if (opcode == 0xd7) {
       layout.loopPoint = Address{next};
@@ -731,8 +729,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0xd4: {
       auto event = cursor.command("Repeat Start", SequenceSemantic::Repeat);
       const u8 count = event.u8("count");
-      const auto found = layout.starts.find(begin);
-      if (found == layout.starts.end()) {
+      const auto found = layout.repeats.find(begin);
+      if (found == layout.repeats.end()) {
         return event.ignore();
       }
       event.derived("total_plays", count == 0 ? 256u : count);
@@ -740,8 +738,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xd5: {
       auto event = cursor.command("Repeat End", SequenceSemantic::Repeat);
-      const auto found = layout.ends.find(begin);
-      if (found == layout.ends.end()) {
+      const auto found = layout.repeats.find(begin);
+      if (found == layout.repeats.end()) {
         return event.ignore();
       }
       event.derived("destination", found->second.start, SourceValueDisplay::Address,
@@ -751,8 +749,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     }
     case 0xd6: {
       auto event = cursor.command("Repeat Break", SequenceSemantic::RepeatBreak);
-      const auto found = layout.breaks.find(begin);
-      if (found == layout.breaks.end()) {
+      const auto found = layout.repeats.find(begin);
+      if (found == layout.repeats.end()) {
         return event.ignore();
       }
       event.derived("destination", found->second.end, SourceValueDisplay::Address, SemanticOperandRole::JumpTarget);
