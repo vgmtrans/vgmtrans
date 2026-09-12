@@ -125,7 +125,6 @@ public:
   Entry append(Instrument instrument);
   Entry add(u64 groupingKey, Instrument instrument);
   Entry getOrAdd(u64 groupingKey, Instrument initialValue);
-  [[nodiscard]] std::optional<Entry> find(u64 groupingKey);
 
   AnnotationBuilder source(SourceRole role, std::string_view label, SourceRange range, std::string_view kind = {});
   AnnotationBuilder source(SourceRole role, std::string_view label, const SourceRecord& record,

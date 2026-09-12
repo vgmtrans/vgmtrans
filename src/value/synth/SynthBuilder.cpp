@@ -327,17 +327,6 @@ InstrumentSetBuilder::Entry InstrumentSetBuilder::getOrAdd(u64 groupingKey, Inst
   return add(groupingKey, std::move(initialValue));
 }
 
-std::optional<InstrumentSetBuilder::Entry> InstrumentSetBuilder::find(u64 groupingKey) {
-  if (finished_) {
-    throw std::logic_error("Cannot find an instrument after InstrumentSetBuilder::finish()");
-  }
-  const auto found = indexes_.find(groupingKey);
-  if (found == indexes_.end()) {
-    return std::nullopt;
-  }
-  return Entry{*this, found->second};
-}
-
 AnnotationBuilder InstrumentSetBuilder::source(SourceRole role, std::string_view label, SourceRange range,
                                                std::string_view kind) {
   observedRange_.include(range);

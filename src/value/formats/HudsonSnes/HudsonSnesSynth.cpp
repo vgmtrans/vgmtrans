@@ -105,7 +105,7 @@ void addMelodic(InstrumentSetBuilder& instruments, const std::vector<Patch>& pat
 
 void addDrums(InstrumentSetBuilder& instruments, const SequenceRecipes& recipes, const std::vector<Patch>& patches,
               const SnesBrrSampleRefs& samples) {
-  std::optional<InstrumentSetBuilder::Entry> kit;
+  InstrumentSetBuilder::Entry kit;
   for (const DrumSlot& drum : recipes.drums) {
     if (drum.note > 127 - kDrumKeyBias) {
       continue;
@@ -124,13 +124,12 @@ void addDrums(InstrumentSetBuilder& instruments, const SequenceRecipes& recipes,
       });
     }
     const u8 key = static_cast<u8>(drum.note + kDrumKeyBias);
-    (*kit)
-        .region(*sample,
-                Region{
-                    .keyRange = KeyRange{.low = key, .high = key},
-                    .unityKey = patch->unityKey + key - drum.sourceKey,
-                    .envelope = snesDspEnvelope(patch->row.adsr1, patch->row.adsr2, patch->row.gain),
-                })
+    kit.region(*sample,
+               Region{
+                   .keyRange = KeyRange{.low = key, .high = key},
+                   .unityKey = patch->unityKey + key - drum.sourceKey,
+                   .envelope = snesDspEnvelope(patch->row.adsr1, patch->row.adsr2, patch->row.gain),
+               })
         .source(fmt::format("Drum {}", drum.note), drum.source, "hudson-snes-drum-region")
         .description(
             fmt::format("Program {}, source key {}, SRCN {}", drum.sourceProgram, drum.sourceKey, patch->row.srcn));

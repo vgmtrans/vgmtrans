@@ -1537,10 +1537,27 @@ Existing delay, completion, all three fixed-point rounding modes, bound-value
 replacement, and format fade coverage passes. The full build is warning-free
 and all 20 CTest targets pass; no test code is added.
 
+### Use existing instrument entry handles directly
+
+HudsonSnes and SuzukiSnes now use an empty InstrumentSetBuilder::Entry for their
+not-yet-created drum kit instead of wrapping that already-nullable handle in
+optional. Both still create a kit only after finding a valid drum region.
+Remove InstrumentSetBuilder::find, which has no callers; formats that group
+instruments use getOrAdd, and other formats retain their returned entry.
+
+This removes 14 production lines and one unused public method. Existing builder
+grouping, entry validity, and drum-kit coverage passes. The full build is
+warning-free and all 20 CTest targets pass; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
   and remaining format-local helpers for redundant state and work.
+- Establish shared sounding-voice continuity before unifying note instrument
+  selection across variant preparation, synth selection, and MIDI pitch context.
+  PitchTransitionIntent::previousNote can express continuity before note flags
+  reflect it; existing linked-note tests require the prior instrument's pitch
+  context. Resetting every plain note's instrument would break that behavior.
 - SonyPS2 still approximates key/velocity-dependent regions during scanning
   under a 3,000-region budget chosen for SF2 table limits. Moving this policy
   to export needs a source-neutral representation of that response; merely
