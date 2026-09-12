@@ -37,7 +37,7 @@ struct StitchPart {
   std::vector<SoundBankAsset> instruments;
   std::vector<const SamplePoolAsset*> samples;
   MidiSequence midi;
-  std::optional<MidiModulationUsage> modulationUsage;
+  MidiModulationUsage modulationUsage;
   std::vector<CollectionStitchBank> banks;
 };
 
@@ -339,19 +339,12 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
     parts.push_back(std::move(part));
   }
 
-  std::optional<MidiModulationUsage> modulationUsage;
+  MidiModulationUsage modulationUsage;
   for (const auto& part : parts) {
-    if (part.modulationUsage) {
-      if (!modulationUsage) {
-        modulationUsage.emplace();
-      }
-      mergeModulationUsage(*modulationUsage, *part.modulationUsage);
-    }
+    mergeModulationUsage(modulationUsage, part.modulationUsage);
   }
-  if (modulationUsage) {
-    for (auto& part : parts) {
-      applyMidiModulationScaling(part.midi, *modulationUsage, request.modulationScaling);
-    }
+  for (auto& part : parts) {
+    applyMidiModulationScaling(part.midi, modulationUsage, request.modulationScaling);
   }
 
   if (!planBanks(parts)) {
@@ -393,7 +386,7 @@ CollectionStitchResult stitchCollections(const SessionSnapshot& snapshot, const 
           .soundBanks = instruments,
           .samplePools = samples,
           .filterSamplesToReferencedInstruments = request.exportOnlyUsedInstruments,
-          .midiModulationUsage = modulationUsage ? &*modulationUsage : nullptr,
+          .midiModulationUsage = &modulationUsage,
           .modulationScaling = request.modulationScaling,
           .modulationConversion = request.modulationConversion,
           .sampleFiltering = request.sampleFiltering,

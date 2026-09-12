@@ -191,6 +191,9 @@ LoweredSynthModulation lowerSynthModulation(const InstrumentModulation& modulati
 
 void applyMidiModulationScaling(MidiSequence& sequence, const MidiModulationUsage& usage,
                                 ModulationScalingPolicy policy) {
+  if (!hasMidiModulationUsage(usage)) {
+    return;
+  }
   for (auto& track : sequence.tracks) {
     for (auto& event : track.events) {
       auto* message = std::get_if<MidiChannelMessage>(&event.payload);
