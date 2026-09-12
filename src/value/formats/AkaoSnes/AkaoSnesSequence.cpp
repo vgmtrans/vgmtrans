@@ -21,7 +21,6 @@
 #include <cmath>
 #include <limits>
 #include <optional>
-#include <unordered_set>
 #include <vector>
 
 namespace vgmtrans::formats::akao_snes {
@@ -833,41 +832,7 @@ struct RuntimeConfig {
 };
 
 struct ProgramState {
-  ProgramState(const SequenceProgram& program, const RuntimeConfig& config) : profile(config.profile) {
-    for (const TrackProgram& track : program.tracks) {
-      for (const SourceCommand& command : track.commands) {
-        const Address fallthrough = command.flow.continuation;
-        const auto nextIndex = track.commandIndex(fallthrough);
-        if (!nextIndex) {
-          continue;
-        }
-        const SourceCommand& next = track.commands[*nextIndex];
-        if (next.flow.endsPlayback()) {
-          terminalPitchBoundaries.insert(fallthrough.value);
-          continue;
-        }
-        if (eventType(profile.version, profile.minorVersion, next.opcode) != EventType::PitchEnvelopeOff) {
-          continue;
-        }
-        const Address afterOff = next.flow.continuation;
-        const auto afterIndex = track.commandIndex(afterOff);
-        if (!afterIndex) {
-          continue;
-        }
-        const SourceCommand& after = track.commands[*afterIndex];
-        if (after.flow.endsPlayback()) {
-          terminalPitchBoundaries.insert(fallthrough.value);
-          continue;
-        }
-        if (!after.flow.unconditionalJump()) {
-          continue;
-        }
-        if (after.flow.defaultDestination()->value <= command.address.value) {
-          terminalPitchBoundaries.insert(fallthrough.value);
-        }
-      }
-    }
-  }
+  explicit ProgramState(const RuntimeConfig& config) : profile(config.profile) {}
 
   void observeTempo(u32 sourceTrackNumber, u64 tick, u8 tempo) {
     if (!collecting) {
@@ -907,13 +872,8 @@ struct ProgramState {
     return next == tempoChanges.begin() ? std::nullopt : std::optional<u8>{(next - 1)->tempo};
   }
 
-  [[nodiscard]] bool terminalPitchBoundary(Address fallthrough) const {
-    return terminalPitchBoundaries.contains(fallthrough.value);
-  }
-
   AkaoSnesProfile profile;
   std::vector<SharedTempoChange> tempoChanges;
-  std::unordered_set<u64> terminalPitchBoundaries;
   bool collecting = true;
   u64 nextOrder = 0;
 };
@@ -1248,9 +1208,25 @@ struct Playback {
     samplePitchSlide();
   }
 
-  void setPitchWaitBoundary(Address fallthrough, u32 waitTicks) {
-    track.pitchAutomationStopTick =
-        program.terminalPitchBoundary(fallthrough) ? std::optional<u64>{vm.tick() + waitTicks} : std::nullopt;
+  [[nodiscard]] bool terminalPitchBoundary(Address fallthrough) const {
+    const auto nextIndex = track.sourceTrack.commandIndex(fallthrough);
+    if (!nextIndex) {
+      return false;
+    }
+    const SourceCommand& next = track.sourceTrack.commands[*nextIndex];
+    if (next.flow.endsPlayback()) {
+      return true;
+    }
+    if (eventType(context.version, context.minorVersion, next.opcode) != EventType::PitchEnvelopeOff) {
+      return false;
+    }
+    const auto afterIndex = track.sourceTrack.commandIndex(next.flow.continuation);
+    if (!afterIndex) {
+      return false;
+    }
+    const CommandFlow& after = track.sourceTrack.commands[*afterIndex].flow;
+    return after.endsPlayback() ||
+           (after.unconditionalJump() && after.defaultDestination()->value < fallthrough.value);
   }
 
   void updatePitchEnvelope() {
@@ -1273,7 +1249,8 @@ struct Playback {
       track.onetimeDuration = 0;
     }
     const u8 duration = (!track.slur && !track.legato) ? (length > 2 ? static_cast<u8>(length - 2) : u8{1}) : length;
-    setPitchWaitBoundary(fallthrough, length);
+    track.pitchAutomationStopTick =
+        terminalPitchBoundary(fallthrough) ? std::optional<u64>{vm.tick() + length} : std::nullopt;
 
     if (noteIndex < 12) {
       const double velocity = kNoteVelocity / 127.0;
