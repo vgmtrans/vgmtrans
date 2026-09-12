@@ -308,7 +308,7 @@ std::optional<ScanSoundBankDraft> addAkaoSnesSynth(ScanResultBuilder& builder, c
   }
   const auto sampleCatalog =
       readSnesBrrCatalog(reader, *layout.spcDirAddress, instrumentInfos, &AkaoSnesInstrumentInfo::srcn);
-  if (sampleCatalog.samples.empty()) {
+  if (sampleCatalog.empty()) {
     return std::nullopt;
   }
 

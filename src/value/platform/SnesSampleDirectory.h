@@ -50,12 +50,6 @@ struct SnesBrrSample {
   SnesBrrStream stream;
 };
 
-// Shared decoded view used by SNES formats. Collection order follows SRCN.
-struct SnesBrrCatalog {
-  std::vector<SnesBrrSample> samples;
-  SourceRange directoryRange;
-};
-
 [[nodiscard]] std::optional<SnesSampleDirectoryEntry> readSnesSampleDirectoryEntry(ByteReader reader, u32 entryAddress,
                                                                                    bool inspectStream = true);
 
@@ -70,13 +64,15 @@ private:
   u32 baseAddress_ = 0;
 };
 
-[[nodiscard]] SnesBrrCatalog readSnesBrrCatalog(ByteReader reader, u32 directoryAddress, std::vector<u8> srcns);
+// Validated samples in SRCN order. Formats can filter this list before adding it.
+[[nodiscard]] std::vector<SnesBrrSample> readSnesBrrCatalog(ByteReader reader, u32 directoryAddress,
+                                                            std::vector<u8> srcns);
 
 // Accept sample-number ranges or instrument records with an SRCN projection.
-// The catalog owns sorting, deduplication, and validation.
+// Sorting, deduplication, and validation happen here.
 template <std::ranges::input_range Entries, class Srcn = std::identity>
-[[nodiscard]] SnesBrrCatalog readSnesBrrCatalog(ByteReader reader, u32 directoryAddress, Entries&& entries,
-                                                Srcn srcn = {}) {
+[[nodiscard]] std::vector<SnesBrrSample> readSnesBrrCatalog(ByteReader reader, u32 directoryAddress, Entries&& entries,
+                                                            Srcn srcn = {}) {
   std::vector<u8> referencedSrcns;
   if constexpr (std::ranges::sized_range<Entries>) {
     referencedSrcns.reserve(std::ranges::size(entries));
@@ -94,7 +90,7 @@ public:
   [[nodiscard]] std::optional<SampleRef> findSrcn(u8 srcn) const;
 
 private:
-  friend SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder&, ByteReader, const SnesBrrCatalog&,
+  friend SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder&, ByteReader, std::span<const SnesBrrSample>,
                                              std::span<const u8>, std::string_view);
 
   struct Entry {
@@ -105,14 +101,14 @@ private:
   std::vector<Entry> entries_;
 };
 
-// Populate the generic sample builder with neutral BRR samples and the standard
+// Populate the generic sample builder from validated samples, with the standard
 // DIR/payload source structure used by SNES formats.
 [[nodiscard]] SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reader,
-                                                  const SnesBrrCatalog& catalog,
+                                                  std::span<const SnesBrrSample> catalog,
                                                   std::string_view directoryEntryKind = "snes-sample-dir-entry");
 // A non-empty usedSrcns span labels every other catalog entry as unused.
-[[nodiscard]] SnesBrrSampleRefs addSnesBrrSamples(
-    SamplePoolBuilder& samples, ByteReader reader, const SnesBrrCatalog& catalog,
-    std::span<const u8> usedSrcns, std::string_view directoryEntryKind = "snes-sample-dir-entry");
+[[nodiscard]] SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reader,
+                                                  std::span<const SnesBrrSample> catalog, std::span<const u8> usedSrcns,
+                                                  std::string_view directoryEntryKind = "snes-sample-dir-entry");
 
 }  // namespace vgmtrans::core

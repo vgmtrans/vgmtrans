@@ -177,15 +177,17 @@ void brrCatalogProjectsInstrumentsInSampleOrder() {
   bytes[0x40] = bytes[0x50] = 1;  // Complete, non-looping BRR blocks.
   const SourceId source{29};
   const auto catalog = readSnesBrrCatalog(ByteReader(source, bytes), 0, patches, &Patch::srcn);
-  expect(catalog.samples.size() == 2 && catalog.samples[0].srcn == 1 && catalog.samples[1].srcn == 2,
+  expect(catalog.size() == 2 && catalog[0].srcn == 1 && catalog[1].srcn == 2,
          "instrument projection must retain sorted unique sample numbers and reject invalid streams");
-  expect(catalog.directoryRange == SourceRange{.source = source, .offset = 4, .size = 8} &&
-             catalog.samples[0].stream.encodedData == SourceRange{.source = source, .offset = 0x40, .size = 9},
+  expect(catalog[0].directoryEntry == SourceRange{.source = source, .offset = 4, .size = 4} &&
+             catalog[1].directoryEntry == SourceRange{.source = source, .offset = 8, .size = 4} &&
+             catalog[0].stream.encodedData == SourceRange{.source = source, .offset = 0x40, .size = 9},
          "projected instruments must retain exact directory and payload source ranges");
   const auto checkRange = [&](auto&& srcns) {
     const auto ranged = readSnesBrrCatalog(ByteReader(source, bytes), 0, std::forward<decltype(srcns)>(srcns));
-    expect(ranged.samples.size() == 2 && ranged.samples[0].srcn == 1 && ranged.samples[1].srcn == 2 &&
-               ranged.directoryRange == catalog.directoryRange,
+    expect(ranged.size() == 2 && ranged[0].srcn == 1 && ranged[1].srcn == 2 &&
+               ranged[0].directoryEntry == catalog[0].directoryEntry &&
+               ranged[1].directoryEntry == catalog[1].directoryEntry,
            "sample-number ranges must use the same ordering, deduplication, and validation as projected records");
   };
   std::vector<u8> srcns{2, 3, 1, 2};
@@ -199,8 +201,17 @@ void brrCatalogProjectsInstrumentsInSampleOrder() {
   const auto empty = readSnesBrrCatalog(ByteReader{}, 0, std::vector<Patch>{}, [](const Patch&) -> u8 {
     throw std::logic_error("an empty range must not evaluate the SRCN projection");
   });
-  expect(empty.samples.empty() && !empty.directoryRange.valid(),
-         "empty input must produce an empty catalog without reading the source");
+  expect(empty.empty(), "empty input must produce an empty catalog without reading the source");
+
+  auto filtered = catalog;
+  filtered.erase(filtered.begin());
+  SourceMapBuilder sourceMap;
+  SamplePoolBuilder samples(AssetId{40}, &sourceMap);
+  const auto refs = addSnesBrrSamples(samples, ByteReader(source, bytes), filtered);
+  const auto annotations = sourceMap.finish();
+  expect(!refs.findSrcn(1) && refs.findSrcn(2) &&
+             annotations.annotations().front().range == SourceRange{.source = source, .offset = 8, .size = 4},
+         "the directory annotation must cover the retained entries after a format filters samples");
 }
 
 void brrAliasesRetainLoopIdentityAndSeparateSourceRecords() {
@@ -225,8 +236,12 @@ void brrAliasesRetainLoopIdentityAndSeparateSourceRecords() {
              refs.findSrcn(3)->owner() == asset,
          "aliases must share a concrete reference only when both BRR data and loop position match");
   expect(built.value.samples.size() == 3 && built.value.samples[0].loop.start == 0 &&
-             built.value.samples[1].loop.start == 16 && built.value.samples[2].loop.start == 16,
+             built.value.samples[0].loop.length == 32 && built.value.samples[1].loop.start == 16 &&
+             built.value.samples[1].loop.length == 16 && built.value.samples[2].loop.start == 16 &&
+             built.value.samples[2].loop.length == 16,
          "aliased directory entries must retain their individual sample values");
+  expect(annotations.annotations().front().range == reader.range(4, 12),
+         "the directory annotation must cover every retained SRCN, including aliases");
   for (u32 index = 0; index < 3; ++index) {
     const auto sources = annotations.ownedBy(ObjectRefs::sample(asset, index));
     expect(sources.size() == 2 && annotations.get(sources[0]).range == reader.range((index + 1) * 4, 4) &&

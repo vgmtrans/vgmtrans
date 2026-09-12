@@ -196,8 +196,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   const std::vector<u8> usedSrcns = referencedSamples(melodic, drums);
   // The paired tables use one four-byte DIR and one two-byte tuning entry per SRCN.
   const u32 srcnCount = (layout.tuningTableAddress - layout.spcDirAddress) / 4u;
-  const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, std::views::iota(0u, srcnCount));
-  if (catalog.samples.empty()) {
+  const auto catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, std::views::iota(0u, srcnCount));
+  if (catalog.empty()) {
     return std::nullopt;
   }
 

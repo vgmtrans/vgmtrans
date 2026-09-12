@@ -36,7 +36,7 @@ struct Patch {
   std::vector<Patch> result;
   for (const u8 program : references) {
     const u32 address = layout.instrumentTableAddress + program * 4u;
-    if (!reader.has(address, 4) || !readSnesSampleDirectoryEntry(reader, layout.spcDirAddress + program * 4u, true)) {
+    if (!reader.has(address, 4)) {
       continue;
     }
     const u8 adsr1 = reader.u8At(address);
@@ -61,8 +61,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
                                            const ReferencedPrograms& references, std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const std::vector<Patch> patches = collectPatches(reader, layout, references);
-  const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, patches, &Patch::program);
-  if (catalog.samples.empty()) {
+  const auto catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, patches, &Patch::program);
+  if (catalog.empty()) {
     return std::nullopt;
   }
 

@@ -549,8 +549,7 @@ void konamiSnesSynthParsersStopAtInvalidBankedInstrument() {
          "KonamiSnes parser should preserve the sparse source instrument index and address");
   const auto samples = readSnesBrrCatalog(ByteReader(SourceId{8}, bytes), *layout->spcDirAddress, instruments,
                                           &KonamiSnesInstrumentInfo::srcn);
-  expect(samples.samples.size() == 1 && samples.samples.front().srcn == 0 &&
-             samples.samples.front().stream.encodedData.size == 9,
+  expect(samples.size() == 1 && samples.front().srcn == 0 && samples.front().stream.encodedData.size == 9,
          "KonamiSnes sample parser should keep only samples used by valid instruments");
 
   auto staleLoopBytes = bytes;

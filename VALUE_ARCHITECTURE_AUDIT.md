@@ -1621,6 +1621,27 @@ The regression fails before the fix. The full build is warning-free and all
 20 CTest targets pass, including seven/fourteen-bit resolution and pan/LFO
 coverage.
 
+### Build SNES instruments from one validated sample list
+
+Return a plain vector of validated BRR samples and accept a span when building
+sample values. Remove the catalog wrapper and its cached directory range;
+compute that range from the retained entries when constructing annotations.
+WolfTeam already filtered its catalog after reading it, leaving the old range
+covering rejected entries. The focused filtering regression fails before this
+change and passes afterward.
+
+GraphRes and Prism filter the validated list directly. Prism reads tuning and
+ADSR at instrument construction, removing its temporary Patch type and collection
+pass. Compile, Itikiti, and Neverland also leave BRR validation to the shared
+reader. Existing instrument-table boundaries and format-specific discovery
+rules remain intact. BRR loop construction uses the reader's validated bounds.
+
+This removes 66 production lines. Existing fixtures cover sorted SRCNs,
+alias identity, loop lengths, malformed samples, and Prism's unreferenced
+instruments; the short filtering regression checks the annotation actually
+built for retained samples. The full build is warning-free and all 20 CTest
+targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
