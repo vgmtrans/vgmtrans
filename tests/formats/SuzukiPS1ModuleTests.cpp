@@ -61,7 +61,7 @@ std::vector<u8> scannerFixture() {
   constexpr u32 bankOffset = 0x100;
   constexpr u32 headerSize = 0x40;
   constexpr u32 sampleSize = 0x20;
-  auto bytes = sequenceFixture({0xac, 0x00, 100, 1, 0x90});
+  auto bytes = sequenceFixture({0xac, 0x00, 0xc2, 0x20, 100, 1, 0x90});
   bytes.resize(bankOffset + headerSize + sampleSize);
   bytes[bankOffset] = 'd';
   bytes[bankOffset + 1] = 'w';
@@ -132,8 +132,8 @@ void suzukiPs1DynamicAdsrUsesAuditedDriverCommands() {
   const SequenceProgram program = parseSuzukiPs1Sequence(
       reader, AssetId{71}, *layout,
       {
-          SuzukiPs1Instrument{.bank = 3, .program = 0, .adsr1 = initialAdsr1, .adsr2 = initialAdsr2},
-          SuzukiPs1Instrument{.bank = 4, .program = 0, .adsr1 = initialAdsr1, .adsr2 = initialAdsr2},
+          SuzukiPs1Envelope{.bank = 3, .program = 0, .adsr1 = initialAdsr1, .adsr2 = initialAdsr2},
+          SuzukiPs1Envelope{.bank = 4, .program = 0, .adsr1 = initialAdsr1, .adsr2 = initialAdsr2},
       });
   const TrackProgram& track = program.tracks.front();
   const auto c1 =
@@ -203,4 +203,11 @@ void suzukiPs1ModuleBuildsFractionallyTunedWdsSynth() {
          "WDS semitone and 1/256-semitone tuning should remain fractional");
   expect(region.envelope == psxSpuEnvelope(composePsxAdsr1(1, 0x70, 8, 8), composePsxAdsr2(1, 1, 0x40, 1, 0x10)),
          "DWDS mode bytes should feed the exact native PSX ADSR conversion");
+  const auto* sequence = snapshot.asset<SequenceProgramAsset>(*collection.members.sequence);
+  const auto performance = SequenceVm(LoopPolicy::PlayOnce).render(sequence->program);
+  const auto envelopes = eventsOfType<EnvelopePerformanceEvent>(performance.tracks.front());
+  expect(
+      envelopes.size() == 2 && envelopes.back()->update.values ==
+                                   psxSpuEnvelope(composePsxAdsr1(1, 0x20, 8, 8), composePsxAdsr2(1, 1, 0x40, 1, 0x10)),
+      "sequence ADSR writes should start from the registers retained by bank scanning");
 }

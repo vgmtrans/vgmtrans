@@ -138,20 +138,14 @@ struct TrackLayout {
 
 struct RuntimeConfig {
   u16 defaultBank = 0;
-  std::vector<SuzukiPs1Instrument> instruments;
-};
+  std::vector<SuzukiPs1Envelope> envelopes;
 
-struct ProgramState {
-  explicit ProgramState(const RuntimeConfig& config) : instruments(config.instruments) {}
-
-  [[nodiscard]] const SuzukiPs1Instrument* instrument(u16 bank, u8 program) const {
-    const auto found = std::ranges::find_if(instruments, [&](const SuzukiPs1Instrument& candidate) {
+  [[nodiscard]] const SuzukiPs1Envelope* envelope(u16 bank, u8 program) const {
+    const auto found = std::ranges::find_if(envelopes, [&](const SuzukiPs1Envelope& candidate) {
       return candidate.bank == bank && candidate.program == program;
     });
-    return found == instruments.end() ? nullptr : &*found;
+    return found == envelopes.end() ? nullptr : &*found;
   }
-
-  std::span<const SuzukiPs1Instrument> instruments;
 };
 
 struct TrackState {
@@ -175,7 +169,7 @@ struct Playback {
   TrackState& track;
   PerformanceEmitter& out;
   VmApi& vm;
-  ProgramState& programState;
+  const RuntimeConfig& config;
 
   void beforeCommand() {
     if (track.initialized) {
@@ -187,11 +181,11 @@ struct Playback {
   }
 
   void loadEnvelope() {
-    const auto* instrument = programState.instrument(track.bank, track.program);
-    track.hasEnvelope = instrument != nullptr;
-    if (instrument != nullptr) {
-      track.adsr1 = instrument->adsr1;
-      track.adsr2 = instrument->adsr2;
+    const auto* envelope = config.envelope(track.bank, track.program);
+    track.hasEnvelope = envelope != nullptr;
+    if (envelope != nullptr) {
+      track.adsr1 = envelope->adsr1;
+      track.adsr2 = envelope->adsr2;
     }
   }
 
@@ -649,11 +643,11 @@ const SequenceProgramConfig& suzukiPs1SequenceConfig() {
 }
 
 SequenceProgram parseSuzukiPs1Sequence(ByteReader reader, AssetId id, const SuzukiPs1SequenceLayout& layout,
-                                       const std::vector<SuzukiPs1Instrument>& instruments, SourceMapBuilder* sourceMap,
+                                       const std::vector<SuzukiPs1Envelope>& envelopes, SourceMapBuilder* sourceMap,
                                        std::vector<Diagnostic>* diagnostics) {
   SequenceProgram program = suzukiPs1SequenceConfig().makeProgram();
-  RuntimeConfig runtime{.defaultBank = layout.defaultBank, .instruments = instruments};
-  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime));
+  RuntimeConfig runtime{.defaultBank = layout.defaultBank, .envelopes = envelopes};
+  program.runtime = makeCompiledRuntime<Cursor, RuntimeConfig>(std::move(runtime));
 
   if (sourceMap != nullptr) {
     sourceMap->header("SuzukiPS1 Sequence Header", reader.range(layout.offset, 0x22))

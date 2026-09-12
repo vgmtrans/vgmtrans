@@ -56,20 +56,17 @@ struct SuzukiPs1BankLayout {
   SuzukiPs1BankKind kind = SuzukiPs1BankKind::Dwds;
 };
 
-struct SuzukiPs1Instrument {
+// Native register values retained for sequence ADSR writes.
+struct SuzukiPs1Envelope {
   u16 bank = 0;
   u8 program = 0;
-  u32 sampleOffset = 0;
-  u32 loopOffset = 0;
-  double unityKey = 60.0;
   u16 adsr1 = 0;
   u16 adsr2 = 0;
-  core::SourceRecord source;
 };
 
 struct SuzukiPs1ScannedBank {
   core::ScanSoundBankDraft bank;
-  std::vector<SuzukiPs1Instrument> instruments;
+  std::vector<SuzukiPs1Envelope> envelopes;
 };
 
 [[nodiscard]] std::optional<SuzukiPs1SequenceLayout> readSuzukiPs1SequenceLayout(core::ByteReader reader, u32 offset);
@@ -81,7 +78,7 @@ struct SuzukiPs1ScannedBank {
                                                                    const SuzukiPs1BankLayout& layout);
 [[nodiscard]] core::SequenceProgram parseSuzukiPs1Sequence(core::ByteReader reader, core::AssetId id,
                                                            const SuzukiPs1SequenceLayout& layout,
-                                                           const std::vector<SuzukiPs1Instrument>& instruments = {},
+                                                           const std::vector<SuzukiPs1Envelope>& envelopes = {},
                                                            core::SourceMapBuilder* sourceMap = nullptr,
                                                            std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& suzukiPs1SequenceConfig();

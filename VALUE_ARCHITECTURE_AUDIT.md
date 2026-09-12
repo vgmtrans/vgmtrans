@@ -1894,6 +1894,25 @@ tick delays, and note extensions. Both renderer versions run under
 AddressSanitizer and UBSan; the harness is not committed. The full build is
 warning-free and all 20 CTest targets pass.
 
+## Retain only Suzuki PS1 native envelopes for sequence playback
+
+Suzuki PS1 now constructs each synth instrument where its record is decoded.
+Sample preflight reads only the offsets needed to inspect streams, removing
+the intermediate vector of full instrument records. The scan-to-sequence
+handoff retains bank, program, and the two native ADSR registers; sample
+metadata and source annotations no longer accompany every sequence runtime.
+
+The compact settings also serve as read-only program state through the existing
+compiled-runtime adapter, removing a forwarding state type. Bank/program lookup
+order, native registers for rejected samples in otherwise playable banks,
+fractional tuning, loop overrides, and published annotations retain their rules.
+This removes 21 production lines without adding another model or adapter.
+
+A seven-line extension to the existing scan fixture renders an attack-rate
+command and verifies that it starts with the scanned bank's other ADSR fields.
+Existing dynamic-command tests cover program changes and bank switches. The
+full build is warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
