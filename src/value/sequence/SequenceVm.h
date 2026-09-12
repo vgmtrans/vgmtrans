@@ -337,6 +337,8 @@ public:
   [[nodiscard]] BranchResult countedRepeatBreak(u8 slot, Address destination);
 
   [[nodiscard]] u64 tick() const noexcept;
+  // Metadata for the executing command, including its track-specific decoding.
+  [[nodiscard]] SourceRange sourceRange() const noexcept;
   [[nodiscard]] const PerformanceSequence& sequence() const noexcept;
   void diagnostic(Diagnostic diagnostic);
 
