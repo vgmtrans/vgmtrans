@@ -476,7 +476,7 @@ struct Playback {
     });
     track.pan.tickRaw([&](s32) { emitPan(track.pan.output(out)); });
     const auto vibratoTick = track.vibrato.depthState.tickFade();
-    if (vibratoTick.shouldApply() && vibratoTick.changed) {
+    if (vibratoTick.changed) {
       emitVibratoDepth(track.vibrato.depthState.currentDepth(), track.vibrato.depthState.fadeOutput(out));
     }
     if (program.masterVolumeTrack == track.trackNumber) {

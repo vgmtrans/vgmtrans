@@ -1562,6 +1562,22 @@ This removes 34 production lines. Existing same-tick global ordering, tempo
 ties, modulation updates, and mixed pitch-transition coverage passes. The full
 build is warning-free and all 20 CTest targets pass; no test code is added.
 
+### Report only usable motion results
+
+Motion ticks no longer carry an unread previous value or an unused active()
+query. shouldApply directly identifies running and finished ticks. Remove its
+unused delayed-step option and the corresponding callback arguments: delayed
+ticks leave the value unchanged, so change-only callbacks cannot apply them.
+Linear callbacks use changed directly; fixed-point callbacks compare the raw
+values once without an additional status branch. HeartBeatSnes likewise uses
+the tick's change result directly.
+
+This removes eight production lines. A temporary sanitized comparison checks
+identical values, statuses, callback counts, and callback values across 217,800
+linear/fixed-point scenarios, including delays, retargeting, completion, and
+all rounding modes. The full build is warning-free and all 20 CTest targets
+pass; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

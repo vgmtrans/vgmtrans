@@ -28,16 +28,11 @@ enum class SequenceMotionMode {
 template <typename ValueType>
 struct SequenceMotionTick {
   SequenceMotionStatus status = SequenceMotionStatus::Inactive;
-  ValueType previous {};
   ValueType current {};
   bool changed = false;
 
-  [[nodiscard]] bool active() const {
-    return status != SequenceMotionStatus::Inactive;
-  }
-
-  [[nodiscard]] bool shouldApply(bool applyDelayedStep = false) const {
-    return active() && (applyDelayedStep || status != SequenceMotionStatus::Delayed);
+  [[nodiscard]] bool shouldApply() const {
+    return status == SequenceMotionStatus::Running || status == SequenceMotionStatus::Finished;
   }
 };
 
@@ -94,7 +89,7 @@ public:
 
     if (plan.usesTicks() && plan.ticks == 0) {
       reset(plan.target);
-      return {SequenceMotionStatus::Finished, previous, current_, current_ != previous};
+      return {SequenceMotionStatus::Finished, current_, current_ != previous};
     }
 
     step_ = plan.mode == SequenceMotionMode::TargetOverTicks
@@ -106,11 +101,10 @@ public:
       } else {
         reset(plan.target);
       }
-      return {SequenceMotionStatus::Finished, previous, current_, current_ != previous};
+      return {SequenceMotionStatus::Finished, current_, current_ != previous};
     }
 
-    return {plan.delay != 0 ? SequenceMotionStatus::Delayed : SequenceMotionStatus::Running, previous, current_,
-            false};
+    return {plan.delay != 0 ? SequenceMotionStatus::Delayed : SequenceMotionStatus::Running, current_, false};
   }
 
   [[nodiscard]] bool active() const {
@@ -125,42 +119,42 @@ public:
 
     if (delay_ != 0) {
       --delay_;
-      return {SequenceMotionStatus::Delayed, previous, current_, false};
+      return {SequenceMotionStatus::Delayed, current_, false};
     }
 
     if (mode_ != SequenceMotionMode::TargetByStep) {
       if (ticksRemaining_ == 0) {
-        return {SequenceMotionStatus::Inactive, previous, current_, false};
+        return {SequenceMotionStatus::Inactive, current_, false};
       }
 
       --ticksRemaining_;
       if (ticksRemaining_ == 0) {
         current_ = target_;
-        return {SequenceMotionStatus::Finished, previous, current_, current_ != previous};
+        return {SequenceMotionStatus::Finished, current_, current_ != previous};
       }
 
       current_ = static_cast<ValueType>(current_ + step_);
-      return {SequenceMotionStatus::Running, previous, current_, current_ != previous};
+      return {SequenceMotionStatus::Running, current_, current_ != previous};
     }
 
     if (step_ == ValueType{}) {
-      return {SequenceMotionStatus::Inactive, previous, current_, false};
+      return {SequenceMotionStatus::Inactive, current_, false};
     }
 
     current_ = static_cast<ValueType>(current_ + step_);
     if ((step_ > ValueType{} && current_ >= target_) || (step_ < ValueType{} && current_ <= target_)) {
       current_ = target_;
       step_ = {};
-      return {SequenceMotionStatus::Finished, previous, current_, current_ != previous};
+      return {SequenceMotionStatus::Finished, current_, current_ != previous};
     }
 
-    return {SequenceMotionStatus::Running, previous, current_, current_ != previous};
+    return {SequenceMotionStatus::Running, current_, current_ != previous};
   }
 
   template <typename Apply>
-  SequenceMotionTick<ValueType> tickChanged(Apply&& apply, bool applyDelayedStep = false) {
+  SequenceMotionTick<ValueType> tickChanged(Apply&& apply) {
     const auto motionTick = tick();
-    if (motionTick.shouldApply(applyDelayedStep) && motionTick.changed) {
+    if (motionTick.changed) {
       std::forward<Apply>(apply)(motionTick.current);
     }
     return motionTick;
@@ -234,14 +228,12 @@ public:
   [[nodiscard]] SequenceMotionTick<ValueType> tick() { return value_.tick(); }
 
   template <typename ApplyRaw>
-  SequenceMotionTick<ValueType> tickRaw(ApplyRaw&& applyRaw, bool applyDelayedStep = false) {
+  SequenceMotionTick<ValueType> tickRaw(ApplyRaw&& applyRaw) {
     const ValueType previousRaw = currentRaw();
     const auto motionTick = tick();
-    if (motionTick.shouldApply(applyDelayedStep)) {
-      const ValueType nextRaw = currentRaw();
-      if (nextRaw != previousRaw) {
-        std::forward<ApplyRaw>(applyRaw)(nextRaw);
-      }
+    const ValueType nextRaw = currentRaw();
+    if (nextRaw != previousRaw) {
+      std::forward<ApplyRaw>(applyRaw)(nextRaw);
     }
     return motionTick;
   }
