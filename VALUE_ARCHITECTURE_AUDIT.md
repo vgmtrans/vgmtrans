@@ -1913,6 +1913,29 @@ command and verifies that it starts with the scanned bank's other ADSR fields.
 Existing dynamic-command tests cover program changes and bank switches. The
 full build is warning-free and all 20 CTest targets pass.
 
+## Construct export variant regions in one pass
+
+Instrument variant preparation now applies envelope overrides and appends
+stereo layers into one candidate region vector. It no longer copies an entire
+instrument for every attack or builds an intermediate stereo input vector.
+The candidate's envelopes determine whether a non-stereo variant differs from
+the base, removing the separately accumulated envelope-difference flag.
+
+Only an actual new variant copies the instrument and replaces its regions.
+Existing variants still match effective region values, preserving deduplication
+across different override histories. Address allocation, active-voice warnings,
+cleared/inherited stages, silent stereo layers, and note selection are unchanged.
+Production line count is unchanged; one construction pass and one state flag
+are removed, with no new types or public API.
+
+All 20 CTest targets pass, including existing envelope, stereo, and address
+exhaustion regressions. A temporary comparison checks variant addresses,
+region values, note selections, and complete diagnostics in 2,048 preparations
+across all four options, partial masks, cleared/restored fields, multiple lanes,
+repeated and held notes, signed/zero gains, and non-finite envelope values.
+Both implementations run under AddressSanitizer and UBSan without findings.
+The full build is warning-free; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
