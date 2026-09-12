@@ -51,7 +51,7 @@ using detail::VmTrackRuntime;
   return Diagnostic{
       .severity = Severity::Warning,
       .message = std::move(message),
-      .range = range.valid() ? std::optional<SourceRange>{range} : std::nullopt,
+      .range = range,
   };
 }
 
@@ -863,7 +863,7 @@ const PerformanceSequence& VmApi::sequence() const noexcept {
 }
 
 void VmApi::diagnostic(Diagnostic diagnostic) {
-  if (!diagnostic.range && command_.range.valid()) {
+  if (!diagnostic.range.valid() && command_.range.valid()) {
     diagnostic.range = command_.range;
   }
   if (!diagnostic.annotation && command_.annotation.valid()) {

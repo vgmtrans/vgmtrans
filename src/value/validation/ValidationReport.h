@@ -9,7 +9,6 @@
 #include "value/base/CoreTypes.h"
 
 #include <iterator>
-#include <optional>
 #include <span>
 #include <string>
 #include <utility>
@@ -29,7 +28,7 @@ public:
                         std::make_move_iterator(report.diagnostics_.end()));
   }
 
-  void error(std::string code, std::string message, std::optional<SourceRange> range = std::nullopt) {
+  void error(std::string code, std::string message, SourceRange range = {}) {
     diagnostics_.push_back(Diagnostic{
         .severity = Severity::Error,
         .code = std::move(code),

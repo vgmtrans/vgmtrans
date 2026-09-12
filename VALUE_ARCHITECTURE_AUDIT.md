@@ -1351,6 +1351,25 @@ This removes 12 production lines and two redundant types without changing the
 runtime API, initialization timing, program lookup, or collection binding. The
 full build is warning-free and all 20 CTest targets pass; no test code is added.
 
+### Represent an unattributed diagnostic range once
+
+Diagnostics and collection issues now contain SourceRange directly. A missing
+SourceId denotes an unattributed location, matching other source-backed values.
+Remove three range-to-optional conversion helpers, repeated conditional wrapping,
+and redundant validation guards. Reporting APIs accept ranges directly; shell
+output and source removal use the same range-validity rule.
+
+This also fixes fallback attribution: explicitly passing an empty SourceRange
+no longer suppresses the scanned file's range or the VM's current command range.
+Locations with a source ID retain source-membership and byte-bound checks,
+including zero-size anchors and out-of-bounds diagnostics. Optional read results
+and extracted-source origins keep their distinct absence semantics.
+
+This removes 33 production lines. A seven-line regression inside the existing
+missing-runtime session test fails before the change and passes afterward;
+adapting the shared assertion helper leaves a net six added test lines. The full
+build is warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

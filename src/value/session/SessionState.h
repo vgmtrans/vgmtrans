@@ -45,7 +45,7 @@ public:
   [[nodiscard]] CollectionId createUserCollection(std::string name, CollectionMembers members, CollectionBinder binder,
                                                   ScanIdAllocator& ids);
 
-  void addError(std::string message, std::optional<SourceRange> range = std::nullopt);
+  void addError(std::string message, SourceRange range = {});
   void addDiagnostics(std::vector<Diagnostic> diagnostics);
 
   [[nodiscard]] const SourceMap& sourceMap() const noexcept { return sourceMap_; }

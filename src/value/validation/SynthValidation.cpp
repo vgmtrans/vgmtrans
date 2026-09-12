@@ -17,16 +17,11 @@ namespace vgmtrans::core {
 
 namespace {
 
-[[nodiscard]] std::optional<SourceRange> validRange(SourceRange range) {
-  return range.valid() ? std::optional<SourceRange>{range} : std::nullopt;
-}
-
 void validateEnvelope(ValidationReport& report, const Envelope& envelope, SourceRange range) {
   // Positive infinity explicitly represents a stage with no finite duration.
   const auto checkSeconds = [&](const std::optional<double> value, std::string_view code, std::string_view name) {
     if (value && (std::isnan(*value) || *value < 0.0)) {
-      report.error(std::string(code), "Synth envelope " + std::string(name) + " time was negative or NaN",
-                   validRange(range));
+      report.error(std::string(code), "Synth envelope " + std::string(name) + " time was negative or NaN", range);
     }
   };
 
@@ -38,15 +33,14 @@ void validateEnvelope(ValidationReport& report, const Envelope& envelope, Source
 
   if (envelope.sustainAmplitude && (!std::isfinite(*envelope.sustainAmplitude) || *envelope.sustainAmplitude < 0.0 ||
                                     *envelope.sustainAmplitude > 1.0)) {
-    report.error("synth.envelope.sustain", "Synth envelope sustain amplitude was outside the 0.0 to 1.0 range",
-                 validRange(range));
+    report.error("synth.envelope.sustain", "Synth envelope sustain amplitude was outside the 0.0 to 1.0 range", range);
   }
 }
 
 void validateYm2151Voice(ValidationReport& report, const Ym2151Voice& voice, SourceRange range) {
   const auto error = [&](std::string_view field) {
     report.error("synth.ym2151." + std::string(field), "YM2151 voice " + std::string(field) + " was out of range",
-                 validRange(range));
+                 range);
   };
   if (voice.algorithm > 7) {
     error("algorithm");
@@ -79,11 +73,10 @@ void validateYm2151Voice(ValidationReport& report, const Ym2151Voice& voice, Sou
 void validateSamples(ValidationReport& report, const SamplePool& pool) {
   for (const auto& sample : pool.samples) {
     if (sample.channels == 0) {
-      report.error("synth.sample.channels", "Synth sample had zero channels", validRange(sample.encodedData));
+      report.error("synth.sample.channels", "Synth sample had zero channels", sample.encodedData);
     }
     if (!std::isfinite(sample.attenuationDb)) {
-      report.error("synth.sample.attenuation", "Synth sample attenuation was not finite",
-                   validRange(sample.encodedData));
+      report.error("synth.sample.attenuation", "Synth sample attenuation was not finite", sample.encodedData);
     }
   }
 }
@@ -103,13 +96,12 @@ ValidationReport validateSampleReferences(const SoundBankAsset& soundBank,
       if (sample.needsBinding()) {
         if (!allowUnboundSampleReferences) {
           report.error("synth.sample-reference.unresolved", "Synth region has an unresolved sample reference",
-                       validRange(region.range));
+                       region.range);
         }
         continue;
       }
       if (!sample.valid()) {
-        report.error("synth.sample-reference.malformed", "Synth region has a malformed sample reference",
-                     validRange(region.range));
+        report.error("synth.sample-reference.malformed", "Synth region has a malformed sample reference", region.range);
         continue;
       }
 
@@ -120,14 +112,13 @@ ValidationReport validateSampleReferences(const SoundBankAsset& soundBank,
         });
         if (found == externalPools.end()) {
           report.error("synth.sample-reference.external-owner",
-                       "Synth region sample owner is not a selected external sample pool", validRange(region.range));
+                       "Synth region sample owner is not a selected external sample pool", region.range);
           continue;
         }
         pool = &(*found)->pool;
       }
       if (sample.index() >= pool->samples.size()) {
-        report.error("synth.sample-reference.out-of-range", "Synth region sample index is out of range",
-                     validRange(region.range));
+        report.error("synth.sample-reference.out-of-range", "Synth region sample index is out of range", region.range);
       }
     }
   }
@@ -141,16 +132,15 @@ ValidationReport validateSoundBank(const SoundBankAsset& soundBank) {
   for (const auto& instrument : soundBank.instruments) {
     if (instrument.identity) {
       if (!instrument.identity->valid()) {
-        report.error("synth.instrument.identity", "Synth instrument had an empty identity domain",
-                     validRange(instrument.range));
+        report.error("synth.instrument.identity", "Synth instrument had an empty identity domain", instrument.range);
       } else if (!identities.emplace(instrument.identity->domain, instrument.identity->key).second) {
         report.error("synth.instrument.duplicate-identity", "Synth instrument identity was duplicated in its set",
-                     validRange(instrument.range));
+                     instrument.range);
       }
     }
     if (!std::isfinite(instrument.reverb) || instrument.reverb < 0.0) {
       report.error("synth.instrument.reverb", "Synth instrument reverb send was not finite and nonnegative",
-                   validRange(instrument.range));
+                   instrument.range);
     }
     if (instrument.synthVoice) {
       std::visit([&](const Ym2151Voice& voice) { validateYm2151Voice(report, voice, instrument.range); },
@@ -161,13 +151,13 @@ ValidationReport validateSoundBank(const SoundBankAsset& soundBank) {
       // Region pan is intentionally unipolar in the synth model. Performance
       // pan uses a different bipolar range and is validated elsewhere.
       if (!std::isfinite(region.pan) || region.pan < 0.0 || region.pan > 1.0) {
-        report.error("synth.region.pan", "Synth region pan was outside the 0.0 to 1.0 range", validRange(region.range));
+        report.error("synth.region.pan", "Synth region pan was outside the 0.0 to 1.0 range", region.range);
       }
       if (!std::isfinite(region.attenuationDb)) {
-        report.error("synth.region.attenuation", "Synth region attenuation was not finite", validRange(region.range));
+        report.error("synth.region.attenuation", "Synth region attenuation was not finite", region.range);
       }
       if (!std::isfinite(region.unityKey)) {
-        report.error("synth.region.unity-key", "Synth region unity key was not finite", validRange(region.range));
+        report.error("synth.region.unity-key", "Synth region unity key was not finite", region.range);
       }
       validateEnvelope(report, region.envelope, region.range);
     }

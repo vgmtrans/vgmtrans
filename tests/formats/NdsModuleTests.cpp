@@ -1199,8 +1199,8 @@ void ndsSequenceDoesNotLinkInvalidControlTargets() {
            "NDS invalid control target should preserve the source command");
     expect(diagnostics.size() == 1 && diagnostics[0].message == warning,
            "NDS invalid control target should report a decode warning");
-    expect(diagnostics[0].range && diagnostics[0].range->source == SourceId{14} &&
-               diagnostics[0].range->offset == trackStart && diagnostics[0].range->size == 4,
+    expect(diagnostics[0].range.valid() && diagnostics[0].range.source == SourceId{14} &&
+               diagnostics[0].range.offset == trackStart && diagnostics[0].range.size == 4,
            "NDS invalid control-target diagnostic should use the command range");
 
     const auto commandAnnotations = annotations.withSequenceSemantic(SourceId{14}, semantic);

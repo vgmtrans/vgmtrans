@@ -127,16 +127,14 @@ void appendWavArtifacts(std::vector<Artifact>& artifacts, std::string_view baseN
     try {
       // Sample bytes stay in SourceStore so WAV export can report source-backed decode errors.
       if (!sources.contains(sample.encodedData.source)) {
-        artifact.diagnostics.push_back(
-            exportError("Sample source was not found", validDiagnosticRange(sample.encodedData)));
+        artifact.diagnostics.push_back(exportError("Sample source was not found", sample.encodedData));
       } else if (auto decoded = decodeSample(sample, sources.bytes(sample.encodedData.source))) {
         artifact.bytes = encodePcm16Wav(*decoded);
       } else {
-        artifact.diagnostics.push_back(
-            exportError("Unsupported sample codec", validDiagnosticRange(sample.encodedData)));
+        artifact.diagnostics.push_back(exportError("Unsupported sample codec", sample.encodedData));
       }
     } catch (const std::exception& ex) {
-      artifact.diagnostics.push_back(exportError(ex.what(), validDiagnosticRange(sample.encodedData)));
+      artifact.diagnostics.push_back(exportError(ex.what(), sample.encodedData));
     }
 
     artifacts.push_back(std::move(artifact));
@@ -203,7 +201,7 @@ Artifact exportStandaloneSequenceMidi(const SessionSnapshot& snapshot, AssetId s
     if (asset == nullptr) {
       diagnostics.push_back(exportError("Sequence asset was not found"));
     } else {
-      diagnostics.push_back(exportError("Asset is not a sequence", validDiagnosticRange(metadata(*asset).range)));
+      diagnostics.push_back(exportError("Asset is not a sequence", metadata(*asset).range));
     }
     return Artifact{
         .filename = "sequence-" + std::to_string(sequenceId.value) + ".mid",
@@ -236,7 +234,7 @@ Artifact exportSequenceMidi(const SessionSnapshot& snapshot, const SourceStore& 
         .filename = artifactBaseName(sequence->metadata, "sequence") + ".mid",
         .mediaType = "audio/midi",
         .diagnostics = {exportError("Sequence belongs to multiple collections; export a specific collection instead",
-                                    validDiagnosticRange(sequence->metadata.range))},
+                                    sequence->metadata.range)},
     };
   }
 
@@ -280,7 +278,7 @@ Artifact exportSoundBank(const SessionSnapshot& snapshot, const SourceStore& sou
   if (collectionCount > 1) {
     return failedArtifact(
         {exportError("Sound bank belongs to multiple collections; export a specific collection instead",
-                     validDiagnosticRange(soundBank->metadata.range))});
+                     soundBank->metadata.range)});
   }
   if (collectionCount == 1) {
     const auto* collection = snapshot.firstCollectionContaining(soundBankId);

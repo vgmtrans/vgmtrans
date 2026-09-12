@@ -38,8 +38,7 @@ CollectionIssue missingSamplePoolIssue(std::optional<AssetId> asset) {
   return missingRoleIssue("missing-sample-pool", "sample pool", asset);
 }
 
-CollectionIssue ambiguousMatchIssue(std::string message, std::optional<AssetId> asset,
-                                    std::optional<SourceRange> range) {
+CollectionIssue ambiguousMatchIssue(std::string message, std::optional<AssetId> asset, SourceRange range) {
   return CollectionIssue{
       .impact = CollectionIssueImpact::Ambiguous,
       .severity = Severity::Warning,

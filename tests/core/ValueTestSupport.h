@@ -216,8 +216,7 @@ const Diagnostic& diagnosticWithMessage(const std::vector<Diagnostic>& diagnosti
 void expectDiagnosticRange(const std::vector<Diagnostic>& diagnostics, std::string_view message,
                            SourceRange expectedRange) {
   const auto& diagnostic = diagnosticWithMessage(diagnostics, message);
-  expect(diagnostic.range.has_value(), "diagnostic should preserve a source range");
-  expect(sameRange(*diagnostic.range, expectedRange), "diagnostic should preserve the expected source range");
+  expect(sameRange(diagnostic.range, expectedRange), "diagnostic should preserve the expected source range");
 }
 
 [[nodiscard]] bool hasProbeMagic(const auto& input, u8 magic, u64 minimumSize = 1) {

@@ -305,9 +305,7 @@ ValidationReport validateScanResult(SourceId source, const ScanResult& result, c
   }
 
   for (const auto& diagnostic : result.diagnostics) {
-    if (diagnostic.range) {
-      validateRange(report, sources, *diagnostic.range, "diagnostic");
-    }
+    validateRange(report, sources, diagnostic.range, "diagnostic");
   }
 
   validateSourceMapRanges(report, sources, result.sourceMap);
@@ -340,22 +338,20 @@ ValidationReport validateExtractionResult(SourceId source, const ExtractionResul
   }
 
   for (const auto& diagnostic : result.diagnostics) {
-    if (diagnostic.range) {
-      validateRange(report, sources, *diagnostic.range, "diagnostic", "Extraction result");
-    }
+    validateRange(report, sources, diagnostic.range, "diagnostic", "Extraction result");
   }
 
   for (const auto& extracted : result.sources) {
     const auto& origin = extracted.file.origin;
     if (extracted.file.knownFormat && extracted.file.knownFormat->empty()) {
       report.error("scan.extracted-source.empty-known-format",
-                   "Extraction result contained a source with an empty known format", origin);
+                   "Extraction result contained a source with an empty known format", origin.value_or(SourceRange{}));
     }
     if (origin && origin->source.valid() && !sources.contains(origin->source)) {
       report.error(
           "scan.extracted-source.missing-parent",
           "Extraction result contained a source with missing parent source " + std::to_string(origin->source.value),
-          origin);
+          *origin);
     }
     if (origin && sources.contains(origin->source)) {
       validateRange(report, sources, *origin, "extracted source origin", "Extraction result");

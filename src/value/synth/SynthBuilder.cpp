@@ -15,10 +15,6 @@ namespace vgmtrans::core {
 
 namespace {
 
-std::optional<SourceRange> diagnosticRange(SourceRange range) {
-  return range.valid() ? std::optional<SourceRange>{range} : std::nullopt;
-}
-
 SourceTarget sampleTarget(SampleRef sample) {
   return SourceTarget{ObjectRefs::sample(sample.owner(), sample.index())};
 }
@@ -290,7 +286,7 @@ void SamplePoolBuilder::report(Severity severity, std::string code, std::string 
       .severity = severity,
       .code = std::move(code),
       .message = std::move(message),
-      .range = diagnosticRange(range),
+      .range = range,
       .object = ObjectRefs::asset(asset_),
   });
 }
@@ -585,7 +581,7 @@ void InstrumentSetBuilder::report(Severity severity, std::string code, std::stri
       .severity = severity,
       .code = std::move(code),
       .message = std::move(message),
-      .range = diagnosticRange(range),
+      .range = range,
       .object = ObjectRefs::asset(asset_),
   });
 }

@@ -150,7 +150,8 @@ struct Diagnostic {
   Severity severity = Severity::Info;
   std::string code;
   std::string message;
-  std::optional<SourceRange> range;
+  // An invalid range means no source location was supplied.
+  SourceRange range;
   std::optional<SourceAnnotationId> annotation;
   std::optional<ObjectRef> object;
 };

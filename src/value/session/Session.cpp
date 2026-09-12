@@ -35,7 +35,7 @@ namespace {
 
 void prepareDiagnosticRanges(std::vector<Diagnostic>& diagnostics, const SourceFile& source) {
   for (auto& diagnostic : diagnostics) {
-    if (!diagnostic.range) {
+    if (!diagnostic.range.valid()) {
       diagnostic.range = SourceRange{.source = source.id, .offset = 0, .size = source.size};
     }
   }
@@ -51,7 +51,7 @@ void prepareDiagnostics(ScanResult& result, const SourceFile& source) {
     result.diagnostics.push_back(Diagnostic{
         .severity = Severity::Error,
         .message = "Sequence program has no runtime executor",
-        .range = sequence->metadata.range.valid() ? std::optional<SourceRange>{sequence->metadata.range} : std::nullopt,
+        .range = sequence->metadata.range,
     });
   }
   prepareDiagnosticRanges(result.diagnostics, source);
@@ -391,7 +391,7 @@ void Session::scanOneSource(SourceId id, std::vector<SourceId>& queue) {
     auto diagnostics = validation.takeDiagnostics();
     for (auto& diagnostic : diagnostics) {
       diagnostic.message = std::string(processor) + " " + std::string(operation) + " failed: " + diagnostic.message;
-      if (!diagnostic.range || !sources_.contains(diagnostic.range->source)) {
+      if (!diagnostic.range.valid() || !sources_.contains(diagnostic.range.source)) {
         diagnostic.range = SourceRange{.source = source.id, .offset = 0, .size = source.size};
       }
     }
