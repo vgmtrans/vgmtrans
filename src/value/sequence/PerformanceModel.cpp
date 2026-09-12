@@ -11,7 +11,6 @@
 #include <iterator>
 #include <limits>
 #include <optional>
-#include <tuple>
 
 namespace vgmtrans::core {
 
@@ -159,11 +158,8 @@ std::vector<const PerformanceEvent*> performanceEventsForCommand(const Performan
       events.push_back(&event);
     }
   }
-  std::ranges::stable_sort(events, [](const PerformanceEvent* lhs, const PerformanceEvent* rhs) {
-    const auto& lhsHeader = performanceEventHeader(*lhs);
-    const auto& rhsHeader = performanceEventHeader(*rhs);
-    return std::tie(lhsHeader.tick, lhsHeader.sequence) < std::tie(rhsHeader.tick, rhsHeader.sequence);
-  });
+  std::ranges::stable_sort(events, {},
+                           [](const PerformanceEvent* event) { return performanceEventHeader(*event).order(); });
   return events;
 }
 

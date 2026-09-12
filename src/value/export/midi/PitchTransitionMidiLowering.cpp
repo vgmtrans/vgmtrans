@@ -61,11 +61,8 @@ class PitchBendRangeTimeline {
     for (const auto& event : events) {
       timeline.push_back(&event);
     }
-    std::ranges::stable_sort(timeline, [](const PerformanceEvent* lhs, const PerformanceEvent* rhs) {
-      const auto& left = performanceEventHeader(*lhs);
-      const auto& right = performanceEventHeader(*rhs);
-      return std::tie(left.tick, left.sequence) < std::tie(right.tick, right.sequence);
-    });
+    std::ranges::stable_sort(timeline, {},
+                             [](const PerformanceEvent* event) { return performanceEventHeader(*event).order(); });
 
     for (const auto* event : timeline) {
       if (context.apply(*event, soundBanks)) {
@@ -76,10 +73,8 @@ class PitchBendRangeTimeline {
 
   [[nodiscard]] double semitones(const PitchBendPerformanceEvent& bend,
                                  const PerformanceEventHeader& at) const {
-    const auto key = std::pair{at.tick, at.sequence};
-    const auto found = std::upper_bound(points_.begin(), points_.end(), key, [](const auto& value, const Point& point) {
-      return value < std::pair{point.header.tick, point.header.sequence};
-    });
+    const auto found =
+        std::ranges::upper_bound(points_, at.order(), {}, [](const Point& point) { return point.header.order(); });
     const auto& context = found == points_.begin() ? initial_ : std::prev(found)->context;
     return context.semitones(bend);
   }
@@ -149,10 +144,7 @@ struct PitchBendLayer {
       });
     }
   }
-  std::ranges::stable_sort(notes, [](const NoteSpan& lhs, const NoteSpan& rhs) {
-    return std::tie(lhs.source.header.tick, lhs.source.header.sequence) <
-           std::tie(rhs.source.header.tick, rhs.source.header.sequence);
-  });
+  std::ranges::stable_sort(notes, {}, [](const NoteSpan& note) { return note.source.header.order(); });
   return notes;
 }
 
@@ -173,12 +165,10 @@ struct PitchBendLayer {
   const PitchBendPerformanceEvent* latest = nullptr;
   for (const auto& event : events) {
     const auto* bend = std::get_if<PitchBendPerformanceEvent>(&event);
-    if (bend == nullptr || bend->layer != kPrimaryPitchBendLayer ||
-        std::tie(bend->header.tick, bend->header.sequence) > std::tie(at.tick, at.sequence)) {
+    if (bend == nullptr || bend->layer != kPrimaryPitchBendLayer || bend->header.order() > at.order()) {
       continue;
     }
-    if (latest == nullptr ||
-        std::tie(latest->header.tick, latest->header.sequence) < std::tie(bend->header.tick, bend->header.sequence)) {
+    if (latest == nullptr || latest->header.order() < bend->header.order()) {
       latest = bend;
     }
   }
@@ -275,10 +265,7 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
 [[nodiscard]] std::vector<PitchBendPerformanceEvent> resolvePitchBends(std::vector<PitchBendWrite> writes,
                                                                        PitchBendLayerId heldTransitionLayer,
                                                                        const PitchBendRangeTimeline& ranges) {
-  std::ranges::stable_sort(writes, [](const PitchBendWrite& lhs, const PitchBendWrite& rhs) {
-    return std::tie(lhs.bend.header.tick, lhs.bend.header.sequence) <
-           std::tie(rhs.bend.header.tick, rhs.bend.header.sequence);
-  });
+  std::ranges::stable_sort(writes, {}, [](const PitchBendWrite& write) { return write.bend.header.order(); });
 
   PitchBendLayer primary;
   PitchBendLayer heldVoice;
@@ -352,7 +339,7 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
   const PitchBendPerformanceEvent* primary = nullptr;
   const PitchBendPerformanceEvent* held = nullptr;
   for (const auto& bend : resolved) {
-    if (std::tie(bend.header.tick, bend.header.sequence) > std::tie(at.tick, at.sequence)) {
+    if (bend.header.order() > at.order()) {
       continue;
     }
     if (bend.layer == kPrimaryPitchBendLayer) {
@@ -611,9 +598,7 @@ void linkPitchBendVoices(std::vector<NoteSpan>& notes, const std::vector<const P
     auto* previous = findNote(notes, *transition.previousNote);
     if (note == nullptr || previous == nullptr || note == previous ||
         automation->realization.startTick > note->source.header.tick ||
-        std::tie(previous->source.header.tick, previous->source.header.sequence) >=
-            std::tie(note->source.header.tick, note->source.header.sequence) ||
-        previous->source.lane != note->source.lane) {
+        previous->source.header.order() >= note->source.header.order() || previous->source.lane != note->source.lane) {
       continue;
     }
 
@@ -815,11 +800,8 @@ PerformanceSequence lowerMidiPerformanceAutomation(const PerformanceSequence& pe
     if (!pitchBendTransitions.empty()) {
       lowerPitchBends(lowered, events, notes, pitchBendTransitions, *pitchBendRanges);
     }
-    std::ranges::stable_sort(events, [](const PerformanceEvent& lhs, const PerformanceEvent& rhs) {
-      const auto& left = performanceEventHeader(lhs);
-      const auto& right = performanceEventHeader(rhs);
-      return std::tie(left.tick, left.sequence) < std::tie(right.tick, right.sequence);
-    });
+    std::ranges::stable_sort(events, {},
+                             [](const PerformanceEvent& event) { return performanceEventHeader(event).order(); });
     track.events = std::move(events);
     std::erase_if(track.automations,
                   [](const PerformanceAutomation& automation) { return pitchTransitionIntent(automation) != nullptr; });

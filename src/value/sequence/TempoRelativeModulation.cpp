@@ -13,7 +13,6 @@
 #include <iterator>
 #include <map>
 #include <optional>
-#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -112,11 +111,8 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
       }
     }
   }
-  std::ranges::stable_sort(timeline, [](const EventRef& lhs, const EventRef& rhs) {
-    const auto& left = performanceEventHeader(*lhs.event);
-    const auto& right = performanceEventHeader(*rhs.event);
-    return std::tie(left.tick, left.sequence) < std::tie(right.tick, right.sequence);
-  });
+  std::ranges::stable_sort(timeline, {},
+                           [](const EventRef& ref) { return performanceEventHeader(*ref.event).order(); });
 
   std::vector<TrackModulationState> states(performance.tracks.size());
   std::vector<std::vector<PerformanceEvent>> derived(performance.tracks.size());
@@ -200,11 +196,8 @@ void resolveTempoRelativeModulation(PerformanceSequence& performance) {
     }
     track.events.insert(track.events.end(), std::make_move_iterator(additions.begin()),
                         std::make_move_iterator(additions.end()));
-    std::ranges::stable_sort(track.events, [](const PerformanceEvent& lhs, const PerformanceEvent& rhs) {
-      const auto& left = performanceEventHeader(lhs);
-      const auto& right = performanceEventHeader(rhs);
-      return std::tie(left.tick, left.sequence) < std::tie(right.tick, right.sequence);
-    });
+    std::ranges::stable_sort(track.events, {},
+                             [](const PerformanceEvent& event) { return performanceEventHeader(event).order(); });
   }
 }
 
