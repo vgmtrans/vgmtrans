@@ -165,7 +165,7 @@ void performanceAutomationRetainsIntentAlongsideOneEventTimeline() {
               LevelPerformanceEvent{
                   .header =
                       PerformanceEventHeader{
-                          .sourceCommand = CommandId{9},
+                          .sourceCommand = {TrackId{3}, CommandId{9}},
                           .sourceAnnotation = SourceAnnotationId{11},
                           .track = TrackId{3},
                           .tick = 0,
@@ -177,7 +177,7 @@ void performanceAutomationRetainsIntentAlongsideOneEventTimeline() {
               LevelPerformanceEvent{
                   .header =
                       PerformanceEventHeader{
-                          .sourceCommand = CommandId{9},
+                          .sourceCommand = {TrackId{3}, CommandId{9}},
                           .sourceAnnotation = SourceAnnotationId{11},
                           .track = TrackId{3},
                           .tick = 1,
@@ -187,7 +187,9 @@ void performanceAutomationRetainsIntentAlongsideOneEventTimeline() {
                   .linearGain = 0.5,
               },
               NotePerformanceEvent{
-                  .header = PerformanceEventHeader{.track = TrackId{3}, .tick = 2, .sequence = 3},
+                  .header =
+                      PerformanceEventHeader{
+                          .sourceCommand = {TrackId{4}, CommandId{9}}, .track = TrackId{3}, .tick = 2, .sequence = 3},
                   .key = 60,
                   .durationTicks = 1,
               },
@@ -196,7 +198,7 @@ void performanceAutomationRetainsIntentAlongsideOneEventTimeline() {
           .id = PerformanceAutomationId{0},
           .header =
               PerformanceEventHeader{
-                  .sourceCommand = CommandId{9},
+                  .sourceCommand = {TrackId{3}, CommandId{9}},
                   .sourceAnnotation = SourceAnnotationId{11},
                   .track = TrackId{3},
                   .tick = 0,
@@ -214,7 +216,7 @@ void performanceAutomationRetainsIntentAlongsideOneEventTimeline() {
              performanceEventHeader(track.events[2]).automation == PerformanceAutomationId{0},
          "realized automation events should remain in the track timeline with their source-intent association");
 
-  const auto sourceEvents = performanceEventsForCommand(track, CommandId{9});
+  const auto sourceEvents = performanceEventsForCommand(track, {TrackId{3}, CommandId{9}});
   expect(sourceEvents.size() == 2 && std::ranges::all_of(sourceEvents,
                                                          [](const PerformanceEvent* event) {
                                                            return performanceEventHeader(*event).sourceAnnotation ==
@@ -228,7 +230,8 @@ void performanceEmitterBindsScalarAutomationWithoutExposingStorage() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{9}, SourceAnnotationId{11}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{9}}, SourceAnnotationId{11}, 0, nextSequence, nextNote,
+                         nextAutomation};
 
   const auto fade = out.fade(PerformanceAutomationTarget::Pitch, 2.0, 2, 1);
   fade.at(out, 1).pitchBend(1.0);
@@ -245,7 +248,7 @@ void performanceEmitterBindsScalarAutomationWithoutExposingStorage() {
              intent.motion == PerformanceAutomationMotion::TargetOverTicks && intent.targetValue == 2.0 &&
              intent.durationTicks == 2 && intent.delayTicks == 1,
          "emitter automation helpers should construct the declared source intent");
-  expect(performanceEventHeader(track.events[0]).sourceCommand == CommandId{9} &&
+  expect(performanceEventHeader(track.events[0]).sourceCommand.id == CommandId{9} &&
              performanceEventHeader(track.events[0]).sourceAnnotation == SourceAnnotationId{11},
          "bound output should retain the automation command's provenance");
 
@@ -253,8 +256,8 @@ void performanceEmitterBindsScalarAutomationWithoutExposingStorage() {
   u64 otherSequence = 0;
   u32 otherNote = 0;
   u32 otherAutomation = 0;
-  PerformanceEmitter otherOut{otherTrack,    CommandId{10}, SourceAnnotationId{12}, 0,
-                              otherSequence, otherNote,     otherAutomation};
+  PerformanceEmitter otherOut{
+      otherTrack, {otherTrack.id, CommandId{10}}, SourceAnnotationId{12}, 0, otherSequence, otherNote, otherAutomation};
   bool rejectedOtherTrack = false;
   try {
     fade.output(otherOut).pitchBend(0.0);
@@ -312,7 +315,8 @@ void performanceBoundValueOwnsReplacementLifecycle() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{9}, SourceAnnotationId{11}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{9}}, SourceAnnotationId{11}, 0, nextSequence, nextNote,
+                         nextAutomation};
   PerformanceBoundValue<SequenceLinearMotion<double>> value;
   value.reset(0.0);
 
@@ -335,16 +339,17 @@ void performanceEmitterResolvesDeclaredPanLawIntoEvents() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track,        CommandId{9}, SourceAnnotationId{11}, 0,
-                         nextSequence, nextNote,     nextAutomation,         PanLaw::ConstantSum};
+  PerformanceEmitter out{track,    {track.id, CommandId{9}}, SourceAnnotationId{11}, 0, nextSequence,
+                         nextNote, nextAutomation,           PanLaw::ConstantSum};
 
   out.pan(0.0);
   expect(std::get<PanPerformanceEvent>(track.events.front()).law == PanLaw::ConstantSum,
          "positional pan events should retain the program's resolved pan law");
 
   PerformanceTrack undeclaredTrack{.id = TrackId{4}};
-  PerformanceEmitter undeclared{undeclaredTrack, CommandId{10}, SourceAnnotationId{12}, 0,
-                                nextSequence,    nextNote,      nextAutomation};
+  PerformanceEmitter undeclared{
+      undeclaredTrack, {undeclaredTrack.id, CommandId{10}}, SourceAnnotationId{12}, 0, nextSequence, nextNote,
+      nextAutomation};
   bool rejectedUndeclaredPan = false;
   try {
     undeclared.pan(0.0);
@@ -359,7 +364,8 @@ void pitchTransitionApiPreservesSamplesAndRealizedLifecycle() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{14}, SourceAnnotationId{16}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{14}}, SourceAnnotationId{16}, 0, nextSequence, nextNote,
+                         nextAutomation};
 
   const PerformanceNoteId retargetNote = out.note(64, 1.0, 16);
   auto first = out.pitchSlide(retargetNote, 60, 64, 8);
@@ -436,7 +442,8 @@ void continuedVoiceResolvesPriorPitchMotion() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{15}, SourceAnnotationId{17}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{15}}, SourceAnnotationId{17}, 0, nextSequence, nextNote,
+                         nextAutomation};
 
   const PerformanceNoteId first = out.note(60, 1.0, 8);
   out.pitchSlide(first, 60, 62, 4);
@@ -458,7 +465,8 @@ void previousNoteEndRetainsContinuationChainBehavior() {
   u64 nextSequence = 0;
   u32 nextNote = 0;
   u32 nextAutomation = 0;
-  PerformanceEmitter out{track, CommandId{18}, SourceAnnotationId{19}, 0, nextSequence, nextNote, nextAutomation};
+  PerformanceEmitter out{track,         {track.id, CommandId{18}}, SourceAnnotationId{19}, 0, nextSequence, nextNote,
+                         nextAutomation};
 
   expect(!out.setPreviousNoteEnd(4), "revising the previous note should still report failure when none exists");
   const PerformanceNoteId unrelated = out.note(55, 1.0, 6);

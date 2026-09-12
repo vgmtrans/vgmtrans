@@ -516,11 +516,11 @@ void signedStereoMaterializationUsesAttackTimeVariants() {
           .note = PerformanceNoteId{1},
       },
       ChannelPanPerformanceEvent{
-          .header = eventHeader(4, 4),
+          .header = {.sourceCommand = {TrackId{0}, CommandId{4}}, .track = TrackId{0}, .tick = 4, .sequence = 4},
           .position = 0.75,
       },
       StereoBalancePerformanceEvent{
-          .header = eventHeader(5, 5),
+          .header = {.sourceCommand = {TrackId{1}, CommandId{4}}, .track = TrackId{0}, .tick = 5, .sequence = 5},
           .leftGain = 1.0,
           .rightGain = 1.0,
       },
@@ -538,7 +538,7 @@ void signedStereoMaterializationUsesAttackTimeVariants() {
   expect(std::ranges::count_if(
              materialized.diagnostics,
              [](const Diagnostic& diagnostic) { return diagnostic.code == "signed-stereo-active-voice"; }) == 2,
-         "phase and pan changes during a sounding note should each report the attack-time limitation");
+         "phase and pan commands from different source tracks should each report the attack-time limitation");
 
   const size_t inverted = selectedInstrumentForNote(materialized, PerformanceNoteId{1}, sets[0]);
   const auto& invertedRegions = sets[0].instruments[inverted].regions;

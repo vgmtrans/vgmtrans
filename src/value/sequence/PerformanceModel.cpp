@@ -143,14 +143,8 @@ const PerformanceTrack* performanceTrackById(const PerformanceSequence& sequence
   return &*found;
 }
 
-const SourceCommand* sourceCommandForEvent(const SequenceProgram& program, const PerformanceEventHeader& header) {
-  if (!header.track.valid() || header.track.value >= program.tracks.size()) {
-    return nullptr;
-  }
-  return program.tracks[header.track.value].command(header.sourceCommand);
-}
-
-std::vector<const PerformanceEvent*> performanceEventsForCommand(const PerformanceTrack& track, CommandId command) {
+std::vector<const PerformanceEvent*> performanceEventsForCommand(const PerformanceTrack& track,
+                                                                 SourceCommandRef command) {
   std::vector<const PerformanceEvent*> events;
   for (const auto& event : track.events) {
     if (performanceEventHeader(event).sourceCommand == command) {

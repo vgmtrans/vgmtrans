@@ -1178,7 +1178,7 @@ void capcomSnesSourceDecoderDecodesAndRendersDriverCommands() {
   const auto& noteEvent = std::get<NotePerformanceEvent>(*note);
   expect(noteEvent.key == 3.0 && noteEvent.durationTicks == 18,
          "CapcomSnes note event should reflect source key and dotted duration");
-  expect(noteEvent.header.sourceCommand == CommandId{4} && noteEvent.header.tick == 0,
+  expect(noteEvent.header.sourceCommand.id == CommandId{4} && noteEvent.header.tick == 0,
          "CapcomSnes note event should link back to the source command");
 
   const auto pan = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {

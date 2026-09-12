@@ -29,6 +29,13 @@ const SourceCommand* TrackProgram::command(CommandId id) const {
   return &commands[id.value];
 }
 
+const SourceCommand* SequenceProgram::command(SourceCommandRef source) const {
+  if (!source.valid() || source.track.value >= tracks.size()) {
+    return nullptr;
+  }
+  return tracks[source.track.value].command(source.id);
+}
+
 bool trackUsesSemantic(const TrackProgram& track, SequenceSemantic semantic) {
   return std::ranges::any_of(track.commands,
                              [semantic](const SourceCommand& command) { return command.semantic == semantic; });

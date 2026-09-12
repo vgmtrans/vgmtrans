@@ -60,9 +60,9 @@ private:
 // PerformanceEmitter fills in the current tick and source command automatically.
 class PerformanceEmitter {
 public:
-  PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand, SourceAnnotationId sourceAnnotation, u64 tick,
-                     u64& nextSequence, u32& nextNote, u32& nextAutomation, PanLaw panLaw = PanLaw::Unspecified,
-                     detail::ActiveNoteState* activeNotes = nullptr,
+  PerformanceEmitter(PerformanceTrack& track, SourceCommandRef sourceCommand, SourceAnnotationId sourceAnnotation,
+                     u64 tick, u64& nextSequence, u32& nextNote, u32& nextAutomation,
+                     PanLaw panLaw = PanLaw::Unspecified, detail::ActiveNoteState* activeNotes = nullptr,
                      std::vector<SourcePlaybackSpan>* sourceSpans = nullptr);
 
   [[nodiscard]] PerformanceEmitter at(u64 tick) const;
@@ -193,7 +193,7 @@ private:
   void finishActiveNote(const detail::ActiveNoteState::Note& note, u64 endTick);
 
   PerformanceTrack& track_;
-  CommandId sourceCommand_;
+  SourceCommandRef sourceCommand_;
   SourceAnnotationId sourceAnnotation_;
   u64 tick_ = 0;
   u64& nextSequence_;

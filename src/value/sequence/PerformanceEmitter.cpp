@@ -55,7 +55,7 @@ void reviseNoteEnd(NotePerformanceEvent& note, u64 endTick) {
 
 }  // namespace
 
-PerformanceEmitter::PerformanceEmitter(PerformanceTrack& track, CommandId sourceCommand,
+PerformanceEmitter::PerformanceEmitter(PerformanceTrack& track, SourceCommandRef sourceCommand,
                                        SourceAnnotationId sourceAnnotation, u64 tick, u64& nextSequence, u32& nextNote,
                                        u32& nextAutomation, PanLaw panLaw, detail::ActiveNoteState* activeNotes,
                                        std::vector<SourcePlaybackSpan>* sourceSpans)

@@ -44,8 +44,9 @@ using PitchBendLayerId = Id<PitchBendLayerIdTag>;
 inline constexpr PitchBendLayerId kPrimaryPitchBendLayer{0};
 
 struct PerformanceEventHeader {
-  CommandId sourceCommand;
+  SourceCommandRef sourceCommand;
   SourceAnnotationId sourceAnnotation;
+  // Playback placement can change without changing the source command.
   TrackId track;
   u64 tick = 0;
   // Stable execution order disambiguates events emitted at the same tick.
@@ -672,9 +673,7 @@ private:
 [[nodiscard]] PitchTransitionIntent* pitchTransitionIntent(PerformanceAutomation& automation);
 [[nodiscard]] double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elapsedTicks);
 [[nodiscard]] const PerformanceTrack* performanceTrackById(const PerformanceSequence& sequence, TrackId id);
-[[nodiscard]] const SourceCommand* sourceCommandForEvent(const SequenceProgram& program,
-                                                         const PerformanceEventHeader& header);
 [[nodiscard]] std::vector<const PerformanceEvent*> performanceEventsForCommand(const PerformanceTrack& track,
-                                                                               CommandId command);
+                                                                               SourceCommandRef command);
 
 }  // namespace vgmtrans::core

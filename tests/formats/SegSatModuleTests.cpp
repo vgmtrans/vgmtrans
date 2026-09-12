@@ -62,7 +62,7 @@ u8 normalizedSegSatVelocity(u8 velocity, const SegSatVlTable& table, u8 totalLev
   return LevelScale::midi7FromLinear(gain / segSatRegionReferenceGain(SegSatVolumeModel::V1_33, table, totalLevel, 0));
 }
 
-std::vector<u8> segSatFixture() {
+std::vector<u8> segSatFixture(bool volumeFirst = false) {
   constexpr u32 sequenceTable = 0x400;
   constexpr u32 sequence = sequenceTable + 6;
   constexpr u32 bank = 0x1000;
@@ -87,6 +87,9 @@ std::vector<u8> segSatFixture() {
     std::ranges::copy(values, bytes.begin() + static_cast<std::ptrdiff_t>(command));
     command += values.size();
   };
+  if (volumeFirst) {
+    append({0xb0, 7, 64, 0});
+  }
   append({0xb0, 32, 5, 0});       // source bank 5
   append({0xc0, 0, 0});           // program 0
   append({0xc3, 0x81, 0});        // flagged channel 3 program event ignored by the driver
@@ -333,7 +336,7 @@ void segSatTempoDeltaBytesPreserveSourceOrder() {
 void segSatCollectionBindingSuppliesVlTablesToSequence() {
   Session session;
   session.registerFormat(segSatModule());
-  const SourceId source = session.addSource(SourceFile{.name = "segsat-fixture.bin"}, segSatFixture());
+  const SourceId source = session.addSource(SourceFile{.name = "segsat-fixture.bin"}, segSatFixture(true));
   session.scanPendingSources();
 
   const SessionSnapshot snapshot = session.snapshot();
@@ -355,9 +358,14 @@ void segSatCollectionBindingSuppliesVlTablesToSequence() {
   const auto* sourceNote = firstNote(unprepared);
   expect(sourceNote != nullptr && LevelScale::midi7FromLinear(sourceNote->linearVelocity) == 64,
          "a durable SegSat sequence should retain its source velocity when no collection context is present");
+  const auto* noteCommand = sequence.program.command(sourceNote->header.sourceCommand);
+  expect(noteCommand != nullptr && noteCommand->annotation == sourceNote->header.sourceAnnotation,
+         "merging the tempo track should preserve the note's source command");
 
   const CollectionPlayback playback =
       session.preparePlayback(collection.id, PlaybackRequest{.sequence = {.sequenceLoops = 0}});
+  expect(orderedPerformanceEvents<TempoPerformanceEvent>(playback.performance).size() == 1,
+         "normal-stream controller IDs should not replace commands from the separate tempo stream");
   const auto* preparedNote = firstNote(playback.performance);
   const auto* preparedLevel = firstLevel(playback.performance);
   const double expectedNoteGain = std::pow(10.0, -(189 * 0.37529) / 20.0);

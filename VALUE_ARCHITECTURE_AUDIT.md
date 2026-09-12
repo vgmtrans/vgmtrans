@@ -2085,6 +2085,34 @@ needs neither CompilerCursor, BytecodeDecode, nor RecordReader. No new tests
 were added; adapting the existing fixtures removes 15 test lines. Production
 code is 117 lines smaller.
 
+## Preserve source command identity independently of playback tracks
+
+Performance event headers now carry a SourceCommandRef: the decoded track and
+its local command ID. SequenceProgram resolves that reference directly, and
+performanceEventsForCommand compares the complete origin. Moving an event to
+another playback track no longer changes which source command it identifies.
+This keeps source attribution separate from playback placement without making
+source annotations mandatory.
+
+This reproduced and fixed two SegSat defects. Merging its tempo track into
+channel zero previously redirected note source lookup into the tempo stream.
+Also, a volume command with the same local ID as a tempo command could replace
+that tempo event during collection preparation. Controller lookup now checks
+the source stream. Instrument-variant warning deduplication likewise retains
+both components of a command origin; its fallback keys use explicit categories
+instead of overlapping bit-packed identities.
+
+The source reference does not yet eliminate copied channel programs. It makes
+that subsequent representation work independent of playback-track renumbering.
+This correctness foundation adds 20 net production lines. Tests reuse existing
+VM, model, instrument-variant, and SegSat fixtures; the larger mechanical test
+diff adapts explicit emitter arguments and wraps longer initializers.
+
+Verification: both SegSat failures were reproduced before their respective
+fixes. The warning-free full build and all 20 CTest targets passed. Existing
+checks also cover same-numbered commands from different source tracks in one
+playback track, including warning deduplication without source annotations.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding
