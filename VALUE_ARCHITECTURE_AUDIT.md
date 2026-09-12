@@ -1263,6 +1263,21 @@ This removes 10 production lines. A temporary sanitized comparison checks
 addresses, unknown identities, and extreme bank/program values. The full build
 is warning-free and all 20 CTest targets pass; no test code is added.
 
+### Keep scan draft operations beside their public methods
+
+Put sequence assignment, miscellaneous payload assignment, and synth builder
+access directly in the draft methods. Remove six private ScanResultBuilder
+methods that only forwarded those operations to the same result-owned slots.
+Draft creation now uses the public synth accessors, and SourceRange::include
+already ignores invalid initial ranges without an extra guard.
+
+This removes 32 production lines without changing the format-facing API, slot
+lifetime, creation order, duplicate-assignment checks, or the validation pass
+before materialization. Existing registry and synth-builder tests cover draft
+construction, incomplete drafts, empty assets, and retained views across result
+growth. The full build is warning-free and all 20 CTest targets pass; no test
+code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
