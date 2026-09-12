@@ -1383,6 +1383,19 @@ Existing coverage checks terminal envelope boundaries, backward loops, sounding
 note transitions, and rests. The full build is warning-free and all 20 CTest
 targets pass; no test code is added.
 
+### Use VM ordering directly for AkaoSnes shared tempo
+
+Tempo commands and fade ticks reach ProgramState in SequenceVM's chronological
+track order. Remove the duplicate order counters, final sort, and prepass-only
+linear search. Both passes now query the same ordered tempo history directly;
+equal-tick changes retain their execution order, including initial-track rules.
+
+This removes 17 production lines and the second lookup algorithm. A temporary
+sanitized comparison checks identical MIDI bytes for 48 scenarios with one to
+eight tracks, competing tempo commands, fades, and active LFOs under both
+modulation policies. The full build is warning-free and all 20 CTest targets
+pass; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

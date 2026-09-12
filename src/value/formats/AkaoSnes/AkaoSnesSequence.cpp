@@ -823,7 +823,6 @@ struct SharedTempoChange {
   u64 tick = 0;
   u8 tempo = 0;
   u32 sourceTrackNumber = 0;
-  u64 order = 0;
 };
 
 struct RuntimeConfig {
@@ -838,36 +837,21 @@ struct ProgramState {
     if (!collecting) {
       return;
     }
+    // SequenceVM visits commands and fade ticks in chronological track order.
     tempoChanges.push_back(SharedTempoChange{
         .tick = tick,
         .tempo = tempo,
         .sourceTrackNumber = sourceTrackNumber,
-        .order = nextOrder++,
     });
   }
 
-  void finishPrepass() {
-    std::ranges::stable_sort(tempoChanges, [](const SharedTempoChange& lhs, const SharedTempoChange& rhs) {
-      return lhs.tick < rhs.tick || (lhs.tick == rhs.tick && lhs.order < rhs.order);
-    });
-    collecting = false;
-  }
+  void finishPrepass() { collecting = false; }
 
   [[nodiscard]] const SharedTempoChange* initialTempo() const {
     return !tempoChanges.empty() && tempoChanges.front().tick == 0 ? &tempoChanges.front() : nullptr;
   }
 
   [[nodiscard]] std::optional<u8> tempoAt(u64 tick) const {
-    if (collecting) {
-      const SharedTempoChange* latest = nullptr;
-      for (const auto& change : tempoChanges) {
-        if (change.tick <= tick && (latest == nullptr || change.tick > latest->tick ||
-                                    (change.tick == latest->tick && change.order > latest->order))) {
-          latest = &change;
-        }
-      }
-      return latest == nullptr ? std::nullopt : std::optional<u8>{latest->tempo};
-    }
     const auto next = std::ranges::upper_bound(tempoChanges, tick, {}, &SharedTempoChange::tick);
     return next == tempoChanges.begin() ? std::nullopt : std::optional<u8>{(next - 1)->tempo};
   }
@@ -875,7 +859,6 @@ struct ProgramState {
   AkaoSnesProfile profile;
   std::vector<SharedTempoChange> tempoChanges;
   bool collecting = true;
-  u64 nextOrder = 0;
 };
 
 struct PitchEnvelopeState {
