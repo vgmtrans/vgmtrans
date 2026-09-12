@@ -1578,6 +1578,18 @@ linear/fixed-point scenarios, including delays, retargeting, completion, and
 all rounding modes. The full build is warning-free and all 20 CTest targets
 pass; no test code is added.
 
+### Make compiler invocation paths direct
+
+CompilerCursor's public invocation methods now lead directly to command
+composition and control-flow validation. Remove two private forwarding
+templates; the typed invokeFlow overload reuses its public callable overload.
+Stored argument ownership, effect aggregation, and default flow are unchanged.
+
+This removes ten production lines. Existing typed/callable invocation, composed
+effects, conflicting flow, source lifetime, and malformed-command coverage
+passes. The full build is warning-free and all 20 CTest targets pass; no test
+code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

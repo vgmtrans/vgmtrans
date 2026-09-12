@@ -402,7 +402,7 @@ public:
 
     template <EnvelopeFields Field>
     Event& emitEnvelopeField(auto value, VoiceEnvelopeScope scope = VoiceEnvelopeScope::FutureAttacks) {
-      return append<&detail::emitEnvelopeField<Playback, Field>>(std::move(value), scope);
+      return appendCallable(&detail::emitEnvelopeField<Playback, Field>, std::move(value), scope);
     }
 
     Event& restoreEnvelope(EnvelopeFields fields = EnvelopeFields::All,
@@ -456,7 +456,7 @@ public:
 
     template <auto Method, class... Arguments>
     Event& invoke(Arguments... arguments) {
-      return append<Method>(std::move(arguments)...);
+      return appendCallable(Method, std::move(arguments)...);
     }
 
     // Keep short, one-off runtime behavior beside the opcode that defines it.
@@ -471,12 +471,15 @@ public:
     // default still applies when the handler returns no flow override.
     template <auto Method, class... Arguments>
     Event& invokeFlow(Arguments... arguments) {
-      return appendFlowCallable(Method, std::move(arguments)...);
+      return invokeFlow(Method, std::move(arguments)...);
     }
 
     template <class Handler, class... Arguments>
     Event& invokeFlow(Handler handler, Arguments... arguments) {
-      return appendFlowCallable(std::move(handler), std::move(arguments)...);
+      static_assert(std::is_same_v<detail::CommandResult<Playback, Handler, Arguments...>, Effects>,
+                    "A runtime control-flow handler must return Effects");
+      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
+      return appendCallable(std::move(handler), std::move(arguments)...);
     }
 
     // The VM may execute this command while the preceding command's wait is
@@ -563,11 +566,6 @@ public:
     Event(CompilerCursor& cursor, DecodedCommandPresentation presentation)
         : cursor_(cursor), presentation_(std::move(presentation)), initialPlayback_(presentation_.playback) {}
 
-    template <auto Operation, class... Arguments>
-    Event& append(Arguments... arguments) {
-      return appendCallable(Operation, std::move(arguments)...);
-    }
-
     template <class Callable, class... Arguments>
     Event& appendCallable(Callable callable, Arguments... arguments) {
       if (presentation_.playback == CommandPlaybackStatus::SourceOnly ||
@@ -585,14 +583,6 @@ public:
         return detail::combineCommandEffects(std::move(combined), next(playback));
       };
       return *this;
-    }
-
-    template <class Callable, class... Arguments>
-    Event& appendFlowCallable(Callable callable, Arguments... arguments) {
-      static_assert(std::is_same_v<detail::CommandResult<Playback, Callable, Arguments...>, Effects>,
-                    "A runtime control-flow handler must return Effects");
-      presentation_.playback = CommandPlaybackStatus::AffectsControlFlow;
-      return appendCallable(std::move(callable), std::move(arguments)...);
     }
 
     void setDefaultTransition(CommandTransition transition) {
