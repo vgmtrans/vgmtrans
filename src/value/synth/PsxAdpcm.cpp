@@ -22,6 +22,19 @@ constexpr u8 kLoopStartFlag = 4;
 
 }  // namespace
 
+std::optional<Loop> PsxAdpcmStream::loopAt(u32 byteOffset) const {
+  if (byteOffset >= encodedData.size) {
+    return std::nullopt;
+  }
+  const u32 start = psxAdpcmDecodedOffset(byteOffset);
+  const u32 frames = psxAdpcmDecodedFrames(static_cast<u32>(encodedData.size));
+  return Loop{
+      .enabled = loop.enabled,
+      .start = start,
+      .length = start < frames ? frames - start : 0,
+  };
+}
+
 std::optional<PsxAdpcmStream> inspectPsxAdpcmStream(ByteReader reader, u32 offset, u32 endOffset) {
   if (offset >= endOffset || !reader.has(offset, 1)) {
     return std::nullopt;

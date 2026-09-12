@@ -193,14 +193,9 @@ std::optional<ScanSoundBankDraft> addWd(ScanResultBuilder& result, const WdLayou
             .attenuationDb = attenuation(parsedRegion.level),
         };
         // The driver adds this WD field to the sample address; it is not pool-relative.
-        if (const auto stream = streams.find(parsedRegion.sampleOffset);
-            stream != streams.end() && stream->second.loop.enabled &&
-            parsedRegion.loopOffset < stream->second.encodedData.size) {
-          const u32 frames = psxAdpcmDecodedFrames(static_cast<u32>(stream->second.encodedData.size));
-          const u32 loopStart = psxAdpcmDecodedOffset(parsedRegion.loopOffset);
-          if (loopStart < frames) {
-            region.loop = Loop{.enabled = true, .start = loopStart, .length = frames - loopStart};
-          }
+        if (const auto loop = streams.at(parsedRegion.sampleOffset).loopAt(parsedRegion.loopOffset);
+            loop && loop->enabled && loop->length != 0) {
+          region.loop = *loop;
         }
         instrument.region(*sample, std::move(region)).source("Region", parsedRegion.source, "square-ps2-region");
       }

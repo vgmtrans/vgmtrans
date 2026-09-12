@@ -1806,6 +1806,20 @@ unnecessary cursor arithmetic, with a net reduction of two production lines.
 Existing reader, compiler, and format tests cover those policies; no tests
 were added. The full build is warning-free and all 20 CTest targets pass.
 
+## Resolve PlayStation loop offsets on the inspected stream
+
+`PsxAdpcmStream::loopAt()` now bounds a relative byte offset and converts it
+to decoded loop coordinates while preserving the stream's enable flag.
+Suzuki PS1, TriAce PS1, and Square PS2 keep their distinct override conditions
+and address rules, but no longer repeat the block arithmetic or recheck the
+existence of samples already admitted by their pool builder. Square still
+requires an enabled, nonempty loop; Suzuki still treats zero as no override.
+
+This removes seven production lines and substantially shortens the three
+format branches. Four assertions lines extend existing fixtures to cover an
+unaligned offset, the stream boundary, and a disabled loop. The full build
+is warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

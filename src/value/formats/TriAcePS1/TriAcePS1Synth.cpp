@@ -186,18 +186,8 @@ std::optional<ScanSoundBankDraft> addTriAcePs1Bank(ScanResultBuilder& result, co
           // region in a bank so values above 0x7f retain their intended boost.
           .attenuationDb = linearAmplitudeToAttenuationDb(sourceRegion.level / static_cast<double>(maximumLevel)),
       };
-      const auto stream = streams.find(sourceRegion.sampleOffset);
-      if (stream != streams.end() && sourceRegion.loopOffset >= sourceRegion.sampleOffset) {
-        const u32 encodedLoop = sourceRegion.loopOffset - sourceRegion.sampleOffset;
-        if (encodedLoop < stream->second.encodedData.size) {
-          const u32 frames = psxAdpcmDecodedFrames(static_cast<u32>(stream->second.encodedData.size));
-          const u32 loopStart = psxAdpcmDecodedOffset(encodedLoop);
-          region.loop = Loop{
-              .enabled = stream->second.loop.enabled,
-              .start = loopStart,
-              .length = loopStart < frames ? frames - loopStart : 0,
-          };
-        }
+      if (sourceRegion.loopOffset >= sourceRegion.sampleOffset) {
+        region.loop = streams.at(sourceRegion.sampleOffset).loopAt(sourceRegion.loopOffset - sourceRegion.sampleOffset);
       }
       instrument.region(*sample, std::move(region)).source("Region", sourceRegion.source, "triace-ps1-region");
     }

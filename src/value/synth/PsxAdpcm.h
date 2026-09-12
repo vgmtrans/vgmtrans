@@ -23,6 +23,10 @@ inline constexpr u32 kPsxAdpcmFramesPerBlock = 28;
 struct PsxAdpcmStream {
   SourceRange encodedData;
   Loop loop;
+
+  // Reposition the loop within this stream, preserving its enable flag.
+  // byteOffset is relative to encodedData; out-of-range offsets return no loop.
+  [[nodiscard]] std::optional<Loop> loopAt(u32 byteOffset) const;
 };
 
 [[nodiscard]] constexpr u32 psxAdpcmDecodedFrames(u32 encodedBytes) noexcept {
