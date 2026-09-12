@@ -186,60 +186,15 @@ struct PanAndAttenuation {
 [[nodiscard]] PanAndAttenuation directOutput(u8 encoded) {
   const u8 directLevel = encoded >> 5;
   const u8 directPan = encoded & 0x1f;
-  double panAttenuation = 0.0;
-  if (directPan & 1) {
-    panAttenuation += 3.0;
-  }
-  if (directPan & 2) {
-    panAttenuation += 6.0;
-  }
-  if (directPan & 4) {
-    panAttenuation += 12.0;
-  }
-  if (directPan & 8) {
-    panAttenuation += 24.0;
-  }
+  const double panAttenuation = (directPan & 0x0f) * 3.0;
   const double panGain = (directPan & 0x0f) == 0x0f ? 0.0 : std::pow(10.0, -panAttenuation / 20.0);
   const double left = directPan < 0x10 ? panGain : 1.0;
   const double right = directPan < 0x10 ? 1.0 : panGain;
 
-  double position = 0.5;
-  u8 midiPan = 64;
-  if (right == 0.0) {
-    position = 0.0;
-    midiPan = 0;
-  } else if (left == right) {
-    position = 0.5;
-  } else if (left == 0.0) {
-    position = 1.0;
-    midiPan = 127;
-  } else {
-    position = right / (left + right);
-    const double arc = std::atan2(position, 1.0 - position) / (std::numbers::pi / 2.0);
-    midiPan = static_cast<u8>(std::lround(arc * 126.0));
-    if (midiPan != 0) {
-      ++midiPan;
-    }
-  }
-
-  double midiLeft = 0.0;
-  double midiRight = 0.0;
-  if (midiPan <= 1) {
-    midiLeft = 1.0;
-  } else if (midiPan == 64) {
-    midiLeft = midiRight = std::sqrt(2.0) / 2.0;
-  } else if (midiPan == 127) {
-    midiRight = 1.0;
-  } else {
-    const double arc = (midiPan - 1) / 126.0 * (std::numbers::pi / 2.0);
-    midiLeft = std::cos(arc);
-    midiRight = std::sin(arc);
-  }
-  const double volumeScale = (left + right) / (midiLeft + midiRight);
-  const double balanceAttenuation = volumeScale <= 0.0 ? 100.0 : std::min(100.0, -20.0 * std::log10(volumeScale));
+  // Preserve both channel gains, normalized against a centered SCSP voice.
   return PanAndAttenuation{
-      .position = position,
-      .attenuationDb = kDirectLevelAttenuation[directLevel] + balanceAttenuation + 3.0103,
+      .position = std::atan2(right, left) / (std::numbers::pi / 2.0),
+      .attenuationDb = kDirectLevelAttenuation[directLevel] - 10.0 * std::log10((left * left + right * right) / 2.0),
   };
 }
 

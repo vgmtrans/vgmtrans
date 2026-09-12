@@ -1173,6 +1173,21 @@ million deterministic random pairs. Existing renderer tests cover pan gain
 headroom, phase-inverted channel magnitudes, and expression independence.
 The full build is warning-free and all 20 CTest targets pass.
 
+### Derive Saturn instrument pan directly from hardware channel gains
+
+Replace the SegSat direct-output parser's MIDI pan quantization and compensation
+with the physical equal-power angle and gain. Decode DIPAN's four attenuation
+bits as one 3 dB step count. This removes 45 production lines and the parser's
+dependency on MIDI pan resolution. It also fixes off-center regions: the old
+code stored a linear balance fraction while compensating for a different,
+quantized pan angle. Retain centered-voice normalization and silent-side and
+direct-level semantics. Clarify the existing equal-power Region::pan contract.
+
+An exhaustive scan regression reconstructs both output channel gains for all
+256 DISDL/DIPAN combinations, including mute, both endpoints, and every level.
+It fails on the old implementation at direct-output byte 33. The full build
+is warning-free and all 20 CTest targets pass with the correction.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

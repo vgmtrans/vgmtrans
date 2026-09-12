@@ -204,6 +204,7 @@ void segSatTempoDeltaBytesPreserveSourceOrder();
 void segSatCollectionBindingSuppliesVlTablesToSequence();
 void segSatRuntimeMapSelectsBankInsideAnotherSampleSpan();
 void segSatMultiBankPlaybackUsesTheActiveBanksVlTable();
+void segSatDirectOutputPreservesHardwareStereoGains();
 void segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources();
 void segSatSsfExtractorUsesFourByteMiniHeader();
 
@@ -393,6 +394,7 @@ int main() {
     segSatCollectionBindingSuppliesVlTablesToSequence();
     segSatRuntimeMapSelectsBankInsideAnotherSampleSpan();
     segSatMultiBankPlaybackUsesTheActiveBanksVlTable();
+    segSatDirectOutputPreservesHardwareStereoGains();
     segSatCollectionBindingUsesRetainedVelocityBanksFromSeparateSources();
     segSatSsfExtractorUsesFourByteMiniHeader();
     suzukiPs1DynamicAdsrUsesAuditedDriverCommands();
