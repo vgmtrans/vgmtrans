@@ -111,11 +111,8 @@ struct SfLayout {
   return makeChunk(std::move(id), std::move(payload));
 }
 
-[[nodiscard]] std::string sf2Name(std::string name, std::string_view fallback) {
-  if (name.empty()) {
-    return std::string(fallback);
-  }
-  return name;
+[[nodiscard]] std::string_view sf2Name(std::string_view name, std::string_view fallback) {
+  return name.empty() ? fallback : name;
 }
 
 [[nodiscard]] u16 sf2Bank(u32 bank) {
@@ -348,7 +345,7 @@ struct SfLayout {
   return layout;
 }
 
-[[nodiscard]] std::vector<Chunk> infoChunks(const std::string& name) {
+[[nodiscard]] std::vector<Chunk> infoChunks(std::string_view name) {
   std::vector<u8> ifil;
   writeLe16(ifil, 2);
   writeLe16(ifil, 1);

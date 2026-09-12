@@ -1443,6 +1443,18 @@ The temporary sanitized SF2/DLS comparison remains byte-identical across 2,304
 scenarios per exporter. The full build is warning-free and all 20 CTest targets
 pass; no test code is added.
 
+### Choose synth display names while writing them
+
+DLS now supplies the instrument, wave, or bank fallback directly to its INFO
+writer. Remove the sample-name rewrite pass and the separate owning-string
+fallback helper. SoundFont's name helper and INFO writer borrow string views
+instead of copying source names. Fallback names remain specific to each record.
+
+This removes 13 production lines. A temporary sanitized comparison checks
+identical SF2 and DLS bytes across 2,304 scenarios with empty, ordinary, long,
+UTF-8, and embedded-null names. The full build is warning-free and all 20 CTest
+targets pass; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
