@@ -62,12 +62,16 @@ ScanSequenceDraft::ScanSequenceDraft(ScanResultBuilder& out, size_t slot, AssetI
 }
 
 ScanSequenceDraft& ScanSequenceDraft::range(SourceRange range) {
-  out_->setSequenceRange(slot_, range);
+  std::get<PendingSequence>(out_->drafts_.at(slot_)->value).range = range;
   return *this;
 }
 
 ScanSequenceDraft& ScanSequenceDraft::program(SequenceProgram program) {
-  out_->setSequenceProgram(slot_, std::move(program));
+  auto& pending = std::get<PendingSequence>(out_->drafts_.at(slot_)->value);
+  if (pending.program) {
+    throw std::logic_error("ScanResultBuilder sequence draft was given more than one program");
+  }
+  pending.program = std::move(program);
   return *this;
 }
 
@@ -76,11 +80,11 @@ ScanSoundBankDraft::ScanSoundBankDraft(ScanResultBuilder& out, size_t slot, Asse
 }
 
 InstrumentSetBuilder& ScanSoundBankDraft::instruments() {
-  return out_->instrumentDraft(slot_);
+  return std::get<PendingSoundBank>(out_->drafts_.at(slot_)->value).instruments;
 }
 
 SamplePoolBuilder& ScanSoundBankDraft::localSamples() {
-  return out_->localSampleDraft(slot_);
+  return std::get<PendingSoundBank>(out_->drafts_.at(slot_)->value).samples;
 }
 
 ScanSamplePoolDraft::ScanSamplePoolDraft(ScanResultBuilder& out, size_t slot, AssetId id)
@@ -88,18 +92,22 @@ ScanSamplePoolDraft::ScanSamplePoolDraft(ScanResultBuilder& out, size_t slot, As
 }
 
 SamplePoolBuilder& ScanSamplePoolDraft::samples() {
-  return out_->sampleDraft(slot_);
+  return std::get<PendingSamplePool>(out_->drafts_.at(slot_)->value).samples;
 }
 
 const SamplePoolBuilder& ScanSamplePoolDraft::samples() const {
-  return out_->sampleDraft(slot_);
+  return std::get<PendingSamplePool>(out_->drafts_.at(slot_)->value).samples;
 }
 
 ScanMiscDraft::ScanMiscDraft(ScanResultBuilder& out, size_t slot, AssetId id) : out_(&out), slot_(slot), id_(id) {
 }
 
 ScanMiscDraft& ScanMiscDraft::payload(std::vector<u8> payload) {
-  out_->setMiscPayload(slot_, std::move(payload));
+  auto& pending = std::get<PendingMisc>(out_->drafts_.at(slot_)->value);
+  if (pending.payload) {
+    throw std::logic_error("ScanResultBuilder misc draft was given more than one payload");
+  }
+  pending.payload = std::move(payload);
   return *this;
 }
 
@@ -163,10 +171,9 @@ ScanSoundBankDraft ScanResultBuilder::soundBank(std::string name, SourceRange ra
       .instruments = InstrumentSetBuilder{id, &sourceMap_, &result_.diagnostics},
       .samples = SamplePoolBuilder{id, &sourceMap_, &result_.diagnostics},
   }));
-  if (range.valid()) {
-    instrumentDraft(slot).include(range);
-  }
-  return ScanSoundBankDraft(*this, slot, id);
+  ScanSoundBankDraft draft(*this, slot, id);
+  draft.instruments().include(range);
+  return draft;
 }
 
 ScanSamplePoolDraft ScanResultBuilder::samplePool(std::string name, SourceRange range) {
@@ -177,10 +184,9 @@ ScanSamplePoolDraft ScanResultBuilder::samplePool(std::string name, SourceRange 
       .name = std::move(name),
       .samples = SamplePoolBuilder{id, &sourceMap_, &result_.diagnostics},
   }));
-  if (range.valid()) {
-    sampleDraft(slot).include(range);
-  }
-  return ScanSamplePoolDraft(*this, slot, id);
+  ScanSamplePoolDraft draft(*this, slot, id);
+  draft.samples().include(range);
+  return draft;
 }
 
 ScanMiscDraft ScanResultBuilder::misc(std::string name, SourceRange range) {
@@ -306,38 +312,6 @@ AssetMetadata ScanResultBuilder::metadata(AssetId id, std::string name, SourceRa
 
 ExplicitCollection& ScanResultBuilder::explicitCollection(size_t index) {
   return result_.explicitCollections.at(index);
-}
-
-void ScanResultBuilder::setSequenceProgram(size_t slot, SequenceProgram program) {
-  auto& pending = std::get<PendingSequence>(drafts_.at(slot)->value);
-  if (pending.program) {
-    throw std::logic_error("ScanResultBuilder sequence draft was given more than one program");
-  }
-  pending.program = std::move(program);
-}
-
-void ScanResultBuilder::setSequenceRange(size_t slot, SourceRange range) {
-  std::get<PendingSequence>(drafts_.at(slot)->value).range = range;
-}
-
-void ScanResultBuilder::setMiscPayload(size_t slot, std::vector<u8> payload) {
-  auto& pending = std::get<PendingMisc>(drafts_.at(slot)->value);
-  if (pending.payload) {
-    throw std::logic_error("ScanResultBuilder misc draft was given more than one payload");
-  }
-  pending.payload = std::move(payload);
-}
-
-InstrumentSetBuilder& ScanResultBuilder::instrumentDraft(size_t slot) {
-  return std::get<PendingSoundBank>(drafts_.at(slot)->value).instruments;
-}
-
-SamplePoolBuilder& ScanResultBuilder::localSampleDraft(size_t slot) {
-  return std::get<PendingSoundBank>(drafts_.at(slot)->value).samples;
-}
-
-SamplePoolBuilder& ScanResultBuilder::sampleDraft(size_t slot) {
-  return std::get<PendingSamplePool>(drafts_.at(slot)->value).samples;
 }
 
 }  // namespace vgmtrans::core

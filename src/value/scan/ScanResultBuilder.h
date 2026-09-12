@@ -164,13 +164,7 @@ private:
   [[nodiscard]] AssetMetadata metadata(AssetId id, std::string name, SourceRange range) const;
   [[nodiscard]] ExplicitCollection& explicitCollection(size_t index);
 
-  void setSequenceRange(size_t slot, SourceRange range);
-  void setSequenceProgram(size_t slot, SequenceProgram program);
   void setPrivateData(size_t slot, AssetPrivateData data);
-  void setMiscPayload(size_t slot, std::vector<u8> payload);
-  [[nodiscard]] InstrumentSetBuilder& instrumentDraft(size_t slot);
-  [[nodiscard]] SamplePoolBuilder& localSampleDraft(size_t slot);
-  [[nodiscard]] SamplePoolBuilder& sampleDraft(size_t slot);
 
   ScanInput input_;
   std::string format_;
