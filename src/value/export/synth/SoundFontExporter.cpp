@@ -98,7 +98,7 @@ struct SfPreset {
 
 struct SfLayout {
   std::vector<SfPreset> presets;
-  std::vector<ResolvedSynthInstrument> instruments;
+  std::vector<const ResolvedSynthInstrument*> instruments;
 };
 
 [[nodiscard]] Chunk makeStringChunk(std::string id, std::string_view text) {
@@ -250,7 +250,7 @@ struct SfLayout {
   };
 }
 
-[[nodiscard]] u16 sf2Attenuation(const Region& region, const Sample& sample) {
+[[nodiscard]] u16 sf2Attenuation(const Region& region, const DecodedSynthSample& sample) {
   constexpr double centibelsPerDb = 10.0;
   // Legacy VGMTrans declares EMU8000-compatible SF2 output. EMU-compatible
   // synths apply a 0.4 factor to initialAttenuation, so the stored value uses
@@ -334,14 +334,14 @@ struct SfLayout {
   for (const auto& source : presets) {
     SfPreset preset{.source = &source, .instrumentIndex = static_cast<u32>(layout.instruments.size())};
     for (size_t i = 0; i < layout.instruments.size(); ++i) {
-      if (const auto offsets = presetEnvelopeOffsets(source, layout.instruments[i])) {
+      if (const auto offsets = presetEnvelopeOffsets(source, *layout.instruments[i])) {
         preset.instrumentIndex = static_cast<u32>(i);
         preset.envelopeOffsets = *offsets;
         break;
       }
     }
     if (preset.instrumentIndex == layout.instruments.size()) {
-      layout.instruments.push_back(source);
+      layout.instruments.push_back(&source);
     }
     layout.presets.push_back(preset);
   }
@@ -443,7 +443,7 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
           makeChunk("pmod", std::vector<u8>(10)), makeChunk("pgen", std::move(generators))};
 }
 
-[[nodiscard]] std::array<Chunk, 4> instrumentChunks(std::span<const ResolvedSynthInstrument> instruments,
+[[nodiscard]] std::array<Chunk, 4> instrumentChunks(std::span<const ResolvedSynthInstrument* const> instruments,
                                                     std::span<const DecodedSynthSample> samples) {
   std::vector<u8> headers;
   std::vector<u8> bags;
@@ -472,18 +472,18 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
     }
   };
 
-  for (const auto& instrument : instruments) {
-    writeFixedString(headers, sf2Name(instrument.instrument->name, "Instrument"), 20);
+  for (const auto* instrument : instruments) {
+    writeFixedString(headers, sf2Name(instrument->instrument->name, "Instrument"), 20);
     writeIndex(headers, bags.size() / 4);
 
     const size_t globalGeneratorOffset = generators.size();
     const size_t globalModulatorOffset = modulators.size();
-    writeModulation(instrument.modulation);
+    writeModulation(instrument->modulation);
     if (generators.size() != globalGeneratorOffset || modulators.size() != globalModulatorOffset) {
       writeBag(globalGeneratorOffset, globalModulatorOffset);
     }
 
-    for (const auto& resolved : instrument.regions) {
+    for (const auto& resolved : instrument->regions) {
       const auto& region = *resolved.region;
       const auto& sample = samples[resolved.sampleIndex];
       const auto pitch = sf2RegionPitch(region);
@@ -493,8 +493,7 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
       writeRangeGen(generators, kSfGenKeyRange, region.keyRange.low, region.keyRange.high);
       writeRangeGen(generators, kSfGenVelRange, region.velocityRange.low, region.velocityRange.high);
       writeModulation(resolved.modulation);
-      writeAmountGen(generators, kSfGenInitialAttenuation,
-                     static_cast<s16>(sf2Attenuation(region, Sample{.attenuationDb = sample.attenuationDb})));
+      writeAmountGen(generators, kSfGenInitialAttenuation, static_cast<s16>(sf2Attenuation(region, sample)));
       writeAmountGen(generators, kSfGenPan, sf2Pan(region.pan));
       writeAmountGen(generators, kSfGenCoarseTune, pitch.coarseTune);
       writeAmountGen(generators, kSfGenFineTune, pitch.fineTune);
@@ -515,8 +514,8 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
           makeChunk("imod", std::move(modulators)), makeChunk("igen", std::move(generators))};
 }
 
-[[nodiscard]] std::vector<SfSampleHeaderInfo> sampleHeaderInfo(std::span<const DecodedSynthSample> samples,
-                                                               std::span<const ResolvedSynthInstrument> instruments) {
+[[nodiscard]] std::vector<SfSampleHeaderInfo> sampleHeaderInfo(
+    std::span<const DecodedSynthSample> samples, std::span<const ResolvedSynthInstrument* const> instruments) {
   // SF2 sample headers have their own original-key/correction fields. Pick the first
   // region that references each sample so sample headers stay consistent with zones.
   std::vector<SfSampleHeaderInfo> info(samples.size());
@@ -524,8 +523,8 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
   for (size_t i = 0; i < samples.size(); ++i) {
     info[i].loop = samples[i].decoded.loop;
   }
-  for (const auto& instrument : instruments) {
-    for (const auto& sfRegion : instrument.regions) {
+  for (const auto* instrument : instruments) {
+    for (const auto& sfRegion : instrument->regions) {
       if (sfRegion.sampleIndex >= info.size() || assigned[sfRegion.sampleIndex]) {
         continue;
       }
@@ -540,7 +539,7 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
 }
 
 [[nodiscard]] Chunk shdrChunk(std::span<const DecodedSynthSample> samples,
-                              std::span<const ResolvedSynthInstrument> instruments) {
+                              std::span<const ResolvedSynthInstrument* const> instruments) {
   const auto headers = sampleHeaderInfo(samples, instruments);
   std::vector<u8> payload;
   u32 startFrame = 0;

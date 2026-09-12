@@ -82,12 +82,11 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
                                                      std::span<const SamplePoolView> samplePools,
                                                      const SourceStore& sources,
                                                      const SynthSampleDecodeOptions& options,
-                                                     const SynthSampleReferences& references, bool discardUnreferenced,
+                                                     SynthSampleReferences needed, bool discardUnreferenced,
                                                      SampleFilteringPolicy filtering) {
   // Decode once into the final sample table, including any phase-inverted
   // variants. Container exporters share its indexes and source diagnostics.
   SynthSampleIndexMap indexes;
-  auto needed = references;
 
   for (const auto& view : samplePools) {
     const SampleFilter selectedFilter = resolveSampleFilter(filtering, view.pool.preferredFilter);

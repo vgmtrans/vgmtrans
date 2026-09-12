@@ -1429,6 +1429,20 @@ and region scopes, fixed/controller depths, both conversion/scaling policies,
 waveforms, delays, and absent, zero, fractional, or full observed maxima. The
 full build is warning-free and all 20 CTest targets pass.
 
+### Use prepared synth values directly
+
+SoundFont layout now borrows its selected prepared instruments, as its presets
+already do, instead of copying every region and modulation vector. The prepared
+data outlives layout and encoding. Attenuation writing accepts the decoded sample
+directly, removing a fabricated source Sample used only to carry attenuation.
+Sample decoding also consumes the temporary reference set directly instead of
+copying it into a second set.
+
+This removes two production lines and three unnecessary copies/constructions.
+The temporary sanitized SF2/DLS comparison remains byte-identical across 2,304
+scenarios per exporter. The full build is warning-free and all 20 CTest targets
+pass; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
