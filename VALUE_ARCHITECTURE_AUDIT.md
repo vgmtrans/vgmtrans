@@ -1774,6 +1774,27 @@ incomplete streams, loop coordinates, sample references, hardware rate, and
 annotations with and without a parent. The full build is warning-free and all
 20 CTest targets pass, including the existing format bank and loop fixtures.
 
+## Keep the NDS predictor inside its encoded sample
+
+An NDS ADPCM sample's `encodedData` now includes its four-byte predictor
+header. The decoder reads that complete bounded stream instead of reaching
+backward into the surrounding source file. This removes the implicit SWAV
+layout dependency from decoding and the scanner's separate predictor-header
+range check. Encoded-byte metadata now includes those four required bytes;
+decoded PCM, rates, channels, and loop coordinates remain unchanged.
+
+Derive the ADPCM loop length directly from the non-loop byte count. The old
+loop-start bound check could never fail: both encoded lengths are nonnegative
+16-bit word counts, and the total already includes the loop offset. The shared
+decoder contract now explicitly requires codec headers inside `encodedData`.
+
+This removes 13 production lines. Extend the existing decoder and SWAR tests
+with exact PCM, a predictor-only stream, and a truncated predictor; test code
+grows by seven lines. A temporary comparison matches PCM and metadata in
+589,824 cases across all initial index bytes, predictor extremes, varying
+payloads, empty payloads, and relocated streams. The harness is not committed.
+The full build is warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

@@ -12,6 +12,7 @@
 #include "value/scan/ScanResultBuilder.h"
 #include "value/scan/ScanTypes.h"
 #include "value/sequence/SequenceVm.h"
+#include "value/synth/SampleDecoder.h"
 #include "value/validation/SynthValidation.h"
 
 #include "ValueFormatTestSupport.h"
@@ -1368,10 +1369,7 @@ void ndsSynthParserDerivesAdpcmLengthsSafely() {
   writeLe16(bytes, 0x44, 0);
   writeLe16(bytes, 0x46, 0);
   writeLe16(bytes, 0x48, 2);
-  bytes[0x50] = 0;
-  bytes[0x51] = 0;
-  bytes[0x52] = 0;
-  bytes[0x53] = 0;
+  writeLe16(bytes, 0x4c, 0x1234);
 
   ScanIdAllocator ids;
   ScanInput input{
@@ -1394,8 +1392,11 @@ void ndsSynthParserDerivesAdpcmLengthsSafely() {
   expect(wave != nullptr && wave->pool.samples.size() == 1,
          "NDS parser should keep non-looping ADPCM with loop offset zero");
   const Sample& sample = wave->pool.samples[0];
-  expect(sample.encodedData.offset == 0x50 && sample.encodedData.size == 4,
-         "NDS ADPCM encoded data should skip the predictor header");
+  expect(sample.encodedData.offset == 0x4c && sample.encodedData.size == 8,
+         "NDS ADPCM encoded data should contain the predictor header and nibble stream");
+  const auto decoded = decodeSample(sample, bytes);
+  expect(decoded && decoded->pcm == std::vector<s16>(9, 0x1234),
+         "a scanned ADPCM sample should decode from its own predictor header");
   expect(!sample.loop.enabled && sample.loop.start == 0 && sample.loop.length == 9,
          "NDS non-looping ADPCM should keep sane decoded loop metadata");
   const auto* waveHeader = annotationWithKind(result.sourceMap, SourceId{12}, SourceRole::Header, "swar-header");

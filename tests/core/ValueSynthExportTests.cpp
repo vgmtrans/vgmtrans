@@ -72,22 +72,28 @@ void snesGainEvaluationHandlesLongIntervals() {
          "GAIN evaluation must still wait for a complete hardware counter period before stepping");
 }
 
-void ndsImaAdpcmDecoderRejectsInvalidInitialIndex() {
-  const Sample sample{
+void ndsImaAdpcmDecoderValidatesItsPredictorHeader() {
+  Sample sample{
       .name = "adpcm",
       .codec = AudioCodec::NdsImaAdpcm,
-      .encodedData = SourceRange{.source = SourceId{0}, .offset = 4, .size = 1},
+      .encodedData = SourceRange{.source = SourceId{0}, .offset = 0, .size = 5},
       .sampleRate = 32768,
   };
 
   const std::vector<u8> validMaxIndex{0x00, 0x00, 0x58, 0x00, 0x00};
   const auto decoded = decodeSample(sample, validMaxIndex);
-  expect(decoded.has_value() && decoded->pcm.size() == 3,
+  expect(decoded && decoded->pcm == std::vector<s16>({0, 4095, 7819}),
          "NDS IMA ADPCM decoder should accept initial predictor index 88");
 
   const std::vector<u8> invalidIndex{0x00, 0x00, 0x59, 0x00, 0x00};
   expect(!decodeSample(sample, invalidIndex).has_value(),
          "NDS IMA ADPCM decoder should reject initial predictor indexes outside the step table");
+  sample.encodedData.size = 3;
+  expect(!decodeSample(sample, validMaxIndex), "the encoded range must contain the whole predictor header");
+  sample.encodedData.size = 4;
+  const auto predictorOnly = decodeSample(sample, validMaxIndex);
+  expect(predictorOnly && predictorOnly->pcm == std::vector<s16>{0},
+         "a predictor-only stream should emit its initial PCM value");
 }
 
 void pcm16DecoderHonorsExplicitByteOrder() {
@@ -1903,7 +1909,7 @@ void runValueSynthExportTests() {
   snesBrrDecoderProducesPcm();
   snesDspNoiseDecoderMatchesHardwareSequence();
   snesGainEvaluationHandlesLongIntervals();
-  ndsImaAdpcmDecoderRejectsInvalidInitialIndex();
+  ndsImaAdpcmDecoderValidatesItsPredictorHeader();
   pcm16DecoderHonorsExplicitByteOrder();
   envelopePredicateDetectsCanonicalData();
   adsrApproximationLowersUnsupportedStages();

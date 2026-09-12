@@ -338,18 +338,14 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
 }
 
 [[nodiscard]] std::optional<DecodedSample> decodeNdsImaAdpcm(const Sample& sample, std::span<const u8> sourceBytes) {
-  if (!rangeIsValid(sample, sourceBytes) || sample.encodedData.offset < 4) {
+  if (!rangeIsValid(sample, sourceBytes) || sample.encodedData.size < 4) {
     return std::nullopt;
   }
 
-  // Sample::encodedData starts at the ADPCM nibble stream. SWAV stores the predictor header in
-  // the four bytes immediately before it.
+  // The four-byte predictor header is followed by low-nibble-first ADPCM data.
   const auto encoded = sourceBytes.subspan(sample.encodedData.offset, sample.encodedData.size);
-  const u32 headerOffset = static_cast<u32>(sample.encodedData.offset - 4);
-  const u32 header =
-      static_cast<u32>(le16(sourceBytes, headerOffset)) | (static_cast<u32>(le16(sourceBytes, headerOffset + 2)) << 16);
-  int pcm16 = static_cast<s16>(header & 0xffff);
-  int index = static_cast<int>((header >> 16) & 0x7f);
+  int pcm16 = static_cast<s16>(le16(encoded, 0));
+  int index = encoded[2] & 0x7f;
   if (index >= static_cast<int>(std::size(kNdsAdpcmTable))) {
     return std::nullopt;
   }
@@ -359,9 +355,9 @@ void decodePsxAdpcmBlock(std::span<s16, kPsxAdpcmFramesPerBlock> output, std::sp
       .channels = sample.channels,
       .loop = sample.loop,
   };
-  decoded.pcm.reserve(encoded.size() * 2 + 1);
+  decoded.pcm.reserve((encoded.size() - 4) * 2 + 1);
   decoded.pcm.push_back(static_cast<s16>(pcm16));
-  for (const u8 byte : encoded) {
+  for (const u8 byte : encoded.subspan(4)) {
     processNdsImaNibble(byte & 0x0f, index, pcm16);
     decoded.pcm.push_back(static_cast<s16>(pcm16));
     processNdsImaNibble((byte & 0xf0) >> 4, index, pcm16);
