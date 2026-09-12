@@ -39,19 +39,6 @@ namespace {
   return track.id();
 }
 
-void finishTrackAnnotation(ByteReader reader, u32 startOffset, SourceMapBuilder* sourceMap,
-                           std::optional<SourceAnnotationId> annotation, const TrackProgram& track) {
-  if (sourceMap == nullptr || !annotation) {
-    return;
-  }
-
-  SourceRange span;
-  for (const SourceCommand& command : track.commands) {
-    span.include(command.range);
-  }
-  AnnotationBuilder{*sourceMap, *annotation}.range(span.valid() ? span : reader.range(startOffset, 0));
-}
-
 [[nodiscard]] std::optional<u32> operandUnsigned32(const SemanticOperand& operand) {
   const auto* value = std::get_if<u64>(&operand.value);
   if (value == nullptr || *value > std::numeric_limits<u32>::max()) {
@@ -178,7 +165,10 @@ TrackProgram TrackDecodeSession::finish() {
       .startAddress = Address{startOffset_},
       .annotation = annotation_.value_or(SourceAnnotationId{}),
   };
+  track.commands.reserve(commands_.size());
+  SourceRange span;
   for (auto& [offset, decoded] : commands_) {
+    span.include(decoded.range);
     const SourceAnnotationId annotation = projectDecodedCommand(sourceMap_, decoded, commandParent_);
     if (sourceMap_ != nullptr && annotation.valid() && rootSequenceAsset_) {
       AnnotationBuilder{*sourceMap_, annotation}.owner(ObjectRefs::sequence(*rootSequenceAsset_));
@@ -194,7 +184,9 @@ TrackProgram TrackDecodeSession::finish() {
         .execution = std::move(decoded.execution),
     });
   }
-  finishTrackAnnotation(reader_, startOffset_, sourceMap_, annotation_, track);
+  if (sourceMap_ != nullptr && annotation_) {
+    AnnotationBuilder{*sourceMap_, *annotation_}.range(span.valid() ? span : reader_.range(startOffset_, 0));
+  }
   return track;
 }
 

@@ -1509,6 +1509,19 @@ unobserved/zero/quantization-boundary, MIDI/synth scaling, and stitched-export
 coverage passes. The full build is warning-free and all 20 CTest targets pass;
 no test code is added.
 
+### Finalize decoded tracks in one pass
+
+TrackDecodeSession now accumulates the track annotation range while assembling
+the final commands, removing a separate walk and its helper. Reserve the known
+command count before assembly. Empty tracks retain their original start anchor,
+and command order, source ownership, and trackless annotations are unchanged.
+The decode bound also uses min directly; its maximum default needs no special
+branch.
+
+This removes ten production lines. Existing source hierarchy, command ordering,
+track-range, and malformed-command coverage passes. The full build is
+warning-free and all 20 CTest targets pass; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
