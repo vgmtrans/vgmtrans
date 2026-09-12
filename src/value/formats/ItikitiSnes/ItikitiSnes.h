@@ -42,7 +42,6 @@ struct ReferencedPrograms {
 struct SequenceParse {
   core::SequenceProgram program;
   ReferencedPrograms references;
-  core::SourceRange headerRange;
 };
 
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);

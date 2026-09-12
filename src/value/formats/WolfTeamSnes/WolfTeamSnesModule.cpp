@@ -26,10 +26,7 @@ namespace {
   const std::string sourceName = result.sourceDisplayName();
   const std::string displayName = fmt::format("{} ({})", sourceName, variantName(layout->variant));
   auto sequence = result.sequence(displayName);
-  SequenceParse parsed =
-      decodeSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics());
-  sequence.range(sequenceSourceRange(input.reader, parsed.headerRange, parsed.program))
-      .program(std::move(parsed.program));
+  sequence.program(decodeSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics()));
 
   auto collection = result.sourceCollection(displayName).sequence(sequence);
   if (const auto synth = addSynth(result, *layout, displayName)) {

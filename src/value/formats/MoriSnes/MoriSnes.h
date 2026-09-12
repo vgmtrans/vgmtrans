@@ -151,7 +151,6 @@ struct ReferencedInstruments {
 struct SequenceParse {
   core::SequenceProgram program;
   ReferencedInstruments references;
-  core::SourceRange headerRange;
 };
 
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);

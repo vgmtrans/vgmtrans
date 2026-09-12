@@ -147,8 +147,11 @@ void layoutsRecoverVersionedDriverState() {
                layout->instrumentTableAddress == 0x2100 && layout->spcDirAddress == 0x6000 &&
                layout->srcnTableAddress == 0x7100 && layout->songIndex == 1 && layout->trackCount == 1,
            "HeartBeatSnes signatures should recover the active song and all synth tables");
-    const SequenceParse parsed = decodeSequence(ByteReader(SourceId{183}, fixture.data()), *layout, AssetId{183});
-    expect(parsed.program.tracks.size() == 1 && parsed.headerRange.size == 6 && parsed.programs.contains(2),
+    SourceMapBuilder sourceMap;
+    const SequenceParse parsed =
+        decodeSequence(ByteReader(SourceId{183}, fixture.data()), *layout, AssetId{183}, &sourceMap);
+    expect(parsed.program.tracks.size() == 1 && sourceMap.finish().annotations().front().range.size == 6 &&
+               parsed.programs.contains(2),
            "sequence decoding should follow relative track pointers and collect referenced programs");
   }
 

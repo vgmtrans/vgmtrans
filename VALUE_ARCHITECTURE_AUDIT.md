@@ -2024,11 +2024,42 @@ case to its existing fixture helpers, checking both nested forwarding fields
 and the embedded operand. The comparison harness remains uncommitted.
 The full build is warning-free and all 20 CTest targets pass.
 
+## Infer sequence bounds from existing source ownership
+
+ScanResultBuilder now infers an unspecified sequence range from its owned source
+annotations and decoded commands. Ownership already includes header children and
+track roots, so parsers no longer need to return a separate header range merely
+for their scanner to reconstruct the same span. Headerless command ranges use
+the input source when no base range was supplied.
+
+Inference runs after every draft finishes: synth builders can still add source
+annotations during materialization. Explicit ranges retain their exact bounds,
+including valid zero-length anchors. SoftCreatSnes keeps its explicit range
+because its owned annotations also describe driver state outside those bounds;
+existing container and playlist-specific ranges remain explicit as well.
+
+Fourteen format modules use the shared default. Thirteen SequenceParse header
+fields disappear, and Prism, Chun, and WolfTeam return SequenceProgram directly
+instead of maintaining format-specific wrappers around it. This removes 34 net
+production lines and three types without adding a new format-facing API.
+
+Verification: the warning-free full build and all 20 CTest targets passed. A
+focused core fixture checks inherited ownership, foreign-source filtering,
+unannotated commands, and explicit bounds. Existing header checks now inspect
+the source map. Total committed test growth is 27 lines. A temporary comparison
+of 395 scanned sequence ranges across 36 formats matched the previous output
+exactly; its capture hook and outputs remain outside committed source. This is
+fixture coverage, not real-file corpus parity.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding
   setup, source metadata handoffs, and repeated scan-to-playback preparation.
   Continue checking export lowering and instrument selection for redundant work.
+- Five formats copy a decoded stream into several playback tracks. Sharing
+  those commands must retain each channel's independent VM state and the
+  TrackId mapping used by source-command lookup; merely hiding the copy loop
+  would not simplify that representation.
 - Establish shared sounding-voice continuity before unifying note instrument
   selection across variant preparation, synth selection, and MIDI pitch context.
   PitchTransitionIntent::previousNote can express continuity before note flags

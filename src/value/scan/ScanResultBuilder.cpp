@@ -289,7 +289,23 @@ ScanResult ScanResultBuilder::finish() {
     result_.assets.push_back(std::move(asset));
   }
 
+  // Synth drafts may add annotations while finishing, so infer bounds only
+  // after all assets and their source metadata have been materialized.
   result_.sourceMap = sourceMap_.finish();
+  for (auto& asset : result_.assets) {
+    auto* sequence = std::get_if<SequenceProgramAsset>(&asset);
+    if (sequence == nullptr || sequence->metadata.range.valid()) {
+      continue;
+    }
+    auto& range = sequence->metadata.range;
+    for (const auto id : result_.sourceMap.annotationsForAsset(sequence->metadata.id)) {
+      const auto annotated = result_.sourceMap.get(id).range;
+      if (annotated.source == source()) {
+        range.include(annotated);
+      }
+    }
+    range = sequenceSourceRange(reader(), range, sequence->program);
+  }
   return std::move(result_);
 }
 

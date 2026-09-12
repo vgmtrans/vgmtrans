@@ -40,9 +40,10 @@ bool sequenceUsesSemantic(const SequenceProgram& program, SequenceSemantic seman
 }
 
 SourceRange sequenceSourceRange(ByteReader reader, SourceRange baseRange, const SequenceProgram& program) {
+  const SourceId source = baseRange.valid() ? baseRange.source : reader.source();
   for (const TrackProgram& track : program.tracks) {
     for (const SourceCommand& command : track.commands) {
-      if (command.range.valid() && command.range.source == baseRange.source) {
+      if (command.range.valid() && command.range.source == source) {
         baseRange.include(command.range);
       }
     }

@@ -868,7 +868,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         relative);
   }
   SequenceProgram program = sequence.finish(sequenceRuntime(layout.echoDelay));
-  return SequenceParse{.program = std::move(program), .references = std::move(references), .headerRange = header};
+  return SequenceParse{.program = std::move(program), .references = std::move(references)};
 }
 
 }  // namespace vgmtrans::formats::itikiti_snes

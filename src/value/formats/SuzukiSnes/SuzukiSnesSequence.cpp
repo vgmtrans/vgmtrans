@@ -990,7 +990,6 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   return SequenceParse{
       .program = std::move(program),
       .recipes = std::move(header.recipes),
-      .headerRange = header.range,
   };
 }
 

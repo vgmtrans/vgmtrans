@@ -41,7 +41,6 @@ struct Layout {
 struct SequenceParse {
   core::SequenceProgram program;
   std::set<u8> programs;
-  core::SourceRange headerRange;
 };
 
 [[nodiscard]] const char* versionName(Version version);

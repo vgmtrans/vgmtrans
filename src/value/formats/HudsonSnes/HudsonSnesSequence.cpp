@@ -1419,7 +1419,6 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   supplementLiveRecipes(reader, layout, std::move(references), header->recipes);
   const u8 timebaseShift = header->timebaseShift;
   SequenceRecipes recipes = header->recipes;
-  const SourceRange headerRange = header->range;
   SequenceProgram program = sequence.finish(sequenceRuntime(layout.version, std::move(*header)));
   program.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(120, timebaseShift);
   program.behavior.initialLevel = math::levelGain(layout.version, math::initialVolume(layout.version));
@@ -1427,7 +1426,6 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   return SequenceParse{
       .program = std::move(program),
       .recipes = std::move(recipes),
-      .headerRange = headerRange,
   };
 }
 

@@ -138,6 +138,9 @@ public:
   [[nodiscard]] SourceMapBuilder& sourceMap() noexcept { return sourceMap_; }
   [[nodiscard]] std::vector<Diagnostic>& diagnostics() noexcept { return result_.diagnostics; }
 
+  // Without an explicit range, finish() spans the sequence's owned source
+  // annotations and decoded commands in this input. Container bounds can be
+  // supplied here or on the draft to keep that range exact.
   [[nodiscard]] ScanSequenceDraft sequence(std::string name, SourceRange range = {});
   [[nodiscard]] ScanSoundBankDraft soundBank(std::string name, SourceRange range = {});
   [[nodiscard]] ScanSamplePoolDraft samplePool(std::string name, SourceRange range = {});
