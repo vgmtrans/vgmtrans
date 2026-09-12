@@ -73,19 +73,19 @@ std::optional<SnesSampleDirectoryEntry> readSnesSampleDirectoryEntry(ByteReader 
   return result;
 }
 
-SnesBrrCatalog readSnesBrrCatalog(ByteReader reader, u32 directoryAddress, std::vector<u8> srcns) {
+std::vector<SnesBrrSample> readSnesBrrCatalog(ByteReader reader, u32 directoryAddress, std::vector<u8> srcns) {
   std::ranges::sort(srcns);
   const auto duplicates = std::ranges::unique(srcns);
   srcns.erase(duplicates.begin(), duplicates.end());
 
-  SnesBrrCatalog catalog;
+  std::vector<SnesBrrSample> catalog;
   const SnesSampleDirectory directory(reader, directoryAddress);
   for (const u8 srcn : srcns) {
     const auto entry = directory.entry(srcn);
-    if (!entry || !entry->stream) {
+    if (!entry) {
       continue;
     }
-    catalog.samples.push_back(SnesBrrSample{
+    catalog.push_back(SnesBrrSample{
         .srcn = srcn,
         .directoryEntry = entry->entryRange,
         .startAddress = entry->startAddress,
@@ -94,11 +94,6 @@ SnesBrrCatalog readSnesBrrCatalog(ByteReader reader, u32 directoryAddress, std::
     });
   }
 
-  if (!catalog.samples.empty()) {
-    const u32 begin = static_cast<u32>(catalog.samples.front().directoryEntry.offset);
-    const u32 end = static_cast<u32>(catalog.samples.back().directoryEntry.endOffset());
-    catalog.directoryRange = reader.range(begin, end - begin);
-  }
   return catalog;
 }
 
@@ -107,43 +102,44 @@ std::optional<SampleRef> SnesBrrSampleRefs::findSrcn(u8 srcn) const {
   return found == entries_.end() ? std::nullopt : std::optional<SampleRef>{found->sample};
 }
 
-SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reader, const SnesBrrCatalog& catalog,
-                                    std::string_view directoryEntryKind) {
+SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reader,
+                                    std::span<const SnesBrrSample> catalog, std::string_view directoryEntryKind) {
   return addSnesBrrSamples(samples, reader, catalog, {}, directoryEntryKind);
 }
 
-SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reader, const SnesBrrCatalog& catalog,
-                                    std::span<const u8> usedSrcns, std::string_view directoryEntryKind) {
-  samples.include(catalog.directoryRange);
+SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reader,
+                                    std::span<const SnesBrrSample> catalog, std::span<const u8> usedSrcns,
+                                    std::string_view directoryEntryKind) {
+  SourceRange directoryRange;
+  for (const auto& info : catalog) {
+    directoryRange.include(info.directoryEntry);
+  }
+  samples.include(directoryRange);
   const SourceAnnotationId root =
-      samples.source(SourceRole::Table, "Sample DIR", catalog.directoryRange, "snes-sample-dir").id();
+      samples.source(SourceRole::Table, "Sample DIR", directoryRange, "snes-sample-dir").id();
 
   SnesBrrSampleRefs refs;
-  refs.entries_.reserve(catalog.samples.size());
-  for (const auto& info : catalog.samples) {
+  refs.entries_.reserve(catalog.size());
+  for (const auto& info : catalog) {
     const bool unused = !usedSrcns.empty() && std::ranges::find(usedSrcns, info.srcn) == usedSrcns.end();
     const std::string name = fmt::format("Sample {}", info.srcn);
     const char* suffix = unused ? " (unused)" : "";
     const u32 encodedLength = static_cast<u32>(info.stream.encodedData.size);
     const u32 decodedLength = (encodedLength / 9) * 16;
-    const u32 lastBlockAddress = encodedLength >= 9 ? info.startAddress + encodedLength - 9 : info.startAddress;
-    const bool loopEnabled =
-        info.stream.loops && info.loopAddress >= info.startAddress && info.loopAddress <= lastBlockAddress;
-    const u32 loopStart = loopEnabled ? ((info.loopAddress - info.startAddress) / 9) * 16 : 0;
-    auto sample = samples.add(
-        info.srcn, Sample{
-                       .name = name + suffix,
-                       .codec = AudioCodec::SnesBrr,
-                       .encodedData = info.stream.encodedData,
-                       .sampleRate = 32000,
-                       .channels = 1,
-                       .loop =
-                           Loop{
-                               .enabled = loopEnabled,
-                               .start = loopStart,
-                               .length = loopEnabled && decodedLength >= loopStart ? decodedLength - loopStart : 0,
-                           },
-                   });
+    const u32 loopStart = info.stream.loops ? ((info.loopAddress - info.startAddress) / 9) * 16 : 0;
+    auto sample = samples.add(info.srcn, Sample{
+                                             .name = name + suffix,
+                                             .codec = AudioCodec::SnesBrr,
+                                             .encodedData = info.stream.encodedData,
+                                             .sampleRate = 32000,
+                                             .channels = 1,
+                                             .loop =
+                                                 Loop{
+                                                     .enabled = info.stream.loops,
+                                                     .start = loopStart,
+                                                     .length = info.stream.loops ? decodedLength - loopStart : 0,
+                                                 },
+                                         });
 
     auto directoryEntry = sample
                               .source(name + " DIR Entry" + suffix, info.directoryEntry, directoryEntryKind)
@@ -159,7 +155,7 @@ SnesBrrSampleRefs addSnesBrrSamples(SamplePoolBuilder& samples, ByteReader reade
         .parent(directoryEntry.id());
 
     SampleRef canonical = sample.ref();
-    const auto earlierSamples = std::span(catalog.samples).first(refs.entries_.size());
+    const auto earlierSamples = catalog.first(refs.entries_.size());
     const auto alias = std::ranges::find_if(earlierSamples, [&](const SnesBrrSample& candidate) {
       return candidate.startAddress == info.startAddress && candidate.stream.loops == info.stream.loops &&
              (!info.stream.loops || candidate.loopAddress == info.loopAddress);

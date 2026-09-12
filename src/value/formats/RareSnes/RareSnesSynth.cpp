@@ -34,8 +34,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   }
 
   const ByteReader reader = builder.reader();
-  const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, *layout.spcDirAddress, recipes.patches, &PatchRecipe::srcn);
-  if (catalog.samples.empty()) {
+  const auto catalog = readSnesBrrCatalog(reader, *layout.spcDirAddress, recipes.patches, &PatchRecipe::srcn);
+  if (catalog.empty()) {
     return std::nullopt;
   }
 

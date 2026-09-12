@@ -40,8 +40,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
       !reader.has(layout.fineTableAddress, tableSize)) {
     return std::nullopt;
   }
-  const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, referencedInstruments);
-  if (catalog.samples.empty()) {
+  const auto catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, referencedInstruments);
+  if (catalog.empty()) {
     return std::nullopt;
   }
 

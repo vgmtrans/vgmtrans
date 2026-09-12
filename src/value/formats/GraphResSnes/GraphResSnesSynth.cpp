@@ -18,33 +18,14 @@ namespace vgmtrans::formats::graph_res_snes {
 
 using namespace core;
 
-namespace {
-
-// A program number directly selects an entry in the sample list. Keep only
-// entries that contain a real sample and point into the sample-data area.
-[[nodiscard]] std::vector<u8> availableSrcns(ByteReader reader, const Layout& layout,
-                                             const std::set<u8>& programs) {
-  std::vector<u8> result;
-  const SnesSampleDirectory directory(reader, layout.spcDirAddress);
-  for (const u8 program : programs) {
-    const auto sample = directory.entry(program);
-    if (sample && sample->stream && sample->startAddress >= layout.spcDirAddress) {
-      result.push_back(program);
-    }
-  }
-  return result;
-}
-
-}  // namespace
-
 // Build one instrument for each sample used by the sequence. The tuning data
 // says that sample pitch $1000 corresponds to MIDI note 57.
 std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Layout& layout,
                                            const std::set<u8>& programs, std::string_view displayName) {
   const ByteReader reader = builder.reader();
-  const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.spcDirAddress,
-                                                    availableSrcns(reader, layout, programs));
-  if (catalog.samples.empty()) {
+  auto catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, programs);
+  std::erase_if(catalog, [&](const SnesBrrSample& sample) { return sample.startAddress < layout.spcDirAddress; });
+  if (catalog.empty()) {
     return std::nullopt;
   }
 
@@ -52,7 +33,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   auto& instruments = bank.instruments();
   auto& samplePool = bank.localSamples();
   const SnesBrrSampleRefs samples = addSnesBrrSamples(samplePool, reader, catalog);
-  for (const SnesBrrSample& sampleInfo : catalog.samples) {
+  for (const SnesBrrSample& sampleInfo : catalog) {
     const u8 program = sampleInfo.srcn;
     const SourceRange source = sampleInfo.directoryEntry;
     const auto sample = samples.findSrcn(program);

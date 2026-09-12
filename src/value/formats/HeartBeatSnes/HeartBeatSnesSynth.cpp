@@ -88,8 +88,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
                                            const std::set<u8>& programs, std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const std::vector<Patch> patches = collectPatches(reader, layout, programs);
-  const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, patches, &Patch::srcn);
-  if (catalog.samples.empty()) {
+  const auto catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, patches, &Patch::srcn);
+  if (catalog.empty()) {
     return std::nullopt;
   }
 

@@ -247,8 +247,8 @@ struct InstrumentRegion {
   return infos;
 }
 
-[[nodiscard]] SnesBrrCatalog collectSamples(ByteReader reader, const Layout& layout,
-                                            const std::vector<InstrumentInfo>& instruments) {
+[[nodiscard]] std::vector<SnesBrrSample> collectSamples(ByteReader reader, const Layout& layout,
+                                                        const std::vector<InstrumentInfo>& instruments) {
   auto sampledInstruments = instruments | std::views::filter([&](const InstrumentInfo& instrument) {
     return !isNoise(profile(layout.profile), instrument);
   });
@@ -451,11 +451,11 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   instruments.insert(instruments.end(), overrides.begin(), overrides.end());
   std::vector<InstrumentInfo> percussion = collectEarlierPercussion(reader, layout, recipes);
   instruments.insert(instruments.end(), percussion.begin(), percussion.end());
-  const SnesBrrCatalog catalog = collectSamples(reader, layout, instruments);
+  const auto catalog = collectSamples(reader, layout, instruments);
   const Profile& selected = profile(layout.profile);
   const bool hasNoise =
       std::ranges::any_of(instruments, [&](const InstrumentInfo& info) { return isNoise(selected, info); });
-  if (instruments.empty() || (catalog.samples.empty() && !hasNoise)) {
+  if (instruments.empty() || (catalog.empty() && !hasNoise)) {
     return std::nullopt;
   }
 

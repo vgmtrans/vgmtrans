@@ -44,8 +44,7 @@ struct Patch {
   for (const u8 program : references.programs) {
     const u16 tuning = static_cast<u16>(layout.tuningTableAddress + program * 2u);
     const u16 adsr = static_cast<u16>(layout.adsrTableAddress + program * 2u);
-    if (!reader.has(tuning, 2) || !reader.has(adsr, 2) ||
-        !readSnesSampleDirectoryEntry(reader, layout.spcDirAddress + program * 4u, true)) {
+    if (!reader.has(tuning, 2) || !reader.has(adsr, 2)) {
       continue;
     }
     result.push_back(Patch{
@@ -66,8 +65,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
                                            const ReferencedPrograms& references, std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const std::vector<Patch> patches = collectPatches(reader, layout, references);
-  const SnesBrrCatalog catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, patches, &Patch::program);
-  if (catalog.samples.empty()) {
+  const auto catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, patches, &Patch::program);
+  if (catalog.empty()) {
     return std::nullopt;
   }
 

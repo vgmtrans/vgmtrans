@@ -109,7 +109,7 @@ std::optional<ScanSoundBankDraft> addCapcomSnesSynth(ScanResultBuilder& builder,
   const auto instrumentInfos = parseCapcomSnesInstrumentInfos(reader, instrumentTableAddress, spcDirAddress);
   const auto sampleCatalog =
       readSnesBrrCatalog(reader, spcDirAddress, instrumentInfos, &CapcomSnesInstrumentInfo::srcn);
-  if (sampleCatalog.samples.empty()) {
+  if (sampleCatalog.empty()) {
     return std::nullopt;
   }
 

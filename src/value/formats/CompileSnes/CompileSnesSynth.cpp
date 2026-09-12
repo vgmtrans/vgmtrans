@@ -22,7 +22,7 @@ namespace {
   std::vector<InstrumentInfo> result;
   for (const u8 program : programs) {
     const auto instrument = readInstrumentInfo(reader, layout, program);
-    if (!instrument || !readSnesSampleDirectoryEntry(reader, layout.spcDirAddress + program * 4u, true)) {
+    if (!instrument) {
       continue;
     }
     result.push_back(*instrument);
@@ -36,9 +36,8 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
                                            const std::set<u8>& programs, std::string_view displayName) {
   const ByteReader reader = builder.reader();
   const std::vector<InstrumentInfo> instrumentInfo = collectInstruments(reader, layout, programs);
-  const SnesBrrCatalog catalog =
-      readSnesBrrCatalog(reader, layout.spcDirAddress, instrumentInfo, &InstrumentInfo::program);
-  if (catalog.samples.empty()) {
+  const auto catalog = readSnesBrrCatalog(reader, layout.spcDirAddress, instrumentInfo, &InstrumentInfo::program);
+  if (catalog.empty()) {
     return std::nullopt;
   }
 

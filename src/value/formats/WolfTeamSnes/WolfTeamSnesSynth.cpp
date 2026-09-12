@@ -121,15 +121,14 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
   }
   const ByteReader reader = builder.reader();
   const std::vector<InstrumentInfo> patches = collectInstruments(reader, layout);
-  SnesBrrCatalog catalog =
-      readSnesBrrCatalog(reader, layout.instruments.sampleDirAddress, patches, &InstrumentInfo::program);
+  auto catalog = readSnesBrrCatalog(reader, layout.instruments.sampleDirAddress, patches, &InstrumentInfo::program);
   const u32 minimumSampleStart =
       layout.variant == Variant::Arcus
           ? layout.instruments.sampleDirAddress + 0x100
           : (layout.middleSegmented()
                  ? layout.instruments.patchTableAddress + layout.instruments.count * layout.instruments.entrySize
                  : 1);
-  std::erase_if(catalog.samples, [&](const SnesBrrSample& sample) {
+  std::erase_if(catalog, [&](const SnesBrrSample& sample) {
     if (sample.startAddress < minimumSampleStart) {
       return true;
     }
@@ -141,7 +140,7 @@ std::optional<ScanSoundBankDraft> addSynth(ScanResultBuilder& builder, const Lay
            sample.loopAddress < sample.startAddress || sample.loopAddress >= layout.instruments.sampleDirAddress ||
            sample.loopAddress > sampleEnd || (sample.stream.loops && sample.loopAddress >= sampleEnd);
   });
-  if (catalog.samples.empty()) {
+  if (catalog.empty()) {
     return std::nullopt;
   }
 
