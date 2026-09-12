@@ -1455,6 +1455,22 @@ identical SF2 and DLS bytes across 2,304 scenarios with empty, ordinary, long,
 UTF-8, and embedded-null names. The full build is warning-free and all 20 CTest
 targets pass; no test code is added.
 
+### Honor note-selected instruments when preparing variants
+
+Variant preparation now resolves a fresh note's explicit instrument before
+falling back to the track selection. Envelope and signed-stereo variants use
+that actual base instrument. Portable address allocation reserves note-requested
+addresses too, preventing generated variants from occupying them.
+
+Use the generated instrument's own address instead of retaining a duplicate in
+VariantRecord. An optional variant address replaces the temporary address/flag
+pair, and the one-use address wrapper is removed. Track restoration and tied
+voice behavior remain in their existing paths.
+
+This removes eight production lines. Existing selection and allocation fixtures
+cover both fixes with four net added test lines; the note-selection case fails
+before the change. The full build is warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
