@@ -1310,6 +1310,20 @@ Existing synth-builder tests cover those rules, invalid/foreign ranges, fallback
 records, and detached builders. The full build is warning-free and all 20 CTest
 targets pass; no test code is added.
 
+### Express delayed output through the emitter
+
+Add PerformanceEmitter::after(ticks), using the emitter's existing saturating
+tick arithmetic and copied output view. SonyPS1, HeartBeatPS1, SonyPS2, and
+SegSat no longer calculate output ticks in local helpers. Remove three local
+aliases of Effects::wait as well. Delayed output retains its source command,
+automation binding, active-note state, and source spans without advancing the VM.
+SegSat's event-count loop handling and distinct tempo timing remain explicit.
+
+This removes seven format-local helpers and 20 production lines. A temporary
+sanitized check covers 48 boundary timing cases, chained delays, sustained notes,
+source spans, and retained automation bindings. The full build is warning-free
+and all 20 CTest targets pass; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

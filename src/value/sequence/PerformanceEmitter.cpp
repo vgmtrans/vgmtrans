@@ -74,6 +74,10 @@ PerformanceEmitter PerformanceEmitter::at(u64 tick) const {
   return output;
 }
 
+PerformanceEmitter PerformanceEmitter::after(u32 ticks) const {
+  return at(addTicks(tick_, ticks));
+}
+
 PerformanceNoteId PerformanceEmitter::note(NotePerformanceEvent event) {
   if (!event.note.valid() && event.extendsPrevious) {
     for (auto previous = track_.events.rbegin(); previous != track_.events.rend(); ++previous) {

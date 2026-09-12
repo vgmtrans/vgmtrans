@@ -12,7 +12,6 @@
 #include "value/sequence/SequenceVm.h"
 
 #include <algorithm>
-#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -82,39 +81,32 @@ struct Playback {
     }
   }
 
-  [[nodiscard]] u64 eventTick(u32 delta) const {
-    return vm.tick() > std::numeric_limits<u64>::max() - delta ? std::numeric_limits<u64>::max() : vm.tick() + delta;
-  }
-
-  [[nodiscard]] Effects after(u32 delta) const { return Effects::wait(delta); }
-
   Effects note(u8 channel, u8 key, u8 velocity, u32 delta) {
     if (channel != track.channel) {
-      return after(delta);
+      return Effects::wait(delta);
     }
-    auto delayed = out.at(eventTick(delta));
+    auto delayed = out.after(delta);
     if (velocity == 0) {
       delayed.noteOff(key);
-      return after(delta);
+      return Effects::wait(delta);
     }
     delayed.noteOn(key, LevelScale::linearFromMidi7(std::min<u8>(velocity, 127)));
-    return after(delta);
+    return Effects::wait(delta);
   }
 
   Effects program(u8 channel, u8 value, u32 delta) {
     if (channel == track.channel && value < 128) {
       track.program = value;
-      out.at(eventTick(delta)).instrument(sonyPs1InstrumentIdentity(track.bank, track.program));
+      out.after(delta).instrument(sonyPs1InstrumentIdentity(track.bank, track.program));
     }
-    return after(delta);
+    return Effects::wait(delta);
   }
 
   Effects controller(u8 channel, u8 controller, u8 value, u32 delta) {
     if (channel != track.channel) {
-      return after(delta);
+      return Effects::wait(delta);
     }
-    const u64 tick = eventTick(delta);
-    auto delayed = out.at(tick);
+    auto delayed = out.after(delta);
     switch (controller) {
       case 0:
         track.bank = value;
@@ -176,7 +168,7 @@ struct Playback {
       default:
         break;
     }
-    return after(delta);
+    return Effects::wait(delta);
   }
 
   Effects pitchBend(u8 channel, u8 msb, u32 delta) {
@@ -184,24 +176,23 @@ struct Playback {
       // All three audited libsnd generations discard the MIDI LSB and use the
       // high seven bits as their signed wheel position.
       const double wheel = std::clamp((static_cast<int>(msb) - 64) / 64.0, -1.0, 1.0);
-      out.at(eventTick(delta))
-          .pitchBend(PitchBendPerformanceEvent{
-              .semitones = wheel * track.pitchBendRange,
-              .normalizedWheelPosition = wheel,
-          });
+      out.after(delta).pitchBend(PitchBendPerformanceEvent{
+          .semitones = wheel * track.pitchBendRange,
+          .normalizedWheelPosition = wheel,
+      });
     }
-    return after(delta);
+    return Effects::wait(delta);
   }
 
   Effects tempo(u32 microsecondsPerQuarter, u32 delta) {
     if (track.channel == 0 && microsecondsPerQuarter != 0) {
-      out.at(eventTick(delta)).tempo(microsecondsPerQuarter);
+      out.after(delta).tempo(microsecondsPerQuarter);
     }
-    return after(delta);
+    return Effects::wait(delta);
   }
 
   Effects loopEnd(u8 count, Address destination, u32 delta) {
-    Effects effects = after(delta);
+    Effects effects = Effects::wait(delta);
     if (count == 127) {
       effects.flowOverride = vm.declaredLoop(destination).flowOverride;
     } else if (count > 1) {
