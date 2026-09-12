@@ -1593,8 +1593,8 @@ TrackProgram decodeSourceTrack(ByteReader reader, Version version, u32 trackNumb
   return decodeTrack(reader, version, trackNumber, startAddress, diagnostics, scope);
 }
 
-SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
-                             std::vector<Diagnostic>* diagnostics) {
+SequenceProgram decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
+                               std::vector<Diagnostic>* diagnostics) {
   const u32 headerSize = static_cast<u32>(layout.tracks.size()) * 4 + 1;
   const SourceRange header = reader.range(layout.sequenceHeaderAddress, headerSize);
   SequenceDecodeSession sequence{reader, sequenceConfig(), sequenceId, header, sourceMap, kCommandLimit};
@@ -1616,10 +1616,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     sequence.addTrack(
         decodeTrack(reader, layout.version, index, track.startAddress, diagnostics, sequence.trackScope()));
   }
-  return SequenceParse{
-      .program = sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime))),
-      .headerRange = header,
-  };
+  return sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime)));
 }
 
 }  // namespace vgmtrans::formats::prism_snes

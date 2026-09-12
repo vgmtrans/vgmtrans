@@ -49,7 +49,6 @@ struct SequenceParse {
   core::SequenceProgram program;
   std::set<u8> programs;
   PatchTable patches;
-  core::SourceRange headerRange;
 };
 
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);

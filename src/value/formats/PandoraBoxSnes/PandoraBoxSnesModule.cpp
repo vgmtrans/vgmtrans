@@ -28,9 +28,7 @@ namespace {
   auto sequence = result.sequence(displayName);
   SequenceParse parsed =
       decodeSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics());
-  const SourceRange header = input.reader.range(layout->sequenceHeaderAddress, kSequenceHeaderSize);
-  sequence.range(sequenceSourceRange(input.reader, header, parsed.program))
-      .program(std::move(parsed.program));
+  sequence.program(std::move(parsed.program));
 
   auto collection = result.sourceCollection(displayName).sequence(sequence);
   if (const auto synth = addSynth(result, *layout, parsed.programs, displayName)) {

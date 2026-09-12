@@ -1236,7 +1236,7 @@ SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetI
 
   SequenceProgram program =
       sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(DriverData{std::move(source), layout}));
-  return SequenceParse{.program = std::move(program), .programs = std::move(programs), .headerRange = header};
+  return SequenceParse{.program = std::move(program), .programs = std::move(programs)};
 }
 
 }  // namespace vgmtrans::formats::compile_snes

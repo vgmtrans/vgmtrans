@@ -24,10 +24,7 @@ namespace {
   ScanResultBuilder result(input, "PrismSnes");
   const std::string displayName = result.sourceDisplayName();
   auto sequence = result.sequence(displayName);
-  SequenceParse parsed =
-      decodeSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics());
-  sequence.range(sequenceSourceRange(input.reader, parsed.headerRange, parsed.program))
-      .program(std::move(parsed.program));
+  sequence.program(decodeSequence(input.reader, *layout, sequence.id(), &result.sourceMap(), &result.diagnostics()));
 
   auto collection = result.sourceCollection(displayName).sequence(sequence);
   if (const auto synth = addSynth(result, *layout, displayName)) {

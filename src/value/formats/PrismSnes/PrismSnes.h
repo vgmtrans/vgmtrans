@@ -52,19 +52,15 @@ struct Layout {
   std::vector<TrackHeader> tracks;
 };
 
-struct SequenceParse {
-  core::SequenceProgram program;
-  core::SourceRange headerRange;
-};
-
 [[nodiscard]] const char* versionName(Version version);
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);
 [[nodiscard]] core::TrackProgram decodeSourceTrack(core::ByteReader reader, Version version, u32 trackNumber,
                                                    u32 startAddress,
                                                    std::vector<core::Diagnostic>* diagnostics = nullptr);
-[[nodiscard]] SequenceParse decodeSequence(core::ByteReader reader, const Layout& layout, core::AssetId sequenceId,
-                                           core::SourceMapBuilder* sourceMap = nullptr,
-                                           std::vector<core::Diagnostic>* diagnostics = nullptr);
+[[nodiscard]] core::SequenceProgram decodeSequence(core::ByteReader reader, const Layout& layout,
+                                                   core::AssetId sequenceId,
+                                                   core::SourceMapBuilder* sourceMap = nullptr,
+                                                   std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
 [[nodiscard]] core::Envelope driverEnvelope(u8 adsr1, u8 adsr2);
 [[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,

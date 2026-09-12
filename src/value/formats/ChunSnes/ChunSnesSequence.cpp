@@ -965,8 +965,8 @@ const SequenceProgramConfig& sequenceConfig() {
   return config;
 }
 
-SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetId sequenceId,
-                             SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
+SequenceProgram decodeSequence(RetainedSource source, const Layout& layout, AssetId sequenceId,
+                               SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
   const ByteReader reader = source.reader();
   const u32 headerSize = 2 + reader.u8At(layout.sequenceHeaderAddress + 1) * 2;
   const SourceRange headerRange = reader.range(layout.sequenceHeaderAddress, headerSize);
@@ -984,7 +984,7 @@ SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetI
   SequenceProgram program =
       sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(DriverData{std::move(source), layout, initialTempo}));
   program.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicroseconds(initialTempo);
-  return {.program = std::move(program), .headerRange = headerRange};
+  return program;
 }
 
 }  // namespace vgmtrans::formats::chun_snes

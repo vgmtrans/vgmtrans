@@ -1271,7 +1271,6 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     return SequenceParse{
         .program = std::move(program),
         .references = std::move(references),
-        .headerRange = header,
     };
   }
 
@@ -1292,7 +1291,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   }
   ReferencedInstruments references = analyzeCompiledProgram<ProgramState>(
       program, &ProgramState::references, diagnostics, SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce});
-  return SequenceParse{.program = std::move(program), .references = std::move(references), .headerRange = header};
+  return SequenceParse{.program = std::move(program), .references = std::move(references)};
 }
 
 }  // namespace vgmtrans::formats::mori_snes

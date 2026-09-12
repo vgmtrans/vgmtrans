@@ -124,7 +124,6 @@ struct ParsedHeader {
 struct SequenceParse {
   core::SequenceProgram program;
   SequenceRecipes recipes;
-  core::SourceRange headerRange;
 };
 
 [[nodiscard]] const char* versionName(Version version);

@@ -103,11 +103,6 @@ struct InstrumentInfo {
   core::SourceRange volumeSource;
 };
 
-struct SequenceParse {
-  core::SequenceProgram program;
-  core::SourceRange headerRange;
-};
-
 [[nodiscard]] const char* variantName(Variant variant);
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);
 [[nodiscard]] std::optional<InstrumentInfo> readInstrumentInfo(core::ByteReader reader, const Layout& layout,
@@ -115,9 +110,10 @@ struct SequenceParse {
 [[nodiscard]] core::TrackProgram decodeSourceTrack(core::ByteReader reader, const Layout& layout,
                                                    const ChannelLayout& channel,
                                                    std::vector<core::Diagnostic>* diagnostics = nullptr);
-[[nodiscard]] SequenceParse decodeSequence(core::ByteReader reader, const Layout& layout, core::AssetId sequenceId,
-                                           core::SourceMapBuilder* sourceMap = nullptr,
-                                           std::vector<core::Diagnostic>* diagnostics = nullptr);
+[[nodiscard]] core::SequenceProgram decodeSequence(core::ByteReader reader, const Layout& layout,
+                                                   core::AssetId sequenceId,
+                                                   core::SourceMapBuilder* sourceMap = nullptr,
+                                                   std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
 [[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
                                                                std::string_view displayName);

@@ -1017,8 +1017,8 @@ TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, const Ch
   return decodeTrack(scope, layout, channel, diagnostics);
 }
 
-SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
-                             std::vector<Diagnostic>* diagnostics) {
+SequenceProgram decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
+                               std::vector<Diagnostic>* diagnostics) {
   const SourceRange headerRange = reader.range(layout.sequenceHeaderAddress, layout.headerLength);
   auto config = sequenceConfig();
   config.behavior = behavior(reader, layout);
@@ -1084,8 +1084,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     }
     sequence.addTrack(decodeTrack(tracks, layout, channel, diagnostics));
   }
-  return SequenceParse{.program = sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime))),
-                       .headerRange = headerRange};
+  return sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime)));
 }
 
 }  // namespace vgmtrans::formats::wolf_team_snes

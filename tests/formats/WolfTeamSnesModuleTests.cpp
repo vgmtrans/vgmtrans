@@ -106,8 +106,8 @@ std::vector<const Event*> events(const PerformanceTrack& track) {
 
 PerformanceSequence render(const Layout& layout, std::vector<u8> bytes) {
   const ByteReader reader(SourceId{170}, bytes);
-  SequenceParse parsed = decodeSequence(reader, layout, AssetId{170});
-  return SequenceVm(LoopPolicy::PlayOnce).render(parsed.program);
+  SequenceProgram parsed = decodeSequence(reader, layout, AssetId{170});
+  return SequenceVm(LoopPolicy::PlayOnce).render(parsed);
 }
 
 std::vector<u8> lateScannerFixture() {
@@ -561,7 +561,7 @@ void streamListsStayOutOfCommandAnnotations() {
   writeBytes(bytes, 0x3080, {0x62, 0x01, 0x00, 0x7f, 0x91});
 
   const Layout layout = directLateLayout(Variant::TalesOfPhantasia, {0x3000, 0x3040, 0x3080});
-  const SequenceParse parsed = decodeSequence(ByteReader(SourceId{190}, bytes), layout, AssetId{190});
+  const SequenceProgram parsed = decodeSequence(ByteReader(SourceId{190}, bytes), layout, AssetId{190});
   const auto hasOnlyEndBoundaries = [](const SequenceProgram& program, u8 opcode, size_t expected) {
     const auto& commands = program.tracks.front().commands;
     return std::ranges::count_if(
@@ -570,8 +570,8 @@ void streamListsStayOutOfCommandAnnotations() {
              return command.opcode == opcode && command.semantic != SequenceSemantic::End;
            });
   };
-  expect(validateSequenceProgram(parsed.program).empty() && hasOnlyEndBoundaries(parsed.program, 0x91, 3) &&
-             parsed.program.runtime.valid() && parsed.program.tracks.front().startAddress.value == 0x3000,
+  expect(validateSequenceProgram(parsed).empty() && hasOnlyEndBoundaries(parsed, 0x91, 3) && parsed.runtime.valid() &&
+             parsed.tracks.front().startAddress.value == 0x3000,
          "phrase ordering belongs to compact track runtime state, while each source boundary remains context-neutral");
 
   std::vector<u8> segmented(kAramSize);
@@ -580,11 +580,10 @@ void streamListsStayOutOfCommandAnnotations() {
   writeBytes(segmented, 0x3040, {0x61, 0x01, 0x00, 0x7f, 0xfd});
   writeBytes(segmented, 0x3080, {0x62, 0x01, 0x00, 0x7f, 0xfd});
   const Layout segmentedLayout = directArcusLayout({0x3000, 0x3040, 0x3080});
-  const SequenceParse segmentedParsed =
+  const SequenceProgram segmentedParsed =
       decodeSequence(ByteReader(SourceId{191}, segmented), segmentedLayout, AssetId{191});
-  expect(validateSequenceProgram(segmentedParsed.program).empty() &&
-             hasOnlyEndBoundaries(segmentedParsed.program, 0xfd, 3) && segmentedParsed.program.runtime.valid() &&
-             segmentedParsed.program.tracks.front().startAddress.value == 0x3000,
+  expect(validateSequenceProgram(segmentedParsed).empty() && hasOnlyEndBoundaries(segmentedParsed, 0xfd, 3) &&
+             segmentedParsed.runtime.valid() && segmentedParsed.tracks.front().startAddress.value == 0x3000,
          "segment ordering belongs to compact track runtime state, not control-command annotations");
 }
 

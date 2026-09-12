@@ -752,7 +752,6 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
       .program = std::move(program),
       .programs = std::move(programs),
       .patches = std::move(patches),
-      .headerRange = header,
   };
 }
 

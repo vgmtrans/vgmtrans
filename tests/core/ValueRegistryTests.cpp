@@ -264,6 +264,26 @@ void scanResultBuilderNamesSourceCollections() {
          "source collection identity should not depend on its display name");
 }
 
+void scanResultBuilderInfersSequenceRangesUnlessExplicit() {
+  const std::vector<u8> bytes(32);
+  const ByteReader reader(SourceId{7}, bytes);
+  ScanIdAllocator ids;
+  ScanInput input{.source = SourceFile{.id = reader.source()}, .reader = reader, .ids = ids};
+  for (const SourceRange bounds : {SourceRange{}, reader.range(12, 0), reader.range(12, 2)}) {
+    ScanResultBuilder out(input, "RangeProbe");
+    auto sequence = out.sequence("Sequence", bounds);
+    auto header = out.sourceMap().header("Header", reader.range(10, 4)).owner(ObjectRefs::sequence(sequence.id()));
+    out.sourceMap().table("Track pointers", reader.range(2, 2)).parent(header.id());
+    out.sourceMap().header("Another sequence", reader.range(0, 32)).owner(ObjectRefs::sequence(AssetId{99}));
+    out.sourceMap().table("Foreign source", SourceRange{.source = SourceId{8}, .size = 32}).parent(header.id());
+    const SourceCommand command{.range = reader.range(20, 2)};
+    sequence.program(SequenceProgram{.tracks = {TrackProgram{.commands = {command}}}});
+    const ScanResult result = out.finish();
+    expect(metadata(result.assets.front()).range == (bounds.valid() ? bounds : reader.range(2, 20)),
+           "inferred sequence bounds should span owned metadata and commands, while explicit bounds stay exact");
+  }
+}
+
 void scanResultBuilderRejectsIncompleteSequenceDrafts() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "builder-uncommitted.probe"}, {0xaa});
@@ -338,6 +358,7 @@ void runValueRegistryTests() {
   sessionRegistersOneFormatModuleAtTheAuthoringSurface();
   scanResultBuilderCoversCommonScannerPlumbing();
   scanResultBuilderNamesSourceCollections();
+  scanResultBuilderInfersSequenceRangesUnlessExplicit();
   scanResultBuilderRejectsIncompleteSequenceDrafts();
   scanResultBuilderPublishesEmptySynthDrafts();
   scanResultBuilderCursorReportsMalformedFields();

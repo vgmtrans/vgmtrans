@@ -238,12 +238,15 @@ void layoutsAndHeadersAreVersioned() {
   expect(bl && bl->version == Version::BahamutLagoon && smr && smr->version == Version::SuperMarioRpg,
          "the FC operand length should distinguish SMR from the otherwise shared Bahamut Lagoon driver");
 
-  const SequenceParse sd3Sequence = decodeSequence(ByteReader(SourceId{125}, sd3Fixture()), *sd3, AssetId{125});
-  const SequenceParse blSequence = decodeSequence(ByteReader(SourceId{126}, laterFixture(false)), *bl, AssetId{126});
-  expect(sd3Sequence.program.tracks.size() == 1 && sd3Sequence.headerRange.size == 22 &&
+  SourceMapBuilder sd3Sources, blSources;
+  const SequenceParse sd3Sequence =
+      decodeSequence(ByteReader(SourceId{125}, sd3Fixture()), *sd3, AssetId{125}, &sd3Sources);
+  const SequenceParse blSequence =
+      decodeSequence(ByteReader(SourceId{126}, laterFixture(false)), *bl, AssetId{126}, &blSources);
+  expect(sd3Sequence.program.tracks.size() == 1 && sd3Sources.finish().annotations().front().range.size == 22 &&
              sd3Sequence.recipes.drums.size() == 1 && sd3Sequence.recipes.drums.front().sourceProgram == 0,
          "SD3 should decode pointers before its sequence-owned drum recipe");
-  expect(blSequence.program.tracks.size() == 1 && blSequence.headerRange.size == 22 &&
+  expect(blSequence.program.tracks.size() == 1 && blSources.finish().annotations().front().range.size == 22 &&
              blSequence.recipes.drums.size() == 1 && blSequence.program.tracks.front().startAddress.value == 0x3000,
          "later drivers should decode the same immutable recipe before their track pointers");
 }

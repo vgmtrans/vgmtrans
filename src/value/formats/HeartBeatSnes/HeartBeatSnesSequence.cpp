@@ -791,7 +791,6 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
   return SequenceParse{
       .program = std::move(program),
       .programs = std::move(programs),
-      .headerRange = header,
   };
 }
 

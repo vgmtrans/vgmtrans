@@ -53,15 +53,11 @@ struct Layout {
   EchoState echo;
 };
 
-struct SequenceParse {
-  core::SequenceProgram program;
-  core::SourceRange headerRange;
-};
-
 [[nodiscard]] std::optional<Layout> findLayout(core::ByteReader reader);
-[[nodiscard]] SequenceParse decodeSequence(core::RetainedSource source, const Layout& layout, core::AssetId sequenceId,
-                                           core::SourceMapBuilder* sourceMap = nullptr,
-                                           std::vector<core::Diagnostic>* diagnostics = nullptr);
+[[nodiscard]] core::SequenceProgram decodeSequence(core::RetainedSource source, const Layout& layout,
+                                                   core::AssetId sequenceId,
+                                                   core::SourceMapBuilder* sourceMap = nullptr,
+                                                   std::vector<core::Diagnostic>* diagnostics = nullptr);
 [[nodiscard]] const core::SequenceProgramConfig& sequenceConfig();
 [[nodiscard]] std::optional<core::ScanSoundBankDraft> addSynth(core::ScanResultBuilder& builder, const Layout& layout,
                                                                std::string_view displayName);

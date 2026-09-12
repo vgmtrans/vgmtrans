@@ -97,6 +97,8 @@ void sequenceSourceRangeIncludesDecodedCommandsFromTheBaseSource() {
 
   expect(sequenceSourceRange(reader, baseRange, program) == reader.range(4, 19),
          "sequence source range should span its base range and same-source decoded commands only");
+  expect(sequenceSourceRange(reader, {}, program) == reader.range(4, 19),
+         "a headerless sequence should infer its range from commands in the input source");
 }
 
 void sequenceValidationProtectsPositionalCommandStorage() {

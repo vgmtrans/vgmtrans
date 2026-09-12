@@ -919,7 +919,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
                                           : source.playlistAddress);
   }
   SequenceProgram program = sequence.finish(sequenceRuntime(reader, layout));
-  return SequenceParse{.program = std::move(program), .references = std::move(references), .headerRange = header};
+  return SequenceParse{.program = std::move(program), .references = std::move(references)};
 }
 
 }  // namespace vgmtrans::formats::neverland_snes
