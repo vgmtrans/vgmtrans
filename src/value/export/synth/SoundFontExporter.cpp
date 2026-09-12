@@ -108,7 +108,7 @@ struct SfLayout {
   if ((payload.size() & 1) != 0) {
     payload.push_back(0);
   }
-  return makeChunk(std::move(id), std::move(payload));
+  return Chunk{std::move(id), std::move(payload)};
 }
 
 [[nodiscard]] std::string_view sf2Name(std::string_view name, std::string_view fallback) {
@@ -351,7 +351,7 @@ struct SfLayout {
   writeLe16(ifil, 1);
 
   return {
-      makeChunk("ifil", std::move(ifil)),
+      Chunk{"ifil", std::move(ifil)},
       makeStringChunk("isng", "VGMTrans"),
       makeStringChunk("INAM", name),
       makeStringChunk("ISFT", "VGMTrans value core"),
@@ -368,7 +368,7 @@ struct SfLayout {
       writeLeS16(payload, 0);
     }
   }
-  return makeChunk("smpl", std::move(payload));
+  return Chunk{"smpl", std::move(payload)};
 }
 
 void writeRangeGen(std::vector<u8>& bytes, u16 generator, u8 low, u8 high) {
@@ -436,8 +436,8 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
   writeIndex(bags, generators.size() / 4);
   writeLe16(bags, 0);
   writeWordGen(generators, 0, 0);
-  return {makeChunk("phdr", std::move(headers)), makeChunk("pbag", std::move(bags)),
-          makeChunk("pmod", std::vector<u8>(10)), makeChunk("pgen", std::move(generators))};
+  return {Chunk{"phdr", std::move(headers)}, Chunk{"pbag", std::move(bags)}, Chunk{"pmod", std::vector<u8>(10)},
+          Chunk{"pgen", std::move(generators)}};
 }
 
 [[nodiscard]] std::array<Chunk, 4> instrumentChunks(std::span<const ResolvedSynthInstrument* const> instruments,
@@ -507,8 +507,8 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
   writeBag(generators.size(), modulators.size());
   modulators.insert(modulators.end(), 10, 0);
   writeWordGen(generators, 0, 0);
-  return {makeChunk("inst", std::move(headers)), makeChunk("ibag", std::move(bags)),
-          makeChunk("imod", std::move(modulators)), makeChunk("igen", std::move(generators))};
+  return {Chunk{"inst", std::move(headers)}, Chunk{"ibag", std::move(bags)}, Chunk{"imod", std::move(modulators)},
+          Chunk{"igen", std::move(generators)}};
 }
 
 [[nodiscard]] std::vector<SfSampleHeaderInfo> sampleHeaderInfo(
@@ -573,7 +573,7 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
   writeU8(payload, 0);
   writeLe16(payload, 0);
   writeLe16(payload, 1);
-  return makeChunk("shdr", std::move(payload));
+  return Chunk{"shdr", std::move(payload)};
 }
 
 [[nodiscard]] std::vector<Chunk> pdtaChunks(const SfLayout& layout, std::span<const DecodedSynthSample> samples) {

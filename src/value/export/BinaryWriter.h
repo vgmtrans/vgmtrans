@@ -27,11 +27,10 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text, size_t widt
 
 struct RiffChunk {
   std::string id;
-  u32 size = 0;
+  // Logical payload only; serialization adds any RIFF alignment byte.
   std::vector<u8> payload;
 };
 
-[[nodiscard]] RiffChunk makeChunk(std::string id, std::vector<u8> payload);
 [[nodiscard]] RiffChunk makeListChunk(std::string type, std::vector<RiffChunk> children);
 void appendChunk(std::vector<u8>& bytes, const RiffChunk& chunk);
 [[nodiscard]] u32 chunkStorageSize(const RiffChunk& chunk);
