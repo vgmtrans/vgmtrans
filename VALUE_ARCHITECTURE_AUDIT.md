@@ -1471,6 +1471,17 @@ This removes eight production lines. Existing selection and allocation fixtures
 cover both fixes with four net added test lines; the note-selection case fails
 before the change. The full build is warning-free and all 20 CTest targets pass.
 
+### Use the performance track's source identity in MoriSnes
+
+MoriSnes now looks up voice limits using PerformanceTrack::sourceTrackNumber,
+which SequenceVM already preserves. Remove the duplicate source-to-output track
+map, its construction pass, and the reverse search during finalization. The
+shared state constructor now only accepts the driver configuration it needs.
+
+This removes 11 production lines. Existing voice ownership, stealing, gating,
+and release-clock coverage passes. The full build is warning-free and all 20
+CTest targets pass; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
