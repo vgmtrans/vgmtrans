@@ -1340,6 +1340,17 @@ three level resolutions, missing and replacement performances, zero and fraction
 amounts, and repeated encoding. The full build is warning-free and all 20 CTest
 targets pass; no test code is added.
 
+### Use existing settings types for read-only program state
+
+SonyPS1 and SonyPS2 now pass their existing RuntimeConfig types directly to the
+compiled runtime adapter. Remove the two ProgramState structs and constructors
+that only copied those same fields. Playback borrows a const settings reference;
+the adapter's ordinary copy-construction path preserves per-render ownership.
+
+This removes 12 production lines and two redundant types without changing the
+runtime API, initialization timing, program lookup, or collection binding. The
+full build is warning-free and all 20 CTest targets pass; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
