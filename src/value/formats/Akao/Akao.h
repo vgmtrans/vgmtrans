@@ -32,23 +32,6 @@ inline constexpr std::string_view kAkaoCollectionResolver = "Akao";
   return {.domain = "akao-melodic-table", .key = offset};
 }
 
-struct AkaoSampleCoverageProvider {
-  std::size_t index = 0;
-  std::optional<u32> sampleSetId;
-  u32 first = 0;
-  u32 count = 0;
-};
-
-struct AkaoSampleCoverageSelection {
-  std::vector<std::size_t> providers;
-  std::vector<u32> missing;
-  bool requestedSampleSetFound = false;
-};
-
-[[nodiscard]] AkaoSampleCoverageSelection selectAkaoSampleCoverage(
-    std::optional<u32> requestedSampleSetId, const std::vector<u32>& required,
-    const std::vector<AkaoSampleCoverageProvider>& providers);
-
 inline constexpr u32 kAkaoSignature = 0x414B414F;
 inline constexpr u32 kAkaoPpqn = 0x30;
 inline constexpr u32 kAkaoMaxTrackCommands = 262144;
@@ -181,23 +164,16 @@ struct AkaoArticulation {
   std::optional<core::Loop> loop;
   u16 adsr1 = 0;
   u16 adsr2 = 0;
-  u32 sampleIndex = 0;
+  core::SampleRef sample;
 };
 
 struct AkaoSamplePoolData {
   std::optional<u16> sampleSetId;
   u32 firstArticulationId = 0;
-  u32 articulationCount = 0;
   std::vector<AkaoArticulation> articulations;
 };
 
-struct AkaoArticulationBinding {
-  core::AssetId samplePool;
-  u32 sampleIndex = 0;
-  AkaoArticulation articulation;
-};
-
-using AkaoArticulationMap = std::map<u32, AkaoArticulationBinding>;
+using AkaoArticulationMap = std::map<u32, AkaoArticulation>;
 
 // A few early games keep the sample header and articulation table in separate
 // fixed locations instead of placing them together in an AKAO block.

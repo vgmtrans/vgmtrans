@@ -1816,9 +1816,31 @@ existence of samples already admitted by their pool builder. Square still
 requires an enabled, nonempty loop; Suzuki still treats zero as no override.
 
 This removes seven production lines and substantially shortens the three
-format branches. Four assertions lines extend existing fixtures to cover an
+format branches. Four lines of assertions extend existing fixtures to cover an
 unaligned offset, the stream boundary, and a disabled loop. The full build
 is warning-free and all 20 CTest targets pass.
+
+## Resolve Akao articulations once and select playable coverage
+
+An articulation whose PSX stream failed inspection retained a default sample
+index of zero. It could consequently link to the first valid sample and
+falsely satisfy collection coverage. Each articulation now retains its actual
+`SampleRef`, empty when no usable stream exists. Source links, collection
+selection, and instrument binding all use that same reference.
+
+The resolver selects sample-pool entries directly, removing the coverage
+provider and selection projections, the separate articulation-binding type,
+and the redundant retained articulation count. Coverage comes from playable
+articulations, so another pool can fill a rejected sample's gap; unresolved
+gaps remain diagnostic. Preferred sample sets, local-source priority, PSF
+isolation, and source-table binding order retain their existing policies.
+
+This removes 85 production lines. Consolidated collection-selection tests
+exercise real resolver inputs for local preference, fallback, and missing
+coverage. The existing scan/bind/export fixture now includes an incomplete
+stream and checks that it has no sample link; that assertion failed before
+the fix. Test code grows by 14 lines overall. The full build is warning-free
+and all 20 CTest targets pass.
 
 ## Further investigation
 

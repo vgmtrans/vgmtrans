@@ -42,7 +42,6 @@ struct ParsedSample {
 };
 
 struct ParsedSamplePool {
-  AssetId asset;
   std::vector<AkaoArticulation> articulations;
   std::vector<ParsedSample> samples;
   std::string name;
@@ -287,9 +286,8 @@ struct ParsedSamplePool {
   // supply information the sample stream omitted.
   for (auto& articulation : articulations) {
     if (auto found = sampleIndexByOffset.find(articulation.sampleOffset); found != sampleIndexByOffset.end()) {
-      articulation.sampleIndex = found->second;
-      const u32 encodedLength = static_cast<u32>(samples[articulation.sampleIndex].value.encodedData.size);
-      Loop& sampleLoop = samples[articulation.sampleIndex].value.loop;
+      const u32 encodedLength = static_cast<u32>(samples[found->second].value.encodedData.size);
+      Loop& sampleLoop = samples[found->second].value.loop;
       if (sampleLoop.enabled && sampleLoop.start == 0 && sampleLoop.length == 0) {
         const u32 loopStart =
             articulation.loopPoint < encodedLength ? psxAdpcmDecodedOffset(articulation.loopPoint) : 0;
@@ -322,7 +320,6 @@ struct ParsedSamplePool {
 void emitSamplePool(const ScanInput& input, ScanResultBuilder& result, ParsedSamplePool& parsed) {
   auto pool = result.samplePool(parsed.name, parsed.range);
   auto& samples = pool.samples();
-  parsed.asset = pool.id();
   const SourceAnnotationId root =
       samples.source(SourceRole::SamplePool, parsed.name, parsed.range, "akao-sample-collection").id();
   for (auto& parsedSample : parsed.samples) {
@@ -344,7 +341,8 @@ void emitSamplePool(const ScanInput& input, ScanResultBuilder& result, ParsedSam
                                                    .derived("first_articulation_id", parsed.table.firstArticulationId)
                                                    .derived("articulation_count", parsed.table.articulationCount)
                                                    .id();
-  for (const AkaoArticulation& articulation : parsed.articulations) {
+  for (AkaoArticulation& articulation : parsed.articulations) {
+    articulation.sample = samples.find(articulation.sampleOffset).value_or(SampleRef::none());
     auto annotation = result.sourceMap()
                           .annotation(SourceRole::TableEntry,
                                       fmt::format("Articulation {}", articulation.articulationId), articulation.source)
@@ -357,15 +355,14 @@ void emitSamplePool(const ScanInput& input, ScanResultBuilder& result, ParsedSam
                           .derived("loop_point", articulation.loopPoint, SourceValueDisplay::Address)
                           .derived("effective_adsr1", articulation.adsr1, SourceValueDisplay::Hex)
                           .derived("effective_adsr2", articulation.adsr2, SourceValueDisplay::Hex);
-    if (articulation.sampleIndex < parsed.samples.size()) {
+    if (articulation.sample.valid()) {
       annotation.link(SourceLinkRole::UsesSample,
-                      SourceTarget{ObjectRefs::sample(parsed.asset, articulation.sampleIndex)});
+                      SourceTarget{ObjectRefs::sample(articulation.sample.owner(), articulation.sample.index())});
     }
   }
   pool.data(AkaoSamplePoolData{
       .sampleSetId = parsed.table.sampleSetId,
       .firstArticulationId = parsed.table.firstArticulationId,
-      .articulationCount = parsed.table.articulationCount,
       .articulations = std::move(parsed.articulations),
   });
 }
