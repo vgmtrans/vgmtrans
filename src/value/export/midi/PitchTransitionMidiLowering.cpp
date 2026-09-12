@@ -112,9 +112,7 @@ struct PitchBendLayer {
 };
 
 [[nodiscard]] u64 noteEnd(const NotePerformanceEvent& note) {
-  return note.header.tick > std::numeric_limits<u64>::max() - note.durationTicks
-             ? std::numeric_limits<u64>::max()
-             : note.header.tick + note.durationTicks;
+  return addTicks(note.header.tick, note.durationTicks);
 }
 
 [[nodiscard]] NoteSpan* findNote(std::vector<NoteSpan>& notes, PerformanceNoteId id) {
@@ -400,9 +398,7 @@ void addWarning(PerformanceSequence& performance, const PerformanceAutomation& a
     std::vector<u64> sampleTicks{startTick, endTick};
     sampleTicks.reserve(sampled->samples.size() + note.portamentoSegments.size() + 2);
     for (const AutomationSample& sample : sampled->samples) {
-      const u64 tick = automation.realization.startTick > std::numeric_limits<u64>::max() - sample.tickOffset
-                           ? std::numeric_limits<u64>::max()
-                           : automation.realization.startTick + sample.tickOffset;
+      const u64 tick = addTicks(automation.realization.startTick, sample.tickOffset);
       if (tick >= startTick && tick <= endTick) {
         sampleTicks.push_back(tick);
       }
@@ -562,9 +558,7 @@ void splitForPortamento(NoteSpan& note, const PerformanceAutomation& automation,
     }
     if (segment.endTick > clampedStart) {
       const u32 overlap = transition.portamentoRendering.overlapTicks;
-      segment.endTick = std::min(note.endTick, clampedStart > std::numeric_limits<u64>::max() - overlap
-                                                   ? std::numeric_limits<u64>::max()
-                                                   : clampedStart + overlap);
+      segment.endTick = std::min(note.endTick, addTicks(clampedStart, overlap));
       if (!sourceEstablishesStart) {
         segment.key = transition.startKey;
         segment.bendBaseKey = transition.startKey;
@@ -641,8 +635,7 @@ void lowerPortamento(PerformanceSequence& performance, std::vector<PerformanceEv
       beginPortamentoRewrite(*previous);
       auto& segment = previous->portamentoSegments.back();
       const u32 overlap = transition.portamentoRendering.overlapTicks;
-      const u64 overlapEnd = startTick > std::numeric_limits<u64>::max() - overlap ? std::numeric_limits<u64>::max()
-                                                                                   : startTick + overlap;
+      const u64 overlapEnd = addTicks(startTick, overlap);
       segment.endTick = std::max(segment.endTick, overlapEnd);
     }
     splitForPortamento(*note, *automation, transition, sourceBend.has_value());

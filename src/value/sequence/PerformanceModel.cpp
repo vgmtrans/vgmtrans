@@ -80,8 +80,7 @@ double PerformanceTempoMap::durationMilliseconds(u64 startTick, u32 durationTick
     return 0.0;
   }
 
-  const u64 endTick = startTick > std::numeric_limits<u64>::max() - durationTicks ? std::numeric_limits<u64>::max()
-                                                                                  : startTick + durationTicks;
+  const u64 endTick = addTicks(startTick, durationTicks);
   const double ppqn = std::max<u32>(timebase_.ppqn, 1);
   u32 tempo = microsecondsPerQuarterAt(startTick);
   u64 cursor = startTick;

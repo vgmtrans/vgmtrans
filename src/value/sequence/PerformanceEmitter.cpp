@@ -18,10 +18,6 @@ namespace vgmtrans::core {
 
 namespace {
 
-[[nodiscard]] u64 addTicks(u64 tick, u32 ticks) {
-  return tick > std::numeric_limits<u64>::max() - ticks ? std::numeric_limits<u64>::max() : tick + ticks;
-}
-
 void reviseNoteEnd(NotePerformanceEvent& note, u64 endTick) {
   const u64 duration = endTick > note.header.tick ? endTick - note.header.tick : 0;
   note.durationTicks = static_cast<u32>(std::min<u64>(duration, std::numeric_limits<u32>::max()));

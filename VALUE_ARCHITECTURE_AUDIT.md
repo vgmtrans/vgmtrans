@@ -1718,6 +1718,21 @@ linear gain directly, retaining overflow/underflow coverage with greater
 precision and no additional fixture or helper. The full build is warning-free
 and all 20 CTest targets pass.
 
+## Share saturating timeline arithmetic
+
+Promote the emitter's existing `addTicks()` operation to a constexpr performance
+utility and reuse it wherever the VM, tempo map, MIDI lowering, instrument
+variants, stitching, MP2k, and SegSat already clamp tick addition. Remove the
+VM's separate timing wrapper and the copied overflow branches. Both arguments
+accept full-width ticks, so this also covers source-span durations without
+narrowing. Explicit overflow rejection during collection retiming remains a
+different policy and is unchanged.
+
+This removes 22 production lines and keeps one clamping rule shared by notes,
+waits, fades, sampled pitch, and portamento overlap. No new test scaffolding is
+needed for this extraction. The full 175-step build is warning-free and all 20
+CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
