@@ -348,6 +348,17 @@ private:
   const SourceCommand& command_;
 };
 
+// Borrowed context for a format's Playback methods. SequenceVm supplies the
+// current emitter and VM position each time it invokes a command or tick.
+template <class TrackStateType>
+struct SequencePlayback {
+  using TrackState = TrackStateType;
+
+  TrackState& track;
+  PerformanceEmitter& out;
+  VmApi& vm;
+};
+
 struct SequenceVmOptions {
   LoopPolicy loopPolicy = LoopPolicy::Default;
   // Extra runtime loop repeats after the first pass through an infinite loop.

@@ -14,7 +14,7 @@
 #include "value/base/LevelScale.h"
 #include "value/export/midi/MidiExporter.h"
 #include "value/export/midi/ModulationAnalysis.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceProgramConfig.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/session/Session.h"
@@ -678,11 +678,7 @@ struct ProbeEndCommand {
   static constexpr std::string_view name = "End";
 };
 
-struct ProbePlayback {
-  ProbeTrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
-
+struct ProbePlayback : SequencePlayback<ProbeTrackState> {
   void programChange(u8 program) {
     track.program = program;
     out.instrument(0, program);
@@ -702,7 +698,7 @@ struct ProbePlayback {
   }
 };
 
-using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
+using ProbeCompilerCursor = CompilerCursor<ProbePlayback>;
 
 [[nodiscard]] DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin) {
   ProbeCompilerCursor cursor(reader, begin, "probe");
@@ -778,7 +774,7 @@ using ProbeCompilerCursor = CompilerCursor<ProbeTrackState, ProbePlayback>;
 }
 
 [[nodiscard]] SequenceRuntime probeSequenceRuntime() {
-  return makeCompiledRuntime<ProbeCompilerCursor>();
+  return makeCompiledRuntime<ProbePlayback>();
 }
 
 [[nodiscard]] SequenceProgram probeSequenceProgram() {

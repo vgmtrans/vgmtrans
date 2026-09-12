@@ -10,7 +10,7 @@
 
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 
 #include <algorithm>
 #include <array>
@@ -100,10 +100,7 @@ struct TrackState {
   return (2.0 * y + 1.0) / 255.0;
 }
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& programState;
 
   [[nodiscard]] Mp2kTone noteTone(u8 key) const {
@@ -539,7 +536,7 @@ struct Playback {
   }
 };
 
-using Mp2kCursor = CompilerCursor<TrackState, Playback>;
+using Mp2kCursor = CompilerCursor<Playback>;
 
 struct DecodeState {
   u8 runningStatus = 0xcf;
@@ -819,7 +816,7 @@ SequenceProgram parseMp2kSequenceProgram(RetainedSource source, AssetId id, cons
       .tones = std::vector<Mp2kTone>(tones.begin(), tones.end()),
       .reverbSend = song.reverb / 127.0,
   };
-  program.runtime = makeCompiledRuntime<Mp2kCursor, ProgramState>(std::move(runtime));
+  program.runtime = makeCompiledRuntime<Playback, ProgramState>(std::move(runtime));
 
   std::optional<SourceAnnotationId> header;
   if (sourceMap && reader.has(song.offset, headerSize)) {

@@ -7,7 +7,7 @@
 #include "ValueTestSupport.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 
 namespace {
 
@@ -27,10 +27,7 @@ struct CompilerPrepassProgramState : CompilerProbeProgramState {
   void finishPrepass() { ++completedPrepasses; }
 };
 
-struct CompilerProbePlayback {
-  CompilerProbeState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct CompilerProbePlayback : SequencePlayback<CompilerProbeState> {
   CompilerProbeProgramState& program;
 
   void beforeCommand() { ++program.executedCommands; }
@@ -49,7 +46,7 @@ struct CompilerProbePlayback {
   void enabledExpression(bool enabled) { out.expression(enabled ? 0.75 : 0.25); }
 };
 
-using ProbeCursor = CompilerCursor<CompilerProbeState, CompilerProbePlayback>;
+using ProbeCursor = CompilerCursor<CompilerProbePlayback>;
 
 DecodedBytecodeCommand decodeProbeCommand(ByteReader reader, u32 begin, u32 end,
                                           std::vector<Diagnostic>* diagnostics = nullptr) {
@@ -230,7 +227,7 @@ SequenceProgramConfig compilerProbeConfig() {
 }
 
 SequenceRuntime compilerProbeRuntime() {
-  return makeCompiledRuntime<ProbeCursor, CompilerProbeProgramState>();
+  return makeCompiledRuntime<CompilerProbePlayback, CompilerProbeProgramState>();
 }
 
 bool hasLinkRole(const SourceAnnotation& annotation, SourceLinkRole role) {
@@ -596,7 +593,7 @@ void compilerCursorAnalysisStopsAfterItsScheduledPrepass() {
   const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{15}, bytes), static_cast<u32>(bytes.size()));
   const SequenceProgramConfig config = compilerProbeConfig();
   SequenceProgram program{
-      .runtime = makeCompiledRuntime<ProbeCursor, CompilerPrepassProgramState>(),
+      .runtime = makeCompiledRuntime<CompilerProbePlayback, CompilerPrepassProgramState>(),
       .timebase = config.timebase,
       .behavior = config.behavior,
       .tracks = {track},
@@ -618,7 +615,7 @@ void compilerCursorAnalysisReportsPrepassDiagnostics() {
   const TrackProgram track = decodeProbeTrack(ByteReader(SourceId{16}, bytes), static_cast<u32>(bytes.size()));
   const SequenceProgramConfig config = compilerProbeConfig();
   const SequenceProgram program{
-      .runtime = makeCompiledRuntime<ProbeCursor, CompilerPrepassProgramState>(),
+      .runtime = makeCompiledRuntime<CompilerProbePlayback, CompilerPrepassProgramState>(),
       .timebase = config.timebase,
       .behavior = config.behavior,
       .tracks = {track},

@@ -9,7 +9,7 @@
 
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
@@ -826,10 +826,7 @@ struct TrackState {
   SequenceLfoDepthFadeState vibratoDepth;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   [[nodiscard]] u8 soundingDuration() const {
@@ -1571,7 +1568,7 @@ struct Playback {
   std::span<const u8> panTable = math::kPan;
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 struct DecodeContext {
   ByteReader reader;
@@ -2411,7 +2408,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     }
     program.tracks.push_back(decodeTrack(reader, track, starts, context, sequenceId, playlist.annotation, sourceMap));
   }
-  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime));
+  program.runtime = makeCompiledRuntime<Playback, ProgramState>(std::move(runtime));
 
   SequenceRecipes recipes = analyzeCompiledProgram<ProgramState>(program, &ProgramState::recipes, diagnostics);
   return SequenceParse{

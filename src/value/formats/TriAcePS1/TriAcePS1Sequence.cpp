@@ -8,7 +8,7 @@
 
 #include "value/base/LevelScale.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/PsxSpu.h"
 
@@ -269,10 +269,7 @@ struct TrackState {
   std::vector<ActiveVoice> activeVoices;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   void beforeCommand() {
@@ -549,7 +546,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end,
                                                    const TriAcePs1TrackLayout& layout, const TrackAnalysis& analysis,
@@ -797,7 +794,7 @@ SequenceProgram parseTriAcePs1Sequence(ByteReader reader, AssetId id, const TriA
   for (const auto& layoutTrack : layout.tracks) {
     sequence.addTrack(decodeTrack(sequence.trackScope(), layout, layoutTrack, diagnostics));
   }
-  return sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(layout));
+  return sequence.finish(makeCompiledRuntime<Playback, ProgramState>(layout));
 }
 
 }  // namespace vgmtrans::formats::triace_ps1

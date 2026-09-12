@@ -8,7 +8,7 @@
 
 #include "value/formats/SonyPS1/SonyPS1.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/PsxSpu.h"
 #include "value/synth/SynthMath.h"
@@ -164,10 +164,7 @@ struct TrackState {
   LfoState tremolo;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& programState;
 
   void beforeCommand() {
@@ -579,7 +576,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 struct ControllerInfo {
   std::string_view label;
@@ -765,7 +762,7 @@ SequenceProgram parseKonamiPs1Sequence(ByteReader reader, AssetId id, const Sequ
   SequenceProgram program = konamiPs1SequenceConfig().makeProgram();
   program.timebase.ppqn = layout.ppqn;
   program.behavior.initialTempoMicrosecondsPerQuarter = timing.tempoMicroseconds(kInitialTempoStep);
-  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{
+  program.runtime = makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{
       .timing = timing,
       .tones = std::move(tones),
   });

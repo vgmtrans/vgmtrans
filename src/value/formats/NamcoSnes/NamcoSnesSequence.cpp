@@ -7,7 +7,7 @@
 #include "value/formats/NamcoSnes/NamcoSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 
 #include <algorithm>
 #include <array>
@@ -224,10 +224,7 @@ struct TrackState {
   std::optional<double> pitchBend;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   [[nodiscard]] ByteReader reader() const { return program.data.source.reader(); }
@@ -664,7 +661,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 template <class Event>
 [[nodiscard]] MaskedValues maskedValues(Event& event, std::string_view valueName,
@@ -852,7 +849,7 @@ SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetI
   program.tracks.push_back(tracks.decode(
       0, layout.sequenceAddress,
       [&](u32 offset) { return decodeCommand(reader, offset, diagnostics, references); }));
-  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(DriverData{std::move(source), layout});
+  program.runtime = makeCompiledRuntime<Playback, ProgramState>(DriverData{std::move(source), layout});
   const TrackProgram stream = program.tracks.front();
   for (u32 voice = 1; voice < kTrackCount; ++voice) {
     TrackProgram copy = stream;

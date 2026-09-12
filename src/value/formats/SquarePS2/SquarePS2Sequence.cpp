@@ -7,7 +7,7 @@
 #include "value/formats/SquarePS2/SquarePS2.h"
 
 #include "value/base/LevelScale.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/PsxSpu.h"
 
@@ -235,11 +235,7 @@ constexpr std::array kAdsrParameters{
     AdsrParameter{"Release Mode", &TrackState::adsr2, 0x0020, 3},
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
-
+struct Playback : SequencePlayback<TrackState> {
   void noteOn(u8 key, u8 velocity) {
     const bool glides =
         track.portamento && track.previousPitchKey && track.portamentoTicks != 0 && *track.previousPitchKey != key;
@@ -411,7 +407,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] Cursor::Event beginEvent(Cursor& cursor, const EventPrefix& source, std::string_view label,
                                        SequenceSemantic semantic,
@@ -910,7 +906,7 @@ const SequenceProgramConfig& sequenceConfig() {
 }
 
 SequenceRuntime sequenceRuntime(RuntimeConfig config) {
-  return makeCompiledRuntime<Cursor>(std::move(config));
+  return makeCompiledRuntime<Playback>(std::move(config));
 }
 
 SequenceProgram parseBgm(ByteReader reader, AssetId id, const BgmLayout& layout, SourceMapBuilder* sourceMap,

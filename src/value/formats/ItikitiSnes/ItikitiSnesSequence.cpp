@@ -7,7 +7,7 @@
 #include "value/formats/ItikitiSnes/ItikitiSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
 
@@ -193,10 +193,7 @@ struct TrackState {
   u8 alternativeCounter = 0;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   void emitLevel(PerformanceEmitter output) const {
@@ -577,7 +574,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] Address relativeTarget(u32 base, u16 relative) {
   return Address{static_cast<u16>(base + relative)};
@@ -839,7 +836,7 @@ const SequenceProgramConfig& sequenceConfig() {
 }
 
 SequenceRuntime sequenceRuntime(u8 echoDelay) {
-  return makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{.echoDelay = echoDelay});
+  return makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{.echoDelay = echoDelay});
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, u32 trackNumber, u32 startAddress, u32 sequenceBase, u8 groupIndex,

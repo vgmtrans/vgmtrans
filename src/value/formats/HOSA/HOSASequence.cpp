@@ -9,7 +9,7 @@
 #include "value/formats/HOSA/HOSALfo.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/PsxSpu.h"
 
@@ -163,9 +163,12 @@ struct TrackHandle {
   u32 index = 0;
 };
 
-struct Playback {
-  Playback(TrackHandle& handle, PerformanceEmitter& output, VmApi& api, ProgramState& state)
-      : track(state.tracks.at(handle.index)), out(output), vm(api), program(state) {}
+struct Playback : SequencePlayback<PlaybackTrack> {
+  // The VM stores a handle; the program owns the mutable playback tracks.
+  using TrackState = TrackHandle;
+
+  Playback(SequencePlayback<TrackHandle> context, ProgramState& state)
+      : SequencePlayback{state.tracks.at(context.track.index), context.out, context.vm}, program(state) {}
 
   void emitLevel() { out.level(track.volume / 127.0, ValueQuantization{.levels = 128}); }
   void emitExpression() { out.expression(track.expression / 127.0, ValueQuantization{.levels = 128}); }
@@ -334,13 +337,10 @@ struct Playback {
   void saveLoop() { program.saveLoop(); }
   void restoreLoop() { program.restoreLoop(vm.tick(), out); }
 
-  PlaybackTrack& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
   ProgramState& program;
 };
 
-using Cursor = CompilerCursor<TrackHandle, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end,
                                                    const RuntimeConfig& config,
@@ -573,7 +573,7 @@ SequenceProgram parseSequence(ByteReader reader, AssetId id, const SequenceLayou
     track.sourceTrackNumber = i;
     sequence.tracks.push_back(std::move(track));
   }
-  sequence.runtime = makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime));
+  sequence.runtime = makeCompiledRuntime<Playback, ProgramState>(std::move(runtime));
   return sequence;
 }
 

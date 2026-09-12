@@ -8,7 +8,7 @@
 
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/SnesDsp.h"
 
@@ -186,10 +186,7 @@ struct TrackState {
 
 // Stateful driver behavior lives here only when it cannot be expressed as an
 // obvious set/emit/VM operation in the command switch below.
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   // Applies the packed note flags and emits a pedal change when slur mode changes.
@@ -336,7 +333,7 @@ private:
   }
 };
 
-using CapcomCursor = CompilerCursor<TrackState, Playback>;
+using CapcomCursor = CompilerCursor<Playback>;
 
 // One source opcode is read and compiled in one local block. Simple commands
 // show their complete behavior inline; only history-dependent driver behavior
@@ -562,7 +559,7 @@ const SequenceProgramConfig& capcomSnesSequenceConfig() {
 }
 
 SequenceRuntime capcomSnesSequenceRuntime(CapcomSnesEngineVersion version) {
-  return makeCompiledRuntime<CapcomCursor, ProgramState>(RuntimeConfig{.version = version});
+  return makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{.version = version});
 }
 
 // Decodes one known track directly for focused tests and callers that already

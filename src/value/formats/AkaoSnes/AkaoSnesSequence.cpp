@@ -11,7 +11,7 @@
 #include "value/base/LevelScale.h"
 #include "value/sequence/BytecodeDecode.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceLfo.h"
 #include "value/sequence/SequenceMotion.h"
 #include "value/synth/SnesDsp.h"
@@ -1010,15 +1010,12 @@ struct TrackState {
 
 // Playback holds the history-dependent services shared by several commands or
 // substantial enough to name. Short one-off effects stay beside their opcode.
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
   const AkaoSnesProfile& context;
 
-  Playback(TrackState& track, PerformanceEmitter& out, VmApi& vm, ProgramState& program)
-      : track(track), out(out), vm(vm), program(program), context(program.profile) {}
+  Playback(SequencePlayback<TrackState> execution, ProgramState& program)
+      : SequencePlayback(execution), program(program), context(program.profile) {}
 
   [[nodiscard]] bool terminalPitchWaitBoundary() const {
     return track.pitchAutomationStopTick && vm.tick() == *track.pitchAutomationStopTick;
@@ -1554,7 +1551,7 @@ struct Playback {
   }
 };
 
-using AkaoSnesCursor = CompilerCursor<TrackState, Playback>;
+using AkaoSnesCursor = CompilerCursor<Playback>;
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, u32 end, AkaoSnesProfile profile,
                                                    u32 romRelocBase, u32 apuRelocBase,
@@ -2086,7 +2083,7 @@ const SequenceProgramConfig& akaoSnesSequenceConfig() {
 
 SequenceRuntime akaoSnesSequenceRuntime(AkaoSnesProfile profile,
                                         std::optional<AkaoSnesV1VolumeEnvelopes> v1VolumeEnvelopes) {
-  return makeCompiledRuntime<AkaoSnesCursor, ProgramState>(
+  return makeCompiledRuntime<Playback, ProgramState>(
       RuntimeConfig{.profile = profile, .v1VolumeEnvelopes = std::move(v1VolumeEnvelopes)});
 }
 
@@ -2152,8 +2149,7 @@ SequenceProgram parseAkaoSnesSequence(ByteReader reader, const AkaoSnesLayout& l
   if (layout.version == AKAOSNES_V1 && layout.volumeEnvelopeTableAddress) {
     runtime.v1VolumeEnvelopes = captureAkaoSnesV1VolumeEnvelopes(reader, *layout.volumeEnvelopeTableAddress);
   }
-  SequenceProgram program =
-      session.finish(makeCompiledRuntime<AkaoSnesCursor, ProgramState>(std::move(runtime)));
+  SequenceProgram program = session.finish(makeCompiledRuntime<Playback, ProgramState>(std::move(runtime)));
   program.behavior.initialTempoMicrosecondsPerQuarter =
       tempoMicrosecondsPerQuarter(profile.version, profile.minorVersion, kDefaultTempo);
 

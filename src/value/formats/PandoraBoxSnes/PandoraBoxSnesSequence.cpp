@@ -7,7 +7,7 @@
 #include "value/formats/PandoraBoxSnes/PandoraBoxSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceProgramConfig.h"
 #include "value/synth/SnesDsp.h"
 
@@ -169,10 +169,7 @@ struct TrackState {
   VibratoState vibrato;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   void beforeCommand() {
@@ -399,7 +396,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 begin, const Layout& layout,
                                                    const TrackLayout& trackLayout,
@@ -662,7 +659,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         reader.le16(pointer.offset));
   }
   return SequenceParse{
-      .program = sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(layout)),
+      .program = sequence.finish(makeCompiledRuntime<Playback, ProgramState>(layout)),
       .programs = std::move(programs),
   };
 }

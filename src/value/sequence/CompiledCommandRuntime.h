@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceVm.h"
 
 #include <any>
@@ -27,13 +26,15 @@ namespace detail {
 template <class Type>
 inline constexpr bool alwaysFalse = false;
 
-template <class Cursor, class ProgramState>
+template <class Playback, class ProgramState>
 inline constexpr unsigned char compiledRuntimeFamily = 0;
 
 }  // namespace detail
 
-template <class TrackState, class Playback, class ProgramState = EmptyCompiledProgramState>
+template <class Playback, class ProgramState = EmptyCompiledProgramState>
 struct CompiledCommandRuntime {
+  using TrackState = typename Playback::TrackState;
+
   [[nodiscard]] static std::any createProgramState(const SequenceProgram& program) {
     // A format can read immutable program settings in its constructor. Formats
     // that need no settings keep working with an ordinary default constructor.
@@ -92,13 +93,13 @@ struct CompiledCommandRuntime {
                                                    PerformanceEmitter& out, VmApi& vm, Execute execute) {
     auto& typedProgramState = std::any_cast<ProgramState&>(programState);
     auto& typedTrackState = std::any_cast<TrackState&>(trackState);
-    // Playback may ask for song-wide state as a fourth reference. Simpler
-    // formats continue to use the original three-reference form.
-    if constexpr (requires { Playback{typedTrackState, out, vm, typedProgramState}; }) {
-      Playback playback{typedTrackState, out, vm, typedProgramState};
+    const SequencePlayback<TrackState> context{typedTrackState, out, vm};
+    // Playback may also borrow song-wide state alongside its execution context.
+    if constexpr (requires { Playback{context, typedProgramState}; }) {
+      Playback playback{context, typedProgramState};
       return execute(playback);
-    } else if constexpr (requires { Playback{typedTrackState, out, vm}; }) {
-      Playback playback{typedTrackState, out, vm};
+    } else if constexpr (requires { Playback{context}; }) {
+      Playback playback{context};
       return execute(playback);
     } else {
       static_assert(detail::alwaysFalse<Playback>, "Playback has no supported construction path");
@@ -159,13 +160,11 @@ struct CompiledCommandRuntime {
 
 // Construct one complete erased runtime for a format whose state needs no
 // program-specific immutable configuration.
-template <class Cursor, class ProgramState = EmptyCompiledProgramState>
+template <class Playback, class ProgramState = EmptyCompiledProgramState>
 [[nodiscard]] SequenceRuntime makeCompiledRuntime() {
-  using TrackState = typename Cursor::TrackState;
-  using Playback = typename Cursor::Playback;
-  using Compiled = CompiledCommandRuntime<TrackState, Playback, ProgramState>;
+  using Compiled = CompiledCommandRuntime<Playback, ProgramState>;
   SequenceRuntime runtime;
-  runtime.family = &detail::compiledRuntimeFamily<Cursor, ProgramState>;
+  runtime.family = &detail::compiledRuntimeFamily<Playback, ProgramState>;
   runtime.createProgramState = [](const SequenceProgram& program) { return Compiled::createProgramState(program); };
   runtime.createTrackState = [](const SequenceProgram& program, const TrackProgram& track) {
     return Compiled::createTrackState(program, track);
@@ -176,11 +175,10 @@ template <class Cursor, class ProgramState = EmptyCompiledProgramState>
 
 // Construct one complete erased runtime whose state factories close over
 // immutable typed format settings.
-template <class Cursor, class ProgramState = EmptyCompiledProgramState, class Config>
+template <class Playback, class ProgramState = EmptyCompiledProgramState, class Config>
 [[nodiscard]] SequenceRuntime makeCompiledRuntime(Config config) {
-  using TrackState = typename Cursor::TrackState;
-  using Playback = typename Cursor::Playback;
-  using Compiled = CompiledCommandRuntime<TrackState, Playback, ProgramState>;
+  using Compiled = CompiledCommandRuntime<Playback, ProgramState>;
+  using TrackState = typename Playback::TrackState;
   constexpr bool programConsumesConfig = std::constructible_from<ProgramState, const SequenceProgram&, const Config&> ||
                                          std::constructible_from<ProgramState, const Config&>;
   constexpr bool trackConsumesConfig =
@@ -190,7 +188,7 @@ template <class Cursor, class ProgramState = EmptyCompiledProgramState, class Co
   static_assert(programConsumesConfig || trackConsumesConfig,
                 "A supplied runtime Config must be consumed by ProgramState or TrackState");
   SequenceRuntime runtime;
-  runtime.family = &detail::compiledRuntimeFamily<Cursor, ProgramState>;
+  runtime.family = &detail::compiledRuntimeFamily<Playback, ProgramState>;
   auto settings = std::make_shared<const Config>(std::move(config));
   runtime.createProgramState = [settings](const SequenceProgram& sequence) {
     return Compiled::createProgramState(sequence, *settings);

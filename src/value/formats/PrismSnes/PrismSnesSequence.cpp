@@ -7,7 +7,7 @@
 #include "value/formats/PrismSnes/PrismSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/synth/SnesDsp.h"
 
 #include <algorithm>
@@ -305,10 +305,7 @@ struct Timing {
   u8 durationTimer = 0;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   [[nodiscard]] u8 physicalChannel() const { return track.physicalChannelFlags & 7; }
@@ -880,7 +877,7 @@ struct Playback {
 };
 
 void Playback::tickRuntimeTrack(RuntimeTrack& runtime) {
-  Playback child{runtime.state, out, vm, program};
+  Playback child{{runtime.state, out, vm}, program};
   const u32 gainGeneration = runtime.state.gainImmediateGeneration;
   child.tickGlobal();
   child.tickGainLevel();
@@ -1178,7 +1175,7 @@ void Playback::tickRuntimeTrack(RuntimeTrack& runtime) {
   }
 }
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 struct DecodeState {
   u8 defaultLength = 0;
@@ -1616,7 +1613,7 @@ SequenceProgram decodeSequence(ByteReader reader, const Layout& layout, AssetId 
     sequence.addTrack(
         decodeTrack(reader, layout.version, index, track.startAddress, diagnostics, sequence.trackScope()));
   }
-  return sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime)));
+  return sequence.finish(makeCompiledRuntime<Playback, ProgramState>(std::move(runtime)));
 }
 
 }  // namespace vgmtrans::formats::prism_snes

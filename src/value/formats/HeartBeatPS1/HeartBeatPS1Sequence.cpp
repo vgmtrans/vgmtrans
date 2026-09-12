@@ -7,7 +7,7 @@
 #include "value/formats/HeartBeatPS1/HeartBeatPS1.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/PsxSpu.h"
 #include "value/synth/SynthMath.h"
@@ -92,10 +92,7 @@ struct TrackState {
   LfoState tremolo;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& programState;
 
   void beforeCommand() {
@@ -367,7 +364,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] bool controllerAffectsPlayback(u8 controller) {
   switch (controller) {
@@ -619,7 +616,7 @@ SequenceProgram parseHeartBeatPs1Sequence(ByteReader reader, AssetId id, const H
   SequenceProgram program = heartBeatPs1SequenceConfig().makeProgram();
   program.timebase.ppqn = layout.ppqn;
   program.behavior.initialTempoMicrosecondsPerQuarter = layout.initialTempo;
-  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{
+  program.runtime = makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{
       .numerator = layout.rhythmNumerator,
       .denominator = static_cast<u8>(1u << layout.rhythmDenominatorPower),
       .ppqn = layout.ppqn,

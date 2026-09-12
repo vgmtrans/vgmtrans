@@ -7,7 +7,7 @@
 #include "value/formats/RareSnes/RareSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 
 #include <fmt/format.h>
 
@@ -665,10 +665,7 @@ struct TrackState {
   u16 lastPitch = 0x1000;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   [[nodiscard]] std::pair<s8, s8> audibleVolumes(s8 left, s8 right) const {
@@ -1196,7 +1193,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] DecodedBytecodeCommand decodeNote(Cursor& cursor, Profile profile, DecodeState& state, u32 trackNumber) {
   auto event = cursor.command(cursor.opcode() == 0x80 ? "Rest" : "Note",
@@ -1783,13 +1780,12 @@ const SequenceProgramConfig& sequenceConfig() {
 }
 
 SequenceRuntime sequenceRuntime(Profile profile, u8 initialTempo, u8 initialTimer, bool monoOutput) {
-  return makeCompiledRuntime<Cursor, ProgramState>(
-      RuntimeConfig{
-          .profile = profile,
-          .initialTempo = initialTempo,
-          .initialTimer = initialTimer,
-          .monoOutput = monoOutput,
-      });
+  return makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{
+      .profile = profile,
+      .initialTempo = initialTempo,
+      .initialTimer = initialTimer,
+      .monoOutput = monoOutput,
+  });
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, Profile profile, u32 trackNumber, u32 startAddress,
@@ -1847,7 +1843,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
       runtime.srcns.push_back(reader.u8At(*layout.instrumentTableAddress + sourceProgram));
     }
   }
-  SequenceProgram program = sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime)));
+  SequenceProgram program = sequence.finish(makeCompiledRuntime<Playback, ProgramState>(std::move(runtime)));
 
   const SequenceRecipes recipes = analyzeCompiledProgram<ProgramState>(
       program, &ProgramState::recipes, diagnostics, SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce});

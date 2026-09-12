@@ -7,7 +7,7 @@
 #include "value/formats/SonyPS2/SonyPS2.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceVm.h"
 #include "value/synth/SynthMath.h"
 
@@ -159,10 +159,7 @@ struct TrackState {
   }
 }
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   const RuntimeConfig& config;
 
   [[nodiscard]] const ProgramRuntimeInfo* selectedProgram() const {
@@ -573,7 +570,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] std::optional<std::pair<u32, u32>> readVlq(ByteReader reader, u32& cursor, u32 end) {
   u32 value = 0;
@@ -1071,7 +1068,7 @@ const SequenceProgramConfig& sequenceConfig() {
 }
 
 SequenceRuntime sequenceRuntime(RuntimeConfig config) {
-  return makeCompiledRuntime<Cursor, RuntimeConfig>(std::move(config));
+  return makeCompiledRuntime<Playback, RuntimeConfig>(std::move(config));
 }
 
 SequenceProgram parseMidiSequence(ByteReader reader, AssetId id, const MidiBlockLayout& layout,

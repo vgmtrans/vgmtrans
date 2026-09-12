@@ -7,7 +7,7 @@
 #include "value/formats/NeverlandSnes/NeverlandSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/synth/SnesDsp.h"
 
 #include <algorithm>
@@ -227,10 +227,7 @@ struct TrackState {
   u32 driftClock = 0;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   [[nodiscard]] const PercussionPatch* percussionPatch(u8 key) const {
@@ -585,7 +582,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] Address sectionAddress(const Layout& layout, u16 encoded) {
   return Address{layout.version == Version::Modern ? static_cast<u16>(layout.sequenceBaseAddress + encoded) : encoded};
@@ -879,7 +876,7 @@ SequenceProgramConfig sequenceConfig(const Layout& layout) {
 }
 
 SequenceRuntime sequenceRuntime(ByteReader reader, const Layout& layout) {
-  return makeCompiledRuntime<Cursor, ProgramState>(RuntimeConfig{.reader = reader, .layout = layout});
+  return makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{.reader = reader, .layout = layout});
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, u32 trackNumber, u32 playlistAddress,

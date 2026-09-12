@@ -8,7 +8,7 @@
 
 #include "value/formats/CPS/CpsTables.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 
 #include <algorithm>
 #include <array>
@@ -124,10 +124,7 @@ struct TrackState {
   u8 lfoRate = 0;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   [[nodiscard]] LfoPerformanceContext lfoContext() const {
@@ -468,7 +465,7 @@ struct Playback {
   void meta(u8 slot, u8 value) { out.marker("CPS Meta " + std::to_string(slot) + "=" + std::to_string(value)); }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] Address relative16(u32 next, u16 raw) {
   return Address{static_cast<u32>(static_cast<s64>(next) + static_cast<s16>(raw))};
@@ -1051,7 +1048,7 @@ SequenceProgram decodeCpsSequence(ByteReader reader, const CpsLayout& layout, co
           .range = reader.range(sourceSequence.offset, std::min<u32>(headerSize, 1)),
       });
     }
-    SequenceProgram empty = sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(
+    SequenceProgram empty = sequence.finish(makeCompiledRuntime<Playback, ProgramState>(
         RuntimeConfig{.version = layout.version, .masterVolume = layout.masterVolume}));
     if (usesLateSequence(layout.version)) {
       empty.behavior.initialExpression = isCps3(layout.version) ? 65.0 / 128.0 : 0.5;
@@ -1095,7 +1092,7 @@ SequenceProgram decodeCpsSequence(ByteReader reader, const CpsLayout& layout, co
       sequence.addTrack(track, reader.range(pointer, 2), start, decode, encoded);
     }
   }
-  SequenceProgram program = sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(
+  SequenceProgram program = sequence.finish(makeCompiledRuntime<Playback, ProgramState>(
       RuntimeConfig{.version = layout.version, .masterVolume = layout.masterVolume}));
   if (usesLateSequence(layout.version)) {
     program.behavior.initialExpression = isCps3(layout.version) ? 65.0 / 128.0 : 0.5;

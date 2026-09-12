@@ -7,7 +7,7 @@
 #include "value/formats/AsciiShuichiSnes/AsciiShuichiSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/sequence/SequenceProgramConfig.h"
 
 #include <algorithm>
@@ -157,10 +157,7 @@ struct TrackState {
   Vibrato vibrato;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   [[nodiscard]] const RuntimePatch& patch() const {
@@ -457,7 +454,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 enum class Command : u8 {
   Program = 0x89,
@@ -788,8 +785,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
                       [&](u32 offset) { return decodeCommand(reader, layout, offset, diagnostics, &programs); },
                       layout.trackAddresses[track]);
   }
-  SequenceProgram program =
-      sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(runtimeConfig(reader, layout)));
+  SequenceProgram program = sequence.finish(makeCompiledRuntime<Playback, ProgramState>(runtimeConfig(reader, layout)));
   return SequenceParse{
       .program = std::move(program),
       .programs = std::move(programs),

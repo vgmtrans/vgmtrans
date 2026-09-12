@@ -7,7 +7,7 @@
 #include "value/formats/HudsonSnes/HudsonSnes.h"
 
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 #include "value/synth/SnesDsp.h"
 
 #include <algorithm>
@@ -313,10 +313,7 @@ struct TrackState {
   u16 volumeSlideAccumulator = 0;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   void beforeCommand() {
@@ -1010,7 +1007,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] DecodedBytecodeCommand decodeSubcommand(Cursor& cursor, Version version, SequenceReferences* references) {
   auto event = cursor.command("Subcommand", SequenceSemantic::State);
@@ -1389,7 +1386,7 @@ const SequenceProgramConfig& sequenceConfig() {
 }
 
 SequenceRuntime sequenceRuntime(Version version, ParsedHeader header) {
-  return makeCompiledRuntime<Cursor, ProgramState>(DriverData{version, std::move(header)});
+  return makeCompiledRuntime<Playback, ProgramState>(DriverData{version, std::move(header)});
 }
 
 TrackProgram decodeSourceTrack(ByteReader reader, Version version, u8 timebaseShift, bool noteVelocity, u32 trackNumber,

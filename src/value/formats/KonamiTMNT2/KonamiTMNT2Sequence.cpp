@@ -8,7 +8,7 @@
 
 #include "value/base/LevelScale.h"
 #include "value/sequence/CommandSourceMap.h"
-#include "value/sequence/CompiledCommandRuntime.h"
+#include "value/sequence/CompilerCursor.h"
 
 #include <algorithm>
 #include <array>
@@ -171,10 +171,7 @@ struct TrackState {
   Address warpDestination;
 };
 
-struct Playback {
-  TrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
+struct Playback : SequencePlayback<TrackState> {
   ProgramState& program;
 
   [[nodiscard]] bool fm() const { return track.chip == TrackChip::Ym2151; }
@@ -601,7 +598,7 @@ struct Playback {
   }
 };
 
-using Cursor = CompilerCursor<TrackState, Playback>;
+using Cursor = CompilerCursor<Playback>;
 
 [[nodiscard]] Address destination(Cursor::Event& event, u32 programOffset, SemanticOperandRole role) {
   const auto encoded = event.rawU16le("encoded_destination", SourceValueDisplay::Address);
@@ -1017,7 +1014,7 @@ SequenceProgram decodeSequence(ByteReader reader, const Layout& layout, const Se
     const auto decode = [&](u32 offset) { return decodeCommand(reader, offset, layout, track, state, diagnostics); };
     session.addTrack(track.number, track.pointer, track.offset, decode, track.offset);
   }
-  auto program = session.finish(makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime)));
+  auto program = session.finish(makeCompiledRuntime<Playback, ProgramState>(std::move(runtime)));
   for (auto& decodedTrack : program.tracks) {
     const auto layoutTrack =
         std::ranges::find(sequenceLayout.tracks, decodedTrack.sourceTrackNumber, &TrackLayout::number);
