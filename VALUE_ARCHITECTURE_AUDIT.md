@@ -1709,6 +1709,15 @@ reuse of the same repeat slot with a different exit octave. It passes both
 before and after the refactor. Existing Akao pitch coverage also passes; the
 full build is warning-free and all 20 CTest targets pass.
 
+## Remove SegSat's test-only MIDI velocity adapter
+
+Remove `segSatMidiVelocity()` and its public declaration. Runtime conversion
+already uses `segSatLinearGain()`; only three saturation assertions kept this
+extra MIDI-specific API alive. Those existing assertions now check the driver's
+linear gain directly, retaining overflow/underflow coverage with greater
+precision and no additional fixture or helper. The full build is warning-free
+and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

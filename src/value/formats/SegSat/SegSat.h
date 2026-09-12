@@ -150,10 +150,6 @@ struct SegSatRuntimeConfig {
   std::vector<SegSatControllerChange> controllerChanges;
 };
 
-// Mega Man 8's driver converts a VL-table result into the MIDI velocity used
-// by the legacy exporter. This is public so the velocity math can be tested on
-// its own.
-[[nodiscard]] u8 segSatMidiVelocity(u8 velocity, const SegSatVlTable& table, u8 totalLevel, s8 volumeBias);
 [[nodiscard]] double segSatLinearGain(SegSatVolumeModel model, u8 velocity, const SegSatVlTable& table, u8 totalLevel,
                                       s8 volumeBias, u8 volume, u8 expression);
 [[nodiscard]] double segSatRegionReferenceGain(SegSatVolumeModel model, const SegSatVlTable& table, u8 totalLevel,

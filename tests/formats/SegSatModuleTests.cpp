@@ -268,9 +268,10 @@ void segSatVlCurveMatchesMm8Saturation() {
       .level2 = 127,
       .rate3 = 2,
   };
-  expect(segSatMidiVelocity(64, identity, 0, 0) == 8,
-         "MM8 VL conversion should include the region total-level attenuation path");
   const auto expectedGain = [](u8 attenuation) { return std::pow(10.0, -(attenuation * 0.37529) / 20.0); };
+  expect(std::abs(segSatLinearGain(SegSatVolumeModel::V1_33, 64, identity, 0, 0, 127, 127) - expectedGain(126)) <
+             0.000000001,
+         "MM8 VL conversion should include the region total-level attenuation path");
   expect(std::abs(segSatLinearGain(SegSatVolumeModel::V1_28, 64, identity, 0, 0, 64, 127) - expectedGain(192)) <
                  0.000000001 &&
              std::abs(segSatLinearGain(SegSatVolumeModel::V1_33, 64, identity, 0, 0, 64, 127) - expectedGain(189)) <
@@ -283,12 +284,13 @@ void segSatVlCurveMatchesMm8Saturation() {
 
   SegSatVlTable positiveOverflow = identity;
   positiveOverflow.rate0 = 0x11;
-  expect(segSatMidiVelocity(80, positiveOverflow, 0, 0) == 127,
+  expect(segSatLinearGain(SegSatVolumeModel::V1_33, 80, positiveOverflow, 0, 0, 127, 127) == 1.0,
          "MM8 byte arithmetic should saturate 0x80..0xbf to positive full scale");
 
   SegSatVlTable negativeUnderflow = identity;
   negativeUnderflow.rate0 = 6;
-  expect(segSatMidiVelocity(1, negativeUnderflow, 0, 0) == 1,
+  expect(std::abs(segSatLinearGain(SegSatVolumeModel::V1_33, 1, negativeUnderflow, 0, 0, 127, 127) -
+                  expectedGain(254)) < 0.000000001,
          "MM8 byte arithmetic should saturate 0xc0..0xff to zero before SCSP attenuation conversion");
 }
 
