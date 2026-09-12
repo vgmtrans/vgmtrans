@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <numbers>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -436,6 +437,42 @@ void segSatCollectionBindingSuppliesVlTablesToSequence() {
   const auto decoded = decodeSample(instruments->localSamples.samples.front(), session.sources().bytes(source));
   expect(decoded && decoded->pcm.size() == 4 && decoded->pcm[0] == 0x1234 && decoded->pcm[1] == -292,
          "SegSat PCM16 samples should decode in the SCSP's big-endian byte order");
+}
+
+void segSatDirectOutputPreservesHardwareStereoGains() {
+  for (u16 encoded = 0; encoded < 256; ++encoded) {
+    auto bytes = segSatFixture();
+    bytes[0x103a + 24] = static_cast<u8>(encoded);
+    Session session;
+    session.registerFormat(segSatModule());
+    session.addSource(SourceFile{.name = "segsat-stereo.bin"}, std::move(bytes));
+    session.scanPendingSources();
+    const auto snapshot = session.snapshot();
+    expect(snapshot.collections().size() == 1, "stereo fixture should produce one collection");
+    const auto* bank = snapshot.asset<SoundBankAsset>(snapshot.collections().front().members.soundBanks.front());
+    expect(bank != nullptr && !bank->instruments.empty() && !bank->instruments.front().regions.empty(),
+           "stereo fixture should retain its sampled region");
+    const auto* velocityBank = bank->privateData.get<SegSatVelocityBank>();
+    expect(velocityBank != nullptr, "stereo fixture should retain its independent voice-level calibration");
+    const auto& region = bank->instruments.front().regions.front();
+    const double referenceGain = velocityBank->instruments.front().regions.front().referenceGain;
+
+    // DISDL selects 6 dB level steps; DIPAN attenuates one side in 3 dB
+    // steps, with 15 muting it. Normalize against the centered voice.
+    const u8 level = encoded >> 5;
+    const u8 pan = encoded & 31;
+    const double directGain = level == 0 ? 0.0 : std::pow(10.0, -6.0 * (7 - level) / 20.0);
+    const double quietSide = (pan & 15) == 15 ? 0.0 : std::pow(10.0, -3.0 * (pan & 15) / 20.0);
+    const double scale = referenceGain * directGain / std::sqrt(2.0);
+    const double expectedLeft = scale * (pan < 16 ? quietSide : 1.0);
+    const double expectedRight = scale * (pan < 16 ? 1.0 : quietSide);
+    const double gain = std::pow(10.0, -region.attenuationDb / 20.0);
+    const double angle = region.pan * std::numbers::pi / 2.0;
+    expect(
+        std::abs(gain * std::cos(angle) - expectedLeft) < 0.0000001 &&
+            std::abs(gain * std::sin(angle) - expectedRight) < 0.0000001,
+        "region pan and attenuation should reproduce both hardware gains for direct output " + std::to_string(encoded));
+  }
 }
 
 void segSatRuntimeMapSelectsBankInsideAnotherSampleSpan() {
