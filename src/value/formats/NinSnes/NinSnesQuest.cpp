@@ -810,6 +810,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       nested.range = reader.range(begin, nested.range.endOffset() - begin);
       nested.opcode = opcode;
       nested.presentation.label = fmt::format("Voice {}: {}", target + 1, nested.presentation.label);
+      nested.fields.insert(nested.fields.begin(), prefix.fields.begin(), prefix.fields.end());
       nested.operands.insert(nested.operands.begin(), prefix.operands.begin(), prefix.operands.end());
       const auto body = nested.execution.body;
       nested.execution.body = [target, body](void* state) {

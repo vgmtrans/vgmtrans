@@ -13,7 +13,6 @@
 #include <limits>
 #include <optional>
 #include <string>
-#include <string_view>
 
 namespace vgmtrans::core {
 
@@ -64,28 +63,6 @@ namespace {
   }
 }
 
-void projectOperand(AnnotationBuilder& annotation, const SemanticOperand& operand) {
-  if (operand.name.empty()) {
-    return;
-  }
-
-  if (operand.encodedValue) {
-    const std::string_view encodedName =
-        operand.encodedName.empty() ? std::string_view{operand.name} : std::string_view{operand.encodedName};
-    if (operand.range.valid()) {
-      annotation.field(encodedName, operand.range, *operand.encodedValue, operand.encodedDisplay);
-    }
-    annotation.derived(operand.name, operand.value, operand.display);
-    return;
-  }
-
-  if (operand.range.valid()) {
-    annotation.field(operand.name, operand.range, operand.value, operand.display);
-  } else {
-    annotation.derived(operand.name, operand.value, operand.display);
-  }
-}
-
 [[nodiscard]] std::optional<u32> sourceChannel(const DecodedBytecodeCommand& command) {
   const auto found = std::ranges::find_if(
       command.operands, [](const SemanticOperand& operand) { return operand.role == SemanticOperandRole::Channel; });
@@ -104,7 +81,8 @@ void projectOperand(AnnotationBuilder& annotation, const SemanticOperand& operan
           .kind(command.presentation.kind)
           .playbackStatus(command.presentation.playback)
           .field("opcode", SourceRange{.source = command.range.source, .offset = command.range.offset, .size = 1},
-                 command.opcode, SourceValueDisplay::Hex);
+                 command.opcode, SourceValueDisplay::Hex)
+          .fields(command.fields);
   if (parent) {
     annotation.parent(*parent);
   }
@@ -112,8 +90,6 @@ void projectOperand(AnnotationBuilder& annotation, const SemanticOperand& operan
   std::optional<u32> instrumentBank;
   std::optional<u32> instrumentProgram;
   for (const auto& operand : command.operands) {
-    projectOperand(annotation, operand);
-
     if (const auto role = linkRole(operand.role)) {
       if (const auto* destination = std::get_if<u64>(&operand.value)) {
         annotation.link(

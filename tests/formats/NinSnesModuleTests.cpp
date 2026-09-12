@@ -2005,6 +2005,17 @@ std::vector<u8> questDriverFixture() {
 void ninSnesQuestSupportsTacticsOgre() {
   expect(profile(ProfileId::Quest).id == ProfileId::Quest, "Quest must have a named profile");
   {
+    const auto bytes = sequenceBytes({0xd9, 0, 0xd9, 0, 0xd8, 1, 0});
+    SourceMapBuilder sourceMap;
+    const auto parsed = decodeSequence(ByteReader(SourceId{1}, bytes), questLayout(), AssetId{1}, &sourceMap);
+    const auto& command = parsed.program.tracks[0].commands.front();
+    const auto annotations = sourceMap.finish();
+    const auto& fields = annotations.get(command.annotation).fields;
+    expect(command.sourceChannel == 0 && fields.size() == 4 && fields[1].range.offset == 0x301 &&
+               fields[2].range.offset == 0x303 && fields[3].range.offset == 0x305,
+           "nested remote commands must retain both forwarding fields and the embedded operand");
+  }
+  {
     auto bytes = questDriverFixture();
     const ByteReader reader(SourceId{1}, bytes);
     const auto layout = findLayout(reader);

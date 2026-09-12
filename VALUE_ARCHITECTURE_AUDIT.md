@@ -1998,6 +1998,32 @@ asset ownership, with two net test lines added. The full build is warning-free
 and all 20 CTest targets pass, including the existing format and source-map
 checks. No additional test fixture or harness is committed.
 
+## Build command source fields directly
+
+CompilerCursor now constructs the existing SourceField representation directly.
+Previously every displayed value became a SemanticOperand carrying names,
+ranges, display modes, and an optional second encoded value, then a separate
+projector translated those operands back into source fields. SemanticOperand
+now contains only a tagged value and its role. Ordinary values stay solely in
+the field list; channel and instrument/control-flow analysis retain the tagged
+values in their original order and types.
+
+This removes the operand-to-field translation function and six intermediate
+metadata members without changing the format-facing compiler API. Encoded and
+resolved fields are recorded together when resolvedValue is called, preserving
+field order, empty-name rules, source links, and truncated-command metadata.
+Quest's nested remote commands concatenate both their source fields and tagged
+values. The change removes 26 production lines across the shared compiler and
+projection code, including that small compound-command adjustment.
+
+A temporary comparison matches annotation fields, links, ownership, channel
+attribution, and diagnostics for 4,096 generated cases before and after the
+change. Both versions run under AddressSanitizer and UBSan without findings.
+The committed tests reuse the existing compiler cases and add an 11-line Quest
+case to its existing fixture helpers, checking both nested forwarding fields
+and the embedded operand. The comparison harness remains uncommitted.
+The full build is warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding

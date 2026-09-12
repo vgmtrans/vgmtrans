@@ -42,15 +42,11 @@ enum class SemanticOperandRole : u8 {
   InstrumentTablePointer,
 };
 
+// Only tagged values are needed after decoding for channel attribution and
+// instrument/control-flow links. Their display fields use SourceField directly.
 struct SemanticOperand {
   SourceValue value = false;
-  SourceRange range;
-  std::string name;
-  SourceValueDisplay display = SourceValueDisplay::Default;
   SemanticOperandRole role = SemanticOperandRole::Value;
-  std::optional<SourceValue> encodedValue;
-  std::string encodedName;
-  SourceValueDisplay encodedDisplay = SourceValueDisplay::Default;
 };
 
 // Temporary decoded form used for reachability, source annotation projection,
@@ -60,14 +56,14 @@ struct DecodedBytecodeCommand {
   u8 opcode = 0;
   CommandFlow flow;
   std::vector<Address> discoveryTargets;
+  std::vector<SourceField> fields;
   std::vector<SemanticOperand> operands;
   CommandExecution execution;
   DecodedCommandPresentation presentation;
 };
 
-// A source field whose encoded value is replaced by an interpreted value in
-// executable IR. SourceMap projection retains both forms without making
-// playback know about source bytes.
+// A raw source field held until its interpreted value is known. The compiler
+// records both display forms without making playback know about source bytes.
 template <class T>
 struct EncodedSemanticField : RangedValue<T> {
   std::string_view name;
