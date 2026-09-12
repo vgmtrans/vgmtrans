@@ -1653,18 +1653,9 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   return cursor.unsupported("Invalid Opcode", "invalid").stop();
 }
 
-[[nodiscard]] TrackProgram decodeTrack(ByteReader reader, Profile profile, u32 trackNumber, u32 startAddress,
-                                       u32 sequenceDataFloor, std::optional<AssetId> sequence,
-                                       std::optional<SourceAnnotationId> parent, SourceMapBuilder* sourceMap,
-                                       std::vector<Diagnostic>* diagnostics) {
-  TrackDecodeScope scope{
-      .reader = reader,
-      .bytecodeEnd = kAramSize,
-      .maxCommands = kMaxTrackCommands,
-      .sequenceAsset = sequence,
-      .parentAnnotation = parent,
-      .sourceMap = sourceMap,
-  };
+[[nodiscard]] TrackProgram decodeTrack(const TrackDecodeScope& scope, Profile profile, u32 trackNumber,
+                                       u32 startAddress, u32 sequenceDataFloor, std::vector<Diagnostic>* diagnostics) {
+  const ByteReader reader = scope.reader;
   auto session = scope.begin(trackNumber, startAddress);
 
   struct DiscoveryPoint {
@@ -1803,20 +1794,16 @@ SequenceRuntime sequenceRuntime(Profile profile, u8 initialTempo, u8 initialTime
 
 TrackProgram decodeSourceTrack(ByteReader reader, Profile profile, u32 trackNumber, u32 startAddress,
                                u32 sequenceDataFloor, std::vector<Diagnostic>* diagnostics) {
-  return decodeTrack(reader, profile, trackNumber, startAddress, sequenceDataFloor, std::nullopt, std::nullopt, nullptr,
-                     diagnostics);
+  const TrackDecodeScope scope{.reader = reader, .bytecodeEnd = kAramSize, .maxCommands = kMaxTrackCommands};
+  return decodeTrack(scope, profile, trackNumber, startAddress, sequenceDataFloor, diagnostics);
 }
 
 SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
                              std::vector<Diagnostic>* diagnostics) {
-  const auto& config = sequenceConfig();
+  auto config = sequenceConfig();
   const u32 sequenceDataFloor =
       std::max<u32>(layout.sequenceHeaderAddress + static_cast<u32>(layout.trackStarts.size()) * 2 + 2, 1);
 
-  // SequenceDecodeSession owns the standard header/pointer source hierarchy.
-  // Stateful Rare durations require the small custom track walker above, so
-  // build an equivalent program and project each track through its shared scope.
-  SequenceProgram program = config.makeProgram();
   RuntimeConfig runtime{
       .profile = layout.profile,
       .initialTempo = layout.initialTempo,
@@ -1824,23 +1811,23 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
       .monoOutput = layout.monoOutput,
   };
   if (layout.profile == Profile::KillerInstinct) {
-    program.behavior.initialLevel = 0.5;
+    config.behavior.initialLevel = 0.5;
   }
   const double initialChannelGain = layout.profile == Profile::KillerInstinct ? 0.5 : 127.0 / 128.0;
-  program.behavior.initialStereoBalance = StereoBalance{initialChannelGain, initialChannelGain};
-  program.behavior.initialTempoMicrosecondsPerQuarter =
+  config.behavior.initialStereoBalance = StereoBalance{initialChannelGain, initialChannelGain};
+  config.behavior.initialTempoMicrosecondsPerQuarter =
       tempoMicrosecondsPerQuarter(layout.initialTempo, layout.initialTimer);
 
-  std::optional<SourceAnnotationId> headerParent;
+  SequenceDecodeSession sequence(reader, config, sequenceId, layout.sequenceHeaderRange, sourceMap, kMaxTrackCommands,
+                                 kAramSize);
+  auto tracks = sequence.trackScope();
   if (sourceMap != nullptr) {
-    auto header = sourceMap->header("RareSnes Sequence Header", layout.sequenceHeaderRange)
-                      .kind("rare-snes-sequence-header")
-                      .owner(ObjectRefs::asset(sequenceId));
-    headerParent = header.id();
+    const auto header = sequence.header().label("RareSnes Sequence Header").owner(ObjectRefs::asset(sequenceId));
+    tracks.parentAnnotation = header.id();
     sourceMap->field("Initial Tempo", layout.initialTempoRange, layout.initialTempo)
         .kind("rare-snes-initial-tempo")
         .owner(ObjectRefs::asset(sequenceId))
-        .parent(*headerParent);
+        .parent(header.id());
   }
 
   for (u32 track = 0; track < layout.trackStarts.size(); ++track) {
@@ -1848,16 +1835,9 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     if (start == 0 || !reader.has(start, 1)) {
       continue;
     }
-    if (sourceMap != nullptr && headerParent) {
-      const SourceRange pointerRange = reader.range(layout.sequenceHeaderAddress + track * 2, 2);
-      sourceMap->pointer(fmt::format("Track {} Pointer", track), pointerRange, SourceTarget{reader.range(start, 1)})
-          .kind("rare-snes-track-pointer")
-          .field("destination", pointerRange, start, SourceValueDisplay::Address)
-          .owner(ObjectRefs::sequenceTrack(sequenceId, track))
-          .parent(*headerParent);
-    }
-    program.tracks.push_back(decodeTrack(reader, layout.profile, track, start, sequenceDataFloor, sequenceId,
-                                         headerParent, sourceMap, diagnostics));
+    sequence.trackPointer(track, reader.range(layout.sequenceHeaderAddress + track * 2, 2), start)
+        .label(fmt::format("Track {} Pointer", track));
+    sequence.addTrack(decodeTrack(tracks, layout.profile, track, start, sequenceDataFloor, diagnostics));
   }
 
   if (layout.instrumentTableAddress) {
@@ -1867,7 +1847,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
       runtime.srcns.push_back(reader.u8At(*layout.instrumentTableAddress + sourceProgram));
     }
   }
-  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime));
+  SequenceProgram program = sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime)));
 
   const SequenceRecipes recipes = analyzeCompiledProgram<ProgramState>(
       program, &ProgramState::recipes, diagnostics, SequenceVmOptions{.loopPolicy = LoopPolicy::PlayOnce});

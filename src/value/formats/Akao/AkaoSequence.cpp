@@ -963,42 +963,30 @@ AkaoSequenceParse parseAkaoSequence(const ScanInput& input, AssetId id, const Ak
   AkaoSequenceAnalysis analysis{.header = layout.header};
   const AkaoProfile profile{.version = analysis.header.version};
   const u32 sequenceEnd = offset + analysis.header.length;
-  const SequenceProgramConfig config = makeAkaoConfig(analysis.header.version);
-  SequenceProgram program = config.makeProgram();
-  program.behavior.panLaw = determinePanLawFromSource(input.source, analysis.header.version);
-  program.behavior.initialStereoBalance =
-      program.behavior.panLaw == PanLaw::ConstantSum ? std::optional{StereoBalance{0.5, 0.5}} : std::nullopt;
+  auto config = makeAkaoConfig(analysis.header.version);
+  config.behavior.panLaw = determinePanLawFromSource(input.source, analysis.header.version);
+  config.behavior.initialStereoBalance =
+      config.behavior.panLaw == PanLaw::ConstantSum ? std::optional{StereoBalance{0.5, 0.5}} : std::nullopt;
 
-  if (sourceMap != nullptr) {
-    auto header = sourceMap->header("AKAO Sequence Header", reader.range(offset, analysis.header.trackHeaderOffset))
-                      .kind("akao-sequence-header")
-                      .owner(ObjectRefs::sequence(id))
-                      .field("sequence_id", reader.range(offset + 4, 2), analysis.header.sequenceId)
-                      .field("size", reader.range(offset + 6, 2), analysis.header.length)
-                      .field("track_bits", reader.range(offset + profile.trackAllocationBitsOffset(), 4),
-                             analysis.header.trackBits, SourceValueDisplay::Hex);
-    if (analysis.header.sampleSetId) {
-      header.field("sample_set_id", reader.range(offset + 0x14, 2), *analysis.header.sampleSetId);
-    }
+  SequenceDecodeSession sequence(reader, config, id, reader.range(offset, analysis.header.trackHeaderOffset), sourceMap,
+                                 kAkaoMaxTrackCommands, sequenceEnd);
+  auto header = sequence.header()
+                    .label("AKAO Sequence Header")
+                    .kind("akao-sequence-header")
+                    .field("sequence_id", reader.range(offset + 4, 2), analysis.header.sequenceId)
+                    .field("size", reader.range(offset + 6, 2), analysis.header.length)
+                    .field("track_bits", reader.range(offset + profile.trackAllocationBitsOffset(), 4),
+                           analysis.header.trackBits, SourceValueDisplay::Hex);
+  if (analysis.header.sampleSetId) {
+    header.field("sample_set_id", reader.range(offset + 0x14, 2), *analysis.header.sampleSetId);
   }
 
-  const TrackDecodeScope tracks{
-      .reader = reader,
-      .bytecodeEnd = sequenceEnd,
-      .maxCommands = kAkaoMaxTrackCommands,
-      .sequenceAsset = id,
-      .sourceMap = sourceMap,
-  };
   for (u32 trackIndex = 0; trackIndex < layout.trackAddresses.size(); ++trackIndex) {
-    auto track = decodeAkaoTrack(analysis.header.version, tracks, trackIndex, layout.trackAddresses[trackIndex],
-                                 diagnostics, &analysis.references);
-    track.sourceTrackNumber = trackIndex;
-    program.tracks.push_back(std::move(track));
+    sequence.addTrack(decodeAkaoTrack(analysis.header.version, sequence.trackScope(), trackIndex,
+                                      layout.trackAddresses[trackIndex], diagnostics, &analysis.references));
   }
-  program.runtime = akaoSequenceRuntime();
-
   return AkaoSequenceParse{
-      .program = std::move(program),
+      .program = sequence.finish(akaoSequenceRuntime()),
       .analysis = std::move(analysis),
   };
 }

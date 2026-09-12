@@ -1597,20 +1597,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
                              std::vector<Diagnostic>* diagnostics) {
   const u32 headerSize = static_cast<u32>(layout.tracks.size()) * 4 + 1;
   const SourceRange header = reader.range(layout.sequenceHeaderAddress, headerSize);
-  std::optional<SourceAnnotationId> headerAnnotation;
-  if (sourceMap != nullptr) {
-    headerAnnotation = sourceMap->header("Sequence Header", header)
-                           .kind("prism-snes-sequence-header")
-                           .owner(ObjectRefs::sequence(sequenceId))
-                           .id();
-  }
-  TrackDecodeScope scope{
-      .reader = reader,
-      .maxCommands = kCommandLimit,
-      .sequenceAsset = sequenceId,
-      .sourceMap = sourceMap,
-  };
-  SequenceProgram program = sequenceConfig().makeProgram();
+  SequenceDecodeSession sequence{reader, sequenceConfig(), sequenceId, header, sourceMap, kCommandLimit};
   RuntimeConfig runtime{
       .version = layout.version,
       .data = RuntimeData::capture(reader, layout),
@@ -1622,26 +1609,15 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         .logicalChannel = track.logicalChannel,
         .physicalChannelFlags = track.physicalChannelFlags,
     });
-    if (sourceMap != nullptr) {
-      auto pointer = sourceMap
-                         ->pointer("Track Pointer", reader.range(static_cast<u32>(track.range.offset) + 2, 2),
-                                   SourceTarget{reader.range(track.startAddress, 1)})
-                         .kind("prism-snes-track-pointer")
-                         .owner(ObjectRefs::sequenceTrack(sequenceId, index))
-                         .field("logical_channel", reader.range(track.range.offset, 1), track.logicalChannel)
-                         .field("physical_channel_flags", reader.range(track.range.offset + 1, 1),
-                                track.physicalChannelFlags, SourceValueDisplay::Hex)
-                         .field("destination", reader.range(track.range.offset + 2, 2), track.startAddress,
-                                SourceValueDisplay::Address);
-      if (headerAnnotation) {
-        pointer.parent(*headerAnnotation);
-      }
-    }
-    program.tracks.push_back(decodeTrack(reader, layout.version, index, track.startAddress, diagnostics, scope));
+    sequence.trackPointer(index, reader.range(track.range.offset + 2, 2), track.startAddress)
+        .field("logical_channel", reader.range(track.range.offset, 1), track.logicalChannel)
+        .field("physical_channel_flags", reader.range(track.range.offset + 1, 1), track.physicalChannelFlags,
+               SourceValueDisplay::Hex);
+    sequence.addTrack(
+        decodeTrack(reader, layout.version, index, track.startAddress, diagnostics, sequence.trackScope()));
   }
-  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime));
   return SequenceParse{
-      .program = std::move(program),
+      .program = sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(std::move(runtime))),
       .headerRange = header,
   };
 }

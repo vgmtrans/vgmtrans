@@ -739,18 +739,11 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   }
 }
 
-[[nodiscard]] TrackProgram decodeTrack(ByteReader reader, AssetId sequence, const TriAcePs1SequenceLayout& layout,
-                                       const TriAcePs1TrackLayout& track, SourceMapBuilder* sourceMap,
-                                       std::vector<Diagnostic>* diagnostics) {
+[[nodiscard]] TrackProgram decodeTrack(const TrackDecodeScope& tracks, const TriAcePs1SequenceLayout& layout,
+                                       const TriAcePs1TrackLayout& track, std::vector<Diagnostic>* diagnostics) {
+  const ByteReader reader = tracks.reader;
   const TrackAnalysis analysis = analyzeTrack(reader, layout, track);
-  const u32 end = layout.offset + layout.length;
-  const TrackDecodeScope tracks{
-      .reader = reader,
-      .bytecodeEnd = end,
-      .maxCommands = kMaxCommands,
-      .sequenceAsset = sequence,
-      .sourceMap = sourceMap,
-  };
+  const u32 end = tracks.bytecodeEnd;
   return tracks.decode(track.slot, track.patternAddresses.front(),
                        [&](u32 offset) { return decodeCommand(reader, offset, end, track, analysis, diagnostics); });
 }
@@ -779,18 +772,18 @@ const SequenceProgramConfig& triAcePs1SequenceConfig() {
 
 SequenceProgram parseTriAcePs1Sequence(ByteReader reader, AssetId id, const TriAcePs1SequenceLayout& layout,
                                        SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
-  SequenceProgram program = triAcePs1SequenceConfig().makeProgram();
-  program.behavior.initialTempoMicrosecondsPerQuarter = tempoMicros(layout.tempo);
-  program.runtime = makeCompiledRuntime<Cursor, ProgramState>(layout);
-
+  auto config = triAcePs1SequenceConfig();
+  config.behavior.initialTempoMicrosecondsPerQuarter = tempoMicros(layout.tempo);
+  SequenceDecodeSession sequence(reader, config, id, reader.range(layout.offset, kSequenceHeaderSize), sourceMap,
+                                 kMaxCommands, layout.offset + layout.length);
+  sequence.header()
+      .label("TriAcePS1 Sequence Header")
+      .kind("triace-ps1-sequence-header")
+      .field("size", reader.range(layout.offset + 2, 2), layout.length - 2)
+      .field("tempo", reader.range(layout.offset + 0x0f, 1), layout.tempo, SourceValueDisplay::BeatsPerMinute)
+      .field("time_signature_numerator", reader.range(layout.offset + 0x10, 1), layout.timeSignatureNumerator)
+      .field("time_signature_denominator", reader.range(layout.offset + 0x11, 1), layout.timeSignatureDenominator);
   if (sourceMap != nullptr) {
-    sourceMap->header("TriAcePS1 Sequence Header", reader.range(layout.offset, kSequenceHeaderSize))
-        .kind("triace-ps1-sequence-header")
-        .owner(ObjectRefs::sequence(id))
-        .field("size", reader.range(layout.offset + 2, 2), layout.length - 2)
-        .field("tempo", reader.range(layout.offset + 0x0f, 1), layout.tempo, SourceValueDisplay::BeatsPerMinute)
-        .field("time_signature_numerator", reader.range(layout.offset + 0x10, 1), layout.timeSignatureNumerator)
-        .field("time_signature_denominator", reader.range(layout.offset + 0x11, 1), layout.timeSignatureDenominator);
     sourceMap->table("Track Records", reader.range(layout.offset + 0x16, 32 * 6))
         .kind("triace-ps1-track-records")
         .owner(ObjectRefs::sequence(id));
@@ -802,11 +795,9 @@ SequenceProgram parseTriAcePs1Sequence(ByteReader reader, AssetId id, const TriA
   }
 
   for (const auto& layoutTrack : layout.tracks) {
-    auto track = decodeTrack(reader, id, layout, layoutTrack, sourceMap, diagnostics);
-    track.sourceTrackNumber = layoutTrack.slot;
-    program.tracks.push_back(std::move(track));
+    sequence.addTrack(decodeTrack(sequence.trackScope(), layout, layoutTrack, diagnostics));
   }
-  return program;
+  return sequence.finish(makeCompiledRuntime<Cursor, ProgramState>(layout));
 }
 
 }  // namespace vgmtrans::formats::triace_ps1

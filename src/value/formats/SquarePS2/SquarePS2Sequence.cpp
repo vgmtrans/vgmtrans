@@ -878,18 +878,12 @@ using Cursor = CompilerCursor<TrackState, Playback>;
   }
 }
 
-[[nodiscard]] TrackProgram decodeTrack(ByteReader reader, AssetId sequence, u32 trackIndex,
-                                       const BgmTrackLayout& source, SourceMapBuilder* sourceMap,
+[[nodiscard]] TrackProgram decodeTrack(TrackDecodeScope tracks, u32 trackIndex, const BgmTrackLayout& source,
                                        std::vector<Diagnostic>* diagnostics) {
+  const ByteReader reader = tracks.reader;
   const u32 end = source.dataOffset + source.length;
   const TrackLayout layout = analyzeTrack(reader, source.dataOffset, end);
-  const TrackDecodeScope tracks{
-      .reader = reader,
-      .bytecodeEnd = end,
-      .maxCommands = kMaxCommands,
-      .sequenceAsset = sequence,
-      .sourceMap = sourceMap,
-  };
+  tracks.bytecodeEnd = end;
   return tracks.decode(trackIndex, source.dataOffset,
                        [&](u32 offset) { return decodeCommand(reader, offset, end, layout, trackIndex, diagnostics); });
 }
@@ -921,40 +915,37 @@ SequenceRuntime sequenceRuntime(RuntimeConfig config) {
 
 SequenceProgram parseBgm(ByteReader reader, AssetId id, const BgmLayout& layout, SourceMapBuilder* sourceMap,
                          std::vector<Diagnostic>* diagnostics) {
-  SequenceProgram program = sequenceConfig().makeProgram();
-  program.timebase.ppqn = layout.ppqn;
+  auto config = sequenceConfig();
+  config.timebase.ppqn = layout.ppqn;
   if (const u32 initialTempo = tempoMicros(layout.initialTempo); initialTempo != 0) {
-    program.behavior.initialTempoMicrosecondsPerQuarter = initialTempo;
+    config.behavior.initialTempoMicrosecondsPerQuarter = initialTempo;
   }
-  program.behavior.initialMasterLevel = controller(static_cast<s8>(layout.initialMasterLevel));
-  program.behavior.initialSourceInstrument = instrumentIdentity(layout.waveBankId, 0);
-  program.runtime = sequenceRuntime(RuntimeConfig{.defaultBank = layout.waveBankId});
-
-  if (sourceMap != nullptr) {
-    sourceMap->header("SquarePS2 BGM Header", reader.range(layout.offset, 0x20))
-        .kind("square-ps2-bgm-header")
-        .owner(ObjectRefs::sequence(id))
-        .fieldsAsChildren()
-        .field("sequence_id", reader.range(layout.offset + 4, 2), layout.sequenceId)
-        .field("wave_bank_id", reader.range(layout.offset + 6, 2), layout.waveBankId)
-        .field("track_count", reader.range(layout.offset + 8, 1), layout.trackCount)
-        .field("initial_tempo", reader.range(layout.offset + 0x0a, 2), layout.initialTempo)
-        .field("initial_master_level", reader.range(layout.offset + 0x0c, 1), layout.initialMasterLevel)
-        .field("ppqn", reader.range(layout.offset + 0x0e, 2), layout.ppqn)
-        .field("length", reader.range(layout.offset + 0x10, 4), layout.declaredLength)
-        .field("flags", reader.range(layout.offset + 0x14, 4), layout.flags, SourceValueDisplay::Hex);
-  }
+  config.behavior.initialMasterLevel = controller(static_cast<s8>(layout.initialMasterLevel));
+  config.behavior.initialSourceInstrument = instrumentIdentity(layout.waveBankId, 0);
+  SequenceDecodeSession sequence{reader, config, id, reader.range(layout.offset, 0x20), sourceMap, kMaxCommands};
+  sequence.header()
+      .label("SquarePS2 BGM Header")
+      .kind("square-ps2-bgm-header")
+      .fieldsAsChildren()
+      .field("sequence_id", reader.range(layout.offset + 4, 2), layout.sequenceId)
+      .field("wave_bank_id", reader.range(layout.offset + 6, 2), layout.waveBankId)
+      .field("track_count", reader.range(layout.offset + 8, 1), layout.trackCount)
+      .field("initial_tempo", reader.range(layout.offset + 0x0a, 2), layout.initialTempo)
+      .field("initial_master_level", reader.range(layout.offset + 0x0c, 1), layout.initialMasterLevel)
+      .field("ppqn", reader.range(layout.offset + 0x0e, 2), layout.ppqn)
+      .field("length", reader.range(layout.offset + 0x10, 4), layout.declaredLength)
+      .field("flags", reader.range(layout.offset + 0x14, 4), layout.flags, SourceValueDisplay::Hex);
 
   for (u32 index = 0; index < layout.tracks.size(); ++index) {
     const auto& track = layout.tracks[index];
-    auto trackProgram = decodeTrack(reader, id, index, track, sourceMap, diagnostics);
+    auto trackProgram = decodeTrack(sequence.trackScope(), index, track, diagnostics);
     if (sourceMap != nullptr && trackProgram.annotation.valid()) {
       AnnotationBuilder{*sourceMap, trackProgram.annotation}.range(reader.range(track.blockOffset, 4 + track.length));
       sourceMap->field("Track Length", reader.range(track.blockOffset, 4), track.length).parent(trackProgram.annotation);
     }
-    program.tracks.push_back(std::move(trackProgram));
+    sequence.addTrack(std::move(trackProgram));
   }
-  return program;
+  return sequence.finish(sequenceRuntime(RuntimeConfig{.defaultBank = layout.waveBankId}));
 }
 
 }  // namespace vgmtrans::formats::square_ps2

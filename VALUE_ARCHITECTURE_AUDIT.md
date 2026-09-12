@@ -1972,10 +1972,37 @@ existing tuning/reverb checks also pass. The full build is warning-free and
 all 20 CTest targets pass. Next work prioritizes shared structural changes to
 format authoring, as requested, over further isolated format cleanups.
 
+## Share sequence assembly with custom track decoders
+
+SequenceDecodeSession no longer requires its built-in reachability walker.
+Formats can reuse its TrackDecodeScope, append a completed TrackProgram, and
+customize its existing header and track-pointer annotations. The ordinary
+addTrack path uses those same operations. Header access returns the existing
+AnnotationBuilder, which is inert without a source map, instead of requiring
+formats to unwrap an optional ID and reconstruct the builder themselves.
+No new model, callback protocol, or traversal policy is introduced.
+
+Prism, Rare, Wolf Team, Akao, Suzuki PS1, TriAce PS1, and Square PS2 now share
+this assembly. Their stateful walkers, track analysis, runtime settings,
+track bounds, source ownership, and annotation parents remain explicit and
+unchanged. Rare and Wolf Team retain their header-parented tracks by copying
+the common scope; Square PS2 sets each track's own bytecode limit on that copy.
+Format-specific header labels and categories are preserved. Prism's pointer
+fields now list the common destination before its additional channel fields.
+AkaoSnes and PandoraBoxSnes also use the direct header builder.
+
+The change removes 95 production lines overall; the shared implementation
+grows by only two lines. The existing exceptional-walker compiler test now
+also verifies sequence assembly, custom annotation fields, and inherited
+asset ownership, with two net test lines added. The full build is warning-free
+and all 20 CTest targets pass, including the existing format and source-map
+checks. No additional test fixture or harness is committed.
+
 ## Further investigation
 
-- Continue auditing export lowering, instrument selection, envelope projection,
-  and remaining format-local helpers for redundant state and work.
+- Prioritize structural simplification of format authoring: shared decoding
+  setup, source metadata handoffs, and repeated scan-to-playback preparation.
+  Continue checking export lowering and instrument selection for redundant work.
 - Establish shared sounding-voice continuity before unifying note instrument
   selection across variant preparation, synth selection, and MIDI pitch context.
   PitchTransitionIntent::previousNote can express continuity before note flags

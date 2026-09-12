@@ -7,6 +7,7 @@
 #pragma once
 
 #include "value/sequence/BytecodeDecode.h"
+#include "value/model/SourceMap.h"
 
 #include <array>
 #include <limits>
@@ -18,7 +19,6 @@
 
 namespace vgmtrans::core {
 
-class SourceMapBuilder;
 struct SequenceProgramConfig;
 
 // One track's annotation and command-projection lifecycle. Most formats use
@@ -93,7 +93,7 @@ struct TrackDecodeScope {
 };
 
 // Owns the generic sequence-header/track-pointer and track -> command
-// annotation lifecycle. Headers and tracks are siblings; pointer fields remain
+// annotation lifecycle. Headers and tracks are siblings by default; pointers remain
 // under the header that encodes them.
 class SequenceDecodeSession {
 public:
@@ -106,11 +106,19 @@ public:
   template <class DecodeCommand>
   void addTrack(u32 trackIndex, SourceRange pointerRange, u32 startOffset, DecodeCommand decodeCommand,
                 std::optional<u64> encodedStartOffset = std::nullopt) {
-    annotateTrackPointer(trackIndex, pointerRange, startOffset, encodedStartOffset);
-    program_.tracks.push_back(tracks_.decode(trackIndex, startOffset, std::move(decodeCommand)));
+    trackPointer(trackIndex, pointerRange, startOffset, encodedStartOffset);
+    addTrack(tracks_.decode(trackIndex, startOffset, std::move(decodeCommand)));
   }
 
-  [[nodiscard]] std::optional<SourceAnnotationId> headerAnnotation() const noexcept { return headerAnnotation_; }
+  // Custom walkers use the same source context and append their completed track.
+  // Copy the scope when a format needs different bounds or an annotation parent.
+  [[nodiscard]] const TrackDecodeScope& trackScope() const noexcept { return tracks_; }
+  void addTrack(TrackProgram track) { program_.tracks.push_back(std::move(track)); }
+
+  // These builders are inert when no source map was requested.
+  [[nodiscard]] AnnotationBuilder header() const { return header_; }
+  AnnotationBuilder trackPointer(u32 trackIndex, SourceRange pointerRange, u32 startOffset,
+                                 std::optional<u64> encodedStartOffset = std::nullopt);
 
   [[nodiscard]] SequenceProgram finish(SequenceRuntime runtime) {
     program_.runtime = std::move(runtime);
@@ -118,11 +126,8 @@ public:
   }
 
 private:
-  void annotateTrackPointer(u32 trackIndex, SourceRange pointerRange, u32 startOffset,
-                            std::optional<u64> encodedStartOffset);
-
   TrackDecodeScope tracks_;
-  std::optional<SourceAnnotationId> headerAnnotation_;
+  AnnotationBuilder header_;
   SequenceProgram program_;
   std::string sourceKindPrefix_;
 };
