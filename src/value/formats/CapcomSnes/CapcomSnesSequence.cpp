@@ -209,11 +209,11 @@ struct Playback {
 
   // Applies a repeat break's note flags only when that break is actually taken.
   [[nodiscard]] Effects repeatBreak(u8 slot, u8 attributes, Address destination) {
-    const auto branch = vm.countedRepeatBreak(slot, destination);
-    if (branch.taken) {
+    const Effects effects = vm.countedRepeatBreak(slot, destination);
+    if (effects.flowOverride) {
       applyAttributes(attributes);
     }
-    return branch.effects;
+    return effects;
   }
 
   // Advances through a rest and prevents the next note from extending the last one.

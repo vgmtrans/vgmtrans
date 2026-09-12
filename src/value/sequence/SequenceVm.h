@@ -35,11 +35,6 @@ struct VmTrackRuntime;
                                               std::vector<Diagnostic>* diagnostics);
 }  // namespace detail
 
-struct BranchResult {
-  bool taken = false;
-  Effects effects;
-};
-
 class PerformanceAutomationBinding;
 class PitchSlideBinding;
 
@@ -332,8 +327,9 @@ public:
 
   // Counted-repeat helpers cover drivers where the first encounter counts as
   // one play and a repeat command jumps back to a decoded source block.
+  // flowOverride is present only when the branch is taken.
   [[nodiscard]] Effects countedRepeatUntil(u8 slot, u32 totalPlays, Address destination);
-  [[nodiscard]] BranchResult countedRepeatBreak(u8 slot, Address destination);
+  [[nodiscard]] Effects countedRepeatBreak(u8 slot, Address destination);
 
   [[nodiscard]] u64 tick() const noexcept;
   // Metadata for the executing command, including its track-specific decoding.
