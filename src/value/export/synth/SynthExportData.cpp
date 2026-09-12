@@ -32,8 +32,8 @@ struct SynthSampleIndexKey {
   friend auto operator<=>(const SynthSampleIndexKey&, const SynthSampleIndexKey&) = default;
 };
 
-using SynthSampleIndexMap = std::map<SynthSampleIndexKey, u32>;
-using SynthSampleReferences = std::set<SynthSampleIndexKey>;
+// A requested sample variant has no output index until decoding succeeds.
+using SynthSampleIndexMap = std::map<SynthSampleIndexKey, std::optional<u32>>;
 using SynthInstrumentSet = std::set<const Instrument*>;
 
 struct SamplePoolView {
@@ -82,19 +82,19 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
                                                      std::span<const SamplePoolView> samplePools,
                                                      const SourceStore& sources,
                                                      const SynthSampleDecodeOptions& options,
-                                                     SynthSampleReferences needed, bool discardUnreferenced,
+                                                     SynthSampleIndexMap indexes, bool discardUnreferenced,
                                                      SampleFilteringPolicy filtering) {
   // Decode once into the final sample table, including any phase-inverted
   // variants. Container exporters share its indexes and source diagnostics.
-  SynthSampleIndexMap indexes;
-
   for (const auto& view : samplePools) {
     const SampleFilter selectedFilter = resolveSampleFilter(filtering, view.pool.preferredFilter);
 
     for (u32 sampleIndex = 0; sampleIndex < view.pool.samples.size(); ++sampleIndex) {
-      if (!discardUnreferenced) needed.insert({view.owner.value, sampleIndex});
-      const auto first = needed.lower_bound({view.owner.value, sampleIndex});
-      const auto last = needed.upper_bound({view.owner.value, sampleIndex, true, std::numeric_limits<u32>::max()});
+      if (!discardUnreferenced) {
+        indexes.try_emplace({view.owner.value, sampleIndex});
+      }
+      const auto first = indexes.lower_bound({view.owner.value, sampleIndex});
+      const auto last = indexes.upper_bound({view.owner.value, sampleIndex, true, std::numeric_limits<u32>::max()});
       if (first == last) continue;
       const auto& sample = view.pool.samples[sampleIndex];
       if (!sources.contains(sample.encodedData.source)) {
@@ -123,7 +123,7 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
 
       // Visit inverted variants first, preserving the existing sample order.
       for (auto it = last; it != first;) {
-        const auto& key = *--it;
+        auto& [key, outputIndex] = *--it;
         auto audio = it == first ? std::move(*decoded) : *decoded;
         if (key.startFrame != 0) {
           const u64 skip = static_cast<u64>(key.startFrame) * audio.channels;
@@ -143,7 +143,7 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
             value = value == std::numeric_limits<s16>::min() ? std::numeric_limits<s16>::max() : static_cast<s16>(-value);
           }
         }
-        indexes[key] = static_cast<u32>(prepared.samples.size());
+        outputIndex = static_cast<u32>(prepared.samples.size());
         prepared.samples.push_back(DecodedSynthSample{
             .name = sample.name + (key.startFrame ? " [sustain]" : "") + (key.phaseInverted ? " [inverted]" : ""),
             .pitch = sample.pitch,
@@ -157,11 +157,12 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
   return indexes;
 }
 
-[[nodiscard]] SynthSampleReferences referencedSamples(std::span<const Instrument* const> instruments) {
-  SynthSampleReferences samples;
+[[nodiscard]] SynthSampleIndexMap referencedSamples(std::span<const Instrument* const> instruments) {
+  SynthSampleIndexMap samples;
   for (const auto* instrument : instruments) {
     for (const auto& region : instrument->regions) {
-      samples.insert({region.sample.owner().value, region.sample.index(), region.invertSamplePhase, region.sampleStartFrame});
+      samples.try_emplace(SynthSampleIndexKey{region.sample.owner().value, region.sample.index(),
+                                              region.invertSamplePhase, region.sampleStartFrame});
     }
   }
   return samples;
@@ -187,16 +188,16 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
         .modulation = lowerModulation(instrument->modulation),
     };
     for (const auto& region : instrument->regions) {
-      const auto sample = samples.find({region.sample.owner().value, region.sample.index(), region.invertSamplePhase,
-                                        region.sampleStartFrame});
-      if (sample == samples.end()) {
+      const auto sample = samples.at(
+          {region.sample.owner().value, region.sample.index(), region.invertSamplePhase, region.sampleStartFrame});
+      if (!sample) {
         diagnostics.push_back(exportError("Region sample reference was not found", region.range));
         continue;
       }
 
       resolvedInstrument.regions.push_back(ResolvedSynthRegion{
           .region = &region,
-          .sampleIndex = sample->second,
+          .sampleIndex = *sample,
           .modulation = lowerModulation(region.modulation),
       });
     }
