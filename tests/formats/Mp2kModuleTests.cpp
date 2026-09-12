@@ -291,7 +291,7 @@ void mp2kModuleBuildsAuditedSequenceAndSynth() {
          "MP2k playback should initialize cleared VOL, unit volX/expression, and hardware center balance separately");
   const auto level = std::ranges::find_if(levels, [](const auto* event) { return event->linearGain != 0.0; });
   expect(level != levels.end() && std::abs((*level)->linearGain - 100.0 / 127.0) < 1e-12 &&
-             (*level)->sourceQuantization && (*level)->sourceQuantization->levels == 128,
+             (*level)->sourceQuantization.levels == 128,
          "MP2k VOL must be a linear 7-bit hardware gain, not a squared MIDI controller curve");
   expect(!pans.empty() && pans.front()->law == PanLaw::ConstantSum &&
              std::abs(pans.front()->stereoPosition - 1.0 / 255.0) < 1e-12 &&
