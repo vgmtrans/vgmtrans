@@ -10,17 +10,6 @@
 
 namespace vgmtrans::core {
 
-namespace {
-
-[[nodiscard]] bool containsOffset(SourceRange range, SourceId source, u64 offset) {
-  if (!range.valid() || range.source != source) {
-    return false;
-  }
-  return range.size == 0 ? range.offset == offset : range.offset <= offset && offset < range.endOffset();
-}
-
-}  // namespace
-
 std::shared_ptr<const SourceInspection> SourceInspection::create(AssetMetadata metadata, SourceMap sourceMap,
                                                                  SharedSourceBytes sourceBytes) {
   if (sourceBytes == nullptr) {
@@ -113,7 +102,7 @@ std::optional<SourceInspectionItem> SourceInspection::itemAt(u64 offset) const {
   size_t bestDepth = 0;
 
   const auto consider = [&](SourceInspectionItem item, SourceRange candidateRange, size_t depth) {
-    if (!containsOffset(candidateRange, range_.source, offset)) {
+    if (!candidateRange.containsOffset(range_.source, offset)) {
       return;
     }
     if (!best || candidateRange.size < bestRange.size ||

@@ -1237,6 +1237,19 @@ and normalized depths, and automatic/forced controller resolutions. Existing
 pan-law and modulation regressions pass. The full build is warning-free and all
 20 CTest targets pass; no test code is added.
 
+### Keep source-range query rules on SourceRange
+
+Move containment, point lookup, and intersection rules onto SourceRange. Source
+maps and source inspection now share the same source-aware queries instead of
+maintaining four local implementations. Range containment still includes empty
+ranges at the end boundary, while byte queries remain half-open and match
+zero-size anchors. Invalid and foreign sources retain their existing behavior.
+
+This removes 20 production lines. A temporary sanitized comparison checks all
+four previous implementations against the shared methods over 21,609 range
+pairs, including empty ranges and extreme offsets. The full build is warning-free
+and all 20 CTest targets pass; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

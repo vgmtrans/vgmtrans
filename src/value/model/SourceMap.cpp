@@ -15,39 +15,6 @@ namespace vgmtrans::core {
 
 namespace {
 
-[[nodiscard]] bool rangeContains(SourceRange outer, SourceRange inner) {
-  if (!outer.valid() || !inner.valid() || outer.source != inner.source) {
-    return false;
-  }
-  if (inner.offset < outer.offset) {
-    return false;
-  }
-  if (inner.offset > outer.endOffset()) {
-    return false;
-  }
-  return inner.size <= outer.endOffset() - inner.offset;
-}
-
-[[nodiscard]] bool rangeContainsOffset(SourceRange range, SourceId source, u64 offset) {
-  if (!range.valid() || range.source != source) {
-    return false;
-  }
-  if (range.size == 0) {
-    return range.offset == offset;
-  }
-  return range.offset <= offset && offset < range.endOffset();
-}
-
-[[nodiscard]] bool rangesIntersect(SourceRange lhs, SourceRange rhs) {
-  if (!lhs.valid() || !rhs.valid() || lhs.source != rhs.source) {
-    return false;
-  }
-  if (lhs.size == 0 || rhs.size == 0) {
-    return rangeContainsOffset(lhs, rhs.source, rhs.offset) || rangeContainsOffset(rhs, lhs.source, lhs.offset);
-  }
-  return lhs.offset < rhs.endOffset() && rhs.offset < lhs.endOffset();
-}
-
 [[nodiscard]] std::vector<SourceAnnotationId> idsFromAnnotations(const SharedSequence<SourceAnnotation>& annotations,
                                                                  auto predicate) {
   std::vector<SourceAnnotationId> ids;
@@ -240,18 +207,18 @@ std::vector<SourceAnnotationId> SourceMap::annotationsForSource(SourceId source)
 }
 
 std::vector<SourceAnnotationId> SourceMap::intersecting(SourceRange range) const {
-  return idsFromAnnotations(
-      annotations(), [&](const SourceAnnotation& annotation) { return rangesIntersect(annotation.range, range); });
+  return idsFromAnnotations(annotations(),
+                            [&](const SourceAnnotation& annotation) { return annotation.range.intersects(range); });
 }
 
 std::vector<SourceAnnotationId> SourceMap::containing(SourceRange range) const {
   return idsFromAnnotations(annotations(),
-                            [&](const SourceAnnotation& annotation) { return rangeContains(annotation.range, range); });
+                            [&](const SourceAnnotation& annotation) { return annotation.range.contains(range); });
 }
 
 std::vector<SourceAnnotationId> SourceMap::at(SourceId source, u64 offset) const {
   return idsFromAnnotations(annotations(), [&](const SourceAnnotation& annotation) {
-    return rangeContainsOffset(annotation.range, source, offset);
+    return annotation.range.containsOffset(source, offset);
   });
 }
 
