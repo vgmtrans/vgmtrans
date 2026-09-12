@@ -6,6 +6,12 @@
 
 #include "value/synth/PsxAdpcm.h"
 
+#include "value/synth/SynthBuilder.h"
+
+#include <fmt/format.h>
+
+#include <iterator>
+
 namespace vgmtrans::core {
 
 namespace {
@@ -48,6 +54,36 @@ std::optional<PsxAdpcmStream> inspectPsxAdpcmStream(ByteReader reader, u32 offse
               .length = loopStartBytes ? psxAdpcmDecodedOffset(encodedLength - *loopStartBytes) : 0,
           },
   };
+}
+
+std::map<u32, PsxAdpcmStream> inspectPsxAdpcmStreams(ByteReader reader, u32 sampleBase, const std::set<u32>& offsets,
+                                                     u32 endOffset) {
+  std::map<u32, PsxAdpcmStream> streams;
+  for (auto current = offsets.begin(); current != offsets.end(); ++current) {
+    const auto next = std::next(current);
+    const u32 boundary = next == offsets.end() ? endOffset : sampleBase + *next;
+    if (const auto stream = inspectPsxAdpcmStream(reader, sampleBase + *current, boundary)) {
+      streams.emplace(*current, *stream);
+    }
+  }
+  return streams;
+}
+
+void addPsxAdpcmSamples(SamplePoolBuilder& samples, const std::map<u32, PsxAdpcmStream>& streams, u32 sampleRate,
+                        SourceAnnotationId parent) {
+  for (const auto& [offset, stream] : streams) {
+    auto sample = samples.add(offset, Sample{
+                                          .name = fmt::format("Sample {}", samples.size()),
+                                          .codec = AudioCodec::PsxAdpcm,
+                                          .encodedData = stream.encodedData,
+                                          .sampleRate = sampleRate,
+                                          .loop = stream.loop,
+                                      });
+    auto source = sample.source(sample.value().name, stream.encodedData, "psx-adpcm-sample");
+    if (parent.valid()) {
+      source.parent(parent);
+    }
+  }
 }
 
 }  // namespace vgmtrans::core

@@ -13,7 +13,6 @@
 #include <fmt/format.h>
 
 #include <algorithm>
-#include <map>
 #include <set>
 #include <utility>
 #include <vector>
@@ -93,19 +92,9 @@ std::optional<SuzukiPs1ScannedBank> addSuzukiPs1Bank(ScanResultBuilder& result, 
     }
     parsed.push_back(std::move(instrument));
   }
-  if (sampleOffsets.empty()) {
-    return std::nullopt;
-  }
-
   const u32 sampleSection = layout.offset + layout.headerSize;
-  const u32 sampleEnd = sampleSection + layout.sampleSize;
-  std::map<u32, PsxAdpcmStream> sampleStreams;
-  for (auto current = sampleOffsets.begin(); current != sampleOffsets.end(); ++current) {
-    const u32 boundary = std::next(current) == sampleOffsets.end() ? sampleEnd : sampleSection + *std::next(current);
-    if (const auto stream = inspectPsxAdpcmStream(reader, sampleSection + *current, boundary)) {
-      sampleStreams.emplace(*current, *stream);
-    }
-  }
+  const auto sampleStreams =
+      inspectPsxAdpcmStreams(reader, sampleSection, sampleOffsets, sampleSection + layout.sampleSize);
   // Draft creation is the publication decision, so establish that both halves
   // of the synth are viable before creating either one.
   if (sampleStreams.empty()) {
@@ -123,20 +112,7 @@ std::optional<SuzukiPs1ScannedBank> addSuzukiPs1Bank(ScanResultBuilder& result, 
                   "suzuki-ps1-sample-data")
           .id();
   samples.include(bankRange);
-  std::map<u32, SampleRef> sampleRefs;
-  for (const auto& [offset, stream] : sampleStreams) {
-    const u32 index = static_cast<u32>(sampleRefs.size());
-    auto entry = samples.add(offset, Sample{
-                                         .name = fmt::format("Sample {}", index),
-                                         .codec = AudioCodec::PsxAdpcm,
-                                         .encodedData = stream.encodedData,
-                                         .sampleRate = kPs1SpuSampleRate,
-                                         .channels = 1,
-                                         .loop = stream.loop,
-                                     });
-    entry.source(fmt::format("Sample {}", index), stream.encodedData, "psx-adpcm-sample").parent(sampleRoot);
-    sampleRefs.emplace(offset, entry.ref());
-  }
+  addPsxAdpcmSamples(samples, sampleStreams, kPs1SpuSampleRate, sampleRoot);
 
   const SourceAnnotationId instrumentRoot =
       instruments
@@ -153,8 +129,8 @@ std::optional<SuzukiPs1ScannedBank> addSuzukiPs1Bank(ScanResultBuilder& result, 
       .field("highest_program", reader.range(layout.offset + 0x1c, 4), layout.highestProgram)
       .field("bank", reader.range(layout.offset + 0x20, 4), layout.bank);
   for (const SuzukiPs1Instrument& source : parsed) {
-    const auto sample = sampleRefs.find(source.sampleOffset);
-    if (sample == sampleRefs.end()) {
+    const auto sample = samples.find(source.sampleOffset);
+    if (!sample) {
       continue;
     }
 
@@ -185,7 +161,7 @@ std::optional<SuzukiPs1ScannedBank> addSuzukiPs1Bank(ScanResultBuilder& result, 
         };
       }
     }
-    instrument.region(sample->second, std::move(region)).source("Region", source.source.range, "suzuki-ps1-region");
+    instrument.region(*sample, std::move(region)).source("Region", source.source.range, "suzuki-ps1-region");
   }
 
   return SuzukiPs1ScannedBank{

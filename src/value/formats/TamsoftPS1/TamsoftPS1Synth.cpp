@@ -11,8 +11,6 @@
 
 #include <fmt/format.h>
 
-#include <iterator>
-#include <map>
 #include <set>
 #include <string>
 
@@ -40,14 +38,7 @@ bool addBank(ScanResultBuilder& result, const BankLayout& layout, std::string_vi
     }
   }
 
-  std::map<u32, PsxAdpcmStream> streams;
-  for (auto current = offsets.begin(); current != offsets.end(); ++current) {
-    const auto next = std::next(current);
-    const u32 boundary = kBankHeaderSize + (next == offsets.end() ? layout.sampleSize : *next);
-    if (const auto stream = inspectPsxAdpcmStream(reader, kBankHeaderSize + *current, boundary)) {
-      streams.emplace(*current, *stream);
-    }
-  }
+  const auto streams = inspectPsxAdpcmStreams(reader, kBankHeaderSize, offsets, kBankHeaderSize + layout.sampleSize);
   if (streams.empty()) {
     return false;
   }
@@ -71,27 +62,15 @@ bool addBank(ScanResultBuilder& result, const BankLayout& layout, std::string_vi
                      reader.range(kBankHeaderSize, layout.sampleSize), "tamsoft-ps1-sample-data")
           .id();
 
-  std::map<u32, SampleRef> sampleRefs;
   const u32 sampleRate = layout.generation == Generation::Ps2 ? kPs2SpuSampleRate : kPs1SpuSampleRate;
-  for (const auto& [offset, stream] : streams) {
-    const u32 index = static_cast<u32>(sampleRefs.size());
-    auto sample = samples.add(offset, Sample{
-                                          .name = fmt::format("Sample {}", index),
-                                          .codec = AudioCodec::PsxAdpcm,
-                                          .encodedData = stream.encodedData,
-                                          .sampleRate = sampleRate,
-                                          .loop = stream.loop,
-                                      });
-    sample.source(sample.value().name, stream.encodedData, "psx-adpcm-sample").parent(sampleRoot);
-    sampleRefs.emplace(offset, sample.ref());
-  }
+  addPsxAdpcmSamples(samples, streams, sampleRate, sampleRoot);
 
   const PsxSpuGeneration spuGeneration =
       layout.generation == Generation::Ps2 ? PsxSpuGeneration::Ps2 : PsxSpuGeneration::Ps1;
   for (u32 program = 1; program < kProgramCount; ++program) {
     const u32 sampleOffset = reader.le32(program * 4);
-    const auto sample = sampleRefs.find(sampleOffset);
-    if (sample == sampleRefs.end()) {
+    const auto sample = samples.find(sampleOffset);
+    if (!sample) {
       continue;
     }
     const u32 storedAdsr = reader.le32(kProgramTableSize + program * 4);
@@ -106,7 +85,7 @@ bool addBank(ScanResultBuilder& result, const BankLayout& layout, std::string_vi
     });
     instrument.source(instrument.value().name, pointerRange, "tamsoft-ps1-instrument").parent(pointerRoot);
     instrument
-        .region(sample->second,
+        .region(*sample,
                 Region{
                     .unityKey = 48.0,
                     .envelope = psxSpuEnvelope(static_cast<u16>(adsr), static_cast<u16>(adsr >> 16), spuGeneration),
@@ -114,8 +93,7 @@ bool addBank(ScanResultBuilder& result, const BankLayout& layout, std::string_vi
                 })
         .source("ADSR", adsrRange, "tamsoft-ps1-region")
         .parent(adsrRoot)
-        .field("stored_adsr1", reader.range(adsrRange.offset, 2), static_cast<u16>(storedAdsr),
-               SourceValueDisplay::Hex)
+        .field("stored_adsr1", reader.range(adsrRange.offset, 2), static_cast<u16>(storedAdsr), SourceValueDisplay::Hex)
         .field("stored_adsr2", reader.range(adsrRange.offset + 2, 2), static_cast<u16>(storedAdsr >> 16),
                SourceValueDisplay::Hex)
         .derived("adsr1", static_cast<u16>(adsr), SourceValueDisplay::Hex)

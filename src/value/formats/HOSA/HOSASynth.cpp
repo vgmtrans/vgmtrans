@@ -15,7 +15,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <map>
 #include <set>
 #include <utility>
 
@@ -122,14 +121,7 @@ std::optional<ScannedBank> addBank(ScanResultBuilder& result, const BankLayout& 
   for (const auto& instrument : parsed) {
     for (const auto& region : instrument.regions) offsets.insert(region.sampleOffset);
   }
-  std::map<u32, PsxAdpcmStream> streams;
-  for (auto current = offsets.begin(); current != offsets.end(); ++current) {
-    const u32 start = sampleBase + *current;
-    const u32 boundary = std::next(current) == offsets.end()
-                             ? static_cast<u32>(reader.size())
-                             : sampleBase + *std::next(current);
-    if (auto stream = inspectPsxAdpcmStream(reader, start, boundary)) streams.emplace(*current, *stream);
-  }
+  const auto streams = inspectPsxAdpcmStreams(reader, sampleBase, offsets, static_cast<u32>(reader.size()));
   if (streams.empty()) return std::nullopt;
 
   auto bank = result.soundBank("HOSA Bank");
@@ -147,20 +139,7 @@ std::optional<ScannedBank> addBank(ScanResultBuilder& result, const BankLayout& 
                      "hosa-sample-data")
           .id();
 
-  std::map<u32, SampleRef> sampleRefs;
-  for (const auto& [offset, stream] : streams) {
-    const u32 index = static_cast<u32>(sampleRefs.size());
-    auto sample = samples.add(offset, Sample{
-                                          .name = fmt::format("Sample {}", index),
-                                          .codec = AudioCodec::PsxAdpcm,
-                                          .encodedData = stream.encodedData,
-                                          .sampleRate = kPs1SpuSampleRate,
-                                          .channels = 1,
-                                          .loop = stream.loop,
-                                      });
-    sample.source(fmt::format("Sample {}", index), stream.encodedData, "psx-adpcm-sample").parent(sampleRoot);
-    sampleRefs.emplace(offset, sample.ref());
-  }
+  addPsxAdpcmSamples(samples, streams, kPs1SpuSampleRate, sampleRoot);
 
   const SourceAnnotationId instrumentRoot =
       bankInstruments
@@ -179,8 +158,10 @@ std::optional<ScannedBank> addBank(ScanResultBuilder& result, const BankLayout& 
     });
     instrument.source(fmt::format("Instrument {}", program), source.source, "hosa-instrument").parent(instrumentRoot);
     for (const auto& regionSource : source.regions) {
-      const auto sample = sampleRefs.find(regionSource.sampleOffset);
-      if (sample == sampleRefs.end()) continue;
+      const auto sample = samples.find(regionSource.sampleOffset);
+      if (!sample) {
+        continue;
+      }
       core::Region region{
           .keyRange = KeyRange{.low = regionSource.keyLow, .high = regionSource.keyHigh},
           .range = regionSource.source.range,
@@ -188,7 +169,7 @@ std::optional<ScannedBank> addBank(ScanResultBuilder& result, const BankLayout& 
           .envelope = psxSpuEnvelope(regionSource.adsr1, regionSource.adsr2),
           .attenuationDb = linearAmplitudeToAttenuationDb(regionSource.volume / 127.0),
       };
-      instrument.region(sample->second, std::move(region)).source("Region", regionSource.source, "hosa-region");
+      instrument.region(*sample, std::move(region)).source("Region", regionSource.source, "hosa-region");
     }
   }
   return ScannedBank{.bank = bank, .instruments = std::move(parsed)};

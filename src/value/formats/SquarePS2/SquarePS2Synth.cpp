@@ -15,7 +15,6 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include <map>
 #include <set>
 #include <utility>
 
@@ -120,19 +119,8 @@ std::optional<ScanSoundBankDraft> addWd(ScanResultBuilder& result, const WdLayou
       }
     }
   }
-  if (sampleOffsets.empty()) {
-    return std::nullopt;
-  }
-
-  const u32 sampleEnd = layout.sampleOffset + layout.sampleSize;
-  std::map<u32, PsxAdpcmStream> streams;
-  for (auto current = sampleOffsets.begin(); current != sampleOffsets.end(); ++current) {
-    const u32 boundary =
-        std::next(current) == sampleOffsets.end() ? sampleEnd : layout.sampleOffset + *std::next(current);
-    if (const auto stream = inspectPsxAdpcmStream(reader, layout.sampleOffset + *current, boundary)) {
-      streams.emplace(*current, *stream);
-    }
-  }
+  const auto streams =
+      inspectPsxAdpcmStreams(reader, layout.sampleOffset, sampleOffsets, layout.sampleOffset + layout.sampleSize);
   if (streams.empty()) {
     return std::nullopt;
   }
@@ -150,20 +138,7 @@ std::optional<ScanSoundBankDraft> addWd(ScanResultBuilder& result, const WdLayou
       .field("instrument_count", reader.range(layout.offset + 8, 4), layout.instrumentCount)
       .field("region_count", reader.range(layout.offset + 0x0c, 4), layout.regionCount);
 
-  std::map<u32, SampleRef> refs;
-  for (const auto& [offset, stream] : streams) {
-    const u32 index = static_cast<u32>(refs.size());
-    auto entry = samples.add(offset, Sample{
-                                         .name = fmt::format("Sample {}", index),
-                                         .codec = AudioCodec::PsxAdpcm,
-                                         .encodedData = stream.encodedData,
-                                         .sampleRate = kPs2SpuSampleRate,
-                                         .channels = 1,
-                                         .loop = stream.loop,
-                                     });
-    entry.source(fmt::format("Sample {}", index), stream.encodedData, "psx-adpcm-sample");
-    refs.emplace(offset, entry.ref());
-  }
+  addPsxAdpcmSamples(samples, streams, kPs2SpuSampleRate);
 
   SoundBankData data{.bankId = layout.bankId};
   for (u32 program = 0; program < programs.size(); ++program) {
@@ -204,8 +179,8 @@ std::optional<ScanSoundBankDraft> addWd(ScanResultBuilder& result, const WdLayou
       const size_t layers = (primary.flags & 1) != 0 && index + 1 < regions.size() ? 2 : 1;
       for (size_t layer = 0; layer < layers; ++layer) {
         const auto& parsedRegion = regions[index + layer];
-        const auto sample = refs.find(parsedRegion.sampleOffset);
-        if (sample == refs.end()) {
+        const auto sample = samples.find(parsedRegion.sampleOffset);
+        if (!sample) {
           continue;
         }
         Region region{
@@ -227,7 +202,7 @@ std::optional<ScanSoundBankDraft> addWd(ScanResultBuilder& result, const WdLayou
             region.loop = Loop{.enabled = true, .start = loopStart, .length = frames - loopStart};
           }
         }
-        instrument.region(sample->second, std::move(region)).source("Region", parsedRegion.source, "square-ps2-region");
+        instrument.region(*sample, std::move(region)).source("Region", parsedRegion.source, "square-ps2-region");
       }
       velocityLow = primary.velocityHigh >= 127 ? 0 : static_cast<u8>(primary.velocityHigh + 1);
       index += layers;

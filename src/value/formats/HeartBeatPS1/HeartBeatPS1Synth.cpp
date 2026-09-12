@@ -15,7 +15,6 @@
 
 #include <algorithm>
 #include <array>
-#include <map>
 #include <set>
 #include <utility>
 
@@ -116,19 +115,8 @@ std::optional<HeartBeatPs1ScannedBank> addHeartBeatPs1Bank(ScanResultBuilder& re
       sampleOffsets.insert(tone.sampleOffset);
     }
   }
-  if (sampleOffsets.empty()) {
-    return std::nullopt;
-  }
-
-  const u32 sampleEnd = layout.sampleOffset + layout.sampleSize;
-  std::map<u32, PsxAdpcmStream> streams;
-  for (auto current = sampleOffsets.begin(); current != sampleOffsets.end(); ++current) {
-    const u32 boundary =
-        std::next(current) == sampleOffsets.end() ? sampleEnd : layout.sampleOffset + *std::next(current);
-    if (const auto stream = inspectPsxAdpcmStream(reader, layout.sampleOffset + *current, boundary)) {
-      streams.emplace(*current, *stream);
-    }
-  }
+  const auto streams =
+      inspectPsxAdpcmStreams(reader, layout.sampleOffset, sampleOffsets, layout.sampleOffset + layout.sampleSize);
   if (streams.empty()) {
     return std::nullopt;
   }
@@ -171,20 +159,7 @@ std::optional<HeartBeatPs1ScannedBank> addHeartBeatPs1Bank(ScanResultBuilder& re
                   "heartbeat-ps1-sample-data")
           .id();
 
-  std::map<u32, SampleRef> sampleRefs;
-  for (const auto& [offset, stream] : streams) {
-    const u32 index = static_cast<u32>(sampleRefs.size());
-    auto entry = samples.add(offset, Sample{
-                                         .name = fmt::format("Sample {}", index),
-                                         .codec = AudioCodec::PsxAdpcm,
-                                         .encodedData = stream.encodedData,
-                                         .sampleRate = kPs1SpuSampleRate,
-                                         .channels = 1,
-                                         .loop = stream.loop,
-                                     });
-    entry.source(fmt::format("Sample {}", index), stream.encodedData, "psx-adpcm-sample").parent(sampleRoot);
-    sampleRefs.emplace(offset, entry.ref());
-  }
+  addPsxAdpcmSamples(samples, streams, kPs1SpuSampleRate, sampleRoot);
 
   std::vector<HeartBeatPs1InstrumentInfo> runtimeInstruments;
   for (const auto& sourceProgram : programs) {
@@ -217,14 +192,14 @@ std::optional<HeartBeatPs1ScannedBank> addHeartBeatPs1Bank(ScanResultBuilder& re
         continue;
       }
       const HeartBeatPs1Tone& tone = tones[toneIndex];
-      const auto sample = sampleRefs.find(tone.sampleOffset);
-      if (sample == sampleRefs.end() || tone.keys.low > tone.keys.high) {
+      const auto sample = samples.find(tone.sampleOffset);
+      if (!sample || tone.keys.low > tone.keys.high) {
         continue;
       }
       const double gain =
           driverLevel(layout.masterVolume) * driverLevel(sourceProgram.volume) * driverLevel(tone.volume);
       instrument
-          .region(sample->second,
+          .region(*sample,
                   Region{
                       .keyRange = tone.keys,
                       .unityKey = tone.unityKey,

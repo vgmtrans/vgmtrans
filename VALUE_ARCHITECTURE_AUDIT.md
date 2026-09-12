@@ -1754,6 +1754,26 @@ cases across all three rendering modes, including sampled, delayed, interrupted,
 linked, and multi-layer pitch. The harness is not committed. The full build is
 warning-free and all 20 CTest targets pass.
 
+## Share PlayStation sample inspection and construction
+
+Square PS2, Suzuki PS1, TriAce PS1, HeartBeat PS1, HOSA, and Tamsoft now use
+shared PSX ADPCM operations to inspect adjacent sample offsets and add their
+annotated samples. Remove each format's duplicate sample-reference map;
+`SamplePoolBuilder::find()` already resolves the same relative source offsets.
+An empty validated stream list also covers an empty offset list, eliminating
+four redundant rejection branches while keeping validation before draft creation.
+
+The common code preserves stream order, boundary handling, sample names,
+PS1/PS2 rates, loop flags, and optional annotation parents. Format-specific
+instrument loop offsets remain explicit: TriAce uses pool-relative offsets,
+while Suzuki and Square use sample-relative offsets with different override
+conditions. Sony VAB retains its distinct index, naming, and annotation rules.
+
+This removes 91 production lines. One focused test exercises unterminated and
+incomplete streams, loop coordinates, sample references, hardware rate, and
+annotations with and without a parent. The full build is warning-free and all
+20 CTest targets pass, including the existing format bank and loop fixtures.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
