@@ -76,6 +76,7 @@ namespace {
                                                      std::span<const SoundBankAsset* const> soundBanks,
                                                      const MidiExportOptions& options,
                                                      ModulationConversionPolicy modulationConversion,
+                                                     ModulationScalingPolicy modulationScaling,
                                                      const PerformanceSequence* preparedPerformance = nullptr) {
   const auto* performance = preparedPerformance;
   if (performance == nullptr && rendering.performance) {
@@ -84,7 +85,17 @@ namespace {
   if (performance == nullptr) {
     return std::nullopt;
   }
-  return renderMidiSequence(*performance, options, modulationConversion, soundBanks, &rendering.modulation);
+  auto midi = renderMidiSequence(*performance, options, modulationConversion, soundBanks, &rendering.modulation);
+  if (modulationConversion == ModulationConversionPolicy::SynthModulators &&
+      modulationScaling == ModulationScalingPolicy::ObservedSequenceRange && rendering.performance) {
+    // Scale once while preparing the MIDI so every artifact uses the same
+    // controller range as its companion synth modulators.
+    const auto usage = analyzePerformanceModulationUsage(*rendering.performance, &rendering.modulation);
+    if (hasMidiModulationUsage(usage)) {
+      applyMidiModulationScaling(midi, usage, modulationScaling);
+    }
+  }
+  return midi;
 }
 
 struct SynthCollectionView {
@@ -95,34 +106,12 @@ struct SynthCollectionView {
 };
 
 [[nodiscard]] Artifact exportMidi(std::string_view baseName, const RenderedCollection& rendering,
-                                  const std::optional<MidiSequence>& loweredMidi,
-                                  ModulationScalingPolicy modulationScaling,
-                                  ModulationConversionPolicy modulationConversion) {
-  if (!loweredMidi) {
-    return Artifact{
-        .filename = std::string(baseName) + ".mid",
-        .mediaType = "audio/midi",
-        .diagnostics = rendering.diagnostics,
-    };
-  }
-
-  auto midiSequence = *loweredMidi;
-  if (modulationConversion == ModulationConversionPolicy::SynthModulators &&
-      modulationScaling == ModulationScalingPolicy::ObservedSequenceRange && rendering.performance) {
-    // Apply the same observed-range scaling to MIDI controller values and synth
-    // modulators so they continue to match each other.
-    const auto usage = analyzePerformanceModulationUsage(*rendering.performance, &rendering.modulation);
-    if (hasMidiModulationUsage(usage)) {
-      applyMidiModulationScaling(midiSequence, usage, modulationScaling);
-    }
-  }
-  auto bytes = encodeMidiFile(midiSequence);
-
+                                  const std::optional<MidiSequence>& midi) {
   return Artifact{
       .filename = std::string(baseName) + ".mid",
       .mediaType = "audio/midi",
-      .bytes = std::move(bytes),
-      .diagnostics = std::move(midiSequence.diagnostics),
+      .bytes = midi ? encodeMidiFile(*midi) : std::vector<u8>{},
+      .diagnostics = midi ? midi->diagnostics : rendering.diagnostics,
   };
 }
 
@@ -224,10 +213,9 @@ Artifact exportStandaloneSequenceMidi(const SessionSnapshot& snapshot, AssetId s
   }
 
   const auto rendering = renderSequence(*sequence, request);
-  const auto midi = renderMidi(rendering, {}, request.midi, ModulationConversionPolicy::SequenceEventSimulation);
-  return exportMidi(artifactBaseName(sequence->metadata, "sequence"), rendering, midi,
-                    ModulationScalingPolicy::FullFormatRange,
-                    ModulationConversionPolicy::SequenceEventSimulation);
+  const auto midi = renderMidi(rendering, {}, request.midi, ModulationConversionPolicy::SequenceEventSimulation,
+                               ModulationScalingPolicy::FullFormatRange);
+  return exportMidi(artifactBaseName(sequence->metadata, "sequence"), rendering, midi);
 }
 
 [[nodiscard]] std::vector<Artifact> exportCollectionImpl(const SessionSnapshot& snapshot, const SourceStore& sources,
@@ -396,10 +384,10 @@ CollectionPlayback prepareCollectionPlayback(const SessionSnapshot& snapshot, co
   };
   workspace.render(exportRequest.sequence, exportRequest.dynamicEnvelopes, /*materializeSignedStereo=*/true);
   const auto instruments = workspace.soundBankView();
-  auto loweredMidi = renderMidi(workspace.rendering, instruments, exportRequest.sequence.midi,
-                                exportRequest.modulationConversion, workspace.performance());
-  auto midi = exportMidi(bound.baseName(), workspace.rendering, loweredMidi, exportRequest.modulationScaling,
-                         exportRequest.modulationConversion);
+  auto loweredMidi =
+      renderMidi(workspace.rendering, instruments, exportRequest.sequence.midi, exportRequest.modulationConversion,
+                 exportRequest.modulationScaling, workspace.performance());
+  auto midi = exportMidi(bound.baseName(), workspace.rendering, loweredMidi);
   const auto synthConversion = loweredMidi ? request.modulationConversion : ModulationConversionPolicy::SynthModulators;
   workspace.prepareSynth(synthConversion, exportRequest.modulationScaling);
   const SynthCollectionView synth{bound.baseName(), instruments, bound.samplePools()};
@@ -456,8 +444,8 @@ std::vector<Artifact> exportCollectionImpl(const SessionSnapshot& snapshot, cons
   }
   std::optional<MidiSequence> loweredMidi;
   if (exportsMidi) {
-    loweredMidi =
-        renderMidi(rendering, instruments, request.sequence.midi, request.modulationConversion, preparedPerformance);
+    loweredMidi = renderMidi(rendering, instruments, request.sequence.midi, request.modulationConversion,
+                             request.modulationScaling, preparedPerformance);
   }
 
   ModulationConversionPolicy synthConversion = request.modulationConversion;
@@ -492,8 +480,7 @@ std::vector<Artifact> exportCollectionImpl(const SessionSnapshot& snapshot, cons
   for (const auto kind : kinds) {
     switch (kind) {
       case ExportKind::Midi:
-        artifacts.push_back(exportMidi(bound.baseName(), rendering, loweredMidi, request.modulationScaling,
-                                       request.modulationConversion));
+        artifacts.push_back(exportMidi(bound.baseName(), rendering, loweredMidi));
         break;
       case ExportKind::Wav: {
         auto wavArtifacts = exportWav(bound, sources);

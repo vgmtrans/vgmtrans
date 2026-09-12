@@ -1324,6 +1324,22 @@ sanitized check covers 48 boundary timing cases, chained delays, sustained notes
 source spans, and retained automation bindings. The full build is warning-free
 and all 20 CTest targets pass; no test code is added.
 
+### Prepare MIDI once before constructing artifacts
+
+Apply optional observed-range modulation scaling while preparing the lowered
+MIDI. Artifact construction now encodes that prepared value directly and chooses
+its diagnostics in one place. Remove the complete MidiSequence copy previously
+made for every MIDI artifact, including exports with scaling disabled. Repeated
+MIDI requests reuse the same scaled sequence without repeating modulation
+analysis or scaling. The canonical performance still supplies modulation maxima.
+
+This removes 13 production lines and two policy arguments from artifact writing.
+A temporary sanitized comparison checks exact bytes and all diagnostic fields
+across 1,440 scenarios: six modulation targets, both conversion/scaling policies,
+three level resolutions, missing and replacement performances, zero and fractional
+amounts, and repeated encoding. The full build is warning-free and all 20 CTest
+targets pass; no test code is added.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
