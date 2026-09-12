@@ -111,10 +111,10 @@ public:
     // LoopCandidate is a source-driver hint that the jump target is a loop point.
     // Repeat counters are ignored here so the hint still applies when the loop
     // command appears while a finite repeat is active.
-    for (const auto& [state, tick] : visited_) {
-      if (state.commandIndex == commandIndex && state.callStack == callStack) {
-        return tick;
-      }
+    // An empty repeat map sorts before every repeat state for this command and stack.
+    const auto found = visited_.lower_bound(VisitState{.commandIndex = commandIndex, .callStack = callStack});
+    if (found != visited_.end() && found->first.commandIndex == commandIndex && found->first.callStack == callStack) {
+      return found->second;
     }
     return std::nullopt;
   }
