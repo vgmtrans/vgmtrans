@@ -253,11 +253,7 @@ struct ProgramState : DriverConfig {
     std::optional<double> audioEndMilliseconds;
   };
 
-  ProgramState(const SequenceProgram& sequence, const DriverConfig& config) : DriverConfig(config) {
-    for (u32 index = 0; index < sequence.tracks.size(); ++index) {
-      outputTracks.emplace(sequence.tracks[index].sourceTrackNumber, index);
-    }
-  }
+  explicit ProgramState(const DriverConfig& config) : DriverConfig(config) {}
 
   [[nodiscard]] double millisecondsAt(u64 tick) const {
     const double tickMilliseconds =
@@ -361,18 +357,12 @@ struct ProgramState : DriverConfig {
 
   void finalizePerformance(PerformanceSequence& performance) {
     for (PerformanceTrack& track : performance.tracks) {
-      const auto source = std::ranges::find_if(outputTracks, [&](const auto& entry) {
-        return entry.second == track.id.value;
-      });
-      if (source == outputTracks.end()) {
-        continue;
-      }
       for (PerformanceEvent& event : track.events) {
         auto* note = std::get_if<NotePerformanceEvent>(&event);
         if (note == nullptr || !note->note.valid()) {
           continue;
         }
-        const auto limit = noteLimits.find(std::pair{source->first, note->note.value});
+        const auto limit = noteLimits.find(std::pair{track.sourceTrackNumber, note->note.value});
         if (limit == noteLimits.end()) {
           continue;
         }
@@ -400,7 +390,6 @@ struct ProgramState : DriverConfig {
   double clockMilliseconds = 0.0;
   std::array<HardwareVoice, 8> voices{};
   std::map<std::tuple<u16, bool, u8>, VoiceScriptAnalysis> voiceCache;
-  std::map<u32, u32> outputTracks;
   std::map<std::pair<u32, u32>, NoteLimit> noteLimits;
   ReferencedInstruments references;
 };
