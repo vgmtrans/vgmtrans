@@ -240,30 +240,18 @@ struct Playback {
   PerformanceEmitter& out;
   VmApi& vm;
 
-  [[nodiscard]] u64 eventTick() const { return vm.tick(); }
-
-  [[nodiscard]] PerformanceEmitter atEvent() const { return out; }
-
-  void publishEnvelope(PerformanceEmitter& emitter) {
-    if (track.hasEnvelope) {
-      emitter.replaceEnvelope(psxSpuEnvelope(track.adsr1, track.adsr2, PsxSpuGeneration::Ps2),
-                              VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
-    }
-  }
-
   void noteOn(u8 key, u8 velocity) {
-    auto emitter = atEvent();
     const bool glides =
         track.portamento && track.previousPitchKey && track.portamentoTicks != 0 && *track.previousPitchKey != key;
     if (glides && !track.legato) {
       // Only Legato On prevents the driver from activating a new destination
       // voice. Otherwise, end the overlap so MIDI portamento also activates one.
-      emitter.noteOff(*track.previousPitchKey);
+      out.noteOff(*track.previousPitchKey);
     }
-    const PerformanceNoteId note = emitter.noteOn(key, controller(static_cast<s8>(std::min<u8>(velocity, 127))));
+    const PerformanceNoteId note = out.noteOn(key, controller(static_cast<s8>(std::min<u8>(velocity, 127))));
     if (glides) {
       // Pitch bend would also retune unrelated and releasing voices.
-      emitter.pitchSlide(note, *track.previousPitchKey, key, track.portamentoTicks).requirePortamento();
+      out.pitchSlide(note, *track.previousPitchKey, key, track.portamentoTicks).requirePortamento();
     }
     track.previousKey = key;
     track.previousPitchKey = key;
@@ -272,7 +260,7 @@ struct Playback {
 
   void noteOff(u8 key) {
     track.previousKey = key;
-    atEvent().noteOff(key);
+    out.noteOff(key);
   }
 
   void noteOffPrevious() { noteOff(track.previousKey); }
@@ -285,9 +273,8 @@ struct Playback {
 
   void resetEnvelope() {
     track.loadEnvelope();
-    auto emitter = atEvent();
-    emitter.instrument(instrumentIdentity(track.bank, track.program), InstrumentEnvelopeMode::UseInstrumentEnvelope);
-    emitter.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    out.instrument(instrumentIdentity(track.bank, track.program), InstrumentEnvelopeMode::UseInstrumentEnvelope);
+    out.restoreEnvelope(EnvelopeFields::All, VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
   }
 
   void envelopeParameter(u8 parameter, u8 value, u8 second) {
@@ -298,8 +285,10 @@ struct Playback {
     } else if (parameter == 9) {
       track.adsr1 = static_cast<u16>((track.adsr1 & ~0x00ffu) | ((value & 0x0f) << 4) | (second & 0x0f));
     }
-    auto emitter = atEvent();
-    publishEnvelope(emitter);
+    if (track.hasEnvelope) {
+      out.replaceEnvelope(psxSpuEnvelope(track.adsr1, track.adsr2, PsxSpuGeneration::Ps2),
+                          VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks);
+    }
   }
 
   [[nodiscard]] LfoPerformanceContext lfoContext(const LfoState& lfo, bool restart) const {
@@ -356,66 +345,57 @@ struct Playback {
 
   void lfoOff(u8 slot) {
     auto& lfo = track.lfos[slot & 3];
-    auto emitter = atEvent();
     lfo.depth = 0;
-    emitLfoDepth(emitter, lfo, false, 0.0);
+    emitLfoDepth(out, lfo, false, 0.0);
     lfo.mode = -1;
   }
 
   void lfoDepthValue(u8 slot, u8 depth) {
     auto& lfo = track.lfos[slot & 3];
     lfo.depth = depth;
-    auto emitter = atEvent();
-    emitLfoDepth(emitter, lfo);
+    emitLfoDepth(out, lfo);
   }
 
   void lfoDepthFade(u8 slot, u32 duration, u8 depth) {
     auto& lfo = track.lfos[slot & 3];
     lfo.depth = depth;
-    const u64 tick = eventTick();
-    auto emitter = out.at(tick);
     const auto target = lfo.mode == 0   ? PerformanceAutomationTarget::VibratoDepth
                         : lfo.mode == 1 ? PerformanceAutomationTarget::TremoloDepth
                                         : PerformanceAutomationTarget::VibratoDepth;
     const double value = lfo.mode == 0 ? vibratoDepth(depth) : tremoloDepth(depth);
     if (lfo.mode < 2) {
-      emitter.fade(target, value, duration);
+      out.fade(target, value, duration);
     }
-    auto terminal = out.at(tick + duration);
+    auto terminal = out.after(duration);
     emitLfoDepth(terminal, lfo);
   }
 
   void lfoRateValue(u8 slot, u8 rate) {
     auto& lfo = track.lfos[slot & 3];
     lfo.rate = rate;
-    auto emitter = atEvent();
-    emitLfoRate(emitter, lfo);
+    emitLfoRate(out, lfo);
   }
 
   void lfoRateFade(u8 slot, u32 duration, u8 rate) {
     auto& lfo = track.lfos[slot & 3];
     lfo.rate = rate;
-    auto emitter = out.at(eventTick() + duration);
-    emitLfoRate(emitter, lfo);
+    auto terminal = out.after(duration);
+    emitLfoRate(terminal, lfo);
   }
 
   void lfoDelay(u8 slot, u8 delay, u8 fade) {
     auto& lfo = track.lfos[slot & 3];
     lfo.delay = delay;
     lfo.fade = fade;
-    auto emitter = atEvent();
-    emitLfoDepth(emitter, lfo, true);
+    emitLfoDepth(out, lfo, true);
   }
 
   void controllerFade(u8 kind, u32 duration, s8 raw) {
-    const u64 tick = eventTick();
-    auto emitter = out.at(tick);
     const double value = controller(raw);
     const auto target = kind == 0   ? PerformanceAutomationTarget::Level
                         : kind == 1 ? PerformanceAutomationTarget::MasterLevel
                                     : PerformanceAutomationTarget::Expression;
-    auto fade = emitter.fade(target, value, duration);
-    auto terminal = fade.at(emitter, tick + duration);
+    auto terminal = out.fade(target, value, duration).output(out.after(duration));
     if (kind == 0) {
       terminal.level(value);
     } else if (kind == 1) {
@@ -427,7 +407,7 @@ struct Playback {
 
   void tuning(s16 semitones256) {
     track.coarseTuning = semitones256;
-    atEvent().tuning(semitones256 * (100.0 / 256.0));
+    out.tuning(semitones256 * (100.0 / 256.0));
   }
 };
 
@@ -471,9 +451,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         lfo.depth = depth;
         lfo.rate = rate;
         lfo.wave = wave & 0x0f;
-        auto emitter = playback.atEvent();
-        playback.emitLfoDepth(emitter, lfo, true);
-        playback.emitLfoRate(emitter, lfo);
+        playback.emitLfoDepth(playback.out, lfo, true);
+        playback.emitLfoRate(playback.out, lfo);
       });
     }
     case 1:
@@ -504,8 +483,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return event.invoke([slot, wave](Playback& playback) {
         auto& lfo = playback.track.lfos[slot & 3];
         lfo.wave = wave & 0x0f;
-        auto emitter = playback.atEvent();
-        playback.emitLfoDepth(emitter, lfo, true);
+        playback.emitLfoDepth(playback.out, lfo, true);
       });
     }
     case 7: {
@@ -577,11 +555,10 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       auto event = beginEvent(cursor, *source, "Tempo", SequenceSemantic::Tempo);
       const u8 raw = event.u8("tempo");
       event.derived("beats_per_minute", static_cast<double>(raw), SourceValueDisplay::BeatsPerMinute);
-      return event.invoke([raw](Playback& playback) {
-        if (const u32 micros = tempoMicros(raw); micros != 0) {
-          playback.atEvent().tempo(micros);
-        }
-      });
+      if (const u32 micros = tempoMicros(raw); micros != 0) {
+        event.emitTempo(micros);
+      }
+      return event;
     }
     case 0x09: {
       auto event = beginEvent(cursor, *source, "Tempo Fade", SequenceSemantic::Tempo);
@@ -590,16 +567,16 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       event.derived("target_beats_per_minute", static_cast<double>(target), SourceValueDisplay::BeatsPerMinute);
       return event.invoke([duration, target](Playback& playback) {
         if (const u32 micros = tempoMicros(target); micros != 0) {
-          const u64 tick = playback.eventTick();
-          auto emitter = playback.out.at(tick);
-          emitter.fade(PerformanceAutomationTarget::Tempo, micros, duration).at(emitter, tick + duration).tempo(micros);
+          playback.out.fade(PerformanceAutomationTarget::Tempo, micros, duration)
+              .output(playback.out.after(duration))
+              .tempo(micros);
         }
       });
     }
     case 0x0a: {
       auto event = beginEvent(cursor, *source, "Master Level", SequenceSemantic::Level);
       const s8 level = event.s8("level");
-      return event.invoke([level](Playback& playback) { playback.atEvent().masterLevel(controller(level)); });
+      return event.emitMasterLevel(controller(level));
     }
     case 0x0b: {
       auto event = beginEvent(cursor, *source, "Master Level Fade", SequenceSemantic::Level);
@@ -613,7 +590,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       const u8 denominator = event.u8("denominator");
       return event.invoke([numerator, denominator](Playback& playback) {
         if (numerator != 0 && denominator != 0) {
-          playback.atEvent().timeSignature(numerator, denominator, 48);
+          playback.out.timeSignature(numerator, denominator, 48);
         }
       });
     }
@@ -673,9 +650,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x22: {
       auto event = beginEvent(cursor, *source, "Level", SequenceSemantic::Level);
       const s8 level = event.s8("level");
-      return event.invoke([level](Playback& playback) {
-        playback.atEvent().level(controller(level), ValueQuantization{.levels = 128});
-      });
+      return event.emitLevel(controller(level), ValueQuantization{.levels = 128});
     }
     case 0x23: {
       auto event = beginEvent(cursor, *source, "Level Fade", SequenceSemantic::Level);
@@ -687,7 +662,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       auto event = beginEvent(cursor, *source, "Expression", SequenceSemantic::Level);
       const s8 expression = event.s8("expression");
       return event.invoke([expression](Playback& playback) {
-        playback.atEvent().expression(controller(expression), ValueQuantization{.levels = 128});
+        playback.out.expression(controller(expression), ValueQuantization{.levels = 128});
       });
     }
     case 0x25: {
@@ -699,17 +674,17 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x26: {
       auto event = beginEvent(cursor, *source, "Pan", SequenceSemantic::Pan);
       const u8 pan = event.u8("pan");
-      return event.invoke([pan](Playback& playback) { playback.atEvent().pan(panPosition(pan)); });
+      return event.emitPan(panPosition(pan));
     }
     case 0x27: {
       auto event = beginEvent(cursor, *source, "Pan Fade", SequenceSemantic::Pan);
       const u32 duration = event.varLen("duration");
       const u8 target = event.u8("target");
       return event.invoke([duration, target](Playback& playback) {
-        const u64 tick = playback.eventTick();
-        auto emitter = playback.out.at(tick);
         const double pan = panPosition(target);
-        emitter.fade(PerformanceAutomationTarget::Pan, pan, duration).at(emitter, tick + duration).pan(pan);
+        playback.out.fade(PerformanceAutomationTarget::Pan, pan, duration)
+            .output(playback.out.after(duration))
+            .pan(pan);
       });
     }
     case 0x28: {
@@ -718,33 +693,29 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return event.invoke([duration](Playback& playback) {
         playback.track.portamentoTicks = duration;
         playback.track.portamento = true;
-        playback.atEvent().portamentoEnable(true);
+        playback.out.portamentoEnable(true);
       });
     }
     case 0x29:
       return beginEvent(cursor, *source, "Portamento Off", SequenceSemantic::Portamento).invoke([](Playback& playback) {
         playback.track.portamento = false;
         playback.track.previousPitchKey.reset();
-        playback.atEvent().portamentoEnable(false);
+        playback.out.portamentoEnable(false);
       });
     case 0x2a:
     case 0x2b: {
       const bool enabled = source->status == 0x2a;
       return beginEvent(cursor, *source, enabled ? "Legato On" : "Legato Off", SequenceSemantic::State)
-          .invoke([enabled](Playback& playback) {
-            playback.track.legato = enabled;
-            playback.atEvent().legatoPedal(enabled);
-          });
+          .set<&TrackState::legato>(enabled)
+          .emitLegatoPedal(enabled);
     }
     case 0x2c: {
       auto event = beginEvent(cursor, *source, "Pitch Slide", SequenceSemantic::Pitch);
       const u32 duration = event.varLen("duration");
       const s8 semitones = event.s8("semitones");
       return event.invoke([duration, semitones](Playback& playback) {
-        const u64 tick = playback.eventTick();
-        auto emitter = playback.out.at(tick);
-        emitter.fade(PerformanceAutomationTarget::Pitch, semitones, duration)
-            .at(emitter, tick + duration)
+        playback.out.fade(PerformanceAutomationTarget::Pitch, semitones, duration)
+            .output(playback.out.after(duration))
             .pitchBend(semitones);
       });
     }
@@ -777,7 +748,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x3c: {
       auto event = beginEvent(cursor, *source, "Sustain Pedal", SequenceSemantic::State);
       const bool enabled = event.u8("enabled", SourceValueDisplay::Boolean) != 0;
-      return event.invoke([enabled](Playback& playback) { playback.atEvent().sustainPedal(enabled); });
+      return event.invoke([enabled](Playback& playback) { playback.out.sustainPedal(enabled); });
     }
     case 0x3d:
       return sourceOnly(cursor, *source, "Sequence Parameter", 1);
@@ -811,7 +782,7 @@ using Cursor = CompilerCursor<TrackState, Playback>;
       return event.invoke([lsb, msb](Playback& playback) {
         const s32 wheel = static_cast<s32>(lsb) + static_cast<s32>(msb) * 128 - 8192;
         const double normalized = std::clamp(wheel / 8192.0, -1.0, 1.0);
-        playback.atEvent().pitchBend(PitchBendPerformanceEvent{
+        playback.out.pitchBend(PitchBendPerformanceEvent{
             .semitones = normalized * playback.track.pitchBendRange,
             .normalizedWheelPosition = normalized,
         });
@@ -820,25 +791,21 @@ using Cursor = CompilerCursor<TrackState, Playback>;
     case 0x5d: {
       auto event = beginEvent(cursor, *source, "Pitch Bend Range", SequenceSemantic::Pitch);
       const s8 range = event.s8("semitones");
-      return event.invoke([range](Playback& playback) {
-        playback.track.pitchBendRange = range;
-        playback.atEvent().pitchBendRange(static_cast<u8>(std::abs(static_cast<int>(range))));
-      });
+      return event.set<&TrackState::pitchBendRange>(range).emitPitchBendRange(
+          static_cast<u8>(std::abs(static_cast<int>(range))));
     }
     case 0x60:
     case 0x61: {
       const bool enabled = source->status == 0x60;
       return beginEvent(cursor, *source, enabled ? "Reverb On" : "Reverb Off", SequenceSemantic::State)
-          .invoke([enabled](Playback& playback) { playback.atEvent().reverb(enabled ? 1.0 : 0.0); });
+          .emitReverb(enabled ? 1.0 : 0.0);
     }
     case 0x62: {
       auto event = beginEvent(cursor, *source, "Output Routing", SequenceSemantic::State);
       const u8 left = event.u8("left");
       const u8 right = event.u8("right");
-      return event.invoke([left, right](Playback& playback) {
-        const double wet = ((left == 1 || left == 2 ? 1.0 : 0.0) + (right == 1 || right == 2 ? 1.0 : 0.0)) / 2.0;
-        playback.atEvent().reverb(wet);
-      });
+      const double wet = ((left == 1 || left == 2 ? 1.0 : 0.0) + (right == 1 || right == 2 ? 1.0 : 0.0)) / 2.0;
+      return event.emitReverb(wet);
     }
     case 0x64:
     case 0x65:
@@ -870,9 +837,8 @@ using Cursor = CompilerCursor<TrackState, Playback>;
         auto& lfo = playback.track.lfos[slot & 3];
         lfo.mode = static_cast<s8>(mode % 3);
         lfo.wave = wave & 0x0f;
-        auto emitter = playback.atEvent();
-        playback.emitLfoDepth(emitter, lfo, true);
-        playback.emitLfoRate(emitter, lfo);
+        playback.emitLfoDepth(playback.out, lfo, true);
+        playback.emitLfoRate(playback.out, lfo);
       });
     }
     case 0x75: {

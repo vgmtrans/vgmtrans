@@ -1681,6 +1681,20 @@ This removes ten production lines and an unsupported operation from the general
 API. Existing pitch sampling and lifecycle coverage passes without additional
 test scaffolding. The full build is warning-free and all 20 CTest targets pass.
 
+## Use the VM's current emitter directly in Square PS2
+
+Remove `atEvent()` and `eventTick()` from Square PS2 playback. SequenceVM already
+executes delayed commands with the correctly positioned emitter, so immediate
+notes, controllers, envelopes, and LFO changes can use `out` directly. Future
+fade endpoints use `out.after(duration)` and retain their automation ownership.
+Simple controller commands use existing cursor emission helpers, and the
+single-call envelope publishing wrapper is folded into its caller.
+
+This removes 34 production lines without adding a new abstraction. One focused
+fixture checks delayed level/pan fades, endpoint values and ownership, and
+immediate level quantization. The full build is warning-free and all 20 CTest
+targets pass, including existing portamento, envelope, LFO, and song-loop coverage.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,
