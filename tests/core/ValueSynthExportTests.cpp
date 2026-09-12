@@ -9,6 +9,7 @@
 #include "SessionSnapshotBuilder.h"
 
 #include "value/export/CollectionBinding.h"
+#include "value/export/BinaryWriter.h"
 #include "value/export/synth/ModulationScaling.h"
 #include "value/export/synth/SynthExportData.h"
 #include "value/synth/PsxSpu.h"
@@ -16,6 +17,21 @@
 #include "value/validation/SynthValidation.h"
 
 namespace {
+
+void riffChunksKeepLogicalSizesSeparateFromStoragePadding() {
+  const RiffChunk odd{"odd ", {1, 2, 3}};
+  const RiffChunk even{"even", {4, 5}};
+  const auto bytes = makeRiff("TEST", {makeListChunk("nest", {odd, even})});
+  // RIFF header plus LIST header/type puts the first child at byte 24.
+  const size_t first = 24;
+  const size_t second = first + chunkStorageSize(odd);
+  expect(readLe32(bytes, first + 4) == 3 && bytes[first + 11] == 0 && second == asciiOffset(bytes, "even") &&
+             readLe32(bytes, second + 4) == 2,
+         "odd payloads need an uncounted alignment byte before the next chunk");
+  expect(bytes.size() == second + chunkStorageSize(even) && readLe32(bytes, 4) == bytes.size() - 8 &&
+             readLe32(bytes, 16) == bytes.size() - 20,
+         "RIFF and LIST sizes must include their child chunks and padding");
+}
 
 void snesBrrDecoderProducesPcm() {
   const std::vector<u8> sourceBytes{0x01, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -1906,6 +1922,7 @@ void synthPreparationKeepsSampleIdentityAndPhaseOrdering() {
 }  // namespace
 
 void runValueSynthExportTests() {
+  riffChunksKeepLogicalSizesSeparateFromStoragePadding();
   snesBrrDecoderProducesPcm();
   snesDspNoiseDecoderMatchesHardwareSequence();
   snesGainEvaluationHandlesLongIntervals();

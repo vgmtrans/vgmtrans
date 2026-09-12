@@ -207,13 +207,13 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
 [[nodiscard]] Chunk colhChunk(std::span<const ResolvedSynthInstrument> instruments) {
   std::vector<u8> payload;
   writeLe32(payload, static_cast<u32>(instruments.size()));
-  return makeChunk("colh", std::move(payload));
+  return Chunk{"colh", std::move(payload)};
 }
 
 [[nodiscard]] Chunk infoList(std::string_view name, std::string_view fallback) {
   std::vector<u8> inam;
   writeFixedString(inam, name.empty() ? fallback : name);
-  return makeListChunk("INFO", {makeChunk("INAM", std::move(inam))});
+  return makeListChunk("INFO", {Chunk{"INAM", std::move(inam)}});
 }
 
 [[nodiscard]] Chunk inshChunk(const ResolvedSynthInstrument& instrument) {
@@ -222,7 +222,7 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
   writeLe32(payload, static_cast<u32>(instrument.regions.size()));
   writeLe32(payload, dlsBank);
   writeLe32(payload, instrument.address.program);
-  return makeChunk("insh", std::move(payload));
+  return Chunk{"insh", std::move(payload)};
 }
 
 [[nodiscard]] Chunk rgnhChunk(const Region& region) {
@@ -234,7 +234,7 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
   writeLe16(payload, 1);
   writeLe16(payload, 0);
   writeLe16(payload, 1);
-  return makeChunk("rgnh", std::move(payload));
+  return Chunk{"rgnh", std::move(payload)};
 }
 
 [[nodiscard]] Chunk wsmpChunk(const Region& region, const DecodedSynthSample& sample) {
@@ -258,7 +258,7 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
     writeLe32(payload, loop.start);
     writeLe32(payload, loop.length);
   }
-  return makeChunk("wsmp", std::move(payload));
+  return Chunk{"wsmp", std::move(payload)};
 }
 
 [[nodiscard]] Chunk wlnkChunk(u32 waveIndex) {
@@ -267,7 +267,7 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
   writeLe16(payload, 0);
   writeLe32(payload, 1);
   writeLe32(payload, waveIndex);
-  return makeChunk("wlnk", std::move(payload));
+  return Chunk{"wlnk", std::move(payload)};
 }
 
 void writeConnection(std::vector<u8>& bytes, DlsConnection connection) {
@@ -315,7 +315,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   writeLe32(art, 8);
   writeLe32(art, static_cast<u32>(connections.size() / 12));
   art.insert(art.end(), connections.begin(), connections.end());
-  return makeListChunk("lar2", {makeChunk("art2", std::move(art))});
+  return makeListChunk("lar2", {Chunk{"art2", std::move(art)}});
 }
 
 [[nodiscard]] Chunk rgn2Chunk(const ResolvedSynthInstrument& instrument, const ResolvedSynthRegion& resolvedRegion,
@@ -371,7 +371,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   writeLe16(payload, blockAlign);
   writeLe16(payload, kBitsPerSample);
   writeLe16(payload, 0);
-  return makeChunk("fmt ", std::move(payload));
+  return Chunk{"fmt ", std::move(payload)};
 }
 
 [[nodiscard]] Chunk dataChunk(const DecodedSynthSample& sample) {
@@ -380,7 +380,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   for (const s16 value : sample.decoded.pcm) {
     writeLeS16(payload, value);
   }
-  return makeChunk("data", std::move(payload));
+  return Chunk{"data", std::move(payload)};
 }
 
 [[nodiscard]] Chunk waveList(const DecodedSynthSample& sample) {
@@ -403,7 +403,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
     offset += chunkStorageSize(wave);
   }
 
-  return makeChunk("ptbl", std::move(payload));
+  return Chunk{"ptbl", std::move(payload)};
 }
 
 [[nodiscard]] std::vector<Chunk> waveChunks(std::span<const DecodedSynthSample> samples) {

@@ -1936,6 +1936,23 @@ repeated and held notes, signed/zero gains, and non-finite envelope values.
 Both implementations run under AddressSanitizer and UBSan without findings.
 The full build is warning-free; no test code is added.
 
+## Derive RIFF chunk sizes when serializing
+
+RIFF chunks now retain their identifier and logical payload only. The writer
+derives the declared size and appends the alignment byte, removing the separate
+size field and the factory that kept it synchronized with a pre-padded buffer.
+SoundFont and DLS construct ordinary chunk values directly. DLS pool offsets
+still use storage size including padding; SoundFont INFO strings still add
+their required even-length padding inside the declared payload.
+
+This removes five production lines, one stored invariant, and one factory.
+Payload and storage sizes retain their 32-bit overflow checks. A compact
+17-line addition to the existing synth test file checks odd/even siblings and
+nested container lengths; existing exporter tests cover the format-specific
+rules. A temporary sanitized comparison matches bytes and storage sizes for
+4,096 nested RIFF cases. The full build is warning-free and all 20 CTest targets
+pass. The comparison harness is not committed.
+
 ## Further investigation
 
 - Continue auditing export lowering, instrument selection, envelope projection,

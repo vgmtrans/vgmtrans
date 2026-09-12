@@ -59,28 +59,24 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text, size_t widt
   bytes.insert(bytes.end(), width - copied, 0);
 }
 
-RiffChunk makeChunk(std::string id, std::vector<u8> payload) {
-  if (payload.size() > std::numeric_limits<u32>::max()) {
+void appendChunk(std::vector<u8>& bytes, const RiffChunk& chunk) {
+  if (chunk.payload.size() > std::numeric_limits<u32>::max()) {
     throw std::overflow_error("RIFF chunk is too large");
   }
-  const u32 size = static_cast<u32>(payload.size());
-  if ((payload.size() & 1) != 0) {
-    payload.push_back(0);
-  }
-  return RiffChunk{.id = std::move(id), .size = size, .payload = std::move(payload)};
-}
-
-void appendChunk(std::vector<u8>& bytes, const RiffChunk& chunk) {
   writeAscii(bytes, chunk.id);
-  writeLe32(bytes, chunk.size);
+  writeLe32(bytes, static_cast<u32>(chunk.payload.size()));
   bytes.insert(bytes.end(), chunk.payload.begin(), chunk.payload.end());
+  if ((chunk.payload.size() & 1) != 0) {
+    bytes.push_back(0);
+  }
 }
 
 u32 chunkStorageSize(const RiffChunk& chunk) {
-  if (chunk.payload.size() > std::numeric_limits<u32>::max() - 8) {
+  const size_t padding = chunk.payload.size() & 1;
+  if (chunk.payload.size() > std::numeric_limits<u32>::max() - 8 - padding) {
     throw std::overflow_error("RIFF chunk is too large");
   }
-  return static_cast<u32>(8 + chunk.payload.size());
+  return static_cast<u32>(8 + chunk.payload.size() + padding);
 }
 
 RiffChunk makeListChunk(std::string type, std::vector<RiffChunk> children) {
@@ -89,7 +85,7 @@ RiffChunk makeListChunk(std::string type, std::vector<RiffChunk> children) {
   for (const auto& child : children) {
     appendChunk(payload, child);
   }
-  return makeChunk("LIST", std::move(payload));
+  return RiffChunk{"LIST", std::move(payload)};
 }
 
 std::vector<u8> makeRiff(std::string type, std::vector<RiffChunk> children) {
