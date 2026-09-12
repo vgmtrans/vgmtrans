@@ -67,6 +67,7 @@ struct ResolvedSynthInstrument {
   LoweredSynthModulation modulation;
 };
 
+// Sample references and modulation policy are resolved before container layout.
 struct PreparedSynthData {
   std::vector<DecodedSynthSample> samples;
   std::vector<ResolvedSynthInstrument> instruments;

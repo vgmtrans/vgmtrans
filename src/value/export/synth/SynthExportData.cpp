@@ -170,7 +170,14 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
 
 [[nodiscard]] std::vector<ResolvedSynthInstrument> resolveSynthInstruments(
     std::span<const Instrument* const> selectedInstruments, const SynthSampleIndexMap& samples,
-    ModulationConversionPolicy conversion, std::vector<Diagnostic>& diagnostics) {
+    const SynthExportInput& input, std::vector<Diagnostic>& diagnostics) {
+  const auto lowerModulation = [&](const InstrumentModulation& modulation) {
+    auto lowered = lowerSynthModulation(modulation, input.modulationConversion);
+    for (auto& modulator : lowered.modulators) {
+      modulator.amount = scaledSynthModulatorAmount(modulator, input.midiModulationUsage, input.modulationScaling);
+    }
+    return lowered;
+  };
   // Drop only regions whose samples cannot be resolved. The rest of the instrument can
   // still produce a useful partial export.
   std::vector<ResolvedSynthInstrument> instruments;
@@ -178,7 +185,7 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
     ResolvedSynthInstrument resolvedInstrument{
         .instrument = instrument,
         .address = resolveInstrumentAddress(instrument->explicitAddress, instrument->identity),
-        .modulation = lowerSynthModulation(instrument->modulation, conversion),
+        .modulation = lowerModulation(instrument->modulation),
     };
     for (const auto& region : instrument->regions) {
       const auto sample = samples.find({region.sample.owner().value, region.sample.index(), region.invertSamplePhase,
@@ -191,7 +198,7 @@ void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
       resolvedInstrument.regions.push_back(ResolvedSynthRegion{
           .region = &region,
           .sampleIndex = sample->second,
-          .modulation = lowerSynthModulation(region.modulation, conversion),
+          .modulation = lowerModulation(region.modulation),
       });
     }
 
@@ -382,8 +389,7 @@ PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceSt
   const bool filterSamples = input.sequenceUsage != nullptr || input.filterSamplesToReferencedInstruments;
   const auto samplesByReference = decodeSynthSamples(
       prepared, samplePools, sources, options, referencedSamples(instruments), filterSamples, input.sampleFiltering);
-  prepared.instruments =
-      resolveSynthInstruments(instruments, samplesByReference, input.modulationConversion, prepared.diagnostics);
+  prepared.instruments = resolveSynthInstruments(instruments, samplesByReference, input, prepared.diagnostics);
   return prepared;
 }
 

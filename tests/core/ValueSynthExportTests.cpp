@@ -605,6 +605,18 @@ void soundFontExporterWritesSfbkRiffFile() {
            "offsets");
   }
 
+  const MidiModulationUsage inactiveVibrato{.vibratoDepth = 0.0};
+  const auto scaledShared =
+      buildSoundFont2(SynthExportInput{.name = "Probe",
+                                       .soundBanks = soundBanks,
+                                       .samplePools = samples,
+                                       .midiModulationUsage = &inactiveVibrato,
+                                       .modulationScaling = ModulationScalingPolicy::ObservedSequenceRange},
+                      sources);
+  expect(chunkSize(scaledShared.bytes, "phdr") == 3 * 38 && chunkSize(scaledShared.bytes, "inst") == 2 * 22 &&
+             soundFontPgenContainsAmount(scaledShared.bytes, 34, 1200),
+         "presets whose modulation becomes identical after scaling should share an SF2 instrument");
+
   soundBank.instruments.resize(1);
   auto& regions = soundBank.instruments.front().regions;
   const Region region = regions.front();

@@ -232,9 +232,7 @@ struct SfLayout {
   return std::nullopt;
 }
 
-[[nodiscard]] std::optional<SfModulatorRecord> sf2ModulatorFor(
-    const SynthModulator& modulator, const MidiModulationUsage* midiModulationUsage = nullptr,
-    ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange) {
+[[nodiscard]] std::optional<SfModulatorRecord> sf2ModulatorFor(const SynthModulator& modulator) {
   // SynthModulator names common controller behavior. This function chooses the SF2 controller
   // and generator numbers that represent it in the file.
   const auto source = modulator.source == SynthSource::ChannelPressure
@@ -248,7 +246,7 @@ struct SfLayout {
   return SfModulatorRecord{
       .source = *source,
       .destination = *destination,
-      .amount = clampS16(scaledSynthModulatorAmount(modulator, midiModulationUsage, modulationScaling)),
+      .amount = clampS16(modulator.amount),
   };
 }
 
@@ -446,9 +444,7 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
 }
 
 [[nodiscard]] std::array<Chunk, 4> instrumentChunks(std::span<const ResolvedSynthInstrument> instruments,
-                                                    std::span<const DecodedSynthSample> samples,
-                                                    const MidiModulationUsage* midiModulationUsage,
-                                                    ModulationScalingPolicy modulationScaling) {
+                                                    std::span<const DecodedSynthSample> samples) {
   std::vector<u8> headers;
   std::vector<u8> bags;
   std::vector<u8> modulators;
@@ -467,7 +463,7 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
       }
     }
     for (const auto& modulator : modulation.modulators) {
-      if (const auto record = sf2ModulatorFor(modulator, midiModulationUsage, modulationScaling)) {
+      if (const auto record = sf2ModulatorFor(modulator)) {
         writeWordGen(modulators, record->source, record->destination);
         writeLeS16(modulators, record->amount);
         writeLe16(modulators, 0);
@@ -584,11 +580,9 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
   return makeChunk("shdr", std::move(payload));
 }
 
-[[nodiscard]] std::vector<Chunk> pdtaChunks(const SfLayout& layout, std::span<const DecodedSynthSample> samples,
-                                            const MidiModulationUsage* midiModulationUsage,
-                                            ModulationScalingPolicy modulationScaling) {
+[[nodiscard]] std::vector<Chunk> pdtaChunks(const SfLayout& layout, std::span<const DecodedSynthSample> samples) {
   auto [phdr, pbag, pmod, pgen] = presetChunks(layout.presets);
-  auto [inst, ibag, imod, igen] = instrumentChunks(layout.instruments, samples, midiModulationUsage, modulationScaling);
+  auto [inst, ibag, imod, igen] = instrumentChunks(layout.instruments, samples);
   return {
       std::move(phdr), std::move(pbag), std::move(pmod),
       std::move(pgen), std::move(inst), std::move(ibag),
@@ -618,13 +612,12 @@ SynthExportResult buildSoundFont2(const SynthExportInput& input, const SourceSto
   }
   const auto layout = sf2Layout(instruments);
   return SynthExportResult{
-      .bytes = makeRiff(
-          "sfbk",
-          {
-              makeListChunk("INFO", infoChunks(sf2Name(input.name, "VGMTrans"))),
-              makeListChunk("sdta", {smplChunk(samples)}),
-              makeListChunk("pdta", pdtaChunks(layout, samples, input.midiModulationUsage, input.modulationScaling)),
-          }),
+      .bytes = makeRiff("sfbk",
+                        {
+                            makeListChunk("INFO", infoChunks(sf2Name(input.name, "VGMTrans"))),
+                            makeListChunk("sdta", {smplChunk(samples)}),
+                            makeListChunk("pdta", pdtaChunks(layout, samples)),
+                        }),
       .diagnostics = std::move(diagnostics),
   };
 }

@@ -161,9 +161,7 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
   return std::nullopt;
 }
 
-[[nodiscard]] std::optional<DlsConnection> dlsConnectionForModulator(
-    const SynthModulator& modulator, const MidiModulationUsage* midiModulationUsage = nullptr,
-    ModulationScalingPolicy modulationScaling = ModulationScalingPolicy::FullFormatRange) {
+[[nodiscard]] std::optional<DlsConnection> dlsConnectionForModulator(const SynthModulator& modulator) {
   // DLS represents vibrato/tremolo depth as LFO or vibrato sources controlled by another
   // source. That is why depth destinations set source/control separately below.
   const auto source = modulator.source == SynthSource::ChannelPressure
@@ -173,11 +171,10 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
     return std::nullopt;
   }
 
-  const auto amount = scaledSynthModulatorAmount(modulator, midiModulationUsage, modulationScaling);
-
   // Depth connections already use an oscillator source; the controller gates
   // that source. Rate and attenuation connections take the controller directly.
-  auto connection = dlsConnectionForGenerator(SynthGenerator{.destination = modulator.destination, .amount = amount});
+  auto connection =
+      dlsConnectionForGenerator(SynthGenerator{.destination = modulator.destination, .amount = modulator.amount});
   if (!connection || modulator.destination == SynthDestination::VibratoDelay) {
     return std::nullopt;
   }
@@ -292,9 +289,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   writeConnection(bytes, DlsConnection{.destination = destination, .scale = scale});
 }
 
-[[nodiscard]] Chunk art2Chunk(const ResolvedSynthInstrument& instrument, const ResolvedSynthRegion& resolvedRegion,
-                              const MidiModulationUsage* midiModulationUsage,
-                              ModulationScalingPolicy modulationScaling) {
+[[nodiscard]] Chunk art2Chunk(const ResolvedSynthInstrument& instrument, const ResolvedSynthRegion& resolvedRegion) {
   // Each region gets a DLS2 articulation list. Region envelope/pan is always written;
   // instrument- and region-level modulation are appended as additional connections.
   const Region& region = *resolvedRegion.region;
@@ -315,7 +310,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
       }
     }
     for (const auto& modulator : scope.modulators) {
-      if (const auto connection = dlsConnectionForModulator(modulator, midiModulationUsage, modulationScaling)) {
+      if (const auto connection = dlsConnectionForModulator(modulator)) {
         writeConnection(connections, *connection);
       }
     }
@@ -331,47 +326,40 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 }
 
 [[nodiscard]] Chunk rgn2Chunk(const ResolvedSynthInstrument& instrument, const ResolvedSynthRegion& resolvedRegion,
-                              std::span<const DecodedSynthSample> samples,
-                              const MidiModulationUsage* midiModulationUsage,
-                              ModulationScalingPolicy modulationScaling) {
+                              std::span<const DecodedSynthSample> samples) {
   const auto& region = *resolvedRegion.region;
   const auto& sample = samples[resolvedRegion.sampleIndex];
   return makeListChunk("rgn2", {
                                    rgnhChunk(region),
                                    wsmpChunk(region, sample),
                                    wlnkChunk(resolvedRegion.sampleIndex),
-                                   art2Chunk(instrument, resolvedRegion, midiModulationUsage, modulationScaling),
+                                   art2Chunk(instrument, resolvedRegion),
                                });
 }
 
-[[nodiscard]] Chunk lrgnList(const ResolvedSynthInstrument& instrument, std::span<const DecodedSynthSample> samples,
-                             const MidiModulationUsage* midiModulationUsage,
-                             ModulationScalingPolicy modulationScaling) {
+[[nodiscard]] Chunk lrgnList(const ResolvedSynthInstrument& instrument, std::span<const DecodedSynthSample> samples) {
   std::vector<Chunk> regions;
   regions.reserve(instrument.regions.size());
   for (const auto& region : instrument.regions) {
-    regions.push_back(rgn2Chunk(instrument, region, samples, midiModulationUsage, modulationScaling));
+    regions.push_back(rgn2Chunk(instrument, region, samples));
   }
   return makeListChunk("lrgn", std::move(regions));
 }
 
-[[nodiscard]] Chunk insList(const ResolvedSynthInstrument& instrument, std::span<const DecodedSynthSample> samples,
-                            const MidiModulationUsage* midiModulationUsage, ModulationScalingPolicy modulationScaling) {
+[[nodiscard]] Chunk insList(const ResolvedSynthInstrument& instrument, std::span<const DecodedSynthSample> samples) {
   return makeListChunk("ins ", {
                                    inshChunk(instrument),
-                                   lrgnList(instrument, samples, midiModulationUsage, modulationScaling),
+                                   lrgnList(instrument, samples),
                                    infoList(dlsName(instrument.instrument->name, "Instrument")),
                                });
 }
 
 [[nodiscard]] Chunk linsList(std::span<const ResolvedSynthInstrument> instruments,
-                             std::span<const DecodedSynthSample> samples,
-                             const MidiModulationUsage* midiModulationUsage,
-                             ModulationScalingPolicy modulationScaling) {
+                             std::span<const DecodedSynthSample> samples) {
   std::vector<Chunk> instrumentChunks;
   instrumentChunks.reserve(instruments.size());
   for (const auto& instrument : instruments) {
-    instrumentChunks.push_back(insList(instrument, samples, midiModulationUsage, modulationScaling));
+    instrumentChunks.push_back(insList(instrument, samples));
   }
   return makeListChunk("lins", std::move(instrumentChunks));
 }
@@ -458,7 +446,7 @@ SynthExportResult buildDls(const SynthExportInput& input, const SourceStore& sou
       .bytes = makeRiff("DLS ",
                         {
                             colhChunk(instruments),
-                            linsList(instruments, samples, input.midiModulationUsage, input.modulationScaling),
+                            linsList(instruments, samples),
                             ptblChunk(waves),
                             makeListChunk("wvpl", std::move(waves)),
                             infoList(dlsName(input.name, "DLS")),
