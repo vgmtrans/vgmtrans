@@ -74,13 +74,6 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
   bytes.push_back(0);
 }
 
-[[nodiscard]] std::string dlsName(std::string name, std::string_view fallback) {
-  if (name.empty()) {
-    return std::string(fallback);
-  }
-  return name;
-}
-
 [[nodiscard]] u8 clampU7(s32 value) {
   return static_cast<u8>(std::clamp<s32>(value, 0, 127));
 }
@@ -217,9 +210,9 @@ void writeFixedString(std::vector<u8>& bytes, std::string_view text) {
   return makeChunk("colh", std::move(payload));
 }
 
-[[nodiscard]] Chunk infoList(std::string name) {
+[[nodiscard]] Chunk infoList(std::string_view name, std::string_view fallback) {
   std::vector<u8> inam;
-  writeFixedString(inam, dlsName(std::move(name), "DLS"));
+  writeFixedString(inam, name.empty() ? fallback : name);
   return makeListChunk("INFO", {makeChunk("INAM", std::move(inam))});
 }
 
@@ -350,7 +343,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   return makeListChunk("ins ", {
                                    inshChunk(instrument),
                                    lrgnList(instrument, samples),
-                                   infoList(dlsName(instrument.instrument->name, "Instrument")),
+                                   infoList(instrument.instrument->name, "Instrument"),
                                });
 }
 
@@ -394,7 +387,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
   return makeListChunk("wave", {
                                    fmtChunk(sample),
                                    dataChunk(sample),
-                                   infoList(sample.name),
+                                   infoList(sample.name, "Wave"),
                                });
 }
 
@@ -428,9 +421,6 @@ SynthExportResult buildDls(const SynthExportInput& input, const SourceStore& sou
   // DLS accepts the decoded PCM view directly. After shared sample/instrument resolution,
   // this function is mostly RIFF table assembly.
   auto [samples, instruments, diagnostics] = prepareSynthData(input, sources);
-  for (auto& sample : samples) {
-    sample.name = dlsName(std::move(sample.name), "Wave");
-  }
 
   if (samples.empty()) {
     diagnostics.push_back(exportError("No decodable samples available for DLS export"));
@@ -449,7 +439,7 @@ SynthExportResult buildDls(const SynthExportInput& input, const SourceStore& sou
                             linsList(instruments, samples),
                             ptblChunk(waves),
                             makeListChunk("wvpl", std::move(waves)),
-                            infoList(dlsName(input.name, "DLS")),
+                            infoList(input.name, "DLS"),
                         }),
       .diagnostics = std::move(diagnostics),
   };
