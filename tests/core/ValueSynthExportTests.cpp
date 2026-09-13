@@ -18,6 +18,57 @@
 
 namespace {
 
+void regionResponsesAreSampledAtExport() {
+  SourceStore sources;
+  const SourceId source = sources.add(SourceFile{.name = "response.pcm"}, {0, 127});
+  SoundBankAsset bank{
+      .metadata = {.id = AssetId{1}},
+      .instruments = {Instrument{
+          .regions =
+              {
+                  Region{.keyRange = {60, 63},
+                         .velocityRange = {20, 23},
+                         .sample = SampleRef::resolved(AssetId{1}, 0),
+                         .response = {.keyDependent = true,
+                                      .velocityDependent = true,
+                                      .evaluate = [](Region& region, u8 key,
+                                                     u8 velocity) { region.attenuationDb = key + velocity; }}},
+                  Region{.sample = SampleRef::resolved(AssetId{1}, 0)},
+              }}},
+      .localSamples = {.samples = {Sample{.codec = AudioCodec::PcmS8,
+                                          .encodedData = {.source = source, .size = 2},
+                                          .sampleRate = 32000}}},
+  };
+  std::vector<Diagnostic> diagnostics;
+  const u32 step = regionSamplingStep(bank, diagnostics, 5);
+  const auto coarse = sampleRegionResponses(bank.instruments[0].regions, step);
+  expect(step == 2 && diagnostics.size() == 1 && coarse.size() == 5 && coarse[0].keyRange == KeyRange{60, 61} &&
+             coarse[0].velocityRange == VelocityRange{20, 21} && coarse[0].attenuationDb == 80 &&
+             coarse[3].attenuationDb == 84 && coarse[4].keyRange == KeyRange{},
+         "the shared budget should include static zones and sample dependent axes at cell midpoints");
+  diagnostics.clear();
+  expect(regionSamplingStep(bank, diagnostics, 1) == 128 && diagnostics.size() == 1,
+         "even the coarsest sampling must report when native region count exceeds the budget");
+
+  const std::array<const SoundBankAsset*, 1> banks{&bank};
+  const SynthExportInput input{.name = "Response", .soundBanks = banks};
+  auto prepared = prepareSynthData(input, sources);
+  const auto sf2 = buildSoundFont2(input, sources);
+  const auto dls = buildDls(input, sources);
+  expect(prepared.diagnostics.empty() && prepared.instruments[0].regions.size() == 17 &&
+             bank.instruments[0].regions.size() == 2 && bank.instruments[0].regions[0].response.evaluate,
+         "direct export should sample native responses without changing source regions");
+  bank.instruments[0].regions = sampleRegionResponses(bank.instruments[0].regions, 1);
+  expect(sf2.bytes == buildSoundFont2(input, sources).bytes && dls.bytes == buildDls(input, sources).bytes,
+         "both container paths should match explicit response materialization");
+  bank.instruments[0].regions.clear();
+  const auto moved = std::move(prepared);
+  const auto& region = moved.instruments[0].regions[15];
+  expect(region.sampleIndex == 0 && region.region.sample.owner() == bank.metadata.id &&
+             region.region.attenuationDb == 86 && !region.region.response.evaluate,
+         "prepared regions must own their sampled values and preserve sample bindings");
+}
+
 void riffChunksKeepLogicalSizesSeparateFromStoragePadding() {
   const RiffChunk odd{"odd ", {1, 2, 3}};
   const RiffChunk even{"even", {4, 5}};
@@ -1915,6 +1966,7 @@ void synthPreparationKeepsSampleIdentityAndPhaseOrdering() {
 }  // namespace
 
 void runValueSynthExportTests() {
+  regionResponsesAreSampledAtExport();
   riffChunksKeepLogicalSizesSeparateFromStoragePadding();
   snesBrrDecoderProducesPcm();
   snesDspNoiseDecoderMatchesHardwareSequence();

@@ -293,8 +293,8 @@ struct SfLayout {
 [[nodiscard]] bool sameSampleMap(const ResolvedSynthInstrument& lhs, const ResolvedSynthInstrument& rhs) {
   return lhs.modulation == rhs.modulation &&
          std::ranges::equal(lhs.regions, rhs.regions, [](const ResolvedSynthRegion& a, const ResolvedSynthRegion& b) {
-           const auto& x = *a.region;
-           const auto& y = *b.region;
+           const auto& x = a.region;
+           const auto& y = b.region;
            return a.sampleIndex == b.sampleIndex && x.keyRange == y.keyRange && x.velocityRange == y.velocityRange &&
                   x.unityKey == y.unityKey && x.loop == y.loop && x.pan == y.pan &&
                   x.attenuationDb == y.attenuationDb && a.modulation == b.modulation;
@@ -309,8 +309,8 @@ struct SfLayout {
 
   SfEnvelope offsets{};
   for (size_t region = 0; region < preset.regions.size(); ++region) {
-    const auto target = sf2Envelope(*preset.regions[region].region);
-    const auto base = sf2Envelope(*instrument.regions[region].region);
+    const auto target = sf2Envelope(preset.regions[region].region);
+    const auto base = sf2Envelope(instrument.regions[region].region);
     for (size_t field = 0; field < offsets.size(); ++field) {
       const s32 difference = static_cast<s32>(target[field]) - base[field];
       if (difference < std::numeric_limits<s16>::min() || difference > std::numeric_limits<s16>::max() ||
@@ -481,7 +481,7 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
     }
 
     for (const auto& resolved : instrument->regions) {
-      const auto& region = *resolved.region;
+      const auto& region = resolved.region;
       const auto& sample = samples[resolved.sampleIndex];
       const auto pitch = sf2RegionPitch(region);
       writeBag(generators.size(), modulators.size());
@@ -525,10 +525,10 @@ void writeIndex(std::vector<u8>& bytes, u64 value) {
       if (sfRegion.sampleIndex >= info.size() || assigned[sfRegion.sampleIndex]) {
         continue;
       }
-      const auto pitch = sf2RegionPitch(*sfRegion.region);
+      const auto pitch = sf2RegionPitch(sfRegion.region);
       info[sfRegion.sampleIndex].pitch =
           sf2SampleHeaderPitch(pitch.rootKey, clampS16(samples[sfRegion.sampleIndex].pitch.cents));
-      info[sfRegion.sampleIndex].loop = effectiveSfLoop(*sfRegion.region, samples[sfRegion.sampleIndex]);
+      info[sfRegion.sampleIndex].loop = effectiveSfLoop(sfRegion.region, samples[sfRegion.sampleIndex]);
       assigned[sfRegion.sampleIndex] = true;
     }
   }

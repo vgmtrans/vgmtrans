@@ -6,6 +6,7 @@
 
 #include "value/export/CollectionBinding.h"
 #include "value/export/midi/PerformanceMidiRenderer.h"
+#include "value/export/synth/SynthExportData.h"
 #include "value/extractors/PsfExtractor.h"
 #include "value/formats/SonyPS2/SonyPS2.h"
 #include "value/session/Session.h"
@@ -427,9 +428,15 @@ void syntheticFeatures() {
   const auto omittedBinding = bindCollection(omittedBlock, omittedCollection->id);
   expect(omittedBinding.collection && omittedBinding.collection->soundBanks().front().localSamples.samples.empty(),
          "a BD missing its initial silent block should translate logical Vagi offsets onto physical samples");
-  expect(bank.instruments[0].regions.size() == 156,
+  expect(bank.instruments[0].regions.size() == 2 && bank.instruments[1].regions.size() == 1,
+         "scanning should retain native sample regions and defer export zoning");
+  std::vector<Diagnostic> samplingDiagnostics;
+  const u32 step = regionSamplingStep(bank, samplingDiagnostics);
+  const auto programRegions = sampleRegionResponses(bank.instruments[0].regions, step);
+  const auto setbRegions = sampleRegionResponses(bank.instruments[1].regions, step);
+  expect(samplingDiagnostics.empty() && programRegions.size() == 156,
          "sample-set limits and both split layers should retain their mapped velocity zones; got " +
-             std::to_string(bank.instruments[0].regions.size()));
+             std::to_string(programRegions.size()));
   const auto& region = bank.instruments[0].regions.front();
   expect(region.sample.valid() && near(region.unityKey, 69.0),
          "Vagi rate and all three tuning layers should determine unity key");
@@ -446,7 +453,7 @@ void syntheticFeatures() {
   expect(bound.collection->samplePools().front()->pool.samples.front().loop.enabled,
          "PSX ADPCM loop flags should survive HD/BD binding");
   expect(bank.instruments[1].identity && bank.instruments[1].identity->domain == kSetbInstrumentDomain &&
-             bank.instruments[1].regions.size() == 117 && near(bank.instruments[1].regions.front().unityKey, 73.5),
+             setbRegions.size() == 117 && near(bank.instruments[1].regions.front().unityKey, 73.5),
          "Setb note-addressed timbres should retain velocity curves, tuning, and their distinct identity domain");
   expect(!bank.instruments[1].regions.front().modulation.vibrato,
          "a Setb note must not invent a default waveform when its custom LFO table is unavailable");

@@ -11,6 +11,8 @@
 #include "value/sequence/PerformanceModel.h"
 #include "value/synth/SampleDecoder.h"
 
+#include <fmt/format.h>
+
 #include <algorithm>
 #include <compare>
 #include <cmath>
@@ -166,29 +168,40 @@ void markSelectedInstrument(const InstrumentSelection& selection, std::span<cons
   // Drop only regions whose samples cannot be resolved. The rest of the instrument can
   // still produce a useful partial export.
   std::vector<ResolvedSynthInstrument> instruments;
-  for (const auto* instrument : selectedInstruments) {
-    ResolvedSynthInstrument resolvedInstrument{
-        .instrument = instrument,
-        .address = resolveInstrumentAddress(instrument->explicitAddress, instrument->identity),
-        .modulation = lowerModulation(instrument->modulation),
-    };
-    for (const auto& region : instrument->regions) {
-      const auto sample = samples.at(
-          {region.sample.owner().value, region.sample.index(), region.invertSamplePhase, region.sampleStartFrame});
-      if (!sample) {
-        diagnostics.push_back(exportError("Region sample reference was not found", region.range));
+  const SynthInstrumentSet selected{selectedInstruments.begin(), selectedInstruments.end()};
+  for (const auto* bank : input.soundBanks) {
+    if (!bank) {
+      continue;
+    }
+    const u32 step = regionSamplingStep(*bank, diagnostics);
+    for (const auto& instrument : bank->instruments) {
+      if (!selected.contains(&instrument)) {
         continue;
       }
+      ResolvedSynthInstrument resolvedInstrument{
+          .instrument = &instrument,
+          .address = resolveInstrumentAddress(instrument.explicitAddress, instrument.identity),
+          .modulation = lowerModulation(instrument.modulation),
+      };
+      for (auto& region : sampleRegionResponses(instrument.regions, step)) {
+        const auto sample = samples.at(
+            {region.sample.owner().value, region.sample.index(), region.invertSamplePhase, region.sampleStartFrame});
+        if (!sample) {
+          diagnostics.push_back(exportError("Region sample reference was not found", region.range));
+          continue;
+        }
 
-      resolvedInstrument.regions.push_back(ResolvedSynthRegion{
-          .region = &region,
-          .sampleIndex = *sample,
-          .modulation = lowerModulation(region.modulation),
-      });
-    }
+        auto modulation = lowerModulation(region.modulation);
+        resolvedInstrument.regions.push_back(ResolvedSynthRegion{
+            .region = std::move(region),
+            .sampleIndex = *sample,
+            .modulation = std::move(modulation),
+        });
+      }
 
-    if (!resolvedInstrument.regions.empty()) {
-      instruments.push_back(std::move(resolvedInstrument));
+      if (!resolvedInstrument.regions.empty()) {
+        instruments.push_back(std::move(resolvedInstrument));
+      }
     }
   }
 
@@ -359,6 +372,77 @@ Envelope approximateEnvelopeAsAdsr(Envelope envelope, double attenuationRangeDb)
       std::lerp(endpointFit, perceptualFit, std::max({firstStageSalience, rapidSecondStageSalience, depthSalience}));
   envelope.sustainAmplitude = 0.0;
   return envelope;
+}
+
+u32 regionSamplingStep(const SoundBankAsset& bank, std::vector<Diagnostic>& diagnostics, u32 maxRegions) {
+  bool hasResponse = false;
+  const auto countAt = [&](u32 step) {
+    u64 count = 0;
+    for (const auto& instrument : bank.instruments) {
+      for (const auto& region : instrument.regions) {
+        const auto& response = region.response;
+        hasResponse |= bool(response.evaluate);
+        if (response.evaluate &&
+            (region.keyRange.low > region.keyRange.high || region.velocityRange.low > region.velocityRange.high)) {
+          continue;
+        }
+        const u32 keys =
+            response.evaluate && response.keyDependent ? region.keyRange.high - region.keyRange.low + 1 : 1;
+        const u32 velocities = response.evaluate && response.velocityDependent
+                                   ? region.velocityRange.high - region.velocityRange.low + 1
+                                   : 1;
+        count += ((keys + step - 1) / step) * ((velocities + step - 1) / step);
+      }
+    }
+    return count;
+  };
+  const u64 exact = countAt(1);
+  if (!hasResponse) {
+    return 1;
+  }
+  u32 step = 1;
+  while (step < 128 && countAt(step) > maxRegions) {
+    ++step;
+  }
+  if (step != 1) {
+    const u64 sampled = countAt(step);
+    diagnostics.push_back(exportWarning(
+        fmt::format("Key/velocity response requires {} exact regions; using {}-step zones ({} regions), {}", exact,
+                    step, sampled,
+                    sampled <= maxRegions ? "to fit synth tables"
+                                          : "but the coarsest zones still exceed the conservative synth-table budget"),
+        bank.metadata.range));
+  }
+  return step;
+}
+
+std::vector<Region> sampleRegionResponses(std::span<const Region> regions, u32 step) {
+  step = std::clamp<u32>(step, 1, 128);
+  std::vector<Region> sampled;
+  sampled.reserve(regions.size());
+  for (const auto& source : regions) {
+    if (!source.response.evaluate) {
+      sampled.push_back(source);
+      continue;
+    }
+    Region base = source;
+    const auto response = std::exchange(base.response, {});
+    for (int key = base.keyRange.low; key <= base.keyRange.high;) {
+      const int keyEnd = response.keyDependent ? std::min<int>(key + step - 1, base.keyRange.high) : base.keyRange.high;
+      for (int velocity = base.velocityRange.low; velocity <= base.velocityRange.high;) {
+        const int velocityEnd = response.velocityDependent ? std::min<int>(velocity + step - 1, base.velocityRange.high)
+                                                           : base.velocityRange.high;
+        Region region = base;
+        region.keyRange = {static_cast<u8>(key), static_cast<u8>(keyEnd)};
+        region.velocityRange = {static_cast<u8>(velocity), static_cast<u8>(velocityEnd)};
+        response.evaluate(region, key + (keyEnd - key) / 2, velocity + (velocityEnd - velocity) / 2);
+        sampled.push_back(std::move(region));
+        velocity = velocityEnd + 1;
+      }
+      key = keyEnd + 1;
+    }
+  }
+  return sampled;
 }
 
 PreparedSynthData prepareSynthData(const SynthExportInput& input, const SourceStore& sources,
