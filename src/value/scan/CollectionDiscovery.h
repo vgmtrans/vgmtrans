@@ -52,9 +52,7 @@ struct AssetWithData {
   const SourceFile* source = nullptr;
 
   [[nodiscard]] AssetId id() const noexcept { return asset->metadata.id; }
-  [[nodiscard]] std::optional<SourceId> sourceId() const noexcept {
-    return asset->metadata.range.valid() ? std::optional{asset->metadata.range.source} : std::nullopt;
-  }
+  [[nodiscard]] SourceId sourceId() const noexcept { return asset->metadata.range.source; }
 };
 
 // Session-wide, read-only input to format-owned collection discovery. It owns a

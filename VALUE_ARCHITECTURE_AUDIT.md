@@ -2393,6 +2393,29 @@ score combinations, including empty inputs, invalid candidates, zero-score
 fallbacks, and ties, plus compile-time rejection of temporary input vectors.
 The capture hook was removed from Session after verification.
 
+## Use discovery assets directly instead of copied metadata
+
+SonyPS1 now reads sequence metadata through borrowed asset pointers and uses
+`AssetWithData` for banks and sample pools. This removes three local record
+types and their copying passes. Matching reads source IDs, offsets, and native
+sample sizes from their owners; external-sample requirements are checked on
+the selected bank. Durable binders still capture only stable asset IDs.
+
+`AssetWithData::sourceId()` now returns the existing `SourceId` value directly.
+SonyPS1, KonamiPS1, and Akao use its validity check instead of wrapping it in
+another optional. Source ID zero remains valid, an invalid ID cannot establish
+a source match, and a valid ID remains available when its source file is absent.
+The change removes 75 production lines and adds ten lines to the existing
+source-discovery test.
+
+All 20 CTest targets pass. All 82 captured resolver results match, including
+collection keys, names, member order, binder presence, and issue details.
+An ignored ASan/UBSan probe compares 15,000 resolver results across 5,000
+synthetic asset sets: missing source files and IDs, path fallbacks, reordered
+assets, empty banks, missing retained data, ambiguous sample bodies, Akao
+sample-set coverage, and SonyPS1's existing sequence-offset ranking. The
+results are identical. Temporary capture instrumentation was removed.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding

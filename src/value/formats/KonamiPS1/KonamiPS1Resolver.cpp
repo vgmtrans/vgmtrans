@@ -9,21 +9,12 @@
 #include "value/formats/SonyPS1/SonyPS1.h"
 
 #include <algorithm>
-#include <optional>
 #include <string>
 #include <vector>
 
 namespace vgmtrans::formats::konami_ps1 {
 
 using namespace core;
-
-namespace {
-
-[[nodiscard]] std::optional<SourceId> sourceId(const AssetMetadata& metadata) {
-  return metadata.range.valid() ? std::optional{metadata.range.source} : std::nullopt;
-}
-
-}  // namespace
 
 std::vector<DesiredCollection> resolveKonamiPs1Collections(const CollectionDiscoveryContext& context) {
   const auto sequences = context.assets<SequenceProgramAsset>(kKonamiPs1FormatName);
@@ -33,15 +24,15 @@ std::vector<DesiredCollection> resolveKonamiPs1Collections(const CollectionDisco
   collections.reserve(sequences.size());
 
   for (const auto* sequence : sequences) {
-    const auto source = sourceId(sequence->metadata);
-    CollectionAssembly collection("source:" + std::to_string(source ? source->value : 0) +
+    const auto source = sequence->metadata.range.source;
+    CollectionAssembly collection("source:" + std::to_string(source.valid() ? source.value : 0) +
                                       ":konami-kdt:" + std::to_string(sequence->metadata.range.offset),
                                   sequence->metadata.name);
     collection.sequence(sequence->metadata.id);
 
     std::vector<const SoundBankAsset*> selectedBanks;
     for (const auto* bank : banks) {
-      if (source && sourceId(bank->metadata) == source) {
+      if (source.valid() && bank->metadata.range.source == source) {
         selectedBanks.push_back(bank);
       }
     }
@@ -55,7 +46,7 @@ std::vector<DesiredCollection> resolveKonamiPs1Collections(const CollectionDisco
     collection.requireSoundBank();
 
     for (const auto* pool : samples) {
-      if (source && sourceId(pool->metadata) == source) {
+      if (source.valid() && pool->metadata.range.source == source) {
         collection.samplePool(pool->metadata.id);
       }
     }

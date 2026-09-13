@@ -44,7 +44,7 @@ void markCovered(std::set<u32>& remaining, const SampleEntry& sample) {
 
 [[nodiscard]] std::string collectionKey(const SequenceEntry& sequence) {
   return "seq:" + std::to_string(sequence.data->sequenceId) +
-         ":source:" + std::to_string(sequence.sourceId() ? sequence.sourceId()->value : 0) +
+         ":source:" + std::to_string(sequence.sourceId().valid() ? sequence.sourceId().value : 0) +
          ":offset:" + std::to_string(sequence.asset->metadata.range.offset);
 }
 
@@ -63,14 +63,14 @@ std::vector<SampleEntry> chooseSamplesForSequence(const SequenceEntry& sequence,
   const bool isolated = psfLike(sequence.source);
   const auto sequenceSource = sequence.sourceId();
   for (const auto& sample : samples) {
-    const bool sameSource = sequenceSource && sample.sourceId() && sequenceSource == sample.sourceId();
+    const bool sameSource = sequenceSource.valid() && sequenceSource == sample.sourceId();
     if (!isolated || sameSource) {
       candidates.push_back(sample);
     }
   }
   std::ranges::sort(candidates, [&](const SampleEntry& left, const SampleEntry& right) {
-    const bool leftLocal = sequenceSource && left.sourceId() == sequenceSource;
-    const bool rightLocal = sequenceSource && right.sourceId() == sequenceSource;
+    const bool leftLocal = sequenceSource.valid() && left.sourceId() == sequenceSource;
+    const bool rightLocal = sequenceSource.valid() && right.sourceId() == sequenceSource;
     return leftLocal != rightLocal ? leftLocal : left.id().value > right.id().value;
   });
 
