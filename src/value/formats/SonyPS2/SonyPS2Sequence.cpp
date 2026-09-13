@@ -572,19 +572,6 @@ struct Playback : SequencePlayback<TrackState> {
 
 using Cursor = CompilerCursor<Playback>;
 
-[[nodiscard]] std::optional<std::pair<u32, u32>> readVlq(ByteReader reader, u32& cursor, u32 end) {
-  u32 value = 0;
-  const u32 begin = cursor;
-  for (u32 byte = 0; byte < 4 && cursor < end; ++byte) {
-    const u8 next = reader.u8At(cursor++);
-    value = (value << 7) | (next & 0x7f);
-    if ((next & 0x80) == 0) {
-      return std::pair{value, cursor - begin};
-    }
-  }
-  return std::nullopt;
-}
-
 [[nodiscard]] std::vector<MidiEvent> inspectMidiEvents(ByteReader reader, const MidiBlockLayout& layout) {
   std::vector<MidiEvent> events;
   std::array<std::optional<u32>, 8> loopStarts;
@@ -598,14 +585,14 @@ using Cursor = CompilerCursor<Playback>;
   while (cursor < layout.dataEnd && events.size() < kMaxCommands) {
     MidiEvent event{.offset = cursor};
     if (!omitDelta) {
-      const auto delta = readVlq(reader, cursor, layout.dataEnd);
+      const auto delta = reader.varLen(cursor, layout.dataEnd);
       if (!delta) {
         event.malformed = true;
         event.end = layout.dataEnd;
         events.push_back(std::move(event));
         break;
       }
-      event.delta = delta->first;
+      event.delta = *delta;
     }
     omitDelta = false;
     if (cursor >= layout.dataEnd) {
@@ -681,25 +668,25 @@ using Cursor = CompilerCursor<Playback>;
         event.malformed = true;
       } else {
         event.metaType = reader.u8At(cursor++);
-        const auto length = readVlq(reader, cursor, layout.dataEnd);
-        if (!length || length->first > layout.dataEnd - cursor) {
+        const auto length = reader.varLen(cursor, layout.dataEnd);
+        if (!length || *length > layout.dataEnd - cursor) {
           event.malformed = true;
         } else {
-          const auto payload = reader.slice(cursor, length->first);
+          const auto payload = reader.slice(cursor, *length);
           event.payload.assign(payload.begin(), payload.end());
-          cursor += length->first;
+          cursor += *length;
           event.endEvent = event.metaType == 0x2f;
         }
       }
     } else if (event.status == 0xf0 || event.status == 0xf7) {
       omitDelta = false;
-      const auto length = readVlq(reader, cursor, layout.dataEnd);
-      if (!length || length->first > layout.dataEnd - cursor) {
+      const auto length = reader.varLen(cursor, layout.dataEnd);
+      if (!length || *length > layout.dataEnd - cursor) {
         event.malformed = true;
       } else {
-        const auto payload = reader.slice(cursor, length->first);
+        const auto payload = reader.slice(cursor, *length);
         event.payload.assign(payload.begin(), payload.end());
-        cursor += length->first;
+        cursor += *length;
       }
     } else {
       event.malformed = true;
@@ -863,14 +850,14 @@ struct SeEvent {
   u32 cursor = layout.dataOffset;
   while (cursor < layout.dataEnd && events.size() < kMaxCommands) {
     SeEvent event{.offset = cursor};
-    const auto delta = readVlq(reader, cursor, layout.dataEnd);
+    const auto delta = reader.varLen(cursor, layout.dataEnd);
     if (!delta || cursor >= layout.dataEnd) {
       event.end = layout.dataEnd;
       event.malformed = true;
       events.push_back(event);
       break;
     }
-    event.delta = static_cast<u32>(std::llround(delta->first * 1000.0 / std::max<u16>(layout.timeScale, 1)));
+    event.delta = static_cast<u32>(std::llround(*delta * 1000.0 / std::max<u16>(layout.timeScale, 1)));
     event.commandOffset = cursor;
     event.opcode = reader.u8At(cursor++);
     event.set = event.opcode & 0x0f;
@@ -892,11 +879,11 @@ struct SeEvent {
         event.key = reader.u8At(cursor++);
         event.operation = reader.u8At(cursor++);
         const auto readValue = [&](u32& value) {
-          const auto decoded = readVlq(reader, cursor, layout.dataEnd);
+          const auto decoded = reader.varLen(cursor, layout.dataEnd);
           if (!decoded) {
             return false;
           }
-          value = decoded->first;
+          value = *decoded;
           return true;
         };
         switch (event.operation) {

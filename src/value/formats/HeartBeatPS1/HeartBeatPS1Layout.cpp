@@ -26,18 +26,6 @@ constexpr u32 kMaximumSectionSize = 0x200000;
          reader.u8At(offset + 2) == 'E' && reader.u8At(offset + 3) == 'S';
 }
 
-[[nodiscard]] std::optional<u32> readVlq(ByteReader reader, u32& cursor, u32 end) {
-  u32 value = 0;
-  for (u8 size = 0; cursor < end && size < 4; ++size) {
-    const u8 byte = reader.u8At(cursor++);
-    value = (value << 7) | (byte & 0x7f);
-    if ((byte & 0x80) == 0) {
-      return value;
-    }
-  }
-  return std::nullopt;
-}
-
 [[nodiscard]] std::optional<std::vector<HeartBeatPs1EventLayout>> readEvents(ByteReader reader, u32 begin, u32 end) {
   std::vector<HeartBeatPs1EventLayout> events;
   std::array<u8, 16> nrpnMsb{};
@@ -61,7 +49,7 @@ constexpr u32 kMaximumSectionSize = 0x200000;
       return events;
     }
 
-    const auto delta = readVlq(reader, cursor, end);
+    const auto delta = reader.varLen(cursor, end);
     if (!delta || cursor >= end) {
       return std::nullopt;
     }
@@ -118,7 +106,7 @@ constexpr u32 kMaximumSectionSize = 0x200000;
         return std::nullopt;
       }
       event.data1 = reader.u8At(cursor++);
-      const auto payloadSize = readVlq(reader, cursor, end);
+      const auto payloadSize = reader.varLen(cursor, end);
       if (!payloadSize || *payloadSize > end - cursor) {
         return std::nullopt;
       }

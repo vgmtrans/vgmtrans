@@ -124,6 +124,17 @@ void recordReaderPreservesNumericFieldsAndFailurePolicies() {
   expect(!truncatedPacked.u24le("packed") && truncatedPacked.position() == 3 && !truncatedPacked.ok(),
          "24-bit record reads must honor the record boundary even when more source bytes exist");
 
+  const std::vector<u8> variableBytes{0x81, 0x80, 0x80, 0x80, 0x01};
+  const ByteReader variableSource(source, variableBytes);
+  u32 position = 0;
+  expect(!variableSource.varLen(position, variableBytes.size()) && position == 4,
+         "bounded variable-length reads must stop after four unterminated bytes");
+  RecordReader variable(variableSource, 0, variableBytes.size());
+  const auto longValue = variable.varLen("duration");
+  expect(longValue && longValue.value == 0x10000001 && variable.ok() && variable.position() == 5 &&
+             longValue.range == variableSource.range(0, 5),
+         "record reads must preserve longer source encodings and their complete field range");
+
   std::vector<Diagnostic> diagnostics;
   RecordReader damaged(ByteReader(source, bytes), 1, 4, &diagnostics);
   expect(!damaged.u32be("too wide") && !damaged.u8("after failure") && damaged.position() == 4,

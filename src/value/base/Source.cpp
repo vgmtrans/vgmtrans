@@ -104,6 +104,19 @@ u32 ByteReader::be32(u64 offset) const {
          (static_cast<u32>(bytes_[offset + 2]) << 8) | static_cast<u32>(bytes_[offset + 3]);
 }
 
+std::optional<u32> ByteReader::varLen(u32& offset, u32 end, u32 maxBytes) const noexcept {
+  const u64 limit = std::min<u64>(end, bytes_.size());
+  u32 value = 0;
+  for (u32 count = 0; count < maxBytes && offset < limit; ++count) {
+    const u8 byte = bytes_[offset++];
+    value = (value << 7) | (byte & 0x7f);
+    if ((byte & 0x80) == 0) {
+      return value;
+    }
+  }
+  return std::nullopt;
+}
+
 std::span<const u8> ByteReader::slice(SourceRange range) const {
   if (range.source != source_) {
     throw std::out_of_range("SourceRange belongs to a different source");

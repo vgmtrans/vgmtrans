@@ -48,18 +48,6 @@ constexpr u32 kRootCounterTargetOffset = 8;
   return signature(reader, offset, '1') || signature(reader, offset, '2') || signature(reader, offset, ' ');
 }
 
-[[nodiscard]] std::optional<u32> vlq(ByteReader reader, u32& offset, u32 end) {
-  u32 result = 0;
-  for (u32 byte = 0; byte < 4 && offset < end; ++byte) {
-    const u8 value = reader.u8At(offset++);
-    result = (result << 7) | (value & 0x7f);
-    if ((value & 0x80) == 0) {
-      return result;
-    }
-  }
-  return std::nullopt;
-}
-
 [[nodiscard]] EventKind eventKind(u8 command) {
   switch (command) {
     case 70:
@@ -91,7 +79,7 @@ constexpr u32 kRootCounterTargetOffset = 8;
   while (offset < end && track.events.size() < kMaximumEvents) {
     EventLayout event{.offset = offset};
     if (!chained) {
-      const auto delta = vlq(reader, offset, end);
+      const auto delta = reader.varLen(offset, end);
       if (!delta) {
         return std::nullopt;
       }

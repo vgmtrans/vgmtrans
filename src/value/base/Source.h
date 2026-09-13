@@ -103,8 +103,8 @@ public:
   [[nodiscard]] bool has(u64 offset, u64 size) const noexcept;
   [[nodiscard]] SourceRange range(u64 offset, u64 size) const noexcept;
 
-  // Reads throw on out-of-range access. Use has() first when malformed data should
-  // stop parsing without an exception.
+  // Fixed-width reads and slices throw on out-of-range access. Use has() first
+  // when malformed data should stop parsing without an exception.
   [[nodiscard]] u8 u8At(u64 offset) const;
   [[nodiscard]] s8 s8At(u64 offset) const;
   [[nodiscard]] u16 le16(u64 offset) const;
@@ -113,6 +113,9 @@ public:
   [[nodiscard]] u32 be24(u64 offset) const;
   [[nodiscard]] u32 le32(u64 offset) const;
   [[nodiscard]] u32 be32(u64 offset) const;
+  // Consume a big-endian base-128 integer within the source and the supplied
+  // window. Missing terminators return null after consuming up to maxBytes.
+  [[nodiscard]] std::optional<u32> varLen(u32& offset, u32 end, u32 maxBytes = 4) const noexcept;
   [[nodiscard]] std::span<const u8> slice(SourceRange range) const;
   [[nodiscard]] std::span<const u8> slice(u64 offset, u64 size) const;
 
