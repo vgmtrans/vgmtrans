@@ -159,7 +159,7 @@ struct ProgramState {
 };
 
 struct TrackHandle {
-  explicit TrackHandle(const TrackProgram& track) : index(track.sourceTrackNumber) {}
+  explicit TrackHandle(TrackStateContext track) : index(track.sourceTrackNumber) {}
   u32 index = 0;
 };
 
@@ -570,7 +570,7 @@ SequenceProgram parseSequence(ByteReader reader, AssetId id, const SequenceLayou
   for (u32 i = 0; i < layout.tracks.size(); ++i) {
     auto track = decodeTrack(reader, id, i, layout.tracks[i].offset, layout.tracks[i].end, runtime, sourceMap,
                              diagnostics);
-    track.sourceTrackNumber = i;
+    track.sourceTrackNumbers = {i};
     sequence.tracks.push_back(std::move(track));
   }
   sequence.runtime = makeCompiledRuntime<Playback, ProgramState>(std::move(runtime));

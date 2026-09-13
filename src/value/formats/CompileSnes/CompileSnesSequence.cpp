@@ -332,7 +332,7 @@ struct ProgramState {
 };
 
 struct TrackState {
-  TrackState(const TrackProgram& source, const DriverData& data)
+  TrackState(TrackStateContext source, const DriverData& data)
       : trackNumber(source.sourceTrackNumber), early(data.early()), stereoEnabled(data.stereoEnabled()) {
     const TrackHeader header = data.trackHeader(source.sourceTrackNumber);
     channel = header.channel;

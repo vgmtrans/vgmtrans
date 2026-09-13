@@ -26,6 +26,7 @@ struct PerformanceSequence;
 struct SequenceProgram;
 struct SourceCommand;
 struct TrackProgram;
+struct TrackStateContext;
 
 enum class PitchTransitionRenderingHint {
   Portamento,
@@ -33,7 +34,7 @@ enum class PitchTransitionRenderingHint {
 };
 
 using CreateProgramState = std::function<std::any(const SequenceProgram&)>;
-using CreateTrackState = std::function<std::any(const SequenceProgram&, const TrackProgram&)>;
+using CreateTrackState = std::function<std::any(TrackStateContext)>;
 using ExecuteCommand = Effects (*)(const SourceCommand&, std::any& programState, std::any& trackState,
                                    PerformanceEmitter& out, VmApi& vm);
 using CommandReadyDuringWait = bool (*)(const SourceCommand&, std::any& programState, std::any& trackState,
@@ -201,7 +202,9 @@ struct SourceCommandRef {
 };
 
 struct TrackProgram {
-  u32 sourceTrackNumber = 0;
+  // Each number runs these commands with independent VM and format state.
+  // Most streams belong to one track; interleaved streams can serve many.
+  std::vector<u32> sourceTrackNumbers{0};
   std::string name;
   Address startAddress;
   SourceAnnotationId annotation;
@@ -211,6 +214,14 @@ struct TrackProgram {
 
   [[nodiscard]] std::optional<u32> commandIndex(Address address) const;
   [[nodiscard]] const SourceCommand* command(CommandId id) const;
+};
+
+// Borrowed initialization data for one playback track. The decoded track stays
+// alive throughout playback, including when format state retains a reference.
+struct TrackStateContext {
+  const SequenceProgram& sequence;
+  const TrackProgram& track;
+  u32 sourceTrackNumber;
 };
 
 // Some drivers arrange a song as a playlist of parallel track sections. A play
@@ -232,6 +243,7 @@ struct PlaylistCommand {
   // carries its normalized entries directly. A repeat command targets another
   // playlist command.
   Address target;
+  // Entries follow playback order: each stream, then each of its track numbers.
   std::vector<std::optional<Address>> trackStarts;
   // Repeat only: zero denotes an infinite repeat; positive values are the
   // number of additional jumps after the first pass through the destination.
@@ -296,12 +308,13 @@ struct SequenceProgram {
   SequenceRuntime runtime;
   Timebase timebase;
   SequenceProgramBehavior behavior;
-  // A track's position is its TrackId. sourceTrackNumber separately preserves
-  // the channel or slot identity encoded by the source format.
+  // A decoded track's position identifies its commands. Its source track
+  // numbers determine how many independent playback tracks execute them.
   std::vector<TrackProgram> tracks;
   std::optional<SectionPlaylist> sectionPlaylist;
 
   [[nodiscard]] const SourceCommand* command(SourceCommandRef source) const;
+  [[nodiscard]] size_t playbackTrackCount() const;
 };
 
 [[nodiscard]] bool trackUsesSemantic(const TrackProgram& track, SequenceSemantic semantic);

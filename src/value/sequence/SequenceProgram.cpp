@@ -36,6 +36,14 @@ const SourceCommand* SequenceProgram::command(SourceCommandRef source) const {
   return tracks[source.track.value].command(source.id);
 }
 
+size_t SequenceProgram::playbackTrackCount() const {
+  size_t count = 0;
+  for (const auto& track : tracks) {
+    count += track.sourceTrackNumbers.size();
+  }
+  return count;
+}
+
 bool trackUsesSemantic(const TrackProgram& track, SequenceSemantic semantic) {
   return std::ranges::any_of(track.commands,
                              [semantic](const SourceCommand& command) { return command.semantic == semantic; });

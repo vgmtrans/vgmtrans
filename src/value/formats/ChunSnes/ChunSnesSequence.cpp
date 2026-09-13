@@ -291,7 +291,7 @@ struct TrackState {
     u8 duration = 0;
   };
 
-  explicit TrackState(const TrackProgram& trackProgram) : trackNumber(trackProgram.sourceTrackNumber) {
+  explicit TrackState(TrackStateContext trackProgram) : trackNumber(trackProgram.sourceTrackNumber) {
     volume.setRounding(SequenceFixedPointRounding::Nearest);
   }
 

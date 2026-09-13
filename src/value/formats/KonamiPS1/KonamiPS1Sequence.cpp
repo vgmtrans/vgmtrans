@@ -818,7 +818,7 @@ SequenceProgram parseKonamiPs1Sequence(ByteReader reader, AssetId id, const Sequ
       }
       return decodeEvent(reader, sourceTrack.end, *event, timing, diagnostics);
     });
-    track.sourceTrackNumber = index;
+    track.sourceTrackNumbers = {index};
     program.tracks.push_back(std::move(track));
   }
   return program;

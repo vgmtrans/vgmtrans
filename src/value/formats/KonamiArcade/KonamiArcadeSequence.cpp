@@ -172,7 +172,7 @@ struct TrackState {
     KonamiArcadeVersion version = KonamiArcadeVersion::MysticWarrior;
   };
 
-  TrackState(const TrackProgram& track, const RuntimeConfig& config)
+  TrackState(TrackStateContext track, const RuntimeConfig& config)
       : version(config.version), sourceTrackNumber(track.sourceTrackNumber) {}
 
   KonamiArcadeVersion version = KonamiArcadeVersion::MysticWarrior;

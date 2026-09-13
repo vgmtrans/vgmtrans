@@ -95,9 +95,9 @@ struct ProgramState {
 };
 
 struct TrackState {
-  TrackState(const TrackProgram& trackProgram, const RuntimeConfig& config)
+  TrackState(TrackStateContext trackProgram, const RuntimeConfig& config)
       : version(config.version), synth(trackSynth(version, trackProgram.sourceTrackNumber)),
-        trackStart(trackProgram.startAddress), noteDuration(version == CpsVersion::Cps1V100 ? 0 : 0xff) {}
+        trackStart(trackProgram.track.startAddress), noteDuration(version == CpsVersion::Cps1V100 ? 0 : 0xff) {}
 
   CpsVersion version = CpsVersion::Unknown;
   SynthKind synth = SynthKind::QSound;

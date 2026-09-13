@@ -10,6 +10,7 @@
 #include "value/sequence/CompilerCursor.h"
 
 #include <algorithm>
+#include <numeric>
 #include <array>
 #include <cmath>
 #include <limits>
@@ -166,7 +167,7 @@ struct PercussionTrigger {
 };
 
 struct TrackState {
-  explicit TrackState(const TrackProgram& source) : number(source.sourceTrackNumber) {}
+  explicit TrackState(TrackStateContext source) : number(source.sourceTrackNumber) {}
 
   void resetPhysicalVoice() {
     triggerDelay = 0;
@@ -850,12 +851,9 @@ SequenceParse decodeSequence(RetainedSource source, const Layout& layout, AssetI
       0, layout.sequenceAddress,
       [&](u32 offset) { return decodeCommand(reader, offset, diagnostics, references); }));
   program.runtime = makeCompiledRuntime<Playback, ProgramState>(DriverData{std::move(source), layout});
-  const TrackProgram stream = program.tracks.front();
-  for (u32 voice = 1; voice < kTrackCount; ++voice) {
-    TrackProgram copy = stream;
-    copy.sourceTrackNumber = voice;
-    program.tracks.push_back(std::move(copy));
-  }
+  auto& numbers = program.tracks.front().sourceTrackNumbers;
+  numbers.resize(kTrackCount);
+  std::iota(numbers.begin(), numbers.end(), 0u);
   return SequenceParse{
       .program = std::move(program),
       .srcns = std::move(references.srcns),

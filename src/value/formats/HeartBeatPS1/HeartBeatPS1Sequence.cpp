@@ -13,6 +13,7 @@
 #include "value/synth/SynthMath.h"
 
 #include <algorithm>
+#include <numeric>
 #include <cmath>
 #include <limits>
 #include <string_view>
@@ -73,7 +74,7 @@ struct LfoState {
 };
 
 struct TrackState {
-  explicit TrackState(const TrackProgram& program)
+  explicit TrackState(TrackStateContext program)
       : channel(static_cast<u8>(program.sourceTrackNumber)), program(static_cast<u8>(program.sourceTrackNumber)) {}
 
   u8 channel = 0;
@@ -674,13 +675,9 @@ SequenceProgram parseHeartBeatPs1Sequence(ByteReader reader, AssetId id, const H
     }
     return decodeEvent(reader, layout.dataEnd, *event, diagnostics);
   });
-  track.sourceTrackNumber = 0;
-  program.tracks.push_back(track);
-  for (u32 channel = 1; channel < layout.trackCount; ++channel) {
-    TrackProgram copy = track;
-    copy.sourceTrackNumber = channel;
-    program.tracks.push_back(std::move(copy));
-  }
+  track.sourceTrackNumbers.resize(layout.trackCount);
+  std::iota(track.sourceTrackNumbers.begin(), track.sourceTrackNumbers.end(), 0u);
+  program.tracks.push_back(std::move(track));
   return program;
 }
 

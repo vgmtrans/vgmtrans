@@ -130,11 +130,12 @@ private:
   std::map<VisitState, u64> visited_;
 };
 
-void addLoopMarker(PerformanceTrack& track, CommandId sourceCommand, u64 tick, u64& nextSequence, std::string text) {
+void addLoopMarker(PerformanceTrack& track, SourceCommandRef sourceCommand, u64 tick, u64& nextSequence,
+                   std::string text) {
   track.events.emplace_back(MarkerPerformanceEvent{
       .header =
           PerformanceEventHeader{
-              .sourceCommand = {track.id, sourceCommand},
+              .sourceCommand = sourceCommand,
               .track = track.id,
               .tick = tick,
               .sequence = nextSequence++,
@@ -314,21 +315,21 @@ struct TrackPosition {
 // whole-sequence coordination, such as synchronized stopping across tracks.
 class VmTrackExecutor {
 public:
-  VmTrackExecutor(const SequenceProgram& program, const SequenceRuntime& runtime, TrackId trackId,
-                  const TrackProgram& track, const SequenceVmOptions& options, PerformanceSequence& targetSequence,
-                  u64& outputSequence, bool includeGlobalInitialEvents, std::any& programState,
-                  bool startsActive = true)
-      : track_(track), sequenceRuntime_(runtime), behavior_(program.behavior),
+  VmTrackExecutor(TrackStateContext context, const SequenceRuntime& runtime, TrackId sourceTrackId, TrackId trackId,
+                  const SequenceVmOptions& options, PerformanceSequence& targetSequence, u64& outputSequence,
+                  bool includeGlobalInitialEvents, std::any& programState, bool startsActive = true)
+      : track_(context.track), sourceTrackId_(sourceTrackId), sequenceRuntime_(runtime),
+        behavior_(context.sequence.behavior),
         loopPolicy_(options.loopPolicy == LoopPolicy::Default ? behavior_.loopPolicy : options.loopPolicy),
         options_(options), targetSequence_(targetSequence), outputSequence_(outputSequence),
         performanceTrack_(PerformanceTrack{
             .id = trackId,
-            .sourceTrackNumber = track.sourceTrackNumber,
-            .name = track.name,
+            .sourceTrackNumber = context.sourceTrackNumber,
+            .name = track_.name,
         }),
-        trackState_(sequenceRuntime_.createTrackState ? sequenceRuntime_.createTrackState(program, track) : std::any{}),
+        trackState_(sequenceRuntime_.createTrackState ? sequenceRuntime_.createTrackState(context) : std::any{}),
         programState_(programState),
-        position_{.command = startsActive ? track.commandIndex(track.startAddress) : std::optional<u32>{}} {
+        position_{.command = startsActive ? track_.commandIndex(track_.startAddress) : std::optional<u32>{}} {
     addInitialTrackEvents(outputAt(0), behavior_, includeGlobalInitialEvents);
     if (startsActive && !position_.command && !track_.commands.empty()) {
       warn(fmt::format("Sequence track start ${:04X} was not decoded", track_.startAddress.value), {});
@@ -442,8 +443,8 @@ public:
   void closeActiveNotesAt(u64 tick) { outputAt(tick, runtime_.lastCommand).allNotesOff(); }
 
   void preserveLoop(u64 startTick, u64 endTick) {
-    addLoopMarker(performanceTrack_, {}, startTick, outputSequence_, "Loop Start");
-    addLoopMarker(performanceTrack_, runtime_.lastCommand, endTick, outputSequence_, "Loop End");
+    addLoopMarker(performanceTrack_, {sourceTrackId_, {}}, startTick, outputSequence_, "Loop Start");
+    addLoopMarker(performanceTrack_, {sourceTrackId_, runtime_.lastCommand}, endTick, outputSequence_, "Loop End");
   }
 
   [[nodiscard]] PerformanceTrack finish() {
@@ -468,7 +469,7 @@ private:
 
   [[nodiscard]] PerformanceEmitter outputAt(u64 tick, CommandId command = {}, SourceAnnotationId annotation = {}) {
     return {performanceTrack_,
-            {performanceTrack_.id, command},
+            {sourceTrackId_, command},
             annotation,
             tick,
             outputSequence_,
@@ -511,7 +512,7 @@ private:
     if (executedCommands_ >= behavior_.commandLimit) {
       const SourceCommand& command = track_.commands.at(*position_.command);
       warn(fmt::format("Sequence VM command limit reached: track={}, address=${:04X}, tick={}, executed={}, limit={}",
-                       track_.sourceTrackNumber, command.address.value, runtime_.tick, executedCommands_,
+                       performanceTrack_.sourceTrackNumber, command.address.value, runtime_.tick, executedCommands_,
                        behavior_.commandLimit),
            command.range);
       position_.command = std::nullopt;
@@ -580,8 +581,9 @@ private:
     // Once a loop is identified, all loop sources use the same export policy:
     // preserve markers, replay for the requested loop count, or stop the track.
     if (loopPolicy_ == LoopPolicy::Preserve) {
-      addLoopMarker(performanceTrack_, CommandId{replayIndex}, loop.startTick, outputSequence_, "Loop Start");
-      addLoopMarker(performanceTrack_, loop.endCommand, loop.endTick, outputSequence_, "Loop End");
+      addLoopMarker(performanceTrack_, {sourceTrackId_, CommandId{replayIndex}}, loop.startTick, outputSequence_,
+                    "Loop Start");
+      addLoopMarker(performanceTrack_, {sourceTrackId_, loop.endCommand}, loop.endTick, outputSequence_, "Loop End");
       position_.command = std::nullopt;
       arrivedByControlFlow_ = false;
       return;
@@ -708,6 +710,7 @@ private:
   }
 
   const TrackProgram& track_;
+  TrackId sourceTrackId_;
   const SequenceRuntime& sequenceRuntime_;
   const SequenceProgramBehavior& behavior_;
   LoopPolicy loopPolicy_;
@@ -888,12 +891,16 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
     const auto renderSemanticPass = [&](PerformanceSequence& target, std::any& passProgramState) {
       u64 outputSequence = 0;
       std::vector<std::unique_ptr<VmTrackExecutor>> executors;
-      executors.reserve(program.tracks.size());
+      executors.reserve(program.playbackTrackCount());
       const bool hasSectionPlaylist = program.sectionPlaylist.has_value();
       for (size_t trackIndex = 0; trackIndex < program.tracks.size(); ++trackIndex) {
-        executors.push_back(std::make_unique<VmTrackExecutor>(
-            program, runtime, TrackId{static_cast<u32>(trackIndex)}, program.tracks[trackIndex], options_, target,
-            outputSequence, executors.empty(), passProgramState, !hasSectionPlaylist));
+        const TrackProgram& track = program.tracks[trackIndex];
+        for (const u32 number : track.sourceTrackNumbers) {
+          executors.push_back(std::make_unique<VmTrackExecutor>(
+              TrackStateContext{program, track, number}, runtime, TrackId{static_cast<u32>(trackIndex)},
+              TrackId{static_cast<u32>(executors.size())}, options_, target, outputSequence, executors.empty(),
+              passProgramState, !hasSectionPlaylist));
+        }
       }
 
       std::optional<SectionPlaylistRunner> playlist;
@@ -908,7 +915,7 @@ PerformanceSequence SequenceVm::renderImpl(const SequenceProgram& program, const
         }
       }
 
-      // Execute the earliest channel first; source track order is the stable
+      // Execute the earliest channel first; declared playback order is the stable
       // tie-break. A channel keeps control at the same tick while it consumes
       // zero-time commands, matching how these drivers run until their next wait.
       std::optional<u64> sequenceEndTick;

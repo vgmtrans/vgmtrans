@@ -420,7 +420,8 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   const auto trackAnnotations = sourceMap.withRole(source, SourceRole::SequenceTrack);
   expect(!trackAnnotations.empty(), "source map should expose track annotations");
   const SourceAnnotation& firstTrackAnnotation = sourceMap.get(trackAnnotations.front());
-  expect(firstTrackAnnotation.owner == ObjectRefs::sequenceTrack(sequence->metadata.id, firstTrack.sourceTrackNumber),
+  expect(firstTrackAnnotation.owner ==
+             ObjectRefs::sequenceTrack(sequence->metadata.id, firstTrack.sourceTrackNumbers.front()),
          "track annotation should point at the semantic sequence track");
   expect(sourceMap.childrenOf(firstTrackAnnotation.id).size() == sequence->program.tracks[0].commands.size(),
          "track annotation should parent its decoded command annotations");

@@ -347,7 +347,7 @@ struct TrackEnvelopeState {
 
 // Only values that persist from one executed command to the next live here.
 struct TrackState {
-  TrackState(const TrackProgram& track, const RuntimeConfig& config)
+  TrackState(TrackStateContext track, const RuntimeConfig& config)
       : version(config.version), voiceBit(static_cast<u8>(1u << std::min<u32>(track.sourceTrackNumber, 7))),
         pan(version <= KONAMISNES_V2 ? 10 : 20) {
     const auto* initialInstrument = config.instrument(0);

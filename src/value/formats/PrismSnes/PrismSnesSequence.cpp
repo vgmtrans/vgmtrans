@@ -117,7 +117,7 @@ struct RuntimeConfig {
   RuntimeData data;
   std::vector<RuntimeTrackConfig> tracks;
 
-  [[nodiscard]] const RuntimeTrackConfig& track(const TrackProgram& source) const {
+  [[nodiscard]] const RuntimeTrackConfig& track(TrackStateContext source) const {
     // decodeSequence builds both vectors in dense source-track-number order.
     return tracks.at(source.sourceTrackNumber);
   }
@@ -215,7 +215,7 @@ struct ProgramState {
 struct RuntimeTrack;
 
 struct TrackState {
-  TrackState(const TrackProgram& source, const RuntimeConfig& config)
+  TrackState(TrackStateContext source, const RuntimeConfig& config)
       : TrackState(config.version, config.data, config.track(source).logicalChannel,
                    config.track(source).physicalChannelFlags) {}
 

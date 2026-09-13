@@ -623,7 +623,7 @@ struct ProgramState {
 };
 
 struct TrackState {
-  TrackState(const TrackProgram& track, const RuntimeConfig& config)
+  TrackState(TrackStateContext track, const RuntimeConfig& config)
       : profile(config.profile), trackNumber(track.sourceTrackNumber),
         monoOutput(profile == Profile::BattletoadsDoubleDragon || config.monoOutput) {
     if (profile == Profile::WinningRun) {

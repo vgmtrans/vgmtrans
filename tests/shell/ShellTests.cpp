@@ -81,7 +81,7 @@ ScanResult scanProbe(const ScanInput& input, bool emptyBank) {
                         }
                         return Effects{};
                       }},
-      .tracks = {{.sourceTrackNumber = 3,
+      .tracks = {{.sourceTrackNumbers = {3},
                   .commands =
                       {
                           {.opcode = 0x7f,
@@ -172,7 +172,7 @@ void persistentSessionAndStableIds() {
   fixture.ok("sources");
   expect(fixture.output.str().find("parent 0") != std::string::npos, "derived sources should expose their parent");
   fixture.ok("assets 0");
-  expect(fixture.output.str().find("source track 3") != std::string::npos, "sequence inspection should list tracks");
+  expect(fixture.output.str().find("source tracks 3") != std::string::npos, "sequence inspection should list tracks");
   fixture.ok("tree 0 1");
   expect(fixture.output.str().find("Loop") != std::string::npos,
          "inspection should include bytes beyond asset metadata");

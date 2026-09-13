@@ -5,6 +5,7 @@
  */
 
 #include "ValueTestSupport.h"
+#include "value/validation/SequenceValidation.h"
 #include "../MidiTestSupport.h"
 
 namespace {
@@ -12,7 +13,7 @@ namespace {
 void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
   const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
-      .sourceTrackNumber = 7,
+      .sourceTrackNumbers = {7},
       .startAddress = Address{0},
   };
 
@@ -351,7 +352,7 @@ void sequenceVmPreservesLoopCandidateAsPerformanceMarkers() {
 void sequenceVmPreservesLoopsAsPerformanceMarkers() {
   const SequenceProgramConfig config = probeSequenceConfig();
   TrackProgram track{
-      .sourceTrackNumber = 7,
+      .sourceTrackNumbers = {7},
       .startAddress = Address{0},
   };
 
@@ -467,7 +468,7 @@ void sequenceVmUsesInitialTempoAndGlobalEventOrder() {
   const SequenceProgramConfig orderConfig = probeSequenceConfig();
   const auto makeTrack = [&](u32 trackNumber, u32 address, u8 program) {
     TrackProgram track{
-        .sourceTrackNumber = trackNumber,
+        .sourceTrackNumbers = {trackNumber},
         .startAddress = Address{address},
     };
     const std::array<u8, 2> bytes{0x80, program};
@@ -499,7 +500,7 @@ void sequenceVmEmitsProgramInitialChannelState() {
       },
       StereoBalance{0.25, 0.75});
   TrackProgram track{
-      .sourceTrackNumber = 4,
+      .sourceTrackNumbers = {4},
       .startAddress = Address{0},
   };
 
@@ -560,7 +561,7 @@ void sequenceVmEmitsInitialMasterLevelOnce() {
       .initialPitchBendRangeSemitones = 255,
   });
   const auto makeTrack = [&](u32 id) {
-    TrackProgram track{.sourceTrackNumber = id, .startAddress = Address{0}};
+    TrackProgram track{.sourceTrackNumbers = {id}, .startAddress = Address{0}};
     const std::array<u8, 1> endBytes{0xff};
     addProbeCommand<ProbeEndCommand>(track, config, Address{0}, probeRange(id, endBytes.size()), endBytes);
     return track;
@@ -1156,7 +1157,7 @@ void sequenceVmSchedulesSemanticTracksAgainstOneProgramState() {
   appendTestCommand(track0, Address{2}, 9, {}, {}, CommandFlow::fallthroughTo(Address{3}));
   appendTestCommand(track0, Address{3}, 0, {}, {}, CommandFlow::end(Address{4}));
 
-  TrackProgram track1{.sourceTrackNumber = 1, .startAddress = Address{10}};
+  TrackProgram track1{.sourceTrackNumbers = {1}, .startAddress = Address{10}};
   appendTestCommand(track1, Address{10}, 2, {}, {}, CommandFlow::fallthroughTo(Address{11}));
   appendTestCommand(track1, Address{11}, 0, {}, {}, CommandFlow::fallthroughTo(Address{12}));
   appendTestCommand(track1, Address{12}, 0, {}, {}, CommandFlow::end(Address{13}));
@@ -1263,12 +1264,6 @@ struct PlaylistProbeTrackState {
   void beginSection() { ++sectionsStarted; }
 };
 
-struct PlaylistProbePlayback {
-  PlaylistProbeTrackState& track;
-  PerformanceEmitter& out;
-  VmApi& vm;
-};
-
 Effects executePlaylistProbe(const SourceCommand& command, std::any&, std::any& trackState, PerformanceEmitter& out,
                              VmApi& vm) {
   auto& state = std::any_cast<PlaylistProbeTrackState&>(trackState);
@@ -1281,7 +1276,7 @@ Effects executePlaylistProbe(const SourceCommand& command, std::any&, std::any& 
   return Effects::wait(command.opcode);
 }
 
-std::any createPlaylistProbeTrackState(const SequenceProgram&, const TrackProgram&) {
+std::any createPlaylistProbeTrackState(TrackStateContext) {
   return PlaylistProbeTrackState{};
 }
 
@@ -1291,7 +1286,7 @@ void beginPlaylistProbeSection(std::any& trackState) {
 
 TrackProgram playlistProbeTrack(u32 trackId, std::initializer_list<std::pair<u32, u8>> sections) {
   TrackProgram track{
-      .sourceTrackNumber = trackId,
+      .sourceTrackNumbers = {trackId},
       .startAddress = Address{sections.begin()->first},
   };
   for (const auto [address, duration] : sections) {
@@ -1318,13 +1313,13 @@ SequenceRuntime playlistProbeRuntime() {
 
 void sequenceVmSwitchesParallelSectionsAtTheFirstChannelEnd() {
   const SequenceProgramConfig config = playlistProbeConfig();
-  const TrackProgram track0 = playlistProbeTrack(0, {{0, 8}});
-  const TrackProgram track1 = playlistProbeTrack(1, {{100, 12}, {110, 4}});
+  TrackProgram shared = playlistProbeTrack(0, {{0, 8}, {100, 12}, {110, 4}});
+  shared.sourceTrackNumbers = {0, 1};
   const SequenceProgram program{
       .runtime = playlistProbeRuntime(),
       .timebase = config.timebase,
       .behavior = config.behavior,
-      .tracks = {track0, track1},
+      .tracks = {shared},
       .sectionPlaylist =
           SectionPlaylist{
               .startAddress = Address{1000},
@@ -1349,12 +1344,16 @@ void sequenceVmSwitchesParallelSectionsAtTheFirstChannelEnd() {
           },
   };
 
+  expect(validateSequenceProgram(program).empty(), "playlist entries should address expanded playback tracks");
   const PerformanceSequence performance = SequenceVm().render(program);
   expect(performance.diagnostics.empty(), "parallel section fixture should render without diagnostics");
   expect(performance.tracks.size() == 2 && performance.tracks[0].endTick == 12 && performance.tracks[1].endTick == 12,
          "the earliest section end should restart every channel at one shared tick");
   const auto& firstLongNote = std::get<NotePerformanceEvent>(performance.tracks[1].events[0]);
   const auto& secondSectionNote = std::get<NotePerformanceEvent>(performance.tracks[1].events[1]);
+  expect(program.command(firstLongNote.header.sourceCommand) == &program.tracks[0].commands[2] &&
+             firstLongNote.header.track == TrackId{1} && firstLongNote.key == 11.0,
+         "shared commands should retain their source identity and each channel's independent state");
   expect(firstLongNote.header.tick == 0 && firstLongNote.durationTicks == 8,
          "a section switch should trim a longer sibling channel at the boundary");
   expect(secondSectionNote.header.tick == 8 && secondSectionNote.durationTicks == 4 && secondSectionNote.key == 22.0,
