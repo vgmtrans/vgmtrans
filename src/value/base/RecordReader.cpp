@@ -94,21 +94,19 @@ RangedValue<u32> RecordReader::u32le(std::string_view name, SourceValueDisplay d
 
 RangedValue<u32> RecordReader::varLen(std::string_view name, SourceValueDisplay display) {
   const u32 begin = position_;
-  u32 value = 0;
-  while (true) {
-    if (!require(1, name)) {
-      return {};
-    }
-    const ::u8 byte = reader_.u8At(position_++);
-    value = (value << 7) + (byte & 0x7f);
-    if ((byte & 0x80) == 0) {
-      break;
-    }
+  if (failed_) {
+    return {};
+  }
+  // These source encodings are bounded by the record, without MIDI's four-byte limit.
+  const auto value = reader_.varLen(position_, end_, end_ - position_);
+  if (!value) {
+    require(1, name);
+    return {};
   }
 
   const SourceRange sourceRange = reader_.range(begin, position_ - begin);
-  field(name, sourceRange, makeSourceValue(value), display);
-  return RangedValue<u32>{value, sourceRange};
+  field(name, sourceRange, makeSourceValue(*value), display);
+  return RangedValue<u32>{*value, sourceRange};
 }
 
 RangedValue<std::string> RecordReader::rawBytes(std::string_view name, u32 size) {

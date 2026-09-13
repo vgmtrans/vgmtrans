@@ -2151,11 +2151,39 @@ unused helper type offsets those additions: total test line count is unchanged.
 The MIDI capture hook was removed, and its harness and results remain ignored.
 Real-file corpus parity is still unverified.
 
+## Share variable-length integer decoding across parsers and records
+
+ByteReader now supplies one consuming base-128 integer reader. SonyPS1,
+SonyPS2, HeartBeatPS1, and KonamiPS1 use it instead of maintaining separate
+four-byte decoding loops. SonyPS2 also stops returning an unused byte count
+alongside every decoded value. RecordReader delegates the byte reading to the
+same primitive while retaining its source fields and truncation diagnostics.
+
+The byte limit remains explicit: the four format parsers accept at most four
+bytes, while RecordReader permits the whole record window and preserves its
+existing unsigned accumulation for longer encodings. The shared reader stops
+at both the supplied window and the actual source bounds. Failed reads retain
+their consumed cursor position; RecordReader keeps its sticky failure behavior.
+The change removes 33 net production lines.
+
+A temporary before/after comparison matches values, cursor positions, validity,
+source fields, and diagnostics for 32,768 generated cases, including missing
+terminators and longer record encodings. Source.cpp and RecordReader.cpp were
+compiled into both comparison executables with AddressSanitizer and UBSan;
+neither reported findings. The harness and results remain ignored. An 11-line
+addition to an existing reader fixture checks the distinct length policies.
+The full build is warning-free and all 20 CTest targets pass.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding
   setup, source metadata handoffs, and repeated scan-to-playback preparation.
   Continue checking export lowering and instrument selection for redundant work.
+- Shared-stream channel routing must preserve unconditional time advancement
+  and startup output. Source-channel metadata alone cannot gate execution:
+  some channel-encoded loop commands control every playback track. Moving
+  future-dated output to execution after a wait also changes initialization
+  timing, so it requires more than removing channel guards.
 - Static instrument discovery can include every reachable bytecode branch,
   while recipe analysis may depend on executed driver state. Preserve that
   distinction when considering a shared replacement for format reference sets.

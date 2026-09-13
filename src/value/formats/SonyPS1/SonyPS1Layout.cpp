@@ -116,22 +116,12 @@ constexpr u32 kPsxMainRamMask = 0x1fffff;
       return events;
     }
     SonyPs1EventLayout event{.offset = offset};
-    u32 delta = 0;
-    for (u8 bytes = 0; bytes < 4; ++bytes) {
-      if (offset >= end || !reader.has(offset, 1)) {
-        return std::nullopt;
-      }
-      const u8 value = reader.u8At(offset++);
-      delta = (delta << 7) | (value & 0x7f);
-      ++event.deltaSize;
-      if ((value & 0x80) == 0) {
-        break;
-      }
-      if (bytes == 3) {
-        return std::nullopt;
-      }
+    const auto delta = reader.varLen(offset, end);
+    if (!delta) {
+      return std::nullopt;
     }
-    event.delta = delta;
+    event.delta = *delta;
+    event.deltaSize = static_cast<u8>(offset - event.offset);
     if (offset >= end || !reader.has(offset, 1)) {
       return std::nullopt;
     }
