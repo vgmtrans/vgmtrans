@@ -4060,13 +4060,7 @@ PerformanceModulationStats performanceModulationStats(const SequenceProgram& pro
           ++stats.melodicBankNoteEvents;
         }
       } else if (const auto* instrumentEvent = std::get_if<InstrumentPerformanceEvent>(&event)) {
-        const std::optional<InstrumentAddress> explicitAddress = instrumentEvent->sourceInstrument
-                                                                     ? std::nullopt
-                                                                     : std::optional{InstrumentAddress{
-                                                                           .bank = instrumentEvent->bank,
-                                                                           .program = instrumentEvent->program,
-                                                                       }};
-        const InstrumentAddress address = resolveInstrumentAddress(explicitAddress, instrumentEvent->sourceInstrument);
+        const InstrumentAddress address = resolveInstrumentAddress(instrumentEvent->instrument);
         instrument.bank = address.bank;
         instrument.program = address.program;
         if (instrument.bank == 0x7f && instrument.program == 0) {

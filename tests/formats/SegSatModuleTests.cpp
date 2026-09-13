@@ -389,7 +389,7 @@ void segSatCollectionBindingSuppliesVlTablesToSequence() {
   const auto* selection = instrument != playback.performance.tracks[0].events.end()
                               ? std::get_if<InstrumentPerformanceEvent>(&*instrument)
                               : nullptr;
-  expect(selection != nullptr && selection->sourceInstrument == segSatInstrumentIdentity(5, 0),
+  expect(selection != nullptr && std::get<InstrumentIdentity>(selection->instrument) == segSatInstrumentIdentity(5, 0),
          "SegSat program selection should retain its source identity for collection-time address resolution");
 
   const auto bend = std::ranges::find_if(playback.performance.tracks[0].events, [](const PerformanceEvent& event) {
@@ -540,9 +540,9 @@ void segSatMultiBankPlaybackUsesTheActiveBanksVlTable() {
   for (const auto& event : playback.performance.tracks.front().events) {
     if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
       notes.emplace_back(selectedBank, note);
-    } else if (const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&event);
-               instrument != nullptr && instrument->sourceInstrument) {
-      if (const auto address = decodeSegSatInstrumentIdentity(*instrument->sourceInstrument)) {
+    } else if (const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&event); instrument != nullptr) {
+      const auto* identity = std::get_if<InstrumentIdentity>(&instrument->instrument);
+      if (const auto address = identity ? decodeSegSatInstrumentIdentity(*identity) : std::nullopt) {
         selectedBank = address->sourceBank;
       }
     }

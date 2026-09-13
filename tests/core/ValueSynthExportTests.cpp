@@ -1128,7 +1128,7 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
       .tracks = {PerformanceTrack{
           .events =
               {
-                  InstrumentPerformanceEvent{.sourceInstrument = semanticIdentity},
+                  InstrumentPerformanceEvent{.instrument = semanticIdentity},
                   NotePerformanceEvent{},
               },
       }},
@@ -1152,7 +1152,7 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
       .tracks = {PerformanceTrack{
           .events =
               {
-                  InstrumentPerformanceEvent{.bank = 1, .program = 1},
+                  InstrumentPerformanceEvent{.instrument = InstrumentAddress{.bank = 1, .program = 1}},
                   NotePerformanceEvent{},
               },
       }},
@@ -1175,7 +1175,7 @@ void collectionSynthExportsCanExportOnlyUsedInstruments() {
       .tracks = {PerformanceTrack{
           .events =
               {
-                  InstrumentPerformanceEvent{.bank = 1 << 7, .program = 1},
+                  InstrumentPerformanceEvent{.instrument = InstrumentAddress{.bank = 1 << 7, .program = 1}},
                   NotePerformanceEvent{},
               },
       }},

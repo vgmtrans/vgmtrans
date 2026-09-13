@@ -241,7 +241,7 @@ void PerformanceEmitter::instrument(InstrumentPerformanceEvent event) {
 
 void PerformanceEmitter::instrument(InstrumentIdentity sourceInstrument, InstrumentEnvelopeMode envelopeMode) {
   instrument(InstrumentPerformanceEvent{
-      .sourceInstrument = std::move(sourceInstrument),
+      .instrument = std::move(sourceInstrument),
       .envelopeMode = envelopeMode,
   });
 }
@@ -252,8 +252,7 @@ void PerformanceEmitter::instrument(u32 bank, u32 program, InstrumentEnvelopeMod
 
 void PerformanceEmitter::instrument(u32 bank, u32 program, bool forceBankSelect, InstrumentEnvelopeMode envelopeMode) {
   instrument(InstrumentPerformanceEvent{
-      .bank = bank,
-      .program = program,
+      .instrument = InstrumentAddress{.bank = bank, .program = program},
       .forceBankSelect = forceBankSelect,
       .envelopeMode = envelopeMode,
   });

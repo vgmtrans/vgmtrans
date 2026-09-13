@@ -274,8 +274,9 @@ void playbackUsesAuditedGatingPitchAndLoops() {
       "duration rate 8 should gate a three-tick percussion note after two ticks");
   expect(!tunings.empty() && std::abs(tunings.back()->cents - 75.0) < 0.000001,
          "CF sixteenth-semitone tuning and EC quarter-semitone transpose should retain their fractions");
-  expect(instruments.size() >= 4 && instruments[instruments.size() - 2]->sourceInstrument->key == kDrumKitKey &&
-             instruments.back()->sourceInstrument->key == 3,
+  expect(instruments.size() >= 4 &&
+             std::get<InstrumentIdentity>(instruments[instruments.size() - 2]->instrument).key == kDrumKitKey &&
+             std::get<InstrumentIdentity>(instruments.back()->instrument).key == 3,
          "percussion mode should select the derived kit and restore the last melodic program afterward");
 
   const PerformanceSequence repeated = render(Version::SeikenDensetsu3, {
@@ -312,9 +313,9 @@ void driverDefaultsAndPitchTransitionsAreVersioned() {
     const auto levels = events<LevelPerformanceEvent>(performance.tracks.front());
     expect(notes.size() == 1 && notes.front()->durationTicks == expected.duration,
            "the profile-specific initial duration rate should match the driver reset state");
-    expect(!instruments.empty() && instruments.front()->sourceInstrument &&
-               instruments.front()->sourceInstrument->key == expected.program,
-           "the profile-specific initial instrument should match the driver reset state");
+    expect(
+        !instruments.empty() && std::get<InstrumentIdentity>(instruments.front()->instrument).key == expected.program,
+        "the profile-specific initial instrument should match the driver reset state");
     expect(!levels.empty() && std::abs(levels.front()->linearGain - expected.level) < 0.000001,
            "the profile-specific initial channel volume should match the driver reset state");
   }

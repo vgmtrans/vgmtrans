@@ -117,13 +117,8 @@ enum class InstrumentEnvelopeMode : u8 {
 
 struct InstrumentPerformanceEvent {
   PerformanceEventHeader header;
-  // Direct selections use the same logical preset bank as InstrumentAddress.
-  // MIDI bank packing belongs exclusively to MIDI lowering. Semantic formats
-  // may instead set sourceInstrument and leave address resolution to export.
-  u32 bank = 0;
-  u32 program = 0;
+  InstrumentSelection instrument;
   bool forceBankSelect = false;
-  std::optional<InstrumentIdentity> sourceInstrument;
   // Instrument selection governs future attacks. Drivers that retain their
   // dynamic ADSR state across a selection opt out explicitly.
   InstrumentEnvelopeMode envelopeMode = InstrumentEnvelopeMode::UseInstrumentEnvelope;

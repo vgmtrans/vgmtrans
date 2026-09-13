@@ -687,8 +687,7 @@ void performanceMidiRendererHonorsMidiExportOptions() {
                                               {
                                                   InstrumentPerformanceEvent{
                                                       .header = PerformanceEventHeader{.tick = 0},
-                                                      .bank = 130,
-                                                      .program = 5,
+                                                      .instrument = InstrumentAddress{.bank = 130, .program = 5},
                                                   },
                                                   LevelPerformanceEvent{
                                                       .header = PerformanceEventHeader{.tick = 0},
@@ -2083,7 +2082,7 @@ void performanceMidiRendererResolvesSourceInstrumentIdentityAtExport() {
               {
                   InstrumentPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
-                      .sourceInstrument = InstrumentIdentity{.domain = "probe.instrument", .key = 5},
+                      .instrument = InstrumentIdentity{.domain = "probe.instrument", .key = 5},
                   },
                   NotePerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 1},

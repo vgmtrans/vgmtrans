@@ -218,9 +218,11 @@ void dynamicDriverFeaturesRenderFromCapturedTables() {
                                       event->delayMilliseconds == 64.0;
                              }),
          "echo must retain voice masks, signed stereo gains, feedback, FIR identity, and EDL timing");
-  expect(std::ranges::any_of(
-             events<InstrumentPerformanceEvent>(track),
-             [](const auto* event) { return event->sourceInstrument && event->sourceInstrument->key == 2; }),
+  expect(std::ranges::any_of(events<InstrumentPerformanceEvent>(track),
+                             [](const auto* event) {
+                               const auto* identity = std::get_if<InstrumentIdentity>(&event->instrument);
+                               return identity && identity->key == 2;
+                             }),
          "instrument changes should retain their source SRCN identity");
 }
 
@@ -267,10 +269,9 @@ void instrumentChangesWaitForTheNextAttack() {
   const auto envelopes = events<EnvelopePerformanceEvent>(track);
   const auto expression = events<ExpressionPerformanceEvent>(track);
 
-  expect(performance.diagnostics.empty() && instruments.size() == 3 && instruments[1]->sourceInstrument &&
-             instruments[1]->sourceInstrument->key == 2 && instruments[1]->header.tick == 0 &&
-             instruments[2]->sourceInstrument && instruments[2]->sourceInstrument->key == 3 &&
-             instruments[2]->header.tick == 16 &&
+  expect(performance.diagnostics.empty() && instruments.size() == 3 &&
+             std::get<InstrumentIdentity>(instruments[1]->instrument).key == 2 && instruments[1]->header.tick == 0 &&
+             std::get<InstrumentIdentity>(instruments[2]->instrument).key == 3 && instruments[2]->header.tick == 16 &&
              std::ranges::none_of(instruments,
                                   [](const InstrumentPerformanceEvent* event) { return event->header.tick == 8; }),
          "FE must defer its MIDI-facing instrument selection across ties until the next real key-on");
@@ -353,7 +354,8 @@ void subtrackTriggersRunTheirChildScore() {
   expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->key == 60.0 &&
              std::ranges::any_of(instruments,
                                  [](const InstrumentPerformanceEvent* event) {
-                                   return event->sourceInstrument && event->sourceInstrument->key == 2;
+                                   const auto* identity = std::get_if<InstrumentIdentity>(&event->instrument);
+                                   return identity && identity->key == 2;
                                  }),
          "subtrack triggers should execute the selected child score after the driver's two-tick voice reset");
 }

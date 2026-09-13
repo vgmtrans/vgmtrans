@@ -754,10 +754,10 @@ void ninSnesProgramResolutionIsCapturedByRuntime() {
   const auto* change = instrument == performance.tracks[0].events.end()
                            ? nullptr
                            : std::get_if<InstrumentPerformanceEvent>(&*instrument);
-  expect(change != nullptr && change->sourceInstrument && change->sourceInstrument->key == 12,
+  const auto* identity = change ? std::get_if<InstrumentIdentity>(&change->instrument) : nullptr;
+  expect(identity && identity->key == 12,
          "NinSnes runtime configuration should retain the parsed source-program mapping (got " +
-             (change != nullptr && change->sourceInstrument ? std::to_string(change->sourceInstrument->key) : "none") +
-             ")");
+             (identity ? std::to_string(identity->key) : "none") + ")");
 }
 
 void ninSnesFe3ConditionalJumpUsesCapturedDriverState() {
@@ -1584,7 +1584,8 @@ void ninSnesIntelligentVoiceLoadingPreservesTuningAndMasksIndex() {
 
   expect(std::ranges::any_of(performance.tracks[0].events, [](const auto& event) {
            const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&event);
-           return instrument && instrument->sourceInstrument && instrument->sourceInstrument->key == 5;
+           const auto* identity = instrument ? std::get_if<InstrumentIdentity>(&instrument->instrument) : nullptr;
+           return identity && identity->key == 5;
          }) && std::ranges::any_of(performance.tracks[0].events, [](const auto& event) {
            const auto* level = std::get_if<LevelPerformanceEvent>(&event);
            return level && std::abs(level->linearGain - ninSnesLevelGain(0x80)) < 0.0001;
@@ -1712,7 +1713,7 @@ void ninSnesIntelligentSectionPreservesVoiceAndLegato() {
       notes.push_back(*note);
     }
     if (const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&event)) {
-      expect(instrument->sourceInstrument && instrument->sourceInstrument->key == 5,
+      expect(std::get<InstrumentIdentity>(instrument->instrument).key == 5,
              "section entry must retain the selected instrument");
     }
   }
@@ -2176,8 +2177,10 @@ void ninSnesQuestSupportsTacticsOgre() {
     std::vector<u32> notePrograms;
     u32 currentProgram = 0;
     for (const auto& event : performance.tracks[0].events) {
-      if (const auto* e = std::get_if<InstrumentPerformanceEvent>(&event); e && e->sourceInstrument) {
-        currentProgram = e->sourceInstrument->key;
+      if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event)) {
+        if (const auto* identity = std::get_if<InstrumentIdentity>(&selection->instrument)) {
+          currentProgram = identity->key;
+        }
       } else if (std::holds_alternative<NotePerformanceEvent>(event)) {
         notePrograms.push_back(currentProgram);
       }

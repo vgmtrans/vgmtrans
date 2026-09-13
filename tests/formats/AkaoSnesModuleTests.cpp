@@ -1022,8 +1022,9 @@ void akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo() {
              notes[4]->durationTicks == 1 && notes[5]->extendsPrevious,
          "percussion, slur, legato, one-time duration, rest, and tie should preserve their distinct note behavior");
   const auto instruments = eventsOfType<InstrumentPerformanceEvent>(noteModePerformance.tracks.front());
-  expect(instruments.size() == 3 && instruments[0]->program == 5 && instruments[1]->bank == kAkaoSnesDrumKitBank &&
-             instruments[2]->bank == 0 && instruments[2]->program == 5,
+  expect(instruments.size() == 3 && std::get<InstrumentAddress>(instruments[0]->instrument).program == 5 &&
+             std::get<InstrumentAddress>(instruments[1]->instrument).bank == kAkaoSnesDrumKitBank &&
+             instruments[2]->instrument == InstrumentSelection{InstrumentAddress{0, 5}},
          "percussion mode should restore the remembered melodic program when it turns off");
 
   std::vector<u8> transposedDrum(0x40, 0xec);

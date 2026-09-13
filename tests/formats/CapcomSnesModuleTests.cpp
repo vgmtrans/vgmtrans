@@ -111,10 +111,11 @@ std::string performanceTrackSnapshot(const PerformanceTrack& track) {
             snapshot += "tempo@" + std::to_string(typedEvent.header.tick) + '=' +
                         std::to_string(typedEvent.microsecondsPerQuarter);
           } else if constexpr (std::is_same_v<T, InstrumentPerformanceEvent>) {
+            const auto* identity = std::get_if<InstrumentIdentity>(&typedEvent.instrument);
             snapshot +=
                 "instrument@" + std::to_string(typedEvent.header.tick) + '=' +
-                (typedEvent.sourceInstrument ? typedEvent.sourceInstrument->domain : "legacy") + ':' +
-                std::to_string(typedEvent.sourceInstrument ? typedEvent.sourceInstrument->key : typedEvent.program);
+                (identity ? identity->domain : "legacy") + ':' +
+                std::to_string(identity ? identity->key : std::get<InstrumentAddress>(typedEvent.instrument).program);
           } else if constexpr (std::is_same_v<T, LevelPerformanceEvent>) {
             snapshot += "level@" + std::to_string(typedEvent.header.tick) + '=' +
                         snapshotNumber(typedEvent.linearGain) + "/q" +
@@ -494,9 +495,9 @@ void capcomSnesModuleDiscoversSequenceInstrumentsAndSamples() {
   expect(instrumentEvent != performance.tracks[0].events.end(),
          "CapcomSnes performance should select a source instrument");
   const auto& instrumentSelection = std::get<InstrumentPerformanceEvent>(*instrumentEvent);
-  expect(instrumentSelection.sourceInstrument ==
+  expect(std::get<InstrumentIdentity>(instrumentSelection.instrument) ==
                  InstrumentIdentity{.domain = std::string(kCapcomSnesInstrumentDomain), .key = 0} &&
-             instrumentSelection.bank == 0 && instrumentSelection.program == 0 && !instrumentSelection.forceBankSelect,
+             !instrumentSelection.forceBankSelect,
          "CapcomSnes performance should not pre-encode target bank/program behavior");
   const auto levelEvent = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     return std::holds_alternative<LevelPerformanceEvent>(event);
