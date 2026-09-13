@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <filesystem>
-#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -21,29 +20,8 @@ using namespace core;
 
 namespace {
 
-struct SequenceEntry {
-  AssetId asset;
-  std::string name;
-  std::optional<SourceId> source;
-  const SourceFile* file = nullptr;
-  u32 offset = 0;
-};
-
-struct InstrumentEntry {
-  AssetId asset;
-  std::optional<SourceId> source;
-  const SourceFile* file = nullptr;
-  u64 offset = 0;
-  u32 sampleBytes = 0;
-  bool needsExternalSamples = false;
-};
-
-struct SampleEntry {
-  AssetId asset;
-  std::optional<SourceId> source;
-  const SourceFile* file = nullptr;
-  u32 sampleBytes = 0;
-};
+using InstrumentEntry = AssetWithData<SoundBankAsset, SonyPs1BankLayout>;
+using SampleEntry = AssetWithData<SamplePoolAsset, SonyPs1SampleBodyLayout>;
 
 struct SonySampleBinding {
   AssetId soundBank;
@@ -76,72 +54,28 @@ struct SonySampleBinding {
   return !a.empty() && !b.empty() && a.parent_path() == b.parent_path() && a.stem() == b.stem();
 }
 
-[[nodiscard]] std::optional<SourceId> sourceId(const AssetMetadata& metadata) {
-  return metadata.range.valid() ? std::optional{metadata.range.source} : std::nullopt;
-}
-
-[[nodiscard]] std::vector<SequenceEntry> sequences(const CollectionDiscoveryContext& context) {
-  std::vector<SequenceEntry> entries;
-  for (const auto* asset : context.assets<SequenceProgramAsset>(kSonyPs1FormatName)) {
-    entries.push_back(SequenceEntry{
-        .asset = asset->metadata.id,
-        .name = asset->metadata.name,
-        .source = sourceId(asset->metadata),
-        .file = context.sourceFor(asset->metadata),
-        .offset = static_cast<u32>(asset->metadata.range.offset),
-    });
-  }
-  return entries;
-}
-
-[[nodiscard]] std::vector<InstrumentEntry> instruments(const CollectionDiscoveryContext& context) {
-  std::vector<InstrumentEntry> entries;
-  for (const auto& entry : context.assetsWithData<SoundBankAsset, SonyPs1BankLayout>()) {
-    entries.push_back(InstrumentEntry{
-        .asset = entry.id(),
-        .source = entry.sourceId(),
-        .file = entry.source,
-        .offset = entry.asset->metadata.range.offset,
-        .sampleBytes = entry.data->expectedSampleBytes,
-        .needsExternalSamples = needsExternalSamples(*entry.asset),
-    });
-  }
-  return entries;
-}
-
-[[nodiscard]] std::vector<SampleEntry> samples(const CollectionDiscoveryContext& context) {
-  std::vector<SampleEntry> entries;
-  for (const auto& entry : context.assetsWithData<SamplePoolAsset, SonyPs1SampleBodyLayout>()) {
-    entries.push_back(SampleEntry{
-        .asset = entry.id(),
-        .source = entry.sourceId(),
-        .file = entry.source,
-        .sampleBytes = entry.data->length,
-    });
-  }
-  return entries;
-}
-
-[[nodiscard]] std::vector<const InstrumentEntry*> chooseInstruments(const SequenceEntry& sequence,
-                                                                    const std::vector<SequenceEntry>& sequenceEntries,
-                                                                    const std::vector<InstrumentEntry>& banks) {
+[[nodiscard]] std::vector<const InstrumentEntry*> chooseInstruments(
+    const SequenceProgramAsset& sequence, const SourceFile* sequenceFile,
+    const std::vector<const SequenceProgramAsset*>& sequenceEntries, const std::vector<InstrumentEntry>& banks) {
+  const SourceId source = sequence.metadata.range.source;
+  const u32 offset = static_cast<u32>(sequence.metadata.range.offset);
   std::vector<const InstrumentEntry*> selected;
   for (const auto& bank : banks) {
-    if (sequence.source && bank.source && *sequence.source == *bank.source) {
+    if (source.valid() && source == bank.sourceId()) {
       selected.push_back(&bank);
     }
   }
   if (!selected.empty()) {
     std::ranges::sort(selected, [](const InstrumentEntry* left, const InstrumentEntry* right) {
-      return left->offset > right->offset;
+      return left->asset->metadata.range.offset > right->asset->metadata.range.offset;
     });
-    const size_t rank = std::ranges::count_if(sequenceEntries, [&](const SequenceEntry& candidate) {
-      return candidate.source == sequence.source && candidate.offset > sequence.offset;
+    const size_t rank = std::ranges::count_if(sequenceEntries, [&](const SequenceProgramAsset* candidate) {
+      return candidate->metadata.range.source == source && static_cast<u32>(candidate->metadata.range.offset) > offset;
     });
     return {selected[std::min(rank, selected.size() - 1)]};
   }
   for (const auto& bank : banks) {
-    if (sameDirectory(sequence.file, bank.file)) {
+    if (sameDirectory(sequenceFile, bank.source)) {
       selected.push_back(&bank);
     }
   }
@@ -154,37 +88,37 @@ struct SonySampleBinding {
 [[nodiscard]] std::vector<const SampleEntry*> chooseSamples(const InstrumentEntry& bank,
                                                             const std::vector<SampleEntry>& bodies) {
   return bestMatches(bodies, [&](const SampleEntry& body) {
-    if (body.sampleBytes != bank.sampleBytes) {
+    if (body.data->length != bank.data->expectedSampleBytes) {
       return -1;
     }
     // Compare successively weaker stem, source, and directory evidence.
-    return (sameStem(bank.file, body.file) ? 4 : 0) +
-           (bank.source && body.source && *bank.source == *body.source ? 2 : 0) +
-           (sameDirectory(bank.file, body.file) ? 1 : 0);
+    return (sameStem(bank.source, body.source) ? 4 : 0) +
+           (bank.sourceId().valid() && bank.sourceId() == body.sourceId() ? 2 : 0) +
+           (sameDirectory(bank.source, body.source) ? 1 : 0);
   });
 }
 
 void attachBank(CollectionAssembly& collection, const InstrumentEntry& bank, const std::vector<SampleEntry>& bodies,
                 std::vector<SonySampleBinding>& bindings) {
-  collection.soundBank(bank.asset);
-  if (!bank.needsExternalSamples) {
+  collection.soundBank(bank.id());
+  if (!needsExternalSamples(*bank.asset)) {
     return;
   }
   const auto candidates = chooseSamples(bank, bodies);
   if (candidates.size() == 1) {
-    collection.samplePool(candidates.front()->asset);
-    bindings.push_back(SonySampleBinding{.soundBank = bank.asset, .samplePool = candidates.front()->asset});
+    collection.samplePool(candidates.front()->id());
+    bindings.push_back(SonySampleBinding{.soundBank = bank.id(), .samplePool = candidates.front()->id()});
     return;
   }
   if (!candidates.empty()) {
-    collection.ambiguous("Sony PS1 sound bank matches multiple external sample pools", bank.asset);
+    collection.ambiguous("Sony PS1 sound bank matches multiple external sample pools", bank.id());
     return;
   }
   collection.incomplete(CollectionIssue{
       .severity = Severity::Warning,
       .code = "missing-sample-pool",
       .message = "Sony PS1 sound bank has no matching external sample pool",
-      .asset = bank.asset,
+      .asset = bank.id(),
   });
 }
 
@@ -260,18 +194,20 @@ void applySonyPs1Bindings(CollectionBindingContext& context, std::span<const Son
 }  // namespace
 
 std::vector<DesiredCollection> resolveSonyPs1Collections(const CollectionDiscoveryContext& context) {
-  const auto sequenceEntries = sequences(context);
-  const auto instrumentEntries = instruments(context);
-  const auto sampleEntries = samples(context);
+  const auto sequenceEntries = context.assets<SequenceProgramAsset>(kSonyPs1FormatName);
+  const auto instrumentEntries = context.assetsWithData<SoundBankAsset, SonyPs1BankLayout>();
+  const auto sampleEntries = context.assetsWithData<SamplePoolAsset, SonyPs1SampleBodyLayout>();
   std::vector<DesiredCollection> collections;
 
-  for (const auto& sequence : sequenceEntries) {
-    CollectionAssembly collection("source:" + std::to_string(sequence.source ? sequence.source->value : 0) +
-                                      ":sequence:" + std::to_string(sequence.offset),
-                                  sequence.name);
-    collection.sequence(sequence.asset);
+  for (const auto* sequence : sequenceEntries) {
+    const auto& metadata = sequence->metadata;
+    const SourceId source = metadata.range.source;
+    CollectionAssembly collection("source:" + std::to_string(source.valid() ? source.value : 0) +
+                                      ":sequence:" + std::to_string(static_cast<u32>(metadata.range.offset)),
+                                  metadata.name);
+    collection.sequence(metadata.id);
     std::vector<SonySampleBinding> bindings;
-    const auto banks = chooseInstruments(sequence, sequenceEntries, instrumentEntries);
+    const auto banks = chooseInstruments(*sequence, context.sourceFor(metadata), sequenceEntries, instrumentEntries);
     for (const auto* bank : banks) {
       attachBank(collection, *bank, sampleEntries, bindings);
     }

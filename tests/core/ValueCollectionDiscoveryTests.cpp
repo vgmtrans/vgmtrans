@@ -60,11 +60,21 @@ void discoveryExposesTypedAssetDataAndSources() {
           },
   });
 
+  for (const auto range : {SourceRange{}, SourceRange{.source = SourceId{99}}}) {
+    auto detached = std::get<SequenceProgramAsset>(assets.front());
+    detached.metadata.id = AssetId{static_cast<u32>(10 + assets.size())};
+    detached.metadata.range = range;
+    assets.push_back(std::move(detached));
+  }
+
   const CollectionDiscoveryContext context(sources, SharedSequence<Asset>{std::move(assets)});
   const auto sequences = context.assetsWithData<SequenceProgramAsset, ProbeData>();
-  expect(sequences.size() == 1 && sequences[0].id() == sequenceId && sequences[0].data->value == 9 &&
+  expect(sequences.size() == 3 && sequences[0].id() == sequenceId && sequences[0].data->value == 9 &&
              sequences[0].sourceId() == source && sequences[0].source == &sources.source(source),
          "collection discovery should expose typed data and source metadata directly from an asset");
+  expect(!sequences[1].sourceId().valid() && sequences[1].source == nullptr &&
+             sequences[2].sourceId() == SourceId{99} && sequences[2].source == nullptr,
+         "an unavailable source file should not erase a valid source ID");
   expect(context.asset<SequenceProgramAsset>(sequenceId) == sequences[0].asset &&
              context.asset<SamplePoolAsset>(samplesId) != nullptr &&
              context.assetsWithData<SamplePoolAsset, ProbeData>().empty(),
