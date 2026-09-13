@@ -463,18 +463,11 @@ void delayTrackStart(TrackProgram& track, u64 ticks, Address delayedStart) {
   track.startAddress = delayedStart;
 }
 
-[[nodiscard]] TrackProgram decodeTrack(ByteReader reader, AssetId id, u32 number, const TrackSeed& seed,
-                                       SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
-  const TrackDecodeScope scope{
-      .reader = reader,
-      .bytecodeEnd = static_cast<u32>(reader.size()),
-      .maxCommands = kMaximumCommands,
-      .sequenceAsset = id,
-      .sourceMap = sourceMap,
-  };
+[[nodiscard]] TrackProgram decodeTrack(const TrackDecodeScope& scope, u32 number, const TrackSeed& seed,
+                                       std::vector<Diagnostic>* diagnostics) {
+  const ByteReader reader = scope.reader;
   TrackProgram track =
       scope.decode(number, seed.start, [&](u32 offset) { return decodeCommand(reader, offset, diagnostics); });
-  track.sourceTrackNumbers = {number};
   track.name = seed.fork ? fmt::format("Track {} fork", seed.sourceSlot + 1)
                          : fmt::format("Track {}", seed.sourceSlot + 1);
   // Synthetic command addresses follow every source byte, so appending keeps the
@@ -500,36 +493,37 @@ const SequenceProgramConfig& sequenceConfig() {
 
 SequenceProgram parseSequence(ByteReader reader, AssetId id, const SequenceLayout& layout,
                               SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
-  SequenceProgram program = sequenceConfig().makeProgram();
-  program.behavior.initialTempoMicrosecondsPerQuarter =
+  auto config = sequenceConfig();
+  config.behavior.initialTempoMicrosecondsPerQuarter =
       layout.generation == Generation::Ps2 ? kPs2InitialTempo : kPs1InitialTempo;
   auto seeds = discoverVoiceSeeds(reader, layout, diagnostics);
 
+  const u32 songEntry = layout.song * kSongEntrySize;
   if (sourceMap != nullptr) {
-    const u32 songEntry = layout.song * kSongEntrySize;
     sourceMap->table("Song Table", reader.range(0, layout.tableSize))
         .kind("tamsoft-ps1-song-table")
         .owner(ObjectRefs::sequence(id));
-    sourceMap->header("Song Entry", reader.range(songEntry, kSongEntrySize))
-        .kind("tamsoft-ps1-song-entry")
-        .owner(ObjectRefs::sequence(id))
-        .field("type", reader.range(songEntry, 2), layout.type)
-        .field("offset", reader.range(songEntry + 2, 2), layout.headerOffset, SourceValueDisplay::Address);
-    if (layout.headerSize != 0) {
-      sourceMap->table("Track Records", reader.range(layout.headerOffset, layout.headerSize))
-          .kind("tamsoft-ps1-track-records")
-          .owner(ObjectRefs::sequence(id));
-    }
+  }
+  SequenceDecodeSession sequence(reader, config, id, reader.range(songEntry, kSongEntrySize), sourceMap,
+                                 kMaximumCommands);
+  sequence.header()
+      .label("Song Entry")
+      .kind("tamsoft-ps1-song-entry")
+      .field("type", reader.range(songEntry, 2), layout.type)
+      .field("offset", reader.range(songEntry + 2, 2), layout.headerOffset, SourceValueDisplay::Address);
+  if (sourceMap != nullptr && layout.headerSize != 0) {
+    sourceMap->table("Track Records", reader.range(layout.headerOffset, layout.headerSize))
+        .kind("tamsoft-ps1-track-records")
+        .owner(ObjectRefs::sequence(id));
   }
 
   for (u32 number = 0; number < seeds.size(); ++number) {
-    program.tracks.push_back(decodeTrack(reader, id, number, seeds[number], sourceMap, diagnostics));
+    sequence.addTrack(decodeTrack(sequence.trackScope(), number, seeds[number], diagnostics));
   }
-  program.runtime = makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{
+  return sequence.finish(makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{
       .generation = layout.generation,
       .seeds = std::move(seeds),
-  });
-  return program;
+  }));
 }
 
 }  // namespace vgmtrans::formats::tamsoft_ps1

@@ -483,16 +483,10 @@ using Cursor = CompilerCursor<Playback>;
   }
 }
 
-[[nodiscard]] TrackProgram decodeTrack(ByteReader reader, AssetId sequence, u32 trackIndex, u32 start, u32 end,
-                                       const RuntimeConfig& config, SourceMapBuilder* sourceMap,
-                                       std::vector<Diagnostic>* diagnostics) {
-  const TrackDecodeScope tracks{
-      .reader = reader,
-      .bytecodeEnd = end,
-      .maxCommands = bytecode::kMaximumCommands,
-      .sequenceAsset = sequence,
-      .sourceMap = sourceMap,
-  };
+[[nodiscard]] TrackProgram decodeTrack(TrackDecodeScope tracks, u32 trackIndex, u32 start, u32 end,
+                                       const RuntimeConfig& config, std::vector<Diagnostic>* diagnostics) {
+  const ByteReader reader = tracks.reader;
+  tracks.bytecodeEnd = end;
   TrackProgram track = tracks.decode(trackIndex, start, [&](u32 offset) {
     return decodeCommand(reader, offset, end, config, diagnostics);
   });
@@ -533,9 +527,9 @@ const SequenceProgramConfig& sequenceConfig() {
 SequenceProgram parseSequence(ByteReader reader, AssetId id, const SequenceLayout& layout,
                               const std::vector<Instrument>& instruments, SourceMapBuilder* sourceMap,
                               std::vector<Diagnostic>* diagnostics) {
-  SequenceProgram sequence = sequenceConfig().makeProgram();
+  auto config = sequenceConfig();
   constexpr double initialRight = 64.0 / 127.0;
-  sequence.behavior.initialStereoBalance = StereoBalance{
+  config.behavior.initialStereoBalance = StereoBalance{
       .leftGain = (layout.leftGain / kSpuFullScale) * (1.0 - initialRight),
       .rightGain = (layout.rightGain / kSpuFullScale) * initialRight,
   };
@@ -546,19 +540,21 @@ SequenceProgram parseSequence(ByteReader reader, AssetId id, const SequenceLayou
       .reverbSend = reverbSend(layout.reverb),
       .instruments = instruments,
   };
+  SequenceDecodeSession sequence(reader, config, id, reader.range(layout.offset, 0x50), sourceMap,
+                                 bytecode::kMaximumCommands);
+  sequence.header()
+      .label("HOSA Sequence Header")
+      .kind("hosa-sequence-header")
+      .field("signature", reader.range(layout.offset, 5), "HOSAV")
+      .field("version", reader.range(layout.offset + 5, 1), layout.version)
+      .field("track_count", reader.range(layout.offset + 6, 1), static_cast<u8>(layout.tracks.size()))
+      .field("reverb_mode", reader.range(layout.offset + 7, 1), layout.reverb.mode)
+      .field("reverb_depth", reader.range(layout.offset + 8, 2), layout.reverb.depth)
+      .field("reverb_delay", reader.range(layout.offset + 10, 1), layout.reverb.delay)
+      .field("reverb_feedback", reader.range(layout.offset + 11, 1), layout.reverb.feedback)
+      .field("left_gain", reader.range(layout.offset + 12, 2), layout.leftGain)
+      .field("right_gain", reader.range(layout.offset + 14, 2), layout.rightGain);
   if (sourceMap != nullptr) {
-    sourceMap->header("HOSA Sequence Header", reader.range(layout.offset, 0x50))
-        .kind("hosa-sequence-header")
-        .owner(ObjectRefs::sequence(id))
-        .field("signature", reader.range(layout.offset, 5), "HOSAV")
-        .field("version", reader.range(layout.offset + 5, 1), layout.version)
-        .field("track_count", reader.range(layout.offset + 6, 1), static_cast<u8>(layout.tracks.size()))
-        .field("reverb_mode", reader.range(layout.offset + 7, 1), layout.reverb.mode)
-        .field("reverb_depth", reader.range(layout.offset + 8, 2), layout.reverb.depth)
-        .field("reverb_delay", reader.range(layout.offset + 10, 1), layout.reverb.delay)
-        .field("reverb_feedback", reader.range(layout.offset + 11, 1), layout.reverb.feedback)
-        .field("left_gain", reader.range(layout.offset + 12, 2), layout.leftGain)
-        .field("right_gain", reader.range(layout.offset + 14, 2), layout.rightGain);
     sourceMap->table("Duration Table", reader.range(layout.offset + 0x10, 0x40))
         .kind("hosa-duration-table")
         .owner(ObjectRefs::sequence(id));
@@ -568,13 +564,10 @@ SequenceProgram parseSequence(ByteReader reader, AssetId id, const SequenceLayou
   }
 
   for (u32 i = 0; i < layout.tracks.size(); ++i) {
-    auto track = decodeTrack(reader, id, i, layout.tracks[i].offset, layout.tracks[i].end, runtime, sourceMap,
-                             diagnostics);
-    track.sourceTrackNumbers = {i};
-    sequence.tracks.push_back(std::move(track));
+    sequence.addTrack(
+        decodeTrack(sequence.trackScope(), i, layout.tracks[i].offset, layout.tracks[i].end, runtime, diagnostics));
   }
-  sequence.runtime = makeCompiledRuntime<Playback, ProgramState>(std::move(runtime));
-  return sequence;
+  return sequence.finish(makeCompiledRuntime<Playback, ProgramState>(std::move(runtime)));
 }
 
 }  // namespace vgmtrans::formats::hosa

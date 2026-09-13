@@ -1167,18 +1167,10 @@ struct DiscoveredCommand {
   DecodeState initialState;
 };
 
-[[nodiscard]] TrackProgram decodeTrack(ByteReader reader, const Layout& layout, u32 trackNumber, u32 startAddress,
-                                       std::optional<AssetId> sequence, std::optional<SourceAnnotationId> parent,
-                                       SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics,
+[[nodiscard]] TrackProgram decodeTrack(const TrackDecodeScope& scope, const Layout& layout, u32 trackNumber,
+                                       u32 startAddress, std::vector<Diagnostic>* diagnostics,
                                        std::set<u8>* referencedInstruments) {
-  TrackDecodeScope scope{
-      .reader = reader,
-      .bytecodeEnd = kAramSize,
-      .maxCommands = kCommandLimit,
-      .sequenceAsset = sequence,
-      .parentAnnotation = parent,
-      .sourceMap = sourceMap,
-  };
+  const ByteReader reader = scope.reader;
   auto session = scope.begin(trackNumber, startAddress);
   std::vector<DiscoveryPoint> pending{{.offset = startAddress}};
   std::set<DiscoveryPoint> visited;
@@ -1300,26 +1292,26 @@ SequenceRuntime sequenceRuntime(RetainedSource source, const Layout& layout) {
 
 TrackProgram decodeSourceTrack(ByteReader reader, const Layout& layout, u32 trackNumber, u32 startAddress,
                                std::vector<Diagnostic>* diagnostics) {
-  return decodeTrack(reader, layout, trackNumber, startAddress, std::nullopt, std::nullopt, nullptr, diagnostics,
-                     nullptr);
+  const TrackDecodeScope scope{.reader = reader, .bytecodeEnd = kAramSize, .maxCommands = kCommandLimit};
+  return decodeTrack(scope, layout, trackNumber, startAddress, diagnostics, nullptr);
 }
 
 SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId sequenceId, SourceMapBuilder* sourceMap,
                              std::vector<Diagnostic>* diagnostics) {
-  SequenceProgram program = sequenceConfig().makeProgram();
-  program.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(layout.initialTimer);
+  auto config = sequenceConfig();
+  config.behavior.initialTempoMicrosecondsPerQuarter = math::tempoMicrosecondsPerQuarter(layout.initialTimer);
   std::set<u8> referencedInstruments{0};
 
-  std::optional<SourceAnnotationId> headerParent;
+  SequenceDecodeSession sequence(reader, config, sequenceId, layout.sequenceHeaderRange, sourceMap, kCommandLimit,
+                                 kAramSize);
+  auto tracks = sequence.trackScope();
   if (sourceMap != nullptr) {
-    auto header = sourceMap->header("SoftCreatSnes Sequence Header", layout.sequenceHeaderRange)
-                      .kind("softcreat-snes-sequence-header")
-                      .owner(ObjectRefs::asset(sequenceId));
-    headerParent = header.id();
+    auto header = sequence.header().label("SoftCreatSnes Sequence Header").owner(ObjectRefs::asset(sequenceId));
+    tracks.parentAnnotation = header.id();
     sourceMap->field("Selected Song", reader.range(0xe4, 1), layout.songIndex)
         .kind("softcreat-snes-song-index")
         .owner(ObjectRefs::asset(sequenceId))
-        .parent(*headerParent);
+        .parent(header.id());
   }
 
   for (u32 track = 0; track < layout.tracks.size(); ++track) {
@@ -1327,20 +1319,20 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
     if (pointer.address == 0 || !reader.has(pointer.address, 1)) {
       continue;
     }
-    if (sourceMap != nullptr && headerParent) {
-      sourceMap->pointer(fmt::format("Track {} Pointer", track), pointer.lowSource,
-                         SourceTarget{reader.range(pointer.address, 1)})
+    if (sourceMap != nullptr) {
+      sourceMap
+          ->pointer(fmt::format("Track {} Pointer", track), pointer.lowSource,
+                    SourceTarget{reader.range(pointer.address, 1)})
           .kind("softcreat-snes-track-pointer")
           .field("low", pointer.lowSource, pointer.address & 0xff, SourceValueDisplay::Address)
           .field("high", pointer.highSource, pointer.address >> 8, SourceValueDisplay::Address)
           .owner(ObjectRefs::sequenceTrack(sequenceId, track))
-          .parent(*headerParent);
+          .parent(*tracks.parentAnnotation);
     }
-    program.tracks.push_back(decodeTrack(reader, layout, track, pointer.address, sequenceId, headerParent, sourceMap,
-                                         diagnostics, &referencedInstruments));
+    sequence.addTrack(decodeTrack(tracks, layout, track, pointer.address, diagnostics, &referencedInstruments));
   }
-  program.runtime = sequenceRuntime(RetainedSource::copyOf(reader), layout);
-  return SequenceParse{.program = std::move(program), .referencedInstruments = std::move(referencedInstruments)};
+  return SequenceParse{.program = sequence.finish(sequenceRuntime(RetainedSource::copyOf(reader), layout)),
+                       .referencedInstruments = std::move(referencedInstruments)};
 }
 
 }  // namespace vgmtrans::formats::softcreat_snes

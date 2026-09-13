@@ -308,22 +308,22 @@ const SequenceProgramConfig& sonyPs1SequenceConfig() {
 
 SequenceProgram parseSonyPs1Sequence(ByteReader reader, AssetId id, const SonyPs1SequenceLayout& layout,
                                      SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics) {
-  SequenceProgram program = sonyPs1SequenceConfig().makeProgram();
-  program.timebase.ppqn = layout.ppqn;
-  program.behavior.initialTempoMicrosecondsPerQuarter = layout.initialTempo;
+  auto config = sonyPs1SequenceConfig();
+  config.timebase.ppqn = layout.ppqn;
+  config.behavior.initialTempoMicrosecondsPerQuarter = layout.initialTempo;
   const bool rhythmSpecified = layout.rhythmNumerator != 0;
-  program.runtime = makeCompiledRuntime<Playback, RuntimeConfig>(RuntimeConfig{
+  auto runtime = makeCompiledRuntime<Playback, RuntimeConfig>(RuntimeConfig{
       .numerator = rhythmSpecified ? layout.rhythmNumerator : u8{4},
       .denominator = rhythmSpecified ? static_cast<u8>(1u << layout.rhythmDenominatorPower) : u8{4},
   });
 
+  const u32 headerSize = layout.dataOffset - layout.offset;
+  SequenceDecodeSession sequence(reader, config, id, reader.range(layout.offset, headerSize), sourceMap, kMaxCommands,
+                                 layout.dataEnd);
   if (sourceMap != nullptr) {
-    const u32 headerSize = layout.dataOffset - layout.offset;
-    auto header = sourceMap
-                      ->header(layout.sep ? "Sony PS1 SEP Sequence Header" : "Sony PS1 SEQ Header",
-                               reader.range(layout.offset, headerSize))
-                      .kind(layout.sep ? "sony-ps1-sep-header" : "sony-ps1-seq-header")
-                      .owner(ObjectRefs::sequence(id));
+    auto header = sequence.header()
+                      .label(layout.sep ? "Sony PS1 SEP Sequence Header" : "Sony PS1 SEQ Header")
+                      .kind(layout.sep ? "sony-ps1-sep-header" : "sony-ps1-seq-header");
     u32 fields = layout.offset;
     if (!layout.sep || layout.sepFirst) {
       header.field("signature", reader.range(fields, 4), reader.le32(fields), SourceValueDisplay::Hex);
@@ -351,14 +351,8 @@ SequenceProgram parseSonyPs1Sequence(ByteReader reader, AssetId id, const SonyPs
     }
   }
 
-  TrackDecodeScope tracks{
-      .reader = reader,
-      .bytecodeEnd = layout.dataEnd,
-      .maxCommands = kMaxCommands,
-      .sourceHasTracks = false,
-      .sequenceAsset = id,
-      .sourceMap = sourceMap,
-  };
+  auto tracks = sequence.trackScope();
+  tracks.sourceHasTracks = false;
   auto eventAt = [&](u32 offset) -> const SonyPs1EventLayout* {
     const auto found = std::ranges::lower_bound(layout.events, offset, {}, &SonyPs1EventLayout::offset);
     return found != layout.events.end() && found->offset == offset ? &*found : nullptr;
@@ -376,8 +370,8 @@ SequenceProgram parseSonyPs1Sequence(ByteReader reader, AssetId id, const SonyPs
     return decoded;
   });
   track.sourceTrackNumbers = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-  program.tracks.push_back(std::move(track));
-  return program;
+  sequence.addTrack(std::move(track));
+  return sequence.finish(std::move(runtime));
 }
 
 }  // namespace vgmtrans::formats::sony_ps1

@@ -2174,6 +2174,32 @@ neither reported findings. The harness and results remain ignored. An 11-line
 addition to an existing reader fixture checks the distinct length policies.
 The full build is warning-free and all 20 CTest targets pass.
 
+## Reuse sequence assembly for five more format parsers
+
+HOSA, KonamiPS1, SonyPS1, SoftCreatSnes, and TamsoftPS1 now assemble their
+programs through SequenceDecodeSession. Custom track decoders borrow its
+TrackDecodeScope instead of rebuilding the reader, safety limits, sequence
+ownership, and source-map context from separate arguments. The existing
+session supplies header ownership and final runtime attachment; no new
+builder, callback protocol, or decoding policy was introduced.
+
+Format-specific behavior remains explicit: HOSA ends tracks at their declared
+bounds, SonyPS1 retains one trackless source stream for its playback channels,
+SoftCreat retains its state-dependent walker and split-byte pointer fields,
+and Tamsoft retains its discovered voice seeds and delayed starts. Header
+labels, kinds, annotation order, parents, ownership, and fields are preserved.
+This removes 35 net production lines and adds no committed test code.
+
+Verification: all 20 CTest targets pass and the full build is warning-free.
+Temporary before/after captures match all 291 rendered MIDI files and all 540
+deterministic scan snapshots, including 45 scans of the five migrated formats.
+The scan snapshot covers source annotations, fields, links, sequence ranges,
+track identities, command flow, and diagnostics. Two unrelated concurrent-scan
+fixtures are excluded because their allocated IDs depend on scheduling. The
+comparison caught and corrected HOSA's nonstandard header kind. Capture hooks
+were removed; the harness and results remain ignored. Real-file corpus parity
+remains unverified.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding
@@ -2198,7 +2224,11 @@ The full build is warning-free and all 20 CTest targets pass.
 - SonyPS2 still approximates key/velocity-dependent regions during scanning
   under a 3,000-region budget chosen for SF2 table limits. Moving this policy
   to export needs a source-neutral representation of that response; merely
-  renaming the limit would not remove the coupling.
+  renaming the limit would not remove the coupling. An opaque deferred Region
+  callback would also introduce ownership and ordering rules: expansion must
+  precede envelope/stereo variants, retain resolved sample references, and work
+  for direct SF2/DLS exports. Do not add that representation without a concrete
+  prototype showing a net simplification.
 - Real-file parity remains unverified. An optional corpus-path question is
   pending; the absence of a corpus does not block further code investigation.
 
