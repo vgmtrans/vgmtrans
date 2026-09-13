@@ -591,9 +591,8 @@ void linkPitchBendVoices(std::vector<NoteSpan>& notes, const std::vector<const P
 
     auto* note = findNote(notes, transition.note);
     auto* previous = findNote(notes, *transition.previousNote);
-    if (note == nullptr || previous == nullptr || note == previous ||
-        automation->realization.startTick > note->source.header.tick ||
-        previous->source.header.order() >= note->source.header.order() || previous->source.lane != note->source.lane) {
+    if (note == nullptr || previous == nullptr ||
+        !pitchTransitionContinuesVoice(*automation, note->source, previous->source)) {
       continue;
     }
 

@@ -2230,6 +2230,49 @@ exports, and 29 DLS exports from the existing fixtures. Capture hooks were
 removed and their harnesses/results remain ignored. This verifies fixture
 output parity, not a real-file corpus.
 
+## Preserve attack-time instrument variants across linked notes
+
+A pre-existing envelope defect treated key-changing ties as fresh attacks
+because their linkage lives in PitchTransitionIntent rather than the note's
+extendsPrevious flag. Restoring an envelope before a linked note selected the
+base preset too early under native MIDI portamento. Pitch-bend rendering
+ignored that tie-level preset but consumed the reset needed by the next fresh
+attack, leaving that note on the old envelope variant.
+
+The performance model now exposes the existing MIDI onset, predecessor-order,
+lane, and cancellation checks for reuse. A linear-time lookup identifies
+linked note IDs before variant preparation and used-instrument filtering.
+Variants retain the original voice's preset across both kinds of continuation;
+synth filtering retains instruments selected by attacks, including a leading
+tie with no preceding voice. MIDI still resolves its bend base after native
+portamento splits. Formats require no additional state or export knowledge.
+
+The fix adds 52 production lines. These derive continuity from finalized
+automation instead of introducing another mutable note flag that would need
+synchronization when slides are canceled. Two existing fixtures gain 43 net
+test lines, covering envelope restoration under both MIDI policies and exact
+used-instrument filtering. No new fixture framework is introduced.
+
+Reachability: a temporary test using valid ItikitiSnes bytecode reproduces both
+failures through its normal decoder and SequenceVM. The source sequence sets
+an attack override, plays a note, enables portamento, restores ADSR, changes
+pitch, disables portamento, and plays a fresh note. Nine format families
+contain both linked-note and dynamic-envelope paths; that identifies potential
+exposure, not measured incidence across games. Collection exports enable
+dynamic-envelope variants by default. A real-file corpus is still unavailable.
+
+History: the extendsPrevious-only check dates to b9745f179 (August 1),
+note-level preset restoration to 27437df2b (August 2), and separately linked
+key changes to a783df96e (August 2), all before this audit. This correction
+supersedes the deferred finding in ccdb49476.
+
+Verification: the full build and all 20 CTest targets pass. An ignored sanitizer
+harness checks 1,296 combinations of predecessor identity/order, lane, start
+and end ticks, and cancellation reason. Captures of this implementation match
+all 63 SF2 and 29 DLS fixture exports and the 290 unchanged MIDI renderings;
+the remaining MIDI fixture was extended and now exercises both policies.
+The probes, captures, and comparison harnesses remain ignored.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding
@@ -2244,18 +2287,12 @@ output parity, not a real-file corpus.
   while recipe analysis may depend on executed driver state. Preserve that
   distinction when considering a shared replacement for format reference sets.
 - Keep future instrument selection distinct from sounding-voice state when
-  simplifying export preparation. Linked notes require the prior instrument's
-  pitch context, and MIDI bend-base inheritance must follow portamento splits.
-  A focused probe confirmed a pre-existing envelope defect: restoring an
-  envelope before a key-changing tie selects the base preset too early under
-  native portamento; pitch-bend rendering consumes that reset without applying
-  it to the next fresh attack. The extendsPrevious-only check dates to
-  b9745f179 (August 1), note-level preset restoration to 27437df2b (August 2),
-  and separately linked key changes to a783df96e (August 2), before this audit.
-  The reproducer and tested proposal remain ignored under value-audit. No fix
-  is committed: another continuation index and export pass added complexity.
-  Seek a smaller correction that retains cancellation, onset, predecessor
-  order, and lane rules within the existing source-voice model.
+  simplifying export preparation. Continuation checks now serve variants and
+  synth usage as well as MIDI pitch-bend linking. A program change during a
+  linked voice still needs care: native portamento starts physical notes while
+  pitch-bend rendering retains one. Preserve bend-base inheritance after
+  portamento splits and the existing cancellation, onset, lane, and predecessor
+  rules when simplifying this further.
 - SonyPS2 still approximates key/velocity-dependent regions during scanning
   under a 3,000-region budget chosen for SF2 table limits. Moving this policy
   to export needs a source-neutral representation of that response; merely

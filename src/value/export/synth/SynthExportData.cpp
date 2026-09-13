@@ -274,12 +274,18 @@ std::vector<const Instrument*> selectSynthInstruments(std::span<const SoundBankA
 
   SynthInstrumentSet used;
   for (const auto& track : sequenceUsage->tracks) {
+    const auto continuedNotes = continuedPerformanceNotes(track);
     // A track uses bank/program zero until its first instrument change.
     InstrumentSelection selection;
+    bool hasVoice = false;
     for (const auto& event : track.events) {
       if (const auto* change = std::get_if<InstrumentPerformanceEvent>(&event)) {
         selection = change->instrument;
       } else if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
+        if (hasVoice && (note->extendsPrevious || continuedNotes.contains(note->note))) {
+          continue;
+        }
+        hasVoice = true;
         if (note->instrumentAddress) {
           markSelectedInstrument(*note->instrumentAddress, instruments, used);
         } else {
