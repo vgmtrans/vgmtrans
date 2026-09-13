@@ -46,8 +46,8 @@ bool pitchTransitionContinuesVoice(const PerformanceAutomation& automation, cons
           automation.realization.endTick > automation.realization.startTick);
 }
 
-std::unordered_set<PerformanceNoteId> continuedPerformanceNotes(const PerformanceTrack& track) {
-  std::unordered_set<PerformanceNoteId> continued;
+std::unordered_map<PerformanceNoteId, PerformanceNoteId> performanceNotePredecessors(const PerformanceTrack& track) {
+  std::unordered_map<PerformanceNoteId, PerformanceNoteId> continued;
   if (track.automations.empty()) {
     return continued;
   }
@@ -67,7 +67,7 @@ std::unordered_set<PerformanceNoteId> continuedPerformanceNotes(const Performanc
     const auto previous = notes.find(*transition->previousNote);
     if (note != notes.end() && previous != notes.end() &&
         pitchTransitionContinuesVoice(automation, *note->second, *previous->second)) {
-      continued.insert(transition->note);
+      continued.try_emplace(transition->note, *transition->previousNote);
     }
   }
   return continued;

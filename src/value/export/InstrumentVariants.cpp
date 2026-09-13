@@ -283,7 +283,7 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
   std::set<const Instrument*> regionlessInstrumentWarnings;
 
   for (auto& track : result.performance.tracks) {
-    const auto continuedNotes = continuedPerformanceNotes(track);
+    const auto continuedNotes = performanceNotePredecessors(track);
     // Once a track uses signed channel gain, all of its pan must be baked into
     // variants so ordinary MIDI pan does not also affect the layered output.
     const bool materializeStereo = options.signedStereo && requiresSignedStereoVariants(track);

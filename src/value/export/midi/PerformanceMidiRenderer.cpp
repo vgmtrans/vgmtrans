@@ -344,8 +344,15 @@ class PitchBendLayers {
   return addTicks(note.header.tick, ticks);
 }
 
+// Only these physical MIDI notes belong to this source voice.
+struct RenderVoice {
+  std::optional<u64> endLimit;
+  std::vector<size_t> fragments;
+};
+
 struct RenderTrackState {
-  RenderTrackState(const PerformanceTrack& source, const PerformanceTempoMap& tempos) {
+  RenderTrackState(const PerformanceTrack& source, const PerformanceTempoMap& tempos)
+      : notePredecessors(performanceNotePredecessors(source)) {
     // Use original limits: pitch lowering merges extensions and changes fragment ticks.
     for (const auto& event : source.events) {
       const auto* note = std::get_if<NotePerformanceEvent>(&event);
@@ -357,13 +364,39 @@ struct RenderTrackState {
     }
   }
 
+  RenderVoice& voiceForNote(const NotePerformanceEvent& note) {
+    auto id = note.note;
+    for (auto previous = notePredecessors.find(id); !noteVoices.contains(id) && previous != notePredecessors.end();
+         previous = notePredecessors.find(id)) {
+      id = previous->second;
+    }
+    const auto found = noteVoices.find(id);
+    size_t voice = voices.size();
+    if (found != noteVoices.end()) {
+      voice = found->second;
+    } else if (note.extendsPrevious && !notePredecessors.contains(note.note) && lastVoice) {
+      voice = *lastVoice;
+    }
+    if (voice == voices.size()) {
+      voices.emplace_back();
+    }
+    if (note.note.valid()) {
+      noteVoices.emplace(note.note, voice);
+    }
+    lastVoice = voice;
+    return voices[voice];
+  }
+
   std::unordered_map<PerformanceNoteId, u64> sourceNoteEndLimits;
-  std::optional<size_t> lastNoteIndex;
-  // One hardware stop time applies to all MIDI fragments of a source voice.
-  size_t voiceStartIndex = 0;
-  std::optional<u64> voiceEndLimit;
-  // MIDI starts in bank/program zero. Keep the actual emitted state so a
-  // generated selection can explicitly return to bank zero.
+  std::unordered_map<PerformanceNoteId, PerformanceNoteId> notePredecessors;
+  std::unordered_map<PerformanceNoteId, size_t> noteVoices;
+  std::vector<RenderVoice> voices;
+  std::optional<size_t> lastVoice;
+  bool hasNote = false;
+  // Source selection belongs to the next attack; MIDI may temporarily select
+  // an older voice's preset for a native-portamento fragment.
+  InstrumentSelection selectedInstrument;
+  // MIDI starts in bank/program zero.
   u16 midiBank = 0;
   u8 midiProgram = 0;
   std::optional<u16> lastPitchBendRangeCents;
@@ -572,53 +605,43 @@ struct VoicePitchBendRangeChange {
   return upper == changes.begin() ? 0 : (*std::prev(upper))->semitones;
 }
 
-[[nodiscard]] std::optional<u32> physicalNoteDuration(MidiTrack& track, RenderTrackState& state,
+[[nodiscard]] std::optional<u32> physicalNoteDuration(MidiTrack& track, RenderTrackState& state, RenderVoice& voice,
                                                       const NotePerformanceEvent& note,
                                                       const PerformanceTempoMap& tempos) {
   const bool freshAttack = !note.extendsPrevious && note.restartsEnvelope;
-  if (freshAttack) {
-    state.voiceStartIndex = track.events.size();
-    state.voiceEndLimit.reset();
-  }
   const auto sourceLimit = state.sourceNoteEndLimits.find(note.note);
   if (sourceLimit != state.sourceNoteEndLimits.end() || note.maximumDurationMilliseconds) {
     const u64 limit =
         sourceLimit != state.sourceNoteEndLimits.end() ? sourceLimit->second : physicalNoteEnd(note, tempos);
-    if (!state.voiceEndLimit || limit < *state.voiceEndLimit) {
-      state.voiceEndLimit = limit;
-      for (size_t i = state.voiceStartIndex; i < track.events.size(); ++i) {
+    if (!voice.endLimit || limit < *voice.endLimit) {
+      voice.endLimit = limit;
+      for (const size_t i : voice.fragments) {
         auto& event = track.events[i];
-        if (auto* fragment = std::get_if<NoteDuration>(&event.payload)) {
-          fragment->duration = static_cast<u32>(std::min<u64>(fragment->duration, limit - std::min(limit, event.tick)));
-        }
+        auto& fragment = std::get<NoteDuration>(event.payload);
+        fragment.duration = static_cast<u32>(std::min<u64>(fragment.duration, limit - std::min(limit, event.tick)));
       }
     }
   }
-  if (!state.voiceEndLimit) {
+  if (!voice.endLimit) {
     return note.durationTicks;
   }
-  if (!freshAttack && note.header.tick >= *state.voiceEndLimit) {
+  if (!freshAttack && note.header.tick >= *voice.endLimit) {
     return std::nullopt;
   }
-  return static_cast<u32>(std::min<u64>(note.durationTicks, *state.voiceEndLimit - note.header.tick));
+  return static_cast<u32>(std::min<u64>(note.durationTicks, *voice.endLimit - note.header.tick));
 }
 
-bool extendPreviousNote(MidiTrack& track, RenderTrackState& state, const NotePerformanceEvent& note, u8 channel,
-                        u32 duration) {
-  if (!note.extendsPrevious || !state.lastNoteIndex || *state.lastNoteIndex >= track.events.size()) {
+bool extendPreviousNote(MidiTrack& track, RenderVoice& voice, const NotePerformanceEvent& note, u32 duration) {
+  if (!note.extendsPrevious || voice.fragments.empty()) {
     return false;
   }
 
-  MidiEvent& previousEvent = track.events[*state.lastNoteIndex];
-  auto* previous = std::get_if<NoteDuration>(&previousEvent.payload);
-  if (previous == nullptr || previous->channel != channel) {
-    return false;
-  }
-
-  const u64 previousEnd = previousEvent.tick + previous->duration;
+  MidiEvent& previousEvent = track.events[voice.fragments.back()];
+  auto& previous = std::get<NoteDuration>(previousEvent.payload);
+  const u64 previousEnd = previousEvent.tick + previous.duration;
   const u64 extensionEnd = note.header.tick + duration;
   if (extensionEnd > previousEnd) {
-    previous->duration = static_cast<u32>(extensionEnd - previousEvent.tick);
+    previous.duration = static_cast<u32>(extensionEnd - previousEvent.tick);
   }
   return true;
 }
@@ -716,6 +739,9 @@ void refreshPitchBendRange(MidiTrack& track, RenderTrackState& state, u64 tick, 
 
 void applyInstrumentPitchBendRange(MidiTrack& track, RenderTrackState& state, u64 tick, u8 channel,
                                    std::optional<u16> cents, ModulationConversionPolicy modulationConversion) {
+  if (state.pitchBendContext.instrumentRangeCents() == cents) {
+    return;
+  }
   const u16 previousRange = effectivePitchBendRangeCents(state, modulationConversion);
   state.pitchBendContext.setInstrumentRangeCents(cents);
   const u16 range = effectivePitchBendRangeCents(state, modulationConversion);
@@ -1299,13 +1325,17 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
       [&](const auto& typedEvent) {
         using TypedEvent = std::decay_t<decltype(typedEvent)>;
         if constexpr (std::is_same_v<TypedEvent, NotePerformanceEvent>) {
-          const auto duration = physicalNoteDuration(track, state, typedEvent, globalTempos);
+          auto& voice = state.voiceForNote(typedEvent);
+          const auto duration = physicalNoteDuration(track, state, voice, typedEvent, globalTempos);
           if (!duration) {
             return;
           }
-          if (!typedEvent.extendsPrevious && typedEvent.instrumentAddress) {
-            applyInstrumentSelection(track, state, typedEvent.header.tick, channel,
-                                     instrumentSelection(*typedEvent.instrumentAddress, soundBanks), options,
+          if (!typedEvent.extendsPrevious) {
+            const auto selection = typedEvent.instrumentAddress ? InstrumentSelection{*typedEvent.instrumentAddress}
+                                                                : state.selectedInstrument;
+            auto resolved = instrumentSelection(selection, soundBanks);
+            resolved.forceBankSelect = false;
+            applyInstrumentSelection(track, state, typedEvent.header.tick, channel, resolved, options,
                                      modulationConversion, false);
           }
           const u8 key = midiKey(typedEvent.key + globalTransposeAt(globalTransposes, typedEvent.header.tick));
@@ -1326,10 +1356,10 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           if (shouldRestartSimulatedPanForNote(typedEvent, state)) {
             restartSimulatedPanForNote(track, state, typedEvent.header.tick, channel, options);
           }
-          if (extendPreviousNote(track, state, typedEvent, channel, *duration)) {
+          if (extendPreviousNote(track, voice, typedEvent, *duration)) {
             return;
           }
-          if (options.terminatePreviousVoice && typedEvent.restartsEnvelope && state.lastNoteIndex) {
+          if (options.terminatePreviousVoice && typedEvent.restartsEnvelope && state.hasNote) {
             // Silence the old voice before bank, range, controller, or bend
             // state for this attack can affect it.
             addController(track, typedEvent.header.tick, channel, MidiController::AllSoundOff, 0,
@@ -1339,7 +1369,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               (state.levelHeadroom != 1.0 || state.sourceLevelGain != 1.0 || state.panLevelGain != 1.0)) {
             addCombinedLevel(track, state, typedEvent.header.tick, channel, options);
           }
-          state.lastNoteIndex = track.events.size();
+          state.hasNote = true;
+          voice.fragments.push_back(track.events.size());
           track.events.push_back(
               midi::note(typedEvent.header.tick, channel, key, midiVelocity(typedEvent.linearVelocity), *duration));
         } else if constexpr (std::is_same_v<TypedEvent, TempoPerformanceEvent>) {
@@ -1349,6 +1380,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           // Standard MIDI treats time signatures as global metadata. They are collected
           // once and written to the first MIDI track by renderMidiSequence.
         } else if constexpr (std::is_same_v<TypedEvent, InstrumentPerformanceEvent>) {
+          state.selectedInstrument = typedEvent.instrument;
           const auto selection = instrumentSelection(typedEvent.instrument, soundBanks, typedEvent.forceBankSelect);
           applyInstrumentSelection(track, state, typedEvent.header.tick, channel, selection, options,
                                    modulationConversion, true);

@@ -274,7 +274,7 @@ std::vector<const Instrument*> selectSynthInstruments(std::span<const SoundBankA
 
   SynthInstrumentSet used;
   for (const auto& track : sequenceUsage->tracks) {
-    const auto continuedNotes = continuedPerformanceNotes(track);
+    const auto continuedNotes = performanceNotePredecessors(track);
     // A track uses bank/program zero until its first instrument change.
     InstrumentSelection selection;
     bool hasVoice = false;
