@@ -2273,6 +2273,30 @@ all 63 SF2 and 29 DLS fixture exports and the 290 unchanged MIDI renderings;
 the remaining MIDI fixture was extended and now exercises both policies.
 The probes, captures, and comparison harnesses remain ignored.
 
+## Prototype deferred key/velocity response sampling
+
+An ignored SonyPS2 prototype separates native response evaluation from generic
+key/velocity grid traversal for both ordinary sample regions and Setb notes.
+Across 1,440 cases and five sampling steps, its 141,477 generated regions match
+the current emitters exactly: ranges, tuning, envelope, pan, attenuation, and
+LFO properties. The probe runs under ASan/UBSan, including stack-use-after-return
+detection after factory settings leave scope. Program-region sample references
+also remain intact after rebinding to a resolved sample owner/index.
+
+This establishes the arithmetic and ownership of captured format settings,
+not a finished model or export change. Unsplit velocity ranges must retain the
+driver's selected center: choosing a generic midpoint changes compensation for
+velocity quantization even when the native curve is linear. The prototype
+keeps that choice within the format response and copies no sample-set vectors.
+
+Next, validate the full preparation path before adding a production API:
+responses must be evaluated before envelope/stereo variants, direct SF2/DLS
+preparation must own expanded regions, and bank-wide sampling budgets must
+move out of scanning. ResolvedSynthRegion currently borrows its Region, so it
+cannot point into temporary expansion output. Source-region inspection also
+needs meaningful baseline values. Require a concrete reduction in format and
+architecture complexity after these integration costs are included.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding
@@ -2297,15 +2321,22 @@ The probes, captures, and comparison harnesses remain ignored.
   under a 3,000-region budget chosen for SF2 table limits. Moving this policy
   to export needs a source-neutral representation of that response; merely
   renaming the limit would not remove the coupling. An opaque deferred Region
-  callback would also introduce ownership and ordering rules: expansion must
-  precede envelope/stereo variants, retain resolved sample references, and work
-  for direct SF2/DLS exports. Do not add that representation without a concrete
-  prototype showing a net simplification.
+  callback introduces ownership and ordering rules. The deferred-response
+  prototype above now verifies both SonyPS2 sampling paths and retained sample
+  binding. Complete its preparation/ownership prototype and measure the whole
+  change before deciding whether this representation is a net simplification.
 - Real-file parity remains unverified. An optional corpus-path question is
   pending; the absence of a corpus does not block further code investigation.
 
 ## Design decisions retained after inspection
 
+- Keep source-link intent separate from VM jump policy. A temporary capture
+  found 39 of 89 fixed targets with intentionally different roles: source
+  pattern calls may execute as VM jumps, and repeat targets may use declared
+  loops. Only 49 matched the obvious inference, with one unannotated target.
+  Automatic source-link fallback would add override/deduplication rules while
+  leaving the mixed cases explicit. Do not add that mechanism merely to remove
+  role arguments from the simpler commands. Existing fixtures pass unchanged.
 - Keep SequenceVM and the compiled command representation. Flattening every
   command into a vector of operations would reintroduce an intermediate
   instruction list and add allocation to simple commands. Most commands need
