@@ -240,7 +240,7 @@ struct ActiveVoice {
 };
 
 struct TrackState {
-  TrackState(const TrackProgram& program, const TriAcePs1SequenceLayout& layout) : slot(program.sourceTrackNumber) {
+  TrackState(TrackStateContext program, const TriAcePs1SequenceLayout& layout) : slot(program.sourceTrackNumber) {
     const auto found =
         std::ranges::find_if(layout.tracks, [&](const TriAcePs1TrackLayout& track) { return track.slot == slot; });
     if (found != layout.tracks.end()) {

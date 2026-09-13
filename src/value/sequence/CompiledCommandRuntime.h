@@ -29,64 +29,35 @@ inline constexpr bool alwaysFalse = false;
 template <class Playback, class ProgramState>
 inline constexpr unsigned char compiledRuntimeFamily = 0;
 
+// Program and track state follow the same rule: use context and immutable
+// settings when requested, otherwise allow a plain state object.
+template <class State, class Context>
+[[nodiscard]] std::any createCompiledState(const Context& context) {
+  if constexpr (std::constructible_from<State, const Context&>) {
+    return State{context};
+  } else if constexpr (std::default_initializable<State>) {
+    return State{};
+  } else {
+    static_assert(alwaysFalse<State>, "Compiled state has no supported construction path");
+  }
+}
+
+template <class State, class Context, class Config>
+[[nodiscard]] std::any createCompiledState(const Context& context, const Config& config) {
+  if constexpr (std::constructible_from<State, const Context&, const Config&>) {
+    return State{context, config};
+  } else if constexpr (std::constructible_from<State, const Config&>) {
+    return State{config};
+  } else {
+    return createCompiledState<State>(context);
+  }
+}
+
 }  // namespace detail
 
 template <class Playback, class ProgramState = EmptyCompiledProgramState>
 struct CompiledCommandRuntime {
   using TrackState = typename Playback::TrackState;
-
-  [[nodiscard]] static std::any createProgramState(const SequenceProgram& program) {
-    // A format can read immutable program settings in its constructor. Formats
-    // that need no settings keep working with an ordinary default constructor.
-    if constexpr (std::constructible_from<ProgramState, const SequenceProgram&>) {
-      return ProgramState{program};
-    } else if constexpr (std::default_initializable<ProgramState>) {
-      return ProgramState{};
-    } else {
-      static_assert(detail::alwaysFalse<ProgramState>, "ProgramState has no supported construction path");
-    }
-  }
-
-  template <class Config>
-  [[nodiscard]] static std::any createProgramState(const SequenceProgram& program, const Config& config) {
-    if constexpr (std::constructible_from<ProgramState, const SequenceProgram&, const Config&>) {
-      return ProgramState{program, config};
-    } else if constexpr (std::constructible_from<ProgramState, const Config&>) {
-      return ProgramState{config};
-    } else {
-      return createProgramState(program);
-    }
-  }
-
-  [[nodiscard]] static std::any createTrackState(const SequenceProgram& program, const TrackProgram& track) {
-    // Choose the most informative constructor the state type provides. This
-    // keeps track identity out of runtime configuration.
-    if constexpr (std::constructible_from<TrackState, const SequenceProgram&, const TrackProgram&>) {
-      return TrackState{program, track};
-    } else if constexpr (std::constructible_from<TrackState, const SequenceProgram&>) {
-      return TrackState{program};
-    } else if constexpr (std::constructible_from<TrackState, const TrackProgram&>) {
-      return TrackState{track};
-    } else if constexpr (std::default_initializable<TrackState>) {
-      return TrackState{};
-    } else {
-      static_assert(detail::alwaysFalse<TrackState>, "TrackState has no supported construction path");
-    }
-  }
-
-  template <class Config>
-  [[nodiscard]] static std::any createTrackState(const SequenceProgram& program, const TrackProgram& track,
-                                                 const Config& config) {
-    if constexpr (std::constructible_from<TrackState, const SequenceProgram&, const TrackProgram&, const Config&>) {
-      return TrackState{program, track, config};
-    } else if constexpr (std::constructible_from<TrackState, const TrackProgram&, const Config&>) {
-      return TrackState{track, config};
-    } else if constexpr (std::constructible_from<TrackState, const Config&>) {
-      return TrackState{config};
-    } else {
-      return createTrackState(program, track);
-    }
-  }
 
   template <class Execute>
   [[nodiscard]] static decltype(auto) withPlayback(std::any& programState, std::any& trackState,
@@ -165,9 +136,11 @@ template <class Playback, class ProgramState = EmptyCompiledProgramState>
   using Compiled = CompiledCommandRuntime<Playback, ProgramState>;
   SequenceRuntime runtime;
   runtime.family = &detail::compiledRuntimeFamily<Playback, ProgramState>;
-  runtime.createProgramState = [](const SequenceProgram& program) { return Compiled::createProgramState(program); };
-  runtime.createTrackState = [](const SequenceProgram& program, const TrackProgram& track) {
-    return Compiled::createTrackState(program, track);
+  runtime.createProgramState = [](const SequenceProgram& program) {
+    return detail::createCompiledState<ProgramState>(program);
+  };
+  runtime.createTrackState = [](TrackStateContext context) {
+    return detail::createCompiledState<typename Playback::TrackState>(context);
   };
   Compiled::installHooks(runtime);
   return runtime;
@@ -181,20 +154,18 @@ template <class Playback, class ProgramState = EmptyCompiledProgramState, class 
   using TrackState = typename Playback::TrackState;
   constexpr bool programConsumesConfig = std::constructible_from<ProgramState, const SequenceProgram&, const Config&> ||
                                          std::constructible_from<ProgramState, const Config&>;
-  constexpr bool trackConsumesConfig =
-      std::constructible_from<TrackState, const SequenceProgram&, const TrackProgram&, const Config&> ||
-      std::constructible_from<TrackState, const TrackProgram&, const Config&> ||
-      std::constructible_from<TrackState, const Config&>;
+  constexpr bool trackConsumesConfig = std::constructible_from<TrackState, const TrackStateContext&, const Config&> ||
+                                       std::constructible_from<TrackState, const Config&>;
   static_assert(programConsumesConfig || trackConsumesConfig,
                 "A supplied runtime Config must be consumed by ProgramState or TrackState");
   SequenceRuntime runtime;
   runtime.family = &detail::compiledRuntimeFamily<Playback, ProgramState>;
   auto settings = std::make_shared<const Config>(std::move(config));
   runtime.createProgramState = [settings](const SequenceProgram& sequence) {
-    return Compiled::createProgramState(sequence, *settings);
+    return detail::createCompiledState<ProgramState>(sequence, *settings);
   };
-  runtime.createTrackState = [settings](const SequenceProgram& sequence, const TrackProgram& track) {
-    return Compiled::createTrackState(sequence, track, *settings);
+  runtime.createTrackState = [settings](TrackStateContext context) {
+    return detail::createCompiledState<TrackState>(context, *settings);
   };
   Compiled::installHooks(runtime);
   return runtime;

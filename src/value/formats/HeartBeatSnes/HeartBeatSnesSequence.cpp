@@ -146,7 +146,7 @@ struct ProgramState {
 };
 
 struct TrackState {
-  explicit TrackState(const TrackProgram& sourceTrack) : trackNumber(sourceTrack.sourceTrackNumber) {}
+  explicit TrackState(TrackStateContext sourceTrack) : trackNumber(sourceTrack.sourceTrackNumber) {}
 
   u32 trackNumber;
   u8 noteLength = 0x10;

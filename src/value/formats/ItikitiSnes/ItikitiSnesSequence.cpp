@@ -161,7 +161,7 @@ struct ProgramState {
 };
 
 struct TrackState {
-  TrackState(const SequenceProgram&, const TrackProgram& sourceTrack)
+  TrackState(TrackStateContext sourceTrack)
       : trackNumber(sourceTrack.sourceTrackNumber),
         voiceBit(static_cast<u8>(1u << std::min<u32>(sourceTrack.sourceTrackNumber, 7))) {}
 

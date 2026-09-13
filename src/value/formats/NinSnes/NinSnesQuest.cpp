@@ -95,7 +95,7 @@ struct CallFrame {
 };
 
 struct TrackState {
-  explicit TrackState(const TrackProgram& track) : number(track.sourceTrackNumber) {}
+  explicit TrackState(TrackStateContext track) : number(track.sourceTrackNumber) {}
   void beginSection() {
     calls.clear();
     percussionNote = 0;

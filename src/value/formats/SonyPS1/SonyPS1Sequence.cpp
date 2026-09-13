@@ -30,7 +30,7 @@ struct RuntimeConfig {
 };
 
 struct TrackState {
-  explicit TrackState(const TrackProgram& program)
+  explicit TrackState(TrackStateContext program)
       : channel(static_cast<u8>(program.sourceTrackNumber)), program(static_cast<u8>(program.sourceTrackNumber)) {}
 
   u8 channel = 0;
@@ -375,13 +375,8 @@ SequenceProgram parseSonyPs1Sequence(ByteReader reader, AssetId id, const SonyPs
     }
     return decoded;
   });
-  track.sourceTrackNumber = 0;
-  program.tracks.push_back(track);
-  for (u32 channel = 1; channel < 16; ++channel) {
-    TrackProgram copy = track;
-    copy.sourceTrackNumber = channel;
-    program.tracks.push_back(std::move(copy));
-  }
+  track.sourceTrackNumbers = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  program.tracks.push_back(std::move(track));
   return program;
 }
 

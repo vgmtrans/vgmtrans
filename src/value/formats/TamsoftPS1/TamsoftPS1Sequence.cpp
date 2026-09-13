@@ -130,7 +130,7 @@ struct ProgramState {
 };
 
 struct TrackState : VoiceState {
-  TrackState(const TrackProgram& track, const RuntimeConfig& config)
+  TrackState(TrackStateContext track, const RuntimeConfig& config)
       : VoiceState(config.seeds.at(track.sourceTrackNumber).voice) {}
 
   bool initialized = false;
@@ -474,7 +474,7 @@ void delayTrackStart(TrackProgram& track, u64 ticks, Address delayedStart) {
   };
   TrackProgram track =
       scope.decode(number, seed.start, [&](u32 offset) { return decodeCommand(reader, offset, diagnostics); });
-  track.sourceTrackNumber = number;
+  track.sourceTrackNumbers = {number};
   track.name = seed.fork ? fmt::format("Track {} fork", seed.sourceSlot + 1)
                          : fmt::format("Track {}", seed.sourceSlot + 1);
   // Synthetic command addresses follow every source byte, so appending keeps the

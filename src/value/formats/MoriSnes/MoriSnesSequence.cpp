@@ -400,7 +400,7 @@ struct RepeatFrame {
 };
 
 struct TrackState : DriverConfig {
-  TrackState(const SequenceProgram&, const TrackProgram& source, const DriverConfig& config)
+  TrackState(TrackStateContext source, const DriverConfig& config)
       : DriverConfig(config), trackNumber(source.sourceTrackNumber) {}
 
   u32 trackNumber = 0;
@@ -869,7 +869,7 @@ struct SfxRuntimeConfig {
 };
 
 struct SfxTrackState : DriverConfig {
-  SfxTrackState(const TrackProgram& source, const SfxRuntimeConfig& config)
+  SfxTrackState(TrackStateContext source, const SfxRuntimeConfig& config)
       : DriverConfig(config.driver), script(config.scripts.at(source.sourceTrackNumber)) {}
 
   u16 script = 0;
@@ -1240,7 +1240,7 @@ SequenceParse decodeSequence(ByteReader reader, const Layout& layout, AssetId se
         return static_cast<SfxPlayback*>(playback)->play();
       };
       program.tracks.push_back(TrackProgram{
-          .sourceTrackNumber = index,
+          .sourceTrackNumbers = {index},
           .startAddress = commandAddress,
           .annotation = trackAnnotation,
           .commands = {std::move(command)},

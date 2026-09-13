@@ -58,16 +58,16 @@ struct MidiEvent {
 };
 
 struct TrackState {
-  TrackState(const SequenceProgram& sequence, const TrackProgram& source)
+  explicit TrackState(TrackStateContext source)
       : channel(isSeTrack(source.sourceTrackNumber) ? 0 : static_cast<u8>(source.sourceTrackNumber)),
         seSequence(isSeTrack(source.sourceTrackNumber)),
         seSet(static_cast<u8>((source.sourceTrackNumber >> 16) & 0x0f)),
         seTimbre(static_cast<u8>((source.sourceTrackNumber >> 8) & 0x7f)),
         seKey(static_cast<u8>(source.sourceTrackNumber & 0x7f)) {
-    currentTempo = sequence.behavior.initialTempoMicrosecondsPerQuarter;
-    ppqn = std::max<u16>(sequence.timebase.ppqn, 1);
-    if (sequence.sectionPlaylist) {
-      sectionPan = sequence.behavior.initialChannelPan.value_or(0.5);
+    currentTempo = source.sequence.behavior.initialTempoMicrosecondsPerQuarter;
+    ppqn = std::max<u16>(source.sequence.timebase.ppqn, 1);
+    if (source.sequence.sectionPlaylist) {
+      sectionPan = source.sequence.behavior.initialChannelPan.value_or(0.5);
       sectionTempo = currentTempo;
     }
   }
@@ -1106,13 +1106,8 @@ SequenceProgram parseMidiSequence(ByteReader reader, AssetId id, const MidiBlock
     }
     return decodeMidiEvent(reader, layout.dataEnd, *found->second, diagnostics);
   });
-  track.sourceTrackNumber = 0;
-  program.tracks.push_back(track);
-  for (u32 channel = 1; channel < 16; ++channel) {
-    TrackProgram copy = track;
-    copy.sourceTrackNumber = channel;
-    program.tracks.push_back(std::move(copy));
-  }
+  track.sourceTrackNumbers = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  program.tracks.push_back(std::move(track));
   return program;
 }
 
@@ -1232,28 +1227,21 @@ struct ParsedSongTable {
   SequenceProgram program = sequenceConfig().makeProgram();
   program.timebase.ppqn = layout.midiBlocks.front().ppqn;
   program.runtime = sequenceRuntime();
-  program.tracks.resize(16);
-  for (u32 channel = 0; channel < 16; ++channel) {
-    program.tracks[channel].sourceTrackNumber = channel;
-    program.tracks[channel].startAddress = Address{layout.midiBlocks.front().dataOffset};
-  }
+  TrackProgram track{
+      .sourceTrackNumbers = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+      .startAddress = Address{layout.midiBlocks.front().dataOffset},
+  };
   for (const auto& block : layout.midiBlocks) {
     SequenceProgram section = parseMidiSequence(reader, id, block, nullptr, diagnostics);
-    for (u32 channel = 0; channel < 16; ++channel) {
-      auto& destination = program.tracks[channel].commands;
-      for (auto command : section.tracks[channel].commands) {
-        if (command.flow.defaultTransition.kind == CommandTransitionKind::End) {
-          command.flow.defaultTransition = CommandTransition::endSection();
-        }
-        destination.push_back(std::move(command));
+    for (auto& command : section.tracks.front().commands) {
+      if (command.flow.defaultTransition.kind == CommandTransitionKind::End) {
+        command.flow.defaultTransition = CommandTransition::endSection();
       }
+      track.commands.push_back(std::move(command));
     }
   }
-  for (auto& track : program.tracks) {
-    std::ranges::sort(track.commands, [](const SourceCommand& left, const SourceCommand& right) {
-      return left.address.value < right.address.value;
-    });
-  }
+  std::ranges::sort(track.commands, {}, [](const SourceCommand& command) { return command.address.value; });
+  program.tracks.push_back(std::move(track));
   return program;
 }
 
@@ -1350,11 +1338,8 @@ std::optional<SequenceProgram> parseSeSequence(ByteReader reader, AssetId id, co
     }
     return decodeSeEvent(reader, layout.dataEnd, *found->second, diagnostics);
   });
-  for (const u32 voice : voices) {
-    TrackProgram copy = decoded;
-    copy.sourceTrackNumber = voice;
-    program.tracks.push_back(std::move(copy));
-  }
+  decoded.sourceTrackNumbers = std::move(voices);
+  program.tracks.push_back(std::move(decoded));
   return program;
 }
 

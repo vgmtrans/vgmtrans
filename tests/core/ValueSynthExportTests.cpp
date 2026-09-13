@@ -1726,7 +1726,7 @@ void collectionPlaybackPreparesOneRenderedMidiAndSoundFontPair() {
   const SourceId source = sources.add(SourceFile{.name = "playback.brr"}, {0x01, 0, 0, 0, 0, 0, 0, 0, 0});
 
   const SequenceProgramConfig config = probeSequenceConfig();
-  TrackProgram track{.sourceTrackNumber = 3, .startAddress = Address{0}};
+  TrackProgram track{.sourceTrackNumbers = {3}, .startAddress = Address{0}};
   const std::array<u8, 3> noteBytes{0x90, 0x3c, 0x04};
   const std::array<u8, 1> endBytes{0xff};
   addProbeCommand<ProbeNoteCommand>(track, config, Address{0}, probeRange(0, noteBytes.size()), noteBytes);

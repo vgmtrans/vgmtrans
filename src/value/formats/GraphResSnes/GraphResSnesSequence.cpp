@@ -138,7 +138,7 @@ struct RepeatFrame {
 };
 
 struct TrackState {
-  TrackState(const TrackProgram& sourceTrack, const RuntimeConfig& config)
+  TrackState(TrackStateContext sourceTrack, const RuntimeConfig& config)
       : data(config.source.reader()), layout(config.layout), trackNumber(sourceTrack.sourceTrackNumber) {}
 
   ByteReader data;

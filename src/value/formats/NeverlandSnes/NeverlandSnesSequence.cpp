@@ -187,9 +187,8 @@ struct ProgramState {
 };
 
 struct TrackState {
-  TrackState(const TrackProgram& source, const RuntimeConfig& config)
-      : reader(config.reader),
-        layout(config.layout),
+  TrackState(TrackStateContext source, const RuntimeConfig& config)
+      : reader(config.reader), layout(config.layout),
         percussion(config.layout.tracks[std::min<u32>(source.sourceTrackNumber, kTrackCount - 1)].percussion),
         voiceBit(static_cast<u8>(1u << std::min<u32>(source.sourceTrackNumber, 7))) {}
 

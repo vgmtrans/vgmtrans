@@ -59,8 +59,8 @@ struct LfoState {
 // Only registers that persist from one executed source command to the next
 // belong here. Source bounds and relative-address bases are decode concerns.
 struct TrackState {
-  explicit TrackState(const TrackProgram& program)
-      : usesModulation(trackUsesSemantic(program, SequenceSemantic::Modulation)) {}
+  explicit TrackState(TrackStateContext program)
+      : usesModulation(trackUsesSemantic(program.track, SequenceSemantic::Modulation)) {}
 
   bool usesModulation = false;
   bool noteWait = false;

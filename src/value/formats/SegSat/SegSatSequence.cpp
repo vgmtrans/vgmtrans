@@ -220,8 +220,8 @@ struct ProgramState {
     }
 
     // Saturn stores one physical event stream whose status nibble selects one
-    // of sixteen channels. Playback uses sixteen copies of that stream so each
-    // copy retains ordinary single-track VM state. The extra track contains
+    // of sixteen channels. Each channel executes the shared commands with
+    // independent VM state. The extra track contains
     // the independent tempo stream; merge it into channel zero only after both
     // timelines have executed.
     PerformanceTrack tempo = std::move(performance.tracks.front());
@@ -270,7 +270,7 @@ struct ProgramState {
 };
 
 struct TrackState {
-  explicit TrackState(const TrackProgram& program) : channel(static_cast<u8>(program.sourceTrackNumber)) {}
+  explicit TrackState(TrackStateContext program) : channel(static_cast<u8>(program.sourceTrackNumber)) {}
 
   u8 channel = 0;
   u8 bank = 0;
@@ -690,7 +690,7 @@ SegSatSequenceParse parseSegSatSequence(ByteReader reader, AssetId id, const Seg
   };
   const u32 tempoStart = layout.offset + 8;
   TrackProgram tempo{
-      .sourceTrackNumber = 0,
+      .sourceTrackNumbers = {0},
       .startAddress = Address{tempoStart},
   };
   if (layout.tempoEventCount != 0) {
@@ -700,7 +700,6 @@ SegSatSequenceParse parseSegSatSequence(ByteReader reader, AssetId id, const Seg
                          diagnostics);
     });
   }
-  tempo.sourceTrackNumber = 0;
   program.tracks.push_back(std::move(tempo));
 
   const u32 normalStart = layout.offset + layout.normalTrack;
@@ -725,13 +724,8 @@ SegSatSequenceParse parseSegSatSequence(ByteReader reader, AssetId id, const Seg
   std::ranges::sort(controllerChanges, {}, &SegSatControllerChange::command);
   const auto duplicate = std::ranges::unique(controllerChanges, {}, &SegSatControllerChange::command);
   controllerChanges.erase(duplicate.begin(), duplicate.end());
-  normal.sourceTrackNumber = 0;
-  program.tracks.push_back(normal);
-  for (u32 channel = 1; channel < 16; ++channel) {
-    TrackProgram copy = normal;
-    copy.sourceTrackNumber = channel;
-    program.tracks.push_back(std::move(copy));
-  }
+  normal.sourceTrackNumbers = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  program.tracks.push_back(std::move(normal));
   program.runtime = makeCompiledRuntime<Playback, ProgramState>();
 
   if (sourceMap != nullptr && header) {

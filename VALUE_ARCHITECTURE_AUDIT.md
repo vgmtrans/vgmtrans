@@ -2113,6 +2113,44 @@ fixes. The warning-free full build and all 20 CTest targets passed. Existing
 checks also cover same-numbered commands from different source tracks in one
 playback track, including warning deduplication without source annotations.
 
+## Execute shared command streams with independent playback tracks
+
+TrackProgram now declares the source track numbers that execute its commands.
+The ordinary case still declares one number. SonyPS1, SonyPS2, HeartBeatPS1,
+SegSat, and NamcoSnes declare all their channels or voices on one decoded
+stream instead of copying the complete command vector for each one. SonyPS2
+also assembles and sorts each song's section commands once, moving the commands
+from temporary sections into the shared song stream.
+
+SequenceVM expands those declarations in order and gives every playback track
+its own cursor, flow state, note state, and format state. Source command
+references retain the decoded stream's identity. Playlist entries still follow
+playback order, and validation resolves their starts against the corresponding
+shared commands. This preserves scheduling, channel-specific initialization,
+prepasses, and section transitions. Shell source inspection shows each decoded
+stream once with its declared track numbers.
+
+TrackStateContext supplies the sequence, decoded track, and current source
+track number together. Format states can keep borrowing the original decoded
+track, as AkaoSnes does; no temporary metadata-only track substitutes for it.
+This removes the runtime adapter's separate constructor combinations for
+sequence, track, and settings. One pair of construction helpers now serves both
+program state and track state. Default construction and settings-only states
+remain supported, and unused runtime settings are still rejected.
+
+The change removes 29 net production lines, including shell inspection. More
+substantially, each shared stream has one command vector rather than up to
+sixteen channel copies. No new storage wrapper or alternate VM was introduced.
+
+Verification: the full build is warning-free and all 20 CTest targets pass.
+A temporary before/after capture matched all 291 MIDI renderings from the
+existing fixtures. The committed playlist fixture now uses shared commands
+while retaining its independent cursor, state-persistence, and boundary checks;
+it also checks source lookup and expanded playlist validation. Removing an
+unused helper type offsets those additions: total test line count is unchanged.
+The MIDI capture hook was removed, and its harness and results remain ignored.
+Real-file corpus parity is still unverified.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding
@@ -2121,10 +2159,6 @@ playback track, including warning deduplication without source annotations.
 - Static instrument discovery can include every reachable bytecode branch,
   while recipe analysis may depend on executed driver state. Preserve that
   distinction when considering a shared replacement for format reference sets.
-- Five formats copy a decoded stream into several playback tracks. Sharing
-  those commands must retain each channel's independent VM state and the
-  TrackId mapping used by source-command lookup; merely hiding the copy loop
-  would not simplify that representation.
 - Establish shared sounding-voice continuity before unifying note instrument
   selection across variant preparation, synth selection, and MIDI pitch context.
   PitchTransitionIntent::previousNote can express continuity before note flags

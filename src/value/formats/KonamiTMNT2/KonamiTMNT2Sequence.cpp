@@ -128,7 +128,7 @@ struct ProgramState {
 };
 
 struct TrackState {
-  TrackState(const TrackProgram& trackProgram, const RuntimeConfig& config)
+  TrackState(TrackStateContext trackProgram, const RuntimeConfig& config)
       : version(config.version), chip(config.trackChips[trackProgram.sourceTrackNumber]),
         baseDuration(version == Version::Vendetta ? 1 : 3) {}
 
@@ -1017,7 +1017,7 @@ SequenceProgram decodeSequence(ByteReader reader, const Layout& layout, const Se
   auto program = session.finish(makeCompiledRuntime<Playback, ProgramState>(std::move(runtime)));
   for (auto& decodedTrack : program.tracks) {
     const auto layoutTrack =
-        std::ranges::find(sequenceLayout.tracks, decodedTrack.sourceTrackNumber, &TrackLayout::number);
+        std::ranges::find(sequenceLayout.tracks, decodedTrack.sourceTrackNumbers.front(), &TrackLayout::number);
     if (layoutTrack == sequenceLayout.tracks.end()) {
       continue;
     }

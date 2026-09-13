@@ -24,6 +24,7 @@
 #include <variant>
 
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #include "value/export/CollectionStitch.h"
 #include "value/session/Session.h"
@@ -213,8 +214,9 @@ void assets(Context& context, Args args) {
     context.out << "  PPQN: " << sequence->program.timebase.ppqn << '\n';
     for (size_t i = 0; i < sequence->program.tracks.size(); ++i) {
       const auto& track = sequence->program.tracks[i];
-      context.out << fmt::format("  track {} | source track {} | 0x{:x} | {} commands | {}\n", i,
-                                 track.sourceTrackNumber, track.startAddress.value, track.commands.size(), track.name);
+      context.out << fmt::format("  track {} | source tracks {} | 0x{:x} | {} commands | {}\n", i,
+                                 fmt::join(track.sourceTrackNumbers, ","), track.startAddress.value,
+                                 track.commands.size(), track.name);
     }
   } else if (const auto* bank = std::get_if<SoundBankAsset>(&value)) {
     context.out << fmt::format("  {} instruments, {} local samples\n", bank->instruments.size(),

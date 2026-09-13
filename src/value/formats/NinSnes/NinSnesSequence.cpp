@@ -785,8 +785,7 @@ struct PitchState {
 };
 
 struct TrackState {
-  TrackState(const SequenceProgram&, const TrackProgram& track, const RuntimeConfig& config)
-      : trackNumber(track.sourceTrackNumber) {
+  TrackState(TrackStateContext track, const RuntimeConfig& config) : trackNumber(track.sourceTrackNumber) {
     if (const auto initial = config.instrumentEnvelopes.find(0); initial != config.instrumentEnvelopes.end()) {
       envelope = initial->second;
     }

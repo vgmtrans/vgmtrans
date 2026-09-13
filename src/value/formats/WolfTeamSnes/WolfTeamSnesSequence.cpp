@@ -255,7 +255,7 @@ struct RuntimeLoopMarker {
 };
 
 struct TrackState {
-  TrackState(const TrackProgram& trackProgram, const RuntimeConfig& config)
+  TrackState(TrackStateContext trackProgram, const RuntimeConfig& config)
       : variant(config.variant), lateTraits(config.lateTraits) {
     const RuntimeTrackConfig& track = config.tracks.at(trackProgram.sourceTrackNumber);
     if (!segmented()) {

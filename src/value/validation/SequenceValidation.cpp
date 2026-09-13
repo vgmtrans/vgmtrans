@@ -57,15 +57,18 @@ ValidationReport validateSequenceProgram(const SequenceProgram& program) {
         if (command.trackStarts.empty()) {
           report.error("sequence.playlist.missing-section",
                        "Sequence playlist referenced a section that was not decoded", command.range);
-        } else if (command.trackStarts.size() != program.tracks.size()) {
+        } else if (command.trackStarts.size() != program.playbackTrackCount()) {
           report.error("sequence.playlist.track-count",
                        "Sequence play command track entries did not match the program track count", command.range);
         } else {
-          for (size_t trackIndex = 0; trackIndex < command.trackStarts.size(); ++trackIndex) {
-            if (command.trackStarts[trackIndex] &&
-                !program.tracks[trackIndex].commandIndex(*command.trackStarts[trackIndex])) {
-              report.error("sequence.playlist.missing-track-start",
-                           "Sequence play command referenced a track start that was not decoded", command.range);
+          size_t playbackIndex = 0;
+          for (const auto& track : program.tracks) {
+            for (size_t i = 0; i < track.sourceTrackNumbers.size(); ++i) {
+              const auto start = command.trackStarts[playbackIndex++];
+              if (start && !track.commandIndex(*start)) {
+                report.error("sequence.playlist.missing-track-start",
+                             "Sequence play command referenced a track start that was not decoded", command.range);
+              }
             }
           }
         }

@@ -177,7 +177,7 @@ struct RuntimeConfig {
 };
 
 struct TrackState {
-  TrackState(const TrackProgram& source, const RuntimeConfig& config)
+  TrackState(TrackStateContext source, const RuntimeConfig& config)
       : patches(config.patches), voiceBit(static_cast<u8>(1u << std::min(source.sourceTrackNumber, u32{7}))) {}
 
   std::span<const Patch> patches;
