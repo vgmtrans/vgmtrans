@@ -2243,18 +2243,19 @@ output parity, not a real-file corpus.
 - Static instrument discovery can include every reachable bytecode branch,
   while recipe analysis may depend on executed driver state. Preserve that
   distinction when considering a shared replacement for format reference sets.
-- Establish shared sounding-voice continuity before unifying note instrument
-  selection across variant preparation, synth selection, and MIDI pitch context.
-  PitchTransitionIntent::previousNote can express continuity before note flags
-  reflect it; existing linked-note tests require the prior instrument's pitch
-  context. Resetting every plain note's instrument would break that behavior.
-  Pitch-bend lowering also requires an uncanceled link beginning by the note's
-  attack, a matching lane, and an earlier predecessor before inheriting a
-  voice. A canonical continuity analysis must preserve those conditions.
-  Instrument matching now uses the shared InstrumentSelection choice. Before
-  changing its lifetime rules, probe dynamic-envelope variants on key-changing
-  continuations: those carry previousNote in their pitch intent while the
-  original note's extendsPrevious flag can still be false.
+- Keep future instrument selection distinct from sounding-voice state when
+  simplifying export preparation. Linked notes require the prior instrument's
+  pitch context, and MIDI bend-base inheritance must follow portamento splits.
+  A focused probe confirmed a pre-existing envelope defect: restoring an
+  envelope before a key-changing tie selects the base preset too early under
+  native portamento; pitch-bend rendering consumes that reset without applying
+  it to the next fresh attack. The extendsPrevious-only check dates to
+  b9745f179 (August 1), note-level preset restoration to 27437df2b (August 2),
+  and separately linked key changes to a783df96e (August 2), before this audit.
+  The reproducer and tested proposal remain ignored under value-audit. No fix
+  is committed: another continuation index and export pass added complexity.
+  Seek a smaller correction that retains cancellation, onset, predecessor
+  order, and lane rules within the existing source-voice model.
 - SonyPS2 still approximates key/velocity-dependent regions during scanning
   under a 3,000-region budget chosen for SF2 table limits. Moving this policy
   to export needs a source-neutral representation of that response; merely
