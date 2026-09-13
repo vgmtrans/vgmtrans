@@ -15,6 +15,7 @@
 #include <limits>
 #include <optional>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -666,6 +667,12 @@ private:
 [[nodiscard]] const PerformanceEventHeader& performanceEventHeader(const PerformanceEvent& event);
 [[nodiscard]] const PitchTransitionIntent* pitchTransitionIntent(const PerformanceAutomation& automation);
 [[nodiscard]] PitchTransitionIntent* pitchTransitionIntent(PerformanceAutomation& automation);
+// Only links active by the note's onset carry the preceding source voice.
+// Mid-note slides and transitions canceled before starting preserve the attack.
+[[nodiscard]] bool pitchTransitionContinuesVoice(const PerformanceAutomation& automation,
+                                                 const NotePerformanceEvent& note,
+                                                 const NotePerformanceEvent& previous);
+[[nodiscard]] std::unordered_set<PerformanceNoteId> continuedPerformanceNotes(const PerformanceTrack& track);
 [[nodiscard]] double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elapsedTicks);
 [[nodiscard]] const PerformanceTrack* performanceTrackById(const PerformanceSequence& sequence, TrackId id);
 [[nodiscard]] std::vector<const PerformanceEvent*> performanceEventsForCommand(const PerformanceTrack& track,

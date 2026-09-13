@@ -283,6 +283,7 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
   std::set<const Instrument*> regionlessInstrumentWarnings;
 
   for (auto& track : result.performance.tracks) {
+    const auto continuedNotes = continuedPerformanceNotes(track);
     // Once a track uses signed channel gain, all of its pan must be baked into
     // variants so ordinary MIDI pan does not also affect the layered output.
     const bool materializeStereo = options.signedStereo && requiresSignedStereoVariants(track);
@@ -363,8 +364,9 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
 
       const u64 noteEnd = addTicks(note->header.tick, note->durationTicks);
       auto& voiceEnd = voiceEnds[note->lane];
-      voiceEnd = note->extendsPrevious ? std::max(voiceEnd, noteEnd) : noteEnd;
-      if (note->extendsPrevious) {
+      const bool continuesVoice = note->extendsPrevious || continuedNotes.contains(note->note);
+      voiceEnd = continuesVoice ? std::max(voiceEnd, noteEnd) : noteEnd;
+      if (continuesVoice) {
         continue;
       }
 

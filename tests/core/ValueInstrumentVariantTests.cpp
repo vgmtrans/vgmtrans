@@ -317,7 +317,7 @@ void dynamicEnvelopeActiveVoiceLimitationIsExplicit() {
   expect(later == 1, "a combined active/future command should still affect the next fresh attack");
 }
 
-void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero() {
+void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero(MidiPitchTransitionRendering rendering) {
   std::vector<Instrument> instruments;
   instruments.reserve(128);
   for (u32 program = 0; program < 128; ++program) {
@@ -350,15 +350,28 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero() {
           .note = PerformanceNoteId{1},
       },
       EnvelopePerformanceEvent{
-          .header = eventHeader(10, 4),
+          .header = eventHeader(6, 4),
           .update = EnvelopeUpdate::restore(),
       },
       NotePerformanceEvent{
-          .header = eventHeader(10, 5),
+          .header = eventHeader(8, 5),
           .key = 62,
-          .durationTicks = 4,
+          .durationTicks = 2,
           .note = PerformanceNoteId{2},
       },
+      NotePerformanceEvent{
+          .header = eventHeader(10, 7),
+          .key = 64,
+          .durationTicks = 4,
+          .note = PerformanceNoteId{3},
+      },
+  });
+  performance.tracks[0].automations.push_back(PerformanceAutomation{
+      .header = eventHeader(8, 6),
+      .intent =
+          PitchTransitionIntent{
+              .note = PerformanceNoteId{2}, .previousNote = PerformanceNoteId{1}, .startKey = 60, .targetKey = 62},
+      .realization = {.startTick = 8, .endTick = 8},
   });
 
   const auto materialized =
@@ -368,8 +381,8 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero() {
          "the allocator should move to the next free bank after bank zero is occupied");
 
   std::vector<const SoundBankAsset*> views{&sets[0]};
-  const MidiSequence midi =
-      renderMidiSequence(materialized.performance, {}, ModulationConversionPolicy::SynthModulators, views);
+  const MidiSequence midi = renderMidiSequence(materialized.performance, {.pitchTransitions = rendering},
+                                               ModulationConversionPolicy::SynthModulators, views);
   std::vector<std::pair<u64, u16>> banks;
   for (const auto& event : midi.tracks[0].events) {
     if (const auto* bank = std::get_if<BankSelect>(&event.payload)) {
@@ -386,8 +399,8 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero() {
                                return program != nullptr && event.tick == 10 && program->value == 0;
                              }),
          "a bank change should reselect the program even when its number is unchanged");
-  expect(std::ranges::none_of(banks, [](const auto& bank) { return bank.first == 4; }),
-         "a tied extension should not reselect its instrument");
+  expect(std::ranges::none_of(banks, [](const auto& bank) { return bank.first == 4 || bank.first == 8; }),
+         "same-pitch and key-changing ties should keep their attack-time instrument");
 }
 
 void variantAddressesRespectExportProjectionsAndExhaustion() {
@@ -451,6 +464,30 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments() {
           .durationTicks = 4,
           .note = PerformanceNoteId{1},
       },
+      NotePerformanceEvent{
+          .header = eventHeader(4, 2),
+          .key = 60,
+          .durationTicks = 4,
+          .extendsPrevious = true,
+          .note = PerformanceNoteId{1},
+      },
+      EnvelopePerformanceEvent{
+          .header = eventHeader(8, 3),
+          .update = EnvelopeUpdate::restore(),
+      },
+      NotePerformanceEvent{
+          .header = eventHeader(8, 4),
+          .key = 62,
+          .durationTicks = 4,
+          .note = PerformanceNoteId{2},
+      },
+  });
+  performance.tracks[0].automations.push_back(PerformanceAutomation{
+      .header = eventHeader(8, 5),
+      .intent =
+          PitchTransitionIntent{
+              .note = PerformanceNoteId{2}, .previousNote = PerformanceNoteId{1}, .startKey = 60, .targetKey = 62},
+      .realization = {.startTick = 8, .endTick = 8},
   });
   const auto materialized =
       materializeInstrumentVariants(performance, sets, InstrumentVariantOptions{.dynamicEnvelopes = true});
@@ -480,6 +517,10 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments() {
              prepared.instruments[0].address == resolveInstrumentAddress(sets[0].instruments[selected].explicitAddress,
                                                                          sets[0].instruments[selected].identity),
          "used-only synth export should retain the exact generated variant selected by the lowered performance");
+
+  const auto leadingTie = sequenceWithEvents({NotePerformanceEvent{.extendsPrevious = true}});
+  expect(selectSynthInstruments(instrumentViews, &leadingTie) == std::vector<const Instrument*>{&sets[0].instruments[0]},
+         "a leading tie with no preceding voice should still retain the selected instrument");
 }
 
 void signedStereoMaterializationUsesAttackTimeVariants() {
@@ -595,7 +636,9 @@ void runValueInstrumentVariantTests() {
   dynamicEnvelopeMaterializationIsIncrementalAndDeduplicated();
   dynamicEnvelopeInstrumentSelectionControlsOverrideCarry();
   dynamicEnvelopeActiveVoiceLimitationIsExplicit();
-  dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero();
+  for (const auto rendering : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
+    dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero(rendering);
+  }
   variantAddressesRespectExportProjectionsAndExhaustion();
   dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments();
   signedStereoMaterializationUsesAttackTimeVariants();
