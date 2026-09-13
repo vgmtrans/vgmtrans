@@ -24,6 +24,15 @@ struct ProbeData {
   u32 value = 0;
 };
 
+void matchingKeepsTiesAndRejectsIncompatibleCandidates() {
+  const std::vector<int> scores{-2, 0, 2, 1, 2, -1};
+  expect(bestMatches(scores, [](int score) { return score; }) == std::vector<const int*>{&scores[2], &scores[4]},
+         "a stronger match should replace weaker candidates and retain every tie in input order");
+  expect(bestMatches(scores, [](int) { return -1; }).empty(), "negative scores should reject all candidates");
+  expect(bestMatches(scores, [](int) { return 0; }).size() == scores.size(),
+         "zero-score candidates should remain available as equally weak fallbacks");
+}
+
 void discoveryExposesTypedAssetDataAndSources() {
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "resolver.probe"}, std::vector<u8>(64));
@@ -65,5 +74,6 @@ void discoveryExposesTypedAssetDataAndSources() {
 }  // namespace
 
 void runValueCollectionDiscoveryTests() {
+  matchingKeepsTiesAndRejectsIncompatibleCandidates();
   discoveryExposesTypedAssetDataAndSources();
 }

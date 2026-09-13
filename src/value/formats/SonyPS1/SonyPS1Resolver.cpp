@@ -153,25 +153,15 @@ struct SonySampleBinding {
 
 [[nodiscard]] std::vector<const SampleEntry*> chooseSamples(const InstrumentEntry& bank,
                                                             const std::vector<SampleEntry>& bodies) {
-  std::vector<const SampleEntry*> selected;
-  int bestAffinity = -1;
-  for (const auto& body : bodies) {
+  return bestMatches(bodies, [&](const SampleEntry& body) {
     if (body.sampleBytes != bank.sampleBytes) {
-      continue;
+      return -1;
     }
     // Compare successively weaker stem, source, and directory evidence.
-    const int affinity = (sameStem(bank.file, body.file) ? 4 : 0) +
-                         (bank.source && body.source && *bank.source == *body.source ? 2 : 0) +
-                         (sameDirectory(bank.file, body.file) ? 1 : 0);
-    if (affinity > bestAffinity) {
-      selected.clear();
-      bestAffinity = affinity;
-    }
-    if (affinity == bestAffinity) {
-      selected.push_back(&body);
-    }
-  }
-  return selected;
+    return (sameStem(bank.file, body.file) ? 4 : 0) +
+           (bank.source && body.source && *bank.source == *body.source ? 2 : 0) +
+           (sameDirectory(bank.file, body.file) ? 1 : 0);
+  });
 }
 
 void attachBank(CollectionAssembly& collection, const InstrumentEntry& bank, const std::vector<SampleEntry>& bodies,

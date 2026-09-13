@@ -42,22 +42,9 @@ using BankEntry = AssetWithData<SoundBankAsset, SoundBankData>;
 
 [[nodiscard]] std::vector<const BankEntry*> matchingBanks(const SequenceEntry& sequence,
                                                           const std::vector<BankEntry>& banks) {
-  std::vector<const BankEntry*> selected;
-  int best = -1;
-  for (const auto& bank : banks) {
-    if (bank.data->bankId != sequence.data->waveBankId) {
-      continue;
-    }
-    const int score = sourceAffinity(sequence.source, bank.source);
-    if (score > best) {
-      best = score;
-      selected.clear();
-    }
-    if (score == best) {
-      selected.push_back(&bank);
-    }
-  }
-  return selected;
+  return bestMatches(banks, [&](const BankEntry& bank) {
+    return bank.data->bankId == sequence.data->waveBankId ? sourceAffinity(sequence.source, bank.source) : -1;
+  });
 }
 
 }  // namespace

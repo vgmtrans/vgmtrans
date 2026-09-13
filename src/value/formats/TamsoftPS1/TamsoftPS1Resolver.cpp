@@ -73,21 +73,7 @@ std::vector<DesiredCollection> resolveCollections(const CollectionDiscoveryConte
   collections.reserve(sequences.size());
 
   for (const auto& sequence : sequences) {
-    std::vector<const BankEntry*> matches;
-    int best = -1;
-    for (const auto& bank : banks) {
-      const int score = matchScore(sequence, bank);
-      if (score < best) {
-        continue;
-      }
-      if (score > best) {
-        best = score;
-        matches.clear();
-      }
-      if (score >= 0) {
-        matches.push_back(&bank);
-      }
-    }
+    auto matches = bestMatches(banks, [&](const BankEntry& bank) { return matchScore(sequence, bank); });
     if (matches.empty() && sequence.data->generation == Generation::Ps2) {
       const auto sameGeneration = [&](const BankEntry& bank) {
         return bank.data->generation == sequence.data->generation;

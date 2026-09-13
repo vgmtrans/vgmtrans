@@ -18,6 +18,30 @@
 
 namespace vgmtrans::core {
 
+// Negative scores reject a candidate; zero is a valid fallback. Retain every
+// highest-scoring candidate in input order so formats can report ambiguity.
+// Returned pointers borrow the caller's candidate vector.
+template <class Candidate, class Score>
+[[nodiscard]] std::vector<const Candidate*> bestMatches(const std::vector<Candidate>& candidates, Score score) {
+  std::vector<const Candidate*> selected;
+  int best = 0;
+  for (const auto& candidate : candidates) {
+    const int rank = score(candidate);
+    if (rank < best) {
+      continue;
+    }
+    if (rank > best) {
+      best = rank;
+      selected.clear();
+    }
+    selected.push_back(&candidate);
+  }
+  return selected;
+}
+
+template <class Candidate, class Score>
+std::vector<const Candidate*> bestMatches(const std::vector<Candidate>&&, Score) = delete;
+
 // One format-owned value joined to its asset at the heterogeneous asset
 // boundary. This borrowed view is valid only during discovery; durable binders
 // capture stable IDs or owned values instead.
