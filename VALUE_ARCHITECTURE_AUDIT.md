@@ -2371,6 +2371,28 @@ with and without a subsequent independent attack. Those pairs have no
 decoding, preparation, or synth-export diagnostics. Larger probes and output
 captures remain ignored.
 
+## Share ranked collection-candidate selection
+
+SonyPS1, SonyPS2, SquarePS2, and TamsoftPS1 now use `bestMatches` for
+highest-score selection and ordered ties. Compatibility and affinity remain
+format-owned: mismatched body sizes and driver IDs are excluded, SonyPS2 still
+rejects ambiguous weak bank matches, and Tamsoft retains its music-bank and
+sole-generation fallback rules. Filename/path interpretation is deliberately
+unchanged because these drivers use different archive and directory policies.
+
+The helper lives in the existing collection-discovery header. Negative scores
+reject candidates; zero remains a valid fallback. Results borrow the candidate
+vector, with temporary vectors rejected at compile time. No collection policy
+object or scoring framework is introduced. Five repeated loops become one,
+removing 37 production lines overall. The committed test adds ten lines.
+
+All 20 CTest targets pass. Captures retain identical collection keys, names,
+member IDs, binder presence, and reported issues across 61 discovery results
+from the four formats. An ignored ASan/UBSan probe verifies 488,281 ordered
+score combinations, including empty inputs, invalid candidates, zero-score
+fallbacks, and ties, plus compile-time rejection of temporary input vectors.
+The capture hook was removed from Session after verification.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding

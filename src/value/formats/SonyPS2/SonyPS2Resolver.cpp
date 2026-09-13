@@ -117,22 +117,9 @@ struct BodyAddressing {
 }
 
 [[nodiscard]] std::vector<const BodyEntry*> chooseBodies(const BankEntry& bank, const std::vector<BodyEntry>& bodies) {
-  std::vector<const BodyEntry*> selected;
-  int best = -1;
-  for (const auto& body : bodies) {
-    if (!compatible(*bank.asset, *bank.data, *body.data)) {
-      continue;
-    }
-    const int score = affinity(bank.source, body.source);
-    if (score > best) {
-      selected.clear();
-      best = score;
-    }
-    if (score == best) {
-      selected.push_back(&body);
-    }
-  }
-  return selected;
+  return bestMatches(bodies, [&](const BodyEntry& body) {
+    return compatible(*bank.asset, *bank.data, *body.data) ? affinity(bank.source, body.source) : kNoAffinity;
+  });
 }
 
 [[nodiscard]] u32 sampleBoundary(const SoundBankData& bank, BodyAddressing addressing, u32 bodyOffset, u32 bodyBytes) {
@@ -150,19 +137,8 @@ struct BodyAddressing {
 
 [[nodiscard]] std::vector<const BankEntry*> chooseBanks(const SequenceEntry& sequence,
                                                         const std::vector<BankEntry>& banks) {
-  std::vector<const BankEntry*> selected;
-  int best = -1;
-  for (const auto& bank : banks) {
-    const int score = affinity(sequence.source, bank.source);
-    if (score > best) {
-      selected.clear();
-      best = score;
-    }
-    if (score == best) {
-      selected.push_back(&bank);
-    }
-  }
-  if (best < 4 && selected.size() != 1) {
+  auto selected = bestMatches(banks, [&](const BankEntry& bank) { return affinity(sequence.source, bank.source); });
+  if (selected.size() > 1 && affinity(sequence.source, selected.front()->source) < 4) {
     selected.clear();
   }
   return selected;
