@@ -759,32 +759,32 @@ SequenceProgram parseKonamiPs1Sequence(ByteReader reader, AssetId id, const Sequ
                                        u16 rootCounterTarget, std::vector<Tone> tones, SourceMapBuilder* sourceMap,
                                        std::vector<Diagnostic>* diagnostics) {
   const DriverTiming timing(layout.ppqn, rootCounterTarget);
-  SequenceProgram program = konamiPs1SequenceConfig().makeProgram();
-  program.timebase.ppqn = layout.ppqn;
-  program.behavior.initialTempoMicrosecondsPerQuarter = timing.tempoMicroseconds(kInitialTempoStep);
-  program.runtime = makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{
+  auto config = konamiPs1SequenceConfig();
+  config.timebase.ppqn = layout.ppqn;
+  config.behavior.initialTempoMicrosecondsPerQuarter = timing.tempoMicroseconds(kInitialTempoStep);
+  auto runtime = makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{
       .timing = timing,
       .tones = std::move(tones),
   });
 
+  if (sourceMap != nullptr && layout.hasKdt2Header) {
+    sourceMap->header("KDT2 Container Header", reader.range(layout.containerOffset, 0x10))
+        .kind("konami-ps1-kdt2-header")
+        .owner(ObjectRefs::sequence(id))
+        .fieldsAsChildren()
+        .field("signature", reader.range(layout.containerOffset, 4), reader.le32(layout.containerOffset),
+               SourceValueDisplay::Hex)
+        .field("sequence_size", reader.range(layout.containerOffset + 4, 4), layout.containerLength - 0x10)
+        .field("sequence_id", reader.range(layout.containerOffset + 8, 4), layout.sequenceId);
+  }
+  const u32 headerSize = layout.version == 1 ? 0x10 + layout.tracks.size() * 2 : 0x50;
+  SequenceDecodeSession sequence(reader, config, id, reader.range(layout.offset, headerSize), sourceMap,
+                                 kMaximumCommands);
   if (sourceMap != nullptr) {
-    if (layout.hasKdt2Header) {
-      sourceMap->header("KDT2 Container Header", reader.range(layout.containerOffset, 0x10))
-          .kind("konami-ps1-kdt2-header")
-          .owner(ObjectRefs::sequence(id))
-          .fieldsAsChildren()
-          .field("signature", reader.range(layout.containerOffset, 4), reader.le32(layout.containerOffset),
-                 SourceValueDisplay::Hex)
-          .field("sequence_size", reader.range(layout.containerOffset + 4, 4), layout.containerLength - 0x10)
-          .field("sequence_id", reader.range(layout.containerOffset + 8, 4), layout.sequenceId);
-    }
-    const u32 headerSize = layout.version == 1 ? 0x10 + layout.tracks.size() * 2 : 0x50;
     auto header =
-        sourceMap
-            ->header(layout.version == 1 ? "KDT1 Sequence Header" : "Fixed-Table KDT Sequence Header",
-                     reader.range(layout.offset, headerSize))
+        sequence.header()
+            .label(layout.version == 1 ? "KDT1 Sequence Header" : "Fixed-Table KDT Sequence Header")
             .kind(layout.version == 1 ? "konami-ps1-kdt1-header" : "konami-ps1-fixed-kdt-header")
-            .owner(ObjectRefs::sequence(id))
             .fieldsAsChildren()
             .field("signature", reader.range(layout.offset, 4), reader.le32(layout.offset), SourceValueDisplay::Hex)
             .field("size", reader.range(layout.offset + 4, 4), layout.length)
@@ -796,32 +796,24 @@ SequenceProgram parseKonamiPs1Sequence(ByteReader reader, AssetId id, const Sequ
     }
   }
 
+  auto tracks = sequence.trackScope();
   for (u32 index = 0; index < layout.tracks.size(); ++index) {
     const auto& sourceTrack = layout.tracks[index];
-    TrackDecodeScope trackScope{
-        .reader = reader,
-        .bytecodeEnd = sourceTrack.end,
-        .maxCommands = kMaximumCommands,
-        .sourceHasTracks = true,
-        .sequenceAsset = id,
-        .sourceMap = sourceMap,
-    };
+    tracks.bytecodeEnd = sourceTrack.end;
     auto eventAt = [&](u32 offset) -> const EventLayout* {
       const auto found = std::ranges::lower_bound(sourceTrack.events, offset, {}, &EventLayout::offset);
       return found != sourceTrack.events.end() && found->offset == offset ? &*found : nullptr;
     };
-    auto track = trackScope.decode(index, sourceTrack.offset, [&](u32 offset) -> DecodedBytecodeCommand {
+    sequence.addTrack(tracks.decode(index, sourceTrack.offset, [&](u32 offset) -> DecodedBytecodeCommand {
       const auto* event = eventAt(offset);
       if (event == nullptr) {
         Cursor cursor(reader, offset, sourceTrack.end, kKonamiPs1CommandKindPrefix, diagnostics);
         return cursor.unsupported("Invalid KonamiPS1 event address").stop();
       }
       return decodeEvent(reader, sourceTrack.end, *event, timing, diagnostics);
-    });
-    track.sourceTrackNumbers = {index};
-    program.tracks.push_back(std::move(track));
+    }));
   }
-  return program;
+  return sequence.finish(std::move(runtime));
 }
 
 }  // namespace vgmtrans::formats::konami_ps1
