@@ -316,8 +316,7 @@ void sourceVoiceScriptChangesFutureReleaseBehavior() {
   const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 2 && notes[0]->durationTicks == 5 * 256 &&
              notes[1]->durationTicks == 8 * 256 && instruments.size() == 2 &&
-             instruments.back()->sourceInstrument &&
-             instruments.back()->sourceInstrument->key == (kDirectInstrumentFlag | 0x0220),
+             std::get<InstrumentIdentity>(instruments.back()->instrument).key == (kDirectInstrumentFlag | 0x0220),
          "source DE should select a directly bound voice script for future attacks, including that script's release "
          "delay and instrument row");
 }
@@ -721,9 +720,8 @@ void liveSongSelectionAndHardwareSoundEffectsAreRecovered() {
   const auto expressions = events<ExpressionPerformanceEvent>(performance.tracks.front());
   const auto bends = events<PitchBendPerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->maximumDurationMilliseconds &&
-             std::abs(*notes.front()->maximumDurationMilliseconds - 7 * 9.875) < 0.000001 &&
-             instruments.size() == 1 && instruments.front()->sourceInstrument &&
-             instruments.front()->sourceInstrument->key == (kDirectInstrumentFlag | 0x1800) &&
+             std::abs(*notes.front()->maximumDurationMilliseconds - 7 * 9.875) < 0.000001 && instruments.size() == 1 &&
+             std::get<InstrumentIdentity>(instruments.front()->instrument).key == (kDirectInstrumentFlag | 0x1800) &&
              performance.tracks.front().automations.empty() &&
              hasPitchBend(bends, kVoiceScriptPitchLayer, 5 * 0x20, 0.25) && expressions.size() == 2 &&
              expressions.front()->header.tick == 0 && expressions.front()->linearGain == 1.0 &&

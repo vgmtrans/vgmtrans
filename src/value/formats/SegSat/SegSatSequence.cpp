@@ -596,9 +596,9 @@ void finalizeSegSatPerformance(PerformanceSequence& performance, std::span<const
         continue;
       }
 
-      if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event);
-          selection != nullptr && selection->sourceInstrument) {
-        if (const auto address = decodeSegSatInstrumentIdentity(*selection->sourceInstrument)) {
+      const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event);
+      if (const auto* identity = selection ? std::get_if<InstrumentIdentity>(&selection->instrument) : nullptr) {
+        if (const auto address = decodeSegSatInstrumentIdentity(*identity)) {
           selectedBank = address->sourceBank;
           selectedProgram = address->program;
           continue;

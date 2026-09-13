@@ -243,19 +243,14 @@ struct MidiInstrumentSelection {
   std::optional<u16> pitchBendRangeCents;
 };
 
-[[nodiscard]] MidiInstrumentSelection instrumentSelection(const InstrumentPerformanceEvent& event,
-                                                          std::span<const SoundBankAsset* const> soundBanks) {
-  const Instrument* instrument = findPerformanceInstrument(event, soundBanks);
-  InstrumentAddress address{.bank = event.bank, .program = event.program};
-  if (event.sourceInstrument) {
-    // A sequential key is a deterministic fallback for incomplete collections.
-    // This is an export policy, not a bank convention imposed on format code.
-    address = resolveInstrumentAddress(instrument != nullptr ? instrument->explicitAddress : std::nullopt,
-                                       event.sourceInstrument);
-  }
+[[nodiscard]] MidiInstrumentSelection instrumentSelection(const InstrumentSelection& selection,
+                                                          std::span<const SoundBankAsset* const> soundBanks,
+                                                          bool forceBankSelect = false) {
+  const Instrument* instrument = findPerformanceInstrument(selection, soundBanks);
   return MidiInstrumentSelection{
-      .address = address,
-      .forceBankSelect = event.sourceInstrument.has_value() || event.forceBankSelect,
+      .address = instrument ? resolveInstrumentAddress(instrument->explicitAddress, instrument->identity)
+                            : resolveInstrumentAddress(selection),
+      .forceBankSelect = std::holds_alternative<InstrumentIdentity>(selection) || forceBankSelect,
       .pitchBendRangeCents = instrument != nullptr ? instrument->pitchBendRangeCents : std::nullopt,
   };
 }
@@ -1309,12 +1304,9 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
             return;
           }
           if (!typedEvent.extendsPrevious && typedEvent.instrumentAddress) {
-            const auto address = *typedEvent.instrumentAddress;
-            applyInstrumentSelection(
-                track, state, typedEvent.header.tick, channel,
-                instrumentSelection(InstrumentPerformanceEvent{.bank = address.bank, .program = address.program},
-                                    soundBanks),
-                options, modulationConversion, false);
+            applyInstrumentSelection(track, state, typedEvent.header.tick, channel,
+                                     instrumentSelection(*typedEvent.instrumentAddress, soundBanks), options,
+                                     modulationConversion, false);
           }
           const u8 key = midiKey(typedEvent.key + globalTransposeAt(globalTransposes, typedEvent.header.tick));
           if (shouldRestartSimulatedVibratoForNote(typedEvent, state)) {
@@ -1357,7 +1349,7 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           // Standard MIDI treats time signatures as global metadata. They are collected
           // once and written to the first MIDI track by renderMidiSequence.
         } else if constexpr (std::is_same_v<TypedEvent, InstrumentPerformanceEvent>) {
-          const auto selection = instrumentSelection(typedEvent, soundBanks);
+          const auto selection = instrumentSelection(typedEvent.instrument, soundBanks, typedEvent.forceBankSelect);
           applyInstrumentSelection(track, state, typedEvent.header.tick, channel, selection, options,
                                    modulationConversion, true);
         } else if constexpr (std::is_same_v<TypedEvent, LevelPerformanceEvent>) {
@@ -1606,7 +1598,7 @@ MidiSequence renderMidiSequence(const PerformanceSequence& performance, MidiExpo
       midiTrack.events.push_back(midi::meta(0, 0x21, {midiPortByte(assignment.port)}, -5));
     }
     applyInstrumentPitchBendRange(midiTrack, renderState, 0, assignment.channel,
-                                  instrumentSelection(InstrumentPerformanceEvent{}, soundBanks).pitchBendRangeCents,
+                                  instrumentSelection(InstrumentAddress{}, soundBanks).pitchBendRangeCents,
                                   modulationConversion);
     for (const auto* event : timelines[trackIndex]) {
       const auto& header = performanceEventHeader(*event);

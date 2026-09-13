@@ -221,8 +221,9 @@ void lateCommandsRenderLoopsSplitsLfoAndDynamicAdsr() {
   const auto balances = events<StereoBalancePerformanceEvent>(track);
   expect(notes.size() == 2 && notes[0]->key == 32.0 && notes[0]->durationTicks == 4 && notes[1]->key == 84.0,
          "late notes should preserve delay/gate duration and normalize driver pitch indexes into its 0-95 table");
-  expect(instruments.size() >= 4 && instruments[instruments.size() - 2]->sourceInstrument->key == 10 &&
-             instruments.back()->sourceInstrument->key == 6,
+  expect(instruments.size() >= 4 &&
+             std::get<InstrumentIdentity>(instruments[instruments.size() - 2]->instrument).key == 10 &&
+             std::get<InstrumentIdentity>(instruments.back()->instrument).key == 6,
          "Star Ocean program 5 should select its low and high key-split instruments at note attack");
   expect(envelopes.size() == 1 && envelopes.front()->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks,
          "AF must replace the active and future ADSR rather than remain a display-only event");
@@ -363,7 +364,7 @@ void leadingJockeyProgramChangesCarryTheirDelay() {
   const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks.front());
   const auto notes = events<NotePerformanceEvent>(performance.tracks.front());
   expect(performance.diagnostics.empty() && notes.size() == 1 && notes.front()->header.tick == 5 &&
-             instruments.size() == 2 && instruments.back()->sourceInstrument->key == 3,
+             instruments.size() == 2 && std::get<InstrumentIdentity>(instruments.back()->instrument).key == 3,
          "Leading Jockey's three-byte 96 must select the direct SRCN before applying its encoded delay");
 }
 

@@ -316,10 +316,10 @@ void compilerCursorOwnsOutputValuesAfterDecoding() {
   const auto& instrument = std::get<InstrumentPerformanceEvent>(events[0]);
   const auto& continuous = std::get<LevelPerformanceEvent>(events[1]);
   const auto& quantized = std::get<LevelPerformanceEvent>(events[2]);
-  expect(
-      instrument.sourceInstrument == InstrumentIdentity{.domain = "temporary source instrument domain", .key = 257} &&
-          instrument.envelopeMode == InstrumentEnvelopeMode::PreserveDynamicOverride,
-      "compiled instrument selections must own a copy of the source domain and preserve envelope policy");
+  expect(std::get<InstrumentIdentity>(instrument.instrument) ==
+                 InstrumentIdentity{.domain = "temporary source instrument domain", .key = 257} &&
+             instrument.envelopeMode == InstrumentEnvelopeMode::PreserveDynamicOverride,
+         "compiled instrument selections must own a copy of the source domain and preserve envelope policy");
   expect(continuous.linearGain == 0.5 && continuous.sourceQuantization.levels == 0 && quantized.linearGain == 0.75 &&
              quantized.sourceQuantization.levels == 64,
          "compiled level output must distinguish unspecified quantization from a declared native scale");

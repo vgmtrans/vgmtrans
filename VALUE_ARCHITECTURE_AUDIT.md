@@ -2200,6 +2200,36 @@ comparison caught and corrected HOSA's nonstandard header kind. Capture hooks
 were removed; the harness and results remain ignored. Real-file corpus parity
 remains unverified.
 
+## Represent instrument selection as one explicit choice
+
+InstrumentPerformanceEvent now carries one InstrumentSelection: either a
+logical InstrumentAddress or a source-domain InstrumentIdentity. The old bank,
+program, and optional sourceInstrument fields could describe competing
+selections, requiring consumers to repeat which one took precedence. The
+model now makes that choice explicit, and lookup helpers accept the selection
+directly instead of constructing temporary performance events for note-level
+preset overrides.
+
+MIDI rendering, synth usage filtering, instrument variants, and pitch-range
+lookup share matchesInstrumentSelection. Address assignment remains in the
+existing export policy. Ordinary lookup still requires an exact source
+identity and returns its first match; variants retain address fallback, while
+synth filtering retains all matches in bank order. Default selection remains
+bank/program zero. Existing format-facing instrument emitter calls are
+unchanged, as are force-bank and envelope-preservation options.
+
+Production code is 28 lines smaller. The committed test changes adapt existing
+fixtures and assertions to the explicit choice, adding eight net lines through
+wrapping and named identity lookups; no new fixture or test function was added.
+The existing policy fixture still exercises exact identity, missing-identity
+fallback, direct addresses, duplicate matches, and note-level overrides.
+
+Verification: the full build is warning-free and all 20 CTest targets pass.
+Temporary before/after captures match all 291 MIDI renderings, 63 SoundFont2
+exports, and 29 DLS exports from the existing fixtures. Capture hooks were
+removed and their harnesses/results remain ignored. This verifies fixture
+output parity, not a real-file corpus.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding
@@ -2221,6 +2251,10 @@ remains unverified.
   Pitch-bend lowering also requires an uncanceled link beginning by the note's
   attack, a matching lane, and an earlier predecessor before inheriting a
   voice. A canonical continuity analysis must preserve those conditions.
+  Instrument matching now uses the shared InstrumentSelection choice. Before
+  changing its lifetime rules, probe dynamic-envelope variants on key-changing
+  continuations: those carry previousNote in their pitch intent while the
+  original note's extendsPrevious flag can still be false.
 - SonyPS2 still approximates key/velocity-dependent regions during scanning
   under a 3,000-region budget chosen for SF2 table limits. Moving this policy
   to export needs a source-neutral representation of that response; merely

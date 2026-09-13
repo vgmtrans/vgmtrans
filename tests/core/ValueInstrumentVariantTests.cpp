@@ -74,10 +74,9 @@ void instrumentSelectionPreservesIdentityAndFallbackPolicies() {
   const SoundBankAsset bank{.instruments = {addressMatch, exactMatch, addressMatch, exactMatch}};
 
   for (const u32 mode : {0, 1, 2, 3}) {
-    InstrumentPerformanceEvent selection{.header = eventHeader(0, 0), .program = 5};
+    InstrumentPerformanceEvent selection{.header = eventHeader(0, 0), .instrument = InstrumentAddress{.program = 5}};
     if (mode < 2) {
-      selection.sourceInstrument =
-          InstrumentIdentity{.domain = mode == 0 ? "dynamic-envelope-test" : "missing", .key = 5};
+      selection.instrument = InstrumentIdentity{.domain = mode == 0 ? "dynamic-envelope-test" : "missing", .key = 5};
     }
     const auto performance = sequenceWithEvents({
         selection,
@@ -96,7 +95,8 @@ void instrumentSelectionPreservesIdentityAndFallbackPolicies() {
     expect(selected == std::vector<const Instrument*>{&bank.instruments[first], &bank.instruments[first + 2]},
            "used-instrument filtering must prefer exact identities, fall back to addresses, and retain every match in "
            "bank order");
-    expect(findPerformanceInstrument(selection, inputs) == (mode == 1 ? nullptr : &bank.instruments[mode == 0 ? 1 : 0]),
+    expect(findPerformanceInstrument(selection.instrument, inputs) ==
+               (mode == 1 ? nullptr : &bank.instruments[mode == 0 ? 1 : 0]),
            "ordinary performance lookup must require an exact identity and select only its first match");
 
     std::array banks{bank};
@@ -130,7 +130,7 @@ void dynamicEnvelopeMaterializationIsIncrementalAndDeduplicated() {
   auto performance = sequenceWithEvents({
       InstrumentPerformanceEvent{
           .header = eventHeader(0, 0),
-          .sourceInstrument = InstrumentIdentity{.domain = "dynamic-envelope-test", .key = 5},
+          .instrument = InstrumentIdentity{.domain = "dynamic-envelope-test", .key = 5},
       },
       EnvelopePerformanceEvent{
           .header = eventHeader(0, 1),
@@ -229,7 +229,7 @@ void dynamicEnvelopeInstrumentSelectionControlsOverrideCarry() {
   auto performance = sequenceWithEvents({
       InstrumentPerformanceEvent{
           .header = eventHeader(0, 0),
-          .sourceInstrument = InstrumentIdentity{.domain = "dynamic-envelope-test", .key = 0},
+          .instrument = InstrumentIdentity{.domain = "dynamic-envelope-test", .key = 0},
       },
       EnvelopePerformanceEvent{
           .header = eventHeader(0, 1),
@@ -243,7 +243,7 @@ void dynamicEnvelopeInstrumentSelectionControlsOverrideCarry() {
       },
       InstrumentPerformanceEvent{
           .header = eventHeader(8, 3),
-          .sourceInstrument = InstrumentIdentity{.domain = "dynamic-envelope-test", .key = 1},
+          .instrument = InstrumentIdentity{.domain = "dynamic-envelope-test", .key = 1},
       },
       NotePerformanceEvent{
           .header = eventHeader(8, 4),
@@ -257,7 +257,7 @@ void dynamicEnvelopeInstrumentSelectionControlsOverrideCarry() {
       },
       InstrumentPerformanceEvent{
           .header = eventHeader(16, 6),
-          .sourceInstrument = InstrumentIdentity{.domain = "dynamic-envelope-test", .key = 0},
+          .instrument = InstrumentIdentity{.domain = "dynamic-envelope-test", .key = 0},
           .envelopeMode = InstrumentEnvelopeMode::PreserveDynamicOverride,
       },
       NotePerformanceEvent{
@@ -330,7 +330,7 @@ void dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero() {
   auto performance = sequenceWithEvents({
       InstrumentPerformanceEvent{
           .header = eventHeader(0, 0),
-          .sourceInstrument = InstrumentIdentity{.domain = "dynamic-envelope-test", .key = 0},
+          .instrument = InstrumentIdentity{.domain = "dynamic-envelope-test", .key = 0},
       },
       EnvelopePerformanceEvent{
           .header = eventHeader(0, 1),
@@ -399,15 +399,16 @@ void variantAddressesRespectExportProjectionsAndExhaustion() {
     if (address == 1 || address == 128 || address == 256 || address == 384 || address == 511 || address == 16383) {
       continue;
     }
-    events.push_back(InstrumentPerformanceEvent{.bank = address / 128, .program = address % 128});
+    events.push_back(
+        InstrumentPerformanceEvent{.instrument = InstrumentAddress{.bank = address / 128, .program = address % 128}});
   }
   // Reserve holes through the MIDI/DLS bank projection, SF2's packed bank,
   // and the exporters' clamped program respectively.
-  events.push_back(InstrumentPerformanceEvent{.bank = 129, .program = 0});
+  events.push_back(InstrumentPerformanceEvent{.instrument = InstrumentAddress{.bank = 129, .program = 0}});
   events.push_back(NotePerformanceEvent{.instrumentAddress = InstrumentAddress{512, 0}});
-  events.push_back(InstrumentPerformanceEvent{.bank = 3, .program = 255});
+  events.push_back(InstrumentPerformanceEvent{.instrument = InstrumentAddress{.bank = 3, .program = 255}});
   events.push_back(InstrumentPerformanceEvent{
-      .sourceInstrument = InstrumentIdentity{.domain = "dynamic-envelope-test", .key = 0},
+      .instrument = InstrumentIdentity{.domain = "dynamic-envelope-test", .key = 0},
   });
   for (u32 note = 1; note <= 4; ++note) {
     events.push_back(EnvelopePerformanceEvent{

@@ -7,6 +7,7 @@
 #include "value/export/synth/SynthExportData.h"
 
 #include "value/export/ExportDiagnostics.h"
+#include "value/export/PerformanceInstrumentSelection.h"
 #include "value/sequence/PerformanceModel.h"
 #include "value/synth/SampleDecoder.h"
 
@@ -43,12 +44,11 @@ struct SamplePoolView {
 
 constexpr double kPerceivedHalfLoudnessDb = 10.0;
 
-template <typename Predicate>
 bool markMatchingInstruments(SynthInstrumentSet& used, std::span<const Instrument* const> instruments,
-                             Predicate matches) {
+                             const InstrumentSelection& selection) {
   bool found = false;
   for (const auto* instrument : instruments) {
-    if (matches(*instrument)) {
+    if (matchesInstrumentSelection(*instrument, selection)) {
       found = true;
       used.insert(instrument);
     }
@@ -56,26 +56,11 @@ bool markMatchingInstruments(SynthInstrumentSet& used, std::span<const Instrumen
   return found;
 }
 
-void markInstrumentAddress(InstrumentAddress address, std::span<const Instrument* const> instruments,
-                           SynthInstrumentSet& used) {
-  markMatchingInstruments(used, instruments, [&](const Instrument& instrument) {
-    return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == address;
-  });
-}
-
-void markSelectedInstrument(const InstrumentPerformanceEvent& selection,
-                            std::span<const Instrument* const> instruments, SynthInstrumentSet& used) {
-  InstrumentAddress address{.bank = selection.bank, .program = selection.program};
-  if (selection.sourceInstrument) {
-    if (markMatchingInstruments(used, instruments, [&](const Instrument& instrument) {
-          return instrument.identity && *instrument.identity == *selection.sourceInstrument;
-        })) {
-      return;
-    }
-    address = resolveInstrumentAddress({}, selection.sourceInstrument);
+void markSelectedInstrument(const InstrumentSelection& selection, std::span<const Instrument* const> instruments,
+                            SynthInstrumentSet& used) {
+  if (!markMatchingInstruments(used, instruments, selection) && std::holds_alternative<InstrumentIdentity>(selection)) {
+    markMatchingInstruments(used, instruments, resolveInstrumentAddress(selection));
   }
-
-  markInstrumentAddress(address, instruments, used);
 }
 
 [[nodiscard]] SynthSampleIndexMap decodeSynthSamples(PreparedSynthData& prepared,
@@ -290,13 +275,13 @@ std::vector<const Instrument*> selectSynthInstruments(std::span<const SoundBankA
   SynthInstrumentSet used;
   for (const auto& track : sequenceUsage->tracks) {
     // A track uses bank/program zero until its first instrument change.
-    InstrumentPerformanceEvent selection;
+    InstrumentSelection selection;
     for (const auto& event : track.events) {
       if (const auto* change = std::get_if<InstrumentPerformanceEvent>(&event)) {
-        selection = *change;
+        selection = change->instrument;
       } else if (const auto* note = std::get_if<NotePerformanceEvent>(&event)) {
         if (note->instrumentAddress) {
-          markInstrumentAddress(*note->instrumentAddress, instruments, used);
+          markSelectedInstrument(*note->instrumentAddress, instruments, used);
         } else {
           markSelectedInstrument(selection, instruments, used);
         }

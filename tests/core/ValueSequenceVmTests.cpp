@@ -52,7 +52,7 @@ void sequenceVmExecutesSourceCommandsAndStopsAtPlayOnceLoop() {
   expect(renderedTrack.events.size() == 2, "VM should emit program and note events before the loop repeats");
 
   const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&renderedTrack.events[0]);
-  expect(instrument != nullptr && instrument->program == 5,
+  expect(instrument != nullptr && std::get<InstrumentAddress>(instrument->instrument).program == 5,
          "program command should emit a target-neutral instrument event");
   expect(instrument->header.sourceCommand.id == CommandId{0} && instrument->header.tick == 0,
          "instrument event should link to the source command and tick");
@@ -536,7 +536,8 @@ void sequenceVmEmitsProgramInitialChannelState() {
   expect(mono != nullptr && mono->channels == 0 && !mono->header.sourceCommand.valid(),
          "initial mono mode should preserve explicit zero and should not pretend to come from a source command");
   const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&events[5]);
-  expect(instrument != nullptr && instrument->sourceInstrument == InstrumentIdentity{.domain = "probe", .key = 7} &&
+  expect(instrument != nullptr &&
+             std::get<InstrumentIdentity>(instrument->instrument) == InstrumentIdentity{.domain = "probe", .key = 7} &&
              !instrument->header.sourceCommand.valid(),
          "initial source instrument should preserve its identity without inventing a source command");
 
@@ -631,7 +632,8 @@ void sequenceVmExposesSubroutineStateFromItsCallStack() {
          "subroutine-state fixture should visit the called command and its continuation");
   const auto& called = std::get<InstrumentPerformanceEvent>(performance.tracks[0].events[0]);
   const auto& continued = std::get<InstrumentPerformanceEvent>(performance.tracks[0].events[1]);
-  expect(called.program == 1 && continued.program == 0,
+  expect(std::get<InstrumentAddress>(called.instrument).program == 1 &&
+             std::get<InstrumentAddress>(continued.instrument).program == 0,
          "VM should expose call-stack state inside a subroutine and clear it after return");
 }
 
@@ -861,7 +863,8 @@ void sequenceVmRunsRepeatBreakSideEffectsOnlyWhenBranchTaken() {
 
   const auto sideEffects = std::ranges::count_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
     const auto* instrument = std::get_if<InstrumentPerformanceEvent>(&event);
-    return instrument != nullptr && instrument->program == 99 && instrument->header.tick == 36;
+    return instrument != nullptr && std::get<InstrumentAddress>(instrument->instrument).program == 99 &&
+           instrument->header.tick == 36;
   });
   expect(sideEffects == 1, "repeat-break command should emit side effects only when the break branch is taken");
 }

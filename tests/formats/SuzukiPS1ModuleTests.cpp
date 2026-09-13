@@ -156,7 +156,8 @@ void suzukiPs1DynamicAdsrUsesAuditedDriverCommands() {
   expect(envelopes.back()->update.values == std::nullopt && envelopes.back()->update.fields == EnvelopeFields::All,
          "C0 should restore the current program's native envelope");
   const auto instruments = eventsOfType<InstrumentPerformanceEvent>(performance.tracks.front());
-  expect(!instruments.empty() && instruments.back()->sourceInstrument == suzukiPs1InstrumentIdentity(4, 0),
+  expect(!instruments.empty() &&
+             std::get<InstrumentIdentity>(instruments.back()->instrument) == suzukiPs1InstrumentIdentity(4, 0),
          "C0 should load the current program from a bank selected by FE");
 }
 

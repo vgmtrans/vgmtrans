@@ -10,6 +10,7 @@
 
 #include <optional>
 #include <string>
+#include <variant>
 
 namespace vgmtrans::core {
 
@@ -31,20 +32,31 @@ struct InstrumentAddress {
   friend bool operator==(const InstrumentAddress&, const InstrumentAddress&) noexcept = default;
 };
 
+// A selection names either a source instrument or a logical preset address.
+// It cannot carry competing identities; address assignment remains export policy.
+using InstrumentSelection = std::variant<InstrumentAddress, InstrumentIdentity>;
+
 // Export addresses are explicit policy when a format needs a particular bank;
 // otherwise a source identity receives a stable sequential 128-program address.
 // Every target uses this function so identity and address cannot disagree.
+[[nodiscard]] inline InstrumentAddress resolveInstrumentAddress(const InstrumentIdentity& identity) noexcept {
+  return InstrumentAddress{.bank = identity.key >> 7, .program = identity.key & 0x7f};
+}
+
+[[nodiscard]] inline InstrumentAddress resolveInstrumentAddress(const InstrumentSelection& selection) noexcept {
+  if (const auto* identity = std::get_if<InstrumentIdentity>(&selection)) {
+    return resolveInstrumentAddress(*identity);
+  }
+  return std::get<InstrumentAddress>(selection);
+}
+
 [[nodiscard]] inline InstrumentAddress resolveInstrumentAddress(
     const std::optional<InstrumentAddress>& explicitAddress,
     const std::optional<InstrumentIdentity>& identity) noexcept {
   if (explicitAddress) {
     return *explicitAddress;
   }
-  const u32 sequentialKey = identity ? identity->key : 0;
-  return InstrumentAddress{
-      .bank = sequentialKey >> 7,
-      .program = sequentialKey & 0x7f,
-  };
+  return identity ? resolveInstrumentAddress(*identity) : InstrumentAddress{};
 }
 
 }  // namespace vgmtrans::core

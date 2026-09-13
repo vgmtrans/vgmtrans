@@ -6,6 +6,7 @@
 
 #include "value/export/InstrumentVariants.h"
 
+#include "value/export/PerformanceInstrumentSelection.h"
 #include "value/synth/SynthMath.h"
 
 #include <algorithm>
@@ -143,12 +144,11 @@ using WarningSourceKey = std::tuple<WarningSourceKind, u32, u64>;
   return {WarningSourceKind::Event, header.track.value, header.sequence};
 }
 
-template <typename Predicate>
 [[nodiscard]] std::optional<InstrumentRef> findInstrument(std::span<const SoundBankAsset> soundBanks,
-                                                          Predicate matches) {
+                                                          const InstrumentSelection& selection) {
   for (u32 setIndex = 0; setIndex < soundBanks.size(); ++setIndex) {
     for (const auto& instrument : soundBanks[setIndex].instruments) {
-      if (matches(instrument)) {
+      if (matchesInstrumentSelection(instrument, selection)) {
         return InstrumentRef{.set = setIndex, .instrument = &instrument};
       }
     }
@@ -156,21 +156,13 @@ template <typename Predicate>
   return std::nullopt;
 }
 
-[[nodiscard]] std::optional<InstrumentRef> resolveSelection(const InstrumentPerformanceEvent& selection,
+[[nodiscard]] std::optional<InstrumentRef> resolveSelection(const InstrumentSelection& selection,
                                                             std::span<const SoundBankAsset> soundBanks) {
-  InstrumentAddress address{.bank = selection.bank, .program = selection.program};
-  if (selection.sourceInstrument) {
-    if (auto resolved = findInstrument(soundBanks, [&](const Instrument& instrument) {
-          return instrument.identity && *instrument.identity == *selection.sourceInstrument;
-        })) {
-      return resolved;
-    }
-    address = resolveInstrumentAddress({}, selection.sourceInstrument);
+  if (auto resolved = findInstrument(soundBanks, selection);
+      resolved || std::holds_alternative<InstrumentAddress>(selection)) {
+    return resolved;
   }
-
-  return findInstrument(soundBanks, [&](const Instrument& instrument) {
-    return resolveInstrumentAddress(instrument.explicitAddress, instrument.identity) == address;
-  });
+  return findInstrument(soundBanks, resolveInstrumentAddress(selection));
 }
 
 class AddressAllocator {
@@ -184,9 +176,7 @@ public:
     for (const auto& track : performance.tracks) {
       for (const auto& event : track.events) {
         if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event)) {
-          reserve(selection->sourceInstrument
-                      ? resolveInstrumentAddress({}, selection->sourceInstrument)
-                      : InstrumentAddress{.bank = selection->bank, .program = selection->program});
+          reserve(resolveInstrumentAddress(selection->instrument));
         } else if (const auto* note = std::get_if<NotePerformanceEvent>(&event); note && note->instrumentAddress) {
           reserve(*note->instrumentAddress);
         }
@@ -318,7 +308,7 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
 
     for (auto& event : track.events) {
       if (const auto* selection = std::get_if<InstrumentPerformanceEvent>(&event)) {
-        selectedInstrument = resolveSelection(*selection, soundBanks);
+        selectedInstrument = resolveSelection(selection->instrument, soundBanks);
         previousAttackUsedVariant = false;
         if (selection->envelopeMode == InstrumentEnvelopeMode::UseInstrumentEnvelope) {
           envelopeStates.clear();
@@ -383,11 +373,7 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
                                envelope->second.fields != EnvelopeFields::None;
       const bool envelopeOnly = hasEnvelope && !materializeStereo;
       const auto baseRef =
-          note->instrumentAddress
-              ? resolveSelection(InstrumentPerformanceEvent{.bank = note->instrumentAddress->bank,
-                                                            .program = note->instrumentAddress->program},
-                                 soundBanks)
-              : selectedInstrument;
+          note->instrumentAddress ? resolveSelection(*note->instrumentAddress, soundBanks) : selectedInstrument;
       if (!baseRef) {
         if ((hasEnvelope || materializeStereo) && !warnedMissingInstrument) {
           result.diagnostics.push_back(instrumentNotFoundWarning(envelopeOnly, note->header));

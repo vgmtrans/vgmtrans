@@ -137,11 +137,12 @@ void groupFallbackAndProgramBanksMatchTheDriver() {
 
   const PerformanceSequence performance = render({0x10, 0x22, 0}, 1);
   const auto instruments = events<InstrumentPerformanceEvent>(performance.tracks.front());
-  expect(performance.diagnostics.empty() && std::ranges::any_of(instruments,
-                                                                [](const auto* event) {
-                                                                  return event->sourceInstrument &&
-                                                                         event->sourceInstrument->key == 0x32;
-                                                                }),
+  expect(performance.diagnostics.empty() &&
+             std::ranges::any_of(instruments,
+                                 [](const auto* event) {
+                                   const auto* identity = std::get_if<InstrumentIdentity>(&event->instrument);
+                                   return identity && identity->key == 0x32;
+                                 }),
          "upper SRCNs should receive the non-music group's audited $10-program bank offset");
 }
 

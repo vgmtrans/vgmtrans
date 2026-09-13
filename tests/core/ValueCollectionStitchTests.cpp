@@ -18,11 +18,11 @@ struct StitchProgramState {
 
   void finalizePerformance(PerformanceSequence& performance) const {
     for (auto& track : performance.tracks) {
-      auto position = track.events.insert(track.events.begin(), InstrumentPerformanceEvent{
-                                                                    .bank = 255,
-                                                                    .program = 0,
-                                                                    .forceBankSelect = true,
-                                                                });
+      auto position =
+          track.events.insert(track.events.begin(), InstrumentPerformanceEvent{
+                                                        .instrument = InstrumentAddress{.bank = 255, .program = 0},
+                                                        .forceBankSelect = true,
+                                                    });
       position = track.events.insert(
           ++position, EnvelopePerformanceEvent{
                           .update = EnvelopeUpdate::set(Envelope{.attackSeconds = 0.25}, EnvelopeFields::Attack),
