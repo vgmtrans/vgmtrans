@@ -449,10 +449,15 @@ void variantAddressesRespectExportProjectionsAndExhaustion() {
          "exhausting portable addresses must retain the existing warning");
 }
 
-void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments() {
+void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(bool changesInstrument) {
   Instrument instrument = testInstrument(0, Envelope{.attackSeconds = 1.0});
   instrument.regions[0].sample = SampleRef::resolved(AssetId{10}, 0);
   std::vector<SoundBankAsset> sets{SoundBankAsset{.instruments = {std::move(instrument)}}};
+  if (changesInstrument) {
+    auto other = sets[0].instruments[0];
+    other.identity->key = 1;
+    sets[0].instruments.push_back(std::move(other));
+  }
   auto performance = sequenceWithEvents({
       EnvelopePerformanceEvent{
           .header = eventHeader(0, 0),
@@ -489,10 +494,17 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments() {
               .note = PerformanceNoteId{2}, .previousNote = PerformanceNoteId{1}, .startKey = 60, .targetKey = 62},
       .realization = {.startTick = 8, .endTick = 8},
   });
+  if (changesInstrument) {
+    performance.tracks[0].events.insert(
+        performance.tracks[0].events.begin() + 3,
+        InstrumentPerformanceEvent{.header = eventHeader(6, 3), .instrument = InstrumentAddress{.program = 1}});
+    performance.tracks[0].events.emplace_back(NotePerformanceEvent{
+        .header = eventHeader(12, 6), .key = 64, .durationTicks = 4, .note = PerformanceNoteId{3}});
+  }
   const auto materialized =
       materializeInstrumentVariants(performance, sets, InstrumentVariantOptions{.dynamicEnvelopes = true});
   const size_t selected = selectedInstrumentForNote(materialized, PerformanceNoteId{1}, sets[0]);
-  expect(selected == 1, "the dynamic note should select its generated prepared instrument");
+  expect(selected == (changesInstrument ? 2 : 1), "the dynamic note should select its generated prepared instrument");
 
   SourceStore sources;
   const SourceId source = sources.add(SourceFile{.name = "dynamic-envelope.pcm"}, std::vector<u8>{0});
@@ -506,17 +518,40 @@ void dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments() {
   };
   std::vector<const SoundBankAsset*> instrumentViews{&sets[0]};
   std::vector<const SamplePoolAsset*> sampleViews{&samples};
-  const auto prepared = prepareSynthData(
-      SynthExportInput{
-          .soundBanks = instrumentViews,
-          .samplePools = sampleViews,
-          .sequenceUsage = &materialized.performance,
-      },
-      sources);
-  expect(prepared.instruments.size() == 1 &&
-             prepared.instruments[0].address == resolveInstrumentAddress(sets[0].instruments[selected].explicitAddress,
-                                                                         sets[0].instruments[selected].identity),
-         "used-only synth export should retain the exact generated variant selected by the lowered performance");
+  const SynthExportInput input{
+      .soundBanks = instrumentViews, .samplePools = sampleViews, .sequenceUsage = &materialized.performance};
+  const auto prepared = prepareSynthData(input, sources);
+  const size_t count = changesInstrument ? 2 : 1;
+  const auto variant = *sets[0].instruments[selected].explicitAddress;
+  expect(prepared.instruments.size() == count && prepared.instruments.back().address == variant,
+         "used-only synth export should retain the attack's variant and any subsequent independent attack");
+
+  for (const auto rendering : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
+    const auto midi = renderMidiSequence(materialized.performance, {.pitchTransitions = rendering},
+                                         ModulationConversionPolicy::SynthModulators, instrumentViews);
+    u16 program = 0;
+    size_t noteCount = 0;
+    for (const auto& event : midi.tracks[0].events) {
+      if (const auto* change = midiChannelMessage(event, MidiChannelMessageKind::ProgramChange)) {
+        program = change->value;
+      } else if (midiNote(event)) {
+        ++noteCount;
+        expect(program == (event.tick == 12 ? 1 : variant.program),
+               "a continuation must use the attack's preset, and the next attack must use the intervening selection");
+      }
+    }
+    expect(noteCount == count + (rendering == MidiPitchTransitionRendering::Portamento ? 1 : 0),
+           "only native portamento should add a physical continuation note");
+  }
+
+  const auto sf2 = buildSoundFont2(input, sources);
+  const auto dls = buildDls(input, sources);
+  const size_t presets = asciiOffset(sf2.bytes, "phdr") + 8;
+  expect(sf2.diagnostics.empty() && dls.diagnostics.empty() && chunkSize(sf2.bytes, "phdr") == (count + 1) * 38 &&
+             readLe16(sf2.bytes, presets + (count - 1) * 38 + 20) == variant.program &&
+             readLe32(dls.bytes, asciiOffset(dls.bytes, "colh") + 8) == count &&
+             readLe32(dls.bytes, asciiOffset(dls.bytes, "insh") + 16) == 1,
+         "both serialized banks must retain exactly the presets used by the paired MIDI");
 
   const auto leadingTie = sequenceWithEvents({NotePerformanceEvent{.extendsPrevious = true}});
   expect(selectSynthInstruments(instrumentViews, &leadingTie) == std::vector<const Instrument*>{&sets[0].instruments[0]},
@@ -640,7 +675,9 @@ void runValueInstrumentVariantTests() {
     dynamicEnvelopeMidiUsesLoweredPerformanceAndReturnsToBankZero(rendering);
   }
   variantAddressesRespectExportProjectionsAndExhaustion();
-  dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments();
+  for (const bool changesInstrument : {false, true}) {
+    dynamicEnvelopeSynthFilteringUsesExactPreparedInstruments(changesInstrument);
+  }
   signedStereoMaterializationUsesAttackTimeVariants();
   signedStereoMaterializationLeavesOrdinaryTracksAlone();
 }

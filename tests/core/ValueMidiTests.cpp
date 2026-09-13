@@ -307,6 +307,41 @@ void performanceMidiRendererKeepsPhysicalLimitsAcrossVoiceContinuations() {
   }
 }
 
+void performanceMidiRendererLimitsOnlyTheOwningVoice() {
+  for (const auto mode : {MidiPitchTransitionRendering::PitchBend, MidiPitchTransitionRendering::Portamento}) {
+    for (const bool linkedNote : {false, true}) {
+      for (const u32 lane : {0, 1}) {
+        PerformanceTrack track{.id = TrackId{0}, .endTick = 105};
+        u64 nextSequence = 0;
+        u32 nextNote = 0;
+        u32 nextAutomation = 0;
+        PerformanceEmitter out{
+            track, {track.id, CommandId{1}}, SourceAnnotationId{2}, 0, nextSequence, nextNote, nextAutomation};
+        const auto held = out.note(NotePerformanceEvent{
+            .key = 60, .durationTicks = linkedNote ? 10u : 100u, .maximumDurationMilliseconds = 100.0});
+        out.at(5).note(NotePerformanceEvent{.key = 72, .durationTicks = 100, .lane = PerformanceLaneId{lane}});
+        if (linkedNote) {
+          const auto next = out.at(10).note(64, 1.0, 90);
+          out.at(10).pitchSlide(next, 60, 64, 10).continueFrom(held);
+        } else {
+          out.at(10).pitchSlide(held, 60, 64, 10);
+        }
+        const auto midi = renderMidiSequence(PerformanceSequence{.timebase = {.ppqn = 100}, .tracks = {track}},
+                                             {.pitchTransitions = mode});
+        const auto notes = midiNotes(midi.tracks[0].events);
+        const bool split = mode == MidiPitchTransitionRendering::Portamento;
+        expect(notes.size() == (split ? 3 : 2) && notes[0].tick == 0 && notes[0].duration == (split ? 11 : 20) &&
+                   notes[1].tick == 5 && notes[1].key == 72 && notes[1].duration == 100,
+               "a voice's hardware deadline and extensions must leave an unrelated overlapping note intact");
+        if (split) {
+          expect(notes[2].tick == 10 && notes[2].duration == 10,
+                 "a native-portamento fragment must inherit its own voice's absolute stop time");
+        }
+      }
+    }
+  }
+}
+
 void performanceMidiRendererSelectsTuningRepresentation() {
   const PerformanceSequence performance{
       .timebase = Timebase{.ppqn = 48},
@@ -3487,6 +3522,7 @@ void runValueMidiTests() {
   performanceMidiRendererTrustsSourceNoteExtensions();
   performanceMidiRendererKeepsPhysicalLimitsAcrossPortamentoFragments();
   performanceMidiRendererKeepsPhysicalLimitsAcrossVoiceContinuations();
+  performanceMidiRendererLimitsOnlyTheOwningVoice();
   performanceMidiRendererSelectsTuningRepresentation();
   performanceMidiRendererWritesTimeSignaturesToFirstTrack();
   performanceMidiRendererUsesGlobalExecutionOrderForTransposeAndMeter();

@@ -2297,6 +2297,44 @@ cannot point into temporary expansion output. Source-region inspection also
 needs meaningful baseline values. Require a concrete reduction in format and
 architecture complexity after these integration costs are included.
 
+## Review follow-up: MIDI voice ownership
+
+Both reported regressions were confirmed. The used-only bank mismatch came
+from bbb5abb2f: the Itikiti bytecode `10 00 25 04 37 08 10 01 3F 08 00`
+started a native-portamento note under program 1 while the bank retained only
+program 0. The overlapping-note truncation came from 522e10749: a capped
+voice's later fragment incorrectly shortened an unrelated note from 100 to
+15 ticks. The first case reaches the real format decoder under PreserveFormat;
+the second is demonstrated with a constructed performance, without an
+established real-game path combining overlap and a hardware timer.
+
+MIDI lowering now resolves the preset belonging to each source attack before
+splitting notes. Continuations inherit that preset, including envelope and
+stereo variants, while the next independent attack retains the source's
+intervening selection. Source events remain intact; the resolved addresses
+belong to the temporary MIDI performance. Chronological source traversal also
+removes two redundant sorts in pitch lowering.
+
+The renderer now associates note IDs and their predecessors with a voice's
+own MIDI fragment indices. Hardware clipping and same-voice extensions use
+those indices, preserving absolute stop times without touching an unrelated
+note. This replaces the track-wide clipping suffix and last-note assumption.
+The existing continuation helper now retains predecessor IDs instead of
+only membership; formats acquire no new state or flags.
+
+Focused tests extend the existing paired-export fixture and cover overlapping
+notes on the same and different lanes, both pitch policies, mid-note splitting,
+and linked source notes. Existing tests retain coverage of later limits,
+tempo changes, zero-duration attacks, and suppressed post-stop fragments.
+The full build and all 20 CTest targets pass. The focused renderer/lowering
+cases also pass ASan/UBSan. All 292 pre-existing serialized MIDI fixture
+captures match. An ignored real-decoder probe checks
+18 serialized MIDI files against six SF2/DLS pairs, parsing actual note-on
+programs and bank headers with ordinary, envelope, and stereo presets, both
+with and without a subsequent independent attack. Those pairs have no
+decoding, preparation, or synth-export diagnostics. Larger probes and output
+captures remain ignored.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding
@@ -2311,12 +2349,10 @@ architecture complexity after these integration costs are included.
   while recipe analysis may depend on executed driver state. Preserve that
   distinction when considering a shared replacement for format reference sets.
 - Keep future instrument selection distinct from sounding-voice state when
-  simplifying export preparation. Continuation checks now serve variants and
-  synth usage as well as MIDI pitch-bend linking. A program change during a
-  linked voice still needs care: native portamento starts physical notes while
-  pitch-bend rendering retains one. Preserve bend-base inheritance after
-  portamento splits and the existing cancellation, onset, lane, and predecessor
-  rules when simplifying this further.
+  simplifying export preparation. The review follow-up above now preserves
+  that distinction through native-portamento fragments and used-only banks.
+  Preserve bend-base inheritance after portamento splits and the existing
+  cancellation, onset, lane, and predecessor rules in further simplification.
 - SonyPS2 still approximates key/velocity-dependent regions during scanning
   under a 3,000-region budget chosen for SF2 table limits. Moving this policy
   to export needs a source-neutral representation of that response; merely

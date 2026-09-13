@@ -15,7 +15,7 @@
 #include <limits>
 #include <optional>
 #include <string>
-#include <unordered_set>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -672,7 +672,9 @@ private:
 [[nodiscard]] bool pitchTransitionContinuesVoice(const PerformanceAutomation& automation,
                                                  const NotePerformanceEvent& note,
                                                  const NotePerformanceEvent& previous);
-[[nodiscard]] std::unordered_set<PerformanceNoteId> continuedPerformanceNotes(const PerformanceTrack& track);
+// Maps each key-changing continuation to the preceding note in its voice.
+[[nodiscard]] std::unordered_map<PerformanceNoteId, PerformanceNoteId> performanceNotePredecessors(
+    const PerformanceTrack& track);
 [[nodiscard]] double pitchTransitionValueAt(const PitchTransitionIntent& transition, u32 elapsedTicks);
 [[nodiscard]] const PerformanceTrack* performanceTrackById(const PerformanceSequence& sequence, TrackId id);
 [[nodiscard]] std::vector<const PerformanceEvent*> performanceEventsForCommand(const PerformanceTrack& track,
