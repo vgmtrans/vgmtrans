@@ -285,7 +285,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 [[nodiscard]] Chunk art2Chunk(const ResolvedSynthInstrument& instrument, const ResolvedSynthRegion& resolvedRegion) {
   // Each region gets a DLS2 articulation list. Region envelope/pan is always written;
   // instrument- and region-level modulation are appended as additional connections.
-  const Region& region = *resolvedRegion.region;
+  const Region& region = resolvedRegion.region;
   std::vector<u8> connections;
   writeConnection(connections, kDlsConnDstPan, dlsPanScale(region.pan));
   const Envelope envelope = approximateEnvelopeAsAdsr(region.envelope, kDlsVolumeEnvelopeRangeDb);
@@ -320,7 +320,7 @@ void writeConnection(std::vector<u8>& bytes, u16 destination, s32 scale) {
 
 [[nodiscard]] Chunk rgn2Chunk(const ResolvedSynthInstrument& instrument, const ResolvedSynthRegion& resolvedRegion,
                               std::span<const DecodedSynthSample> samples) {
-  const auto& region = *resolvedRegion.region;
+  const auto& region = resolvedRegion.region;
   const auto& sample = samples[resolvedRegion.sampleIndex];
   return makeListChunk("rgn2", {
                                    rgnhChunk(region),

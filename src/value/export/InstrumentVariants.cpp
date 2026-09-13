@@ -5,8 +5,8 @@
  */
 
 #include "value/export/InstrumentVariants.h"
-
 #include "value/export/PerformanceInstrumentSelection.h"
+#include "value/export/synth/SynthExportData.h"
 #include "value/synth/SynthMath.h"
 
 #include <algorithm>
@@ -276,6 +276,15 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
                                                                std::span<SoundBankAsset> soundBanks,
                                                                InstrumentVariantOptions options) {
   InstrumentVariantMaterialization result{.performance = performance};
+  for (auto& bank : soundBanks) {
+    const u32 step = regionSamplingStep(bank, result.diagnostics);
+    for (auto& instrument : bank.instruments) {
+      if (std::ranges::any_of(instrument.regions,
+                              [](const Region& region) { return bool(region.response.evaluate); })) {
+        instrument.regions = sampleRegionResponses(instrument.regions, step);
+      }
+    }
+  }
   AddressAllocator addresses{soundBanks, performance};
   std::vector<VariantRecord> variants;
   std::set<WarningSourceKey> activeEnvelopeWarnings;

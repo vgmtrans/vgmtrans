@@ -2278,7 +2278,7 @@ The probes, captures, and comparison harnesses remain ignored.
 An ignored SonyPS2 prototype separates native response evaluation from generic
 key/velocity grid traversal for both ordinary sample regions and Setb notes.
 Across 1,440 cases and five sampling steps, its 141,477 generated regions match
-the current emitters exactly: ranges, tuning, envelope, pan, attenuation, and
+the pre-change emitters exactly: ranges, tuning, envelope, pan, attenuation, and
 LFO properties. The probe runs under ASan/UBSan, including stack-use-after-return
 detection after factory settings leave scope. Program-region sample references
 also remain intact after rebinding to a resolved sample owner/index.
@@ -2289,13 +2289,49 @@ driver's selected center: choosing a generic midpoint changes compensation for
 velocity quantization even when the native curve is linear. The prototype
 keeps that choice within the format response and copies no sample-set vectors.
 
-Next, validate the full preparation path before adding a production API:
-responses must be evaluated before envelope/stereo variants, direct SF2/DLS
-preparation must own expanded regions, and bank-wide sampling budgets must
-move out of scanning. ResolvedSynthRegion currently borrows its Region, so it
-cannot point into temporary expansion output. Source-region inspection also
-needs meaningful baseline values. Require a concrete reduction in format and
-architecture complexity after these integration costs are included.
+The production implementation below completes the preparation and ownership
+requirements established by this prototype.
+
+## Defer native region responses until synth export
+
+SonyPS2 now retains one region per native sample or Setb note. Each optional
+`RegionResponse` owns immutable driver settings and evaluates physical region
+parameters at a key/velocity. Native curve math, selected centers, quantization,
+and source annotations stay in the format. Baseline values remain available
+for inspection. Constant responses require no retained callback; sample-set
+vectors and borrowed reader/storage references are never captured.
+
+The existing shared synth-preparation module owns the grid traversal and
+bank-wide sampling budget. SF2 and DLS retain the established 3,000-region
+sampling policy; another exporter can choose its own budget or step. Budget
+warnings now accompany export. Static zones count toward the budget, and an
+unrepresentable native count still produces a warning without dropping zones.
+This is a conservative sampling budget, not a replacement for container table
+overflow checks or a new limit on static banks.
+
+Responses are materialized before attack-time envelope and signed-stereo
+variants, then cleared. Direct container export samples them independently.
+`ResolvedSynthRegion` owns its resulting `Region`, preserving resolved sample
+bindings through expansion and moves; instrument metadata remains borrowed.
+Callbacks leave sample/phase/start-frame settings, ranges, and the response
+unchanged. The sampler copies a callback once per native region, not per zone.
+
+SonyPS2 loses 110 production lines, two sizing structs, and its separate sizing
+prepass. The complete production change adds eight lines, including the shared
+API and ownership documentation, with no additional architecture files. The
+existing SonyPS2 fixture retains three native regions instead of 273 generated
+zones. Tests add 69 lines: one compact shared-export case and extensions of the
+existing SonyPS2, envelope, and stereo fixtures.
+
+All 20 CTest targets pass. All 96 pre-existing synth-export captures (65 SF2,
+31 DLS) retain identical byte fingerprints. The production response functions
+also match the old emitter in 1,440 cases / 141,477 regions under ASan/UBSan,
+including expired factory settings and rebound sample references. Large
+comparison harnesses and capture hooks remain outside the committed code.
+An additional end-to-end comparison matches 20 SonyPS2 MIDI/SF2/DLS artifacts
+through direct and collection exports, using both the existing fixture and a
+widened fixture that triggers budget-driven coarsening. Real-file parity
+remains unverified without a corpus.
 
 ## Review follow-up: MIDI voice ownership
 
@@ -2353,14 +2389,11 @@ captures remain ignored.
   that distinction through native-portamento fragments and used-only banks.
   Preserve bend-base inheritance after portamento splits and the existing
   cancellation, onset, lane, and predecessor rules in further simplification.
-- SonyPS2 still approximates key/velocity-dependent regions during scanning
-  under a 3,000-region budget chosen for SF2 table limits. Moving this policy
-  to export needs a source-neutral representation of that response; merely
-  renaming the limit would not remove the coupling. An opaque deferred Region
-  callback introduces ownership and ordering rules. The deferred-response
-  prototype above now verifies both SonyPS2 sampling paths and retained sample
-  binding. Complete its preparation/ownership prototype and measure the whole
-  change before deciding whether this representation is a net simplification.
+- The shared native-region response model is now in production for SonyPS2.
+  Further adopters should remove actual native grid/budget machinery and retain
+  immutable value captures. Preserve expansion before attack-time variants and
+  owned prepared regions; avoid layering another generic response framework on
+  top of the two shared synth-preparation helpers.
 - Real-file parity remains unverified. An optional corpus-path question is
   pending; the absence of a corpus does not block further code investigation.
 

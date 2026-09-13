@@ -126,6 +126,12 @@ void dynamicEnvelopeMaterializationIsIncrementalAndDeduplicated() {
   std::vector<SoundBankAsset> sets{SoundBankAsset{
       .instruments = {testInstrument(5, firstBase, secondBase)},
   }};
+  // Native responses must be evaluated before attack-time overrides, and must
+  // not survive to overwrite the variant during synth export.
+  sets[0].instruments[0].regions[0].envelope = {};
+  sets[0].instruments[0].regions[0].response.evaluate = [firstBase](Region& region, u8, u8) {
+    region.envelope = firstBase;
+  };
 
   auto performance = sequenceWithEvents({
       InstrumentPerformanceEvent{
@@ -210,6 +216,8 @@ void dynamicEnvelopeMaterializationIsIncrementalAndDeduplicated() {
          "setting a field with an absent value should explicitly clear that field");
 
   const auto& attackVariant = sets[0].instruments[first];
+  expect(!attackVariant.regions[0].response.evaluate && !sets[0].instruments[0].regions[0].response.evaluate,
+         "materialized regions should have no pending native response");
   expect(attackVariant.regions[0].envelope.attackSeconds == 0.25 &&
              attackVariant.regions[1].envelope.attackSeconds == 0.25,
          "a partial attack update should apply to every region");
@@ -563,6 +571,8 @@ void signedStereoMaterializationUsesAttackTimeVariants() {
   const SourceId source = sources.add(SourceFile{.name = "signed-stereo.pcm"}, std::vector<u8>{0x00, 0x80, 0xe8, 0x03});
   Instrument instrument = testInstrument(0, {});
   instrument.regions[0].sample = SampleRef::resolved(AssetId{10}, 0);
+  instrument.regions[0].pan = 0.0;
+  instrument.regions[0].response.evaluate = [](Region& region, u8, u8) { region.pan = 0.5; };
   std::vector<SoundBankAsset> sets{SoundBankAsset{
       .metadata = AssetMetadata{.id = AssetId{10}},
       .instruments = {std::move(instrument)},

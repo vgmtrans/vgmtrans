@@ -55,12 +55,13 @@ struct DecodedSynthSample {
 };
 
 struct ResolvedSynthRegion {
-  const Region* region = nullptr;
+  Region region;
   u32 sampleIndex = 0;
   LoweredSynthModulation modulation;
 };
 
 struct ResolvedSynthInstrument {
+  // Borrows source instrument metadata; sampled region values below are owned.
   const Instrument* instrument = nullptr;
   InstrumentAddress address;
   std::vector<ResolvedSynthRegion> regions;
@@ -84,6 +85,16 @@ struct PreparedSynthData {
 // changing the instrument data kept by the scanner. attenuationRangeDb is the
 // target's full-scale volume-envelope range.
 [[nodiscard]] Envelope approximateEnvelopeAsAdsr(Envelope envelope, double attenuationRangeDb = 100.0);
+
+// Use one resolution across a bank, including its static regions. The default
+// leaves room for generators/modulators in SF2's 16-bit tables and is also used
+// by DLS and instrument variants to keep their zones consistent.
+[[nodiscard]] u32 regionSamplingStep(const SoundBankAsset& bank, std::vector<Diagnostic>& diagnostics,
+                                     u32 maxRegions = 3000);
+
+// Sample cell midpoints only on dependent axes. Returned regions own their
+// values and have no pending response, so later envelope/stereo edits persist.
+[[nodiscard]] std::vector<Region> sampleRegionResponses(std::span<const Region> regions, u32 step);
 
 // Decode samples and resolve instrument references once before a format-specific
 // writer lays out its container.

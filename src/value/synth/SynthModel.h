@@ -14,6 +14,7 @@
 #include "value/synth/Ym2151.h"
 
 #include <cassert>
+#include <functional>
 #include <optional>
 #include <string>
 #include <variant>
@@ -83,6 +84,16 @@ struct Loop {
   friend bool operator==(const Loop&, const Loop&) = default;
 };
 
+struct Region;
+
+struct RegionResponse {
+  bool keyDependent = false;
+  bool velocityDependent = false;
+  // Own immutable native settings. Evaluate physical parameters at a MIDI
+  // key/velocity; leave ranges, sample/phase/start-frame settings, and response unchanged.
+  std::function<void(Region&, u8, u8)> evaluate;
+};
+
 struct Region {
   // One playable zone inside an instrument: key/velocity range, sample reference,
   // tuning, envelope, pan, attenuation, and optional region-specific loop.
@@ -108,6 +119,9 @@ struct Region {
   // that modulation on the region avoids applying one layer's curve to every
   // sample in the instrument.
   InstrumentModulation modulation;
+  // Optional native key/velocity behavior. The values above remain a useful
+  // preview; exporters choose how finely to sample the response.
+  RegionResponse response;
 };
 
 struct Instrument {
