@@ -2499,6 +2499,37 @@ All 20 test targets pass (10.79 seconds). All 542 scan/source-map captures and
 before committing; the probes and their output remain in the ignored build
 folder.
 
+## Sample native regions only when variants need them
+
+Instrument variant preparation now samples a bank when a fresh note attack
+first requires an envelope or signed-stereo override. Ordinary notes, unused
+banks, and envelope updates that do not reach a new attack retain their native
+responses until synth export. This removes unconditional sampling and its
+synth-table warnings from otherwise unaffected MIDI preparation.
+
+The existing sampling block runs immediately before applying overrides. A set
+of bank indexes ensures it runs once per bank; all original instruments share
+one resolution before any generated variants are appended. Sampling also
+precedes the empty-region check, preserving behavior for responses whose ranges
+produce no zones. Format callbacks, shared sampling policy, sample bindings,
+and final export representations are unchanged.
+
+This adds six production lines, including the lifecycle documentation. The
+benefit is removing an unconditional preparation phase, rather than reducing
+source line count. No new API, helper type, or format-specific branch is added.
+Two existing tests gain nine lines net to check ordinary notes and an untouched
+bank. The audit's one-note probe now performs zero evaluations, retains one
+native region, creates no variants, and reports no sampling warning; it
+previously evaluated 1,849 regions despite needing no variant.
+
+All 20 tests pass (10.92 seconds). The 304 MIDI and 100 SF2/DLS fixture captures
+match the baseline exactly. An ignored comparison runs both implementations
+with ASan/UBSan over 144 generated cases, including coarsened grids, static and
+responsive instruments, multiple banks, repeated overrides, active-voice-only
+updates, linked notes, and signed stereo. Prepared regions and note instrument
+addresses match for both complete and used-only synth selection. Temporary
+probes and capture hooks are not committed. Real-file parity remains unverified.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding

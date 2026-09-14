@@ -276,15 +276,7 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
                                                                std::span<SoundBankAsset> soundBanks,
                                                                InstrumentVariantOptions options) {
   InstrumentVariantMaterialization result{.performance = performance};
-  for (auto& bank : soundBanks) {
-    const u32 step = regionSamplingStep(bank, result.diagnostics);
-    for (auto& instrument : bank.instruments) {
-      if (std::ranges::any_of(instrument.regions,
-                              [](const Region& region) { return bool(region.response.evaluate); })) {
-        instrument.regions = sampleRegionResponses(instrument.regions, step);
-      }
-    }
-  }
+  std::set<u32> sampledBanks;
   AddressAllocator addresses{soundBanks, performance};
   std::vector<VariantRecord> variants;
   std::set<WarningSourceKey> activeEnvelopeWarnings;
@@ -396,6 +388,19 @@ InstrumentVariantMaterialization materializeInstrumentVariants(const Performance
       const auto& base = *baseRef->instrument;
       std::optional<InstrumentAddress> variantAddress;
       if (hasEnvelope || materializeStereo) {
+        // Evaluate native responses before overriding them. Sample the whole
+        // bank once, keeping its resolution independent of the variants added.
+        if (sampledBanks.insert(baseRef->set).second) {
+          auto& bank = soundBanks[baseRef->set];
+          const u32 step = regionSamplingStep(bank, result.diagnostics);
+          for (auto& instrument : bank.instruments) {
+            if (std::ranges::any_of(instrument.regions,
+                                    [](const Region& region) { return bool(region.response.evaluate); })) {
+              instrument.regions = sampleRegionResponses(instrument.regions, step);
+            }
+          }
+        }
+
         if (base.regions.empty()) {
           if (regionlessInstrumentWarnings.insert(&base).second) {
             result.diagnostics.push_back(noRegionsWarning(envelopeOnly, note->header));

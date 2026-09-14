@@ -132,6 +132,8 @@ void dynamicEnvelopeMaterializationIsIncrementalAndDeduplicated() {
   sets[0].instruments[0].regions[0].response.evaluate = [firstBase](Region& region, u8, u8) {
     region.envelope = firstBase;
   };
+  sets.push_back(sets.front());
+  sets.back().instruments[0].identity->key = 99;
 
   auto performance = sequenceWithEvents({
       InstrumentPerformanceEvent{
@@ -200,6 +202,8 @@ void dynamicEnvelopeMaterializationIsIncrementalAndDeduplicated() {
       materializeInstrumentVariants(performance, sets, InstrumentVariantOptions{.dynamicEnvelopes = true});
   expect(materialized.diagnostics.empty(), "valid future-note envelope updates should not warn");
   expect(sets[0].instruments.size() == 5, "only four distinct effective envelopes should create variants");
+  expect(sets[1].instruments.size() == 1 && sets[1].instruments[0].regions[0].response.evaluate,
+         "banks that need no variants should retain their native responses");
 
   const size_t first = selectedInstrumentForNote(materialized, PerformanceNoteId{1}, sets[0]);
   const size_t duplicate = selectedInstrumentForNote(materialized, PerformanceNoteId{2}, sets[0]);
@@ -653,6 +657,8 @@ void signedStereoMaterializationLeavesOrdinaryTracksAlone() {
   std::vector<SoundBankAsset> sets{SoundBankAsset{
       .instruments = {testInstrument(0, {})},
   }};
+  sets[0].instruments[0].regions[0].response = {
+      .keyDependent = true, .velocityDependent = true, .evaluate = [](Region&, u8, u8) {}};
   const auto performance = sequenceWithEvents({
       ChannelPanPerformanceEvent{
           .header = eventHeader(0, 0),
@@ -666,8 +672,11 @@ void signedStereoMaterializationLeavesOrdinaryTracksAlone() {
       },
   });
 
-  const auto materialized =
-      materializeInstrumentVariants(performance, sets, InstrumentVariantOptions{.signedStereo = true});
+  const auto materialized = materializeInstrumentVariants(
+      performance, sets, InstrumentVariantOptions{.dynamicEnvelopes = true, .signedStereo = true});
+  expect(materialized.diagnostics.empty() && sets[0].instruments[0].regions.size() == 1 &&
+             sets[0].instruments[0].regions[0].response.evaluate,
+         "ordinary notes should not sample native responses or warn about synth table budgets");
   expect(sets[0].instruments.size() == 1 &&
              std::holds_alternative<ChannelPanPerformanceEvent>(materialized.performance.tracks[0].events[0]) &&
              !std::get<NotePerformanceEvent>(materialized.performance.tracks[0].events[1]).instrumentAddress,
