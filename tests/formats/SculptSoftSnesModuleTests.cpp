@@ -45,7 +45,7 @@ std::vector<T> events(const PerformanceTrack& track) {
   return result;
 }
 
-std::vector<u8> fixture() {
+std::vector<u8> fixture(Revision revision = Revision::Standard) {
   std::vector<u8> data(kAramSize);
   bytes(data, 0x700, {0x8f, 0, 0x10, 0x8f, 0x30, 0x11, 0x8d, 3});
   bytes(data, 0x720, {0x8f, 0x20, 0xfa, 0x8f, 0x81, 0xf1});
@@ -60,6 +60,14 @@ std::vector<u8> fixture() {
   word(data, 0x950, 0xa00);
   bytes(data, 0xa00, {0xf6, 0, 0x24, 0xc4, 0x2c, 0xf6, 0xf0, 0x24, 0xc4, 0x2d, 0xe8, 4, 0x80});
   bytes(data, 0xa20, {0x96, 0, 0x26, 0xd4, 0xab, 0xf4, 0xac, 0x96, 0x20, 0x26, 0xd4, 0xac});
+  if (revision == Revision::Extended) {
+    data[0xa0b] = 10;
+    bytes(data, 0xa00 - 57, {0x60, 0x88, 0xa0, 0x5d, 0xdd, 0x88, 5, 0xfd, 0x7d, 0xad, 10});
+    word(data, 0x956, 0xc00);
+    word(data, 0x958, 0xc40);
+    bytes(data, 0xc00, {0xe8, 0, 0xfd, 0xda, 0x3d, 0x8f, 1, 0xce, 0x3f, 0, 0xd, 0x2d, 0xfd, 0xf8, 0x65});
+    bytes(data, 0xc40, {0x8f, 1, 0xcf, 0x5f, 0, 0xe});
+  }
   word(data, 0x6d, 0x4000);
   for (u32 i = 0; i < 14; ++i) {
     word(data, 0x2000 + 2 * i, static_cast<u16>(0x2100 + 0x20 * i));
@@ -367,6 +375,95 @@ void playbackOwnsTablesAndReportsMalformedCommands() {
          "undefined commands must produce a diagnostic");
 }
 
+double gainAt(const PerformanceTrack& track, u64 tick) {
+  double value = 1;
+  for (const auto& event : events<ExpressionPerformanceEvent>(track)) {
+    if (event.header.tick <= tick) {
+      value = event.linearGain;
+    }
+  }
+  return value;
+}
+
+void extendedRevisionRequiresMatchingCodeAndPreservesLowPitches() {
+  auto data = fixture(Revision::Extended);
+  expect(findLayout(ByteReader(SourceId{70}, data))->revision == Revision::Extended,
+         "extended pitch conversion and command handlers must select the extended revision");
+  bytes(data, 0x4100, {0xf2, 100, 0xf7, 0x10, 0xff, 2, 0xf0});  // -12 semitones in driver units.
+  const auto notes = events<NotePerformanceEvent>(render(data).tracks.front());
+  expect(notes.size() == 1 && notes.front().key == 12,
+         "the extended six-octave bias must preserve pitches below the standard driver's range");
+  data[0x5000] = 0x40;
+  bytes(data, 0x4100, {0xf2, 100, 0xf7, 0, 0x10, 2, 0xf0});
+  expect(events<NotePerformanceEvent>(render(data).tracks.front()).front().key == 72,
+         "raw DSP pitch patches must bypass the extended pitch bias");
+  data[0xc40] = 0;
+  expect(!findLayout(ByteReader(SourceId{70}, data)), "a missing legato handler must reject the extended revision");
+  data = fixture(Revision::Extended);
+  data[0xa00 - 57] = 0;
+  expect(!findLayout(ByteReader(SourceId{70}, data)),
+         "a different pitch conversion must not be accepted by its table alone");
+}
+
+void extendedGateUsesBothBytesWithoutChangingNoteTiming() {
+  auto data = fixture(Revision::Extended);
+  bytes(data, 0x5000, {1, 0, 1, 0, 50, 0});
+  word(data, 0x2140, 0x5100);
+  bytes(data, 0x5100, {1, 2, 0, 1, 0, 4, 1, 0, 127, 127, 127, 0});
+  bytes(data, 0x4100, {0xf2, 100,  0xfa, 0, 128, 1,    0xfb, 255,  45,  0xf7, 0xc0, 3,
+                       0,    0xf7, 0xc0, 3, 2,   0xf4, 255,  0xf4, 255, 0xf4, 100,  0xf0});
+  const auto performance = render(data);
+  const auto& track = performance.tracks.front();
+  const auto notes = events<NotePerformanceEvent>(track);
+  expect(notes.size() == 1 && notes.front().durationTicks == 612,
+         "FB modifies the envelope gate, while zero-duration notes and following waits retain their normal timing");
+  expect(gainAt(track, 500) > 0.9 && gainAt(track, 610) == 0,
+         "the extended gate must scale and round both bytes separately: 300 at 1.5 becomes 578, not 450");
+
+  // The pending gate is global: a wait leaves it available to the next channel.
+  bytes(data, 0x4000, {2, 0, 1});
+  word(data, 0x2202, 0x4200);
+  bytes(data, 0x4200, {0xfb, 255, 45, 0xf4, 255, 0xf0});
+  bytes(data, 0x4100, {0xf2, 100, 0xf7, 0xc0, 3, 2, 0xf4, 255, 0xf0});
+  const auto shared = render(data);
+  const auto voice = std::ranges::find(shared.tracks, 0u, &PerformanceTrack::sourceTrackNumber);
+  expect(gainAt(*voice, 250) > 0.9, "the extended gate latch must be shared across channels");
+}
+
+void legatoAttackPreservesSamplePanEchoAndCurrentGain() {
+  auto data = fixture(Revision::Extended);
+  bytes(data, 0x5000, {0x19, 0, 1, 0, 0, 0});
+  word(data, 0x2122, 0x5010);
+  bytes(data, 0x5010, {9, 0, 2, 0, 0, 0});
+  word(data, 0x3008, 0x6003);
+  word(data, 0x300a, 0x6003);
+  word(data, 0x2140, 0x5100);
+  bytes(data, 0x5100, {0, 255, 0, 1, 0, 2, 1, 0, 127, 32});
+  word(data, 0x2180, 0x5120);
+  bytes(data, 0x5120, {0, 255, 0, 1, 0, 2, 1, 1, 20, 80});
+  word(data, 0x21c0, 0x5140);
+  bytes(data, 0x5140, {3, 64, 32, 0xc0, 127, 0, 0, 0, 0, 0, 0, 0});
+  bytes(data, 0x4100, {0xf2, 100, 0xf7, 0xc0, 3, 3, 0xf5, 1, 0xf2, 50, 0xfc, 0xf7, 0xd4, 3, 4, 0xf7, 0xc0, 3, 1, 0xf0});
+  const auto performance = render(data);
+  const auto& track = performance.tracks.front();
+  const auto notes = events<NotePerformanceEvent>(track);
+  expect(notes.size() == 2 && notes[0].durationTicks == 7 && notes[1].header.tick == 7,
+         "FC suppresses the next attack's key-on and is consumed exactly once");
+  const auto pan = events<StereoBalancePerformanceEvent>(track);
+  expect(std::ranges::any_of(pan,
+                             [](const auto& event) {
+                               return event.header.tick == 3 && event.leftGain == 10.0 / 128 &&
+                                      event.rightGain == 40.0 / 128;
+                             }),
+         "legato must retain pan-curve position and alternating-pan phase while updating volume");
+  const auto echo = events<ReverbPerformanceEvent>(track);
+  expect(std::ranges::none_of(echo, [](const auto& event) { return event.header.tick == 3; }),
+         "legato must not replace global echo or clear the voice's echo bit");
+  const auto instruments = events<InstrumentPerformanceEvent>(track);
+  expect(instruments.size() == 2 && instruments.back().header.tick == 7 && gainAt(track, 3) < 0.5,
+         "legato must retain the sample and current DSP envelope instead of resetting either");
+}
+
 }  // namespace
 
 void runSculptSoftSnesModuleTests() {
@@ -382,4 +479,7 @@ void runSculptSoftSnesModuleTests() {
   sampleCurvesResolveTuningAndNoise();
   echoIsSharedAcrossVoices();
   playbackOwnsTablesAndReportsMalformedCommands();
+  extendedRevisionRequiresMatchingCodeAndPreservesLowPitches();
+  extendedGateUsesBothBytesWithoutChangingNoteTiming();
+  legatoAttackPreservesSamplePanEchoAndCurrentGain();
 }
