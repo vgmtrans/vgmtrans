@@ -134,8 +134,56 @@ void annotateSynthValue(AnnotationBuilder annotation, const Region& region) {
   annotateEnvelope(annotation, region.envelope);
 }
 
-SamplePoolBuilder::SamplePoolBuilder(AssetId asset, SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics)
+detail::SynthBuilderSources::SynthBuilderSources(AssetId asset, SourceMapBuilder* sourceMap,
+                                                 std::vector<Diagnostic>* diagnostics)
     : asset_(asset), sourceMap_(sourceMap), diagnostics_(diagnostics) {
+}
+
+AnnotationBuilder detail::SynthBuilderSources::source(SourceRole role, std::string_view label, SourceRange range,
+                                                      std::string_view kind) {
+  observedRange_.include(range);
+  if (sourceMap_ == nullptr || !range.valid()) {
+    return {};
+  }
+  auto annotation = sourceMap_->annotation(role, label, range).owner(ObjectRefs::asset(asset_));
+  if (!kind.empty()) {
+    annotation.kind(kind);
+  }
+  return annotation;
+}
+
+AnnotationBuilder detail::SynthBuilderSources::source(SourceRole role, std::string_view label,
+                                                      const SourceRecord& record, std::string_view kind) {
+  return source(role, label, record.range, kind).fields(record.fields);
+}
+
+SourceRange detail::SynthBuilderSources::range() const noexcept {
+  return includedRange_.valid() ? includedRange_ : observedRange_;
+}
+
+void detail::SynthBuilderSources::warning(std::string message, SourceRange range) {
+  report(Severity::Warning, {}, std::move(message), range);
+}
+
+void detail::SynthBuilderSources::error(std::string message, SourceRange range) {
+  report(Severity::Error, {}, std::move(message), range);
+}
+
+void detail::SynthBuilderSources::report(Severity severity, std::string code, std::string message, SourceRange range) {
+  if (diagnostics_ == nullptr) {
+    return;
+  }
+  diagnostics_->push_back(Diagnostic{
+      .severity = severity,
+      .code = std::move(code),
+      .message = std::move(message),
+      .range = range,
+      .object = ObjectRefs::asset(asset_),
+  });
+}
+
+SamplePoolBuilder::SamplePoolBuilder(AssetId asset, SourceMapBuilder* sourceMap, std::vector<Diagnostic>* diagnostics)
+    : SynthBuilderSources(asset, sourceMap, diagnostics) {
 }
 
 SamplePoolBuilder::Entry SamplePoolBuilder::add(u64 sourceKey, Sample sample) {
@@ -164,39 +212,9 @@ std::optional<SampleRef> SamplePoolBuilder::find(u64 sourceKey) const {
   return SampleRef::resolved(asset_, found->second);
 }
 
-AnnotationBuilder SamplePoolBuilder::source(SourceRole role, std::string_view label, SourceRange range,
-                                            std::string_view kind) {
-  observedRange_.include(range);
-  if (sourceMap_ == nullptr || !range.valid()) {
-    return {};
-  }
-  auto annotation = sourceMap_->annotation(role, label, range).owner(ObjectRefs::asset(asset_));
-  if (!kind.empty()) {
-    annotation.kind(kind);
-  }
-  return annotation;
-}
-
-AnnotationBuilder SamplePoolBuilder::source(SourceRole role, std::string_view label, const SourceRecord& record,
-                                            std::string_view kind) {
-  return source(role, label, record.range, kind).fields(record.fields);
-}
-
 SamplePoolBuilder& SamplePoolBuilder::include(SourceRange range) {
   includedRange_.include(range);
   return *this;
-}
-
-SourceRange SamplePoolBuilder::range() const noexcept {
-  return includedRange_.valid() ? includedRange_ : observedRange_;
-}
-
-void SamplePoolBuilder::warning(std::string message, SourceRange range) {
-  report(Severity::Warning, {}, std::move(message), range);
-}
-
-void SamplePoolBuilder::error(std::string message, SourceRange range) {
-  report(Severity::Error, {}, std::move(message), range);
 }
 
 BuiltSamplePool SamplePoolBuilder::finish() && {
@@ -278,22 +296,9 @@ void SamplePoolBuilder::finishSources() {
   }
 }
 
-void SamplePoolBuilder::report(Severity severity, std::string code, std::string message, SourceRange range) {
-  if (diagnostics_ == nullptr) {
-    return;
-  }
-  diagnostics_->push_back(Diagnostic{
-      .severity = severity,
-      .code = std::move(code),
-      .message = std::move(message),
-      .range = range,
-      .object = ObjectRefs::asset(asset_),
-  });
-}
-
 InstrumentSetBuilder::InstrumentSetBuilder(AssetId asset, SourceMapBuilder* sourceMap,
                                            std::vector<Diagnostic>* diagnostics)
-    : asset_(asset), sourceMap_(sourceMap), diagnostics_(diagnostics) {
+    : SynthBuilderSources(asset, sourceMap, diagnostics) {
 }
 
 InstrumentSetBuilder::Entry InstrumentSetBuilder::append(Instrument instrument) {
@@ -327,39 +332,9 @@ InstrumentSetBuilder::Entry InstrumentSetBuilder::getOrAdd(u64 groupingKey, Inst
   return add(groupingKey, std::move(initialValue));
 }
 
-AnnotationBuilder InstrumentSetBuilder::source(SourceRole role, std::string_view label, SourceRange range,
-                                               std::string_view kind) {
-  observedRange_.include(range);
-  if (sourceMap_ == nullptr || !range.valid()) {
-    return {};
-  }
-  auto annotation = sourceMap_->annotation(role, label, range).owner(ObjectRefs::asset(asset_));
-  if (!kind.empty()) {
-    annotation.kind(kind);
-  }
-  return annotation;
-}
-
-AnnotationBuilder InstrumentSetBuilder::source(SourceRole role, std::string_view label, const SourceRecord& record,
-                                               std::string_view kind) {
-  return source(role, label, record.range, kind).fields(record.fields);
-}
-
 InstrumentSetBuilder& InstrumentSetBuilder::include(SourceRange range) {
   includedRange_.include(range);
   return *this;
-}
-
-SourceRange InstrumentSetBuilder::range() const noexcept {
-  return includedRange_.valid() ? includedRange_ : observedRange_;
-}
-
-void InstrumentSetBuilder::warning(std::string message, SourceRange range) {
-  report(Severity::Warning, {}, std::move(message), range);
-}
-
-void InstrumentSetBuilder::error(std::string message, SourceRange range) {
-  report(Severity::Error, {}, std::move(message), range);
 }
 
 BuiltInstrumentSet InstrumentSetBuilder::finish() && {
@@ -560,19 +535,6 @@ void InstrumentSetBuilder::recordRegionRange(u32 instrumentIndex, u32 regionInde
   if (!state.rangeWasExplicit) {
     instruments_[instrumentIndex].regions[regionIndex].range.include(range);
   }
-}
-
-void InstrumentSetBuilder::report(Severity severity, std::string code, std::string message, SourceRange range) {
-  if (diagnostics_ == nullptr) {
-    return;
-  }
-  diagnostics_->push_back(Diagnostic{
-      .severity = severity,
-      .code = std::move(code),
-      .message = std::move(message),
-      .range = range,
-      .object = ObjectRefs::asset(asset_),
-  });
 }
 
 }  // namespace vgmtrans::core

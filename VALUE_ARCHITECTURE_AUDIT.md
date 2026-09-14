@@ -2473,6 +2473,32 @@ modulation profile, and MIDI renderer run with ASan/UBSan. Temporary capture hoo
 are removed before committing. This is fixture/generated-input coverage; no
 real-file corpus was available.
 
+## Share synth builder source bookkeeping
+
+`SamplePoolBuilder` and `InstrumentSetBuilder` now use one internal
+`SynthBuilderSources` implementation for asset-level annotations, source range
+selection, and diagnostics. Their format-facing APIs, move-only ownership,
+entry types, grouping rules, and finalization remain distinct. The shared state
+holds the asset owner, optional source map/diagnostic sinks, and explicit versus
+observed source spans. Format authors continue using the existing builders.
+
+This removes **42 production lines** from the two existing synth builder files.
+No format caller changes or new committed tests are needed. In particular,
+source annotations still infer their kind from their label when no explicit
+kind is supplied, and source ranges are still tracked without a source map.
+
+An ignored ASan/UBSan probe, including the changed builder implementation,
+compares 1,600 generated cases against the baseline. Final ranges, source
+annotations and links, diagnostics (including their asset owners), sample
+references, and moved-builder results match exactly. Cases cover absent sinks,
+invalid and zero-length source ranges, explicit spans, duplicate keys, and
+multiple annotations per entry.
+
+All 20 test targets pass (10.79 seconds). All 542 scan/source-map captures and
+100 SF2/DLS exports match the baseline. Temporary capture hooks are removed
+before committing; the probes and their output remain in the ignored build
+folder.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding
