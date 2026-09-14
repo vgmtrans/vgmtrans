@@ -317,7 +317,7 @@ struct Playback : SequencePlayback<TrackState> {
       return;
     }
     track.pan.begin(out.fade(PerformanceAutomationTarget::Pan, math::panPosition(target), length),
-                    SequenceFixedPointMotion<s32>::toRawTarget(target, length));
+                    track.pan.toRawTarget(target, length));
   }
 
   void vibrato(u8 delay, u8 rate, u8 depth) {
@@ -368,7 +368,7 @@ struct Playback : SequencePlayback<TrackState> {
       return;
     }
     track.volume.begin(out.fade(PerformanceAutomationTarget::Level, math::channelGain(target), length),
-                       SequenceFixedPointMotion<s32>::toRawTarget(target, length));
+                       track.volume.toRawTarget(target, length));
   }
 
   [[nodiscard]] static double masterRelativeGain(u8 value) {
@@ -387,7 +387,7 @@ struct Playback : SequencePlayback<TrackState> {
       return;
     }
     program.masterVolume.begin(out.fade(PerformanceAutomationTarget::MasterLevel, masterRelativeGain(target), length),
-                               SequenceFixedPointMotion<s32>::toRawTarget(target, length));
+                               program.masterVolume.toRawTarget(target, length));
     program.masterVolumeTrack = track.trackNumber;
   }
 

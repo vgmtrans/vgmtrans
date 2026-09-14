@@ -738,12 +738,6 @@ struct Playback : SequencePlayback<TrackState> {
 
   void beginFade(FadeTarget target, bool stepBased, u8 destination, u8 ticks, s8 step) {
     const u8 clampedDestination = target == FadeTarget::Pan ? clampPan(track.version, destination) : destination;
-    // Versions 1-4 provide a duration and let the driver calculate the step.
-    // Versions 5-6 provide the signed step directly and stop at the target.
-    const SequenceFixedPointMotion<s32> motion =
-        stepBased
-            ? SequenceFixedPointMotion<s32>::toRawTargetByFixedStep(clampedDestination, static_cast<s32>(step) * 16)
-            : SequenceFixedPointMotion<s32>::toRawTarget(clampedDestination, ticks);
     auto* state = &track.tempoState;
     auto automationTarget = PerformanceAutomationTarget::Tempo;
     double targetValue = 0.0;
@@ -762,6 +756,10 @@ struct Playback : SequencePlayback<TrackState> {
         targetValue = stereoPositionFromPan(track.version, clampedDestination);
         break;
     }
+    // Versions 1-4 provide a duration and let the driver calculate the step.
+    // Versions 5-6 provide the signed step directly and stop at the target.
+    const auto motion = stepBased ? state->toRawTargetByFixedStep(clampedDestination, static_cast<s32>(step) * 16)
+                                  : state->toRawTarget(clampedDestination, ticks);
     if (target == FadeTarget::Volume && track.currentNoteVolume == 0 && track.version >= KONAMISNES_V3) {
       // Preserve only the raw motion until a nonzero note makes the mixer write
       // VOL(L/R) again.

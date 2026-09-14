@@ -563,8 +563,8 @@ struct EchoState {
       setVolume(left, right);
       return true;
     }
-    leftVolume.begin(SequenceFixedPointMotion<s32>::toRawTarget(static_cast<s8>(left), length));
-    rightVolume.begin(SequenceFixedPointMotion<s32>::toRawTarget(static_cast<s8>(right), length));
+    leftVolume.begin(leftVolume.toRawTarget(static_cast<s8>(left), length));
+    rightVolume.begin(rightVolume.toRawTarget(static_cast<s8>(right), length));
     lastAdvanceTick.reset();
     return false;
   }
@@ -1194,7 +1194,7 @@ struct Playback : SequencePlayback<TrackState> {
     // Interpolate the source pan index before applying its non-linear table.
     const auto gains = math::panGains(program.selected, panTable, value);
     track.pan.begin(out.fade(PerformanceAutomationTarget::Pan, math::stereoPosition(gains), length),
-                    SequenceFixedPointMotion<s32>::toRawTarget(value, length));
+                    track.pan.toRawTarget(value, length));
   }
 
   void vibratoOn(u8 delay, u8 rate, u8 depth) {
@@ -1274,11 +1274,10 @@ struct Playback : SequencePlayback<TrackState> {
     }
     const u8 driverTempo = program.commandTempo(value);
     program.tempoState.reset(program.tempo);
-    program.tempoState.begin(out.fade(PerformanceAutomationTarget::Tempo,
-                                      static_cast<double>(
-                                          math::tempoMicrosecondsPerQuarter(driverTempo, program.tempoTimerTarget)),
-                                      length),
-                             SequenceFixedPointMotion<s32>::toRawTarget(driverTempo, length));
+    program.tempoState.begin(
+        out.fade(PerformanceAutomationTarget::Tempo,
+                 static_cast<double>(math::tempoMicrosecondsPerQuarter(driverTempo, program.tempoTimerTarget)), length),
+        program.tempoState.toRawTarget(driverTempo, length));
     program.tempoAutomationTrack = track.trackNumber;
     advanceTempoFade();
   }
@@ -1294,7 +1293,7 @@ struct Playback : SequencePlayback<TrackState> {
       return;
     }
     track.volume.begin(out.fade(PerformanceAutomationTarget::Level, math::levelGain(value), length),
-                       SequenceFixedPointMotion<s32>::toRawTarget(value, length));
+                       track.volume.toRawTarget(value, length));
   }
 
   [[nodiscard]] double masterGain(u8 value) const {
@@ -1324,7 +1323,7 @@ struct Playback : SequencePlayback<TrackState> {
     }
     program.masterVolumeState.reset(program.masterVolume);
     program.masterVolumeState.begin(out.fade(PerformanceAutomationTarget::MasterLevel, masterGain(value), length),
-                                    SequenceFixedPointMotion<s32>::toRawTarget(value, length));
+                                    program.masterVolumeState.toRawTarget(value, length));
     program.masterVolumeAutomationTrack = track.trackNumber;
   }
 

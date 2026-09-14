@@ -80,15 +80,13 @@ public:
     step_ = {};
     delay_ = 0;
     ticksRemaining_ = 0;
-    mode_ = SequenceMotionMode::TargetOverTicks;
   }
 
   SequenceMotionTick<ValueType> begin(const SequenceMotionPlan<ValueType>& plan) {
     const ValueType previous = current_;
     target_ = plan.target;
     delay_ = plan.delay;
-    ticksRemaining_ = plan.ticks;
-    mode_ = plan.mode;
+    ticksRemaining_ = plan.usesTicks() ? plan.ticks : 0;
 
     if (plan.usesTicks() && plan.ticks == 0) {
       reset(plan.target);
@@ -110,10 +108,7 @@ public:
     return {plan.delay != 0 ? SequenceMotionStatus::Delayed : SequenceMotionStatus::Running, current_, false};
   }
 
-  [[nodiscard]] bool active() const {
-    return delay_ != 0 ||
-           (mode_ == SequenceMotionMode::TargetByStep ? step_ != ValueType{} : ticksRemaining_ != 0);
-  }
+  [[nodiscard]] bool active() const { return delay_ != 0 || ticksRemaining_ != 0 || step_ != ValueType{}; }
 
   [[nodiscard]] ValueType current() const { return current_; }
 
@@ -125,14 +120,11 @@ public:
       return {SequenceMotionStatus::Delayed, current_, false};
     }
 
-    if (mode_ != SequenceMotionMode::TargetByStep) {
-      if (ticksRemaining_ == 0) {
-        return {SequenceMotionStatus::Inactive, current_, false};
-      }
-
+    if (ticksRemaining_ != 0) {
       --ticksRemaining_;
       if (ticksRemaining_ == 0) {
         current_ = target_;
+        step_ = {};
         return {SequenceMotionStatus::Finished, current_, current_ != previous};
       }
 
@@ -169,25 +161,6 @@ private:
   ValueType step_{};
   u32 delay_ = 0;
   u32 ticksRemaining_ = 0;
-  SequenceMotionMode mode_ = SequenceMotionMode::TargetOverTicks;
-};
-
-template <typename ValueType = s32, unsigned FractionBits = 8>
-struct SequenceFixedPointMotion {
-  ValueType targetRaw {};
-  ValueType stepFixed {};
-  u32 ticks = 0;
-  u32 delay = 0;
-  SequenceMotionMode mode = SequenceMotionMode::TargetOverTicks;
-
-  [[nodiscard]] static SequenceFixedPointMotion toRawTarget(ValueType targetValue, u32 tickCount, u32 delayTicks = 0) {
-    return {targetValue, {}, tickCount, delayTicks, SequenceMotionMode::TargetOverTicks};
-  }
-
-  [[nodiscard]] static SequenceFixedPointMotion toRawTargetByFixedStep(ValueType targetValue, ValueType stepValue,
-                                                                       u32 delayTicks = 0) {
-    return {targetValue, stepValue, 0, delayTicks, SequenceMotionMode::TargetByStep};
-  }
 };
 
 enum class SequenceFixedPointRounding {
@@ -208,6 +181,17 @@ public:
     return rawValue * kScale;
   }
 
+  // Plans use the accumulator's fixed-point units. Convert the raw target
+  // here; a driver-supplied fixed step already has the correct scale.
+  [[nodiscard]] static SequenceMotionPlan<ValueType> toRawTarget(ValueType target, u32 ticks, u32 delay = 0) {
+    return SequenceMotionPlan<ValueType>::targetOverTicks(toFixed(target), ticks, delay);
+  }
+
+  [[nodiscard]] static SequenceMotionPlan<ValueType> toRawTargetByFixedStep(ValueType target, ValueType step,
+                                                                            u32 delay = 0) {
+    return SequenceMotionPlan<ValueType>::targetByStep(toFixed(target), step, delay);
+  }
+
   void reset(ValueType rawCurrent = {}) { value_.reset(toFixed(rawCurrent)); }
 
   [[nodiscard]] bool active() const { return value_.active(); }
@@ -218,17 +202,10 @@ public:
     rounding_ = rounding;
   }
 
-  SequenceMotionTick<ValueType> begin(const SequenceFixedPointMotion<ValueType, FractionBits>& rawMotion) {
+  SequenceMotionTick<ValueType> begin(const SequenceMotionPlan<ValueType>& plan) {
     // Drivers retarget from the rounded raw value, discarding the old fraction.
-    // Linear motion then computes the step in fixed-point units.
     value_.reset(toFixed(currentRaw()));
-    return value_.begin(SequenceMotionPlan<ValueType>{
-        toFixed(rawMotion.targetRaw),
-        rawMotion.stepFixed,
-        rawMotion.ticks,
-        rawMotion.delay,
-        rawMotion.mode,
-    });
+    return value_.begin(plan);
   }
 
   [[nodiscard]] SequenceMotionTick<ValueType> tick() { return value_.tick(); }
