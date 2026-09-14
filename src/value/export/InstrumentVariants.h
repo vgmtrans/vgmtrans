@@ -26,7 +26,8 @@ struct InstrumentVariantMaterialization {
 
 // Appends only variants selected by fresh note attacks. Applying all requested
 // state in one pass keeps combined envelope and stereo changes on one variant;
-// the input performance remains unchanged.
+// the input performance remains unchanged. Native responses are sampled before
+// a bank's first variant is considered; other banks retain their native regions.
 [[nodiscard]] InstrumentVariantMaterialization materializeInstrumentVariants(const PerformanceSequence& performance,
                                                                              std::span<SoundBankAsset> soundBanks,
                                                                              InstrumentVariantOptions options);
