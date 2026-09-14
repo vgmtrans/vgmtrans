@@ -23,7 +23,10 @@ inline constexpr u32 kAramSize = 0x10000;
 inline constexpr u32 kCommandLimit = 131072;
 inline constexpr std::string_view kInstrumentDomain = "sculpt-soft-snes.sample";
 
+enum class Revision { Standard, Extended };
+
 struct Layout {
+  Revision revision = Revision::Standard;
   u16 tables = 0;
   u16 directory = 0;
   u16 song = 0;

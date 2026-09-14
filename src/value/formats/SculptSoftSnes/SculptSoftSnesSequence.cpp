@@ -23,6 +23,8 @@ using namespace core;
 
 namespace {
 
+constexpr std::array<u8, 4> kCurveFlags{1, 4, 8, 2};  // Gain, pitch, pan, sample.
+
 struct Phrase {
   Address start;
   Address end;
@@ -42,6 +44,7 @@ struct PhraseFrame {
 struct RuntimeConfig {
   std::shared_ptr<const DriverData> data;
   u32 frameMicroseconds;
+  Revision revision;
 };
 
 struct ProgramState {
@@ -52,6 +55,8 @@ struct ProgramState {
   bool sequenceTick = true;
   u8 echoMask = 0;
   std::optional<std::array<u8, 12>> echo;
+  std::optional<u16> nextGate;
+  bool legato = false;
 
   void advance(u64 tick) {
     if (tick == frame) {
@@ -66,10 +71,12 @@ struct ProgramState {
 
 struct TrackState {
   TrackState(TrackStateContext context, const RuntimeConfig& config)
-      : data(config.data), frameSeconds(config.frameMicroseconds / 1000000.0), number(context.sourceTrackNumber) {}
+      : data(config.data), frameSeconds(config.frameMicroseconds / 1000000.0), revision(config.revision),
+        number(context.sourceTrackNumber) {}
 
   std::shared_ptr<const DriverData> data;
   double frameSeconds;
+  Revision revision;
   u32 number;
   u16 pitch = 0x21c;
   u16 finePitch = 0;
@@ -78,6 +85,8 @@ struct TrackState {
   u8 program = 0;
   u8 sample = 0;
   u8 voiceVolume = 0;
+  u8 fixedPan = 50;
+  u8 fixedSample = 0;
   Patch patch;
   std::array<CurvePlayer, 4> curves;
   bool alternatePan = false;
@@ -119,16 +128,19 @@ struct Playback : SequencePlayback<TrackState> {
     pitch = static_cast<u16>(pitch + track.data->sampleTuning[track.sample]);
     u16 dspPitch = pitch;
     if ((track.patch.flags & 0x40) == 0) {
-      // $11b1 clamps the octave above $04af. Low words select a lower octave;
-      // negative words use the driver's special wrapped low-octave path.
-      unsigned octave = 4;
-      if (pitch < 0x4b0) {
+      const unsigned topOctave = track.revision == Revision::Extended ? 10 : 4;
+      if (track.revision == Revision::Extended) {
+        pitch = static_cast<u16>(pitch + 0x5a0);
+      }
+      // Clamp high octaves; negative words take the wrapped low-octave path.
+      unsigned octave = topOctave;
+      if (pitch < (topOctave + 1) * 240) {
         octave = pitch / 240;
       } else if (pitch >= 0x8000) {
         pitch = static_cast<u16>(pitch + 0xdf20);
         octave = 0;
       }
-      dspPitch = track.data->pitches[pitch % 240] >> (4 - std::min(4u, octave));
+      dspPitch = track.data->pitches[pitch % 240] >> (topOctave - octave);
     }
     return 72.0 + 12.0 * std::log2(std::max(1u, unsigned(dspPitch & 0x3fff)) / 4096.0);
   }
@@ -166,7 +178,7 @@ struct Playback : SequencePlayback<TrackState> {
   }
 
   void emitVoice() {
-    const u8 pan = static_cast<u8>((track.patch.flags & 8) ? track.curves[2].value : track.patch.pan);
+    const u8 pan = static_cast<u8>((track.patch.flags & 8) ? track.curves[2].value : track.fixedPan);
     if (track.emittedPan != pan) {
       const u8 left = static_cast<u8>((track.voiceVolume * pan) / 100);
       const u8 right = static_cast<u8>(track.voiceVolume - left);
@@ -187,39 +199,51 @@ struct Playback : SequencePlayback<TrackState> {
     }
   }
 
-  void attack(u16 duration) {
+  void attack(u16 duration, bool legato) {
     if (!track.data->patches[track.program]) {
       warning(fmt::format("Invalid SculptSoftSnes instrument {}", track.program));
       return;
     }
     track.patch = *track.data->patches[track.program];
     track.voiceVolume = std::min<u8>(track.volume, 127);
-    const std::array<u8, 4> flags{1, 4, 8, 2};
     const std::array<u8, 4> indices{track.patch.gain, track.patch.pitch, track.patch.pan, track.patch.sample};
-    const u16 gate = static_cast<u16>((u32(duration & 255) * program.gateScale + 128) >> 8);
-    for (u8 lane = 0; lane < 4; ++lane) {
-      track.curves[lane] = {};
-      if ((track.patch.flags & flags[lane]) == 0) {
+    const auto scaledByte = [&](u8 value) { return (u32(value) * program.gateScale + 128) >> 8; };
+    // The extended driver scales and rounds the two duration bytes separately.
+    const u16 gate = static_cast<u16>(scaledByte(static_cast<u8>(duration)) +
+                                      (track.revision == Revision::Extended ? scaledByte(duration >> 8) << 8 : 0));
+    for (u8 lane = 0; lane < (legato ? 2 : 4); ++lane) {
+      if ((track.patch.flags & kCurveFlags[lane]) == 0) {
         continue;
       }
       const auto& curve = track.data->curves[lane][indices[lane]];
       if (!curve) {
         warning(fmt::format("Invalid SculptSoftSnes envelope: patch {}, lane {}, index {}", track.program, lane,
                             indices[lane]));
-        track.patch.flags &= static_cast<u8>(~flags[lane]);
+        track.patch.flags &= static_cast<u8>(~kCurveFlags[lane]);
       } else {
         track.curves[lane].start(*curve, gate);
         // $0856 runs sequence commands before the frame's envelope updates.
         track.curves[lane].tick();
       }
     }
-    track.alternatePan = (track.patch.flags & 8) != 0 && track.curves[2].curve->alternate && !track.alternatePan;
-    const u8 sample = static_cast<u8>((track.patch.flags & 2) ? track.curves[3].value : track.patch.sample);
-    const bool retrigger = !track.sounding || track.sample != sample || (track.data->sampleFlags[sample] & 0x40) != 0;
+    if (!legato) {
+      track.alternatePan = (track.patch.flags & 8) != 0 && track.curves[2].curve->alternate && !track.alternatePan;
+      if ((track.patch.flags & 8) == 0) {
+        track.fixedPan = track.patch.pan;
+      }
+      if ((track.patch.flags & 2) == 0) {
+        track.fixedSample = track.patch.sample;
+      }
+    }
+    const u8 sample = static_cast<u8>((track.patch.flags & 2) ? track.curves[3].value : track.fixedSample);
+    const bool retrigger =
+        !legato && (!track.sounding || track.sample != sample || (track.data->sampleFlags[sample] & 0x40) != 0);
     if (retrigger && track.note) {
       out.setNoteEnd(*track.note, vm.tick());
     }
-    selectSample(sample);
+    if (!legato) {
+      selectSample(sample);
+    }
     if ((track.patch.flags & 0x20) != 0 && !track.warnedPitchModulation) {
       track.warnedPitchModulation = true;
       warning("SculptSoftSnes DSP pitch modulation is not representable by the current performance model");
@@ -229,16 +253,20 @@ struct Playback : SequencePlayback<TrackState> {
       // tuning in the bend instead of losing them when a renderer rounds a key.
       track.noteKey = std::clamp(std::round(key()), 0.0, 127.0);
     }
-    track.gainRegister = static_cast<u8>((track.patch.flags & 1) ? track.curves[0].value : track.patch.gain);
-    track.envelope = snesDspGainEnvelopeValue(track.gainRegister, 0, 0.0);
+    if (legato) {
+      updateGainRegister();
+    } else {
+      track.gainRegister = static_cast<u8>((track.patch.flags & 1) ? track.curves[0].value : track.patch.gain);
+      track.envelope = snesDspGainEnvelopeValue(track.gainRegister, 0, 0.0);
+      emitEcho();
+    }
     track.emittedPan.reset();
     track.emittedPitch.reset();
-    emitEcho();
     emitVoice();
     if (retrigger) {
       track.note = out.note(track.noteKey, 1.0, 1);
     }
-    track.sounding = true;
+    track.sounding = track.sounding || retrigger;
   }
 
   void tick() {
@@ -256,8 +284,10 @@ struct Playback : SequencePlayback<TrackState> {
     const u64 clocks = (vm.tick() * samplesPerFrame) / period - ((vm.tick() - 1) * samplesPerFrame) / period;
     track.envelope =
         snesDspGainEnvelopeValue(track.gainRegister, track.envelope, (clocks * period + 0.001) / kSnesDspSampleRate);
-    for (auto& curve : track.curves) {
-      curve.tick();
+    for (u8 lane = 0; lane < track.curves.size(); ++lane) {
+      if ((track.patch.flags & kCurveFlags[lane]) != 0) {
+        track.curves[lane].tick();
+      }
     }
     if ((track.patch.flags & 2) != 0 && track.curves[3].value != track.sample) {
       out.setNoteEnd(*track.note, vm.tick());
@@ -265,7 +295,13 @@ struct Playback : SequencePlayback<TrackState> {
       track.noteKey = std::clamp(std::round(key()), 0.0, 127.0);
       track.note = out.note(track.noteKey, 1.0, 1);
     }
-    // $0a37 chooses a linear GAIN rate from the distance to the next target.
+    updateGainRegister();
+    emitVoice();
+    out.setNoteEnd(*track.note, vm.tick() + 1);
+  }
+
+  void updateGainRegister() {
+    // Choose a linear GAIN rate from the distance to the next target.
     constexpr std::array<u8, 22> distances{255, 214, 160, 128, 107, 80, 64, 54, 40, 32, 27,
                                            20,  16,  14,  11,  8,   6,  5,  4,  3,  2,  1};
     constexpr std::array<u8, 22> rates{29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19,
@@ -279,8 +315,6 @@ struct Playback : SequencePlayback<TrackState> {
     }
     track.gainRegister =
         distance == 0 && target == 0 ? 0x82 : static_cast<u8>((difference < 0 ? 0x80 : 0xc0) | rates[rateIndex]);
-    emitVoice();
-    out.setNoteEnd(*track.note, vm.tick() + 1);
   }
 
   [[nodiscard]] Effects waitFrame() {
@@ -315,10 +349,13 @@ struct Playback : SequencePlayback<TrackState> {
       track.note.reset();
       track.sounding = false;
     } else if (opcode != 0xf4 && duration != 0) {
+      const u16 gate = program.nextGate.value_or(duration);
+      program.nextGate.reset();
+      const bool legato = std::exchange(program.legato, false);
       track.voicePitch = static_cast<u16>(track.pitch + track.finePitch + track.transpose);
       const bool retrigger = opcode < 0xf0 ? (opcode & 0x20) != 0 : opcode == 0xf7;
       if (retrigger) {
-        attack(duration);
+        attack(gate, legato);
       } else if (track.sounding) {
         emitVoice();
       }
@@ -349,6 +386,8 @@ struct Playback : SequencePlayback<TrackState> {
     program.tempo = value;
     program.gateScale = gateScale;
   }
+  void gate(u16 duration) { program.nextGate = duration; }
+  void legato() { program.legato = true; }
 
   [[nodiscard]] Effects call(Phrase phrase) {
     if (track.phrases.size() == 5) {
@@ -397,7 +436,7 @@ struct Playback : SequencePlayback<TrackState> {
 
 using Cursor = CompilerCursor<Playback>;
 
-[[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 offset, Address start,
+[[nodiscard]] DecodedBytecodeCommand decodeCommand(ByteReader reader, u32 offset, Address start, Revision revision,
                                                    std::vector<Phrase>& phrases, std::vector<Diagnostic>* diagnostics,
                                                    std::set<u8>* referencedPrograms) {
   Cursor cursor(reader, offset, "sculpt-soft-snes", diagnostics);
@@ -468,19 +507,37 @@ using Cursor = CompilerCursor<Playback>;
       const u8 tempo = event.u8("tempo accumulator step");
       return event.invoke<&Playback::tempo>(tempo, event.u16le("gate multiplier (8.8)"));
     }
-    default:
-      if (diagnostics) {
-        diagnostics->push_back(Diagnostic{.severity = Severity::Warning,
-                                          .message = fmt::format("Invalid SculptSoftSnes opcode ${:02X}", opcode),
-                                          .range = reader.range(offset, 1)});
+    case 0xfb:
+      if (revision == Revision::Extended) {
+        auto event = cursor.command("Envelope Gate", SequenceSemantic::Envelope);
+        u16 duration = 0;
+        u8 part;
+        do {
+          part = event.u8("duration (255 = continue)");
+          duration = static_cast<u16>(duration + part);
+        } while (part == 255 && event.ok());
+        return event.invoke<&Playback::gate>(duration);
       }
-      return cursor.unsupported(fmt::format("Invalid Opcode ${:02X}", opcode)).stop();
+      break;
+    case 0xfc:
+      if (revision == Revision::Extended) {
+        return cursor.command("Legato Attack", SequenceSemantic::Note).invoke<&Playback::legato>();
+      }
+      break;
+    default:
+      break;
   }
+  if (diagnostics) {
+    diagnostics->push_back(Diagnostic{.severity = Severity::Warning,
+                                      .message = fmt::format("Invalid SculptSoftSnes opcode ${:02X}", opcode),
+                                      .range = reader.range(offset, 1)});
+  }
+  return cursor.unsupported(fmt::format("Invalid Opcode ${:02X}", opcode)).stop();
 }
 
 // Phrase returns are address comparisons, not opcodes. Discover each bounded
 // phrase separately, then add a return boundary only where no real command lives.
-[[nodiscard]] TrackProgram decodeTrack(const TrackDecodeScope& scope, u32 number, u32 start,
+[[nodiscard]] TrackProgram decodeTrack(const TrackDecodeScope& scope, u32 number, u32 start, Revision revision,
                                        std::vector<Diagnostic>* diagnostics, std::set<u8>* referencedPrograms) {
   std::map<u32, DecodedBytecodeCommand> commands;
   std::vector<std::pair<u32, u32>> pending{{start, kAramSize}};
@@ -502,7 +559,8 @@ using Cursor = CompilerCursor<Playback>;
         continue;
       }
       std::vector<Phrase> phrases;
-      auto command = decodeCommand(scope.reader, offset, Address{start}, phrases, diagnostics, referencedPrograms);
+      auto command =
+          decodeCommand(scope.reader, offset, Address{start}, revision, phrases, diagnostics, referencedPrograms);
       for (const auto& phrase : phrases) {
         pending.emplace_back(phrase.start.value, phrase.end.value);
         ends.insert(phrase.end.value);
@@ -568,10 +626,12 @@ SequenceProgram decodeSequence(ByteReader reader, const Layout& layout, const Dr
     const u32 pointer = tracks + reader.u8At(layout.song + 1 + i) * 2u;
     const u16 start = reader.le16(pointer);
     sequence.trackPointer(i, reader.range(pointer, 2), start);
-    sequence.addTrack(decodeTrack(sequence.trackScope(), i, start, diagnostics, referencedPrograms));
+    sequence.addTrack(decodeTrack(sequence.trackScope(), i, start, layout.revision, diagnostics, referencedPrograms));
   }
-  return sequence.finish(makeCompiledRuntime<Playback, ProgramState>(
-      RuntimeConfig{.data = std::make_shared<const DriverData>(data), .frameMicroseconds = layout.frameMicroseconds}));
+  return sequence.finish(
+      makeCompiledRuntime<Playback, ProgramState>(RuntimeConfig{.data = std::make_shared<const DriverData>(data),
+                                                                .frameMicroseconds = layout.frameMicroseconds,
+                                                                .revision = layout.revision}));
 }
 
 }  // namespace vgmtrans::formats::sculpt_soft_snes

@@ -1,10 +1,9 @@
-# Sculptured Software SNES: Bugs Bunny driver
+# Sculptured Software SNES driver
 
-This format supports the driver revision used by **Bugs Bunny Rabbit Rampage**
-and compatible games. Addresses below refer to that revision; related revisions
-may relocate code and tables. Sculptured Software's initialization loader is
-shared by several different sequence interpreters, so detection also checks the
-interpreter's command map and table relationships.
+This format supports the standard revision used by **Bugs Bunny Rabbit Rampage**
+and the extended revision used by **NHL Stanley Cup** and **Rocko's Modern Life**.
+Addresses below refer to the standard revision unless stated otherwise; related
+revisions may relocate code and tables.
 
 ## Detection and tables
 
@@ -20,8 +19,10 @@ interpreter's command map and table relationships.
   (twentieths of a semitone), then sample flags. SRCN selects a normal DSP DIR
   entry; the prefix is **not** BRR data.
 * Detection also checks the phrase-handler and pitch/delta table relationships;
-  this prevents interpreting the different earlier/later command maps as this
-  revision. Direct-page and absolute table addresses may move.
+  the extended revision additionally requires its pitch-bias and $fb/$fc handlers.
+  Direct-page and absolute table addresses may move.
+* The live song-header pointer identifies the current sequence. Sound-effect
+  cues without an active song header are not treated as music sequences.
 
 ## Sequence and clock
 
@@ -49,11 +50,28 @@ retiming the physical envelopes.
 | $f8 | pitch LE16, duration | Absolute pitch without attack. $1753 |
 | $f9 | — | Restart original track; reset pitch and volume. $176a |
 | $fa | tempo, gate LE16 | Set global tempo increment and 8.8 envelope-gate multiplier. $178f |
+| $fb (extended) | duration bytes | Override the next note's envelope gate; $ff continues the sum. |
+| $fc (extended) | — | Update the next attack without keying on or resetting sample, pan, and echo state. |
 
 A zero note duration updates pitch state but does not start a voice or wait.
 A zero $f3/$f4 duration wraps the byte countdown and waits 256 music ticks.
 $f7/$f8 attack selection comes from bit 1 of the doubled dispatch index, not
 bit 5 of the opcode.
+
+The extended revision's $fb command sums bytes into a wrapping 16-bit gate
+duration, reading until a byte below $ff. This changes the next nonzero pitched
+event's envelope gate, not its sequence wait. A pitch-only event also consumes
+the override. The gate multiplier scales the low and high bytes separately,
+rounding each product before recombining them; for example, duration 300 with a
+1.5 multiplier becomes 578, not 450. The standard revision scales only the low
+duration byte.
+
+$fc makes the next nonzero pitched event legato. An attack still loads patch
+flags, volume, and pitch and restarts its GAIN and pitch curves, but preserves
+the current DSP envelope, sample, pan-curve position, alternating-pan phase,
+and echo state. A pitch-only event consumes the flag without reloading a patch.
+Both pending modifiers are global; zero-duration events, rests, and waits leave
+them available to the next qualifying event, including one on another channel.
 
 Phrase descriptor (following $f6): start LE16, exclusive end LE16, repeat count,
 transpose LE16, volume multiplier LE16, replacement count, replacement bytes.
@@ -92,8 +110,9 @@ Curve header: loop start, loop end, release lead, speed, interpolation flag,
 point count, point width, alternating-pan flag. Points are bytes except pitch,
 which uses little-endian words. Initial value is point zero; countdown starts
 at speed+1. The main loop advances it once in the same frame as the attack,
-before writing the voice registers. The remaining gate is max(0, rounded(duration-low-byte × gate-scale)
-− release-lead × speed). On a point advance, subtract speed. When it reaches
+before writing the voice registers. The remaining gate is max(0, scaled-duration
+− release-lead × speed), using the revision's duration scaling above.
+On a point advance, subtract speed. When it reaches
 zero, jump to loop-end (not loop-end+1) and continue into the release points.
 While it remains positive, passing loop-end jumps to loop-start. A final point
 that equals loop-end loops indefinitely; other final points freeze the value.
@@ -113,6 +132,11 @@ at the DSP's unity rate of 4096. Pitch conversion uses the driver's table and
 integer shifts, then converts the final 14-bit DSP register to a playback
 ratio. Bank regions use unity key 72 at 32000 Hz; sample-prefix tuning is
 already included in the sequence's ratio and must not be applied twice.
+
+The extended revision adds $05a0 (six octaves) before the table lookup and
+shifts over ten octaves instead of four. This preserves the ordinary pitch
+range while accommodating lower signed pitches. Raw DSP pitch patches bypass
+both the bias and the table conversion.
 
 MIDI export rounds note numbers, so each attack uses an integral anchor key
 and retains the fractional part in its pitch bend. This preserves the DSP
@@ -155,8 +179,11 @@ exported through the shared SNES sample support.
 | Mortal Kombat | 34 / 34 | Pass |
 | Tony Meola's Sidekicks Soccer | 4 / 8 | Recognized sequences pass |
 | Sports Illustrated Championship Football and Baseball | 6 / 6 | Pass |
+| Super Star Wars: The Empire Strikes Back | 19 / 20 | Sequences pass; opening logo cue uses the sound-effect system |
+| NHL Stanley Cup | 5 / 11 | Sequences pass; six organ cues use the sound-effect system |
+| Rocko's Modern Life | 6 / 6 | Pass |
 
-All 192 recognized sequences have sound banks.
+All 222 recognized sequences have sound banks.
 Partial archive counts do not establish support for the unrecognized snapshots
 or different Sculptured driver revisions. The counts describe parsing and export
 coverage, not waveform equivalence with the original DSP output.
