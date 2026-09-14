@@ -43,9 +43,14 @@ class NinSnesInstrSet:
   std::vector<u8> usedSRCNs;
 
  private:
+  void addAddmusicKCustomInstruments();
   void addStandardPercussionDrumKit(const NinSnesSeq& seq);
   void addIntelliOverrideInstrs(const NinSnesSeq& seq);
   void addIntelliDrumKits(const NinSnesSeq& seq);
+
+  u32 addmusicKCustomInstrTableAddr = 0;
+  u8 addmusicKCustomInstrBase = 0;
+  u8 addmusicKCustomInstrCount = 0;
 };
 
 // *************

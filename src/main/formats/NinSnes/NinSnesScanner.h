@@ -18,10 +18,12 @@ public:
   void searchForNinSnesFromARAM(RawFile* file);
 
 private:
-  void loadFromScanResult(RawFile* file, const NinSnesScanResult& scanResult);
+  bool loadFromScanResult(RawFile* file, const NinSnesScanResult& scanResult,
+                          bool loadInstrumentSet = true);
   static BytePattern makeInitSectionPtrPattern(u8 addrSectionPtr);
   static BytePattern makeInitSectionPtrYIPattern(u8 addrSectionPtr);
   static BytePattern makeInitSectionPtrSMWPattern(u8 addrSectionPtr);
+  static BytePattern makeInitSectionPtrSMWAddmusicKPattern(u8 addrSectionPtr);
   static BytePattern makeInitSectionPtrGD3Pattern(u8 addrSectionPtr);
   static BytePattern makeInitSectionPtrYSFRPattern(u8 addrSectionPtr);
   static BytePattern makeInitSectionPtrTSPattern(u8 addrSectionPtr);
@@ -33,10 +35,12 @@ private:
   static BytePattern ptnJumpToVcmd;
   static BytePattern ptnJumpToVcmdSMW;
   static BytePattern ptnReadVcmdLengthSMW;
+  static BytePattern ptnReadVcmdLengthSMWAddmusicK;
   static BytePattern ptnDispatchNoteYI;
   static BytePattern ptnIncSectionPtr;
   static BytePattern ptnLoadInstrTableAddress;
   static BytePattern ptnLoadInstrTableAddressSMW;
+  static BytePattern ptnLoadInstrTableAddressSMWAddmusicK;
   static BytePattern ptnSetDIR;
   static BytePattern ptnSetDIRYI;
   static BytePattern ptnSetDIRVS;

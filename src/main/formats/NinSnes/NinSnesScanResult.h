@@ -20,6 +20,10 @@ struct NinSnesScanResult {
   u32 instrTableAddr = 0;
   u16 spcDirAddr = 0;
 
+  u32 addmusicKCustomInstrTableAddr = 0;
+  u8 addmusicKCustomInstrBase = 0;
+  u8 addmusicKCustomInstrCount = 0;
+
   u16 konamiBaseAddress = 0;
   u16 falcomBaseOffset = 0;
   u8 quintetBGMInstrBase = 0;

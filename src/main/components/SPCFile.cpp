@@ -10,7 +10,36 @@
 #include "RawFile.h"
 #include "VGMTag.h"
 
+#include <algorithm>
+#include <cctype>
 #include <stdexcept>
+
+namespace {
+
+u32 parseOptionalID666Number(std::string value, std::string_view fieldName) {
+  auto isWhitespace = [](unsigned char c) { return std::isspace(c) != 0; };
+  value.erase(value.begin(), std::find_if_not(value.begin(), value.end(), isWhitespace));
+  value.erase(std::find_if_not(value.rbegin(), value.rend(), isWhitespace).base(), value.end());
+
+  if (value.empty()) {
+    return 0;
+  }
+
+  const bool isDecimal = std::ranges::all_of(value, [](unsigned char c) { return std::isdigit(c) != 0; });
+  if (!isDecimal) {
+    L_WARN("Ignored malformed {} in ID666 tag: {}", fieldName, value);
+    return 0;
+  }
+
+  try {
+    return static_cast<u32>(std::stoul(value));
+  } catch (const std::exception& e) {
+    L_WARN("Failed to parse {} from ID666 tag: {}", fieldName, e.what());
+    return 0;
+  }
+}
+
+}  // namespace
 
 VGMTag SPCFile::tagFromSPCFile(const SPCFile& spc) {
   const auto& id666 = spc.id666Tag();
@@ -26,8 +55,7 @@ SPCFile::SPCFile(const RawFile& file) {
     throw std::length_error("SPC file is smaller than required length");
   }
 
-  if (!std::equal(file.begin(), file.begin() + 27, "SNES-SPC700 Sound File Data") ||
-      file.readShort(0x21) != 0x1a1a) {
+  if (!std::equal(file.begin(), file.begin() + 27, "SNES-SPC700 Sound File Data") || file.readShort(0x21) != 0x1a1a) {
     throw std::runtime_error("Invalid SPC signature");
   }
 
@@ -51,18 +79,8 @@ void SPCFile::loadID666Tag(const RawFile& file) {
   m_id666Tag.nameOfDumper = file.readNullTerminatedString(0x6E, 16);
   m_id666Tag.comments = file.readNullTerminatedString(0x7E, 32);
   m_id666Tag.dateDumped = file.readNullTerminatedString(0x9E, 11);
-  try {
-    m_id666Tag.secondsToPlay = std::stoi(file.readNullTerminatedString(0xA9, 3));
-  } catch (const std::exception& e) {
-    L_WARN("Failed to parse seconds to play from ID666 tag: {}", e.what());
-    m_id666Tag.secondsToPlay = 0;
-  }
-  try {
-    m_id666Tag.fadeLength = std::stoi(file.readNullTerminatedString(0xAC, 5));
-  } catch (const std::exception& e) {
-    L_WARN("Failed to parse fade length from ID666 tag: {}", e.what());
-    m_id666Tag.fadeLength = 0;
-  }
+  m_id666Tag.secondsToPlay = parseOptionalID666Number(file.readNullTerminatedString(0xA9, 3), "seconds to play");
+  m_id666Tag.fadeLength = parseOptionalID666Number(file.readNullTerminatedString(0xAC, 5), "fade length");
   m_id666Tag.artist = file.readNullTerminatedString(0xB1, 32);
   m_id666Tag.defaultChannelDisables = file.readByte(0xD1);
   m_id666Tag.emulatorUsed = file.readByte(0xD2);
@@ -70,7 +88,7 @@ void SPCFile::loadID666Tag(const RawFile& file) {
 
 void SPCFile::loadExtendedID666Tag(const RawFile& file, size_t offset) {
   if (!std::equal(file.begin() + offset, file.begin() + offset + 4, "xid6")) {
-    return; // No extended ID666 chunk found
+    return;  // No extended ID666 chunk found
   }
 
   size_t chunkSize = file.readWord(offset + 4);
@@ -121,7 +139,7 @@ void SPCFile::loadExtendedID666Tag(const RawFile& file, size_t offset) {
             L_INFO("Ignored id6 tag id: {} in SPC", id);
             break;
         }
-        currentOffset += 4 + ((dataLength + 3) & ~3); // Align to 32-bit boundary
+        currentOffset += 4 + ((dataLength + 3) & ~3);  // Align to 32-bit boundary
         break;
       }
 
