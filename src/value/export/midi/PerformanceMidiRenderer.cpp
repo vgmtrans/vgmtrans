@@ -1083,15 +1083,19 @@ void setSimulatedVibratoDepth(MidiTrack& track, RenderTrackState& state, u64 tic
   }
 }
 
-void sampleRestartedVibrato(MidiTrack& track, RenderTrackState& state, const ModulationPerformanceEvent& event,
-                            u8 channel) {
+void updateRestartedVibratoOutput(MidiTrack& track, RenderTrackState& state, const ModulationPerformanceEvent& event,
+                                 u8 channel) {
   auto& pitch = pitchLfo(state, event.pitchLayer);
   auto& lfo = pitch.oscillator;
-  if (event.context.restartMode != LfoRestartMode::PhaseAndDelay || !lfo.canSampleImmediately()) {
+  if (event.context.restartMode != LfoRestartMode::PhaseAndDelay || lfo.outputHeldUntilNextNote) {
     return;
   }
-  const double value = simulatedVibratoAtPhase(lfo, lfoValue(lfo));
-  lfo.producedSample = true;
+  // A rate/depth event can restart vibrato on a held voice without a new MIDI
+  // attack. Clear its previous sample during the new delay, just as a note
+  // restart does, so later pitch slides do not inherit a frozen LFO offset.
+  const bool startsImmediately = lfo.canSampleImmediately();
+  const double value = startsImmediately ? simulatedVibratoAtPhase(lfo, lfoValue(lfo)) : 0.0;
+  lfo.producedSample = startsImmediately;
   if (value != pitch.semitones) {
     pitch.semitones = value;
     addCurrentPitchBend(track, state, event.header.tick, channel, ModulationConversionPolicy::SequenceEventSimulation,
@@ -1492,15 +1496,12 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
                   track, state, typedEvent.header.tick, channel,
                   typedEvent.pitchDepthSemitones.value_or(std::clamp(typedEvent.amount, 0.0, 1.0) * 2.0),
                   typedEvent.context.zeroDepthBehavior, typedEvent.pitchLayer);
-              refreshPitchBendRange(track, state, typedEvent.header.tick, channel,
-                                    effectivePitchBendRangeCents(state, modulationConversion));
-              sampleRestartedVibrato(track, state, typedEvent, channel);
-            } else {
-              refreshPitchBendRange(track, state, typedEvent.header.tick, channel,
-                                    effectivePitchBendRangeCents(state, modulationConversion));
-              if (state.lastPitchBendIndex) {
-                addCurrentPitchBend(track, state, typedEvent.header.tick, channel, modulationConversion, false);
-              }
+            }
+            refreshPitchBendRange(track, state, typedEvent.header.tick, channel,
+                                  effectivePitchBendRangeCents(state, modulationConversion));
+            updateRestartedVibratoOutput(track, state, typedEvent, channel);
+            if (typedEvent.target == ModulationPerformanceTarget::VibratoRate && state.lastPitchBendIndex) {
+              addCurrentPitchBend(track, state, typedEvent.header.tick, channel, modulationConversion, false);
             }
             return;
           }
