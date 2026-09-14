@@ -219,10 +219,11 @@ void triAcePs1SequenceExecutesAuditedDriverFeatures() {
   const auto modulation = eventsOfType<ModulationPerformanceEvent>(track);
   const auto depth = std::ranges::find_if(modulation, [](const ModulationPerformanceEvent* event) {
     return event->target == ModulationPerformanceTarget::VibratoDepth && event->pitchDepthSemitones == 0.0 &&
-           event->context.delayTicks == 2;
+           event->context.delay && event->context.delay->ticks == 2;
   });
-  expect(depth != modulation.end() && (*depth)->context.cyclesPerTick == 0.125 && (*depth)->context.delayTicks == 2 &&
-             (*depth)->context.shape && (*depth)->context.shape->samples.size() == 64,
+  expect(depth != modulation.end() && (*depth)->context.cyclesPerTick == 0.125 && (*depth)->context.delay &&
+             (*depth)->context.delay->ticks == 2 && (*depth)->context.shape &&
+             (*depth)->context.shape->samples.size() == 64,
          "automatic vibrato should retain the audited waveform, rate, and delay");
   const auto ramp = std::ranges::find_if(track.automations, [](const PerformanceAutomation& automation) {
     const auto* intent = std::get_if<ScalarPerformanceAutomationIntent>(&automation.intent);

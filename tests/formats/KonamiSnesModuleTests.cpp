@@ -446,11 +446,12 @@ void konamiSnesModuleDiscoversSequenceInstrumentsAndSamples() {
              std::abs(*vibratoDepthEvent.pitchDepthSemitones - (expectedDepthCents / 100.0)) < 0.0001,
          "KonamiSnes vibrato depth should retain peak pitch swing for sequence-event simulation");
   const auto vibratoDelay = std::ranges::find_if(performance.tracks[0].events, [](const PerformanceEvent& event) {
-    return std::holds_alternative<VibratoDelayPerformanceEvent>(event);
+    const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event);
+    return modulation && modulation->target == ModulationPerformanceTarget::VibratoDelay;
   });
   expect(vibratoDelay != performance.tracks[0].events.end(),
          "KonamiSnes vibrato command should emit target-neutral delay");
-  expect(std::get<VibratoDelayPerformanceEvent>(*vibratoDelay).delayTicks == 2,
+  expect(std::get<ModulationPerformanceEvent>(*vibratoDelay).context.delay->ticks == 2,
          "KonamiSnes vibrato delay should be converted to rendered sequence ticks");
 
   const SequenceModulationProfile modulationProfile = analyzeSequenceModulation(performance);

@@ -246,8 +246,7 @@ struct Playback : SequencePlayback<TrackState> {
         .cyclesPerTick = vibrato.enabled() ? std::optional<double>{vibrato.rate / 256.0} : std::optional<double>{0.0},
         // E4's delay counter compares before incrementing, so the first
         // nonzero sample occurs on music tick delay+1.
-        .delayTicks = static_cast<u32>(vibrato.delay) + 1,
-        .delayIsTempoRelative = true,
+        .delay = LfoDelay{.ticks = static_cast<u32>(vibrato.delay) + 1, .tempoRelative = true},
         .shape = LfoShape{.waveform = LfoWaveform::Triangle},
         // The shared simulator samples before advancing. Starting one phase
         // step ahead reproduces the driver's add-rate-then-sample order.
@@ -262,8 +261,7 @@ struct Playback : SequencePlayback<TrackState> {
         // ED begins advancing between music ticks once its delay counter has
         // reached delay. At sequence-tick resolution, the first changed
         // sample is therefore observed at delay+1.
-        .delayTicks = static_cast<u32>(delay) + 1,
-        .delayIsTempoRelative = true,
+        .delay = LfoDelay{.ticks = static_cast<u32>(delay) + 1, .tempoRelative = true},
         .shape = LfoShape{.waveform = LfoWaveform::Triangle},
         // The driver's absolute signed-byte phase starts at nominal gain and
         // advances before the first coarse tick sample.

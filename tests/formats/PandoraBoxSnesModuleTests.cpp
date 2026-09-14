@@ -209,17 +209,16 @@ void modulationEnvelopeReverbAndPanRemainPhysical() {
   expect(envelope.size() == 1 && envelope.front()->scope == VoiceEnvelopeScope::ActiveVoicesAndFutureAttacks &&
              envelope.front()->update.values == snesDspEnvelope(0xff, 0x1f, 0),
          "$F3 should replace the active and persistent DSP ADSR state");
-  expect(!depth.empty() && depth.back()->pitchDepthSemitones && *depth.back()->pitchDepthSemitones > 0.0 &&
-             depth.back()->context.shape && depth.back()->context.shape->waveform == LfoWaveform::Triangle &&
-             depth.back()->context.shape->samples.size() == 16 && depth.back()->context.pitchRangeSemitones &&
-             std::abs(depth.back()->context.pitchRangeSemitones->minimum -
-                      12.0 * std::log2(2415.0 / 2435.0)) < 0.000001 &&
-             std::abs(depth.back()->context.pitchRangeSemitones->maximum -
-                      12.0 * std::log2(2447.0 / 2435.0)) < 0.000001 &&
-             depth.back()->context.delayTicks == 2 &&
-             depth.back()->context.delayUpdateMode == LfoDelayUpdateMode::FutureNotesOnly && !rate.empty() &&
-             rate.back()->context.cyclesPerTick == 1.0 / (2.0 * 3.0 * 8.0),
-         "$E8 should emit the audited delayed triangle pitch LFO, not a generic event or tremolo");
+  expect(
+      !depth.empty() && depth.back()->pitchDepthSemitones && *depth.back()->pitchDepthSemitones > 0.0 &&
+          depth.back()->context.shape && depth.back()->context.shape->waveform == LfoWaveform::Triangle &&
+          depth.back()->context.shape->samples.size() == 16 && depth.back()->context.pitchRangeSemitones &&
+          std::abs(depth.back()->context.pitchRangeSemitones->minimum - 12.0 * std::log2(2415.0 / 2435.0)) < 0.000001 &&
+          std::abs(depth.back()->context.pitchRangeSemitones->maximum - 12.0 * std::log2(2447.0 / 2435.0)) < 0.000001 &&
+          depth.back()->context.delay && depth.back()->context.delay->ticks == 2 &&
+          depth.back()->context.delay->updateMode == LfoDelayUpdateMode::FutureNotesOnly && !rate.empty() &&
+          rate.back()->context.cyclesPerTick == 1.0 / (2.0 * 3.0 * 8.0),
+      "$E8 should emit the audited delayed triangle pitch LFO, not a generic event or tremolo");
   expect(modulationEvents(track, ModulationPerformanceTarget::TremoloDepth).empty(),
          "the Pandora Box drivers have no tremolo modulation path");
 

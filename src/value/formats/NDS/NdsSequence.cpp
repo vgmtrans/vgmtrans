@@ -119,37 +119,18 @@ struct Playback : SequencePlayback<TrackState> {
   [[nodiscard]] LfoPerformanceContext lfoContext() const {
     return LfoPerformanceContext{
         .frequencyHz = lfoFrequencyHz(),
-        .delayTicks = lfoDelayTicks(),
-        .delayMilliseconds = lfoDelayMilliseconds(),
+        .delay = LfoDelay{.ticks = lfoDelayTicks(), .milliseconds = lfoDelayMilliseconds()},
         .shape = LfoShape{.waveform = LfoWaveform::Sine},
         .phaseRunsAtZeroDepth = true,
     };
   }
 
-  void emitLfoRate(ModulationPerformanceTarget target) {
-    const double hertz = lfoFrequencyHz();
-    auto context = lfoContext();
-    switch (target) {
-      case ModulationPerformanceTarget::VibratoRate:
-        out.vibratoRate(hertz, std::move(context));
-        break;
-      case ModulationPerformanceTarget::TremoloRate:
-        out.tremoloRate(hertz, std::move(context));
-        break;
-      case ModulationPerformanceTarget::PanRate:
-        out.panLfoRate(hertz, std::move(context));
-        break;
-      case ModulationPerformanceTarget::VibratoDepth:
-      case ModulationPerformanceTarget::TremoloDepth:
-      case ModulationPerformanceTarget::PanDepth:
-        break;
-    }
-  }
-
   void emitLfoRates() {
-    emitLfoRate(ModulationPerformanceTarget::VibratoRate);
-    emitLfoRate(ModulationPerformanceTarget::TremoloRate);
-    emitLfoRate(ModulationPerformanceTarget::PanRate);
+    const auto context = lfoContext();
+    for (auto target : {ModulationPerformanceTarget::VibratoRate, ModulationPerformanceTarget::TremoloRate,
+                        ModulationPerformanceTarget::PanRate}) {
+      out.modulation(ModulationPerformanceEvent{.target = target, .context = context});
+    }
   }
 
   void emitLfoDelayControls() {

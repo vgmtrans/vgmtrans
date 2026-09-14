@@ -653,15 +653,15 @@ void ndsSequenceModelsNitroLfoRegisters() {
     } else if (modulation->target == ModulationPerformanceTarget::PanDepth && modulation->panDepth &&
                *modulation->panDepth > 0.0) {
       pan = modulation;
-    } else if (modulation->target == ModulationPerformanceTarget::VibratoRate &&
-               modulation->context.delayMilliseconds == 250.0) {
+    } else if (modulation->target == ModulationPerformanceTarget::VibratoRate && modulation->context.delay &&
+               modulation->context.delay->milliseconds == 250.0) {
       rate = modulation;
     }
   }
 
-  expect(rate != nullptr && rate->context.frequencyHz == 12.0 && rate->context.delayTicks == 24 &&
-             rate->context.shape && rate->context.shape->waveform == LfoWaveform::Sine &&
-             rate->context.phaseRunsAtZeroDepth,
+  expect(rate != nullptr && rate->context.frequencyHz == 12.0 && rate->context.delay &&
+             rate->context.delay->ticks == 24 && rate->context.shape &&
+             rate->context.shape->waveform == LfoWaveform::Sine && rate->context.phaseRunsAtZeroDepth,
          "NDS should retain Nitro's fixed-clock rate, delay, sine shape, and zero-depth phase behavior");
   expect(pitch != nullptr && pitch->pitchDepthSemitones && std::abs(*pitch->pitchDepthSemitones - 0.9921875) < 0.000001,
          "NDS pitch modulation should use Nitro's depth/range scaling");

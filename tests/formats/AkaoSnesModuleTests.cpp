@@ -911,11 +911,12 @@ void akaoSnesCompiledAutomationTicksControllerAndTempoFades() {
   tracks.push_back(decodeTrack(bytes, ff6, lfoTrackStart, lfoTrackStart + 6, 0));
   tracks.push_back(decodeTrack(bytes, ff6, start + 10, static_cast<u32>(offset), 1));
   const PerformanceSequence sharedTempo = renderTracks(ff6, std::move(tracks));
-  const auto delays = eventsOfType<VibratoDelayPerformanceEvent>(sharedTempo.tracks.front());
+  const auto delays = eventsOfType<ModulationPerformanceEvent>(sharedTempo.tracks.front());
   expect(std::ranges::all_of(std::array<u64, 4>{1, 2, 3, 4},
                              [&](u64 tick) {
-                               return std::ranges::any_of(delays, [tick](const VibratoDelayPerformanceEvent* delay) {
-                                 return delay->header.tick == tick;
+                               return std::ranges::any_of(delays, [tick](const ModulationPerformanceEvent* delay) {
+                                 return delay->target == ModulationPerformanceTarget::VibratoDelay &&
+                                        delay->header.tick == tick;
                                });
                              }),
          "tempo-fade steps should resynchronize tempo-dependent LFOs on other tracks");
@@ -1153,9 +1154,12 @@ void akaoSnesCompilerCursorCoversNoteModesPitchAndSharedTempo() {
   tempoTracks.push_back(decodeTrack(sharedTempoBytes, ff6, start, 0x40, 0));
   tempoTracks.push_back(decodeTrack(sharedTempoBytes, ff6, tempoTrackStart, 0x90, 1));
   const PerformanceSequence sharedTempo = renderTracks(ff6, std::move(tempoTracks));
-  const auto vibratoDelays = eventsOfType<VibratoDelayPerformanceEvent>(sharedTempo.tracks[0]);
+  const auto vibratoDelays = eventsOfType<ModulationPerformanceEvent>(sharedTempo.tracks[0]);
   expect(std::ranges::any_of(vibratoDelays,
-                             [](const VibratoDelayPerformanceEvent* delay) { return delay->header.tick == 8; }),
+                             [](const ModulationPerformanceEvent* delay) {
+                               return delay->target == ModulationPerformanceTarget::VibratoDelay &&
+                                      delay->header.tick == 8;
+                             }),
          "a delayed tempo change on one track should resynchronize another track's active LFO at that tick");
 }
 

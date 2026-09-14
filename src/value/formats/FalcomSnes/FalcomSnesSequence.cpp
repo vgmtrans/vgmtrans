@@ -294,8 +294,7 @@ struct Playback : SequencePlayback<TrackState> {
     const double cycles = track.vibrato.enabled ? std::abs(static_cast<int>(track.vibrato.rate)) / 256.0 : 0.0;
     LfoPerformanceContext context{
         .cyclesPerTick = cycles,
-        .delayTicks = delay,
-        .delayIsTempoRelative = delay.has_value(),
+        .delay = delay ? std::optional{LfoDelay{.ticks = *delay, .tempoRelative = true}} : std::nullopt,
         .shape = math::vibratoShape(track.vibrato.depth),
         .initialPhaseCycles = phase,
         .noteRestartInitialPhaseCycles = phase,

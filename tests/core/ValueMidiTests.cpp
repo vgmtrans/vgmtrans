@@ -2311,10 +2311,9 @@ void performanceMidiRendererSimulatesDelayedVibratoAsPitchBendShape() {
                       .header = PerformanceEventHeader{.tick = 0},
                       .microsecondsPerQuarter = 1'000'000,
                   },
-                  VibratoDelayPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 0},
-                      .delayTicks = 2,
-                  },
+                  ModulationPerformanceEvent{.header = PerformanceEventHeader{.tick = 0},
+                                             .target = ModulationPerformanceTarget::VibratoDelay,
+                                             .context = {.delay = LfoDelay{.ticks = 2}}},
                   ModulationPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
                       .target = ModulationPerformanceTarget::VibratoRate,
@@ -2517,10 +2516,9 @@ void performanceMidiRendererDoesNotDoubleDelayVibrato() {
                       .amount = 0.0,
                       .pitchDepthSemitones = 0.0,
                   },
-                  VibratoDelayPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 0},
-                      .delayTicks = 2,
-                  },
+                  ModulationPerformanceEvent{.header = PerformanceEventHeader{.tick = 0},
+                                             .target = ModulationPerformanceTarget::VibratoDelay,
+                                             .context = {.delay = LfoDelay{.ticks = 2}}},
                   ModulationPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
                       .target = ModulationPerformanceTarget::VibratoRate,
@@ -2573,10 +2571,9 @@ void performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes() {
                       .header = PerformanceEventHeader{.tick = 0},
                       .microsecondsPerQuarter = 1'000'000,
                   },
-                  VibratoDelayPerformanceEvent{
-                      .header = PerformanceEventHeader{.tick = 0},
-                      .delayTicks = 2,
-                  },
+                  ModulationPerformanceEvent{.header = PerformanceEventHeader{.tick = 0},
+                                             .target = ModulationPerformanceTarget::VibratoDelay,
+                                             .context = {.delay = LfoDelay{.ticks = 2}}},
                   ModulationPerformanceEvent{
                       .header = PerformanceEventHeader{.tick = 0},
                       .target = ModulationPerformanceTarget::VibratoRate,
@@ -2625,11 +2622,10 @@ void performanceMidiRendererRestartsSimulatedVibratoDelayForNewNotes() {
 void performanceMidiRendererReplacesSavedNoteDelay() {
   const LfoShape shape{.waveform = LfoWaveform::Sine, .samples = {0.0, 1.0, 0.0, -1.0}};
   std::vector<PerformanceEvent> events{
-      VibratoDelayPerformanceEvent{
+      ModulationPerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
-          .delayTicks = 3,
-          .updateMode = LfoDelayUpdateMode::FutureNotesOnly,
-      },
+          .target = ModulationPerformanceTarget::VibratoDelay,
+          .context = {.delay = LfoDelay{.ticks = 3, .updateMode = LfoDelayUpdateMode::FutureNotesOnly}}},
       ModulationPerformanceEvent{
           .header = PerformanceEventHeader{.tick = 0},
           .target = ModulationPerformanceTarget::VibratoRate,
@@ -2655,10 +2651,9 @@ void performanceMidiRendererReplacesSavedNoteDelay() {
           .key = 60,
           .durationTicks = 5,
       },
-      VibratoDelayPerformanceEvent{
-          .header = PerformanceEventHeader{.tick = 4},
-          .delayTicks = 1,
-      },
+      ModulationPerformanceEvent{.header = PerformanceEventHeader{.tick = 4},
+                                 .target = ModulationPerformanceTarget::VibratoDelay,
+                                 .context = {.delay = LfoDelay{.ticks = 1}}},
       NotePerformanceEvent{
           .header = PerformanceEventHeader{.tick = 5},
           .key = 62,
@@ -2694,10 +2689,9 @@ void performanceMidiRendererSimulatesTremoloUsingGlobalTempo() {
                   .endTick = 8,
                   .events =
                       {
-                          TremoloDelayPerformanceEvent{
-                              .header = PerformanceEventHeader{.tick = 0},
-                              .delayTicks = 2,
-                          },
+                          ModulationPerformanceEvent{.header = PerformanceEventHeader{.tick = 0},
+                                                     .target = ModulationPerformanceTarget::TremoloDelay,
+                                                     .context = {.delay = LfoDelay{.ticks = 2}}},
                           ModulationPerformanceEvent{
                               .header = PerformanceEventHeader{.tick = 0},
                               .target = ModulationPerformanceTarget::TremoloRate,
@@ -3198,11 +3192,10 @@ void tempoRelativeModulationFollowsTheGlobalTempoTimeline() {
                               .target = ModulationPerformanceTarget::VibratoRate,
                               .context = LfoPerformanceContext{.cyclesPerTick = 0.25},
                           },
-                          VibratoDelayPerformanceEvent{
+                          ModulationPerformanceEvent{
                               .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 0, .sequence = 1},
-                              .delayTicks = 10,
-                              .tempoRelative = true,
-                          },
+                              .target = ModulationPerformanceTarget::VibratoDelay,
+                              .context = {.delay = LfoDelay{.ticks = 10, .tempoRelative = true}}},
                           ModulationPerformanceEvent{
                               .header = PerformanceEventHeader{.track = TrackId{0}, .tick = 20, .sequence = 4},
                               .target = ModulationPerformanceTarget::VibratoRate,
@@ -3231,13 +3224,10 @@ void tempoRelativeModulationFollowsTheGlobalTempoTimeline() {
 
   resolveTempoRelativeModulation(performance);
   std::vector<const ModulationPerformanceEvent*> rates;
-  std::vector<const VibratoDelayPerformanceEvent*> delays;
+  std::vector<const ModulationPerformanceEvent*> delays;
   for (const PerformanceEvent& event : performance.tracks[0].events) {
-    if (const auto* rate = std::get_if<ModulationPerformanceEvent>(&event)) {
-      rates.push_back(rate);
-    }
-    if (const auto* delay = std::get_if<VibratoDelayPerformanceEvent>(&event)) {
-      delays.push_back(delay);
+    if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
+      (modulation->target == ModulationPerformanceTarget::VibratoDelay ? delays : rates).push_back(modulation);
     }
   }
 
@@ -3247,12 +3237,16 @@ void tempoRelativeModulationFollowsTheGlobalTempoTimeline() {
              rates[1]->header.sequence == 2 && rates[2]->header.tick == 20 && rates[2]->context.frequencyHz &&
              std::abs(*rates[2]->context.frequencyHz - 7.0) < 0.0001,
          "tempo-relative LFO rates should follow cross-track tempo changes in global execution order");
-  expect(delays.size() == 3 && delays[0]->milliseconds && std::abs(*delays[0]->milliseconds - 100.0) < 0.0001 &&
-             delays[1]->header.tick == 10 && delays[1]->milliseconds &&
-             std::abs(*delays[1]->milliseconds - 50.0) < 0.0001 && delays[2]->header.tick == 30 &&
-             delays[2]->milliseconds && std::abs(*delays[2]->milliseconds - 25.0) < 0.0001 &&
-             std::ranges::all_of(delays, [](const auto* delay) { return delay->tempoRelative; }),
-         "tempo-relative LFO delays should retain ticks while exposing physical synth delay values");
+  expect(
+      delays.size() == 3 &&
+          std::ranges::all_of(
+              delays, [](const auto* event) { return event->context.delay && event->context.delay->tempoRelative; }) &&
+          delays[0]->context.delay->milliseconds &&
+          std::abs(*delays[0]->context.delay->milliseconds - 100.0) < 0.0001 && delays[1]->header.tick == 10 &&
+          delays[1]->context.delay->milliseconds && std::abs(*delays[1]->context.delay->milliseconds - 50.0) < 0.0001 &&
+          delays[2]->header.tick == 30 && delays[2]->context.delay->milliseconds &&
+          std::abs(*delays[2]->context.delay->milliseconds - 25.0) < 0.0001,
+      "tempo-relative LFO delays should retain ticks while exposing physical synth delay values");
 
   const auto simulatedPitchBends = [](bool changeTempo) {
     PerformanceSequence simulation{
@@ -3328,13 +3322,11 @@ void tempoRelativeModulationKeepsIndependentRatesAndDelayPolicies() {
   out.vibratoRateCyclesPerTick(0.125, {}, PitchBendLayerId{0});
   out.panLfoRateCyclesPerTick(0.5);
   out.tremoloRateCyclesPerTick(0.375);
-  out.vibratoDelay(VibratoDelayPerformanceEvent{
-      .delayTicks = 4, .tempoRelative = true, .updateMode = LfoDelayUpdateMode::FutureNotesOnly});
-  out.tremoloDelay(TremoloDelayPerformanceEvent{
-      .delayTicks = 8, .tempoRelative = true, .updateMode = LfoDelayUpdateMode::FutureNotesOnly});
+  out.vibratoDelay(LfoDelay{.ticks = 4, .tempoRelative = true, .updateMode = LfoDelayUpdateMode::FutureNotesOnly});
+  out.tremoloDelay(LfoDelay{.ticks = 8, .tempoRelative = true, .updateMode = LfoDelayUpdateMode::FutureNotesOnly});
   out.at(20).vibratoRate(7.0, {}, PitchBendLayerId{2});
   out.at(20).tremoloRate(9.0);
-  out.at(20).vibratoDelay(VibratoDelayPerformanceEvent{.milliseconds = 3.0});
+  out.at(20).vibratoDelay(LfoDelay{.milliseconds = 3.0});
   PerformanceEmitter tempo{performance.tracks[1],  {performance.tracks[1].id, CommandId{9}},
                            SourceAnnotationId{10}, 0,
                            nextSequence,           nextNote,
@@ -3367,11 +3359,13 @@ void tempoRelativeModulationKeepsIndependentRatesAndDelayPolicies() {
              std::get<ModulationPerformanceEvent>(*second[0]).context.frequencyHz == 50.0 &&
              std::get<ModulationPerformanceEvent>(*second[1]).context.frequencyHz == 200.0,
          "independent vibrato layers and pan must survive another layer's fixed-clock replacement");
-  const auto& vibratoDelay = std::get<VibratoDelayPerformanceEvent>(*first[4]);
-  const auto& tremoloDelay = std::get<TremoloDelayPerformanceEvent>(*second[2]);
-  expect(vibratoDelay.milliseconds == 20.0 && tremoloDelay.milliseconds == 20.0 &&
-             vibratoDelay.updateMode == LfoDelayUpdateMode::FutureNotesOnly &&
-             tremoloDelay.updateMode == LfoDelayUpdateMode::FutureNotesOnly,
+  const auto& vibrato = std::get<ModulationPerformanceEvent>(*first[4]);
+  const auto& tremolo = std::get<ModulationPerformanceEvent>(*second[2]);
+  expect(vibrato.target == ModulationPerformanceTarget::VibratoDelay && vibrato.context.delay &&
+             tremolo.target == ModulationPerformanceTarget::TremoloDelay && tremolo.context.delay &&
+             vibrato.context.delay->milliseconds == 20.0 && tremolo.context.delay->milliseconds == 20.0 &&
+             vibrato.context.delay->updateMode == LfoDelayUpdateMode::FutureNotesOnly &&
+             tremolo.context.delay->updateMode == LfoDelayUpdateMode::FutureNotesOnly,
          "tempo updates must preserve both delay policies while resolving their physical duration");
 }
 

@@ -230,11 +230,11 @@ struct Playback : SequencePlayback<TrackState> {
     const double resetPhase = track.lfo.speed / 256.0;
     return LfoPerformanceContext{
         .cyclesPerTick = track.lfo.speed / 256.0,
-        .delayTicks = track.lfo.delay,
-        .delayIsTempoRelative = true,
+        .delay = LfoDelay{.ticks = track.lfo.delay,
+                          .tempoRelative = true,
+                          .updateMode = LfoDelayUpdateMode::FutureNotesOnly},
         .shape = LfoShape{.waveform = LfoWaveform::Triangle},
         .initialPhaseCycles = resetPhase,
-        .delayUpdateMode = LfoDelayUpdateMode::FutureNotesOnly,
         .restartMode = restartPhase ? LfoRestartMode::Phase : LfoRestartMode::None,
         .phaseRunsAtZeroDepth = false,
         .delayRunsWhileInactive = false,

@@ -348,7 +348,7 @@ void rareSnesPhysicalLfosAndPitchEnvelopesUseTimerClock() {
   const auto modulation = events<ModulationPerformanceEvent>(performance);
   const bool vibratoDepth = std::ranges::any_of(modulation, [](const ModulationPerformanceEvent* event) {
     return event->target == ModulationPerformanceTarget::VibratoDepth && event->pitchDepthSemitones &&
-           *event->pitchDepthSemitones > 0.0 && event->context.delayMilliseconds;
+           *event->pitchDepthSemitones > 0.0 && event->context.delay && event->context.delay->milliseconds;
   });
   const bool vibratoRate = std::ranges::any_of(modulation, [](const ModulationPerformanceEvent* event) {
     return event->target == ModulationPerformanceTarget::VibratoRate && event->context.frequencyHz &&

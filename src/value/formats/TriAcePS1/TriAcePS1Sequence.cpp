@@ -292,12 +292,11 @@ struct Playback : SequencePlayback<TrackState> {
         .initialPhaseCycles = depth < 0 ? 0.5 : 0.0,
         .noteRestartInitialPhaseCycles = depth < 0 ? 0.5 : 0.0,
         .sampleImmediatelyOnNote = false,
-        .delayUpdateMode = automatic ? LfoDelayUpdateMode::FutureNotesOnly : LfoDelayUpdateMode::CurrentAndFutureNotes,
         .restartMode = restart,
         .phaseRunsAtZeroDepth = false,
     };
     if (automatic) {
-      context.delayTicks = track.vibratoDelay;
+      context.delay = LfoDelay{.ticks = track.vibratoDelay, .updateMode = LfoDelayUpdateMode::FutureNotesOnly};
       context.restartMode = LfoRestartMode::PhaseAndDelay;
     }
     return context;

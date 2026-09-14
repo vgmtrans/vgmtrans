@@ -255,18 +255,12 @@ struct MidiInstrumentSelection {
   };
 }
 
-struct SimulatedLfoDelay {
-  u32 ticks = 0;
-  std::optional<double> milliseconds;
-  bool tempoRelative = false;
-};
-
 struct SimulatedLfoState {
   double depth = 0.0;
   double frequencyHz = 0.0;
   std::optional<double> cyclesPerTick;
-  SimulatedLfoDelay delay;
-  SimulatedLfoDelay noteRestartDelay;
+  LfoDelay delay;
+  LfoDelay noteRestartDelay;
   u32 delayCounterTicks = 0;
   double delayCounterMilliseconds = 0.0;
   u64 cursorTick = 0;
@@ -884,9 +878,12 @@ void applyLfoRestart(SimulatedLfoState& lfo, u64 tick, LfoRestartMode mode,
   lfo.producedSample = false;
 }
 
-void applyLfoDelayUpdate(SimulatedLfoState& lfo, SimulatedLfoDelay delay, LfoDelayUpdateMode mode) {
+void applyLfoDelayUpdate(SimulatedLfoState& lfo, LfoDelay delay) {
+  if (delay.milliseconds) {
+    delay.milliseconds = std::max(0.0, *delay.milliseconds);
+  }
   lfo.noteRestartDelay = delay;
-  if (mode == LfoDelayUpdateMode::CurrentAndFutureNotes) {
+  if (delay.updateMode == LfoDelayUpdateMode::CurrentAndFutureNotes) {
     lfo.delay = std::move(delay);
   }
 }
@@ -927,14 +924,8 @@ void configureLfo(SimulatedLfoState& lfo, u64 tick, const ModulationPerformanceE
   if (context.panLaw != PanLaw::Unspecified) {
     lfo.panLaw = context.panLaw;
   }
-  if (context.delayTicks || context.delayMilliseconds) {
-    SimulatedLfoDelay delay{
-        .ticks = context.delayTicks.value_or(0),
-        .milliseconds =
-            context.delayMilliseconds ? std::optional{std::max(0.0, *context.delayMilliseconds)} : std::nullopt,
-        .tempoRelative = context.delayIsTempoRelative,
-    };
-    applyLfoDelayUpdate(lfo, std::move(delay), context.delayUpdateMode);
+  if (context.delay) {
+    applyLfoDelayUpdate(lfo, *context.delay);
   }
   lfo.phaseRunsAtZeroDepth = context.phaseRunsAtZeroDepth;
   lfo.delayRunsWhileInactive = context.delayRunsWhileInactive;
@@ -951,15 +942,9 @@ void restartNoteLfo(SimulatedLfoState& lfo, u64 tick,
   }
 }
 
-void setLfoDelay(SimulatedLfoState& lfo, u64 tick, u32 delayTicks, std::optional<double> delayMilliseconds,
-                 bool tempoRelative, LfoDelayUpdateMode updateMode,
+void setLfoDelay(SimulatedLfoState& lfo, u64 tick, LfoDelay delay,
                  LfoInitialPhaseFallback fallback = LfoInitialPhaseFallback::Zero) {
-  SimulatedLfoDelay delay{
-      .ticks = delayTicks,
-      .milliseconds = delayMilliseconds ? std::optional{std::max(0.0, *delayMilliseconds)} : std::nullopt,
-      .tempoRelative = tempoRelative,
-  };
-  applyLfoDelayUpdate(lfo, std::move(delay), updateMode);
+  applyLfoDelayUpdate(lfo, delay);
   if (!lfo.started) {
     applyLfoRestart(lfo, tick, LfoRestartMode::PhaseAndDelay, fallback);
   }
@@ -1460,22 +1445,6 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
           state.pitchBendContext.setSourceRangeCents(typedEvent.cents);
           refreshPitchBendRange(track, state, typedEvent.header.tick, channel,
                                 effectivePitchBendRangeCents(state, modulationConversion));
-        } else if constexpr (std::is_same_v<TypedEvent, VibratoDelayPerformanceEvent>) {
-          setLfoDelay(pitchLfo(state, kPrimaryPitchBendLayer).oscillator, typedEvent.header.tick, typedEvent.delayTicks,
-                      typedEvent.milliseconds, typedEvent.tempoRelative, typedEvent.updateMode);
-          if (modulationConversion != ModulationConversionPolicy::SequenceEventSimulation) {
-            addController(track, typedEvent.header.tick, channel, MidiController::VibratoDelay,
-                          vibratoDelayControllerValue(typedEvent, modulationProfile));
-          }
-        } else if constexpr (std::is_same_v<TypedEvent, TremoloDelayPerformanceEvent>) {
-          const auto fallback = typedEvent.milliseconds ? LfoInitialPhaseFallback::Zero
-                                                        : LfoInitialPhaseFallback::UnipolarTremoloNominalGain;
-          setLfoDelay(state.tremolo, typedEvent.header.tick, typedEvent.delayTicks, typedEvent.milliseconds,
-                      typedEvent.tempoRelative, typedEvent.updateMode, fallback);
-          if (modulationConversion != ModulationConversionPolicy::SequenceEventSimulation) {
-            addController(track, typedEvent.header.tick, channel, MidiController::TremoloDelay,
-                          tremoloDelayControllerValue(typedEvent, modulationProfile));
-          }
         } else if constexpr (std::is_same_v<TypedEvent, PortamentoPerformanceEvent>) {
           if (typedEvent.timeMilliseconds) {
             midi::appendController14(track, typedEvent.header.tick, channel, MidiController::PortamentoTime,
@@ -1495,6 +1464,23 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
         } else if constexpr (std::is_same_v<TypedEvent, ModulationPerformanceEvent>) {
           const double normalizedAmount = modulationControllerAmount(typedEvent, modulationProfile);
           const u8 value = midiNormalized7(normalizedAmount);
+          if (typedEvent.target == ModulationPerformanceTarget::VibratoDelay ||
+              typedEvent.target == ModulationPerformanceTarget::TremoloDelay) {
+            const bool vibrato = typedEvent.target == ModulationPerformanceTarget::VibratoDelay;
+            if (typedEvent.context.delay) {
+              const auto& delay = *typedEvent.context.delay;
+              auto& lfo = vibrato ? pitchLfo(state, typedEvent.pitchLayer).oscillator : state.tremolo;
+              const auto fallback = vibrato || delay.milliseconds ? LfoInitialPhaseFallback::Zero
+                                                                  : LfoInitialPhaseFallback::UnipolarTremoloNominalGain;
+              setLfoDelay(lfo, typedEvent.header.tick, delay, fallback);
+            }
+            if (modulationConversion != ModulationConversionPolicy::SequenceEventSimulation &&
+                (!vibrato || typedEvent.pitchLayer == kPrimaryPitchBendLayer)) {
+              addController(track, typedEvent.header.tick, channel,
+                            vibrato ? MidiController::VibratoDelay : MidiController::TremoloDelay, value);
+            }
+            return;
+          }
           const bool pitchTarget = typedEvent.target == ModulationPerformanceTarget::VibratoDepth ||
                                    typedEvent.target == ModulationPerformanceTarget::VibratoRate;
           if (pitchTarget && (modulationConversion == ModulationConversionPolicy::SequenceEventSimulation ||
@@ -1573,6 +1559,8 @@ void addMidiEvent(MidiTrack& track, RenderTrackState& state, const PerformanceEv
               break;
             case ModulationPerformanceTarget::PanDepth:
             case ModulationPerformanceTarget::PanRate:
+            case ModulationPerformanceTarget::VibratoDelay:
+            case ModulationPerformanceTarget::TremoloDelay:
               break;
           }
         } else if constexpr (std::is_same_v<TypedEvent, MarkerPerformanceEvent>) {

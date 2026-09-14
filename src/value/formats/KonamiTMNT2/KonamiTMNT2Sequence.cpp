@@ -479,8 +479,7 @@ struct Playback : SequencePlayback<TrackState> {
         track.version == Version::Tmnt2 ? ((packed >> 4) * 2 + 1) : ((packed >> 4) * track.baseDuration + 1);
     const LfoPerformanceContext context{
         .cyclesPerTick = enabled ? std::optional<double>{1.0 / 16.0} : std::optional<double>{0.0},
-        .delayTicks = delay,
-        .delayIsTempoRelative = true,
+        .delay = LfoDelay{.ticks = delay, .tempoRelative = true},
         .shape = LfoShape{.waveform = LfoWaveform::Triangle},
         .initialPhaseCycles = 0.0,
         .phaseRunsAtZeroDepth = false,

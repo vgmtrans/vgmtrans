@@ -400,8 +400,7 @@ struct Playback : SequencePlayback<TrackState> {
   [[nodiscard]] LfoPerformanceContext lfoContext() const {
     return LfoPerformanceContext{
         .cyclesPerTick = track.vibratoPhaseStep / 64.0,
-        .delayTicks = track.vibratoDelay,
-        .delayIsTempoRelative = true,
+        .delay = LfoDelay{.ticks = track.vibratoDelay, .tempoRelative = true},
         .shape = LfoShape{.waveform = LfoWaveform::Triangle},
         .initialPhaseCycles = 0.0,
     };

@@ -44,18 +44,15 @@ struct StitchProgramState {
             .amount = 1.0,
             .context = LfoPerformanceContext{.frequencyHz = 5.0},
         });
-        track.events.push_back(VibratoDelayPerformanceEvent{
-            .header = PerformanceEventHeader{.tick = 1},
-            .milliseconds = 100.0,
-        });
-        track.events.push_back(VibratoDelayPerformanceEvent{
-            .header = PerformanceEventHeader{.tick = 2},
-            .milliseconds = 150.0,
-        });
-        track.events.push_back(VibratoDelayPerformanceEvent{
-            .header = PerformanceEventHeader{.tick = 3},
-            .milliseconds = 200.0,
-        });
+        track.events.push_back(ModulationPerformanceEvent{.header = PerformanceEventHeader{.tick = 1},
+                                                          .target = ModulationPerformanceTarget::VibratoDelay,
+                                                          .context = {.delay = LfoDelay{.milliseconds = 100.0}}});
+        track.events.push_back(ModulationPerformanceEvent{.header = PerformanceEventHeader{.tick = 2},
+                                                          .target = ModulationPerformanceTarget::VibratoDelay,
+                                                          .context = {.delay = LfoDelay{.milliseconds = 150.0}}});
+        track.events.push_back(ModulationPerformanceEvent{.header = PerformanceEventHeader{.tick = 3},
+                                                          .target = ModulationPerformanceTarget::VibratoDelay,
+                                                          .context = {.delay = LfoDelay{.milliseconds = 200.0}}});
         track.events.push_back(TuningPerformanceEvent{
             .header = PerformanceEventHeader{.tick = 1},
             .cents = 25.0,

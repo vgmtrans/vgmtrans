@@ -90,11 +90,6 @@ template <class Convert>
                               [](double value) { return synthAmountFromSeconds(synthSecondsRangeMinimum(value)); });
 }
 
-[[nodiscard]] u8 midi7(double normalized) noexcept {
-  return static_cast<u8>(
-      std::clamp<s32>(static_cast<s32>(std::lround(std::clamp(normalized, 0.0, 1.0) * 127.0)), 0, 127));
-}
-
 [[nodiscard]] std::optional<LfoWaveform> standardWaveform(const ModulationPerformanceEvent& event) {
   return event.context.shape ? std::optional{event.context.shape->waveform} : std::nullopt;
 }
@@ -136,6 +131,13 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
         tremolo.rate.observe(*event.context.frequencyHz);
       }
       break;
+    case ModulationPerformanceTarget::VibratoDelay:
+    case ModulationPerformanceTarget::TremoloDelay:
+      if (event.context.delay && event.context.delay->milliseconds) {
+        auto& lfo = event.target == ModulationPerformanceTarget::VibratoDelay ? vibrato : tremolo;
+        lfo.delay.observe(*event.context.delay->milliseconds / 1000.0, true);
+      }
+      break;
     case ModulationPerformanceTarget::PanDepth:
       if (event.panDepth) {
         pan.maxDepth = std::max(pan.maxDepth, std::abs(*event.panDepth));
@@ -149,8 +151,8 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
   }
 }
 
-[[nodiscard]] const ModulationRange* rateRange(const ModulationPerformanceEvent& event,
-                                               const SequenceModulationProfile& profile) noexcept {
+[[nodiscard]] const ModulationRange* timingRange(const ModulationPerformanceEvent& event,
+                                                 const SequenceModulationProfile& profile) noexcept {
   switch (event.target) {
     case ModulationPerformanceTarget::VibratoRate:
       return profile.instruments.vibrato ? &profile.instruments.vibrato->rateHertz : nullptr;
@@ -158,6 +160,14 @@ void observeModulation(const ModulationPerformanceEvent& event, LfoObservation& 
       return profile.instruments.tremolo ? &profile.instruments.tremolo->rateHertz : nullptr;
     case ModulationPerformanceTarget::PanRate:
       return profile.panRateHertz ? &*profile.panRateHertz : nullptr;
+    case ModulationPerformanceTarget::VibratoDelay:
+      return profile.instruments.vibrato && profile.instruments.vibrato->delaySeconds
+                 ? &*profile.instruments.vibrato->delaySeconds
+                 : nullptr;
+    case ModulationPerformanceTarget::TremoloDelay:
+      return profile.instruments.tremolo && profile.instruments.tremolo->delaySeconds
+                 ? &*profile.instruments.tremolo->delaySeconds
+                 : nullptr;
     case ModulationPerformanceTarget::VibratoDepth:
     case ModulationPerformanceTarget::TremoloDepth:
     case ModulationPerformanceTarget::PanDepth:
@@ -177,12 +187,6 @@ SequenceModulationProfile analyzeSequenceModulation(const PerformanceSequence& s
     for (const auto& event : track.events) {
       if (const auto* modulation = std::get_if<ModulationPerformanceEvent>(&event)) {
         observeModulation(*modulation, vibrato, tremolo, pan);
-      } else if (const auto* vibratoDelay = std::get_if<VibratoDelayPerformanceEvent>(&event);
-                 vibratoDelay != nullptr && vibratoDelay->milliseconds) {
-        vibrato.delay.observe(*vibratoDelay->milliseconds / 1000.0, true);
-      } else if (const auto* tremoloDelay = std::get_if<TremoloDelayPerformanceEvent>(&event);
-                 tremoloDelay != nullptr && tremoloDelay->milliseconds) {
-        tremolo.delay.observe(*tremoloDelay->milliseconds / 1000.0, true);
       }
     }
   }
@@ -238,35 +242,25 @@ double modulationControllerAmount(const ModulationPerformanceEvent& event,
         return normalizedLinear(std::abs(*event.panDepth), profile->maxPanDepth);
       }
       break;
+    case ModulationPerformanceTarget::VibratoDelay:
+    case ModulationPerformanceTarget::TremoloDelay:
+      if (event.context.delay && event.context.delay->milliseconds) {
+        if (const auto* range = timingRange(event, *profile)) {
+          return normalizedSeconds(*event.context.delay->milliseconds / 1000.0, *range);
+        }
+      }
+      break;
     case ModulationPerformanceTarget::VibratoRate:
     case ModulationPerformanceTarget::TremoloRate:
     case ModulationPerformanceTarget::PanRate:
       if (event.context.frequencyHz) {
-        if (const auto* range = rateRange(event, *profile)) {
+        if (const auto* range = timingRange(event, *profile)) {
           return normalizedHertz(*event.context.frequencyHz, *range);
         }
       }
       break;
   }
   return std::clamp(event.amount, 0.0, 1.0);
-}
-
-u8 vibratoDelayControllerValue(const VibratoDelayPerformanceEvent& event,
-                               const SequenceModulationProfile* profile) noexcept {
-  if (profile == nullptr || !event.milliseconds || !profile->instruments.vibrato ||
-      !profile->instruments.vibrato->delaySeconds) {
-    return 0;
-  }
-  return midi7(normalizedSeconds(*event.milliseconds / 1000.0, *profile->instruments.vibrato->delaySeconds));
-}
-
-u8 tremoloDelayControllerValue(const TremoloDelayPerformanceEvent& event,
-                               const SequenceModulationProfile* profile) noexcept {
-  if (profile == nullptr || !event.milliseconds || !profile->instruments.tremolo ||
-      !profile->instruments.tremolo->delaySeconds) {
-    return 0;
-  }
-  return midi7(normalizedSeconds(*event.milliseconds / 1000.0, *profile->instruments.tremolo->delaySeconds));
 }
 
 void applySequenceModulation(SoundBankAsset& soundBank, const SequenceModulationProfile& profile) {

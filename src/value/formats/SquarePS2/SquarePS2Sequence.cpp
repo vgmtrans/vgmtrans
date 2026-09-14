@@ -292,8 +292,7 @@ struct Playback : SequencePlayback<TrackState> {
     const double initialPhase = inverted && (lfo.wave & 7) != 2 && (lfo.wave & 7) != 4 ? 0.5 : 0.0;
     return LfoPerformanceContext{
         .cyclesPerTick = lfoCyclesPerTick(lfo.rate),
-        .delayTicks = lfo.delay,
-        .delayIsTempoRelative = true,
+        .delay = LfoDelay{.ticks = lfo.delay, .tempoRelative = true},
         .shape = lfoShape(lfo.wave),
         .initialPhaseCycles = initialPhase,
         .noteRestartInitialPhaseCycles = initialPhase,
