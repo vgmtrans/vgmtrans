@@ -324,8 +324,8 @@ struct Playback : SequencePlayback<TrackState> {
     track.pitchIsDelta = false;
     track.pitch.reset(static_cast<s32>(track.pitchScale));
     if (slide.length != 0) {
-      static_cast<void>(track.pitch.begin(
-          SequenceFixedPointMotion<s32>::toRawTarget(static_cast<s32>(pitchRegister(target)), slide.length)));
+      static_cast<void>(
+          track.pitch.begin(track.pitch.toRawTarget(static_cast<s32>(pitchRegister(target)), slide.length)));
     }
     vibratoOff();
   }
@@ -535,7 +535,7 @@ struct Playback : SequencePlayback<TrackState> {
 
   void volumeFade(u8 length, u8 target) {
     if (length != 0) {
-      static_cast<void>(track.volume.begin(SequenceFixedPointMotion<s32>::toRawTarget(target, length)));
+      static_cast<void>(track.volume.begin(track.volume.toRawTarget(target, length)));
     }
   }
 
@@ -546,7 +546,7 @@ struct Playback : SequencePlayback<TrackState> {
 
   void masterFade(u8 length, u8 target) {
     if (length != 0) {
-      static_cast<void>(program.master.begin(SequenceFixedPointMotion<s32>::toRawTarget(target, length)));
+      static_cast<void>(program.master.begin(program.master.toRawTarget(target, length)));
     }
   }
 
@@ -558,8 +558,7 @@ struct Playback : SequencePlayback<TrackState> {
   void tempoFade(u8 length, u8 target) {
     // E8 interpolates timer divisors, so interpolating BPM would change the fade.
     if (length != 0) {
-      static_cast<void>(
-          program.tempo.begin(SequenceFixedPointMotion<s32>::toRawTarget(tempoDivisor(target, false), length)));
+      static_cast<void>(program.tempo.begin(program.tempo.toRawTarget(tempoDivisor(target, false), length)));
     }
   }
 

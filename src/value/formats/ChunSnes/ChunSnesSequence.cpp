@@ -436,7 +436,7 @@ struct Playback : SequencePlayback<TrackState> {
     if (duration != 0) {
       track.volume.begin(out.fade(PerformanceAutomationTarget::Level,
                                   math::channelGain(track.channelMaster, target, track.alternateVolume), duration),
-                         SequenceFixedPointMotion<s32>::toRawTarget(target, duration));
+                         track.volume.toRawTarget(target, duration));
     }
   }
 

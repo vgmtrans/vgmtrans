@@ -1616,7 +1616,7 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
                                [](Playback& playback, u16 ticks, u8 volume) {
                                  playback.track.volume.begin(
                                      playback.out.fade(PerformanceAutomationTarget::Level, channelLevel(volume), ticks),
-                                     SequenceFixedPointMotion<s32>::toRawTarget(volume, ticks));
+                                     playback.track.volume.toRawTarget(volume, ticks));
                                },
                                length, target);
     }
@@ -1636,7 +1636,7 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
                          const double rightGain = rightGainFromPan(pan);
                          playback.track.pan.begin(
                              playback.out.fade(PerformanceAutomationTarget::Pan, (rightGain * 2.0) - 1.0, ticks),
-                             SequenceFixedPointMotion<s32>::toRawTarget(pan, ticks));
+                             playback.track.pan.toRawTarget(pan, ticks));
                        },
                        length, target);
     }
@@ -1919,7 +1919,7 @@ using AkaoSnesCursor = CompilerCursor<Playback>;
                                                static_cast<double>(tempoMicrosecondsPerQuarter(
                                                    playback.context.version, playback.context.minorVersion, tempo)),
                                                ticks),
-                             SequenceFixedPointMotion<s32>::toRawTarget(tempo, ticks));
+                             playback.track.tempoState.toRawTarget(tempo, ticks));
                        },
                        length, target);
     }

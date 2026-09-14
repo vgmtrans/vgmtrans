@@ -2416,6 +2416,30 @@ assets, empty banks, missing retained data, ambiguous sample bodies, Akao
 sample-set coverage, and SonyPS1's existing sequence-offset ranking. The
 results are identical. Temporary capture instrumentation was removed.
 
+## Use one motion plan and derive live motion state
+
+Fixed-point fades now use `SequenceMotionPlan` directly. The fixed-point
+state's `toRawTarget` factories convert targets to accumulator units and
+preserve driver-supplied fixed steps. Seven format families obtain those
+plans from their motion state, removing the separate `SequenceFixedPointMotion`
+type and its repeated fields and translation. Retargeting still rounds the
+current source value before calculating the next step.
+
+Live linear motion no longer retains its construction mode. Remaining ticks
+identify timed motion; its step is cleared on completion, so zero remaining
+ticks with a nonzero step identifies target-driven motion. Delays, constant
+values, explicit timed steps, and exact final-target snaps retain their behavior.
+The change removes 27 production lines and adds seven lines to the existing
+fixed-point regression test.
+
+All 20 CTest targets pass, and all 304 serialized MIDI fixture captures match.
+An ignored ASan/UBSan comparison checks 10,672,560 transitions against the
+previous header, including signed/unsigned integers, floating-point values,
+five fractional scales, three rounding modes, delays, supplied steps,
+retargeting, completion, clearing, and non-finite floating-point values.
+All returned statuses, values, change flags, raw callbacks, and active states
+match. Temporary MIDI capture instrumentation was removed.
+
 ## Further investigation
 
 - Prioritize structural simplification of format authoring: shared decoding

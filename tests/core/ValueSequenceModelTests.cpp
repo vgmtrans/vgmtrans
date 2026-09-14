@@ -298,15 +298,22 @@ void fixedPointMotionRetargetsFromTheRoundedSourceValue() {
                               SequenceFixedPointRounding::Nearest}) {
     SequenceFixedPointAutomation<> motion;
     motion.setRounding(rounding);
-    motion.begin(SequenceFixedPointMotion<>::toRawTarget(-5, 2));
+    motion.begin(motion.toRawTarget(-5, 2));
     expect(motion.tick().current == -640, "fixed-point motion must retain fractional steps internally");
     const s32 raw = rounding == SequenceFixedPointRounding::TowardZero ? -2 : -3;
     expect(motion.currentRaw() == raw, "negative raw values must obey the driver's selected rounding policy");
-    motion.begin(SequenceFixedPointMotion<>::toRawTarget(0, 2));
+    motion.begin(motion.toRawTarget(0, 2));
     expect(motion.currentFixed() == raw * 256 && motion.tick().current == raw * 128,
            "retargeting must discard the old fractional accumulator before computing the next step");
     expect(motion.tick().status == SequenceMotionStatus::Finished && motion.currentRaw() == 0,
            "a retargeted fixed-point fade must still finish on its declared target tick");
+
+    motion.begin(motion.toRawTargetByFixedStep(-1, -96, 1));
+    expect(motion.tick().status == SequenceMotionStatus::Delayed && motion.tick().current == -96 &&
+               motion.tick().current == -192,
+           "a raw target must retain the driver's fixed-point step and delay without rescaling them");
+    expect(motion.tick().status == SequenceMotionStatus::Finished && motion.currentFixed() == -256,
+           "fixed-step motion must stop at the scaled raw target");
   }
 }
 

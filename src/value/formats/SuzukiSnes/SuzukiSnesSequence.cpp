@@ -496,7 +496,7 @@ struct Playback : SequencePlayback<TrackState> {
       return;
     }
     track.volume.begin(out.fade(PerformanceAutomationTarget::Level, math::levelGain(target), length),
-                       SequenceFixedPointMotion<s32>::toRawTarget(target, length));
+                       track.volume.toRawTarget(target, length));
   }
 
   void emitPan(PerformanceEmitter output, u8 value) const {
@@ -515,7 +515,7 @@ struct Playback : SequencePlayback<TrackState> {
       return;
     }
     track.pan.begin(out.fade(PerformanceAutomationTarget::Pan, math::panPosition(target), length),
-                    SequenceFixedPointMotion<s32>::toRawTarget(target, length));
+                    track.pan.toRawTarget(target, length));
   }
 
   void vibrato(u8 period, s8 step, u8 delay) {
